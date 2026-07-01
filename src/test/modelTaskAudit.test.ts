@@ -32,6 +32,7 @@ test("buildModelTaskAuditDashboard", async (t) => {
         inputTokens: 1000,
         outputTokens: 2400,
         costUsd: 0.012,
+        outputText: "正文内容",
         errorMessage: null,
         createdAt: "2026-01-01T00:00:00.000Z",
         modelProvider: { providerId: "mock", displayName: "Mock" },
@@ -45,6 +46,7 @@ test("buildModelTaskAuditDashboard", async (t) => {
         inputTokens: 800,
         outputTokens: 0,
         costUsd: 0.003,
+        outputText: null,
         errorMessage: "API key missing",
         createdAt: "2026-01-02T00:00:00.000Z",
         modelProvider: { providerId: "deepseek", displayName: "DeepSeek" },
@@ -58,6 +60,7 @@ test("buildModelTaskAuditDashboard", async (t) => {
         inputTokens: null,
         outputTokens: null,
         costUsd: null,
+        outputText: JSON.stringify({ qualityGate: { score: 82 } }),
         errorMessage: null,
         createdAt: "2026-01-03T00:00:00.000Z",
         modelProvider: { providerId: "mock", displayName: "Mock" },
@@ -72,6 +75,7 @@ test("buildModelTaskAuditDashboard", async (t) => {
     assert.equal(dashboard.summary.knownCostUsd, 0.015);
     assert.equal(dashboard.summary.missingUsageTasks, 1);
     assert.equal(dashboard.providerReadiness.unconfiguredEnabledProviders, 1);
+    assert.ok(dashboard.modelEffectRows.some((row) => row.averageQualityScore === 82));
     assert.equal(dashboard.recentFailures[0].errorMessage, "API key missing");
     assert.ok(dashboard.riskFlags.some((flag) => flag.includes("失败率")));
     assert.ok(dashboard.nextActions.some((action) => action.includes("API Key")));
@@ -87,6 +91,7 @@ test("buildModelTaskAuditDashboard", async (t) => {
         inputTokens: 1000,
         outputTokens: 2600,
         costUsd: 0.012,
+        outputText: "正文内容",
         errorMessage: null,
         createdAt: "2026-01-01T00:00:00.000Z",
         modelProvider: { providerId: "mock", displayName: "Mock" },
@@ -100,10 +105,25 @@ test("buildModelTaskAuditDashboard", async (t) => {
         inputTokens: 1200,
         outputTokens: 900,
         costUsd: 0.006,
+        outputText: JSON.stringify({ score: 90, shouldSecondPass: false, issues: [] }),
         errorMessage: null,
         createdAt: "2026-01-02T00:00:00.000Z",
         modelProvider: { providerId: "mock", displayName: "Mock" },
         chapter: { title: "第一章" },
+      },
+      {
+        id: "task-3",
+        taskType: "chapter_review",
+        model: "mock-novel",
+        status: "succeeded",
+        inputTokens: 1100,
+        outputTokens: 800,
+        costUsd: 0.005,
+        outputText: JSON.stringify({ score: 86, shouldSecondPass: false, issues: [] }),
+        errorMessage: null,
+        createdAt: "2026-01-03T00:00:00.000Z",
+        modelProvider: { providerId: "mock", displayName: "Mock" },
+        chapter: { title: "第二章" },
       },
     ], [providers[0]]);
 
@@ -111,6 +131,10 @@ test("buildModelTaskAuditDashboard", async (t) => {
     assert.equal(dashboard.score, 100);
     assert.equal(dashboard.providerRows[0].successRatePercent, 100);
     assert.equal(dashboard.taskTypeRows.length, 2);
+    const reviewEffect = dashboard.modelEffectRows.find((row) => row.taskType === "chapter_review");
+    assert.equal(reviewEffect?.recommendation, "prefer");
+    assert.equal(reviewEffect?.averageQualityScore, 88);
+    assert.equal(reviewEffect?.averageCostPerSucceededTaskUsd, 0.0055);
     assert.equal(dashboard.recentFailures.length, 0);
   });
 });

@@ -40,6 +40,24 @@ interface RecentFailure {
   createdAt: string;
 }
 
+interface ModelEffectComparisonRow {
+  id: string;
+  taskType: string;
+  taskLabel: string;
+  providerName: string;
+  providerId: string;
+  model: string;
+  totalTasks: number;
+  succeededTasks: number;
+  failedTasks: number;
+  successRatePercent: number;
+  averageQualityScore: number;
+  averageTotalTokens: number;
+  averageCostPerSucceededTaskUsd: number;
+  recommendation: "prefer" | "watch" | "avoid" | "insufficient";
+  reason: string;
+}
+
 interface ModelTaskAuditDashboard {
   status: "healthy" | "watch" | "waste";
   score: number;
@@ -66,6 +84,7 @@ interface ModelTaskAuditDashboard {
   };
   providerRows: ProviderAuditRow[];
   taskTypeRows: TaskTypeAuditRow[];
+  modelEffectRows: ModelEffectComparisonRow[];
   recentFailures: RecentFailure[];
   riskFlags: string[];
   nextActions: string[];
@@ -83,6 +102,13 @@ function usd(value: number) {
 
 function compactNumber(value: number) {
   return new Intl.NumberFormat("zh-CN").format(value);
+}
+
+function recommendationLabel(value: ModelEffectComparisonRow["recommendation"]) {
+  if (value === "prefer") return "优先";
+  if (value === "avoid") return "暂停";
+  if (value === "insufficient") return "补样本";
+  return "观察";
 }
 
 export function ModelTaskAuditPanel({ projectId }: { projectId: string }) {
@@ -199,6 +225,31 @@ export function ModelTaskAuditPanel({ projectId }: { projectId: string }) {
                 ))}
                 {dashboard.providerRows.length === 0 ? <p className="text-sm text-slate-600">还没有模型调用记录。</p> : null}
               </div>
+            </div>
+          </div>
+
+          <div className="rounded-md border border-slate-200 p-3">
+            <div className="font-medium text-slate-950">任务模型对比</div>
+            <div className="mt-3 grid gap-2 lg:grid-cols-2">
+              {dashboard.modelEffectRows.slice(0, 6).map((row) => (
+                <div className="rounded-md bg-slate-50 p-3 text-sm" key={row.id}>
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <div className="font-medium text-slate-950">{row.taskLabel}</div>
+                      <div className="mt-1 text-xs text-slate-500">{row.providerName} · {row.model}</div>
+                    </div>
+                    <div className="text-xs text-slate-500">{recommendationLabel(row.recommendation)}</div>
+                  </div>
+                  <div className="mt-2 grid grid-cols-2 gap-2 text-slate-600 sm:grid-cols-4">
+                    <div>成功 {row.successRatePercent}%</div>
+                    <div>质量 {row.averageQualityScore || "缺"}</div>
+                    <div>{usd(row.averageCostPerSucceededTaskUsd)}/次</div>
+                    <div>{compactNumber(row.averageTotalTokens)} Token</div>
+                  </div>
+                  <p className="mt-2 leading-6 text-slate-600">{row.reason}</p>
+                </div>
+              ))}
+              {dashboard.modelEffectRows.length === 0 ? <p className="text-sm text-slate-600">还没有足够的模型调用样本。</p> : null}
             </div>
           </div>
 

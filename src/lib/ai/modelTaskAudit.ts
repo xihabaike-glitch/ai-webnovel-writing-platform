@@ -6,6 +6,7 @@ export interface ModelAuditTask {
   inputTokens: number | null;
   outputTokens: number | null;
   costUsd: number | null;
+  outputText?: string | null;
   errorMessage: string | null;
   createdAt: Date | string;
   modelProvider?: {
@@ -64,6 +65,24 @@ export interface RecentFailure {
   createdAt: string;
 }
 
+export interface ModelEffectComparisonRow {
+  id: string;
+  taskType: string;
+  taskLabel: string;
+  providerName: string;
+  providerId: string;
+  model: string;
+  totalTasks: number;
+  succeededTasks: number;
+  failedTasks: number;
+  successRatePercent: number;
+  averageQualityScore: number;
+  averageTotalTokens: number;
+  averageCostPerSucceededTaskUsd: number;
+  recommendation: "prefer" | "watch" | "avoid" | "insufficient";
+  reason: string;
+}
+
 export interface ModelTaskAuditDashboard {
   status: "healthy" | "watch" | "waste";
   score: number;
@@ -90,6 +109,7 @@ export interface ModelTaskAuditDashboard {
   };
   providerRows: ProviderAuditRow[];
   taskTypeRows: TaskTypeAuditRow[];
+  modelEffectRows: ModelEffectComparisonRow[];
   recentFailures: RecentFailure[];
   riskFlags: string[];
   nextActions: string[];
@@ -134,12 +154,119 @@ function dateIso(value: Date | string) {
   return new Date(value).toISOString();
 }
 
+function parseJsonObject(value: string | null | undefined) {
+  if (!value) return null;
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+      ? parsed as Record<string, unknown>
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+function qualityScore(task: ModelAuditTask) {
+  const output = parseJsonObject(task.outputText);
+  if (!output) return null;
+  if (typeof output.score === "number") return output.score;
+  const qualityGate = output.qualityGate;
+  if (qualityGate && typeof qualityGate === "object" && !Array.isArray(qualityGate)) {
+    const score = (qualityGate as Record<string, unknown>).score;
+    if (typeof score === "number") return score;
+  }
+  return null;
+}
+
 function providerKey(task: ModelAuditTask) {
   return [
     task.modelProvider?.providerId ?? "unknown",
     task.modelProvider?.displayName ?? "未知模型",
     task.model,
   ].join("::");
+}
+
+function recommendationFor(input: {
+  totalTasks: number;
+  successRatePercent: number;
+  averageQualityScore: number;
+  averageCostPerSucceededTaskUsd: number;
+  missingQualityScores: number;
+}): Pick<ModelEffectComparisonRow, "recommendation" | "reason"> {
+  if (input.totalTasks < 2) {
+    return { recommendation: "insufficient", reason: "样本不足，至少再跑一次同类任务。" };
+  }
+  if (input.successRatePercent < 60) {
+    return { recommendation: "avoid", reason: "成功率偏低，不适合继续扩大调用。" };
+  }
+  if (input.averageQualityScore > 0 && input.averageQualityScore < 70) {
+    return { recommendation: "avoid", reason: "平均质量分偏低，容易制造返工。" };
+  }
+  if (input.successRatePercent >= 85 && (input.averageQualityScore === 0 || input.averageQualityScore >= 80)) {
+    const qualityNote = input.missingQualityScores > 0 ? "但部分任务缺少质量分。" : "质量分和成功率都稳。";
+    return { recommendation: "prefer", reason: qualityNote };
+  }
+  return { recommendation: "watch", reason: "能用，但还需要继续观察质量、失败率或成本。" };
+}
+
+function buildModelEffectRows(tasks: ModelAuditTask[]): ModelEffectComparisonRow[] {
+  const groups = new Map<string, ModelAuditTask[]>();
+  for (const task of tasks) {
+    const key = [task.taskType, providerKey(task)].join("::task-provider::");
+    groups.set(key, [...(groups.get(key) ?? []), task]);
+  }
+
+  return [...groups.entries()]
+    .map(([key, items]) => {
+      const [taskType, provider] = key.split("::task-provider::");
+      const [providerId, providerName, model] = provider.split("::");
+      const succeeded = items.filter((task) => task.status === "succeeded");
+      const failed = items.filter((task) => task.status === "failed").length;
+      const scored = items
+        .map(qualityScore)
+        .filter((score): score is number => typeof score === "number");
+      const averageQualityScore = scored.length > 0
+        ? Math.round(scored.reduce((sum, score) => sum + score, 0) / scored.length)
+        : 0;
+      const averageTotalTokens = items.length > 0
+        ? Math.round(items.reduce((sum, task) => sum + tokens(task), 0) / items.length)
+        : 0;
+      const knownCost = items.reduce((sum, task) => sum + (task.costUsd ?? 0), 0);
+      const averageCostPerSucceededTaskUsd = succeeded.length > 0 ? money(knownCost / succeeded.length) : 0;
+      const successRatePercent = successRate(succeeded.length, items.length);
+      const recommendation = recommendationFor({
+        totalTasks: items.length,
+        successRatePercent,
+        averageQualityScore,
+        averageCostPerSucceededTaskUsd,
+        missingQualityScores: items.length - scored.length,
+      });
+
+      return {
+        id: key,
+        taskType,
+        taskLabel: labelFor(taskType),
+        providerName,
+        providerId,
+        model,
+        totalTasks: items.length,
+        succeededTasks: succeeded.length,
+        failedTasks: failed,
+        successRatePercent,
+        averageQualityScore,
+        averageTotalTokens,
+        averageCostPerSucceededTaskUsd,
+        ...recommendation,
+      };
+    })
+    .sort((left, right) => {
+      const rank = { prefer: 0, watch: 1, insufficient: 2, avoid: 3 };
+      return left.taskLabel.localeCompare(right.taskLabel)
+        || rank[left.recommendation] - rank[right.recommendation]
+        || right.successRatePercent - left.successRatePercent
+        || right.averageQualityScore - left.averageQualityScore
+        || left.averageCostPerSucceededTaskUsd - right.averageCostPerSucceededTaskUsd;
+    });
 }
 
 function buildProviderRows(tasks: ModelAuditTask[]): ProviderAuditRow[] {
@@ -264,6 +391,7 @@ function buildNextActions(
   summary: ModelTaskAuditDashboard["summary"],
   providerRows: ProviderAuditRow[],
   taskTypeRows: TaskTypeAuditRow[],
+  modelEffectRows: ModelEffectComparisonRow[],
   readiness: ModelTaskAuditDashboard["providerReadiness"],
 ) {
   const actions: string[] = [];
@@ -271,9 +399,13 @@ function buildNextActions(
     .filter((row) => row.totalTasks >= 2)
     .sort((left, right) => left.successRatePercent - right.successRatePercent || right.failedTasks - left.failedTasks)[0];
   const expensiveTaskType = taskTypeRows[0];
+  const avoidedModel = modelEffectRows.find((row) => row.recommendation === "avoid");
+  const preferredModel = modelEffectRows.find((row) => row.recommendation === "prefer");
 
   if (readiness.unconfiguredEnabledProviders > 0) actions.push("先补齐启用模型的 API Key，避免任务随机失败。");
   if (worstProvider && worstProvider.successRatePercent < 80) actions.push(`优先检查「${worstProvider.providerName} / ${worstProvider.model}」，成功率只有 ${worstProvider.successRatePercent}%。`);
+  if (avoidedModel) actions.push(`暂停扩大「${avoidedModel.taskLabel} / ${avoidedModel.providerName}」调用：${avoidedModel.reason}`);
+  if (preferredModel) actions.push(`优先把「${preferredModel.taskLabel}」交给「${preferredModel.providerName} / ${preferredModel.model}」，当前表现最好。`);
   if (summary.missingUsageTasks > 0) actions.push("把所有模型适配器的 Token 和成本回写补齐，否则预算看板会失真。");
   if (expensiveTaskType && expensiveTaskType.knownCostUsd > 0) actions.push(`先优化「${expensiveTaskType.label}」提示词和上下文裁剪，它当前成本最高。`);
   if (summary.totalTasks === 0) actions.push("先用 Mock 或真实模型跑一章初稿、审稿、二改，建立第一组审计样本。");
@@ -313,6 +445,7 @@ export function buildModelTaskAuditDashboard(
   };
   const providerRows = buildProviderRows(tasks);
   const taskTypeRows = buildTaskTypeRows(tasks);
+  const modelEffectRows = buildModelEffectRows(tasks);
   const score = auditScore(summary, providerReadiness);
   const status = statusFor(score);
 
@@ -324,8 +457,9 @@ export function buildModelTaskAuditDashboard(
     providerReadiness,
     providerRows,
     taskTypeRows,
+    modelEffectRows,
     recentFailures: buildRecentFailures(tasks),
     riskFlags: buildRiskFlags(summary, providerReadiness),
-    nextActions: buildNextActions(summary, providerRows, taskTypeRows, providerReadiness),
+    nextActions: buildNextActions(summary, providerRows, taskTypeRows, modelEffectRows, providerReadiness),
   };
 }

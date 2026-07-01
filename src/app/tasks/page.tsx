@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { AppShell } from "@/components/app-shell/AppShell";
 import { prisma } from "@/lib/db/prisma";
+import { buildBatchExecutionSafety } from "@/lib/projects/batchExecutionSafety";
 import { buildTaskQueueCenter, type QueueItem } from "@/lib/projects/taskQueueCenter";
 
 function categoryClass(category: QueueItem["category"]) {
@@ -20,6 +21,7 @@ export default async function TasksPage() {
     orderBy: { updatedAt: "desc" },
   });
   const queue = buildTaskQueueCenter(projects);
+  const safety = buildBatchExecutionSafety(queue.items, projects);
 
   return (
     <AppShell>
@@ -59,6 +61,47 @@ export default async function TasksPage() {
         <div className="rounded-md border border-slate-200 bg-white p-3">
           <div className="text-xs text-slate-500">卡住</div>
           <div className="mt-1 text-2xl font-semibold">{queue.overview.blockedCards}</div>
+        </div>
+      </section>
+
+      <section className="mb-6 rounded-md border border-slate-200 bg-white p-4">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <h2 className="font-medium">批量执行安全阀</h2>
+            <p className="mt-1 text-sm text-slate-600">先看本批数量、混跑风险、并发占用和预算估算，再决定是否进入项目内执行。</p>
+          </div>
+          <div className="rounded-md bg-slate-50 px-3 py-2 text-sm font-medium text-slate-700">
+            {safety.canRunRecommendedBatch ? "建议批次可执行" : "建议先处理阻塞"}
+          </div>
+        </div>
+        <div className="mt-4 grid gap-3 md:grid-cols-4">
+          <div className="rounded-md bg-slate-50 p-3">
+            <div className="text-xs text-slate-500">推荐本批</div>
+            <div className="mt-1 text-2xl font-semibold">{safety.recommendedBatchSize}/{safety.maxBatchSize}</div>
+          </div>
+          <div className="rounded-md bg-slate-50 p-3">
+            <div className="text-xs text-slate-500">预计 Token</div>
+            <div className="mt-1 text-2xl font-semibold">{safety.estimatedTokens}</div>
+          </div>
+          <div className="rounded-md bg-slate-50 p-3">
+            <div className="text-xs text-slate-500">预计成本</div>
+            <div className="mt-1 text-2xl font-semibold">${safety.estimatedCostUsd.toFixed(4)}</div>
+          </div>
+          <div className="rounded-md bg-slate-50 p-3">
+            <div className="text-xs text-slate-500">预检项</div>
+            <div className="mt-1 text-2xl font-semibold">{safety.items.filter((item) => item.status === "pass").length}/{safety.items.length}</div>
+          </div>
+        </div>
+        <div className="mt-4 grid gap-2 lg:grid-cols-2">
+          {safety.items.map((item) => (
+            <div className="rounded-md border border-slate-200 p-3 text-sm" key={item.id}>
+              <div className="flex items-center justify-between gap-2">
+                <div className="font-medium text-slate-950">{item.label}</div>
+                <div className="text-xs text-slate-500">{item.status === "pass" ? "通过" : item.status === "warn" ? "提醒" : "阻止"}</div>
+              </div>
+              <p className="mt-1 leading-6 text-slate-600">{item.detail}</p>
+            </div>
+          ))}
         </div>
       </section>
 

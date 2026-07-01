@@ -9,6 +9,7 @@ import { ChapterProductionPanel } from "@/components/projects/ChapterProductionP
 import { CharacterArcPanel } from "@/components/projects/CharacterArcPanel";
 import { ExportMarkdownButton } from "@/components/projects/ExportMarkdownButton";
 import { FirstThreeRewritePanel } from "@/components/projects/FirstThreeRewritePanel";
+import { ModelTaskAuditPanel } from "@/components/projects/ModelTaskAuditPanel";
 import { PlatformExportCenterPanel } from "@/components/projects/PlatformExportCenterPanel";
 import { ProjectControlDashboardPanel } from "@/components/projects/ProjectControlDashboardPanel";
 import { RetentionDiagnosticPanel } from "@/components/projects/RetentionDiagnosticPanel";
@@ -252,6 +253,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ projec
             <ExportMarkdownButton projectId={project.id} title={project.title} />
           </div>
         </div>
+        <ModelTaskAuditPanel projectId={project.id} />
         <section className="grid gap-4 lg:grid-cols-2">
           <div className="rounded-md border border-slate-200 bg-white p-4">
             <div className="mb-3 flex items-center justify-between">

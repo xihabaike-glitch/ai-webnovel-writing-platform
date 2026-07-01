@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { AppShell } from "@/components/app-shell/AppShell";
+import { RetryTaskButton } from "@/components/tasks/RetryTaskButton";
 import { buildTaskRunConsole, type TaskRunLog } from "@/lib/ai/taskRunConsole";
 import { prisma } from "@/lib/db/prisma";
 import { buildBatchExecutionSafety } from "@/lib/projects/batchExecutionSafety";
@@ -191,9 +192,13 @@ export default async function TasksPage() {
                 <div className="mt-2 text-slate-600">{candidate.projectTitle} · {candidate.chapterTitle}</div>
                 <p className="mt-2 leading-6 text-slate-600">{candidate.errorMessage}</p>
                 <p className="mt-1 leading-6 text-slate-500">{candidate.retryReason}</p>
-                <Link className="mt-3 inline-flex rounded-md border border-slate-200 px-3 py-2 text-sm font-medium hover:bg-white" href={candidate.href}>
-                  {candidate.actionLabel}
-                </Link>
+                {candidate.directRetrySupported ? (
+                  <RetryTaskButton taskId={candidate.id} />
+                ) : (
+                  <Link className="mt-3 inline-flex rounded-md border border-slate-200 px-3 py-2 text-sm font-medium hover:bg-white" href={candidate.href}>
+                    {candidate.actionLabel}
+                  </Link>
+                )}
               </div>
             ))}
             {runConsole.retryCandidates.length === 0 ? <p className="text-sm text-slate-600">暂无失败任务需要重试。</p> : null}

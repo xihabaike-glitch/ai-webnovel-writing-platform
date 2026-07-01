@@ -13,6 +13,7 @@ const baseTask: TaskRunInput = {
   outputTokens: 1800,
   costUsd: 0.01,
   errorMessage: null,
+  inputSnapshot: "{}",
   createdAt: "2026-01-01T00:00:00.000Z",
   updatedAt: "2026-01-01T00:00:05.000Z",
   project: { title: "夜雨系统" },
@@ -52,6 +53,8 @@ test("buildTaskRunConsole", async (t) => {
     assert.equal(console.summary.staleRunningTasks, 1);
     assert.equal(console.summary.totalTokens, 8400);
     assert.equal(console.retryCandidates[0].retryable, true);
+    assert.equal(console.retryCandidates[0].directRetrySupported, true);
+    assert.equal(console.retryCandidates[0].actionLabel, "一键重试");
     assert.equal(console.retryCandidates[0].href, "/projects/project-1/chapters/chapter-1");
     assert.equal(console.recentLogs[0].id, "task-2");
     assert.ok(console.nextActions.some((action) => action.includes("疑似卡死")));

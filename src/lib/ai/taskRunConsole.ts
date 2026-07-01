@@ -1,3 +1,5 @@
+import { buildTaskRetryPlan } from "./taskRetry.ts";
+
 export interface TaskRunInput {
   id: string;
   projectId: string;
@@ -9,6 +11,7 @@ export interface TaskRunInput {
   outputTokens: number | null;
   costUsd: number | null;
   errorMessage: string | null;
+  inputSnapshot: string;
   createdAt: Date | string;
   updatedAt: Date | string;
   project?: {
@@ -56,6 +59,7 @@ export interface TaskRetryCandidate {
   actionLabel: string;
   href: string;
   errorMessage: string;
+  directRetrySupported: boolean;
 }
 
 export interface TaskRunConsole {
@@ -200,20 +204,26 @@ function buildRetryCandidates(tasks: TaskRunInput[]): TaskRetryCandidate[] {
     .filter((task) => task.status === "failed")
     .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime())
     .slice(0, 8)
-    .map((task) => ({
-      id: task.id,
-      projectId: task.projectId,
-      projectTitle: task.project?.title ?? "未知项目",
-      chapterTitle: task.chapter?.title ?? "项目任务",
-      taskLabel: labelFor(task.taskType),
-      providerName: task.modelProvider?.displayName ?? "未知模型",
-      model: task.model,
-      retryable: isRetryableError(task.errorMessage),
-      retryReason: retryReason(task),
-      actionLabel: actionLabel(task),
-      href: chapterHref(task),
-      errorMessage: compact(task.errorMessage),
-    }));
+    .map((task) => {
+      const retryPlan = buildTaskRetryPlan(task);
+      const retryable = isRetryableError(task.errorMessage);
+      const directRetrySupported = retryPlan.supported && retryable;
+      return {
+        id: task.id,
+        projectId: task.projectId,
+        projectTitle: task.project?.title ?? "未知项目",
+        chapterTitle: task.chapter?.title ?? "项目任务",
+        taskLabel: labelFor(task.taskType),
+        providerName: task.modelProvider?.displayName ?? "未知模型",
+        model: task.model,
+        retryable,
+        retryReason: directRetrySupported ? retryPlan.reason : retryReason(task),
+        actionLabel: directRetrySupported ? retryPlan.actionLabel : actionLabel(task),
+        href: chapterHref(task),
+        errorMessage: compact(task.errorMessage),
+        directRetrySupported,
+      };
+    });
 }
 
 function nextActions(console: Pick<TaskRunConsole, "summary" | "retryCandidates">) {

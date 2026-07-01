@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
+import { buildProjectDefaults } from "@/lib/projects/projectDefaults";
+import type { LengthType, PlatformId } from "@/lib/platforms/platformProfiles";
 import { createProjectSchema } from "@/lib/validators/project";
 
 export async function GET() {
@@ -12,7 +14,16 @@ export async function GET() {
 export async function POST(request: Request) {
   const body = await request.json();
   const input = createProjectSchema.parse(body);
-  const project = await prisma.project.create({ data: input });
+  const defaults = buildProjectDefaults({
+    platformId: input.targetPlatform as PlatformId,
+    lengthType: input.targetLengthType as LengthType | undefined,
+  });
+  const project = await prisma.project.create({
+    data: {
+      ...input,
+      targetLengthType: input.targetLengthType ?? defaults.targetLengthType,
+      targetWordCount: input.targetWordCount ?? defaults.targetWordCount,
+    },
+  });
   return NextResponse.json({ project }, { status: 201 });
 }
-

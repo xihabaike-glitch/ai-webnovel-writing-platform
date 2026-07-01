@@ -1,18 +1,13 @@
 import Link from "next/link";
 import { AppShell } from "@/components/app-shell/AppShell";
 import { ProjectForm } from "@/components/projects/ProjectForm";
+import { prisma } from "@/lib/db/prisma";
 
-const demoProjects = [
-  {
-    id: "demo",
-    title: "示例作品：夜雨系统",
-    targetPlatform: "fanqie",
-    currentWordCount: 0,
-    targetWordCount: 300000,
-  },
-];
+export default async function ProjectsPage() {
+  const projects = await prisma.project.findMany({
+    orderBy: { updatedAt: "desc" },
+  });
 
-export default function ProjectsPage() {
   return (
     <AppShell>
       <div className="mb-6 flex items-center justify-between">
@@ -25,7 +20,7 @@ export default function ProjectsPage() {
         <ProjectForm />
       </div>
       <div className="grid gap-3">
-        {demoProjects.map((project) => (
+        {projects.map((project) => (
           <Link
             key={project.id}
             href={`/projects/${project.id}`}
@@ -37,6 +32,11 @@ export default function ProjectsPage() {
             </div>
           </Link>
         ))}
+        {projects.length === 0 ? (
+          <p className="rounded-md border border-dashed border-slate-300 p-4 text-sm text-slate-600">
+            还没有作品。先用上面的表单创建一个。
+          </p>
+        ) : null}
       </div>
     </AppShell>
   );

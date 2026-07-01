@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { platformProfiles, type PlatformId } from "@/lib/platforms/platformProfiles";
 
@@ -11,11 +12,45 @@ const lengthOptions = [
 ];
 
 export function ProjectForm() {
+  const router = useRouter();
   const [platformId, setPlatformId] = useState<PlatformId>("fanqie");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const selectedProfile = platformProfiles.find((profile) => profile.id === platformId) ?? platformProfiles[0];
 
+  async function createProject(formData: FormData) {
+    setIsSubmitting(true);
+    setError(null);
+    try {
+      const response = await fetch("/api/projects", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: String(formData.get("title") ?? ""),
+          targetPlatform: String(formData.get("platform") ?? "fanqie"),
+          targetLengthType: String(formData.get("length") ?? selectedProfile.defaultLengthType),
+          genre: String(formData.get("genre") ?? ""),
+          sellingPoint: String(formData.get("sellingPoint") ?? ""),
+          updateCadence: String(formData.get("updateCadence") ?? ""),
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("创建作品失败，请检查必填字段。");
+      }
+
+      const payload = (await response.json()) as { project: { id: string } };
+      router.push(`/projects/${payload.project.id}`);
+      router.refresh();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "创建作品失败。");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
   return (
-    <form className="grid gap-4 rounded-md border border-slate-200 bg-white p-4">
+    <form action={createProject} className="grid gap-4 rounded-md border border-slate-200 bg-white p-4">
       <div>
         <label className="text-sm font-medium" htmlFor="title">
           作品名
@@ -26,6 +61,30 @@ export function ProjectForm() {
           id="title"
           name="title"
         />
+      </div>
+      <div className="grid gap-4 md:grid-cols-2">
+        <div>
+          <label className="text-sm font-medium" htmlFor="genre">
+            题材
+          </label>
+          <input
+            className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2"
+            defaultValue="都市系统"
+            id="genre"
+            name="genre"
+          />
+        </div>
+        <div>
+          <label className="text-sm font-medium" htmlFor="updateCadence">
+            更新节奏
+          </label>
+          <input
+            className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2"
+            defaultValue="daily_4000"
+            id="updateCadence"
+            name="updateCadence"
+          />
+        </div>
       </div>
       <div className="grid gap-4 md:grid-cols-2">
         <div>
@@ -64,7 +123,25 @@ export function ProjectForm() {
         <div className="mt-1">开头：{selectedProfile.openingRules.join("；")}</div>
         <div className="mt-1">审稿：{selectedProfile.reviewFocus.join("、")}</div>
       </div>
+      <div>
+        <label className="text-sm font-medium" htmlFor="sellingPoint">
+          核心卖点
+        </label>
+        <textarea
+          className="mt-1 min-h-20 w-full rounded-md border border-slate-200 px-3 py-2"
+          defaultValue="雨夜危机中觉醒系统，主角用一次次选择翻盘。"
+          id="sellingPoint"
+          name="sellingPoint"
+        />
+      </div>
+      {error ? <p className="text-sm text-red-600">{error}</p> : null}
+      <button
+        className="w-fit rounded-md bg-slate-950 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+        disabled={isSubmitting}
+        type="submit"
+      >
+        {isSubmitting ? "创建中" : "创建作品"}
+      </button>
     </form>
   );
 }
-

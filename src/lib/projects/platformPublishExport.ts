@@ -149,6 +149,27 @@ export interface PlatformPublishExportCenter {
   totalPublishableChapters: number;
 }
 
+export interface PlatformPublishArchivePlatform {
+  platformId: string;
+  platformName: string;
+  canExport: boolean;
+  fileName: string;
+  chapterCount: number;
+  wordCount: number;
+  preflightScore: number;
+  blocked: string[];
+  warnings: string[];
+}
+
+export interface PlatformPublishArchive {
+  readyCount: number;
+  blockedCount: number;
+  totalChapterCount: number;
+  totalWordCount: number;
+  platforms: PlatformPublishArchivePlatform[];
+  markdown: string;
+}
+
 function formatCompareValue(value: string | number | boolean | string[]) {
   if (Array.isArray(value)) return value.length ? value.join("、") : "无";
   if (typeof value === "boolean") return value ? "允许导出" : "暂不允许";
@@ -200,6 +221,18 @@ export function buildPublishPackageVersionComparison(
 
 function compact(text: string) {
   return text.replace(/\s+/g, " ").trim();
+}
+
+function safeFileName(input: string) {
+  return input
+    .replace(/[\\/:*?"<>|]/g, "-")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 80);
+}
+
+function markdownTableCell(input: string) {
+  return input.replace(/\|/g, "\\|").replace(/\n/g, " ");
 }
 
 function latestTask(tasks: PublishExportAiTask[], chapterId: string, taskType: string) {
@@ -642,5 +675,95 @@ export function buildPlatformPublishExportCenter(input: PlatformPublishExportInp
     packages,
     recommendedPlatformId: input.targetPlatform.id,
     totalPublishableChapters: publishableChapters(input.chapters).length,
+  };
+}
+
+export function buildPlatformPublishArchive(
+  center: PlatformPublishExportCenter,
+  projectTitle: string,
+  generatedAt: Date | string = new Date(),
+): PlatformPublishArchive {
+  const platforms = center.packages.map((pack) => {
+    const wordCount = pack.chapters.reduce((sum, chapter) => sum + chapter.wordCount, 0);
+    return {
+      platformId: pack.platformId,
+      platformName: pack.platformName,
+      canExport: pack.canExport,
+      fileName: `${safeFileName(`${projectTitle}-${pack.platformName}-发布包`)}.md`,
+      chapterCount: pack.chapters.length,
+      wordCount,
+      preflightScore: pack.preflight.score,
+      blocked: pack.preflight.blocked,
+      warnings: pack.warnings,
+    };
+  });
+  const readyPlatforms = center.packages.filter((pack) => pack.canExport);
+  const readyMeta = platforms.filter((platform) => platform.canExport);
+  const generatedText = new Intl.DateTimeFormat("zh-CN", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(generatedAt));
+  const totalChapterCount = readyMeta.reduce((sum, platform) => sum + platform.chapterCount, 0);
+  const totalWordCount = readyMeta.reduce((sum, platform) => sum + platform.wordCount, 0);
+  const manifestRows = platforms.map((platform) => [
+    platform.platformName,
+    platform.canExport ? "可导出" : "需处理",
+    String(platform.preflightScore),
+    String(platform.chapterCount),
+    String(platform.wordCount),
+    platform.canExport ? platform.fileName : platform.blocked.join("；") || "暂无",
+  ]);
+  const markdown = [
+    `# ${projectTitle} 全平台投稿包`,
+    "",
+    `生成时间：${generatedText}`,
+    `可导出平台：${readyMeta.length}/${platforms.length}`,
+    `归档章节合计：${totalChapterCount}`,
+    `归档字数合计：${totalWordCount}`,
+    "",
+    "## 平台清单",
+    "",
+    "| 平台 | 状态 | 质检分 | 章节 | 字数 | 文件/阻塞项 |",
+    "| --- | --- | ---: | ---: | ---: | --- |",
+    ...manifestRows.map((row) => `| ${row.map(markdownTableCell).join(" | ")} |`),
+    "",
+    "## 已就绪平台正文",
+    ...(readyPlatforms.length
+      ? readyPlatforms.flatMap((pack) => {
+        const meta = platforms.find((platform) => platform.platformId === pack.platformId);
+        return [
+          "",
+          `### ${pack.platformName}`,
+          "",
+          `建议文件名：${meta?.fileName ?? `${pack.platformName}-发布包.md`}`,
+          "",
+          pack.markdown,
+        ];
+      })
+      : ["", "暂无通过质检的平台发布包。"]),
+    "",
+    "## 待处理平台",
+    ...(platforms.some((platform) => !platform.canExport)
+      ? platforms
+        .filter((platform) => !platform.canExport)
+        .flatMap((platform) => [
+          "",
+          `### ${platform.platformName}`,
+          ...(platform.blocked.length ? platform.blocked.map((item) => `- 阻塞：${item}`) : ["- 阻塞：暂无"]),
+          ...(platform.warnings.length ? platform.warnings.slice(0, 4).map((item) => `- 提醒：${item}`) : []),
+        ])
+      : ["", "所有平台均已通过当前质检。"]),
+  ].join("\n");
+
+  return {
+    readyCount: readyMeta.length,
+    blockedCount: platforms.length - readyMeta.length,
+    totalChapterCount,
+    totalWordCount,
+    platforms,
+    markdown,
   };
 }

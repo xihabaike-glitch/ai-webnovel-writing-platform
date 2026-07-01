@@ -167,6 +167,7 @@ function formatTime(value: string) {
 function versionActionLabel(action: string) {
   if (action === "copy") return "复制";
   if (action === "download") return "下载";
+  if (action === "archive") return "归档";
   return "保存";
 }
 
@@ -187,6 +188,10 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
   const executableActions = useMemo(
     () => selectedPackage?.repairActions.filter(canRunAction).slice(0, 5) ?? [],
     [selectedPackage],
+  );
+  const exportablePackages = useMemo(
+    () => center?.packages.filter((pack) => pack.canExport) ?? [],
+    [center],
   );
 
   async function loadCenter(options?: { keepMessage?: boolean }) {
@@ -277,6 +282,36 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
       await loadCenter({ keepMessage: true });
     } catch (caught) {
       setMessage(caught instanceof Error ? caught.message : "下载发布包失败。");
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  async function downloadArchive() {
+    if (!exportablePackages.length) {
+      setMessage("暂无通过质检的平台包，先处理发布前阻塞项。");
+      return;
+    }
+    setIsLoading(true);
+    setMessage(null);
+    try {
+      const response = await fetch(`/api/projects/${projectId}/platform-export?format=archive`);
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null) as { error?: string } | null;
+        throw new Error(payload?.error ?? "下载全平台投稿包失败。");
+      }
+      const markdown = await response.text();
+      const blob = new Blob([markdown], { type: "text/markdown;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "全平台投稿包.md";
+      link.click();
+      URL.revokeObjectURL(url);
+      setMessage(`已下载全平台投稿包，包含 ${exportablePackages.length} 个通过质检的平台版本。`);
+      await loadCenter({ keepMessage: true });
+    } catch (caught) {
+      setMessage(caught instanceof Error ? caught.message : "下载全平台投稿包失败。");
     } finally {
       setIsLoading(false);
     }
@@ -421,8 +456,33 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
           >
             下载发布包
           </button>
+          <button
+            className="rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-900 hover:bg-slate-50 disabled:opacity-50"
+            disabled={!exportablePackages.length || isLoading}
+            onClick={downloadArchive}
+            type="button"
+          >
+            下载全平台包
+          </button>
         </div>
       </div>
+
+      {center ? (
+        <div className="mt-3 grid gap-2 rounded-md bg-slate-50 p-3 text-sm text-slate-600 sm:grid-cols-3">
+          <div>
+            <div className="text-xs text-slate-500">全平台归档</div>
+            <div className="mt-1 font-medium text-slate-950">可导出 {exportablePackages.length}/{center.packages.length}</div>
+          </div>
+          <div>
+            <div className="text-xs text-slate-500">待处理平台</div>
+            <div className="mt-1 font-medium text-slate-950">{center.packages.length - exportablePackages.length}</div>
+          </div>
+          <div>
+            <div className="text-xs text-slate-500">归档内容</div>
+            <div className="mt-1 font-medium text-slate-950">清单 + Markdown 正文</div>
+          </div>
+        </div>
+      ) : null}
 
       {message ? <p className="mt-3 text-sm text-slate-600">{message}</p> : null}
 

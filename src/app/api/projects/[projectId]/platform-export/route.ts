@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db/prisma";
 import { getPlatformProfile, platformProfiles, type PlatformId } from "@/lib/platforms/platformProfiles";
 import {
   buildPlatformPublishExportCenter,
+  buildPlatformPublishArchive,
   buildPublishPackageVersionComparison,
   parsePublishSnapshotTags,
   type PlatformPublishPackage,
@@ -159,6 +160,45 @@ export async function GET(request: Request, { params }: Params) {
       headers: {
         "Content-Type": "text/markdown; charset=utf-8",
         "Content-Disposition": `attachment; filename="${encodeURIComponent(`${project.title}-${pack.platformName}-发布包.md`)}"`,
+      },
+    });
+  }
+
+  if (searchParams.get("format") === "archive") {
+    const archive = buildPlatformPublishArchive(center, project.title);
+    const exportablePacks = center.packages.filter((pack) => pack.canExport);
+
+    if (!exportablePacks.length) {
+      return NextResponse.json({
+        error: "没有通过质检的平台发布包，暂不能下载全平台投稿包。",
+        archive,
+      }, { status: 409 });
+    }
+
+    await prisma.$transaction(
+      exportablePacks.map((pack) => prisma.publishPackageSnapshot.create({
+        data: {
+          projectId,
+          platformId: pack.platformId,
+          platformName: pack.platformName,
+          title: pack.title,
+          logline: pack.logline,
+          synopsis: pack.synopsis,
+          tags: JSON.stringify(pack.tags),
+          markdown: pack.markdown,
+          chapterCount: pack.chapters.length,
+          wordCount: pack.chapters.reduce((sum, chapter) => sum + chapter.wordCount, 0),
+          preflightScore: pack.preflight.score,
+          canExport: pack.canExport,
+          action: "archive",
+        },
+      })),
+    );
+
+    return new NextResponse(archive.markdown, {
+      headers: {
+        "Content-Type": "text/markdown; charset=utf-8",
+        "Content-Disposition": `attachment; filename="${encodeURIComponent(`${project.title}-全平台投稿包.md`)}"`,
       },
     });
   }

@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { getPlatformProfile, platformProfiles } from "../lib/platforms/platformProfiles.ts";
 import {
   buildPlatformPublishExportCenter,
+  buildPlatformPublishArchive,
   buildPublishPackageVersionComparison,
   parsePublishSnapshotTags,
 } from "../lib/projects/platformPublishExport.ts";
@@ -335,5 +336,55 @@ test("buildPlatformPublishExportCenter", async (t) => {
     assert.equal(comparison.items.find((item) => item.label === "书名")?.changed, true);
     assert.equal(comparison.items.find((item) => item.label === "标签")?.changed, false);
     assert.equal(comparison.items.find((item) => item.label === "质检分")?.changed, true);
+  });
+
+  await t.test("builds an all-platform archive from exportable packages", () => {
+    const center = buildPlatformPublishExportCenter({
+      project: {
+        title: "夜雨系统",
+        genre: "都市系统",
+        sellingPoint: "雨夜危机中觉醒系统，主角用选择翻盘。",
+        currentWordCount: 9000,
+        targetWordCount: 300000,
+      },
+      targetPlatform: getPlatformProfile("fanqie"),
+      chapters: finalChapters,
+      aiTasks: passedReviews,
+      submissionChecklist: readyChecklist,
+      platforms: [getPlatformProfile("fanqie"), getPlatformProfile("webnovel")],
+    });
+    const archive = buildPlatformPublishArchive(center, "夜雨系统", "2026-01-06T08:00:00.000Z");
+
+    assert.equal(archive.readyCount, 2);
+    assert.equal(archive.blockedCount, 0);
+    assert.equal(archive.totalChapterCount, 6);
+    assert.equal(archive.totalWordCount, 15600);
+    assert.ok(archive.platforms.some((platform) => platform.fileName === "夜雨系统-番茄小说-发布包.md"));
+    assert.ok(archive.markdown.includes("# 夜雨系统 全平台投稿包"));
+    assert.ok(archive.markdown.includes("| 番茄小说 | 可导出 |"));
+    assert.ok(archive.markdown.includes("### WebNovel"));
+    assert.ok(archive.markdown.includes("# 番茄小说 发布包"));
+  });
+
+  await t.test("keeps blocked platforms in the archive manifest", () => {
+    const center = buildPlatformPublishExportCenter({
+      project: {
+        title: "夜雨|系统",
+        genre: "都市系统",
+        sellingPoint: "雨夜危机中觉醒系统，主角用选择翻盘。",
+        currentWordCount: 1200,
+        targetWordCount: 300000,
+      },
+      targetPlatform: getPlatformProfile("fanqie"),
+      chapters,
+      platforms: [getPlatformProfile("fanqie")],
+    });
+    const archive = buildPlatformPublishArchive(center, "夜雨|系统", "2026-01-06T08:00:00.000Z");
+
+    assert.equal(archive.readyCount, 0);
+    assert.equal(archive.blockedCount, 1);
+    assert.ok(archive.platforms[0].fileName.includes("夜雨-系统-番茄小说-发布包.md"));
+    assert.ok(archive.markdown.includes("暂无通过质检的平台发布包。"));
+    assert.ok(archive.markdown.includes("| 番茄小说 | 需处理 |"));
   });
 });

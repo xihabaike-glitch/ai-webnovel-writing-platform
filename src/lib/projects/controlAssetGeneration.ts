@@ -70,6 +70,14 @@ interface GeneratedPayload {
   rationale?: string[];
 }
 
+export interface ControlAssetQualityGate {
+  score: number;
+  status: "pass" | "warn" | "fail";
+  passed: boolean;
+  issues: string[];
+  nextActions: string[];
+}
+
 function areaLabel(areaId: ControlAssetAreaId) {
   if (areaId === "characters") return "人物弧光";
   if (areaId === "world") return "世界观资料";
@@ -195,6 +203,108 @@ function normalizeStoryLines(payload: GeneratedPayload, chapterIds: Set<string>,
   };
 }
 
+function gateStatus(score: number): ControlAssetQualityGate["status"] {
+  if (score >= 80) return "pass";
+  if (score >= 60) return "warn";
+  return "fail";
+}
+
+function qualityGate(score: number, issues: string[], nextActions: string[]): ControlAssetQualityGate {
+  const normalized = Math.max(0, Math.min(100, Math.round(score)));
+  const status = gateStatus(normalized);
+  return {
+    score: normalized,
+    status,
+    passed: status !== "fail",
+    issues,
+    nextActions,
+  };
+}
+
+function nonEmptyFields(item: Record<string, string>, fields: string[]) {
+  return fields.filter((field) => clean(item[field]).length > 0).length;
+}
+
+export function buildControlAssetQualityGate(
+  areaId: ControlAssetAreaId,
+  assets: {
+    characters?: GeneratedCharacter[];
+    worldEntries?: GeneratedWorldEntry[];
+    plotThreads?: Array<{ type: string; title: string; startChapterId: string | null; endChapterId: string | null; status: string }>;
+    foreshadows?: Array<{ title: string; setupChapterId: string | null; payoffChapterId: string | null; relatedCharacterIds: string[]; status: string; notes: string }>;
+  },
+): ControlAssetQualityGate {
+  const issues: string[] = [];
+  const nextActions: string[] = [];
+
+  if (areaId === "characters") {
+    const characters = assets.characters ?? [];
+    if (characters.length === 0) issues.push("模型没有生成人物卡。");
+    const fields = ["name", "role", "desire", "need", "flaw", "arcStart", "arcEnd", "voice", "relationshipNotes"];
+    const completeness = characters.length
+      ? characters.reduce((sum, character) => sum + (nonEmptyFields(character as unknown as Record<string, string>, fields) / fields.length) * 100, 0) / characters.length
+      : 0;
+    if (!characters.some((character) => /主角|男主|女主|protagonist/i.test(`${character.role}${character.name}`))) {
+      issues.push("缺少主角定位，人物弧光没有锚点。");
+      nextActions.push("补一张主角卡，写清欲望、缺陷、起点和终点。");
+    }
+    if (!characters.some((character) => /反派|敌人|对手|antagonist/i.test(`${character.role}${character.name}`))) {
+      issues.push("缺少反派或压力源，主线冲突会变软。");
+      nextActions.push("补一个会主动改变局面的反派压力源。");
+    }
+    if (characters.some((character) => clean(character.relationshipNotes).length < 12)) {
+      issues.push("存在关系压力过薄的人物卡。");
+      nextActions.push("把人物关系绑定到误解、亏欠、守护或背叛上。");
+    }
+    return qualityGate(completeness - issues.length * 6, issues, nextActions);
+  }
+
+  if (areaId === "world") {
+    const entries = assets.worldEntries ?? [];
+    if (entries.length === 0) issues.push("模型没有生成世界观资料。");
+    const types = new Set(entries.map((entry) => entry.type));
+    for (const required of ["system_rule", "taboo", "platform_soil"]) {
+      if (!types.has(required)) issues.push(`缺少 ${required} 类型设定。`);
+    }
+    const contentScore = entries.length
+      ? entries.reduce((sum, entry) => sum + Math.min(100, clean(entry.content).length * 2), 0) / entries.length
+      : 0;
+    if (entries.some((entry) => clean(entry.content).length < 40)) {
+      issues.push("存在内容过薄的设定卡。");
+      nextActions.push("每条设定补清规则、限制、代价和剧情用途。");
+    }
+    if (!entries.some((entry) => /限制|代价|冲突|风险|禁忌|读者|平台/u.test(entry.content))) {
+      issues.push("设定没有写出限制或剧情用途。");
+      nextActions.push("让设定服务冲突，而不是只当名词解释。");
+    }
+    return qualityGate((contentScore + (types.size / 3) * 100) / 2 - issues.length * 5, issues, nextActions);
+  }
+
+  const plotThreads = assets.plotThreads ?? [];
+  const foreshadows = assets.foreshadows ?? [];
+  if (plotThreads.length === 0) issues.push("模型没有生成主线。");
+  if (foreshadows.length === 0) issues.push("模型没有生成伏笔。");
+  if (!plotThreads.some((thread) => thread.type === "main")) {
+    issues.push("缺少 main 类型主线。");
+    nextActions.push("至少保留一条 main 主线，并绑定第一章起点。");
+  }
+  if (plotThreads.some((thread) => !thread.startChapterId)) {
+    issues.push("存在未绑定起点章节的剧情线。");
+    nextActions.push("给每条主线绑定起点章，别让主线只是标签。");
+  }
+  if (foreshadows.some((foreshadow) => !foreshadow.setupChapterId && clean(foreshadow.notes).length < 20)) {
+    issues.push("存在没有埋点章或说明过薄的伏笔。");
+    nextActions.push("给伏笔补埋点章，或者写清它会在哪个反转中回收。");
+  }
+  const storyScore = (
+    (plotThreads.length > 0 ? 35 : 0)
+    + (foreshadows.length > 0 ? 35 : 0)
+    + (plotThreads.some((thread) => thread.startChapterId) ? 15 : 0)
+    + (foreshadows.some((foreshadow) => foreshadow.setupChapterId || clean(foreshadow.notes).length >= 20) ? 15 : 0)
+  );
+  return qualityGate(storyScore - issues.length * 6, issues, nextActions);
+}
+
 export async function generateControlAssets(projectId: string, areaId: ControlAssetAreaId) {
   const project = await prisma.project.findUnique({
     where: { id: projectId },
@@ -246,31 +356,68 @@ export async function generateControlAssets(projectId: string, areaId: ControlAs
     });
     const payload = parseJsonObject(result.text);
     const created: string[] = [];
+    const normalizedCharacters = areaId === "characters" ? normalizeCharacters(payload) : [];
+    const normalizedWorldEntries = areaId === "world" ? normalizeWorldEntries(payload) : [];
+    const normalizedStoryLines = areaId === "story-lines"
+      ? normalizeStoryLines(
+        payload,
+        new Set(project.chapters.map((chapter) => chapter.id)),
+        new Set(project.characters.map((character) => character.id)),
+      )
+      : { plotThreads: [], foreshadows: [] };
+    const quality = buildControlAssetQualityGate(areaId, {
+      characters: normalizedCharacters,
+      worldEntries: normalizedWorldEntries,
+      plotThreads: normalizedStoryLines.plotThreads,
+      foreshadows: normalizedStoryLines.foreshadows,
+    });
+
+    if (!quality.passed) {
+      await prisma.aiTask.update({
+        where: { id: task.id },
+        data: {
+          status: "failed",
+          outputText: JSON.stringify({ generated: payload, qualityGate: quality }, null, 2),
+          inputTokens: result.usage?.inputTokens,
+          outputTokens: result.usage?.outputTokens,
+          costUsd: result.usage?.costUsd,
+          errorMessage: `质量闸门未通过：${quality.issues.join("；")}`,
+        },
+      });
+      return {
+        taskId: task.id,
+        areaId,
+        created: [],
+        qualityGate: quality,
+        error: `质量闸门未通过：${quality.issues.join("；")}`,
+        provider: {
+          id: provider.id,
+          providerId: provider.providerId,
+          displayName: provider.displayName,
+          model: provider.defaultModel,
+        },
+      };
+    }
 
     await prisma.$transaction(async (tx) => {
       if (areaId === "characters") {
-        for (const seed of normalizeCharacters(payload)) {
+        for (const seed of normalizedCharacters) {
           await tx.character.create({ data: { projectId, ...seed } });
           created.push(seed.name);
         }
       }
       if (areaId === "world") {
-        for (const seed of normalizeWorldEntries(payload)) {
+        for (const seed of normalizedWorldEntries) {
           await tx.worldEntry.create({ data: { projectId, ...seed } });
           created.push(seed.title);
         }
       }
       if (areaId === "story-lines") {
-        const normalized = normalizeStoryLines(
-          payload,
-          new Set(project.chapters.map((chapter) => chapter.id)),
-          new Set(project.characters.map((character) => character.id)),
-        );
-        for (const seed of normalized.plotThreads) {
+        for (const seed of normalizedStoryLines.plotThreads) {
           await tx.plotThread.create({ data: { projectId, ...seed } });
           created.push(seed.title);
         }
-        for (const seed of normalized.foreshadows) {
+        for (const seed of normalizedStoryLines.foreshadows) {
           await tx.foreshadow.create({
             data: {
               projectId,
@@ -289,7 +436,7 @@ export async function generateControlAssets(projectId: string, areaId: ControlAs
         where: { id: task.id },
         data: {
           status: "succeeded",
-          outputText: result.text,
+          outputText: JSON.stringify({ generated: payload, qualityGate: quality }, null, 2),
           inputTokens: result.usage?.inputTokens,
           outputTokens: result.usage?.outputTokens,
           costUsd: result.usage?.costUsd,
@@ -305,13 +452,14 @@ export async function generateControlAssets(projectId: string, areaId: ControlAs
       taskId: task.id,
       areaId,
       created,
+      qualityGate: quality,
       provider: {
         id: provider.id,
         providerId: provider.providerId,
         displayName: provider.displayName,
         model: provider.defaultModel,
       },
-      message: `AI 已生成 ${created.length} 项：${created.join("、")}。`,
+      message: `AI 已生成 ${created.length} 项，质检 ${quality.score} 分：${created.join("、")}。`,
     };
   } catch (caught) {
     const message = caught instanceof Error ? caught.message : "Unknown control asset generation error";

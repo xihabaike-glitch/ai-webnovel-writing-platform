@@ -97,12 +97,20 @@ export function ProjectControlDashboardPanel({ projectId }: { projectId: string 
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ areaId: action.areaId, mode }),
       });
-      const payload = await response.json() as { message?: string; error?: string };
+      const payload = await response.json() as {
+        message?: string;
+        error?: string;
+        qualityGate?: { score: number; issues: string[] };
+      };
       if (!response.ok) {
-        throw new Error(payload.error ?? "执行总控动作失败。");
+        const quality = payload.qualityGate
+          ? `质检 ${payload.qualityGate.score} 分：${payload.qualityGate.issues.slice(0, 2).join("；")}`
+          : "";
+        throw new Error([payload.error, quality].filter(Boolean).join(" "));
       }
       await loadDashboard();
-      setMessage(payload.message ?? "动作已完成。");
+      const quality = payload.qualityGate ? `质检 ${payload.qualityGate.score} 分。` : "";
+      setMessage([payload.message ?? "动作已完成。", quality].filter(Boolean).join(" "));
     } catch (caught) {
       setMessage(caught instanceof Error ? caught.message : "执行总控动作失败。");
     } finally {

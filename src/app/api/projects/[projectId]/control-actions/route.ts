@@ -60,7 +60,7 @@ export async function POST(request: Request, { params }: Params) {
     if (areaId === "characters" || areaId === "world" || areaId === "story-lines") {
       const generated = await generateControlAssets(projectId, areaId as ControlAssetAreaId);
       if ("error" in generated) {
-        return NextResponse.json(generated, { status: 500 });
+        return NextResponse.json(generated, { status: generated.qualityGate?.status === "fail" ? 422 : 500 });
       }
       return NextResponse.json({
         ...generated,

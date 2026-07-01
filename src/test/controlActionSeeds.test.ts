@@ -7,7 +7,7 @@ import {
   buildStoryLineActionSeeds,
   buildWorldActionSeeds,
 } from "../lib/projects/controlActionSeeds.ts";
-import { buildControlAssetPrompt } from "../lib/projects/controlAssetGeneration.ts";
+import { buildControlAssetPrompt, buildControlAssetQualityGate } from "../lib/projects/controlAssetGeneration.ts";
 
 const project = {
   id: "demo-project",
@@ -90,5 +90,49 @@ test("control action seeds", async (t) => {
     assert.ok(prompt.userPrompt.includes("生成模块：主线伏笔"));
     assert.ok(prompt.userPrompt.includes("章节 ID 必须从现有章节里选择"));
     assert.ok(prompt.userPrompt.includes("chapter-1"));
+  });
+
+  await t.test("passes strong generated control assets through the quality gate", () => {
+    const gate = buildControlAssetQualityGate("characters", {
+      characters: [
+        {
+          name: "林晚",
+          role: "主角",
+          desire: "抓住系统翻盘机会",
+          need: "学会主动选择",
+          flaw: "遇到代价时逃避",
+          arcStart: "被动卷入危机",
+          arcEnd: "主动承担代价",
+          voice: "克制直接",
+          relationshipNotes: "和反派形成规则对抗，和关系镜像角色形成情绪拉扯。",
+        },
+        {
+          name: "沈砚",
+          role: "反派",
+          desire: "控制系统规则",
+          need: "逼出主角弱点",
+          flaw: "过度迷信秩序",
+          arcStart: "把主角当变量",
+          arcEnd: "亲自下场对抗",
+          voice: "冷静压迫",
+          relationshipNotes: "每次出手都改变主角处境。",
+        },
+      ],
+    });
+
+    assert.equal(gate.status, "pass");
+    assert.equal(gate.passed, true);
+  });
+
+  await t.test("blocks thin generated control assets before database writes", () => {
+    const gate = buildControlAssetQualityGate("world", {
+      worldEntries: [
+        { type: "other", title: "设定", content: "很强。" },
+      ],
+    });
+
+    assert.equal(gate.status, "fail");
+    assert.equal(gate.passed, false);
+    assert.ok(gate.issues.some((issue) => issue.includes("缺少")));
   });
 });

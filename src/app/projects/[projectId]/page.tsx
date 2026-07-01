@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { AppShell } from "@/components/app-shell/AppShell";
 import { CreateChapterForm } from "@/components/chapters/CreateChapterForm";
 import { OutlineTreePanel } from "@/components/outlines/OutlineTreePanel";
+import { CharacterArcPanel } from "@/components/projects/CharacterArcPanel";
 import { ExportMarkdownButton } from "@/components/projects/ExportMarkdownButton";
 import { FirstThreeRewritePanel } from "@/components/projects/FirstThreeRewritePanel";
 import { RetentionDiagnosticPanel } from "@/components/projects/RetentionDiagnosticPanel";
@@ -216,6 +217,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ projec
         </section>
         <RetentionDiagnosticPanel projectId={project.id} />
         <FirstThreeRewritePanel projectId={project.id} />
+        <CharacterArcPanel projectId={project.id} />
         <StoryStructureDiagnosticPanel projectId={project.id} />
         <SubmissionPackagePanel projectId={project.id} submissionPackage={submissionPackage} />
         <div className="grid gap-4 md:grid-cols-[2fr_1fr]">

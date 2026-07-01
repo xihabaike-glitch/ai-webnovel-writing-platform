@@ -29,6 +29,7 @@ model Project {
   aiTasks          AiTask[]
   publishSnapshots PublishPackageSnapshot[]
   submissionAssets PlatformSubmissionAsset[]
+  submissionAssetVersions PlatformSubmissionAssetVersion[]
 }
 
 model Chapter {
@@ -243,7 +244,32 @@ model PlatformSubmissionAsset {
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
-  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  project  Project                          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  versions PlatformSubmissionAssetVersion[]
 
   @@unique([projectId, platformId])
+}
+
+model PlatformSubmissionAssetVersion {
+  id               String   @id @default(cuid())
+  projectId        String
+  assetId          String?
+  platformId       String
+  platformName     String
+  title            String
+  logline          String
+  synopsis         String
+  overseasSynopsis String   @default("")
+  tags             String   @default("[]")
+  note             String   @default("")
+  source           String   @default("manual")
+  auditScore       Int      @default(0)
+  auditStatus      String   @default("needs_work")
+  action           String
+  createdAt        DateTime @default(now())
+
+  project Project                  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  asset   PlatformSubmissionAsset? @relation(fields: [assetId], references: [id], onDelete: SetNull)
+
+  @@index([projectId, platformId, createdAt])
 }

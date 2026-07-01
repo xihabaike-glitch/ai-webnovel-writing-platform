@@ -209,3 +209,26 @@ CREATE TABLE IF NOT EXISTS "PlatformSubmissionAsset" (
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS "PlatformSubmissionAsset_projectId_platformId_key" ON "PlatformSubmissionAsset"("projectId", "platformId");
+
+CREATE TABLE IF NOT EXISTS "PlatformSubmissionAssetVersion" (
+  "id" TEXT NOT NULL PRIMARY KEY,
+  "projectId" TEXT NOT NULL,
+  "assetId" TEXT,
+  "platformId" TEXT NOT NULL,
+  "platformName" TEXT NOT NULL,
+  "title" TEXT NOT NULL,
+  "logline" TEXT NOT NULL,
+  "synopsis" TEXT NOT NULL,
+  "overseasSynopsis" TEXT NOT NULL DEFAULT '',
+  "tags" TEXT NOT NULL DEFAULT '[]',
+  "note" TEXT NOT NULL DEFAULT '',
+  "source" TEXT NOT NULL DEFAULT 'manual',
+  "auditScore" INTEGER NOT NULL DEFAULT 0,
+  "auditStatus" TEXT NOT NULL DEFAULT 'needs_work',
+  "action" TEXT NOT NULL,
+  "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT "PlatformSubmissionAssetVersion_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "Project" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT "PlatformSubmissionAssetVersion_assetId_fkey" FOREIGN KEY ("assetId") REFERENCES "PlatformSubmissionAsset" ("id") ON DELETE SET NULL ON UPDATE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS "PlatformSubmissionAssetVersion_projectId_platformId_createdAt_idx" ON "PlatformSubmissionAssetVersion"("projectId", "platformId", "createdAt");

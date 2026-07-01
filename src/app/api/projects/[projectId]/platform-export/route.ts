@@ -6,6 +6,7 @@ import {
   buildPlatformPublishArchive,
   buildPublishPackageRestorePatch,
   buildPublishPackageVersionComparison,
+  buildSubmissionAssetAudit,
   parsePublishSnapshotTags,
   type PublishPackageArchiveGroup,
   type PlatformPublishPackage,
@@ -55,6 +56,7 @@ async function buildCenter(projectId: string) {
       aiTasks: { orderBy: { createdAt: "desc" } },
       publishSnapshots: { orderBy: { createdAt: "desc" }, take: 80 },
       submissionAssets: { orderBy: { updatedAt: "desc" } },
+      submissionAssetVersions: { orderBy: { createdAt: "desc" }, take: 80 },
     },
   });
 
@@ -101,6 +103,22 @@ async function buildCenter(projectId: string) {
       note: asset.note,
       source: asset.source,
       updatedAt: asset.updatedAt,
+    })),
+    submissionAssetVersions: project.submissionAssetVersions.map((version) => ({
+      id: version.id,
+      platformId: version.platformId,
+      platformName: version.platformName,
+      title: version.title,
+      logline: version.logline,
+      synopsis: version.synopsis,
+      overseasSynopsis: version.overseasSynopsis,
+      tags: parsePublishSnapshotTags(version.tags),
+      note: version.note,
+      source: version.source,
+      auditScore: version.auditScore,
+      auditStatus: version.auditStatus === "ready" || version.auditStatus === "blocked" ? version.auditStatus : "needs_work",
+      action: version.action,
+      createdAt: version.createdAt,
     })),
     submissionChecklist,
   });
@@ -305,35 +323,69 @@ export async function POST(request: Request, { params }: Params) {
       return NextResponse.json({ error: "请选择有效发布平台。" }, { status: 400 });
     }
 
-    const asset = await prisma.platformSubmissionAsset.upsert({
-      where: {
-        projectId_platformId: {
+    const normalizedTags = normalizeTagsInput(body.tags);
+    const normalizedAsset = {
+      platformId: platform.id,
+      platformName: platform.name,
+      title: trimText(body.title, context.project.title),
+      logline: trimText(body.logline),
+      synopsis: trimText(body.synopsis),
+      overseasSynopsis: trimText(body.overseasSynopsis),
+      tags: normalizedTags,
+      note: trimText(body.note),
+      source: "manual",
+    };
+    const audit = buildSubmissionAssetAudit(platform, normalizedAsset);
+    const [asset, assetVersion] = await prisma.$transaction(async (tx) => {
+      const savedAsset = await tx.platformSubmissionAsset.upsert({
+        where: {
+          projectId_platformId: {
+            projectId,
+            platformId: platform.id,
+          },
+        },
+        create: {
           projectId,
           platformId: platform.id,
+          platformName: platform.name,
+          title: normalizedAsset.title,
+          logline: normalizedAsset.logline,
+          synopsis: normalizedAsset.synopsis,
+          overseasSynopsis: normalizedAsset.overseasSynopsis,
+          tags: JSON.stringify(normalizedTags),
+          note: normalizedAsset.note,
+          source: "manual",
         },
-      },
-      create: {
-        projectId,
-        platformId: platform.id,
-        platformName: platform.name,
-        title: trimText(body.title, context.project.title),
-        logline: trimText(body.logline),
-        synopsis: trimText(body.synopsis),
-        overseasSynopsis: trimText(body.overseasSynopsis),
-        tags: JSON.stringify(normalizeTagsInput(body.tags)),
-        note: trimText(body.note),
-        source: "manual",
-      },
-      update: {
-        platformName: platform.name,
-        title: trimText(body.title, context.project.title),
-        logline: trimText(body.logline),
-        synopsis: trimText(body.synopsis),
-        overseasSynopsis: trimText(body.overseasSynopsis),
-        tags: JSON.stringify(normalizeTagsInput(body.tags)),
-        note: trimText(body.note),
-        source: "manual",
-      },
+        update: {
+          platformName: platform.name,
+          title: normalizedAsset.title,
+          logline: normalizedAsset.logline,
+          synopsis: normalizedAsset.synopsis,
+          overseasSynopsis: normalizedAsset.overseasSynopsis,
+          tags: JSON.stringify(normalizedTags),
+          note: normalizedAsset.note,
+          source: "manual",
+        },
+      });
+      const savedVersion = await tx.platformSubmissionAssetVersion.create({
+        data: {
+          projectId,
+          assetId: savedAsset.id,
+          platformId: platform.id,
+          platformName: platform.name,
+          title: normalizedAsset.title,
+          logline: normalizedAsset.logline,
+          synopsis: normalizedAsset.synopsis,
+          overseasSynopsis: normalizedAsset.overseasSynopsis,
+          tags: JSON.stringify(normalizedTags),
+          note: normalizedAsset.note,
+          source: "manual",
+          auditScore: audit.score,
+          auditStatus: audit.status,
+          action: "save",
+        },
+      });
+      return [savedAsset, savedVersion];
     });
 
     return NextResponse.json({
@@ -342,6 +394,11 @@ export async function POST(request: Request, { params }: Params) {
         ...asset,
         tags: parsePublishSnapshotTags(asset.tags),
       },
+      assetVersion: {
+        ...assetVersion,
+        tags: parsePublishSnapshotTags(assetVersion.tags),
+      },
+      audit,
     }, { status: 201 });
   }
 
@@ -361,15 +418,26 @@ export async function POST(request: Request, { params }: Params) {
       title: version.title,
       logline: version.logline,
     });
-    const [, , snapshot] = await prisma.$transaction([
-      prisma.project.update({
+    const restoreTags = parsePublishSnapshotTags(version.tags);
+    const restorePlatform = selectedPlatform(version.platformId);
+    const restoreAudit = restorePlatform
+      ? buildSubmissionAssetAudit(restorePlatform, {
+        title: version.title,
+        logline: version.logline,
+        synopsis: version.synopsis,
+        overseasSynopsis: version.synopsis,
+        tags: restoreTags,
+      })
+      : { score: 0, status: "needs_work" as const, passed: [], issues: [] };
+    const [, , assetVersion, snapshot] = await prisma.$transaction(async (tx) => {
+      const updatedProject = await tx.project.update({
         where: { id: projectId },
         data: {
           title: patch.title,
           sellingPoint: patch.sellingPoint,
         },
-      }),
-      prisma.platformSubmissionAsset.upsert({
+      });
+      const restoredAsset = await tx.platformSubmissionAsset.upsert({
         where: {
           projectId_platformId: {
             projectId,
@@ -398,8 +466,26 @@ export async function POST(request: Request, { params }: Params) {
           note: "由历史发布包恢复。",
           source: "restore",
         },
-      }),
-      prisma.publishPackageSnapshot.create({
+      });
+      const restoredAssetVersion = await tx.platformSubmissionAssetVersion.create({
+        data: {
+          projectId,
+          assetId: restoredAsset.id,
+          platformId: version.platformId,
+          platformName: version.platformName,
+          title: version.title,
+          logline: version.logline,
+          synopsis: version.synopsis,
+          overseasSynopsis: version.synopsis,
+          tags: version.tags,
+          note: "由历史发布包恢复。",
+          source: "restore",
+          auditScore: restoreAudit.score,
+          auditStatus: restoreAudit.status,
+          action: "restore",
+        },
+      });
+      const restoredSnapshot = await tx.publishPackageSnapshot.create({
         data: {
           projectId,
           platformId: version.platformId,
@@ -415,12 +501,14 @@ export async function POST(request: Request, { params }: Params) {
           canExport: version.canExport,
           action: "restore",
         },
-      }),
-    ]);
+      });
+      return [updatedProject, restoredAsset, restoredAssetVersion, restoredSnapshot];
+    });
 
     return NextResponse.json({
-      message: `已恢复 ${version.platformName} 历史版本的标题和核心卖点。`,
+      message: `已恢复 ${version.platformName} 历史版本，并写入投稿资产版本。`,
       patch,
+      assetVersion,
       snapshot,
     });
   }

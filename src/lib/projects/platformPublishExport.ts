@@ -163,12 +163,34 @@ export interface PlatformSubmissionAssetInput {
   updatedAt?: Date | string;
 }
 
+export interface PlatformSubmissionAssetVersionInput extends PlatformSubmissionAssetInput {
+  auditScore: number;
+  auditStatus: PlatformSubmissionAssetAudit["status"];
+  action: string;
+  createdAt: Date | string;
+}
+
+export interface PlatformSubmissionAssetIssue {
+  field: "title" | "logline" | "synopsis" | "overseasSynopsis" | "tags";
+  severity: "blocker" | "warning";
+  label: string;
+  detail: string;
+}
+
+export interface PlatformSubmissionAssetAudit {
+  score: number;
+  status: "ready" | "needs_work" | "blocked";
+  passed: string[];
+  issues: PlatformSubmissionAssetIssue[];
+}
+
 export interface PlatformPublishExportInput {
   project: PublishExportProject;
   chapters: PublishExportChapter[];
   aiTasks?: PublishExportAiTask[];
   publishSnapshots?: PublishPackageVersionItem[];
   submissionAssets?: PlatformSubmissionAssetInput[];
+  submissionAssetVersions?: PlatformSubmissionAssetVersionInput[];
   submissionChecklist?: SubmissionChecklist;
   targetPlatform: PlatformProfile;
   platforms?: PlatformProfile[];
@@ -202,6 +224,8 @@ export interface PlatformPublishPackage {
   platformName: string;
   category: PlatformProfile["category"];
   submissionAsset: (PlatformSubmissionAssetInput & { persisted: boolean }) | null;
+  submissionAssetAudit: PlatformSubmissionAssetAudit;
+  submissionAssetVersions: PlatformSubmissionAssetVersionInput[];
   title: string;
   logline: string;
   synopsis: string;
@@ -856,6 +880,13 @@ function buildMarkdown(pack: Omit<PlatformPublishPackage, "markdown">) {
     "## 标签",
     pack.tags.join("、"),
     "",
+    "## 投稿资产质检",
+    `资产分：${pack.submissionAssetAudit.score}`,
+    `状态：${pack.submissionAssetAudit.status === "ready" ? "可用" : pack.submissionAssetAudit.status === "blocked" ? "需重写" : "需打磨"}`,
+    ...(pack.submissionAssetAudit.issues.length
+      ? pack.submissionAssetAudit.issues.map((issue) => `- ${issue.severity === "blocker" ? "阻塞" : "提醒"}：${issue.label}｜${issue.detail}`)
+      : ["- 暂无明显问题。"]),
+    "",
     "## 发布说明",
     pack.publishNote,
     "",
@@ -899,6 +930,117 @@ function textOrFallback(value: string | undefined, fallback: string) {
   return trimmed || fallback;
 }
 
+function textLength(value: string) {
+  return value.trim().length;
+}
+
+function hasAny(text: string, keywords: string[]) {
+  return keywords.some((keyword) => text.toLowerCase().includes(keyword.toLowerCase()));
+}
+
+function cjkRatio(text: string) {
+  const compact = text.replace(/\s/g, "");
+  if (!compact.length) return 0;
+  const cjk = compact.match(/[\u4e00-\u9fff]/g)?.length ?? 0;
+  return cjk / compact.length;
+}
+
+export function buildSubmissionAssetAudit(
+  platform: PlatformProfile,
+  asset: {
+    title: string;
+    logline: string;
+    synopsis: string;
+    overseasSynopsis: string;
+    tags: string[];
+  },
+): PlatformSubmissionAssetAudit {
+  const issues: PlatformSubmissionAssetIssue[] = [];
+  const passed: string[] = [];
+  const searchableText = [asset.title, asset.logline, asset.synopsis, asset.overseasSynopsis, asset.tags.join(" ")].join(" ");
+  const primarySynopsis = platform.category === "overseas" ? asset.overseasSynopsis : asset.synopsis;
+
+  const addIssue = (issue: PlatformSubmissionAssetIssue) => issues.push(issue);
+  const minLogline = platform.category === "overseas" ? 55 : 18;
+  const minSynopsis = platform.category === "short" ? 80 : platform.category === "overseas" ? 120 : 100;
+
+  if (textLength(asset.title) >= 2 && textLength(asset.title) <= 32) {
+    passed.push("标题长度可用。");
+  } else {
+    addIssue({ field: "title", severity: "blocker", label: "标题长度失控", detail: "标题需要 2-32 字，太短没识别度，太长会拖慢平台列表页判断。" });
+  }
+
+  if (textLength(asset.logline) >= minLogline) {
+    passed.push("一句话卖点有基本信息量。");
+  } else {
+    addIssue({ field: "logline", severity: "blocker", label: "卖点太空", detail: `一句话卖点至少 ${minLogline} 字，要说清主角、冲突和可期待的爽点或情绪。` });
+  }
+
+  if (textLength(primarySynopsis) >= minSynopsis) {
+    passed.push("简介长度达到平台判断门槛。");
+  } else {
+    addIssue({
+      field: platform.category === "overseas" ? "overseasSynopsis" : "synopsis",
+      severity: "blocker",
+      label: "简介撑不起投稿判断",
+      detail: `当前平台简介至少建议 ${minSynopsis} 字，要补主角目标、核心冲突、主线推进和读者期待。`,
+    });
+  }
+
+  if (asset.tags.length >= 3) {
+    passed.push("标签数量够平台分发使用。");
+  } else {
+    addIssue({ field: "tags", severity: "warning", label: "标签太少", detail: "至少准备 3 个标签，方便平台识别题材、情绪和核心卖点。" });
+  }
+
+  if (hasAny(searchableText, platform.genres)) {
+    passed.push("题材标签与平台常见品类有连接。");
+  } else {
+    addIssue({ field: "tags", severity: "warning", label: "平台题材信号弱", detail: `建议至少贴近一个平台高频品类：${platform.genres.slice(0, 5).join("、")}。` });
+  }
+
+  if (platform.id === "fanqie" && hasAny(searchableText, ["爽", "逆袭", "系统", "重生", "翻盘", "危机", "选择"])) {
+    passed.push("番茄快读爽点信号明确。");
+  } else if (platform.id === "fanqie") {
+    addIssue({ field: "logline", severity: "warning", label: "番茄爽点不够直给", detail: "番茄标题/卖点要更直接打出系统、逆袭、翻盘、危机或连续选择。" });
+  }
+
+  if (platform.id === "qidian" && hasAny(searchableText, ["世界", "体系", "升级", "主线", "长期", "伏笔", "境界"])) {
+    passed.push("起点长线结构信号明确。");
+  } else if (platform.id === "qidian") {
+    addIssue({ field: "synopsis", severity: "warning", label: "起点长线期待不足", detail: "起点简介要补世界观、升级体系、长期主线或阶段目标。" });
+  }
+
+  if (platform.id === "zhihu_yanxuan" && hasAny(searchableText, ["反转", "真相", "复仇", "第一人称", "悬疑", "付费"])) {
+    passed.push("知乎盐选反转/付费期待明确。");
+  } else if (platform.id === "zhihu_yanxuan") {
+    addIssue({ field: "synopsis", severity: "warning", label: "盐选付费钩子不够尖", detail: "知乎盐选需要更强的第一人称矛盾、反转链、复仇或真相期待。" });
+  }
+
+  if (platform.category === "female" && hasAny(searchableText, ["关系", "情感", "拉扯", "暗恋", "婚", "救赎", "成长"])) {
+    passed.push("女频情绪关系信号明确。");
+  } else if (platform.category === "female") {
+    addIssue({ field: "logline", severity: "warning", label: "情绪线不够可见", detail: "女频平台需要更早展示关系张力、情绪推进或人物成长。" });
+  }
+
+  if (platform.category === "overseas" && cjkRatio(asset.overseasSynopsis) < 0.2 && /[a-zA-Z]/.test(asset.overseasSynopsis)) {
+    passed.push("海外简介具备英文投稿信号。");
+  } else if (platform.category === "overseas") {
+    addIssue({ field: "overseasSynopsis", severity: "blocker", label: "海外简介不够英文平台化", detail: "海外平台需要英文简介，避免直接中文投递或机器直译感过强。" });
+  }
+
+  const blockerCount = issues.filter((issue) => issue.severity === "blocker").length;
+  const warningCount = issues.length - blockerCount;
+  const score = Math.max(0, 100 - blockerCount * 24 - warningCount * 10);
+
+  return {
+    score,
+    status: blockerCount ? "blocked" : warningCount ? "needs_work" : "ready",
+    passed,
+    issues,
+  };
+}
+
 function buildPlatformPackage(
   input: PlatformPublishExportInput,
   platform: PlatformProfile,
@@ -920,6 +1062,13 @@ function buildPlatformPackage(
     ? textOrFallback(submissionAsset?.overseasSynopsis, textOrFallback(submissionAsset?.synopsis, submissionPackage.overseasSynopsis))
     : textOrFallback(submissionAsset?.synopsis, submissionPackage.synopsis);
   const tags = assetTags.length ? assetTags : submissionPackage.tags;
+  const submissionAssetAudit = buildSubmissionAssetAudit(platform, {
+    title,
+    logline,
+    synopsis,
+    overseasSynopsis: textOrFallback(submissionAsset?.overseasSynopsis, submissionPackage.overseasSynopsis),
+    tags,
+  });
   const publishNote = [
     buildPublishNote(platform, submissionPackage),
     submissionAsset?.note.trim() ? `投稿资产备注：${submissionAsset.note.trim()}` : "",
@@ -949,6 +1098,10 @@ function buildPlatformPackage(
     .filter((snapshot) => snapshot.platformId === platform.id)
     .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime())
     .slice(0, 5);
+  const submissionAssetVersions = (input.submissionAssetVersions ?? [])
+    .filter((version) => version.platformId === platform.id)
+    .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime())
+    .slice(0, 5);
   const packWithoutMarkdown = {
     platformId: platform.id,
     platformName: platform.name,
@@ -958,6 +1111,8 @@ function buildPlatformPackage(
       tags: assetTags,
       persisted: true,
     } : null,
+    submissionAssetAudit,
+    submissionAssetVersions,
     title,
     logline,
     synopsis,

@@ -6,6 +6,7 @@ import {
   buildPlatformPublishArchive,
   buildPublishPackageRestorePatch,
   buildPublishPackageVersionComparison,
+  buildSubmissionAssetAudit,
   countPublishPackageVersionActions,
   filterPublishPackageVersions,
   normalizePublishPackageVersionAction,
@@ -199,7 +200,7 @@ test("buildPlatformPublishExportCenter", async (t) => {
           platformName: "番茄小说",
           title: "夜雨系统：倒计时重生",
           logline: "系统每晚倒计时，女主用选择把绝境打成爽点。",
-          synopsis: "林晚在雨夜绑定倒计时系统，每一次选择都牵动生死与复仇。",
+          synopsis: "林晚在雨夜绑定倒计时系统，每一次选择都牵动生死与复仇。她必须在救人与自保之间连续做出决定，把系统惩罚反手变成翻盘筹码，沿着隐藏任务追查当年真相，同时把背叛她的人一步步拖回雨夜审判，并逼出幕后黑手的新任务。",
           overseasSynopsis: "Night Rain System follows Lin Wan through deadly timed choices.",
           tags: ["系统", "重生", "强爽点"],
           note: "首秀前强调前三章钩子。",
@@ -207,16 +208,60 @@ test("buildPlatformPublishExportCenter", async (t) => {
           updatedAt: "2026-01-06T08:00:00.000Z",
         },
       ],
+      submissionAssetVersions: [
+        {
+          id: "asset-version-1",
+          platformId: "fanqie",
+          platformName: "番茄小说",
+          title: "夜雨系统：倒计时重生",
+          logline: "系统每晚倒计时，女主用选择把绝境打成爽点。",
+          synopsis: "林晚在雨夜绑定倒计时系统，每一次选择都牵动生死与复仇。她必须在救人与自保之间连续做出决定，把系统惩罚反手变成翻盘筹码，沿着隐藏任务追查当年真相，同时把背叛她的人一步步拖回雨夜审判，并逼出幕后黑手的新任务。",
+          overseasSynopsis: "Night Rain System follows Lin Wan through deadly timed choices.",
+          tags: ["系统", "重生", "强爽点"],
+          note: "首秀前强调前三章钩子。",
+          source: "manual",
+          auditScore: 100,
+          auditStatus: "ready",
+          action: "save",
+          createdAt: "2026-01-07T08:00:00.000Z",
+        },
+      ],
     });
     const pack = center.packages[0];
 
     assert.equal(pack.title, "夜雨系统：倒计时重生");
     assert.equal(pack.logline, "系统每晚倒计时，女主用选择把绝境打成爽点。");
-    assert.equal(pack.synopsis, "林晚在雨夜绑定倒计时系统，每一次选择都牵动生死与复仇。");
+    assert.ok(pack.synopsis.includes("把系统惩罚反手变成翻盘筹码"));
     assert.deepEqual(pack.tags, ["系统", "重生", "强爽点"]);
     assert.equal(pack.submissionAsset?.persisted, true);
+    assert.equal(pack.submissionAssetAudit.status, "ready");
+    assert.equal(pack.submissionAssetVersions.length, 1);
+    assert.equal(pack.submissionAssetVersions[0].id, "asset-version-1");
     assert.ok(pack.publishNote.includes("首秀前强调前三章钩子。"));
     assert.ok(pack.markdown.includes("夜雨系统：倒计时重生"));
+    assert.ok(pack.markdown.includes("投稿资产质检"));
+  });
+
+  await t.test("scores platform submission asset fields", () => {
+    const weakFanqieAudit = buildSubmissionAssetAudit(getPlatformProfile("fanqie"), {
+      title: "夜",
+      logline: "系统",
+      synopsis: "她醒了。",
+      overseasSynopsis: "",
+      tags: ["慢热"],
+    });
+    const strongQidianAudit = buildSubmissionAssetAudit(getPlatformProfile("qidian"), {
+      title: "万界长夜体系",
+      logline: "少年在万界规则崩塌后重建升级体系，沿着主线追查旧神伏笔。",
+      synopsis: "少年在长夜世界醒来，发现每个境界都对应一段被抹去的历史。他必须重建升级体系，推进长期主线，收束隐藏伏笔，逐步揭开宗门、王朝和旧神之间的利益链，并在每个阶段 Boss 身上拿回失落规则，最终挑战操纵万界的旧神。",
+      overseasSynopsis: "",
+      tags: ["玄幻", "升级", "世界观"],
+    });
+
+    assert.equal(weakFanqieAudit.status, "blocked");
+    assert.ok(weakFanqieAudit.issues.some((issue) => issue.field === "logline"));
+    assert.equal(strongQidianAudit.status, "ready");
+    assert.ok(strongQidianAudit.score >= 90);
   });
 
   await t.test("blocks export when latest review still asks for a second pass", () => {

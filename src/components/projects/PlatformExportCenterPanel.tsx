@@ -169,11 +169,44 @@ interface PlatformSubmissionAsset {
   persisted: boolean;
 }
 
+interface PlatformSubmissionAssetIssue {
+  field: "title" | "logline" | "synopsis" | "overseasSynopsis" | "tags";
+  severity: "blocker" | "warning";
+  label: string;
+  detail: string;
+}
+
+interface PlatformSubmissionAssetAudit {
+  score: number;
+  status: "ready" | "needs_work" | "blocked";
+  passed: string[];
+  issues: PlatformSubmissionAssetIssue[];
+}
+
+interface PlatformSubmissionAssetVersion {
+  id?: string;
+  platformId: string;
+  platformName: string;
+  title: string;
+  logline: string;
+  synopsis: string;
+  overseasSynopsis: string;
+  tags: string[];
+  note: string;
+  source: string;
+  auditScore: number;
+  auditStatus: PlatformSubmissionAssetAudit["status"];
+  action: string;
+  createdAt: string;
+}
+
 interface PlatformPublishPackage {
   platformId: string;
   platformName: string;
   category: string;
   submissionAsset: PlatformSubmissionAsset | null;
+  submissionAssetAudit: PlatformSubmissionAssetAudit;
+  submissionAssetVersions: PlatformSubmissionAssetVersion[];
   title: string;
   logline: string;
   synopsis: string;
@@ -267,6 +300,23 @@ function versionActionLabel(action: string) {
   if (action === "copy") return "复制";
   if (action === "download") return "下载";
   if (action === "archive") return "归档";
+  if (action === "restore") return "恢复";
+  return "保存";
+}
+
+function assetAuditStatusLabel(status: PlatformSubmissionAssetAudit["status"]) {
+  if (status === "ready") return "可用";
+  if (status === "blocked") return "需重写";
+  return "需打磨";
+}
+
+function assetAuditStatusClass(status: PlatformSubmissionAssetAudit["status"]) {
+  if (status === "ready") return "bg-emerald-50 text-emerald-700";
+  if (status === "blocked") return "bg-rose-50 text-rose-700";
+  return "bg-amber-50 text-amber-700";
+}
+
+function assetVersionActionLabel(action: string) {
   if (action === "restore") return "恢复";
   return "保存";
 }
@@ -1237,7 +1287,7 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
             ) : null}
           </div>
 
-          <div className="rounded-md border border-slate-200 p-3">
+          <div className="rounded-md border border-slate-200 p-3" data-testid="submission-asset-editor">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
               <div>
                 <div className="font-medium text-slate-950">投稿资产</div>
@@ -1256,6 +1306,39 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
               >
                 {isSavingAsset ? "保存中" : "保存投稿资产"}
               </button>
+            </div>
+            <div className="mt-3 grid gap-3 lg:grid-cols-[180px_1fr]">
+              <div className="rounded-md bg-slate-50 p-3">
+                <div className="text-xs text-slate-500">资产质检</div>
+                <div className="mt-1 text-2xl font-semibold text-slate-950">{selectedPackage.submissionAssetAudit.score}</div>
+                <span className={`mt-2 inline-flex w-fit rounded-md px-2 py-1 text-xs font-medium ${assetAuditStatusClass(selectedPackage.submissionAssetAudit.status)}`}>
+                  {assetAuditStatusLabel(selectedPackage.submissionAssetAudit.status)}
+                </span>
+              </div>
+              <div className="rounded-md bg-slate-50 p-3 text-sm">
+                <div className="font-medium text-slate-900">字段问题</div>
+                <div className="mt-2 grid gap-2">
+                  {(selectedPackage.submissionAssetAudit.issues.length ? selectedPackage.submissionAssetAudit.issues : []).slice(0, 4).map((issue) => (
+                    <div className="rounded-md border border-slate-200 bg-white p-2" key={`${issue.field}-${issue.label}`}>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className={`rounded-md px-2 py-1 text-xs font-medium ${
+                          issue.severity === "blocker" ? "bg-rose-50 text-rose-700" : "bg-amber-50 text-amber-700"
+                        }`}>
+                          {issue.severity === "blocker" ? "阻塞" : "提醒"}
+                        </span>
+                        <span className="font-medium text-slate-950">{issue.label}</span>
+                      </div>
+                      <div className="mt-1 leading-5 text-slate-600">{issue.detail}</div>
+                    </div>
+                  ))}
+                  {!selectedPackage.submissionAssetAudit.issues.length ? (
+                    <div className="rounded-md border border-emerald-100 bg-white p-2 text-emerald-700">当前平台投稿字段暂无明显问题。</div>
+                  ) : null}
+                </div>
+                {selectedPackage.submissionAssetAudit.passed.length ? (
+                  <div className="mt-3 text-xs text-slate-500">已通过：{selectedPackage.submissionAssetAudit.passed.slice(0, 3).join("、")}</div>
+                ) : null}
+              </div>
             </div>
             <div className="mt-3 grid gap-3 lg:grid-cols-2">
               <label className="grid gap-1 text-sm text-slate-600">
@@ -1313,6 +1396,37 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
                   value={assetDraft.note}
                 />
               </label>
+            </div>
+            <div className="mt-3 rounded-md bg-slate-50 p-3 text-sm">
+              <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <div className="font-medium text-slate-900">投稿资产版本</div>
+                  <div className="mt-1 text-xs text-slate-500">最近 {selectedPackage.submissionAssetVersions.length} 次保存或恢复。</div>
+                </div>
+                <div className="text-xs text-slate-500">{selectedPackage.platformName}</div>
+              </div>
+              <div className="mt-2 grid gap-2 lg:grid-cols-2">
+                {selectedPackage.submissionAssetVersions.map((version) => (
+                  <div className="rounded-md border border-slate-200 bg-white p-3" key={version.id ?? `${version.platformId}-${version.createdAt}`}>
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                      <div>
+                        <div className="font-medium text-slate-950">{version.title}</div>
+                        <div className="mt-1 text-xs text-slate-500">
+                          {assetVersionActionLabel(version.action)} · {formatTime(version.createdAt)}
+                        </div>
+                      </div>
+                      <span className={`w-fit rounded-md px-2 py-1 text-xs font-medium ${assetAuditStatusClass(version.auditStatus)}`}>
+                        {version.auditScore}
+                      </span>
+                    </div>
+                    <div className="mt-2 line-clamp-2 text-slate-600">{version.logline}</div>
+                    <div className="mt-2 text-xs text-slate-500">标签：{version.tags.join("、") || "无"}</div>
+                  </div>
+                ))}
+                {!selectedPackage.submissionAssetVersions.length ? (
+                  <div className="rounded-md border border-slate-200 bg-white p-3 text-slate-600">还没有投稿资产版本，保存一次后开始记录。</div>
+                ) : null}
+              </div>
             </div>
           </div>
 

@@ -120,12 +120,26 @@ export interface ControlArea {
   status: "good" | "watch" | "blocked";
   evidence: string;
   nextAction: string;
+  actionLabel: string;
+  targetAnchor: string;
+}
+
+export interface ControlPriorityAction {
+  id: string;
+  areaId: string;
+  label: string;
+  score: number;
+  severity: "high" | "medium" | "low";
+  reason: string;
+  actionLabel: string;
+  targetAnchor: string;
 }
 
 export interface ProjectControlDashboard {
   overallScore: number;
   verdict: string;
   areas: ControlArea[];
+  priorityActions: ControlPriorityAction[];
   criticalActions: string[];
   metrics: {
     chapters: number;
@@ -141,7 +155,15 @@ function clampScore(value: number) {
   return Math.max(0, Math.min(100, Math.round(value)));
 }
 
-function area(id: string, label: string, score: number, evidence: string, nextAction: string): ControlArea {
+function area(
+  id: string,
+  label: string,
+  score: number,
+  evidence: string,
+  nextAction: string | undefined,
+  actionLabel: string,
+  targetAnchor: string,
+): ControlArea {
   const normalized = clampScore(score);
   return {
     id,
@@ -149,8 +171,16 @@ function area(id: string, label: string, score: number, evidence: string, nextAc
     score: normalized,
     status: normalized >= 80 ? "good" : normalized >= 55 ? "watch" : "blocked",
     evidence,
-    nextAction,
+    nextAction: nextAction ?? "补齐该模块的硬缺口。",
+    actionLabel,
+    targetAnchor,
   };
+}
+
+function actionSeverity(status: ControlArea["status"]): ControlPriorityAction["severity"] {
+  if (status === "blocked") return "high";
+  if (status === "watch") return "medium";
+  return "low";
 }
 
 function ratio(part: number, total: number) {
@@ -235,31 +265,44 @@ export function buildProjectControlDashboard(input: ProjectControlDashboardInput
     : 0;
 
   const areas = [
-    area("outline", "大纲骨架", outline, `${input.outlineNodes.length} 个大纲节点。`, "补齐开头、结尾、主干、分支、叶片和土壤。"),
-    area("characters", "人物弧光", characterDashboard.averageCompleteness, `${characterDashboard.completeCharacters}/${characterDashboard.totalCharacters} 个人物完整。`, characterDashboard.nextActions[0]),
-    area("world", "世界观资料", ratio(worldDashboard.completeEntries, Math.max(worldDashboard.totalEntries, 3)) * 100, `${worldDashboard.completeEntries}/${worldDashboard.totalEntries} 条设定完整。`, worldDashboard.nextActions[0]),
-    area("story-lines", "伏笔主线", ratio(storyLineDashboard.foreshadowReady + storyLineDashboard.threadResolved, Math.max(storyLineDashboard.foreshadowTotal + storyLineDashboard.threadTotal, 2)) * 100, `${storyLineDashboard.foreshadowReady} 个伏笔已回收，${storyLineDashboard.threadResolved} 条剧情线有终点。`, storyLineDashboard.nextActions[0]),
-    area("production", "章节生产", productionScore, `${production.dashboard.totalItems} 张排期卡，${production.dashboard.blockedItems} 张卡住。`, production.dashboard.nextActions[0]),
-    area("ai-pipeline", "AI 写审改", aiPipelineScore, `${batchDraft.readyCandidates} 章可初稿，${reviewPipeline.reviewReadyCount} 章待审，${reviewPipeline.secondPassReadyCount} 章可二改。`, "按批量初稿、批量审稿、批量二改顺序清队列。"),
-    area("ops", "连载运营", average([serialization.submissionReadinessPercent, serialization.publishReadyCount > 0 ? 100 : 40]), `${serialization.publishReadyCount} 章可发布，投稿准备度 ${serialization.submissionReadinessPercent}%。`, serialization.actions[0]?.detail ?? "继续推进运营动作。"),
+    area("outline", "大纲骨架", outline, `${input.outlineNodes.length} 个大纲节点。`, "补齐开头、结尾、主干、分支、叶片和土壤。", "补大纲骨架", "outline-tree"),
+    area("characters", "人物弧光", characterDashboard.averageCompleteness, `${characterDashboard.completeCharacters}/${characterDashboard.totalCharacters} 个人物完整。`, characterDashboard.nextActions[0], "补人物弧光", "character-arc"),
+    area("world", "世界观资料", ratio(worldDashboard.completeEntries, Math.max(worldDashboard.totalEntries, 3)) * 100, `${worldDashboard.completeEntries}/${worldDashboard.totalEntries} 条设定完整。`, worldDashboard.nextActions[0], "补世界观", "world-bible"),
+    area("story-lines", "伏笔主线", ratio(storyLineDashboard.foreshadowReady + storyLineDashboard.threadResolved, Math.max(storyLineDashboard.foreshadowTotal + storyLineDashboard.threadTotal, 2)) * 100, `${storyLineDashboard.foreshadowReady} 个伏笔已回收，${storyLineDashboard.threadResolved} 条剧情线有终点。`, storyLineDashboard.nextActions[0], "补主线伏笔", "story-lines"),
+    area("production", "章节生产", productionScore, `${production.dashboard.totalItems} 张排期卡，${production.dashboard.blockedItems} 张卡住。`, production.dashboard.nextActions[0], "排章节生产", "chapter-production"),
+    area("ai-pipeline", "AI 写审改", aiPipelineScore, `${batchDraft.readyCandidates} 章可初稿，${reviewPipeline.reviewReadyCount} 章待审，${reviewPipeline.secondPassReadyCount} 章可二改。`, "按批量初稿、批量审稿、批量二改顺序清队列。", "清写审改队列", "ai-pipeline"),
+    area("ops", "连载运营", average([serialization.submissionReadinessPercent, serialization.publishReadyCount > 0 ? 100 : 40]), `${serialization.publishReadyCount} 章可发布，投稿准备度 ${serialization.submissionReadinessPercent}%。`, serialization.actions[0]?.detail ?? "继续推进运营动作。", "看运营动作", "serialization-ops"),
     area(
       "export",
       "平台导出",
       targetPackage.canExport ? 95 : platformExport.totalPublishableChapters > 0 ? targetPackage.preflight.score : 30,
       `${platformExport.packages.length} 个平台发布包，${platformExport.totalPublishableChapters} 章有正文，${targetPackage.platformName} 质检 ${targetPackage.preflight.score} 分。`,
       targetPackage.canExport ? "下载发布包并人工最终检查。" : targetPackage.repairPath.headline,
+      "处理发布缺口",
+      "platform-export",
     ),
   ];
   const overallScore = clampScore(average(areas.map((item) => item.score)));
-  const criticalActions = [...areas]
+  const priorityActions = [...areas]
     .sort((left, right) => left.score - right.score || left.label.localeCompare(right.label))
     .slice(0, 4)
-    .map((item) => `${item.label}：${item.nextAction}`);
+    .map((item): ControlPriorityAction => ({
+      id: `priority-${item.id}`,
+      areaId: item.id,
+      label: item.label,
+      score: item.score,
+      severity: actionSeverity(item.status),
+      reason: item.nextAction,
+      actionLabel: item.actionLabel,
+      targetAnchor: item.targetAnchor,
+    }));
+  const criticalActions = priorityActions.map((item) => `${item.label}：${item.reason}`);
 
   return {
     overallScore,
     verdict: verdict(overallScore),
     areas,
+    priorityActions,
     criticalActions,
     metrics: {
       chapters: input.chapters.length,

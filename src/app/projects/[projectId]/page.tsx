@@ -234,12 +234,24 @@ export default async function ProjectPage({ params }: { params: Promise<{ projec
         <div id="character-arc">
           <CharacterArcPanel projectId={project.id} />
         </div>
-        <StoryLinePanel projectId={project.id} />
-        <WorldBiblePanel projectId={project.id} />
-        <ChapterProductionPanel projectId={project.id} />
-        <BatchDraftCenterPanel projectId={project.id} />
-        <BatchReviewPipelinePanel projectId={project.id} />
-        <SerializationOpsPanel projectId={project.id} />
+        <div id="story-lines">
+          <StoryLinePanel projectId={project.id} />
+        </div>
+        <div id="world-bible">
+          <WorldBiblePanel projectId={project.id} />
+        </div>
+        <div id="chapter-production">
+          <ChapterProductionPanel projectId={project.id} />
+        </div>
+        <div id="ai-pipeline">
+          <BatchDraftCenterPanel projectId={project.id} />
+          <div className="mt-4">
+            <BatchReviewPipelinePanel projectId={project.id} />
+          </div>
+        </div>
+        <div id="serialization-ops">
+          <SerializationOpsPanel projectId={project.id} />
+        </div>
         <div id="platform-export">
           <PlatformExportCenterPanel projectId={project.id} />
         </div>
@@ -247,7 +259,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ projec
         <div id="submission-package">
           <SubmissionPackagePanel projectId={project.id} submissionPackage={submissionPackage} />
         </div>
-        <div className="grid gap-4 md:grid-cols-[2fr_1fr]">
+        <div id="outline-tree" className="grid gap-4 md:grid-cols-[2fr_1fr]">
           <OutlineTreePanel projectId={project.id} nodes={outlineNodes} />
           <div className="rounded-md border bg-white p-4">
             <div className="font-medium">平台策略</div>

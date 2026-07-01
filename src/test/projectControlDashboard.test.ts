@@ -59,6 +59,9 @@ test("buildProjectControlDashboard", async (t) => {
     assert.equal(dashboard.metrics.publishableChapters, 1);
     assert.equal(dashboard.areas.find((area) => area.id === "export")?.status, "blocked");
     assert.ok(dashboard.areas.find((area) => area.id === "export")?.nextAction.includes("先处理"));
+    assert.equal(dashboard.priorityActions.length, 4);
+    assert.ok(dashboard.priorityActions.some((action) => action.areaId === "characters" && action.targetAnchor === "character-arc"));
+    assert.ok(dashboard.priorityActions.every((action) => action.actionLabel.length > 0));
     assert.ok(dashboard.overallScore > 0);
     assert.ok(dashboard.criticalActions.some((action) => action.includes("人物弧光")));
   });

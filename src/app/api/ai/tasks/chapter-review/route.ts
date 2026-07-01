@@ -1,81 +1,21 @@
 import { NextResponse } from "next/server";
-import { buildChapterReviewPrompt } from "@/lib/ai/buildChapterReviewPrompt";
+import { reviewChapterDraft } from "@/lib/ai/chapterReviewGeneration";
 import { prisma } from "@/lib/db/prisma";
-import { getActiveModelProvider } from "@/lib/model-gateway/activeProvider";
-import { getPlatformProfile, type PlatformId } from "@/lib/platforms/platformProfiles";
 
 export async function POST(request: Request) {
   const body = (await request.json()) as { chapterId: string };
-  const chapter = await prisma.chapter.findUnique({
-    where: { id: body.chapterId },
-    include: { project: true },
-  });
-
-  if (!chapter) {
-    return NextResponse.json({ error: "Chapter not found" }, { status: 404 });
-  }
-
-  const platform = getPlatformProfile(chapter.project.targetPlatform as PlatformId);
-  const prompt = buildChapterReviewPrompt({
-    projectTitle: chapter.project.title,
-    platform,
-    chapter: {
-      title: chapter.title,
-      content: chapter.content,
-      goal: chapter.goal,
-      hook: chapter.hook,
-      conflict: chapter.conflict,
-      valueShift: chapter.valueShift,
-      cliffhanger: chapter.cliffhanger,
-    },
-  });
-
-  const { provider, adapter } = await getActiveModelProvider();
-
-  const task = await prisma.aiTask.create({
-    data: {
-      projectId: chapter.projectId,
-      chapterId: chapter.id,
-      taskType: "chapter_review",
-      providerConfigId: provider.id,
-      model: provider.defaultModel,
-      status: "running",
-      inputSnapshot: JSON.stringify(prompt),
-    },
-  });
 
   try {
-    const result = await adapter.generate({
-      providerId: provider.providerId as "claude" | "deepseek" | "kimi" | "gpt" | "openai_compatible" | "ollama" | "mock",
-      model: provider.defaultModel,
-      systemPrompt: prompt.systemPrompt,
-      userPrompt: prompt.userPrompt,
-    });
-    const parsedResult = JSON.parse(result.text);
+    const review = await reviewChapterDraft(body.chapterId);
+    if ("error" in review) {
+      return NextResponse.json({ task: review.task, error: review.error }, { status: 500 });
+    }
 
-    const updatedTask = await prisma.aiTask.update({
-      where: { id: task.id },
-      data: {
-        status: "succeeded",
-        outputText: result.text,
-        inputTokens: result.usage?.inputTokens,
-        outputTokens: result.usage?.outputTokens,
-        costUsd: result.usage?.costUsd,
-      },
-    });
-
-    return NextResponse.json({ task: updatedTask, result: parsedResult });
+    return NextResponse.json({ task: review.task, result: review.result });
   } catch (caught) {
     const message = caught instanceof Error ? caught.message : "Unknown review error";
-    const failedTask = await prisma.aiTask.update({
-      where: { id: task.id },
-      data: {
-        status: "failed",
-        errorMessage: message,
-      },
-    });
-
-    return NextResponse.json({ task: failedTask, error: message }, { status: 500 });
+    const status = message === "Chapter not found" ? 404 : 500;
+    return NextResponse.json({ error: message }, { status });
   }
 }
 

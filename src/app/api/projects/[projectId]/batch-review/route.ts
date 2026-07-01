@@ -142,6 +142,9 @@ export async function POST(request: Request, { params }: Params) {
         chapterTitle: result.chapter.title,
         taskId: result.task.id,
         wordCount: result.chapter.wordCount,
+        score: "error" in result ? null : result.secondPassAudit.score,
+        issueCount: "error" in result ? 0 : result.secondPassAudit.issues.length,
+        shouldSecondPass: "error" in result ? false : result.secondPassAudit.shouldSecondPass,
         error: "error" in result ? result.error : null,
       });
     }

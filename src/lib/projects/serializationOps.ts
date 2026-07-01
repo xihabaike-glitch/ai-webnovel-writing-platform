@@ -77,11 +77,15 @@ function latestTask(tasks: SerializationTask[], chapterId: string, taskType: str
     .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime())[0];
 }
 
-function parseReviewScore(task: SerializationTask | undefined) {
+function parseReviewDecision(task: SerializationTask | undefined) {
   if (!task?.outputText) return null;
   try {
-    const parsed = JSON.parse(task.outputText) as { score?: number };
-    return typeof parsed.score === "number" ? parsed.score : null;
+    const parsed = JSON.parse(task.outputText) as { score?: number; shouldSecondPass?: boolean };
+    const score = typeof parsed.score === "number" ? parsed.score : null;
+    const shouldSecondPass = typeof parsed.shouldSecondPass === "boolean"
+      ? parsed.shouldSecondPass
+      : score === null || score < 85;
+    return { score, shouldSecondPass };
   } catch {
     return null;
   }
@@ -151,11 +155,12 @@ export function buildSerializationOpsDashboard(input: SerializationOpsInput): Se
   const reviewQueue = draftedChapters.filter((chapter) => !reviewed(chapter, input.aiTasks));
   const revisionQueue = draftedChapters.filter((chapter) => {
     const reviewTask = latestTask(input.aiTasks, chapter.id, "chapter_review");
-    const score = parseReviewScore(reviewTask);
-    return reviewed(chapter, input.aiTasks) && !secondPassed(chapter, input.aiTasks) && (score === null || score < 85);
+    const decision = parseReviewDecision(reviewTask);
+    return reviewed(chapter, input.aiTasks) && (decision?.shouldSecondPass ?? true);
   });
   const publishReady = draftedChapters.filter((chapter) => (
     reviewed(chapter, input.aiTasks)
+    && !revisionQueue.some((item) => item.id === chapter.id)
     && (secondPassed(chapter, input.aiTasks) || chapter.status === "final")
   ));
   const progressPercent = input.project.targetWordCount > 0

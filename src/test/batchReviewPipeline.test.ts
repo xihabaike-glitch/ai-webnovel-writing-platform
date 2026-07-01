@@ -89,6 +89,65 @@ test("buildReviewPipelineQueue", async (t) => {
     assert.ok(queue.candidates[0].instruction.includes("第二个任务"));
   });
 
+  await t.test("keeps second-pass chapters in queue until automatic recheck passes", () => {
+    const failedRecheckQueue = buildReviewPipelineQueue([chapter], [
+      {
+        id: "second-pass",
+        chapterId: "chapter-1",
+        taskType: "chapter_second_pass",
+        status: "succeeded",
+        outputText: "二改正文",
+        errorMessage: null,
+        createdAt: "2026-01-01T00:00:00.000Z",
+      },
+      {
+        id: "auto-recheck",
+        chapterId: "chapter-1",
+        taskType: "chapter_review",
+        status: "succeeded",
+        outputText: JSON.stringify({
+          score: 80,
+          shouldSecondPass: true,
+          issues: [{ type: "payoff", suggestion: "章末继续加压。" }],
+        }),
+        errorMessage: null,
+        createdAt: "2026-01-02T00:00:00.000Z",
+      },
+    ]);
+
+    assert.equal(failedRecheckQueue.secondPassReadyCount, 1);
+    assert.equal(failedRecheckQueue.candidates[0].secondPassStatus, "ready");
+
+    const passedRecheckQueue = buildReviewPipelineQueue([chapter], [
+      {
+        id: "second-pass",
+        chapterId: "chapter-1",
+        taskType: "chapter_second_pass",
+        status: "succeeded",
+        outputText: "二改正文",
+        errorMessage: null,
+        createdAt: "2026-01-01T00:00:00.000Z",
+      },
+      {
+        id: "auto-recheck",
+        chapterId: "chapter-1",
+        taskType: "chapter_review",
+        status: "succeeded",
+        outputText: JSON.stringify({
+          score: 90,
+          shouldSecondPass: false,
+          issues: [{ type: "length", suggestion: "后续人工精修字数。" }],
+        }),
+        errorMessage: null,
+        createdAt: "2026-01-02T00:00:00.000Z",
+      },
+    ]);
+
+    assert.equal(passedRecheckQueue.secondPassReadyCount, 0);
+    assert.equal(passedRecheckQueue.candidates[0].secondPassStatus, "done");
+    assert.equal(passedRecheckQueue.candidates[0].reason, "二改后复检已达标。");
+  });
+
   await t.test("blocks empty chapters and running jobs", () => {
     const queue = buildReviewPipelineQueue([
       { ...chapter, id: "empty", wordCount: 0 },

@@ -102,4 +102,63 @@ test("buildSerializationOpsDashboard", async (t) => {
     assert.equal(dashboard.nextPublishChapter?.id, "chapter-1");
     assert.equal(dashboard.actions.some((action) => action.id === "publish-next"), true);
   });
+
+  await t.test("requires second-pass recheck before publish readiness", () => {
+    const failedRecheck = buildSerializationOpsDashboard({
+      project,
+      platform,
+      chapters: [chapter],
+      aiTasks: [
+        {
+          id: "second-1",
+          chapterId: "chapter-1",
+          taskType: "chapter_second_pass",
+          status: "succeeded",
+          outputText: "二改正文",
+          createdAt: "2026-01-01T00:00:00.000Z",
+        },
+        {
+          id: "recheck-1",
+          chapterId: "chapter-1",
+          taskType: "chapter_review",
+          status: "succeeded",
+          outputText: JSON.stringify({ score: 80, shouldSecondPass: true, issues: [{ type: "payoff" }] }),
+          createdAt: "2026-01-02T00:00:00.000Z",
+        },
+      ],
+      submissionChecklist: { ...checklist, readinessPercent: 90, items: [] },
+    });
+
+    assert.equal(failedRecheck.publishReadyCount, 0);
+    assert.equal(failedRecheck.revisionQueueCount, 1);
+    assert.equal(failedRecheck.actions[0].id, "revise-next");
+
+    const passedRecheck = buildSerializationOpsDashboard({
+      project,
+      platform,
+      chapters: [chapter],
+      aiTasks: [
+        {
+          id: "second-1",
+          chapterId: "chapter-1",
+          taskType: "chapter_second_pass",
+          status: "succeeded",
+          outputText: "二改正文",
+          createdAt: "2026-01-01T00:00:00.000Z",
+        },
+        {
+          id: "recheck-1",
+          chapterId: "chapter-1",
+          taskType: "chapter_review",
+          status: "succeeded",
+          outputText: JSON.stringify({ score: 90, shouldSecondPass: false, issues: [{ type: "length" }] }),
+          createdAt: "2026-01-02T00:00:00.000Z",
+        },
+      ],
+      submissionChecklist: { ...checklist, readinessPercent: 90, items: [] },
+    });
+
+    assert.equal(passedRecheck.publishReadyCount, 1);
+    assert.equal(passedRecheck.revisionQueueCount, 0);
+  });
 });

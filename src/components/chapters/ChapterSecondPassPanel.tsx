@@ -21,6 +21,11 @@ interface SecondPassResult {
     displayName: string;
     model: string;
   };
+  secondPassAudit: {
+    score: number;
+    shouldSecondPass: boolean;
+    issues: Array<{ type: string; suggestion: string }>;
+  };
 }
 
 const modeOptions: Array<{ value: SecondPassMode; label: string }> = [
@@ -54,7 +59,7 @@ export function ChapterSecondPassPanel({ chapterId, currentWordCount }: { chapte
         throw new Error(payload.error || "二改失败。");
       }
       setResult(payload);
-      setMessage("已完成章节二改，并自动保存二改前旧稿");
+      setMessage(`已完成章节二改，复检 ${payload.secondPassAudit.score} 分${payload.secondPassAudit.shouldSecondPass ? "，仍建议继续二改。" : "，可进入发布检查。"}`);
       router.refresh();
     } catch (caught) {
       setMessage(caught instanceof Error ? caught.message : "二改失败。");
@@ -124,8 +129,15 @@ export function ChapterSecondPassPanel({ chapterId, currentWordCount }: { chapte
             <div className="text-xs text-slate-500">{result.activeProvider.displayName} · {result.activeProvider.model}</div>
           </div>
           <div className="mt-1 text-slate-500">
-            {result.chapter.wordCount} 字 · {result.chapter.status} · {result.task.status}
+            {result.chapter.wordCount} 字 · 复检 {result.secondPassAudit.score} 分 · {result.secondPassAudit.shouldSecondPass ? "继续二改" : "可发布检查"}
           </div>
+          {result.secondPassAudit.issues.length ? (
+            <div className="mt-2 grid gap-1 text-slate-500">
+              {result.secondPassAudit.issues.slice(0, 3).map((issue) => (
+                <div key={`${issue.type}-${issue.suggestion}`}>复检建议：{issue.suggestion}</div>
+              ))}
+            </div>
+          ) : null}
           <p className="mt-2 line-clamp-4 text-slate-600">{result.content}</p>
         </div>
       ) : null}

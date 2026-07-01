@@ -2,6 +2,7 @@ import {
   buildChapterSecondPassPrompt,
   type SecondPassMode,
 } from "@/lib/ai/buildChapterSecondPassPrompt";
+import { buildDraftQualityAudit } from "@/lib/ai/draftQualityAudit";
 import { prisma } from "@/lib/db/prisma";
 import { getActiveModelProvider } from "@/lib/model-gateway/activeProvider";
 import type { ModelProviderId } from "@/lib/model-gateway/types";
@@ -88,6 +89,19 @@ export async function generateChapterSecondPass(options: GenerateChapterSecondPa
       maxTokens: 3200,
     });
     const wordCount = countWords(result.text);
+    const secondPassAudit = buildDraftQualityAudit({
+      platform,
+      targetWords: options.targetWords ?? Math.max(1200, chapter.wordCount),
+      content: result.text,
+      chapter: {
+        title: chapter.title,
+        goal: chapter.goal,
+        hook: chapter.hook,
+        conflict: chapter.conflict,
+        valueShift: chapter.valueShift,
+        cliffhanger: chapter.cliffhanger,
+      },
+    });
 
     const [updatedTask, updatedChapter] = await prisma.$transaction(async (tx) => {
       const savedTask = await tx.aiTask.update({
@@ -125,6 +139,26 @@ export async function generateChapterSecondPass(options: GenerateChapterSecondPa
           status: "revising",
         },
       });
+      await tx.aiTask.create({
+        data: {
+          projectId: chapter.projectId,
+          chapterId: chapter.id,
+          taskType: "chapter_review",
+          providerConfigId: provider.id,
+          model: `${provider.defaultModel}:auto-second-pass-audit`,
+          status: "succeeded",
+          inputSnapshot: JSON.stringify({
+            source: "auto_second_pass_quality_audit",
+            secondPassTaskId: task.id,
+            platformId: platform.id,
+            targetWords: options.targetWords ?? Math.max(1200, chapter.wordCount),
+          }),
+          outputText: JSON.stringify(secondPassAudit),
+          inputTokens: 0,
+          outputTokens: 0,
+          costUsd: 0,
+        },
+      });
       const chapters = await tx.chapter.findMany({
         where: { projectId: chapter.projectId },
         select: { wordCount: true },
@@ -143,6 +177,7 @@ export async function generateChapterSecondPass(options: GenerateChapterSecondPa
       task: updatedTask,
       chapter: updatedChapter,
       content: result.text,
+      secondPassAudit,
       activeProvider: {
         id: provider.id,
         providerId: provider.providerId,

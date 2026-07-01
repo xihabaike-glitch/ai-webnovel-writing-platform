@@ -40,6 +40,7 @@ export async function POST(request: Request, { params }: Params) {
       chapter: result.chapter,
       content: result.content,
       activeProvider: result.activeProvider,
+      secondPassAudit: result.secondPassAudit,
     });
   } catch (caught) {
     const message = caught instanceof Error ? caught.message : "Unknown second pass error";

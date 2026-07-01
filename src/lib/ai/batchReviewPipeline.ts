@@ -46,6 +46,7 @@ export interface ReviewPipelineQueue {
 
 interface ParsedReview {
   score?: number;
+  shouldSecondPass?: boolean;
   issues?: Array<{
     severity?: string;
     type?: string;
@@ -89,6 +90,13 @@ function issueInstruction(review: ParsedReview | null) {
     || "按审稿意见强化钩子、冲突、爽点和章末追读。";
 }
 
+function needsSecondPassFromReview(review: ParsedReview | null) {
+  if (!review) return false;
+  if (typeof review.shouldSecondPass === "boolean") return review.shouldSecondPass;
+  const score = typeof review.score === "number" ? review.score : null;
+  return (score ?? 100) < 85 || (review.issues?.length ?? 0) > 0;
+}
+
 export function chooseSecondPassMode(review: ParsedReview | null): SecondPassMode {
   const types = (review?.issues ?? []).map((issue) => issue.type ?? "").join(" ");
   if (/hook/.test(types)) return "more_hook";
@@ -108,7 +116,7 @@ function candidateFor(chapter: ReviewPipelineChapter, tasks: ReviewPipelineTask[
   const score = typeof review?.score === "number" ? review.score : null;
   const hasDraft = chapter.wordCount > 0;
   const reviewed = reviewTask?.status === "succeeded" && Boolean(review);
-  const needsSecondPass = reviewed && ((score ?? 100) < 85 || issueCount > 0);
+  const needsSecondPass = reviewed && needsSecondPassFromReview(review);
   const secondPassDone = secondPassTask?.status === "succeeded";
   const reviewStatus = runningReview
     ? "running"
@@ -119,11 +127,11 @@ function candidateFor(chapter: ReviewPipelineChapter, tasks: ReviewPipelineTask[
         : "ready";
   const secondPassStatus = runningSecondPass
     ? "running"
-    : secondPassDone
-      ? "done"
-      : needsSecondPass
+    : needsSecondPass
         ? "ready"
-        : "blocked";
+        : secondPassDone
+          ? "done"
+          : "blocked";
 
   return {
     chapterId: chapter.id,
@@ -143,7 +151,9 @@ function candidateFor(chapter: ReviewPipelineChapter, tasks: ReviewPipelineTask[
         : reviewed
           ? needsSecondPass
             ? "已审稿，存在可执行二改问题。"
-            : "已审稿，暂不需要批量二改。"
+            : secondPassDone
+              ? "二改后复检已达标。"
+              : "已审稿，暂不需要批量二改。"
           : "已有正文但未审稿，可以进入批量审稿。",
     recommendedReview: reviewStatus === "ready",
     recommendedSecondPass: secondPassStatus === "ready",

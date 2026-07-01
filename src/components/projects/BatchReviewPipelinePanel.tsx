@@ -48,6 +48,7 @@ interface BatchPipelineResult {
   score?: number | null;
   issueCount?: number;
   wordCount?: number;
+  shouldSecondPass?: boolean;
   error: string | null;
 }
 
@@ -341,7 +342,7 @@ export function BatchReviewPipelinePanel({ projectId }: { projectId: string }) {
                   <span>{result.status === "succeeded" ? "成功" : "失败"}</span>
                 </div>
                 <div className="mt-1">
-                  {typeof result.score === "number" ? `${result.score} 分 · ${result.issueCount ?? 0} 个问题` : `${result.wordCount ?? 0} 字`}
+                  {typeof result.score === "number" ? `${result.score} 分 · ${result.issueCount ?? 0} 个问题${result.shouldSecondPass ? " · 继续二改" : " · 复检达标"}` : `${result.wordCount ?? 0} 字`}
                 </div>
                 {result.error ? <p className="mt-1">{result.error}</p> : null}
               </div>

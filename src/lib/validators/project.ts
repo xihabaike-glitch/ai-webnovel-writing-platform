@@ -17,4 +17,5 @@ export const createProjectSchema = z.object({
   genre: z.string().min(1).max(80),
   sellingPoint: z.string().max(500).default(""),
   updateCadence: z.string().max(80).default(""),
+  templateId: z.string().max(80).optional(),
 });

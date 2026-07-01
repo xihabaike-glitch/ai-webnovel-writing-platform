@@ -2,7 +2,8 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { platformProfiles, type PlatformId } from "@/lib/platforms/platformProfiles";
+import { platformProfiles, type LengthType, type PlatformId } from "@/lib/platforms/platformProfiles";
+import { projectTemplates } from "@/lib/projects/projectTemplates";
 
 const lengthOptions = [
   { id: "short_10k", label: "1 万字短篇" },
@@ -13,10 +14,34 @@ const lengthOptions = [
 
 export function ProjectForm() {
   const router = useRouter();
-  const [platformId, setPlatformId] = useState<PlatformId>("fanqie");
+  const defaultTemplate = projectTemplates[0];
+  const [templateId, setTemplateId] = useState(defaultTemplate.id);
+  const [title, setTitle] = useState(defaultTemplate.titleSeed);
+  const [genre, setGenre] = useState(defaultTemplate.genre);
+  const [updateCadence, setUpdateCadence] = useState(defaultTemplate.updateCadence);
+  const [platformId, setPlatformId] = useState<PlatformId>(defaultTemplate.platformId);
+  const [lengthType, setLengthType] = useState<LengthType>(defaultTemplate.lengthType);
+  const [sellingPoint, setSellingPoint] = useState(defaultTemplate.sellingPoint);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const selectedProfile = platformProfiles.find((profile) => profile.id === platformId) ?? platformProfiles[0];
+  const selectedTemplate = projectTemplates.find((template) => template.id === templateId) ?? defaultTemplate;
+
+  function applyTemplate(nextTemplateId: string) {
+    const template = projectTemplates.find((item) => item.id === nextTemplateId) ?? defaultTemplate;
+    setTemplateId(template.id);
+    setTitle(template.titleSeed);
+    setGenre(template.genre);
+    setUpdateCadence(template.updateCadence);
+    setPlatformId(template.platformId);
+    setLengthType(template.lengthType);
+    setSellingPoint(template.sellingPoint);
+  }
+
+  function applyPlatform(nextPlatformId: PlatformId) {
+    const template = projectTemplates.find((item) => item.platformId === nextPlatformId) ?? defaultTemplate;
+    applyTemplate(template.id);
+  }
 
   async function createProject(formData: FormData) {
     setIsSubmitting(true);
@@ -32,6 +57,7 @@ export function ProjectForm() {
           genre: String(formData.get("genre") ?? ""),
           sellingPoint: String(formData.get("sellingPoint") ?? ""),
           updateCadence: String(formData.get("updateCadence") ?? ""),
+          templateId: String(formData.get("templateId") ?? ""),
         }),
       });
 
@@ -52,14 +78,38 @@ export function ProjectForm() {
   return (
     <form action={createProject} className="grid gap-4 rounded-md border border-slate-200 bg-white p-4">
       <div>
+        <label className="text-sm font-medium" htmlFor="templateId">
+          开书模板
+        </label>
+        <select
+          className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2"
+          id="templateId"
+          name="templateId"
+          onChange={(event) => applyTemplate(event.target.value)}
+          value={templateId}
+        >
+          {projectTemplates.map((template) => (
+            <option key={template.id} value={template.id}>
+              {template.label}
+            </option>
+          ))}
+        </select>
+        <div className="mt-2 rounded-md bg-slate-50 p-3 text-sm text-slate-600">
+          <div className="font-medium text-slate-900">{selectedTemplate.label}</div>
+          <div className="mt-1">{selectedTemplate.positioning}</div>
+          <div className="mt-1">前三章：{selectedTemplate.firstThree.map((chapter) => chapter.title).join(" / ")}</div>
+        </div>
+      </div>
+      <div>
         <label className="text-sm font-medium" htmlFor="title">
           作品名
         </label>
         <input
           className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2"
-          defaultValue="夜雨系统"
           id="title"
           name="title"
+          onChange={(event) => setTitle(event.target.value)}
+          value={title}
         />
       </div>
       <div className="grid gap-4 md:grid-cols-2">
@@ -69,9 +119,10 @@ export function ProjectForm() {
           </label>
           <input
             className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2"
-            defaultValue="都市系统"
             id="genre"
             name="genre"
+            onChange={(event) => setGenre(event.target.value)}
+            value={genre}
           />
         </div>
         <div>
@@ -80,9 +131,10 @@ export function ProjectForm() {
           </label>
           <input
             className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2"
-            defaultValue="daily_4000"
             id="updateCadence"
             name="updateCadence"
+            onChange={(event) => setUpdateCadence(event.target.value)}
+            value={updateCadence}
           />
         </div>
       </div>
@@ -95,7 +147,7 @@ export function ProjectForm() {
             className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2"
             id="platform"
             name="platform"
-            onChange={(event) => setPlatformId(event.target.value as PlatformId)}
+            onChange={(event) => applyPlatform(event.target.value as PlatformId)}
             value={platformId}
           >
             {platformProfiles.map((platform) => (
@@ -109,7 +161,13 @@ export function ProjectForm() {
           <label className="text-sm font-medium" htmlFor="length">
             篇幅
           </label>
-          <select className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2" id="length" name="length">
+          <select
+            className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2"
+            id="length"
+            name="length"
+            onChange={(event) => setLengthType(event.target.value as LengthType)}
+            value={lengthType}
+          >
             {lengthOptions.map((option) => (
               <option key={option.id} value={option.id}>
                 {option.label}
@@ -129,9 +187,10 @@ export function ProjectForm() {
         </label>
         <textarea
           className="mt-1 min-h-20 w-full rounded-md border border-slate-200 px-3 py-2"
-          defaultValue="雨夜危机中觉醒系统，主角用一次次选择翻盘。"
           id="sellingPoint"
           name="sellingPoint"
+          onChange={(event) => setSellingPoint(event.target.value)}
+          value={sellingPoint}
         />
       </div>
       {error ? <p className="text-sm text-red-600">{error}</p> : null}

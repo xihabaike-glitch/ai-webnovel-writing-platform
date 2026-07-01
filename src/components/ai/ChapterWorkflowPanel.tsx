@@ -20,6 +20,26 @@ interface ReviewResult {
   summary: string;
 }
 
+interface OpeningDiagnosticItem {
+  id: string;
+  label: string;
+  status: "pass" | "warn" | "fail";
+  score: number;
+  evidence: string;
+  suggestion: string;
+}
+
+interface OpeningDiagnostic {
+  score: number;
+  verdict: string;
+  excerpt: string;
+  wordCount: number;
+  items: OpeningDiagnosticItem[];
+  rewritePlan: string[];
+  platformFocus: string[];
+  markdown: string;
+}
+
 interface WorkflowPayload {
   chapter: {
     title: string;
@@ -69,10 +89,13 @@ export function ChapterWorkflowPanel({
   const [reviewResult, setReviewResult] = useState<ReviewResult | null>(null);
   const [isGeneratingDraft, setIsGeneratingDraft] = useState(false);
   const [isReviewing, setIsReviewing] = useState(false);
+  const [isDiagnosingOpening, setIsDiagnosingOpening] = useState(false);
+  const [isDownloadingDiagnostic, setIsDownloadingDiagnostic] = useState(false);
   const [isSavingRevision, setIsSavingRevision] = useState(false);
   const [restoringRevisionId, setRestoringRevisionId] = useState<string | null>(null);
   const [revisions, setRevisions] = useState<ChapterRevisionSummary[]>([]);
   const [selectedRevision, setSelectedRevision] = useState<ChapterRevisionSummary | null>(null);
+  const [openingDiagnostic, setOpeningDiagnostic] = useState<OpeningDiagnostic | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const groupedIssues = useMemo(
     () => (reviewResult ? nonEmptyReviewGroups(groupReviewIssues(reviewResult.issues)) : []),
@@ -203,6 +226,53 @@ export function ChapterWorkflowPanel({
     }
   }
 
+  async function runOpeningDiagnostic() {
+    setIsDiagnosingOpening(true);
+    setMessage(null);
+    try {
+      const response = await fetch(`/api/chapters/${chapterId}/opening-diagnostic`);
+      if (!response.ok) {
+        throw new Error("黄金三秒诊断失败。");
+      }
+      const payload = (await response.json()) as { diagnostic: OpeningDiagnostic };
+      setOpeningDiagnostic(payload.diagnostic);
+      setMessage("已完成黄金三秒诊断");
+    } catch (caught) {
+      setMessage(caught instanceof Error ? caught.message : "黄金三秒诊断失败。");
+    } finally {
+      setIsDiagnosingOpening(false);
+    }
+  }
+
+  async function copyOpeningDiagnostic() {
+    if (!openingDiagnostic) return;
+    await navigator.clipboard.writeText(openingDiagnostic.markdown);
+    setMessage("已复制黄金三秒诊断");
+  }
+
+  async function downloadOpeningDiagnostic() {
+    setIsDownloadingDiagnostic(true);
+    setMessage(null);
+    try {
+      const response = await fetch(`/api/chapters/${chapterId}/opening-diagnostic?format=markdown`);
+      if (!response.ok) {
+        throw new Error("下载诊断失败。");
+      }
+      const markdown = await response.text();
+      const blob = new Blob([markdown], { type: "text/markdown;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "黄金三秒诊断.md";
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (caught) {
+      setMessage(caught instanceof Error ? caught.message : "下载诊断失败。");
+    } finally {
+      setIsDownloadingDiagnostic(false);
+    }
+  }
+
   return (
     <aside className="grid gap-4">
       <section className="rounded-md border border-slate-200 bg-white p-4">
@@ -220,7 +290,7 @@ export function ChapterWorkflowPanel({
             <div className="rounded-md bg-amber-50 p-2 text-amber-700">当前模型未配置 Key，会优先使用可用模型或 Mock。</div>
           ) : null}
         </div>
-        <div className="mt-4 grid grid-cols-2 gap-2">
+        <div className="mt-4 grid gap-2 sm:grid-cols-3">
           <button
             className="rounded-md bg-slate-950 px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
             disabled={isGeneratingDraft}
@@ -237,8 +307,74 @@ export function ChapterWorkflowPanel({
           >
             {isReviewing ? "审稿中" : "运行审稿"}
           </button>
+          <button
+            className="rounded-md border border-slate-200 px-3 py-2 text-sm font-medium hover:bg-slate-50 disabled:opacity-50"
+            disabled={isDiagnosingOpening}
+            onClick={runOpeningDiagnostic}
+            type="button"
+          >
+            {isDiagnosingOpening ? "诊断中" : "黄金三秒"}
+          </button>
         </div>
         {message ? <p className="mt-3 text-sm text-slate-600">{message}</p> : null}
+      </section>
+
+      <section className="rounded-md border border-slate-200 bg-white p-4">
+        <div className="flex items-center justify-between gap-3">
+          <h3 className="font-medium">黄金三秒诊断</h3>
+          {openingDiagnostic ? (
+            <div className="flex gap-2">
+              <button className="text-xs text-slate-500 hover:text-slate-900" onClick={copyOpeningDiagnostic} type="button">
+                复制
+              </button>
+              <button
+                className="text-xs text-slate-500 hover:text-slate-900 disabled:opacity-50"
+                disabled={isDownloadingDiagnostic}
+                onClick={downloadOpeningDiagnostic}
+                type="button"
+              >
+                {isDownloadingDiagnostic ? "下载中" : "下载"}
+              </button>
+            </div>
+          ) : null}
+        </div>
+        {openingDiagnostic ? (
+          <div className="mt-4 grid gap-3 text-sm">
+            <div className="rounded-md bg-slate-50 p-3">
+              <div className="text-xs text-slate-500">评分</div>
+              <div className="mt-1 text-2xl font-semibold text-slate-950">{openingDiagnostic.score}</div>
+              <p className="mt-2 text-slate-600">{openingDiagnostic.verdict}</p>
+            </div>
+            <div className="rounded-md border border-slate-200 p-3">
+              <div className="text-xs font-medium text-slate-500">检测窗口 · {openingDiagnostic.wordCount} 字</div>
+              <p className="mt-2 line-clamp-4 text-slate-700">{openingDiagnostic.excerpt || "正文为空。"}</p>
+            </div>
+            <div className="grid gap-2">
+              {openingDiagnostic.items.map((entry) => (
+                <div className="rounded-md bg-slate-50 p-3" key={entry.id}>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-medium text-slate-900">{entry.label}</span>
+                    <span className="text-xs text-slate-500">
+                      {entry.status} · {entry.score}
+                    </span>
+                  </div>
+                  <p className="mt-1 text-slate-600">{entry.evidence}</p>
+                  <p className="mt-1 text-slate-500">{entry.suggestion}</p>
+                </div>
+              ))}
+            </div>
+            <div className="rounded-md border border-slate-200 p-3">
+              <div className="font-medium">修订顺序</div>
+              <div className="mt-2 grid gap-2 text-slate-600">
+                {openingDiagnostic.rewritePlan.map((step, index) => (
+                  <div key={step}>{index + 1}. {step}</div>
+                ))}
+              </div>
+            </div>
+          </div>
+        ) : (
+          <p className="mt-3 text-sm text-slate-600">检查第一章前 800 字：首句钩子、主角处境、不可逆危机、选择压力和平台适配。</p>
+        )}
       </section>
 
       <section className="rounded-md border border-slate-200 bg-white p-4">

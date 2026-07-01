@@ -9,6 +9,7 @@ const baseItem: QueueItem = {
   projectTitle: "夜雨系统",
   platformName: "番茄小说",
   category: "review",
+  blockerType: null,
   label: "待审稿",
   chapterTitle: "第一章",
   evidence: "已有正文但未审稿。",

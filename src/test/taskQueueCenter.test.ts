@@ -74,6 +74,8 @@ test("buildTaskQueueCenter", async (t) => {
     assert.equal(queue.overview.secondPassReady, 1);
     assert.equal(queue.overview.exportReady, 0);
     assert.equal(queue.overview.blockedCards, 2);
+    assert.equal(queue.overview.publishBlocked, 1);
+    assert.equal(queue.overview.chapterCardBlocked, 1);
     assert.equal(queue.overview.totalItems, 5);
     assert.equal(queue.recommendedNext?.category, "review");
     assert.deepEqual(
@@ -81,7 +83,10 @@ test("buildTaskQueueCenter", async (t) => {
       ["review", "second_pass", "draft", "blocked", "blocked"],
     );
     const publishBlocker = queue.items.find((item) => item.id.includes(":publish-repair:"));
+    const cardBlocker = queue.items.find((item) => item.id.includes(":blocked:"));
     assert.ok(publishBlocker?.href.endsWith("#platform-export"));
+    assert.equal(publishBlocker?.blockerType, "publish_repair");
+    assert.equal(cardBlocker?.blockerType, "chapter_card");
     assert.ok(publishBlocker?.evidence.includes("先处理"));
   });
 });

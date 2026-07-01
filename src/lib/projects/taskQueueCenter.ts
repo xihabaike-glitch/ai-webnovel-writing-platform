@@ -41,6 +41,7 @@ export interface QueueItem {
   projectTitle: string;
   platformName: string;
   category: "draft" | "review" | "second_pass" | "export" | "blocked";
+  blockerType: "chapter_card" | "publish_repair" | null;
   label: string;
   chapterTitle: string;
   evidence: string;
@@ -57,6 +58,8 @@ export interface TaskQueueCenter {
     secondPassReady: number;
     exportReady: number;
     blockedCards: number;
+    publishBlocked: number;
+    chapterCardBlocked: number;
   };
   items: QueueItem[];
   recommendedNext: QueueItem | null;
@@ -81,9 +84,10 @@ function categoryLabel(category: QueueItem["category"]) {
   return labels[category];
 }
 
-function item(input: Omit<QueueItem, "label" | "priority">): QueueItem {
+function item(input: Omit<QueueItem, "label" | "priority" | "blockerType"> & { blockerType?: QueueItem["blockerType"] }): QueueItem {
   return {
     ...input,
+    blockerType: input.blockerType ?? null,
     label: categoryLabel(input.category),
     priority: categoryPriority[input.category],
   };
@@ -171,6 +175,7 @@ export function buildTaskQueueCenter(projects: TaskQueueProject[]): TaskQueueCen
         projectTitle: project.title,
         platformName: platform.name,
         category: "blocked",
+        blockerType: "publish_repair",
         chapterTitle: `${targetPackage.platformName} 发布质检`,
         evidence: targetPackage.repairPath.headline,
         actionLabel: targetPackage.repairPath.nextStep?.label ?? "处理发布阻塞",
@@ -185,6 +190,7 @@ export function buildTaskQueueCenter(projects: TaskQueueProject[]): TaskQueueCen
         projectTitle: project.title,
         platformName: platform.name,
         category: "blocked",
+        blockerType: "chapter_card",
         chapterTitle: candidate.title,
         evidence: candidate.reason,
         actionLabel: "补章节卡",
@@ -207,6 +213,8 @@ export function buildTaskQueueCenter(projects: TaskQueueProject[]): TaskQueueCen
       secondPassReady: items.filter((entry) => entry.category === "second_pass").length,
       exportReady: items.filter((entry) => entry.category === "export").length,
       blockedCards: items.filter((entry) => entry.category === "blocked").length,
+      publishBlocked: items.filter((entry) => entry.blockerType === "publish_repair").length,
+      chapterCardBlocked: items.filter((entry) => entry.blockerType === "chapter_card").length,
     },
     items,
     recommendedNext: items.find((entry) => entry.category !== "blocked") ?? items[0] ?? null,

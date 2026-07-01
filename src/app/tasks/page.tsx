@@ -16,6 +16,12 @@ function categoryClass(category: QueueItem["category"]) {
   return "bg-rose-50 text-rose-700";
 }
 
+function blockerTypeLabel(entry: QueueItem) {
+  if (entry.blockerType === "publish_repair") return "发布阻塞";
+  if (entry.blockerType === "chapter_card") return "章节卡住";
+  return entry.label;
+}
+
 function runStatusClass(status: string) {
   if (status === "succeeded") return "bg-emerald-50 text-emerald-700";
   if (status === "failed") return "bg-rose-50 text-rose-700";
@@ -109,6 +115,14 @@ export default async function TasksPage() {
         <div className="rounded-md border border-slate-200 bg-white p-3">
           <div className="text-xs text-slate-500">卡住</div>
           <div className="mt-1 text-2xl font-semibold">{queue.overview.blockedCards}</div>
+        </div>
+        <div className="rounded-md border border-slate-200 bg-white p-3">
+          <div className="text-xs text-slate-500">发布阻塞</div>
+          <div className="mt-1 text-2xl font-semibold">{queue.overview.publishBlocked}</div>
+        </div>
+        <div className="rounded-md border border-slate-200 bg-white p-3">
+          <div className="text-xs text-slate-500">章节卡住</div>
+          <div className="mt-1 text-2xl font-semibold">{queue.overview.chapterCardBlocked}</div>
         </div>
       </section>
 
@@ -271,7 +285,7 @@ export default async function TasksPage() {
             <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
               <div>
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className={`rounded-md px-2 py-1 text-xs font-medium ${categoryClass(entry.category)}`}>{entry.label}</span>
+                  <span className={`rounded-md px-2 py-1 text-xs font-medium ${categoryClass(entry.category)}`}>{blockerTypeLabel(entry)}</span>
                   <Link className="font-semibold text-slate-950 hover:underline" href={`/projects/${entry.projectId}`}>
                     {entry.projectTitle}
                   </Link>

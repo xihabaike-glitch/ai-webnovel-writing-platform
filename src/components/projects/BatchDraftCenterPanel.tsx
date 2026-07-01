@@ -7,9 +7,12 @@ interface BatchDraftCandidate {
   chapterId: string;
   order: number;
   title: string;
-  status: "ready" | "needs_card" | "has_draft" | "running";
+  status: "ready" | "needs_card" | "weak_style" | "has_draft" | "running";
   wordCount: number;
   missingFields: string[];
+  styleScore: number | null;
+  styleVerdict: string | null;
+  priorityFixes: string[];
   reason: string;
   recommended: boolean;
 }
@@ -44,6 +47,7 @@ function statusLabel(status: BatchDraftCandidate["status"]) {
   const labels = {
     ready: "可生成",
     needs_card: "需补卡",
+    weak_style: "风格弱",
     has_draft: "已有正文",
     running: "运行中",
   };
@@ -61,6 +65,10 @@ export function BatchDraftCenterPanel({ projectId }: { projectId: string }) {
   const [message, setMessage] = useState<string | null>(null);
   const readyIds = useMemo(
     () => queue?.candidates.filter((candidate) => candidate.status === "ready").map((candidate) => candidate.chapterId) ?? [],
+    [queue],
+  );
+  const weakStyleCount = useMemo(
+    () => queue?.candidates.filter((candidate) => candidate.status === "weak_style").length ?? 0,
     [queue],
   );
 
@@ -152,7 +160,7 @@ export function BatchDraftCenterPanel({ projectId }: { projectId: string }) {
         </button>
       </div>
 
-      <div className="mt-4 grid gap-3 sm:grid-cols-4">
+      <div className="mt-4 grid gap-3 sm:grid-cols-5">
         <div className="rounded-md bg-slate-50 p-3">
           <div className="text-xs text-slate-500">候选章节</div>
           <div className="mt-1 text-2xl font-semibold text-slate-950">{queue?.totalCandidates ?? 0}</div>
@@ -164,6 +172,10 @@ export function BatchDraftCenterPanel({ projectId }: { projectId: string }) {
         <div className="rounded-md bg-slate-50 p-3">
           <div className="text-xs text-slate-500">已选择</div>
           <div className="mt-1 text-2xl font-semibold text-slate-950">{selectedIds.length}</div>
+        </div>
+        <div className="rounded-md bg-slate-50 p-3">
+          <div className="text-xs text-slate-500">需补风格</div>
+          <div className="mt-1 text-2xl font-semibold text-slate-950">{weakStyleCount}</div>
         </div>
         <div className="rounded-md bg-slate-50 p-3">
           <div className="text-xs text-slate-500">当前模型</div>
@@ -263,8 +275,23 @@ export function BatchDraftCenterPanel({ projectId }: { projectId: string }) {
                 {candidate.missingFields.length ? (
                   <span className="mt-1 block text-slate-500">缺口：{candidate.missingFields.join("、")}</span>
                 ) : null}
+                {candidate.styleScore !== null ? (
+                  <span className="mt-1 block text-slate-500">平台体检：{candidate.styleScore} 分 · {candidate.styleVerdict}</span>
+                ) : null}
+                {candidate.priorityFixes.length ? (
+                  <span className="mt-1 grid gap-1 text-slate-500">
+                    {candidate.priorityFixes.map((fix) => (
+                      <span key={fix}>补强：{fix}</span>
+                    ))}
+                  </span>
+                ) : null}
               </span>
-              <span className="text-xs text-slate-500">{statusLabel(candidate.status)} · {candidate.wordCount} 字</span>
+              <span className="text-xs text-slate-500">
+                {statusLabel(candidate.status)}
+                {candidate.styleScore !== null ? ` · ${candidate.styleScore} 分` : ""}
+                {" · "}
+                {candidate.wordCount} 字
+              </span>
             </label>
           );
         })}

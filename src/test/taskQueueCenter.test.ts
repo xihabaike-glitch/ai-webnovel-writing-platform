@@ -8,11 +8,11 @@ const baseChapter = {
   title: "第一章 雨夜系统",
   content: "",
   wordCount: 0,
-  goal: "让主角遭遇系统。",
-  hook: "门外倒计时出现。",
-  conflict: "主角必须选择救人或逃跑。",
-  valueShift: "日常转为危机。",
-  cliffhanger: "系统提示第一次失败。",
+  goal: "让主角在雨夜被系统逼进不可逆选择。",
+  hook: "系统倒计时只剩十秒，门外的人已经开始求救。",
+  conflict: "主角必须在逃跑和救人之间选择，否则会失去唯一证据。",
+  valueShift: "从普通生活转向失控危机，第一次意识到系统会索命。",
+  cliffhanger: "系统刷新第二个任务：亲手交出证据。",
   status: "outline",
 };
 

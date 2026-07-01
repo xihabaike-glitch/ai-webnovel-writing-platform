@@ -5,6 +5,7 @@ import { buildBatchRunGuard } from "@/lib/ai/batchRunGuard";
 import { generateChapterDraft } from "@/lib/ai/chapterDraftGeneration";
 import { prisma } from "@/lib/db/prisma";
 import { getActiveModelProvider } from "@/lib/model-gateway/activeProvider";
+import { getPlatformProfile, type PlatformId } from "@/lib/platforms/platformProfiles";
 
 interface Params {
   params: Promise<{ projectId: string }>;
@@ -15,7 +16,7 @@ const batchDraftSchema = z.object({
   targetWords: z.number().int().min(500).max(5000).default(1200),
 });
 
-async function getQueue(projectId: string) {
+async function getQueue(projectId: string, targetPlatform: string) {
   const chapters = await prisma.chapter.findMany({
     where: { projectId },
     orderBy: { order: "asc" },
@@ -32,11 +33,12 @@ async function getQueue(projectId: string) {
     orderBy: { createdAt: "desc" },
   });
 
-  return buildBatchDraftQueue(chapters, tasks);
+  const platform = getPlatformProfile(targetPlatform as PlatformId);
+  return buildBatchDraftQueue(chapters, tasks, platform);
 }
 
 async function activeProviderView() {
-  const { provider } = await getActiveModelProvider();
+  const { provider } = await getActiveModelProvider("chapter_draft");
   return {
     providerId: provider.providerId,
     displayName: provider.displayName,
@@ -56,7 +58,7 @@ export async function GET(_request: Request, { params }: Params) {
   }
 
   return NextResponse.json({
-    queue: await getQueue(projectId),
+    queue: await getQueue(projectId, project.targetPlatform),
     activeProvider: await activeProviderView(),
   });
 }
@@ -75,7 +77,7 @@ export async function POST(request: Request, { params }: Params) {
   }
 
   const input = parsed.data;
-  const queue = await getQueue(projectId);
+  const queue = await getQueue(projectId, project.targetPlatform);
   const candidateById = new Map(queue.candidates.map((candidate) => [candidate.chapterId, candidate]));
   const rejected = input.chapterIds
     .map((chapterId) => candidateById.get(chapterId))
@@ -132,7 +134,7 @@ export async function POST(request: Request, { params }: Params) {
 
   return NextResponse.json({
     results,
-    queue: await getQueue(projectId),
+    queue: await getQueue(projectId, project.targetPlatform),
     activeProvider: await activeProviderView(),
   });
 }

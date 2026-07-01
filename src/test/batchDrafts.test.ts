@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { buildBatchDraftQueue } from "../lib/ai/batchDrafts.ts";
+import { getPlatformProfile } from "../lib/platforms/platformProfiles.ts";
 
 const baseChapter = {
   id: "chapter-1",
@@ -49,5 +50,33 @@ test("buildBatchDraftQueue", async (t) => {
 
     assert.equal(queue.readyCandidates, 0);
     assert.equal(queue.candidates[0].status, "running");
+  });
+
+  await t.test("filters out complete but weak platform-style cards", () => {
+    const queue = buildBatchDraftQueue([
+      {
+        ...baseChapter,
+        hook: "主角醒来。",
+        conflict: "聊聊天。",
+        valueShift: "从早上到晚上。",
+        cliffhanger: "明天再说。",
+      },
+      {
+        ...baseChapter,
+        id: "chapter-2",
+        order: 2,
+        hook: "系统倒计时只剩十秒，门外的人已经开始求救。",
+        conflict: "主角必须在逃跑和救人之间选择，否则会失去唯一证据。",
+        valueShift: "从普通生活转向失控危机，第一次意识到系统会索命。",
+        cliffhanger: "系统刷新第二个任务：亲手交出证据。",
+      },
+    ], [], getPlatformProfile("fanqie"));
+
+    assert.equal(queue.readyCandidates, 1);
+    assert.deepEqual(queue.recommendedChapterIds, ["chapter-2"]);
+    assert.equal(queue.candidates[0].status, "weak_style");
+    assert.ok((queue.candidates[0].styleScore ?? 100) < 70);
+    assert.ok(queue.candidates[0].priorityFixes.length > 0);
+    assert.ok(queue.warnings.some((warning) => warning.includes("平台风格体检")));
   });
 });

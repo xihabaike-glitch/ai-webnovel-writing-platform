@@ -201,7 +201,7 @@ export function buildProjectControlDashboard(input: ProjectControlDashboardInput
     foreshadows: input.foreshadows,
     plotThreads: input.plotThreads,
   });
-  const batchDraft = buildBatchDraftQueue(input.chapters, input.aiTasks as BatchDraftTask[]);
+  const batchDraft = buildBatchDraftQueue(input.chapters, input.aiTasks as BatchDraftTask[], input.platform);
   const reviewPipeline = buildReviewPipelineQueue(input.chapters, input.aiTasks);
   const serialization = buildSerializationOpsDashboard({
     project: input.project,

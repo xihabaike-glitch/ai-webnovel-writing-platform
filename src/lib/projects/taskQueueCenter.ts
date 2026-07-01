@@ -93,7 +93,7 @@ export function buildTaskQueueCenter(projects: TaskQueueProject[]): TaskQueueCen
   const items = projects.flatMap((project) => {
     const platform = getPlatformProfile(project.targetPlatform as PlatformId);
     const projectHref = `/projects/${project.id}`;
-    const draftQueue = buildBatchDraftQueue(project.chapters, project.aiTasks);
+    const draftQueue = buildBatchDraftQueue(project.chapters, project.aiTasks, platform);
     const reviewQueue = buildReviewPipelineQueue(project.chapters, project.aiTasks);
     const exportCenter = buildPlatformPublishExportCenter({
       project: {

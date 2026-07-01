@@ -96,6 +96,7 @@ export interface ControlAiTask {
   taskType: string;
   status: string;
   outputText: string | null;
+  inputSnapshot?: string;
   errorMessage: string | null;
   createdAt: Date | string;
 }
@@ -143,12 +144,26 @@ export interface ControlPriorityAction {
   generateLabel: string;
 }
 
+export interface ControlAssetQualityReport {
+  taskId: string;
+  areaId: string;
+  areaLabel: string;
+  score: number;
+  status: "pass" | "warn" | "fail";
+  repaired: boolean;
+  createdCount: number;
+  issues: string[];
+  nextActions: string[];
+  createdAt: string;
+}
+
 export interface ProjectControlDashboard {
   overallScore: number;
   verdict: string;
   areas: ControlArea[];
   priorityActions: ControlPriorityAction[];
   criticalActions: string[];
+  controlAssetQualityReports: ControlAssetQualityReport[];
   metrics: {
     chapters: number;
     words: number;
@@ -231,6 +246,92 @@ function verdict(score: number) {
   if (score >= 70) return "项目生产链基本打通，但仍有模块会拖慢发布。";
   if (score >= 50) return "项目有雏形，但缺口会导致写作和发布互相卡住。";
   return "项目还在搭骨架，先别急着批量扩写或投放。";
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function parseJsonObject(value: string | null | undefined) {
+  if (!value) return null;
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    return isRecord(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function stringArray(value: unknown) {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
+}
+
+function controlAssetAreaLabel(areaId: string) {
+  if (areaId === "characters") return "人物弧光";
+  if (areaId === "world") return "世界观资料";
+  if (areaId === "story-lines") return "主线伏笔";
+  return "资料生成";
+}
+
+function normalizeControlAssetStatus(status: unknown, score: number): ControlAssetQualityReport["status"] {
+  if (status === "pass" || status === "warn" || status === "fail") return status;
+  if (score >= 75) return "pass";
+  if (score >= 60) return "warn";
+  return "fail";
+}
+
+function arrayCount(value: unknown) {
+  return Array.isArray(value) ? value.length : 0;
+}
+
+function inferControlAssetArea(generated: Record<string, unknown> | null) {
+  if (!generated) return "unknown";
+  if (arrayCount(generated.characters) > 0) return "characters";
+  if (arrayCount(generated.worldEntries) > 0) return "world";
+  if (arrayCount(generated.plotThreads) > 0 || arrayCount(generated.foreshadows) > 0) return "story-lines";
+  return "unknown";
+}
+
+function generatedAssetCount(generated: Record<string, unknown> | null, areaId: string) {
+  if (!generated) return 0;
+  if (areaId === "characters") return arrayCount(generated.characters);
+  if (areaId === "world") return arrayCount(generated.worldEntries);
+  if (areaId === "story-lines") return arrayCount(generated.plotThreads) + arrayCount(generated.foreshadows);
+  return arrayCount(generated.characters) + arrayCount(generated.worldEntries) + arrayCount(generated.plotThreads) + arrayCount(generated.foreshadows);
+}
+
+function buildControlAssetQualityReports(tasks: ControlAiTask[]): ControlAssetQualityReport[] {
+  return tasks
+    .filter((task) => task.taskType === "control_asset_generate" && task.outputText)
+    .map((task) => {
+      const output = parseJsonObject(task.outputText);
+      if (!output) return null;
+      const qualityGate = isRecord(output.qualityGate) ? output.qualityGate : null;
+      if (!qualityGate) return null;
+
+      const generated = isRecord(output.generated) ? output.generated : null;
+      const snapshot = parseJsonObject(task.inputSnapshot);
+      const snapshotArea = typeof snapshot?.areaId === "string" ? snapshot.areaId : null;
+      const areaId = snapshotArea ?? inferControlAssetArea(generated);
+      const score = clampScore(typeof qualityGate.score === "number" ? qualityGate.score : 0);
+      const repair = isRecord(output.repair) ? output.repair : null;
+
+      return {
+        taskId: task.id,
+        areaId,
+        areaLabel: controlAssetAreaLabel(areaId),
+        score,
+        status: normalizeControlAssetStatus(qualityGate.status, score),
+        repaired: repair?.attempted === true,
+        createdCount: generatedAssetCount(generated, areaId),
+        issues: stringArray(qualityGate.issues),
+        nextActions: stringArray(qualityGate.nextActions),
+        createdAt: new Date(task.createdAt).toISOString(),
+      } satisfies ControlAssetQualityReport;
+    })
+    .filter((report): report is ControlAssetQualityReport => Boolean(report))
+    .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime())
+    .slice(0, 3);
 }
 
 export function buildProjectControlDashboard(input: ProjectControlDashboardInput): ProjectControlDashboard {
@@ -317,6 +418,7 @@ export function buildProjectControlDashboard(input: ProjectControlDashboardInput
       generateLabel: item.generateLabel,
     }));
   const criticalActions = priorityActions.map((item) => `${item.label}：${item.reason}`);
+  const controlAssetQualityReports = buildControlAssetQualityReports(input.aiTasks);
 
   return {
     overallScore,
@@ -324,6 +426,7 @@ export function buildProjectControlDashboard(input: ProjectControlDashboardInput
     areas,
     priorityActions,
     criticalActions,
+    controlAssetQualityReports,
     metrics: {
       chapters: input.chapters.length,
       words: input.project.currentWordCount,

@@ -50,6 +50,24 @@ test("buildProjectControlDashboard", async (t) => {
       plotThreads: [],
       aiTasks: [
         { id: "review-1", chapterId: "chapter-1", taskType: "chapter_review", status: "succeeded", outputText: JSON.stringify({ score: 72, issues: [{ type: "hook" }] }), errorMessage: null, createdAt: "2026-01-01T00:00:00.000Z" },
+        {
+          id: "asset-1",
+          chapterId: null,
+          taskType: "control_asset_generate",
+          status: "succeeded",
+          inputSnapshot: JSON.stringify({ areaId: "world" }),
+          outputText: JSON.stringify({
+            generated: {
+              worldEntries: [
+                { type: "system_rule", title: "雨夜系统", content: "系统每次奖励都绑定新的债务和关系压力。" },
+              ],
+            },
+            qualityGate: { score: 88, status: "pass", passed: true, issues: [], nextActions: [] },
+            repair: { attempted: true },
+          }),
+          errorMessage: null,
+          createdAt: "2026-01-02T00:00:00.000Z",
+        },
       ],
       submissionChecklist: checklist,
     });
@@ -64,6 +82,10 @@ test("buildProjectControlDashboard", async (t) => {
     assert.ok(dashboard.priorityActions.every((action) => action.actionLabel.length > 0));
     assert.ok(dashboard.priorityActions.some((action) => action.areaId === "characters" && action.canExecute && action.executeLabel === "补人物卡"));
     assert.ok(dashboard.priorityActions.some((action) => action.areaId === "characters" && action.canGenerate && action.generateLabel === "AI 生成人物"));
+    assert.equal(dashboard.controlAssetQualityReports.length, 1);
+    assert.equal(dashboard.controlAssetQualityReports[0].areaLabel, "世界观资料");
+    assert.equal(dashboard.controlAssetQualityReports[0].score, 88);
+    assert.equal(dashboard.controlAssetQualityReports[0].repaired, true);
     assert.ok(dashboard.overallScore > 0);
     assert.ok(dashboard.criticalActions.some((action) => action.includes("人物弧光")));
   });

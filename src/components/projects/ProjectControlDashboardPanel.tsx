@@ -33,12 +33,26 @@ interface ControlPriorityAction {
   generateLabel: string;
 }
 
+interface ControlAssetQualityReport {
+  taskId: string;
+  areaId: string;
+  areaLabel: string;
+  score: number;
+  status: "pass" | "warn" | "fail";
+  repaired: boolean;
+  createdCount: number;
+  issues: string[];
+  nextActions: string[];
+  createdAt: string;
+}
+
 interface ProjectControlDashboard {
   overallScore: number;
   verdict: string;
   areas: ControlArea[];
   priorityActions: ControlPriorityAction[];
   criticalActions: string[];
+  controlAssetQualityReports: ControlAssetQualityReport[];
   metrics: {
     chapters: number;
     words: number;
@@ -59,6 +73,12 @@ function severityLabel(severity: ControlPriorityAction["severity"]) {
   if (severity === "high") return "高优先级";
   if (severity === "medium") return "中优先级";
   return "可优化";
+}
+
+function qualityStatusLabel(status: ControlAssetQualityReport["status"]) {
+  if (status === "pass") return "通过";
+  if (status === "warn") return "需看";
+  return "拦截";
 }
 
 export function ProjectControlDashboardPanel({ projectId }: { projectId: string }) {
@@ -219,6 +239,27 @@ export function ProjectControlDashboardPanel({ projectId }: { projectId: string 
                   <div className="rounded-md bg-slate-50 p-2" key={action}>{index + 1}. {action}</div>
                 ))}
               </div>
+              {dashboard.controlAssetQualityReports?.length ? (
+                <div className="mt-4 border-t border-slate-200 pt-3">
+                  <div className="font-medium text-slate-950">最近 AI 资料质检</div>
+                  <div className="mt-3 grid gap-2">
+                    {dashboard.controlAssetQualityReports.map((report) => {
+                      const detail = report.issues[0] ?? report.nextActions[0] ?? `已生成 ${report.createdCount} 项资料卡。`;
+                      return (
+                        <div className="rounded-md bg-slate-50 p-3 text-sm" key={report.taskId}>
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <div className="font-medium text-slate-950">{report.areaLabel}</div>
+                            <div className="text-xs text-slate-500">
+                              {qualityStatusLabel(report.status)} · {report.score} 分{report.repaired ? " · 已返修" : ""}
+                            </div>
+                          </div>
+                          <p className="mt-1 leading-6 text-slate-600">{detail}</p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : null}
             </div>
             <div className="rounded-md border border-slate-200 p-3">
               <div className="font-medium text-slate-950">模块健康</div>

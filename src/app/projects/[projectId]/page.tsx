@@ -25,6 +25,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ projec
   const outlineNodes = project.outlineNodes.map((node) => ({
     id: node.id,
     parentId: node.parentId,
+    chapterId: node.chapterId,
     type: node.type,
     title: node.title,
     summary: node.summary,

@@ -2,7 +2,9 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   buildPublishRepairSecondPassInstruction,
+  buildPublishRepairTaskSnapshot,
   canExecutePublishRepairAction,
+  publishRepairTaskSource,
 } from "../lib/projects/publishRepairActionExecution.ts";
 
 test("publish repair action execution helpers", async (t) => {
@@ -23,5 +25,21 @@ test("publish repair action execution helpers", async (t) => {
     assert.ok(instruction.includes("开头钩子"));
     assert.ok(instruction.includes("章末追读悬念"));
     assert.ok(instruction.includes("不要另起炉灶"));
+  });
+
+  await t.test("marks repair tasks with source metadata", () => {
+    const snapshot = buildPublishRepairTaskSnapshot({
+      kind: "run_chapter_review",
+      label: "补章节审稿",
+      detail: "补齐发布前审稿。",
+      chapterId: "chapter-1",
+      chapterTitle: "雨夜系统",
+    }, "{\"prompt\":\"original\"}");
+    const parsed = JSON.parse(snapshot) as Record<string, unknown>;
+
+    assert.equal(parsed.source, publishRepairTaskSource);
+    assert.equal(parsed.actionKind, "run_chapter_review");
+    assert.equal(parsed.chapterTitle, "雨夜系统");
+    assert.equal(parsed.originalInputSnapshot, "{\"prompt\":\"original\"}");
   });
 });

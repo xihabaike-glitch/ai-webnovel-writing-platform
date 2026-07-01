@@ -116,10 +116,14 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
     () => center?.packages.find((pack) => pack.platformId === selectedPlatformId) ?? center?.packages[0] ?? null,
     [center, selectedPlatformId],
   );
+  const executableActions = useMemo(
+    () => selectedPackage?.repairActions.filter(canRunAction).slice(0, 5) ?? [],
+    [selectedPackage],
+  );
 
-  async function loadCenter() {
+  async function loadCenter(options?: { keepMessage?: boolean }) {
     setIsLoading(true);
-    setMessage(null);
+    if (!options?.keepMessage) setMessage(null);
     try {
       const response = await fetch(`/api/projects/${projectId}/platform-export`);
       if (!response.ok) {
@@ -195,9 +199,39 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
         throw new Error(payload?.error ?? "修复动作执行失败。");
       }
       setMessage(payload?.message ?? "修复动作已完成。");
-      await loadCenter();
+      await loadCenter({ keepMessage: true });
     } catch (caught) {
       setMessage(caught instanceof Error ? caught.message : "修复动作执行失败。");
+    } finally {
+      setRunningActionId(null);
+    }
+  }
+
+  async function runBatchRepairActions() {
+    if (!executableActions.length) return;
+    setRunningActionId("batch");
+    setMessage(null);
+    try {
+      const response = await fetch(`/api/projects/${projectId}/platform-export/repair`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          actions: executableActions.map((action) => ({
+            kind: action.kind,
+            chapterId: action.chapterId,
+            chapterTitle: action.chapterTitle,
+            detail: action.detail,
+          })),
+        }),
+      });
+      const payload = (await response.json().catch(() => null)) as { message?: string; error?: string } | null;
+      if (!response.ok) {
+        throw new Error(payload?.error ?? "批量修复失败。");
+      }
+      setMessage(payload?.message ?? "批量修复已完成。");
+      await loadCenter({ keepMessage: true });
+    } catch (caught) {
+      setMessage(caught instanceof Error ? caught.message : "批量修复失败。");
     } finally {
       setRunningActionId(null);
     }
@@ -217,7 +251,7 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
         <button
           className="rounded-md border border-slate-200 px-3 py-2 text-sm font-medium hover:bg-slate-50 disabled:opacity-50"
           disabled={isLoading}
-          onClick={loadCenter}
+          onClick={() => void loadCenter()}
           type="button"
         >
           {isLoading ? "读取中" : "刷新发布包"}
@@ -299,7 +333,19 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
             </div>
             {selectedPackage.repairActions.length ? (
               <div className="mt-3 rounded-md bg-slate-50 p-3 text-sm">
-                <div className="font-medium text-slate-900">下一步处理</div>
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="font-medium text-slate-900">下一步处理</div>
+                  {executableActions.length ? (
+                    <button
+                      className="w-fit rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white disabled:opacity-50"
+                      disabled={Boolean(runningActionId)}
+                      onClick={() => void runBatchRepairActions()}
+                      type="button"
+                    >
+                      {runningActionId === "batch" ? "批量处理中" : `批量处理前 ${executableActions.length} 项`}
+                    </button>
+                  ) : null}
+                </div>
                 <div className="mt-2 grid gap-2 lg:grid-cols-2">
                   {selectedPackage.repairActions.slice(0, 6).map((action) => (
                     <div

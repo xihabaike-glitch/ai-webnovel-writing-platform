@@ -10,6 +10,7 @@ import { CharacterArcPanel } from "@/components/projects/CharacterArcPanel";
 import { ExportMarkdownButton } from "@/components/projects/ExportMarkdownButton";
 import { FirstThreeRewritePanel } from "@/components/projects/FirstThreeRewritePanel";
 import { PlatformExportCenterPanel } from "@/components/projects/PlatformExportCenterPanel";
+import { ProjectControlDashboardPanel } from "@/components/projects/ProjectControlDashboardPanel";
 import { RetentionDiagnosticPanel } from "@/components/projects/RetentionDiagnosticPanel";
 import { SerializationOpsPanel } from "@/components/projects/SerializationOpsPanel";
 import { StoryLinePanel } from "@/components/projects/StoryLinePanel";
@@ -115,6 +116,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ projec
             {platform.name} · {project.currentWordCount}/{project.targetWordCount} 字 · {project.genre}
           </p>
         </div>
+        <ProjectControlDashboardPanel projectId={project.id} />
         <section className="grid gap-4 md:grid-cols-[1.4fr_1fr]">
           <div className="rounded-md border border-slate-200 bg-white p-4">
             <div className="flex items-start justify-between gap-4">

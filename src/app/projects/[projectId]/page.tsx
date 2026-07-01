@@ -4,10 +4,12 @@ import { AppShell } from "@/components/app-shell/AppShell";
 import { CreateChapterForm } from "@/components/chapters/CreateChapterForm";
 import { OutlineTreePanel } from "@/components/outlines/OutlineTreePanel";
 import { ExportMarkdownButton } from "@/components/projects/ExportMarkdownButton";
+import { SubmissionPackagePanel } from "@/components/projects/SubmissionPackagePanel";
 import { prisma } from "@/lib/db/prisma";
 import { getPlatformProfile, type PlatformId } from "@/lib/platforms/platformProfiles";
 import { buildProjectDashboard } from "@/lib/projects/projectDashboard";
 import { buildSubmissionChecklist } from "@/lib/projects/submissionChecklist";
+import { buildSubmissionPackage } from "@/lib/projects/submissionPackage";
 
 export default async function ProjectPage({ params }: { params: Promise<{ projectId: string }> }) {
   const { projectId } = await params;
@@ -55,6 +57,15 @@ export default async function ProjectPage({ params }: { params: Promise<{ projec
       status: task.status,
       chapter: task.chapterId ? { id: task.chapterId } : null,
     })),
+  });
+  const submissionPackage = buildSubmissionPackage({
+    title: project.title,
+    genre: project.genre,
+    sellingPoint: project.sellingPoint,
+    currentWordCount: project.currentWordCount,
+    targetWordCount: project.targetWordCount,
+    platform,
+    chapters: project.chapters,
   });
   const outlineNodes = project.outlineNodes.map((node) => ({
     id: node.id,
@@ -189,6 +200,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ projec
             </div>
           </div>
         </section>
+        <SubmissionPackagePanel projectId={project.id} submissionPackage={submissionPackage} />
         <div className="grid gap-4 md:grid-cols-[2fr_1fr]">
           <OutlineTreePanel projectId={project.id} nodes={outlineNodes} />
           <div className="rounded-md border bg-white p-4">

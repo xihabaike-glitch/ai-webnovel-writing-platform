@@ -130,6 +130,61 @@ export class MockAdapter implements ModelAdapter {
       };
     }
 
+    if (request.systemPrompt.includes("平台投稿资产优化师")) {
+      const platformMatch = request.userPrompt.match(/目标平台：(.+)/);
+      const titleMatch = request.userPrompt.match(/当前标题：(.+)/);
+      const loglineMatch = request.userPrompt.match(/当前一句话卖点：(.+)/);
+      const platform = platformMatch?.[1]?.trim() || "目标平台";
+      const title = titleMatch?.[1]?.trim() || "夜雨系统";
+      const rawLogline = loglineMatch?.[1]?.trim() || "主角在雨夜系统中连续翻盘";
+      const logline = rawLogline.replace(/[。！？!?.,，、；;：:]+$/u, "");
+      const baseSynopsis = `${title}讲述林晚在雨夜绑定倒计时系统后，被迫在救人与自保之间连续选择。每一次系统奖励都带来新的代价，她把危机反手变成翻盘筹码，沿着隐藏任务追查当年真相，并把背叛她的人一步步拖回雨夜审判。`;
+      const text = JSON.stringify(
+        {
+          variants: [
+            {
+              strategy: "强钩子爽点版",
+              title: `${title}：倒计时翻盘`,
+              logline: `${logline}，第一章就把危机、选择和翻盘筹码摆到读者眼前。`,
+              synopsis: `${baseSynopsis}这个版本重点强化开局危机、连续爽点和章末追读，让${platform}读者第一眼看到系统、选择、复仇和反转。`,
+              overseasSynopsis: `For ${platform}, this pitch foregrounds Lin Wan's countdown system, deadly choices, escalating costs, and revenge-driven reversals.`,
+              tags: ["系统", "重生", "强钩子", "逆袭", "高压选择"],
+              rationale: ["标题增加即时冲突", "卖点突出翻盘路径", "简介补足主角目标和长期期待"],
+            },
+            {
+              strategy: "主线悬疑版",
+              title: `${title}：雨夜真相`,
+              logline: `${logline}，每次选择都揭开一层旧案真相和更危险的系统规则。`,
+              synopsis: `${baseSynopsis}这个版本把隐藏任务和旧案真相前置，强调每次胜利都会换来更深的系统债务，适合需要悬疑牵引和持续追读的投稿包装。`,
+              overseasSynopsis: `This version sells a mystery-forward system story: every choice reveals a buried truth while increasing Lin Wan's debt to the countdown rules.`,
+              tags: ["系统流", "悬疑", "复仇", "反转", "章末悬念"],
+              rationale: ["补强真相线", "提高连续追读理由", "标签更利于悬疑分发"],
+            },
+            {
+              strategy: "情绪复仇版",
+              title: `${title}：她在雨夜归来`,
+              logline: `${logline}，她用系统逼出的每个选择，把背叛者拖回同一场雨夜审判。`,
+              synopsis: `${baseSynopsis}这个版本把情绪仇恨和人物反击放在前面，让读者先抓住主角为什么必须赢，再看到系统规则如何制造连续爽点。`,
+              overseasSynopsis: `A revenge-driven system pitch for ${platform}: Lin Wan turns each forced choice into evidence, leverage, and punishment for those who betrayed her.`,
+              tags: ["复仇", "系统", "女主逆袭", "高压选择", "爽文"],
+              rationale: ["强化情绪动机", "提高女主辨识度", "让系统爽点服务复仇主线"],
+            },
+          ],
+        },
+        null,
+        2,
+      );
+
+      return {
+        text,
+        usage: {
+          inputTokens: request.systemPrompt.length + request.userPrompt.length,
+          outputTokens: text.length,
+          costUsd: 0,
+        },
+      };
+    }
+
     if (request.systemPrompt.includes("投稿包装编辑")) {
       const platformMatch = request.userPrompt.match(/目标平台：(.+)/);
       const loglineMatch = request.userPrompt.match(/原一句话卖点：(.+)/);

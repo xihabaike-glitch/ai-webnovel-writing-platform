@@ -200,6 +200,17 @@ interface PlatformSubmissionAssetVersion {
   createdAt: string;
 }
 
+interface PlatformSubmissionAssetOptimizationVariant {
+  strategy: string;
+  title: string;
+  logline: string;
+  synopsis: string;
+  overseasSynopsis: string;
+  tags: string[];
+  rationale: string[];
+  audit: PlatformSubmissionAssetAudit;
+}
+
 interface PlatformPublishPackage {
   platformId: string;
   platformName: string;
@@ -347,6 +358,8 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
   const [isLoadingVersion, setIsLoadingVersion] = useState(false);
   const [isRestoringVersion, setIsRestoringVersion] = useState(false);
   const [isSavingAsset, setIsSavingAsset] = useState(false);
+  const [isOptimizingAsset, setIsOptimizingAsset] = useState(false);
+  const [assetOptimizationVariants, setAssetOptimizationVariants] = useState<PlatformSubmissionAssetOptimizationVariant[]>([]);
   const [versionActionFilter, setVersionActionFilter] = useState<PublishPackageVersionActionFilter>("all");
   const [assetDraft, setAssetDraft] = useState<SubmissionAssetDraft>({
     title: "",
@@ -458,7 +471,7 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
     }
   }
 
-  async function saveSubmissionAsset() {
+  async function saveSubmissionAsset(nextDraft: SubmissionAssetDraft = assetDraft, options?: { message?: string }) {
     if (!selectedPackage) return;
     setIsSavingAsset(true);
     setMessage(null);
@@ -469,18 +482,59 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
         body: JSON.stringify({
           action: "save-asset",
           platformId: selectedPackage.platformId,
-          ...assetDraft,
+          ...nextDraft,
         }),
       });
       const payload = (await response.json().catch(() => null)) as { message?: string; error?: string } | null;
       if (!response.ok) throw new Error(payload?.error ?? "保存投稿资产失败。");
-      setMessage(payload?.message ?? "投稿资产已保存。");
+      setMessage(options?.message ?? payload?.message ?? "投稿资产已保存。");
       await loadCenter({ keepMessage: true });
     } catch (caught) {
       setMessage(caught instanceof Error ? caught.message : "保存投稿资产失败。");
     } finally {
       setIsSavingAsset(false);
     }
+  }
+
+  async function optimizeSubmissionAsset() {
+    if (!selectedPackage) return;
+    setIsOptimizingAsset(true);
+    setAssetOptimizationVariants([]);
+    setMessage(null);
+    try {
+      const response = await fetch(`/api/projects/${projectId}/platform-export/asset-optimize`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          platformId: selectedPackage.platformId,
+          ...assetDraft,
+        }),
+      });
+      const payload = (await response.json().catch(() => null)) as {
+        variants?: PlatformSubmissionAssetOptimizationVariant[];
+        error?: string;
+      } | null;
+      if (!response.ok || !payload?.variants) throw new Error(payload?.error ?? "AI 优化投稿资产失败。");
+      setAssetOptimizationVariants(payload.variants);
+      setMessage(`已生成 ${payload.variants.length} 个 ${selectedPackage.platformName} 投稿优化方案。`);
+    } catch (caught) {
+      setMessage(caught instanceof Error ? caught.message : "AI 优化投稿资产失败。");
+    } finally {
+      setIsOptimizingAsset(false);
+    }
+  }
+
+  async function applyOptimizationVariant(variant: PlatformSubmissionAssetOptimizationVariant) {
+    const nextDraft = {
+      title: variant.title,
+      logline: variant.logline,
+      synopsis: variant.synopsis,
+      overseasSynopsis: variant.overseasSynopsis,
+      tags: variant.tags.join("、"),
+      note: assetDraft.note,
+    };
+    setAssetDraft(nextDraft);
+    await saveSubmissionAsset(nextDraft, { message: `已应用并保存「${variant.strategy}」。` });
   }
 
   async function copyMarkdown() {
@@ -702,6 +756,7 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
       tags: selectedPackage.tags.join("、"),
       note: selectedPackage.submissionAsset?.note ?? "",
     });
+    setAssetOptimizationVariants([]);
   }, [selectedPackage?.platformId, selectedPackage?.submissionAsset?.updatedAt]);
 
   return (
@@ -1297,15 +1352,26 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
                     : "自动生成草稿"}
                 </div>
               </div>
-              <button
-                className="w-fit rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white disabled:opacity-50"
-                data-testid="save-submission-asset"
-                disabled={isSavingAsset}
-                onClick={() => void saveSubmissionAsset()}
-                type="button"
-              >
-                {isSavingAsset ? "保存中" : "保存投稿资产"}
-              </button>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  className="w-fit rounded-md border border-slate-200 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                  data-testid="optimize-submission-asset"
+                  disabled={isOptimizingAsset || isSavingAsset}
+                  onClick={() => void optimizeSubmissionAsset()}
+                  type="button"
+                >
+                  {isOptimizingAsset ? "优化中" : "AI 优化投稿资产"}
+                </button>
+                <button
+                  className="w-fit rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white disabled:opacity-50"
+                  data-testid="save-submission-asset"
+                  disabled={isSavingAsset}
+                  onClick={() => void saveSubmissionAsset()}
+                  type="button"
+                >
+                  {isSavingAsset ? "保存中" : "保存投稿资产"}
+                </button>
+              </div>
             </div>
             <div className="mt-3 grid gap-3 lg:grid-cols-[180px_1fr]">
               <div className="rounded-md bg-slate-50 p-3">
@@ -1397,6 +1463,54 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
                 />
               </label>
             </div>
+            {assetOptimizationVariants.length ? (
+              <div className="mt-3 rounded-md bg-slate-50 p-3 text-sm">
+                <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <div className="font-medium text-slate-900">AI 优化方案</div>
+                    <div className="mt-1 text-xs text-slate-500">选择一个方案应用后，会直接保存为新的投稿资产版本。</div>
+                  </div>
+                  <button
+                    className="w-fit rounded-md border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                    onClick={() => setAssetOptimizationVariants([])}
+                    type="button"
+                  >
+                    清空方案
+                  </button>
+                </div>
+                <div className="mt-3 grid gap-3 lg:grid-cols-3">
+                  {assetOptimizationVariants.map((variant) => (
+                    <div className="rounded-md border border-slate-200 bg-white p-3" key={variant.strategy}>
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                        <div>
+                          <div className="font-medium text-slate-950">{variant.strategy}</div>
+                          <div className="mt-1 text-xs text-slate-500">{variant.title}</div>
+                        </div>
+                        <span className={`w-fit rounded-md px-2 py-1 text-xs font-medium ${assetAuditStatusClass(variant.audit.status)}`}>
+                          {variant.audit.score}
+                        </span>
+                      </div>
+                      <div className="mt-2 leading-6 text-slate-700">{variant.logline}</div>
+                      <div className="mt-2 line-clamp-4 leading-6 text-slate-600">{variant.synopsis}</div>
+                      <div className="mt-2 text-xs text-slate-500">标签：{variant.tags.join("、")}</div>
+                      <div className="mt-2 grid gap-1 text-xs text-slate-500">
+                        {variant.rationale.slice(0, 3).map((item) => (
+                          <div key={item}>{item}</div>
+                        ))}
+                      </div>
+                      <button
+                        className="mt-3 w-fit rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white disabled:opacity-50"
+                        disabled={isSavingAsset}
+                        onClick={() => void applyOptimizationVariant(variant)}
+                        type="button"
+                      >
+                        应用并保存
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null}
             <div className="mt-3 rounded-md bg-slate-50 p-3 text-sm">
               <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
                 <div>

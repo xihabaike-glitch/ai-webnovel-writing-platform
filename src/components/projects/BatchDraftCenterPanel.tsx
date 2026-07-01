@@ -104,9 +104,10 @@ export function BatchDraftCenterPanel({ projectId }: { projectId: string }) {
         queue?: BatchDraftQueue;
         activeProvider?: ActiveProvider;
         error?: string;
+        guard?: { warnings?: string[] };
       };
       if (!response.ok) {
-        throw new Error(payload.error ?? "批量生成初稿失败。");
+        throw new Error([payload.error, ...(payload.guard?.warnings ?? [])].filter(Boolean).join(" "));
       }
       setResults(payload.results ?? []);
       if (payload.queue) setQueue(payload.queue);

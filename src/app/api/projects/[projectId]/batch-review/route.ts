@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { buildReviewPipelineQueue } from "@/lib/ai/batchReviewPipeline";
+import { buildBatchRunGuard } from "@/lib/ai/batchRunGuard";
 import { generateChapterSecondPass } from "@/lib/ai/chapterSecondPassGeneration";
 import { reviewChapterDraft } from "@/lib/ai/chapterReviewGeneration";
 import { prisma } from "@/lib/db/prisma";
@@ -88,6 +89,30 @@ export async function POST(request: Request, { params }: Params) {
       rejected,
       queue,
     }, { status: 400 });
+  }
+
+  const guard = buildBatchRunGuard({
+    action: input.action === "review" ? "review" : "second_pass",
+    batchSize: input.chapterIds.length,
+    targetWords: input.targetWords,
+    tasks: await prisma.aiTask.findMany({
+      select: {
+        status: true,
+        inputTokens: true,
+        outputTokens: true,
+        costUsd: true,
+      },
+      take: 500,
+      orderBy: { createdAt: "desc" },
+    }),
+  });
+  if (!guard.allowed) {
+    return NextResponse.json({
+      error: guard.summary,
+      guard,
+      queue,
+      activeProvider: await activeProviderView(),
+    }, { status: 429 });
   }
 
   const results = [];

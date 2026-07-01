@@ -146,9 +146,10 @@ export function BatchReviewPipelinePanel({ projectId }: { projectId: string }) {
         queue?: ReviewPipelineQueue;
         activeProvider?: ActiveProvider;
         error?: string;
+        guard?: { warnings?: string[] };
       };
       if (!response.ok) {
-        throw new Error(payload.error ?? "批量处理失败。");
+        throw new Error([payload.error, ...(payload.guard?.warnings ?? [])].filter(Boolean).join(" "));
       }
       setResults(payload.results ?? []);
       if (payload.queue) setQueue(payload.queue);

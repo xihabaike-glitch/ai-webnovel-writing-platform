@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { buildBatchDraftQueue } from "@/lib/ai/batchDrafts";
+import { buildBatchRunGuard } from "@/lib/ai/batchRunGuard";
 import { generateChapterDraft } from "@/lib/ai/chapterDraftGeneration";
 import { prisma } from "@/lib/db/prisma";
 import { getActiveModelProvider } from "@/lib/model-gateway/activeProvider";
@@ -86,6 +87,30 @@ export async function POST(request: Request, { params }: Params) {
       rejected,
       queue,
     }, { status: 400 });
+  }
+
+  const guard = buildBatchRunGuard({
+    action: "draft",
+    batchSize: input.chapterIds.length,
+    targetWords: input.targetWords,
+    tasks: await prisma.aiTask.findMany({
+      select: {
+        status: true,
+        inputTokens: true,
+        outputTokens: true,
+        costUsd: true,
+      },
+      take: 500,
+      orderBy: { createdAt: "desc" },
+    }),
+  });
+  if (!guard.allowed) {
+    return NextResponse.json({
+      error: guard.summary,
+      guard,
+      queue,
+      activeProvider: await activeProviderView(),
+    }, { status: 429 });
   }
 
   const results = [];

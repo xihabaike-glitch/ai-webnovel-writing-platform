@@ -8,6 +8,7 @@ import { BatchReviewPipelinePanel } from "@/components/projects/BatchReviewPipel
 import { ChapterProductionPanel } from "@/components/projects/ChapterProductionPanel";
 import { CharacterArcPanel } from "@/components/projects/CharacterArcPanel";
 import { ExportMarkdownButton } from "@/components/projects/ExportMarkdownButton";
+import { FirstDayWorkflowPanel } from "@/components/projects/FirstDayWorkflowPanel";
 import { FirstThreeRewritePanel } from "@/components/projects/FirstThreeRewritePanel";
 import { ModelTaskAuditPanel } from "@/components/projects/ModelTaskAuditPanel";
 import { PlatformExportCenterPanel } from "@/components/projects/PlatformExportCenterPanel";
@@ -117,7 +118,10 @@ export default async function ProjectPage({ params }: { params: Promise<{ projec
             {platform.name} · {project.currentWordCount}/{project.targetWordCount} 字 · {project.genre}
           </p>
         </div>
-        <ProjectControlDashboardPanel projectId={project.id} />
+        <div id="project-control">
+          <ProjectControlDashboardPanel projectId={project.id} />
+        </div>
+        <FirstDayWorkflowPanel projectId={project.id} />
         <section className="grid gap-4 md:grid-cols-[1.4fr_1fr]">
           <div className="rounded-md border border-slate-200 bg-white p-4">
             <div className="flex items-start justify-between gap-4">
@@ -227,14 +231,18 @@ export default async function ProjectPage({ params }: { params: Promise<{ projec
         </section>
         <RetentionDiagnosticPanel projectId={project.id} />
         <FirstThreeRewritePanel projectId={project.id} />
-        <CharacterArcPanel projectId={project.id} />
+        <div id="character-arc">
+          <CharacterArcPanel projectId={project.id} />
+        </div>
         <StoryLinePanel projectId={project.id} />
         <WorldBiblePanel projectId={project.id} />
         <ChapterProductionPanel projectId={project.id} />
         <BatchDraftCenterPanel projectId={project.id} />
         <BatchReviewPipelinePanel projectId={project.id} />
         <SerializationOpsPanel projectId={project.id} />
-        <PlatformExportCenterPanel projectId={project.id} />
+        <div id="platform-export">
+          <PlatformExportCenterPanel projectId={project.id} />
+        </div>
         <StoryStructureDiagnosticPanel projectId={project.id} />
         <SubmissionPackagePanel projectId={project.id} submissionPackage={submissionPackage} />
         <div className="grid gap-4 md:grid-cols-[2fr_1fr]">

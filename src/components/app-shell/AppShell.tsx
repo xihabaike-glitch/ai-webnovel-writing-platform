@@ -11,6 +11,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           </Link>
           <nav className="flex gap-4 text-sm text-slate-600">
             <Link href="/projects">作品</Link>
+            <Link href="/tasks">任务</Link>
             <Link href="/settings/models">模型设置</Link>
           </nav>
         </div>
@@ -19,4 +20,3 @@ export function AppShell({ children }: { children: ReactNode }) {
     </div>
   );
 }
-

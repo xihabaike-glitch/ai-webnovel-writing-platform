@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { groupReviewIssues, nonEmptyReviewGroups } from "@/lib/ai/reviewGrouping";
 import { latestTaskStatus, type AiTaskWorkflowItem } from "@/lib/ai/taskWorkflow";
+import type { ChapterRevisionSummary } from "@/lib/chapters/revisions";
 import type { PlatformProfile } from "@/lib/platforms/platformProfiles";
 
 interface ReviewIssue {
@@ -68,6 +69,10 @@ export function ChapterWorkflowPanel({
   const [reviewResult, setReviewResult] = useState<ReviewResult | null>(null);
   const [isGeneratingDraft, setIsGeneratingDraft] = useState(false);
   const [isReviewing, setIsReviewing] = useState(false);
+  const [isSavingRevision, setIsSavingRevision] = useState(false);
+  const [restoringRevisionId, setRestoringRevisionId] = useState<string | null>(null);
+  const [revisions, setRevisions] = useState<ChapterRevisionSummary[]>([]);
+  const [selectedRevision, setSelectedRevision] = useState<ChapterRevisionSummary | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const groupedIssues = useMemo(
     () => (reviewResult ? nonEmptyReviewGroups(groupReviewIssues(reviewResult.issues)) : []),
@@ -86,8 +91,20 @@ export function ChapterWorkflowPanel({
     if (parsedReview) setReviewResult(parsedReview);
   }
 
+  async function loadRevisions() {
+    const response = await fetch(`/api/chapters/${chapterId}/revisions`);
+    if (!response.ok) return;
+    const payload = (await response.json()) as { revisions: ChapterRevisionSummary[] };
+    setRevisions(payload.revisions);
+    setSelectedRevision((current) => {
+      if (!current) return payload.revisions[0] ?? null;
+      return payload.revisions.find((revision) => revision.id === current.id) ?? payload.revisions[0] ?? null;
+    });
+  }
+
   useEffect(() => {
     void loadWorkflow();
+    void loadRevisions();
   }, [chapterId]);
 
   async function generateDraft() {
@@ -106,11 +123,58 @@ export function ChapterWorkflowPanel({
 
       setMessage("已生成正文初稿");
       await loadWorkflow();
+      await loadRevisions();
       router.refresh();
     } catch (caught) {
       setMessage(caught instanceof Error ? caught.message : "生成正文失败。");
     } finally {
       setIsGeneratingDraft(false);
+    }
+  }
+
+  async function saveRevision() {
+    setIsSavingRevision(true);
+    setMessage(null);
+    try {
+      const response = await fetch(`/api/chapters/${chapterId}/revisions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ notes: "作者手动保存快照。" }),
+      });
+
+      if (!response.ok) {
+        throw new Error("保存快照失败。");
+      }
+
+      setMessage("已保存章节快照");
+      await loadRevisions();
+    } catch (caught) {
+      setMessage(caught instanceof Error ? caught.message : "保存快照失败。");
+    } finally {
+      setIsSavingRevision(false);
+    }
+  }
+
+  async function restoreRevision(revisionId: string) {
+    setRestoringRevisionId(revisionId);
+    setMessage(null);
+    try {
+      const response = await fetch(`/api/chapters/${chapterId}/revisions/${revisionId}/restore`, {
+        method: "POST",
+      });
+
+      if (!response.ok) {
+        throw new Error("回滚版本失败。");
+      }
+
+      setMessage("已回滚到所选版本");
+      await loadWorkflow();
+      await loadRevisions();
+      router.refresh();
+    } catch (caught) {
+      setMessage(caught instanceof Error ? caught.message : "回滚版本失败。");
+    } finally {
+      setRestoringRevisionId(null);
     }
   }
 
@@ -240,6 +304,61 @@ export function ChapterWorkflowPanel({
           {workflow && workflow.tasks.length === 0 ? <p className="text-sm text-slate-600">还没有 AI 任务。</p> : null}
           {!workflow ? <p className="text-sm text-slate-600">正在读取 AI 任务。</p> : null}
         </div>
+      </section>
+
+      <section className="rounded-md border border-slate-200 bg-white p-4">
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <h3 className="font-medium">版本快照</h3>
+          <button
+            className="rounded-md border border-slate-200 px-3 py-1.5 text-xs font-medium hover:bg-slate-50 disabled:opacity-50"
+            disabled={isSavingRevision}
+            onClick={saveRevision}
+            type="button"
+          >
+            {isSavingRevision ? "保存中" : "保存快照"}
+          </button>
+        </div>
+        <div className="grid gap-2">
+          {revisions.map((revision) => (
+            <button
+              className={`rounded-md p-3 text-left text-xs ${selectedRevision?.id === revision.id ? "bg-slate-950 text-white" : "bg-slate-50 text-slate-600 hover:bg-slate-100"}`}
+              key={revision.id}
+              onClick={() => setSelectedRevision(revision)}
+              type="button"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-medium">{revision.sourceLabel}</span>
+                <span>{revision.wordCount} 字</span>
+              </div>
+              <div className="mt-1">{new Date(revision.createdAt).toLocaleString()}</div>
+              <div className="mt-2 line-clamp-2">{revision.preview}</div>
+            </button>
+          ))}
+          {revisions.length === 0 ? <p className="text-sm text-slate-600">还没有版本快照。AI 重写前会自动保存旧稿。</p> : null}
+        </div>
+        {selectedRevision ? (
+          <div className="mt-4 rounded-md border border-slate-200 p-3">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <div className="text-sm font-medium">{selectedRevision.title}</div>
+                <div className="mt-1 text-xs text-slate-500">
+                  {selectedRevision.sourceLabel} · {selectedRevision.status} · {selectedRevision.wordCount} 字
+                </div>
+              </div>
+              <button
+                className="rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white disabled:opacity-50"
+                disabled={restoringRevisionId === selectedRevision.id}
+                onClick={() => restoreRevision(selectedRevision.id)}
+                type="button"
+              >
+                {restoringRevisionId === selectedRevision.id ? "回滚中" : "回滚"}
+              </button>
+            </div>
+            <pre className="mt-3 max-h-56 overflow-auto whitespace-pre-wrap rounded-md bg-slate-50 p-3 text-xs leading-5 text-slate-700">
+              {selectedRevision.content || "空正文"}
+            </pre>
+          </div>
+        ) : null}
       </section>
     </aside>
   );

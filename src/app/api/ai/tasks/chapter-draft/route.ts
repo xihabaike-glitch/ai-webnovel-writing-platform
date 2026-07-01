@@ -70,6 +70,23 @@ export async function POST(request: Request) {
           costUsd: result.usage?.costUsd,
         },
       });
+      await tx.chapterRevision.create({
+        data: {
+          chapterId: chapter.id,
+          source: "ai_draft_before_overwrite",
+          sourceTaskId: task.id,
+          title: chapter.title,
+          content: chapter.content,
+          wordCount: chapter.wordCount,
+          goal: chapter.goal,
+          hook: chapter.hook,
+          conflict: chapter.conflict,
+          valueShift: chapter.valueShift,
+          cliffhanger: chapter.cliffhanger,
+          status: chapter.status,
+          notes: "AI 生成正文前自动保存。",
+        },
+      });
       const savedChapter = await tx.chapter.update({
         where: { id: chapter.id },
         data: {

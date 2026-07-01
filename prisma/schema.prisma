@@ -49,6 +49,27 @@ model Chapter {
   project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   outlineNodes OutlineNode[]
+  revisions    ChapterRevision[]
+}
+
+model ChapterRevision {
+  id          String   @id @default(cuid())
+  chapterId   String
+  source      String
+  sourceTaskId String?
+  title       String
+  content     String   @default("")
+  wordCount   Int      @default(0)
+  goal        String   @default("")
+  hook        String   @default("")
+  conflict    String   @default("")
+  valueShift  String   @default("")
+  cliffhanger String   @default("")
+  status      String
+  notes       String   @default("")
+  createdAt   DateTime @default(now())
+
+  chapter Chapter @relation(fields: [chapterId], references: [id], onDelete: Cascade)
 }
 
 model OutlineNode {

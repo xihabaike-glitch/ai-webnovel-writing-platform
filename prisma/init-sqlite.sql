@@ -31,6 +31,25 @@ CREATE TABLE IF NOT EXISTS "Chapter" (
   CONSTRAINT "Chapter_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "Project" ("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
 
+CREATE TABLE IF NOT EXISTS "ChapterRevision" (
+  "id" TEXT NOT NULL PRIMARY KEY,
+  "chapterId" TEXT NOT NULL,
+  "source" TEXT NOT NULL,
+  "sourceTaskId" TEXT,
+  "title" TEXT NOT NULL,
+  "content" TEXT NOT NULL DEFAULT '',
+  "wordCount" INTEGER NOT NULL DEFAULT 0,
+  "goal" TEXT NOT NULL DEFAULT '',
+  "hook" TEXT NOT NULL DEFAULT '',
+  "conflict" TEXT NOT NULL DEFAULT '',
+  "valueShift" TEXT NOT NULL DEFAULT '',
+  "cliffhanger" TEXT NOT NULL DEFAULT '',
+  "status" TEXT NOT NULL,
+  "notes" TEXT NOT NULL DEFAULT '',
+  "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT "ChapterRevision_chapterId_fkey" FOREIGN KEY ("chapterId") REFERENCES "Chapter" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
 CREATE TABLE IF NOT EXISTS "OutlineNode" (
   "id" TEXT NOT NULL PRIMARY KEY,
   "projectId" TEXT NOT NULL,

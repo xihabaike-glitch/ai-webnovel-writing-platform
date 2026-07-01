@@ -10,6 +10,7 @@ import { RetentionDiagnosticPanel } from "@/components/projects/RetentionDiagnos
 import { StoryLinePanel } from "@/components/projects/StoryLinePanel";
 import { StoryStructureDiagnosticPanel } from "@/components/projects/StoryStructureDiagnosticPanel";
 import { SubmissionPackagePanel } from "@/components/projects/SubmissionPackagePanel";
+import { WorldBiblePanel } from "@/components/projects/WorldBiblePanel";
 import { prisma } from "@/lib/db/prisma";
 import { getPlatformProfile, type PlatformId } from "@/lib/platforms/platformProfiles";
 import { buildProjectDashboard } from "@/lib/projects/projectDashboard";
@@ -220,6 +221,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ projec
         <FirstThreeRewritePanel projectId={project.id} />
         <CharacterArcPanel projectId={project.id} />
         <StoryLinePanel projectId={project.id} />
+        <WorldBiblePanel projectId={project.id} />
         <StoryStructureDiagnosticPanel projectId={project.id} />
         <SubmissionPackagePanel projectId={project.id} submissionPackage={submissionPackage} />
         <div className="grid gap-4 md:grid-cols-[2fr_1fr]">

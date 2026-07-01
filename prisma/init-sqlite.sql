@@ -190,3 +190,22 @@ CREATE TABLE IF NOT EXISTS "PublishPackageSnapshot" (
   "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT "PublishPackageSnapshot_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "Project" ("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
+
+CREATE TABLE IF NOT EXISTS "PlatformSubmissionAsset" (
+  "id" TEXT NOT NULL PRIMARY KEY,
+  "projectId" TEXT NOT NULL,
+  "platformId" TEXT NOT NULL,
+  "platformName" TEXT NOT NULL,
+  "title" TEXT NOT NULL,
+  "logline" TEXT NOT NULL,
+  "synopsis" TEXT NOT NULL,
+  "overseasSynopsis" TEXT NOT NULL DEFAULT '',
+  "tags" TEXT NOT NULL DEFAULT '[]',
+  "note" TEXT NOT NULL DEFAULT '',
+  "source" TEXT NOT NULL DEFAULT 'manual',
+  "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT "PlatformSubmissionAsset_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "Project" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS "PlatformSubmissionAsset_projectId_platformId_key" ON "PlatformSubmissionAsset"("projectId", "platformId");

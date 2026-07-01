@@ -28,6 +28,7 @@ model Project {
   outlineNodes     OutlineNode[]
   aiTasks          AiTask[]
   publishSnapshots PublishPackageSnapshot[]
+  submissionAssets PlatformSubmissionAsset[]
 }
 
 model Chapter {
@@ -225,4 +226,24 @@ model PublishPackageSnapshot {
   createdAt      DateTime @default(now())
 
   project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+model PlatformSubmissionAsset {
+  id               String   @id @default(cuid())
+  projectId        String
+  platformId       String
+  platformName     String
+  title            String
+  logline          String
+  synopsis         String
+  overseasSynopsis String   @default("")
+  tags             String   @default("[]")
+  note             String   @default("")
+  source           String   @default("manual")
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, platformId])
 }

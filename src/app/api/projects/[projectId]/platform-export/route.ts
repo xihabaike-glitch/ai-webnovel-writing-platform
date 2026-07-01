@@ -29,6 +29,24 @@ function snapshotActionLabel(action: string | null) {
   return "snapshot";
 }
 
+function normalizeTagsInput(tags: unknown) {
+  if (Array.isArray(tags)) {
+    return tags.map((tag) => String(tag).trim()).filter(Boolean).slice(0, 12);
+  }
+  if (typeof tags !== "string") return [];
+  try {
+    const parsed = JSON.parse(tags) as unknown;
+    if (Array.isArray(parsed)) return normalizeTagsInput(parsed);
+  } catch {
+    // Plain text tag lists are expected from the editor.
+  }
+  return tags.split(/[、,，\n]/).map((tag) => tag.trim()).filter(Boolean).slice(0, 12);
+}
+
+function trimText(value: unknown, fallback = "") {
+  return typeof value === "string" ? value.trim() : fallback;
+}
+
 async function buildCenter(projectId: string) {
   const project = await prisma.project.findUnique({
     where: { id: projectId },
@@ -36,6 +54,7 @@ async function buildCenter(projectId: string) {
       chapters: { orderBy: { order: "asc" } },
       aiTasks: { orderBy: { createdAt: "desc" } },
       publishSnapshots: { orderBy: { createdAt: "desc" }, take: 80 },
+      submissionAssets: { orderBy: { updatedAt: "desc" } },
     },
   });
 
@@ -70,6 +89,19 @@ async function buildCenter(projectId: string) {
     chapters: project.chapters,
     aiTasks: project.aiTasks,
     publishSnapshots: project.publishSnapshots,
+    submissionAssets: project.submissionAssets.map((asset) => ({
+      id: asset.id,
+      platformId: asset.platformId,
+      platformName: asset.platformName,
+      title: asset.title,
+      logline: asset.logline,
+      synopsis: asset.synopsis,
+      overseasSynopsis: asset.overseasSynopsis,
+      tags: parsePublishSnapshotTags(asset.tags),
+      note: asset.note,
+      source: asset.source,
+      updatedAt: asset.updatedAt,
+    })),
     submissionChecklist,
   });
 
@@ -250,11 +282,67 @@ export async function GET(request: Request, { params }: Params) {
 
 export async function POST(request: Request, { params }: Params) {
   const { projectId } = await params;
-  const body = (await request.json().catch(() => ({}))) as { platformId?: string; action?: string; versionId?: string };
+  const body = (await request.json().catch(() => ({}))) as {
+    platformId?: string;
+    action?: string;
+    versionId?: string;
+    title?: unknown;
+    logline?: unknown;
+    synopsis?: unknown;
+    overseasSynopsis?: unknown;
+    tags?: unknown;
+    note?: unknown;
+  };
   const context = await buildCenter(projectId);
 
   if (!context) {
     return NextResponse.json({ error: "Project not found" }, { status: 404 });
+  }
+
+  if (body.action === "save-asset") {
+    const platform = selectedPlatform(body.platformId ?? null);
+    if (!platform) {
+      return NextResponse.json({ error: "请选择有效发布平台。" }, { status: 400 });
+    }
+
+    const asset = await prisma.platformSubmissionAsset.upsert({
+      where: {
+        projectId_platformId: {
+          projectId,
+          platformId: platform.id,
+        },
+      },
+      create: {
+        projectId,
+        platformId: platform.id,
+        platformName: platform.name,
+        title: trimText(body.title, context.project.title),
+        logline: trimText(body.logline),
+        synopsis: trimText(body.synopsis),
+        overseasSynopsis: trimText(body.overseasSynopsis),
+        tags: JSON.stringify(normalizeTagsInput(body.tags)),
+        note: trimText(body.note),
+        source: "manual",
+      },
+      update: {
+        platformName: platform.name,
+        title: trimText(body.title, context.project.title),
+        logline: trimText(body.logline),
+        synopsis: trimText(body.synopsis),
+        overseasSynopsis: trimText(body.overseasSynopsis),
+        tags: JSON.stringify(normalizeTagsInput(body.tags)),
+        note: trimText(body.note),
+        source: "manual",
+      },
+    });
+
+    return NextResponse.json({
+      message: `已保存 ${platform.name} 投稿资产。`,
+      asset: {
+        ...asset,
+        tags: parsePublishSnapshotTags(asset.tags),
+      },
+    }, { status: 201 });
   }
 
   if (body.action === "restore" && body.versionId) {
@@ -273,12 +361,42 @@ export async function POST(request: Request, { params }: Params) {
       title: version.title,
       logline: version.logline,
     });
-    const [, snapshot] = await prisma.$transaction([
+    const [, , snapshot] = await prisma.$transaction([
       prisma.project.update({
         where: { id: projectId },
         data: {
           title: patch.title,
           sellingPoint: patch.sellingPoint,
+        },
+      }),
+      prisma.platformSubmissionAsset.upsert({
+        where: {
+          projectId_platformId: {
+            projectId,
+            platformId: version.platformId,
+          },
+        },
+        create: {
+          projectId,
+          platformId: version.platformId,
+          platformName: version.platformName,
+          title: version.title,
+          logline: version.logline,
+          synopsis: version.synopsis,
+          overseasSynopsis: version.synopsis,
+          tags: version.tags,
+          note: "由历史发布包恢复。",
+          source: "restore",
+        },
+        update: {
+          platformName: version.platformName,
+          title: version.title,
+          logline: version.logline,
+          synopsis: version.synopsis,
+          overseasSynopsis: version.synopsis,
+          tags: version.tags,
+          note: "由历史发布包恢复。",
+          source: "restore",
         },
       }),
       prisma.publishPackageSnapshot.create({

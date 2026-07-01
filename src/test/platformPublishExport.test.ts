@@ -178,6 +178,47 @@ test("buildPlatformPublishExportCenter", async (t) => {
     assert.ok(pack.markdown.includes("导出状态：允许导出"));
   });
 
+  await t.test("prefers persisted platform submission assets", () => {
+    const center = buildPlatformPublishExportCenter({
+      project: {
+        title: "夜雨系统",
+        genre: "都市系统",
+        sellingPoint: "雨夜危机中觉醒系统，主角用选择翻盘。",
+        currentWordCount: 9000,
+        targetWordCount: 300000,
+      },
+      targetPlatform: getPlatformProfile("fanqie"),
+      chapters: finalChapters,
+      aiTasks: passedReviews,
+      submissionChecklist: readyChecklist,
+      platforms: [getPlatformProfile("fanqie")],
+      submissionAssets: [
+        {
+          id: "asset-fanqie",
+          platformId: "fanqie",
+          platformName: "番茄小说",
+          title: "夜雨系统：倒计时重生",
+          logline: "系统每晚倒计时，女主用选择把绝境打成爽点。",
+          synopsis: "林晚在雨夜绑定倒计时系统，每一次选择都牵动生死与复仇。",
+          overseasSynopsis: "Night Rain System follows Lin Wan through deadly timed choices.",
+          tags: ["系统", "重生", "强爽点"],
+          note: "首秀前强调前三章钩子。",
+          source: "manual",
+          updatedAt: "2026-01-06T08:00:00.000Z",
+        },
+      ],
+    });
+    const pack = center.packages[0];
+
+    assert.equal(pack.title, "夜雨系统：倒计时重生");
+    assert.equal(pack.logline, "系统每晚倒计时，女主用选择把绝境打成爽点。");
+    assert.equal(pack.synopsis, "林晚在雨夜绑定倒计时系统，每一次选择都牵动生死与复仇。");
+    assert.deepEqual(pack.tags, ["系统", "重生", "强爽点"]);
+    assert.equal(pack.submissionAsset?.persisted, true);
+    assert.ok(pack.publishNote.includes("首秀前强调前三章钩子。"));
+    assert.ok(pack.markdown.includes("夜雨系统：倒计时重生"));
+  });
+
   await t.test("blocks export when latest review still asks for a second pass", () => {
     const center = buildPlatformPublishExportCenter({
       project: {

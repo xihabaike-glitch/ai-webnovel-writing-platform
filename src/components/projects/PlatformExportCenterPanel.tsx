@@ -154,10 +154,26 @@ interface PlatformPublishChapter {
   warnings: string[];
 }
 
+interface PlatformSubmissionAsset {
+  id?: string;
+  platformId: string;
+  platformName: string;
+  title: string;
+  logline: string;
+  synopsis: string;
+  overseasSynopsis: string;
+  tags: string[];
+  note: string;
+  source: string;
+  updatedAt?: string;
+  persisted: boolean;
+}
+
 interface PlatformPublishPackage {
   platformId: string;
   platformName: string;
   category: string;
+  submissionAsset: PlatformSubmissionAsset | null;
   title: string;
   logline: string;
   synopsis: string;
@@ -198,6 +214,15 @@ interface PlatformPublishExportCenter {
   recommendedPlatformId: string;
   totalPublishableChapters: number;
   workspace: PlatformPublishWorkspace;
+}
+
+interface SubmissionAssetDraft {
+  title: string;
+  logline: string;
+  synopsis: string;
+  overseasSynopsis: string;
+  tags: string;
+  note: string;
 }
 
 function actionHref(projectId: string, action: PublishRepairAction) {
@@ -271,7 +296,16 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
   const [versionDetail, setVersionDetail] = useState<PublishPackageVersionDetailState | null>(null);
   const [isLoadingVersion, setIsLoadingVersion] = useState(false);
   const [isRestoringVersion, setIsRestoringVersion] = useState(false);
+  const [isSavingAsset, setIsSavingAsset] = useState(false);
   const [versionActionFilter, setVersionActionFilter] = useState<PublishPackageVersionActionFilter>("all");
+  const [assetDraft, setAssetDraft] = useState<SubmissionAssetDraft>({
+    title: "",
+    logline: "",
+    synopsis: "",
+    overseasSynopsis: "",
+    tags: "",
+    note: "",
+  });
   const selectedPackage = useMemo(
     () => center?.packages.find((pack) => pack.platformId === selectedPlatformId) ?? center?.packages[0] ?? null,
     [center, selectedPlatformId],
@@ -371,6 +405,31 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
       setMessage(caught instanceof Error ? caught.message : "恢复历史版本失败。");
     } finally {
       setIsRestoringVersion(false);
+    }
+  }
+
+  async function saveSubmissionAsset() {
+    if (!selectedPackage) return;
+    setIsSavingAsset(true);
+    setMessage(null);
+    try {
+      const response = await fetch(`/api/projects/${projectId}/platform-export`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "save-asset",
+          platformId: selectedPackage.platformId,
+          ...assetDraft,
+        }),
+      });
+      const payload = (await response.json().catch(() => null)) as { message?: string; error?: string } | null;
+      if (!response.ok) throw new Error(payload?.error ?? "保存投稿资产失败。");
+      setMessage(payload?.message ?? "投稿资产已保存。");
+      await loadCenter({ keepMessage: true });
+    } catch (caught) {
+      setMessage(caught instanceof Error ? caught.message : "保存投稿资产失败。");
+    } finally {
+      setIsSavingAsset(false);
     }
   }
 
@@ -579,6 +638,22 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
     void loadCenter();
   }, [projectId]);
 
+  useEffect(() => {
+    if (!selectedPackage) return;
+    setAssetDraft({
+      title: selectedPackage.title,
+      logline: selectedPackage.logline,
+      synopsis: selectedPackage.category === "overseas"
+        ? selectedPackage.submissionAsset?.synopsis ?? ""
+        : selectedPackage.synopsis,
+      overseasSynopsis: selectedPackage.category === "overseas"
+        ? selectedPackage.synopsis
+        : selectedPackage.submissionAsset?.overseasSynopsis ?? "",
+      tags: selectedPackage.tags.join("、"),
+      note: selectedPackage.submissionAsset?.note ?? "",
+    });
+  }, [selectedPackage?.platformId, selectedPackage?.submissionAsset?.updatedAt]);
+
   return (
     <section className="rounded-md border border-slate-200 bg-white p-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -739,7 +814,7 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
 
       {selectedPackage ? (
         <div className="mt-4 grid gap-4">
-          <div className="rounded-md border border-slate-200 p-3">
+          <div className="rounded-md border border-slate-200 p-3" data-testid="submission-asset-editor">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
               <div>
                 <div className="font-medium text-slate-950">发布前质检</div>
@@ -1160,6 +1235,85 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
                 ) : null}
               </div>
             ) : null}
+          </div>
+
+          <div className="rounded-md border border-slate-200 p-3">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <div className="font-medium text-slate-950">投稿资产</div>
+                <div className="mt-1 text-xs text-slate-500">
+                  {selectedPackage.submissionAsset
+                    ? `已保存 · ${selectedPackage.submissionAsset.updatedAt ? formatTime(selectedPackage.submissionAsset.updatedAt) : selectedPackage.submissionAsset.source}`
+                    : "自动生成草稿"}
+                </div>
+              </div>
+              <button
+                className="w-fit rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white disabled:opacity-50"
+                data-testid="save-submission-asset"
+                disabled={isSavingAsset}
+                onClick={() => void saveSubmissionAsset()}
+                type="button"
+              >
+                {isSavingAsset ? "保存中" : "保存投稿资产"}
+              </button>
+            </div>
+            <div className="mt-3 grid gap-3 lg:grid-cols-2">
+              <label className="grid gap-1 text-sm text-slate-600">
+                标题
+                <input
+                  className="rounded-md border border-slate-200 px-3 py-2 text-slate-950"
+                  data-testid="submission-asset-title"
+                  onChange={(event) => setAssetDraft((current) => ({ ...current, title: event.target.value }))}
+                  value={assetDraft.title}
+                />
+              </label>
+              <label className="grid gap-1 text-sm text-slate-600">
+                标签
+                <input
+                  className="rounded-md border border-slate-200 px-3 py-2 text-slate-950"
+                  data-testid="submission-asset-tags"
+                  onChange={(event) => setAssetDraft((current) => ({ ...current, tags: event.target.value }))}
+                  placeholder="系统、重生、爽文"
+                  value={assetDraft.tags}
+                />
+              </label>
+              <label className="grid gap-1 text-sm text-slate-600 lg:col-span-2">
+                一句话卖点
+                <textarea
+                  className="min-h-20 rounded-md border border-slate-200 px-3 py-2 text-slate-950"
+                  data-testid="submission-asset-logline"
+                  onChange={(event) => setAssetDraft((current) => ({ ...current, logline: event.target.value }))}
+                  value={assetDraft.logline}
+                />
+              </label>
+              <label className="grid gap-1 text-sm text-slate-600">
+                国内简介
+                <textarea
+                  className="min-h-32 rounded-md border border-slate-200 px-3 py-2 text-slate-950"
+                  data-testid="submission-asset-synopsis"
+                  onChange={(event) => setAssetDraft((current) => ({ ...current, synopsis: event.target.value }))}
+                  value={assetDraft.synopsis}
+                />
+              </label>
+              <label className="grid gap-1 text-sm text-slate-600">
+                海外简介
+                <textarea
+                  className="min-h-32 rounded-md border border-slate-200 px-3 py-2 text-slate-950"
+                  data-testid="submission-asset-overseas-synopsis"
+                  onChange={(event) => setAssetDraft((current) => ({ ...current, overseasSynopsis: event.target.value }))}
+                  value={assetDraft.overseasSynopsis}
+                />
+              </label>
+              <label className="grid gap-1 text-sm text-slate-600 lg:col-span-2">
+                备注
+                <textarea
+                  className="min-h-20 rounded-md border border-slate-200 px-3 py-2 text-slate-950"
+                  data-testid="submission-asset-note"
+                  onChange={(event) => setAssetDraft((current) => ({ ...current, note: event.target.value }))}
+                  value={assetDraft.note}
+                />
+              </label>
+            </div>
           </div>
 
           <div className="rounded-md border border-slate-200 p-3">

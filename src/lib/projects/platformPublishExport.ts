@@ -149,11 +149,26 @@ export interface PublishPackageRestorePatch {
   restoredFields: string[];
 }
 
+export interface PlatformSubmissionAssetInput {
+  id?: string;
+  platformId: string;
+  platformName: string;
+  title: string;
+  logline: string;
+  synopsis: string;
+  overseasSynopsis: string;
+  tags: string[];
+  note: string;
+  source: string;
+  updatedAt?: Date | string;
+}
+
 export interface PlatformPublishExportInput {
   project: PublishExportProject;
   chapters: PublishExportChapter[];
   aiTasks?: PublishExportAiTask[];
   publishSnapshots?: PublishPackageVersionItem[];
+  submissionAssets?: PlatformSubmissionAssetInput[];
   submissionChecklist?: SubmissionChecklist;
   targetPlatform: PlatformProfile;
   platforms?: PlatformProfile[];
@@ -186,6 +201,7 @@ export interface PlatformPublishPackage {
   platformId: PlatformId;
   platformName: string;
   category: PlatformProfile["category"];
+  submissionAsset: (PlatformSubmissionAssetInput & { persisted: boolean }) | null;
   title: string;
   logline: string;
   synopsis: string;
@@ -878,6 +894,11 @@ function buildMarkdown(pack: Omit<PlatformPublishPackage, "markdown">) {
   ].join("\n");
 }
 
+function textOrFallback(value: string | undefined, fallback: string) {
+  const trimmed = value?.trim();
+  return trimmed || fallback;
+}
+
 function buildPlatformPackage(
   input: PlatformPublishExportInput,
   platform: PlatformProfile,
@@ -891,6 +912,18 @@ function buildPlatformPackage(
     platform,
     chapters: input.chapters,
   });
+  const submissionAsset = input.submissionAssets?.find((asset) => asset.platformId === platform.id) ?? null;
+  const assetTags = submissionAsset?.tags.map((tag) => tag.trim()).filter(Boolean) ?? [];
+  const title = textOrFallback(submissionAsset?.title, input.project.title);
+  const logline = textOrFallback(submissionAsset?.logline, submissionPackage.logline);
+  const synopsis = platform.category === "overseas"
+    ? textOrFallback(submissionAsset?.overseasSynopsis, textOrFallback(submissionAsset?.synopsis, submissionPackage.overseasSynopsis))
+    : textOrFallback(submissionAsset?.synopsis, submissionPackage.synopsis);
+  const tags = assetTags.length ? assetTags : submissionPackage.tags;
+  const publishNote = [
+    buildPublishNote(platform, submissionPackage),
+    submissionAsset?.note.trim() ? `投稿资产备注：${submissionAsset.note.trim()}` : "",
+  ].filter(Boolean).join("\n");
   const chapters = publishableChapters(input.chapters).map((chapter) => {
     const warnings = chapterWarnings(chapter, platform);
     const preflight = buildChapterPreflight(chapter, platform, input.aiTasks ?? [], warnings);
@@ -920,11 +953,16 @@ function buildPlatformPackage(
     platformId: platform.id,
     platformName: platform.name,
     category: platform.category,
-    title: input.project.title,
-    logline: submissionPackage.logline,
-    synopsis: platform.category === "overseas" ? submissionPackage.overseasSynopsis : submissionPackage.synopsis,
-    tags: submissionPackage.tags,
-    publishNote: buildPublishNote(platform, submissionPackage),
+    submissionAsset: submissionAsset ? {
+      ...submissionAsset,
+      tags: assetTags,
+      persisted: true,
+    } : null,
+    title,
+    logline,
+    synopsis,
+    tags,
+    publishNote,
     chapters,
     preflight,
     canExport: preflight.canExport,

@@ -2,6 +2,7 @@ import { ChapterWorkflowPanel } from "@/components/ai/ChapterWorkflowPanel";
 import { AppShell } from "@/components/app-shell/AppShell";
 import { ChapterEditor } from "@/components/chapters/ChapterEditor";
 import { ChapterRevisionWorkbench } from "@/components/chapters/ChapterRevisionWorkbench";
+import { ChapterSecondPassPanel } from "@/components/chapters/ChapterSecondPassPanel";
 import { prisma } from "@/lib/db/prisma";
 import { getPlatformProfile, type PlatformId } from "@/lib/platforms/platformProfiles";
 import { notFound } from "next/navigation";
@@ -42,6 +43,7 @@ export default async function ChapterPage({
             key={`${chapter.id}-${chapter.updatedAt.toISOString()}`}
             chapter={editableChapter}
           />
+          <ChapterSecondPassPanel chapterId={chapter.id} currentWordCount={chapter.wordCount} />
           <ChapterRevisionWorkbench chapter={editableChapter} />
         </div>
         <ChapterWorkflowPanel chapterId={chapterId} platform={platform} />

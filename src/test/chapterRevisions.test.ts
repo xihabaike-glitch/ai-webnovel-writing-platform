@@ -45,6 +45,24 @@ test("chapter revision summaries", async (t) => {
     assert.equal(summaries[0].sourceLabel, "前三章改写前旧稿");
   });
 
+  await t.test("labels second-pass snapshots", () => {
+    const summaries = summarizeChapterRevisions([
+      {
+        id: "revision-3",
+        source: "chapter_second_pass_before_overwrite",
+        sourceTaskId: "task-3",
+        title: "第一章",
+        content: "二改前旧稿。",
+        wordCount: 6,
+        status: "revising",
+        notes: "二改前自动保存",
+        createdAt: "2026-07-01T00:00:00.000Z",
+      },
+    ]);
+
+    assert.equal(summaries[0].sourceLabel, "二改前旧稿");
+  });
+
   await t.test("uses a clear placeholder for empty content", () => {
     assert.equal(previewRevisionContent("   "), "空正文");
   });

@@ -17,6 +17,7 @@ function aiTaskLabel(taskType: string) {
   const labels: Record<string, string> = {
     chapter_draft: "正文初稿",
     chapter_review: "章节审稿",
+    chapter_second_pass: "章节二改",
     first_three_rewrite: "前三章改写",
     submission_package_optimize: "投稿资料优化",
   };

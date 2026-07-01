@@ -96,6 +96,41 @@ export class MockAdapter implements ModelAdapter {
       };
     }
 
+    if (request.systemPrompt.includes("网文二改写手")) {
+      const titleMatch = request.userPrompt.match(/章节标题：(.+)/);
+      const modeMatch = request.userPrompt.match(/二改方向：(.+)/);
+      const instructionMatch = request.userPrompt.match(/作者指令：(.+)/);
+      const hookMatch = request.userPrompt.match(/开头钩子：(.+)/);
+      const conflictMatch = request.userPrompt.match(/冲突：(.+)/);
+      const cliffhangerMatch = request.userPrompt.match(/章末悬念：(.+)/);
+      const title = titleMatch?.[1]?.trim() || "这一章";
+      const mode = modeMatch?.[1]?.trim() || "强化追读";
+      const instruction = instructionMatch?.[1]?.trim() || "节奏更快，冲突更清楚";
+      const hook = hookMatch?.[1]?.trim() || "危险在第一段出现";
+      const conflict = conflictMatch?.[1]?.trim() || "主角必须立刻做选择";
+      const cliffhanger = cliffhangerMatch?.[1]?.trim() || "新的问题在章末出现";
+      const text = [
+        `${hook}。`,
+        "",
+        `林晚猛地抬头，雨声像被人一把推到耳边，系统提示却比雨更冷。${title}到了这一步，已经不能再慢慢解释。她要按新的二改方向处理：${mode}。更直接地说，作者要的是：${instruction}。`,
+        "",
+        `门后的求救声短促地断了一下，像有人捂住了那人的嘴。走廊尽头的脚步声逼近，手机屏幕上的倒计时只剩个位数。${conflict}。她如果退，今晚所有线索都会断；她如果进，就等于承认自己已经被卷进这套规则。`,
+        "",
+        "系统奖励栏忽然刷新，冷白色的字一行行跳出来。新手技能、临时保护、记忆惩罚，全都不是安慰，而是把她推上去的筹码。林晚终于明白，所谓选择从来不是给她自由，而是逼她用最痛的方式证明自己有资格活下去。",
+        "",
+        `她按下门把。门开的瞬间，屋里的人抬起头，第一句话就把她钉在原地：${cliffhanger}`,
+      ].join("\n");
+
+      return {
+        text,
+        usage: {
+          inputTokens: request.systemPrompt.length + request.userPrompt.length,
+          outputTokens: text.length,
+          costUsd: 0,
+        },
+      };
+    }
+
     const text = JSON.stringify(
       {
         score: 72,

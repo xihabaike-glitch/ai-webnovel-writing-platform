@@ -19,6 +19,36 @@ interface SubmissionPackageView {
   markdown: string;
 }
 
+interface OptimizedSubmissionPackage {
+  logline: string;
+  synopsis: string;
+  overseasSynopsis: string;
+  tags: string[];
+  rationale: string[];
+}
+
+function optimizedMarkdown(title: string, optimized: OptimizedSubmissionPackage) {
+  return [
+    `# ${title} 优化投稿资料`,
+    "",
+    "## 一句话卖点",
+    optimized.logline,
+    "",
+    "## 中文简介",
+    optimized.synopsis,
+    "",
+    "## Overseas Synopsis",
+    optimized.overseasSynopsis,
+    "",
+    "## 标签",
+    optimized.tags.join("、"),
+    "",
+    "## 优化理由",
+    ...optimized.rationale.map((item) => `- ${item}`),
+    "",
+  ].join("\n");
+}
+
 export function SubmissionPackagePanel({
   projectId,
   submissionPackage,
@@ -28,6 +58,8 @@ export function SubmissionPackagePanel({
 }) {
   const [message, setMessage] = useState<string | null>(null);
   const [isDownloading, setIsDownloading] = useState(false);
+  const [isOptimizing, setIsOptimizing] = useState(false);
+  const [optimized, setOptimized] = useState<OptimizedSubmissionPackage | null>(null);
 
   async function copyMarkdown() {
     await navigator.clipboard.writeText(submissionPackage.markdown);
@@ -57,6 +89,32 @@ export function SubmissionPackagePanel({
     }
   }
 
+  async function optimizePackage() {
+    setIsOptimizing(true);
+    setMessage(null);
+    try {
+      const response = await fetch(`/api/projects/${projectId}/submission-package/optimize`, {
+        method: "POST",
+      });
+      if (!response.ok) {
+        throw new Error("优化投稿资料失败。");
+      }
+      const payload = (await response.json()) as { optimized: OptimizedSubmissionPackage };
+      setOptimized(payload.optimized);
+      setMessage("已生成平台优化版");
+    } catch (caught) {
+      setMessage(caught instanceof Error ? caught.message : "优化投稿资料失败。");
+    } finally {
+      setIsOptimizing(false);
+    }
+  }
+
+  async function copyOptimizedMarkdown() {
+    if (!optimized) return;
+    await navigator.clipboard.writeText(optimizedMarkdown(submissionPackage.title, optimized));
+    setMessage("已复制优化版投稿资料");
+  }
+
   return (
     <section className="rounded-md border border-slate-200 bg-white p-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -71,6 +129,14 @@ export function SubmissionPackagePanel({
             type="button"
           >
             复制全部
+          </button>
+          <button
+            className="rounded-md border border-slate-200 px-3 py-2 text-sm font-medium hover:bg-slate-50 disabled:opacity-50"
+            disabled={isOptimizing}
+            onClick={optimizePackage}
+            type="button"
+          >
+            {isOptimizing ? "优化中" : "AI 优化"}
           </button>
           <button
             className="rounded-md bg-slate-950 px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
@@ -111,6 +177,42 @@ export function SubmissionPackagePanel({
           </div>
         ))}
       </div>
+      {optimized ? (
+        <div className="mt-4 rounded-md border border-slate-200 p-3">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div className="text-sm font-medium">平台优化版</div>
+            <button
+              className="w-fit rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white"
+              onClick={copyOptimizedMarkdown}
+              type="button"
+            >
+              复制优化版
+            </button>
+          </div>
+          <div className="mt-3 grid gap-3">
+            <div className="rounded-md bg-slate-50 p-3">
+              <div className="text-xs font-medium text-slate-500">一句话卖点</div>
+              <p className="mt-1 text-sm text-slate-700">{optimized.logline}</p>
+            </div>
+            <div className="rounded-md bg-slate-50 p-3">
+              <div className="text-xs font-medium text-slate-500">中文简介</div>
+              <p className="mt-1 text-sm leading-6 text-slate-700">{optimized.synopsis}</p>
+            </div>
+            <div className="rounded-md bg-slate-50 p-3">
+              <div className="text-xs font-medium text-slate-500">标签</div>
+              <p className="mt-1 text-sm text-slate-700">{optimized.tags.join("、")}</p>
+            </div>
+            <div className="rounded-md bg-slate-50 p-3">
+              <div className="text-xs font-medium text-slate-500">优化理由</div>
+              <div className="mt-1 grid gap-1 text-sm text-slate-700">
+                {optimized.rationale.map((item) => (
+                  <div key={item}>{item}</div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </section>
   );
 }

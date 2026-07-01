@@ -11,6 +11,15 @@ import { buildProjectDashboard } from "@/lib/projects/projectDashboard";
 import { buildSubmissionChecklist } from "@/lib/projects/submissionChecklist";
 import { buildSubmissionPackage } from "@/lib/projects/submissionPackage";
 
+function aiTaskLabel(taskType: string) {
+  const labels: Record<string, string> = {
+    chapter_draft: "正文初稿",
+    chapter_review: "章节审稿",
+    submission_package_optimize: "投稿资料优化",
+  };
+  return labels[taskType] ?? taskType;
+}
+
 export default async function ProjectPage({ params }: { params: Promise<{ projectId: string }> }) {
   const { projectId } = await params;
   const project = await prisma.project.findUnique({
@@ -227,7 +236,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ projec
               {dashboard.recentTasks.map((task) => (
                 <div className="rounded-md bg-slate-50 p-3 text-sm" key={task.id}>
                   <div className="flex items-center justify-between gap-2">
-                    <span className="font-medium">{task.taskType === "chapter_draft" ? "正文初稿" : "章节审稿"}</span>
+                    <span className="font-medium">{aiTaskLabel(task.taskType)}</span>
                     <span className="text-slate-500">{task.status}</span>
                   </div>
                   <div className="mt-1 text-slate-500">

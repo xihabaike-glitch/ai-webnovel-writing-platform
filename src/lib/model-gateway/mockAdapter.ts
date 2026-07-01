@@ -2,6 +2,34 @@ import type { GenerateRequest, GenerateResult, ModelAdapter } from "./types.ts";
 
 export class MockAdapter implements ModelAdapter {
   async generate(request: GenerateRequest): Promise<GenerateResult> {
+    if (request.systemPrompt.includes("投稿包装编辑")) {
+      const platformMatch = request.userPrompt.match(/目标平台：(.+)/);
+      const loglineMatch = request.userPrompt.match(/原一句话卖点：(.+)/);
+      const platform = platformMatch?.[1]?.trim() || "目标平台";
+      const rawLogline = loglineMatch?.[1]?.trim() || "主角在危机中觉醒能力并连续翻盘";
+      const logline = rawLogline.replace(/[。！？!?.,，、；;：:]+$/u, "");
+      const text = JSON.stringify(
+        {
+          logline: `${logline}，开局即进入高压选择。`,
+          synopsis: `为适配${platform}，简介强化开局危机、连续冲突和章末追读期待：${logline}。主角在雨夜危机中被迫行动，每一次选择都带来新的代价和更大的反转。`,
+          overseasSynopsis: `Positioned for ${platform}, this version highlights the immediate hook, progression promise, and chapter-end tension. ${logline}`,
+          tags: ["强钩子", "系统流", "逆袭", "高压选择", "章末悬念"],
+          rationale: ["强化第一眼钩子", "突出平台追读重点", "减少泛泛设定描述"],
+        },
+        null,
+        2,
+      );
+
+      return {
+        text,
+        usage: {
+          inputTokens: request.systemPrompt.length + request.userPrompt.length,
+          outputTokens: text.length,
+          costUsd: 0,
+        },
+      };
+    }
+
     if (request.systemPrompt.includes("正文初稿")) {
       const titleMatch = request.userPrompt.match(/章节标题：(.+)/);
       const goalMatch = request.userPrompt.match(/章节目标：(.+)/);

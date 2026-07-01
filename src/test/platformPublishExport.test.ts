@@ -163,7 +163,18 @@ test("buildPlatformPublishExportCenter", async (t) => {
       },
       targetPlatform: getPlatformProfile("fanqie"),
       chapters: finalChapters,
-      aiTasks: passedReviews,
+      aiTasks: [
+        ...passedReviews,
+        {
+          id: "asset-optimize-1",
+          chapterId: null,
+          taskType: "platform_submission_asset_optimize",
+          status: "succeeded",
+          inputSnapshot: JSON.stringify({ platformId: "fanqie" }),
+          outputText: JSON.stringify({ variants: [{ strategy: "强钩子爽点版" }, { strategy: "主线悬疑版" }, { strategy: "情绪复仇版" }] }),
+          createdAt: "2026-01-07T07:00:00.000Z",
+        },
+      ],
       submissionChecklist: readyChecklist,
       platforms: [getPlatformProfile("fanqie")],
     });
@@ -190,7 +201,18 @@ test("buildPlatformPublishExportCenter", async (t) => {
       },
       targetPlatform: getPlatformProfile("fanqie"),
       chapters: finalChapters,
-      aiTasks: passedReviews,
+      aiTasks: [
+        ...passedReviews,
+        {
+          id: "asset-optimize-1",
+          chapterId: null,
+          taskType: "platform_submission_asset_optimize",
+          status: "succeeded",
+          inputSnapshot: JSON.stringify({ platformId: "fanqie" }),
+          outputText: JSON.stringify({ variants: [{ strategy: "强钩子爽点版" }, { strategy: "主线悬疑版" }, { strategy: "情绪复仇版" }] }),
+          createdAt: "2026-01-07T07:00:00.000Z",
+        },
+      ],
       submissionChecklist: readyChecklist,
       platforms: [getPlatformProfile("fanqie")],
       submissionAssets: [
@@ -225,6 +247,24 @@ test("buildPlatformPublishExportCenter", async (t) => {
           action: "save",
           createdAt: "2026-01-07T08:00:00.000Z",
         },
+        {
+          id: "asset-version-adopted",
+          platformId: "fanqie",
+          platformName: "番茄小说",
+          title: "夜雨系统：倒计时翻盘",
+          logline: "系统每晚倒计时，女主用选择把危机打成连续翻盘爽点。",
+          synopsis: "林晚在雨夜绑定倒计时系统，每一次选择都牵动生死与复仇。她必须把系统惩罚反手变成翻盘筹码，沿着隐藏任务追查真相，并把背叛者拖回雨夜审判。",
+          overseasSynopsis: "Night Rain System follows Lin Wan through deadly timed choices.",
+          tags: ["系统", "重生", "强爽点"],
+          note: "采纳 AI 候选。",
+          source: "ai_variant",
+          auditScore: 96,
+          auditStatus: "ready",
+          action: "adopt",
+          sourceTaskId: "asset-optimize-1",
+          strategy: "强钩子爽点版",
+          createdAt: "2026-01-08T08:00:00.000Z",
+        },
       ],
     });
     const pack = center.packages[0];
@@ -235,8 +275,12 @@ test("buildPlatformPublishExportCenter", async (t) => {
     assert.deepEqual(pack.tags, ["系统", "重生", "强爽点"]);
     assert.equal(pack.submissionAsset?.persisted, true);
     assert.equal(pack.submissionAssetAudit.status, "ready");
-    assert.equal(pack.submissionAssetVersions.length, 1);
-    assert.equal(pack.submissionAssetVersions[0].id, "asset-version-1");
+    assert.equal(pack.submissionAssetVersions.length, 2);
+    assert.equal(pack.submissionAssetVersions[0].id, "asset-version-adopted");
+    assert.equal(pack.submissionAssetAdoption.generatedVariants, 3);
+    assert.equal(pack.submissionAssetAdoption.adoptedVersions, 1);
+    assert.equal(pack.submissionAssetAdoption.adoptionRatePercent, 33);
+    assert.deepEqual(pack.submissionAssetAdoption.recentStrategies, ["强钩子爽点版"]);
     assert.ok(pack.publishNote.includes("首秀前强调前三章钩子。"));
     assert.ok(pack.markdown.includes("夜雨系统：倒计时重生"));
     assert.ok(pack.markdown.includes("投稿资产质检"));

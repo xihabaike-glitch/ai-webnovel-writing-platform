@@ -167,6 +167,8 @@ export interface PlatformSubmissionAssetVersionInput extends PlatformSubmissionA
   auditScore: number;
   auditStatus: PlatformSubmissionAssetAudit["status"];
   action: string;
+  sourceTaskId?: string | null;
+  strategy?: string;
   createdAt: Date | string;
 }
 
@@ -182,6 +184,16 @@ export interface PlatformSubmissionAssetAudit {
   status: "ready" | "needs_work" | "blocked";
   passed: string[];
   issues: PlatformSubmissionAssetIssue[];
+}
+
+export interface PlatformSubmissionAssetAdoptionSummary {
+  generatedTasks: number;
+  generatedVariants: number;
+  adoptedVersions: number;
+  adoptionRatePercent: number;
+  bestAdoptedScore: number;
+  recentStrategies: string[];
+  verdict: string;
 }
 
 export interface PlatformPublishExportInput {
@@ -226,6 +238,7 @@ export interface PlatformPublishPackage {
   submissionAsset: (PlatformSubmissionAssetInput & { persisted: boolean }) | null;
   submissionAssetAudit: PlatformSubmissionAssetAudit;
   submissionAssetVersions: PlatformSubmissionAssetVersionInput[];
+  submissionAssetAdoption: PlatformSubmissionAssetAdoptionSummary;
   title: string;
   logline: string;
   synopsis: string;
@@ -1041,6 +1054,52 @@ export function buildSubmissionAssetAudit(
   };
 }
 
+function taskPlatformId(task: PublishExportAiTask) {
+  const parsed = parseJsonObject(task.inputSnapshot ?? "");
+  return typeof parsed?.platformId === "string" ? parsed.platformId : null;
+}
+
+function countOptimizationVariants(task: PublishExportAiTask) {
+  if (task.status !== "succeeded") return 0;
+  const parsed = parseJsonObject(task.outputText ?? "");
+  const variants = parsed?.variants;
+  return Array.isArray(variants) ? variants.length : 0;
+}
+
+function buildSubmissionAssetAdoptionSummary(
+  platform: PlatformProfile,
+  tasks: PublishExportAiTask[],
+  versions: PlatformSubmissionAssetVersionInput[],
+): PlatformSubmissionAssetAdoptionSummary {
+  const optimizationTasks = tasks.filter((task) => (
+    task.taskType === "platform_submission_asset_optimize"
+    && taskPlatformId(task) === platform.id
+    && task.status === "succeeded"
+  ));
+  const generatedVariants = optimizationTasks.reduce((sum, task) => sum + countOptimizationVariants(task), 0);
+  const adoptedVersions = versions.filter((version) => version.platformId === platform.id && version.action === "adopt");
+  const adoptionRatePercent = generatedVariants ? Math.round((adoptedVersions.length / generatedVariants) * 100) : 0;
+  const recentStrategies = adoptedVersions
+    .map((version) => version.strategy?.trim())
+    .filter((strategy): strategy is string => Boolean(strategy))
+    .slice(0, 3);
+  const bestAdoptedScore = adoptedVersions.reduce((best, version) => Math.max(best, version.auditScore), 0);
+
+  return {
+    generatedTasks: optimizationTasks.length,
+    generatedVariants,
+    adoptedVersions: adoptedVersions.length,
+    adoptionRatePercent,
+    bestAdoptedScore,
+    recentStrategies,
+    verdict: generatedVariants === 0
+      ? "还没有生成候选方案。"
+      : adoptedVersions.length === 0
+        ? "候选还没被采纳，先别自嗨，拿一个方案落库验证。"
+        : `已采纳 ${adoptedVersions.length}/${generatedVariants} 个候选，最高质检 ${bestAdoptedScore} 分。`,
+  };
+}
+
 function buildPlatformPackage(
   input: PlatformPublishExportInput,
   platform: PlatformProfile,
@@ -1102,6 +1161,11 @@ function buildPlatformPackage(
     .filter((version) => version.platformId === platform.id)
     .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime())
     .slice(0, 5);
+  const submissionAssetAdoption = buildSubmissionAssetAdoptionSummary(
+    platform,
+    input.aiTasks ?? [],
+    input.submissionAssetVersions ?? [],
+  );
   const packWithoutMarkdown = {
     platformId: platform.id,
     platformName: platform.name,
@@ -1113,6 +1177,7 @@ function buildPlatformPackage(
     } : null,
     submissionAssetAudit,
     submissionAssetVersions,
+    submissionAssetAdoption,
     title,
     logline,
     synopsis,

@@ -109,6 +109,8 @@ export async function POST(request: Request, { params }: Params) {
       auditScore: version.auditScore,
       auditStatus: version.auditStatus === "ready" || version.auditStatus === "blocked" ? version.auditStatus : "needs_work",
       action: version.action,
+      sourceTaskId: version.sourceTaskId,
+      strategy: version.strategy,
       createdAt: version.createdAt,
     })),
     submissionChecklist,

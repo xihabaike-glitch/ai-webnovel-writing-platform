@@ -197,6 +197,8 @@ interface PlatformSubmissionAssetVersion {
   auditScore: number;
   auditStatus: PlatformSubmissionAssetAudit["status"];
   action: string;
+  sourceTaskId?: string | null;
+  strategy?: string;
   createdAt: string;
 }
 
@@ -209,6 +211,17 @@ interface PlatformSubmissionAssetOptimizationVariant {
   tags: string[];
   rationale: string[];
   audit: PlatformSubmissionAssetAudit;
+  sourceTaskId?: string;
+}
+
+interface PlatformSubmissionAssetAdoption {
+  generatedTasks: number;
+  generatedVariants: number;
+  adoptedVersions: number;
+  adoptionRatePercent: number;
+  bestAdoptedScore: number;
+  recentStrategies: string[];
+  verdict: string;
 }
 
 interface PlatformPublishPackage {
@@ -218,6 +231,7 @@ interface PlatformPublishPackage {
   submissionAsset: PlatformSubmissionAsset | null;
   submissionAssetAudit: PlatformSubmissionAssetAudit;
   submissionAssetVersions: PlatformSubmissionAssetVersion[];
+  submissionAssetAdoption: PlatformSubmissionAssetAdoption;
   title: string;
   logline: string;
   synopsis: string;
@@ -267,6 +281,13 @@ interface SubmissionAssetDraft {
   overseasSynopsis: string;
   tags: string;
   note: string;
+}
+
+interface SaveSubmissionAssetOptions {
+  message?: string;
+  saveAction?: "save" | "adopt";
+  sourceTaskId?: string;
+  strategy?: string;
 }
 
 function actionHref(projectId: string, action: PublishRepairAction) {
@@ -328,6 +349,7 @@ function assetAuditStatusClass(status: PlatformSubmissionAssetAudit["status"]) {
 }
 
 function assetVersionActionLabel(action: string) {
+  if (action === "adopt") return "采纳";
   if (action === "restore") return "恢复";
   return "保存";
 }
@@ -471,7 +493,7 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
     }
   }
 
-  async function saveSubmissionAsset(nextDraft: SubmissionAssetDraft = assetDraft, options?: { message?: string }) {
+  async function saveSubmissionAsset(nextDraft: SubmissionAssetDraft = assetDraft, options?: SaveSubmissionAssetOptions) {
     if (!selectedPackage) return;
     setIsSavingAsset(true);
     setMessage(null);
@@ -482,6 +504,9 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
         body: JSON.stringify({
           action: "save-asset",
           platformId: selectedPackage.platformId,
+          saveAction: options?.saveAction,
+          sourceTaskId: options?.sourceTaskId,
+          strategy: options?.strategy,
           ...nextDraft,
         }),
       });
@@ -511,11 +536,12 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
         }),
       });
       const payload = (await response.json().catch(() => null)) as {
+        task?: { id: string };
         variants?: PlatformSubmissionAssetOptimizationVariant[];
         error?: string;
       } | null;
       if (!response.ok || !payload?.variants) throw new Error(payload?.error ?? "AI 优化投稿资产失败。");
-      setAssetOptimizationVariants(payload.variants);
+      setAssetOptimizationVariants(payload.variants.map((variant) => ({ ...variant, sourceTaskId: payload.task?.id })));
       setMessage(`已生成 ${payload.variants.length} 个 ${selectedPackage.platformName} 投稿优化方案。`);
     } catch (caught) {
       setMessage(caught instanceof Error ? caught.message : "AI 优化投稿资产失败。");
@@ -534,7 +560,12 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
       note: assetDraft.note,
     };
     setAssetDraft(nextDraft);
-    await saveSubmissionAsset(nextDraft, { message: `已应用并保存「${variant.strategy}」。` });
+    await saveSubmissionAsset(nextDraft, {
+      message: `已采纳并保存「${variant.strategy}」。`,
+      saveAction: "adopt",
+      sourceTaskId: variant.sourceTaskId,
+      strategy: variant.strategy,
+    });
   }
 
   async function copyMarkdown() {
@@ -1406,6 +1437,30 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
                 ) : null}
               </div>
             </div>
+            <div className="mt-3 grid gap-2 rounded-md bg-slate-50 p-3 text-sm sm:grid-cols-4">
+              <div>
+                <div className="text-xs text-slate-500">AI 候选</div>
+                <div className="mt-1 font-medium text-slate-950">{selectedPackage.submissionAssetAdoption.generatedVariants}</div>
+              </div>
+              <div>
+                <div className="text-xs text-slate-500">已采纳</div>
+                <div className="mt-1 font-medium text-slate-950">{selectedPackage.submissionAssetAdoption.adoptedVersions}</div>
+              </div>
+              <div>
+                <div className="text-xs text-slate-500">采纳率</div>
+                <div className="mt-1 font-medium text-slate-950">{selectedPackage.submissionAssetAdoption.adoptionRatePercent}%</div>
+              </div>
+              <div>
+                <div className="text-xs text-slate-500">最高采纳分</div>
+                <div className="mt-1 font-medium text-slate-950">{selectedPackage.submissionAssetAdoption.bestAdoptedScore || "暂无"}</div>
+              </div>
+              <div className="sm:col-span-4">
+                <div className="text-slate-600">{selectedPackage.submissionAssetAdoption.verdict}</div>
+                {selectedPackage.submissionAssetAdoption.recentStrategies.length ? (
+                  <div className="mt-1 text-xs text-slate-500">最近采纳：{selectedPackage.submissionAssetAdoption.recentStrategies.join("、")}</div>
+                ) : null}
+              </div>
+            </div>
             <div className="mt-3 grid gap-3 lg:grid-cols-2">
               <label className="grid gap-1 text-sm text-slate-600">
                 标题
@@ -1490,6 +1545,15 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
                           {variant.audit.score}
                         </span>
                       </div>
+                      <div className="mt-2 flex flex-wrap gap-2 text-xs text-slate-500">
+                        <span>较当前 {variant.audit.score - selectedPackage.submissionAssetAudit.score >= 0 ? "+" : ""}{variant.audit.score - selectedPackage.submissionAssetAudit.score} 分</span>
+                        <span>改动 {[
+                          variant.title !== assetDraft.title ? "标题" : "",
+                          variant.logline !== assetDraft.logline ? "卖点" : "",
+                          variant.synopsis !== assetDraft.synopsis ? "简介" : "",
+                          variant.tags.join("、") !== assetDraft.tags ? "标签" : "",
+                        ].filter(Boolean).join("、") || "无"}</span>
+                      </div>
                       <div className="mt-2 leading-6 text-slate-700">{variant.logline}</div>
                       <div className="mt-2 line-clamp-4 leading-6 text-slate-600">{variant.synopsis}</div>
                       <div className="mt-2 text-xs text-slate-500">标签：{variant.tags.join("、")}</div>
@@ -1527,6 +1591,7 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
                         <div className="font-medium text-slate-950">{version.title}</div>
                         <div className="mt-1 text-xs text-slate-500">
                           {assetVersionActionLabel(version.action)} · {formatTime(version.createdAt)}
+                          {version.strategy ? ` · ${version.strategy}` : ""}
                         </div>
                       </div>
                       <span className={`w-fit rounded-md px-2 py-1 text-xs font-medium ${assetAuditStatusClass(version.auditStatus)}`}>

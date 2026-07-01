@@ -223,6 +223,8 @@ CREATE TABLE IF NOT EXISTS "PlatformSubmissionAssetVersion" (
   "tags" TEXT NOT NULL DEFAULT '[]',
   "note" TEXT NOT NULL DEFAULT '',
   "source" TEXT NOT NULL DEFAULT 'manual',
+  "sourceTaskId" TEXT,
+  "strategy" TEXT NOT NULL DEFAULT '',
   "auditScore" INTEGER NOT NULL DEFAULT 0,
   "auditStatus" TEXT NOT NULL DEFAULT 'needs_work',
   "action" TEXT NOT NULL,

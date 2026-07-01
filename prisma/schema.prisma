@@ -263,6 +263,8 @@ model PlatformSubmissionAssetVersion {
   tags             String   @default("[]")
   note             String   @default("")
   source           String   @default("manual")
+  sourceTaskId     String?
+  strategy         String   @default("")
   auditScore       Int      @default(0)
   auditStatus      String   @default("needs_work")
   action           String

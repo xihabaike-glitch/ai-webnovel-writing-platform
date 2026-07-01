@@ -118,6 +118,8 @@ async function buildCenter(projectId: string) {
       auditScore: version.auditScore,
       auditStatus: version.auditStatus === "ready" || version.auditStatus === "blocked" ? version.auditStatus : "needs_work",
       action: version.action,
+      sourceTaskId: version.sourceTaskId,
+      strategy: version.strategy,
       createdAt: version.createdAt,
     })),
     submissionChecklist,
@@ -310,6 +312,9 @@ export async function POST(request: Request, { params }: Params) {
     overseasSynopsis?: unknown;
     tags?: unknown;
     note?: unknown;
+    sourceTaskId?: unknown;
+    strategy?: unknown;
+    saveAction?: unknown;
   };
   const context = await buildCenter(projectId);
 
@@ -333,9 +338,12 @@ export async function POST(request: Request, { params }: Params) {
       overseasSynopsis: trimText(body.overseasSynopsis),
       tags: normalizedTags,
       note: trimText(body.note),
-      source: "manual",
+      source: typeof body.sourceTaskId === "string" && body.sourceTaskId.trim() ? "ai_variant" : "manual",
     };
     const audit = buildSubmissionAssetAudit(platform, normalizedAsset);
+    const sourceTaskId = trimText(body.sourceTaskId) || null;
+    const strategy = trimText(body.strategy);
+    const versionAction = body.saveAction === "adopt" && sourceTaskId ? "adopt" : "save";
     const [asset, assetVersion] = await prisma.$transaction(async (tx) => {
       const savedAsset = await tx.platformSubmissionAsset.upsert({
         where: {
@@ -354,7 +362,7 @@ export async function POST(request: Request, { params }: Params) {
           overseasSynopsis: normalizedAsset.overseasSynopsis,
           tags: JSON.stringify(normalizedTags),
           note: normalizedAsset.note,
-          source: "manual",
+          source: normalizedAsset.source,
         },
         update: {
           platformName: platform.name,
@@ -364,7 +372,7 @@ export async function POST(request: Request, { params }: Params) {
           overseasSynopsis: normalizedAsset.overseasSynopsis,
           tags: JSON.stringify(normalizedTags),
           note: normalizedAsset.note,
-          source: "manual",
+          source: normalizedAsset.source,
         },
       });
       const savedVersion = await tx.platformSubmissionAssetVersion.create({
@@ -379,10 +387,12 @@ export async function POST(request: Request, { params }: Params) {
           overseasSynopsis: normalizedAsset.overseasSynopsis,
           tags: JSON.stringify(normalizedTags),
           note: normalizedAsset.note,
-          source: "manual",
+          source: normalizedAsset.source,
+          sourceTaskId,
+          strategy,
           auditScore: audit.score,
           auditStatus: audit.status,
-          action: "save",
+          action: versionAction,
         },
       });
       return [savedAsset, savedVersion];

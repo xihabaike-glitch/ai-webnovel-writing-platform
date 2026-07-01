@@ -1,0 +1,145 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Project {
+  id               String   @id @default(cuid())
+  title            String
+  targetPlatform   String
+  targetLengthType String
+  targetWordCount  Int
+  currentWordCount Int      @default(0)
+  genre            String
+  sellingPoint     String   @default("")
+  updateCadence    String   @default("")
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  chapters     Chapter[]
+  characters   Character[]
+  worldEntries WorldEntry[]
+  foreshadows  Foreshadow[]
+  plotThreads  PlotThread[]
+  aiTasks      AiTask[]
+}
+
+model Chapter {
+  id          String   @id @default(cuid())
+  projectId   String
+  volumeId    String?
+  order       Int
+  title       String
+  content     String   @default("")
+  wordCount   Int      @default(0)
+  goal        String   @default("")
+  hook        String   @default("")
+  conflict    String   @default("")
+  valueShift  String   @default("")
+  cliffhanger String   @default("")
+  status      String   @default("draft")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+model Character {
+  id                String   @id @default(cuid())
+  projectId         String
+  name              String
+  role              String
+  desire            String   @default("")
+  need              String   @default("")
+  flaw              String   @default("")
+  arcStart          String   @default("")
+  arcEnd            String   @default("")
+  voice             String   @default("")
+  relationshipNotes String   @default("")
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+model WorldEntry {
+  id        String   @id @default(cuid())
+  projectId String
+  type      String
+  title     String
+  content   String   @default("")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+model Foreshadow {
+  id                  String   @id @default(cuid())
+  projectId           String
+  title               String
+  setupChapterId      String?
+  payoffChapterId     String?
+  relatedCharacterIds String   @default("[]")
+  status              String   @default("planned")
+  notes               String   @default("")
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+model PlotThread {
+  id             String   @id @default(cuid())
+  projectId      String
+  type           String
+  title          String
+  startChapterId String?
+  endChapterId   String?
+  status         String   @default("planned")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+model ModelProvider {
+  id               String   @id @default(cuid())
+  providerId       String
+  displayName      String
+  baseUrl          String?
+  encryptedApiKey  String?
+  defaultModel     String
+  enabled          Boolean  @default(true)
+  maxContextTokens Int?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  aiTasks AiTask[]
+}
+
+model AiTask {
+  id              String   @id @default(cuid())
+  projectId       String
+  chapterId       String?
+  taskType        String
+  providerConfigId String
+  model           String
+  status          String   @default("queued")
+  inputSnapshot   String
+  outputText      String?
+  inputTokens     Int?
+  outputTokens    Int?
+  costUsd         Float?
+  errorMessage    String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  project       Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  modelProvider ModelProvider @relation(fields: [providerConfigId], references: [id], onDelete: Restrict)
+}
+

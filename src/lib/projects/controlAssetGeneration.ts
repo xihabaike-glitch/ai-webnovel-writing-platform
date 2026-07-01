@@ -70,6 +70,14 @@ interface GeneratedPayload {
   rationale?: string[];
 }
 
+interface NormalizedControlAssets {
+  characters: GeneratedCharacter[];
+  worldEntries: GeneratedWorldEntry[];
+  plotThreads: Array<{ type: string; title: string; startChapterId: string | null; endChapterId: string | null; status: string }>;
+  foreshadows: Array<{ title: string; setupChapterId: string | null; payoffChapterId: string | null; relatedCharacterIds: string[]; status: string; notes: string }>;
+  qualityGate: ControlAssetQualityGate;
+}
+
 export interface ControlAssetQualityGate {
   score: number;
   status: "pass" | "warn" | "fail";
@@ -137,6 +145,31 @@ export function buildControlAssetPrompt(input: PromptInput) {
   };
 }
 
+export function buildControlAssetRepairPrompt(input: {
+  areaId: ControlAssetAreaId;
+  originalPrompt: ReturnType<typeof buildControlAssetPrompt>;
+  generated: GeneratedPayload;
+  qualityGate: ControlAssetQualityGate;
+}) {
+  return {
+    systemPrompt: [
+      input.originalPrompt.systemPrompt,
+      "你现在进入返修模式。上一版没有通过质量闸门，必须按问题重写，不要解释，不要保留弱项。",
+    ].join("\n"),
+    userPrompt: [
+      `返修模块：${areaLabel(input.areaId)}`,
+      `输出要求：${schemaInstruction(input.areaId)}`,
+      `质量分：${input.qualityGate.score}`,
+      `问题：${input.qualityGate.issues.join("；") || "无"}`,
+      `修复动作：${input.qualityGate.nextActions.join("；") || "补强具体冲突、限制和回收点"}`,
+      "原始任务：",
+      input.originalPrompt.userPrompt,
+      "上一版 JSON：",
+      JSON.stringify(input.generated, null, 2),
+    ].join("\n\n"),
+  };
+}
+
 function parseJsonObject(text: string): GeneratedPayload {
   const trimmed = text.trim();
   try {
@@ -200,6 +233,39 @@ function normalizeStoryLines(payload: GeneratedPayload, chapterIds: Set<string>,
       status: clean(item.status) || "planned",
       notes: clean(item.notes),
     })),
+  };
+}
+
+function normalizeGeneratedAssets(
+  areaId: ControlAssetAreaId,
+  payload: GeneratedPayload,
+  context: {
+    chapters: Array<{ id: string }>;
+    characters: Array<{ id: string }>;
+  },
+): NormalizedControlAssets {
+  const characters = areaId === "characters" ? normalizeCharacters(payload) : [];
+  const worldEntries = areaId === "world" ? normalizeWorldEntries(payload) : [];
+  const storyLines = areaId === "story-lines"
+    ? normalizeStoryLines(
+      payload,
+      new Set(context.chapters.map((chapter) => chapter.id)),
+      new Set(context.characters.map((character) => character.id)),
+    )
+    : { plotThreads: [], foreshadows: [] };
+  const quality = buildControlAssetQualityGate(areaId, {
+    characters,
+    worldEntries,
+    plotThreads: storyLines.plotThreads,
+    foreshadows: storyLines.foreshadows,
+  });
+
+  return {
+    characters,
+    worldEntries,
+    plotThreads: storyLines.plotThreads,
+    foreshadows: storyLines.foreshadows,
+    qualityGate: quality,
   };
 }
 
@@ -305,6 +371,18 @@ export function buildControlAssetQualityGate(
   return qualityGate(storyScore - issues.length * 6, issues, nextActions);
 }
 
+function mergeUsage(
+  first: { inputTokens: number; outputTokens: number; costUsd?: number } | undefined,
+  second: { inputTokens: number; outputTokens: number; costUsd?: number } | undefined,
+) {
+  if (!first && !second) return undefined;
+  return {
+    inputTokens: (first?.inputTokens ?? 0) + (second?.inputTokens ?? 0),
+    outputTokens: (first?.outputTokens ?? 0) + (second?.outputTokens ?? 0),
+    costUsd: (first?.costUsd ?? 0) + (second?.costUsd ?? 0),
+  };
+}
+
 export async function generateControlAssets(projectId: string, areaId: ControlAssetAreaId) {
   const project = await prisma.project.findUnique({
     where: { id: projectId },
@@ -354,33 +432,63 @@ export async function generateControlAssets(projectId: string, areaId: ControlAs
       temperature: 0.65,
       maxTokens: 2200,
     });
-    const payload = parseJsonObject(result.text);
+    let payload = parseJsonObject(result.text);
     const created: string[] = [];
-    const normalizedCharacters = areaId === "characters" ? normalizeCharacters(payload) : [];
-    const normalizedWorldEntries = areaId === "world" ? normalizeWorldEntries(payload) : [];
-    const normalizedStoryLines = areaId === "story-lines"
-      ? normalizeStoryLines(
-        payload,
-        new Set(project.chapters.map((chapter) => chapter.id)),
-        new Set(project.characters.map((character) => character.id)),
-      )
-      : { plotThreads: [], foreshadows: [] };
-    const quality = buildControlAssetQualityGate(areaId, {
-      characters: normalizedCharacters,
-      worldEntries: normalizedWorldEntries,
-      plotThreads: normalizedStoryLines.plotThreads,
-      foreshadows: normalizedStoryLines.foreshadows,
-    });
+    const firstAttempt = {
+      generated: payload,
+      qualityGate: normalizeGeneratedAssets(areaId, payload, project).qualityGate,
+    };
+    let normalized = normalizeGeneratedAssets(areaId, payload, project);
+    let usage = result.usage;
+    let repairAttempt: { generated: GeneratedPayload; qualityGate: ControlAssetQualityGate } | null = null;
+
+    if (!normalized.qualityGate.passed) {
+      const repairPrompt = buildControlAssetRepairPrompt({
+        areaId,
+        originalPrompt: prompt,
+        generated: payload,
+        qualityGate: normalized.qualityGate,
+      });
+      const repaired = await adapter.generate({
+        providerId: provider.providerId as ModelProviderId,
+        model: provider.defaultModel,
+        systemPrompt: repairPrompt.systemPrompt,
+        userPrompt: repairPrompt.userPrompt,
+        temperature: 0.45,
+        maxTokens: 2200,
+      });
+      const repairedPayload = parseJsonObject(repaired.text);
+      const repairedNormalized = normalizeGeneratedAssets(areaId, repairedPayload, project);
+      repairAttempt = {
+        generated: repairedPayload,
+        qualityGate: repairedNormalized.qualityGate,
+      };
+      usage = mergeUsage(result.usage, repaired.usage);
+
+      if (repairedNormalized.qualityGate.passed) {
+        payload = repairedPayload;
+        normalized = repairedNormalized;
+      }
+    }
+    const quality = normalized.qualityGate;
 
     if (!quality.passed) {
       await prisma.aiTask.update({
         where: { id: task.id },
         data: {
           status: "failed",
-          outputText: JSON.stringify({ generated: payload, qualityGate: quality }, null, 2),
-          inputTokens: result.usage?.inputTokens,
-          outputTokens: result.usage?.outputTokens,
-          costUsd: result.usage?.costUsd,
+          outputText: JSON.stringify({
+            generated: payload,
+            qualityGate: quality,
+            repair: {
+              attempted: Boolean(repairAttempt),
+              firstAttempt,
+              repairAttempt,
+            },
+          }, null, 2),
+          inputTokens: usage?.inputTokens,
+          outputTokens: usage?.outputTokens,
+          costUsd: usage?.costUsd,
           errorMessage: `质量闸门未通过：${quality.issues.join("；")}`,
         },
       });
@@ -401,23 +509,23 @@ export async function generateControlAssets(projectId: string, areaId: ControlAs
 
     await prisma.$transaction(async (tx) => {
       if (areaId === "characters") {
-        for (const seed of normalizedCharacters) {
+        for (const seed of normalized.characters) {
           await tx.character.create({ data: { projectId, ...seed } });
           created.push(seed.name);
         }
       }
       if (areaId === "world") {
-        for (const seed of normalizedWorldEntries) {
+        for (const seed of normalized.worldEntries) {
           await tx.worldEntry.create({ data: { projectId, ...seed } });
           created.push(seed.title);
         }
       }
       if (areaId === "story-lines") {
-        for (const seed of normalizedStoryLines.plotThreads) {
+        for (const seed of normalized.plotThreads) {
           await tx.plotThread.create({ data: { projectId, ...seed } });
           created.push(seed.title);
         }
-        for (const seed of normalizedStoryLines.foreshadows) {
+        for (const seed of normalized.foreshadows) {
           await tx.foreshadow.create({
             data: {
               projectId,
@@ -436,10 +544,18 @@ export async function generateControlAssets(projectId: string, areaId: ControlAs
         where: { id: task.id },
         data: {
           status: "succeeded",
-          outputText: JSON.stringify({ generated: payload, qualityGate: quality }, null, 2),
-          inputTokens: result.usage?.inputTokens,
-          outputTokens: result.usage?.outputTokens,
-          costUsd: result.usage?.costUsd,
+          outputText: JSON.stringify({
+            generated: payload,
+            qualityGate: quality,
+            repair: {
+              attempted: Boolean(repairAttempt),
+              firstAttempt,
+              repairAttempt,
+            },
+          }, null, 2),
+          inputTokens: usage?.inputTokens,
+          outputTokens: usage?.outputTokens,
+          costUsd: usage?.costUsd,
         },
       });
     });
@@ -459,7 +575,7 @@ export async function generateControlAssets(projectId: string, areaId: ControlAs
         displayName: provider.displayName,
         model: provider.defaultModel,
       },
-      message: `AI 已生成 ${created.length} 项，质检 ${quality.score} 分：${created.join("、")}。`,
+      message: `${repairAttempt ? "AI 已自动返修并生成" : "AI 已生成"} ${created.length} 项，质检 ${quality.score} 分：${created.join("、")}。`,
     };
   } catch (caught) {
     const message = caught instanceof Error ? caught.message : "Unknown control asset generation error";

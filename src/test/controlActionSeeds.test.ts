@@ -7,7 +7,7 @@ import {
   buildStoryLineActionSeeds,
   buildWorldActionSeeds,
 } from "../lib/projects/controlActionSeeds.ts";
-import { buildControlAssetPrompt, buildControlAssetQualityGate } from "../lib/projects/controlAssetGeneration.ts";
+import { buildControlAssetPrompt, buildControlAssetQualityGate, buildControlAssetRepairPrompt } from "../lib/projects/controlAssetGeneration.ts";
 
 const project = {
   id: "demo-project",
@@ -134,5 +134,39 @@ test("control action seeds", async (t) => {
     assert.equal(gate.status, "fail");
     assert.equal(gate.passed, false);
     assert.ok(gate.issues.some((issue) => issue.includes("缺少")));
+  });
+
+  await t.test("builds repair prompts from failed quality gates", () => {
+    const originalPrompt = buildControlAssetPrompt({
+      areaId: "world",
+      project: {
+        ...project,
+        targetLengthType: "long_300k_plus",
+        targetWordCount: 300000,
+        updateCadence: "daily_4000",
+      },
+      platform: getPlatformProfile("fanqie"),
+      existing: {
+        chapters: [],
+        characters: [],
+        worldEntries: [],
+        foreshadows: [],
+        plotThreads: [],
+      },
+    });
+    const qualityGate = buildControlAssetQualityGate("world", {
+      worldEntries: [{ type: "other", title: "薄设定", content: "很强。" }],
+    });
+    const repairPrompt = buildControlAssetRepairPrompt({
+      areaId: "world",
+      originalPrompt,
+      generated: { worldEntries: [{ type: "other", title: "薄设定", content: "很强。" }] },
+      qualityGate,
+    });
+
+    assert.ok(repairPrompt.systemPrompt.includes("返修模式"));
+    assert.ok(repairPrompt.userPrompt.includes("质量分"));
+    assert.ok(repairPrompt.userPrompt.includes("缺少 system_rule"));
+    assert.ok(repairPrompt.userPrompt.includes("上一版 JSON"));
   });
 });

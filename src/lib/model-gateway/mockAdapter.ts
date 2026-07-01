@@ -6,11 +6,46 @@ export class MockAdapter implements ModelAdapter {
       const isCharacters = request.userPrompt.includes("生成模块：人物弧光");
       const isWorld = request.userPrompt.includes("生成模块：世界观资料");
       const isStoryLines = request.userPrompt.includes("生成模块：主线伏笔");
+      const shouldReturnThinDraft = request.userPrompt.includes("触发质量返修") && !request.systemPrompt.includes("返修模式");
       const chapterMatch = request.userPrompt.match(/"id": "([^"]+)",\n\s+"order": 1/);
       const characterMatch = request.userPrompt.match(/"characters": \[\s*\{\s*"id": "([^"]+)"/);
       const firstChapterId = chapterMatch?.[1] ?? null;
       const firstCharacterId = characterMatch?.[1] ?? undefined;
-      const payload = isCharacters
+      const payload = shouldReturnThinDraft
+        ? isWorld
+          ? {
+            worldEntries: [
+              {
+                type: "other",
+                title: "薄设定",
+                content: "很强。",
+              },
+            ],
+            rationale: ["故意触发质量返修"],
+          }
+          : isCharacters
+            ? {
+              characters: [
+                {
+                  name: "路人",
+                  role: "配角",
+                  desire: "",
+                  need: "",
+                  flaw: "",
+                  arcStart: "",
+                  arcEnd: "",
+                  voice: "",
+                  relationshipNotes: "",
+                },
+              ],
+              rationale: ["故意触发质量返修"],
+            }
+            : {
+              plotThreads: [],
+              foreshadows: [{ title: "薄伏笔", setupChapterId: null, payoffChapterId: null, relatedCharacterIds: [], status: "planned", notes: "" }],
+              rationale: ["故意触发质量返修"],
+            }
+        : isCharacters
         ? {
           characters: [
             {

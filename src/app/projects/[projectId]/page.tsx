@@ -7,6 +7,7 @@ import { ExportMarkdownButton } from "@/components/projects/ExportMarkdownButton
 import { prisma } from "@/lib/db/prisma";
 import { getPlatformProfile, type PlatformId } from "@/lib/platforms/platformProfiles";
 import { buildProjectDashboard } from "@/lib/projects/projectDashboard";
+import { buildSubmissionChecklist } from "@/lib/projects/submissionChecklist";
 
 export default async function ProjectPage({ params }: { params: Promise<{ projectId: string }> }) {
   const { projectId } = await params;
@@ -39,6 +40,20 @@ export default async function ProjectPage({ params }: { params: Promise<{ projec
     aiTasks: project.aiTasks.map((task) => ({
       ...task,
       chapter: task.chapterId ? chaptersById.get(task.chapterId) ?? null : null,
+    })),
+  });
+  const submissionChecklist = buildSubmissionChecklist({
+    title: project.title,
+    genre: project.genre,
+    sellingPoint: project.sellingPoint,
+    currentWordCount: project.currentWordCount,
+    targetWordCount: project.targetWordCount,
+    platform,
+    chapters: project.chapters,
+    aiTasks: project.aiTasks.map((task) => ({
+      taskType: task.taskType,
+      status: task.status,
+      chapter: task.chapterId ? { id: task.chapterId } : null,
     })),
   });
   const outlineNodes = project.outlineNodes.map((node) => ({
@@ -124,6 +139,53 @@ export default async function ProjectPage({ params }: { params: Promise<{ projec
                   {warning}
                 </div>
               ))}
+            </div>
+          </div>
+        </section>
+        <section className="rounded-md border border-slate-200 bg-white p-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <h2 className="font-medium">投稿前检查</h2>
+              <p className="mt-1 text-sm text-slate-600">
+                {platform.name} · 准备度 {submissionChecklist.readinessPercent}% · 通过 {submissionChecklist.passCount} 项 · 待处理 {submissionChecklist.todoCount} 项 · 风险 {submissionChecklist.riskCount} 项
+              </p>
+            </div>
+            <div className="h-2 min-w-44 overflow-hidden rounded bg-slate-100">
+              <div className="h-full bg-slate-950" style={{ width: `${submissionChecklist.readinessPercent}%` }} />
+            </div>
+          </div>
+          <div className="mt-4 grid gap-3 lg:grid-cols-3">
+            <div className="rounded-md bg-slate-50 p-3">
+              <div className="text-sm font-medium">通过项</div>
+              <div className="mt-2 grid gap-2 text-sm text-slate-600">
+                {submissionChecklist.items.filter((entry) => entry.status === "pass").slice(0, 5).map((entry) => (
+                  <div key={entry.id}>{entry.label}</div>
+                ))}
+              </div>
+            </div>
+            <div className="rounded-md bg-slate-50 p-3">
+              <div className="text-sm font-medium">待处理</div>
+              <div className="mt-2 grid gap-2 text-sm text-slate-600">
+                {submissionChecklist.items.filter((entry) => entry.status === "todo").map((entry) => (
+                  <div key={entry.id}>
+                    <div className="font-medium text-slate-900">{entry.label}</div>
+                    <div>{entry.detail}</div>
+                  </div>
+                ))}
+                {submissionChecklist.todoCount === 0 ? <div>没有硬性缺口。</div> : null}
+              </div>
+            </div>
+            <div className="rounded-md bg-slate-50 p-3">
+              <div className="text-sm font-medium">风险项</div>
+              <div className="mt-2 grid gap-2 text-sm text-slate-600">
+                {submissionChecklist.items.filter((entry) => entry.status === "risk").map((entry) => (
+                  <div key={entry.id}>
+                    <div className="font-medium text-slate-900">{entry.label}</div>
+                    <div>{entry.detail}</div>
+                  </div>
+                ))}
+                {submissionChecklist.riskCount === 0 ? <div>暂无明显风险。</div> : null}
+              </div>
             </div>
           </div>
         </section>

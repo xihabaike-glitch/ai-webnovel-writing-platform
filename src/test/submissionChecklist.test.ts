@@ -1,0 +1,74 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { buildSubmissionChecklist } from "../lib/projects/submissionChecklist.ts";
+import { getPlatformProfile } from "../lib/platforms/platformProfiles.ts";
+
+const chapters = [
+  {
+    id: "chapter-1",
+    title: "第一章",
+    order: 1,
+    status: "final",
+    wordCount: 3000,
+    hook: "系统倒计时只剩十秒。",
+    cliffhanger: "第二个选择出现。",
+  },
+  {
+    id: "chapter-2",
+    title: "第二章",
+    order: 2,
+    status: "draft",
+    wordCount: 3000,
+    hook: "主角被迫验证系统。",
+    cliffhanger: "反派看到系统提示。",
+  },
+  {
+    id: "chapter-3",
+    title: "第三章",
+    order: 3,
+    status: "draft",
+    wordCount: 3000,
+    hook: "奖励变成新的陷阱。",
+    cliffhanger: "倒计时重置。",
+  },
+];
+
+test("buildSubmissionChecklist", async (t) => {
+  await t.test("requires stronger word count for free long-form platforms", () => {
+    const checklist = buildSubmissionChecklist({
+      title: "夜雨系统",
+      genre: "都市系统",
+      sellingPoint: "雨夜危机中觉醒系统，主角用一次次选择翻盘。",
+      currentWordCount: 9000,
+      targetWordCount: 300000,
+      platform: getPlatformProfile("fanqie"),
+      chapters,
+      aiTasks: chapters.map((chapter) => ({
+        taskType: "chapter_review",
+        status: "succeeded",
+        chapter: { id: chapter.id },
+      })),
+    });
+
+    assert.equal(checklist.items.find((item) => item.id === "word-count")?.status, "pass");
+    assert.equal(checklist.items.find((item) => item.id === "first-three")?.status, "pass");
+    assert.equal(checklist.items.find((item) => item.id === "reviewed-first-three")?.status, "pass");
+    assert.ok(checklist.readinessPercent > 60);
+  });
+
+  await t.test("allows a lower first submission line for Zhihu short stories", () => {
+    const checklist = buildSubmissionChecklist({
+      title: "雨夜反转",
+      genre: "悬疑",
+      sellingPoint: "第一人称雨夜复仇反转故事。",
+      currentWordCount: 1200,
+      targetWordCount: 10000,
+      platform: getPlatformProfile("zhihu_yanxuan"),
+      chapters: chapters.slice(0, 1),
+      aiTasks: [],
+    });
+
+    assert.equal(checklist.items.find((item) => item.id === "word-count")?.status, "pass");
+    assert.equal(checklist.items.find((item) => item.id === "first-three")?.status, "todo");
+  });
+});

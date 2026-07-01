@@ -40,6 +40,24 @@ interface OpeningDiagnostic {
   markdown: string;
 }
 
+interface OpeningRewriteVariant {
+  id: string;
+  name: string;
+  strategy: string;
+  targetReader: string;
+  estimatedScore: number;
+  openingText: string;
+  fixes: string[];
+  platformNote: string;
+}
+
+interface OpeningRewritePackage {
+  diagnostic: OpeningDiagnostic;
+  variants: OpeningRewriteVariant[];
+  recommendedVariantId: string;
+  markdown: string;
+}
+
 interface WorkflowPayload {
   chapter: {
     title: string;
@@ -91,11 +109,14 @@ export function ChapterWorkflowPanel({
   const [isReviewing, setIsReviewing] = useState(false);
   const [isDiagnosingOpening, setIsDiagnosingOpening] = useState(false);
   const [isDownloadingDiagnostic, setIsDownloadingDiagnostic] = useState(false);
+  const [isRewritingOpening, setIsRewritingOpening] = useState(false);
+  const [isDownloadingRewrite, setIsDownloadingRewrite] = useState(false);
   const [isSavingRevision, setIsSavingRevision] = useState(false);
   const [restoringRevisionId, setRestoringRevisionId] = useState<string | null>(null);
   const [revisions, setRevisions] = useState<ChapterRevisionSummary[]>([]);
   const [selectedRevision, setSelectedRevision] = useState<ChapterRevisionSummary | null>(null);
   const [openingDiagnostic, setOpeningDiagnostic] = useState<OpeningDiagnostic | null>(null);
+  const [openingRewrite, setOpeningRewrite] = useState<OpeningRewritePackage | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const groupedIssues = useMemo(
     () => (reviewResult ? nonEmptyReviewGroups(groupReviewIssues(reviewResult.issues)) : []),
@@ -273,6 +294,59 @@ export function ChapterWorkflowPanel({
     }
   }
 
+  async function runOpeningRewrite() {
+    setIsRewritingOpening(true);
+    setMessage(null);
+    try {
+      const response = await fetch(`/api/chapters/${chapterId}/opening-rewrite`);
+      if (!response.ok) {
+        throw new Error("开头重写失败。");
+      }
+      const payload = (await response.json()) as { rewritePackage: OpeningRewritePackage };
+      setOpeningRewrite(payload.rewritePackage);
+      setOpeningDiagnostic(payload.rewritePackage.diagnostic);
+      setMessage("已生成首章开头重写");
+    } catch (caught) {
+      setMessage(caught instanceof Error ? caught.message : "开头重写失败。");
+    } finally {
+      setIsRewritingOpening(false);
+    }
+  }
+
+  async function copyOpeningRewrite() {
+    if (!openingRewrite) return;
+    await navigator.clipboard.writeText(openingRewrite.markdown);
+    setMessage("已复制首章开头重写");
+  }
+
+  async function copyOpeningVariant(variant: OpeningRewriteVariant) {
+    await navigator.clipboard.writeText(variant.openingText);
+    setMessage(`已复制${variant.name}`);
+  }
+
+  async function downloadOpeningRewrite() {
+    setIsDownloadingRewrite(true);
+    setMessage(null);
+    try {
+      const response = await fetch(`/api/chapters/${chapterId}/opening-rewrite?format=markdown`);
+      if (!response.ok) {
+        throw new Error("下载重写失败。");
+      }
+      const markdown = await response.text();
+      const blob = new Blob([markdown], { type: "text/markdown;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "首章开头重写.md";
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (caught) {
+      setMessage(caught instanceof Error ? caught.message : "下载重写失败。");
+    } finally {
+      setIsDownloadingRewrite(false);
+    }
+  }
+
   return (
     <aside className="grid gap-4">
       <section className="rounded-md border border-slate-200 bg-white p-4">
@@ -290,7 +364,7 @@ export function ChapterWorkflowPanel({
             <div className="rounded-md bg-amber-50 p-2 text-amber-700">当前模型未配置 Key，会优先使用可用模型或 Mock。</div>
           ) : null}
         </div>
-        <div className="mt-4 grid gap-2 sm:grid-cols-3">
+        <div className="mt-4 grid grid-cols-2 gap-2">
           <button
             className="rounded-md bg-slate-950 px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
             disabled={isGeneratingDraft}
@@ -314,6 +388,14 @@ export function ChapterWorkflowPanel({
             type="button"
           >
             {isDiagnosingOpening ? "诊断中" : "黄金三秒"}
+          </button>
+          <button
+            className="rounded-md border border-slate-200 px-3 py-2 text-sm font-medium hover:bg-slate-50 disabled:opacity-50"
+            disabled={isRewritingOpening}
+            onClick={runOpeningRewrite}
+            type="button"
+          >
+            {isRewritingOpening ? "重写中" : "开头重写"}
           </button>
         </div>
         {message ? <p className="mt-3 text-sm text-slate-600">{message}</p> : null}
@@ -374,6 +456,73 @@ export function ChapterWorkflowPanel({
           </div>
         ) : (
           <p className="mt-3 text-sm text-slate-600">检查第一章前 800 字：首句钩子、主角处境、不可逆危机、选择压力和平台适配。</p>
+        )}
+      </section>
+
+      <section className="rounded-md border border-slate-200 bg-white p-4">
+        <div className="flex items-center justify-between gap-3">
+          <h3 className="font-medium">首章重写助手</h3>
+          {openingRewrite ? (
+            <div className="flex gap-2">
+              <button className="text-xs text-slate-500 hover:text-slate-900" onClick={copyOpeningRewrite} type="button">
+                复制全部
+              </button>
+              <button
+                className="text-xs text-slate-500 hover:text-slate-900 disabled:opacity-50"
+                disabled={isDownloadingRewrite}
+                onClick={downloadOpeningRewrite}
+                type="button"
+              >
+                {isDownloadingRewrite ? "下载中" : "下载"}
+              </button>
+            </div>
+          ) : null}
+        </div>
+        {openingRewrite ? (
+          <div className="mt-4 grid gap-3 text-sm">
+            {openingRewrite.variants.map((variant) => (
+              <div className="rounded-md border border-slate-200 p-3" key={variant.id}>
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <div className="font-medium text-slate-950">
+                      {variant.name}
+                      {variant.id === openingRewrite.recommendedVariantId ? (
+                        <span className="ml-2 text-xs font-normal text-slate-500">推荐</span>
+                      ) : null}
+                    </div>
+                    <p className="mt-1 text-xs text-slate-500">预估 {variant.estimatedScore} · {variant.platformNote}</p>
+                  </div>
+                  <button
+                    className="rounded-md border border-slate-200 px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50"
+                    onClick={() => copyOpeningVariant(variant)}
+                    type="button"
+                  >
+                    复制正文
+                  </button>
+                </div>
+                <div className="mt-3 grid gap-2 text-slate-600">
+                  <div>
+                    <span className="font-medium text-slate-900">策略：</span>
+                    {variant.strategy}
+                  </div>
+                  <div>
+                    <span className="font-medium text-slate-900">读者：</span>
+                    {variant.targetReader}
+                  </div>
+                </div>
+                <pre className="mt-3 max-h-72 overflow-auto whitespace-pre-wrap rounded-md bg-slate-50 p-3 text-xs leading-5 text-slate-700">
+                  {variant.openingText}
+                </pre>
+                <div className="mt-3 grid gap-1 text-xs text-slate-500">
+                  {variant.fixes.map((fix) => (
+                    <div key={fix}>{fix}</div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="mt-3 text-sm text-slate-600">基于黄金三秒诊断，生成 3 套可复制的首章开头改写版本。</p>
         )}
       </section>
 

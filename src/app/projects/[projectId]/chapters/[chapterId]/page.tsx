@@ -1,4 +1,4 @@
-import { ChapterReviewPanel } from "@/components/ai/ChapterReviewPanel";
+import { ChapterWorkflowPanel } from "@/components/ai/ChapterWorkflowPanel";
 import { AppShell } from "@/components/app-shell/AppShell";
 import { ChapterEditor } from "@/components/chapters/ChapterEditor";
 import { prisma } from "@/lib/db/prisma";
@@ -25,6 +25,7 @@ export default async function ChapterPage({
     <AppShell>
       <div className="grid gap-4 lg:grid-cols-[1fr_360px]">
         <ChapterEditor
+          key={`${chapter.id}-${chapter.updatedAt.toISOString()}`}
           chapter={{
             id: chapter.id,
             title: chapter.title,
@@ -38,7 +39,7 @@ export default async function ChapterPage({
             wordCount: chapter.wordCount,
           }}
         />
-        <ChapterReviewPanel chapterId={chapterId} platform={platform} />
+        <ChapterWorkflowPanel chapterId={chapterId} platform={platform} />
       </div>
     </AppShell>
   );

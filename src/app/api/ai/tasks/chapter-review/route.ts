@@ -44,25 +44,39 @@ export async function POST(request: Request) {
     },
   });
 
-  const result = await adapter.generate({
-    providerId: provider.providerId as "claude" | "deepseek" | "kimi" | "gpt" | "openai_compatible" | "ollama" | "mock",
-    model: provider.defaultModel,
-    systemPrompt: prompt.systemPrompt,
-    userPrompt: prompt.userPrompt,
-  });
+  try {
+    const result = await adapter.generate({
+      providerId: provider.providerId as "claude" | "deepseek" | "kimi" | "gpt" | "openai_compatible" | "ollama" | "mock",
+      model: provider.defaultModel,
+      systemPrompt: prompt.systemPrompt,
+      userPrompt: prompt.userPrompt,
+    });
+    const parsedResult = JSON.parse(result.text);
 
-  const updatedTask = await prisma.aiTask.update({
-    where: { id: task.id },
-    data: {
-      status: "succeeded",
-      outputText: result.text,
-      inputTokens: result.usage?.inputTokens,
-      outputTokens: result.usage?.outputTokens,
-      costUsd: result.usage?.costUsd,
-    },
-  });
+    const updatedTask = await prisma.aiTask.update({
+      where: { id: task.id },
+      data: {
+        status: "succeeded",
+        outputText: result.text,
+        inputTokens: result.usage?.inputTokens,
+        outputTokens: result.usage?.outputTokens,
+        costUsd: result.usage?.costUsd,
+      },
+    });
 
-  return NextResponse.json({ task: updatedTask, result: JSON.parse(result.text) });
+    return NextResponse.json({ task: updatedTask, result: parsedResult });
+  } catch (caught) {
+    const message = caught instanceof Error ? caught.message : "Unknown review error";
+    const failedTask = await prisma.aiTask.update({
+      where: { id: task.id },
+      data: {
+        status: "failed",
+        errorMessage: message,
+      },
+    });
+
+    return NextResponse.json({ task: failedTask, error: message }, { status: 500 });
+  }
 }
 
 export async function GET(request: Request) {

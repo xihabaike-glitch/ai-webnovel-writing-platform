@@ -1,6 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { previewRevisionContent, summarizeChapterRevisions } from "../lib/chapters/revisions.ts";
+import {
+  buildChapterRevisionComparison,
+  previewRevisionContent,
+  summarizeChapterRevisions,
+} from "../lib/chapters/revisions.ts";
 
 test("chapter revision summaries", async (t) => {
   await t.test("labels AI overwrite snapshots and creates readable previews", () => {
@@ -23,7 +27,56 @@ test("chapter revision summaries", async (t) => {
     assert.equal(summaries[0].sourceTaskId, "task-1");
   });
 
+  await t.test("labels first-three rewrite snapshots", () => {
+    const summaries = summarizeChapterRevisions([
+      {
+        id: "revision-2",
+        source: "first_three_rewrite_before_overwrite",
+        sourceTaskId: "task-2",
+        title: "第二章",
+        content: "改写前旧稿。",
+        wordCount: 6,
+        status: "draft",
+        notes: "前三章改写前自动保存",
+        createdAt: "2026-07-01T00:00:00.000Z",
+      },
+    ]);
+
+    assert.equal(summaries[0].sourceLabel, "前三章改写前旧稿");
+  });
+
   await t.test("uses a clear placeholder for empty content", () => {
     assert.equal(previewRevisionContent("   "), "空正文");
+  });
+
+  await t.test("compares a revision with the current chapter", () => {
+    const comparison = buildChapterRevisionComparison(
+      {
+        title: "第一章 新稿",
+        content: "新稿第一段。",
+        wordCount: 12,
+        goal: "新目标",
+        hook: "新钩子",
+        conflict: "冲突",
+        valueShift: "变化",
+        cliffhanger: "悬念",
+        status: "draft",
+      },
+      {
+        title: "第一章 旧稿",
+        content: "旧稿第一段。",
+        wordCount: 8,
+        goal: "旧目标",
+        hook: "旧钩子",
+        conflict: "冲突",
+        valueShift: "变化",
+        cliffhanger: "悬念",
+        status: "draft",
+      },
+    );
+
+    assert.equal(comparison.wordDelta, 4);
+    assert.deepEqual(comparison.changedFields, ["标题", "正文", "章节目标", "开头钩子"]);
+    assert.equal(comparison.oldPreview, "旧稿第一段。");
   });
 });

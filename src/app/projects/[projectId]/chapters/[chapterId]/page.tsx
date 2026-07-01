@@ -1,6 +1,7 @@
 import { ChapterWorkflowPanel } from "@/components/ai/ChapterWorkflowPanel";
 import { AppShell } from "@/components/app-shell/AppShell";
 import { ChapterEditor } from "@/components/chapters/ChapterEditor";
+import { ChapterRevisionWorkbench } from "@/components/chapters/ChapterRevisionWorkbench";
 import { prisma } from "@/lib/db/prisma";
 import { getPlatformProfile, type PlatformId } from "@/lib/platforms/platformProfiles";
 import { notFound } from "next/navigation";
@@ -20,25 +21,29 @@ export default async function ChapterPage({
     notFound();
   }
   const platform = getPlatformProfile(chapter.project.targetPlatform as PlatformId);
+  const editableChapter = {
+    id: chapter.id,
+    title: chapter.title,
+    content: chapter.content,
+    goal: chapter.goal,
+    hook: chapter.hook,
+    conflict: chapter.conflict,
+    valueShift: chapter.valueShift,
+    cliffhanger: chapter.cliffhanger,
+    status: chapter.status,
+    wordCount: chapter.wordCount,
+  };
 
   return (
     <AppShell>
       <div className="grid gap-4 lg:grid-cols-[1fr_360px]">
-        <ChapterEditor
-          key={`${chapter.id}-${chapter.updatedAt.toISOString()}`}
-          chapter={{
-            id: chapter.id,
-            title: chapter.title,
-            content: chapter.content,
-            goal: chapter.goal,
-            hook: chapter.hook,
-            conflict: chapter.conflict,
-            valueShift: chapter.valueShift,
-            cliffhanger: chapter.cliffhanger,
-            status: chapter.status,
-            wordCount: chapter.wordCount,
-          }}
-        />
+        <div className="grid gap-4">
+          <ChapterEditor
+            key={`${chapter.id}-${chapter.updatedAt.toISOString()}`}
+            chapter={editableChapter}
+          />
+          <ChapterRevisionWorkbench chapter={editableChapter} />
+        </div>
         <ChapterWorkflowPanel chapterId={chapterId} platform={platform} />
       </div>
     </AppShell>

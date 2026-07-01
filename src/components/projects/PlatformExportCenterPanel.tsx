@@ -174,10 +174,30 @@ interface PlatformPublishPackage {
   markdown: string;
 }
 
+interface PlatformPublishWorkspaceAction extends PublishRepairAction {
+  platformIds: string[];
+  platformNames: string[];
+  occurrenceCount: number;
+}
+
+interface PlatformPublishWorkspace {
+  readyPlatforms: number;
+  blockedPlatforms: number;
+  averagePreflightScore: number;
+  totalBlockedItems: number;
+  totalWarnings: number;
+  executableActions: number;
+  manualActions: number;
+  archiveReady: boolean;
+  nextActions: PlatformPublishWorkspaceAction[];
+  headline: string;
+}
+
 interface PlatformPublishExportCenter {
   packages: PlatformPublishPackage[];
   recommendedPlatformId: string;
   totalPublishableChapters: number;
+  workspace: PlatformPublishWorkspace;
 }
 
 function actionHref(projectId: string, action: PublishRepairAction) {
@@ -263,6 +283,10 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
   }, [selectedPackage]);
   const exportablePackages = useMemo(
     () => center?.packages.filter((pack) => pack.canExport) ?? [],
+    [center],
+  );
+  const workspaceExecutableActions = useMemo(
+    () => center?.workspace.nextActions.filter(canRunAction).slice(0, 5) ?? [],
     [center],
   );
   const versionActionCounts = useMemo(() => {
@@ -488,6 +512,44 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
     }
   }
 
+  async function runWorkspaceBatchRepairActions() {
+    if (!workspaceExecutableActions.length) return;
+    setRunningActionId("workspace-batch");
+    setMessage(null);
+    setRunResults(workspaceExecutableActions.map(pendingResultFromAction));
+    try {
+      const response = await fetch(`/api/projects/${projectId}/platform-export/repair`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          actions: workspaceExecutableActions.map((action) => ({
+            kind: action.kind,
+            chapterId: action.chapterId,
+            chapterTitle: action.chapterTitle,
+            detail: action.detail,
+          })),
+        }),
+      });
+      const payload = (await response.json().catch(() => null)) as {
+        message?: string;
+        error?: string;
+        results?: RawPublishRepairRunResult[];
+      } | null;
+      if (!response.ok) {
+        throw new Error(payload?.error ?? "全平台批量修复失败。");
+      }
+      setRunResults(payload?.results?.map(normalizeRunResult) ?? []);
+      setMessage(payload?.message ?? "全平台批量修复已完成。");
+      await loadCenter({ keepMessage: true });
+    } catch (caught) {
+      const errorMessage = caught instanceof Error ? caught.message : "全平台批量修复失败。";
+      setRunResults((current) => current.map((result) => ({ ...result, status: "failed", error: errorMessage, message: errorMessage })));
+      setMessage(errorMessage);
+    } finally {
+      setRunningActionId(null);
+    }
+  }
+
   useEffect(() => {
     void loadCenter();
   }, [projectId]);
@@ -573,6 +635,78 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
             <div className="text-xs text-slate-500">归档内容</div>
             <div className="mt-1 font-medium text-slate-950">清单 + Markdown 正文</div>
           </div>
+        </div>
+      ) : null}
+
+      {center ? (
+        <div className="mt-3 rounded-md border border-slate-200 p-3">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <div className="font-medium text-slate-950">全平台发布工作台</div>
+              <p className="mt-1 text-sm leading-6 text-slate-600">{center.workspace.headline}</p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button
+                className="w-fit rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white disabled:opacity-50"
+                disabled={!workspaceExecutableActions.length || Boolean(runningActionId)}
+                onClick={() => void runWorkspaceBatchRepairActions()}
+                type="button"
+              >
+                {runningActionId === "workspace-batch" ? "批量处理中" : `批量处理全平台前 ${workspaceExecutableActions.length} 项`}
+              </button>
+              <button
+                className="w-fit rounded-md border border-slate-200 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                disabled={!exportablePackages.length || isLoading}
+                onClick={downloadArchive}
+                type="button"
+              >
+                下载全平台包
+              </button>
+            </div>
+          </div>
+          <div className="mt-3 grid gap-2 sm:grid-cols-3 lg:grid-cols-6">
+            <div className="rounded-md bg-slate-50 p-2">
+              <div className="text-xs text-slate-500">就绪平台</div>
+              <div className="mt-1 font-medium text-slate-950">{center.workspace.readyPlatforms}/{center.packages.length}</div>
+            </div>
+            <div className="rounded-md bg-slate-50 p-2">
+              <div className="text-xs text-slate-500">平均质检</div>
+              <div className="mt-1 font-medium text-slate-950">{center.workspace.averagePreflightScore}</div>
+            </div>
+            <div className="rounded-md bg-slate-50 p-2">
+              <div className="text-xs text-slate-500">阻塞项</div>
+              <div className="mt-1 font-medium text-slate-950">{center.workspace.totalBlockedItems}</div>
+            </div>
+            <div className="rounded-md bg-slate-50 p-2">
+              <div className="text-xs text-slate-500">提醒</div>
+              <div className="mt-1 font-medium text-slate-950">{center.workspace.totalWarnings}</div>
+            </div>
+            <div className="rounded-md bg-slate-50 p-2">
+              <div className="text-xs text-slate-500">可自动修</div>
+              <div className="mt-1 font-medium text-slate-950">{center.workspace.executableActions}</div>
+            </div>
+            <div className="rounded-md bg-slate-50 p-2">
+              <div className="text-xs text-slate-500">需手动</div>
+              <div className="mt-1 font-medium text-slate-950">{center.workspace.manualActions}</div>
+            </div>
+          </div>
+          {center.workspace.nextActions.length ? (
+            <div className="mt-3 grid gap-2 lg:grid-cols-2">
+              {center.workspace.nextActions.slice(0, 4).map((action) => (
+                <div className="rounded-md bg-slate-50 p-3 text-sm" key={`${action.kind}-${action.chapterId ?? "project"}`}>
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div>
+                      <div className="font-medium text-slate-950">{action.label}</div>
+                      {action.chapterTitle ? <div className="mt-1 text-xs text-slate-500">{action.chapterTitle}</div> : null}
+                    </div>
+                    <div className="text-xs text-slate-500">影响 {action.occurrenceCount} 个平台</div>
+                  </div>
+                  <p className="mt-2 leading-6 text-slate-600">{action.detail}</p>
+                  <div className="mt-2 line-clamp-2 text-xs text-slate-500">{action.platformNames.join("、")}</div>
+                </div>
+              ))}
+            </div>
+          ) : null}
         </div>
       ) : null}
 

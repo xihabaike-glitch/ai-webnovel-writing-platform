@@ -196,10 +196,30 @@ export interface PlatformPublishPackage {
   markdown: string;
 }
 
+export interface PlatformPublishWorkspaceAction extends PublishRepairAction {
+  platformIds: PlatformId[];
+  platformNames: string[];
+  occurrenceCount: number;
+}
+
+export interface PlatformPublishWorkspace {
+  readyPlatforms: number;
+  blockedPlatforms: number;
+  averagePreflightScore: number;
+  totalBlockedItems: number;
+  totalWarnings: number;
+  executableActions: number;
+  manualActions: number;
+  archiveReady: boolean;
+  nextActions: PlatformPublishWorkspaceAction[];
+  headline: string;
+}
+
 export interface PlatformPublishExportCenter {
   packages: PlatformPublishPackage[];
   recommendedPlatformId: PlatformId;
   totalPublishableChapters: number;
+  workspace: PlatformPublishWorkspace;
 }
 
 export interface PlatformPublishArchivePlatform {
@@ -606,6 +626,60 @@ function repairActionRank(action: PublishRepairAction) {
   return priorityRank[action.priority] * 10 + kindRank[action.kind];
 }
 
+function workspaceActionKey(action: PublishRepairAction) {
+  return `${action.kind}-${action.chapterId ?? "project"}`;
+}
+
+function buildPublishWorkspace(packages: PlatformPublishPackage[]): PlatformPublishWorkspace {
+  const actions = new Map<string, PlatformPublishWorkspaceAction>();
+  for (const pack of packages) {
+    for (const action of pack.repairActions) {
+      const key = workspaceActionKey(action);
+      const current = actions.get(key);
+      if (current) {
+        if (!current.platformIds.includes(pack.platformId)) current.platformIds.push(pack.platformId);
+        if (!current.platformNames.includes(pack.platformName)) current.platformNames.push(pack.platformName);
+        current.occurrenceCount += 1;
+      } else {
+        actions.set(key, {
+          ...action,
+          platformIds: [pack.platformId],
+          platformNames: [pack.platformName],
+          occurrenceCount: 1,
+        });
+      }
+    }
+  }
+  const nextActions = [...actions.values()]
+    .sort((left, right) => (
+      repairActionRank(left) - repairActionRank(right)
+      || right.occurrenceCount - left.occurrenceCount
+      || left.label.localeCompare(right.label)
+    ));
+  const readyPlatforms = packages.filter((pack) => pack.canExport).length;
+  const blockedPlatforms = packages.length - readyPlatforms;
+  const averagePreflightScore = packages.length
+    ? Math.round(packages.reduce((sum, pack) => sum + pack.preflight.score, 0) / packages.length)
+    : 0;
+  const executableActions = nextActions.filter(canExecuteRepairAction).length;
+  const manualActions = nextActions.length - executableActions;
+
+  return {
+    readyPlatforms,
+    blockedPlatforms,
+    averagePreflightScore,
+    totalBlockedItems: packages.reduce((sum, pack) => sum + pack.preflight.blocked.length, 0),
+    totalWarnings: packages.reduce((sum, pack) => sum + pack.preflight.warnings.length, 0),
+    executableActions,
+    manualActions,
+    archiveReady: readyPlatforms > 0,
+    nextActions,
+    headline: blockedPlatforms === 0
+      ? "所有平台已通过当前质检，可以下载全平台投稿包。"
+      : `还有 ${blockedPlatforms} 个平台待处理，优先清理 ${executableActions} 个可自动执行动作。`,
+  };
+}
+
 function buildRepairPath(preflight: PublishPreflight): PublishRepairPath {
   const sortedActions = [...preflight.repairActions].sort((left, right) => (
     repairActionRank(left) - repairActionRank(right)
@@ -860,6 +934,7 @@ export function buildPlatformPublishExportCenter(input: PlatformPublishExportInp
     packages,
     recommendedPlatformId: input.targetPlatform.id,
     totalPublishableChapters: publishableChapters(input.chapters).length,
+    workspace: buildPublishWorkspace(packages),
   };
 }
 

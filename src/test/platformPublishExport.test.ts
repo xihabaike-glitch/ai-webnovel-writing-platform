@@ -80,6 +80,31 @@ test("buildPlatformPublishExportCenter", async (t) => {
     assert.equal(center.packages[0].repairPath.nextStep?.kind, "run_chapter_review");
     assert.equal(center.packages[0].repairPath.executableActions, 1);
     assert.equal(center.packages[0].repairPath.manualActions, 0);
+    assert.equal(center.workspace.readyPlatforms, 0);
+    assert.equal(center.workspace.blockedPlatforms, platformProfiles.length);
+    assert.ok(center.workspace.nextActions.some((action) => action.kind === "run_chapter_review"));
+  });
+
+  await t.test("dedupes workspace repair actions across platforms", () => {
+    const center = buildPlatformPublishExportCenter({
+      project: {
+        title: "夜雨系统",
+        genre: "都市系统",
+        sellingPoint: "雨夜危机中觉醒系统，主角用选择翻盘。",
+        currentWordCount: 1200,
+        targetWordCount: 300000,
+      },
+      targetPlatform: getPlatformProfile("fanqie"),
+      chapters,
+      platforms: [getPlatformProfile("fanqie"), getPlatformProfile("qidian")],
+    });
+    const reviewAction = center.workspace.nextActions.find((action) => action.kind === "run_chapter_review");
+
+    assert.equal(center.workspace.blockedPlatforms, 2);
+    assert.equal(center.workspace.executableActions, 1);
+    assert.equal(reviewAction?.occurrenceCount, 2);
+    assert.deepEqual(reviewAction?.platformNames.sort(), ["番茄小说", "起点中文网"].sort());
+    assert.ok(center.workspace.headline.includes("2 个平台"));
   });
 
   await t.test("uses overseas packaging for overseas platforms", () => {

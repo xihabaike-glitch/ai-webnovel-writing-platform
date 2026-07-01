@@ -6,6 +6,7 @@ import { OutlineTreePanel } from "@/components/outlines/OutlineTreePanel";
 import { ExportMarkdownButton } from "@/components/projects/ExportMarkdownButton";
 import { FirstThreeRewritePanel } from "@/components/projects/FirstThreeRewritePanel";
 import { RetentionDiagnosticPanel } from "@/components/projects/RetentionDiagnosticPanel";
+import { StoryStructureDiagnosticPanel } from "@/components/projects/StoryStructureDiagnosticPanel";
 import { SubmissionPackagePanel } from "@/components/projects/SubmissionPackagePanel";
 import { prisma } from "@/lib/db/prisma";
 import { getPlatformProfile, type PlatformId } from "@/lib/platforms/platformProfiles";
@@ -215,6 +216,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ projec
         </section>
         <RetentionDiagnosticPanel projectId={project.id} />
         <FirstThreeRewritePanel projectId={project.id} />
+        <StoryStructureDiagnosticPanel projectId={project.id} />
         <SubmissionPackagePanel projectId={project.id} submissionPackage={submissionPackage} />
         <div className="grid gap-4 md:grid-cols-[2fr_1fr]">
           <OutlineTreePanel projectId={project.id} nodes={outlineNodes} />

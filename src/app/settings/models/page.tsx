@@ -1,21 +1,40 @@
 import { AppShell } from "@/components/app-shell/AppShell";
+import { ModelProviderSettings } from "@/components/settings/ModelProviderSettings";
+import { prisma } from "@/lib/db/prisma";
+import { providerOptions } from "@/lib/model-gateway/providerDefaults";
 
-const providers = ["Claude", "DeepSeek", "Kimi", "GPT", "OpenAI-compatible", "Ollama"];
+function maskProvider(provider: {
+  id: string;
+  providerId: string;
+  displayName: string;
+  baseUrl: string | null;
+  encryptedApiKey: string | null;
+  defaultModel: string;
+  enabled: boolean;
+  maxContextTokens: number | null;
+}) {
+  return {
+    id: provider.id,
+    providerId: provider.providerId,
+    displayName: provider.displayName,
+    baseUrl: provider.baseUrl,
+    hasApiKey: Boolean(provider.encryptedApiKey),
+    defaultModel: provider.defaultModel,
+    enabled: provider.enabled,
+    maxContextTokens: provider.maxContextTokens,
+  };
+}
 
-export default function ModelSettingsPage() {
+export default async function ModelSettingsPage() {
+  const providers = await prisma.modelProvider.findMany({
+    orderBy: { updatedAt: "desc" },
+  });
+
   return (
     <AppShell>
       <h1 className="text-2xl font-semibold">模型设置</h1>
-      <p className="mt-1 text-sm text-slate-600">MVP 先保留 provider 配置入口，真实密钥只在服务端保存。</p>
-      <div className="mt-6 grid gap-3">
-        {providers.map((provider) => (
-          <div key={provider} className="rounded-md border bg-white p-4">
-            <div className="font-medium">{provider}</div>
-            <p className="mt-1 text-sm text-slate-600">待接入 Model Gateway。</p>
-          </div>
-        ))}
-      </div>
+      <p className="mt-1 text-sm text-slate-600">配置 Claude、DeepSeek、Kimi、GPT、兼容网关或本地 Ollama。</p>
+      <ModelProviderSettings options={providerOptions} providers={providers.map(maskProvider)} />
     </AppShell>
   );
 }
-

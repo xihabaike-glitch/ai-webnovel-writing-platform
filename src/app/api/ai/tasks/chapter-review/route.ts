@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { buildChapterReviewPrompt } from "@/lib/ai/buildChapterReviewPrompt";
 import { prisma } from "@/lib/db/prisma";
-import { MockAdapter } from "@/lib/model-gateway/mockAdapter";
+import { getActiveModelProvider } from "@/lib/model-gateway/activeProvider";
 import { getPlatformProfile, type PlatformId } from "@/lib/platforms/platformProfiles";
 
 export async function POST(request: Request) {
@@ -30,17 +30,7 @@ export async function POST(request: Request) {
     },
   });
 
-  const provider = await prisma.modelProvider.upsert({
-    where: { id: "mock-provider" },
-    create: {
-      id: "mock-provider",
-      providerId: "mock",
-      displayName: "Mock Provider",
-      defaultModel: "mock-editor",
-      enabled: true,
-    },
-    update: {},
-  });
+  const { provider, adapter } = await getActiveModelProvider();
 
   const task = await prisma.aiTask.create({
     data: {
@@ -48,15 +38,15 @@ export async function POST(request: Request) {
       chapterId: chapter.id,
       taskType: "chapter_review",
       providerConfigId: provider.id,
-      model: "mock-editor",
+      model: provider.defaultModel,
       status: "running",
       inputSnapshot: JSON.stringify(prompt),
     },
   });
 
-  const result = await new MockAdapter().generate({
-    providerId: "mock",
-    model: "mock-editor",
+  const result = await adapter.generate({
+    providerId: provider.providerId as "claude" | "deepseek" | "kimi" | "gpt" | "openai_compatible" | "ollama" | "mock",
+    model: provider.defaultModel,
     systemPrompt: prompt.systemPrompt,
     userPrompt: prompt.userPrompt,
   });

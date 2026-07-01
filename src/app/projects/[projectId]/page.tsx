@@ -7,6 +7,7 @@ import { CharacterArcPanel } from "@/components/projects/CharacterArcPanel";
 import { ExportMarkdownButton } from "@/components/projects/ExportMarkdownButton";
 import { FirstThreeRewritePanel } from "@/components/projects/FirstThreeRewritePanel";
 import { RetentionDiagnosticPanel } from "@/components/projects/RetentionDiagnosticPanel";
+import { StoryLinePanel } from "@/components/projects/StoryLinePanel";
 import { StoryStructureDiagnosticPanel } from "@/components/projects/StoryStructureDiagnosticPanel";
 import { SubmissionPackagePanel } from "@/components/projects/SubmissionPackagePanel";
 import { prisma } from "@/lib/db/prisma";
@@ -218,6 +219,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ projec
         <RetentionDiagnosticPanel projectId={project.id} />
         <FirstThreeRewritePanel projectId={project.id} />
         <CharacterArcPanel projectId={project.id} />
+        <StoryLinePanel projectId={project.id} />
         <StoryStructureDiagnosticPanel projectId={project.id} />
         <SubmissionPackagePanel projectId={project.id} submissionPackage={submissionPackage} />
         <div className="grid gap-4 md:grid-cols-[2fr_1fr]">

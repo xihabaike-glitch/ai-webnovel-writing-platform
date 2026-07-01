@@ -105,7 +105,7 @@ export interface PublishPackageVersionItem {
   createdAt: Date | string;
 }
 
-export type PublishPackageVersionActionFilter = "all" | "copy" | "download" | "archive" | "snapshot";
+export type PublishPackageVersionActionFilter = "all" | "copy" | "download" | "archive" | "snapshot" | "restore";
 
 export interface PublishPackageSnapshotDetail extends PublishPackageVersionItem {
   logline: string;
@@ -141,6 +141,12 @@ export interface PublishPackageVersionComparisonItem {
 export interface PublishPackageVersionComparison {
   changedCount: number;
   items: PublishPackageVersionComparisonItem[];
+}
+
+export interface PublishPackageRestorePatch {
+  title: string;
+  sellingPoint: string;
+  restoredFields: string[];
 }
 
 export interface PlatformPublishExportInput {
@@ -261,7 +267,7 @@ export function parsePublishSnapshotTags(tags: string | string[] | null | undefi
 }
 
 export function normalizePublishPackageVersionAction(action: string): PublishPackageVersionActionFilter {
-  if (action === "copy" || action === "download" || action === "archive" || action === "snapshot") return action;
+  if (action === "copy" || action === "download" || action === "archive" || action === "snapshot" || action === "restore") return action;
   return "snapshot";
 }
 
@@ -280,6 +286,7 @@ export function countPublishPackageVersionActions(versions: PublishPackageVersio
     download: 0,
     archive: 0,
     snapshot: 0,
+    restore: 0,
   };
   versions.forEach((version) => {
     counts[normalizePublishPackageVersionAction(version.action)] += 1;
@@ -316,6 +323,14 @@ export function buildPublishPackageVersionComparison(
   return {
     changedCount: items.filter((item) => item.changed).length,
     items,
+  };
+}
+
+export function buildPublishPackageRestorePatch(version: Pick<PublishPackageSnapshotDetail, "title" | "logline">): PublishPackageRestorePatch {
+  return {
+    title: version.title.trim(),
+    sellingPoint: version.logline.trim(),
+    restoredFields: ["title", "sellingPoint"],
   };
 }
 

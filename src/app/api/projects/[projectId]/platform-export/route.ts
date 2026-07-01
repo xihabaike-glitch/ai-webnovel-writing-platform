@@ -4,6 +4,7 @@ import { getPlatformProfile, platformProfiles, type PlatformId } from "@/lib/pla
 import {
   buildPlatformPublishExportCenter,
   buildPlatformPublishArchive,
+  buildPublishPackageRestorePatch,
   buildPublishPackageVersionComparison,
   parsePublishSnapshotTags,
   type PublishPackageArchiveGroup,
@@ -24,6 +25,7 @@ function selectedPlatform(platformId: string | null) {
 function snapshotActionLabel(action: string | null) {
   if (action === "copy") return "copy";
   if (action === "download") return "download";
+  if (action === "restore") return "restore";
   return "snapshot";
 }
 
@@ -248,11 +250,61 @@ export async function GET(request: Request, { params }: Params) {
 
 export async function POST(request: Request, { params }: Params) {
   const { projectId } = await params;
-  const body = (await request.json().catch(() => ({}))) as { platformId?: string; action?: string };
+  const body = (await request.json().catch(() => ({}))) as { platformId?: string; action?: string; versionId?: string };
   const context = await buildCenter(projectId);
 
   if (!context) {
     return NextResponse.json({ error: "Project not found" }, { status: 404 });
+  }
+
+  if (body.action === "restore" && body.versionId) {
+    const version = await prisma.publishPackageSnapshot.findFirst({
+      where: {
+        id: body.versionId,
+        projectId,
+      },
+    });
+
+    if (!version) {
+      return NextResponse.json({ error: "Publish package version not found" }, { status: 404 });
+    }
+
+    const patch = buildPublishPackageRestorePatch({
+      title: version.title,
+      logline: version.logline,
+    });
+    const [, snapshot] = await prisma.$transaction([
+      prisma.project.update({
+        where: { id: projectId },
+        data: {
+          title: patch.title,
+          sellingPoint: patch.sellingPoint,
+        },
+      }),
+      prisma.publishPackageSnapshot.create({
+        data: {
+          projectId,
+          platformId: version.platformId,
+          platformName: version.platformName,
+          title: version.title,
+          logline: version.logline,
+          synopsis: version.synopsis,
+          tags: version.tags,
+          markdown: version.markdown,
+          chapterCount: version.chapterCount,
+          wordCount: version.wordCount,
+          preflightScore: version.preflightScore,
+          canExport: version.canExport,
+          action: "restore",
+        },
+      }),
+    ]);
+
+    return NextResponse.json({
+      message: `已恢复 ${version.platformName} 历史版本的标题和核心卖点。`,
+      patch,
+      snapshot,
+    });
   }
 
   const { targetPlatform, center } = context;

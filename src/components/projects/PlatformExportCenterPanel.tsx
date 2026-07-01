@@ -87,7 +87,7 @@ interface PublishPackageVersionItem {
   createdAt: string;
 }
 
-type PublishPackageVersionActionFilter = "all" | "copy" | "download" | "archive" | "snapshot";
+type PublishPackageVersionActionFilter = "all" | "copy" | "download" | "archive" | "snapshot" | "restore";
 
 interface PublishPackageVersionDetail extends PublishPackageVersionItem {
   logline: string;
@@ -242,11 +242,12 @@ function versionActionLabel(action: string) {
   if (action === "copy") return "复制";
   if (action === "download") return "下载";
   if (action === "archive") return "归档";
+  if (action === "restore") return "恢复";
   return "保存";
 }
 
 function normalizeVersionAction(action: string): PublishPackageVersionActionFilter {
-  if (action === "copy" || action === "download" || action === "archive" || action === "snapshot") return action;
+  if (action === "copy" || action === "download" || action === "archive" || action === "snapshot" || action === "restore") return action;
   return "snapshot";
 }
 
@@ -255,6 +256,7 @@ const versionActionFilters: { id: PublishPackageVersionActionFilter; label: stri
   { id: "copy", label: "复制" },
   { id: "download", label: "下载" },
   { id: "archive", label: "归档" },
+  { id: "restore", label: "恢复" },
   { id: "snapshot", label: "保存" },
 ];
 
@@ -268,6 +270,7 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
   const [selectedVersionId, setSelectedVersionId] = useState<string | null>(null);
   const [versionDetail, setVersionDetail] = useState<PublishPackageVersionDetailState | null>(null);
   const [isLoadingVersion, setIsLoadingVersion] = useState(false);
+  const [isRestoringVersion, setIsRestoringVersion] = useState(false);
   const [versionActionFilter, setVersionActionFilter] = useState<PublishPackageVersionActionFilter>("all");
   const selectedPackage = useMemo(
     () => center?.packages.find((pack) => pack.platformId === selectedPlatformId) ?? center?.packages[0] ?? null,
@@ -296,6 +299,7 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
       download: 0,
       archive: 0,
       snapshot: 0,
+      restore: 0,
     };
     selectedPackage?.publishVersions.forEach((version) => {
       counts[normalizeVersionAction(version.action)] += 1;
@@ -346,6 +350,27 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
       setMessage(caught instanceof Error ? caught.message : "读取发布包版本失败。");
     } finally {
       setIsLoadingVersion(false);
+    }
+  }
+
+  async function restoreVersion() {
+    if (!versionDetail) return;
+    setIsRestoringVersion(true);
+    setMessage(null);
+    try {
+      const response = await fetch(`/api/projects/${projectId}/platform-export`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "restore", versionId: versionDetail.version.id }),
+      });
+      const payload = (await response.json().catch(() => null)) as { message?: string; error?: string } | null;
+      if (!response.ok) throw new Error(payload?.error ?? "恢复历史版本失败。");
+      setMessage(payload?.message ?? "已恢复历史版本。");
+      await loadCenter({ keepMessage: true });
+    } catch (caught) {
+      setMessage(caught instanceof Error ? caught.message : "恢复历史版本失败。");
+    } finally {
+      setIsRestoringVersion(false);
     }
   }
 
@@ -1051,16 +1076,26 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
                           {versionDetail.version.platformName} · {versionActionLabel(versionDetail.version.action)} · {formatTime(versionDetail.version.createdAt)}
                         </div>
                       </div>
-                      <button
-                        className="w-fit rounded-md border border-slate-200 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
-                        onClick={() => {
-                          void navigator.clipboard.writeText(versionDetail.version.markdown);
-                          setMessage("已复制该历史版本 Markdown。");
-                        }}
-                        type="button"
-                      >
-                        复制此版本
-                      </button>
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          className="w-fit rounded-md border border-slate-200 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                          onClick={() => {
+                            void navigator.clipboard.writeText(versionDetail.version.markdown);
+                            setMessage("已复制该历史版本 Markdown。");
+                          }}
+                          type="button"
+                        >
+                          复制此版本
+                        </button>
+                        <button
+                          className="w-fit rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white disabled:opacity-50"
+                          disabled={isRestoringVersion}
+                          onClick={() => void restoreVersion()}
+                          type="button"
+                        >
+                          {isRestoringVersion ? "恢复中" : "恢复标题卖点"}
+                        </button>
+                      </div>
                     </div>
                     {versionDetail.archiveGroup ? (
                       <div className="mt-3 rounded-md bg-slate-50 p-3">

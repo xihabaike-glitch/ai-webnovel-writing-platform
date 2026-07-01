@@ -4,6 +4,7 @@ import { getPlatformProfile, platformProfiles } from "../lib/platforms/platformP
 import {
   buildPlatformPublishExportCenter,
   buildPlatformPublishArchive,
+  buildPublishPackageRestorePatch,
   buildPublishPackageVersionComparison,
   countPublishPackageVersionActions,
   filterPublishPackageVersions,
@@ -376,16 +377,31 @@ test("buildPlatformPublishExportCenter", async (t) => {
         canExport: true,
         createdAt: "2026-01-03T00:00:00.000Z",
       },
+      {
+        id: "restore-1",
+        platformId: "fanqie",
+        platformName: "番茄小说",
+        title: "夜雨系统",
+        action: "restore",
+        chapterCount: 3,
+        wordCount: 7800,
+        preflightScore: 93,
+        canExport: true,
+        createdAt: "2026-01-04T00:00:00.000Z",
+      },
     ];
     const counts = countPublishPackageVersionActions(versions);
 
     assert.equal(normalizePublishPackageVersionAction("manual-save"), "snapshot");
-    assert.equal(counts.all, 3);
+    assert.equal(normalizePublishPackageVersionAction("restore"), "restore");
+    assert.equal(counts.all, 4);
     assert.equal(counts.copy, 1);
     assert.equal(counts.archive, 1);
     assert.equal(counts.snapshot, 1);
+    assert.equal(counts.restore, 1);
     assert.equal(filterPublishPackageVersions(versions, "archive").map((version) => version.id).join(","), "archive-1");
-    assert.equal(filterPublishPackageVersions(versions, "all").length, 3);
+    assert.equal(filterPublishPackageVersions(versions, "restore").map((version) => version.id).join(","), "restore-1");
+    assert.equal(filterPublishPackageVersions(versions, "all").length, 4);
   });
 
   await t.test("compares publish package versions with the current package", () => {
@@ -426,6 +442,17 @@ test("buildPlatformPublishExportCenter", async (t) => {
     assert.equal(comparison.items.find((item) => item.label === "书名")?.changed, true);
     assert.equal(comparison.items.find((item) => item.label === "标签")?.changed, false);
     assert.equal(comparison.items.find((item) => item.label === "质检分")?.changed, true);
+  });
+
+  await t.test("builds a safe restore patch from publish package versions", () => {
+    const patch = buildPublishPackageRestorePatch({
+      title: " 旧版夜雨系统 ",
+      logline: " 旧版卖点：雨夜系统翻盘。 ",
+    });
+
+    assert.equal(patch.title, "旧版夜雨系统");
+    assert.equal(patch.sellingPoint, "旧版卖点：雨夜系统翻盘。");
+    assert.deepEqual(patch.restoredFields, ["title", "sellingPoint"]);
   });
 
   await t.test("builds an all-platform archive from exportable packages", () => {

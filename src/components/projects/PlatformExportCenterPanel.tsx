@@ -54,11 +54,30 @@ interface PublishPackageVersionItem {
   createdAt: string;
 }
 
+type PublishPackageVersionActionFilter = "all" | "copy" | "download" | "archive" | "snapshot";
+
 interface PublishPackageVersionDetail extends PublishPackageVersionItem {
   logline: string;
   synopsis: string;
   tags: string[];
   markdown: string;
+}
+
+interface PublishPackageArchiveGroupPlatform {
+  id: string;
+  platformId: string;
+  platformName: string;
+  chapterCount: number;
+  wordCount: number;
+  preflightScore: number;
+  canExport: boolean;
+}
+
+interface PublishPackageArchiveGroup {
+  createdAt: string;
+  platformCount: number;
+  totalWordCount: number;
+  platforms: PublishPackageArchiveGroupPlatform[];
 }
 
 interface PublishPackageVersionComparisonItem {
@@ -76,6 +95,7 @@ interface PublishPackageVersionComparison {
 interface PublishPackageVersionDetailState {
   version: PublishPackageVersionDetail;
   comparison: PublishPackageVersionComparison;
+  archiveGroup?: PublishPackageArchiveGroup | null;
 }
 
 interface PublishPreflight {
@@ -171,6 +191,19 @@ function versionActionLabel(action: string) {
   return "保存";
 }
 
+function normalizeVersionAction(action: string): PublishPackageVersionActionFilter {
+  if (action === "copy" || action === "download" || action === "archive" || action === "snapshot") return action;
+  return "snapshot";
+}
+
+const versionActionFilters: { id: PublishPackageVersionActionFilter; label: string }[] = [
+  { id: "all", label: "全部" },
+  { id: "copy", label: "复制" },
+  { id: "download", label: "下载" },
+  { id: "archive", label: "归档" },
+  { id: "snapshot", label: "保存" },
+];
+
 export function PlatformExportCenterPanel({ projectId }: { projectId: string }) {
   const [center, setCenter] = useState<PlatformPublishExportCenter | null>(null);
   const [selectedPlatformId, setSelectedPlatformId] = useState<string>("");
@@ -181,6 +214,7 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
   const [selectedVersionId, setSelectedVersionId] = useState<string | null>(null);
   const [versionDetail, setVersionDetail] = useState<PublishPackageVersionDetailState | null>(null);
   const [isLoadingVersion, setIsLoadingVersion] = useState(false);
+  const [versionActionFilter, setVersionActionFilter] = useState<PublishPackageVersionActionFilter>("all");
   const selectedPackage = useMemo(
     () => center?.packages.find((pack) => pack.platformId === selectedPlatformId) ?? center?.packages[0] ?? null,
     [center, selectedPlatformId],
@@ -193,6 +227,24 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
     () => center?.packages.filter((pack) => pack.canExport) ?? [],
     [center],
   );
+  const versionActionCounts = useMemo(() => {
+    const counts: Record<PublishPackageVersionActionFilter, number> = {
+      all: selectedPackage?.publishVersions.length ?? 0,
+      copy: 0,
+      download: 0,
+      archive: 0,
+      snapshot: 0,
+    };
+    selectedPackage?.publishVersions.forEach((version) => {
+      counts[normalizeVersionAction(version.action)] += 1;
+    });
+    return counts;
+  }, [selectedPackage]);
+  const filteredPublishVersions = useMemo(() => {
+    const versions = selectedPackage?.publishVersions ?? [];
+    if (versionActionFilter === "all") return versions;
+    return versions.filter((version) => normalizeVersionAction(version.action) === versionActionFilter);
+  }, [selectedPackage, versionActionFilter]);
 
   async function loadCenter(options?: { keepMessage?: boolean }) {
     setIsLoading(true);
@@ -226,6 +278,7 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
       setVersionDetail({
         version: payload.version,
         comparison: payload.comparison,
+        archiveGroup: payload.archiveGroup ?? null,
       });
     } catch (caught) {
       setMessage(caught instanceof Error ? caught.message : "读取发布包版本失败。");
@@ -427,6 +480,7 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
               setSelectedPlatformId(event.target.value);
               setSelectedVersionId(null);
               setVersionDetail(null);
+              setVersionActionFilter("all");
             }}
             value={selectedPlatformId}
           >
@@ -682,12 +736,32 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
                 <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
                   <div>
                     <div className="font-medium text-slate-900">发布包版本</div>
-                    <div className="mt-1 text-xs text-slate-500">最近 {selectedPackage.publishVersions.length} 次复制或下载保存。</div>
+                    <div className="mt-1 text-xs text-slate-500">最近 {selectedPackage.publishVersions.length} 次复制、下载或归档保存。</div>
                   </div>
                   <div className="text-xs text-slate-500">当前平台：{selectedPackage.platformName}</div>
                 </div>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {versionActionFilters.map((filter) => (
+                    <button
+                      className={`rounded-md border px-3 py-1.5 text-xs font-medium ${
+                        versionActionFilter === filter.id
+                          ? "border-slate-950 bg-slate-950 text-white"
+                          : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                      }`}
+                      key={filter.id}
+                      onClick={() => {
+                        setVersionActionFilter(filter.id);
+                        setSelectedVersionId(null);
+                        setVersionDetail(null);
+                      }}
+                      type="button"
+                    >
+                      {filter.label} {versionActionCounts[filter.id]}
+                    </button>
+                  ))}
+                </div>
                 <div className="mt-2 grid gap-2">
-                  {selectedPackage.publishVersions.map((version) => (
+                  {filteredPublishVersions.map((version) => (
                     <div className="rounded-md border border-slate-200 bg-white p-3" key={version.id}>
                       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                         <div>
@@ -717,6 +791,11 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
                       </button>
                     </div>
                   ))}
+                  {!filteredPublishVersions.length ? (
+                    <div className="rounded-md border border-slate-200 bg-white p-3 text-slate-600">
+                      当前筛选下没有历史版本。
+                    </div>
+                  ) : null}
                 </div>
                 {versionDetail ? (
                   <div className="mt-3 rounded-md border border-slate-200 bg-white p-3">
@@ -738,6 +817,37 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
                         复制此版本
                       </button>
                     </div>
+                    {versionDetail.archiveGroup ? (
+                      <div className="mt-3 rounded-md bg-slate-50 p-3">
+                        <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
+                          <div>
+                            <div className="font-medium text-slate-900">同批归档平台</div>
+                            <div className="mt-1 text-xs text-slate-500">
+                              {versionDetail.archiveGroup.platformCount} 个平台 · {versionDetail.archiveGroup.totalWordCount} 字
+                            </div>
+                          </div>
+                          <div className="text-xs text-slate-500">{formatTime(versionDetail.archiveGroup.createdAt)}</div>
+                        </div>
+                        <div className="mt-2 grid gap-2 lg:grid-cols-2">
+                          {versionDetail.archiveGroup.platforms.map((platform) => (
+                            <div className="rounded-md border border-slate-200 bg-white p-2" key={platform.id}>
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="font-medium text-slate-950">{platform.platformName}</span>
+                                <span className={`rounded-md px-2 py-1 text-xs font-medium ${
+                                  platform.canExport ? "bg-emerald-50 text-emerald-700" : "bg-rose-50 text-rose-700"
+                                }`}>
+                                  质检 {platform.preflightScore}
+                                </span>
+                              </div>
+                              <div className="mt-2 flex flex-wrap gap-2 text-xs text-slate-500">
+                                <span>{platform.chapterCount} 章</span>
+                                <span>{platform.wordCount} 字</span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ) : null}
                     <div className="mt-3 rounded-md bg-slate-50 p-3">
                       <div className="font-medium text-slate-900">与当前包对比</div>
                       <div className="mt-1 text-xs text-slate-500">变化 {versionDetail.comparison.changedCount} 项</div>

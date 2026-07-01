@@ -72,11 +72,30 @@ export interface PublishPackageVersionItem {
   createdAt: Date | string;
 }
 
+export type PublishPackageVersionActionFilter = "all" | "copy" | "download" | "archive" | "snapshot";
+
 export interface PublishPackageSnapshotDetail extends PublishPackageVersionItem {
   logline: string;
   synopsis: string;
   tags: string[];
   markdown: string;
+}
+
+export interface PublishPackageArchiveGroupPlatform {
+  id: string;
+  platformId: string;
+  platformName: string;
+  chapterCount: number;
+  wordCount: number;
+  preflightScore: number;
+  canExport: boolean;
+}
+
+export interface PublishPackageArchiveGroup {
+  createdAt: Date | string;
+  platformCount: number;
+  totalWordCount: number;
+  platforms: PublishPackageArchiveGroupPlatform[];
 }
 
 export interface PublishPackageVersionComparisonItem {
@@ -185,6 +204,33 @@ export function parsePublishSnapshotTags(tags: string | string[] | null | undefi
   } catch {
     return [];
   }
+}
+
+export function normalizePublishPackageVersionAction(action: string): PublishPackageVersionActionFilter {
+  if (action === "copy" || action === "download" || action === "archive" || action === "snapshot") return action;
+  return "snapshot";
+}
+
+export function filterPublishPackageVersions(
+  versions: PublishPackageVersionItem[],
+  action: PublishPackageVersionActionFilter,
+) {
+  if (action === "all") return versions;
+  return versions.filter((version) => normalizePublishPackageVersionAction(version.action) === action);
+}
+
+export function countPublishPackageVersionActions(versions: PublishPackageVersionItem[]) {
+  const counts: Record<PublishPackageVersionActionFilter, number> = {
+    all: versions.length,
+    copy: 0,
+    download: 0,
+    archive: 0,
+    snapshot: 0,
+  };
+  versions.forEach((version) => {
+    counts[normalizePublishPackageVersionAction(version.action)] += 1;
+  });
+  return counts;
 }
 
 export function buildPublishPackageVersionComparison(

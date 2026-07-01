@@ -6,6 +6,7 @@ import {
   buildPlatformPublishArchive,
   buildPublishPackageVersionComparison,
   parsePublishSnapshotTags,
+  type PublishPackageArchiveGroup,
   type PlatformPublishPackage,
   type PublishPackageSnapshotDetail,
 } from "@/lib/projects/platformPublishExport";
@@ -93,6 +94,34 @@ async function createPublishSnapshot(projectId: string, pack: PlatformPublishPac
   });
 }
 
+function buildArchiveGroup(snapshots: {
+  id: string;
+  platformId: string;
+  platformName: string;
+  chapterCount: number;
+  wordCount: number;
+  preflightScore: number;
+  canExport: boolean;
+  createdAt: Date;
+}[]): PublishPackageArchiveGroup | null {
+  if (!snapshots.length) return null;
+  const sorted = [...snapshots].sort((left, right) => left.platformName.localeCompare(right.platformName));
+  return {
+    createdAt: sorted[0].createdAt,
+    platformCount: sorted.length,
+    totalWordCount: sorted.reduce((sum, item) => sum + item.wordCount, 0),
+    platforms: sorted.map((item) => ({
+      id: item.id,
+      platformId: item.platformId,
+      platformName: item.platformName,
+      chapterCount: item.chapterCount,
+      wordCount: item.wordCount,
+      preflightScore: item.preflightScore,
+      canExport: item.canExport,
+    })),
+  };
+}
+
 export async function GET(request: Request, { params }: Params) {
   const { projectId } = await params;
   const { searchParams } = new URL(request.url);
@@ -136,10 +165,18 @@ export async function GET(request: Request, { params }: Params) {
       canExport: snapshot.canExport,
       createdAt: snapshot.createdAt,
     };
+    const archiveGroup = snapshot.action === "archive"
+      ? buildArchiveGroup((await prisma.publishPackageSnapshot.findMany({
+        where: { projectId, action: "archive" },
+        orderBy: { createdAt: "desc" },
+        take: 80,
+      })).filter((item) => Math.abs(item.createdAt.getTime() - snapshot.createdAt.getTime()) <= 5000))
+      : null;
 
     return NextResponse.json({
       version,
       comparison: buildPublishPackageVersionComparison(version, currentPack),
+      archiveGroup,
     });
   }
 

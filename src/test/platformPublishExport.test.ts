@@ -5,6 +5,9 @@ import {
   buildPlatformPublishExportCenter,
   buildPlatformPublishArchive,
   buildPublishPackageVersionComparison,
+  countPublishPackageVersionActions,
+  filterPublishPackageVersions,
+  normalizePublishPackageVersionAction,
   parsePublishSnapshotTags,
 } from "../lib/projects/platformPublishExport.ts";
 import { buildPublishRepairTaskSnapshot } from "../lib/projects/publishRepairActionExecution.ts";
@@ -296,6 +299,56 @@ test("buildPlatformPublishExportCenter", async (t) => {
     assert.equal(pack.publishVersions[0].id, "new-fanqie");
     assert.equal(pack.publishVersions[1].id, "old-fanqie");
     assert.equal(pack.publishVersions.every((version) => version.platformId === "fanqie"), true);
+  });
+
+  await t.test("filters and counts publish package versions by action", () => {
+    const versions = [
+      {
+        id: "copy-1",
+        platformId: "fanqie",
+        platformName: "番茄小说",
+        title: "夜雨系统",
+        action: "copy",
+        chapterCount: 3,
+        wordCount: 7800,
+        preflightScore: 90,
+        canExport: true,
+        createdAt: "2026-01-01T00:00:00.000Z",
+      },
+      {
+        id: "archive-1",
+        platformId: "qidian",
+        platformName: "起点中文网",
+        title: "夜雨系统",
+        action: "archive",
+        chapterCount: 3,
+        wordCount: 7800,
+        preflightScore: 92,
+        canExport: true,
+        createdAt: "2026-01-02T00:00:00.000Z",
+      },
+      {
+        id: "unknown-1",
+        platformId: "webnovel",
+        platformName: "WebNovel",
+        title: "夜雨系统",
+        action: "manual-save",
+        chapterCount: 3,
+        wordCount: 7800,
+        preflightScore: 91,
+        canExport: true,
+        createdAt: "2026-01-03T00:00:00.000Z",
+      },
+    ];
+    const counts = countPublishPackageVersionActions(versions);
+
+    assert.equal(normalizePublishPackageVersionAction("manual-save"), "snapshot");
+    assert.equal(counts.all, 3);
+    assert.equal(counts.copy, 1);
+    assert.equal(counts.archive, 1);
+    assert.equal(counts.snapshot, 1);
+    assert.equal(filterPublishPackageVersions(versions, "archive").map((version) => version.id).join(","), "archive-1");
+    assert.equal(filterPublishPackageVersions(versions, "all").length, 3);
   });
 
   await t.test("compares publish package versions with the current package", () => {

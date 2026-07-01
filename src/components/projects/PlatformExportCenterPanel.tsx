@@ -263,6 +263,22 @@ interface PlatformPublishEffect {
   history: PlatformPublishMetric[];
 }
 
+interface PlatformPublishOptimizationAction {
+  id: string;
+  priority: "high" | "medium" | "low";
+  area: "data" | "asset" | "opening" | "platform" | "cadence";
+  label: string;
+  detail: string;
+  evidence: string;
+  target: string;
+}
+
+interface PlatformPublishEffectOptimization {
+  status: "collect_data" | "urgent_rework" | "iterate" | "scale";
+  headline: string;
+  actions: PlatformPublishOptimizationAction[];
+}
+
 interface PlatformPublishPackage {
   platformId: string;
   platformName: string;
@@ -272,6 +288,7 @@ interface PlatformPublishPackage {
   submissionAssetVersions: PlatformSubmissionAssetVersion[];
   submissionAssetAdoption: PlatformSubmissionAssetAdoption;
   publishEffect: PlatformPublishEffect;
+  effectOptimization: PlatformPublishEffectOptimization;
   title: string;
   logline: string;
   synopsis: string;
@@ -436,6 +453,27 @@ function contractStatusLabel(status: string) {
   if (status === "rejected") return "被拒";
   if (status === "pending") return "待反馈";
   return "未知";
+}
+
+function optimizationStatusLabel(status: PlatformPublishEffectOptimization["status"]) {
+  if (status === "urgent_rework") return "优先返工";
+  if (status === "scale") return "放大有效";
+  if (status === "collect_data") return "先补数据";
+  return "继续迭代";
+}
+
+function optimizationPriorityClass(priority: PlatformPublishOptimizationAction["priority"]) {
+  if (priority === "high") return "bg-rose-50 text-rose-700";
+  if (priority === "medium") return "bg-amber-50 text-amber-700";
+  return "bg-slate-100 text-slate-600";
+}
+
+function optimizationAreaLabel(area: PlatformPublishOptimizationAction["area"]) {
+  if (area === "asset") return "投稿资产";
+  if (area === "opening") return "前三章";
+  if (area === "platform") return "平台表达";
+  if (area === "cadence") return "更新节奏";
+  return "数据";
 }
 
 function normalizeVersionAction(action: string): PublishPackageVersionActionFilter {
@@ -1789,6 +1827,35 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
             </div>
             <div className="mt-3 rounded-md bg-slate-50 p-3 text-sm text-slate-700">
               <span className="font-medium text-slate-950">下一步：</span>{selectedPackage.publishEffect.nextAction}
+            </div>
+            <div className="mt-3 rounded-md border border-slate-200 p-3">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <div className="font-medium text-slate-950">二轮优化清单</div>
+                  <p className="mt-1 text-sm leading-6 text-slate-600">{selectedPackage.effectOptimization.headline}</p>
+                </div>
+                <span className="w-fit rounded-md bg-slate-100 px-2 py-1 text-xs font-medium text-slate-600">
+                  {optimizationStatusLabel(selectedPackage.effectOptimization.status)}
+                </span>
+              </div>
+              <div className="mt-3 grid gap-2 lg:grid-cols-2">
+                {selectedPackage.effectOptimization.actions.map((action) => (
+                  <div className="rounded-md bg-slate-50 p-3 text-sm" key={action.id}>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className={`rounded-md px-2 py-1 text-xs font-medium ${optimizationPriorityClass(action.priority)}`}>
+                        {action.priority === "high" ? "高" : action.priority === "medium" ? "中" : "低"}
+                      </span>
+                      <span className="rounded-md bg-white px-2 py-1 text-xs text-slate-600">{optimizationAreaLabel(action.area)}</span>
+                      <span className="font-medium text-slate-950">{action.label}</span>
+                    </div>
+                    <p className="mt-2 leading-6 text-slate-600">{action.detail}</p>
+                    <div className="mt-2 grid gap-1 text-xs text-slate-500">
+                      <div>依据：{action.evidence}</div>
+                      <div>位置：{action.target}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
             <div className="mt-3 grid gap-3 lg:grid-cols-3">
               {[

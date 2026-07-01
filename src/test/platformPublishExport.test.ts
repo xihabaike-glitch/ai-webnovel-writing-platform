@@ -87,6 +87,8 @@ test("buildPlatformPublishExportCenter", async (t) => {
     assert.ok(center.workspace.nextActions.some((action) => action.kind === "run_chapter_review"));
     assert.equal(center.packages[0].publishEffect.status, "empty");
     assert.ok(center.packages[0].publishEffect.nextAction.includes("录入"));
+    assert.equal(center.packages[0].effectOptimization.status, "collect_data");
+    assert.ok(center.packages[0].effectOptimization.actions.some((action) => action.area === "data"));
   });
 
   await t.test("dedupes workspace repair actions across platforms", () => {
@@ -307,10 +309,56 @@ test("buildPlatformPublishExportCenter", async (t) => {
     assert.equal(pack.publishEffect.favoriteRatePercent, 6);
     assert.equal(pack.publishEffect.followRatePercent, 3);
     assert.ok(pack.publishEffect.verdict.includes("有可追的苗头"));
+    assert.equal(pack.effectOptimization.status, "scale");
+    assert.ok(pack.effectOptimization.actions.some((action) => action.label.includes("放大")));
     assert.ok(pack.publishNote.includes("首秀前强调前三章钩子。"));
     assert.ok(pack.markdown.includes("夜雨系统：倒计时重生"));
     assert.ok(pack.markdown.includes("投稿资产质检"));
     assert.ok(pack.markdown.includes("发布效果复盘"));
+    assert.ok(pack.markdown.includes("二轮优化清单"));
+  });
+
+  await t.test("builds second-round optimization actions from weak publish metrics", () => {
+    const center = buildPlatformPublishExportCenter({
+      project: {
+        title: "夜雨系统",
+        genre: "都市系统",
+        sellingPoint: "雨夜危机中觉醒系统，主角用选择翻盘。",
+        currentWordCount: 9000,
+        targetWordCount: 300000,
+      },
+      targetPlatform: getPlatformProfile("fanqie"),
+      chapters: finalChapters,
+      aiTasks: passedReviews,
+      submissionChecklist: readyChecklist,
+      platforms: [getPlatformProfile("fanqie")],
+      platformPublishMetrics: [
+        {
+          id: "metric-fanqie-weak",
+          platformId: "fanqie",
+          platformName: "番茄小说",
+          views: 1000,
+          clicks: 30,
+          favorites: 8,
+          follows: 4,
+          comments: 1,
+          paidReads: 0,
+          editorFeedback: "开头慢，卖点不够直。",
+          contractStatus: "rejected",
+          publishUrl: "",
+          notes: "弱转化样本。",
+          snapshotDate: "2026-01-10T08:00:00.000Z",
+        },
+      ],
+    });
+    const pack = center.packages[0];
+
+    assert.equal(pack.publishEffect.status, "weak");
+    assert.equal(pack.effectOptimization.status, "urgent_rework");
+    assert.ok(pack.effectOptimization.headline.includes("转化漏斗"));
+    assert.ok(pack.effectOptimization.actions.some((action) => action.area === "asset" && action.label.includes("重做标题")));
+    assert.ok(pack.effectOptimization.actions.some((action) => action.area === "opening" && action.label.includes("收藏动机")));
+    assert.ok(pack.effectOptimization.actions.some((action) => action.evidence.includes("开头慢")));
   });
 
   await t.test("scores platform submission asset fields", () => {

@@ -235,6 +235,22 @@ export interface PlatformPublishEffectSummary {
   history: PlatformPublishMetricInput[];
 }
 
+export interface PlatformPublishOptimizationAction {
+  id: string;
+  priority: "high" | "medium" | "low";
+  area: "data" | "asset" | "opening" | "platform" | "cadence";
+  label: string;
+  detail: string;
+  evidence: string;
+  target: string;
+}
+
+export interface PlatformPublishEffectOptimization {
+  status: "collect_data" | "urgent_rework" | "iterate" | "scale";
+  headline: string;
+  actions: PlatformPublishOptimizationAction[];
+}
+
 export interface PlatformPublishExportInput {
   project: PublishExportProject;
   chapters: PublishExportChapter[];
@@ -280,6 +296,7 @@ export interface PlatformPublishPackage {
   submissionAssetVersions: PlatformSubmissionAssetVersionInput[];
   submissionAssetAdoption: PlatformSubmissionAssetAdoptionSummary;
   publishEffect: PlatformPublishEffectSummary;
+  effectOptimization: PlatformPublishEffectOptimization;
   title: string;
   logline: string;
   synopsis: string;
@@ -972,6 +989,10 @@ function buildMarkdown(pack: Omit<PlatformPublishPackage, "markdown">) {
     `下一步：${pack.publishEffect.nextAction}`,
     ...(pack.publishEffect.latest?.editorFeedback ? [`编辑反馈：${pack.publishEffect.latest.editorFeedback}`] : []),
     "",
+    "## 二轮优化清单",
+    pack.effectOptimization.headline,
+    ...pack.effectOptimization.actions.map((action) => `- [${action.priority}] ${action.label}｜${action.target}｜${action.detail}｜依据：${action.evidence}`),
+    "",
     "## 风险提醒",
     ...(pack.warnings.length ? pack.warnings.map((warning) => `- ${warning}`) : ["- 暂无明显风险。"]),
     "",
@@ -1269,6 +1290,192 @@ function buildPlatformPublishEffect(
   };
 }
 
+function effectAction(
+  id: string,
+  priority: PlatformPublishOptimizationAction["priority"],
+  area: PlatformPublishOptimizationAction["area"],
+  label: string,
+  detail: string,
+  evidence: string,
+  target: string,
+): PlatformPublishOptimizationAction {
+  return { id, priority, area, label, detail, evidence, target };
+}
+
+function buildPlatformEffectOptimization(
+  platform: PlatformProfile,
+  effect: PlatformPublishEffectSummary,
+  assetAudit: PlatformSubmissionAssetAudit,
+  chapters: PlatformPublishChapter[],
+  adoption: PlatformSubmissionAssetAdoptionSummary,
+): PlatformPublishEffectOptimization {
+  if (effect.status === "empty") {
+    return {
+      status: "collect_data",
+      headline: "先别玄学复盘，缺数据就只是在自我感动。",
+      actions: [
+        effectAction(
+          `${platform.id}-collect-effect-data`,
+          "high",
+          "data",
+          "录入首轮发布数据",
+          "至少补曝光、点击、收藏、追读、评论和编辑反馈，再判断平台是否吃这个卖点。",
+          "当前没有任何发布效果记录。",
+          "发布效果复盘",
+        ),
+      ],
+    };
+  }
+
+  const actions: PlatformPublishOptimizationAction[] = [];
+  const firstThree = chapters.slice(0, 3);
+  const weakOpening = firstThree.some((chapter) => chapter.preflight.score < 85 || !chapter.ready);
+
+  if (effect.latest?.contractStatus === "rejected") {
+    actions.push(effectAction(
+      `${platform.id}-rebuild-rejected-package`,
+      "high",
+      "asset",
+      "按拒稿反馈重做投稿资产",
+      "把编辑反馈拆成标题、卖点、简介、前三章四类问题，重写后再生成一轮平台候选方案。",
+      effect.latest.editorFeedback || "最新反馈状态为被拒。",
+      "投稿资产",
+    ));
+  }
+
+  if (effect.totalViews >= 100 && effect.clickRatePercent < 5) {
+    actions.push(effectAction(
+      `${platform.id}-fix-click-package`,
+      "high",
+      "asset",
+      "重做标题、卖点和标签",
+      `${platform.name} 读者没点进来，先把标题从“像简介”改成“能一眼看懂冲突和爽点”。`,
+      `点击率 ${effect.clickRatePercent}%，低于 5%。`,
+      "投稿资产",
+    ));
+  }
+
+  if (effect.totalViews >= 100 && effect.clickRatePercent >= 5 && effect.followRatePercent < 1) {
+    actions.push(effectAction(
+      `${platform.id}-fix-first-three-retention`,
+      "high",
+      "opening",
+      "重查前三章留存链路",
+      "点击不算死，但追读没接住，优先重写第一章钩子、第二章兑现和第三章转折。",
+      `点击率 ${effect.clickRatePercent}%，追读率只有 ${effect.followRatePercent}%。`,
+      "前三章",
+    ));
+  }
+
+  if (effect.favoriteRatePercent < 2 && effect.totalViews >= 100) {
+    actions.push(effectAction(
+      `${platform.id}-increase-save-motive`,
+      "medium",
+      "opening",
+      "补强收藏动机",
+      "前三章需要更清楚的长期奖励、关系拉扯或主线谜团，否则读者看完也不会收藏。",
+      `收藏率 ${effect.favoriteRatePercent}%。`,
+      "人物弧光 / 主线钩子",
+    ));
+  }
+
+  if (assetAudit.status !== "ready") {
+    actions.push(effectAction(
+      `${platform.id}-repair-asset-audit`,
+      "medium",
+      "asset",
+      "先修投稿资产质检问题",
+      "投稿资产还没到平台判断门槛，别拿脏数据指导内容方向。",
+      `资产质检 ${assetAudit.score} 分，状态 ${assetAudit.status}。`,
+      "投稿资产",
+    ));
+  }
+
+  if (adoption.generatedVariants > 0 && adoption.adoptedVersions === 0) {
+    actions.push(effectAction(
+      `${platform.id}-adopt-candidate`,
+      "medium",
+      "asset",
+      "采纳一个 AI 候选做实测",
+      "候选生成了但没有采纳，等于厨房炒了三盘菜却一口不尝。",
+      `已生成 ${adoption.generatedVariants} 个候选，采纳 0 个。`,
+      "AI 优化方案",
+    ));
+  }
+
+  if (platform.category === "overseas" && effect.status === "weak") {
+    actions.push(effectAction(
+      `${platform.id}-localize-overseas-package`,
+      "medium",
+      "platform",
+      "重做海外平台表达",
+      "海外弱转化时先检查英文标题、简介和标签是否像本土连载，不要把中文卖点硬翻过去。",
+      `${platform.name} 属于海外平台，当前复盘状态偏弱。`,
+      "海外简介 / 标签",
+    ));
+  }
+
+  if (effect.status === "promising" || effect.status === "signed") {
+    actions.push(effectAction(
+      `${platform.id}-scale-winning-signal`,
+      "high",
+      "cadence",
+      "放大已验证卖点",
+      "保持标题卖点方向，下一轮优先加更、强化同类爽点，并记录新增章节后的转化变化。",
+      effect.status === "signed" ? "平台已给出签约或邀约信号。" : `收藏率 ${effect.favoriteRatePercent}%，追读率 ${effect.followRatePercent}%。`,
+      "更新节奏 / 主线爽点",
+    ));
+    actions.push(effectAction(
+      `${platform.id}-protect-winning-package`,
+      "medium",
+      "asset",
+      "保留当前投稿包装",
+      "数据已经说明这套包装能打，别因为手痒把标题和简介改散。",
+      effect.verdict,
+      "投稿资产",
+    ));
+  }
+
+  if (!actions.length) {
+    actions.push(effectAction(
+      `${platform.id}-collect-second-sample`,
+      "medium",
+      "data",
+      "补第二轮样本",
+      "当前数据既不差也不够亮，至少再记录一轮，避免用一次偶然波动决定平台方向。",
+      `当前记录 ${effect.records} 次，状态为 ${effect.status}。`,
+      "发布效果复盘",
+    ));
+  }
+
+  const uniqueActions = dedupeOptimizationActions(actions).slice(0, 5);
+  const status: PlatformPublishEffectOptimization["status"] = effect.status === "weak"
+    ? "urgent_rework"
+    : effect.status === "promising" || effect.status === "signed"
+      ? "scale"
+      : "iterate";
+
+  return {
+    status,
+    headline: status === "urgent_rework"
+      ? "二轮别大修世界观，先修最靠近转化漏斗的洞。"
+      : status === "scale"
+        ? "数据已经给方向了，现在要放大，不要乱换靶子。"
+        : "继续迭代，但别把观察样本当平台结论。",
+    actions: uniqueActions,
+  };
+}
+
+function dedupeOptimizationActions(actions: PlatformPublishOptimizationAction[]) {
+  const seen = new Set<string>();
+  return actions.filter((action) => {
+    const key = `${action.area}-${action.target}-${action.label}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
 function buildPlatformPackage(
   input: PlatformPublishExportInput,
   platform: PlatformProfile,
@@ -1336,6 +1543,13 @@ function buildPlatformPackage(
     input.submissionAssetVersions ?? [],
   );
   const publishEffect = buildPlatformPublishEffect(platform, input.platformPublishMetrics ?? []);
+  const effectOptimization = buildPlatformEffectOptimization(
+    platform,
+    publishEffect,
+    submissionAssetAudit,
+    chapters,
+    submissionAssetAdoption,
+  );
   const packWithoutMarkdown = {
     platformId: platform.id,
     platformName: platform.name,
@@ -1349,6 +1563,7 @@ function buildPlatformPackage(
     submissionAssetVersions,
     submissionAssetAdoption,
     publishEffect,
+    effectOptimization,
     title,
     logline,
     synopsis,

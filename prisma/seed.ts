@@ -1,4 +1,6 @@
 import { PrismaClient } from "@prisma/client";
+import { buildDefaultOutlineNodes } from "../src/lib/outlines/defaultOutline.ts";
+import { getPlatformProfile, type PlatformId } from "../src/lib/platforms/platformProfiles.ts";
 
 const prisma = new PrismaClient();
 
@@ -32,6 +34,39 @@ async function main() {
     update: {},
   });
 
+  const platform = getPlatformProfile(project.targetPlatform as PlatformId);
+  const outlineNodes = buildDefaultOutlineNodes({
+    projectId: project.id,
+    title: project.title,
+    genre: project.genre,
+    sellingPoint: project.sellingPoint,
+    platform,
+  });
+
+  for (const node of outlineNodes) {
+    await prisma.outlineNode.upsert({
+      where: { id: node.id },
+      create: {
+        ...node,
+        projectId: project.id,
+      },
+      update: {
+        parentId: node.parentId,
+        type: node.type,
+        title: node.title,
+        summary: node.summary,
+        goal: node.goal,
+        hook: node.hook,
+        conflict: node.conflict,
+        valueShift: node.valueShift,
+        platformNote: node.platformNote,
+        order: node.order,
+        depth: node.depth,
+        status: node.status,
+      },
+    });
+  }
+
   console.log(`Seeded ${project.title}`);
 }
 
@@ -43,4 +78,3 @@ main()
   .finally(async () => {
     await prisma.$disconnect();
   });
-

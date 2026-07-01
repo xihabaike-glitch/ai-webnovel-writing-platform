@@ -25,6 +25,7 @@ model Project {
   worldEntries WorldEntry[]
   foreshadows  Foreshadow[]
   plotThreads  PlotThread[]
+  outlineNodes OutlineNode[]
   aiTasks      AiTask[]
 }
 
@@ -46,6 +47,33 @@ model Chapter {
   updatedAt   DateTime @updatedAt
 
   project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  outlineNodes OutlineNode[]
+}
+
+model OutlineNode {
+  id           String   @id @default(cuid())
+  projectId    String
+  parentId     String?
+  chapterId    String?
+  type         String
+  title        String
+  summary      String   @default("")
+  goal         String   @default("")
+  hook         String   @default("")
+  conflict     String   @default("")
+  valueShift   String   @default("")
+  platformNote String   @default("")
+  order        Int      @default(0)
+  depth        Int      @default(0)
+  status       String   @default("planned")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  project  Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  chapter  Chapter?      @relation(fields: [chapterId], references: [id], onDelete: SetNull)
+  parent   OutlineNode?  @relation("OutlineTree", fields: [parentId], references: [id], onDelete: Cascade)
+  children OutlineNode[] @relation("OutlineTree")
 }
 
 model Character {
@@ -142,4 +170,3 @@ model AiTask {
   project       Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
   modelProvider ModelProvider @relation(fields: [providerConfigId], references: [id], onDelete: Restrict)
 }
-

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AppShell } from "@/components/app-shell/AppShell";
 import { CreateChapterForm } from "@/components/chapters/CreateChapterForm";
+import { OutlineTreePanel } from "@/components/outlines/OutlineTreePanel";
 import { ExportMarkdownButton } from "@/components/projects/ExportMarkdownButton";
 import { prisma } from "@/lib/db/prisma";
 import { getPlatformProfile, type PlatformId } from "@/lib/platforms/platformProfiles";
@@ -10,7 +11,10 @@ export default async function ProjectPage({ params }: { params: Promise<{ projec
   const { projectId } = await params;
   const project = await prisma.project.findUnique({
     where: { id: projectId },
-    include: { chapters: { orderBy: { order: "asc" } } },
+    include: {
+      chapters: { orderBy: { order: "asc" } },
+      outlineNodes: { orderBy: [{ depth: "asc" }, { order: "asc" }, { createdAt: "asc" }] },
+    },
   });
 
   if (!project) {
@@ -18,6 +22,21 @@ export default async function ProjectPage({ params }: { params: Promise<{ projec
   }
 
   const platform = getPlatformProfile(project.targetPlatform as PlatformId);
+  const outlineNodes = project.outlineNodes.map((node) => ({
+    id: node.id,
+    parentId: node.parentId,
+    type: node.type,
+    title: node.title,
+    summary: node.summary,
+    goal: node.goal,
+    hook: node.hook,
+    conflict: node.conflict,
+    valueShift: node.valueShift,
+    platformNote: node.platformNote,
+    order: node.order,
+    depth: node.depth,
+    status: node.status,
+  }));
 
   return (
     <AppShell>
@@ -28,11 +47,8 @@ export default async function ProjectPage({ params }: { params: Promise<{ projec
             {platform.name} · {project.currentWordCount}/{project.targetWordCount} 字 · {project.genre}
           </p>
         </div>
-        <div className="grid gap-4 md:grid-cols-3">
-          <div className="rounded-md border bg-white p-4">
-            <div className="font-medium">大纲树</div>
-            <p className="mt-2 text-sm text-slate-600">根、主干、支线、叶片的作品结构。</p>
-          </div>
+        <div className="grid gap-4 md:grid-cols-[2fr_1fr]">
+          <OutlineTreePanel projectId={project.id} nodes={outlineNodes} />
           <div className="rounded-md border bg-white p-4">
             <div className="font-medium">平台策略</div>
             <p className="mt-2 text-sm text-slate-600">开头：{platform.openingRules.join("；")}</p>

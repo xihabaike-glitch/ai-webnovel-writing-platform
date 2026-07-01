@@ -31,6 +31,29 @@ CREATE TABLE IF NOT EXISTS "Chapter" (
   CONSTRAINT "Chapter_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "Project" ("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
 
+CREATE TABLE IF NOT EXISTS "OutlineNode" (
+  "id" TEXT NOT NULL PRIMARY KEY,
+  "projectId" TEXT NOT NULL,
+  "parentId" TEXT,
+  "chapterId" TEXT,
+  "type" TEXT NOT NULL,
+  "title" TEXT NOT NULL,
+  "summary" TEXT NOT NULL DEFAULT '',
+  "goal" TEXT NOT NULL DEFAULT '',
+  "hook" TEXT NOT NULL DEFAULT '',
+  "conflict" TEXT NOT NULL DEFAULT '',
+  "valueShift" TEXT NOT NULL DEFAULT '',
+  "platformNote" TEXT NOT NULL DEFAULT '',
+  "order" INTEGER NOT NULL DEFAULT 0,
+  "depth" INTEGER NOT NULL DEFAULT 0,
+  "status" TEXT NOT NULL DEFAULT 'planned',
+  "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT "OutlineNode_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "Project" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT "OutlineNode_chapterId_fkey" FOREIGN KEY ("chapterId") REFERENCES "Chapter" ("id") ON DELETE SET NULL ON UPDATE CASCADE,
+  CONSTRAINT "OutlineNode_parentId_fkey" FOREIGN KEY ("parentId") REFERENCES "OutlineNode" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
 CREATE TABLE IF NOT EXISTS "Character" (
   "id" TEXT NOT NULL PRIMARY KEY,
   "projectId" TEXT NOT NULL,
@@ -118,4 +141,3 @@ CREATE TABLE IF NOT EXISTS "AiTask" (
   CONSTRAINT "AiTask_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "Project" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT "AiTask_providerConfigId_fkey" FOREIGN KEY ("providerConfigId") REFERENCES "ModelProvider" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
 );
-

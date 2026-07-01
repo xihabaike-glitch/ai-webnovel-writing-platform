@@ -2,6 +2,14 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import {
+  actionFromRunResult,
+  labelForAction,
+  normalizeRunResult,
+  pendingResultFromAction,
+  type PublishRepairRunResult,
+  type RawPublishRepairRunResult,
+} from "@/lib/projects/publishRepairRunResults";
 
 type PublishRepairActionKind =
   | "edit_chapter"
@@ -97,6 +105,18 @@ function canRunAction(action: PublishRepairAction) {
   return (action.kind === "run_chapter_review" || action.kind === "run_second_pass") && Boolean(action.chapterId);
 }
 
+function resultStatusLabel(status: PublishRepairRunResult["status"]) {
+  if (status === "succeeded") return "成功";
+  if (status === "pending") return "处理中";
+  return "失败";
+}
+
+function resultStatusClass(status: PublishRepairRunResult["status"]) {
+  if (status === "succeeded") return "bg-emerald-50 text-emerald-700";
+  if (status === "pending") return "bg-amber-50 text-amber-700";
+  return "bg-rose-50 text-rose-700";
+}
+
 function formatTime(value: string) {
   return new Intl.DateTimeFormat("zh-CN", {
     month: "2-digit",
@@ -112,6 +132,7 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
   const [isLoading, setIsLoading] = useState(false);
   const [runningActionId, setRunningActionId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [runResults, setRunResults] = useState<PublishRepairRunResult[]>([]);
   const selectedPackage = useMemo(
     () => center?.packages.find((pack) => pack.platformId === selectedPlatformId) ?? center?.packages[0] ?? null,
     [center, selectedPlatformId],
@@ -183,6 +204,7 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
     if (!canRunAction(action)) return;
     setRunningActionId(action.id);
     setMessage(null);
+    setRunResults([pendingResultFromAction(action)]);
     try {
       const response = await fetch(`/api/projects/${projectId}/platform-export/repair`, {
         method: "POST",
@@ -194,14 +216,27 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
           detail: action.detail,
         }),
       });
-      const payload = (await response.json().catch(() => null)) as { message?: string; error?: string } | null;
+      const payload = (await response.json().catch(() => null)) as {
+        message?: string;
+        error?: string;
+        result?: RawPublishRepairRunResult;
+        results?: RawPublishRepairRunResult[];
+      } | null;
       if (!response.ok) {
         throw new Error(payload?.error ?? "修复动作执行失败。");
       }
+      const results = payload?.results?.length
+        ? payload.results.map(normalizeRunResult)
+        : payload?.result
+          ? [normalizeRunResult(payload.result)]
+          : [];
+      setRunResults(results.length ? results : [{ ...pendingResultFromAction(action), status: "succeeded", message: payload?.message ?? "修复动作已完成。" }]);
       setMessage(payload?.message ?? "修复动作已完成。");
       await loadCenter({ keepMessage: true });
     } catch (caught) {
-      setMessage(caught instanceof Error ? caught.message : "修复动作执行失败。");
+      const errorMessage = caught instanceof Error ? caught.message : "修复动作执行失败。";
+      setRunResults([{ ...pendingResultFromAction(action), status: "failed", error: errorMessage, message: errorMessage }]);
+      setMessage(errorMessage);
     } finally {
       setRunningActionId(null);
     }
@@ -211,6 +246,7 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
     if (!executableActions.length) return;
     setRunningActionId("batch");
     setMessage(null);
+    setRunResults(executableActions.map(pendingResultFromAction));
     try {
       const response = await fetch(`/api/projects/${projectId}/platform-export/repair`, {
         method: "POST",
@@ -224,14 +260,21 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
           })),
         }),
       });
-      const payload = (await response.json().catch(() => null)) as { message?: string; error?: string } | null;
+      const payload = (await response.json().catch(() => null)) as {
+        message?: string;
+        error?: string;
+        results?: RawPublishRepairRunResult[];
+      } | null;
       if (!response.ok) {
         throw new Error(payload?.error ?? "批量修复失败。");
       }
+      setRunResults(payload?.results?.map(normalizeRunResult) ?? []);
       setMessage(payload?.message ?? "批量修复已完成。");
       await loadCenter({ keepMessage: true });
     } catch (caught) {
-      setMessage(caught instanceof Error ? caught.message : "批量修复失败。");
+      const errorMessage = caught instanceof Error ? caught.message : "批量修复失败。";
+      setRunResults((current) => current.map((result) => ({ ...result, status: "failed", error: errorMessage, message: errorMessage })));
+      setMessage(errorMessage);
     } finally {
       setRunningActionId(null);
     }
@@ -372,6 +415,97 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
                         >
                           打开位置
                         </Link>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                {runResults.length ? (
+                  <div className="mt-3 rounded-md border border-slate-200 bg-white p-3">
+                    <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
+                      <div>
+                        <div className="font-medium text-slate-950">本次处理结果</div>
+                        <div className="mt-1 text-xs text-slate-500">
+                          成功 {runResults.filter((result) => result.status === "succeeded").length} 项 ·
+                          失败 {runResults.filter((result) => result.status === "failed").length} 项 ·
+                          处理中 {runResults.filter((result) => result.status === "pending").length} 项
+                        </div>
+                      </div>
+                      {runResults.some((result) => result.status === "failed" && canRunAction(actionFromRunResult(result))) ? (
+                        <button
+                          className="w-fit rounded-md border border-slate-200 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                          disabled={Boolean(runningActionId)}
+                          onClick={() => {
+                            const failedResult = runResults.find((result) => result.status === "failed" && canRunAction(actionFromRunResult(result)));
+                            if (failedResult) void runRepairAction(actionFromRunResult(failedResult));
+                          }}
+                          type="button"
+                        >
+                          重试首个失败项
+                        </button>
+                      ) : null}
+                    </div>
+                    <div className="mt-3 grid gap-2">
+                      {runResults.map((result) => {
+                        const retryAction = actionFromRunResult(result);
+                        return (
+                          <div className="rounded-md border border-slate-200 p-3" key={result.id}>
+                            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                              <div>
+                                <div className="font-medium text-slate-950">{labelForAction(result.action)}</div>
+                                <div className="mt-1 text-xs text-slate-500">{result.chapterTitle}</div>
+                              </div>
+                              <span className={`w-fit rounded-md px-2 py-1 text-xs font-medium ${resultStatusClass(result.status)}`}>
+                                {resultStatusLabel(result.status)}
+                              </span>
+                            </div>
+                            <div className="mt-2 text-slate-600">
+                              {result.error ?? result.message ?? (result.status === "pending" ? "等待模型返回结果。" : "已完成处理。")}
+                            </div>
+                            <div className="mt-2 flex flex-wrap gap-2 text-xs text-slate-500">
+                              {typeof result.score === "number" ? <span>评分 {result.score}</span> : null}
+                              {typeof result.issueCount === "number" ? <span>问题 {result.issueCount} 个</span> : null}
+                              {typeof result.wordCount === "number" ? <span>{result.wordCount} 字</span> : null}
+                            </div>
+                            {result.status === "failed" && canRunAction(retryAction) ? (
+                              <button
+                                className="mt-3 rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white disabled:opacity-50"
+                                disabled={Boolean(runningActionId)}
+                                onClick={() => void runRepairAction(retryAction)}
+                                type="button"
+                              >
+                                {runningActionId === retryAction.id ? "重试中" : "重试此项"}
+                              </button>
+                            ) : null}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+            {runResults.length && !selectedPackage.repairActions.length ? (
+              <div className="mt-3 rounded-md bg-slate-50 p-3 text-sm">
+                <div className="font-medium text-slate-900">本次处理结果</div>
+                <div className="mt-1 text-xs text-slate-500">
+                  成功 {runResults.filter((result) => result.status === "succeeded").length} 项 ·
+                  失败 {runResults.filter((result) => result.status === "failed").length} 项 ·
+                  处理中 {runResults.filter((result) => result.status === "pending").length} 项
+                </div>
+                <div className="mt-3 grid gap-2">
+                  {runResults.map((result) => (
+                    <div className="rounded-md border border-slate-200 bg-white p-3" key={result.id}>
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                        <div>
+                          <div className="font-medium text-slate-950">{labelForAction(result.action)}</div>
+                          <div className="mt-1 text-xs text-slate-500">{result.chapterTitle}</div>
+                        </div>
+                        <span className={`w-fit rounded-md px-2 py-1 text-xs font-medium ${resultStatusClass(result.status)}`}>
+                          {resultStatusLabel(result.status)}
+                        </span>
+                      </div>
+                      <div className="mt-2 text-slate-600">
+                        {result.error ?? result.message ?? (result.status === "pending" ? "等待模型返回结果。" : "已完成处理。")}
                       </div>
                     </div>
                   ))}

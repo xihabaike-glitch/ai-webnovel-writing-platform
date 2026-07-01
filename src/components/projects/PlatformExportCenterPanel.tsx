@@ -20,6 +20,19 @@ interface PublishRepairAction {
   chapterTitle?: string;
 }
 
+interface PublishRepairHistoryItem {
+  id: string;
+  actionKind: PublishRepairActionKind;
+  label: string;
+  chapterId: string | null;
+  chapterTitle: string;
+  status: string;
+  score: number | null;
+  shouldSecondPass: boolean | null;
+  message: string;
+  createdAt: string;
+}
+
 interface PublishPreflight {
   score: number;
   canExport: boolean;
@@ -56,6 +69,7 @@ interface PlatformPublishPackage {
   preflight: PublishPreflight;
   canExport: boolean;
   repairActions: PublishRepairAction[];
+  repairHistory: PublishRepairHistoryItem[];
   warnings: string[];
   markdown: string;
 }
@@ -81,6 +95,15 @@ function actionHref(projectId: string, action: PublishRepairAction) {
 
 function canRunAction(action: PublishRepairAction) {
   return (action.kind === "run_chapter_review" || action.kind === "run_second_pass") && Boolean(action.chapterId);
+}
+
+function formatTime(value: string) {
+  return new Intl.DateTimeFormat("zh-CN", {
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(value));
 }
 
 export function PlatformExportCenterPanel({ projectId }: { projectId: string }) {
@@ -304,6 +327,25 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
                           打开位置
                         </Link>
                       </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+            {selectedPackage.repairHistory.length ? (
+              <div className="mt-3 rounded-md bg-slate-50 p-3 text-sm">
+                <div className="font-medium text-slate-900">最近修复记录</div>
+                <div className="mt-2 grid gap-2">
+                  {selectedPackage.repairHistory.map((item) => (
+                    <div className="rounded-md border border-slate-200 bg-white p-3" key={item.id}>
+                      <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
+                        <div>
+                          <div className="font-medium text-slate-950">{item.label}</div>
+                          <div className="mt-1 text-xs text-slate-500">{item.chapterTitle}</div>
+                        </div>
+                        <div className="text-xs text-slate-500">{formatTime(item.createdAt)} · {item.status}</div>
+                      </div>
+                      <div className="mt-2 text-slate-600">{item.message}</div>
                     </div>
                   ))}
                 </div>

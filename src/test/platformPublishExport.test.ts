@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { getPlatformProfile, platformProfiles } from "../lib/platforms/platformProfiles.ts";
 import { buildPlatformPublishExportCenter } from "../lib/projects/platformPublishExport.ts";
+import { buildPublishRepairTaskSnapshot } from "../lib/projects/publishRepairActionExecution.ts";
 
 const chapters = [
   {
@@ -188,5 +189,46 @@ test("buildPlatformPublishExportCenter", async (t) => {
     assert.equal(pack.canExport, false);
     assert.ok(pack.preflight.blocked.some((item) => item.includes("低于 80%")));
     assert.ok(pack.repairActions.some((action) => action.kind === "open_submission_package"));
+  });
+
+  await t.test("summarizes publish repair task history", () => {
+    const center = buildPlatformPublishExportCenter({
+      project: {
+        title: "夜雨系统",
+        genre: "都市系统",
+        sellingPoint: "雨夜危机中觉醒系统，主角用选择翻盘。",
+        currentWordCount: 9000,
+        targetWordCount: 300000,
+      },
+      targetPlatform: getPlatformProfile("fanqie"),
+      chapters: finalChapters,
+      aiTasks: [
+        ...passedReviews,
+        {
+          id: "repair-review-1",
+          chapterId: "chapter-1",
+          taskType: "chapter_review",
+          status: "succeeded",
+          inputSnapshot: buildPublishRepairTaskSnapshot({
+            kind: "run_chapter_review",
+            label: "补章节审稿",
+            detail: "进入章节工作台运行审稿。",
+            chapterId: "chapter-1",
+            chapterTitle: "第1夜",
+          }, "{}"),
+          outputText: JSON.stringify({ score: 91, shouldSecondPass: false }),
+          createdAt: "2026-01-10T00:00:00.000Z",
+        },
+      ],
+      submissionChecklist: readyChecklist,
+      platforms: [getPlatformProfile("fanqie")],
+    });
+    const pack = center.packages[0];
+
+    assert.equal(pack.repairHistory.length, 1);
+    assert.equal(pack.repairHistory[0].label, "补章节审稿");
+    assert.equal(pack.repairHistory[0].score, 91);
+    assert.ok(pack.repairHistory[0].message.includes("已通过"));
+    assert.ok(pack.markdown.includes("最近修复记录"));
   });
 });

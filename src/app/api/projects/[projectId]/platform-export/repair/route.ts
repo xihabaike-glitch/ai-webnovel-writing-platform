@@ -3,6 +3,7 @@ import { reviewChapterDraft } from "@/lib/ai/chapterReviewGeneration";
 import { generateChapterSecondPass } from "@/lib/ai/chapterSecondPassGeneration";
 import { prisma } from "@/lib/db/prisma";
 import {
+  buildPublishRepairTaskSnapshot,
   buildPublishRepairSecondPassInstruction,
   canExecutePublishRepairAction,
 } from "@/lib/projects/publishRepairActionExecution";
@@ -24,11 +25,20 @@ function actionFromBody(body: RepairBody): PublishRepairAction {
     id: `${body.chapterId ?? "project"}-${body.kind ?? "unknown"}`,
     kind: body.kind ?? "open_submission_package",
     priority: "high",
-    label: "",
+    label: body.kind === "run_second_pass" ? "执行二改" : "补章节审稿",
     detail: body.detail?.trim() || "根据发布前质检结果修复。",
     chapterId: body.chapterId,
     chapterTitle: body.chapterTitle,
   };
+}
+
+async function markPublishRepairTask(task: { id: string; inputSnapshot: string }, action: PublishRepairAction) {
+  return prisma.aiTask.update({
+    where: { id: task.id },
+    data: {
+      inputSnapshot: buildPublishRepairTaskSnapshot(action, task.inputSnapshot),
+    },
+  });
 }
 
 export async function POST(request: Request, { params }: Params) {
@@ -58,14 +68,18 @@ export async function POST(request: Request, { params }: Params) {
 
   if (action.kind === "run_chapter_review") {
     const review = await reviewChapterDraft(chapter.id);
+    const markedTask = await markPublishRepairTask(review.task, {
+      ...action,
+      chapterTitle: action.chapterTitle ?? chapter.title,
+    });
     if ("error" in review) {
-      return NextResponse.json({ action: action.kind, task: review.task, error: review.error }, { status: 500 });
+      return NextResponse.json({ action: action.kind, task: markedTask, error: review.error }, { status: 500 });
     }
 
     return NextResponse.json({
       action: action.kind,
       message: "已完成章节审稿。",
-      task: review.task,
+      task: markedTask,
       result: review.result,
     });
   }
@@ -81,14 +95,18 @@ export async function POST(request: Request, { params }: Params) {
       targetWords: Math.max(1200, chapter.wordCount),
     });
 
+    const markedTask = await markPublishRepairTask(secondPass.task, {
+      ...action,
+      chapterTitle: action.chapterTitle ?? chapter.title,
+    });
     if ("error" in secondPass) {
-      return NextResponse.json({ action: action.kind, task: secondPass.task, error: secondPass.error }, { status: 500 });
+      return NextResponse.json({ action: action.kind, task: markedTask, error: secondPass.error }, { status: 500 });
     }
 
     return NextResponse.json({
       action: action.kind,
       message: `已完成二改，复检 ${secondPass.secondPassAudit.score} 分。`,
-      task: secondPass.task,
+      task: markedTask,
       chapter: secondPass.chapter,
       secondPassAudit: secondPass.secondPassAudit,
     });

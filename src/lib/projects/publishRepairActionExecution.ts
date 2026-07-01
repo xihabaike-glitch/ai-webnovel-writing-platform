@@ -1,5 +1,7 @@
 import type { PublishRepairAction, PublishRepairActionKind } from "./platformPublishExport.ts";
 
+export const publishRepairTaskSource = "publish_repair_action";
+
 export const executablePublishRepairKinds: PublishRepairActionKind[] = [
   "run_chapter_review",
   "run_second_pass",
@@ -16,4 +18,19 @@ export function buildPublishRepairSecondPassInstruction(action: Pick<PublishRepa
     action.detail,
     "优先补强开头钩子、冲突推进、平台爽点密度和章末追读悬念；保留原有主线信息，不要另起炉灶。",
   ].filter(Boolean).join("\n");
+}
+
+export function buildPublishRepairTaskSnapshot(
+  action: Pick<PublishRepairAction, "kind" | "label" | "detail" | "chapterId" | "chapterTitle">,
+  originalInputSnapshot: string,
+) {
+  return JSON.stringify({
+    source: publishRepairTaskSource,
+    actionKind: action.kind,
+    actionLabel: action.label,
+    actionDetail: action.detail,
+    chapterId: action.chapterId,
+    chapterTitle: action.chapterTitle,
+    originalInputSnapshot,
+  });
 }

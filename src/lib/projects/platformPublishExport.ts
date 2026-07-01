@@ -1,5 +1,6 @@
 import type { PlatformProfile } from "../platforms/platformProfiles.ts";
 import { platformProfiles, type PlatformId } from "../platforms/platformProfiles.ts";
+import { publishRepairTaskSource } from "./publishRepairActionExecution.ts";
 import type { SubmissionChecklist } from "./submissionChecklist.ts";
 import { buildSubmissionPackage, type SubmissionPackage, type SubmissionPackageChapter } from "./submissionPackage.ts";
 
@@ -17,10 +18,14 @@ export interface PublishExportChapter extends SubmissionPackageChapter {
 }
 
 export interface PublishExportAiTask {
+  id?: string;
   chapterId: string | null;
   taskType: string;
   status: string;
   outputText: string | null;
+  inputSnapshot?: string;
+  errorMessage?: string | null;
+  model?: string;
   createdAt: Date | string;
 }
 
@@ -39,6 +44,19 @@ export interface PublishRepairAction {
   detail: string;
   chapterId?: string;
   chapterTitle?: string;
+}
+
+export interface PublishRepairHistoryItem {
+  id: string;
+  actionKind: PublishRepairActionKind;
+  label: string;
+  chapterId: string | null;
+  chapterTitle: string;
+  status: string;
+  score: number | null;
+  shouldSecondPass: boolean | null;
+  message: string;
+  createdAt: Date | string;
 }
 
 export interface PlatformPublishExportInput {
@@ -86,6 +104,7 @@ export interface PlatformPublishPackage {
   preflight: PublishPreflight;
   canExport: boolean;
   repairActions: PublishRepairAction[];
+  repairHistory: PublishRepairHistoryItem[];
   warnings: string[];
   markdown: string;
 }
@@ -115,6 +134,16 @@ function parseReviewDecision(task: PublishExportAiTask | undefined) {
       ? parsed.shouldSecondPass
       : score === null || score < 85;
     return { score, shouldSecondPass };
+  } catch {
+    return null;
+  }
+}
+
+function parseJsonObject(text: string | null | undefined) {
+  if (!text) return null;
+  try {
+    const parsed = JSON.parse(text) as Record<string, unknown>;
+    return parsed && typeof parsed === "object" ? parsed : null;
   } catch {
     return null;
   }
@@ -350,6 +379,75 @@ function dedupeRepairActions(actions: PublishRepairAction[]) {
   });
 }
 
+function repairLabel(kind: PublishRepairActionKind) {
+  const labels: Record<PublishRepairActionKind, string> = {
+    edit_chapter: "编辑章节",
+    run_chapter_review: "补章节审稿",
+    run_second_pass: "执行二改",
+    open_submission_package: "补投稿资料",
+    add_publish_chapters: "补可发布章节",
+  };
+  return labels[kind];
+}
+
+function buildRepairHistory(tasks: PublishExportAiTask[], chapters: PublishExportChapter[]): PublishRepairHistoryItem[] {
+  const chapterTitles = new Map(chapters.map((chapter) => [chapter.id, chapter.title]));
+  const auditBySecondPassTaskId = new Map<string, { score: number | null; shouldSecondPass: boolean | null }>();
+
+  tasks.forEach((task) => {
+    const snapshot = parseJsonObject(task.inputSnapshot);
+    const secondPassTaskId = typeof snapshot?.secondPassTaskId === "string" ? snapshot.secondPassTaskId : null;
+    if (task.taskType === "chapter_review" && secondPassTaskId) {
+      const decision = parseReviewDecision(task);
+      auditBySecondPassTaskId.set(secondPassTaskId, {
+        score: decision?.score ?? null,
+        shouldSecondPass: decision?.shouldSecondPass ?? null,
+      });
+    }
+  });
+
+  return tasks
+    .map((task) => {
+      const snapshot = parseJsonObject(task.inputSnapshot);
+      if (snapshot?.source !== publishRepairTaskSource) return null;
+      const actionKind = typeof snapshot.actionKind === "string" ? snapshot.actionKind as PublishRepairActionKind : null;
+      if (!actionKind) return null;
+      const actionLabel = typeof snapshot.actionLabel === "string" && snapshot.actionLabel.trim()
+        ? snapshot.actionLabel
+        : repairLabel(actionKind);
+      const chapterTitle = typeof snapshot.chapterTitle === "string" && snapshot.chapterTitle.trim()
+        ? snapshot.chapterTitle
+        : task.chapterId ? chapterTitles.get(task.chapterId) ?? "未命名章节" : "项目资料";
+      const decision = task.taskType === "chapter_review"
+        ? parseReviewDecision(task)
+        : auditBySecondPassTaskId.get(task.id ?? "");
+      const score = decision?.score ?? null;
+      const shouldSecondPass = decision?.shouldSecondPass ?? null;
+      const statusLabel = task.status === "succeeded" ? "成功" : task.status === "failed" ? "失败" : task.status;
+      const message = task.status === "failed"
+        ? task.errorMessage ?? "执行失败。"
+        : score !== null
+          ? `复检 ${score} 分${shouldSecondPass ? "，仍需继续处理。" : "，已通过当前检查。"}`
+          : "已完成修复动作。";
+
+      return {
+        id: task.id ?? `${actionKind}-${task.chapterId ?? "project"}-${new Date(task.createdAt).getTime()}`,
+        actionKind,
+        label: actionLabel,
+        chapterId: task.chapterId,
+        chapterTitle,
+        status: statusLabel,
+        score,
+        shouldSecondPass,
+        message,
+        createdAt: task.createdAt,
+      };
+    })
+    .filter((item): item is PublishRepairHistoryItem => Boolean(item))
+    .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime())
+    .slice(0, 6);
+}
+
 function buildMarkdown(pack: Omit<PlatformPublishPackage, "markdown">) {
   return [
     `# ${pack.platformName} 发布包`,
@@ -375,6 +473,7 @@ function buildMarkdown(pack: Omit<PlatformPublishPackage, "markdown">) {
     ...(pack.preflight.blocked.length ? pack.preflight.blocked.map((item) => `- 阻塞：${item}`) : ["- 阻塞：无"]),
     ...(pack.preflight.warnings.length ? pack.preflight.warnings.map((item) => `- 提醒：${item}`) : ["- 提醒：无"]),
     ...(pack.repairActions.length ? ["", "## 修复动作", ...pack.repairActions.map((action) => `- ${action.label}：${action.detail}`)] : []),
+    ...(pack.repairHistory.length ? ["", "## 最近修复记录", ...pack.repairHistory.map((item) => `- ${item.label}｜${item.chapterTitle}｜${item.status}｜${item.message}`)] : []),
     "",
     "## 风险提醒",
     ...(pack.warnings.length ? pack.warnings.map((warning) => `- ${warning}`) : ["- 暂无明显风险。"]),
@@ -423,6 +522,7 @@ function buildPlatformPackage(
   });
   const warnings = buildPackageWarnings(platform, chapters, input.submissionChecklist);
   const preflight = buildPackagePreflight(chapters, warnings, input.submissionChecklist);
+  const repairHistory = buildRepairHistory(input.aiTasks ?? [], input.chapters);
   const packWithoutMarkdown = {
     platformId: platform.id,
     platformName: platform.name,
@@ -436,6 +536,7 @@ function buildPlatformPackage(
     preflight,
     canExport: preflight.canExport,
     repairActions: preflight.repairActions,
+    repairHistory,
     warnings,
   };
 

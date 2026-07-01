@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { AppShell } from "@/components/app-shell/AppShell";
 import { CreateChapterForm } from "@/components/chapters/CreateChapterForm";
 import { OutlineTreePanel } from "@/components/outlines/OutlineTreePanel";
+import { BatchDraftCenterPanel } from "@/components/projects/BatchDraftCenterPanel";
 import { ChapterProductionPanel } from "@/components/projects/ChapterProductionPanel";
 import { CharacterArcPanel } from "@/components/projects/CharacterArcPanel";
 import { ExportMarkdownButton } from "@/components/projects/ExportMarkdownButton";
@@ -224,6 +225,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ projec
         <StoryLinePanel projectId={project.id} />
         <WorldBiblePanel projectId={project.id} />
         <ChapterProductionPanel projectId={project.id} />
+        <BatchDraftCenterPanel projectId={project.id} />
         <StoryStructureDiagnosticPanel projectId={project.id} />
         <SubmissionPackagePanel projectId={project.id} submissionPackage={submissionPackage} />
         <div className="grid gap-4 md:grid-cols-[2fr_1fr]">

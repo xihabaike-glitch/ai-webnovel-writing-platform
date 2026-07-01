@@ -9,6 +9,7 @@ import { ChapterProductionPanel } from "@/components/projects/ChapterProductionP
 import { CharacterArcPanel } from "@/components/projects/CharacterArcPanel";
 import { ExportMarkdownButton } from "@/components/projects/ExportMarkdownButton";
 import { FirstThreeRewritePanel } from "@/components/projects/FirstThreeRewritePanel";
+import { PlatformExportCenterPanel } from "@/components/projects/PlatformExportCenterPanel";
 import { RetentionDiagnosticPanel } from "@/components/projects/RetentionDiagnosticPanel";
 import { SerializationOpsPanel } from "@/components/projects/SerializationOpsPanel";
 import { StoryLinePanel } from "@/components/projects/StoryLinePanel";
@@ -230,6 +231,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ projec
         <BatchDraftCenterPanel projectId={project.id} />
         <BatchReviewPipelinePanel projectId={project.id} />
         <SerializationOpsPanel projectId={project.id} />
+        <PlatformExportCenterPanel projectId={project.id} />
         <StoryStructureDiagnosticPanel projectId={project.id} />
         <SubmissionPackagePanel projectId={project.id} submissionPackage={submissionPackage} />
         <div className="grid gap-4 md:grid-cols-[2fr_1fr]">

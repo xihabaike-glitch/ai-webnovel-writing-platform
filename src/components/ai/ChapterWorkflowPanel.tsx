@@ -173,7 +173,12 @@ export function ChapterWorkflowPanel({
         throw new Error("生成正文失败。");
       }
 
-      setMessage("已生成正文初稿");
+      const payload = (await response.json()) as {
+        draftQuality?: { score: number; shouldSecondPass: boolean };
+      };
+      setMessage(payload.draftQuality
+        ? `已生成正文初稿，自动体检 ${payload.draftQuality.score} 分${payload.draftQuality.shouldSecondPass ? "，建议进入二改。" : "。"}`
+        : "已生成正文初稿");
       await loadWorkflow();
       await loadRevisions();
       router.refresh();

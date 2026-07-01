@@ -57,6 +57,38 @@ test("buildReviewPipelineQueue", async (t) => {
     assert.ok(queue.candidates[0].instruction.includes("倒计时"));
   });
 
+  await t.test("uses automatic draft quality audit as a second-pass signal", () => {
+    const queue = buildReviewPipelineQueue([chapter], [
+      {
+        id: "auto-audit",
+        chapterId: "chapter-1",
+        taskType: "chapter_review",
+        status: "succeeded",
+        outputText: JSON.stringify({
+          score: 78,
+          shouldSecondPass: true,
+          issues: [
+            {
+              severity: "high",
+              type: "payoff",
+              message: "章末没有形成清晰追读问题。",
+              suggestion: "结尾改成系统刷新第二个任务。",
+            },
+          ],
+          summary: "自动平台体检：需要二改。",
+        }),
+        errorMessage: null,
+        createdAt: "2026-01-01T00:00:00.000Z",
+      },
+    ]);
+
+    assert.equal(queue.reviewReadyCount, 0);
+    assert.equal(queue.secondPassReadyCount, 1);
+    assert.equal(queue.candidates[0].reviewScore, 78);
+    assert.equal(queue.candidates[0].secondPassMode, "more_payoff");
+    assert.ok(queue.candidates[0].instruction.includes("第二个任务"));
+  });
+
   await t.test("blocks empty chapters and running jobs", () => {
     const queue = buildReviewPipelineQueue([
       { ...chapter, id: "empty", wordCount: 0 },

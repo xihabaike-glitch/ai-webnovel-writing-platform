@@ -40,6 +40,8 @@ interface BatchDraftResult {
   chapterTitle: string;
   taskId: string;
   wordCount: number;
+  draftQualityScore: number | null;
+  shouldSecondPass: boolean;
   error: string | null;
 }
 
@@ -241,8 +243,12 @@ export function BatchDraftCenterPanel({ projectId }: { projectId: string }) {
               <div className="rounded-md bg-slate-50 p-3" key={`${result.chapterId}-${result.taskId}`}>
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <span className="font-medium text-slate-950">{result.chapterTitle}</span>
-                  <span>{result.status === "succeeded" ? "成功" : "失败"} · {result.wordCount} 字</span>
+                  <span>
+                    {result.status === "succeeded" ? "成功" : "失败"} · {result.wordCount} 字
+                    {typeof result.draftQualityScore === "number" ? ` · 体检 ${result.draftQualityScore} 分` : ""}
+                  </span>
                 </div>
+                {result.shouldSecondPass ? <p className="mt-1">自动体检建议进入二改队列。</p> : null}
                 {result.error ? <p className="mt-1">{result.error}</p> : null}
                 <Link className="mt-2 inline-block text-xs font-medium text-slate-950" href={`/projects/${projectId}/chapters/${result.chapterId}`}>
                   打开章节

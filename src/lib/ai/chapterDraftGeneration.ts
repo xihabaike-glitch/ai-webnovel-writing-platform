@@ -1,4 +1,5 @@
 import { buildChapterDraftPrompt } from "@/lib/ai/buildChapterDraftPrompt";
+import { buildDraftQualityAudit } from "@/lib/ai/draftQualityAudit";
 import { prisma } from "@/lib/db/prisma";
 import { getActiveModelProvider } from "@/lib/model-gateway/activeProvider";
 import type { ModelProviderId } from "@/lib/model-gateway/types";
@@ -61,6 +62,19 @@ export async function generateChapterDraft(options: GenerateChapterDraftOptions)
       maxTokens: 2400,
     });
     const wordCount = countWords(result.text);
+    const draftQuality = buildDraftQualityAudit({
+      platform,
+      targetWords: options.targetWords ?? 1200,
+      content: result.text,
+      chapter: {
+        title: chapter.title,
+        goal: chapter.goal,
+        hook: chapter.hook,
+        conflict: chapter.conflict,
+        valueShift: chapter.valueShift,
+        cliffhanger: chapter.cliffhanger,
+      },
+    });
 
     const [updatedTask, updatedChapter] = await prisma.$transaction(async (tx) => {
       const savedTask = await tx.aiTask.update({
@@ -98,6 +112,26 @@ export async function generateChapterDraft(options: GenerateChapterDraftOptions)
           status: "draft",
         },
       });
+      await tx.aiTask.create({
+        data: {
+          projectId: chapter.projectId,
+          chapterId: chapter.id,
+          taskType: "chapter_review",
+          providerConfigId: provider.id,
+          model: `${provider.defaultModel}:auto-style-audit`,
+          status: "succeeded",
+          inputSnapshot: JSON.stringify({
+            source: "auto_draft_quality_audit",
+            draftTaskId: task.id,
+            platformId: platform.id,
+            targetWords: options.targetWords ?? 1200,
+          }),
+          outputText: JSON.stringify(draftQuality),
+          inputTokens: 0,
+          outputTokens: 0,
+          costUsd: 0,
+        },
+      });
       const chapters = await tx.chapter.findMany({
         where: { projectId: chapter.projectId },
         select: { wordCount: true },
@@ -116,6 +150,7 @@ export async function generateChapterDraft(options: GenerateChapterDraftOptions)
       task: updatedTask,
       chapter: updatedChapter,
       content: result.text,
+      draftQuality,
       provider: {
         id: provider.id,
         providerId: provider.providerId,

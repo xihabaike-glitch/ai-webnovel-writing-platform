@@ -128,6 +128,8 @@ export async function POST(request: Request, { params }: Params) {
       chapterTitle: result.chapter.title,
       taskId: result.task.id,
       wordCount: "error" in result ? result.chapter.wordCount : result.chapter.wordCount,
+      draftQualityScore: "error" in result ? null : result.draftQuality.score,
+      shouldSecondPass: "error" in result ? false : result.draftQuality.shouldSecondPass,
       error: "error" in result ? result.error : null,
     });
   }

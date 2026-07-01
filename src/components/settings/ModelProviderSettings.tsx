@@ -72,6 +72,23 @@ interface RouteEffectAuditView {
   nextActions: string[];
 }
 
+interface RouteRecommendationView {
+  taskType: string;
+  label: string;
+  status: "ready" | "current" | "insufficient";
+  recommendedPrimaryProviderConfigId: string | null;
+  recommendedFallbackProviderConfigId: string | null;
+  currentPrimaryProviderConfigId: string | null;
+  currentFallbackProviderConfigId: string | null;
+  primaryProviderName: string;
+  fallbackProviderName: string | null;
+  sampleTasks: number;
+  successRatePercent: number;
+  averageQualityScore: number;
+  averageCostPerSucceededTaskUsd: number;
+  reason: string;
+}
+
 interface RouteDraft {
   primaryProviderConfigId: string;
   fallbackProviderConfigId: string;
@@ -127,6 +144,7 @@ export function ModelProviderSettings({
   options,
   providers,
   routeEffectAudit,
+  routeRecommendations,
   routeOptions,
   routes,
 }: {
@@ -134,6 +152,7 @@ export function ModelProviderSettings({
   options: ProviderOptionView[];
   providers: ProviderView[];
   routeEffectAudit: RouteEffectAuditView;
+  routeRecommendations: RouteRecommendationView[];
   routeOptions: RouteOptionView[];
   routes: RouteView[];
 }) {
@@ -160,6 +179,7 @@ export function ModelProviderSettings({
     }),
   ));
   const [savingRouteType, setSavingRouteType] = useState<string | null>(null);
+  const [applyingRecommendationType, setApplyingRecommendationType] = useState<string | null>(null);
   const [routeMessage, setRouteMessage] = useState<string | null>(null);
   const currentTestResult = testResults[selectedProviderId];
 
@@ -266,6 +286,37 @@ export function ModelProviderSettings({
       setRouteMessage(caught instanceof Error ? caught.message : "保存模型路由失败。");
     } finally {
       setSavingRouteType(null);
+    }
+  }
+
+  async function applyRecommendation(recommendation: RouteRecommendationView) {
+    if (!recommendation.recommendedPrimaryProviderConfigId) return;
+    setApplyingRecommendationType(recommendation.taskType);
+    setRouteMessage(null);
+    try {
+      const response = await fetch("/api/model-task-routes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          taskType: recommendation.taskType,
+          primaryProviderConfigId: recommendation.recommendedPrimaryProviderConfigId,
+          fallbackProviderConfigId: recommendation.recommendedFallbackProviderConfigId,
+        }),
+      });
+      if (!response.ok) throw new Error("应用路由建议失败。");
+      setRouteDrafts((current) => ({
+        ...current,
+        [recommendation.taskType]: {
+          primaryProviderConfigId: recommendation.recommendedPrimaryProviderConfigId ?? "",
+          fallbackProviderConfigId: recommendation.recommendedFallbackProviderConfigId ?? "",
+        },
+      }));
+      setRouteMessage(`已应用「${recommendation.label}」路由建议`);
+      router.refresh();
+    } catch (caught) {
+      setRouteMessage(caught instanceof Error ? caught.message : "应用路由建议失败。");
+    } finally {
+      setApplyingRecommendationType(null);
     }
   }
 
@@ -385,6 +436,44 @@ export function ModelProviderSettings({
             下一条建议补齐：{routeEffectAudit.summary.nextUnconfiguredTaskLabel}
           </div>
         ) : null}
+        <div className="mt-4 rounded-md border border-slate-200 p-3">
+          <div className="text-sm font-medium text-slate-950">系统路由建议</div>
+          <div className="mt-3 grid gap-2 lg:grid-cols-2">
+            {routeRecommendations.map((recommendation) => (
+              <div className="rounded-md bg-slate-50 p-3 text-sm" key={recommendation.taskType}>
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <div className="font-medium text-slate-950">{recommendation.label}</div>
+                    <div className="mt-1 text-xs text-slate-500">
+                      {recommendation.status === "ready" ? "可应用" : recommendation.status === "current" ? "已采用" : "样本不足"}
+                    </div>
+                  </div>
+                  {recommendation.status === "ready" ? (
+                    <button
+                      className="rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white disabled:opacity-50"
+                      disabled={applyingRecommendationType === recommendation.taskType}
+                      onClick={() => applyRecommendation(recommendation)}
+                      type="button"
+                    >
+                      {applyingRecommendationType === recommendation.taskType ? "应用中" : "应用建议"}
+                    </button>
+                  ) : null}
+                </div>
+                <div className="mt-2 grid gap-1 text-xs text-slate-600 md:grid-cols-2">
+                  <div>首选：{recommendation.primaryProviderName}</div>
+                  <div>备用：{recommendation.fallbackProviderName ?? "无"}</div>
+                </div>
+                <div className="mt-2 flex flex-wrap gap-2 text-xs text-slate-600">
+                  <span className="rounded-md bg-white px-2 py-1">样本 {recommendation.sampleTasks}</span>
+                  <span className="rounded-md bg-white px-2 py-1">成功率 {recommendation.successRatePercent}%</span>
+                  <span className="rounded-md bg-white px-2 py-1">质量 {recommendation.averageQualityScore || "缺"}</span>
+                  <span className="rounded-md bg-white px-2 py-1">${recommendation.averageCostPerSucceededTaskUsd.toFixed(4)}/次</span>
+                </div>
+                <p className="mt-2 leading-6 text-slate-600">{recommendation.reason}</p>
+              </div>
+            ))}
+          </div>
+        </div>
         <div className="mt-4 grid gap-3 lg:grid-cols-[0.8fr_1.2fr]">
           <div className="rounded-md border border-slate-200 p-3">
             <div className="text-sm font-medium text-slate-950">路由下一步</div>

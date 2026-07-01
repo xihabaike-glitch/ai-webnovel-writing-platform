@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db/prisma";
 import { providerOptions } from "@/lib/model-gateway/providerDefaults";
 import { buildProviderHealthDashboard } from "@/lib/model-gateway/providerHealth";
 import { buildRouteEffectAudit } from "@/lib/model-gateway/routeEffectAudit";
+import { buildRouteRecommendations } from "@/lib/model-gateway/routeRecommendations";
 import { modelTaskRouteOptions } from "@/lib/model-gateway/taskRouting";
 
 export const dynamic = "force-dynamic";
@@ -51,6 +52,7 @@ export default async function ModelSettingsPage() {
         inputTokens: true,
         outputTokens: true,
         costUsd: true,
+        outputText: true,
         createdAt: true,
       },
     }),
@@ -66,6 +68,14 @@ export default async function ModelSettingsPage() {
       defaultModel: provider.defaultModel,
     })),
   );
+  const routeRecommendations = buildRouteRecommendations(recentTasks, routes, providers.map((provider) => ({
+    id: provider.id,
+    providerId: provider.providerId,
+    displayName: provider.displayName,
+    defaultModel: provider.defaultModel,
+    enabled: provider.enabled,
+    encryptedApiKey: provider.encryptedApiKey,
+  })));
 
   return (
     <AppShell>
@@ -76,6 +86,7 @@ export default async function ModelSettingsPage() {
         options={providerOptions}
         providers={maskedProviders}
         routeEffectAudit={routeEffectAudit}
+        routeRecommendations={routeRecommendations}
         routeOptions={modelTaskRouteOptions}
         routes={routes.map((route) => ({
           id: route.id,

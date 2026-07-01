@@ -231,4 +231,65 @@ test("buildPlatformPublishExportCenter", async (t) => {
     assert.ok(pack.repairHistory[0].message.includes("已通过"));
     assert.ok(pack.markdown.includes("最近修复记录"));
   });
+
+  await t.test("attaches recent publish package versions by platform", () => {
+    const center = buildPlatformPublishExportCenter({
+      project: {
+        title: "夜雨系统",
+        genre: "都市系统",
+        sellingPoint: "雨夜危机中觉醒系统，主角用选择翻盘。",
+        currentWordCount: 9000,
+        targetWordCount: 300000,
+      },
+      targetPlatform: getPlatformProfile("fanqie"),
+      chapters: finalChapters,
+      aiTasks: passedReviews,
+      submissionChecklist: readyChecklist,
+      platforms: [getPlatformProfile("fanqie")],
+      publishSnapshots: [
+        {
+          id: "old-fanqie",
+          platformId: "fanqie",
+          platformName: "番茄小说",
+          title: "夜雨系统",
+          action: "copy",
+          chapterCount: 3,
+          wordCount: 7800,
+          preflightScore: 88,
+          canExport: true,
+          createdAt: "2026-01-01T00:00:00.000Z",
+        },
+        {
+          id: "qidian-version",
+          platformId: "qidian",
+          platformName: "起点中文网",
+          title: "夜雨系统",
+          action: "download",
+          chapterCount: 3,
+          wordCount: 7800,
+          preflightScore: 90,
+          canExport: true,
+          createdAt: "2026-01-03T00:00:00.000Z",
+        },
+        {
+          id: "new-fanqie",
+          platformId: "fanqie",
+          platformName: "番茄小说",
+          title: "夜雨系统",
+          action: "download",
+          chapterCount: 3,
+          wordCount: 7800,
+          preflightScore: 95,
+          canExport: true,
+          createdAt: "2026-01-04T00:00:00.000Z",
+        },
+      ],
+    });
+    const pack = center.packages[0];
+
+    assert.equal(pack.publishVersions.length, 2);
+    assert.equal(pack.publishVersions[0].id, "new-fanqie");
+    assert.equal(pack.publishVersions[1].id, "old-fanqie");
+    assert.equal(pack.publishVersions.every((version) => version.platformId === "fanqie"), true);
+  });
 });

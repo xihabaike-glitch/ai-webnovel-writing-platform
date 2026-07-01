@@ -171,3 +171,22 @@ CREATE TABLE IF NOT EXISTS "AiTask" (
   CONSTRAINT "AiTask_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "Project" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT "AiTask_providerConfigId_fkey" FOREIGN KEY ("providerConfigId") REFERENCES "ModelProvider" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
 );
+
+CREATE TABLE IF NOT EXISTS "PublishPackageSnapshot" (
+  "id" TEXT NOT NULL PRIMARY KEY,
+  "projectId" TEXT NOT NULL,
+  "platformId" TEXT NOT NULL,
+  "platformName" TEXT NOT NULL,
+  "title" TEXT NOT NULL,
+  "logline" TEXT NOT NULL,
+  "synopsis" TEXT NOT NULL,
+  "tags" TEXT NOT NULL DEFAULT '[]',
+  "markdown" TEXT NOT NULL,
+  "chapterCount" INTEGER NOT NULL DEFAULT 0,
+  "wordCount" INTEGER NOT NULL DEFAULT 0,
+  "preflightScore" INTEGER NOT NULL DEFAULT 0,
+  "canExport" BOOLEAN NOT NULL DEFAULT false,
+  "action" TEXT NOT NULL,
+  "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT "PublishPackageSnapshot_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "Project" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);

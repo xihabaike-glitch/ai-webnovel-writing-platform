@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { getPlatformProfile, platformProfiles, type PlatformId } from "@/lib/platforms/platformProfiles";
-import { buildPlatformPublishExportCenter } from "@/lib/projects/platformPublishExport";
+import { buildPlatformPublishExportCenter, type PlatformPublishPackage } from "@/lib/projects/platformPublishExport";
 import { buildSubmissionChecklist } from "@/lib/projects/submissionChecklist";
 
 interface Params {
@@ -13,19 +13,24 @@ function selectedPlatform(platformId: string | null) {
   return platformProfiles.find((platform) => platform.id === platformId) ?? null;
 }
 
-export async function GET(request: Request, { params }: Params) {
-  const { projectId } = await params;
-  const { searchParams } = new URL(request.url);
+function snapshotActionLabel(action: string | null) {
+  if (action === "copy") return "copy";
+  if (action === "download") return "download";
+  return "snapshot";
+}
+
+async function buildCenter(projectId: string) {
   const project = await prisma.project.findUnique({
     where: { id: projectId },
     include: {
       chapters: { orderBy: { order: "asc" } },
       aiTasks: { orderBy: { createdAt: "desc" } },
+      publishSnapshots: { orderBy: { createdAt: "desc" }, take: 80 },
     },
   });
 
   if (!project) {
-    return NextResponse.json({ error: "Project not found" }, { status: 404 });
+    return null;
   }
 
   const targetPlatform = getPlatformProfile(project.targetPlatform as PlatformId);
@@ -54,8 +59,43 @@ export async function GET(request: Request, { params }: Params) {
     targetPlatform,
     chapters: project.chapters,
     aiTasks: project.aiTasks,
+    publishSnapshots: project.publishSnapshots,
     submissionChecklist,
   });
+
+  return { project, targetPlatform, center };
+}
+
+async function createPublishSnapshot(projectId: string, pack: PlatformPublishPackage, action: string) {
+  return prisma.publishPackageSnapshot.create({
+    data: {
+      projectId,
+      platformId: pack.platformId,
+      platformName: pack.platformName,
+      title: pack.title,
+      logline: pack.logline,
+      synopsis: pack.synopsis,
+      tags: JSON.stringify(pack.tags),
+      markdown: pack.markdown,
+      chapterCount: pack.chapters.length,
+      wordCount: pack.chapters.reduce((sum, chapter) => sum + chapter.wordCount, 0),
+      preflightScore: pack.preflight.score,
+      canExport: pack.canExport,
+      action,
+    },
+  });
+}
+
+export async function GET(request: Request, { params }: Params) {
+  const { projectId } = await params;
+  const { searchParams } = new URL(request.url);
+  const context = await buildCenter(projectId);
+
+  if (!context) {
+    return NextResponse.json({ error: "Project not found" }, { status: 404 });
+  }
+
+  const { project, targetPlatform, center } = context;
   const platform = selectedPlatform(searchParams.get("platformId"));
 
   if (searchParams.get("format") === "markdown") {
@@ -69,6 +109,8 @@ export async function GET(request: Request, { params }: Params) {
       }, { status: 409 });
     }
 
+    await createPublishSnapshot(projectId, pack, "download");
+
     return new NextResponse(pack.markdown, {
       headers: {
         "Content-Type": "text/markdown; charset=utf-8",
@@ -81,4 +123,33 @@ export async function GET(request: Request, { params }: Params) {
     center,
     selectedPackage: platform ? center.packages.find((pack) => pack.platformId === platform.id) ?? null : null,
   });
+}
+
+export async function POST(request: Request, { params }: Params) {
+  const { projectId } = await params;
+  const body = (await request.json().catch(() => ({}))) as { platformId?: string; action?: string };
+  const context = await buildCenter(projectId);
+
+  if (!context) {
+    return NextResponse.json({ error: "Project not found" }, { status: 404 });
+  }
+
+  const { targetPlatform, center } = context;
+  const platform = selectedPlatform(body.platformId ?? null);
+  const pack = center.packages.find((item) => item.platformId === (platform?.id ?? targetPlatform.id))
+    ?? center.packages[0];
+
+  if (!pack.canExport) {
+    return NextResponse.json({
+      error: "发布前质检未通过，暂不保存发布包版本。",
+      preflight: pack.preflight,
+    }, { status: 409 });
+  }
+
+  const snapshot = await createPublishSnapshot(projectId, pack, snapshotActionLabel(body.action ?? null));
+
+  return NextResponse.json({
+    message: `已保存 ${pack.platformName} 发布包版本。`,
+    snapshot,
+  }, { status: 201 });
 }

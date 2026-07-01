@@ -41,6 +41,19 @@ interface PublishRepairHistoryItem {
   createdAt: string;
 }
 
+interface PublishPackageVersionItem {
+  id: string;
+  platformId: string;
+  platformName: string;
+  title: string;
+  action: string;
+  chapterCount: number;
+  wordCount: number;
+  preflightScore: number;
+  canExport: boolean;
+  createdAt: string;
+}
+
 interface PublishPreflight {
   score: number;
   canExport: boolean;
@@ -78,6 +91,7 @@ interface PlatformPublishPackage {
   canExport: boolean;
   repairActions: PublishRepairAction[];
   repairHistory: PublishRepairHistoryItem[];
+  publishVersions: PublishPackageVersionItem[];
   warnings: string[];
   markdown: string;
 }
@@ -126,6 +140,12 @@ function formatTime(value: string) {
   }).format(new Date(value));
 }
 
+function versionActionLabel(action: string) {
+  if (action === "copy") return "复制";
+  if (action === "download") return "下载";
+  return "保存";
+}
+
 export function PlatformExportCenterPanel({ projectId }: { projectId: string }) {
   const [center, setCenter] = useState<PlatformPublishExportCenter | null>(null);
   const [selectedPlatformId, setSelectedPlatformId] = useState<string>("");
@@ -167,7 +187,19 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
       return;
     }
     await navigator.clipboard.writeText(selectedPackage.markdown);
-    setMessage(`已复制 ${selectedPackage.platformName} 发布包`);
+    try {
+      const response = await fetch(`/api/projects/${projectId}/platform-export`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ platformId: selectedPackage.platformId, action: "copy" }),
+      });
+      const payload = (await response.json().catch(() => null)) as { message?: string; error?: string } | null;
+      if (!response.ok) throw new Error(payload?.error ?? "发布包已复制，但版本保存失败。");
+      setMessage(`已复制 ${selectedPackage.platformName} 发布包，并保存版本。`);
+      await loadCenter({ keepMessage: true });
+    } catch (caught) {
+      setMessage(caught instanceof Error ? caught.message : "发布包已复制，但版本保存失败。");
+    }
   }
 
   async function downloadMarkdown() {
@@ -192,7 +224,8 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
       link.download = `${selectedPackage.title}-${selectedPackage.platformName}-发布包.md`;
       link.click();
       URL.revokeObjectURL(url);
-      setMessage(`已下载 ${selectedPackage.platformName} 发布包`);
+      setMessage(`已下载 ${selectedPackage.platformName} 发布包，并保存版本。`);
+      await loadCenter({ keepMessage: true });
     } catch (caught) {
       setMessage(caught instanceof Error ? caught.message : "下载发布包失败。");
     } finally {
@@ -526,6 +559,41 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
                         <div className="text-xs text-slate-500">{formatTime(item.createdAt)} · {item.status}</div>
                       </div>
                       <div className="mt-2 text-slate-600">{item.message}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+            {selectedPackage.publishVersions.length ? (
+              <div className="mt-3 rounded-md bg-slate-50 p-3 text-sm">
+                <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <div className="font-medium text-slate-900">发布包版本</div>
+                    <div className="mt-1 text-xs text-slate-500">最近 {selectedPackage.publishVersions.length} 次复制或下载保存。</div>
+                  </div>
+                  <div className="text-xs text-slate-500">当前平台：{selectedPackage.platformName}</div>
+                </div>
+                <div className="mt-2 grid gap-2">
+                  {selectedPackage.publishVersions.map((version) => (
+                    <div className="rounded-md border border-slate-200 bg-white p-3" key={version.id}>
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                        <div>
+                          <div className="font-medium text-slate-950">{version.title}</div>
+                          <div className="mt-1 text-xs text-slate-500">
+                            {versionActionLabel(version.action)} · {formatTime(version.createdAt)}
+                          </div>
+                        </div>
+                        <div className={`w-fit rounded-md px-2 py-1 text-xs font-medium ${
+                          version.canExport ? "bg-emerald-50 text-emerald-700" : "bg-rose-50 text-rose-700"
+                        }`}>
+                          质检 {version.preflightScore}
+                        </div>
+                      </div>
+                      <div className="mt-2 flex flex-wrap gap-2 text-xs text-slate-500">
+                        <span>{version.chapterCount} 章</span>
+                        <span>{version.wordCount} 字</span>
+                        <span>{version.platformName}</span>
+                      </div>
                     </div>
                   ))}
                 </div>

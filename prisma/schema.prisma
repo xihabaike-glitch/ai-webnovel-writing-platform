@@ -20,13 +20,14 @@ model Project {
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
-  chapters     Chapter[]
-  characters   Character[]
-  worldEntries WorldEntry[]
-  foreshadows  Foreshadow[]
-  plotThreads  PlotThread[]
-  outlineNodes OutlineNode[]
-  aiTasks      AiTask[]
+  chapters         Chapter[]
+  characters       Character[]
+  worldEntries     WorldEntry[]
+  foreshadows      Foreshadow[]
+  plotThreads      PlotThread[]
+  outlineNodes     OutlineNode[]
+  aiTasks          AiTask[]
+  publishSnapshots PublishPackageSnapshot[]
 }
 
 model Chapter {
@@ -53,21 +54,21 @@ model Chapter {
 }
 
 model ChapterRevision {
-  id          String   @id @default(cuid())
-  chapterId   String
-  source      String
+  id           String   @id @default(cuid())
+  chapterId    String
+  source       String
   sourceTaskId String?
-  title       String
-  content     String   @default("")
-  wordCount   Int      @default(0)
-  goal        String   @default("")
-  hook        String   @default("")
-  conflict    String   @default("")
-  valueShift  String   @default("")
-  cliffhanger String   @default("")
-  status      String
-  notes       String   @default("")
-  createdAt   DateTime @default(now())
+  title        String
+  content      String   @default("")
+  wordCount    Int      @default(0)
+  goal         String   @default("")
+  hook         String   @default("")
+  conflict     String   @default("")
+  valueShift   String   @default("")
+  cliffhanger  String   @default("")
+  status       String
+  notes        String   @default("")
+  createdAt    DateTime @default(now())
 
   chapter Chapter @relation(fields: [chapterId], references: [id], onDelete: Cascade)
 }
@@ -168,7 +169,7 @@ model ModelProvider {
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
-  aiTasks AiTask[]
+  aiTasks        AiTask[]
   primaryRoutes  ModelTaskRoute[] @relation("PrimaryRouteProvider")
   fallbackRoutes ModelTaskRoute[] @relation("FallbackRouteProvider")
 }
@@ -186,22 +187,42 @@ model ModelTaskRoute {
 }
 
 model AiTask {
-  id              String   @id @default(cuid())
-  projectId       String
-  chapterId       String?
-  taskType        String
+  id               String   @id @default(cuid())
+  projectId        String
+  chapterId        String?
+  taskType         String
   providerConfigId String
-  model           String
-  status          String   @default("queued")
-  inputSnapshot   String
-  outputText      String?
-  inputTokens     Int?
-  outputTokens    Int?
-  costUsd         Float?
-  errorMessage    String?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  model            String
+  status           String   @default("queued")
+  inputSnapshot    String
+  outputText       String?
+  inputTokens      Int?
+  outputTokens     Int?
+  costUsd          Float?
+  errorMessage     String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
   project       Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
   modelProvider ModelProvider @relation(fields: [providerConfigId], references: [id], onDelete: Restrict)
+}
+
+model PublishPackageSnapshot {
+  id             String   @id @default(cuid())
+  projectId      String
+  platformId     String
+  platformName   String
+  title          String
+  logline        String
+  synopsis       String
+  tags           String   @default("[]")
+  markdown       String
+  chapterCount   Int      @default(0)
+  wordCount      Int      @default(0)
+  preflightScore Int      @default(0)
+  canExport      Boolean  @default(false)
+  action         String
+  createdAt      DateTime @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 }

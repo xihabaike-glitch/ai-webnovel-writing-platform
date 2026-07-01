@@ -59,10 +59,24 @@ export interface PublishRepairHistoryItem {
   createdAt: Date | string;
 }
 
+export interface PublishPackageVersionItem {
+  id: string;
+  platformId: string;
+  platformName: string;
+  title: string;
+  action: string;
+  chapterCount: number;
+  wordCount: number;
+  preflightScore: number;
+  canExport: boolean;
+  createdAt: Date | string;
+}
+
 export interface PlatformPublishExportInput {
   project: PublishExportProject;
   chapters: PublishExportChapter[];
   aiTasks?: PublishExportAiTask[];
+  publishSnapshots?: PublishPackageVersionItem[];
   submissionChecklist?: SubmissionChecklist;
   targetPlatform: PlatformProfile;
   platforms?: PlatformProfile[];
@@ -105,6 +119,7 @@ export interface PlatformPublishPackage {
   canExport: boolean;
   repairActions: PublishRepairAction[];
   repairHistory: PublishRepairHistoryItem[];
+  publishVersions: PublishPackageVersionItem[];
   warnings: string[];
   markdown: string;
 }
@@ -523,6 +538,10 @@ function buildPlatformPackage(
   const warnings = buildPackageWarnings(platform, chapters, input.submissionChecklist);
   const preflight = buildPackagePreflight(chapters, warnings, input.submissionChecklist);
   const repairHistory = buildRepairHistory(input.aiTasks ?? [], input.chapters);
+  const publishVersions = (input.publishSnapshots ?? [])
+    .filter((snapshot) => snapshot.platformId === platform.id)
+    .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime())
+    .slice(0, 5);
   const packWithoutMarkdown = {
     platformId: platform.id,
     platformName: platform.name,
@@ -537,6 +556,7 @@ function buildPlatformPackage(
     canExport: preflight.canExport,
     repairActions: preflight.repairActions,
     repairHistory,
+    publishVersions,
     warnings,
   };
 

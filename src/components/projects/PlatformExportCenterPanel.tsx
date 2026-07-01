@@ -224,6 +224,45 @@ interface PlatformSubmissionAssetAdoption {
   verdict: string;
 }
 
+interface PlatformPublishMetric {
+  id?: string;
+  platformId: string;
+  platformName: string;
+  views: number;
+  clicks: number;
+  favorites: number;
+  follows: number;
+  comments: number;
+  paidReads: number;
+  editorFeedback: string;
+  contractStatus: string;
+  publishUrl: string;
+  notes: string;
+  snapshotDate: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+interface PlatformPublishEffect {
+  status: "empty" | "weak" | "watch" | "promising" | "signed";
+  records: number;
+  latest: PlatformPublishMetric | null;
+  totalViews: number;
+  totalClicks: number;
+  totalFavorites: number;
+  totalFollows: number;
+  totalComments: number;
+  totalPaidReads: number;
+  clickRatePercent: number;
+  favoriteRatePercent: number;
+  followRatePercent: number;
+  commentRatePercent: number;
+  paidReadRatePercent: number;
+  verdict: string;
+  nextAction: string;
+  history: PlatformPublishMetric[];
+}
+
 interface PlatformPublishPackage {
   platformId: string;
   platformName: string;
@@ -232,6 +271,7 @@ interface PlatformPublishPackage {
   submissionAssetAudit: PlatformSubmissionAssetAudit;
   submissionAssetVersions: PlatformSubmissionAssetVersion[];
   submissionAssetAdoption: PlatformSubmissionAssetAdoption;
+  publishEffect: PlatformPublishEffect;
   title: string;
   logline: string;
   synopsis: string;
@@ -290,6 +330,20 @@ interface SaveSubmissionAssetOptions {
   strategy?: string;
 }
 
+interface PublishEffectDraft {
+  views: string;
+  clicks: string;
+  favorites: string;
+  follows: string;
+  comments: string;
+  paidReads: string;
+  contractStatus: string;
+  publishUrl: string;
+  editorFeedback: string;
+  notes: string;
+  snapshotDate: string;
+}
+
 function actionHref(projectId: string, action: PublishRepairAction) {
   if (action.kind === "open_submission_package") return `/projects/${projectId}#submission-package`;
   if (action.kind === "add_publish_chapters") return `/projects/${projectId}#create-chapter`;
@@ -328,6 +382,12 @@ function formatTime(value: string) {
   }).format(new Date(value));
 }
 
+function formatDateInput(value?: Date | string) {
+  const date = value instanceof Date ? value : new Date(value ?? Date.now());
+  if (Number.isNaN(date.getTime())) return new Date().toISOString().slice(0, 10);
+  return date.toISOString().slice(0, 10);
+}
+
 function versionActionLabel(action: string) {
   if (action === "copy") return "复制";
   if (action === "download") return "下载";
@@ -352,6 +412,30 @@ function assetVersionActionLabel(action: string) {
   if (action === "adopt") return "采纳";
   if (action === "restore") return "恢复";
   return "保存";
+}
+
+function effectStatusLabel(status: PlatformPublishEffect["status"]) {
+  if (status === "signed") return "已验证";
+  if (status === "promising") return "有苗头";
+  if (status === "weak") return "偏弱";
+  if (status === "watch") return "观察";
+  return "未记录";
+}
+
+function effectStatusClass(status: PlatformPublishEffect["status"]) {
+  if (status === "signed") return "bg-emerald-50 text-emerald-700";
+  if (status === "promising") return "bg-cyan-50 text-cyan-700";
+  if (status === "weak") return "bg-rose-50 text-rose-700";
+  if (status === "watch") return "bg-amber-50 text-amber-700";
+  return "bg-slate-100 text-slate-600";
+}
+
+function contractStatusLabel(status: string) {
+  if (status === "signed") return "已签约";
+  if (status === "invited") return "收到邀约";
+  if (status === "rejected") return "被拒";
+  if (status === "pending") return "待反馈";
+  return "未知";
 }
 
 function normalizeVersionAction(action: string): PublishPackageVersionActionFilter {
@@ -381,6 +465,7 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
   const [isRestoringVersion, setIsRestoringVersion] = useState(false);
   const [isSavingAsset, setIsSavingAsset] = useState(false);
   const [isOptimizingAsset, setIsOptimizingAsset] = useState(false);
+  const [isSavingEffect, setIsSavingEffect] = useState(false);
   const [assetOptimizationVariants, setAssetOptimizationVariants] = useState<PlatformSubmissionAssetOptimizationVariant[]>([]);
   const [versionActionFilter, setVersionActionFilter] = useState<PublishPackageVersionActionFilter>("all");
   const [assetDraft, setAssetDraft] = useState<SubmissionAssetDraft>({
@@ -390,6 +475,19 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
     overseasSynopsis: "",
     tags: "",
     note: "",
+  });
+  const [effectDraft, setEffectDraft] = useState<PublishEffectDraft>({
+    views: "",
+    clicks: "",
+    favorites: "",
+    follows: "",
+    comments: "",
+    paidReads: "",
+    contractStatus: "unknown",
+    publishUrl: "",
+    editorFeedback: "",
+    notes: "",
+    snapshotDate: formatDateInput(),
   });
   const selectedPackage = useMemo(
     () => center?.packages.find((pack) => pack.platformId === selectedPlatformId) ?? center?.packages[0] ?? null,
@@ -518,6 +616,32 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
       setMessage(caught instanceof Error ? caught.message : "保存投稿资产失败。");
     } finally {
       setIsSavingAsset(false);
+    }
+  }
+
+  async function savePublishEffect() {
+    if (!selectedPackage) return;
+    setIsSavingEffect(true);
+    setMessage(null);
+    try {
+      const response = await fetch(`/api/projects/${projectId}/platform-export`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "save-effect",
+          platformId: selectedPackage.platformId,
+          ...effectDraft,
+          note: effectDraft.notes,
+        }),
+      });
+      const payload = (await response.json().catch(() => null)) as { message?: string; error?: string } | null;
+      if (!response.ok) throw new Error(payload?.error ?? "保存发布效果失败。");
+      setMessage(payload?.message ?? "发布效果已记录。");
+      await loadCenter({ keepMessage: true });
+    } catch (caught) {
+      setMessage(caught instanceof Error ? caught.message : "保存发布效果失败。");
+    } finally {
+      setIsSavingEffect(false);
     }
   }
 
@@ -789,6 +913,24 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
     });
     setAssetOptimizationVariants([]);
   }, [selectedPackage?.platformId, selectedPackage?.submissionAsset?.updatedAt]);
+
+  useEffect(() => {
+    if (!selectedPackage) return;
+    const latest = selectedPackage.publishEffect.latest;
+    setEffectDraft({
+      views: latest ? String(latest.views) : "",
+      clicks: latest ? String(latest.clicks) : "",
+      favorites: latest ? String(latest.favorites) : "",
+      follows: latest ? String(latest.follows) : "",
+      comments: latest ? String(latest.comments) : "",
+      paidReads: latest ? String(latest.paidReads) : "",
+      contractStatus: latest?.contractStatus ?? "unknown",
+      publishUrl: latest?.publishUrl ?? "",
+      editorFeedback: latest?.editorFeedback ?? "",
+      notes: latest?.notes ?? "",
+      snapshotDate: formatDateInput(latest?.snapshotDate),
+    });
+  }, [selectedPackage?.platformId, selectedPackage?.publishEffect.latest?.id]);
 
   return (
     <section className="rounded-md border border-slate-200 bg-white p-4">
@@ -1607,6 +1749,142 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
                 ) : null}
               </div>
             </div>
+          </div>
+
+          <div className="rounded-md border border-slate-200 p-3" data-testid="publish-effect-panel">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <div className="font-medium text-slate-950">发布效果复盘</div>
+                <p className="mt-1 text-sm leading-6 text-slate-600">{selectedPackage.publishEffect.verdict}</p>
+              </div>
+              <span className={`w-fit rounded-md px-2 py-1 text-xs font-medium ${effectStatusClass(selectedPackage.publishEffect.status)}`}>
+                {effectStatusLabel(selectedPackage.publishEffect.status)}
+              </span>
+            </div>
+            <div className="mt-3 grid gap-2 text-sm sm:grid-cols-3 lg:grid-cols-6">
+              <div className="rounded-md bg-slate-50 p-2">
+                <div className="text-xs text-slate-500">曝光</div>
+                <div className="mt-1 font-medium text-slate-950">{selectedPackage.publishEffect.totalViews}</div>
+              </div>
+              <div className="rounded-md bg-slate-50 p-2">
+                <div className="text-xs text-slate-500">点击率</div>
+                <div className="mt-1 font-medium text-slate-950">{selectedPackage.publishEffect.clickRatePercent}%</div>
+              </div>
+              <div className="rounded-md bg-slate-50 p-2">
+                <div className="text-xs text-slate-500">收藏率</div>
+                <div className="mt-1 font-medium text-slate-950">{selectedPackage.publishEffect.favoriteRatePercent}%</div>
+              </div>
+              <div className="rounded-md bg-slate-50 p-2">
+                <div className="text-xs text-slate-500">追读率</div>
+                <div className="mt-1 font-medium text-slate-950">{selectedPackage.publishEffect.followRatePercent}%</div>
+              </div>
+              <div className="rounded-md bg-slate-50 p-2">
+                <div className="text-xs text-slate-500">评论率</div>
+                <div className="mt-1 font-medium text-slate-950">{selectedPackage.publishEffect.commentRatePercent}%</div>
+              </div>
+              <div className="rounded-md bg-slate-50 p-2">
+                <div className="text-xs text-slate-500">付费阅读率</div>
+                <div className="mt-1 font-medium text-slate-950">{selectedPackage.publishEffect.paidReadRatePercent}%</div>
+              </div>
+            </div>
+            <div className="mt-3 rounded-md bg-slate-50 p-3 text-sm text-slate-700">
+              <span className="font-medium text-slate-950">下一步：</span>{selectedPackage.publishEffect.nextAction}
+            </div>
+            <div className="mt-3 grid gap-3 lg:grid-cols-3">
+              {[
+                ["views", "曝光"],
+                ["clicks", "点击"],
+                ["favorites", "收藏"],
+                ["follows", "追读"],
+                ["comments", "评论"],
+                ["paidReads", "付费阅读"],
+              ].map(([field, label]) => (
+                <label className="grid gap-1 text-sm text-slate-600" key={field}>
+                  {label}
+                  <input
+                    className="rounded-md border border-slate-200 px-3 py-2 text-slate-950"
+                    min="0"
+                    onChange={(event) => setEffectDraft((current) => ({ ...current, [field]: event.target.value }))}
+                    type="number"
+                    value={effectDraft[field as keyof Pick<PublishEffectDraft, "views" | "clicks" | "favorites" | "follows" | "comments" | "paidReads">]}
+                  />
+                </label>
+              ))}
+              <label className="grid gap-1 text-sm text-slate-600">
+                反馈状态
+                <select
+                  className="rounded-md border border-slate-200 px-3 py-2 text-slate-950"
+                  onChange={(event) => setEffectDraft((current) => ({ ...current, contractStatus: event.target.value }))}
+                  value={effectDraft.contractStatus}
+                >
+                  <option value="unknown">未知</option>
+                  <option value="pending">待反馈</option>
+                  <option value="invited">收到邀约</option>
+                  <option value="signed">已签约</option>
+                  <option value="rejected">被拒</option>
+                </select>
+              </label>
+              <label className="grid gap-1 text-sm text-slate-600">
+                记录日期
+                <input
+                  className="rounded-md border border-slate-200 px-3 py-2 text-slate-950"
+                  onChange={(event) => setEffectDraft((current) => ({ ...current, snapshotDate: event.target.value }))}
+                  type="date"
+                  value={effectDraft.snapshotDate}
+                />
+              </label>
+              <label className="grid gap-1 text-sm text-slate-600 lg:col-span-1">
+                发布链接
+                <input
+                  className="rounded-md border border-slate-200 px-3 py-2 text-slate-950"
+                  onChange={(event) => setEffectDraft((current) => ({ ...current, publishUrl: event.target.value }))}
+                  value={effectDraft.publishUrl}
+                />
+              </label>
+              <label className="grid gap-1 text-sm text-slate-600 lg:col-span-3">
+                编辑反馈
+                <textarea
+                  className="min-h-20 rounded-md border border-slate-200 px-3 py-2 text-slate-950"
+                  onChange={(event) => setEffectDraft((current) => ({ ...current, editorFeedback: event.target.value }))}
+                  value={effectDraft.editorFeedback}
+                />
+              </label>
+              <label className="grid gap-1 text-sm text-slate-600 lg:col-span-3">
+                复盘备注
+                <textarea
+                  className="min-h-20 rounded-md border border-slate-200 px-3 py-2 text-slate-950"
+                  onChange={(event) => setEffectDraft((current) => ({ ...current, notes: event.target.value }))}
+                  value={effectDraft.notes}
+                />
+              </label>
+            </div>
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <button
+                className="rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white disabled:opacity-50"
+                disabled={isSavingEffect}
+                onClick={() => void savePublishEffect()}
+                type="button"
+              >
+                {isSavingEffect ? "记录中" : "记录发布效果"}
+              </button>
+              <span className="text-xs text-slate-500">已记录 {selectedPackage.publishEffect.records} 次</span>
+            </div>
+            {selectedPackage.publishEffect.history.length ? (
+              <div className="mt-3 grid gap-2 lg:grid-cols-2">
+                {selectedPackage.publishEffect.history.slice(0, 4).map((metric) => (
+                  <div className="rounded-md border border-slate-200 bg-white p-3 text-sm" key={metric.id ?? `${metric.platformId}-${metric.snapshotDate}`}>
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="font-medium text-slate-950">{formatTime(metric.snapshotDate)}</div>
+                      <span className="rounded-md bg-slate-100 px-2 py-1 text-xs text-slate-600">{contractStatusLabel(metric.contractStatus)}</span>
+                    </div>
+                    <div className="mt-2 text-slate-600">
+                      曝光 {metric.views} · 点击 {metric.clicks} · 收藏 {metric.favorites} · 追读 {metric.follows}
+                    </div>
+                    {metric.editorFeedback ? <div className="mt-2 line-clamp-2 text-slate-500">反馈：{metric.editorFeedback}</div> : null}
+                  </div>
+                ))}
+              </div>
+            ) : null}
           </div>
 
           <div className="rounded-md border border-slate-200 p-3">

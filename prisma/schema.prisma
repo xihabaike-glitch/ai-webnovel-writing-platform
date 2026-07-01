@@ -30,6 +30,7 @@ model Project {
   publishSnapshots PublishPackageSnapshot[]
   submissionAssets PlatformSubmissionAsset[]
   submissionAssetVersions PlatformSubmissionAssetVersion[]
+  platformPublishMetrics PlatformPublishMetric[]
 }
 
 model Chapter {
@@ -274,4 +275,28 @@ model PlatformSubmissionAssetVersion {
   asset   PlatformSubmissionAsset? @relation(fields: [assetId], references: [id], onDelete: SetNull)
 
   @@index([projectId, platformId, createdAt])
+}
+
+model PlatformPublishMetric {
+  id             String   @id @default(cuid())
+  projectId      String
+  platformId     String
+  platformName   String
+  views          Int      @default(0)
+  clicks         Int      @default(0)
+  favorites      Int      @default(0)
+  follows        Int      @default(0)
+  comments       Int      @default(0)
+  paidReads      Int      @default(0)
+  editorFeedback String   @default("")
+  contractStatus String   @default("unknown")
+  publishUrl     String   @default("")
+  notes          String   @default("")
+  snapshotDate   DateTime @default(now())
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, platformId, snapshotDate])
 }

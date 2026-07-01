@@ -196,6 +196,45 @@ export interface PlatformSubmissionAssetAdoptionSummary {
   verdict: string;
 }
 
+export interface PlatformPublishMetricInput {
+  id?: string;
+  platformId: string;
+  platformName: string;
+  views: number;
+  clicks: number;
+  favorites: number;
+  follows: number;
+  comments: number;
+  paidReads: number;
+  editorFeedback: string;
+  contractStatus: string;
+  publishUrl: string;
+  notes: string;
+  snapshotDate: Date | string;
+  createdAt?: Date | string;
+  updatedAt?: Date | string;
+}
+
+export interface PlatformPublishEffectSummary {
+  status: "empty" | "weak" | "watch" | "promising" | "signed";
+  records: number;
+  latest: PlatformPublishMetricInput | null;
+  totalViews: number;
+  totalClicks: number;
+  totalFavorites: number;
+  totalFollows: number;
+  totalComments: number;
+  totalPaidReads: number;
+  clickRatePercent: number;
+  favoriteRatePercent: number;
+  followRatePercent: number;
+  commentRatePercent: number;
+  paidReadRatePercent: number;
+  verdict: string;
+  nextAction: string;
+  history: PlatformPublishMetricInput[];
+}
+
 export interface PlatformPublishExportInput {
   project: PublishExportProject;
   chapters: PublishExportChapter[];
@@ -203,6 +242,7 @@ export interface PlatformPublishExportInput {
   publishSnapshots?: PublishPackageVersionItem[];
   submissionAssets?: PlatformSubmissionAssetInput[];
   submissionAssetVersions?: PlatformSubmissionAssetVersionInput[];
+  platformPublishMetrics?: PlatformPublishMetricInput[];
   submissionChecklist?: SubmissionChecklist;
   targetPlatform: PlatformProfile;
   platforms?: PlatformProfile[];
@@ -239,6 +279,7 @@ export interface PlatformPublishPackage {
   submissionAssetAudit: PlatformSubmissionAssetAudit;
   submissionAssetVersions: PlatformSubmissionAssetVersionInput[];
   submissionAssetAdoption: PlatformSubmissionAssetAdoptionSummary;
+  publishEffect: PlatformPublishEffectSummary;
   title: string;
   logline: string;
   synopsis: string;
@@ -923,6 +964,14 @@ function buildMarkdown(pack: Omit<PlatformPublishPackage, "markdown">) {
     ] : []),
     ...(pack.repairHistory.length ? ["", "## 最近修复记录", ...pack.repairHistory.map((item) => `- ${item.label}｜${item.chapterTitle}｜${item.status}｜${item.message}`)] : []),
     "",
+    "## 发布效果复盘",
+    `记录数：${pack.publishEffect.records}`,
+    `曝光/点击/收藏/追读：${pack.publishEffect.totalViews}/${pack.publishEffect.totalClicks}/${pack.publishEffect.totalFavorites}/${pack.publishEffect.totalFollows}`,
+    `点击率：${pack.publishEffect.clickRatePercent}%｜收藏率：${pack.publishEffect.favoriteRatePercent}%｜追读率：${pack.publishEffect.followRatePercent}%`,
+    `结论：${pack.publishEffect.verdict}`,
+    `下一步：${pack.publishEffect.nextAction}`,
+    ...(pack.publishEffect.latest?.editorFeedback ? [`编辑反馈：${pack.publishEffect.latest.editorFeedback}`] : []),
+    "",
     "## 风险提醒",
     ...(pack.warnings.length ? pack.warnings.map((warning) => `- ${warning}`) : ["- 暂无明显风险。"]),
     "",
@@ -1100,6 +1149,126 @@ function buildSubmissionAssetAdoptionSummary(
   };
 }
 
+function percent(numerator: number, denominator: number) {
+  if (!denominator) return 0;
+  return Math.round((numerator / denominator) * 1000) / 10;
+}
+
+function contractStatusLabel(status: string) {
+  if (status === "signed") return "已签约";
+  if (status === "invited") return "收到邀约";
+  if (status === "rejected") return "被拒";
+  if (status === "pending") return "待反馈";
+  return "未知";
+}
+
+function buildPlatformPublishEffect(
+  platform: PlatformProfile,
+  metrics: PlatformPublishMetricInput[],
+): PlatformPublishEffectSummary {
+  const history = metrics
+    .filter((metric) => metric.platformId === platform.id)
+    .sort((left, right) => new Date(right.snapshotDate).getTime() - new Date(left.snapshotDate).getTime())
+    .slice(0, 6);
+  const totalViews = history.reduce((sum, metric) => sum + Math.max(0, metric.views), 0);
+  const totalClicks = history.reduce((sum, metric) => sum + Math.max(0, metric.clicks), 0);
+  const totalFavorites = history.reduce((sum, metric) => sum + Math.max(0, metric.favorites), 0);
+  const totalFollows = history.reduce((sum, metric) => sum + Math.max(0, metric.follows), 0);
+  const totalComments = history.reduce((sum, metric) => sum + Math.max(0, metric.comments), 0);
+  const totalPaidReads = history.reduce((sum, metric) => sum + Math.max(0, metric.paidReads), 0);
+  const clickRatePercent = percent(totalClicks, totalViews);
+  const favoriteRatePercent = percent(totalFavorites, totalViews);
+  const followRatePercent = percent(totalFollows, totalViews);
+  const commentRatePercent = percent(totalComments, totalViews);
+  const paidReadRatePercent = percent(totalPaidReads, totalViews);
+  const latest = history[0] ?? null;
+
+  if (!latest) {
+    return {
+      status: "empty",
+      records: 0,
+      latest: null,
+      totalViews: 0,
+      totalClicks: 0,
+      totalFavorites: 0,
+      totalFollows: 0,
+      totalComments: 0,
+      totalPaidReads: 0,
+      clickRatePercent: 0,
+      favoriteRatePercent: 0,
+      followRatePercent: 0,
+      commentRatePercent: 0,
+      paidReadRatePercent: 0,
+      verdict: "还没有发布效果记录。别靠脑补判断平台喜不喜欢，先录一组真实数据。",
+      nextAction: "发布后录入曝光、点击、收藏、追读、评论和编辑反馈。",
+      history: [],
+    };
+  }
+
+  const latestStatus = latest.contractStatus;
+  if (latestStatus === "signed" || latestStatus === "invited") {
+    return {
+      status: "signed",
+      records: history.length,
+      latest,
+      totalViews,
+      totalClicks,
+      totalFavorites,
+      totalFollows,
+      totalComments,
+      totalPaidReads,
+      clickRatePercent,
+      favoriteRatePercent,
+      followRatePercent,
+      commentRatePercent,
+      paidReadRatePercent,
+      verdict: `${platform.name} 已经${contractStatusLabel(latestStatus)}，先稳住更新和质量，别乱改核心卖点。`,
+      nextAction: "围绕已验证卖点继续加更，并记录编辑反馈里的明确要求。",
+      history,
+    };
+  }
+
+  const status = totalViews < 100
+    ? "watch"
+    : latestStatus === "rejected" || clickRatePercent < 5 || followRatePercent < 1
+      ? "weak"
+      : favoriteRatePercent >= 4 || followRatePercent >= 2 || paidReadRatePercent >= 1
+        ? "promising"
+        : "watch";
+  const verdict = status === "weak"
+    ? `${platform.name} 当前转化偏弱，别急着怪平台，先检查标题卖点和前三章兑现。`
+    : status === "promising"
+      ? `${platform.name} 有可追的苗头，别换方向，优先放大已产生收藏/追读的爽点。`
+      : `样本还不够硬，${platform.name} 这组数据只能观察，别过早下结论。`;
+  const nextAction = latestStatus === "rejected"
+    ? "复盘编辑反馈，重做投稿资产，再生成一轮平台候选方案。"
+    : clickRatePercent < 5 && totalViews >= 100
+      ? "先改标题、一句话卖点和标签，解决读者点不进来的问题。"
+      : followRatePercent < 1 && totalViews >= 100
+        ? "重查前三章钩子、章末悬念和爽点兑现，解决点进来留不住的问题。"
+        : "继续记录下一轮数据，至少保留两次复盘后再决定换平台或换卖点。";
+
+  return {
+    status,
+    records: history.length,
+    latest,
+    totalViews,
+    totalClicks,
+    totalFavorites,
+    totalFollows,
+    totalComments,
+    totalPaidReads,
+    clickRatePercent,
+    favoriteRatePercent,
+    followRatePercent,
+    commentRatePercent,
+    paidReadRatePercent,
+    verdict,
+    nextAction,
+    history,
+  };
+}
+
 function buildPlatformPackage(
   input: PlatformPublishExportInput,
   platform: PlatformProfile,
@@ -1166,6 +1335,7 @@ function buildPlatformPackage(
     input.aiTasks ?? [],
     input.submissionAssetVersions ?? [],
   );
+  const publishEffect = buildPlatformPublishEffect(platform, input.platformPublishMetrics ?? []);
   const packWithoutMarkdown = {
     platformId: platform.id,
     platformName: platform.name,
@@ -1178,6 +1348,7 @@ function buildPlatformPackage(
     submissionAssetAudit,
     submissionAssetVersions,
     submissionAssetAdoption,
+    publishEffect,
     title,
     logline,
     synopsis,

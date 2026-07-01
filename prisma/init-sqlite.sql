@@ -234,3 +234,26 @@ CREATE TABLE IF NOT EXISTS "PlatformSubmissionAssetVersion" (
 );
 
 CREATE INDEX IF NOT EXISTS "PlatformSubmissionAssetVersion_projectId_platformId_createdAt_idx" ON "PlatformSubmissionAssetVersion"("projectId", "platformId", "createdAt");
+
+CREATE TABLE IF NOT EXISTS "PlatformPublishMetric" (
+  "id" TEXT NOT NULL PRIMARY KEY,
+  "projectId" TEXT NOT NULL,
+  "platformId" TEXT NOT NULL,
+  "platformName" TEXT NOT NULL,
+  "views" INTEGER NOT NULL DEFAULT 0,
+  "clicks" INTEGER NOT NULL DEFAULT 0,
+  "favorites" INTEGER NOT NULL DEFAULT 0,
+  "follows" INTEGER NOT NULL DEFAULT 0,
+  "comments" INTEGER NOT NULL DEFAULT 0,
+  "paidReads" INTEGER NOT NULL DEFAULT 0,
+  "editorFeedback" TEXT NOT NULL DEFAULT '',
+  "contractStatus" TEXT NOT NULL DEFAULT 'unknown',
+  "publishUrl" TEXT NOT NULL DEFAULT '',
+  "notes" TEXT NOT NULL DEFAULT '',
+  "snapshotDate" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT "PlatformPublishMetric_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "Project" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS "PlatformPublishMetric_projectId_platformId_snapshotDate_idx" ON "PlatformPublishMetric"("projectId", "platformId", "snapshotDate");

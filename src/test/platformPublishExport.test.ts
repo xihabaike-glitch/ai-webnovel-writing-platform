@@ -85,6 +85,8 @@ test("buildPlatformPublishExportCenter", async (t) => {
     assert.equal(center.workspace.readyPlatforms, 0);
     assert.equal(center.workspace.blockedPlatforms, platformProfiles.length);
     assert.ok(center.workspace.nextActions.some((action) => action.kind === "run_chapter_review"));
+    assert.equal(center.packages[0].publishEffect.status, "empty");
+    assert.ok(center.packages[0].publishEffect.nextAction.includes("录入"));
   });
 
   await t.test("dedupes workspace repair actions across platforms", () => {
@@ -266,6 +268,24 @@ test("buildPlatformPublishExportCenter", async (t) => {
           createdAt: "2026-01-08T08:00:00.000Z",
         },
       ],
+      platformPublishMetrics: [
+        {
+          id: "metric-fanqie-1",
+          platformId: "fanqie",
+          platformName: "番茄小说",
+          views: 1200,
+          clicks: 180,
+          favorites: 72,
+          follows: 36,
+          comments: 12,
+          paidReads: 0,
+          editorFeedback: "标题方向可以，前三章继续加压。",
+          contractStatus: "pending",
+          publishUrl: "https://fanqie.example/book/1",
+          notes: "首轮测试数据。",
+          snapshotDate: "2026-01-09T08:00:00.000Z",
+        },
+      ],
     });
     const pack = center.packages[0];
 
@@ -281,9 +301,16 @@ test("buildPlatformPublishExportCenter", async (t) => {
     assert.equal(pack.submissionAssetAdoption.adoptedVersions, 1);
     assert.equal(pack.submissionAssetAdoption.adoptionRatePercent, 33);
     assert.deepEqual(pack.submissionAssetAdoption.recentStrategies, ["强钩子爽点版"]);
+    assert.equal(pack.publishEffect.status, "promising");
+    assert.equal(pack.publishEffect.totalViews, 1200);
+    assert.equal(pack.publishEffect.clickRatePercent, 15);
+    assert.equal(pack.publishEffect.favoriteRatePercent, 6);
+    assert.equal(pack.publishEffect.followRatePercent, 3);
+    assert.ok(pack.publishEffect.verdict.includes("有可追的苗头"));
     assert.ok(pack.publishNote.includes("首秀前强调前三章钩子。"));
     assert.ok(pack.markdown.includes("夜雨系统：倒计时重生"));
     assert.ok(pack.markdown.includes("投稿资产质检"));
+    assert.ok(pack.markdown.includes("发布效果复盘"));
   });
 
   await t.test("scores platform submission asset fields", () => {

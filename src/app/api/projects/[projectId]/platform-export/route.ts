@@ -48,6 +48,23 @@ function trimText(value: unknown, fallback = "") {
   return typeof value === "string" ? value.trim() : fallback;
 }
 
+function normalizeMetricNumber(value: unknown) {
+  const number = typeof value === "number" ? value : typeof value === "string" ? Number(value.trim()) : 0;
+  if (!Number.isFinite(number)) return 0;
+  return Math.max(0, Math.round(number));
+}
+
+function normalizeSnapshotDate(value: unknown) {
+  if (typeof value !== "string" || !value.trim()) return new Date();
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? new Date() : parsed;
+}
+
+function normalizeContractStatus(value: unknown) {
+  if (value === "signed" || value === "invited" || value === "rejected" || value === "pending") return value;
+  return "unknown";
+}
+
 async function buildCenter(projectId: string) {
   const project = await prisma.project.findUnique({
     where: { id: projectId },
@@ -57,6 +74,7 @@ async function buildCenter(projectId: string) {
       publishSnapshots: { orderBy: { createdAt: "desc" }, take: 80 },
       submissionAssets: { orderBy: { updatedAt: "desc" } },
       submissionAssetVersions: { orderBy: { createdAt: "desc" }, take: 80 },
+      platformPublishMetrics: { orderBy: { snapshotDate: "desc" }, take: 80 },
     },
   });
 
@@ -121,6 +139,24 @@ async function buildCenter(projectId: string) {
       sourceTaskId: version.sourceTaskId,
       strategy: version.strategy,
       createdAt: version.createdAt,
+    })),
+    platformPublishMetrics: project.platformPublishMetrics.map((metric) => ({
+      id: metric.id,
+      platformId: metric.platformId,
+      platformName: metric.platformName,
+      views: metric.views,
+      clicks: metric.clicks,
+      favorites: metric.favorites,
+      follows: metric.follows,
+      comments: metric.comments,
+      paidReads: metric.paidReads,
+      editorFeedback: metric.editorFeedback,
+      contractStatus: metric.contractStatus,
+      publishUrl: metric.publishUrl,
+      notes: metric.notes,
+      snapshotDate: metric.snapshotDate,
+      createdAt: metric.createdAt,
+      updatedAt: metric.updatedAt,
     })),
     submissionChecklist,
   });
@@ -315,11 +351,52 @@ export async function POST(request: Request, { params }: Params) {
     sourceTaskId?: unknown;
     strategy?: unknown;
     saveAction?: unknown;
+    views?: unknown;
+    clicks?: unknown;
+    favorites?: unknown;
+    follows?: unknown;
+    comments?: unknown;
+    paidReads?: unknown;
+    editorFeedback?: unknown;
+    contractStatus?: unknown;
+    publishUrl?: unknown;
+    snapshotDate?: unknown;
   };
   const context = await buildCenter(projectId);
 
   if (!context) {
     return NextResponse.json({ error: "Project not found" }, { status: 404 });
+  }
+
+  if (body.action === "save-effect") {
+    const platform = selectedPlatform(body.platformId ?? null);
+    if (!platform) {
+      return NextResponse.json({ error: "请选择有效发布平台。" }, { status: 400 });
+    }
+
+    const metric = await prisma.platformPublishMetric.create({
+      data: {
+        projectId,
+        platformId: platform.id,
+        platformName: platform.name,
+        views: normalizeMetricNumber(body.views),
+        clicks: normalizeMetricNumber(body.clicks),
+        favorites: normalizeMetricNumber(body.favorites),
+        follows: normalizeMetricNumber(body.follows),
+        comments: normalizeMetricNumber(body.comments),
+        paidReads: normalizeMetricNumber(body.paidReads),
+        editorFeedback: trimText(body.editorFeedback),
+        contractStatus: normalizeContractStatus(body.contractStatus),
+        publishUrl: trimText(body.publishUrl),
+        notes: trimText(body.note),
+        snapshotDate: normalizeSnapshotDate(body.snapshotDate),
+      },
+    });
+
+    return NextResponse.json({
+      message: `已记录 ${platform.name} 发布效果。`,
+      metric,
+    }, { status: 201 });
   }
 
   if (body.action === "save-asset") {

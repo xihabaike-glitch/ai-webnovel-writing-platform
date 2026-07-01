@@ -1,8 +1,7 @@
 import type { ModelProvider } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
-import { AnthropicMessagesAdapter, OllamaAdapter, OpenAICompatibleAdapter } from "./adapters.ts";
-import { MockAdapter } from "./mockAdapter.ts";
-import type { ModelAdapter, ModelProviderId } from "./types.ts";
+import { createModelAdapter } from "./adapterFactory.ts";
+import type { ModelAdapter } from "./types.ts";
 
 export interface SelectedModelProvider {
   provider: ModelProvider;
@@ -14,14 +13,6 @@ function canUseProvider(provider: ModelProvider) {
   if (provider.providerId === "mock") return true;
   if (provider.providerId === "ollama") return true;
   return Boolean(provider.encryptedApiKey);
-}
-
-function adapterFor(provider: ModelProvider): ModelAdapter {
-  const providerId = provider.providerId as ModelProviderId;
-  if (providerId === "mock") return new MockAdapter();
-  if (providerId === "claude") return new AnthropicMessagesAdapter(provider);
-  if (providerId === "ollama") return new OllamaAdapter(provider);
-  return new OpenAICompatibleAdapter(provider);
 }
 
 export async function getActiveModelProvider(): Promise<SelectedModelProvider> {
@@ -46,6 +37,6 @@ export async function getActiveModelProvider(): Promise<SelectedModelProvider> {
 
   return {
     provider,
-    adapter: adapterFor(provider),
+    adapter: createModelAdapter(provider),
   };
 }

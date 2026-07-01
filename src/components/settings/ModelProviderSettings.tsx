@@ -36,6 +36,20 @@ interface DraftProvider {
   maxContextTokens: string;
 }
 
+interface ConnectionTestResult {
+  ok: boolean;
+  status: "connected" | "failed";
+  latencyMs: number;
+  testedAt: string;
+  sampleText: string | null;
+  usage: {
+    inputTokens: number;
+    outputTokens: number;
+  } | null;
+  errorMessage: string | null;
+  repairHint: string | null;
+}
+
 const statusCopy: Record<ProviderHealthStatus, { label: string; className: string }> = {
   ready: { label: "可用", className: "border-emerald-200 bg-emerald-50 text-emerald-700" },
   warn: { label: "需注意", className: "border-amber-200 bg-amber-50 text-amber-700" },
@@ -76,6 +90,9 @@ export function ModelProviderSettings({
   const [draft, setDraft] = useState<DraftProvider>(() => draftFromOption(selectedOption, existing));
   const [message, setMessage] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [testingProviderId, setTestingProviderId] = useState<ModelProviderId | null>(null);
+  const [testResults, setTestResults] = useState<Record<string, ConnectionTestResult>>({});
+  const currentTestResult = testResults[selectedProviderId];
 
   function selectProvider(providerId: ModelProviderId) {
     const option = options.find((item) => item.providerId === providerId) ?? options[0];
@@ -114,6 +131,48 @@ export function ModelProviderSettings({
       setMessage(caught instanceof Error ? caught.message : "保存模型配置失败。");
     } finally {
       setIsSaving(false);
+    }
+  }
+
+  async function testProviderConnection() {
+    setTestingProviderId(draft.providerId);
+    setMessage(null);
+
+    try {
+      const response = await fetch("/api/model-providers/test", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: draft.id,
+          providerId: draft.providerId,
+          baseUrl: draft.baseUrl.trim(),
+          apiKey: draft.apiKey.trim() || undefined,
+          defaultModel: draft.defaultModel.trim(),
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("模型连接测试失败。");
+      }
+
+      const payload = (await response.json()) as { result: ConnectionTestResult };
+      setTestResults((current) => ({ ...current, [draft.providerId]: payload.result }));
+    } catch (caught) {
+      setTestResults((current) => ({
+        ...current,
+        [draft.providerId]: {
+          ok: false,
+          status: "failed",
+          latencyMs: 0,
+          testedAt: new Date().toISOString(),
+          sampleText: null,
+          usage: null,
+          errorMessage: caught instanceof Error ? caught.message : "模型连接测试失败。",
+          repairHint: "检查模型名、Base URL 和 API Key 后重新测试。",
+        },
+      }));
+    } finally {
+      setTestingProviderId(null);
     }
   }
 
@@ -273,8 +332,42 @@ export function ModelProviderSettings({
             >
               {isSaving ? "保存中" : "保存配置"}
             </button>
+            <button
+              className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 disabled:opacity-50"
+              disabled={testingProviderId === draft.providerId}
+              onClick={testProviderConnection}
+              type="button"
+            >
+              {testingProviderId === draft.providerId ? "测试中" : "测试连接"}
+            </button>
             {message ? <span className="text-sm text-slate-600">{message}</span> : null}
           </div>
+          {currentTestResult ? (
+            <div className={`rounded-md border p-4 text-sm ${currentTestResult.ok ? "border-emerald-200 bg-emerald-50" : "border-rose-200 bg-rose-50"}`}>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h3 className={`font-medium ${currentTestResult.ok ? "text-emerald-800" : "text-rose-800"}`}>
+                  {currentTestResult.ok ? "连接成功" : "连接失败"}
+                </h3>
+                <span className={currentTestResult.ok ? "text-emerald-700" : "text-rose-700"}>
+                  {currentTestResult.latencyMs}ms
+                </span>
+              </div>
+              {currentTestResult.sampleText ? (
+                <p className="mt-2 text-slate-700">返回样例：{currentTestResult.sampleText}</p>
+              ) : null}
+              {currentTestResult.usage ? (
+                <p className="mt-2 text-xs text-slate-600">
+                  Token：输入 {currentTestResult.usage.inputTokens} / 输出 {currentTestResult.usage.outputTokens}
+                </p>
+              ) : null}
+              {currentTestResult.errorMessage ? (
+                <p className="mt-2 text-slate-700">错误：{currentTestResult.errorMessage}</p>
+              ) : null}
+              {currentTestResult.repairHint ? (
+                <p className="mt-2 text-slate-700">建议：{currentTestResult.repairHint}</p>
+              ) : null}
+            </div>
+          ) : null}
         </form>
       </div>
     </div>

@@ -10,3 +10,11 @@ export const saveModelProviderSchema = z.object({
   enabled: z.boolean().optional(),
   maxContextTokens: z.number().int().positive().optional(),
 });
+
+export const testModelProviderSchema = saveModelProviderSchema.pick({
+  id: true,
+  providerId: true,
+  baseUrl: true,
+  apiKey: true,
+  defaultModel: true,
+});

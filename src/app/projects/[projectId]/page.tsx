@@ -244,7 +244,9 @@ export default async function ProjectPage({ params }: { params: Promise<{ projec
           <PlatformExportCenterPanel projectId={project.id} />
         </div>
         <StoryStructureDiagnosticPanel projectId={project.id} />
-        <SubmissionPackagePanel projectId={project.id} submissionPackage={submissionPackage} />
+        <div id="submission-package">
+          <SubmissionPackagePanel projectId={project.id} submissionPackage={submissionPackage} />
+        </div>
         <div className="grid gap-4 md:grid-cols-[2fr_1fr]">
           <OutlineTreePanel projectId={project.id} nodes={outlineNodes} />
           <div className="rounded-md border bg-white p-4">
@@ -255,7 +257,9 @@ export default async function ProjectPage({ params }: { params: Promise<{ projec
           </div>
         </div>
         <div className="grid gap-4 md:grid-cols-[1fr_auto]">
-          <CreateChapterForm projectId={project.id} />
+          <div id="create-chapter">
+            <CreateChapterForm projectId={project.id} />
+          </div>
           <div className="rounded-md border border-slate-200 bg-white p-4">
             <div className="mb-3 font-medium">导出</div>
             <ExportMarkdownButton projectId={project.id} title={project.title} />

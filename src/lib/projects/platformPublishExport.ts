@@ -24,6 +24,23 @@ export interface PublishExportAiTask {
   createdAt: Date | string;
 }
 
+export type PublishRepairActionKind =
+  | "edit_chapter"
+  | "run_chapter_review"
+  | "run_second_pass"
+  | "open_submission_package"
+  | "add_publish_chapters";
+
+export interface PublishRepairAction {
+  id: string;
+  kind: PublishRepairActionKind;
+  priority: "high" | "medium" | "low";
+  label: string;
+  detail: string;
+  chapterId?: string;
+  chapterTitle?: string;
+}
+
 export interface PlatformPublishExportInput {
   project: PublishExportProject;
   chapters: PublishExportChapter[];
@@ -39,6 +56,7 @@ export interface PublishPreflight {
   passed: string[];
   blocked: string[];
   warnings: string[];
+  repairActions: PublishRepairAction[];
 }
 
 export interface PlatformPublishChapter {
@@ -50,6 +68,7 @@ export interface PlatformPublishChapter {
   status: string;
   ready: boolean;
   preflight: PublishPreflight;
+  repairActions: PublishRepairAction[];
   body: string;
   warnings: string[];
 }
@@ -66,6 +85,7 @@ export interface PlatformPublishPackage {
   chapters: PlatformPublishChapter[];
   preflight: PublishPreflight;
   canExport: boolean;
+  repairActions: PublishRepairAction[];
   warnings: string[];
   markdown: string;
 }
@@ -102,6 +122,24 @@ function parseReviewDecision(task: PublishExportAiTask | undefined) {
 
 function preflightScore(blocked: string[], warnings: string[]) {
   return Math.max(0, Math.min(100, 100 - blocked.length * 22 - warnings.length * 6));
+}
+
+function chapterAction(
+  chapter: PublishExportChapter,
+  kind: PublishRepairActionKind,
+  label: string,
+  detail: string,
+  priority: PublishRepairAction["priority"] = "high",
+): PublishRepairAction {
+  return {
+    id: `${chapter.id}-${kind}`,
+    kind,
+    priority,
+    label,
+    detail,
+    chapterId: chapter.id,
+    chapterTitle: chapter.title,
+  };
 }
 
 function publishableChapters(chapters: PublishExportChapter[]) {
@@ -165,20 +203,57 @@ function buildChapterPreflight(
   const blocked: string[] = [];
   const passed: string[] = [];
   const softWarnings = [...warnings];
+  const repairActions: PublishRepairAction[] = [];
   const reviewDecision = parseReviewDecision(latestTask(tasks, chapter.id, "chapter_review"));
 
   if (compact(chapter.content).length > 0 && chapter.wordCount > 0) passed.push("正文已生成");
-  else blocked.push("正文为空，不能发布。");
+  else {
+    blocked.push("正文为空，不能发布。");
+    repairActions.push(chapterAction(
+      chapter,
+      "edit_chapter",
+      "补正文或生成初稿",
+      "进入章节工作台补正文，再重新审稿。",
+    ));
+  }
   if (chapter.hook.trim()) passed.push("开头钩子已填写");
-  else blocked.push("缺少开头钩子。");
+  else {
+    blocked.push("缺少开头钩子。");
+    repairActions.push(chapterAction(
+      chapter,
+      "edit_chapter",
+      "补开头钩子",
+      "进入章节编辑区补强第一屏抓人点。",
+    ));
+  }
   if (chapter.cliffhanger.trim()) passed.push("章末悬念已填写");
-  else blocked.push("缺少章末悬念。");
+  else {
+    blocked.push("缺少章末悬念。");
+    repairActions.push(chapterAction(
+      chapter,
+      "edit_chapter",
+      "补章末悬念",
+      "进入章节编辑区补下一章追读问题。",
+    ));
+  }
   if (reviewDecision && !reviewDecision.shouldSecondPass) {
     passed.push(`最新平台复检 ${reviewDecision.score ?? "--"} 分`);
   } else if (reviewDecision?.shouldSecondPass) {
     blocked.push(`最新平台复检 ${reviewDecision.score ?? "--"} 分，仍要求二改。`);
+    repairActions.push(chapterAction(
+      chapter,
+      "run_second_pass",
+      "执行二改",
+      "进入二改工作台按平台问题重写，并让系统自动复检。",
+    ));
   } else {
     blocked.push("缺少通过的审稿/复检记录。");
+    repairActions.push(chapterAction(
+      chapter,
+      "run_chapter_review",
+      "补章节审稿",
+      "进入章节工作台运行审稿，拿到通过的复检记录。",
+    ));
   }
   if (platform.category === "overseas") softWarnings.push("海外平台发布前建议人工英文化终稿。");
 
@@ -188,6 +263,7 @@ function buildChapterPreflight(
     passed,
     blocked,
     warnings: softWarnings,
+    repairActions: dedupeRepairActions(repairActions),
   };
 }
 
@@ -221,15 +297,37 @@ function buildPackageWarnings(platform: PlatformProfile, chapters: PlatformPubli
 function buildPackagePreflight(chapters: PlatformPublishChapter[], warnings: string[], checklist?: SubmissionChecklist): PublishPreflight {
   const blocked: string[] = [];
   const passed: string[] = [];
+  const repairActions: PublishRepairAction[] = [];
 
   if (chapters.length > 0) passed.push(`已准备 ${chapters.length} 章正文`);
-  else blocked.push("没有可导出的正文章节。");
+  else {
+    blocked.push("没有可导出的正文章节。");
+    repairActions.push({
+      id: "add-publish-chapters",
+      kind: "add_publish_chapters",
+      priority: "high",
+      label: "补可发布章节",
+      detail: "先创建或生成至少一章正文，再回到发布质检。",
+    });
+  }
   const blockedChapters = chapters.filter((chapter) => !chapter.preflight.canExport);
   if (blockedChapters.length === 0 && chapters.length > 0) passed.push("全部章节通过发布前质检");
-  if (blockedChapters.length > 0) blocked.push(`${blockedChapters.length} 章未通过发布前质检。`);
+  if (blockedChapters.length > 0) {
+    blocked.push(`${blockedChapters.length} 章未通过发布前质检。`);
+    repairActions.push(...blockedChapters.flatMap((chapter) => chapter.repairActions));
+  }
   if (checklist) {
     if (checklist.readinessPercent >= 80) passed.push(`投稿资料准备度 ${checklist.readinessPercent}%`);
-    else blocked.push(`投稿资料准备度 ${checklist.readinessPercent}%，低于 80%。`);
+    else {
+      blocked.push(`投稿资料准备度 ${checklist.readinessPercent}%，低于 80%。`);
+      repairActions.push({
+        id: "open-submission-package",
+        kind: "open_submission_package",
+        priority: "high",
+        label: "补投稿资料",
+        detail: "处理投稿清单里的待办项，让准备度达到 80% 以上。",
+      });
+    }
   }
 
   return {
@@ -238,7 +336,18 @@ function buildPackagePreflight(chapters: PlatformPublishChapter[], warnings: str
     passed,
     blocked,
     warnings,
+    repairActions: dedupeRepairActions(repairActions),
   };
+}
+
+function dedupeRepairActions(actions: PublishRepairAction[]) {
+  const seen = new Set<string>();
+  return actions.filter((action) => {
+    const key = `${action.kind}-${action.chapterId ?? "project"}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 function buildMarkdown(pack: Omit<PlatformPublishPackage, "markdown">) {
@@ -265,6 +374,7 @@ function buildMarkdown(pack: Omit<PlatformPublishPackage, "markdown">) {
     `导出状态：${pack.canExport ? "允许导出" : "暂不允许导出"}`,
     ...(pack.preflight.blocked.length ? pack.preflight.blocked.map((item) => `- 阻塞：${item}`) : ["- 阻塞：无"]),
     ...(pack.preflight.warnings.length ? pack.preflight.warnings.map((item) => `- 提醒：${item}`) : ["- 提醒：无"]),
+    ...(pack.repairActions.length ? ["", "## 修复动作", ...pack.repairActions.map((action) => `- ${action.label}：${action.detail}`)] : []),
     "",
     "## 风险提醒",
     ...(pack.warnings.length ? pack.warnings.map((warning) => `- ${warning}`) : ["- 暂无明显风险。"]),
@@ -306,6 +416,7 @@ function buildPlatformPackage(
       status: chapter.status,
       ready: preflight.canExport,
       preflight,
+      repairActions: preflight.repairActions,
       body: formatBody(chapter, platform),
       warnings,
     };
@@ -324,6 +435,7 @@ function buildPlatformPackage(
     chapters,
     preflight,
     canExport: preflight.canExport,
+    repairActions: preflight.repairActions,
     warnings,
   };
 

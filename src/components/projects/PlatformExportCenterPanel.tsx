@@ -1,6 +1,24 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+
+type PublishRepairActionKind =
+  | "edit_chapter"
+  | "run_chapter_review"
+  | "run_second_pass"
+  | "open_submission_package"
+  | "add_publish_chapters";
+
+interface PublishRepairAction {
+  id: string;
+  kind: PublishRepairActionKind;
+  priority: "high" | "medium" | "low";
+  label: string;
+  detail: string;
+  chapterId?: string;
+  chapterTitle?: string;
+}
 
 interface PublishPreflight {
   score: number;
@@ -8,6 +26,7 @@ interface PublishPreflight {
   passed: string[];
   blocked: string[];
   warnings: string[];
+  repairActions: PublishRepairAction[];
 }
 
 interface PlatformPublishChapter {
@@ -19,6 +38,7 @@ interface PlatformPublishChapter {
   status: string;
   ready: boolean;
   preflight: PublishPreflight;
+  repairActions: PublishRepairAction[];
   body: string;
   warnings: string[];
 }
@@ -35,6 +55,7 @@ interface PlatformPublishPackage {
   chapters: PlatformPublishChapter[];
   preflight: PublishPreflight;
   canExport: boolean;
+  repairActions: PublishRepairAction[];
   warnings: string[];
   markdown: string;
 }
@@ -43,6 +64,19 @@ interface PlatformPublishExportCenter {
   packages: PlatformPublishPackage[];
   recommendedPlatformId: string;
   totalPublishableChapters: number;
+}
+
+function actionHref(projectId: string, action: PublishRepairAction) {
+  if (action.kind === "open_submission_package") return `/projects/${projectId}#submission-package`;
+  if (action.kind === "add_publish_chapters") return `/projects/${projectId}#create-chapter`;
+  if (action.kind === "run_second_pass" && action.chapterId) {
+    return `/projects/${projectId}/chapters/${action.chapterId}#chapter-second-pass`;
+  }
+  if (action.kind === "run_chapter_review" && action.chapterId) {
+    return `/projects/${projectId}/chapters/${action.chapterId}#chapter-workflow`;
+  }
+  if (action.chapterId) return `/projects/${projectId}/chapters/${action.chapterId}#chapter-editor`;
+  return `/projects/${projectId}`;
 }
 
 export function PlatformExportCenterPanel({ projectId }: { projectId: string }) {
@@ -207,6 +241,24 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
                 </div>
               </div>
             </div>
+            {selectedPackage.repairActions.length ? (
+              <div className="mt-3 rounded-md bg-slate-50 p-3 text-sm">
+                <div className="font-medium text-slate-900">下一步处理</div>
+                <div className="mt-2 grid gap-2 lg:grid-cols-2">
+                  {selectedPackage.repairActions.slice(0, 6).map((action) => (
+                    <Link
+                      className="rounded-md border border-slate-200 bg-white p-3 text-slate-600 hover:border-slate-300 hover:bg-slate-50"
+                      href={actionHref(projectId, action)}
+                      key={action.id}
+                    >
+                      <div className="font-medium text-slate-950">{action.label}</div>
+                      {action.chapterTitle ? <div className="mt-1 text-xs text-slate-500">{action.chapterTitle}</div> : null}
+                      <div className="mt-1 leading-5">{action.detail}</div>
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            ) : null}
           </div>
 
           <div className="rounded-md border border-slate-200 p-3">
@@ -251,6 +303,19 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
                 <p className="mt-2 line-clamp-3 whitespace-pre-wrap text-slate-600">{chapter.body}</p>
                 {chapter.preflight.blocked.length ? (
                   <p className="mt-2 text-slate-500">阻塞项：{chapter.preflight.blocked.join("；")}</p>
+                ) : null}
+                {chapter.repairActions.length ? (
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {chapter.repairActions.slice(0, 2).map((action) => (
+                      <Link
+                        className="rounded-md border border-slate-200 px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                        href={actionHref(projectId, action)}
+                        key={action.id}
+                      >
+                        {action.label}
+                      </Link>
+                    ))}
+                  </div>
                 ) : null}
                 {chapter.warnings.length ? (
                   <p className="mt-2 text-slate-500">章节风险：{chapter.warnings.join("；")}</p>

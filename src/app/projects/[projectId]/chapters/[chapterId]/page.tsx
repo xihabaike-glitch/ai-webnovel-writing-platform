@@ -39,14 +39,20 @@ export default async function ChapterPage({
     <AppShell>
       <div className="grid gap-4 lg:grid-cols-[1fr_360px]">
         <div className="grid gap-4">
-          <ChapterEditor
-            key={`${chapter.id}-${chapter.updatedAt.toISOString()}`}
-            chapter={editableChapter}
-          />
-          <ChapterSecondPassPanel chapterId={chapter.id} currentWordCount={chapter.wordCount} />
+          <div id="chapter-editor">
+            <ChapterEditor
+              key={`${chapter.id}-${chapter.updatedAt.toISOString()}`}
+              chapter={editableChapter}
+            />
+          </div>
+          <div id="chapter-second-pass">
+            <ChapterSecondPassPanel chapterId={chapter.id} currentWordCount={chapter.wordCount} />
+          </div>
           <ChapterRevisionWorkbench chapter={editableChapter} />
         </div>
-        <ChapterWorkflowPanel chapterCard={editableChapter} chapterId={chapterId} platform={platform} />
+        <div id="chapter-workflow">
+          <ChapterWorkflowPanel chapterCard={editableChapter} chapterId={chapterId} platform={platform} />
+        </div>
       </div>
     </AppShell>
   );

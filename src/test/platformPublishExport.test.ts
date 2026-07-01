@@ -66,6 +66,7 @@ test("buildPlatformPublishExportCenter", async (t) => {
     assert.equal(center.totalPublishableChapters, 1);
     assert.ok(center.packages.some((pack) => pack.platformId === "qidian"));
     assert.ok(center.packages.some((pack) => pack.platformId === "wattpad"));
+    assert.ok(center.packages[0].repairActions.some((action) => action.kind === "run_chapter_review"));
   });
 
   await t.test("uses overseas packaging for overseas platforms", () => {
@@ -107,6 +108,7 @@ test("buildPlatformPublishExportCenter", async (t) => {
     assert.ok(markdown.includes("# 番茄小说 发布包"));
     assert.ok(markdown.includes("林晚推开门"));
     assert.ok(markdown.includes("发布前质检"));
+    assert.ok(markdown.includes("修复动作"));
     assert.ok(markdown.includes("风险提醒"));
   });
 
@@ -129,6 +131,7 @@ test("buildPlatformPublishExportCenter", async (t) => {
 
     assert.equal(pack.canExport, true);
     assert.equal(pack.preflight.blocked.length, 0);
+    assert.equal(pack.repairActions.length, 0);
     assert.equal(pack.chapters.every((chapter) => chapter.ready), true);
     assert.ok(pack.markdown.includes("导出状态：允许导出"));
   });
@@ -161,6 +164,7 @@ test("buildPlatformPublishExportCenter", async (t) => {
 
     assert.equal(pack.canExport, false);
     assert.ok(pack.preflight.blocked.some((item) => item.includes("1 章未通过")));
+    assert.ok(pack.repairActions.some((action) => action.kind === "run_second_pass" && action.chapterId === "chapter-1"));
     assert.ok(pack.chapters[0].preflight.blocked.some((item) => item.includes("仍要求二改")));
   });
 
@@ -183,5 +187,6 @@ test("buildPlatformPublishExportCenter", async (t) => {
 
     assert.equal(pack.canExport, false);
     assert.ok(pack.preflight.blocked.some((item) => item.includes("低于 80%")));
+    assert.ok(pack.repairActions.some((action) => action.kind === "open_submission_package"));
   });
 });

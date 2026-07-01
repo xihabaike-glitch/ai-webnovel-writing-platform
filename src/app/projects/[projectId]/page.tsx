@@ -6,6 +6,7 @@ import { OutlineTreePanel } from "@/components/outlines/OutlineTreePanel";
 import { ExportMarkdownButton } from "@/components/projects/ExportMarkdownButton";
 import { prisma } from "@/lib/db/prisma";
 import { getPlatformProfile, type PlatformId } from "@/lib/platforms/platformProfiles";
+import { buildProjectDashboard } from "@/lib/projects/projectDashboard";
 
 export default async function ProjectPage({ params }: { params: Promise<{ projectId: string }> }) {
   const { projectId } = await params;
@@ -14,6 +15,13 @@ export default async function ProjectPage({ params }: { params: Promise<{ projec
     include: {
       chapters: { orderBy: { order: "asc" } },
       outlineNodes: { orderBy: [{ depth: "asc" }, { order: "asc" }, { createdAt: "asc" }] },
+      aiTasks: {
+        include: {
+          modelProvider: { select: { providerId: true, displayName: true } },
+        },
+        orderBy: { createdAt: "desc" },
+        take: 12,
+      },
     },
   });
 
@@ -22,6 +30,17 @@ export default async function ProjectPage({ params }: { params: Promise<{ projec
   }
 
   const platform = getPlatformProfile(project.targetPlatform as PlatformId);
+  const chaptersById = new Map(project.chapters.map((chapter) => [chapter.id, chapter]));
+  const dashboard = buildProjectDashboard({
+    currentWordCount: project.currentWordCount,
+    targetWordCount: project.targetWordCount,
+    platform,
+    chapters: project.chapters,
+    aiTasks: project.aiTasks.map((task) => ({
+      ...task,
+      chapter: task.chapterId ? chaptersById.get(task.chapterId) ?? null : null,
+    })),
+  });
   const outlineNodes = project.outlineNodes.map((node) => ({
     id: node.id,
     parentId: node.parentId,
@@ -48,6 +67,66 @@ export default async function ProjectPage({ params }: { params: Promise<{ projec
             {platform.name} · {project.currentWordCount}/{project.targetWordCount} 字 · {project.genre}
           </p>
         </div>
+        <section className="grid gap-4 md:grid-cols-[1.4fr_1fr]">
+          <div className="rounded-md border border-slate-200 bg-white p-4">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <div className="text-sm text-slate-500">创作进度</div>
+                <div className="mt-1 text-3xl font-semibold">{dashboard.progressPercent}%</div>
+              </div>
+              {dashboard.nextChapter ? (
+                <Link
+                  className="rounded-md bg-slate-950 px-4 py-2 text-sm font-medium text-white"
+                  href={`/projects/${project.id}/chapters/${dashboard.nextChapter.id}`}
+                >
+                  继续写作
+                </Link>
+              ) : null}
+            </div>
+            <div className="mt-4 h-2 overflow-hidden rounded bg-slate-100">
+              <div className="h-full bg-slate-950" style={{ width: `${dashboard.progressPercent}%` }} />
+            </div>
+            <div className="mt-4 grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
+              <div className="rounded-md bg-slate-50 p-3">
+                <div className="text-slate-500">章节</div>
+                <div className="mt-1 font-medium">{dashboard.totalChapters}</div>
+              </div>
+              <div className="rounded-md bg-slate-50 p-3">
+                <div className="text-slate-500">大纲</div>
+                <div className="mt-1 font-medium">{dashboard.statusCounts.outline ?? 0}</div>
+              </div>
+              <div className="rounded-md bg-slate-50 p-3">
+                <div className="text-slate-500">草稿</div>
+                <div className="mt-1 font-medium">{dashboard.statusCounts.draft ?? 0}</div>
+              </div>
+              <div className="rounded-md bg-slate-50 p-3">
+                <div className="text-slate-500">定稿</div>
+                <div className="mt-1 font-medium">{dashboard.statusCounts.final ?? 0}</div>
+              </div>
+            </div>
+          </div>
+          <div className="rounded-md border border-slate-200 bg-white p-4">
+            <div className="font-medium">下一步</div>
+            {dashboard.nextChapter ? (
+              <div className="mt-3 rounded-md bg-slate-50 p-3 text-sm">
+                <div className="font-medium text-slate-950">{dashboard.nextChapter.title}</div>
+                <div className="mt-1 text-slate-500">
+                  第 {dashboard.nextChapter.order} 章 · {dashboard.nextChapter.wordCount} 字 · {dashboard.nextChapter.status}
+                </div>
+              </div>
+            ) : (
+              <p className="mt-3 text-sm text-slate-600">先创建第一章。</p>
+            )}
+            <div className="mt-4 font-medium">风险提醒</div>
+            <div className="mt-2 grid gap-2 text-sm text-slate-600">
+              {dashboard.platformWarnings.slice(0, 4).map((warning) => (
+                <div className="rounded-md bg-slate-50 p-2" key={warning}>
+                  {warning}
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
         <div className="grid gap-4 md:grid-cols-[2fr_1fr]">
           <OutlineTreePanel projectId={project.id} nodes={outlineNodes} />
           <div className="rounded-md border bg-white p-4">
@@ -64,6 +143,52 @@ export default async function ProjectPage({ params }: { params: Promise<{ projec
             <ExportMarkdownButton projectId={project.id} title={project.title} />
           </div>
         </div>
+        <section className="grid gap-4 lg:grid-cols-2">
+          <div className="rounded-md border border-slate-200 bg-white p-4">
+            <div className="mb-3 flex items-center justify-between">
+              <h2 className="font-medium">最近 AI 任务</h2>
+              <span className="text-sm text-slate-500">{dashboard.recentTasks.length} 条</span>
+            </div>
+            <div className="grid gap-2">
+              {dashboard.recentTasks.map((task) => (
+                <div className="rounded-md bg-slate-50 p-3 text-sm" key={task.id}>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-medium">{task.taskType === "chapter_draft" ? "正文初稿" : "章节审稿"}</span>
+                    <span className="text-slate-500">{task.status}</span>
+                  </div>
+                  <div className="mt-1 text-slate-500">
+                    {task.chapter?.title ?? "项目任务"} · {task.modelProvider?.displayName ?? "未知模型"} · {task.model}
+                  </div>
+                  <div className="mt-1 text-xs text-slate-400">{new Date(task.createdAt).toLocaleString()}</div>
+                </div>
+              ))}
+              {dashboard.recentTasks.length === 0 ? <p className="text-sm text-slate-600">还没有 AI 任务。</p> : null}
+            </div>
+          </div>
+          <div className="rounded-md border border-slate-200 bg-white p-4">
+            <div className="mb-3 flex items-center justify-between">
+              <h2 className="font-medium">未审稿章节</h2>
+              <span className="text-sm text-slate-500">{dashboard.unreviewedChapters.length} 章</span>
+            </div>
+            <div className="grid gap-2">
+              {dashboard.unreviewedChapters.slice(0, 6).map((chapter) => (
+                <Link
+                  className="rounded-md bg-slate-50 p-3 text-sm hover:bg-slate-100"
+                  href={`/projects/${project.id}/chapters/${chapter.id}`}
+                  key={chapter.id}
+                >
+                  <div className="font-medium">{chapter.title}</div>
+                  <div className="mt-1 text-slate-500">
+                    第 {chapter.order} 章 · {chapter.wordCount} 字 · 需要审稿
+                  </div>
+                </Link>
+              ))}
+              {dashboard.unreviewedChapters.length === 0 ? (
+                <p className="text-sm text-slate-600">所有有正文的章节都已审稿。</p>
+              ) : null}
+            </div>
+          </div>
+        </section>
         <section className="rounded-md border border-slate-200 bg-white p-4">
           <div className="mb-3 flex items-center justify-between">
             <h2 className="font-medium">章节列表</h2>

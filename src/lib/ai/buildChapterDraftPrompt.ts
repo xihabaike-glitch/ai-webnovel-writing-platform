@@ -1,4 +1,5 @@
 import type { PlatformProfile } from "../platforms/platformProfiles.ts";
+import { buildPlatformWritingStylePromptBlock } from "../platforms/writingStyleTemplates.ts";
 
 interface ChapterDraftPromptInput {
   projectTitle: string;
@@ -18,6 +19,7 @@ interface ChapterDraftPromptInput {
 }
 
 export function buildChapterDraftPrompt(input: ChapterDraftPromptInput) {
+  const platformStyle = buildPlatformWritingStylePromptBlock(input.platform.id);
   const systemPrompt = [
     "你是高执行力网文写手，只输出正文初稿，不输出解释、标题、Markdown 或审稿意见。",
     "优先满足平台读者预期：开头有钩子，中段有冲突推进，结尾有明确悬念。",
@@ -31,6 +33,7 @@ export function buildChapterDraftPrompt(input: ChapterDraftPromptInput) {
     `目标平台：${input.platform.name}`,
     `平台开头规则：${input.platform.openingRules.join("；")}`,
     `平台审稿重点：${input.platform.reviewFocus.join("、")}`,
+    platformStyle,
     `目标字数：约 ${input.targetWords} 字`,
     `章节标题：${input.chapter.title}`,
     `章节目标：${input.chapter.goal}`,

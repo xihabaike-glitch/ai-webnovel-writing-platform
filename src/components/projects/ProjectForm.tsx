@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { platformProfiles, type LengthType, type PlatformId } from "@/lib/platforms/platformProfiles";
+import { getPlatformWritingStyle } from "@/lib/platforms/writingStyleTemplates";
 import { projectTemplates } from "@/lib/projects/projectTemplates";
 
 const lengthOptions = [
@@ -26,6 +27,7 @@ export function ProjectForm() {
   const [error, setError] = useState<string | null>(null);
   const selectedProfile = platformProfiles.find((profile) => profile.id === platformId) ?? platformProfiles[0];
   const selectedTemplate = projectTemplates.find((template) => template.id === templateId) ?? defaultTemplate;
+  const selectedStyle = getPlatformWritingStyle(selectedProfile.id);
 
   function applyTemplate(nextTemplateId: string) {
     const template = projectTemplates.find((item) => item.id === nextTemplateId) ?? defaultTemplate;
@@ -180,6 +182,26 @@ export function ProjectForm() {
         <div className="font-medium text-slate-900">{selectedProfile.name} 写作提醒</div>
         <div className="mt-1">开头：{selectedProfile.openingRules.join("；")}</div>
         <div className="mt-1">审稿：{selectedProfile.reviewFocus.join("、")}</div>
+      </div>
+      <div className="grid gap-3 rounded-md border border-slate-200 bg-white p-3 text-sm text-slate-600 md:grid-cols-2">
+        <div>
+          <div className="font-medium text-slate-900">平台风格模板</div>
+          <div className="mt-1">读者承诺：{selectedStyle.audiencePromise}</div>
+          <div className="mt-1">首屏钩子：{selectedStyle.openingHook}</div>
+          <div className="mt-1">章节节奏：{selectedStyle.chapterRhythm}</div>
+        </div>
+        <div>
+          <div className="font-medium text-slate-900">生成时会强制检查</div>
+          <div className="mt-1">章末：{selectedStyle.endingBeat}</div>
+          <div className="mt-1">语言：{selectedStyle.languageStyle}</div>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {selectedStyle.mustHave.map((item) => (
+              <span className="rounded-md bg-slate-100 px-2 py-1 text-xs text-slate-700" key={item}>
+                {item}
+              </span>
+            ))}
+          </div>
+        </div>
       </div>
       <div>
         <label className="text-sm font-medium" htmlFor="sellingPoint">

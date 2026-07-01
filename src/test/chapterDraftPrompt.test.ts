@@ -25,6 +25,8 @@ test("buildChapterDraftPrompt", async (t) => {
   await t.test("includes platform rules and chapter card constraints", () => {
     assert.ok(prompt.systemPrompt.includes("正文初稿"));
     assert.ok(prompt.userPrompt.includes("番茄小说"));
+    assert.ok(prompt.userPrompt.includes("平台风格模板"));
+    assert.ok(prompt.userPrompt.includes("每 300-500 字"));
     assert.ok(prompt.userPrompt.includes("章节目标：让主角遭遇不可逆事件。"));
     assert.ok(prompt.userPrompt.includes("第一段必须进入事件现场"));
   });

@@ -75,3 +75,22 @@ export async function POST(request: Request) {
   return NextResponse.json({ task: updatedTask, result: JSON.parse(result.text) });
 }
 
+export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url);
+  const chapterId = searchParams.get("chapterId");
+
+  if (!chapterId) {
+    return NextResponse.json({ error: "chapterId is required" }, { status: 400 });
+  }
+
+  const tasks = await prisma.aiTask.findMany({
+    where: {
+      chapterId,
+      taskType: "chapter_review",
+    },
+    orderBy: { createdAt: "desc" },
+    take: 5,
+  });
+
+  return NextResponse.json({ tasks });
+}

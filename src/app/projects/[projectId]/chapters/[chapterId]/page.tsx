@@ -2,6 +2,7 @@ import { ChapterReviewPanel } from "@/components/ai/ChapterReviewPanel";
 import { AppShell } from "@/components/app-shell/AppShell";
 import { ChapterEditor } from "@/components/chapters/ChapterEditor";
 import { prisma } from "@/lib/db/prisma";
+import { getPlatformProfile, type PlatformId } from "@/lib/platforms/platformProfiles";
 import { notFound } from "next/navigation";
 
 export default async function ChapterPage({
@@ -18,6 +19,7 @@ export default async function ChapterPage({
   if (!chapter) {
     notFound();
   }
+  const platform = getPlatformProfile(chapter.project.targetPlatform as PlatformId);
 
   return (
     <AppShell>
@@ -36,7 +38,7 @@ export default async function ChapterPage({
             wordCount: chapter.wordCount,
           }}
         />
-        <ChapterReviewPanel chapterId={chapterId} />
+        <ChapterReviewPanel chapterId={chapterId} platform={platform} />
       </div>
     </AppShell>
   );

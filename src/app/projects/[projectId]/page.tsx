@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AppShell } from "@/components/app-shell/AppShell";
 import { CreateChapterForm } from "@/components/chapters/CreateChapterForm";
+import { ExportMarkdownButton } from "@/components/projects/ExportMarkdownButton";
 import { prisma } from "@/lib/db/prisma";
 import { getPlatformProfile, type PlatformId } from "@/lib/platforms/platformProfiles";
 
@@ -27,7 +28,6 @@ export default async function ProjectPage({ params }: { params: Promise<{ projec
             {platform.name} · {project.currentWordCount}/{project.targetWordCount} 字 · {project.genre}
           </p>
         </div>
-        <CreateChapterForm projectId={project.id} />
         <div className="grid gap-4 md:grid-cols-3">
           <div className="rounded-md border bg-white p-4">
             <div className="font-medium">大纲树</div>
@@ -35,7 +35,16 @@ export default async function ProjectPage({ params }: { params: Promise<{ projec
           </div>
           <div className="rounded-md border bg-white p-4">
             <div className="font-medium">平台策略</div>
-            <p className="mt-2 text-sm text-slate-600">起点、番茄、七猫、知乎盐选和海外平台画像。</p>
+            <p className="mt-2 text-sm text-slate-600">开头：{platform.openingRules.join("；")}</p>
+            <p className="mt-2 text-sm text-slate-600">审稿：{platform.reviewFocus.join("、")}</p>
+            <p className="mt-2 text-sm text-slate-600">风险：{platform.risks.join("、")}</p>
+          </div>
+        </div>
+        <div className="grid gap-4 md:grid-cols-[1fr_auto]">
+          <CreateChapterForm projectId={project.id} />
+          <div className="rounded-md border border-slate-200 bg-white p-4">
+            <div className="mb-3 font-medium">导出</div>
+            <ExportMarkdownButton projectId={project.id} title={project.title} />
           </div>
         </div>
         <section className="rounded-md border border-slate-200 bg-white p-4">

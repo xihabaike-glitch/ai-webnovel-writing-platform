@@ -54,6 +54,27 @@ interface MultiPlatformSubmission {
   markdown: string;
 }
 
+interface SubmissionAbVariant {
+  id: string;
+  name: string;
+  angle: string;
+  title: string;
+  logline: string;
+  synopsis: string;
+  tags: string[];
+  score: number;
+  hypothesis: string;
+  expectedReader: string;
+  revisionFocus: string[];
+}
+
+interface SubmissionAbTest {
+  platformName: string;
+  recommendedVariantId: string;
+  variants: SubmissionAbVariant[];
+  markdown: string;
+}
+
 function optimizedMarkdown(title: string, optimized: OptimizedSubmissionPackage) {
   return [
     `# ${title} 优化投稿资料`,
@@ -101,6 +122,9 @@ export function SubmissionPackagePanel({
   const [isLoadingMultiPlatform, setIsLoadingMultiPlatform] = useState(false);
   const [isDownloadingMultiPlatform, setIsDownloadingMultiPlatform] = useState(false);
   const [multiPlatform, setMultiPlatform] = useState<MultiPlatformSubmission | null>(null);
+  const [isLoadingAbTest, setIsLoadingAbTest] = useState(false);
+  const [isDownloadingAbTest, setIsDownloadingAbTest] = useState(false);
+  const [abTest, setAbTest] = useState<SubmissionAbTest | null>(null);
 
   async function copyMarkdown() {
     await navigator.clipboard.writeText(submissionPackage.markdown);
@@ -203,6 +227,53 @@ export function SubmissionPackagePanel({
     }
   }
 
+  async function loadAbTest() {
+    setIsLoadingAbTest(true);
+    setMessage(null);
+    try {
+      const response = await fetch(`/api/projects/${projectId}/submission-package/ab-test`);
+      if (!response.ok) {
+        throw new Error("生成 A/B 测试失败。");
+      }
+      const payload = (await response.json()) as { submissionAbTest: SubmissionAbTest };
+      setAbTest(payload.submissionAbTest);
+      setMessage("已生成投稿 A/B 测试");
+    } catch (caught) {
+      setMessage(caught instanceof Error ? caught.message : "生成 A/B 测试失败。");
+    } finally {
+      setIsLoadingAbTest(false);
+    }
+  }
+
+  async function copyAbTestMarkdown() {
+    if (!abTest) return;
+    await navigator.clipboard.writeText(abTest.markdown);
+    setMessage("已复制 A/B 测试");
+  }
+
+  async function downloadAbTestMarkdown() {
+    setIsDownloadingAbTest(true);
+    setMessage(null);
+    try {
+      const response = await fetch(`/api/projects/${projectId}/submission-package/ab-test?format=markdown`);
+      if (!response.ok) {
+        throw new Error("下载 A/B 测试失败。");
+      }
+      const markdown = await response.text();
+      const blob = new Blob([markdown], { type: "text/markdown;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `${submissionPackage.title}-投稿AB测试.md`;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (caught) {
+      setMessage(caught instanceof Error ? caught.message : "下载 A/B 测试失败。");
+    } finally {
+      setIsDownloadingAbTest(false);
+    }
+  }
+
   return (
     <section className="rounded-md border border-slate-200 bg-white p-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -233,6 +304,14 @@ export function SubmissionPackagePanel({
             type="button"
           >
             {isLoadingMultiPlatform ? "生成中" : "多平台版本"}
+          </button>
+          <button
+            className="rounded-md border border-slate-200 px-3 py-2 text-sm font-medium hover:bg-slate-50 disabled:opacity-50"
+            disabled={isLoadingAbTest}
+            onClick={loadAbTest}
+            type="button"
+          >
+            {isLoadingAbTest ? "测试中" : "A/B 测试"}
           </button>
           <button
             className="rounded-md bg-slate-950 px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
@@ -370,6 +449,75 @@ export function SubmissionPackagePanel({
                   <div>
                     <span className="font-medium text-slate-900">风险：</span>
                     {variant.risks.join("、")}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
+      {abTest ? (
+        <div className="mt-4 rounded-md border border-slate-200 p-3">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <div className="text-sm font-medium">投稿 A/B 测试</div>
+              <p className="mt-1 text-xs text-slate-500">
+                推荐：{abTest.variants.find((variant) => variant.id === abTest.recommendedVariantId)?.name ?? "待判断"} · {abTest.platformName}
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button
+                className="rounded-md border border-slate-200 px-3 py-2 text-xs font-medium hover:bg-slate-50"
+                onClick={copyAbTestMarkdown}
+                type="button"
+              >
+                复制测试
+              </button>
+              <button
+                className="rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white disabled:opacity-50"
+                disabled={isDownloadingAbTest}
+                onClick={downloadAbTestMarkdown}
+                type="button"
+              >
+                {isDownloadingAbTest ? "下载中" : "下载测试"}
+              </button>
+            </div>
+          </div>
+          <div className="mt-3 grid gap-3">
+            {abTest.variants.map((variant) => (
+              <div className="rounded-md bg-slate-50 p-3" key={variant.id}>
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <div className="text-sm font-medium text-slate-900">
+                      {variant.name}
+                      {variant.id === abTest.recommendedVariantId ? (
+                        <span className="ml-2 text-xs font-normal text-slate-500">推荐</span>
+                      ) : null}
+                    </div>
+                    <p className="mt-1 text-xs text-slate-500">{variant.angle}</p>
+                  </div>
+                  <div className="w-fit rounded-md bg-white px-2 py-1 text-xs font-medium text-slate-700">{variant.score}</div>
+                </div>
+                <div className="mt-3 rounded-md bg-white p-3">
+                  <div className="text-xs font-medium text-slate-500">标题</div>
+                  <p className="mt-1 text-sm text-slate-800">{variant.title}</p>
+                </div>
+                <div className="mt-2 grid gap-2 text-sm text-slate-600">
+                  <div>
+                    <span className="font-medium text-slate-900">卖点：</span>
+                    {variant.logline}
+                  </div>
+                  <div>
+                    <span className="font-medium text-slate-900">假设：</span>
+                    {variant.hypothesis}
+                  </div>
+                  <div>
+                    <span className="font-medium text-slate-900">读者：</span>
+                    {variant.expectedReader}
+                  </div>
+                  <div>
+                    <span className="font-medium text-slate-900">标签：</span>
+                    {variant.tags.join("、")}
                   </div>
                 </div>
               </div>

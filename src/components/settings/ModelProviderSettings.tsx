@@ -46,6 +46,10 @@ interface RouteEffectAuditView {
     fallbackTaskCount: number;
     otherTaskCount: number;
     knownCostUsd: number;
+    healthyRoutes: number;
+    watchRoutes: number;
+    unconfiguredRoutes: number;
+    nextUnconfiguredTaskLabel: string | null;
   };
   rows: Array<{
     taskType: string;
@@ -348,6 +352,18 @@ export function ModelProviderSettings({
             <div className="mt-1 text-2xl font-semibold">{routeEffectAudit.summary.configuredRoutes}/{routeEffectAudit.summary.routedTaskTypes}</div>
           </div>
           <div className="rounded-md bg-slate-50 p-3">
+            <div className="text-xs text-slate-500">健康路由</div>
+            <div className="mt-1 text-2xl font-semibold">{routeEffectAudit.summary.healthyRoutes}</div>
+          </div>
+          <div className="rounded-md bg-slate-50 p-3">
+            <div className="text-xs text-slate-500">需观察</div>
+            <div className="mt-1 text-2xl font-semibold">{routeEffectAudit.summary.watchRoutes}</div>
+          </div>
+          <div className="rounded-md bg-slate-50 p-3">
+            <div className="text-xs text-slate-500">未配置</div>
+            <div className="mt-1 text-2xl font-semibold">{routeEffectAudit.summary.unconfiguredRoutes}</div>
+          </div>
+          <div className="rounded-md bg-slate-50 p-3">
             <div className="text-xs text-slate-500">有样本</div>
             <div className="mt-1 text-2xl font-semibold">{routeEffectAudit.summary.observedTaskTypes}</div>
           </div>
@@ -363,11 +379,12 @@ export function ModelProviderSettings({
             <div className="text-xs text-slate-500">路由成本</div>
             <div className="mt-1 text-2xl font-semibold">${routeEffectAudit.summary.knownCostUsd.toFixed(4)}</div>
           </div>
-          <div className="rounded-md bg-slate-50 p-3">
-            <div className="text-xs text-slate-500">审计行</div>
-            <div className="mt-1 text-2xl font-semibold">{routeEffectAudit.rows.length}</div>
-          </div>
         </div>
+        {routeEffectAudit.summary.nextUnconfiguredTaskLabel ? (
+          <div className="mt-3 rounded-md bg-amber-50 p-3 text-sm text-amber-800">
+            下一条建议补齐：{routeEffectAudit.summary.nextUnconfiguredTaskLabel}
+          </div>
+        ) : null}
         <div className="mt-4 grid gap-3 lg:grid-cols-[0.8fr_1.2fr]">
           <div className="rounded-md border border-slate-200 p-3">
             <div className="text-sm font-medium text-slate-950">路由下一步</div>

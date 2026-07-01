@@ -50,6 +50,10 @@ export interface RouteEffectAudit {
     fallbackTaskCount: number;
     otherTaskCount: number;
     knownCostUsd: number;
+    healthyRoutes: number;
+    watchRoutes: number;
+    unconfiguredRoutes: number;
+    nextUnconfiguredTaskLabel: string | null;
   };
   rows: RouteEffectRow[];
   nextActions: string[];
@@ -156,6 +160,10 @@ export function buildRouteEffectAudit(
     fallbackTaskCount: rows.reduce((sum, row) => sum + row.fallbackTasks, 0),
     otherTaskCount: rows.reduce((sum, row) => sum + row.otherTasks, 0),
     knownCostUsd: money(rows.reduce((sum, row) => sum + row.knownCostUsd, 0)),
+    healthyRoutes: rows.filter((row) => row.status === "healthy").length,
+    watchRoutes: rows.filter((row) => row.status === "watch").length,
+    unconfiguredRoutes: rows.filter((row) => row.status === "unconfigured").length,
+    nextUnconfiguredTaskLabel: rows.find((row) => row.status === "unconfigured")?.label ?? null,
   };
   const nextActions = [
     summary.configuredRoutes < summary.routedTaskTypes ? "优先补齐未配置路由的任务类型，别继续靠默认模型碰运气。" : null,

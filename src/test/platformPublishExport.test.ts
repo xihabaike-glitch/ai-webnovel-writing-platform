@@ -76,6 +76,10 @@ test("buildPlatformPublishExportCenter", async (t) => {
     assert.ok(center.packages.some((pack) => pack.platformId === "qidian"));
     assert.ok(center.packages.some((pack) => pack.platformId === "wattpad"));
     assert.ok(center.packages[0].repairActions.some((action) => action.kind === "run_chapter_review"));
+    assert.equal(center.packages[0].repairPath.status, "needs_repair");
+    assert.equal(center.packages[0].repairPath.nextStep?.kind, "run_chapter_review");
+    assert.equal(center.packages[0].repairPath.executableActions, 1);
+    assert.equal(center.packages[0].repairPath.manualActions, 0);
   });
 
   await t.test("uses overseas packaging for overseas platforms", () => {
@@ -141,6 +145,9 @@ test("buildPlatformPublishExportCenter", async (t) => {
     assert.equal(pack.canExport, true);
     assert.equal(pack.preflight.blocked.length, 0);
     assert.equal(pack.repairActions.length, 0);
+    assert.equal(pack.repairPath.status, "ready");
+    assert.equal(pack.repairPath.nextStep, null);
+    assert.equal(pack.repairPath.totalActions, 0);
     assert.equal(pack.chapters.every((chapter) => chapter.ready), true);
     assert.ok(pack.markdown.includes("导出状态：允许导出"));
   });
@@ -174,6 +181,9 @@ test("buildPlatformPublishExportCenter", async (t) => {
     assert.equal(pack.canExport, false);
     assert.ok(pack.preflight.blocked.some((item) => item.includes("1 章未通过")));
     assert.ok(pack.repairActions.some((action) => action.kind === "run_second_pass" && action.chapterId === "chapter-1"));
+    assert.equal(pack.repairPath.nextStep?.kind, "run_second_pass");
+    assert.equal(pack.repairPath.executableActions, 1);
+    assert.equal(pack.repairPath.groups.some((group) => group.kind === "run_second_pass" && group.count === 1), true);
     assert.ok(pack.chapters[0].preflight.blocked.some((item) => item.includes("仍要求二改")));
   });
 
@@ -197,6 +207,8 @@ test("buildPlatformPublishExportCenter", async (t) => {
     assert.equal(pack.canExport, false);
     assert.ok(pack.preflight.blocked.some((item) => item.includes("低于 80%")));
     assert.ok(pack.repairActions.some((action) => action.kind === "open_submission_package"));
+    assert.equal(pack.repairPath.nextStep?.kind, "open_submission_package");
+    assert.equal(pack.repairPath.manualActions, 1);
   });
 
   await t.test("summarizes publish repair task history", () => {

@@ -59,6 +59,39 @@ export interface PublishRepairHistoryItem {
   createdAt: Date | string;
 }
 
+export interface PublishRepairPathStep {
+  id: string;
+  kind: PublishRepairActionKind;
+  priority: PublishRepairAction["priority"];
+  label: string;
+  detail: string;
+  executable: boolean;
+  chapterId?: string;
+  chapterTitle?: string;
+}
+
+export interface PublishRepairPathGroup {
+  kind: PublishRepairActionKind;
+  label: string;
+  count: number;
+  executableCount: number;
+  manualCount: number;
+  chapterTitles: string[];
+}
+
+export interface PublishRepairPath {
+  status: "ready" | "needs_repair";
+  headline: string;
+  nextStep: PublishRepairPathStep | null;
+  totalActions: number;
+  executableActions: number;
+  manualActions: number;
+  affectedChapters: number;
+  blockedCount: number;
+  warningCount: number;
+  groups: PublishRepairPathGroup[];
+}
+
 export interface PublishPackageVersionItem {
   id: string;
   platformId: string;
@@ -156,6 +189,7 @@ export interface PlatformPublishPackage {
   preflight: PublishPreflight;
   canExport: boolean;
   repairActions: PublishRepairAction[];
+  repairPath: PublishRepairPath;
   repairHistory: PublishRepairHistoryItem[];
   publishVersions: PublishPackageVersionItem[];
   warnings: string[];
@@ -552,6 +586,97 @@ function repairLabel(kind: PublishRepairActionKind) {
   return labels[kind];
 }
 
+function canExecuteRepairAction(action: PublishRepairAction) {
+  return (action.kind === "run_chapter_review" || action.kind === "run_second_pass") && Boolean(action.chapterId);
+}
+
+function repairActionRank(action: PublishRepairAction) {
+  const priorityRank: Record<PublishRepairAction["priority"], number> = {
+    high: 0,
+    medium: 1,
+    low: 2,
+  };
+  const kindRank: Record<PublishRepairActionKind, number> = {
+    add_publish_chapters: 0,
+    edit_chapter: 1,
+    run_second_pass: 2,
+    run_chapter_review: 3,
+    open_submission_package: 4,
+  };
+  return priorityRank[action.priority] * 10 + kindRank[action.kind];
+}
+
+function buildRepairPath(preflight: PublishPreflight): PublishRepairPath {
+  const sortedActions = [...preflight.repairActions].sort((left, right) => (
+    repairActionRank(left) - repairActionRank(right)
+    || (left.chapterTitle ?? "").localeCompare(right.chapterTitle ?? "")
+    || left.label.localeCompare(right.label)
+  ));
+  const steps = sortedActions.map((action): PublishRepairPathStep => ({
+    id: action.id,
+    kind: action.kind,
+    priority: action.priority,
+    label: action.label,
+    detail: action.detail,
+    executable: canExecuteRepairAction(action),
+    chapterId: action.chapterId,
+    chapterTitle: action.chapterTitle,
+  }));
+  const groups = Array.from(steps.reduce((map, step) => {
+    const current = map.get(step.kind) ?? {
+      kind: step.kind,
+      label: repairLabel(step.kind),
+      count: 0,
+      executableCount: 0,
+      manualCount: 0,
+      chapterTitles: [],
+    };
+    current.count += 1;
+    if (step.executable) current.executableCount += 1;
+    else current.manualCount += 1;
+    if (step.chapterTitle && !current.chapterTitles.includes(step.chapterTitle)) {
+      current.chapterTitles.push(step.chapterTitle);
+    }
+    map.set(step.kind, current);
+    return map;
+  }, new Map<PublishRepairActionKind, PublishRepairPathGroup>()).values())
+    .sort((left, right) => repairActionRank({ id: left.kind, kind: left.kind, priority: "high", label: left.label, detail: "" })
+      - repairActionRank({ id: right.kind, kind: right.kind, priority: "high", label: right.label, detail: "" }));
+  const affectedChapters = new Set(steps.map((step) => step.chapterId).filter((chapterId): chapterId is string => Boolean(chapterId))).size;
+  const executableActions = steps.filter((step) => step.executable).length;
+  const manualActions = steps.length - executableActions;
+
+  if (preflight.canExport) {
+    return {
+      status: "ready",
+      headline: "当前发布包已通过质检，可以复制、下载或加入全平台归档。",
+      nextStep: null,
+      totalActions: 0,
+      executableActions: 0,
+      manualActions: 0,
+      affectedChapters: 0,
+      blockedCount: preflight.blocked.length,
+      warningCount: preflight.warnings.length,
+      groups: [],
+    };
+  }
+
+  return {
+    status: "needs_repair",
+    headline: steps[0]
+      ? `先处理：${steps[0].label}${steps[0].chapterTitle ? `（${steps[0].chapterTitle}）` : ""}`
+      : "先补齐阻塞项，再回到发布前质检。",
+    nextStep: steps[0] ?? null,
+    totalActions: steps.length,
+    executableActions,
+    manualActions,
+    affectedChapters,
+    blockedCount: preflight.blocked.length,
+    warningCount: preflight.warnings.length,
+    groups,
+  };
+}
+
 function buildRepairHistory(tasks: PublishExportAiTask[], chapters: PublishExportChapter[]): PublishRepairHistoryItem[] {
   const chapterTitles = new Map(chapters.map((chapter) => [chapter.id, chapter.title]));
   const auditBySecondPassTaskId = new Map<string, { score: number | null; shouldSecondPass: boolean | null }>();
@@ -634,7 +759,19 @@ function buildMarkdown(pack: Omit<PlatformPublishPackage, "markdown">) {
     `导出状态：${pack.canExport ? "允许导出" : "暂不允许导出"}`,
     ...(pack.preflight.blocked.length ? pack.preflight.blocked.map((item) => `- 阻塞：${item}`) : ["- 阻塞：无"]),
     ...(pack.preflight.warnings.length ? pack.preflight.warnings.map((item) => `- 提醒：${item}`) : ["- 提醒：无"]),
-    ...(pack.repairActions.length ? ["", "## 修复动作", ...pack.repairActions.map((action) => `- ${action.label}：${action.detail}`)] : []),
+    ...(pack.repairActions.length ? [
+      "",
+      "## 修复路径",
+      pack.repairPath.headline,
+      `- 阻塞项：${pack.repairPath.blockedCount}`,
+      `- 可一键处理：${pack.repairPath.executableActions}`,
+      `- 需要手动处理：${pack.repairPath.manualActions}`,
+      `- 影响章节：${pack.repairPath.affectedChapters}`,
+      ...pack.repairPath.groups.map((group) => `- ${group.label}：${group.count} 项`),
+      "",
+      "## 修复动作",
+      ...pack.repairActions.map((action) => `- ${action.label}：${action.detail}`),
+    ] : []),
     ...(pack.repairHistory.length ? ["", "## 最近修复记录", ...pack.repairHistory.map((item) => `- ${item.label}｜${item.chapterTitle}｜${item.status}｜${item.message}`)] : []),
     "",
     "## 风险提醒",
@@ -684,6 +821,7 @@ function buildPlatformPackage(
   });
   const warnings = buildPackageWarnings(platform, chapters, input.submissionChecklist);
   const preflight = buildPackagePreflight(chapters, warnings, input.submissionChecklist);
+  const repairPath = buildRepairPath(preflight);
   const repairHistory = buildRepairHistory(input.aiTasks ?? [], input.chapters);
   const publishVersions = (input.publishSnapshots ?? [])
     .filter((snapshot) => snapshot.platformId === platform.id)
@@ -702,6 +840,7 @@ function buildPlatformPackage(
     preflight,
     canExport: preflight.canExport,
     repairActions: preflight.repairActions,
+    repairPath,
     repairHistory,
     publishVersions,
     warnings,

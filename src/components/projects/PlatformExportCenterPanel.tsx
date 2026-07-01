@@ -41,6 +41,39 @@ interface PublishRepairHistoryItem {
   createdAt: string;
 }
 
+interface PublishRepairPathStep {
+  id: string;
+  kind: PublishRepairActionKind;
+  priority: "high" | "medium" | "low";
+  label: string;
+  detail: string;
+  executable: boolean;
+  chapterId?: string;
+  chapterTitle?: string;
+}
+
+interface PublishRepairPathGroup {
+  kind: PublishRepairActionKind;
+  label: string;
+  count: number;
+  executableCount: number;
+  manualCount: number;
+  chapterTitles: string[];
+}
+
+interface PublishRepairPath {
+  status: "ready" | "needs_repair";
+  headline: string;
+  nextStep: PublishRepairPathStep | null;
+  totalActions: number;
+  executableActions: number;
+  manualActions: number;
+  affectedChapters: number;
+  blockedCount: number;
+  warningCount: number;
+  groups: PublishRepairPathGroup[];
+}
+
 interface PublishPackageVersionItem {
   id: string;
   platformId: string;
@@ -134,6 +167,7 @@ interface PlatformPublishPackage {
   preflight: PublishPreflight;
   canExport: boolean;
   repairActions: PublishRepairAction[];
+  repairPath: PublishRepairPath;
   repairHistory: PublishRepairHistoryItem[];
   publishVersions: PublishPackageVersionItem[];
   warnings: string[];
@@ -223,6 +257,10 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
     () => selectedPackage?.repairActions.filter(canRunAction).slice(0, 5) ?? [],
     [selectedPackage],
   );
+  const nextRepairAction = useMemo(() => {
+    if (!selectedPackage?.repairPath.nextStep) return null;
+    return selectedPackage.repairActions.find((action) => action.id === selectedPackage.repairPath.nextStep?.id) ?? null;
+  }, [selectedPackage]);
   const exportablePackages = useMemo(
     () => center?.packages.filter((pack) => pack.canExport) ?? [],
     [center],
@@ -555,6 +593,79 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
               }`}>
                 {selectedPackage.canExport ? "已通过" : "需处理"}
               </div>
+            </div>
+            <div className={`mt-3 rounded-md border p-3 text-sm ${
+              selectedPackage.repairPath.status === "ready"
+                ? "border-emerald-100 bg-emerald-50"
+                : "border-amber-100 bg-amber-50"
+            }`}>
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                <div>
+                  <div className={selectedPackage.repairPath.status === "ready" ? "font-medium text-emerald-900" : "font-medium text-amber-900"}>
+                    修复到可导出
+                  </div>
+                  <div className={selectedPackage.repairPath.status === "ready" ? "mt-1 text-emerald-700" : "mt-1 text-amber-700"}>
+                    {selectedPackage.repairPath.headline}
+                  </div>
+                </div>
+                {nextRepairAction ? (
+                  canRunAction(nextRepairAction) ? (
+                    <button
+                      className="w-fit rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white disabled:opacity-50"
+                      disabled={Boolean(runningActionId)}
+                      onClick={() => void runRepairAction(nextRepairAction)}
+                      type="button"
+                    >
+                      {runningActionId === nextRepairAction.id ? "处理中" : "处理首要项"}
+                    </button>
+                  ) : (
+                    <Link
+                      className="w-fit rounded-md border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                      href={actionHref(projectId, nextRepairAction)}
+                    >
+                      打开首要位置
+                    </Link>
+                  )
+                ) : null}
+              </div>
+              <div className="mt-3 grid gap-2 sm:grid-cols-4">
+                <div className="rounded-md bg-white/80 p-2">
+                  <div className="text-xs text-slate-500">阻塞项</div>
+                  <div className="mt-1 font-medium text-slate-950">{selectedPackage.repairPath.blockedCount}</div>
+                </div>
+                <div className="rounded-md bg-white/80 p-2">
+                  <div className="text-xs text-slate-500">可一键处理</div>
+                  <div className="mt-1 font-medium text-slate-950">{selectedPackage.repairPath.executableActions}</div>
+                </div>
+                <div className="rounded-md bg-white/80 p-2">
+                  <div className="text-xs text-slate-500">需要手动处理</div>
+                  <div className="mt-1 font-medium text-slate-950">{selectedPackage.repairPath.manualActions}</div>
+                </div>
+                <div className="rounded-md bg-white/80 p-2">
+                  <div className="text-xs text-slate-500">影响章节</div>
+                  <div className="mt-1 font-medium text-slate-950">{selectedPackage.repairPath.affectedChapters}</div>
+                </div>
+              </div>
+              {selectedPackage.repairPath.groups.length ? (
+                <div className="mt-3 grid gap-2 lg:grid-cols-2">
+                  {selectedPackage.repairPath.groups.map((group) => (
+                    <div className="rounded-md bg-white/80 p-2" key={group.kind}>
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-medium text-slate-950">{group.label}</span>
+                        <span className="text-xs text-slate-500">{group.count} 项</span>
+                      </div>
+                      <div className="mt-1 text-xs text-slate-500">
+                        可一键 {group.executableCount} · 手动 {group.manualCount}
+                      </div>
+                      {group.chapterTitles.length ? (
+                        <div className="mt-1 line-clamp-2 text-xs text-slate-500">
+                          {group.chapterTitles.slice(0, 3).join("、")}
+                        </div>
+                      ) : null}
+                    </div>
+                  ))}
+                </div>
+              ) : null}
             </div>
             <div className="mt-3 grid gap-2 text-sm text-slate-600 lg:grid-cols-2">
               <div className="rounded-md bg-slate-50 p-3">

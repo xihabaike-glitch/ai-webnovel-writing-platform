@@ -3,6 +3,7 @@ import { ModelProviderSettings } from "@/components/settings/ModelProviderSettin
 import { prisma } from "@/lib/db/prisma";
 import { providerOptions } from "@/lib/model-gateway/providerDefaults";
 import { buildProviderHealthDashboard } from "@/lib/model-gateway/providerHealth";
+import { buildRouteEffectAudit } from "@/lib/model-gateway/routeEffectAudit";
 import { modelTaskRouteOptions } from "@/lib/model-gateway/taskRouting";
 
 export const dynamic = "force-dynamic";
@@ -32,16 +33,39 @@ function maskProvider(provider: {
 }
 
 export default async function ModelSettingsPage() {
-  const [providers, routes] = await Promise.all([
+  const [providers, routes, recentTasks] = await Promise.all([
     prisma.modelProvider.findMany({
       orderBy: { updatedAt: "desc" },
     }),
     prisma.modelTaskRoute.findMany({
       orderBy: { taskType: "asc" },
     }),
+    prisma.aiTask.findMany({
+      orderBy: { createdAt: "desc" },
+      take: 500,
+      select: {
+        id: true,
+        taskType: true,
+        providerConfigId: true,
+        status: true,
+        inputTokens: true,
+        outputTokens: true,
+        costUsd: true,
+        createdAt: true,
+      },
+    }),
   ]);
   const maskedProviders = providers.map(maskProvider);
   const healthDashboard = buildProviderHealthDashboard(maskedProviders);
+  const routeEffectAudit = buildRouteEffectAudit(
+    recentTasks,
+    routes,
+    providers.map((provider) => ({
+      id: provider.id,
+      displayName: provider.displayName,
+      defaultModel: provider.defaultModel,
+    })),
+  );
 
   return (
     <AppShell>
@@ -51,6 +75,7 @@ export default async function ModelSettingsPage() {
         healthDashboard={healthDashboard}
         options={providerOptions}
         providers={maskedProviders}
+        routeEffectAudit={routeEffectAudit}
         routeOptions={modelTaskRouteOptions}
         routes={routes.map((route) => ({
           id: route.id,

@@ -38,6 +38,36 @@ interface RouteView {
   fallbackProviderConfigId: string | null;
 }
 
+interface RouteEffectAuditView {
+  summary: {
+    routedTaskTypes: number;
+    configuredRoutes: number;
+    observedTaskTypes: number;
+    fallbackTaskCount: number;
+    otherTaskCount: number;
+    knownCostUsd: number;
+  };
+  rows: Array<{
+    taskType: string;
+    label: string;
+    primaryProviderName: string;
+    fallbackProviderName: string;
+    totalTasks: number;
+    primaryTasks: number;
+    fallbackTasks: number;
+    otherTasks: number;
+    succeededTasks: number;
+    failedTasks: number;
+    successRatePercent: number;
+    totalTokens: number;
+    knownCostUsd: number;
+    lastUsedAt: string | null;
+    status: "healthy" | "watch" | "unconfigured";
+    recommendation: string;
+  }>;
+  nextActions: string[];
+}
+
 interface RouteDraft {
   primaryProviderConfigId: string;
   fallbackProviderConfigId: string;
@@ -92,12 +122,14 @@ export function ModelProviderSettings({
   healthDashboard,
   options,
   providers,
+  routeEffectAudit,
   routeOptions,
   routes,
 }: {
   healthDashboard: ProviderHealthDashboard;
   options: ProviderOptionView[];
   providers: ProviderView[];
+  routeEffectAudit: RouteEffectAuditView;
   routeOptions: RouteOptionView[];
   routes: RouteView[];
 }) {
@@ -309,6 +341,68 @@ export function ModelProviderSettings({
             <p className="mt-1 text-sm text-slate-600">给不同 AI 任务指定首选模型和备用模型，未配置时自动使用当前可用模型。</p>
           </div>
           {routeMessage ? <div className="rounded-md bg-slate-50 px-3 py-2 text-sm text-slate-600">{routeMessage}</div> : null}
+        </div>
+        <div className="mt-4 grid gap-3 md:grid-cols-3 lg:grid-cols-6">
+          <div className="rounded-md bg-slate-50 p-3">
+            <div className="text-xs text-slate-500">已配置</div>
+            <div className="mt-1 text-2xl font-semibold">{routeEffectAudit.summary.configuredRoutes}/{routeEffectAudit.summary.routedTaskTypes}</div>
+          </div>
+          <div className="rounded-md bg-slate-50 p-3">
+            <div className="text-xs text-slate-500">有样本</div>
+            <div className="mt-1 text-2xl font-semibold">{routeEffectAudit.summary.observedTaskTypes}</div>
+          </div>
+          <div className="rounded-md bg-slate-50 p-3">
+            <div className="text-xs text-slate-500">走备用</div>
+            <div className="mt-1 text-2xl font-semibold">{routeEffectAudit.summary.fallbackTaskCount}</div>
+          </div>
+          <div className="rounded-md bg-slate-50 p-3">
+            <div className="text-xs text-slate-500">偏离路由</div>
+            <div className="mt-1 text-2xl font-semibold">{routeEffectAudit.summary.otherTaskCount}</div>
+          </div>
+          <div className="rounded-md bg-slate-50 p-3">
+            <div className="text-xs text-slate-500">路由成本</div>
+            <div className="mt-1 text-2xl font-semibold">${routeEffectAudit.summary.knownCostUsd.toFixed(4)}</div>
+          </div>
+          <div className="rounded-md bg-slate-50 p-3">
+            <div className="text-xs text-slate-500">审计行</div>
+            <div className="mt-1 text-2xl font-semibold">{routeEffectAudit.rows.length}</div>
+          </div>
+        </div>
+        <div className="mt-4 grid gap-3 lg:grid-cols-[0.8fr_1.2fr]">
+          <div className="rounded-md border border-slate-200 p-3">
+            <div className="text-sm font-medium text-slate-950">路由下一步</div>
+            <div className="mt-3 grid gap-2 text-sm text-slate-600">
+              {routeEffectAudit.nextActions.map((action, index) => (
+                <div className="rounded-md bg-slate-50 p-2" key={action}>{index + 1}. {action}</div>
+              ))}
+            </div>
+          </div>
+          <div className="rounded-md border border-slate-200 p-3">
+            <div className="text-sm font-medium text-slate-950">路由效果审计</div>
+            <div className="mt-3 grid gap-2">
+              {routeEffectAudit.rows.map((row) => (
+                <div className="rounded-md bg-slate-50 p-3 text-sm" key={row.taskType}>
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="font-medium text-slate-950">{row.label}</div>
+                    <div className="text-xs text-slate-500">{row.status === "healthy" ? "稳定" : row.status === "watch" ? "观察" : "未配置"}</div>
+                  </div>
+                  <div className="mt-2 grid gap-1 text-xs text-slate-500 md:grid-cols-2">
+                    <div>首选：{row.primaryProviderName}</div>
+                    <div>备用：{row.fallbackProviderName}</div>
+                  </div>
+                  <div className="mt-2 flex flex-wrap gap-2 text-xs text-slate-600">
+                    <span className="rounded-md bg-white px-2 py-1">任务 {row.totalTasks}</span>
+                    <span className="rounded-md bg-white px-2 py-1">成功率 {row.successRatePercent}%</span>
+                    <span className="rounded-md bg-white px-2 py-1">首选 {row.primaryTasks}</span>
+                    <span className="rounded-md bg-white px-2 py-1">备用 {row.fallbackTasks}</span>
+                    <span className="rounded-md bg-white px-2 py-1">偏离 {row.otherTasks}</span>
+                    <span className="rounded-md bg-white px-2 py-1">${row.knownCostUsd.toFixed(4)}</span>
+                  </div>
+                  <p className="mt-2 leading-6 text-slate-600">{row.recommendation}</p>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
         <div className="mt-4 grid gap-3">
           {routeOptions.map((option) => {

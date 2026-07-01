@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { getPlatformProfile, type PlatformId } from "@/lib/platforms/platformProfiles";
+import { buildSubmissionChecklist } from "@/lib/projects/submissionChecklist";
 import { buildSubmissionPackage } from "@/lib/projects/submissionPackage";
 
 interface Params {
@@ -15,6 +16,7 @@ export async function GET(request: Request, { params }: Params) {
     where: { id: projectId },
     include: {
       chapters: { orderBy: { order: "asc" } },
+      aiTasks: { orderBy: { createdAt: "desc" } },
     },
   });
 
@@ -23,6 +25,20 @@ export async function GET(request: Request, { params }: Params) {
   }
 
   const platform = getPlatformProfile(project.targetPlatform as PlatformId);
+  const submissionChecklist = buildSubmissionChecklist({
+    title: project.title,
+    genre: project.genre,
+    sellingPoint: project.sellingPoint,
+    currentWordCount: project.currentWordCount,
+    targetWordCount: project.targetWordCount,
+    platform,
+    chapters: project.chapters,
+    aiTasks: project.aiTasks.map((task) => ({
+      taskType: task.taskType,
+      status: task.status,
+      chapter: task.chapterId ? { id: task.chapterId } : null,
+    })),
+  });
   const submissionPackage = buildSubmissionPackage({
     title: project.title,
     genre: project.genre,
@@ -34,6 +50,13 @@ export async function GET(request: Request, { params }: Params) {
   });
 
   if (format === "markdown") {
+    if (submissionChecklist.readinessPercent < 80) {
+      return NextResponse.json({
+        error: "投稿资料准备度未达 80%",
+        submissionChecklist,
+      }, { status: 409 });
+    }
+
     return new NextResponse(submissionPackage.markdown, {
       headers: {
         "Content-Type": "text/markdown; charset=utf-8",
@@ -41,5 +64,5 @@ export async function GET(request: Request, { params }: Params) {
     });
   }
 
-  return NextResponse.json({ submissionPackage });
+  return NextResponse.json({ submissionPackage, submissionChecklist });
 }

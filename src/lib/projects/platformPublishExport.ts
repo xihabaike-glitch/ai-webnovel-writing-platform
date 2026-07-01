@@ -1,5 +1,6 @@
 import type { PlatformProfile } from "../platforms/platformProfiles.ts";
 import { platformProfiles, type PlatformId } from "../platforms/platformProfiles.ts";
+import type { SubmissionChecklist } from "./submissionChecklist.ts";
 import { buildSubmissionPackage, type SubmissionPackage, type SubmissionPackageChapter } from "./submissionPackage.ts";
 
 export interface PublishExportProject {
@@ -15,11 +16,29 @@ export interface PublishExportChapter extends SubmissionPackageChapter {
   status: string;
 }
 
+export interface PublishExportAiTask {
+  chapterId: string | null;
+  taskType: string;
+  status: string;
+  outputText: string | null;
+  createdAt: Date | string;
+}
+
 export interface PlatformPublishExportInput {
   project: PublishExportProject;
   chapters: PublishExportChapter[];
+  aiTasks?: PublishExportAiTask[];
+  submissionChecklist?: SubmissionChecklist;
   targetPlatform: PlatformProfile;
   platforms?: PlatformProfile[];
+}
+
+export interface PublishPreflight {
+  score: number;
+  canExport: boolean;
+  passed: string[];
+  blocked: string[];
+  warnings: string[];
 }
 
 export interface PlatformPublishChapter {
@@ -30,6 +49,7 @@ export interface PlatformPublishChapter {
   wordCount: number;
   status: string;
   ready: boolean;
+  preflight: PublishPreflight;
   body: string;
   warnings: string[];
 }
@@ -44,6 +64,8 @@ export interface PlatformPublishPackage {
   tags: string[];
   publishNote: string;
   chapters: PlatformPublishChapter[];
+  preflight: PublishPreflight;
+  canExport: boolean;
   warnings: string[];
   markdown: string;
 }
@@ -56,6 +78,30 @@ export interface PlatformPublishExportCenter {
 
 function compact(text: string) {
   return text.replace(/\s+/g, " ").trim();
+}
+
+function latestTask(tasks: PublishExportAiTask[], chapterId: string, taskType: string) {
+  return tasks
+    .filter((task) => task.chapterId === chapterId && task.taskType === taskType)
+    .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime())[0];
+}
+
+function parseReviewDecision(task: PublishExportAiTask | undefined) {
+  if (!task || task.status !== "succeeded" || !task.outputText) return null;
+  try {
+    const parsed = JSON.parse(task.outputText) as { score?: number; shouldSecondPass?: boolean };
+    const score = typeof parsed.score === "number" ? parsed.score : null;
+    const shouldSecondPass = typeof parsed.shouldSecondPass === "boolean"
+      ? parsed.shouldSecondPass
+      : score === null || score < 85;
+    return { score, shouldSecondPass };
+  } catch {
+    return null;
+  }
+}
+
+function preflightScore(blocked: string[], warnings: string[]) {
+  return Math.max(0, Math.min(100, 100 - blocked.length * 22 - warnings.length * 6));
 }
 
 function publishableChapters(chapters: PublishExportChapter[]) {
@@ -110,6 +156,41 @@ function chapterWarnings(chapter: PublishExportChapter, platform: PlatformProfil
   return warnings;
 }
 
+function buildChapterPreflight(
+  chapter: PublishExportChapter,
+  platform: PlatformProfile,
+  tasks: PublishExportAiTask[],
+  warnings: string[],
+): PublishPreflight {
+  const blocked: string[] = [];
+  const passed: string[] = [];
+  const softWarnings = [...warnings];
+  const reviewDecision = parseReviewDecision(latestTask(tasks, chapter.id, "chapter_review"));
+
+  if (compact(chapter.content).length > 0 && chapter.wordCount > 0) passed.push("正文已生成");
+  else blocked.push("正文为空，不能发布。");
+  if (chapter.hook.trim()) passed.push("开头钩子已填写");
+  else blocked.push("缺少开头钩子。");
+  if (chapter.cliffhanger.trim()) passed.push("章末悬念已填写");
+  else blocked.push("缺少章末悬念。");
+  if (reviewDecision && !reviewDecision.shouldSecondPass) {
+    passed.push(`最新平台复检 ${reviewDecision.score ?? "--"} 分`);
+  } else if (reviewDecision?.shouldSecondPass) {
+    blocked.push(`最新平台复检 ${reviewDecision.score ?? "--"} 分，仍要求二改。`);
+  } else {
+    blocked.push("缺少通过的审稿/复检记录。");
+  }
+  if (platform.category === "overseas") softWarnings.push("海外平台发布前建议人工英文化终稿。");
+
+  return {
+    score: preflightScore(blocked, softWarnings),
+    canExport: blocked.length === 0,
+    passed,
+    blocked,
+    warnings: softWarnings,
+  };
+}
+
 function buildPublishNote(platform: PlatformProfile, submissionPackage: SubmissionPackage) {
   if (platform.category === "overseas") {
     return [
@@ -125,15 +206,39 @@ function buildPublishNote(platform: PlatformProfile, submissionPackage: Submissi
   ].join("\n");
 }
 
-function buildPackageWarnings(platform: PlatformProfile, chapters: PlatformPublishChapter[]) {
+function buildPackageWarnings(platform: PlatformProfile, chapters: PlatformPublishChapter[], checklist?: SubmissionChecklist) {
   const warnings: string[] = [];
   if (chapters.length === 0) warnings.push("没有可导出的正文章节。");
   if (chapters.some((chapter) => !chapter.ready)) warnings.push("存在未完全就绪章节，发布前先补钩子、正文或章末悬念。");
+  if (checklist && checklist.readinessPercent < 80) warnings.push(`投稿资料准备度 ${checklist.readinessPercent}%，低于发布门槛。`);
   if (platform.id === "qidian" && chapters.length < 3) warnings.push("起点投稿建议至少准备前三章和长期主线期待。");
   if (platform.id === "fanqie" && chapters.length < 8) warnings.push("番茄首秀前建议继续储备章节，减少断更风险。");
   if (platform.id === "zhihu_yanxuan" && chapters.reduce((sum, chapter) => sum + chapter.wordCount, 0) < 1000) warnings.push("知乎盐选短篇至少准备 1000 字以上的付费期待。");
   if (platform.category === "overseas") warnings.push("海外平台发布前建议补英文标题、英文简介和英文正文润色。");
   return warnings;
+}
+
+function buildPackagePreflight(chapters: PlatformPublishChapter[], warnings: string[], checklist?: SubmissionChecklist): PublishPreflight {
+  const blocked: string[] = [];
+  const passed: string[] = [];
+
+  if (chapters.length > 0) passed.push(`已准备 ${chapters.length} 章正文`);
+  else blocked.push("没有可导出的正文章节。");
+  const blockedChapters = chapters.filter((chapter) => !chapter.preflight.canExport);
+  if (blockedChapters.length === 0 && chapters.length > 0) passed.push("全部章节通过发布前质检");
+  if (blockedChapters.length > 0) blocked.push(`${blockedChapters.length} 章未通过发布前质检。`);
+  if (checklist) {
+    if (checklist.readinessPercent >= 80) passed.push(`投稿资料准备度 ${checklist.readinessPercent}%`);
+    else blocked.push(`投稿资料准备度 ${checklist.readinessPercent}%，低于 80%。`);
+  }
+
+  return {
+    score: preflightScore(blocked, warnings),
+    canExport: blocked.length === 0,
+    passed,
+    blocked,
+    warnings,
+  };
 }
 
 function buildMarkdown(pack: Omit<PlatformPublishPackage, "markdown">) {
@@ -154,6 +259,12 @@ function buildMarkdown(pack: Omit<PlatformPublishPackage, "markdown">) {
     "",
     "## 发布说明",
     pack.publishNote,
+    "",
+    "## 发布前质检",
+    `质检分：${pack.preflight.score}`,
+    `导出状态：${pack.canExport ? "允许导出" : "暂不允许导出"}`,
+    ...(pack.preflight.blocked.length ? pack.preflight.blocked.map((item) => `- 阻塞：${item}`) : ["- 阻塞：无"]),
+    ...(pack.preflight.warnings.length ? pack.preflight.warnings.map((item) => `- 提醒：${item}`) : ["- 提醒：无"]),
     "",
     "## 风险提醒",
     ...(pack.warnings.length ? pack.warnings.map((warning) => `- ${warning}`) : ["- 暂无明显风险。"]),
@@ -185,6 +296,7 @@ function buildPlatformPackage(
   });
   const chapters = publishableChapters(input.chapters).map((chapter) => {
     const warnings = chapterWarnings(chapter, platform);
+    const preflight = buildChapterPreflight(chapter, platform, input.aiTasks ?? [], warnings);
     return {
       id: chapter.id,
       order: chapter.order,
@@ -192,11 +304,14 @@ function buildPlatformPackage(
       formattedTitle: titleForPlatform(chapter, platform),
       wordCount: chapter.wordCount,
       status: chapter.status,
-      ready: warnings.length === 0 || warnings.every((warning) => warning.includes("海外平台")),
+      ready: preflight.canExport,
+      preflight,
       body: formatBody(chapter, platform),
       warnings,
     };
   });
+  const warnings = buildPackageWarnings(platform, chapters, input.submissionChecklist);
+  const preflight = buildPackagePreflight(chapters, warnings, input.submissionChecklist);
   const packWithoutMarkdown = {
     platformId: platform.id,
     platformName: platform.name,
@@ -207,7 +322,9 @@ function buildPlatformPackage(
     tags: submissionPackage.tags,
     publishNote: buildPublishNote(platform, submissionPackage),
     chapters,
-    warnings: buildPackageWarnings(platform, chapters),
+    preflight,
+    canExport: preflight.canExport,
+    warnings,
   };
 
   return {

@@ -2,6 +2,14 @@
 
 import { useEffect, useMemo, useState } from "react";
 
+interface PublishPreflight {
+  score: number;
+  canExport: boolean;
+  passed: string[];
+  blocked: string[];
+  warnings: string[];
+}
+
 interface PlatformPublishChapter {
   id: string;
   order: number;
@@ -10,6 +18,7 @@ interface PlatformPublishChapter {
   wordCount: number;
   status: string;
   ready: boolean;
+  preflight: PublishPreflight;
   body: string;
   warnings: string[];
 }
@@ -24,6 +33,8 @@ interface PlatformPublishPackage {
   tags: string[];
   publishNote: string;
   chapters: PlatformPublishChapter[];
+  preflight: PublishPreflight;
+  canExport: boolean;
   warnings: string[];
   markdown: string;
 }
@@ -64,18 +75,27 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
 
   async function copyMarkdown() {
     if (!selectedPackage) return;
+    if (!selectedPackage.canExport) {
+      setMessage("发布前质检未通过，先处理阻塞项。");
+      return;
+    }
     await navigator.clipboard.writeText(selectedPackage.markdown);
     setMessage(`已复制 ${selectedPackage.platformName} 发布包`);
   }
 
   async function downloadMarkdown() {
     if (!selectedPackage) return;
+    if (!selectedPackage.canExport) {
+      setMessage("发布前质检未通过，暂不允许下载发布包。");
+      return;
+    }
     setIsLoading(true);
     setMessage(null);
     try {
       const response = await fetch(`/api/projects/${projectId}/platform-export?platformId=${selectedPackage.platformId}&format=markdown`);
       if (!response.ok) {
-        throw new Error("下载发布包失败。");
+        const payload = await response.json().catch(() => null) as { error?: string } | null;
+        throw new Error(payload?.error ?? "下载发布包失败。");
       }
       const markdown = await response.text();
       const blob = new Blob([markdown], { type: "text/markdown;charset=utf-8" });
@@ -134,7 +154,7 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
         <div className="flex flex-wrap items-end gap-2">
           <button
             className="rounded-md border border-slate-200 px-3 py-2 text-sm font-medium hover:bg-slate-50 disabled:opacity-50"
-            disabled={!selectedPackage}
+            disabled={!selectedPackage || !selectedPackage.canExport}
             onClick={copyMarkdown}
             type="button"
           >
@@ -142,7 +162,7 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
           </button>
           <button
             className="rounded-md bg-slate-950 px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
-            disabled={!selectedPackage || isLoading}
+            disabled={!selectedPackage || !selectedPackage.canExport || isLoading}
             onClick={downloadMarkdown}
             type="button"
           >
@@ -155,6 +175,40 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
 
       {selectedPackage ? (
         <div className="mt-4 grid gap-4">
+          <div className="rounded-md border border-slate-200 p-3">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <div className="font-medium text-slate-950">发布前质检</div>
+                <p className="mt-1 text-sm text-slate-600">
+                  {selectedPackage.canExport ? "允许导出" : "暂不允许导出"} · 质检分 {selectedPackage.preflight.score}
+                </p>
+              </div>
+              <div className={`w-fit rounded-md px-2 py-1 text-xs font-medium ${
+                selectedPackage.canExport ? "bg-emerald-50 text-emerald-700" : "bg-rose-50 text-rose-700"
+              }`}>
+                {selectedPackage.canExport ? "已通过" : "需处理"}
+              </div>
+            </div>
+            <div className="mt-3 grid gap-2 text-sm text-slate-600 lg:grid-cols-2">
+              <div className="rounded-md bg-slate-50 p-3">
+                <div className="font-medium text-slate-900">阻塞项</div>
+                <div className="mt-2 grid gap-1">
+                  {(selectedPackage.preflight.blocked.length ? selectedPackage.preflight.blocked : ["无"]).map((item) => (
+                    <div key={item}>{item}</div>
+                  ))}
+                </div>
+              </div>
+              <div className="rounded-md bg-slate-50 p-3">
+                <div className="font-medium text-slate-900">提醒</div>
+                <div className="mt-2 grid gap-1">
+                  {(selectedPackage.preflight.warnings.length ? selectedPackage.preflight.warnings.slice(0, 4) : ["暂无明显提醒。"]).map((item) => (
+                    <div key={item}>{item}</div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+
           <div className="rounded-md border border-slate-200 p-3">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
               <div>
@@ -188,11 +242,16 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                   <div>
                     <div className="font-medium text-slate-950">{chapter.formattedTitle}</div>
-                    <div className="mt-1 text-slate-500">{chapter.wordCount} 字 · {chapter.status} · {chapter.ready ? "可发布" : "待处理"}</div>
+                    <div className="mt-1 text-slate-500">
+                      {chapter.wordCount} 字 · {chapter.status} · {chapter.ready ? "可发布" : "待处理"} · 质检 {chapter.preflight.score}
+                    </div>
                   </div>
                   <div className="text-xs text-slate-500">第 {chapter.order} 章</div>
                 </div>
                 <p className="mt-2 line-clamp-3 whitespace-pre-wrap text-slate-600">{chapter.body}</p>
+                {chapter.preflight.blocked.length ? (
+                  <p className="mt-2 text-slate-500">阻塞项：{chapter.preflight.blocked.join("；")}</p>
+                ) : null}
                 {chapter.warnings.length ? (
                   <p className="mt-2 text-slate-500">章节风险：{chapter.warnings.join("；")}</p>
                 ) : null}

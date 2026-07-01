@@ -63,6 +63,39 @@ export class MockAdapter implements ModelAdapter {
       };
     }
 
+    if (request.systemPrompt.includes("网文改稿写手")) {
+      const titleMatch = request.userPrompt.match(/章节：第 \d+ 章 (.+)/);
+      const roleMatch = request.userPrompt.match(/章节职责：(.+)/);
+      const targetMatch = request.userPrompt.match(/改稿目标：(.+)/);
+      const coldOpenMatch = request.userPrompt.match(/冷开场：(.+)/);
+      const endingMatch = request.userPrompt.match(/章末处理：(.+)/);
+      const title = titleMatch?.[1]?.trim() || "改写章节";
+      const role = roleMatch?.[1]?.trim() || "用强钩子推动主线";
+      const target = targetMatch?.[1]?.trim() || "让本章形成清晰追读";
+      const coldOpen = coldOpenMatch?.[1]?.trim() || "危险在第一段出现";
+      const ending = endingMatch?.[1]?.trim() || "章末抛出新的主线问题";
+      const text = [
+        `${coldOpen}`,
+        "",
+        `林晚没有时间把恐惧想明白。雨声压着窗沿，系统面板却在她眼前亮得刺眼，像一只不肯闭上的眼睛。她知道这一章的核心不是解释世界，而是完成“${role}”。读者必须在第一屏就看见问题，也必须在这一屏明白，退后一步会付出更大的代价。`,
+        "",
+        `所以她往前走。门后的声音越来越急，走廊另一头的脚步声却越来越近。目标也被系统推到她眼前：${target}。这不是温吞的选择题，而是把她逼到墙角的生死题。救人，她会暴露自己；逃跑，她会丢掉唯一能翻盘的线索。`,
+        "",
+        "她把手按上门把，指尖冰得发麻。下一秒，系统弹出奖励栏，给出的却不是安慰，而是一把更锋利的刀。新手技能、记忆惩罚、未知标记，每一个词都像钉子，把她钉在这个雨夜里。她终于明白，所谓开局不是得到金手指，而是被金手指推上牌桌。",
+        "",
+        `门开了。${title}真正开始的瞬间，她听见里面的人低声说出一个不该知道的名字。${ending}`,
+      ].join("\n");
+
+      return {
+        text,
+        usage: {
+          inputTokens: request.systemPrompt.length + request.userPrompt.length,
+          outputTokens: text.length,
+          costUsd: 0,
+        },
+      };
+    }
+
     const text = JSON.stringify(
       {
         score: 72,

@@ -27,6 +27,33 @@ interface OptimizedSubmissionPackage {
   rationale: string[];
 }
 
+interface MultiPlatformSubmissionVariant {
+  platformId: string;
+  platformName: string;
+  category: string;
+  readinessPercent: number;
+  fitScore: number;
+  actionLabel: string;
+  positioning: string;
+  opportunity: string;
+  rewriteFocus: string[];
+  risks: string[];
+  submissionPackage: {
+    logline: string;
+    synopsis: string;
+    overseasSynopsis: string;
+    tags: string[];
+  };
+}
+
+interface MultiPlatformSubmission {
+  title: string;
+  targetPlatformId: string;
+  recommendedPlatformId: string;
+  variants: MultiPlatformSubmissionVariant[];
+  markdown: string;
+}
+
 function optimizedMarkdown(title: string, optimized: OptimizedSubmissionPackage) {
   return [
     `# ${title} 优化投稿资料`,
@@ -49,6 +76,17 @@ function optimizedMarkdown(title: string, optimized: OptimizedSubmissionPackage)
   ].join("\n");
 }
 
+function categoryLabel(category: string) {
+  const labels: Record<string, string> = {
+    paid: "付费订阅",
+    free: "免费广告",
+    female: "女频垂直",
+    short: "短篇小众",
+    overseas: "海外平台",
+  };
+  return labels[category] ?? category;
+}
+
 export function SubmissionPackagePanel({
   projectId,
   submissionPackage,
@@ -60,6 +98,9 @@ export function SubmissionPackagePanel({
   const [isDownloading, setIsDownloading] = useState(false);
   const [isOptimizing, setIsOptimizing] = useState(false);
   const [optimized, setOptimized] = useState<OptimizedSubmissionPackage | null>(null);
+  const [isLoadingMultiPlatform, setIsLoadingMultiPlatform] = useState(false);
+  const [isDownloadingMultiPlatform, setIsDownloadingMultiPlatform] = useState(false);
+  const [multiPlatform, setMultiPlatform] = useState<MultiPlatformSubmission | null>(null);
 
   async function copyMarkdown() {
     await navigator.clipboard.writeText(submissionPackage.markdown);
@@ -115,6 +156,53 @@ export function SubmissionPackagePanel({
     setMessage("已复制优化版投稿资料");
   }
 
+  async function loadMultiPlatformVersions() {
+    setIsLoadingMultiPlatform(true);
+    setMessage(null);
+    try {
+      const response = await fetch(`/api/projects/${projectId}/submission-package/multi-platform`);
+      if (!response.ok) {
+        throw new Error("生成多平台版本失败。");
+      }
+      const payload = (await response.json()) as { multiPlatformSubmission: MultiPlatformSubmission };
+      setMultiPlatform(payload.multiPlatformSubmission);
+      setMessage("已生成多平台投稿版本");
+    } catch (caught) {
+      setMessage(caught instanceof Error ? caught.message : "生成多平台版本失败。");
+    } finally {
+      setIsLoadingMultiPlatform(false);
+    }
+  }
+
+  async function copyMultiPlatformMarkdown() {
+    if (!multiPlatform) return;
+    await navigator.clipboard.writeText(multiPlatform.markdown);
+    setMessage("已复制多平台投稿版本");
+  }
+
+  async function downloadMultiPlatformMarkdown() {
+    setIsDownloadingMultiPlatform(true);
+    setMessage(null);
+    try {
+      const response = await fetch(`/api/projects/${projectId}/submission-package/multi-platform?format=markdown`);
+      if (!response.ok) {
+        throw new Error("下载多平台版本失败。");
+      }
+      const markdown = await response.text();
+      const blob = new Blob([markdown], { type: "text/markdown;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `${submissionPackage.title}-多平台投稿版本.md`;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (caught) {
+      setMessage(caught instanceof Error ? caught.message : "下载多平台版本失败。");
+    } finally {
+      setIsDownloadingMultiPlatform(false);
+    }
+  }
+
   return (
     <section className="rounded-md border border-slate-200 bg-white p-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -137,6 +225,14 @@ export function SubmissionPackagePanel({
             type="button"
           >
             {isOptimizing ? "优化中" : "AI 优化"}
+          </button>
+          <button
+            className="rounded-md border border-slate-200 px-3 py-2 text-sm font-medium hover:bg-slate-50 disabled:opacity-50"
+            disabled={isLoadingMultiPlatform}
+            onClick={loadMultiPlatformVersions}
+            type="button"
+          >
+            {isLoadingMultiPlatform ? "生成中" : "多平台版本"}
           </button>
           <button
             className="rounded-md bg-slate-950 px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
@@ -210,6 +306,74 @@ export function SubmissionPackagePanel({
                 ))}
               </div>
             </div>
+          </div>
+        </div>
+      ) : null}
+      {multiPlatform ? (
+        <div className="mt-4 rounded-md border border-slate-200 p-3">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <div className="text-sm font-medium">多平台投稿版本</div>
+              <p className="mt-1 text-xs text-slate-500">
+                推荐：{multiPlatform.variants.find((variant) => variant.platformId === multiPlatform.recommendedPlatformId)?.platformName ?? "待判断"}
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button
+                className="rounded-md border border-slate-200 px-3 py-2 text-xs font-medium hover:bg-slate-50"
+                onClick={copyMultiPlatformMarkdown}
+                type="button"
+              >
+                复制多平台
+              </button>
+              <button
+                className="rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white disabled:opacity-50"
+                disabled={isDownloadingMultiPlatform}
+                onClick={downloadMultiPlatformMarkdown}
+                type="button"
+              >
+                {isDownloadingMultiPlatform ? "下载中" : "下载多平台"}
+              </button>
+            </div>
+          </div>
+          <div className="mt-3 grid gap-3 lg:grid-cols-2">
+            {multiPlatform.variants.map((variant) => (
+              <div className="rounded-md bg-slate-50 p-3" key={variant.platformId}>
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <div className="text-sm font-medium text-slate-900">
+                      {variant.platformName}
+                      {variant.platformId === multiPlatform.targetPlatformId ? (
+                        <span className="ml-2 text-xs font-normal text-slate-500">当前目标</span>
+                      ) : null}
+                    </div>
+                    <div className="mt-1 text-xs text-slate-500">{categoryLabel(variant.category)} · 准备度 {variant.readinessPercent}%</div>
+                  </div>
+                  <div className="w-fit rounded-md bg-white px-2 py-1 text-xs font-medium text-slate-700">
+                    {variant.fitScore} · {variant.actionLabel}
+                  </div>
+                </div>
+                <p className="mt-3 text-sm leading-6 text-slate-700">{variant.positioning}</p>
+                <div className="mt-3 grid gap-2 text-sm text-slate-600">
+                  <div>
+                    <span className="font-medium text-slate-900">机会：</span>
+                    {variant.opportunity}
+                  </div>
+                  <div>
+                    <span className="font-medium text-slate-900">标签：</span>
+                    {variant.submissionPackage.tags.join("、")}
+                  </div>
+                  <div>
+                    <span className="font-medium text-slate-900">重写：</span>
+                    {variant.rewriteFocus.join("；")}
+                  </div>
+                  <div>
+                    <span className="font-medium text-slate-900">风险：</span>
+                    {variant.risks.join("、")}
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       ) : null}

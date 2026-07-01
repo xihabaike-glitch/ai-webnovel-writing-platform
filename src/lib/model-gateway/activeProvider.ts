@@ -1,5 +1,5 @@
 import type { ModelProvider } from "@prisma/client";
-import { prisma } from "@/lib/db/prisma";
+import { prisma } from "../db/prisma.ts";
 import { createModelAdapter } from "./adapterFactory.ts";
 import { selectModelProviderForTask } from "./providerSelection.ts";
 import type { RoutedModelTaskType } from "./taskRouting.ts";

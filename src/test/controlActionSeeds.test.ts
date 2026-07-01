@@ -7,6 +7,7 @@ import {
   buildStoryLineActionSeeds,
   buildWorldActionSeeds,
 } from "../lib/projects/controlActionSeeds.ts";
+import { buildControlAssetPrompt } from "../lib/projects/controlAssetGeneration.ts";
 
 const project = {
   id: "demo-project",
@@ -64,5 +65,30 @@ test("control action seeds", async (t) => {
     assert.equal(seeds.filter((seed) => seed.type === "branch").length, 3);
     assert.equal(seeds.filter((seed) => seed.type === "leaf").length, 2);
     assert.equal(seeds.find((seed) => seed.type === "opening")?.parentId, "existing-root");
+  });
+
+  await t.test("builds strict JSON prompts for AI control assets", () => {
+    const prompt = buildControlAssetPrompt({
+      areaId: "story-lines",
+      project: {
+        ...project,
+        targetLengthType: "long_300k_plus",
+        targetWordCount: 300000,
+        updateCadence: "daily_4000",
+      },
+      platform: getPlatformProfile("fanqie"),
+      existing: {
+        chapters: [{ id: "chapter-1", order: 1, title: "第一章", goal: "开局", hook: "倒计时", conflict: "必须选择", valueShift: "平静到危机", cliffhanger: "新任务" }],
+        characters: [{ id: "character-1", name: "林晚", role: "主角", desire: "翻盘", need: "主动选择", flaw: "逃避", arcStart: "被动", arcEnd: "主动", voice: "克制", relationshipNotes: "和反派冲突" }],
+        worldEntries: [],
+        foreshadows: [],
+        plotThreads: [],
+      },
+    });
+
+    assert.ok(prompt.systemPrompt.includes("只输出合法 JSON"));
+    assert.ok(prompt.userPrompt.includes("生成模块：主线伏笔"));
+    assert.ok(prompt.userPrompt.includes("章节 ID 必须从现有章节里选择"));
+    assert.ok(prompt.userPrompt.includes("chapter-1"));
   });
 });

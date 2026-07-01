@@ -96,6 +96,7 @@ const taskLabels: Record<string, string> = {
   chapter_second_pass: "章节二改",
   first_three_rewrite: "前三章改写",
   submission_package_optimize: "投稿资料优化",
+  control_asset_generate: "总控资料生成",
 };
 
 const statusLabels: Record<string, string> = {

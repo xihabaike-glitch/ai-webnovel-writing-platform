@@ -14,6 +14,8 @@ interface ControlArea {
   targetAnchor: string;
   canExecute: boolean;
   executeLabel: string;
+  canGenerate: boolean;
+  generateLabel: string;
 }
 
 interface ControlPriorityAction {
@@ -27,6 +29,8 @@ interface ControlPriorityAction {
   targetAnchor: string;
   canExecute: boolean;
   executeLabel: string;
+  canGenerate: boolean;
+  generateLabel: string;
 }
 
 interface ProjectControlDashboard {
@@ -84,14 +88,14 @@ export function ProjectControlDashboardPanel({ projectId }: { projectId: string 
     void loadDashboard();
   }, [projectId]);
 
-  async function executeAction(action: ControlPriorityAction) {
-    setRunningActionId(action.id);
+  async function executeAction(action: ControlPriorityAction, mode: "seed" | "ai") {
+    setRunningActionId(`${action.id}-${mode}`);
     setMessage(null);
     try {
       const response = await fetch(`/api/projects/${projectId}/control-actions`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ areaId: action.areaId }),
+        body: JSON.stringify({ areaId: action.areaId, mode }),
       });
       const payload = await response.json() as { message?: string; error?: string };
       if (!response.ok) {
@@ -177,10 +181,20 @@ export function ProjectControlDashboardPanel({ projectId }: { projectId: string 
                           <button
                             className="inline-flex w-fit items-center justify-center rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white hover:bg-slate-800 disabled:opacity-50"
                             disabled={Boolean(runningActionId)}
-                            onClick={() => executeAction(action)}
+                            onClick={() => executeAction(action, "seed")}
                             type="button"
                           >
-                            {runningActionId === action.id ? "执行中" : action.executeLabel}
+                            {runningActionId === `${action.id}-seed` ? "执行中" : action.executeLabel}
+                          </button>
+                        ) : null}
+                        {action.canGenerate ? (
+                          <button
+                            className="inline-flex w-fit items-center justify-center rounded-md border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-900 hover:bg-slate-100 disabled:opacity-50"
+                            disabled={Boolean(runningActionId)}
+                            onClick={() => executeAction(action, "ai")}
+                            type="button"
+                          >
+                            {runningActionId === `${action.id}-ai` ? "生成中" : action.generateLabel}
                           </button>
                         ) : null}
                         <Link

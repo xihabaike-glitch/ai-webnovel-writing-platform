@@ -63,6 +63,7 @@ test("buildProjectControlDashboard", async (t) => {
     assert.ok(dashboard.priorityActions.some((action) => action.areaId === "characters" && action.targetAnchor === "character-arc"));
     assert.ok(dashboard.priorityActions.every((action) => action.actionLabel.length > 0));
     assert.ok(dashboard.priorityActions.some((action) => action.areaId === "characters" && action.canExecute && action.executeLabel === "补人物卡"));
+    assert.ok(dashboard.priorityActions.some((action) => action.areaId === "characters" && action.canGenerate && action.generateLabel === "AI 生成人物"));
     assert.ok(dashboard.overallScore > 0);
     assert.ok(dashboard.criticalActions.some((action) => action.includes("人物弧光")));
   });

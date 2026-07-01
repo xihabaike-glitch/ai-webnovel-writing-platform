@@ -26,6 +26,7 @@ export const saveModelTaskRouteSchema = z.object({
     "chapter_second_pass",
     "submission_package_optimize",
     "first_three_rewrite",
+    "control_asset_generate",
   ]),
   primaryProviderConfigId: z.string().optional().nullable(),
   fallbackProviderConfigId: z.string().optional().nullable(),

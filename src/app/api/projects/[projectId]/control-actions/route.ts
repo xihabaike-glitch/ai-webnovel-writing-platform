@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { getPlatformProfile, type PlatformId } from "@/lib/platforms/platformProfiles";
+import { generateControlAssets, type ControlAssetAreaId } from "@/lib/projects/controlAssetGeneration";
 import {
   buildCharacterActionSeeds,
   buildOutlineActionSeeds,
@@ -14,6 +15,7 @@ interface Params {
 
 interface ControlActionBody {
   areaId?: string;
+  mode?: "seed" | "ai";
 }
 
 function result(areaId: string, targetAnchor: string, created: string[], skipped?: string) {
@@ -32,6 +34,7 @@ export async function POST(request: Request, { params }: Params) {
   const { projectId } = await params;
   const body = (await request.json().catch(() => ({}))) as ControlActionBody;
   const areaId = body.areaId?.trim();
+  const mode = body.mode ?? "seed";
 
   if (!areaId) {
     return NextResponse.json({ error: "缺少动作类型。" }, { status: 400 });
@@ -51,6 +54,20 @@ export async function POST(request: Request, { params }: Params) {
 
   if (!project) {
     return NextResponse.json({ error: "Project not found" }, { status: 404 });
+  }
+
+  if (mode === "ai") {
+    if (areaId === "characters" || areaId === "world" || areaId === "story-lines") {
+      const generated = await generateControlAssets(projectId, areaId as ControlAssetAreaId);
+      if ("error" in generated) {
+        return NextResponse.json(generated, { status: 500 });
+      }
+      return NextResponse.json({
+        ...generated,
+        targetAnchor: areaId === "characters" ? "character-arc" : areaId === "world" ? "world-bible" : "story-lines",
+      });
+    }
+    return NextResponse.json({ error: "该模块暂不支持 AI 生成，请先使用结构草稿。" }, { status: 400 });
   }
 
   const platform = getPlatformProfile(project.targetPlatform as PlatformId);

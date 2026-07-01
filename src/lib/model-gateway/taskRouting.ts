@@ -3,7 +3,8 @@ export type RoutedModelTaskType =
   | "chapter_review"
   | "chapter_second_pass"
   | "submission_package_optimize"
-  | "first_three_rewrite";
+  | "first_three_rewrite"
+  | "control_asset_generate";
 
 export interface ModelTaskRouteOption {
   taskType: RoutedModelTaskType;
@@ -36,6 +37,11 @@ export const modelTaskRouteOptions: ModelTaskRouteOption[] = [
     taskType: "first_three_rewrite",
     label: "前三章改写",
     description: "偏高压钩子和整段改写，优先选择强创作模型，备用模型负责兜底。",
+  },
+  {
+    taskType: "control_asset_generate",
+    label: "总控资料生成",
+    description: "偏人物弧光、世界观规则和主线伏笔，优先选择结构化输出稳定、长上下文理解好的模型。",
   },
 ];
 

@@ -59,7 +59,7 @@ test("buildRouteEffectAudit", async (t) => {
     assert.equal(audit.summary.knownCostUsd, 0.04);
     assert.equal(audit.summary.healthyRoutes, 0);
     assert.equal(audit.summary.watchRoutes, 1);
-    assert.equal(audit.summary.unconfiguredRoutes, 4);
+    assert.equal(audit.summary.unconfiguredRoutes, 5);
     assert.equal(audit.summary.nextUnconfiguredTaskLabel, "章节审稿");
     assert.equal(draft?.primaryTasks, 1);
     assert.equal(draft?.fallbackTasks, 1);

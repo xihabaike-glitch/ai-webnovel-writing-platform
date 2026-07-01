@@ -2,6 +2,99 @@ import type { GenerateRequest, GenerateResult, ModelAdapter } from "./types.ts";
 
 export class MockAdapter implements ModelAdapter {
   async generate(request: GenerateRequest): Promise<GenerateResult> {
+    if (request.systemPrompt.includes("项目总控资料生成器")) {
+      const isCharacters = request.userPrompt.includes("生成模块：人物弧光");
+      const isWorld = request.userPrompt.includes("生成模块：世界观资料");
+      const isStoryLines = request.userPrompt.includes("生成模块：主线伏笔");
+      const chapterMatch = request.userPrompt.match(/"id": "([^"]+)",\n\s+"order": 1/);
+      const characterMatch = request.userPrompt.match(/"characters": \[\s*\{\s*"id": "([^"]+)"/);
+      const firstChapterId = chapterMatch?.[1] ?? null;
+      const firstCharacterId = characterMatch?.[1] ?? undefined;
+      const payload = isCharacters
+        ? {
+          characters: [
+            {
+              name: "林晚",
+              role: "主角",
+              desire: "抓住系统给出的翻盘机会，查清雨夜危机背后的真相。",
+              need: "从被动求生变成主动选择，并接受每次胜利都要付出代价。",
+              flaw: "遇到压力时倾向先逃避责任，把选择推给系统或他人。",
+              arcStart: "被倒计时推着行动，只想保住眼前的人和线索。",
+              arcEnd: "能主动制定规则，用自己的代价换来终局胜利。",
+              voice: "紧绷、克制，判断风险时句子短，情绪爆发时直接。",
+              relationshipNotes: "和反派压力源形成规则对抗，和关系镜像角色形成情绪拉扯。",
+            },
+            {
+              name: "沈砚",
+              role: "反派",
+              desire: "控制系统规则和关键资源，让主角永远只能按他的局行动。",
+              need: "成为主角成长的外部压力，逼出主角的真正选择。",
+              flaw: "过度迷信秩序和筹码，低估情感关系带来的变量。",
+              arcStart: "把主角当成可回收的小变量。",
+              arcEnd: "被主角逼到亲自下场，成为终局代价的核心。",
+              voice: "冷静、礼貌、压迫感强，常用规则和利益说话。",
+              relationshipNotes: "每次出手都要改变主角处境，不能只当背景敌人。",
+            },
+          ],
+          rationale: ["补齐主角与反派的欲望冲突", "让人物弧光服务主线压力"],
+        }
+        : isWorld
+          ? {
+            worldEntries: [
+              {
+                type: "system_rule",
+                title: "雨夜系统规则",
+                content: "系统只在高压选择中触发，每次奖励都绑定新的债务、标记或敌人注意。主角不能靠系统无成本解决问题，能力越强，暴露风险越高。",
+              },
+              {
+                type: "taboo",
+                title: "无代价翻盘禁忌",
+                content: "禁止复活、洗白、开挂式胜利无代价发生。任何突破都必须交换记忆、关系、身份安全或关键线索，让爽点之后出现更大的追读问题。",
+              },
+              {
+                type: "platform_soil",
+                title: "平台追读土壤",
+                content: "每章必须有明确目标、具体冲突和章末问题。设定解释只服务选择压力，不能连续铺陈；爽点要和人物代价绑定，避免空转升级。",
+              },
+            ],
+            rationale: ["补齐规则、禁忌和平台土壤", "让设定直接服务章节生产"],
+          }
+          : isStoryLines
+            ? {
+              plotThreads: [
+                {
+                  type: "main",
+                  title: "雨夜系统真相主线",
+                  startChapterId: firstChapterId,
+                  endChapterId: null,
+                  status: "active",
+                },
+              ],
+              foreshadows: [
+                {
+                  title: "系统倒计时异常",
+                  setupChapterId: firstChapterId,
+                  payoffChapterId: null,
+                  relatedCharacterIds: firstCharacterId ? [firstCharacterId] : [],
+                  status: "planned",
+                  notes: "开局倒计时少了一秒，中段回收为系统被人为改写的证据。",
+                },
+              ],
+              rationale: ["建立主线问题", "给开头钩子绑定可回收伏笔"],
+            }
+            : { rationale: ["未识别模块"] };
+      const text = JSON.stringify(payload, null, 2);
+
+      return {
+        text,
+        usage: {
+          inputTokens: request.systemPrompt.length + request.userPrompt.length,
+          outputTokens: text.length,
+          costUsd: 0,
+        },
+      };
+    }
+
     if (request.systemPrompt.includes("投稿包装编辑")) {
       const platformMatch = request.userPrompt.match(/目标平台：(.+)/);
       const loglineMatch = request.userPrompt.match(/原一句话卖点：(.+)/);

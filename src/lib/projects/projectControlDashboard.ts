@@ -214,7 +214,10 @@ export function buildProjectControlDashboard(input: ProjectControlDashboardInput
     project: input.project,
     targetPlatform: input.platform,
     chapters: input.chapters,
+    aiTasks: input.aiTasks,
+    submissionChecklist: input.submissionChecklist,
   });
+  const targetPackage = platformExport.packages.find((pack) => pack.platformId === input.platform.id) ?? platformExport.packages[0];
   const outline = outlineScore(input.outlineNodes);
   const productionScore = production.dashboard.totalItems > 0
     ? ratio(
@@ -239,7 +242,13 @@ export function buildProjectControlDashboard(input: ProjectControlDashboardInput
     area("production", "章节生产", productionScore, `${production.dashboard.totalItems} 张排期卡，${production.dashboard.blockedItems} 张卡住。`, production.dashboard.nextActions[0]),
     area("ai-pipeline", "AI 写审改", aiPipelineScore, `${batchDraft.readyCandidates} 章可初稿，${reviewPipeline.reviewReadyCount} 章待审，${reviewPipeline.secondPassReadyCount} 章可二改。`, "按批量初稿、批量审稿、批量二改顺序清队列。"),
     area("ops", "连载运营", average([serialization.submissionReadinessPercent, serialization.publishReadyCount > 0 ? 100 : 40]), `${serialization.publishReadyCount} 章可发布，投稿准备度 ${serialization.submissionReadinessPercent}%。`, serialization.actions[0]?.detail ?? "继续推进运营动作。"),
-    area("export", "平台导出", platformExport.totalPublishableChapters > 0 ? 90 : 30, `${platformExport.packages.length} 个平台发布包，${platformExport.totalPublishableChapters} 章可导出。`, "选择目标平台，下载发布包并人工最终检查。"),
+    area(
+      "export",
+      "平台导出",
+      targetPackage.canExport ? 95 : platformExport.totalPublishableChapters > 0 ? targetPackage.preflight.score : 30,
+      `${platformExport.packages.length} 个平台发布包，${platformExport.totalPublishableChapters} 章有正文，${targetPackage.platformName} 质检 ${targetPackage.preflight.score} 分。`,
+      targetPackage.canExport ? "下载发布包并人工最终检查。" : targetPackage.repairPath.headline,
+    ),
   ];
   const overallScore = clampScore(average(areas.map((item) => item.score)));
   const criticalActions = [...areas]

@@ -57,6 +57,8 @@ test("buildProjectControlDashboard", async (t) => {
     assert.equal(dashboard.areas.length, 8);
     assert.equal(dashboard.metrics.chapters, 1);
     assert.equal(dashboard.metrics.publishableChapters, 1);
+    assert.equal(dashboard.areas.find((area) => area.id === "export")?.status, "blocked");
+    assert.ok(dashboard.areas.find((area) => area.id === "export")?.nextAction.includes("先处理"));
     assert.ok(dashboard.overallScore > 0);
     assert.ok(dashboard.criticalActions.some((action) => action.includes("人物弧光")));
   });
@@ -65,7 +67,7 @@ test("buildProjectControlDashboard", async (t) => {
     const dashboard = buildProjectControlDashboard({
       project: { ...project, currentWordCount: 2400 },
       platform: getPlatformProfile("fanqie"),
-      chapters: [{ ...chapter, status: "revising" }],
+      chapters: [{ ...chapter, wordCount: 2400, status: "revising" }],
       outlineNodes: ["root", "opening", "ending", "trunk", "soil"].map((type, index) => ({
         id: type,
         parentId: index === 0 ? null : "root",
@@ -98,7 +100,7 @@ test("buildProjectControlDashboard", async (t) => {
       ],
       aiTasks: [
         { id: "draft-1", chapterId: "chapter-1", taskType: "chapter_draft", status: "succeeded", outputText: chapter.content, errorMessage: null, createdAt: "2026-01-01T00:00:00.000Z" },
-        { id: "review-1", chapterId: "chapter-1", taskType: "chapter_review", status: "succeeded", outputText: JSON.stringify({ score: 88, issues: [] }), errorMessage: null, createdAt: "2026-01-02T00:00:00.000Z" },
+        { id: "review-1", chapterId: "chapter-1", taskType: "chapter_review", status: "succeeded", outputText: JSON.stringify({ score: 88, shouldSecondPass: false, issues: [] }), errorMessage: null, createdAt: "2026-01-02T00:00:00.000Z" },
         { id: "second-1", chapterId: "chapter-1", taskType: "chapter_second_pass", status: "succeeded", outputText: chapter.content, errorMessage: null, createdAt: "2026-01-03T00:00:00.000Z" },
       ],
       submissionChecklist: { ...checklist, readinessPercent: 90, items: [] },

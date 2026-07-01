@@ -72,14 +72,16 @@ test("buildTaskQueueCenter", async (t) => {
     assert.equal(queue.overview.draftReady, 1);
     assert.equal(queue.overview.reviewReady, 1);
     assert.equal(queue.overview.secondPassReady, 1);
-    assert.equal(queue.overview.exportReady, 1);
-    assert.equal(queue.overview.blockedCards, 1);
+    assert.equal(queue.overview.exportReady, 0);
+    assert.equal(queue.overview.blockedCards, 2);
     assert.equal(queue.overview.totalItems, 5);
     assert.equal(queue.recommendedNext?.category, "review");
     assert.deepEqual(
       queue.items.map((item) => item.category),
-      ["review", "second_pass", "draft", "export", "blocked"],
+      ["review", "second_pass", "draft", "blocked", "blocked"],
     );
-    assert.ok(queue.items.find((item) => item.category === "export")?.href.endsWith("#platform-export"));
+    const publishBlocker = queue.items.find((item) => item.id.includes(":publish-repair:"));
+    assert.ok(publishBlocker?.href.endsWith("#platform-export"));
+    assert.ok(publishBlocker?.evidence.includes("先处理"));
   });
 });

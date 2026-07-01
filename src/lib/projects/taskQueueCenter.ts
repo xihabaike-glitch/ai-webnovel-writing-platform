@@ -105,6 +105,7 @@ export function buildTaskQueueCenter(projects: TaskQueueProject[]): TaskQueueCen
       },
       targetPlatform: platform,
       chapters: project.chapters,
+      aiTasks: project.aiTasks,
     });
     const queueItems: QueueItem[] = [];
 
@@ -150,8 +151,8 @@ export function buildTaskQueueCenter(projects: TaskQueueProject[]): TaskQueueCen
       }));
     }
 
-    if (exportCenter.totalPublishableChapters > 0) {
-      const targetPackage = exportCenter.packages.find((pack) => pack.platformId === platform.id) ?? exportCenter.packages[0];
+    const targetPackage = exportCenter.packages.find((pack) => pack.platformId === platform.id) ?? exportCenter.packages[0];
+    if (exportCenter.totalPublishableChapters > 0 && targetPackage.canExport) {
       queueItems.push(item({
         id: `${project.id}:export:${platform.id}`,
         projectId: project.id,
@@ -161,6 +162,18 @@ export function buildTaskQueueCenter(projects: TaskQueueProject[]): TaskQueueCen
         chapterTitle: `${targetPackage.platformName} 发布包`,
         evidence: `${exportCenter.totalPublishableChapters} 章有正文可导出，${targetPackage.warnings.length} 条发布提醒。`,
         actionLabel: "导出平台包",
+        href: `${projectHref}#platform-export`,
+      }));
+    } else if (exportCenter.totalPublishableChapters > 0 && targetPackage.repairPath.status === "needs_repair") {
+      queueItems.push(item({
+        id: `${project.id}:publish-repair:${platform.id}`,
+        projectId: project.id,
+        projectTitle: project.title,
+        platformName: platform.name,
+        category: "blocked",
+        chapterTitle: `${targetPackage.platformName} 发布质检`,
+        evidence: targetPackage.repairPath.headline,
+        actionLabel: targetPackage.repairPath.nextStep?.label ?? "处理发布阻塞",
         href: `${projectHref}#platform-export`,
       }));
     }

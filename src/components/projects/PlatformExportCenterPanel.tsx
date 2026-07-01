@@ -79,10 +79,15 @@ function actionHref(projectId: string, action: PublishRepairAction) {
   return `/projects/${projectId}`;
 }
 
+function canRunAction(action: PublishRepairAction) {
+  return (action.kind === "run_chapter_review" || action.kind === "run_second_pass") && Boolean(action.chapterId);
+}
+
 export function PlatformExportCenterPanel({ projectId }: { projectId: string }) {
   const [center, setCenter] = useState<PlatformPublishExportCenter | null>(null);
   const [selectedPlatformId, setSelectedPlatformId] = useState<string>("");
   const [isLoading, setIsLoading] = useState(false);
+  const [runningActionId, setRunningActionId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const selectedPackage = useMemo(
     () => center?.packages.find((pack) => pack.platformId === selectedPlatformId) ?? center?.packages[0] ?? null,
@@ -144,6 +149,34 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
       setMessage(caught instanceof Error ? caught.message : "下载发布包失败。");
     } finally {
       setIsLoading(false);
+    }
+  }
+
+  async function runRepairAction(action: PublishRepairAction) {
+    if (!canRunAction(action)) return;
+    setRunningActionId(action.id);
+    setMessage(null);
+    try {
+      const response = await fetch(`/api/projects/${projectId}/platform-export/repair`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          kind: action.kind,
+          chapterId: action.chapterId,
+          chapterTitle: action.chapterTitle,
+          detail: action.detail,
+        }),
+      });
+      const payload = (await response.json().catch(() => null)) as { message?: string; error?: string } | null;
+      if (!response.ok) {
+        throw new Error(payload?.error ?? "修复动作执行失败。");
+      }
+      setMessage(payload?.message ?? "修复动作已完成。");
+      await loadCenter();
+    } catch (caught) {
+      setMessage(caught instanceof Error ? caught.message : "修复动作执行失败。");
+    } finally {
+      setRunningActionId(null);
     }
   }
 
@@ -246,15 +279,32 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
                 <div className="font-medium text-slate-900">下一步处理</div>
                 <div className="mt-2 grid gap-2 lg:grid-cols-2">
                   {selectedPackage.repairActions.slice(0, 6).map((action) => (
-                    <Link
+                    <div
                       className="rounded-md border border-slate-200 bg-white p-3 text-slate-600 hover:border-slate-300 hover:bg-slate-50"
-                      href={actionHref(projectId, action)}
                       key={action.id}
                     >
                       <div className="font-medium text-slate-950">{action.label}</div>
                       {action.chapterTitle ? <div className="mt-1 text-xs text-slate-500">{action.chapterTitle}</div> : null}
                       <div className="mt-1 leading-5">{action.detail}</div>
-                    </Link>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {canRunAction(action) ? (
+                          <button
+                            className="rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white disabled:opacity-50"
+                            disabled={Boolean(runningActionId)}
+                            onClick={() => void runRepairAction(action)}
+                            type="button"
+                          >
+                            {runningActionId === action.id ? "处理中" : "立即处理"}
+                          </button>
+                        ) : null}
+                        <Link
+                          className="rounded-md border border-slate-200 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                          href={actionHref(projectId, action)}
+                        >
+                          打开位置
+                        </Link>
+                      </div>
+                    </div>
                   ))}
                 </div>
               </div>
@@ -307,13 +357,25 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
                 {chapter.repairActions.length ? (
                   <div className="mt-2 flex flex-wrap gap-2">
                     {chapter.repairActions.slice(0, 2).map((action) => (
-                      <Link
-                        className="rounded-md border border-slate-200 px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50"
-                        href={actionHref(projectId, action)}
-                        key={action.id}
-                      >
-                        {action.label}
-                      </Link>
+                      canRunAction(action) ? (
+                        <button
+                          className="rounded-md border border-slate-200 px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                          disabled={Boolean(runningActionId)}
+                          key={action.id}
+                          onClick={() => void runRepairAction(action)}
+                          type="button"
+                        >
+                          {runningActionId === action.id ? "处理中" : action.label}
+                        </button>
+                      ) : (
+                        <Link
+                          className="rounded-md border border-slate-200 px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                          href={actionHref(projectId, action)}
+                          key={action.id}
+                        >
+                          {action.label}
+                        </Link>
+                      )
                     ))}
                   </div>
                 ) : null}

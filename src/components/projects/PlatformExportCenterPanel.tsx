@@ -54,6 +54,30 @@ interface PublishPackageVersionItem {
   createdAt: string;
 }
 
+interface PublishPackageVersionDetail extends PublishPackageVersionItem {
+  logline: string;
+  synopsis: string;
+  tags: string[];
+  markdown: string;
+}
+
+interface PublishPackageVersionComparisonItem {
+  label: string;
+  current: string;
+  version: string;
+  changed: boolean;
+}
+
+interface PublishPackageVersionComparison {
+  changedCount: number;
+  items: PublishPackageVersionComparisonItem[];
+}
+
+interface PublishPackageVersionDetailState {
+  version: PublishPackageVersionDetail;
+  comparison: PublishPackageVersionComparison;
+}
+
 interface PublishPreflight {
   score: number;
   canExport: boolean;
@@ -153,6 +177,9 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
   const [runningActionId, setRunningActionId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [runResults, setRunResults] = useState<PublishRepairRunResult[]>([]);
+  const [selectedVersionId, setSelectedVersionId] = useState<string | null>(null);
+  const [versionDetail, setVersionDetail] = useState<PublishPackageVersionDetailState | null>(null);
+  const [isLoadingVersion, setIsLoadingVersion] = useState(false);
   const selectedPackage = useMemo(
     () => center?.packages.find((pack) => pack.platformId === selectedPlatformId) ?? center?.packages[0] ?? null,
     [center, selectedPlatformId],
@@ -177,6 +204,28 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
       setMessage(caught instanceof Error ? caught.message : "读取平台发布包失败。");
     } finally {
       setIsLoading(false);
+    }
+  }
+
+  async function loadVersionDetail(versionId: string) {
+    setSelectedVersionId(versionId);
+    setVersionDetail(null);
+    setIsLoadingVersion(true);
+    setMessage(null);
+    try {
+      const response = await fetch(`/api/projects/${projectId}/platform-export?versionId=${versionId}`);
+      const payload = (await response.json().catch(() => null)) as (PublishPackageVersionDetailState & { error?: string }) | null;
+      if (!response.ok || !payload) {
+        throw new Error(payload?.error ?? "读取发布包版本失败。");
+      }
+      setVersionDetail({
+        version: payload.version,
+        comparison: payload.comparison,
+      });
+    } catch (caught) {
+      setMessage(caught instanceof Error ? caught.message : "读取发布包版本失败。");
+    } finally {
+      setIsLoadingVersion(false);
     }
   }
 
@@ -339,7 +388,11 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
           发布平台
           <select
             className="rounded-md border border-slate-200 px-3 py-2"
-            onChange={(event) => setSelectedPlatformId(event.target.value)}
+            onChange={(event) => {
+              setSelectedPlatformId(event.target.value);
+              setSelectedVersionId(null);
+              setVersionDetail(null);
+            }}
             value={selectedPlatformId}
           >
             {center?.packages.map((pack) => (
@@ -594,9 +647,67 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
                         <span>{version.wordCount} 字</span>
                         <span>{version.platformName}</span>
                       </div>
+                      <button
+                        className="mt-3 rounded-md border border-slate-200 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                        disabled={isLoadingVersion && selectedVersionId === version.id}
+                        onClick={() => void loadVersionDetail(version.id)}
+                        type="button"
+                      >
+                        {isLoadingVersion && selectedVersionId === version.id ? "读取中" : "查看详情"}
+                      </button>
                     </div>
                   ))}
                 </div>
+                {versionDetail ? (
+                  <div className="mt-3 rounded-md border border-slate-200 bg-white p-3">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                      <div>
+                        <div className="font-medium text-slate-950">版本详情</div>
+                        <div className="mt-1 text-xs text-slate-500">
+                          {versionDetail.version.platformName} · {versionActionLabel(versionDetail.version.action)} · {formatTime(versionDetail.version.createdAt)}
+                        </div>
+                      </div>
+                      <button
+                        className="w-fit rounded-md border border-slate-200 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                        onClick={() => {
+                          void navigator.clipboard.writeText(versionDetail.version.markdown);
+                          setMessage("已复制该历史版本 Markdown。");
+                        }}
+                        type="button"
+                      >
+                        复制此版本
+                      </button>
+                    </div>
+                    <div className="mt-3 rounded-md bg-slate-50 p-3">
+                      <div className="font-medium text-slate-900">与当前包对比</div>
+                      <div className="mt-1 text-xs text-slate-500">变化 {versionDetail.comparison.changedCount} 项</div>
+                      <div className="mt-2 grid gap-2 lg:grid-cols-2">
+                        {versionDetail.comparison.items.map((item) => (
+                          <div className="rounded-md border border-slate-200 bg-white p-2" key={item.label}>
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="font-medium text-slate-950">{item.label}</span>
+                              <span className={`rounded-md px-2 py-1 text-xs font-medium ${
+                                item.changed ? "bg-amber-50 text-amber-700" : "bg-emerald-50 text-emerald-700"
+                              }`}>
+                                {item.changed ? "有变化" : "一致"}
+                              </span>
+                            </div>
+                            <div className="mt-2 grid gap-1 text-xs text-slate-600">
+                              <div>当前：{item.current}</div>
+                              <div>版本：{item.version}</div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="mt-3">
+                      <div className="font-medium text-slate-900">Markdown 预览</div>
+                      <pre className="mt-2 max-h-80 overflow-auto whitespace-pre-wrap rounded-md bg-slate-950 p-3 text-xs leading-5 text-slate-100">
+                        {versionDetail.version.markdown}
+                      </pre>
+                    </div>
+                  </div>
+                ) : null}
               </div>
             ) : null}
           </div>

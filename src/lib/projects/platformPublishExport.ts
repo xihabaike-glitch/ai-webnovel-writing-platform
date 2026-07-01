@@ -72,6 +72,25 @@ export interface PublishPackageVersionItem {
   createdAt: Date | string;
 }
 
+export interface PublishPackageSnapshotDetail extends PublishPackageVersionItem {
+  logline: string;
+  synopsis: string;
+  tags: string[];
+  markdown: string;
+}
+
+export interface PublishPackageVersionComparisonItem {
+  label: string;
+  current: string;
+  version: string;
+  changed: boolean;
+}
+
+export interface PublishPackageVersionComparison {
+  changedCount: number;
+  items: PublishPackageVersionComparisonItem[];
+}
+
 export interface PlatformPublishExportInput {
   project: PublishExportProject;
   chapters: PublishExportChapter[];
@@ -128,6 +147,55 @@ export interface PlatformPublishExportCenter {
   packages: PlatformPublishPackage[];
   recommendedPlatformId: PlatformId;
   totalPublishableChapters: number;
+}
+
+function formatCompareValue(value: string | number | boolean | string[]) {
+  if (Array.isArray(value)) return value.length ? value.join("、") : "无";
+  if (typeof value === "boolean") return value ? "允许导出" : "暂不允许";
+  return String(value);
+}
+
+export function parsePublishSnapshotTags(tags: string | string[] | null | undefined) {
+  if (Array.isArray(tags)) return tags;
+  if (!tags) return [];
+  try {
+    const parsed = JSON.parse(tags) as unknown;
+    return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+export function buildPublishPackageVersionComparison(
+  version: PublishPackageSnapshotDetail,
+  current: PlatformPublishPackage,
+): PublishPackageVersionComparison {
+  const currentWordCount = current.chapters.reduce((sum, chapter) => sum + chapter.wordCount, 0);
+  const pairs = [
+    ["书名", current.title, version.title],
+    ["一句话卖点", current.logline, version.logline],
+    ["简介", current.synopsis, version.synopsis],
+    ["标签", current.tags, version.tags],
+    ["章节数", current.chapters.length, version.chapterCount],
+    ["字数", currentWordCount, version.wordCount],
+    ["质检分", current.preflight.score, version.preflightScore],
+    ["导出状态", current.canExport, version.canExport],
+  ] as const;
+  const items = pairs.map(([label, currentValue, versionValue]) => {
+    const currentText = formatCompareValue(currentValue);
+    const versionText = formatCompareValue(versionValue);
+    return {
+      label,
+      current: currentText,
+      version: versionText,
+      changed: currentText !== versionText,
+    };
+  });
+
+  return {
+    changedCount: items.filter((item) => item.changed).length,
+    items,
+  };
 }
 
 function compact(text: string) {

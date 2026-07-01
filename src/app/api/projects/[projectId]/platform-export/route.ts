@@ -1,7 +1,13 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { getPlatformProfile, platformProfiles, type PlatformId } from "@/lib/platforms/platformProfiles";
-import { buildPlatformPublishExportCenter, type PlatformPublishPackage } from "@/lib/projects/platformPublishExport";
+import {
+  buildPlatformPublishExportCenter,
+  buildPublishPackageVersionComparison,
+  parsePublishSnapshotTags,
+  type PlatformPublishPackage,
+  type PublishPackageSnapshotDetail,
+} from "@/lib/projects/platformPublishExport";
 import { buildSubmissionChecklist } from "@/lib/projects/submissionChecklist";
 
 interface Params {
@@ -97,6 +103,44 @@ export async function GET(request: Request, { params }: Params) {
 
   const { project, targetPlatform, center } = context;
   const platform = selectedPlatform(searchParams.get("platformId"));
+  const versionId = searchParams.get("versionId");
+
+  if (versionId) {
+    const snapshot = await prisma.publishPackageSnapshot.findFirst({
+      where: {
+        id: versionId,
+        projectId,
+      },
+    });
+
+    if (!snapshot) {
+      return NextResponse.json({ error: "Publish package version not found" }, { status: 404 });
+    }
+
+    const currentPack = center.packages.find((item) => item.platformId === snapshot.platformId)
+      ?? center.packages[0];
+    const version: PublishPackageSnapshotDetail = {
+      id: snapshot.id,
+      platformId: snapshot.platformId,
+      platformName: snapshot.platformName,
+      title: snapshot.title,
+      logline: snapshot.logline,
+      synopsis: snapshot.synopsis,
+      tags: parsePublishSnapshotTags(snapshot.tags),
+      markdown: snapshot.markdown,
+      action: snapshot.action,
+      chapterCount: snapshot.chapterCount,
+      wordCount: snapshot.wordCount,
+      preflightScore: snapshot.preflightScore,
+      canExport: snapshot.canExport,
+      createdAt: snapshot.createdAt,
+    };
+
+    return NextResponse.json({
+      version,
+      comparison: buildPublishPackageVersionComparison(version, currentPack),
+    });
+  }
 
   if (searchParams.get("format") === "markdown") {
     const pack = center.packages.find((item) => item.platformId === (platform?.id ?? targetPlatform.id))

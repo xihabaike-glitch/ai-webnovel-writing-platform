@@ -1,7 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { getPlatformProfile, platformProfiles } from "../lib/platforms/platformProfiles.ts";
-import { buildPlatformPublishExportCenter } from "../lib/projects/platformPublishExport.ts";
+import {
+  buildPlatformPublishExportCenter,
+  buildPublishPackageVersionComparison,
+  parsePublishSnapshotTags,
+} from "../lib/projects/platformPublishExport.ts";
 import { buildPublishRepairTaskSnapshot } from "../lib/projects/publishRepairActionExecution.ts";
 
 const chapters = [
@@ -291,5 +295,45 @@ test("buildPlatformPublishExportCenter", async (t) => {
     assert.equal(pack.publishVersions[0].id, "new-fanqie");
     assert.equal(pack.publishVersions[1].id, "old-fanqie");
     assert.equal(pack.publishVersions.every((version) => version.platformId === "fanqie"), true);
+  });
+
+  await t.test("compares publish package versions with the current package", () => {
+    const center = buildPlatformPublishExportCenter({
+      project: {
+        title: "夜雨系统",
+        genre: "都市系统",
+        sellingPoint: "雨夜危机中觉醒系统，主角用选择翻盘。",
+        currentWordCount: 9000,
+        targetWordCount: 300000,
+      },
+      targetPlatform: getPlatformProfile("fanqie"),
+      chapters: finalChapters,
+      aiTasks: passedReviews,
+      submissionChecklist: readyChecklist,
+      platforms: [getPlatformProfile("fanqie")],
+    });
+    const pack = center.packages[0];
+    const comparison = buildPublishPackageVersionComparison({
+      id: "snapshot-1",
+      platformId: "fanqie",
+      platformName: "番茄小说",
+      title: "旧书名",
+      logline: pack.logline,
+      synopsis: pack.synopsis,
+      tags: parsePublishSnapshotTags(JSON.stringify(pack.tags)),
+      markdown: "# 旧发布包",
+      action: "copy",
+      chapterCount: pack.chapters.length,
+      wordCount: pack.chapters.reduce((sum, chapter) => sum + chapter.wordCount, 0),
+      preflightScore: pack.preflight.score - 5,
+      canExport: pack.canExport,
+      createdAt: "2026-01-05T00:00:00.000Z",
+    }, pack);
+
+    assert.equal(parsePublishSnapshotTags("not json").length, 0);
+    assert.ok(comparison.changedCount >= 2);
+    assert.equal(comparison.items.find((item) => item.label === "书名")?.changed, true);
+    assert.equal(comparison.items.find((item) => item.label === "标签")?.changed, false);
+    assert.equal(comparison.items.find((item) => item.label === "质检分")?.changed, true);
   });
 });

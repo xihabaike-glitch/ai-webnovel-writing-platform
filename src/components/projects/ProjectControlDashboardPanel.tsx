@@ -12,6 +12,8 @@ interface ControlArea {
   nextAction: string;
   actionLabel: string;
   targetAnchor: string;
+  canExecute: boolean;
+  executeLabel: string;
 }
 
 interface ControlPriorityAction {
@@ -23,6 +25,8 @@ interface ControlPriorityAction {
   reason: string;
   actionLabel: string;
   targetAnchor: string;
+  canExecute: boolean;
+  executeLabel: string;
 }
 
 interface ProjectControlDashboard {
@@ -56,6 +60,7 @@ function severityLabel(severity: ControlPriorityAction["severity"]) {
 export function ProjectControlDashboardPanel({ projectId }: { projectId: string }) {
   const [dashboard, setDashboard] = useState<ProjectControlDashboard | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [runningActionId, setRunningActionId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
   async function loadDashboard() {
@@ -78,6 +83,28 @@ export function ProjectControlDashboardPanel({ projectId }: { projectId: string 
   useEffect(() => {
     void loadDashboard();
   }, [projectId]);
+
+  async function executeAction(action: ControlPriorityAction) {
+    setRunningActionId(action.id);
+    setMessage(null);
+    try {
+      const response = await fetch(`/api/projects/${projectId}/control-actions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ areaId: action.areaId }),
+      });
+      const payload = await response.json() as { message?: string; error?: string };
+      if (!response.ok) {
+        throw new Error(payload.error ?? "执行总控动作失败。");
+      }
+      await loadDashboard();
+      setMessage(payload.message ?? "动作已完成。");
+    } catch (caught) {
+      setMessage(caught instanceof Error ? caught.message : "执行总控动作失败。");
+    } finally {
+      setRunningActionId(null);
+    }
+  }
 
   return (
     <section className="rounded-md border border-slate-200 bg-white p-4">
@@ -145,12 +172,24 @@ export function ProjectControlDashboardPanel({ projectId }: { projectId: string 
                         <div className="text-xs text-slate-500">{index + 1} · {severityLabel(action.severity)} · {action.score}</div>
                         <div className="mt-1 font-medium text-slate-950">{action.label}</div>
                       </div>
-                      <Link
-                        className="inline-flex w-fit items-center justify-center rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white hover:bg-slate-800"
-                        href={`/projects/${projectId}#${action.targetAnchor}`}
-                      >
-                        {action.actionLabel}
-                      </Link>
+                      <div className="flex flex-wrap gap-2">
+                        {action.canExecute ? (
+                          <button
+                            className="inline-flex w-fit items-center justify-center rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white hover:bg-slate-800 disabled:opacity-50"
+                            disabled={Boolean(runningActionId)}
+                            onClick={() => executeAction(action)}
+                            type="button"
+                          >
+                            {runningActionId === action.id ? "执行中" : action.executeLabel}
+                          </button>
+                        ) : null}
+                        <Link
+                          className="inline-flex w-fit items-center justify-center rounded-md border border-slate-200 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-white"
+                          href={`/projects/${projectId}#${action.targetAnchor}`}
+                        >
+                          {action.actionLabel}
+                        </Link>
+                      </div>
                     </div>
                     <p className="mt-2 leading-6 text-slate-600">{action.reason}</p>
                   </div>

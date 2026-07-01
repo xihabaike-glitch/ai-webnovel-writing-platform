@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { groupReviewIssues, nonEmptyReviewGroups } from "@/lib/ai/reviewGrouping";
 import { latestTaskStatus, type AiTaskWorkflowItem } from "@/lib/ai/taskWorkflow";
+import { buildPlatformStyleScore, type PlatformStyleChapterCard } from "@/lib/chapters/platformStyleScore";
 import type { ChapterRevisionSummary } from "@/lib/chapters/revisions";
 import type { PlatformProfile } from "@/lib/platforms/platformProfiles";
 
@@ -98,9 +99,11 @@ function parseReview(outputText: string | null) {
 export function ChapterWorkflowPanel({
   chapterId,
   platform,
+  chapterCard,
 }: {
   chapterId: string;
   platform: PlatformProfile;
+  chapterCard: PlatformStyleChapterCard;
 }) {
   const router = useRouter();
   const [workflow, setWorkflow] = useState<WorkflowPayload | null>(null);
@@ -122,6 +125,7 @@ export function ChapterWorkflowPanel({
     () => (reviewResult ? nonEmptyReviewGroups(groupReviewIssues(reviewResult.issues)) : []),
     [reviewResult],
   );
+  const styleScore = useMemo(() => buildPlatformStyleScore({ platform, chapter: chapterCard }), [platform, chapterCard]);
   const latestDraftStatus = workflow ? latestTaskStatus(workflow.tasks, "chapter_draft") : "not_started";
   const latestReviewStatus = workflow ? latestTaskStatus(workflow.tasks, "chapter_review") : "not_started";
 
@@ -152,6 +156,10 @@ export function ChapterWorkflowPanel({
   }, [chapterId]);
 
   async function generateDraft() {
+    if (!styleScore.canGenerate) {
+      setMessage(`生成前体检 ${styleScore.score} 分：先补强章节卡再生成。`);
+      return;
+    }
     setIsGeneratingDraft(true);
     setMessage(null);
     try {
@@ -364,10 +372,31 @@ export function ChapterWorkflowPanel({
             <div className="rounded-md bg-amber-50 p-2 text-amber-700">当前模型未配置 Key，会优先使用可用模型或 Mock。</div>
           ) : null}
         </div>
+        <div className={`mt-4 rounded-md p-3 text-sm ${styleScore.canGenerate ? "bg-emerald-50 text-emerald-800" : "bg-amber-50 text-amber-800"}`}>
+          <div className="flex items-center justify-between gap-3">
+            <div className="font-medium">生成前体检</div>
+            <div className="text-lg font-semibold">{styleScore.score}</div>
+          </div>
+          <p className="mt-1">{styleScore.verdict}</p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {styleScore.platformMustHave.map((item) => (
+              <span className="rounded-md bg-white/70 px-2 py-1 text-xs" key={item}>
+                {item}
+              </span>
+            ))}
+          </div>
+          {styleScore.priorityFixes.length > 0 ? (
+            <div className="mt-3 grid gap-1">
+              {styleScore.priorityFixes.map((fix) => (
+                <div key={fix}>补强：{fix}</div>
+              ))}
+            </div>
+          ) : null}
+        </div>
         <div className="mt-4 grid grid-cols-2 gap-2">
           <button
             className="rounded-md bg-slate-950 px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
-            disabled={isGeneratingDraft}
+            disabled={isGeneratingDraft || !styleScore.canGenerate}
             onClick={generateDraft}
             type="button"
           >

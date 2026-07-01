@@ -46,7 +46,7 @@ export default async function ChapterPage({
           <ChapterSecondPassPanel chapterId={chapter.id} currentWordCount={chapter.wordCount} />
           <ChapterRevisionWorkbench chapter={editableChapter} />
         </div>
-        <ChapterWorkflowPanel chapterId={chapterId} platform={platform} />
+        <ChapterWorkflowPanel chapterCard={editableChapter} chapterId={chapterId} platform={platform} />
       </div>
     </AppShell>
   );

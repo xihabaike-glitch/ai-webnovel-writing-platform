@@ -38,7 +38,7 @@ export async function generateChapterDraft(options: GenerateChapterDraftOptions)
     },
   });
 
-  const { provider, adapter } = await getActiveModelProvider();
+  const { provider, adapter } = await getActiveModelProvider("chapter_draft");
   const task = await prisma.aiTask.create({
     data: {
       projectId: chapter.projectId,

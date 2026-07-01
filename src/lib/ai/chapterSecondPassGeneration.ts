@@ -65,7 +65,7 @@ export async function generateChapterSecondPass(options: GenerateChapterSecondPa
     },
   });
 
-  const { provider, adapter } = await getActiveModelProvider();
+  const { provider, adapter } = await getActiveModelProvider("chapter_second_pass");
   const task = await prisma.aiTask.create({
     data: {
       projectId: chapter.projectId,

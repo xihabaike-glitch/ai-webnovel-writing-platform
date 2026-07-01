@@ -33,7 +33,7 @@ export async function POST(_request: Request, { params }: Params) {
     chapters: project.chapters,
   });
   const prompt = buildSubmissionOptimizationPrompt({ platform, submissionPackage });
-  const { provider, adapter } = await getActiveModelProvider();
+  const { provider, adapter } = await getActiveModelProvider("submission_package_optimize");
   const task = await prisma.aiTask.create({
     data: {
       projectId,

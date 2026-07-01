@@ -42,7 +42,7 @@ export async function reviewChapterDraft(chapterId: string) {
     },
   });
 
-  const { provider, adapter } = await getActiveModelProvider();
+  const { provider, adapter } = await getActiveModelProvider("chapter_review");
   const task = await prisma.aiTask.create({
     data: {
       projectId: chapter.projectId,

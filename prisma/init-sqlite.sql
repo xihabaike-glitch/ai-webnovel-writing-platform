@@ -141,6 +141,17 @@ CREATE TABLE IF NOT EXISTS "ModelProvider" (
   "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS "ModelTaskRoute" (
+  "id" TEXT NOT NULL PRIMARY KEY,
+  "taskType" TEXT NOT NULL UNIQUE,
+  "primaryProviderConfigId" TEXT,
+  "fallbackProviderConfigId" TEXT,
+  "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT "ModelTaskRoute_primaryProviderConfigId_fkey" FOREIGN KEY ("primaryProviderConfigId") REFERENCES "ModelProvider" ("id") ON DELETE SET NULL ON UPDATE CASCADE,
+  CONSTRAINT "ModelTaskRoute_fallbackProviderConfigId_fkey" FOREIGN KEY ("fallbackProviderConfigId") REFERENCES "ModelProvider" ("id") ON DELETE SET NULL ON UPDATE CASCADE
+);
+
 CREATE TABLE IF NOT EXISTS "AiTask" (
   "id" TEXT NOT NULL PRIMARY KEY,
   "projectId" TEXT NOT NULL,

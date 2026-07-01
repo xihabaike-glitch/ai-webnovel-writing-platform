@@ -18,3 +18,15 @@ export const testModelProviderSchema = saveModelProviderSchema.pick({
   apiKey: true,
   defaultModel: true,
 });
+
+export const saveModelTaskRouteSchema = z.object({
+  taskType: z.enum([
+    "chapter_draft",
+    "chapter_review",
+    "chapter_second_pass",
+    "submission_package_optimize",
+    "first_three_rewrite",
+  ]),
+  primaryProviderConfigId: z.string().optional().nullable(),
+  fallbackProviderConfigId: z.string().optional().nullable(),
+});

@@ -169,6 +169,20 @@ model ModelProvider {
   updatedAt        DateTime @updatedAt
 
   aiTasks AiTask[]
+  primaryRoutes  ModelTaskRoute[] @relation("PrimaryRouteProvider")
+  fallbackRoutes ModelTaskRoute[] @relation("FallbackRouteProvider")
+}
+
+model ModelTaskRoute {
+  id                       String   @id @default(cuid())
+  taskType                 String   @unique
+  primaryProviderConfigId  String?
+  fallbackProviderConfigId String?
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
+
+  primaryProvider  ModelProvider? @relation("PrimaryRouteProvider", fields: [primaryProviderConfigId], references: [id], onDelete: SetNull)
+  fallbackProvider ModelProvider? @relation("FallbackRouteProvider", fields: [fallbackProviderConfigId], references: [id], onDelete: SetNull)
 }
 
 model AiTask {

@@ -26,7 +26,7 @@ export async function GET(request: Request) {
   }
 
   const [{ provider }, tasks] = await Promise.all([
-    getActiveModelProvider(),
+    getActiveModelProvider("chapter_draft"),
     prisma.aiTask.findMany({
       where: {
         chapterId,

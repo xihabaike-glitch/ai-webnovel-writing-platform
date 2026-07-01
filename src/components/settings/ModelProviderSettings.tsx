@@ -25,6 +25,24 @@ interface ProviderView {
   maxContextTokens: number | null;
 }
 
+interface RouteOptionView {
+  taskType: string;
+  label: string;
+  description: string;
+}
+
+interface RouteView {
+  id: string;
+  taskType: string;
+  primaryProviderConfigId: string | null;
+  fallbackProviderConfigId: string | null;
+}
+
+interface RouteDraft {
+  primaryProviderConfigId: string;
+  fallbackProviderConfigId: string;
+}
+
 interface DraftProvider {
   id?: string;
   providerId: ModelProviderId;
@@ -74,10 +92,14 @@ export function ModelProviderSettings({
   healthDashboard,
   options,
   providers,
+  routeOptions,
+  routes,
 }: {
   healthDashboard: ProviderHealthDashboard;
   options: ProviderOptionView[];
   providers: ProviderView[];
+  routeOptions: RouteOptionView[];
+  routes: RouteView[];
 }) {
   const router = useRouter();
   const existingByProvider = useMemo(
@@ -92,6 +114,17 @@ export function ModelProviderSettings({
   const [isSaving, setIsSaving] = useState(false);
   const [testingProviderId, setTestingProviderId] = useState<ModelProviderId | null>(null);
   const [testResults, setTestResults] = useState<Record<string, ConnectionTestResult>>({});
+  const [routeDrafts, setRouteDrafts] = useState<Record<string, RouteDraft>>(() => Object.fromEntries(
+    routeOptions.map((option) => {
+      const route = routes.find((item) => item.taskType === option.taskType);
+      return [option.taskType, {
+        primaryProviderConfigId: route?.primaryProviderConfigId ?? "",
+        fallbackProviderConfigId: route?.fallbackProviderConfigId ?? "",
+      }];
+    }),
+  ));
+  const [savingRouteType, setSavingRouteType] = useState<string | null>(null);
+  const [routeMessage, setRouteMessage] = useState<string | null>(null);
   const currentTestResult = testResults[selectedProviderId];
 
   function selectProvider(providerId: ModelProviderId) {
@@ -176,6 +209,30 @@ export function ModelProviderSettings({
     }
   }
 
+  async function saveRoute(taskType: string) {
+    const draftRoute = routeDrafts[taskType] ?? { primaryProviderConfigId: "", fallbackProviderConfigId: "" };
+    setSavingRouteType(taskType);
+    setRouteMessage(null);
+    try {
+      const response = await fetch("/api/model-task-routes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          taskType,
+          primaryProviderConfigId: draftRoute.primaryProviderConfigId || null,
+          fallbackProviderConfigId: draftRoute.fallbackProviderConfigId || null,
+        }),
+      });
+      if (!response.ok) throw new Error("保存模型路由失败。");
+      setRouteMessage("模型路由已保存");
+      router.refresh();
+    } catch (caught) {
+      setRouteMessage(caught instanceof Error ? caught.message : "保存模型路由失败。");
+    } finally {
+      setSavingRouteType(null);
+    }
+  }
+
   return (
     <div className="mt-6 grid gap-5">
       <section className="grid gap-3">
@@ -241,6 +298,74 @@ export function ModelProviderSettings({
                 <div className="mt-3 text-xs text-slate-500">适配任务：{row.taskFit.join(" / ")}</div>
                 <div className="mt-2 text-xs text-slate-600">{row.nextAction}</div>
               </article>
+            );
+          })}
+        </div>
+      </section>
+      <section className="rounded-md border border-slate-200 bg-white p-4">
+        <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <h2 className="font-medium text-slate-950">模型路由策略</h2>
+            <p className="mt-1 text-sm text-slate-600">给不同 AI 任务指定首选模型和备用模型，未配置时自动使用当前可用模型。</p>
+          </div>
+          {routeMessage ? <div className="rounded-md bg-slate-50 px-3 py-2 text-sm text-slate-600">{routeMessage}</div> : null}
+        </div>
+        <div className="mt-4 grid gap-3">
+          {routeOptions.map((option) => {
+            const draftRoute = routeDrafts[option.taskType] ?? { primaryProviderConfigId: "", fallbackProviderConfigId: "" };
+            return (
+              <div className="rounded-md border border-slate-200 p-3" key={option.taskType}>
+                <div className="grid gap-3 lg:grid-cols-[1fr_220px_220px_auto] lg:items-end">
+                  <div>
+                    <div className="font-medium text-slate-950">{option.label}</div>
+                    <p className="mt-1 text-sm leading-6 text-slate-600">{option.description}</p>
+                  </div>
+                  <label className="grid gap-1 text-sm">
+                    首选模型
+                    <select
+                      className="rounded-md border border-slate-200 px-3 py-2"
+                      onChange={(event) => setRouteDrafts((current) => ({
+                        ...current,
+                        [option.taskType]: { ...draftRoute, primaryProviderConfigId: event.target.value },
+                      }))}
+                      value={draftRoute.primaryProviderConfigId}
+                    >
+                      <option value="">自动选择</option>
+                      {providers.map((provider) => (
+                        <option key={provider.id} value={provider.id}>
+                          {provider.displayName} · {provider.defaultModel}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="grid gap-1 text-sm">
+                    备用模型
+                    <select
+                      className="rounded-md border border-slate-200 px-3 py-2"
+                      onChange={(event) => setRouteDrafts((current) => ({
+                        ...current,
+                        [option.taskType]: { ...draftRoute, fallbackProviderConfigId: event.target.value },
+                      }))}
+                      value={draftRoute.fallbackProviderConfigId}
+                    >
+                      <option value="">无备用</option>
+                      {providers.map((provider) => (
+                        <option key={provider.id} value={provider.id}>
+                          {provider.displayName} · {provider.defaultModel}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <button
+                    className="w-fit rounded-md bg-slate-950 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+                    disabled={savingRouteType === option.taskType}
+                    onClick={() => saveRoute(option.taskType)}
+                    type="button"
+                  >
+                    {savingRouteType === option.taskType ? "保存中" : "保存路由"}
+                  </button>
+                </div>
+              </div>
             );
           })}
         </div>

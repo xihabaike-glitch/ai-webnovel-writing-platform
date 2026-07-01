@@ -65,7 +65,7 @@ export async function POST(request: Request, { params }: Params) {
     platform,
     chapters: project.chapters,
   });
-  const { provider, adapter } = await getActiveModelProvider();
+  const { provider, adapter } = await getActiveModelProvider("first_three_rewrite");
   const chaptersByOrder = new Map(project.chapters.map((chapter) => [chapter.order, chapter]));
   const results = [];
 

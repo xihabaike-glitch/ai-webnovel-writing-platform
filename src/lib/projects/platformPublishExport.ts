@@ -392,7 +392,7 @@ export interface PlatformStrategySwitchPlan {
 }
 
 export interface PlatformStrategyExecutionReceipt {
-  stepId: PlatformStrategySwitchStep["id"] | "adopt-submission-asset";
+  stepId: PlatformStrategySwitchStep["id"] | "adopt-submission-asset" | "save-publish-effect";
   platformId: PlatformId;
   platformName: string;
   title: string;
@@ -1114,6 +1114,19 @@ export function buildPlatformStrategyExecutionReceipt(
       nextAction: "保存发布效果后再看排行榜，让真实数据决定下一轮主战场。",
       href: "#publish-effect-panel",
       severity: "needs_action",
+    };
+  }
+
+  if (stepId === "save-publish-effect") {
+    return {
+      stepId,
+      platformId: plan.platformId,
+      platformName: plan.platformName,
+      title: "发布效果已入账",
+      message: `${plan.platformName} 的真实数据已经写进策略系统。现在别拍脑袋，排行榜会重新算账。`,
+      nextAction: "回到平台策略排行榜，看主战场是否继续加码，还是该换打法。",
+      href: "#platform-export",
+      severity: "success",
     };
   }
 

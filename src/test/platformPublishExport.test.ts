@@ -956,6 +956,63 @@ test("buildPlatformPublishExportCenter", async (t) => {
     assert.equal(plan.steps.find((step) => step.id === "record-publish-effect")?.executable, true);
   });
 
+  await t.test("marks publish effect recording done after real metrics are saved", () => {
+    const center = buildPlatformPublishExportCenter({
+      project: {
+        title: "夜雨系统",
+        genre: "都市系统",
+        sellingPoint: "雨夜危机中觉醒系统，主角用选择翻盘。",
+        currentWordCount: 9000,
+        targetWordCount: 300000,
+      },
+      targetPlatform: getPlatformProfile("qimao"),
+      chapters: finalChapters,
+      aiTasks: passedReviews,
+      submissionChecklist: readyChecklist,
+      platforms: [getPlatformProfile("qimao")],
+      submissionAssets: [
+        {
+          id: "asset-qimao-ready",
+          platformId: "qimao",
+          platformName: "七猫",
+          title: "夜雨系统：倒计时翻盘",
+          logline: "雨夜倒计时逼她选择，林晚把系统惩罚打成翻盘爽点。",
+          synopsis: "林晚在雨夜绑定倒计时系统，每一次选择都牵动生死、复仇和悬疑真相。她从被迫救人开始，一步步摸清系统规则，把惩罚变成筹码，把背叛者拖回真相现场，并在连续任务中建立稳定目标：查清当年事故、保护真正重要的人、夺回属于自己的命运。故事保持强钩子、强情绪和连续爽点，适合七猫免费长篇平台连载。",
+          overseasSynopsis: "Night Rain System follows Lin Wan through timed choices and revenge.",
+          tags: ["系统", "逆袭", "悬疑"],
+          note: "七猫主战场资产。",
+          source: "manual",
+          updatedAt: "2026-01-06T08:00:00.000Z",
+        },
+      ],
+      platformPublishMetrics: [
+        {
+          id: "metric-qimao",
+          platformId: "qimao",
+          platformName: "七猫",
+          views: 1200,
+          clicks: 240,
+          favorites: 80,
+          follows: 36,
+          comments: 8,
+          paidReads: 0,
+          editorFeedback: "继续观察前三章转化。",
+          contractStatus: "pending",
+          publishUrl: "https://example.com/qimao",
+          notes: "首轮数据。",
+          snapshotDate: "2026-01-08T00:00:00.000Z",
+        },
+      ],
+    });
+    const strategy = center.platformStrategy[0];
+    const pack = center.packages[0];
+    const plan = buildPlatformStrategySwitchPlan(strategy, getPlatformProfile("qimao"), pack);
+
+    assert.equal(pack.publishEffect.records, 1);
+    assert.equal(plan.steps.find((step) => step.id === "record-publish-effect")?.status, "done");
+    assert.equal(plan.steps.find((step) => step.id === "record-publish-effect")?.executable, false);
+  });
+
   await t.test("builds PM-style receipts after strategy steps execute", () => {
     const strategy = {
       rank: 1,
@@ -980,6 +1037,7 @@ test("buildPlatformPublishExportCenter", async (t) => {
     const assetReceipt = buildPlatformStrategyExecutionReceipt(plan, "fix-submission-asset", 3);
     const adoptedReceipt = buildPlatformStrategyExecutionReceipt(plan, "adopt-submission-asset", 1);
     const rewriteReceipt = buildPlatformStrategyExecutionReceipt(plan, "rewrite-first-three", 3);
+    const effectReceipt = buildPlatformStrategyExecutionReceipt(plan, "save-publish-effect");
 
     assert.equal(assetReceipt.href, "#submission-asset-editor");
     assert.equal(assetReceipt.severity, "needs_action");
@@ -991,5 +1049,8 @@ test("buildPlatformPublishExportCenter", async (t) => {
     assert.equal(rewriteReceipt.href, "#platform-export");
     assert.ok(rewriteReceipt.message.includes("已重写 3 章"));
     assert.ok(rewriteReceipt.nextAction.includes("发布前质检"));
+    assert.equal(effectReceipt.severity, "success");
+    assert.ok(effectReceipt.message.includes("真实数据"));
+    assert.ok(effectReceipt.nextAction.includes("排行榜"));
   });
 });

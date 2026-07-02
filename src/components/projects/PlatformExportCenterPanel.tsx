@@ -653,6 +653,18 @@ function buildStrategyExecutionReceipt(
       severity: "needs_action",
     };
   }
+  if (stepId === "save-publish-effect") {
+    return {
+      stepId,
+      platformId: plan.platformId,
+      platformName: plan.platformName,
+      title: "发布效果已入账",
+      message: `${plan.platformName} 的真实数据已经写进策略系统。现在别拍脑袋，排行榜会重新算账。`,
+      nextAction: "回到平台策略排行榜，看主战场是否继续加码，还是该换打法。",
+      href: "#platform-export",
+      severity: "success",
+    };
+  }
   return {
     stepId,
     platformId: plan.platformId,
@@ -874,6 +886,7 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
 
   async function savePublishEffect() {
     if (!selectedPackage) return;
+    const platformId = selectedPackage.platformId;
     setIsSavingEffect(true);
     setMessage(null);
     try {
@@ -891,6 +904,11 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
       if (!response.ok) throw new Error(payload?.error ?? "保存发布效果失败。");
       setMessage(payload?.message ?? "发布效果已记录。");
       await loadCenter({ keepMessage: true });
+      if (strategySwitchPlan?.platformId === platformId) {
+        const refreshedPlan = await refreshStrategyPlan(platformId);
+        setStrategyExecutionReceipt(buildStrategyExecutionReceipt(refreshedPlan, "save-publish-effect"));
+        setMessage(`${payload?.message ?? "发布效果已记录。"} 策略链已刷新。`);
+      }
     } catch (caught) {
       setMessage(caught instanceof Error ? caught.message : "保存发布效果失败。");
     } finally {

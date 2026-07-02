@@ -378,6 +378,7 @@ export interface PlatformStrategyReviewDecision {
   detail: string;
   action: string;
   tasks: PlatformStrategyReviewTask[];
+  history: PlatformStrategyReviewHistoryItem[];
 }
 
 export interface PlatformStrategyReviewTask {
@@ -386,6 +387,15 @@ export interface PlatformStrategyReviewTask {
   execution: "open_target" | "generate_asset_variants" | "rewrite_first_three" | "save_snapshot" | "apply_strategy";
   label: string;
   detail: string;
+  href: string;
+}
+
+export interface PlatformStrategyReviewHistoryItem {
+  id: string;
+  type: "snapshot" | "asset" | "metric" | "repair";
+  label: string;
+  detail: string;
+  createdAt: Date | string;
   href: string;
 }
 
@@ -926,16 +936,66 @@ function comparisonScore(comparison: PlatformPublishEffectComparison) {
   return 40;
 }
 
+function buildPlatformStrategyReviewHistory(pack: PlatformPublishPackage): PlatformStrategyReviewHistoryItem[] {
+  const snapshotItems: PlatformStrategyReviewHistoryItem[] = pack.publishVersions.slice(0, 4).map((version) => ({
+    id: `snapshot-${version.id}`,
+    type: "snapshot",
+    label: version.action === "snapshot"
+      ? "保存发布包版本"
+      : version.action === "archive"
+        ? "归档发布包"
+        : version.action === "download"
+          ? "下载发布包"
+          : version.action === "copy"
+            ? "复制发布包"
+            : "恢复历史版本",
+    detail: `${version.title}｜质检 ${version.preflightScore} 分｜${version.chapterCount} 章`,
+    createdAt: version.createdAt,
+    href: "#package-version-history",
+  }));
+  const assetItems: PlatformStrategyReviewHistoryItem[] = pack.submissionAssetVersions.slice(0, 4).map((version) => ({
+    id: `asset-${version.id ?? `${version.platformId}-${new Date(version.createdAt).getTime()}`}`,
+    type: "asset",
+    label: version.action === "adopt" ? "采纳投稿资产" : version.action === "restore" ? "恢复投稿资产" : "保存投稿资产",
+    detail: `${version.title}｜资产 ${version.auditScore} 分${version.strategy ? `｜${version.strategy}` : ""}`,
+    createdAt: version.createdAt,
+    href: "#submission-asset-editor",
+  }));
+  const metricItems: PlatformStrategyReviewHistoryItem[] = pack.publishEffect.history.slice(0, 4).map((metric) => ({
+    id: `metric-${metric.id ?? `${metric.platformId}-${new Date(metric.snapshotDate).getTime()}`}`,
+    type: "metric",
+    label: "记录发布效果",
+    detail: `曝光 ${metric.views}｜点击 ${metric.clicks}｜收藏 ${metric.favorites}｜追读 ${metric.follows}`,
+    createdAt: metric.snapshotDate,
+    href: "#publish-effect-panel",
+  }));
+  const repairItems: PlatformStrategyReviewHistoryItem[] = pack.repairHistory.slice(0, 4).map((item) => ({
+    id: `repair-${item.id}`,
+    type: "repair",
+    label: item.label,
+    detail: `${item.chapterTitle}｜${item.status}｜${item.message}`,
+    createdAt: item.createdAt,
+    href: "#first-three-rewrite",
+  }));
+
+  return [...snapshotItems, ...assetItems, ...metricItems, ...repairItems]
+    .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime())
+    .slice(0, 6);
+}
+
 function buildPlatformStrategyReviewDecision(
   pack: PlatformPublishPackage,
   recommendation: PlatformStrategyRankItem["recommendation"],
 ): PlatformStrategyReviewDecision {
+  const history = buildPlatformStrategyReviewHistory(pack);
+
   if (!pack.publishEffect.records) {
     return {
       kind: "collect",
       label: "先补数据",
       detail: "还没有真实发布数据，现在谈加码就是拍脑袋。",
       action: "先录入曝光、点击、收藏、追读和编辑反馈。",
+      history,
       tasks: [
         {
           id: "record-first-publish-effect",
@@ -973,6 +1033,7 @@ function buildPlatformStrategyReviewDecision(
       label: "继续加码",
       detail: "数据已经给出正反馈，主资源可以继续往这里压。",
       action: "保持主战场，继续更新、归档版本，并跟踪下一轮转化。",
+      history,
       tasks: [
         {
           id: "keep-main-platform",
@@ -1008,6 +1069,7 @@ function buildPlatformStrategyReviewDecision(
       label: "先修打法",
       detail: "真实反馈偏弱，现在继续硬投只会扩大损失。",
       action: "回到前三章、投稿资产和发布节奏，先修再投。",
+      history,
       tasks: [
         {
           id: "rewrite-opening-hook",
@@ -1043,6 +1105,7 @@ function buildPlatformStrategyReviewDecision(
       label: "换个打法",
       detail: "当前平台胜率靠后，不值得继续烧主资源。",
       action: "把它降为观察平台，回排行榜选择更高胜率主战场。",
+      history,
       tasks: [
         {
           id: "demote-platform",
@@ -1077,6 +1140,7 @@ function buildPlatformStrategyReviewDecision(
     label: "小步迭代",
     detail: "数据还没差到要撤，也没好到能猛冲。",
     action: "做一轮小改动，再记录下一轮数据对照。",
+    history,
     tasks: [
       {
         id: "adjust-one-variable",

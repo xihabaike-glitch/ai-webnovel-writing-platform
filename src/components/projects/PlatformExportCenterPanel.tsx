@@ -370,6 +370,7 @@ interface PlatformStrategyReviewDecision {
   detail: string;
   action: string;
   tasks: PlatformStrategyReviewTask[];
+  history: PlatformStrategyReviewHistoryItem[];
 }
 
 interface PlatformStrategyReviewTask {
@@ -379,6 +380,27 @@ interface PlatformStrategyReviewTask {
   label: string;
   detail: string;
   href: string;
+}
+
+interface PlatformStrategyReviewHistoryItem {
+  id: string;
+  type: "snapshot" | "asset" | "metric" | "repair";
+  label: string;
+  detail: string;
+  createdAt: string;
+  href: string;
+}
+
+interface PlatformStrategyReviewTaskReceipt {
+  id: string;
+  platformId: string;
+  platformName: string;
+  taskLabel: string;
+  title: string;
+  message: string;
+  nextAction: string;
+  href: string;
+  severity: "success" | "needs_action";
 }
 
 interface PlatformStrategySwitchStep {
@@ -644,6 +666,41 @@ function strategyReviewTaskActionLabel(execution: PlatformStrategyReviewTask["ex
   return "前往";
 }
 
+function strategyReviewHistoryClass(type: PlatformStrategyReviewHistoryItem["type"]) {
+  if (type === "snapshot") return "bg-indigo-50 text-indigo-700";
+  if (type === "asset") return "bg-cyan-50 text-cyan-700";
+  if (type === "metric") return "bg-emerald-50 text-emerald-700";
+  return "bg-amber-50 text-amber-700";
+}
+
+function buildStrategyReviewTaskReceipt(
+  item: PlatformStrategyRankItem,
+  task: PlatformStrategyReviewTask,
+  resultLabel: string,
+): PlatformStrategyReviewTaskReceipt {
+  const nextAction = task.execution === "generate_asset_variants"
+    ? "去投稿资产区采纳一个候选，否则生成再多也不会进入实测。"
+    : task.execution === "rewrite_first_three"
+      ? "检查前三章重写结果，再跑发布质检和平台复盘。"
+      : task.execution === "save_snapshot"
+        ? "版本已经留下证据，下一轮改动后再做对照。"
+        : task.execution === "apply_strategy"
+          ? "主战场已切换，继续按执行链处理下一步。"
+          : "继续在目标面板补齐数据或处理卡点。";
+
+  return {
+    id: `${item.platformId}:${task.id}:${Date.now()}`,
+    platformId: item.platformId,
+    platformName: item.platformName,
+    taskLabel: task.label,
+    title: `${item.platformName}｜${task.label}已执行`,
+    message: resultLabel,
+    nextAction,
+    href: task.href,
+    severity: task.execution === "open_target" ? "needs_action" : "success",
+  };
+}
+
 function switchStepStatusLabel(status: PlatformStrategySwitchStep["status"]) {
   if (status === "done") return "已完成";
   if (status === "next") return "现在做";
@@ -772,6 +829,7 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
   const [runningStrategyReviewTaskId, setRunningStrategyReviewTaskId] = useState<string | null>(null);
   const [strategySwitchPlan, setStrategySwitchPlan] = useState<PlatformStrategySwitchPlan | null>(null);
   const [strategyExecutionReceipt, setStrategyExecutionReceipt] = useState<PlatformStrategyExecutionReceipt | null>(null);
+  const [strategyReviewTaskReceipt, setStrategyReviewTaskReceipt] = useState<PlatformStrategyReviewTaskReceipt | null>(null);
   const [assetOptimizationVariants, setAssetOptimizationVariants] = useState<PlatformSubmissionAssetOptimizationVariant[]>([]);
   const [versionActionFilter, setVersionActionFilter] = useState<PublishPackageVersionActionFilter>("all");
   const [assetDraft, setAssetDraft] = useState<SubmissionAssetDraft>({
@@ -1018,17 +1076,20 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
     setSelectedVersionId(null);
     setVersionDetail(null);
     setRunningStrategyReviewTaskId(taskRunId);
+    setStrategyReviewTaskReceipt(null);
     setMessage(null);
 
     try {
       if (task.execution === "open_target") {
         window.location.hash = task.href.replace(/^#/, "");
+        setStrategyReviewTaskReceipt(buildStrategyReviewTaskReceipt(item, task, `已定位到「${task.label}」，现在要补具体内容，别只看一眼就走。`));
         setMessage(`已定位到「${task.label}」。`);
         return;
       }
 
       if (task.execution === "apply_strategy") {
         await applyPlatformStrategy(item);
+        setStrategyReviewTaskReceipt(buildStrategyReviewTaskReceipt(item, task, `已把 ${item.platformName} 作为当前策略动作推进对象。`));
         return;
       }
 
@@ -1041,6 +1102,7 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
         const payload = (await response.json().catch(() => null)) as { message?: string; error?: string } | null;
         if (!response.ok) throw new Error(payload?.error ?? "保存发布包版本失败。");
         setVersionActionFilter("snapshot");
+        setStrategyReviewTaskReceipt(buildStrategyReviewTaskReceipt(item, task, payload?.message ?? `已保存 ${item.platformName} 发布包版本。`));
         setMessage(payload?.message ?? `已保存 ${item.platformName} 发布包版本。`);
         await loadCenter({ keepMessage: true });
         window.location.hash = "package-version-history";
@@ -1078,6 +1140,7 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
         } | null;
         if (!response.ok || !payload?.variants) throw new Error(payload?.error ?? "AI 优化投稿资产失败。");
         setAssetOptimizationVariants(payload.variants.map((variant) => ({ ...variant, sourceTaskId: payload.task?.id })));
+        setStrategyReviewTaskReceipt(buildStrategyReviewTaskReceipt(item, task, `已生成 ${payload.variants.length} 个 ${strategyPackage.platformName} 投稿资产候选。`));
         setMessage(`已执行「${task.label}」，生成 ${payload.variants.length} 个 ${strategyPackage.platformName} 投稿资产候选。`);
         window.location.hash = "submission-asset-editor";
         return;
@@ -1097,6 +1160,7 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
         await loadCenter({ keepMessage: true });
         const refreshedPlan = await refreshStrategyPlan(strategyPackage.platformId);
         setStrategyExecutionReceipt(buildStrategyExecutionReceipt(refreshedPlan, "rewrite-first-three", payload.results.length));
+        setStrategyReviewTaskReceipt(buildStrategyReviewTaskReceipt(item, task, `已重写前三章共 ${payload.results.length} 章。`));
         setMessage(`已执行「${task.label}」，重写前三章共 ${payload.results.length} 章，策略链已刷新。`);
         return;
       }
@@ -1724,6 +1788,32 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
                           ))}
                         </div>
                       ) : null}
+                      {item.reviewDecision.history.length ? (
+                        <div className="mt-3 border-t border-slate-100 pt-2">
+                          <div className="text-[11px] font-medium text-slate-500">最近复盘历史</div>
+                          <div className="mt-1 grid gap-1.5">
+                            {item.reviewDecision.history.slice(0, 3).map((history) => (
+                              <a
+                                className="block rounded-md bg-slate-50 p-2 hover:bg-slate-100"
+                                href={history.href}
+                                key={history.id}
+                              >
+                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                  <span className="font-medium text-slate-800">{history.label}</span>
+                                  <span className={`rounded-md px-1.5 py-0.5 text-[11px] font-medium ${strategyReviewHistoryClass(history.type)}`}>
+                                    {formatTime(history.createdAt)}
+                                  </span>
+                                </div>
+                                <div className="mt-1 line-clamp-2 leading-5 text-slate-500">{history.detail}</div>
+                              </a>
+                            ))}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="mt-3 rounded-md bg-slate-50 p-2 text-[11px] leading-5 text-slate-500">
+                          暂无复盘历史。先执行一个任务，系统才有证据可追。
+                        </div>
+                      )}
                     </div>
                     <div className="mt-2 text-xs text-slate-500">下一步：{item.nextAction}</div>
                     <div className="mt-2 grid gap-1 text-xs text-slate-500">
@@ -1851,6 +1941,31 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
                           href={strategyExecutionReceipt.href}
                         >
                           去处理
+                        </a>
+                      </div>
+                    </div>
+                  ) : null}
+                  {strategyReviewTaskReceipt ? (
+                    <div className={`mt-3 rounded-md border p-3 text-sm ${
+                      strategyReviewTaskReceipt.severity === "success"
+                        ? "border-emerald-100 bg-emerald-50"
+                        : "border-amber-100 bg-amber-50"
+                    }`}>
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                        <div>
+                          <div className={strategyReviewTaskReceipt.severity === "success" ? "font-medium text-emerald-900" : "font-medium text-amber-900"}>
+                            {strategyReviewTaskReceipt.title}
+                          </div>
+                          <p className={strategyReviewTaskReceipt.severity === "success" ? "mt-1 leading-6 text-emerald-700" : "mt-1 leading-6 text-amber-700"}>
+                            {strategyReviewTaskReceipt.message}
+                          </p>
+                          <p className="mt-1 leading-6 text-slate-700">下一刀：{strategyReviewTaskReceipt.nextAction}</p>
+                        </div>
+                        <a
+                          className="w-fit rounded-md bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                          href={strategyReviewTaskReceipt.href}
+                        >
+                          去查看
                         </a>
                       </div>
                     </div>

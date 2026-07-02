@@ -691,6 +691,83 @@ test("buildPlatformPublishExportCenter", async (t) => {
     assert.equal(pack.publishVersions[0].id, "new-fanqie");
     assert.equal(pack.publishVersions[1].id, "old-fanqie");
     assert.equal(pack.publishVersions.every((version) => version.platformId === "fanqie"), true);
+    assert.equal(center.platformStrategy[0].reviewDecision.history.some((item) => item.id === "snapshot-new-fanqie"), true);
+    assert.equal(center.platformStrategy[0].reviewDecision.history.find((item) => item.id === "snapshot-new-fanqie")?.href, "#package-version-history");
+  });
+
+  await t.test("summarizes strategy review history from versions, assets, and metrics", () => {
+    const center = buildPlatformPublishExportCenter({
+      project: {
+        title: "夜雨系统",
+        genre: "都市系统",
+        sellingPoint: "雨夜危机中觉醒系统，主角用选择翻盘。",
+        currentWordCount: 9000,
+        targetWordCount: 300000,
+      },
+      targetPlatform: getPlatformProfile("fanqie"),
+      chapters: finalChapters,
+      aiTasks: passedReviews,
+      submissionChecklist: readyChecklist,
+      platforms: [getPlatformProfile("fanqie")],
+      publishSnapshots: [
+        {
+          id: "snapshot-fanqie",
+          platformId: "fanqie",
+          platformName: "番茄小说",
+          title: "夜雨系统",
+          action: "snapshot",
+          chapterCount: 3,
+          wordCount: 7800,
+          preflightScore: 95,
+          canExport: true,
+          createdAt: "2026-01-04T00:00:00.000Z",
+        },
+      ],
+      submissionAssetVersions: [
+        {
+          id: "asset-version-fanqie",
+          platformId: "fanqie",
+          platformName: "番茄小说",
+          title: "夜雨系统：倒计时重生",
+          logline: "系统每晚倒计时，女主用选择把绝境打成爽点。",
+          synopsis: "林晚在雨夜绑定倒计时系统，每一次选择都牵动生死与复仇。她必须在救人与自保之间连续做出决定，把系统惩罚反手变成翻盘筹码，沿着隐藏任务追查当年真相，同时把背叛她的人一步步拖回雨夜审判，并逼出幕后黑手的新任务。",
+          overseasSynopsis: "Night Rain System follows Lin Wan through timed choices.",
+          tags: ["系统", "重生", "强爽点"],
+          note: "首秀前强调前三章钩子。",
+          source: "ai_variant",
+          auditScore: 96,
+          auditStatus: "ready",
+          action: "adopt",
+          sourceTaskId: "asset-task-1",
+          strategy: "强钩子爽点版",
+          createdAt: "2026-01-05T00:00:00.000Z",
+        },
+      ],
+      platformPublishMetrics: [
+        {
+          id: "metric-fanqie",
+          platformId: "fanqie",
+          platformName: "番茄小说",
+          views: 1000,
+          clicks: 180,
+          favorites: 60,
+          follows: 30,
+          comments: 8,
+          paidReads: 0,
+          editorFeedback: "继续观察。",
+          contractStatus: "pending",
+          publishUrl: "",
+          notes: "首轮数据。",
+          snapshotDate: "2026-01-06T00:00:00.000Z",
+        },
+      ],
+    });
+    const history = center.platformStrategy[0].reviewDecision.history;
+
+    assert.deepEqual(history.slice(0, 3).map((item) => item.type), ["metric", "asset", "snapshot"]);
+    assert.ok(history[0].detail.includes("曝光 1000"));
+    assert.ok(history[1].detail.includes("强钩子爽点版"));
+    assert.equal(history[2].href, "#package-version-history");
   });
 
   await t.test("filters and counts publish package versions by action", () => {
@@ -872,6 +949,7 @@ test("buildPlatformPublishExportCenter", async (t) => {
         detail: "数据还没差到要撤，也没好到能猛冲。",
         action: "做一轮小改动，再记录下一轮数据对照。",
         tasks: [],
+        history: [],
       },
       verdict: "七猫可以继续加码，但先补齐短板。",
       nextAction: "修投稿资产后重写前三章。",

@@ -34,6 +34,18 @@ interface SecondPassResult {
   }>;
 }
 
+interface BudgetRepairAction {
+  id: string;
+  label: string;
+  detail: string;
+  impact: string;
+}
+
+interface BudgetGuardView {
+  summary: string;
+  repairActions: BudgetRepairAction[];
+}
+
 const modeOptions: Array<{ value: SecondPassMode; label: string }> = [
   { value: "platform_fit", label: "更像目标平台" },
   { value: "more_hook", label: "钩子更强" },
@@ -55,19 +67,22 @@ export function ChapterSecondPassPanel({ chapterId, currentWordCount }: { chapte
   const [targetWords, setTargetWords] = useState(Math.max(1200, currentWordCount));
   const [isRunning, setIsRunning] = useState(false);
   const [result, setResult] = useState<SecondPassResult | null>(null);
+  const [budgetGuard, setBudgetGuard] = useState<BudgetGuardView | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
   async function runSecondPass() {
     setIsRunning(true);
     setMessage(null);
+    setBudgetGuard(null);
     try {
       const response = await fetch(`/api/chapters/${chapterId}/second-pass`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ instruction, mode, targetWords }),
       });
-      const payload = (await response.json()) as SecondPassResult & { error?: string };
+      const payload = (await response.json()) as SecondPassResult & { error?: string; budgetGuard?: BudgetGuardView };
       if (!response.ok) {
+        if (payload.budgetGuard) setBudgetGuard(payload.budgetGuard);
         throw new Error(payload.error || "二改失败。");
       }
       setResult(payload);
@@ -134,6 +149,21 @@ export function ChapterSecondPassPanel({ chapterId, currentWordCount }: { chapte
       </div>
 
       {message ? <p className="mt-3 text-sm text-slate-600">{message}</p> : null}
+      {budgetGuard ? (
+        <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+          <div className="font-medium">预算修复建议</div>
+          <p className="mt-1">{budgetGuard.summary}</p>
+          <div className="mt-3 grid gap-2 lg:grid-cols-2">
+            {budgetGuard.repairActions.map((action) => (
+              <div className="rounded-md bg-white/70 p-3" key={action.id}>
+                <div className="font-medium">{action.label}</div>
+                <p className="mt-1">{action.detail}</p>
+                <p className="mt-1 text-xs">{action.impact}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
 
       {result ? (
         <div className="mt-4 rounded-md bg-slate-50 p-3 text-sm">

@@ -1,3 +1,5 @@
+import { buildModelBudgetGuard, normalizeModelBudgetSettings, type ModelBudgetRepairAction, type ModelBudgetSettings } from "./modelBudget.ts";
+
 export interface ModelAuditTask {
   id: string;
   taskType: string;
@@ -107,6 +109,7 @@ export interface ModelTaskAuditDashboard {
     failedSpendUsd: number;
     topCostTaskLabel: string | null;
     throttleAdvice: string[];
+    repairActions: ModelBudgetRepairAction[];
   };
   summary: {
     totalTasks: number;
@@ -484,6 +487,12 @@ function buildBudgetCenter(
     .reduce((sum, task) => sum + (task.costUsd ?? 0), 0));
   const projectedMonthlyCostUsd = money((summary.knownCostUsd / dateRangeDays(tasks)) * 30);
   const topCostTask = taskTypeRows.find((row) => row.knownCostUsd > 0) ?? null;
+  const guard = buildModelBudgetGuard({
+    settings: settingsInput,
+    tasks,
+    taskType: topCostTask?.taskType ?? "chapter_draft",
+    batchSize: 2,
+  });
   const throttleAdvice: string[] = [];
 
   if (usedPercent >= 100) throttleAdvice.push("暂停批量生成，只保留审稿和必要二改，先查最高成本任务。");
@@ -514,6 +523,7 @@ function buildBudgetCenter(
     failedSpendUsd,
     topCostTaskLabel: topCostTask?.label ?? null,
     throttleAdvice: throttleAdvice.slice(0, 5),
+    repairActions: guard.repairActions,
   };
 }
 
@@ -570,4 +580,3 @@ export function buildModelTaskAuditDashboard(
     nextActions: buildNextActions(summary, providerRows, taskTypeRows, modelEffectRows, providerReadiness),
   };
 }
-import { normalizeModelBudgetSettings, type ModelBudgetSettings } from "./modelBudget.ts";

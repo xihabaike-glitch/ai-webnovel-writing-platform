@@ -45,6 +45,18 @@ interface BatchDraftResult {
   error: string | null;
 }
 
+interface BudgetRepairAction {
+  id: string;
+  label: string;
+  detail: string;
+  impact: string;
+}
+
+interface BudgetGuardView {
+  summary: string;
+  repairActions: BudgetRepairAction[];
+}
+
 function statusLabel(status: BatchDraftCandidate["status"]) {
   const labels = {
     ready: "可生成",
@@ -62,6 +74,7 @@ export function BatchDraftCenterPanel({ projectId }: { projectId: string }) {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [targetWords, setTargetWords] = useState(1200);
   const [results, setResults] = useState<BatchDraftResult[]>([]);
+  const [budgetGuard, setBudgetGuard] = useState<BudgetGuardView | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -102,6 +115,7 @@ export function BatchDraftCenterPanel({ projectId }: { projectId: string }) {
   async function generateBatch() {
     setIsGenerating(true);
     setMessage(null);
+    setBudgetGuard(null);
     setResults([]);
     try {
       const response = await fetch(`/api/projects/${projectId}/batch-drafts`, {
@@ -115,8 +129,10 @@ export function BatchDraftCenterPanel({ projectId }: { projectId: string }) {
         activeProvider?: ActiveProvider;
         error?: string;
         guard?: { warnings?: string[] };
+        budgetGuard?: BudgetGuardView;
       };
       if (!response.ok) {
+        if (payload.budgetGuard) setBudgetGuard(payload.budgetGuard);
         throw new Error([payload.error, ...(payload.guard?.warnings ?? [])].filter(Boolean).join(" "));
       }
       setResults(payload.results ?? []);
@@ -186,6 +202,21 @@ export function BatchDraftCenterPanel({ projectId }: { projectId: string }) {
       </div>
 
       {message ? <p className="mt-3 text-sm text-slate-600">{message}</p> : null}
+      {budgetGuard ? (
+        <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+          <div className="font-medium">预算修复建议</div>
+          <p className="mt-1">{budgetGuard.summary}</p>
+          <div className="mt-3 grid gap-2 lg:grid-cols-2">
+            {budgetGuard.repairActions.map((action) => (
+              <div className="rounded-md bg-white/70 p-3" key={action.id}>
+                <div className="font-medium">{action.label}</div>
+                <p className="mt-1">{action.detail}</p>
+                <p className="mt-1 text-xs">{action.impact}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
 
       <div className="mt-4 grid gap-4 lg:grid-cols-[1fr_1.2fr]">
         <div className="rounded-md border border-slate-200 p-3">

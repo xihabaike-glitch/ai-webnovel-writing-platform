@@ -163,6 +163,7 @@ export async function generateChapterDraft(options: GenerateChapterDraftOptions)
       displayName: generation.provider.displayName,
       model: generation.provider.defaultModel,
     },
+    budgetGuard: generation.budgetGuard,
     attempts: generation.attempts,
   };
 }

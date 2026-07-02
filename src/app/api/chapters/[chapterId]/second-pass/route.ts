@@ -33,7 +33,7 @@ export async function POST(request: Request, { params }: Params) {
     });
     if ("error" in result) {
       const error = result.error ?? "二改失败。";
-      return NextResponse.json({ task: result.task, error }, { status: error.startsWith("预算拦截") ? 429 : 500 });
+      return NextResponse.json({ task: result.task, error, budgetGuard: result.budgetGuard }, { status: error.startsWith("预算拦截") ? 429 : 500 });
     }
 
     return NextResponse.json({

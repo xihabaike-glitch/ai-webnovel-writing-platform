@@ -84,6 +84,18 @@ interface WorkflowPayload {
   tasks: AiTaskWorkflowItem[];
 }
 
+interface BudgetRepairAction {
+  id: string;
+  label: string;
+  detail: string;
+  impact: string;
+}
+
+interface BudgetGuardView {
+  summary: string;
+  repairActions: BudgetRepairAction[];
+}
+
 function statusText(status: string) {
   const labels: Record<string, string> = {
     queued: "排队中",
@@ -134,6 +146,7 @@ export function ChapterWorkflowPanel({
   const [selectedRevision, setSelectedRevision] = useState<ChapterRevisionSummary | null>(null);
   const [openingDiagnostic, setOpeningDiagnostic] = useState<OpeningDiagnostic | null>(null);
   const [openingRewrite, setOpeningRewrite] = useState<OpeningRewritePackage | null>(null);
+  const [budgetGuard, setBudgetGuard] = useState<BudgetGuardView | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const groupedIssues = useMemo(
     () => (reviewResult ? nonEmptyReviewGroups(groupReviewIssues(reviewResult.issues)) : []),
@@ -176,6 +189,7 @@ export function ChapterWorkflowPanel({
     }
     setIsGeneratingDraft(true);
     setMessage(null);
+    setBudgetGuard(null);
     try {
       const response = await fetch("/api/ai/tasks/chapter-draft", {
         method: "POST",
@@ -183,14 +197,16 @@ export function ChapterWorkflowPanel({
         body: JSON.stringify({ chapterId, targetWords: 1200 }),
       });
 
-      if (!response.ok) {
-        throw new Error("生成正文失败。");
-      }
-
       const payload = (await response.json()) as {
+        error?: string;
         draftQuality?: { score: number; shouldSecondPass: boolean };
+        budgetGuard?: BudgetGuardView;
         attempts?: Array<{ status: "succeeded" | "failed"; role: string; displayName: string; model: string }>;
       };
+      if (!response.ok) {
+        if (payload.budgetGuard) setBudgetGuard(payload.budgetGuard);
+        throw new Error(payload.error || "生成正文失败。");
+      }
       const fallbackUsed = payload.attempts?.some((attempt) => attempt.status === "failed");
       setMessage(payload.draftQuality
         ? `已生成正文初稿${fallbackUsed ? "，已自动切换备用模型" : ""}，自动体检 ${payload.draftQuality.score} 分${payload.draftQuality.shouldSecondPass ? "，建议进入二改。" : "。"}`
@@ -254,6 +270,7 @@ export function ChapterWorkflowPanel({
   async function runReview() {
     setIsReviewing(true);
     setMessage(null);
+    setBudgetGuard(null);
     try {
       const response = await fetch("/api/ai/tasks/chapter-review", {
         method: "POST",
@@ -261,16 +278,18 @@ export function ChapterWorkflowPanel({
         body: JSON.stringify({ chapterId }),
       });
 
-      if (!response.ok) {
-        throw new Error("审稿失败。");
-      }
-
       const payload = (await response.json()) as {
-        result: ReviewResult;
+        error?: string;
+        result?: ReviewResult;
+        budgetGuard?: BudgetGuardView;
         attempts?: Array<{ status: "succeeded" | "failed"; role: string; displayName: string; model: string }>;
       };
+      if (!response.ok) {
+        if (payload.budgetGuard) setBudgetGuard(payload.budgetGuard);
+        throw new Error(payload.error || "审稿失败。");
+      }
       const fallbackUsed = payload.attempts?.some((attempt) => attempt.status === "failed");
-      setReviewResult(payload.result);
+      if (payload.result) setReviewResult(payload.result);
       setMessage(`已完成章节审稿${fallbackUsed ? "，已自动切换备用模型" : ""}`);
       await loadWorkflow();
     } catch (caught) {
@@ -468,6 +487,21 @@ export function ChapterWorkflowPanel({
           </button>
         </div>
         {message ? <p className="mt-3 text-sm text-slate-600">{message}</p> : null}
+        {budgetGuard ? (
+          <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+            <div className="font-medium">预算修复建议</div>
+            <p className="mt-1">{budgetGuard.summary}</p>
+            <div className="mt-3 grid gap-2">
+              {budgetGuard.repairActions.map((action) => (
+                <div className="rounded-md bg-white/70 p-3" key={action.id}>
+                  <div className="font-medium">{action.label}</div>
+                  <p className="mt-1">{action.detail}</p>
+                  <p className="mt-1 text-xs">{action.impact}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
       </section>
 
       <section className="rounded-md border border-slate-200 bg-white p-4">

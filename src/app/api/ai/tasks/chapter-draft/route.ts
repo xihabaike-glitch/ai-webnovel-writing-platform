@@ -12,7 +12,7 @@ export async function POST(request: Request) {
     });
     if ("error" in result) {
       const error = result.error ?? "生成正文失败。";
-      return NextResponse.json({ task: result.task, error }, { status: error.startsWith("预算拦截") ? 429 : 500 });
+      return NextResponse.json({ task: result.task, error, budgetGuard: result.budgetGuard }, { status: error.startsWith("预算拦截") ? 429 : 500 });
     }
 
     return NextResponse.json({

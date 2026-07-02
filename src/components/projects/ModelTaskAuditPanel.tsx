@@ -82,6 +82,12 @@ interface ModelTaskAuditDashboard {
     failedSpendUsd: number;
     topCostTaskLabel: string | null;
     throttleAdvice: string[];
+    repairActions?: Array<{
+      id: string;
+      label: string;
+      detail: string;
+      impact: string;
+    }>;
   };
   summary: {
     totalTasks: number;
@@ -297,6 +303,17 @@ export function ModelTaskAuditPanel({ projectId }: { projectId: string }) {
                 <div className="rounded-md bg-white/70 px-3 py-2" key={action}>{action}</div>
               ))}
             </div>
+            {dashboard.budgetCenter.repairActions?.length ? (
+              <div className="mt-3 grid gap-2 text-sm lg:grid-cols-2">
+                {dashboard.budgetCenter.repairActions.map((action) => (
+                  <div className="rounded-md bg-white/70 p-3" key={action.id}>
+                    <div className="font-medium">{action.label}</div>
+                    <p className="mt-1">{action.detail}</p>
+                    <p className="mt-1 text-xs opacity-80">{action.impact}</p>
+                  </div>
+                ))}
+              </div>
+            ) : null}
             <form className="mt-4 grid gap-3 rounded-md bg-white/70 p-3 text-sm text-slate-700 lg:grid-cols-[repeat(5,minmax(0,1fr))_auto]" onSubmit={saveBudget}>
               <label className="grid gap-1">
                 月预算

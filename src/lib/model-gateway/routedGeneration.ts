@@ -1,6 +1,6 @@
 import type { AiTask, ModelProvider } from "@prisma/client";
 import { prisma } from "../db/prisma.ts";
-import { buildModelBudgetGuard } from "../ai/modelBudget.ts";
+import { buildModelBudgetGuard, type ModelBudgetGuard } from "../ai/modelBudget.ts";
 import { getModelProviderCandidates, type SelectedModelProviderCandidate } from "./activeProvider.ts";
 import type { RoutedModelTaskType } from "./taskRouting.ts";
 import type { GenerateRequest, GenerateResult, ModelProviderId } from "./types.ts";
@@ -31,6 +31,7 @@ export interface RoutedGenerationFailure {
   provider: ModelProvider;
   role: RoutedGenerationAttempt["role"];
   error: string;
+  budgetGuard?: ModelBudgetGuard;
   attempts: RoutedGenerationAttempt[];
 }
 
@@ -130,6 +131,7 @@ export async function runRoutedGeneration(options: RunRoutedGenerationOptions): 
       provider: candidate.provider,
       role: candidate.role,
       error: `预算拦截：${budgetGuard.summary}`,
+      budgetGuard,
       attempts: [attempt],
     };
   }

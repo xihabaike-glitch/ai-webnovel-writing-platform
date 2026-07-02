@@ -9,7 +9,7 @@ export async function POST(request: Request) {
     const review = await reviewChapterDraft(body.chapterId);
     if ("error" in review) {
       const error = review.error ?? "审稿失败。";
-      return NextResponse.json({ task: review.task, error }, { status: error.startsWith("预算拦截") ? 429 : 500 });
+      return NextResponse.json({ task: review.task, error, budgetGuard: review.budgetGuard }, { status: error.startsWith("预算拦截") ? 429 : 500 });
     }
 
     return NextResponse.json({ task: review.task, result: review.result, attempts: review.attempts });

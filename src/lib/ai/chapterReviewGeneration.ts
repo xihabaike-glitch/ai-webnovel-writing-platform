@@ -83,6 +83,7 @@ export async function reviewChapterDraft(chapterId: string) {
       displayName: generation.provider.displayName,
       model: generation.provider.defaultModel,
     },
+    budgetGuard: generation.budgetGuard,
     attempts: generation.attempts,
   };
 }

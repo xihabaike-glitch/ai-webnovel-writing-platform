@@ -33,6 +33,8 @@ test("model budget guard", async (t) => {
     assert.equal(guard.allowed, false);
     assert.equal(guard.status, "block");
     assert.ok(guard.blockers.some((blocker) => blocker.includes("月预算")));
+    assert.ok(guard.repairActions.some((action) => action.id === "reduce_batch_size"));
+    assert.ok(guard.repairActions.some((action) => action.id === "raise_budget_or_warn"));
   });
 
   await t.test("warn mode reports blockers without stopping execution", () => {
@@ -53,6 +55,7 @@ test("model budget guard", async (t) => {
     assert.equal(guard.allowed, true);
     assert.equal(guard.status, "warn");
     assert.ok(guard.blockers.length > 0);
+    assert.ok(guard.repairActions.some((action) => action.id === "raise_budget_or_warn"));
   });
 
   await t.test("blocks when recent failure rate is above the project limit", () => {
@@ -75,5 +78,6 @@ test("model budget guard", async (t) => {
     assert.equal(guard.allowed, false);
     assert.equal(guard.failureRatePercent, 67);
     assert.ok(guard.blockers.some((blocker) => blocker.includes("失败率")));
+    assert.ok(guard.repairActions.some((action) => action.id === "fix_failure_rate"));
   });
 });

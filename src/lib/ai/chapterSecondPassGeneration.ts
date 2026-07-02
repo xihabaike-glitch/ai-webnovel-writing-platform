@@ -190,6 +190,7 @@ export async function generateChapterSecondPass(options: GenerateChapterSecondPa
       displayName: generation.provider.displayName,
       model: generation.provider.defaultModel,
     },
+    budgetGuard: generation.budgetGuard,
     attempts: generation.attempts,
   };
 }

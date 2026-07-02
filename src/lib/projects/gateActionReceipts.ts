@@ -2,8 +2,11 @@ import type { PrePublishGateAction, PrePublishGateActionExecution, PrePublishGat
 
 export const gateActionReceiptStorageKey = "ai-webnovel-gate-action-receipts";
 export const gateActionReceiptUpdatedEvent = "ai-webnovel-gate-action-receipts-updated";
+export const defaultGateActionReceiptLimit = 20;
 
 export type GateActionReceiptExecutionType = PrePublishGateActionExecution["type"] | "platform_strategy" | "manual";
+export type GateActionReceiptStatusFilter = "all" | GateActionReceipt["status"];
+export type GateActionReceiptExecutionFilter = "all" | GateActionReceiptExecutionType;
 
 export interface GateActionReceiptPayload {
   message?: string;
@@ -40,6 +43,8 @@ export interface GateActionReceipt {
   succeededCount: number;
   failedCount: number;
   taskId: string | null;
+  platformId?: string;
+  platformName?: string;
   recheck: {
     status: "ready" | "blocked";
     label: string;
@@ -47,6 +52,33 @@ export interface GateActionReceipt {
     actionLabel: string;
   };
   createdAt: string;
+}
+
+export interface GateActionReceiptFilters {
+  status?: GateActionReceiptStatusFilter;
+  executionType?: GateActionReceiptExecutionFilter;
+  platformId?: string;
+}
+
+export interface GateActionReceiptSummary {
+  total: number;
+  succeeded: number;
+  failed: number;
+  readyRecheck: number;
+  blockedRecheck: number;
+  succeededActions: number;
+  failedActions: number;
+  platforms: Array<{
+    id: string;
+    name: string;
+    total: number;
+    failed: number;
+  }>;
+  executionTypes: Array<{
+    type: GateActionReceiptExecutionType;
+    total: number;
+    failed: number;
+  }>;
 }
 
 export interface GatePlatformStrategyReceiptPayload {
@@ -212,6 +244,24 @@ function strategyRecheckHint(input: {
   };
 }
 
+function platformIdFromActionId(actionId: string) {
+  const match = actionId.match(/^platform-strategy:([^:]+):/);
+  return match?.[1] ?? "manual";
+}
+
+function platformNameFromDetail(detail: string) {
+  if (!detail.includes("·")) return "总闸门";
+  const [name] = detail.split("·");
+  return name?.trim() || "总闸门";
+}
+
+export function gateActionReceiptPlatform(receipt: GateActionReceipt) {
+  return {
+    id: receipt.platformId || platformIdFromActionId(receipt.actionId),
+    name: receipt.platformName || platformNameFromDetail(receipt.detail),
+  };
+}
+
 export function buildGateActionReceipt(input: {
   action: PrePublishGateAction;
   payload?: GateActionReceiptPayload;
@@ -242,6 +292,8 @@ export function buildGateActionReceipt(input: {
     succeededCount: counts.succeededCount,
     failedCount: counts.failedCount,
     taskId,
+    platformId: platformIdFromActionId(input.action.id),
+    platformName: platformNameFromDetail(input.action.detail),
     recheck: recheckHint({
       action: input.action,
       status: input.status,
@@ -282,6 +334,8 @@ export function buildGatePlatformStrategyReceipt(input: {
     succeededCount,
     failedCount: input.status === "failed" ? 1 : 0,
     taskId: payload.task?.id ?? null,
+    platformId: input.item.platformId,
+    platformName: input.item.platformName,
     recheck: strategyRecheckHint({
       item: input.item,
       status: input.status,
@@ -291,7 +345,7 @@ export function buildGatePlatformStrategyReceipt(input: {
   };
 }
 
-export function trimGateActionReceipts(receipts: GateActionReceipt[], limit = 8) {
+export function trimGateActionReceipts(receipts: GateActionReceipt[], limit = defaultGateActionReceiptLimit) {
   return receipts
     .slice()
     .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime())
@@ -341,11 +395,75 @@ export function mergeGateActionReceipts(...groups: GateActionReceipt[][]) {
   return trimGateActionReceipts([...byId.values()]);
 }
 
-export async function fetchPersistedGateActionReceipts() {
-  const response = await fetch("/api/gate/action-receipts", { cache: "no-store" });
+export function filterGateActionReceipts(receipts: GateActionReceipt[], filters: GateActionReceiptFilters) {
+  return trimGateActionReceipts(receipts.filter((receipt) => {
+    const platform = gateActionReceiptPlatform(receipt);
+    return true
+      && (!filters.status || filters.status === "all" || receipt.status === filters.status)
+      && (!filters.executionType || filters.executionType === "all" || receipt.executionType === filters.executionType)
+      && (!filters.platformId || filters.platformId === "all" || platform.id === filters.platformId);
+  }));
+}
+
+export function buildGateActionReceiptSummary(receipts: GateActionReceipt[]): GateActionReceiptSummary {
+  const platformMap = new Map<string, GateActionReceiptSummary["platforms"][number]>();
+  const executionMap = new Map<GateActionReceiptExecutionType, GateActionReceiptSummary["executionTypes"][number]>();
+  let succeededActions = 0;
+  let failedActions = 0;
+
+  for (const receipt of receipts) {
+    const platform = gateActionReceiptPlatform(receipt);
+    const platformSummary = platformMap.get(platform.id) ?? {
+      id: platform.id,
+      name: platform.name,
+      total: 0,
+      failed: 0,
+    };
+    platformSummary.total += 1;
+    if (receipt.status === "failed") platformSummary.failed += 1;
+    platformMap.set(platform.id, platformSummary);
+
+    const executionSummary = executionMap.get(receipt.executionType) ?? {
+      type: receipt.executionType,
+      total: 0,
+      failed: 0,
+    };
+    executionSummary.total += 1;
+    if (receipt.status === "failed") executionSummary.failed += 1;
+    executionMap.set(receipt.executionType, executionSummary);
+
+    succeededActions += receipt.succeededCount;
+    failedActions += receipt.failedCount;
+  }
+
+  return {
+    total: receipts.length,
+    succeeded: receipts.filter((receipt) => receipt.status === "succeeded").length,
+    failed: receipts.filter((receipt) => receipt.status === "failed").length,
+    readyRecheck: receipts.filter((receipt) => receipt.recheck.status === "ready").length,
+    blockedRecheck: receipts.filter((receipt) => receipt.recheck.status === "blocked").length,
+    succeededActions,
+    failedActions,
+    platforms: [...platformMap.values()].sort((left, right) => right.total - left.total || left.name.localeCompare(right.name)),
+    executionTypes: [...executionMap.values()].sort((left, right) => right.total - left.total || left.type.localeCompare(right.type)),
+  };
+}
+
+function gateActionReceiptQuery(options?: GateActionReceiptFilters & { limit?: number }) {
+  const params = new URLSearchParams();
+  if (options?.status && options.status !== "all") params.set("status", options.status);
+  if (options?.executionType && options.executionType !== "all") params.set("executionType", options.executionType);
+  if (options?.platformId && options.platformId !== "all") params.set("platformId", options.platformId);
+  if (options?.limit) params.set("limit", String(options.limit));
+  const query = params.toString();
+  return query ? `?${query}` : "";
+}
+
+export async function fetchPersistedGateActionReceipts(options?: GateActionReceiptFilters & { limit?: number }) {
+  const response = await fetch(`/api/gate/action-receipts${gateActionReceiptQuery(options)}`, { cache: "no-store" });
   const payload = (await response.json().catch(() => null)) as { receipts?: GateActionReceipt[]; error?: string } | null;
   if (!response.ok) throw new Error(payload?.error ?? "读取闸门审计历史失败。");
-  return trimGateActionReceipts(payload?.receipts ?? []);
+  return trimGateActionReceipts(payload?.receipts ?? [], options?.limit ?? defaultGateActionReceiptLimit);
 }
 
 export async function persistGateActionReceipt(receipt: GateActionReceipt, payload?: unknown) {

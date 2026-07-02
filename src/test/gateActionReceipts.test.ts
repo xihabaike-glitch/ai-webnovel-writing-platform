@@ -1,8 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  buildGateActionReceiptSummary,
   buildGateActionReceipt,
   buildGatePlatformStrategyReceipt,
+  filterGateActionReceipts,
+  gateActionReceiptPlatform,
   mergeGateActionReceipts,
   trimGateActionReceipts,
 } from "../lib/projects/gateActionReceipts.ts";
@@ -156,6 +159,38 @@ test("buildGateActionReceipt", async (t) => {
     assert.equal(merged.length, 2);
     assert.equal(merged[0].taskId, "task-new");
     assert.equal(merged[1].taskId, "task-old");
+  });
+
+  await t.test("summarizes and filters receipts for the audit center", () => {
+    const totalGateReceipt = buildGateActionReceipt({
+      action,
+      status: "succeeded",
+      now: "2026-01-01T00:00:00.000Z",
+      payload: { results: [{ status: "succeeded", taskId: "task-gate" }] },
+    });
+    const platformReceipt = buildGatePlatformStrategyReceipt({
+      item: strategyPlatform,
+      status: "failed",
+      now: "2026-01-01T00:00:01.000Z",
+      payload: { error: "发布包缺少钩子。" },
+    });
+
+    const summary = buildGateActionReceiptSummary([totalGateReceipt, platformReceipt]);
+    const failedFanqie = filterGateActionReceipts([totalGateReceipt, platformReceipt], {
+      platformId: "fanqie",
+      status: "failed",
+    });
+
+    assert.equal(gateActionReceiptPlatform(totalGateReceipt).name, "总闸门");
+    assert.equal(gateActionReceiptPlatform(platformReceipt).name, "番茄小说");
+    assert.equal(summary.total, 2);
+    assert.equal(summary.succeeded, 1);
+    assert.equal(summary.failed, 1);
+    assert.equal(summary.failedActions, 1);
+    assert.equal(summary.platforms.find((platform) => platform.id === "manual")?.total, 1);
+    assert.equal(summary.platforms.find((platform) => platform.id === "fanqie")?.total, 1);
+    assert.equal(failedFanqie.length, 1);
+    assert.equal(failedFanqie[0].actionId, "platform-strategy:fanqie:generate_asset_variants");
   });
 
   await t.test("builds platform strategy receipts for the unified gate audit log", () => {

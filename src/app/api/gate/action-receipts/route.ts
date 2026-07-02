@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
 import type { GateActionReceipt } from "@/lib/projects/gateActionReceipts";
 
@@ -42,6 +43,8 @@ function toReceipt(item: {
   succeededCount: number;
   failedCount: number;
   taskId: string | null;
+  platformId: string;
+  platformName: string;
   recheckStatus: string;
   recheckLabel: string;
   recheckDetail: string;
@@ -60,6 +63,8 @@ function toReceipt(item: {
     succeededCount: item.succeededCount,
     failedCount: item.failedCount,
     taskId: item.taskId,
+    platformId: item.platformId,
+    platformName: item.platformName,
     recheck: {
       status: item.recheckStatus === "blocked" ? "blocked" : "ready",
       label: item.recheckLabel,
@@ -70,10 +75,27 @@ function toReceipt(item: {
   };
 }
 
-export async function GET() {
+function takeLimit(value: string | null) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return 50;
+  return Math.min(100, Math.max(1, Math.round(parsed)));
+}
+
+export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url);
+  const where: Prisma.GateActionAuditWhereInput = {};
+  const status = searchParams.get("status");
+  const executionType = searchParams.get("executionType");
+  const platformId = searchParams.get("platformId");
+
+  if (status === "succeeded" || status === "failed") where.status = status;
+  if (executionType) where.executionType = executionType;
+  if (platformId) where.platformId = platformId;
+
   const items = await prisma.gateActionAudit.findMany({
+    where,
     orderBy: { createdAt: "desc" },
-    take: 20,
+    take: takeLimit(searchParams.get("limit")),
   });
 
   return NextResponse.json({ receipts: items.map(toReceipt) });
@@ -101,8 +123,8 @@ export async function POST(request: Request) {
     receiptId: receipt.id,
     actionId,
     projectId: project?.id ?? null,
-    platformId: platformIdFromAction(actionId),
-    platformName: platformNameFromDetail(detail),
+    platformId: text(receipt.platformId, platformIdFromAction(actionId)),
+    platformName: text(receipt.platformName, platformNameFromDetail(detail)),
     label: text(receipt.label),
     detail,
     href,

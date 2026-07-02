@@ -1,6 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { buildGateActionReceipt, buildGatePlatformStrategyReceipt, trimGateActionReceipts } from "../lib/projects/gateActionReceipts.ts";
+import {
+  buildGateActionReceipt,
+  buildGatePlatformStrategyReceipt,
+  mergeGateActionReceipts,
+  trimGateActionReceipts,
+} from "../lib/projects/gateActionReceipts.ts";
 import type { PrePublishGateAction, PrePublishGateStrategyPlatform } from "../lib/projects/prePublishGate.ts";
 
 const action: PrePublishGateAction = {
@@ -130,6 +135,27 @@ test("buildGateActionReceipt", async (t) => {
     assert.equal(trimmed.length, 3);
     assert.equal(trimmed[0].taskId, "task-9");
     assert.equal(trimmed[2].taskId, "task-7");
+  });
+
+  await t.test("merges local and persisted receipts without duplicates", () => {
+    const older = buildGateActionReceipt({
+      action,
+      status: "succeeded",
+      now: "2026-01-01T00:00:00.000Z",
+      payload: { results: [{ status: "succeeded", taskId: "task-old" }] },
+    });
+    const newer = buildGateActionReceipt({
+      action,
+      status: "succeeded",
+      now: "2026-01-01T00:00:01.000Z",
+      payload: { results: [{ status: "succeeded", taskId: "task-new" }] },
+    });
+
+    const merged = mergeGateActionReceipts([older, newer], [older]);
+
+    assert.equal(merged.length, 2);
+    assert.equal(merged[0].taskId, "task-new");
+    assert.equal(merged[1].taskId, "task-old");
   });
 
   await t.test("builds platform strategy receipts for the unified gate audit log", () => {

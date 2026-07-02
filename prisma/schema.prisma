@@ -36,6 +36,7 @@ model Project {
   submissionAssets PlatformSubmissionAsset[]
   submissionAssetVersions PlatformSubmissionAssetVersion[]
   platformPublishMetrics PlatformPublishMetric[]
+  gateActionAudits GateActionAudit[]
 }
 
 model Chapter {
@@ -304,4 +305,34 @@ model PlatformPublishMetric {
   project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@index([projectId, platformId, snapshotDate])
+}
+
+model GateActionAudit {
+  id              String   @id @default(cuid())
+  receiptId       String   @unique
+  actionId        String
+  projectId       String?
+  platformId      String   @default("")
+  platformName    String   @default("")
+  label           String
+  detail          String
+  href            String
+  status          String
+  message         String
+  executionType   String
+  succeededCount  Int      @default(0)
+  failedCount     Int      @default(0)
+  taskId          String?
+  recheckStatus   String
+  recheckLabel    String
+  recheckDetail   String
+  recheckAction   String
+  payload         String   @default("{}")
+  createdAt       DateTime @default(now())
+
+  project Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+
+  @@index([projectId, createdAt])
+  @@index([platformId, createdAt])
+  @@index([executionType, createdAt])
 }

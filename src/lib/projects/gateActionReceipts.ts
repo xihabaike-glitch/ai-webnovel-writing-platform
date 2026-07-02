@@ -331,8 +331,45 @@ export function saveGateActionReceipts(receipts: GateActionReceipt[]) {
   return next;
 }
 
+export function mergeGateActionReceipts(...groups: GateActionReceipt[][]) {
+  const byId = new Map<string, GateActionReceipt>();
+  for (const group of groups) {
+    for (const receipt of group) {
+      byId.set(receipt.id, receipt);
+    }
+  }
+  return trimGateActionReceipts([...byId.values()]);
+}
+
+export async function fetchPersistedGateActionReceipts() {
+  const response = await fetch("/api/gate/action-receipts", { cache: "no-store" });
+  const payload = (await response.json().catch(() => null)) as { receipts?: GateActionReceipt[]; error?: string } | null;
+  if (!response.ok) throw new Error(payload?.error ?? "读取闸门审计历史失败。");
+  return trimGateActionReceipts(payload?.receipts ?? []);
+}
+
+export async function persistGateActionReceipt(receipt: GateActionReceipt, payload?: unknown) {
+  const response = await fetch("/api/gate/action-receipts", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ receipt, payload }),
+  });
+  const result = (await response.json().catch(() => null)) as { receipt?: GateActionReceipt; error?: string } | null;
+  if (!response.ok || !result?.receipt) throw new Error(result?.error ?? "保存闸门审计记录失败。");
+  return result.receipt;
+}
+
+export async function clearPersistedGateActionReceipts() {
+  const response = await fetch("/api/gate/action-receipts", { method: "DELETE" });
+  const result = (await response.json().catch(() => null)) as { deleted?: number; error?: string } | null;
+  if (!response.ok) throw new Error(result?.error ?? "清空闸门审计历史失败。");
+  return result?.deleted ?? 0;
+}
+
 export function addGateActionReceipt(receipt: GateActionReceipt) {
-  return saveGateActionReceipts([receipt, ...loadGateActionReceipts()]);
+  const next = saveGateActionReceipts([receipt, ...loadGateActionReceipts()]);
+  void persistGateActionReceipt(receipt).catch(() => undefined);
+  return next;
 }
 
 export function clearGateActionReceipts() {

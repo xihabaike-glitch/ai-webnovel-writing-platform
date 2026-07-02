@@ -5,8 +5,12 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import {
   clearGateActionReceipts,
+  clearPersistedGateActionReceipts,
+  fetchPersistedGateActionReceipts,
   gateActionReceiptUpdatedEvent,
   loadGateActionReceipts,
+  mergeGateActionReceipts,
+  persistGateActionReceipt,
   saveGateActionReceipts,
   type GateActionReceipt,
 } from "@/lib/projects/gateActionReceipts";
@@ -37,7 +41,15 @@ export function GateActionWorkspace({ actions }: { actions: PrePublishGateAction
   const latestReceipt = receipts[0] ?? null;
 
   useEffect(() => {
-    setReceipts(loadGateActionReceipts());
+    const localReceipts = loadGateActionReceipts();
+    setReceipts(localReceipts);
+
+    void fetchPersistedGateActionReceipts()
+      .then((persisted) => {
+        const merged = mergeGateActionReceipts(persisted, loadGateActionReceipts());
+        setReceipts(saveGateActionReceipts(merged));
+      })
+      .catch(() => undefined);
 
     function handleReceiptUpdate(event: Event) {
       const customEvent = event as CustomEvent<GateActionReceipt[]>;
@@ -50,11 +62,13 @@ export function GateActionWorkspace({ actions }: { actions: PrePublishGateAction
 
   function addReceipt(receipt: GateActionReceipt) {
     setReceipts((current) => saveGateActionReceipts([receipt, ...current]));
+    void persistGateActionReceipt(receipt).catch(() => undefined);
   }
 
   function clearReceipts() {
     clearGateActionReceipts();
     setReceipts([]);
+    void clearPersistedGateActionReceipts().catch(() => undefined);
   }
 
   return (

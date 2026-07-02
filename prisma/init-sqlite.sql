@@ -262,3 +262,32 @@ CREATE TABLE IF NOT EXISTS "PlatformPublishMetric" (
 );
 
 CREATE INDEX IF NOT EXISTS "PlatformPublishMetric_projectId_platformId_snapshotDate_idx" ON "PlatformPublishMetric"("projectId", "platformId", "snapshotDate");
+
+CREATE TABLE IF NOT EXISTS "GateActionAudit" (
+  "id" TEXT NOT NULL PRIMARY KEY,
+  "receiptId" TEXT NOT NULL UNIQUE,
+  "actionId" TEXT NOT NULL,
+  "projectId" TEXT,
+  "platformId" TEXT NOT NULL DEFAULT '',
+  "platformName" TEXT NOT NULL DEFAULT '',
+  "label" TEXT NOT NULL,
+  "detail" TEXT NOT NULL,
+  "href" TEXT NOT NULL,
+  "status" TEXT NOT NULL,
+  "message" TEXT NOT NULL,
+  "executionType" TEXT NOT NULL,
+  "succeededCount" INTEGER NOT NULL DEFAULT 0,
+  "failedCount" INTEGER NOT NULL DEFAULT 0,
+  "taskId" TEXT,
+  "recheckStatus" TEXT NOT NULL,
+  "recheckLabel" TEXT NOT NULL,
+  "recheckDetail" TEXT NOT NULL,
+  "recheckAction" TEXT NOT NULL,
+  "payload" TEXT NOT NULL DEFAULT '{}',
+  "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT "GateActionAudit_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "Project" ("id") ON DELETE SET NULL ON UPDATE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS "GateActionAudit_projectId_createdAt_idx" ON "GateActionAudit"("projectId", "createdAt");
+CREATE INDEX IF NOT EXISTS "GateActionAudit_platformId_createdAt_idx" ON "GateActionAudit"("platformId", "createdAt");
+CREATE INDEX IF NOT EXISTS "GateActionAudit_executionType_createdAt_idx" ON "GateActionAudit"("executionType", "createdAt");

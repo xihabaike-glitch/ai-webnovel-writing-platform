@@ -2,6 +2,7 @@ import { buildChapterReviewPrompt } from "@/lib/ai/buildChapterReviewPrompt";
 import { prisma } from "@/lib/db/prisma";
 import { runRoutedGeneration } from "@/lib/model-gateway/routedGeneration";
 import { getPlatformProfile, type PlatformId } from "@/lib/platforms/platformProfiles";
+import { findProjectStartTacticSummary } from "@/lib/projects/projectStartTactics";
 
 export interface ReviewIssueResult {
   severity: string;
@@ -19,7 +20,13 @@ export interface ChapterReviewResult {
 export async function reviewChapterDraft(chapterId: string) {
   const chapter = await prisma.chapter.findUnique({
     where: { id: chapterId },
-    include: { project: true },
+    include: {
+      project: {
+        include: {
+          worldEntries: true,
+        },
+      },
+    },
   });
 
   if (!chapter) {
@@ -27,9 +34,11 @@ export async function reviewChapterDraft(chapterId: string) {
   }
 
   const platform = getPlatformProfile(chapter.project.targetPlatform as PlatformId);
+  const startTactic = findProjectStartTacticSummary(chapter.project.worldEntries);
   const prompt = buildChapterReviewPrompt({
     projectTitle: chapter.project.title,
     platform,
+    startTactic,
     chapter: {
       title: chapter.title,
       content: chapter.content,

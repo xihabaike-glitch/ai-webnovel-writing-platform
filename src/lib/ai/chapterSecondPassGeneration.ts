@@ -6,6 +6,7 @@ import { buildDraftQualityAudit } from "@/lib/ai/draftQualityAudit";
 import { prisma } from "@/lib/db/prisma";
 import { runRoutedGeneration } from "@/lib/model-gateway/routedGeneration";
 import { getPlatformProfile, type PlatformId } from "@/lib/platforms/platformProfiles";
+import { findProjectStartTacticSummary } from "@/lib/projects/projectStartTactics";
 import { countWords } from "@/lib/text/wordCount";
 
 export type { SecondPassMode } from "@/lib/ai/buildChapterSecondPassPrompt";
@@ -37,7 +38,13 @@ export async function generateChapterSecondPass(options: GenerateChapterSecondPa
 
   const chapter = await prisma.chapter.findUnique({
     where: { id: options.chapterId },
-    include: { project: true },
+    include: {
+      project: {
+        include: {
+          worldEntries: true,
+        },
+      },
+    },
   });
 
   if (!chapter) {
@@ -46,11 +53,13 @@ export async function generateChapterSecondPass(options: GenerateChapterSecondPa
 
   const mode = normalizeSecondPassMode(options.mode);
   const platform = getPlatformProfile(chapter.project.targetPlatform as PlatformId);
+  const startTactic = findProjectStartTacticSummary(chapter.project.worldEntries);
   const prompt = buildChapterSecondPassPrompt({
     projectTitle: chapter.project.title,
     genre: chapter.project.genre,
     sellingPoint: chapter.project.sellingPoint,
     platform,
+    startTactic,
     instruction,
     mode,
     targetWords: options.targetWords ?? Math.max(1200, chapter.wordCount),
@@ -69,7 +78,7 @@ export async function generateChapterSecondPass(options: GenerateChapterSecondPa
     projectId: chapter.projectId,
     chapterId: chapter.id,
     taskType: "chapter_second_pass",
-    inputSnapshot: { prompt, instruction, mode },
+    inputSnapshot: { prompt, instruction, mode, startTactic },
     request: {
       systemPrompt: prompt.systemPrompt,
       userPrompt: prompt.userPrompt,

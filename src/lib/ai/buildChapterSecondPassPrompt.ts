@@ -1,4 +1,5 @@
 import type { PlatformProfile } from "../platforms/platformProfiles.ts";
+import type { ProjectStartTacticSummary } from "../projects/projectStartTactics.ts";
 
 export type SecondPassMode = "more_hook" | "more_payoff" | "less_exposition" | "more_emotion" | "platform_fit";
 
@@ -7,6 +8,7 @@ export interface ChapterSecondPassPromptInput {
   genre: string;
   sellingPoint: string;
   platform: PlatformProfile;
+  startTactic?: ProjectStartTacticSummary | null;
   instruction: string;
   mode: SecondPassMode;
   targetWords: number;
@@ -30,6 +32,16 @@ const modeInstructions: Record<SecondPassMode, string> = {
 };
 
 export function buildChapterSecondPassPrompt(input: ChapterSecondPassPromptInput) {
+  const startTacticLines = input.startTactic
+    ? [
+        "首轮平台打法：",
+        `来源：${input.startTactic.label}`,
+        `打法：${input.startTactic.primaryTactic}`,
+        `开头动作：${input.startTactic.openingMove}`,
+        `验证动作：${input.startTactic.verificationMove}`,
+        `风险提醒：${input.startTactic.risk || "按平台反馈继续校准。"}`,
+      ]
+    : [];
   const systemPrompt = [
     "你是毒舌但高执行力的网文二改写手，只输出二改后的正文。",
     "你不会解释修改思路，不输出标题、Markdown、清单或审稿意见。",
@@ -43,6 +55,7 @@ export function buildChapterSecondPassPrompt(input: ChapterSecondPassPromptInput
     `目标平台：${input.platform.name}`,
     `平台开头规则：${input.platform.openingRules.join("；")}`,
     `平台审稿重点：${input.platform.reviewFocus.join("、")}`,
+    ...startTacticLines,
     `二改方向：${modeInstructions[input.mode]}`,
     `作者指令：${input.instruction}`,
     `目标字数：约 ${input.targetWords} 字`,
@@ -63,6 +76,7 @@ export function buildChapterSecondPassPrompt(input: ChapterSecondPassPromptInput
     "3. 保留章节核心事件，不要另开新故事。",
     "4. 开头必须比当前稿更快进入冲突。",
     "5. 结尾必须扣住章末悬念，不能平收。",
+    input.startTactic ? "6. 优先执行首轮平台打法，尤其是开头动作和验证动作，不要把它写成注释。" : "",
   ].join("\n");
 
   return { systemPrompt, userPrompt };

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { buildGateActionReceipt, type GateActionReceipt, type GateActionReceiptPayload } from "@/lib/projects/gateActionReceipts";
 import type { PrePublishGateAction } from "@/lib/projects/prePublishGate";
 
 function actionTone(tone: PrePublishGateAction["tone"]) {
@@ -18,20 +19,15 @@ function executeLabel(action: PrePublishGateAction) {
   return "执行批次";
 }
 
-function successMessage(action: PrePublishGateAction, payload: { message?: string; results?: Array<{ status?: string }>; task?: { status?: string } }) {
-  if (payload.message) return payload.message;
-  if (action.execution?.type === "recommended_batch") {
-    const succeeded = payload.results?.filter((result) => result.status === "succeeded").length ?? 0;
-    const failed = payload.results?.filter((result) => result.status === "failed").length ?? 0;
-    return `推荐批次完成：成功 ${succeeded}，失败 ${failed}。`;
-  }
-  if (action.execution?.type === "retry_task") {
-    return payload.task?.status === "succeeded" ? "重试成功。" : "已发起重试。";
-  }
-  return "处理完成。";
-}
-
-export function GatePriorityActionCard({ action, index }: { action: PrePublishGateAction; index: number }) {
+export function GatePriorityActionCard({
+  action,
+  index,
+  onReceipt,
+}: {
+  action: PrePublishGateAction;
+  index: number;
+  onReceipt?: (receipt: GateActionReceipt) => void;
+}) {
   const router = useRouter();
   const [isRunning, setIsRunning] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -62,17 +58,22 @@ export function GatePriorityActionCard({ action, index }: { action: PrePublishGa
             : undefined,
         },
       );
-      const payload = (await response.json().catch(() => ({}))) as {
-        message?: string;
-        error?: string;
-        results?: Array<{ status?: string }>;
-        task?: { status?: string };
-      };
+      const payload = (await response.json().catch(() => ({}))) as GateActionReceiptPayload;
       if (!response.ok) throw new Error(payload.error ?? "动作执行失败。");
-      setMessage(successMessage(action, payload));
+      const receipt = buildGateActionReceipt({ action, payload, status: "succeeded" });
+      setMessage(receipt.message);
+      onReceipt?.(receipt);
       router.refresh();
     } catch (caught) {
-      setMessage(caught instanceof Error ? caught.message : "动作执行失败。");
+      const errorMessage = caught instanceof Error ? caught.message : "动作执行失败。";
+      const receipt = buildGateActionReceipt({
+        action,
+        payload: { error: errorMessage },
+        status: "failed",
+        fallbackError: errorMessage,
+      });
+      setMessage(receipt.message);
+      onReceipt?.(receipt);
     } finally {
       setIsRunning(false);
     }

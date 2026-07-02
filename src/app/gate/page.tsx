@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { AppShell } from "@/components/app-shell/AppShell";
-import { GatePriorityActionCard } from "@/components/gate/GatePriorityActionCard";
+import { GateActionWorkspace } from "@/components/gate/GateActionWorkspace";
 import { buildTaskBatchHistory } from "@/lib/ai/taskBatchHistory";
 import { prisma } from "@/lib/db/prisma";
 import { buildPrePublishGate, type PrePublishGateItem } from "@/lib/projects/prePublishGate";
@@ -117,14 +117,7 @@ export default async function GatePage() {
 
         <div className="rounded-md border border-slate-200 bg-white p-4">
           <div className="mb-3 font-medium text-slate-950">优先动作</div>
-          <div className="grid gap-2">
-            {gate.priorityActions.map((action, index) => (
-              <GatePriorityActionCard action={action} index={index} key={action.id} />
-            ))}
-            {gate.priorityActions.length === 0 ? (
-              <p className="rounded-md bg-slate-50 p-3 text-sm text-slate-600">暂无需要处理的动作。</p>
-            ) : null}
-          </div>
+          <GateActionWorkspace actions={gate.priorityActions} />
         </div>
       </section>
 

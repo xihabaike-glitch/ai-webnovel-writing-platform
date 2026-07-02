@@ -43,4 +43,36 @@ test("buildChapterDraftPrompt", async (t) => {
     assert.ok(result.text.includes("主角必须在逃跑和救人之间选择"));
     assert.doesNotThrow(() => assert.notEqual(result.text.trim().startsWith("{"), true));
   });
+
+  await t.test("includes project start tactic when available", () => {
+    const tacticPrompt = buildChapterDraftPrompt({
+      projectTitle: "夜雨系统",
+      genre: "都市系统",
+      sellingPoint: "雨夜系统翻盘",
+      platform: getPlatformProfile("fanqie"),
+      startTactic: {
+        title: "首轮平台打法：番茄小说",
+        label: "历史可复用",
+        primaryTactic: "修复、复测、重验和效果回填已闭环。",
+        openingMove: "先修标题简介标签和前三章兑现，再小步重验。",
+        verificationMove: "记录首轮曝光、点击、收藏、追读。",
+        risk: "不要直接放量。",
+      },
+      targetWords: 1200,
+      chapter: {
+        title: "第一章 雨夜系统",
+        goal: "让主角遭遇不可逆事件。",
+        hook: "系统倒计时只剩十秒。",
+        conflict: "主角必须在逃跑和救人之间选择。",
+        valueShift: "普通生活转向失控危机。",
+        cliffhanger: "系统给出第二个选择。",
+        content: "",
+      },
+    });
+
+    assert.ok(tacticPrompt.userPrompt.includes("首轮平台打法"));
+    assert.ok(tacticPrompt.userPrompt.includes("历史可复用"));
+    assert.ok(tacticPrompt.userPrompt.includes("先修标题简介标签和前三章兑现"));
+    assert.ok(tacticPrompt.userPrompt.includes("记录首轮曝光、点击、收藏、追读"));
+  });
 });

@@ -32,6 +32,12 @@ export interface ProjectStartTacticSummary {
   risk: string;
 }
 
+export interface ProjectStartTacticEntryLike {
+  type: string;
+  title: string;
+  content: string;
+}
+
 function defaultTacticForCategory(platform: PlatformProfile) {
   if (platform.category === "paid") return "先搭长线主干，再用前三章证明升级期待。";
   if (platform.category === "free") return "先抓首章钩子，再用前三章连续兑现爽点和情绪回报。";
@@ -150,4 +156,9 @@ export function parseProjectStartTacticSummary(entry: { title: string; content: 
     verificationMove,
     risk,
   };
+}
+
+export function findProjectStartTacticSummary(entries: ProjectStartTacticEntryLike[]): ProjectStartTacticSummary | null {
+  const entry = entries.find((item) => item.type === "platform_soil" && item.title.startsWith("首轮平台打法：")) ?? null;
+  return parseProjectStartTacticSummary(entry);
 }

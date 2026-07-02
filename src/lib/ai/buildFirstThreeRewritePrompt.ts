@@ -1,11 +1,13 @@
 import type { ChapterRewritePlan } from "../projects/firstThreeRewrite.ts";
 import type { PlatformProfile } from "../platforms/platformProfiles.ts";
+import type { ProjectStartTacticSummary } from "../projects/projectStartTactics.ts";
 
 interface FirstThreeRewritePromptInput {
   projectTitle: string;
   genre: string;
   sellingPoint: string;
   platform: PlatformProfile;
+  startTactic?: ProjectStartTacticSummary | null;
   targetWords: number;
   chapter: {
     order: number;
@@ -25,6 +27,17 @@ function list(items: string[]) {
 }
 
 export function buildFirstThreeRewritePrompt(input: FirstThreeRewritePromptInput) {
+  const startTacticLines = input.startTactic
+    ? [
+        "首轮平台打法：",
+        `来源：${input.startTactic.label}`,
+        `打法：${input.startTactic.primaryTactic}`,
+        `开头动作：${input.startTactic.openingMove}`,
+        `验证动作：${input.startTactic.verificationMove}`,
+        `风险提醒：${input.startTactic.risk || "按平台反馈继续校准。"}`,
+        "",
+      ]
+    : [];
   const systemPrompt = [
     "你是高执行力网文改稿写手，只输出改写后的正文，不输出解释、标题、Markdown、清单或审稿意见。",
     "你必须严格按改稿处方执行：先抓开头，再压主干，最后用章末悬念把读者推到下一章。",
@@ -38,6 +51,7 @@ export function buildFirstThreeRewritePrompt(input: FirstThreeRewritePromptInput
     `目标平台：${input.platform.name}`,
     `平台开头规则：${input.platform.openingRules.join("；")}`,
     `平台审稿重点：${input.platform.reviewFocus.join("、")}`,
+    ...startTacticLines,
     `目标字数：约 ${input.targetWords} 字`,
     "",
     `章节：第 ${input.chapter.order} 章 ${input.chapter.title}`,

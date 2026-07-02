@@ -3,6 +3,7 @@ import { buildDraftQualityAudit } from "@/lib/ai/draftQualityAudit";
 import { prisma } from "@/lib/db/prisma";
 import { runRoutedGeneration } from "@/lib/model-gateway/routedGeneration";
 import { getPlatformProfile, type PlatformId } from "@/lib/platforms/platformProfiles";
+import { findProjectStartTacticSummary } from "@/lib/projects/projectStartTactics";
 import { countWords } from "@/lib/text/wordCount";
 
 export interface GenerateChapterDraftOptions {
@@ -13,7 +14,13 @@ export interface GenerateChapterDraftOptions {
 export async function generateChapterDraft(options: GenerateChapterDraftOptions) {
   const chapter = await prisma.chapter.findUnique({
     where: { id: options.chapterId },
-    include: { project: true },
+    include: {
+      project: {
+        include: {
+          worldEntries: true,
+        },
+      },
+    },
   });
 
   if (!chapter) {
@@ -21,11 +28,13 @@ export async function generateChapterDraft(options: GenerateChapterDraftOptions)
   }
 
   const platform = getPlatformProfile(chapter.project.targetPlatform as PlatformId);
+  const startTactic = findProjectStartTacticSummary(chapter.project.worldEntries);
   const prompt = buildChapterDraftPrompt({
     projectTitle: chapter.project.title,
     genre: chapter.project.genre,
     sellingPoint: chapter.project.sellingPoint,
     platform,
+    startTactic,
     targetWords: options.targetWords ?? 1200,
     chapter: {
       title: chapter.title,

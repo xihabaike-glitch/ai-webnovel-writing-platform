@@ -5,6 +5,7 @@ import { getActiveModelProvider } from "@/lib/model-gateway/activeProvider";
 import type { ModelProviderId } from "@/lib/model-gateway/types";
 import { getPlatformProfile, type PlatformId } from "@/lib/platforms/platformProfiles";
 import { buildFirstThreeRewriteEvaluation, buildFirstThreeRewritePackage } from "@/lib/projects/firstThreeRewrite";
+import { findProjectStartTacticSummary } from "@/lib/projects/projectStartTactics";
 import { countWords } from "@/lib/text/wordCount";
 
 interface Params {
@@ -53,6 +54,7 @@ export async function POST(request: Request, { params }: Params) {
     where: { id: projectId },
     include: {
       chapters: { orderBy: { order: "asc" } },
+      worldEntries: true,
     },
   });
 
@@ -61,6 +63,7 @@ export async function POST(request: Request, { params }: Params) {
   }
 
   const platform = getPlatformProfile((body.platformId ?? project.targetPlatform) as PlatformId);
+  const startTactic = findProjectStartTacticSummary(project.worldEntries);
   const rewritePackage = buildFirstThreeRewritePackage({
     projectTitle: project.title,
     platform,
@@ -95,6 +98,7 @@ export async function POST(request: Request, { params }: Params) {
       genre: project.genre,
       sellingPoint: project.sellingPoint,
       platform,
+      startTactic,
       targetWords: body.targetWords ?? 1600,
       chapter: {
         order: chapter.order,
@@ -117,7 +121,7 @@ export async function POST(request: Request, { params }: Params) {
         providerConfigId: provider.id,
         model: provider.defaultModel,
         status: "running",
-        inputSnapshot: JSON.stringify({ prompt, plan }),
+        inputSnapshot: JSON.stringify({ prompt, plan, startTactic }),
       },
     });
 

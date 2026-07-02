@@ -6,6 +6,7 @@ import type { GatePlatformTacticExperienceItem } from "../lib/projects/gateActio
 import {
   buildProjectStartTacticAdvice,
   buildProjectStartTacticWorldEntry,
+  findProjectStartTacticSummary,
   parseProjectStartTacticSummary,
 } from "../lib/projects/projectStartTactics.ts";
 import { getDefaultTemplateForPlatform } from "../lib/projects/projectTemplates.ts";
@@ -70,5 +71,9 @@ test("buildProjectStartTacticAdvice", async (t) => {
     assert.equal(summary?.label, "模板推荐");
     assert.ok(summary?.openingMove.includes("第一段"));
     assert.ok(summary?.verificationMove.includes("前三章"));
+    assert.equal(findProjectStartTacticSummary([
+      { type: "platform_soil", title: "普通平台土壤", content: "每章要有追读。" },
+      entry,
+    ])?.title, "首轮平台打法：番茄小说");
   });
 });

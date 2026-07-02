@@ -1,11 +1,13 @@
 import type { PlatformProfile } from "../platforms/platformProfiles.ts";
 import { buildPlatformWritingStylePromptBlock } from "../platforms/writingStyleTemplates.ts";
+import type { ProjectStartTacticSummary } from "../projects/projectStartTactics.ts";
 
 interface ChapterDraftPromptInput {
   projectTitle: string;
   genre: string;
   sellingPoint: string;
   platform: PlatformProfile;
+  startTactic?: ProjectStartTacticSummary | null;
   targetWords: number;
   chapter: {
     title: string;
@@ -20,6 +22,16 @@ interface ChapterDraftPromptInput {
 
 export function buildChapterDraftPrompt(input: ChapterDraftPromptInput) {
   const platformStyle = buildPlatformWritingStylePromptBlock(input.platform.id);
+  const startTacticLines = input.startTactic
+    ? [
+        "首轮平台打法：",
+        `来源：${input.startTactic.label}`,
+        `打法：${input.startTactic.primaryTactic}`,
+        `开头动作：${input.startTactic.openingMove}`,
+        `验证动作：${input.startTactic.verificationMove}`,
+        `风险提醒：${input.startTactic.risk || "按平台反馈继续校准。"}`,
+      ].join("\n")
+    : "";
   const systemPrompt = [
     "你是高执行力网文写手，只输出正文初稿，不输出解释、标题、Markdown 或审稿意见。",
     "优先满足平台读者预期：开头有钩子，中段有冲突推进，结尾有明确悬念。",
@@ -34,6 +46,7 @@ export function buildChapterDraftPrompt(input: ChapterDraftPromptInput) {
     `平台开头规则：${input.platform.openingRules.join("；")}`,
     `平台审稿重点：${input.platform.reviewFocus.join("、")}`,
     platformStyle,
+    startTacticLines,
     `目标字数：约 ${input.targetWords} 字`,
     `章节标题：${input.chapter.title}`,
     `章节目标：${input.chapter.goal}`,

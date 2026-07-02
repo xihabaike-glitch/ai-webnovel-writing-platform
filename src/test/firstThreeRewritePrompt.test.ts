@@ -62,4 +62,38 @@ test("buildFirstThreeRewritePrompt", async (t) => {
     assert.ok(result.text.includes("第一章 雨夜系统"));
     assert.equal(result.text.trim().startsWith("{"), false);
   });
+
+  await t.test("includes project start tactic when available", () => {
+    const tacticPrompt = buildFirstThreeRewritePrompt({
+      projectTitle: "夜雨系统",
+      genre: "都市系统",
+      sellingPoint: "雨夜系统翻盘",
+      platform: getPlatformProfile("fanqie"),
+      startTactic: {
+        title: "首轮平台打法：番茄小说",
+        label: "历史观察",
+        primaryTactic: "只复用小步重验流程，不复制成功结论。",
+        openingMove: "先修前三章兑现，再用小步数据重验。",
+        verificationMove: "等下一轮效果回填后再加码。",
+        risk: "缺重验效果前不要扩大投放。",
+      },
+      targetWords: 1600,
+      chapter: {
+        order: 1,
+        title: "第一章 雨夜系统",
+        content: "林晚推开门，系统提示音在雨夜响起。",
+        goal: "让主角遭遇不可逆事件。",
+        hook: "雨夜、系统、门后未知风险。",
+        conflict: "主角必须在危险和逃避之间选择。",
+        valueShift: "普通生活转向失控危机。",
+        cliffhanger: "系统给出第一个选择。",
+      },
+      plan,
+    });
+
+    assert.ok(tacticPrompt.userPrompt.includes("首轮平台打法"));
+    assert.ok(tacticPrompt.userPrompt.includes("历史观察"));
+    assert.ok(tacticPrompt.userPrompt.includes("只复用小步重验流程"));
+    assert.ok(tacticPrompt.userPrompt.includes("等下一轮效果回填后再加码"));
+  });
 });

@@ -14,6 +14,7 @@ import {
   buildGatePlatformRetreatGate,
   buildGatePlatformRetreatDispatchItems,
   buildGatePlatformRetreatResolution,
+  buildGatePlatformRetreatRecheckDispatchItems,
   buildGatePlatformDispatchReceipt,
   buildGatePlatformGrowthDispatchItems,
   buildGatePlatformGrowthReview,
@@ -192,6 +193,7 @@ export function GateActionWorkspace({ actions }: { actions: PrePublishGateAction
   const retreatResolutionIssues = retreatResolution.items.filter((item) => item.status !== "resolved").slice(0, 4);
   const scaleGate = buildGatePlatformScaleGate(platformGrowthReview, dispatchEvidenceReview, scaleFollowup, scaleCadence, retreatGate, retreatResolution);
   const scaleGateVisibleItems = scaleGate.items.filter((item) => item.status !== "not_candidate").slice(0, 4);
+  const retreatRecheckDispatchItems = buildGatePlatformRetreatRecheckDispatchItems(scaleGate, retreatResolution, visibleDispatchTasks);
   const latestReceipt = filteredReceipts[0] ?? null;
 
   useEffect(() => {
@@ -882,6 +884,70 @@ export function GateActionWorkspace({ actions }: { actions: PrePublishGateAction
             </p>
           )}
         </div>
+        {retreatRecheckDispatchItems.length ? (
+          <div className="mt-3 grid gap-2">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <div className="text-xs font-medium text-slate-500">修复后重验派单</div>
+                <p className="mt-1 text-xs text-slate-500">复测数据转好后，重新派一张小步加码任务，按新打法重新验收。</p>
+              </div>
+              <Link
+                className="w-fit rounded-md border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                href="/dispatch"
+              >
+                打开派单中心
+              </Link>
+            </div>
+            <div className="grid gap-2 xl:grid-cols-2">
+              {retreatRecheckDispatchItems.map((item) => (
+                <div className="rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900" key={item.id}>
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-medium">{item.title}</span>
+                        <span className={`rounded-md px-2 py-1 text-xs font-medium ${dispatchStateClass(item.state)}`}>{dispatchStateLabel(item.state)}</span>
+                      </div>
+                      <p className="mt-2 leading-6 opacity-85">{item.detail}</p>
+                    </div>
+                    <div className="text-right text-xs opacity-75">
+                      <div>{item.ownerRole}</div>
+                      <div className="mt-1">{item.dueLabel}</div>
+                    </div>
+                  </div>
+                  <div className="mt-2 flex flex-wrap gap-2 text-xs opacity-75">
+                    {item.acceptanceCriteria.map((criterion) => (
+                      <span className="rounded-md bg-white/70 px-2 py-1" key={criterion}>{criterion}</span>
+                    ))}
+                  </div>
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    <button
+                      className="rounded-md border border-white/70 bg-white px-3 py-2 text-xs font-medium text-slate-950 hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60"
+                      disabled={item.state !== "queued"}
+                      onClick={() => assignDispatch(item)}
+                      type="button"
+                    >
+                      {item.state === "queued" ? item.actionLabel : dispatchStateLabel(item.state)}
+                    </button>
+                    {item.state === "assigned" ? (
+                      <Link
+                        className="rounded-md border border-white/70 bg-white/80 px-3 py-2 text-xs font-medium text-emerald-800 hover:bg-white"
+                        href="/dispatch"
+                      >
+                        去派单中心收口
+                      </Link>
+                    ) : null}
+                    <Link
+                      className="rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white hover:bg-slate-800"
+                      href={item.href}
+                    >
+                      打开处理入口
+                    </Link>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
         <div className="mt-3 grid gap-2">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div>

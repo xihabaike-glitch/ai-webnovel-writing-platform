@@ -2052,6 +2052,55 @@ export function buildGatePlatformScaleGate(
   };
 }
 
+export function buildGatePlatformRetreatRecheckDispatchItems(
+  scaleGate: GatePlatformScaleGate,
+  retreatResolution: GatePlatformRetreatResolution,
+  persistedTasks: PersistedGatePlatformDispatchTask[] = [],
+): GatePlatformGrowthDispatchItem[] {
+  const resolvedByPlatform = new Map(
+    retreatResolution.items
+      .filter((item) => item.status === "resolved")
+      .map((item) => [item.platformId, item]),
+  );
+  const persistedByKey = new Map(persistedTasks.map((task) => [task.dispatchKey, task]));
+
+  return scaleGate.items
+    .map((item): GatePlatformGrowthDispatchItem | null => {
+      if (item.status !== "needs_dispatch" || item.label !== "修复后重验") return null;
+      const resolution = resolvedByPlatform.get(item.platformId);
+      if (!resolution?.latestEffectAt) return null;
+      const dispatchKey = `${item.platformId}:scale_up:retreat_recheck:${resolution.latestEffectAt}`;
+      const persisted = persistedByKey.get(dispatchKey);
+
+      return {
+        id: dispatchKey,
+        platformId: item.platformId,
+        platformName: item.platformName,
+        stage: "scale_up",
+        state: persisted?.state ?? "queued",
+        priorityScore: item.priorityScore,
+        ownerRole: "增长运营",
+        title: `${item.platformName} 修复后小步重验`,
+        detail: "基于撤退修复后的复测数据，重新做一轮小范围加码验收，只验证新打法，不沿用旧判断。",
+        dueLabel: "下一轮更新前",
+        actionLabel: "派给增长运营",
+        href: item.href,
+        acceptanceCriteria: ["重验范围已限定", "修复后版本作为新基准", "下一轮效果回填计划已写清"],
+        evidence: item.evidence,
+        reviewLatestAt: resolution.latestEffectAt,
+      };
+    })
+    .filter((item): item is GatePlatformGrowthDispatchItem => Boolean(item))
+    .sort((left, right) => {
+      const stateWeight: Record<GatePlatformGrowthDispatchState, number> = { queued: 0, assigned: 1, completed: 2 };
+      const stateDiff = stateWeight[left.state] - stateWeight[right.state];
+      if (stateDiff !== 0) return stateDiff;
+      const priorityDiff = right.priorityScore - left.priorityScore;
+      if (priorityDiff !== 0) return priorityDiff;
+      return left.platformName.localeCompare(right.platformName);
+    });
+}
+
 export function buildGatePlatformScaleFollowup(
   tasks: PersistedGatePlatformDispatchTask[],
   receipts: GateActionReceipt[] = [],

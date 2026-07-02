@@ -16,6 +16,7 @@ import {
   buildGatePlatformRetreatGate,
   buildGatePlatformRetreatDispatchItems,
   buildGatePlatformRetreatResolution,
+  buildGatePlatformRetreatRecheckDispatchItems,
   buildGateDispatchTaskCenter,
   buildGateDispatchTaskCloseoutItem,
   buildGatePublishEffectReceipt,
@@ -1059,6 +1060,20 @@ test("buildGateActionReceipt", async (t) => {
       updatedRetreatGate,
       resolvedResolution,
     );
+    const recheckDispatches = buildGatePlatformRetreatRecheckDispatchItems(recheckGate, resolvedResolution);
+    const assignedRecheckDispatches = buildGatePlatformRetreatRecheckDispatchItems(recheckGate, resolvedResolution, [{
+      ...recheckDispatches[0],
+      databaseId: "dispatch-db-retreat-recheck",
+      dispatchKey: recheckDispatches[0].id,
+      projectId: "project-1",
+      sourceReceiptId: null,
+      completionEvidence: "",
+      state: "assigned",
+      assignedAt: "2026-01-16T00:30:00.000Z",
+      completedAt: null,
+      createdAt: "2026-01-16T00:30:00.000Z",
+      updatedAt: "2026-01-16T00:30:00.000Z",
+    }]);
 
     assert.equal(retreatGate.items.find((item) => item.platformId === "fanqie")?.status, "pivot_platform");
     assert.equal(pendingResolution.items[0].status, "needs_effect");
@@ -1068,6 +1083,11 @@ test("buildGateActionReceipt", async (t) => {
     assert.equal(updatedRetreatGate.items.find((item) => item.platformId === "fanqie")?.status, "healthy");
     assert.equal(recheckGate.items.find((item) => item.platformId === "fanqie")?.status, "needs_dispatch");
     assert.equal(recheckGate.items.find((item) => item.platformId === "fanqie")?.label, "修复后重验");
+    assert.equal(recheckDispatches.length, 1);
+    assert.equal(recheckDispatches[0].stage, "scale_up");
+    assert.ok(recheckDispatches[0].id.includes("retreat_recheck"));
+    assert.equal(recheckDispatches[0].title, "番茄小说 修复后小步重验");
+    assert.equal(assignedRecheckDispatches[0].state, "assigned");
   });
 
   await t.test("records dispatch receipts and marks the dispatch as assigned", () => {

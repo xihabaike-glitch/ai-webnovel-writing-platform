@@ -804,6 +804,34 @@ function reviewPlanStepStatusClass(status: PlatformStrategyReviewPlanStep["statu
   return "bg-slate-100 text-slate-600";
 }
 
+function buildReviewPlanStepTask(
+  item: PlatformStrategyRankItem,
+  step: PlatformStrategyReviewPlanStep,
+): PlatformStrategyReviewTask {
+  const matchedTask = item.reviewDecision.tasks.find((task) => task.id === step.taskId);
+  if (matchedTask && step.href !== "#platform-strategy-ranking") return matchedTask;
+
+  return {
+    id: `plan-${step.id}`,
+    priority: step.status === "next" ? "high" : "medium",
+    execution: "open_target",
+    rankTarget: step.href === "#platform-strategy-ranking" ? "evidence" : matchedTask?.rankTarget ?? "evidence",
+    rankReason: "这是计划里的检查点，先定位证据面板，再决定下一轮动作。",
+    label: step.label,
+    detail: step.detail,
+    href: step.href,
+  };
+}
+
+function reviewPlanStepActionLabel(
+  step: PlatformStrategyReviewPlanStep,
+  task: PlatformStrategyReviewTask,
+) {
+  if (step.status === "done") return "查看证据";
+  if (step.status === "queued") return "等待前一步";
+  return strategyReviewTaskActionLabel(task.execution);
+}
+
 function buildStrategyExecutionReceipt(
   plan: PlatformStrategySwitchPlan,
   stepId: string,
@@ -1908,12 +1936,28 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
                             </span>
                           </div>
                           <div className="mt-2 grid gap-1.5">
-                            {item.reviewDecision.nextPlan.steps.map((step) => (
-                              <a
-                                className="block rounded-md bg-slate-50 p-2 hover:bg-slate-100"
-                                href={step.href}
-                                key={step.id}
-                              >
+                            {item.reviewDecision.nextPlan.steps.map((step) => {
+                              const planTask = buildReviewPlanStepTask(item, step);
+                              const planTaskRunId = `${item.platformId}:${planTask.id}`;
+                              const isStepBusy = runningStrategyReviewTaskId === planTaskRunId;
+                              const isStepDisabled = Boolean(
+                                step.status === "queued"
+                                || runningStrategyReviewTaskId
+                                || applyingStrategyPlatformId
+                                || (planTask.execution === "generate_asset_variants" && isOptimizingAsset),
+                              );
+
+                              return (
+                                <div
+                                  className={`rounded-md border p-2 ${
+                                    step.status === "next"
+                                      ? "border-amber-200 bg-amber-50"
+                                      : step.status === "done"
+                                        ? "border-emerald-100 bg-emerald-50"
+                                        : "border-slate-100 bg-slate-50"
+                                  }`}
+                                  key={step.id}
+                                >
                                 <div className="flex flex-wrap items-center justify-between gap-2">
                                   <span className="font-medium text-slate-800">{step.label}</span>
                                   <span className={`rounded-md px-1.5 py-0.5 text-[11px] font-medium ${reviewPlanStepStatusClass(step.status)}`}>
@@ -1924,8 +1968,33 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
                                 <div className="mt-1 rounded-md bg-white px-2 py-1 leading-5 text-slate-500">
                                   验收：{step.expectedSignal}
                                 </div>
-                              </a>
-                            ))}
+                                <div className="mt-2 flex flex-wrap items-center gap-2">
+                                  <button
+                                    className={`rounded-md px-2 py-1 text-[11px] font-medium disabled:opacity-50 ${
+                                      step.status === "next"
+                                        ? "bg-slate-950 text-white hover:bg-slate-800"
+                                        : "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                                    }`}
+                                    disabled={isStepDisabled}
+                                    onClick={() => {
+                                      if (step.status === "done") {
+                                        window.location.hash = step.href.replace(/^#/, "");
+                                        setMessage(`已定位到「${step.label}」的复盘证据。`);
+                                        return;
+                                      }
+                                      void runStrategyReviewTask(item, planTask);
+                                    }}
+                                    type="button"
+                                  >
+                                    {isStepBusy ? "执行中" : reviewPlanStepActionLabel(step, planTask)}
+                                  </button>
+                                  {step.status === "next" ? (
+                                    <span className="text-[11px] text-amber-700">当前只推进这一步，完成后再解锁下一步。</span>
+                                  ) : null}
+                                </div>
+                              </div>
+                              );
+                            })}
                           </div>
                           <div className="mt-2 rounded-md bg-white px-2 py-1 leading-5 text-slate-500">
                             复盘点：{item.reviewDecision.nextPlan.checkpoint}

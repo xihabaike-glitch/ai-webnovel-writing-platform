@@ -894,11 +894,17 @@ test("buildPlatformPublishExportCenter", async (t) => {
       ],
     });
     const history = center.platformStrategy[0].reviewDecision.history;
+    const ledger = center.platformStrategy[0].reviewDecision.evidenceLedger;
 
     assert.deepEqual(history.slice(0, 3).map((item) => item.type), ["metric", "asset", "snapshot"]);
     assert.ok(history[0].detail.includes("曝光 1000"));
     assert.ok(history[1].detail.includes("强钩子爽点版"));
     assert.equal(history[2].href, "#package-version-history");
+    assert.equal(ledger.status, "ready");
+    assert.equal(ledger.completedSignals, 4);
+    assert.equal(ledger.entries.slice(0, 3).map((entry) => entry.type).join(","), "metric,asset,snapshot");
+    assert.ok(ledger.entries[0].scoreImpact.includes("点击率"));
+    assert.ok(ledger.entries[1].nextReason.includes("入口素材"));
   });
 
   await t.test("filters and counts publish package versions by action", () => {
@@ -1090,6 +1096,16 @@ test("buildPlatformPublishExportCenter", async (t) => {
           currentStepLabel: "回排行榜做最终判断",
           checkpoint: "第 7 天必须看策略分、真实数据和版本对照，再决定加码/迭代/修打法/撤退。",
           steps: [],
+        },
+        evidenceLedger: {
+          status: "empty" as const,
+          score: 0,
+          headline: "七猫 还没有复盘证据，别急着拍脑袋。",
+          completedSignals: 0,
+          totalSignals: 4,
+          latestEvidenceAt: null,
+          missingSignals: [],
+          entries: [],
         },
         history: [],
       },

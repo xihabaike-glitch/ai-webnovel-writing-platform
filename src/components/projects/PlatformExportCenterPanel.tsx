@@ -371,6 +371,7 @@ interface PlatformStrategyReviewDecision {
   action: string;
   tasks: PlatformStrategyReviewTask[];
   nextPlan: PlatformStrategyReviewPlan;
+  evidenceLedger: PlatformStrategyEvidenceLedger;
   history: PlatformStrategyReviewHistoryItem[];
 }
 
@@ -390,6 +391,30 @@ interface PlatformStrategyReviewHistoryItem {
   type: "snapshot" | "asset" | "metric" | "repair";
   label: string;
   detail: string;
+  createdAt: string;
+  href: string;
+}
+
+interface PlatformStrategyEvidenceLedger {
+  status: "empty" | "partial" | "ready";
+  score: number;
+  headline: string;
+  completedSignals: number;
+  totalSignals: number;
+  latestEvidenceAt: string | null;
+  missingSignals: string[];
+  entries: PlatformStrategyEvidenceLedgerEntry[];
+}
+
+interface PlatformStrategyEvidenceLedgerEntry {
+  id: string;
+  type: "snapshot" | "asset" | "metric" | "repair";
+  actor: "system";
+  label: string;
+  result: string;
+  scoreImpact: string;
+  nextReason: string;
+  strength: "strong" | "medium" | "weak";
   createdAt: string;
   href: string;
 }
@@ -710,6 +735,30 @@ function strategyReviewHistoryClass(type: PlatformStrategyReviewHistoryItem["typ
   if (type === "asset") return "bg-cyan-50 text-cyan-700";
   if (type === "metric") return "bg-emerald-50 text-emerald-700";
   return "bg-amber-50 text-amber-700";
+}
+
+function evidenceLedgerStatusClass(status: PlatformStrategyEvidenceLedger["status"]) {
+  if (status === "ready") return "bg-emerald-50 text-emerald-700";
+  if (status === "partial") return "bg-amber-50 text-amber-700";
+  return "bg-rose-50 text-rose-700";
+}
+
+function evidenceLedgerStatusLabel(status: PlatformStrategyEvidenceLedger["status"]) {
+  if (status === "ready") return "可复盘";
+  if (status === "partial") return "证据薄";
+  return "缺证据";
+}
+
+function evidenceLedgerStrengthClass(strength: PlatformStrategyEvidenceLedgerEntry["strength"]) {
+  if (strength === "strong") return "bg-emerald-50 text-emerald-700";
+  if (strength === "medium") return "bg-amber-50 text-amber-700";
+  return "bg-rose-50 text-rose-700";
+}
+
+function evidenceLedgerStrengthLabel(strength: PlatformStrategyEvidenceLedgerEntry["strength"]) {
+  if (strength === "strong") return "强";
+  if (strength === "medium") return "中";
+  return "弱";
 }
 
 const strategyScoreLabels: { key: keyof PlatformStrategyRankItem["scores"]; label: string }[] = [
@@ -2001,6 +2050,61 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
                           </div>
                         </div>
                       ) : null}
+                      <div className="mt-3 border-t border-slate-100 pt-2">
+                        <div className="flex flex-wrap items-start justify-between gap-2">
+                          <div>
+                            <div className="font-medium text-slate-800">复盘证据账本</div>
+                            <div className="mt-1 text-slate-500">
+                              覆盖 {item.reviewDecision.evidenceLedger.completedSignals}/{item.reviewDecision.evidenceLedger.totalSignals}
+                              {" "}· 证据分 {item.reviewDecision.evidenceLedger.score}
+                              {item.reviewDecision.evidenceLedger.latestEvidenceAt
+                                ? ` · 最新 ${formatTime(item.reviewDecision.evidenceLedger.latestEvidenceAt)}`
+                                : ""}
+                            </div>
+                          </div>
+                          <span className={`rounded-md px-2 py-1 text-[11px] font-medium ${evidenceLedgerStatusClass(item.reviewDecision.evidenceLedger.status)}`}>
+                            {evidenceLedgerStatusLabel(item.reviewDecision.evidenceLedger.status)}
+                          </span>
+                        </div>
+                        <div className="mt-2 rounded-md bg-white px-2 py-1 leading-5 text-slate-500">
+                          {item.reviewDecision.evidenceLedger.headline}
+                        </div>
+                        {item.reviewDecision.evidenceLedger.missingSignals.length ? (
+                          <div className="mt-2 flex flex-wrap gap-1.5">
+                            {item.reviewDecision.evidenceLedger.missingSignals.slice(0, 3).map((signal) => (
+                              <span className="rounded-md bg-rose-50 px-2 py-1 text-[11px] text-rose-700" key={signal}>
+                                {signal}
+                              </span>
+                            ))}
+                          </div>
+                        ) : null}
+                        {item.reviewDecision.evidenceLedger.entries.length ? (
+                          <div className="mt-2 grid gap-1.5">
+                            {item.reviewDecision.evidenceLedger.entries.slice(0, 3).map((entry) => (
+                              <a
+                                className="block rounded-md bg-slate-50 p-2 hover:bg-slate-100"
+                                href={entry.href}
+                                key={entry.id}
+                              >
+                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                  <span className="font-medium text-slate-800">{entry.label}</span>
+                                  <span className={`rounded-md px-1.5 py-0.5 text-[11px] font-medium ${evidenceLedgerStrengthClass(entry.strength)}`}>
+                                    {formatTime(entry.createdAt)} · {evidenceLedgerStrengthLabel(entry.strength)}
+                                  </span>
+                                </div>
+                                <div className="mt-1 leading-5 text-slate-500">系统记录：{entry.result}</div>
+                                <div className="mt-1 rounded-md bg-white px-2 py-1 leading-5 text-slate-500">
+                                  影响：{entry.scoreImpact}｜下一步依据：{entry.nextReason}
+                                </div>
+                              </a>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="mt-2 rounded-md bg-slate-50 p-2 text-[11px] leading-5 text-slate-500">
+                            还没有能落到账本里的执行结果。
+                          </div>
+                        )}
+                      </div>
                       {item.reviewDecision.history.length ? (
                         <div className="mt-3 border-t border-slate-100 pt-2">
                           <div className="text-[11px] font-medium text-slate-500">最近复盘历史</div>

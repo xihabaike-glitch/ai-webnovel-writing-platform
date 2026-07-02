@@ -379,6 +379,7 @@ export interface PlatformStrategyReviewDecision {
   action: string;
   tasks: PlatformStrategyReviewTask[];
   nextPlan: PlatformStrategyReviewPlan;
+  evidenceLedger: PlatformStrategyEvidenceLedger;
   history: PlatformStrategyReviewHistoryItem[];
 }
 
@@ -400,6 +401,30 @@ export interface PlatformStrategyReviewHistoryItem {
   type: "snapshot" | "asset" | "metric" | "repair";
   label: string;
   detail: string;
+  createdAt: Date | string;
+  href: string;
+}
+
+export interface PlatformStrategyEvidenceLedger {
+  status: "empty" | "partial" | "ready";
+  score: number;
+  headline: string;
+  completedSignals: number;
+  totalSignals: number;
+  latestEvidenceAt: Date | string | null;
+  missingSignals: string[];
+  entries: PlatformStrategyEvidenceLedgerEntry[];
+}
+
+export interface PlatformStrategyEvidenceLedgerEntry {
+  id: string;
+  type: "snapshot" | "asset" | "metric" | "repair";
+  actor: "system";
+  label: string;
+  result: string;
+  scoreImpact: string;
+  nextReason: string;
+  strength: "strong" | "medium" | "weak";
   createdAt: Date | string;
   href: string;
 }
@@ -1011,6 +1036,109 @@ function buildPlatformStrategyReviewHistory(pack: PlatformPublishPackage): Platf
     .slice(0, 6);
 }
 
+function evidenceStrength(score: number) {
+  if (score >= 80) return "strong" as const;
+  if (score >= 50) return "medium" as const;
+  return "weak" as const;
+}
+
+function metricRate(part: number, total: number) {
+  return total ? Number(((part / total) * 100).toFixed(1)) : 0;
+}
+
+function buildPlatformStrategyEvidenceLedger(pack: PlatformPublishPackage): PlatformStrategyEvidenceLedger {
+  const signalChecks = [
+    {
+      done: pack.publishVersions.length > 0,
+      missing: "缺发布包版本基准，下一轮改动无法对照。",
+    },
+    {
+      done: pack.submissionAssetVersions.length > 0 || pack.submissionAssetAudit.status === "ready",
+      missing: "缺可追溯投稿资产记录，入口变量无法归因。",
+    },
+    {
+      done: pack.publishEffect.records > 0,
+      missing: "缺真实曝光、点击、收藏、追读数据。",
+    },
+    {
+      done: pack.repairHistory.length > 0 || pack.preflight.score >= 90,
+      missing: "缺前三章/发布质检修复记录。",
+    },
+  ];
+  const completedSignals = signalChecks.filter((signal) => signal.done).length;
+  const totalSignals = signalChecks.length;
+  const score = Math.round((completedSignals / totalSignals) * 100);
+
+  const snapshotEntries: PlatformStrategyEvidenceLedgerEntry[] = pack.publishVersions.slice(0, 4).map((version) => ({
+    id: `ledger-snapshot-${version.id}`,
+    type: "snapshot",
+    actor: "system",
+    label: version.action === "snapshot" ? "保存发布包版本" : version.action === "archive" ? "归档发布包" : "记录发布包动作",
+    result: `${version.title}｜${version.chapterCount} 章｜${version.wordCount} 字`,
+    scoreImpact: `发布质检 ${version.preflightScore} 分｜${version.canExport ? "可投" : "待修"}`,
+    nextReason: "它是下一轮修改的对照基准，别靠记忆判断成败。",
+    strength: evidenceStrength(version.preflightScore),
+    createdAt: version.createdAt,
+    href: "#package-version-history",
+  }));
+  const assetEntries: PlatformStrategyEvidenceLedgerEntry[] = pack.submissionAssetVersions.slice(0, 4).map((version) => ({
+    id: `ledger-asset-${version.id ?? `${version.platformId}-${new Date(version.createdAt).getTime()}`}`,
+    type: "asset",
+    actor: "system",
+    label: version.action === "adopt" ? "采纳投稿资产" : version.action === "restore" ? "恢复投稿资产" : "保存投稿资产",
+    result: `${version.title}｜${version.strategy || "常规版本"}`,
+    scoreImpact: `资产 ${version.auditScore} 分｜${version.auditStatus}`,
+    nextReason: "入口素材会直接影响点击和收藏，必须和真实数据绑定复盘。",
+    strength: evidenceStrength(version.auditScore),
+    createdAt: version.createdAt,
+    href: "#submission-asset-editor",
+  }));
+  const metricEntries: PlatformStrategyEvidenceLedgerEntry[] = pack.publishEffect.history.slice(0, 4).map((metric) => ({
+    id: `ledger-metric-${metric.id ?? `${metric.platformId}-${new Date(metric.snapshotDate).getTime()}`}`,
+    type: "metric",
+    actor: "system",
+    label: "记录发布效果",
+    result: `曝光 ${metric.views}｜点击 ${metric.clicks}｜收藏 ${metric.favorites}｜追读 ${metric.follows}`,
+    scoreImpact: `点击率 ${metricRate(metric.clicks, metric.views)}%｜追读率 ${metricRate(metric.follows, metric.views)}%`,
+    nextReason: "真实效果决定加码、修入口还是换平台。",
+    strength: metric.clicks >= 100 || metric.follows >= 30 ? "strong" : metric.clicks >= 30 || metric.follows >= 8 ? "medium" : "weak",
+    createdAt: metric.snapshotDate,
+    href: "#publish-effect-panel",
+  }));
+  const repairEntries: PlatformStrategyEvidenceLedgerEntry[] = pack.repairHistory.slice(0, 4).map((item) => ({
+    id: `ledger-repair-${item.id}`,
+    type: "repair",
+    actor: "system",
+    label: item.label,
+    result: `${item.chapterTitle}｜${item.message}`,
+    scoreImpact: `修复状态 ${item.status}`,
+    nextReason: "内容缺陷修过才配继续投，不然只是扩大低质样本。",
+    strength: item.status === "succeeded" ? "strong" : item.status === "failed" ? "weak" : "medium",
+    createdAt: item.createdAt,
+    href: "#first-three-rewrite",
+  }));
+  const entries = [...snapshotEntries, ...assetEntries, ...metricEntries, ...repairEntries]
+    .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime())
+    .slice(0, 8);
+  const missingSignals = signalChecks.filter((signal) => !signal.done).map((signal) => signal.missing);
+  const status = completedSignals === 0 ? "empty" : completedSignals >= 3 ? "ready" : "partial";
+
+  return {
+    status,
+    score,
+    headline: status === "ready"
+      ? `${pack.platformName} 证据够用，可以做下一轮策略判断。`
+      : status === "partial"
+        ? `${pack.platformName} 证据还薄，先补缺口再下结论。`
+        : `${pack.platformName} 还没有复盘证据，别急着拍脑袋。`,
+    completedSignals,
+    totalSignals,
+    latestEvidenceAt: entries[0]?.createdAt ?? null,
+    missingSignals,
+    entries,
+  };
+}
+
 function platformStrategyComponentScores(pack: PlatformPublishPackage): PlatformStrategyRankItem["scores"] {
   return {
     preflight: pack.preflight.score,
@@ -1193,6 +1321,7 @@ function buildPlatformStrategyReviewDecision(
   recommendation: PlatformStrategyRankItem["recommendation"],
 ): PlatformStrategyReviewDecision {
   const history = buildPlatformStrategyReviewHistory(pack);
+  const evidenceLedger = buildPlatformStrategyEvidenceLedger(pack);
 
   if (!pack.publishEffect.records) {
     const tasks = rankPlatformStrategyReviewTasks(pack, [
@@ -1229,6 +1358,7 @@ function buildPlatformStrategyReviewDecision(
       detail: "还没有真实发布数据，现在谈加码就是拍脑袋。",
       action: "先录入曝光、点击、收藏、追读和编辑反馈。",
       history,
+      evidenceLedger,
       tasks,
       nextPlan: buildPlatformStrategyReviewPlan(pack, "collect", tasks),
     };
@@ -1267,6 +1397,7 @@ function buildPlatformStrategyReviewDecision(
       detail: "数据已经给出正反馈，主资源可以继续往这里压。",
       action: "保持主战场，继续更新、归档版本，并跟踪下一轮转化。",
       history,
+      evidenceLedger,
       tasks,
       nextPlan: buildPlatformStrategyReviewPlan(pack, "scale", tasks),
     };
@@ -1305,6 +1436,7 @@ function buildPlatformStrategyReviewDecision(
       detail: "真实反馈偏弱，现在继续硬投只会扩大损失。",
       action: "回到前三章、投稿资产和发布节奏，先修再投。",
       history,
+      evidenceLedger,
       tasks,
       nextPlan: buildPlatformStrategyReviewPlan(pack, "repair", tasks),
     };
@@ -1343,6 +1475,7 @@ function buildPlatformStrategyReviewDecision(
       detail: "当前平台胜率靠后，不值得继续烧主资源。",
       action: "把它降为观察平台，回排行榜选择更高胜率主战场。",
       history,
+      evidenceLedger,
       tasks,
       nextPlan: buildPlatformStrategyReviewPlan(pack, "pivot", tasks),
     };
@@ -1380,6 +1513,7 @@ function buildPlatformStrategyReviewDecision(
     detail: "数据还没差到要撤，也没好到能猛冲。",
     action: "做一轮小改动，再记录下一轮数据对照。",
     history,
+    evidenceLedger,
     tasks,
     nextPlan: buildPlatformStrategyReviewPlan(pack, "iterate", tasks),
   };

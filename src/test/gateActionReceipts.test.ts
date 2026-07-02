@@ -11,6 +11,7 @@ import {
   buildGatePlatformDispatchReceipt,
   buildGateDispatchEvidenceReview,
   buildGatePlatformScaleGate,
+  buildGatePlatformScaleFollowup,
   buildGateDispatchTaskCenter,
   buildGateDispatchTaskCloseoutItem,
   buildGatePublishEffectReceipt,
@@ -596,6 +597,86 @@ test("buildGateActionReceipt", async (t) => {
     assert.equal(gate.items.find((item) => item.platformId === "qimao")?.status, "blocked_evidence");
     assert.equal(gate.items.find((item) => item.platformId === "webnovel")?.status, "needs_dispatch");
     assert.ok(gate.nextActions.some((actionText) => actionText.includes("真闭环派单")));
+  });
+
+  await t.test("requires post-scale publish effect before a second scale-up", () => {
+    const fanqieEffect = buildGatePublishEffectReceipt({
+      projectId: "project-1",
+      platformId: "fanqie",
+      platformName: "番茄小说",
+      now: "2026-01-01T02:00:00.000Z",
+      metric: {
+        views: 3000,
+        clicks: 500,
+        favorites: 160,
+        follows: 90,
+      },
+    });
+    const reviews = buildGatePlatformGrowthReview([fanqieEffect]);
+    const scaleDispatch = buildGatePlatformGrowthDispatchItems([fanqieEffect])[0];
+    const completedScaleTask = {
+      ...scaleDispatch,
+      databaseId: "dispatch-db-scale",
+      dispatchKey: scaleDispatch.id,
+      projectId: "project-1",
+      sourceReceiptId: null,
+      completionEvidence: "已把推荐量放大 20%，保留原标题和标签作为对照。",
+      state: "completed" as const,
+      assignedAt: "2026-01-01T02:30:00.000Z",
+      completedAt: "2026-01-01T03:00:00.000Z",
+      createdAt: "2026-01-01T02:30:00.000Z",
+      updatedAt: "2026-01-01T03:00:00.000Z",
+    };
+    const laterNonEffectReceipt = buildGatePlatformStrategyReceipt({
+      item: {
+        ...strategyPlatform,
+        actionType: "generate_asset_variants",
+        actionLabel: "生成投稿方案",
+      },
+      status: "succeeded",
+      now: "2026-01-01T04:00:00.000Z",
+      payload: {
+        variants: [{ strategy: "加码后标题备选" }],
+      },
+    });
+    const evidenceReview = buildGateDispatchEvidenceReview(
+      [completedScaleTask],
+      [laterNonEffectReceipt, fanqieEffect],
+    );
+    const followup = buildGatePlatformScaleFollowup(
+      [completedScaleTask],
+      [laterNonEffectReceipt, fanqieEffect],
+    );
+    const blockedGate = buildGatePlatformScaleGate(reviews, evidenceReview, followup);
+    const laterEffectReceipt = buildGatePublishEffectReceipt({
+      projectId: "project-1",
+      platformId: "fanqie",
+      platformName: "番茄小说",
+      now: "2026-01-01T05:00:00.000Z",
+      metric: {
+        views: 4200,
+        clicks: 760,
+        favorites: 240,
+        follows: 150,
+      },
+    });
+    const trackedFollowup = buildGatePlatformScaleFollowup(
+      [completedScaleTask],
+      [laterEffectReceipt, laterNonEffectReceipt, fanqieEffect],
+    );
+    const readyGate = buildGatePlatformScaleGate(
+      reviews,
+      buildGateDispatchEvidenceReview([completedScaleTask], [laterEffectReceipt, laterNonEffectReceipt, fanqieEffect]),
+      trackedFollowup,
+    );
+
+    assert.equal(evidenceReview.items[0].status, "verified");
+    assert.equal(followup.summary.needsEffect, 1);
+    assert.equal(followup.items[0].status, "needs_effect");
+    assert.equal(blockedGate.items[0].status, "blocked_evidence");
+    assert.equal(blockedGate.items[0].label, "等待加码效果");
+    assert.equal(trackedFollowup.summary.tracked, 1);
+    assert.equal(readyGate.items[0].status, "ready");
   });
 
   await t.test("records dispatch receipts and marks the dispatch as assigned", () => {

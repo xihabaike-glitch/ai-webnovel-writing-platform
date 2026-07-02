@@ -8,6 +8,7 @@ import {
   buildGateActionReceiptSummary,
   buildGateActionReviewAdvice,
   buildGateDispatchEvidenceReview,
+  buildGatePlatformScaleFollowup,
   buildGatePlatformScaleGate,
   buildGatePlatformDispatchReceipt,
   buildGatePlatformGrowthDispatchItems,
@@ -31,6 +32,7 @@ import {
   type GateActionReviewAdviceState,
   type GateActionReceiptStatusFilter,
   type GateDispatchEvidenceReviewStatus,
+  type GatePlatformScaleFollowupStatus,
   type GatePlatformScaleGateStatus,
   type GatePlatformGrowthDispatchItem,
   type GatePlatformGrowthReview,
@@ -118,6 +120,13 @@ function scaleGateClass(status: GatePlatformScaleGateStatus) {
   return "border-slate-200 bg-slate-50 text-slate-800";
 }
 
+function scaleFollowupClass(status: GatePlatformScaleFollowupStatus) {
+  if (status === "tracked") return "border-emerald-200 bg-emerald-50 text-emerald-900";
+  if (status === "needs_effect") return "border-amber-200 bg-amber-50 text-amber-900";
+  if (status === "missing_evidence") return "border-rose-200 bg-rose-50 text-rose-900";
+  return "border-slate-200 bg-slate-50 text-slate-800";
+}
+
 export function GateActionWorkspace({ actions }: { actions: PrePublishGateAction[] }) {
   const router = useRouter();
   const [receipts, setReceipts] = useState<GateActionReceipt[]>([]);
@@ -140,7 +149,9 @@ export function GateActionWorkspace({ actions }: { actions: PrePublishGateAction
     : persistedDispatchTasks.filter((task) => task.platformId === platformFilter);
   const dispatchEvidenceReview = buildGateDispatchEvidenceReview(visibleDispatchTasks, receipts);
   const dispatchEvidenceIssues = dispatchEvidenceReview.items.filter((item) => item.status !== "verified").slice(0, 4);
-  const scaleGate = buildGatePlatformScaleGate(platformGrowthReview, dispatchEvidenceReview);
+  const scaleFollowup = buildGatePlatformScaleFollowup(visibleDispatchTasks, receipts);
+  const scaleFollowupIssues = scaleFollowup.items.filter((item) => item.status !== "tracked").slice(0, 4);
+  const scaleGate = buildGatePlatformScaleGate(platformGrowthReview, dispatchEvidenceReview, scaleFollowup);
   const scaleGateVisibleItems = scaleGate.items.filter((item) => item.status !== "not_candidate").slice(0, 4);
   const latestReceipt = filteredReceipts[0] ?? null;
 
@@ -370,6 +381,83 @@ export function GateActionWorkspace({ actions }: { actions: PrePublishGateAction
           ) : (
             <p className="rounded-md border border-dashed border-slate-300 bg-white p-3 text-sm text-slate-600">
               暂无派单任务。先让平台增长复盘榜生成任务，再进入证据验收。
+            </p>
+          )}
+        </div>
+        <div className="mt-3 grid gap-2">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <div className="text-xs font-medium text-slate-500">加码后效果追踪</div>
+              <p className="mt-1 text-xs text-slate-500">每次小步加码后必须回填下一轮效果对照，否则暂停第二次加码。</p>
+            </div>
+          </div>
+          <div className="grid gap-2 sm:grid-cols-4">
+            <div className="rounded-md border border-emerald-100 bg-white p-3">
+              <div className="text-xs text-slate-500">已回填对照</div>
+              <div className="mt-1 text-lg font-semibold text-emerald-700">{scaleFollowup.summary.tracked}</div>
+            </div>
+            <div className="rounded-md border border-amber-100 bg-white p-3">
+              <div className="text-xs text-slate-500">待效果对照</div>
+              <div className="mt-1 text-lg font-semibold text-amber-700">{scaleFollowup.summary.needsEffect}</div>
+            </div>
+            <div className="rounded-md border border-slate-200 bg-white p-3">
+              <div className="text-xs text-slate-500">加码未完成</div>
+              <div className="mt-1 text-lg font-semibold text-slate-700">{scaleFollowup.summary.needsCompletion}</div>
+            </div>
+            <div className="rounded-md border border-rose-100 bg-white p-3">
+              <div className="text-xs text-slate-500">缺加码依据</div>
+              <div className="mt-1 text-lg font-semibold text-rose-700">{scaleFollowup.summary.missingEvidence}</div>
+            </div>
+          </div>
+          {scaleFollowup.nextActions.length ? (
+            <div className="grid gap-2 xl:grid-cols-2">
+              {scaleFollowup.nextActions.map((action) => (
+                <div className="rounded-md bg-white p-3 text-sm leading-6 text-slate-600" key={action}>{action}</div>
+              ))}
+            </div>
+          ) : null}
+          {scaleFollowupIssues.length ? (
+            <div className="grid gap-2 xl:grid-cols-2">
+              {scaleFollowupIssues.map((item) => (
+                <div className={`rounded-md border p-3 text-sm ${scaleFollowupClass(item.status)}`} key={item.dispatchKey}>
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-medium">{item.title}</span>
+                        <span className="rounded-md bg-white/70 px-2 py-1 text-xs font-medium">{item.label}</span>
+                      </div>
+                      <p className="mt-2 leading-6 opacity-85">{item.detail}</p>
+                    </div>
+                    <div className="text-right text-xs opacity-75">
+                      <div>{item.platformName}</div>
+                      <div className="mt-1">{item.ownerRole}</div>
+                    </div>
+                  </div>
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    <Link
+                      className="rounded-md bg-white px-3 py-2 text-xs font-medium text-slate-950"
+                      href={item.href}
+                    >
+                      {item.actionLabel}
+                    </Link>
+                    <button
+                      className="rounded-md border border-white/70 bg-white/70 px-3 py-2 text-xs font-medium text-slate-950"
+                      onClick={() => focusPlatform(item.platformId)}
+                      type="button"
+                    >
+                      只看该平台
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : scaleFollowup.summary.total ? (
+            <p className="rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
+              当前加码派单都有后续效果对照，可以按数据判断继续加码、迭代或撤退。
+            </p>
+          ) : (
+            <p className="rounded-md border border-dashed border-slate-300 bg-white p-3 text-sm text-slate-600">
+              暂无加码派单。只有平台通过加码决策闸后，这里才会追踪下一轮效果。
             </p>
           )}
         </div>

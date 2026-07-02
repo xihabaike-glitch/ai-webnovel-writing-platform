@@ -270,6 +270,37 @@ export interface GatePlatformScaleGate {
   items: GatePlatformScaleGateItem[];
 }
 
+export type GatePlatformScaleFollowupStatus = "tracked" | "needs_effect" | "needs_completion" | "missing_evidence";
+
+export interface GatePlatformScaleFollowupItem {
+  dispatchKey: string;
+  platformId: string;
+  platformName: string;
+  ownerRole: string;
+  title: string;
+  status: GatePlatformScaleFollowupStatus;
+  label: string;
+  detail: string;
+  actionLabel: string;
+  href: string;
+  priorityScore: number;
+  completedAt: string | null;
+  latestEffectAt: string | null;
+  evidence: string[];
+}
+
+export interface GatePlatformScaleFollowup {
+  summary: {
+    total: number;
+    tracked: number;
+    needsEffect: number;
+    needsCompletion: number;
+    missingEvidence: number;
+  };
+  nextActions: string[];
+  items: GatePlatformScaleFollowupItem[];
+}
+
 export interface GatePlatformStrategyReceiptPayload {
   message?: string;
   error?: string;
@@ -1567,6 +1598,7 @@ export function buildGateDispatchEvidenceReview(
 export function buildGatePlatformScaleGate(
   reviews: GatePlatformGrowthReview[],
   dispatchEvidenceReview: GateDispatchEvidenceReview,
+  scaleFollowup?: GatePlatformScaleFollowup,
 ): GatePlatformScaleGate {
   const evidenceItemsByPlatform = new Map<string, GateDispatchEvidenceReviewItem[]>();
   for (const item of dispatchEvidenceReview.items) {
@@ -1574,11 +1606,19 @@ export function buildGatePlatformScaleGate(
     items.push(item);
     evidenceItemsByPlatform.set(item.platformId, items);
   }
+  const scaleFollowupItemsByPlatform = new Map<string, GatePlatformScaleFollowupItem[]>();
+  for (const item of scaleFollowup?.items ?? []) {
+    const items = scaleFollowupItemsByPlatform.get(item.platformId) ?? [];
+    items.push(item);
+    scaleFollowupItemsByPlatform.set(item.platformId, items);
+  }
 
   const items = reviews.map((review): GatePlatformScaleGateItem => {
     const platformEvidenceItems = evidenceItemsByPlatform.get(review.platformId) ?? [];
     const issue = platformEvidenceItems.find((item) => item.status !== "verified") ?? null;
     const verifiedEvidence = platformEvidenceItems.filter((item) => item.status === "verified");
+    const scaleFollowupIssue = (scaleFollowupItemsByPlatform.get(review.platformId) ?? [])
+      .find((item) => item.status !== "tracked") ?? null;
 
     if (review.stage !== "scale_up") {
       return {
@@ -1607,6 +1647,21 @@ export function buildGatePlatformScaleGate(
         priorityScore: Math.max(review.priorityScore, issue.priorityScore),
         stage: review.stage,
         evidence: issue.evidence.slice(0, 3),
+      };
+    }
+
+    if (scaleFollowupIssue) {
+      return {
+        platformId: review.platformId,
+        platformName: review.platformName,
+        status: "blocked_evidence",
+        label: "等待加码效果",
+        detail: `${review.platformName} 上一轮加码还没有完成效果对照：${scaleFollowupIssue.detail}`,
+        actionLabel: scaleFollowupIssue.actionLabel,
+        href: scaleFollowupIssue.href,
+        priorityScore: Math.max(review.priorityScore, scaleFollowupIssue.priorityScore),
+        stage: review.stage,
+        evidence: scaleFollowupIssue.evidence.slice(0, 3),
       };
     }
 
@@ -1673,6 +1728,138 @@ export function buildGatePlatformScaleGate(
       const priorityDiff = right.priorityScore - left.priorityScore;
       if (priorityDiff !== 0) return priorityDiff;
       return left.platformName.localeCompare(right.platformName);
+    }),
+  };
+}
+
+export function buildGatePlatformScaleFollowup(
+  tasks: PersistedGatePlatformDispatchTask[],
+  receipts: GateActionReceipt[] = [],
+): GatePlatformScaleFollowup {
+  const operationalReceipts = trimGateActionReceipts(receipts, 100)
+    .filter((receipt) => !isAuditMetaReceipt(receipt));
+  const scaleTasks = tasks.filter((task) => task.stage === "scale_up");
+  const items = scaleTasks.map((task): GatePlatformScaleFollowupItem => {
+    const completionEvidence = task.completionEvidence.trim();
+    const completedAt = validDate(task.completedAt) ?? validDate(task.updatedAt);
+
+    if (task.state !== "completed") {
+      return {
+        dispatchKey: task.dispatchKey,
+        platformId: task.platformId,
+        platformName: task.platformName,
+        ownerRole: task.ownerRole,
+        title: task.title,
+        status: "needs_completion",
+        label: "加码未完成",
+        detail: "加码派单还没完成，先收口范围、版本和执行动作，再要求下一轮效果数据。",
+        actionLabel: "处理加码派单",
+        href: task.href,
+        priorityScore: task.priorityScore,
+        completedAt: task.completedAt,
+        latestEffectAt: null,
+        evidence: task.evidence,
+      };
+    }
+
+    if (!completionEvidence) {
+      return {
+        dispatchKey: task.dispatchKey,
+        platformId: task.platformId,
+        platformName: task.platformName,
+        ownerRole: task.ownerRole,
+        title: task.title,
+        status: "missing_evidence",
+        label: "缺加码依据",
+        detail: "加码派单显示完成，但没有写清楚加码范围、版本和执行证据，不能继续下一次加码。",
+        actionLabel: "补齐完成依据",
+        href: "/dispatch",
+        priorityScore: task.priorityScore,
+        completedAt: task.completedAt,
+        latestEffectAt: null,
+        evidence: ["缺少加码完成依据", ...task.evidence],
+      };
+    }
+
+    const latestEffectReceipt = completedAt
+      ? latestReceiptFor(operationalReceipts, (receipt) => {
+          const platform = gateActionReceiptPlatform(receipt);
+          return true
+            && platform.id === task.platformId
+            && receipt.status === "succeeded"
+            && actionTypeFromReceipt(receipt) === "save_effect"
+            && receiptIsAfterDate(receipt, completedAt);
+        })
+      : null;
+
+    if (latestEffectReceipt) {
+      return {
+        dispatchKey: task.dispatchKey,
+        platformId: task.platformId,
+        platformName: task.platformName,
+        ownerRole: task.ownerRole,
+        title: task.title,
+        status: "tracked",
+        label: "已回填对照",
+        detail: "加码完成后已经看到下一轮效果回填，可以用数据判断继续加码、迭代或撤退。",
+        actionLabel: "查看效果数据",
+        href: latestEffectReceipt.href,
+        priorityScore: task.priorityScore,
+        completedAt: task.completedAt,
+        latestEffectAt: latestEffectReceipt.createdAt,
+        evidence: [`加码依据：${completionEvidence}`, `效果回执：${latestEffectReceipt.label}`],
+      };
+    }
+
+    return {
+      dispatchKey: task.dispatchKey,
+      platformId: task.platformId,
+      platformName: task.platformName,
+      ownerRole: task.ownerRole,
+      title: task.title,
+      status: "needs_effect",
+      label: "待效果对照",
+      detail: "加码已经完成，但还没有下一轮效果回填。继续第二次加码之前，先补曝光、点击、收藏、追读等对照数据。",
+      actionLabel: "回填加码效果",
+      href: projectAnchorHref(task.href, "#publish-effect-panel"),
+      priorityScore: task.priorityScore,
+      completedAt: task.completedAt,
+      latestEffectAt: null,
+      evidence: [`加码依据：${completionEvidence}`, ...task.evidence],
+    };
+  });
+
+  const tracked = items.filter((item) => item.status === "tracked").length;
+  const needsEffect = items.filter((item) => item.status === "needs_effect").length;
+  const needsCompletion = items.filter((item) => item.status === "needs_completion").length;
+  const missingEvidence = items.filter((item) => item.status === "missing_evidence").length;
+  const statusWeight: Record<GatePlatformScaleFollowupStatus, number> = {
+    missing_evidence: 0,
+    needs_effect: 1,
+    needs_completion: 2,
+    tracked: 3,
+  };
+
+  return {
+    summary: {
+      total: items.length,
+      tracked,
+      needsEffect,
+      needsCompletion,
+      missingEvidence,
+    },
+    nextActions: [
+      missingEvidence > 0 ? `${missingEvidence} 个加码派单缺完成依据，先补范围、版本和执行证据。` : null,
+      needsEffect > 0 ? `${needsEffect} 个加码派单缺下一轮效果回填，第二次加码先暂停。` : null,
+      needsCompletion > 0 ? `${needsCompletion} 个加码派单还没完成，先收口再看数据。` : null,
+      items.length > 0 && tracked === items.length ? "全部加码派单都有后续效果对照，可以用数据决定继续加码或换打法。" : null,
+    ].filter((action): action is string => Boolean(action)),
+    items: items.sort((left, right) => {
+      const statusDiff = statusWeight[left.status] - statusWeight[right.status];
+      if (statusDiff !== 0) return statusDiff;
+      const priorityDiff = right.priorityScore - left.priorityScore;
+      if (priorityDiff !== 0) return priorityDiff;
+      return left.title.localeCompare(right.title);
     }),
   };
 }

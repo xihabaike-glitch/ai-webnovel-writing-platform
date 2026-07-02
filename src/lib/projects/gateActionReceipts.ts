@@ -2984,6 +2984,40 @@ export function filterGatePlatformDecisionTimelineItems(
   });
 }
 
+function markdownLine(input: string) {
+  return input.replace(/\s+/g, " ").trim();
+}
+
+export function buildGatePlatformDecisionSummaryMarkdown(item: GatePlatformDecisionTimelineItem) {
+  const eventLines = item.events.length
+    ? item.events.map((event, index) => [
+        `${index + 1}. ${event.label} · ${new Date(event.createdAt).toLocaleString("zh-CN")}`,
+        `   - ${markdownLine(event.detail)}`,
+        ...event.evidence.slice(0, 3).map((evidence) => `   - 证据：${markdownLine(evidence)}`),
+      ].join("\n"))
+    : ["暂无事件记录。"];
+
+  return [
+    `# ${item.platformName} 平台决策复盘`,
+    "",
+    `- 当前状态：${item.label}`,
+    `- 优先级：${item.priorityScore}`,
+    `- 下一步：${item.actionLabel}`,
+    `- 处理入口：${item.href}`,
+    "",
+    "## 主编判断",
+    markdownLine(item.detail),
+    "",
+    "## 证据时间线",
+    ...eventLines,
+    "",
+    "## 复盘口径",
+    "- 只按真实回执、派单证据和效果数据判断平台去留。",
+    "- 修复、复测、重验、回填必须闭环后，才允许进入下一轮加码。",
+    "- 如果最新数据继续走弱，优先修打法或换平台，不扩大错误投入。",
+  ].join("\n");
+}
+
 export async function persistGateDispatchTask(dispatch: GatePlatformGrowthDispatchItem, sourceReceipt?: GateActionReceipt) {
   const response = await fetch("/api/gate/dispatch-tasks", {
     method: "POST",

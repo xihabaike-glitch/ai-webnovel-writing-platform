@@ -16,6 +16,7 @@ import {
   buildGatePlatformRetreatResolution,
   buildGatePlatformRetreatRecheckDispatchItems,
   buildGatePlatformDecisionTimeline,
+  buildGatePlatformDecisionSummaryMarkdown,
   buildGatePlatformDispatchReceipt,
   buildGatePlatformGrowthDispatchItems,
   buildGatePlatformGrowthReview,
@@ -46,6 +47,7 @@ import {
   type GatePlatformRetreatResolutionStatus,
   type GatePlatformDecisionTimelineEventType,
   type GatePlatformDecisionTimelineStatus,
+  type GatePlatformDecisionTimelineItem,
   type GatePlatformGrowthDispatchItem,
   type GatePlatformGrowthReview,
   type PersistedGatePlatformDispatchTask,
@@ -204,6 +206,7 @@ export function GateActionWorkspace({ actions }: { actions: PrePublishGateAction
   const [platformFilter, setPlatformFilter] = useState("all");
   const [timelineStatusFilter, setTimelineStatusFilter] = useState<GatePlatformDecisionTimelineStatus | "all">("all");
   const [timelineEventFilter, setTimelineEventFilter] = useState<GatePlatformDecisionTimelineEventType | "all">("all");
+  const [timelineExportMessage, setTimelineExportMessage] = useState("");
   const [persistedDispatchTasks, setPersistedDispatchTasks] = useState<PersistedGatePlatformDispatchTask[]>([]);
   const filteredReceipts = filterGateActionReceipts(receipts, {
     status: statusFilter,
@@ -297,6 +300,24 @@ export function GateActionWorkspace({ actions }: { actions: PrePublishGateAction
     setPlatformFilter(platformId);
     setExecutionFilter("all");
     setStatusFilter("all");
+  }
+
+  async function copyDecisionSummary(item: GatePlatformDecisionTimelineItem) {
+    const markdown = buildGatePlatformDecisionSummaryMarkdown(item);
+    await navigator.clipboard.writeText(markdown);
+    setTimelineExportMessage(`${item.platformName} 复盘摘要已复制。`);
+  }
+
+  function downloadDecisionSummary(item: GatePlatformDecisionTimelineItem) {
+    const markdown = buildGatePlatformDecisionSummaryMarkdown(item);
+    const blob = new Blob([markdown], { type: "text/markdown;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `${item.platformName}-平台决策复盘.md`;
+    link.click();
+    URL.revokeObjectURL(url);
+    setTimelineExportMessage(`${item.platformName} 复盘摘要已下载。`);
   }
 
   return (
@@ -1039,6 +1060,9 @@ export function GateActionWorkspace({ actions }: { actions: PrePublishGateAction
               </label>
             </div>
           ) : null}
+          {timelineExportMessage ? (
+            <p className="rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">{timelineExportMessage}</p>
+          ) : null}
           {decisionTimeline.nextActions.length ? (
             <div className="grid gap-2 xl:grid-cols-2">
               {decisionTimeline.nextActions.map((action) => (
@@ -1075,6 +1099,22 @@ export function GateActionWorkspace({ actions }: { actions: PrePublishGateAction
                         <p className="mt-2 leading-6 opacity-85">{event.detail}</p>
                       </Link>
                     ))}
+                  </div>
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    <button
+                      className="rounded-md border border-white/70 bg-white px-3 py-2 text-xs font-medium text-slate-950 hover:bg-white/80"
+                      onClick={() => void copyDecisionSummary(item)}
+                      type="button"
+                    >
+                      复制复盘摘要
+                    </button>
+                    <button
+                      className="rounded-md border border-white/70 bg-white/70 px-3 py-2 text-xs font-medium text-slate-950 hover:bg-white"
+                      onClick={() => downloadDecisionSummary(item)}
+                      type="button"
+                    >
+                      下载复盘摘要
+                    </button>
                   </div>
                 </div>
               ))}

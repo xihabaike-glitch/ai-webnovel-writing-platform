@@ -18,6 +18,7 @@ import {
   buildGatePlatformRetreatResolution,
   buildGatePlatformRetreatRecheckDispatchItems,
   buildGatePlatformDecisionTimeline,
+  buildGatePlatformDecisionSummaryMarkdown,
   filterGatePlatformDecisionTimelineItems,
   buildGateDispatchTaskCenter,
   buildGateDispatchTaskCloseoutItem,
@@ -1132,6 +1133,7 @@ test("buildGateActionReceipt", async (t) => {
       scaleFollowup: trackedRecheckFollowup,
     });
     const timelineItem = decisionTimeline.items.find((item) => item.platformId === "fanqie");
+    const timelineMarkdown = buildGatePlatformDecisionSummaryMarkdown(timelineItem!);
 
     assert.equal(retreatGate.items.find((item) => item.platformId === "fanqie")?.status, "pivot_platform");
     assert.equal(pendingResolution.items[0].status, "needs_effect");
@@ -1160,6 +1162,10 @@ test("buildGateActionReceipt", async (t) => {
     assert.equal(filterGatePlatformDecisionTimelineItems(decisionTimeline.items, { status: "recovering" }).length, 1);
     assert.equal(filterGatePlatformDecisionTimelineItems(decisionTimeline.items, { eventType: "recheck" })[0]?.platformId, "fanqie");
     assert.equal(filterGatePlatformDecisionTimelineItems(decisionTimeline.items, { status: "blocked" }).length, 0);
+    assert.ok(timelineMarkdown.includes("# 番茄小说 平台决策复盘"));
+    assert.ok(timelineMarkdown.includes("当前状态：修复后恢复"));
+    assert.ok(timelineMarkdown.includes("重验已回填"));
+    assert.ok(timelineMarkdown.includes("复盘口径"));
   });
 
   await t.test("records dispatch receipts and marks the dispatch as assigned", () => {

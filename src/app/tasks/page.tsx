@@ -1,10 +1,12 @@
 import Link from "next/link";
 import { AppShell } from "@/components/app-shell/AppShell";
 import { RetryTaskButton } from "@/components/tasks/RetryTaskButton";
+import { RunRecommendedBatchButton } from "@/components/tasks/RunRecommendedBatchButton";
 import { buildTaskRunConsole, type TaskRunLog } from "@/lib/ai/taskRunConsole";
 import { prisma } from "@/lib/db/prisma";
 import { buildBatchExecutionSafety } from "@/lib/projects/batchExecutionSafety";
 import { buildTaskQueueCenter, type QueueItem } from "@/lib/projects/taskQueueCenter";
+import { buildTaskQueueExecutionPlan } from "@/lib/projects/taskQueueExecutionPlan";
 
 export const dynamic = "force-dynamic";
 
@@ -72,6 +74,7 @@ export default async function TasksPage() {
   const chaptersById = new Map(chapters.map((chapter) => [chapter.id, chapter]));
   const queue = buildTaskQueueCenter(projects);
   const safety = buildBatchExecutionSafety(queue.items, projects);
+  const executionPlan = buildTaskQueueExecutionPlan(queue.items);
   const runConsole = buildTaskRunConsole(recentAiTasks.map((task) => ({
     ...task,
     chapter: task.chapterId ? chaptersById.get(task.chapterId) ?? null : null,
@@ -242,11 +245,25 @@ export default async function TasksPage() {
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <h2 className="font-medium">批量执行安全阀</h2>
-            <p className="mt-1 text-sm text-slate-600">先看本批数量、混跑风险、并发占用和预算估算，再决定是否进入项目内执行。</p>
+            <p className="mt-1 text-sm text-slate-600">先看本批数量、混跑风险、并发占用和预算估算，再一键执行推荐小批次。</p>
           </div>
-          <div className="rounded-md bg-slate-50 px-3 py-2 text-sm font-medium text-slate-700">
-            {safety.canRunRecommendedBatch ? "建议批次可执行" : "建议先处理阻塞"}
+          <div className="flex flex-col gap-2 lg:items-end">
+            <div className="rounded-md bg-slate-50 px-3 py-2 text-sm font-medium text-slate-700">
+              {safety.canRunRecommendedBatch && executionPlan.canRun ? "建议批次可执行" : "建议先处理阻塞"}
+            </div>
+            <RunRecommendedBatchButton disabled={!safety.canRunRecommendedBatch || !executionPlan.canRun} />
           </div>
+        </div>
+        <div className="mt-4 rounded-md border border-slate-200 bg-slate-50 p-3 text-sm">
+          <div className="font-medium text-slate-950">{executionPlan.actionLabel}</div>
+          <p className="mt-1 leading-6 text-slate-600">{executionPlan.detail}</p>
+          {executionPlan.warnings.length ? (
+            <div className="mt-2 grid gap-1 text-xs text-amber-700">
+              {executionPlan.warnings.map((warning) => (
+                <div key={warning}>{warning}</div>
+              ))}
+            </div>
+          ) : null}
         </div>
         <div className="mt-4 grid gap-3 md:grid-cols-4">
           <div className="rounded-md bg-slate-50 p-3">

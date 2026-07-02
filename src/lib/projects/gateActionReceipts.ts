@@ -209,6 +209,39 @@ export interface GateDispatchTaskCloseoutItem {
   dueAt: string | null;
 }
 
+export type GateDispatchEvidenceReviewStatus = "verified" | "needs_receipt" | "missing_evidence" | "active";
+
+export interface GateDispatchEvidenceReviewItem {
+  dispatchKey: string;
+  platformId: string;
+  platformName: string;
+  ownerRole: string;
+  title: string;
+  priorityScore: number;
+  state: GatePlatformGrowthDispatchState;
+  status: GateDispatchEvidenceReviewStatus;
+  label: string;
+  detail: string;
+  href: string;
+  completionEvidence: string;
+  completedAt: string | null;
+  latestReceiptAt: string | null;
+  evidence: string[];
+}
+
+export interface GateDispatchEvidenceReview {
+  summary: {
+    total: number;
+    completed: number;
+    verified: number;
+    needsReceipt: number;
+    missingEvidence: number;
+    active: number;
+  };
+  nextActions: string[];
+  items: GateDispatchEvidenceReviewItem[];
+}
+
 export interface GatePlatformStrategyReceiptPayload {
   message?: string;
   error?: string;
@@ -1206,6 +1239,10 @@ function validDate(value: string | null | undefined) {
   return Number.isNaN(dateValue.getTime()) ? null : dateValue;
 }
 
+function receiptIsAfterDate(receipt: GateActionReceipt, dateValue: Date) {
+  return new Date(receipt.createdAt).getTime() > dateValue.getTime();
+}
+
 function endOfDay(value: Date) {
   const dateValue = new Date(value);
   dateValue.setHours(23, 59, 59, 999);
@@ -1363,6 +1400,139 @@ export function buildGateDispatchTaskCenter(
       tasks.length === 0 ? "还没有派单任务，先从总闸门执行平台复盘和派单。" : null,
     ].filter((action): action is string => Boolean(action)),
     closeoutItems,
+  };
+}
+
+export function buildGateDispatchEvidenceReview(
+  tasks: PersistedGatePlatformDispatchTask[],
+  receipts: GateActionReceipt[] = [],
+): GateDispatchEvidenceReview {
+  const operationalReceipts = trimGateActionReceipts(receipts, 100)
+    .filter((receipt) => !isAuditMetaReceipt(receipt));
+  const items = tasks.map((task): GateDispatchEvidenceReviewItem => {
+    const completionEvidence = task.completionEvidence.trim();
+    const completedAt = validDate(task.completedAt) ?? validDate(task.updatedAt);
+
+    if (task.state !== "completed") {
+      return {
+        dispatchKey: task.dispatchKey,
+        platformId: task.platformId,
+        platformName: task.platformName,
+        ownerRole: task.ownerRole,
+        title: task.title,
+        priorityScore: task.priorityScore,
+        state: task.state,
+        status: "active",
+        label: "未完成",
+        detail: "先把派单推进到完成，再用依据和业务回执验收。",
+        href: task.href,
+        completionEvidence,
+        completedAt: task.completedAt,
+        latestReceiptAt: null,
+        evidence: task.evidence,
+      };
+    }
+
+    if (!completionEvidence) {
+      return {
+        dispatchKey: task.dispatchKey,
+        platformId: task.platformId,
+        platformName: task.platformName,
+        ownerRole: task.ownerRole,
+        title: task.title,
+        priorityScore: task.priorityScore,
+        state: task.state,
+        status: "missing_evidence",
+        label: "缺完成依据",
+        detail: "状态已经完成，但没有写清楚完成了什么、证据在哪里。这个完成不能算数。",
+        href: task.href,
+        completionEvidence,
+        completedAt: task.completedAt,
+        latestReceiptAt: null,
+        evidence: ["缺少完成依据", ...task.evidence],
+      };
+    }
+
+    const latestOperationalReceipt = completedAt
+      ? latestReceiptFor(operationalReceipts, (receipt) => {
+          const platform = gateActionReceiptPlatform(receipt);
+          return platform.id === task.platformId && receipt.status === "succeeded" && receiptIsAfterDate(receipt, completedAt);
+        })
+      : null;
+
+    if (latestOperationalReceipt) {
+      return {
+        dispatchKey: task.dispatchKey,
+        platformId: task.platformId,
+        platformName: task.platformName,
+        ownerRole: task.ownerRole,
+        title: task.title,
+        priorityScore: task.priorityScore,
+        state: task.state,
+        status: "verified",
+        label: "真闭环",
+        detail: "完成依据之后，已经看到同平台新的成功业务回执。",
+        href: task.href,
+        completionEvidence,
+        completedAt: task.completedAt,
+        latestReceiptAt: latestOperationalReceipt.createdAt,
+        evidence: [`完成依据：${completionEvidence}`, `业务回执：${latestOperationalReceipt.label}`],
+      };
+    }
+
+    return {
+      dispatchKey: task.dispatchKey,
+      platformId: task.platformId,
+      platformName: task.platformName,
+      ownerRole: task.ownerRole,
+      title: task.title,
+      priorityScore: task.priorityScore,
+      state: task.state,
+      status: "needs_receipt",
+      label: "待业务回执",
+      detail: "已经有完成依据，但还没看到后续业务回执。刷新总闸门或执行对应动作，证明它真的闭环。",
+      href: task.href,
+      completionEvidence,
+      completedAt: task.completedAt,
+      latestReceiptAt: null,
+      evidence: [`完成依据：${completionEvidence}`, ...task.evidence],
+    };
+  });
+
+  const verified = items.filter((item) => item.status === "verified").length;
+  const needsReceipt = items.filter((item) => item.status === "needs_receipt").length;
+  const missingEvidence = items.filter((item) => item.status === "missing_evidence").length;
+  const active = items.filter((item) => item.status === "active").length;
+  const completed = tasks.filter((task) => task.state === "completed").length;
+  const statusWeight: Record<GateDispatchEvidenceReviewStatus, number> = {
+    missing_evidence: 0,
+    needs_receipt: 1,
+    active: 2,
+    verified: 3,
+  };
+
+  return {
+    summary: {
+      total: tasks.length,
+      completed,
+      verified,
+      needsReceipt,
+      missingEvidence,
+      active,
+    },
+    nextActions: [
+      missingEvidence > 0 ? `${missingEvidence} 个完成任务缺依据，先补证据，否则就是纸面闭环。` : null,
+      needsReceipt > 0 ? `${needsReceipt} 个完成任务还缺后续业务回执，去总闸门刷新或执行对应动作。` : null,
+      active > 0 ? `${active} 个派单还没完成，今天只推进能拿到验收证据的事项。` : null,
+      tasks.length > 0 && verified === completed && active === 0 ? "全部完成任务都有后续业务回执，可以进入下一轮平台加码判断。" : null,
+    ].filter((action): action is string => Boolean(action)),
+    items: items.sort((left, right) => {
+      const statusDiff = statusWeight[left.status] - statusWeight[right.status];
+      if (statusDiff !== 0) return statusDiff;
+      const priorityDiff = right.priorityScore - left.priorityScore;
+      if (priorityDiff !== 0) return priorityDiff;
+      return left.title.localeCompare(right.title);
+    }),
   };
 }
 

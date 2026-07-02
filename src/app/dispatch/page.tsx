@@ -1,7 +1,7 @@
 import { AppShell } from "@/components/app-shell/AppShell";
 import { GateDispatchTaskCenter } from "@/components/gate/GateDispatchTaskCenter";
 import { prisma } from "@/lib/db/prisma";
-import type { GatePlatformGrowthDispatchState, PersistedGatePlatformDispatchTask } from "@/lib/projects/gateActionReceipts";
+import type { GateActionReceipt, GatePlatformGrowthDispatchState, PersistedGatePlatformDispatchTask } from "@/lib/projects/gateActionReceipts";
 
 export const dynamic = "force-dynamic";
 
@@ -73,15 +73,65 @@ function toTask(task: {
   };
 }
 
+function toReceipt(item: {
+  receiptId: string;
+  actionId: string;
+  label: string;
+  detail: string;
+  href: string;
+  status: string;
+  message: string;
+  executionType: string;
+  succeededCount: number;
+  failedCount: number;
+  taskId: string | null;
+  platformId: string;
+  platformName: string;
+  recheckStatus: string;
+  recheckLabel: string;
+  recheckDetail: string;
+  recheckAction: string;
+  createdAt: Date;
+}): GateActionReceipt {
+  return {
+    id: item.receiptId,
+    actionId: item.actionId,
+    label: item.label,
+    detail: item.detail,
+    href: item.href,
+    status: item.status === "failed" ? "failed" : "succeeded",
+    message: item.message,
+    executionType: item.executionType as GateActionReceipt["executionType"],
+    succeededCount: item.succeededCount,
+    failedCount: item.failedCount,
+    taskId: item.taskId,
+    platformId: item.platformId,
+    platformName: item.platformName,
+    recheck: {
+      status: item.recheckStatus === "blocked" ? "blocked" : "ready",
+      label: item.recheckLabel,
+      detail: item.recheckDetail,
+      actionLabel: item.recheckAction,
+    },
+    createdAt: item.createdAt.toISOString(),
+  };
+}
+
 export default async function DispatchPage() {
-  const tasks = await prisma.gateDispatchTask.findMany({
-    orderBy: [
-      { state: "asc" },
-      { priorityScore: "desc" },
-      { updatedAt: "desc" },
-    ],
-    take: 200,
-  });
+  const [tasks, receipts] = await Promise.all([
+    prisma.gateDispatchTask.findMany({
+      orderBy: [
+        { state: "asc" },
+        { priorityScore: "desc" },
+        { updatedAt: "desc" },
+      ],
+      take: 200,
+    }),
+    prisma.gateActionAudit.findMany({
+      orderBy: { createdAt: "desc" },
+      take: 100,
+    }),
+  ]);
 
   return (
     <AppShell>
@@ -94,7 +144,7 @@ export default async function DispatchPage() {
           {tasks.length ? `${tasks.length} 个派单任务` : "等待总闸门派单"}
         </div>
       </div>
-      <GateDispatchTaskCenter initialTasks={tasks.map(toTask)} />
+      <GateDispatchTaskCenter initialReceipts={receipts.map(toReceipt)} initialTasks={tasks.map(toTask)} />
     </AppShell>
   );
 }

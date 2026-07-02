@@ -3,9 +3,12 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import {
+  buildGateDispatchEvidenceReview,
   buildGateDispatchTaskCenter,
   filterGateDispatchTasks,
   updatePersistedGateDispatchTaskState,
+  type GateActionReceipt,
+  type GateDispatchEvidenceReviewStatus,
   type GateDispatchTaskStateFilter,
   type GateDispatchTaskCloseoutStatus,
   type GatePlatformGrowthDispatchState,
@@ -31,6 +34,13 @@ function closeoutClass(status: GateDispatchTaskCloseoutStatus) {
   return "border-slate-200 bg-slate-50 text-slate-700";
 }
 
+function evidenceClass(status: GateDispatchEvidenceReviewStatus) {
+  if (status === "missing_evidence") return "border-rose-200 bg-rose-50 text-rose-800";
+  if (status === "needs_receipt") return "border-amber-200 bg-amber-50 text-amber-800";
+  if (status === "verified") return "border-emerald-200 bg-emerald-50 text-emerald-800";
+  return "border-slate-200 bg-slate-50 text-slate-700";
+}
+
 function actionLabel(state: GatePlatformGrowthDispatchState) {
   if (state === "queued") return "接单";
   if (state === "assigned") return "标记完成";
@@ -43,7 +53,13 @@ function nextState(state: GatePlatformGrowthDispatchState): GatePlatformGrowthDi
   return "assigned";
 }
 
-export function GateDispatchTaskCenter({ initialTasks }: { initialTasks: PersistedGatePlatformDispatchTask[] }) {
+export function GateDispatchTaskCenter({
+  initialReceipts,
+  initialTasks,
+}: {
+  initialReceipts: GateActionReceipt[];
+  initialTasks: PersistedGatePlatformDispatchTask[];
+}) {
   const [tasks, setTasks] = useState(initialTasks);
   const [stateFilter, setStateFilter] = useState<GateDispatchTaskStateFilter>("all");
   const [platformFilter, setPlatformFilter] = useState("all");
@@ -52,6 +68,8 @@ export function GateDispatchTaskCenter({ initialTasks }: { initialTasks: Persist
   const [completionDrafts, setCompletionDrafts] = useState<Record<string, string>>({});
   const [errorMessage, setErrorMessage] = useState("");
   const center = useMemo(() => buildGateDispatchTaskCenter(tasks), [tasks]);
+  const evidenceReview = useMemo(() => buildGateDispatchEvidenceReview(tasks, initialReceipts), [initialReceipts, tasks]);
+  const evidenceIssues = evidenceReview.items.filter((item) => item.status !== "verified").slice(0, 5);
   const filteredTasks = useMemo(() => filterGateDispatchTasks(tasks, {
     state: stateFilter,
     platformId: platformFilter,
@@ -148,6 +166,59 @@ export function GateDispatchTaskCenter({ initialTasks }: { initialTasks: Persist
               </Link>
             ))}
             {center.closeoutItems.length === 0 ? <p className="text-sm text-slate-600">暂无派单任务。</p> : null}
+          </div>
+        </div>
+      </section>
+
+      <section className="grid gap-4 lg:grid-cols-[0.8fr_1.2fr]">
+        <div className="rounded-md border border-slate-200 bg-white p-4">
+          <div className="font-medium text-slate-950">完成证据复盘</div>
+          <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
+            <div className="rounded-md bg-emerald-50 p-3 text-emerald-800">
+              <div className="text-xs opacity-75">真闭环</div>
+              <div className="mt-1 text-2xl font-semibold">{evidenceReview.summary.verified}</div>
+            </div>
+            <div className="rounded-md bg-amber-50 p-3 text-amber-800">
+              <div className="text-xs opacity-75">待业务回执</div>
+              <div className="mt-1 text-2xl font-semibold">{evidenceReview.summary.needsReceipt}</div>
+            </div>
+            <div className="rounded-md bg-rose-50 p-3 text-rose-800">
+              <div className="text-xs opacity-75">缺依据</div>
+              <div className="mt-1 text-2xl font-semibold">{evidenceReview.summary.missingEvidence}</div>
+            </div>
+            <div className="rounded-md bg-slate-50 p-3 text-slate-700">
+              <div className="text-xs opacity-75">未完成</div>
+              <div className="mt-1 text-2xl font-semibold">{evidenceReview.summary.active}</div>
+            </div>
+          </div>
+          <div className="mt-3 grid gap-2 text-sm text-slate-600">
+            {evidenceReview.nextActions.map((action) => (
+              <div className="rounded-md bg-slate-50 p-2" key={action}>{action}</div>
+            ))}
+          </div>
+        </div>
+        <div className="rounded-md border border-slate-200 bg-white p-4">
+          <div className="font-medium text-slate-950">证据待复检</div>
+          <div className="mt-3 grid gap-2">
+            {evidenceIssues.map((item) => (
+              <Link className={`rounded-md border p-3 text-sm ${evidenceClass(item.status)}`} href={item.href} key={item.dispatchKey}>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="font-medium">{item.title}</div>
+                  <span className="rounded-md bg-white/70 px-2 py-1 text-xs font-medium">{item.label}</span>
+                </div>
+                <p className="mt-1 leading-6 opacity-85">{item.detail}</p>
+                <div className="mt-2 flex flex-wrap gap-2 text-xs opacity-75">
+                  <span>{item.platformName}</span>
+                  <span>{item.ownerRole}</span>
+                  <span>优先级 {item.priorityScore}</span>
+                </div>
+              </Link>
+            ))}
+            {evidenceIssues.length === 0 ? (
+              <p className="rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
+                当前完成项都有后续业务回执，证据链是闭上的。
+              </p>
+            ) : null}
           </div>
         </div>
       </section>

@@ -9,6 +9,7 @@ import {
   buildGatePlatformGrowthReview,
   buildGatePlatformGrowthDispatchItems,
   buildGatePlatformDispatchReceipt,
+  buildGateDispatchEvidenceReview,
   buildGateDispatchTaskCenter,
   buildGateDispatchTaskCloseoutItem,
   buildGatePublishEffectReceipt,
@@ -690,6 +691,108 @@ test("buildGateActionReceipt", async (t) => {
     assert.equal(center.summary.dueToday, 1);
     assert.equal(center.closeoutItems[0].dispatchKey, overdueTask.dispatchKey);
     assert.ok(center.nextActions[0].includes("逾期"));
+  });
+
+  await t.test("reviews dispatch completion evidence against later business receipts", () => {
+    const baseDispatch = buildGatePlatformGrowthDispatchItems([buildGatePlatformStrategyReceipt({
+      item: strategyPlatform,
+      status: "succeeded",
+      now: "2026-01-01T00:00:00.000Z",
+      payload: {
+        variants: [{ strategy: "强钩子版" }],
+      },
+    })])[0];
+    const verifiedTask = {
+      ...baseDispatch,
+      databaseId: "dispatch-db-verified",
+      dispatchKey: baseDispatch.id,
+      projectId: "project-1",
+      sourceReceiptId: null,
+      completionEvidence: "已采纳标题简介并保存基准。",
+      state: "completed" as const,
+      assignedAt: "2026-01-01T00:30:00.000Z",
+      completedAt: "2026-01-01T01:00:00.000Z",
+      createdAt: "2026-01-01T00:30:00.000Z",
+      updatedAt: "2026-01-01T01:00:00.000Z",
+    };
+    const needsReceiptTask = {
+      ...baseDispatch,
+      id: "qimao:record_metrics",
+      databaseId: "dispatch-db-needs-receipt",
+      dispatchKey: "qimao:record_metrics",
+      projectId: "project-2",
+      sourceReceiptId: null,
+      completionEvidence: "已完成数据整理，等待闸门回执。",
+      platformId: "qimao",
+      platformName: "七猫小说",
+      state: "completed" as const,
+      priorityScore: 55,
+      assignedAt: "2026-01-01T00:30:00.000Z",
+      completedAt: "2026-01-01T01:00:00.000Z",
+      createdAt: "2026-01-01T00:30:00.000Z",
+      updatedAt: "2026-01-01T01:00:00.000Z",
+    };
+    const missingEvidenceTask = {
+      ...baseDispatch,
+      id: "webnovel:scale_up",
+      databaseId: "dispatch-db-missing",
+      dispatchKey: "webnovel:scale_up",
+      projectId: "project-3",
+      sourceReceiptId: null,
+      completionEvidence: "",
+      platformId: "webnovel",
+      platformName: "WebNovel",
+      state: "completed" as const,
+      priorityScore: 70,
+      assignedAt: "2026-01-01T00:30:00.000Z",
+      completedAt: "2026-01-01T01:00:00.000Z",
+      createdAt: "2026-01-01T00:30:00.000Z",
+      updatedAt: "2026-01-01T01:00:00.000Z",
+    };
+    const activeTask = {
+      ...baseDispatch,
+      id: "royalroad:adopt_asset",
+      databaseId: "dispatch-db-active",
+      dispatchKey: "royalroad:adopt_asset",
+      projectId: "project-4",
+      sourceReceiptId: null,
+      completionEvidence: "",
+      platformId: "royalroad",
+      platformName: "Royal Road",
+      state: "assigned" as const,
+      priorityScore: 35,
+      assignedAt: "2026-01-01T00:30:00.000Z",
+      completedAt: null,
+      createdAt: "2026-01-01T00:30:00.000Z",
+      updatedAt: "2026-01-01T00:30:00.000Z",
+    };
+    const laterBusinessReceipt = buildGatePublishEffectReceipt({
+      projectId: "project-1",
+      platformId: "fanqie",
+      platformName: "番茄小说",
+      now: "2026-01-01T02:00:00.000Z",
+      metric: {
+        views: 1000,
+        clicks: 180,
+        favorites: 35,
+        follows: 12,
+      },
+    });
+
+    const review = buildGateDispatchEvidenceReview([
+      verifiedTask,
+      needsReceiptTask,
+      missingEvidenceTask,
+      activeTask,
+    ], [laterBusinessReceipt]);
+
+    assert.equal(review.summary.verified, 1);
+    assert.equal(review.summary.needsReceipt, 1);
+    assert.equal(review.summary.missingEvidence, 1);
+    assert.equal(review.summary.active, 1);
+    assert.equal(review.items[0].status, "missing_evidence");
+    assert.equal(review.items.find((item) => item.dispatchKey === verifiedTask.dispatchKey)?.status, "verified");
+    assert.ok(review.nextActions.some((actionText) => actionText.includes("后续业务回执")));
   });
 
   await t.test("builds platform strategy receipts for the unified gate audit log", () => {

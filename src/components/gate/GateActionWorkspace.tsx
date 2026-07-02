@@ -21,7 +21,6 @@ import {
   persistGateActionReceipt,
   persistGateDispatchTask,
   saveGateActionReceipts,
-  updatePersistedGateDispatchTaskState,
   type GateActionReceipt,
   type GateActionReceiptExecutionFilter,
   type GateActionReviewAdvice,
@@ -162,12 +161,6 @@ export function GateActionWorkspace({ actions }: { actions: PrePublishGateAction
     const receipt = buildGatePlatformDispatchReceipt({ dispatch });
     addReceipt(receipt);
     void persistGateDispatchTask({ ...dispatch, state: "assigned" }, receipt)
-      .then((task) => setPersistedDispatchTasks((current) => [task, ...current.filter((item) => item.dispatchKey !== task.dispatchKey)]))
-      .catch(() => undefined);
-  }
-
-  function completeDispatch(dispatch: GatePlatformGrowthDispatchItem) {
-    void updatePersistedGateDispatchTaskState(dispatch.id, "completed")
       .then((task) => setPersistedDispatchTasks((current) => [task, ...current.filter((item) => item.dispatchKey !== task.dispatchKey)]))
       .catch(() => undefined);
   }
@@ -361,13 +354,12 @@ export function GateActionWorkspace({ actions }: { actions: PrePublishGateAction
                       {item.state === "queued" ? item.actionLabel : dispatchStateLabel(item.state)}
                     </button>
                     {item.state === "assigned" ? (
-                      <button
+                      <Link
                         className="rounded-md border border-emerald-200 px-3 py-2 text-xs font-medium text-emerald-700 hover:bg-emerald-50"
-                        onClick={() => completeDispatch(item)}
-                        type="button"
+                        href="/dispatch"
                       >
-                        标记完成
-                      </button>
+                        去派单中心收口
+                      </Link>
                     ) : null}
                     <Link
                       className="rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white hover:bg-slate-800"

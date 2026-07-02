@@ -103,7 +103,15 @@ export interface GateActionReviewAdvice {
   evidence: string[];
 }
 
-export type GatePlatformGrowthReviewStage = "fix_failure" | "adopt_asset" | "record_metrics" | "scale_up" | "watch";
+export type GatePlatformGrowthReviewStage =
+  | "fix_failure"
+  | "adopt_asset"
+  | "record_metrics"
+  | "scale_up"
+  | "repair_tactic"
+  | "pivot_platform"
+  | "pause_platform"
+  | "watch";
 
 export interface GatePlatformGrowthReview {
   platformId: string;
@@ -1107,6 +1115,87 @@ export function buildGatePlatformGrowthDispatchItems(
       reviewLatestAt: review.latestAt,
     };
   });
+}
+
+function retreatDispatchSpec(item: GatePlatformRetreatItem) {
+  if (item.status === "repair_tactic") {
+    return {
+      stage: "repair_tactic" as const,
+      ownerRole: "投稿打法编辑",
+      title: `${item.platformName} 投稿打法修复`,
+      detail: "重写标题、简介、标签和前三章卖点兑现，把弱转化原因拆成可执行修复项。",
+      dueLabel: "24 小时内",
+      actionLabel: "派给打法编辑",
+      acceptanceCriteria: ["标题简介完成新版", "标签和卖点重排", "前三章兑现问题已列出修复方案"],
+    };
+  }
+
+  if (item.status === "pivot_platform") {
+    return {
+      stage: "pivot_platform" as const,
+      ownerRole: "平台策略编辑",
+      title: `${item.platformName} 换打法/迁移方案`,
+      detail: "停止沿用当前投放打法，产出新包装方向和候选迁移平台，明确保留、改写和放弃项。",
+      dueLabel: "下一轮投放前",
+      actionLabel: "派给策略编辑",
+      acceptanceCriteria: ["新打法方向已写清", "候选平台已列出", "迁移后的标题简介标签有草案"],
+    };
+  }
+
+  if (item.status === "pause") {
+    return {
+      stage: "pause_platform" as const,
+      ownerRole: "主编",
+      title: `${item.platformName} 暂停投放复盘`,
+      detail: "暂停该平台新增投放，复盘零转化原因，决定修入口、换平台或撤出当前版本。",
+      dueLabel: "今天",
+      actionLabel: "派给主编复盘",
+      acceptanceCriteria: ["暂停原因已记录", "下一步处理路径已选择", "恢复投放条件已写清"],
+    };
+  }
+
+  return null;
+}
+
+export function buildGatePlatformRetreatDispatchItems(
+  retreatGate: GatePlatformRetreatGate,
+  persistedTasks: PersistedGatePlatformDispatchTask[] = [],
+): GatePlatformGrowthDispatchItem[] {
+  const persistedByKey = new Map(persistedTasks.map((task) => [task.dispatchKey, task]));
+  return retreatGate.items
+    .map((item): GatePlatformGrowthDispatchItem | null => {
+      const spec = retreatDispatchSpec(item);
+      if (!spec) return null;
+      const dispatchKey = `${item.platformId}:${spec.stage}`;
+      const persisted = persistedByKey.get(dispatchKey);
+
+      return {
+        id: dispatchKey,
+        platformId: item.platformId,
+        platformName: item.platformName,
+        stage: spec.stage,
+        state: persisted?.state ?? "queued",
+        priorityScore: item.priorityScore,
+        ownerRole: spec.ownerRole,
+        title: spec.title,
+        detail: spec.detail,
+        dueLabel: spec.dueLabel,
+        actionLabel: spec.actionLabel,
+        href: item.href,
+        acceptanceCriteria: spec.acceptanceCriteria,
+        evidence: item.evidence,
+        reviewLatestAt: item.latestAt,
+      };
+    })
+    .filter((item): item is GatePlatformGrowthDispatchItem => Boolean(item))
+    .sort((left, right) => {
+      const stateWeight: Record<GatePlatformGrowthDispatchState, number> = { queued: 0, assigned: 1, completed: 2 };
+      const stateDiff = stateWeight[left.state] - stateWeight[right.state];
+      if (stateDiff !== 0) return stateDiff;
+      const priorityDiff = right.priorityScore - left.priorityScore;
+      if (priorityDiff !== 0) return priorityDiff;
+      return left.platformName.localeCompare(right.platformName);
+    });
 }
 
 export function buildGatePlatformDispatchReceipt(input: {

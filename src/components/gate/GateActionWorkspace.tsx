@@ -12,6 +12,7 @@ import {
   buildGatePlatformScaleCadence,
   buildGatePlatformScaleGate,
   buildGatePlatformRetreatGate,
+  buildGatePlatformRetreatDispatchItems,
   buildGatePlatformDispatchReceipt,
   buildGatePlatformGrowthDispatchItems,
   buildGatePlatformGrowthReview,
@@ -177,6 +178,7 @@ export function GateActionWorkspace({ actions }: { actions: PrePublishGateAction
   const retreatVisibleItems = retreatGate.items
     .filter((item) => platformFilter === "all" || item.platformId === platformFilter)
     .slice(0, 4);
+  const retreatDispatchItems = buildGatePlatformRetreatDispatchItems(retreatGate, visibleDispatchTasks);
   const scaleGate = buildGatePlatformScaleGate(platformGrowthReview, dispatchEvidenceReview, scaleFollowup, scaleCadence, retreatGate);
   const scaleGateVisibleItems = scaleGate.items.filter((item) => item.status !== "not_candidate").slice(0, 4);
   const latestReceipt = filteredReceipts[0] ?? null;
@@ -643,6 +645,76 @@ export function GateActionWorkspace({ actions }: { actions: PrePublishGateAction
           ) : (
             <p className="rounded-md border border-dashed border-slate-300 bg-white p-3 text-sm text-slate-600">
               暂无可判断的效果数据。先回填至少一条平台效果。
+            </p>
+          )}
+        </div>
+        <div className="mt-3 grid gap-2">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <div className="text-xs font-medium text-slate-500">撤退修复派单台</div>
+              <p className="mt-1 text-xs text-slate-500">把修打法、换平台和暂停复盘变成角色任务，进入派单中心验收。</p>
+            </div>
+            {retreatDispatchItems.length ? (
+              <Link
+                className="w-fit rounded-md border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                href="/dispatch"
+              >
+                打开派单中心
+              </Link>
+            ) : null}
+          </div>
+          {retreatDispatchItems.length ? (
+            <div className="grid gap-2 xl:grid-cols-2">
+              {retreatDispatchItems.map((item) => (
+                <div className="rounded-md border border-slate-200 bg-white p-3 text-sm" key={item.id}>
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-medium text-slate-950">{item.title}</span>
+                        <span className={`rounded-md px-2 py-1 text-xs font-medium ${dispatchStateClass(item.state)}`}>{dispatchStateLabel(item.state)}</span>
+                      </div>
+                      <p className="mt-2 leading-6 text-slate-600">{item.detail}</p>
+                    </div>
+                    <div className="text-right text-xs text-slate-500">
+                      <div>{item.ownerRole}</div>
+                      <div className="mt-1">{item.dueLabel}</div>
+                    </div>
+                  </div>
+                  <div className="mt-2 flex flex-wrap gap-2 text-xs text-slate-500">
+                    {item.acceptanceCriteria.map((criterion) => (
+                      <span className="rounded-md bg-slate-50 px-2 py-1" key={criterion}>{criterion}</span>
+                    ))}
+                  </div>
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    <button
+                      className="rounded-md border border-slate-200 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                      disabled={item.state !== "queued"}
+                      onClick={() => assignDispatch(item)}
+                      type="button"
+                    >
+                      {item.state === "queued" ? item.actionLabel : dispatchStateLabel(item.state)}
+                    </button>
+                    {item.state === "assigned" ? (
+                      <Link
+                        className="rounded-md border border-emerald-200 px-3 py-2 text-xs font-medium text-emerald-700 hover:bg-emerald-50"
+                        href="/dispatch"
+                      >
+                        去派单中心收口
+                      </Link>
+                    ) : null}
+                    <Link
+                      className="rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white hover:bg-slate-800"
+                      href={item.href}
+                    >
+                      打开处理入口
+                    </Link>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="rounded-md border border-dashed border-slate-300 bg-white p-3 text-sm text-slate-600">
+              暂无撤退修复派单。只有触发修打法、换平台或暂停时才会出现。
             </p>
           )}
         </div>

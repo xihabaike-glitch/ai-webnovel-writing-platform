@@ -64,6 +64,7 @@ function toTask(item: {
   acceptanceCriteria: string;
   evidence: string;
   sourceReceiptId: string | null;
+  completionEvidence: string;
   reviewLatestAt: Date;
   assignedAt: Date | null;
   completedAt: Date | null;
@@ -89,6 +90,7 @@ function toTask(item: {
     acceptanceCriteria: parseJsonList(item.acceptanceCriteria),
     evidence: parseJsonList(item.evidence),
     sourceReceiptId: item.sourceReceiptId,
+    completionEvidence: item.completionEvidence,
     reviewLatestAt: item.reviewLatestAt.toISOString(),
     assignedAt: item.assignedAt?.toISOString() ?? null,
     completedAt: item.completedAt?.toISOString() ?? null,
@@ -163,6 +165,7 @@ export async function POST(request: Request) {
     acceptanceCriteria: JSON.stringify(stringList(dispatch.acceptanceCriteria)),
     evidence: JSON.stringify(stringList(dispatch.evidence)),
     sourceReceiptId: text(body?.sourceReceipt?.id) || null,
+    completionEvidence: "",
     reviewLatestAt: date(dispatch.reviewLatestAt),
     assignedAt: nextState === "assigned" ? now : null,
     completedAt: nextState === "completed" ? now : null,
@@ -182,7 +185,11 @@ export async function POST(request: Request) {
 }
 
 export async function PATCH(request: Request) {
-  const body = (await request.json().catch(() => null)) as { dispatchKey?: string; state?: GatePlatformGrowthDispatchState } | null;
+  const body = (await request.json().catch(() => null)) as {
+    dispatchKey?: string;
+    state?: GatePlatformGrowthDispatchState;
+    completionEvidence?: string;
+  } | null;
   const dispatchKey = text(body?.dispatchKey);
 
   if (!dispatchKey) {
@@ -190,6 +197,10 @@ export async function PATCH(request: Request) {
   }
 
   const nextState = state(body?.state);
+  const completionEvidence = text(body?.completionEvidence).trim();
+  if (nextState === "completed" && completionEvidence.length < 8) {
+    return NextResponse.json({ error: "完成派单前，请写清楚完成依据，至少 8 个字。" }, { status: 400 });
+  }
   const now = new Date();
   const task = await prisma.gateDispatchTask.update({
     where: { dispatchKey },
@@ -197,6 +208,7 @@ export async function PATCH(request: Request) {
       state: nextState,
       assignedAt: nextState === "assigned" ? now : undefined,
       completedAt: nextState === "completed" ? now : nextState === "queued" || nextState === "assigned" ? null : undefined,
+      completionEvidence: nextState === "completed" ? completionEvidence : nextState === "queued" || nextState === "assigned" ? "" : undefined,
     },
   });
 

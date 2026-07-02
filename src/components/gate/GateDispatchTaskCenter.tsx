@@ -49,6 +49,8 @@ export function GateDispatchTaskCenter({ initialTasks }: { initialTasks: Persist
   const [platformFilter, setPlatformFilter] = useState("all");
   const [roleFilter, setRoleFilter] = useState("all");
   const [runningKey, setRunningKey] = useState<string | null>(null);
+  const [completionDrafts, setCompletionDrafts] = useState<Record<string, string>>({});
+  const [errorMessage, setErrorMessage] = useState("");
   const center = useMemo(() => buildGateDispatchTaskCenter(tasks), [tasks]);
   const filteredTasks = useMemo(() => filterGateDispatchTasks(tasks, {
     state: stateFilter,
@@ -58,10 +60,23 @@ export function GateDispatchTaskCenter({ initialTasks }: { initialTasks: Persist
 
   async function updateTask(task: PersistedGatePlatformDispatchTask) {
     const targetState = nextState(task.state);
+    const completionEvidence = completionDrafts[task.dispatchKey]?.trim() ?? "";
+    if (targetState === "completed" && completionEvidence.length < 8) {
+      setErrorMessage("完成前请写清楚完成依据，至少 8 个字。");
+      return;
+    }
     setRunningKey(task.dispatchKey);
+    setErrorMessage("");
     try {
-      const updated = await updatePersistedGateDispatchTaskState(task.dispatchKey, targetState);
+      const updated = await updatePersistedGateDispatchTaskState(task.dispatchKey, targetState, { completionEvidence });
       setTasks((current) => current.map((item) => item.dispatchKey === updated.dispatchKey ? updated : item));
+      setCompletionDrafts((current) => {
+        const next = { ...current };
+        delete next[task.dispatchKey];
+        return next;
+      });
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "派单状态更新失败。");
     } finally {
       setRunningKey(null);
     }
@@ -182,6 +197,10 @@ export function GateDispatchTaskCenter({ initialTasks }: { initialTasks: Persist
         </div>
       </section>
 
+      {errorMessage ? (
+        <p className="rounded-md border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">{errorMessage}</p>
+      ) : null}
+
       <section className="grid gap-3">
         {filteredTasks.map((task) => (
           <div className="rounded-md border border-slate-200 bg-white p-4" key={task.dispatchKey}>
@@ -204,6 +223,22 @@ export function GateDispatchTaskCenter({ initialTasks }: { initialTasks: Persist
                     <span className="rounded-md bg-slate-50 px-2 py-1" key={criterion}>{criterion}</span>
                   ))}
                 </div>
+                {task.state === "assigned" ? (
+                  <label className="mt-3 grid gap-1 text-xs font-medium text-slate-600">
+                    完成依据
+                    <textarea
+                      className="min-h-20 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-normal text-slate-800"
+                      onChange={(event) => setCompletionDrafts((current) => ({ ...current, [task.dispatchKey]: event.target.value }))}
+                      placeholder="写清楚完成了什么、证据在哪里、是否已回填数据。"
+                      value={completionDrafts[task.dispatchKey] ?? ""}
+                    />
+                  </label>
+                ) : null}
+                {task.completionEvidence ? (
+                  <p className="mt-3 rounded-md bg-emerald-50 p-3 text-sm leading-6 text-emerald-800">
+                    完成依据：{task.completionEvidence}
+                  </p>
+                ) : null}
               </div>
               <div className="flex shrink-0 flex-wrap gap-2 lg:justify-end">
                 <button

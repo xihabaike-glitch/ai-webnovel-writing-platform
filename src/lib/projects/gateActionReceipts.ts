@@ -150,6 +150,7 @@ export interface PersistedGatePlatformDispatchTask extends GatePlatformGrowthDis
   dispatchKey: string;
   projectId: string | null;
   sourceReceiptId: string | null;
+  completionEvidence: string;
   assignedAt: string | null;
   completedAt: string | null;
   createdAt: string;
@@ -1376,11 +1377,15 @@ export async function persistGateDispatchTask(dispatch: GatePlatformGrowthDispat
   return payload.task;
 }
 
-export async function updatePersistedGateDispatchTaskState(dispatchKey: string, state: GatePlatformGrowthDispatchState) {
+export async function updatePersistedGateDispatchTaskState(
+  dispatchKey: string,
+  state: GatePlatformGrowthDispatchState,
+  options?: { completionEvidence?: string },
+) {
   const response = await fetch("/api/gate/dispatch-tasks", {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ dispatchKey, state }),
+    body: JSON.stringify({ dispatchKey, state, completionEvidence: options?.completionEvidence }),
   });
   const payload = (await response.json().catch(() => null)) as { task?: PersistedGatePlatformDispatchTask; error?: string } | null;
   if (!response.ok || !payload?.task) throw new Error(payload?.error ?? "更新平台派单失败。");

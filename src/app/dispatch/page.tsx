@@ -38,6 +38,7 @@ function toTask(task: {
   acceptanceCriteria: string;
   evidence: string;
   sourceReceiptId: string | null;
+  completionEvidence: string;
   reviewLatestAt: Date;
   assignedAt: Date | null;
   completedAt: Date | null;
@@ -63,6 +64,7 @@ function toTask(task: {
     acceptanceCriteria: parseStringList(task.acceptanceCriteria),
     evidence: parseStringList(task.evidence),
     sourceReceiptId: task.sourceReceiptId,
+    completionEvidence: task.completionEvidence,
     reviewLatestAt: task.reviewLatestAt.toISOString(),
     assignedAt: task.assignedAt?.toISOString() ?? null,
     completedAt: task.completedAt?.toISOString() ?? null,

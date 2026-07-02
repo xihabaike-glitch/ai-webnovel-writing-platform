@@ -310,6 +310,7 @@ CREATE TABLE IF NOT EXISTS "GateDispatchTask" (
   "acceptanceCriteria" TEXT NOT NULL DEFAULT '[]',
   "evidence" TEXT NOT NULL DEFAULT '[]',
   "sourceReceiptId" TEXT,
+  "completionEvidence" TEXT NOT NULL DEFAULT '',
   "reviewLatestAt" DATETIME NOT NULL,
   "assignedAt" DATETIME,
   "completedAt" DATETIME,

@@ -125,7 +125,7 @@ export interface GatePlatformGrowthReview {
   evidence: string[];
 }
 
-export type GatePlatformGrowthDispatchState = "queued" | "assigned";
+export type GatePlatformGrowthDispatchState = "queued" | "assigned" | "completed";
 
 export interface GatePlatformGrowthDispatchItem {
   id: string;
@@ -143,6 +143,17 @@ export interface GatePlatformGrowthDispatchItem {
   acceptanceCriteria: string[];
   evidence: string[];
   reviewLatestAt: string;
+}
+
+export interface PersistedGatePlatformDispatchTask extends GatePlatformGrowthDispatchItem {
+  databaseId: string;
+  dispatchKey: string;
+  projectId: string | null;
+  sourceReceiptId: string | null;
+  assignedAt: string | null;
+  completedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface GatePlatformStrategyReceiptPayload {
@@ -806,21 +817,34 @@ function dispatchSpec(review: GatePlatformGrowthReview) {
   };
 }
 
-export function buildGatePlatformGrowthDispatchItems(receipts: GateActionReceipt[], limit = 6): GatePlatformGrowthDispatchItem[] {
+export function buildGatePlatformGrowthDispatchItems(
+  receipts: GateActionReceipt[],
+  limit = 6,
+  persistedTasks: PersistedGatePlatformDispatchTask[] = [],
+): GatePlatformGrowthDispatchItem[] {
   const reviews = buildGatePlatformGrowthReview(receipts, limit);
+  const persistedByKey = new Map(persistedTasks.map((task) => [task.dispatchKey, task]));
   return reviews.map((review): GatePlatformGrowthDispatchItem => {
     const spec = dispatchSpec(review);
+    const dispatchKey = `${review.platformId}:${review.stage}`;
+    const persisted = persistedByKey.get(dispatchKey);
     const assignedReceipt = latestReceiptFor(
       receipts,
       (receipt) => receipt.actionId === `gate-platform-dispatch:${review.stage}:${review.platformId}` && receipt.status === "succeeded",
     );
+    const isAssignedByReceipt = Boolean(assignedReceipt && new Date(assignedReceipt.createdAt).getTime() > new Date(review.latestAt).getTime());
+    const state = persisted?.state === "completed"
+      ? "completed"
+      : persisted?.state === "assigned" || isAssignedByReceipt
+        ? "assigned"
+        : "queued";
 
     return {
-      id: `${review.platformId}:${review.stage}`,
+      id: dispatchKey,
       platformId: review.platformId,
       platformName: review.platformName,
       stage: review.stage,
-      state: assignedReceipt && new Date(assignedReceipt.createdAt).getTime() > new Date(review.latestAt).getTime() ? "assigned" : "queued",
+      state,
       priorityScore: review.priorityScore,
       ownerRole: spec.ownerRole,
       title: spec.title,
@@ -1086,6 +1110,44 @@ export async function clearPersistedGateActionReceipts() {
   const result = (await response.json().catch(() => null)) as { deleted?: number; error?: string } | null;
   if (!response.ok) throw new Error(result?.error ?? "清空闸门审计历史失败。");
   return result?.deleted ?? 0;
+}
+
+export async function fetchPersistedGateDispatchTasks(options?: {
+  state?: GatePlatformGrowthDispatchState | "all";
+  platformId?: string;
+  limit?: number;
+}) {
+  const params = new URLSearchParams();
+  if (options?.state && options.state !== "all") params.set("state", options.state);
+  if (options?.platformId && options.platformId !== "all") params.set("platformId", options.platformId);
+  if (options?.limit) params.set("limit", String(options.limit));
+  const query = params.toString() ? `?${params.toString()}` : "";
+  const response = await fetch(`/api/gate/dispatch-tasks${query}`, { cache: "no-store" });
+  const payload = (await response.json().catch(() => null)) as { tasks?: PersistedGatePlatformDispatchTask[]; error?: string } | null;
+  if (!response.ok) throw new Error(payload?.error ?? "读取平台派单失败。");
+  return payload?.tasks ?? [];
+}
+
+export async function persistGateDispatchTask(dispatch: GatePlatformGrowthDispatchItem, sourceReceipt?: GateActionReceipt) {
+  const response = await fetch("/api/gate/dispatch-tasks", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ dispatch, sourceReceipt }),
+  });
+  const payload = (await response.json().catch(() => null)) as { task?: PersistedGatePlatformDispatchTask; error?: string } | null;
+  if (!response.ok || !payload?.task) throw new Error(payload?.error ?? "保存平台派单失败。");
+  return payload.task;
+}
+
+export async function updatePersistedGateDispatchTaskState(dispatchKey: string, state: GatePlatformGrowthDispatchState) {
+  const response = await fetch("/api/gate/dispatch-tasks", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ dispatchKey, state }),
+  });
+  const payload = (await response.json().catch(() => null)) as { task?: PersistedGatePlatformDispatchTask; error?: string } | null;
+  if (!response.ok || !payload?.task) throw new Error(payload?.error ?? "更新平台派单失败。");
+  return payload.task;
 }
 
 export function addGateActionReceipt(receipt: GateActionReceipt) {

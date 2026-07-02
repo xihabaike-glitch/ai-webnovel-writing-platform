@@ -14,11 +14,14 @@ import {
   clearPersistedGateActionReceipts,
   filterGateActionReceipts,
   fetchPersistedGateActionReceipts,
+  fetchPersistedGateDispatchTasks,
   gateActionReceiptUpdatedEvent,
   loadGateActionReceipts,
   mergeGateActionReceipts,
   persistGateActionReceipt,
+  persistGateDispatchTask,
   saveGateActionReceipts,
+  updatePersistedGateDispatchTaskState,
   type GateActionReceipt,
   type GateActionReceiptExecutionFilter,
   type GateActionReviewAdvice,
@@ -28,6 +31,7 @@ import {
   type GateActionReceiptStatusFilter,
   type GatePlatformGrowthDispatchItem,
   type GatePlatformGrowthReview,
+  type PersistedGatePlatformDispatchTask,
 } from "@/lib/projects/gateActionReceipts";
 import type { PrePublishGateAction } from "@/lib/projects/prePublishGate";
 import { GatePriorityActionCard } from "./GatePriorityActionCard";
@@ -86,8 +90,15 @@ function growthStageClass(stage: GatePlatformGrowthReview["stage"]) {
 }
 
 function dispatchStateClass(state: GatePlatformGrowthDispatchItem["state"]) {
+  if (state === "completed") return "bg-slate-100 text-slate-600";
   if (state === "assigned") return "bg-emerald-50 text-emerald-700";
   return "bg-amber-50 text-amber-700";
+}
+
+function dispatchStateLabel(state: GatePlatformGrowthDispatchItem["state"]) {
+  if (state === "completed") return "已完成";
+  if (state === "assigned") return "已派单";
+  return "待派单";
 }
 
 export function GateActionWorkspace({ actions }: { actions: PrePublishGateAction[] }) {
@@ -96,6 +107,7 @@ export function GateActionWorkspace({ actions }: { actions: PrePublishGateAction
   const [statusFilter, setStatusFilter] = useState<GateActionReceiptStatusFilter>("all");
   const [executionFilter, setExecutionFilter] = useState<GateActionReceiptExecutionFilter>("all");
   const [platformFilter, setPlatformFilter] = useState("all");
+  const [persistedDispatchTasks, setPersistedDispatchTasks] = useState<PersistedGatePlatformDispatchTask[]>([]);
   const filteredReceipts = filterGateActionReceipts(receipts, {
     status: statusFilter,
     executionType: executionFilter,
@@ -105,7 +117,7 @@ export function GateActionWorkspace({ actions }: { actions: PrePublishGateAction
   const filteredSummary = buildGateActionReceiptSummary(filteredReceipts);
   const reviewAdvice = buildGateActionReviewAdvice(filteredReceipts);
   const platformGrowthReview = buildGatePlatformGrowthReview(receipts);
-  const platformDispatchItems = buildGatePlatformGrowthDispatchItems(receipts);
+  const platformDispatchItems = buildGatePlatformGrowthDispatchItems(receipts, 6, persistedDispatchTasks);
   const latestReceipt = filteredReceipts[0] ?? null;
 
   useEffect(() => {
@@ -117,6 +129,9 @@ export function GateActionWorkspace({ actions }: { actions: PrePublishGateAction
         const merged = mergeGateActionReceipts(persisted, loadGateActionReceipts());
         setReceipts(saveGateActionReceipts(merged));
       })
+      .catch(() => undefined);
+    void fetchPersistedGateDispatchTasks()
+      .then(setPersistedDispatchTasks)
       .catch(() => undefined);
 
     function handleReceiptUpdate(event: Event) {
@@ -144,7 +159,17 @@ export function GateActionWorkspace({ actions }: { actions: PrePublishGateAction
   }
 
   function assignDispatch(dispatch: GatePlatformGrowthDispatchItem) {
-    addReceipt(buildGatePlatformDispatchReceipt({ dispatch }));
+    const receipt = buildGatePlatformDispatchReceipt({ dispatch });
+    addReceipt(receipt);
+    void persistGateDispatchTask({ ...dispatch, state: "assigned" }, receipt)
+      .then((task) => setPersistedDispatchTasks((current) => [task, ...current.filter((item) => item.dispatchKey !== task.dispatchKey)]))
+      .catch(() => undefined);
+  }
+
+  function completeDispatch(dispatch: GatePlatformGrowthDispatchItem) {
+    void updatePersistedGateDispatchTaskState(dispatch.id, "completed")
+      .then((task) => setPersistedDispatchTasks((current) => [task, ...current.filter((item) => item.dispatchKey !== task.dispatchKey)]))
+      .catch(() => undefined);
   }
 
   function focusPlatform(platformId: string) {
@@ -312,9 +337,7 @@ export function GateActionWorkspace({ actions }: { actions: PrePublishGateAction
                     <div>
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="font-medium text-slate-950">{item.title}</span>
-                        <span className={`rounded-md px-2 py-1 text-xs font-medium ${dispatchStateClass(item.state)}`}>
-                          {item.state === "assigned" ? "已派单" : "待派单"}
-                        </span>
+                        <span className={`rounded-md px-2 py-1 text-xs font-medium ${dispatchStateClass(item.state)}`}>{dispatchStateLabel(item.state)}</span>
                       </div>
                       <p className="mt-2 leading-6 text-slate-600">{item.detail}</p>
                     </div>
@@ -331,12 +354,21 @@ export function GateActionWorkspace({ actions }: { actions: PrePublishGateAction
                   <div className="mt-3 flex flex-wrap items-center gap-2">
                     <button
                       className="rounded-md border border-slate-200 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
-                      disabled={item.state === "assigned"}
+                      disabled={item.state !== "queued"}
                       onClick={() => assignDispatch(item)}
                       type="button"
                     >
-                      {item.state === "assigned" ? "已派单" : item.actionLabel}
+                      {item.state === "queued" ? item.actionLabel : dispatchStateLabel(item.state)}
                     </button>
+                    {item.state === "assigned" ? (
+                      <button
+                        className="rounded-md border border-emerald-200 px-3 py-2 text-xs font-medium text-emerald-700 hover:bg-emerald-50"
+                        onClick={() => completeDispatch(item)}
+                        type="button"
+                      >
+                        标记完成
+                      </button>
+                    ) : null}
                     <Link
                       className="rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white hover:bg-slate-800"
                       href={item.href}

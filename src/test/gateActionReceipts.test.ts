@@ -524,6 +524,34 @@ test("buildGateActionReceipt", async (t) => {
     assert.equal(review[0].total, 1);
   });
 
+  await t.test("uses persisted dispatch tasks to keep completion state after refresh", () => {
+    const assetReceipt = buildGatePlatformStrategyReceipt({
+      item: strategyPlatform,
+      status: "succeeded",
+      now: "2026-01-01T00:00:00.000Z",
+      payload: {
+        variants: [{ strategy: "强钩子版" }],
+      },
+    });
+    const dispatch = buildGatePlatformGrowthDispatchItems([assetReceipt])[0];
+
+    const refreshed = buildGatePlatformGrowthDispatchItems([assetReceipt], 6, [{
+      ...dispatch,
+      databaseId: "dispatch-db-1",
+      dispatchKey: dispatch.id,
+      projectId: "project-1",
+      sourceReceiptId: null,
+      state: "completed",
+      assignedAt: "2026-01-01T00:00:01.000Z",
+      completedAt: "2026-01-01T00:00:02.000Z",
+      createdAt: "2026-01-01T00:00:01.000Z",
+      updatedAt: "2026-01-01T00:00:02.000Z",
+    }]);
+
+    assert.equal(refreshed[0].id, "fanqie:adopt_asset");
+    assert.equal(refreshed[0].state, "completed");
+  });
+
   await t.test("builds platform strategy receipts for the unified gate audit log", () => {
     const receipt = buildGatePlatformStrategyReceipt({
       item: strategyPlatform,

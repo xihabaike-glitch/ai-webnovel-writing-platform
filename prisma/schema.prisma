@@ -37,6 +37,7 @@ model Project {
   submissionAssetVersions PlatformSubmissionAssetVersion[]
   platformPublishMetrics PlatformPublishMetric[]
   gateActionAudits GateActionAudit[]
+  gateDispatchTasks GateDispatchTask[]
 }
 
 model Chapter {
@@ -335,4 +336,35 @@ model GateActionAudit {
   @@index([projectId, createdAt])
   @@index([platformId, createdAt])
   @@index([executionType, createdAt])
+}
+
+model GateDispatchTask {
+  id                 String   @id @default(cuid())
+  dispatchKey        String   @unique
+  projectId          String?
+  platformId         String
+  platformName       String
+  stage              String
+  state              String   @default("queued")
+  priorityScore      Int      @default(0)
+  ownerRole          String
+  title              String
+  detail             String
+  dueLabel           String
+  actionLabel        String
+  href               String
+  acceptanceCriteria String   @default("[]")
+  evidence           String   @default("[]")
+  sourceReceiptId    String?
+  reviewLatestAt     DateTime
+  assignedAt         DateTime?
+  completedAt        DateTime?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  project Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+
+  @@index([state, priorityScore])
+  @@index([platformId, updatedAt])
+  @@index([projectId, updatedAt])
 }

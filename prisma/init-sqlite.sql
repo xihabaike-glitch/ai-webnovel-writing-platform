@@ -291,3 +291,33 @@ CREATE TABLE IF NOT EXISTS "GateActionAudit" (
 CREATE INDEX IF NOT EXISTS "GateActionAudit_projectId_createdAt_idx" ON "GateActionAudit"("projectId", "createdAt");
 CREATE INDEX IF NOT EXISTS "GateActionAudit_platformId_createdAt_idx" ON "GateActionAudit"("platformId", "createdAt");
 CREATE INDEX IF NOT EXISTS "GateActionAudit_executionType_createdAt_idx" ON "GateActionAudit"("executionType", "createdAt");
+
+CREATE TABLE IF NOT EXISTS "GateDispatchTask" (
+  "id" TEXT NOT NULL PRIMARY KEY,
+  "dispatchKey" TEXT NOT NULL UNIQUE,
+  "projectId" TEXT,
+  "platformId" TEXT NOT NULL,
+  "platformName" TEXT NOT NULL,
+  "stage" TEXT NOT NULL,
+  "state" TEXT NOT NULL DEFAULT 'queued',
+  "priorityScore" INTEGER NOT NULL DEFAULT 0,
+  "ownerRole" TEXT NOT NULL,
+  "title" TEXT NOT NULL,
+  "detail" TEXT NOT NULL,
+  "dueLabel" TEXT NOT NULL,
+  "actionLabel" TEXT NOT NULL,
+  "href" TEXT NOT NULL,
+  "acceptanceCriteria" TEXT NOT NULL DEFAULT '[]',
+  "evidence" TEXT NOT NULL DEFAULT '[]',
+  "sourceReceiptId" TEXT,
+  "reviewLatestAt" DATETIME NOT NULL,
+  "assignedAt" DATETIME,
+  "completedAt" DATETIME,
+  "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT "GateDispatchTask_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "Project" ("id") ON DELETE SET NULL ON UPDATE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS "GateDispatchTask_state_priorityScore_idx" ON "GateDispatchTask"("state", "priorityScore");
+CREATE INDEX IF NOT EXISTS "GateDispatchTask_platformId_updatedAt_idx" ON "GateDispatchTask"("platformId", "updatedAt");
+CREATE INDEX IF NOT EXISTS "GateDispatchTask_projectId_updatedAt_idx" ON "GateDispatchTask"("projectId", "updatedAt");

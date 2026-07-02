@@ -4,6 +4,7 @@ import { getPlatformProfile, platformProfiles, type PlatformId } from "@/lib/pla
 import {
   buildPlatformPublishExportCenter,
   buildPlatformPublishArchive,
+  buildPlatformStrategySwitchPlan,
   buildPublishPackageRestorePatch,
   buildPublishPackageVersionComparison,
   buildSubmissionAssetAudit,
@@ -63,6 +64,15 @@ function normalizeSnapshotDate(value: unknown) {
 function normalizeContractStatus(value: unknown) {
   if (value === "signed" || value === "invited" || value === "rejected" || value === "pending") return value;
   return "unknown";
+}
+
+function strategyUpdateCadence(platform: ReturnType<typeof selectedPlatform>, fallback: string) {
+  if (!platform) return fallback;
+  if (platform.category === "free") return "daily_4000_6000_main_platform";
+  if (platform.category === "short") return "short_serial_closed_loop";
+  if (platform.category === "overseas") return "3_5_chapters_weekly_en";
+  if (platform.category === "female") return "daily_3000_emotion_arc";
+  return "daily_4000_long_form";
 }
 
 async function buildCenter(projectId: string) {
@@ -366,6 +376,35 @@ export async function POST(request: Request, { params }: Params) {
 
   if (!context) {
     return NextResponse.json({ error: "Project not found" }, { status: 404 });
+  }
+
+  if (body.action === "apply-strategy") {
+    const platform = selectedPlatform(body.platformId ?? null);
+    if (!platform) {
+      return NextResponse.json({ error: "请选择有效发布平台。" }, { status: 400 });
+    }
+
+    const strategy = context.center.platformStrategy.find((item) => item.platformId === platform.id);
+    if (!strategy) {
+      return NextResponse.json({ error: "当前平台暂未生成策略评分。" }, { status: 400 });
+    }
+
+    const previousPlatform = getPlatformProfile(context.project.targetPlatform as PlatformId);
+    const project = await prisma.project.update({
+      where: { id: projectId },
+      data: {
+        targetPlatform: platform.id,
+        updateCadence: strategyUpdateCadence(platform, context.project.updateCadence),
+      },
+    });
+    const switchPlan = buildPlatformStrategySwitchPlan(strategy, previousPlatform);
+
+    return NextResponse.json({
+      message: `已把主战场切到 ${platform.name}。`,
+      project,
+      strategy,
+      switchPlan,
+    });
   }
 
   if (body.action === "save-effect") {

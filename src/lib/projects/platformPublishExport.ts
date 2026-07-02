@@ -371,6 +371,25 @@ export interface PlatformStrategyRankItem {
   risks: string[];
 }
 
+export interface PlatformStrategySwitchStep {
+  id: string;
+  label: string;
+  detail: string;
+  status: "done" | "next" | "queued";
+  href: string;
+}
+
+export interface PlatformStrategySwitchPlan {
+  platformId: PlatformId;
+  platformName: string;
+  headline: string;
+  previousPlatformId: PlatformId;
+  previousPlatformName: string;
+  recommendation: PlatformStrategyRankItem["recommendation"];
+  score: number;
+  steps: PlatformStrategySwitchStep[];
+}
+
 export interface PlatformPublishExportCenter {
   packages: PlatformPublishPackage[];
   recommendedPlatformId: PlatformId;
@@ -940,6 +959,68 @@ function buildPlatformStrategy(packages: PlatformPublishPackage[]): PlatformStra
       || left.platformName.localeCompare(right.platformName)
     ))
     .map((item, index) => ({ ...item, rank: index + 1 }));
+}
+
+export function buildPlatformStrategySwitchPlan(
+  strategy: PlatformStrategyRankItem,
+  previousPlatform: PlatformProfile,
+): PlatformStrategySwitchPlan {
+  const isSamePlatform = strategy.platformId === previousPlatform.id;
+  const priorityLabel = strategy.recommendation === "focus"
+    ? "主推"
+    : strategy.recommendation === "grow"
+      ? "加码"
+      : strategy.recommendation === "repair"
+        ? "先修"
+        : strategy.recommendation === "watch"
+          ? "观察"
+          : "降权";
+  const headline = isSamePlatform
+    ? `${strategy.platformName} 继续当主战场，别换来换去，先把这条执行链跑完。`
+    : `已从 ${previousPlatform.name} 切到 ${strategy.platformName}，接下来别到处乱投，先把这条执行链跑完。`;
+  const assetDetail = strategy.recommendation === "repair"
+    ? "先处理投稿资料和发布阻塞，当前状态硬投只会消耗样本。"
+    : `按「${priorityLabel}」策略修标题、简介、标签和平台话术，别拿通用简介糊弄平台。`;
+
+  return {
+    platformId: strategy.platformId,
+    platformName: strategy.platformName,
+    headline,
+    previousPlatformId: previousPlatform.id,
+    previousPlatformName: previousPlatform.name,
+    recommendation: strategy.recommendation,
+    score: strategy.score,
+    steps: [
+      {
+        id: "switch-target-platform",
+        label: "切换目标平台",
+        detail: `项目主战场已设为 ${strategy.platformName}，后续发布包、前三章重写和效果记录都以它为准。`,
+        status: "done",
+        href: "#platform-export",
+      },
+      {
+        id: "fix-submission-asset",
+        label: "修投稿资产",
+        detail: assetDetail,
+        status: "next",
+        href: "#submission-asset-editor",
+      },
+      {
+        id: "rewrite-first-three",
+        label: "重写前三章",
+        detail: "用目标平台规则重写前三章钩子、爽点、情绪张力和章末悬念。",
+        status: "queued",
+        href: "#first-three-rewrite",
+      },
+      {
+        id: "record-publish-effect",
+        label: "记录发布效果",
+        detail: "上线后记录阅读、点击、收藏、追读和编辑反馈，下一轮排行榜才有真实判断。",
+        status: "queued",
+        href: "#publish-effect-panel",
+      },
+    ],
+  };
 }
 
 function buildRepairPath(preflight: PublishPreflight): PublishRepairPath {

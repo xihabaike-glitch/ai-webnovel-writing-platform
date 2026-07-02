@@ -4,6 +4,7 @@ import { getPlatformProfile, platformProfiles } from "../lib/platforms/platformP
 import {
   buildPlatformPublishExportCenter,
   buildPlatformPublishArchive,
+  buildPlatformStrategySwitchPlan,
   buildPublishPackageRestorePatch,
   buildPublishPackageVersionComparison,
   buildSubmissionAssetAudit,
@@ -839,5 +840,36 @@ test("buildPlatformPublishExportCenter", async (t) => {
     assert.ok(archive.platforms[0].fileName.includes("夜雨-系统-番茄小说-发布包.md"));
     assert.ok(archive.markdown.includes("暂无通过质检的平台发布包。"));
     assert.ok(archive.markdown.includes("| 番茄小说 | 需处理 |"));
+  });
+
+  await t.test("builds an execution chain when applying a ranked platform strategy", () => {
+    const strategy = {
+      rank: 1,
+      platformId: "qimao" as const,
+      platformName: "七猫",
+      score: 76,
+      recommendation: "grow" as const,
+      verdict: "七猫可以继续加码，但先补齐短板。",
+      nextAction: "修投稿资产后重写前三章。",
+      href: "#platform-export",
+      scores: {
+        preflight: 88,
+        asset: 72,
+        effect: 58,
+        comparison: 58,
+        adoption: 45,
+      },
+      reasons: ["投稿资产 72 分"],
+      risks: ["标签不够精准"],
+    };
+    const plan = buildPlatformStrategySwitchPlan(strategy, getPlatformProfile("fanqie"));
+
+    assert.equal(plan.platformId, "qimao");
+    assert.equal(plan.previousPlatformId, "fanqie");
+    assert.ok(plan.headline.includes("七猫"));
+    assert.equal(plan.steps[0].status, "done");
+    assert.equal(plan.steps[1].href, "#submission-asset-editor");
+    assert.ok(plan.steps.some((step) => step.href === "#first-three-rewrite"));
+    assert.ok(plan.steps.some((step) => step.href === "#publish-effect-panel"));
   });
 });

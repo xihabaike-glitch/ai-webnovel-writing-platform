@@ -363,6 +363,25 @@ interface PlatformStrategyRankItem {
   risks: string[];
 }
 
+interface PlatformStrategySwitchStep {
+  id: string;
+  label: string;
+  detail: string;
+  status: "done" | "next" | "queued";
+  href: string;
+}
+
+interface PlatformStrategySwitchPlan {
+  platformId: string;
+  platformName: string;
+  headline: string;
+  previousPlatformId: string;
+  previousPlatformName: string;
+  recommendation: PlatformStrategyRankItem["recommendation"];
+  score: number;
+  steps: PlatformStrategySwitchStep[];
+}
+
 interface PlatformPublishExportCenter {
   packages: PlatformPublishPackage[];
   recommendedPlatformId: string;
@@ -552,6 +571,18 @@ function strategyRecommendationClass(recommendation: PlatformStrategyRankItem["r
   return "bg-amber-50 text-amber-700";
 }
 
+function switchStepStatusLabel(status: PlatformStrategySwitchStep["status"]) {
+  if (status === "done") return "已完成";
+  if (status === "next") return "现在做";
+  return "排队中";
+}
+
+function switchStepStatusClass(status: PlatformStrategySwitchStep["status"]) {
+  if (status === "done") return "bg-emerald-50 text-emerald-700";
+  if (status === "next") return "bg-amber-50 text-amber-700";
+  return "bg-slate-100 text-slate-600";
+}
+
 function normalizeVersionAction(action: string): PublishPackageVersionActionFilter {
   if (action === "copy" || action === "download" || action === "archive" || action === "snapshot" || action === "restore") return action;
   return "snapshot";
@@ -581,6 +612,8 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
   const [isOptimizingAsset, setIsOptimizingAsset] = useState(false);
   const [isSavingEffect, setIsSavingEffect] = useState(false);
   const [runningOptimizationActionId, setRunningOptimizationActionId] = useState<string | null>(null);
+  const [applyingStrategyPlatformId, setApplyingStrategyPlatformId] = useState<string | null>(null);
+  const [strategySwitchPlan, setStrategySwitchPlan] = useState<PlatformStrategySwitchPlan | null>(null);
   const [assetOptimizationVariants, setAssetOptimizationVariants] = useState<PlatformSubmissionAssetOptimizationVariant[]>([]);
   const [versionActionFilter, setVersionActionFilter] = useState<PublishPackageVersionActionFilter>("all");
   const [assetDraft, setAssetDraft] = useState<SubmissionAssetDraft>({
@@ -757,6 +790,35 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
       setMessage(caught instanceof Error ? caught.message : "保存发布效果失败。");
     } finally {
       setIsSavingEffect(false);
+    }
+  }
+
+  async function applyPlatformStrategy(item: PlatformStrategyRankItem) {
+    setApplyingStrategyPlatformId(item.platformId);
+    setMessage(null);
+    try {
+      const response = await fetch(`/api/projects/${projectId}/platform-export`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "apply-strategy", platformId: item.platformId }),
+      });
+      const payload = (await response.json().catch(() => null)) as {
+        message?: string;
+        error?: string;
+        switchPlan?: PlatformStrategySwitchPlan;
+      } | null;
+      if (!response.ok || !payload?.switchPlan) throw new Error(payload?.error ?? "应用平台策略失败。");
+      setSelectedPlatformId(item.platformId);
+      setSelectedVersionId(null);
+      setVersionDetail(null);
+      setVersionActionFilter("all");
+      setStrategySwitchPlan(payload.switchPlan);
+      setMessage(payload.message ?? `已应用 ${item.platformName} 平台策略。`);
+      await loadCenter({ keepMessage: true });
+    } catch (caught) {
+      setMessage(caught instanceof Error ? caught.message : "应用平台策略失败。");
+    } finally {
+      setApplyingStrategyPlatformId(null);
     }
   }
 
@@ -1248,16 +1310,9 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
               </div>
               <div className="mt-3 grid gap-2 lg:grid-cols-3">
                 {center.platformStrategy.slice(0, 3).map((item) => (
-                  <button
-                    className="rounded-md bg-slate-50 p-3 text-left text-sm hover:bg-slate-100"
+                  <div
+                    className="rounded-md bg-slate-50 p-3 text-sm"
                     key={item.platformId}
-                    onClick={() => {
-                      setSelectedPlatformId(item.platformId);
-                      setSelectedVersionId(null);
-                      setVersionDetail(null);
-                      setVersionActionFilter("all");
-                    }}
-                    type="button"
                   >
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <div className="font-medium text-slate-950">#{item.rank} {item.platformName}</div>
@@ -1272,9 +1327,61 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
                       <div>依据：{item.reasons.slice(0, 3).join("；")}</div>
                       {item.risks.length ? <div>风险：{item.risks.slice(0, 2).join("；")}</div> : null}
                     </div>
-                  </button>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <button
+                        className="rounded-md border border-slate-200 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-white"
+                        onClick={() => {
+                          setSelectedPlatformId(item.platformId);
+                          setSelectedVersionId(null);
+                          setVersionDetail(null);
+                          setVersionActionFilter("all");
+                        }}
+                        type="button"
+                      >
+                        查看平台
+                      </button>
+                      <button
+                        className="rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white disabled:opacity-50"
+                        disabled={Boolean(applyingStrategyPlatformId)}
+                        onClick={() => void applyPlatformStrategy(item)}
+                        type="button"
+                      >
+                        {applyingStrategyPlatformId === item.platformId ? "应用中" : "设为主战场"}
+                      </button>
+                    </div>
+                  </div>
                 ))}
               </div>
+              {strategySwitchPlan ? (
+                <div className="mt-3 rounded-md border border-cyan-100 bg-cyan-50 p-3">
+                  <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                      <div className="font-medium text-cyan-950">{strategySwitchPlan.platformName} 执行链</div>
+                      <p className="mt-1 text-sm leading-6 text-cyan-800">{strategySwitchPlan.headline}</p>
+                    </div>
+                    <div className="w-fit rounded-md bg-white px-2 py-1 text-xs font-medium text-cyan-700">
+                      策略分 {strategySwitchPlan.score}
+                    </div>
+                  </div>
+                  <div className="mt-3 grid gap-2 lg:grid-cols-4">
+                    {strategySwitchPlan.steps.map((step) => (
+                      <a
+                        className="rounded-md bg-white p-3 text-sm hover:bg-cyan-100"
+                        href={step.href}
+                        key={step.id}
+                      >
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div className="font-medium text-slate-950">{step.label}</div>
+                          <span className={`rounded-md px-2 py-1 text-xs font-medium ${switchStepStatusClass(step.status)}`}>
+                            {switchStepStatusLabel(step.status)}
+                          </span>
+                        </div>
+                        <p className="mt-2 leading-6 text-slate-600">{step.detail}</p>
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
             </div>
           ) : null}
         </div>

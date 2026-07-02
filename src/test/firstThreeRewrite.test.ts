@@ -116,5 +116,71 @@ test("buildFirstThreeRewritePackage", async (t) => {
     assert.ok(evaluation.oldPreview.includes("林晚醒来"));
     assert.ok(evaluation.newPreview.includes("系统倒计时"));
     assert.ok(evaluation.verdict.length > 0);
+    assert.equal(evaluation.decision.action, "keep");
+    assert.ok(evaluation.decision.reasons.some((reason) => reason.includes("平台分")));
+  });
+
+  await t.test("asks for a second pass when rewrite improves but is not publish-ready", () => {
+    const evaluation = buildFirstThreeRewriteEvaluation({
+      platform: getPlatformProfile("fanqie"),
+      before: {
+        title: "雨夜",
+        content: "林晚醒来，天色很暗。",
+        wordCount: 200,
+        goal: "",
+        hook: "",
+        conflict: "",
+        valueShift: "",
+        cliffhanger: "",
+        status: "outline",
+      },
+      after: {
+        title: "雨夜",
+        content: "系统响了一声，林晚知道事情不对。",
+        wordCount: 900,
+        goal: "让主角发现异常。",
+        hook: "系统响了一声。",
+        conflict: "主角必须做选择。",
+        valueShift: "从平静到不安。",
+        cliffhanger: "",
+        status: "draft",
+      },
+    });
+
+    assert.equal(evaluation.decision.action, "second_pass");
+    assert.equal(evaluation.decision.severity, "needs_work");
+    assert.ok(evaluation.decision.nextAction.length > 0);
+  });
+
+  await t.test("recommends rollback when rewrite does not improve the platform score", () => {
+    const evaluation = buildFirstThreeRewriteEvaluation({
+      platform: getPlatformProfile("fanqie"),
+      before: {
+        title: "雨夜系统",
+        content: "系统倒计时只剩十秒，林晚必须在逃跑和救人之间选择。",
+        wordCount: 1600,
+        goal: "让主角在雨夜被系统逼入不可逆选择。",
+        hook: "系统倒计时只剩十秒。",
+        conflict: "主角必须在逃跑和救人之间选择，否则会失去记忆。",
+        valueShift: "从被动逃避转向主动救人。",
+        cliffhanger: "系统刷新第二个任务，目标名字出现在名单背面。",
+        status: "draft",
+      },
+      after: {
+        title: "雨夜",
+        content: "林晚醒来，天色很暗。",
+        wordCount: 200,
+        goal: "",
+        hook: "",
+        conflict: "",
+        valueShift: "",
+        cliffhanger: "",
+        status: "draft",
+      },
+    });
+
+    assert.equal(evaluation.decision.action, "rollback");
+    assert.equal(evaluation.decision.severity, "danger");
+    assert.ok(evaluation.decision.nextAction.includes("回滚"));
   });
 });

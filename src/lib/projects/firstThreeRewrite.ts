@@ -74,6 +74,15 @@ export interface FirstThreeRewriteScoreItemDelta {
   suggestion: string;
 }
 
+export interface FirstThreeRewriteDecision {
+  action: "keep" | "second_pass" | "rollback";
+  label: string;
+  severity: "success" | "needs_work" | "danger";
+  rationale: string;
+  nextAction: string;
+  reasons: string[];
+}
+
 export interface FirstThreeRewriteEvaluation {
   beforeScore: number;
   afterScore: number;
@@ -83,6 +92,7 @@ export interface FirstThreeRewriteEvaluation {
   oldPreview: string;
   newPreview: string;
   verdict: string;
+  decision: FirstThreeRewriteDecision;
   itemDeltas: FirstThreeRewriteScoreItemDelta[];
   priorityFixes: string[];
 }
@@ -390,6 +400,54 @@ function evaluationVerdict(scoreDelta: number, afterScore: number, changedFields
   return "改写有提升，但仍未到稳态发布线，继续压强第一屏和章末追读。";
 }
 
+function buildRewriteDecision(input: {
+  scoreDelta: number;
+  afterScore: number;
+  itemDeltas: FirstThreeRewriteScoreItemDelta[];
+  priorityFixes: string[];
+}): FirstThreeRewriteDecision {
+  const failedItems = input.itemDeltas.filter((item) => item.status === "fail");
+  const improvedItems = input.itemDeltas.filter((item) => item.delta > 0);
+  const weakenedItems = input.itemDeltas.filter((item) => item.delta < 0);
+  const reasons = [
+    `平台分 ${input.scoreDelta >= 0 ? "+" : ""}${input.scoreDelta}，当前 ${input.afterScore} 分。`,
+    improvedItems.length ? `提升项：${improvedItems.slice(0, 2).map((item) => item.label).join("、")}。` : "",
+    weakenedItems.length ? `变弱项：${weakenedItems.slice(0, 2).map((item) => item.label).join("、")}。` : "",
+    failedItems.length ? `仍失败：${failedItems.slice(0, 2).map((item) => item.label).join("、")}。` : "",
+  ].filter(Boolean);
+
+  if (input.scoreDelta <= 0 || (input.afterScore < 50 && input.scoreDelta < 8)) {
+    return {
+      action: "rollback",
+      label: "建议回滚",
+      severity: "danger",
+      rationale: "这版没有证明自己比旧稿更适合平台，继续往下投只会污染判断。",
+      nextAction: "打开章节版本，回滚到改写前旧稿，再按失败项重写。",
+      reasons,
+    };
+  }
+
+  if (input.afterScore >= 85 && input.scoreDelta >= 10 && failedItems.length === 0) {
+    return {
+      action: "keep",
+      label: "建议保留",
+      severity: "success",
+      rationale: "这版已经拿到明显平台收益，可以先保留当前稿，再跑发布质检。",
+      nextAction: "保留当前稿，进入发布前质检和平台导出复查。",
+      reasons,
+    };
+  }
+
+  return {
+    action: "second_pass",
+    label: "继续二改",
+    severity: "needs_work",
+    rationale: "这版有提升，但还没到稳定发布线，别急着当终稿。",
+    nextAction: input.priorityFixes[0] ?? "继续补强首屏钩子、冲突压力和章末追读。",
+    reasons,
+  };
+}
+
 export function buildFirstThreeRewriteEvaluation(input: {
   platform: PlatformProfile;
   before: FirstThreeRewriteComparableChapter;
@@ -443,6 +501,13 @@ export function buildFirstThreeRewriteEvaluation(input: {
     })
     .map(([, label]) => label);
   const scoreDelta = afterScore.score - beforeScore.score;
+  const priorityFixes = afterScore.priorityFixes;
+  const decision = buildRewriteDecision({
+    scoreDelta,
+    afterScore: afterScore.score,
+    itemDeltas,
+    priorityFixes,
+  });
 
   return {
     beforeScore: beforeScore.score,
@@ -453,8 +518,9 @@ export function buildFirstThreeRewriteEvaluation(input: {
     oldPreview: previewRevisionContent(input.before.content),
     newPreview: previewRevisionContent(input.after.content),
     verdict: evaluationVerdict(scoreDelta, afterScore.score, changedFieldLabels),
+    decision,
     itemDeltas,
-    priorityFixes: afterScore.priorityFixes,
+    priorityFixes,
   };
 }
 

@@ -92,8 +92,18 @@ interface FirstThreeRewriteEvaluation {
   oldPreview: string;
   newPreview: string;
   verdict: string;
+  decision: FirstThreeRewriteDecision;
   itemDeltas: FirstThreeRewriteEvaluationItem[];
   priorityFixes: string[];
+}
+
+interface FirstThreeRewriteDecision {
+  action: "keep" | "second_pass" | "rollback";
+  label: string;
+  severity: "success" | "needs_work" | "danger";
+  rationale: string;
+  nextAction: string;
+  reasons: string[];
 }
 
 function priorityLabel(priority: ChapterRewritePlan["priority"]) {
@@ -114,6 +124,12 @@ function evaluationTone(delta: number) {
   if (delta > 0) return "text-emerald-700";
   if (delta < 0) return "text-rose-700";
   return "text-slate-600";
+}
+
+function decisionClass(severity: FirstThreeRewriteDecision["severity"]) {
+  if (severity === "success") return "bg-emerald-50 text-emerald-700";
+  if (severity === "danger") return "bg-rose-50 text-rose-700";
+  return "bg-amber-50 text-amber-700";
 }
 
 export function FirstThreeRewritePanel({ projectId }: { projectId: string }) {
@@ -353,6 +369,22 @@ export function FirstThreeRewritePanel({ projectId }: { projectId: string }) {
                           </div>
                         </div>
                         <p className="text-xs leading-5 text-slate-600">{result.evaluation.verdict}</p>
+                        <div className="rounded-md border border-slate-200 bg-white p-3 text-xs">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <span className={`rounded-md px-2 py-1 font-medium ${decisionClass(result.evaluation.decision.severity)}`}>
+                              {result.evaluation.decision.label}
+                            </span>
+                            <span className="text-slate-500">{result.evaluation.decision.nextAction}</span>
+                          </div>
+                          <p className="mt-2 leading-5 text-slate-600">{result.evaluation.decision.rationale}</p>
+                          {result.evaluation.decision.reasons.length ? (
+                            <div className="mt-2 grid gap-1 text-slate-500">
+                              {result.evaluation.decision.reasons.slice(0, 3).map((reason) => (
+                                <div key={reason}>{reason}</div>
+                              ))}
+                            </div>
+                          ) : null}
+                        </div>
                         <div className="grid gap-2 text-xs text-slate-500">
                           <div>改动：{result.evaluation.changedFields.slice(0, 5).join("、") || "暂无明显字段变化"}</div>
                           <div>旧稿：{result.evaluation.oldPreview}</div>

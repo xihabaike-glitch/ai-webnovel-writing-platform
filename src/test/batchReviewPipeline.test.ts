@@ -24,6 +24,21 @@ test("buildReviewPipelineQueue", async (t) => {
     assert.equal(queue.candidates[0].reviewStatus, "ready");
   });
 
+  await t.test("carries project start tactics into the review queue", () => {
+    const queue = buildReviewPipelineQueue([chapter], [], 5, {
+      title: "首轮平台打法：番茄小说",
+      label: "模板推荐",
+      primaryTactic: "先抓首章钩子，再用前三章连续兑现爽点和情绪回报。",
+      openingMove: "第一段给不可逆损失。",
+      verificationMove: "跑前三章后复盘追读。",
+      risk: "解释过多会掉首秀。",
+    });
+
+    assert.equal(queue.startTactic?.label, "模板推荐");
+    assert.ok(queue.startTactic?.openingMove.includes("不可逆损失"));
+    assert.deepEqual(queue.recommendedReviewChapterIds, ["chapter-1"]);
+  });
+
   await t.test("recommends reviewed weak chapters for second pass", () => {
     const queue = buildReviewPipelineQueue([chapter], [
       {

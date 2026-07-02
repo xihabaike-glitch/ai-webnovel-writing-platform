@@ -21,12 +21,22 @@ interface ReviewPipelineCandidate {
   recommendedSecondPass: boolean;
 }
 
+interface ProjectStartTacticSummary {
+  title: string;
+  label: string;
+  primaryTactic: string;
+  openingMove: string;
+  verificationMove: string;
+  risk: string;
+}
+
 interface ReviewPipelineQueue {
   totalCandidates: number;
   reviewReadyCount: number;
   secondPassReadyCount: number;
   recommendedReviewChapterIds: string[];
   recommendedSecondPassChapterIds: string[];
+  startTactic: ProjectStartTacticSummary | null;
   warnings: string[];
   candidates: ReviewPipelineCandidate[];
 }
@@ -441,6 +451,20 @@ export function BatchReviewPipelinePanel({ projectId }: { projectId: string }) {
     );
   }
 
+  function renderStartTactic(startTactic: ProjectStartTacticSummary | null) {
+    if (!startTactic) return null;
+
+    return (
+      <div className="mt-2 border-l-2 border-emerald-500 pl-3 text-xs text-emerald-900">
+        <div className="font-medium">首轮平台打法 · {startTactic.label}</div>
+        <div className="mt-1">{startTactic.primaryTactic}</div>
+        {startTactic.openingMove ? <div className="mt-1">开头：{startTactic.openingMove}</div> : null}
+        {startTactic.verificationMove ? <div className="mt-1">验证：{startTactic.verificationMove}</div> : null}
+        {startTactic.risk ? <div className="mt-1 text-emerald-800">风险：{startTactic.risk}</div> : null}
+      </div>
+    );
+  }
+
   useEffect(() => {
     void loadQueue();
   }, [projectId]);
@@ -597,6 +621,7 @@ export function BatchReviewPipelinePanel({ projectId }: { projectId: string }) {
             <div>
               <div className="font-medium text-slate-950">第 {candidate.order} 章 · {candidate.title}</div>
               <p className="mt-1 text-slate-600">{candidate.reason}</p>
+              {renderStartTactic(queue.startTactic)}
               {candidate.secondPassStatus === "ready" ? (
                 <p className="mt-1 text-slate-500">二改方向：{modeLabel(candidate.secondPassMode)} · {candidate.instruction}</p>
               ) : null}

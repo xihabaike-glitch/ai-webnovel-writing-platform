@@ -1,4 +1,5 @@
 import type { SecondPassMode } from "./buildChapterSecondPassPrompt.ts";
+import type { ProjectStartTacticSummary } from "../projects/projectStartTactics.ts";
 
 export interface ReviewPipelineChapter {
   id: string;
@@ -40,6 +41,7 @@ export interface ReviewPipelineQueue {
   secondPassReadyCount: number;
   recommendedReviewChapterIds: string[];
   recommendedSecondPassChapterIds: string[];
+  startTactic: ProjectStartTacticSummary | null;
   warnings: string[];
   candidates: ReviewPipelineCandidate[];
 }
@@ -164,6 +166,7 @@ export function buildReviewPipelineQueue(
   chapters: ReviewPipelineChapter[],
   tasks: ReviewPipelineTask[],
   limit = 5,
+  startTactic: ProjectStartTacticSummary | null = null,
 ): ReviewPipelineQueue {
   const orderedTasks = [...tasks].sort((left, right) => (
     new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime()
@@ -187,6 +190,7 @@ export function buildReviewPipelineQueue(
     secondPassReadyCount: secondPassReady.length,
     recommendedReviewChapterIds: reviewReady.slice(0, limit).map((candidate) => candidate.chapterId),
     recommendedSecondPassChapterIds: secondPassReady.slice(0, limit).map((candidate) => candidate.chapterId),
+    startTactic,
     warnings,
     candidates,
   };

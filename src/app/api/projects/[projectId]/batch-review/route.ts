@@ -10,6 +10,7 @@ import { prisma } from "@/lib/db/prisma";
 import { getActiveModelProvider } from "@/lib/model-gateway/activeProvider";
 import { buildBatchRouteEffectSummary } from "@/lib/model-gateway/batchRouteEffectSummary";
 import { buildRouteRecommendations } from "@/lib/model-gateway/routeRecommendations";
+import { findProjectStartTacticSummary } from "@/lib/projects/projectStartTactics";
 
 interface Params {
   params: Promise<{ projectId: string }>;
@@ -22,19 +23,25 @@ const batchReviewSchema = z.object({
 });
 
 async function getQueue(projectId: string) {
-  const chapters = await prisma.chapter.findMany({
-    where: { projectId },
-    orderBy: { order: "asc" },
-  });
-  const tasks = await prisma.aiTask.findMany({
-    where: {
-      projectId,
-      taskType: { in: ["chapter_review", "chapter_second_pass"] },
-    },
-    orderBy: { createdAt: "desc" },
-  });
+  const [chapters, tasks, worldEntries] = await Promise.all([
+    prisma.chapter.findMany({
+      where: { projectId },
+      orderBy: { order: "asc" },
+    }),
+    prisma.aiTask.findMany({
+      where: {
+        projectId,
+        taskType: { in: ["chapter_review", "chapter_second_pass"] },
+      },
+      orderBy: { createdAt: "desc" },
+    }),
+    prisma.worldEntry.findMany({
+      where: { projectId },
+      orderBy: [{ type: "asc" }, { createdAt: "asc" }],
+    }),
+  ]);
 
-  return buildReviewPipelineQueue(chapters, tasks);
+  return buildReviewPipelineQueue(chapters, tasks, 5, findProjectStartTacticSummary(worldEntries));
 }
 
 async function activeProviderView() {

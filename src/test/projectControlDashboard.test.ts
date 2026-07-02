@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { getPlatformProfile } from "../lib/platforms/platformProfiles.ts";
+import { getPlatformProfile, platformProfiles } from "../lib/platforms/platformProfiles.ts";
 import { buildProjectControlDashboard } from "../lib/projects/projectControlDashboard.ts";
 
 const project = {
@@ -179,5 +179,50 @@ test("buildProjectControlDashboard", async (t) => {
     assert.ok(dashboard.platformVerdict.actionLabel.length > 0);
     assert.equal(dashboard.areas.find((area) => area.id === "world")?.status, "good");
     assert.equal(dashboard.areas.find((area) => area.id === "export")?.status, "good");
+  });
+
+  await t.test("promotes executable asset generation after evidence baseline exists", () => {
+    const dashboard = buildProjectControlDashboard({
+      project,
+      platform: getPlatformProfile("fanqie"),
+      chapters: [chapter],
+      outlineNodes: [],
+      characters: [],
+      worldEntries: [],
+      foreshadows: [],
+      plotThreads: [],
+      aiTasks: [],
+      publishSnapshots: platformProfiles.map((platform) => ({
+          id: `snapshot-weak-asset-${platform.id}`,
+          platformId: platform.id,
+          platformName: platform.name,
+          title: "夜雨系统",
+          action: "snapshot",
+          chapterCount: 1,
+          wordCount: 1200,
+          preflightScore: 55,
+          canExport: false,
+          createdAt: "2026-01-04T00:00:00.000Z",
+        })),
+      submissionAssets: platformProfiles.map((platform) => ({
+          id: `asset-weak-${platform.id}`,
+          platformId: platform.id,
+          platformName: platform.name,
+          title: "夜",
+          logline: "系统。",
+          synopsis: "她醒了。",
+          overseasSynopsis: "",
+          tags: ["慢热"],
+          note: "弱资产。",
+          source: "manual",
+          updatedAt: "2026-01-04T01:00:00.000Z",
+        })),
+      submissionChecklist: checklist,
+    });
+
+    assert.equal(dashboard.platformVerdict.actionKind, "generate_asset_variants");
+    assert.equal(dashboard.platformVerdict.actionExecutable, true);
+    assert.equal(dashboard.platformVerdict.actionLabel, "生成投稿资产候选");
+    assert.equal(dashboard.platformVerdict.actionAnchor, "submission-asset-editor");
   });
 });

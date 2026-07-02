@@ -190,7 +190,7 @@ export interface PlatformControlVerdictSummary {
   status: PlatformStrategyAutoVerdict["status"];
   headline: string;
   nextAction: string;
-  actionKind: "save_evidence_baseline" | "open_target";
+  actionKind: "save_evidence_baseline" | "generate_asset_variants" | "open_target";
   actionLabel: string;
   actionExecutable: boolean;
   actionAnchor: string;
@@ -218,20 +218,20 @@ function platformVerdictAction(
       actionAnchor: "package-version-history",
     };
   }
+  if (primaryPlatformId && (firstGap.includes("投稿资产") || nextAction.includes("投稿资产") || nextAction.includes("入口"))) {
+    return {
+      actionKind: "generate_asset_variants",
+      actionLabel: "生成投稿资产候选",
+      actionExecutable: true,
+      actionAnchor: "submission-asset-editor",
+    };
+  }
   if (firstGap.includes("真实曝光") || firstGap.includes("点击") || firstGap.includes("追读")) {
     return {
       actionKind: "open_target",
       actionLabel: "录入发布效果",
       actionExecutable: false,
       actionAnchor: "publish-effect-panel",
-    };
-  }
-  if (nextAction.includes("投稿资产") || nextAction.includes("入口")) {
-    return {
-      actionKind: "open_target",
-      actionLabel: "处理投稿资产",
-      actionExecutable: false,
-      actionAnchor: "submission-asset-editor",
     };
   }
   if (nextAction.includes("前三章") || nextAction.includes("开头")) {

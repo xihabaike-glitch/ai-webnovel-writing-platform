@@ -68,7 +68,7 @@ interface PlatformControlVerdictSummary {
   status: "ready" | "needs_evidence" | "needs_repair";
   headline: string;
   nextAction: string;
-  actionKind: "save_evidence_baseline" | "open_target";
+  actionKind: "save_evidence_baseline" | "generate_asset_variants" | "open_target";
   actionLabel: string;
   actionExecutable: boolean;
   actionAnchor: string;
@@ -171,19 +171,37 @@ export function ProjectControlDashboardPanel({ projectId }: { projectId: string 
   }
 
   async function executePlatformVerdictAction() {
-    if (!dashboard?.platformVerdict.primaryPlatformId || dashboard.platformVerdict.actionKind !== "save_evidence_baseline") return;
+    if (!dashboard?.platformVerdict.primaryPlatformId || !dashboard.platformVerdict.actionExecutable) return;
     setRunningVerdictAction(true);
     setMessage(null);
     try {
-      const response = await fetch(`/api/projects/${projectId}/platform-export`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "snapshot", platformId: dashboard.platformVerdict.primaryPlatformId }),
-      });
-      const payload = await response.json().catch(() => null) as { message?: string; error?: string } | null;
-      if (!response.ok) throw new Error(payload?.error ?? "保存证据基准失败。");
+      if (dashboard.platformVerdict.actionKind === "save_evidence_baseline") {
+        const response = await fetch(`/api/projects/${projectId}/platform-export`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "snapshot", platformId: dashboard.platformVerdict.primaryPlatformId }),
+        });
+        const payload = await response.json().catch(() => null) as { message?: string; error?: string } | null;
+        if (!response.ok) throw new Error(payload?.error ?? "保存证据基准失败。");
+        await loadDashboard();
+        setMessage(payload?.message ?? "证据基准已保存。");
+        return;
+      }
+
+      if (dashboard.platformVerdict.actionKind === "generate_asset_variants") {
+        const response = await fetch(`/api/projects/${projectId}/platform-export/asset-optimize`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ platformId: dashboard.platformVerdict.primaryPlatformId }),
+        });
+        const payload = await response.json().catch(() => null) as { variants?: unknown[]; error?: string } | null;
+        if (!response.ok || !payload?.variants) throw new Error(payload?.error ?? "生成投稿资产候选失败。");
+        await loadDashboard();
+        setMessage(`已生成 ${payload.variants.length} 个投稿资产候选，去采纳一个，别光看热闹。`);
+        return;
+      }
+
       await loadDashboard();
-      setMessage(payload?.message ?? "证据基准已保存。");
     } catch (caught) {
       setMessage(caught instanceof Error ? caught.message : "执行平台裁决动作失败。");
     } finally {

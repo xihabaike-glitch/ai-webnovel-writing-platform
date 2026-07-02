@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { buildReviewPipelineQueue } from "@/lib/ai/batchReviewPipeline";
+import type { Project } from "@prisma/client";
+import { buildReviewPipelineQueue, type ReviewPipelineQueue } from "@/lib/ai/batchReviewPipeline";
 import { buildBatchRunGuard } from "@/lib/ai/batchRunGuard";
 import { generateChapterSecondPass } from "@/lib/ai/chapterSecondPassGeneration";
 import { reviewChapterDraft } from "@/lib/ai/chapterReviewGeneration";
@@ -46,6 +47,45 @@ async function activeProviderView() {
   };
 }
 
+async function getRecentBudgetTasks(projectId: string) {
+  return prisma.aiTask.findMany({
+    where: { projectId },
+    select: {
+      taskType: true,
+      status: true,
+      inputTokens: true,
+      outputTokens: true,
+      costUsd: true,
+    },
+    take: 500,
+    orderBy: { createdAt: "desc" },
+  });
+}
+
+function buildBudgetPreviews(
+  project: Project,
+  queue: ReviewPipelineQueue,
+  recentTasks: Awaited<ReturnType<typeof getRecentBudgetTasks>>,
+) {
+  const reviewBatchSize = queue.recommendedReviewChapterIds.length || Math.min(queue.reviewReadyCount, 5) || 1;
+  const secondPassBatchSize = queue.recommendedSecondPassChapterIds.length || Math.min(queue.secondPassReadyCount, 5) || 1;
+
+  return {
+    reviewBudgetPreview: buildModelBudgetGuard({
+      settings: project,
+      tasks: recentTasks,
+      taskType: "chapter_review",
+      batchSize: reviewBatchSize,
+    }),
+    secondPassBudgetPreview: buildModelBudgetGuard({
+      settings: project,
+      tasks: recentTasks,
+      taskType: "chapter_second_pass",
+      batchSize: secondPassBatchSize,
+    }),
+  };
+}
+
 export async function GET(_request: Request, { params }: Params) {
   const { projectId } = await params;
   const project = await prisma.project.findUnique({ where: { id: projectId } });
@@ -54,9 +94,13 @@ export async function GET(_request: Request, { params }: Params) {
     return NextResponse.json({ error: "Project not found" }, { status: 404 });
   }
 
+  const queue = await getQueue(projectId);
+  const recentTasks = await getRecentBudgetTasks(projectId);
+
   return NextResponse.json({
-    queue: await getQueue(projectId),
+    queue,
     activeProvider: await activeProviderView(),
+    ...buildBudgetPreviews(project, queue, recentTasks),
   });
 }
 
@@ -92,18 +136,7 @@ export async function POST(request: Request, { params }: Params) {
     }, { status: 400 });
   }
 
-  const recentTasks = await prisma.aiTask.findMany({
-    where: { projectId },
-    select: {
-      taskType: true,
-      status: true,
-      inputTokens: true,
-      outputTokens: true,
-      costUsd: true,
-    },
-    take: 500,
-    orderBy: { createdAt: "desc" },
-  });
+  const recentTasks = await getRecentBudgetTasks(projectId);
   const guard = buildBatchRunGuard({
     action: input.action === "review" ? "review" : "second_pass",
     batchSize: input.chapterIds.length,
@@ -116,6 +149,7 @@ export async function POST(request: Request, { params }: Params) {
       guard,
       queue,
       activeProvider: await activeProviderView(),
+      ...buildBudgetPreviews(project, queue, recentTasks),
     }, { status: 429 });
   }
   const budgetGuard = buildModelBudgetGuard({
@@ -130,6 +164,7 @@ export async function POST(request: Request, { params }: Params) {
       budgetGuard,
       queue,
       activeProvider: await activeProviderView(),
+      ...buildBudgetPreviews(project, queue, recentTasks),
     }, { status: 429 });
   }
 
@@ -168,9 +203,13 @@ export async function POST(request: Request, { params }: Params) {
     }
   }
 
+  const nextQueue = await getQueue(projectId);
+  const nextRecentTasks = await getRecentBudgetTasks(projectId);
+
   return NextResponse.json({
     results,
-    queue: await getQueue(projectId),
+    queue: nextQueue,
     activeProvider: await activeProviderView(),
+    ...buildBudgetPreviews(project, nextQueue, nextRecentTasks),
   });
 }

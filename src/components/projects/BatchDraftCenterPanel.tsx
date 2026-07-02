@@ -61,6 +61,18 @@ interface BudgetGuardView {
   repairActions: BudgetRepairAction[];
 }
 
+interface BudgetPreviewView extends BudgetGuardView {
+  status: "safe" | "warn" | "block";
+  estimatedTaskCostUsd: number;
+  estimatedBatchCostUsd: number;
+  projectedUsedUsd: number;
+  monthlyBudgetUsd: number;
+  usedUsd: number;
+  remainingBudgetUsd: number;
+  recommendedBatchSize: number;
+  failureRatePercent: number;
+}
+
 function statusLabel(status: BatchDraftCandidate["status"]) {
   const labels = {
     ready: "可生成",
@@ -79,6 +91,7 @@ export function BatchDraftCenterPanel({ projectId }: { projectId: string }) {
   const [targetWords, setTargetWords] = useState(1200);
   const [results, setResults] = useState<BatchDraftResult[]>([]);
   const [budgetGuard, setBudgetGuard] = useState<BudgetGuardView | null>(null);
+  const [budgetPreview, setBudgetPreview] = useState<BudgetPreviewView | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -102,9 +115,11 @@ export function BatchDraftCenterPanel({ projectId }: { projectId: string }) {
       const payload = (await response.json()) as {
         queue: BatchDraftQueue;
         activeProvider: ActiveProvider;
+        budgetPreview?: BudgetPreviewView;
       };
       setQueue(payload.queue);
       setActiveProvider(payload.activeProvider);
+      if (payload.budgetPreview) setBudgetPreview(payload.budgetPreview);
       setSelectedIds((current) => {
         const kept = current.filter((chapterId) => payload.queue.recommendedChapterIds.includes(chapterId));
         return kept.length ? kept : payload.queue.recommendedChapterIds;
@@ -134,14 +149,17 @@ export function BatchDraftCenterPanel({ projectId }: { projectId: string }) {
         error?: string;
         guard?: { warnings?: string[] };
         budgetGuard?: BudgetGuardView;
+        budgetPreview?: BudgetPreviewView;
       };
       if (!response.ok) {
         if (payload.budgetGuard) setBudgetGuard(payload.budgetGuard);
+        if (payload.budgetPreview) setBudgetPreview(payload.budgetPreview);
         throw new Error([payload.error, ...(payload.guard?.warnings ?? [])].filter(Boolean).join(" "));
       }
       setResults(payload.results ?? []);
       if (payload.queue) setQueue(payload.queue);
       if (payload.activeProvider) setActiveProvider(payload.activeProvider);
+      if (payload.budgetPreview) setBudgetPreview(payload.budgetPreview);
       setSelectedIds(payload.queue?.recommendedChapterIds ?? []);
       const succeeded = (payload.results ?? []).filter((result) => result.status === "succeeded").length;
       const failed = (payload.results ?? []).filter((result) => result.status === "failed").length;
@@ -203,6 +221,24 @@ export function BatchDraftCenterPanel({ projectId }: { projectId: string }) {
     document.getElementById("model-task-audit")?.scrollIntoView({ behavior: "smooth", block: "start" });
     window.history.replaceState(null, "", "#model-task-audit");
     setMessage("已定位到模型预算中心，可以调整额度或拦截模式。");
+  }
+
+  function usd(value: number) {
+    return `$${value.toFixed(value >= 1 ? 2 : 4)}`;
+  }
+
+  function previewTone(status: BudgetPreviewView["status"]) {
+    if (status === "block") return "border-rose-200 bg-rose-50 text-rose-900";
+    if (status === "warn") return "border-amber-200 bg-amber-50 text-amber-900";
+    return "border-emerald-200 bg-emerald-50 text-emerald-900";
+  }
+
+  function applyPreviewBatch() {
+    if (!budgetPreview) return;
+    const nextSize = Math.max(1, Math.min(budgetPreview.recommendedBatchSize, readyIds.length || 1, 5));
+    const sourceIds = selectedIds.length >= nextSize ? selectedIds : readyIds;
+    setSelectedIds(sourceIds.slice(0, nextSize));
+    setMessage(`已按预算预估选择 ${nextSize} 章。`);
   }
 
   useEffect(() => {
@@ -319,6 +355,27 @@ export function BatchDraftCenterPanel({ projectId }: { projectId: string }) {
                 <div className="rounded-md bg-slate-50 p-2" key={warning}>{warning}</div>
               ))}
             </div>
+            {budgetPreview ? (
+              <div className={`rounded-md border p-3 ${previewTone(budgetPreview.status)}`}>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="font-medium">预算预估</div>
+                  <button
+                    className="rounded-md border border-current px-2 py-1 text-xs font-medium hover:bg-white/60"
+                    disabled={readyIds.length === 0}
+                    onClick={applyPreviewBatch}
+                    type="button"
+                  >
+                    按推荐选 {Math.min(budgetPreview.recommendedBatchSize, readyIds.length || 1, 5)} 章
+                  </button>
+                </div>
+                <div className="mt-2 grid gap-1 text-xs">
+                  <div>当前选择预计：{usd(budgetPreview.estimatedTaskCostUsd * Math.max(1, selectedIds.length))}</div>
+                  <div>执行后累计：{usd(budgetPreview.usedUsd + budgetPreview.estimatedTaskCostUsd * Math.max(1, selectedIds.length))} / {usd(budgetPreview.monthlyBudgetUsd)}</div>
+                  <div>推荐最大批量：{Math.min(budgetPreview.recommendedBatchSize, 5)} 章 · 失败率 {budgetPreview.failureRatePercent}%</div>
+                  <div>{budgetPreview.summary}</div>
+                </div>
+              </div>
+            ) : null}
           </div>
         </div>
 

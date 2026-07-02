@@ -50,6 +50,8 @@ export interface ModelBudgetGuard {
   projectedUsedUsd: number;
   monthlyBudgetUsd: number;
   usedUsd: number;
+  remainingBudgetUsd: number;
+  recommendedBatchSize: number;
   failureRatePercent: number;
   blockers: string[];
   warnings: string[];
@@ -104,6 +106,27 @@ function estimateTaskCost(tasks: ModelBudgetTask[], taskType: string) {
   return 0;
 }
 
+function batchCapacity(input: {
+  batchSize: number;
+  estimatedTaskCostUsd: number;
+  usedUsd: number;
+  monthlyBudgetUsd: number;
+  maxBatchCostUsd: number;
+}) {
+  const remainingBudgetUsd = Math.max(0, input.monthlyBudgetUsd - input.usedUsd);
+  const maxByBatchLimit = input.estimatedTaskCostUsd > 0
+    ? Math.floor(input.maxBatchCostUsd / input.estimatedTaskCostUsd)
+    : input.batchSize;
+  const maxByMonthlyLimit = input.estimatedTaskCostUsd > 0
+    ? Math.floor(remainingBudgetUsd / input.estimatedTaskCostUsd)
+    : input.batchSize;
+
+  return {
+    remainingBudgetUsd: money(remainingBudgetUsd),
+    recommendedBatchSize: Math.max(1, Math.min(input.batchSize, maxByBatchLimit, maxByMonthlyLimit)),
+  };
+}
+
 function taskTypeLabel(taskType: string) {
   const labels: Record<string, string> = {
     chapter_draft: "正文初稿",
@@ -131,14 +154,7 @@ function buildRepairActions(input: {
   warnings: string[];
 }): ModelBudgetRepairAction[] {
   const actions: ModelBudgetRepairAction[] = [];
-  const remainingBudgetUsd = Math.max(0, input.monthlyBudgetUsd - input.usedUsd);
-  const maxByBatchLimit = input.estimatedTaskCostUsd > 0
-    ? Math.floor(input.maxBatchCostUsd / input.estimatedTaskCostUsd)
-    : input.batchSize;
-  const maxByMonthlyLimit = input.estimatedTaskCostUsd > 0
-    ? Math.floor(remainingBudgetUsd / input.estimatedTaskCostUsd)
-    : input.batchSize;
-  const recommendedBatchSize = Math.max(1, Math.min(input.batchSize, maxByBatchLimit, maxByMonthlyLimit));
+  const { recommendedBatchSize } = batchCapacity(input);
 
   if (input.batchSize > 1 && recommendedBatchSize < input.batchSize) {
     actions.push({
@@ -215,6 +231,13 @@ export function buildModelBudgetGuard(input: ModelBudgetGuardInput): ModelBudget
   const estimatedBatchCostUsd = money(estimatedTaskCostUsd * batchSize);
   const usedUsd = knownCost(input.tasks);
   const projectedUsedUsd = money(usedUsd + estimatedBatchCostUsd);
+  const { remainingBudgetUsd, recommendedBatchSize } = batchCapacity({
+    batchSize,
+    estimatedTaskCostUsd,
+    usedUsd,
+    monthlyBudgetUsd: settings.aiMonthlyBudgetUsd,
+    maxBatchCostUsd: settings.aiMaxBatchCostUsd,
+  });
   const failureRatePercent = failureRate(input.tasks);
   const warnings: string[] = [];
   const blockers: string[] = [];
@@ -267,6 +290,8 @@ export function buildModelBudgetGuard(input: ModelBudgetGuardInput): ModelBudget
     projectedUsedUsd,
     monthlyBudgetUsd: settings.aiMonthlyBudgetUsd,
     usedUsd,
+    remainingBudgetUsd,
+    recommendedBatchSize,
     failureRatePercent,
     blockers,
     warnings,

@@ -32,6 +32,8 @@ test("model budget guard", async (t) => {
 
     assert.equal(guard.allowed, false);
     assert.equal(guard.status, "block");
+    assert.equal(guard.remainingBudgetUsd, 0);
+    assert.equal(guard.recommendedBatchSize, 1);
     assert.ok(guard.blockers.some((blocker) => blocker.includes("月预算")));
     const batchAction = guard.repairActions.find((action) => action.id === "reduce_batch_size");
     const budgetAction = guard.repairActions.find((action) => action.id === "raise_budget_or_warn");

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { buildBatchDraftQueue } from "@/lib/ai/batchDrafts";
+import type { Project } from "@prisma/client";
+import { buildBatchDraftQueue, type BatchDraftQueue } from "@/lib/ai/batchDrafts";
 import { buildBatchRunGuard } from "@/lib/ai/batchRunGuard";
 import { generateChapterDraft } from "@/lib/ai/chapterDraftGeneration";
 import { buildModelBudgetGuard } from "@/lib/ai/modelBudget";
@@ -50,6 +51,35 @@ async function activeProviderView() {
   };
 }
 
+async function getRecentBudgetTasks(projectId: string) {
+  return prisma.aiTask.findMany({
+    where: { projectId },
+    select: {
+      taskType: true,
+      status: true,
+      inputTokens: true,
+      outputTokens: true,
+      costUsd: true,
+    },
+    take: 500,
+    orderBy: { createdAt: "desc" },
+  });
+}
+
+function buildBudgetPreview(
+  project: Project,
+  queue: BatchDraftQueue,
+  recentTasks: Awaited<ReturnType<typeof getRecentBudgetTasks>>,
+) {
+  const suggestedBatchSize = queue.recommendedChapterIds.length || Math.min(queue.readyCandidates, 5) || 1;
+  return buildModelBudgetGuard({
+    settings: project,
+    tasks: recentTasks,
+    taskType: "chapter_draft",
+    batchSize: suggestedBatchSize,
+  });
+}
+
 export async function GET(_request: Request, { params }: Params) {
   const { projectId } = await params;
   const project = await prisma.project.findUnique({ where: { id: projectId } });
@@ -58,9 +88,13 @@ export async function GET(_request: Request, { params }: Params) {
     return NextResponse.json({ error: "Project not found" }, { status: 404 });
   }
 
+  const queue = await getQueue(projectId, project.targetPlatform);
+  const recentTasks = await getRecentBudgetTasks(projectId);
+
   return NextResponse.json({
-    queue: await getQueue(projectId, project.targetPlatform),
+    queue,
     activeProvider: await activeProviderView(),
+    budgetPreview: buildBudgetPreview(project, queue, recentTasks),
   });
 }
 
@@ -92,18 +126,7 @@ export async function POST(request: Request, { params }: Params) {
     }, { status: 400 });
   }
 
-  const recentTasks = await prisma.aiTask.findMany({
-    where: { projectId },
-    select: {
-      taskType: true,
-      status: true,
-      inputTokens: true,
-      outputTokens: true,
-      costUsd: true,
-    },
-    take: 500,
-    orderBy: { createdAt: "desc" },
-  });
+  const recentTasks = await getRecentBudgetTasks(projectId);
   const guard = buildBatchRunGuard({
     action: "draft",
     batchSize: input.chapterIds.length,
@@ -116,6 +139,7 @@ export async function POST(request: Request, { params }: Params) {
       guard,
       queue,
       activeProvider: await activeProviderView(),
+      budgetPreview: buildBudgetPreview(project, queue, recentTasks),
     }, { status: 429 });
   }
   const budgetGuard = buildModelBudgetGuard({
@@ -130,6 +154,7 @@ export async function POST(request: Request, { params }: Params) {
       budgetGuard,
       queue,
       activeProvider: await activeProviderView(),
+      budgetPreview: buildBudgetPreview(project, queue, recentTasks),
     }, { status: 429 });
   }
 
@@ -152,9 +177,13 @@ export async function POST(request: Request, { params }: Params) {
     });
   }
 
+  const nextQueue = await getQueue(projectId, project.targetPlatform);
+  const nextRecentTasks = await getRecentBudgetTasks(projectId);
+
   return NextResponse.json({
     results,
-    queue: await getQueue(projectId, project.targetPlatform),
+    queue: nextQueue,
     activeProvider: await activeProviderView(),
+    budgetPreview: buildBudgetPreview(project, nextQueue, nextRecentTasks),
   });
 }

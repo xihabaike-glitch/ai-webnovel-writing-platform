@@ -68,6 +68,18 @@ interface BudgetGuardView {
   repairActions: BudgetRepairAction[];
 }
 
+interface BudgetPreviewView extends BudgetGuardView {
+  status: "safe" | "warn" | "block";
+  estimatedTaskCostUsd: number;
+  estimatedBatchCostUsd: number;
+  projectedUsedUsd: number;
+  monthlyBudgetUsd: number;
+  usedUsd: number;
+  remainingBudgetUsd: number;
+  recommendedBatchSize: number;
+  failureRatePercent: number;
+}
+
 function reviewStatusLabel(status: ReviewPipelineCandidate["reviewStatus"]) {
   const labels = {
     ready: "待审稿",
@@ -107,6 +119,8 @@ export function BatchReviewPipelinePanel({ projectId }: { projectId: string }) {
   const [targetWords, setTargetWords] = useState(1200);
   const [results, setResults] = useState<BatchPipelineResult[]>([]);
   const [budgetGuard, setBudgetGuard] = useState<BudgetGuardView | null>(null);
+  const [reviewBudgetPreview, setReviewBudgetPreview] = useState<BudgetPreviewView | null>(null);
+  const [secondPassBudgetPreview, setSecondPassBudgetPreview] = useState<BudgetPreviewView | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [runningAction, setRunningAction] = useState<"review" | "second_pass" | null>(null);
   const [lastBudgetAction, setLastBudgetAction] = useState<"review" | "second_pass" | null>(null);
@@ -131,9 +145,13 @@ export function BatchReviewPipelinePanel({ projectId }: { projectId: string }) {
       const payload = (await response.json()) as {
         queue: ReviewPipelineQueue;
         activeProvider: ActiveProvider;
+        reviewBudgetPreview?: BudgetPreviewView;
+        secondPassBudgetPreview?: BudgetPreviewView;
       };
       setQueue(payload.queue);
       setActiveProvider(payload.activeProvider);
+      if (payload.reviewBudgetPreview) setReviewBudgetPreview(payload.reviewBudgetPreview);
+      if (payload.secondPassBudgetPreview) setSecondPassBudgetPreview(payload.secondPassBudgetPreview);
       setSelectedReviewIds((current) => {
         const kept = current.filter((chapterId) => payload.queue.recommendedReviewChapterIds.includes(chapterId));
         return kept.length ? kept : payload.queue.recommendedReviewChapterIds;
@@ -169,14 +187,20 @@ export function BatchReviewPipelinePanel({ projectId }: { projectId: string }) {
         error?: string;
         guard?: { warnings?: string[] };
         budgetGuard?: BudgetGuardView;
+        reviewBudgetPreview?: BudgetPreviewView;
+        secondPassBudgetPreview?: BudgetPreviewView;
       };
       if (!response.ok) {
         if (payload.budgetGuard) setBudgetGuard(payload.budgetGuard);
+        if (payload.reviewBudgetPreview) setReviewBudgetPreview(payload.reviewBudgetPreview);
+        if (payload.secondPassBudgetPreview) setSecondPassBudgetPreview(payload.secondPassBudgetPreview);
         throw new Error([payload.error, ...(payload.guard?.warnings ?? [])].filter(Boolean).join(" "));
       }
       setResults(payload.results ?? []);
       if (payload.queue) setQueue(payload.queue);
       if (payload.activeProvider) setActiveProvider(payload.activeProvider);
+      if (payload.reviewBudgetPreview) setReviewBudgetPreview(payload.reviewBudgetPreview);
+      if (payload.secondPassBudgetPreview) setSecondPassBudgetPreview(payload.secondPassBudgetPreview);
       setSelectedReviewIds(payload.queue?.recommendedReviewChapterIds ?? []);
       setSelectedSecondPassIds(payload.queue?.recommendedSecondPassChapterIds ?? []);
       const succeeded = (payload.results ?? []).filter((result) => result.status === "succeeded").length;
@@ -255,6 +279,60 @@ export function BatchReviewPipelinePanel({ projectId }: { projectId: string }) {
     document.getElementById("model-task-audit")?.scrollIntoView({ behavior: "smooth", block: "start" });
     window.history.replaceState(null, "", "#model-task-audit");
     setMessage("已定位到模型预算中心，可以调整额度或拦截模式。");
+  }
+
+  function usd(value: number) {
+    return `$${value.toFixed(value >= 1 ? 2 : 4)}`;
+  }
+
+  function previewTone(status: BudgetPreviewView["status"]) {
+    if (status === "block") return "border-rose-200 bg-rose-50 text-rose-900";
+    if (status === "warn") return "border-amber-200 bg-amber-50 text-amber-900";
+    return "border-emerald-200 bg-emerald-50 text-emerald-900";
+  }
+
+  function applyPreviewBatch(action: "review" | "second_pass") {
+    const preview = action === "review" ? reviewBudgetPreview : secondPassBudgetPreview;
+    const readyIds = action === "review" ? reviewReadyIds : secondPassReadyIds;
+    if (!preview) return;
+    const nextSize = Math.max(1, Math.min(preview.recommendedBatchSize, readyIds.length || 1, 5));
+    const nextIds = readyIds.slice(0, nextSize);
+    if (action === "review") {
+      setSelectedReviewIds(nextIds);
+    } else {
+      setSelectedSecondPassIds(nextIds);
+    }
+    setMessage(`已按预算预估选择 ${nextSize} 个${action === "review" ? "审稿" : "二改"}任务。`);
+  }
+
+  function renderBudgetPreview(action: "review" | "second_pass") {
+    const preview = action === "review" ? reviewBudgetPreview : secondPassBudgetPreview;
+    const selectedCount = action === "review" ? selectedReviewIds.length : selectedSecondPassIds.length;
+    const readyCount = action === "review" ? reviewReadyIds.length : secondPassReadyIds.length;
+    if (!preview) return null;
+    const estimatedBatch = preview.estimatedTaskCostUsd * Math.max(1, selectedCount);
+
+    return (
+      <div className={`rounded-md border p-3 ${previewTone(preview.status)}`}>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="font-medium">预算预估</div>
+          <button
+            className="rounded-md border border-current px-2 py-1 text-xs font-medium hover:bg-white/60"
+            disabled={readyCount === 0}
+            onClick={() => applyPreviewBatch(action)}
+            type="button"
+          >
+            按推荐选 {Math.min(preview.recommendedBatchSize, readyCount || 1, 5)} 个
+          </button>
+        </div>
+        <div className="mt-2 grid gap-1 text-xs">
+          <div>当前选择预计：{usd(estimatedBatch)}</div>
+          <div>执行后累计：{usd(preview.usedUsd + estimatedBatch)} / {usd(preview.monthlyBudgetUsd)}</div>
+          <div>推荐最大批量：{Math.min(preview.recommendedBatchSize, 5)} 个 · 失败率 {preview.failureRatePercent}%</div>
+          <div>{preview.summary}</div>
+        </div>
+      </div>
+    );
   }
 
   useEffect(() => {
@@ -341,6 +419,7 @@ export function BatchReviewPipelinePanel({ projectId }: { projectId: string }) {
             >
               {runningAction === "review" ? "审稿中" : "开始批量审稿"}
             </button>
+            {renderBudgetPreview("review")}
           </div>
         </div>
 
@@ -374,6 +453,7 @@ export function BatchReviewPipelinePanel({ projectId }: { projectId: string }) {
             >
               {runningAction === "second_pass" ? "二改中" : "开始批量二改"}
             </button>
+            {renderBudgetPreview("second_pass")}
           </div>
         </div>
 

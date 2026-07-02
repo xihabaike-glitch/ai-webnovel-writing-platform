@@ -401,6 +401,19 @@ interface PlatformStrategyReviewTaskReceipt {
   nextAction: string;
   href: string;
   severity: "success" | "needs_action";
+  beforeScore: number;
+  afterScore: number;
+  scoreDelta: number;
+  scoreChanges: PlatformStrategyScoreDeltaItem[];
+  draggers: string[];
+}
+
+interface PlatformStrategyScoreDeltaItem {
+  key: keyof PlatformStrategyRankItem["scores"];
+  label: string;
+  before: number;
+  after: number;
+  delta: number;
 }
 
 interface PlatformStrategySwitchStep {
@@ -673,10 +686,44 @@ function strategyReviewHistoryClass(type: PlatformStrategyReviewHistoryItem["typ
   return "bg-amber-50 text-amber-700";
 }
 
+const strategyScoreLabels: { key: keyof PlatformStrategyRankItem["scores"]; label: string }[] = [
+  { key: "preflight", label: "质检" },
+  { key: "asset", label: "资产" },
+  { key: "effect", label: "效果" },
+  { key: "comparison", label: "对照" },
+  { key: "adoption", label: "采纳" },
+];
+
+function buildStrategyScoreChanges(
+  before: PlatformStrategyRankItem,
+  after: PlatformStrategyRankItem,
+): PlatformStrategyScoreDeltaItem[] {
+  return strategyScoreLabels.map((item) => ({
+    ...item,
+    before: before.scores[item.key],
+    after: after.scores[item.key],
+    delta: after.scores[item.key] - before.scores[item.key],
+  }));
+}
+
+function buildStrategyScoreDraggers(item: PlatformStrategyRankItem) {
+  return strategyScoreLabels
+    .map((score) => ({ label: score.label, value: item.scores[score.key] }))
+    .sort((left, right) => left.value - right.value)
+    .slice(0, 2)
+    .map((score) => `${score.label} ${score.value}`);
+}
+
+function scoreDeltaLabel(delta: number) {
+  if (delta > 0) return `+${delta}`;
+  return String(delta);
+}
+
 function buildStrategyReviewTaskReceipt(
   item: PlatformStrategyRankItem,
   task: PlatformStrategyReviewTask,
   resultLabel: string,
+  afterItem = item,
 ): PlatformStrategyReviewTaskReceipt {
   const nextAction = task.execution === "generate_asset_variants"
     ? "去投稿资产区采纳一个候选，否则生成再多也不会进入实测。"
@@ -687,6 +734,7 @@ function buildStrategyReviewTaskReceipt(
         : task.execution === "apply_strategy"
           ? "主战场已切换，继续按执行链处理下一步。"
           : "继续在目标面板补齐数据或处理卡点。";
+  const scoreDelta = afterItem.score - item.score;
 
   return {
     id: `${item.platformId}:${task.id}:${Date.now()}`,
@@ -697,7 +745,12 @@ function buildStrategyReviewTaskReceipt(
     message: resultLabel,
     nextAction,
     href: task.href,
-    severity: task.execution === "open_target" ? "needs_action" : "success",
+    severity: task.execution === "open_target" || scoreDelta < 0 ? "needs_action" : "success",
+    beforeScore: item.score,
+    afterScore: afterItem.score,
+    scoreDelta,
+    scoreChanges: buildStrategyScoreChanges(item, afterItem),
+    draggers: buildStrategyScoreDraggers(afterItem),
   };
 }
 
@@ -909,8 +962,10 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
       setCenter(payload.center);
       setSelectedPlatformId((current) => current || payload.center.recommendedPlatformId);
       setStrategySwitchPlan((current) => current ?? payload.center.activeStrategyPlan);
+      return payload.center;
     } catch (caught) {
       setMessage(caught instanceof Error ? caught.message : "读取平台发布包失败。");
+      return null;
     } finally {
       setIsLoading(false);
     }
@@ -1059,9 +1114,10 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
       setVersionActionFilter("all");
       setStrategySwitchPlan(payload.switchPlan);
       setMessage(payload.message ?? `已应用 ${item.platformName} 平台策略。`);
-      await loadCenter({ keepMessage: true });
+      return await loadCenter({ keepMessage: true });
     } catch (caught) {
       setMessage(caught instanceof Error ? caught.message : "应用平台策略失败。");
+      return null;
     } finally {
       setApplyingStrategyPlatformId(null);
     }
@@ -1088,8 +1144,9 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
       }
 
       if (task.execution === "apply_strategy") {
-        await applyPlatformStrategy(item);
-        setStrategyReviewTaskReceipt(buildStrategyReviewTaskReceipt(item, task, `已把 ${item.platformName} 作为当前策略动作推进对象。`));
+        const refreshedCenter = await applyPlatformStrategy(item);
+        const afterItem = refreshedCenter?.platformStrategy.find((strategy) => strategy.platformId === item.platformId) ?? item;
+        setStrategyReviewTaskReceipt(buildStrategyReviewTaskReceipt(item, task, `已把 ${item.platformName} 作为当前策略动作推进对象。`, afterItem));
         return;
       }
 
@@ -1102,9 +1159,10 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
         const payload = (await response.json().catch(() => null)) as { message?: string; error?: string } | null;
         if (!response.ok) throw new Error(payload?.error ?? "保存发布包版本失败。");
         setVersionActionFilter("snapshot");
-        setStrategyReviewTaskReceipt(buildStrategyReviewTaskReceipt(item, task, payload?.message ?? `已保存 ${item.platformName} 发布包版本。`));
         setMessage(payload?.message ?? `已保存 ${item.platformName} 发布包版本。`);
-        await loadCenter({ keepMessage: true });
+        const refreshedCenter = await loadCenter({ keepMessage: true });
+        const afterItem = refreshedCenter?.platformStrategy.find((strategy) => strategy.platformId === item.platformId) ?? item;
+        setStrategyReviewTaskReceipt(buildStrategyReviewTaskReceipt(item, task, payload?.message ?? `已保存 ${item.platformName} 发布包版本。`, afterItem));
         window.location.hash = "package-version-history";
         return;
       }
@@ -1140,7 +1198,9 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
         } | null;
         if (!response.ok || !payload?.variants) throw new Error(payload?.error ?? "AI 优化投稿资产失败。");
         setAssetOptimizationVariants(payload.variants.map((variant) => ({ ...variant, sourceTaskId: payload.task?.id })));
-        setStrategyReviewTaskReceipt(buildStrategyReviewTaskReceipt(item, task, `已生成 ${payload.variants.length} 个 ${strategyPackage.platformName} 投稿资产候选。`));
+        const refreshedCenter = await loadCenter({ keepMessage: true });
+        const afterItem = refreshedCenter?.platformStrategy.find((strategy) => strategy.platformId === item.platformId) ?? item;
+        setStrategyReviewTaskReceipt(buildStrategyReviewTaskReceipt(item, task, `已生成 ${payload.variants.length} 个 ${strategyPackage.platformName} 投稿资产候选。`, afterItem));
         setMessage(`已执行「${task.label}」，生成 ${payload.variants.length} 个 ${strategyPackage.platformName} 投稿资产候选。`);
         window.location.hash = "submission-asset-editor";
         return;
@@ -1157,10 +1217,11 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
           error?: string;
         } | null;
         if (!response.ok || !payload?.results) throw new Error(payload?.error ?? "前三章二轮重写失败。");
-        await loadCenter({ keepMessage: true });
+        const refreshedCenter = await loadCenter({ keepMessage: true });
+        const afterItem = refreshedCenter?.platformStrategy.find((strategy) => strategy.platformId === item.platformId) ?? item;
         const refreshedPlan = await refreshStrategyPlan(strategyPackage.platformId);
         setStrategyExecutionReceipt(buildStrategyExecutionReceipt(refreshedPlan, "rewrite-first-three", payload.results.length));
-        setStrategyReviewTaskReceipt(buildStrategyReviewTaskReceipt(item, task, `已重写前三章共 ${payload.results.length} 章。`));
+        setStrategyReviewTaskReceipt(buildStrategyReviewTaskReceipt(item, task, `已重写前三章共 ${payload.results.length} 章。`, afterItem));
         setMessage(`已执行「${task.label}」，重写前三章共 ${payload.results.length} 章，策略链已刷新。`);
         return;
       }
@@ -1960,6 +2021,43 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
                             {strategyReviewTaskReceipt.message}
                           </p>
                           <p className="mt-1 leading-6 text-slate-700">下一刀：{strategyReviewTaskReceipt.nextAction}</p>
+                          <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+                            <span className="rounded-md bg-white px-2 py-1 font-medium text-slate-700">
+                              策略分 {strategyReviewTaskReceipt.beforeScore} → {strategyReviewTaskReceipt.afterScore}
+                            </span>
+                            <span className={`rounded-md px-2 py-1 font-medium ${
+                              strategyReviewTaskReceipt.scoreDelta > 0
+                                ? "bg-emerald-100 text-emerald-800"
+                                : strategyReviewTaskReceipt.scoreDelta < 0
+                                  ? "bg-rose-100 text-rose-800"
+                                  : "bg-slate-100 text-slate-700"
+                            }`}>
+                              {strategyReviewTaskReceipt.scoreDelta === 0 ? "持平" : scoreDeltaLabel(strategyReviewTaskReceipt.scoreDelta)}
+                            </span>
+                          </div>
+                          <div className="mt-2 flex flex-wrap gap-1.5 text-xs">
+                            {strategyReviewTaskReceipt.scoreChanges
+                              .filter((change) => change.delta !== 0)
+                              .slice(0, 3)
+                              .map((change) => (
+                                <span
+                                  className={`rounded-md px-2 py-1 ${
+                                    change.delta > 0 ? "bg-emerald-100 text-emerald-800" : "bg-rose-100 text-rose-800"
+                                  }`}
+                                  key={change.key}
+                                >
+                                  {change.label} {change.before}→{change.after}（{scoreDeltaLabel(change.delta)}）
+                                </span>
+                              ))}
+                            {strategyReviewTaskReceipt.scoreChanges.every((change) => change.delta === 0) ? (
+                              <span className="rounded-md bg-white px-2 py-1 text-slate-600">子指标暂未变化，继续补证据。</span>
+                            ) : null}
+                          </div>
+                          {strategyReviewTaskReceipt.draggers.length ? (
+                            <p className="mt-2 text-xs leading-5 text-slate-600">
+                              当前拖后腿：{strategyReviewTaskReceipt.draggers.join("；")}
+                            </p>
+                          ) : null}
                         </div>
                         <a
                           className="w-fit rounded-md bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"

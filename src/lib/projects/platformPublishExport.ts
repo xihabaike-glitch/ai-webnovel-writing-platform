@@ -392,7 +392,7 @@ export interface PlatformStrategySwitchPlan {
 }
 
 export interface PlatformStrategyExecutionReceipt {
-  stepId: PlatformStrategySwitchStep["id"];
+  stepId: PlatformStrategySwitchStep["id"] | "adopt-submission-asset";
   platformId: PlatformId;
   platformName: string;
   title: string;
@@ -1058,9 +1058,22 @@ export function buildPlatformStrategySwitchPlan(
 
 export function buildPlatformStrategyExecutionReceipt(
   plan: PlatformStrategySwitchPlan,
-  stepId: PlatformStrategySwitchStep["id"],
+  stepId: PlatformStrategyExecutionReceipt["stepId"],
   resultCount = 0,
 ): PlatformStrategyExecutionReceipt {
+  if (stepId === "adopt-submission-asset") {
+    return {
+      stepId,
+      platformId: plan.platformId,
+      platformName: plan.platformName,
+      title: "投稿资产已采纳保存",
+      message: `${plan.platformName} 的候选方案已经落库。生成只是热身，保存才算开始干活。`,
+      nextAction: "看刷新后的执行链，继续执行真正的下一步。",
+      href: "#platform-export",
+      severity: "success",
+    };
+  }
+
   if (stepId === "fix-submission-asset") {
     return {
       stepId,

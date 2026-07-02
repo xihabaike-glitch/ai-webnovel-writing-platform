@@ -600,6 +600,19 @@ function buildStrategyExecutionReceipt(
   stepId: string,
   resultCount = 0,
 ): PlatformStrategyExecutionReceipt {
+  if (stepId === "adopt-submission-asset") {
+    return {
+      stepId,
+      platformId: plan.platformId,
+      platformName: plan.platformName,
+      title: "投稿资产已采纳保存",
+      message: `${plan.platformName} 的候选方案已经落库。生成只是热身，保存才算开始干活。`,
+      nextAction: "看刷新后的执行链，继续执行真正的下一步。",
+      href: "#platform-export",
+      severity: "success",
+    };
+  }
+
   if (stepId === "fix-submission-asset") {
     return {
       stepId,
@@ -815,7 +828,7 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
   }
 
   async function saveSubmissionAsset(nextDraft: SubmissionAssetDraft = assetDraft, options?: SaveSubmissionAssetOptions) {
-    if (!selectedPackage) return;
+    if (!selectedPackage) return false;
     setIsSavingAsset(true);
     setMessage(null);
     try {
@@ -835,11 +848,28 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
       if (!response.ok) throw new Error(payload?.error ?? "保存投稿资产失败。");
       setMessage(options?.message ?? payload?.message ?? "投稿资产已保存。");
       await loadCenter({ keepMessage: true });
+      return true;
     } catch (caught) {
       setMessage(caught instanceof Error ? caught.message : "保存投稿资产失败。");
+      return false;
     } finally {
       setIsSavingAsset(false);
     }
+  }
+
+  async function refreshStrategyPlan(platformId: string) {
+    const response = await fetch(`/api/projects/${projectId}/platform-export`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "refresh-strategy", platformId }),
+    });
+    const payload = (await response.json().catch(() => null)) as {
+      error?: string;
+      switchPlan?: PlatformStrategySwitchPlan;
+    } | null;
+    if (!response.ok || !payload?.switchPlan) throw new Error(payload?.error ?? "刷新策略执行链失败。");
+    setStrategySwitchPlan(payload.switchPlan);
+    return payload.switchPlan;
   }
 
   async function savePublishEffect() {
@@ -1034,6 +1064,7 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
   }
 
   async function applyOptimizationVariant(variant: PlatformSubmissionAssetOptimizationVariant) {
+    const platformId = selectedPackage?.platformId;
     const nextDraft = {
       title: variant.title,
       logline: variant.logline,
@@ -1043,12 +1074,21 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
       note: assetDraft.note,
     };
     setAssetDraft(nextDraft);
-    await saveSubmissionAsset(nextDraft, {
+    const saved = await saveSubmissionAsset(nextDraft, {
       message: `已采纳并保存「${variant.strategy}」。`,
       saveAction: "adopt",
       sourceTaskId: variant.sourceTaskId,
       strategy: variant.strategy,
     });
+    if (!saved || !platformId || strategySwitchPlan?.platformId !== platformId) return;
+    try {
+      const refreshedPlan = await refreshStrategyPlan(platformId);
+      setStrategyExecutionReceipt(buildStrategyExecutionReceipt(refreshedPlan, "adopt-submission-asset"));
+      setMessage(`已采纳并保存「${variant.strategy}」，策略链已刷新。`);
+    } catch (caught) {
+      setStrategyExecutionReceipt(buildStrategyExecutionReceipt(strategySwitchPlan, "adopt-submission-asset"));
+      setMessage(caught instanceof Error ? caught.message : "投稿资产已保存，但策略链刷新失败。");
+    }
   }
 
   async function copyMarkdown() {

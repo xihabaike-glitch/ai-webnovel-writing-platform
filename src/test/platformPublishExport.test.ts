@@ -937,12 +937,16 @@ test("buildPlatformPublishExportCenter", async (t) => {
     };
     const plan = buildPlatformStrategySwitchPlan(strategy, getPlatformProfile("fanqie"));
     const assetReceipt = buildPlatformStrategyExecutionReceipt(plan, "fix-submission-asset", 3);
+    const adoptedReceipt = buildPlatformStrategyExecutionReceipt(plan, "adopt-submission-asset", 1);
     const rewriteReceipt = buildPlatformStrategyExecutionReceipt(plan, "rewrite-first-three", 3);
 
     assert.equal(assetReceipt.href, "#submission-asset-editor");
     assert.equal(assetReceipt.severity, "needs_action");
     assert.ok(assetReceipt.message.includes("3 个候选方案"));
     assert.ok(assetReceipt.nextAction.includes("采纳"));
+    assert.equal(adoptedReceipt.severity, "success");
+    assert.ok(adoptedReceipt.message.includes("已经落库"));
+    assert.ok(adoptedReceipt.nextAction.includes("执行链"));
     assert.equal(rewriteReceipt.href, "#platform-export");
     assert.ok(rewriteReceipt.message.includes("已重写 3 章"));
     assert.ok(rewriteReceipt.nextAction.includes("发布前质检"));

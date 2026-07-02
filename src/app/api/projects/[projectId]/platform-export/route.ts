@@ -411,6 +411,28 @@ export async function POST(request: Request, { params }: Params) {
     });
   }
 
+  if (body.action === "refresh-strategy") {
+    const platform = selectedPlatform(body.platformId ?? null);
+    if (!platform) {
+      return NextResponse.json({ error: "请选择有效发布平台。" }, { status: 400 });
+    }
+
+    const strategy = context.center.platformStrategy.find((item) => item.platformId === platform.id);
+    if (!strategy) {
+      return NextResponse.json({ error: "当前平台暂未生成策略评分。" }, { status: 400 });
+    }
+
+    return NextResponse.json({
+      message: `已刷新 ${platform.name} 策略执行链。`,
+      strategy,
+      switchPlan: buildPlatformStrategySwitchPlan(
+        strategy,
+        getPlatformProfile(context.project.targetPlatform as PlatformId),
+        context.center.packages.find((pack) => pack.platformId === platform.id),
+      ),
+    });
+  }
+
   if (body.action === "save-effect") {
     const platform = selectedPlatform(body.platformId ?? null);
     if (!platform) {

@@ -391,6 +391,17 @@ export interface PlatformStrategySwitchPlan {
   steps: PlatformStrategySwitchStep[];
 }
 
+export interface PlatformStrategyExecutionReceipt {
+  stepId: PlatformStrategySwitchStep["id"];
+  platformId: PlatformId;
+  platformName: string;
+  title: string;
+  message: string;
+  nextAction: string;
+  href: string;
+  severity: "success" | "needs_action";
+}
+
 export interface PlatformPublishExportCenter {
   packages: PlatformPublishPackage[];
   recommendedPlatformId: PlatformId;
@@ -1042,6 +1053,66 @@ export function buildPlatformStrategySwitchPlan(
         href: "#publish-effect-panel",
       },
     ],
+  };
+}
+
+export function buildPlatformStrategyExecutionReceipt(
+  plan: PlatformStrategySwitchPlan,
+  stepId: PlatformStrategySwitchStep["id"],
+  resultCount = 0,
+): PlatformStrategyExecutionReceipt {
+  if (stepId === "fix-submission-asset") {
+    return {
+      stepId,
+      platformId: plan.platformId,
+      platformName: plan.platformName,
+      title: "投稿资产候选已生成",
+      message: resultCount
+        ? `已给 ${plan.platformName} 生成 ${resultCount} 个候选方案。别停在欣赏文案，挑一个采纳并保存。`
+        : `已进入 ${plan.platformName} 投稿资产修复区。别拿通用简介糊弄平台。`,
+      nextAction: "采纳一个候选并保存投稿资产，然后重新应用策略链。",
+      href: "#submission-asset-editor",
+      severity: "needs_action",
+    };
+  }
+
+  if (stepId === "rewrite-first-three") {
+    return {
+      stepId,
+      platformId: plan.platformId,
+      platformName: plan.platformName,
+      title: "前三章已按主战场重写",
+      message: resultCount
+        ? `已重写 ${resultCount} 章。现在别急着投，先看发布质检是不是还在拦你。`
+        : "前三章重写动作已完成。现在检查钩子、爽点和章末悬念有没有真的变硬。",
+      nextAction: "回到发布前质检；若通过，就记录发布效果，若未通过，继续处理阻塞项。",
+      href: "#platform-export",
+      severity: "needs_action",
+    };
+  }
+
+  if (stepId === "record-publish-effect") {
+    return {
+      stepId,
+      platformId: plan.platformId,
+      platformName: plan.platformName,
+      title: "该录真实效果了",
+      message: `把 ${plan.platformName} 的曝光、点击、收藏、追读和编辑反馈填进去。没有数据的策略都是情绪价值。`,
+      nextAction: "保存发布效果后再看排行榜，让真实数据决定下一轮主战场。",
+      href: "#publish-effect-panel",
+      severity: "needs_action",
+    };
+  }
+
+  return {
+    stepId,
+    platformId: plan.platformId,
+    platformName: plan.platformName,
+    title: "主战场已切换",
+    message: `${plan.platformName} 已设为当前主战场。`,
+    nextAction: "继续执行链里的下一步。",
+    href: "#platform-export",
+    severity: "success",
   };
 }
 

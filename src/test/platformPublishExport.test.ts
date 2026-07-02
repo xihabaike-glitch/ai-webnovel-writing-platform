@@ -4,6 +4,7 @@ import { getPlatformProfile, platformProfiles } from "../lib/platforms/platformP
 import {
   buildPlatformPublishExportCenter,
   buildPlatformPublishArchive,
+  buildPlatformStrategyExecutionReceipt,
   buildPlatformStrategySwitchPlan,
   buildPublishPackageRestorePatch,
   buildPublishPackageVersionComparison,
@@ -912,5 +913,38 @@ test("buildPlatformPublishExportCenter", async (t) => {
     assert.equal(plan.steps.find((step) => step.id === "fix-submission-asset")?.status, "done");
     assert.equal(plan.steps.find((step) => step.id === "rewrite-first-three")?.status, "next");
     assert.equal(plan.steps.find((step) => step.id === "rewrite-first-three")?.executable, true);
+  });
+
+  await t.test("builds PM-style receipts after strategy steps execute", () => {
+    const strategy = {
+      rank: 1,
+      platformId: "qimao" as const,
+      platformName: "七猫",
+      score: 76,
+      recommendation: "grow" as const,
+      verdict: "七猫可以继续加码，但先补齐短板。",
+      nextAction: "修投稿资产后重写前三章。",
+      href: "#platform-export",
+      scores: {
+        preflight: 88,
+        asset: 72,
+        effect: 58,
+        comparison: 58,
+        adoption: 45,
+      },
+      reasons: ["投稿资产 72 分"],
+      risks: ["标签不够精准"],
+    };
+    const plan = buildPlatformStrategySwitchPlan(strategy, getPlatformProfile("fanqie"));
+    const assetReceipt = buildPlatformStrategyExecutionReceipt(plan, "fix-submission-asset", 3);
+    const rewriteReceipt = buildPlatformStrategyExecutionReceipt(plan, "rewrite-first-three", 3);
+
+    assert.equal(assetReceipt.href, "#submission-asset-editor");
+    assert.equal(assetReceipt.severity, "needs_action");
+    assert.ok(assetReceipt.message.includes("3 个候选方案"));
+    assert.ok(assetReceipt.nextAction.includes("采纳"));
+    assert.equal(rewriteReceipt.href, "#platform-export");
+    assert.ok(rewriteReceipt.message.includes("已重写 3 章"));
+    assert.ok(rewriteReceipt.nextAction.includes("发布前质检"));
   });
 });

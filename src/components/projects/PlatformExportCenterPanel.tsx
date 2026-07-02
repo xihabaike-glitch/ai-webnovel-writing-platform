@@ -383,6 +383,17 @@ interface PlatformStrategySwitchPlan {
   steps: PlatformStrategySwitchStep[];
 }
 
+interface PlatformStrategyExecutionReceipt {
+  stepId: string;
+  platformId: string;
+  platformName: string;
+  title: string;
+  message: string;
+  nextAction: string;
+  href: string;
+  severity: "success" | "needs_action";
+}
+
 interface PlatformPublishExportCenter {
   packages: PlatformPublishPackage[];
   recommendedPlatformId: string;
@@ -584,6 +595,63 @@ function switchStepStatusClass(status: PlatformStrategySwitchStep["status"]) {
   return "bg-slate-100 text-slate-600";
 }
 
+function buildStrategyExecutionReceipt(
+  plan: PlatformStrategySwitchPlan,
+  stepId: string,
+  resultCount = 0,
+): PlatformStrategyExecutionReceipt {
+  if (stepId === "fix-submission-asset") {
+    return {
+      stepId,
+      platformId: plan.platformId,
+      platformName: plan.platformName,
+      title: "投稿资产候选已生成",
+      message: resultCount
+        ? `已给 ${plan.platformName} 生成 ${resultCount} 个候选方案。别停在欣赏文案，挑一个采纳并保存。`
+        : `已进入 ${plan.platformName} 投稿资产修复区。别拿通用简介糊弄平台。`,
+      nextAction: "采纳一个候选并保存投稿资产，然后重新应用策略链。",
+      href: "#submission-asset-editor",
+      severity: "needs_action",
+    };
+  }
+  if (stepId === "rewrite-first-three") {
+    return {
+      stepId,
+      platformId: plan.platformId,
+      platformName: plan.platformName,
+      title: "前三章已按主战场重写",
+      message: resultCount
+        ? `已重写 ${resultCount} 章。现在别急着投，先看发布质检是不是还在拦你。`
+        : "前三章重写动作已完成。现在检查钩子、爽点和章末悬念有没有真的变硬。",
+      nextAction: "回到发布前质检；若通过，就记录发布效果，若未通过，继续处理阻塞项。",
+      href: "#platform-export",
+      severity: "needs_action",
+    };
+  }
+  if (stepId === "record-publish-effect") {
+    return {
+      stepId,
+      platformId: plan.platformId,
+      platformName: plan.platformName,
+      title: "该录真实效果了",
+      message: `把 ${plan.platformName} 的曝光、点击、收藏、追读和编辑反馈填进去。没有数据的策略都是情绪价值。`,
+      nextAction: "保存发布效果后再看排行榜，让真实数据决定下一轮主战场。",
+      href: "#publish-effect-panel",
+      severity: "needs_action",
+    };
+  }
+  return {
+    stepId,
+    platformId: plan.platformId,
+    platformName: plan.platformName,
+    title: "主战场已切换",
+    message: `${plan.platformName} 已设为当前主战场。`,
+    nextAction: "继续执行链里的下一步。",
+    href: "#platform-export",
+    severity: "success",
+  };
+}
+
 function normalizeVersionAction(action: string): PublishPackageVersionActionFilter {
   if (action === "copy" || action === "download" || action === "archive" || action === "snapshot" || action === "restore") return action;
   return "snapshot";
@@ -616,6 +684,7 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
   const [applyingStrategyPlatformId, setApplyingStrategyPlatformId] = useState<string | null>(null);
   const [runningStrategyStepId, setRunningStrategyStepId] = useState<string | null>(null);
   const [strategySwitchPlan, setStrategySwitchPlan] = useState<PlatformStrategySwitchPlan | null>(null);
+  const [strategyExecutionReceipt, setStrategyExecutionReceipt] = useState<PlatformStrategyExecutionReceipt | null>(null);
   const [assetOptimizationVariants, setAssetOptimizationVariants] = useState<PlatformSubmissionAssetOptimizationVariant[]>([]);
   const [versionActionFilter, setVersionActionFilter] = useState<PublishPackageVersionActionFilter>("all");
   const [assetDraft, setAssetDraft] = useState<SubmissionAssetDraft>({
@@ -801,6 +870,7 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
 
   async function applyPlatformStrategy(item: PlatformStrategyRankItem) {
     setApplyingStrategyPlatformId(item.platformId);
+    setStrategyExecutionReceipt(null);
     setMessage(null);
     try {
       const response = await fetch(`/api/projects/${projectId}/platform-export`, {
@@ -868,6 +938,7 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
         } | null;
         if (!response.ok || !payload?.variants) throw new Error(payload?.error ?? "AI 优化投稿资产失败。");
         setAssetOptimizationVariants(payload.variants.map((variant) => ({ ...variant, sourceTaskId: payload.task?.id })));
+        setStrategyExecutionReceipt(buildStrategyExecutionReceipt(strategySwitchPlan, strategyNextStep.id, payload.variants.length));
         setMessage(`已按执行链生成 ${payload.variants.length} 个 ${strategyPackage.platformName} 投稿资产候选。`);
       } else if (strategyNextStep.id === "rewrite-first-three") {
         const response = await fetch(`/api/projects/${projectId}/first-three-rewrite/generate`, {
@@ -880,10 +951,12 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
           error?: string;
         } | null;
         if (!response.ok || !payload?.results) throw new Error(payload?.error ?? "前三章二轮重写失败。");
+        setStrategyExecutionReceipt(buildStrategyExecutionReceipt(strategySwitchPlan, strategyNextStep.id, payload.results.length));
         setMessage(`已按执行链重写 ${strategyPackage.platformName} 前三章，共 ${payload.results.length} 章。`);
         await loadCenter({ keepMessage: true });
       } else if (strategyNextStep.id === "record-publish-effect") {
         window.location.hash = "publish-effect-panel";
+        setStrategyExecutionReceipt(buildStrategyExecutionReceipt(strategySwitchPlan, strategyNextStep.id));
         setMessage("下一步是录入真实发布效果：把曝光、点击、收藏、追读和编辑反馈填进去。");
       }
     } catch (caught) {
@@ -1464,6 +1537,31 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
                       </a>
                     ))}
                   </div>
+                  {strategyExecutionReceipt ? (
+                    <div className={`mt-3 rounded-md border p-3 text-sm ${
+                      strategyExecutionReceipt.severity === "success"
+                        ? "border-emerald-100 bg-emerald-50"
+                        : "border-amber-100 bg-amber-50"
+                    }`}>
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                        <div>
+                          <div className={strategyExecutionReceipt.severity === "success" ? "font-medium text-emerald-900" : "font-medium text-amber-900"}>
+                            {strategyExecutionReceipt.title}
+                          </div>
+                          <p className={strategyExecutionReceipt.severity === "success" ? "mt-1 leading-6 text-emerald-700" : "mt-1 leading-6 text-amber-700"}>
+                            {strategyExecutionReceipt.message}
+                          </p>
+                          <p className="mt-1 leading-6 text-slate-700">下一刀：{strategyExecutionReceipt.nextAction}</p>
+                        </div>
+                        <a
+                          className="w-fit rounded-md bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                          href={strategyExecutionReceipt.href}
+                        >
+                          去处理
+                        </a>
+                      </div>
+                    </div>
+                  ) : null}
                 </div>
               ) : null}
             </div>

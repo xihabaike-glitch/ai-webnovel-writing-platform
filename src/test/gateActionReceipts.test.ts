@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { buildGateActionReceipt, trimGateActionReceipts } from "../lib/projects/gateActionReceipts.ts";
-import type { PrePublishGateAction } from "../lib/projects/prePublishGate.ts";
+import { buildGateActionReceipt, buildGatePlatformStrategyReceipt, trimGateActionReceipts } from "../lib/projects/gateActionReceipts.ts";
+import type { PrePublishGateAction, PrePublishGateStrategyPlatform } from "../lib/projects/prePublishGate.ts";
 
 const action: PrePublishGateAction = {
   id: "strategy",
@@ -13,6 +13,33 @@ const action: PrePublishGateAction = {
     type: "recommended_batch",
     strategyId: "standard",
   },
+};
+
+const strategyPlatform: PrePublishGateStrategyPlatform = {
+  platformId: "fanqie",
+  platformName: "番茄小说",
+  targetProjectId: "project-1",
+  recommendation: "prepare_asset",
+  actionType: "generate_asset_variants",
+  label: "先补资产",
+  actionLabel: "生成投稿方案",
+  score: 72,
+  projectCount: 1,
+  readyPackages: 0,
+  weakPackages: 0,
+  dataGaps: 1,
+  assetGaps: 1,
+  baselineGaps: 0,
+  nextAction: "先生成并采纳投稿资产候选。",
+  href: "/projects/project-1#submission-asset-editor",
+  projects: [{
+    projectId: "project-1",
+    projectTitle: "夜雨系统",
+    statusLabel: "待修复",
+    effectLabel: "缺数据",
+    loopLabel: "先采纳候选",
+    href: "/projects/project-1#submission-asset-editor",
+  }],
 };
 
 test("buildGateActionReceipt", async (t) => {
@@ -103,5 +130,47 @@ test("buildGateActionReceipt", async (t) => {
     assert.equal(trimmed.length, 3);
     assert.equal(trimmed[0].taskId, "task-9");
     assert.equal(trimmed[2].taskId, "task-7");
+  });
+
+  await t.test("builds platform strategy receipts for the unified gate audit log", () => {
+    const receipt = buildGatePlatformStrategyReceipt({
+      item: strategyPlatform,
+      status: "succeeded",
+      now: "2026-01-01T00:00:00.000Z",
+      payload: {
+        task: { id: "task-asset-1", status: "succeeded" },
+        variants: [{ strategy: "强钩子版" }, { strategy: "短剧版" }],
+      },
+    });
+
+    assert.equal(receipt.executionType, "platform_strategy");
+    assert.equal(receipt.actionId, "platform-strategy:fanqie:generate_asset_variants");
+    assert.equal(receipt.succeededCount, 2);
+    assert.equal(receipt.failedCount, 0);
+    assert.equal(receipt.taskId, "task-asset-1");
+    assert.ok(receipt.message.includes("2 个"));
+    assert.equal(receipt.recheck.label, "采纳投稿方案并复检");
+  });
+
+  await t.test("keeps platform strategy failures actionable", () => {
+    const receipt = buildGatePlatformStrategyReceipt({
+      item: {
+        ...strategyPlatform,
+        recommendation: "repair",
+        actionType: "rewrite_first_three",
+        label: "先修再投",
+        actionLabel: "重写前三章",
+      },
+      status: "failed",
+      now: "2026-01-01T00:00:00.000Z",
+      payload: { error: "模型额度不足。" },
+    });
+
+    assert.equal(receipt.executionType, "platform_strategy");
+    assert.equal(receipt.status, "failed");
+    assert.equal(receipt.failedCount, 1);
+    assert.equal(receipt.message, "模型额度不足。");
+    assert.equal(receipt.recheck.status, "blocked");
+    assert.equal(receipt.recheck.actionLabel, "打开相关位置");
   });
 });

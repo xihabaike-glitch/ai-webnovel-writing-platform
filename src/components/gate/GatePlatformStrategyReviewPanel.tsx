@@ -3,16 +3,13 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import {
+  addGateActionReceipt,
+  buildGatePlatformStrategyReceipt,
+  type GateActionReceipt,
+  type GatePlatformStrategyReceiptPayload,
+} from "@/lib/projects/gateActionReceipts";
 import type { PrePublishGateStrategyPlatform, PrePublishGateStrategyReview } from "@/lib/projects/prePublishGate";
-
-interface StrategyActionReceipt {
-  id: string;
-  label: string;
-  status: "succeeded" | "failed";
-  message: string;
-  href: string;
-  createdAt: string;
-}
 
 function recommendationTone(recommendation: PrePublishGateStrategyPlatform["recommendation"]) {
   if (recommendation === "scale") return "bg-emerald-50 text-emerald-700";
@@ -29,7 +26,7 @@ function scoreTone(score: number) {
   return "text-rose-700";
 }
 
-function receiptTone(status: StrategyActionReceipt["status"]) {
+function receiptTone(status: GateActionReceipt["status"]) {
   if (status === "succeeded") return "border-emerald-200 bg-emerald-50 text-emerald-800";
   return "border-rose-200 bg-rose-50 text-rose-800";
 }
@@ -37,7 +34,12 @@ function receiptTone(status: StrategyActionReceipt["status"]) {
 export function GatePlatformStrategyReviewPanel({ review }: { review: PrePublishGateStrategyReview }) {
   const router = useRouter();
   const [runningId, setRunningId] = useState<string | null>(null);
-  const [receipt, setReceipt] = useState<StrategyActionReceipt | null>(null);
+  const [receipt, setReceipt] = useState<GateActionReceipt | null>(null);
+
+  function recordReceipt(nextReceipt: GateActionReceipt) {
+    setReceipt(nextReceipt);
+    addGateActionReceipt(nextReceipt);
+  }
 
   async function runStrategyAction(item: PrePublishGateStrategyPlatform) {
     if (!item.targetProjectId) return;
@@ -47,14 +49,7 @@ export function GatePlatformStrategyReviewPanel({ review }: { review: PrePublish
 
     try {
       if (item.actionType === "open_target") {
-        setReceipt({
-          id: `${runId}:${new Date().toISOString()}`,
-          label: item.actionLabel,
-          status: "succeeded",
-          message: item.nextAction,
-          href: item.href,
-          createdAt: new Date().toISOString(),
-        });
+        recordReceipt(buildGatePlatformStrategyReceipt({ item, status: "succeeded" }));
         router.push(item.href);
         return;
       }
@@ -77,38 +72,22 @@ export function GatePlatformStrategyReviewPanel({ review }: { review: PrePublish
           ),
         },
       );
-      const payload = (await response.json().catch(() => null)) as {
-        message?: string;
-        error?: string;
-        variants?: unknown[];
-        results?: unknown[];
-      } | null;
+      const payload = (await response.json().catch(() => null)) as GatePlatformStrategyReceiptPayload | null;
       if (!response.ok) throw new Error(payload?.error ?? "策略动作执行失败。");
-
-      const message = item.actionType === "generate_asset_variants"
-        ? `已生成 ${payload?.variants?.length ?? 0} 个 ${item.platformName} 投稿方案，下一步采纳最强版本并保存基准。`
-        : item.actionType === "rewrite_first_three"
-          ? `已按 ${item.platformName} 重写前三章，共 ${payload?.results?.length ?? 0} 章。`
-          : payload?.message ?? `已保存 ${item.platformName} 发布包基准。`;
-      setReceipt({
-        id: `${runId}:${new Date().toISOString()}`,
-        label: item.actionLabel,
+      recordReceipt(buildGatePlatformStrategyReceipt({
+        item,
+        payload: payload ?? {},
         status: "succeeded",
-        message,
-        href: item.href,
-        createdAt: new Date().toISOString(),
-      });
+      }));
       router.refresh();
     } catch (caught) {
       const message = caught instanceof Error ? caught.message : "策略动作执行失败。";
-      setReceipt({
-        id: `${runId}:${new Date().toISOString()}`,
-        label: item.actionLabel,
+      recordReceipt(buildGatePlatformStrategyReceipt({
+        item,
+        payload: { error: message },
         status: "failed",
-        message,
-        href: item.href,
-        createdAt: new Date().toISOString(),
-      });
+        fallbackError: message,
+      }));
     } finally {
       setRunningId(null);
     }

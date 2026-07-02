@@ -3,11 +3,15 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { trimGateActionReceipts, type GateActionReceipt } from "@/lib/projects/gateActionReceipts";
+import {
+  clearGateActionReceipts,
+  gateActionReceiptUpdatedEvent,
+  loadGateActionReceipts,
+  saveGateActionReceipts,
+  type GateActionReceipt,
+} from "@/lib/projects/gateActionReceipts";
 import type { PrePublishGateAction } from "@/lib/projects/prePublishGate";
 import { GatePriorityActionCard } from "./GatePriorityActionCard";
-
-const storageKey = "ai-webnovel-gate-action-receipts";
 
 function receiptStatusClass(status: GateActionReceipt["status"]) {
   if (status === "succeeded") return "bg-emerald-50 text-emerald-700";
@@ -23,27 +27,8 @@ function executionLabel(type: GateActionReceipt["executionType"]) {
   if (type === "publish_repair") return "发布修复";
   if (type === "retry_task") return "失败重试";
   if (type === "recommended_batch") return "推荐批次";
+  if (type === "platform_strategy") return "平台策略";
   return "人工处理";
-}
-
-function loadReceipts() {
-  try {
-    const parsed = JSON.parse(window.localStorage.getItem(storageKey) ?? "[]") as unknown;
-    if (!Array.isArray(parsed)) return [];
-    return trimGateActionReceipts(parsed.filter((item): item is GateActionReceipt => (
-      Boolean(item)
-      && typeof item === "object"
-      && "id" in item
-      && "label" in item
-      && "createdAt" in item
-    )));
-  } catch {
-    return [];
-  }
-}
-
-function saveReceipts(receipts: GateActionReceipt[]) {
-  window.localStorage.setItem(storageKey, JSON.stringify(trimGateActionReceipts(receipts)));
 }
 
 export function GateActionWorkspace({ actions }: { actions: PrePublishGateAction[] }) {
@@ -52,19 +37,23 @@ export function GateActionWorkspace({ actions }: { actions: PrePublishGateAction
   const latestReceipt = receipts[0] ?? null;
 
   useEffect(() => {
-    setReceipts(loadReceipts());
+    setReceipts(loadGateActionReceipts());
+
+    function handleReceiptUpdate(event: Event) {
+      const customEvent = event as CustomEvent<GateActionReceipt[]>;
+      setReceipts(customEvent.detail ?? loadGateActionReceipts());
+    }
+
+    window.addEventListener(gateActionReceiptUpdatedEvent, handleReceiptUpdate);
+    return () => window.removeEventListener(gateActionReceiptUpdatedEvent, handleReceiptUpdate);
   }, []);
 
   function addReceipt(receipt: GateActionReceipt) {
-    setReceipts((current) => {
-      const next = trimGateActionReceipts([receipt, ...current]);
-      saveReceipts(next);
-      return next;
-    });
+    setReceipts((current) => saveGateActionReceipts([receipt, ...current]));
   }
 
   function clearReceipts() {
-    window.localStorage.removeItem(storageKey);
+    clearGateActionReceipts();
     setReceipts([]);
   }
 

@@ -1,8 +1,14 @@
-import type { PrePublishGateAction, PrePublishGateActionExecution } from "./prePublishGate.ts";
+import type { PrePublishGateAction, PrePublishGateActionExecution, PrePublishGateStrategyPlatform } from "./prePublishGate.ts";
+
+export const gateActionReceiptStorageKey = "ai-webnovel-gate-action-receipts";
+export const gateActionReceiptUpdatedEvent = "ai-webnovel-gate-action-receipts-updated";
+
+export type GateActionReceiptExecutionType = PrePublishGateActionExecution["type"] | "platform_strategy" | "manual";
 
 export interface GateActionReceiptPayload {
   message?: string;
   error?: string;
+  variants?: unknown[];
   results?: Array<{
     status?: string;
     taskId?: string;
@@ -30,7 +36,7 @@ export interface GateActionReceipt {
   href: string;
   status: "succeeded" | "failed";
   message: string;
-  executionType: PrePublishGateActionExecution["type"] | "manual";
+  executionType: GateActionReceiptExecutionType;
   succeededCount: number;
   failedCount: number;
   taskId: string | null;
@@ -41,6 +47,17 @@ export interface GateActionReceipt {
     actionLabel: string;
   };
   createdAt: string;
+}
+
+export interface GatePlatformStrategyReceiptPayload {
+  message?: string;
+  error?: string;
+  variants?: unknown[];
+  results?: unknown[];
+  task?: {
+    id?: string;
+    status?: string;
+  };
 }
 
 function countStatus(payload: GateActionReceiptPayload) {
@@ -127,6 +144,74 @@ function recheckHint(input: {
   };
 }
 
+function strategyReceiptMessage(input: {
+  item: PrePublishGateStrategyPlatform;
+  payload: GatePlatformStrategyReceiptPayload;
+  status: GateActionReceipt["status"];
+  fallbackError?: string;
+}) {
+  if (input.status === "failed") return input.payload.error ?? input.fallbackError ?? "策略动作执行失败。";
+  if (input.payload.message) return input.payload.message;
+
+  if (input.item.actionType === "generate_asset_variants") {
+    return `已生成 ${input.payload.variants?.length ?? 0} 个 ${input.item.platformName} 投稿方案，下一步采纳最强版本并保存基准。`;
+  }
+  if (input.item.actionType === "rewrite_first_three") {
+    return `已按 ${input.item.platformName} 重写前三章，共 ${input.payload.results?.length ?? 0} 章。`;
+  }
+  if (input.item.actionType === "save_snapshot") return `已保存 ${input.item.platformName} 发布包基准。`;
+  return input.item.nextAction;
+}
+
+function strategyRecheckHint(input: {
+  item: PrePublishGateStrategyPlatform;
+  status: GateActionReceipt["status"];
+  message: string;
+}): GateActionReceipt["recheck"] {
+  if (input.status === "failed") {
+    return {
+      status: "blocked",
+      label: "先处理策略动作失败",
+      detail: input.message,
+      actionLabel: "打开相关位置",
+    };
+  }
+
+  if (input.item.actionType === "generate_asset_variants") {
+    return {
+      status: "ready",
+      label: "采纳投稿方案并复检",
+      detail: "投稿方案已生成，采纳最强版本后刷新总闸门，确认资产、基准和投放链路是否补齐。",
+      actionLabel: "刷新总闸门",
+    };
+  }
+
+  if (input.item.actionType === "rewrite_first_three") {
+    return {
+      status: "ready",
+      label: "复检前三章与发布包",
+      detail: "前三章已重写，刷新总闸门后确认弱转化平台是否进入新一轮基准和回填。",
+      actionLabel: "刷新总闸门",
+    };
+  }
+
+  if (input.item.actionType === "save_snapshot") {
+    return {
+      status: "ready",
+      label: "投放后回填效果",
+      detail: "发布包基准已保存，下一步投放后回填曝光、点击、收藏、追读和编辑反馈。",
+      actionLabel: "刷新总闸门",
+    };
+  }
+
+  return {
+    status: "ready",
+    label: "复检策略结果",
+    detail: "策略目标位置已打开，处理完成后刷新总闸门确认平台推荐是否变化。",
+    actionLabel: "刷新总闸门",
+  };
+}
+
 export function buildGateActionReceipt(input: {
   action: PrePublishGateAction;
   payload?: GateActionReceiptPayload;
@@ -166,9 +251,92 @@ export function buildGateActionReceipt(input: {
   };
 }
 
+export function buildGatePlatformStrategyReceipt(input: {
+  item: PrePublishGateStrategyPlatform;
+  payload?: GatePlatformStrategyReceiptPayload;
+  status: GateActionReceipt["status"];
+  fallbackError?: string;
+  now?: Date | string;
+}): GateActionReceipt {
+  const payload = input.payload ?? {};
+  const createdAt = input.now ? new Date(input.now).toISOString() : new Date().toISOString();
+  const message = strategyReceiptMessage({
+    item: input.item,
+    payload,
+    status: input.status,
+    fallbackError: input.fallbackError,
+  });
+  const succeededCount = input.status === "succeeded"
+    ? Math.max(payload.variants?.length ?? 0, payload.results?.length ?? 0, input.item.actionType === "open_target" || input.item.actionType === "save_snapshot" ? 1 : 0)
+    : 0;
+
+  return {
+    id: `platform-strategy:${input.item.platformId}:${input.item.actionType}:${createdAt}`,
+    actionId: `platform-strategy:${input.item.platformId}:${input.item.actionType}`,
+    label: input.item.actionLabel,
+    detail: `${input.item.platformName} · ${input.item.label} · ${input.item.nextAction}`,
+    href: input.item.href,
+    status: input.status,
+    message,
+    executionType: "platform_strategy",
+    succeededCount,
+    failedCount: input.status === "failed" ? 1 : 0,
+    taskId: payload.task?.id ?? null,
+    recheck: strategyRecheckHint({
+      item: input.item,
+      status: input.status,
+      message,
+    }),
+    createdAt,
+  };
+}
+
 export function trimGateActionReceipts(receipts: GateActionReceipt[], limit = 8) {
   return receipts
     .slice()
     .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime())
     .slice(0, limit);
+}
+
+function isGateActionReceipt(item: unknown): item is GateActionReceipt {
+  if (!item || typeof item !== "object") return false;
+  return true
+    && "id" in item
+    && "label" in item
+    && "createdAt" in item
+    && "status" in item;
+}
+
+function emitReceiptUpdate(receipts: GateActionReceipt[]) {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new CustomEvent(gateActionReceiptUpdatedEvent, { detail: receipts }));
+}
+
+export function loadGateActionReceipts() {
+  if (typeof window === "undefined") return [];
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(gateActionReceiptStorageKey) ?? "[]") as unknown;
+    if (!Array.isArray(parsed)) return [];
+    return trimGateActionReceipts(parsed.filter(isGateActionReceipt));
+  } catch {
+    return [];
+  }
+}
+
+export function saveGateActionReceipts(receipts: GateActionReceipt[]) {
+  if (typeof window === "undefined") return [];
+  const next = trimGateActionReceipts(receipts);
+  window.localStorage.setItem(gateActionReceiptStorageKey, JSON.stringify(next));
+  emitReceiptUpdate(next);
+  return next;
+}
+
+export function addGateActionReceipt(receipt: GateActionReceipt) {
+  return saveGateActionReceipts([receipt, ...loadGateActionReceipts()]);
+}
+
+export function clearGateActionReceipts() {
+  if (typeof window === "undefined") return;
+  window.localStorage.removeItem(gateActionReceiptStorageKey);
+  emitReceiptUpdate([]);
 }

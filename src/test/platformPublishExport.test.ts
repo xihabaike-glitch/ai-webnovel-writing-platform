@@ -910,6 +910,9 @@ test("buildPlatformPublishExportCenter", async (t) => {
 
     assert.equal(pack.submissionAssetAudit.status, "ready");
     assert.equal(pack.canExport, false);
+    assert.equal(plan.progress.completedSteps, 2);
+    assert.equal(plan.progress.progressPercent, 50);
+    assert.equal(plan.progress.nextStepLabel, "重写前三章");
     assert.equal(plan.steps.find((step) => step.id === "fix-submission-asset")?.status, "done");
     assert.equal(plan.steps.find((step) => step.id === "rewrite-first-three")?.status, "next");
     assert.equal(plan.steps.find((step) => step.id === "rewrite-first-three")?.executable, true);
@@ -1009,6 +1012,9 @@ test("buildPlatformPublishExportCenter", async (t) => {
     const plan = buildPlatformStrategySwitchPlan(strategy, getPlatformProfile("qimao"), pack);
 
     assert.equal(pack.publishEffect.records, 1);
+    assert.equal(plan.progress.status, "complete");
+    assert.equal(plan.progress.completedSteps, 4);
+    assert.equal(plan.progress.progressPercent, 100);
     assert.equal(plan.steps.find((step) => step.id === "record-publish-effect")?.status, "done");
     assert.equal(plan.steps.find((step) => step.id === "record-publish-effect")?.executable, false);
   });

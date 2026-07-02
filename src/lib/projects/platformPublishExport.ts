@@ -380,6 +380,17 @@ export interface PlatformStrategySwitchStep {
   href: string;
 }
 
+export interface PlatformStrategyProgressSummary {
+  status: "in_progress" | "complete";
+  completedSteps: number;
+  totalSteps: number;
+  progressPercent: number;
+  nextStepId: string | null;
+  nextStepLabel: string;
+  bottleneck: string;
+  verdict: string;
+}
+
 export interface PlatformStrategySwitchPlan {
   platformId: PlatformId;
   platformName: string;
@@ -388,6 +399,7 @@ export interface PlatformStrategySwitchPlan {
   previousPlatformName: string;
   recommendation: PlatformStrategyRankItem["recommendation"];
   score: number;
+  progress: PlatformStrategyProgressSummary;
   steps: PlatformStrategySwitchStep[];
 }
 
@@ -973,6 +985,40 @@ function buildPlatformStrategy(packages: PlatformPublishPackage[]): PlatformStra
     .map((item, index) => ({ ...item, rank: index + 1 }));
 }
 
+function buildPlatformStrategyProgressSummary(
+  platformName: string,
+  steps: PlatformStrategySwitchStep[],
+): PlatformStrategyProgressSummary {
+  const completedSteps = steps.filter((step) => step.status === "done").length;
+  const totalSteps = steps.length;
+  const nextStep = steps.find((step) => step.status === "next") ?? null;
+  const progressPercent = totalSteps ? Math.round((completedSteps / totalSteps) * 100) : 0;
+
+  if (!nextStep) {
+    return {
+      status: "complete",
+      completedSteps,
+      totalSteps,
+      progressPercent,
+      nextStepId: null,
+      nextStepLabel: "复盘排行榜",
+      bottleneck: "暂无卡点",
+      verdict: `${platformName} 这条执行链已经闭环，别继续盲动，回排行榜看数据说话。`,
+    };
+  }
+
+  return {
+    status: "in_progress",
+    completedSteps,
+    totalSteps,
+    progressPercent,
+    nextStepId: nextStep.id,
+    nextStepLabel: nextStep.label,
+    bottleneck: nextStep.detail,
+    verdict: `${platformName} 还有 ${totalSteps - completedSteps} 步没跑完，先处理「${nextStep.label}」，别开新坑。`,
+  };
+}
+
 export function buildPlatformStrategySwitchPlan(
   strategy: PlatformStrategyRankItem,
   previousPlatform: PlatformProfile,
@@ -1011,6 +1057,41 @@ export function buildPlatformStrategySwitchPlan(
     return id === nextStepId ? "next" as const : "queued" as const;
   };
 
+  const steps: PlatformStrategySwitchStep[] = [
+    {
+      id: "switch-target-platform",
+      label: "切换目标平台",
+      detail: `项目主战场已设为 ${strategy.platformName}，后续发布包、前三章重写和效果记录都以它为准。`,
+      status: "done",
+      executable: false,
+      href: "#platform-export",
+    },
+    {
+      id: "fix-submission-asset",
+      label: "修投稿资产",
+      detail: assetDetail,
+      status: stepStatus("fix-submission-asset"),
+      executable: !assetDone,
+      href: "#submission-asset-editor",
+    },
+    {
+      id: "rewrite-first-three",
+      label: "重写前三章",
+      detail: "用目标平台规则重写前三章钩子、爽点、情绪张力和章末悬念。",
+      status: stepStatus("rewrite-first-three"),
+      executable: assetDone && !rewriteDone,
+      href: "#first-three-rewrite",
+    },
+    {
+      id: "record-publish-effect",
+      label: "记录发布效果",
+      detail: "上线后记录阅读、点击、收藏、追读和编辑反馈，下一轮排行榜才有真实判断。",
+      status: stepStatus("record-publish-effect"),
+      executable: assetDone && rewriteDone && !effectDone,
+      href: "#publish-effect-panel",
+    },
+  ];
+
   return {
     platformId: strategy.platformId,
     platformName: strategy.platformName,
@@ -1019,40 +1100,8 @@ export function buildPlatformStrategySwitchPlan(
     previousPlatformName: previousPlatform.name,
     recommendation: strategy.recommendation,
     score: strategy.score,
-    steps: [
-      {
-        id: "switch-target-platform",
-        label: "切换目标平台",
-        detail: `项目主战场已设为 ${strategy.platformName}，后续发布包、前三章重写和效果记录都以它为准。`,
-        status: "done",
-        executable: false,
-        href: "#platform-export",
-      },
-      {
-        id: "fix-submission-asset",
-        label: "修投稿资产",
-        detail: assetDetail,
-        status: stepStatus("fix-submission-asset"),
-        executable: !assetDone,
-        href: "#submission-asset-editor",
-      },
-      {
-        id: "rewrite-first-three",
-        label: "重写前三章",
-        detail: "用目标平台规则重写前三章钩子、爽点、情绪张力和章末悬念。",
-        status: stepStatus("rewrite-first-three"),
-        executable: assetDone && !rewriteDone,
-        href: "#first-three-rewrite",
-      },
-      {
-        id: "record-publish-effect",
-        label: "记录发布效果",
-        detail: "上线后记录阅读、点击、收藏、追读和编辑反馈，下一轮排行榜才有真实判断。",
-        status: stepStatus("record-publish-effect"),
-        executable: assetDone && rewriteDone && !effectDone,
-        href: "#publish-effect-panel",
-      },
-    ],
+    progress: buildPlatformStrategyProgressSummary(strategy.platformName, steps),
+    steps,
   };
 }
 

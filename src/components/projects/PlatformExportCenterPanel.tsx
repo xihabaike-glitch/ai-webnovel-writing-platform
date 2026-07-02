@@ -372,6 +372,17 @@ interface PlatformStrategySwitchStep {
   href: string;
 }
 
+interface PlatformStrategyProgressSummary {
+  status: "in_progress" | "complete";
+  completedSteps: number;
+  totalSteps: number;
+  progressPercent: number;
+  nextStepId: string | null;
+  nextStepLabel: string;
+  bottleneck: string;
+  verdict: string;
+}
+
 interface PlatformStrategySwitchPlan {
   platformId: string;
   platformName: string;
@@ -380,6 +391,7 @@ interface PlatformStrategySwitchPlan {
   previousPlatformName: string;
   recommendation: PlatformStrategyRankItem["recommendation"];
   score: number;
+  progress: PlatformStrategyProgressSummary;
   steps: PlatformStrategySwitchStep[];
 }
 
@@ -1578,6 +1590,33 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
                         </button>
                       ) : null}
                     </div>
+                  </div>
+                  <div className="mt-3 rounded-md bg-white p-3 text-sm">
+                    <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                      <div>
+                        <div className="font-medium text-slate-950">
+                          执行进度 {strategySwitchPlan.progress.completedSteps}/{strategySwitchPlan.progress.totalSteps}
+                        </div>
+                        <p className="mt-1 leading-6 text-slate-600">{strategySwitchPlan.progress.verdict}</p>
+                      </div>
+                      <div className="min-w-44">
+                        <div className="flex items-center justify-between gap-2 text-xs text-slate-500">
+                          <span>{strategySwitchPlan.progress.status === "complete" ? "已闭环" : `下一步：${strategySwitchPlan.progress.nextStepLabel}`}</span>
+                          <span>{strategySwitchPlan.progress.progressPercent}%</span>
+                        </div>
+                        <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-100">
+                          <div
+                            className={strategySwitchPlan.progress.status === "complete" ? "h-full rounded-full bg-emerald-500" : "h-full rounded-full bg-cyan-700"}
+                            style={{ width: `${strategySwitchPlan.progress.progressPercent}%` }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                    {strategySwitchPlan.progress.status !== "complete" ? (
+                      <div className="mt-3 rounded-md bg-amber-50 p-2 text-xs leading-5 text-amber-800">
+                        当前卡点：{strategySwitchPlan.progress.bottleneck}
+                      </div>
+                    ) : null}
                   </div>
                   <div className="mt-3 grid gap-2 lg:grid-cols-4">
                     {strategySwitchPlan.steps.map((step) => (

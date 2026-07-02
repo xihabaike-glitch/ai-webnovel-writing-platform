@@ -85,6 +85,8 @@ test("buildPlatformPublishExportCenter", async (t) => {
     assert.equal(center.workspace.readyPlatforms, 0);
     assert.equal(center.workspace.blockedPlatforms, platformProfiles.length);
     assert.ok(center.workspace.nextActions.some((action) => action.kind === "run_chapter_review"));
+    assert.equal(center.platformStrategy.length, platformProfiles.length);
+    assert.equal(center.platformStrategy[0].rank, 1);
     assert.equal(center.packages[0].publishEffect.status, "empty");
     assert.ok(center.packages[0].publishEffect.nextAction.includes("录入"));
     assert.equal(center.packages[0].effectOptimization.status, "collect_data");
@@ -379,6 +381,64 @@ test("buildPlatformPublishExportCenter", async (t) => {
     assert.equal(comparison.followRateDeltaPercent, 2);
     assert.ok(comparison.wins.some((item) => item.includes("点击率")));
     assert.ok(comparison.verdict.includes("正反馈"));
+  });
+
+  await t.test("ranks platform strategy from readiness, assets, effects, and comparison", () => {
+    const center = buildPlatformPublishExportCenter({
+      project: {
+        title: "夜雨系统",
+        genre: "都市系统",
+        sellingPoint: "雨夜危机中觉醒系统，主角用选择翻盘。",
+        currentWordCount: 9000,
+        targetWordCount: 300000,
+      },
+      targetPlatform: getPlatformProfile("fanqie"),
+      chapters: finalChapters,
+      aiTasks: passedReviews,
+      submissionChecklist: readyChecklist,
+      platforms: [getPlatformProfile("fanqie"), getPlatformProfile("qimao")],
+      platformPublishMetrics: [
+        {
+          id: "metric-qimao-after",
+          platformId: "qimao",
+          platformName: "七猫",
+          views: 1200,
+          clicks: 180,
+          favorites: 72,
+          follows: 36,
+          comments: 12,
+          paidReads: 0,
+          editorFeedback: "二轮后变好。",
+          contractStatus: "pending",
+          publishUrl: "",
+          notes: "二轮后。",
+          snapshotDate: "2026-01-10T08:00:00.000Z",
+        },
+        {
+          id: "metric-qimao-before",
+          platformId: "qimao",
+          platformName: "七猫",
+          views: 1000,
+          clicks: 80,
+          favorites: 20,
+          follows: 10,
+          comments: 3,
+          paidReads: 0,
+          editorFeedback: "二轮前。",
+          contractStatus: "pending",
+          publishUrl: "",
+          notes: "二轮前。",
+          snapshotDate: "2026-01-09T08:00:00.000Z",
+        },
+      ],
+    });
+    const top = center.platformStrategy[0];
+
+    assert.equal(top.platformId, "qimao");
+    assert.equal(top.rank, 1);
+    assert.ok(top.score > center.platformStrategy[1].score);
+    assert.ok(["focus", "grow"].includes(top.recommendation));
+    assert.ok(top.reasons.some((reason) => reason.includes("二轮对照 improved")));
   });
 
   await t.test("builds second-round optimization actions from weak publish metrics", () => {

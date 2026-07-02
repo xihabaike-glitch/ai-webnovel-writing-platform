@@ -343,11 +343,32 @@ interface PlatformPublishWorkspace {
   headline: string;
 }
 
+interface PlatformStrategyRankItem {
+  rank: number;
+  platformId: string;
+  platformName: string;
+  score: number;
+  recommendation: "focus" | "grow" | "watch" | "repair" | "avoid";
+  verdict: string;
+  nextAction: string;
+  href: string;
+  scores: {
+    preflight: number;
+    asset: number;
+    effect: number;
+    comparison: number;
+    adoption: number;
+  };
+  reasons: string[];
+  risks: string[];
+}
+
 interface PlatformPublishExportCenter {
   packages: PlatformPublishPackage[];
   recommendedPlatformId: string;
   totalPublishableChapters: number;
   workspace: PlatformPublishWorkspace;
+  platformStrategy: PlatformStrategyRankItem[];
 }
 
 interface SubmissionAssetDraft {
@@ -513,6 +534,22 @@ function comparisonStatusClass(status: PlatformPublishEffectComparison["status"]
 function formatDelta(value: number, suffix = "") {
   if (value > 0) return `+${value}${suffix}`;
   return `${value}${suffix}`;
+}
+
+function strategyRecommendationLabel(recommendation: PlatformStrategyRankItem["recommendation"]) {
+  if (recommendation === "focus") return "优先打";
+  if (recommendation === "grow") return "加码";
+  if (recommendation === "repair") return "先修";
+  if (recommendation === "avoid") return "靠后";
+  return "观察";
+}
+
+function strategyRecommendationClass(recommendation: PlatformStrategyRankItem["recommendation"]) {
+  if (recommendation === "focus") return "bg-emerald-50 text-emerald-700";
+  if (recommendation === "grow") return "bg-cyan-50 text-cyan-700";
+  if (recommendation === "repair") return "bg-rose-50 text-rose-700";
+  if (recommendation === "avoid") return "bg-slate-100 text-slate-600";
+  return "bg-amber-50 text-amber-700";
 }
 
 function normalizeVersionAction(action: string): PublishPackageVersionActionFilter {
@@ -1198,6 +1235,46 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
                   <div className="mt-2 line-clamp-2 text-xs text-slate-500">{action.platformNames.join("、")}</div>
                 </div>
               ))}
+            </div>
+          ) : null}
+          {center.platformStrategy.length ? (
+            <div className="mt-3 rounded-md border border-slate-200 p-3">
+              <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <div className="font-medium text-slate-950">平台策略排行榜</div>
+                  <p className="mt-1 text-sm text-slate-600">按质检、投稿资产、真实效果、二轮改善和候选采纳综合排序。</p>
+                </div>
+                <div className="text-xs text-slate-500">Top {Math.min(3, center.platformStrategy.length)}</div>
+              </div>
+              <div className="mt-3 grid gap-2 lg:grid-cols-3">
+                {center.platformStrategy.slice(0, 3).map((item) => (
+                  <button
+                    className="rounded-md bg-slate-50 p-3 text-left text-sm hover:bg-slate-100"
+                    key={item.platformId}
+                    onClick={() => {
+                      setSelectedPlatformId(item.platformId);
+                      setSelectedVersionId(null);
+                      setVersionDetail(null);
+                      setVersionActionFilter("all");
+                    }}
+                    type="button"
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="font-medium text-slate-950">#{item.rank} {item.platformName}</div>
+                      <span className={`rounded-md px-2 py-1 text-xs font-medium ${strategyRecommendationClass(item.recommendation)}`}>
+                        {strategyRecommendationLabel(item.recommendation)}
+                      </span>
+                    </div>
+                    <div className="mt-2 text-2xl font-semibold text-slate-950">{item.score}</div>
+                    <p className="mt-2 leading-6 text-slate-600">{item.verdict}</p>
+                    <div className="mt-2 text-xs text-slate-500">下一步：{item.nextAction}</div>
+                    <div className="mt-2 grid gap-1 text-xs text-slate-500">
+                      <div>依据：{item.reasons.slice(0, 3).join("；")}</div>
+                      {item.risks.length ? <div>风险：{item.risks.slice(0, 2).join("；")}</div> : null}
+                    </div>
+                  </button>
+                ))}
+              </div>
             </div>
           ) : null}
         </div>

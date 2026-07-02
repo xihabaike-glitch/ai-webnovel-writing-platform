@@ -351,11 +351,32 @@ export interface PlatformPublishWorkspace {
   headline: string;
 }
 
+export interface PlatformStrategyRankItem {
+  rank: number;
+  platformId: PlatformId;
+  platformName: string;
+  score: number;
+  recommendation: "focus" | "grow" | "watch" | "repair" | "avoid";
+  verdict: string;
+  nextAction: string;
+  href: string;
+  scores: {
+    preflight: number;
+    asset: number;
+    effect: number;
+    comparison: number;
+    adoption: number;
+  };
+  reasons: string[];
+  risks: string[];
+}
+
 export interface PlatformPublishExportCenter {
   packages: PlatformPublishPackage[];
   recommendedPlatformId: PlatformId;
   totalPublishableChapters: number;
   workspace: PlatformPublishWorkspace;
+  platformStrategy: PlatformStrategyRankItem[];
 }
 
 export interface PlatformPublishArchivePlatform {
@@ -823,6 +844,102 @@ function buildPublishWorkspace(packages: PlatformPublishPackage[]): PlatformPubl
       ? "所有平台已通过当前质检，可以下载全平台投稿包。"
       : `还有 ${blockedPlatforms} 个平台待处理，优先清理 ${executableActions} 个可自动执行动作。`,
   };
+}
+
+function effectScore(effect: PlatformPublishEffectSummary) {
+  if (effect.status === "signed") return 100;
+  if (effect.status === "promising") return 82;
+  if (effect.status === "watch") return effect.records ? 58 : 42;
+  if (effect.status === "weak") return 24;
+  return 36;
+}
+
+function comparisonScore(comparison: PlatformPublishEffectComparison) {
+  if (comparison.status === "improved") return 88;
+  if (comparison.status === "mixed") return 58;
+  if (comparison.status === "flat") return 45;
+  if (comparison.status === "declined") return 18;
+  return 40;
+}
+
+function buildPlatformStrategy(packages: PlatformPublishPackage[]): PlatformStrategyRankItem[] {
+  const ranked = packages.map((pack) => {
+    const scores = {
+      preflight: pack.preflight.score,
+      asset: pack.submissionAssetAudit.score,
+      effect: effectScore(pack.publishEffect),
+      comparison: comparisonScore(pack.publishEffect.comparison),
+      adoption: pack.submissionAssetAdoption.adoptionRatePercent
+        ? Math.min(100, 50 + pack.submissionAssetAdoption.adoptionRatePercent)
+        : pack.submissionAssetAdoption.generatedVariants ? 35 : 45,
+    };
+    const score = Math.round(
+      scores.preflight * 0.25
+      + scores.asset * 0.2
+      + scores.effect * 0.28
+      + scores.comparison * 0.17
+      + scores.adoption * 0.1,
+    );
+    const recommendation: PlatformStrategyRankItem["recommendation"] = score >= 82
+      ? "focus"
+      : score >= 68
+        ? "grow"
+        : score >= 52
+          ? "watch"
+          : pack.publishEffect.status === "weak" || pack.preflight.blocked.length
+            ? "repair"
+            : "avoid";
+    const reasons = [
+      pack.canExport ? `发布质检 ${pack.preflight.score} 分` : `发布阻塞 ${pack.preflight.blocked.length} 项`,
+      `投稿资产 ${pack.submissionAssetAudit.score} 分`,
+      pack.publishEffect.records ? `真实效果 ${pack.publishEffect.status}` : "还没真实数据",
+      pack.publishEffect.comparison.status !== "none" ? `二轮对照 ${pack.publishEffect.comparison.status}` : "缺前后对照",
+      pack.submissionAssetAdoption.adoptedVersions ? `已采纳 ${pack.submissionAssetAdoption.adoptedVersions} 个候选` : "候选采纳不足",
+    ];
+    const risks = [
+      ...pack.preflight.blocked.slice(0, 2),
+      ...pack.submissionAssetAudit.issues.slice(0, 2).map((issue) => issue.label),
+      pack.publishEffect.status === "weak" ? "真实转化偏弱" : "",
+      pack.publishEffect.comparison.status === "declined" ? "二轮后数据下滑" : "",
+    ].filter(Boolean);
+    const verdict = recommendation === "focus"
+      ? `${pack.platformName} 当前最值得优先打，数据和准备度都别浪费。`
+      : recommendation === "grow"
+        ? `${pack.platformName} 可以继续加码，但先补齐短板。`
+        : recommendation === "watch"
+          ? `${pack.platformName} 先观察，别把主资源全押上去。`
+          : recommendation === "repair"
+            ? `${pack.platformName} 先修再投，现在硬上就是给平台送低质样本。`
+            : `${pack.platformName} 暂时靠后，别把时间烧在低胜率方向。`;
+    const nextAction = recommendation === "focus"
+      ? "优先更新、归档并持续记录下一轮数据。"
+      : recommendation === "grow"
+        ? pack.effectOptimization.actions[0]?.detail ?? "补齐平台短板后再继续投放。"
+        : recommendation === "repair"
+          ? pack.repairPath.nextStep?.detail ?? pack.effectOptimization.actions[0]?.detail ?? "先处理阻塞项。"
+          : pack.publishEffect.nextAction;
+
+    return {
+      rank: 0,
+      platformId: pack.platformId,
+      platformName: pack.platformName,
+      score,
+      recommendation,
+      verdict,
+      nextAction,
+      href: "#platform-export",
+      scores,
+      reasons,
+      risks,
+    };
+  });
+
+  return ranked
+    .sort((left, right) => (
+      right.score - left.score
+      || left.platformName.localeCompare(right.platformName)
+    ))
+    .map((item, index) => ({ ...item, rank: index + 1 }));
 }
 
 function buildRepairPath(preflight: PublishPreflight): PublishRepairPath {
@@ -1739,6 +1856,7 @@ export function buildPlatformPublishExportCenter(input: PlatformPublishExportInp
     recommendedPlatformId: input.targetPlatform.id,
     totalPublishableChapters: publishableChapters(input.chapters).length,
     workspace: buildPublishWorkspace(packages),
+    platformStrategy: buildPlatformStrategy(packages),
   };
 }
 

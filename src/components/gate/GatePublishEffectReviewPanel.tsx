@@ -5,6 +5,23 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { PrePublishGateProjectStatus } from "@/lib/projects/prePublishGate";
 
+interface GateAssetVariant {
+  strategy: string;
+  title: string;
+  logline: string;
+  synopsis: string;
+  overseasSynopsis: string;
+  tags: string[];
+  rationale: string[];
+  sourceTaskId?: string;
+  audit?: {
+    score: number;
+    status: "ready" | "needs_work" | "blocked";
+  };
+}
+
+type GateAssetAuditStatus = NonNullable<GateAssetVariant["audit"]>["status"];
+
 function statusTone(status: PrePublishGateProjectStatus["effectReview"]["status"]) {
   if (status === "signed") return "bg-emerald-100 text-emerald-800";
   if (status === "promising") return "bg-emerald-50 text-emerald-700";
@@ -17,6 +34,12 @@ function priorityTone(priority: "high" | "medium" | "low") {
   if (priority === "high") return "bg-rose-50 text-rose-700";
   if (priority === "medium") return "bg-amber-50 text-amber-700";
   return "bg-slate-100 text-slate-700";
+}
+
+function auditTone(status: GateAssetAuditStatus) {
+  if (status === "ready") return "bg-emerald-50 text-emerald-700";
+  if (status === "blocked") return "bg-rose-50 text-rose-700";
+  return "bg-amber-50 text-amber-700";
 }
 
 function actionText(priority: "high" | "medium" | "low") {
@@ -49,7 +72,9 @@ function executeText(execution: PrePublishGateProjectStatus["effectReview"]["opt
 export function GatePublishEffectReviewPanel({ packages }: { packages: PrePublishGateProjectStatus[] }) {
   const router = useRouter();
   const [runningActionId, setRunningActionId] = useState<string | null>(null);
+  const [savingVariantId, setSavingVariantId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [generatedVariants, setGeneratedVariants] = useState<Record<string, GateAssetVariant[]>>({});
   const totalRecords = packages.reduce((sum, item) => sum + item.effectReview.records, 0);
   const totalViews = packages.reduce((sum, item) => sum + item.effectReview.totalViews, 0);
   const totalClicks = packages.reduce((sum, item) => sum + item.effectReview.totalClicks, 0);
@@ -78,12 +103,16 @@ export function GatePublishEffectReviewPanel({ packages }: { packages: PrePublis
           body: JSON.stringify({ platformId: item.platformId }),
         });
         const payload = (await response.json().catch(() => null)) as {
-          variants?: unknown[];
+          task?: { id?: string };
+          variants?: GateAssetVariant[];
           error?: string;
         } | null;
         if (!response.ok || !payload?.variants) throw new Error(payload?.error ?? "生成投稿方案失败。");
-        setMessage(`已按「${action.label}」生成 ${payload.variants.length} 个 ${item.platformName} 投稿方案，进入项目页可采纳。`);
-        router.refresh();
+        setGeneratedVariants((current) => ({
+          ...current,
+          [actionId]: payload.variants!.map((variant) => ({ ...variant, sourceTaskId: payload.task?.id })),
+        }));
+        setMessage(`已按「${action.label}」生成 ${payload.variants.length} 个 ${item.platformName} 投稿方案，可以直接采纳。`);
         return;
       }
 
@@ -105,6 +134,44 @@ export function GatePublishEffectReviewPanel({ packages }: { packages: PrePublis
       setMessage(caught instanceof Error ? caught.message : "二轮优化执行失败。");
     } finally {
       setRunningActionId(null);
+    }
+  }
+
+  async function adoptVariant(item: PrePublishGateProjectStatus, actionId: string, variant: GateAssetVariant) {
+    const variantId = `${actionId}:${variant.strategy}`;
+    setSavingVariantId(variantId);
+    setMessage(null);
+    try {
+      const response = await fetch(`/api/projects/${item.projectId}/platform-export`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "save-asset",
+          platformId: item.platformId,
+          saveAction: "adopt",
+          sourceTaskId: variant.sourceTaskId,
+          strategy: variant.strategy,
+          title: variant.title,
+          logline: variant.logline,
+          synopsis: variant.synopsis,
+          overseasSynopsis: variant.overseasSynopsis,
+          tags: variant.tags,
+          note: `总闸门采纳：${variant.strategy}`,
+        }),
+      });
+      const payload = (await response.json().catch(() => null)) as { message?: string; error?: string } | null;
+      if (!response.ok) throw new Error(payload?.error ?? "采纳投稿方案失败。");
+      setMessage(`已采纳并保存「${variant.strategy}」，${item.platformName} 投稿资产已进入实测版本。`);
+      setGeneratedVariants((current) => {
+        const next = { ...current };
+        delete next[actionId];
+        return next;
+      });
+      router.refresh();
+    } catch (caught) {
+      setMessage(caught instanceof Error ? caught.message : "采纳投稿方案失败。");
+    } finally {
+      setSavingVariantId(null);
     }
   }
 
@@ -178,32 +245,74 @@ export function GatePublishEffectReviewPanel({ packages }: { packages: PrePublis
                 </Link>
               </div>
               <div className="mt-3 grid gap-2">
-                {item.effectReview.optimizationActions.map((action) => (
-                  <div className="rounded-md bg-slate-50 p-3 text-sm" key={action.id}>
-                    <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className={`rounded-md px-2 py-1 text-xs font-medium ${priorityTone(action.priority)}`}>{actionText(action.priority)}</span>
-                        <span className="font-medium text-slate-950">{action.label}</span>
-                        <span className="text-xs text-slate-500">{action.target}</span>
+                {item.effectReview.optimizationActions.map((action) => {
+                  const actionId = `${item.projectId}:${action.id}`;
+                  const variants = generatedVariants[actionId] ?? [];
+
+                  return (
+                    <div className="rounded-md bg-slate-50 p-3 text-sm" key={action.id}>
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className={`rounded-md px-2 py-1 text-xs font-medium ${priorityTone(action.priority)}`}>{actionText(action.priority)}</span>
+                          <span className="font-medium text-slate-950">{action.label}</span>
+                          <span className="text-xs text-slate-500">{action.target}</span>
+                        </div>
+                        {action.execution === "open_target" ? (
+                          <Link className="w-fit rounded-md border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50" href={action.href}>
+                            {executeText(action.execution)}
+                          </Link>
+                        ) : (
+                          <button
+                            className="w-fit rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white disabled:opacity-50"
+                            disabled={Boolean(runningActionId)}
+                            onClick={() => void runEffectAction(item, action)}
+                            type="button"
+                          >
+                            {runningActionId === actionId ? "执行中" : executeText(action.execution)}
+                          </button>
+                        )}
                       </div>
-                      {action.execution === "open_target" ? (
-                        <Link className="w-fit rounded-md border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50" href={action.href}>
-                          {executeText(action.execution)}
-                        </Link>
-                      ) : (
-                        <button
-                          className="w-fit rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white disabled:opacity-50"
-                          disabled={Boolean(runningActionId)}
-                          onClick={() => void runEffectAction(item, action)}
-                          type="button"
-                        >
-                          {runningActionId === `${item.projectId}:${action.id}` ? "执行中" : executeText(action.execution)}
-                        </button>
-                      )}
+                      <p className="mt-1 leading-6 text-slate-600">{action.detail}</p>
+                      {variants.length ? (
+                        <div className="mt-3 grid gap-3 lg:grid-cols-3">
+                          {variants.map((variant) => (
+                            <div className="rounded-md border border-slate-200 bg-white p-3" key={`${actionId}:${variant.strategy}`}>
+                              <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                                <div>
+                                  <div className="font-medium text-slate-950">{variant.strategy}</div>
+                                  <div className="mt-1 text-xs text-slate-500">{variant.title}</div>
+                                </div>
+                                {variant.audit ? (
+                                  <span className={`w-fit rounded-md px-2 py-1 text-xs font-medium ${auditTone(variant.audit.status)}`}>
+                                    {variant.audit.score}
+                                  </span>
+                                ) : null}
+                              </div>
+                              <p className="mt-2 leading-6 text-slate-700">{variant.logline}</p>
+                              <p className="mt-2 line-clamp-4 leading-6 text-slate-600">{variant.synopsis}</p>
+                              <div className="mt-2 text-xs text-slate-500">标签：{variant.tags.join("、")}</div>
+                              {variant.rationale.length ? (
+                                <div className="mt-2 grid gap-1 text-xs text-slate-500">
+                                  {variant.rationale.slice(0, 3).map((reason) => (
+                                    <div key={reason}>{reason}</div>
+                                  ))}
+                                </div>
+                              ) : null}
+                              <button
+                                className="mt-3 w-fit rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white disabled:opacity-50"
+                                disabled={Boolean(savingVariantId)}
+                                onClick={() => void adoptVariant(item, actionId, variant)}
+                                type="button"
+                              >
+                                {savingVariantId === `${actionId}:${variant.strategy}` ? "采纳中" : "采纳保存"}
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      ) : null}
                     </div>
-                    <p className="mt-1 leading-6 text-slate-600">{action.detail}</p>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           </div>

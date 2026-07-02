@@ -103,6 +103,28 @@ export interface GateActionReviewAdvice {
   evidence: string[];
 }
 
+export type GatePlatformGrowthReviewStage = "fix_failure" | "adopt_asset" | "record_metrics" | "scale_up" | "watch";
+
+export interface GatePlatformGrowthReview {
+  platformId: string;
+  platformName: string;
+  total: number;
+  failed: number;
+  failureRatePercent: number;
+  assetRuns: number;
+  baselines: number;
+  effects: number;
+  blockedRecheck: number;
+  readyRecheck: number;
+  priorityScore: number;
+  stage: GatePlatformGrowthReviewStage;
+  stageLabel: string;
+  nextAction: string;
+  href: string;
+  latestAt: string;
+  evidence: string[];
+}
+
 export interface GatePlatformStrategyReceiptPayload {
   message?: string;
   error?: string;
@@ -575,6 +597,130 @@ function adviceEvidence(receipts: GateActionReceipt[]) {
 function projectAnchorHref(href: string, anchor: string) {
   const match = href.match(/\/projects\/([^/#?]+)/);
   return match?.[1] ? `/projects/${match[1]}${anchor}` : href;
+}
+
+function growthEvidence(input: {
+  failed: number;
+  assetRuns: number;
+  baselines: number;
+  effects: number;
+  blockedRecheck: number;
+}) {
+  return [
+    `失败 ${input.failed}`,
+    `资产 ${input.assetRuns}`,
+    `基准 ${input.baselines}`,
+    `效果 ${input.effects}`,
+    `阻塞 ${input.blockedRecheck}`,
+  ];
+}
+
+export function buildGatePlatformGrowthReview(receipts: GateActionReceipt[], limit = 6): GatePlatformGrowthReview[] {
+  const sorted = trimGateActionReceipts(receipts, defaultGateActionReceiptLimit);
+  const groups = new Map<string, { platformId: string; platformName: string; receipts: GateActionReceipt[] }>();
+
+  for (const receipt of sorted) {
+    const platform = gateActionReceiptPlatform(receipt);
+    if (platform.id === "manual") continue;
+    const group = groups.get(platform.id) ?? { platformId: platform.id, platformName: platform.name, receipts: [] };
+    group.receipts.push(receipt);
+    groups.set(platform.id, group);
+  }
+
+  const reviews: GatePlatformGrowthReview[] = [];
+  for (const group of groups.values()) {
+    const operationalReceipts = group.receipts.filter((receipt) => !isAdviceActionReceipt(receipt));
+    if (operationalReceipts.length === 0) continue;
+
+    const failedReceipts = operationalReceipts.filter((receipt) => receipt.status === "failed");
+    const assetReceipts = operationalReceipts.filter((receipt) => actionTypeFromReceipt(receipt) === "generate_asset_variants" && receipt.status === "succeeded");
+    const baselineReceipts = operationalReceipts.filter((receipt) => actionTypeFromReceipt(receipt) === "save_snapshot" && receipt.status === "succeeded");
+    const effectReceipts = operationalReceipts.filter((receipt) => actionTypeFromReceipt(receipt) === "save_effect" && receipt.status === "succeeded");
+    const latest = operationalReceipts[0];
+    const latestFailure = failedReceipts[0] ?? null;
+    const latestSuccess = operationalReceipts.find((receipt) => receipt.status === "succeeded") ?? null;
+    const latestAsset = assetReceipts[0] ?? null;
+    const latestBaseline = baselineReceipts[0] ?? null;
+    const latestEffect = effectReceipts[0] ?? null;
+    const failureRatePercent = Math.round((failedReceipts.length / operationalReceipts.length) * 100);
+    const blockedRecheck = operationalReceipts.filter((receipt) => receipt.recheck.status === "blocked").length;
+    const readyRecheck = operationalReceipts.filter((receipt) => receipt.recheck.status === "ready").length;
+    const failureIsResolved = Boolean(latestFailure && latestSuccess && receiptIsAfter(latestSuccess, latestFailure));
+    const hasFreshBaselineAfterAsset = Boolean(latestAsset && latestBaseline && receiptIsAfter(latestBaseline, latestAsset));
+    const hasFreshEffectAfterBaseline = Boolean(latestBaseline && latestEffect && receiptIsAfter(latestEffect, latestBaseline));
+
+    let stage: GatePlatformGrowthReviewStage = "watch";
+    let stageLabel = "继续观察";
+    let nextAction = "继续执行总闸门推荐动作，等下一条真实回执再复盘。";
+    let href = latest.href;
+
+    if (!failureIsResolved && failedReceipts.length > 0) {
+      stage = "fix_failure";
+      stageLabel = "先救火";
+      nextAction = "先处理最近失败项，别在故障没清掉时继续加码。";
+      href = latestFailure?.href ?? latest.href;
+    } else if (latestAsset && !hasFreshBaselineAfterAsset) {
+      stage = "adopt_asset";
+      stageLabel = "采纳资产";
+      nextAction = "采纳最强投稿方案，并保存发布包基准。";
+      href = projectAnchorHref(latestAsset.href, "#submission-asset-editor");
+    } else if (latestBaseline && !hasFreshEffectAfterBaseline) {
+      stage = "record_metrics";
+      stageLabel = "补效果";
+      nextAction = "回填曝光、点击、收藏、追读，让平台判断有数据。";
+      href = projectAnchorHref(latestBaseline.href, "#publish-effect-panel");
+    } else if (latestEffect && failedReceipts.length === 0) {
+      stage = "scale_up";
+      stageLabel = "可加码";
+      nextAction = "效果链路已经闭环，可以做一轮小步加码。";
+      href = latestEffect.href;
+    }
+
+    const gapScore = stage === "adopt_asset" ? 24 : stage === "record_metrics" ? 22 : stage === "scale_up" ? 8 : 10;
+    const priorityScore = Math.max(1, Math.min(100, Math.round(
+      failedReceipts.length * 30
+      + failureRatePercent * 0.45
+      + blockedRecheck * 18
+      + gapScore
+      + Math.min(operationalReceipts.length, 6),
+    )));
+
+    reviews.push({
+      platformId: group.platformId,
+      platformName: group.platformName,
+      total: operationalReceipts.length,
+      failed: failedReceipts.length,
+      failureRatePercent,
+      assetRuns: assetReceipts.length,
+      baselines: baselineReceipts.length,
+      effects: effectReceipts.length,
+      blockedRecheck,
+      readyRecheck,
+      priorityScore,
+      stage,
+      stageLabel,
+      nextAction,
+      href,
+      latestAt: latest.createdAt,
+      evidence: growthEvidence({
+        failed: failedReceipts.length,
+        assetRuns: assetReceipts.length,
+        baselines: baselineReceipts.length,
+        effects: effectReceipts.length,
+        blockedRecheck,
+      }),
+    });
+  }
+
+  return reviews
+    .sort((left, right) => {
+      const scoreDiff = right.priorityScore - left.priorityScore;
+      if (scoreDiff !== 0) return scoreDiff;
+      const failureDiff = right.failed - left.failed;
+      if (failureDiff !== 0) return failureDiff;
+      return new Date(right.latestAt).getTime() - new Date(left.latestAt).getTime();
+    })
+    .slice(0, limit);
 }
 
 export function buildGateActionReviewAdvice(receipts: GateActionReceipt[], limit = 3): GateActionReviewAdvice[] {

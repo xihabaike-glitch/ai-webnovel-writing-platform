@@ -6,6 +6,7 @@ import {
   buildGateActionReceipt,
   buildGatePlatformStrategyReceipt,
   buildGateActionReviewAdvice,
+  buildGatePlatformGrowthReview,
   buildGatePublishEffectReceipt,
   filterGateActionReceipts,
   gateActionReceiptPlatform,
@@ -395,6 +396,78 @@ test("buildGateActionReceipt", async (t) => {
     const advice = buildGateActionReviewAdvice([baselineReceipt, accepted, effectReceipt]);
 
     assert.ok(!advice.some((item) => item.id === "fanqie:baseline-needs-metrics"));
+  });
+
+  await t.test("ranks platforms by growth review priority", () => {
+    const fanqieFailure = buildGatePlatformStrategyReceipt({
+      item: {
+        ...strategyPlatform,
+        actionType: "rewrite_first_three",
+        actionLabel: "重写前三章",
+      },
+      status: "failed",
+      now: "2026-01-01T00:00:03.000Z",
+      payload: { error: "前三章冲突不足。" },
+    });
+    const qimaoBaseline = buildGatePlatformStrategyReceipt({
+      item: {
+        ...strategyPlatform,
+        platformId: "qimao",
+        platformName: "七猫小说",
+        actionType: "save_snapshot",
+        actionLabel: "保存基准",
+        href: "/projects/project-2#platform-export",
+      },
+      status: "succeeded",
+      now: "2026-01-01T00:00:02.000Z",
+      payload: { task: { id: "snapshot-qimao", status: "succeeded" } },
+    });
+    const webnovelEffect = buildGatePublishEffectReceipt({
+      projectId: "project-3",
+      platformId: "webnovel",
+      platformName: "WebNovel",
+      now: "2026-01-01T00:00:01.000Z",
+      metric: {
+        views: 2000,
+        clicks: 300,
+        favorites: 120,
+        follows: 80,
+      },
+    });
+
+    const review = buildGatePlatformGrowthReview([webnovelEffect, qimaoBaseline, fanqieFailure]);
+
+    assert.equal(review[0].platformId, "fanqie");
+    assert.equal(review[0].stage, "fix_failure");
+    assert.equal(review[0].stageLabel, "先救火");
+    assert.equal(review[0].failed, 1);
+    assert.ok(review[0].priorityScore > review[1].priorityScore);
+    assert.equal(review[1].platformId, "qimao");
+    assert.equal(review[1].stage, "record_metrics");
+    assert.equal(review[1].href, "/projects/project-2#publish-effect-panel");
+    assert.equal(review[2].platformId, "webnovel");
+    assert.equal(review[2].stage, "scale_up");
+  });
+
+  await t.test("moves generated assets to adoption in the growth review", () => {
+    const assetReceipt = buildGatePlatformStrategyReceipt({
+      item: strategyPlatform,
+      status: "succeeded",
+      now: "2026-01-01T00:00:00.000Z",
+      payload: {
+        variants: [{ strategy: "强钩子版" }],
+      },
+    });
+
+    const review = buildGatePlatformGrowthReview([assetReceipt]);
+
+    assert.equal(review.length, 1);
+    assert.equal(review[0].stage, "adopt_asset");
+    assert.equal(review[0].stageLabel, "采纳资产");
+    assert.equal(review[0].assetRuns, 1);
+    assert.equal(review[0].baselines, 0);
+    assert.equal(review[0].href, "/projects/project-1#submission-asset-editor");
+    assert.ok(review[0].evidence.includes("资产 1"));
   });
 
   await t.test("builds platform strategy receipts for the unified gate audit log", () => {

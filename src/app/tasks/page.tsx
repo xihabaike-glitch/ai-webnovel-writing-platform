@@ -6,6 +6,7 @@ import { buildTaskBatchHistory } from "@/lib/ai/taskBatchHistory";
 import { buildTaskRunConsole, type TaskRunLog } from "@/lib/ai/taskRunConsole";
 import { prisma } from "@/lib/db/prisma";
 import { buildBatchExecutionSafety } from "@/lib/projects/batchExecutionSafety";
+import { buildBatchStrategyComparison } from "@/lib/projects/batchStrategyComparison";
 import { batchExecutionStrategies, getBatchExecutionStrategy } from "@/lib/projects/batchExecutionStrategy";
 import { buildTaskQueueCenter, type QueueItem } from "@/lib/projects/taskQueueCenter";
 import { buildTaskQueueExecutionPlan } from "@/lib/projects/taskQueueExecutionPlan";
@@ -97,6 +98,7 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
     ...task,
     chapter: task.chapterId ? chaptersById.get(task.chapterId) ?? null : null,
   })));
+  const strategyComparison = buildBatchStrategyComparison(queue.items, projects, batchHistory);
 
   return (
     <AppShell>
@@ -289,6 +291,38 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
               </div>
             </Link>
           ))}
+        </div>
+        <div className="mt-4 rounded-md border border-slate-200 p-3">
+          <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <div className="text-sm font-medium text-slate-950">策略效果对比</div>
+              <p className="mt-1 text-sm leading-6 text-slate-600">{strategyComparison.headline}</p>
+            </div>
+            <Link className="w-fit rounded-md border border-slate-200 px-3 py-2 text-sm font-medium hover:bg-slate-50" href={`/tasks?batchStrategy=${strategyComparison.recommendedStrategyId}`}>
+              切到推荐档
+            </Link>
+          </div>
+          <div className="mt-3 grid gap-2 lg:grid-cols-3">
+            {strategyComparison.rows.map((row) => (
+              <div className="rounded-md bg-slate-50 p-3 text-sm" key={row.strategy.id}>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-medium text-slate-950">{row.strategy.label}档</span>
+                  <span className={row.strategy.id === strategyComparison.recommendedStrategyId ? "rounded-md bg-emerald-100 px-2 py-1 text-xs font-medium text-emerald-700" : "text-xs text-slate-500"}>
+                    {row.strategy.id === strategyComparison.recommendedStrategyId ? "推荐" : row.canRun ? "可用" : "先别用"}
+                  </span>
+                </div>
+                <div className="mt-2 grid grid-cols-2 gap-2 text-xs text-slate-600">
+                  <div>本批 {row.recommendedBatchSize}/{row.maxBatchSize}</div>
+                  <div>预测成功 {row.predictedSuccessRatePercent}%</div>
+                  <div>质量 {row.recentAverageQualityScore ?? "缺"}</div>
+                  <div>成本 {usd(row.estimatedCostUsd || row.recentAverageCostUsd)}</div>
+                  <div>提醒 {row.warnChecks}</div>
+                  <div>阻止 {row.blockChecks}</div>
+                </div>
+                <p className="mt-2 leading-6 text-slate-600">{row.verdict}</p>
+              </div>
+            ))}
+          </div>
         </div>
         <div className="mt-4 rounded-md border border-slate-200 bg-slate-50 p-3 text-sm">
           <div className="font-medium text-slate-950">{executionPlan.actionLabel}</div>

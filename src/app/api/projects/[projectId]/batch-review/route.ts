@@ -8,6 +8,7 @@ import { reviewChapterDraft } from "@/lib/ai/chapterReviewGeneration";
 import { buildModelBudgetGuard } from "@/lib/ai/modelBudget";
 import { prisma } from "@/lib/db/prisma";
 import { getActiveModelProvider } from "@/lib/model-gateway/activeProvider";
+import { buildBatchRouteEffectSummary } from "@/lib/model-gateway/batchRouteEffectSummary";
 import { buildRouteRecommendations } from "@/lib/model-gateway/routeRecommendations";
 
 interface Params {
@@ -230,6 +231,12 @@ export async function POST(request: Request, { params }: Params) {
         score: "error" in result ? null : result.result.score,
         issueCount: "error" in result ? 0 : result.result.issues.length,
         error: "error" in result ? result.error : null,
+        providerName: result.provider.displayName,
+        model: result.provider.model,
+        role: result.attempts.find((attempt) => attempt.taskId === result.task.id)?.role ?? null,
+        inputTokens: result.task.inputTokens,
+        outputTokens: result.task.outputTokens,
+        costUsd: result.task.costUsd,
       });
     } else {
       const result = await generateChapterSecondPass({
@@ -248,6 +255,12 @@ export async function POST(request: Request, { params }: Params) {
         issueCount: "error" in result ? 0 : result.secondPassAudit.issues.length,
         shouldSecondPass: "error" in result ? false : result.secondPassAudit.shouldSecondPass,
         error: "error" in result ? result.error : null,
+        providerName: result.activeProvider.displayName,
+        model: result.activeProvider.model,
+        role: result.attempts.find((attempt) => attempt.taskId === result.task.id)?.role ?? null,
+        inputTokens: result.task.inputTokens,
+        outputTokens: result.task.outputTokens,
+        costUsd: result.task.costUsd,
       });
     }
   }
@@ -257,6 +270,17 @@ export async function POST(request: Request, { params }: Params) {
 
   return NextResponse.json({
     results,
+    routeEffectSummary: buildBatchRouteEffectSummary(results.map((result) => ({
+      status: result.status as "succeeded" | "failed",
+      taskId: result.taskId,
+      providerName: result.providerName,
+      model: result.model,
+      role: result.role,
+      inputTokens: result.inputTokens,
+      outputTokens: result.outputTokens,
+      costUsd: result.costUsd,
+      qualityScore: result.score,
+    }))),
     queue: nextQueue,
     activeProvider: await activeProviderView(),
     ...buildBudgetPreviews(project, nextQueue, nextRecentTasks),

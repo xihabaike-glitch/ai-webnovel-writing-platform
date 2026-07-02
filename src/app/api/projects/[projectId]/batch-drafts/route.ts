@@ -7,6 +7,7 @@ import { generateChapterDraft } from "@/lib/ai/chapterDraftGeneration";
 import { buildModelBudgetGuard } from "@/lib/ai/modelBudget";
 import { prisma } from "@/lib/db/prisma";
 import { getActiveModelProvider } from "@/lib/model-gateway/activeProvider";
+import { buildBatchRouteEffectSummary } from "@/lib/model-gateway/batchRouteEffectSummary";
 import { buildRouteRecommendations } from "@/lib/model-gateway/routeRecommendations";
 import { getPlatformProfile, type PlatformId } from "@/lib/platforms/platformProfiles";
 
@@ -219,6 +220,12 @@ export async function POST(request: Request, { params }: Params) {
       draftQualityScore: "error" in result ? null : result.draftQuality.score,
       shouldSecondPass: "error" in result ? false : result.draftQuality.shouldSecondPass,
       error: "error" in result ? result.error : null,
+      providerName: result.provider.displayName,
+      model: result.provider.model,
+      role: result.attempts.find((attempt) => attempt.taskId === result.task.id)?.role ?? null,
+      inputTokens: result.task.inputTokens,
+      outputTokens: result.task.outputTokens,
+      costUsd: result.task.costUsd,
     });
   }
 
@@ -227,6 +234,17 @@ export async function POST(request: Request, { params }: Params) {
 
   return NextResponse.json({
     results,
+    routeEffectSummary: buildBatchRouteEffectSummary(results.map((result) => ({
+      status: result.status as "succeeded" | "failed",
+      taskId: result.taskId,
+      providerName: result.providerName,
+      model: result.model,
+      role: result.role,
+      inputTokens: result.inputTokens,
+      outputTokens: result.outputTokens,
+      costUsd: result.costUsd,
+      qualityScore: result.draftQualityScore,
+    }))),
     queue: nextQueue,
     activeProvider: await activeProviderView(),
     budgetPreview: buildBudgetPreview(project, nextQueue, nextRecentTasks),

@@ -45,6 +45,22 @@ interface BatchDraftResult {
   error: string | null;
 }
 
+interface BatchRouteEffectSummary {
+  totalTasks: number;
+  succeededTasks: number;
+  failedTasks: number;
+  successRatePercent: number;
+  totalTokens: number;
+  knownCostUsd: number;
+  averageCostPerSucceededTaskUsd: number;
+  averageQualityScore: number | null;
+  primaryTasks: number;
+  fallbackTasks: number;
+  autoTasks: number;
+  providerLabels: string[];
+  verdict: string;
+}
+
 interface BudgetRepairAction {
   id: string;
   kind: "set_batch_size" | "lower_target_words" | "switch_to_review" | "inspect_failures" | "open_budget_settings";
@@ -105,6 +121,7 @@ export function BatchDraftCenterPanel({ projectId }: { projectId: string }) {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [targetWords, setTargetWords] = useState(1200);
   const [results, setResults] = useState<BatchDraftResult[]>([]);
+  const [routeEffectSummary, setRouteEffectSummary] = useState<BatchRouteEffectSummary | null>(null);
   const [budgetGuard, setBudgetGuard] = useState<BudgetGuardView | null>(null);
   const [budgetPreview, setBudgetPreview] = useState<BudgetPreviewView | null>(null);
   const [routeRecommendation, setRouteRecommendation] = useState<RouteRecommendationView | null>(null);
@@ -155,6 +172,7 @@ export function BatchDraftCenterPanel({ projectId }: { projectId: string }) {
     setMessage(null);
     setBudgetGuard(null);
     setResults([]);
+    setRouteEffectSummary(null);
     try {
       const response = await fetch(`/api/projects/${projectId}/batch-drafts`, {
         method: "POST",
@@ -163,6 +181,7 @@ export function BatchDraftCenterPanel({ projectId }: { projectId: string }) {
       });
       const payload = await response.json() as {
         results?: BatchDraftResult[];
+        routeEffectSummary?: BatchRouteEffectSummary;
         queue?: BatchDraftQueue;
         activeProvider?: ActiveProvider;
         error?: string;
@@ -178,6 +197,7 @@ export function BatchDraftCenterPanel({ projectId }: { projectId: string }) {
         throw new Error([payload.error, ...(payload.guard?.warnings ?? [])].filter(Boolean).join(" "));
       }
       setResults(payload.results ?? []);
+      setRouteEffectSummary(payload.routeEffectSummary ?? null);
       if (payload.queue) setQueue(payload.queue);
       if (payload.activeProvider) setActiveProvider(payload.activeProvider);
       if (payload.budgetPreview) setBudgetPreview(payload.budgetPreview);
@@ -252,6 +272,12 @@ export function BatchDraftCenterPanel({ projectId }: { projectId: string }) {
   function previewTone(status: BudgetPreviewView["status"]) {
     if (status === "block") return "border-rose-200 bg-rose-50 text-rose-900";
     if (status === "warn") return "border-amber-200 bg-amber-50 text-amber-900";
+    return "border-emerald-200 bg-emerald-50 text-emerald-900";
+  }
+
+  function effectTone(summary: BatchRouteEffectSummary) {
+    if (summary.successRatePercent < 80 || summary.failedTasks > 0) return "border-rose-200 bg-rose-50 text-rose-900";
+    if (summary.fallbackTasks > 0 || (summary.averageQualityScore !== null && summary.averageQualityScore < 80)) return "border-amber-200 bg-amber-50 text-amber-900";
     return "border-emerald-200 bg-emerald-50 text-emerald-900";
   }
 
@@ -449,6 +475,22 @@ export function BatchDraftCenterPanel({ projectId }: { projectId: string }) {
         <div className="rounded-md border border-slate-200 p-3">
           <div className="font-medium text-slate-950">执行结果</div>
           <div className="mt-3 grid gap-2 text-sm text-slate-600">
+            {routeEffectSummary ? (
+              <div className={`rounded-md border p-3 ${effectTone(routeEffectSummary)}`}>
+                <div className="font-medium">本批路线效果回收</div>
+                <div className="mt-2 grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
+                  <div>成功率 {routeEffectSummary.successRatePercent}%</div>
+                  <div>质量 {routeEffectSummary.averageQualityScore ?? "缺"}</div>
+                  <div>{usd(routeEffectSummary.knownCostUsd)} 总成本</div>
+                  <div>{routeEffectSummary.totalTokens} Token</div>
+                </div>
+                <div className="mt-2 text-xs">
+                  首选 {routeEffectSummary.primaryTasks} · 备用 {routeEffectSummary.fallbackTasks} · 自动 {routeEffectSummary.autoTasks}
+                </div>
+                <div className="mt-1 text-xs">{routeEffectSummary.providerLabels.join(" / ")}</div>
+                <p className="mt-2 text-xs">{routeEffectSummary.verdict}</p>
+              </div>
+            ) : null}
             {results.map((result) => (
               <div className="rounded-md bg-slate-50 p-3" key={`${result.chapterId}-${result.taskId}`}>
                 <div className="flex flex-wrap items-center justify-between gap-2">

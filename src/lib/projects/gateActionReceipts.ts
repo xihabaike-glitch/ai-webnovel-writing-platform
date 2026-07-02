@@ -365,6 +365,35 @@ export function buildGatePlatformStrategyReceipt(input: {
   };
 }
 
+export function buildGateAdviceActionReceipt(input: {
+  advice: GateActionReviewAdvice;
+  now?: Date | string;
+}): GateActionReceipt {
+  const createdAt = input.now ? new Date(input.now).toISOString() : new Date().toISOString();
+  return {
+    id: `gate-advice:${input.advice.id}:${createdAt}`,
+    actionId: `gate-advice:${input.advice.action.kind}:${input.advice.platformId}`,
+    label: input.advice.action.label,
+    detail: `${input.advice.platformName} · ${input.advice.headline}`,
+    href: input.advice.action.href,
+    status: "succeeded",
+    message: `已响应复盘建议：${input.advice.detail}`,
+    executionType: "manual",
+    succeededCount: 1,
+    failedCount: 0,
+    taskId: null,
+    platformId: input.advice.platformId,
+    platformName: input.advice.platformName,
+    recheck: {
+      status: "ready",
+      label: "复检建议处理结果",
+      detail: "已进入建议对应的处理位置，完成采纳、回填或修复后刷新总闸门，确认审计建议是否解除。",
+      actionLabel: "刷新总闸门",
+    },
+    createdAt,
+  };
+}
+
 export function trimGateActionReceipts(receipts: GateActionReceipt[], limit = defaultGateActionReceiptLimit) {
   return receipts
     .slice()

@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  buildGateAdviceActionReceipt,
   buildGateActionReceiptSummary,
   buildGateActionReceipt,
   buildGatePlatformStrategyReceipt,
@@ -261,6 +262,31 @@ test("buildGateActionReceipt", async (t) => {
     assert.equal(advice[0].action.kind, "record_metrics");
     assert.equal(advice[0].action.label, "回填发布效果");
     assert.equal(advice[0].action.href, "/projects/project-1#publish-effect-panel");
+  });
+
+  await t.test("builds audit receipts when an advice action is accepted", () => {
+    const assetReceipt = buildGatePlatformStrategyReceipt({
+      item: strategyPlatform,
+      status: "succeeded",
+      now: "2026-01-01T00:00:00.000Z",
+      payload: {
+        variants: [{ strategy: "强钩子版" }],
+      },
+    });
+    const advice = buildGateActionReviewAdvice([assetReceipt])[0];
+    const receipt = buildGateAdviceActionReceipt({
+      advice,
+      now: "2026-01-01T00:00:01.000Z",
+    });
+
+    assert.equal(receipt.id, "gate-advice:fanqie:asset-without-baseline:2026-01-01T00:00:01.000Z");
+    assert.equal(receipt.actionId, "gate-advice:adopt_asset:fanqie");
+    assert.equal(receipt.executionType, "manual");
+    assert.equal(receipt.platformId, "fanqie");
+    assert.equal(receipt.platformName, "番茄小说");
+    assert.equal(receipt.href, "/projects/project-1#submission-asset-editor");
+    assert.equal(receipt.succeededCount, 1);
+    assert.equal(receipt.recheck.label, "复检建议处理结果");
   });
 
   await t.test("builds platform strategy receipts for the unified gate audit log", () => {

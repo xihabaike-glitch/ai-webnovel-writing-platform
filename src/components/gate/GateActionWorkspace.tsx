@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import {
+  buildGateAdviceActionReceipt,
   buildGateActionReceiptSummary,
   buildGateActionReviewAdvice,
   clearGateActionReceipts,
@@ -17,6 +18,7 @@ import {
   saveGateActionReceipts,
   type GateActionReceipt,
   type GateActionReceiptExecutionFilter,
+  type GateActionReviewAdvice,
   type GateActionReviewAdviceAction,
   type GateActionReviewAdviceSeverity,
   type GateActionReceiptStatusFilter,
@@ -109,6 +111,10 @@ export function GateActionWorkspace({ actions }: { actions: PrePublishGateAction
     clearGateActionReceipts();
     setReceipts([]);
     void clearPersistedGateActionReceipts().catch(() => undefined);
+  }
+
+  function recordAdviceAction(advice: GateActionReviewAdvice) {
+    addReceipt(buildGateAdviceActionReceipt({ advice }));
   }
 
   return (
@@ -221,7 +227,10 @@ export function GateActionWorkspace({ actions }: { actions: PrePublishGateAction
                 {item.action.kind === "refresh_gate" ? (
                   <button
                     className="w-fit shrink-0 rounded-md bg-white px-3 py-2 text-xs font-medium text-slate-950"
-                    onClick={() => router.refresh()}
+                    onClick={() => {
+                      recordAdviceAction(item);
+                      router.refresh();
+                    }}
                     type="button"
                     title={adviceActionTitle(item.action.kind)}
                   >
@@ -231,6 +240,7 @@ export function GateActionWorkspace({ actions }: { actions: PrePublishGateAction
                   <Link
                     className="w-fit shrink-0 rounded-md bg-white px-3 py-2 text-xs font-medium text-slate-950"
                     href={item.action.href}
+                    onClick={() => recordAdviceAction(item)}
                     title={adviceActionTitle(item.action.kind)}
                   >
                     {item.action.label}

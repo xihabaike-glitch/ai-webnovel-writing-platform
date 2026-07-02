@@ -981,9 +981,10 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
           error?: string;
         } | null;
         if (!response.ok || !payload?.results) throw new Error(payload?.error ?? "前三章二轮重写失败。");
-        setStrategyExecutionReceipt(buildStrategyExecutionReceipt(strategySwitchPlan, strategyNextStep.id, payload.results.length));
-        setMessage(`已按执行链重写 ${strategyPackage.platformName} 前三章，共 ${payload.results.length} 章。`);
         await loadCenter({ keepMessage: true });
+        const refreshedPlan = await refreshStrategyPlan(strategyPackage.platformId);
+        setStrategyExecutionReceipt(buildStrategyExecutionReceipt(refreshedPlan, strategyNextStep.id, payload.results.length));
+        setMessage(`已按执行链重写 ${strategyPackage.platformName} 前三章，共 ${payload.results.length} 章，策略链已刷新。`);
       } else if (strategyNextStep.id === "record-publish-effect") {
         window.location.hash = "publish-effect-panel";
         setStrategyExecutionReceipt(buildStrategyExecutionReceipt(strategySwitchPlan, strategyNextStep.id));

@@ -915,6 +915,47 @@ test("buildPlatformPublishExportCenter", async (t) => {
     assert.equal(plan.steps.find((step) => step.id === "rewrite-first-three")?.executable, true);
   });
 
+  await t.test("promotes publish effect recording after rewrite makes the package exportable", () => {
+    const center = buildPlatformPublishExportCenter({
+      project: {
+        title: "夜雨系统",
+        genre: "都市系统",
+        sellingPoint: "雨夜危机中觉醒系统，主角用选择翻盘。",
+        currentWordCount: 9000,
+        targetWordCount: 300000,
+      },
+      targetPlatform: getPlatformProfile("qimao"),
+      chapters: finalChapters,
+      aiTasks: passedReviews,
+      submissionChecklist: readyChecklist,
+      platforms: [getPlatformProfile("qimao")],
+      submissionAssets: [
+        {
+          id: "asset-qimao-ready",
+          platformId: "qimao",
+          platformName: "七猫",
+          title: "夜雨系统：倒计时翻盘",
+          logline: "雨夜倒计时逼她选择，林晚把系统惩罚打成翻盘爽点。",
+          synopsis: "林晚在雨夜绑定倒计时系统，每一次选择都牵动生死、复仇和悬疑真相。她从被迫救人开始，一步步摸清系统规则，把惩罚变成筹码，把背叛者拖回真相现场，并在连续任务中建立稳定目标：查清当年事故、保护真正重要的人、夺回属于自己的命运。故事保持强钩子、强情绪和连续爽点，适合七猫免费长篇平台连载。",
+          overseasSynopsis: "Night Rain System follows Lin Wan through timed choices and revenge.",
+          tags: ["系统", "逆袭", "悬疑"],
+          note: "七猫主战场资产。",
+          source: "manual",
+          updatedAt: "2026-01-06T08:00:00.000Z",
+        },
+      ],
+    });
+    const strategy = center.platformStrategy[0];
+    const pack = center.packages[0];
+    const plan = buildPlatformStrategySwitchPlan(strategy, getPlatformProfile("qimao"), pack);
+
+    assert.equal(pack.canExport, true);
+    assert.equal(pack.publishEffect.records, 0);
+    assert.equal(plan.steps.find((step) => step.id === "rewrite-first-three")?.status, "done");
+    assert.equal(plan.steps.find((step) => step.id === "record-publish-effect")?.status, "next");
+    assert.equal(plan.steps.find((step) => step.id === "record-publish-effect")?.executable, true);
+  });
+
   await t.test("builds PM-style receipts after strategy steps execute", () => {
     const strategy = {
       rank: 1,

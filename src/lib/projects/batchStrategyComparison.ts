@@ -26,6 +26,17 @@ export interface BatchStrategyComparison {
   rows: BatchStrategyComparisonRow[];
 }
 
+export interface BatchStrategyDecision {
+  strategyId: BatchExecutionStrategyId;
+  status: "ready" | "switch_strategy" | "blocked";
+  title: string;
+  detail: string;
+  riskNotes: string[];
+  actionLabel: string;
+  actionHref: string;
+  canRun: boolean;
+}
+
 function money(value: number) {
   return Math.round(value * 1000000) / 1000000;
 }
@@ -140,5 +151,57 @@ export function buildBatchStrategyComparison(
     recommendedStrategyId: recommended.strategy.id,
     headline: `建议使用${recommended.strategy.label}档：${recommended.verdict}`,
     rows,
+  };
+}
+
+export function buildBatchStrategyDecision(
+  comparison: BatchStrategyComparison,
+  activeStrategyId: BatchExecutionStrategyId,
+): BatchStrategyDecision {
+  const recommended = comparison.rows.find((row) => row.strategy.id === comparison.recommendedStrategyId) ?? comparison.rows[0];
+  const active = comparison.rows.find((row) => row.strategy.id === activeStrategyId) ?? recommended;
+  const riskNotes = [
+    recommended.recommendedBatchSize > 0 ? `本批建议 ${recommended.recommendedBatchSize}/${recommended.maxBatchSize} 个。` : "当前没有可执行批次。",
+    `预测成功率 ${recommended.predictedSuccessRatePercent}%。`,
+    recommended.recentAverageQualityScore !== null ? `最近质量均分 ${recommended.recentAverageQualityScore}。` : "最近质量样本不足。",
+    recommended.warnChecks > 0 ? `${recommended.warnChecks} 个提醒项需要盯住。` : null,
+    recommended.blockChecks > 0 ? `${recommended.blockChecks} 个阻止项必须先处理。` : null,
+  ].filter((note): note is string => Boolean(note));
+
+  if (!recommended.canRun || recommended.blockChecks > 0 || recommended.recommendedBatchSize === 0) {
+    return {
+      strategyId: recommended.strategy.id,
+      status: "blocked",
+      title: `先别放量：${recommended.strategy.label}档也未通过`,
+      detail: recommended.verdict,
+      riskNotes,
+      actionLabel: "查看阻止项",
+      actionHref: `/tasks?batchStrategy=${recommended.strategy.id}`,
+      canRun: false,
+    };
+  }
+
+  if (active.strategy.id !== recommended.strategy.id) {
+    return {
+      strategyId: recommended.strategy.id,
+      status: "switch_strategy",
+      title: `建议切到${recommended.strategy.label}档再执行`,
+      detail: recommended.verdict,
+      riskNotes,
+      actionLabel: `切到${recommended.strategy.label}档`,
+      actionHref: `/tasks?batchStrategy=${recommended.strategy.id}`,
+      canRun: true,
+    };
+  }
+
+  return {
+    strategyId: recommended.strategy.id,
+    status: "ready",
+    title: `可以执行${recommended.strategy.label}档推荐批次`,
+    detail: recommended.verdict,
+    riskNotes,
+    actionLabel: "执行推荐批次",
+    actionHref: `/tasks?batchStrategy=${recommended.strategy.id}`,
+    canRun: true,
   };
 }

@@ -6,7 +6,7 @@ import { buildTaskBatchHistory } from "@/lib/ai/taskBatchHistory";
 import { buildTaskRunConsole, type TaskRunLog } from "@/lib/ai/taskRunConsole";
 import { prisma } from "@/lib/db/prisma";
 import { buildBatchExecutionSafety } from "@/lib/projects/batchExecutionSafety";
-import { buildBatchStrategyComparison } from "@/lib/projects/batchStrategyComparison";
+import { buildBatchStrategyComparison, buildBatchStrategyDecision } from "@/lib/projects/batchStrategyComparison";
 import { batchExecutionStrategies, getBatchExecutionStrategy } from "@/lib/projects/batchExecutionStrategy";
 import { buildTaskQueueCenter, type QueueItem } from "@/lib/projects/taskQueueCenter";
 import { buildTaskQueueExecutionPlan } from "@/lib/projects/taskQueueExecutionPlan";
@@ -99,6 +99,7 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
     chapter: task.chapterId ? chaptersById.get(task.chapterId) ?? null : null,
   })));
   const strategyComparison = buildBatchStrategyComparison(queue.items, projects, batchHistory);
+  const strategyDecision = buildBatchStrategyDecision(strategyComparison, activeStrategy.id);
 
   return (
     <AppShell>
@@ -291,6 +292,27 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
               </div>
             </Link>
           ))}
+        </div>
+        <div className="mt-4 rounded-md border border-slate-200 bg-slate-50 p-3">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <div className="text-sm font-medium text-slate-950">PM 决策卡</div>
+              <p className="mt-1 text-sm font-medium text-slate-950">{strategyDecision.title}</p>
+              <p className="mt-1 text-sm leading-6 text-slate-600">{strategyDecision.detail}</p>
+            </div>
+            {strategyDecision.status === "ready" ? (
+              <RunRecommendedBatchButton disabled={!strategyDecision.canRun} strategyId={strategyDecision.strategyId} />
+            ) : (
+              <Link className="w-fit rounded-md bg-slate-950 px-4 py-2 text-sm font-medium text-white" href={strategyDecision.actionHref}>
+                {strategyDecision.actionLabel}
+              </Link>
+            )}
+          </div>
+          <div className="mt-3 grid gap-2 md:grid-cols-2 lg:grid-cols-3">
+            {strategyDecision.riskNotes.map((note) => (
+              <div className="rounded-md bg-white px-3 py-2 text-xs text-slate-600" key={note}>{note}</div>
+            ))}
+          </div>
         </div>
         <div className="mt-4 rounded-md border border-slate-200 p-3">
           <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">

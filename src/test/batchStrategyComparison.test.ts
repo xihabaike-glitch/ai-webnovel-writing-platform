@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { buildBatchStrategyComparison } from "../lib/projects/batchStrategyComparison.ts";
+import { buildBatchStrategyComparison, buildBatchStrategyDecision } from "../lib/projects/batchStrategyComparison.ts";
 import type { TaskBatchHistoryItem } from "../lib/ai/taskBatchHistory.ts";
 import type { QueueItem } from "../lib/projects/taskQueueCenter.ts";
 
@@ -91,5 +91,56 @@ test("buildBatchStrategyComparison", async (t) => {
     assert.equal(comparison.recommendedStrategyId, "aggressive");
     assert.equal(comparison.rows.find((row) => row.strategy.id === "aggressive")?.recommendedBatchSize, 3);
     assert.ok(comparison.rows.every((row) => row.predictedSuccessRatePercent > 0));
+  });
+
+  await t.test("builds a ready decision when the active strategy is recommended", () => {
+    const comparison = buildBatchStrategyComparison([
+      queueItem({ id: "project-1:review:chapter-1" }),
+      queueItem({ id: "project-1:review:chapter-2", chapterTitle: "第二章" }),
+    ], [{ aiTasks: [] }], [
+      batch({ id: "batch-1", totalTasks: 4, succeededTasks: 4, failedTasks: 0, quality: 88 }),
+      batch({ id: "batch-2", totalTasks: 4, succeededTasks: 4, failedTasks: 0, quality: 90 }),
+    ]);
+    const decision = buildBatchStrategyDecision(comparison, comparison.recommendedStrategyId);
+
+    assert.equal(decision.status, "ready");
+    assert.equal(decision.canRun, true);
+    assert.ok(decision.riskNotes.some((note) => note.includes("预测成功率")));
+  });
+
+  await t.test("asks to switch strategy when another mode is recommended", () => {
+    const comparison = buildBatchStrategyComparison([
+      queueItem({ id: "project-1:review:chapter-1" }),
+    ], [{ aiTasks: [] }], [
+      batch({ id: "batch-1", totalTasks: 2, succeededTasks: 1, failedTasks: 1, quality: 72 }),
+    ]);
+    const decision = buildBatchStrategyDecision(comparison, "aggressive");
+
+    assert.equal(decision.status, "switch_strategy");
+    assert.equal(decision.strategyId, "conservative");
+    assert.ok(decision.actionLabel.includes("保守"));
+  });
+
+  await t.test("blocks the decision when all strategies fail preflight", () => {
+    const comparison = buildBatchStrategyComparison([
+      queueItem({ id: "project-1:review:chapter-1" }),
+    ], [
+      {
+        aiTasks: [
+          { status: "running", inputTokens: null, outputTokens: null, costUsd: null },
+          { status: "running", inputTokens: null, outputTokens: null, costUsd: null },
+          { status: "queued", inputTokens: null, outputTokens: null, costUsd: null },
+          { status: "queued", inputTokens: null, outputTokens: null, costUsd: null },
+          { status: "queued", inputTokens: null, outputTokens: null, costUsd: null },
+          { status: "queued", inputTokens: null, outputTokens: null, costUsd: null },
+          { status: "queued", inputTokens: null, outputTokens: null, costUsd: null },
+        ],
+      },
+    ], []);
+    const decision = buildBatchStrategyDecision(comparison, "standard");
+
+    assert.equal(decision.status, "blocked");
+    assert.equal(decision.canRun, false);
+    assert.ok(decision.riskNotes.some((note) => note.includes("阻止项")));
   });
 });

@@ -26,6 +26,15 @@ export interface TaskBatchHistoryInput {
   } | null;
 }
 
+export interface TaskBatchRepairAction {
+  id: string;
+  kind: "retry_failed" | "inspect_running" | "open_chapter" | "open_model_routes" | "continue_batch";
+  label: string;
+  detail: string;
+  href: string;
+  taskId?: string;
+}
+
 export interface TaskBatchHistoryItem {
   id: string;
   projectId: string;
@@ -40,7 +49,9 @@ export interface TaskBatchHistoryItem {
   summary: BatchRouteEffectSummary;
   runningTasks: number;
   failedSamples: string[];
+  failedTaskIds: string[];
   nextAction: string;
+  repairActions: TaskBatchRepairAction[];
 }
 
 const batchTaskLabels: Record<string, string> = {
@@ -157,6 +168,54 @@ function batchNextAction(input: {
   return "这批表现稳定，可以继续按安全阀推进下一小批。";
 }
 
+function buildRepairActions(input: {
+  summary: BatchRouteEffectSummary;
+  runningTasks: number;
+  failedTasks: TaskBatchHistoryInput[];
+  href: string;
+}): TaskBatchRepairAction[] {
+  const actions: Array<TaskBatchRepairAction | null> = [
+    input.runningTasks > 0 ? {
+      id: "inspect_running",
+      kind: "inspect_running",
+      label: "查看未落地任务",
+      detail: "先确认排队或运行中的任务是否已经卡住。",
+      href: "/tasks",
+    } : null,
+    input.failedTasks[0] ? {
+      id: "retry_failed",
+      kind: "retry_failed",
+      label: "重试失败样本",
+      detail: "先用最近失败样本验证链路，再恢复批量。",
+      href: input.failedTasks[0].chapterId ? `/projects/${input.failedTasks[0].projectId}/chapters/${input.failedTasks[0].chapterId}` : `/projects/${input.failedTasks[0].projectId}`,
+      taskId: input.failedTasks[0].id,
+    } : null,
+    input.summary.averageQualityScore !== null && input.summary.averageQualityScore < 80 ? {
+      id: "open_chapter",
+      kind: "open_chapter",
+      label: "补强章节卡",
+      detail: "质量低于放量线，先补钩子、冲突、爽点和章末追读。",
+      href: input.href,
+    } : null,
+    input.summary.fallbackTasks > 0 || input.summary.averageCostPerSucceededTaskUsd > 0.05 ? {
+      id: "open_model_routes",
+      kind: "open_model_routes",
+      label: "检查模型路线",
+      detail: "成本偏高或触发备用模型，先调整首选/备用模型。",
+      href: "/settings/models",
+    } : null,
+    input.summary.totalTasks > 0 && input.summary.failedTasks === 0 && input.runningTasks === 0 && (input.summary.averageQualityScore ?? 100) >= 80 ? {
+      id: "continue_batch",
+      kind: "continue_batch",
+      label: "继续下一小批",
+      detail: "这批已稳定，回任务中心按安全阀继续推进。",
+      href: "/tasks",
+    } : null,
+  ];
+
+  return actions.filter((action): action is TaskBatchRepairAction => Boolean(action)).slice(0, 3);
+}
+
 export function buildTaskBatchHistory(
   tasks: TaskBatchHistoryInput[],
   options: { windowMinutes?: number; limit?: number } = {},
@@ -204,10 +263,12 @@ export function buildTaskBatchHistory(
           qualityScore: qualityScores.get(task.id) ?? null,
         })));
       const runningTasks = group.filter((task) => task.status === "running" || task.status === "queued").length;
+      const failedTasks = group.filter((task) => task.status === "failed");
       const failedSamples = group
         .filter((task) => task.status === "failed")
         .map((task) => compact(task.errorMessage))
         .slice(0, 2);
+      const href = first.chapterId ? `/projects/${first.projectId}/chapters/${first.chapterId}` : `/projects/${first.projectId}`;
 
       return {
         id: `${first.projectId}:${first.taskType}:${dateIso(startedAt.createdAt)}`,
@@ -219,11 +280,18 @@ export function buildTaskBatchHistory(
         finishedAt: dateIso(finishedAt.updatedAt),
         chapterTitles: uniqueTexts(group.map((task) => task.chapter?.title ?? "项目任务")).slice(0, 5),
         taskIds: group.map((task) => task.id),
-        href: first.chapterId ? `/projects/${first.projectId}/chapters/${first.chapterId}` : `/projects/${first.projectId}`,
+        href,
         summary,
         runningTasks,
         failedSamples,
+        failedTaskIds: failedTasks.map((task) => task.id),
         nextAction: batchNextAction({ summary, runningTasks, failedSamples }),
+        repairActions: buildRepairActions({
+          summary,
+          runningTasks,
+          failedTasks,
+          href,
+        }),
       };
     })
     .sort((left, right) => new Date(right.startedAt).getTime() - new Date(left.startedAt).getTime())

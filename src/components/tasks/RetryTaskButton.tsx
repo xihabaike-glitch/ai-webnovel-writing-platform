@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
-export function RetryTaskButton({ taskId }: { taskId: string }) {
+export function RetryTaskButton({ taskId, className = "mt-3 flex flex-wrap items-center gap-2" }: { taskId: string; className?: string }) {
   const router = useRouter();
   const [isRetrying, setIsRetrying] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -29,7 +29,7 @@ export function RetryTaskButton({ taskId }: { taskId: string }) {
   }
 
   return (
-    <div className="mt-3 flex flex-wrap items-center gap-2">
+    <div className={className}>
       <button
         className="rounded-md bg-slate-950 px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
         disabled={isRetrying}

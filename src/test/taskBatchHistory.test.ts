@@ -73,6 +73,47 @@ test("buildTaskBatchHistory", async (t) => {
 
     assert.equal(history[0].summary.failedTasks, 1);
     assert.equal(history[0].failedSamples[0], "503 provider timeout");
+    assert.deepEqual(history[0].failedTaskIds, ["review-1"]);
+    assert.equal(history[0].repairActions[0].kind, "retry_failed");
+    assert.equal(history[0].repairActions[0].taskId, "review-1");
     assert.ok(history[0].nextAction.includes("失败样本"));
+  });
+
+  await t.test("recommends chapter repair for low quality and continuing for stable batches", () => {
+    const weakHistory = buildTaskBatchHistory([
+      task({
+        id: "review-1",
+        taskType: "chapter_review",
+        outputText: JSON.stringify({ score: 72 }),
+        createdAt: "2026-01-01T00:00:00.000Z",
+      }),
+    ]);
+    const stableHistory = buildTaskBatchHistory([
+      task({
+        id: "review-2",
+        taskType: "chapter_review",
+        outputText: JSON.stringify({ score: 91 }),
+        createdAt: "2026-01-01T00:10:00.000Z",
+      }),
+    ]);
+
+    assert.equal(weakHistory[0].repairActions[0].kind, "open_chapter");
+    assert.equal(stableHistory[0].repairActions[0].kind, "continue_batch");
+  });
+
+  await t.test("recommends model route inspection for costly fallback batches", () => {
+    const history = buildTaskBatchHistory([
+      task({
+        id: "draft-1",
+        costUsd: 0.08,
+        inputSnapshot: JSON.stringify({
+          input: { prompt: "写第一章" },
+          routeAttempt: { role: "fallback" },
+        }),
+        createdAt: "2026-01-01T00:00:00.000Z",
+      }),
+    ]);
+
+    assert.ok(history[0].repairActions.some((action) => action.kind === "open_model_routes"));
   });
 });

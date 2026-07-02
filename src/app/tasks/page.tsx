@@ -323,14 +323,14 @@ export default async function TasksPage() {
         </div>
         <div className="mt-4 grid gap-3">
           {batchHistory.map((batch) => (
-            <Link className="rounded-md border border-slate-200 p-3 text-sm hover:bg-slate-50" href={batch.href} key={batch.id}>
+            <div className="rounded-md border border-slate-200 p-3 text-sm" key={batch.id}>
               <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                 <div>
                   <div className="flex flex-wrap items-center gap-2">
                     <span className={`rounded-md border px-2 py-1 text-xs font-medium ${batchTone(batch.summary.successRatePercent, batch.summary.failedTasks, batch.runningTasks)}`}>
                       成功率 {batch.summary.successRatePercent}%
                     </span>
-                    <span className="font-medium text-slate-950">{batch.taskLabel}</span>
+                    <Link className="font-medium text-slate-950 hover:underline" href={batch.href}>{batch.taskLabel}</Link>
                     <span className="text-xs text-slate-500">{new Date(batch.startedAt).toLocaleString()}</span>
                   </div>
                   <div className="mt-2 text-slate-600">{batch.projectTitle} · {batch.chapterTitles.join("、")}</div>
@@ -343,6 +343,20 @@ export default async function TasksPage() {
                       ))}
                     </div>
                   ) : null}
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {batch.repairActions.map((action) => (
+                      action.kind === "retry_failed" && action.taskId ? (
+                        <div className="flex flex-wrap items-center gap-2" key={action.id}>
+                          <span className="text-xs font-medium text-slate-500" title={action.detail}>{action.label}</span>
+                          <RetryTaskButton className="flex flex-wrap items-center gap-2" taskId={action.taskId} />
+                        </div>
+                      ) : (
+                        <Link className="rounded-md border border-slate-200 px-3 py-2 text-sm font-medium hover:bg-slate-50" href={action.href} key={action.id} title={action.detail}>
+                          {action.label}
+                        </Link>
+                      )
+                    ))}
+                  </div>
                 </div>
                 <div className="grid min-w-56 gap-1 rounded-md bg-slate-50 p-3 text-xs text-slate-600">
                   <div>任务 {batch.summary.totalTasks} · 未落地 {batch.runningTasks}</div>
@@ -351,7 +365,7 @@ export default async function TasksPage() {
                   <div>{batch.summary.providerLabels.join(" / ") || "暂无模型路线"}</div>
                 </div>
               </div>
-            </Link>
+            </div>
           ))}
           {batchHistory.length === 0 ? (
             <p className="rounded-md border border-dashed border-slate-300 p-3 text-sm text-slate-600">

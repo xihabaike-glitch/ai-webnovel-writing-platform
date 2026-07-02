@@ -10,6 +10,7 @@ import {
   buildGatePlatformGrowthDispatchItems,
   buildGatePlatformDispatchReceipt,
   buildGateDispatchEvidenceReview,
+  buildGatePlatformScaleGate,
   buildGateDispatchTaskCenter,
   buildGateDispatchTaskCloseoutItem,
   buildGatePublishEffectReceipt,
@@ -500,6 +501,101 @@ test("buildGateActionReceipt", async (t) => {
     assert.equal(dispatchItems[0].ownerRole, "运营数据编辑");
     assert.equal(dispatchItems[0].actionLabel, "派给数据编辑");
     assert.ok(dispatchItems[0].acceptanceCriteria.includes("曝光点击已填写"));
+  });
+
+  await t.test("gates platform scale-up behind verified dispatch evidence", () => {
+    const fanqieEffect = buildGatePublishEffectReceipt({
+      projectId: "project-1",
+      platformId: "fanqie",
+      platformName: "番茄小说",
+      now: "2026-01-01T02:00:00.000Z",
+      metric: {
+        views: 3000,
+        clicks: 500,
+        favorites: 160,
+        follows: 90,
+      },
+    });
+    const qimaoEffect = buildGatePublishEffectReceipt({
+      projectId: "project-2",
+      platformId: "qimao",
+      platformName: "七猫小说",
+      now: "2026-01-01T02:10:00.000Z",
+      metric: {
+        views: 1800,
+        clicks: 220,
+        favorites: 70,
+        follows: 32,
+      },
+    });
+    const webnovelEffect = buildGatePublishEffectReceipt({
+      projectId: "project-3",
+      platformId: "webnovel",
+      platformName: "WebNovel",
+      now: "2026-01-01T02:20:00.000Z",
+      metric: {
+        views: 1200,
+        clicks: 180,
+        favorites: 62,
+        follows: 28,
+      },
+    });
+    const reviews = buildGatePlatformGrowthReview([webnovelEffect, qimaoEffect, fanqieEffect]);
+    const fanqieDispatch = buildGatePlatformGrowthDispatchItems([fanqieEffect])[0];
+    const qimaoDispatch = buildGatePlatformGrowthDispatchItems([qimaoEffect])[0];
+    const verifiedFanqieTask = {
+      ...fanqieDispatch,
+      databaseId: "dispatch-db-fanqie",
+      dispatchKey: fanqieDispatch.id,
+      projectId: "project-1",
+      sourceReceiptId: null,
+      completionEvidence: "已完成小步加码并回填后一轮效果。",
+      state: "completed" as const,
+      assignedAt: "2026-01-01T02:30:00.000Z",
+      completedAt: "2026-01-01T03:00:00.000Z",
+      createdAt: "2026-01-01T02:30:00.000Z",
+      updatedAt: "2026-01-01T03:00:00.000Z",
+    };
+    const qimaoTaskWithoutReceipt = {
+      ...qimaoDispatch,
+      databaseId: "dispatch-db-qimao",
+      dispatchKey: qimaoDispatch.id,
+      projectId: "project-2",
+      sourceReceiptId: null,
+      completionEvidence: "已做小步加码，等下一条回执。",
+      state: "completed" as const,
+      assignedAt: "2026-01-01T02:30:00.000Z",
+      completedAt: "2026-01-01T03:00:00.000Z",
+      createdAt: "2026-01-01T02:30:00.000Z",
+      updatedAt: "2026-01-01T03:00:00.000Z",
+    };
+    const fanqieLaterReceipt = buildGatePublishEffectReceipt({
+      projectId: "project-1",
+      platformId: "fanqie",
+      platformName: "番茄小说",
+      now: "2026-01-01T04:00:00.000Z",
+      metric: {
+        views: 3600,
+        clicks: 620,
+        favorites: 200,
+        follows: 120,
+      },
+    });
+    const evidenceReview = buildGateDispatchEvidenceReview(
+      [verifiedFanqieTask, qimaoTaskWithoutReceipt],
+      [fanqieLaterReceipt, webnovelEffect, qimaoEffect, fanqieEffect],
+    );
+
+    const gate = buildGatePlatformScaleGate(reviews, evidenceReview);
+
+    assert.equal(gate.summary.candidates, 3);
+    assert.equal(gate.summary.ready, 1);
+    assert.equal(gate.summary.blockedEvidence, 1);
+    assert.equal(gate.summary.needsDispatch, 1);
+    assert.equal(gate.items.find((item) => item.platformId === "fanqie")?.status, "ready");
+    assert.equal(gate.items.find((item) => item.platformId === "qimao")?.status, "blocked_evidence");
+    assert.equal(gate.items.find((item) => item.platformId === "webnovel")?.status, "needs_dispatch");
+    assert.ok(gate.nextActions.some((actionText) => actionText.includes("真闭环派单")));
   });
 
   await t.test("records dispatch receipts and marks the dispatch as assigned", () => {

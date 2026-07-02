@@ -242,6 +242,34 @@ export interface GateDispatchEvidenceReview {
   items: GateDispatchEvidenceReviewItem[];
 }
 
+export type GatePlatformScaleGateStatus = "ready" | "blocked_evidence" | "needs_dispatch" | "not_candidate";
+
+export interface GatePlatformScaleGateItem {
+  platformId: string;
+  platformName: string;
+  status: GatePlatformScaleGateStatus;
+  label: string;
+  detail: string;
+  actionLabel: string;
+  href: string;
+  priorityScore: number;
+  stage: GatePlatformGrowthReviewStage;
+  evidence: string[];
+}
+
+export interface GatePlatformScaleGate {
+  summary: {
+    total: number;
+    candidates: number;
+    ready: number;
+    blockedEvidence: number;
+    needsDispatch: number;
+    notCandidate: number;
+  };
+  nextActions: string[];
+  items: GatePlatformScaleGateItem[];
+}
+
 export interface GatePlatformStrategyReceiptPayload {
   message?: string;
   error?: string;
@@ -1532,6 +1560,119 @@ export function buildGateDispatchEvidenceReview(
       const priorityDiff = right.priorityScore - left.priorityScore;
       if (priorityDiff !== 0) return priorityDiff;
       return left.title.localeCompare(right.title);
+    }),
+  };
+}
+
+export function buildGatePlatformScaleGate(
+  reviews: GatePlatformGrowthReview[],
+  dispatchEvidenceReview: GateDispatchEvidenceReview,
+): GatePlatformScaleGate {
+  const evidenceItemsByPlatform = new Map<string, GateDispatchEvidenceReviewItem[]>();
+  for (const item of dispatchEvidenceReview.items) {
+    const items = evidenceItemsByPlatform.get(item.platformId) ?? [];
+    items.push(item);
+    evidenceItemsByPlatform.set(item.platformId, items);
+  }
+
+  const items = reviews.map((review): GatePlatformScaleGateItem => {
+    const platformEvidenceItems = evidenceItemsByPlatform.get(review.platformId) ?? [];
+    const issue = platformEvidenceItems.find((item) => item.status !== "verified") ?? null;
+    const verifiedEvidence = platformEvidenceItems.filter((item) => item.status === "verified");
+
+    if (review.stage !== "scale_up") {
+      return {
+        platformId: review.platformId,
+        platformName: review.platformName,
+        status: "not_candidate",
+        label: review.stageLabel,
+        detail: `${review.platformName} 还在「${review.stageLabel}」阶段，先完成当前动作，别把没闭环的问题伪装成增长机会。`,
+        actionLabel: "处理当前阶段",
+        href: review.href,
+        priorityScore: review.priorityScore,
+        stage: review.stage,
+        evidence: review.evidence,
+      };
+    }
+
+    if (issue) {
+      return {
+        platformId: review.platformId,
+        platformName: review.platformName,
+        status: "blocked_evidence",
+        label: "禁止加码",
+        detail: `${review.platformName} 已进入加码候选，但派单证据仍是「${issue.label}」。先把证据链闭上，再谈扩大投入。`,
+        actionLabel: issue.status === "active" ? "处理派单" : "补齐证据",
+        href: issue.status === "active" ? issue.href : "/dispatch",
+        priorityScore: Math.max(review.priorityScore, issue.priorityScore),
+        stage: review.stage,
+        evidence: issue.evidence.slice(0, 3),
+      };
+    }
+
+    if (verifiedEvidence.length === 0) {
+      return {
+        platformId: review.platformId,
+        platformName: review.platformName,
+        status: "needs_dispatch",
+        label: "先派单验收",
+        detail: `${review.platformName} 的效果链路看起来可加码，但还没有同平台真闭环派单。先生成并完成加码派单，避免凭感觉扩量。`,
+        actionLabel: "去派单验收",
+        href: "/dispatch",
+        priorityScore: review.priorityScore,
+        stage: review.stage,
+        evidence: review.evidence,
+      };
+    }
+
+    return {
+      platformId: review.platformId,
+      platformName: review.platformName,
+      status: "ready",
+      label: "允许小步加码",
+      detail: `${review.platformName} 有效果回执，也有同平台真闭环派单，可以进入一轮小幅加码。`,
+      actionLabel: "执行小步加码",
+      href: review.href,
+      priorityScore: review.priorityScore,
+      stage: review.stage,
+      evidence: [`真闭环派单 ${verifiedEvidence.length}`, ...review.evidence],
+    };
+  });
+
+  const ready = items.filter((item) => item.status === "ready").length;
+  const blockedEvidence = items.filter((item) => item.status === "blocked_evidence").length;
+  const needsDispatch = items.filter((item) => item.status === "needs_dispatch").length;
+  const candidates = items.filter((item) => item.stage === "scale_up").length;
+  const notCandidate = items.filter((item) => item.status === "not_candidate").length;
+  const statusWeight: Record<GatePlatformScaleGateStatus, number> = {
+    blocked_evidence: 0,
+    needs_dispatch: 1,
+    ready: 2,
+    not_candidate: 3,
+  };
+
+  return {
+    summary: {
+      total: items.length,
+      candidates,
+      ready,
+      blockedEvidence,
+      needsDispatch,
+      notCandidate,
+    },
+    nextActions: [
+      blockedEvidence > 0 ? `${blockedEvidence} 个加码候选被证据问题拦下，先补派单依据或业务回执。` : null,
+      needsDispatch > 0 ? `${needsDispatch} 个加码候选缺少真闭环派单，先走派单验收再扩量。` : null,
+      ready > 0 ? `${ready} 个平台允许小步加码，范围要小，下一轮必须回填效果数据。` : null,
+      candidates === 0 && items.length > 0 ? "暂无可加码候选，先把救火、采纳资产和效果回填做完。" : null,
+      items.length === 0 ? "还没有平台复盘结果，先执行总闸门动作生成业务回执。" : null,
+    ].filter((action): action is string => Boolean(action)),
+    items: items.sort((left, right) => {
+      const statusDiff = statusWeight[left.status] - statusWeight[right.status];
+      if (statusDiff !== 0) return statusDiff;
+      const priorityDiff = right.priorityScore - left.priorityScore;
+      if (priorityDiff !== 0) return priorityDiff;
+      return left.platformName.localeCompare(right.platformName);
     }),
   };
 }

@@ -8,6 +8,7 @@ import {
   buildGateActionReceiptSummary,
   buildGateActionReviewAdvice,
   buildGateDispatchEvidenceReview,
+  buildGatePlatformScaleGate,
   buildGatePlatformDispatchReceipt,
   buildGatePlatformGrowthDispatchItems,
   buildGatePlatformGrowthReview,
@@ -30,6 +31,7 @@ import {
   type GateActionReviewAdviceState,
   type GateActionReceiptStatusFilter,
   type GateDispatchEvidenceReviewStatus,
+  type GatePlatformScaleGateStatus,
   type GatePlatformGrowthDispatchItem,
   type GatePlatformGrowthReview,
   type PersistedGatePlatformDispatchTask,
@@ -109,6 +111,13 @@ function evidenceStateClass(status: GateDispatchEvidenceReviewStatus) {
   return "border-slate-200 bg-slate-50 text-slate-800";
 }
 
+function scaleGateClass(status: GatePlatformScaleGateStatus) {
+  if (status === "ready") return "border-emerald-200 bg-emerald-50 text-emerald-900";
+  if (status === "blocked_evidence") return "border-rose-200 bg-rose-50 text-rose-900";
+  if (status === "needs_dispatch") return "border-amber-200 bg-amber-50 text-amber-900";
+  return "border-slate-200 bg-slate-50 text-slate-800";
+}
+
 export function GateActionWorkspace({ actions }: { actions: PrePublishGateAction[] }) {
   const router = useRouter();
   const [receipts, setReceipts] = useState<GateActionReceipt[]>([]);
@@ -131,6 +140,8 @@ export function GateActionWorkspace({ actions }: { actions: PrePublishGateAction
     : persistedDispatchTasks.filter((task) => task.platformId === platformFilter);
   const dispatchEvidenceReview = buildGateDispatchEvidenceReview(visibleDispatchTasks, receipts);
   const dispatchEvidenceIssues = dispatchEvidenceReview.items.filter((item) => item.status !== "verified").slice(0, 4);
+  const scaleGate = buildGatePlatformScaleGate(platformGrowthReview, dispatchEvidenceReview);
+  const scaleGateVisibleItems = scaleGate.items.filter((item) => item.status !== "not_candidate").slice(0, 4);
   const latestReceipt = filteredReceipts[0] ?? null;
 
   useEffect(() => {
@@ -359,6 +370,90 @@ export function GateActionWorkspace({ actions }: { actions: PrePublishGateAction
           ) : (
             <p className="rounded-md border border-dashed border-slate-300 bg-white p-3 text-sm text-slate-600">
               暂无派单任务。先让平台增长复盘榜生成任务，再进入证据验收。
+            </p>
+          )}
+        </div>
+        <div className="mt-3 grid gap-2">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <div className="text-xs font-medium text-slate-500">平台加码决策闸</div>
+              <p className="mt-1 text-xs text-slate-500">平台复盘说可加码只是候选，必须通过派单证据验收才允许扩量。</p>
+            </div>
+          </div>
+          <div className="grid gap-2 sm:grid-cols-4">
+            <div className="rounded-md border border-emerald-100 bg-white p-3">
+              <div className="text-xs text-slate-500">允许加码</div>
+              <div className="mt-1 text-lg font-semibold text-emerald-700">{scaleGate.summary.ready}</div>
+            </div>
+            <div className="rounded-md border border-rose-100 bg-white p-3">
+              <div className="text-xs text-slate-500">证据拦截</div>
+              <div className="mt-1 text-lg font-semibold text-rose-700">{scaleGate.summary.blockedEvidence}</div>
+            </div>
+            <div className="rounded-md border border-amber-100 bg-white p-3">
+              <div className="text-xs text-slate-500">缺派单验收</div>
+              <div className="mt-1 text-lg font-semibold text-amber-700">{scaleGate.summary.needsDispatch}</div>
+            </div>
+            <div className="rounded-md border border-slate-200 bg-white p-3">
+              <div className="text-xs text-slate-500">加码候选</div>
+              <div className="mt-1 text-lg font-semibold text-slate-700">{scaleGate.summary.candidates}</div>
+            </div>
+          </div>
+          {scaleGate.nextActions.length ? (
+            <div className="grid gap-2 xl:grid-cols-2">
+              {scaleGate.nextActions.map((action) => (
+                <div className="rounded-md bg-white p-3 text-sm leading-6 text-slate-600" key={action}>{action}</div>
+              ))}
+            </div>
+          ) : null}
+          {scaleGateVisibleItems.length ? (
+            <div className="grid gap-2 xl:grid-cols-2">
+              {scaleGateVisibleItems.map((item) => (
+                <div className={`rounded-md border p-3 text-sm ${scaleGateClass(item.status)}`} key={item.platformId}>
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-medium">{item.platformName}</span>
+                        <span className="rounded-md bg-white/70 px-2 py-1 text-xs font-medium">{item.label}</span>
+                      </div>
+                      <p className="mt-2 leading-6 opacity-85">{item.detail}</p>
+                    </div>
+                    <div className="text-right text-xs opacity-75">
+                      <div>优先级</div>
+                      <div className="mt-1 text-base font-semibold">{item.priorityScore}</div>
+                    </div>
+                  </div>
+                  <div className="mt-2 flex flex-wrap gap-2 text-xs opacity-75">
+                    {item.evidence.slice(0, 4).map((evidence) => (
+                      <span className="rounded-md bg-white/70 px-2 py-1" key={evidence}>{evidence}</span>
+                    ))}
+                  </div>
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    <Link
+                      className="rounded-md bg-white px-3 py-2 text-xs font-medium text-slate-950"
+                      href={item.href}
+                    >
+                      {item.actionLabel}
+                    </Link>
+                    {item.status !== "ready" ? (
+                      <button
+                        className="rounded-md border border-white/70 bg-white/70 px-3 py-2 text-xs font-medium text-slate-950"
+                        onClick={() => focusPlatform(item.platformId)}
+                        type="button"
+                      >
+                        只看该平台
+                      </button>
+                    ) : null}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : platformGrowthReview.length ? (
+            <p className="rounded-md border border-dashed border-slate-300 bg-white p-3 text-sm text-slate-600">
+              当前没有加码候选。先把平台复盘榜里的救火、采纳资产和效果回填做完。
+            </p>
+          ) : (
+            <p className="rounded-md border border-dashed border-slate-300 bg-white p-3 text-sm text-slate-600">
+              还没有平台复盘结果。先执行总闸门动作，生成真实业务回执。
             </p>
           )}
         </div>

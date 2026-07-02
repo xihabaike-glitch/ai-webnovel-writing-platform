@@ -14,6 +14,7 @@ interface Params {
 interface GenerateBody {
   targetWords?: number;
   chapterOrders?: number[];
+  platformId?: string;
 }
 
 function normalizeOrders(rawOrders: number[] | undefined) {
@@ -59,7 +60,7 @@ export async function POST(request: Request, { params }: Params) {
     return NextResponse.json({ error: "Project not found" }, { status: 404 });
   }
 
-  const platform = getPlatformProfile(project.targetPlatform as PlatformId);
+  const platform = getPlatformProfile((body.platformId ?? project.targetPlatform) as PlatformId);
   const rewritePackage = buildFirstThreeRewritePackage({
     projectTitle: project.title,
     platform,

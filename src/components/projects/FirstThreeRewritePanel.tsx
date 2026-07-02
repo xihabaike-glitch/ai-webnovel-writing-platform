@@ -162,7 +162,7 @@ export function FirstThreeRewritePanel({ projectId }: { projectId: string }) {
   }
 
   return (
-    <section className="rounded-md border border-slate-200 bg-white p-4">
+    <section className="rounded-md border border-slate-200 bg-white p-4" id="first-three-rewrite">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h2 className="font-medium">前三章重排改稿助手</h2>

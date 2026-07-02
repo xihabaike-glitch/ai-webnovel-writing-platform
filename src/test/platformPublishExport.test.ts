@@ -89,6 +89,7 @@ test("buildPlatformPublishExportCenter", async (t) => {
     assert.ok(center.packages[0].publishEffect.nextAction.includes("录入"));
     assert.equal(center.packages[0].effectOptimization.status, "collect_data");
     assert.ok(center.packages[0].effectOptimization.actions.some((action) => action.area === "data"));
+    assert.ok(center.packages[0].effectOptimization.actions.some((action) => action.execution === "open_target" && action.href === "#publish-effect-panel"));
   });
 
   await t.test("dedupes workspace repair actions across platforms", () => {
@@ -356,8 +357,16 @@ test("buildPlatformPublishExportCenter", async (t) => {
     assert.equal(pack.publishEffect.status, "weak");
     assert.equal(pack.effectOptimization.status, "urgent_rework");
     assert.ok(pack.effectOptimization.headline.includes("转化漏斗"));
-    assert.ok(pack.effectOptimization.actions.some((action) => action.area === "asset" && action.label.includes("重做标题")));
-    assert.ok(pack.effectOptimization.actions.some((action) => action.area === "opening" && action.label.includes("收藏动机")));
+    assert.ok(pack.effectOptimization.actions.some((action) => (
+      action.area === "asset"
+      && action.execution === "generate_asset_variants"
+      && action.label.includes("重做标题")
+    )));
+    assert.ok(pack.effectOptimization.actions.some((action) => (
+      action.area === "opening"
+      && action.execution === "rewrite_first_three"
+      && action.label.includes("收藏动机")
+    )));
     assert.ok(pack.effectOptimization.actions.some((action) => action.evidence.includes("开头慢")));
   });
 

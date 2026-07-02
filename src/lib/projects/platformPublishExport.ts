@@ -239,10 +239,12 @@ export interface PlatformPublishOptimizationAction {
   id: string;
   priority: "high" | "medium" | "low";
   area: "data" | "asset" | "opening" | "platform" | "cadence";
+  execution: "generate_asset_variants" | "rewrite_first_three" | "open_target";
   label: string;
   detail: string;
   evidence: string;
   target: string;
+  href: string;
 }
 
 export interface PlatformPublishEffectOptimization {
@@ -1294,12 +1296,14 @@ function effectAction(
   id: string,
   priority: PlatformPublishOptimizationAction["priority"],
   area: PlatformPublishOptimizationAction["area"],
+  execution: PlatformPublishOptimizationAction["execution"],
   label: string,
   detail: string,
   evidence: string,
   target: string,
+  href: string,
 ): PlatformPublishOptimizationAction {
-  return { id, priority, area, label, detail, evidence, target };
+  return { id, priority, area, execution, label, detail, evidence, target, href };
 }
 
 function buildPlatformEffectOptimization(
@@ -1318,10 +1322,12 @@ function buildPlatformEffectOptimization(
           `${platform.id}-collect-effect-data`,
           "high",
           "data",
+          "open_target",
           "录入首轮发布数据",
           "至少补曝光、点击、收藏、追读、评论和编辑反馈，再判断平台是否吃这个卖点。",
           "当前没有任何发布效果记录。",
           "发布效果复盘",
+          "#publish-effect-panel",
         ),
       ],
     };
@@ -1336,10 +1342,12 @@ function buildPlatformEffectOptimization(
       `${platform.id}-rebuild-rejected-package`,
       "high",
       "asset",
+      "generate_asset_variants",
       "按拒稿反馈重做投稿资产",
       "把编辑反馈拆成标题、卖点、简介、前三章四类问题，重写后再生成一轮平台候选方案。",
       effect.latest.editorFeedback || "最新反馈状态为被拒。",
       "投稿资产",
+      "#submission-asset-editor",
     ));
   }
 
@@ -1348,10 +1356,12 @@ function buildPlatformEffectOptimization(
       `${platform.id}-fix-click-package`,
       "high",
       "asset",
+      "generate_asset_variants",
       "重做标题、卖点和标签",
       `${platform.name} 读者没点进来，先把标题从“像简介”改成“能一眼看懂冲突和爽点”。`,
       `点击率 ${effect.clickRatePercent}%，低于 5%。`,
       "投稿资产",
+      "#submission-asset-editor",
     ));
   }
 
@@ -1360,10 +1370,12 @@ function buildPlatformEffectOptimization(
       `${platform.id}-fix-first-three-retention`,
       "high",
       "opening",
+      "rewrite_first_three",
       "重查前三章留存链路",
       "点击不算死，但追读没接住，优先重写第一章钩子、第二章兑现和第三章转折。",
       `点击率 ${effect.clickRatePercent}%，追读率只有 ${effect.followRatePercent}%。`,
       "前三章",
+      "#first-three-rewrite",
     ));
   }
 
@@ -1372,10 +1384,12 @@ function buildPlatformEffectOptimization(
       `${platform.id}-increase-save-motive`,
       "medium",
       "opening",
+      "rewrite_first_three",
       "补强收藏动机",
       "前三章需要更清楚的长期奖励、关系拉扯或主线谜团，否则读者看完也不会收藏。",
       `收藏率 ${effect.favoriteRatePercent}%。`,
       "人物弧光 / 主线钩子",
+      "#first-three-rewrite",
     ));
   }
 
@@ -1384,10 +1398,12 @@ function buildPlatformEffectOptimization(
       `${platform.id}-repair-asset-audit`,
       "medium",
       "asset",
+      "generate_asset_variants",
       "先修投稿资产质检问题",
       "投稿资产还没到平台判断门槛，别拿脏数据指导内容方向。",
       `资产质检 ${assetAudit.score} 分，状态 ${assetAudit.status}。`,
       "投稿资产",
+      "#submission-asset-editor",
     ));
   }
 
@@ -1396,10 +1412,12 @@ function buildPlatformEffectOptimization(
       `${platform.id}-adopt-candidate`,
       "medium",
       "asset",
+      "open_target",
       "采纳一个 AI 候选做实测",
       "候选生成了但没有采纳，等于厨房炒了三盘菜却一口不尝。",
       `已生成 ${adoption.generatedVariants} 个候选，采纳 0 个。`,
       "AI 优化方案",
+      "#submission-asset-editor",
     ));
   }
 
@@ -1408,10 +1426,12 @@ function buildPlatformEffectOptimization(
       `${platform.id}-localize-overseas-package`,
       "medium",
       "platform",
+      "generate_asset_variants",
       "重做海外平台表达",
       "海外弱转化时先检查英文标题、简介和标签是否像本土连载，不要把中文卖点硬翻过去。",
       `${platform.name} 属于海外平台，当前复盘状态偏弱。`,
       "海外简介 / 标签",
+      "#submission-asset-editor",
     ));
   }
 
@@ -1420,19 +1440,23 @@ function buildPlatformEffectOptimization(
       `${platform.id}-scale-winning-signal`,
       "high",
       "cadence",
+      "open_target",
       "放大已验证卖点",
       "保持标题卖点方向，下一轮优先加更、强化同类爽点，并记录新增章节后的转化变化。",
       effect.status === "signed" ? "平台已给出签约或邀约信号。" : `收藏率 ${effect.favoriteRatePercent}%，追读率 ${effect.followRatePercent}%。`,
       "更新节奏 / 主线爽点",
+      "#create-chapter",
     ));
     actions.push(effectAction(
       `${platform.id}-protect-winning-package`,
       "medium",
       "asset",
+      "open_target",
       "保留当前投稿包装",
       "数据已经说明这套包装能打，别因为手痒把标题和简介改散。",
       effect.verdict,
       "投稿资产",
+      "#submission-asset-editor",
     ));
   }
 
@@ -1441,10 +1465,12 @@ function buildPlatformEffectOptimization(
       `${platform.id}-collect-second-sample`,
       "medium",
       "data",
+      "open_target",
       "补第二轮样本",
       "当前数据既不差也不够亮，至少再记录一轮，避免用一次偶然波动决定平台方向。",
       `当前记录 ${effect.records} 次，状态为 ${effect.status}。`,
       "发布效果复盘",
+      "#publish-effect-panel",
     ));
   }
 

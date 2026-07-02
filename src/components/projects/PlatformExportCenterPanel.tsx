@@ -267,10 +267,12 @@ interface PlatformPublishOptimizationAction {
   id: string;
   priority: "high" | "medium" | "low";
   area: "data" | "asset" | "opening" | "platform" | "cadence";
+  execution: "generate_asset_variants" | "rewrite_first_three" | "open_target";
   label: string;
   detail: string;
   evidence: string;
   target: string;
+  href: string;
 }
 
 interface PlatformPublishEffectOptimization {
@@ -504,6 +506,7 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
   const [isSavingAsset, setIsSavingAsset] = useState(false);
   const [isOptimizingAsset, setIsOptimizingAsset] = useState(false);
   const [isSavingEffect, setIsSavingEffect] = useState(false);
+  const [runningOptimizationActionId, setRunningOptimizationActionId] = useState<string | null>(null);
   const [assetOptimizationVariants, setAssetOptimizationVariants] = useState<PlatformSubmissionAssetOptimizationVariant[]>([]);
   const [versionActionFilter, setVersionActionFilter] = useState<PublishPackageVersionActionFilter>("all");
   const [assetDraft, setAssetDraft] = useState<SubmissionAssetDraft>({
@@ -684,7 +687,7 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
   }
 
   async function optimizeSubmissionAsset() {
-    if (!selectedPackage) return;
+    if (!selectedPackage) return false;
     setIsOptimizingAsset(true);
     setAssetOptimizationVariants([]);
     setMessage(null);
@@ -705,10 +708,47 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
       if (!response.ok || !payload?.variants) throw new Error(payload?.error ?? "AI 优化投稿资产失败。");
       setAssetOptimizationVariants(payload.variants.map((variant) => ({ ...variant, sourceTaskId: payload.task?.id })));
       setMessage(`已生成 ${payload.variants.length} 个 ${selectedPackage.platformName} 投稿优化方案。`);
+      return true;
     } catch (caught) {
       setMessage(caught instanceof Error ? caught.message : "AI 优化投稿资产失败。");
+      return false;
     } finally {
       setIsOptimizingAsset(false);
+    }
+  }
+
+  async function runEffectOptimizationAction(action: PlatformPublishOptimizationAction) {
+    if (!selectedPackage) return;
+    if (action.execution === "open_target") {
+      window.location.hash = action.href.replace(/^#/, "");
+      return;
+    }
+
+    setRunningOptimizationActionId(action.id);
+    setMessage(null);
+    try {
+      if (action.execution === "generate_asset_variants") {
+        const succeeded = await optimizeSubmissionAsset();
+        if (!succeeded) return;
+        setMessage(`已按「${action.label}」生成投稿资产候选方案。`);
+      } else if (action.execution === "rewrite_first_three") {
+        const response = await fetch(`/api/projects/${projectId}/first-three-rewrite/generate`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ platformId: selectedPackage.platformId, chapterOrders: [1, 2, 3], targetWords: 1600 }),
+        });
+        const payload = (await response.json().catch(() => null)) as {
+          results?: { order: number }[];
+          error?: string;
+        } | null;
+        if (!response.ok || !payload?.results) throw new Error(payload?.error ?? "前三章二轮重写失败。");
+        setMessage(`已按「${action.label}」重写前三章，共 ${payload.results.length} 章。`);
+        await loadCenter({ keepMessage: true });
+      }
+    } catch (caught) {
+      setMessage(caught instanceof Error ? caught.message : "二轮优化执行失败。");
+    } finally {
+      setRunningOptimizationActionId(null);
     }
   }
 
@@ -1130,7 +1170,7 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
 
       {selectedPackage ? (
         <div className="mt-4 grid gap-4">
-          <div className="rounded-md border border-slate-200 p-3" data-testid="submission-asset-editor">
+          <div className="rounded-md border border-slate-200 p-3">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
               <div>
                 <div className="font-medium text-slate-950">发布前质检</div>
@@ -1553,7 +1593,7 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
             ) : null}
           </div>
 
-          <div className="rounded-md border border-slate-200 p-3" data-testid="submission-asset-editor">
+          <div className="rounded-md border border-slate-200 p-3" data-testid="submission-asset-editor" id="submission-asset-editor">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
               <div>
                 <div className="font-medium text-slate-950">投稿资产</div>
@@ -1789,7 +1829,7 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
             </div>
           </div>
 
-          <div className="rounded-md border border-slate-200 p-3" data-testid="publish-effect-panel">
+          <div className="rounded-md border border-slate-200 p-3" data-testid="publish-effect-panel" id="publish-effect-panel">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
               <div>
                 <div className="font-medium text-slate-950">发布效果复盘</div>
@@ -1841,12 +1881,28 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
               <div className="mt-3 grid gap-2 lg:grid-cols-2">
                 {selectedPackage.effectOptimization.actions.map((action) => (
                   <div className="rounded-md bg-slate-50 p-3 text-sm" key={action.id}>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className={`rounded-md px-2 py-1 text-xs font-medium ${optimizationPriorityClass(action.priority)}`}>
-                        {action.priority === "high" ? "高" : action.priority === "medium" ? "中" : "低"}
-                      </span>
-                      <span className="rounded-md bg-white px-2 py-1 text-xs text-slate-600">{optimizationAreaLabel(action.area)}</span>
-                      <span className="font-medium text-slate-950">{action.label}</span>
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className={`rounded-md px-2 py-1 text-xs font-medium ${optimizationPriorityClass(action.priority)}`}>
+                          {action.priority === "high" ? "高" : action.priority === "medium" ? "中" : "低"}
+                        </span>
+                        <span className="rounded-md bg-white px-2 py-1 text-xs text-slate-600">{optimizationAreaLabel(action.area)}</span>
+                        <span className="font-medium text-slate-950">{action.label}</span>
+                      </div>
+                      <button
+                        className="w-fit rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white disabled:opacity-50"
+                        disabled={Boolean(runningOptimizationActionId) || isOptimizingAsset}
+                        onClick={() => void runEffectOptimizationAction(action)}
+                        type="button"
+                      >
+                        {runningOptimizationActionId === action.id
+                          ? "执行中"
+                          : action.execution === "generate_asset_variants"
+                            ? "生成方案"
+                            : action.execution === "rewrite_first_three"
+                              ? "重写前三章"
+                              : "打开位置"}
+                      </button>
                     </div>
                     <p className="mt-2 leading-6 text-slate-600">{action.detail}</p>
                     <div className="mt-2 grid gap-1 text-xs text-slate-500">

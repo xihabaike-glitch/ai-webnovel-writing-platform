@@ -377,6 +377,8 @@ interface PlatformStrategyReviewTask {
   id: string;
   priority: "high" | "medium" | "low";
   execution: "open_target" | "generate_asset_variants" | "rewrite_first_three" | "save_snapshot" | "apply_strategy";
+  rankTarget: keyof PlatformStrategyRankItem["scores"] | "evidence";
+  rankReason: string;
   label: string;
   detail: string;
   href: string;
@@ -1833,6 +1835,9 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
                                 <span className={`shrink-0 rounded-md px-1.5 py-0.5 text-[11px] font-medium ${strategyReviewTaskPriorityClass(task.priority)}`}>
                                   {strategyReviewTaskPriorityLabel(task.priority)}
                                 </span>
+                              </div>
+                              <div className="mt-1 rounded-md bg-white px-2 py-1 leading-5 text-slate-500">
+                                排序理由：{task.rankReason}
                               </div>
                               <div className="mt-1 leading-5 text-slate-500">{task.detail}</div>
                               <button

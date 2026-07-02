@@ -385,10 +385,14 @@ export interface PlatformStrategyReviewTask {
   id: string;
   priority: "high" | "medium" | "low";
   execution: "open_target" | "generate_asset_variants" | "rewrite_first_three" | "save_snapshot" | "apply_strategy";
+  rankTarget: keyof PlatformStrategyRankItem["scores"] | "evidence";
+  rankReason: string;
   label: string;
   detail: string;
   href: string;
 }
+
+type PlatformStrategyReviewTaskDraft = Omit<PlatformStrategyReviewTask, "rankTarget" | "rankReason">;
 
 export interface PlatformStrategyReviewHistoryItem {
   id: string;
@@ -983,6 +987,92 @@ function buildPlatformStrategyReviewHistory(pack: PlatformPublishPackage): Platf
     .slice(0, 6);
 }
 
+function platformStrategyComponentScores(pack: PlatformPublishPackage): PlatformStrategyRankItem["scores"] {
+  return {
+    preflight: pack.preflight.score,
+    asset: pack.submissionAssetAudit.score,
+    effect: effectScore(pack.publishEffect),
+    comparison: comparisonScore(pack.publishEffect.comparison),
+    adoption: pack.submissionAssetAdoption.adoptionRatePercent
+      ? Math.min(100, 50 + pack.submissionAssetAdoption.adoptionRatePercent)
+      : pack.submissionAssetAdoption.generatedVariants ? 35 : 45,
+  };
+}
+
+function reviewTaskRankTarget(task: PlatformStrategyReviewTaskDraft): PlatformStrategyReviewTask["rankTarget"] {
+  if (task.id.includes("asset") || task.id.includes("variable") || task.id.includes("transferable")) return "asset";
+  if (task.id.includes("rewrite") || task.id.includes("opening")) return "preflight";
+  if (task.id.includes("metric") || task.id.includes("effect") || task.id.includes("track") || task.id.includes("compare")) return "effect";
+  if (task.id.includes("version") || task.id.includes("archive") || task.id.includes("snapshot")) return "evidence";
+  if (task.id.includes("main-platform")) return "comparison";
+  return "adoption";
+}
+
+function reviewTaskRankReason(
+  pack: PlatformPublishPackage,
+  target: PlatformStrategyReviewTask["rankTarget"],
+  score: number,
+) {
+  if (target === "evidence") {
+    return pack.publishVersions.length
+      ? "已经有版本证据，当前更适合做对照留痕。"
+      : "缺少版本证据，先留一份基准，后面才知道改动有没有用。";
+  }
+  if (target === "effect" && !pack.publishEffect.records) {
+    return "真实效果 0 条，平台判断还没有证据，先补数据。";
+  }
+  if (target === "asset" && pack.submissionAssetAudit.status !== "ready") {
+    return `投稿资产 ${score} 分，入口素材还没过关，先别拿脏样本测平台。`;
+  }
+  if (target === "preflight" && !pack.canExport) {
+    return `发布质检 ${score} 分，正文/前三章还没到可投状态。`;
+  }
+  const labels: Record<keyof PlatformStrategyRankItem["scores"], string> = {
+    preflight: "发布质检",
+    asset: "投稿资产",
+    effect: "真实效果",
+    comparison: "二轮对照",
+    adoption: "候选采纳",
+  };
+  return `${labels[target]} ${score} 分，是当前需要继续盯的指标。`;
+}
+
+function rankPlatformStrategyReviewTasks(
+  pack: PlatformPublishPackage,
+  tasks: PlatformStrategyReviewTaskDraft[],
+): PlatformStrategyReviewTask[] {
+  const scores = platformStrategyComponentScores(pack);
+  const priorityWeight: Record<PlatformStrategyReviewTask["priority"], number> = { high: 20, medium: 10, low: 0 };
+  const ranked = tasks.map((task, index) => {
+    const target = reviewTaskRankTarget(task);
+    const targetScore = target === "evidence" ? 72 : scores[target];
+    const blockerBoost = target === "preflight" && !pack.canExport
+      ? 28
+      : target === "asset" && pack.submissionAssetAudit.status !== "ready"
+        ? 26
+        : target === "effect" && !pack.publishEffect.records
+          ? 34
+          : target === "comparison" && pack.publishEffect.comparison.status === "declined"
+            ? 24
+            : target === "adoption" && pack.submissionAssetAdoption.generatedVariants > 0 && pack.submissionAssetAdoption.adoptedVersions === 0
+              ? 22
+              : 0;
+    const evidenceBoost = target === "evidence" && !pack.publishVersions.length ? 14 : 0;
+
+    return {
+      ...task,
+      rankTarget: target,
+      rankReason: reviewTaskRankReason(pack, target, targetScore),
+      rankScore: 100 - targetScore + blockerBoost + evidenceBoost + priorityWeight[task.priority],
+      originalIndex: index,
+    };
+  });
+
+  return ranked
+    .sort((left, right) => right.rankScore - left.rankScore || left.originalIndex - right.originalIndex)
+    .map(({ rankScore: _rankScore, originalIndex: _originalIndex, ...task }) => task);
+}
+
 function buildPlatformStrategyReviewDecision(
   pack: PlatformPublishPackage,
   recommendation: PlatformStrategyRankItem["recommendation"],
@@ -996,7 +1086,7 @@ function buildPlatformStrategyReviewDecision(
       detail: "还没有真实发布数据，现在谈加码就是拍脑袋。",
       action: "先录入曝光、点击、收藏、追读和编辑反馈。",
       history,
-      tasks: [
+      tasks: rankPlatformStrategyReviewTasks(pack, [
         {
           id: "record-first-publish-effect",
           priority: "high",
@@ -1023,7 +1113,7 @@ function buildPlatformStrategyReviewDecision(
             : "投稿资产还没过关，先别急着拿它测平台。",
           href: "#submission-asset-editor",
         },
-      ],
+      ]),
     };
   }
 
@@ -1034,7 +1124,7 @@ function buildPlatformStrategyReviewDecision(
       detail: "数据已经给出正反馈，主资源可以继续往这里压。",
       action: "保持主战场，继续更新、归档版本，并跟踪下一轮转化。",
       history,
-      tasks: [
+      tasks: rankPlatformStrategyReviewTasks(pack, [
         {
           id: "keep-main-platform",
           priority: "high",
@@ -1059,7 +1149,7 @@ function buildPlatformStrategyReviewDecision(
           detail: "继续记录新增曝光、点击、收藏、追读和付费阅读变化。",
           href: "#publish-effect-panel",
         },
-      ],
+      ]),
     };
   }
 
@@ -1070,7 +1160,7 @@ function buildPlatformStrategyReviewDecision(
       detail: "真实反馈偏弱，现在继续硬投只会扩大损失。",
       action: "回到前三章、投稿资产和发布节奏，先修再投。",
       history,
-      tasks: [
+      tasks: rankPlatformStrategyReviewTasks(pack, [
         {
           id: "rewrite-opening-hook",
           priority: "high",
@@ -1095,7 +1185,7 @@ function buildPlatformStrategyReviewDecision(
           detail: "修完后再记录一轮数据，用前后变化判断是不是修对了。",
           href: "#publish-effect-panel",
         },
-      ],
+      ]),
     };
   }
 
@@ -1106,7 +1196,7 @@ function buildPlatformStrategyReviewDecision(
       detail: "当前平台胜率靠后，不值得继续烧主资源。",
       action: "把它降为观察平台，回排行榜选择更高胜率主战场。",
       history,
-      tasks: [
+      tasks: rankPlatformStrategyReviewTasks(pack, [
         {
           id: "demote-platform",
           priority: "high",
@@ -1131,7 +1221,7 @@ function buildPlatformStrategyReviewDecision(
           detail: "保留能复用的卖点和简介，按新平台口味重组表达。",
           href: "#submission-asset-editor",
         },
-      ],
+      ]),
     };
   }
 
@@ -1141,7 +1231,7 @@ function buildPlatformStrategyReviewDecision(
     detail: "数据还没差到要撤，也没好到能猛冲。",
     action: "做一轮小改动，再记录下一轮数据对照。",
     history,
-    tasks: [
+    tasks: rankPlatformStrategyReviewTasks(pack, [
       {
         id: "adjust-one-variable",
         priority: "high",
@@ -1166,7 +1256,7 @@ function buildPlatformStrategyReviewDecision(
         detail: "记录新一轮曝光、点击、收藏和追读，再决定加码还是换方向。",
         href: "#publish-effect-panel",
       },
-    ],
+    ]),
   };
 }
 

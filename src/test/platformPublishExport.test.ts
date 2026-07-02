@@ -510,6 +510,61 @@ test("buildPlatformPublishExportCenter", async (t) => {
     assert.ok(pack.effectOptimization.actions.some((action) => action.evidence.includes("开头慢")));
   });
 
+  await t.test("reranks strategy review tasks from the weakest current bottleneck", () => {
+    const center = buildPlatformPublishExportCenter({
+      project: {
+        title: "夜雨系统",
+        genre: "都市系统",
+        sellingPoint: "雨夜危机中觉醒系统，主角用选择翻盘。",
+        currentWordCount: 9000,
+        targetWordCount: 300000,
+      },
+      targetPlatform: getPlatformProfile("fanqie"),
+      chapters: finalChapters,
+      aiTasks: passedReviews,
+      submissionChecklist: readyChecklist,
+      platforms: [getPlatformProfile("fanqie")],
+      submissionAssets: [
+        {
+          id: "asset-weak",
+          platformId: "fanqie",
+          platformName: "番茄小说",
+          title: "夜",
+          logline: "系统。",
+          synopsis: "她醒了。",
+          overseasSynopsis: "",
+          tags: ["慢热"],
+          note: "弱资产。",
+          source: "manual",
+          updatedAt: "2026-01-09T08:00:00.000Z",
+        },
+      ],
+      platformPublishMetrics: [
+        {
+          id: "metric-fanqie-weak-asset",
+          platformId: "fanqie",
+          platformName: "番茄小说",
+          views: 1000,
+          clicks: 30,
+          favorites: 8,
+          follows: 4,
+          comments: 1,
+          paidReads: 0,
+          editorFeedback: "开头慢，卖点不够直。",
+          contractStatus: "rejected",
+          publishUrl: "",
+          notes: "弱转化样本。",
+          snapshotDate: "2026-01-10T08:00:00.000Z",
+        },
+      ],
+    });
+    const firstTask = center.platformStrategy[0].reviewDecision.tasks[0];
+
+    assert.equal(firstTask.id, "fix-submission-asset");
+    assert.equal(firstTask.rankTarget, "asset");
+    assert.ok(firstTask.rankReason.includes("投稿资产"));
+  });
+
   await t.test("scores platform submission asset fields", () => {
     const weakFanqieAudit = buildSubmissionAssetAudit(getPlatformProfile("fanqie"), {
       title: "夜",

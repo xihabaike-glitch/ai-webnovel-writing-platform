@@ -91,7 +91,11 @@ export interface ModelTaskAuditDashboard {
   budgetCenter: {
     status: "safe" | "watch" | "over";
     label: string;
+    enforcement: "off" | "warn" | "block";
     monthlyBudgetUsd: number;
+    maxTaskCostUsd: number;
+    maxBatchCostUsd: number;
+    maxFailureRatePercent: number;
     usedUsd: number;
     usedPercent: number;
     remainingUsd: number;
@@ -455,8 +459,10 @@ function buildBudgetCenter(
   tasks: ModelAuditTask[],
   summary: ModelTaskAuditDashboard["summary"],
   taskTypeRows: TaskTypeAuditRow[],
+  settingsInput?: ModelBudgetSettings | null,
 ) {
-  const monthlyBudgetUsd = 5;
+  const settings = normalizeModelBudgetSettings(settingsInput);
+  const monthlyBudgetUsd = settings.aiMonthlyBudgetUsd;
   const usedPercent = monthlyBudgetUsd > 0 ? Math.round((summary.knownCostUsd / monthlyBudgetUsd) * 100) : 0;
   const status: ModelTaskAuditDashboard["budgetCenter"]["status"] = usedPercent >= 100
     ? "over"
@@ -492,7 +498,11 @@ function buildBudgetCenter(
   return {
     status,
     label: status === "safe" ? "安全" : status === "watch" ? "观察" : "超预算",
+    enforcement: settings.aiBudgetEnforcement,
     monthlyBudgetUsd,
+    maxTaskCostUsd: settings.aiMaxTaskCostUsd,
+    maxBatchCostUsd: settings.aiMaxBatchCostUsd,
+    maxFailureRatePercent: settings.aiMaxFailureRatePercent,
     usedUsd: summary.knownCostUsd,
     usedPercent,
     remainingUsd: money(Math.max(0, monthlyBudgetUsd - summary.knownCostUsd)),
@@ -510,6 +520,7 @@ function buildBudgetCenter(
 export function buildModelTaskAuditDashboard(
   tasks: ModelAuditTask[],
   providers: ModelAuditProvider[],
+  budgetSettings?: ModelBudgetSettings | null,
 ): ModelTaskAuditDashboard {
   const succeededTasks = tasks.filter((task) => task.status === "succeeded").length;
   const failedTasks = tasks.filter((task) => task.status === "failed").length;
@@ -540,7 +551,7 @@ export function buildModelTaskAuditDashboard(
   const providerRows = buildProviderRows(tasks);
   const taskTypeRows = buildTaskTypeRows(tasks);
   const modelEffectRows = buildModelEffectRows(tasks);
-  const budgetCenter = buildBudgetCenter(tasks, summary, taskTypeRows);
+  const budgetCenter = buildBudgetCenter(tasks, summary, taskTypeRows, budgetSettings);
   const score = auditScore(summary, providerReadiness);
   const status = statusFor(score);
 
@@ -559,3 +570,4 @@ export function buildModelTaskAuditDashboard(
     nextActions: buildNextActions(summary, providerRows, taskTypeRows, modelEffectRows, providerReadiness),
   };
 }
+import { normalizeModelBudgetSettings, type ModelBudgetSettings } from "./modelBudget.ts";

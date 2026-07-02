@@ -11,7 +11,8 @@ export async function POST(request: Request) {
       targetWords: body.targetWords,
     });
     if ("error" in result) {
-      return NextResponse.json({ task: result.task, error: result.error }, { status: 500 });
+      const error = result.error ?? "生成正文失败。";
+      return NextResponse.json({ task: result.task, error }, { status: error.startsWith("预算拦截") ? 429 : 500 });
     }
 
     return NextResponse.json({

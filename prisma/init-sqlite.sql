@@ -8,6 +8,11 @@ CREATE TABLE IF NOT EXISTS "Project" (
   "genre" TEXT NOT NULL,
   "sellingPoint" TEXT NOT NULL DEFAULT '',
   "updateCadence" TEXT NOT NULL DEFAULT '',
+  "aiMonthlyBudgetUsd" REAL NOT NULL DEFAULT 5,
+  "aiMaxTaskCostUsd" REAL NOT NULL DEFAULT 0.25,
+  "aiMaxBatchCostUsd" REAL NOT NULL DEFAULT 1,
+  "aiMaxFailureRatePercent" INTEGER NOT NULL DEFAULT 20,
+  "aiBudgetEnforcement" TEXT NOT NULL DEFAULT 'block',
   "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );

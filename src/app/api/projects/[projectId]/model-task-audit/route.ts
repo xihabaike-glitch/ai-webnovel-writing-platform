@@ -10,7 +10,14 @@ export async function GET(_request: Request, { params }: Params) {
   const { projectId } = await params;
   const project = await prisma.project.findUnique({
     where: { id: projectId },
-    select: { id: true },
+    select: {
+      id: true,
+      aiMonthlyBudgetUsd: true,
+      aiMaxTaskCostUsd: true,
+      aiMaxBatchCostUsd: true,
+      aiMaxFailureRatePercent: true,
+      aiBudgetEnforcement: true,
+    },
   });
 
   if (!project) {
@@ -48,6 +55,7 @@ export async function GET(_request: Request, { params }: Params) {
         chapter: task.chapterId ? chaptersById.get(task.chapterId) ?? null : null,
       })),
       providers,
+      project,
     ),
   });
 }

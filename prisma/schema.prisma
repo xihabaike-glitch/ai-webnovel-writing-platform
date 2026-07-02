@@ -17,6 +17,11 @@ model Project {
   genre            String
   sellingPoint     String   @default("")
   updateCadence    String   @default("")
+  aiMonthlyBudgetUsd      Float    @default(5)
+  aiMaxTaskCostUsd        Float    @default(0.25)
+  aiMaxBatchCostUsd       Float    @default(1)
+  aiMaxFailureRatePercent Int      @default(20)
+  aiBudgetEnforcement     String   @default("block")
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import type { FormEvent } from "react";
 
 interface ProviderAuditRow {
   id: string;
@@ -65,7 +66,11 @@ interface ModelTaskAuditDashboard {
   budgetCenter: {
     status: "safe" | "watch" | "over";
     label: string;
+    enforcement: "off" | "warn" | "block";
     monthlyBudgetUsd: number;
+    maxTaskCostUsd: number;
+    maxBatchCostUsd: number;
+    maxFailureRatePercent: number;
     usedUsd: number;
     usedPercent: number;
     remainingUsd: number;
@@ -136,7 +141,15 @@ function budgetStatusClass(status: ModelTaskAuditDashboard["budgetCenter"]["stat
 export function ModelTaskAuditPanel({ projectId }: { projectId: string }) {
   const [dashboard, setDashboard] = useState<ModelTaskAuditDashboard | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isSavingBudget, setIsSavingBudget] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [budgetDraft, setBudgetDraft] = useState({
+    aiMonthlyBudgetUsd: "5",
+    aiMaxTaskCostUsd: "0.25",
+    aiMaxBatchCostUsd: "1",
+    aiMaxFailureRatePercent: "20",
+    aiBudgetEnforcement: "block" as "off" | "warn" | "block",
+  });
 
   async function loadAudit() {
     setIsLoading(true);
@@ -148,6 +161,13 @@ export function ModelTaskAuditPanel({ projectId }: { projectId: string }) {
       }
       const payload = (await response.json()) as { dashboard: ModelTaskAuditDashboard };
       setDashboard(payload.dashboard);
+      setBudgetDraft({
+        aiMonthlyBudgetUsd: String(payload.dashboard.budgetCenter.monthlyBudgetUsd),
+        aiMaxTaskCostUsd: String(payload.dashboard.budgetCenter.maxTaskCostUsd),
+        aiMaxBatchCostUsd: String(payload.dashboard.budgetCenter.maxBatchCostUsd),
+        aiMaxFailureRatePercent: String(payload.dashboard.budgetCenter.maxFailureRatePercent),
+        aiBudgetEnforcement: payload.dashboard.budgetCenter.enforcement,
+      });
     } catch (caught) {
       setMessage(caught instanceof Error ? caught.message : "读取模型审计失败。");
     } finally {
@@ -158,6 +178,32 @@ export function ModelTaskAuditPanel({ projectId }: { projectId: string }) {
   useEffect(() => {
     void loadAudit();
   }, [projectId]);
+
+  async function saveBudget(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setIsSavingBudget(true);
+    setMessage(null);
+    try {
+      const response = await fetch(`/api/projects/${projectId}/model-budget`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          aiMonthlyBudgetUsd: Number(budgetDraft.aiMonthlyBudgetUsd),
+          aiMaxTaskCostUsd: Number(budgetDraft.aiMaxTaskCostUsd),
+          aiMaxBatchCostUsd: Number(budgetDraft.aiMaxBatchCostUsd),
+          aiMaxFailureRatePercent: Number(budgetDraft.aiMaxFailureRatePercent),
+          aiBudgetEnforcement: budgetDraft.aiBudgetEnforcement,
+        }),
+      });
+      if (!response.ok) throw new Error("保存预算规则失败。");
+      setMessage("预算规则已保存");
+      await loadAudit();
+    } catch (caught) {
+      setMessage(caught instanceof Error ? caught.message : "保存预算规则失败。");
+    } finally {
+      setIsSavingBudget(false);
+    }
+  }
 
   return (
     <section className="rounded-md border border-slate-200 bg-white p-4">
@@ -251,6 +297,71 @@ export function ModelTaskAuditPanel({ projectId }: { projectId: string }) {
                 <div className="rounded-md bg-white/70 px-3 py-2" key={action}>{action}</div>
               ))}
             </div>
+            <form className="mt-4 grid gap-3 rounded-md bg-white/70 p-3 text-sm text-slate-700 lg:grid-cols-[repeat(5,minmax(0,1fr))_auto]" onSubmit={saveBudget}>
+              <label className="grid gap-1">
+                月预算
+                <input
+                  className="rounded-md border border-slate-200 px-3 py-2"
+                  min="0.01"
+                  onChange={(event) => setBudgetDraft((current) => ({ ...current, aiMonthlyBudgetUsd: event.target.value }))}
+                  step="0.01"
+                  type="number"
+                  value={budgetDraft.aiMonthlyBudgetUsd}
+                />
+              </label>
+              <label className="grid gap-1">
+                单次上限
+                <input
+                  className="rounded-md border border-slate-200 px-3 py-2"
+                  min="0.01"
+                  onChange={(event) => setBudgetDraft((current) => ({ ...current, aiMaxTaskCostUsd: event.target.value }))}
+                  step="0.01"
+                  type="number"
+                  value={budgetDraft.aiMaxTaskCostUsd}
+                />
+              </label>
+              <label className="grid gap-1">
+                批量上限
+                <input
+                  className="rounded-md border border-slate-200 px-3 py-2"
+                  min="0.01"
+                  onChange={(event) => setBudgetDraft((current) => ({ ...current, aiMaxBatchCostUsd: event.target.value }))}
+                  step="0.01"
+                  type="number"
+                  value={budgetDraft.aiMaxBatchCostUsd}
+                />
+              </label>
+              <label className="grid gap-1">
+                失败率上限
+                <input
+                  className="rounded-md border border-slate-200 px-3 py-2"
+                  max="100"
+                  min="1"
+                  onChange={(event) => setBudgetDraft((current) => ({ ...current, aiMaxFailureRatePercent: event.target.value }))}
+                  type="number"
+                  value={budgetDraft.aiMaxFailureRatePercent}
+                />
+              </label>
+              <label className="grid gap-1">
+                执行策略
+                <select
+                  className="rounded-md border border-slate-200 px-3 py-2"
+                  onChange={(event) => setBudgetDraft((current) => ({ ...current, aiBudgetEnforcement: event.target.value as "off" | "warn" | "block" }))}
+                  value={budgetDraft.aiBudgetEnforcement}
+                >
+                  <option value="block">超限拦截</option>
+                  <option value="warn">只提醒</option>
+                  <option value="off">关闭</option>
+                </select>
+              </label>
+              <button
+                className="self-end rounded-md bg-slate-950 px-4 py-2 font-medium text-white disabled:opacity-50"
+                disabled={isSavingBudget}
+                type="submit"
+              >
+                {isSavingBudget ? "保存中" : "保存"}
+              </button>
+            </form>
           </div>
 
           <div className="grid gap-4 lg:grid-cols-[1fr_1.2fr]">

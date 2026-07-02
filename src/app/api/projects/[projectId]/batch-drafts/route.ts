@@ -3,6 +3,7 @@ import { z } from "zod";
 import { buildBatchDraftQueue } from "@/lib/ai/batchDrafts";
 import { buildBatchRunGuard } from "@/lib/ai/batchRunGuard";
 import { generateChapterDraft } from "@/lib/ai/chapterDraftGeneration";
+import { buildModelBudgetGuard } from "@/lib/ai/modelBudget";
 import { prisma } from "@/lib/db/prisma";
 import { getActiveModelProvider } from "@/lib/model-gateway/activeProvider";
 import { getPlatformProfile, type PlatformId } from "@/lib/platforms/platformProfiles";
@@ -91,25 +92,42 @@ export async function POST(request: Request, { params }: Params) {
     }, { status: 400 });
   }
 
+  const recentTasks = await prisma.aiTask.findMany({
+    where: { projectId },
+    select: {
+      taskType: true,
+      status: true,
+      inputTokens: true,
+      outputTokens: true,
+      costUsd: true,
+    },
+    take: 500,
+    orderBy: { createdAt: "desc" },
+  });
   const guard = buildBatchRunGuard({
     action: "draft",
     batchSize: input.chapterIds.length,
     targetWords: input.targetWords,
-    tasks: await prisma.aiTask.findMany({
-      select: {
-        status: true,
-        inputTokens: true,
-        outputTokens: true,
-        costUsd: true,
-      },
-      take: 500,
-      orderBy: { createdAt: "desc" },
-    }),
+    tasks: recentTasks,
   });
   if (!guard.allowed) {
     return NextResponse.json({
       error: guard.summary,
       guard,
+      queue,
+      activeProvider: await activeProviderView(),
+    }, { status: 429 });
+  }
+  const budgetGuard = buildModelBudgetGuard({
+    settings: project,
+    tasks: recentTasks,
+    taskType: "chapter_draft",
+    batchSize: input.chapterIds.length,
+  });
+  if (!budgetGuard.allowed) {
+    return NextResponse.json({
+      error: budgetGuard.summary,
+      budgetGuard,
       queue,
       activeProvider: await activeProviderView(),
     }, { status: 429 });

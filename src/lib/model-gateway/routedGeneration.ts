@@ -1,5 +1,6 @@
 import type { AiTask, ModelProvider } from "@prisma/client";
 import { prisma } from "../db/prisma.ts";
+import { buildModelBudgetGuard } from "../ai/modelBudget.ts";
 import { getModelProviderCandidates, type SelectedModelProviderCandidate } from "./activeProvider.ts";
 import type { RoutedModelTaskType } from "./taskRouting.ts";
 import type { GenerateRequest, GenerateResult, ModelProviderId } from "./types.ts";
@@ -64,6 +65,74 @@ export async function runRoutedGeneration(options: RunRoutedGenerationOptions): 
   const candidates = await getModelProviderCandidates(options.taskType);
   const attempts: RoutedGenerationAttempt[] = [];
   let lastFailure: RoutedGenerationFailure | null = null;
+  const [project, budgetTasks] = await Promise.all([
+    prisma.project.findUnique({
+      where: { id: options.projectId },
+      select: {
+        aiMonthlyBudgetUsd: true,
+        aiMaxTaskCostUsd: true,
+        aiMaxBatchCostUsd: true,
+        aiMaxFailureRatePercent: true,
+        aiBudgetEnforcement: true,
+      },
+    }),
+    prisma.aiTask.findMany({
+      where: { projectId: options.projectId },
+      select: {
+        taskType: true,
+        status: true,
+        costUsd: true,
+      },
+      orderBy: { createdAt: "desc" },
+      take: 500,
+    }),
+  ]);
+  const budgetGuard = buildModelBudgetGuard({
+    settings: project,
+    tasks: budgetTasks,
+    taskType: options.taskType,
+  });
+
+  if (!budgetGuard.allowed) {
+    const candidate = candidates[0];
+    const task = await prisma.aiTask.create({
+      data: {
+        projectId: options.projectId,
+        chapterId: options.chapterId,
+        taskType: options.taskType,
+        providerConfigId: candidate.provider.id,
+        model: candidate.provider.defaultModel,
+        status: "failed",
+        inputSnapshot: JSON.stringify({
+          input: options.inputSnapshot,
+          budgetGuard,
+        }),
+        errorMessage: `预算拦截：${budgetGuard.summary}`,
+        inputTokens: 0,
+        outputTokens: 0,
+        costUsd: 0,
+      },
+    });
+    const attempt: RoutedGenerationAttempt = {
+      taskId: task.id,
+      providerConfigId: candidate.provider.id,
+      providerId: candidate.provider.providerId,
+      displayName: candidate.provider.displayName,
+      model: candidate.provider.defaultModel,
+      role: candidate.role,
+      status: "failed",
+      errorMessage: `预算拦截：${budgetGuard.summary}`,
+    };
+
+    return {
+      ok: false,
+      task,
+      provider: candidate.provider,
+      role: candidate.role,
+      error: `预算拦截：${budgetGuard.summary}`,
+      attempts: [attempt],
+    };
+  }
 
   for (const [index, candidate] of candidates.entries()) {
     const task = await prisma.aiTask.create({

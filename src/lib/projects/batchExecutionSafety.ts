@@ -1,4 +1,5 @@
 import type { QueueItem } from "./taskQueueCenter.ts";
+import { defaultBatchExecutionStrategy, type BatchExecutionStrategy } from "./batchExecutionStrategy.ts";
 
 export interface SafetyTaskProject {
   aiTasks: Array<{
@@ -17,6 +18,7 @@ export interface ExecutionSafetyItem {
 }
 
 export interface BatchExecutionSafety {
+  strategy: BatchExecutionStrategy;
   recommendedBatchIds: string[];
   recommendedBatchSize: number;
   estimatedTokens: number;
@@ -26,8 +28,6 @@ export interface BatchExecutionSafety {
   items: ExecutionSafetyItem[];
   warnings: string[];
 }
-
-const maxBatchSize = 5;
 
 const estimatedTokensByCategory: Record<QueueItem["category"], number> = {
   draft: 3200,
@@ -71,9 +71,10 @@ function projectMix(batch: QueueItem[]) {
 export function buildBatchExecutionSafety(
   queueItems: QueueItem[],
   projects: SafetyTaskProject[],
+  strategy: BatchExecutionStrategy = defaultBatchExecutionStrategy,
 ): BatchExecutionSafety {
   const runnable = queueItems.filter((item) => item.category !== "blocked");
-  const recommended = runnable.slice(0, maxBatchSize);
+  const recommended = runnable.slice(0, strategy.maxBatchSize);
   const blockedCount = queueItems.filter((item) => item.category === "blocked").length;
   const estimatedTokens = recommended.reduce((sum, item) => sum + estimatedTokensByCategory[item.category], 0);
   const costPerToken = historicalCostPerToken(projects);
@@ -90,10 +91,10 @@ export function buildBatchExecutionSafety(
     safetyItem(
       "batch-size",
       "批量数量",
-      recommended.length === 0 ? "block" : recommended.length <= maxBatchSize ? "pass" : "block",
+      recommended.length === 0 ? "block" : recommended.length <= strategy.maxBatchSize ? "pass" : "block",
       recommended.length === 0
         ? "没有可执行任务，先补章节卡或进入项目工作台。"
-        : `建议本批执行 ${recommended.length} 个任务，上限 ${maxBatchSize} 个。`,
+        : `建议本批执行 ${recommended.length} 个任务，${strategy.label}档上限 ${strategy.maxBatchSize} 个。`,
     ),
     safetyItem(
       "blocked-items",
@@ -110,28 +111,32 @@ export function buildBatchExecutionSafety(
     safetyItem(
       "mixed-projects",
       "项目混跑",
-      projectCount <= 1 ? "pass" : "warn",
-      projectCount <= 1 ? "本批只涉及 1 个项目。" : `本批跨 ${projectCount} 个项目，注意模型语气和上下文漂移。`,
+      projectCount <= 1 || strategy.allowCrossProject ? "pass" : "warn",
+      projectCount <= 1
+        ? "本批只涉及 1 个项目。"
+        : strategy.allowCrossProject
+          ? `${strategy.label}档允许同类任务跨项目补齐批次，本批跨 ${projectCount} 个项目。`
+          : `本批跨 ${projectCount} 个项目，当前档位建议保持单项目上下文。`,
     ),
     safetyItem(
       "running-tasks",
       "并发占用",
-      runningTasks === 0 ? "pass" : runningTasks <= 3 ? "warn" : "block",
+      runningTasks === 0 ? "pass" : runningTasks <= strategy.runningWarnThreshold ? "warn" : runningTasks < strategy.runningBlockThreshold ? "warn" : "block",
       runningTasks === 0 ? "当前没有排队或运行中的 AI 任务。" : `当前已有 ${runningTasks} 个任务排队或运行。`,
     ),
     safetyItem(
       "failure-rate",
       "失败率",
-      failureRate < 20 ? "pass" : failureRate < 40 ? "warn" : "block",
+      failureRate < strategy.failureWarnPercent ? "pass" : failureRate < strategy.failureBlockPercent ? "warn" : "block",
       totalTasks === 0 ? "还没有历史任务样本。" : `历史 AI 失败率 ${failureRate}%。`,
     ),
     safetyItem(
       "budget",
       "预算估算",
-      estimatedTokens <= 20000 ? "pass" : "warn",
+      estimatedTokens <= strategy.maxEstimatedTokens ? "pass" : "warn",
       costPerToken > 0
-        ? `预计约 ${estimatedTokens} Token，参考历史成本约 $${estimatedCostUsd.toFixed(4)}。`
-        : `预计约 ${estimatedTokens} Token；暂无真实成本样本，只能先按 Token 控量。`,
+        ? `预计约 ${estimatedTokens} Token，${strategy.label}档阈值 ${strategy.maxEstimatedTokens}，参考历史成本约 $${estimatedCostUsd.toFixed(4)}。`
+        : `预计约 ${estimatedTokens} Token，${strategy.label}档阈值 ${strategy.maxEstimatedTokens}；暂无真实成本样本，只能先按 Token 控量。`,
     ),
   ];
   const warnings = items
@@ -139,11 +144,12 @@ export function buildBatchExecutionSafety(
     .map((item) => `${item.label}：${item.detail}`);
 
   return {
+    strategy,
     recommendedBatchIds: recommended.map((item) => item.id),
     recommendedBatchSize: recommended.length,
     estimatedTokens,
     estimatedCostUsd,
-    maxBatchSize,
+    maxBatchSize: strategy.maxBatchSize,
     canRunRecommendedBatch: recommended.length > 0 && items.every((item) => item.status !== "block"),
     items,
     warnings: warnings.length ? warnings : ["建议批次暂无明显执行风险。"],

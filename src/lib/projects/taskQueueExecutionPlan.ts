@@ -1,4 +1,5 @@
 import type { QueueItem } from "./taskQueueCenter.ts";
+import { defaultBatchExecutionStrategy, type BatchExecutionStrategy } from "./batchExecutionStrategy.ts";
 
 export type ExecutableQueueCategory = "draft" | "review" | "second_pass";
 type ExecutableQueueItem = QueueItem & { category: ExecutableQueueCategory };
@@ -7,6 +8,7 @@ export interface TaskQueueExecutionPlan {
   canRun: boolean;
   category: ExecutableQueueCategory | null;
   projectId: string | null;
+  projectIds: string[];
   projectTitle: string | null;
   itemIds: string[];
   chapterIds: string[];
@@ -31,7 +33,11 @@ function categoryActionLabel(category: ExecutableQueueCategory) {
   return "批量二改";
 }
 
-export function buildTaskQueueExecutionPlan(queueItems: QueueItem[], maxBatchSize = 5): TaskQueueExecutionPlan {
+export function buildTaskQueueExecutionPlan(
+  queueItems: QueueItem[],
+  maxBatchSize = defaultBatchExecutionStrategy.maxBatchSize,
+  strategy: Pick<BatchExecutionStrategy, "allowCrossProject"> = defaultBatchExecutionStrategy,
+): TaskQueueExecutionPlan {
   const executable = queueItems.filter(isExecutableQueueItem);
   const first = executable[0];
 
@@ -40,6 +46,7 @@ export function buildTaskQueueExecutionPlan(queueItems: QueueItem[], maxBatchSiz
       canRun: false,
       category: null,
       projectId: null,
+      projectIds: [],
       projectTitle: null,
       itemIds: [],
       chapterIds: [],
@@ -50,21 +57,25 @@ export function buildTaskQueueExecutionPlan(queueItems: QueueItem[], maxBatchSiz
   }
 
   const batch = executable
-    .filter((item) => item.category === first.category && item.projectId === first.projectId)
+    .filter((item) => item.category === first.category && (strategy.allowCrossProject || item.projectId === first.projectId))
     .slice(0, maxBatchSize);
   const sameCategoryOtherProjects = executable.filter((item) => item.category === first.category && item.projectId !== first.projectId).length;
+  const projectIds = [...new Set(batch.map((item) => item.projectId))];
+  const projectTitles = [...new Set(batch.map((item) => item.projectTitle))];
 
   return {
     canRun: batch.length > 0,
     category: first.category,
     projectId: first.projectId,
-    projectTitle: first.projectTitle,
+    projectIds,
+    projectTitle: projectTitles.length === 1 ? first.projectTitle : `${projectTitles.length} 个项目`,
     itemIds: batch.map((item) => item.id),
     chapterIds: batch.map(chapterIdFromItem).filter(Boolean),
     actionLabel: `${categoryActionLabel(first.category)} ${batch.length} 个`,
-    detail: `${first.projectTitle} · ${first.label} · ${batch.map((item) => item.chapterTitle).join("、")}`,
+    detail: `${projectTitles.join("、")} · ${first.label} · ${batch.map((item) => item.chapterTitle).join("、")}`,
     warnings: [
-      sameCategoryOtherProjects > 0 ? `还有 ${sameCategoryOtherProjects} 个同类任务分布在其他项目，本批先保持单项目上下文。` : null,
+      sameCategoryOtherProjects > 0 && !strategy.allowCrossProject ? `还有 ${sameCategoryOtherProjects} 个同类任务分布在其他项目，本批先保持单项目上下文。` : null,
+      projectIds.length > 1 ? `本批跨 ${projectIds.length} 个项目，执行前确认模型路线和风格稳定。` : null,
       batch.length >= maxBatchSize ? `本批已达到 ${maxBatchSize} 个上限，剩余任务下一批继续。` : null,
     ].filter((warning): warning is string => Boolean(warning)),
   };

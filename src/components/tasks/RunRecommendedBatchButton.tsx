@@ -20,7 +20,7 @@ interface BatchRunResponse {
   }>;
 }
 
-export function RunRecommendedBatchButton({ disabled }: { disabled: boolean }) {
+export function RunRecommendedBatchButton({ disabled, strategyId }: { disabled: boolean; strategyId: string }) {
   const router = useRouter();
   const [isRunning, setIsRunning] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -29,7 +29,7 @@ export function RunRecommendedBatchButton({ disabled }: { disabled: boolean }) {
     setIsRunning(true);
     setMessage(null);
     try {
-      const response = await fetch("/api/tasks/recommended-batch", {
+      const response = await fetch(`/api/tasks/recommended-batch?strategy=${encodeURIComponent(strategyId)}`, {
         method: "POST",
       });
       const payload = (await response.json()) as BatchRunResponse;

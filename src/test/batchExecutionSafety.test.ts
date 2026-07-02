@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { buildBatchExecutionSafety } from "../lib/projects/batchExecutionSafety.ts";
+import { getBatchExecutionStrategy } from "../lib/projects/batchExecutionStrategy.ts";
 import type { QueueItem } from "../lib/projects/taskQueueCenter.ts";
 
 const baseItem: QueueItem = {
@@ -55,5 +56,24 @@ test("buildBatchExecutionSafety", async (t) => {
 
     assert.equal(safety.canRunRecommendedBatch, false);
     assert.equal(safety.items.find((item) => item.id === "running-tasks")?.status, "block");
+  });
+
+  await t.test("applies conservative and aggressive strategy thresholds", () => {
+    const items = Array.from({ length: 6 }, (_, index) => ({
+      ...baseItem,
+      id: `item-${index + 1}`,
+      chapterTitle: `第${index + 1}章`,
+      projectId: index % 2 === 0 ? "project-1" : "project-2",
+    }));
+    const conservative = buildBatchExecutionSafety(items, [{ aiTasks: [] }], getBatchExecutionStrategy("conservative"));
+    const aggressive = buildBatchExecutionSafety(items, [{ aiTasks: [] }], getBatchExecutionStrategy("aggressive"));
+
+    assert.equal(conservative.recommendedBatchSize, 3);
+    assert.equal(conservative.maxBatchSize, 3);
+    assert.equal(conservative.items.find((item) => item.id === "mixed-projects")?.status, "warn");
+    assert.equal(aggressive.recommendedBatchSize, 6);
+    assert.equal(aggressive.maxBatchSize, 8);
+    assert.equal(aggressive.strategy.allowCrossProject, true);
+    assert.equal(aggressive.items.find((item) => item.id === "mixed-projects")?.status, "pass");
   });
 });

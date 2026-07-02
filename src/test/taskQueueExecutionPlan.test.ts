@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { getBatchExecutionStrategy } from "../lib/projects/batchExecutionStrategy.ts";
 import { buildTaskQueueExecutionPlan } from "../lib/projects/taskQueueExecutionPlan.ts";
 import type { QueueItem } from "../lib/projects/taskQueueCenter.ts";
 
@@ -40,5 +41,17 @@ test("buildTaskQueueExecutionPlan", async (t) => {
     assert.equal(plan.canRun, false);
     assert.equal(plan.category, null);
     assert.equal(plan.chapterIds.length, 0);
+  });
+
+  await t.test("allows aggressive same-action batches to cross projects", () => {
+    const plan = buildTaskQueueExecutionPlan([
+      queueItem({ id: "project-1:review:chapter-1", category: "review", projectId: "project-1", projectTitle: "项目一", chapterTitle: "第一章" }),
+      queueItem({ id: "project-2:review:chapter-2", category: "review", projectId: "project-2", projectTitle: "项目二", chapterTitle: "第二章" }),
+      queueItem({ id: "project-3:review:chapter-3", category: "review", projectId: "project-3", projectTitle: "项目三", chapterTitle: "第三章" }),
+    ], 8, getBatchExecutionStrategy("aggressive"));
+
+    assert.deepEqual(plan.projectIds, ["project-1", "project-2", "project-3"]);
+    assert.deepEqual(plan.chapterIds, ["chapter-1", "chapter-2", "chapter-3"]);
+    assert.ok(plan.warnings.some((warning) => warning.includes("跨 3 个项目")));
   });
 });

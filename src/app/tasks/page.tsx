@@ -6,6 +6,7 @@ import { buildTaskBatchHistory } from "@/lib/ai/taskBatchHistory";
 import { buildTaskRunConsole, type TaskRunLog } from "@/lib/ai/taskRunConsole";
 import { prisma } from "@/lib/db/prisma";
 import { buildBatchExecutionSafety } from "@/lib/projects/batchExecutionSafety";
+import { batchExecutionStrategies, getBatchExecutionStrategy } from "@/lib/projects/batchExecutionStrategy";
 import { buildTaskQueueCenter, type QueueItem } from "@/lib/projects/taskQueueCenter";
 import { buildTaskQueueExecutionPlan } from "@/lib/projects/taskQueueExecutionPlan";
 
@@ -61,7 +62,9 @@ function batchTone(successRate: number, failedTasks: number, runningTasks: numbe
   return "border-emerald-200 bg-emerald-50 text-emerald-800";
 }
 
-export default async function TasksPage() {
+export default async function TasksPage({ searchParams }: { searchParams?: Promise<{ batchStrategy?: string }> }) {
+  const resolvedSearchParams = searchParams ? await searchParams : {};
+  const activeStrategy = getBatchExecutionStrategy(resolvedSearchParams.batchStrategy);
   const [projects, recentAiTasks, chapters] = await Promise.all([
     prisma.project.findMany({
       include: {
@@ -84,8 +87,8 @@ export default async function TasksPage() {
   ]);
   const chaptersById = new Map(chapters.map((chapter) => [chapter.id, chapter]));
   const queue = buildTaskQueueCenter(projects);
-  const safety = buildBatchExecutionSafety(queue.items, projects);
-  const executionPlan = buildTaskQueueExecutionPlan(queue.items);
+  const safety = buildBatchExecutionSafety(queue.items, projects, activeStrategy);
+  const executionPlan = buildTaskQueueExecutionPlan(queue.items, activeStrategy.maxBatchSize, activeStrategy);
   const runConsole = buildTaskRunConsole(recentAiTasks.map((task) => ({
     ...task,
     chapter: task.chapterId ? chaptersById.get(task.chapterId) ?? null : null,
@@ -266,8 +269,26 @@ export default async function TasksPage() {
             <div className="rounded-md bg-slate-50 px-3 py-2 text-sm font-medium text-slate-700">
               {safety.canRunRecommendedBatch && executionPlan.canRun ? "建议批次可执行" : "建议先处理阻塞"}
             </div>
-            <RunRecommendedBatchButton disabled={!safety.canRunRecommendedBatch || !executionPlan.canRun} />
+            <RunRecommendedBatchButton disabled={!safety.canRunRecommendedBatch || !executionPlan.canRun} strategyId={activeStrategy.id} />
           </div>
+        </div>
+        <div className="mt-4 grid gap-2 md:grid-cols-3">
+          {batchExecutionStrategies.map((strategy) => (
+            <Link
+              className={`rounded-md border p-3 text-sm ${strategy.id === activeStrategy.id ? "border-slate-950 bg-slate-950 text-white" : "border-slate-200 bg-white hover:bg-slate-50"}`}
+              href={`/tasks?batchStrategy=${strategy.id}`}
+              key={strategy.id}
+            >
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-medium">{strategy.label}档</span>
+                <span className={strategy.id === activeStrategy.id ? "text-xs text-slate-200" : "text-xs text-slate-500"}>{strategy.maxBatchSize} 个上限</span>
+              </div>
+              <p className={strategy.id === activeStrategy.id ? "mt-2 leading-6 text-slate-200" : "mt-2 leading-6 text-slate-600"}>{strategy.description}</p>
+              <div className={strategy.id === activeStrategy.id ? "mt-2 text-xs text-slate-200" : "mt-2 text-xs text-slate-500"}>
+                Token {strategy.maxEstimatedTokens} · {strategy.allowCrossProject ? "允许跨项目" : "单项目优先"}
+              </div>
+            </Link>
+          ))}
         </div>
         <div className="mt-4 rounded-md border border-slate-200 bg-slate-50 p-3 text-sm">
           <div className="font-medium text-slate-950">{executionPlan.actionLabel}</div>

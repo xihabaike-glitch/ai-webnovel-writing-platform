@@ -448,6 +448,12 @@ export interface GatePlatformDecisionTimeline {
   items: GatePlatformDecisionTimelineItem[];
 }
 
+export interface GatePlatformDecisionTimelineFilters {
+  platformId?: string;
+  status?: GatePlatformDecisionTimelineStatus | "all";
+  eventType?: GatePlatformDecisionTimelineEventType | "all";
+}
+
 export interface GatePlatformStrategyReceiptPayload {
   message?: string;
   error?: string;
@@ -2964,6 +2970,18 @@ export function buildGatePlatformDecisionTimeline(input: {
     ].filter((action): action is string => Boolean(action)),
     items: sortedItems,
   };
+}
+
+export function filterGatePlatformDecisionTimelineItems(
+  items: GatePlatformDecisionTimelineItem[],
+  filters: GatePlatformDecisionTimelineFilters = {},
+): GatePlatformDecisionTimelineItem[] {
+  return items.filter((item) => {
+    if (filters.platformId && filters.platformId !== "all" && item.platformId !== filters.platformId) return false;
+    if (filters.status && filters.status !== "all" && item.status !== filters.status) return false;
+    if (filters.eventType && filters.eventType !== "all" && !item.events.some((event) => event.type === filters.eventType)) return false;
+    return true;
+  });
 }
 
 export async function persistGateDispatchTask(dispatch: GatePlatformGrowthDispatchItem, sourceReceipt?: GateActionReceipt) {

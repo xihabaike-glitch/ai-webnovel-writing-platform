@@ -18,6 +18,7 @@ import {
   buildGatePlatformRetreatResolution,
   buildGatePlatformRetreatRecheckDispatchItems,
   buildGatePlatformDecisionTimeline,
+  filterGatePlatformDecisionTimelineItems,
   buildGateDispatchTaskCenter,
   buildGateDispatchTaskCloseoutItem,
   buildGatePublishEffectReceipt,
@@ -1156,6 +1157,9 @@ test("buildGateActionReceipt", async (t) => {
     assert.equal(timelineItem?.events.some((event) => event.type === "repair" && event.label === "修复已复测"), true);
     assert.equal(timelineItem?.events.some((event) => event.type === "recheck" && event.label === "重验已回填"), true);
     assert.equal(timelineItem?.events[0].type, "effect");
+    assert.equal(filterGatePlatformDecisionTimelineItems(decisionTimeline.items, { status: "recovering" }).length, 1);
+    assert.equal(filterGatePlatformDecisionTimelineItems(decisionTimeline.items, { eventType: "recheck" })[0]?.platformId, "fanqie");
+    assert.equal(filterGatePlatformDecisionTimelineItems(decisionTimeline.items, { status: "blocked" }).length, 0);
   });
 
   await t.test("records dispatch receipts and marks the dispatch as assigned", () => {

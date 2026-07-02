@@ -219,6 +219,7 @@ export interface PlatformPublishEffectSummary {
   status: "empty" | "weak" | "watch" | "promising" | "signed";
   records: number;
   latest: PlatformPublishMetricInput | null;
+  comparison: PlatformPublishEffectComparison;
   totalViews: number;
   totalClicks: number;
   totalFavorites: number;
@@ -233,6 +234,22 @@ export interface PlatformPublishEffectSummary {
   verdict: string;
   nextAction: string;
   history: PlatformPublishMetricInput[];
+}
+
+export interface PlatformPublishEffectComparison {
+  status: "none" | "improved" | "declined" | "mixed" | "flat";
+  previous: PlatformPublishMetricInput | null;
+  current: PlatformPublishMetricInput | null;
+  viewsDelta: number;
+  clicksDelta: number;
+  favoritesDelta: number;
+  followsDelta: number;
+  clickRateDeltaPercent: number;
+  favoriteRateDeltaPercent: number;
+  followRateDeltaPercent: number;
+  verdict: string;
+  wins: string[];
+  losses: string[];
 }
 
 export interface PlatformPublishOptimizationAction {
@@ -991,6 +1008,14 @@ function buildMarkdown(pack: Omit<PlatformPublishPackage, "markdown">) {
     `下一步：${pack.publishEffect.nextAction}`,
     ...(pack.publishEffect.latest?.editorFeedback ? [`编辑反馈：${pack.publishEffect.latest.editorFeedback}`] : []),
     "",
+    "## 执行前后对照",
+    `状态：${pack.publishEffect.comparison.status}`,
+    `曝光变化：${pack.publishEffect.comparison.viewsDelta}`,
+    `点击率变化：${pack.publishEffect.comparison.clickRateDeltaPercent}%`,
+    `收藏率变化：${pack.publishEffect.comparison.favoriteRateDeltaPercent}%`,
+    `追读率变化：${pack.publishEffect.comparison.followRateDeltaPercent}%`,
+    `判断：${pack.publishEffect.comparison.verdict}`,
+    "",
     "## 二轮优化清单",
     pack.effectOptimization.headline,
     ...pack.effectOptimization.actions.map((action) => `- [${action.priority}] ${action.label}｜${action.target}｜${action.detail}｜依据：${action.evidence}`),
@@ -1185,6 +1210,96 @@ function contractStatusLabel(status: string) {
   return "未知";
 }
 
+function rateDelta(current: number, previous: number) {
+  return Math.round((current - previous) * 10) / 10;
+}
+
+function metricRates(metric: PlatformPublishMetricInput | null) {
+  if (!metric) {
+    return {
+      clickRatePercent: 0,
+      favoriteRatePercent: 0,
+      followRatePercent: 0,
+    };
+  }
+  return {
+    clickRatePercent: percent(metric.clicks, metric.views),
+    favoriteRatePercent: percent(metric.favorites, metric.views),
+    followRatePercent: percent(metric.follows, metric.views),
+  };
+}
+
+function buildPublishEffectComparison(history: PlatformPublishMetricInput[]): PlatformPublishEffectComparison {
+  const current = history[0] ?? null;
+  const previous = history[1] ?? null;
+
+  if (!current || !previous) {
+    return {
+      status: "none",
+      previous,
+      current,
+      viewsDelta: 0,
+      clicksDelta: 0,
+      favoritesDelta: 0,
+      followsDelta: 0,
+      clickRateDeltaPercent: 0,
+      favoriteRateDeltaPercent: 0,
+      followRateDeltaPercent: 0,
+      verdict: "还没有前后对照样本。至少录两次数据，才能判断改动有没有用。",
+      wins: [],
+      losses: [],
+    };
+  }
+
+  const currentRates = metricRates(current);
+  const previousRates = metricRates(previous);
+  const clickRateDeltaPercent = rateDelta(currentRates.clickRatePercent, previousRates.clickRatePercent);
+  const favoriteRateDeltaPercent = rateDelta(currentRates.favoriteRatePercent, previousRates.favoriteRatePercent);
+  const followRateDeltaPercent = rateDelta(currentRates.followRatePercent, previousRates.followRatePercent);
+  const wins = [
+    clickRateDeltaPercent >= 1 ? `点击率 +${clickRateDeltaPercent}%` : "",
+    favoriteRateDeltaPercent >= 1 ? `收藏率 +${favoriteRateDeltaPercent}%` : "",
+    followRateDeltaPercent >= 0.5 ? `追读率 +${followRateDeltaPercent}%` : "",
+    current.comments > previous.comments ? `评论 +${current.comments - previous.comments}` : "",
+  ].filter(Boolean);
+  const losses = [
+    clickRateDeltaPercent <= -1 ? `点击率 ${clickRateDeltaPercent}%` : "",
+    favoriteRateDeltaPercent <= -1 ? `收藏率 ${favoriteRateDeltaPercent}%` : "",
+    followRateDeltaPercent <= -0.5 ? `追读率 ${followRateDeltaPercent}%` : "",
+    current.comments < previous.comments ? `评论 ${current.comments - previous.comments}` : "",
+  ].filter(Boolean);
+  const status: PlatformPublishEffectComparison["status"] = wins.length && !losses.length
+    ? "improved"
+    : losses.length && !wins.length
+      ? "declined"
+      : wins.length && losses.length
+        ? "mixed"
+        : "flat";
+  const verdict = status === "improved"
+    ? "这轮优化有正反馈，别急着换方向，继续放大有效信号。"
+    : status === "declined"
+      ? "这轮优化把数据改差了，别嘴硬，回滚包装或重查前三章兑现。"
+      : status === "mixed"
+        ? "有指标涨也有指标跌，先判断是入口变好还是留存变差。"
+        : "数据基本没动，说明改动不够狠，或者样本还不够。";
+
+  return {
+    status,
+    previous,
+    current,
+    viewsDelta: current.views - previous.views,
+    clicksDelta: current.clicks - previous.clicks,
+    favoritesDelta: current.favorites - previous.favorites,
+    followsDelta: current.follows - previous.follows,
+    clickRateDeltaPercent,
+    favoriteRateDeltaPercent,
+    followRateDeltaPercent,
+    verdict,
+    wins,
+    losses,
+  };
+}
+
 function buildPlatformPublishEffect(
   platform: PlatformProfile,
   metrics: PlatformPublishMetricInput[],
@@ -1205,12 +1320,14 @@ function buildPlatformPublishEffect(
   const commentRatePercent = percent(totalComments, totalViews);
   const paidReadRatePercent = percent(totalPaidReads, totalViews);
   const latest = history[0] ?? null;
+  const comparison = buildPublishEffectComparison(history);
 
   if (!latest) {
     return {
       status: "empty",
       records: 0,
       latest: null,
+      comparison,
       totalViews: 0,
       totalClicks: 0,
       totalFavorites: 0,
@@ -1234,6 +1351,7 @@ function buildPlatformPublishEffect(
       status: "signed",
       records: history.length,
       latest,
+      comparison,
       totalViews,
       totalClicks,
       totalFavorites,
@@ -1275,6 +1393,7 @@ function buildPlatformPublishEffect(
     status,
     records: history.length,
     latest,
+    comparison,
     totalViews,
     totalClicks,
     totalFavorites,

@@ -247,6 +247,7 @@ interface PlatformPublishEffect {
   status: "empty" | "weak" | "watch" | "promising" | "signed";
   records: number;
   latest: PlatformPublishMetric | null;
+  comparison: PlatformPublishEffectComparison;
   totalViews: number;
   totalClicks: number;
   totalFavorites: number;
@@ -261,6 +262,22 @@ interface PlatformPublishEffect {
   verdict: string;
   nextAction: string;
   history: PlatformPublishMetric[];
+}
+
+interface PlatformPublishEffectComparison {
+  status: "none" | "improved" | "declined" | "mixed" | "flat";
+  previous: PlatformPublishMetric | null;
+  current: PlatformPublishMetric | null;
+  viewsDelta: number;
+  clicksDelta: number;
+  favoritesDelta: number;
+  followsDelta: number;
+  clickRateDeltaPercent: number;
+  favoriteRateDeltaPercent: number;
+  followRateDeltaPercent: number;
+  verdict: string;
+  wins: string[];
+  losses: string[];
 }
 
 interface PlatformPublishOptimizationAction {
@@ -476,6 +493,26 @@ function optimizationAreaLabel(area: PlatformPublishOptimizationAction["area"]) 
   if (area === "platform") return "平台表达";
   if (area === "cadence") return "更新节奏";
   return "数据";
+}
+
+function comparisonStatusLabel(status: PlatformPublishEffectComparison["status"]) {
+  if (status === "improved") return "变好";
+  if (status === "declined") return "变差";
+  if (status === "mixed") return "有涨有跌";
+  if (status === "flat") return "没动";
+  return "待对照";
+}
+
+function comparisonStatusClass(status: PlatformPublishEffectComparison["status"]) {
+  if (status === "improved") return "bg-emerald-50 text-emerald-700";
+  if (status === "declined") return "bg-rose-50 text-rose-700";
+  if (status === "mixed") return "bg-amber-50 text-amber-700";
+  return "bg-slate-100 text-slate-600";
+}
+
+function formatDelta(value: number, suffix = "") {
+  if (value > 0) return `+${value}${suffix}`;
+  return `${value}${suffix}`;
 }
 
 function normalizeVersionAction(action: string): PublishPackageVersionActionFilter {
@@ -1867,6 +1904,41 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
             </div>
             <div className="mt-3 rounded-md bg-slate-50 p-3 text-sm text-slate-700">
               <span className="font-medium text-slate-950">下一步：</span>{selectedPackage.publishEffect.nextAction}
+            </div>
+            <div className="mt-3 rounded-md border border-slate-200 p-3">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <div className="font-medium text-slate-950">执行前后对照</div>
+                  <p className="mt-1 text-sm leading-6 text-slate-600">{selectedPackage.publishEffect.comparison.verdict}</p>
+                </div>
+                <span className={`w-fit rounded-md px-2 py-1 text-xs font-medium ${comparisonStatusClass(selectedPackage.publishEffect.comparison.status)}`}>
+                  {comparisonStatusLabel(selectedPackage.publishEffect.comparison.status)}
+                </span>
+              </div>
+              <div className="mt-3 grid gap-2 text-sm sm:grid-cols-2 lg:grid-cols-4">
+                <div className="rounded-md bg-slate-50 p-2">
+                  <div className="text-xs text-slate-500">曝光变化</div>
+                  <div className="mt-1 font-medium text-slate-950">{formatDelta(selectedPackage.publishEffect.comparison.viewsDelta)}</div>
+                </div>
+                <div className="rounded-md bg-slate-50 p-2">
+                  <div className="text-xs text-slate-500">点击率变化</div>
+                  <div className="mt-1 font-medium text-slate-950">{formatDelta(selectedPackage.publishEffect.comparison.clickRateDeltaPercent, "%")}</div>
+                </div>
+                <div className="rounded-md bg-slate-50 p-2">
+                  <div className="text-xs text-slate-500">收藏率变化</div>
+                  <div className="mt-1 font-medium text-slate-950">{formatDelta(selectedPackage.publishEffect.comparison.favoriteRateDeltaPercent, "%")}</div>
+                </div>
+                <div className="rounded-md bg-slate-50 p-2">
+                  <div className="text-xs text-slate-500">追读率变化</div>
+                  <div className="mt-1 font-medium text-slate-950">{formatDelta(selectedPackage.publishEffect.comparison.followRateDeltaPercent, "%")}</div>
+                </div>
+              </div>
+              {(selectedPackage.publishEffect.comparison.wins.length || selectedPackage.publishEffect.comparison.losses.length) ? (
+                <div className="mt-3 grid gap-2 text-xs text-slate-500 sm:grid-cols-2">
+                  <div>上涨：{selectedPackage.publishEffect.comparison.wins.join("、") || "无"}</div>
+                  <div>下滑：{selectedPackage.publishEffect.comparison.losses.join("、") || "无"}</div>
+                </div>
+              ) : null}
             </div>
             <div className="mt-3 rounded-md border border-slate-200 p-3">
               <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">

@@ -397,7 +397,11 @@ export async function POST(request: Request, { params }: Params) {
         updateCadence: strategyUpdateCadence(platform, context.project.updateCadence),
       },
     });
-    const switchPlan = buildPlatformStrategySwitchPlan(strategy, previousPlatform);
+    const switchPlan = buildPlatformStrategySwitchPlan(
+      strategy,
+      previousPlatform,
+      context.center.packages.find((pack) => pack.platformId === platform.id),
+    );
 
     return NextResponse.json({
       message: `已把主战场切到 ${platform.name}。`,

@@ -368,6 +368,7 @@ interface PlatformStrategySwitchStep {
   label: string;
   detail: string;
   status: "done" | "next" | "queued";
+  executable: boolean;
   href: string;
 }
 
@@ -613,6 +614,7 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
   const [isSavingEffect, setIsSavingEffect] = useState(false);
   const [runningOptimizationActionId, setRunningOptimizationActionId] = useState<string | null>(null);
   const [applyingStrategyPlatformId, setApplyingStrategyPlatformId] = useState<string | null>(null);
+  const [runningStrategyStepId, setRunningStrategyStepId] = useState<string | null>(null);
   const [strategySwitchPlan, setStrategySwitchPlan] = useState<PlatformStrategySwitchPlan | null>(null);
   const [assetOptimizationVariants, setAssetOptimizationVariants] = useState<PlatformSubmissionAssetOptimizationVariant[]>([]);
   const [versionActionFilter, setVersionActionFilter] = useState<PublishPackageVersionActionFilter>("all");
@@ -671,6 +673,10 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
     });
     return counts;
   }, [selectedPackage]);
+  const strategyNextStep = useMemo(
+    () => strategySwitchPlan?.steps.find((step) => step.status === "next") ?? null,
+    [strategySwitchPlan],
+  );
   const filteredPublishVersions = useMemo(() => {
     const versions = selectedPackage?.publishVersions ?? [];
     if (versionActionFilter === "all") return versions;
@@ -819,6 +825,72 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
       setMessage(caught instanceof Error ? caught.message : "应用平台策略失败。");
     } finally {
       setApplyingStrategyPlatformId(null);
+    }
+  }
+
+  async function executeStrategyNextStep() {
+    if (!strategySwitchPlan || !strategyNextStep) return;
+    const strategyPackage = center?.packages.find((pack) => pack.platformId === strategySwitchPlan.platformId) ?? selectedPackage;
+    if (!strategyPackage) return;
+    setSelectedPlatformId(strategyPackage.platformId);
+    setRunningStrategyStepId(strategyNextStep.id);
+    setMessage(null);
+
+    try {
+      if (strategyNextStep.id === "fix-submission-asset") {
+        const nextDraft = {
+          title: strategyPackage.title,
+          logline: strategyPackage.logline,
+          synopsis: strategyPackage.category === "overseas"
+            ? strategyPackage.submissionAsset?.synopsis ?? ""
+            : strategyPackage.synopsis,
+          overseasSynopsis: strategyPackage.category === "overseas"
+            ? strategyPackage.synopsis
+            : strategyPackage.submissionAsset?.overseasSynopsis ?? "",
+          tags: strategyPackage.tags.join("、"),
+          note: strategyPackage.submissionAsset?.note ?? "",
+        };
+        setAssetDraft(nextDraft);
+        setIsOptimizingAsset(true);
+        setAssetOptimizationVariants([]);
+        const response = await fetch(`/api/projects/${projectId}/platform-export/asset-optimize`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            platformId: strategyPackage.platformId,
+            ...nextDraft,
+          }),
+        });
+        const payload = (await response.json().catch(() => null)) as {
+          task?: { id: string };
+          variants?: PlatformSubmissionAssetOptimizationVariant[];
+          error?: string;
+        } | null;
+        if (!response.ok || !payload?.variants) throw new Error(payload?.error ?? "AI 优化投稿资产失败。");
+        setAssetOptimizationVariants(payload.variants.map((variant) => ({ ...variant, sourceTaskId: payload.task?.id })));
+        setMessage(`已按执行链生成 ${payload.variants.length} 个 ${strategyPackage.platformName} 投稿资产候选。`);
+      } else if (strategyNextStep.id === "rewrite-first-three") {
+        const response = await fetch(`/api/projects/${projectId}/first-three-rewrite/generate`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ platformId: strategyPackage.platformId, chapterOrders: [1, 2, 3], targetWords: 1600 }),
+        });
+        const payload = (await response.json().catch(() => null)) as {
+          results?: { order: number }[];
+          error?: string;
+        } | null;
+        if (!response.ok || !payload?.results) throw new Error(payload?.error ?? "前三章二轮重写失败。");
+        setMessage(`已按执行链重写 ${strategyPackage.platformName} 前三章，共 ${payload.results.length} 章。`);
+        await loadCenter({ keepMessage: true });
+      } else if (strategyNextStep.id === "record-publish-effect") {
+        window.location.hash = "publish-effect-panel";
+        setMessage("下一步是录入真实发布效果：把曝光、点击、收藏、追读和编辑反馈填进去。");
+      }
+    } catch (caught) {
+      setMessage(caught instanceof Error ? caught.message : "执行策略下一步失败。");
+    } finally {
+      setIsOptimizingAsset(false);
+      setRunningStrategyStepId(null);
     }
   }
 
@@ -1359,8 +1431,20 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
                       <div className="font-medium text-cyan-950">{strategySwitchPlan.platformName} 执行链</div>
                       <p className="mt-1 text-sm leading-6 text-cyan-800">{strategySwitchPlan.headline}</p>
                     </div>
-                    <div className="w-fit rounded-md bg-white px-2 py-1 text-xs font-medium text-cyan-700">
-                      策略分 {strategySwitchPlan.score}
+                    <div className="flex flex-wrap items-center gap-2">
+                      <div className="w-fit rounded-md bg-white px-2 py-1 text-xs font-medium text-cyan-700">
+                        策略分 {strategySwitchPlan.score}
+                      </div>
+                      {strategyNextStep ? (
+                        <button
+                          className="rounded-md bg-cyan-950 px-3 py-2 text-xs font-medium text-white disabled:opacity-50"
+                          disabled={Boolean(runningStrategyStepId) || !strategyNextStep.executable}
+                          onClick={() => void executeStrategyNextStep()}
+                          type="button"
+                        >
+                          {runningStrategyStepId ? "执行中" : `执行下一步：${strategyNextStep.label}`}
+                        </button>
+                      ) : null}
                     </div>
                   </div>
                   <div className="mt-3 grid gap-2 lg:grid-cols-4">

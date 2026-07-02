@@ -869,7 +869,48 @@ test("buildPlatformPublishExportCenter", async (t) => {
     assert.ok(plan.headline.includes("七猫"));
     assert.equal(plan.steps[0].status, "done");
     assert.equal(plan.steps[1].href, "#submission-asset-editor");
+    assert.equal(plan.steps[1].status, "next");
+    assert.equal(plan.steps[1].executable, true);
     assert.ok(plan.steps.some((step) => step.href === "#first-three-rewrite"));
     assert.ok(plan.steps.some((step) => step.href === "#publish-effect-panel"));
+  });
+
+  await t.test("promotes first-three rewrite after the platform asset is ready", () => {
+    const center = buildPlatformPublishExportCenter({
+      project: {
+        title: "夜雨系统",
+        genre: "都市系统",
+        sellingPoint: "雨夜危机中觉醒系统，主角用选择翻盘。",
+        currentWordCount: 1200,
+        targetWordCount: 300000,
+      },
+      targetPlatform: getPlatformProfile("fanqie"),
+      chapters,
+      platforms: [getPlatformProfile("qimao")],
+      submissionAssets: [
+        {
+          id: "asset-qimao",
+          platformId: "qimao",
+          platformName: "七猫",
+          title: "夜雨系统：倒计时翻盘",
+          logline: "雨夜倒计时逼她选择，林晚把系统惩罚打成翻盘爽点。",
+          synopsis: "林晚在雨夜绑定倒计时系统，每一次选择都牵动生死、复仇和悬疑真相。她从被迫救人开始，一步步摸清系统规则，把惩罚变成筹码，把背叛者拖回真相现场，并在连续任务中建立稳定目标：查清当年事故、保护真正重要的人、夺回属于自己的命运。故事保持强钩子、强情绪和连续爽点，适合七猫免费长篇平台连载。",
+          overseasSynopsis: "Night Rain System follows Lin Wan through timed choices and revenge.",
+          tags: ["系统", "逆袭", "悬疑"],
+          note: "七猫主战场资产。",
+          source: "manual",
+          updatedAt: "2026-01-06T08:00:00.000Z",
+        },
+      ],
+    });
+    const strategy = center.platformStrategy[0];
+    const pack = center.packages[0];
+    const plan = buildPlatformStrategySwitchPlan(strategy, getPlatformProfile("fanqie"), pack);
+
+    assert.equal(pack.submissionAssetAudit.status, "ready");
+    assert.equal(pack.canExport, false);
+    assert.equal(plan.steps.find((step) => step.id === "fix-submission-asset")?.status, "done");
+    assert.equal(plan.steps.find((step) => step.id === "rewrite-first-three")?.status, "next");
+    assert.equal(plan.steps.find((step) => step.id === "rewrite-first-three")?.executable, true);
   });
 });

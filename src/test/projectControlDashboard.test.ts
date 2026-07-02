@@ -125,6 +125,7 @@ test("buildProjectControlDashboard", async (t) => {
         { id: "w1", type: "system_rule", title: "系统规则", content: "系统任务必须伴随代价，并推动主角做出高风险选择。每次奖励都要带出新的债务、敌人或关系压力。" },
         { id: "w2", type: "taboo", title: "复活禁忌", content: "不能无代价复活，任何复活都必须交换记忆或关系。禁忌一旦触发，会让主角失去最重要的证据。" },
         { id: "w3", type: "platform_soil", title: "平台土壤", content: "每章必须有爽点、冲突和章末追读，信息要前置。设定只服务选择压力，不能连续解释超过两段。" },
+        { id: "w4", type: "platform_soil", title: "首轮平台打法：番茄小说", content: "状态：历史可复用\n打法：番茄小说 已完成修复、复测、重验和效果回填，可以作为同类平台的恢复模板。\n开头动作：新项目可复用：先修标题简介标签和前三章兑现，再小步重验。\n验证动作：创建后先跑前三章和平台包装，再记录首轮曝光、点击、收藏、追读。\n风险：不要直接放量，先保留小步验证窗口。" },
       ],
       foreshadows: [
         { id: "f1", title: "系统异常", setupChapterId: "chapter-1", payoffChapterId: "chapter-1", relatedCharacterIds: "[]", status: "paid_off", notes: "已回收" },
@@ -177,6 +178,9 @@ test("buildProjectControlDashboard", async (t) => {
     assert.equal(dashboard.platformVerdict.primaryPlatformName, "番茄小说");
     assert.ok(dashboard.platformVerdict.primaryScore > 0);
     assert.ok(dashboard.platformVerdict.actionLabel.length > 0);
+    assert.equal(dashboard.startTactic?.label, "历史可复用");
+    assert.ok(dashboard.startTactic?.openingMove.includes("小步重验"));
+    assert.ok(dashboard.startTactic?.verificationMove.includes("首轮曝光"));
     assert.equal(dashboard.areas.find((area) => area.id === "world")?.status, "good");
     assert.equal(dashboard.areas.find((area) => area.id === "export")?.status, "good");
   });

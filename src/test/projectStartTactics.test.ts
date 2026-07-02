@@ -3,7 +3,11 @@ import assert from "node:assert/strict";
 import { getPlatformProfile } from "../lib/platforms/platformProfiles.ts";
 import { getPlatformWritingStyle } from "../lib/platforms/writingStyleTemplates.ts";
 import type { GatePlatformTacticExperienceItem } from "../lib/projects/gateActionReceipts.ts";
-import { buildProjectStartTacticAdvice } from "../lib/projects/projectStartTactics.ts";
+import {
+  buildProjectStartTacticAdvice,
+  buildProjectStartTacticWorldEntry,
+  parseProjectStartTacticSummary,
+} from "../lib/projects/projectStartTactics.ts";
 import { getDefaultTemplateForPlatform } from "../lib/projects/projectTemplates.ts";
 
 test("buildProjectStartTacticAdvice", async (t) => {
@@ -48,5 +52,23 @@ test("buildProjectStartTacticAdvice", async (t) => {
     assert.ok(advice.openingMove.includes("小步重验"));
     assert.ok(advice.evidence[0].includes("重验已回填"));
     assert.ok(advice.checklist.some((item) => item.includes("首屏钩子")));
+  });
+
+  await t.test("turns start advice into a reusable platform soil entry", () => {
+    const platform = getPlatformProfile("fanqie");
+    const template = getDefaultTemplateForPlatform(platform.id);
+    const style = getPlatformWritingStyle(platform.id);
+    const advice = buildProjectStartTacticAdvice({ platform, template, style });
+    const entry = buildProjectStartTacticWorldEntry(advice, platform.name);
+    const summary = parseProjectStartTacticSummary(entry);
+
+    assert.equal(entry.type, "platform_soil");
+    assert.equal(entry.title, "首轮平台打法：番茄小说");
+    assert.ok(entry.content.includes("状态：模板推荐"));
+    assert.ok(entry.content.includes("开头动作："));
+    assert.ok(entry.content.includes("验证动作："));
+    assert.equal(summary?.label, "模板推荐");
+    assert.ok(summary?.openingMove.includes("第一段"));
+    assert.ok(summary?.verificationMove.includes("前三章"));
   });
 });

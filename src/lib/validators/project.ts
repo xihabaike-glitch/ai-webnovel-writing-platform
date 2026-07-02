@@ -1,5 +1,17 @@
 import { z } from "zod";
 
+export const projectStartTacticAdviceSchema = z.object({
+  status: z.enum(["history_blocked", "history_watch", "history_usable", "template"]),
+  label: z.string().max(40),
+  title: z.string().max(160),
+  primaryTactic: z.string().max(1000),
+  openingMove: z.string().max(1000),
+  verificationMove: z.string().max(1000),
+  risk: z.string().max(1000),
+  evidence: z.array(z.string().max(500)).max(5).default([]),
+  checklist: z.array(z.string().max(500)).max(6).default([]),
+});
+
 export const createProjectSchema = z.object({
   title: z.string().min(1).max(120),
   targetPlatform: z.enum([
@@ -18,4 +30,5 @@ export const createProjectSchema = z.object({
   sellingPoint: z.string().max(500).default(""),
   updateCadence: z.string().max(80).default(""),
   templateId: z.string().max(80).optional(),
+  startTacticAdvice: projectStartTacticAdviceSchema.optional(),
 });

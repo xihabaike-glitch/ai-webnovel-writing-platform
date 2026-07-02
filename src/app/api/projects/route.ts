@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { buildDefaultOutlineNodes } from "@/lib/outlines/defaultOutline";
 import { buildProjectDefaults } from "@/lib/projects/projectDefaults";
+import { buildProjectStartTacticAdvice, buildProjectStartTacticWorldEntry } from "@/lib/projects/projectStartTactics";
 import {
   buildTemplateChapterSeeds,
   buildTemplateCharacterSeed,
@@ -10,6 +11,7 @@ import {
 } from "@/lib/projects/projectTemplates";
 import { getPlatformProfile } from "@/lib/platforms/platformProfiles";
 import type { LengthType, PlatformId } from "@/lib/platforms/platformProfiles";
+import { getPlatformWritingStyle } from "@/lib/platforms/writingStyleTemplates";
 import { createProjectSchema } from "@/lib/validators/project";
 
 export async function GET() {
@@ -44,6 +46,13 @@ export async function POST(request: Request) {
 
     if (template) {
       const platform = getPlatformProfile(platformId);
+      const style = getPlatformWritingStyle(platformId);
+      const startTacticAdvice = input.startTacticAdvice ?? buildProjectStartTacticAdvice({
+        platform,
+        template,
+        style,
+      });
+      const startTacticEntry = buildProjectStartTacticWorldEntry(startTacticAdvice, platform.name);
       const outlineNodes = buildDefaultOutlineNodes({
         projectId: created.id,
         title: created.title,
@@ -75,7 +84,10 @@ export async function POST(request: Request) {
         },
       });
       await tx.worldEntry.createMany({
-        data: buildTemplateWorldEntrySeeds(template).map((entry) => ({
+        data: [
+          ...buildTemplateWorldEntrySeeds(template),
+          startTacticEntry,
+        ].map((entry) => ({
           projectId: created.id,
           ...entry,
         })),

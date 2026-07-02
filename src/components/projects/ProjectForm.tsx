@@ -112,6 +112,7 @@ export function ProjectForm() {
           sellingPoint: String(formData.get("sellingPoint") ?? ""),
           updateCadence: String(formData.get("updateCadence") ?? ""),
           templateId: String(formData.get("templateId") ?? ""),
+          startTacticAdvice: tacticAdvice,
         }),
       });
 

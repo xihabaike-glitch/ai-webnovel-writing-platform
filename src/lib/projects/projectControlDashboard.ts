@@ -11,6 +11,7 @@ import {
   type PlatformSubmissionAssetVersionInput,
   type PublishPackageVersionItem,
 } from "./platformPublishExport.ts";
+import { parseProjectStartTacticSummary, type ProjectStartTacticSummary } from "./projectStartTactics.ts";
 import { buildSerializationOpsDashboard } from "./serializationOps.ts";
 import { buildStoryLineDashboard } from "./storyLines.ts";
 import type { SubmissionChecklist } from "./submissionChecklist.ts";
@@ -172,6 +173,7 @@ export interface ProjectControlDashboard {
   overallScore: number;
   verdict: string;
   platformVerdict: PlatformControlVerdictSummary;
+  startTactic: ProjectStartTacticSummary | null;
   areas: ControlArea[];
   priorityActions: ControlPriorityAction[];
   criticalActions: string[];
@@ -419,6 +421,10 @@ function buildControlAssetQualityReports(tasks: ControlAiTask[]): ControlAssetQu
     .slice(0, 3);
 }
 
+function findStartTacticEntry(entries: ControlWorldEntry[]) {
+  return entries.find((entry) => entry.type === "platform_soil" && entry.title.startsWith("首轮平台打法：")) ?? null;
+}
+
 export function buildProjectControlDashboard(input: ProjectControlDashboardInput): ProjectControlDashboard {
   const characterDashboard = buildCharacterArcDashboard(input.characters);
   const worldDashboard = buildWorldBibleDashboard(input.worldEntries);
@@ -473,6 +479,7 @@ export function buildProjectControlDashboard(input: ProjectControlDashboardInput
     evidenceGaps,
     targetAnchor: "platform-strategy-verdict",
   };
+  const startTactic = parseProjectStartTacticSummary(findStartTacticEntry(input.worldEntries));
   const outline = outlineScore(input.outlineNodes);
   const productionScore = production.dashboard.totalItems > 0
     ? ratio(
@@ -532,6 +539,7 @@ export function buildProjectControlDashboard(input: ProjectControlDashboardInput
     overallScore,
     verdict: verdict(overallScore),
     platformVerdict,
+    startTactic,
     areas,
     priorityActions,
     criticalActions,

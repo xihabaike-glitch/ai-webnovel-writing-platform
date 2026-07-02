@@ -167,6 +167,81 @@ test("buildPrePublishGate", async (t) => {
     assert.ok(review.optimizationActions.some((action) => action.execution === "open_target"));
   });
 
+  await t.test("builds a closed-loop timeline from adopted assets, baselines, and publish effects", () => {
+    const adoptedAsset = {
+      id: "asset-version-1",
+      platformId: "fanqie",
+      platformName: "番茄小说",
+      title: "夜雨系统：倒计时救人",
+      logline: "林晚每次选择都在雨夜改命。",
+      synopsis: "林晚被系统逼到绝境，必须用一次次高压选择翻盘。",
+      overseasSynopsis: "A countdown system turns every rainy night into a life-or-death choice.",
+      tags: ["系统", "都市", "逆袭"],
+      note: "总闸门采纳",
+      source: "ai_variant",
+      auditScore: 92,
+      auditStatus: "ready" as const,
+      action: "adopt",
+      sourceTaskId: "asset-optimize-1",
+      strategy: "强钩子爽点版",
+      createdAt: "2026-01-09T00:00:00.000Z",
+    };
+    const baseline = {
+      id: "snapshot-1",
+      platformId: "fanqie",
+      platformName: "番茄小说",
+      title: "夜雨系统",
+      action: "snapshot",
+      chapterCount: 3,
+      wordCount: 7800,
+      preflightScore: 92,
+      canExport: true,
+      createdAt: "2026-01-09T01:00:00.000Z",
+    };
+    const promisingMetric = {
+      platformId: "fanqie",
+      platformName: "番茄小说",
+      views: 1200,
+      clicks: 120,
+      favorites: 72,
+      follows: 36,
+      comments: 8,
+      paidReads: 3,
+      editorFeedback: "标题方向可继续放大。",
+      contractStatus: "pending",
+      publishUrl: "https://example.com/book",
+      notes: "首轮投放",
+      snapshotDate: "2026-01-10T00:00:00.000Z",
+    };
+
+    const needsBaselineGate = buildPrePublishGate({
+      projects: [{
+        ...readyProject,
+        submissionAssetVersions: [adoptedAsset],
+      }],
+      failureTasks: [],
+      batchHistory: [],
+    });
+    assert.equal(needsBaselineGate.projectStatuses[0].loopTimeline.status, "needs_baseline");
+    assert.ok(needsBaselineGate.projectStatuses[0].loopTimeline.items.some((item) => item.type === "asset"));
+
+    const scalingGate = buildPrePublishGate({
+      projects: [{
+        ...readyProject,
+        submissionAssetVersions: [adoptedAsset],
+        publishSnapshots: [baseline],
+        platformPublishMetrics: [promisingMetric],
+      }],
+      failureTasks: [],
+      batchHistory: [],
+    });
+    const timeline = scalingGate.projectStatuses[0].loopTimeline;
+
+    assert.equal(timeline.status, "scaling");
+    assert.deepEqual(timeline.items.map((item) => item.type), ["metric", "snapshot", "asset"]);
+    assert.equal(timeline.actionHref, "/projects/project-ready#create-chapter");
+  });
+
   await t.test("exposes executable second-round actions for weak publish effects", () => {
     const gate = buildPrePublishGate({
       projects: [{

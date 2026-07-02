@@ -9,6 +9,10 @@ import {
   type PlatformPublishEffectSummary,
   type PlatformPublishMetricInput,
   type PlatformPublishOptimizationAction,
+  type PlatformPublishPackage,
+  type PlatformSubmissionAssetInput,
+  type PlatformSubmissionAssetVersionInput,
+  type PublishPackageVersionItem,
   type PublishRepairAction,
   type PublishRepairActionKind,
 } from "./platformPublishExport.ts";
@@ -49,7 +53,27 @@ export interface PrePublishGateProject {
     outputTokens?: number | null;
     costUsd?: number | null;
   }>;
+  publishSnapshots?: PublishPackageVersionItem[];
+  submissionAssets?: PlatformSubmissionAssetInput[];
+  submissionAssetVersions?: PlatformSubmissionAssetVersionInput[];
   platformPublishMetrics?: PlatformPublishMetricInput[];
+}
+
+export interface PrePublishGateLoopTimelineItem {
+  id: string;
+  type: "asset" | "snapshot" | "metric" | "repair";
+  label: string;
+  detail: string;
+  createdAt: Date | string;
+  href: string;
+}
+
+export interface PrePublishGateLoopTimeline {
+  status: "needs_asset" | "needs_baseline" | "needs_effect" | "needs_iteration" | "scaling";
+  label: string;
+  nextAction: string;
+  actionHref: string;
+  items: PrePublishGateLoopTimelineItem[];
 }
 
 export interface PrePublishGateEffectAction {
@@ -103,6 +127,7 @@ export interface PrePublishGateProjectStatus {
   downloadHref: string | null;
   execution: PrePublishGateActionExecution | null;
   effectReview: PrePublishGateEffectReview;
+  loopTimeline: PrePublishGateLoopTimeline;
 }
 
 export interface PrePublishGateItem {
@@ -251,6 +276,93 @@ function effectReview(
   };
 }
 
+function loopStatusLabel(status: PrePublishGateLoopTimeline["status"]) {
+  if (status === "needs_asset") return "先采纳候选";
+  if (status === "needs_baseline") return "保存基准";
+  if (status === "needs_effect") return "等待回填";
+  if (status === "needs_iteration") return "二轮优化";
+  return "放大验证";
+}
+
+function buildLoopTimeline(projectId: string, pack: PlatformPublishPackage): PrePublishGateLoopTimeline {
+  const latestAdoptedAsset = pack.submissionAssetVersions.find((version) => version.action === "adopt") ?? null;
+  const latestAsset = latestAdoptedAsset ?? pack.submissionAssetVersions[0] ?? null;
+  const latestSnapshot = pack.publishVersions[0] ?? null;
+  const latestMetric = pack.publishEffect.latest;
+  const latestRepair = pack.repairHistory[0] ?? null;
+  const items: PrePublishGateLoopTimelineItem[] = [
+    latestAsset ? {
+      id: `asset:${latestAsset.id ?? latestAsset.createdAt}`,
+      type: "asset",
+      label: latestAsset.action === "adopt" ? "采纳投稿资产" : latestAsset.action === "restore" ? "恢复投稿资产" : "保存投稿资产",
+      detail: `${latestAsset.title}｜资产 ${latestAsset.auditScore} 分${latestAsset.strategy ? `｜${latestAsset.strategy}` : ""}`,
+      createdAt: latestAsset.createdAt,
+      href: `/projects/${projectId}#submission-asset-editor`,
+    } : null,
+    latestSnapshot ? {
+      id: `snapshot:${latestSnapshot.id}`,
+      type: "snapshot",
+      label: latestSnapshot.action === "snapshot" ? "保存发布包基准" : latestSnapshot.action === "archive" ? "归档发布包" : "记录发布包",
+      detail: `${latestSnapshot.title}｜质检 ${latestSnapshot.preflightScore} 分｜${latestSnapshot.chapterCount} 章`,
+      createdAt: latestSnapshot.createdAt,
+      href: `/projects/${projectId}#package-version-history`,
+    } : null,
+    latestMetric ? {
+      id: `metric:${latestMetric.id ?? latestMetric.snapshotDate}`,
+      type: "metric",
+      label: "回填投放效果",
+      detail: `曝光 ${latestMetric.views}｜点击 ${latestMetric.clicks}｜收藏 ${latestMetric.favorites}｜追读 ${latestMetric.follows}`,
+      createdAt: latestMetric.snapshotDate,
+      href: `/projects/${projectId}#publish-effect-panel`,
+    } : null,
+    latestRepair ? {
+      id: `repair:${latestRepair.id}`,
+      type: "repair",
+      label: latestRepair.label,
+      detail: `${latestRepair.chapterTitle}｜${latestRepair.message}`,
+      createdAt: latestRepair.createdAt,
+      href: `/projects/${projectId}#first-three-rewrite`,
+    } : null,
+  ].filter((item): item is PrePublishGateLoopTimelineItem => Boolean(item))
+    .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime())
+    .slice(0, 5);
+  const status: PrePublishGateLoopTimeline["status"] = !latestAsset
+    ? "needs_asset"
+    : !latestSnapshot
+      ? "needs_baseline"
+      : !latestMetric
+        ? "needs_effect"
+        : pack.publishEffect.status === "weak"
+          ? "needs_iteration"
+          : "scaling";
+  const nextAction = status === "needs_asset"
+    ? "先生成并采纳一个投稿资产候选，不要拿默认包装去赌平台。"
+    : status === "needs_baseline"
+      ? "保存当前发布包基准，下一轮投放才有对照。"
+      : status === "needs_effect"
+        ? "投放后回填曝光、点击、收藏、追读和编辑反馈。"
+        : status === "needs_iteration"
+          ? "按弱项执行二轮优化，再保存新基准。"
+          : "保留有效包装，继续加更和记录下一轮数据。";
+  const actionHref = status === "needs_asset"
+    ? `/projects/${projectId}#submission-asset-editor`
+    : status === "needs_baseline"
+      ? `/projects/${projectId}#package-version-history`
+      : status === "needs_effect"
+        ? `/projects/${projectId}#publish-effect-panel`
+        : status === "needs_iteration"
+          ? `/projects/${projectId}#first-three-rewrite`
+          : `/projects/${projectId}#create-chapter`;
+
+  return {
+    status,
+    label: loopStatusLabel(status),
+    nextAction,
+    actionHref,
+    items,
+  };
+}
+
 function projectStatus(project: PrePublishGateProject): PrePublishGateProjectStatus {
   const platform = getPlatformProfile(project.targetPlatform as PlatformId);
   const aiTasks = project.aiTasks.map((task) => ({
@@ -268,6 +380,9 @@ function projectStatus(project: PrePublishGateProject): PrePublishGateProjectSta
     targetPlatform: platform,
     chapters: project.chapters,
     aiTasks,
+    publishSnapshots: project.publishSnapshots ?? [],
+    submissionAssets: project.submissionAssets ?? [],
+    submissionAssetVersions: project.submissionAssetVersions ?? [],
     platformPublishMetrics: project.platformPublishMetrics ?? [],
     platforms: [platform],
   });
@@ -306,6 +421,7 @@ function projectStatus(project: PrePublishGateProject): PrePublishGateProjectSta
       pack.effectOptimization.status,
       pack.effectOptimization.headline,
     ),
+    loopTimeline: buildLoopTimeline(project.id, pack),
   };
 }
 

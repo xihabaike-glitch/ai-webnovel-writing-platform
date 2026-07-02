@@ -1,13 +1,20 @@
 import Link from "next/link";
 import { AppShell } from "@/components/app-shell/AppShell";
+import { GateClosedLoopTimelinePanel } from "@/components/gate/GateClosedLoopTimelinePanel";
 import { GateActionWorkspace } from "@/components/gate/GateActionWorkspace";
 import { GateExportPackagePanel } from "@/components/gate/GateExportPackagePanel";
 import { GatePublishEffectReviewPanel } from "@/components/gate/GatePublishEffectReviewPanel";
 import { buildTaskBatchHistory } from "@/lib/ai/taskBatchHistory";
 import { prisma } from "@/lib/db/prisma";
 import { buildPrePublishGate, type PrePublishGateItem } from "@/lib/projects/prePublishGate";
+import { parsePublishSnapshotTags } from "@/lib/projects/platformPublishExport";
 
 export const dynamic = "force-dynamic";
+
+function normalizeAssetAuditStatus(status: string): "ready" | "blocked" | "needs_work" {
+  if (status === "ready" || status === "blocked") return status;
+  return "needs_work";
+}
 
 function statusTone(status: string) {
   if (status === "ready") return "border-emerald-200 bg-emerald-50 text-emerald-800";
@@ -28,6 +35,9 @@ export default async function GatePage() {
       include: {
         chapters: { orderBy: { order: "asc" } },
         aiTasks: { orderBy: { createdAt: "desc" } },
+        publishSnapshots: { orderBy: { createdAt: "desc" }, take: 80 },
+        submissionAssets: { orderBy: { updatedAt: "desc" } },
+        submissionAssetVersions: { orderBy: { createdAt: "desc" }, take: 80 },
         platformPublishMetrics: { orderBy: { snapshotDate: "desc" }, take: 80 },
       },
       orderBy: { updatedAt: "desc" },
@@ -49,8 +59,42 @@ export default async function GatePage() {
     ...task,
     chapter: task.chapterId ? chaptersById.get(task.chapterId) ?? null : null,
   }));
+  const gateProjects = projects.map((project) => ({
+    ...project,
+    submissionAssets: project.submissionAssets.map((asset) => ({
+      id: asset.id,
+      platformId: asset.platformId,
+      platformName: asset.platformName,
+      title: asset.title,
+      logline: asset.logline,
+      synopsis: asset.synopsis,
+      overseasSynopsis: asset.overseasSynopsis,
+      tags: parsePublishSnapshotTags(asset.tags),
+      note: asset.note,
+      source: asset.source,
+      updatedAt: asset.updatedAt,
+    })),
+    submissionAssetVersions: project.submissionAssetVersions.map((version) => ({
+      id: version.id,
+      platformId: version.platformId,
+      platformName: version.platformName,
+      title: version.title,
+      logline: version.logline,
+      synopsis: version.synopsis,
+      overseasSynopsis: version.overseasSynopsis,
+      tags: parsePublishSnapshotTags(version.tags),
+      note: version.note,
+      source: version.source,
+      auditScore: version.auditScore,
+      auditStatus: normalizeAssetAuditStatus(version.auditStatus),
+      action: version.action,
+      sourceTaskId: version.sourceTaskId,
+      strategy: version.strategy ?? undefined,
+      createdAt: version.createdAt,
+    })),
+  }));
   const gate = buildPrePublishGate({
-    projects,
+    projects: gateProjects,
     failureTasks: recentTasksWithChapter,
     batchHistory: buildTaskBatchHistory(recentTasksWithChapter),
   });
@@ -102,6 +146,8 @@ export default async function GatePage() {
       <GateExportPackagePanel packages={gate.projectStatuses} />
 
       <GatePublishEffectReviewPanel packages={gate.projectStatuses} />
+
+      <GateClosedLoopTimelinePanel packages={gate.projectStatuses} />
 
       <section className="mb-6 grid gap-4 lg:grid-cols-[0.9fr_1.1fr]">
         <div className="rounded-md border border-slate-200 bg-white p-4">

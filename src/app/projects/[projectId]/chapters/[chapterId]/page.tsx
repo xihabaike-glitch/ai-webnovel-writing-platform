@@ -48,7 +48,9 @@ export default async function ChapterPage({
           <div id="chapter-second-pass">
             <ChapterSecondPassPanel chapterId={chapter.id} currentWordCount={chapter.wordCount} />
           </div>
-          <ChapterRevisionWorkbench chapter={editableChapter} />
+          <div id="chapter-revisions">
+            <ChapterRevisionWorkbench chapter={editableChapter} />
+          </div>
         </div>
         <div id="chapter-workflow">
           <ChapterWorkflowPanel chapterCard={editableChapter} chapterId={chapterId} platform={platform} />

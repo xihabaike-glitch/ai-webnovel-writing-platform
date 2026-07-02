@@ -132,7 +132,7 @@ export async function POST(request: Request, { params }: Params) {
       });
       const wordCount = countWords(generated.text);
 
-      const [updatedTask, updatedChapter] = await prisma.$transaction(async (tx) => {
+      const [updatedTask, updatedChapter, rollbackRevision] = await prisma.$transaction(async (tx) => {
         const savedTask = await tx.aiTask.update({
           where: { id: task.id },
           data: {
@@ -143,7 +143,7 @@ export async function POST(request: Request, { params }: Params) {
             costUsd: generated.usage?.costUsd,
           },
         });
-        await tx.chapterRevision.create({
+        const savedRollbackRevision = await tx.chapterRevision.create({
           data: {
             chapterId: chapter.id,
             source: "first_three_rewrite_before_overwrite",
@@ -169,7 +169,7 @@ export async function POST(request: Request, { params }: Params) {
             status: "draft",
           },
         });
-        return [savedTask, savedChapter];
+        return [savedTask, savedChapter, savedRollbackRevision];
       });
 
       chaptersByOrder.set(plan.order, updatedChapter);
@@ -179,6 +179,7 @@ export async function POST(request: Request, { params }: Params) {
         task: updatedTask,
         chapter: updatedChapter,
         content: generated.text,
+        rollbackRevisionId: rollbackRevision.id,
         evaluation: buildFirstThreeRewriteEvaluation({
           platform,
           before: chapter,

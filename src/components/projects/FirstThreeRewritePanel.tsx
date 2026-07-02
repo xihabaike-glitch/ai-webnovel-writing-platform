@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 interface RetentionDiagnostic {
@@ -61,6 +62,7 @@ interface GeneratedRewriteResult {
     status: string;
   };
   content: string;
+  rollbackRevisionId?: string;
   evaluation?: FirstThreeRewriteEvaluation;
 }
 
@@ -133,12 +135,14 @@ function decisionClass(severity: FirstThreeRewriteDecision["severity"]) {
 }
 
 export function FirstThreeRewritePanel({ projectId }: { projectId: string }) {
+  const router = useRouter();
   const [rewritePackage, setRewritePackage] = useState<FirstThreeRewritePackage | null>(null);
   const [generatedResults, setGeneratedResults] = useState<GeneratedRewriteResult[]>([]);
   const [providerLabel, setProviderLabel] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isGeneratingDrafts, setIsGeneratingDrafts] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
+  const [runningDecisionId, setRunningDecisionId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
   async function loadRewritePackage() {
@@ -209,6 +213,54 @@ export function FirstThreeRewritePanel({ projectId }: { projectId: string }) {
       setMessage(caught instanceof Error ? caught.message : "下载前三章改稿处方失败。");
     } finally {
       setIsDownloading(false);
+    }
+  }
+
+  async function executeDecision(result: GeneratedRewriteResult) {
+    if (!result.evaluation) return;
+    const decision = result.evaluation.decision;
+    setRunningDecisionId(`${result.chapter.id}-${decision.action}`);
+    setMessage(null);
+    try {
+      if (decision.action === "keep") {
+        window.location.href = `/projects/${projectId}#platform-export`;
+        setMessage("已定位到发布质检，保留稿也得过质检，别裸奔。");
+        return;
+      }
+
+      if (decision.action === "second_pass") {
+        const response = await fetch(`/api/chapters/${result.chapter.id}/second-pass`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            instruction: decision.nextAction,
+            mode: "platform_fit",
+            targetWords: Math.max(1200, result.chapter.wordCount),
+          }),
+        });
+        const payload = await response.json().catch(() => null) as { secondPassAudit?: { score: number; shouldSecondPass: boolean }; error?: string } | null;
+        if (!response.ok || !payload?.secondPassAudit) throw new Error(payload?.error ?? "执行二改失败。");
+        setMessage(`已执行第 ${result.order} 章二改，复检 ${payload.secondPassAudit.score} 分${payload.secondPassAudit.shouldSecondPass ? "，还要继续压。" : "，可以回到发布质检。"}`);
+        router.refresh();
+        return;
+      }
+
+      if (!result.rollbackRevisionId) {
+        window.location.href = `/projects/${projectId}/chapters/${result.chapter.id}#chapter-revisions`;
+        setMessage("没有拿到可自动回滚的快照，已带你去版本台手动处理。");
+        return;
+      }
+      const response = await fetch(`/api/chapters/${result.chapter.id}/revisions/${result.rollbackRevisionId}/restore`, {
+        method: "POST",
+      });
+      const payload = await response.json().catch(() => null) as { error?: string } | null;
+      if (!response.ok) throw new Error(payload?.error ?? "恢复旧稿失败。");
+      setMessage(`已回滚第 ${result.order} 章到改写前旧稿。`);
+      router.refresh();
+    } catch (caught) {
+      setMessage(caught instanceof Error ? caught.message : "执行决策动作失败。");
+    } finally {
+      setRunningDecisionId(null);
     }
   }
 
@@ -384,6 +436,28 @@ export function FirstThreeRewritePanel({ projectId }: { projectId: string }) {
                               ))}
                             </div>
                           ) : null}
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            <button
+                              className="rounded-md bg-slate-950 px-3 py-2 font-medium text-white disabled:opacity-50"
+                              disabled={runningDecisionId === `${result.chapter.id}-${result.evaluation.decision.action}`}
+                              onClick={() => executeDecision(result)}
+                              type="button"
+                            >
+                              {runningDecisionId === `${result.chapter.id}-${result.evaluation.decision.action}` ? "执行中" : result.evaluation.decision.label}
+                            </button>
+                            <Link
+                              className="rounded-md border border-slate-200 px-3 py-2 font-medium text-slate-700 hover:bg-slate-50"
+                              href={
+                                result.evaluation.decision.action === "keep"
+                                  ? `/projects/${projectId}#platform-export`
+                                  : result.evaluation.decision.action === "second_pass"
+                                    ? `/projects/${projectId}/chapters/${result.chapter.id}#chapter-second-pass`
+                                    : `/projects/${projectId}/chapters/${result.chapter.id}#chapter-revisions`
+                              }
+                            >
+                              打开工作台
+                            </Link>
+                          </div>
                         </div>
                         <div className="grid gap-2 text-xs text-slate-500">
                           <div>改动：{result.evaluation.changedFields.slice(0, 5).join("、") || "暂无明显字段变化"}</div>

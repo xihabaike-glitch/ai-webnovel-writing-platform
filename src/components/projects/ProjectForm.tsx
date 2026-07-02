@@ -1,9 +1,17 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { platformProfiles, type LengthType, type PlatformId } from "@/lib/platforms/platformProfiles";
 import { getPlatformWritingStyle } from "@/lib/platforms/writingStyleTemplates";
+import {
+  buildGatePlatformDecisionTimeline,
+  buildGatePlatformTacticExperienceLibrary,
+  fetchPersistedGateActionReceipts,
+  fetchPersistedGateDispatchTasks,
+  type GatePlatformTacticExperienceItem,
+} from "@/lib/projects/gateActionReceipts";
+import { buildProjectStartTacticAdvice, type ProjectStartTacticAdviceStatus } from "@/lib/projects/projectStartTactics";
 import { projectTemplates } from "@/lib/projects/projectTemplates";
 
 const lengthOptions = [
@@ -12,6 +20,13 @@ const lengthOptions = [
   { id: "long_300k_plus", label: "30 万字以上长篇" },
   { id: "mega_1m_plus", label: "100 万字以上超长篇" },
 ];
+
+function tacticAdviceClass(status: ProjectStartTacticAdviceStatus) {
+  if (status === "history_blocked") return "border-rose-200 bg-rose-50 text-rose-900";
+  if (status === "history_watch") return "border-amber-200 bg-amber-50 text-amber-900";
+  if (status === "history_usable") return "border-emerald-200 bg-emerald-50 text-emerald-900";
+  return "border-slate-200 bg-slate-50 text-slate-800";
+}
 
 export function ProjectForm() {
   const router = useRouter();
@@ -23,11 +38,48 @@ export function ProjectForm() {
   const [platformId, setPlatformId] = useState<PlatformId>(defaultTemplate.platformId);
   const [lengthType, setLengthType] = useState<LengthType>(defaultTemplate.lengthType);
   const [sellingPoint, setSellingPoint] = useState(defaultTemplate.sellingPoint);
+  const [historyExperiences, setHistoryExperiences] = useState<GatePlatformTacticExperienceItem[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const selectedProfile = platformProfiles.find((profile) => profile.id === platformId) ?? platformProfiles[0];
   const selectedTemplate = projectTemplates.find((template) => template.id === templateId) ?? defaultTemplate;
   const selectedStyle = getPlatformWritingStyle(selectedProfile.id);
+  const selectedExperience = historyExperiences.find((item) => item.platformId === selectedProfile.id) ?? null;
+  const tacticAdvice = buildProjectStartTacticAdvice({
+    platform: selectedProfile,
+    template: selectedTemplate,
+    style: selectedStyle,
+    experience: selectedExperience,
+  });
+
+  useEffect(() => {
+    let ignore = false;
+
+    async function loadHistoricalExperience() {
+      try {
+        const [receipts, tasks] = await Promise.all([
+          fetchPersistedGateActionReceipts(),
+          fetchPersistedGateDispatchTasks(),
+        ]);
+        if (ignore) return;
+        const timeline = buildGatePlatformDecisionTimeline({
+          receipts,
+          tasks,
+          limit: platformProfiles.length,
+        });
+        const library = buildGatePlatformTacticExperienceLibrary(timeline, platformProfiles.length);
+        setHistoryExperiences(library.items);
+      } catch {
+        if (!ignore) setHistoryExperiences([]);
+      }
+    }
+
+    void loadHistoricalExperience();
+
+    return () => {
+      ignore = true;
+    };
+  }, []);
 
   function applyTemplate(nextTemplateId: string) {
     const template = projectTemplates.find((item) => item.id === nextTemplateId) ?? defaultTemplate;
@@ -202,6 +254,39 @@ export function ProjectForm() {
             ))}
           </div>
         </div>
+      </div>
+      <div className={`rounded-md border p-3 text-sm ${tacticAdviceClass(tacticAdvice.status)}`}>
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="font-medium">{tacticAdvice.title}</div>
+          <span className="rounded-md bg-white/70 px-2 py-1 text-xs font-medium">{tacticAdvice.label}</span>
+        </div>
+        <p className="mt-2 leading-6 opacity-85">{tacticAdvice.primaryTactic}</p>
+        <div className="mt-3 grid gap-2 md:grid-cols-2">
+          <div className="rounded-md bg-white/70 p-3">
+            <div className="text-xs font-medium opacity-70">开头动作</div>
+            <p className="mt-1 leading-6">{tacticAdvice.openingMove}</p>
+          </div>
+          <div className="rounded-md bg-white/70 p-3">
+            <div className="text-xs font-medium opacity-70">验证动作</div>
+            <p className="mt-1 leading-6">{tacticAdvice.verificationMove}</p>
+          </div>
+        </div>
+        <div className="mt-3 rounded-md bg-white/70 p-3">
+          <div className="text-xs font-medium opacity-70">风险提醒</div>
+          <p className="mt-1 leading-6">{tacticAdvice.risk}</p>
+        </div>
+        <div className="mt-3 flex flex-wrap gap-2">
+          {tacticAdvice.checklist.map((item) => (
+            <span className="rounded-md bg-white/70 px-2 py-1 text-xs" key={item}>{item}</span>
+          ))}
+        </div>
+        {tacticAdvice.evidence.length ? (
+          <div className="mt-3 grid gap-1">
+            {tacticAdvice.evidence.slice(0, 2).map((evidence) => (
+              <p className="rounded-md border border-white/70 bg-white/60 p-2 text-xs leading-5 opacity-80" key={evidence}>{evidence}</p>
+            ))}
+          </div>
+        ) : null}
       </div>
       <div>
         <label className="text-sm font-medium" htmlFor="sellingPoint">

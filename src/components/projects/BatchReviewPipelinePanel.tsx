@@ -54,9 +54,13 @@ interface BatchPipelineResult {
 
 interface BudgetRepairAction {
   id: string;
+  kind: "set_batch_size" | "lower_target_words" | "switch_to_review" | "inspect_failures" | "open_budget_settings";
   label: string;
   detail: string;
   impact: string;
+  recommendedBatchSize?: number;
+  targetWordsMultiplier?: number;
+  href?: string;
 }
 
 interface BudgetGuardView {
@@ -105,6 +109,7 @@ export function BatchReviewPipelinePanel({ projectId }: { projectId: string }) {
   const [budgetGuard, setBudgetGuard] = useState<BudgetGuardView | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [runningAction, setRunningAction] = useState<"review" | "second_pass" | null>(null);
+  const [lastBudgetAction, setLastBudgetAction] = useState<"review" | "second_pass" | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const reviewReadyIds = useMemo(
     () => queue?.candidates.filter((candidate) => candidate.reviewStatus === "ready").map((candidate) => candidate.chapterId) ?? [],
@@ -147,6 +152,7 @@ export function BatchReviewPipelinePanel({ projectId }: { projectId: string }) {
   async function runBatch(action: "review" | "second_pass") {
     const chapterIds = action === "review" ? selectedReviewIds : selectedSecondPassIds;
     setRunningAction(action);
+    setLastBudgetAction(action);
     setMessage(null);
     setBudgetGuard(null);
     setResults([]);
@@ -199,12 +205,64 @@ export function BatchReviewPipelinePanel({ projectId }: { projectId: string }) {
     ));
   }
 
+  function buttonLabel(action: BudgetRepairAction) {
+    const labels: Record<BudgetRepairAction["kind"], string> = {
+      set_batch_size: "应用批量",
+      lower_target_words: "应用字数",
+      switch_to_review: "改走审稿",
+      inspect_failures: "查看失败",
+      open_budget_settings: "打开预算",
+    };
+    return labels[action.kind];
+  }
+
+  function applyBudgetRepair(action: BudgetRepairAction) {
+    if (action.kind === "set_batch_size") {
+      const targetAction = lastBudgetAction ?? (selectedSecondPassIds.length ? "second_pass" : "review");
+      const sourceIds = targetAction === "review" ? selectedReviewIds : selectedSecondPassIds;
+      const fallbackIds = sourceIds.length ? sourceIds : targetAction === "review" ? reviewReadyIds : secondPassReadyIds;
+      const nextSize = Math.max(1, Math.min(action.recommendedBatchSize ?? 1, fallbackIds.length || 1, 5));
+      if (targetAction === "review") {
+        setSelectedReviewIds(fallbackIds.slice(0, nextSize));
+      } else {
+        setSelectedSecondPassIds(fallbackIds.slice(0, nextSize));
+      }
+      setMessage(`已把${targetAction === "review" ? "审稿" : "二改"}队列缩到 ${nextSize} 个任务，可以重试。`);
+      return;
+    }
+
+    if (action.kind === "lower_target_words") {
+      const nextWords = Math.max(500, Math.round(targetWords * (action.targetWordsMultiplier ?? 0.7)));
+      setTargetWords(nextWords);
+      setMessage(`已把二改目标字数降到 ${nextWords}，可以重试。`);
+      return;
+    }
+
+    if (action.kind === "switch_to_review") {
+      const nextIds = (queue?.recommendedReviewChapterIds.length ? queue.recommendedReviewChapterIds : reviewReadyIds).slice(0, 5);
+      setSelectedSecondPassIds([]);
+      setSelectedReviewIds(nextIds);
+      setLastBudgetAction("review");
+      setMessage("已切换到先审稿：先判断质量，再决定是否继续二改。");
+      return;
+    }
+
+    if (action.kind === "inspect_failures") {
+      window.location.assign(action.href ?? "/failures");
+      return;
+    }
+
+    document.getElementById("model-task-audit")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.history.replaceState(null, "", "#model-task-audit");
+    setMessage("已定位到模型预算中心，可以调整额度或拦截模式。");
+  }
+
   useEffect(() => {
     void loadQueue();
   }, [projectId]);
 
   return (
-    <section className="rounded-md border border-slate-200 bg-white p-4">
+    <section className="rounded-md border border-slate-200 bg-white p-4" id="review-pipeline">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h2 className="font-medium">批量审稿与二改生产线</h2>
@@ -250,6 +308,13 @@ export function BatchReviewPipelinePanel({ projectId }: { projectId: string }) {
                 <div className="font-medium">{action.label}</div>
                 <p className="mt-1">{action.detail}</p>
                 <p className="mt-1 text-xs">{action.impact}</p>
+                <button
+                  className="mt-3 rounded-md border border-amber-300 bg-white px-3 py-1.5 text-xs font-medium text-amber-950 hover:bg-amber-100"
+                  onClick={() => applyBudgetRepair(action)}
+                  type="button"
+                >
+                  {buttonLabel(action)}
+                </button>
               </div>
             ))}
           </div>

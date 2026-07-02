@@ -278,7 +278,9 @@ export default async function ProjectPage({ params }: { params: Promise<{ projec
             <ExportMarkdownButton projectId={project.id} title={project.title} />
           </div>
         </div>
-        <ModelTaskAuditPanel projectId={project.id} />
+        <div id="model-task-audit">
+          <ModelTaskAuditPanel projectId={project.id} />
+        </div>
         <section className="grid gap-4 lg:grid-cols-2">
           <div className="rounded-md border border-slate-200 bg-white p-4">
             <div className="mb-3 flex items-center justify-between">

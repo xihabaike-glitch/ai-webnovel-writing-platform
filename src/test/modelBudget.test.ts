@@ -33,8 +33,15 @@ test("model budget guard", async (t) => {
     assert.equal(guard.allowed, false);
     assert.equal(guard.status, "block");
     assert.ok(guard.blockers.some((blocker) => blocker.includes("月预算")));
-    assert.ok(guard.repairActions.some((action) => action.id === "reduce_batch_size"));
-    assert.ok(guard.repairActions.some((action) => action.id === "raise_budget_or_warn"));
+    const batchAction = guard.repairActions.find((action) => action.id === "reduce_batch_size");
+    const budgetAction = guard.repairActions.find((action) => action.id === "raise_budget_or_warn");
+    const wordsAction = guard.repairActions.find((action) => action.id === "lower_target_words");
+    assert.equal(batchAction?.kind, "set_batch_size");
+    assert.equal(batchAction?.recommendedBatchSize, 1);
+    assert.equal(budgetAction?.kind, "open_budget_settings");
+    assert.equal(budgetAction?.href, "#model-task-audit");
+    assert.equal(wordsAction?.kind, "lower_target_words");
+    assert.equal(wordsAction?.targetWordsMultiplier, 0.7);
   });
 
   await t.test("warn mode reports blockers without stopping execution", () => {
@@ -55,7 +62,7 @@ test("model budget guard", async (t) => {
     assert.equal(guard.allowed, true);
     assert.equal(guard.status, "warn");
     assert.ok(guard.blockers.length > 0);
-    assert.ok(guard.repairActions.some((action) => action.id === "raise_budget_or_warn"));
+    assert.ok(guard.repairActions.some((action) => action.id === "raise_budget_or_warn" && action.kind === "open_budget_settings"));
   });
 
   await t.test("blocks when recent failure rate is above the project limit", () => {
@@ -78,6 +85,6 @@ test("model budget guard", async (t) => {
     assert.equal(guard.allowed, false);
     assert.equal(guard.failureRatePercent, 67);
     assert.ok(guard.blockers.some((blocker) => blocker.includes("失败率")));
-    assert.ok(guard.repairActions.some((action) => action.id === "fix_failure_rate"));
+    assert.ok(guard.repairActions.some((action) => action.id === "fix_failure_rate" && action.kind === "inspect_failures"));
   });
 });

@@ -22,11 +22,22 @@ export interface ModelBudgetGuardInput {
   estimatedTaskCostUsd?: number;
 }
 
+export type ModelBudgetRepairActionKind =
+  | "set_batch_size"
+  | "lower_target_words"
+  | "switch_to_review"
+  | "inspect_failures"
+  | "open_budget_settings";
+
 export interface ModelBudgetRepairAction {
   id: string;
+  kind: ModelBudgetRepairActionKind;
   label: string;
   detail: string;
   impact: string;
+  recommendedBatchSize?: number;
+  targetWordsMultiplier?: number;
+  href?: string;
 }
 
 export interface ModelBudgetGuard {
@@ -132,24 +143,29 @@ function buildRepairActions(input: {
   if (input.batchSize > 1 && recommendedBatchSize < input.batchSize) {
     actions.push({
       id: "reduce_batch_size",
+      kind: "set_batch_size",
       label: `本批改成 ${recommendedBatchSize} 个任务`,
       detail: `当前选择 ${input.batchSize} 个任务，预计本批 $${(input.estimatedTaskCostUsd * input.batchSize).toFixed(4)}。`,
       impact: "立即降低本次批量成本，适合先跑小样本验证质量。",
+      recommendedBatchSize,
     });
   }
 
   if (input.taskType === "chapter_draft" || input.taskType === "chapter_second_pass") {
     actions.push({
       id: "lower_target_words",
+      kind: "lower_target_words",
       label: "降低目标字数后重试",
       detail: `${taskTypeLabel(input.taskType)}属于长文本输出，目标字数越高，输入输出 Token 越容易超预算。`,
       impact: "把本次目标字数下调 20%-40%，通常能直接压低单次成本。",
+      targetWordsMultiplier: 0.7,
     });
   }
 
   if (input.taskType === "chapter_draft") {
     actions.push({
       id: "review_first",
+      kind: "switch_to_review",
       label: "先审稿，不继续生成正文",
       detail: "如果项目已经有正文样本，先跑审稿或风格体检，比继续生成新稿更省钱。",
       impact: "把预算用在判断质量上，避免继续生产需要返工的正文。",
@@ -159,27 +175,33 @@ function buildRepairActions(input: {
   if (input.failureRatePercent > input.maxFailureRatePercent) {
     actions.push({
       id: "fix_failure_rate",
+      kind: "inspect_failures",
       label: "先处理失败率再放量",
       detail: `近期失败率 ${input.failureRatePercent}%，已经高于 ${input.maxFailureRatePercent}% 上限。`,
       impact: "优先检查 API Key、模型名、上下文长度和 JSON 输出格式，减少失败成本。",
+      href: "/failures",
     });
   }
 
   if (input.projectedUsedUsd > input.monthlyBudgetUsd) {
     actions.push({
       id: "raise_budget_or_warn",
+      kind: "open_budget_settings",
       label: "调高预算或改为只提醒",
       detail: `执行后预计累计 $${input.projectedUsedUsd.toFixed(4)}，月预算为 $${input.monthlyBudgetUsd.toFixed(4)}。`,
       impact: "如果这次调用确实必要，可以在预算中心临时调高额度或切到只提醒。",
+      href: "#model-task-audit",
     });
   }
 
   if (input.blockers.length === 0 && input.warnings.length > 0) {
     actions.push({
       id: "small_sample",
+      kind: "set_batch_size",
       label: "保留小批量试跑",
       detail: input.warnings[0],
       impact: "先跑 1 个任务观察真实成本，再决定是否扩大队列。",
+      recommendedBatchSize: 1,
     });
   }
 

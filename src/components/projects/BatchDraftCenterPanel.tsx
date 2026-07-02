@@ -47,9 +47,13 @@ interface BatchDraftResult {
 
 interface BudgetRepairAction {
   id: string;
+  kind: "set_batch_size" | "lower_target_words" | "switch_to_review" | "inspect_failures" | "open_budget_settings";
   label: string;
   detail: string;
   impact: string;
+  recommendedBatchSize?: number;
+  targetWordsMultiplier?: number;
+  href?: string;
 }
 
 interface BudgetGuardView {
@@ -157,6 +161,50 @@ export function BatchDraftCenterPanel({ projectId }: { projectId: string }) {
     ));
   }
 
+  function buttonLabel(action: BudgetRepairAction) {
+    const labels: Record<BudgetRepairAction["kind"], string> = {
+      set_batch_size: "应用批量",
+      lower_target_words: "应用字数",
+      switch_to_review: "先去审稿",
+      inspect_failures: "查看失败",
+      open_budget_settings: "打开预算",
+    };
+    return labels[action.kind];
+  }
+
+  function applyBudgetRepair(action: BudgetRepairAction) {
+    if (action.kind === "set_batch_size") {
+      const fallbackIds = selectedIds.length ? selectedIds : readyIds;
+      const nextSize = Math.max(1, Math.min(action.recommendedBatchSize ?? 1, fallbackIds.length || 1, 5));
+      setSelectedIds(fallbackIds.slice(0, nextSize));
+      setMessage(`已把本批缩到 ${nextSize} 个任务，可以重试。`);
+      return;
+    }
+
+    if (action.kind === "lower_target_words") {
+      const nextWords = Math.max(500, Math.round(targetWords * (action.targetWordsMultiplier ?? 0.7)));
+      setTargetWords(nextWords);
+      setMessage(`已把单章目标字数降到 ${nextWords}，可以重试。`);
+      return;
+    }
+
+    if (action.kind === "switch_to_review") {
+      setSelectedIds([]);
+      document.getElementById("review-pipeline")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      setMessage("已暂停初稿选择，请在批量审稿与二改生产线先做质量判断。");
+      return;
+    }
+
+    if (action.kind === "inspect_failures") {
+      window.location.assign(action.href ?? "/failures");
+      return;
+    }
+
+    document.getElementById("model-task-audit")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.history.replaceState(null, "", "#model-task-audit");
+    setMessage("已定位到模型预算中心，可以调整额度或拦截模式。");
+  }
+
   useEffect(() => {
     void loadQueue();
   }, [projectId]);
@@ -212,6 +260,13 @@ export function BatchDraftCenterPanel({ projectId }: { projectId: string }) {
                 <div className="font-medium">{action.label}</div>
                 <p className="mt-1">{action.detail}</p>
                 <p className="mt-1 text-xs">{action.impact}</p>
+                <button
+                  className="mt-3 rounded-md border border-amber-300 bg-white px-3 py-1.5 text-xs font-medium text-amber-950 hover:bg-amber-100"
+                  onClick={() => applyBudgetRepair(action)}
+                  type="button"
+                >
+                  {buttonLabel(action)}
+                </button>
               </div>
             ))}
           </div>

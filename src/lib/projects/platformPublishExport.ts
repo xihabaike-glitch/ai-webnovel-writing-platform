@@ -478,6 +478,10 @@ export interface PlatformStrategySwitchPlan {
   platformId: PlatformId;
   platformName: string;
   headline: string;
+  decisionBasis: string;
+  evidenceStatus: PlatformStrategyEvidenceLedger["status"];
+  evidenceScore: number;
+  evidenceGaps: string[];
   previousPlatformId: PlatformId;
   previousPlatformName: string;
   recommendation: PlatformStrategyRankItem["recommendation"];
@@ -1645,6 +1649,17 @@ export function buildPlatformStrategySwitchPlan(
   pack?: PlatformPublishPackage,
 ): PlatformStrategySwitchPlan {
   const isSamePlatform = strategy.platformId === previousPlatform.id;
+  const ledger = strategy.reviewDecision?.evidenceLedger ?? {
+    status: "empty" as const,
+    score: 0,
+    headline: `${strategy.platformName} 还没有复盘证据，别急着拍脑袋。`,
+    completedSignals: 0,
+    totalSignals: 4,
+    latestEvidenceAt: null,
+    missingSignals: ["缺发布包版本基准，下一轮改动无法对照。"],
+    entries: [],
+  };
+  const snapshotDone = pack ? pack.publishVersions.length > 0 : ledger.entries.some((entry) => entry.type === "snapshot");
   const priorityLabel = strategy.recommendation === "focus"
     ? "主推"
     : strategy.recommendation === "grow"
@@ -1654,23 +1669,32 @@ export function buildPlatformStrategySwitchPlan(
         : strategy.recommendation === "watch"
           ? "观察"
           : "降权";
+  const evidenceGate = ledger.status === "ready"
+    ? "证据够用，可以按策略分推进。"
+    : `证据账本只有 ${ledger.score} 分，先补证据，别急着宣布方向对了。`;
   const headline = isSamePlatform
-    ? `${strategy.platformName} 继续当主战场，别换来换去，先把这条执行链跑完。`
-    : `已从 ${previousPlatform.name} 切到 ${strategy.platformName}，接下来别到处乱投，先把这条执行链跑完。`;
+    ? `${strategy.platformName} 继续当主战场，${evidenceGate}`
+    : `已从 ${previousPlatform.name} 切到 ${strategy.platformName}，${evidenceGate}`;
+  const decisionBasis = ledger.status === "ready"
+    ? `${strategy.platformName} 已覆盖 ${ledger.completedSignals}/${ledger.totalSignals} 类证据，按「${priorityLabel}」策略推进。`
+    : `${strategy.platformName} 只覆盖 ${ledger.completedSignals}/${ledger.totalSignals} 类证据，先补：${ledger.missingSignals[0] ?? "关键证据"}。`;
   const assetDetail = strategy.recommendation === "repair"
     ? "先处理投稿资料和发布阻塞，当前状态硬投只会消耗样本。"
     : `按「${priorityLabel}」策略修标题、简介、标签和平台话术，别拿通用简介糊弄平台。`;
   const assetDone = pack ? pack.submissionAssetAudit.status === "ready" : false;
   const rewriteDone = pack ? pack.canExport : false;
   const effectDone = pack ? pack.publishEffect.records > 0 : false;
-  const nextStepId: "fix-submission-asset" | "rewrite-first-three" | "record-publish-effect" | null = !assetDone
-    ? "fix-submission-asset"
-    : !rewriteDone
-      ? "rewrite-first-three"
-      : !effectDone
-        ? "record-publish-effect"
-        : null;
-  const stepStatus = (id: "fix-submission-asset" | "rewrite-first-three" | "record-publish-effect") => {
+  const nextStepId: "save-evidence-baseline" | "fix-submission-asset" | "rewrite-first-three" | "record-publish-effect" | null = !snapshotDone
+    ? "save-evidence-baseline"
+    : !assetDone
+      ? "fix-submission-asset"
+      : !rewriteDone
+        ? "rewrite-first-three"
+        : !effectDone
+          ? "record-publish-effect"
+          : null;
+  const stepStatus = (id: "save-evidence-baseline" | "fix-submission-asset" | "rewrite-first-three" | "record-publish-effect") => {
+    if (id === "save-evidence-baseline" && snapshotDone) return "done" as const;
     if (id === "fix-submission-asset" && assetDone) return "done" as const;
     if (id === "rewrite-first-three" && rewriteDone) return "done" as const;
     if (id === "record-publish-effect" && effectDone) return "done" as const;
@@ -1687,11 +1711,21 @@ export function buildPlatformStrategySwitchPlan(
       href: "#platform-export",
     },
     {
+      id: "save-evidence-baseline",
+      label: "保存证据基准",
+      detail: ledger.status === "ready"
+        ? "已有发布包版本基准，后续改动能做前后对照。"
+        : ledger.missingSignals.find((signal) => signal.includes("发布包版本")) ?? "先保存当前发布包版本，否则后面改动无法归因。",
+      status: stepStatus("save-evidence-baseline"),
+      executable: !snapshotDone,
+      href: "#package-version-history",
+    },
+    {
       id: "fix-submission-asset",
       label: "修投稿资产",
       detail: assetDetail,
       status: stepStatus("fix-submission-asset"),
-      executable: !assetDone,
+      executable: snapshotDone && !assetDone,
       href: "#submission-asset-editor",
     },
     {
@@ -1716,6 +1750,10 @@ export function buildPlatformStrategySwitchPlan(
     platformId: strategy.platformId,
     platformName: strategy.platformName,
     headline,
+    decisionBasis,
+    evidenceStatus: ledger.status,
+    evidenceScore: ledger.score,
+    evidenceGaps: ledger.missingSignals,
     previousPlatformId: previousPlatform.id,
     previousPlatformName: previousPlatform.name,
     recommendation: strategy.recommendation,
@@ -1739,6 +1777,19 @@ export function buildPlatformStrategyExecutionReceipt(
       message: `${plan.platformName} 的候选方案已经落库。生成只是热身，保存才算开始干活。`,
       nextAction: "看刷新后的执行链，继续执行真正的下一步。",
       href: "#platform-export",
+      severity: "success",
+    };
+  }
+
+  if (stepId === "save-evidence-baseline") {
+    return {
+      stepId,
+      platformId: plan.platformId,
+      platformName: plan.platformName,
+      title: "证据基准已保存",
+      message: `${plan.platformName} 当前发布包已经入账。后面再改标题、简介或前三章，就有东西能对照。`,
+      nextAction: "回到执行链，继续处理下一个未完成步骤。",
+      href: "#package-version-history",
       severity: "success",
     };
   }

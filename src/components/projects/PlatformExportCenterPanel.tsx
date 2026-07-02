@@ -493,6 +493,10 @@ interface PlatformStrategySwitchPlan {
   platformId: string;
   platformName: string;
   headline: string;
+  decisionBasis: string;
+  evidenceStatus: PlatformStrategyEvidenceLedger["status"];
+  evidenceScore: number;
+  evidenceGaps: string[];
   previousPlatformId: string;
   previousPlatformName: string;
   recommendation: PlatformStrategyRankItem["recommendation"];
@@ -1357,7 +1361,21 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
     setMessage(null);
 
     try {
-      if (strategyNextStep.id === "fix-submission-asset") {
+      if (strategyNextStep.id === "save-evidence-baseline") {
+        const response = await fetch(`/api/projects/${projectId}/platform-export`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "snapshot", platformId: strategyPackage.platformId }),
+        });
+        const payload = (await response.json().catch(() => null)) as { message?: string; error?: string } | null;
+        if (!response.ok) throw new Error(payload?.error ?? "保存发布包版本失败。");
+        setVersionActionFilter("snapshot");
+        await loadCenter({ keepMessage: true });
+        const refreshedPlan = await refreshStrategyPlan(strategyPackage.platformId);
+        setStrategyExecutionReceipt(buildStrategyExecutionReceipt(refreshedPlan, strategyNextStep.id));
+        setMessage(payload?.message ?? `已保存 ${strategyPackage.platformName} 证据基准。`);
+        window.location.hash = "package-version-history";
+      } else if (strategyNextStep.id === "fix-submission-asset") {
         const nextDraft = {
           title: strategyPackage.title,
           logline: strategyPackage.logline,
@@ -2173,6 +2191,9 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
                       <div className="w-fit rounded-md bg-white px-2 py-1 text-xs font-medium text-cyan-700">
                         策略分 {strategySwitchPlan.score}
                       </div>
+                      <div className={`w-fit rounded-md px-2 py-1 text-xs font-medium ${evidenceLedgerStatusClass(strategySwitchPlan.evidenceStatus)}`}>
+                        证据 {strategySwitchPlan.evidenceScore}
+                      </div>
                       {strategyNextStep ? (
                         <button
                           className="rounded-md bg-cyan-950 px-3 py-2 text-xs font-medium text-white disabled:opacity-50"
@@ -2214,6 +2235,18 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
                         ) : null}
                       </div>
                     </div>
+                    <div className="mt-3 rounded-md bg-cyan-50 px-2 py-1 text-xs leading-5 text-cyan-800">
+                      决策依据：{strategySwitchPlan.decisionBasis}
+                    </div>
+                    {strategySwitchPlan.evidenceGaps.length ? (
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        {strategySwitchPlan.evidenceGaps.slice(0, 3).map((gap) => (
+                          <span className="rounded-md bg-white px-2 py-1 text-[11px] text-cyan-800" key={gap}>
+                            {gap}
+                          </span>
+                        ))}
+                      </div>
+                    ) : null}
                     {strategySwitchPlan.progress.status !== "complete" ? (
                       <div className="mt-3 rounded-md bg-amber-50 p-2 text-xs leading-5 text-amber-800">
                         当前卡点：{strategySwitchPlan.progress.bottleneck}

@@ -1128,9 +1128,12 @@ test("buildPlatformPublishExportCenter", async (t) => {
     assert.equal(plan.previousPlatformId, "fanqie");
     assert.ok(plan.headline.includes("七猫"));
     assert.equal(plan.steps[0].status, "done");
-    assert.equal(plan.steps[1].href, "#submission-asset-editor");
+    assert.equal(plan.steps[1].id, "save-evidence-baseline");
+    assert.equal(plan.steps[1].href, "#package-version-history");
     assert.equal(plan.steps[1].status, "next");
     assert.equal(plan.steps[1].executable, true);
+    assert.equal(plan.evidenceStatus, "empty");
+    assert.ok(plan.decisionBasis.includes("只覆盖 0/4"));
     assert.ok(plan.steps.some((step) => step.href === "#first-three-rewrite"));
     assert.ok(plan.steps.some((step) => step.href === "#publish-effect-panel"));
   });
@@ -1162,6 +1165,20 @@ test("buildPlatformPublishExportCenter", async (t) => {
           updatedAt: "2026-01-06T08:00:00.000Z",
         },
       ],
+      publishSnapshots: [
+        {
+          id: "snapshot-qimao-baseline",
+          platformId: "qimao",
+          platformName: "七猫",
+          title: "夜雨系统",
+          action: "snapshot",
+          chapterCount: 0,
+          wordCount: 0,
+          preflightScore: 20,
+          canExport: false,
+          createdAt: "2026-01-06T09:00:00.000Z",
+        },
+      ],
     });
     const strategy = center.platformStrategy[0];
     const pack = center.packages[0];
@@ -1169,9 +1186,10 @@ test("buildPlatformPublishExportCenter", async (t) => {
 
     assert.equal(pack.submissionAssetAudit.status, "ready");
     assert.equal(pack.canExport, false);
-    assert.equal(plan.progress.completedSteps, 2);
-    assert.equal(plan.progress.progressPercent, 50);
+    assert.equal(plan.progress.completedSteps, 3);
+    assert.equal(plan.progress.progressPercent, 60);
     assert.equal(plan.progress.nextStepLabel, "重写前三章");
+    assert.equal(plan.steps.find((step) => step.id === "save-evidence-baseline")?.status, "done");
     assert.equal(plan.steps.find((step) => step.id === "fix-submission-asset")?.status, "done");
     assert.equal(plan.steps.find((step) => step.id === "rewrite-first-three")?.status, "next");
     assert.equal(plan.steps.find((step) => step.id === "rewrite-first-three")?.executable, true);
@@ -1206,6 +1224,20 @@ test("buildPlatformPublishExportCenter", async (t) => {
           updatedAt: "2026-01-06T08:00:00.000Z",
         },
       ],
+      publishSnapshots: [
+        {
+          id: "snapshot-qimao-ready",
+          platformId: "qimao",
+          platformName: "七猫",
+          title: "夜雨系统",
+          action: "snapshot",
+          chapterCount: 3,
+          wordCount: 7800,
+          preflightScore: 95,
+          canExport: true,
+          createdAt: "2026-01-07T09:00:00.000Z",
+        },
+      ],
     });
     const strategy = center.platformStrategy[0];
     const pack = center.packages[0];
@@ -1213,6 +1245,7 @@ test("buildPlatformPublishExportCenter", async (t) => {
 
     assert.equal(pack.canExport, true);
     assert.equal(pack.publishEffect.records, 0);
+    assert.equal(plan.steps.find((step) => step.id === "save-evidence-baseline")?.status, "done");
     assert.equal(plan.steps.find((step) => step.id === "rewrite-first-three")?.status, "done");
     assert.equal(plan.steps.find((step) => step.id === "record-publish-effect")?.status, "next");
     assert.equal(plan.steps.find((step) => step.id === "record-publish-effect")?.executable, true);
@@ -1247,6 +1280,20 @@ test("buildPlatformPublishExportCenter", async (t) => {
           updatedAt: "2026-01-06T08:00:00.000Z",
         },
       ],
+      publishSnapshots: [
+        {
+          id: "snapshot-qimao-final",
+          platformId: "qimao",
+          platformName: "七猫",
+          title: "夜雨系统",
+          action: "snapshot",
+          chapterCount: 3,
+          wordCount: 7800,
+          preflightScore: 95,
+          canExport: true,
+          createdAt: "2026-01-07T09:00:00.000Z",
+        },
+      ],
       platformPublishMetrics: [
         {
           id: "metric-qimao",
@@ -1272,7 +1319,7 @@ test("buildPlatformPublishExportCenter", async (t) => {
 
     assert.equal(pack.publishEffect.records, 1);
     assert.equal(plan.progress.status, "complete");
-    assert.equal(plan.progress.completedSteps, 4);
+    assert.equal(plan.progress.completedSteps, 5);
     assert.equal(plan.progress.progressPercent, 100);
     assert.equal(plan.progress.actionLabel, "复盘排行榜");
     assert.equal(plan.progress.actionHref, "#platform-strategy-ranking");
@@ -1301,11 +1348,15 @@ test("buildPlatformPublishExportCenter", async (t) => {
       risks: ["标签不够精准"],
     };
     const plan = buildPlatformStrategySwitchPlan(strategy, getPlatformProfile("fanqie"));
+    const baselineReceipt = buildPlatformStrategyExecutionReceipt(plan, "save-evidence-baseline");
     const assetReceipt = buildPlatformStrategyExecutionReceipt(plan, "fix-submission-asset", 3);
     const adoptedReceipt = buildPlatformStrategyExecutionReceipt(plan, "adopt-submission-asset", 1);
     const rewriteReceipt = buildPlatformStrategyExecutionReceipt(plan, "rewrite-first-three", 3);
     const effectReceipt = buildPlatformStrategyExecutionReceipt(plan, "save-publish-effect");
 
+    assert.equal(baselineReceipt.href, "#package-version-history");
+    assert.equal(baselineReceipt.severity, "success");
+    assert.ok(baselineReceipt.nextAction.includes("执行链"));
     assert.equal(assetReceipt.href, "#submission-asset-editor");
     assert.equal(assetReceipt.severity, "needs_action");
     assert.ok(assetReceipt.message.includes("3 个候选方案"));

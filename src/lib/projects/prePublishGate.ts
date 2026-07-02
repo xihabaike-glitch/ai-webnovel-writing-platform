@@ -4,7 +4,8 @@ import { getPlatformProfile, type PlatformId } from "../platforms/platformProfil
 import { buildBatchExecutionSafety } from "./batchExecutionSafety.ts";
 import { getBatchExecutionStrategy, type BatchExecutionStrategyId } from "./batchExecutionStrategy.ts";
 import { buildBatchStrategyComparison, buildBatchStrategyDecision } from "./batchStrategyComparison.ts";
-import { buildPlatformPublishExportCenter } from "./platformPublishExport.ts";
+import { buildPlatformPublishExportCenter, type PublishRepairAction, type PublishRepairActionKind } from "./platformPublishExport.ts";
+import { canExecutePublishRepairAction } from "./publishRepairActionExecution.ts";
 import { buildTaskQueueCenter } from "./taskQueueCenter.ts";
 
 export interface PrePublishGateProject {
@@ -56,6 +57,7 @@ export interface PrePublishGateProjectStatus {
   warningCount: number;
   nextAction: string;
   href: string;
+  execution: PrePublishGateActionExecution | null;
 }
 
 export interface PrePublishGateItem {
@@ -73,7 +75,26 @@ export interface PrePublishGateAction {
   detail: string;
   href: string;
   tone: "primary" | "repair" | "review";
+  execution: PrePublishGateActionExecution | null;
 }
+
+export type PrePublishGateActionExecution =
+  | {
+    type: "publish_repair";
+    projectId: string;
+    kind: PublishRepairActionKind;
+    chapterId?: string;
+    chapterTitle?: string;
+    detail: string;
+  }
+  | {
+    type: "retry_task";
+    taskId: string;
+  }
+  | {
+    type: "recommended_batch";
+    strategyId: BatchExecutionStrategyId;
+  };
 
 export interface PrePublishGate {
   status: "ready" | "needs_repair" | "blocked";
@@ -113,6 +134,27 @@ function gateItem(input: PrePublishGateItem): PrePublishGateItem {
   return input;
 }
 
+function actionHref(projectId: string, action: PublishRepairAction) {
+  if (action.kind === "open_submission_package") return `/projects/${projectId}#submission-package`;
+  if (action.kind === "add_publish_chapters") return `/projects/${projectId}#create-chapter`;
+  if (action.kind === "run_second_pass" && action.chapterId) return `/projects/${projectId}/chapters/${action.chapterId}#chapter-second-pass`;
+  if (action.kind === "run_chapter_review" && action.chapterId) return `/projects/${projectId}/chapters/${action.chapterId}#chapter-workflow`;
+  if (action.chapterId) return `/projects/${projectId}/chapters/${action.chapterId}#chapter-editor`;
+  return `/projects/${projectId}`;
+}
+
+function publishRepairExecution(projectId: string, action: PublishRepairAction): PrePublishGateActionExecution | null {
+  if (!canExecutePublishRepairAction(action)) return null;
+  return {
+    type: "publish_repair",
+    projectId,
+    kind: action.kind,
+    chapterId: action.chapterId,
+    chapterTitle: action.chapterTitle,
+    detail: action.detail,
+  };
+}
+
 function projectStatus(project: PrePublishGateProject): PrePublishGateProjectStatus {
   const platform = getPlatformProfile(project.targetPlatform as PlatformId);
   const aiTasks = project.aiTasks.map((task) => ({
@@ -133,6 +175,10 @@ function projectStatus(project: PrePublishGateProject): PrePublishGateProjectSta
     platforms: [platform],
   });
   const pack = center.packages[0];
+  const nextRepairAction = pack.repairActions.find((action) => action.id === pack.repairPath.nextStep?.id)
+    ?? pack.repairActions.find(canExecutePublishRepairAction)
+    ?? pack.repairActions[0]
+    ?? null;
   const publishableChapters = center.totalPublishableChapters;
   const ready = publishableChapters > 0 && pack.canExport && pack.finalGate.status === "ready_to_submit";
   const empty = publishableChapters === 0;
@@ -150,8 +196,9 @@ function projectStatus(project: PrePublishGateProject): PrePublishGateProjectSta
     warningCount: pack.warnings.length + pack.preflight.warnings.length,
     nextAction: ready
       ? "导出平台发布包"
-      : pack.repairPath.nextStep?.label ?? pack.finalGate.nextAction ?? "回到项目工作台补齐发布资料",
-    href: `/projects/${project.id}#platform-export`,
+      : nextRepairAction?.label ?? pack.finalGate.nextAction ?? "回到项目工作台补齐发布资料",
+    href: nextRepairAction ? actionHref(project.id, nextRepairAction) : `/projects/${project.id}#platform-export`,
+    execution: nextRepairAction ? publishRepairExecution(project.id, nextRepairAction) : null,
   };
 }
 
@@ -161,8 +208,9 @@ function action(
   detail: string,
   href: string,
   tone: PrePublishGateAction["tone"] = "repair",
+  execution: PrePublishGateActionExecution | null = null,
 ): PrePublishGateAction {
-  return { id, label, detail, href, tone };
+  return { id, label, detail, href, tone, execution };
 }
 
 function uniqueActions(actions: PrePublishGateAction[]) {
@@ -278,13 +326,33 @@ export function buildPrePublishGate(input: PrePublishGateInput): PrePublishGate 
         project.nextAction,
         `${project.projectTitle} · ${project.platformName} · ${project.finalGateLabel}`,
         project.href,
+        "repair",
+        project.execution,
+      )),
+    ...failureCenter.recentFailures
+      .filter((failure) => failure.retryable)
+      .slice(0, 2)
+      .map((failure) => action(
+        `retry:${failure.id}`,
+        "一键重试失败任务",
+        `${failure.projectTitle} · ${failure.chapterTitle} · ${failure.categoryLabel}`,
+        failure.href,
+        "review",
+        { type: "retry_task", taskId: failure.id },
       )),
     ...failureCenter.nextActions.map((detail, index) => action(`failure:${index}`, "处理失败复盘", detail, "/failures", "review")),
     queue.recommendedNext
       ? action("queue:next", queue.recommendedNext.actionLabel, `${queue.recommendedNext.projectTitle} · ${queue.recommendedNext.chapterTitle}`, queue.recommendedNext.href)
       : null,
     runnableTasks > 0
-      ? action("strategy", decision.actionLabel, decision.detail, decision.actionHref, decision.canRun ? "primary" : "repair")
+      ? action(
+        "strategy",
+        decision.actionLabel,
+        decision.detail,
+        decision.actionHref,
+        decision.canRun ? "primary" : "repair",
+        decision.canRun ? { type: "recommended_batch", strategyId: decision.strategyId } : null,
+      )
       : null,
     ...projectStatuses
       .filter((project) => project.status === "ready")

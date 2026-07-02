@@ -59,16 +59,8 @@ const readyProject: PrePublishGateProject = {
 const blockedProject: PrePublishGateProject = {
   ...readyProject,
   id: "project-blocked",
-  currentWordCount: 2400,
-  chapters: [
-    {
-      ...finalChapters[0],
-      id: "chapter-blocked-1",
-      wordCount: 1200,
-      content: "正文太短。",
-      hook: "",
-    },
-  ],
+  currentWordCount: 9000,
+  chapters: finalChapters.map((chapter) => ({ ...chapter, status: "draft" })),
   aiTasks: [],
 };
 
@@ -105,6 +97,18 @@ test("buildPrePublishGate", async (t) => {
           chapter: { title: "第一章" },
           modelProvider: { providerId: "anthropic", displayName: "Claude" },
         },
+        {
+          id: "failed-2",
+          projectId: "project-blocked",
+          taskType: "chapter_review",
+          model: "deepseek-chat",
+          status: "failed",
+          errorMessage: "request timeout",
+          createdAt: "2026-01-08T00:01:00.000Z",
+          project: { title: "夜雨系统" },
+          chapter: { title: "第二章" },
+          modelProvider: { providerId: "deepseek", displayName: "DeepSeek" },
+        },
       ],
       batchHistory: [],
     });
@@ -112,9 +116,11 @@ test("buildPrePublishGate", async (t) => {
     assert.equal(gate.status, "blocked");
     assert.equal(gate.label, "暂不发布");
     assert.equal(gate.overview.readyPackages, 0);
-    assert.equal(gate.overview.failureTasks, 1);
+    assert.equal(gate.overview.failureTasks, 2);
     assert.ok(gate.items.some((item) => item.id === "publish-package" && item.status === "block"));
     assert.ok(gate.items.some((item) => item.id === "ai-failures" && item.status === "block"));
+    assert.ok(gate.priorityActions.some((action) => action.execution?.type === "publish_repair"));
+    assert.ok(gate.priorityActions.some((action) => action.execution?.type === "retry_task" && action.execution.taskId === "failed-2"));
     assert.ok(gate.priorityActions.some((action) => action.href === "/failures"));
   });
 });

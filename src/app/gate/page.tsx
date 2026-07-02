@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { AppShell } from "@/components/app-shell/AppShell";
+import { GatePriorityActionCard } from "@/components/gate/GatePriorityActionCard";
 import { buildTaskBatchHistory } from "@/lib/ai/taskBatchHistory";
 import { prisma } from "@/lib/db/prisma";
-import { buildPrePublishGate, type PrePublishGateItem, type PrePublishGateAction } from "@/lib/projects/prePublishGate";
+import { buildPrePublishGate, type PrePublishGateItem } from "@/lib/projects/prePublishGate";
 
 export const dynamic = "force-dynamic";
 
@@ -17,12 +18,6 @@ function checkTone(status: PrePublishGateItem["status"]) {
   if (status === "pass") return "bg-emerald-50 text-emerald-700";
   if (status === "warn") return "bg-amber-50 text-amber-700";
   return "bg-rose-50 text-rose-700";
-}
-
-function actionTone(tone: PrePublishGateAction["tone"]) {
-  if (tone === "primary") return "border-slate-950 bg-slate-950 text-white";
-  if (tone === "review") return "border-blue-200 bg-blue-50 text-blue-800";
-  return "border-amber-200 bg-amber-50 text-amber-800";
 }
 
 export default async function GatePage() {
@@ -124,10 +119,7 @@ export default async function GatePage() {
           <div className="mb-3 font-medium text-slate-950">优先动作</div>
           <div className="grid gap-2">
             {gate.priorityActions.map((action, index) => (
-              <Link className={`rounded-md border p-3 text-sm ${actionTone(action.tone)}`} href={action.href} key={action.id}>
-                <div className="font-medium">{index + 1}. {action.label}</div>
-                <p className="mt-1 leading-6 opacity-80">{action.detail}</p>
-              </Link>
+              <GatePriorityActionCard action={action} index={index} key={action.id} />
             ))}
             {gate.priorityActions.length === 0 ? (
               <p className="rounded-md bg-slate-50 p-3 text-sm text-slate-600">暂无需要处理的动作。</p>

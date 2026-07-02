@@ -7,6 +7,8 @@ import {
   buildGatePlatformStrategyReceipt,
   buildGateActionReviewAdvice,
   buildGatePlatformGrowthReview,
+  buildGatePlatformGrowthDispatchItems,
+  buildGatePlatformDispatchReceipt,
   buildGatePublishEffectReceipt,
   filterGateActionReceipts,
   gateActionReceiptPlatform,
@@ -468,6 +470,58 @@ test("buildGateActionReceipt", async (t) => {
     assert.equal(review[0].baselines, 0);
     assert.equal(review[0].href, "/projects/project-1#submission-asset-editor");
     assert.ok(review[0].evidence.includes("资产 1"));
+  });
+
+  await t.test("turns growth review items into role-based dispatch cards", () => {
+    const baselineReceipt = buildGatePlatformStrategyReceipt({
+      item: {
+        ...strategyPlatform,
+        platformId: "qimao",
+        platformName: "七猫小说",
+        actionType: "save_snapshot",
+        actionLabel: "保存基准",
+        href: "/projects/project-2#platform-export",
+      },
+      status: "succeeded",
+      now: "2026-01-01T00:00:00.000Z",
+      payload: { task: { id: "snapshot-qimao", status: "succeeded" } },
+    });
+
+    const dispatchItems = buildGatePlatformGrowthDispatchItems([baselineReceipt]);
+
+    assert.equal(dispatchItems.length, 1);
+    assert.equal(dispatchItems[0].platformId, "qimao");
+    assert.equal(dispatchItems[0].stage, "record_metrics");
+    assert.equal(dispatchItems[0].state, "queued");
+    assert.equal(dispatchItems[0].ownerRole, "运营数据编辑");
+    assert.equal(dispatchItems[0].actionLabel, "派给数据编辑");
+    assert.ok(dispatchItems[0].acceptanceCriteria.includes("曝光点击已填写"));
+  });
+
+  await t.test("records dispatch receipts and marks the dispatch as assigned", () => {
+    const assetReceipt = buildGatePlatformStrategyReceipt({
+      item: strategyPlatform,
+      status: "succeeded",
+      now: "2026-01-01T00:00:00.000Z",
+      payload: {
+        variants: [{ strategy: "强钩子版" }],
+      },
+    });
+    const dispatch = buildGatePlatformGrowthDispatchItems([assetReceipt])[0];
+    const receipt = buildGatePlatformDispatchReceipt({
+      dispatch,
+      now: "2026-01-01T00:00:01.000Z",
+    });
+    const nextDispatch = buildGatePlatformGrowthDispatchItems([assetReceipt, receipt])[0];
+    const review = buildGatePlatformGrowthReview([assetReceipt, receipt]);
+
+    assert.equal(receipt.actionId, "gate-platform-dispatch:adopt_asset:fanqie");
+    assert.equal(receipt.executionType, "manual");
+    assert.equal(receipt.platformName, "番茄小说");
+    assert.ok(receipt.recheck.detail.includes("验收标准"));
+    assert.equal(nextDispatch.state, "assigned");
+    assert.equal(review[0].assetRuns, 1);
+    assert.equal(review[0].total, 1);
   });
 
   await t.test("builds platform strategy receipts for the unified gate audit log", () => {

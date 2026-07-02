@@ -125,6 +125,26 @@ export interface GatePlatformGrowthReview {
   evidence: string[];
 }
 
+export type GatePlatformGrowthDispatchState = "queued" | "assigned";
+
+export interface GatePlatformGrowthDispatchItem {
+  id: string;
+  platformId: string;
+  platformName: string;
+  stage: GatePlatformGrowthReviewStage;
+  state: GatePlatformGrowthDispatchState;
+  priorityScore: number;
+  ownerRole: string;
+  title: string;
+  detail: string;
+  dueLabel: string;
+  actionLabel: string;
+  href: string;
+  acceptanceCriteria: string[];
+  evidence: string[];
+  reviewLatestAt: string;
+}
+
 export interface GatePlatformStrategyReceiptPayload {
   message?: string;
   error?: string;
@@ -574,6 +594,14 @@ function isAdviceActionReceipt(receipt: GateActionReceipt) {
   return receipt.actionId.startsWith("gate-advice:");
 }
 
+function isPlatformDispatchReceipt(receipt: GateActionReceipt) {
+  return receipt.actionId.startsWith("gate-platform-dispatch:");
+}
+
+function isAuditMetaReceipt(receipt: GateActionReceipt) {
+  return isAdviceActionReceipt(receipt) || isPlatformDispatchReceipt(receipt);
+}
+
 function latestReceiptFor(receipts: GateActionReceipt[], predicate: (receipt: GateActionReceipt) => boolean) {
   return trimGateActionReceipts(receipts.filter(predicate), 1)[0] ?? null;
 }
@@ -629,7 +657,7 @@ export function buildGatePlatformGrowthReview(receipts: GateActionReceipt[], lim
 
   const reviews: GatePlatformGrowthReview[] = [];
   for (const group of groups.values()) {
-    const operationalReceipts = group.receipts.filter((receipt) => !isAdviceActionReceipt(receipt));
+    const operationalReceipts = group.receipts.filter((receipt) => !isAuditMetaReceipt(receipt));
     if (operationalReceipts.length === 0) continue;
 
     const failedReceipts = operationalReceipts.filter((receipt) => receipt.status === "failed");
@@ -723,6 +751,119 @@ export function buildGatePlatformGrowthReview(receipts: GateActionReceipt[], lim
     .slice(0, limit);
 }
 
+function dispatchSpec(review: GatePlatformGrowthReview) {
+  if (review.stage === "fix_failure") {
+    return {
+      ownerRole: "平台救火编辑",
+      title: `${review.platformName} 失败项修复`,
+      detail: "复查最近失败原因，先修标题钩子、前三章冲突或发布包缺口，再回到总闸门复检。",
+      dueLabel: "今天",
+      actionLabel: "派给救火编辑",
+      acceptanceCriteria: ["失败原因已定位", "对应内容或配置已修复", "总闸门刷新后不再显示同一失败"],
+    };
+  }
+
+  if (review.stage === "adopt_asset") {
+    return {
+      ownerRole: "投稿资产编辑",
+      title: `${review.platformName} 投稿资产采纳`,
+      detail: "从已生成方案里选最强版本，完成标题、简介、标签和卖点文案采纳，并保存发布包基准。",
+      dueLabel: "24 小时内",
+      actionLabel: "派给资产编辑",
+      acceptanceCriteria: ["已采纳一个明确版本", "标题简介标签不为空", "保存了新的发布包基准"],
+    };
+  }
+
+  if (review.stage === "record_metrics") {
+    return {
+      ownerRole: "运营数据编辑",
+      title: `${review.platformName} 发布效果回填`,
+      detail: "补录曝光、点击、收藏、追读和评论等真实数据，让下一轮平台判断不再靠感觉。",
+      dueLabel: "投放后 48 小时内",
+      actionLabel: "派给数据编辑",
+      acceptanceCriteria: ["曝光点击已填写", "收藏追读已填写", "保存后审计历史出现效果回填回执"],
+    };
+  }
+
+  if (review.stage === "scale_up") {
+    return {
+      ownerRole: "增长运营",
+      title: `${review.platformName} 小步加码`,
+      detail: "围绕已有正向效果做一轮小幅加码，记录加码前后版本和下一轮对照数据。",
+      dueLabel: "下一轮更新前",
+      actionLabel: "派给增长运营",
+      acceptanceCriteria: ["加码范围已限定", "保留加码前基准", "下一轮效果数据有回填计划"],
+    };
+  }
+
+  return {
+    ownerRole: "主编",
+    title: `${review.platformName} 继续观察`,
+    detail: "当前没有明确事故或缺口，继续收集下一条业务回执后再决定是否加码。",
+    dueLabel: "下一条回执后",
+    actionLabel: "派给主编观察",
+    acceptanceCriteria: ["继续执行推荐动作", "保留新回执", "下一轮复盘榜有新判断"],
+  };
+}
+
+export function buildGatePlatformGrowthDispatchItems(receipts: GateActionReceipt[], limit = 6): GatePlatformGrowthDispatchItem[] {
+  const reviews = buildGatePlatformGrowthReview(receipts, limit);
+  return reviews.map((review): GatePlatformGrowthDispatchItem => {
+    const spec = dispatchSpec(review);
+    const assignedReceipt = latestReceiptFor(
+      receipts,
+      (receipt) => receipt.actionId === `gate-platform-dispatch:${review.stage}:${review.platformId}` && receipt.status === "succeeded",
+    );
+
+    return {
+      id: `${review.platformId}:${review.stage}`,
+      platformId: review.platformId,
+      platformName: review.platformName,
+      stage: review.stage,
+      state: assignedReceipt && new Date(assignedReceipt.createdAt).getTime() > new Date(review.latestAt).getTime() ? "assigned" : "queued",
+      priorityScore: review.priorityScore,
+      ownerRole: spec.ownerRole,
+      title: spec.title,
+      detail: spec.detail,
+      dueLabel: spec.dueLabel,
+      actionLabel: spec.actionLabel,
+      href: review.href,
+      acceptanceCriteria: spec.acceptanceCriteria,
+      evidence: review.evidence,
+      reviewLatestAt: review.latestAt,
+    };
+  });
+}
+
+export function buildGatePlatformDispatchReceipt(input: {
+  dispatch: GatePlatformGrowthDispatchItem;
+  now?: Date | string;
+}): GateActionReceipt {
+  const createdAt = input.now ? new Date(input.now).toISOString() : new Date().toISOString();
+  return {
+    id: `gate-platform-dispatch:${input.dispatch.id}:${createdAt}`,
+    actionId: `gate-platform-dispatch:${input.dispatch.stage}:${input.dispatch.platformId}`,
+    label: input.dispatch.actionLabel,
+    detail: `${input.dispatch.platformName} · ${input.dispatch.title}`,
+    href: input.dispatch.href,
+    status: "succeeded",
+    message: `已派单给${input.dispatch.ownerRole}：${input.dispatch.detail}`,
+    executionType: "manual",
+    succeededCount: 1,
+    failedCount: 0,
+    taskId: null,
+    platformId: input.dispatch.platformId,
+    platformName: input.dispatch.platformName,
+    recheck: {
+      status: "ready",
+      label: "复检派单结果",
+      detail: `验收标准：${input.dispatch.acceptanceCriteria.join("；")}。完成后刷新总闸门，看平台复盘榜是否降级或转入下一阶段。`,
+      actionLabel: "刷新总闸门",
+    },
+    createdAt,
+  };
+}
+
 export function buildGateActionReviewAdvice(receipts: GateActionReceipt[], limit = 3): GateActionReviewAdvice[] {
   const sorted = trimGateActionReceipts(receipts, defaultGateActionReceiptLimit);
   if (sorted.length === 0) {
@@ -753,7 +894,7 @@ export function buildGateActionReviewAdvice(receipts: GateActionReceipt[], limit
 
   const advice: GateActionReviewAdvice[] = [];
   for (const group of groups.values()) {
-    const operationalReceipts = group.receipts.filter((receipt) => !isAdviceActionReceipt(receipt));
+    const operationalReceipts = group.receipts.filter((receipt) => !isAuditMetaReceipt(receipt));
     const failed = operationalReceipts.filter((receipt) => receipt.status === "failed");
     const succeeded = operationalReceipts.filter((receipt) => receipt.status === "succeeded");
     const latest = operationalReceipts[0] ?? group.receipts[0];

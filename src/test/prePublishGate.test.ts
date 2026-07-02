@@ -78,6 +78,10 @@ test("buildPrePublishGate", async (t) => {
     assert.equal(gate.overview.runnableTasks, 0);
     assert.ok(gate.score >= 85);
     assert.ok(gate.items.every((item) => item.status === "pass"));
+    assert.equal(gate.projectStatuses[0].platformId, "fanqie");
+    assert.equal(gate.projectStatuses[0].wordCount, 7800);
+    assert.ok(gate.projectStatuses[0].downloadHref?.includes("format=markdown"));
+    assert.ok(gate.projectStatuses[0].downloadHref?.includes("platformId=fanqie"));
     assert.ok(gate.priorityActions.some((action) => action.label === "导出平台发布包"));
   });
 

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { AppShell } from "@/components/app-shell/AppShell";
 import { GateActionWorkspace } from "@/components/gate/GateActionWorkspace";
+import { GateExportPackagePanel } from "@/components/gate/GateExportPackagePanel";
 import { buildTaskBatchHistory } from "@/lib/ai/taskBatchHistory";
 import { prisma } from "@/lib/db/prisma";
 import { buildPrePublishGate, type PrePublishGateItem } from "@/lib/projects/prePublishGate";
@@ -95,6 +96,8 @@ export default async function GatePage() {
           <div className="mt-1 text-2xl font-semibold">{gate.overview.failureTasks}</div>
         </div>
       </section>
+
+      <GateExportPackagePanel packages={gate.projectStatuses} />
 
       <section className="mb-6 grid gap-4 lg:grid-cols-[0.9fr_1.1fr]">
         <div className="rounded-md border border-slate-200 bg-white p-4">

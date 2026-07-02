@@ -47,16 +47,19 @@ export interface PrePublishGateProject {
 export interface PrePublishGateProjectStatus {
   projectId: string;
   projectTitle: string;
+  platformId: string;
   platformName: string;
   status: "ready" | "needs_repair" | "empty";
   label: string;
   preflightScore: number;
   finalGateLabel: string;
   publishableChapters: number;
+  wordCount: number;
   blockedCount: number;
   warningCount: number;
   nextAction: string;
   href: string;
+  downloadHref: string | null;
   execution: PrePublishGateActionExecution | null;
 }
 
@@ -186,18 +189,21 @@ function projectStatus(project: PrePublishGateProject): PrePublishGateProjectSta
   return {
     projectId: project.id,
     projectTitle: project.title,
+    platformId: pack.platformId,
     platformName: pack.platformName,
     status: ready ? "ready" : empty ? "empty" : "needs_repair",
     label: ready ? "可发布" : empty ? "无正文" : "待修复",
     preflightScore: pack.preflight.score,
     finalGateLabel: pack.finalGate.label,
     publishableChapters,
+    wordCount: pack.chapters.reduce((sum, chapter) => sum + chapter.wordCount, 0),
     blockedCount: pack.preflight.blocked.length + pack.finalGate.blockers.length,
     warningCount: pack.warnings.length + pack.preflight.warnings.length,
     nextAction: ready
       ? "导出平台发布包"
       : nextRepairAction?.label ?? pack.finalGate.nextAction ?? "回到项目工作台补齐发布资料",
     href: nextRepairAction ? actionHref(project.id, nextRepairAction) : `/projects/${project.id}#platform-export`,
+    downloadHref: ready ? `/api/projects/${project.id}/platform-export?format=markdown&platformId=${pack.platformId}` : null,
     execution: nextRepairAction ? publishRepairExecution(project.id, nextRepairAction) : null,
   };
 }

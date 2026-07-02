@@ -45,4 +45,26 @@ test("buildOpeningRewritePackage", async (t) => {
     assert.ok(primary.openingText.includes("countdown"));
     assert.ok(primary.platformNote.includes("Explain the hook"));
   });
+
+  await t.test("carries project start tactic into rewrite variants", () => {
+    const result = buildOpeningRewritePackage({
+      projectTitle: "夜雨系统",
+      platform: getPlatformProfile("fanqie"),
+      startTactic: {
+        title: "首轮平台打法：番茄小说",
+        label: "历史观察",
+        primaryTactic: "只复用小步重验流程，不复制成功结论。",
+        openingMove: "先修前三章兑现，再用小步数据重验。",
+        verificationMove: "等下一轮效果回填后再加码。",
+        risk: "缺重验效果前不要扩大投放。",
+      },
+      chapter,
+    });
+    const primary = result.variants.find((variant) => variant.id === "platform-primary");
+
+    assert.ok(primary?.strategy.includes("首轮平台打法要求"));
+    assert.ok(primary?.fixes.some((fix) => fix.includes("先修前三章兑现")));
+    assert.ok(primary?.platformNote.includes("历史观察"));
+    assert.ok(result.markdown.includes("首轮打法：历史观察"));
+  });
 });

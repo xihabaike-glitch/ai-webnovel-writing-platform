@@ -38,6 +38,10 @@ function firstProblem(diagnostic: OpeningDiagnostic) {
   return diagnostic.items.find((item) => item.status !== "pass")?.suggestion ?? "把选择、代价和章末新问题写得更具体。";
 }
 
+function startTacticStrategy(input: OpeningRewriteInput) {
+  return input.startTactic ? `首轮平台打法要求：${input.startTactic.openingMove}` : null;
+}
+
 function platformPrimaryName(platform: PlatformProfile) {
   if (platform.id === "qidian") return "起点长期期待版";
   if (platform.id === "zhihu_yanxuan") return "知乎反转付费版";
@@ -119,6 +123,7 @@ function fixesFor(diagnostic: OpeningDiagnostic, fallback: string) {
 function buildVariants(input: OpeningRewriteInput, diagnostic: OpeningDiagnostic): OpeningRewriteVariant[] {
   const primaryName = platformPrimaryName(input.platform);
   const primaryIsOverseas = input.platform.category === "overseas";
+  const tacticStrategy = startTacticStrategy(input);
   const primaryOpening = primaryIsOverseas
     ? buildOverseasOpening(input)
     : buildChineseOpening(input, diagnostic, input.platform.id === "qidian" ? "long" : input.platform.id === "zhihu_yanxuan" ? "twist" : "hook");
@@ -127,12 +132,18 @@ function buildVariants(input: OpeningRewriteInput, diagnostic: OpeningDiagnostic
     {
       id: "platform-primary",
       name: primaryName,
-      strategy: platformPrimaryStrategy(input.platform),
+      strategy: [tacticStrategy, platformPrimaryStrategy(input.platform)].filter(Boolean).join(" "),
       targetReader: `${input.platform.name} 的首章读者，优先满足 ${input.platform.reviewFocus.slice(0, 3).join("、")}。`,
       estimatedScore: variantScore(diagnostic, 16),
       openingText: primaryOpening,
-      fixes: fixesFor(diagnostic, firstProblem(diagnostic)),
-      platformNote: input.platform.openingRules.join("；"),
+      fixes: [
+        ...(input.startTactic ? [`执行首轮打法：${input.startTactic.openingMove}`] : []),
+        ...fixesFor(diagnostic, firstProblem(diagnostic)),
+      ].slice(0, 4),
+      platformNote: [
+        input.platform.openingRules.join("；"),
+        input.startTactic ? `首轮打法：${input.startTactic.label}｜${input.startTactic.openingMove}` : "",
+      ].filter(Boolean).join("；"),
     },
     {
       id: "long-promise",
@@ -167,6 +178,7 @@ function buildMarkdown(input: OpeningRewriteInput, diagnostic: OpeningDiagnostic
     "",
     `诊断原分：${diagnostic.score}`,
     `平台：${input.platform.name}`,
+    input.startTactic ? `首轮打法：${input.startTactic.label}｜${input.startTactic.openingMove}` : null,
     "",
     "## 推荐排序",
     ...variants.map((variant, index) => `${index + 1}. ${variant.name}｜预估 ${variant.estimatedScore}｜${variant.strategy}`),
@@ -185,7 +197,7 @@ function buildMarkdown(input: OpeningRewriteInput, diagnostic: OpeningDiagnostic
       ...variant.fixes.map((fix) => `- ${fix}`),
       "",
     ]),
-  ].join("\n");
+  ].filter((line): line is string => line !== null).join("\n");
 }
 
 export function buildOpeningRewritePackage(input: OpeningRewriteInput): OpeningRewritePackage {

@@ -1,9 +1,11 @@
 import type { PlatformProfile } from "../platforms/platformProfiles.ts";
+import type { ProjectStartTacticSummary } from "../projects/projectStartTactics.ts";
 import { countWords } from "../text/wordCount.ts";
 
 export interface OpeningDiagnosticInput {
   projectTitle: string;
   platform: PlatformProfile;
+  startTactic?: ProjectStartTacticSummary | null;
   chapter: {
     title: string;
     content: string;
@@ -55,6 +57,15 @@ function includesAny(text: string, words: string[]) {
   return words.some((word) => text.includes(word));
 }
 
+function tacticKeywords(tactic: ProjectStartTacticSummary | null | undefined) {
+  if (!tactic) return [];
+  return tactic.openingMove
+    .split(/[、，；;,.。！？!?\s]+/u)
+    .map((part) => part.trim())
+    .filter((part) => part.length >= 2 && !["开头动作", "新项目", "第一段"].includes(part))
+    .slice(0, 6);
+}
+
 function item(
   id: string,
   label: string,
@@ -79,12 +90,13 @@ function buildItems(input: OpeningDiagnosticInput, excerpt: string): OpeningDiag
   const hookText = `${sentence} ${input.chapter.hook}`;
   const conflictText = `${excerpt} ${input.chapter.conflict}`;
   const platformText = `${excerpt} ${input.chapter.hook} ${input.chapter.conflict} ${input.chapter.cliffhanger}`;
+  const tacticHits = tacticKeywords(input.startTactic).filter((keyword) => platformText.includes(keyword));
   const platformHits = [...input.platform.openingRules, ...input.platform.reviewFocus].filter((rule) => {
     const keywords = rule.split(/[、，；;,. ]+/).filter((part) => part.length >= 2);
     return keywords.some((keyword) => platformText.includes(keyword));
   });
 
-  return [
+  const items = [
     item(
       "first-line-hook",
       "首句钩子",
@@ -140,6 +152,20 @@ function buildItems(input: OpeningDiagnosticInput, excerpt: string): OpeningDiag
       "黄金三秒样章至少准备 300-800 字，让事件、选择、代价形成闭环。",
     ),
   ];
+
+  if (input.startTactic) {
+    items.push(item(
+      "start-tactic-fit",
+      "首轮打法适配",
+      tacticHits.length >= 1,
+      includesAny(platformText, crisisWords) || includesAny(platformText, choiceWords),
+      10,
+      tacticHits.length > 0 ? `命中：${tacticHits.join("、")}` : `首轮打法：${input.startTactic.openingMove}`,
+      `按首轮平台打法重写第一屏：${input.startTactic.openingMove}`,
+    ));
+  }
+
+  return items;
 }
 
 function verdict(score: number) {
@@ -149,13 +175,14 @@ function verdict(score: number) {
   return "开头还没站住，先别投，重写第一屏。";
 }
 
-function buildRewritePlan(items: OpeningDiagnosticItem[], platform: PlatformProfile) {
+function buildRewritePlan(items: OpeningDiagnosticItem[], platform: PlatformProfile, startTactic?: ProjectStartTacticSummary | null) {
   const failed = items.filter((entry) => entry.status !== "pass");
   return [
+    startTactic ? `先执行首轮平台打法：${startTactic.openingMove}` : null,
     failed[0]?.suggestion ?? "保留当前开局钩子，把主角选择和代价再写得更具体。",
     failed[1]?.suggestion ?? `继续贴合${platform.name}的审稿重点：${platform.reviewFocus.join("、")}。`,
     "把前 800 字改成：异常事件 -> 主角即时反应 -> 两难选择 -> 明确代价 -> 章末新问题。",
-  ];
+  ].filter((step): step is string => Boolean(step));
 }
 
 function buildMarkdown(input: OpeningDiagnosticInput, diagnostic: Omit<OpeningDiagnostic, "markdown">) {
@@ -163,6 +190,7 @@ function buildMarkdown(input: OpeningDiagnosticInput, diagnostic: Omit<OpeningDi
     `# ${input.projectTitle} / ${input.chapter.title} 黄金三秒诊断`,
     "",
     `平台：${input.platform.name}`,
+    input.startTactic ? `首轮打法：${input.startTactic.label}｜${input.startTactic.openingMove}` : null,
     `评分：${diagnostic.score}`,
     `结论：${diagnostic.verdict}`,
     "",
@@ -177,7 +205,7 @@ function buildMarkdown(input: OpeningDiagnosticInput, diagnostic: Omit<OpeningDi
     "## 修订顺序",
     ...diagnostic.rewritePlan.map((step, index) => `${index + 1}. ${step}`),
     "",
-  ].join("\n");
+  ].filter((line): line is string => line !== null).join("\n");
 }
 
 export function buildOpeningDiagnostic(input: OpeningDiagnosticInput): OpeningDiagnostic {
@@ -190,8 +218,12 @@ export function buildOpeningDiagnostic(input: OpeningDiagnosticInput): OpeningDi
     excerpt,
     wordCount: countWords(excerpt),
     items,
-    rewritePlan: buildRewritePlan(items, input.platform),
-    platformFocus: [...input.platform.openingRules, ...input.platform.reviewFocus.slice(0, 3)],
+    rewritePlan: buildRewritePlan(items, input.platform, input.startTactic),
+    platformFocus: [
+      ...input.platform.openingRules,
+      ...input.platform.reviewFocus.slice(0, 3),
+      ...(input.startTactic ? [`首轮打法：${input.startTactic.openingMove}`] : []),
+    ],
   };
 
   return {

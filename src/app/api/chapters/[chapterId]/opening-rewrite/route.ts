@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { getPlatformProfile, type PlatformId } from "@/lib/platforms/platformProfiles";
 import { buildOpeningRewritePackage } from "@/lib/chapters/openingRewrite";
+import { findProjectStartTacticSummary } from "@/lib/projects/projectStartTactics";
 
 interface Params {
   params: Promise<{ chapterId: string }>;
@@ -12,7 +13,13 @@ export async function GET(request: Request, { params }: Params) {
   const { searchParams } = new URL(request.url);
   const chapter = await prisma.chapter.findUnique({
     where: { id: chapterId },
-    include: { project: true },
+    include: {
+      project: {
+        include: {
+          worldEntries: true,
+        },
+      },
+    },
   });
 
   if (!chapter) {
@@ -20,9 +27,11 @@ export async function GET(request: Request, { params }: Params) {
   }
 
   const platform = getPlatformProfile(chapter.project.targetPlatform as PlatformId);
+  const startTactic = findProjectStartTacticSummary(chapter.project.worldEntries);
   const rewritePackage = buildOpeningRewritePackage({
     projectTitle: chapter.project.title,
     platform,
+    startTactic,
     chapter: {
       title: chapter.title,
       content: chapter.content,

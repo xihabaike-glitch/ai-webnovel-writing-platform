@@ -42,4 +42,32 @@ test("buildOpeningDiagnostic", async (t) => {
     assert.ok(diagnostic.items.some((item) => item.status === "fail"));
     assert.ok(diagnostic.rewritePlan.length >= 3);
   });
+
+  await t.test("uses project start tactic as an opening diagnostic rule", () => {
+    const diagnostic = buildOpeningDiagnostic({
+      projectTitle: "夜雨系统",
+      platform: getPlatformProfile("fanqie"),
+      startTactic: {
+        title: "首轮平台打法：番茄小说",
+        label: "历史可复用",
+        primaryTactic: "修复、复测、重验和效果回填已闭环。",
+        openingMove: "第一段直接给危机和倒计时。",
+        verificationMove: "记录首轮曝光、点击、收藏、追读。",
+        risk: "不要直接放量。",
+      },
+      chapter: {
+        title: "第一章 雨夜系统",
+        content: "林晚推开门，系统倒计时只剩十秒。她必须立刻选择。",
+        goal: "让主角遭遇不可逆事件。",
+        hook: "系统倒计时只剩十秒。",
+        conflict: "主角必须在逃跑和救人之间选择。",
+        cliffhanger: "系统给出第二个选择。",
+      },
+    });
+
+    assert.ok(diagnostic.items.some((item) => item.id === "start-tactic-fit"));
+    assert.ok(diagnostic.platformFocus.some((item) => item.includes("首轮打法")));
+    assert.ok(diagnostic.rewritePlan[0].includes("第一段直接给危机和倒计时"));
+    assert.ok(diagnostic.markdown.includes("首轮打法：历史可复用"));
+  });
 });

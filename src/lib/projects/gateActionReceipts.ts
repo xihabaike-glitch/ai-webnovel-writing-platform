@@ -82,6 +82,13 @@ export interface GateActionReceiptSummary {
 }
 
 export type GateActionReviewAdviceSeverity = "urgent" | "warning" | "opportunity" | "healthy";
+export type GateActionReviewAdviceActionKind = "handle_failure" | "adopt_asset" | "record_metrics" | "refresh_gate" | "start_gate_action";
+
+export interface GateActionReviewAdviceAction {
+  kind: GateActionReviewAdviceActionKind;
+  label: string;
+  href: string;
+}
 
 export interface GateActionReviewAdvice {
   id: string;
@@ -90,8 +97,7 @@ export interface GateActionReviewAdvice {
   platformName: string;
   headline: string;
   detail: string;
-  actionLabel: string;
-  href: string;
+  action: GateActionReviewAdviceAction;
   evidence: string[];
 }
 
@@ -480,6 +486,11 @@ function adviceEvidence(receipts: GateActionReceipt[]) {
   return trimGateActionReceipts(receipts, 3).map((receipt) => `${receipt.label}：${receipt.status === "succeeded" ? "成功" : "失败"}`);
 }
 
+function projectAnchorHref(href: string, anchor: string) {
+  const match = href.match(/\/projects\/([^/#?]+)/);
+  return match?.[1] ? `/projects/${match[1]}${anchor}` : href;
+}
+
 export function buildGateActionReviewAdvice(receipts: GateActionReceipt[], limit = 3): GateActionReviewAdvice[] {
   const sorted = trimGateActionReceipts(receipts, defaultGateActionReceiptLimit);
   if (sorted.length === 0) {
@@ -490,8 +501,11 @@ export function buildGateActionReviewAdvice(receipts: GateActionReceipt[], limit
       platformName: "总闸门",
       headline: "还没有执行证据，别靠感觉判断平台策略。",
       detail: "先从总闸门执行一次修复、生成或保存动作，再让系统根据真实回执复盘下一步。",
-      actionLabel: "先处理上方动作",
-      href: "/gate",
+      action: {
+        kind: "start_gate_action",
+        label: "处理上方动作",
+        href: "/gate",
+      },
       evidence: ["当前没有审计回执"],
     }];
   }
@@ -519,8 +533,11 @@ export function buildGateActionReviewAdvice(receipts: GateActionReceipt[], limit
         platformName: group.platformName,
         headline: `${group.platformName} 失败偏多，别继续硬冲。`,
         detail: `最近 ${group.receipts.length} 条里失败 ${failed.length} 条，先修最晚失败项，再谈加码。`,
-        actionLabel: "打开失败位置",
-        href: failed[0]?.href ?? latest.href,
+        action: {
+          kind: "handle_failure",
+          label: "处理失败项",
+          href: failed[0]?.href ?? latest.href,
+        },
         evidence: adviceEvidence(failed),
       });
       continue;
@@ -538,8 +555,11 @@ export function buildGateActionReviewAdvice(receipts: GateActionReceipt[], limit
         platformName: group.platformName,
         headline: `${group.platformName} 资产生成了，别让方案躺在草稿箱。`,
         detail: "已经生成投稿方案，但还没有看到后续保存基准。先采纳最强版本，否则生成动作等于没进生产线。",
-        actionLabel: "打开资产位置",
-        href: latestAsset.href,
+        action: {
+          kind: "adopt_asset",
+          label: "采纳投稿方案",
+          href: projectAnchorHref(latestAsset.href, "#submission-asset-editor"),
+        },
         evidence: adviceEvidence([latestAsset, ...group.receipts.filter((receipt) => receipt.status === "succeeded")]),
       });
       continue;
@@ -554,8 +574,11 @@ export function buildGateActionReviewAdvice(receipts: GateActionReceipt[], limit
         platformName: group.platformName,
         headline: `${group.platformName} 已有发布基准，下一步别缺效果回填。`,
         detail: "基准保存后要补曝光、点击、收藏、追读或编辑反馈，否则平台选择还是拍脑袋。",
-        actionLabel: "打开发布包",
-        href: latestSnapshot.href,
+        action: {
+          kind: "record_metrics",
+          label: "回填发布效果",
+          href: projectAnchorHref(latestSnapshot.href, "#publish-effect-panel"),
+        },
         evidence: adviceEvidence([latestSnapshot, ...succeeded]),
       });
       continue;
@@ -569,8 +592,11 @@ export function buildGateActionReviewAdvice(receipts: GateActionReceipt[], limit
         platformName: group.platformName,
         headline: `${group.platformName} 执行链路稳定，可以进入小步加码。`,
         detail: "最近动作没有失败，先扩大一次最小批量，再用审计历史看质量和转化是否同步变好。",
-        actionLabel: "刷新总闸门",
-        href: "/gate",
+        action: {
+          kind: "refresh_gate",
+          label: "刷新总闸门",
+          href: "/gate",
+        },
         evidence: adviceEvidence(succeeded),
       });
     }
@@ -585,8 +611,11 @@ export function buildGateActionReviewAdvice(receipts: GateActionReceipt[], limit
       platformName: "总闸门",
       headline: "复检欠账太多，继续新增动作只会把坑埋深。",
       detail: `还有 ${blocked.length} 条回执要求先处理失败原因。先清掉阻塞，再跑新批次。`,
-      actionLabel: "打开阻塞位置",
-      href: blocked[0]?.href ?? "/gate",
+      action: {
+        kind: "handle_failure",
+        label: "处理阻塞项",
+        href: blocked[0]?.href ?? "/gate",
+      },
       evidence: adviceEvidence(blocked),
     });
   }
@@ -601,8 +630,11 @@ export function buildGateActionReviewAdvice(receipts: GateActionReceipt[], limit
       platformName: platform.name,
       headline: "目前没有明显事故，别松手，继续用证据推进。",
       detail: "继续按总闸门推荐动作小步执行，下一次复盘重点看失败率、基准保存和真实投放反馈。",
-      actionLabel: "刷新总闸门",
-      href: "/gate",
+      action: {
+        kind: "refresh_gate",
+        label: "刷新总闸门",
+        href: "/gate",
+      },
       evidence: adviceEvidence(sorted),
     });
   }

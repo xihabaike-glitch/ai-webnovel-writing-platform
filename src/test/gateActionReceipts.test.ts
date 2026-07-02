@@ -217,7 +217,8 @@ test("buildGateActionReceipt", async (t) => {
     assert.equal(advice[0].severity, "urgent");
     assert.equal(advice[0].platformId, "fanqie");
     assert.ok(advice[0].headline.includes("失败偏多"));
-    assert.equal(advice[0].actionLabel, "打开失败位置");
+    assert.equal(advice[0].action.kind, "handle_failure");
+    assert.equal(advice[0].action.label, "处理失败项");
   });
 
   await t.test("pushes generated assets toward baseline adoption", () => {
@@ -235,7 +236,9 @@ test("buildGateActionReceipt", async (t) => {
     assert.equal(advice[0].severity, "opportunity");
     assert.equal(advice[0].platformId, "fanqie");
     assert.ok(advice[0].headline.includes("资产生成了"));
-    assert.equal(advice[0].actionLabel, "打开资产位置");
+    assert.equal(advice[0].action.kind, "adopt_asset");
+    assert.equal(advice[0].action.label, "采纳投稿方案");
+    assert.equal(advice[0].action.href, "/projects/project-1#submission-asset-editor");
   });
 
   await t.test("asks for metrics after a platform baseline is saved", () => {
@@ -255,7 +258,9 @@ test("buildGateActionReceipt", async (t) => {
     assert.equal(advice[0].severity, "warning");
     assert.equal(advice[0].platformId, "fanqie");
     assert.ok(advice[0].headline.includes("发布基准"));
-    assert.equal(advice[0].actionLabel, "打开发布包");
+    assert.equal(advice[0].action.kind, "record_metrics");
+    assert.equal(advice[0].action.label, "回填发布效果");
+    assert.equal(advice[0].action.href, "/projects/project-1#publish-effect-panel");
   });
 
   await t.test("builds platform strategy receipts for the unified gate audit log", () => {

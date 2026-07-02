@@ -17,6 +17,7 @@ import {
   saveGateActionReceipts,
   type GateActionReceipt,
   type GateActionReceiptExecutionFilter,
+  type GateActionReviewAdviceAction,
   type GateActionReviewAdviceSeverity,
   type GateActionReceiptStatusFilter,
 } from "@/lib/projects/gateActionReceipts";
@@ -53,6 +54,14 @@ function adviceLabel(severity: GateActionReviewAdviceSeverity) {
   if (severity === "warning") return "补证据";
   if (severity === "opportunity") return "别浪费";
   return "可加码";
+}
+
+function adviceActionTitle(kind: GateActionReviewAdviceAction["kind"]) {
+  if (kind === "handle_failure") return "把坑先填上";
+  if (kind === "adopt_asset") return "进入资产采纳";
+  if (kind === "record_metrics") return "进入效果回填";
+  if (kind === "start_gate_action") return "从闸门动作开始";
+  return "重新计算闸门";
 }
 
 export function GateActionWorkspace({ actions }: { actions: PrePublishGateAction[] }) {
@@ -209,17 +218,22 @@ export function GateActionWorkspace({ actions }: { actions: PrePublishGateAction
                     ))}
                   </div>
                 </div>
-                {item.actionLabel === "刷新总闸门" ? (
+                {item.action.kind === "refresh_gate" ? (
                   <button
                     className="w-fit shrink-0 rounded-md bg-white px-3 py-2 text-xs font-medium text-slate-950"
                     onClick={() => router.refresh()}
                     type="button"
+                    title={adviceActionTitle(item.action.kind)}
                   >
-                    {item.actionLabel}
+                    {item.action.label}
                   </button>
                 ) : (
-                  <Link className="w-fit shrink-0 rounded-md bg-white px-3 py-2 text-xs font-medium text-slate-950" href={item.href}>
-                    {item.actionLabel}
+                  <Link
+                    className="w-fit shrink-0 rounded-md bg-white px-3 py-2 text-xs font-medium text-slate-950"
+                    href={item.action.href}
+                    title={adviceActionTitle(item.action.kind)}
+                  >
+                    {item.action.label}
                   </Link>
                 )}
               </div>

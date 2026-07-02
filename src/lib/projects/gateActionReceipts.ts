@@ -81,6 +81,20 @@ export interface GateActionReceiptSummary {
   }>;
 }
 
+export type GateActionReviewAdviceSeverity = "urgent" | "warning" | "opportunity" | "healthy";
+
+export interface GateActionReviewAdvice {
+  id: string;
+  severity: GateActionReviewAdviceSeverity;
+  platformId: string;
+  platformName: string;
+  headline: string;
+  detail: string;
+  actionLabel: string;
+  href: string;
+  evidence: string[];
+}
+
 export interface GatePlatformStrategyReceiptPayload {
   message?: string;
   error?: string;
@@ -447,6 +461,168 @@ export function buildGateActionReceiptSummary(receipts: GateActionReceipt[]): Ga
     platforms: [...platformMap.values()].sort((left, right) => right.total - left.total || left.name.localeCompare(right.name)),
     executionTypes: [...executionMap.values()].sort((left, right) => right.total - left.total || left.type.localeCompare(right.type)),
   };
+}
+
+function actionTypeFromReceipt(receipt: GateActionReceipt) {
+  const parts = receipt.actionId.split(":");
+  return receipt.executionType === "platform_strategy" ? parts[2] ?? "" : receipt.executionType;
+}
+
+function latestReceiptFor(receipts: GateActionReceipt[], predicate: (receipt: GateActionReceipt) => boolean) {
+  return trimGateActionReceipts(receipts.filter(predicate), 1)[0] ?? null;
+}
+
+function receiptIsAfter(left: GateActionReceipt, right: GateActionReceipt) {
+  return new Date(left.createdAt).getTime() > new Date(right.createdAt).getTime();
+}
+
+function adviceEvidence(receipts: GateActionReceipt[]) {
+  return trimGateActionReceipts(receipts, 3).map((receipt) => `${receipt.label}：${receipt.status === "succeeded" ? "成功" : "失败"}`);
+}
+
+export function buildGateActionReviewAdvice(receipts: GateActionReceipt[], limit = 3): GateActionReviewAdvice[] {
+  const sorted = trimGateActionReceipts(receipts, defaultGateActionReceiptLimit);
+  if (sorted.length === 0) {
+    return [{
+      id: "empty-audit-history",
+      severity: "warning",
+      platformId: "manual",
+      platformName: "总闸门",
+      headline: "还没有执行证据，别靠感觉判断平台策略。",
+      detail: "先从总闸门执行一次修复、生成或保存动作，再让系统根据真实回执复盘下一步。",
+      actionLabel: "先处理上方动作",
+      href: "/gate",
+      evidence: ["当前没有审计回执"],
+    }];
+  }
+
+  const groups = new Map<string, { platformId: string; platformName: string; receipts: GateActionReceipt[] }>();
+  for (const receipt of sorted) {
+    const platform = gateActionReceiptPlatform(receipt);
+    const group = groups.get(platform.id) ?? { platformId: platform.id, platformName: platform.name, receipts: [] };
+    group.receipts.push(receipt);
+    groups.set(platform.id, group);
+  }
+
+  const advice: GateActionReviewAdvice[] = [];
+  for (const group of groups.values()) {
+    const failed = group.receipts.filter((receipt) => receipt.status === "failed");
+    const succeeded = group.receipts.filter((receipt) => receipt.status === "succeeded");
+    const latest = group.receipts[0];
+    const failureRate = group.receipts.length ? failed.length / group.receipts.length : 0;
+
+    if (failed.length >= 2 || (failed.length >= 1 && failureRate >= 0.5)) {
+      advice.push({
+        id: `${group.platformId}:failure-cluster`,
+        severity: "urgent",
+        platformId: group.platformId,
+        platformName: group.platformName,
+        headline: `${group.platformName} 失败偏多，别继续硬冲。`,
+        detail: `最近 ${group.receipts.length} 条里失败 ${failed.length} 条，先修最晚失败项，再谈加码。`,
+        actionLabel: "打开失败位置",
+        href: failed[0]?.href ?? latest.href,
+        evidence: adviceEvidence(failed),
+      });
+      continue;
+    }
+
+    const latestAsset = latestReceiptFor(group.receipts, (receipt) => actionTypeFromReceipt(receipt) === "generate_asset_variants" && receipt.status === "succeeded");
+    const laterSnapshot = latestAsset
+      ? latestReceiptFor(group.receipts, (receipt) => actionTypeFromReceipt(receipt) === "save_snapshot" && receipt.status === "succeeded" && receiptIsAfter(receipt, latestAsset))
+      : null;
+    if (latestAsset && !laterSnapshot) {
+      advice.push({
+        id: `${group.platformId}:asset-without-baseline`,
+        severity: "opportunity",
+        platformId: group.platformId,
+        platformName: group.platformName,
+        headline: `${group.platformName} 资产生成了，别让方案躺在草稿箱。`,
+        detail: "已经生成投稿方案，但还没有看到后续保存基准。先采纳最强版本，否则生成动作等于没进生产线。",
+        actionLabel: "打开资产位置",
+        href: latestAsset.href,
+        evidence: adviceEvidence([latestAsset, ...group.receipts.filter((receipt) => receipt.status === "succeeded")]),
+      });
+      continue;
+    }
+
+    const latestSnapshot = latestReceiptFor(group.receipts, (receipt) => actionTypeFromReceipt(receipt) === "save_snapshot" && receipt.status === "succeeded");
+    if (latestSnapshot) {
+      advice.push({
+        id: `${group.platformId}:baseline-needs-metrics`,
+        severity: "warning",
+        platformId: group.platformId,
+        platformName: group.platformName,
+        headline: `${group.platformName} 已有发布基准，下一步别缺效果回填。`,
+        detail: "基准保存后要补曝光、点击、收藏、追读或编辑反馈，否则平台选择还是拍脑袋。",
+        actionLabel: "打开发布包",
+        href: latestSnapshot.href,
+        evidence: adviceEvidence([latestSnapshot, ...succeeded]),
+      });
+      continue;
+    }
+
+    if (succeeded.length >= 3 && failed.length === 0) {
+      advice.push({
+        id: `${group.platformId}:stable-success`,
+        severity: "healthy",
+        platformId: group.platformId,
+        platformName: group.platformName,
+        headline: `${group.platformName} 执行链路稳定，可以进入小步加码。`,
+        detail: "最近动作没有失败，先扩大一次最小批量，再用审计历史看质量和转化是否同步变好。",
+        actionLabel: "刷新总闸门",
+        href: "/gate",
+        evidence: adviceEvidence(succeeded),
+      });
+    }
+  }
+
+  const blocked = sorted.filter((receipt) => receipt.recheck.status === "blocked");
+  if (blocked.length >= 2) {
+    advice.push({
+      id: "blocked-recheck-debt",
+      severity: "urgent",
+      platformId: "manual",
+      platformName: "总闸门",
+      headline: "复检欠账太多，继续新增动作只会把坑埋深。",
+      detail: `还有 ${blocked.length} 条回执要求先处理失败原因。先清掉阻塞，再跑新批次。`,
+      actionLabel: "打开阻塞位置",
+      href: blocked[0]?.href ?? "/gate",
+      evidence: adviceEvidence(blocked),
+    });
+  }
+
+  if (advice.length === 0) {
+    const latest = sorted[0];
+    const platform = gateActionReceiptPlatform(latest);
+    advice.push({
+      id: "steady-watch",
+      severity: "healthy",
+      platformId: platform.id,
+      platformName: platform.name,
+      headline: "目前没有明显事故，别松手，继续用证据推进。",
+      detail: "继续按总闸门推荐动作小步执行，下一次复盘重点看失败率、基准保存和真实投放反馈。",
+      actionLabel: "刷新总闸门",
+      href: "/gate",
+      evidence: adviceEvidence(sorted),
+    });
+  }
+
+  const severityWeight: Record<GateActionReviewAdviceSeverity, number> = {
+    urgent: 0,
+    warning: 1,
+    opportunity: 2,
+    healthy: 3,
+  };
+
+  return advice
+    .sort((left, right) => {
+      const severityDiff = severityWeight[left.severity] - severityWeight[right.severity];
+      if (severityDiff !== 0) return severityDiff;
+      const manualDiff = Number(left.platformId === "manual") - Number(right.platformId === "manual");
+      if (manualDiff !== 0) return manualDiff;
+      return left.platformName.localeCompare(right.platformName);
+    })
+    .slice(0, limit);
 }
 
 function gateActionReceiptQuery(options?: GateActionReceiptFilters & { limit?: number }) {

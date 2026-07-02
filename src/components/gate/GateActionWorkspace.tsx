@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import {
   buildGateActionReceiptSummary,
+  buildGateActionReviewAdvice,
   clearGateActionReceipts,
   clearPersistedGateActionReceipts,
   filterGateActionReceipts,
@@ -16,6 +17,7 @@ import {
   saveGateActionReceipts,
   type GateActionReceipt,
   type GateActionReceiptExecutionFilter,
+  type GateActionReviewAdviceSeverity,
   type GateActionReceiptStatusFilter,
 } from "@/lib/projects/gateActionReceipts";
 import type { PrePublishGateAction } from "@/lib/projects/prePublishGate";
@@ -39,6 +41,20 @@ function executionLabel(type: GateActionReceipt["executionType"]) {
   return "人工处理";
 }
 
+function adviceClass(severity: GateActionReviewAdviceSeverity) {
+  if (severity === "urgent") return "border-rose-200 bg-rose-50 text-rose-900";
+  if (severity === "warning") return "border-amber-200 bg-amber-50 text-amber-900";
+  if (severity === "opportunity") return "border-blue-200 bg-blue-50 text-blue-900";
+  return "border-emerald-200 bg-emerald-50 text-emerald-900";
+}
+
+function adviceLabel(severity: GateActionReviewAdviceSeverity) {
+  if (severity === "urgent") return "先救火";
+  if (severity === "warning") return "补证据";
+  if (severity === "opportunity") return "别浪费";
+  return "可加码";
+}
+
 export function GateActionWorkspace({ actions }: { actions: PrePublishGateAction[] }) {
   const router = useRouter();
   const [receipts, setReceipts] = useState<GateActionReceipt[]>([]);
@@ -52,6 +68,7 @@ export function GateActionWorkspace({ actions }: { actions: PrePublishGateAction
   });
   const summary = buildGateActionReceiptSummary(receipts);
   const filteredSummary = buildGateActionReceiptSummary(filteredReceipts);
+  const reviewAdvice = buildGateActionReviewAdvice(filteredReceipts);
   const latestReceipt = filteredReceipts[0] ?? null;
 
   useEffect(() => {
@@ -173,6 +190,41 @@ export function GateActionWorkspace({ actions }: { actions: PrePublishGateAction
               <option value="failed">失败 · {summary.failed}</option>
             </select>
           </label>
+        </div>
+        <div className="mt-3 grid gap-2">
+          <div className="text-xs font-medium text-slate-500">毒舌复盘建议</div>
+          {reviewAdvice.map((item) => (
+            <div className={`rounded-md border p-3 text-sm ${adviceClass(item.severity)}`} key={item.id}>
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="rounded-md bg-white/75 px-2 py-1 text-xs font-medium">{adviceLabel(item.severity)}</span>
+                    <span className="text-xs opacity-75">{item.platformName}</span>
+                  </div>
+                  <div className="mt-2 font-medium">{item.headline}</div>
+                  <p className="mt-1 leading-6 opacity-85">{item.detail}</p>
+                  <div className="mt-2 flex flex-wrap gap-2 text-xs opacity-75">
+                    {item.evidence.map((evidence) => (
+                      <span className="rounded-md bg-white/70 px-2 py-1" key={evidence}>{evidence}</span>
+                    ))}
+                  </div>
+                </div>
+                {item.actionLabel === "刷新总闸门" ? (
+                  <button
+                    className="w-fit shrink-0 rounded-md bg-white px-3 py-2 text-xs font-medium text-slate-950"
+                    onClick={() => router.refresh()}
+                    type="button"
+                  >
+                    {item.actionLabel}
+                  </button>
+                ) : (
+                  <Link className="w-fit shrink-0 rounded-md bg-white px-3 py-2 text-xs font-medium text-slate-950" href={item.href}>
+                    {item.actionLabel}
+                  </Link>
+                )}
+              </div>
+            </div>
+          ))}
         </div>
         {latestReceipt ? (
           <div className={`mt-3 rounded-md border p-3 text-sm ${recheckClass(latestReceipt.recheck.status)}`}>

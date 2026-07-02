@@ -4,6 +4,7 @@ import {
   buildGateActionReceiptSummary,
   buildGateActionReceipt,
   buildGatePlatformStrategyReceipt,
+  buildGateActionReviewAdvice,
   filterGateActionReceipts,
   gateActionReceiptPlatform,
   mergeGateActionReceipts,
@@ -191,6 +192,70 @@ test("buildGateActionReceipt", async (t) => {
     assert.equal(summary.platforms.find((platform) => platform.id === "fanqie")?.total, 1);
     assert.equal(failedFanqie.length, 1);
     assert.equal(failedFanqie[0].actionId, "platform-strategy:fanqie:generate_asset_variants");
+  });
+
+  await t.test("turns repeated failures into urgent review advice", () => {
+    const failedAsset = buildGatePlatformStrategyReceipt({
+      item: strategyPlatform,
+      status: "failed",
+      now: "2026-01-01T00:00:00.000Z",
+      payload: { error: "标题钩子太弱。" },
+    });
+    const failedRewrite = buildGatePlatformStrategyReceipt({
+      item: {
+        ...strategyPlatform,
+        actionType: "rewrite_first_three",
+        actionLabel: "重写前三章",
+      },
+      status: "failed",
+      now: "2026-01-01T00:00:01.000Z",
+      payload: { error: "前三章缺少冲突升级。" },
+    });
+
+    const advice = buildGateActionReviewAdvice([failedAsset, failedRewrite]);
+
+    assert.equal(advice[0].severity, "urgent");
+    assert.equal(advice[0].platformId, "fanqie");
+    assert.ok(advice[0].headline.includes("失败偏多"));
+    assert.equal(advice[0].actionLabel, "打开失败位置");
+  });
+
+  await t.test("pushes generated assets toward baseline adoption", () => {
+    const assetReceipt = buildGatePlatformStrategyReceipt({
+      item: strategyPlatform,
+      status: "succeeded",
+      now: "2026-01-01T00:00:00.000Z",
+      payload: {
+        variants: [{ strategy: "强钩子版" }, { strategy: "短剧版" }],
+      },
+    });
+
+    const advice = buildGateActionReviewAdvice([assetReceipt]);
+
+    assert.equal(advice[0].severity, "opportunity");
+    assert.equal(advice[0].platformId, "fanqie");
+    assert.ok(advice[0].headline.includes("资产生成了"));
+    assert.equal(advice[0].actionLabel, "打开资产位置");
+  });
+
+  await t.test("asks for metrics after a platform baseline is saved", () => {
+    const snapshotReceipt = buildGatePlatformStrategyReceipt({
+      item: {
+        ...strategyPlatform,
+        actionType: "save_snapshot",
+        actionLabel: "保存基准",
+      },
+      status: "succeeded",
+      now: "2026-01-01T00:00:00.000Z",
+      payload: { task: { id: "snapshot-1", status: "succeeded" } },
+    });
+
+    const advice = buildGateActionReviewAdvice([snapshotReceipt]);
+
+    assert.equal(advice[0].severity, "warning");
+    assert.equal(advice[0].platformId, "fanqie");
+    assert.ok(advice[0].headline.includes("发布基准"));
+    assert.equal(advice[0].actionLabel, "打开发布包");
   });
 
   await t.test("builds platform strategy receipts for the unified gate audit log", () => {

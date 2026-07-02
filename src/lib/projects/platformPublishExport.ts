@@ -378,6 +378,7 @@ export interface PlatformStrategyReviewDecision {
   detail: string;
   action: string;
   tasks: PlatformStrategyReviewTask[];
+  nextPlan: PlatformStrategyReviewPlan;
   history: PlatformStrategyReviewHistoryItem[];
 }
 
@@ -401,6 +402,23 @@ export interface PlatformStrategyReviewHistoryItem {
   detail: string;
   createdAt: Date | string;
   href: string;
+}
+
+export interface PlatformStrategyReviewPlan {
+  headline: string;
+  cadence: "three_step" | "seven_day";
+  checkpoint: string;
+  steps: PlatformStrategyReviewPlanStep[];
+}
+
+export interface PlatformStrategyReviewPlanStep {
+  id: string;
+  dayLabel: "今天" | "48小时内" | "第7天";
+  taskId: string;
+  label: string;
+  detail: string;
+  href: string;
+  expectedSignal: string;
 }
 
 export interface PlatformStrategySwitchStep {
@@ -1073,6 +1091,66 @@ function rankPlatformStrategyReviewTasks(
     .map(({ rankScore: _rankScore, originalIndex: _originalIndex, ...task }) => task);
 }
 
+function reviewPlanSignal(task: PlatformStrategyReviewTask) {
+  if (task.execution === "generate_asset_variants") return "至少生成并采纳 1 个可实测候选。";
+  if (task.execution === "rewrite_first_three") return "前三章通过质检，开局钩子和章末悬念可投。";
+  if (task.execution === "save_snapshot") return "留下当前版本基准，方便下一轮对照。";
+  if (task.execution === "apply_strategy") return "主战场明确，后续动作不再分散。";
+  if (task.rankTarget === "effect") return "补齐曝光、点击、收藏、追读和反馈数据。";
+  return "当前卡点有明确处理记录。";
+}
+
+function buildPlatformStrategyReviewPlan(
+  pack: PlatformPublishPackage,
+  decisionKind: PlatformStrategyReviewDecision["kind"],
+  tasks: PlatformStrategyReviewTask[],
+): PlatformStrategyReviewPlan {
+  const selectedTasks = tasks.slice(0, 3);
+  const dayLabels: PlatformStrategyReviewPlanStep["dayLabel"][] = ["今天", "48小时内", "第7天"];
+  const fallbackTask: PlatformStrategyReviewTask = {
+    id: "review-ranking",
+    priority: "medium",
+    execution: "open_target",
+    rankTarget: "evidence",
+    rankReason: "动作跑完后必须回排行榜看数据，别靠手感宣布胜利。",
+    label: "回排行榜复盘",
+    detail: "检查策略分、子指标变化和平台排序，再决定加码、迭代还是撤退。",
+    href: "#platform-strategy-ranking",
+  };
+  const steps = dayLabels.map((dayLabel, index) => {
+    const task = selectedTasks[index] ?? fallbackTask;
+    return {
+      id: `${task.id}-${index + 1}`,
+      dayLabel,
+      taskId: task.id,
+      label: task.label,
+      detail: index === 2 && selectedTasks.length >= 2
+        ? "别继续闷头改，第 7 天必须回看数据和策略分变化。"
+        : task.detail,
+      href: index === 2 && selectedTasks.length >= 2 ? "#platform-strategy-ranking" : task.href,
+      expectedSignal: index === 2 && selectedTasks.length >= 2
+        ? "根据策略分变化决定继续加码、小步迭代、先修打法或换方向。"
+        : reviewPlanSignal(task),
+    };
+  });
+  const headline = decisionKind === "scale"
+    ? `${pack.platformName} 下一轮计划：别乱改，先保护有效信号再放大。`
+    : decisionKind === "collect"
+      ? `${pack.platformName} 下一轮计划：先补证据，没有数据就没有判断。`
+      : decisionKind === "repair"
+        ? `${pack.platformName} 下一轮计划：先修入口和前三章，别继续烧低质样本。`
+        : decisionKind === "pivot"
+          ? `${pack.platformName} 下一轮计划：降权观察，把主资源挪到高胜率方向。`
+          : `${pack.platformName} 下一轮计划：小步改、留证据、第 7 天再判断。`;
+
+  return {
+    headline,
+    cadence: "seven_day",
+    checkpoint: "第 7 天必须看策略分、真实数据和版本对照，再决定加码/迭代/修打法/撤退。",
+    steps,
+  };
+}
+
 function buildPlatformStrategyReviewDecision(
   pack: PlatformPublishPackage,
   recommendation: PlatformStrategyRankItem["recommendation"],
@@ -1080,183 +1158,193 @@ function buildPlatformStrategyReviewDecision(
   const history = buildPlatformStrategyReviewHistory(pack);
 
   if (!pack.publishEffect.records) {
+    const tasks = rankPlatformStrategyReviewTasks(pack, [
+      {
+        id: "record-first-publish-effect",
+        priority: "high",
+        execution: "open_target",
+        label: "录入首轮数据",
+        detail: "补齐曝光、点击、收藏、追读、评论和编辑反馈。",
+        href: "#publish-effect-panel",
+      },
+      {
+        id: "archive-current-submission",
+        priority: "medium",
+        execution: "save_snapshot",
+        label: "归档当前版本",
+        detail: "把当前投稿包存成版本，下一轮才知道改动有没有用。",
+        href: "#package-version-history",
+      },
+      {
+        id: "check-platform-asset",
+        priority: pack.submissionAssetAudit.status === "ready" ? "low" : "medium",
+        execution: pack.submissionAssetAudit.status === "ready" ? "open_target" : "generate_asset_variants",
+        label: "检查投稿资产",
+        detail: pack.submissionAssetAudit.status === "ready"
+          ? "标题、简介、标签已可用，只做发布前复核。"
+          : "投稿资产还没过关，先别急着拿它测平台。",
+        href: "#submission-asset-editor",
+      },
+    ]);
     return {
       kind: "collect",
       label: "先补数据",
       detail: "还没有真实发布数据，现在谈加码就是拍脑袋。",
       action: "先录入曝光、点击、收藏、追读和编辑反馈。",
       history,
-      tasks: rankPlatformStrategyReviewTasks(pack, [
-        {
-          id: "record-first-publish-effect",
-          priority: "high",
-          execution: "open_target",
-          label: "录入首轮数据",
-          detail: "补齐曝光、点击、收藏、追读、评论和编辑反馈。",
-          href: "#publish-effect-panel",
-        },
-        {
-          id: "archive-current-submission",
-          priority: "medium",
-          execution: "save_snapshot",
-          label: "归档当前版本",
-          detail: "把当前投稿包存成版本，下一轮才知道改动有没有用。",
-          href: "#package-version-history",
-        },
-        {
-          id: "check-platform-asset",
-          priority: pack.submissionAssetAudit.status === "ready" ? "low" : "medium",
-          execution: pack.submissionAssetAudit.status === "ready" ? "open_target" : "generate_asset_variants",
-          label: "检查投稿资产",
-          detail: pack.submissionAssetAudit.status === "ready"
-            ? "标题、简介、标签已可用，只做发布前复核。"
-            : "投稿资产还没过关，先别急着拿它测平台。",
-          href: "#submission-asset-editor",
-        },
-      ]),
+      tasks,
+      nextPlan: buildPlatformStrategyReviewPlan(pack, "collect", tasks),
     };
   }
 
   if (recommendation === "focus" || pack.publishEffect.status === "signed" || pack.publishEffect.comparison.status === "improved") {
+    const tasks = rankPlatformStrategyReviewTasks(pack, [
+      {
+        id: "keep-main-platform",
+        priority: "high",
+        execution: "apply_strategy",
+        label: "锁定主战场",
+        detail: `继续以 ${pack.platformName} 为主平台，不要频繁横跳稀释样本。`,
+        href: "#platform-strategy-ranking",
+      },
+      {
+        id: "archive-winning-version",
+        priority: "high",
+        execution: "save_snapshot",
+        label: "归档有效版本",
+        detail: "保存当前标题、简介、标签和前三章组合，作为下一轮对照基准。",
+        href: "#package-version-history",
+      },
+      {
+        id: "track-next-round",
+        priority: "medium",
+        execution: "open_target",
+        label: "跟踪下一轮转化",
+        detail: "继续记录新增曝光、点击、收藏、追读和付费阅读变化。",
+        href: "#publish-effect-panel",
+      },
+    ]);
     return {
       kind: "scale",
       label: "继续加码",
       detail: "数据已经给出正反馈，主资源可以继续往这里压。",
       action: "保持主战场，继续更新、归档版本，并跟踪下一轮转化。",
       history,
-      tasks: rankPlatformStrategyReviewTasks(pack, [
-        {
-          id: "keep-main-platform",
-          priority: "high",
-          execution: "apply_strategy",
-          label: "锁定主战场",
-          detail: `继续以 ${pack.platformName} 为主平台，不要频繁横跳稀释样本。`,
-          href: "#platform-strategy-ranking",
-        },
-        {
-          id: "archive-winning-version",
-          priority: "high",
-          execution: "save_snapshot",
-          label: "归档有效版本",
-          detail: "保存当前标题、简介、标签和前三章组合，作为下一轮对照基准。",
-          href: "#package-version-history",
-        },
-        {
-          id: "track-next-round",
-          priority: "medium",
-          execution: "open_target",
-          label: "跟踪下一轮转化",
-          detail: "继续记录新增曝光、点击、收藏、追读和付费阅读变化。",
-          href: "#publish-effect-panel",
-        },
-      ]),
+      tasks,
+      nextPlan: buildPlatformStrategyReviewPlan(pack, "scale", tasks),
     };
   }
 
   if (pack.publishEffect.status === "weak" || pack.publishEffect.comparison.status === "declined" || recommendation === "repair") {
+    const tasks = rankPlatformStrategyReviewTasks(pack, [
+      {
+        id: "rewrite-opening-hook",
+        priority: "high",
+        execution: "rewrite_first_three",
+        label: "重修前三章钩子",
+        detail: pack.repairPath.nextStep?.detail ?? "把开局冲突、爽点兑现和章末悬念重新打磨一轮。",
+        href: "#first-three-rewrite",
+      },
+      {
+        id: "fix-submission-asset",
+        priority: "high",
+        execution: "generate_asset_variants",
+        label: "重做投稿资产",
+        detail: "重写书名、简介、标签和平台话术，别让入口素材拖累正文。",
+        href: "#submission-asset-editor",
+      },
+      {
+        id: "record-repair-metric",
+        priority: "medium",
+        execution: "open_target",
+        label: "设置二轮对照",
+        detail: "修完后再记录一轮数据，用前后变化判断是不是修对了。",
+        href: "#publish-effect-panel",
+      },
+    ]);
     return {
       kind: "repair",
       label: "先修打法",
       detail: "真实反馈偏弱，现在继续硬投只会扩大损失。",
       action: "回到前三章、投稿资产和发布节奏，先修再投。",
       history,
-      tasks: rankPlatformStrategyReviewTasks(pack, [
-        {
-          id: "rewrite-opening-hook",
-          priority: "high",
-          execution: "rewrite_first_three",
-          label: "重修前三章钩子",
-          detail: pack.repairPath.nextStep?.detail ?? "把开局冲突、爽点兑现和章末悬念重新打磨一轮。",
-          href: "#first-three-rewrite",
-        },
-        {
-          id: "fix-submission-asset",
-          priority: "high",
-          execution: "generate_asset_variants",
-          label: "重做投稿资产",
-          detail: "重写书名、简介、标签和平台话术，别让入口素材拖累正文。",
-          href: "#submission-asset-editor",
-        },
-        {
-          id: "record-repair-metric",
-          priority: "medium",
-          execution: "open_target",
-          label: "设置二轮对照",
-          detail: "修完后再记录一轮数据，用前后变化判断是不是修对了。",
-          href: "#publish-effect-panel",
-        },
-      ]),
+      tasks,
+      nextPlan: buildPlatformStrategyReviewPlan(pack, "repair", tasks),
     };
   }
 
   if (recommendation === "avoid") {
+    const tasks = rankPlatformStrategyReviewTasks(pack, [
+      {
+        id: "demote-platform",
+        priority: "high",
+        execution: "open_target",
+        label: "降为观察平台",
+        detail: `${pack.platformName} 暂时不吃主资源，只保留必要记录。`,
+        href: "#platform-strategy-ranking",
+      },
+      {
+        id: "pick-stronger-platform",
+        priority: "high",
+        execution: "open_target",
+        label: "选择高胜率平台",
+        detail: "从排行榜前三里选更适合当前题材和数据的平台继续推进。",
+        href: "#platform-strategy-ranking",
+      },
+      {
+        id: "reuse-transferable-assets",
+        priority: "medium",
+        execution: "generate_asset_variants",
+        label: "复用可迁移素材",
+        detail: "保留能复用的卖点和简介，按新平台口味重组表达。",
+        href: "#submission-asset-editor",
+      },
+    ]);
     return {
       kind: "pivot",
       label: "换个打法",
       detail: "当前平台胜率靠后，不值得继续烧主资源。",
       action: "把它降为观察平台，回排行榜选择更高胜率主战场。",
       history,
-      tasks: rankPlatformStrategyReviewTasks(pack, [
-        {
-          id: "demote-platform",
-          priority: "high",
-          execution: "open_target",
-          label: "降为观察平台",
-          detail: `${pack.platformName} 暂时不吃主资源，只保留必要记录。`,
-          href: "#platform-strategy-ranking",
-        },
-        {
-          id: "pick-stronger-platform",
-          priority: "high",
-          execution: "open_target",
-          label: "选择高胜率平台",
-          detail: "从排行榜前三里选更适合当前题材和数据的平台继续推进。",
-          href: "#platform-strategy-ranking",
-        },
-        {
-          id: "reuse-transferable-assets",
-          priority: "medium",
-          execution: "generate_asset_variants",
-          label: "复用可迁移素材",
-          detail: "保留能复用的卖点和简介，按新平台口味重组表达。",
-          href: "#submission-asset-editor",
-        },
-      ]),
+      tasks,
+      nextPlan: buildPlatformStrategyReviewPlan(pack, "pivot", tasks),
     };
   }
 
+  const tasks = rankPlatformStrategyReviewTasks(pack, [
+    {
+      id: "adjust-one-variable",
+      priority: "high",
+      execution: "generate_asset_variants",
+      label: "只改一个变量",
+      detail: "优先只改标题、简介、标签或前三章钩子中的一项，别一次全改到无法归因。",
+      href: "#submission-asset-editor",
+    },
+    {
+      id: "archive-iteration-version",
+      priority: "medium",
+      execution: "save_snapshot",
+      label: "保存迭代版本",
+      detail: "把本轮改动归档，下一轮才能知道到底是哪一刀生效。",
+      href: "#package-version-history",
+    },
+    {
+      id: "compare-next-metrics",
+      priority: "medium",
+      execution: "open_target",
+      label: "复盘下一轮数据",
+      detail: "记录新一轮曝光、点击、收藏和追读，再决定加码还是换方向。",
+      href: "#publish-effect-panel",
+    },
+  ]);
   return {
     kind: "iterate",
     label: "小步迭代",
     detail: "数据还没差到要撤，也没好到能猛冲。",
     action: "做一轮小改动，再记录下一轮数据对照。",
     history,
-    tasks: rankPlatformStrategyReviewTasks(pack, [
-      {
-        id: "adjust-one-variable",
-        priority: "high",
-        execution: "generate_asset_variants",
-        label: "只改一个变量",
-        detail: "优先只改标题、简介、标签或前三章钩子中的一项，别一次全改到无法归因。",
-        href: "#submission-asset-editor",
-      },
-      {
-        id: "archive-iteration-version",
-        priority: "medium",
-        execution: "save_snapshot",
-        label: "保存迭代版本",
-        detail: "把本轮改动归档，下一轮才能知道到底是哪一刀生效。",
-        href: "#package-version-history",
-      },
-      {
-        id: "compare-next-metrics",
-        priority: "medium",
-        execution: "open_target",
-        label: "复盘下一轮数据",
-        detail: "记录新一轮曝光、点击、收藏和追读，再决定加码还是换方向。",
-        href: "#publish-effect-panel",
-      },
-    ]),
+    tasks,
+    nextPlan: buildPlatformStrategyReviewPlan(pack, "iterate", tasks),
   };
 }
 

@@ -563,6 +563,11 @@ test("buildPlatformPublishExportCenter", async (t) => {
     assert.equal(firstTask.id, "fix-submission-asset");
     assert.equal(firstTask.rankTarget, "asset");
     assert.ok(firstTask.rankReason.includes("投稿资产"));
+    assert.equal(center.platformStrategy[0].reviewDecision.nextPlan.steps[0].taskId, firstTask.id);
+    assert.equal(center.platformStrategy[0].reviewDecision.nextPlan.steps[0].dayLabel, "今天");
+    assert.equal(center.platformStrategy[0].reviewDecision.nextPlan.steps[2].dayLabel, "第7天");
+    assert.equal(center.platformStrategy[0].reviewDecision.nextPlan.steps[2].href, "#platform-strategy-ranking");
+    assert.ok(center.platformStrategy[0].reviewDecision.nextPlan.checkpoint.includes("第 7 天"));
   });
 
   await t.test("scores platform submission asset fields", () => {
@@ -1004,6 +1009,12 @@ test("buildPlatformPublishExportCenter", async (t) => {
         detail: "数据还没差到要撤，也没好到能猛冲。",
         action: "做一轮小改动，再记录下一轮数据对照。",
         tasks: [],
+        nextPlan: {
+          headline: "七猫 下一轮计划：小步改、留证据、第 7 天再判断。",
+          cadence: "seven_day" as const,
+          checkpoint: "第 7 天必须看策略分、真实数据和版本对照，再决定加码/迭代/修打法/撤退。",
+          steps: [],
+        },
         history: [],
       },
       verdict: "七猫可以继续加码，但先补齐短板。",

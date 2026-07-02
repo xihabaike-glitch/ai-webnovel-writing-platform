@@ -370,6 +370,7 @@ interface PlatformStrategyReviewDecision {
   detail: string;
   action: string;
   tasks: PlatformStrategyReviewTask[];
+  nextPlan: PlatformStrategyReviewPlan;
   history: PlatformStrategyReviewHistoryItem[];
 }
 
@@ -391,6 +392,23 @@ interface PlatformStrategyReviewHistoryItem {
   detail: string;
   createdAt: string;
   href: string;
+}
+
+interface PlatformStrategyReviewPlan {
+  headline: string;
+  cadence: "three_step" | "seven_day";
+  checkpoint: string;
+  steps: PlatformStrategyReviewPlanStep[];
+}
+
+interface PlatformStrategyReviewPlanStep {
+  id: string;
+  dayLabel: "今天" | "48小时内" | "第7天";
+  taskId: string;
+  label: string;
+  detail: string;
+  href: string;
+  expectedSignal: string;
 }
 
 interface PlatformStrategyReviewTaskReceipt {
@@ -1852,6 +1870,34 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
                               </button>
                             </div>
                           ))}
+                        </div>
+                      ) : null}
+                      {item.reviewDecision.nextPlan.steps.length ? (
+                        <div className="mt-3 border-t border-slate-100 pt-2">
+                          <div className="font-medium text-slate-800">{item.reviewDecision.nextPlan.headline}</div>
+                          <div className="mt-2 grid gap-1.5">
+                            {item.reviewDecision.nextPlan.steps.map((step) => (
+                              <a
+                                className="block rounded-md bg-slate-50 p-2 hover:bg-slate-100"
+                                href={step.href}
+                                key={step.id}
+                              >
+                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                  <span className="font-medium text-slate-800">{step.label}</span>
+                                  <span className="rounded-md bg-white px-1.5 py-0.5 text-[11px] font-medium text-slate-600">
+                                    {step.dayLabel}
+                                  </span>
+                                </div>
+                                <div className="mt-1 leading-5 text-slate-500">{step.detail}</div>
+                                <div className="mt-1 rounded-md bg-white px-2 py-1 leading-5 text-slate-500">
+                                  验收：{step.expectedSignal}
+                                </div>
+                              </a>
+                            ))}
+                          </div>
+                          <div className="mt-2 rounded-md bg-white px-2 py-1 leading-5 text-slate-500">
+                            复盘点：{item.reviewDecision.nextPlan.checkpoint}
+                          </div>
                         </div>
                       ) : null}
                       {item.reviewDecision.history.length ? (

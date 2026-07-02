@@ -27,6 +27,7 @@ test("buildModelTaskAuditDashboard", async (t) => {
       {
         id: "task-1",
         taskType: "chapter_draft",
+        providerConfigId: "mock-provider",
         model: "mock-novel",
         status: "succeeded",
         inputTokens: 1000,
@@ -108,6 +109,7 @@ test("buildModelTaskAuditDashboard", async (t) => {
       {
         id: "task-2",
         taskType: "chapter_review",
+        providerConfigId: "mock-provider",
         model: "mock-novel",
         status: "succeeded",
         inputTokens: 1200,
@@ -122,6 +124,7 @@ test("buildModelTaskAuditDashboard", async (t) => {
       {
         id: "task-3",
         taskType: "chapter_review",
+        providerConfigId: "mock-provider",
         model: "mock-novel",
         status: "succeeded",
         inputTokens: 1100,
@@ -133,7 +136,13 @@ test("buildModelTaskAuditDashboard", async (t) => {
         modelProvider: { providerId: "mock", displayName: "Mock" },
         chapter: { title: "第二章" },
       },
-    ], [providers[0]]);
+    ], [providers[0]], null, [
+      {
+        taskType: "chapter_review",
+        primaryProviderConfigId: "mock-provider",
+        fallbackProviderConfigId: null,
+      },
+    ]);
 
     assert.equal(dashboard.status, "healthy");
     assert.equal(dashboard.score, 100);
@@ -146,6 +155,9 @@ test("buildModelTaskAuditDashboard", async (t) => {
     assert.equal(reviewEffect?.recommendation, "prefer");
     assert.equal(reviewEffect?.averageQualityScore, 88);
     assert.equal(reviewEffect?.averageCostPerSucceededTaskUsd, 0.0055);
+    const reviewRoute = dashboard.routeRecommendations.find((recommendation) => recommendation.taskType === "chapter_review");
+    assert.equal(reviewRoute?.status, "current");
+    assert.equal(reviewRoute?.primaryProviderName, "Mock · mock-novel");
     assert.equal(dashboard.recentFailures.length, 0);
   });
 });

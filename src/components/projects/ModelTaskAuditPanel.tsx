@@ -59,6 +59,23 @@ interface ModelEffectComparisonRow {
   reason: string;
 }
 
+interface RouteRecommendationView {
+  taskType: string;
+  label: string;
+  status: "ready" | "current" | "insufficient";
+  recommendedPrimaryProviderConfigId: string | null;
+  recommendedFallbackProviderConfigId: string | null;
+  currentPrimaryProviderConfigId: string | null;
+  currentFallbackProviderConfigId: string | null;
+  primaryProviderName: string;
+  fallbackProviderName: string | null;
+  sampleTasks: number;
+  successRatePercent: number;
+  averageQualityScore: number;
+  averageCostPerSucceededTaskUsd: number;
+  reason: string;
+}
+
 interface ModelTaskAuditDashboard {
   status: "healthy" | "watch" | "waste";
   score: number;
@@ -112,6 +129,7 @@ interface ModelTaskAuditDashboard {
   providerRows: ProviderAuditRow[];
   taskTypeRows: TaskTypeAuditRow[];
   modelEffectRows: ModelEffectComparisonRow[];
+  routeRecommendations: RouteRecommendationView[];
   recentFailures: RecentFailure[];
   riskFlags: string[];
   nextActions: string[];
@@ -136,6 +154,18 @@ function recommendationLabel(value: ModelEffectComparisonRow["recommendation"]) 
   if (value === "avoid") return "暂停";
   if (value === "insufficient") return "补样本";
   return "观察";
+}
+
+function routeStatusLabel(value: RouteRecommendationView["status"]) {
+  if (value === "ready") return "建议调整";
+  if (value === "current") return "已采用";
+  return "补样本";
+}
+
+function routeStatusClass(value: RouteRecommendationView["status"]) {
+  if (value === "ready") return "bg-cyan-50 text-cyan-700";
+  if (value === "current") return "bg-emerald-50 text-emerald-700";
+  return "bg-slate-100 text-slate-600";
 }
 
 function budgetStatusClass(status: ModelTaskAuditDashboard["budgetCenter"]["status"]) {
@@ -379,6 +409,39 @@ export function ModelTaskAuditPanel({ projectId }: { projectId: string }) {
                 {isSavingBudget ? "保存中" : "保存"}
               </button>
             </form>
+          </div>
+
+          <div className="rounded-md border border-slate-200 p-3">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div className="font-medium text-slate-950">推荐模型路线</div>
+              <a className="text-sm font-medium text-slate-600 hover:text-slate-950" href="/settings/models">
+                去模型设置应用
+              </a>
+            </div>
+            <div className="mt-3 grid gap-2 lg:grid-cols-2">
+              {dashboard.routeRecommendations.slice(0, 6).map((recommendation) => (
+                <div className="rounded-md bg-slate-50 p-3 text-sm" key={recommendation.taskType}>
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div>
+                      <div className="font-medium text-slate-950">{recommendation.label}</div>
+                      <div className="mt-1 text-xs text-slate-500">首选：{recommendation.primaryProviderName}</div>
+                      <div className="mt-1 text-xs text-slate-500">备用：{recommendation.fallbackProviderName ?? "暂无"}</div>
+                    </div>
+                    <span className={`rounded-md px-2 py-1 text-xs font-medium ${routeStatusClass(recommendation.status)}`}>
+                      {routeStatusLabel(recommendation.status)}
+                    </span>
+                  </div>
+                  <div className="mt-2 grid grid-cols-2 gap-2 text-slate-600 sm:grid-cols-4">
+                    <div>样本 {recommendation.sampleTasks}</div>
+                    <div>成功 {recommendation.successRatePercent}%</div>
+                    <div>质量 {recommendation.averageQualityScore || "缺"}</div>
+                    <div>{usd(recommendation.averageCostPerSucceededTaskUsd)}/次</div>
+                  </div>
+                  <p className="mt-2 leading-6 text-slate-600">{recommendation.reason}</p>
+                </div>
+              ))}
+              {dashboard.routeRecommendations.length === 0 ? <p className="text-sm text-slate-600">还没有模型路线样本。</p> : null}
+            </div>
           </div>
 
           <div className="grid gap-4 lg:grid-cols-[1fr_1.2fr]">

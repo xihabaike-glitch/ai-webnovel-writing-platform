@@ -24,7 +24,7 @@ export async function GET(_request: Request, { params }: Params) {
     return NextResponse.json({ error: "Project not found" }, { status: 404 });
   }
 
-  const [tasks, providers, chapters] = await Promise.all([
+  const [tasks, providers, routes, chapters] = await Promise.all([
     prisma.aiTask.findMany({
       where: { projectId },
       include: {
@@ -41,6 +41,14 @@ export async function GET(_request: Request, { params }: Params) {
     prisma.modelProvider.findMany({
       orderBy: [{ enabled: "desc" }, { updatedAt: "desc" }],
     }),
+    prisma.modelTaskRoute.findMany({
+      orderBy: { taskType: "asc" },
+      select: {
+        taskType: true,
+        primaryProviderConfigId: true,
+        fallbackProviderConfigId: true,
+      },
+    }),
     prisma.chapter.findMany({
       where: { projectId },
       select: { id: true, title: true },
@@ -56,6 +64,7 @@ export async function GET(_request: Request, { params }: Params) {
       })),
       providers,
       project,
+      routes,
     ),
   });
 }

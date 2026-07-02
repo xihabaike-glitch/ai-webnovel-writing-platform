@@ -1,8 +1,10 @@
 import { buildModelBudgetGuard, normalizeModelBudgetSettings, type ModelBudgetRepairAction, type ModelBudgetSettings } from "./modelBudget.ts";
+import { buildRouteRecommendations, type RouteRecommendation } from "../model-gateway/routeRecommendations.ts";
 
 export interface ModelAuditTask {
   id: string;
   taskType: string;
+  providerConfigId?: string;
   model: string;
   status: string;
   inputSnapshot?: string | null;
@@ -28,6 +30,12 @@ export interface ModelAuditProvider {
   defaultModel: string;
   enabled: boolean;
   encryptedApiKey: string | null;
+}
+
+export interface ModelAuditRoute {
+  taskType: string;
+  primaryProviderConfigId: string | null;
+  fallbackProviderConfigId: string | null;
 }
 
 export interface ProviderAuditRow {
@@ -134,6 +142,7 @@ export interface ModelTaskAuditDashboard {
   providerRows: ProviderAuditRow[];
   taskTypeRows: TaskTypeAuditRow[];
   modelEffectRows: ModelEffectComparisonRow[];
+  routeRecommendations: RouteRecommendation[];
   recentFailures: RecentFailure[];
   riskFlags: string[];
   nextActions: string[];
@@ -531,6 +540,7 @@ export function buildModelTaskAuditDashboard(
   tasks: ModelAuditTask[],
   providers: ModelAuditProvider[],
   budgetSettings?: ModelBudgetSettings | null,
+  routes: ModelAuditRoute[] = [],
 ): ModelTaskAuditDashboard {
   const succeededTasks = tasks.filter((task) => task.status === "succeeded").length;
   const failedTasks = tasks.filter((task) => task.status === "failed").length;
@@ -561,6 +571,22 @@ export function buildModelTaskAuditDashboard(
   const providerRows = buildProviderRows(tasks);
   const taskTypeRows = buildTaskTypeRows(tasks);
   const modelEffectRows = buildModelEffectRows(tasks);
+  const routeRecommendations = buildRouteRecommendations(
+    tasks
+      .filter((task) => task.providerConfigId)
+      .map((task) => ({
+        id: task.id,
+        taskType: task.taskType,
+        providerConfigId: task.providerConfigId as string,
+        status: task.status,
+        inputTokens: task.inputTokens,
+        outputTokens: task.outputTokens,
+        costUsd: task.costUsd,
+        outputText: task.outputText ?? null,
+      })),
+    routes,
+    providers,
+  );
   const budgetCenter = buildBudgetCenter(tasks, summary, taskTypeRows, budgetSettings);
   const score = auditScore(summary, providerReadiness);
   const status = statusFor(score);
@@ -575,6 +601,7 @@ export function buildModelTaskAuditDashboard(
     providerRows,
     taskTypeRows,
     modelEffectRows,
+    routeRecommendations,
     recentFailures: buildRecentFailures(tasks),
     riskFlags: buildRiskFlags(summary, providerReadiness),
     nextActions: buildNextActions(summary, providerRows, taskTypeRows, modelEffectRows, providerReadiness),

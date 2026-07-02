@@ -505,6 +505,28 @@ interface PlatformStrategySwitchPlan {
   steps: PlatformStrategySwitchStep[];
 }
 
+interface PlatformStrategyAutoVerdictItem {
+  platformId: string;
+  platformName: string;
+  role: "primary" | "backup" | "blocked";
+  recommendation: PlatformStrategyRankItem["recommendation"];
+  score: number;
+  evidenceScore: number;
+  reason: string;
+  action: string;
+  href: string;
+}
+
+interface PlatformStrategyAutoVerdict {
+  status: "ready" | "needs_evidence" | "needs_repair";
+  headline: string;
+  nextAction: string;
+  primary: PlatformStrategyAutoVerdictItem | null;
+  backups: PlatformStrategyAutoVerdictItem[];
+  blocked: PlatformStrategyAutoVerdictItem[];
+  rationale: string[];
+}
+
 interface PlatformStrategyExecutionReceipt {
   stepId: string;
   platformId: string;
@@ -522,6 +544,7 @@ interface PlatformPublishExportCenter {
   totalPublishableChapters: number;
   workspace: PlatformPublishWorkspace;
   platformStrategy: PlatformStrategyRankItem[];
+  strategyVerdict: PlatformStrategyAutoVerdict;
   activeStrategyPlan: PlatformStrategySwitchPlan | null;
 }
 
@@ -704,6 +727,30 @@ function strategyRecommendationClass(recommendation: PlatformStrategyRankItem["r
   if (recommendation === "repair") return "bg-rose-50 text-rose-700";
   if (recommendation === "avoid") return "bg-slate-100 text-slate-600";
   return "bg-amber-50 text-amber-700";
+}
+
+function strategyVerdictStatusClass(status: PlatformStrategyAutoVerdict["status"]) {
+  if (status === "ready") return "bg-emerald-50 text-emerald-700";
+  if (status === "needs_repair") return "bg-rose-50 text-rose-700";
+  return "bg-amber-50 text-amber-700";
+}
+
+function strategyVerdictStatusLabel(status: PlatformStrategyAutoVerdict["status"]) {
+  if (status === "ready") return "可裁决";
+  if (status === "needs_repair") return "先修";
+  return "补证据";
+}
+
+function strategyVerdictRoleLabel(role: PlatformStrategyAutoVerdictItem["role"]) {
+  if (role === "primary") return "主推";
+  if (role === "backup") return "备选";
+  return "降权";
+}
+
+function strategyVerdictRoleClass(role: PlatformStrategyAutoVerdictItem["role"]) {
+  if (role === "primary") return "bg-slate-950 text-white";
+  if (role === "backup") return "bg-cyan-50 text-cyan-700";
+  return "bg-slate-100 text-slate-600";
 }
 
 function strategyReviewDecisionClass(kind: PlatformStrategyReviewDecision["kind"]) {
@@ -1923,6 +1970,96 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
               ))}
             </div>
           ) : null}
+          <div className="mt-3 rounded-md border border-slate-200 p-3" id="platform-strategy-verdict">
+            <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
+              <div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="font-medium text-slate-950">平台策略自动裁决</div>
+                  <span className={`rounded-md px-2 py-1 text-[11px] font-medium ${strategyVerdictStatusClass(center.strategyVerdict.status)}`}>
+                    {strategyVerdictStatusLabel(center.strategyVerdict.status)}
+                  </span>
+                </div>
+                <p className="mt-1 text-sm leading-6 text-slate-600">{center.strategyVerdict.headline}</p>
+                <div className="mt-2 rounded-md bg-slate-50 px-2 py-1 text-xs leading-5 text-slate-600">
+                  下一刀：{center.strategyVerdict.nextAction}
+                </div>
+              </div>
+              {center.strategyVerdict.primary ? (
+                <button
+                  className="w-fit rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white disabled:opacity-50"
+                  disabled={Boolean(applyingStrategyPlatformId)}
+                  onClick={() => {
+                    const target = center.platformStrategy.find((strategy) => strategy.platformId === center.strategyVerdict.primary?.platformId);
+                    if (target) void applyPlatformStrategy(target);
+                  }}
+                  type="button"
+                >
+                  {applyingStrategyPlatformId === center.strategyVerdict.primary.platformId ? "应用中" : "应用主平台裁决"}
+                </button>
+              ) : null}
+            </div>
+            <div className="mt-3 grid gap-2 lg:grid-cols-3">
+              {center.strategyVerdict.primary ? (
+                <div className="rounded-md bg-slate-50 p-3 text-sm">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="font-medium text-slate-950">{center.strategyVerdict.primary.platformName}</span>
+                    <span className={`rounded-md px-2 py-1 text-[11px] font-medium ${strategyVerdictRoleClass(center.strategyVerdict.primary.role)}`}>
+                      {strategyVerdictRoleLabel(center.strategyVerdict.primary.role)}
+                    </span>
+                  </div>
+                  <div className="mt-2 grid grid-cols-2 gap-2 text-xs text-slate-500">
+                    <div>策略分 <span className="font-medium text-slate-950">{center.strategyVerdict.primary.score}</span></div>
+                    <div>证据分 <span className="font-medium text-slate-950">{center.strategyVerdict.primary.evidenceScore}</span></div>
+                  </div>
+                  <p className="mt-2 leading-6 text-slate-600">{center.strategyVerdict.primary.reason}</p>
+                  <div className="mt-2 rounded-md bg-white px-2 py-1 text-xs leading-5 text-slate-500">
+                    {center.strategyVerdict.primary.action}
+                  </div>
+                </div>
+              ) : null}
+              <div className="rounded-md bg-slate-50 p-3 text-sm">
+                <div className="font-medium text-slate-950">备选平台</div>
+                <div className="mt-2 grid gap-1.5">
+                  {center.strategyVerdict.backups.length ? center.strategyVerdict.backups.map((item) => (
+                    <div className="rounded-md bg-white p-2" key={item.platformId}>
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <span className="font-medium text-slate-800">{item.platformName}</span>
+                        <span className={`rounded-md px-1.5 py-0.5 text-[11px] font-medium ${strategyVerdictRoleClass(item.role)}`}>
+                          {strategyVerdictRoleLabel(item.role)} · {item.score}
+                        </span>
+                      </div>
+                      <div className="mt-1 leading-5 text-slate-500">{item.reason}</div>
+                    </div>
+                  )) : (
+                    <div className="rounded-md bg-white p-2 text-xs leading-5 text-slate-500">暂无合格备选，先把主平台证据链跑完。</div>
+                  )}
+                </div>
+              </div>
+              <div className="rounded-md bg-slate-50 p-3 text-sm">
+                <div className="font-medium text-slate-950">降权/禁投</div>
+                <div className="mt-2 grid gap-1.5">
+                  {center.strategyVerdict.blocked.length ? center.strategyVerdict.blocked.map((item) => (
+                    <div className="rounded-md bg-white p-2" key={item.platformId}>
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <span className="font-medium text-slate-800">{item.platformName}</span>
+                        <span className={`rounded-md px-1.5 py-0.5 text-[11px] font-medium ${strategyVerdictRoleClass(item.role)}`}>
+                          {strategyVerdictRoleLabel(item.role)} · {item.score}
+                        </span>
+                      </div>
+                      <div className="mt-1 leading-5 text-slate-500">{item.action}</div>
+                    </div>
+                  )) : (
+                    <div className="rounded-md bg-white p-2 text-xs leading-5 text-slate-500">暂时没有必须禁投的平台。</div>
+                  )}
+                </div>
+              </div>
+            </div>
+            <div className="mt-3 grid gap-1 text-xs text-slate-500">
+              {center.strategyVerdict.rationale.map((line) => (
+                <div key={line}>依据：{line}</div>
+              ))}
+            </div>
+          </div>
           {center.platformStrategy.length ? (
             <div className="mt-3 rounded-md border border-slate-200 p-3" id="platform-strategy-ranking">
               <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">

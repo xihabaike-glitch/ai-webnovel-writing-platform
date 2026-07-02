@@ -89,6 +89,10 @@ test("buildPlatformPublishExportCenter", async (t) => {
     assert.ok(center.workspace.nextActions.some((action) => action.kind === "run_chapter_review"));
     assert.equal(center.platformStrategy.length, platformProfiles.length);
     assert.equal(center.platformStrategy[0].rank, 1);
+    assert.equal(center.strategyVerdict.status, "needs_evidence");
+    assert.equal(center.strategyVerdict.primary?.platformId, center.platformStrategy[0].platformId);
+    assert.ok(center.strategyVerdict.nextAction.includes("缺") || center.strategyVerdict.nextAction.includes("录入"));
+    assert.ok(center.strategyVerdict.rationale.some((line) => line.includes("主平台")));
     assert.equal(center.activeStrategyPlan?.platformId, "fanqie");
     assert.equal(center.activeStrategyPlan?.progress.status, "in_progress");
     assert.equal(center.activeStrategyPlan?.steps[0].status, "done");
@@ -450,6 +454,10 @@ test("buildPlatformPublishExportCenter", async (t) => {
     assert.ok(top.score > center.platformStrategy[1].score);
     assert.ok(["focus", "grow"].includes(top.recommendation));
     assert.equal(top.reviewDecision.kind, "scale");
+    assert.equal(center.strategyVerdict.status, "ready");
+    assert.equal(center.strategyVerdict.primary?.platformId, "qimao");
+    assert.ok(center.strategyVerdict.headline.includes("主推"));
+    assert.ok(center.strategyVerdict.backups.length <= 2);
     assert.ok(top.reviewDecision.tasks.some((task) => task.id === "archive-winning-version" && task.priority === "high"));
     assert.equal(top.reviewDecision.tasks.find((task) => task.id === "keep-main-platform")?.execution, "apply_strategy");
     assert.ok(top.reasons.some((reason) => reason.includes("二轮对照 improved")));

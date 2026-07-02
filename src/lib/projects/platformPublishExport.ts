@@ -490,6 +490,28 @@ export interface PlatformStrategySwitchPlan {
   steps: PlatformStrategySwitchStep[];
 }
 
+export interface PlatformStrategyAutoVerdictItem {
+  platformId: PlatformId;
+  platformName: string;
+  role: "primary" | "backup" | "blocked";
+  recommendation: PlatformStrategyRankItem["recommendation"];
+  score: number;
+  evidenceScore: number;
+  reason: string;
+  action: string;
+  href: string;
+}
+
+export interface PlatformStrategyAutoVerdict {
+  status: "ready" | "needs_evidence" | "needs_repair";
+  headline: string;
+  nextAction: string;
+  primary: PlatformStrategyAutoVerdictItem | null;
+  backups: PlatformStrategyAutoVerdictItem[];
+  blocked: PlatformStrategyAutoVerdictItem[];
+  rationale: string[];
+}
+
 export interface PlatformStrategyExecutionReceipt {
   stepId: PlatformStrategySwitchStep["id"] | "adopt-submission-asset" | "save-publish-effect";
   platformId: PlatformId;
@@ -507,6 +529,7 @@ export interface PlatformPublishExportCenter {
   totalPublishableChapters: number;
   workspace: PlatformPublishWorkspace;
   platformStrategy: PlatformStrategyRankItem[];
+  strategyVerdict: PlatformStrategyAutoVerdict;
   activeStrategyPlan: PlatformStrategySwitchPlan | null;
 }
 
@@ -1603,6 +1626,87 @@ function buildPlatformStrategy(packages: PlatformPublishPackage[]): PlatformStra
       || left.platformName.localeCompare(right.platformName)
     ))
     .map((item, index) => ({ ...item, rank: index + 1 }));
+}
+
+function verdictItem(
+  item: PlatformStrategyRankItem,
+  role: PlatformStrategyAutoVerdictItem["role"],
+): PlatformStrategyAutoVerdictItem {
+  const ledger = item.reviewDecision.evidenceLedger;
+  const reason = role === "primary"
+    ? `${item.platformName} 排名第 ${item.rank}，策略分 ${item.score}，证据分 ${ledger.score}。`
+    : role === "backup"
+      ? `${item.platformName} 可做备选，分差可控，但别抢主资源。`
+      : `${item.platformName} 当前胜率不够，继续投入容易扩大低质样本。`;
+
+  return {
+    platformId: item.platformId,
+    platformName: item.platformName,
+    role,
+    recommendation: item.recommendation,
+    score: item.score,
+    evidenceScore: ledger.score,
+    reason,
+    action: ledger.status === "ready" ? item.nextAction : ledger.missingSignals[0] ?? item.nextAction,
+    href: item.href,
+  };
+}
+
+function buildPlatformStrategyAutoVerdict(platformStrategy: PlatformStrategyRankItem[]): PlatformStrategyAutoVerdict {
+  const primary = platformStrategy[0] ?? null;
+  const backups = platformStrategy
+    .slice(1)
+    .filter((item) => item.recommendation !== "avoid" && item.score >= 52)
+    .slice(0, 2)
+    .map((item) => verdictItem(item, "backup"));
+  const blocked = platformStrategy
+    .filter((item) => item.recommendation === "avoid" || item.score < 52 || item.reviewDecision.evidenceLedger.status === "empty")
+    .slice(0, 3)
+    .map((item) => verdictItem(item, "blocked"));
+
+  if (!primary) {
+    return {
+      status: "needs_evidence",
+      headline: "还没有平台策略样本，先把发布包和数据补起来。",
+      nextAction: "先完成平台发布包质检，再录入真实效果。",
+      primary: null,
+      backups: [],
+      blocked: [],
+      rationale: ["缺少平台策略排行，无法做主战场裁决。"],
+    };
+  }
+
+  const primaryLedger = primary.reviewDecision.evidenceLedger;
+  const status: PlatformStrategyAutoVerdict["status"] = primary.reviewDecision.kind === "repair"
+    ? "needs_repair"
+    : primaryLedger.status === "ready" && primary.score >= 68
+      ? "ready"
+      : "needs_evidence";
+  const headline = status === "ready"
+    ? `主推 ${primary.platformName}，但只按证据链加码，别到处撒网。`
+    : status === "needs_repair"
+      ? `${primary.platformName} 暂列第一也别飘，先修入口和前三章。`
+      : `${primary.platformName} 暂列第一，但证据还薄，先补账本再裁决。`;
+  const nextAction = status === "ready"
+    ? primary.nextAction
+    : status === "needs_repair"
+      ? primary.reviewDecision.tasks[0]?.detail ?? primary.nextAction
+      : primaryLedger.missingSignals[0] ?? primary.nextAction;
+  const rationale = [
+    `主平台：${primary.platformName}｜策略分 ${primary.score}｜证据分 ${primaryLedger.score}。`,
+    `裁决：${primary.reviewDecision.label}｜${primary.reviewDecision.detail}`,
+    primary.risks.length ? `最大风险：${primary.risks[0]}` : `主要依据：${primary.reasons[0] ?? "平台综合分最高"}`,
+  ];
+
+  return {
+    status,
+    headline,
+    nextAction,
+    primary: verdictItem(primary, "primary"),
+    backups,
+    blocked,
+    rationale,
+  };
 }
 
 function buildPlatformStrategyProgressSummary(
@@ -2771,6 +2875,7 @@ export function buildPlatformPublishExportCenter(input: PlatformPublishExportInp
   const platforms = input.platforms ?? platformProfiles;
   const packages = platforms.map((platform) => buildPlatformPackage(input, platform));
   const platformStrategy = buildPlatformStrategy(packages);
+  const strategyVerdict = buildPlatformStrategyAutoVerdict(platformStrategy);
   const activeStrategy = platformStrategy.find((strategy) => strategy.platformId === input.targetPlatform.id) ?? null;
   const activePackage = packages.find((pack) => pack.platformId === input.targetPlatform.id);
 
@@ -2780,6 +2885,7 @@ export function buildPlatformPublishExportCenter(input: PlatformPublishExportInp
     totalPublishableChapters: publishableChapters(input.chapters).length,
     workspace: buildPublishWorkspace(packages),
     platformStrategy,
+    strategyVerdict,
     activeStrategyPlan: activeStrategy
       ? buildPlatformStrategySwitchPlan(activeStrategy, input.targetPlatform, activePackage)
       : null,

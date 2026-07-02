@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { trimGateActionReceipts, type GateActionReceipt } from "@/lib/projects/gateActionReceipts";
 import type { PrePublishGateAction } from "@/lib/projects/prePublishGate";
@@ -11,6 +12,11 @@ const storageKey = "ai-webnovel-gate-action-receipts";
 function receiptStatusClass(status: GateActionReceipt["status"]) {
   if (status === "succeeded") return "bg-emerald-50 text-emerald-700";
   return "bg-rose-50 text-rose-700";
+}
+
+function recheckClass(status: GateActionReceipt["recheck"]["status"]) {
+  if (status === "ready") return "border-emerald-200 bg-emerald-50 text-emerald-800";
+  return "border-rose-200 bg-rose-50 text-rose-800";
 }
 
 function executionLabel(type: GateActionReceipt["executionType"]) {
@@ -41,7 +47,9 @@ function saveReceipts(receipts: GateActionReceipt[]) {
 }
 
 export function GateActionWorkspace({ actions }: { actions: PrePublishGateAction[] }) {
+  const router = useRouter();
   const [receipts, setReceipts] = useState<GateActionReceipt[]>([]);
+  const latestReceipt = receipts[0] ?? null;
 
   useEffect(() => {
     setReceipts(loadReceipts());
@@ -87,6 +95,32 @@ export function GateActionWorkspace({ actions }: { actions: PrePublishGateAction
             </button>
           ) : null}
         </div>
+        {latestReceipt ? (
+          <div className={`mt-3 rounded-md border p-3 text-sm ${recheckClass(latestReceipt.recheck.status)}`}>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <div className="font-medium">{latestReceipt.recheck.label}</div>
+                <p className="mt-1 leading-6 opacity-85">{latestReceipt.recheck.detail}</p>
+              </div>
+              {latestReceipt.recheck.status === "ready" ? (
+                <button
+                  className="w-fit shrink-0 rounded-md bg-white px-3 py-2 text-xs font-medium text-slate-950"
+                  onClick={() => router.refresh()}
+                  type="button"
+                >
+                  {latestReceipt.recheck.actionLabel}
+                </button>
+              ) : (
+                <Link
+                  className="w-fit shrink-0 rounded-md bg-white px-3 py-2 text-xs font-medium text-slate-950"
+                  href={latestReceipt.href}
+                >
+                  {latestReceipt.recheck.actionLabel}
+                </Link>
+              )}
+            </div>
+          </div>
+        ) : null}
         <div className="mt-3 grid gap-2">
           {receipts.map((receipt) => (
             <div className="rounded-md border border-slate-200 bg-white p-3 text-sm" key={receipt.id}>

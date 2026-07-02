@@ -34,6 +34,12 @@ export interface GateActionReceipt {
   succeededCount: number;
   failedCount: number;
   taskId: string | null;
+  recheck: {
+    status: "ready" | "blocked";
+    label: string;
+    detail: string;
+    actionLabel: string;
+  };
   createdAt: string;
 }
 
@@ -72,6 +78,55 @@ function receiptMessage(input: {
   return "已打开处理位置。";
 }
 
+function recheckHint(input: {
+  action: PrePublishGateAction;
+  status: GateActionReceipt["status"];
+  message: string;
+}): GateActionReceipt["recheck"] {
+  if (input.status === "failed") {
+    return {
+      status: "blocked",
+      label: "先处理失败原因",
+      detail: input.message,
+      actionLabel: "打开相关位置",
+    };
+  }
+
+  if (input.action.execution?.type === "publish_repair") {
+    return {
+      status: "ready",
+      label: "重新质检发布包",
+      detail: "发布修复已完成，刷新总闸门后确认发布包、前三章和审稿状态是否解除阻塞。",
+      actionLabel: "刷新总闸门",
+    };
+  }
+
+  if (input.action.execution?.type === "retry_task") {
+    return {
+      status: "ready",
+      label: "刷新失败复盘",
+      detail: "失败任务已重试，刷新后检查失败数量、可重试项和模型稳定性是否改善。",
+      actionLabel: "刷新总闸门",
+    };
+  }
+
+  if (input.action.execution?.type === "recommended_batch") {
+    return {
+      status: "ready",
+      label: "复检任务队列",
+      detail: "推荐批次已执行，刷新后确认生产任务、阻塞项和下一批策略是否变化。",
+      actionLabel: "刷新总闸门",
+    };
+  }
+
+  return {
+    status: "ready",
+    label: "复检处理结果",
+    detail: "处理位置已打开，完成人工编辑后回到这里刷新总闸门。",
+    actionLabel: "刷新总闸门",
+  };
+}
+
 export function buildGateActionReceipt(input: {
   action: PrePublishGateAction;
   payload?: GateActionReceiptPayload;
@@ -83,6 +138,12 @@ export function buildGateActionReceipt(input: {
   const counts = countStatus(payload);
   const createdAt = input.now ? new Date(input.now).toISOString() : new Date().toISOString();
   const taskId = payload.task?.id ?? payload.result?.taskId ?? payload.results?.find((result) => result.taskId)?.taskId ?? null;
+  const message = receiptMessage({
+    action: input.action,
+    payload,
+    status: input.status,
+    fallbackError: input.fallbackError,
+  });
 
   return {
     id: `${input.action.id}:${createdAt}`,
@@ -91,16 +152,16 @@ export function buildGateActionReceipt(input: {
     detail: input.action.detail,
     href: input.action.href,
     status: input.status,
-    message: receiptMessage({
-      action: input.action,
-      payload,
-      status: input.status,
-      fallbackError: input.fallbackError,
-    }),
+    message,
     executionType: input.action.execution?.type ?? "manual",
     succeededCount: counts.succeededCount,
     failedCount: counts.failedCount,
     taskId,
+    recheck: recheckHint({
+      action: input.action,
+      status: input.status,
+      message,
+    }),
     createdAt,
   };
 }

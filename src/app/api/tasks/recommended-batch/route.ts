@@ -7,6 +7,7 @@ import { prisma } from "@/lib/db/prisma";
 import { buildBatchRouteEffectSummary } from "@/lib/model-gateway/batchRouteEffectSummary";
 import { buildBatchExecutionSafety } from "@/lib/projects/batchExecutionSafety";
 import { getBatchExecutionStrategy } from "@/lib/projects/batchExecutionStrategy";
+import { findProjectStartTacticSummary } from "@/lib/projects/projectStartTactics";
 import { buildTaskQueueCenter } from "@/lib/projects/taskQueueCenter";
 import { buildTaskQueueExecutionPlan } from "@/lib/projects/taskQueueExecutionPlan";
 
@@ -20,6 +21,7 @@ export async function POST(request: Request) {
     include: {
       chapters: { orderBy: { order: "asc" } },
       aiTasks: { orderBy: { createdAt: "desc" } },
+      worldEntries: { orderBy: [{ type: "asc" }, { createdAt: "asc" }] },
     },
     orderBy: { updatedAt: "desc" },
   });
@@ -45,7 +47,8 @@ export async function POST(request: Request) {
     for (const projectId of plan.projectIds) {
       const project = projectsById.get(projectId);
       if (!project) continue;
-      for (const candidate of buildReviewPipelineQueue(project.chapters, project.aiTasks).candidates) {
+      const startTactic = findProjectStartTacticSummary(project.worldEntries);
+      for (const candidate of buildReviewPipelineQueue(project.chapters, project.aiTasks, 5, startTactic).candidates) {
         secondPassCandidates.set(candidate.chapterId, candidate);
       }
     }

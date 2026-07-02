@@ -71,6 +71,7 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
       include: {
         chapters: { orderBy: { order: "asc" } },
         aiTasks: { orderBy: { createdAt: "desc" } },
+        worldEntries: { orderBy: [{ type: "asc" }, { createdAt: "asc" }] },
       },
       orderBy: { updatedAt: "desc" },
     }),
@@ -349,6 +350,18 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
         <div className="mt-4 rounded-md border border-slate-200 bg-slate-50 p-3 text-sm">
           <div className="font-medium text-slate-950">{executionPlan.actionLabel}</div>
           <p className="mt-1 leading-6 text-slate-600">{executionPlan.detail}</p>
+          {executionPlan.strategyBases.length ? (
+            <div className="mt-3 grid gap-2 lg:grid-cols-2">
+              {executionPlan.strategyBases.map((basis) => (
+                <div className="rounded-md bg-white p-3 text-xs text-emerald-900" key={basis.title}>
+                  <div className="font-medium">首轮平台打法 · {basis.label}</div>
+                  <div className="mt-1">{basis.primaryTactic}</div>
+                  <div className="mt-1">开头：{basis.openingMove}</div>
+                  <div className="mt-1">验证：{basis.verificationMove}</div>
+                </div>
+              ))}
+            </div>
+          ) : null}
           {executionPlan.warnings.length ? (
             <div className="mt-2 grid gap-1 text-xs text-amber-700">
               {executionPlan.warnings.map((warning) => (
@@ -467,6 +480,14 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
                   {entry.platformName} · {entry.chapterTitle}
                 </div>
                 <p className="mt-2 text-sm leading-6 text-slate-600">{entry.evidence}</p>
+                {entry.strategyBasis ? (
+                  <div className="mt-3 border-l-2 border-emerald-500 pl-3 text-xs leading-5 text-emerald-900">
+                    <div className="font-medium">首轮平台打法 · {entry.strategyBasis.label}</div>
+                    <div className="mt-1">{entry.strategyBasis.primaryTactic}</div>
+                    <div className="mt-1">开头：{entry.strategyBasis.openingMove}</div>
+                    <div className="mt-1">验证：{entry.strategyBasis.verificationMove}</div>
+                  </div>
+                ) : null}
               </div>
               <Link className="w-fit rounded-md border border-slate-200 px-3 py-2 text-sm font-medium hover:bg-slate-50" href={entry.href}>
                 {entry.actionLabel}

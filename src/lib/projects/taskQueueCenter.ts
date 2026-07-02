@@ -2,6 +2,7 @@ import { buildBatchDraftQueue } from "../ai/batchDrafts.ts";
 import { buildReviewPipelineQueue } from "../ai/batchReviewPipeline.ts";
 import { getPlatformProfile, type PlatformId } from "../platforms/platformProfiles.ts";
 import { buildPlatformPublishExportCenter } from "./platformPublishExport.ts";
+import { findProjectStartTacticSummary, type ProjectStartTacticEntryLike, type ProjectStartTacticSummary } from "./projectStartTactics.ts";
 
 export interface TaskQueueProject {
   id: string;
@@ -33,6 +34,7 @@ export interface TaskQueueProject {
     errorMessage: string | null;
     createdAt: Date | string;
   }>;
+  worldEntries?: ProjectStartTacticEntryLike[];
 }
 
 export interface QueueItem {
@@ -45,6 +47,7 @@ export interface QueueItem {
   label: string;
   chapterTitle: string;
   evidence: string;
+  strategyBasis?: ProjectStartTacticSummary | null;
   actionLabel: string;
   href: string;
   priority: number;
@@ -97,8 +100,9 @@ export function buildTaskQueueCenter(projects: TaskQueueProject[]): TaskQueueCen
   const items = projects.flatMap((project) => {
     const platform = getPlatformProfile(project.targetPlatform as PlatformId);
     const projectHref = `/projects/${project.id}`;
+    const startTactic = findProjectStartTacticSummary(project.worldEntries ?? []);
     const draftQueue = buildBatchDraftQueue(project.chapters, project.aiTasks, platform);
-    const reviewQueue = buildReviewPipelineQueue(project.chapters, project.aiTasks);
+    const reviewQueue = buildReviewPipelineQueue(project.chapters, project.aiTasks, 5, startTactic);
     const exportCenter = buildPlatformPublishExportCenter({
       project: {
         title: project.title,
@@ -122,6 +126,7 @@ export function buildTaskQueueCenter(projects: TaskQueueProject[]): TaskQueueCen
         category: "draft",
         chapterTitle: candidate.title,
         evidence: candidate.reason,
+        strategyBasis: startTactic,
         actionLabel: "生成初稿",
         href: `${projectHref}/chapters/${candidate.chapterId}`,
       }));
@@ -136,6 +141,7 @@ export function buildTaskQueueCenter(projects: TaskQueueProject[]): TaskQueueCen
         category: "review",
         chapterTitle: candidate.title,
         evidence: candidate.reason,
+        strategyBasis: startTactic,
         actionLabel: "审稿",
         href: `${projectHref}/chapters/${candidate.chapterId}`,
       }));
@@ -150,6 +156,7 @@ export function buildTaskQueueCenter(projects: TaskQueueProject[]): TaskQueueCen
         category: "second_pass",
         chapterTitle: candidate.title,
         evidence: candidate.instruction,
+        strategyBasis: startTactic,
         actionLabel: "二改",
         href: `${projectHref}/chapters/${candidate.chapterId}`,
       }));
@@ -165,6 +172,7 @@ export function buildTaskQueueCenter(projects: TaskQueueProject[]): TaskQueueCen
         category: "export",
         chapterTitle: `${targetPackage.platformName} 发布包`,
         evidence: `${exportCenter.totalPublishableChapters} 章有正文可导出，${targetPackage.warnings.length} 条发布提醒。`,
+        strategyBasis: startTactic,
         actionLabel: "导出平台包",
         href: `${projectHref}#platform-export`,
       }));
@@ -178,6 +186,7 @@ export function buildTaskQueueCenter(projects: TaskQueueProject[]): TaskQueueCen
         blockerType: "publish_repair",
         chapterTitle: `${targetPackage.platformName} 发布质检`,
         evidence: targetPackage.repairPath.headline,
+        strategyBasis: startTactic,
         actionLabel: targetPackage.repairPath.nextStep?.label ?? "处理发布阻塞",
         href: `${projectHref}#platform-export`,
       }));
@@ -193,6 +202,7 @@ export function buildTaskQueueCenter(projects: TaskQueueProject[]): TaskQueueCen
         blockerType: "chapter_card",
         chapterTitle: candidate.title,
         evidence: candidate.reason,
+        strategyBasis: startTactic,
         actionLabel: "补章节卡",
         href: `${projectHref}/chapters/${candidate.chapterId}`,
       }));

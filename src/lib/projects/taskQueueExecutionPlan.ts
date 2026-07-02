@@ -12,6 +12,7 @@ export interface TaskQueueExecutionPlan {
   projectTitle: string | null;
   itemIds: string[];
   chapterIds: string[];
+  strategyBases: NonNullable<QueueItem["strategyBasis"]>[];
   actionLabel: string;
   detail: string;
   warnings: string[];
@@ -50,6 +51,7 @@ export function buildTaskQueueExecutionPlan(
       projectTitle: null,
       itemIds: [],
       chapterIds: [],
+      strategyBases: [],
       actionLabel: "暂无可执行批次",
       detail: "当前队列没有可直接运行的初稿、审稿或二改任务。",
       warnings: ["先补章节卡、处理发布阻塞，或进入项目生成新的可执行任务。"],
@@ -62,6 +64,14 @@ export function buildTaskQueueExecutionPlan(
   const sameCategoryOtherProjects = executable.filter((item) => item.category === first.category && item.projectId !== first.projectId).length;
   const projectIds = [...new Set(batch.map((item) => item.projectId))];
   const projectTitles = [...new Set(batch.map((item) => item.projectTitle))];
+  const strategyBases = [
+    ...new Map(
+      batch
+        .map((item) => item.strategyBasis)
+        .filter((basis): basis is NonNullable<QueueItem["strategyBasis"]> => Boolean(basis))
+        .map((basis) => [basis.title, basis]),
+    ).values(),
+  ];
 
   return {
     canRun: batch.length > 0,
@@ -71,6 +81,7 @@ export function buildTaskQueueExecutionPlan(
     projectTitle: projectTitles.length === 1 ? first.projectTitle : `${projectTitles.length} 个项目`,
     itemIds: batch.map((item) => item.id),
     chapterIds: batch.map(chapterIdFromItem).filter(Boolean),
+    strategyBases,
     actionLabel: `${categoryActionLabel(first.category)} ${batch.length} 个`,
     detail: `${projectTitles.join("、")} · ${first.label} · ${batch.map((item) => item.chapterTitle).join("、")}`,
     warnings: [

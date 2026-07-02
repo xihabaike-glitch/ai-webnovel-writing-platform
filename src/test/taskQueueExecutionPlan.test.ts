@@ -33,6 +33,25 @@ test("buildTaskQueueExecutionPlan", async (t) => {
     assert.ok(plan.warnings.some((warning) => warning.includes("其他项目")));
   });
 
+  await t.test("summarizes start tactics for the recommended batch", () => {
+    const strategyBasis = {
+      title: "首轮平台打法：番茄小说",
+      label: "模板推荐",
+      primaryTactic: "先抓首章钩子，再用前三章连续兑现爽点。",
+      openingMove: "第一段给倒计时。",
+      verificationMove: "审稿前看前三章追读。",
+      risk: "慢热会掉首秀。",
+    };
+    const plan = buildTaskQueueExecutionPlan([
+      queueItem({ id: "project-1:review:chapter-1", category: "review", projectId: "project-1", projectTitle: "项目一", chapterTitle: "第一章", strategyBasis }),
+      queueItem({ id: "project-1:review:chapter-2", category: "review", projectId: "project-1", projectTitle: "项目一", chapterTitle: "第二章", strategyBasis }),
+    ]);
+
+    assert.equal(plan.strategyBases.length, 1);
+    assert.equal(plan.strategyBases[0].label, "模板推荐");
+    assert.ok(plan.strategyBases[0].openingMove.includes("倒计时"));
+  });
+
   await t.test("returns a blocked plan when there are no executable items", () => {
     const plan = buildTaskQueueExecutionPlan([
       queueItem({ id: "project-1:blocked:chapter-1", category: "blocked", projectId: "project-1", projectTitle: "项目一", chapterTitle: "第一章" }),

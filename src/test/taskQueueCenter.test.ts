@@ -63,6 +63,13 @@ const project: TaskQueueProject = {
       createdAt: "2026-01-02T00:00:00.000Z",
     },
   ],
+  worldEntries: [
+    {
+      type: "platform_soil",
+      title: "首轮平台打法：番茄小说",
+      content: "状态：模板推荐\n打法：首章先给不可逆危机，三章内连续兑现爽点。\n开头动作：第一段给倒计时。\n验证动作：批量前检查前三章追读。\n风险：解释过多会掉节奏。",
+    },
+  ],
 };
 
 test("buildTaskQueueCenter", async (t) => {
@@ -88,5 +95,7 @@ test("buildTaskQueueCenter", async (t) => {
     assert.equal(publishBlocker?.blockerType, "publish_repair");
     assert.equal(cardBlocker?.blockerType, "chapter_card");
     assert.ok(publishBlocker?.evidence.includes("先处理"));
+    assert.equal(queue.recommendedNext?.strategyBasis?.label, "模板推荐");
+    assert.ok(queue.items.every((item) => item.strategyBasis?.openingMove.includes("倒计时")));
   });
 });

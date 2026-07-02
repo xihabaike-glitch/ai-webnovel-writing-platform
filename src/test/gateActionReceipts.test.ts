@@ -15,6 +15,7 @@ import {
   buildGatePlatformScaleCadence,
   buildGatePlatformRetreatGate,
   buildGatePlatformRetreatDispatchItems,
+  buildGatePlatformRetreatResolution,
   buildGateDispatchTaskCenter,
   buildGateDispatchTaskCloseoutItem,
   buildGatePublishEffectReceipt,
@@ -977,6 +978,96 @@ test("buildGateActionReceipt", async (t) => {
     assert.equal(queuedDispatches.find((item) => item.platformId === "webnovel")?.stage, "pause_platform");
     assert.equal(assignedDispatches.find((item) => item.platformId === "fanqie")?.state, "assigned");
     assert.ok(queuedDispatches.find((item) => item.platformId === "qimao")?.acceptanceCriteria.includes("标题简介完成新版"));
+  });
+
+  await t.test("requires post-repair effect evidence before retreat blocks are released", () => {
+    const fanqieStrong = buildGatePublishEffectReceipt({
+      projectId: "project-1",
+      platformId: "fanqie",
+      platformName: "番茄小说",
+      now: "2026-01-01T00:00:00.000Z",
+      metric: { views: 3000, clicks: 600, favorites: 210, follows: 120 },
+    });
+    const fanqieWeak = buildGatePublishEffectReceipt({
+      projectId: "project-1",
+      platformId: "fanqie",
+      platformName: "番茄小说",
+      now: "2026-01-08T00:00:00.000Z",
+      metric: { views: 2600, clicks: 260, favorites: 88, follows: 38 },
+    });
+    const fanqieWeaker = buildGatePublishEffectReceipt({
+      projectId: "project-1",
+      platformId: "fanqie",
+      platformName: "番茄小说",
+      now: "2026-01-15T00:00:00.000Z",
+      metric: { views: 2400, clicks: 96, favorites: 35, follows: 10 },
+    });
+    const reviews = buildGatePlatformGrowthReview([fanqieWeaker, fanqieWeak, fanqieStrong]);
+    const retreatGate = buildGatePlatformRetreatGate([fanqieWeaker, fanqieWeak, fanqieStrong], reviews);
+    const retreatDispatch = buildGatePlatformRetreatDispatchItems(retreatGate)[0];
+    const completedRetreatTask = {
+      ...retreatDispatch,
+      databaseId: "dispatch-db-retreat-fanqie",
+      dispatchKey: retreatDispatch.id,
+      projectId: "project-1",
+      sourceReceiptId: null,
+      completionEvidence: "已重写标题简介标签，并列出前三章兑现修复点。",
+      state: "completed" as const,
+      assignedAt: "2026-01-15T00:30:00.000Z",
+      completedAt: "2026-01-15T01:00:00.000Z",
+      createdAt: "2026-01-15T00:30:00.000Z",
+      updatedAt: "2026-01-15T01:00:00.000Z",
+    };
+    const pendingResolution = buildGatePlatformRetreatResolution(
+      [completedRetreatTask],
+      [fanqieWeaker, fanqieWeak, fanqieStrong],
+    );
+    const blockedGate = buildGatePlatformScaleGate(
+      reviews,
+      buildGateDispatchEvidenceReview([completedRetreatTask], [fanqieWeaker, fanqieWeak, fanqieStrong]),
+      undefined,
+      undefined,
+      retreatGate,
+      pendingResolution,
+    );
+    const laterEffect = buildGatePublishEffectReceipt({
+      projectId: "project-1",
+      platformId: "fanqie",
+      platformName: "番茄小说",
+      now: "2026-01-16T00:00:00.000Z",
+      metric: { views: 2600, clicks: 420, favorites: 150, follows: 70 },
+    });
+    const resolvedResolution = buildGatePlatformRetreatResolution(
+      [completedRetreatTask],
+      [laterEffect, fanqieWeaker, fanqieWeak, fanqieStrong],
+    );
+    const stillBlockedGate = buildGatePlatformScaleGate(
+      reviews,
+      buildGateDispatchEvidenceReview([completedRetreatTask], [laterEffect, fanqieWeaker, fanqieWeak, fanqieStrong]),
+      undefined,
+      undefined,
+      retreatGate,
+      resolvedResolution,
+    );
+    const updatedReviews = buildGatePlatformGrowthReview([laterEffect, fanqieWeaker, fanqieWeak, fanqieStrong]);
+    const updatedRetreatGate = buildGatePlatformRetreatGate([laterEffect, fanqieWeaker, fanqieWeak, fanqieStrong], updatedReviews);
+    const recheckGate = buildGatePlatformScaleGate(
+      updatedReviews,
+      buildGateDispatchEvidenceReview([completedRetreatTask], [laterEffect, fanqieWeaker, fanqieWeak, fanqieStrong]),
+      undefined,
+      undefined,
+      updatedRetreatGate,
+      resolvedResolution,
+    );
+
+    assert.equal(retreatGate.items.find((item) => item.platformId === "fanqie")?.status, "pivot_platform");
+    assert.equal(pendingResolution.items[0].status, "needs_effect");
+    assert.equal(blockedGate.items.find((item) => item.platformId === "fanqie")?.label, "修复待复测");
+    assert.equal(resolvedResolution.items[0].status, "resolved");
+    assert.equal(stillBlockedGate.items.find((item) => item.platformId === "fanqie")?.label, "复测仍异常");
+    assert.equal(updatedRetreatGate.items.find((item) => item.platformId === "fanqie")?.status, "healthy");
+    assert.equal(recheckGate.items.find((item) => item.platformId === "fanqie")?.status, "needs_dispatch");
+    assert.equal(recheckGate.items.find((item) => item.platformId === "fanqie")?.label, "修复后重验");
   });
 
   await t.test("records dispatch receipts and marks the dispatch as assigned", () => {

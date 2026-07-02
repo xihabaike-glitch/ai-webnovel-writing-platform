@@ -223,6 +223,7 @@ export interface GateDispatchEvidenceReviewItem {
   dispatchKey: string;
   platformId: string;
   platformName: string;
+  stage: GatePlatformGrowthReviewStage;
   ownerRole: string;
   title: string;
   priorityScore: number;
@@ -372,6 +373,39 @@ export interface GatePlatformRetreatGate {
   };
   nextActions: string[];
   items: GatePlatformRetreatItem[];
+}
+
+export type GatePlatformRetreatResolutionStatus = "resolved" | "needs_effect" | "missing_evidence" | "active";
+
+export interface GatePlatformRetreatResolutionItem {
+  dispatchKey: string;
+  platformId: string;
+  platformName: string;
+  stage: GatePlatformGrowthReviewStage;
+  ownerRole: string;
+  title: string;
+  status: GatePlatformRetreatResolutionStatus;
+  label: string;
+  detail: string;
+  actionLabel: string;
+  href: string;
+  priorityScore: number;
+  completedAt: string | null;
+  latestEffectAt: string | null;
+  completionEvidence: string;
+  evidence: string[];
+}
+
+export interface GatePlatformRetreatResolution {
+  summary: {
+    total: number;
+    resolved: number;
+    needsEffect: number;
+    missingEvidence: number;
+    active: number;
+  };
+  nextActions: string[];
+  items: GatePlatformRetreatResolutionItem[];
 }
 
 export interface GatePlatformStrategyReceiptPayload {
@@ -1198,6 +1232,10 @@ export function buildGatePlatformRetreatDispatchItems(
     });
 }
 
+function isRetreatDispatchStage(stage: GatePlatformGrowthReviewStage) {
+  return stage === "repair_tactic" || stage === "pivot_platform" || stage === "pause_platform";
+}
+
 export function buildGatePlatformDispatchReceipt(input: {
   dispatch: GatePlatformGrowthDispatchItem;
   now?: Date | string;
@@ -1671,6 +1709,7 @@ export function buildGateDispatchEvidenceReview(
         dispatchKey: task.dispatchKey,
         platformId: task.platformId,
         platformName: task.platformName,
+        stage: task.stage,
         ownerRole: task.ownerRole,
         title: task.title,
         priorityScore: task.priorityScore,
@@ -1691,6 +1730,7 @@ export function buildGateDispatchEvidenceReview(
         dispatchKey: task.dispatchKey,
         platformId: task.platformId,
         platformName: task.platformName,
+        stage: task.stage,
         ownerRole: task.ownerRole,
         title: task.title,
         priorityScore: task.priorityScore,
@@ -1718,6 +1758,7 @@ export function buildGateDispatchEvidenceReview(
         dispatchKey: task.dispatchKey,
         platformId: task.platformId,
         platformName: task.platformName,
+        stage: task.stage,
         ownerRole: task.ownerRole,
         title: task.title,
         priorityScore: task.priorityScore,
@@ -1737,6 +1778,7 @@ export function buildGateDispatchEvidenceReview(
       dispatchKey: task.dispatchKey,
       platformId: task.platformId,
       platformName: task.platformName,
+      stage: task.stage,
       ownerRole: task.ownerRole,
       title: task.title,
       priorityScore: task.priorityScore,
@@ -1795,6 +1837,7 @@ export function buildGatePlatformScaleGate(
   scaleFollowup?: GatePlatformScaleFollowup,
   scaleCadence?: GatePlatformScaleCadence,
   retreatGate?: GatePlatformRetreatGate,
+  retreatResolution?: GatePlatformRetreatResolution,
 ): GatePlatformScaleGate {
   const evidenceItemsByPlatform = new Map<string, GateDispatchEvidenceReviewItem[]>();
   for (const item of dispatchEvidenceReview.items) {
@@ -1810,15 +1853,17 @@ export function buildGatePlatformScaleGate(
   }
   const scaleCadenceByPlatform = new Map((scaleCadence?.items ?? []).map((item) => [item.platformId, item]));
   const retreatByPlatform = new Map((retreatGate?.items ?? []).map((item) => [item.platformId, item]));
+  const retreatResolutionByPlatform = new Map((retreatResolution?.items ?? []).map((item) => [item.platformId, item]));
 
   const items = reviews.map((review): GatePlatformScaleGateItem => {
     const platformEvidenceItems = evidenceItemsByPlatform.get(review.platformId) ?? [];
-    const issue = platformEvidenceItems.find((item) => item.status !== "verified") ?? null;
-    const verifiedEvidence = platformEvidenceItems.filter((item) => item.status === "verified");
+    const issue = platformEvidenceItems.find((item) => item.status !== "verified" && !isRetreatDispatchStage(item.stage)) ?? null;
+    const verifiedEvidence = platformEvidenceItems.filter((item) => item.status === "verified" && !isRetreatDispatchStage(item.stage));
     const scaleFollowupIssue = (scaleFollowupItemsByPlatform.get(review.platformId) ?? [])
       .find((item) => item.status !== "tracked") ?? null;
     const cadenceIssue = scaleCadenceByPlatform.get(review.platformId);
     const retreatIssue = retreatByPlatform.get(review.platformId);
+    const retreatResolutionIssue = retreatResolutionByPlatform.get(review.platformId) ?? null;
 
     if (review.stage !== "scale_up") {
       return {
@@ -1881,6 +1926,36 @@ export function buildGatePlatformScaleGate(
     }
 
     if (retreatIssue && ["pause", "pivot_platform", "repair_tactic"].includes(retreatIssue.status)) {
+      if (retreatResolutionIssue && retreatResolutionIssue.status !== "resolved") {
+        return {
+          platformId: review.platformId,
+          platformName: review.platformName,
+          status: "blocked_evidence",
+          label: retreatResolutionIssue.label,
+          detail: `${review.platformName} 触发撤退/换打法闸，修复验收仍是「${retreatResolutionIssue.label}」：${retreatResolutionIssue.detail}`,
+          actionLabel: retreatResolutionIssue.actionLabel,
+          href: retreatResolutionIssue.href,
+          priorityScore: Math.max(review.priorityScore, retreatResolutionIssue.priorityScore),
+          stage: review.stage,
+          evidence: retreatResolutionIssue.evidence.slice(0, 3),
+        };
+      }
+
+      if (retreatResolutionIssue?.status === "resolved") {
+        return {
+          platformId: review.platformId,
+          platformName: review.platformName,
+          status: "blocked_evidence",
+          label: "复测仍异常",
+          detail: `${review.platformName} 已完成撤退修复并有复测数据，但最新数据仍触发「${retreatIssue.label}」。继续修打法或换平台，不允许加码。`,
+          actionLabel: retreatIssue.actionLabel,
+          href: retreatIssue.href,
+          priorityScore: Math.max(review.priorityScore, retreatResolutionIssue.priorityScore),
+          stage: review.stage,
+          evidence: [retreatIssue.detail, ...retreatResolutionIssue.evidence].slice(0, 3),
+        };
+      }
+
       return {
         platformId: review.platformId,
         platformName: review.platformName,
@@ -1892,6 +1967,21 @@ export function buildGatePlatformScaleGate(
         priorityScore: Math.max(review.priorityScore, retreatIssue.priorityScore),
         stage: review.stage,
         evidence: retreatIssue.evidence.slice(0, 3),
+      };
+    }
+
+    if (retreatResolutionIssue?.status === "resolved") {
+      return {
+        platformId: review.platformId,
+        platformName: review.platformName,
+        status: "needs_dispatch",
+        label: "修复后重验",
+        detail: `${review.platformName} 已完成撤退修复并有复测数据。先重新生成一张小步加码派单，别沿用撤退前的旧证据。`,
+        actionLabel: "重新派单验收",
+        href: "/dispatch",
+        priorityScore: Math.max(review.priorityScore, retreatResolutionIssue.priorityScore),
+        stage: review.stage,
+        evidence: retreatResolutionIssue.evidence.slice(0, 3),
       };
     }
 
@@ -2260,6 +2350,146 @@ export function buildGatePlatformScaleCadence(
       const priorityDiff = right.priorityScore - left.priorityScore;
       if (priorityDiff !== 0) return priorityDiff;
       return left.platformName.localeCompare(right.platformName);
+    }),
+  };
+}
+
+export function buildGatePlatformRetreatResolution(
+  tasks: PersistedGatePlatformDispatchTask[],
+  receipts: GateActionReceipt[] = [],
+): GatePlatformRetreatResolution {
+  const operationalReceipts = trimGateActionReceipts(receipts, 100)
+    .filter((receipt) => !isAuditMetaReceipt(receipt));
+  const retreatTasks = tasks.filter((task) => isRetreatDispatchStage(task.stage));
+  const items = retreatTasks.map((task): GatePlatformRetreatResolutionItem => {
+    const completionEvidence = task.completionEvidence.trim();
+    const completedAt = validDate(task.completedAt) ?? validDate(task.updatedAt);
+
+    if (task.state !== "completed") {
+      return {
+        dispatchKey: task.dispatchKey,
+        platformId: task.platformId,
+        platformName: task.platformName,
+        stage: task.stage,
+        ownerRole: task.ownerRole,
+        title: task.title,
+        status: "active",
+        label: "修复未完成",
+        detail: "撤退修复派单还没收口，先完成打法修复、迁移方案或暂停复盘。",
+        actionLabel: "处理撤退派单",
+        href: "/dispatch",
+        priorityScore: task.priorityScore,
+        completedAt: task.completedAt,
+        latestEffectAt: null,
+        completionEvidence,
+        evidence: task.evidence,
+      };
+    }
+
+    if (!completionEvidence) {
+      return {
+        dispatchKey: task.dispatchKey,
+        platformId: task.platformId,
+        platformName: task.platformName,
+        stage: task.stage,
+        ownerRole: task.ownerRole,
+        title: task.title,
+        status: "missing_evidence",
+        label: "缺修复依据",
+        detail: "撤退修复显示完成，但没有写清楚改了什么、暂停原因或迁移判断，不能解除拦截。",
+        actionLabel: "补修复依据",
+        href: "/dispatch",
+        priorityScore: task.priorityScore,
+        completedAt: task.completedAt,
+        latestEffectAt: null,
+        completionEvidence,
+        evidence: ["缺少撤退修复依据", ...task.evidence],
+      };
+    }
+
+    const latestEffectReceipt = completedAt
+      ? latestReceiptFor(operationalReceipts, (receipt) => {
+          const platform = gateActionReceiptPlatform(receipt);
+          return true
+            && platform.id === task.platformId
+            && receipt.status === "succeeded"
+            && actionTypeFromReceipt(receipt) === "save_effect"
+            && receiptIsAfterDate(receipt, completedAt);
+        })
+      : null;
+
+    if (latestEffectReceipt) {
+      return {
+        dispatchKey: task.dispatchKey,
+        platformId: task.platformId,
+        platformName: task.platformName,
+        stage: task.stage,
+        ownerRole: task.ownerRole,
+        title: task.title,
+        status: "resolved",
+        label: "修复已复测",
+        detail: "撤退修复完成后，已经看到同平台新的效果回填，可以用新数据重新判断去留和加码。",
+        actionLabel: "查看复测数据",
+        href: latestEffectReceipt.href,
+        priorityScore: task.priorityScore,
+        completedAt: task.completedAt,
+        latestEffectAt: latestEffectReceipt.createdAt,
+        completionEvidence,
+        evidence: [`修复依据：${completionEvidence}`, `复测回执：${latestEffectReceipt.label}`],
+      };
+    }
+
+    return {
+      dispatchKey: task.dispatchKey,
+      platformId: task.platformId,
+      platformName: task.platformName,
+      stage: task.stage,
+      ownerRole: task.ownerRole,
+      title: task.title,
+      status: "needs_effect",
+      label: "修复待复测",
+      detail: "撤退修复方案已经完成，但还没有修复后的效果回填。先补一轮数据，再决定恢复、换平台或撤出。",
+      actionLabel: "回填修复后效果",
+      href: projectAnchorHref(task.href, "#publish-effect-panel"),
+      priorityScore: task.priorityScore,
+      completedAt: task.completedAt,
+      latestEffectAt: null,
+      completionEvidence,
+      evidence: [`修复依据：${completionEvidence}`, ...task.evidence],
+    };
+  });
+
+  const resolved = items.filter((item) => item.status === "resolved").length;
+  const needsEffect = items.filter((item) => item.status === "needs_effect").length;
+  const missingEvidence = items.filter((item) => item.status === "missing_evidence").length;
+  const active = items.filter((item) => item.status === "active").length;
+  const statusWeight: Record<GatePlatformRetreatResolutionStatus, number> = {
+    missing_evidence: 0,
+    needs_effect: 1,
+    active: 2,
+    resolved: 3,
+  };
+
+  return {
+    summary: {
+      total: items.length,
+      resolved,
+      needsEffect,
+      missingEvidence,
+      active,
+    },
+    nextActions: [
+      missingEvidence > 0 ? `${missingEvidence} 个撤退修复缺依据，先补清楚改了什么和恢复条件。` : null,
+      needsEffect > 0 ? `${needsEffect} 个撤退修复缺复测效果，别急着恢复加码。` : null,
+      active > 0 ? `${active} 个撤退修复派单还没收口，先完成再看平台去留。` : null,
+      items.length > 0 && resolved === items.length ? "全部撤退修复都有后续效果复测，可以重新进入平台决策。" : null,
+    ].filter((action): action is string => Boolean(action)),
+    items: items.sort((left, right) => {
+      const statusDiff = statusWeight[left.status] - statusWeight[right.status];
+      if (statusDiff !== 0) return statusDiff;
+      const priorityDiff = right.priorityScore - left.priorityScore;
+      if (priorityDiff !== 0) return priorityDiff;
+      return left.title.localeCompare(right.title);
     }),
   };
 }

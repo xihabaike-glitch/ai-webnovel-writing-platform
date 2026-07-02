@@ -13,6 +13,7 @@ import {
   buildGatePlatformScaleGate,
   buildGatePlatformRetreatGate,
   buildGatePlatformRetreatDispatchItems,
+  buildGatePlatformRetreatResolution,
   buildGatePlatformDispatchReceipt,
   buildGatePlatformGrowthDispatchItems,
   buildGatePlatformGrowthReview,
@@ -39,6 +40,7 @@ import {
   type GatePlatformScaleCadenceStatus,
   type GatePlatformScaleGateStatus,
   type GatePlatformRetreatStatus,
+  type GatePlatformRetreatResolutionStatus,
   type GatePlatformGrowthDispatchItem,
   type GatePlatformGrowthReview,
   type PersistedGatePlatformDispatchTask,
@@ -148,6 +150,13 @@ function retreatClass(status: GatePlatformRetreatStatus) {
   return "border-slate-200 bg-slate-50 text-slate-800";
 }
 
+function retreatResolutionClass(status: GatePlatformRetreatResolutionStatus) {
+  if (status === "missing_evidence") return "border-rose-200 bg-rose-50 text-rose-900";
+  if (status === "needs_effect") return "border-amber-200 bg-amber-50 text-amber-900";
+  if (status === "resolved") return "border-emerald-200 bg-emerald-50 text-emerald-900";
+  return "border-slate-200 bg-slate-50 text-slate-800";
+}
+
 export function GateActionWorkspace({ actions }: { actions: PrePublishGateAction[] }) {
   const router = useRouter();
   const [receipts, setReceipts] = useState<GateActionReceipt[]>([]);
@@ -179,7 +188,9 @@ export function GateActionWorkspace({ actions }: { actions: PrePublishGateAction
     .filter((item) => platformFilter === "all" || item.platformId === platformFilter)
     .slice(0, 4);
   const retreatDispatchItems = buildGatePlatformRetreatDispatchItems(retreatGate, visibleDispatchTasks);
-  const scaleGate = buildGatePlatformScaleGate(platformGrowthReview, dispatchEvidenceReview, scaleFollowup, scaleCadence, retreatGate);
+  const retreatResolution = buildGatePlatformRetreatResolution(visibleDispatchTasks, receipts);
+  const retreatResolutionIssues = retreatResolution.items.filter((item) => item.status !== "resolved").slice(0, 4);
+  const scaleGate = buildGatePlatformScaleGate(platformGrowthReview, dispatchEvidenceReview, scaleFollowup, scaleCadence, retreatGate, retreatResolution);
   const scaleGateVisibleItems = scaleGate.items.filter((item) => item.status !== "not_candidate").slice(0, 4);
   const latestReceipt = filteredReceipts[0] ?? null;
 
@@ -715,6 +726,75 @@ export function GateActionWorkspace({ actions }: { actions: PrePublishGateAction
           ) : (
             <p className="rounded-md border border-dashed border-slate-300 bg-white p-3 text-sm text-slate-600">
               暂无撤退修复派单。只有触发修打法、换平台或暂停时才会出现。
+            </p>
+          )}
+        </div>
+        <div className="mt-3 grid gap-2">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <div className="text-xs font-medium text-slate-500">撤退修复验收</div>
+              <p className="mt-1 text-xs text-slate-500">修复方案完成后，还要等一轮效果复测，才解除撤退拦截。</p>
+            </div>
+            {retreatResolution.summary.total ? (
+              <div className="w-fit rounded-md border border-slate-200 bg-white px-3 py-2 text-xs text-slate-600">
+                已复测 {retreatResolution.summary.resolved}/{retreatResolution.summary.total}
+              </div>
+            ) : null}
+          </div>
+          {retreatResolution.nextActions.length ? (
+            <div className="grid gap-2 xl:grid-cols-2">
+              {retreatResolution.nextActions.map((action) => (
+                <div className="rounded-md bg-white p-3 text-sm leading-6 text-slate-600" key={action}>{action}</div>
+              ))}
+            </div>
+          ) : null}
+          {retreatResolutionIssues.length ? (
+            <div className="grid gap-2 xl:grid-cols-2">
+              {retreatResolutionIssues.map((item) => (
+                <div className={`rounded-md border p-3 text-sm ${retreatResolutionClass(item.status)}`} key={item.dispatchKey}>
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-medium">{item.title}</span>
+                        <span className="rounded-md bg-white/70 px-2 py-1 text-xs font-medium">{item.label}</span>
+                      </div>
+                      <p className="mt-2 leading-6 opacity-85">{item.detail}</p>
+                    </div>
+                    <div className="text-right text-xs opacity-75">
+                      <div>{item.ownerRole}</div>
+                      <div className="mt-1">优先级 {item.priorityScore}</div>
+                    </div>
+                  </div>
+                  <div className="mt-2 flex flex-wrap gap-2 text-xs opacity-75">
+                    {item.evidence.slice(0, 3).map((evidence) => (
+                      <span className="rounded-md bg-white/70 px-2 py-1" key={evidence}>{evidence}</span>
+                    ))}
+                  </div>
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    <Link
+                      className="rounded-md bg-white px-3 py-2 text-xs font-medium text-slate-950"
+                      href={item.href}
+                    >
+                      {item.actionLabel}
+                    </Link>
+                    <button
+                      className="rounded-md border border-white/70 bg-white/70 px-3 py-2 text-xs font-medium text-slate-950"
+                      onClick={() => focusPlatform(item.platformId)}
+                      type="button"
+                    >
+                      只看该平台
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : retreatResolution.summary.total ? (
+            <p className="rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
+              当前撤退修复都有后续效果复测，总闸可以重新按新数据判断平台去留。
+            </p>
+          ) : (
+            <p className="rounded-md border border-dashed border-slate-300 bg-white p-3 text-sm text-slate-600">
+              暂无撤退修复验收项。先从上方派单台派出并完成修复任务。
             </p>
           )}
         </div>

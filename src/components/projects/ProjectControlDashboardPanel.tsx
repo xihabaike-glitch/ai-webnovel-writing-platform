@@ -68,7 +68,7 @@ interface PlatformControlVerdictSummary {
   status: "ready" | "needs_evidence" | "needs_repair";
   headline: string;
   nextAction: string;
-  actionKind: "save_evidence_baseline" | "generate_asset_variants" | "open_target";
+  actionKind: "save_evidence_baseline" | "generate_asset_variants" | "rewrite_first_three" | "open_target";
   actionLabel: string;
   actionExecutable: boolean;
   actionAnchor: string;
@@ -198,6 +198,23 @@ export function ProjectControlDashboardPanel({ projectId }: { projectId: string 
         if (!response.ok || !payload?.variants) throw new Error(payload?.error ?? "生成投稿资产候选失败。");
         await loadDashboard();
         setMessage(`已生成 ${payload.variants.length} 个投稿资产候选，去采纳一个，别光看热闹。`);
+        return;
+      }
+
+      if (dashboard.platformVerdict.actionKind === "rewrite_first_three") {
+        const response = await fetch(`/api/projects/${projectId}/first-three-rewrite/generate`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            platformId: dashboard.platformVerdict.primaryPlatformId,
+            chapterOrders: [1, 2, 3],
+            targetWords: 1600,
+          }),
+        });
+        const payload = await response.json().catch(() => null) as { results?: unknown[]; error?: string } | null;
+        if (!response.ok || !payload?.results) throw new Error(payload?.error ?? "重写前三章失败。");
+        await loadDashboard();
+        setMessage(`已按 ${dashboard.platformVerdict.primaryPlatformName ?? "目标平台"} 重写前三章，共 ${payload.results.length} 章。`);
         return;
       }
 

@@ -225,4 +225,61 @@ test("buildProjectControlDashboard", async (t) => {
     assert.equal(dashboard.platformVerdict.actionLabel, "生成投稿资产候选");
     assert.equal(dashboard.platformVerdict.actionAnchor, "submission-asset-editor");
   });
+
+  await t.test("promotes executable first-three rewrite after assets are ready", () => {
+    const firstThree = [1, 2, 3].map((order) => ({
+      ...chapter,
+      id: `chapter-${order}`,
+      order,
+      title: `第${order}章 雨夜系统`,
+      content: "林晚推开门，系统提示音在雨夜响起。她必须马上做选择，否则雨中的人会死。",
+      wordCount: 1600,
+      hook: "系统倒计时出现。",
+      conflict: "主角必须救人或逃跑。",
+      cliffhanger: "系统给出第二个任务。",
+    }));
+
+    const dashboard = buildProjectControlDashboard({
+      project: { ...project, currentWordCount: 4800 },
+      platform: getPlatformProfile("fanqie"),
+      chapters: firstThree,
+      outlineNodes: [],
+      characters: [],
+      worldEntries: [],
+      foreshadows: [],
+      plotThreads: [],
+      aiTasks: [],
+      publishSnapshots: platformProfiles.map((platform) => ({
+        id: `snapshot-before-rewrite-${platform.id}`,
+        platformId: platform.id,
+        platformName: platform.name,
+        title: "夜雨系统",
+        action: "snapshot",
+        chapterCount: 3,
+        wordCount: 4800,
+        preflightScore: 72,
+        canExport: false,
+        createdAt: "2026-01-05T00:00:00.000Z",
+      })),
+      submissionAssets: platformProfiles.map((platform) => ({
+        id: `asset-ready-${platform.id}`,
+        platformId: platform.id,
+        platformName: platform.name,
+        title: "夜雨系统：雨夜倒计时",
+        logline: "雨夜倒计时逼她救人，系统惩罚反成翻盘筹码。",
+        synopsis: "林晚在雨夜绑定倒计时系统，每一次选择都牵动生死、复仇和悬疑真相。她从被迫救人开始，一步步摸清系统规则，把惩罚变成筹码，把背叛者拖回真相现场，并在连续任务中建立稳定目标：查清当年事故、保护真正重要的人、夺回属于自己的命运。故事保持强钩子、强情绪和连续爽点，适合平台长篇连载。",
+        overseasSynopsis: "Night Rain System follows Lin Wan through timed choices and revenge.",
+        tags: ["系统", "逆袭", "悬疑"],
+        note: "主战场资产已就绪。",
+        source: "manual",
+        updatedAt: "2026-01-05T01:00:00.000Z",
+      })),
+      submissionChecklist: { ...checklist, readinessPercent: 90, items: [] },
+    });
+
+    assert.equal(dashboard.platformVerdict.actionKind, "rewrite_first_three");
+    assert.equal(dashboard.platformVerdict.actionExecutable, true);
+    assert.equal(dashboard.platformVerdict.actionLabel, "重写前三章");
+    assert.equal(dashboard.platformVerdict.actionAnchor, "first-three-rewrite");
+  });
 });

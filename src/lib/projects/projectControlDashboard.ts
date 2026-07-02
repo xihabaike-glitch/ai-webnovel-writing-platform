@@ -190,7 +190,7 @@ export interface PlatformControlVerdictSummary {
   status: PlatformStrategyAutoVerdict["status"];
   headline: string;
   nextAction: string;
-  actionKind: "save_evidence_baseline" | "generate_asset_variants" | "open_target";
+  actionKind: "save_evidence_baseline" | "generate_asset_variants" | "rewrite_first_three" | "open_target";
   actionLabel: string;
   actionExecutable: boolean;
   actionAnchor: string;
@@ -210,6 +210,7 @@ function platformVerdictAction(
   evidenceGaps: string[],
 ): Pick<PlatformControlVerdictSummary, "actionKind" | "actionLabel" | "actionExecutable" | "actionAnchor"> {
   const firstGap = evidenceGaps[0] ?? "";
+  const gapText = evidenceGaps.join(" ");
   if (primaryPlatformId && firstGap.includes("发布包版本")) {
     return {
       actionKind: "save_evidence_baseline",
@@ -226,20 +227,28 @@ function platformVerdictAction(
       actionAnchor: "submission-asset-editor",
     };
   }
+  if (
+    primaryPlatformId
+    && (
+      gapText.includes("前三章")
+      || gapText.includes("发布质检修复")
+      || nextAction.includes("前三章")
+      || nextAction.includes("开头")
+    )
+  ) {
+    return {
+      actionKind: "rewrite_first_three",
+      actionLabel: "重写前三章",
+      actionExecutable: true,
+      actionAnchor: "first-three-rewrite",
+    };
+  }
   if (firstGap.includes("真实曝光") || firstGap.includes("点击") || firstGap.includes("追读")) {
     return {
       actionKind: "open_target",
       actionLabel: "录入发布效果",
       actionExecutable: false,
       actionAnchor: "publish-effect-panel",
-    };
-  }
-  if (nextAction.includes("前三章") || nextAction.includes("开头")) {
-    return {
-      actionKind: "open_target",
-      actionLabel: "处理前三章",
-      actionExecutable: false,
-      actionAnchor: "first-three-rewrite",
     };
   }
   return {

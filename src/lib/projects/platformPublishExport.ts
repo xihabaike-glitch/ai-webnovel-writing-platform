@@ -35,6 +35,7 @@ export type PublishRepairActionKind =
   | "run_second_pass"
   | "open_submission_package"
   | "add_publish_chapters";
+export type PublishRepairHistoryActionKind = PublishRepairActionKind | "rewrite_first_three";
 
 export interface PublishRepairAction {
   id: string;
@@ -48,7 +49,7 @@ export interface PublishRepairAction {
 
 export interface PublishRepairHistoryItem {
   id: string;
-  actionKind: PublishRepairActionKind;
+  actionKind: PublishRepairHistoryActionKind;
   label: string;
   chapterId: string | null;
   chapterTitle: string;
@@ -2040,6 +2041,24 @@ function buildRepairPath(preflight: PublishPreflight): PublishRepairPath {
 function buildRepairHistory(tasks: PublishExportAiTask[], chapters: PublishExportChapter[]): PublishRepairHistoryItem[] {
   const chapterTitles = new Map(chapters.map((chapter) => [chapter.id, chapter.title]));
   const auditBySecondPassTaskId = new Map<string, { score: number | null; shouldSecondPass: boolean | null }>();
+  const firstThreeRewriteItems: PublishRepairHistoryItem[] = tasks
+    .filter((task) => task.taskType === "first_three_rewrite")
+    .map((task) => {
+      const chapterTitle = task.chapterId ? chapterTitles.get(task.chapterId) ?? "未命名章节" : "前三章";
+      const statusLabel = task.status === "succeeded" ? "成功" : task.status === "failed" ? "失败" : task.status;
+      return {
+        id: task.id ?? `first-three-${task.chapterId ?? "project"}-${new Date(task.createdAt).getTime()}`,
+        actionKind: "rewrite_first_three",
+        label: "前三章重写",
+        chapterId: task.chapterId,
+        chapterTitle,
+        status: statusLabel,
+        score: null,
+        shouldSecondPass: null,
+        message: task.status === "failed" ? task.errorMessage ?? "前三章重写失败。" : "已按平台处方重写前三章。",
+        createdAt: task.createdAt,
+      };
+    });
 
   tasks.forEach((task) => {
     const snapshot = parseJsonObject(task.inputSnapshot);
@@ -2053,12 +2072,12 @@ function buildRepairHistory(tasks: PublishExportAiTask[], chapters: PublishExpor
     }
   });
 
-  return tasks
-    .map((task) => {
+  const repairTaskItems = tasks
+    .flatMap((task): PublishRepairHistoryItem[] => {
       const snapshot = parseJsonObject(task.inputSnapshot);
-      if (snapshot?.source !== publishRepairTaskSource) return null;
+      if (snapshot?.source !== publishRepairTaskSource) return [];
       const actionKind = typeof snapshot.actionKind === "string" ? snapshot.actionKind as PublishRepairActionKind : null;
-      if (!actionKind) return null;
+      if (!actionKind) return [];
       const actionLabel = typeof snapshot.actionLabel === "string" && snapshot.actionLabel.trim()
         ? snapshot.actionLabel
         : repairLabel(actionKind);
@@ -2077,7 +2096,7 @@ function buildRepairHistory(tasks: PublishExportAiTask[], chapters: PublishExpor
           ? `复检 ${score} 分${shouldSecondPass ? "，仍需继续处理。" : "，已通过当前检查。"}`
           : "已完成修复动作。";
 
-      return {
+      return [{
         id: task.id ?? `${actionKind}-${task.chapterId ?? "project"}-${new Date(task.createdAt).getTime()}`,
         actionKind,
         label: actionLabel,
@@ -2088,9 +2107,13 @@ function buildRepairHistory(tasks: PublishExportAiTask[], chapters: PublishExpor
         shouldSecondPass,
         message,
         createdAt: task.createdAt,
-      };
-    })
-    .filter((item): item is PublishRepairHistoryItem => Boolean(item))
+      }];
+    });
+
+  return [
+    ...firstThreeRewriteItems,
+    ...repairTaskItems,
+  ]
     .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime())
     .slice(0, 6);
 }

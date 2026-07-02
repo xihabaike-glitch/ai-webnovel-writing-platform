@@ -142,8 +142,11 @@ export interface PrePublishGateStrategyProject {
 export interface PrePublishGateStrategyPlatform {
   platformId: string;
   platformName: string;
+  targetProjectId: string | null;
   recommendation: "scale" | "repair" | "collect_data" | "prepare_asset" | "pause";
+  actionType: "open_target" | "generate_asset_variants" | "rewrite_first_three" | "save_snapshot";
   label: string;
+  actionLabel: string;
   score: number;
   projectCount: number;
   readyPackages: number;
@@ -553,8 +556,25 @@ function buildStrategyPlatform(
   return {
     platformId,
     platformName,
+    targetProjectId: target?.projectId ?? null,
     recommendation,
+    actionType: recommendation === "prepare_asset"
+      ? "generate_asset_variants"
+      : recommendation === "repair"
+        ? "rewrite_first_three"
+        : recommendation === "collect_data" && target?.loopTimeline.status === "needs_baseline"
+          ? "save_snapshot"
+          : "open_target",
     label: strategyRecommendationLabel(recommendation),
+    actionLabel: recommendation === "prepare_asset"
+      ? "生成投稿方案"
+      : recommendation === "repair"
+        ? "重写前三章"
+        : recommendation === "collect_data" && target?.loopTimeline.status === "needs_baseline"
+          ? "保存基准"
+          : recommendation === "scale"
+            ? "打开加更"
+            : "打开位置",
     score,
     projectCount,
     readyPackages,
@@ -563,7 +583,9 @@ function buildStrategyPlatform(
     assetGaps,
     baselineGaps,
     nextAction,
-    href: target?.loopTimeline.actionHref ?? target?.href ?? "/projects",
+    href: recommendation === "scale" && target
+      ? `/projects/${target.projectId}#create-chapter`
+      : target?.loopTimeline.actionHref ?? target?.href ?? "/projects",
     projects: items.slice(0, 4).map((item) => ({
       projectId: item.projectId,
       projectTitle: item.projectTitle,

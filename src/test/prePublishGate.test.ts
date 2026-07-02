@@ -299,7 +299,11 @@ test("buildPrePublishGate", async (t) => {
     assert.equal(review.totals.repair, 1);
     assert.equal(review.primary?.platformId, "fanqie");
     assert.equal(fanqie?.recommendation, "scale");
+    assert.equal(fanqie?.actionType, "open_target");
+    assert.equal(fanqie?.href, "/projects/project-ready#create-chapter");
     assert.equal(qimao?.recommendation, "repair");
+    assert.equal(qimao?.actionType, "rewrite_first_three");
+    assert.equal(qimao?.actionLabel, "重写前三章");
     assert.ok(qimao?.nextAction.includes("先按弱项"));
   });
 

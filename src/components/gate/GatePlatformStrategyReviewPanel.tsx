@@ -1,5 +1,18 @@
+"use client";
+
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
 import type { PrePublishGateStrategyPlatform, PrePublishGateStrategyReview } from "@/lib/projects/prePublishGate";
+
+interface StrategyActionReceipt {
+  id: string;
+  label: string;
+  status: "succeeded" | "failed";
+  message: string;
+  href: string;
+  createdAt: string;
+}
 
 function recommendationTone(recommendation: PrePublishGateStrategyPlatform["recommendation"]) {
   if (recommendation === "scale") return "bg-emerald-50 text-emerald-700";
@@ -16,7 +29,97 @@ function scoreTone(score: number) {
   return "text-rose-700";
 }
 
+function receiptTone(status: StrategyActionReceipt["status"]) {
+  if (status === "succeeded") return "border-emerald-200 bg-emerald-50 text-emerald-800";
+  return "border-rose-200 bg-rose-50 text-rose-800";
+}
+
 export function GatePlatformStrategyReviewPanel({ review }: { review: PrePublishGateStrategyReview }) {
+  const router = useRouter();
+  const [runningId, setRunningId] = useState<string | null>(null);
+  const [receipt, setReceipt] = useState<StrategyActionReceipt | null>(null);
+
+  async function runStrategyAction(item: PrePublishGateStrategyPlatform) {
+    if (!item.targetProjectId) return;
+    const runId = `${item.targetProjectId}:${item.platformId}:${item.actionType}`;
+    setRunningId(runId);
+    setReceipt(null);
+
+    try {
+      if (item.actionType === "open_target") {
+        setReceipt({
+          id: `${runId}:${new Date().toISOString()}`,
+          label: item.actionLabel,
+          status: "succeeded",
+          message: item.nextAction,
+          href: item.href,
+          createdAt: new Date().toISOString(),
+        });
+        router.push(item.href);
+        return;
+      }
+
+      const response = await fetch(
+        item.actionType === "generate_asset_variants"
+          ? `/api/projects/${item.targetProjectId}/platform-export/asset-optimize`
+          : item.actionType === "rewrite_first_three"
+            ? `/api/projects/${item.targetProjectId}/first-three-rewrite/generate`
+            : `/api/projects/${item.targetProjectId}/platform-export`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(
+            item.actionType === "generate_asset_variants"
+              ? { platformId: item.platformId }
+              : item.actionType === "rewrite_first_three"
+                ? { platformId: item.platformId, chapterOrders: [1, 2, 3], targetWords: 1600 }
+                : { action: "snapshot", platformId: item.platformId },
+          ),
+        },
+      );
+      const payload = (await response.json().catch(() => null)) as {
+        message?: string;
+        error?: string;
+        variants?: unknown[];
+        results?: unknown[];
+      } | null;
+      if (!response.ok) throw new Error(payload?.error ?? "策略动作执行失败。");
+
+      const message = item.actionType === "generate_asset_variants"
+        ? `已生成 ${payload?.variants?.length ?? 0} 个 ${item.platformName} 投稿方案，下一步采纳最强版本并保存基准。`
+        : item.actionType === "rewrite_first_three"
+          ? `已按 ${item.platformName} 重写前三章，共 ${payload?.results?.length ?? 0} 章。`
+          : payload?.message ?? `已保存 ${item.platformName} 发布包基准。`;
+      setReceipt({
+        id: `${runId}:${new Date().toISOString()}`,
+        label: item.actionLabel,
+        status: "succeeded",
+        message,
+        href: item.href,
+        createdAt: new Date().toISOString(),
+      });
+      router.refresh();
+    } catch (caught) {
+      const message = caught instanceof Error ? caught.message : "策略动作执行失败。";
+      setReceipt({
+        id: `${runId}:${new Date().toISOString()}`,
+        label: item.actionLabel,
+        status: "failed",
+        message,
+        href: item.href,
+        createdAt: new Date().toISOString(),
+      });
+    } finally {
+      setRunningId(null);
+    }
+  }
+
+  function buttonText(item: PrePublishGateStrategyPlatform) {
+    const runId = `${item.targetProjectId}:${item.platformId}:${item.actionType}`;
+    if (runningId === runId) return "执行中";
+    return item.actionLabel;
+  }
+
   return (
     <section className="mb-6 rounded-md border border-slate-200 bg-white p-4">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
@@ -48,6 +151,21 @@ export function GatePlatformStrategyReviewPanel({ review }: { review: PrePublish
         </div>
       </div>
 
+      {receipt ? (
+        <div className={`mt-3 rounded-md border p-3 text-sm ${receiptTone(receipt.status)}`}>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <div className="font-medium">{receipt.status === "succeeded" ? "策略动作已执行" : "策略动作失败"} · {receipt.label}</div>
+              <p className="mt-1 leading-6 opacity-85">{receipt.message}</p>
+              <p className="mt-1 text-xs opacity-70">{new Date(receipt.createdAt).toLocaleString()}</p>
+            </div>
+            <Link className="w-fit rounded-md bg-white px-3 py-2 text-xs font-medium text-slate-950" href={receipt.href}>
+              打开相关位置
+            </Link>
+          </div>
+        </div>
+      ) : null}
+
       {review.primary ? (
         <div className="mt-4 rounded-md border border-slate-200 bg-slate-50 p-3">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
@@ -61,9 +179,14 @@ export function GatePlatformStrategyReviewPanel({ review }: { review: PrePublish
               </div>
               <p className="mt-2 text-sm leading-6 text-slate-600">{review.primary.nextAction}</p>
             </div>
-            <Link className="w-fit rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white" href={review.primary.href}>
-              处理主平台
-            </Link>
+            <button
+              className="w-fit rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white disabled:opacity-50"
+              disabled={Boolean(runningId) || !review.primary.targetProjectId}
+              onClick={() => void runStrategyAction(review.primary!)}
+              type="button"
+            >
+              {buttonText(review.primary)}
+            </button>
           </div>
         </div>
       ) : null}
@@ -82,9 +205,19 @@ export function GatePlatformStrategyReviewPanel({ review }: { review: PrePublish
                 </div>
                 <p className="mt-2 text-sm leading-6 text-slate-600">{item.nextAction}</p>
               </div>
-              <Link className="w-fit rounded-md border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50" href={item.href}>
-                去处理
-              </Link>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  className="w-fit rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white disabled:opacity-50"
+                  disabled={Boolean(runningId) || !item.targetProjectId}
+                  onClick={() => void runStrategyAction(item)}
+                  type="button"
+                >
+                  {buttonText(item)}
+                </button>
+                <Link className="w-fit rounded-md border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50" href={item.href}>
+                  打开位置
+                </Link>
+              </div>
             </div>
             <div className="mt-3 grid grid-cols-3 gap-2 text-center text-xs text-slate-600">
               <div className="rounded-md bg-white px-2 py-2">

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { AppShell } from "@/components/app-shell/AppShell";
 import { RetryTaskButton } from "@/components/tasks/RetryTaskButton";
 import { RunRecommendedBatchButton } from "@/components/tasks/RunRecommendedBatchButton";
+import { buildTaskBatchHistory } from "@/lib/ai/taskBatchHistory";
 import { buildTaskRunConsole, type TaskRunLog } from "@/lib/ai/taskRunConsole";
 import { prisma } from "@/lib/db/prisma";
 import { buildBatchExecutionSafety } from "@/lib/projects/batchExecutionSafety";
@@ -50,6 +51,16 @@ function logMeta(log: TaskRunLog) {
   return parts.join(" · ");
 }
 
+function usd(value: number) {
+  return `$${value.toFixed(4)}`;
+}
+
+function batchTone(successRate: number, failedTasks: number, runningTasks: number) {
+  if (runningTasks > 0) return "border-blue-200 bg-blue-50 text-blue-800";
+  if (failedTasks > 0 || successRate < 80) return "border-rose-200 bg-rose-50 text-rose-800";
+  return "border-emerald-200 bg-emerald-50 text-emerald-800";
+}
+
 export default async function TasksPage() {
   const [projects, recentAiTasks, chapters] = await Promise.all([
     prisma.project.findMany({
@@ -76,6 +87,10 @@ export default async function TasksPage() {
   const safety = buildBatchExecutionSafety(queue.items, projects);
   const executionPlan = buildTaskQueueExecutionPlan(queue.items);
   const runConsole = buildTaskRunConsole(recentAiTasks.map((task) => ({
+    ...task,
+    chapter: task.chapterId ? chaptersById.get(task.chapterId) ?? null : null,
+  })));
+  const batchHistory = buildTaskBatchHistory(recentAiTasks.map((task) => ({
     ...task,
     chapter: task.chapterId ? chaptersById.get(task.chapterId) ?? null : null,
   })));
@@ -293,6 +308,56 @@ export default async function TasksPage() {
               <p className="mt-1 leading-6 text-slate-600">{item.detail}</p>
             </div>
           ))}
+        </div>
+      </section>
+
+      <section className="mb-6 rounded-md border border-slate-200 bg-white p-4">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <h2 className="font-medium">最近批量回执</h2>
+            <p className="mt-1 text-sm text-slate-600">按同项目、同动作、短时间连续运行自动归批，复盘成功率、成本、质量和下一步。</p>
+          </div>
+          <div className="rounded-md bg-slate-50 px-3 py-2 text-sm font-medium text-slate-700">
+            {batchHistory.length ? `${batchHistory.length} 批可复盘` : "等待批量样本"}
+          </div>
+        </div>
+        <div className="mt-4 grid gap-3">
+          {batchHistory.map((batch) => (
+            <Link className="rounded-md border border-slate-200 p-3 text-sm hover:bg-slate-50" href={batch.href} key={batch.id}>
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                <div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className={`rounded-md border px-2 py-1 text-xs font-medium ${batchTone(batch.summary.successRatePercent, batch.summary.failedTasks, batch.runningTasks)}`}>
+                      成功率 {batch.summary.successRatePercent}%
+                    </span>
+                    <span className="font-medium text-slate-950">{batch.taskLabel}</span>
+                    <span className="text-xs text-slate-500">{new Date(batch.startedAt).toLocaleString()}</span>
+                  </div>
+                  <div className="mt-2 text-slate-600">{batch.projectTitle} · {batch.chapterTitles.join("、")}</div>
+                  <p className="mt-2 leading-6 text-slate-600">{batch.summary.verdict}</p>
+                  <p className="mt-1 leading-6 text-slate-500">{batch.nextAction}</p>
+                  {batch.failedSamples.length ? (
+                    <div className="mt-2 grid gap-1 text-xs text-rose-700">
+                      {batch.failedSamples.map((sample) => (
+                        <div key={sample}>{sample}</div>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+                <div className="grid min-w-56 gap-1 rounded-md bg-slate-50 p-3 text-xs text-slate-600">
+                  <div>任务 {batch.summary.totalTasks} · 未落地 {batch.runningTasks}</div>
+                  <div>成本 {usd(batch.summary.knownCostUsd)} · Token {batch.summary.totalTokens}</div>
+                  <div>质量 {batch.summary.averageQualityScore ?? "缺"} · 备用 {batch.summary.fallbackTasks}</div>
+                  <div>{batch.summary.providerLabels.join(" / ") || "暂无模型路线"}</div>
+                </div>
+              </div>
+            </Link>
+          ))}
+          {batchHistory.length === 0 ? (
+            <p className="rounded-md border border-dashed border-slate-300 p-3 text-sm text-slate-600">
+              还没有可归因的批量写审改记录。先执行一次推荐小批次，这里会自动生成回执。
+            </p>
+          ) : null}
         </div>
       </section>
 

@@ -12,6 +12,7 @@ import {
   buildGateDispatchEvidenceReview,
   buildGatePlatformScaleGate,
   buildGatePlatformScaleFollowup,
+  buildGatePlatformScaleCadence,
   buildGateDispatchTaskCenter,
   buildGateDispatchTaskCloseoutItem,
   buildGatePublishEffectReceipt,
@@ -677,6 +678,142 @@ test("buildGateActionReceipt", async (t) => {
     assert.equal(blockedGate.items[0].label, "等待加码效果");
     assert.equal(trackedFollowup.summary.tracked, 1);
     assert.equal(readyGate.items[0].status, "ready");
+  });
+
+  await t.test("controls continuous scale-up cadence by window, cooldown, and follow-up", () => {
+    const fanqieEffect = buildGatePublishEffectReceipt({
+      projectId: "project-1",
+      platformId: "fanqie",
+      platformName: "番茄小说",
+      now: "2026-01-20T00:00:00.000Z",
+      metric: {
+        views: 3000,
+        clicks: 500,
+        favorites: 160,
+        follows: 90,
+      },
+    });
+    const qimaoEffect = buildGatePublishEffectReceipt({
+      projectId: "project-2",
+      platformId: "qimao",
+      platformName: "七猫小说",
+      now: "2026-01-20T00:10:00.000Z",
+      metric: {
+        views: 2500,
+        clicks: 420,
+        favorites: 120,
+        follows: 70,
+      },
+    });
+    const webnovelEffect = buildGatePublishEffectReceipt({
+      projectId: "project-3",
+      platformId: "webnovel",
+      platformName: "WebNovel",
+      now: "2026-01-20T00:20:00.000Z",
+      metric: {
+        views: 1800,
+        clicks: 280,
+        favorites: 90,
+        follows: 48,
+      },
+    });
+    const reviews = buildGatePlatformGrowthReview([webnovelEffect, qimaoEffect, fanqieEffect]);
+    const fanqieDispatch = buildGatePlatformGrowthDispatchItems([fanqieEffect])[0];
+    const qimaoDispatch = buildGatePlatformGrowthDispatchItems([qimaoEffect])[0];
+    const webnovelDispatch = buildGatePlatformGrowthDispatchItems([webnovelEffect])[0];
+    const fanqieRecentTask = {
+      ...fanqieDispatch,
+      databaseId: "dispatch-db-fanqie-recent",
+      dispatchKey: fanqieDispatch.id,
+      projectId: "project-1",
+      sourceReceiptId: null,
+      completionEvidence: "已完成一轮小步加码并记录范围。",
+      state: "completed" as const,
+      assignedAt: "2026-01-18T08:00:00.000Z",
+      completedAt: "2026-01-18T09:00:00.000Z",
+      createdAt: "2026-01-18T08:00:00.000Z",
+      updatedAt: "2026-01-18T09:00:00.000Z",
+    };
+    const qimaoFirstTask = {
+      ...qimaoDispatch,
+      databaseId: "dispatch-db-qimao-1",
+      dispatchKey: qimaoDispatch.id,
+      projectId: "project-2",
+      sourceReceiptId: null,
+      completionEvidence: "已完成第一轮小步加码。",
+      state: "completed" as const,
+      assignedAt: "2026-01-08T08:00:00.000Z",
+      completedAt: "2026-01-08T09:00:00.000Z",
+      createdAt: "2026-01-08T08:00:00.000Z",
+      updatedAt: "2026-01-08T09:00:00.000Z",
+    };
+    const qimaoSecondTask = {
+      ...qimaoDispatch,
+      databaseId: "dispatch-db-qimao-2",
+      dispatchKey: "qimao:scale_up:second",
+      projectId: "project-2",
+      sourceReceiptId: null,
+      completionEvidence: "已完成第二轮小步加码。",
+      state: "completed" as const,
+      assignedAt: "2026-01-16T08:00:00.000Z",
+      completedAt: "2026-01-16T09:00:00.000Z",
+      createdAt: "2026-01-16T08:00:00.000Z",
+      updatedAt: "2026-01-16T09:00:00.000Z",
+    };
+    const webnovelTask = {
+      ...webnovelDispatch,
+      databaseId: "dispatch-db-webnovel",
+      dispatchKey: webnovelDispatch.id,
+      projectId: "project-3",
+      sourceReceiptId: null,
+      completionEvidence: "已完成海外小步加码。",
+      state: "completed" as const,
+      assignedAt: "2026-01-20T08:00:00.000Z",
+      completedAt: "2026-01-20T09:00:00.000Z",
+      createdAt: "2026-01-20T08:00:00.000Z",
+      updatedAt: "2026-01-20T09:00:00.000Z",
+    };
+    const fanqieAfterScaleEffect = buildGatePublishEffectReceipt({
+      projectId: "project-1",
+      platformId: "fanqie",
+      platformName: "番茄小说",
+      now: "2026-01-19T09:00:00.000Z",
+      metric: {
+        views: 3600,
+        clicks: 620,
+        favorites: 190,
+        follows: 110,
+      },
+    });
+    const qimaoAfterSecondScaleEffect = buildGatePublishEffectReceipt({
+      projectId: "project-2",
+      platformId: "qimao",
+      platformName: "七猫小说",
+      now: "2026-01-17T09:00:00.000Z",
+      metric: {
+        views: 2800,
+        clicks: 460,
+        favorites: 150,
+        follows: 92,
+      },
+    });
+    const receipts = [qimaoAfterSecondScaleEffect, fanqieAfterScaleEffect, webnovelEffect, qimaoEffect, fanqieEffect];
+    const tasks = [fanqieRecentTask, qimaoFirstTask, qimaoSecondTask, webnovelTask];
+    const followup = buildGatePlatformScaleFollowup(tasks, receipts);
+    const cadence = buildGatePlatformScaleCadence(reviews, tasks, followup, "2026-01-20T12:00:00.000Z", {
+      windowDays: 14,
+      maxScaleInWindow: 2,
+      cooldownDays: 7,
+    });
+    const evidenceReview = buildGateDispatchEvidenceReview(tasks, receipts);
+    const gate = buildGatePlatformScaleGate(reviews, evidenceReview, followup, cadence);
+
+    assert.equal(cadence.items.find((item) => item.platformId === "fanqie")?.status, "cooldown");
+    assert.equal(cadence.items.find((item) => item.platformId === "qimao")?.status, "over_limit");
+    assert.equal(cadence.items.find((item) => item.platformId === "webnovel")?.status, "needs_followup");
+    assert.equal(gate.items.find((item) => item.platformId === "fanqie")?.status, "blocked_evidence");
+    assert.ok(cadence.nextActions.some((actionText) => actionText.includes("冷却期")));
+    assert.ok(cadence.nextActions.some((actionText) => actionText.includes("上限")));
   });
 
   await t.test("records dispatch receipts and marks the dispatch as assigned", () => {

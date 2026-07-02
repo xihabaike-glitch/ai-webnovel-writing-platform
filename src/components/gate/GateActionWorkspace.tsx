@@ -9,6 +9,7 @@ import {
   buildGateActionReviewAdvice,
   buildGateDispatchEvidenceReview,
   buildGatePlatformScaleFollowup,
+  buildGatePlatformScaleCadence,
   buildGatePlatformScaleGate,
   buildGatePlatformDispatchReceipt,
   buildGatePlatformGrowthDispatchItems,
@@ -33,6 +34,7 @@ import {
   type GateActionReceiptStatusFilter,
   type GateDispatchEvidenceReviewStatus,
   type GatePlatformScaleFollowupStatus,
+  type GatePlatformScaleCadenceStatus,
   type GatePlatformScaleGateStatus,
   type GatePlatformGrowthDispatchItem,
   type GatePlatformGrowthReview,
@@ -127,6 +129,14 @@ function scaleFollowupClass(status: GatePlatformScaleFollowupStatus) {
   return "border-slate-200 bg-slate-50 text-slate-800";
 }
 
+function scaleCadenceClass(status: GatePlatformScaleCadenceStatus) {
+  if (status === "ready") return "border-emerald-200 bg-emerald-50 text-emerald-900";
+  if (status === "cooldown") return "border-blue-200 bg-blue-50 text-blue-900";
+  if (status === "over_limit") return "border-rose-200 bg-rose-50 text-rose-900";
+  if (status === "needs_followup") return "border-amber-200 bg-amber-50 text-amber-900";
+  return "border-slate-200 bg-slate-50 text-slate-800";
+}
+
 export function GateActionWorkspace({ actions }: { actions: PrePublishGateAction[] }) {
   const router = useRouter();
   const [receipts, setReceipts] = useState<GateActionReceipt[]>([]);
@@ -151,7 +161,9 @@ export function GateActionWorkspace({ actions }: { actions: PrePublishGateAction
   const dispatchEvidenceIssues = dispatchEvidenceReview.items.filter((item) => item.status !== "verified").slice(0, 4);
   const scaleFollowup = buildGatePlatformScaleFollowup(visibleDispatchTasks, receipts);
   const scaleFollowupIssues = scaleFollowup.items.filter((item) => item.status !== "tracked").slice(0, 4);
-  const scaleGate = buildGatePlatformScaleGate(platformGrowthReview, dispatchEvidenceReview, scaleFollowup);
+  const scaleCadence = buildGatePlatformScaleCadence(platformGrowthReview, visibleDispatchTasks, scaleFollowup);
+  const scaleCadenceIssues = scaleCadence.items.filter((item) => item.status !== "ready" && item.status !== "not_candidate").slice(0, 4);
+  const scaleGate = buildGatePlatformScaleGate(platformGrowthReview, dispatchEvidenceReview, scaleFollowup, scaleCadence);
   const scaleGateVisibleItems = scaleGate.items.filter((item) => item.status !== "not_candidate").slice(0, 4);
   const latestReceipt = filteredReceipts[0] ?? null;
 
@@ -458,6 +470,83 @@ export function GateActionWorkspace({ actions }: { actions: PrePublishGateAction
           ) : (
             <p className="rounded-md border border-dashed border-slate-300 bg-white p-3 text-sm text-slate-600">
               暂无加码派单。只有平台通过加码决策闸后，这里才会追踪下一轮效果。
+            </p>
+          )}
+        </div>
+        <div className="mt-3 grid gap-2">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <div className="text-xs font-medium text-slate-500">连续加码节奏闸</div>
+              <p className="mt-1 text-xs text-slate-500">控制加码次数、冷却期和回填周期，防止一次好数据被连续猛推。</p>
+            </div>
+          </div>
+          <div className="grid gap-2 sm:grid-cols-4">
+            <div className="rounded-md border border-emerald-100 bg-white p-3">
+              <div className="text-xs text-slate-500">节奏允许</div>
+              <div className="mt-1 text-lg font-semibold text-emerald-700">{scaleCadence.summary.ready}</div>
+            </div>
+            <div className="rounded-md border border-blue-100 bg-white p-3">
+              <div className="text-xs text-slate-500">冷却中</div>
+              <div className="mt-1 text-lg font-semibold text-blue-700">{scaleCadence.summary.cooldown}</div>
+            </div>
+            <div className="rounded-md border border-rose-100 bg-white p-3">
+              <div className="text-xs text-slate-500">窗口超限</div>
+              <div className="mt-1 text-lg font-semibold text-rose-700">{scaleCadence.summary.overLimit}</div>
+            </div>
+            <div className="rounded-md border border-amber-100 bg-white p-3">
+              <div className="text-xs text-slate-500">缺效果闭环</div>
+              <div className="mt-1 text-lg font-semibold text-amber-700">{scaleCadence.summary.needsFollowup}</div>
+            </div>
+          </div>
+          {scaleCadence.nextActions.length ? (
+            <div className="grid gap-2 xl:grid-cols-2">
+              {scaleCadence.nextActions.map((action) => (
+                <div className="rounded-md bg-white p-3 text-sm leading-6 text-slate-600" key={action}>{action}</div>
+              ))}
+            </div>
+          ) : null}
+          {scaleCadenceIssues.length ? (
+            <div className="grid gap-2 xl:grid-cols-2">
+              {scaleCadenceIssues.map((item) => (
+                <div className={`rounded-md border p-3 text-sm ${scaleCadenceClass(item.status)}`} key={item.platformId}>
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-medium">{item.platformName}</span>
+                        <span className="rounded-md bg-white/70 px-2 py-1 text-xs font-medium">{item.label}</span>
+                      </div>
+                      <p className="mt-2 leading-6 opacity-85">{item.detail}</p>
+                    </div>
+                    <div className="text-right text-xs opacity-75">
+                      <div>{item.windowDays} 天窗口</div>
+                      <div className="mt-1">{item.recentScaleCount} 次加码</div>
+                    </div>
+                  </div>
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    <Link
+                      className="rounded-md bg-white px-3 py-2 text-xs font-medium text-slate-950"
+                      href={item.href}
+                    >
+                      {item.actionLabel}
+                    </Link>
+                    <button
+                      className="rounded-md border border-white/70 bg-white/70 px-3 py-2 text-xs font-medium text-slate-950"
+                      onClick={() => focusPlatform(item.platformId)}
+                      type="button"
+                    >
+                      只看该平台
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : scaleCadence.summary.candidates ? (
+            <p className="rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
+              当前加码候选没有触发连续加码限制，可以进入决策闸继续验收。
+            </p>
+          ) : (
+            <p className="rounded-md border border-dashed border-slate-300 bg-white p-3 text-sm text-slate-600">
+              暂无加码候选，先让平台复盘榜跑出明确的效果链路。
             </p>
           )}
         </div>

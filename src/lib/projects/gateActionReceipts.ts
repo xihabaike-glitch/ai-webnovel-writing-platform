@@ -301,6 +301,38 @@ export interface GatePlatformScaleFollowup {
   items: GatePlatformScaleFollowupItem[];
 }
 
+export type GatePlatformScaleCadenceStatus = "ready" | "cooldown" | "over_limit" | "needs_followup" | "not_candidate";
+
+export interface GatePlatformScaleCadenceItem {
+  platformId: string;
+  platformName: string;
+  status: GatePlatformScaleCadenceStatus;
+  label: string;
+  detail: string;
+  actionLabel: string;
+  href: string;
+  priorityScore: number;
+  recentScaleCount: number;
+  windowDays: number;
+  cooldownDays: number;
+  latestScaleAt: string | null;
+  nextAllowedAt: string | null;
+  evidence: string[];
+}
+
+export interface GatePlatformScaleCadence {
+  summary: {
+    total: number;
+    candidates: number;
+    ready: number;
+    cooldown: number;
+    overLimit: number;
+    needsFollowup: number;
+  };
+  nextActions: string[];
+  items: GatePlatformScaleCadenceItem[];
+}
+
 export interface GatePlatformStrategyReceiptPayload {
   message?: string;
   error?: string;
@@ -1599,6 +1631,7 @@ export function buildGatePlatformScaleGate(
   reviews: GatePlatformGrowthReview[],
   dispatchEvidenceReview: GateDispatchEvidenceReview,
   scaleFollowup?: GatePlatformScaleFollowup,
+  scaleCadence?: GatePlatformScaleCadence,
 ): GatePlatformScaleGate {
   const evidenceItemsByPlatform = new Map<string, GateDispatchEvidenceReviewItem[]>();
   for (const item of dispatchEvidenceReview.items) {
@@ -1612,6 +1645,7 @@ export function buildGatePlatformScaleGate(
     items.push(item);
     scaleFollowupItemsByPlatform.set(item.platformId, items);
   }
+  const scaleCadenceByPlatform = new Map((scaleCadence?.items ?? []).map((item) => [item.platformId, item]));
 
   const items = reviews.map((review): GatePlatformScaleGateItem => {
     const platformEvidenceItems = evidenceItemsByPlatform.get(review.platformId) ?? [];
@@ -1619,6 +1653,7 @@ export function buildGatePlatformScaleGate(
     const verifiedEvidence = platformEvidenceItems.filter((item) => item.status === "verified");
     const scaleFollowupIssue = (scaleFollowupItemsByPlatform.get(review.platformId) ?? [])
       .find((item) => item.status !== "tracked") ?? null;
+    const cadenceIssue = scaleCadenceByPlatform.get(review.platformId);
 
     if (review.stage !== "scale_up") {
       return {
@@ -1662,6 +1697,21 @@ export function buildGatePlatformScaleGate(
         priorityScore: Math.max(review.priorityScore, scaleFollowupIssue.priorityScore),
         stage: review.stage,
         evidence: scaleFollowupIssue.evidence.slice(0, 3),
+      };
+    }
+
+    if (cadenceIssue && cadenceIssue.status !== "ready" && cadenceIssue.status !== "not_candidate") {
+      return {
+        platformId: review.platformId,
+        platformName: review.platformName,
+        status: "blocked_evidence",
+        label: cadenceIssue.label,
+        detail: `${review.platformName} 未通过连续加码节奏检查：${cadenceIssue.detail}`,
+        actionLabel: cadenceIssue.actionLabel,
+        href: cadenceIssue.href,
+        priorityScore: Math.max(review.priorityScore, cadenceIssue.priorityScore),
+        stage: review.stage,
+        evidence: cadenceIssue.evidence.slice(0, 3),
       };
     }
 
@@ -1860,6 +1910,176 @@ export function buildGatePlatformScaleFollowup(
       const priorityDiff = right.priorityScore - left.priorityScore;
       if (priorityDiff !== 0) return priorityDiff;
       return left.title.localeCompare(right.title);
+    }),
+  };
+}
+
+export function buildGatePlatformScaleCadence(
+  reviews: GatePlatformGrowthReview[],
+  tasks: PersistedGatePlatformDispatchTask[],
+  scaleFollowup: GatePlatformScaleFollowup,
+  now: Date | string = new Date(),
+  options: { windowDays?: number; maxScaleInWindow?: number; cooldownDays?: number } = {},
+): GatePlatformScaleCadence {
+  const windowDays = options.windowDays ?? 14;
+  const maxScaleInWindow = options.maxScaleInWindow ?? 2;
+  const cooldownDays = options.cooldownDays ?? 7;
+  const current = new Date(now);
+  const windowStart = new Date(current.getTime() - windowDays * 24 * 60 * 60 * 1000);
+  const followupByPlatform = new Map(scaleFollowup.items.map((item) => [item.platformId, item]));
+  const scaleTasksByPlatform = new Map<string, PersistedGatePlatformDispatchTask[]>();
+  for (const task of tasks.filter((item) => item.stage === "scale_up")) {
+    const platformTasks = scaleTasksByPlatform.get(task.platformId) ?? [];
+    platformTasks.push(task);
+    scaleTasksByPlatform.set(task.platformId, platformTasks);
+  }
+
+  const items = reviews.map((review): GatePlatformScaleCadenceItem => {
+    const platformTasks = (scaleTasksByPlatform.get(review.platformId) ?? [])
+      .slice()
+      .sort((left, right) => new Date(right.completedAt ?? right.updatedAt).getTime() - new Date(left.completedAt ?? left.updatedAt).getTime());
+    const completedScaleTasks = platformTasks.filter((task) => task.state === "completed");
+    const latestCompletedTask = completedScaleTasks[0] ?? null;
+    const latestScaleAt = validDate(latestCompletedTask?.completedAt) ?? validDate(latestCompletedTask?.updatedAt);
+    const recentScaleCount = completedScaleTasks.filter((task) => {
+      const completedAt = validDate(task.completedAt) ?? validDate(task.updatedAt);
+      return completedAt ? completedAt.getTime() >= windowStart.getTime() && completedAt.getTime() <= current.getTime() : false;
+    }).length;
+    const nextAllowedAt = latestScaleAt
+      ? new Date(latestScaleAt.getTime() + cooldownDays * 24 * 60 * 60 * 1000)
+      : null;
+    const followup = followupByPlatform.get(review.platformId) ?? null;
+
+    if (review.stage !== "scale_up") {
+      return {
+        platformId: review.platformId,
+        platformName: review.platformName,
+        status: "not_candidate",
+        label: "非加码阶段",
+        detail: `${review.platformName} 当前是「${review.stageLabel}」，先完成现阶段动作。`,
+        actionLabel: "处理当前阶段",
+        href: review.href,
+        priorityScore: review.priorityScore,
+        recentScaleCount,
+        windowDays,
+        cooldownDays,
+        latestScaleAt: latestScaleAt?.toISOString() ?? null,
+        nextAllowedAt: nextAllowedAt?.toISOString() ?? null,
+        evidence: review.evidence,
+      };
+    }
+
+    if (followup && followup.status !== "tracked") {
+      return {
+        platformId: review.platformId,
+        platformName: review.platformName,
+        status: "needs_followup",
+        label: "先补效果",
+        detail: `${review.platformName} 上一轮加码还没完成效果闭环。先补对照数据，不许连续加码。`,
+        actionLabel: followup.actionLabel,
+        href: followup.href,
+        priorityScore: Math.max(review.priorityScore, followup.priorityScore),
+        recentScaleCount,
+        windowDays,
+        cooldownDays,
+        latestScaleAt: latestScaleAt?.toISOString() ?? null,
+        nextAllowedAt: nextAllowedAt?.toISOString() ?? null,
+        evidence: followup.evidence.slice(0, 3),
+      };
+    }
+
+    if (recentScaleCount >= maxScaleInWindow) {
+      return {
+        platformId: review.platformId,
+        platformName: review.platformName,
+        status: "over_limit",
+        label: "窗口超限",
+        detail: `${review.platformName} 最近 ${windowDays} 天已加码 ${recentScaleCount} 次，达到上限 ${maxScaleInWindow} 次。别把短期噪声当趋势。`,
+        actionLabel: "等待窗口释放",
+        href: "/gate",
+        priorityScore: review.priorityScore,
+        recentScaleCount,
+        windowDays,
+        cooldownDays,
+        latestScaleAt: latestScaleAt?.toISOString() ?? null,
+        nextAllowedAt: nextAllowedAt?.toISOString() ?? null,
+        evidence: [`${windowDays} 天内加码 ${recentScaleCount}/${maxScaleInWindow}`, ...review.evidence],
+      };
+    }
+
+    if (nextAllowedAt && current.getTime() < nextAllowedAt.getTime()) {
+      return {
+        platformId: review.platformId,
+        platformName: review.platformName,
+        status: "cooldown",
+        label: "冷却中",
+        detail: `${review.platformName} 上一轮加码还在冷却期。至少等到 ${nextAllowedAt.toISOString().slice(0, 10)}，再看对照数据。`,
+        actionLabel: "等待冷却结束",
+        href: "/gate",
+        priorityScore: review.priorityScore,
+        recentScaleCount,
+        windowDays,
+        cooldownDays,
+        latestScaleAt: latestScaleAt?.toISOString() ?? null,
+        nextAllowedAt: nextAllowedAt.toISOString(),
+        evidence: [`冷却 ${cooldownDays} 天`, latestScaleAt ? `最近加码 ${latestScaleAt.toISOString().slice(0, 10)}` : "无最近加码"],
+      };
+    }
+
+    return {
+      platformId: review.platformId,
+      platformName: review.platformName,
+      status: "ready",
+      label: latestScaleAt ? "节奏允许" : "首轮可排期",
+      detail: latestScaleAt
+        ? `${review.platformName} 未超过加码窗口，冷却期已过，可以排一轮小步加码。`
+        : `${review.platformName} 没有近期加码记录，可以排首轮小步加码。`,
+      actionLabel: "进入加码决策",
+      href: review.href,
+      priorityScore: review.priorityScore,
+      recentScaleCount,
+      windowDays,
+      cooldownDays,
+      latestScaleAt: latestScaleAt?.toISOString() ?? null,
+      nextAllowedAt: nextAllowedAt?.toISOString() ?? null,
+      evidence: [`${windowDays} 天内加码 ${recentScaleCount}/${maxScaleInWindow}`, ...review.evidence],
+    };
+  });
+
+  const ready = items.filter((item) => item.status === "ready").length;
+  const cooldown = items.filter((item) => item.status === "cooldown").length;
+  const overLimit = items.filter((item) => item.status === "over_limit").length;
+  const needsFollowup = items.filter((item) => item.status === "needs_followup").length;
+  const candidates = items.filter((item) => item.status !== "not_candidate").length;
+  const statusWeight: Record<GatePlatformScaleCadenceStatus, number> = {
+    needs_followup: 0,
+    over_limit: 1,
+    cooldown: 2,
+    ready: 3,
+    not_candidate: 4,
+  };
+
+  return {
+    summary: {
+      total: items.length,
+      candidates,
+      ready,
+      cooldown,
+      overLimit,
+      needsFollowup,
+    },
+    nextActions: [
+      needsFollowup > 0 ? `${needsFollowup} 个平台上一轮加码缺效果闭环，先补数据。` : null,
+      overLimit > 0 ? `${overLimit} 个平台触发 ${windowDays} 天加码次数上限，先停手观察。` : null,
+      cooldown > 0 ? `${cooldown} 个平台仍在 ${cooldownDays} 天冷却期，不要连续推。` : null,
+      ready > 0 ? `${ready} 个平台通过节奏检查，可以进入小步加码决策。` : null,
+    ].filter((action): action is string => Boolean(action)),
+    items: items.sort((left, right) => {
+      const statusDiff = statusWeight[left.status] - statusWeight[right.status];
+      if (statusDiff !== 0) return statusDiff;
+      const priorityDiff = right.priorityScore - left.priorityScore;
+      if (priorityDiff !== 0) return priorityDiff;
+      return left.platformName.localeCompare(right.platformName);
     }),
   };
 }

@@ -9,7 +9,9 @@ import {
   buildGatePlatformGrowthReview,
   buildGatePlatformGrowthDispatchItems,
   buildGatePlatformDispatchReceipt,
+  buildGateDispatchTaskCenter,
   buildGatePublishEffectReceipt,
+  filterGateDispatchTasks,
   filterGateActionReceipts,
   gateActionReceiptPlatform,
   mergeGateActionReceipts,
@@ -550,6 +552,82 @@ test("buildGateActionReceipt", async (t) => {
 
     assert.equal(refreshed[0].id, "fanqie:adopt_asset");
     assert.equal(refreshed[0].state, "completed");
+  });
+
+  await t.test("summarizes and filters persisted dispatch tasks for the task center", () => {
+    const baseDispatch = buildGatePlatformGrowthDispatchItems([buildGatePlatformStrategyReceipt({
+      item: strategyPlatform,
+      status: "succeeded",
+      now: "2026-01-01T00:00:00.000Z",
+      payload: {
+        variants: [{ strategy: "强钩子版" }],
+      },
+    })])[0];
+    const tasks = [
+      {
+        ...baseDispatch,
+        databaseId: "dispatch-db-1",
+        dispatchKey: baseDispatch.id,
+        projectId: "project-1",
+        sourceReceiptId: null,
+        state: "queued" as const,
+        priorityScore: 86,
+        assignedAt: null,
+        completedAt: null,
+        createdAt: "2026-01-01T00:00:01.000Z",
+        updatedAt: "2026-01-01T00:00:01.000Z",
+      },
+      {
+        ...baseDispatch,
+        id: "qimao:record_metrics",
+        databaseId: "dispatch-db-2",
+        dispatchKey: "qimao:record_metrics",
+        projectId: "project-2",
+        platformId: "qimao",
+        platformName: "七猫小说",
+        stage: "record_metrics" as const,
+        state: "assigned" as const,
+        ownerRole: "运营数据编辑",
+        priorityScore: 42,
+        assignedAt: "2026-01-01T00:00:02.000Z",
+        completedAt: null,
+        createdAt: "2026-01-01T00:00:02.000Z",
+        updatedAt: "2026-01-01T00:00:02.000Z",
+      },
+      {
+        ...baseDispatch,
+        id: "webnovel:scale_up",
+        databaseId: "dispatch-db-3",
+        dispatchKey: "webnovel:scale_up",
+        projectId: "project-3",
+        platformId: "webnovel",
+        platformName: "WebNovel",
+        stage: "scale_up" as const,
+        state: "completed" as const,
+        ownerRole: "增长运营",
+        priorityScore: 22,
+        assignedAt: "2026-01-01T00:00:03.000Z",
+        completedAt: "2026-01-01T00:00:04.000Z",
+        createdAt: "2026-01-01T00:00:03.000Z",
+        updatedAt: "2026-01-01T00:00:04.000Z",
+      },
+    ];
+
+    const center = buildGateDispatchTaskCenter(tasks);
+    const assigned = filterGateDispatchTasks(tasks, { state: "assigned" });
+    const fanqie = filterGateDispatchTasks(tasks, { platformId: "fanqie" });
+
+    assert.equal(center.summary.total, 3);
+    assert.equal(center.summary.active, 2);
+    assert.equal(center.summary.queued, 1);
+    assert.equal(center.summary.assigned, 1);
+    assert.equal(center.summary.completed, 1);
+    assert.equal(center.platforms[0].id, "fanqie");
+    assert.ok(center.nextActions.some((actionText) => actionText.includes("高优先级")));
+    assert.equal(assigned.length, 1);
+    assert.equal(assigned[0].platformId, "qimao");
+    assert.equal(fanqie.length, 1);
+    assert.equal(fanqie[0].ownerRole, "投稿资产编辑");
   });
 
   await t.test("builds platform strategy receipts for the unified gate audit log", () => {

@@ -156,6 +156,39 @@ export interface PersistedGatePlatformDispatchTask extends GatePlatformGrowthDis
   updatedAt: string;
 }
 
+export type GateDispatchTaskStateFilter = GatePlatformGrowthDispatchState | "all";
+
+export interface GateDispatchTaskFilters {
+  state?: GateDispatchTaskStateFilter;
+  platformId?: string;
+  ownerRole?: string;
+}
+
+export interface GateDispatchTaskCenter {
+  summary: {
+    total: number;
+    queued: number;
+    assigned: number;
+    completed: number;
+    active: number;
+    averagePriorityScore: number;
+  };
+  platforms: Array<{
+    id: string;
+    name: string;
+    total: number;
+    active: number;
+    topPriorityScore: number;
+  }>;
+  ownerRoles: Array<{
+    role: string;
+    total: number;
+    active: number;
+    topPriorityScore: number;
+  }>;
+  nextActions: string[];
+}
+
 export interface GatePlatformStrategyReceiptPayload {
   message?: string;
   error?: string;
@@ -1126,6 +1159,96 @@ export async function fetchPersistedGateDispatchTasks(options?: {
   const payload = (await response.json().catch(() => null)) as { tasks?: PersistedGatePlatformDispatchTask[]; error?: string } | null;
   if (!response.ok) throw new Error(payload?.error ?? "读取平台派单失败。");
   return payload?.tasks ?? [];
+}
+
+export function filterGateDispatchTasks(
+  tasks: PersistedGatePlatformDispatchTask[],
+  filters: GateDispatchTaskFilters,
+) {
+  return tasks
+    .filter((task) => true
+      && (!filters.state || filters.state === "all" || task.state === filters.state)
+      && (!filters.platformId || filters.platformId === "all" || task.platformId === filters.platformId)
+      && (!filters.ownerRole || filters.ownerRole === "all" || task.ownerRole === filters.ownerRole))
+    .sort((left, right) => {
+      const stateWeight: Record<GatePlatformGrowthDispatchState, number> = { queued: 0, assigned: 1, completed: 2 };
+      const stateDiff = stateWeight[left.state] - stateWeight[right.state];
+      if (stateDiff !== 0) return stateDiff;
+      const priorityDiff = right.priorityScore - left.priorityScore;
+      if (priorityDiff !== 0) return priorityDiff;
+      return new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime();
+    });
+}
+
+export function buildGateDispatchTaskCenter(tasks: PersistedGatePlatformDispatchTask[]): GateDispatchTaskCenter {
+  const platformMap = new Map<string, GateDispatchTaskCenter["platforms"][number]>();
+  const roleMap = new Map<string, GateDispatchTaskCenter["ownerRoles"][number]>();
+  let totalPriorityScore = 0;
+
+  for (const task of tasks) {
+    const isActive = task.state !== "completed";
+    totalPriorityScore += task.priorityScore;
+
+    const platform = platformMap.get(task.platformId) ?? {
+      id: task.platformId,
+      name: task.platformName,
+      total: 0,
+      active: 0,
+      topPriorityScore: 0,
+    };
+    platform.total += 1;
+    if (isActive) platform.active += 1;
+    platform.topPriorityScore = Math.max(platform.topPriorityScore, task.priorityScore);
+    platformMap.set(task.platformId, platform);
+
+    const role = roleMap.get(task.ownerRole) ?? {
+      role: task.ownerRole,
+      total: 0,
+      active: 0,
+      topPriorityScore: 0,
+    };
+    role.total += 1;
+    if (isActive) role.active += 1;
+    role.topPriorityScore = Math.max(role.topPriorityScore, task.priorityScore);
+    roleMap.set(task.ownerRole, role);
+  }
+
+  const queued = tasks.filter((task) => task.state === "queued").length;
+  const assigned = tasks.filter((task) => task.state === "assigned").length;
+  const completed = tasks.filter((task) => task.state === "completed").length;
+  const highPriorityQueued = tasks.filter((task) => task.state === "queued" && task.priorityScore >= 70).length;
+  const activeRoles = [...roleMap.values()].filter((role) => role.active > 0).length;
+  const topPlatform = [...platformMap.values()].sort((left, right) => right.active - left.active || right.total - left.total)[0] ?? null;
+
+  return {
+    summary: {
+      total: tasks.length,
+      queued,
+      assigned,
+      completed,
+      active: queued + assigned,
+      averagePriorityScore: tasks.length ? Math.round(totalPriorityScore / tasks.length) : 0,
+    },
+    platforms: [...platformMap.values()].sort((left, right) => (
+      right.active - left.active
+      || right.topPriorityScore - left.topPriorityScore
+      || right.total - left.total
+      || left.name.localeCompare(right.name)
+    )),
+    ownerRoles: [...roleMap.values()].sort((left, right) => (
+      right.active - left.active
+      || right.topPriorityScore - left.topPriorityScore
+      || right.total - left.total
+      || left.role.localeCompare(right.role)
+    )),
+    nextActions: [
+      highPriorityQueued > 0 ? `先派掉 ${highPriorityQueued} 个高优先级任务，别让平台机会窗口过期。` : null,
+      assigned > 0 ? `跟进 ${assigned} 个已派任务，要求按验收标准回填证据。` : null,
+      topPlatform && topPlatform.active > 0 ? `${topPlatform.name} 当前活跃派单最多，先压低它的未闭环数量。` : null,
+      activeRoles > 1 ? `跨 ${activeRoles} 个角色协同，今天只看派单是否闭环，不开新坑。` : null,
+      tasks.length === 0 ? "还没有派单任务，先从总闸门执行平台复盘和派单。" : null,
+    ].filter((action): action is string => Boolean(action)),
+  };
 }
 
 export async function persistGateDispatchTask(dispatch: GatePlatformGrowthDispatchItem, sourceReceipt?: GateActionReceipt) {

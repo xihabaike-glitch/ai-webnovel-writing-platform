@@ -196,7 +196,7 @@ export async function PATCH(request: Request) {
     data: {
       state: nextState,
       assignedAt: nextState === "assigned" ? now : undefined,
-      completedAt: nextState === "completed" ? now : nextState === "queued" ? null : undefined,
+      completedAt: nextState === "completed" ? now : nextState === "queued" || nextState === "assigned" ? null : undefined,
     },
   });
 

@@ -10,6 +10,7 @@ import {
   buildGatePlatformGrowthDispatchItems,
   buildGatePlatformDispatchReceipt,
   buildGateDispatchTaskCenter,
+  buildGateDispatchTaskCloseoutItem,
   buildGatePublishEffectReceipt,
   filterGateDispatchTasks,
   filterGateActionReceipts,
@@ -628,6 +629,58 @@ test("buildGateActionReceipt", async (t) => {
     assert.equal(assigned[0].platformId, "qimao");
     assert.equal(fanqie.length, 1);
     assert.equal(fanqie[0].ownerRole, "投稿资产编辑");
+  });
+
+  await t.test("flags overdue and today dispatch closeout items", () => {
+    const baseDispatch = buildGatePlatformGrowthDispatchItems([buildGatePlatformStrategyReceipt({
+      item: strategyPlatform,
+      status: "succeeded",
+      now: "2026-01-01T00:00:00.000Z",
+      payload: {
+        variants: [{ strategy: "强钩子版" }],
+      },
+    })])[0];
+    const overdueTask = {
+      ...baseDispatch,
+      databaseId: "dispatch-db-overdue",
+      dispatchKey: baseDispatch.id,
+      projectId: "project-1",
+      sourceReceiptId: null,
+      state: "assigned" as const,
+      dueLabel: "24 小时内",
+      assignedAt: "2026-01-01T08:00:00.000Z",
+      completedAt: null,
+      createdAt: "2026-01-01T08:00:00.000Z",
+      updatedAt: "2026-01-01T08:00:00.000Z",
+    };
+    const todayTask = {
+      ...baseDispatch,
+      id: "qimao:record_metrics",
+      databaseId: "dispatch-db-today",
+      dispatchKey: "qimao:record_metrics",
+      projectId: "project-2",
+      platformId: "qimao",
+      platformName: "七猫小说",
+      stage: "record_metrics" as const,
+      state: "assigned" as const,
+      dueLabel: "今天",
+      assignedAt: "2026-01-02T08:00:00.000Z",
+      completedAt: null,
+      createdAt: "2026-01-02T08:00:00.000Z",
+      updatedAt: "2026-01-02T08:00:00.000Z",
+    };
+    const center = buildGateDispatchTaskCenter([todayTask, overdueTask], "2026-01-02T12:00:00.000Z");
+    const overdue = buildGateDispatchTaskCloseoutItem(overdueTask, "2026-01-02T12:00:00.000Z");
+    const today = buildGateDispatchTaskCloseoutItem(todayTask, "2026-01-02T12:00:00.000Z");
+
+    assert.equal(overdue.status, "overdue");
+    assert.equal(overdue.label, "已逾期");
+    assert.equal(today.status, "today");
+    assert.equal(today.label, "今天必须收");
+    assert.equal(center.summary.overdue, 1);
+    assert.equal(center.summary.dueToday, 1);
+    assert.equal(center.closeoutItems[0].dispatchKey, overdueTask.dispatchKey);
+    assert.ok(center.nextActions[0].includes("逾期"));
   });
 
   await t.test("builds platform strategy receipts for the unified gate audit log", () => {

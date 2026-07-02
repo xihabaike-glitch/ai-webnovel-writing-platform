@@ -171,6 +171,8 @@ export interface GateDispatchTaskCenter {
     assigned: number;
     completed: number;
     active: number;
+    overdue: number;
+    dueToday: number;
     averagePriorityScore: number;
   };
   platforms: Array<{
@@ -187,6 +189,23 @@ export interface GateDispatchTaskCenter {
     topPriorityScore: number;
   }>;
   nextActions: string[];
+  closeoutItems: GateDispatchTaskCloseoutItem[];
+}
+
+export type GateDispatchTaskCloseoutStatus = "overdue" | "today" | "planned" | "done";
+
+export interface GateDispatchTaskCloseoutItem {
+  dispatchKey: string;
+  platformName: string;
+  ownerRole: string;
+  title: string;
+  priorityScore: number;
+  state: GatePlatformGrowthDispatchState;
+  status: GateDispatchTaskCloseoutStatus;
+  label: string;
+  detail: string;
+  href: string;
+  dueAt: string | null;
 }
 
 export interface GatePlatformStrategyReceiptPayload {
@@ -1180,7 +1199,85 @@ export function filterGateDispatchTasks(
     });
 }
 
-export function buildGateDispatchTaskCenter(tasks: PersistedGatePlatformDispatchTask[]): GateDispatchTaskCenter {
+function validDate(value: string | null | undefined) {
+  if (!value) return null;
+  const dateValue = new Date(value);
+  return Number.isNaN(dateValue.getTime()) ? null : dateValue;
+}
+
+function endOfDay(value: Date) {
+  const dateValue = new Date(value);
+  dateValue.setHours(23, 59, 59, 999);
+  return dateValue;
+}
+
+function sameDay(left: Date, right: Date) {
+  return left.getFullYear() === right.getFullYear()
+    && left.getMonth() === right.getMonth()
+    && left.getDate() === right.getDate();
+}
+
+function taskAnchorDate(task: PersistedGatePlatformDispatchTask) {
+  return validDate(task.assignedAt) ?? validDate(task.createdAt) ?? new Date();
+}
+
+function dispatchDueAt(task: PersistedGatePlatformDispatchTask) {
+  const anchor = taskAnchorDate(task);
+  if (task.dueLabel === "今天") return endOfDay(anchor);
+  if (task.dueLabel.includes("48")) return new Date(anchor.getTime() + 48 * 60 * 60 * 1000);
+  if (task.dueLabel.includes("24")) return new Date(anchor.getTime() + 24 * 60 * 60 * 1000);
+  return null;
+}
+
+export function buildGateDispatchTaskCloseoutItem(
+  task: PersistedGatePlatformDispatchTask,
+  now: Date | string = new Date(),
+): GateDispatchTaskCloseoutItem {
+  const current = new Date(now);
+  const dueAt = dispatchDueAt(task);
+  const overdue = Boolean(task.state !== "completed" && dueAt && current.getTime() > dueAt.getTime());
+  const dueToday = Boolean(task.state !== "completed" && dueAt && sameDay(dueAt, current) && !overdue);
+  const status: GateDispatchTaskCloseoutStatus = task.state === "completed"
+    ? "done"
+    : overdue
+      ? "overdue"
+      : dueToday
+        ? "today"
+        : "planned";
+  const label = status === "done"
+    ? "已收口"
+    : status === "overdue"
+      ? "已逾期"
+      : status === "today"
+        ? "今天必须收"
+        : "计划中";
+  const detail = status === "done"
+    ? "这个派单已经完成，后续只看复盘数据是否真的回填。"
+    : status === "overdue"
+      ? "已经超过承诺节奏，不要继续开新派单，先把这个收掉。"
+      : status === "today"
+        ? "今天该收口，至少要给出完成证据或明确阻塞原因。"
+        : "没有硬性今日截止，按优先级排队推进。";
+
+  return {
+    dispatchKey: task.dispatchKey,
+    platformName: task.platformName,
+    ownerRole: task.ownerRole,
+    title: task.title,
+    priorityScore: task.priorityScore,
+    state: task.state,
+    status,
+    label,
+    detail,
+    href: task.href,
+    dueAt: dueAt?.toISOString() ?? null,
+  };
+}
+
+export function buildGateDispatchTaskCenter(
+  tasks: PersistedGatePlatformDispatchTask[],
+  now: Date | string = new Date(),
+): GateDispatchTaskCenter {
   const platformMap = new Map<string, GateDispatchTaskCenter["platforms"][number]>();
   const roleMap = new Map<string, GateDispatchTaskCenter["ownerRoles"][number]>();
   let totalPriorityScore = 0;
@@ -1219,6 +1316,18 @@ export function buildGateDispatchTaskCenter(tasks: PersistedGatePlatformDispatch
   const highPriorityQueued = tasks.filter((task) => task.state === "queued" && task.priorityScore >= 70).length;
   const activeRoles = [...roleMap.values()].filter((role) => role.active > 0).length;
   const topPlatform = [...platformMap.values()].sort((left, right) => right.active - left.active || right.total - left.total)[0] ?? null;
+  const closeoutItems = tasks
+    .map((task) => buildGateDispatchTaskCloseoutItem(task, now))
+    .sort((left, right) => {
+      const statusWeight: Record<GateDispatchTaskCloseoutStatus, number> = { overdue: 0, today: 1, planned: 2, done: 3 };
+      const statusDiff = statusWeight[left.status] - statusWeight[right.status];
+      if (statusDiff !== 0) return statusDiff;
+      const priorityDiff = right.priorityScore - left.priorityScore;
+      if (priorityDiff !== 0) return priorityDiff;
+      return left.title.localeCompare(right.title);
+    });
+  const overdue = closeoutItems.filter((item) => item.status === "overdue").length;
+  const dueToday = closeoutItems.filter((item) => item.status === "today").length;
 
   return {
     summary: {
@@ -1227,6 +1336,8 @@ export function buildGateDispatchTaskCenter(tasks: PersistedGatePlatformDispatch
       assigned,
       completed,
       active: queued + assigned,
+      overdue,
+      dueToday,
       averagePriorityScore: tasks.length ? Math.round(totalPriorityScore / tasks.length) : 0,
     },
     platforms: [...platformMap.values()].sort((left, right) => (
@@ -1242,12 +1353,15 @@ export function buildGateDispatchTaskCenter(tasks: PersistedGatePlatformDispatch
       || left.role.localeCompare(right.role)
     )),
     nextActions: [
+      overdue > 0 ? `先收 ${overdue} 个逾期派单，拖着不处理就是假闭环。` : null,
+      dueToday > 0 ? `今天必须收 ${dueToday} 个派单，至少补齐证据或阻塞原因。` : null,
       highPriorityQueued > 0 ? `先派掉 ${highPriorityQueued} 个高优先级任务，别让平台机会窗口过期。` : null,
       assigned > 0 ? `跟进 ${assigned} 个已派任务，要求按验收标准回填证据。` : null,
       topPlatform && topPlatform.active > 0 ? `${topPlatform.name} 当前活跃派单最多，先压低它的未闭环数量。` : null,
       activeRoles > 1 ? `跨 ${activeRoles} 个角色协同，今天只看派单是否闭环，不开新坑。` : null,
       tasks.length === 0 ? "还没有派单任务，先从总闸门执行平台复盘和派单。" : null,
     ].filter((action): action is string => Boolean(action)),
+    closeoutItems,
   };
 }
 

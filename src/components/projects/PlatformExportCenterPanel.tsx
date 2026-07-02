@@ -10,6 +10,7 @@ import {
   type PublishRepairRunResult,
   type RawPublishRepairRunResult,
 } from "@/lib/projects/publishRepairRunResults";
+import { addGateActionReceipt, buildGatePublishEffectReceipt } from "@/lib/projects/gateActionReceipts";
 
 type PublishRepairActionKind =
   | "edit_chapter"
@@ -1281,8 +1282,16 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
           note: effectDraft.notes,
         }),
       });
-      const payload = (await response.json().catch(() => null)) as { message?: string; error?: string } | null;
+      const payload = (await response.json().catch(() => null)) as { message?: string; metric?: PlatformPublishMetric; error?: string } | null;
       if (!response.ok) throw new Error(payload?.error ?? "保存发布效果失败。");
+      if (payload?.metric) {
+        addGateActionReceipt(buildGatePublishEffectReceipt({
+          projectId,
+          platformId: payload.metric.platformId,
+          platformName: payload.metric.platformName,
+          metric: payload.metric,
+        }));
+      }
       setMessage(payload?.message ?? "发布效果已记录。");
       await loadCenter({ keepMessage: true });
       if (strategySwitchPlan?.platformId === platformId) {

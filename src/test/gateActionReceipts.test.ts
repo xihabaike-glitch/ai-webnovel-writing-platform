@@ -6,6 +6,7 @@ import {
   buildGateActionReceipt,
   buildGatePlatformStrategyReceipt,
   buildGateActionReviewAdvice,
+  buildGatePublishEffectReceipt,
   filterGateActionReceipts,
   gateActionReceiptPlatform,
   mergeGateActionReceipts,
@@ -338,6 +339,62 @@ test("buildGateActionReceipt", async (t) => {
     assert.equal(advice[0].id, "fanqie:baseline-needs-metrics");
     assert.equal(advice[0].action.kind, "record_metrics");
     assert.ok(!advice.some((item) => item.id === "fanqie:asset-without-baseline"));
+  });
+
+  await t.test("builds publish effect receipts for the gate audit log", () => {
+    const receipt = buildGatePublishEffectReceipt({
+      projectId: "project-1",
+      platformId: "fanqie",
+      platformName: "番茄小说",
+      now: "2026-01-01T00:00:00.000Z",
+      metric: {
+        views: 1200,
+        clicks: 180,
+        favorites: 72,
+        follows: 36,
+        snapshotDate: "2026-01-01",
+      },
+    });
+
+    assert.equal(receipt.actionId, "platform-strategy:fanqie:save_effect");
+    assert.equal(receipt.executionType, "platform_strategy");
+    assert.equal(receipt.href, "/projects/project-1#publish-effect-panel");
+    assert.equal(receipt.platformName, "番茄小说");
+    assert.ok(receipt.message.includes("曝光 1200"));
+    assert.equal(receipt.recheck.label, "复检发布效果建议");
+  });
+
+  await t.test("clears metrics advice after publish effect is recorded", () => {
+    const baselineReceipt = buildGatePlatformStrategyReceipt({
+      item: {
+        ...strategyPlatform,
+        actionType: "save_snapshot",
+        actionLabel: "保存基准",
+      },
+      status: "succeeded",
+      now: "2026-01-01T00:00:00.000Z",
+      payload: { task: { id: "snapshot-1", status: "succeeded" } },
+    });
+    const accepted = buildGateAdviceActionReceipt({
+      advice: buildGateActionReviewAdvice([baselineReceipt])[0],
+      now: "2026-01-01T00:00:01.000Z",
+    });
+    const effectReceipt = buildGatePublishEffectReceipt({
+      projectId: "project-1",
+      platformId: "fanqie",
+      platformName: "番茄小说",
+      now: "2026-01-01T00:00:02.000Z",
+      metric: {
+        views: 1200,
+        clicks: 180,
+        favorites: 72,
+        follows: 36,
+      },
+    });
+
+    const advice = buildGateActionReviewAdvice([baselineReceipt, accepted, effectReceipt]);
+
+    assert.ok(!advice.some((item) => item.id === "fanqie:baseline-needs-metrics"));
   });
 
   await t.test("builds platform strategy receipts for the unified gate audit log", () => {

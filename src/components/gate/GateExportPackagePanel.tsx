@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { addGateActionReceipt, buildGatePublishEffectReceipt, type GatePublishEffectReceiptMetric } from "@/lib/projects/gateActionReceipts";
 import type { PrePublishGateProjectStatus } from "@/lib/projects/prePublishGate";
 
 interface EffectDraft {
@@ -85,8 +86,19 @@ export function GateExportPackagePanel({ packages }: { packages: PrePublishGateP
           ...effectDraft,
         }),
       });
-      const payload = (await response.json().catch(() => ({}))) as { message?: string; error?: string };
+      const payload = (await response.json().catch(() => ({}))) as { message?: string; metric?: GatePublishEffectReceiptMetric & {
+        platformId: string;
+        platformName: string;
+      }; error?: string };
       if (!response.ok) throw new Error(payload.error ?? "保存发布效果失败。");
+      if (payload.metric) {
+        addGateActionReceipt(buildGatePublishEffectReceipt({
+          projectId: item.projectId,
+          platformId: payload.metric.platformId,
+          platformName: payload.metric.platformName,
+          metric: payload.metric,
+        }));
+      }
       setMessage(payload.message ?? `已记录 ${item.platformName} 发布效果。`);
       setEffectDraft(emptyEffectDraft);
       setEffectPackageKey(null);

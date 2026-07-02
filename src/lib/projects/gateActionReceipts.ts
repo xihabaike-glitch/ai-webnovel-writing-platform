@@ -114,6 +114,16 @@ export interface GatePlatformStrategyReceiptPayload {
   };
 }
 
+export interface GatePublishEffectReceiptMetric {
+  views: number;
+  clicks: number;
+  favorites: number;
+  follows: number;
+  comments?: number;
+  paidReads?: number;
+  snapshotDate?: Date | string;
+}
+
 function countStatus(payload: GateActionReceiptPayload) {
   const results = payload.results?.length ? payload.results : payload.result ? [payload.result] : [];
   return {
@@ -396,6 +406,39 @@ export function buildGateAdviceActionReceipt(input: {
   };
 }
 
+export function buildGatePublishEffectReceipt(input: {
+  projectId: string;
+  platformId: string;
+  platformName: string;
+  metric: GatePublishEffectReceiptMetric;
+  now?: Date | string;
+}): GateActionReceipt {
+  const createdAt = input.now ? new Date(input.now).toISOString() : new Date().toISOString();
+  const snapshotDate = input.metric.snapshotDate ? new Date(input.metric.snapshotDate).toISOString().slice(0, 10) : "";
+  return {
+    id: `platform-strategy:${input.platformId}:save_effect:${createdAt}`,
+    actionId: `platform-strategy:${input.platformId}:save_effect`,
+    label: "回填发布效果",
+    detail: `${input.platformName} · 发布效果回填 · 曝光 ${input.metric.views} · 点击 ${input.metric.clicks} · 收藏 ${input.metric.favorites} · 追读 ${input.metric.follows}`,
+    href: `/projects/${input.projectId}#publish-effect-panel`,
+    status: "succeeded",
+    message: `已记录 ${input.platformName} 发布效果：曝光 ${input.metric.views}，点击 ${input.metric.clicks}，收藏 ${input.metric.favorites}，追读 ${input.metric.follows}${snapshotDate ? `，日期 ${snapshotDate}` : ""}。`,
+    executionType: "platform_strategy",
+    succeededCount: 1,
+    failedCount: 0,
+    taskId: null,
+    platformId: input.platformId,
+    platformName: input.platformName,
+    recheck: {
+      status: "ready",
+      label: "复检发布效果建议",
+      detail: "真实投放数据已回填，刷新总闸门后确认平台策略、二轮优化和加码建议是否更新。",
+      actionLabel: "刷新总闸门",
+    },
+    createdAt,
+  };
+}
+
 export function trimGateActionReceipts(receipts: GateActionReceipt[], limit = defaultGateActionReceiptLimit) {
   return receipts
     .slice()
@@ -623,7 +666,9 @@ export function buildGateActionReviewAdvice(receipts: GateActionReceipt[], limit
     }
 
     const latestSnapshot = latestReceiptFor(group.receipts, (receipt) => actionTypeFromReceipt(receipt) === "save_snapshot" && receipt.status === "succeeded");
-    if (latestSnapshot) {
+    const latestEffect = latestReceiptFor(group.receipts, (receipt) => actionTypeFromReceipt(receipt) === "save_effect" && receipt.status === "succeeded");
+    const effectIsRecorded = Boolean(latestSnapshot && latestEffect && receiptIsAfter(latestEffect, latestSnapshot));
+    if (latestSnapshot && !effectIsRecorded) {
       const state = adviceState(latestAdviceResponse(group.receipts, "record_metrics", group.platformId), latestSnapshot);
       advice.push({
         id: `${group.platformId}:baseline-needs-metrics`,

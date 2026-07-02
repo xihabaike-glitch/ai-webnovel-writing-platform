@@ -107,6 +107,9 @@ test("buildPlatformPublishExportCenter", async (t) => {
     assert.equal(center.packages[0].effectOptimization.status, "collect_data");
     assert.ok(center.packages[0].effectOptimization.actions.some((action) => action.area === "data"));
     assert.ok(center.packages[0].effectOptimization.actions.some((action) => action.execution === "open_target" && action.href === "#publish-effect-panel"));
+    assert.equal(center.packages[0].finalGate.status, "do_not_submit");
+    assert.ok(center.packages[0].finalGate.blockers.some((item) => item.includes("前三章")));
+    assert.ok(center.packages[0].finalGate.items.some((item) => item.id === "review-records" && item.status === "block"));
   });
 
   await t.test("dedupes workspace repair actions across platforms", () => {
@@ -209,7 +212,12 @@ test("buildPlatformPublishExportCenter", async (t) => {
     assert.equal(pack.repairPath.nextStep, null);
     assert.equal(pack.repairPath.totalActions, 0);
     assert.equal(pack.chapters.every((chapter) => chapter.ready), true);
+    assert.equal(pack.finalGate.status, "ready_to_submit");
+    assert.equal(pack.finalGate.label, "可投");
+    assert.ok(pack.finalGate.items.every((item) => item.status === "pass"));
+    assert.ok(pack.finalGate.verdict.includes("标题、简介、前三章"));
     assert.ok(pack.markdown.includes("导出状态：允许导出"));
+    assert.ok(pack.markdown.includes("最终裁决：可投"));
   });
 
   await t.test("prefers persisted platform submission assets", () => {

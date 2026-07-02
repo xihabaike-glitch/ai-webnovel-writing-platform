@@ -293,6 +293,26 @@ export interface PublishPreflight {
   repairActions: PublishRepairAction[];
 }
 
+export interface PlatformFinalGateItem {
+  id: string;
+  label: string;
+  status: "pass" | "fix" | "block";
+  detail: string;
+  actionLabel: string;
+  href: string;
+}
+
+export interface PlatformFinalSubmissionGate {
+  status: "ready_to_submit" | "fix_first" | "do_not_submit";
+  label: string;
+  headline: string;
+  verdict: string;
+  nextAction: string;
+  score: number;
+  blockers: string[];
+  items: PlatformFinalGateItem[];
+}
+
 export interface PlatformPublishChapter {
   id: string;
   order: number;
@@ -324,6 +344,7 @@ export interface PlatformPublishPackage {
   publishNote: string;
   chapters: PlatformPublishChapter[];
   preflight: PublishPreflight;
+  finalGate: PlatformFinalSubmissionGate;
   canExport: boolean;
   repairActions: PublishRepairAction[];
   repairPath: PublishRepairPath;
@@ -903,6 +924,142 @@ function buildPackagePreflight(chapters: PlatformPublishChapter[], warnings: str
     blocked,
     warnings,
     repairActions: dedupeRepairActions(repairActions),
+  };
+}
+
+function minimumFinalGateWords(platform: PlatformProfile) {
+  if (platform.id === "zhihu_yanxuan") return 1000;
+  if (platform.category === "overseas") return 3000;
+  return 8000;
+}
+
+function finalGateItem(
+  id: string,
+  label: string,
+  status: PlatformFinalGateItem["status"],
+  detail: string,
+  actionLabel: string,
+  href: string,
+): PlatformFinalGateItem {
+  return { id, label, status, detail, actionLabel, href };
+}
+
+function finalGateItemScore(status: PlatformFinalGateItem["status"]) {
+  if (status === "pass") return 100;
+  if (status === "fix") return 58;
+  return 18;
+}
+
+function hasPassedReview(chapter: PlatformPublishChapter) {
+  return chapter.preflight.passed.some((item) => item.includes("复检"));
+}
+
+function buildFinalSubmissionGate(input: {
+  project: PublishExportProject;
+  platform: PlatformProfile;
+  title: string;
+  logline: string;
+  synopsis: string;
+  chapters: PlatformPublishChapter[];
+  preflight: PublishPreflight;
+  assetAudit: PlatformSubmissionAssetAudit;
+}): PlatformFinalSubmissionGate {
+  const firstThree = input.chapters.slice(0, 3);
+  const firstThreeReady = firstThree.filter((chapter) => chapter.ready).length;
+  const reviewedFirstThree = firstThree.filter(hasPassedReview).length;
+  const minWords = minimumFinalGateWords(input.platform);
+  const items = [
+    finalGateItem(
+      "submission-asset",
+      "投稿资产",
+      input.assetAudit.status === "ready" ? "pass" : input.assetAudit.status === "blocked" ? "block" : "fix",
+      input.assetAudit.status === "ready"
+        ? `标题、简介、标签资产 ${input.assetAudit.score} 分，可进入投前判断。`
+        : `投稿资产 ${input.assetAudit.score} 分，${input.assetAudit.issues[0]?.detail ?? "标题、简介或标签还不够硬。"}`,
+      input.assetAudit.status === "ready" ? "复查资产" : "优化投稿资产",
+      "#submission-asset-editor",
+    ),
+    finalGateItem(
+      "title-synopsis",
+      "标题简介",
+      input.title.trim().length >= 2 && input.logline.trim().length >= 10 && input.synopsis.trim().length >= 80 ? "pass" : "fix",
+      input.title.trim().length >= 2 && input.logline.trim().length >= 10 && input.synopsis.trim().length >= 80
+        ? "标题、一句话卖点和简介达到基本投前长度。"
+        : "标题、卖点或简介还太薄，平台入口没法稳定判断。",
+      "补标题简介",
+      "#submission-asset-editor",
+    ),
+    finalGateItem(
+      "first-three",
+      "前三章",
+      firstThree.length >= 3 && firstThreeReady === 3 ? "pass" : firstThree.length === 0 ? "block" : "fix",
+      firstThree.length >= 3
+        ? `前三章可投 ${firstThreeReady}/3 章。`
+        : `当前只有 ${firstThree.length}/3 章，首轮留存样本不足。`,
+      firstThree.length >= 3 ? "修前三章" : "补前三章",
+      "#first-three-rewrite",
+    ),
+    finalGateItem(
+      "word-count",
+      "投稿字数",
+      input.project.currentWordCount >= minWords ? "pass" : input.project.currentWordCount === 0 ? "block" : "fix",
+      input.project.currentWordCount >= minWords
+        ? `当前 ${input.project.currentWordCount} 字，达到 ${input.platform.name} 投前检查线。`
+        : `当前 ${input.project.currentWordCount} 字，建议至少 ${minWords} 字再投。`,
+      "补正文字数",
+      "#chapter-production",
+    ),
+    finalGateItem(
+      "review-records",
+      "审稿记录",
+      firstThree.length >= 3 && reviewedFirstThree === 3 ? "pass" : reviewedFirstThree === 0 ? "block" : "fix",
+      firstThree.length >= 3
+        ? `前三章通过审稿/复检 ${reviewedFirstThree}/3 章。`
+        : "先补齐前三章，再跑审稿和复检。",
+      "补审稿复检",
+      "#ai-pipeline",
+    ),
+    finalGateItem(
+      "publish-preflight",
+      "发布质检",
+      input.preflight.canExport ? "pass" : input.preflight.score < 60 ? "block" : "fix",
+      input.preflight.canExport
+        ? `发布质检 ${input.preflight.score} 分，无硬阻塞。`
+        : `发布质检 ${input.preflight.score} 分，阻塞 ${input.preflight.blocked.length} 项。`,
+      input.preflight.canExport ? "保存发布基准" : "处理阻塞项",
+      "#platform-export",
+    ),
+  ];
+  const blockers = items.filter((item) => item.status === "block").map((item) => `${item.label}：${item.detail}`);
+  const fixItems = items.filter((item) => item.status === "fix");
+  const score = Math.round(items.reduce((sum, item) => sum + finalGateItemScore(item.status), 0) / items.length);
+  const status: PlatformFinalSubmissionGate["status"] = blockers.length
+    ? "do_not_submit"
+    : fixItems.length
+      ? "fix_first"
+      : "ready_to_submit";
+
+  return {
+    status,
+    label: status === "ready_to_submit" ? "可投" : status === "fix_first" ? "先修" : "别投",
+    headline: status === "ready_to_submit"
+      ? `${input.platform.name} 发布门槛已过，可以保存基准后投。`
+      : status === "fix_first"
+        ? `${input.platform.name} 还差临门一脚，先修完再投。`
+        : `${input.platform.name} 当前别投，硬上只会污染样本。`,
+    verdict: status === "ready_to_submit"
+      ? "标题、简介、前三章、字数、审稿和投稿资产都过了投前线。"
+      : status === "fix_first"
+        ? `先处理：${fixItems[0]?.label ?? "发布缺口"}。现在不是不能投，是别拿半成品去赌。`
+        : `硬阻塞：${blockers[0] ?? "关键投前条件缺失"}。先修到至少没有红灯。`,
+    nextAction: status === "ready_to_submit"
+      ? "保存发布包版本基准，然后下载或复制发布包。"
+      : status === "fix_first"
+        ? fixItems[0]?.actionLabel ?? "处理投前缺口"
+        : items.find((item) => item.status === "block")?.actionLabel ?? "先补硬缺口",
+    score,
+    blockers,
+    items,
   };
 }
 
@@ -2145,6 +2302,11 @@ function buildMarkdown(pack: Omit<PlatformPublishPackage, "markdown">) {
     pack.publishNote,
     "",
     "## 发布前质检",
+    `最终裁决：${pack.finalGate.label}｜${pack.finalGate.score} 分`,
+    `裁决结论：${pack.finalGate.verdict}`,
+    `下一步：${pack.finalGate.nextAction}`,
+    ...pack.finalGate.items.map((item) => `- ${item.label}：${item.status === "pass" ? "通过" : item.status === "fix" ? "先修" : "阻塞"}｜${item.detail}`),
+    "",
     `质检分：${pack.preflight.score}`,
     `导出状态：${pack.canExport ? "允许导出" : "暂不允许导出"}`,
     ...(pack.preflight.blocked.length ? pack.preflight.blocked.map((item) => `- 阻塞：${item}`) : ["- 阻塞：无"]),
@@ -2836,6 +2998,16 @@ function buildPlatformPackage(
   });
   const warnings = buildPackageWarnings(platform, chapters, input.submissionChecklist);
   const preflight = buildPackagePreflight(chapters, warnings, input.submissionChecklist);
+  const finalGate = buildFinalSubmissionGate({
+    project: input.project,
+    platform,
+    title,
+    logline,
+    synopsis,
+    chapters,
+    preflight,
+    assetAudit: submissionAssetAudit,
+  });
   const repairPath = buildRepairPath(preflight);
   const repairHistory = buildRepairHistory(input.aiTasks ?? [], input.chapters);
   const publishVersions = (input.publishSnapshots ?? [])
@@ -2880,6 +3052,7 @@ function buildPlatformPackage(
     publishNote,
     chapters,
     preflight,
+    finalGate,
     canExport: preflight.canExport,
     repairActions: preflight.repairActions,
     repairPath,

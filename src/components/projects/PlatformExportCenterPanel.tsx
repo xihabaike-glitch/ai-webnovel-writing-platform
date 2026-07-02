@@ -140,6 +140,26 @@ interface PublishPreflight {
   repairActions: PublishRepairAction[];
 }
 
+interface PlatformFinalGateItem {
+  id: string;
+  label: string;
+  status: "pass" | "fix" | "block";
+  detail: string;
+  actionLabel: string;
+  href: string;
+}
+
+interface PlatformFinalSubmissionGate {
+  status: "ready_to_submit" | "fix_first" | "do_not_submit";
+  label: string;
+  headline: string;
+  verdict: string;
+  nextAction: string;
+  score: number;
+  blockers: string[];
+  items: PlatformFinalGateItem[];
+}
+
 interface PlatformPublishChapter {
   id: string;
   order: number;
@@ -315,6 +335,7 @@ interface PlatformPublishPackage {
   publishNote: string;
   chapters: PlatformPublishChapter[];
   preflight: PublishPreflight;
+  finalGate: PlatformFinalSubmissionGate;
   canExport: boolean;
   repairActions: PublishRepairAction[];
   repairPath: PublishRepairPath;
@@ -706,6 +727,24 @@ function comparisonStatusClass(status: PlatformPublishEffectComparison["status"]
   if (status === "declined") return "bg-rose-50 text-rose-700";
   if (status === "mixed") return "bg-amber-50 text-amber-700";
   return "bg-slate-100 text-slate-600";
+}
+
+function finalGateStatusClass(status: PlatformFinalSubmissionGate["status"]) {
+  if (status === "ready_to_submit") return "bg-emerald-50 text-emerald-700";
+  if (status === "do_not_submit") return "bg-rose-50 text-rose-700";
+  return "bg-amber-50 text-amber-700";
+}
+
+function finalGateItemStatusLabel(status: PlatformFinalGateItem["status"]) {
+  if (status === "pass") return "通过";
+  if (status === "block") return "阻塞";
+  return "先修";
+}
+
+function finalGateItemStatusClass(status: PlatformFinalGateItem["status"]) {
+  if (status === "pass") return "bg-emerald-50 text-emerald-700";
+  if (status === "block") return "bg-rose-50 text-rose-700";
+  return "bg-amber-50 text-amber-700";
 }
 
 function formatDelta(value: number, suffix = "") {
@@ -2505,6 +2544,48 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
 
       {selectedPackage ? (
         <div className="mt-4 grid gap-4">
+          <div className="rounded-md border border-slate-200 bg-white p-3">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+              <div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="font-medium text-slate-950">投前最终裁决</div>
+                  <span className={`rounded-md px-2 py-1 text-xs font-medium ${finalGateStatusClass(selectedPackage.finalGate.status)}`}>
+                    {selectedPackage.finalGate.label} · {selectedPackage.finalGate.score}
+                  </span>
+                </div>
+                <p className="mt-2 text-sm leading-6 text-slate-600">{selectedPackage.finalGate.headline}</p>
+                <p className="mt-1 text-sm leading-6 text-slate-500">{selectedPackage.finalGate.verdict}</p>
+              </div>
+              <a
+                className="w-fit rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white"
+                href={
+                  selectedPackage.finalGate.status === "ready_to_submit"
+                    ? "#package-version-history"
+                    : selectedPackage.finalGate.items.find((item) => item.status !== "pass")?.href ?? "#platform-export"
+                }
+              >
+                {selectedPackage.finalGate.nextAction}
+              </a>
+            </div>
+            <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+              {selectedPackage.finalGate.items.map((item) => (
+                <div className="rounded-md bg-slate-50 p-3 text-sm" key={item.id}>
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="font-medium text-slate-950">{item.label}</div>
+                    <span className={`rounded-md px-2 py-1 text-[11px] font-medium ${finalGateItemStatusClass(item.status)}`}>
+                      {finalGateItemStatusLabel(item.status)}
+                    </span>
+                  </div>
+                  <p className="mt-2 leading-5 text-slate-600">{item.detail}</p>
+                  {item.status !== "pass" ? (
+                    <a className="mt-2 inline-flex text-xs font-medium text-slate-950 underline" href={item.href}>
+                      {item.actionLabel}
+                    </a>
+                  ) : null}
+                </div>
+              ))}
+            </div>
+          </div>
           <div className="rounded-md border border-slate-200 p-3">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
               <div>

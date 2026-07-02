@@ -127,4 +127,42 @@ test("buildPrePublishGate", async (t) => {
     assert.ok(gate.priorityActions.some((action) => action.execution?.type === "retry_task" && action.execution.taskId === "failed-2"));
     assert.ok(gate.priorityActions.some((action) => action.href === "/failures"));
   });
+
+  await t.test("summarizes publish effect metrics for launch review", () => {
+    const gate = buildPrePublishGate({
+      projects: [{
+        ...readyProject,
+        platformPublishMetrics: [
+          {
+            platformId: "fanqie",
+            platformName: "番茄小说",
+            views: 1200,
+            clicks: 120,
+            favorites: 72,
+            follows: 36,
+            comments: 8,
+            paidReads: 3,
+            editorFeedback: "标题方向可继续放大。",
+            contractStatus: "pending",
+            publishUrl: "https://example.com/book",
+            notes: "首轮投放",
+            snapshotDate: "2026-01-10T00:00:00.000Z",
+          },
+        ],
+      }],
+      failureTasks: [],
+      batchHistory: [],
+    });
+    const review = gate.projectStatuses[0].effectReview;
+
+    assert.equal(review.status, "promising");
+    assert.equal(review.label, "可放大");
+    assert.equal(review.records, 1);
+    assert.equal(review.totalViews, 1200);
+    assert.equal(review.clickRatePercent, 10);
+    assert.equal(review.favoriteRatePercent, 6);
+    assert.equal(review.followRatePercent, 3);
+    assert.ok(review.verdict.includes("可追"));
+    assert.ok(review.optimizationActions.some((action) => action.href === "/projects/project-ready#create-chapter"));
+  });
 });

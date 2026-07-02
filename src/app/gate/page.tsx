@@ -2,6 +2,7 @@ import Link from "next/link";
 import { AppShell } from "@/components/app-shell/AppShell";
 import { GateActionWorkspace } from "@/components/gate/GateActionWorkspace";
 import { GateExportPackagePanel } from "@/components/gate/GateExportPackagePanel";
+import { GatePublishEffectReviewPanel } from "@/components/gate/GatePublishEffectReviewPanel";
 import { buildTaskBatchHistory } from "@/lib/ai/taskBatchHistory";
 import { prisma } from "@/lib/db/prisma";
 import { buildPrePublishGate, type PrePublishGateItem } from "@/lib/projects/prePublishGate";
@@ -27,6 +28,7 @@ export default async function GatePage() {
       include: {
         chapters: { orderBy: { order: "asc" } },
         aiTasks: { orderBy: { createdAt: "desc" } },
+        platformPublishMetrics: { orderBy: { snapshotDate: "desc" }, take: 80 },
       },
       orderBy: { updatedAt: "desc" },
     }),
@@ -98,6 +100,8 @@ export default async function GatePage() {
       </section>
 
       <GateExportPackagePanel packages={gate.projectStatuses} />
+
+      <GatePublishEffectReviewPanel packages={gate.projectStatuses} />
 
       <section className="mb-6 grid gap-4 lg:grid-cols-[0.9fr_1.1fr]">
         <div className="rounded-md border border-slate-200 bg-white p-4">

@@ -4,7 +4,14 @@ import { getPlatformProfile, type PlatformId } from "../platforms/platformProfil
 import { buildBatchExecutionSafety } from "./batchExecutionSafety.ts";
 import { getBatchExecutionStrategy, type BatchExecutionStrategyId } from "./batchExecutionStrategy.ts";
 import { buildBatchStrategyComparison, buildBatchStrategyDecision } from "./batchStrategyComparison.ts";
-import { buildPlatformPublishExportCenter, type PublishRepairAction, type PublishRepairActionKind } from "./platformPublishExport.ts";
+import {
+  buildPlatformPublishExportCenter,
+  type PlatformPublishEffectSummary,
+  type PlatformPublishMetricInput,
+  type PlatformPublishOptimizationAction,
+  type PublishRepairAction,
+  type PublishRepairActionKind,
+} from "./platformPublishExport.ts";
 import { canExecutePublishRepairAction } from "./publishRepairActionExecution.ts";
 import { buildTaskQueueCenter } from "./taskQueueCenter.ts";
 
@@ -42,6 +49,39 @@ export interface PrePublishGateProject {
     outputTokens?: number | null;
     costUsd?: number | null;
   }>;
+  platformPublishMetrics?: PlatformPublishMetricInput[];
+}
+
+export interface PrePublishGateEffectAction {
+  id: string;
+  priority: PlatformPublishOptimizationAction["priority"];
+  label: string;
+  detail: string;
+  target: string;
+  href: string;
+}
+
+export interface PrePublishGateEffectReview {
+  status: PlatformPublishEffectSummary["status"];
+  label: string;
+  records: number;
+  totalViews: number;
+  totalClicks: number;
+  totalFavorites: number;
+  totalFollows: number;
+  totalComments: number;
+  totalPaidReads: number;
+  clickRatePercent: number;
+  favoriteRatePercent: number;
+  followRatePercent: number;
+  paidReadRatePercent: number;
+  latestSnapshotDate: Date | string | null;
+  latestContractStatus: string | null;
+  verdict: string;
+  nextAction: string;
+  optimizationStatus: "collect_data" | "urgent_rework" | "iterate" | "scale";
+  optimizationHeadline: string;
+  optimizationActions: PrePublishGateEffectAction[];
 }
 
 export interface PrePublishGateProjectStatus {
@@ -61,6 +101,7 @@ export interface PrePublishGateProjectStatus {
   href: string;
   downloadHref: string | null;
   execution: PrePublishGateActionExecution | null;
+  effectReview: PrePublishGateEffectReview;
 }
 
 export interface PrePublishGateItem {
@@ -158,6 +199,56 @@ function publishRepairExecution(projectId: string, action: PublishRepairAction):
   };
 }
 
+function effectLabel(status: PlatformPublishEffectSummary["status"]) {
+  if (status === "signed") return "签约信号";
+  if (status === "promising") return "可放大";
+  if (status === "weak") return "弱转化";
+  if (status === "watch") return "观察中";
+  return "缺数据";
+}
+
+function projectAnchor(projectId: string, href: string) {
+  return href.startsWith("#") ? `/projects/${projectId}${href}` : href;
+}
+
+function effectReview(
+  projectId: string,
+  effect: PlatformPublishEffectSummary,
+  actions: PlatformPublishOptimizationAction[],
+  optimizationStatus: PrePublishGateEffectReview["optimizationStatus"],
+  optimizationHeadline: string,
+): PrePublishGateEffectReview {
+  return {
+    status: effect.status,
+    label: effectLabel(effect.status),
+    records: effect.records,
+    totalViews: effect.totalViews,
+    totalClicks: effect.totalClicks,
+    totalFavorites: effect.totalFavorites,
+    totalFollows: effect.totalFollows,
+    totalComments: effect.totalComments,
+    totalPaidReads: effect.totalPaidReads,
+    clickRatePercent: effect.clickRatePercent,
+    favoriteRatePercent: effect.favoriteRatePercent,
+    followRatePercent: effect.followRatePercent,
+    paidReadRatePercent: effect.paidReadRatePercent,
+    latestSnapshotDate: effect.latest?.snapshotDate ?? null,
+    latestContractStatus: effect.latest?.contractStatus ?? null,
+    verdict: effect.verdict,
+    nextAction: effect.nextAction,
+    optimizationStatus,
+    optimizationHeadline,
+    optimizationActions: actions.slice(0, 3).map((action) => ({
+      id: action.id,
+      priority: action.priority,
+      label: action.label,
+      detail: action.detail,
+      target: action.target,
+      href: projectAnchor(projectId, action.href),
+    })),
+  };
+}
+
 function projectStatus(project: PrePublishGateProject): PrePublishGateProjectStatus {
   const platform = getPlatformProfile(project.targetPlatform as PlatformId);
   const aiTasks = project.aiTasks.map((task) => ({
@@ -175,6 +266,7 @@ function projectStatus(project: PrePublishGateProject): PrePublishGateProjectSta
     targetPlatform: platform,
     chapters: project.chapters,
     aiTasks,
+    platformPublishMetrics: project.platformPublishMetrics ?? [],
     platforms: [platform],
   });
   const pack = center.packages[0];
@@ -205,6 +297,13 @@ function projectStatus(project: PrePublishGateProject): PrePublishGateProjectSta
     href: nextRepairAction ? actionHref(project.id, nextRepairAction) : `/projects/${project.id}#platform-export`,
     downloadHref: ready ? `/api/projects/${project.id}/platform-export?format=markdown&platformId=${pack.platformId}` : null,
     execution: nextRepairAction ? publishRepairExecution(project.id, nextRepairAction) : null,
+    effectReview: effectReview(
+      project.id,
+      pack.publishEffect,
+      pack.effectOptimization.actions,
+      pack.effectOptimization.status,
+      pack.effectOptimization.headline,
+    ),
   };
 }
 

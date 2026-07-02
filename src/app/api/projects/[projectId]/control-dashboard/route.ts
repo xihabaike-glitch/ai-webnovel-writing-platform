@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { getPlatformProfile, type PlatformId } from "@/lib/platforms/platformProfiles";
 import { buildProjectControlDashboard } from "@/lib/projects/projectControlDashboard";
+import { parsePublishSnapshotTags } from "@/lib/projects/platformPublishExport";
 import { buildSubmissionChecklist } from "@/lib/projects/submissionChecklist";
 
 interface Params {
@@ -20,6 +21,10 @@ export async function GET(_request: Request, { params }: Params) {
       foreshadows: { orderBy: { createdAt: "asc" } },
       plotThreads: { orderBy: { createdAt: "asc" } },
       aiTasks: { orderBy: { createdAt: "desc" } },
+      publishSnapshots: { orderBy: { createdAt: "desc" }, take: 80 },
+      submissionAssets: { orderBy: { updatedAt: "desc" } },
+      submissionAssetVersions: { orderBy: { createdAt: "desc" }, take: 80 },
+      platformPublishMetrics: { orderBy: { snapshotDate: "desc" }, take: 80 },
     },
   });
 
@@ -60,6 +65,56 @@ export async function GET(_request: Request, { params }: Params) {
     foreshadows: project.foreshadows,
     plotThreads: project.plotThreads,
     aiTasks: project.aiTasks,
+    publishSnapshots: project.publishSnapshots,
+    submissionAssets: project.submissionAssets.map((asset) => ({
+      id: asset.id,
+      platformId: asset.platformId,
+      platformName: asset.platformName,
+      title: asset.title,
+      logline: asset.logline,
+      synopsis: asset.synopsis,
+      overseasSynopsis: asset.overseasSynopsis,
+      tags: parsePublishSnapshotTags(asset.tags),
+      note: asset.note,
+      source: asset.source,
+      updatedAt: asset.updatedAt,
+    })),
+    submissionAssetVersions: project.submissionAssetVersions.map((version) => ({
+      id: version.id,
+      platformId: version.platformId,
+      platformName: version.platformName,
+      title: version.title,
+      logline: version.logline,
+      synopsis: version.synopsis,
+      overseasSynopsis: version.overseasSynopsis,
+      tags: parsePublishSnapshotTags(version.tags),
+      note: version.note,
+      source: version.source,
+      auditScore: version.auditScore,
+      auditStatus: version.auditStatus === "ready" || version.auditStatus === "blocked" ? version.auditStatus : "needs_work",
+      action: version.action,
+      sourceTaskId: version.sourceTaskId,
+      strategy: version.strategy,
+      createdAt: version.createdAt,
+    })),
+    platformPublishMetrics: project.platformPublishMetrics.map((metric) => ({
+      id: metric.id,
+      platformId: metric.platformId,
+      platformName: metric.platformName,
+      views: metric.views,
+      clicks: metric.clicks,
+      favorites: metric.favorites,
+      follows: metric.follows,
+      comments: metric.comments,
+      paidReads: metric.paidReads,
+      editorFeedback: metric.editorFeedback,
+      contractStatus: metric.contractStatus,
+      publishUrl: metric.publishUrl,
+      notes: metric.notes,
+      snapshotDate: metric.snapshotDate,
+      createdAt: metric.createdAt,
+      updatedAt: metric.updatedAt,
+    })),
     submissionChecklist,
   });
 

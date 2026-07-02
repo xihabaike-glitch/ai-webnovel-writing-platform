@@ -3,7 +3,14 @@ import { buildBatchDraftQueue, type BatchDraftTask } from "../ai/batchDrafts.ts"
 import { buildReviewPipelineQueue } from "../ai/batchReviewPipeline.ts";
 import { buildCharacterArcDashboard } from "./characterArc.ts";
 import { buildChapterProductionSchedule } from "./chapterProductionSchedule.ts";
-import { buildPlatformPublishExportCenter } from "./platformPublishExport.ts";
+import {
+  buildPlatformPublishExportCenter,
+  type PlatformPublishMetricInput,
+  type PlatformStrategyAutoVerdict,
+  type PlatformSubmissionAssetInput,
+  type PlatformSubmissionAssetVersionInput,
+  type PublishPackageVersionItem,
+} from "./platformPublishExport.ts";
 import { buildSerializationOpsDashboard } from "./serializationOps.ts";
 import { buildStoryLineDashboard } from "./storyLines.ts";
 import type { SubmissionChecklist } from "./submissionChecklist.ts";
@@ -111,6 +118,10 @@ export interface ProjectControlDashboardInput {
   foreshadows: ControlForeshadow[];
   plotThreads: ControlPlotThread[];
   aiTasks: ControlAiTask[];
+  publishSnapshots?: PublishPackageVersionItem[];
+  submissionAssets?: PlatformSubmissionAssetInput[];
+  submissionAssetVersions?: PlatformSubmissionAssetVersionInput[];
+  platformPublishMetrics?: PlatformPublishMetricInput[];
   submissionChecklist: SubmissionChecklist;
 }
 
@@ -160,6 +171,7 @@ export interface ControlAssetQualityReport {
 export interface ProjectControlDashboard {
   overallScore: number;
   verdict: string;
+  platformVerdict: PlatformControlVerdictSummary;
   areas: ControlArea[];
   priorityActions: ControlPriorityAction[];
   criticalActions: string[];
@@ -172,6 +184,20 @@ export interface ProjectControlDashboard {
     worldEntries: number;
     publishableChapters: number;
   };
+}
+
+export interface PlatformControlVerdictSummary {
+  status: PlatformStrategyAutoVerdict["status"];
+  headline: string;
+  nextAction: string;
+  primaryPlatformName: string | null;
+  primaryPlatformId: string | null;
+  primaryScore: number;
+  primaryEvidenceScore: number;
+  backupPlatformNames: string[];
+  blockedPlatformNames: string[];
+  evidenceGaps: string[];
+  targetAnchor: string;
 }
 
 function clampScore(value: number) {
@@ -362,9 +388,28 @@ export function buildProjectControlDashboard(input: ProjectControlDashboardInput
     targetPlatform: input.platform,
     chapters: input.chapters,
     aiTasks: input.aiTasks,
+    publishSnapshots: input.publishSnapshots,
+    submissionAssets: input.submissionAssets,
+    submissionAssetVersions: input.submissionAssetVersions,
+    platformPublishMetrics: input.platformPublishMetrics,
     submissionChecklist: input.submissionChecklist,
   });
   const targetPackage = platformExport.packages.find((pack) => pack.platformId === input.platform.id) ?? platformExport.packages[0];
+  const platformVerdict: PlatformControlVerdictSummary = {
+    status: platformExport.strategyVerdict.status,
+    headline: platformExport.strategyVerdict.headline,
+    nextAction: platformExport.strategyVerdict.nextAction,
+    primaryPlatformName: platformExport.strategyVerdict.primary?.platformName ?? null,
+    primaryPlatformId: platformExport.strategyVerdict.primary?.platformId ?? null,
+    primaryScore: platformExport.strategyVerdict.primary?.score ?? 0,
+    primaryEvidenceScore: platformExport.strategyVerdict.primary?.evidenceScore ?? 0,
+    backupPlatformNames: platformExport.strategyVerdict.backups.map((item) => item.platformName),
+    blockedPlatformNames: platformExport.strategyVerdict.blocked.map((item) => item.platformName),
+    evidenceGaps: platformExport.strategyVerdict.primary
+      ? platformExport.platformStrategy.find((item) => item.platformId === platformExport.strategyVerdict.primary?.platformId)?.reviewDecision.evidenceLedger.missingSignals.slice(0, 3) ?? []
+      : [],
+    targetAnchor: "platform-strategy-verdict",
+  };
   const outline = outlineScore(input.outlineNodes);
   const productionScore = production.dashboard.totalItems > 0
     ? ratio(
@@ -423,6 +468,7 @@ export function buildProjectControlDashboard(input: ProjectControlDashboardInput
   return {
     overallScore,
     verdict: verdict(overallScore),
+    platformVerdict,
     areas,
     priorityActions,
     criticalActions,

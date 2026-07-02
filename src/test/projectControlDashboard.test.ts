@@ -75,6 +75,10 @@ test("buildProjectControlDashboard", async (t) => {
     assert.equal(dashboard.areas.length, 8);
     assert.equal(dashboard.metrics.chapters, 1);
     assert.equal(dashboard.metrics.publishableChapters, 1);
+    assert.equal(dashboard.platformVerdict.status, "needs_evidence");
+    assert.ok(dashboard.platformVerdict.primaryPlatformName);
+    assert.ok(dashboard.platformVerdict.nextAction.length > 0);
+    assert.equal(dashboard.platformVerdict.targetAnchor, "platform-strategy-verdict");
     assert.equal(dashboard.areas.find((area) => area.id === "export")?.status, "blocked");
     assert.ok(dashboard.areas.find((area) => area.id === "export")?.nextAction.includes("先处理"));
     assert.equal(dashboard.priorityActions.length, 4);
@@ -130,10 +134,45 @@ test("buildProjectControlDashboard", async (t) => {
         { id: "review-1", chapterId: "chapter-1", taskType: "chapter_review", status: "succeeded", outputText: JSON.stringify({ score: 88, shouldSecondPass: false, issues: [] }), errorMessage: null, createdAt: "2026-01-02T00:00:00.000Z" },
         { id: "second-1", chapterId: "chapter-1", taskType: "chapter_second_pass", status: "succeeded", outputText: chapter.content, errorMessage: null, createdAt: "2026-01-03T00:00:00.000Z" },
       ],
+      publishSnapshots: [
+        {
+          id: "snapshot-fanqie",
+          platformId: "fanqie",
+          platformName: "番茄小说",
+          title: "夜雨系统",
+          action: "snapshot",
+          chapterCount: 1,
+          wordCount: 2400,
+          preflightScore: 95,
+          canExport: true,
+          createdAt: "2026-01-04T00:00:00.000Z",
+        },
+      ],
+      platformPublishMetrics: [
+        {
+          id: "metric-fanqie",
+          platformId: "fanqie",
+          platformName: "番茄小说",
+          views: 1000,
+          clicks: 180,
+          favorites: 60,
+          follows: 30,
+          comments: 8,
+          paidReads: 0,
+          editorFeedback: "继续观察。",
+          contractStatus: "pending",
+          publishUrl: "",
+          notes: "首轮数据。",
+          snapshotDate: "2026-01-05T00:00:00.000Z",
+        },
+      ],
       submissionChecklist: { ...checklist, readinessPercent: 90, items: [] },
     });
 
     assert.ok(dashboard.overallScore >= 60);
+    assert.ok(["ready", "needs_repair", "needs_evidence"].includes(dashboard.platformVerdict.status));
+    assert.equal(dashboard.platformVerdict.primaryPlatformName, "番茄小说");
+    assert.ok(dashboard.platformVerdict.primaryScore > 0);
     assert.equal(dashboard.areas.find((area) => area.id === "world")?.status, "good");
     assert.equal(dashboard.areas.find((area) => area.id === "export")?.status, "good");
   });

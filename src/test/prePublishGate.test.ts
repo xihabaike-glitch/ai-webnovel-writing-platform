@@ -242,6 +242,67 @@ test("buildPrePublishGate", async (t) => {
     assert.equal(timeline.actionHref, "/projects/project-ready#create-chapter");
   });
 
+  await t.test("summarizes platform strategy across launch-gate projects", () => {
+    const gate = buildPrePublishGate({
+      projects: [
+        {
+          ...readyProject,
+          platformPublishMetrics: [
+            {
+              platformId: "fanqie",
+              platformName: "番茄小说",
+              views: 1200,
+              clicks: 120,
+              favorites: 72,
+              follows: 36,
+              comments: 8,
+              paidReads: 3,
+              editorFeedback: "标题方向可继续放大。",
+              contractStatus: "pending",
+              publishUrl: "https://example.com/book",
+              notes: "首轮投放",
+              snapshotDate: "2026-01-10T00:00:00.000Z",
+            },
+          ],
+        },
+        {
+          ...readyProject,
+          id: "project-qimao-weak",
+          targetPlatform: "qimao",
+          platformPublishMetrics: [
+            {
+              platformId: "qimao",
+              platformName: "七猫",
+              views: 1000,
+              clicks: 20,
+              favorites: 5,
+              follows: 2,
+              comments: 1,
+              paidReads: 0,
+              editorFeedback: "点击弱，前三章留存也弱。",
+              contractStatus: "pending",
+              publishUrl: "https://example.com/qimao-book",
+              notes: "弱转化样本",
+              snapshotDate: "2026-01-11T00:00:00.000Z",
+            },
+          ],
+        },
+      ],
+      failureTasks: [],
+      batchHistory: [],
+    });
+    const review = gate.strategyReview;
+    const fanqie = review.platforms.find((item) => item.platformId === "fanqie");
+    const qimao = review.platforms.find((item) => item.platformId === "qimao");
+
+    assert.equal(review.totals.scale, 1);
+    assert.equal(review.totals.repair, 1);
+    assert.equal(review.primary?.platformId, "fanqie");
+    assert.equal(fanqie?.recommendation, "scale");
+    assert.equal(qimao?.recommendation, "repair");
+    assert.ok(qimao?.nextAction.includes("先按弱项"));
+  });
+
   await t.test("exposes executable second-round actions for weak publish effects", () => {
     const gate = buildPrePublishGate({
       projects: [{

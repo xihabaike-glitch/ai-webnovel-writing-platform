@@ -3,6 +3,7 @@ import { AppShell } from "@/components/app-shell/AppShell";
 import { GateClosedLoopTimelinePanel } from "@/components/gate/GateClosedLoopTimelinePanel";
 import { GateActionWorkspace } from "@/components/gate/GateActionWorkspace";
 import { GateExportPackagePanel } from "@/components/gate/GateExportPackagePanel";
+import { GatePlatformStrategyReviewPanel } from "@/components/gate/GatePlatformStrategyReviewPanel";
 import { GatePublishEffectReviewPanel } from "@/components/gate/GatePublishEffectReviewPanel";
 import { buildTaskBatchHistory } from "@/lib/ai/taskBatchHistory";
 import { prisma } from "@/lib/db/prisma";
@@ -146,6 +147,8 @@ export default async function GatePage() {
       <GateExportPackagePanel packages={gate.projectStatuses} />
 
       <GatePublishEffectReviewPanel packages={gate.projectStatuses} />
+
+      <GatePlatformStrategyReviewPanel review={gate.strategyReview} />
 
       <GateClosedLoopTimelinePanel packages={gate.projectStatuses} />
 

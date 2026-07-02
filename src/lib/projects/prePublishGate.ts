@@ -130,6 +130,46 @@ export interface PrePublishGateProjectStatus {
   loopTimeline: PrePublishGateLoopTimeline;
 }
 
+export interface PrePublishGateStrategyProject {
+  projectId: string;
+  projectTitle: string;
+  statusLabel: string;
+  effectLabel: string;
+  loopLabel: string;
+  href: string;
+}
+
+export interface PrePublishGateStrategyPlatform {
+  platformId: string;
+  platformName: string;
+  recommendation: "scale" | "repair" | "collect_data" | "prepare_asset" | "pause";
+  label: string;
+  score: number;
+  projectCount: number;
+  readyPackages: number;
+  weakPackages: number;
+  dataGaps: number;
+  assetGaps: number;
+  baselineGaps: number;
+  nextAction: string;
+  href: string;
+  projects: PrePublishGateStrategyProject[];
+}
+
+export interface PrePublishGateStrategyReview {
+  headline: string;
+  verdict: string;
+  primary: PrePublishGateStrategyPlatform | null;
+  platforms: PrePublishGateStrategyPlatform[];
+  totals: {
+    scale: number;
+    repair: number;
+    collectData: number;
+    prepareAsset: number;
+    pause: number;
+  };
+}
+
 export interface PrePublishGateItem {
   id: string;
   label: string;
@@ -186,6 +226,7 @@ export interface PrePublishGate {
   };
   items: PrePublishGateItem[];
   projectStatuses: PrePublishGateProjectStatus[];
+  strategyReview: PrePublishGateStrategyReview;
   priorityActions: PrePublishGateAction[];
 }
 
@@ -446,6 +487,145 @@ function uniqueActions(actions: PrePublishGateAction[]) {
   }).slice(0, 6);
 }
 
+function strategyRecommendationLabel(recommendation: PrePublishGateStrategyPlatform["recommendation"]) {
+  if (recommendation === "scale") return "主推放大";
+  if (recommendation === "repair") return "先修再投";
+  if (recommendation === "collect_data") return "补齐证据";
+  if (recommendation === "prepare_asset") return "先补资产";
+  return "暂缓投放";
+}
+
+function buildStrategyPlatform(
+  platformId: string,
+  platformName: string,
+  items: PrePublishGateProjectStatus[],
+): PrePublishGateStrategyPlatform {
+  const projectCount = items.length;
+  const readyPackages = items.filter((item) => item.status === "ready").length;
+  const weakPackages = items.filter((item) => item.effectReview.status === "weak" || item.loopTimeline.status === "needs_iteration").length;
+  const scaleSignals = items.filter((item) => item.effectReview.status === "promising" || item.effectReview.status === "signed" || item.loopTimeline.status === "scaling").length;
+  const dataGaps = items.filter((item) => item.effectReview.status === "empty" || item.loopTimeline.status === "needs_effect").length;
+  const assetGaps = items.filter((item) => item.loopTimeline.status === "needs_asset" && item.effectReview.records === 0).length;
+  const baselineGaps = items.filter((item) => item.loopTimeline.status === "needs_baseline" && item.effectReview.records === 0).length;
+  const emptyPackages = items.filter((item) => item.status === "empty").length;
+  const averagePreflight = projectCount > 0
+    ? items.reduce((sum, item) => sum + item.preflightScore, 0) / projectCount
+    : 0;
+  const score = clampScore(
+    averagePreflight
+      + scaleSignals * 12
+      + readyPackages * 5
+      - weakPackages * 18
+      - assetGaps * 10
+      - baselineGaps * 8
+      - dataGaps * 6
+      - emptyPackages * 12,
+  );
+  const recommendation: PrePublishGateStrategyPlatform["recommendation"] = scaleSignals > 0 && weakPackages === 0 && assetGaps === 0
+    ? "scale"
+    : weakPackages > 0
+      ? "repair"
+      : assetGaps > 0
+        ? "prepare_asset"
+        : dataGaps > 0 || baselineGaps > 0
+          ? "collect_data"
+          : readyPackages === 0
+            ? "pause"
+            : "collect_data";
+  const nextAction = recommendation === "scale"
+    ? "保留有效包装，继续加更、复投，并记录下一轮真实数据。"
+    : recommendation === "repair"
+      ? "别急着扩量，先按弱项重写标题简介或前三章，再保存新基准。"
+      : recommendation === "prepare_asset"
+        ? "先生成并采纳投稿资产候选，别用默认包装硬投。"
+        : recommendation === "collect_data"
+          ? "先补发布包基准和投放回填，没有证据不要拍脑袋换平台。"
+          : "先暂停投放，把正文、质检和基础发布包补齐。";
+  const target = items.find((item) => (
+    recommendation === "scale" && (item.effectReview.status === "promising" || item.effectReview.status === "signed" || item.loopTimeline.status === "scaling")
+  ))
+    ?? items.find((item) => recommendation === "repair" && (item.effectReview.status === "weak" || item.loopTimeline.status === "needs_iteration"))
+    ?? items.find((item) => recommendation === "prepare_asset" && item.loopTimeline.status === "needs_asset")
+    ?? items.find((item) => recommendation === "collect_data" && (item.loopTimeline.status === "needs_baseline" || item.loopTimeline.status === "needs_effect"))
+    ?? items.find((item) => item.status !== "ready")
+    ?? items[0];
+
+  return {
+    platformId,
+    platformName,
+    recommendation,
+    label: strategyRecommendationLabel(recommendation),
+    score,
+    projectCount,
+    readyPackages,
+    weakPackages,
+    dataGaps,
+    assetGaps,
+    baselineGaps,
+    nextAction,
+    href: target?.loopTimeline.actionHref ?? target?.href ?? "/projects",
+    projects: items.slice(0, 4).map((item) => ({
+      projectId: item.projectId,
+      projectTitle: item.projectTitle,
+      statusLabel: item.label,
+      effectLabel: item.effectReview.label,
+      loopLabel: item.loopTimeline.label,
+      href: item.href,
+    })),
+  };
+}
+
+function buildStrategyReview(projectStatuses: PrePublishGateProjectStatus[]): PrePublishGateStrategyReview {
+  const grouped = new Map<string, PrePublishGateProjectStatus[]>();
+  for (const item of projectStatuses) {
+    const key = `${item.platformId}:${item.platformName}`;
+    grouped.set(key, [...(grouped.get(key) ?? []), item]);
+  }
+  const platforms = [...grouped.entries()].map(([key, items]) => {
+    const [platformId, platformName] = key.split(":");
+    return buildStrategyPlatform(platformId, platformName, items);
+  }).sort((left, right) => {
+    const recommendationWeight: Record<PrePublishGateStrategyPlatform["recommendation"], number> = {
+      scale: 5,
+      repair: 4,
+      collect_data: 3,
+      prepare_asset: 2,
+      pause: 1,
+    };
+    return recommendationWeight[right.recommendation] - recommendationWeight[left.recommendation]
+      || right.score - left.score
+      || right.projectCount - left.projectCount;
+  });
+  const totals = {
+    scale: platforms.filter((item) => item.recommendation === "scale").length,
+    repair: platforms.filter((item) => item.recommendation === "repair").length,
+    collectData: platforms.filter((item) => item.recommendation === "collect_data").length,
+    prepareAsset: platforms.filter((item) => item.recommendation === "prepare_asset").length,
+    pause: platforms.filter((item) => item.recommendation === "pause").length,
+  };
+  const primary = platforms.find((item) => item.recommendation !== "pause") ?? platforms[0] ?? null;
+  const headline = primary
+    ? `${primary.platformName}：${primary.label}`
+    : "还没有可复盘平台";
+  const verdict = primary
+    ? totals.scale > 0
+      ? `${totals.scale} 个平台可以放大，${totals.repair} 个平台需要先修。`
+      : totals.repair > 0
+        ? `${totals.repair} 个平台存在弱转化，先修复再扩量。`
+        : totals.collectData + totals.prepareAsset > 0
+          ? `${totals.collectData + totals.prepareAsset} 个平台缺少资产、基准或真实效果证据。`
+          : "平台策略暂无明确主推项，先补齐基础发布链路。"
+    : "还没有项目进入平台复盘。";
+
+  return {
+    headline,
+    verdict,
+    primary,
+    platforms,
+    totals,
+  };
+}
+
 export function buildPrePublishGate(input: PrePublishGateInput): PrePublishGate {
   const projects = input.projects;
   const queue = buildTaskQueueCenter(projects);
@@ -525,6 +705,7 @@ export function buildPrePublishGate(input: PrePublishGateInput): PrePublishGate 
 
   const blockCount = items.filter((item) => item.status === "block").length;
   const warnCount = items.filter((item) => item.status === "warn").length;
+  const strategyReview = buildStrategyReview(projectStatuses);
   const averagePreflight = projectStatuses.length > 0
     ? projectStatuses.reduce((sum, project) => sum + project.preflightScore, 0) / projectStatuses.length
     : 0;
@@ -602,6 +783,7 @@ export function buildPrePublishGate(input: PrePublishGateInput): PrePublishGate 
     },
     items,
     projectStatuses,
+    strategyReview,
     priorityActions,
   };
 }

@@ -17,6 +17,8 @@ import {
   buildGatePlatformRetreatRecheckDispatchItems,
   buildGatePlatformDecisionTimeline,
   buildGatePlatformDecisionSummaryMarkdown,
+  buildGatePlatformTacticExperienceLibrary,
+  buildGatePlatformTacticExperienceMarkdown,
   buildGatePlatformDispatchReceipt,
   buildGatePlatformGrowthDispatchItems,
   buildGatePlatformGrowthReview,
@@ -48,6 +50,8 @@ import {
   type GatePlatformDecisionTimelineEventType,
   type GatePlatformDecisionTimelineStatus,
   type GatePlatformDecisionTimelineItem,
+  type GatePlatformTacticExperienceItem,
+  type GatePlatformTacticExperienceStatus,
   type GatePlatformGrowthDispatchItem,
   type GatePlatformGrowthReview,
   type PersistedGatePlatformDispatchTask,
@@ -198,6 +202,18 @@ function decisionEventLabel(type: GatePlatformDecisionTimelineEventType | "all")
   return "全部事件";
 }
 
+function tacticExperienceClass(status: GatePlatformTacticExperienceStatus) {
+  if (status === "blocked") return "border-rose-200 bg-rose-50 text-rose-900";
+  if (status === "watch") return "border-amber-200 bg-amber-50 text-amber-900";
+  return "border-emerald-200 bg-emerald-50 text-emerald-900";
+}
+
+function tacticExperienceStatusLabel(status: GatePlatformTacticExperienceStatus) {
+  if (status === "blocked") return "避坑样本";
+  if (status === "watch") return "观察样本";
+  return "可复用";
+}
+
 export function GateActionWorkspace({ actions }: { actions: PrePublishGateAction[] }) {
   const router = useRouter();
   const [receipts, setReceipts] = useState<GateActionReceipt[]>([]);
@@ -248,6 +264,7 @@ export function GateActionWorkspace({ actions }: { actions: PrePublishGateAction
     status: timelineStatusFilter,
     eventType: timelineEventFilter,
   });
+  const tacticExperienceLibrary = buildGatePlatformTacticExperienceLibrary(decisionTimeline);
   const latestReceipt = filteredReceipts[0] ?? null;
 
   useEffect(() => {
@@ -318,6 +335,24 @@ export function GateActionWorkspace({ actions }: { actions: PrePublishGateAction
     link.click();
     URL.revokeObjectURL(url);
     setTimelineExportMessage(`${item.platformName} 复盘摘要已下载。`);
+  }
+
+  async function copyTacticExperience(item: GatePlatformTacticExperienceItem) {
+    const markdown = buildGatePlatformTacticExperienceMarkdown(item);
+    await navigator.clipboard.writeText(markdown);
+    setTimelineExportMessage(`${item.platformName} 打法经验已复制。`);
+  }
+
+  function downloadTacticExperience(item: GatePlatformTacticExperienceItem) {
+    const markdown = buildGatePlatformTacticExperienceMarkdown(item);
+    const blob = new Blob([markdown], { type: "text/markdown;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `${item.platformName}-平台打法经验.md`;
+    link.click();
+    URL.revokeObjectURL(url);
+    setTimelineExportMessage(`${item.platformName} 打法经验已下载。`);
   }
 
   return (
@@ -1126,6 +1161,95 @@ export function GateActionWorkspace({ actions }: { actions: PrePublishGateAction
           ) : (
             <p className="rounded-md border border-dashed border-slate-300 bg-white p-3 text-sm text-slate-600">
               暂无平台决策链。先产生平台效果回执或派单任务。
+            </p>
+          )}
+        </div>
+        <div className="mt-3 grid gap-2">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <div className="text-xs font-medium text-slate-500">平台打法经验库</div>
+              <p className="mt-1 text-xs text-slate-500">把时间线里的真实证据沉淀成可复用打法、观察样本和避坑样本。</p>
+            </div>
+            {tacticExperienceLibrary.summary.total ? (
+              <div className="flex flex-wrap gap-2 text-xs">
+                <span className="rounded-md border border-emerald-200 bg-emerald-50 px-2 py-1 text-emerald-800">
+                  可复用 {tacticExperienceLibrary.summary.usable}
+                </span>
+                <span className="rounded-md border border-amber-200 bg-amber-50 px-2 py-1 text-amber-800">
+                  观察 {tacticExperienceLibrary.summary.watch}
+                </span>
+                <span className="rounded-md border border-rose-200 bg-rose-50 px-2 py-1 text-rose-800">
+                  避坑 {tacticExperienceLibrary.summary.blocked}
+                </span>
+              </div>
+            ) : null}
+          </div>
+          {tacticExperienceLibrary.nextActions.length ? (
+            <div className="grid gap-2 xl:grid-cols-3">
+              {tacticExperienceLibrary.nextActions.map((action) => (
+                <div className="rounded-md bg-white p-3 text-sm leading-6 text-slate-600" key={action}>{action}</div>
+              ))}
+            </div>
+          ) : null}
+          {tacticExperienceLibrary.items.length ? (
+            <div className="grid gap-2 xl:grid-cols-3">
+              {tacticExperienceLibrary.items.map((item) => (
+                <div className={`rounded-md border p-3 text-sm ${tacticExperienceClass(item.status)}`} key={item.platformId}>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-medium">{item.platformName}</span>
+                    <span className="rounded-md bg-white/70 px-2 py-1 text-xs font-medium">{tacticExperienceStatusLabel(item.status)}</span>
+                  </div>
+                  <div className="mt-3 rounded-md bg-white/70 p-3">
+                    <div className="text-xs font-medium opacity-70">打法</div>
+                    <p className="mt-1 font-medium leading-6">{item.tactic}</p>
+                  </div>
+                  <p className="mt-3 leading-6 opacity-85">{item.lesson}</p>
+                  <div className="mt-3 grid gap-2">
+                    <div className="rounded-md bg-white/70 p-3">
+                      <div className="text-xs font-medium opacity-70">复用方式</div>
+                      <p className="mt-1 leading-6">{item.reuseHint}</p>
+                    </div>
+                    <div className="rounded-md bg-white/70 p-3">
+                      <div className="text-xs font-medium opacity-70">风险提醒</div>
+                      <p className="mt-1 leading-6">{item.risk}</p>
+                    </div>
+                  </div>
+                  {item.evidence.length ? (
+                    <div className="mt-3 grid gap-1">
+                      {item.evidence.slice(0, 2).map((evidence) => (
+                        <p className="rounded-md border border-white/70 bg-white/60 p-2 text-xs leading-5 opacity-80" key={evidence}>{evidence}</p>
+                      ))}
+                    </div>
+                  ) : null}
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    <button
+                      className="rounded-md border border-white/70 bg-white px-3 py-2 text-xs font-medium text-slate-950 hover:bg-white/80"
+                      onClick={() => focusPlatform(item.platformId)}
+                      type="button"
+                    >
+                      只看该平台
+                    </button>
+                    <button
+                      className="rounded-md border border-white/70 bg-white/70 px-3 py-2 text-xs font-medium text-slate-950 hover:bg-white"
+                      onClick={() => void copyTacticExperience(item)}
+                      type="button"
+                    >
+                      复制经验
+                    </button>
+                    <button
+                      className="rounded-md border border-white/70 bg-white/70 px-3 py-2 text-xs font-medium text-slate-950 hover:bg-white"
+                      onClick={() => downloadTacticExperience(item)}
+                      type="button"
+                    >
+                      下载经验
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="rounded-md border border-dashed border-slate-300 bg-white p-3 text-sm text-slate-600">
+              暂无可沉淀的平台打法经验。先完成平台决策链。
             </p>
           )}
         </div>

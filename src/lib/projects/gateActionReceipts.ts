@@ -454,6 +454,36 @@ export interface GatePlatformDecisionTimelineFilters {
   eventType?: GatePlatformDecisionTimelineEventType | "all";
 }
 
+export type GatePlatformTacticExperienceStatus = "blocked" | "watch" | "usable";
+
+export interface GatePlatformTacticExperienceItem {
+  platformId: string;
+  platformName: string;
+  status: GatePlatformTacticExperienceStatus;
+  label: string;
+  tactic: string;
+  lesson: string;
+  reuseHint: string;
+  risk: string;
+  href: string;
+  sourceStatus: GatePlatformDecisionTimelineStatus;
+  sourceLabel: string;
+  priorityScore: number;
+  latestAt: string;
+  evidence: string[];
+}
+
+export interface GatePlatformTacticExperienceLibrary {
+  summary: {
+    total: number;
+    blocked: number;
+    watch: number;
+    usable: number;
+  };
+  nextActions: string[];
+  items: GatePlatformTacticExperienceItem[];
+}
+
 export interface GatePlatformStrategyReceiptPayload {
   message?: string;
   error?: string;
@@ -2986,6 +3016,143 @@ export function filterGatePlatformDecisionTimelineItems(
 
 function markdownLine(input: string) {
   return input.replace(/\s+/g, " ").trim();
+}
+
+export function buildGatePlatformTacticExperienceLibrary(
+  timeline: GatePlatformDecisionTimeline,
+  limit = 6,
+): GatePlatformTacticExperienceLibrary {
+  const items = timeline.items.map((item): GatePlatformTacticExperienceItem => {
+    const evidence = item.events.slice(0, 3).map((event) => `${event.label}：${markdownLine(event.detail)}`);
+    const base = {
+      platformId: item.platformId,
+      platformName: item.platformName,
+      href: item.href,
+      sourceStatus: item.status,
+      sourceLabel: item.label,
+      priorityScore: item.priorityScore,
+      latestAt: item.latestAt,
+      evidence,
+    };
+
+    if (item.status === "blocked") {
+      return {
+        ...base,
+        status: "blocked",
+        label: "避坑样本",
+        tactic: item.label,
+        lesson: `${item.platformName} 当前证据仍在撤退或修打法区间，不能把失败样本包装成成功经验。`,
+        reuseHint: "同类项目先避开直接加码，优先复制问题诊断清单和撤退条件。",
+        risk: markdownLine(item.detail),
+      };
+    }
+
+    if (item.status === "needs_effect") {
+      return {
+        ...base,
+        status: "watch",
+        label: "待复测经验",
+        tactic: "修复后复测",
+        lesson: `${item.platformName} 已经进入修复链路，但缺少下一轮效果数据，结论还不能写进成功案例。`,
+        reuseHint: "新项目可以复用修复清单，但必须补曝光、点击、收藏、追读四项效果样本。",
+        risk: "缺复测数据前不要把它当成恢复打法，只能当成待验证模板。",
+      };
+    }
+
+    if (item.status === "rechecking") {
+      return {
+        ...base,
+        status: "watch",
+        label: "重验中打法",
+        tactic: "修复后小步重验",
+        lesson: `${item.platformName} 已经从修复走到重验阶段，流程可借鉴，胜率还要等回填确认。`,
+        reuseHint: "同类项目只复制小步重验节奏，不复制放量结论。",
+        risk: "缺下一轮重验效果前，不要提前扩大投放或更新规模。",
+      };
+    }
+
+    if (item.status === "recovering") {
+      return {
+        ...base,
+        status: "usable",
+        label: "可复用打法",
+        tactic: "修复后重验打法",
+        lesson: `${item.platformName} 已完成修复、复测、重验和效果回填，可以作为同类平台的恢复模板。`,
+        reuseHint: "新项目可复用：先修标题简介标签和前三章兑现，再小步重验。",
+        risk: "不要直接放量，先保留小步验证窗口。",
+      };
+    }
+
+    return {
+      ...base,
+      status: "usable",
+      label: "健康观察样本",
+      tactic: "稳态观察打法",
+      lesson: `${item.platformName} 当前没有撤退修复债，可以作为平台稳定期观察样本。`,
+      reuseHint: "新项目可复用健康阈值和复盘口径，继续按总闸门节奏观察。",
+      risk: "健康不等于可无限加码，仍要保留效果回填节奏。",
+    };
+  });
+
+  const statusWeight: Record<GatePlatformTacticExperienceStatus, number> = {
+    blocked: 0,
+    watch: 1,
+    usable: 2,
+  };
+  const sortedItems = items
+    .sort((left, right) => {
+      const statusDiff = statusWeight[left.status] - statusWeight[right.status];
+      if (statusDiff !== 0) return statusDiff;
+      const priorityDiff = right.priorityScore - left.priorityScore;
+      if (priorityDiff !== 0) return priorityDiff;
+      return new Date(right.latestAt).getTime() - new Date(left.latestAt).getTime();
+    })
+    .slice(0, limit);
+  const blocked = sortedItems.filter((item) => item.status === "blocked").length;
+  const watch = sortedItems.filter((item) => item.status === "watch").length;
+  const usable = sortedItems.filter((item) => item.status === "usable").length;
+
+  return {
+    summary: {
+      total: sortedItems.length,
+      blocked,
+      watch,
+      usable,
+    },
+    nextActions: [
+      blocked > 0 ? `${blocked} 个避坑样本要先沉淀撤退条件，别让错误打法复用。` : null,
+      watch > 0 ? `${watch} 个观察样本只复用流程，等效果回填后再写成标准打法。` : null,
+      usable > 0 ? `${usable} 个可复用打法可以进入新项目平台选择参考。` : null,
+    ].filter((action): action is string => Boolean(action)),
+    items: sortedItems,
+  };
+}
+
+export function buildGatePlatformTacticExperienceMarkdown(item: GatePlatformTacticExperienceItem) {
+  const evidenceLines = item.evidence.length
+    ? item.evidence.map((evidence, index) => `${index + 1}. ${markdownLine(evidence)}`)
+    : ["暂无证据记录。"];
+
+  return [
+    `# ${item.platformName} 平台打法经验`,
+    "",
+    `- 经验状态：${item.label}`,
+    `- 来源判断：${item.sourceLabel}`,
+    `- 可复用打法：${item.tactic}`,
+    `- 处理入口：${item.href}`,
+    "",
+    "## 经验结论",
+    markdownLine(item.lesson),
+    "",
+    "## 复用方式",
+    markdownLine(item.reuseHint),
+    "",
+    "## 风险提醒",
+    markdownLine(item.risk),
+    "",
+    "## 来源证据",
+    ...evidenceLines,
+  ].join("\n");
 }
 
 export function buildGatePlatformDecisionSummaryMarkdown(item: GatePlatformDecisionTimelineItem) {

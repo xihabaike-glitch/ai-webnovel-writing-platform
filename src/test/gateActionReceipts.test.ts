@@ -19,6 +19,8 @@ import {
   buildGatePlatformRetreatRecheckDispatchItems,
   buildGatePlatformDecisionTimeline,
   buildGatePlatformDecisionSummaryMarkdown,
+  buildGatePlatformTacticExperienceLibrary,
+  buildGatePlatformTacticExperienceMarkdown,
   filterGatePlatformDecisionTimelineItems,
   buildGateDispatchTaskCenter,
   buildGateDispatchTaskCloseoutItem,
@@ -1134,6 +1136,9 @@ test("buildGateActionReceipt", async (t) => {
     });
     const timelineItem = decisionTimeline.items.find((item) => item.platformId === "fanqie");
     const timelineMarkdown = buildGatePlatformDecisionSummaryMarkdown(timelineItem!);
+    const tacticLibrary = buildGatePlatformTacticExperienceLibrary(decisionTimeline);
+    const tacticItem = tacticLibrary.items.find((item) => item.platformId === "fanqie");
+    const tacticMarkdown = buildGatePlatformTacticExperienceMarkdown(tacticItem!);
 
     assert.equal(retreatGate.items.find((item) => item.platformId === "fanqie")?.status, "pivot_platform");
     assert.equal(pendingResolution.items[0].status, "needs_effect");
@@ -1166,6 +1171,14 @@ test("buildGateActionReceipt", async (t) => {
     assert.ok(timelineMarkdown.includes("当前状态：修复后恢复"));
     assert.ok(timelineMarkdown.includes("重验已回填"));
     assert.ok(timelineMarkdown.includes("复盘口径"));
+    assert.equal(tacticLibrary.summary.usable, 1);
+    assert.equal(tacticItem?.status, "usable");
+    assert.equal(tacticItem?.label, "可复用打法");
+    assert.ok(tacticItem?.reuseHint.includes("小步重验"));
+    assert.ok(tacticItem?.evidence.some((evidence) => evidence.includes("重验已回填")));
+    assert.ok(tacticMarkdown.includes("# 番茄小说 平台打法经验"));
+    assert.ok(tacticMarkdown.includes("可复用打法：修复后重验打法"));
+    assert.ok(tacticMarkdown.includes("风险提醒"));
   });
 
   await t.test("records dispatch receipts and marks the dispatch as assigned", () => {

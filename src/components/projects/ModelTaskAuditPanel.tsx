@@ -178,6 +178,7 @@ export function ModelTaskAuditPanel({ projectId }: { projectId: string }) {
   const [dashboard, setDashboard] = useState<ModelTaskAuditDashboard | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isSavingBudget, setIsSavingBudget] = useState(false);
+  const [applyingRouteType, setApplyingRouteType] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [budgetDraft, setBudgetDraft] = useState({
     aiMonthlyBudgetUsd: "5",
@@ -238,6 +239,30 @@ export function ModelTaskAuditPanel({ projectId }: { projectId: string }) {
       setMessage(caught instanceof Error ? caught.message : "保存预算规则失败。");
     } finally {
       setIsSavingBudget(false);
+    }
+  }
+
+  async function applyRouteRecommendation(recommendation: RouteRecommendationView) {
+    if (!recommendation.recommendedPrimaryProviderConfigId) return;
+    setApplyingRouteType(recommendation.taskType);
+    setMessage(null);
+    try {
+      const response = await fetch("/api/model-task-routes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          taskType: recommendation.taskType,
+          primaryProviderConfigId: recommendation.recommendedPrimaryProviderConfigId,
+          fallbackProviderConfigId: recommendation.recommendedFallbackProviderConfigId,
+        }),
+      });
+      if (!response.ok) throw new Error("应用模型路线失败。");
+      await loadAudit();
+      setMessage(`已应用「${recommendation.label}」模型路线`);
+    } catch (caught) {
+      setMessage(caught instanceof Error ? caught.message : "应用模型路线失败。");
+    } finally {
+      setApplyingRouteType(null);
     }
   }
 
@@ -431,6 +456,16 @@ export function ModelTaskAuditPanel({ projectId }: { projectId: string }) {
                       {routeStatusLabel(recommendation.status)}
                     </span>
                   </div>
+                  {recommendation.status === "ready" ? (
+                    <button
+                      className="mt-3 rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white disabled:opacity-50"
+                      disabled={applyingRouteType === recommendation.taskType}
+                      onClick={() => applyRouteRecommendation(recommendation)}
+                      type="button"
+                    >
+                      {applyingRouteType === recommendation.taskType ? "应用中" : "应用这条路线"}
+                    </button>
+                  ) : null}
                   <div className="mt-2 grid grid-cols-2 gap-2 text-slate-600 sm:grid-cols-4">
                     <div>样本 {recommendation.sampleTasks}</div>
                     <div>成功 {recommendation.successRatePercent}%</div>

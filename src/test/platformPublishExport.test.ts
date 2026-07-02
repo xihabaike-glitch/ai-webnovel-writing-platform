@@ -89,6 +89,9 @@ test("buildPlatformPublishExportCenter", async (t) => {
     assert.ok(center.workspace.nextActions.some((action) => action.kind === "run_chapter_review"));
     assert.equal(center.platformStrategy.length, platformProfiles.length);
     assert.equal(center.platformStrategy[0].rank, 1);
+    assert.equal(center.activeStrategyPlan?.platformId, "fanqie");
+    assert.equal(center.activeStrategyPlan?.progress.status, "in_progress");
+    assert.equal(center.activeStrategyPlan?.steps[0].status, "done");
     assert.equal(center.packages[0].publishEffect.status, "empty");
     assert.ok(center.packages[0].publishEffect.nextAction.includes("录入"));
     assert.equal(center.packages[0].effectOptimization.status, "collect_data");

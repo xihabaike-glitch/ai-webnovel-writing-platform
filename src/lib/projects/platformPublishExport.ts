@@ -420,6 +420,7 @@ export interface PlatformPublishExportCenter {
   totalPublishableChapters: number;
   workspace: PlatformPublishWorkspace;
   platformStrategy: PlatformStrategyRankItem[];
+  activeStrategyPlan: PlatformStrategySwitchPlan | null;
 }
 
 export interface PlatformPublishArchivePlatform {
@@ -2099,13 +2100,19 @@ function buildPlatformPackage(
 export function buildPlatformPublishExportCenter(input: PlatformPublishExportInput): PlatformPublishExportCenter {
   const platforms = input.platforms ?? platformProfiles;
   const packages = platforms.map((platform) => buildPlatformPackage(input, platform));
+  const platformStrategy = buildPlatformStrategy(packages);
+  const activeStrategy = platformStrategy.find((strategy) => strategy.platformId === input.targetPlatform.id) ?? null;
+  const activePackage = packages.find((pack) => pack.platformId === input.targetPlatform.id);
 
   return {
     packages,
     recommendedPlatformId: input.targetPlatform.id,
     totalPublishableChapters: publishableChapters(input.chapters).length,
     workspace: buildPublishWorkspace(packages),
-    platformStrategy: buildPlatformStrategy(packages),
+    platformStrategy,
+    activeStrategyPlan: activeStrategy
+      ? buildPlatformStrategySwitchPlan(activeStrategy, input.targetPlatform, activePackage)
+      : null,
   };
 }
 

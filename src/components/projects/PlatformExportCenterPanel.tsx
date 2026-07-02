@@ -412,6 +412,7 @@ interface PlatformPublishExportCenter {
   totalPublishableChapters: number;
   workspace: PlatformPublishWorkspace;
   platformStrategy: PlatformStrategyRankItem[];
+  activeStrategyPlan: PlatformStrategySwitchPlan | null;
 }
 
 interface SubmissionAssetDraft {
@@ -800,6 +801,7 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
       const payload = (await response.json()) as { center: PlatformPublishExportCenter };
       setCenter(payload.center);
       setSelectedPlatformId((current) => current || payload.center.recommendedPlatformId);
+      setStrategySwitchPlan((current) => current ?? payload.center.activeStrategyPlan);
     } catch (caught) {
       setMessage(caught instanceof Error ? caught.message : "读取平台发布包失败。");
     } finally {

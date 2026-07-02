@@ -408,6 +408,46 @@ export interface GatePlatformRetreatResolution {
   items: GatePlatformRetreatResolutionItem[];
 }
 
+export type GatePlatformDecisionTimelineEventType = "effect" | "retreat" | "repair" | "recheck" | "dispatch";
+
+export interface GatePlatformDecisionTimelineEvent {
+  id: string;
+  type: GatePlatformDecisionTimelineEventType;
+  label: string;
+  detail: string;
+  href: string;
+  createdAt: string;
+  evidence: string[];
+}
+
+export type GatePlatformDecisionTimelineStatus = "blocked" | "needs_effect" | "rechecking" | "recovering" | "healthy";
+
+export interface GatePlatformDecisionTimelineItem {
+  platformId: string;
+  platformName: string;
+  status: GatePlatformDecisionTimelineStatus;
+  label: string;
+  detail: string;
+  actionLabel: string;
+  href: string;
+  priorityScore: number;
+  latestAt: string;
+  events: GatePlatformDecisionTimelineEvent[];
+}
+
+export interface GatePlatformDecisionTimeline {
+  summary: {
+    total: number;
+    blocked: number;
+    needsEffect: number;
+    rechecking: number;
+    recovering: number;
+    healthy: number;
+  };
+  nextActions: string[];
+  items: GatePlatformDecisionTimelineItem[];
+}
+
 export interface GatePlatformStrategyReceiptPayload {
   message?: string;
   error?: string;
@@ -2696,6 +2736,233 @@ export function buildGatePlatformRetreatGate(
       if (priorityDiff !== 0) return priorityDiff;
       return left.platformName.localeCompare(right.platformName);
     }),
+  };
+}
+
+export function buildGatePlatformDecisionTimeline(input: {
+  receipts: GateActionReceipt[];
+  tasks?: PersistedGatePlatformDispatchTask[];
+  retreatGate?: GatePlatformRetreatGate;
+  retreatResolution?: GatePlatformRetreatResolution;
+  scaleFollowup?: GatePlatformScaleFollowup;
+  limit?: number;
+}): GatePlatformDecisionTimeline {
+  const receipts = trimGateActionReceipts(input.receipts, 100).filter((receipt) => !isAuditMetaReceipt(receipt));
+  const tasks = input.tasks ?? [];
+  const retreatGate = input.retreatGate ?? buildGatePlatformRetreatGate(receipts);
+  const retreatResolution = input.retreatResolution ?? buildGatePlatformRetreatResolution(tasks, receipts);
+  const scaleFollowup = input.scaleFollowup ?? buildGatePlatformScaleFollowup(tasks, receipts);
+  const platformMap = new Map<string, {
+    platformId: string;
+    platformName: string;
+    priorityScore: number;
+    href: string;
+    events: GatePlatformDecisionTimelineEvent[];
+  }>();
+
+  function ensurePlatform(platformId: string, platformName: string, href = "/gate") {
+    const current = platformMap.get(platformId);
+    if (current) {
+      if (platformName && current.platformName !== platformName) current.platformName = platformName;
+      return current;
+    }
+    const next = { platformId, platformName, priorityScore: 1, href, events: [] };
+    platformMap.set(platformId, next);
+    return next;
+  }
+
+  for (const receipt of receipts) {
+    const platform = gateActionReceiptPlatform(receipt);
+    if (platform.id === "manual") continue;
+    const metric = metricFromReceipt(receipt);
+    const eventPlatform = ensurePlatform(platform.id, platform.name, receipt.href);
+    eventPlatform.priorityScore = Math.max(eventPlatform.priorityScore, receipt.status === "failed" ? 70 : 25);
+    if (metric) {
+      eventPlatform.events.push({
+        id: `effect:${receipt.id}`,
+        type: "effect",
+        label: "效果回填",
+        detail: `曝光 ${metric.views}，点击 ${metric.clicks}，收藏 ${metric.favorites}，追读 ${metric.follows}。`,
+        href: receipt.href,
+        createdAt: receipt.createdAt,
+        evidence: [`点击率 ${metric.clickRatePercent}%`, `收藏率 ${metric.favoriteRatePercent}%`, `追读率 ${metric.followRatePercent}%`],
+      });
+    } else if (isPlatformDispatchReceipt(receipt)) {
+      eventPlatform.events.push({
+        id: `dispatch-receipt:${receipt.id}`,
+        type: "dispatch",
+        label: "派单回执",
+        detail: receipt.detail,
+        href: receipt.href,
+        createdAt: receipt.createdAt,
+        evidence: [receipt.message],
+      });
+    }
+  }
+
+  for (const task of tasks) {
+    const eventPlatform = ensurePlatform(task.platformId, task.platformName, task.href);
+    eventPlatform.priorityScore = Math.max(eventPlatform.priorityScore, task.priorityScore);
+    const isRetreatRepair = isRetreatDispatchStage(task.stage);
+    const isRetreatRecheck = isRetreatRecheckDispatchTask(task);
+    const completedAt = task.completedAt ?? task.updatedAt;
+    eventPlatform.events.push({
+      id: `task:${task.dispatchKey}`,
+      type: isRetreatRecheck ? "recheck" : isRetreatRepair ? "repair" : "dispatch",
+      label: task.state === "completed"
+        ? isRetreatRecheck ? "重验完成" : isRetreatRepair ? "修复完成" : "派单完成"
+        : isRetreatRecheck ? "重验派单" : isRetreatRepair ? "修复派单" : "平台派单",
+      detail: task.state === "completed" && task.completionEvidence.trim()
+        ? task.completionEvidence.trim()
+        : `${task.ownerRole} · ${task.title}`,
+      href: task.state === "completed" ? "/dispatch" : task.href,
+      createdAt: task.state === "completed" ? completedAt : task.updatedAt,
+      evidence: task.acceptanceCriteria.slice(0, 3),
+    });
+  }
+
+  for (const item of retreatGate.items) {
+    if (item.status === "healthy" || item.status === "watch") continue;
+    const eventPlatform = ensurePlatform(item.platformId, item.platformName, item.href);
+    eventPlatform.priorityScore = Math.max(eventPlatform.priorityScore, item.priorityScore);
+    eventPlatform.events.push({
+      id: `retreat:${item.platformId}:${item.latestAt}`,
+      type: "retreat",
+      label: item.label,
+      detail: item.detail,
+      href: item.href,
+      createdAt: item.latestAt,
+      evidence: item.evidence,
+    });
+  }
+
+  for (const item of retreatResolution.items) {
+    const eventPlatform = ensurePlatform(item.platformId, item.platformName, item.href);
+    eventPlatform.priorityScore = Math.max(eventPlatform.priorityScore, item.priorityScore);
+    eventPlatform.events.push({
+      id: `resolution:${item.dispatchKey}:${item.status}`,
+      type: "repair",
+      label: item.label,
+      detail: item.detail,
+      href: item.href,
+      createdAt: item.latestEffectAt ?? item.completedAt ?? new Date(0).toISOString(),
+      evidence: item.evidence.slice(0, 3),
+    });
+  }
+
+  for (const item of scaleFollowup.items.filter((followup) => isRetreatRecheckDispatchTask(followup))) {
+    const eventPlatform = ensurePlatform(item.platformId, item.platformName, item.href);
+    eventPlatform.priorityScore = Math.max(eventPlatform.priorityScore, item.priorityScore);
+    eventPlatform.events.push({
+      id: `recheck-followup:${item.dispatchKey}:${item.status}`,
+      type: "recheck",
+      label: item.label,
+      detail: item.detail,
+      href: item.href,
+      createdAt: item.latestEffectAt ?? item.completedAt ?? new Date(0).toISOString(),
+      evidence: item.evidence.slice(0, 3),
+    });
+  }
+
+  const retreatByPlatform = new Map(retreatGate.items.map((item) => [item.platformId, item]));
+  const resolutionByPlatform = new Map(retreatResolution.items.map((item) => [item.platformId, item]));
+  const recheckFollowupByPlatform = new Map(
+    scaleFollowup.items.filter((item) => isRetreatRecheckDispatchTask(item)).map((item) => [item.platformId, item]),
+  );
+  const items = [...platformMap.values()].map((platform): GatePlatformDecisionTimelineItem => {
+    const sortedEvents = platform.events
+      .filter((event) => !Number.isNaN(new Date(event.createdAt).getTime()))
+      .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime())
+      .slice(0, 6);
+    const retreat = retreatByPlatform.get(platform.platformId);
+    const resolution = resolutionByPlatform.get(platform.platformId);
+    const recheckFollowup = recheckFollowupByPlatform.get(platform.platformId);
+    let status: GatePlatformDecisionTimelineStatus = "healthy";
+    let label = "健康观察";
+    let detail = `${platform.platformName} 当前没有撤退修复债，继续按总闸门节奏观察。`;
+    let actionLabel = "查看平台";
+    let href = platform.href;
+
+    if (retreat && ["pause", "pivot_platform", "repair_tactic"].includes(retreat.status) && resolution?.status !== "resolved") {
+      status = "blocked";
+      label = retreat.label;
+      detail = retreat.detail;
+      actionLabel = retreat.actionLabel;
+      href = retreat.href;
+    } else if (resolution && resolution.status !== "resolved") {
+      status = "needs_effect";
+      label = resolution.label;
+      detail = resolution.detail;
+      actionLabel = resolution.actionLabel;
+      href = resolution.href;
+    } else if (recheckFollowup && recheckFollowup.status !== "tracked") {
+      status = "rechecking";
+      label = recheckFollowup.label;
+      detail = recheckFollowup.detail;
+      actionLabel = recheckFollowup.actionLabel;
+      href = recheckFollowup.href;
+    } else if (resolution?.status === "resolved") {
+      status = "recovering";
+      label = "修复后恢复";
+      detail = `${platform.platformName} 已有修复复测证据，继续用重验数据判断是否恢复增长。`;
+      actionLabel = "查看重验";
+      href = resolution.href;
+    }
+
+    return {
+      platformId: platform.platformId,
+      platformName: platform.platformName,
+      status,
+      label,
+      detail,
+      actionLabel,
+      href,
+      priorityScore: platform.priorityScore,
+      latestAt: sortedEvents[0]?.createdAt ?? new Date(0).toISOString(),
+      events: sortedEvents,
+    };
+  });
+
+  const limit = input.limit ?? 5;
+  const statusWeight: Record<GatePlatformDecisionTimelineStatus, number> = {
+    blocked: 0,
+    needs_effect: 1,
+    rechecking: 2,
+    recovering: 3,
+    healthy: 4,
+  };
+  const sortedItems = items
+    .filter((item) => item.events.length > 0)
+    .sort((left, right) => {
+      const statusDiff = statusWeight[left.status] - statusWeight[right.status];
+      if (statusDiff !== 0) return statusDiff;
+      const priorityDiff = right.priorityScore - left.priorityScore;
+      if (priorityDiff !== 0) return priorityDiff;
+      return new Date(right.latestAt).getTime() - new Date(left.latestAt).getTime();
+    })
+    .slice(0, limit);
+  const blocked = sortedItems.filter((item) => item.status === "blocked").length;
+  const needsEffect = sortedItems.filter((item) => item.status === "needs_effect").length;
+  const rechecking = sortedItems.filter((item) => item.status === "rechecking").length;
+  const recovering = sortedItems.filter((item) => item.status === "recovering").length;
+  const healthy = sortedItems.filter((item) => item.status === "healthy").length;
+
+  return {
+    summary: {
+      total: sortedItems.length,
+      blocked,
+      needsEffect,
+      rechecking,
+      recovering,
+      healthy,
+    },
+    nextActions: [
+      blocked > 0 ? `${blocked} 个平台仍有撤退或修复阻塞，先看时间线里的最近断点。` : null,
+      needsEffect > 0 ? `${needsEffect} 个平台修复后缺复测效果，先补数据再判断恢复。` : null,
+      rechecking > 0 ? `${rechecking} 个平台处在重验中，下一步只看重验效果回填。` : null,
+      recovering > 0 ? `${recovering} 个平台已有恢复证据，继续小步验证，不要直接放量。` : null,
+    ].filter((action): action is string => Boolean(action)),
+    items: sortedItems,
   };
 }
 

@@ -17,6 +17,7 @@ import {
   buildGatePlatformRetreatDispatchItems,
   buildGatePlatformRetreatResolution,
   buildGatePlatformRetreatRecheckDispatchItems,
+  buildGatePlatformDecisionTimeline,
   buildGateDispatchTaskCenter,
   buildGateDispatchTaskCloseoutItem,
   buildGatePublishEffectReceipt,
@@ -1122,6 +1123,14 @@ test("buildGateActionReceipt", async (t) => {
       [completedRecheckTask],
       [postRecheckEffect, postRecheckNonEffectReceipt, laterEffect, fanqieWeaker, fanqieWeak, fanqieStrong],
     );
+    const decisionTimeline = buildGatePlatformDecisionTimeline({
+      receipts: [postRecheckEffect, postRecheckNonEffectReceipt, laterEffect, fanqieWeaker, fanqieWeak, fanqieStrong],
+      tasks: [completedRetreatTask, completedRecheckTask],
+      retreatGate: updatedRetreatGate,
+      retreatResolution: resolvedResolution,
+      scaleFollowup: trackedRecheckFollowup,
+    });
+    const timelineItem = decisionTimeline.items.find((item) => item.platformId === "fanqie");
 
     assert.equal(retreatGate.items.find((item) => item.platformId === "fanqie")?.status, "pivot_platform");
     assert.equal(pendingResolution.items[0].status, "needs_effect");
@@ -1143,6 +1152,10 @@ test("buildGateActionReceipt", async (t) => {
     assert.equal(recheckBlockedGate.items.find((item) => item.platformId === "fanqie")?.label, "等待加码效果");
     assert.equal(trackedRecheckFollowup.items[0].status, "tracked");
     assert.equal(trackedRecheckFollowup.items[0].label, "重验已回填");
+    assert.equal(timelineItem?.status, "recovering");
+    assert.equal(timelineItem?.events.some((event) => event.type === "repair" && event.label === "修复已复测"), true);
+    assert.equal(timelineItem?.events.some((event) => event.type === "recheck" && event.label === "重验已回填"), true);
+    assert.equal(timelineItem?.events[0].type, "effect");
   });
 
   await t.test("records dispatch receipts and marks the dispatch as assigned", () => {

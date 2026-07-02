@@ -22,6 +22,14 @@ interface GateAssetVariant {
 
 type GateAssetAuditStatus = NonNullable<GateAssetVariant["audit"]>["status"];
 
+interface PendingBaseline {
+  projectId: string;
+  projectTitle: string;
+  platformId: string;
+  platformName: string;
+  strategy: string;
+}
+
 function statusTone(status: PrePublishGateProjectStatus["effectReview"]["status"]) {
   if (status === "signed") return "bg-emerald-100 text-emerald-800";
   if (status === "promising") return "bg-emerald-50 text-emerald-700";
@@ -73,7 +81,9 @@ export function GatePublishEffectReviewPanel({ packages }: { packages: PrePublis
   const router = useRouter();
   const [runningActionId, setRunningActionId] = useState<string | null>(null);
   const [savingVariantId, setSavingVariantId] = useState<string | null>(null);
+  const [savingBaselineId, setSavingBaselineId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [pendingBaseline, setPendingBaseline] = useState<PendingBaseline | null>(null);
   const [generatedVariants, setGeneratedVariants] = useState<Record<string, GateAssetVariant[]>>({});
   const totalRecords = packages.reduce((sum, item) => sum + item.effectReview.records, 0);
   const totalViews = packages.reduce((sum, item) => sum + item.effectReview.totalViews, 0);
@@ -162,6 +172,13 @@ export function GatePublishEffectReviewPanel({ packages }: { packages: PrePublis
       const payload = (await response.json().catch(() => null)) as { message?: string; error?: string } | null;
       if (!response.ok) throw new Error(payload?.error ?? "采纳投稿方案失败。");
       setMessage(`已采纳并保存「${variant.strategy}」，${item.platformName} 投稿资产已进入实测版本。`);
+      setPendingBaseline({
+        projectId: item.projectId,
+        projectTitle: item.projectTitle,
+        platformId: item.platformId,
+        platformName: item.platformName,
+        strategy: variant.strategy,
+      });
       setGeneratedVariants((current) => {
         const next = { ...current };
         delete next[actionId];
@@ -172,6 +189,28 @@ export function GatePublishEffectReviewPanel({ packages }: { packages: PrePublis
       setMessage(caught instanceof Error ? caught.message : "采纳投稿方案失败。");
     } finally {
       setSavingVariantId(null);
+    }
+  }
+
+  async function saveBaseline(item: PendingBaseline) {
+    const baselineId = `${item.projectId}:${item.platformId}:baseline`;
+    setSavingBaselineId(baselineId);
+    setMessage(null);
+    try {
+      const response = await fetch(`/api/projects/${item.projectId}/platform-export`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "snapshot", platformId: item.platformId }),
+      });
+      const payload = (await response.json().catch(() => null)) as { message?: string; error?: string } | null;
+      if (!response.ok) throw new Error(payload?.error ?? "保存发布包基准失败。");
+      setMessage(`已保存「${item.strategy}」对应的 ${item.platformName} 发布包基准，下一步可以投放并回填效果。`);
+      setPendingBaseline(null);
+      router.refresh();
+    } catch (caught) {
+      setMessage(caught instanceof Error ? caught.message : "保存发布包基准失败。");
+    } finally {
+      setSavingBaselineId(null);
     }
   }
 
@@ -201,6 +240,26 @@ export function GatePublishEffectReviewPanel({ packages }: { packages: PrePublis
       </div>
       {message ? (
         <div className="mt-3 rounded-md bg-slate-50 px-3 py-2 text-sm text-slate-600">{message}</div>
+      ) : null}
+      {pendingBaseline ? (
+        <div className="mt-3 rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <div className="font-medium">采纳已完成，立刻保存发布包基准</div>
+              <p className="mt-1 leading-6 opacity-85">
+                {pendingBaseline.projectTitle} · {pendingBaseline.platformName} · {pendingBaseline.strategy}
+              </p>
+            </div>
+            <button
+              className="w-fit rounded-md bg-white px-3 py-2 text-xs font-medium text-slate-950 disabled:opacity-50"
+              disabled={savingBaselineId === `${pendingBaseline.projectId}:${pendingBaseline.platformId}:baseline`}
+              onClick={() => void saveBaseline(pendingBaseline)}
+              type="button"
+            >
+              {savingBaselineId === `${pendingBaseline.projectId}:${pendingBaseline.platformId}:baseline` ? "保存中" : "保存基准"}
+            </button>
+          </div>
+        </div>
       ) : null}
 
       <div className="mt-4 grid gap-3">

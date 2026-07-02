@@ -94,6 +94,10 @@ test("buildPlatformPublishExportCenter", async (t) => {
     assert.equal(center.activeStrategyPlan?.steps[0].status, "done");
     assert.equal(center.platformStrategy.find((item) => item.platformId === "fanqie")?.reviewDecision.kind, "collect");
     assert.ok(center.platformStrategy.find((item) => item.platformId === "fanqie")?.reviewDecision.tasks.some((task) => task.id === "record-first-publish-effect"));
+    assert.equal(
+      center.platformStrategy.find((item) => item.platformId === "fanqie")?.reviewDecision.tasks.find((task) => task.id === "archive-current-submission")?.execution,
+      "save_snapshot",
+    );
     assert.equal(center.packages[0].publishEffect.status, "empty");
     assert.ok(center.packages[0].publishEffect.nextAction.includes("录入"));
     assert.equal(center.packages[0].effectOptimization.status, "collect_data");
@@ -447,6 +451,7 @@ test("buildPlatformPublishExportCenter", async (t) => {
     assert.ok(["focus", "grow"].includes(top.recommendation));
     assert.equal(top.reviewDecision.kind, "scale");
     assert.ok(top.reviewDecision.tasks.some((task) => task.id === "archive-winning-version" && task.priority === "high"));
+    assert.equal(top.reviewDecision.tasks.find((task) => task.id === "keep-main-platform")?.execution, "apply_strategy");
     assert.ok(top.reasons.some((reason) => reason.includes("二轮对照 improved")));
   });
 
@@ -489,6 +494,7 @@ test("buildPlatformPublishExportCenter", async (t) => {
     assert.equal(pack.publishEffect.status, "weak");
     assert.equal(strategy.reviewDecision.kind, "repair");
     assert.ok(strategy.reviewDecision.tasks.some((task) => task.id === "rewrite-opening-hook" && task.priority === "high"));
+    assert.equal(strategy.reviewDecision.tasks.find((task) => task.id === "fix-submission-asset")?.execution, "generate_asset_variants");
     assert.equal(pack.effectOptimization.status, "urgent_rework");
     assert.ok(pack.effectOptimization.headline.includes("转化漏斗"));
     assert.ok(pack.effectOptimization.actions.some((action) => (

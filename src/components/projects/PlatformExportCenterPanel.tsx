@@ -375,6 +375,7 @@ interface PlatformStrategyReviewDecision {
 interface PlatformStrategyReviewTask {
   id: string;
   priority: "high" | "medium" | "low";
+  execution: "open_target" | "generate_asset_variants" | "rewrite_first_three" | "save_snapshot" | "apply_strategy";
   label: string;
   detail: string;
   href: string;
@@ -635,6 +636,14 @@ function strategyReviewTaskPriorityClass(priority: PlatformStrategyReviewTask["p
   return "bg-slate-100 text-slate-600";
 }
 
+function strategyReviewTaskActionLabel(execution: PlatformStrategyReviewTask["execution"]) {
+  if (execution === "generate_asset_variants") return "生成";
+  if (execution === "rewrite_first_three") return "重写";
+  if (execution === "save_snapshot") return "保存";
+  if (execution === "apply_strategy") return "应用";
+  return "前往";
+}
+
 function switchStepStatusLabel(status: PlatformStrategySwitchStep["status"]) {
   if (status === "done") return "已完成";
   if (status === "next") return "现在做";
@@ -760,6 +769,7 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
   const [runningOptimizationActionId, setRunningOptimizationActionId] = useState<string | null>(null);
   const [applyingStrategyPlatformId, setApplyingStrategyPlatformId] = useState<string | null>(null);
   const [runningStrategyStepId, setRunningStrategyStepId] = useState<string | null>(null);
+  const [runningStrategyReviewTaskId, setRunningStrategyReviewTaskId] = useState<string | null>(null);
   const [strategySwitchPlan, setStrategySwitchPlan] = useState<PlatformStrategySwitchPlan | null>(null);
   const [strategyExecutionReceipt, setStrategyExecutionReceipt] = useState<PlatformStrategyExecutionReceipt | null>(null);
   const [assetOptimizationVariants, setAssetOptimizationVariants] = useState<PlatformSubmissionAssetOptimizationVariant[]>([]);
@@ -996,6 +1006,105 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
       setMessage(caught instanceof Error ? caught.message : "应用平台策略失败。");
     } finally {
       setApplyingStrategyPlatformId(null);
+    }
+  }
+
+  async function runStrategyReviewTask(item: PlatformStrategyRankItem, task: PlatformStrategyReviewTask) {
+    const strategyPackage = center?.packages.find((pack) => pack.platformId === item.platformId);
+    if (!strategyPackage) return;
+
+    const taskRunId = `${item.platformId}:${task.id}`;
+    setSelectedPlatformId(item.platformId);
+    setSelectedVersionId(null);
+    setVersionDetail(null);
+    setRunningStrategyReviewTaskId(taskRunId);
+    setMessage(null);
+
+    try {
+      if (task.execution === "open_target") {
+        window.location.hash = task.href.replace(/^#/, "");
+        setMessage(`已定位到「${task.label}」。`);
+        return;
+      }
+
+      if (task.execution === "apply_strategy") {
+        await applyPlatformStrategy(item);
+        return;
+      }
+
+      if (task.execution === "save_snapshot") {
+        const response = await fetch(`/api/projects/${projectId}/platform-export`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "snapshot", platformId: item.platformId }),
+        });
+        const payload = (await response.json().catch(() => null)) as { message?: string; error?: string } | null;
+        if (!response.ok) throw new Error(payload?.error ?? "保存发布包版本失败。");
+        setVersionActionFilter("snapshot");
+        setMessage(payload?.message ?? `已保存 ${item.platformName} 发布包版本。`);
+        await loadCenter({ keepMessage: true });
+        window.location.hash = "package-version-history";
+        return;
+      }
+
+      if (task.execution === "generate_asset_variants") {
+        const nextDraft = {
+          title: strategyPackage.title,
+          logline: strategyPackage.logline,
+          synopsis: strategyPackage.category === "overseas"
+            ? strategyPackage.submissionAsset?.synopsis ?? ""
+            : strategyPackage.synopsis,
+          overseasSynopsis: strategyPackage.category === "overseas"
+            ? strategyPackage.synopsis
+            : strategyPackage.submissionAsset?.overseasSynopsis ?? "",
+          tags: strategyPackage.tags.join("、"),
+          note: strategyPackage.submissionAsset?.note ?? "",
+        };
+        setAssetDraft(nextDraft);
+        setAssetOptimizationVariants([]);
+        setIsOptimizingAsset(true);
+        const response = await fetch(`/api/projects/${projectId}/platform-export/asset-optimize`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            platformId: strategyPackage.platformId,
+            ...nextDraft,
+          }),
+        });
+        const payload = (await response.json().catch(() => null)) as {
+          task?: { id: string };
+          variants?: PlatformSubmissionAssetOptimizationVariant[];
+          error?: string;
+        } | null;
+        if (!response.ok || !payload?.variants) throw new Error(payload?.error ?? "AI 优化投稿资产失败。");
+        setAssetOptimizationVariants(payload.variants.map((variant) => ({ ...variant, sourceTaskId: payload.task?.id })));
+        setMessage(`已执行「${task.label}」，生成 ${payload.variants.length} 个 ${strategyPackage.platformName} 投稿资产候选。`);
+        window.location.hash = "submission-asset-editor";
+        return;
+      }
+
+      if (task.execution === "rewrite_first_three") {
+        const response = await fetch(`/api/projects/${projectId}/first-three-rewrite/generate`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ platformId: strategyPackage.platformId, chapterOrders: [1, 2, 3], targetWords: 1600 }),
+        });
+        const payload = (await response.json().catch(() => null)) as {
+          results?: { order: number }[];
+          error?: string;
+        } | null;
+        if (!response.ok || !payload?.results) throw new Error(payload?.error ?? "前三章二轮重写失败。");
+        await loadCenter({ keepMessage: true });
+        const refreshedPlan = await refreshStrategyPlan(strategyPackage.platformId);
+        setStrategyExecutionReceipt(buildStrategyExecutionReceipt(refreshedPlan, "rewrite-first-three", payload.results.length));
+        setMessage(`已执行「${task.label}」，重写前三章共 ${payload.results.length} 章，策略链已刷新。`);
+        return;
+      }
+    } catch (caught) {
+      setMessage(caught instanceof Error ? caught.message : "执行复盘任务失败。");
+    } finally {
+      setIsOptimizingAsset(false);
+      setRunningStrategyReviewTaskId(null);
     }
   }
 
@@ -1590,9 +1699,8 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
                       {item.reviewDecision.tasks.length ? (
                         <div className="mt-2 grid gap-1.5">
                           {item.reviewDecision.tasks.slice(0, 3).map((task) => (
-                            <a
-                              className="block rounded-md border border-slate-100 bg-slate-50 p-2 hover:border-slate-200 hover:bg-white"
-                              href={task.href}
+                            <div
+                              className="rounded-md border border-slate-100 bg-slate-50 p-2"
                               key={task.id}
                             >
                               <div className="flex items-start justify-between gap-2">
@@ -1602,7 +1710,17 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
                                 </span>
                               </div>
                               <div className="mt-1 leading-5 text-slate-500">{task.detail}</div>
-                            </a>
+                              <button
+                                className="mt-2 rounded-md border border-slate-200 bg-white px-2 py-1 text-[11px] font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                                disabled={Boolean(runningStrategyReviewTaskId || applyingStrategyPlatformId || (task.execution === "generate_asset_variants" && isOptimizingAsset))}
+                                onClick={() => void runStrategyReviewTask(item, task)}
+                                type="button"
+                              >
+                                {runningStrategyReviewTaskId === `${item.platformId}:${task.id}`
+                                  ? "执行中"
+                                  : strategyReviewTaskActionLabel(task.execution)}
+                              </button>
+                            </div>
                           ))}
                         </div>
                       ) : null}

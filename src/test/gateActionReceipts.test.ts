@@ -13,6 +13,7 @@ import {
   buildGatePlatformScaleGate,
   buildGatePlatformScaleFollowup,
   buildGatePlatformScaleCadence,
+  buildGatePlatformRetreatGate,
   buildGateDispatchTaskCenter,
   buildGateDispatchTaskCloseoutItem,
   buildGatePublishEffectReceipt,
@@ -814,6 +815,101 @@ test("buildGateActionReceipt", async (t) => {
     assert.equal(gate.items.find((item) => item.platformId === "fanqie")?.status, "blocked_evidence");
     assert.ok(cadence.nextActions.some((actionText) => actionText.includes("冷却期")));
     assert.ok(cadence.nextActions.some((actionText) => actionText.includes("上限")));
+  });
+
+  await t.test("forces tactic repair or platform pivot when effects decline", () => {
+    const fanqieStrong = buildGatePublishEffectReceipt({
+      projectId: "project-1",
+      platformId: "fanqie",
+      platformName: "番茄小说",
+      now: "2026-01-01T00:00:00.000Z",
+      metric: {
+        views: 3000,
+        clicks: 600,
+        favorites: 210,
+        follows: 120,
+      },
+    });
+    const fanqieWeak = buildGatePublishEffectReceipt({
+      projectId: "project-1",
+      platformId: "fanqie",
+      platformName: "番茄小说",
+      now: "2026-01-08T00:00:00.000Z",
+      metric: {
+        views: 2600,
+        clicks: 260,
+        favorites: 88,
+        follows: 38,
+      },
+    });
+    const fanqieWeaker = buildGatePublishEffectReceipt({
+      projectId: "project-1",
+      platformId: "fanqie",
+      platformName: "番茄小说",
+      now: "2026-01-15T00:00:00.000Z",
+      metric: {
+        views: 2400,
+        clicks: 96,
+        favorites: 35,
+        follows: 10,
+      },
+    });
+    const qimaoWeak = buildGatePublishEffectReceipt({
+      projectId: "project-2",
+      platformId: "qimao",
+      platformName: "七猫小说",
+      now: "2026-01-15T00:10:00.000Z",
+      metric: {
+        views: 2000,
+        clicks: 70,
+        favorites: 20,
+        follows: 8,
+      },
+    });
+    const webnovelGood = buildGatePublishEffectReceipt({
+      projectId: "project-3",
+      platformId: "webnovel",
+      platformName: "WebNovel",
+      now: "2026-01-15T00:20:00.000Z",
+      metric: {
+        views: 1800,
+        clicks: 260,
+        favorites: 110,
+        follows: 62,
+      },
+    });
+    const receipts = [webnovelGood, qimaoWeak, fanqieWeaker, fanqieWeak, fanqieStrong];
+    const reviews = buildGatePlatformGrowthReview(receipts);
+    const retreatGate = buildGatePlatformRetreatGate(receipts, reviews);
+    const fanqieDispatch = buildGatePlatformGrowthDispatchItems([fanqieWeaker])[0];
+    const fanqieTask = {
+      ...fanqieDispatch,
+      databaseId: "dispatch-db-fanqie-retreat",
+      dispatchKey: fanqieDispatch.id,
+      projectId: "project-1",
+      sourceReceiptId: null,
+      completionEvidence: "已完成上一轮小步加码。",
+      state: "completed" as const,
+      assignedAt: "2026-01-10T08:00:00.000Z",
+      completedAt: "2026-01-10T09:00:00.000Z",
+      createdAt: "2026-01-10T08:00:00.000Z",
+      updatedAt: "2026-01-10T09:00:00.000Z",
+    };
+    const followup = buildGatePlatformScaleFollowup([fanqieTask], receipts);
+    const cadence = buildGatePlatformScaleCadence(reviews, [fanqieTask], followup, "2026-01-20T00:00:00.000Z");
+    const scaleGate = buildGatePlatformScaleGate(
+      reviews,
+      buildGateDispatchEvidenceReview([fanqieTask], receipts),
+      followup,
+      cadence,
+      retreatGate,
+    );
+
+    assert.equal(retreatGate.items.find((item) => item.platformId === "fanqie")?.status, "pivot_platform");
+    assert.equal(retreatGate.items.find((item) => item.platformId === "qimao")?.status, "repair_tactic");
+    assert.equal(retreatGate.items.find((item) => item.platformId === "webnovel")?.status, "watch");
+    assert.equal(scaleGate.items.find((item) => item.platformId === "fanqie")?.status, "blocked_evidence");
+    assert.ok(retreatGate.nextActions.some((actionText) => actionText.includes("换打法")));
   });
 
   await t.test("records dispatch receipts and marks the dispatch as assigned", () => {

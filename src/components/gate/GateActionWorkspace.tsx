@@ -11,6 +11,7 @@ import {
   buildGatePlatformScaleFollowup,
   buildGatePlatformScaleCadence,
   buildGatePlatformScaleGate,
+  buildGatePlatformRetreatGate,
   buildGatePlatformDispatchReceipt,
   buildGatePlatformGrowthDispatchItems,
   buildGatePlatformGrowthReview,
@@ -36,6 +37,7 @@ import {
   type GatePlatformScaleFollowupStatus,
   type GatePlatformScaleCadenceStatus,
   type GatePlatformScaleGateStatus,
+  type GatePlatformRetreatStatus,
   type GatePlatformGrowthDispatchItem,
   type GatePlatformGrowthReview,
   type PersistedGatePlatformDispatchTask,
@@ -137,6 +139,14 @@ function scaleCadenceClass(status: GatePlatformScaleCadenceStatus) {
   return "border-slate-200 bg-slate-50 text-slate-800";
 }
 
+function retreatClass(status: GatePlatformRetreatStatus) {
+  if (status === "pause") return "border-rose-300 bg-rose-50 text-rose-900";
+  if (status === "pivot_platform") return "border-orange-200 bg-orange-50 text-orange-900";
+  if (status === "repair_tactic") return "border-amber-200 bg-amber-50 text-amber-900";
+  if (status === "healthy") return "border-emerald-200 bg-emerald-50 text-emerald-900";
+  return "border-slate-200 bg-slate-50 text-slate-800";
+}
+
 export function GateActionWorkspace({ actions }: { actions: PrePublishGateAction[] }) {
   const router = useRouter();
   const [receipts, setReceipts] = useState<GateActionReceipt[]>([]);
@@ -163,7 +173,11 @@ export function GateActionWorkspace({ actions }: { actions: PrePublishGateAction
   const scaleFollowupIssues = scaleFollowup.items.filter((item) => item.status !== "tracked").slice(0, 4);
   const scaleCadence = buildGatePlatformScaleCadence(platformGrowthReview, visibleDispatchTasks, scaleFollowup);
   const scaleCadenceIssues = scaleCadence.items.filter((item) => item.status !== "ready" && item.status !== "not_candidate").slice(0, 4);
-  const scaleGate = buildGatePlatformScaleGate(platformGrowthReview, dispatchEvidenceReview, scaleFollowup, scaleCadence);
+  const retreatGate = buildGatePlatformRetreatGate(receipts, platformGrowthReview);
+  const retreatVisibleItems = retreatGate.items
+    .filter((item) => platformFilter === "all" || item.platformId === platformFilter)
+    .slice(0, 4);
+  const scaleGate = buildGatePlatformScaleGate(platformGrowthReview, dispatchEvidenceReview, scaleFollowup, scaleCadence, retreatGate);
   const scaleGateVisibleItems = scaleGate.items.filter((item) => item.status !== "not_candidate").slice(0, 4);
   const latestReceipt = filteredReceipts[0] ?? null;
 
@@ -547,6 +561,88 @@ export function GateActionWorkspace({ actions }: { actions: PrePublishGateAction
           ) : (
             <p className="rounded-md border border-dashed border-slate-300 bg-white p-3 text-sm text-slate-600">
               暂无加码候选，先让平台复盘榜跑出明确的效果链路。
+            </p>
+          )}
+        </div>
+        <div className="mt-3 grid gap-2">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <div className="text-xs font-medium text-slate-500">撤退/换打法闸</div>
+              <p className="mt-1 text-xs text-slate-500">连续效果变弱时，先修打法、换平台或暂停，不把坏趋势继续放大。</p>
+            </div>
+          </div>
+          <div className="grid gap-2 sm:grid-cols-5">
+            <div className="rounded-md border border-emerald-100 bg-white p-3">
+              <div className="text-xs text-slate-500">健康</div>
+              <div className="mt-1 text-lg font-semibold text-emerald-700">{retreatGate.summary.healthy}</div>
+            </div>
+            <div className="rounded-md border border-slate-200 bg-white p-3">
+              <div className="text-xs text-slate-500">观察</div>
+              <div className="mt-1 text-lg font-semibold text-slate-700">{retreatGate.summary.watch}</div>
+            </div>
+            <div className="rounded-md border border-amber-100 bg-white p-3">
+              <div className="text-xs text-slate-500">修打法</div>
+              <div className="mt-1 text-lg font-semibold text-amber-700">{retreatGate.summary.repairTactic}</div>
+            </div>
+            <div className="rounded-md border border-orange-100 bg-white p-3">
+              <div className="text-xs text-slate-500">换平台/打法</div>
+              <div className="mt-1 text-lg font-semibold text-orange-700">{retreatGate.summary.pivotPlatform}</div>
+            </div>
+            <div className="rounded-md border border-rose-100 bg-white p-3">
+              <div className="text-xs text-slate-500">暂停</div>
+              <div className="mt-1 text-lg font-semibold text-rose-700">{retreatGate.summary.pause}</div>
+            </div>
+          </div>
+          {retreatGate.nextActions.length ? (
+            <div className="grid gap-2 xl:grid-cols-2">
+              {retreatGate.nextActions.map((action) => (
+                <div className="rounded-md bg-white p-3 text-sm leading-6 text-slate-600" key={action}>{action}</div>
+              ))}
+            </div>
+          ) : null}
+          {retreatVisibleItems.length ? (
+            <div className="grid gap-2 xl:grid-cols-2">
+              {retreatVisibleItems.map((item) => (
+                <div className={`rounded-md border p-3 text-sm ${retreatClass(item.status)}`} key={item.platformId}>
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-medium">{item.platformName}</span>
+                        <span className="rounded-md bg-white/70 px-2 py-1 text-xs font-medium">{item.label}</span>
+                      </div>
+                      <p className="mt-2 leading-6 opacity-85">{item.detail}</p>
+                    </div>
+                    <div className="text-right text-xs opacity-75">
+                      <div>曝光 {item.latestViews}</div>
+                      <div className="mt-1">下滑 {item.declineSignals}/5</div>
+                    </div>
+                  </div>
+                  <div className="mt-2 flex flex-wrap gap-2 text-xs opacity-75">
+                    {item.evidence.map((evidence) => (
+                      <span className="rounded-md bg-white/70 px-2 py-1" key={evidence}>{evidence}</span>
+                    ))}
+                  </div>
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    <Link
+                      className="rounded-md bg-white px-3 py-2 text-xs font-medium text-slate-950"
+                      href={item.href}
+                    >
+                      {item.actionLabel}
+                    </Link>
+                    <button
+                      className="rounded-md border border-white/70 bg-white/70 px-3 py-2 text-xs font-medium text-slate-950"
+                      onClick={() => focusPlatform(item.platformId)}
+                      type="button"
+                    >
+                      只看该平台
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="rounded-md border border-dashed border-slate-300 bg-white p-3 text-sm text-slate-600">
+              暂无可判断的效果数据。先回填至少一条平台效果。
             </p>
           )}
         </div>

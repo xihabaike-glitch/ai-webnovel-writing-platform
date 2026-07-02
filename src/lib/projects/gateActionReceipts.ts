@@ -333,6 +333,39 @@ export interface GatePlatformScaleCadence {
   items: GatePlatformScaleCadenceItem[];
 }
 
+export type GatePlatformRetreatStatus = "healthy" | "watch" | "repair_tactic" | "pivot_platform" | "pause";
+
+export interface GatePlatformRetreatItem {
+  platformId: string;
+  platformName: string;
+  status: GatePlatformRetreatStatus;
+  label: string;
+  detail: string;
+  actionLabel: string;
+  href: string;
+  priorityScore: number;
+  latestAt: string;
+  latestViews: number;
+  clickRatePercent: number;
+  favoriteRatePercent: number;
+  followRatePercent: number;
+  declineSignals: number;
+  evidence: string[];
+}
+
+export interface GatePlatformRetreatGate {
+  summary: {
+    total: number;
+    healthy: number;
+    watch: number;
+    repairTactic: number;
+    pivotPlatform: number;
+    pause: number;
+  };
+  nextActions: string[];
+  items: GatePlatformRetreatItem[];
+}
+
 export interface GatePlatformStrategyReceiptPayload {
   message?: string;
   error?: string;
@@ -829,6 +862,46 @@ function growthEvidence(input: {
     `效果 ${input.effects}`,
     `阻塞 ${input.blockedRecheck}`,
   ];
+}
+
+function percent(part: number, total: number) {
+  return total > 0 ? Math.round((part / total) * 1000) / 10 : 0;
+}
+
+interface GatePublishEffectMetricSnapshot extends GatePublishEffectReceiptMetric {
+  receiptId: string;
+  platformId: string;
+  platformName: string;
+  href: string;
+  createdAt: string;
+  clickRatePercent: number;
+  favoriteRatePercent: number;
+  followRatePercent: number;
+}
+
+function metricFromReceipt(receipt: GateActionReceipt): GatePublishEffectMetricSnapshot | null {
+  if (actionTypeFromReceipt(receipt) !== "save_effect" || receipt.status !== "succeeded") return null;
+  const source = `${receipt.detail} ${receipt.message}`;
+  const views = Number(source.match(/曝光\s*(\d+)/)?.[1] ?? 0);
+  const clicks = Number(source.match(/点击\s*(\d+)/)?.[1] ?? 0);
+  const favorites = Number(source.match(/收藏\s*(\d+)/)?.[1] ?? 0);
+  const follows = Number(source.match(/追读\s*(\d+)/)?.[1] ?? 0);
+  if (![views, clicks, favorites, follows].every((value) => Number.isFinite(value))) return null;
+  const platform = gateActionReceiptPlatform(receipt);
+  return {
+    receiptId: receipt.id,
+    platformId: platform.id,
+    platformName: platform.name,
+    href: receipt.href,
+    createdAt: receipt.createdAt,
+    views,
+    clicks,
+    favorites,
+    follows,
+    clickRatePercent: percent(clicks, views),
+    favoriteRatePercent: percent(favorites, views),
+    followRatePercent: percent(follows, views),
+  };
 }
 
 export function buildGatePlatformGrowthReview(receipts: GateActionReceipt[], limit = 6): GatePlatformGrowthReview[] {
@@ -1632,6 +1705,7 @@ export function buildGatePlatformScaleGate(
   dispatchEvidenceReview: GateDispatchEvidenceReview,
   scaleFollowup?: GatePlatformScaleFollowup,
   scaleCadence?: GatePlatformScaleCadence,
+  retreatGate?: GatePlatformRetreatGate,
 ): GatePlatformScaleGate {
   const evidenceItemsByPlatform = new Map<string, GateDispatchEvidenceReviewItem[]>();
   for (const item of dispatchEvidenceReview.items) {
@@ -1646,6 +1720,7 @@ export function buildGatePlatformScaleGate(
     scaleFollowupItemsByPlatform.set(item.platformId, items);
   }
   const scaleCadenceByPlatform = new Map((scaleCadence?.items ?? []).map((item) => [item.platformId, item]));
+  const retreatByPlatform = new Map((retreatGate?.items ?? []).map((item) => [item.platformId, item]));
 
   const items = reviews.map((review): GatePlatformScaleGateItem => {
     const platformEvidenceItems = evidenceItemsByPlatform.get(review.platformId) ?? [];
@@ -1654,6 +1729,7 @@ export function buildGatePlatformScaleGate(
     const scaleFollowupIssue = (scaleFollowupItemsByPlatform.get(review.platformId) ?? [])
       .find((item) => item.status !== "tracked") ?? null;
     const cadenceIssue = scaleCadenceByPlatform.get(review.platformId);
+    const retreatIssue = retreatByPlatform.get(review.platformId);
 
     if (review.stage !== "scale_up") {
       return {
@@ -1712,6 +1788,21 @@ export function buildGatePlatformScaleGate(
         priorityScore: Math.max(review.priorityScore, cadenceIssue.priorityScore),
         stage: review.stage,
         evidence: cadenceIssue.evidence.slice(0, 3),
+      };
+    }
+
+    if (retreatIssue && ["pause", "pivot_platform", "repair_tactic"].includes(retreatIssue.status)) {
+      return {
+        platformId: review.platformId,
+        platformName: review.platformName,
+        status: "blocked_evidence",
+        label: retreatIssue.label,
+        detail: `${review.platformName} 触发撤退/换打法闸：${retreatIssue.detail}`,
+        actionLabel: retreatIssue.actionLabel,
+        href: retreatIssue.href,
+        priorityScore: Math.max(review.priorityScore, retreatIssue.priorityScore),
+        stage: review.stage,
+        evidence: retreatIssue.evidence.slice(0, 3),
       };
     }
 
@@ -2073,6 +2164,146 @@ export function buildGatePlatformScaleCadence(
       overLimit > 0 ? `${overLimit} 个平台触发 ${windowDays} 天加码次数上限，先停手观察。` : null,
       cooldown > 0 ? `${cooldown} 个平台仍在 ${cooldownDays} 天冷却期，不要连续推。` : null,
       ready > 0 ? `${ready} 个平台通过节奏检查，可以进入小步加码决策。` : null,
+    ].filter((action): action is string => Boolean(action)),
+    items: items.sort((left, right) => {
+      const statusDiff = statusWeight[left.status] - statusWeight[right.status];
+      if (statusDiff !== 0) return statusDiff;
+      const priorityDiff = right.priorityScore - left.priorityScore;
+      if (priorityDiff !== 0) return priorityDiff;
+      return left.platformName.localeCompare(right.platformName);
+    }),
+  };
+}
+
+export function buildGatePlatformRetreatGate(
+  receipts: GateActionReceipt[],
+  reviews: GatePlatformGrowthReview[] = buildGatePlatformGrowthReview(receipts),
+): GatePlatformRetreatGate {
+  const metricsByPlatform = new Map<string, GatePublishEffectMetricSnapshot[]>();
+  for (const receipt of trimGateActionReceipts(receipts, 100).filter((item) => !isAuditMetaReceipt(item))) {
+    const metric = metricFromReceipt(receipt);
+    if (!metric) continue;
+    const metrics = metricsByPlatform.get(metric.platformId) ?? [];
+    metrics.push(metric);
+    metricsByPlatform.set(metric.platformId, metrics);
+  }
+  for (const [platformId, metrics] of metricsByPlatform.entries()) {
+    metricsByPlatform.set(platformId, metrics.sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime()));
+  }
+
+  const items: GatePlatformRetreatItem[] = [];
+  for (const review of reviews) {
+    const metrics = metricsByPlatform.get(review.platformId) ?? [];
+    const latest = metrics[0] ?? null;
+    if (!latest) continue;
+    const previous = metrics[1] ?? null;
+    const prior = metrics[2] ?? null;
+    const declineSignals = previous
+      ? [
+          latest.clicks < previous.clicks,
+          latest.favorites < previous.favorites,
+          latest.follows < previous.follows,
+          latest.clickRatePercent < previous.clickRatePercent,
+          latest.followRatePercent < previous.followRatePercent,
+        ].filter(Boolean).length
+      : 0;
+    const previousDeclineSignals = previous && prior
+      ? [
+          previous.clicks < prior.clicks,
+          previous.favorites < prior.favorites,
+          previous.follows < prior.follows,
+          previous.clickRatePercent < prior.clickRatePercent,
+          previous.followRatePercent < prior.followRatePercent,
+        ].filter(Boolean).length
+      : 0;
+    const weakConversion = latest.views >= 100 && (latest.clickRatePercent < 5 || latest.followRatePercent < 1 || latest.favoriteRatePercent < 2);
+    const zeroConversion = latest.views >= 100 && latest.clicks === 0 && latest.follows === 0;
+    const repeatedDecline = declineSignals >= 3 && previousDeclineSignals >= 3;
+    const href = latest.href;
+    let status: GatePlatformRetreatStatus = "healthy";
+    let label = "继续观察";
+    let detail = `${review.platformName} 最新效果没有明显下滑，继续按证据小步推进。`;
+    let actionLabel = "查看效果数据";
+    let priorityScore = Math.max(1, review.priorityScore - 10);
+
+    if (zeroConversion) {
+      status = "pause";
+      label = "暂停投放";
+      detail = `${review.platformName} 有曝光但点击和追读为 0，继续投放只是在扩大损失。先暂停，重做入口卖点。`;
+      actionLabel = "暂停并复盘";
+      priorityScore = Math.max(90, review.priorityScore);
+    } else if (repeatedDecline || (declineSignals >= 4 && weakConversion)) {
+      status = "pivot_platform";
+      label = "换打法/换平台";
+      detail = `${review.platformName} 连续效果走弱，不要继续硬推。换标题简介打法，必要时把主力转到更匹配的平台。`;
+      actionLabel = "制定换打法";
+      priorityScore = Math.max(82, review.priorityScore);
+    } else if (weakConversion || declineSignals >= 3) {
+      status = "repair_tactic";
+      label = "修打法";
+      detail = `${review.platformName} 转化偏弱或关键指标下滑，先修标题、简介、标签和前三章兑现，再谈加码。`;
+      actionLabel = "修投稿打法";
+      priorityScore = Math.max(72, review.priorityScore);
+    } else if (!previous) {
+      status = "watch";
+      label = "样本不足";
+      detail = `${review.platformName} 只有一条效果数据，先收第二条对照，不要急着下结论。`;
+      actionLabel = "继续回填数据";
+      priorityScore = Math.max(35, review.priorityScore);
+    }
+
+    items.push({
+      platformId: review.platformId,
+      platformName: review.platformName,
+      status,
+      label,
+      detail,
+      actionLabel,
+      href,
+      priorityScore,
+      latestAt: latest.createdAt,
+      latestViews: latest.views,
+      clickRatePercent: latest.clickRatePercent,
+      favoriteRatePercent: latest.favoriteRatePercent,
+      followRatePercent: latest.followRatePercent,
+      declineSignals,
+      evidence: [
+        `点击率 ${latest.clickRatePercent}%`,
+        `收藏率 ${latest.favoriteRatePercent}%`,
+        `追读率 ${latest.followRatePercent}%`,
+        previous ? `下滑信号 ${declineSignals}/5` : "仅 1 条数据",
+      ],
+    });
+  }
+
+  const healthy = items.filter((item) => item.status === "healthy").length;
+  const watch = items.filter((item) => item.status === "watch").length;
+  const repairTactic = items.filter((item) => item.status === "repair_tactic").length;
+  const pivotPlatform = items.filter((item) => item.status === "pivot_platform").length;
+  const pause = items.filter((item) => item.status === "pause").length;
+  const statusWeight: Record<GatePlatformRetreatStatus, number> = {
+    pause: 0,
+    pivot_platform: 1,
+    repair_tactic: 2,
+    watch: 3,
+    healthy: 4,
+  };
+
+  return {
+    summary: {
+      total: items.length,
+      healthy,
+      watch,
+      repairTactic,
+      pivotPlatform,
+      pause,
+    },
+    nextActions: [
+      pause > 0 ? `${pause} 个平台要暂停投放，别拿 0 转化继续烧时间。` : null,
+      pivotPlatform > 0 ? `${pivotPlatform} 个平台连续走弱，进入换打法或换平台判断。` : null,
+      repairTactic > 0 ? `${repairTactic} 个平台先修投稿打法，再谈继续加码。` : null,
+      watch > 0 ? `${watch} 个平台样本不足，先补第二条效果对照。` : null,
+      items.length > 0 && healthy === items.length ? "当前有数据的平台没有明显退场信号，继续小步验证。" : null,
     ].filter((action): action is string => Boolean(action)),
     items: items.sort((left, right) => {
       const statusDiff = statusWeight[left.status] - statusWeight[right.status];

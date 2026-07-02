@@ -1236,6 +1236,10 @@ function isRetreatDispatchStage(stage: GatePlatformGrowthReviewStage) {
   return stage === "repair_tactic" || stage === "pivot_platform" || stage === "pause_platform";
 }
 
+function isRetreatRecheckDispatchTask(task: Pick<PersistedGatePlatformDispatchTask, "dispatchKey">) {
+  return task.dispatchKey.includes(":scale_up:retreat_recheck:");
+}
+
 export function buildGatePlatformDispatchReceipt(input: {
   dispatch: GatePlatformGrowthDispatchItem;
   now?: Date | string;
@@ -2111,6 +2115,7 @@ export function buildGatePlatformScaleFollowup(
   const items = scaleTasks.map((task): GatePlatformScaleFollowupItem => {
     const completionEvidence = task.completionEvidence.trim();
     const completedAt = validDate(task.completedAt) ?? validDate(task.updatedAt);
+    const isRetreatRecheck = isRetreatRecheckDispatchTask(task);
 
     if (task.state !== "completed") {
       return {
@@ -2120,9 +2125,11 @@ export function buildGatePlatformScaleFollowup(
         ownerRole: task.ownerRole,
         title: task.title,
         status: "needs_completion",
-        label: "加码未完成",
-        detail: "加码派单还没完成，先收口范围、版本和执行动作，再要求下一轮效果数据。",
-        actionLabel: "处理加码派单",
+        label: isRetreatRecheck ? "重验未完成" : "加码未完成",
+        detail: isRetreatRecheck
+          ? "修复后重验派单还没完成，先收口重验范围、版本和执行动作，再要求下一轮效果数据。"
+          : "加码派单还没完成，先收口范围、版本和执行动作，再要求下一轮效果数据。",
+        actionLabel: isRetreatRecheck ? "处理重验派单" : "处理加码派单",
         href: task.href,
         priorityScore: task.priorityScore,
         completedAt: task.completedAt,
@@ -2139,14 +2146,16 @@ export function buildGatePlatformScaleFollowup(
         ownerRole: task.ownerRole,
         title: task.title,
         status: "missing_evidence",
-        label: "缺加码依据",
-        detail: "加码派单显示完成，但没有写清楚加码范围、版本和执行证据，不能继续下一次加码。",
+        label: isRetreatRecheck ? "缺重验依据" : "缺加码依据",
+        detail: isRetreatRecheck
+          ? "修复后重验显示完成，但没有写清楚重验范围、版本和执行证据，不能继续判断平台恢复。"
+          : "加码派单显示完成，但没有写清楚加码范围、版本和执行证据，不能继续下一次加码。",
         actionLabel: "补齐完成依据",
         href: "/dispatch",
         priorityScore: task.priorityScore,
         completedAt: task.completedAt,
         latestEffectAt: null,
-        evidence: ["缺少加码完成依据", ...task.evidence],
+        evidence: [isRetreatRecheck ? "缺少重验完成依据" : "缺少加码完成依据", ...task.evidence],
       };
     }
 
@@ -2169,14 +2178,16 @@ export function buildGatePlatformScaleFollowup(
         ownerRole: task.ownerRole,
         title: task.title,
         status: "tracked",
-        label: "已回填对照",
-        detail: "加码完成后已经看到下一轮效果回填，可以用数据判断继续加码、迭代或撤退。",
+        label: isRetreatRecheck ? "重验已回填" : "已回填对照",
+        detail: isRetreatRecheck
+          ? "修复后重验完成后已经看到下一轮效果回填，可以用新数据判断恢复、继续修打法或撤退。"
+          : "加码完成后已经看到下一轮效果回填，可以用数据判断继续加码、迭代或撤退。",
         actionLabel: "查看效果数据",
         href: latestEffectReceipt.href,
         priorityScore: task.priorityScore,
         completedAt: task.completedAt,
         latestEffectAt: latestEffectReceipt.createdAt,
-        evidence: [`加码依据：${completionEvidence}`, `效果回执：${latestEffectReceipt.label}`],
+        evidence: [`${isRetreatRecheck ? "重验依据" : "加码依据"}：${completionEvidence}`, `效果回执：${latestEffectReceipt.label}`],
       };
     }
 
@@ -2187,14 +2198,16 @@ export function buildGatePlatformScaleFollowup(
       ownerRole: task.ownerRole,
       title: task.title,
       status: "needs_effect",
-      label: "待效果对照",
-      detail: "加码已经完成，但还没有下一轮效果回填。继续第二次加码之前，先补曝光、点击、收藏、追读等对照数据。",
-      actionLabel: "回填加码效果",
+      label: isRetreatRecheck ? "待重验效果" : "待效果对照",
+      detail: isRetreatRecheck
+        ? "修复后重验已经完成，但还没有下一轮效果回填。先补曝光、点击、收藏、追读等数据，再判断是否真正恢复。"
+        : "加码已经完成，但还没有下一轮效果回填。继续第二次加码之前，先补曝光、点击、收藏、追读等对照数据。",
+      actionLabel: isRetreatRecheck ? "回填重验效果" : "回填加码效果",
       href: projectAnchorHref(task.href, "#publish-effect-panel"),
       priorityScore: task.priorityScore,
       completedAt: task.completedAt,
       latestEffectAt: null,
-      evidence: [`加码依据：${completionEvidence}`, ...task.evidence],
+      evidence: [`${isRetreatRecheck ? "重验依据" : "加码依据"}：${completionEvidence}`, ...task.evidence],
     };
   });
 
@@ -2202,6 +2215,8 @@ export function buildGatePlatformScaleFollowup(
   const needsEffect = items.filter((item) => item.status === "needs_effect").length;
   const needsCompletion = items.filter((item) => item.status === "needs_completion").length;
   const missingEvidence = items.filter((item) => item.status === "missing_evidence").length;
+  const retreatRecheckNeedsEffect = items.filter((item) => item.status === "needs_effect" && item.dispatchKey.includes(":scale_up:retreat_recheck:")).length;
+  const regularNeedsEffect = needsEffect - retreatRecheckNeedsEffect;
   const statusWeight: Record<GatePlatformScaleFollowupStatus, number> = {
     missing_evidence: 0,
     needs_effect: 1,
@@ -2219,7 +2234,8 @@ export function buildGatePlatformScaleFollowup(
     },
     nextActions: [
       missingEvidence > 0 ? `${missingEvidence} 个加码派单缺完成依据，先补范围、版本和执行证据。` : null,
-      needsEffect > 0 ? `${needsEffect} 个加码派单缺下一轮效果回填，第二次加码先暂停。` : null,
+      retreatRecheckNeedsEffect > 0 ? `${retreatRecheckNeedsEffect} 个修复后重验缺下一轮效果回填，先补数据再判断是否恢复。` : null,
+      regularNeedsEffect > 0 ? `${regularNeedsEffect} 个加码派单缺下一轮效果回填，第二次加码先暂停。` : null,
       needsCompletion > 0 ? `${needsCompletion} 个加码派单还没完成，先收口再看数据。` : null,
       items.length > 0 && tracked === items.length ? "全部加码派单都有后续效果对照，可以用数据决定继续加码或换打法。" : null,
     ].filter((action): action is string => Boolean(action)),

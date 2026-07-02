@@ -1074,6 +1074,54 @@ test("buildGateActionReceipt", async (t) => {
       createdAt: "2026-01-16T00:30:00.000Z",
       updatedAt: "2026-01-16T00:30:00.000Z",
     }]);
+    const completedRecheckTask = {
+      ...recheckDispatches[0],
+      databaseId: "dispatch-db-retreat-recheck-done",
+      dispatchKey: recheckDispatches[0].id,
+      projectId: "project-1",
+      sourceReceiptId: null,
+      completionEvidence: "已按修复后新标题小范围重验，保留复测版本作为新基准。",
+      state: "completed" as const,
+      assignedAt: "2026-01-16T00:30:00.000Z",
+      completedAt: "2026-01-16T01:00:00.000Z",
+      createdAt: "2026-01-16T00:30:00.000Z",
+      updatedAt: "2026-01-16T01:00:00.000Z",
+    };
+    const postRecheckNonEffectReceipt = buildGatePlatformStrategyReceipt({
+      item: {
+        ...strategyPlatform,
+        actionType: "generate_asset_variants",
+        actionLabel: "生成投稿方案",
+      },
+      status: "succeeded",
+      now: "2026-01-16T02:00:00.000Z",
+      payload: {
+        variants: [{ strategy: "重验后标题备选" }],
+      },
+    });
+    const recheckFollowup = buildGatePlatformScaleFollowup(
+      [completedRecheckTask],
+      [postRecheckNonEffectReceipt, laterEffect, fanqieWeaker, fanqieWeak, fanqieStrong],
+    );
+    const recheckBlockedGate = buildGatePlatformScaleGate(
+      updatedReviews,
+      buildGateDispatchEvidenceReview([completedRecheckTask], [postRecheckNonEffectReceipt, laterEffect, fanqieWeaker, fanqieWeak, fanqieStrong]),
+      recheckFollowup,
+      undefined,
+      updatedRetreatGate,
+      resolvedResolution,
+    );
+    const postRecheckEffect = buildGatePublishEffectReceipt({
+      projectId: "project-1",
+      platformId: "fanqie",
+      platformName: "番茄小说",
+      now: "2026-01-17T00:00:00.000Z",
+      metric: { views: 3200, clicks: 640, favorites: 220, follows: 130 },
+    });
+    const trackedRecheckFollowup = buildGatePlatformScaleFollowup(
+      [completedRecheckTask],
+      [postRecheckEffect, postRecheckNonEffectReceipt, laterEffect, fanqieWeaker, fanqieWeak, fanqieStrong],
+    );
 
     assert.equal(retreatGate.items.find((item) => item.platformId === "fanqie")?.status, "pivot_platform");
     assert.equal(pendingResolution.items[0].status, "needs_effect");
@@ -1088,6 +1136,13 @@ test("buildGateActionReceipt", async (t) => {
     assert.ok(recheckDispatches[0].id.includes("retreat_recheck"));
     assert.equal(recheckDispatches[0].title, "番茄小说 修复后小步重验");
     assert.equal(assignedRecheckDispatches[0].state, "assigned");
+    assert.equal(recheckFollowup.items[0].status, "needs_effect");
+    assert.equal(recheckFollowup.items[0].label, "待重验效果");
+    assert.ok(recheckFollowup.nextActions.some((actionText) => actionText.includes("修复后重验缺下一轮效果")));
+    assert.equal(recheckBlockedGate.items.find((item) => item.platformId === "fanqie")?.status, "blocked_evidence");
+    assert.equal(recheckBlockedGate.items.find((item) => item.platformId === "fanqie")?.label, "等待加码效果");
+    assert.equal(trackedRecheckFollowup.items[0].status, "tracked");
+    assert.equal(trackedRecheckFollowup.items[0].label, "重验已回填");
   });
 
   await t.test("records dispatch receipts and marks the dispatch as assigned", () => {

@@ -92,6 +92,7 @@ test("buildPlatformPublishExportCenter", async (t) => {
     assert.equal(center.activeStrategyPlan?.platformId, "fanqie");
     assert.equal(center.activeStrategyPlan?.progress.status, "in_progress");
     assert.equal(center.activeStrategyPlan?.steps[0].status, "done");
+    assert.equal(center.platformStrategy.find((item) => item.platformId === "fanqie")?.reviewDecision.kind, "collect");
     assert.equal(center.packages[0].publishEffect.status, "empty");
     assert.ok(center.packages[0].publishEffect.nextAction.includes("录入"));
     assert.equal(center.packages[0].effectOptimization.status, "collect_data");
@@ -443,6 +444,7 @@ test("buildPlatformPublishExportCenter", async (t) => {
     assert.equal(top.rank, 1);
     assert.ok(top.score > center.platformStrategy[1].score);
     assert.ok(["focus", "grow"].includes(top.recommendation));
+    assert.equal(top.reviewDecision.kind, "scale");
     assert.ok(top.reasons.some((reason) => reason.includes("二轮对照 improved")));
   });
 

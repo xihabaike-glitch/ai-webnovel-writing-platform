@@ -357,6 +357,7 @@ export interface PlatformStrategyRankItem {
   platformName: string;
   score: number;
   recommendation: "focus" | "grow" | "watch" | "repair" | "avoid";
+  reviewDecision: PlatformStrategyReviewDecision;
   verdict: string;
   nextAction: string;
   href: string;
@@ -369,6 +370,13 @@ export interface PlatformStrategyRankItem {
   };
   reasons: string[];
   risks: string[];
+}
+
+export interface PlatformStrategyReviewDecision {
+  kind: "scale" | "iterate" | "collect" | "repair" | "pivot";
+  label: string;
+  detail: string;
+  action: string;
 }
 
 export interface PlatformStrategySwitchStep {
@@ -908,6 +916,54 @@ function comparisonScore(comparison: PlatformPublishEffectComparison) {
   return 40;
 }
 
+function buildPlatformStrategyReviewDecision(
+  pack: PlatformPublishPackage,
+  recommendation: PlatformStrategyRankItem["recommendation"],
+): PlatformStrategyReviewDecision {
+  if (!pack.publishEffect.records) {
+    return {
+      kind: "collect",
+      label: "先补数据",
+      detail: "还没有真实发布数据，现在谈加码就是拍脑袋。",
+      action: "先录入曝光、点击、收藏、追读和编辑反馈。",
+    };
+  }
+
+  if (recommendation === "focus" || pack.publishEffect.status === "signed" || pack.publishEffect.comparison.status === "improved") {
+    return {
+      kind: "scale",
+      label: "继续加码",
+      detail: "数据已经给出正反馈，主资源可以继续往这里压。",
+      action: "保持主战场，继续更新、归档版本，并跟踪下一轮转化。",
+    };
+  }
+
+  if (pack.publishEffect.status === "weak" || pack.publishEffect.comparison.status === "declined" || recommendation === "repair") {
+    return {
+      kind: "repair",
+      label: "先修打法",
+      detail: "真实反馈偏弱，现在继续硬投只会扩大损失。",
+      action: "回到前三章、投稿资产和发布节奏，先修再投。",
+    };
+  }
+
+  if (recommendation === "avoid") {
+    return {
+      kind: "pivot",
+      label: "换个打法",
+      detail: "当前平台胜率靠后，不值得继续烧主资源。",
+      action: "把它降为观察平台，回排行榜选择更高胜率主战场。",
+    };
+  }
+
+  return {
+    kind: "iterate",
+    label: "小步迭代",
+    detail: "数据还没差到要撤，也没好到能猛冲。",
+    action: "做一轮小改动，再记录下一轮数据对照。",
+  };
+}
+
 function buildPlatformStrategy(packages: PlatformPublishPackage[]): PlatformStrategyRankItem[] {
   const ranked = packages.map((pack) => {
     const scores = {
@@ -964,6 +1020,7 @@ function buildPlatformStrategy(packages: PlatformPublishPackage[]): PlatformStra
         : recommendation === "repair"
           ? pack.repairPath.nextStep?.detail ?? pack.effectOptimization.actions[0]?.detail ?? "先处理阻塞项。"
           : pack.publishEffect.nextAction;
+    const reviewDecision = buildPlatformStrategyReviewDecision(pack, recommendation);
 
     return {
       rank: 0,
@@ -971,6 +1028,7 @@ function buildPlatformStrategy(packages: PlatformPublishPackage[]): PlatformStra
       platformName: pack.platformName,
       score,
       recommendation,
+      reviewDecision,
       verdict,
       nextAction,
       href: "#platform-export",

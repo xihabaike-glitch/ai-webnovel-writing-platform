@@ -349,6 +349,7 @@ interface PlatformStrategyRankItem {
   platformName: string;
   score: number;
   recommendation: "focus" | "grow" | "watch" | "repair" | "avoid";
+  reviewDecision: PlatformStrategyReviewDecision;
   verdict: string;
   nextAction: string;
   href: string;
@@ -361,6 +362,13 @@ interface PlatformStrategyRankItem {
   };
   reasons: string[];
   risks: string[];
+}
+
+interface PlatformStrategyReviewDecision {
+  kind: "scale" | "iterate" | "collect" | "repair" | "pivot";
+  label: string;
+  detail: string;
+  action: string;
 }
 
 interface PlatformStrategySwitchStep {
@@ -596,6 +604,14 @@ function strategyRecommendationClass(recommendation: PlatformStrategyRankItem["r
   if (recommendation === "repair") return "bg-rose-50 text-rose-700";
   if (recommendation === "avoid") return "bg-slate-100 text-slate-600";
   return "bg-amber-50 text-amber-700";
+}
+
+function strategyReviewDecisionClass(kind: PlatformStrategyReviewDecision["kind"]) {
+  if (kind === "scale") return "bg-emerald-50 text-emerald-700";
+  if (kind === "iterate") return "bg-cyan-50 text-cyan-700";
+  if (kind === "collect") return "bg-amber-50 text-amber-700";
+  if (kind === "repair") return "bg-rose-50 text-rose-700";
+  return "bg-slate-100 text-slate-600";
 }
 
 function switchStepStatusLabel(status: PlatformStrategySwitchStep["status"]) {
@@ -1542,6 +1558,15 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
                     </div>
                     <div className="mt-2 text-2xl font-semibold text-slate-950">{item.score}</div>
                     <p className="mt-2 leading-6 text-slate-600">{item.verdict}</p>
+                    <div className="mt-2 rounded-md bg-white p-2 text-xs">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className={`rounded-md px-2 py-1 font-medium ${strategyReviewDecisionClass(item.reviewDecision.kind)}`}>
+                          复盘：{item.reviewDecision.label}
+                        </span>
+                        <span className="text-slate-500">{item.reviewDecision.detail}</span>
+                      </div>
+                      <div className="mt-1 leading-5 text-slate-600">动作：{item.reviewDecision.action}</div>
+                    </div>
                     <div className="mt-2 text-xs text-slate-500">下一步：{item.nextAction}</div>
                     <div className="mt-2 grid gap-1 text-xs text-slate-500">
                       <div>依据：{item.reasons.slice(0, 3).join("；")}</div>

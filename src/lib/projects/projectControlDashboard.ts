@@ -190,6 +190,10 @@ export interface PlatformControlVerdictSummary {
   status: PlatformStrategyAutoVerdict["status"];
   headline: string;
   nextAction: string;
+  actionKind: "save_evidence_baseline" | "open_target";
+  actionLabel: string;
+  actionExecutable: boolean;
+  actionAnchor: string;
   primaryPlatformName: string | null;
   primaryPlatformId: string | null;
   primaryScore: number;
@@ -198,6 +202,52 @@ export interface PlatformControlVerdictSummary {
   blockedPlatformNames: string[];
   evidenceGaps: string[];
   targetAnchor: string;
+}
+
+function platformVerdictAction(
+  primaryPlatformId: string | null,
+  nextAction: string,
+  evidenceGaps: string[],
+): Pick<PlatformControlVerdictSummary, "actionKind" | "actionLabel" | "actionExecutable" | "actionAnchor"> {
+  const firstGap = evidenceGaps[0] ?? "";
+  if (primaryPlatformId && firstGap.includes("发布包版本")) {
+    return {
+      actionKind: "save_evidence_baseline",
+      actionLabel: "保存证据基准",
+      actionExecutable: true,
+      actionAnchor: "package-version-history",
+    };
+  }
+  if (firstGap.includes("真实曝光") || firstGap.includes("点击") || firstGap.includes("追读")) {
+    return {
+      actionKind: "open_target",
+      actionLabel: "录入发布效果",
+      actionExecutable: false,
+      actionAnchor: "publish-effect-panel",
+    };
+  }
+  if (nextAction.includes("投稿资产") || nextAction.includes("入口")) {
+    return {
+      actionKind: "open_target",
+      actionLabel: "处理投稿资产",
+      actionExecutable: false,
+      actionAnchor: "submission-asset-editor",
+    };
+  }
+  if (nextAction.includes("前三章") || nextAction.includes("开头")) {
+    return {
+      actionKind: "open_target",
+      actionLabel: "处理前三章",
+      actionExecutable: false,
+      actionAnchor: "first-three-rewrite",
+    };
+  }
+  return {
+    actionKind: "open_target",
+    actionLabel: "看裁决面板",
+    actionExecutable: false,
+    actionAnchor: "platform-strategy-verdict",
+  };
 }
 
 function clampScore(value: number) {
@@ -395,19 +445,23 @@ export function buildProjectControlDashboard(input: ProjectControlDashboardInput
     submissionChecklist: input.submissionChecklist,
   });
   const targetPackage = platformExport.packages.find((pack) => pack.platformId === input.platform.id) ?? platformExport.packages[0];
+  const primaryPlatformId = platformExport.strategyVerdict.primary?.platformId ?? null;
+  const evidenceGaps = platformExport.strategyVerdict.primary
+    ? platformExport.platformStrategy.find((item) => item.platformId === platformExport.strategyVerdict.primary?.platformId)?.reviewDecision.evidenceLedger.missingSignals.slice(0, 3) ?? []
+    : [];
+  const verdictAction = platformVerdictAction(primaryPlatformId, platformExport.strategyVerdict.nextAction, evidenceGaps);
   const platformVerdict: PlatformControlVerdictSummary = {
     status: platformExport.strategyVerdict.status,
     headline: platformExport.strategyVerdict.headline,
     nextAction: platformExport.strategyVerdict.nextAction,
+    ...verdictAction,
     primaryPlatformName: platformExport.strategyVerdict.primary?.platformName ?? null,
-    primaryPlatformId: platformExport.strategyVerdict.primary?.platformId ?? null,
+    primaryPlatformId,
     primaryScore: platformExport.strategyVerdict.primary?.score ?? 0,
     primaryEvidenceScore: platformExport.strategyVerdict.primary?.evidenceScore ?? 0,
     backupPlatformNames: platformExport.strategyVerdict.backups.map((item) => item.platformName),
     blockedPlatformNames: platformExport.strategyVerdict.blocked.map((item) => item.platformName),
-    evidenceGaps: platformExport.strategyVerdict.primary
-      ? platformExport.platformStrategy.find((item) => item.platformId === platformExport.strategyVerdict.primary?.platformId)?.reviewDecision.evidenceLedger.missingSignals.slice(0, 3) ?? []
-      : [],
+    evidenceGaps,
     targetAnchor: "platform-strategy-verdict",
   };
   const outline = outlineScore(input.outlineNodes);

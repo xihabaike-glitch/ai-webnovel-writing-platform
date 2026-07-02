@@ -78,6 +78,9 @@ test("buildProjectControlDashboard", async (t) => {
     assert.equal(dashboard.platformVerdict.status, "needs_evidence");
     assert.ok(dashboard.platformVerdict.primaryPlatformName);
     assert.ok(dashboard.platformVerdict.nextAction.length > 0);
+    assert.equal(dashboard.platformVerdict.actionKind, "save_evidence_baseline");
+    assert.equal(dashboard.platformVerdict.actionExecutable, true);
+    assert.equal(dashboard.platformVerdict.actionLabel, "保存证据基准");
     assert.equal(dashboard.platformVerdict.targetAnchor, "platform-strategy-verdict");
     assert.equal(dashboard.areas.find((area) => area.id === "export")?.status, "blocked");
     assert.ok(dashboard.areas.find((area) => area.id === "export")?.nextAction.includes("先处理"));
@@ -173,6 +176,7 @@ test("buildProjectControlDashboard", async (t) => {
     assert.ok(["ready", "needs_repair", "needs_evidence"].includes(dashboard.platformVerdict.status));
     assert.equal(dashboard.platformVerdict.primaryPlatformName, "番茄小说");
     assert.ok(dashboard.platformVerdict.primaryScore > 0);
+    assert.ok(dashboard.platformVerdict.actionLabel.length > 0);
     assert.equal(dashboard.areas.find((area) => area.id === "world")?.status, "good");
     assert.equal(dashboard.areas.find((area) => area.id === "export")?.status, "good");
   });

@@ -68,6 +68,10 @@ interface PlatformControlVerdictSummary {
   status: "ready" | "needs_evidence" | "needs_repair";
   headline: string;
   nextAction: string;
+  actionKind: "save_evidence_baseline" | "open_target";
+  actionLabel: string;
+  actionExecutable: boolean;
+  actionAnchor: string;
   primaryPlatformName: string | null;
   primaryPlatformId: string | null;
   primaryScore: number;
@@ -112,6 +116,7 @@ export function ProjectControlDashboardPanel({ projectId }: { projectId: string 
   const [dashboard, setDashboard] = useState<ProjectControlDashboard | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [runningActionId, setRunningActionId] = useState<string | null>(null);
+  const [runningVerdictAction, setRunningVerdictAction] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
   async function loadDashboard() {
@@ -162,6 +167,27 @@ export function ProjectControlDashboardPanel({ projectId }: { projectId: string 
       setMessage(caught instanceof Error ? caught.message : "执行总控动作失败。");
     } finally {
       setRunningActionId(null);
+    }
+  }
+
+  async function executePlatformVerdictAction() {
+    if (!dashboard?.platformVerdict.primaryPlatformId || dashboard.platformVerdict.actionKind !== "save_evidence_baseline") return;
+    setRunningVerdictAction(true);
+    setMessage(null);
+    try {
+      const response = await fetch(`/api/projects/${projectId}/platform-export`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "snapshot", platformId: dashboard.platformVerdict.primaryPlatformId }),
+      });
+      const payload = await response.json().catch(() => null) as { message?: string; error?: string } | null;
+      if (!response.ok) throw new Error(payload?.error ?? "保存证据基准失败。");
+      await loadDashboard();
+      setMessage(payload?.message ?? "证据基准已保存。");
+    } catch (caught) {
+      setMessage(caught instanceof Error ? caught.message : "执行平台裁决动作失败。");
+    } finally {
+      setRunningVerdictAction(false);
     }
   }
 
@@ -234,12 +260,31 @@ export function ProjectControlDashboardPanel({ projectId }: { projectId: string 
                   今天这一刀：{dashboard.platformVerdict.nextAction}
                 </div>
               </div>
-              <Link
-                className="inline-flex w-fit items-center justify-center rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white hover:bg-slate-800"
-                href={`/projects/${projectId}#${dashboard.platformVerdict.targetAnchor}`}
-              >
-                看裁决面板
-              </Link>
+              <div className="flex flex-wrap gap-2">
+                {dashboard.platformVerdict.actionExecutable ? (
+                  <button
+                    className="inline-flex w-fit items-center justify-center rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white hover:bg-slate-800 disabled:opacity-50"
+                    disabled={runningVerdictAction}
+                    onClick={() => void executePlatformVerdictAction()}
+                    type="button"
+                  >
+                    {runningVerdictAction ? "执行中" : dashboard.platformVerdict.actionLabel}
+                  </button>
+                ) : (
+                  <Link
+                    className="inline-flex w-fit items-center justify-center rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white hover:bg-slate-800"
+                    href={`/projects/${projectId}#${dashboard.platformVerdict.actionAnchor}`}
+                  >
+                    {dashboard.platformVerdict.actionLabel}
+                  </Link>
+                )}
+                <Link
+                  className="inline-flex w-fit items-center justify-center rounded-md border border-slate-200 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                  href={`/projects/${projectId}#${dashboard.platformVerdict.targetAnchor}`}
+                >
+                  看裁决面板
+                </Link>
+              </div>
             </div>
             <div className="mt-3 grid gap-2 sm:grid-cols-3">
               <div className="rounded-md bg-slate-50 p-3">

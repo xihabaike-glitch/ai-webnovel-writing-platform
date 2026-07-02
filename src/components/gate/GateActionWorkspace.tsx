@@ -21,6 +21,7 @@ import {
   type GateActionReviewAdvice,
   type GateActionReviewAdviceAction,
   type GateActionReviewAdviceSeverity,
+  type GateActionReviewAdviceState,
   type GateActionReceiptStatusFilter,
 } from "@/lib/projects/gateActionReceipts";
 import type { PrePublishGateAction } from "@/lib/projects/prePublishGate";
@@ -56,6 +57,11 @@ function adviceLabel(severity: GateActionReviewAdviceSeverity) {
   if (severity === "warning") return "补证据";
   if (severity === "opportunity") return "别浪费";
   return "可加码";
+}
+
+function adviceStateLabel(state: GateActionReviewAdviceState) {
+  if (state === "in_progress") return "处理中";
+  return "待处理";
 }
 
 function adviceActionTitle(kind: GateActionReviewAdviceAction["kind"]) {
@@ -214,6 +220,7 @@ export function GateActionWorkspace({ actions }: { actions: PrePublishGateAction
                 <div>
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="rounded-md bg-white/75 px-2 py-1 text-xs font-medium">{adviceLabel(item.severity)}</span>
+                    <span className="rounded-md bg-white/60 px-2 py-1 text-xs font-medium">{adviceStateLabel(item.state)}</span>
                     <span className="text-xs opacity-75">{item.platformName}</span>
                   </div>
                   <div className="mt-2 font-medium">{item.headline}</div>

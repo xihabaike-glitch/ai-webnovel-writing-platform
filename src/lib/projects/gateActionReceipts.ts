@@ -83,6 +83,7 @@ export interface GateActionReceiptSummary {
 
 export type GateActionReviewAdviceSeverity = "urgent" | "warning" | "opportunity" | "healthy";
 export type GateActionReviewAdviceActionKind = "handle_failure" | "adopt_asset" | "record_metrics" | "refresh_gate" | "start_gate_action";
+export type GateActionReviewAdviceState = "open" | "in_progress";
 
 export interface GateActionReviewAdviceAction {
   kind: GateActionReviewAdviceActionKind;
@@ -93,6 +94,7 @@ export interface GateActionReviewAdviceAction {
 export interface GateActionReviewAdvice {
   id: string;
   severity: GateActionReviewAdviceSeverity;
+  state: GateActionReviewAdviceState;
   platformId: string;
   platformName: string;
   headline: string;
@@ -503,12 +505,24 @@ function actionTypeFromReceipt(receipt: GateActionReceipt) {
   return receipt.executionType === "platform_strategy" ? parts[2] ?? "" : receipt.executionType;
 }
 
+function isAdviceActionReceipt(receipt: GateActionReceipt) {
+  return receipt.actionId.startsWith("gate-advice:");
+}
+
 function latestReceiptFor(receipts: GateActionReceipt[], predicate: (receipt: GateActionReceipt) => boolean) {
   return trimGateActionReceipts(receipts.filter(predicate), 1)[0] ?? null;
 }
 
 function receiptIsAfter(left: GateActionReceipt, right: GateActionReceipt) {
   return new Date(left.createdAt).getTime() > new Date(right.createdAt).getTime();
+}
+
+function latestAdviceResponse(receipts: GateActionReceipt[], kind: GateActionReviewAdviceActionKind, platformId: string) {
+  return latestReceiptFor(receipts, (receipt) => receipt.actionId === `gate-advice:${kind}:${platformId}` && receipt.status === "succeeded");
+}
+
+function adviceState(response: GateActionReceipt | null, trigger: GateActionReceipt | null): GateActionReviewAdviceState {
+  return response && trigger && receiptIsAfter(response, trigger) ? "in_progress" : "open";
 }
 
 function adviceEvidence(receipts: GateActionReceipt[]) {
@@ -526,6 +540,7 @@ export function buildGateActionReviewAdvice(receipts: GateActionReceipt[], limit
     return [{
       id: "empty-audit-history",
       severity: "warning",
+      state: "open",
       platformId: "manual",
       platformName: "总闸门",
       headline: "还没有执行证据，别靠感觉判断平台策略。",
@@ -549,19 +564,28 @@ export function buildGateActionReviewAdvice(receipts: GateActionReceipt[], limit
 
   const advice: GateActionReviewAdvice[] = [];
   for (const group of groups.values()) {
-    const failed = group.receipts.filter((receipt) => receipt.status === "failed");
-    const succeeded = group.receipts.filter((receipt) => receipt.status === "succeeded");
-    const latest = group.receipts[0];
-    const failureRate = group.receipts.length ? failed.length / group.receipts.length : 0;
+    const operationalReceipts = group.receipts.filter((receipt) => !isAdviceActionReceipt(receipt));
+    const failed = operationalReceipts.filter((receipt) => receipt.status === "failed");
+    const succeeded = operationalReceipts.filter((receipt) => receipt.status === "succeeded");
+    const latest = operationalReceipts[0] ?? group.receipts[0];
+    const latestFailure = failed[0] ?? null;
+    const latestSuccess = succeeded[0] ?? null;
+    const failureRate = operationalReceipts.length ? failed.length / operationalReceipts.length : 0;
+    const failureResponse = latestAdviceResponse(group.receipts, "handle_failure", group.platformId);
+    const failureIsResolved = Boolean(latestFailure && latestSuccess && receiptIsAfter(latestSuccess, latestFailure));
 
-    if (failed.length >= 2 || (failed.length >= 1 && failureRate >= 0.5)) {
+    if (!failureIsResolved && (failed.length >= 2 || (failed.length >= 1 && failureRate >= 0.5))) {
+      const state = adviceState(failureResponse, latestFailure);
       advice.push({
         id: `${group.platformId}:failure-cluster`,
-        severity: "urgent",
+        severity: state === "in_progress" ? "warning" : "urgent",
+        state,
         platformId: group.platformId,
         platformName: group.platformName,
-        headline: `${group.platformName} 失败偏多，别继续硬冲。`,
-        detail: `最近 ${group.receipts.length} 条里失败 ${failed.length} 条，先修最晚失败项，再谈加码。`,
+        headline: state === "in_progress" ? `${group.platformName} 失败处理已响应，等真实修复回执。` : `${group.platformName} 失败偏多，别继续硬冲。`,
+        detail: state === "in_progress"
+          ? `已经进入失败处理位，但最近 ${operationalReceipts.length} 条业务回执里失败仍有 ${failed.length} 条。完成修复后刷新总闸门。`
+          : `最近 ${operationalReceipts.length} 条业务回执里失败 ${failed.length} 条，先修最晚失败项，再谈加码。`,
         action: {
           kind: "handle_failure",
           label: "处理失败项",
@@ -577,13 +601,17 @@ export function buildGateActionReviewAdvice(receipts: GateActionReceipt[], limit
       ? latestReceiptFor(group.receipts, (receipt) => actionTypeFromReceipt(receipt) === "save_snapshot" && receipt.status === "succeeded" && receiptIsAfter(receipt, latestAsset))
       : null;
     if (latestAsset && !laterSnapshot) {
+      const state = adviceState(latestAdviceResponse(group.receipts, "adopt_asset", group.platformId), latestAsset);
       advice.push({
         id: `${group.platformId}:asset-without-baseline`,
         severity: "opportunity",
+        state,
         platformId: group.platformId,
         platformName: group.platformName,
-        headline: `${group.platformName} 资产生成了，别让方案躺在草稿箱。`,
-        detail: "已经生成投稿方案，但还没有看到后续保存基准。先采纳最强版本，否则生成动作等于没进生产线。",
+        headline: state === "in_progress" ? `${group.platformName} 资产采纳已响应，差一个基准回执。` : `${group.platformName} 资产生成了，别让方案躺在草稿箱。`,
+        detail: state === "in_progress"
+          ? "已经进入资产采纳位置，但还没看到保存发布包基准。采纳后立刻保存基准，别只点到页面就收工。"
+          : "已经生成投稿方案，但还没有看到后续保存基准。先采纳最强版本，否则生成动作等于没进生产线。",
         action: {
           kind: "adopt_asset",
           label: "采纳投稿方案",
@@ -596,13 +624,17 @@ export function buildGateActionReviewAdvice(receipts: GateActionReceipt[], limit
 
     const latestSnapshot = latestReceiptFor(group.receipts, (receipt) => actionTypeFromReceipt(receipt) === "save_snapshot" && receipt.status === "succeeded");
     if (latestSnapshot) {
+      const state = adviceState(latestAdviceResponse(group.receipts, "record_metrics", group.platformId), latestSnapshot);
       advice.push({
         id: `${group.platformId}:baseline-needs-metrics`,
         severity: "warning",
+        state,
         platformId: group.platformId,
         platformName: group.platformName,
-        headline: `${group.platformName} 已有发布基准，下一步别缺效果回填。`,
-        detail: "基准保存后要补曝光、点击、收藏、追读或编辑反馈，否则平台选择还是拍脑袋。",
+        headline: state === "in_progress" ? `${group.platformName} 效果回填已响应，等真实数据落表。` : `${group.platformName} 已有发布基准，下一步别缺效果回填。`,
+        detail: state === "in_progress"
+          ? "已经进入效果回填位置，但审计历史还没看到新的投放数据证据。补完曝光、点击、收藏、追读后再复检。"
+          : "基准保存后要补曝光、点击、收藏、追读或编辑反馈，否则平台选择还是拍脑袋。",
         action: {
           kind: "record_metrics",
           label: "回填发布效果",
@@ -617,6 +649,7 @@ export function buildGateActionReviewAdvice(receipts: GateActionReceipt[], limit
       advice.push({
         id: `${group.platformId}:stable-success`,
         severity: "healthy",
+        state: "open",
         platformId: group.platformId,
         platformName: group.platformName,
         headline: `${group.platformName} 执行链路稳定，可以进入小步加码。`,
@@ -636,6 +669,7 @@ export function buildGateActionReviewAdvice(receipts: GateActionReceipt[], limit
     advice.push({
       id: "blocked-recheck-debt",
       severity: "urgent",
+      state: adviceState(latestAdviceResponse(sorted, "handle_failure", "manual"), blocked[0] ?? null),
       platformId: "manual",
       platformName: "总闸门",
       headline: "复检欠账太多，继续新增动作只会把坑埋深。",
@@ -655,6 +689,7 @@ export function buildGateActionReviewAdvice(receipts: GateActionReceipt[], limit
     advice.push({
       id: "steady-watch",
       severity: "healthy",
+      state: "open",
       platformId: platform.id,
       platformName: platform.name,
       headline: "目前没有明显事故，别松手，继续用证据推进。",

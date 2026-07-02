@@ -216,6 +216,7 @@ test("buildGateActionReceipt", async (t) => {
     const advice = buildGateActionReviewAdvice([failedAsset, failedRewrite]);
 
     assert.equal(advice[0].severity, "urgent");
+    assert.equal(advice[0].state, "open");
     assert.equal(advice[0].platformId, "fanqie");
     assert.ok(advice[0].headline.includes("失败偏多"));
     assert.equal(advice[0].action.kind, "handle_failure");
@@ -235,6 +236,7 @@ test("buildGateActionReceipt", async (t) => {
     const advice = buildGateActionReviewAdvice([assetReceipt]);
 
     assert.equal(advice[0].severity, "opportunity");
+    assert.equal(advice[0].state, "open");
     assert.equal(advice[0].platformId, "fanqie");
     assert.ok(advice[0].headline.includes("资产生成了"));
     assert.equal(advice[0].action.kind, "adopt_asset");
@@ -257,6 +259,7 @@ test("buildGateActionReceipt", async (t) => {
     const advice = buildGateActionReviewAdvice([snapshotReceipt]);
 
     assert.equal(advice[0].severity, "warning");
+    assert.equal(advice[0].state, "open");
     assert.equal(advice[0].platformId, "fanqie");
     assert.ok(advice[0].headline.includes("发布基准"));
     assert.equal(advice[0].action.kind, "record_metrics");
@@ -287,6 +290,54 @@ test("buildGateActionReceipt", async (t) => {
     assert.equal(receipt.href, "/projects/project-1#submission-asset-editor");
     assert.equal(receipt.succeededCount, 1);
     assert.equal(receipt.recheck.label, "复检建议处理结果");
+  });
+
+  await t.test("marks accepted advice as in progress until a resolving receipt appears", () => {
+    const assetReceipt = buildGatePlatformStrategyReceipt({
+      item: strategyPlatform,
+      status: "succeeded",
+      now: "2026-01-01T00:00:00.000Z",
+      payload: {
+        variants: [{ strategy: "强钩子版" }],
+      },
+    });
+    const accepted = buildGateAdviceActionReceipt({
+      advice: buildGateActionReviewAdvice([assetReceipt])[0],
+      now: "2026-01-01T00:00:01.000Z",
+    });
+
+    const advice = buildGateActionReviewAdvice([assetReceipt, accepted]);
+
+    assert.equal(advice[0].id, "fanqie:asset-without-baseline");
+    assert.equal(advice[0].state, "in_progress");
+    assert.ok(advice[0].headline.includes("已响应"));
+  });
+
+  await t.test("clears asset advice after a later baseline receipt", () => {
+    const assetReceipt = buildGatePlatformStrategyReceipt({
+      item: strategyPlatform,
+      status: "succeeded",
+      now: "2026-01-01T00:00:00.000Z",
+      payload: {
+        variants: [{ strategy: "强钩子版" }],
+      },
+    });
+    const baselineReceipt = buildGatePlatformStrategyReceipt({
+      item: {
+        ...strategyPlatform,
+        actionType: "save_snapshot",
+        actionLabel: "保存基准",
+      },
+      status: "succeeded",
+      now: "2026-01-01T00:00:02.000Z",
+      payload: { task: { id: "snapshot-1", status: "succeeded" } },
+    });
+
+    const advice = buildGateActionReviewAdvice([assetReceipt, baselineReceipt]);
+
+    assert.equal(advice[0].id, "fanqie:baseline-needs-metrics");
+    assert.equal(advice[0].action.kind, "record_metrics");
+    assert.ok(!advice.some((item) => item.id === "fanqie:asset-without-baseline"));
   });
 
   await t.test("builds platform strategy receipts for the unified gate audit log", () => {

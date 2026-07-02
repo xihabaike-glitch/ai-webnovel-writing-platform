@@ -379,6 +379,8 @@ interface PlatformStrategyProgressSummary {
   progressPercent: number;
   nextStepId: string | null;
   nextStepLabel: string;
+  actionLabel: string;
+  actionHref: string;
   bottleneck: string;
   verdict: string;
 }
@@ -1518,7 +1520,7 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
             </div>
           ) : null}
           {center.platformStrategy.length ? (
-            <div className="mt-3 rounded-md border border-slate-200 p-3">
+            <div className="mt-3 rounded-md border border-slate-200 p-3" id="platform-strategy-ranking">
               <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
                 <div>
                   <div className="font-medium text-slate-950">平台策略排行榜</div>
@@ -1612,6 +1614,14 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
                             style={{ width: `${strategySwitchPlan.progress.progressPercent}%` }}
                           />
                         </div>
+                        {strategySwitchPlan.progress.status === "complete" ? (
+                          <a
+                            className="mt-3 inline-flex w-fit rounded-md bg-emerald-700 px-3 py-2 text-xs font-medium text-white hover:bg-emerald-800"
+                            href={strategySwitchPlan.progress.actionHref}
+                          >
+                            {strategySwitchPlan.progress.actionLabel}
+                          </a>
+                        ) : null}
                       </div>
                     </div>
                     {strategySwitchPlan.progress.status !== "complete" ? (

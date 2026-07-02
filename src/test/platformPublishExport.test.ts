@@ -1018,6 +1018,8 @@ test("buildPlatformPublishExportCenter", async (t) => {
     assert.equal(plan.progress.status, "complete");
     assert.equal(plan.progress.completedSteps, 4);
     assert.equal(plan.progress.progressPercent, 100);
+    assert.equal(plan.progress.actionLabel, "复盘排行榜");
+    assert.equal(plan.progress.actionHref, "#platform-strategy-ranking");
     assert.equal(plan.steps.find((step) => step.id === "record-publish-effect")?.status, "done");
     assert.equal(plan.steps.find((step) => step.id === "record-publish-effect")?.executable, false);
   });

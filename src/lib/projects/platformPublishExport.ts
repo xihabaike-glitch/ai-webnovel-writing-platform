@@ -387,6 +387,8 @@ export interface PlatformStrategyProgressSummary {
   progressPercent: number;
   nextStepId: string | null;
   nextStepLabel: string;
+  actionLabel: string;
+  actionHref: string;
   bottleneck: string;
   verdict: string;
 }
@@ -1003,6 +1005,8 @@ function buildPlatformStrategyProgressSummary(
       progressPercent,
       nextStepId: null,
       nextStepLabel: "复盘排行榜",
+      actionLabel: "复盘排行榜",
+      actionHref: "#platform-strategy-ranking",
       bottleneck: "暂无卡点",
       verdict: `${platformName} 这条执行链已经闭环，别继续盲动，回排行榜看数据说话。`,
     };
@@ -1015,6 +1019,8 @@ function buildPlatformStrategyProgressSummary(
     progressPercent,
     nextStepId: nextStep.id,
     nextStepLabel: nextStep.label,
+    actionLabel: nextStep.label,
+    actionHref: nextStep.href,
     bottleneck: nextStep.detail,
     verdict: `${platformName} 还有 ${totalSteps - completedSteps} 步没跑完，先处理「${nextStep.label}」，别开新坑。`,
   };

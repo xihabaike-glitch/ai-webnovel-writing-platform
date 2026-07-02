@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { summarizeAiTasks } from "@/lib/ai/taskWorkflow";
 import { prisma } from "@/lib/db/prisma";
-import { getActiveModelProvider } from "@/lib/model-gateway/activeProvider";
+import { getActiveModelProvider, getModelProviderCandidates } from "@/lib/model-gateway/activeProvider";
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -25,8 +25,9 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Chapter not found" }, { status: 404 });
   }
 
-  const [{ provider }, tasks] = await Promise.all([
+  const [{ provider }, modelCandidates, tasks] = await Promise.all([
     getActiveModelProvider("chapter_draft"),
+    getModelProviderCandidates("chapter_draft"),
     prisma.aiTask.findMany({
       where: {
         chapterId,
@@ -58,6 +59,14 @@ export async function GET(request: Request) {
       hasApiKey: Boolean(provider.encryptedApiKey),
       baseUrl: provider.baseUrl,
     },
+    modelRoute: modelCandidates.map((candidate) => ({
+      role: candidate.role,
+      providerId: candidate.provider.providerId,
+      displayName: candidate.provider.displayName,
+      model: candidate.provider.defaultModel,
+      enabled: candidate.provider.enabled,
+      hasApiKey: Boolean(candidate.provider.encryptedApiKey),
+    })),
     tasks: summarizeAiTasks(tasks),
   });
 }

@@ -1,7 +1,6 @@
 import { buildChapterReviewPrompt } from "@/lib/ai/buildChapterReviewPrompt";
 import { prisma } from "@/lib/db/prisma";
-import { getActiveModelProvider } from "@/lib/model-gateway/activeProvider";
-import type { ModelProviderId } from "@/lib/model-gateway/types";
+import { runRoutedGeneration } from "@/lib/model-gateway/routedGeneration";
 import { getPlatformProfile, type PlatformId } from "@/lib/platforms/platformProfiles";
 
 export interface ReviewIssueResult {
@@ -42,41 +41,26 @@ export async function reviewChapterDraft(chapterId: string) {
     },
   });
 
-  const { provider, adapter } = await getActiveModelProvider("chapter_review");
-  const task = await prisma.aiTask.create({
-    data: {
-      projectId: chapter.projectId,
-      chapterId: chapter.id,
-      taskType: "chapter_review",
-      providerConfigId: provider.id,
-      model: provider.defaultModel,
-      status: "running",
-      inputSnapshot: JSON.stringify(prompt),
+  const generation = await runRoutedGeneration({
+    projectId: chapter.projectId,
+    chapterId: chapter.id,
+    taskType: "chapter_review",
+    inputSnapshot: prompt,
+    request: {
+      systemPrompt: prompt.systemPrompt,
+      userPrompt: prompt.userPrompt,
+    },
+    validateResult: (result) => {
+      JSON.parse(result.text);
     },
   });
 
-  try {
-    const result = await adapter.generate({
-      providerId: provider.providerId as ModelProviderId,
-      model: provider.defaultModel,
-      systemPrompt: prompt.systemPrompt,
-      userPrompt: prompt.userPrompt,
-    });
+  if (generation.ok) {
+    const { result, provider } = generation;
     const parsedResult = JSON.parse(result.text) as ChapterReviewResult;
 
-    const updatedTask = await prisma.aiTask.update({
-      where: { id: task.id },
-      data: {
-        status: "succeeded",
-        outputText: result.text,
-        inputTokens: result.usage?.inputTokens,
-        outputTokens: result.usage?.outputTokens,
-        costUsd: result.usage?.costUsd,
-      },
-    });
-
     return {
-      task: updatedTask,
+      task: generation.task,
       result: parsedResult,
       chapter,
       provider: {
@@ -85,27 +69,20 @@ export async function reviewChapterDraft(chapterId: string) {
         displayName: provider.displayName,
         model: provider.defaultModel,
       },
-    };
-  } catch (caught) {
-    const message = caught instanceof Error ? caught.message : "Unknown review error";
-    const failedTask = await prisma.aiTask.update({
-      where: { id: task.id },
-      data: {
-        status: "failed",
-        errorMessage: message,
-      },
-    });
-
-    return {
-      task: failedTask,
-      error: message,
-      chapter,
-      provider: {
-        id: provider.id,
-        providerId: provider.providerId,
-        displayName: provider.displayName,
-        model: provider.defaultModel,
-      },
+      attempts: generation.attempts,
     };
   }
+
+  return {
+    task: generation.task,
+    error: generation.error,
+    chapter,
+    provider: {
+      id: generation.provider.id,
+      providerId: generation.provider.providerId,
+      displayName: generation.provider.displayName,
+      model: generation.provider.defaultModel,
+    },
+    attempts: generation.attempts,
+  };
 }

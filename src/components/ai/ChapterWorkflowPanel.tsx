@@ -73,6 +73,14 @@ interface WorkflowPayload {
     hasApiKey: boolean;
     baseUrl: string | null;
   };
+  modelRoute: Array<{
+    role: "primary" | "fallback" | "auto";
+    providerId: string;
+    displayName: string;
+    model: string;
+    enabled: boolean;
+    hasApiKey: boolean;
+  }>;
   tasks: AiTaskWorkflowItem[];
 }
 
@@ -94,6 +102,12 @@ function parseReview(outputText: string | null) {
   } catch {
     return null;
   }
+}
+
+function modelRouteRoleLabel(role: "primary" | "fallback" | "auto") {
+  if (role === "primary") return "首选";
+  if (role === "fallback") return "备用";
+  return "自动";
 }
 
 export function ChapterWorkflowPanel({
@@ -175,9 +189,11 @@ export function ChapterWorkflowPanel({
 
       const payload = (await response.json()) as {
         draftQuality?: { score: number; shouldSecondPass: boolean };
+        attempts?: Array<{ status: "succeeded" | "failed"; role: string; displayName: string; model: string }>;
       };
+      const fallbackUsed = payload.attempts?.some((attempt) => attempt.status === "failed");
       setMessage(payload.draftQuality
-        ? `已生成正文初稿，自动体检 ${payload.draftQuality.score} 分${payload.draftQuality.shouldSecondPass ? "，建议进入二改。" : "。"}`
+        ? `已生成正文初稿${fallbackUsed ? "，已自动切换备用模型" : ""}，自动体检 ${payload.draftQuality.score} 分${payload.draftQuality.shouldSecondPass ? "，建议进入二改。" : "。"}`
         : "已生成正文初稿");
       await loadWorkflow();
       await loadRevisions();
@@ -249,9 +265,13 @@ export function ChapterWorkflowPanel({
         throw new Error("审稿失败。");
       }
 
-      const payload = (await response.json()) as { result: ReviewResult };
+      const payload = (await response.json()) as {
+        result: ReviewResult;
+        attempts?: Array<{ status: "succeeded" | "failed"; role: string; displayName: string; model: string }>;
+      };
+      const fallbackUsed = payload.attempts?.some((attempt) => attempt.status === "failed");
       setReviewResult(payload.result);
-      setMessage("已完成章节审稿");
+      setMessage(`已完成章节审稿${fallbackUsed ? "，已自动切换备用模型" : ""}`);
       await loadWorkflow();
     } catch (caught) {
       setMessage(caught instanceof Error ? caught.message : "审稿失败。");
@@ -377,6 +397,21 @@ export function ChapterWorkflowPanel({
             <div className="rounded-md bg-amber-50 p-2 text-amber-700">当前模型未配置 Key，会优先使用可用模型或 Mock。</div>
           ) : null}
         </div>
+        {workflow?.modelRoute.length ? (
+          <div className="mt-3 rounded-md border border-slate-200 p-3">
+            <div className="text-xs font-medium text-slate-500">正文生成调用链</div>
+            <div className="mt-2 grid gap-2">
+              {workflow.modelRoute.map((candidate, index) => (
+                <div className="flex flex-wrap items-center justify-between gap-2 rounded-md bg-slate-50 px-3 py-2 text-xs" key={`${candidate.role}-${candidate.providerId}-${candidate.model}-${index}`}>
+                  <span className="font-medium text-slate-800">
+                    {index + 1}. {modelRouteRoleLabel(candidate.role)} · {candidate.displayName}
+                  </span>
+                  <span className="text-slate-500">{candidate.model}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
         <div className={`mt-4 rounded-md p-3 text-sm ${styleScore.canGenerate ? "bg-emerald-50 text-emerald-800" : "bg-amber-50 text-amber-800"}`}>
           <div className="flex items-center justify-between gap-3">
             <div className="font-medium">生成前体检</div>

@@ -9,6 +9,11 @@ export interface RouteProviderChoice<TProvider> {
   fallbackProvider?: TProvider | null;
 }
 
+export interface ProviderCandidate<TProvider> {
+  provider: TProvider;
+  role: "primary" | "fallback" | "auto";
+}
+
 export function canUseProvider(provider: SelectableProvider) {
   if (!provider.enabled) return false;
   if (provider.providerId === "mock") return true;
@@ -28,4 +33,30 @@ export function selectModelProviderForTask<TProvider extends SelectableProvider>
   if (route?.primaryProvider && canUseProvider(route.primaryProvider)) return route.primaryProvider;
   if (route?.fallbackProvider && canUseProvider(route.fallbackProvider)) return route.fallbackProvider;
   return pickDefaultProvider(providers);
+}
+
+function pushCandidate<TProvider extends SelectableProvider & { id?: string }>(
+  candidates: ProviderCandidate<TProvider>[],
+  provider: TProvider | undefined | null,
+  role: ProviderCandidate<TProvider>["role"],
+) {
+  if (!provider || !canUseProvider(provider)) return;
+  const duplicated = candidates.some((candidate) => {
+    if (provider.id && candidate.provider.id) return candidate.provider.id === provider.id;
+    return candidate.provider === provider;
+  });
+  if (!duplicated) candidates.push({ provider, role });
+}
+
+export function selectModelProviderCandidatesForTask<TProvider extends SelectableProvider & { id?: string }>(
+  providers: TProvider[],
+  route?: RouteProviderChoice<TProvider> | null,
+): ProviderCandidate<TProvider>[] {
+  const candidates: ProviderCandidate<TProvider>[] = [];
+
+  pushCandidate(candidates, route?.primaryProvider, "primary");
+  pushCandidate(candidates, route?.fallbackProvider, "fallback");
+  pushCandidate(candidates, pickDefaultProvider(providers), "auto");
+
+  return candidates;
 }

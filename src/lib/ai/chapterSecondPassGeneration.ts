@@ -4,8 +4,7 @@ import {
 } from "@/lib/ai/buildChapterSecondPassPrompt";
 import { buildDraftQualityAudit } from "@/lib/ai/draftQualityAudit";
 import { prisma } from "@/lib/db/prisma";
-import { getActiveModelProvider } from "@/lib/model-gateway/activeProvider";
-import type { ModelProviderId } from "@/lib/model-gateway/types";
+import { runRoutedGeneration } from "@/lib/model-gateway/routedGeneration";
 import { getPlatformProfile, type PlatformId } from "@/lib/platforms/platformProfiles";
 import { countWords } from "@/lib/text/wordCount";
 
@@ -66,28 +65,21 @@ export async function generateChapterSecondPass(options: GenerateChapterSecondPa
     },
   });
 
-  const { provider, adapter } = await getActiveModelProvider("chapter_second_pass");
-  const task = await prisma.aiTask.create({
-    data: {
-      projectId: chapter.projectId,
-      chapterId: chapter.id,
-      taskType: "chapter_second_pass",
-      providerConfigId: provider.id,
-      model: provider.defaultModel,
-      status: "running",
-      inputSnapshot: JSON.stringify({ prompt, instruction, mode }),
-    },
-  });
-
-  try {
-    const result = await adapter.generate({
-      providerId: provider.providerId as ModelProviderId,
-      model: provider.defaultModel,
+  const generation = await runRoutedGeneration({
+    projectId: chapter.projectId,
+    chapterId: chapter.id,
+    taskType: "chapter_second_pass",
+    inputSnapshot: { prompt, instruction, mode },
+    request: {
       systemPrompt: prompt.systemPrompt,
       userPrompt: prompt.userPrompt,
       temperature: 0.76,
       maxTokens: 3200,
-    });
+    },
+  });
+
+  if (generation.ok) {
+    const { result, provider, task } = generation;
     const wordCount = countWords(result.text);
     const secondPassAudit = buildDraftQualityAudit({
       platform,
@@ -118,7 +110,7 @@ export async function generateChapterSecondPass(options: GenerateChapterSecondPa
         data: {
           chapterId: chapter.id,
           source: "chapter_second_pass_before_overwrite",
-          sourceTaskId: task.id,
+          sourceTaskId: generation.task.id,
           title: chapter.title,
           content: chapter.content,
           wordCount: chapter.wordCount,
@@ -184,27 +176,20 @@ export async function generateChapterSecondPass(options: GenerateChapterSecondPa
         displayName: provider.displayName,
         model: provider.defaultModel,
       },
-    };
-  } catch (caught) {
-    const message = caught instanceof Error ? caught.message : "Unknown second pass error";
-    const failedTask = await prisma.aiTask.update({
-      where: { id: task.id },
-      data: {
-        status: "failed",
-        errorMessage: message,
-      },
-    });
-
-    return {
-      task: failedTask,
-      chapter,
-      error: message,
-      activeProvider: {
-        id: provider.id,
-        providerId: provider.providerId,
-        displayName: provider.displayName,
-        model: provider.defaultModel,
-      },
+      attempts: generation.attempts,
     };
   }
+
+  return {
+    task: generation.task,
+    chapter,
+    error: generation.error,
+    activeProvider: {
+      id: generation.provider.id,
+      providerId: generation.provider.providerId,
+      displayName: generation.provider.displayName,
+      model: generation.provider.defaultModel,
+    },
+    attempts: generation.attempts,
+  };
 }

@@ -11,7 +11,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ task: review.task, error: review.error }, { status: 500 });
     }
 
-    return NextResponse.json({ task: review.task, result: review.result });
+    return NextResponse.json({ task: review.task, result: review.result, attempts: review.attempts });
   } catch (caught) {
     const message = caught instanceof Error ? caught.message : "Unknown review error";
     const status = message === "Chapter not found" ? 404 : 500;

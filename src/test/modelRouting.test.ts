@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { selectModelProviderForTask } from "../lib/model-gateway/providerSelection.ts";
+import { selectModelProviderCandidatesForTask, selectModelProviderForTask } from "../lib/model-gateway/providerSelection.ts";
 import { buildRouteRecommendations } from "../lib/model-gateway/routeRecommendations.ts";
 import { labelForRoutedTask, modelTaskRouteOptions } from "../lib/model-gateway/taskRouting.ts";
 
@@ -45,6 +45,25 @@ test("model task routing", async (t) => {
     });
 
     assert.equal(selected?.id, "mock-provider");
+  });
+
+  await t.test("builds an ordered failover candidate chain", () => {
+    const candidates = selectModelProviderCandidatesForTask([mockProvider, gptProvider], {
+      primaryProvider: gptProvider,
+      fallbackProvider: mockProvider,
+    });
+
+    assert.deepEqual(candidates.map((candidate) => candidate.provider.id), ["gpt-provider", "mock-provider"]);
+    assert.deepEqual(candidates.map((candidate) => candidate.role), ["primary", "fallback"]);
+  });
+
+  await t.test("deduplicates the automatic fallback candidate", () => {
+    const candidates = selectModelProviderCandidatesForTask([gptProvider, mockProvider], {
+      primaryProvider: gptProvider,
+      fallbackProvider: null,
+    });
+
+    assert.deepEqual(candidates.map((candidate) => candidate.provider.id), ["gpt-provider"]);
   });
 
   await t.test("falls back to default active provider without a route", () => {

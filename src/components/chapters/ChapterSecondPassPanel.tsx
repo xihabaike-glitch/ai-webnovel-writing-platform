@@ -26,6 +26,12 @@ interface SecondPassResult {
     shouldSecondPass: boolean;
     issues: Array<{ type: string; suggestion: string }>;
   };
+  attempts?: Array<{
+    status: "succeeded" | "failed";
+    role: "primary" | "fallback" | "auto";
+    displayName: string;
+    model: string;
+  }>;
 }
 
 const modeOptions: Array<{ value: SecondPassMode; label: string }> = [
@@ -35,6 +41,12 @@ const modeOptions: Array<{ value: SecondPassMode; label: string }> = [
   { value: "less_exposition", label: "减少解释" },
   { value: "more_emotion", label: "情绪更重" },
 ];
+
+function roleLabel(role: "primary" | "fallback" | "auto") {
+  if (role === "primary") return "首选";
+  if (role === "fallback") return "备用";
+  return "自动";
+}
 
 export function ChapterSecondPassPanel({ chapterId, currentWordCount }: { chapterId: string; currentWordCount: number }) {
   const router = useRouter();
@@ -59,7 +71,8 @@ export function ChapterSecondPassPanel({ chapterId, currentWordCount }: { chapte
         throw new Error(payload.error || "二改失败。");
       }
       setResult(payload);
-      setMessage(`已完成章节二改，复检 ${payload.secondPassAudit.score} 分${payload.secondPassAudit.shouldSecondPass ? "，仍建议继续二改。" : "，可进入发布检查。"}`);
+      const fallbackUsed = payload.attempts?.some((attempt) => attempt.status === "failed");
+      setMessage(`已完成章节二改${fallbackUsed ? "，已自动切换备用模型" : ""}，复检 ${payload.secondPassAudit.score} 分${payload.secondPassAudit.shouldSecondPass ? "，仍建议继续二改。" : "，可进入发布检查。"}`);
       router.refresh();
     } catch (caught) {
       setMessage(caught instanceof Error ? caught.message : "二改失败。");
@@ -131,6 +144,15 @@ export function ChapterSecondPassPanel({ chapterId, currentWordCount }: { chapte
           <div className="mt-1 text-slate-500">
             {result.chapter.wordCount} 字 · 复检 {result.secondPassAudit.score} 分 · {result.secondPassAudit.shouldSecondPass ? "继续二改" : "可发布检查"}
           </div>
+          {result.attempts?.length ? (
+            <div className="mt-2 flex flex-wrap gap-2 text-xs text-slate-500">
+              {result.attempts.map((attempt, index) => (
+                <span className="rounded-md bg-white px-2 py-1" key={`${attempt.role}-${attempt.model}-${index}`}>
+                  {roleLabel(attempt.role)} · {attempt.displayName} · {attempt.status === "succeeded" ? "成功" : "失败"}
+                </span>
+              ))}
+            </div>
+          ) : null}
           {result.secondPassAudit.issues.length ? (
             <div className="mt-2 grid gap-1 text-slate-500">
               {result.secondPassAudit.issues.slice(0, 3).map((issue) => (

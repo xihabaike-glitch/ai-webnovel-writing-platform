@@ -27,6 +27,24 @@ test("task retry helpers", async (t) => {
     assert.equal(payload?.targetWords, 1800);
   });
 
+  await t.test("restores second-pass retry payload from routed model snapshots", () => {
+    const payload = parseSecondPassRetryPayload(JSON.stringify({
+      input: {
+        instruction: "压缩解释，补一个章末钩子。",
+        mode: "less_exposition",
+        prompt: { targetWords: 1600 },
+      },
+      routeAttempt: {
+        role: "fallback",
+        providerId: "mock",
+      },
+    }));
+
+    assert.equal(payload?.instruction, "压缩解释，补一个章末钩子。");
+    assert.equal(payload?.mode, "less_exposition");
+    assert.equal(payload?.targetWords, 1600);
+  });
+
   await t.test("blocks unsupported or incomplete retry tasks", () => {
     assert.equal(buildTaskRetryPlan({
       chapterId: "chapter-1",

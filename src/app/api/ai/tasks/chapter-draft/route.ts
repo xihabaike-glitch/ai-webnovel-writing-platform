@@ -19,6 +19,7 @@ export async function POST(request: Request) {
       chapter: result.chapter,
       content: result.content,
       draftQuality: result.draftQuality,
+      attempts: result.attempts,
     });
   } catch (caught) {
     const message = caught instanceof Error ? caught.message : "Unknown draft generation error";

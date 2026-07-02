@@ -71,12 +71,21 @@ export function buildTaskRetryPlan(task: Pick<RetryableTaskInput, "chapterId" | 
 
 export function parseSecondPassRetryPayload(inputSnapshot: string): SecondPassRetryPayload | null {
   try {
-    const parsed = JSON.parse(inputSnapshot) as {
+    const parsedRoot = JSON.parse(inputSnapshot) as {
+      input?: unknown;
       instruction?: unknown;
       mode?: unknown;
       prompt?: { targetWords?: unknown };
       targetWords?: unknown;
     };
+    const parsed = parsedRoot.input && typeof parsedRoot.input === "object" && !Array.isArray(parsedRoot.input)
+      ? parsedRoot.input as {
+        instruction?: unknown;
+        mode?: unknown;
+        prompt?: { targetWords?: unknown };
+        targetWords?: unknown;
+      }
+      : parsedRoot;
     const instruction = typeof parsed.instruction === "string" ? parsed.instruction.trim() : "";
     if (!instruction) return null;
     const rawTargetWords = typeof parsed.targetWords === "number"

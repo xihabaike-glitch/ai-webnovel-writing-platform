@@ -62,6 +62,22 @@ interface ModelTaskAuditDashboard {
   status: "healthy" | "watch" | "waste";
   score: number;
   verdict: string;
+  budgetCenter: {
+    status: "safe" | "watch" | "over";
+    label: string;
+    monthlyBudgetUsd: number;
+    usedUsd: number;
+    usedPercent: number;
+    remainingUsd: number;
+    projectedMonthlyCostUsd: number;
+    knownCostCoveragePercent: number;
+    fallbackAttemptRatePercent: number;
+    fallbackAttempts: number;
+    routedAttempts: number;
+    failedSpendUsd: number;
+    topCostTaskLabel: string | null;
+    throttleAdvice: string[];
+  };
   summary: {
     totalTasks: number;
     succeededTasks: number;
@@ -109,6 +125,12 @@ function recommendationLabel(value: ModelEffectComparisonRow["recommendation"]) 
   if (value === "avoid") return "暂停";
   if (value === "insufficient") return "补样本";
   return "观察";
+}
+
+function budgetStatusClass(status: ModelTaskAuditDashboard["budgetCenter"]["status"]) {
+  if (status === "safe") return "border-emerald-200 bg-emerald-50 text-emerald-800";
+  if (status === "over") return "border-rose-200 bg-rose-50 text-rose-800";
+  return "border-amber-200 bg-amber-50 text-amber-800";
 }
 
 export function ModelTaskAuditPanel({ projectId }: { projectId: string }) {
@@ -192,6 +214,42 @@ export function ModelTaskAuditPanel({ projectId }: { projectId: string }) {
                 <div className="text-xs text-slate-500">可用模型</div>
                 <div className="mt-1 text-2xl font-semibold text-slate-950">{dashboard.providerReadiness.configuredProviders}/{dashboard.providerReadiness.enabledProviders}</div>
               </div>
+            </div>
+          </div>
+
+          <div className={`rounded-md border p-4 ${budgetStatusClass(dashboard.budgetCenter.status)}`}>
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+              <div>
+                <div className="text-xs opacity-80">预算中心</div>
+                <div className="mt-1 text-2xl font-semibold">{dashboard.budgetCenter.label} · {dashboard.budgetCenter.usedPercent}%</div>
+                <p className="mt-2 text-sm leading-6">
+                  已用 {usd(dashboard.budgetCenter.usedUsd)} / 月预算 {usd(dashboard.budgetCenter.monthlyBudgetUsd)}，
+                  预计月消耗 {usd(dashboard.budgetCenter.projectedMonthlyCostUsd)}。
+                </p>
+              </div>
+              <div className="grid gap-2 text-sm sm:grid-cols-2 lg:min-w-[520px] lg:grid-cols-4">
+                <div className="rounded-md bg-white/70 p-3">
+                  <div className="text-xs opacity-70">剩余额度</div>
+                  <div className="mt-1 font-semibold">{usd(dashboard.budgetCenter.remainingUsd)}</div>
+                </div>
+                <div className="rounded-md bg-white/70 p-3">
+                  <div className="text-xs opacity-70">成本覆盖</div>
+                  <div className="mt-1 font-semibold">{dashboard.budgetCenter.knownCostCoveragePercent}%</div>
+                </div>
+                <div className="rounded-md bg-white/70 p-3">
+                  <div className="text-xs opacity-70">备用触发</div>
+                  <div className="mt-1 font-semibold">{dashboard.budgetCenter.fallbackAttempts}/{dashboard.budgetCenter.routedAttempts}</div>
+                </div>
+                <div className="rounded-md bg-white/70 p-3">
+                  <div className="text-xs opacity-70">失败成本</div>
+                  <div className="mt-1 font-semibold">{usd(dashboard.budgetCenter.failedSpendUsd)}</div>
+                </div>
+              </div>
+            </div>
+            <div className="mt-3 grid gap-2 text-sm lg:grid-cols-2">
+              {dashboard.budgetCenter.throttleAdvice.map((action) => (
+                <div className="rounded-md bg-white/70 px-3 py-2" key={action}>{action}</div>
+              ))}
             </div>
           </div>
 

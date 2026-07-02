@@ -43,6 +43,7 @@ test("buildModelTaskAuditDashboard", async (t) => {
         taskType: "chapter_review",
         model: "deepseek-chat",
         status: "failed",
+        inputSnapshot: JSON.stringify({ routeAttempt: { role: "primary", attemptNumber: 1 } }),
         inputTokens: 800,
         outputTokens: 0,
         costUsd: 0.003,
@@ -57,6 +58,7 @@ test("buildModelTaskAuditDashboard", async (t) => {
         taskType: "chapter_second_pass",
         model: "mock-novel",
         status: "succeeded",
+        inputSnapshot: JSON.stringify({ routeAttempt: { role: "fallback", attemptNumber: 2 } }),
         inputTokens: null,
         outputTokens: null,
         costUsd: null,
@@ -74,6 +76,12 @@ test("buildModelTaskAuditDashboard", async (t) => {
     assert.equal(dashboard.summary.totalTokens, 4200);
     assert.equal(dashboard.summary.knownCostUsd, 0.015);
     assert.equal(dashboard.summary.missingUsageTasks, 1);
+    assert.equal(dashboard.budgetCenter.status, "watch");
+    assert.equal(dashboard.budgetCenter.knownCostCoveragePercent, 50);
+    assert.equal(dashboard.budgetCenter.fallbackAttempts, 1);
+    assert.equal(dashboard.budgetCenter.fallbackAttemptRatePercent, 50);
+    assert.equal(dashboard.budgetCenter.failedSpendUsd, 0.003);
+    assert.ok(dashboard.budgetCenter.throttleAdvice.some((action) => action.includes("备用模型")));
     assert.equal(dashboard.providerReadiness.unconfiguredEnabledProviders, 1);
     assert.ok(dashboard.modelEffectRows.some((row) => row.averageQualityScore === 82));
     assert.equal(dashboard.recentFailures[0].errorMessage, "API key missing");
@@ -129,6 +137,9 @@ test("buildModelTaskAuditDashboard", async (t) => {
 
     assert.equal(dashboard.status, "healthy");
     assert.equal(dashboard.score, 100);
+    assert.equal(dashboard.budgetCenter.status, "safe");
+    assert.equal(dashboard.budgetCenter.knownCostCoveragePercent, 100);
+    assert.equal(dashboard.budgetCenter.topCostTaskLabel, "正文初稿");
     assert.equal(dashboard.providerRows[0].successRatePercent, 100);
     assert.equal(dashboard.taskTypeRows.length, 2);
     const reviewEffect = dashboard.modelEffectRows.find((row) => row.taskType === "chapter_review");

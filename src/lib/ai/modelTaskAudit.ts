@@ -3,6 +3,7 @@ export interface ModelAuditTask {
   taskType: string;
   model: string;
   status: string;
+  inputSnapshot?: string | null;
   inputTokens: number | null;
   outputTokens: number | null;
   costUsd: number | null;
@@ -87,6 +88,22 @@ export interface ModelTaskAuditDashboard {
   status: "healthy" | "watch" | "waste";
   score: number;
   verdict: string;
+  budgetCenter: {
+    status: "safe" | "watch" | "over";
+    label: string;
+    monthlyBudgetUsd: number;
+    usedUsd: number;
+    usedPercent: number;
+    remainingUsd: number;
+    projectedMonthlyCostUsd: number;
+    knownCostCoveragePercent: number;
+    fallbackAttemptRatePercent: number;
+    fallbackAttempts: number;
+    routedAttempts: number;
+    failedSpendUsd: number;
+    topCostTaskLabel: string | null;
+    throttleAdvice: string[];
+  };
   summary: {
     totalTasks: number;
     succeededTasks: number;
@@ -165,6 +182,17 @@ function parseJsonObject(value: string | null | undefined) {
   } catch {
     return null;
   }
+}
+
+function routeAttempt(task: ModelAuditTask) {
+  const snapshot = parseJsonObject(task.inputSnapshot);
+  const attempt = snapshot?.routeAttempt;
+  if (!attempt || typeof attempt !== "object" || Array.isArray(attempt)) return null;
+  const record = attempt as Record<string, unknown>;
+  return {
+    role: typeof record.role === "string" ? record.role : null,
+    attemptNumber: typeof record.attemptNumber === "number" ? record.attemptNumber : null,
+  };
 }
 
 function qualityScore(task: ModelAuditTask) {
@@ -414,6 +442,71 @@ function buildNextActions(
   return actions.slice(0, 5);
 }
 
+function dateRangeDays(tasks: ModelAuditTask[]) {
+  if (tasks.length === 0) return 1;
+  const times = tasks.map((task) => new Date(task.createdAt).getTime()).filter(Number.isFinite);
+  if (times.length === 0) return 1;
+  const min = Math.min(...times);
+  const max = Math.max(...times);
+  return Math.max(1, Math.ceil((max - min) / 86_400_000) + 1);
+}
+
+function buildBudgetCenter(
+  tasks: ModelAuditTask[],
+  summary: ModelTaskAuditDashboard["summary"],
+  taskTypeRows: TaskTypeAuditRow[],
+) {
+  const monthlyBudgetUsd = 5;
+  const usedPercent = monthlyBudgetUsd > 0 ? Math.round((summary.knownCostUsd / monthlyBudgetUsd) * 100) : 0;
+  const status: ModelTaskAuditDashboard["budgetCenter"]["status"] = usedPercent >= 100
+    ? "over"
+    : usedPercent >= 70 || summary.failureRatePercent >= 20
+      ? "watch"
+      : "safe";
+  const routedAttempts = tasks.filter((task) => routeAttempt(task)).length;
+  const fallbackAttempts = tasks.filter((task) => {
+    const attempt = routeAttempt(task);
+    return attempt?.role === "fallback" || (attempt?.role === "auto" && (attempt.attemptNumber ?? 1) > 1);
+  }).length;
+  const succeededTasks = tasks.filter((task) => task.status === "succeeded").length;
+  const usageRecordedTasks = tasks.filter((task) => (
+    task.status === "succeeded"
+    && (typeof task.inputTokens === "number" || typeof task.outputTokens === "number")
+  )).length;
+  const failedSpendUsd = money(tasks
+    .filter((task) => task.status === "failed")
+    .reduce((sum, task) => sum + (task.costUsd ?? 0), 0));
+  const projectedMonthlyCostUsd = money((summary.knownCostUsd / dateRangeDays(tasks)) * 30);
+  const topCostTask = taskTypeRows.find((row) => row.knownCostUsd > 0) ?? null;
+  const throttleAdvice: string[] = [];
+
+  if (usedPercent >= 100) throttleAdvice.push("暂停批量生成，只保留审稿和必要二改，先查最高成本任务。");
+  else if (usedPercent >= 70) throttleAdvice.push("进入预算观察区，批量任务改成小批试跑。");
+  if (summary.failureRatePercent >= 20) throttleAdvice.push(`失败率 ${summary.failureRatePercent}%，先修模型配置或提示词，再继续烧调用。`);
+  if (fallbackAttempts > 0) throttleAdvice.push(`已触发备用模型 ${fallbackAttempts} 次，检查首选模型稳定性。`);
+  if (failedSpendUsd > 0) throttleAdvice.push(`失败任务已消耗 $${failedSpendUsd.toFixed(4)}，把失败原因归类后再放量。`);
+  if (topCostTask) throttleAdvice.push(`优先压缩「${topCostTask.label}」上下文，它是当前成本最高任务。`);
+  if (summary.missingUsageTasks > 0) throttleAdvice.push("补齐 Token/费用回写，否则预算判断会偏乐观。");
+  if (throttleAdvice.length === 0) throttleAdvice.push("预算水位安全，可以继续按小批量节奏扩大样本。");
+
+  return {
+    status,
+    label: status === "safe" ? "安全" : status === "watch" ? "观察" : "超预算",
+    monthlyBudgetUsd,
+    usedUsd: summary.knownCostUsd,
+    usedPercent,
+    remainingUsd: money(Math.max(0, monthlyBudgetUsd - summary.knownCostUsd)),
+    projectedMonthlyCostUsd,
+    knownCostCoveragePercent: succeededTasks > 0 ? Math.round((usageRecordedTasks / succeededTasks) * 100) : 0,
+    fallbackAttemptRatePercent: routedAttempts > 0 ? Math.round((fallbackAttempts / routedAttempts) * 100) : 0,
+    fallbackAttempts,
+    routedAttempts,
+    failedSpendUsd,
+    topCostTaskLabel: topCostTask?.label ?? null,
+    throttleAdvice: throttleAdvice.slice(0, 5),
+  };
+}
+
 export function buildModelTaskAuditDashboard(
   tasks: ModelAuditTask[],
   providers: ModelAuditProvider[],
@@ -447,6 +540,7 @@ export function buildModelTaskAuditDashboard(
   const providerRows = buildProviderRows(tasks);
   const taskTypeRows = buildTaskTypeRows(tasks);
   const modelEffectRows = buildModelEffectRows(tasks);
+  const budgetCenter = buildBudgetCenter(tasks, summary, taskTypeRows);
   const score = auditScore(summary, providerReadiness);
   const status = statusFor(score);
 
@@ -454,6 +548,7 @@ export function buildModelTaskAuditDashboard(
     status,
     score,
     verdict: verdictFor(status, summary),
+    budgetCenter,
     summary,
     providerReadiness,
     providerRows,

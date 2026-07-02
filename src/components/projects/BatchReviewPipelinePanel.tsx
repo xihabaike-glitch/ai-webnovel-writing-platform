@@ -80,6 +80,21 @@ interface BudgetPreviewView extends BudgetGuardView {
   failureRatePercent: number;
 }
 
+interface RouteRecommendationView {
+  taskType: string;
+  label: string;
+  status: "ready" | "current" | "insufficient";
+  recommendedPrimaryProviderConfigId: string | null;
+  recommendedFallbackProviderConfigId: string | null;
+  primaryProviderName: string;
+  fallbackProviderName: string | null;
+  sampleTasks: number;
+  successRatePercent: number;
+  averageQualityScore: number;
+  averageCostPerSucceededTaskUsd: number;
+  reason: string;
+}
+
 function reviewStatusLabel(status: ReviewPipelineCandidate["reviewStatus"]) {
   const labels = {
     ready: "待审稿",
@@ -121,9 +136,12 @@ export function BatchReviewPipelinePanel({ projectId }: { projectId: string }) {
   const [budgetGuard, setBudgetGuard] = useState<BudgetGuardView | null>(null);
   const [reviewBudgetPreview, setReviewBudgetPreview] = useState<BudgetPreviewView | null>(null);
   const [secondPassBudgetPreview, setSecondPassBudgetPreview] = useState<BudgetPreviewView | null>(null);
+  const [reviewRouteRecommendation, setReviewRouteRecommendation] = useState<RouteRecommendationView | null>(null);
+  const [secondPassRouteRecommendation, setSecondPassRouteRecommendation] = useState<RouteRecommendationView | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [runningAction, setRunningAction] = useState<"review" | "second_pass" | null>(null);
   const [lastBudgetAction, setLastBudgetAction] = useState<"review" | "second_pass" | null>(null);
+  const [applyingRouteType, setApplyingRouteType] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const reviewReadyIds = useMemo(
     () => queue?.candidates.filter((candidate) => candidate.reviewStatus === "ready").map((candidate) => candidate.chapterId) ?? [],
@@ -147,11 +165,15 @@ export function BatchReviewPipelinePanel({ projectId }: { projectId: string }) {
         activeProvider: ActiveProvider;
         reviewBudgetPreview?: BudgetPreviewView;
         secondPassBudgetPreview?: BudgetPreviewView;
+        reviewRouteRecommendation?: RouteRecommendationView | null;
+        secondPassRouteRecommendation?: RouteRecommendationView | null;
       };
       setQueue(payload.queue);
       setActiveProvider(payload.activeProvider);
       if (payload.reviewBudgetPreview) setReviewBudgetPreview(payload.reviewBudgetPreview);
       if (payload.secondPassBudgetPreview) setSecondPassBudgetPreview(payload.secondPassBudgetPreview);
+      setReviewRouteRecommendation(payload.reviewRouteRecommendation ?? null);
+      setSecondPassRouteRecommendation(payload.secondPassRouteRecommendation ?? null);
       setSelectedReviewIds((current) => {
         const kept = current.filter((chapterId) => payload.queue.recommendedReviewChapterIds.includes(chapterId));
         return kept.length ? kept : payload.queue.recommendedReviewChapterIds;
@@ -189,11 +211,15 @@ export function BatchReviewPipelinePanel({ projectId }: { projectId: string }) {
         budgetGuard?: BudgetGuardView;
         reviewBudgetPreview?: BudgetPreviewView;
         secondPassBudgetPreview?: BudgetPreviewView;
+        reviewRouteRecommendation?: RouteRecommendationView | null;
+        secondPassRouteRecommendation?: RouteRecommendationView | null;
       };
       if (!response.ok) {
         if (payload.budgetGuard) setBudgetGuard(payload.budgetGuard);
         if (payload.reviewBudgetPreview) setReviewBudgetPreview(payload.reviewBudgetPreview);
         if (payload.secondPassBudgetPreview) setSecondPassBudgetPreview(payload.secondPassBudgetPreview);
+        setReviewRouteRecommendation(payload.reviewRouteRecommendation ?? null);
+        setSecondPassRouteRecommendation(payload.secondPassRouteRecommendation ?? null);
         throw new Error([payload.error, ...(payload.guard?.warnings ?? [])].filter(Boolean).join(" "));
       }
       setResults(payload.results ?? []);
@@ -201,6 +227,8 @@ export function BatchReviewPipelinePanel({ projectId }: { projectId: string }) {
       if (payload.activeProvider) setActiveProvider(payload.activeProvider);
       if (payload.reviewBudgetPreview) setReviewBudgetPreview(payload.reviewBudgetPreview);
       if (payload.secondPassBudgetPreview) setSecondPassBudgetPreview(payload.secondPassBudgetPreview);
+      setReviewRouteRecommendation(payload.reviewRouteRecommendation ?? null);
+      setSecondPassRouteRecommendation(payload.secondPassRouteRecommendation ?? null);
       setSelectedReviewIds(payload.queue?.recommendedReviewChapterIds ?? []);
       setSelectedSecondPassIds(payload.queue?.recommendedSecondPassChapterIds ?? []);
       const succeeded = (payload.results ?? []).filter((result) => result.status === "succeeded").length;
@@ -335,6 +363,58 @@ export function BatchReviewPipelinePanel({ projectId }: { projectId: string }) {
     );
   }
 
+  async function applyRouteRecommendation(action: "review" | "second_pass") {
+    const recommendation = action === "review" ? reviewRouteRecommendation : secondPassRouteRecommendation;
+    if (!recommendation?.recommendedPrimaryProviderConfigId) return;
+    setApplyingRouteType(recommendation.taskType);
+    setMessage(null);
+    try {
+      const response = await fetch("/api/model-task-routes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          taskType: recommendation.taskType,
+          primaryProviderConfigId: recommendation.recommendedPrimaryProviderConfigId,
+          fallbackProviderConfigId: recommendation.recommendedFallbackProviderConfigId,
+        }),
+      });
+      if (!response.ok) throw new Error("应用模型路线失败。");
+      await loadQueue();
+      setMessage(`已应用「${recommendation.label}」模型路线。`);
+    } catch (caught) {
+      setMessage(caught instanceof Error ? caught.message : "应用模型路线失败。");
+    } finally {
+      setApplyingRouteType(null);
+    }
+  }
+
+  function renderRouteRecommendation(action: "review" | "second_pass") {
+    const recommendation = action === "review" ? reviewRouteRecommendation : secondPassRouteRecommendation;
+    if (recommendation?.status !== "ready") return null;
+
+    return (
+      <div className="rounded-md border border-cyan-200 bg-cyan-50 p-3 text-cyan-900">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="font-medium">模型路线建议</div>
+          <button
+            className="rounded-md bg-cyan-950 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50"
+            disabled={Boolean(runningAction) || applyingRouteType === recommendation.taskType}
+            onClick={() => applyRouteRecommendation(action)}
+            type="button"
+          >
+            {applyingRouteType === recommendation.taskType ? "应用中" : "先应用路线"}
+          </button>
+        </div>
+        <div className="mt-2 grid gap-1 text-xs">
+          <div>首选：{recommendation.primaryProviderName}</div>
+          <div>备用：{recommendation.fallbackProviderName ?? "暂无"}</div>
+          <div>样本 {recommendation.sampleTasks} · 成功 {recommendation.successRatePercent}% · 质量 {recommendation.averageQualityScore || "缺"} · {usd(recommendation.averageCostPerSucceededTaskUsd)}/次</div>
+          <div>{recommendation.reason}</div>
+        </div>
+      </div>
+    );
+  }
+
   useEffect(() => {
     void loadQueue();
   }, [projectId]);
@@ -419,6 +499,7 @@ export function BatchReviewPipelinePanel({ projectId }: { projectId: string }) {
             >
               {runningAction === "review" ? "审稿中" : "开始批量审稿"}
             </button>
+            {renderRouteRecommendation("review")}
             {renderBudgetPreview("review")}
           </div>
         </div>
@@ -453,6 +534,7 @@ export function BatchReviewPipelinePanel({ projectId }: { projectId: string }) {
             >
               {runningAction === "second_pass" ? "二改中" : "开始批量二改"}
             </button>
+            {renderRouteRecommendation("second_pass")}
             {renderBudgetPreview("second_pass")}
           </div>
         </div>

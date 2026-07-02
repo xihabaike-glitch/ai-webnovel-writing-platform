@@ -7,6 +7,7 @@ import { generateChapterDraft } from "@/lib/ai/chapterDraftGeneration";
 import { buildModelBudgetGuard } from "@/lib/ai/modelBudget";
 import { prisma } from "@/lib/db/prisma";
 import { getActiveModelProvider } from "@/lib/model-gateway/activeProvider";
+import { buildRouteRecommendations } from "@/lib/model-gateway/routeRecommendations";
 import { getPlatformProfile, type PlatformId } from "@/lib/platforms/platformProfiles";
 
 interface Params {
@@ -66,6 +67,47 @@ async function getRecentBudgetTasks(projectId: string) {
   });
 }
 
+async function getRouteRecommendation(projectId: string) {
+  const [tasks, routes, providers] = await Promise.all([
+    prisma.aiTask.findMany({
+      where: { projectId },
+      orderBy: { createdAt: "desc" },
+      take: 500,
+      select: {
+        id: true,
+        taskType: true,
+        providerConfigId: true,
+        status: true,
+        inputTokens: true,
+        outputTokens: true,
+        costUsd: true,
+        outputText: true,
+      },
+    }),
+    prisma.modelTaskRoute.findMany({
+      orderBy: { taskType: "asc" },
+      select: {
+        taskType: true,
+        primaryProviderConfigId: true,
+        fallbackProviderConfigId: true,
+      },
+    }),
+    prisma.modelProvider.findMany({
+      orderBy: [{ enabled: "desc" }, { updatedAt: "desc" }],
+      select: {
+        id: true,
+        providerId: true,
+        displayName: true,
+        defaultModel: true,
+        enabled: true,
+        encryptedApiKey: true,
+      },
+    }),
+  ]);
+
+  return buildRouteRecommendations(tasks, routes, providers).find((recommendation) => recommendation.taskType === "chapter_draft") ?? null;
+}
+
 function buildBudgetPreview(
   project: Project,
   queue: BatchDraftQueue,
@@ -95,6 +137,7 @@ export async function GET(_request: Request, { params }: Params) {
     queue,
     activeProvider: await activeProviderView(),
     budgetPreview: buildBudgetPreview(project, queue, recentTasks),
+    routeRecommendation: await getRouteRecommendation(projectId),
   });
 }
 
@@ -140,6 +183,7 @@ export async function POST(request: Request, { params }: Params) {
       queue,
       activeProvider: await activeProviderView(),
       budgetPreview: buildBudgetPreview(project, queue, recentTasks),
+      routeRecommendation: await getRouteRecommendation(projectId),
     }, { status: 429 });
   }
   const budgetGuard = buildModelBudgetGuard({
@@ -155,6 +199,7 @@ export async function POST(request: Request, { params }: Params) {
       queue,
       activeProvider: await activeProviderView(),
       budgetPreview: buildBudgetPreview(project, queue, recentTasks),
+      routeRecommendation: await getRouteRecommendation(projectId),
     }, { status: 429 });
   }
 
@@ -185,5 +230,6 @@ export async function POST(request: Request, { params }: Params) {
     queue: nextQueue,
     activeProvider: await activeProviderView(),
     budgetPreview: buildBudgetPreview(project, nextQueue, nextRecentTasks),
+    routeRecommendation: await getRouteRecommendation(projectId),
   });
 }

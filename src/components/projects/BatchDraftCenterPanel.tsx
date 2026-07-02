@@ -73,6 +73,21 @@ interface BudgetPreviewView extends BudgetGuardView {
   failureRatePercent: number;
 }
 
+interface RouteRecommendationView {
+  taskType: string;
+  label: string;
+  status: "ready" | "current" | "insufficient";
+  recommendedPrimaryProviderConfigId: string | null;
+  recommendedFallbackProviderConfigId: string | null;
+  primaryProviderName: string;
+  fallbackProviderName: string | null;
+  sampleTasks: number;
+  successRatePercent: number;
+  averageQualityScore: number;
+  averageCostPerSucceededTaskUsd: number;
+  reason: string;
+}
+
 function statusLabel(status: BatchDraftCandidate["status"]) {
   const labels = {
     ready: "可生成",
@@ -92,8 +107,10 @@ export function BatchDraftCenterPanel({ projectId }: { projectId: string }) {
   const [results, setResults] = useState<BatchDraftResult[]>([]);
   const [budgetGuard, setBudgetGuard] = useState<BudgetGuardView | null>(null);
   const [budgetPreview, setBudgetPreview] = useState<BudgetPreviewView | null>(null);
+  const [routeRecommendation, setRouteRecommendation] = useState<RouteRecommendationView | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isApplyingRoute, setIsApplyingRoute] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const readyIds = useMemo(
     () => queue?.candidates.filter((candidate) => candidate.status === "ready").map((candidate) => candidate.chapterId) ?? [],
@@ -116,10 +133,12 @@ export function BatchDraftCenterPanel({ projectId }: { projectId: string }) {
         queue: BatchDraftQueue;
         activeProvider: ActiveProvider;
         budgetPreview?: BudgetPreviewView;
+        routeRecommendation?: RouteRecommendationView | null;
       };
       setQueue(payload.queue);
       setActiveProvider(payload.activeProvider);
       if (payload.budgetPreview) setBudgetPreview(payload.budgetPreview);
+      setRouteRecommendation(payload.routeRecommendation ?? null);
       setSelectedIds((current) => {
         const kept = current.filter((chapterId) => payload.queue.recommendedChapterIds.includes(chapterId));
         return kept.length ? kept : payload.queue.recommendedChapterIds;
@@ -150,16 +169,19 @@ export function BatchDraftCenterPanel({ projectId }: { projectId: string }) {
         guard?: { warnings?: string[] };
         budgetGuard?: BudgetGuardView;
         budgetPreview?: BudgetPreviewView;
+        routeRecommendation?: RouteRecommendationView | null;
       };
       if (!response.ok) {
         if (payload.budgetGuard) setBudgetGuard(payload.budgetGuard);
         if (payload.budgetPreview) setBudgetPreview(payload.budgetPreview);
+        setRouteRecommendation(payload.routeRecommendation ?? null);
         throw new Error([payload.error, ...(payload.guard?.warnings ?? [])].filter(Boolean).join(" "));
       }
       setResults(payload.results ?? []);
       if (payload.queue) setQueue(payload.queue);
       if (payload.activeProvider) setActiveProvider(payload.activeProvider);
       if (payload.budgetPreview) setBudgetPreview(payload.budgetPreview);
+      setRouteRecommendation(payload.routeRecommendation ?? null);
       setSelectedIds(payload.queue?.recommendedChapterIds ?? []);
       const succeeded = (payload.results ?? []).filter((result) => result.status === "succeeded").length;
       const failed = (payload.results ?? []).filter((result) => result.status === "failed").length;
@@ -239,6 +261,30 @@ export function BatchDraftCenterPanel({ projectId }: { projectId: string }) {
     const sourceIds = selectedIds.length >= nextSize ? selectedIds : readyIds;
     setSelectedIds(sourceIds.slice(0, nextSize));
     setMessage(`已按预算预估选择 ${nextSize} 章。`);
+  }
+
+  async function applyRouteRecommendation() {
+    if (!routeRecommendation?.recommendedPrimaryProviderConfigId) return;
+    setIsApplyingRoute(true);
+    setMessage(null);
+    try {
+      const response = await fetch("/api/model-task-routes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          taskType: routeRecommendation.taskType,
+          primaryProviderConfigId: routeRecommendation.recommendedPrimaryProviderConfigId,
+          fallbackProviderConfigId: routeRecommendation.recommendedFallbackProviderConfigId,
+        }),
+      });
+      if (!response.ok) throw new Error("应用初稿模型路线失败。");
+      await loadQueue();
+      setMessage(`已应用「${routeRecommendation.label}」模型路线。`);
+    } catch (caught) {
+      setMessage(caught instanceof Error ? caught.message : "应用初稿模型路线失败。");
+    } finally {
+      setIsApplyingRoute(false);
+    }
   }
 
   useEffect(() => {
@@ -355,6 +401,27 @@ export function BatchDraftCenterPanel({ projectId }: { projectId: string }) {
                 <div className="rounded-md bg-slate-50 p-2" key={warning}>{warning}</div>
               ))}
             </div>
+            {routeRecommendation?.status === "ready" ? (
+              <div className="rounded-md border border-cyan-200 bg-cyan-50 p-3 text-cyan-900">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="font-medium">模型路线建议</div>
+                  <button
+                    className="rounded-md bg-cyan-950 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50"
+                    disabled={isApplyingRoute || isGenerating}
+                    onClick={applyRouteRecommendation}
+                    type="button"
+                  >
+                    {isApplyingRoute ? "应用中" : "先应用路线"}
+                  </button>
+                </div>
+                <div className="mt-2 grid gap-1 text-xs">
+                  <div>首选：{routeRecommendation.primaryProviderName}</div>
+                  <div>备用：{routeRecommendation.fallbackProviderName ?? "暂无"}</div>
+                  <div>样本 {routeRecommendation.sampleTasks} · 成功 {routeRecommendation.successRatePercent}% · 质量 {routeRecommendation.averageQualityScore || "缺"} · {usd(routeRecommendation.averageCostPerSucceededTaskUsd)}/次</div>
+                  <div>{routeRecommendation.reason}</div>
+                </div>
+              </div>
+            ) : null}
             {budgetPreview ? (
               <div className={`rounded-md border p-3 ${previewTone(budgetPreview.status)}`}>
                 <div className="flex flex-wrap items-center justify-between gap-2">

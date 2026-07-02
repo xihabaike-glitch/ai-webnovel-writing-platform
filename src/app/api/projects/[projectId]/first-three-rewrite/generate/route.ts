@@ -4,7 +4,7 @@ import { prisma } from "@/lib/db/prisma";
 import { getActiveModelProvider } from "@/lib/model-gateway/activeProvider";
 import type { ModelProviderId } from "@/lib/model-gateway/types";
 import { getPlatformProfile, type PlatformId } from "@/lib/platforms/platformProfiles";
-import { buildFirstThreeRewritePackage } from "@/lib/projects/firstThreeRewrite";
+import { buildFirstThreeRewriteEvaluation, buildFirstThreeRewritePackage } from "@/lib/projects/firstThreeRewrite";
 import { countWords } from "@/lib/text/wordCount";
 
 interface Params {
@@ -179,6 +179,11 @@ export async function POST(request: Request, { params }: Params) {
         task: updatedTask,
         chapter: updatedChapter,
         content: generated.text,
+        evaluation: buildFirstThreeRewriteEvaluation({
+          platform,
+          before: chapter,
+          after: updatedChapter,
+        }),
       });
     } catch (caught) {
       const message = caught instanceof Error ? caught.message : "Unknown first-three rewrite error";

@@ -1,3 +1,5 @@
+import { buildPlatformStyleScore, type PlatformStyleScoreItem } from "../chapters/platformStyleScore.ts";
+import { previewRevisionContent } from "../chapters/revisions.ts";
 import type { PlatformProfile } from "../platforms/platformProfiles.ts";
 import {
   buildRetentionDiagnostic,
@@ -48,6 +50,41 @@ export interface FirstThreeRewritePackage {
   structureMoves: StructureMove[];
   platformPrescriptions: PlatformPrescription[];
   markdown: string;
+}
+
+export interface FirstThreeRewriteComparableChapter {
+  title: string;
+  content: string;
+  wordCount: number;
+  goal: string;
+  hook: string;
+  conflict: string;
+  valueShift?: string;
+  cliffhanger: string;
+  status: string;
+}
+
+export interface FirstThreeRewriteScoreItemDelta {
+  id: string;
+  label: string;
+  before: number;
+  after: number;
+  delta: number;
+  status: PlatformStyleScoreItem["status"];
+  suggestion: string;
+}
+
+export interface FirstThreeRewriteEvaluation {
+  beforeScore: number;
+  afterScore: number;
+  scoreDelta: number;
+  wordDelta: number;
+  changedFields: string[];
+  oldPreview: string;
+  newPreview: string;
+  verdict: string;
+  itemDeltas: FirstThreeRewriteScoreItemDelta[];
+  priorityFixes: string[];
 }
 
 const fallbackChapters: RetentionChapter[] = [
@@ -339,6 +376,86 @@ function buildMarkdown(input: FirstThreeRewriteInput, pack: Omit<FirstThreeRewri
     ...pack.platformPrescriptions.map((item) => `- ${item.label}：${item.instruction}`),
     "",
   ].join("\n");
+}
+
+function fieldChanged(before: string | undefined, after: string | undefined) {
+  return compact(before ?? "") !== compact(after ?? "");
+}
+
+function evaluationVerdict(scoreDelta: number, afterScore: number, changedFields: string[]) {
+  if (afterScore >= 85 && scoreDelta >= 10) return "改写收益明显，已经接近可投开局，下一步看正文阅读感和章末追读。";
+  if (afterScore >= 75 && scoreDelta > 0) return "改写有效，但还要人工检查正文是否真的兑现了钩子和爽点。";
+  if (scoreDelta <= 0) return "平台分没有提升，别急着采纳，优先回看钩子、冲突和章末悬念。";
+  if (changedFields.length <= 2) return "只改到了少数字段，收益有限，建议再补一次结构性重写。";
+  return "改写有提升，但仍未到稳态发布线，继续压强第一屏和章末追读。";
+}
+
+export function buildFirstThreeRewriteEvaluation(input: {
+  platform: PlatformProfile;
+  before: FirstThreeRewriteComparableChapter;
+  after: FirstThreeRewriteComparableChapter;
+}): FirstThreeRewriteEvaluation {
+  const beforeScore = buildPlatformStyleScore({
+    platform: input.platform,
+    chapter: {
+      ...input.before,
+      valueShift: input.before.valueShift ?? "",
+    },
+  });
+  const afterScore = buildPlatformStyleScore({
+    platform: input.platform,
+    chapter: {
+      ...input.after,
+      valueShift: input.after.valueShift ?? "",
+    },
+  });
+  const beforeItems = new Map(beforeScore.items.map((item) => [item.id, item]));
+  const itemDeltas = afterScore.items.map((item) => {
+    const beforeItem = beforeItems.get(item.id);
+    const before = beforeItem?.score ?? 0;
+    return {
+      id: item.id,
+      label: item.label,
+      before,
+      after: item.score,
+      delta: item.score - before,
+      status: item.status,
+      suggestion: item.suggestion,
+    };
+  });
+  const changedFields = [
+    ["title", "标题"],
+    ["content", "正文"],
+    ["goal", "章节目标"],
+    ["hook", "开头钩子"],
+    ["conflict", "冲突"],
+    ["valueShift", "价值变化"],
+    ["cliffhanger", "章末悬念"],
+    ["status", "状态"],
+  ] as const;
+  const changedFieldLabels = changedFields
+    .filter(([field]) => {
+      const before = input.before[field];
+      const after = input.after[field];
+      return typeof before === "number" || typeof after === "number"
+        ? before !== after
+        : fieldChanged(before?.toString(), after?.toString());
+    })
+    .map(([, label]) => label);
+  const scoreDelta = afterScore.score - beforeScore.score;
+
+  return {
+    beforeScore: beforeScore.score,
+    afterScore: afterScore.score,
+    scoreDelta,
+    wordDelta: input.after.wordCount - input.before.wordCount,
+    changedFields: changedFieldLabels,
+    oldPreview: previewRevisionContent(input.before.content),
+    newPreview: previewRevisionContent(input.after.content),
+    verdict: evaluationVerdict(scoreDelta, afterScore.score, changedFieldLabels),
+    itemDeltas,
+    priorityFixes: afterScore.priorityFixes,
+  };
 }
 
 export function buildFirstThreeRewritePackage(input: FirstThreeRewriteInput): FirstThreeRewritePackage {

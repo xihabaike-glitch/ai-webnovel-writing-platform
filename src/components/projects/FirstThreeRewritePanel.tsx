@@ -61,6 +61,7 @@ interface GeneratedRewriteResult {
     status: string;
   };
   content: string;
+  evaluation?: FirstThreeRewriteEvaluation;
 }
 
 interface GenerateRewriteResponse {
@@ -72,6 +73,29 @@ interface GenerateRewriteResponse {
   results: GeneratedRewriteResult[];
 }
 
+interface FirstThreeRewriteEvaluationItem {
+  id: string;
+  label: string;
+  before: number;
+  after: number;
+  delta: number;
+  status: "pass" | "warn" | "fail";
+  suggestion: string;
+}
+
+interface FirstThreeRewriteEvaluation {
+  beforeScore: number;
+  afterScore: number;
+  scoreDelta: number;
+  wordDelta: number;
+  changedFields: string[];
+  oldPreview: string;
+  newPreview: string;
+  verdict: string;
+  itemDeltas: FirstThreeRewriteEvaluationItem[];
+  priorityFixes: string[];
+}
+
 function priorityLabel(priority: ChapterRewritePlan["priority"]) {
   const labels = {
     high: "高优先级",
@@ -79,6 +103,17 @@ function priorityLabel(priority: ChapterRewritePlan["priority"]) {
     low: "低优先级",
   };
   return labels[priority];
+}
+
+function signedNumber(value: number) {
+  if (value > 0) return `+${value}`;
+  return `${value}`;
+}
+
+function evaluationTone(delta: number) {
+  if (delta > 0) return "text-emerald-700";
+  if (delta < 0) return "text-rose-700";
+  return "text-slate-600";
 }
 
 export function FirstThreeRewritePanel({ projectId }: { projectId: string }) {
@@ -295,6 +330,46 @@ export function FirstThreeRewritePanel({ projectId }: { projectId: string }) {
                       </Link>
                     </div>
                     <p className="mt-2 line-clamp-4 text-slate-600">{result.content}</p>
+                    {result.evaluation ? (
+                      <div className="mt-3 grid gap-3 border-t border-slate-200 pt-3">
+                        <div className="grid grid-cols-3 gap-2 text-xs">
+                          <div>
+                            <div className="text-slate-500">平台分</div>
+                            <div className="mt-1 font-medium text-slate-950">
+                              {result.evaluation.beforeScore} → {result.evaluation.afterScore}
+                            </div>
+                          </div>
+                          <div>
+                            <div className="text-slate-500">提升</div>
+                            <div className={`mt-1 font-medium ${evaluationTone(result.evaluation.scoreDelta)}`}>
+                              {signedNumber(result.evaluation.scoreDelta)}
+                            </div>
+                          </div>
+                          <div>
+                            <div className="text-slate-500">字数</div>
+                            <div className={`mt-1 font-medium ${evaluationTone(result.evaluation.wordDelta)}`}>
+                              {signedNumber(result.evaluation.wordDelta)}
+                            </div>
+                          </div>
+                        </div>
+                        <p className="text-xs leading-5 text-slate-600">{result.evaluation.verdict}</p>
+                        <div className="grid gap-2 text-xs text-slate-500">
+                          <div>改动：{result.evaluation.changedFields.slice(0, 5).join("、") || "暂无明显字段变化"}</div>
+                          <div>旧稿：{result.evaluation.oldPreview}</div>
+                          <div>新稿：{result.evaluation.newPreview}</div>
+                        </div>
+                        <div className="grid gap-1 text-xs">
+                          {result.evaluation.itemDeltas.slice(0, 3).map((item) => (
+                            <div className="flex items-center justify-between gap-2 text-slate-600" key={item.id}>
+                              <span>{item.label}</span>
+                              <span className={evaluationTone(item.delta)}>
+                                {item.before} → {item.after}（{signedNumber(item.delta)}）
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ) : null}
                   </div>
                 ))}
               </div>

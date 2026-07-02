@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { getPlatformProfile } from "../lib/platforms/platformProfiles.ts";
-import { buildFirstThreeRewritePackage } from "../lib/projects/firstThreeRewrite.ts";
+import { buildFirstThreeRewriteEvaluation, buildFirstThreeRewritePackage } from "../lib/projects/firstThreeRewrite.ts";
 import type { RetentionChapter } from "../lib/projects/retentionDiagnostic.ts";
 
 const strongChapters: RetentionChapter[] = [
@@ -79,5 +79,42 @@ test("buildFirstThreeRewritePackage", async (t) => {
     assert.ok(result.chapterPlans.some((plan) => plan.chapterId === "missing-2"));
     assert.ok(result.structureMoves.some((move) => move.id === "rebuild-cliffhanger-chain"));
     assert.ok(result.markdown.includes("起点中文网"));
+  });
+
+  await t.test("evaluates before and after platform rewrite gains", () => {
+    const evaluation = buildFirstThreeRewriteEvaluation({
+      platform: getPlatformProfile("fanqie"),
+      before: {
+        title: "雨夜",
+        content: "林晚醒来，天色很暗。",
+        wordCount: 200,
+        goal: "",
+        hook: "",
+        conflict: "",
+        valueShift: "",
+        cliffhanger: "",
+        status: "outline",
+      },
+      after: {
+        title: "雨夜系统",
+        content: "系统倒计时只剩十秒，林晚必须在逃跑和救人之间选择，否则任务惩罚会立刻抹掉她的记忆。",
+        wordCount: 1600,
+        goal: "让主角在雨夜被系统逼入不可逆选择。",
+        hook: "系统倒计时只剩十秒。",
+        conflict: "主角必须在逃跑和救人之间选择，否则会失去记忆。",
+        valueShift: "从被动逃避转向主动救人。",
+        cliffhanger: "系统刷新第二个任务，目标名字出现在名单背面。",
+        status: "draft",
+      },
+    });
+
+    assert.ok(evaluation.afterScore > evaluation.beforeScore);
+    assert.ok(evaluation.scoreDelta > 0);
+    assert.equal(evaluation.wordDelta, 1400);
+    assert.ok(evaluation.changedFields.includes("开头钩子"));
+    assert.ok(evaluation.itemDeltas.some((item) => item.id === "opening-hook" && item.delta > 0));
+    assert.ok(evaluation.oldPreview.includes("林晚醒来"));
+    assert.ok(evaluation.newPreview.includes("系统倒计时"));
+    assert.ok(evaluation.verdict.length > 0);
   });
 });

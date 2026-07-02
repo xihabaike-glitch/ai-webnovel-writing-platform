@@ -565,9 +565,80 @@ test("buildPlatformPublishExportCenter", async (t) => {
     assert.ok(firstTask.rankReason.includes("投稿资产"));
     assert.equal(center.platformStrategy[0].reviewDecision.nextPlan.steps[0].taskId, firstTask.id);
     assert.equal(center.platformStrategy[0].reviewDecision.nextPlan.steps[0].dayLabel, "今天");
+    assert.equal(center.platformStrategy[0].reviewDecision.nextPlan.steps[0].status, "next");
     assert.equal(center.platformStrategy[0].reviewDecision.nextPlan.steps[2].dayLabel, "第7天");
     assert.equal(center.platformStrategy[0].reviewDecision.nextPlan.steps[2].href, "#platform-strategy-ranking");
     assert.ok(center.platformStrategy[0].reviewDecision.nextPlan.checkpoint.includes("第 7 天"));
+  });
+
+  await t.test("advances review plan status from completed evidence", () => {
+    const center = buildPlatformPublishExportCenter({
+      project: {
+        title: "夜雨系统",
+        genre: "都市系统",
+        sellingPoint: "雨夜危机中觉醒系统，主角用选择翻盘。",
+        currentWordCount: 9000,
+        targetWordCount: 300000,
+      },
+      targetPlatform: getPlatformProfile("fanqie"),
+      chapters: finalChapters,
+      aiTasks: passedReviews,
+      submissionChecklist: readyChecklist,
+      platforms: [getPlatformProfile("fanqie")],
+      submissionAssets: [
+        {
+          id: "asset-ready",
+          platformId: "fanqie",
+          platformName: "番茄小说",
+          title: "夜雨系统：倒计时重生",
+          logline: "雨夜倒计时逼她选择，林晚把系统惩罚打成翻盘爽点。",
+          synopsis: "林晚在雨夜绑定倒计时系统，每一次选择都牵动生死、复仇和悬疑真相。她从被迫救人开始，一步步摸清系统规则，把惩罚变成筹码，把背叛者拖回真相现场，并在连续任务中建立稳定目标：查清当年事故、保护真正重要的人、夺回属于自己的命运。",
+          overseasSynopsis: "Night Rain System follows Lin Wan through timed choices.",
+          tags: ["系统", "逆袭", "悬疑"],
+          note: "资产已过审。",
+          source: "manual",
+          updatedAt: "2026-01-09T08:00:00.000Z",
+        },
+      ],
+      publishSnapshots: [
+        {
+          id: "snapshot-ready",
+          platformId: "fanqie",
+          platformName: "番茄小说",
+          title: "夜雨系统",
+          action: "snapshot",
+          chapterCount: 3,
+          wordCount: 7800,
+          preflightScore: 95,
+          canExport: true,
+          createdAt: "2026-01-09T09:00:00.000Z",
+        },
+      ],
+      platformPublishMetrics: [
+        {
+          id: "metric-ready",
+          platformId: "fanqie",
+          platformName: "番茄小说",
+          views: 1000,
+          clicks: 180,
+          favorites: 60,
+          follows: 30,
+          comments: 8,
+          paidReads: 0,
+          editorFeedback: "继续观察。",
+          contractStatus: "pending",
+          publishUrl: "",
+          notes: "首轮数据。",
+          snapshotDate: "2026-01-10T08:00:00.000Z",
+        },
+      ],
+    });
+    const plan = center.platformStrategy[0].reviewDecision.nextPlan;
+
+    assert.equal(plan.completedSteps >= 1, true);
+    assert.equal(plan.steps[0].status, "done");
+    assert.equal(plan.currentStepId, plan.steps.find((step) => step.status === "next")?.id ?? null);
+    assert.ok(plan.currentStepLabel);
   });
 
   await t.test("scores platform submission asset fields", () => {
@@ -1012,6 +1083,11 @@ test("buildPlatformPublishExportCenter", async (t) => {
         nextPlan: {
           headline: "七猫 下一轮计划：小步改、留证据、第 7 天再判断。",
           cadence: "seven_day" as const,
+          status: "complete" as const,
+          completedSteps: 0,
+          totalSteps: 0,
+          currentStepId: null,
+          currentStepLabel: "回排行榜做最终判断",
           checkpoint: "第 7 天必须看策略分、真实数据和版本对照，再决定加码/迭代/修打法/撤退。",
           steps: [],
         },

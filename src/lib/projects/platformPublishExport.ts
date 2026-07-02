@@ -407,6 +407,11 @@ export interface PlatformStrategyReviewHistoryItem {
 export interface PlatformStrategyReviewPlan {
   headline: string;
   cadence: "three_step" | "seven_day";
+  status: "in_progress" | "complete";
+  completedSteps: number;
+  totalSteps: number;
+  currentStepId: string | null;
+  currentStepLabel: string;
   checkpoint: string;
   steps: PlatformStrategyReviewPlanStep[];
 }
@@ -417,6 +422,7 @@ export interface PlatformStrategyReviewPlanStep {
   taskId: string;
   label: string;
   detail: string;
+  status: "done" | "next" | "queued";
   href: string;
   expectedSignal: string;
 }
@@ -1100,6 +1106,19 @@ function reviewPlanSignal(task: PlatformStrategyReviewTask) {
   return "当前卡点有明确处理记录。";
 }
 
+function reviewPlanTaskDone(pack: PlatformPublishPackage, task: PlatformStrategyReviewTask, isCheckpoint: boolean) {
+  if (isCheckpoint) return false;
+  if (task.execution === "save_snapshot") return pack.publishVersions.length > 0;
+  if (task.execution === "rewrite_first_three") return pack.canExport;
+  if (task.execution === "generate_asset_variants") {
+    if (task.id === "check-platform-asset") return pack.submissionAssetAudit.status === "ready";
+    return pack.submissionAssetAdoption.adoptedVersions > 0 || pack.submissionAssetAudit.status === "ready";
+  }
+  if (task.execution === "open_target" && task.rankTarget === "effect") return pack.publishEffect.records > 0;
+  if (task.execution === "open_target" && task.rankTarget === "evidence") return pack.publishVersions.length > 0;
+  return false;
+}
+
 function buildPlatformStrategyReviewPlan(
   pack: PlatformPublishPackage,
   decisionKind: PlatformStrategyReviewDecision["kind"],
@@ -1119,20 +1138,33 @@ function buildPlatformStrategyReviewPlan(
   };
   const steps = dayLabels.map((dayLabel, index) => {
     const task = selectedTasks[index] ?? fallbackTask;
+    const isCheckpoint = index === 2 && selectedTasks.length >= 2;
     return {
       id: `${task.id}-${index + 1}`,
       dayLabel,
       taskId: task.id,
       label: task.label,
-      detail: index === 2 && selectedTasks.length >= 2
+      detail: isCheckpoint
         ? "别继续闷头改，第 7 天必须回看数据和策略分变化。"
         : task.detail,
-      href: index === 2 && selectedTasks.length >= 2 ? "#platform-strategy-ranking" : task.href,
-      expectedSignal: index === 2 && selectedTasks.length >= 2
+      status: reviewPlanTaskDone(pack, task, isCheckpoint) ? "done" as const : "queued" as const,
+      href: isCheckpoint ? "#platform-strategy-ranking" : task.href,
+      expectedSignal: isCheckpoint
         ? "根据策略分变化决定继续加码、小步迭代、先修打法或换方向。"
         : reviewPlanSignal(task),
     };
   });
+  const nextStepIndex = steps.findIndex((step) => step.status !== "done");
+  const statusSteps = steps.map((step, index) => ({
+    ...step,
+    status: step.status === "done"
+      ? "done" as const
+      : index === nextStepIndex
+        ? "next" as const
+        : "queued" as const,
+  }));
+  const completedSteps = statusSteps.filter((step) => step.status === "done").length;
+  const currentStep = statusSteps.find((step) => step.status === "next") ?? null;
   const headline = decisionKind === "scale"
     ? `${pack.platformName} 下一轮计划：别乱改，先保护有效信号再放大。`
     : decisionKind === "collect"
@@ -1146,8 +1178,13 @@ function buildPlatformStrategyReviewPlan(
   return {
     headline,
     cadence: "seven_day",
+    status: currentStep ? "in_progress" : "complete",
+    completedSteps,
+    totalSteps: statusSteps.length,
+    currentStepId: currentStep?.id ?? null,
+    currentStepLabel: currentStep?.label ?? "回排行榜做最终判断",
     checkpoint: "第 7 天必须看策略分、真实数据和版本对照，再决定加码/迭代/修打法/撤退。",
-    steps,
+    steps: statusSteps,
   };
 }
 

@@ -397,6 +397,11 @@ interface PlatformStrategyReviewHistoryItem {
 interface PlatformStrategyReviewPlan {
   headline: string;
   cadence: "three_step" | "seven_day";
+  status: "in_progress" | "complete";
+  completedSteps: number;
+  totalSteps: number;
+  currentStepId: string | null;
+  currentStepLabel: string;
   checkpoint: string;
   steps: PlatformStrategyReviewPlanStep[];
 }
@@ -407,6 +412,7 @@ interface PlatformStrategyReviewPlanStep {
   taskId: string;
   label: string;
   detail: string;
+  status: "done" | "next" | "queued";
   href: string;
   expectedSignal: string;
 }
@@ -781,6 +787,18 @@ function switchStepStatusLabel(status: PlatformStrategySwitchStep["status"]) {
 }
 
 function switchStepStatusClass(status: PlatformStrategySwitchStep["status"]) {
+  if (status === "done") return "bg-emerald-50 text-emerald-700";
+  if (status === "next") return "bg-amber-50 text-amber-700";
+  return "bg-slate-100 text-slate-600";
+}
+
+function reviewPlanStepStatusLabel(status: PlatformStrategyReviewPlanStep["status"]) {
+  if (status === "done") return "已完成";
+  if (status === "next") return "现在做";
+  return "排队中";
+}
+
+function reviewPlanStepStatusClass(status: PlatformStrategyReviewPlanStep["status"]) {
   if (status === "done") return "bg-emerald-50 text-emerald-700";
   if (status === "next") return "bg-amber-50 text-amber-700";
   return "bg-slate-100 text-slate-600";
@@ -1874,7 +1892,21 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
                       ) : null}
                       {item.reviewDecision.nextPlan.steps.length ? (
                         <div className="mt-3 border-t border-slate-100 pt-2">
-                          <div className="font-medium text-slate-800">{item.reviewDecision.nextPlan.headline}</div>
+                          <div className="flex flex-wrap items-start justify-between gap-2">
+                            <div>
+                              <div className="font-medium text-slate-800">{item.reviewDecision.nextPlan.headline}</div>
+                              <div className="mt-1 text-slate-500">
+                                进度 {item.reviewDecision.nextPlan.completedSteps}/{item.reviewDecision.nextPlan.totalSteps} · 当前：{item.reviewDecision.nextPlan.currentStepLabel}
+                              </div>
+                            </div>
+                            <span className={`rounded-md px-2 py-1 text-[11px] font-medium ${
+                              item.reviewDecision.nextPlan.status === "complete"
+                                ? "bg-emerald-50 text-emerald-700"
+                                : "bg-amber-50 text-amber-700"
+                            }`}>
+                              {item.reviewDecision.nextPlan.status === "complete" ? "计划完成" : "执行中"}
+                            </span>
+                          </div>
                           <div className="mt-2 grid gap-1.5">
                             {item.reviewDecision.nextPlan.steps.map((step) => (
                               <a
@@ -1884,8 +1916,8 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
                               >
                                 <div className="flex flex-wrap items-center justify-between gap-2">
                                   <span className="font-medium text-slate-800">{step.label}</span>
-                                  <span className="rounded-md bg-white px-1.5 py-0.5 text-[11px] font-medium text-slate-600">
-                                    {step.dayLabel}
+                                  <span className={`rounded-md px-1.5 py-0.5 text-[11px] font-medium ${reviewPlanStepStatusClass(step.status)}`}>
+                                    {step.dayLabel} · {reviewPlanStepStatusLabel(step.status)}
                                   </span>
                                 </div>
                                 <div className="mt-1 leading-5 text-slate-500">{step.detail}</div>

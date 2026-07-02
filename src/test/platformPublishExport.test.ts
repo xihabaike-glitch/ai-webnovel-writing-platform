@@ -93,6 +93,7 @@ test("buildPlatformPublishExportCenter", async (t) => {
     assert.equal(center.activeStrategyPlan?.progress.status, "in_progress");
     assert.equal(center.activeStrategyPlan?.steps[0].status, "done");
     assert.equal(center.platformStrategy.find((item) => item.platformId === "fanqie")?.reviewDecision.kind, "collect");
+    assert.ok(center.platformStrategy.find((item) => item.platformId === "fanqie")?.reviewDecision.tasks.some((task) => task.id === "record-first-publish-effect"));
     assert.equal(center.packages[0].publishEffect.status, "empty");
     assert.ok(center.packages[0].publishEffect.nextAction.includes("录入"));
     assert.equal(center.packages[0].effectOptimization.status, "collect_data");
@@ -445,6 +446,7 @@ test("buildPlatformPublishExportCenter", async (t) => {
     assert.ok(top.score > center.platformStrategy[1].score);
     assert.ok(["focus", "grow"].includes(top.recommendation));
     assert.equal(top.reviewDecision.kind, "scale");
+    assert.ok(top.reviewDecision.tasks.some((task) => task.id === "archive-winning-version" && task.priority === "high"));
     assert.ok(top.reasons.some((reason) => reason.includes("二轮对照 improved")));
   });
 
@@ -482,8 +484,11 @@ test("buildPlatformPublishExportCenter", async (t) => {
       ],
     });
     const pack = center.packages[0];
+    const strategy = center.platformStrategy[0];
 
     assert.equal(pack.publishEffect.status, "weak");
+    assert.equal(strategy.reviewDecision.kind, "repair");
+    assert.ok(strategy.reviewDecision.tasks.some((task) => task.id === "rewrite-opening-hook" && task.priority === "high"));
     assert.equal(pack.effectOptimization.status, "urgent_rework");
     assert.ok(pack.effectOptimization.headline.includes("转化漏斗"));
     assert.ok(pack.effectOptimization.actions.some((action) => (
@@ -855,6 +860,13 @@ test("buildPlatformPublishExportCenter", async (t) => {
       platformName: "七猫",
       score: 76,
       recommendation: "grow" as const,
+      reviewDecision: {
+        kind: "iterate" as const,
+        label: "小步迭代",
+        detail: "数据还没差到要撤，也没好到能猛冲。",
+        action: "做一轮小改动，再记录下一轮数据对照。",
+        tasks: [],
+      },
       verdict: "七猫可以继续加码，但先补齐短板。",
       nextAction: "修投稿资产后重写前三章。",
       href: "#platform-export",

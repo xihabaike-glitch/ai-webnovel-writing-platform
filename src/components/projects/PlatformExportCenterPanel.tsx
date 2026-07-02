@@ -369,6 +369,15 @@ interface PlatformStrategyReviewDecision {
   label: string;
   detail: string;
   action: string;
+  tasks: PlatformStrategyReviewTask[];
+}
+
+interface PlatformStrategyReviewTask {
+  id: string;
+  priority: "high" | "medium" | "low";
+  label: string;
+  detail: string;
+  href: string;
 }
 
 interface PlatformStrategySwitchStep {
@@ -611,6 +620,18 @@ function strategyReviewDecisionClass(kind: PlatformStrategyReviewDecision["kind"
   if (kind === "iterate") return "bg-cyan-50 text-cyan-700";
   if (kind === "collect") return "bg-amber-50 text-amber-700";
   if (kind === "repair") return "bg-rose-50 text-rose-700";
+  return "bg-slate-100 text-slate-600";
+}
+
+function strategyReviewTaskPriorityLabel(priority: PlatformStrategyReviewTask["priority"]) {
+  if (priority === "high") return "高";
+  if (priority === "medium") return "中";
+  return "低";
+}
+
+function strategyReviewTaskPriorityClass(priority: PlatformStrategyReviewTask["priority"]) {
+  if (priority === "high") return "bg-rose-50 text-rose-700";
+  if (priority === "medium") return "bg-amber-50 text-amber-700";
   return "bg-slate-100 text-slate-600";
 }
 
@@ -1566,6 +1587,25 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
                         <span className="text-slate-500">{item.reviewDecision.detail}</span>
                       </div>
                       <div className="mt-1 leading-5 text-slate-600">动作：{item.reviewDecision.action}</div>
+                      {item.reviewDecision.tasks.length ? (
+                        <div className="mt-2 grid gap-1.5">
+                          {item.reviewDecision.tasks.slice(0, 3).map((task) => (
+                            <a
+                              className="block rounded-md border border-slate-100 bg-slate-50 p-2 hover:border-slate-200 hover:bg-white"
+                              href={task.href}
+                              key={task.id}
+                            >
+                              <div className="flex items-start justify-between gap-2">
+                                <span className="font-medium text-slate-800">{task.label}</span>
+                                <span className={`shrink-0 rounded-md px-1.5 py-0.5 text-[11px] font-medium ${strategyReviewTaskPriorityClass(task.priority)}`}>
+                                  {strategyReviewTaskPriorityLabel(task.priority)}
+                                </span>
+                              </div>
+                              <div className="mt-1 leading-5 text-slate-500">{task.detail}</div>
+                            </a>
+                          ))}
+                        </div>
+                      ) : null}
                     </div>
                     <div className="mt-2 text-xs text-slate-500">下一步：{item.nextAction}</div>
                     <div className="mt-2 grid gap-1 text-xs text-slate-500">
@@ -1971,7 +2011,7 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
               </div>
             ) : null}
             {selectedPackage.publishVersions.length ? (
-              <div className="mt-3 rounded-md bg-slate-50 p-3 text-sm">
+              <div className="mt-3 rounded-md bg-slate-50 p-3 text-sm" id="package-version-history">
                 <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
                   <div>
                     <div className="font-medium text-slate-900">发布包版本</div>

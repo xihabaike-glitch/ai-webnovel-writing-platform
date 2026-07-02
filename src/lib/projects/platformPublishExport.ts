@@ -377,6 +377,15 @@ export interface PlatformStrategyReviewDecision {
   label: string;
   detail: string;
   action: string;
+  tasks: PlatformStrategyReviewTask[];
+}
+
+export interface PlatformStrategyReviewTask {
+  id: string;
+  priority: "high" | "medium" | "low";
+  label: string;
+  detail: string;
+  href: string;
 }
 
 export interface PlatformStrategySwitchStep {
@@ -926,6 +935,31 @@ function buildPlatformStrategyReviewDecision(
       label: "先补数据",
       detail: "还没有真实发布数据，现在谈加码就是拍脑袋。",
       action: "先录入曝光、点击、收藏、追读和编辑反馈。",
+      tasks: [
+        {
+          id: "record-first-publish-effect",
+          priority: "high",
+          label: "录入首轮数据",
+          detail: "补齐曝光、点击、收藏、追读、评论和编辑反馈。",
+          href: "#publish-effect-panel",
+        },
+        {
+          id: "archive-current-submission",
+          priority: "medium",
+          label: "归档当前版本",
+          detail: "把当前投稿包存成版本，下一轮才知道改动有没有用。",
+          href: "#package-version-history",
+        },
+        {
+          id: "check-platform-asset",
+          priority: pack.submissionAssetAudit.status === "ready" ? "low" : "medium",
+          label: "检查投稿资产",
+          detail: pack.submissionAssetAudit.status === "ready"
+            ? "标题、简介、标签已可用，只做发布前复核。"
+            : "投稿资产还没过关，先别急着拿它测平台。",
+          href: "#submission-asset-editor",
+        },
+      ],
     };
   }
 
@@ -935,6 +969,29 @@ function buildPlatformStrategyReviewDecision(
       label: "继续加码",
       detail: "数据已经给出正反馈，主资源可以继续往这里压。",
       action: "保持主战场，继续更新、归档版本，并跟踪下一轮转化。",
+      tasks: [
+        {
+          id: "keep-main-platform",
+          priority: "high",
+          label: "锁定主战场",
+          detail: `继续以 ${pack.platformName} 为主平台，不要频繁横跳稀释样本。`,
+          href: "#platform-strategy-ranking",
+        },
+        {
+          id: "archive-winning-version",
+          priority: "high",
+          label: "归档有效版本",
+          detail: "保存当前标题、简介、标签和前三章组合，作为下一轮对照基准。",
+          href: "#package-version-history",
+        },
+        {
+          id: "track-next-round",
+          priority: "medium",
+          label: "跟踪下一轮转化",
+          detail: "继续记录新增曝光、点击、收藏、追读和付费阅读变化。",
+          href: "#publish-effect-panel",
+        },
+      ],
     };
   }
 
@@ -944,6 +1001,29 @@ function buildPlatformStrategyReviewDecision(
       label: "先修打法",
       detail: "真实反馈偏弱，现在继续硬投只会扩大损失。",
       action: "回到前三章、投稿资产和发布节奏，先修再投。",
+      tasks: [
+        {
+          id: "rewrite-opening-hook",
+          priority: "high",
+          label: "重修前三章钩子",
+          detail: pack.repairPath.nextStep?.detail ?? "把开局冲突、爽点兑现和章末悬念重新打磨一轮。",
+          href: "#first-three-rewrite",
+        },
+        {
+          id: "fix-submission-asset",
+          priority: "high",
+          label: "重做投稿资产",
+          detail: "重写书名、简介、标签和平台话术，别让入口素材拖累正文。",
+          href: "#submission-asset-editor",
+        },
+        {
+          id: "record-repair-metric",
+          priority: "medium",
+          label: "设置二轮对照",
+          detail: "修完后再记录一轮数据，用前后变化判断是不是修对了。",
+          href: "#publish-effect-panel",
+        },
+      ],
     };
   }
 
@@ -953,6 +1033,29 @@ function buildPlatformStrategyReviewDecision(
       label: "换个打法",
       detail: "当前平台胜率靠后，不值得继续烧主资源。",
       action: "把它降为观察平台，回排行榜选择更高胜率主战场。",
+      tasks: [
+        {
+          id: "demote-platform",
+          priority: "high",
+          label: "降为观察平台",
+          detail: `${pack.platformName} 暂时不吃主资源，只保留必要记录。`,
+          href: "#platform-strategy-ranking",
+        },
+        {
+          id: "pick-stronger-platform",
+          priority: "high",
+          label: "选择高胜率平台",
+          detail: "从排行榜前三里选更适合当前题材和数据的平台继续推进。",
+          href: "#platform-strategy-ranking",
+        },
+        {
+          id: "reuse-transferable-assets",
+          priority: "medium",
+          label: "复用可迁移素材",
+          detail: "保留能复用的卖点和简介，按新平台口味重组表达。",
+          href: "#submission-asset-editor",
+        },
+      ],
     };
   }
 
@@ -961,6 +1064,29 @@ function buildPlatformStrategyReviewDecision(
     label: "小步迭代",
     detail: "数据还没差到要撤，也没好到能猛冲。",
     action: "做一轮小改动，再记录下一轮数据对照。",
+    tasks: [
+      {
+        id: "adjust-one-variable",
+        priority: "high",
+        label: "只改一个变量",
+        detail: "优先只改标题、简介、标签或前三章钩子中的一项，别一次全改到无法归因。",
+        href: "#submission-asset-editor",
+      },
+      {
+        id: "archive-iteration-version",
+        priority: "medium",
+        label: "保存迭代版本",
+        detail: "把本轮改动归档，下一轮才能知道到底是哪一刀生效。",
+        href: "#package-version-history",
+      },
+      {
+        id: "compare-next-metrics",
+        priority: "medium",
+        label: "复盘下一轮数据",
+        detail: "记录新一轮曝光、点击、收藏和追读，再决定加码还是换方向。",
+        href: "#publish-effect-panel",
+      },
+    ],
   };
 }
 

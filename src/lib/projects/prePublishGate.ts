@@ -55,6 +55,7 @@ export interface PrePublishGateProject {
 export interface PrePublishGateEffectAction {
   id: string;
   priority: PlatformPublishOptimizationAction["priority"];
+  execution: PlatformPublishOptimizationAction["execution"];
   label: string;
   detail: string;
   target: string;
@@ -241,6 +242,7 @@ function effectReview(
     optimizationActions: actions.slice(0, 3).map((action) => ({
       id: action.id,
       priority: action.priority,
+      execution: action.execution,
       label: action.label,
       detail: action.detail,
       target: action.target,

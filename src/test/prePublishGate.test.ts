@@ -164,5 +164,38 @@ test("buildPrePublishGate", async (t) => {
     assert.equal(review.followRatePercent, 3);
     assert.ok(review.verdict.includes("可追"));
     assert.ok(review.optimizationActions.some((action) => action.href === "/projects/project-ready#create-chapter"));
+    assert.ok(review.optimizationActions.some((action) => action.execution === "open_target"));
+  });
+
+  await t.test("exposes executable second-round actions for weak publish effects", () => {
+    const gate = buildPrePublishGate({
+      projects: [{
+        ...readyProject,
+        platformPublishMetrics: [
+          {
+            platformId: "fanqie",
+            platformName: "番茄小说",
+            views: 1000,
+            clicks: 20,
+            favorites: 5,
+            follows: 2,
+            comments: 1,
+            paidReads: 0,
+            editorFeedback: "点击弱，前三章留存也弱。",
+            contractStatus: "pending",
+            publishUrl: "https://example.com/book",
+            notes: "弱转化样本",
+            snapshotDate: "2026-01-11T00:00:00.000Z",
+          },
+        ],
+      }],
+      failureTasks: [],
+      batchHistory: [],
+    });
+    const actions = gate.projectStatuses[0].effectReview.optimizationActions;
+
+    assert.equal(gate.projectStatuses[0].effectReview.status, "weak");
+    assert.ok(actions.some((action) => action.execution === "generate_asset_variants"));
+    assert.ok(actions.some((action) => action.execution === "rewrite_first_three"));
   });
 });

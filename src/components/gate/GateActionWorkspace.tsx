@@ -7,6 +7,7 @@ import {
   buildGateAdviceActionReceipt,
   buildGateActionReceiptSummary,
   buildGateActionReviewAdvice,
+  buildGateDispatchEvidenceReview,
   buildGatePlatformDispatchReceipt,
   buildGatePlatformGrowthDispatchItems,
   buildGatePlatformGrowthReview,
@@ -28,6 +29,7 @@ import {
   type GateActionReviewAdviceSeverity,
   type GateActionReviewAdviceState,
   type GateActionReceiptStatusFilter,
+  type GateDispatchEvidenceReviewStatus,
   type GatePlatformGrowthDispatchItem,
   type GatePlatformGrowthReview,
   type PersistedGatePlatformDispatchTask,
@@ -100,6 +102,13 @@ function dispatchStateLabel(state: GatePlatformGrowthDispatchItem["state"]) {
   return "待派单";
 }
 
+function evidenceStateClass(status: GateDispatchEvidenceReviewStatus) {
+  if (status === "missing_evidence") return "border-rose-200 bg-rose-50 text-rose-900";
+  if (status === "needs_receipt") return "border-amber-200 bg-amber-50 text-amber-900";
+  if (status === "verified") return "border-emerald-200 bg-emerald-50 text-emerald-900";
+  return "border-slate-200 bg-slate-50 text-slate-800";
+}
+
 export function GateActionWorkspace({ actions }: { actions: PrePublishGateAction[] }) {
   const router = useRouter();
   const [receipts, setReceipts] = useState<GateActionReceipt[]>([]);
@@ -117,6 +126,11 @@ export function GateActionWorkspace({ actions }: { actions: PrePublishGateAction
   const reviewAdvice = buildGateActionReviewAdvice(filteredReceipts);
   const platformGrowthReview = buildGatePlatformGrowthReview(receipts);
   const platformDispatchItems = buildGatePlatformGrowthDispatchItems(receipts, 6, persistedDispatchTasks);
+  const visibleDispatchTasks = platformFilter === "all"
+    ? persistedDispatchTasks
+    : persistedDispatchTasks.filter((task) => task.platformId === platformFilter);
+  const dispatchEvidenceReview = buildGateDispatchEvidenceReview(visibleDispatchTasks, receipts);
+  const dispatchEvidenceIssues = dispatchEvidenceReview.items.filter((item) => item.status !== "verified").slice(0, 4);
   const latestReceipt = filteredReceipts[0] ?? null;
 
   useEffect(() => {
@@ -259,6 +273,94 @@ export function GateActionWorkspace({ actions }: { actions: PrePublishGateAction
               <option value="failed">失败 · {summary.failed}</option>
             </select>
           </label>
+        </div>
+        <div className="mt-3 grid gap-2">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <div className="text-xs font-medium text-slate-500">派单证据总控</div>
+              <p className="mt-1 text-xs text-slate-500">把派单中心的完成证据反哺到总闸门，区分真闭环和纸面完成。</p>
+            </div>
+            <Link
+              className="w-fit rounded-md border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
+              href="/dispatch"
+            >
+              打开派单中心
+            </Link>
+          </div>
+          <div className="grid gap-2 sm:grid-cols-4">
+            <div className="rounded-md border border-emerald-100 bg-white p-3">
+              <div className="text-xs text-slate-500">真闭环</div>
+              <div className="mt-1 text-lg font-semibold text-emerald-700">{dispatchEvidenceReview.summary.verified}</div>
+            </div>
+            <div className="rounded-md border border-amber-100 bg-white p-3">
+              <div className="text-xs text-slate-500">待业务回执</div>
+              <div className="mt-1 text-lg font-semibold text-amber-700">{dispatchEvidenceReview.summary.needsReceipt}</div>
+            </div>
+            <div className="rounded-md border border-rose-100 bg-white p-3">
+              <div className="text-xs text-slate-500">缺依据</div>
+              <div className="mt-1 text-lg font-semibold text-rose-700">{dispatchEvidenceReview.summary.missingEvidence}</div>
+            </div>
+            <div className="rounded-md border border-slate-200 bg-white p-3">
+              <div className="text-xs text-slate-500">未完成</div>
+              <div className="mt-1 text-lg font-semibold text-slate-700">{dispatchEvidenceReview.summary.active}</div>
+            </div>
+          </div>
+          {dispatchEvidenceReview.nextActions.length ? (
+            <div className="grid gap-2 xl:grid-cols-2">
+              {dispatchEvidenceReview.nextActions.map((action) => (
+                <div className="rounded-md bg-white p-3 text-sm leading-6 text-slate-600" key={action}>{action}</div>
+              ))}
+            </div>
+          ) : null}
+          {dispatchEvidenceIssues.length ? (
+            <div className="grid gap-2 xl:grid-cols-2">
+              {dispatchEvidenceIssues.map((item) => (
+                <div className={`rounded-md border p-3 text-sm ${evidenceStateClass(item.status)}`} key={item.dispatchKey}>
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-medium">{item.title}</span>
+                        <span className="rounded-md bg-white/70 px-2 py-1 text-xs font-medium">{item.label}</span>
+                      </div>
+                      <p className="mt-2 leading-6 opacity-85">{item.detail}</p>
+                    </div>
+                    <div className="text-right text-xs opacity-75">
+                      <div>{item.platformName}</div>
+                      <div className="mt-1">{item.ownerRole}</div>
+                    </div>
+                  </div>
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    <Link
+                      className="rounded-md bg-white px-3 py-2 text-xs font-medium text-slate-950"
+                      href={item.status === "active" ? item.href : "/dispatch"}
+                    >
+                      {item.status === "active" ? "打开处理入口" : "补齐证据"}
+                    </Link>
+                    {item.status === "needs_receipt" ? (
+                      <button
+                        className="rounded-md border border-white/70 bg-white/70 px-3 py-2 text-xs font-medium text-slate-950"
+                        onClick={() => {
+                          setPlatformFilter(item.platformId);
+                          router.refresh();
+                        }}
+                        type="button"
+                      >
+                        只看该平台
+                      </button>
+                    ) : null}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : visibleDispatchTasks.length ? (
+            <p className="rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
+              当前派单证据链闭合，可以把注意力放到下一轮平台增长动作。
+            </p>
+          ) : (
+            <p className="rounded-md border border-dashed border-slate-300 bg-white p-3 text-sm text-slate-600">
+              暂无派单任务。先让平台增长复盘榜生成任务，再进入证据验收。
+            </p>
+          )}
         </div>
         <div className="mt-3 grid gap-2">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">

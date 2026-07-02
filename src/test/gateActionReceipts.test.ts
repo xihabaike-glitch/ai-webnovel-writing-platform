@@ -778,13 +778,17 @@ test("buildGateActionReceipt", async (t) => {
         follows: 12,
       },
     });
+    const dispatchReceiptAfterCompletion = buildGatePlatformDispatchReceipt({
+      dispatch: needsReceiptTask,
+      now: "2026-01-01T02:30:00.000Z",
+    });
 
     const review = buildGateDispatchEvidenceReview([
       verifiedTask,
       needsReceiptTask,
       missingEvidenceTask,
       activeTask,
-    ], [laterBusinessReceipt]);
+    ], [dispatchReceiptAfterCompletion, laterBusinessReceipt]);
 
     assert.equal(review.summary.verified, 1);
     assert.equal(review.summary.needsReceipt, 1);
@@ -792,6 +796,7 @@ test("buildGateActionReceipt", async (t) => {
     assert.equal(review.summary.active, 1);
     assert.equal(review.items[0].status, "missing_evidence");
     assert.equal(review.items.find((item) => item.dispatchKey === verifiedTask.dispatchKey)?.status, "verified");
+    assert.equal(review.items.find((item) => item.dispatchKey === needsReceiptTask.dispatchKey)?.status, "needs_receipt");
     assert.ok(review.nextActions.some((actionText) => actionText.includes("后续业务回执")));
   });
 

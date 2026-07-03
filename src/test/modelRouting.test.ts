@@ -11,6 +11,7 @@ import {
   buildRouteConfirmationRecheckGovernanceAction,
   buildRouteConfirmationGovernanceEvidenceFromDispatchTasks,
   buildRouteConfirmationGovernanceFollowUpDispatches,
+  buildRouteConfirmationDispatchFlow,
   buildRouteConfirmationHistory,
   buildModelRouteConfirmationDispatch,
   buildModelRouteConfirmationReceipt,
@@ -541,6 +542,61 @@ test("model task routing", async (t) => {
     assert.equal(history[0]?.recheckStatus, "waiting_recheck");
     assert.equal(history[0]?.recheckLabel, "等待小样本复检");
     assert.ok(history[0]?.recheckDetail.includes("下一批同类型任务"));
+  });
+
+  await t.test("summarizes route dispatch flow by confirmation, recheck, and governance state", () => {
+    const confirmation = buildModelRouteConfirmationReceipt({
+      taskType: "chapter_review",
+      primaryProviderName: "DeepSeek · deepseek-chat",
+      fallbackProviderName: "Kimi · kimi-k2.6",
+      reason: "完成调整模型路由派单，已保存新首选模型。",
+      source: "manual",
+      createdAt: "2026-07-04T15:30:00.000Z",
+    });
+
+    const flow = buildRouteConfirmationDispatchFlow([confirmation], [
+      {
+        dispatchKey: "model-route-confirmation-recheck:chapter_review:2026-07-04T15:30:00.000Z",
+        stage: "model_route_confirmation_recheck",
+        state: "assigned",
+        title: "复检章节审稿路由确认",
+        detail: "章节审稿已切到首选 DeepSeek。",
+        actionLabel: "复检模型路由",
+        href: "/settings/models",
+        priorityScore: 72,
+        reviewLatestAt: "2026-07-04T15:30:00.000Z",
+      },
+      {
+        dispatchKey: "model-route-governance:chapter_review:switch_route:2026-07-04T16:00:00.000Z",
+        stage: "model_route_governance",
+        state: "assigned",
+        title: "处理章节审稿路由复检问题",
+        detail: "复检仍命中备用路线。",
+        actionLabel: "切备用/重分配",
+        href: "/settings/models",
+        priorityScore: 88,
+        reviewLatestAt: "2026-07-04T16:00:00.000Z",
+      },
+      {
+        dispatchKey: "model-route-governance:chapter_draft:extend_watch:2026-07-04T13:00:00.000Z",
+        stage: "model_route_governance",
+        state: "completed",
+        title: "处理正文初稿路由复检问题",
+        detail: "已治理完成。",
+        actionLabel: "延长观察",
+        href: "/settings/models",
+        priorityScore: 76,
+        reviewLatestAt: "2026-07-04T13:00:00.000Z",
+      },
+    ]);
+
+    assert.equal(flow.summary.confirmed, 1);
+    assert.equal(flow.summary.dispatched, 2);
+    assert.equal(flow.summary.waitingRecheck, 1);
+    assert.equal(flow.summary.needsGovernance, 1);
+    assert.equal(flow.summary.completed, 1);
+    assert.equal(flow.lanes[0].id, "needs_governance");
+    assert.equal(flow.lanes.find((lane) => lane.id === "confirmed")?.items[0]?.label, "章节审稿路由已确认");
   });
 
   await t.test("marks the current route when it already matches the recommendation", () => {

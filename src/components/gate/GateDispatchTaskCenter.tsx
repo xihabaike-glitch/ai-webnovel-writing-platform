@@ -15,6 +15,7 @@ import {
   type GatePlatformGrowthDispatchState,
   type PersistedGatePlatformDispatchTask,
 } from "@/lib/projects/gateActionReceipts";
+import type { RouteConfirmationDispatchFlow, RouteConfirmationDispatchFlowLaneId } from "@/lib/model-gateway/routeConfirmation";
 
 function stateClass(state: GatePlatformGrowthDispatchState) {
   if (state === "queued") return "bg-amber-50 text-amber-700";
@@ -54,12 +55,21 @@ function nextState(state: GatePlatformGrowthDispatchState): GatePlatformGrowthDi
   return "assigned";
 }
 
+function routeFlowLaneClass(laneId: RouteConfirmationDispatchFlowLaneId) {
+  if (laneId === "needs_governance") return "border-amber-200 bg-amber-50 text-amber-900";
+  if (laneId === "waiting_recheck") return "border-sky-200 bg-sky-50 text-sky-900";
+  if (laneId === "confirmed") return "border-emerald-200 bg-emerald-50 text-emerald-900";
+  return "border-slate-200 bg-slate-50 text-slate-800";
+}
+
 export function GateDispatchTaskCenter({
   initialReceipts,
   initialTasks,
+  routeConfirmationDispatchFlow,
 }: {
   initialReceipts: GateActionReceipt[];
   initialTasks: PersistedGatePlatformDispatchTask[];
+  routeConfirmationDispatchFlow: RouteConfirmationDispatchFlow;
 }) {
   const [tasks, setTasks] = useState(initialTasks);
   const [stateFilter, setStateFilter] = useState<GateDispatchTaskStateFilter>("all");
@@ -139,6 +149,47 @@ export function GateDispatchTaskCenter({
           <div className="mt-1 text-2xl font-semibold">{center.summary.averagePriorityScore}</div>
         </div>
       </section>
+
+      {routeConfirmationDispatchFlow.summary.confirmed || routeConfirmationDispatchFlow.summary.dispatched || routeConfirmationDispatchFlow.summary.completed ? (
+        <section className="grid gap-3">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <div className="font-medium text-slate-950">模型路由流转</div>
+              <div className="mt-2 flex flex-wrap gap-2 text-xs text-slate-600">
+                <span className="rounded-md bg-slate-50 px-2 py-1">已派单 {routeConfirmationDispatchFlow.summary.dispatched}</span>
+                <span className="rounded-md bg-slate-50 px-2 py-1">已确认 {routeConfirmationDispatchFlow.summary.confirmed}</span>
+                <span className="rounded-md bg-slate-50 px-2 py-1">待复检 {routeConfirmationDispatchFlow.summary.waitingRecheck}</span>
+                <span className="rounded-md bg-slate-50 px-2 py-1">需治理 {routeConfirmationDispatchFlow.summary.needsGovernance}</span>
+              </div>
+            </div>
+            <div className="w-fit rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600">
+              已完成 {routeConfirmationDispatchFlow.summary.completed}
+            </div>
+          </div>
+          <div className="grid gap-3 lg:grid-cols-4">
+            {routeConfirmationDispatchFlow.lanes.map((lane) => (
+              <div className={`rounded-md border p-3 ${routeFlowLaneClass(lane.id)}`} key={lane.id}>
+                <div className="flex items-center justify-between gap-2">
+                  <div className="text-sm font-medium">{lane.label}</div>
+                  <span className="rounded-md bg-white/70 px-2 py-1 text-xs font-medium">{lane.count}</span>
+                </div>
+                <div className="mt-3 grid gap-2">
+                  {lane.items.map((item) => (
+                    <Link className="rounded-md bg-white/70 p-2 text-xs leading-5 hover:bg-white" href={item.href} key={item.id}>
+                      <div className="font-medium">{item.label}</div>
+                      <div className="mt-1 line-clamp-2 opacity-80">{item.detail}</div>
+                      <div className="mt-1 opacity-70">{item.actionLabel} · 优先级 {item.priorityScore}</div>
+                    </Link>
+                  ))}
+                  {lane.items.length === 0 ? (
+                    <div className="rounded-md bg-white/60 p-2 text-xs opacity-70">暂无</div>
+                  ) : null}
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      ) : null}
 
       <section className="grid gap-4 lg:grid-cols-[0.85fr_1.15fr]">
         <div className="rounded-md border border-slate-200 bg-white p-4">

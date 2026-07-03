@@ -3,6 +3,7 @@ import { GateDispatchTaskCenter } from "@/components/gate/GateDispatchTaskCenter
 import { buildTaskBatchHistory } from "@/lib/ai/taskBatchHistory";
 import { prisma } from "@/lib/db/prisma";
 import {
+  buildRouteConfirmationDispatchFlow,
   buildRouteConfirmationGovernanceEvidenceFromDispatchTasks,
   buildRouteConfirmationGovernanceFollowUpDispatches,
   buildModelRouteConfirmationDispatch,
@@ -287,6 +288,7 @@ export default async function DispatchPage() {
     ...generatedTasks,
     ...persistedTasks.filter((task) => !generatedKeys.has(task.dispatchKey)),
   ];
+  const routeConfirmationDispatchFlow = buildRouteConfirmationDispatchFlow(routeConfirmationReceipts, mergedTasks);
 
   return (
     <AppShell>
@@ -299,7 +301,11 @@ export default async function DispatchPage() {
           {mergedTasks.length ? `${mergedTasks.length} 个派单任务` : "等待总闸门派单"}
         </div>
       </div>
-      <GateDispatchTaskCenter initialReceipts={receiptItems} initialTasks={mergedTasks} />
+      <GateDispatchTaskCenter
+        initialReceipts={receiptItems}
+        initialTasks={mergedTasks}
+        routeConfirmationDispatchFlow={routeConfirmationDispatchFlow}
+      />
     </AppShell>
   );
 }

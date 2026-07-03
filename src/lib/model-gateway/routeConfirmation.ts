@@ -62,6 +62,48 @@ export interface RouteConfirmationHistoryItem {
   recheckDetail: string;
 }
 
+export interface RouteConfirmationDispatchFlowTask {
+  dispatchKey: string;
+  stage: string;
+  state: string;
+  title: string;
+  detail: string;
+  actionLabel: string;
+  href: string;
+  priorityScore: number;
+  reviewLatestAt: string;
+}
+
+export type RouteConfirmationDispatchFlowLaneId = "needs_governance" | "waiting_recheck" | "confirmed" | "completed";
+
+export interface RouteConfirmationDispatchFlowItem {
+  id: string;
+  label: string;
+  detail: string;
+  actionLabel: string;
+  href: string;
+  priorityScore: number;
+  latestAt: string;
+}
+
+export interface RouteConfirmationDispatchFlowLane {
+  id: RouteConfirmationDispatchFlowLaneId;
+  label: string;
+  count: number;
+  items: RouteConfirmationDispatchFlowItem[];
+}
+
+export interface RouteConfirmationDispatchFlow {
+  summary: {
+    confirmed: number;
+    dispatched: number;
+    waitingRecheck: number;
+    needsGovernance: number;
+    completed: number;
+  };
+  lanes: RouteConfirmationDispatchFlowLane[];
+}
+
 export interface ModelRouteConfirmationDispatch {
   id: string;
   dispatchKey: string;
@@ -458,6 +500,36 @@ function latestRouteConfirmationRecheck(
     .sort((left, right) => (right.completedAt ?? "").localeCompare(left.completedAt ?? ""))[0] ?? null;
 }
 
+function flowItemFromTask(task: RouteConfirmationDispatchFlowTask): RouteConfirmationDispatchFlowItem {
+  return {
+    id: task.dispatchKey,
+    label: task.title,
+    detail: task.detail,
+    actionLabel: task.actionLabel,
+    href: task.href,
+    priorityScore: task.priorityScore,
+    latestAt: task.reviewLatestAt,
+  };
+}
+
+function flowItemFromReceipt(receipt: ModelRouteConfirmationReceipt): RouteConfirmationDispatchFlowItem {
+  return {
+    id: receipt.id,
+    label: receipt.label,
+    detail: receipt.detail,
+    actionLabel: receipt.recheck.label,
+    href: receipt.href,
+    priorityScore: receipt.payload.restoredCandidate || receipt.payload.avoidanceStatus === "applied" ? 86 : 72,
+    latestAt: receipt.createdAt,
+  };
+}
+
+function sortFlowItems(items: RouteConfirmationDispatchFlowItem[]) {
+  return [...items].sort((left, right) => (
+    right.priorityScore - left.priorityScore || right.latestAt.localeCompare(left.latestAt)
+  ));
+}
+
 export function buildModelRouteConfirmationReceipt(input: ModelRouteConfirmationInput): ModelRouteConfirmationReceipt {
   const taskLabel = labelForRoutedTask(input.taskType);
   const source = input.source ?? "manual";
@@ -628,6 +700,56 @@ export function buildRouteConfirmationHistory(
       recheckDetail: recheck.summary,
     };
   }).sort((left, right) => right.createdAt.localeCompare(left.createdAt));
+}
+
+export function buildRouteConfirmationDispatchFlow(
+  confirmations: ModelRouteConfirmationReceipt[],
+  dispatches: RouteConfirmationDispatchFlowTask[],
+): RouteConfirmationDispatchFlow {
+  const modelRouteDispatches = dispatches.filter((task) => (
+    task.stage === "model_route_confirmation_recheck" || task.stage === "model_route_governance"
+  ));
+  const activeDispatches = modelRouteDispatches.filter((task) => task.state !== "completed");
+  const waitingRecheck = activeDispatches.filter((task) => task.stage === "model_route_confirmation_recheck");
+  const needsGovernance = activeDispatches.filter((task) => task.stage === "model_route_governance");
+  const completed = modelRouteDispatches.filter((task) => task.state === "completed");
+  const lanes: RouteConfirmationDispatchFlowLane[] = [
+    {
+      id: "needs_governance",
+      label: "需治理",
+      count: needsGovernance.length,
+      items: sortFlowItems(needsGovernance.map(flowItemFromTask)).slice(0, 4),
+    },
+    {
+      id: "waiting_recheck",
+      label: "待复检",
+      count: waitingRecheck.length,
+      items: sortFlowItems(waitingRecheck.map(flowItemFromTask)).slice(0, 4),
+    },
+    {
+      id: "confirmed",
+      label: "已确认",
+      count: confirmations.length,
+      items: sortFlowItems(confirmations.map(flowItemFromReceipt)).slice(0, 4),
+    },
+    {
+      id: "completed",
+      label: "已完成",
+      count: completed.length,
+      items: sortFlowItems(completed.map(flowItemFromTask)).slice(0, 4),
+    },
+  ];
+
+  return {
+    summary: {
+      confirmed: confirmations.length,
+      dispatched: activeDispatches.length,
+      waitingRecheck: waitingRecheck.length,
+      needsGovernance: needsGovernance.length,
+      completed: completed.length,
+    },
+    lanes,
+  };
 }
 
 export function buildRouteConfirmationRecheckEvidenceFromDispatchTasks(

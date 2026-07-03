@@ -302,6 +302,7 @@ export function ModelProviderSettings({
   const [applyingRecommendationType, setApplyingRecommendationType] = useState<string | null>(null);
   const [governingRuleKey, setGoverningRuleKey] = useState<string | null>(null);
   const [creatingRetestRuleKey, setCreatingRetestRuleKey] = useState<string | null>(null);
+  const [runningRetestRuleKey, setRunningRetestRuleKey] = useState<string | null>(null);
   const [scopeDrafts, setScopeDrafts] = useState<Record<string, string>>(() => Object.fromEntries(
     routeAvoidanceGovernance.items.map((item) => [
       item.ruleKey,
@@ -473,6 +474,28 @@ export function ModelProviderSettings({
       setRouteMessage(caught instanceof Error ? caught.message : "生成复测派单失败。");
     } finally {
       setCreatingRetestRuleKey(null);
+    }
+  }
+
+  async function runRetestSamples(item: RouteAvoidanceGovernanceView["retestQueue"]["items"][number]) {
+    setRunningRetestRuleKey(item.ruleKey);
+    setRouteMessage(null);
+    try {
+      const response = await fetch("/api/model-route-avoidance-retest-samples", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ruleKey: item.ruleKey, execute: true }),
+      });
+      const payload = await response.json().catch(() => null) as { results?: Array<{ status: string }>; error?: string } | null;
+      if (!response.ok) throw new Error(payload?.error ?? "运行复测样本失败。");
+      const succeeded = payload?.results?.filter((result) => result.status === "succeeded").length ?? 0;
+      const total = payload?.results?.length ?? 0;
+      setRouteMessage(`已运行复测样本：${succeeded}/${total} 成功`);
+      router.refresh();
+    } catch (caught) {
+      setRouteMessage(caught instanceof Error ? caught.message : "运行复测样本失败。");
+    } finally {
+      setRunningRetestRuleKey(null);
     }
   }
 
@@ -833,6 +856,14 @@ export function ModelProviderSettings({
                         type="button"
                       >
                         {creatingRetestRuleKey === item.ruleKey ? "生成中" : "生成复测派单"}
+                      </button>
+                      <button
+                        className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 disabled:opacity-50"
+                        disabled={runningRetestRuleKey === item.ruleKey}
+                        onClick={() => runRetestSamples(item)}
+                        type="button"
+                      >
+                        {runningRetestRuleKey === item.ruleKey ? "运行中" : "运行复测样本"}
                       </button>
                     </div>
                   </div>

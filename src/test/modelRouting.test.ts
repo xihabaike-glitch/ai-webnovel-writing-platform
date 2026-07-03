@@ -10,6 +10,7 @@ import {
   buildRouteAvoidanceRulesFromDispatchTasks,
   buildRouteRecommendations,
 } from "../lib/model-gateway/routeRecommendations.ts";
+import { buildRouteAvoidanceRetestSamplePlan } from "../lib/model-gateway/routeRetestSamples.ts";
 import { labelForRoutedTask, modelTaskRouteOptions } from "../lib/model-gateway/taskRouting.ts";
 
 const mockProvider = {
@@ -707,5 +708,101 @@ test("model task routing", async (t) => {
     assert.equal(governance.retestReview.items[1].confidence, "high");
     assert.ok(governance.retestReview.items[1].actionLabel.includes("解除观察"));
     assert.ok(governance.nextActions.some((action) => action.includes("1 条复测已通过")));
+  });
+
+  await t.test("builds an executable sample plan for scoped route retests", () => {
+    const governance = buildRouteAvoidanceGovernance([
+      {
+        taskType: "chapter_review",
+        providerConfigId: "deepseek-provider",
+        providerId: "deepseek",
+        model: "deepseek-chat",
+        reason: "审稿 JSON 不稳定。",
+        evidence: ["审稿失败 2 次"],
+        watchUntil: "2026-07-01T00:00:00.000Z",
+      },
+      {
+        providerConfigId: "kimi-provider",
+        providerId: "kimi",
+        model: "kimi-k2.6",
+        reason: "全局路线异常。",
+        evidence: ["全局失败"],
+        watchUntil: "2026-07-01T00:00:00.000Z",
+      },
+    ], [
+      {
+        id: "deepseek-provider",
+        providerId: "deepseek",
+        displayName: "DeepSeek",
+        defaultModel: "deepseek-chat",
+        enabled: true,
+        encryptedApiKey: "key",
+      },
+      {
+        id: "kimi-provider",
+        providerId: "kimi",
+        displayName: "Kimi",
+        defaultModel: "kimi-k2.6",
+        enabled: true,
+        encryptedApiKey: "key",
+      },
+    ], { now: "2026-07-03T00:00:00.000Z" });
+
+    const scopedPlan = buildRouteAvoidanceRetestSamplePlan(governance.retestQueue.items[0], [
+      {
+        id: "project-1",
+        title: "雨夜系统",
+        targetPlatform: "fanqie",
+        chapters: [
+          {
+            id: "chapter-1",
+            order: 1,
+            title: "第一章 雨夜系统",
+            wordCount: 1200,
+            status: "draft",
+            goal: "遭遇系统",
+            hook: "雨夜倒计时出现",
+            conflict: "必须救人",
+            valueShift: "普通生活转向危机",
+            cliffhanger: "第二个任务刷新",
+          },
+          {
+            id: "chapter-2",
+            order: 2,
+            title: "第二章 备用路线",
+            wordCount: 1000,
+            status: "draft",
+            goal: "逃出小区",
+            hook: "门外有人敲门",
+            conflict: "邻居不可信",
+            valueShift: "求生转向反击",
+            cliffhanger: "奖励变成惩罚",
+          },
+        ],
+        aiTasks: [
+          {
+            id: "old-review",
+            chapterId: "chapter-2",
+            taskType: "chapter_review",
+            status: "succeeded",
+            outputText: JSON.stringify({ score: 88, issues: [], summary: "ok" }),
+            errorMessage: null,
+            createdAt: "2026-07-01T00:00:00.000Z",
+          },
+        ],
+      },
+    ]);
+    const globalPlan = buildRouteAvoidanceRetestSamplePlan(governance.retestQueue.items[1], []);
+
+    assert.equal(scopedPlan.canRun, true);
+    assert.equal(scopedPlan.taskType, "chapter_review");
+    assert.equal(scopedPlan.projectId, "project-1");
+    assert.deepEqual(scopedPlan.chapterIds, ["chapter-1"]);
+    assert.equal(scopedPlan.sampleCount, 1);
+    assert.ok(scopedPlan.actionLabel.includes("运行"));
+    assert.ok(scopedPlan.warning.includes("复测模式"));
+    assert.equal(globalPlan.canRun, false);
+    assert.equal(globalPlan.status, "needs_scope");
+    assert.ok(globalPlan.reason.includes("限定任务"));
   });
 });

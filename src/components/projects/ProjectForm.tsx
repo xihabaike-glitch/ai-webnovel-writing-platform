@@ -13,7 +13,12 @@ import {
   type GateBatchTacticEffectItem,
   type GatePlatformTacticExperienceItem,
 } from "@/lib/projects/gateActionReceipts";
-import { buildProjectStartTacticAdvice, type ProjectStartTacticAdviceStatus } from "@/lib/projects/projectStartTactics";
+import {
+  buildProjectStartPlatformExperienceGuide,
+  buildProjectStartTacticAdvice,
+  type ProjectStartPlatformExperienceStatus,
+  type ProjectStartTacticAdviceStatus,
+} from "@/lib/projects/projectStartTactics";
 import { projectTemplates } from "@/lib/projects/projectTemplates";
 
 const lengthOptions = [
@@ -27,6 +32,13 @@ function tacticAdviceClass(status: ProjectStartTacticAdviceStatus) {
   if (status === "history_blocked") return "border-rose-200 bg-rose-50 text-rose-900";
   if (status === "history_watch") return "border-amber-200 bg-amber-50 text-amber-900";
   if (status === "history_usable") return "border-emerald-200 bg-emerald-50 text-emerald-900";
+  return "border-slate-200 bg-slate-50 text-slate-800";
+}
+
+function platformExperienceClass(status: ProjectStartPlatformExperienceStatus) {
+  if (status === "recommended") return "border-emerald-200 bg-emerald-50 text-emerald-900";
+  if (status === "watch") return "border-amber-200 bg-amber-50 text-amber-900";
+  if (status === "avoid") return "border-rose-200 bg-rose-50 text-rose-900";
   return "border-slate-200 bg-slate-50 text-slate-800";
 }
 
@@ -49,6 +61,13 @@ export function ProjectForm() {
   const selectedStyle = getPlatformWritingStyle(selectedProfile.id);
   const selectedExperience = historyExperiences.find((item) => item.platformId === selectedProfile.id) ?? null;
   const selectedBatchEffect = batchTacticEffects.find((item) => item.tacticTitle.includes(selectedProfile.name)) ?? null;
+  const platformExperienceGuide = buildProjectStartPlatformExperienceGuide({
+    platforms: platformProfiles,
+    experiences: historyExperiences,
+    batchEffects: batchTacticEffects,
+    limit: 4,
+  });
+  const selectedPlatformGuide = platformExperienceGuide.items.find((item) => item.platformId === selectedProfile.id) ?? null;
   const tacticAdvice = buildProjectStartTacticAdvice({
     platform: selectedProfile,
     template: selectedTemplate,
@@ -165,6 +184,43 @@ export function ProjectForm() {
           <div className="mt-1">前三章：{selectedTemplate.firstThree.map((chapter) => chapter.title).join(" / ")}</div>
         </div>
       </div>
+      {platformExperienceGuide.summary.total ? (
+        <div className="grid gap-2 rounded-md border border-slate-200 bg-slate-50 p-3 text-sm">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <div className="font-medium text-slate-950">平台经验指南</div>
+              <p className="mt-1 text-xs text-slate-500">按历史最终判定和批量打法复盘，先看平台该优先、观察还是避坑。</p>
+            </div>
+            <div className="flex flex-wrap gap-2 text-xs">
+              <span className="rounded-md border border-emerald-200 bg-white px-2 py-1 text-emerald-700">推荐 {platformExperienceGuide.summary.recommended}</span>
+              <span className="rounded-md border border-rose-200 bg-white px-2 py-1 text-rose-700">避坑 {platformExperienceGuide.summary.avoid}</span>
+            </div>
+          </div>
+          {platformExperienceGuide.nextActions.length ? (
+            <div className="grid gap-2 md:grid-cols-2">
+              {platformExperienceGuide.nextActions.slice(0, 2).map((action) => (
+                <div className="rounded-md bg-white p-2 text-xs leading-5 text-slate-600" key={action}>{action}</div>
+              ))}
+            </div>
+          ) : null}
+          <div className="grid gap-2 md:grid-cols-2">
+            {platformExperienceGuide.items.map((item) => (
+              <button
+                className={`rounded-md border p-3 text-left ${platformExperienceClass(item.status)}`}
+                key={item.platformId}
+                onClick={() => applyPlatform(item.platformId)}
+                type="button"
+              >
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="font-medium">{item.platformName}</span>
+                  <span className="rounded-md bg-white/70 px-2 py-1 text-xs font-medium">{item.label}</span>
+                </div>
+                <p className="mt-2 text-xs leading-5 opacity-85">{item.detail}</p>
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : null}
       {selectedBatchEffect ? (
         <div className={`rounded-md border p-3 text-sm ${tacticAdviceClass(tacticAdvice.status)}`}>
           <div className="flex flex-wrap items-center gap-2">
@@ -260,6 +316,12 @@ export function ProjectForm() {
         <div className="font-medium text-slate-900">{selectedProfile.name} 写作提醒</div>
         <div className="mt-1">开头：{selectedProfile.openingRules.join("；")}</div>
         <div className="mt-1">审稿：{selectedProfile.reviewFocus.join("、")}</div>
+        {selectedPlatformGuide ? (
+          <div className={`mt-3 rounded-md border p-3 ${platformExperienceClass(selectedPlatformGuide.status)}`}>
+            <div className="font-medium">{selectedPlatformGuide.headline}</div>
+            <p className="mt-1 leading-6">{selectedPlatformGuide.detail}</p>
+          </div>
+        ) : null}
       </div>
       <div className="grid gap-3 rounded-md border border-slate-200 bg-white p-3 text-sm text-slate-600 md:grid-cols-2">
         <div>

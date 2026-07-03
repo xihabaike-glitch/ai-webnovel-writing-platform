@@ -32,6 +32,33 @@ export interface ProjectStartTacticSummary {
   risk: string;
 }
 
+export type ProjectStartPlatformExperienceStatus = "recommended" | "watch" | "avoid" | "template";
+
+export interface ProjectStartPlatformExperienceItem {
+  platformId: PlatformProfile["id"];
+  platformName: string;
+  status: ProjectStartPlatformExperienceStatus;
+  label: string;
+  headline: string;
+  detail: string;
+  priorityScore: number;
+  source: "experience" | "batch" | "template";
+  href: string;
+  evidence: string[];
+}
+
+export interface ProjectStartPlatformExperienceGuide {
+  summary: {
+    total: number;
+    recommended: number;
+    watch: number;
+    avoid: number;
+    template: number;
+  };
+  nextActions: string[];
+  items: ProjectStartPlatformExperienceItem[];
+}
+
 export interface ProjectStartTacticEntryLike {
   type: string;
   title: string;
@@ -56,6 +83,159 @@ function historyLabel(experience: GatePlatformTacticExperienceItem) {
   if (experience.status === "blocked") return "历史避坑";
   if (experience.status === "watch") return "历史观察";
   return "历史可复用";
+}
+
+function batchEffectForPlatform(batchEffects: GateBatchTacticEffectItem[], platform: PlatformProfile) {
+  return batchEffects.find((item) => item.tacticTitle.includes(platform.name)) ?? null;
+}
+
+export function buildProjectStartPlatformExperienceGuide(input: {
+  platforms: PlatformProfile[];
+  experiences?: GatePlatformTacticExperienceItem[];
+  batchEffects?: GateBatchTacticEffectItem[];
+  limit?: number;
+}): ProjectStartPlatformExperienceGuide {
+  const experiences = input.experiences ?? [];
+  const batchEffects = input.batchEffects ?? [];
+  const items = input.platforms.map((platform): ProjectStartPlatformExperienceItem => {
+    const experience = experiences.find((item) => item.platformId === platform.id) ?? null;
+    const batchEffect = batchEffectForPlatform(batchEffects, platform);
+
+    if (batchEffect?.status === "blocked") {
+      return {
+        platformId: platform.id,
+        platformName: platform.name,
+        status: "avoid",
+        label: "批量避坑",
+        headline: `${platform.name} 暂不优先`,
+        detail: `批量样本已经标记为 ${batchEffect.tacticLabel}，先避开「${batchEffect.openingMove || batchEffect.primaryTactic}」。`,
+        priorityScore: 100 + batchEffect.failedTasks,
+        source: "batch",
+        href: "/gate",
+        evidence: [
+          `批量样本：${batchEffect.sampleBatches} 批，成功率 ${batchEffect.successRatePercent}%，失败 ${batchEffect.failedTasks}`,
+          ...batchEffect.evidence.slice(0, 2),
+        ],
+      };
+    }
+
+    if (experience?.status === "blocked") {
+      return {
+        platformId: platform.id,
+        platformName: platform.name,
+        status: "avoid",
+        label: "历史避坑",
+        headline: `${platform.name} 先别硬上`,
+        detail: `${experience.tactic} 已经沉淀为避坑样本。${experience.reuseHint}`,
+        priorityScore: experience.priorityScore,
+        source: "experience",
+        href: experience.href,
+        evidence: experience.evidence.slice(0, 3),
+      };
+    }
+
+    if (experience?.status === "usable") {
+      return {
+        platformId: platform.id,
+        platformName: platform.name,
+        status: "recommended",
+        label: "历史可复用",
+        headline: `${platform.name} 优先参考`,
+        detail: `${experience.tactic} 可作为新项目开书参考。${experience.reuseHint}`,
+        priorityScore: experience.priorityScore,
+        source: "experience",
+        href: experience.href,
+        evidence: experience.evidence.slice(0, 3),
+      };
+    }
+
+    if (batchEffect?.status === "usable") {
+      return {
+        platformId: platform.id,
+        platformName: platform.name,
+        status: "recommended",
+        label: "批量可复用",
+        headline: `${platform.name} 可复用批量打法`,
+        detail: `${batchEffect.primaryTactic} ${batchEffect.nextAction}`,
+        priorityScore: batchEffect.successRatePercent,
+        source: "batch",
+        href: "/gate",
+        evidence: [
+          `批量样本：${batchEffect.sampleBatches} 批，成功率 ${batchEffect.successRatePercent}%，质量 ${batchEffect.averageQualityScore ?? "缺"}`,
+          ...batchEffect.evidence.slice(0, 2),
+        ],
+      };
+    }
+
+    if (experience?.status === "watch" || batchEffect?.status === "watch") {
+      const source = experience?.status === "watch" ? experience : batchEffect;
+      return {
+        platformId: platform.id,
+        platformName: platform.name,
+        status: "watch",
+        label: experience?.status === "watch" ? "历史观察" : "批量观察",
+        headline: `${platform.name} 小样本观察`,
+        detail: experience?.status === "watch"
+          ? `${experience.tactic} 还不能写成成功打法。${experience.reuseHint}`
+          : `${batchEffect?.tacticLabel ?? "批量样本"} 样本还薄，只能小批验证。`,
+        priorityScore: experience?.status === "watch" ? experience.priorityScore : batchEffect?.successRatePercent ?? 40,
+        source: experience?.status === "watch" ? "experience" : "batch",
+        href: experience?.href ?? "/gate",
+        evidence: experience?.evidence.slice(0, 3) ?? batchEffect?.evidence.slice(0, 3) ?? [],
+      };
+    }
+
+    return {
+      platformId: platform.id,
+      platformName: platform.name,
+      status: "template",
+      label: "模板默认",
+      headline: `${platform.name} 按模板开书`,
+      detail: `${defaultTacticForCategory(platform)} 暂无历史样本，先走平台模板和小步验证。`,
+      priorityScore: 20,
+      source: "template",
+      href: "/projects",
+      evidence: [`平台风险：${platform.risks[0] ?? "按平台反馈继续校准。"}`],
+    };
+  });
+
+  const statusWeight: Record<ProjectStartPlatformExperienceStatus, number> = {
+    recommended: 0,
+    watch: 1,
+    template: 2,
+    avoid: 3,
+  };
+  const sortedItems = items
+    .sort((left, right) => {
+      const statusDiff = statusWeight[left.status] - statusWeight[right.status];
+      if (statusDiff !== 0) return statusDiff;
+      const priorityDiff = right.priorityScore - left.priorityScore;
+      if (priorityDiff !== 0) return priorityDiff;
+      return left.platformName.localeCompare(right.platformName);
+    })
+    .slice(0, input.limit ?? items.length);
+  const recommended = sortedItems.filter((item) => item.status === "recommended").length;
+  const watch = sortedItems.filter((item) => item.status === "watch").length;
+  const avoid = sortedItems.filter((item) => item.status === "avoid").length;
+  const template = sortedItems.filter((item) => item.status === "template").length;
+  const firstRecommended = sortedItems.find((item) => item.status === "recommended");
+
+  return {
+    summary: {
+      total: sortedItems.length,
+      recommended,
+      watch,
+      avoid,
+      template,
+    },
+    nextActions: [
+      firstRecommended ? `优先参考 ${firstRecommended.platformName}：${firstRecommended.detail}` : null,
+      watch > 0 ? `${watch} 个平台只有观察样本，新项目只能小步验证。` : null,
+      avoid > 0 ? `${avoid} 个平台有避坑信号，开书前先改入口、题材或验证口径。` : null,
+      recommended === 0 ? "暂无可复用平台样本，先按模板开书并保留首轮数据回收。" : null,
+    ].filter((action): action is string => Boolean(action)),
+    items: sortedItems,
+  };
 }
 
 export function buildProjectStartTacticAdvice(input: {

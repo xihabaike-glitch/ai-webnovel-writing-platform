@@ -4,6 +4,7 @@ import { getPlatformProfile } from "../lib/platforms/platformProfiles.ts";
 import { getPlatformWritingStyle } from "../lib/platforms/writingStyleTemplates.ts";
 import type { GateBatchTacticEffectItem, GatePlatformTacticExperienceItem } from "../lib/projects/gateActionReceipts.ts";
 import {
+  buildProjectStartPlatformExperienceGuide,
   buildProjectStartTacticAdvice,
   buildProjectStartTacticWorldEntry,
   findProjectStartTacticSummary,
@@ -118,6 +119,81 @@ test("buildProjectStartTacticAdvice", async (t) => {
     assert.ok(advice.primaryTactic.includes("不要复用"));
     assert.ok(advice.openingMove.includes(style.openingHook));
     assert.ok(advice.evidence[1].includes("失败 2"));
+  });
+
+  await t.test("summarizes platform choices from final experience and batch avoidance", () => {
+    const platforms = [getPlatformProfile("fanqie"), getPlatformProfile("qimao"), getPlatformProfile("webnovel")];
+    const fanqieExperience: GatePlatformTacticExperienceItem = {
+      platformId: "fanqie",
+      platformName: "番茄小说",
+      status: "usable",
+      label: "可复用打法",
+      tactic: "三轮稳定加码打法",
+      lesson: "三轮真实数据验证后可以进入稳定加码池。",
+      reuseHint: "新项目可复用这套平台包装、前三章兑现和小步加码节奏，进入稳定加码池前仍要保留基准对照。",
+      risk: "稳定加码不是无限放量。",
+      href: "/gate",
+      sourceStatus: "healthy",
+      sourceLabel: "稳定加码",
+      priorityScore: 96,
+      latestAt: "2026-01-18T00:00:00.000Z",
+      evidence: ["最终判定：稳定加码：三轮数据连续站住。"],
+    };
+    const webnovelExperience: GatePlatformTacticExperienceItem = {
+      platformId: "webnovel",
+      platformName: "WebNovel",
+      status: "blocked",
+      label: "避坑样本",
+      tactic: "三轮归档暂停样本",
+      lesson: "三轮后仍未形成有效转化。",
+      reuseHint: "同类项目先复用暂停原因和避坑清单。",
+      risk: "重启条件必须写清。",
+      href: "/gate",
+      sourceStatus: "blocked",
+      sourceLabel: "归档暂停",
+      priorityScore: 94,
+      latestAt: "2026-01-18T00:10:00.000Z",
+      evidence: ["最终判定：归档暂停：继续投入只会扩大损失。"],
+    };
+    const qimaoBatch: GateBatchTacticEffectItem = {
+      id: "qimao:slow-open",
+      status: "blocked",
+      label: "避坑打法",
+      tacticTitle: "首轮平台打法：七猫",
+      tacticLabel: "批量避坑",
+      primaryTactic: "慢铺关系再进冲突。",
+      openingMove: "第一段慢慢铺关系。",
+      verificationMove: "批量后复检前三章追读。",
+      risk: "首屏太慢会掉读者。",
+      sampleBatches: 1,
+      succeededTasks: 0,
+      failedTasks: 2,
+      successRatePercent: 0,
+      averageQualityScore: 68,
+      knownCostUsd: 0.02,
+      latestAt: "2026-01-03T00:00:00.000Z",
+      evidence: ["执行推荐批次：成功 0，失败 2，质量 68"],
+      nextAction: "先拆失败样本和低分原因。",
+    };
+
+    const guide = buildProjectStartPlatformExperienceGuide({
+      platforms,
+      experiences: [webnovelExperience, fanqieExperience],
+      batchEffects: [qimaoBatch],
+    });
+
+    assert.equal(guide.summary.total, 3);
+    assert.equal(guide.summary.recommended, 1);
+    assert.equal(guide.summary.avoid, 2);
+    assert.equal(guide.items[0].platformId, "fanqie");
+    assert.equal(guide.items[0].status, "recommended");
+    assert.ok(guide.items[0].detail.includes("稳定加码池"));
+    assert.ok(guide.items[0].evidence[0].includes("最终判定"));
+    assert.equal(guide.items.find((item) => item.platformId === "qimao")?.status, "avoid");
+    assert.ok(guide.items.find((item) => item.platformId === "qimao")?.detail.includes("批量避坑"));
+    assert.equal(guide.items.find((item) => item.platformId === "webnovel")?.status, "avoid");
+    assert.ok(guide.nextActions.some((action) => action.includes("优先参考 番茄小说")));
+    assert.ok(guide.nextActions.some((action) => action.includes("2 个平台有避坑信号")));
   });
 
   await t.test("turns start advice into a reusable platform soil entry", () => {

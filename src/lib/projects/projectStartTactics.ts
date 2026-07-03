@@ -1,6 +1,6 @@
 import type { PlatformProfile } from "../platforms/platformProfiles.ts";
 import type { PlatformWritingStyleTemplate } from "../platforms/writingStyleTemplates.ts";
-import type { GatePlatformTacticExperienceItem } from "./gateActionReceipts.ts";
+import type { GateBatchTacticEffectItem, GatePlatformTacticExperienceItem } from "./gateActionReceipts.ts";
 import type { ProjectTemplate } from "./projectTemplates.ts";
 
 export type ProjectStartTacticAdviceStatus = "history_blocked" | "history_watch" | "history_usable" | "template";
@@ -63,9 +63,52 @@ export function buildProjectStartTacticAdvice(input: {
   template: ProjectTemplate;
   style: PlatformWritingStyleTemplate;
   experience?: GatePlatformTacticExperienceItem | null;
+  batchEffect?: GateBatchTacticEffectItem | null;
 }): ProjectStartTacticAdvice {
-  const { platform, template, style, experience } = input;
+  const { platform, template, style, experience, batchEffect } = input;
   const firstThreeTitles = template.firstThree.map((chapter) => chapter.title).join(" / ");
+
+  if (batchEffect) {
+    const batchEvidence = [
+      `批量样本：${batchEffect.sampleBatches} 批，成功率 ${batchEffect.successRatePercent}%，质量 ${batchEffect.averageQualityScore ?? "缺"}`,
+      `任务结果：成功 ${batchEffect.succeededTasks}，失败 ${batchEffect.failedTasks}，成本 $${batchEffect.knownCostUsd.toFixed(4)}`,
+      ...batchEffect.evidence.slice(0, 2),
+    ];
+
+    if (batchEffect.status === "blocked") {
+      return {
+        status: "history_blocked",
+        label: "批量避坑",
+        title: `${platform.name}：避开已跑崩打法`,
+        primaryTactic: `不要复用「${batchEffect.openingMove || batchEffect.primaryTactic}」。先回到平台模板打法，再重做钩子、节奏和前三章兑现。`,
+        openingMove: `避开已验证失败开头：${batchEffect.openingMove || batchEffect.primaryTactic}；改用：${style.openingHook}`,
+        verificationMove: "创建后只做小批验证，先看前三章审稿分、失败率和平台包装，不允许直接放量。",
+        risk: batchEffect.nextAction,
+        evidence: batchEvidence,
+        checklist: [
+          `模板前三章：${firstThreeTitles}`,
+          `必须具备：${style.mustHave.join("、")}`,
+          `避坑动作：不要复制 ${batchEffect.tacticLabel}`,
+        ],
+      };
+    }
+
+    return {
+      status: batchEffect.status === "usable" ? "history_usable" : "history_watch",
+      label: batchEffect.status === "usable" ? "批量可复用" : "批量观察",
+      title: `${platform.name}：${batchEffect.tacticLabel} 批量复盘`,
+      primaryTactic: batchEffect.primaryTactic,
+      openingMove: batchEffect.openingMove || style.openingHook,
+      verificationMove: `${batchEffect.verificationMove || "创建后跑前三章与批量审稿。"}；首批复盘继续看成功率、质量分和失败样本。`,
+      risk: batchEffect.status === "usable" ? batchEffect.risk : batchEffect.nextAction,
+      evidence: batchEvidence,
+      checklist: [
+        `批量状态：${batchEffect.label}`,
+        `模板前三章：${firstThreeTitles}`,
+        `必须具备：${style.mustHave.join("、")}`,
+      ],
+    };
+  }
 
   if (experience) {
     return {

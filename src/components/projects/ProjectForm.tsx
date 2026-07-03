@@ -5,10 +5,12 @@ import { useEffect, useState } from "react";
 import { platformProfiles, type LengthType, type PlatformId } from "@/lib/platforms/platformProfiles";
 import { getPlatformWritingStyle } from "@/lib/platforms/writingStyleTemplates";
 import {
+  buildGateBatchTacticEffectReview,
   buildGatePlatformDecisionTimeline,
   buildGatePlatformTacticExperienceLibrary,
   fetchPersistedGateActionReceipts,
   fetchPersistedGateDispatchTasks,
+  type GateBatchTacticEffectItem,
   type GatePlatformTacticExperienceItem,
 } from "@/lib/projects/gateActionReceipts";
 import { buildProjectStartTacticAdvice, type ProjectStartTacticAdviceStatus } from "@/lib/projects/projectStartTactics";
@@ -39,17 +41,20 @@ export function ProjectForm() {
   const [lengthType, setLengthType] = useState<LengthType>(defaultTemplate.lengthType);
   const [sellingPoint, setSellingPoint] = useState(defaultTemplate.sellingPoint);
   const [historyExperiences, setHistoryExperiences] = useState<GatePlatformTacticExperienceItem[]>([]);
+  const [batchTacticEffects, setBatchTacticEffects] = useState<GateBatchTacticEffectItem[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const selectedProfile = platformProfiles.find((profile) => profile.id === platformId) ?? platformProfiles[0];
   const selectedTemplate = projectTemplates.find((template) => template.id === templateId) ?? defaultTemplate;
   const selectedStyle = getPlatformWritingStyle(selectedProfile.id);
   const selectedExperience = historyExperiences.find((item) => item.platformId === selectedProfile.id) ?? null;
+  const selectedBatchEffect = batchTacticEffects.find((item) => item.tacticTitle.includes(selectedProfile.name)) ?? null;
   const tacticAdvice = buildProjectStartTacticAdvice({
     platform: selectedProfile,
     template: selectedTemplate,
     style: selectedStyle,
     experience: selectedExperience,
+    batchEffect: selectedBatchEffect,
   });
 
   useEffect(() => {
@@ -68,9 +73,14 @@ export function ProjectForm() {
           limit: platformProfiles.length,
         });
         const library = buildGatePlatformTacticExperienceLibrary(timeline, platformProfiles.length);
+        const batchEffectReview = buildGateBatchTacticEffectReview(receipts, platformProfiles.length);
         setHistoryExperiences(library.items);
+        setBatchTacticEffects(batchEffectReview.items);
       } catch {
-        if (!ignore) setHistoryExperiences([]);
+        if (!ignore) {
+          setHistoryExperiences([]);
+          setBatchTacticEffects([]);
+        }
       }
     }
 
@@ -155,6 +165,21 @@ export function ProjectForm() {
           <div className="mt-1">前三章：{selectedTemplate.firstThree.map((chapter) => chapter.title).join(" / ")}</div>
         </div>
       </div>
+      {selectedBatchEffect ? (
+        <div className={`rounded-md border p-3 text-sm ${tacticAdviceClass(tacticAdvice.status)}`}>
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="font-medium">批量打法复盘命中</div>
+            <span className="rounded-md bg-white/70 px-2 py-1 text-xs font-medium">{selectedBatchEffect.label}</span>
+          </div>
+          <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+            <div className="rounded-md bg-white/70 p-2">批次 {selectedBatchEffect.sampleBatches}</div>
+            <div className="rounded-md bg-white/70 p-2">成功率 {selectedBatchEffect.successRatePercent}%</div>
+            <div className="rounded-md bg-white/70 p-2">质量 {selectedBatchEffect.averageQualityScore ?? "缺"}</div>
+            <div className="rounded-md bg-white/70 p-2">失败 {selectedBatchEffect.failedTasks}</div>
+          </div>
+          <p className="mt-3 leading-6 opacity-85">{selectedBatchEffect.nextAction}</p>
+        </div>
+      ) : null}
       <div>
         <label className="text-sm font-medium" htmlFor="title">
           作品名

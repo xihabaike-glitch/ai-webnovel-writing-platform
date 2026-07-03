@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { getPlatformProfile } from "../lib/platforms/platformProfiles.ts";
 import { getPlatformWritingStyle } from "../lib/platforms/writingStyleTemplates.ts";
-import type { GatePlatformTacticExperienceItem } from "../lib/projects/gateActionReceipts.ts";
+import type { GateBatchTacticEffectItem, GatePlatformTacticExperienceItem } from "../lib/projects/gateActionReceipts.ts";
 import {
   buildProjectStartTacticAdvice,
   buildProjectStartTacticWorldEntry,
@@ -53,6 +53,71 @@ test("buildProjectStartTacticAdvice", async (t) => {
     assert.ok(advice.openingMove.includes("小步重验"));
     assert.ok(advice.evidence[0].includes("重验已回填"));
     assert.ok(advice.checklist.some((item) => item.includes("首屏钩子")));
+  });
+
+  await t.test("prefers reusable batch tactic effects for new projects", () => {
+    const platform = getPlatformProfile("fanqie");
+    const template = getDefaultTemplateForPlatform(platform.id);
+    const style = getPlatformWritingStyle(platform.id);
+    const batchEffect: GateBatchTacticEffectItem = {
+      id: "fanqie:fast-hook",
+      status: "usable",
+      label: "可复用打法",
+      tacticTitle: "首轮平台打法：番茄小说",
+      tacticLabel: "批量可复用",
+      primaryTactic: "首章先给不可逆危机，三章内连续兑现爽点。",
+      openingMove: "第一段给倒计时和身份暴露风险。",
+      verificationMove: "批量后复检前三章追读。",
+      risk: "解释过多会掉首秀。",
+      sampleBatches: 2,
+      succeededTasks: 4,
+      failedTasks: 0,
+      successRatePercent: 100,
+      averageQualityScore: 89,
+      knownCostUsd: 0.03,
+      latestAt: "2026-01-02T00:00:00.000Z",
+      evidence: ["执行推荐批次：成功 2，失败 0，质量 90"],
+      nextAction: "可以进入新项目开书参考。",
+    };
+    const advice = buildProjectStartTacticAdvice({ platform, template, style, batchEffect });
+
+    assert.equal(advice.status, "history_usable");
+    assert.equal(advice.label, "批量可复用");
+    assert.ok(advice.openingMove.includes("身份暴露风险"));
+    assert.ok(advice.evidence[0].includes("成功率 100%"));
+  });
+
+  await t.test("turns blocked batch tactic effects into avoidance advice", () => {
+    const platform = getPlatformProfile("qimao");
+    const template = getDefaultTemplateForPlatform(platform.id);
+    const style = getPlatformWritingStyle(platform.id);
+    const batchEffect: GateBatchTacticEffectItem = {
+      id: "qimao:slow-open",
+      status: "blocked",
+      label: "避坑打法",
+      tacticTitle: "首轮平台打法：七猫小说",
+      tacticLabel: "批量避坑",
+      primaryTactic: "慢铺关系再进冲突。",
+      openingMove: "第一段慢慢铺关系。",
+      verificationMove: "批量后复检前三章追读。",
+      risk: "首屏太慢会掉读者。",
+      sampleBatches: 1,
+      succeededTasks: 0,
+      failedTasks: 2,
+      successRatePercent: 0,
+      averageQualityScore: 68,
+      knownCostUsd: 0.02,
+      latestAt: "2026-01-03T00:00:00.000Z",
+      evidence: ["执行推荐批次：成功 0，失败 2，质量 68"],
+      nextAction: "先拆失败样本和低分原因，暂停把这套打法继续放进新批次。",
+    };
+    const advice = buildProjectStartTacticAdvice({ platform, template, style, batchEffect });
+
+    assert.equal(advice.status, "history_blocked");
+    assert.equal(advice.label, "批量避坑");
+    assert.ok(advice.primaryTactic.includes("不要复用"));
+    assert.ok(advice.openingMove.includes(style.openingHook));
+    assert.ok(advice.evidence[1].includes("失败 2"));
   });
 
   await t.test("turns start advice into a reusable platform soil entry", () => {

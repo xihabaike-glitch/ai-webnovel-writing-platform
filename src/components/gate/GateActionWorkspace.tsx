@@ -1451,6 +1451,18 @@ export function GateActionWorkspace({ actions }: { actions: PrePublishGateAction
                 </span>
               </div>
               <p className="mt-1 leading-6 text-slate-600">{receipt.message}</p>
+              {receipt.startTactics?.length ? (
+                <div className="mt-3 grid gap-2 lg:grid-cols-2">
+                  {receipt.startTactics.slice(0, 2).map((tactic) => (
+                    <div className="rounded-md bg-emerald-50 p-3 text-xs text-emerald-900" key={tactic.title}>
+                      <div className="font-medium">本批打法依据 · {tactic.label}</div>
+                      <div className="mt-1">{tactic.primaryTactic}</div>
+                      {tactic.openingMove ? <div className="mt-1">开头：{tactic.openingMove}</div> : null}
+                      {tactic.verificationMove ? <div className="mt-1">验证：{tactic.verificationMove}</div> : null}
+                    </div>
+                  ))}
+                </div>
+              ) : null}
               <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-slate-500">
                 <span>{executionLabel(receipt.executionType)}</span>
                 <span>{new Date(receipt.createdAt).toLocaleString()}</span>

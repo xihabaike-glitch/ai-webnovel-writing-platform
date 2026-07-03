@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
-import type { GateActionReceipt } from "@/lib/projects/gateActionReceipts";
+import type { GateActionReceipt, GateActionReceiptStartTactic } from "@/lib/projects/gateActionReceipts";
 
 function text(value: unknown, fallback = "") {
   return typeof value === "string" ? value : fallback;
@@ -31,6 +31,21 @@ function platformNameFromDetail(detail: string) {
   return detail.split("·")[0]?.trim() ?? "";
 }
 
+function parsePayload(payload: string) {
+  try {
+    const parsed = JSON.parse(payload) as { startTactics?: GateActionReceiptStartTactic[]; plan?: { strategyBases?: GateActionReceiptStartTactic[] } };
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function startTacticsFromPayload(payload: string) {
+  const parsed = parsePayload(payload);
+  const startTactics = parsed.startTactics?.length ? parsed.startTactics : parsed.plan?.strategyBases ?? [];
+  return startTactics.filter((item) => item && typeof item.title === "string" && typeof item.primaryTactic === "string");
+}
+
 function toReceipt(item: {
   receiptId: string;
   actionId: string;
@@ -49,6 +64,7 @@ function toReceipt(item: {
   recheckLabel: string;
   recheckDetail: string;
   recheckAction: string;
+  payload: string;
   createdAt: Date;
 }): GateActionReceipt {
   return {
@@ -65,6 +81,7 @@ function toReceipt(item: {
     taskId: item.taskId,
     platformId: item.platformId,
     platformName: item.platformName,
+    startTactics: startTacticsFromPayload(item.payload),
     recheck: {
       status: item.recheckStatus === "blocked" ? "blocked" : "ready",
       label: item.recheckLabel,
@@ -138,7 +155,7 @@ export async function POST(request: Request) {
     recheckLabel: text(receipt.recheck?.label),
     recheckDetail: text(receipt.recheck?.detail),
     recheckAction: text(receipt.recheck?.actionLabel, "刷新总闸门"),
-    payload: JSON.stringify(body?.payload ?? {}),
+    payload: JSON.stringify(body?.payload ?? { startTactics: receipt.startTactics ?? [] }),
     createdAt: date(receipt.createdAt),
   };
   const audit = await prisma.gateActionAudit.upsert({

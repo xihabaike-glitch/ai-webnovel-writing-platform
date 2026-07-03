@@ -11,6 +11,10 @@ export type GateActionReceiptExecutionFilter = "all" | GateActionReceiptExecutio
 export interface GateActionReceiptPayload {
   message?: string;
   error?: string;
+  plan?: {
+    strategyBases?: GateActionReceiptStartTactic[];
+  };
+  startTactics?: GateActionReceiptStartTactic[];
   variants?: unknown[];
   results?: Array<{
     status?: string;
@@ -31,6 +35,15 @@ export interface GateActionReceiptPayload {
   };
 }
 
+export interface GateActionReceiptStartTactic {
+  title: string;
+  label: string;
+  primaryTactic: string;
+  openingMove: string;
+  verificationMove: string;
+  risk?: string;
+}
+
 export interface GateActionReceipt {
   id: string;
   actionId: string;
@@ -45,6 +58,7 @@ export interface GateActionReceipt {
   taskId: string | null;
   platformId?: string;
   platformName?: string;
+  startTactics?: GateActionReceiptStartTactic[];
   recheck: {
     status: "ready" | "blocked";
     label: string;
@@ -513,6 +527,28 @@ function countStatus(payload: GateActionReceiptPayload) {
   };
 }
 
+function startTacticsFromPayload(payload: GateActionReceiptPayload) {
+  const candidates = payload.startTactics?.length ? payload.startTactics : payload.plan?.strategyBases ?? [];
+  return candidates
+    .filter((item) => item && typeof item.title === "string" && typeof item.primaryTactic === "string")
+    .map((item) => ({
+      title: item.title,
+      label: item.label || "首轮打法",
+      primaryTactic: item.primaryTactic,
+      openingMove: item.openingMove,
+      verificationMove: item.verificationMove,
+      risk: item.risk,
+    }));
+}
+
+function startTacticReceiptText(startTactics: GateActionReceiptStartTactic[]) {
+  if (startTactics.length === 0) return "";
+  return `打法依据：${startTactics
+    .slice(0, 2)
+    .map((item) => `${item.label}｜${item.openingMove || item.primaryTactic}`)
+    .join("；")}。`;
+}
+
 function receiptMessage(input: {
   action: PrePublishGateAction;
   payload: GateActionReceiptPayload;
@@ -526,10 +562,11 @@ function receiptMessage(input: {
   if (executionType === "recommended_batch") {
     const counts = countStatus(input.payload);
     const route = input.payload.routeEffectSummary;
+    const tacticText = startTacticReceiptText(startTacticsFromPayload(input.payload));
     const routeText = route
       ? `成功率 ${route.successRatePercent}%，成本 $${route.knownCostUsd.toFixed(4)}，质量 ${route.averageQualityScore ?? "缺"}。`
       : "";
-    return `推荐批次完成：成功 ${counts.succeededCount}，失败 ${counts.failedCount}。${routeText}`;
+    return `推荐批次完成：成功 ${counts.succeededCount}，失败 ${counts.failedCount}。${routeText}${tacticText}`;
   }
 
   if (executionType === "retry_task") {
@@ -684,6 +721,7 @@ export function buildGateActionReceipt(input: {
 }): GateActionReceipt {
   const payload = input.payload ?? {};
   const counts = countStatus(payload);
+  const startTactics = startTacticsFromPayload(payload);
   const createdAt = input.now ? new Date(input.now).toISOString() : new Date().toISOString();
   const taskId = payload.task?.id ?? payload.result?.taskId ?? payload.results?.find((result) => result.taskId)?.taskId ?? null;
   const message = receiptMessage({
@@ -707,6 +745,7 @@ export function buildGateActionReceipt(input: {
     taskId,
     platformId: platformIdFromActionId(input.action.id),
     platformName: platformNameFromDetail(input.action.detail),
+    startTactics,
     recheck: recheckHint({
       action: input.action,
       status: input.status,
@@ -1552,10 +1591,11 @@ export async function fetchPersistedGateActionReceipts(options?: GateActionRecei
 }
 
 export async function persistGateActionReceipt(receipt: GateActionReceipt, payload?: unknown) {
+  const persistedPayload = payload ?? { startTactics: receipt.startTactics ?? [] };
   const response = await fetch("/api/gate/action-receipts", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ receipt, payload }),
+    body: JSON.stringify({ receipt, payload: persistedPayload }),
   });
   const result = (await response.json().catch(() => null)) as { receipt?: GateActionReceipt; error?: string } | null;
   if (!response.ok || !result?.receipt) throw new Error(result?.error ?? "保存闸门审计记录失败。");

@@ -88,6 +88,16 @@ test("buildGateActionReceipt", async (t) => {
           knownCostUsd: 0.01,
           averageQualityScore: 82,
         },
+        plan: {
+          strategyBases: [{
+            title: "首轮平台打法：番茄小说",
+            label: "模板推荐",
+            primaryTactic: "先抓首章钩子，再用前三章连续兑现爽点。",
+            openingMove: "第一段给倒计时和不可逆损失。",
+            verificationMove: "批量后复检前三章追读。",
+            risk: "解释过多会掉首秀。",
+          }],
+        },
       },
     });
 
@@ -98,6 +108,9 @@ test("buildGateActionReceipt", async (t) => {
     assert.equal(receipt.taskId, "task-1");
     assert.ok(receipt.message.includes("成功 1，失败 1"));
     assert.ok(receipt.message.includes("成功率 50%"));
+    assert.ok(receipt.message.includes("打法依据"));
+    assert.equal(receipt.startTactics?.[0].label, "模板推荐");
+    assert.ok(receipt.startTactics?.[0].openingMove.includes("倒计时"));
     assert.equal(receipt.recheck.status, "ready");
     assert.equal(receipt.recheck.label, "复检任务队列");
   });

@@ -8,6 +8,11 @@ interface BatchRunResponse {
   plan?: {
     actionLabel: string;
     detail: string;
+    strategyBases?: Array<{
+      label: string;
+      openingMove: string;
+      primaryTactic: string;
+    }>;
   };
   routeEffectSummary?: {
     successRatePercent: number;
@@ -41,7 +46,9 @@ export function RunRecommendedBatchButton({ disabled, strategyId }: { disabled: 
       const summary = payload.routeEffectSummary
         ? `成功率 ${payload.routeEffectSummary.successRatePercent}%，成本 $${payload.routeEffectSummary.knownCostUsd.toFixed(4)}，质量 ${payload.routeEffectSummary.averageQualityScore ?? "缺"}。`
         : "";
-      setMessage(`${payload.plan?.actionLabel ?? "推荐批次"}完成：成功 ${succeeded}，失败 ${failed}。${summary}`);
+      const tactic = payload.plan?.strategyBases?.[0];
+      const tacticText = tactic ? `打法依据：${tactic.label}｜${tactic.openingMove || tactic.primaryTactic}。` : "";
+      setMessage(`${payload.plan?.actionLabel ?? "推荐批次"}完成：成功 ${succeeded}，失败 ${failed}。${summary}${tacticText}`);
       router.refresh();
     } catch (caught) {
       setMessage(caught instanceof Error ? caught.message : "推荐批次执行失败。");

@@ -146,6 +146,8 @@ interface RouteAvoidanceGovernanceView {
       model: string;
       taskScope: string;
       taskType: string | null;
+      reason: string;
+      evidence: string[];
       status: "due" | "upcoming" | "waiting";
       dueAt: string | null;
       daysUntilDue: number | null;
@@ -277,6 +279,7 @@ export function ModelProviderSettings({
   const [savingRouteType, setSavingRouteType] = useState<string | null>(null);
   const [applyingRecommendationType, setApplyingRecommendationType] = useState<string | null>(null);
   const [governingRuleKey, setGoverningRuleKey] = useState<string | null>(null);
+  const [creatingRetestRuleKey, setCreatingRetestRuleKey] = useState<string | null>(null);
   const [scopeDrafts, setScopeDrafts] = useState<Record<string, string>>(() => Object.fromEntries(
     routeAvoidanceGovernance.items.map((item) => [
       item.ruleKey,
@@ -429,6 +432,25 @@ export function ModelProviderSettings({
       setRouteMessage(caught instanceof Error ? caught.message : "应用路由建议失败。");
     } finally {
       setApplyingRecommendationType(null);
+    }
+  }
+
+  async function createRetestDispatch(item: RouteAvoidanceGovernanceView["retestQueue"]["items"][number]) {
+    setCreatingRetestRuleKey(item.ruleKey);
+    setRouteMessage(null);
+    try {
+      const response = await fetch("/api/model-route-avoidance-retests", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ruleKey: item.ruleKey }),
+      });
+      if (!response.ok) throw new Error("生成复测派单失败。");
+      setRouteMessage(`已生成「${item.providerName}」复测派单`);
+      router.refresh();
+    } catch (caught) {
+      setRouteMessage(caught instanceof Error ? caught.message : "生成复测派单失败。");
+    } finally {
+      setCreatingRetestRuleKey(null);
     }
   }
 
@@ -722,9 +744,17 @@ export function ModelProviderSettings({
                       <span className="rounded-md bg-slate-50 px-2 py-1 text-xs font-medium">{item.actionLabel}</span>
                     </div>
                     <p className="mt-2 leading-6 text-slate-600">{item.recommendation}</p>
-                    <div className="mt-2 flex flex-wrap gap-2 text-xs text-slate-500">
+                    <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-slate-500">
                       <span className="rounded-md bg-slate-50 px-2 py-1">样本 {item.recommendedSampleSize}</span>
                       <span className="rounded-md bg-slate-50 px-2 py-1">{item.dueAt ? item.dueAt.slice(0, 10) : "立即安排"}</span>
+                      <button
+                        className="rounded-md bg-slate-950 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50"
+                        disabled={creatingRetestRuleKey === item.ruleKey}
+                        onClick={() => createRetestDispatch(item)}
+                        type="button"
+                      >
+                        {creatingRetestRuleKey === item.ruleKey ? "生成中" : "生成复测派单"}
+                      </button>
                     </div>
                   </div>
                 ))}

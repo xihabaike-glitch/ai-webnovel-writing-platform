@@ -101,12 +101,33 @@ export interface RouteAvoidanceRetestQueueItem {
   model: string;
   taskScope: string;
   taskType: string | null;
+  reason: string;
+  evidence: string[];
   status: "due" | "upcoming" | "waiting";
   dueAt: string | null;
   daysUntilDue: number | null;
   recommendedSampleSize: number;
   actionLabel: string;
   recommendation: string;
+}
+
+export interface RouteAvoidanceRetestDispatch {
+  dispatchKey: string;
+  projectId: null;
+  platformId: string;
+  platformName: string;
+  stage: string;
+  state: "assigned";
+  priorityScore: number;
+  ownerRole: string;
+  title: string;
+  detail: string;
+  dueLabel: string;
+  actionLabel: string;
+  href: string;
+  acceptanceCriteria: string[];
+  evidence: string[];
+  reviewLatestAt: string;
 }
 
 export interface RouteAvoidanceGovernance {
@@ -400,6 +421,8 @@ function buildRetestQueue(
       model: item.model,
       taskScope: item.taskScope,
       taskType: item.scopedTaskType,
+      reason: item.reason,
+      evidence: item.evidence,
       status,
       dueAt: item.watchUntil,
       daysUntilDue: untilDue,
@@ -422,6 +445,43 @@ function buildRetestQueue(
       waiting: queueItems.filter((item) => item.status === "waiting").length,
     },
     items: queueItems,
+  };
+}
+
+export function buildRouteAvoidanceRetestDispatch(item: RouteAvoidanceRetestQueueItem): RouteAvoidanceRetestDispatch {
+  const dueLabel = item.status === "due"
+    ? "今天"
+    : item.status === "upcoming"
+      ? `${item.daysUntilDue ?? 3} 天内`
+      : item.dueAt
+        ? item.dueAt.slice(0, 10)
+        : "观察期内";
+  const priorityScore = item.status === "due" ? 90 : item.status === "upcoming" ? 70 : 50;
+  const reviewLatestAt = item.dueAt && !Number.isNaN(new Date(item.dueAt).getTime())
+    ? item.dueAt
+    : new Date().toISOString();
+
+  return {
+    dispatchKey: `model-route-retest:${item.ruleKey}`,
+    projectId: null,
+    platformId: "model-routing",
+    platformName: "模型路由",
+    stage: "model_route_retest",
+    state: "assigned",
+    priorityScore,
+    ownerRole: "模型治理",
+    title: `${item.providerName} · ${item.model} 复测`,
+    detail: `对「${item.taskScope}」跑 ${item.recommendedSampleSize} 个小样本，判断是否解除避坑规则。原始原因：${item.reason}`,
+    dueLabel,
+    actionLabel: "运行复测样本",
+    href: "/settings/models",
+    acceptanceCriteria: [
+      `完成 ${item.recommendedSampleSize} 个小样本复测`,
+      "记录成功率、质量分、成本和是否命中备用路线",
+      "复测通过则解除观察；复测失败则延长观察或继续避开",
+    ],
+    evidence: item.evidence.length ? item.evidence : [item.reason],
+    reviewLatestAt,
   };
 }
 

@@ -5,6 +5,7 @@ import { selectModelProviderCandidatesForTask, selectModelProviderForTask } from
 import {
   applyRouteAvoidanceOverrides,
   buildRouteAvoidanceGovernance,
+  buildRouteAvoidanceRetestDispatch,
   buildRouteAvoidanceRuleKey,
   buildRouteAvoidanceRulesFromDispatchTasks,
   buildRouteRecommendations,
@@ -597,5 +598,43 @@ test("model task routing", async (t) => {
     assert.ok(governance.retestQueue.items[0].actionLabel.includes("立即复测"));
     assert.ok(governance.retestQueue.items[1].actionLabel.includes("即将复测"));
     assert.ok(governance.nextActions.some((action) => action.includes("1 条避坑规则已到复测日")));
+  });
+
+  await t.test("turns a due avoidance retest queue item into a dispatch task", () => {
+    const governance = buildRouteAvoidanceGovernance([
+      {
+        taskType: "chapter_review",
+        providerConfigId: "deepseek-provider",
+        providerId: "deepseek",
+        model: "deepseek-chat",
+        reason: "审稿 JSON 不稳定。",
+        evidence: ["审稿失败 2 次"],
+        watchUntil: "2026-07-01T00:00:00.000Z",
+      },
+    ], [
+      {
+        id: "deepseek-provider",
+        providerId: "deepseek",
+        displayName: "DeepSeek",
+        defaultModel: "deepseek-chat",
+        enabled: true,
+        encryptedApiKey: "key",
+      },
+    ], { now: "2026-07-03T00:00:00.000Z" });
+    const dispatch = buildRouteAvoidanceRetestDispatch(governance.retestQueue.items[0]);
+
+    assert.equal(dispatch.dispatchKey, "model-route-retest:deepseek-provider:deepseek-chat");
+    assert.equal(dispatch.platformId, "model-routing");
+    assert.equal(dispatch.platformName, "模型路由");
+    assert.equal(dispatch.stage, "model_route_retest");
+    assert.equal(dispatch.state, "assigned");
+    assert.equal(dispatch.priorityScore, 90);
+    assert.equal(dispatch.ownerRole, "模型治理");
+    assert.equal(dispatch.href, "/settings/models");
+    assert.equal(dispatch.actionLabel, "运行复测样本");
+    assert.ok(dispatch.title.includes("DeepSeek"));
+    assert.ok(dispatch.detail.includes("章节审稿"));
+    assert.ok(dispatch.acceptanceCriteria.some((item) => item.includes("2 个小样本")));
+    assert.ok(dispatch.evidence.some((item) => item.includes("审稿失败 2 次")));
   });
 });

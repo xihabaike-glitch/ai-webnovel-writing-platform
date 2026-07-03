@@ -16,6 +16,7 @@ import {
   buildGateProjectStartMetricFollowupDispatchItems,
   buildGateProjectSecondMetricDecision,
   buildGateProjectSecondMetricDispatchItems,
+  buildGateProjectSecondMetricFollowupDispatchItems,
   buildGatePlatformDispatchReceipt,
   buildGateDispatchEvidenceReview,
   buildGatePlatformScaleGate,
@@ -1365,6 +1366,118 @@ test("buildGateActionReceipt", async (t) => {
 
     assert.equal(refreshed[0].state, "queued");
     assert.equal(refreshed[3].state, "completed");
+  });
+
+  await t.test("routes completed second-round dispatches back into the next loop", () => {
+    function completedSecondDispatch(input: {
+      projectId: string;
+      platformId: string;
+      platformName: string;
+      stage: "scale_up" | "repair_tactic" | "pivot_platform" | "pause_platform";
+      suffix: string;
+      completedAt: string;
+    }) {
+      return {
+        id: `${input.platformId}:second_metric:${input.suffix}:${input.projectId}`,
+        dispatchKey: `${input.platformId}:second_metric:${input.suffix}:${input.projectId}`,
+        databaseId: `dispatch-db-second-followup-${input.platformId}`,
+        projectId: input.projectId,
+        platformId: input.platformId,
+        platformName: input.platformName,
+        stage: input.stage,
+        state: "completed" as const,
+        priorityScore: 84,
+        ownerRole: "二轮负责人",
+        title: `${input.platformName} 二轮派单`,
+        detail: "二轮派单已完成。",
+        dueLabel: "今天",
+        actionLabel: "收口",
+        href: `/projects/${input.projectId}#platform-export`,
+        acceptanceCriteria: ["二轮派单完成"],
+        evidence: ["二轮决策"],
+        sourceReceiptId: null,
+        completionEvidence: "已完成二轮决策动作。",
+        reviewLatestAt: "2026-01-01T05:00:00.000Z",
+        assignedAt: "2026-01-01T06:00:00.000Z",
+        completedAt: input.completedAt,
+        createdAt: "2026-01-01T06:00:00.000Z",
+        updatedAt: input.completedAt,
+      };
+    }
+
+    const completed = [
+      completedSecondDispatch({
+        projectId: "project-1",
+        platformId: "fanqie",
+        platformName: "番茄小说",
+        stage: "scale_up",
+        suffix: "continue_scale",
+        completedAt: "2026-01-01T07:00:00.000Z",
+      }),
+      completedSecondDispatch({
+        projectId: "project-2",
+        platformId: "qimao",
+        platformName: "七猫小说",
+        stage: "repair_tactic",
+        suffix: "repair_tactic",
+        completedAt: "2026-01-01T07:05:00.000Z",
+      }),
+      completedSecondDispatch({
+        projectId: "project-3",
+        platformId: "royalroad",
+        platformName: "Royal Road",
+        stage: "pivot_platform",
+        suffix: "pivot_platform",
+        completedAt: "2026-01-01T07:10:00.000Z",
+      }),
+      completedSecondDispatch({
+        projectId: "project-4",
+        platformId: "webnovel",
+        platformName: "WebNovel",
+        stage: "pause_platform",
+        suffix: "pause",
+        completedAt: "2026-01-01T07:15:00.000Z",
+      }),
+    ];
+
+    const followups = buildGateProjectSecondMetricFollowupDispatchItems(completed);
+
+    assert.equal(followups.length, 4);
+    assert.deepEqual(followups.map((item) => item.stage), [
+      "start_metrics_recovery",
+      "start_publish_finalize",
+      "start_platform_package",
+      "pause_platform",
+    ]);
+    assert.equal(followups[0].id, "fanqie:second_metric_followup:third_metrics_recovery:project-1");
+    assert.equal(followups[0].ownerRole, "数据运营");
+    assert.ok(followups[0].acceptanceCriteria.includes("第三轮曝光、点击、收藏或追读已回收"));
+    assert.equal(followups[1].ownerRole, "发布包主编");
+    assert.equal(followups[1].href, "/projects/project-2#platform-export");
+    assert.ok(followups[1].acceptanceCriteria.includes("二轮修复后的发布包基准已保存"));
+    assert.equal(followups[2].ownerRole, "平台验证编辑");
+    assert.equal(followups[2].href, "/projects/project-3#submission-package");
+    assert.ok(followups[2].acceptanceCriteria.includes("新平台标题简介标签验证已完成"));
+    assert.equal(followups[3].ownerRole, "复盘负责人");
+    assert.ok(followups[3].acceptanceCriteria.includes("暂停复盘归档已完成"));
+
+    const persisted = [{
+      ...followups[0],
+      databaseId: "dispatch-db-third-metrics",
+      dispatchKey: followups[0].id,
+      projectId: "project-1",
+      sourceReceiptId: null,
+      completionEvidence: "已回收第三轮数据。",
+      state: "completed" as const,
+      assignedAt: "2026-01-01T08:00:00.000Z",
+      completedAt: "2026-01-01T09:00:00.000Z",
+      createdAt: "2026-01-01T08:00:00.000Z",
+      updatedAt: "2026-01-01T09:00:00.000Z",
+    }];
+    const refreshed = buildGateProjectSecondMetricFollowupDispatchItems(completed, persisted);
+
+    assert.equal(refreshed[0].state, "completed");
+    assert.equal(refreshed[1].state, "queued");
   });
 
   await t.test("gates platform scale-up behind verified dispatch evidence", () => {

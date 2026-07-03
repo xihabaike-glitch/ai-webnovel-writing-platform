@@ -3031,6 +3031,103 @@ export function buildGateProjectSecondMetricDispatchItems(
     .filter((item): item is GatePlatformGrowthDispatchItem => Boolean(item));
 }
 
+function projectSecondMetricFollowupSpec(task: PersistedGatePlatformDispatchTask) {
+  if (task.stage === "scale_up" && task.dispatchKey.includes(":second_metric:continue_scale:")) {
+    return {
+      suffix: "third_metrics_recovery",
+      stage: "start_metrics_recovery" as const,
+      ownerRole: "数据运营",
+      titleSuffix: "第三轮数据回收",
+      detail: `${task.platformName} 二轮后继续加码已完成，下一步必须回收第三轮真实数据，验证继续加码有没有透支效果。`,
+      dueLabel: "加码后 24 小时",
+      actionLabel: "派给数据运营",
+      anchor: "#platform-export",
+      acceptanceCriteria: ["第三轮曝光、点击、收藏或追读已回收", "第三轮数据与二轮基准可对照", "继续加码后的风险备注已保存"],
+    };
+  }
+
+  if (task.stage === "repair_tactic" && task.dispatchKey.includes(":second_metric:repair_tactic:")) {
+    return {
+      suffix: "publish_finalize",
+      stage: "start_publish_finalize" as const,
+      ownerRole: "发布包主编",
+      titleSuffix: "二轮修复后发布包复检",
+      detail: `${task.platformName} 二轮打法修复已完成，回到发布包定稿复检，确认入口承诺、标签和前三章兑现重新对齐。`,
+      dueLabel: "今天",
+      actionLabel: "派给发布主编",
+      anchor: "#platform-export",
+      acceptanceCriteria: ["二轮修复后的发布包基准已保存", "标题简介标签与前三章兑现重新一致", "下一轮复测口径已写清"],
+    };
+  }
+
+  if (task.stage === "pivot_platform" && task.dispatchKey.includes(":second_metric:pivot_platform:")) {
+    return {
+      suffix: "new_platform_validation",
+      stage: "start_platform_package" as const,
+      ownerRole: "平台验证编辑",
+      titleSuffix: "新平台开书验证",
+      detail: `${task.platformName} 二轮换平台/换打法方案已完成，先做新平台包装验证，不要直接迁移主力资源。`,
+      dueLabel: "今天",
+      actionLabel: "派给平台验证",
+      anchor: "#submission-package",
+      acceptanceCriteria: ["新平台标题简介标签验证已完成", "新平台首章钩子和前三章兑现已对齐", "小范围验证计划已保存"],
+    };
+  }
+
+  if (task.stage === "pause_platform" && task.dispatchKey.includes(":second_metric:pause:")) {
+    return {
+      suffix: "pause_archive",
+      stage: "pause_platform" as const,
+      ownerRole: "复盘负责人",
+      titleSuffix: "暂停复盘归档",
+      detail: `${task.platformName} 二轮暂停动作已完成，最后把暂停原因、复盘结论和重启条件归档，避免以后重复踩坑。`,
+      dueLabel: "今天",
+      actionLabel: "派给复盘负责人",
+      anchor: "#platform-export",
+      acceptanceCriteria: ["暂停复盘归档已完成", "重启条件和禁止动作已写清", "平台经验已进入避坑样本"],
+    };
+  }
+
+  return null;
+}
+
+export function buildGateProjectSecondMetricFollowupDispatchItems(
+  tasks: PersistedGatePlatformDispatchTask[],
+  persistedTasks: PersistedGatePlatformDispatchTask[] = [],
+): GatePlatformGrowthDispatchItem[] {
+  const persistedByKey = new Map(persistedTasks.map((task) => [task.dispatchKey, task]));
+
+  return tasks
+    .filter((task) => task.state === "completed" && task.completionEvidence.trim())
+    .map((task): GatePlatformGrowthDispatchItem | null => {
+      const spec = projectSecondMetricFollowupSpec(task);
+      if (!spec) return null;
+      const projectId = task.projectId ?? projectIdFromReceiptHref(task.href) ?? "unknown";
+      const dispatchKey = `${task.platformId}:second_metric_followup:${spec.suffix}:${projectId}`;
+      const persisted = persistedByKey.get(dispatchKey);
+      const href = projectId !== "unknown" ? `/projects/${projectId}${spec.anchor}` : task.href;
+
+      return {
+        id: dispatchKey,
+        platformId: task.platformId,
+        platformName: task.platformName,
+        stage: spec.stage,
+        state: persisted?.state ?? "queued",
+        priorityScore: Math.max(task.priorityScore, 72),
+        ownerRole: spec.ownerRole,
+        title: `${task.platformName} ${spec.titleSuffix}`,
+        detail: spec.detail,
+        dueLabel: spec.dueLabel,
+        actionLabel: spec.actionLabel,
+        href,
+        acceptanceCriteria: spec.acceptanceCriteria,
+        evidence: [`二轮完成依据：${task.completionEvidence.trim()}`, ...task.evidence].slice(0, 4),
+        reviewLatestAt: task.completedAt ?? task.updatedAt,
+      };
+    })
+    .filter((item): item is GatePlatformGrowthDispatchItem => Boolean(item));
+}
+
 export function buildGatePlatformScaleGate(
   reviews: GatePlatformGrowthReview[],
   dispatchEvidenceReview: GateDispatchEvidenceReview,

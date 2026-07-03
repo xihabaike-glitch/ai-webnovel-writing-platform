@@ -261,6 +261,40 @@ test("model task routing", async (t) => {
     assert.ok(advice.items[0].recommendation.includes("命中备用路线"));
   });
 
+  await t.test("respects explicit route recheck governance decisions from structured evidence", () => {
+    const evidence = buildRouteConfirmationRecheckEvidenceFromDispatchTasks([{
+      dispatchKey: "model-route-confirmation-recheck:chapter_draft:2026-07-04T10:00:00.000Z",
+      stage: "model_route_confirmation_recheck",
+      state: "completed",
+      completionEvidence: [
+        "复检正文初稿路由确认",
+        "样本数：2",
+        "成功率：100%",
+        "质量：86",
+        "成本：偏高",
+        "备用命中：未命中备用",
+        "是否需要治理：是，原因：成本超出预算线",
+      ].join("\n"),
+      evidence: ["已确认正文初稿模型路由。"],
+      completedAt: "2026-07-04T12:00:00.000Z",
+    }]);
+
+    const advice = buildRouteConfirmationRecheckAdvice(evidence);
+
+    assert.equal(evidence[0].recommendedAction, "watch");
+    assert.equal(evidence[0].sampleCount, 2);
+    assert.equal(evidence[0].cost, "偏高");
+    assert.equal(evidence[0].needsGovernance, true);
+    assert.equal(advice.summary.extendWatch, 1);
+    assert.equal(advice.items[0].taskType, "chapter_draft");
+    assert.equal(advice.items[0].action, "extend_watch");
+    assert.equal(advice.items[0].sampleCount, 2);
+    assert.equal(advice.items[0].cost, "偏高");
+    assert.equal(advice.items[0].needsGovernance, true);
+    assert.ok(advice.items[0].recommendation.includes("需要治理"));
+    assert.ok(advice.items[0].recommendation.includes("成本"));
+  });
+
   await t.test("builds an auditable dispatch action from route recheck governance advice", () => {
     const evidence = buildRouteConfirmationRecheckEvidenceFromDispatchTasks([{
       dispatchKey: "model-route-confirmation-recheck:chapter_review:2026-07-04T10:00:00.000Z",

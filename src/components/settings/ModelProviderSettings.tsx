@@ -240,6 +240,12 @@ interface RouteConfirmationRecheckAdviceView {
     action: "switch_route" | "extend_watch" | "manual_review";
     actionLabel: string;
     recommendation: string;
+    sampleCount: number | null;
+    successRatePercent: number | null;
+    qualityScore: number | null;
+    cost: string | null;
+    fallbackHit: boolean | null;
+    needsGovernance: boolean | null;
     evidence: string[];
     completedAt: string | null;
   }>;
@@ -893,6 +899,14 @@ export function ModelProviderSettings({
                     </span>
                   </div>
                   <p className="mt-2 leading-6 text-slate-700">{item.recommendation}</p>
+                  <div className="mt-2 flex flex-wrap gap-2 text-xs text-slate-600">
+                    {item.sampleCount !== null ? <span className="rounded-md bg-slate-50 px-2 py-1">样本 {item.sampleCount}</span> : null}
+                    {item.successRatePercent !== null ? <span className="rounded-md bg-slate-50 px-2 py-1">成功率 {item.successRatePercent}%</span> : null}
+                    {item.qualityScore !== null ? <span className="rounded-md bg-slate-50 px-2 py-1">质量 {item.qualityScore}</span> : null}
+                    {item.cost ? <span className="rounded-md bg-slate-50 px-2 py-1">成本 {item.cost}</span> : null}
+                    {item.fallbackHit !== null ? <span className="rounded-md bg-slate-50 px-2 py-1">{item.fallbackHit ? "命中备用" : "未命中备用"}</span> : null}
+                    {item.needsGovernance !== null ? <span className="rounded-md bg-slate-50 px-2 py-1">{item.needsGovernance ? "需要治理" : "无需治理"}</span> : null}
+                  </div>
                   <div className="mt-2 grid gap-1">
                     {item.evidence.slice(0, 3).map((entry) => (
                       <div className="rounded-md bg-slate-50 px-2 py-1 text-xs leading-5 text-slate-500" key={entry}>{entry}</div>

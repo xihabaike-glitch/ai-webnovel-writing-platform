@@ -191,6 +191,10 @@ export interface RouteConfirmationRecheckEvidence {
   taskType: RoutedModelTaskType;
   successRatePercent: number | null;
   qualityScore: number | null;
+  sampleCount: number | null;
+  cost: string | null;
+  fallbackHit: boolean | null;
+  needsGovernance: boolean | null;
   recommendedAction: "keep" | "watch" | "manual_review";
   summary: string;
   completionEvidence: string;
@@ -222,6 +226,12 @@ export interface RouteConfirmationRecheckAdviceItem {
   action: "switch_route" | "extend_watch" | "manual_review";
   actionLabel: string;
   recommendation: string;
+  sampleCount: number | null;
+  successRatePercent: number | null;
+  qualityScore: number | null;
+  cost: string | null;
+  fallbackHit: boolean | null;
+  needsGovernance: boolean | null;
   evidence: string[];
   completedAt: string | null;
 }
@@ -340,23 +350,34 @@ function taskTypeFromGovernanceKey(dispatchKey: string) {
 }
 
 function classifyConfirmationRecheck(completionEvidence: string) {
+  const record = parseRouteDispatchCompletionEvidence({
+    stage: "model_route_confirmation_recheck",
+    title: "模型路由复检",
+    actionLabel: "复检模型路由",
+  }, completionEvidence);
   const normalized = completionEvidence.replace(/\s+/g, "");
-  const successRatePercent = numericPercentAfter("成功率", completionEvidence);
-  const qualityScore = numericPercentAfter("质量", completionEvidence);
-  const hasFallback = hasFallbackSignal(normalized);
+  const successRatePercent = record?.successRatePercent ?? numericPercentAfter("成功率", completionEvidence);
+  const qualityScore = record?.qualityScore ?? numericPercentAfter("质量", completionEvidence);
+  const hasFallback = record?.fallbackHit ?? hasFallbackSignal(normalized);
   const hasFailure = hasFailureSignal(normalized);
-  const keep = (successRatePercent ?? 0) >= 90 && (qualityScore ?? 0) >= 80 && !hasFailure && !hasFallback;
-  const watch = hasFailure || hasFallback || (successRatePercent !== null && successRatePercent < 80) || (qualityScore !== null && qualityScore < 70);
+  const hasCostRisk = Boolean(record?.cost && /(高|贵|超|异常|失控|偏高)/.test(record.cost));
+  const needsGovernance = record?.needsGovernance === true || hasCostRisk;
+  const keep = !needsGovernance && (successRatePercent ?? 0) >= 90 && (qualityScore ?? 0) >= 80 && !hasFailure && !hasFallback;
+  const watch = needsGovernance || hasFailure || hasFallback || (successRatePercent !== null && successRatePercent < 80) || (qualityScore !== null && qualityScore < 70);
   const recommendedAction: RouteConfirmationRecheckEvidence["recommendedAction"] = keep ? "keep" : watch ? "watch" : "manual_review";
   const summary = recommendedAction === "keep"
     ? `最近路由复检通过：成功率 ${successRatePercent ?? "未填"}%，质量 ${qualityScore ?? "未填"}，可继续沿用。`
     : recommendedAction === "watch"
-      ? `最近路由复检需观察：成功率 ${successRatePercent ?? "未填"}%，质量 ${qualityScore ?? "未填"}${hasFallback ? "，仍命中备用路线" : ""}。`
+      ? `最近路由复检需观察：成功率 ${successRatePercent ?? "未填"}%，质量 ${qualityScore ?? "未填"}${hasFallback ? "，仍命中备用路线" : ""}${needsGovernance ? "，完成依据要求治理" : ""}。`
       : "最近路由复检证据不足，需要人工复核成功率、质量和备用命中。";
 
   return {
     successRatePercent,
     qualityScore,
+    sampleCount: record?.sampleCount ?? null,
+    cost: record?.cost ?? null,
+    fallbackHit: record?.fallbackHit ?? null,
+    needsGovernance: record?.needsGovernance ?? (hasCostRisk ? true : null),
     recommendedAction,
     summary,
   };
@@ -437,6 +458,14 @@ function routeRecheckAction(item: RouteConfirmationRecheckEvidence, hasFallback:
       action: "manual_review",
       actionLabel: "人工复核",
       recommendation: `「${label}」复检证据不完整，先人工补齐成功率、质量和备用命中，再决定是否调整路线。`,
+    };
+  }
+  if (item.needsGovernance) {
+    const cost = item.cost ? `，成本记录为「${item.cost}」` : "";
+    return {
+      action: "extend_watch",
+      actionLabel: "延长观察",
+      recommendation: `「${label}」复检完成依据明确需要治理${cost}，先延长观察并跑小样本，暂缓扩大批量。`,
     };
   }
   if (hasFallback) {
@@ -1088,6 +1117,12 @@ export function buildRouteConfirmationRecheckAdvice(
       label: labelForRoutedTask(item.taskType),
       severity: routeRecheckSeverity(item, hasFallback, hasFailure),
       ...action,
+      sampleCount: item.sampleCount,
+      successRatePercent: item.successRatePercent,
+      qualityScore: item.qualityScore,
+      cost: item.cost,
+      fallbackHit: item.fallbackHit,
+      needsGovernance: item.needsGovernance,
       evidence: buildAdviceEvidence(item),
       completedAt: item.completedAt,
     }];

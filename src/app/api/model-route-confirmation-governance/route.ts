@@ -14,6 +14,14 @@ function stringList(value: unknown) {
   return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string" && item.trim().length > 0) : [];
 }
 
+function nullableNumber(value: unknown) {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function nullableBoolean(value: unknown) {
+  return typeof value === "boolean" ? value : null;
+}
+
 function adviceAction(value: unknown): RouteConfirmationRecheckAdviceItem["action"] | null {
   if (value === "switch_route" || value === "extend_watch" || value === "manual_review") return value;
   return null;
@@ -45,6 +53,12 @@ function adviceFromBody(value: unknown): RouteConfirmationRecheckAdviceItem | nu
     action,
     actionLabel,
     recommendation,
+    sampleCount: nullableNumber(raw.sampleCount),
+    successRatePercent: nullableNumber(raw.successRatePercent),
+    qualityScore: nullableNumber(raw.qualityScore),
+    cost: text(raw.cost) || null,
+    fallbackHit: nullableBoolean(raw.fallbackHit),
+    needsGovernance: nullableBoolean(raw.needsGovernance),
     evidence: stringList(raw.evidence),
     completedAt: text(raw.completedAt) || null,
   };

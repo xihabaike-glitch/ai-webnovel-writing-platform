@@ -1,4 +1,5 @@
 import type { WritingWorkbenchModelTimeline } from "@/lib/projects/writingWorkbench";
+import { RetryTaskButton } from "@/components/tasks/RetryTaskButton";
 
 function statusLabel(status: string) {
   const labels: Record<string, string> = {
@@ -44,6 +45,15 @@ export function WorkbenchModelTimelinePanel({ timeline }: { timeline: WritingWor
             </div>
             <p className="mt-2 text-slate-600">{item.summary}</p>
             <p className="mt-2 text-slate-500">下一步：{item.nextAction}</p>
+            {item.retryAction ? (
+              item.retryAction.supported ? (
+                <RetryTaskButton className="mt-3 flex flex-wrap items-center gap-2" taskId={item.id} />
+              ) : (
+                <div className="mt-3 rounded-md border border-slate-200 bg-white px-3 py-2 text-xs text-slate-600">
+                  {item.retryAction.label}：{item.retryAction.reason}
+                </div>
+              )
+            ) : null}
           </div>
         ))}
         {timeline.items.length === 0 ? (

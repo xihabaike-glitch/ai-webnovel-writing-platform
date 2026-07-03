@@ -162,9 +162,11 @@ export default async function ProjectPage({ params }: { params: Promise<{ projec
     })),
     aiTasks: project.aiTasks.map((task) => ({
       id: task.id,
+      chapterId: task.chapterId,
       taskType: task.taskType,
       status: task.status,
       model: task.model,
+      inputSnapshot: task.inputSnapshot,
       createdAt: task.createdAt,
       outputText: task.outputText,
       costUsd: task.costUsd,

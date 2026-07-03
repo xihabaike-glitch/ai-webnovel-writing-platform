@@ -1,3 +1,5 @@
+import { buildTaskRetryPlan } from "../ai/taskRetry.ts";
+
 export type WorkbenchStatus = "pass" | "warn" | "fail";
 
 export interface WritingWorkbenchProject {
@@ -53,9 +55,11 @@ export interface WritingWorkbenchWorldEntry {
 
 export interface WritingWorkbenchAiTask {
   id: string;
+  chapterId?: string | null;
   taskType: string;
   status: string;
   model: string;
+  inputSnapshot?: string | null;
   createdAt: Date | string;
   outputText?: string | null;
   costUsd?: number | null;
@@ -157,6 +161,14 @@ export interface WritingWorkbenchModelTimelineItem {
   summary: string;
   costLabel: string;
   nextAction: string;
+  retryAction: WritingWorkbenchModelTimelineRetryAction | null;
+}
+
+export interface WritingWorkbenchModelTimelineRetryAction {
+  supported: boolean;
+  label: string;
+  reason: string;
+  endpoint: string | null;
 }
 
 const treeRequirements: Array<{
@@ -468,6 +480,24 @@ function nextActionForTask(task: WritingWorkbenchAiTask) {
   return "把结果沉淀到项目土壤或下一轮动作里。";
 }
 
+function buildTimelineRetryAction(task: WritingWorkbenchAiTask): WritingWorkbenchModelTimelineRetryAction | null {
+  if (task.status !== "failed") return null;
+
+  const plan = buildTaskRetryPlan({
+    chapterId: task.chapterId ?? null,
+    taskType: task.taskType,
+    status: task.status,
+    inputSnapshot: task.inputSnapshot ?? "{}",
+  });
+
+  return {
+    supported: plan.supported,
+    label: plan.actionLabel,
+    reason: plan.reason,
+    endpoint: plan.supported ? `/api/ai/tasks/${task.id}/retry` : null,
+  };
+}
+
 function buildModelTimeline(tasks: WritingWorkbenchAiTask[]): WritingWorkbenchModelTimeline {
   const items = [...tasks]
     .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime())
@@ -482,6 +512,7 @@ function buildModelTimeline(tasks: WritingWorkbenchAiTask[]): WritingWorkbenchMo
       summary: summarizeTask(task),
       costLabel: typeof task.costUsd === "number" ? `$${task.costUsd.toFixed(3)}` : "未记录费用",
       nextAction: nextActionForTask(task),
+      retryAction: buildTimelineRetryAction(task),
     }));
 
   return {

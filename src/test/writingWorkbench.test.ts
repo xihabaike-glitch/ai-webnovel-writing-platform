@@ -78,6 +78,8 @@ test("buildWritingWorkbench", async (t) => {
           taskType: "chapter_draft",
           status: "failed",
           model: "deepseek-chat",
+          chapterId: "c1",
+          inputSnapshot: "{}",
           createdAt: "2026-07-03T00:00:00.000Z",
         },
         {
@@ -114,6 +116,10 @@ test("buildWritingWorkbench", async (t) => {
     assert.equal(workbench.modelTimeline.items[0].id, "task2");
     assert.ok(workbench.modelTimeline.items[0].summary.includes("节奏合格"));
     assert.ok(workbench.modelTimeline.items.some((item) => item.status === "failed" && item.nextAction.includes("复盘")));
+    const failedItem = workbench.modelTimeline.items.find((item) => item.id === "task1");
+    assert.equal(failedItem?.retryAction?.supported, true);
+    assert.equal(failedItem?.retryAction?.endpoint, "/api/ai/tasks/task1/retry");
+    assert.equal(failedItem?.retryAction?.label, "一键重试");
   });
 
   await t.test("recommends creating a chapter when the project has only structure", () => {
@@ -153,5 +159,40 @@ test("buildWritingWorkbench", async (t) => {
     assert.ok(!workbench.quickFixes.some((fix) => fix.kind === "world_seed"));
     assert.ok(workbench.modelActions.every((action) => action.disabledReason?.includes("先创建第一章")));
     assert.equal(workbench.modelTimeline.emptyState, "还没有模型执行记录。");
+  });
+
+  await t.test("explains failed timeline tasks that cannot be retried directly", () => {
+    const workbench = buildWritingWorkbench({
+      project: {
+        id: "p3",
+        title: "盐选反转",
+        genre: "悬疑短篇",
+        sellingPoint: "第一人称复仇反转。",
+        targetPlatformName: "知乎盐选",
+        targetWordCount: 10000,
+        currentWordCount: 0,
+      },
+      chapters: [],
+      outlineNodes: [],
+      characters: [],
+      worldEntries: [],
+      aiTasks: [
+        {
+          id: "task3",
+          taskType: "submission_package_optimize",
+          status: "failed",
+          model: "gpt-4.1",
+          chapterId: null,
+          inputSnapshot: "{}",
+          errorMessage: "context too long",
+          createdAt: "2026-07-03T01:00:00.000Z",
+        },
+      ],
+    });
+
+    const [item] = workbench.modelTimeline.items;
+    assert.equal(item.retryAction?.supported, false);
+    assert.equal(item.retryAction?.label, "回项目处理");
+    assert.ok(item.retryAction?.reason.includes("没有绑定章节"));
   });
 });

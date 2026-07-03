@@ -17,6 +17,7 @@ import {
   buildGateProjectSecondMetricDecision,
   buildGateProjectSecondMetricDispatchItems,
   buildGateProjectSecondMetricFollowupDispatchItems,
+  buildGateProjectThirdMetricDecision,
   buildGatePlatformDispatchReceipt,
   buildGateDispatchEvidenceReview,
   buildGatePlatformScaleGate,
@@ -1478,6 +1479,108 @@ test("buildGateActionReceipt", async (t) => {
 
     assert.equal(refreshed[0].state, "completed");
     assert.equal(refreshed[1].state, "queued");
+  });
+
+  await t.test("decides final platform state after third-round metric recovery", () => {
+    function thirdMetricTask(input: {
+      projectId: string;
+      platformId: string;
+      platformName: string;
+      completedAt: string;
+    }) {
+      return {
+        id: `${input.platformId}:second_metric_followup:third_metrics_recovery:${input.projectId}`,
+        dispatchKey: `${input.platformId}:second_metric_followup:third_metrics_recovery:${input.projectId}`,
+        databaseId: `dispatch-db-third-${input.platformId}`,
+        projectId: input.projectId,
+        platformId: input.platformId,
+        platformName: input.platformName,
+        stage: "start_metrics_recovery" as const,
+        state: "completed" as const,
+        priorityScore: 86,
+        ownerRole: "数据运营",
+        title: `${input.platformName} 第三轮数据回收`,
+        detail: "第三轮数据已回收。",
+        dueLabel: "加码后 24 小时",
+        actionLabel: "派给数据运营",
+        href: `/projects/${input.projectId}#platform-export`,
+        acceptanceCriteria: ["第三轮曝光、点击、收藏或追读已回收"],
+        evidence: ["二轮后继续加码已完成"],
+        sourceReceiptId: null,
+        completionEvidence: "已回收第三轮真实数据。",
+        reviewLatestAt: "2026-01-01T07:00:00.000Z",
+        assignedAt: "2026-01-01T07:30:00.000Z",
+        completedAt: input.completedAt,
+        createdAt: "2026-01-01T07:30:00.000Z",
+        updatedAt: input.completedAt,
+      };
+    }
+
+    const tasks = [
+      thirdMetricTask({ projectId: "project-1", platformId: "fanqie", platformName: "番茄小说", completedAt: "2026-01-01T08:00:00.000Z" }),
+      thirdMetricTask({ projectId: "project-2", platformId: "qimao", platformName: "七猫小说", completedAt: "2026-01-01T08:00:00.000Z" }),
+      thirdMetricTask({ projectId: "project-3", platformId: "royalroad", platformName: "Royal Road", completedAt: "2026-01-01T08:00:00.000Z" }),
+      thirdMetricTask({ projectId: "project-4", platformId: "webnovel", platformName: "WebNovel", completedAt: "2026-01-01T08:00:00.000Z" }),
+      thirdMetricTask({ projectId: "project-5", platformId: "wattpad", platformName: "Wattpad", completedAt: "2026-01-01T08:00:00.000Z" }),
+    ];
+    const receipts = [
+      buildGatePublishEffectReceipt({
+        projectId: "project-1",
+        platformId: "fanqie",
+        platformName: "番茄小说",
+        now: "2026-01-01T09:00:00.000Z",
+        metric: { views: 9000, clicks: 1250, favorites: 390, follows: 180 },
+      }),
+      buildGatePublishEffectReceipt({
+        projectId: "project-2",
+        platformId: "qimao",
+        platformName: "七猫小说",
+        now: "2026-01-01T09:00:00.000Z",
+        metric: { views: 7600, clicks: 620, favorites: 190, follows: 92 },
+      }),
+      buildGatePublishEffectReceipt({
+        projectId: "project-3",
+        platformId: "royalroad",
+        platformName: "Royal Road",
+        now: "2026-01-01T09:00:00.000Z",
+        metric: { views: 6400, clicks: 310, favorites: 72, follows: 48 },
+      }),
+      buildGatePublishEffectReceipt({
+        projectId: "project-4",
+        platformId: "webnovel",
+        platformName: "WebNovel",
+        now: "2026-01-01T09:00:00.000Z",
+        metric: { views: 5200, clicks: 0, favorites: 0, follows: 0 },
+      }),
+    ];
+
+    const decision = buildGateProjectThirdMetricDecision(tasks, receipts);
+
+    assert.equal(decision.summary.total, 5);
+    assert.equal(decision.summary.stableScale, 1);
+    assert.equal(decision.summary.downgradeRepair, 1);
+    assert.equal(decision.summary.pivotPlatform, 1);
+    assert.equal(decision.summary.archivePause, 1);
+    assert.equal(decision.summary.waitMetric, 1);
+    assert.deepEqual(decision.items.map((item) => item.status), [
+      "archive_pause",
+      "pivot_platform",
+      "downgrade_repair",
+      "wait_metric",
+      "stable_scale",
+    ]);
+    assert.equal(decision.items[0].platformId, "webnovel");
+    assert.equal(decision.items[0].actionLabel, "归档暂停");
+    assert.ok(decision.items[0].detail.includes("三轮"));
+    assert.equal(decision.items[1].platformId, "royalroad");
+    assert.equal(decision.items[1].actionLabel, "换平台验证");
+    assert.equal(decision.items[2].platformId, "qimao");
+    assert.equal(decision.items[2].actionLabel, "降档修复");
+    assert.equal(decision.items[3].platformId, "wattpad");
+    assert.equal(decision.items[3].actionLabel, "回填第三轮数据");
+    assert.equal(decision.items[4].platformId, "fanqie");
+    assert.equal(decision.items[4].actionLabel, "稳定加码");
+    assert.ok(decision.items[4].evidence.includes("追读率 2%"));
   });
 
   await t.test("gates platform scale-up behind verified dispatch evidence", () => {

@@ -381,6 +381,39 @@ export interface GateProjectSecondMetricDecision {
   items: GateProjectSecondMetricDecisionItem[];
 }
 
+export type GateProjectThirdMetricDecisionStatus = "stable_scale" | "downgrade_repair" | "pivot_platform" | "archive_pause" | "wait_metric";
+
+export interface GateProjectThirdMetricDecisionItem {
+  dispatchKey: string;
+  projectId: string | null;
+  platformId: string;
+  platformName: string;
+  status: GateProjectThirdMetricDecisionStatus;
+  label: string;
+  detail: string;
+  actionLabel: string;
+  href: string;
+  priorityScore: number;
+  metricAt: string | null;
+  clickRatePercent: number | null;
+  favoriteRatePercent: number | null;
+  followRatePercent: number | null;
+  evidence: string[];
+}
+
+export interface GateProjectThirdMetricDecision {
+  summary: {
+    total: number;
+    stableScale: number;
+    downgradeRepair: number;
+    pivotPlatform: number;
+    archivePause: number;
+    waitMetric: number;
+  };
+  nextActions: string[];
+  items: GateProjectThirdMetricDecisionItem[];
+}
+
 export type GatePlatformScaleGateStatus = "ready" | "blocked_evidence" | "needs_dispatch" | "not_candidate";
 
 export interface GatePlatformScaleGateItem {
@@ -3126,6 +3159,168 @@ export function buildGateProjectSecondMetricFollowupDispatchItems(
       };
     })
     .filter((item): item is GatePlatformGrowthDispatchItem => Boolean(item));
+}
+
+function projectThirdMetricDecisionFromMetric(
+  task: PersistedGatePlatformDispatchTask,
+  metric: GatePublishEffectMetricSnapshot | null,
+): Pick<GateProjectThirdMetricDecisionItem, "status" | "label" | "detail" | "actionLabel" | "href" | "priorityScore" | "evidence"> {
+  if (!metric) {
+    return {
+      status: "wait_metric",
+      label: "等三轮数据",
+      detail: `${task.platformName} 已完成第三轮数据回收派单，但还没有看到第三轮效果回执。先补真实数据，再做最终平台状态判断。`,
+      actionLabel: "回填第三轮数据",
+      href: task.href,
+      priorityScore: task.priorityScore,
+      evidence: ["缺少第三轮效果回执", ...task.evidence].slice(0, 3),
+    };
+  }
+
+  const zeroConversion = metric.views >= 100 && metric.clicks === 0 && metric.follows === 0;
+  if (zeroConversion || metric.clickRatePercent < 4 || metric.followRatePercent < 0.6) {
+    return {
+      status: "archive_pause",
+      label: "归档暂停",
+      detail: `${task.platformName} 三轮加码后仍然没有形成有效点击或追读，继续投入只会扩大损失。归档暂停，保留避坑样本和重启条件。`,
+      actionLabel: "归档暂停",
+      href: task.href,
+      priorityScore: Math.max(task.priorityScore, 94),
+      evidence: [`点击率 ${precisePercent(metric.clicks, metric.views)}%`, `收藏率 ${precisePercent(metric.favorites, metric.views)}%`, `追读率 ${precisePercent(metric.follows, metric.views)}%`],
+    };
+  }
+
+  if (metric.clickRatePercent < 6 || metric.favoriteRatePercent < 1.5 || metric.followRatePercent < 0.9) {
+    return {
+      status: "pivot_platform",
+      label: "换平台",
+      detail: `${task.platformName} 三轮数据仍低于平台匹配线，当前平台或入口打法不值得继续消耗主力资源，转入新平台验证。`,
+      actionLabel: "换平台验证",
+      href: task.href.replace("#platform-export", "#submission-package"),
+      priorityScore: Math.max(task.priorityScore, 88),
+      evidence: [`点击率 ${precisePercent(metric.clicks, metric.views)}%`, `收藏率 ${precisePercent(metric.favorites, metric.views)}%`, `追读率 ${precisePercent(metric.follows, metric.views)}%`],
+    };
+  }
+
+  if (metric.clickRatePercent < 9 || metric.favoriteRatePercent < 3 || metric.followRatePercent < 1.5) {
+    return {
+      status: "downgrade_repair",
+      label: "降档修复",
+      detail: `${task.platformName} 三轮数据没有崩，但稳定性还不够硬。降档为修复优先，先收紧投入、复检发布包和前三章兑现。`,
+      actionLabel: "降档修复",
+      href: task.href,
+      priorityScore: Math.max(task.priorityScore, 82),
+      evidence: [`点击率 ${precisePercent(metric.clicks, metric.views)}%`, `收藏率 ${precisePercent(metric.favorites, metric.views)}%`, `追读率 ${precisePercent(metric.follows, metric.views)}%`],
+    };
+  }
+
+  return {
+    status: "stable_scale",
+    label: "稳定加码",
+    detail: `${task.platformName} 三轮数据连续站住，点击率 ${metric.clickRatePercent}%，收藏率 ${metric.favoriteRatePercent}%，追读率 ${metric.followRatePercent}%。可以进入稳定加码，但仍保留周期复盘。`,
+    actionLabel: "稳定加码",
+    href: task.href,
+    priorityScore: Math.max(task.priorityScore, 84),
+    evidence: [`点击率 ${precisePercent(metric.clicks, metric.views)}%`, `收藏率 ${precisePercent(metric.favorites, metric.views)}%`, `追读率 ${precisePercent(metric.follows, metric.views)}%`],
+  };
+}
+
+export function buildGateProjectThirdMetricDecision(
+  tasks: PersistedGatePlatformDispatchTask[],
+  receipts: GateActionReceipt[] = [],
+): GateProjectThirdMetricDecision {
+  const operationalReceipts = trimGateActionReceipts(receipts, 100)
+    .filter((receipt) => !isAuditMetaReceipt(receipt));
+  const metricsByPlatform = new Map<string, GatePublishEffectMetricSnapshot[]>();
+
+  for (const receipt of operationalReceipts) {
+    const metric = metricFromReceipt(receipt);
+    if (!metric) continue;
+    const metrics = metricsByPlatform.get(metric.platformId) ?? [];
+    metrics.push(metric);
+    metricsByPlatform.set(metric.platformId, metrics);
+  }
+
+  for (const metrics of metricsByPlatform.values()) {
+    metrics.sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime());
+  }
+
+  const thirdMetricTasks = tasks
+    .filter((task) => (
+      task.stage === "start_metrics_recovery"
+      && task.dispatchKey.includes(":second_metric_followup:third_metrics_recovery:")
+      && task.state === "completed"
+      && task.completionEvidence.trim()
+    ))
+    .sort((left, right) => new Date(right.completedAt ?? right.updatedAt).getTime() - new Date(left.completedAt ?? left.updatedAt).getTime());
+  const latestTaskByPlatform = new Map<string, PersistedGatePlatformDispatchTask>();
+  for (const task of thirdMetricTasks) {
+    if (!latestTaskByPlatform.has(task.platformId)) latestTaskByPlatform.set(task.platformId, task);
+  }
+
+  const items = [...latestTaskByPlatform.values()].map((task): GateProjectThirdMetricDecisionItem => {
+    const completedAt = validDate(task.completedAt) ?? validDate(task.updatedAt);
+    const metric = (metricsByPlatform.get(task.platformId) ?? [])
+      .find((candidate) => !completedAt || new Date(candidate.createdAt).getTime() > completedAt.getTime()) ?? null;
+    const decision = projectThirdMetricDecisionFromMetric(task, metric);
+
+    return {
+      dispatchKey: task.dispatchKey,
+      projectId: task.projectId,
+      platformId: task.platformId,
+      platformName: task.platformName,
+      status: decision.status,
+      label: decision.label,
+      detail: decision.detail,
+      actionLabel: decision.actionLabel,
+      href: decision.href,
+      priorityScore: decision.priorityScore,
+      metricAt: metric?.createdAt ?? null,
+      clickRatePercent: metric?.clickRatePercent ?? null,
+      favoriteRatePercent: metric?.favoriteRatePercent ?? null,
+      followRatePercent: metric?.followRatePercent ?? null,
+      evidence: decision.evidence,
+    };
+  });
+
+  const stableScale = items.filter((item) => item.status === "stable_scale").length;
+  const downgradeRepair = items.filter((item) => item.status === "downgrade_repair").length;
+  const pivotPlatform = items.filter((item) => item.status === "pivot_platform").length;
+  const archivePause = items.filter((item) => item.status === "archive_pause").length;
+  const waitMetric = items.filter((item) => item.status === "wait_metric").length;
+  const statusWeight: Record<GateProjectThirdMetricDecisionStatus, number> = {
+    archive_pause: 0,
+    pivot_platform: 1,
+    downgrade_repair: 2,
+    wait_metric: 3,
+    stable_scale: 4,
+  };
+
+  return {
+    summary: {
+      total: items.length,
+      stableScale,
+      downgradeRepair,
+      pivotPlatform,
+      archivePause,
+      waitMetric,
+    },
+    nextActions: [
+      archivePause > 0 ? `${archivePause} 个平台三轮后仍无有效转化，归档暂停，沉淀避坑样本。` : null,
+      pivotPlatform > 0 ? `${pivotPlatform} 个平台三轮后平台匹配弱，转去新平台验证。` : null,
+      downgradeRepair > 0 ? `${downgradeRepair} 个平台三轮后未稳住，降档修复发布包和前三章。` : null,
+      waitMetric > 0 ? `${waitMetric} 个平台缺第三轮真实数据，先补效果回执。` : null,
+      stableScale > 0 ? `${stableScale} 个平台三轮数据稳定，可以进入稳定加码池。` : null,
+      items.length === 0 ? "还没有完成第三轮数据回收，先把二轮继续加码后的回流任务收口。" : null,
+    ].filter((action): action is string => Boolean(action)),
+    items: items.sort((left, right) => {
+      const statusDiff = statusWeight[left.status] - statusWeight[right.status];
+      if (statusDiff !== 0) return statusDiff;
+      const priorityDiff = right.priorityScore - left.priorityScore;
+      if (priorityDiff !== 0) return priorityDiff;
+      return left.platformName.localeCompare(right.platformName);
+    }),
+  };
 }
 
 export function buildGatePlatformScaleGate(

@@ -195,4 +195,60 @@ test("buildWritingWorkbench", async (t) => {
     assert.equal(item.retryAction?.label, "回项目处理");
     assert.ok(item.retryAction?.reason.includes("没有绑定章节"));
   });
+
+  await t.test("marks a failed timeline task as recovered by a later same-chapter success", () => {
+    const workbench = buildWritingWorkbench({
+      project: {
+        id: "p4",
+        title: "七猫保底文",
+        genre: "年代逆袭",
+        sellingPoint: "女主靠手艺翻身。",
+        targetPlatformName: "七猫",
+        targetWordCount: 500000,
+        currentWordCount: 1800,
+      },
+      chapters: [
+        {
+          id: "c4",
+          title: "第一章 回村",
+          order: 1,
+          status: "draft",
+          wordCount: 1800,
+          hook: "女主刚回村就被逼签下不平等欠条。",
+          conflict: "保住母亲药钱和拒绝族亲压榨只能选一个。",
+          cliffhanger: "她发现欠条背面藏着上一世的死亡日期。",
+        },
+      ],
+      outlineNodes: [],
+      characters: [],
+      worldEntries: [],
+      aiTasks: [
+        {
+          id: "failed-draft",
+          taskType: "chapter_draft",
+          status: "failed",
+          model: "deepseek-chat",
+          chapterId: "c4",
+          inputSnapshot: "{}",
+          errorMessage: "503 provider timeout",
+          createdAt: "2026-07-03T02:00:00.000Z",
+        },
+        {
+          id: "retry-draft",
+          taskType: "chapter_draft",
+          status: "succeeded",
+          model: "deepseek-chat",
+          chapterId: "c4",
+          inputSnapshot: "{}",
+          outputText: "重试后已生成第一章正文。",
+          createdAt: "2026-07-03T02:04:00.000Z",
+        },
+      ],
+    });
+
+    const failedItem = workbench.modelTimeline.items.find((item) => item.id === "failed-draft");
+    assert.equal(failedItem?.recovery.status, "recovered");
+    assert.equal(failedItem?.recovery.recoveredByTaskId, "retry-draft");
+    assert.ok(failedItem?.recovery.label.includes("已恢复"));
+  });
 });

@@ -45,14 +45,23 @@ export function WorkbenchModelTimelinePanel({ timeline }: { timeline: WritingWor
             </div>
             <p className="mt-2 text-slate-600">{item.summary}</p>
             <p className="mt-2 text-slate-500">下一步：{item.nextAction}</p>
+            {item.recovery ? (
+              <div className={`mt-3 rounded-md border px-3 py-2 text-xs ${
+                item.recovery.status === "recovered"
+                  ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                  : "border-amber-200 bg-amber-50 text-amber-800"
+              }`}>
+                {item.recovery.label}：{item.recovery.detail}
+              </div>
+            ) : null}
             {item.retryAction ? (
-              item.retryAction.supported ? (
+              item.retryAction.supported && item.recovery?.status !== "recovered" ? (
                 <RetryTaskButton className="mt-3 flex flex-wrap items-center gap-2" taskId={item.id} />
-              ) : (
+              ) : item.recovery?.status !== "recovered" ? (
                 <div className="mt-3 rounded-md border border-slate-200 bg-white px-3 py-2 text-xs text-slate-600">
                   {item.retryAction.label}：{item.retryAction.reason}
                 </div>
-              )
+              ) : null
             ) : null}
           </div>
         ))}

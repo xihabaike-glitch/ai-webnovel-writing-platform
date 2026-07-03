@@ -162,6 +162,7 @@ export interface WritingWorkbenchModelTimelineItem {
   costLabel: string;
   nextAction: string;
   retryAction: WritingWorkbenchModelTimelineRetryAction | null;
+  recovery: WritingWorkbenchModelTimelineRecovery | null;
 }
 
 export interface WritingWorkbenchModelTimelineRetryAction {
@@ -169,6 +170,13 @@ export interface WritingWorkbenchModelTimelineRetryAction {
   label: string;
   reason: string;
   endpoint: string | null;
+}
+
+export interface WritingWorkbenchModelTimelineRecovery {
+  status: "recovered" | "unresolved";
+  label: string;
+  detail: string;
+  recoveredByTaskId: string | null;
 }
 
 const treeRequirements: Array<{
@@ -498,6 +506,37 @@ function buildTimelineRetryAction(task: WritingWorkbenchAiTask): WritingWorkbenc
   };
 }
 
+function buildTimelineRecovery(task: WritingWorkbenchAiTask, tasks: WritingWorkbenchAiTask[]): WritingWorkbenchModelTimelineRecovery | null {
+  if (task.status !== "failed") return null;
+
+  const taskCreatedAt = new Date(task.createdAt).getTime();
+  const recoveredBy = tasks
+    .filter((candidate) => (
+      candidate.id !== task.id
+      && candidate.status === "succeeded"
+      && candidate.taskType === task.taskType
+      && candidate.chapterId === task.chapterId
+      && new Date(candidate.createdAt).getTime() > taskCreatedAt
+    ))
+    .sort((left, right) => new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime())[0];
+
+  if (!recoveredBy) {
+    return {
+      status: "unresolved",
+      label: "未恢复",
+      detail: "还没有看到同章节同任务类型的成功记录。",
+      recoveredByTaskId: null,
+    };
+  }
+
+  return {
+    status: "recovered",
+    label: "已恢复",
+    detail: `后续 ${taskLabel(recoveredBy.taskType)} 已成功，恢复任务：${recoveredBy.id}。`,
+    recoveredByTaskId: recoveredBy.id,
+  };
+}
+
 function buildModelTimeline(tasks: WritingWorkbenchAiTask[]): WritingWorkbenchModelTimeline {
   const items = [...tasks]
     .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime())
@@ -513,6 +552,7 @@ function buildModelTimeline(tasks: WritingWorkbenchAiTask[]): WritingWorkbenchMo
       costLabel: typeof task.costUsd === "number" ? `$${task.costUsd.toFixed(3)}` : "未记录费用",
       nextAction: nextActionForTask(task),
       retryAction: buildTimelineRetryAction(task),
+      recovery: buildTimelineRecovery(task, tasks),
     }));
 
   return {

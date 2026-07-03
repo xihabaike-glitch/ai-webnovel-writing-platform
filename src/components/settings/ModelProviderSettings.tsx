@@ -119,6 +119,7 @@ interface RouteAvoidanceGovernanceView {
     providerId: string | null;
     model: string;
     taskScope: string;
+    scopedTaskType: string | null;
     riskLevel: "high" | "medium";
     actionLabel: string;
     reviewAction: string;
@@ -126,6 +127,10 @@ interface RouteAvoidanceGovernanceView {
     evidence: string[];
     governanceNote: string | null;
     watchUntil: string | null;
+    scopeOptions: Array<{
+      taskType: string;
+      label: string;
+    }>;
   }>;
   nextActions: string[];
 }
@@ -250,6 +255,12 @@ export function ModelProviderSettings({
   const [savingRouteType, setSavingRouteType] = useState<string | null>(null);
   const [applyingRecommendationType, setApplyingRecommendationType] = useState<string | null>(null);
   const [governingRuleKey, setGoverningRuleKey] = useState<string | null>(null);
+  const [scopeDrafts, setScopeDrafts] = useState<Record<string, string>>(() => Object.fromEntries(
+    routeAvoidanceGovernance.items.map((item) => [
+      item.ruleKey,
+      item.scopedTaskType ?? item.scopeOptions[0]?.taskType ?? "chapter_review",
+    ]),
+  ));
   const [routeMessage, setRouteMessage] = useState<string | null>(null);
   const currentTestResult = testResults[selectedProviderId];
 
@@ -406,6 +417,8 @@ export function ModelProviderSettings({
     setGoverningRuleKey(`${item.ruleKey}:${action}`);
     setRouteMessage(null);
     const expiresAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString();
+    const selectedTaskType = scopeDrafts[item.ruleKey] ?? item.scopedTaskType ?? item.scopeOptions[0]?.taskType ?? "chapter_review";
+    const selectedTaskLabel = item.scopeOptions.find((option) => option.taskType === selectedTaskType)?.label ?? "所选任务";
 
     try {
       const response = await fetch("/api/model-route-avoidance-overrides", {
@@ -414,11 +427,11 @@ export function ModelProviderSettings({
         body: JSON.stringify({
           ruleKey: item.ruleKey,
           action,
-          taskType: action === "scope_task" ? "chapter_review" : null,
+          taskType: action === "scope_task" ? selectedTaskType : null,
           note: action === "dismiss"
             ? "人工复测通过，解除观察。"
             : action === "scope_task"
-              ? "先限定在章节审稿任务继续观察。"
+              ? `先限定在${selectedTaskLabel}任务继续观察。`
               : "延长观察 14 天，再跑两批后复核。",
           expiresAt: action === "extend_watch" ? expiresAt : null,
         }),
@@ -673,14 +686,23 @@ export function ModelProviderSettings({
                     {item.evidence.slice(0, 2).map((evidence) => <div key={evidence}>{evidence}</div>)}
                   </div>
                 ) : null}
-                <div className="mt-3 flex flex-wrap gap-2">
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  <select
+                    className="rounded-md border border-slate-300 bg-white px-2 py-1.5 text-xs text-slate-700"
+                    onChange={(event) => setScopeDrafts((current) => ({ ...current, [item.ruleKey]: event.target.value }))}
+                    value={scopeDrafts[item.ruleKey] ?? item.scopedTaskType ?? item.scopeOptions[0]?.taskType ?? "chapter_review"}
+                  >
+                    {item.scopeOptions.map((option) => (
+                      <option key={option.taskType} value={option.taskType}>{option.label}</option>
+                    ))}
+                  </select>
                   <button
                     className="rounded-md bg-slate-950 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50"
                     disabled={governingRuleKey === `${item.ruleKey}:scope_task`}
                     onClick={() => saveAvoidanceOverride(item, "scope_task")}
                     type="button"
                   >
-                    {governingRuleKey === `${item.ruleKey}:scope_task` ? "保存中" : "限定到审稿"}
+                    {governingRuleKey === `${item.ruleKey}:scope_task` ? "保存中" : "限定到所选任务"}
                   </button>
                   <button
                     className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 disabled:opacity-50"

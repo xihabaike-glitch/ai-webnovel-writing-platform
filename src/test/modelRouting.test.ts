@@ -417,6 +417,8 @@ test("model task routing", async (t) => {
     assert.equal(governance.items[0].riskLevel, "high");
     assert.equal(governance.items[0].actionLabel, "限定任务类型");
     assert.ok(governance.items[0].reviewAction.includes("人工解除观察"));
+    assert.ok(governance.items[0].scopeOptions.some((option) => option.taskType === "chapter_draft" && option.label === "正文初稿"));
+    assert.ok(governance.items[0].scopeOptions.some((option) => option.taskType === "first_three_rewrite" && option.label === "前三章改写"));
     assert.equal(governance.items[1].taskScope, "章节审稿");
     assert.ok(governance.nextActions.some((action) => action.includes("全局避坑规则")));
   });

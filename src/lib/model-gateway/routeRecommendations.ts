@@ -80,6 +80,7 @@ export interface RouteAvoidanceGovernanceItem {
   providerId: string | null;
   model: string;
   taskScope: string;
+  scopedTaskType: string | null;
   riskLevel: "high" | "medium";
   actionLabel: string;
   reviewAction: string;
@@ -87,6 +88,10 @@ export interface RouteAvoidanceGovernanceItem {
   evidence: string[];
   governanceNote: string | null;
   watchUntil: string | null;
+  scopeOptions: Array<{
+    taskType: string;
+    label: string;
+  }>;
 }
 
 export interface RouteAvoidanceGovernance {
@@ -343,6 +348,7 @@ export function buildRouteAvoidanceGovernance(
       providerId: provider?.providerId ?? rule.providerId ?? null,
       model,
       taskScope,
+      scopedTaskType: rule.taskType ?? null,
       riskLevel: scoped ? "medium" : "high",
       actionLabel: scoped ? "人工复核" : "限定任务类型",
       reviewAction: rule.watchUntil
@@ -354,6 +360,10 @@ export function buildRouteAvoidanceGovernance(
       evidence: rule.evidence ?? [],
       governanceNote: rule.governanceNote ?? null,
       watchUntil: rule.watchUntil ?? null,
+      scopeOptions: modelTaskRouteOptions.map((option) => ({
+        taskType: option.taskType,
+        label: option.label,
+      })),
     };
   }).sort((left, right) => (
     (left.riskLevel === "high" ? 0 : 1) - (right.riskLevel === "high" ? 0 : 1)

@@ -9,8 +9,9 @@ import {
   buildProjectStartTacticWorldEntry,
   findProjectStartTacticSummary,
   parseProjectStartTacticSummary,
+  selectProjectStartTemplateFromExperienceGuide,
 } from "../lib/projects/projectStartTactics.ts";
-import { getDefaultTemplateForPlatform } from "../lib/projects/projectTemplates.ts";
+import { getDefaultTemplateForPlatform, projectTemplates } from "../lib/projects/projectTemplates.ts";
 
 test("buildProjectStartTacticAdvice", async (t) => {
   await t.test("uses template advice when no historical platform experience exists", () => {
@@ -194,6 +195,67 @@ test("buildProjectStartTacticAdvice", async (t) => {
     assert.equal(guide.items.find((item) => item.platformId === "webnovel")?.status, "avoid");
     assert.ok(guide.nextActions.some((action) => action.includes("优先参考 番茄小说")));
     assert.ok(guide.nextActions.some((action) => action.includes("2 个平台有避坑信号")));
+  });
+
+  await t.test("selects a reusable platform template for new project defaults", () => {
+    const fallbackTemplate = getDefaultTemplateForPlatform("qidian");
+    const fanqieExperience: GatePlatformTacticExperienceItem = {
+      platformId: "fanqie",
+      platformName: "番茄小说",
+      status: "usable",
+      label: "可复用打法",
+      tactic: "首秀稳定加码打法",
+      lesson: "首秀数据连续站住。",
+      reuseHint: "新项目可复用首章高压钩子和前三章兑现节奏。",
+      risk: "先小步验证，不要直接放量。",
+      href: "/gate",
+      sourceStatus: "healthy",
+      sourceLabel: "稳定加码",
+      priorityScore: 92,
+      latestAt: "2026-01-18T00:00:00.000Z",
+      evidence: ["最终判定：稳定加码。"],
+    };
+    const webnovelExperience: GatePlatformTacticExperienceItem = {
+      platformId: "webnovel",
+      platformName: "WebNovel",
+      status: "blocked",
+      label: "避坑样本",
+      tactic: "海外转化暂停样本",
+      lesson: "三轮仍未形成有效转化。",
+      reuseHint: "同类项目先复用暂停原因。",
+      risk: "重启条件必须写清。",
+      href: "/gate",
+      sourceStatus: "blocked",
+      sourceLabel: "归档暂停",
+      priorityScore: 98,
+      latestAt: "2026-01-18T00:10:00.000Z",
+      evidence: ["最终判定：归档暂停。"],
+    };
+    const guide = buildProjectStartPlatformExperienceGuide({
+      platforms: [getPlatformProfile("qidian"), getPlatformProfile("fanqie"), getPlatformProfile("webnovel")],
+      experiences: [webnovelExperience, fanqieExperience],
+    });
+
+    const selected = selectProjectStartTemplateFromExperienceGuide({
+      templates: projectTemplates,
+      guide,
+      fallbackTemplate,
+    });
+
+    assert.equal(selected.platformId, "fanqie");
+
+    const avoidOnlyGuide = buildProjectStartPlatformExperienceGuide({
+      platforms: [getPlatformProfile("qidian"), getPlatformProfile("webnovel")],
+      experiences: [webnovelExperience],
+    });
+
+    const conservativeSelected = selectProjectStartTemplateFromExperienceGuide({
+      templates: projectTemplates,
+      guide: avoidOnlyGuide,
+      fallbackTemplate,
+    });
+
+    assert.equal(conservativeSelected.id, fallbackTemplate.id);
   });
 
   await t.test("turns start advice into a reusable platform soil entry", () => {

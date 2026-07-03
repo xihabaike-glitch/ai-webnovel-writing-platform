@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { platformProfiles, type LengthType, type PlatformId } from "@/lib/platforms/platformProfiles";
 import { getPlatformWritingStyle } from "@/lib/platforms/writingStyleTemplates";
 import {
@@ -16,10 +16,11 @@ import {
 import {
   buildProjectStartPlatformExperienceGuide,
   buildProjectStartTacticAdvice,
+  selectProjectStartTemplateFromExperienceGuide,
   type ProjectStartPlatformExperienceStatus,
   type ProjectStartTacticAdviceStatus,
 } from "@/lib/projects/projectStartTactics";
-import { projectTemplates } from "@/lib/projects/projectTemplates";
+import { projectTemplates, type ProjectTemplate } from "@/lib/projects/projectTemplates";
 
 const lengthOptions = [
   { id: "short_10k", label: "1 万字短篇" },
@@ -45,6 +46,8 @@ function platformExperienceClass(status: ProjectStartPlatformExperienceStatus) {
 export function ProjectForm() {
   const router = useRouter();
   const defaultTemplate = projectTemplates[0];
+  const userTouchedStartDefaultsRef = useRef(false);
+  const historyDefaultAppliedRef = useRef(false);
   const [templateId, setTemplateId] = useState(defaultTemplate.id);
   const [title, setTitle] = useState(defaultTemplate.titleSeed);
   const [genre, setGenre] = useState(defaultTemplate.genre);
@@ -95,6 +98,20 @@ export function ProjectForm() {
         const batchEffectReview = buildGateBatchTacticEffectReview(receipts, platformProfiles.length);
         setHistoryExperiences(library.items);
         setBatchTacticEffects(batchEffectReview.items);
+        const historicalGuide = buildProjectStartPlatformExperienceGuide({
+          platforms: platformProfiles,
+          experiences: library.items,
+          batchEffects: batchEffectReview.items,
+        });
+        const recommendedTemplate = selectProjectStartTemplateFromExperienceGuide({
+          templates: projectTemplates,
+          guide: historicalGuide,
+          fallbackTemplate: defaultTemplate,
+        });
+        if (!userTouchedStartDefaultsRef.current && !historyDefaultAppliedRef.current && recommendedTemplate.id !== defaultTemplate.id) {
+          historyDefaultAppliedRef.current = true;
+          applyTemplateFields(recommendedTemplate);
+        }
       } catch {
         if (!ignore) {
           setHistoryExperiences([]);
@@ -110,8 +127,11 @@ export function ProjectForm() {
     };
   }, []);
 
-  function applyTemplate(nextTemplateId: string) {
-    const template = projectTemplates.find((item) => item.id === nextTemplateId) ?? defaultTemplate;
+  function markUserTouchedStartDefaults() {
+    userTouchedStartDefaultsRef.current = true;
+  }
+
+  function applyTemplateFields(template: ProjectTemplate) {
     setTemplateId(template.id);
     setTitle(template.titleSeed);
     setGenre(template.genre);
@@ -121,9 +141,16 @@ export function ProjectForm() {
     setSellingPoint(template.sellingPoint);
   }
 
+  function applyTemplate(nextTemplateId: string) {
+    markUserTouchedStartDefaults();
+    const template = projectTemplates.find((item) => item.id === nextTemplateId) ?? defaultTemplate;
+    applyTemplateFields(template);
+  }
+
   function applyPlatform(nextPlatformId: PlatformId) {
+    markUserTouchedStartDefaults();
     const template = projectTemplates.find((item) => item.platformId === nextPlatformId) ?? defaultTemplate;
-    applyTemplate(template.id);
+    applyTemplateFields(template);
   }
 
   async function createProject(formData: FormData) {
@@ -244,7 +271,10 @@ export function ProjectForm() {
           className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2"
           id="title"
           name="title"
-          onChange={(event) => setTitle(event.target.value)}
+          onChange={(event) => {
+            markUserTouchedStartDefaults();
+            setTitle(event.target.value);
+          }}
           value={title}
         />
       </div>
@@ -257,7 +287,10 @@ export function ProjectForm() {
             className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2"
             id="genre"
             name="genre"
-            onChange={(event) => setGenre(event.target.value)}
+            onChange={(event) => {
+              markUserTouchedStartDefaults();
+              setGenre(event.target.value);
+            }}
             value={genre}
           />
         </div>
@@ -269,7 +302,10 @@ export function ProjectForm() {
             className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2"
             id="updateCadence"
             name="updateCadence"
-            onChange={(event) => setUpdateCadence(event.target.value)}
+            onChange={(event) => {
+              markUserTouchedStartDefaults();
+              setUpdateCadence(event.target.value);
+            }}
             value={updateCadence}
           />
         </div>
@@ -301,7 +337,10 @@ export function ProjectForm() {
             className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2"
             id="length"
             name="length"
-            onChange={(event) => setLengthType(event.target.value as LengthType)}
+            onChange={(event) => {
+              markUserTouchedStartDefaults();
+              setLengthType(event.target.value as LengthType);
+            }}
             value={lengthType}
           >
             {lengthOptions.map((option) => (
@@ -384,7 +423,10 @@ export function ProjectForm() {
           className="mt-1 min-h-20 w-full rounded-md border border-slate-200 px-3 py-2"
           id="sellingPoint"
           name="sellingPoint"
-          onChange={(event) => setSellingPoint(event.target.value)}
+          onChange={(event) => {
+            markUserTouchedStartDefaults();
+            setSellingPoint(event.target.value);
+          }}
           value={sellingPoint}
         />
       </div>

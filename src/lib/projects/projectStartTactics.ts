@@ -238,6 +238,16 @@ export function buildProjectStartPlatformExperienceGuide(input: {
   };
 }
 
+export function selectProjectStartTemplateFromExperienceGuide(input: {
+  templates: ProjectTemplate[];
+  guide: ProjectStartPlatformExperienceGuide;
+  fallbackTemplate: ProjectTemplate;
+}): ProjectTemplate {
+  const recommendedPlatform = input.guide.items.find((item) => item.status === "recommended");
+  if (!recommendedPlatform) return input.fallbackTemplate;
+  return input.templates.find((template) => template.platformId === recommendedPlatform.platformId) ?? input.fallbackTemplate;
+}
+
 export function buildProjectStartTacticAdvice(input: {
   platform: PlatformProfile;
   template: ProjectTemplate;

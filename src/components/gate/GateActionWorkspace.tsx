@@ -9,6 +9,7 @@ import {
   buildGateActionReviewAdvice,
   buildGateFailureRepairReceiptReview,
   buildGateFailureRepairRecheckDispatchItems,
+  buildGateFailureRepairRecheckResolution,
   buildGateDispatchEvidenceReview,
   buildGatePlatformScaleFollowup,
   buildGatePlatformScaleCadence,
@@ -93,6 +94,13 @@ function failureRepairReviewClass(status: ReturnType<typeof buildGateFailureRepa
   if (status === "recheck") return "border-blue-200 bg-blue-50 text-blue-900";
   if (status === "blocked") return "border-rose-200 bg-rose-50 text-rose-900";
   return "border-amber-200 bg-amber-50 text-amber-900";
+}
+
+function failureRepairResolutionClass(status: ReturnType<typeof buildGateFailureRepairRecheckResolution>["status"]) {
+  if (status === "resolved") return "border-emerald-200 bg-emerald-50 text-emerald-900";
+  if (status === "failed") return "border-rose-200 bg-rose-50 text-rose-900";
+  if (status === "active") return "border-amber-200 bg-amber-50 text-amber-900";
+  return "border-slate-200 bg-slate-50 text-slate-700";
 }
 
 function executionLabel(type: GateActionReceipt["executionType"]) {
@@ -331,6 +339,7 @@ export function GateActionWorkspace({
   const summary = buildGateActionReceiptSummary(receipts);
   const filteredSummary = buildGateActionReceiptSummary(filteredReceipts);
   const failureRepairReview = buildGateFailureRepairReceiptReview(failureRepairBatch, receipts);
+  const failureRepairResolution = buildGateFailureRepairRecheckResolution(failureRepairBatch, persistedDispatchTasks);
   const reviewAdvice = buildGateActionReviewAdvice(filteredReceipts);
   const platformGrowthReview = buildGatePlatformGrowthReview(receipts);
   const allStartValidationReview = buildGateProjectStartValidationReview(persistedDispatchTasks);
@@ -589,6 +598,32 @@ export function GateActionWorkspace({
             {failureRepairReview.evidence.length ? (
               <div className="mt-2 grid gap-1 text-xs opacity-80">
                 {failureRepairReview.evidence.map((item) => <div key={item}>{item}</div>)}
+              </div>
+            ) : null}
+          </div>
+          <div className={`rounded-md border p-3 ${failureRepairResolutionClass(failureRepairResolution.status)}`}>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <div className="text-sm font-medium">{failureRepairResolution.label}</div>
+                <p className="mt-1 text-xs leading-5 opacity-85">{failureRepairResolution.detail}</p>
+              </div>
+              <Link
+                className="w-fit rounded-md bg-white px-3 py-2 text-xs font-medium text-slate-950"
+                href={failureRepairResolution.href}
+              >
+                {failureRepairResolution.actionLabel}
+              </Link>
+            </div>
+            <div className="mt-3 grid gap-2 text-xs sm:grid-cols-3">
+              <div className="rounded-md bg-white/70 px-3 py-2">复检完成 {failureRepairResolution.completedRechecks}</div>
+              <div className="rounded-md bg-white/70 px-3 py-2">未恢复 {failureRepairResolution.unresolvedFailures}</div>
+              <div className="rounded-md bg-white/70 px-3 py-2">
+                {failureRepairResolution.latestDispatchKey ? "已关联复检派单" : "暂无复检派单"}
+              </div>
+            </div>
+            {failureRepairResolution.evidence.length ? (
+              <div className="mt-2 grid gap-1 text-xs opacity-80">
+                {failureRepairResolution.evidence.map((item) => <div key={item}>{item}</div>)}
               </div>
             ) : null}
           </div>

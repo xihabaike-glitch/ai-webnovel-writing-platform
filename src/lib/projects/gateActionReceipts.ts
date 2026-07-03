@@ -116,6 +116,18 @@ export interface GateFailureRepairReceiptReview {
   evidence: string[];
 }
 
+export interface GateFailureRepairRecheckResolution {
+  status: "none" | "active" | "failed" | "resolved";
+  label: string;
+  detail: string;
+  actionLabel: string;
+  href: string;
+  completedRechecks: number;
+  unresolvedFailures: number;
+  latestDispatchKey: string | null;
+  evidence: string[];
+}
+
 export type GateActionReviewAdviceSeverity = "urgent" | "warning" | "opportunity" | "healthy";
 export type GateActionReviewAdviceActionKind = "handle_failure" | "adopt_asset" | "record_metrics" | "refresh_gate" | "start_gate_action";
 export type GateActionReviewAdviceState = "open" | "in_progress";
@@ -1085,6 +1097,81 @@ export function buildGateFailureRepairRecheckDispatchItems(
     ].slice(0, 5),
     reviewLatestAt: new Date().toISOString(),
   }];
+}
+
+function failureRepairRecheckTasks(tasks: PersistedGatePlatformDispatchTask[]) {
+  return tasks
+    .filter((task) => task.stage === "failure_repair_recheck")
+    .sort((left, right) => new Date(right.completedAt ?? right.updatedAt).getTime() - new Date(left.completedAt ?? left.updatedAt).getTime());
+}
+
+export function buildGateFailureRepairRecheckResolution(
+  batch: FailureRepairBatch,
+  tasks: PersistedGatePlatformDispatchTask[],
+): GateFailureRepairRecheckResolution {
+  const recheckTasks = failureRepairRecheckTasks(tasks);
+  const completedTasks = recheckTasks.filter((task) => task.state === "completed");
+  const latest = recheckTasks[0] ?? null;
+  const latestCompleted = completedTasks[0] ?? null;
+  const evidence = [
+    ...(latestCompleted?.completionEvidence.trim() ? [`完成依据：${latestCompleted.completionEvidence.trim()}`] : []),
+    ...batch.guidance,
+    ...batch.items.slice(0, 3).map((item) => `${item.projectTitle} · ${item.taskLabel}：${item.errorMessage}`),
+  ].slice(0, 5);
+
+  if (!latest) {
+    return {
+      status: "none",
+      label: "未派复检",
+      detail: "失败修复复检还没有派单；先让复检负责人接住未清空失败。",
+      actionLabel: "查看派单中心",
+      href: "/dispatch",
+      completedRechecks: 0,
+      unresolvedFailures: batch.summary.unresolvedFailures,
+      latestDispatchKey: null,
+      evidence: batch.guidance.slice(0, 3),
+    };
+  }
+
+  if (!latestCompleted) {
+    return {
+      status: "active",
+      label: "等待复检完成",
+      detail: "失败修复复检派单已经创建，但还没有完成依据；不能把接单当成闭环。",
+      actionLabel: "查看派单",
+      href: latest.href,
+      completedRechecks: 0,
+      unresolvedFailures: batch.summary.unresolvedFailures,
+      latestDispatchKey: latest.dispatchKey,
+      evidence: latest.evidence.slice(0, 5),
+    };
+  }
+
+  if (batch.summary.unresolvedFailures > 0 || batch.status !== "clear") {
+    return {
+      status: "failed",
+      label: "复检未通过",
+      detail: `复检负责人已提交完成依据，但当前仍有 ${batch.summary.unresolvedFailures} 个未恢复失败；需要进入第三轮处理建议，继续拆配置、重试或人工复盘。`,
+      actionLabel: "生成第三轮处理建议",
+      href: "/dispatch",
+      completedRechecks: completedTasks.length,
+      unresolvedFailures: batch.summary.unresolvedFailures,
+      latestDispatchKey: latestCompleted.dispatchKey,
+      evidence,
+    };
+  }
+
+  return {
+    status: "resolved",
+    label: "复检闭环",
+    detail: `复检完成后未恢复失败已归零，已记录 ${completedTasks.length} 次复检完成依据。`,
+    actionLabel: "查看任务中心",
+    href: "/tasks",
+    completedRechecks: completedTasks.length,
+    unresolvedFailures: 0,
+    latestDispatchKey: latestCompleted.dispatchKey,
+    evidence,
+  };
 }
 
 export function buildGatePlatformStrategyReceipt(input: {

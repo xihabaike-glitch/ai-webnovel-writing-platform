@@ -8,6 +8,7 @@ import {
   buildGateActionReviewAdvice,
   buildGateFailureRepairReceiptReview,
   buildGateFailureRepairRecheckDispatchItems,
+  buildGateFailureRepairRecheckResolution,
   buildGatePlatformGrowthReview,
   buildGatePlatformGrowthDispatchItems,
   buildGateProjectStartValidationDispatchItems,
@@ -477,6 +478,63 @@ test("buildGateActionReceipt", async (t) => {
     assert.ok(dispatches[0].acceptanceCriteria.includes("总闸门未恢复失败数降为 0"));
     assert.ok(dispatches[0].evidence.some((line) => line.includes("已记录模型配置修复")));
     assert.equal(clearedDispatches.length, 0);
+  });
+
+  await t.test("reviews completed failure repair recheck dispatch against unresolved failures", () => {
+    const review = buildGateFailureRepairReceiptReview(failureRepairBatch, [
+      buildGateActionReceipt({
+        action: {
+          id: "failure-repair-batch",
+          label: "去模型设置",
+          detail: "先修配置，再谈重试：1 个未恢复失败指向 API Key、权限或模型配置。",
+          href: "/settings/models",
+          tone: "repair",
+          execution: null,
+        },
+        status: "succeeded",
+        now: "2026-01-01T00:00:00.000Z",
+        payload: { message: "已记录模型配置修复。" },
+      }),
+    ]);
+    const [dispatch] = buildGateFailureRepairRecheckDispatchItems(review, failureRepairBatch);
+    const completedTask = {
+      ...dispatch,
+      databaseId: "dispatch-db-recheck",
+      dispatchKey: dispatch.id,
+      projectId: null,
+      sourceReceiptId: null,
+      completionEvidence: "已复检配置和重试结果，但仍有 DeepSeek 配置失败未恢复。",
+      assignedAt: "2026-01-01T00:05:00.000Z",
+      completedAt: "2026-01-01T00:30:00.000Z",
+      createdAt: "2026-01-01T00:05:00.000Z",
+      updatedAt: "2026-01-01T00:30:00.000Z",
+      state: "completed" as const,
+    };
+    const blocked = buildGateFailureRepairRecheckResolution(failureRepairBatch, [completedTask]);
+    const cleared = buildGateFailureRepairRecheckResolution({
+      ...failureRepairBatch,
+      status: "clear",
+      summary: {
+        unresolvedFailures: 0,
+        configFailures: 0,
+        retryableFailures: 0,
+        manualFailures: 0,
+        affectedProjects: 0,
+        affectedProviders: 0,
+      },
+      items: [],
+    }, [completedTask]);
+
+    assert.equal(blocked.status, "failed");
+    assert.equal(blocked.label, "复检未通过");
+    assert.equal(blocked.completedRechecks, 1);
+    assert.equal(blocked.unresolvedFailures, 2);
+    assert.equal(blocked.actionLabel, "生成第三轮处理建议");
+    assert.ok(blocked.detail.includes("仍有 2 个未恢复失败"));
+    assert.ok(blocked.evidence.some((line) => line.includes("DeepSeek 配置失败")));
+    assert.equal(cleared.status, "resolved");
+    assert.equal(cleared.label, "复检闭环");
+    assert.equal(cleared.actionLabel, "查看任务中心");
   });
 
   await t.test("turns repeated failures into urgent review advice", () => {

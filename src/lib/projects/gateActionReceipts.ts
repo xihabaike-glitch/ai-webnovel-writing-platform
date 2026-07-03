@@ -182,6 +182,7 @@ export type GatePlatformGrowthReviewStage =
   | "failure_retry_repair"
   | "failure_manual_review"
   | "model_route_confirmation_recheck"
+  | "model_route_governance"
   | "start_first_three_review"
   | "start_opening_diagnostic"
   | "start_platform_package"

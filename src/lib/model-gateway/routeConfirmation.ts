@@ -1,4 +1,5 @@
 import { isRoutedModelTaskType, labelForRoutedTask, type RoutedModelTaskType } from "./taskRouting.ts";
+import type { GateActionReceipt, GatePlatformGrowthDispatchItem } from "../projects/gateActionReceipts.ts";
 
 export type ModelRouteConfirmationSource = "manual" | "recommendation" | "preset";
 
@@ -127,6 +128,19 @@ export interface RouteConfirmationRecheckAdvice {
     manualReview: number;
   };
   items: RouteConfirmationRecheckAdviceItem[];
+}
+
+export interface RouteConfirmationRecheckGovernanceAction {
+  receipt: GateActionReceipt;
+  dispatch: GatePlatformGrowthDispatchItem & { dispatchKey: string };
+  payload: {
+    adviceId: string;
+    taskType: RoutedModelTaskType;
+    action: RouteConfirmationRecheckAdviceItem["action"];
+    severity: RouteConfirmationRecheckAdviceItem["severity"];
+    recommendation: string;
+    evidence: string[];
+  };
 }
 
 const sourceLabels: Record<ModelRouteConfirmationSource, string> = {
@@ -286,6 +300,28 @@ function routeRecheckAction(item: RouteConfirmationRecheckEvidence, hasFallback:
     actionLabel: "延长观察",
     recommendation: `「${label}」复检未达标，延长观察并先跑小样本。`,
   };
+}
+
+function routeGovernanceAcceptanceCriteria(action: RouteConfirmationRecheckAdviceItem["action"]) {
+  if (action === "switch_route") {
+    return [
+      "在模型设置中调整首选模型或备用模型，避免继续命中弱路线。",
+      "重新跑至少 2 个同类型小样本，记录成功率、质量和备用命中。",
+      "治理后再决定是否恢复批量任务。",
+    ];
+  }
+  if (action === "manual_review") {
+    return [
+      "补齐复检样本的成功率、质量、成本和备用命中说明。",
+      "确认是否需要换模型、降级批量或继续观察。",
+      "把人工结论写回完成依据。",
+    ];
+  }
+  return [
+    "延长观察窗口，暂缓扩大同类型批量。",
+    "继续跑至少 2 个小样本并记录成功率、质量和异常。",
+    "观察期结束后回到模型设置复核路线。",
+  ];
 }
 
 export function buildModelRouteConfirmationReceipt(input: ModelRouteConfirmationInput): ModelRouteConfirmationReceipt {
@@ -468,4 +504,63 @@ export function buildRouteConfirmationRecheckAdvice(
     },
     items,
   };
+}
+
+export function buildRouteConfirmationRecheckGovernanceAction(
+  advice: RouteConfirmationRecheckAdviceItem,
+  options: { createdAt?: string | Date } = {},
+): RouteConfirmationRecheckGovernanceAction {
+  const createdAt = asIsoString(options.createdAt);
+  const dispatchKey = `model-route-governance:${advice.taskType}:${advice.action}:${createdAt}`;
+  const priorityScore = advice.severity === "blocked" ? 88 : 76;
+  const payload = {
+    adviceId: advice.id,
+    taskType: advice.taskType,
+    action: advice.action,
+    severity: advice.severity,
+    recommendation: advice.recommendation,
+    evidence: advice.evidence,
+  };
+  const receipt: GateActionReceipt = {
+    id: `${dispatchKey}:receipt`,
+    actionId: `model-route-governance:${advice.taskType}:${advice.action}`,
+    label: `${advice.label}路由治理已派单`,
+    detail: `动作：${advice.actionLabel}；建议：${advice.recommendation}`,
+    href: "/settings/models",
+    status: "succeeded",
+    message: `已为「${advice.label}」生成模型路由治理派单：${advice.actionLabel}。`,
+    executionType: "model_route",
+    succeededCount: 1,
+    failedCount: 0,
+    taskId: null,
+    platformId: "model-routing",
+    platformName: "模型路由",
+    recheck: {
+      status: "ready",
+      label: "查看治理派单",
+      detail: "到分发中心跟进模型路由治理任务。",
+      actionLabel: "打开分发中心",
+    },
+    createdAt,
+  };
+  const dispatch: GatePlatformGrowthDispatchItem & { dispatchKey: string } = {
+    id: dispatchKey,
+    dispatchKey,
+    platformId: "model-routing",
+    platformName: "模型路由",
+    stage: "model_route_governance",
+    state: "assigned",
+    priorityScore,
+    ownerRole: "模型治理",
+    title: `处理${advice.label}路由复检问题`,
+    detail: advice.recommendation,
+    dueLabel: advice.severity === "blocked" ? "今天处理" : "观察期内",
+    actionLabel: advice.actionLabel,
+    href: "/settings/models",
+    acceptanceCriteria: routeGovernanceAcceptanceCriteria(advice.action),
+    evidence: advice.evidence,
+    reviewLatestAt: createdAt,
+  };
+
+  return { receipt, dispatch, payload };
 }

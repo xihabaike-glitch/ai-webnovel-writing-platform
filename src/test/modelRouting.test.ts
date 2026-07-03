@@ -8,6 +8,7 @@ import {
 } from "../lib/model-gateway/providerSelection.ts";
 import {
   buildRouteConfirmationRecheckAdvice,
+  buildRouteConfirmationRecheckGovernanceAction,
   buildModelRouteConfirmationDispatch,
   buildModelRouteConfirmationReceipt,
   buildRouteConfirmationRecheckEvidenceFromDispatchTasks,
@@ -250,6 +251,32 @@ test("model task routing", async (t) => {
     assert.equal(advice.items[0].action, "switch_route");
     assert.equal(advice.items[0].severity, "blocked");
     assert.ok(advice.items[0].recommendation.includes("命中备用路线"));
+  });
+
+  await t.test("builds an auditable dispatch action from route recheck governance advice", () => {
+    const evidence = buildRouteConfirmationRecheckEvidenceFromDispatchTasks([{
+      dispatchKey: "model-route-confirmation-recheck:chapter_review:2026-07-04T10:00:00.000Z",
+      stage: "model_route_confirmation_recheck",
+      state: "completed",
+      completionEvidence: "完成 2 个章节审稿小样本，1 个超时，成功率 50%，质量 62，命中备用路线。",
+      evidence: ["已确认章节审稿模型路由。"],
+      completedAt: "2026-07-04T12:00:00.000Z",
+    }]);
+    const advice = buildRouteConfirmationRecheckAdvice(evidence);
+
+    const action = buildRouteConfirmationRecheckGovernanceAction(advice.items[0], {
+      createdAt: "2026-07-04T13:00:00.000Z",
+    });
+
+    assert.equal(action.receipt.executionType, "model_route");
+    assert.equal(action.receipt.platformId, "model-routing");
+    assert.equal(action.receipt.label, "章节审稿路由治理已派单");
+    assert.ok(action.receipt.message.includes("切备用/重分配"));
+    assert.equal(action.dispatch.dispatchKey, "model-route-governance:chapter_review:switch_route:2026-07-04T13:00:00.000Z");
+    assert.equal(action.dispatch.stage, "model_route_governance");
+    assert.equal(action.dispatch.ownerRole, "模型治理");
+    assert.ok(action.dispatch.acceptanceCriteria.some((item) => item.includes("首选模型")));
+    assert.ok(action.payload.evidence.some((item) => item.includes("成功率 50")));
   });
 
   await t.test("builds a cold-start route blueprint from writing model presets", () => {

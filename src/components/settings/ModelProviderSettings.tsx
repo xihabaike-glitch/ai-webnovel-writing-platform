@@ -369,6 +369,7 @@ export function ModelProviderSettings({
   const [governingRuleKey, setGoverningRuleKey] = useState<string | null>(null);
   const [creatingRetestRuleKey, setCreatingRetestRuleKey] = useState<string | null>(null);
   const [runningRetestRuleKey, setRunningRetestRuleKey] = useState<string | null>(null);
+  const [executingRouteAdviceId, setExecutingRouteAdviceId] = useState<string | null>(null);
   const [scopeDrafts, setScopeDrafts] = useState<Record<string, string>>(() => Object.fromEntries(
     routeAvoidanceGovernance.items.map((item) => [
       item.ruleKey,
@@ -605,6 +606,26 @@ export function ModelProviderSettings({
       return;
     }
     await saveAvoidanceOverride(governanceItem, item.recommendedAction);
+  }
+
+  async function executeRouteRecheckAdvice(item: RouteConfirmationRecheckAdviceView["items"][number]) {
+    setExecutingRouteAdviceId(item.id);
+    setRouteMessage(null);
+    try {
+      const response = await fetch("/api/model-route-confirmation-governance", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ advice: item }),
+      });
+      const payload = await response.json().catch(() => null) as { error?: string } | null;
+      if (!response.ok) throw new Error(payload?.error ?? "生成模型路由治理派单失败。");
+      setRouteMessage(`已生成「${item.label}」模型路由治理派单`);
+      router.refresh();
+    } catch (caught) {
+      setRouteMessage(caught instanceof Error ? caught.message : "生成模型路由治理派单失败。");
+    } finally {
+      setExecutingRouteAdviceId(null);
+    }
   }
 
   async function saveAvoidanceOverride(
@@ -859,6 +880,16 @@ export function ModelProviderSettings({
                     {item.evidence.slice(0, 3).map((entry) => (
                       <div className="rounded-md bg-slate-50 px-2 py-1 text-xs leading-5 text-slate-500" key={entry}>{entry}</div>
                     ))}
+                  </div>
+                  <div className="mt-3 flex flex-wrap justify-end gap-2">
+                    <button
+                      className="rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+                      disabled={executingRouteAdviceId === item.id}
+                      onClick={() => void executeRouteRecheckAdvice(item)}
+                      type="button"
+                    >
+                      {executingRouteAdviceId === item.id ? "生成中" : "生成治理派单"}
+                    </button>
                   </div>
                 </div>
               ))}

@@ -169,6 +169,8 @@ interface RouteAvoidanceGovernanceView {
       providerName: string;
       model: string;
       taskScope: string;
+      successRatePercent: number | null;
+      qualityScore: number | null;
       recommendedAction: "dismiss" | "extend_watch" | "manual_review";
       confidence: "high" | "medium";
       actionLabel: string;
@@ -311,6 +313,17 @@ export function ModelProviderSettings({
   ));
   const [routeMessage, setRouteMessage] = useState<string | null>(null);
   const currentTestResult = testResults[selectedProviderId];
+  const latestRetestReviewByRuleKey = useMemo(() => {
+    const reviewsByRuleKey = new Map<string, RouteAvoidanceGovernanceView["retestReview"]["items"][number]>();
+    [...routeAvoidanceGovernance.retestReview.items]
+      .sort((left, right) => (right.completedAt ?? "").localeCompare(left.completedAt ?? ""))
+      .forEach((review) => {
+        if (!reviewsByRuleKey.has(review.ruleKey)) {
+          reviewsByRuleKey.set(review.ruleKey, review);
+        }
+      });
+    return reviewsByRuleKey;
+  }, [routeAvoidanceGovernance.retestReview.items]);
 
   function selectProvider(providerId: ModelProviderId) {
     const option = options.find((item) => item.providerId === providerId) ?? options[0];
@@ -827,47 +840,72 @@ export function ModelProviderSettings({
                 </div>
               </div>
               <div className="mt-3 grid gap-2 lg:grid-cols-3">
-                {routeAvoidanceGovernance.retestQueue.items.slice(0, 6).map((item) => (
-                  <div
-                    className={`rounded-md border bg-white p-3 text-sm ${
-                      item.status === "due"
-                        ? "border-rose-200 text-rose-950"
-                        : item.status === "upcoming"
-                          ? "border-amber-200 text-amber-950"
-                          : "border-slate-200 text-slate-700"
-                    }`}
-                    key={item.id}
-                  >
-                    <div className="flex flex-wrap items-start justify-between gap-2">
-                      <div>
-                        <div className="font-medium text-slate-950">{item.providerName} · {item.model}</div>
-                        <div className="mt-1 text-xs opacity-75">{item.taskScope}</div>
+                {routeAvoidanceGovernance.retestQueue.items.slice(0, 6).map((item) => {
+                  const latestReview = latestRetestReviewByRuleKey.get(item.ruleKey);
+                  return (
+                    <div
+                      className={`rounded-md border bg-white p-3 text-sm ${
+                        item.status === "due"
+                          ? "border-rose-200 text-rose-950"
+                          : item.status === "upcoming"
+                            ? "border-amber-200 text-amber-950"
+                            : "border-slate-200 text-slate-700"
+                      }`}
+                      key={item.id}
+                    >
+                      <div className="flex flex-wrap items-start justify-between gap-2">
+                        <div>
+                          <div className="font-medium text-slate-950">{item.providerName} · {item.model}</div>
+                          <div className="mt-1 text-xs opacity-75">{item.taskScope}</div>
+                        </div>
+                        <span className="rounded-md bg-slate-50 px-2 py-1 text-xs font-medium">{item.actionLabel}</span>
                       </div>
-                      <span className="rounded-md bg-slate-50 px-2 py-1 text-xs font-medium">{item.actionLabel}</span>
+                      <p className="mt-2 leading-6 text-slate-600">{item.recommendation}</p>
+                      {latestReview ? (
+                        <div className="mt-2 rounded-md border border-slate-200 bg-slate-50 p-2 text-xs text-slate-600">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <span className="font-medium text-slate-800">最近复测</span>
+                            <span className={`rounded-md px-2 py-1 font-medium ${
+                              latestReview.recommendedAction === "dismiss"
+                                ? "bg-emerald-50 text-emerald-700"
+                                : latestReview.recommendedAction === "extend_watch"
+                                  ? "bg-amber-50 text-amber-700"
+                                  : "bg-white text-slate-600"
+                            }`}>{latestReview.actionLabel}</span>
+                          </div>
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            <span className="rounded-md bg-white px-2 py-1">
+                              成功率 {latestReview.successRatePercent === null ? "未填" : `${latestReview.successRatePercent}%`}
+                            </span>
+                            <span className="rounded-md bg-white px-2 py-1">质量 {latestReview.qualityScore ?? "未填"}</span>
+                            {latestReview.completedAt ? <span className="rounded-md bg-white px-2 py-1">{latestReview.completedAt.slice(0, 10)}</span> : null}
+                          </div>
+                          <p className="mt-2 leading-5 text-slate-500">{latestReview.completionEvidence}</p>
+                        </div>
+                      ) : null}
+                      <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                        <span className="rounded-md bg-slate-50 px-2 py-1">样本 {item.recommendedSampleSize}</span>
+                        <span className="rounded-md bg-slate-50 px-2 py-1">{item.dueAt ? item.dueAt.slice(0, 10) : "立即安排"}</span>
+                        <button
+                          className="rounded-md bg-slate-950 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50"
+                          disabled={creatingRetestRuleKey === item.ruleKey}
+                          onClick={() => createRetestDispatch(item)}
+                          type="button"
+                        >
+                          {creatingRetestRuleKey === item.ruleKey ? "生成中" : "生成复测派单"}
+                        </button>
+                        <button
+                          className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 disabled:opacity-50"
+                          disabled={runningRetestRuleKey === item.ruleKey}
+                          onClick={() => runRetestSamples(item)}
+                          type="button"
+                        >
+                          {runningRetestRuleKey === item.ruleKey ? "运行中" : "运行复测样本"}
+                        </button>
+                      </div>
                     </div>
-                    <p className="mt-2 leading-6 text-slate-600">{item.recommendation}</p>
-                    <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-slate-500">
-                      <span className="rounded-md bg-slate-50 px-2 py-1">样本 {item.recommendedSampleSize}</span>
-                      <span className="rounded-md bg-slate-50 px-2 py-1">{item.dueAt ? item.dueAt.slice(0, 10) : "立即安排"}</span>
-                      <button
-                        className="rounded-md bg-slate-950 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50"
-                        disabled={creatingRetestRuleKey === item.ruleKey}
-                        onClick={() => createRetestDispatch(item)}
-                        type="button"
-                      >
-                        {creatingRetestRuleKey === item.ruleKey ? "生成中" : "生成复测派单"}
-                      </button>
-                      <button
-                        className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 disabled:opacity-50"
-                        disabled={runningRetestRuleKey === item.ruleKey}
-                        onClick={() => runRetestSamples(item)}
-                        type="button"
-                      >
-                        {runningRetestRuleKey === item.ruleKey ? "运行中" : "运行复测样本"}
-                      </button>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           ) : null}

@@ -148,6 +148,8 @@ export interface RouteAvoidanceRetestReviewItem {
   providerName: string;
   model: string;
   taskScope: string;
+  successRatePercent: number | null;
+  qualityScore: number | null;
   recommendedAction: "dismiss" | "extend_watch" | "manual_review";
   confidence: "high" | "medium";
   actionLabel: string;
@@ -537,7 +539,7 @@ function completedAtIso(value: string | Date | null | undefined) {
   return Number.isNaN(date.getTime()) ? null : date.toISOString();
 }
 
-function classifyRetestEvidence(completionEvidence: string): Pick<RouteAvoidanceRetestReviewItem, "recommendedAction" | "confidence" | "actionLabel" | "rationale"> {
+function classifyRetestEvidence(completionEvidence: string): Pick<RouteAvoidanceRetestReviewItem, "successRatePercent" | "qualityScore" | "recommendedAction" | "confidence" | "actionLabel" | "rationale"> {
   const normalized = completionEvidence.replace(/\s+/g, "");
   const successRate = numericPercentAfter("成功率", completionEvidence);
   const qualityScore = numericPercentAfter("质量", completionEvidence);
@@ -551,6 +553,8 @@ function classifyRetestEvidence(completionEvidence: string): Pick<RouteAvoidance
     return {
       recommendedAction: "dismiss",
       confidence: strongPass ? "high" : "medium",
+      successRatePercent: successRate,
+      qualityScore,
       actionLabel: "建议解除观察",
       rationale: `复测样本已恢复：成功率 ${successRate ?? "未填"}%，质量 ${qualityScore ?? "未填"}，未出现硬失败。`,
     };
@@ -560,6 +564,8 @@ function classifyRetestEvidence(completionEvidence: string): Pick<RouteAvoidance
     return {
       recommendedAction: "extend_watch",
       confidence: hasFailure || hasFallback ? "high" : "medium",
+      successRatePercent: successRate,
+      qualityScore,
       actionLabel: "建议继续观察",
       rationale: `复测仍有风险：成功率 ${successRate ?? "未填"}%，质量 ${qualityScore ?? "未填"}${hasFallback ? "，仍依赖备用路线" : ""}。`,
     };
@@ -568,6 +574,8 @@ function classifyRetestEvidence(completionEvidence: string): Pick<RouteAvoidance
   return {
     recommendedAction: "manual_review",
     confidence: "medium",
+    successRatePercent: successRate,
+    qualityScore,
     actionLabel: "建议人工复核",
     rationale: "复测证据没有写清成功率、质量分或备用路线，需要人工判断。",
   };

@@ -730,9 +730,13 @@ test("model task routing", async (t) => {
     assert.equal(governance.retestReview.summary.extendWatchRecommended, 1);
     assert.equal(governance.retestReview.items[0].recommendedAction, "extend_watch");
     assert.equal(governance.retestReview.items[0].providerName, "Kimi");
+    assert.equal(governance.retestReview.items[0].successRatePercent, 50);
+    assert.equal(governance.retestReview.items[0].qualityScore, 62);
     assert.ok(governance.retestReview.items[0].actionLabel.includes("继续观察"));
     assert.equal(governance.retestReview.items[1].recommendedAction, "dismiss");
     assert.equal(governance.retestReview.items[1].confidence, "high");
+    assert.equal(governance.retestReview.items[1].successRatePercent, 100);
+    assert.equal(governance.retestReview.items[1].qualityScore, 86);
     assert.ok(governance.retestReview.items[1].actionLabel.includes("解除观察"));
     assert.ok(governance.nextActions.some((action) => action.includes("1 条复测已通过")));
   });

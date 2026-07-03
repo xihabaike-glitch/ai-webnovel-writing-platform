@@ -9,6 +9,7 @@ import {
 import {
   buildRouteConfirmationRecheckAdvice,
   buildRouteConfirmationRecheckGovernanceAction,
+  buildRouteConfirmationGovernanceEvidenceFromDispatchTasks,
   buildModelRouteConfirmationDispatch,
   buildModelRouteConfirmationReceipt,
   buildRouteConfirmationRecheckEvidenceFromDispatchTasks,
@@ -416,6 +417,50 @@ test("model task routing", async (t) => {
     assert.equal(review?.averageCostPerSucceededTaskUsd, 0.007);
     assert.ok(review?.reason.includes("最近路由复检通过：成功率 100%，质量 82"));
     assert.equal(draft?.status, "insufficient");
+  });
+
+  await t.test("feeds completed route governance evidence back into recommendations", () => {
+    const routeGovernanceEvidence = buildRouteConfirmationGovernanceEvidenceFromDispatchTasks([{
+      dispatchKey: "model-route-governance:chapter_review:switch_route:2026-07-04T13:00:00.000Z",
+      stage: "model_route_governance",
+      state: "completed",
+      completionEvidence: "已处理章节审稿路由，复跑 2 个小样本仍命中备用，成功率 50%，质量 62，仍需换模型。",
+      evidence: ["最近路由复检需观察：成功率 50%，质量 62，仍命中备用路线。"],
+      completedAt: "2026-07-04T15:00:00.000Z",
+    }]);
+    const recommendations = buildRouteRecommendations([
+      {
+        id: "review-1",
+        taskType: "chapter_review",
+        providerConfigId: "gpt-provider",
+        status: "succeeded",
+        inputTokens: 1000,
+        outputTokens: 800,
+        costUsd: 0.008,
+        outputText: JSON.stringify({ score: 91 }),
+      },
+      {
+        id: "review-2",
+        taskType: "chapter_review",
+        providerConfigId: "gpt-provider",
+        status: "succeeded",
+        inputTokens: 980,
+        outputTokens: 780,
+        costUsd: 0.006,
+        outputText: JSON.stringify({ score: 87 }),
+      },
+    ], [], [
+      { ...gptProvider, defaultModel: "gpt-4.1" },
+      { ...mockProvider, defaultModel: "mock-novel" },
+    ], {
+      routeGovernanceEvidence,
+    });
+
+    const review = recommendations.find((item) => item.taskType === "chapter_review");
+
+    assert.equal(routeGovernanceEvidence[0].status, "needs_switch");
+    assert.ok(review?.reason.includes("路由治理仍需换模型"));
+    assert.ok(review?.reason.includes("成功率 50"));
   });
 
   await t.test("marks the current route when it already matches the recommendation", () => {

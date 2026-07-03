@@ -96,12 +96,31 @@ export interface RouteConfirmationRecheckDispatchTask {
   completedAt?: string | Date | null;
 }
 
+export interface RouteConfirmationGovernanceDispatchTask {
+  dispatchKey: string;
+  stage: string;
+  state: string;
+  completionEvidence: string;
+  evidence?: string[] | string | null;
+  completedAt?: string | Date | null;
+}
+
 export interface RouteConfirmationRecheckEvidence {
   id: string;
   taskType: RoutedModelTaskType;
   successRatePercent: number | null;
   qualityScore: number | null;
   recommendedAction: "keep" | "watch" | "manual_review";
+  summary: string;
+  completionEvidence: string;
+  evidence: string[];
+  completedAt: string | null;
+}
+
+export interface RouteConfirmationGovernanceEvidence {
+  id: string;
+  taskType: RoutedModelTaskType;
+  status: "resolved" | "needs_switch" | "watch" | "manual_review";
   summary: string;
   completionEvidence: string;
   evidence: string[];
@@ -220,6 +239,12 @@ function taskTypeFromConfirmationRecheckKey(dispatchKey: string) {
   return isRoutedModelTaskType(taskType) ? taskType : null;
 }
 
+function taskTypeFromGovernanceKey(dispatchKey: string) {
+  const match = dispatchKey.match(/^model-route-governance:([^:]+):/);
+  const taskType = match?.[1] ?? "";
+  return isRoutedModelTaskType(taskType) ? taskType : null;
+}
+
 function classifyConfirmationRecheck(completionEvidence: string) {
   const normalized = completionEvidence.replace(/\s+/g, "");
   const successRatePercent = numericPercentAfter("成功率", completionEvidence);
@@ -240,6 +265,45 @@ function classifyConfirmationRecheck(completionEvidence: string) {
     qualityScore,
     recommendedAction,
     summary,
+  };
+}
+
+function classifyGovernanceEvidence(taskType: RoutedModelTaskType, completionEvidence: string): Pick<RouteConfirmationGovernanceEvidence, "status" | "summary"> {
+  const normalized = completionEvidence.replace(/\s+/g, "");
+  const label = labelForRoutedTask(taskType);
+  const hasNeedsSwitch = normalized.includes("仍需换模型")
+    || normalized.includes("继续命中备用")
+    || normalized.includes("仍命中备用")
+    || normalized.includes("换模型")
+    || hasFailureSignal(normalized);
+  const hasResolved = !hasNeedsSwitch && (
+    normalized.includes("已治理")
+    || normalized.includes("已切换")
+    || normalized.includes("已重分配")
+    || normalized.includes("治理完成")
+  );
+  const hasWatch = normalized.includes("继续观察") || normalized.includes("延长观察") || normalized.includes("观察期");
+  if (hasNeedsSwitch) {
+    return {
+      status: "needs_switch",
+      summary: `路由治理仍需换模型：${label}治理后仍有风险，${completionEvidence}`,
+    };
+  }
+  if (hasResolved) {
+    return {
+      status: "resolved",
+      summary: `路由治理已完成：${label}路线已处理，${completionEvidence}`,
+    };
+  }
+  if (hasWatch) {
+    return {
+      status: "watch",
+      summary: `路由治理继续观察：${label}进入观察期，${completionEvidence}`,
+    };
+  }
+  return {
+    status: "manual_review",
+    summary: `路由治理需人工复核：${label}治理结果不够明确，${completionEvidence}`,
   };
 }
 
@@ -462,6 +526,31 @@ export function buildRouteConfirmationRecheckEvidenceFromDispatchTasks(
       const decision = classifyConfirmationRecheck(dispatch.completionEvidence);
       return [{
         id: `${dispatch.dispatchKey}:evidence`,
+        taskType,
+        ...decision,
+        completionEvidence: dispatch.completionEvidence,
+        evidence: Array.from(new Set([...evidenceList(dispatch.evidence), dispatch.completionEvidence])),
+        completedAt: completedAtIso(dispatch.completedAt),
+      }];
+    })
+    .sort((left, right) => (right.completedAt ?? "").localeCompare(left.completedAt ?? ""));
+}
+
+export function buildRouteConfirmationGovernanceEvidenceFromDispatchTasks(
+  dispatches: RouteConfirmationGovernanceDispatchTask[],
+): RouteConfirmationGovernanceEvidence[] {
+  return dispatches
+    .filter((dispatch) => (
+      dispatch.stage === "model_route_governance"
+      && dispatch.state === "completed"
+      && dispatch.completionEvidence.trim()
+    ))
+    .flatMap((dispatch): RouteConfirmationGovernanceEvidence[] => {
+      const taskType = taskTypeFromGovernanceKey(dispatch.dispatchKey);
+      if (!taskType) return [];
+      const decision = classifyGovernanceEvidence(taskType, dispatch.completionEvidence);
+      return [{
+        id: `${dispatch.dispatchKey}:governance`,
         taskType,
         ...decision,
         completionEvidence: dispatch.completionEvidence,

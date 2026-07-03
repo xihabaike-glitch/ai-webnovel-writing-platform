@@ -6,6 +6,7 @@ import { providerModelPresets, providerOptions } from "@/lib/model-gateway/provi
 import { buildProviderHealthDashboard } from "@/lib/model-gateway/providerHealth";
 import { buildRouteEffectAudit } from "@/lib/model-gateway/routeEffectAudit";
 import {
+  buildRouteConfirmationGovernanceEvidenceFromDispatchTasks,
   buildRouteConfirmationRecheckAdvice,
   buildRouteConfirmationRecheckEvidenceFromDispatchTasks,
 } from "@/lib/model-gateway/routeConfirmation";
@@ -47,7 +48,17 @@ function maskProvider(provider: {
 }
 
 export default async function ModelSettingsPage() {
-  const [providers, routes, recentTasks, completedRouteRepairs, completedRouteRetests, completedRouteConfirmationRechecks, routeAvoidanceOverrides, routeConfirmationAudits] = await Promise.all([
+  const [
+    providers,
+    routes,
+    recentTasks,
+    completedRouteRepairs,
+    completedRouteRetests,
+    completedRouteConfirmationRechecks,
+    completedRouteGovernanceTasks,
+    routeAvoidanceOverrides,
+    routeConfirmationAudits,
+  ] = await Promise.all([
     prisma.modelProvider.findMany({
       orderBy: { updatedAt: "desc" },
     }),
@@ -115,6 +126,22 @@ export default async function ModelSettingsPage() {
         completedAt: true,
       },
     }),
+    prisma.gateDispatchTask.findMany({
+      where: {
+        stage: "model_route_governance",
+        state: "completed",
+      },
+      orderBy: { completedAt: "desc" },
+      take: 100,
+      select: {
+        dispatchKey: true,
+        stage: true,
+        state: true,
+        completionEvidence: true,
+        evidence: true,
+        completedAt: true,
+      },
+    }),
     prisma.modelRouteAvoidanceOverride.findMany({
       orderBy: { updatedAt: "desc" },
       select: {
@@ -162,6 +189,7 @@ export default async function ModelSettingsPage() {
   });
   const routeConfirmationRechecks = buildRouteConfirmationRecheckEvidenceFromDispatchTasks(completedRouteConfirmationRechecks);
   const routeConfirmationRecheckAdvice = buildRouteConfirmationRecheckAdvice(routeConfirmationRechecks);
+  const routeGovernanceEvidence = buildRouteConfirmationGovernanceEvidenceFromDispatchTasks(completedRouteGovernanceTasks);
   const healthDashboard = buildProviderHealthDashboard(maskedProviders);
   const routeEffectAudit = buildRouteEffectAudit(
     recentTasks,
@@ -176,6 +204,7 @@ export default async function ModelSettingsPage() {
     avoidanceRules: routeAvoidanceRules,
     routeAvoidanceDecisionHistory,
     routeConfirmationRechecks,
+    routeGovernanceEvidence,
   });
   const presetRouteBlueprint = buildPresetRouteBlueprint(routeProviders, routes);
 

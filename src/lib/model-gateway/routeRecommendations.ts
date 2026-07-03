@@ -1,5 +1,5 @@
 import { labelForRoutedTask, modelTaskRouteOptions } from "./taskRouting.ts";
-import type { RouteConfirmationRecheckEvidence } from "./routeConfirmation.ts";
+import type { RouteConfirmationGovernanceEvidence, RouteConfirmationRecheckEvidence } from "./routeConfirmation.ts";
 
 export interface RouteRecommendationProvider {
   id: string;
@@ -69,6 +69,7 @@ export interface RouteRecommendationOptions {
   avoidanceRules?: RouteAvoidanceRule[];
   routeAvoidanceDecisionHistory?: RouteAvoidanceDecisionHistory;
   routeConfirmationRechecks?: RouteConfirmationRecheckEvidence[];
+  routeGovernanceEvidence?: RouteConfirmationGovernanceEvidence[];
 }
 
 export interface RouteAvoidanceDispatchTask {
@@ -410,6 +411,13 @@ function latestRouteConfirmationRecheckReason(
   routeConfirmationRechecks: RouteConfirmationRecheckEvidence[] | undefined,
 ) {
   return routeConfirmationRechecks?.find((item) => item.taskType === taskType)?.summary ?? "";
+}
+
+function latestRouteGovernanceReason(
+  taskType: string,
+  routeGovernanceEvidence: RouteConfirmationGovernanceEvidence[] | undefined,
+) {
+  return routeGovernanceEvidence?.find((item) => item.taskType === taskType)?.summary ?? "";
 }
 
 export function buildRouteAvoidanceRulesFromDispatchTasks(
@@ -958,6 +966,7 @@ export function buildRouteRecommendations(
       restoredDecisionForTask(option.taskType, primary?.provider, options.routeAvoidanceDecisionHistory),
     );
     const confirmationRecheckReason = latestRouteConfirmationRecheckReason(option.taskType, options.routeConfirmationRechecks);
+    const governanceReason = latestRouteGovernanceReason(option.taskType, options.routeGovernanceEvidence);
 
     return {
       taskType: option.taskType,
@@ -974,7 +983,7 @@ export function buildRouteRecommendations(
       averageQualityScore: primary?.averageQualityScore ?? 0,
       averageCostPerSucceededTaskUsd: primary?.averageCostPerSucceededTaskUsd ?? 0,
       avoidance,
-      reason: [avoidance.reason, restorationReason, confirmationRecheckReason, baseReason].filter(Boolean).join(" "),
+      reason: [avoidance.reason, restorationReason, confirmationRecheckReason, governanceReason, baseReason].filter(Boolean).join(" "),
     };
   });
 }

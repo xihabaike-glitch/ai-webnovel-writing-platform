@@ -1583,6 +1583,87 @@ test("buildGateActionReceipt", async (t) => {
     assert.ok(decision.items[4].evidence.includes("追读率 2%"));
   });
 
+  await t.test("turns third-round final outcomes into platform tactic experience", () => {
+    function thirdMetricTask(input: {
+      projectId: string;
+      platformId: string;
+      platformName: string;
+      completedAt: string;
+    }) {
+      return {
+        id: `${input.platformId}:second_metric_followup:third_metrics_recovery:${input.projectId}`,
+        dispatchKey: `${input.platformId}:second_metric_followup:third_metrics_recovery:${input.projectId}`,
+        databaseId: `dispatch-db-third-experience-${input.platformId}`,
+        projectId: input.projectId,
+        platformId: input.platformId,
+        platformName: input.platformName,
+        stage: "start_metrics_recovery" as const,
+        state: "completed" as const,
+        priorityScore: 88,
+        ownerRole: "数据运营",
+        title: `${input.platformName} 第三轮数据回收`,
+        detail: "第三轮数据已回收。",
+        dueLabel: "加码后 24 小时",
+        actionLabel: "派给数据运营",
+        href: `/projects/${input.projectId}#platform-export`,
+        acceptanceCriteria: ["第三轮曝光、点击、收藏或追读已回收"],
+        evidence: ["二轮后继续加码已完成"],
+        sourceReceiptId: null,
+        completionEvidence: "已回收第三轮真实数据。",
+        reviewLatestAt: "2026-01-01T07:00:00.000Z",
+        assignedAt: "2026-01-01T07:30:00.000Z",
+        completedAt: input.completedAt,
+        createdAt: "2026-01-01T07:30:00.000Z",
+        updatedAt: input.completedAt,
+      };
+    }
+
+    const tasks = [
+      thirdMetricTask({ projectId: "project-1", platformId: "fanqie", platformName: "番茄小说", completedAt: "2026-01-01T08:00:00.000Z" }),
+      thirdMetricTask({ projectId: "project-4", platformId: "webnovel", platformName: "WebNovel", completedAt: "2026-01-01T08:00:00.000Z" }),
+    ];
+    const receipts = [
+      buildGatePublishEffectReceipt({
+        projectId: "project-1",
+        platformId: "fanqie",
+        platformName: "番茄小说",
+        now: "2026-01-01T09:00:00.000Z",
+        metric: { views: 9000, clicks: 1250, favorites: 390, follows: 180 },
+      }),
+      buildGatePublishEffectReceipt({
+        projectId: "project-4",
+        platformId: "webnovel",
+        platformName: "WebNovel",
+        now: "2026-01-01T09:00:00.000Z",
+        metric: { views: 5200, clicks: 0, favorites: 0, follows: 0 },
+      }),
+    ];
+
+    const decisionTimeline = buildGatePlatformDecisionTimeline({ receipts, tasks, limit: 10 });
+    const fanqieTimeline = decisionTimeline.items.find((item) => item.platformId === "fanqie");
+    const webnovelTimeline = decisionTimeline.items.find((item) => item.platformId === "webnovel");
+    const tacticLibrary = buildGatePlatformTacticExperienceLibrary(decisionTimeline, 10);
+    const fanqieExperience = tacticLibrary.items.find((item) => item.platformId === "fanqie");
+    const webnovelExperience = tacticLibrary.items.find((item) => item.platformId === "webnovel");
+    const fanqieMarkdown = buildGatePlatformTacticExperienceMarkdown(fanqieExperience!);
+
+    assert.equal(fanqieTimeline?.events.some((event) => event.type === "final" && event.label === "稳定加码"), true);
+    assert.equal(webnovelTimeline?.events.some((event) => event.type === "final" && event.label === "归档暂停"), true);
+    assert.equal(tacticLibrary.summary.usable, 1);
+    assert.equal(tacticLibrary.summary.blocked, 1);
+    assert.equal(fanqieExperience?.status, "usable");
+    assert.equal(fanqieExperience?.label, "可复用打法");
+    assert.equal(fanqieExperience?.tactic, "三轮稳定加码打法");
+    assert.ok(fanqieExperience?.reuseHint.includes("稳定加码池"));
+    assert.ok(fanqieExperience?.evidence.some((evidence) => evidence.includes("最终判定：稳定加码")));
+    assert.equal(webnovelExperience?.status, "blocked");
+    assert.equal(webnovelExperience?.label, "避坑样本");
+    assert.equal(webnovelExperience?.tactic, "三轮归档暂停样本");
+    assert.ok(webnovelExperience?.risk.includes("重启条件"));
+    assert.ok(fanqieMarkdown.includes("可复用打法：三轮稳定加码打法"));
+    assert.ok(fanqieMarkdown.includes("稳定加码池"));
+  });
+
   await t.test("gates platform scale-up behind verified dispatch evidence", () => {
     const fanqieEffect = buildGatePublishEffectReceipt({
       projectId: "project-1",

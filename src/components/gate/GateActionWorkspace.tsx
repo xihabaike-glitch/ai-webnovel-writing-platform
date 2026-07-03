@@ -252,6 +252,7 @@ function decisionTimelineClass(status: GatePlatformDecisionTimelineStatus) {
 }
 
 function decisionEventClass(type: GatePlatformDecisionTimelineEventType) {
+  if (type === "final") return "bg-violet-50 text-violet-700";
   if (type === "retreat") return "bg-rose-50 text-rose-700";
   if (type === "repair") return "bg-amber-50 text-amber-700";
   if (type === "recheck") return "bg-blue-50 text-blue-700";
@@ -269,6 +270,7 @@ function decisionTimelineStatusLabel(status: GatePlatformDecisionTimelineStatus 
 }
 
 function decisionEventLabel(type: GatePlatformDecisionTimelineEventType | "all") {
+  if (type === "final") return "最终判定";
   if (type === "effect") return "效果回填";
   if (type === "retreat") return "撤退判断";
   if (type === "repair") return "修复记录";
@@ -1537,7 +1539,7 @@ export function GateActionWorkspace({ actions }: { actions: PrePublishGateAction
                   onChange={(event) => setTimelineEventFilter(event.target.value as GatePlatformDecisionTimelineEventType | "all")}
                   value={timelineEventFilter}
                 >
-                  {(["all", "retreat", "repair", "recheck", "effect", "dispatch"] as const).map((eventType) => (
+                  {(["all", "final", "retreat", "repair", "recheck", "effect", "dispatch"] as const).map((eventType) => (
                     <option key={eventType} value={eventType}>{decisionEventLabel(eventType)}</option>
                   ))}
                 </select>

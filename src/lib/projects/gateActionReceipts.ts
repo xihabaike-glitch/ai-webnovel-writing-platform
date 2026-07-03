@@ -571,7 +571,7 @@ export interface GatePlatformRetreatResolution {
   items: GatePlatformRetreatResolutionItem[];
 }
 
-export type GatePlatformDecisionTimelineEventType = "effect" | "retreat" | "repair" | "recheck" | "dispatch";
+export type GatePlatformDecisionTimelineEventType = "effect" | "retreat" | "repair" | "recheck" | "dispatch" | "final";
 
 export interface GatePlatformDecisionTimelineEvent {
   id: string;
@@ -4193,6 +4193,7 @@ export function buildGatePlatformDecisionTimeline(input: {
   retreatGate?: GatePlatformRetreatGate;
   retreatResolution?: GatePlatformRetreatResolution;
   scaleFollowup?: GatePlatformScaleFollowup;
+  thirdMetricDecision?: GateProjectThirdMetricDecision;
   limit?: number;
 }): GatePlatformDecisionTimeline {
   const receipts = trimGateActionReceipts(input.receipts, 100).filter((receipt) => !isAuditMetaReceipt(receipt));
@@ -4200,6 +4201,7 @@ export function buildGatePlatformDecisionTimeline(input: {
   const retreatGate = input.retreatGate ?? buildGatePlatformRetreatGate(receipts);
   const retreatResolution = input.retreatResolution ?? buildGatePlatformRetreatResolution(tasks, receipts);
   const scaleFollowup = input.scaleFollowup ?? buildGatePlatformScaleFollowup(tasks, receipts);
+  const thirdMetricDecision = input.thirdMetricDecision ?? buildGateProjectThirdMetricDecision(tasks, receipts);
   const platformMap = new Map<string, {
     platformId: string;
     platformName: string;
@@ -4308,6 +4310,20 @@ export function buildGatePlatformDecisionTimeline(input: {
       detail: item.detail,
       href: item.href,
       createdAt: item.latestEffectAt ?? item.completedAt ?? new Date(0).toISOString(),
+      evidence: item.evidence.slice(0, 3),
+    });
+  }
+
+  for (const item of thirdMetricDecision.items) {
+    const eventPlatform = ensurePlatform(item.platformId, item.platformName, item.href);
+    eventPlatform.priorityScore = Math.max(eventPlatform.priorityScore, item.priorityScore);
+    eventPlatform.events.push({
+      id: `final:${item.dispatchKey}:${item.status}`,
+      type: "final",
+      label: item.label,
+      detail: item.detail,
+      href: item.href,
+      createdAt: item.metricAt ?? new Date(0).toISOString(),
       evidence: item.evidence.slice(0, 3),
     });
   }
@@ -4435,6 +4451,7 @@ export function buildGatePlatformTacticExperienceLibrary(
   limit = 6,
 ): GatePlatformTacticExperienceLibrary {
   const items = timeline.items.map((item): GatePlatformTacticExperienceItem => {
+    const finalEvent = item.events.find((event) => event.type === "final") ?? null;
     const evidence = item.events.slice(0, 3).map((event) => `${event.label}：${markdownLine(event.detail)}`);
     const base = {
       platformId: item.platformId,
@@ -4446,6 +4463,58 @@ export function buildGatePlatformTacticExperienceLibrary(
       latestAt: item.latestAt,
       evidence,
     };
+
+    if (finalEvent?.label === "稳定加码") {
+      return {
+        ...base,
+        status: "usable",
+        label: "可复用打法",
+        tactic: "三轮稳定加码打法",
+        lesson: `${item.platformName} 已完成三轮真实数据验证，点击、收藏和追读能连续站住，可以作为同类平台的稳定加码样本。`,
+        reuseHint: "新项目可复用这套平台包装、前三章兑现和小步加码节奏，进入稳定加码池前仍要保留基准对照。",
+        risk: "稳定加码不是无限放量；每轮仍要回填效果，发现转化下滑就立刻降档。",
+        evidence: [`最终判定：${finalEvent.label}：${markdownLine(finalEvent.detail)}`, ...base.evidence].slice(0, 4),
+      };
+    }
+
+    if (finalEvent?.label === "归档暂停") {
+      return {
+        ...base,
+        status: "blocked",
+        label: "避坑样本",
+        tactic: "三轮归档暂停样本",
+        lesson: `${item.platformName} 三轮后仍未形成有效转化，说明当前平台、入口卖点或正文兑现不适合继续投入。`,
+        reuseHint: "同类项目先复用暂停原因和避坑清单，不要复制这套投放路径。",
+        risk: "重启条件必须写清：新平台包装、开头兑现或题材定位有明确改动后，才允许重新小样本验证。",
+        evidence: [`最终判定：${finalEvent.label}：${markdownLine(finalEvent.detail)}`, ...base.evidence].slice(0, 4),
+      };
+    }
+
+    if (finalEvent?.label === "换平台") {
+      return {
+        ...base,
+        status: "blocked",
+        label: "避坑样本",
+        tactic: "三轮换平台样本",
+        lesson: `${item.platformName} 三轮后平台匹配仍弱，继续把主力资源压在原平台的性价比不够。`,
+        reuseHint: "同类项目优先复用平台转向条件和新平台验证清单。",
+        risk: "未完成新平台小样本验证前，不要把旧平台失败包装成题材失败。",
+        evidence: [`最终判定：${finalEvent.label}：${markdownLine(finalEvent.detail)}`, ...base.evidence].slice(0, 4),
+      };
+    }
+
+    if (finalEvent?.label === "降档修复") {
+      return {
+        ...base,
+        status: "watch",
+        label: "观察样本",
+        tactic: "三轮降档修复打法",
+        lesson: `${item.platformName} 三轮数据没有崩，但稳定性不足，适合作为降档修复流程样本。`,
+        reuseHint: "同类项目只复用收紧投入、复检发布包和前三章兑现的流程，暂不复用加码结论。",
+        risk: "修复后必须再看新一轮效果，缺复测数据前不要恢复稳定加码。",
+        evidence: [`最终判定：${finalEvent.label}：${markdownLine(finalEvent.detail)}`, ...base.evidence].slice(0, 4),
+      };
+    }
 
     if (item.status === "blocked") {
       return {

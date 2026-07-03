@@ -803,6 +803,65 @@ export function buildRouteDispatchCompletionTemplate(task: RouteDispatchCompleti
   return null;
 }
 
+function valueAfterCompletionLabel(label: string, text: string) {
+  const match = text.match(new RegExp(`^\\s*${label}\\s*[:：]\\s*(.+?)\\s*$`, "m"));
+  return match?.[1]?.trim() ?? null;
+}
+
+function hasConcreteCompletionValue(value: string | null) {
+  if (!value) return false;
+  if (value.includes("/")) return false;
+  return !["待填", "未填", "无"].includes(value);
+}
+
+function hasConcreteFallbackDecision(text: string) {
+  const labeledValue = valueAfterCompletionLabel("备用命中", text);
+  if (labeledValue !== null) {
+    return hasConcreteCompletionValue(labeledValue)
+      && /(未命中备用|未走备用|未使用备用|命中备用|走备用|使用备用)/.test(labeledValue);
+  }
+  const normalized = text.replace(/\s+/g, "");
+  return hasFallbackSignal(normalized)
+    || normalized.includes("未命中备用")
+    || normalized.includes("未走备用")
+    || normalized.includes("未使用备用");
+}
+
+function hasRouteRecheckDecision(text: string) {
+  const value = valueAfterCompletionLabel("是否需要治理", text);
+  return hasConcreteCompletionValue(value);
+}
+
+function hasGovernanceConclusion(text: string) {
+  const value = valueAfterCompletionLabel("治理结论", text);
+  if (value !== null) {
+    return hasConcreteCompletionValue(value)
+      && /(已治理完成|继续观察|仍需换模型|治理完成)/.test(value);
+  }
+  return /(已治理完成|继续观察|仍需换模型|治理完成)/.test(text.replace(/\s+/g, ""));
+}
+
+export function reviewRouteDispatchCompletionEvidence(
+  task: RouteDispatchCompletionTemplateTask,
+  completionEvidence: string,
+) {
+  if (task.stage !== "model_route_governance" && task.stage !== "model_route_confirmation_recheck") return null;
+  if (completionEvidence.trim().length < 8) return "完成前请写清楚完成依据，至少 8 个字。";
+
+  const missing: string[] = [];
+  if (numericPercentAfter("成功率", completionEvidence) === null) missing.push("成功率");
+  if (numericPercentAfter("质量", completionEvidence) === null) missing.push("质量");
+  if (!hasConcreteFallbackDecision(completionEvidence)) missing.push("备用命中");
+  if (task.stage === "model_route_confirmation_recheck" && !hasRouteRecheckDecision(completionEvidence)) {
+    missing.push("是否需要治理");
+  }
+  if (task.stage === "model_route_governance" && !hasGovernanceConclusion(completionEvidence)) {
+    missing.push("治理结论");
+  }
+
+  return missing.length ? `请补齐模型路由完成依据：${missing.join("、")}。` : null;
+}
+
 export function buildRouteConfirmationRecheckEvidenceFromDispatchTasks(
   dispatches: RouteConfirmationRecheckDispatchTask[],
 ): RouteConfirmationRecheckEvidence[] {

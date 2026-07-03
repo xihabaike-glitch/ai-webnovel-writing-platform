@@ -14,6 +14,7 @@ import {
   buildRouteConfirmationDispatchFlow,
   buildRouteConfirmationHistory,
   buildRouteDispatchCompletionTemplate,
+  reviewRouteDispatchCompletionEvidence,
   filterRouteConfirmationDispatchTasks,
   buildModelRouteConfirmationDispatch,
   buildModelRouteConfirmationReceipt,
@@ -681,6 +682,45 @@ test("model task routing", async (t) => {
     assert.ok(recheckTemplate?.includes("质量"));
     assert.ok(recheckTemplate?.includes("是否需要治理"));
     assert.equal(buildRouteDispatchCompletionTemplate({ stage: "record_metrics", title: "记录数据", actionLabel: "记录" }), null);
+  });
+
+  await t.test("requires filled route dispatch completion evidence before closeout", () => {
+    const recheckTask = {
+      stage: "model_route_confirmation_recheck",
+      title: "复检章节审稿路由确认",
+      actionLabel: "复检模型路由",
+    };
+    const governanceTask = {
+      stage: "model_route_governance",
+      title: "处理章节审稿路由复检问题",
+      actionLabel: "切备用/重分配",
+    };
+    const emptyRecheckTemplate = buildRouteDispatchCompletionTemplate(recheckTask) ?? "";
+    const emptyGovernanceTemplate = buildRouteDispatchCompletionTemplate(governanceTask) ?? "";
+
+    assert.ok(reviewRouteDispatchCompletionEvidence(recheckTask, emptyRecheckTemplate)?.includes("成功率"));
+    assert.ok(reviewRouteDispatchCompletionEvidence(governanceTask, emptyGovernanceTemplate)?.includes("治理结论"));
+    assert.equal(reviewRouteDispatchCompletionEvidence(recheckTask, [
+      "复检章节审稿路由确认",
+      "样本数：2",
+      "成功率：100%",
+      "质量：86",
+      "成本：正常",
+      "备用命中：未命中备用",
+      "是否需要治理：否",
+    ].join("\n")), null);
+    assert.equal(reviewRouteDispatchCompletionEvidence(governanceTask, [
+      "处理章节审稿路由复检问题",
+      "处理动作：切备用/重分配",
+      "新首选模型：DeepSeek · deepseek-chat",
+      "新备用模型：Kimi · kimi-k2.6",
+      "复跑样本数：2",
+      "成功率：100%",
+      "质量：86",
+      "备用命中：未命中备用",
+      "治理结论：已治理完成",
+    ].join("\n")), null);
+    assert.equal(reviewRouteDispatchCompletionEvidence({ stage: "record_metrics", title: "记录数据", actionLabel: "记录" }, "已记录平台数据。"), null);
   });
 
   await t.test("marks the current route when it already matches the recommendation", () => {

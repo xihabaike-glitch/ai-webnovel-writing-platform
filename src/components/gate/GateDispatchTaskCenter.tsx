@@ -18,6 +18,7 @@ import {
 import {
   buildRouteDispatchCompletionTemplate,
   filterRouteConfirmationDispatchTasks,
+  reviewRouteDispatchCompletionEvidence,
   type RouteConfirmationDispatchFlow,
   type RouteConfirmationDispatchFlowLaneId,
   type RouteConfirmationDispatchTaskFilter,
@@ -107,6 +108,13 @@ export function GateDispatchTaskCenter({
     const completionEvidence = completionDrafts[task.dispatchKey]?.trim() ?? "";
     if (targetState === "completed" && completionEvidence.length < 8) {
       setErrorMessage("完成前请写清楚完成依据，至少 8 个字。");
+      return;
+    }
+    const routeCompletionIssue = targetState === "completed"
+      ? reviewRouteDispatchCompletionEvidence(task, completionEvidence)
+      : null;
+    if (routeCompletionIssue) {
+      setErrorMessage(routeCompletionIssue);
       return;
     }
     setRunningKey(task.dispatchKey);

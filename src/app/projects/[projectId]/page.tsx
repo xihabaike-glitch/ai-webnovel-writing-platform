@@ -19,11 +19,13 @@ import { StoryLinePanel } from "@/components/projects/StoryLinePanel";
 import { StoryStructureDiagnosticPanel } from "@/components/projects/StoryStructureDiagnosticPanel";
 import { SubmissionPackagePanel } from "@/components/projects/SubmissionPackagePanel";
 import { WorldBiblePanel } from "@/components/projects/WorldBiblePanel";
+import { WritingWorkbenchPanel } from "@/components/projects/WritingWorkbenchPanel";
 import { prisma } from "@/lib/db/prisma";
 import { getPlatformProfile, type PlatformId } from "@/lib/platforms/platformProfiles";
 import { buildProjectDashboard } from "@/lib/projects/projectDashboard";
 import { buildSubmissionChecklist } from "@/lib/projects/submissionChecklist";
 import { buildSubmissionPackage } from "@/lib/projects/submissionPackage";
+import { buildWritingWorkbench } from "@/lib/projects/writingWorkbench";
 
 function aiTaskLabel(taskType: string) {
   const labels: Record<string, string> = {
@@ -44,6 +46,8 @@ export default async function ProjectPage({ params }: { params: Promise<{ projec
     include: {
       chapters: { orderBy: { order: "asc" } },
       outlineNodes: { orderBy: [{ depth: "asc" }, { order: "asc" }, { createdAt: "asc" }] },
+      characters: { orderBy: { createdAt: "asc" } },
+      worldEntries: { orderBy: [{ type: "asc" }, { createdAt: "asc" }] },
       aiTasks: {
         include: {
           modelProvider: { select: { providerId: true, displayName: true } },
@@ -109,6 +113,61 @@ export default async function ProjectPage({ params }: { params: Promise<{ projec
     depth: node.depth,
     status: node.status,
   }));
+  const writingWorkbench = buildWritingWorkbench({
+    project: {
+      id: project.id,
+      title: project.title,
+      genre: project.genre,
+      sellingPoint: project.sellingPoint,
+      targetPlatformName: platform.name,
+      targetWordCount: project.targetWordCount,
+      currentWordCount: project.currentWordCount,
+    },
+    chapters: project.chapters.map((chapter) => ({
+      id: chapter.id,
+      title: chapter.title,
+      order: chapter.order,
+      status: chapter.status,
+      wordCount: chapter.wordCount,
+      hook: chapter.hook,
+      conflict: chapter.conflict,
+      cliffhanger: chapter.cliffhanger,
+    })),
+    outlineNodes: project.outlineNodes.map((node) => ({
+      id: node.id,
+      type: node.type,
+      title: node.title,
+      goal: node.goal,
+      hook: node.hook,
+      conflict: node.conflict,
+      valueShift: node.valueShift,
+      status: node.status,
+    })),
+    characters: project.characters.map((character) => ({
+      id: character.id,
+      name: character.name,
+      role: character.role,
+      desire: character.desire,
+      need: character.need,
+      flaw: character.flaw,
+      arcStart: character.arcStart,
+      arcEnd: character.arcEnd,
+      relationshipNotes: character.relationshipNotes,
+    })),
+    worldEntries: project.worldEntries.map((entry) => ({
+      id: entry.id,
+      type: entry.type,
+      title: entry.title,
+      content: entry.content,
+    })),
+    aiTasks: project.aiTasks.map((task) => ({
+      id: task.id,
+      taskType: task.taskType,
+      status: task.status,
+      model: task.model,
+      createdAt: task.createdAt,
+    })),
+  });
 
   return (
     <AppShell>
@@ -119,6 +178,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ projec
             {platform.name} · {project.currentWordCount}/{project.targetWordCount} 字 · {project.genre}
           </p>
         </div>
+        <WritingWorkbenchPanel workbench={writingWorkbench} />
         <div id="project-control">
           <ProjectControlDashboardPanel projectId={project.id} />
         </div>

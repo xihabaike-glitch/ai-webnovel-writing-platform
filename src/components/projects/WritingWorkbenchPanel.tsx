@@ -1,0 +1,126 @@
+import Link from "next/link";
+import type { WritingWorkbench, WorkbenchStatus } from "@/lib/projects/writingWorkbench";
+
+function statusLabel(status: WorkbenchStatus) {
+  if (status === "pass") return "已具备";
+  if (status === "warn") return "待补强";
+  return "缺口";
+}
+
+function statusClass(status: WorkbenchStatus) {
+  if (status === "pass") return "border-emerald-200 bg-emerald-50 text-emerald-800";
+  if (status === "warn") return "border-amber-200 bg-amber-50 text-amber-800";
+  return "border-rose-200 bg-rose-50 text-rose-800";
+}
+
+export function WritingWorkbenchPanel({ workbench }: { workbench: WritingWorkbench }) {
+  return (
+    <section className="rounded-md border border-slate-200 bg-white p-4">
+      <div className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
+        <div>
+          <div className="text-sm text-slate-500">写作工作台</div>
+          <div className="mt-1 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <h2 className="text-xl font-semibold text-slate-950">{workbench.projectTitle}</h2>
+              <p className="mt-1 text-sm text-slate-600">{workbench.summary.oneLineBrief}</p>
+            </div>
+            <Link
+              className="inline-flex w-fit items-center rounded-md bg-slate-950 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
+              href={workbench.heroAction.href}
+            >
+              {workbench.heroAction.label}
+            </Link>
+          </div>
+          <p className="mt-3 text-sm text-slate-600">{workbench.heroAction.reason}</p>
+
+          <div className="mt-4 grid gap-3 sm:grid-cols-3">
+            <div className="rounded-md bg-slate-50 p-3">
+              <div className="text-xs text-slate-500">平台</div>
+              <div className="mt-1 font-medium text-slate-950">{workbench.summary.targetPlatformName}</div>
+            </div>
+            <div className="rounded-md bg-slate-50 p-3">
+              <div className="text-xs text-slate-500">成熟度</div>
+              <div className="mt-1 text-2xl font-semibold text-slate-950">{workbench.summary.maturityScore}</div>
+            </div>
+            <div className="rounded-md bg-slate-50 p-3">
+              <div className="text-xs text-slate-500">字数进度</div>
+              <div className="mt-1 text-2xl font-semibold text-slate-950">{workbench.summary.progressPercent}%</div>
+            </div>
+          </div>
+        </div>
+
+        <div className="rounded-md bg-slate-50 p-3">
+          <div className="font-medium text-slate-950">快捷入口</div>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {workbench.quickLinks.map((link) => (
+              <Link
+                className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100"
+                href={link.href}
+                key={link.href}
+              >
+                {link.label}
+              </Link>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-6">
+        {workbench.treeBlocks.map((block) => (
+          <div className="rounded-md border border-slate-200 p-3" key={block.type}>
+            <div className="flex items-center justify-between gap-2">
+              <div className="font-medium text-slate-950">{block.label}</div>
+              <span className={`rounded-md border px-2 py-1 text-xs ${statusClass(block.status)}`}>
+                {statusLabel(block.status)}
+              </span>
+            </div>
+            <div className="mt-1 text-xs text-slate-500">{block.count} 个素材</div>
+            <p className="mt-2 text-sm text-slate-600">{block.note}</p>
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-4 grid gap-3 lg:grid-cols-3">
+        <div className="rounded-md bg-slate-50 p-3">
+          <div className="text-sm font-medium text-slate-950">章节焦点</div>
+          <div className="mt-2 text-sm text-slate-600">
+            {workbench.chapterFocus.nextChapter ? (
+              <>
+                <div className="font-medium text-slate-950">{workbench.chapterFocus.nextChapter.title}</div>
+                <div className="mt-1">
+                  第 {workbench.chapterFocus.nextChapter.order} 章 · {workbench.chapterFocus.nextChapter.wordCount} 字 · {workbench.chapterFocus.nextChapter.status}
+                </div>
+              </>
+            ) : (
+              <div>还没有章节。</div>
+            )}
+            <div className="mt-2">{workbench.chapterFocus.nextAction}</div>
+          </div>
+        </div>
+
+        <div className="rounded-md bg-slate-50 p-3">
+          <div className="text-sm font-medium text-slate-950">人物弧光</div>
+          <div className="mt-2 text-sm text-slate-600">
+            完整 {workbench.characterFocus.completeCharacters}/{workbench.characterFocus.totalCharacters} 个
+          </div>
+          <p className="mt-2 text-sm text-slate-600">{workbench.characterFocus.nextAction}</p>
+        </div>
+
+        <div className="rounded-md bg-slate-50 p-3">
+          <div className="flex items-center justify-between gap-2">
+            <div className="text-sm font-medium text-slate-950">模型建议</div>
+            <span className="text-xs text-slate-500">失败 {workbench.modelFocus.failedTaskCount}</span>
+          </div>
+          <div className="mt-2 grid gap-2 text-sm text-slate-600">
+            {workbench.modelFocus.nextRoutes.slice(0, 3).map((route) => (
+              <div key={route.task}>
+                <div className="font-medium text-slate-950">{route.task}</div>
+                <div>{route.reason}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}

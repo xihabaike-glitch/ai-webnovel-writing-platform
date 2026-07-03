@@ -75,6 +75,7 @@ export interface RouteConfirmationDispatchFlowTask {
 }
 
 export type RouteConfirmationDispatchFlowLaneId = "needs_governance" | "waiting_recheck" | "confirmed" | "completed";
+export type RouteConfirmationDispatchTaskFilter = "all" | "needs_governance" | "waiting_recheck" | "completed";
 
 export interface RouteConfirmationDispatchFlowItem {
   id: string;
@@ -530,6 +531,10 @@ function sortFlowItems(items: RouteConfirmationDispatchFlowItem[]) {
   ));
 }
 
+function isRouteConfirmationTask(task: RouteConfirmationDispatchFlowTask) {
+  return task.stage === "model_route_confirmation_recheck" || task.stage === "model_route_governance";
+}
+
 export function buildModelRouteConfirmationReceipt(input: ModelRouteConfirmationInput): ModelRouteConfirmationReceipt {
   const taskLabel = labelForRoutedTask(input.taskType);
   const source = input.source ?? "manual";
@@ -706,9 +711,7 @@ export function buildRouteConfirmationDispatchFlow(
   confirmations: ModelRouteConfirmationReceipt[],
   dispatches: RouteConfirmationDispatchFlowTask[],
 ): RouteConfirmationDispatchFlow {
-  const modelRouteDispatches = dispatches.filter((task) => (
-    task.stage === "model_route_confirmation_recheck" || task.stage === "model_route_governance"
-  ));
+  const modelRouteDispatches = dispatches.filter(isRouteConfirmationTask);
   const activeDispatches = modelRouteDispatches.filter((task) => task.state !== "completed");
   const waitingRecheck = activeDispatches.filter((task) => task.stage === "model_route_confirmation_recheck");
   const needsGovernance = activeDispatches.filter((task) => task.stage === "model_route_governance");
@@ -750,6 +753,20 @@ export function buildRouteConfirmationDispatchFlow(
     },
     lanes,
   };
+}
+
+export function filterRouteConfirmationDispatchTasks<T extends RouteConfirmationDispatchFlowTask>(
+  tasks: T[],
+  filter: RouteConfirmationDispatchTaskFilter,
+): T[] {
+  if (filter === "all") return tasks;
+  if (filter === "needs_governance") {
+    return tasks.filter((task) => task.stage === "model_route_governance" && task.state !== "completed");
+  }
+  if (filter === "waiting_recheck") {
+    return tasks.filter((task) => task.stage === "model_route_confirmation_recheck" && task.state !== "completed");
+  }
+  return tasks.filter((task) => isRouteConfirmationTask(task) && task.state === "completed");
 }
 
 export function buildRouteConfirmationRecheckEvidenceFromDispatchTasks(

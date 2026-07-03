@@ -15,7 +15,12 @@ import {
   type GatePlatformGrowthDispatchState,
   type PersistedGatePlatformDispatchTask,
 } from "@/lib/projects/gateActionReceipts";
-import type { RouteConfirmationDispatchFlow, RouteConfirmationDispatchFlowLaneId } from "@/lib/model-gateway/routeConfirmation";
+import {
+  filterRouteConfirmationDispatchTasks,
+  type RouteConfirmationDispatchFlow,
+  type RouteConfirmationDispatchFlowLaneId,
+  type RouteConfirmationDispatchTaskFilter,
+} from "@/lib/model-gateway/routeConfirmation";
 
 function stateClass(state: GatePlatformGrowthDispatchState) {
   if (state === "queued") return "bg-amber-50 text-amber-700";
@@ -62,6 +67,11 @@ function routeFlowLaneClass(laneId: RouteConfirmationDispatchFlowLaneId) {
   return "border-slate-200 bg-slate-50 text-slate-800";
 }
 
+function routeFlowFilterFromLane(laneId: RouteConfirmationDispatchFlowLaneId): RouteConfirmationDispatchTaskFilter | null {
+  if (laneId === "confirmed") return null;
+  return laneId;
+}
+
 export function GateDispatchTaskCenter({
   initialReceipts,
   initialTasks,
@@ -75,17 +85,21 @@ export function GateDispatchTaskCenter({
   const [stateFilter, setStateFilter] = useState<GateDispatchTaskStateFilter>("all");
   const [platformFilter, setPlatformFilter] = useState("all");
   const [roleFilter, setRoleFilter] = useState("all");
+  const [routeFlowFilter, setRouteFlowFilter] = useState<RouteConfirmationDispatchTaskFilter>("all");
   const [runningKey, setRunningKey] = useState<string | null>(null);
   const [completionDrafts, setCompletionDrafts] = useState<Record<string, string>>({});
   const [errorMessage, setErrorMessage] = useState("");
   const center = useMemo(() => buildGateDispatchTaskCenter(tasks), [tasks]);
   const evidenceReview = useMemo(() => buildGateDispatchEvidenceReview(tasks, initialReceipts), [initialReceipts, tasks]);
   const evidenceIssues = evidenceReview.items.filter((item) => item.status !== "verified").slice(0, 5);
-  const filteredTasks = useMemo(() => filterGateDispatchTasks(tasks, {
-    state: stateFilter,
-    platformId: platformFilter,
-    ownerRole: roleFilter,
-  }), [platformFilter, roleFilter, stateFilter, tasks]);
+  const filteredTasks = useMemo(() => {
+    const baseTasks = filterGateDispatchTasks(tasks, {
+      state: stateFilter,
+      platformId: platformFilter,
+      ownerRole: roleFilter,
+    });
+    return filterRouteConfirmationDispatchTasks(baseTasks, routeFlowFilter);
+  }, [platformFilter, roleFilter, routeFlowFilter, stateFilter, tasks]);
 
   async function updateTask(task: PersistedGatePlatformDispatchTask) {
     const targetState = nextState(task.state);
@@ -167,27 +181,53 @@ export function GateDispatchTaskCenter({
             </div>
           </div>
           <div className="grid gap-3 lg:grid-cols-4">
-            {routeConfirmationDispatchFlow.lanes.map((lane) => (
-              <div className={`rounded-md border p-3 ${routeFlowLaneClass(lane.id)}`} key={lane.id}>
-                <div className="flex items-center justify-between gap-2">
-                  <div className="text-sm font-medium">{lane.label}</div>
-                  <span className="rounded-md bg-white/70 px-2 py-1 text-xs font-medium">{lane.count}</span>
+            {routeConfirmationDispatchFlow.lanes.map((lane) => {
+              const laneFilter = routeFlowFilterFromLane(lane.id);
+              const selected = routeFlowFilter === laneFilter;
+              return (
+                <div className={`rounded-md border p-3 ${routeFlowLaneClass(lane.id)} ${selected ? "ring-2 ring-slate-950/20" : ""}`} key={lane.id}>
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="text-sm font-medium">{lane.label}</div>
+                    {laneFilter ? (
+                      <button
+                        className="rounded-md bg-white/80 px-2 py-1 text-xs font-medium hover:bg-white"
+                        onClick={() => setRouteFlowFilter(selected ? "all" : laneFilter)}
+                        type="button"
+                      >
+                        {lane.count}
+                      </button>
+                    ) : (
+                      <span className="rounded-md bg-white/70 px-2 py-1 text-xs font-medium">{lane.count}</span>
+                    )}
+                  </div>
+                  <div className="mt-3 grid gap-2">
+                    {lane.items.map((item) => (
+                      <Link className="rounded-md bg-white/70 p-2 text-xs leading-5 hover:bg-white" href={item.href} key={item.id}>
+                        <div className="font-medium">{item.label}</div>
+                        <div className="mt-1 line-clamp-2 opacity-80">{item.detail}</div>
+                        <div className="mt-1 opacity-70">{item.actionLabel} · 优先级 {item.priorityScore}</div>
+                      </Link>
+                    ))}
+                    {lane.items.length === 0 ? (
+                      <div className="rounded-md bg-white/60 p-2 text-xs opacity-70">暂无</div>
+                    ) : null}
+                  </div>
                 </div>
-                <div className="mt-3 grid gap-2">
-                  {lane.items.map((item) => (
-                    <Link className="rounded-md bg-white/70 p-2 text-xs leading-5 hover:bg-white" href={item.href} key={item.id}>
-                      <div className="font-medium">{item.label}</div>
-                      <div className="mt-1 line-clamp-2 opacity-80">{item.detail}</div>
-                      <div className="mt-1 opacity-70">{item.actionLabel} · 优先级 {item.priorityScore}</div>
-                    </Link>
-                  ))}
-                  {lane.items.length === 0 ? (
-                    <div className="rounded-md bg-white/60 p-2 text-xs opacity-70">暂无</div>
-                  ) : null}
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
+          {routeFlowFilter !== "all" ? (
+            <div className="flex flex-wrap items-center gap-2 text-sm text-slate-600">
+              <span className="rounded-md bg-slate-50 px-2 py-1">已筛选：{routeConfirmationDispatchFlow.lanes.find((lane) => lane.id === routeFlowFilter)?.label}</span>
+              <button
+                className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                onClick={() => setRouteFlowFilter("all")}
+                type="button"
+              >
+                清除
+              </button>
+            </div>
+          ) : null}
         </section>
       ) : null}
 

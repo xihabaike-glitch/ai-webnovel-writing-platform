@@ -13,6 +13,7 @@ import {
   buildRouteConfirmationGovernanceFollowUpDispatches,
   buildRouteConfirmationDispatchFlow,
   buildRouteConfirmationHistory,
+  filterRouteConfirmationDispatchTasks,
   buildModelRouteConfirmationDispatch,
   buildModelRouteConfirmationReceipt,
   buildRouteConfirmationRecheckEvidenceFromDispatchTasks,
@@ -597,6 +598,66 @@ test("model task routing", async (t) => {
     assert.equal(flow.summary.completed, 1);
     assert.equal(flow.lanes[0].id, "needs_governance");
     assert.equal(flow.lanes.find((lane) => lane.id === "confirmed")?.items[0]?.label, "章节审稿路由已确认");
+  });
+
+  await t.test("filters dispatch tasks by route flow lane", () => {
+    const tasks = [
+      {
+        dispatchKey: "model-route-confirmation-recheck:chapter_review:2026-07-04T15:30:00.000Z",
+        stage: "model_route_confirmation_recheck",
+        state: "assigned",
+        title: "复检章节审稿路由确认",
+        detail: "章节审稿已切到首选 DeepSeek。",
+        actionLabel: "复检模型路由",
+        href: "/settings/models",
+        priorityScore: 72,
+        reviewLatestAt: "2026-07-04T15:30:00.000Z",
+      },
+      {
+        dispatchKey: "model-route-governance:chapter_review:switch_route:2026-07-04T16:00:00.000Z",
+        stage: "model_route_governance",
+        state: "assigned",
+        title: "处理章节审稿路由复检问题",
+        detail: "复检仍命中备用路线。",
+        actionLabel: "切备用/重分配",
+        href: "/settings/models",
+        priorityScore: 88,
+        reviewLatestAt: "2026-07-04T16:00:00.000Z",
+      },
+      {
+        dispatchKey: "model-route-governance:chapter_draft:extend_watch:2026-07-04T13:00:00.000Z",
+        stage: "model_route_governance",
+        state: "completed",
+        title: "处理正文初稿路由复检问题",
+        detail: "已治理完成。",
+        actionLabel: "延长观察",
+        href: "/settings/models",
+        priorityScore: 76,
+        reviewLatestAt: "2026-07-04T13:00:00.000Z",
+      },
+      {
+        dispatchKey: "platform:fanqie:metrics",
+        stage: "record_metrics",
+        state: "assigned",
+        title: "记录番茄数据",
+        detail: "回填平台数据。",
+        actionLabel: "记录数据",
+        href: "/gate",
+        priorityScore: 60,
+        reviewLatestAt: "2026-07-04T12:00:00.000Z",
+      },
+    ];
+
+    assert.deepEqual(filterRouteConfirmationDispatchTasks(tasks, "needs_governance").map((task) => task.dispatchKey), [
+      "model-route-governance:chapter_review:switch_route:2026-07-04T16:00:00.000Z",
+    ]);
+    assert.deepEqual(filterRouteConfirmationDispatchTasks(tasks, "waiting_recheck").map((task) => task.dispatchKey), [
+      "model-route-confirmation-recheck:chapter_review:2026-07-04T15:30:00.000Z",
+    ]);
+    assert.deepEqual(filterRouteConfirmationDispatchTasks(tasks, "completed").map((task) => task.dispatchKey), [
+      "model-route-governance:chapter_draft:extend_watch:2026-07-04T13:00:00.000Z",
+    ]);
+    assert.equal(filterRouteConfirmationDispatchTasks(tasks, "all").length, tasks.length);
   });
 
   await t.test("marks the current route when it already matches the recommendation", () => {

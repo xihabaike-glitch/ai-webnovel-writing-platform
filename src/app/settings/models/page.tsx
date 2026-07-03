@@ -5,7 +5,10 @@ import { buildPresetRouteBlueprint } from "@/lib/model-gateway/presetRouteBluepr
 import { providerModelPresets, providerOptions } from "@/lib/model-gateway/providerDefaults";
 import { buildProviderHealthDashboard } from "@/lib/model-gateway/providerHealth";
 import { buildRouteEffectAudit } from "@/lib/model-gateway/routeEffectAudit";
-import { buildRouteConfirmationRecheckEvidenceFromDispatchTasks } from "@/lib/model-gateway/routeConfirmation";
+import {
+  buildRouteConfirmationRecheckAdvice,
+  buildRouteConfirmationRecheckEvidenceFromDispatchTasks,
+} from "@/lib/model-gateway/routeConfirmation";
 import {
   applyRouteAvoidanceOverrides,
   buildRouteAvoidanceDecisionHistory,
@@ -158,6 +161,7 @@ export default async function ModelSettingsPage() {
     retestDispatches: completedRouteRetests,
   });
   const routeConfirmationRechecks = buildRouteConfirmationRecheckEvidenceFromDispatchTasks(completedRouteConfirmationRechecks);
+  const routeConfirmationRecheckAdvice = buildRouteConfirmationRecheckAdvice(routeConfirmationRechecks);
   const healthDashboard = buildProviderHealthDashboard(maskedProviders);
   const routeEffectAudit = buildRouteEffectAudit(
     recentTasks,
@@ -196,6 +200,7 @@ export default async function ModelSettingsPage() {
           status: audit.status,
           createdAt: audit.createdAt.toISOString(),
         }))}
+        routeConfirmationRecheckAdvice={routeConfirmationRecheckAdvice}
         routeRecommendations={routeRecommendations}
         routeOptions={modelTaskRouteOptions}
         routes={routes.map((route) => ({

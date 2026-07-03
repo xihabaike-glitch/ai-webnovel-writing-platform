@@ -7,6 +7,7 @@ import {
   selectModelProviderForTask,
 } from "../lib/model-gateway/providerSelection.ts";
 import {
+  buildRouteConfirmationRecheckAdvice,
   buildModelRouteConfirmationDispatch,
   buildModelRouteConfirmationReceipt,
   buildRouteConfirmationRecheckEvidenceFromDispatchTasks,
@@ -219,6 +220,36 @@ test("model task routing", async (t) => {
     assert.equal(evidence[0].qualityScore, 82);
     assert.equal(evidence[0].recommendedAction, "keep");
     assert.ok(evidence[0].summary.includes("复检通过"));
+  });
+
+  await t.test("turns weak route confirmation rechecks into governance advice", () => {
+    const evidence = buildRouteConfirmationRecheckEvidenceFromDispatchTasks([
+      {
+        dispatchKey: "model-route-confirmation-recheck:chapter_review:2026-07-04T10:00:00.000Z",
+        stage: "model_route_confirmation_recheck",
+        state: "completed",
+        completionEvidence: "完成 2 个章节审稿小样本，1 个超时，成功率 50%，质量 62，命中备用路线。",
+        evidence: ["已确认章节审稿模型路由。"],
+        completedAt: "2026-07-04T12:00:00.000Z",
+      },
+      {
+        dispatchKey: "model-route-confirmation-recheck:chapter_draft:2026-07-04T09:00:00.000Z",
+        stage: "model_route_confirmation_recheck",
+        state: "completed",
+        completionEvidence: "完成 2 个正文初稿小样本，成功率 100%，质量 86，未命中备用路线。",
+        evidence: [],
+        completedAt: "2026-07-04T11:00:00.000Z",
+      },
+    ]);
+
+    const advice = buildRouteConfirmationRecheckAdvice(evidence);
+
+    assert.equal(advice.summary.total, 1);
+    assert.equal(advice.summary.switchRoute, 1);
+    assert.equal(advice.items[0].taskType, "chapter_review");
+    assert.equal(advice.items[0].action, "switch_route");
+    assert.equal(advice.items[0].severity, "blocked");
+    assert.ok(advice.items[0].recommendation.includes("命中备用路线"));
   });
 
   await t.test("builds a cold-start route blueprint from writing model presets", () => {

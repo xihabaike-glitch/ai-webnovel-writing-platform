@@ -221,6 +221,26 @@ interface RouteConfirmationHistoryView {
   createdAt: string;
 }
 
+interface RouteConfirmationRecheckAdviceView {
+  summary: {
+    total: number;
+    switchRoute: number;
+    extendWatch: number;
+    manualReview: number;
+  };
+  items: Array<{
+    id: string;
+    taskType: string;
+    label: string;
+    severity: "warning" | "blocked";
+    action: "switch_route" | "extend_watch" | "manual_review";
+    actionLabel: string;
+    recommendation: string;
+    evidence: string[];
+    completedAt: string | null;
+  }>;
+}
+
 interface PresetRouteBlueprintView {
   summary: {
     total: number;
@@ -302,6 +322,7 @@ export function ModelProviderSettings({
   routeAvoidanceDecisionHistory,
   routeAvoidanceGovernance,
   routeConfirmationHistory,
+  routeConfirmationRecheckAdvice,
   routeRecommendations,
   routeOptions,
   routes,
@@ -315,6 +336,7 @@ export function ModelProviderSettings({
   routeAvoidanceDecisionHistory: RouteAvoidanceDecisionHistoryView;
   routeAvoidanceGovernance: RouteAvoidanceGovernanceView;
   routeConfirmationHistory: RouteConfirmationHistoryView[];
+  routeConfirmationRecheckAdvice: RouteConfirmationRecheckAdviceView;
   routeRecommendations: RouteRecommendationView[];
   routeOptions: RouteOptionView[];
   routes: RouteView[];
@@ -795,6 +817,49 @@ export function ModelProviderSettings({
                   </div>
                   <p className="mt-2 leading-6 text-slate-600">{item.message}</p>
                   <div className="mt-2 rounded-md bg-white p-2 text-xs leading-5 text-slate-500">{item.detail}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
+        {routeConfirmationRecheckAdvice.summary.total ? (
+          <div className="mt-4 rounded-md border border-amber-200 bg-amber-50/40 p-3">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+              <div>
+                <div className="text-sm font-medium text-slate-950">复检治理建议</div>
+                <p className="mt-1 text-sm text-slate-600">只展示复检未达标的模型路线，方便先处理会拖慢生产的任务。</p>
+              </div>
+              <div className="flex flex-wrap gap-2 text-xs text-slate-600">
+                <span className="rounded-md bg-white px-2 py-1">切换 {routeConfirmationRecheckAdvice.summary.switchRoute}</span>
+                <span className="rounded-md bg-white px-2 py-1">观察 {routeConfirmationRecheckAdvice.summary.extendWatch}</span>
+                <span className="rounded-md bg-white px-2 py-1">复核 {routeConfirmationRecheckAdvice.summary.manualReview}</span>
+              </div>
+            </div>
+            <div className="mt-3 grid gap-2 lg:grid-cols-2">
+              {routeConfirmationRecheckAdvice.items.slice(0, 6).map((item) => (
+                <div
+                  className={`rounded-md border bg-white p-3 text-sm ${
+                    item.severity === "blocked" ? "border-rose-200" : "border-amber-200"
+                  }`}
+                  key={item.id}
+                >
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div>
+                      <div className="font-medium text-slate-950">{item.label}</div>
+                      <div className="mt-1 text-xs text-slate-500">{item.completedAt ? item.completedAt.slice(0, 10) : "待补复检日期"}</div>
+                    </div>
+                    <span className={`rounded-md px-2 py-1 text-xs ${
+                      item.severity === "blocked" ? "bg-rose-50 text-rose-700" : "bg-amber-50 text-amber-700"
+                    }`}>
+                      {item.actionLabel}
+                    </span>
+                  </div>
+                  <p className="mt-2 leading-6 text-slate-700">{item.recommendation}</p>
+                  <div className="mt-2 grid gap-1">
+                    {item.evidence.slice(0, 3).map((entry) => (
+                      <div className="rounded-md bg-slate-50 px-2 py-1 text-xs leading-5 text-slate-500" key={entry}>{entry}</div>
+                    ))}
+                  </div>
                 </div>
               ))}
             </div>

@@ -107,6 +107,28 @@ export interface RouteConfirmationRecheckEvidence {
   completedAt: string | null;
 }
 
+export interface RouteConfirmationRecheckAdviceItem {
+  id: string;
+  taskType: RoutedModelTaskType;
+  label: string;
+  severity: "warning" | "blocked";
+  action: "switch_route" | "extend_watch" | "manual_review";
+  actionLabel: string;
+  recommendation: string;
+  evidence: string[];
+  completedAt: string | null;
+}
+
+export interface RouteConfirmationRecheckAdvice {
+  summary: {
+    total: number;
+    switchRoute: number;
+    extendWatch: number;
+    manualReview: number;
+  };
+  items: RouteConfirmationRecheckAdviceItem[];
+}
+
 const sourceLabels: Record<ModelRouteConfirmationSource, string> = {
   manual: "人工保存",
   recommendation: "系统建议",
@@ -188,9 +210,8 @@ function classifyConfirmationRecheck(completionEvidence: string) {
   const normalized = completionEvidence.replace(/\s+/g, "");
   const successRatePercent = numericPercentAfter("成功率", completionEvidence);
   const qualityScore = numericPercentAfter("质量", completionEvidence);
-  const hasNoFallback = normalized.includes("未命中备用") || normalized.includes("未走备用") || normalized.includes("未使用备用");
-  const hasFallback = !hasNoFallback && (normalized.includes("命中备用") || normalized.includes("走备用") || normalized.includes("使用备用"));
-  const hasFailure = /(失败|超时|报错|异常|不可用|JSON不稳定|格式错误)/.test(normalized);
+  const hasFallback = hasFallbackSignal(normalized);
+  const hasFailure = hasFailureSignal(normalized);
   const keep = (successRatePercent ?? 0) >= 90 && (qualityScore ?? 0) >= 80 && !hasFailure && !hasFallback;
   const watch = hasFailure || hasFallback || (successRatePercent !== null && successRatePercent < 80) || (qualityScore !== null && qualityScore < 70);
   const recommendedAction: RouteConfirmationRecheckEvidence["recommendedAction"] = keep ? "keep" : watch ? "watch" : "manual_review";
@@ -205,6 +226,65 @@ function classifyConfirmationRecheck(completionEvidence: string) {
     qualityScore,
     recommendedAction,
     summary,
+  };
+}
+
+function hasFallbackSignal(normalizedCompletionEvidence: string) {
+  const hasNoFallback = normalizedCompletionEvidence.includes("未命中备用")
+    || normalizedCompletionEvidence.includes("未走备用")
+    || normalizedCompletionEvidence.includes("未使用备用");
+  return !hasNoFallback && (
+    normalizedCompletionEvidence.includes("命中备用")
+    || normalizedCompletionEvidence.includes("走备用")
+    || normalizedCompletionEvidence.includes("使用备用")
+  );
+}
+
+function hasFailureSignal(normalizedCompletionEvidence: string) {
+  return /(失败|超时|报错|异常|不可用|JSON不稳定|格式错误)/.test(normalizedCompletionEvidence);
+}
+
+function buildAdviceEvidence(item: RouteConfirmationRecheckEvidence) {
+  return Array.from(new Set([
+    item.summary,
+    ...item.evidence,
+    item.completionEvidence,
+  ].filter((entry) => entry.trim().length > 0))).slice(0, 4);
+}
+
+function routeRecheckSeverity(item: RouteConfirmationRecheckEvidence, hasFallback: boolean, hasFailure: boolean): RouteConfirmationRecheckAdviceItem["severity"] {
+  if (hasFallback || hasFailure || (item.successRatePercent !== null && item.successRatePercent < 80)) return "blocked";
+  return "warning";
+}
+
+function routeRecheckAction(item: RouteConfirmationRecheckEvidence, hasFallback: boolean, hasFailure: boolean): Pick<RouteConfirmationRecheckAdviceItem, "action" | "actionLabel" | "recommendation"> | null {
+  const label = labelForRoutedTask(item.taskType);
+  if (item.recommendedAction === "keep") return null;
+  if (item.recommendedAction === "manual_review") {
+    return {
+      action: "manual_review",
+      actionLabel: "人工复核",
+      recommendation: `「${label}」复检证据不完整，先人工补齐成功率、质量和备用命中，再决定是否调整路线。`,
+    };
+  }
+  if (hasFallback) {
+    return {
+      action: "switch_route",
+      actionLabel: "切备用/重分配",
+      recommendation: `「${label}」复检仍命中备用路线，先切换首选模型或重分配任务模型。`,
+    };
+  }
+  if (hasFailure || (item.successRatePercent !== null && item.successRatePercent < 80)) {
+    return {
+      action: "extend_watch",
+      actionLabel: "延长观察",
+      recommendation: `「${label}」复检成功率偏低，延长观察并先跑小样本，暂缓扩大批量。`,
+    };
+  }
+  return {
+    action: "extend_watch",
+    actionLabel: "延长观察",
+    recommendation: `「${label}」复检未达标，延长观察并先跑小样本。`,
   };
 }
 
@@ -354,4 +434,38 @@ export function buildRouteConfirmationRecheckEvidenceFromDispatchTasks(
       }];
     })
     .sort((left, right) => (right.completedAt ?? "").localeCompare(left.completedAt ?? ""));
+}
+
+export function buildRouteConfirmationRecheckAdvice(
+  evidence: RouteConfirmationRecheckEvidence[],
+): RouteConfirmationRecheckAdvice {
+  const items = evidence.flatMap((item): RouteConfirmationRecheckAdviceItem[] => {
+    const normalized = item.completionEvidence.replace(/\s+/g, "");
+    const hasFallback = hasFallbackSignal(normalized);
+    const hasFailure = hasFailureSignal(normalized);
+    const action = routeRecheckAction(item, hasFallback, hasFailure);
+    if (!action) return [];
+    return [{
+      id: `${item.id}:advice`,
+      taskType: item.taskType,
+      label: labelForRoutedTask(item.taskType),
+      severity: routeRecheckSeverity(item, hasFallback, hasFailure),
+      ...action,
+      evidence: buildAdviceEvidence(item),
+      completedAt: item.completedAt,
+    }];
+  }).sort((left, right) => {
+    if (left.severity !== right.severity) return left.severity === "blocked" ? -1 : 1;
+    return (right.completedAt ?? "").localeCompare(left.completedAt ?? "");
+  });
+
+  return {
+    summary: {
+      total: items.length,
+      switchRoute: items.filter((item) => item.action === "switch_route").length,
+      extendWatch: items.filter((item) => item.action === "extend_watch").length,
+      manualReview: items.filter((item) => item.action === "manual_review").length,
+    },
+    items,
+  };
 }

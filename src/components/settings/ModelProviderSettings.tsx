@@ -105,6 +105,28 @@ interface RouteRecommendationView {
   reason: string;
 }
 
+interface RouteAvoidanceGovernanceView {
+  summary: {
+    totalRules: number;
+    globalRules: number;
+    scopedRules: number;
+    highRiskRules: number;
+  };
+  items: Array<{
+    id: string;
+    providerName: string;
+    providerId: string | null;
+    model: string;
+    taskScope: string;
+    riskLevel: "high" | "medium";
+    actionLabel: string;
+    reviewAction: string;
+    reason: string;
+    evidence: string[];
+  }>;
+  nextActions: string[];
+}
+
 interface PresetRouteBlueprintView {
   summary: {
     total: number;
@@ -183,6 +205,7 @@ export function ModelProviderSettings({
   presetRouteBlueprint,
   providers,
   routeEffectAudit,
+  routeAvoidanceGovernance,
   routeRecommendations,
   routeOptions,
   routes,
@@ -193,6 +216,7 @@ export function ModelProviderSettings({
   presetRouteBlueprint: PresetRouteBlueprintView;
   providers: ProviderView[];
   routeEffectAudit: RouteEffectAuditView;
+  routeAvoidanceGovernance: RouteAvoidanceGovernanceView;
   routeRecommendations: RouteRecommendationView[];
   routeOptions: RouteOptionView[];
   routes: RouteView[];
@@ -572,6 +596,50 @@ export function ModelProviderSettings({
                 <p className="mt-2 leading-6 text-slate-600">{item.reason}</p>
               </div>
             ))}
+          </div>
+        </div>
+        <div className="mt-4 rounded-md border border-slate-200 p-3">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <div className="text-sm font-medium text-slate-950">避坑规则治理</div>
+              <p className="mt-1 text-sm text-slate-600">第三轮路由修复沉淀出的模型避坑规则，先治理范围，再影响下一批任务。</p>
+            </div>
+            <div className="flex flex-wrap gap-2 text-xs text-slate-600">
+              <span className="rounded-md bg-slate-50 px-2 py-1">规则 {routeAvoidanceGovernance.summary.totalRules}</span>
+              <span className="rounded-md bg-slate-50 px-2 py-1">全局 {routeAvoidanceGovernance.summary.globalRules}</span>
+              <span className="rounded-md bg-slate-50 px-2 py-1">任务级 {routeAvoidanceGovernance.summary.scopedRules}</span>
+              <span className="rounded-md bg-slate-50 px-2 py-1">高风险 {routeAvoidanceGovernance.summary.highRiskRules}</span>
+            </div>
+          </div>
+          {routeAvoidanceGovernance.nextActions.length ? (
+            <div className="mt-3 grid gap-2 md:grid-cols-2">
+              {routeAvoidanceGovernance.nextActions.map((action) => (
+                <div className="rounded-md bg-amber-50 p-2 text-xs leading-5 text-amber-900" key={action}>{action}</div>
+              ))}
+            </div>
+          ) : null}
+          <div className="mt-3 grid gap-2 lg:grid-cols-2">
+            {routeAvoidanceGovernance.items.map((item) => (
+              <div className={`rounded-md border p-3 text-sm ${item.riskLevel === "high" ? "border-amber-200 bg-amber-50 text-amber-950" : "border-slate-200 bg-slate-50 text-slate-700"}`} key={item.id}>
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <div className="font-medium text-slate-950">{item.providerName} · {item.model}</div>
+                    <div className="mt-1 text-xs opacity-75">影响范围：{item.taskScope}</div>
+                  </div>
+                  <span className="rounded-md bg-white px-2 py-1 text-xs font-medium">{item.actionLabel}</span>
+                </div>
+                <p className="mt-2 leading-6">{item.reason}</p>
+                <div className="mt-2 rounded-md bg-white/70 p-2 text-xs leading-5">{item.reviewAction}</div>
+                {item.evidence.length ? (
+                  <div className="mt-2 grid gap-1 text-xs opacity-80">
+                    {item.evidence.slice(0, 2).map((evidence) => <div key={evidence}>{evidence}</div>)}
+                  </div>
+                ) : null}
+              </div>
+            ))}
+            {routeAvoidanceGovernance.items.length === 0 ? (
+              <div className="rounded-md bg-slate-50 p-3 text-sm text-slate-600">暂无避坑规则。等第三轮路由修复完成后，这里会集中展示可治理的模型经验。</div>
+            ) : null}
           </div>
         </div>
         <div className="mt-4 rounded-md border border-slate-200 p-3">

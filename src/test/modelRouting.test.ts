@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { buildPresetRouteBlueprint } from "../lib/model-gateway/presetRouteBlueprint.ts";
 import { selectModelProviderCandidatesForTask, selectModelProviderForTask } from "../lib/model-gateway/providerSelection.ts";
-import { buildRouteAvoidanceRulesFromDispatchTasks, buildRouteRecommendations } from "../lib/model-gateway/routeRecommendations.ts";
+import { buildRouteAvoidanceGovernance, buildRouteAvoidanceRulesFromDispatchTasks, buildRouteRecommendations } from "../lib/model-gateway/routeRecommendations.ts";
 import { labelForRoutedTask, modelTaskRouteOptions } from "../lib/model-gateway/taskRouting.ts";
 
 const mockProvider = {
@@ -365,5 +365,53 @@ test("model task routing", async (t) => {
     assert.equal(rules[0].model, "deepseek-chat");
     assert.ok(rules[0].reason.includes("降级到 Kimi"));
     assert.ok(rules[0].evidence?.includes("第三轮恢复闭环"));
+  });
+
+  await t.test("builds a governance view for learned route avoidance rules", () => {
+    const governance = buildRouteAvoidanceGovernance([
+      {
+        providerConfigId: "deepseek-provider",
+        providerId: "deepseek",
+        model: "deepseek-chat",
+        reason: "已把 DeepSeek 失败路线降级到 Kimi 备用模型，暂停 deepseek-chat 批量路线。",
+        evidence: ["第三轮恢复闭环", "未恢复 0"],
+      },
+      {
+        taskType: "chapter_review",
+        providerConfigId: "gpt-provider",
+        providerId: "gpt",
+        model: "gpt-4.1",
+        reason: "章节审稿 JSON 不稳定，先限定在审稿任务观察。",
+        evidence: ["审稿失败 2 次"],
+      },
+    ], [
+      {
+        id: "deepseek-provider",
+        providerId: "deepseek",
+        displayName: "DeepSeek",
+        defaultModel: "deepseek-chat",
+        enabled: true,
+        encryptedApiKey: "key",
+      },
+      {
+        id: "gpt-provider",
+        providerId: "gpt",
+        displayName: "GPT",
+        defaultModel: "gpt-4.1",
+        enabled: true,
+        encryptedApiKey: "key",
+      },
+    ]);
+
+    assert.equal(governance.summary.totalRules, 2);
+    assert.equal(governance.summary.globalRules, 1);
+    assert.equal(governance.summary.scopedRules, 1);
+    assert.equal(governance.items[0].providerName, "DeepSeek");
+    assert.equal(governance.items[0].taskScope, "全部写作任务");
+    assert.equal(governance.items[0].riskLevel, "high");
+    assert.equal(governance.items[0].actionLabel, "限定任务类型");
+    assert.ok(governance.items[0].reviewAction.includes("人工解除观察"));
+    assert.equal(governance.items[1].taskScope, "章节审稿");
+    assert.ok(governance.nextActions.some((action) => action.includes("全局避坑规则")));
   });
 });

@@ -53,6 +53,30 @@ export interface RouteAvoidanceDispatchTask {
   evidence?: string[] | string | null;
 }
 
+export interface RouteAvoidanceGovernanceItem {
+  id: string;
+  providerName: string;
+  providerId: string | null;
+  model: string;
+  taskScope: string;
+  riskLevel: "high" | "medium";
+  actionLabel: string;
+  reviewAction: string;
+  reason: string;
+  evidence: string[];
+}
+
+export interface RouteAvoidanceGovernance {
+  summary: {
+    totalRules: number;
+    globalRules: number;
+    scopedRules: number;
+    highRiskRules: number;
+  };
+  items: RouteAvoidanceGovernanceItem[];
+  nextActions: string[];
+}
+
 export interface RouteRecommendation {
   taskType: string;
   label: string;
@@ -213,6 +237,76 @@ export function buildRouteAvoidanceRulesFromDispatchTasks(
     });
 
   return Array.from(rules.values());
+}
+
+function providerForRule(
+  rule: RouteAvoidanceRule,
+  providers: RouteRecommendationProvider[],
+) {
+  return providers.find((provider) => (
+    (rule.providerConfigId && sameText(rule.providerConfigId, provider.id))
+    || (rule.providerId && sameText(rule.providerId, provider.providerId))
+    || (rule.model && sameText(rule.model, provider.defaultModel))
+  ));
+}
+
+function routeAvoidanceRuleId(rule: RouteAvoidanceRule, index: number) {
+  return [
+    rule.taskType ?? "all",
+    rule.providerConfigId ?? rule.providerId ?? "provider",
+    rule.model ?? "model",
+    index,
+  ].join(":");
+}
+
+export function buildRouteAvoidanceGovernance(
+  rules: RouteAvoidanceRule[],
+  providers: RouteRecommendationProvider[],
+): RouteAvoidanceGovernance {
+  const items = rules.map((rule, index): RouteAvoidanceGovernanceItem => {
+    const provider = providerForRule(rule, providers);
+    const scoped = Boolean(rule.taskType);
+    const providerName = provider?.displayName ?? rule.providerId ?? rule.providerConfigId ?? "未知模型";
+    const model = provider?.defaultModel ?? rule.model ?? "未指定模型";
+    const taskScope = rule.taskType ? labelForRoutedTask(rule.taskType) : "全部写作任务";
+
+    return {
+      id: routeAvoidanceRuleId(rule, index),
+      providerName,
+      providerId: provider?.providerId ?? rule.providerId ?? null,
+      model,
+      taskScope,
+      riskLevel: scoped ? "medium" : "high",
+      actionLabel: scoped ? "人工复核" : "限定任务类型",
+      reviewAction: scoped
+        ? `人工解除观察：如果「${taskScope}」连续小批量通过，可移除这条避坑规则。`
+        : `人工解除观察前，先把「${providerName}」限定到具体任务类型，避免全局误伤。`,
+      reason: rule.reason,
+      evidence: rule.evidence ?? [],
+    };
+  }).sort((left, right) => (
+    (left.riskLevel === "high" ? 0 : 1) - (right.riskLevel === "high" ? 0 : 1)
+    || left.providerName.localeCompare(right.providerName)
+  ));
+  const globalRules = items.filter((item) => item.taskScope === "全部写作任务").length;
+  const scopedRules = items.length - globalRules;
+  const highRiskRules = items.filter((item) => item.riskLevel === "high").length;
+  const nextActions = [
+    globalRules > 0 ? `有 ${globalRules} 条全局避坑规则，先限定到任务类型再长期生效。` : "",
+    scopedRules > 0 ? `有 ${scopedRules} 条任务级避坑规则，等下一批样本稳定后人工解除观察。` : "",
+    items.length === 0 ? "暂无避坑规则；继续用第三轮派单沉淀模型路线经验。" : "",
+  ].filter(Boolean);
+
+  return {
+    summary: {
+      totalRules: items.length,
+      globalRules,
+      scopedRules,
+      highRiskRules,
+    },
+    items,
+    nextActions,
+  };
 }
 
 function successRate(succeeded: number, total: number) {

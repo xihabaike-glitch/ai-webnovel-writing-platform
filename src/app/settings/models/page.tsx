@@ -5,7 +5,7 @@ import { buildPresetRouteBlueprint } from "@/lib/model-gateway/presetRouteBluepr
 import { providerModelPresets, providerOptions } from "@/lib/model-gateway/providerDefaults";
 import { buildProviderHealthDashboard } from "@/lib/model-gateway/providerHealth";
 import { buildRouteEffectAudit } from "@/lib/model-gateway/routeEffectAudit";
-import { buildRouteAvoidanceRulesFromDispatchTasks, buildRouteRecommendations } from "@/lib/model-gateway/routeRecommendations";
+import { buildRouteAvoidanceGovernance, buildRouteAvoidanceRulesFromDispatchTasks, buildRouteRecommendations } from "@/lib/model-gateway/routeRecommendations";
 import { modelTaskRouteOptions } from "@/lib/model-gateway/taskRouting";
 
 export const dynamic = "force-dynamic";
@@ -82,6 +82,7 @@ export default async function ModelSettingsPage() {
     encryptedApiKey: provider.encryptedApiKey,
   }));
   const routeAvoidanceRules = buildRouteAvoidanceRulesFromDispatchTasks(completedRouteRepairs, routeProviders);
+  const routeAvoidanceGovernance = buildRouteAvoidanceGovernance(routeAvoidanceRules, routeProviders);
   const healthDashboard = buildProviderHealthDashboard(maskedProviders);
   const routeEffectAudit = buildRouteEffectAudit(
     recentTasks,
@@ -108,6 +109,7 @@ export default async function ModelSettingsPage() {
         presetRouteBlueprint={presetRouteBlueprint}
         providers={maskedProviders}
         routeEffectAudit={routeEffectAudit}
+        routeAvoidanceGovernance={routeAvoidanceGovernance}
         routeRecommendations={routeRecommendations}
         routeOptions={modelTaskRouteOptions}
         routes={routes.map((route) => ({

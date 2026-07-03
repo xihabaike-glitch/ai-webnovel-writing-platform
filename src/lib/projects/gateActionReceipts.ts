@@ -1024,6 +1024,14 @@ function actionTypeFromReceipt(receipt: GateActionReceipt) {
   return receipt.executionType === "platform_strategy" ? parts[2] ?? "" : receipt.executionType;
 }
 
+function isProjectStartDecisionReceipt(receipt: GateActionReceipt) {
+  return receipt.actionId.startsWith("project_start_decision:");
+}
+
+function projectStartDecisionStatus(receipt: GateActionReceipt) {
+  return receipt.actionId.split(":")[1] ?? "";
+}
+
 function isAdviceActionReceipt(receipt: GateActionReceipt) {
   return receipt.actionId.startsWith("gate-advice:");
 }
@@ -1479,6 +1487,62 @@ export function buildGateActionReviewAdvice(receipts: GateActionReceipt[], limit
     const failureRate = operationalReceipts.length ? failed.length / operationalReceipts.length : 0;
     const failureResponse = latestAdviceResponse(group.receipts, "handle_failure", group.platformId);
     const failureIsResolved = Boolean(latestFailure && latestSuccess && receiptIsAfter(latestSuccess, latestFailure));
+    const latestStartDecision = latestReceiptFor(group.receipts, (receipt) => isProjectStartDecisionReceipt(receipt) && receipt.status === "succeeded");
+
+    if (latestStartDecision?.recheck.status === "blocked") {
+      const state = adviceState(latestAdviceResponse(group.receipts, "handle_failure", group.platformId), latestStartDecision);
+      advice.push({
+        id: `${group.platformId}:start-decision-blocked`,
+        severity: state === "in_progress" ? "warning" : "urgent",
+        state,
+        platformId: group.platformId,
+        platformName: group.platformName,
+        headline: state === "in_progress" ? `${group.platformName} 开书策略避坑已响应，等重写回执。` : `${group.platformName} 开书策略卡住，先处理开头避坑。`,
+        detail: state === "in_progress"
+          ? "已经进入开头修复位，但还没看到后续重写、审稿或验证回执。修完前三章后再刷新总闸门。"
+          : "开书策略回执要求先停用旧打法。别继续扩批，先重写前三章开头和平台包装，再小批验证。",
+        action: {
+          kind: "handle_failure",
+          label: "处理开头避坑",
+          href: latestStartDecision.href,
+        },
+        evidence: adviceEvidence([latestStartDecision]),
+      });
+      continue;
+    }
+
+    if (latestStartDecision && projectStartDecisionStatus(latestStartDecision) !== "pause") {
+      const laterValidation = latestReceiptFor(group.receipts, (receipt) => (
+        receiptIsAfter(receipt, latestStartDecision)
+        && (
+          receipt.executionType === "recommended_batch"
+          || actionTypeFromReceipt(receipt) === "rewrite_first_three"
+          || actionTypeFromReceipt(receipt) === "generate_asset_variants"
+          || receipt.taskId !== null
+        )
+      ));
+      if (!laterValidation) {
+        const state = adviceState(latestAdviceResponse(group.receipts, "start_gate_action", group.platformId), latestStartDecision);
+        advice.push({
+          id: `${group.platformId}:start-decision-validate`,
+          severity: state === "in_progress" ? "warning" : "opportunity",
+          state,
+          platformId: group.platformId,
+          platformName: group.platformName,
+          headline: state === "in_progress" ? `${group.platformName} 首轮验证已响应，等执行回执。` : `${group.platformName} 开书打法已落库，别停在资料层。`,
+          detail: state === "in_progress"
+            ? "已经进入首轮验证位置，但还没有看到批量审稿、前三章重写或平台包装动作。补一条真实执行回执。"
+            : "平台土壤和首轮打法已经写入项目，下一步要跑前三章、审稿或平台包装，让打法进入真实样本。",
+          action: {
+            kind: "start_gate_action",
+            label: "跑首轮验证",
+            href: projectAnchorHref(latestStartDecision.href, "#ai-pipeline"),
+          },
+          evidence: adviceEvidence([latestStartDecision]),
+        });
+        continue;
+      }
+    }
 
     if (!failureIsResolved && (failed.length >= 2 || (failed.length >= 1 && failureRate >= 0.5))) {
       const state = adviceState(failureResponse, latestFailure);

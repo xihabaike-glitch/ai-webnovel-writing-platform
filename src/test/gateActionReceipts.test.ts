@@ -32,6 +32,7 @@ import {
   mergeGateActionReceipts,
   trimGateActionReceipts,
 } from "../lib/projects/gateActionReceipts.ts";
+import { buildProjectStartDecisionActionReceipt } from "../lib/projects/projectStartDecisionActions.ts";
 import type { PrePublishGateAction, PrePublishGateStrategyPlatform } from "../lib/projects/prePublishGate.ts";
 
 const action: PrePublishGateAction = {
@@ -358,6 +359,76 @@ test("buildGateActionReceipt", async (t) => {
     assert.equal(advice[0].action.kind, "record_metrics");
     assert.equal(advice[0].action.label, "回填发布效果");
     assert.equal(advice[0].action.href, "/projects/project-1#publish-effect-panel");
+  });
+
+  await t.test("turns blocked project start decisions into opening repair advice", () => {
+    const startReceipt = buildProjectStartDecisionActionReceipt({
+      projectId: "project-1",
+      projectTitle: "替身归来",
+      platformId: "qimao",
+      platformName: "七猫免费小说",
+      decision: {
+        status: "pause",
+        label: "先停用",
+        headline: "这套开书打法已经带着避坑信号，别再复用到新批次。",
+        nextExperiment: "先重写前三章开头和平台包装，只做小批验证，等审稿分和失败率回正再恢复。",
+        actionLabel: "重写前三章",
+        targetAnchor: "first-three-rewrite",
+        evidence: ["来源：批量避坑"],
+      },
+      startTactic: {
+        title: "首轮平台打法：七猫免费小说",
+        label: "批量避坑",
+        primaryTactic: "不要复用慢热设定开场。",
+        openingMove: "第一屏先给身份暴露。",
+        verificationMove: "只做小批验证。",
+        risk: "暂停继续放量。",
+      },
+      created: [],
+      skipped: "已记录避坑动作。",
+      now: "2026-01-01T00:00:00.000Z",
+    });
+
+    const advice = buildGateActionReviewAdvice([startReceipt]);
+
+    assert.equal(advice[0].id, "qimao:start-decision-blocked");
+    assert.equal(advice[0].severity, "urgent");
+    assert.equal(advice[0].platformName, "七猫免费小说");
+    assert.ok(advice[0].headline.includes("开书策略卡住"));
+    assert.equal(advice[0].action.kind, "handle_failure");
+    assert.equal(advice[0].action.label, "处理开头避坑");
+    assert.equal(advice[0].action.href, "/projects/project-1#first-three-rewrite");
+  });
+
+  await t.test("turns seeded project start decisions into first validation advice", () => {
+    const startReceipt = buildProjectStartDecisionActionReceipt({
+      projectId: "project-1",
+      projectTitle: "夜雨系统",
+      platformId: "fanqie",
+      platformName: "番茄小说",
+      decision: {
+        status: "seed",
+        label: "先建打法",
+        headline: "这个项目还没有首轮平台打法，先别让 AI 自由发挥。",
+        nextExperiment: "先生成平台土壤和首轮开书打法，再进入前三章、审稿和发布包装。",
+        actionLabel: "补平台土壤",
+        targetAnchor: "world-bible",
+        evidence: ["未找到首轮平台打法记录。"],
+      },
+      startTactic: null,
+      created: ["核心规则", "首轮平台打法：番茄小说"],
+      skipped: null,
+      now: "2026-01-01T00:00:00.000Z",
+    });
+
+    const advice = buildGateActionReviewAdvice([startReceipt]);
+
+    assert.equal(advice[0].id, "fanqie:start-decision-validate");
+    assert.equal(advice[0].severity, "opportunity");
+    assert.ok(advice[0].headline.includes("开书打法已落库"));
+    assert.equal(advice[0].action.kind, "start_gate_action");
+    assert.equal(advice[0].action.label, "跑首轮验证");
+    assert.equal(advice[0].action.href, "/projects/project-1#ai-pipeline");
   });
 
   await t.test("builds audit receipts when an advice action is accepted", () => {

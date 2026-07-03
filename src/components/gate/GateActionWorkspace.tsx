@@ -79,6 +79,11 @@ function executionLabel(type: GateActionReceipt["executionType"]) {
   return "人工处理";
 }
 
+function receiptExecutionLabel(receipt: GateActionReceipt) {
+  if (receipt.actionId.startsWith("project_start_decision:")) return "开书策略";
+  return executionLabel(receipt.executionType);
+}
+
 function adviceClass(severity: GateActionReviewAdviceSeverity) {
   if (severity === "urgent") return "border-rose-200 bg-rose-50 text-rose-900";
   if (severity === "warning") return "border-amber-200 bg-amber-50 text-amber-900";
@@ -1535,7 +1540,7 @@ export function GateActionWorkspace({ actions }: { actions: PrePublishGateAction
                 </div>
               ) : null}
               <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-slate-500">
-                <span>{executionLabel(receipt.executionType)}</span>
+                <span>{receiptExecutionLabel(receipt)}</span>
                 <span>{new Date(receipt.createdAt).toLocaleString()}</span>
                 {receipt.succeededCount + receipt.failedCount > 0 ? (
                   <span>成功 {receipt.succeededCount} · 失败 {receipt.failedCount}</span>

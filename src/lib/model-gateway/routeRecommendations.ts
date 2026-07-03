@@ -337,9 +337,12 @@ function avoidanceForTask(
   const applied = provider
     ? rules.filter((rule) => matchesAvoidanceRule(taskType, provider, rule))
     : [];
-  const evidence = Array.from(new Set(applied.flatMap((rule) => rule.evidence ?? [])));
+  const evidence = Array.from(new Set(applied.flatMap((rule) => [
+    ...(rule.evidence ?? []),
+    avoidanceGovernanceEvidence(rule),
+  ].filter(Boolean))));
   const reason = applied.length > 0
-    ? `已避开 ${provider?.displayName}${provider?.defaultModel ? ` · ${provider.defaultModel}` : ""}：${applied[0].reason}`
+    ? `已避开 ${provider?.displayName}${provider?.defaultModel ? ` · ${provider.defaultModel}` : ""}：${avoidanceReason(applied[0])}`
     : null;
 
   return {
@@ -348,6 +351,21 @@ function avoidanceForTask(
     reason,
     evidence,
   };
+}
+
+function avoidanceGovernanceEvidence(rule: RouteAvoidanceRule) {
+  if (rule.watchUntil) {
+    return `延长观察到 ${rule.watchUntil.slice(0, 10)}：${rule.governanceNote ?? "到期后再复测。"}`;
+  }
+  return rule.governanceNote ? `治理备注：${rule.governanceNote}` : "";
+}
+
+function avoidanceReason(rule: RouteAvoidanceRule) {
+  if (rule.watchUntil) {
+    return `延长观察到 ${rule.watchUntil.slice(0, 10)}，${rule.governanceNote ?? "到期后再复测。"} 原始原因：${rule.reason}`;
+  }
+  if (rule.governanceNote) return `${rule.governanceNote} 原始原因：${rule.reason}`;
+  return rule.reason;
 }
 
 export function buildRouteAvoidanceRulesFromDispatchTasks(

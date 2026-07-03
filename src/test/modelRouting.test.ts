@@ -527,6 +527,65 @@ test("model task routing", async (t) => {
     assert.equal(draft?.avoidance.status, "none");
   });
 
+  await t.test("explains extended watch governance inside route recommendations", () => {
+    const rawRules = [
+      {
+        providerConfigId: "deepseek-provider",
+        providerId: "deepseek",
+        model: "deepseek-chat",
+        reason: "DeepSeek 批量路线需要继续观察。",
+        evidence: ["第三轮恢复闭环"],
+      },
+    ];
+    const effective = applyRouteAvoidanceOverrides(rawRules, [
+      {
+        ruleKey: buildRouteAvoidanceRuleKey(rawRules[0]),
+        action: "extend_watch",
+        expiresAt: "2026-07-18T00:00:00.000Z",
+        note: "复测仍异常，延长观察。",
+      },
+    ]);
+    const recommendations = buildRouteRecommendations([
+      {
+        id: "draft-deepseek-1",
+        taskType: "chapter_draft",
+        providerConfigId: "deepseek-provider",
+        status: "succeeded",
+        inputTokens: 1000,
+        outputTokens: 1200,
+        costUsd: 0.002,
+        outputText: JSON.stringify({ score: 88 }),
+      },
+      {
+        id: "draft-deepseek-2",
+        taskType: "chapter_draft",
+        providerConfigId: "deepseek-provider",
+        status: "succeeded",
+        inputTokens: 1000,
+        outputTokens: 1200,
+        costUsd: 0.002,
+        outputText: JSON.stringify({ score: 86 }),
+      },
+    ], [], [
+      {
+        id: "deepseek-provider",
+        providerId: "deepseek",
+        displayName: "DeepSeek",
+        defaultModel: "deepseek-chat",
+        enabled: true,
+        encryptedApiKey: "key",
+      },
+    ], { avoidanceRules: effective });
+
+    const draft = recommendations.find((item) => item.taskType === "chapter_draft");
+
+    assert.equal(draft?.recommendedPrimaryProviderConfigId, null);
+    assert.equal(draft?.avoidance.status, "applied");
+    assert.ok(draft?.reason.includes("延长观察到 2026-07-18"));
+    assert.ok(draft?.reason.includes("复测仍异常"));
+    assert.ok(draft?.avoidance.evidence.some((item) => item.includes("延长观察到 2026-07-18")));
+  });
+
   await t.test("shows extended watch windows in governance", () => {
     const rawRules = [
       {

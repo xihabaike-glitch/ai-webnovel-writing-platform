@@ -7,6 +7,7 @@ import {
   buildGatePlatformStrategyReceipt,
   buildGateActionReviewAdvice,
   buildGateFailureRepairReceiptReview,
+  buildGateFailureRepairRecheckDispatchItems,
   buildGatePlatformGrowthReview,
   buildGatePlatformGrowthDispatchItems,
   buildGateProjectStartValidationDispatchItems,
@@ -404,6 +405,78 @@ test("buildGateActionReceipt", async (t) => {
     assert.match(responded.detail, /当前仍有 2 个未恢复失败/);
     assert.equal(cleared.status, "cleared");
     assert.match(cleared.detail, /已清空/);
+  });
+
+  await t.test("turns unresolved failure repair receipts into recheck dispatch cards", () => {
+    const manualRepair = buildGateActionReceipt({
+      action: {
+        id: "failure-repair-batch",
+        label: "去模型设置",
+        detail: "先修配置，再谈重试：1 个未恢复失败指向 API Key、权限或模型配置。",
+        href: "/settings/models",
+        tone: "repair",
+        execution: null,
+      },
+      status: "succeeded",
+      now: "2026-01-01T00:00:00.000Z",
+      payload: { message: "已记录模型配置修复。" },
+    });
+    const retryReceipt = buildGateActionReceipt({
+      action: {
+        id: "repair-batch-retry:timeout-failure",
+        label: "一键重试",
+        detail: "夜雨系统 · 第二章 · 可直接复用当前章节内容重新执行。",
+        href: "/projects/project-1/chapters/chapter-2",
+        tone: "review",
+        execution: { type: "retry_task", taskId: "timeout-failure" },
+      },
+      status: "succeeded",
+      now: "2026-01-01T00:01:00.000Z",
+      payload: { task: { id: "timeout-failure-retry", status: "succeeded" } },
+    });
+    const review = buildGateFailureRepairReceiptReview(failureRepairBatch, [retryReceipt, manualRepair]);
+    const dispatches = buildGateFailureRepairRecheckDispatchItems(review, failureRepairBatch);
+    const clearedDispatches = buildGateFailureRepairRecheckDispatchItems(
+      buildGateFailureRepairReceiptReview({
+        ...failureRepairBatch,
+        status: "clear",
+        summary: {
+          unresolvedFailures: 0,
+          configFailures: 0,
+          retryableFailures: 0,
+          manualFailures: 0,
+          affectedProjects: 0,
+          affectedProviders: 0,
+        },
+        items: [],
+      }, [retryReceipt, manualRepair]),
+      {
+        ...failureRepairBatch,
+        status: "clear",
+        summary: {
+          unresolvedFailures: 0,
+          configFailures: 0,
+          retryableFailures: 0,
+          manualFailures: 0,
+          affectedProjects: 0,
+          affectedProviders: 0,
+        },
+        items: [],
+      },
+    );
+
+    assert.equal(dispatches.length, 1);
+    assert.equal(dispatches[0].id, "global:failure_repair_recheck:failure-repair-batch");
+    assert.equal(dispatches[0].platformId, "global");
+    assert.equal(dispatches[0].stage, "failure_repair_recheck");
+    assert.equal(dispatches[0].ownerRole, "故障复检负责人");
+    assert.equal(dispatches[0].state, "queued");
+    assert.equal(dispatches[0].priorityScore, 94);
+    assert.equal(dispatches[0].href, "/gate");
+    assert.ok(dispatches[0].detail.includes("仍有 2 个未恢复失败"));
+    assert.ok(dispatches[0].acceptanceCriteria.includes("总闸门未恢复失败数降为 0"));
+    assert.ok(dispatches[0].evidence.some((line) => line.includes("已记录模型配置修复")));
+    assert.equal(clearedDispatches.length, 0);
   });
 
   await t.test("turns repeated failures into urgent review advice", () => {

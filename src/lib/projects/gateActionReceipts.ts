@@ -146,6 +146,7 @@ export type GatePlatformGrowthReviewStage =
   | "repair_tactic"
   | "pivot_platform"
   | "pause_platform"
+  | "failure_repair_recheck"
   | "start_first_three_review"
   | "start_opening_diagnostic"
   | "start_platform_package"
@@ -1044,6 +1045,46 @@ export function buildGateFailureRepairReceiptReview(
     latestReceiptId: latest.id,
     evidence,
   };
+}
+
+export function buildGateFailureRepairRecheckDispatchItems(
+  review: GateFailureRepairReceiptReview,
+  batch: FailureRepairBatch,
+  persistedTasks: PersistedGatePlatformDispatchTask[] = [],
+): GatePlatformGrowthDispatchItem[] {
+  if (review.status !== "recheck" && review.status !== "blocked") return [];
+
+  const dispatchKey = "global:failure_repair_recheck:failure-repair-batch";
+  const persisted = persistedTasks.find((task) => task.dispatchKey === dispatchKey);
+  const isBlocked = review.status === "blocked";
+
+  return [{
+    id: dispatchKey,
+    platformId: "global",
+    platformName: "全局任务",
+    stage: "failure_repair_recheck",
+    state: persisted?.state ?? "queued",
+    priorityScore: isBlocked ? 98 : 94,
+    ownerRole: "故障复检负责人",
+    title: isBlocked ? "失败修复动作失败复盘" : "失败修复后复检",
+    detail: isBlocked
+      ? `${review.detail} 当前仍有 ${batch.summary.unresolvedFailures} 个未恢复失败，先定位失败原因，再重新执行修复。`
+      : `已有失败修复回执，但当前仍有 ${batch.summary.unresolvedFailures} 个未恢复失败。需要复检配置、重试结果和失败列表，别把按钮点击误当成真正清空。`,
+    dueLabel: isBlocked ? "立即" : "今天",
+    actionLabel: "派给复检负责人",
+    href: review.href,
+    acceptanceCriteria: [
+      "总闸门未恢复失败数降为 0",
+      "失败修复回执与当前失败列表已对齐",
+      "仍未清空的失败已拆成下一轮可执行动作",
+    ],
+    evidence: [
+      ...review.evidence,
+      ...batch.guidance,
+      `未恢复失败 ${batch.summary.unresolvedFailures} 个`,
+    ].slice(0, 5),
+    reviewLatestAt: new Date().toISOString(),
+  }];
 }
 
 export function buildGatePlatformStrategyReceipt(input: {

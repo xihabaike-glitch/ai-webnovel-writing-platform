@@ -6,6 +6,7 @@ import {
   buildGateDispatchEvidenceReview,
   buildGateDispatchTaskCenter,
   filterGateDispatchTasks,
+  persistGateDispatchTask,
   updatePersistedGateDispatchTaskState,
   type GateActionReceipt,
   type GateDispatchEvidenceReviewStatus,
@@ -86,7 +87,9 @@ export function GateDispatchTaskCenter({
     setRunningKey(task.dispatchKey);
     setErrorMessage("");
     try {
-      const updated = await updatePersistedGateDispatchTaskState(task.dispatchKey, targetState, { completionEvidence });
+      const updated = task.databaseId
+        ? await updatePersistedGateDispatchTaskState(task.dispatchKey, targetState, { completionEvidence })
+        : await persistGateDispatchTask({ ...task, state: targetState });
       setTasks((current) => current.map((item) => item.dispatchKey === updated.dispatchKey ? updated : item));
       setCompletionDrafts((current) => {
         const next = { ...current };

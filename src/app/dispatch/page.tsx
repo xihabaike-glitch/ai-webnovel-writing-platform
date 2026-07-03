@@ -1,9 +1,24 @@
 import { AppShell } from "@/components/app-shell/AppShell";
 import { GateDispatchTaskCenter } from "@/components/gate/GateDispatchTaskCenter";
+import { buildTaskBatchHistory } from "@/lib/ai/taskBatchHistory";
 import { prisma } from "@/lib/db/prisma";
-import type { GateActionReceipt, GatePlatformGrowthDispatchState, PersistedGatePlatformDispatchTask } from "@/lib/projects/gateActionReceipts";
+import {
+  buildGateFailureRepairReceiptReview,
+  buildGateFailureRepairRecheckDispatchItems,
+  type GateActionReceipt,
+  type GatePlatformGrowthDispatchItem,
+  type GatePlatformGrowthDispatchState,
+  type PersistedGatePlatformDispatchTask,
+} from "@/lib/projects/gateActionReceipts";
+import { buildPrePublishGate } from "@/lib/projects/prePublishGate";
+import { parsePublishSnapshotTags } from "@/lib/projects/platformPublishExport";
 
 export const dynamic = "force-dynamic";
+
+function normalizeAssetAuditStatus(status: string): "ready" | "blocked" | "needs_work" {
+  if (status === "ready" || status === "blocked") return status;
+  return "needs_work";
+}
 
 function parseStringList(value: string) {
   try {
@@ -117,8 +132,42 @@ function toReceipt(item: {
   };
 }
 
+function toVirtualTask(
+  item: GatePlatformGrowthDispatchItem,
+  persisted?: PersistedGatePlatformDispatchTask,
+): PersistedGatePlatformDispatchTask {
+  const timestamp = persisted?.updatedAt ?? item.reviewLatestAt;
+
+  return {
+    databaseId: persisted?.databaseId ?? "",
+    dispatchKey: item.id,
+    id: item.id,
+    projectId: persisted?.projectId ?? null,
+    platformId: item.platformId,
+    platformName: item.platformName,
+    stage: item.stage,
+    state: item.state,
+    priorityScore: item.priorityScore,
+    ownerRole: item.ownerRole,
+    title: item.title,
+    detail: item.detail,
+    dueLabel: item.dueLabel,
+    actionLabel: item.actionLabel,
+    href: item.href,
+    acceptanceCriteria: item.acceptanceCriteria,
+    evidence: item.evidence,
+    sourceReceiptId: persisted?.sourceReceiptId ?? null,
+    completionEvidence: persisted?.completionEvidence ?? "",
+    reviewLatestAt: item.reviewLatestAt,
+    assignedAt: persisted?.assignedAt ?? null,
+    completedAt: persisted?.completedAt ?? null,
+    createdAt: persisted?.createdAt ?? timestamp,
+    updatedAt: timestamp,
+  };
+}
+
 export default async function DispatchPage() {
-  const [tasks, receipts] = await Promise.all([
+  const [tasks, receipts, projects, recentAiTasks, chapters] = await Promise.all([
     prisma.gateDispatchTask.findMany({
       orderBy: [
         { state: "asc" },
@@ -131,7 +180,87 @@ export default async function DispatchPage() {
       orderBy: { createdAt: "desc" },
       take: 100,
     }),
+    prisma.project.findMany({
+      include: {
+        chapters: { orderBy: { order: "asc" } },
+        aiTasks: { orderBy: { createdAt: "desc" } },
+        publishSnapshots: { orderBy: { createdAt: "desc" }, take: 80 },
+        submissionAssets: { orderBy: { updatedAt: "desc" } },
+        submissionAssetVersions: { orderBy: { createdAt: "desc" }, take: 80 },
+        platformPublishMetrics: { orderBy: { snapshotDate: "desc" }, take: 80 },
+      },
+      orderBy: { updatedAt: "desc" },
+    }),
+    prisma.aiTask.findMany({
+      include: {
+        project: { select: { title: true } },
+        modelProvider: { select: { providerId: true, displayName: true } },
+      },
+      orderBy: { createdAt: "desc" },
+      take: 120,
+    }),
+    prisma.chapter.findMany({
+      select: { id: true, title: true },
+    }),
   ]);
+  const persistedTasks = tasks.map(toTask);
+  const receiptItems = receipts.map(toReceipt);
+  const chaptersById = new Map(chapters.map((chapter) => [chapter.id, chapter]));
+  const recentTasksWithChapter = recentAiTasks.map((task) => ({
+    ...task,
+    chapter: task.chapterId ? chaptersById.get(task.chapterId) ?? null : null,
+  }));
+  const gateProjects = projects.map((project) => ({
+    ...project,
+    submissionAssets: project.submissionAssets.map((asset) => ({
+      id: asset.id,
+      platformId: asset.platformId,
+      platformName: asset.platformName,
+      title: asset.title,
+      logline: asset.logline,
+      synopsis: asset.synopsis,
+      overseasSynopsis: asset.overseasSynopsis,
+      tags: parsePublishSnapshotTags(asset.tags),
+      note: asset.note,
+      source: asset.source,
+      updatedAt: asset.updatedAt,
+    })),
+    submissionAssetVersions: project.submissionAssetVersions.map((version) => ({
+      id: version.id,
+      platformId: version.platformId,
+      platformName: version.platformName,
+      title: version.title,
+      logline: version.logline,
+      synopsis: version.synopsis,
+      overseasSynopsis: version.overseasSynopsis,
+      tags: parsePublishSnapshotTags(version.tags),
+      note: version.note,
+      source: version.source,
+      auditScore: version.auditScore,
+      auditStatus: normalizeAssetAuditStatus(version.auditStatus),
+      action: version.action,
+      sourceTaskId: version.sourceTaskId,
+      strategy: version.strategy ?? undefined,
+      createdAt: version.createdAt,
+    })),
+  }));
+  const gate = buildPrePublishGate({
+    projects: gateProjects,
+    failureTasks: recentTasksWithChapter,
+    batchHistory: buildTaskBatchHistory(recentTasksWithChapter),
+  });
+  const failureRepairReview = buildGateFailureRepairReceiptReview(gate.failureRepairBatch, receiptItems);
+  const persistedByKey = new Map(persistedTasks.map((task) => [task.dispatchKey, task]));
+  const generatedTasks = buildGateFailureRepairRecheckDispatchItems(
+    failureRepairReview,
+    gate.failureRepairBatch,
+    persistedTasks,
+  ).map((item) => toVirtualTask(item, persistedByKey.get(item.id)));
+  const generatedKeys = new Set(generatedTasks.map((task) => task.dispatchKey));
+  const mergedTasks = [
+    ...generatedTasks,
+    ...persistedTasks.filter((task) => !generatedKeys.has(task.dispatchKey)),
+  ];
 
   return (
     <AppShell>
@@ -141,10 +270,10 @@ export default async function DispatchPage() {
           <p className="mt-1 text-sm text-slate-600">把总闸门里的平台复盘任务集中管理，按状态、平台和角色推进闭环。</p>
         </div>
         <div className="w-fit rounded-md border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700">
-          {tasks.length ? `${tasks.length} 个派单任务` : "等待总闸门派单"}
+          {mergedTasks.length ? `${mergedTasks.length} 个派单任务` : "等待总闸门派单"}
         </div>
       </div>
-      <GateDispatchTaskCenter initialReceipts={receipts.map(toReceipt)} initialTasks={tasks.map(toTask)} />
+      <GateDispatchTaskCenter initialReceipts={receiptItems} initialTasks={mergedTasks} />
     </AppShell>
   );
 }

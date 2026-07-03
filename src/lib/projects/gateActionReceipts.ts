@@ -5,7 +5,7 @@ export const gateActionReceiptStorageKey = "ai-webnovel-gate-action-receipts";
 export const gateActionReceiptUpdatedEvent = "ai-webnovel-gate-action-receipts-updated";
 export const defaultGateActionReceiptLimit = 20;
 
-export type GateActionReceiptExecutionType = PrePublishGateActionExecution["type"] | "platform_strategy" | "manual";
+export type GateActionReceiptExecutionType = PrePublishGateActionExecution["type"] | "platform_strategy" | "model_route" | "manual";
 export type GateActionReceiptStatusFilter = "all" | GateActionReceipt["status"];
 export type GateActionReceiptExecutionFilter = "all" | GateActionReceiptExecutionType;
 
@@ -181,6 +181,7 @@ export type GatePlatformGrowthReviewStage =
   | "failure_route_repair"
   | "failure_retry_repair"
   | "failure_manual_review"
+  | "model_route_confirmation_recheck"
   | "start_first_three_review"
   | "start_opening_diagnostic"
   | "start_platform_package"

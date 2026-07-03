@@ -117,6 +117,7 @@ function executionLabel(type: GateActionReceipt["executionType"]) {
   if (type === "retry_task") return "失败重试";
   if (type === "recommended_batch") return "推荐批次";
   if (type === "platform_strategy") return "平台策略";
+  if (type === "model_route") return "模型路由";
   return "人工处理";
 }
 

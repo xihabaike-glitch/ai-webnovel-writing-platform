@@ -6,7 +6,11 @@ import {
   selectModelProviderCandidatesForTask,
   selectModelProviderForTask,
 } from "../lib/model-gateway/providerSelection.ts";
-import { buildModelRouteConfirmationReceipt } from "../lib/model-gateway/routeConfirmation.ts";
+import {
+  buildModelRouteConfirmationDispatch,
+  buildModelRouteConfirmationReceipt,
+  modelRouteConfirmationReceiptFromAudit,
+} from "../lib/model-gateway/routeConfirmation.ts";
 import {
   applyRouteAvoidanceOverrides,
   buildRouteAvoidanceGovernance,
@@ -134,6 +138,68 @@ test("model task routing", async (t) => {
     assert.ok(receipt.detail.includes("Kimi · kimi-k2.6"));
     assert.ok(receipt.message.includes("复测通过恢复候选"));
     assert.equal(receipt.recheck.label, "复检模型路由");
+  });
+
+  await t.test("turns route confirmations into follow-up dispatch tasks", () => {
+    const receipt = buildModelRouteConfirmationReceipt({
+      taskType: "chapter_review",
+      primaryProviderName: "GPT · gpt-5-mini",
+      fallbackProviderName: "DeepSeek · deepseek-chat",
+      reason: "近 8 次样本成功率 100%，质量 71，单次成功成本 $0.0000。",
+      source: "recommendation",
+      createdAt: "2026-07-04T10:00:00.000Z",
+    });
+
+    const dispatch = buildModelRouteConfirmationDispatch(receipt);
+
+    assert.equal(dispatch.dispatchKey, "model-route-confirmation-recheck:chapter_review:2026-07-04T10:00:00.000Z");
+    assert.equal(dispatch.platformId, "model-routing");
+    assert.equal(dispatch.platformName, "模型路由");
+    assert.equal(dispatch.stage, "model_route_confirmation_recheck");
+    assert.equal(dispatch.state, "assigned");
+    assert.equal(dispatch.ownerRole, "模型治理");
+    assert.equal(dispatch.href, "/settings/models");
+    assert.equal(dispatch.actionLabel, "复检模型路由");
+    assert.ok(dispatch.title.includes("章节审稿"));
+    assert.ok(dispatch.detail.includes("GPT · gpt-5-mini"));
+    assert.ok(dispatch.acceptanceCriteria.some((item) => item.includes("成功率")));
+    assert.ok(dispatch.evidence.some((item) => item.includes("近 8 次样本成功率")));
+  });
+
+  await t.test("restores route confirmation receipts from persisted audits", () => {
+    const receipt = buildModelRouteConfirmationReceipt({
+      taskType: "chapter_second_pass",
+      primaryProviderName: "Kimi · kimi-k2.6",
+      reason: "人工保存模型路由。",
+      source: "manual",
+      createdAt: "2026-07-04T11:00:00.000Z",
+    });
+
+    const restored = modelRouteConfirmationReceiptFromAudit({
+      receiptId: receipt.id,
+      actionId: receipt.actionId,
+      label: receipt.label,
+      detail: receipt.detail,
+      href: receipt.href,
+      status: receipt.status,
+      message: receipt.message,
+      executionType: receipt.executionType,
+      succeededCount: receipt.succeededCount,
+      failedCount: receipt.failedCount,
+      platformId: receipt.platformId,
+      platformName: receipt.platformName,
+      recheckStatus: receipt.recheck.status,
+      recheckLabel: receipt.recheck.label,
+      recheckDetail: receipt.recheck.detail,
+      recheckAction: receipt.recheck.action,
+      payload: JSON.stringify(receipt.payload),
+      createdAt: new Date(receipt.createdAt),
+    });
+
+    assert.equal(restored?.payload.taskType, "chapter_second_pass");
+    assert.equal(restored?.payload.primaryProviderName, "Kimi · kimi-k2.6");
+    assert.equal(restored?.createdAt, "2026-07-04T11:00:00.000Z");
+    assert.equal(modelRouteConfirmationReceiptFromAudit({ ...restored!, executionType: "manual", receiptId: restored!.id, recheckStatus: "ready", recheckAction: restored!.recheck.action, payload: "{}" }), null);
   });
 
   await t.test("builds a cold-start route blueprint from writing model presets", () => {

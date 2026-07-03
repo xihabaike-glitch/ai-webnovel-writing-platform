@@ -212,6 +212,15 @@ interface RouteAvoidanceDecisionHistoryView {
   }>;
 }
 
+interface RouteConfirmationHistoryView {
+  id: string;
+  label: string;
+  detail: string;
+  message: string;
+  status: string;
+  createdAt: string;
+}
+
 interface PresetRouteBlueprintView {
   summary: {
     total: number;
@@ -292,6 +301,7 @@ export function ModelProviderSettings({
   routeEffectAudit,
   routeAvoidanceDecisionHistory,
   routeAvoidanceGovernance,
+  routeConfirmationHistory,
   routeRecommendations,
   routeOptions,
   routes,
@@ -304,6 +314,7 @@ export function ModelProviderSettings({
   routeEffectAudit: RouteEffectAuditView;
   routeAvoidanceDecisionHistory: RouteAvoidanceDecisionHistoryView;
   routeAvoidanceGovernance: RouteAvoidanceGovernanceView;
+  routeConfirmationHistory: RouteConfirmationHistoryView[];
   routeRecommendations: RouteRecommendationView[];
   routeOptions: RouteOptionView[];
   routes: RouteView[];
@@ -355,6 +366,12 @@ export function ModelProviderSettings({
       });
     return reviewsByRuleKey;
   }, [routeAvoidanceGovernance.retestReview.items]);
+
+  function providerNameForRoute(providerConfigId: string | null | undefined) {
+    if (!providerConfigId) return null;
+    const provider = providers.find((item) => item.id === providerConfigId);
+    return provider ? `${provider.displayName} · ${provider.defaultModel}` : null;
+  }
 
   function selectProvider(providerId: ModelProviderId) {
     const option = options.find((item) => item.providerId === providerId) ?? options[0];
@@ -459,6 +476,12 @@ export function ModelProviderSettings({
           taskType,
           primaryProviderConfigId: draftRoute.primaryProviderConfigId || null,
           fallbackProviderConfigId: draftRoute.fallbackProviderConfigId || null,
+          confirmation: {
+            source: "manual",
+            reason: "人工保存模型路由。",
+            primaryProviderName: providerNameForRoute(draftRoute.primaryProviderConfigId),
+            fallbackProviderName: providerNameForRoute(draftRoute.fallbackProviderConfigId),
+          },
         }),
       });
       if (!response.ok) throw new Error("保存模型路由失败。");
@@ -483,6 +506,15 @@ export function ModelProviderSettings({
           taskType: recommendation.taskType,
           primaryProviderConfigId: recommendation.recommendedPrimaryProviderConfigId,
           fallbackProviderConfigId: recommendation.recommendedFallbackProviderConfigId,
+          confirmation: {
+            source: "recommendation",
+            reason: recommendation.reason,
+            primaryProviderName: recommendation.primaryProviderName,
+            fallbackProviderName: recommendation.fallbackProviderName,
+            routeStatus: recommendation.status,
+            avoidanceStatus: recommendation.avoidance.status,
+            restoredCandidate: recommendation.reason.includes("复测通过"),
+          },
         }),
       });
       if (!response.ok) throw new Error("应用路由建议失败。");
@@ -601,6 +633,13 @@ export function ModelProviderSettings({
           taskType: item.taskType,
           primaryProviderConfigId: item.recommendedPrimaryProviderConfigId,
           fallbackProviderConfigId: item.recommendedFallbackProviderConfigId,
+          confirmation: {
+            source: "preset",
+            reason: item.reason,
+            primaryProviderName: item.primaryProviderName,
+            fallbackProviderName: item.fallbackProviderName,
+            routeStatus: item.status === "ready" ? "ready" : item.status === "current" ? "current" : "insufficient",
+          },
         }),
       });
       if (!response.ok) throw new Error("应用冷启动路由失败。");
@@ -734,6 +773,31 @@ export function ModelProviderSettings({
         {routeEffectAudit.summary.nextUnconfiguredTaskLabel ? (
           <div className="mt-3 rounded-md bg-amber-50 p-3 text-sm text-amber-800">
             下一条建议补齐：{routeEffectAudit.summary.nextUnconfiguredTaskLabel}
+          </div>
+        ) : null}
+        {routeConfirmationHistory.length ? (
+          <div className="mt-4 rounded-md border border-slate-200 p-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="text-sm font-medium text-slate-950">路由确认记录</div>
+              <span className="rounded-md bg-slate-50 px-2 py-1 text-xs text-slate-500">最近 {routeConfirmationHistory.length} 条</span>
+            </div>
+            <div className="mt-3 grid gap-2 lg:grid-cols-2">
+              {routeConfirmationHistory.map((item) => (
+                <div className="rounded-md bg-slate-50 p-3 text-sm" key={item.id}>
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div>
+                      <div className="font-medium text-slate-950">{item.label}</div>
+                      <div className="mt-1 text-xs text-slate-500">{item.createdAt.slice(0, 10)}</div>
+                    </div>
+                    <span className="rounded-md bg-white px-2 py-1 text-xs text-emerald-700">
+                      {item.status === "succeeded" ? "已确认" : item.status}
+                    </span>
+                  </div>
+                  <p className="mt-2 leading-6 text-slate-600">{item.message}</p>
+                  <div className="mt-2 rounded-md bg-white p-2 text-xs leading-5 text-slate-500">{item.detail}</div>
+                </div>
+              ))}
+            </div>
           </div>
         ) : null}
         <div className="mt-4 rounded-md border border-slate-200 p-3">

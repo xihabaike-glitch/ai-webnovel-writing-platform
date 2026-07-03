@@ -307,6 +307,15 @@ export function BatchDraftCenterPanel({ projectId }: { projectId: string }) {
           taskType: routeRecommendation.taskType,
           primaryProviderConfigId: routeRecommendation.recommendedPrimaryProviderConfigId,
           fallbackProviderConfigId: routeRecommendation.recommendedFallbackProviderConfigId,
+          confirmation: {
+            source: "recommendation",
+            reason: routeRecommendation.reason,
+            primaryProviderName: routeRecommendation.primaryProviderName,
+            fallbackProviderName: routeRecommendation.fallbackProviderName,
+            routeStatus: routeRecommendation.status,
+            avoidanceStatus: routeRecommendation.avoidance.status,
+            restoredCandidate: routeRecommendation.reason.includes("复测通过"),
+          },
         }),
       });
       if (!response.ok) throw new Error("应用初稿模型路线失败。");

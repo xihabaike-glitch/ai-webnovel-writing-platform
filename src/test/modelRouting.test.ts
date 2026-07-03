@@ -6,6 +6,7 @@ import {
   selectModelProviderCandidatesForTask,
   selectModelProviderForTask,
 } from "../lib/model-gateway/providerSelection.ts";
+import { buildModelRouteConfirmationReceipt } from "../lib/model-gateway/routeConfirmation.ts";
 import {
   applyRouteAvoidanceOverrides,
   buildRouteAvoidanceGovernance,
@@ -114,6 +115,25 @@ test("model task routing", async (t) => {
     assert.ok(modelTaskRouteOptions.some((option) => option.taskType === "control_asset_generate"));
     assert.equal(labelForRoutedTask("chapter_second_pass"), "章节二改");
     assert.equal(labelForRoutedTask("control_asset_generate"), "总控资料生成");
+  });
+
+  await t.test("builds route confirmation receipts for applied recommendations", () => {
+    const receipt = buildModelRouteConfirmationReceipt({
+      taskType: "chapter_draft",
+      primaryProviderName: "DeepSeek · deepseek-chat",
+      fallbackProviderName: "Kimi · kimi-k2.6",
+      reason: "复测通过，恢复候选：成功率 100%，质量 86。近 2 次样本成功率 100%。",
+      source: "recommendation",
+      createdAt: "2026-07-04T10:00:00.000Z",
+    });
+
+    assert.equal(receipt.executionType, "model_route");
+    assert.equal(receipt.platformId, "model-routing");
+    assert.equal(receipt.label, "正文初稿路由已确认");
+    assert.ok(receipt.detail.includes("DeepSeek · deepseek-chat"));
+    assert.ok(receipt.detail.includes("Kimi · kimi-k2.6"));
+    assert.ok(receipt.message.includes("复测通过恢复候选"));
+    assert.equal(receipt.recheck.label, "复检模型路由");
   });
 
   await t.test("builds a cold-start route blueprint from writing model presets", () => {

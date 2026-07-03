@@ -43,7 +43,7 @@ function maskProvider(provider: {
 }
 
 export default async function ModelSettingsPage() {
-  const [providers, routes, recentTasks, completedRouteRepairs, completedRouteRetests, routeAvoidanceOverrides] = await Promise.all([
+  const [providers, routes, recentTasks, completedRouteRepairs, completedRouteRetests, routeAvoidanceOverrides, routeConfirmationAudits] = await Promise.all([
     prisma.modelProvider.findMany({
       orderBy: { updatedAt: "desc" },
     }),
@@ -106,6 +106,19 @@ export default async function ModelSettingsPage() {
         updatedAt: true,
       },
     }),
+    prisma.gateActionAudit.findMany({
+      where: { executionType: "model_route" },
+      orderBy: { createdAt: "desc" },
+      take: 8,
+      select: {
+        receiptId: true,
+        label: true,
+        detail: true,
+        message: true,
+        status: true,
+        createdAt: true,
+      },
+    }),
   ]);
   const maskedProviders = providers.map(maskProvider);
   const routeProviders = providers.map((provider) => ({
@@ -156,6 +169,14 @@ export default async function ModelSettingsPage() {
         routeEffectAudit={routeEffectAudit}
         routeAvoidanceDecisionHistory={routeAvoidanceDecisionHistory}
         routeAvoidanceGovernance={routeAvoidanceGovernance}
+        routeConfirmationHistory={routeConfirmationAudits.map((audit) => ({
+          id: audit.receiptId,
+          label: audit.label,
+          detail: audit.detail,
+          message: audit.message,
+          status: audit.status,
+          createdAt: audit.createdAt.toISOString(),
+        }))}
         routeRecommendations={routeRecommendations}
         routeOptions={modelTaskRouteOptions}
         routes={routes.map((route) => ({

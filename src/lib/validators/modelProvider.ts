@@ -30,6 +30,15 @@ export const saveModelTaskRouteSchema = z.object({
   ]),
   primaryProviderConfigId: z.string().optional().nullable(),
   fallbackProviderConfigId: z.string().optional().nullable(),
+  confirmation: z.object({
+    source: z.enum(["manual", "recommendation", "preset"]).optional(),
+    reason: z.string().max(1000).optional().nullable(),
+    primaryProviderName: z.string().max(180).optional().nullable(),
+    fallbackProviderName: z.string().max(180).optional().nullable(),
+    routeStatus: z.enum(["ready", "current", "insufficient"]).optional().nullable(),
+    avoidanceStatus: z.enum(["none", "applied"]).optional().nullable(),
+    restoredCandidate: z.boolean().optional().nullable(),
+  }).optional(),
 });
 
 export const saveRouteAvoidanceOverrideSchema = z.object({

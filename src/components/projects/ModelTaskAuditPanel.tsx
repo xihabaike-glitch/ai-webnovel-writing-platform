@@ -271,6 +271,15 @@ export function ModelTaskAuditPanel({ projectId }: { projectId: string }) {
           taskType: recommendation.taskType,
           primaryProviderConfigId: recommendation.recommendedPrimaryProviderConfigId,
           fallbackProviderConfigId: recommendation.recommendedFallbackProviderConfigId,
+          confirmation: {
+            source: "recommendation",
+            reason: recommendation.reason,
+            primaryProviderName: recommendation.primaryProviderName,
+            fallbackProviderName: recommendation.fallbackProviderName,
+            routeStatus: recommendation.status,
+            avoidanceStatus: recommendation.avoidance.status,
+            restoredCandidate: recommendation.reason.includes("复测通过"),
+          },
         }),
       });
       if (!response.ok) throw new Error("应用模型路线失败。");

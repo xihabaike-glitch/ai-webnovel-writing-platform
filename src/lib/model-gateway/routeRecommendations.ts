@@ -1,4 +1,5 @@
 import { labelForRoutedTask, modelTaskRouteOptions } from "./taskRouting.ts";
+import type { RouteConfirmationRecheckEvidence } from "./routeConfirmation.ts";
 
 export interface RouteRecommendationProvider {
   id: string;
@@ -67,6 +68,7 @@ export interface RouteRecommendationAvoidance {
 export interface RouteRecommendationOptions {
   avoidanceRules?: RouteAvoidanceRule[];
   routeAvoidanceDecisionHistory?: RouteAvoidanceDecisionHistory;
+  routeConfirmationRechecks?: RouteConfirmationRecheckEvidence[];
 }
 
 export interface RouteAvoidanceDispatchTask {
@@ -401,6 +403,13 @@ function restoredCandidateReason(item: RouteAvoidanceDecisionHistoryItem | null)
   const date = item.latestRetest.completedAt ? `，复测日期 ${item.latestRetest.completedAt.slice(0, 10)}` : "";
   const note = item.note ? `，${item.note}` : "";
   return `复测通过，恢复候选：成功率 ${successRate}，质量 ${quality}${date}${note}。`;
+}
+
+function latestRouteConfirmationRecheckReason(
+  taskType: string,
+  routeConfirmationRechecks: RouteConfirmationRecheckEvidence[] | undefined,
+) {
+  return routeConfirmationRechecks?.find((item) => item.taskType === taskType)?.summary ?? "";
 }
 
 export function buildRouteAvoidanceRulesFromDispatchTasks(
@@ -948,6 +957,7 @@ export function buildRouteRecommendations(
     const restorationReason = restoredCandidateReason(
       restoredDecisionForTask(option.taskType, primary?.provider, options.routeAvoidanceDecisionHistory),
     );
+    const confirmationRecheckReason = latestRouteConfirmationRecheckReason(option.taskType, options.routeConfirmationRechecks);
 
     return {
       taskType: option.taskType,
@@ -964,7 +974,7 @@ export function buildRouteRecommendations(
       averageQualityScore: primary?.averageQualityScore ?? 0,
       averageCostPerSucceededTaskUsd: primary?.averageCostPerSucceededTaskUsd ?? 0,
       avoidance,
-      reason: [avoidance.reason, restorationReason, baseReason].filter(Boolean).join(" "),
+      reason: [avoidance.reason, restorationReason, confirmationRecheckReason, baseReason].filter(Boolean).join(" "),
     };
   });
 }

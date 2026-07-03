@@ -86,6 +86,27 @@ export interface ModelRouteConfirmationAuditRecord {
   createdAt: string | Date;
 }
 
+export interface RouteConfirmationRecheckDispatchTask {
+  dispatchKey: string;
+  stage: string;
+  state: string;
+  completionEvidence: string;
+  evidence?: string[] | string | null;
+  completedAt?: string | Date | null;
+}
+
+export interface RouteConfirmationRecheckEvidence {
+  id: string;
+  taskType: RoutedModelTaskType;
+  successRatePercent: number | null;
+  qualityScore: number | null;
+  recommendedAction: "keep" | "watch" | "manual_review";
+  summary: string;
+  completionEvidence: string;
+  evidence: string[];
+  completedAt: string | null;
+}
+
 const sourceLabels: Record<ModelRouteConfirmationSource, string> = {
   manual: "人工保存",
   recommendation: "系统建议",
@@ -131,6 +152,60 @@ function avoidanceStatus(value: unknown): ModelRouteConfirmationReceipt["payload
 
 function stringOrNull(value: unknown) {
   return typeof value === "string" && value.trim() ? value : null;
+}
+
+function numericPercentAfter(label: string, text: string) {
+  const match = text.match(new RegExp(`${label}\\s*[:：]?\\s*(\\d{1,3})\\s*%?`));
+  if (!match) return null;
+  const value = Number(match[1]);
+  return Number.isFinite(value) ? value : null;
+}
+
+function completedAtIso(value: string | Date | null | undefined) {
+  if (!value) return null;
+  const date = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date.toISOString();
+}
+
+function evidenceList(value: RouteConfirmationRecheckDispatchTask["evidence"]) {
+  if (Array.isArray(value)) return value.filter((item) => item.trim().length > 0);
+  if (typeof value !== "string") return [];
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === "string" && item.trim().length > 0) : [];
+  } catch {
+    return value.trim() ? [value.trim()] : [];
+  }
+}
+
+function taskTypeFromConfirmationRecheckKey(dispatchKey: string) {
+  const match = dispatchKey.match(/^model-route-confirmation-recheck:([^:]+):/);
+  const taskType = match?.[1] ?? "";
+  return isRoutedModelTaskType(taskType) ? taskType : null;
+}
+
+function classifyConfirmationRecheck(completionEvidence: string) {
+  const normalized = completionEvidence.replace(/\s+/g, "");
+  const successRatePercent = numericPercentAfter("成功率", completionEvidence);
+  const qualityScore = numericPercentAfter("质量", completionEvidence);
+  const hasNoFallback = normalized.includes("未命中备用") || normalized.includes("未走备用") || normalized.includes("未使用备用");
+  const hasFallback = !hasNoFallback && (normalized.includes("命中备用") || normalized.includes("走备用") || normalized.includes("使用备用"));
+  const hasFailure = /(失败|超时|报错|异常|不可用|JSON不稳定|格式错误)/.test(normalized);
+  const keep = (successRatePercent ?? 0) >= 90 && (qualityScore ?? 0) >= 80 && !hasFailure && !hasFallback;
+  const watch = hasFailure || hasFallback || (successRatePercent !== null && successRatePercent < 80) || (qualityScore !== null && qualityScore < 70);
+  const recommendedAction: RouteConfirmationRecheckEvidence["recommendedAction"] = keep ? "keep" : watch ? "watch" : "manual_review";
+  const summary = recommendedAction === "keep"
+    ? `最近路由复检通过：成功率 ${successRatePercent ?? "未填"}%，质量 ${qualityScore ?? "未填"}，可继续沿用。`
+    : recommendedAction === "watch"
+      ? `最近路由复检需观察：成功率 ${successRatePercent ?? "未填"}%，质量 ${qualityScore ?? "未填"}${hasFallback ? "，仍命中备用路线" : ""}。`
+      : "最近路由复检证据不足，需要人工复核成功率、质量和备用命中。";
+
+  return {
+    successRatePercent,
+    qualityScore,
+    recommendedAction,
+    summary,
+  };
 }
 
 export function buildModelRouteConfirmationReceipt(input: ModelRouteConfirmationInput): ModelRouteConfirmationReceipt {
@@ -254,4 +329,29 @@ export function modelRouteConfirmationReceiptFromAudit(record: ModelRouteConfirm
     },
     createdAt,
   };
+}
+
+export function buildRouteConfirmationRecheckEvidenceFromDispatchTasks(
+  dispatches: RouteConfirmationRecheckDispatchTask[],
+): RouteConfirmationRecheckEvidence[] {
+  return dispatches
+    .filter((dispatch) => (
+      dispatch.stage === "model_route_confirmation_recheck"
+      && dispatch.state === "completed"
+      && dispatch.completionEvidence.trim()
+    ))
+    .flatMap((dispatch): RouteConfirmationRecheckEvidence[] => {
+      const taskType = taskTypeFromConfirmationRecheckKey(dispatch.dispatchKey);
+      if (!taskType) return [];
+      const decision = classifyConfirmationRecheck(dispatch.completionEvidence);
+      return [{
+        id: `${dispatch.dispatchKey}:evidence`,
+        taskType,
+        ...decision,
+        completionEvidence: dispatch.completionEvidence,
+        evidence: Array.from(new Set([...evidenceList(dispatch.evidence), dispatch.completionEvidence])),
+        completedAt: completedAtIso(dispatch.completedAt),
+      }];
+    })
+    .sort((left, right) => (right.completedAt ?? "").localeCompare(left.completedAt ?? ""));
 }

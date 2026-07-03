@@ -9,6 +9,7 @@ import {
 import {
   buildModelRouteConfirmationDispatch,
   buildModelRouteConfirmationReceipt,
+  buildRouteConfirmationRecheckEvidenceFromDispatchTasks,
   modelRouteConfirmationReceiptFromAudit,
 } from "../lib/model-gateway/routeConfirmation.ts";
 import {
@@ -202,6 +203,24 @@ test("model task routing", async (t) => {
     assert.equal(modelRouteConfirmationReceiptFromAudit({ ...restored!, executionType: "manual", receiptId: restored!.id, recheckStatus: "ready", recheckAction: restored!.recheck.action, payload: "{}" }), null);
   });
 
+  await t.test("extracts route confirmation recheck evidence from completed dispatches", () => {
+    const evidence = buildRouteConfirmationRecheckEvidenceFromDispatchTasks([{
+      dispatchKey: "model-route-confirmation-recheck:chapter_review:2026-07-04T10:00:00.000Z",
+      stage: "model_route_confirmation_recheck",
+      state: "completed",
+      completionEvidence: "完成 2 个章节审稿小样本，成功率 100%，质量 82，成本正常，未命中备用路线。",
+      evidence: ["已确认章节审稿模型路由。"],
+      completedAt: "2026-07-04T12:00:00.000Z",
+    }]);
+
+    assert.equal(evidence.length, 1);
+    assert.equal(evidence[0].taskType, "chapter_review");
+    assert.equal(evidence[0].successRatePercent, 100);
+    assert.equal(evidence[0].qualityScore, 82);
+    assert.equal(evidence[0].recommendedAction, "keep");
+    assert.ok(evidence[0].summary.includes("复检通过"));
+  });
+
   await t.test("builds a cold-start route blueprint from writing model presets", () => {
     const blueprint = buildPresetRouteBlueprint([
       {
@@ -252,6 +271,14 @@ test("model task routing", async (t) => {
   });
 
   await t.test("builds route recommendations from successful model samples", () => {
+    const routeConfirmationRechecks = buildRouteConfirmationRecheckEvidenceFromDispatchTasks([{
+      dispatchKey: "model-route-confirmation-recheck:chapter_review:2026-07-04T10:00:00.000Z",
+      stage: "model_route_confirmation_recheck",
+      state: "completed",
+      completionEvidence: "完成 2 个章节审稿小样本，成功率 100%，质量 82，成本正常，未命中备用路线。",
+      evidence: [],
+      completedAt: "2026-07-04T12:00:00.000Z",
+    }]);
     const recommendations = buildRouteRecommendations([
       {
         id: "review-1",
@@ -317,7 +344,9 @@ test("model task routing", async (t) => {
       { ...mockProvider, defaultModel: "mock-novel" },
       { ...gptProvider, defaultModel: "gpt-4.1" },
       { ...disabledClaude, defaultModel: "claude-sonnet" },
-    ]);
+    ], {
+      routeConfirmationRechecks,
+    });
 
     const review = recommendations.find((item) => item.taskType === "chapter_review");
     const draft = recommendations.find((item) => item.taskType === "chapter_draft");
@@ -327,6 +356,7 @@ test("model task routing", async (t) => {
     assert.equal(review?.successRatePercent, 100);
     assert.equal(review?.averageQualityScore, 89);
     assert.equal(review?.averageCostPerSucceededTaskUsd, 0.007);
+    assert.ok(review?.reason.includes("最近路由复检通过：成功率 100%，质量 82"));
     assert.equal(draft?.status, "insufficient");
   });
 

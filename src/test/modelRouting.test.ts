@@ -9,6 +9,7 @@ import {
 import {
   applyRouteAvoidanceOverrides,
   buildRouteAvoidanceGovernance,
+  buildRouteAvoidanceDecisionHistory,
   buildRouteAvoidanceRetestDispatch,
   buildRouteAvoidanceRuleKey,
   buildRouteAvoidanceRulesFromDispatchTasks,
@@ -739,6 +740,98 @@ test("model task routing", async (t) => {
     assert.equal(governance.retestReview.items[1].qualityScore, 86);
     assert.ok(governance.retestReview.items[1].actionLabel.includes("解除观察"));
     assert.ok(governance.nextActions.some((action) => action.includes("1 条复测已通过")));
+  });
+
+  await t.test("keeps applied retest governance decisions visible after overrides change active rules", () => {
+    const rawRules = [
+      {
+        taskType: "chapter_review",
+        providerConfigId: "deepseek-provider",
+        providerId: "deepseek",
+        model: "deepseek-chat",
+        reason: "审稿 JSON 不稳定。",
+        evidence: ["审稿失败 2 次"],
+        watchUntil: "2026-07-01T00:00:00.000Z",
+      },
+      {
+        taskType: "chapter_draft",
+        providerConfigId: "kimi-provider",
+        providerId: "kimi",
+        model: "kimi-k2.6",
+        reason: "正文初稿速度波动。",
+        evidence: ["超时 1 次"],
+        watchUntil: "2026-07-01T00:00:00.000Z",
+      },
+    ];
+    const providers = [
+      {
+        id: "deepseek-provider",
+        providerId: "deepseek",
+        displayName: "DeepSeek",
+        defaultModel: "deepseek-chat",
+        enabled: true,
+        encryptedApiKey: "key",
+      },
+      {
+        id: "kimi-provider",
+        providerId: "kimi",
+        displayName: "Kimi",
+        defaultModel: "kimi-k2.6",
+        enabled: true,
+        encryptedApiKey: "key",
+      },
+    ];
+    const overrides = [
+      {
+        ruleKey: buildRouteAvoidanceRuleKey(rawRules[0]),
+        action: "dismiss" as const,
+        note: "复测通过，解除观察。",
+        updatedAt: "2026-07-04T08:00:00.000Z",
+      },
+      {
+        ruleKey: buildRouteAvoidanceRuleKey(rawRules[1]),
+        action: "extend_watch" as const,
+        expiresAt: "2026-07-18T00:00:00.000Z",
+        note: "复测仍异常，延长观察。",
+        updatedAt: "2026-07-04T09:00:00.000Z",
+      },
+    ];
+    const retestDispatches = [
+      {
+        dispatchKey: "model-route-retest:deepseek-provider:deepseek-chat",
+        stage: "model_route_retest",
+        state: "completed",
+        completionEvidence: "完成 3 个小样本复测，成功率 100%，质量 86，成本正常，未命中备用路线。",
+        evidence: ["复测通过"],
+        completedAt: "2026-07-04T07:30:00.000Z",
+      },
+      {
+        dispatchKey: "model-route-retest:kimi-provider:kimi-k2.6",
+        stage: "model_route_retest",
+        state: "completed",
+        completionEvidence: "完成 2 个小样本复测，1 个超时，成功率 50%，质量 62，命中备用路线。",
+        evidence: ["复测失败"],
+        completedAt: "2026-07-04T08:30:00.000Z",
+      },
+    ];
+
+    const activeRules = applyRouteAvoidanceOverrides(rawRules, overrides);
+    const history = buildRouteAvoidanceDecisionHistory(rawRules, overrides, providers, { retestDispatches });
+    const dismissed = history.items.find((item) => item.ruleKey === "deepseek-provider:deepseek-chat");
+    const extended = history.items.find((item) => item.ruleKey === "kimi-provider:kimi-k2.6");
+
+    assert.equal(activeRules.length, 1);
+    assert.equal(activeRules[0].providerId, "kimi");
+    assert.equal(history.summary.total, 2);
+    assert.equal(history.summary.dismissed, 1);
+    assert.equal(history.summary.extendedWatch, 1);
+    assert.equal(dismissed?.actionLabel, "已解除观察");
+    assert.equal(dismissed?.latestRetest?.successRatePercent, 100);
+    assert.equal(dismissed?.latestRetest?.qualityScore, 86);
+    assert.ok(dismissed?.latestRetest?.completionEvidence.includes("未命中备用路线"));
+    assert.equal(extended?.actionLabel, "已延长观察");
+    assert.equal(extended?.expiresAt, "2026-07-18T00:00:00.000Z");
+    assert.equal(extended?.latestRetest?.recommendedAction, "extend_watch");
   });
 
   await t.test("builds an executable sample plan for scoped route retests", () => {

@@ -45,6 +45,7 @@ export interface RouteAvoidanceOverride {
   taskType?: string | null;
   note?: string | null;
   expiresAt?: string | null;
+  updatedAt?: string | null;
 }
 
 export interface RouteAvoidanceOverrideRecord {
@@ -53,6 +54,7 @@ export interface RouteAvoidanceOverrideRecord {
   taskType: string | null;
   note: string;
   expiresAt: Date | string | null;
+  updatedAt?: Date | string | null;
 }
 
 export interface RouteRecommendationAvoidance {
@@ -157,6 +159,30 @@ export interface RouteAvoidanceRetestReviewItem {
   completionEvidence: string;
   evidence: string[];
   completedAt: string | null;
+}
+
+export interface RouteAvoidanceDecisionHistoryItem {
+  id: string;
+  ruleKey: string;
+  providerName: string;
+  model: string;
+  taskScope: string;
+  action: RouteAvoidanceOverrideAction;
+  actionLabel: string;
+  note: string | null;
+  expiresAt: string | null;
+  updatedAt: string | null;
+  latestRetest: RouteAvoidanceRetestReviewItem | null;
+}
+
+export interface RouteAvoidanceDecisionHistory {
+  summary: {
+    total: number;
+    dismissed: number;
+    scoped: number;
+    extendedWatch: number;
+  };
+  items: RouteAvoidanceDecisionHistoryItem[];
 }
 
 export interface RouteAvoidanceGovernance {
@@ -395,6 +421,7 @@ export function routeAvoidanceOverrideFromRecord(record: RouteAvoidanceOverrideR
     taskType: record.taskType,
     note: record.note,
     expiresAt: record.expiresAt instanceof Date ? record.expiresAt.toISOString() : record.expiresAt,
+    updatedAt: record.updatedAt instanceof Date ? record.updatedAt.toISOString() : record.updatedAt ?? null,
   };
 }
 
@@ -621,6 +648,87 @@ function buildRetestReview(
       manualReviewRecommended: reviewItems.filter((item) => item.recommendedAction === "manual_review").length,
     },
     items: reviewItems,
+  };
+}
+
+function latestRetestReviewForRule(
+  ruleKey: string,
+  item: RouteAvoidanceGovernanceItem,
+  dispatches: RouteAvoidanceRetestDispatchTask[],
+): RouteAvoidanceRetestReviewItem | null {
+  const latestDispatch = dispatches
+    .filter((dispatch) => (
+      dispatch.stage === "model_route_retest"
+      && dispatch.state === "completed"
+      && dispatch.dispatchKey.replace(/^model-route-retest:/, "") === ruleKey
+      && dispatch.completionEvidence.trim()
+    ))
+    .sort((left, right) => (completedAtIso(right.completedAt) ?? "").localeCompare(completedAtIso(left.completedAt) ?? ""))[0];
+
+  if (!latestDispatch) return null;
+  const decision = classifyRetestEvidence(latestDispatch.completionEvidence);
+
+  return {
+    id: `${latestDispatch.dispatchKey}:review`,
+    ruleKey,
+    providerName: item.providerName,
+    model: item.model,
+    taskScope: item.taskScope,
+    ...decision,
+    completionEvidence: latestDispatch.completionEvidence,
+    evidence: Array.from(new Set([...evidenceList(latestDispatch.evidence), latestDispatch.completionEvidence])),
+    completedAt: completedAtIso(latestDispatch.completedAt),
+  };
+}
+
+function overrideActionLabel(action: RouteAvoidanceOverrideAction) {
+  if (action === "dismiss") return "已解除观察";
+  if (action === "scope_task") return "已限定任务";
+  return "已延长观察";
+}
+
+export function buildRouteAvoidanceDecisionHistory(
+  rules: RouteAvoidanceRule[],
+  overrides: RouteAvoidanceOverride[],
+  providers: RouteRecommendationProvider[],
+  options: RouteAvoidanceGovernanceOptions = {},
+): RouteAvoidanceDecisionHistory {
+  const rawItemsByRuleKey = new Map(
+    buildRouteAvoidanceGovernance(rules, providers, { now: options.now }).items.map((item) => [item.ruleKey, item]),
+  );
+  const items = overrides
+    .flatMap((override): RouteAvoidanceDecisionHistoryItem[] => {
+      const item = rawItemsByRuleKey.get(override.ruleKey);
+      if (!item) return [];
+      return [{
+        id: `${override.ruleKey}:${override.action}`,
+        ruleKey: override.ruleKey,
+        providerName: item.providerName,
+        model: item.model,
+        taskScope: override.action === "scope_task"
+          ? labelForRoutedTask(override.taskType ?? item.scopedTaskType ?? "")
+          : item.taskScope,
+        action: override.action,
+        actionLabel: overrideActionLabel(override.action),
+        note: override.note?.trim() || null,
+        expiresAt: override.expiresAt ?? null,
+        updatedAt: override.updatedAt ?? null,
+        latestRetest: latestRetestReviewForRule(override.ruleKey, item, options.retestDispatches ?? []),
+      }];
+    })
+    .sort((left, right) => (
+      (right.updatedAt ?? "").localeCompare(left.updatedAt ?? "")
+      || left.providerName.localeCompare(right.providerName)
+    ));
+
+  return {
+    summary: {
+      total: items.length,
+      dismissed: items.filter((item) => item.action === "dismiss").length,
+      scoped: items.filter((item) => item.action === "scope_task").length,
+      extendedWatch: items.filter((item) => item.action === "extend_watch").length,
+    },
+    items,
   };
 }
 

@@ -183,6 +183,35 @@ interface RouteAvoidanceGovernanceView {
   nextActions: string[];
 }
 
+interface RouteAvoidanceDecisionHistoryView {
+  summary: {
+    total: number;
+    dismissed: number;
+    scoped: number;
+    extendedWatch: number;
+  };
+  items: Array<{
+    id: string;
+    ruleKey: string;
+    providerName: string;
+    model: string;
+    taskScope: string;
+    action: "dismiss" | "scope_task" | "extend_watch";
+    actionLabel: string;
+    note: string | null;
+    expiresAt: string | null;
+    updatedAt: string | null;
+    latestRetest: {
+      successRatePercent: number | null;
+      qualityScore: number | null;
+      recommendedAction: "dismiss" | "extend_watch" | "manual_review";
+      actionLabel: string;
+      completionEvidence: string;
+      completedAt: string | null;
+    } | null;
+  }>;
+}
+
 interface PresetRouteBlueprintView {
   summary: {
     total: number;
@@ -261,6 +290,7 @@ export function ModelProviderSettings({
   presetRouteBlueprint,
   providers,
   routeEffectAudit,
+  routeAvoidanceDecisionHistory,
   routeAvoidanceGovernance,
   routeRecommendations,
   routeOptions,
@@ -272,6 +302,7 @@ export function ModelProviderSettings({
   presetRouteBlueprint: PresetRouteBlueprintView;
   providers: ProviderView[];
   routeEffectAudit: RouteEffectAuditView;
+  routeAvoidanceDecisionHistory: RouteAvoidanceDecisionHistoryView;
   routeAvoidanceGovernance: RouteAvoidanceGovernanceView;
   routeRecommendations: RouteRecommendationView[];
   routeOptions: RouteOptionView[];
@@ -824,6 +855,58 @@ export function ModelProviderSettings({
                         </button>
                       ) : null}
                     </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
+          {routeAvoidanceDecisionHistory.items.length ? (
+            <div className="mt-3 rounded-md border border-slate-200 bg-white p-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="text-sm font-medium text-slate-950">治理历史</div>
+                <div className="flex flex-wrap gap-2 text-xs text-slate-600">
+                  <span className="rounded-md bg-emerald-50 px-2 py-1 text-emerald-700">解除 {routeAvoidanceDecisionHistory.summary.dismissed}</span>
+                  <span className="rounded-md bg-sky-50 px-2 py-1 text-sky-700">限定 {routeAvoidanceDecisionHistory.summary.scoped}</span>
+                  <span className="rounded-md bg-amber-50 px-2 py-1 text-amber-700">延长 {routeAvoidanceDecisionHistory.summary.extendedWatch}</span>
+                </div>
+              </div>
+              <div className="mt-3 grid gap-2 lg:grid-cols-2">
+                {routeAvoidanceDecisionHistory.items.slice(0, 6).map((item) => (
+                  <div className="rounded-md border border-slate-200 bg-slate-50 p-3 text-sm" key={item.id}>
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <div>
+                        <div className="font-medium text-slate-950">{item.providerName} · {item.model}</div>
+                        <div className="mt-1 text-xs text-slate-500">{item.taskScope}</div>
+                      </div>
+                      <span className={`rounded-md px-2 py-1 text-xs font-medium ${
+                        item.action === "dismiss"
+                          ? "bg-emerald-50 text-emerald-700"
+                          : item.action === "extend_watch"
+                            ? "bg-amber-50 text-amber-700"
+                            : "bg-sky-50 text-sky-700"
+                      }`}>{item.actionLabel}</span>
+                    </div>
+                    {item.note ? <p className="mt-2 leading-6 text-slate-600">{item.note}</p> : null}
+                    <div className="mt-2 flex flex-wrap gap-2 text-xs text-slate-500">
+                      {item.updatedAt ? <span className="rounded-md bg-white px-2 py-1">应用 {item.updatedAt.slice(0, 10)}</span> : null}
+                      {item.expiresAt ? <span className="rounded-md bg-white px-2 py-1">观察到 {item.expiresAt.slice(0, 10)}</span> : null}
+                    </div>
+                    {item.latestRetest ? (
+                      <div className="mt-2 rounded-md bg-white p-2 text-xs text-slate-600">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <span className="font-medium text-slate-800">闭环证据</span>
+                          <span>{item.latestRetest.actionLabel}</span>
+                        </div>
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          <span className="rounded-md bg-slate-50 px-2 py-1">
+                            成功率 {item.latestRetest.successRatePercent === null ? "未填" : `${item.latestRetest.successRatePercent}%`}
+                          </span>
+                          <span className="rounded-md bg-slate-50 px-2 py-1">质量 {item.latestRetest.qualityScore ?? "未填"}</span>
+                          {item.latestRetest.completedAt ? <span className="rounded-md bg-slate-50 px-2 py-1">{item.latestRetest.completedAt.slice(0, 10)}</span> : null}
+                        </div>
+                        <p className="mt-2 leading-5 text-slate-500">{item.latestRetest.completionEvidence}</p>
+                      </div>
+                    ) : null}
                   </div>
                 ))}
               </div>

@@ -7,6 +7,7 @@ import { buildProviderHealthDashboard } from "@/lib/model-gateway/providerHealth
 import { buildRouteEffectAudit } from "@/lib/model-gateway/routeEffectAudit";
 import {
   applyRouteAvoidanceOverrides,
+  buildRouteAvoidanceDecisionHistory,
   buildRouteAvoidanceGovernance,
   buildRouteAvoidanceRulesFromDispatchTasks,
   buildRouteRecommendations,
@@ -102,6 +103,7 @@ export default async function ModelSettingsPage() {
         taskType: true,
         note: true,
         expiresAt: true,
+        updatedAt: true,
       },
     }),
   ]);
@@ -114,11 +116,15 @@ export default async function ModelSettingsPage() {
     enabled: provider.enabled,
     encryptedApiKey: provider.encryptedApiKey,
   }));
-  const routeAvoidanceRules = applyRouteAvoidanceOverrides(
-    buildRouteAvoidanceRulesFromDispatchTasks(completedRouteRepairs, routeProviders),
-    routeAvoidanceOverrides.map(routeAvoidanceOverrideFromRecord).filter((override): override is RouteAvoidanceOverride => Boolean(override)),
-  );
+  const rawRouteAvoidanceRules = buildRouteAvoidanceRulesFromDispatchTasks(completedRouteRepairs, routeProviders);
+  const routeAvoidanceOverrideInputs = routeAvoidanceOverrides
+    .map(routeAvoidanceOverrideFromRecord)
+    .filter((override): override is RouteAvoidanceOverride => Boolean(override));
+  const routeAvoidanceRules = applyRouteAvoidanceOverrides(rawRouteAvoidanceRules, routeAvoidanceOverrideInputs);
   const routeAvoidanceGovernance = buildRouteAvoidanceGovernance(routeAvoidanceRules, routeProviders, {
+    retestDispatches: completedRouteRetests,
+  });
+  const routeAvoidanceDecisionHistory = buildRouteAvoidanceDecisionHistory(rawRouteAvoidanceRules, routeAvoidanceOverrideInputs, routeProviders, {
     retestDispatches: completedRouteRetests,
   });
   const healthDashboard = buildProviderHealthDashboard(maskedProviders);
@@ -147,6 +153,7 @@ export default async function ModelSettingsPage() {
         presetRouteBlueprint={presetRouteBlueprint}
         providers={maskedProviders}
         routeEffectAudit={routeEffectAudit}
+        routeAvoidanceDecisionHistory={routeAvoidanceDecisionHistory}
         routeAvoidanceGovernance={routeAvoidanceGovernance}
         routeRecommendations={routeRecommendations}
         routeOptions={modelTaskRouteOptions}

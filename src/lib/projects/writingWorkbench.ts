@@ -111,6 +111,17 @@ export interface WritingWorkbench {
     label: string;
     href: string;
   }>;
+  quickFixes: WritingWorkbenchQuickFix[];
+}
+
+export interface WritingWorkbenchQuickFix {
+  id: string;
+  kind: "chapter_hook" | "chapter_card" | "character_seed" | "world_seed";
+  label: string;
+  description: string;
+  method: "PATCH" | "POST";
+  endpoint: string;
+  payload: Record<string, string>;
 }
 
 const treeRequirements: Array<{
@@ -250,6 +261,99 @@ function buildModelRoutes(input: WritingWorkbenchInput, nextChapter: WritingWork
     : routes;
 }
 
+function buildQuickFixes(input: WritingWorkbenchInput, nextChapter: WritingWorkbenchChapter | null): WritingWorkbenchQuickFix[] {
+  const fixes: WritingWorkbenchQuickFix[] = [];
+  const projectHook = input.project.sellingPoint
+    ? `${input.project.sellingPoint}但第一段必须先给危机、选择和不可逆代价。`
+    : `${input.project.title}第一段必须先给危机、选择和不可逆代价。`;
+
+  if (nextChapter && !hasText(nextChapter.hook)) {
+    fixes.push({
+      id: `chapter-hook-${nextChapter.id}`,
+      kind: "chapter_hook",
+      label: "一键补开头钩子",
+      description: `给「${nextChapter.title}」补一个能抓住读者的首段压力点。`,
+      method: "PATCH",
+      endpoint: `/api/chapters/${nextChapter.id}`,
+      payload: {
+        hook: projectHook.slice(0, 500),
+      },
+    });
+  }
+
+  if (nextChapter && (!hasText(nextChapter.conflict) || !hasText(nextChapter.cliffhanger))) {
+    fixes.push({
+      id: `chapter-card-${nextChapter.id}`,
+      kind: "chapter_card",
+      label: "补章节冲突和悬念",
+      description: `把「${nextChapter.title}」补成可生成正文的章节卡。`,
+      method: "PATCH",
+      endpoint: `/api/chapters/${nextChapter.id}`,
+      payload: {
+        conflict: nextChapter.conflict || "主角必须在保住当前利益和承担更大代价之间做选择。",
+        cliffhanger: nextChapter.cliffhanger || "章末抛出新的证据或更高风险，让读者必须点下一章。",
+      },
+    });
+  }
+
+  const hasCompleteCharacter = input.characters.some(isCharacterComplete);
+  if (!hasCompleteCharacter) {
+    const existingLead = input.characters[0];
+    fixes.push({
+      id: "character-seed",
+      kind: "character_seed",
+      label: existingLead ? "补关系镜像角色" : "创建主角人物卡",
+      description: existingLead
+        ? "主角弧光未闭合，先补一个能制造关系压力的镜像角色。"
+        : "还没有人物卡，先建立主角欲望、缺陷和终局变化。",
+      method: "POST",
+      endpoint: `/api/projects/${input.project.id}/characters`,
+      payload: existingLead
+        ? {
+          name: "关系镜像角色",
+          role: "关系压力源",
+          desire: `逼迫${existingLead.name || "主角"}面对真实欲望`,
+          need: "在冲突中暴露主角缺口",
+          flaw: "把控制误认为保护",
+          arcStart: "以阻碍者身份进入主线",
+          arcEnd: "成为主角变化的镜子或代价",
+          voice: "直接、尖锐、带压迫感",
+          relationshipNotes: "每次出现都要让主角在逃避和承担之间做选择。",
+        }
+        : {
+          name: "主角",
+          role: "主角",
+          desire: `完成「${input.project.title}」的核心目标`,
+          need: "学会主动选择并承担代价",
+          flaw: "在压力下会用旧办法逃避真正问题",
+          arcStart: "被危机推着走",
+          arcEnd: "主动定义自己的规则和归宿",
+          voice: "克制、敏锐，关键时刻有狠劲",
+          relationshipNotes: "至少绑定一个反派、一个盟友和一个关系代价。",
+        },
+    });
+  }
+
+  const hasSoil = input.worldEntries.length > 0 || input.outlineNodes.some((node) => node.type === "soil");
+  if (!hasSoil) {
+    fixes.push({
+      id: "world-platform-soil",
+      kind: "world_seed",
+      label: "补平台土壤",
+      description: `沉淀${input.project.targetPlatformName}的节奏、钩子和风险，后续生成不再凭感觉。`,
+      method: "POST",
+      endpoint: `/api/projects/${input.project.id}/world-entries`,
+      payload: {
+        type: "platform_soil",
+        title: `${input.project.targetPlatformName}土壤`,
+        content: `目标平台：${input.project.targetPlatformName}。题材：${input.project.genre}。卖点：${input.project.sellingPoint || "待补"}。每章优先检查开头危机、明确冲突、价值变化和章末悬念。`,
+      },
+    });
+  }
+
+  return fixes.slice(0, 4);
+}
+
 export function buildWritingWorkbench(input: WritingWorkbenchInput): WritingWorkbench {
   const treeBlocks = buildTreeBlocks(input.outlineNodes, input.worldEntries);
   const nextChapter = pickNextChapter(input.chapters);
@@ -306,5 +410,6 @@ export function buildWritingWorkbench(input: WritingWorkbenchInput): WritingWork
       { label: "模型任务", href: `/projects/${input.project.id}#ai-pipeline` },
       { label: "发布包", href: `/projects/${input.project.id}#platform-export` },
     ],
+    quickFixes: buildQuickFixes(input, nextChapter),
   };
 }

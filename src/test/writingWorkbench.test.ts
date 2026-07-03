@@ -95,6 +95,9 @@ test("buildWritingWorkbench", async (t) => {
     assert.ok(workbench.characterFocus.nextAction.includes("人物弧光"));
     assert.ok(workbench.modelFocus.nextRoutes.some((route) => route.task.includes("开头钩子")));
     assert.ok(workbench.quickLinks.some((link) => link.href === "/projects/p1#outline-tree"));
+    assert.ok(workbench.quickFixes.some((fix) => fix.kind === "chapter_hook" && fix.endpoint === "/api/chapters/c1"));
+    assert.ok(workbench.quickFixes.some((fix) => fix.kind === "character_seed" && fix.endpoint === "/api/projects/p1/characters"));
+    assert.ok(workbench.quickFixes.some((fix) => fix.kind === "world_seed" && fix.payload.type === "platform_soil"));
   });
 
   await t.test("recommends creating a chapter when the project has only structure", () => {
@@ -130,5 +133,7 @@ test("buildWritingWorkbench", async (t) => {
     assert.equal(workbench.heroAction.href, "/projects/p2#create-chapter");
     assert.equal(workbench.chapterFocus.nextChapter, null);
     assert.ok(workbench.characterFocus.nextAction.includes("主角人物卡"));
+    assert.ok(workbench.quickFixes.some((fix) => fix.kind === "character_seed"));
+    assert.ok(!workbench.quickFixes.some((fix) => fix.kind === "world_seed"));
   });
 });

@@ -57,6 +57,9 @@ export interface WritingWorkbenchAiTask {
   status: string;
   model: string;
   createdAt: Date | string;
+  outputText?: string | null;
+  costUsd?: number | null;
+  errorMessage?: string | null;
 }
 
 export interface WritingWorkbenchInput {
@@ -108,6 +111,7 @@ export interface WritingWorkbench {
     }>;
   };
   modelActions: WritingWorkbenchModelAction[];
+  modelTimeline: WritingWorkbenchModelTimeline;
   quickLinks: Array<{
     label: string;
     href: string;
@@ -135,6 +139,24 @@ export interface WritingWorkbenchModelAction {
   payload: Record<string, string | number>;
   refreshHref: string;
   disabledReason: string | null;
+}
+
+export interface WritingWorkbenchModelTimeline {
+  totalRuns: number;
+  emptyState: string;
+  items: WritingWorkbenchModelTimelineItem[];
+}
+
+export interface WritingWorkbenchModelTimelineItem {
+  id: string;
+  taskType: string;
+  label: string;
+  status: string;
+  model: string;
+  createdAt: string;
+  summary: string;
+  costLabel: string;
+  nextAction: string;
 }
 
 const treeRequirements: Array<{
@@ -417,6 +439,58 @@ function buildModelActions(input: WritingWorkbenchInput, nextChapter: WritingWor
   ];
 }
 
+function taskLabel(taskType: string) {
+  const labels: Record<string, string> = {
+    chapter_draft: "正文生成",
+    chapter_review: "平台复审",
+    chapter_second_pass: "章节二改",
+    first_three_rewrite: "前三章改写",
+    submission_package_optimize: "投稿资料优化",
+    control_asset_generate: "总控资料生成",
+  };
+
+  return labels[taskType] ?? taskType;
+}
+
+function summarizeTask(task: WritingWorkbenchAiTask) {
+  if (task.status === "failed") {
+    return task.errorMessage?.trim() || "模型任务失败，缺少可用输出。";
+  }
+
+  return task.outputText?.trim().slice(0, 80) || "任务已记录，暂无输出摘要。";
+}
+
+function nextActionForTask(task: WritingWorkbenchAiTask) {
+  if (task.status === "failed") return "先复盘模型路由、预算和提示词，再重试。";
+  if (task.taskType === "chapter_draft") return "进入平台复审，检查节奏、爽点和人物选择。";
+  if (task.taskType === "chapter_review") return "按审稿结论补强章节卡或执行二改。";
+  if (task.taskType === "chapter_second_pass") return "回到发布检查，确认是否可进入投稿包。";
+  return "把结果沉淀到项目土壤或下一轮动作里。";
+}
+
+function buildModelTimeline(tasks: WritingWorkbenchAiTask[]): WritingWorkbenchModelTimeline {
+  const items = [...tasks]
+    .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime())
+    .slice(0, 5)
+    .map((task) => ({
+      id: task.id,
+      taskType: task.taskType,
+      label: taskLabel(task.taskType),
+      status: task.status,
+      model: task.model,
+      createdAt: new Date(task.createdAt).toISOString(),
+      summary: summarizeTask(task),
+      costLabel: typeof task.costUsd === "number" ? `$${task.costUsd.toFixed(3)}` : "未记录费用",
+      nextAction: nextActionForTask(task),
+    }));
+
+  return {
+    totalRuns: tasks.length,
+    emptyState: "还没有模型执行记录。",
+    items,
+  };
+}
+
 export function buildWritingWorkbench(input: WritingWorkbenchInput): WritingWorkbench {
   const treeBlocks = buildTreeBlocks(input.outlineNodes, input.worldEntries);
   const nextChapter = pickNextChapter(input.chapters);
@@ -467,6 +541,7 @@ export function buildWritingWorkbench(input: WritingWorkbenchInput): WritingWork
       nextRoutes: buildModelRoutes(input, nextChapter),
     },
     modelActions: buildModelActions(input, nextChapter),
+    modelTimeline: buildModelTimeline(input.aiTasks),
     quickLinks: [
       { label: "大树结构", href: `/projects/${input.project.id}#outline-tree` },
       { label: "人物弧光", href: `/projects/${input.project.id}#character-arc` },

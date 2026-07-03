@@ -166,6 +166,9 @@ export default async function ProjectPage({ params }: { params: Promise<{ projec
       status: task.status,
       model: task.model,
       createdAt: task.createdAt,
+      outputText: task.outputText,
+      costUsd: task.costUsd,
+      errorMessage: task.errorMessage,
     })),
   });
 

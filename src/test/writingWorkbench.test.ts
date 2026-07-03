@@ -80,6 +80,15 @@ test("buildWritingWorkbench", async (t) => {
           model: "deepseek-chat",
           createdAt: "2026-07-03T00:00:00.000Z",
         },
+        {
+          id: "task2",
+          taskType: "chapter_review",
+          status: "succeeded",
+          model: "claude-sonnet",
+          outputText: "节奏合格，但人物选择还可以更狠。",
+          costUsd: 0.034,
+          createdAt: "2026-07-03T00:05:00.000Z",
+        },
       ],
     });
 
@@ -101,6 +110,10 @@ test("buildWritingWorkbench", async (t) => {
     assert.ok(workbench.modelActions.some((action) => action.kind === "opening_diagnostic" && action.method === "GET"));
     assert.ok(workbench.modelActions.some((action) => action.kind === "chapter_draft" && action.endpoint === "/api/ai/tasks/chapter-draft"));
     assert.ok(workbench.modelActions.some((action) => action.kind === "chapter_review" && action.payload.chapterId === "c1"));
+    assert.equal(workbench.modelTimeline.totalRuns, 2);
+    assert.equal(workbench.modelTimeline.items[0].id, "task2");
+    assert.ok(workbench.modelTimeline.items[0].summary.includes("节奏合格"));
+    assert.ok(workbench.modelTimeline.items.some((item) => item.status === "failed" && item.nextAction.includes("复盘")));
   });
 
   await t.test("recommends creating a chapter when the project has only structure", () => {
@@ -139,5 +152,6 @@ test("buildWritingWorkbench", async (t) => {
     assert.ok(workbench.quickFixes.some((fix) => fix.kind === "character_seed"));
     assert.ok(!workbench.quickFixes.some((fix) => fix.kind === "world_seed"));
     assert.ok(workbench.modelActions.every((action) => action.disabledReason?.includes("先创建第一章")));
+    assert.equal(workbench.modelTimeline.emptyState, "还没有模型执行记录。");
   });
 });

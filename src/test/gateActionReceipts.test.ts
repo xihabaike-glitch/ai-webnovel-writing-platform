@@ -14,6 +14,7 @@ import {
   buildGateProjectStartMetricDecision,
   buildGateProjectStartMetricDispatchItems,
   buildGateProjectStartMetricFollowupDispatchItems,
+  buildGateProjectSecondMetricDecision,
   buildGatePlatformDispatchReceipt,
   buildGateDispatchEvidenceReview,
   buildGatePlatformScaleGate,
@@ -1127,6 +1128,103 @@ test("buildGateActionReceipt", async (t) => {
 
     assert.equal(refreshed[0].state, "queued");
     assert.equal(refreshed[2].state, "completed");
+  });
+
+  await t.test("decides second-round platform direction after scaled metric recovery", () => {
+    function secondMetricTask(input: {
+      projectId: string;
+      platformId: string;
+      platformName: string;
+      completedAt: string;
+    }) {
+      return {
+        id: `${input.platformId}:start_metric_followup:next_metrics_recovery:${input.projectId}`,
+        dispatchKey: `${input.platformId}:start_metric_followup:next_metrics_recovery:${input.projectId}`,
+        databaseId: `dispatch-db-second-${input.platformId}`,
+        projectId: input.projectId,
+        platformId: input.platformId,
+        platformName: input.platformName,
+        stage: "start_metrics_recovery" as const,
+        state: "completed" as const,
+        priorityScore: 82,
+        ownerRole: "首轮数据运营",
+        title: `${input.platformName} 加码后二轮数据回收`,
+        detail: "加码后二轮数据已回收。",
+        dueLabel: "加码后 24 小时",
+        actionLabel: "派给数据运营",
+        href: `/projects/${input.projectId}#platform-export`,
+        acceptanceCriteria: ["加码后的曝光、点击、追读或收藏已回收"],
+        evidence: ["首轮小步加码已完成"],
+        sourceReceiptId: null,
+        completionEvidence: "已回收加码后的二轮数据。",
+        reviewLatestAt: "2026-01-01T03:00:00.000Z",
+        assignedAt: "2026-01-01T03:30:00.000Z",
+        completedAt: input.completedAt,
+        createdAt: "2026-01-01T03:30:00.000Z",
+        updatedAt: input.completedAt,
+      };
+    }
+
+    const tasks = [
+      secondMetricTask({ projectId: "project-1", platformId: "fanqie", platformName: "番茄小说", completedAt: "2026-01-01T04:00:00.000Z" }),
+      secondMetricTask({ projectId: "project-2", platformId: "qimao", platformName: "七猫小说", completedAt: "2026-01-01T04:00:00.000Z" }),
+      secondMetricTask({ projectId: "project-3", platformId: "royalroad", platformName: "Royal Road", completedAt: "2026-01-01T04:00:00.000Z" }),
+      secondMetricTask({ projectId: "project-4", platformId: "webnovel", platformName: "WebNovel", completedAt: "2026-01-01T04:00:00.000Z" }),
+    ];
+    const receipts = [
+      buildGatePublishEffectReceipt({
+        projectId: "project-1",
+        platformId: "fanqie",
+        platformName: "番茄小说",
+        now: "2026-01-01T05:00:00.000Z",
+        metric: { views: 6000, clicks: 980, favorites: 360, follows: 160 },
+      }),
+      buildGatePublishEffectReceipt({
+        projectId: "project-2",
+        platformId: "qimao",
+        platformName: "七猫小说",
+        now: "2026-01-01T05:00:00.000Z",
+        metric: { views: 4800, clicks: 260, favorites: 92, follows: 42 },
+      }),
+      buildGatePublishEffectReceipt({
+        projectId: "project-3",
+        platformId: "royalroad",
+        platformName: "Royal Road",
+        now: "2026-01-01T05:00:00.000Z",
+        metric: { views: 5200, clicks: 180, favorites: 52, follows: 18 },
+      }),
+      buildGatePublishEffectReceipt({
+        projectId: "project-4",
+        platformId: "webnovel",
+        platformName: "WebNovel",
+        now: "2026-01-01T05:00:00.000Z",
+        metric: { views: 3000, clicks: 0, favorites: 0, follows: 0 },
+      }),
+    ];
+
+    const decision = buildGateProjectSecondMetricDecision(tasks, receipts);
+
+    assert.equal(decision.summary.total, 4);
+    assert.equal(decision.summary.continueScale, 1);
+    assert.equal(decision.summary.repairTactic, 1);
+    assert.equal(decision.summary.pivotPlatform, 1);
+    assert.equal(decision.summary.pause, 1);
+    assert.deepEqual(decision.items.map((item) => item.status), [
+      "pause",
+      "pivot_platform",
+      "repair_tactic",
+      "continue_scale",
+    ]);
+    assert.equal(decision.items[0].platformId, "webnovel");
+    assert.equal(decision.items[0].actionLabel, "暂停并复盘");
+    assert.equal(decision.items[1].platformId, "royalroad");
+    assert.equal(decision.items[1].href, "/projects/project-3#platform-export");
+    assert.ok(decision.items[1].detail.includes("换平台"));
+    assert.equal(decision.items[2].platformId, "qimao");
+    assert.equal(decision.items[2].actionLabel, "修投稿打法");
+    assert.equal(decision.items[3].platformId, "fanqie");
+    assert.equal(decision.items[3].actionLabel, "继续小步加码");
+    assert.ok(decision.items[3].evidence.includes("追读率 2.67%"));
   });
 
   await t.test("gates platform scale-up behind verified dispatch evidence", () => {

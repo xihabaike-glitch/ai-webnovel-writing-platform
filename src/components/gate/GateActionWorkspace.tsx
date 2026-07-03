@@ -28,6 +28,7 @@ import {
   buildGateProjectStartMetricDecision,
   buildGateProjectStartMetricDispatchItems,
   buildGateProjectStartMetricFollowupDispatchItems,
+  buildGateProjectSecondMetricDecision,
   buildGatePlatformGrowthReview,
   clearGateActionReceipts,
   clearPersistedGateActionReceipts,
@@ -50,6 +51,7 @@ import {
   type GateActionReceiptStatusFilter,
   type GateDispatchEvidenceReviewStatus,
   type GateProjectStartMetricDecisionStatus,
+  type GateProjectSecondMetricDecisionStatus,
   type GateProjectStartValidationStatus,
   type GatePlatformScaleFollowupStatus,
   type GatePlatformScaleCadenceStatus,
@@ -184,6 +186,14 @@ function startMetricDecisionClass(status: GateProjectStartMetricDecisionStatus) 
   return "border-amber-200 bg-amber-50 text-amber-900";
 }
 
+function secondMetricDecisionClass(status: GateProjectSecondMetricDecisionStatus) {
+  if (status === "continue_scale") return "border-emerald-200 bg-emerald-50 text-emerald-900";
+  if (status === "repair_tactic") return "border-amber-200 bg-amber-50 text-amber-900";
+  if (status === "pivot_platform") return "border-orange-200 bg-orange-50 text-orange-900";
+  if (status === "pause") return "border-rose-200 bg-rose-50 text-rose-900";
+  return "border-slate-200 bg-slate-50 text-slate-800";
+}
+
 function scaleGateClass(status: GatePlatformScaleGateStatus) {
   if (status === "ready") return "border-emerald-200 bg-emerald-50 text-emerald-900";
   if (status === "blocked_evidence") return "border-rose-200 bg-rose-50 text-rose-900";
@@ -312,6 +322,8 @@ export function GateActionWorkspace({ actions }: { actions: PrePublishGateAction
   const startValidationPlans = startValidationReview.plans.slice(0, 4);
   const startMetricDecision = buildGateProjectStartMetricDecision(visibleDispatchTasks, receipts);
   const startMetricDecisionItems = startMetricDecision.items.slice(0, 4);
+  const secondMetricDecision = buildGateProjectSecondMetricDecision(visibleDispatchTasks, receipts);
+  const secondMetricDecisionItems = secondMetricDecision.items.slice(0, 4);
   const scaleFollowup = buildGatePlatformScaleFollowup(visibleDispatchTasks, receipts);
   const scaleFollowupIssues = scaleFollowup.items.filter((item) => item.status !== "tracked").slice(0, 4);
   const scaleCadence = buildGatePlatformScaleCadence(platformGrowthReview, visibleDispatchTasks, scaleFollowup);
@@ -773,6 +785,94 @@ export function GateActionWorkspace({ actions }: { actions: PrePublishGateAction
           ) : (
             <p className="rounded-md border border-dashed border-slate-300 bg-white p-3 text-sm text-slate-600">
               暂无首轮数据决策。先完成“首轮数据回收”派单，并回填发布效果数据。
+            </p>
+          )}
+        </div>
+        <div className="mt-3 grid gap-2">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <div className="text-xs font-medium text-slate-500">二轮数据决策台</div>
+              <p className="mt-1 text-xs text-slate-500">加码后二轮数据回来后，决定继续小步加码、修打法、换平台或暂停。</p>
+            </div>
+            <Link
+              className="w-fit rounded-md border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
+              href="/dispatch"
+            >
+              查看二轮回收
+            </Link>
+          </div>
+          <div className="grid gap-2 sm:grid-cols-5">
+            <div className="rounded-md border border-emerald-100 bg-white p-3">
+              <div className="text-xs text-slate-500">继续加码</div>
+              <div className="mt-1 text-lg font-semibold text-emerald-700">{secondMetricDecision.summary.continueScale}</div>
+            </div>
+            <div className="rounded-md border border-amber-100 bg-white p-3">
+              <div className="text-xs text-slate-500">修打法</div>
+              <div className="mt-1 text-lg font-semibold text-amber-700">{secondMetricDecision.summary.repairTactic}</div>
+            </div>
+            <div className="rounded-md border border-orange-100 bg-white p-3">
+              <div className="text-xs text-slate-500">换平台/打法</div>
+              <div className="mt-1 text-lg font-semibold text-orange-700">{secondMetricDecision.summary.pivotPlatform}</div>
+            </div>
+            <div className="rounded-md border border-rose-100 bg-white p-3">
+              <div className="text-xs text-slate-500">暂停</div>
+              <div className="mt-1 text-lg font-semibold text-rose-700">{secondMetricDecision.summary.pause}</div>
+            </div>
+            <div className="rounded-md border border-slate-200 bg-white p-3">
+              <div className="text-xs text-slate-500">等数据</div>
+              <div className="mt-1 text-lg font-semibold text-slate-700">{secondMetricDecision.summary.waitMetric}</div>
+            </div>
+          </div>
+          {secondMetricDecision.nextActions.length ? (
+            <div className="grid gap-2 xl:grid-cols-2">
+              {secondMetricDecision.nextActions.map((action) => (
+                <div className="rounded-md bg-white p-3 text-sm leading-6 text-slate-600" key={action}>{action}</div>
+              ))}
+            </div>
+          ) : null}
+          {secondMetricDecisionItems.length ? (
+            <div className="grid gap-2 xl:grid-cols-2">
+              {secondMetricDecisionItems.map((item) => (
+                <div className={`rounded-md border p-3 text-sm ${secondMetricDecisionClass(item.status)}`} key={item.dispatchKey}>
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-medium">{item.platformName} 二轮决策</span>
+                        <span className="rounded-md bg-white/70 px-2 py-1 text-xs font-medium">{item.label}</span>
+                      </div>
+                      <p className="mt-2 leading-6 opacity-85">{item.detail}</p>
+                    </div>
+                    <div className="text-right text-xs opacity-75">
+                      {item.metricAt ? <div>{new Date(item.metricAt).toLocaleDateString()}</div> : <div>未回填</div>}
+                      <div className="mt-1">优先级 {item.priorityScore}</div>
+                    </div>
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-2 text-xs opacity-75">
+                    {item.evidence.map((evidence) => (
+                      <span className="rounded-md bg-white/70 px-2 py-1" key={evidence}>{evidence}</span>
+                    ))}
+                  </div>
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    <Link
+                      className="rounded-md bg-white px-3 py-2 text-xs font-medium text-slate-950"
+                      href={item.href}
+                    >
+                      {item.actionLabel}
+                    </Link>
+                    <button
+                      className="rounded-md border border-white/70 bg-white/70 px-3 py-2 text-xs font-medium text-slate-950"
+                      onClick={() => focusPlatform(item.platformId)}
+                      type="button"
+                    >
+                      只看该平台
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="rounded-md border border-dashed border-slate-300 bg-white p-3 text-sm text-slate-600">
+              暂无二轮数据决策。先完成“加码后二轮数据回收”派单，并回填对应效果。
             </p>
           )}
         </div>

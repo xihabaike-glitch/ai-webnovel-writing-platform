@@ -348,6 +348,39 @@ export interface GateProjectStartMetricDecision {
   items: GateProjectStartMetricDecisionItem[];
 }
 
+export type GateProjectSecondMetricDecisionStatus = "continue_scale" | "repair_tactic" | "pivot_platform" | "pause" | "wait_metric";
+
+export interface GateProjectSecondMetricDecisionItem {
+  dispatchKey: string;
+  projectId: string | null;
+  platformId: string;
+  platformName: string;
+  status: GateProjectSecondMetricDecisionStatus;
+  label: string;
+  detail: string;
+  actionLabel: string;
+  href: string;
+  priorityScore: number;
+  metricAt: string | null;
+  clickRatePercent: number | null;
+  favoriteRatePercent: number | null;
+  followRatePercent: number | null;
+  evidence: string[];
+}
+
+export interface GateProjectSecondMetricDecision {
+  summary: {
+    total: number;
+    continueScale: number;
+    repairTactic: number;
+    pivotPlatform: number;
+    pause: number;
+    waitMetric: number;
+  };
+  nextActions: string[];
+  items: GateProjectSecondMetricDecisionItem[];
+}
+
 export type GatePlatformScaleGateStatus = "ready" | "blocked_evidence" | "needs_dispatch" | "not_candidate";
 
 export interface GatePlatformScaleGateItem {
@@ -1165,6 +1198,10 @@ function growthEvidence(input: {
 
 function percent(part: number, total: number) {
   return total > 0 ? Math.round((part / total) * 1000) / 10 : 0;
+}
+
+function precisePercent(part: number, total: number) {
+  return total > 0 ? Math.round((part / total) * 10000) / 100 : 0;
 }
 
 interface GatePublishEffectMetricSnapshot extends GatePublishEffectReceiptMetric {
@@ -2735,6 +2772,168 @@ export function buildGateProjectStartMetricFollowupDispatchItems(
       };
     })
     .filter((item): item is GatePlatformGrowthDispatchItem => Boolean(item));
+}
+
+function projectSecondMetricDecisionFromMetric(
+  task: PersistedGatePlatformDispatchTask,
+  metric: GatePublishEffectMetricSnapshot | null,
+): Pick<GateProjectSecondMetricDecisionItem, "status" | "label" | "detail" | "actionLabel" | "href" | "priorityScore" | "evidence"> {
+  if (!metric) {
+    return {
+      status: "wait_metric",
+      label: "等二轮数据",
+      detail: `${task.platformName} 已完成加码后二轮数据回收派单，但还没有看到回收后的效果回执。先补真实数据，再做继续、修复或撤退判断。`,
+      actionLabel: "回填二轮数据",
+      href: task.href,
+      priorityScore: task.priorityScore,
+      evidence: ["缺少二轮效果回执", ...task.evidence].slice(0, 3),
+    };
+  }
+
+  const zeroConversion = metric.views >= 100 && metric.clicks === 0 && metric.follows === 0;
+  if (zeroConversion) {
+    return {
+      status: "pause",
+      label: "暂停",
+      detail: `${task.platformName} 二轮加码后有曝光但点击和追读为 0。继续推只会扩大损失，先暂停并复盘入口卖点。`,
+      actionLabel: "暂停并复盘",
+      href: task.href,
+      priorityScore: Math.max(task.priorityScore, 92),
+      evidence: [`曝光 ${metric.views}`, `点击 ${metric.clicks}`, `追读 ${metric.follows}`],
+    };
+  }
+
+  if (metric.clickRatePercent < 4 || metric.favoriteRatePercent < 1.2 || metric.followRatePercent < 0.6) {
+    return {
+      status: "pivot_platform",
+      label: "换打法/换平台",
+      detail: `${task.platformName} 二轮加码后的点击率 ${metric.clickRatePercent}%，收藏率 ${metric.favoriteRatePercent}%，追读率 ${metric.followRatePercent}%。平台匹配或入口打法偏离，进入换打法/换平台判断。`,
+      actionLabel: "制定换平台方案",
+      href: task.href,
+      priorityScore: Math.max(task.priorityScore, 86),
+      evidence: [`点击率 ${precisePercent(metric.clicks, metric.views)}%`, `收藏率 ${precisePercent(metric.favorites, metric.views)}%`, `追读率 ${precisePercent(metric.follows, metric.views)}%`],
+    };
+  }
+
+  if (metric.clickRatePercent < 7 || metric.favoriteRatePercent < 2.5 || metric.followRatePercent < 1.2) {
+    return {
+      status: "repair_tactic",
+      label: "修打法",
+      detail: `${task.platformName} 二轮数据没有崩，但转化还不够硬。先修标题、简介、标签和前三章兑现，再考虑下一轮。`,
+      actionLabel: "修投稿打法",
+      href: task.href.replace("#platform-export", "#submission-package"),
+      priorityScore: Math.max(task.priorityScore, 78),
+      evidence: [`点击率 ${precisePercent(metric.clicks, metric.views)}%`, `收藏率 ${precisePercent(metric.favorites, metric.views)}%`, `追读率 ${precisePercent(metric.follows, metric.views)}%`],
+    };
+  }
+
+  return {
+    status: "continue_scale",
+    label: "继续加码",
+    detail: `${task.platformName} 二轮加码后点击率 ${metric.clickRatePercent}%，收藏率 ${metric.favoriteRatePercent}%，追读率 ${metric.followRatePercent}%。可以继续小步加码，但仍要保留对照组。`,
+    actionLabel: "继续小步加码",
+    href: task.href,
+    priorityScore: Math.max(task.priorityScore, 80),
+    evidence: [`点击率 ${precisePercent(metric.clicks, metric.views)}%`, `收藏率 ${precisePercent(metric.favorites, metric.views)}%`, `追读率 ${precisePercent(metric.follows, metric.views)}%`],
+  };
+}
+
+export function buildGateProjectSecondMetricDecision(
+  tasks: PersistedGatePlatformDispatchTask[],
+  receipts: GateActionReceipt[] = [],
+): GateProjectSecondMetricDecision {
+  const operationalReceipts = trimGateActionReceipts(receipts, 100)
+    .filter((receipt) => !isAuditMetaReceipt(receipt));
+  const metricsByPlatform = new Map<string, GatePublishEffectMetricSnapshot[]>();
+
+  for (const receipt of operationalReceipts) {
+    const metric = metricFromReceipt(receipt);
+    if (!metric) continue;
+    const metrics = metricsByPlatform.get(metric.platformId) ?? [];
+    metrics.push(metric);
+    metricsByPlatform.set(metric.platformId, metrics);
+  }
+
+  for (const metrics of metricsByPlatform.values()) {
+    metrics.sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime());
+  }
+
+  const secondMetricTasks = tasks
+    .filter((task) => (
+      task.stage === "start_metrics_recovery"
+      && task.dispatchKey.includes(":start_metric_followup:next_metrics_recovery:")
+      && task.state === "completed"
+      && task.completionEvidence.trim()
+    ))
+    .sort((left, right) => new Date(right.completedAt ?? right.updatedAt).getTime() - new Date(left.completedAt ?? left.updatedAt).getTime());
+  const latestTaskByPlatform = new Map<string, PersistedGatePlatformDispatchTask>();
+  for (const task of secondMetricTasks) {
+    if (!latestTaskByPlatform.has(task.platformId)) latestTaskByPlatform.set(task.platformId, task);
+  }
+
+  const items = [...latestTaskByPlatform.values()].map((task): GateProjectSecondMetricDecisionItem => {
+    const completedAt = validDate(task.completedAt) ?? validDate(task.updatedAt);
+    const metric = (metricsByPlatform.get(task.platformId) ?? [])
+      .find((candidate) => !completedAt || new Date(candidate.createdAt).getTime() > completedAt.getTime()) ?? null;
+    const decision = projectSecondMetricDecisionFromMetric(task, metric);
+
+    return {
+      dispatchKey: task.dispatchKey,
+      projectId: task.projectId,
+      platformId: task.platformId,
+      platformName: task.platformName,
+      status: decision.status,
+      label: decision.label,
+      detail: decision.detail,
+      actionLabel: decision.actionLabel,
+      href: decision.href,
+      priorityScore: decision.priorityScore,
+      metricAt: metric?.createdAt ?? null,
+      clickRatePercent: metric?.clickRatePercent ?? null,
+      favoriteRatePercent: metric?.favoriteRatePercent ?? null,
+      followRatePercent: metric?.followRatePercent ?? null,
+      evidence: decision.evidence,
+    };
+  });
+
+  const continueScale = items.filter((item) => item.status === "continue_scale").length;
+  const repairTactic = items.filter((item) => item.status === "repair_tactic").length;
+  const pivotPlatform = items.filter((item) => item.status === "pivot_platform").length;
+  const pause = items.filter((item) => item.status === "pause").length;
+  const waitMetric = items.filter((item) => item.status === "wait_metric").length;
+  const statusWeight: Record<GateProjectSecondMetricDecisionStatus, number> = {
+    pause: 0,
+    pivot_platform: 1,
+    repair_tactic: 2,
+    wait_metric: 3,
+    continue_scale: 4,
+  };
+
+  return {
+    summary: {
+      total: items.length,
+      continueScale,
+      repairTactic,
+      pivotPlatform,
+      pause,
+      waitMetric,
+    },
+    nextActions: [
+      pause > 0 ? `${pause} 个平台二轮加码后要暂停，别继续扩大损失。` : null,
+      pivotPlatform > 0 ? `${pivotPlatform} 个平台需要换打法或换平台，别硬推。` : null,
+      repairTactic > 0 ? `${repairTactic} 个平台二轮转化偏弱，先修打法再继续。` : null,
+      waitMetric > 0 ? `${waitMetric} 个平台缺二轮真实数据，先补效果回执。` : null,
+      continueScale > 0 ? `${continueScale} 个平台二轮表现可继续，但只能小步加码并保留对照。` : null,
+      items.length === 0 ? "还没有完成加码后二轮数据回收，先把回流任务收口。" : null,
+    ].filter((action): action is string => Boolean(action)),
+    items: items.sort((left, right) => {
+      const statusDiff = statusWeight[left.status] - statusWeight[right.status];
+      if (statusDiff !== 0) return statusDiff;
+      const priorityDiff = right.priorityScore - left.priorityScore;
+      if (priorityDiff !== 0) return priorityDiff;
+      return left.platformName.localeCompare(right.platformName);
+    }),
+  };
 }
 
 export function buildGatePlatformScaleGate(

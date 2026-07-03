@@ -69,4 +69,64 @@ test("buildTaskRunConsole", async (t) => {
     assert.equal(console.retryCandidates.length, 0);
     assert.equal(console.recentLogs[0].runtimeMs, 5000);
   });
+
+  await t.test("builds a global failure repair batch from unresolved failures", () => {
+    const console = buildTaskRunConsole([
+      {
+        ...baseTask,
+        id: "api-key-failure",
+        chapterId: "chapter-3",
+        taskType: "chapter_review",
+        status: "failed",
+        model: "deepseek-chat",
+        errorMessage: "API key missing",
+        createdAt: "2026-01-01T00:10:00.000Z",
+        updatedAt: "2026-01-01T00:10:02.000Z",
+        chapter: { title: "第三章 密钥门" },
+        modelProvider: { providerId: "deepseek", displayName: "DeepSeek" },
+      },
+      {
+        ...baseTask,
+        id: "retryable-timeout",
+        chapterId: "chapter-2",
+        taskType: "chapter_draft",
+        status: "failed",
+        errorMessage: "Model request failed: 503 provider timeout",
+        createdAt: "2026-01-01T00:09:00.000Z",
+        updatedAt: "2026-01-01T00:09:02.000Z",
+        chapter: { title: "第二章 断桥" },
+      },
+      {
+        ...baseTask,
+        id: "old-review-failure",
+        taskType: "chapter_review",
+        status: "failed",
+        errorMessage: "429 too many requests",
+        createdAt: "2026-01-01T00:08:00.000Z",
+        updatedAt: "2026-01-01T00:08:02.000Z",
+      },
+      {
+        ...baseTask,
+        id: "recovered-review",
+        taskType: "chapter_review",
+        status: "succeeded",
+        errorMessage: null,
+        createdAt: "2026-01-01T00:12:00.000Z",
+        updatedAt: "2026-01-01T00:12:05.000Z",
+      },
+    ], { now: new Date("2026-01-01T00:20:00.000Z") });
+
+    assert.equal(console.failureRepairBatch.status, "fix_config");
+    assert.equal(console.failureRepairBatch.summary.unresolvedFailures, 2);
+    assert.equal(console.failureRepairBatch.summary.configFailures, 1);
+    assert.equal(console.failureRepairBatch.summary.retryableFailures, 1);
+    assert.equal(console.failureRepairBatch.primaryActionLabel, "去模型设置");
+    assert.equal(console.failureRepairBatch.primaryActionHref, "/settings/models");
+    assert.deepEqual(console.failureRepairBatch.items.map((item) => item.id), ["api-key-failure", "retryable-timeout"]);
+    assert.equal(console.failureRepairBatch.items[0].directRetrySupported, false);
+    assert.equal(console.failureRepairBatch.items[0].actionLabel, "去模型设置");
+    assert.equal(console.failureRepairBatch.items[1].directRetrySupported, true);
+    assert.equal(console.failureRepairBatch.items[1].actionLabel, "一键重试");
+    assert.ok(console.failureRepairBatch.guidance.some((line) => line.includes("先修配置")));
+  });
 });

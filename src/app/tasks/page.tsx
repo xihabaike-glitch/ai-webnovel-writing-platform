@@ -63,6 +63,19 @@ function batchTone(successRate: number, failedTasks: number, runningTasks: numbe
   return "border-emerald-200 bg-emerald-50 text-emerald-800";
 }
 
+function repairBatchTone(status: ReturnType<typeof buildTaskRunConsole>["failureRepairBatch"]["status"]) {
+  if (status === "clear") return "border-emerald-200 bg-emerald-50 text-emerald-900";
+  if (status === "fix_config") return "border-rose-200 bg-rose-50 text-rose-900";
+  if (status === "retry_sample") return "border-amber-200 bg-amber-50 text-amber-900";
+  return "border-slate-200 bg-slate-50 text-slate-900";
+}
+
+function repairKindLabel(kind: ReturnType<typeof buildTaskRunConsole>["failureRepairBatch"]["items"][number]["repairKind"]) {
+  if (kind === "config") return "修配置";
+  if (kind === "retry") return "可重试";
+  return "人工复盘";
+}
+
 export default async function TasksPage({ searchParams }: { searchParams?: Promise<{ batchStrategy?: string }> }) {
   const resolvedSearchParams = searchParams ? await searchParams : {};
   const activeStrategy = getBatchExecutionStrategy(resolvedSearchParams.batchStrategy);
@@ -212,6 +225,76 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
               ))}
               {runConsole.taskTypeRows.length === 0 ? <p className="text-sm text-slate-600">暂无运行数据。</p> : null}
             </div>
+          </div>
+        </div>
+      </section>
+
+      <section className={`mb-6 rounded-md border p-4 ${repairBatchTone(runConsole.failureRepairBatch.status)}`}>
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <h2 className="font-medium">失败修复批次</h2>
+            <p className="mt-1 text-sm leading-6">{runConsole.failureRepairBatch.title}：{runConsole.failureRepairBatch.detail}</p>
+          </div>
+          <Link className="w-fit rounded-md bg-slate-950 px-4 py-2 text-sm font-medium text-white" href={runConsole.failureRepairBatch.primaryActionHref}>
+            {runConsole.failureRepairBatch.primaryActionLabel}
+          </Link>
+        </div>
+        <div className="mt-4 grid gap-3 md:grid-cols-3 lg:grid-cols-6">
+          <div className="rounded-md bg-white/70 p-3">
+            <div className="text-xs opacity-70">未恢复</div>
+            <div className="mt-1 text-2xl font-semibold">{runConsole.failureRepairBatch.summary.unresolvedFailures}</div>
+          </div>
+          <div className="rounded-md bg-white/70 p-3">
+            <div className="text-xs opacity-70">配置类</div>
+            <div className="mt-1 text-2xl font-semibold">{runConsole.failureRepairBatch.summary.configFailures}</div>
+          </div>
+          <div className="rounded-md bg-white/70 p-3">
+            <div className="text-xs opacity-70">可重试</div>
+            <div className="mt-1 text-2xl font-semibold">{runConsole.failureRepairBatch.summary.retryableFailures}</div>
+          </div>
+          <div className="rounded-md bg-white/70 p-3">
+            <div className="text-xs opacity-70">人工复盘</div>
+            <div className="mt-1 text-2xl font-semibold">{runConsole.failureRepairBatch.summary.manualFailures}</div>
+          </div>
+          <div className="rounded-md bg-white/70 p-3">
+            <div className="text-xs opacity-70">项目</div>
+            <div className="mt-1 text-2xl font-semibold">{runConsole.failureRepairBatch.summary.affectedProjects}</div>
+          </div>
+          <div className="rounded-md bg-white/70 p-3">
+            <div className="text-xs opacity-70">模型</div>
+            <div className="mt-1 text-2xl font-semibold">{runConsole.failureRepairBatch.summary.affectedProviders}</div>
+          </div>
+        </div>
+        <div className="mt-4 grid gap-3 lg:grid-cols-[0.85fr_1.15fr]">
+          <div className="grid gap-2 text-sm">
+            {runConsole.failureRepairBatch.guidance.map((line) => (
+              <div className="rounded-md bg-white/70 px-3 py-2" key={line}>{line}</div>
+            ))}
+          </div>
+          <div className="grid gap-2">
+            {runConsole.failureRepairBatch.items.slice(0, 4).map((item) => (
+              <div className="rounded-md bg-white/70 p-3 text-sm" key={item.id}>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="rounded-md bg-slate-950 px-2 py-1 text-xs font-medium text-white">{repairKindLabel(item.repairKind)}</span>
+                  <span className="font-medium">{item.taskLabel}</span>
+                  <span className="text-xs opacity-70">{item.providerName} · {item.model}</span>
+                </div>
+                <div className="mt-2 opacity-80">{item.projectTitle} · {item.chapterTitle}</div>
+                <p className="mt-1 leading-6 opacity-80">{item.retryReason}</p>
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  {item.directRetrySupported ? (
+                    <RetryTaskButton className="flex flex-wrap items-center gap-2" taskId={item.id} />
+                  ) : (
+                    <Link className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-medium hover:bg-slate-50" href={item.href}>
+                      {item.actionLabel}
+                    </Link>
+                  )}
+                </div>
+              </div>
+            ))}
+            {runConsole.failureRepairBatch.items.length === 0 ? (
+              <p className="rounded-md bg-white/70 p-3 text-sm">没有未恢复失败。</p>
+            ) : null}
           </div>
         </div>
       </section>

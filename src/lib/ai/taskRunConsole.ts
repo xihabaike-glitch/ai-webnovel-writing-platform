@@ -62,6 +62,28 @@ export interface TaskRetryCandidate {
   directRetrySupported: boolean;
 }
 
+export interface FailureRepairBatchItem extends TaskRetryCandidate {
+  repairKind: "config" | "retry" | "manual";
+}
+
+export interface FailureRepairBatch {
+  status: "clear" | "fix_config" | "retry_sample" | "review_manual";
+  title: string;
+  detail: string;
+  primaryActionLabel: string;
+  primaryActionHref: string;
+  summary: {
+    unresolvedFailures: number;
+    configFailures: number;
+    retryableFailures: number;
+    manualFailures: number;
+    affectedProjects: number;
+    affectedProviders: number;
+  };
+  guidance: string[];
+  items: FailureRepairBatchItem[];
+}
+
 export interface TaskRunConsole {
   status: "idle" | "running" | "blocked" | "healthy";
   verdict: string;
@@ -85,6 +107,7 @@ export interface TaskRunConsole {
     failedTasks: number;
     succeededTasks: number;
   }>;
+  failureRepairBatch: FailureRepairBatch;
   retryCandidates: TaskRetryCandidate[];
   recentLogs: TaskRunLog[];
   nextActions: string[];
@@ -132,13 +155,20 @@ function isRetryableError(message: string | null) {
   return /rate limit|quota|429|timeout|timed out|network|econn|connection|socket|dns|fetch failed|json|parse|schema|provider|server error|500|503|限流|配额|超时|网络|连接|解析|供应商/.test(text);
 }
 
+function isConfigError(message: string | null) {
+  const text = compact(message).toLowerCase();
+  return /api key|apikey|unauthorized|forbidden|401|403|permission|authentication|密钥|权限|授权|未配置/.test(text);
+}
+
 function retryReason(task: TaskRunInput) {
+  if (isConfigError(task.errorMessage)) return "这类失败更像 API Key、权限或模型配置问题，先修配置再继续。";
   if (task.taskType === "chapter_second_pass") return "二改任务需要保留作者指令，建议回章节页确认方向后重试。";
   if (isRetryableError(task.errorMessage)) return "错误类型具备重试价值，建议先单章重试，再恢复批量。";
   return "更像配置、权限或输入问题，先修配置再重试。";
 }
 
 function actionLabel(task: TaskRunInput) {
+  if (isConfigError(task.errorMessage)) return "去模型设置";
   if (task.taskType === "chapter_draft") return "回章节重试初稿";
   if (task.taskType === "chapter_review") return "回章节重试审稿";
   if (task.taskType === "chapter_second_pass") return "回章节重试二改";
@@ -146,6 +176,7 @@ function actionLabel(task: TaskRunInput) {
 }
 
 function chapterHref(task: TaskRunInput) {
+  if (isConfigError(task.errorMessage)) return "/settings/models";
   return task.chapterId ? `/projects/${task.projectId}/chapters/${task.chapterId}` : `/projects/${task.projectId}`;
 }
 
@@ -201,6 +232,27 @@ function buildTaskTypeRows(tasks: TaskRunInput[]) {
     .sort((left, right) => right.runningTasks - left.runningTasks || right.failedTasks - left.failedTasks || right.totalTasks - left.totalTasks);
 }
 
+function recoveryFor(task: TaskRunInput, tasks: TaskRunInput[]) {
+  const taskCreatedAt = new Date(task.createdAt).getTime();
+  const recoveredBy = tasks
+    .filter((candidate) => (
+      candidate.id !== task.id
+      && candidate.status === "succeeded"
+      && candidate.projectId === task.projectId
+      && candidate.taskType === task.taskType
+      && Boolean(task.chapterId)
+      && candidate.chapterId === task.chapterId
+      && new Date(candidate.createdAt).getTime() > taskCreatedAt
+    ))
+    .sort((left, right) => new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime())[0];
+
+  return recoveredBy ? { status: "recovered" as const, recoveredByTaskId: recoveredBy.id } : { status: "unresolved" as const, recoveredByTaskId: null };
+}
+
+function unresolvedFailures(tasks: TaskRunInput[]) {
+  return tasks.filter((task) => task.status === "failed" && recoveryFor(task, tasks).status === "unresolved");
+}
+
 function buildRetryCandidates(tasks: TaskRunInput[]): TaskRetryCandidate[] {
   return tasks
     .filter((task) => task.status === "failed")
@@ -226,6 +278,89 @@ function buildRetryCandidates(tasks: TaskRunInput[]): TaskRetryCandidate[] {
         directRetrySupported,
       };
     });
+}
+
+function repairKind(candidate: TaskRetryCandidate): FailureRepairBatchItem["repairKind"] {
+  if (candidate.directRetrySupported) return "retry";
+  if (candidate.actionLabel === "去模型设置") return "config";
+  return "manual";
+}
+
+function buildFailureRepairBatch(tasks: TaskRunInput[]): FailureRepairBatch {
+  const candidates = buildRetryCandidates(unresolvedFailures(tasks))
+    .map((candidate) => ({ ...candidate, repairKind: repairKind(candidate) }))
+    .sort((left, right) => {
+      const rank = { config: 0, retry: 1, manual: 2 };
+      return rank[left.repairKind] - rank[right.repairKind] || left.projectTitle.localeCompare(right.projectTitle);
+    });
+  const configFailures = candidates.filter((candidate) => candidate.repairKind === "config").length;
+  const retryableFailures = candidates.filter((candidate) => candidate.repairKind === "retry").length;
+  const manualFailures = candidates.filter((candidate) => candidate.repairKind === "manual").length;
+  const summary = {
+    unresolvedFailures: candidates.length,
+    configFailures,
+    retryableFailures,
+    manualFailures,
+    affectedProjects: new Set(candidates.map((candidate) => candidate.projectId)).size,
+    affectedProviders: new Set(candidates.map((candidate) => `${candidate.providerName}:${candidate.model}`)).size,
+  };
+
+  if (candidates.length === 0) {
+    return {
+      status: "clear",
+      title: "失败修复批次已清空",
+      detail: "没有未恢复失败，批量生产可以继续按安全阀推进。",
+      primaryActionLabel: "查看任务队列",
+      primaryActionHref: "/tasks",
+      summary,
+      guidance: ["继续保留失败记录和恢复证据，下一轮放量仍先看失败率。"],
+      items: [],
+    };
+  }
+
+  if (configFailures > 0) {
+    return {
+      status: "fix_config",
+      title: "先修配置，再谈重试",
+      detail: `${configFailures} 个未恢复失败指向 API Key、权限或模型配置。先修配置，否则重试只是在重复烧时间。`,
+      primaryActionLabel: "去模型设置",
+      primaryActionHref: "/settings/models",
+      summary,
+      guidance: [
+        "先修配置类失败，再处理可重试任务。",
+        "修完后只挑 1 个失败样本重试，确认成功再恢复批量。",
+      ],
+      items: candidates,
+    };
+  }
+
+  if (retryableFailures > 0) {
+    const firstRetry = candidates.find((candidate) => candidate.repairKind === "retry");
+    return {
+      status: "retry_sample",
+      title: "先单章重试，不要直接放量",
+      detail: `${retryableFailures} 个未恢复失败具备重试价值。先拿最近样本验证链路，再恢复批量。`,
+      primaryActionLabel: firstRetry?.actionLabel ?? "处理失败",
+      primaryActionHref: firstRetry?.href ?? "/failures",
+      summary,
+      guidance: [
+        "先重试 1 个样本，成功后再处理剩余同类失败。",
+        "如果样本仍失败，立刻回模型路线和提示词，不要继续批量。",
+      ],
+      items: candidates,
+    };
+  }
+
+  return {
+    status: "review_manual",
+    title: "先人工复盘失败输入",
+    detail: `${manualFailures} 个未恢复失败暂不适合直接重试，需要回章节或项目页确认输入、上下文和任务类型。`,
+    primaryActionLabel: candidates[0]?.actionLabel ?? "查看复盘",
+    primaryActionHref: candidates[0]?.href ?? "/failures",
+    summary,
+    guidance: ["先修输入和上下文，再发起小样本验证。"],
+    items: candidates,
+  };
 }
 
 function nextActions(console: Pick<TaskRunConsole, "summary" | "retryCandidates">) {
@@ -257,6 +392,7 @@ export function buildTaskRunConsole(tasks: TaskRunInput[], options: { now?: Date
     lastRunAt: sortedTasks[0] ? dateIso(sortedTasks[0].createdAt) : null,
   };
   const retryCandidates = buildRetryCandidates(sortedTasks);
+  const failureRepairBatch = buildFailureRepairBatch(sortedTasks);
   const status: TaskRunConsole["status"] = summary.totalTasks === 0
     ? "idle"
     : summary.failedTasks > 0 || summary.staleRunningTasks > 0
@@ -277,6 +413,7 @@ export function buildTaskRunConsole(tasks: TaskRunInput[], options: { now?: Date
     verdict,
     summary,
     taskTypeRows: buildTaskTypeRows(tasks),
+    failureRepairBatch,
     retryCandidates,
     recentLogs: sortedTasks.slice(0, 12).map(buildLog),
     nextActions: nextActions({ summary, retryCandidates }),

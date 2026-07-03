@@ -6,9 +6,11 @@ import { providerModelPresets, providerOptions } from "@/lib/model-gateway/provi
 import { buildProviderHealthDashboard } from "@/lib/model-gateway/providerHealth";
 import { buildRouteEffectAudit } from "@/lib/model-gateway/routeEffectAudit";
 import {
+  buildRouteConfirmationHistory,
   buildRouteConfirmationGovernanceEvidenceFromDispatchTasks,
   buildRouteConfirmationRecheckAdvice,
   buildRouteConfirmationRecheckEvidenceFromDispatchTasks,
+  modelRouteConfirmationReceiptFromAudit,
 } from "@/lib/model-gateway/routeConfirmation";
 import {
   applyRouteAvoidanceOverrides,
@@ -159,10 +161,22 @@ export default async function ModelSettingsPage() {
       take: 8,
       select: {
         receiptId: true,
+        actionId: true,
         label: true,
         detail: true,
+        href: true,
         message: true,
         status: true,
+        executionType: true,
+        succeededCount: true,
+        failedCount: true,
+        platformId: true,
+        platformName: true,
+        recheckStatus: true,
+        recheckLabel: true,
+        recheckDetail: true,
+        recheckAction: true,
+        payload: true,
         createdAt: true,
       },
     }),
@@ -189,6 +203,10 @@ export default async function ModelSettingsPage() {
   });
   const routeConfirmationRechecks = buildRouteConfirmationRecheckEvidenceFromDispatchTasks(completedRouteConfirmationRechecks);
   const routeConfirmationRecheckAdvice = buildRouteConfirmationRecheckAdvice(routeConfirmationRechecks);
+  const routeConfirmationReceipts = routeConfirmationAudits
+    .map(modelRouteConfirmationReceiptFromAudit)
+    .filter((receipt): receipt is NonNullable<ReturnType<typeof modelRouteConfirmationReceiptFromAudit>> => Boolean(receipt));
+  const routeConfirmationHistory = buildRouteConfirmationHistory(routeConfirmationReceipts, routeConfirmationRechecks);
   const routeGovernanceEvidence = buildRouteConfirmationGovernanceEvidenceFromDispatchTasks(completedRouteGovernanceTasks);
   const healthDashboard = buildProviderHealthDashboard(maskedProviders);
   const routeEffectAudit = buildRouteEffectAudit(
@@ -221,14 +239,7 @@ export default async function ModelSettingsPage() {
         routeEffectAudit={routeEffectAudit}
         routeAvoidanceDecisionHistory={routeAvoidanceDecisionHistory}
         routeAvoidanceGovernance={routeAvoidanceGovernance}
-        routeConfirmationHistory={routeConfirmationAudits.map((audit) => ({
-          id: audit.receiptId,
-          label: audit.label,
-          detail: audit.detail,
-          message: audit.message,
-          status: audit.status,
-          createdAt: audit.createdAt.toISOString(),
-        }))}
+        routeConfirmationHistory={routeConfirmationHistory}
         routeConfirmationRecheckAdvice={routeConfirmationRecheckAdvice}
         routeRecommendations={routeRecommendations}
         routeOptions={modelTaskRouteOptions}

@@ -47,6 +47,21 @@ export interface ModelRouteConfirmationReceipt {
   createdAt: string;
 }
 
+export type RouteConfirmationHistoryStatus = "waiting_recheck" | "recheck_passed" | "recheck_needs_governance";
+
+export interface RouteConfirmationHistoryItem {
+  id: string;
+  taskType: RoutedModelTaskType;
+  label: string;
+  detail: string;
+  message: string;
+  status: ModelRouteConfirmationReceipt["status"];
+  createdAt: string;
+  recheckStatus: RouteConfirmationHistoryStatus;
+  recheckLabel: string;
+  recheckDetail: string;
+}
+
 export interface ModelRouteConfirmationDispatch {
   id: string;
   dispatchKey: string;
@@ -423,6 +438,26 @@ function routeConfirmationAfterGovernance(
   )));
 }
 
+function timestampMs(value: string | null) {
+  if (!value) return null;
+  const timestamp = new Date(value).getTime();
+  return Number.isNaN(timestamp) ? null : timestamp;
+}
+
+function latestRouteConfirmationRecheck(
+  receipt: ModelRouteConfirmationReceipt,
+  rechecks: RouteConfirmationRecheckEvidence[],
+) {
+  const receiptAt = timestampMs(receipt.createdAt);
+  if (receiptAt === null) return null;
+  return rechecks
+    .filter((item) => {
+      const completedAt = timestampMs(item.completedAt);
+      return item.taskType === receipt.payload.taskType && completedAt !== null && completedAt > receiptAt;
+    })
+    .sort((left, right) => (right.completedAt ?? "").localeCompare(left.completedAt ?? ""))[0] ?? null;
+}
+
 export function buildModelRouteConfirmationReceipt(input: ModelRouteConfirmationInput): ModelRouteConfirmationReceipt {
   const taskLabel = labelForRoutedTask(input.taskType);
   const source = input.source ?? "manual";
@@ -544,6 +579,55 @@ export function modelRouteConfirmationReceiptFromAudit(record: ModelRouteConfirm
     },
     createdAt,
   };
+}
+
+export function buildRouteConfirmationHistory(
+  receipts: ModelRouteConfirmationReceipt[],
+  rechecks: RouteConfirmationRecheckEvidence[],
+): RouteConfirmationHistoryItem[] {
+  return receipts.map((receipt): RouteConfirmationHistoryItem => {
+    const recheck = latestRouteConfirmationRecheck(receipt, rechecks);
+    if (!recheck) {
+      return {
+        id: receipt.id,
+        taskType: receipt.payload.taskType,
+        label: receipt.label,
+        detail: receipt.detail,
+        message: receipt.message,
+        status: receipt.status,
+        createdAt: receipt.createdAt,
+        recheckStatus: "waiting_recheck",
+        recheckLabel: "等待小样本复检",
+        recheckDetail: `下一批同类型任务后，复看${labelForRoutedTask(receipt.payload.taskType)}的成功率、质量、成本和备用命中。`,
+      };
+    }
+    if (recheck.recommendedAction === "keep") {
+      return {
+        id: receipt.id,
+        taskType: receipt.payload.taskType,
+        label: receipt.label,
+        detail: receipt.detail,
+        message: receipt.message,
+        status: receipt.status,
+        createdAt: receipt.createdAt,
+        recheckStatus: "recheck_passed",
+        recheckLabel: "已复检通过",
+        recheckDetail: recheck.summary,
+      };
+    }
+    return {
+      id: receipt.id,
+      taskType: receipt.payload.taskType,
+      label: receipt.label,
+      detail: receipt.detail,
+      message: receipt.message,
+      status: receipt.status,
+      createdAt: receipt.createdAt,
+      recheckStatus: "recheck_needs_governance",
+      recheckLabel: "已复检需治理",
+      recheckDetail: recheck.summary,
+    };
+  }).sort((left, right) => right.createdAt.localeCompare(left.createdAt));
 }
 
 export function buildRouteConfirmationRecheckEvidenceFromDispatchTasks(

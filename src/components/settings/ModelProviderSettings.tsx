@@ -214,11 +214,15 @@ interface RouteAvoidanceDecisionHistoryView {
 
 interface RouteConfirmationHistoryView {
   id: string;
+  taskType: string;
   label: string;
   detail: string;
   message: string;
   status: string;
   createdAt: string;
+  recheckStatus: "waiting_recheck" | "recheck_passed" | "recheck_needs_governance";
+  recheckLabel: string;
+  recheckDetail: string;
 }
 
 interface RouteConfirmationRecheckAdviceView {
@@ -297,6 +301,12 @@ const statusCopy: Record<ProviderHealthStatus, { label: string; className: strin
   warn: { label: "需注意", className: "border-amber-200 bg-amber-50 text-amber-700" },
   blocked: { label: "阻塞", className: "border-rose-200 bg-rose-50 text-rose-700" },
   disabled: { label: "未启用", className: "border-slate-200 bg-slate-50 text-slate-500" },
+};
+
+const routeRecheckStatusCopy: Record<RouteConfirmationHistoryView["recheckStatus"], { className: string }> = {
+  waiting_recheck: { className: "border-sky-200 bg-sky-50 text-sky-700" },
+  recheck_passed: { className: "border-emerald-200 bg-emerald-50 text-emerald-700" },
+  recheck_needs_governance: { className: "border-amber-200 bg-amber-50 text-amber-700" },
 };
 
 function draftFromOption(option: ProviderOptionView, existing?: ProviderView): DraftProvider {
@@ -825,21 +835,28 @@ export function ModelProviderSettings({
               <span className="rounded-md bg-slate-50 px-2 py-1 text-xs text-slate-500">最近 {routeConfirmationHistory.length} 条</span>
             </div>
             <div className="mt-3 grid gap-2 lg:grid-cols-2">
-              {routeConfirmationHistory.map((item) => (
-                <div className="rounded-md bg-slate-50 p-3 text-sm" key={item.id}>
-                  <div className="flex flex-wrap items-start justify-between gap-2">
-                    <div>
-                      <div className="font-medium text-slate-950">{item.label}</div>
-                      <div className="mt-1 text-xs text-slate-500">{item.createdAt.slice(0, 10)}</div>
+              {routeConfirmationHistory.map((item) => {
+                const recheckStatus = routeRecheckStatusCopy[item.recheckStatus];
+                return (
+                  <div className="rounded-md bg-slate-50 p-3 text-sm" key={item.id}>
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <div>
+                        <div className="font-medium text-slate-950">{item.label}</div>
+                        <div className="mt-1 text-xs text-slate-500">{item.createdAt.slice(0, 10)}</div>
+                      </div>
+                      <span className="rounded-md bg-white px-2 py-1 text-xs text-emerald-700">
+                        {item.status === "succeeded" ? "已确认" : item.status}
+                      </span>
                     </div>
-                    <span className="rounded-md bg-white px-2 py-1 text-xs text-emerald-700">
-                      {item.status === "succeeded" ? "已确认" : item.status}
-                    </span>
+                    <p className="mt-2 leading-6 text-slate-600">{item.message}</p>
+                    <div className={`mt-2 rounded-md border px-2 py-1 text-xs leading-5 ${recheckStatus.className}`}>
+                      <span className="font-medium">{item.recheckLabel}</span>
+                      <span className="ml-1">{item.recheckDetail}</span>
+                    </div>
+                    <div className="mt-2 rounded-md bg-white p-2 text-xs leading-5 text-slate-500">{item.detail}</div>
                   </div>
-                  <p className="mt-2 leading-6 text-slate-600">{item.message}</p>
-                  <div className="mt-2 rounded-md bg-white p-2 text-xs leading-5 text-slate-500">{item.detail}</div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         ) : null}

@@ -11,6 +11,7 @@ import {
   buildRouteConfirmationRecheckGovernanceAction,
   buildRouteConfirmationGovernanceEvidenceFromDispatchTasks,
   buildRouteConfirmationGovernanceFollowUpDispatches,
+  buildRouteConfirmationHistory,
   buildModelRouteConfirmationDispatch,
   buildModelRouteConfirmationReceipt,
   buildRouteConfirmationRecheckEvidenceFromDispatchTasks,
@@ -523,6 +524,23 @@ test("model task routing", async (t) => {
     assert.equal(followUps.some((item) => item.actionLabel === "调整模型路由"), false);
     assert.equal(recheck.stage, "model_route_confirmation_recheck");
     assert.ok(recheck.detail.includes("DeepSeek"));
+  });
+
+  await t.test("marks a route confirmation as waiting for sample recheck", () => {
+    const confirmation = buildModelRouteConfirmationReceipt({
+      taskType: "chapter_review",
+      primaryProviderName: "DeepSeek · deepseek-chat",
+      fallbackProviderName: "Kimi · kimi-k2.6",
+      reason: "完成调整模型路由派单，已保存新首选模型。",
+      source: "manual",
+      createdAt: "2026-07-04T15:30:00.000Z",
+    });
+
+    const history = buildRouteConfirmationHistory([confirmation], []);
+
+    assert.equal(history[0]?.recheckStatus, "waiting_recheck");
+    assert.equal(history[0]?.recheckLabel, "等待小样本复检");
+    assert.ok(history[0]?.recheckDetail.includes("下一批同类型任务"));
   });
 
   await t.test("marks the current route when it already matches the recommendation", () => {

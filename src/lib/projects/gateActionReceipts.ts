@@ -277,6 +277,41 @@ export interface GateDispatchEvidenceReview {
   items: GateDispatchEvidenceReviewItem[];
 }
 
+export type GateProjectStartValidationStatus = "ready" | "missing_evidence" | "active";
+
+export interface GateProjectStartValidationPlan {
+  key: string;
+  projectId: string | null;
+  platformId: string;
+  platformName: string;
+  status: GateProjectStartValidationStatus;
+  label: string;
+  nextAction: string;
+  href: string;
+  totalItems: number;
+  completedItems: number;
+  activeItems: number;
+  missingEvidenceItems: number;
+  missingStages: GatePlatformGrowthReviewStage[];
+  evidence: string[];
+  latestAt: string;
+}
+
+export interface GateProjectStartValidationReview {
+  summary: {
+    totalPlans: number;
+    readyPlans: number;
+    missingEvidencePlans: number;
+    activePlans: number;
+    totalItems: number;
+    completedItems: number;
+    activeItems: number;
+    missingEvidenceItems: number;
+  };
+  nextActions: string[];
+  plans: GateProjectStartValidationPlan[];
+}
+
 export type GatePlatformScaleGateStatus = "ready" | "blocked_evidence" | "needs_dispatch" | "not_candidate";
 
 export interface GatePlatformScaleGateItem {
@@ -2166,6 +2201,127 @@ export function buildGateDispatchEvidenceReview(
       const priorityDiff = right.priorityScore - left.priorityScore;
       if (priorityDiff !== 0) return priorityDiff;
       return left.title.localeCompare(right.title);
+    }),
+  };
+}
+
+const projectStartValidationStages: GatePlatformGrowthReviewStage[] = [
+  "start_first_three_review",
+  "start_opening_diagnostic",
+  "start_platform_package",
+];
+
+function isProjectStartValidationStage(stage: GatePlatformGrowthReviewStage) {
+  return projectStartValidationStages.includes(stage);
+}
+
+function projectStartValidationStageLabel(stage: GatePlatformGrowthReviewStage) {
+  if (stage === "start_first_three_review") return "前三章审稿验证";
+  if (stage === "start_opening_diagnostic") return "开头钩子诊断";
+  if (stage === "start_platform_package") return "平台包装验证";
+  return "首轮验证";
+}
+
+function projectStartValidationGroupKey(task: PersistedGatePlatformDispatchTask) {
+  const projectId = task.projectId ?? projectIdFromReceiptHref(task.href);
+  return `${task.platformId}:${projectId}`;
+}
+
+function startValidationStatusLabel(status: GateProjectStartValidationStatus) {
+  if (status === "ready") return "首轮验证收齐";
+  if (status === "missing_evidence") return "缺完成依据";
+  return "首轮验证未收口";
+}
+
+export function buildGateProjectStartValidationReview(
+  tasks: PersistedGatePlatformDispatchTask[],
+): GateProjectStartValidationReview {
+  const groups = new Map<string, PersistedGatePlatformDispatchTask[]>();
+
+  for (const task of tasks) {
+    if (!isProjectStartValidationStage(task.stage)) continue;
+    const key = projectStartValidationGroupKey(task);
+    groups.set(key, [...(groups.get(key) ?? []), task]);
+  }
+
+  const plans = [...groups.entries()].map(([key, groupTasks]): GateProjectStartValidationPlan => {
+    const firstTask = groupTasks[0];
+    const stageTasks = new Map(groupTasks.map((task) => [task.stage, task]));
+    const missingStages = projectStartValidationStages.filter((stage) => {
+      const task = stageTasks.get(stage);
+      return !task || task.state !== "completed" || !task.completionEvidence.trim();
+    });
+    const completedItems = groupTasks.filter((task) => task.state === "completed").length;
+    const activeItems = groupTasks.filter((task) => task.state !== "completed").length;
+    const missingEvidenceItems = groupTasks.filter((task) => task.state === "completed" && !task.completionEvidence.trim()).length;
+    const latestAt = groupTasks
+      .map((task) => task.completedAt ?? task.updatedAt)
+      .sort((left, right) => new Date(right).getTime() - new Date(left).getTime())[0] ?? firstTask.updatedAt;
+    const status: GateProjectStartValidationStatus = missingStages.length === 0
+      ? "ready"
+      : missingEvidenceItems > 0
+        ? "missing_evidence"
+        : "active";
+    const firstMissingStage = missingStages[0];
+    const nextAction = status === "ready"
+      ? "首轮验证三件套已收齐，可以进入发布包定稿和首轮数据回收。"
+      : status === "missing_evidence"
+        ? `补齐${projectStartValidationStageLabel(firstMissingStage)}的完成依据，否则不能放行首轮验证。`
+        : `先完成${projectStartValidationStageLabel(firstMissingStage)}，别急着进入下一轮加码。`;
+
+    return {
+      key,
+      projectId: firstTask.projectId ?? projectIdFromReceiptHref(firstTask.href),
+      platformId: firstTask.platformId,
+      platformName: firstTask.platformName,
+      status,
+      label: startValidationStatusLabel(status),
+      nextAction,
+      href: firstTask.href,
+      totalItems: projectStartValidationStages.length,
+      completedItems,
+      activeItems,
+      missingEvidenceItems,
+      missingStages,
+      evidence: groupTasks.flatMap((task) => (
+        task.completionEvidence.trim()
+          ? [`${task.title}：${task.completionEvidence.trim()}`]
+          : task.evidence.slice(0, 1)
+      )),
+      latestAt,
+    };
+  });
+
+  const readyPlans = plans.filter((plan) => plan.status === "ready").length;
+  const missingEvidencePlans = plans.filter((plan) => plan.status === "missing_evidence").length;
+  const activePlans = plans.filter((plan) => plan.status === "active").length;
+  const totalItems = plans.reduce((sum, plan) => sum + plan.totalItems, 0);
+  const completedItems = plans.reduce((sum, plan) => sum + plan.completedItems, 0);
+  const activeItems = plans.reduce((sum, plan) => sum + plan.activeItems, 0);
+  const missingEvidenceItems = plans.reduce((sum, plan) => sum + plan.missingEvidenceItems, 0);
+
+  return {
+    summary: {
+      totalPlans: plans.length,
+      readyPlans,
+      missingEvidencePlans,
+      activePlans,
+      totalItems,
+      completedItems,
+      activeItems,
+      missingEvidenceItems,
+    },
+    nextActions: [
+      missingEvidenceItems > 0 ? `${missingEvidenceItems} 个首轮验证任务缺完成依据，先补证据。` : null,
+      activeItems > 0 ? `${activeItems} 个首轮验证任务还没完成，优先收口前三章、开头和包装。` : null,
+      plans.length > 0 && readyPlans === plans.length ? "所有首轮验证计划都已收齐，可以进入发布包定稿和首轮数据回收。" : null,
+      plans.length === 0 ? "还没有首轮验证派单。先在总闸门执行开书策略，再派出三张验证卡。" : null,
+    ].filter((action): action is string => Boolean(action)),
+    plans: plans.sort((left, right) => {
+      const statusWeight: Record<GateProjectStartValidationStatus, number> = { missing_evidence: 0, active: 1, ready: 2 };
+      const statusDiff = statusWeight[left.status] - statusWeight[right.status];
+      if (statusDiff !== 0) return statusDiff;
+      return new Date(right.latestAt).getTime() - new Date(left.latestAt).getTime();
     }),
   };
 }

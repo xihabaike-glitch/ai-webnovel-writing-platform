@@ -9,6 +9,7 @@ import {
   buildGatePlatformGrowthReview,
   buildGatePlatformGrowthDispatchItems,
   buildGateProjectStartValidationDispatchItems,
+  buildGateProjectStartValidationReview,
   buildGatePlatformDispatchReceipt,
   buildGateDispatchEvidenceReview,
   buildGatePlatformScaleGate,
@@ -698,6 +699,66 @@ test("buildGateActionReceipt", async (t) => {
     assert.ok(dispatchItems[1].acceptanceCriteria.includes("开头钩子诊断已完成"));
     assert.equal(dispatchItems[2].href, "/projects/project-1#platform-export");
     assert.ok(dispatchItems[2].acceptanceCriteria.includes("标题简介标签已有候选"));
+  });
+
+  await t.test("reviews first-round start validation dispatch completion as a three-part gate", () => {
+    const startReceipt = buildProjectStartDecisionActionReceipt({
+      projectId: "project-1",
+      projectTitle: "夜雨系统",
+      platformId: "fanqie",
+      platformName: "番茄小说",
+      decision: {
+        status: "seed",
+        label: "先建打法",
+        headline: "这个项目还没有首轮平台打法，先别让 AI 自由发挥。",
+        nextExperiment: "先生成平台土壤和首轮开书打法，再进入前三章、审稿和发布包装。",
+        actionLabel: "补平台土壤",
+        targetAnchor: "world-bible",
+        evidence: ["未找到首轮平台打法记录。"],
+      },
+      startTactic: null,
+      created: ["核心规则", "首轮平台打法：番茄小说"],
+      skipped: null,
+      now: "2026-01-01T00:00:00.000Z",
+    });
+    const dispatchItems = buildGateProjectStartValidationDispatchItems([startReceipt]);
+    const tasks = dispatchItems.map((item, index) => ({
+      ...item,
+      databaseId: `dispatch-db-${index + 1}`,
+      dispatchKey: item.id,
+      projectId: "project-1",
+      sourceReceiptId: startReceipt.id,
+      completionEvidence: index === 0 ? "前三章已经审完，问题进入二改队列。" : index === 1 ? "" : "标题简介标签已经生成候选并保存。",
+      state: index === 2 ? "completed" as const : index === 0 ? "completed" as const : "assigned" as const,
+      assignedAt: "2026-01-01T00:00:01.000Z",
+      completedAt: index === 0 || index === 2 ? "2026-01-01T00:00:02.000Z" : null,
+      createdAt: "2026-01-01T00:00:01.000Z",
+      updatedAt: "2026-01-01T00:00:02.000Z",
+    }));
+
+    const review = buildGateProjectStartValidationReview(tasks);
+
+    assert.equal(review.summary.totalPlans, 1);
+    assert.equal(review.summary.readyPlans, 0);
+    assert.equal(review.summary.completedItems, 2);
+    assert.equal(review.summary.activeItems, 1);
+    assert.equal(review.plans[0].status, "active");
+    assert.equal(review.plans[0].projectId, "project-1");
+    assert.equal(review.plans[0].platformName, "番茄小说");
+    assert.deepEqual(review.plans[0].missingStages, ["start_opening_diagnostic"]);
+    assert.ok(review.plans[0].nextAction.includes("开头钩子诊断"));
+
+    const completedTasks = tasks.map((task) => ({
+      ...task,
+      state: "completed" as const,
+      completionEvidence: task.completionEvidence || "第一章钩子诊断完成，慢热问题已标出。",
+      completedAt: task.completedAt ?? "2026-01-01T00:00:03.000Z",
+    }));
+    const completedReview = buildGateProjectStartValidationReview(completedTasks);
+
+    assert.equal(completedReview.summary.readyPlans, 1);
+    assert.equal(completedReview.plans[0].status, "ready");
+    assert.equal(completedReview.plans[0].nextAction, "首轮验证三件套已收齐，可以进入发布包定稿和首轮数据回收。");
   });
 
   await t.test("gates platform scale-up behind verified dispatch evidence", () => {

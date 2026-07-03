@@ -23,6 +23,7 @@ import {
   buildGatePlatformDispatchReceipt,
   buildGatePlatformGrowthDispatchItems,
   buildGateProjectStartValidationDispatchItems,
+  buildGateProjectStartValidationReview,
   buildGatePlatformGrowthReview,
   clearGateActionReceipts,
   clearPersistedGateActionReceipts,
@@ -44,6 +45,7 @@ import {
   type GateActionReviewAdviceState,
   type GateActionReceiptStatusFilter,
   type GateDispatchEvidenceReviewStatus,
+  type GateProjectStartValidationStatus,
   type GatePlatformScaleFollowupStatus,
   type GatePlatformScaleCadenceStatus,
   type GatePlatformScaleGateStatus,
@@ -123,6 +125,20 @@ function growthStageClass(stage: GatePlatformGrowthReview["stage"]) {
   return "bg-slate-100 text-slate-700";
 }
 
+function growthStageLabel(stage: GatePlatformGrowthReview["stage"]) {
+  if (stage === "start_first_three_review") return "前三章审稿";
+  if (stage === "start_opening_diagnostic") return "开头钩子诊断";
+  if (stage === "start_platform_package") return "平台包装";
+  if (stage === "fix_failure") return "修失败";
+  if (stage === "record_metrics") return "补数据";
+  if (stage === "adopt_asset") return "采纳资产";
+  if (stage === "scale_up") return "小步加码";
+  if (stage === "repair_tactic") return "打法修复";
+  if (stage === "pivot_platform") return "平台转向";
+  if (stage === "pause_platform") return "暂停平台";
+  return "继续观察";
+}
+
 function dispatchStateClass(state: GatePlatformGrowthDispatchItem["state"]) {
   if (state === "completed") return "bg-slate-100 text-slate-600";
   if (state === "assigned") return "bg-emerald-50 text-emerald-700";
@@ -140,6 +156,12 @@ function evidenceStateClass(status: GateDispatchEvidenceReviewStatus) {
   if (status === "needs_receipt") return "border-amber-200 bg-amber-50 text-amber-900";
   if (status === "verified") return "border-emerald-200 bg-emerald-50 text-emerald-900";
   return "border-slate-200 bg-slate-50 text-slate-800";
+}
+
+function startValidationClass(status: GateProjectStartValidationStatus) {
+  if (status === "ready") return "border-emerald-200 bg-emerald-50 text-emerald-900";
+  if (status === "missing_evidence") return "border-rose-200 bg-rose-50 text-rose-900";
+  return "border-amber-200 bg-amber-50 text-amber-900";
 }
 
 function scaleGateClass(status: GatePlatformScaleGateStatus) {
@@ -261,6 +283,8 @@ export function GateActionWorkspace({ actions }: { actions: PrePublishGateAction
     : persistedDispatchTasks.filter((task) => task.platformId === platformFilter);
   const dispatchEvidenceReview = buildGateDispatchEvidenceReview(visibleDispatchTasks, receipts);
   const dispatchEvidenceIssues = dispatchEvidenceReview.items.filter((item) => item.status !== "verified").slice(0, 4);
+  const startValidationReview = buildGateProjectStartValidationReview(visibleDispatchTasks);
+  const startValidationPlans = startValidationReview.plans.slice(0, 4);
   const scaleFollowup = buildGatePlatformScaleFollowup(visibleDispatchTasks, receipts);
   const scaleFollowupIssues = scaleFollowup.items.filter((item) => item.status !== "tracked").slice(0, 4);
   const scaleCadence = buildGatePlatformScaleCadence(platformGrowthReview, visibleDispatchTasks, scaleFollowup);
@@ -552,6 +576,92 @@ export function GateActionWorkspace({ actions }: { actions: PrePublishGateAction
           ) : (
             <p className="rounded-md border border-dashed border-slate-300 bg-white p-3 text-sm text-slate-600">
               暂无派单任务。先让平台增长复盘榜生成任务，再进入证据验收。
+            </p>
+          )}
+        </div>
+        <div className="mt-3 grid gap-2">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <div className="text-xs font-medium text-slate-500">开书首轮验证台</div>
+              <p className="mt-1 text-xs text-slate-500">只盯前三章审稿、开头钩子、平台包装三件套，没收齐就不放行下一轮。</p>
+            </div>
+            <Link
+              className="w-fit rounded-md border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
+              href="/dispatch"
+            >
+              去收验证任务
+            </Link>
+          </div>
+          <div className="grid gap-2 sm:grid-cols-4">
+            <div className="rounded-md border border-slate-200 bg-white p-3">
+              <div className="text-xs text-slate-500">验证计划</div>
+              <div className="mt-1 text-lg font-semibold text-slate-950">{startValidationReview.summary.totalPlans}</div>
+            </div>
+            <div className="rounded-md border border-emerald-100 bg-white p-3">
+              <div className="text-xs text-slate-500">已收齐</div>
+              <div className="mt-1 text-lg font-semibold text-emerald-700">{startValidationReview.summary.readyPlans}</div>
+            </div>
+            <div className="rounded-md border border-rose-100 bg-white p-3">
+              <div className="text-xs text-slate-500">缺依据</div>
+              <div className="mt-1 text-lg font-semibold text-rose-700">{startValidationReview.summary.missingEvidenceItems}</div>
+            </div>
+            <div className="rounded-md border border-amber-100 bg-white p-3">
+              <div className="text-xs text-slate-500">未收口</div>
+              <div className="mt-1 text-lg font-semibold text-amber-700">{startValidationReview.summary.activeItems}</div>
+            </div>
+          </div>
+          {startValidationReview.nextActions.length ? (
+            <div className="grid gap-2 xl:grid-cols-2">
+              {startValidationReview.nextActions.map((action) => (
+                <div className="rounded-md bg-white p-3 text-sm leading-6 text-slate-600" key={action}>{action}</div>
+              ))}
+            </div>
+          ) : null}
+          {startValidationPlans.length ? (
+            <div className="grid gap-2 xl:grid-cols-2">
+              {startValidationPlans.map((plan) => (
+                <div className={`rounded-md border p-3 text-sm ${startValidationClass(plan.status)}`} key={plan.key}>
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-medium">{plan.platformName} 首轮验证</span>
+                        <span className="rounded-md bg-white/70 px-2 py-1 text-xs font-medium">{plan.label}</span>
+                      </div>
+                      <p className="mt-2 leading-6 opacity-85">{plan.nextAction}</p>
+                    </div>
+                    <div className="text-right text-xs opacity-75">
+                      <div>{plan.completedItems}/{plan.totalItems} 完成</div>
+                      <div className="mt-1">{plan.projectId ?? "未绑定项目"}</div>
+                    </div>
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-2 text-xs opacity-75">
+                    {plan.missingStages.length ? plan.missingStages.map((stage) => (
+                      <span className="rounded-md bg-white/70 px-2 py-1" key={stage}>{growthStageLabel(stage)}</span>
+                    )) : (
+                      <span className="rounded-md bg-white/70 px-2 py-1">三件套已收齐</span>
+                    )}
+                  </div>
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    <Link
+                      className="rounded-md bg-white px-3 py-2 text-xs font-medium text-slate-950"
+                      href={plan.status === "ready" ? plan.href : "/dispatch"}
+                    >
+                      {plan.status === "ready" ? "打开项目" : "补齐验证"}
+                    </Link>
+                    <button
+                      className="rounded-md border border-white/70 bg-white/70 px-3 py-2 text-xs font-medium text-slate-950"
+                      onClick={() => focusPlatform(plan.platformId)}
+                      type="button"
+                    >
+                      只看该平台
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="rounded-md border border-dashed border-slate-300 bg-white p-3 text-sm text-slate-600">
+              暂无首轮验证派单。先执行开书策略，再从平台派单台派出三张验证卡。
             </p>
           )}
         </div>

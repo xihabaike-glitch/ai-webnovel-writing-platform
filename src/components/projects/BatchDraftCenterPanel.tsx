@@ -101,6 +101,12 @@ interface RouteRecommendationView {
   successRatePercent: number;
   averageQualityScore: number;
   averageCostPerSucceededTaskUsd: number;
+  avoidance: {
+    status: "none" | "applied";
+    appliedRules: number;
+    reason: string | null;
+    evidence: string[];
+  };
   reason: string;
 }
 
@@ -445,6 +451,12 @@ export function BatchDraftCenterPanel({ projectId }: { projectId: string }) {
                   <div>备用：{routeRecommendation.fallbackProviderName ?? "暂无"}</div>
                   <div>样本 {routeRecommendation.sampleTasks} · 成功 {routeRecommendation.successRatePercent}% · 质量 {routeRecommendation.averageQualityScore || "缺"} · {usd(routeRecommendation.averageCostPerSucceededTaskUsd)}/次</div>
                   <div>{routeRecommendation.reason}</div>
+                  {routeRecommendation.avoidance.status === "applied" ? (
+                    <div className="rounded-md border border-amber-200 bg-amber-50 p-2 text-amber-900">
+                      <div className="font-medium">已应用避坑规则 · {routeRecommendation.avoidance.appliedRules} 条</div>
+                      {routeRecommendation.avoidance.evidence.slice(0, 2).map((item) => <div key={item}>{item}</div>)}
+                    </div>
+                  ) : null}
                 </div>
               </div>
             ) : null}

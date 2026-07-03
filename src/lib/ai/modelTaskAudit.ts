@@ -1,6 +1,6 @@
 import { buildModelBudgetGuard, normalizeModelBudgetSettings, type ModelBudgetRepairAction, type ModelBudgetSettings } from "./modelBudget.ts";
 import { buildTaskRetryPlan } from "./taskRetry.ts";
-import { buildRouteRecommendations, type RouteRecommendation } from "../model-gateway/routeRecommendations.ts";
+import { buildRouteRecommendations, type RouteAvoidanceRule, type RouteRecommendation } from "../model-gateway/routeRecommendations.ts";
 
 export interface ModelAuditTask {
   id: string;
@@ -635,6 +635,7 @@ export function buildModelTaskAuditDashboard(
   providers: ModelAuditProvider[],
   budgetSettings?: ModelBudgetSettings | null,
   routes: ModelAuditRoute[] = [],
+  avoidanceRules: RouteAvoidanceRule[] = [],
 ): ModelTaskAuditDashboard {
   const succeededTasks = tasks.filter((task) => task.status === "succeeded").length;
   const failedTasks = tasks.filter((task) => task.status === "failed").length;
@@ -685,6 +686,7 @@ export function buildModelTaskAuditDashboard(
       })),
     routes,
     providers,
+    { avoidanceRules },
   );
   const budgetCenter = buildBudgetCenter(tasks, summary, taskTypeRows, budgetSettings);
   const score = auditScore(summary, providerReadiness);

@@ -96,6 +96,12 @@ interface RouteRecommendationView {
   successRatePercent: number;
   averageQualityScore: number;
   averageCostPerSucceededTaskUsd: number;
+  avoidance: {
+    status: "none" | "applied";
+    appliedRules: number;
+    reason: string | null;
+    evidence: string[];
+  };
   reason: string;
 }
 
@@ -602,6 +608,12 @@ export function ModelProviderSettings({
                   <span className="rounded-md bg-white px-2 py-1">${recommendation.averageCostPerSucceededTaskUsd.toFixed(4)}/次</span>
                 </div>
                 <p className="mt-2 leading-6 text-slate-600">{recommendation.reason}</p>
+                {recommendation.avoidance.status === "applied" ? (
+                  <div className="mt-2 rounded-md border border-amber-200 bg-amber-50 p-2 text-xs leading-5 text-amber-900">
+                    <div className="font-medium">已应用避坑规则 · {recommendation.avoidance.appliedRules} 条</div>
+                    {recommendation.avoidance.evidence.slice(0, 2).map((item) => <div key={item}>{item}</div>)}
+                  </div>
+                ) : null}
               </div>
             ))}
           </div>

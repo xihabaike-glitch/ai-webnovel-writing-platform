@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { buildPresetRouteBlueprint } from "../lib/model-gateway/presetRouteBlueprint.ts";
 import { selectModelProviderCandidatesForTask, selectModelProviderForTask } from "../lib/model-gateway/providerSelection.ts";
-import { buildRouteRecommendations } from "../lib/model-gateway/routeRecommendations.ts";
+import { buildRouteAvoidanceRulesFromDispatchTasks, buildRouteRecommendations } from "../lib/model-gateway/routeRecommendations.ts";
 import { labelForRoutedTask, modelTaskRouteOptions } from "../lib/model-gateway/taskRouting.ts";
 
 const mockProvider = {
@@ -244,5 +244,126 @@ test("model task routing", async (t) => {
 
     assert.equal(asset?.status, "current");
     assert.equal(asset?.averageQualityScore, 85);
+  });
+
+  await t.test("applies learned avoidance rules before recommending the next batch route", () => {
+    const recommendations = buildRouteRecommendations([
+      {
+        id: "draft-deepseek-1",
+        taskType: "chapter_draft",
+        providerConfigId: "deepseek-provider",
+        status: "succeeded",
+        inputTokens: 1200,
+        outputTokens: 2200,
+        costUsd: 0.003,
+        outputText: JSON.stringify({ score: 88 }),
+      },
+      {
+        id: "draft-deepseek-2",
+        taskType: "chapter_draft",
+        providerConfigId: "deepseek-provider",
+        status: "succeeded",
+        inputTokens: 1180,
+        outputTokens: 2100,
+        costUsd: 0.003,
+        outputText: JSON.stringify({ score: 86 }),
+      },
+      {
+        id: "draft-kimi-1",
+        taskType: "chapter_draft",
+        providerConfigId: "kimi-provider",
+        status: "succeeded",
+        inputTokens: 1300,
+        outputTokens: 2300,
+        costUsd: 0.008,
+        outputText: JSON.stringify({ score: 84 }),
+      },
+      {
+        id: "draft-kimi-2",
+        taskType: "chapter_draft",
+        providerConfigId: "kimi-provider",
+        status: "succeeded",
+        inputTokens: 1320,
+        outputTokens: 2350,
+        costUsd: 0.008,
+        outputText: JSON.stringify({ score: 83 }),
+      },
+    ], [], [
+      {
+        id: "deepseek-provider",
+        providerId: "deepseek",
+        displayName: "DeepSeek",
+        defaultModel: "deepseek-chat",
+        enabled: true,
+        encryptedApiKey: "key",
+      },
+      {
+        id: "kimi-provider",
+        providerId: "kimi",
+        displayName: "Kimi",
+        defaultModel: "kimi-k2.6",
+        enabled: true,
+        encryptedApiKey: "key",
+      },
+    ], {
+      avoidanceRules: [
+        {
+          taskType: "chapter_draft",
+          providerId: "deepseek",
+          model: "deepseek-chat",
+          reason: "第三轮恢复闭环：DeepSeek 失败路线降级到 Kimi 备用模型。",
+          evidence: ["已暂停 deepseek-chat 批量路线"],
+        },
+      ],
+    });
+
+    const draft = recommendations.find((item) => item.taskType === "chapter_draft");
+
+    assert.equal(draft?.recommendedPrimaryProviderConfigId, "kimi-provider");
+    assert.equal(draft?.avoidance.status, "applied");
+    assert.equal(draft?.avoidance.appliedRules, 1);
+    assert.ok(draft?.reason.includes("避开 DeepSeek"));
+    assert.ok(draft?.avoidance.evidence.includes("已暂停 deepseek-chat 批量路线"));
+  });
+
+  await t.test("extracts learned avoidance rules from completed route repair dispatches", () => {
+    const rules = buildRouteAvoidanceRulesFromDispatchTasks([
+      {
+        stage: "failure_route_repair",
+        state: "completed",
+        completionEvidence: "已把 DeepSeek 失败路线降级到 Kimi 备用模型，暂停 deepseek-chat 批量路线。",
+        evidence: ["第三轮恢复闭环"],
+      },
+      {
+        stage: "failure_config_repair",
+        state: "completed",
+        completionEvidence: "已补齐 Kimi Key。",
+        evidence: [],
+      },
+    ], [
+      {
+        id: "deepseek-provider",
+        providerId: "deepseek",
+        displayName: "DeepSeek",
+        defaultModel: "deepseek-chat",
+        enabled: true,
+        encryptedApiKey: "key",
+      },
+      {
+        id: "kimi-provider",
+        providerId: "kimi",
+        displayName: "Kimi",
+        defaultModel: "kimi-k2.6",
+        enabled: true,
+        encryptedApiKey: "key",
+      },
+    ]);
+
+    assert.equal(rules.length, 1);
+    assert.equal(rules[0].providerConfigId, "deepseek-provider");
+    assert.equal(rules[0].providerId, "deepseek");
+    assert.equal(rules[0].model, "deepseek-chat");
+    assert.ok(rules[0].reason.includes("降级到 Kimi"));
+    assert.ok(rules[0].evidence?.includes("第三轮恢复闭环"));
   });
 });

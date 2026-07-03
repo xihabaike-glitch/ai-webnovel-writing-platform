@@ -9,7 +9,7 @@ import { buildModelBudgetGuard } from "@/lib/ai/modelBudget";
 import { prisma } from "@/lib/db/prisma";
 import { getActiveModelProvider } from "@/lib/model-gateway/activeProvider";
 import { buildBatchRouteEffectSummary } from "@/lib/model-gateway/batchRouteEffectSummary";
-import { buildRouteRecommendations } from "@/lib/model-gateway/routeRecommendations";
+import { buildRouteAvoidanceRulesFromDispatchTasks, buildRouteRecommendations } from "@/lib/model-gateway/routeRecommendations";
 import { findProjectStartTacticSummary } from "@/lib/projects/projectStartTactics";
 
 interface Params {
@@ -72,7 +72,7 @@ async function getRecentBudgetTasks(projectId: string) {
 }
 
 async function getRouteRecommendations(projectId: string) {
-  const [tasks, routes, providers] = await Promise.all([
+  const [tasks, routes, providers, completedRouteRepairs] = await Promise.all([
     prisma.aiTask.findMany({
       where: { projectId },
       orderBy: { createdAt: "desc" },
@@ -107,8 +107,23 @@ async function getRouteRecommendations(projectId: string) {
         encryptedApiKey: true,
       },
     }),
+    prisma.gateDispatchTask.findMany({
+      where: {
+        stage: "failure_route_repair",
+        state: "completed",
+      },
+      orderBy: { completedAt: "desc" },
+      take: 100,
+      select: {
+        stage: true,
+        state: true,
+        completionEvidence: true,
+        evidence: true,
+      },
+    }),
   ]);
-  const recommendations = buildRouteRecommendations(tasks, routes, providers);
+  const avoidanceRules = buildRouteAvoidanceRulesFromDispatchTasks(completedRouteRepairs, providers);
+  const recommendations = buildRouteRecommendations(tasks, routes, providers, { avoidanceRules });
 
   return {
     reviewRouteRecommendation: recommendations.find((recommendation) => recommendation.taskType === "chapter_review") ?? null,

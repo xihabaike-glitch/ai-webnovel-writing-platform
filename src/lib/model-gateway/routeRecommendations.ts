@@ -26,6 +26,33 @@ export interface RouteRecommendationTask {
   outputText: string | null;
 }
 
+export interface RouteAvoidanceRule {
+  taskType?: string | null;
+  providerConfigId?: string | null;
+  providerId?: string | null;
+  model?: string | null;
+  reason: string;
+  evidence?: string[];
+}
+
+export interface RouteRecommendationAvoidance {
+  status: "none" | "applied";
+  appliedRules: number;
+  reason: string | null;
+  evidence: string[];
+}
+
+export interface RouteRecommendationOptions {
+  avoidanceRules?: RouteAvoidanceRule[];
+}
+
+export interface RouteAvoidanceDispatchTask {
+  stage: string;
+  state: string;
+  completionEvidence: string;
+  evidence?: string[] | string | null;
+}
+
 export interface RouteRecommendation {
   taskType: string;
   label: string;
@@ -40,6 +67,7 @@ export interface RouteRecommendation {
   successRatePercent: number;
   averageQualityScore: number;
   averageCostPerSucceededTaskUsd: number;
+  avoidance: RouteRecommendationAvoidance;
   reason: string;
 }
 
@@ -79,6 +107,112 @@ function canUseProvider(provider: RouteRecommendationProvider) {
 
 function providerName(provider: RouteRecommendationProvider | undefined) {
   return provider ? `${provider.displayName} · ${provider.defaultModel}` : "无可用模型";
+}
+
+function sameText(left: string | null | undefined, right: string | null | undefined) {
+  return Boolean(left && right && left.toLowerCase() === right.toLowerCase());
+}
+
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function providerRiskMention(evidence: string, provider: RouteRecommendationProvider) {
+  const normalized = evidence.toLowerCase();
+  const markers = [provider.displayName, provider.providerId, provider.defaultModel]
+    .filter((value) => value.trim().length > 0)
+    .map((value) => value.toLowerCase());
+
+  return markers.some((marker) => {
+    const escaped = escapeRegExp(marker);
+    return [
+      new RegExp(`${escaped}\\s*(失败|报错|不可用|异常)`),
+      new RegExp(`(暂停|禁用|避开|拉黑)\\s*${escaped}`),
+      new RegExp(`${escaped}.{0,16}降级到`),
+    ].some((pattern) => pattern.test(normalized));
+  });
+}
+
+function evidenceList(value: RouteAvoidanceDispatchTask["evidence"]) {
+  if (Array.isArray(value)) return value.filter((item) => item.trim().length > 0);
+  if (typeof value !== "string") return [];
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === "string" && item.trim().length > 0) : [];
+  } catch {
+    return value.trim() ? [value.trim()] : [];
+  }
+}
+
+function matchesAvoidanceRule(
+  taskType: string,
+  provider: RouteRecommendationProvider,
+  rule: RouteAvoidanceRule,
+) {
+  if (rule.taskType && rule.taskType !== taskType) return false;
+  const matchesProviderConfig = sameText(rule.providerConfigId, provider.id);
+  const matchesProvider = sameText(rule.providerId, provider.providerId);
+  const matchesModel = sameText(rule.model, provider.defaultModel);
+  const hasProviderScope = Boolean(rule.providerConfigId || rule.providerId || rule.model);
+
+  if (!hasProviderScope) return true;
+  if (rule.providerConfigId && !matchesProviderConfig) return false;
+  if (rule.providerId && !matchesProvider) return false;
+  if (rule.model && !matchesModel) return false;
+
+  return true;
+}
+
+function avoidanceForTask(
+  taskType: string,
+  provider: RouteRecommendationProvider | null,
+  rules: RouteAvoidanceRule[],
+): RouteRecommendationAvoidance {
+  const applied = provider
+    ? rules.filter((rule) => matchesAvoidanceRule(taskType, provider, rule))
+    : [];
+  const evidence = Array.from(new Set(applied.flatMap((rule) => rule.evidence ?? [])));
+  const reason = applied.length > 0
+    ? `已避开 ${provider?.displayName}${provider?.defaultModel ? ` · ${provider.defaultModel}` : ""}：${applied[0].reason}`
+    : null;
+
+  return {
+    status: applied.length > 0 ? "applied" : "none",
+    appliedRules: applied.length,
+    reason,
+    evidence,
+  };
+}
+
+export function buildRouteAvoidanceRulesFromDispatchTasks(
+  tasks: RouteAvoidanceDispatchTask[],
+  providers: RouteRecommendationProvider[],
+): RouteAvoidanceRule[] {
+  const rules = new Map<string, RouteAvoidanceRule>();
+
+  tasks
+    .filter((task) => task.stage === "failure_route_repair" && task.state === "completed")
+    .forEach((task) => {
+      const completionEvidence = task.completionEvidence.trim();
+      if (!completionEvidence) return;
+
+      providers
+        .filter((provider) => providerRiskMention(completionEvidence, provider))
+        .forEach((provider) => {
+          const key = provider.id;
+          if (rules.has(key)) return;
+
+          rules.set(key, {
+            providerConfigId: provider.id,
+            providerId: provider.providerId,
+            model: provider.defaultModel,
+            reason: completionEvidence,
+            evidence: Array.from(new Set([...evidenceList(task.evidence), completionEvidence])),
+          });
+        });
+    });
+
+  return Array.from(rules.values());
 }
 
 function successRate(succeeded: number, total: number) {
@@ -132,9 +266,11 @@ export function buildRouteRecommendations(
   tasks: RouteRecommendationTask[],
   routes: RouteRecommendationRoute[],
   providers: RouteRecommendationProvider[],
+  options: RouteRecommendationOptions = {},
 ): RouteRecommendation[] {
   const routesByTaskType = new Map(routes.map((route) => [route.taskType, route]));
   const usableProviders = providers.filter(canUseProvider);
+  const avoidanceRules = options.avoidanceRules ?? [];
 
   return modelTaskRouteOptions.map((option): RouteRecommendation => {
     const route = routesByTaskType.get(option.taskType);
@@ -144,6 +280,7 @@ export function buildRouteRecommendations(
         candidate.totalTasks >= 2
         && candidate.successRatePercent >= 60
         && (candidate.averageQualityScore === 0 || candidate.averageQualityScore >= 70)
+        && !avoidanceRules.some((rule) => matchesAvoidanceRule(option.taskType, candidate.provider, rule))
       ))
       .sort((left, right) => (
         right.score - left.score
@@ -155,11 +292,18 @@ export function buildRouteRecommendations(
     const fallback = candidates.find((candidate) => candidate.provider.id !== primary?.provider.id) ?? null;
     const recommendedPrimaryProviderConfigId = primary?.provider.id ?? null;
     const recommendedFallbackProviderConfigId = fallback?.provider.id ?? null;
+    const avoidedProvider = usableProviders.find((provider) => (
+      avoidanceRules.some((rule) => matchesAvoidanceRule(option.taskType, provider, rule))
+    )) ?? null;
+    const avoidance = avoidanceForTask(option.taskType, avoidedProvider, avoidanceRules);
     const status: RouteRecommendation["status"] = !primary
       ? "insufficient"
       : sameRoute(route, recommendedPrimaryProviderConfigId, recommendedFallbackProviderConfigId)
         ? "current"
         : "ready";
+    const baseReason = primary
+      ? `近 ${primary.totalTasks} 次样本成功率 ${primary.successRatePercent}%，质量 ${primary.averageQualityScore || "缺"}，单次成功成本 $${primary.averageCostPerSucceededTaskUsd.toFixed(4)}。`
+      : `「${option.label}」还没有足够可用样本，先各跑 2 次再让系统接管路由。`;
 
     return {
       taskType: option.taskType,
@@ -175,9 +319,8 @@ export function buildRouteRecommendations(
       successRatePercent: primary?.successRatePercent ?? 0,
       averageQualityScore: primary?.averageQualityScore ?? 0,
       averageCostPerSucceededTaskUsd: primary?.averageCostPerSucceededTaskUsd ?? 0,
-      reason: primary
-        ? `近 ${primary.totalTasks} 次样本成功率 ${primary.successRatePercent}%，质量 ${primary.averageQualityScore || "缺"}，单次成功成本 $${primary.averageCostPerSucceededTaskUsd.toFixed(4)}。`
-        : `「${option.label}」还没有足够可用样本，先各跑 2 次再让系统接管路由。`,
+      avoidance,
+      reason: avoidance.reason ? `${avoidance.reason} ${baseReason}` : baseReason,
     };
   });
 }

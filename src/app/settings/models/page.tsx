@@ -5,7 +5,7 @@ import { buildPresetRouteBlueprint } from "@/lib/model-gateway/presetRouteBluepr
 import { providerModelPresets, providerOptions } from "@/lib/model-gateway/providerDefaults";
 import { buildProviderHealthDashboard } from "@/lib/model-gateway/providerHealth";
 import { buildRouteEffectAudit } from "@/lib/model-gateway/routeEffectAudit";
-import { buildRouteRecommendations } from "@/lib/model-gateway/routeRecommendations";
+import { buildRouteAvoidanceRulesFromDispatchTasks, buildRouteRecommendations } from "@/lib/model-gateway/routeRecommendations";
 import { modelTaskRouteOptions } from "@/lib/model-gateway/taskRouting";
 
 export const dynamic = "force-dynamic";
@@ -35,7 +35,7 @@ function maskProvider(provider: {
 }
 
 export default async function ModelSettingsPage() {
-  const [providers, routes, recentTasks] = await Promise.all([
+  const [providers, routes, recentTasks, completedRouteRepairs] = await Promise.all([
     prisma.modelProvider.findMany({
       orderBy: { updatedAt: "desc" },
     }),
@@ -57,8 +57,31 @@ export default async function ModelSettingsPage() {
         createdAt: true,
       },
     }),
+    prisma.gateDispatchTask.findMany({
+      where: {
+        stage: "failure_route_repair",
+        state: "completed",
+      },
+      orderBy: { completedAt: "desc" },
+      take: 100,
+      select: {
+        stage: true,
+        state: true,
+        completionEvidence: true,
+        evidence: true,
+      },
+    }),
   ]);
   const maskedProviders = providers.map(maskProvider);
+  const routeProviders = providers.map((provider) => ({
+    id: provider.id,
+    providerId: provider.providerId,
+    displayName: provider.displayName,
+    defaultModel: provider.defaultModel,
+    enabled: provider.enabled,
+    encryptedApiKey: provider.encryptedApiKey,
+  }));
+  const routeAvoidanceRules = buildRouteAvoidanceRulesFromDispatchTasks(completedRouteRepairs, routeProviders);
   const healthDashboard = buildProviderHealthDashboard(maskedProviders);
   const routeEffectAudit = buildRouteEffectAudit(
     recentTasks,
@@ -69,22 +92,10 @@ export default async function ModelSettingsPage() {
       defaultModel: provider.defaultModel,
     })),
   );
-  const routeRecommendations = buildRouteRecommendations(recentTasks, routes, providers.map((provider) => ({
-    id: provider.id,
-    providerId: provider.providerId,
-    displayName: provider.displayName,
-    defaultModel: provider.defaultModel,
-    enabled: provider.enabled,
-    encryptedApiKey: provider.encryptedApiKey,
-  })));
-  const presetRouteBlueprint = buildPresetRouteBlueprint(providers.map((provider) => ({
-    id: provider.id,
-    providerId: provider.providerId,
-    displayName: provider.displayName,
-    defaultModel: provider.defaultModel,
-    enabled: provider.enabled,
-    encryptedApiKey: provider.encryptedApiKey,
-  })), routes);
+  const routeRecommendations = buildRouteRecommendations(recentTasks, routes, routeProviders, {
+    avoidanceRules: routeAvoidanceRules,
+  });
+  const presetRouteBlueprint = buildPresetRouteBlueprint(routeProviders, routes);
 
   return (
     <AppShell>

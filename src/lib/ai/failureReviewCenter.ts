@@ -1,6 +1,7 @@
 export interface FailureReviewTask {
   id: string;
   projectId: string;
+  chapterId?: string | null;
   taskType: string;
   model: string;
   status: string;
@@ -38,6 +39,9 @@ export interface FailureReviewItem {
   category: FailureCategory;
   categoryLabel: string;
   retryable: boolean;
+  recoveryStatus: "recovered" | "unresolved";
+  recoveredByTaskId: string | null;
+  recoveryLabel: string;
   errorMessage: string;
   suggestion: string;
   createdAt: string;
@@ -47,6 +51,8 @@ export interface FailureReviewItem {
 export interface FailureReviewCenter {
   summary: {
     totalFailures: number;
+    recoveredFailures: number;
+    unresolvedFailures: number;
     retryableFailures: number;
     affectedProjects: number;
     affectedProviders: number;
@@ -144,8 +150,32 @@ function groupBy(
     .sort((left, right) => right.count - left.count || left.label.localeCompare(right.label));
 }
 
-function nextActions(items: FailureReviewItem[], categoryGroups: FailureGroup[], providerGroups: FailureGroup[]) {
-  if (items.length === 0) return ["暂无失败任务，继续保持失败原因和成本记录。"];
+function recoveryFor(task: FailureReviewTask, tasks: FailureReviewTask[]) {
+  const taskCreatedAt = new Date(task.createdAt).getTime();
+  const recoveredBy = tasks
+    .filter((candidate) => (
+      candidate.id !== task.id
+      && candidate.status === "succeeded"
+      && candidate.projectId === task.projectId
+      && candidate.taskType === task.taskType
+      && Boolean(task.chapterId)
+      && candidate.chapterId === task.chapterId
+      && new Date(candidate.createdAt).getTime() > taskCreatedAt
+    ))
+    .sort((left, right) => new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime())[0];
+
+  return {
+    recoveryStatus: recoveredBy ? "recovered" as const : "unresolved" as const,
+    recoveredByTaskId: recoveredBy?.id ?? null,
+    recoveryLabel: recoveredBy ? `已由后续任务 ${recoveredBy.id} 恢复。` : "尚未看到后续成功记录。",
+  };
+}
+
+function nextActions(items: FailureReviewItem[], categoryGroups: FailureGroup[], providerGroups: FailureGroup[], recoveredFailures: number) {
+  if (items.length === 0) {
+    if (recoveredFailures > 0) return [`${recoveredFailures} 个历史失败已恢复，继续保留恢复证据并观察后续失败率。`];
+    return ["暂无失败任务，继续保持失败原因和成本记录。"];
+  }
   const actions: string[] = [];
   const topCategory = categoryGroups[0];
   const topProvider = providerGroups[0];
@@ -168,6 +198,7 @@ export function buildFailureReviewCenter(tasks: FailureReviewTask[]): FailureRev
       const category = categorize(task.errorMessage);
       const projectTitle = task.project?.title ?? "未知项目";
       const chapterTitle = task.chapter?.title ?? "项目任务";
+      const recovery = recoveryFor(task, tasks);
 
       return {
         id: task.id,
@@ -179,33 +210,38 @@ export function buildFailureReviewCenter(tasks: FailureReviewTask[]): FailureRev
         model: task.model,
         category,
         categoryLabel: categoryLabels[category],
-        retryable: retryableCategories.has(category),
+        retryable: recovery.recoveryStatus === "unresolved" && retryableCategories.has(category),
+        recoveryStatus: recovery.recoveryStatus,
+        recoveredByTaskId: recovery.recoveredByTaskId,
+        recoveryLabel: recovery.recoveryLabel,
         errorMessage: compact(task.errorMessage),
         suggestion: categorySuggestions[category],
         createdAt: dateIso(task.createdAt),
         href: `/projects/${task.projectId}`,
       };
     });
+  const unresolvedFailures = failures.filter((item) => item.recoveryStatus === "unresolved");
+  const recoveredFailures = failures.length - unresolvedFailures.length;
   const categoryGroups = groupBy(
-    failures,
+    unresolvedFailures,
     (item) => item.category,
     (item) => item.categoryLabel,
     (item) => item.suggestion,
   );
   const providerGroups = groupBy(
-    failures,
+    unresolvedFailures,
     (item) => `${item.providerName}:${item.model}`,
     (item) => `${item.providerName} · ${item.model}`,
     () => "检查该模型的密钥、限流、上下文长度和近期供应商稳定性。",
   );
   const taskTypeGroups = groupBy(
-    failures,
+    unresolvedFailures,
     (item) => item.taskLabel,
     (item) => item.taskLabel,
     () => "复查该任务类型的提示词、输出格式约束和上下文裁剪。",
   );
   const projectGroups = groupBy(
-    failures,
+    unresolvedFailures,
     (item) => item.projectId,
     (item) => item.projectTitle,
     () => "回到项目工作台，先单章重试失败任务，不要直接批量扩大。",
@@ -214,9 +250,11 @@ export function buildFailureReviewCenter(tasks: FailureReviewTask[]): FailureRev
   return {
     summary: {
       totalFailures: failures.length,
-      retryableFailures: failures.filter((item) => item.retryable).length,
-      affectedProjects: new Set(failures.map((item) => item.projectId)).size,
-      affectedProviders: new Set(failures.map((item) => `${item.providerName}:${item.model}`)).size,
+      recoveredFailures,
+      unresolvedFailures: unresolvedFailures.length,
+      retryableFailures: unresolvedFailures.filter((item) => item.retryable).length,
+      affectedProjects: new Set(unresolvedFailures.map((item) => item.projectId)).size,
+      affectedProviders: new Set(unresolvedFailures.map((item) => `${item.providerName}:${item.model}`)).size,
       mostCommonCategory: categoryGroups[0]?.label ?? "暂无失败",
     },
     categoryGroups,
@@ -224,6 +262,6 @@ export function buildFailureReviewCenter(tasks: FailureReviewTask[]): FailureRev
     taskTypeGroups,
     projectGroups,
     recentFailures: failures.slice(0, 12),
-    nextActions: nextActions(failures, categoryGroups, providerGroups),
+    nextActions: nextActions(unresolvedFailures, categoryGroups, providerGroups, recoveredFailures),
   };
 }

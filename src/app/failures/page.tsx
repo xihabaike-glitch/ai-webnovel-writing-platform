@@ -3,6 +3,8 @@ import { AppShell } from "@/components/app-shell/AppShell";
 import { prisma } from "@/lib/db/prisma";
 import { buildFailureReviewCenter } from "@/lib/ai/failureReviewCenter";
 
+export const dynamic = "force-dynamic";
+
 function groupList(groups: Array<{ id: string; label: string; count: number; percent: number; sample: string; suggestion: string }>) {
   return (
     <div className="grid gap-2">
@@ -24,13 +26,13 @@ function groupList(groups: Array<{ id: string; label: string; count: number; per
 export default async function FailuresPage() {
   const [tasks, chapters] = await Promise.all([
     prisma.aiTask.findMany({
-      where: { status: "failed" },
+      where: { status: { in: ["failed", "succeeded"] } },
       include: {
         project: { select: { title: true } },
         modelProvider: { select: { providerId: true, displayName: true } },
       },
       orderBy: { createdAt: "desc" },
-      take: 200,
+      take: 300,
     }),
     prisma.chapter.findMany({
       select: { id: true, title: true },
@@ -49,10 +51,18 @@ export default async function FailuresPage() {
         <p className="mt-1 text-sm text-slate-600">按错误原因、模型、任务类型和项目聚合失败，先修配置和提示词，再重试。</p>
       </div>
 
-      <section className="mb-6 grid gap-3 md:grid-cols-3 lg:grid-cols-5">
+      <section className="mb-6 grid gap-3 md:grid-cols-3 lg:grid-cols-7">
         <div className="rounded-md border border-slate-200 bg-white p-3">
-          <div className="text-xs text-slate-500">失败任务</div>
+          <div className="text-xs text-slate-500">历史失败</div>
           <div className="mt-1 text-2xl font-semibold">{center.summary.totalFailures}</div>
+        </div>
+        <div className="rounded-md border border-slate-200 bg-white p-3">
+          <div className="text-xs text-slate-500">未恢复</div>
+          <div className="mt-1 text-2xl font-semibold">{center.summary.unresolvedFailures}</div>
+        </div>
+        <div className="rounded-md border border-slate-200 bg-white p-3">
+          <div className="text-xs text-slate-500">已恢复</div>
+          <div className="mt-1 text-2xl font-semibold">{center.summary.recoveredFailures}</div>
         </div>
         <div className="rounded-md border border-slate-200 bg-white p-3">
           <div className="text-xs text-slate-500">可重试</div>
@@ -107,6 +117,13 @@ export default async function FailuresPage() {
               <div>
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="rounded-md bg-rose-50 px-2 py-1 text-xs font-medium text-rose-700">{failure.categoryLabel}</span>
+                  <span className={`rounded-md px-2 py-1 text-xs font-medium ${
+                    failure.recoveryStatus === "recovered"
+                      ? "bg-emerald-50 text-emerald-700"
+                      : "bg-amber-50 text-amber-700"
+                  }`}>
+                    {failure.recoveryStatus === "recovered" ? "已恢复" : "未恢复"}
+                  </span>
                   <Link className="font-semibold text-slate-950 hover:underline" href={failure.href}>{failure.projectTitle}</Link>
                   <span className="text-sm text-slate-500">{failure.taskLabel}</span>
                 </div>
@@ -114,10 +131,16 @@ export default async function FailuresPage() {
                   {failure.chapterTitle} · {failure.providerName} · {failure.model} · {new Date(failure.createdAt).toLocaleString()}
                 </div>
                 <p className="mt-2 text-sm leading-6 text-slate-600">{failure.errorMessage}</p>
-                <p className="mt-1 text-sm leading-6 text-slate-500">{failure.suggestion}</p>
+                <p className="mt-1 text-sm leading-6 text-slate-500">
+                  {failure.recoveryStatus === "recovered" ? failure.recoveryLabel : failure.suggestion}
+                </p>
               </div>
-              <div className="shrink-0 rounded-md bg-slate-50 px-3 py-2 text-sm text-slate-600">
-                {failure.retryable ? "可单章重试" : "先修配置"}
+              <div className={`shrink-0 rounded-md px-3 py-2 text-sm ${
+                failure.recoveryStatus === "recovered"
+                  ? "bg-emerald-50 text-emerald-700"
+                  : "bg-slate-50 text-slate-600"
+              }`}>
+                {failure.recoveryStatus === "recovered" ? "已恢复" : failure.retryable ? "可单章重试" : "先修配置"}
               </div>
             </div>
           </div>

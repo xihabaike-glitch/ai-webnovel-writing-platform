@@ -5,6 +5,7 @@ import { buildFailureReviewCenter } from "../lib/ai/failureReviewCenter.ts";
 const baseTask = {
   id: "task-1",
   projectId: "project-1",
+  chapterId: "chapter-1",
   taskType: "chapter_draft",
   model: "deepseek-chat",
   status: "failed",
@@ -63,5 +64,42 @@ test("buildFailureReviewCenter", async (t) => {
     assert.equal(center.summary.mostCommonCategory, "暂无失败");
     assert.equal(center.recentFailures.length, 0);
     assert.ok(center.nextActions[0].includes("暂无失败任务"));
+  });
+
+  await t.test("separates recovered failures from unresolved repair pressure", () => {
+    const center = buildFailureReviewCenter([
+      {
+        ...baseTask,
+        id: "failed-draft",
+        taskType: "chapter_draft",
+        errorMessage: "503 provider timeout",
+        createdAt: "2026-01-01T00:00:00.000Z",
+      },
+      {
+        ...baseTask,
+        id: "recovered-draft",
+        taskType: "chapter_draft",
+        status: "succeeded",
+        errorMessage: null,
+        createdAt: "2026-01-01T00:04:00.000Z",
+      },
+      {
+        ...baseTask,
+        id: "unresolved-review",
+        taskType: "chapter_review",
+        errorMessage: "Rate limit exceeded 429",
+        createdAt: "2026-01-01T00:05:00.000Z",
+      },
+    ]);
+
+    assert.equal(center.summary.totalFailures, 2);
+    assert.equal(center.summary.recoveredFailures, 1);
+    assert.equal(center.summary.unresolvedFailures, 1);
+    assert.equal(center.summary.retryableFailures, 1);
+    assert.equal(center.categoryGroups.length, 1);
+    assert.equal(center.categoryGroups[0].label, "限流/配额");
+    assert.equal(center.recentFailures.find((item) => item.id === "failed-draft")?.recoveryStatus, "recovered");
+    assert.equal(center.recentFailures.find((item) => item.id === "failed-draft")?.recoveredByTaskId, "recovered-draft");
+    assert.equal(center.recentFailures.find((item) => item.id === "unresolved-review")?.recoveryStatus, "unresolved");
   });
 });

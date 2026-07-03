@@ -11,6 +11,7 @@ import {
   buildGateProjectStartValidationDispatchItems,
   buildGateProjectStartValidationReview,
   buildGateProjectStartNextDispatchItems,
+  buildGateProjectStartMetricDecision,
   buildGatePlatformDispatchReceipt,
   buildGateDispatchEvidenceReview,
   buildGatePlatformScaleGate,
@@ -829,6 +830,100 @@ test("buildGateActionReceipt", async (t) => {
 
     assert.equal(refreshed[0].state, "completed");
     assert.equal(refreshed[1].state, "queued");
+  });
+
+  await t.test("decides the first metric recovery outcome before platform scale-up", () => {
+    const finalizeDispatch = {
+      id: "fanqie:start_next:publish_finalize:project-1",
+      dispatchKey: "fanqie:start_next:publish_finalize:project-1",
+      databaseId: "dispatch-db-finalize",
+      projectId: "project-1",
+      platformId: "fanqie",
+      platformName: "番茄小说",
+      stage: "start_publish_finalize" as const,
+      state: "completed" as const,
+      priorityScore: 76,
+      ownerRole: "发布包主编",
+      title: "番茄小说 发布包定稿",
+      detail: "发布包已定稿。",
+      dueLabel: "今天",
+      actionLabel: "派给发布主编",
+      href: "/projects/project-1#platform-export",
+      acceptanceCriteria: ["发布包定稿版本已保存"],
+      evidence: ["首轮验证收齐"],
+      sourceReceiptId: null,
+      completionEvidence: "发布包已经定稿。",
+      reviewLatestAt: "2026-01-01T00:00:04.000Z",
+      assignedAt: "2026-01-01T00:00:05.000Z",
+      completedAt: "2026-01-01T00:00:06.000Z",
+      createdAt: "2026-01-01T00:00:05.000Z",
+      updatedAt: "2026-01-01T00:00:06.000Z",
+    };
+    const metricDispatch = {
+      ...finalizeDispatch,
+      id: "fanqie:start_next:metrics_recovery:project-1",
+      dispatchKey: "fanqie:start_next:metrics_recovery:project-1",
+      databaseId: "dispatch-db-metrics",
+      stage: "start_metrics_recovery" as const,
+      priorityScore: 68,
+      ownerRole: "首轮数据运营",
+      title: "番茄小说 首轮数据回收",
+      actionLabel: "派给数据运营",
+      completionEvidence: "首轮曝光点击收藏追读已经回收。",
+      completedAt: "2026-01-01T00:00:07.000Z",
+      updatedAt: "2026-01-01T00:00:07.000Z",
+    };
+    const strongReceipt = buildGatePublishEffectReceipt({
+      projectId: "project-1",
+      platformId: "fanqie",
+      platformName: "番茄小说",
+      now: "2026-01-01T01:00:00.000Z",
+      metric: {
+        views: 3200,
+        clicks: 620,
+        favorites: 180,
+        follows: 92,
+      },
+    });
+    const weakReceipt = buildGatePublishEffectReceipt({
+      projectId: "project-2",
+      platformId: "qimao",
+      platformName: "七猫小说",
+      now: "2026-01-01T01:00:00.000Z",
+      metric: {
+        views: 4200,
+        clicks: 160,
+        favorites: 30,
+        follows: 12,
+      },
+    });
+    const qimaoMetricDispatch = {
+      ...metricDispatch,
+      id: "qimao:start_next:metrics_recovery:project-2",
+      dispatchKey: "qimao:start_next:metrics_recovery:project-2",
+      databaseId: "dispatch-db-qimao-metrics",
+      projectId: "project-2",
+      platformId: "qimao",
+      platformName: "七猫小说",
+      href: "/projects/project-2#platform-export",
+      title: "七猫小说 首轮数据回收",
+      completedAt: "2026-01-01T00:00:07.000Z",
+    };
+
+    const decision = buildGateProjectStartMetricDecision(
+      [metricDispatch, finalizeDispatch, qimaoMetricDispatch],
+      [weakReceipt, strongReceipt],
+    );
+
+    assert.equal(decision.summary.total, 2);
+    assert.equal(decision.summary.scale, 1);
+    assert.equal(decision.summary.repairPackaging, 1);
+    assert.equal(decision.items[0].status, "repair_packaging");
+    assert.equal(decision.items[0].platformId, "qimao");
+    assert.ok(decision.items[0].detail.includes("点击率"));
+    assert.equal(decision.items[1].status, "scale");
+    assert.equal(decision.items[1].platformId, "fanqie");
+    assert.equal(decision.items[1].actionLabel, "进入小步加码");
   });
 
   await t.test("gates platform scale-up behind verified dispatch evidence", () => {

@@ -25,6 +25,7 @@ import {
   buildGateProjectStartValidationDispatchItems,
   buildGateProjectStartValidationReview,
   buildGateProjectStartNextDispatchItems,
+  buildGateProjectStartMetricDecision,
   buildGatePlatformGrowthReview,
   clearGateActionReceipts,
   clearPersistedGateActionReceipts,
@@ -46,6 +47,7 @@ import {
   type GateActionReviewAdviceState,
   type GateActionReceiptStatusFilter,
   type GateDispatchEvidenceReviewStatus,
+  type GateProjectStartMetricDecisionStatus,
   type GateProjectStartValidationStatus,
   type GatePlatformScaleFollowupStatus,
   type GatePlatformScaleCadenceStatus,
@@ -166,6 +168,13 @@ function evidenceStateClass(status: GateDispatchEvidenceReviewStatus) {
 function startValidationClass(status: GateProjectStartValidationStatus) {
   if (status === "ready") return "border-emerald-200 bg-emerald-50 text-emerald-900";
   if (status === "missing_evidence") return "border-rose-200 bg-rose-50 text-rose-900";
+  return "border-amber-200 bg-amber-50 text-amber-900";
+}
+
+function startMetricDecisionClass(status: GateProjectStartMetricDecisionStatus) {
+  if (status === "scale") return "border-emerald-200 bg-emerald-50 text-emerald-900";
+  if (status === "repair_packaging") return "border-rose-200 bg-rose-50 text-rose-900";
+  if (status === "rewrite_opening") return "border-orange-200 bg-orange-50 text-orange-900";
   return "border-amber-200 bg-amber-50 text-amber-900";
 }
 
@@ -292,6 +301,8 @@ export function GateActionWorkspace({ actions }: { actions: PrePublishGateAction
   const dispatchEvidenceIssues = dispatchEvidenceReview.items.filter((item) => item.status !== "verified").slice(0, 4);
   const startValidationReview = buildGateProjectStartValidationReview(visibleDispatchTasks);
   const startValidationPlans = startValidationReview.plans.slice(0, 4);
+  const startMetricDecision = buildGateProjectStartMetricDecision(visibleDispatchTasks, receipts);
+  const startMetricDecisionItems = startMetricDecision.items.slice(0, 4);
   const scaleFollowup = buildGatePlatformScaleFollowup(visibleDispatchTasks, receipts);
   const scaleFollowupIssues = scaleFollowup.items.filter((item) => item.status !== "tracked").slice(0, 4);
   const scaleCadence = buildGatePlatformScaleCadence(platformGrowthReview, visibleDispatchTasks, scaleFollowup);
@@ -669,6 +680,90 @@ export function GateActionWorkspace({ actions }: { actions: PrePublishGateAction
           ) : (
             <p className="rounded-md border border-dashed border-slate-300 bg-white p-3 text-sm text-slate-600">
               暂无首轮验证派单。先执行开书策略，再从平台派单台派出三张验证卡。
+            </p>
+          )}
+        </div>
+        <div className="mt-3 grid gap-2">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <div className="text-xs font-medium text-slate-500">首轮数据决策台</div>
+              <p className="mt-1 text-xs text-slate-500">首轮数据回来后，先判断修包装、重写开头、继续加码，别凭感觉扩大投入。</p>
+            </div>
+            <Link
+              className="w-fit rounded-md border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
+              href="/dispatch"
+            >
+              查看数据回收
+            </Link>
+          </div>
+          <div className="grid gap-2 sm:grid-cols-4">
+            <div className="rounded-md border border-emerald-100 bg-white p-3">
+              <div className="text-xs text-slate-500">可加码</div>
+              <div className="mt-1 text-lg font-semibold text-emerald-700">{startMetricDecision.summary.scale}</div>
+            </div>
+            <div className="rounded-md border border-rose-100 bg-white p-3">
+              <div className="text-xs text-slate-500">修包装</div>
+              <div className="mt-1 text-lg font-semibold text-rose-700">{startMetricDecision.summary.repairPackaging}</div>
+            </div>
+            <div className="rounded-md border border-orange-100 bg-white p-3">
+              <div className="text-xs text-slate-500">重写开头</div>
+              <div className="mt-1 text-lg font-semibold text-orange-700">{startMetricDecision.summary.rewriteOpening}</div>
+            </div>
+            <div className="rounded-md border border-amber-100 bg-white p-3">
+              <div className="text-xs text-slate-500">等数据</div>
+              <div className="mt-1 text-lg font-semibold text-amber-700">{startMetricDecision.summary.waitMetric}</div>
+            </div>
+          </div>
+          {startMetricDecision.nextActions.length ? (
+            <div className="grid gap-2 xl:grid-cols-2">
+              {startMetricDecision.nextActions.map((action) => (
+                <div className="rounded-md bg-white p-3 text-sm leading-6 text-slate-600" key={action}>{action}</div>
+              ))}
+            </div>
+          ) : null}
+          {startMetricDecisionItems.length ? (
+            <div className="grid gap-2 xl:grid-cols-2">
+              {startMetricDecisionItems.map((item) => (
+                <div className={`rounded-md border p-3 text-sm ${startMetricDecisionClass(item.status)}`} key={item.dispatchKey}>
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-medium">{item.platformName} 首轮决策</span>
+                        <span className="rounded-md bg-white/70 px-2 py-1 text-xs font-medium">{item.label}</span>
+                      </div>
+                      <p className="mt-2 leading-6 opacity-85">{item.detail}</p>
+                    </div>
+                    <div className="text-right text-xs opacity-75">
+                      {item.metricAt ? <div>{new Date(item.metricAt).toLocaleDateString()}</div> : <div>未回填</div>}
+                      <div className="mt-1">优先级 {item.priorityScore}</div>
+                    </div>
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-2 text-xs opacity-75">
+                    {item.evidence.map((evidence) => (
+                      <span className="rounded-md bg-white/70 px-2 py-1" key={evidence}>{evidence}</span>
+                    ))}
+                  </div>
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    <Link
+                      className="rounded-md bg-white px-3 py-2 text-xs font-medium text-slate-950"
+                      href={item.href}
+                    >
+                      {item.actionLabel}
+                    </Link>
+                    <button
+                      className="rounded-md border border-white/70 bg-white/70 px-3 py-2 text-xs font-medium text-slate-950"
+                      onClick={() => focusPlatform(item.platformId)}
+                      type="button"
+                    >
+                      只看该平台
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="rounded-md border border-dashed border-slate-300 bg-white p-3 text-sm text-slate-600">
+              暂无首轮数据决策。先完成“首轮数据回收”派单，并回填发布效果数据。
             </p>
           )}
         </div>

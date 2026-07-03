@@ -314,6 +314,38 @@ export interface GateProjectStartValidationReview {
   plans: GateProjectStartValidationPlan[];
 }
 
+export type GateProjectStartMetricDecisionStatus = "scale" | "repair_packaging" | "rewrite_opening" | "wait_metric";
+
+export interface GateProjectStartMetricDecisionItem {
+  dispatchKey: string;
+  projectId: string | null;
+  platformId: string;
+  platformName: string;
+  status: GateProjectStartMetricDecisionStatus;
+  label: string;
+  detail: string;
+  actionLabel: string;
+  href: string;
+  priorityScore: number;
+  metricAt: string | null;
+  clickRatePercent: number | null;
+  favoriteRatePercent: number | null;
+  followRatePercent: number | null;
+  evidence: string[];
+}
+
+export interface GateProjectStartMetricDecision {
+  summary: {
+    total: number;
+    scale: number;
+    repairPackaging: number;
+    rewriteOpening: number;
+    waitMetric: number;
+  };
+  nextActions: string[];
+  items: GateProjectStartMetricDecisionItem[];
+}
+
 export type GatePlatformScaleGateStatus = "ready" | "blocked_evidence" | "needs_dispatch" | "not_candidate";
 
 export interface GatePlatformScaleGateItem {
@@ -2397,6 +2429,146 @@ export function buildGateProjectStartNextDispatchItems(
         reviewLatestAt: plan.latestAt,
       };
     }));
+}
+
+function projectStartMetricDecisionFromMetric(
+  task: PersistedGatePlatformDispatchTask,
+  metric: GatePublishEffectMetricSnapshot | null,
+): Pick<GateProjectStartMetricDecisionItem, "status" | "label" | "detail" | "actionLabel" | "href" | "priorityScore" | "evidence"> {
+  if (!metric) {
+    return {
+      status: "wait_metric",
+      label: "等首轮数据",
+      detail: `${task.platformName} 已完成数据回收派单，但还没有看到回收后的发布效果回执。先补真实数据，再做平台判断。`,
+      actionLabel: "回填首轮数据",
+      href: task.href,
+      priorityScore: task.priorityScore,
+      evidence: ["缺少首轮效果回执", ...task.evidence].slice(0, 3),
+    };
+  }
+
+  if (metric.clickRatePercent < 6 || metric.favoriteRatePercent < 1.5) {
+    return {
+      status: "repair_packaging",
+      label: "先修包装",
+      detail: `${task.platformName} 首轮点击率 ${metric.clickRatePercent}%，收藏率 ${metric.favoriteRatePercent}%。入口承诺偏弱，先修标题、简介、标签和卖点包装。`,
+      actionLabel: "修包装",
+      href: task.href.replace("#platform-export", "#submission-package"),
+      priorityScore: Math.max(task.priorityScore, 84),
+      evidence: [`点击率 ${metric.clickRatePercent}%`, `收藏率 ${metric.favoriteRatePercent}%`, `追读率 ${metric.followRatePercent}%`],
+    };
+  }
+
+  if (metric.followRatePercent < 1.2) {
+    return {
+      status: "rewrite_opening",
+      label: "重写开头",
+      detail: `${task.platformName} 首轮点击能进来，但追读率只有 ${metric.followRatePercent}%。正文开头兑现弱，先回到前三章和第一章钩子。`,
+      actionLabel: "重写开头",
+      href: task.href.replace("#platform-export", "#first-three-rewrite"),
+      priorityScore: Math.max(task.priorityScore, 80),
+      evidence: [`点击率 ${metric.clickRatePercent}%`, `追读率 ${metric.followRatePercent}%`],
+    };
+  }
+
+  return {
+    status: "scale",
+    label: "可小步加码",
+    detail: `${task.platformName} 首轮点击率 ${metric.clickRatePercent}%，收藏率 ${metric.favoriteRatePercent}%，追读率 ${metric.followRatePercent}%。可以进入小范围加码，但下一轮必须继续回收数据。`,
+    actionLabel: "进入小步加码",
+    href: task.href,
+    priorityScore: Math.max(task.priorityScore, 78),
+    evidence: [`点击率 ${metric.clickRatePercent}%`, `收藏率 ${metric.favoriteRatePercent}%`, `追读率 ${metric.followRatePercent}%`],
+  };
+}
+
+export function buildGateProjectStartMetricDecision(
+  tasks: PersistedGatePlatformDispatchTask[],
+  receipts: GateActionReceipt[] = [],
+): GateProjectStartMetricDecision {
+  const operationalReceipts = trimGateActionReceipts(receipts, 100)
+    .filter((receipt) => !isAuditMetaReceipt(receipt));
+  const metricsByPlatform = new Map<string, GatePublishEffectMetricSnapshot[]>();
+
+  for (const receipt of operationalReceipts) {
+    const metric = metricFromReceipt(receipt);
+    if (!metric) continue;
+    const metrics = metricsByPlatform.get(metric.platformId) ?? [];
+    metrics.push(metric);
+    metricsByPlatform.set(metric.platformId, metrics);
+  }
+
+  for (const metrics of metricsByPlatform.values()) {
+    metrics.sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime());
+  }
+
+  const metricTasks = tasks
+    .filter((task) => task.stage === "start_metrics_recovery" && task.state === "completed" && task.completionEvidence.trim())
+    .sort((left, right) => new Date(right.completedAt ?? right.updatedAt).getTime() - new Date(left.completedAt ?? left.updatedAt).getTime());
+  const latestTaskByPlatform = new Map<string, PersistedGatePlatformDispatchTask>();
+  for (const task of metricTasks) {
+    if (!latestTaskByPlatform.has(task.platformId)) latestTaskByPlatform.set(task.platformId, task);
+  }
+
+  const items = [...latestTaskByPlatform.values()].map((task): GateProjectStartMetricDecisionItem => {
+    const completedAt = validDate(task.completedAt) ?? validDate(task.updatedAt);
+    const metric = (metricsByPlatform.get(task.platformId) ?? [])
+      .find((candidate) => !completedAt || new Date(candidate.createdAt).getTime() > completedAt.getTime()) ?? null;
+    const decision = projectStartMetricDecisionFromMetric(task, metric);
+
+    return {
+      dispatchKey: task.dispatchKey,
+      projectId: task.projectId,
+      platformId: task.platformId,
+      platformName: task.platformName,
+      status: decision.status,
+      label: decision.label,
+      detail: decision.detail,
+      actionLabel: decision.actionLabel,
+      href: decision.href,
+      priorityScore: decision.priorityScore,
+      metricAt: metric?.createdAt ?? null,
+      clickRatePercent: metric?.clickRatePercent ?? null,
+      favoriteRatePercent: metric?.favoriteRatePercent ?? null,
+      followRatePercent: metric?.followRatePercent ?? null,
+      evidence: decision.evidence,
+    };
+  });
+
+  const scale = items.filter((item) => item.status === "scale").length;
+  const repairPackaging = items.filter((item) => item.status === "repair_packaging").length;
+  const rewriteOpening = items.filter((item) => item.status === "rewrite_opening").length;
+  const waitMetric = items.filter((item) => item.status === "wait_metric").length;
+  const statusWeight: Record<GateProjectStartMetricDecisionStatus, number> = {
+    repair_packaging: 0,
+    rewrite_opening: 1,
+    wait_metric: 2,
+    scale: 3,
+  };
+
+  return {
+    summary: {
+      total: items.length,
+      scale,
+      repairPackaging,
+      rewriteOpening,
+      waitMetric,
+    },
+    nextActions: [
+      repairPackaging > 0 ? `${repairPackaging} 个平台首轮入口弱，先修标题简介标签。` : null,
+      rewriteOpening > 0 ? `${rewriteOpening} 个平台追读弱，回到开头和前三章重写。` : null,
+      waitMetric > 0 ? `${waitMetric} 个平台还缺首轮真实数据，先补效果回执。` : null,
+      scale > 0 ? `${scale} 个平台首轮数据可加码，但必须小范围推进。` : null,
+      items.length === 0 ? "还没有完成首轮数据回收派单，先收数据再做平台决策。" : null,
+    ].filter((action): action is string => Boolean(action)),
+    items: items.sort((left, right) => {
+      const statusDiff = statusWeight[left.status] - statusWeight[right.status];
+      if (statusDiff !== 0) return statusDiff;
+      const priorityDiff = right.priorityScore - left.priorityScore;
+      if (priorityDiff !== 0) return priorityDiff;
+      return left.platformName.localeCompare(right.platformName);
+    }),
+  };
 }
 
 export function buildGatePlatformScaleGate(

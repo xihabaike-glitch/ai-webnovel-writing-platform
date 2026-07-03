@@ -10,6 +10,7 @@ import {
   buildRouteConfirmationRecheckAdvice,
   buildRouteConfirmationRecheckGovernanceAction,
   buildRouteConfirmationGovernanceEvidenceFromDispatchTasks,
+  buildRouteConfirmationGovernanceFollowUpDispatches,
   buildModelRouteConfirmationDispatch,
   buildModelRouteConfirmationReceipt,
   buildRouteConfirmationRecheckEvidenceFromDispatchTasks,
@@ -461,6 +462,39 @@ test("model task routing", async (t) => {
     assert.equal(routeGovernanceEvidence[0].status, "needs_switch");
     assert.ok(review?.reason.includes("路由治理仍需换模型"));
     assert.ok(review?.reason.includes("成功率 50"));
+  });
+
+  await t.test("turns completed route governance evidence into follow-up dispatches", () => {
+    const routeGovernanceEvidence = buildRouteConfirmationGovernanceEvidenceFromDispatchTasks([
+      {
+        dispatchKey: "model-route-governance:chapter_review:switch_route:2026-07-04T13:00:00.000Z",
+        stage: "model_route_governance",
+        state: "completed",
+        completionEvidence: "已处理章节审稿路由，复跑 2 个小样本仍命中备用，成功率 50%，质量 62，仍需换模型。",
+        evidence: ["最近路由复检需观察：成功率 50%，质量 62，仍命中备用路线。"],
+        completedAt: "2026-07-04T15:00:00.000Z",
+      },
+      {
+        dispatchKey: "model-route-governance:chapter_draft:extend_watch:2026-07-04T14:00:00.000Z",
+        stage: "model_route_governance",
+        state: "completed",
+        completionEvidence: "正文初稿路由已治理，已切换首选模型，复跑 2 个小样本成功率 100%，质量 86，未命中备用。",
+        evidence: ["已生成模型路由治理派单。"],
+        completedAt: "2026-07-04T16:00:00.000Z",
+      },
+    ]);
+
+    const followUps = buildRouteConfirmationGovernanceFollowUpDispatches(routeGovernanceEvidence);
+    const switchRoute = followUps.find((item) => item.dispatchKey.includes("chapter_review"));
+    const recheck = followUps.find((item) => item.dispatchKey.includes("chapter_draft"));
+
+    assert.equal(switchRoute?.stage, "model_route_governance");
+    assert.equal(switchRoute?.priorityScore, 94);
+    assert.equal(switchRoute?.actionLabel, "调整模型路由");
+    assert.ok(switchRoute?.detail.includes("仍需换模型"));
+    assert.equal(recheck?.stage, "model_route_confirmation_recheck");
+    assert.equal(recheck?.actionLabel, "复检小样本");
+    assert.ok(recheck?.acceptanceCriteria.some((item) => item.includes("成功率")));
   });
 
   await t.test("marks the current route when it already matches the recommendation", () => {

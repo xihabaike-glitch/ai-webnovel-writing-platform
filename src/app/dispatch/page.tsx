@@ -3,6 +3,8 @@ import { GateDispatchTaskCenter } from "@/components/gate/GateDispatchTaskCenter
 import { buildTaskBatchHistory } from "@/lib/ai/taskBatchHistory";
 import { prisma } from "@/lib/db/prisma";
 import {
+  buildRouteConfirmationGovernanceEvidenceFromDispatchTasks,
+  buildRouteConfirmationGovernanceFollowUpDispatches,
   buildModelRouteConfirmationDispatch,
   modelRouteConfirmationReceiptFromAudit,
 } from "@/lib/model-gateway/routeConfirmation";
@@ -262,8 +264,11 @@ export default async function DispatchPage() {
     .map(modelRouteConfirmationReceiptFromAudit)
     .filter((receipt): receipt is NonNullable<ReturnType<typeof modelRouteConfirmationReceiptFromAudit>> => Boolean(receipt))
     .map(buildModelRouteConfirmationDispatch);
+  const routeGovernanceEvidence = buildRouteConfirmationGovernanceEvidenceFromDispatchTasks(persistedTasks);
+  const routeGovernanceFollowUps = buildRouteConfirmationGovernanceFollowUpDispatches(routeGovernanceEvidence);
   const generatedTasks = [
     ...routeConfirmationDispatches,
+    ...routeGovernanceFollowUps,
     ...buildGateFailureRepairRecheckDispatchItems(
       failureRepairReview,
       gate.failureRepairBatch,

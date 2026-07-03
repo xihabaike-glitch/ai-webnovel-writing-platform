@@ -127,6 +127,8 @@ export interface RouteConfirmationGovernanceEvidence {
   completedAt: string | null;
 }
 
+export type RouteConfirmationGovernanceFollowUpDispatch = GatePlatformGrowthDispatchItem & { dispatchKey: string };
+
 export interface RouteConfirmationRecheckAdviceItem {
   id: string;
   taskType: RoutedModelTaskType;
@@ -388,6 +390,24 @@ function routeGovernanceAcceptanceCriteria(action: RouteConfirmationRecheckAdvic
   ];
 }
 
+function routeGovernanceFollowUpKey(item: RouteConfirmationGovernanceEvidence, action: string) {
+  const timestamp = item.completedAt ?? "latest";
+  return `model-route-governance-followup:${item.taskType}:${action}:${timestamp}`;
+}
+
+function routeGovernanceRecheckKey(item: RouteConfirmationGovernanceEvidence) {
+  const timestamp = item.completedAt ?? "latest";
+  return `model-route-confirmation-recheck:${item.taskType}:governance:${timestamp}`;
+}
+
+function routeGovernanceFollowUpEvidence(item: RouteConfirmationGovernanceEvidence) {
+  return Array.from(new Set([item.summary, ...item.evidence, item.completionEvidence])).slice(0, 4);
+}
+
+function routeGovernanceFollowUpReviewLatestAt(item: RouteConfirmationGovernanceEvidence) {
+  return item.completedAt ?? new Date().toISOString();
+}
+
 export function buildModelRouteConfirmationReceipt(input: ModelRouteConfirmationInput): ModelRouteConfirmationReceipt {
   const taskLabel = labelForRoutedTask(input.taskType);
   const source = input.source ?? "manual";
@@ -559,6 +579,67 @@ export function buildRouteConfirmationGovernanceEvidenceFromDispatchTasks(
       }];
     })
     .sort((left, right) => (right.completedAt ?? "").localeCompare(left.completedAt ?? ""));
+}
+
+export function buildRouteConfirmationGovernanceFollowUpDispatches(
+  evidence: RouteConfirmationGovernanceEvidence[],
+): RouteConfirmationGovernanceFollowUpDispatch[] {
+  return evidence.flatMap((item): RouteConfirmationGovernanceFollowUpDispatch[] => {
+    const label = labelForRoutedTask(item.taskType);
+    const reviewLatestAt = routeGovernanceFollowUpReviewLatestAt(item);
+    const evidenceList = routeGovernanceFollowUpEvidence(item);
+    if (item.status === "needs_switch") {
+      const dispatchKey = routeGovernanceFollowUpKey(item, "adjust_route");
+      return [{
+        id: dispatchKey,
+        dispatchKey,
+        platformId: "model-routing",
+        platformName: "模型路由",
+        stage: "model_route_governance",
+        state: "assigned",
+        priorityScore: 94,
+        ownerRole: "模型治理",
+        title: `调整${label}模型路由`,
+        detail: `${item.summary} 先调整首选或备用模型，暂缓扩大同类型批量。`,
+        dueLabel: "今天处理",
+        actionLabel: "调整模型路由",
+        href: "/settings/models",
+        acceptanceCriteria: [
+          "重新选择首选模型或备用模型，避开仍需换模型的路线。",
+          "保存新路由后生成确认记录。",
+          "下一批同类型任务先用小样本复检，不直接扩大批量。",
+        ],
+        evidence: evidenceList,
+        reviewLatestAt,
+      }];
+    }
+    if (item.status === "resolved") {
+      const dispatchKey = routeGovernanceRecheckKey(item);
+      return [{
+        id: dispatchKey,
+        dispatchKey,
+        platformId: "model-routing",
+        platformName: "模型路由",
+        stage: "model_route_confirmation_recheck",
+        state: "assigned",
+        priorityScore: 74,
+        ownerRole: "模型治理",
+        title: `复检${label}治理后小样本`,
+        detail: `${item.summary} 下一批同类型任务后复看成功率、质量、成本和备用命中。`,
+        dueLabel: "下一批任务后",
+        actionLabel: "复检小样本",
+        href: "/settings/models",
+        acceptanceCriteria: [
+          "至少完成 2 个同类型小样本任务。",
+          "复看成功率、平均质量、单次成功成本和备用命中情况。",
+          "如果成功率低于 80% 或质量低于 75，回到模型设置调整路线。",
+        ],
+        evidence: evidenceList,
+        reviewLatestAt,
+      }];
+    }
+    return [];
+  }).sort((left, right) => right.priorityScore - left.priorityScore || right.reviewLatestAt.localeCompare(left.reviewLatestAt));
 }
 
 export function buildRouteConfirmationRecheckAdvice(

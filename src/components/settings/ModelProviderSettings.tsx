@@ -132,6 +132,28 @@ interface RouteAvoidanceGovernanceView {
       label: string;
     }>;
   }>;
+  retestQueue: {
+    summary: {
+      total: number;
+      due: number;
+      upcoming: number;
+      waiting: number;
+    };
+    items: Array<{
+      id: string;
+      ruleKey: string;
+      providerName: string;
+      model: string;
+      taskScope: string;
+      taskType: string | null;
+      status: "due" | "upcoming" | "waiting";
+      dueAt: string | null;
+      daysUntilDue: number | null;
+      recommendedSampleSize: number;
+      actionLabel: string;
+      recommendation: string;
+    }>;
+  };
   nextActions: string[];
 }
 
@@ -660,6 +682,7 @@ export function ModelProviderSettings({
               <span className="rounded-md bg-slate-50 px-2 py-1">全局 {routeAvoidanceGovernance.summary.globalRules}</span>
               <span className="rounded-md bg-slate-50 px-2 py-1">任务级 {routeAvoidanceGovernance.summary.scopedRules}</span>
               <span className="rounded-md bg-slate-50 px-2 py-1">高风险 {routeAvoidanceGovernance.summary.highRiskRules}</span>
+              <span className="rounded-md bg-slate-50 px-2 py-1">待复测 {routeAvoidanceGovernance.retestQueue.summary.due}</span>
             </div>
           </div>
           {routeAvoidanceGovernance.nextActions.length ? (
@@ -667,6 +690,45 @@ export function ModelProviderSettings({
               {routeAvoidanceGovernance.nextActions.map((action) => (
                 <div className="rounded-md bg-amber-50 p-2 text-xs leading-5 text-amber-900" key={action}>{action}</div>
               ))}
+            </div>
+          ) : null}
+          {routeAvoidanceGovernance.retestQueue.items.length ? (
+            <div className="mt-3 rounded-md border border-slate-200 bg-slate-50 p-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="text-sm font-medium text-slate-950">复测队列</div>
+                <div className="flex flex-wrap gap-2 text-xs text-slate-600">
+                  <span className="rounded-md bg-white px-2 py-1">到期 {routeAvoidanceGovernance.retestQueue.summary.due}</span>
+                  <span className="rounded-md bg-white px-2 py-1">3 天内 {routeAvoidanceGovernance.retestQueue.summary.upcoming}</span>
+                  <span className="rounded-md bg-white px-2 py-1">观察中 {routeAvoidanceGovernance.retestQueue.summary.waiting}</span>
+                </div>
+              </div>
+              <div className="mt-3 grid gap-2 lg:grid-cols-3">
+                {routeAvoidanceGovernance.retestQueue.items.slice(0, 6).map((item) => (
+                  <div
+                    className={`rounded-md border bg-white p-3 text-sm ${
+                      item.status === "due"
+                        ? "border-rose-200 text-rose-950"
+                        : item.status === "upcoming"
+                          ? "border-amber-200 text-amber-950"
+                          : "border-slate-200 text-slate-700"
+                    }`}
+                    key={item.id}
+                  >
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <div>
+                        <div className="font-medium text-slate-950">{item.providerName} · {item.model}</div>
+                        <div className="mt-1 text-xs opacity-75">{item.taskScope}</div>
+                      </div>
+                      <span className="rounded-md bg-slate-50 px-2 py-1 text-xs font-medium">{item.actionLabel}</span>
+                    </div>
+                    <p className="mt-2 leading-6 text-slate-600">{item.recommendation}</p>
+                    <div className="mt-2 flex flex-wrap gap-2 text-xs text-slate-500">
+                      <span className="rounded-md bg-slate-50 px-2 py-1">样本 {item.recommendedSampleSize}</span>
+                      <span className="rounded-md bg-slate-50 px-2 py-1">{item.dueAt ? item.dueAt.slice(0, 10) : "立即安排"}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           ) : null}
           <div className="mt-3 grid gap-2 lg:grid-cols-2">

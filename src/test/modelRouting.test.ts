@@ -530,4 +530,72 @@ test("model task routing", async (t) => {
     assert.ok(governance.items[0].reviewAction.includes("2026-07-20"));
     assert.ok(governance.items[0].reviewAction.includes("再跑两批"));
   });
+
+  await t.test("builds a retest queue for expired and upcoming avoidance watch windows", () => {
+    const governance = buildRouteAvoidanceGovernance([
+      {
+        taskType: "chapter_review",
+        providerConfigId: "deepseek-provider",
+        providerId: "deepseek",
+        model: "deepseek-chat",
+        reason: "审稿 JSON 不稳定。",
+        evidence: ["审稿失败 2 次"],
+        watchUntil: "2026-07-01T00:00:00.000Z",
+      },
+      {
+        taskType: "chapter_draft",
+        providerConfigId: "kimi-provider",
+        providerId: "kimi",
+        model: "kimi-k2.6",
+        reason: "正文初稿速度波动。",
+        evidence: ["超时 1 次"],
+        watchUntil: "2026-07-05T00:00:00.000Z",
+      },
+      {
+        providerConfigId: "gpt-provider",
+        providerId: "gpt",
+        model: "gpt-4.1",
+        reason: "全局成本异常。",
+        evidence: ["成本偏高"],
+        watchUntil: "2026-07-20T00:00:00.000Z",
+      },
+    ], [
+      {
+        id: "deepseek-provider",
+        providerId: "deepseek",
+        displayName: "DeepSeek",
+        defaultModel: "deepseek-chat",
+        enabled: true,
+        encryptedApiKey: "key",
+      },
+      {
+        id: "kimi-provider",
+        providerId: "kimi",
+        displayName: "Kimi",
+        defaultModel: "kimi-k2.6",
+        enabled: true,
+        encryptedApiKey: "key",
+      },
+      {
+        id: "gpt-provider",
+        providerId: "gpt",
+        displayName: "GPT",
+        defaultModel: "gpt-4.1",
+        enabled: true,
+        encryptedApiKey: "key",
+      },
+    ], { now: "2026-07-03T00:00:00.000Z" });
+
+    assert.equal(governance.retestQueue.summary.total, 3);
+    assert.equal(governance.retestQueue.summary.due, 1);
+    assert.equal(governance.retestQueue.summary.upcoming, 1);
+    assert.equal(governance.retestQueue.summary.waiting, 1);
+    assert.equal(governance.retestQueue.items[0].status, "due");
+    assert.equal(governance.retestQueue.items[0].providerName, "DeepSeek");
+    assert.equal(governance.retestQueue.items[0].taskType, "chapter_review");
+    assert.equal(governance.retestQueue.items[0].daysUntilDue, -2);
+    assert.ok(governance.retestQueue.items[0].actionLabel.includes("立即复测"));
+    assert.ok(governance.retestQueue.items[1].actionLabel.includes("即将复测"));
+    assert.ok(governance.nextActions.some((action) => action.includes("1 条避坑规则已到复测日")));
+  });
 });

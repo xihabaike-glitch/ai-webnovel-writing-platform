@@ -94,6 +94,21 @@ export interface RouteAvoidanceGovernanceItem {
   }>;
 }
 
+export interface RouteAvoidanceRetestQueueItem {
+  id: string;
+  ruleKey: string;
+  providerName: string;
+  model: string;
+  taskScope: string;
+  taskType: string | null;
+  status: "due" | "upcoming" | "waiting";
+  dueAt: string | null;
+  daysUntilDue: number | null;
+  recommendedSampleSize: number;
+  actionLabel: string;
+  recommendation: string;
+}
+
 export interface RouteAvoidanceGovernance {
   summary: {
     totalRules: number;
@@ -102,7 +117,20 @@ export interface RouteAvoidanceGovernance {
     highRiskRules: number;
   };
   items: RouteAvoidanceGovernanceItem[];
+  retestQueue: {
+    summary: {
+      total: number;
+      due: number;
+      upcoming: number;
+      waiting: number;
+    };
+    items: RouteAvoidanceRetestQueueItem[];
+  };
   nextActions: string[];
+}
+
+export interface RouteAvoidanceGovernanceOptions {
+  now?: string | Date;
 }
 
 export interface RouteRecommendation {
@@ -330,9 +358,77 @@ function routeAvoidanceRuleId(rule: RouteAvoidanceRule, index: number) {
   ].join(":");
 }
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+function daysUntil(dueAt: string | null, now: Date) {
+  if (!dueAt) return null;
+  const dueTime = new Date(dueAt).getTime();
+  if (Number.isNaN(dueTime)) return null;
+  return Math.ceil((dueTime - now.getTime()) / DAY_MS);
+}
+
+function retestStatus(daysUntilDue: number | null): RouteAvoidanceRetestQueueItem["status"] {
+  if (daysUntilDue === null) return "due";
+  if (daysUntilDue <= 0) return "due";
+  if (daysUntilDue <= 3) return "upcoming";
+  return "waiting";
+}
+
+function buildRetestQueue(
+  items: RouteAvoidanceGovernanceItem[],
+  now: Date,
+): RouteAvoidanceGovernance["retestQueue"] {
+  const queueItems = items.map((item): RouteAvoidanceRetestQueueItem => {
+    const untilDue = daysUntil(item.watchUntil, now);
+    const status = retestStatus(untilDue);
+    const recommendedSampleSize = item.riskLevel === "high" ? 3 : 2;
+    const actionLabel = status === "due"
+      ? "立即复测"
+      : status === "upcoming"
+        ? `即将复测 · ${untilDue} 天`
+        : `等待观察 · ${untilDue} 天`;
+    const recommendation = status === "due"
+      ? `跑 ${recommendedSampleSize} 个小样本复测；通过后解除观察，失败则继续避开。`
+      : status === "upcoming"
+        ? `准备 ${recommendedSampleSize} 个小样本，观察期到后立刻复测。`
+        : `继续收集「${item.taskScope}」样本，到期前不恢复放量。`;
+
+    return {
+      id: `${item.id}:retest`,
+      ruleKey: item.ruleKey,
+      providerName: item.providerName,
+      model: item.model,
+      taskScope: item.taskScope,
+      taskType: item.scopedTaskType,
+      status,
+      dueAt: item.watchUntil,
+      daysUntilDue: untilDue,
+      recommendedSampleSize,
+      actionLabel,
+      recommendation,
+    };
+  }).sort((left, right) => {
+    const statusRank = { due: 0, upcoming: 1, waiting: 2 };
+    return statusRank[left.status] - statusRank[right.status]
+      || (left.daysUntilDue ?? -999) - (right.daysUntilDue ?? -999)
+      || left.providerName.localeCompare(right.providerName);
+  });
+
+  return {
+    summary: {
+      total: queueItems.length,
+      due: queueItems.filter((item) => item.status === "due").length,
+      upcoming: queueItems.filter((item) => item.status === "upcoming").length,
+      waiting: queueItems.filter((item) => item.status === "waiting").length,
+    },
+    items: queueItems,
+  };
+}
+
 export function buildRouteAvoidanceGovernance(
   rules: RouteAvoidanceRule[],
   providers: RouteRecommendationProvider[],
+  options: RouteAvoidanceGovernanceOptions = {},
 ): RouteAvoidanceGovernance {
   const items = rules.map((rule, index): RouteAvoidanceGovernanceItem => {
     const provider = providerForRule(rule, providers);
@@ -372,7 +468,11 @@ export function buildRouteAvoidanceGovernance(
   const globalRules = items.filter((item) => item.taskScope === "全部写作任务").length;
   const scopedRules = items.length - globalRules;
   const highRiskRules = items.filter((item) => item.riskLevel === "high").length;
+  const now = options.now instanceof Date ? options.now : new Date(options.now ?? Date.now());
+  const retestQueue = buildRetestQueue(items, now);
   const nextActions = [
+    retestQueue.summary.due > 0 ? `${retestQueue.summary.due} 条避坑规则已到复测日，先跑小样本再决定是否解除观察。` : "",
+    retestQueue.summary.upcoming > 0 ? `${retestQueue.summary.upcoming} 条避坑规则将在 3 天内复测，提前准备样本。` : "",
     globalRules > 0 ? `有 ${globalRules} 条全局避坑规则，先限定到任务类型再长期生效。` : "",
     scopedRules > 0 ? `有 ${scopedRules} 条任务级避坑规则，等下一批样本稳定后人工解除观察。` : "",
     items.length === 0 ? "暂无避坑规则；继续用第三轮派单沉淀模型路线经验。" : "",
@@ -386,6 +486,7 @@ export function buildRouteAvoidanceGovernance(
       highRiskRules,
     },
     items,
+    retestQueue,
     nextActions,
   };
 }

@@ -9,6 +9,18 @@ export interface ProviderOption {
   note: string;
 }
 
+export type ProviderModelPresetTaskTag = "长篇规划" | "正文初稿" | "审稿二改" | "低成本批量";
+
+export interface ProviderModelPreset {
+  id: string;
+  providerId: ModelProviderId;
+  label: string;
+  model: string;
+  maxContextTokens: number;
+  taskTags: ProviderModelPresetTaskTag[];
+  note: string;
+}
+
 export const providerOptions: ProviderOption[] = [
   {
     providerId: "mock",
@@ -68,6 +80,85 @@ export const providerOptions: ProviderOption[] = [
   },
 ];
 
+export const providerModelPresets: ProviderModelPreset[] = [
+  {
+    id: "gpt-balanced",
+    providerId: "gpt",
+    label: "GPT 均衡写作",
+    model: "gpt-5-mini",
+    maxContextTokens: 128000,
+    taskTags: ["正文初稿", "审稿二改", "低成本批量"],
+    note: "适合日常章节生成、审稿和批量试跑，先用它跑稳定性。",
+  },
+  {
+    id: "gpt-longform",
+    providerId: "gpt",
+    label: "GPT 长篇规划",
+    model: "gpt-5",
+    maxContextTokens: 128000,
+    taskTags: ["长篇规划", "审稿二改"],
+    note: "适合世界观、人物弧光和复杂结构拆解，成本更高，别拿来乱跑批量。",
+  },
+  {
+    id: "claude-structure",
+    providerId: "claude",
+    label: "Claude 结构审稿",
+    model: "claude-sonnet-4-5",
+    maxContextTokens: 200000,
+    taskTags: ["长篇规划", "审稿二改"],
+    note: "适合长上下文结构判断、人物动机检查和复杂二改建议。",
+  },
+  {
+    id: "claude-draft",
+    providerId: "claude",
+    label: "Claude 正文润色",
+    model: "claude-haiku-4-5",
+    maxContextTokens: 200000,
+    taskTags: ["正文初稿", "低成本批量"],
+    note: "适合语言流畅度、轻量正文生成和多版本试写。",
+  },
+  {
+    id: "deepseek-batch",
+    providerId: "deepseek",
+    label: "DeepSeek 批量初稿",
+    model: "deepseek-chat",
+    maxContextTokens: 64000,
+    taskTags: ["正文初稿", "低成本批量"],
+    note: "适合低成本批量章节、首轮改写和平台风格试跑。",
+  },
+  {
+    id: "deepseek-reasoner",
+    providerId: "deepseek",
+    label: "DeepSeek 推理审稿",
+    model: "deepseek-reasoner",
+    maxContextTokens: 64000,
+    taskTags: ["长篇规划", "审稿二改"],
+    note: "适合拆问题、查逻辑断点、做复杂审稿，不建议作为所有任务默认。",
+  },
+  {
+    id: "kimi-long-context",
+    providerId: "kimi",
+    label: "Kimi 长上下文",
+    model: "kimi-k2.6",
+    maxContextTokens: 128000,
+    taskTags: ["长篇规划", "审稿二改"],
+    note: "适合整卷材料、人物线和世界观资料一起读的任务。",
+  },
+  {
+    id: "kimi-draft",
+    providerId: "kimi",
+    label: "Kimi 中文初稿",
+    model: "kimi-k2.6",
+    maxContextTokens: 128000,
+    taskTags: ["正文初稿", "低成本批量"],
+    note: "适合中文长文续写、批量章节和平台资料改写。",
+  },
+];
+
 export function getProviderOption(providerId: ModelProviderId) {
   return providerOptions.find((option) => option.providerId === providerId);
+}
+
+export function getProviderModelPresets(providerId: string) {
+  return providerModelPresets.filter((preset) => preset.providerId === providerId);
 }

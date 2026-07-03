@@ -14,6 +14,16 @@ interface ProviderOptionView {
   note: string;
 }
 
+interface ProviderModelPresetView {
+  id: string;
+  providerId: ModelProviderId;
+  label: string;
+  model: string;
+  maxContextTokens: number;
+  taskTags: string[];
+  note: string;
+}
+
 interface ProviderView {
   id: string;
   providerId: string;
@@ -142,6 +152,7 @@ function draftFromOption(option: ProviderOptionView, existing?: ProviderView): D
 export function ModelProviderSettings({
   healthDashboard,
   options,
+  presets,
   providers,
   routeEffectAudit,
   routeRecommendations,
@@ -150,6 +161,7 @@ export function ModelProviderSettings({
 }: {
   healthDashboard: ProviderHealthDashboard;
   options: ProviderOptionView[];
+  presets: ProviderModelPresetView[];
   providers: ProviderView[];
   routeEffectAudit: RouteEffectAuditView;
   routeRecommendations: RouteRecommendationView[];
@@ -163,6 +175,7 @@ export function ModelProviderSettings({
   );
   const [selectedProviderId, setSelectedProviderId] = useState<ModelProviderId>(options[0]?.providerId ?? "mock");
   const selectedOption = options.find((option) => option.providerId === selectedProviderId) ?? options[0];
+  const selectedPresets = presets.filter((preset) => preset.providerId === selectedProviderId);
   const existing = existingByProvider.get(selectedProviderId);
   const [draft, setDraft] = useState<DraftProvider>(() => draftFromOption(selectedOption, existing));
   const [message, setMessage] = useState<string | null>(null);
@@ -188,6 +201,15 @@ export function ModelProviderSettings({
     setSelectedProviderId(providerId);
     setDraft(draftFromOption(option, existingByProvider.get(providerId)));
     setMessage(null);
+  }
+
+  function applyPreset(preset: ProviderModelPresetView) {
+    setDraft((current) => ({
+      ...current,
+      defaultModel: preset.model,
+      maxContextTokens: String(preset.maxContextTokens),
+    }));
+    setMessage(`已套用「${preset.label}」`);
   }
 
   async function saveProvider(event: React.FormEvent<HTMLFormElement>) {
@@ -595,6 +617,33 @@ export function ModelProviderSettings({
             <h2 className="font-medium">{selectedOption.displayName}</h2>
             <p className="mt-1 text-sm text-slate-600">{selectedOption.note}</p>
           </div>
+          {selectedPresets.length ? (
+            <div className="grid gap-2">
+              <div className="text-sm font-medium text-slate-950">写作任务模型预设</div>
+              <div className="grid gap-2 md:grid-cols-2">
+                {selectedPresets.map((preset) => (
+                  <button
+                    className="rounded-md border border-slate-200 bg-slate-50 p-3 text-left text-sm hover:bg-white"
+                    key={preset.id}
+                    onClick={() => applyPreset(preset)}
+                    type="button"
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="font-medium text-slate-950">{preset.label}</span>
+                      <span className="text-xs text-slate-500">{preset.maxContextTokens.toLocaleString()} tokens</span>
+                    </div>
+                    <div className="mt-1 text-xs text-slate-500">{preset.model}</div>
+                    <div className="mt-2 flex flex-wrap gap-1">
+                      {preset.taskTags.map((tag) => (
+                        <span className="rounded-md bg-white px-2 py-1 text-xs text-slate-600" key={tag}>{tag}</span>
+                      ))}
+                    </div>
+                    <p className="mt-2 leading-5 text-slate-600">{preset.note}</p>
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : null}
           <label className="grid gap-1 text-sm">
             显示名称
             <input

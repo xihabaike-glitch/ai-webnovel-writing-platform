@@ -1,7 +1,7 @@
 import { AppShell } from "@/components/app-shell/AppShell";
 import { ModelProviderSettings } from "@/components/settings/ModelProviderSettings";
 import { prisma } from "@/lib/db/prisma";
-import { providerOptions } from "@/lib/model-gateway/providerDefaults";
+import { providerModelPresets, providerOptions } from "@/lib/model-gateway/providerDefaults";
 import { buildProviderHealthDashboard } from "@/lib/model-gateway/providerHealth";
 import { buildRouteEffectAudit } from "@/lib/model-gateway/routeEffectAudit";
 import { buildRouteRecommendations } from "@/lib/model-gateway/routeRecommendations";
@@ -84,6 +84,7 @@ export default async function ModelSettingsPage() {
       <ModelProviderSettings
         healthDashboard={healthDashboard}
         options={providerOptions}
+        presets={providerModelPresets}
         providers={maskedProviders}
         routeEffectAudit={routeEffectAudit}
         routeRecommendations={routeRecommendations}

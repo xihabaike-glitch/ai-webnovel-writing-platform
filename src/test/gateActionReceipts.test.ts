@@ -10,6 +10,7 @@ import {
   buildGateFailureRepairRecheckDispatchItems,
   buildGateFailureRepairRecheckResolution,
   buildGateFailureRepairThirdRoundDispatchItems,
+  buildGateFailureRepairThirdRoundResolution,
   buildGatePlatformGrowthReview,
   buildGatePlatformGrowthDispatchItems,
   buildGateProjectStartValidationDispatchItems,
@@ -599,6 +600,78 @@ test("buildGateActionReceipt", async (t) => {
     assert.equal(thirdRound[2].href, "/projects/project-1/chapters/chapter-2");
     assert.ok(thirdRound[2].evidence.some((line) => line.includes("503 provider timeout")));
     assert.equal(resolved.length, 0);
+  });
+
+  await t.test("reviews third-round dispatch completion and extracts route lessons", () => {
+    const resolution = buildGateFailureRepairRecheckResolution(failureRepairBatch, [{
+      id: "global:failure_repair_recheck:failure-repair-batch",
+      dispatchKey: "global:failure_repair_recheck:failure-repair-batch",
+      databaseId: "dispatch-db-recheck",
+      projectId: null,
+      platformId: "global",
+      platformName: "全局任务",
+      stage: "failure_repair_recheck",
+      state: "completed",
+      priorityScore: 94,
+      ownerRole: "故障复检负责人",
+      title: "失败修复后复检",
+      detail: "复检仍未清空失败。",
+      dueLabel: "今天",
+      actionLabel: "派给复检负责人",
+      href: "/gate",
+      acceptanceCriteria: ["总闸门未恢复失败数降为 0"],
+      evidence: ["已记录模型配置修复。"],
+      sourceReceiptId: null,
+      completionEvidence: "复检后仍有配置和重试失败。",
+      reviewLatestAt: "2026-01-01T00:00:00.000Z",
+      assignedAt: "2026-01-01T00:05:00.000Z",
+      completedAt: "2026-01-01T00:30:00.000Z",
+      createdAt: "2026-01-01T00:05:00.000Z",
+      updatedAt: "2026-01-01T00:30:00.000Z",
+    }]);
+    const thirdRound = buildGateFailureRepairThirdRoundDispatchItems(resolution, failureRepairBatch);
+    const completedThirdRound = thirdRound.map((item, index) => ({
+      ...item,
+      databaseId: `dispatch-db-third-${index + 1}`,
+      dispatchKey: item.id,
+      projectId: null,
+      sourceReceiptId: null,
+      completionEvidence: item.stage === "failure_route_repair"
+        ? "已把 DeepSeek 失败路线降级到 Kimi 备用模型，暂停 deepseek-chat 批量路线。"
+        : `${item.ownerRole} 已完成第三轮处理。`,
+      assignedAt: "2026-01-01T00:40:00.000Z",
+      completedAt: `2026-01-01T01:0${index}:00.000Z`,
+      createdAt: "2026-01-01T00:40:00.000Z",
+      updatedAt: `2026-01-01T01:0${index}:00.000Z`,
+      state: "completed" as const,
+    }));
+    const stillFailed = buildGateFailureRepairThirdRoundResolution(failureRepairBatch, completedThirdRound);
+    const recovered = buildGateFailureRepairThirdRoundResolution({
+      ...failureRepairBatch,
+      status: "clear",
+      summary: {
+        unresolvedFailures: 0,
+        configFailures: 0,
+        retryableFailures: 0,
+        manualFailures: 0,
+        affectedProjects: 0,
+        affectedProviders: 0,
+      },
+      items: [],
+    }, completedThirdRound);
+
+    assert.equal(stillFailed.status, "failed");
+    assert.equal(stillFailed.label, "第三轮仍未恢复");
+    assert.equal(stillFailed.completedItems, 3);
+    assert.equal(stillFailed.unresolvedFailures, 2);
+    assert.equal(stillFailed.routeLesson.status, "blocked");
+    assert.ok(stillFailed.detail.includes("第三轮已完成 3 项"));
+    assert.equal(recovered.status, "resolved");
+    assert.equal(recovered.label, "第三轮恢复闭环");
+    assert.equal(recovered.routeLesson.status, "usable");
+    assert.ok(recovered.routeLesson.rule.includes("DeepSeek"));
+    assert.ok(recovered.routeLesson.rule.includes("Kimi"));
+    assert.ok(recovered.evidence.some((line) => line.includes("deepseek-chat")));
   });
 
   await t.test("turns repeated failures into urgent review advice", () => {

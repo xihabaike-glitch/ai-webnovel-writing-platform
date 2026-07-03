@@ -128,6 +128,24 @@ export interface GateFailureRepairRecheckResolution {
   evidence: string[];
 }
 
+export interface GateFailureRepairThirdRoundResolution {
+  status: "none" | "active" | "failed" | "resolved";
+  label: string;
+  detail: string;
+  actionLabel: string;
+  href: string;
+  totalItems: number;
+  completedItems: number;
+  unresolvedFailures: number;
+  routeLesson: {
+    status: "none" | "blocked" | "usable";
+    title: string;
+    rule: string;
+    evidence: string[];
+  };
+  evidence: string[];
+}
+
 export type GateActionReviewAdviceSeverity = "urgent" | "warning" | "opportunity" | "healthy";
 export type GateActionReviewAdviceActionKind = "handle_failure" | "adopt_asset" | "record_metrics" | "refresh_gate" | "start_gate_action";
 export type GateActionReviewAdviceState = "open" | "in_progress";
@@ -1311,6 +1329,121 @@ export function buildGateFailureRepairThirdRoundDispatchItems(
   }
 
   return items;
+}
+
+const failureRepairThirdRoundStages: GatePlatformGrowthReviewStage[] = [
+  "failure_config_repair",
+  "failure_route_repair",
+  "failure_retry_repair",
+  "failure_manual_review",
+];
+
+function failureRepairThirdRoundTasks(tasks: PersistedGatePlatformDispatchTask[]) {
+  return tasks
+    .filter((task) => failureRepairThirdRoundStages.includes(task.stage))
+    .sort((left, right) => new Date(right.completedAt ?? right.updatedAt).getTime() - new Date(left.completedAt ?? left.updatedAt).getTime());
+}
+
+function failureRepairRouteLesson(
+  batch: FailureRepairBatch,
+  routeTask: PersistedGatePlatformDispatchTask | null,
+  recovered: boolean,
+): GateFailureRepairThirdRoundResolution["routeLesson"] {
+  if (!routeTask) {
+    return {
+      status: "none",
+      title: "暂无路由经验",
+      rule: "第三轮还没有模型路由负责人完成依据，暂时不能沉淀路由避坑规则。",
+      evidence: batch.guidance.slice(0, 3),
+    };
+  }
+
+  const affectedModels = [...new Set(batch.items.map((item) => `${item.providerName}/${item.model}`))];
+  const completionEvidence = routeTask.completionEvidence.trim();
+  const rule = recovered
+    ? `${completionEvidence} 后续同类失败优先避开 ${affectedModels.join("、") || "高失败路线"}，先走已验证备用模型，再恢复批量。`
+    : `${completionEvidence} 但失败尚未清空，${affectedModels.join("、") || "当前路线"} 仍需降权或暂停，不能直接恢复批量。`;
+
+  return {
+    status: recovered ? "usable" : "blocked",
+    title: recovered ? "可复用模型路由避坑" : "路由避坑仍待验证",
+    rule,
+    evidence: [
+      ...(completionEvidence ? [`完成依据：${completionEvidence}`] : []),
+      ...affectedModels.map((model) => `受影响模型：${model}`),
+    ].slice(0, 5),
+  };
+}
+
+export function buildGateFailureRepairThirdRoundResolution(
+  batch: FailureRepairBatch,
+  tasks: PersistedGatePlatformDispatchTask[],
+): GateFailureRepairThirdRoundResolution {
+  const thirdRoundTasks = failureRepairThirdRoundTasks(tasks);
+  const completedTasks = thirdRoundTasks.filter((task) => task.state === "completed" && task.completionEvidence.trim());
+  const routeTask = completedTasks.find((task) => task.stage === "failure_route_repair") ?? null;
+  const evidence = [
+    ...completedTasks.slice(0, 4).map((task) => `${task.ownerRole}：${task.completionEvidence.trim()}`),
+    ...batch.items.slice(0, 3).map((item) => `${item.projectTitle} · ${item.taskLabel}：${item.errorMessage}`),
+  ].slice(0, 6);
+
+  if (thirdRoundTasks.length === 0) {
+    return {
+      status: "none",
+      label: "第三轮未派单",
+      detail: "第三轮处理卡还没有生成；先把复检未通过的问题拆给配置、路由、重试或人工复盘负责人。",
+      actionLabel: "查看派单中心",
+      href: "/dispatch",
+      totalItems: 0,
+      completedItems: 0,
+      unresolvedFailures: batch.summary.unresolvedFailures,
+      routeLesson: failureRepairRouteLesson(batch, null, false),
+      evidence: batch.guidance.slice(0, 3),
+    };
+  }
+
+  if (completedTasks.length < thirdRoundTasks.length) {
+    return {
+      status: "active",
+      label: "第三轮处理中",
+      detail: `第三轮已完成 ${completedTasks.length}/${thirdRoundTasks.length} 项，还不能判断是否恢复。`,
+      actionLabel: "继续处理第三轮",
+      href: "/dispatch",
+      totalItems: thirdRoundTasks.length,
+      completedItems: completedTasks.length,
+      unresolvedFailures: batch.summary.unresolvedFailures,
+      routeLesson: failureRepairRouteLesson(batch, routeTask, false),
+      evidence: evidence.length ? evidence : thirdRoundTasks.flatMap((task) => task.evidence).slice(0, 5),
+    };
+  }
+
+  if (batch.status !== "clear" || batch.summary.unresolvedFailures > 0) {
+    return {
+      status: "failed",
+      label: "第三轮仍未恢复",
+      detail: `第三轮已完成 ${completedTasks.length} 项，但当前仍有 ${batch.summary.unresolvedFailures} 个未恢复失败；路由和配置不能恢复批量。`,
+      actionLabel: "继续总闸门复检",
+      href: "/gate",
+      totalItems: thirdRoundTasks.length,
+      completedItems: completedTasks.length,
+      unresolvedFailures: batch.summary.unresolvedFailures,
+      routeLesson: failureRepairRouteLesson(batch, routeTask, false),
+      evidence,
+    };
+  }
+
+  return {
+    status: "resolved",
+    label: "第三轮恢复闭环",
+    detail: `第三轮 ${completedTasks.length} 项处理完成后未恢复失败已归零，可以沉淀模型路由避坑规则。`,
+    actionLabel: "查看模型路由",
+    href: "/settings/models",
+    totalItems: thirdRoundTasks.length,
+    completedItems: completedTasks.length,
+    unresolvedFailures: 0,
+    routeLesson: failureRepairRouteLesson(batch, routeTask, true),
+    evidence,
+  };
 }
 
 export function buildGatePlatformStrategyReceipt(input: {

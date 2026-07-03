@@ -11,6 +11,7 @@ import {
   buildGateFailureRepairRecheckDispatchItems,
   buildGateFailureRepairRecheckResolution,
   buildGateFailureRepairThirdRoundDispatchItems,
+  buildGateFailureRepairThirdRoundResolution,
   buildGateDispatchEvidenceReview,
   buildGatePlatformScaleFollowup,
   buildGatePlatformScaleCadence,
@@ -98,6 +99,13 @@ function failureRepairReviewClass(status: ReturnType<typeof buildGateFailureRepa
 }
 
 function failureRepairResolutionClass(status: ReturnType<typeof buildGateFailureRepairRecheckResolution>["status"]) {
+  if (status === "resolved") return "border-emerald-200 bg-emerald-50 text-emerald-900";
+  if (status === "failed") return "border-rose-200 bg-rose-50 text-rose-900";
+  if (status === "active") return "border-amber-200 bg-amber-50 text-amber-900";
+  return "border-slate-200 bg-slate-50 text-slate-700";
+}
+
+function failureRepairThirdRoundClass(status: ReturnType<typeof buildGateFailureRepairThirdRoundResolution>["status"]) {
   if (status === "resolved") return "border-emerald-200 bg-emerald-50 text-emerald-900";
   if (status === "failed") return "border-rose-200 bg-rose-50 text-rose-900";
   if (status === "active") return "border-amber-200 bg-amber-50 text-amber-900";
@@ -341,6 +349,7 @@ export function GateActionWorkspace({
   const filteredSummary = buildGateActionReceiptSummary(filteredReceipts);
   const failureRepairReview = buildGateFailureRepairReceiptReview(failureRepairBatch, receipts);
   const failureRepairResolution = buildGateFailureRepairRecheckResolution(failureRepairBatch, persistedDispatchTasks);
+  const failureRepairThirdRound = buildGateFailureRepairThirdRoundResolution(failureRepairBatch, persistedDispatchTasks);
   const reviewAdvice = buildGateActionReviewAdvice(filteredReceipts);
   const platformGrowthReview = buildGatePlatformGrowthReview(receipts);
   const allStartValidationReview = buildGateProjectStartValidationReview(persistedDispatchTasks);
@@ -626,6 +635,36 @@ export function GateActionWorkspace({
             {failureRepairResolution.evidence.length ? (
               <div className="mt-2 grid gap-1 text-xs opacity-80">
                 {failureRepairResolution.evidence.map((item) => <div key={item}>{item}</div>)}
+              </div>
+            ) : null}
+          </div>
+          <div className={`rounded-md border p-3 ${failureRepairThirdRoundClass(failureRepairThirdRound.status)}`}>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <div className="text-sm font-medium">{failureRepairThirdRound.label}</div>
+                <p className="mt-1 text-xs leading-5 opacity-85">{failureRepairThirdRound.detail}</p>
+              </div>
+              <Link
+                className="w-fit rounded-md bg-white px-3 py-2 text-xs font-medium text-slate-950"
+                href={failureRepairThirdRound.href}
+              >
+                {failureRepairThirdRound.actionLabel}
+              </Link>
+            </div>
+            <div className="mt-3 grid gap-2 text-xs sm:grid-cols-4">
+              <div className="rounded-md bg-white/70 px-3 py-2">第三轮完成 {failureRepairThirdRound.completedItems}/{failureRepairThirdRound.totalItems}</div>
+              <div className="rounded-md bg-white/70 px-3 py-2">未恢复 {failureRepairThirdRound.unresolvedFailures}</div>
+              <div className="rounded-md bg-white/70 px-3 py-2">{failureRepairThirdRound.routeLesson.title}</div>
+              <div className="rounded-md bg-white/70 px-3 py-2">
+                {failureRepairThirdRound.routeLesson.status === "usable" ? "可复用" : failureRepairThirdRound.routeLesson.status === "blocked" ? "待验证" : "未生成"}
+              </div>
+            </div>
+            <p className="mt-2 rounded-md bg-white/70 p-2 text-xs leading-5 opacity-85">
+              {failureRepairThirdRound.routeLesson.rule}
+            </p>
+            {failureRepairThirdRound.evidence.length ? (
+              <div className="mt-2 grid gap-1 text-xs opacity-80">
+                {failureRepairThirdRound.evidence.map((item) => <div key={item}>{item}</div>)}
               </div>
             ) : null}
           </div>

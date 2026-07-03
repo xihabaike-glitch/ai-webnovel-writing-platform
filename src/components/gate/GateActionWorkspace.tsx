@@ -29,6 +29,7 @@ import {
   buildGateProjectStartMetricDispatchItems,
   buildGateProjectStartMetricFollowupDispatchItems,
   buildGateProjectSecondMetricDecision,
+  buildGateProjectSecondMetricDispatchItems,
   buildGatePlatformGrowthReview,
   clearGateActionReceipts,
   clearPersistedGateActionReceipts,
@@ -304,11 +305,13 @@ export function GateActionWorkspace({ actions }: { actions: PrePublishGateAction
   const platformGrowthReview = buildGatePlatformGrowthReview(receipts);
   const allStartValidationReview = buildGateProjectStartValidationReview(persistedDispatchTasks);
   const allStartMetricDecision = buildGateProjectStartMetricDecision(persistedDispatchTasks, receipts);
+  const allSecondMetricDecision = buildGateProjectSecondMetricDecision(persistedDispatchTasks, receipts);
   const platformDispatchItems = [
     ...buildGateProjectStartValidationDispatchItems(receipts, persistedDispatchTasks),
     ...buildGateProjectStartNextDispatchItems(allStartValidationReview, persistedDispatchTasks),
     ...buildGateProjectStartMetricDispatchItems(allStartMetricDecision, persistedDispatchTasks),
     ...buildGateProjectStartMetricFollowupDispatchItems(persistedDispatchTasks, persistedDispatchTasks),
+    ...buildGateProjectSecondMetricDispatchItems(allSecondMetricDecision, persistedDispatchTasks),
     ...buildGatePlatformGrowthDispatchItems(receipts, 6, persistedDispatchTasks),
   ]
     .sort((a, b) => b.priorityScore - a.priorityScore || a.title.localeCompare(b.title))

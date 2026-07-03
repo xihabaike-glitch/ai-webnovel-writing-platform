@@ -15,6 +15,7 @@ import {
   buildGateProjectStartMetricDispatchItems,
   buildGateProjectStartMetricFollowupDispatchItems,
   buildGateProjectSecondMetricDecision,
+  buildGateProjectSecondMetricDispatchItems,
   buildGatePlatformDispatchReceipt,
   buildGateDispatchEvidenceReview,
   buildGatePlatformScaleGate,
@@ -1225,6 +1226,145 @@ test("buildGateActionReceipt", async (t) => {
     assert.equal(decision.items[3].platformId, "fanqie");
     assert.equal(decision.items[3].actionLabel, "继续小步加码");
     assert.ok(decision.items[3].evidence.includes("追读率 2.67%"));
+  });
+
+  await t.test("turns second-round metric decisions into role dispatch cards", () => {
+    const decision = {
+      summary: {
+        total: 5,
+        continueScale: 1,
+        repairTactic: 1,
+        pivotPlatform: 1,
+        pause: 1,
+        waitMetric: 1,
+      },
+      nextActions: ["二轮数据已分流。"],
+      items: [
+        {
+          dispatchKey: "webnovel:start_metric_followup:next_metrics_recovery:project-4",
+          projectId: "project-4",
+          platformId: "webnovel",
+          platformName: "WebNovel",
+          status: "pause" as const,
+          label: "暂停",
+          detail: "WebNovel 二轮加码后有曝光但点击和追读为 0。",
+          actionLabel: "暂停并复盘",
+          href: "/projects/project-4#platform-export",
+          priorityScore: 94,
+          metricAt: "2026-01-01T05:00:00.000Z",
+          clickRatePercent: 0,
+          favoriteRatePercent: 0,
+          followRatePercent: 0,
+          evidence: ["曝光 3000", "点击 0", "追读 0"],
+        },
+        {
+          dispatchKey: "royalroad:start_metric_followup:next_metrics_recovery:project-3",
+          projectId: "project-3",
+          platformId: "royalroad",
+          platformName: "Royal Road",
+          status: "pivot_platform" as const,
+          label: "换打法/换平台",
+          detail: "Royal Road 平台匹配或入口打法偏离。",
+          actionLabel: "制定换平台方案",
+          href: "/projects/project-3#platform-export",
+          priorityScore: 88,
+          metricAt: "2026-01-01T05:00:00.000Z",
+          clickRatePercent: 3.5,
+          favoriteRatePercent: 1,
+          followRatePercent: 0.3,
+          evidence: ["点击率 3.46%", "收藏率 1%", "追读率 0.35%"],
+        },
+        {
+          dispatchKey: "qimao:start_metric_followup:next_metrics_recovery:project-2",
+          projectId: "project-2",
+          platformId: "qimao",
+          platformName: "七猫小说",
+          status: "repair_tactic" as const,
+          label: "修打法",
+          detail: "七猫小说 二轮数据没有崩，但转化还不够硬。",
+          actionLabel: "修投稿打法",
+          href: "/projects/project-2#submission-package",
+          priorityScore: 82,
+          metricAt: "2026-01-01T05:00:00.000Z",
+          clickRatePercent: 5.4,
+          favoriteRatePercent: 1.9,
+          followRatePercent: 0.9,
+          evidence: ["点击率 5.42%", "收藏率 1.92%", "追读率 0.88%"],
+        },
+        {
+          dispatchKey: "fanqie:start_metric_followup:next_metrics_recovery:project-1",
+          projectId: "project-1",
+          platformId: "fanqie",
+          platformName: "番茄小说",
+          status: "continue_scale" as const,
+          label: "继续加码",
+          detail: "番茄小说 二轮表现可继续。",
+          actionLabel: "继续小步加码",
+          href: "/projects/project-1#platform-export",
+          priorityScore: 84,
+          metricAt: "2026-01-01T05:00:00.000Z",
+          clickRatePercent: 16.3,
+          favoriteRatePercent: 6,
+          followRatePercent: 2.7,
+          evidence: ["点击率 16.33%", "收藏率 6%", "追读率 2.67%"],
+        },
+        {
+          dispatchKey: "wattpad:start_metric_followup:next_metrics_recovery:project-5",
+          projectId: "project-5",
+          platformId: "wattpad",
+          platformName: "Wattpad",
+          status: "wait_metric" as const,
+          label: "等二轮数据",
+          detail: "Wattpad 缺二轮效果回执。",
+          actionLabel: "回填二轮数据",
+          href: "/projects/project-5#platform-export",
+          priorityScore: 70,
+          metricAt: null,
+          clickRatePercent: null,
+          favoriteRatePercent: null,
+          followRatePercent: null,
+          evidence: ["缺少二轮效果回执"],
+        },
+      ],
+    };
+
+    const dispatches = buildGateProjectSecondMetricDispatchItems(decision);
+
+    assert.equal(dispatches.length, 4);
+    assert.deepEqual(dispatches.map((item) => item.stage), [
+      "pause_platform",
+      "pivot_platform",
+      "repair_tactic",
+      "scale_up",
+    ]);
+    assert.equal(dispatches[0].id, "webnovel:second_metric:pause:project-4");
+    assert.equal(dispatches[0].ownerRole, "复盘负责人");
+    assert.ok(dispatches[0].acceptanceCriteria.includes("暂停原因和复盘结论已保存"));
+    assert.equal(dispatches[1].ownerRole, "平台策略");
+    assert.ok(dispatches[1].acceptanceCriteria.includes("迁移平台或新打法方案已确定"));
+    assert.equal(dispatches[2].ownerRole, "包装策略编辑");
+    assert.equal(dispatches[2].href, "/projects/project-2#submission-package");
+    assert.ok(dispatches[2].acceptanceCriteria.includes("二轮弱项对应的标题简介标签修复完成"));
+    assert.equal(dispatches[3].ownerRole, "增长运营");
+    assert.ok(dispatches[3].acceptanceCriteria.includes("第三轮小步加码范围已限定"));
+
+    const persisted = [{
+      ...dispatches[3],
+      databaseId: "dispatch-db-second-scale",
+      dispatchKey: dispatches[3].id,
+      projectId: "project-1",
+      sourceReceiptId: null,
+      completionEvidence: "已完成第三轮小步加码。",
+      state: "completed" as const,
+      assignedAt: "2026-01-01T06:00:00.000Z",
+      completedAt: "2026-01-01T07:00:00.000Z",
+      createdAt: "2026-01-01T06:00:00.000Z",
+      updatedAt: "2026-01-01T07:00:00.000Z",
+    }];
+    const refreshed = buildGateProjectSecondMetricDispatchItems(decision, persisted);
+
+    assert.equal(refreshed[0].state, "queued");
+    assert.equal(refreshed[3].state, "completed");
   });
 
   await t.test("gates platform scale-up behind verified dispatch evidence", () => {

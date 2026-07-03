@@ -2936,6 +2936,101 @@ export function buildGateProjectSecondMetricDecision(
   };
 }
 
+function projectSecondMetricDispatchSpec(item: GateProjectSecondMetricDecisionItem) {
+  if (item.status === "pause") {
+    return {
+      suffix: "pause",
+      stage: "pause_platform" as const,
+      ownerRole: "复盘负责人",
+      titleSuffix: "二轮暂停复盘",
+      detail: `${item.detail} 暂停不是放弃，是先停止扩大损失，复盘入口、平台和正文兑现。`,
+      dueLabel: "今天",
+      actionLabel: "派给复盘负责人",
+      href: item.href,
+      acceptanceCriteria: ["暂停原因和复盘结论已保存", "继续投入条件已写清", "替代平台或修复动作已列出"],
+    };
+  }
+
+  if (item.status === "pivot_platform") {
+    return {
+      suffix: "pivot_platform",
+      stage: "pivot_platform" as const,
+      ownerRole: "平台策略",
+      titleSuffix: "二轮换平台/换打法",
+      detail: `${item.detail} 先定义新平台或新打法，再决定是否迁移主力资源。`,
+      dueLabel: "今天",
+      actionLabel: "派给平台策略",
+      href: item.href,
+      acceptanceCriteria: ["迁移平台或新打法方案已确定", "旧平台继续投入上限已写清", "新平台验证口径已保存"],
+    };
+  }
+
+  if (item.status === "repair_tactic") {
+    return {
+      suffix: "repair_tactic",
+      stage: "repair_tactic" as const,
+      ownerRole: "包装策略编辑",
+      titleSuffix: "二轮打法修复",
+      detail: `${item.detail} 把二轮弱项拆回标题、简介、标签、前三章兑现和入口承诺。`,
+      dueLabel: "今天",
+      actionLabel: "派给包装策略编辑",
+      href: item.href,
+      acceptanceCriteria: ["二轮弱项对应的标题简介标签修复完成", "前三章兑现点和入口承诺重新对齐", "下一轮复测口径已保存"],
+    };
+  }
+
+  if (item.status === "continue_scale") {
+    return {
+      suffix: "continue_scale",
+      stage: "scale_up" as const,
+      ownerRole: "增长运营",
+      titleSuffix: "二轮后继续小步加码",
+      detail: `${item.detail} 继续加码必须保留基准版本和效果回收时间，别把好信号一次用光。`,
+      dueLabel: "下一轮更新前",
+      actionLabel: "派给增长运营",
+      href: item.href,
+      acceptanceCriteria: ["第三轮小步加码范围已限定", "基准版本和加码版本已区分", "第三轮效果回收时间已确定"],
+    };
+  }
+
+  return null;
+}
+
+export function buildGateProjectSecondMetricDispatchItems(
+  decision: GateProjectSecondMetricDecision,
+  persistedTasks: PersistedGatePlatformDispatchTask[] = [],
+): GatePlatformGrowthDispatchItem[] {
+  const persistedByKey = new Map(persistedTasks.map((task) => [task.dispatchKey, task]));
+
+  return decision.items
+    .map((item): GatePlatformGrowthDispatchItem | null => {
+      const spec = projectSecondMetricDispatchSpec(item);
+      if (!spec) return null;
+      const projectId = item.projectId ?? "unknown";
+      const dispatchKey = `${item.platformId}:second_metric:${spec.suffix}:${projectId}`;
+      const persisted = persistedByKey.get(dispatchKey);
+
+      return {
+        id: dispatchKey,
+        platformId: item.platformId,
+        platformName: item.platformName,
+        stage: spec.stage,
+        state: persisted?.state ?? "queued",
+        priorityScore: item.priorityScore,
+        ownerRole: spec.ownerRole,
+        title: `${item.platformName} ${spec.titleSuffix}`,
+        detail: spec.detail,
+        dueLabel: spec.dueLabel,
+        actionLabel: spec.actionLabel,
+        href: spec.href,
+        acceptanceCriteria: spec.acceptanceCriteria,
+        evidence: item.evidence,
+        reviewLatestAt: item.metricAt ?? new Date().toISOString(),
+      };
+    })
+    .filter((item): item is GatePlatformGrowthDispatchItem => Boolean(item));
+}
+
 export function buildGatePlatformScaleGate(
   reviews: GatePlatformGrowthReview[],
   dispatchEvidenceReview: GateDispatchEvidenceReview,

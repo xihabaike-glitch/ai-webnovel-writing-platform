@@ -107,6 +107,7 @@ export interface WritingWorkbench {
       reason: string;
     }>;
   };
+  modelActions: WritingWorkbenchModelAction[];
   quickLinks: Array<{
     label: string;
     href: string;
@@ -122,6 +123,18 @@ export interface WritingWorkbenchQuickFix {
   method: "PATCH" | "POST";
   endpoint: string;
   payload: Record<string, string>;
+}
+
+export interface WritingWorkbenchModelAction {
+  id: string;
+  kind: "opening_diagnostic" | "chapter_draft" | "chapter_review";
+  label: string;
+  description: string;
+  method: "GET" | "POST";
+  endpoint: string;
+  payload: Record<string, string | number>;
+  refreshHref: string;
+  disabledReason: string | null;
 }
 
 const treeRequirements: Array<{
@@ -354,6 +367,56 @@ function buildQuickFixes(input: WritingWorkbenchInput, nextChapter: WritingWorkb
   return fixes.slice(0, 4);
 }
 
+function buildModelActions(input: WritingWorkbenchInput, nextChapter: WritingWorkbenchChapter | null): WritingWorkbenchModelAction[] {
+  const noChapterReason = nextChapter ? null : "先创建第一章，再执行模型任务。";
+  const chapterId = nextChapter?.id ?? "";
+  const chapterHref = nextChapter
+    ? `/projects/${input.project.id}/chapters/${nextChapter.id}#chapter-workflow`
+    : `/projects/${input.project.id}#create-chapter`;
+  const chapterNeedsCard = nextChapter
+    ? !hasText(nextChapter.hook) || !hasText(nextChapter.conflict) || !hasText(nextChapter.cliffhanger)
+    : false;
+
+  return [
+    {
+      id: "opening-diagnostic",
+      kind: "opening_diagnostic",
+      label: "诊断开头",
+      description: "检查前三秒钩子、危机进入速度和平台留存风险。",
+      method: "GET",
+      endpoint: nextChapter ? `/api/chapters/${nextChapter.id}/opening-diagnostic` : "",
+      payload: {},
+      refreshHref: chapterHref,
+      disabledReason: noChapterReason,
+    },
+    {
+      id: "chapter-draft",
+      kind: "chapter_draft",
+      label: "生成正文",
+      description: "按章节卡扩写正文，并记录草稿质量与模型任务。",
+      method: "POST",
+      endpoint: "/api/ai/tasks/chapter-draft",
+      payload: {
+        chapterId,
+        targetWords: input.project.targetPlatformName.includes("起点") ? 2600 : 1800,
+      },
+      refreshHref: chapterHref,
+      disabledReason: noChapterReason ?? (chapterNeedsCard ? "先补齐开头钩子、冲突和章末悬念。" : null),
+    },
+    {
+      id: "chapter-review",
+      kind: "chapter_review",
+      label: "平台复审",
+      description: `按${input.project.targetPlatformName}口味检查节奏、爽点、人物选择和投稿风险。`,
+      method: "POST",
+      endpoint: "/api/ai/tasks/chapter-review",
+      payload: { chapterId },
+      refreshHref: chapterHref,
+      disabledReason: noChapterReason ?? (nextChapter && nextChapter.wordCount <= 0 ? "先生成或粘贴正文，再执行平台复审。" : null),
+    },
+  ];
+}
+
 export function buildWritingWorkbench(input: WritingWorkbenchInput): WritingWorkbench {
   const treeBlocks = buildTreeBlocks(input.outlineNodes, input.worldEntries);
   const nextChapter = pickNextChapter(input.chapters);
@@ -403,6 +466,7 @@ export function buildWritingWorkbench(input: WritingWorkbenchInput): WritingWork
       failedTaskCount: input.aiTasks.filter((task) => task.status === "failed").length,
       nextRoutes: buildModelRoutes(input, nextChapter),
     },
+    modelActions: buildModelActions(input, nextChapter),
     quickLinks: [
       { label: "大树结构", href: `/projects/${input.project.id}#outline-tree` },
       { label: "人物弧光", href: `/projects/${input.project.id}#character-arc` },

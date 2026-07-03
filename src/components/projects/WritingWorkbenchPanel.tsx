@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { WritingWorkbench, WorkbenchStatus } from "@/lib/projects/writingWorkbench";
+import { WorkbenchModelActionPanel } from "./WorkbenchModelActionPanel";
 import { WorkbenchQuickFixPanel } from "./WorkbenchQuickFixPanel";
 
 function statusLabel(status: WorkbenchStatus) {
@@ -67,6 +68,7 @@ export function WritingWorkbenchPanel({ workbench }: { workbench: WritingWorkben
       </div>
 
       <WorkbenchQuickFixPanel quickFixes={workbench.quickFixes} />
+      <WorkbenchModelActionPanel actions={workbench.modelActions} />
 
       <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-6">
         {workbench.treeBlocks.map((block) => (

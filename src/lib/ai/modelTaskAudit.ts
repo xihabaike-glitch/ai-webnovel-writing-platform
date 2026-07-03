@@ -1,8 +1,10 @@
 import { buildModelBudgetGuard, normalizeModelBudgetSettings, type ModelBudgetRepairAction, type ModelBudgetSettings } from "./modelBudget.ts";
+import { buildTaskRetryPlan } from "./taskRetry.ts";
 import { buildRouteRecommendations, type RouteRecommendation } from "../model-gateway/routeRecommendations.ts";
 
 export interface ModelAuditTask {
   id: string;
+  projectId?: string | null;
   chapterId?: string | null;
   taskType: string;
   providerConfigId?: string;
@@ -77,8 +79,14 @@ export interface RecentFailure {
   recoveryStatus: "recovered" | "unresolved";
   recoveredByTaskId: string | null;
   recoveryLabel: string;
+  directRetrySupported: boolean;
+  actionLabel: string;
+  actionHref: string;
+  actionReason: string;
   createdAt: string;
 }
+
+type FailureRecoveryState = Pick<RecentFailure, "recoveryStatus" | "recoveredByTaskId" | "recoveryLabel">;
 
 export interface ModelEffectComparisonRow {
   id: string;
@@ -213,6 +221,53 @@ function failureRecovery(task: ModelAuditTask, tasks: ModelAuditTask[]) {
     recoveryStatus: recoveredBy ? "recovered" as const : "unresolved" as const,
     recoveredByTaskId: recoveredBy?.id ?? null,
     recoveryLabel: recoveredBy ? `已由后续任务 ${recoveredBy.id} 恢复。` : "尚未看到后续成功记录。",
+  };
+}
+
+function isModelConfigError(errorMessage: string | null) {
+  return /api key|apikey|unauthorized|authentication|permission|forbidden|401|403|密钥|授权|权限|未配置|missing/i.test(errorMessage ?? "");
+}
+
+function chapterHref(task: ModelAuditTask) {
+  if (task.projectId && task.chapterId) return `/projects/${task.projectId}/chapters/${task.chapterId}`;
+  if (task.projectId) return `/projects/${task.projectId}`;
+  return "/projects";
+}
+
+function buildFailureAction(
+  task: ModelAuditTask,
+  recovery: FailureRecoveryState,
+): Pick<RecentFailure, "directRetrySupported" | "actionLabel" | "actionHref" | "actionReason"> {
+  if (recovery.recoveryStatus === "recovered") {
+    return {
+      directRetrySupported: false,
+      actionLabel: "查看恢复记录",
+      actionHref: chapterHref(task),
+      actionReason: recovery.recoveryLabel,
+    };
+  }
+
+  if (isModelConfigError(task.errorMessage)) {
+    return {
+      directRetrySupported: false,
+      actionLabel: "去模型设置",
+      actionHref: "/settings/models",
+      actionReason: "这类失败更像 API Key、权限或供应商配置问题，先修配置再继续跑任务。",
+    };
+  }
+
+  const retryPlan = buildTaskRetryPlan({
+    chapterId: task.chapterId ?? null,
+    taskType: task.taskType,
+    status: task.status,
+    inputSnapshot: task.inputSnapshot ?? "",
+  });
+
+  return {
+    directRetrySupported: retryPlan.supported,
+    actionLabel: retryPlan.actionLabel,
+    actionHref: chapterHref(task),
+    actionReason: retryPlan.reason,
   };
 }
 
@@ -413,20 +468,25 @@ function buildRecentFailures(tasks: ModelAuditTask[]): RecentFailure[] {
     .filter((task) => task.status === "failed")
     .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime())
     .slice(0, 5)
-    .map((task) => ({
-      id: task.id,
-      label: labelFor(task.taskType),
-      providerName: task.modelProvider?.displayName ?? "未知模型",
-      model: task.model,
-      chapterTitle: task.chapter?.title ?? "项目任务",
-      errorMessage: task.errorMessage || "任务失败，但没有记录错误信息。",
-      ...(failureRecovery(task, tasks) ?? {
+    .map((task) => {
+      const recovery = failureRecovery(task, tasks) ?? {
         recoveryStatus: "unresolved" as const,
         recoveredByTaskId: null,
         recoveryLabel: "尚未看到后续成功记录。",
-      }),
-      createdAt: dateIso(task.createdAt),
-    }));
+      };
+
+      return {
+        id: task.id,
+        label: labelFor(task.taskType),
+        providerName: task.modelProvider?.displayName ?? "未知模型",
+        model: task.model,
+        chapterTitle: task.chapter?.title ?? "项目任务",
+        errorMessage: task.errorMessage || "任务失败，但没有记录错误信息。",
+        ...recovery,
+        ...buildFailureAction(task, recovery),
+        createdAt: dateIso(task.createdAt),
+      };
+    });
 }
 
 function auditScore(summary: ModelTaskAuditDashboard["summary"], readiness: ModelTaskAuditDashboard["providerReadiness"]) {

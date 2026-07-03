@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
+import { RetryTaskButton } from "@/components/tasks/RetryTaskButton";
 
 interface ProviderAuditRow {
   id: string;
@@ -41,6 +42,10 @@ interface RecentFailure {
   recoveryStatus: "recovered" | "unresolved";
   recoveredByTaskId: string | null;
   recoveryLabel: string;
+  directRetrySupported: boolean;
+  actionLabel: string;
+  actionHref: string;
+  actionReason: string;
   createdAt: string;
 }
 
@@ -587,6 +592,28 @@ export function ModelTaskAuditPanel({ projectId }: { projectId: string }) {
                     <div className="mt-1 text-slate-500">{failure.providerName} · {failure.model} · {new Date(failure.createdAt).toLocaleString()}</div>
                     <p className="mt-1 text-slate-600">{failure.errorMessage}</p>
                     <p className="mt-1 text-xs text-slate-500">{failure.recoveryLabel}</p>
+                    {failure.recoveryStatus === "unresolved" ? (
+                      <div className="mt-3 flex flex-wrap items-center gap-2">
+                        {failure.directRetrySupported ? (
+                          <RetryTaskButton taskId={failure.id} className="flex flex-wrap items-center gap-2" />
+                        ) : (
+                          <a
+                            className="rounded-md bg-slate-950 px-3 py-2 text-sm font-medium text-white"
+                            href={failure.actionHref}
+                          >
+                            {failure.actionLabel}
+                          </a>
+                        )}
+                        <span className="text-xs text-slate-500">{failure.actionReason}</span>
+                      </div>
+                    ) : (
+                      <div className="mt-3 flex flex-wrap items-center gap-2">
+                        <a className="text-sm font-medium text-slate-600 hover:text-slate-950" href={failure.actionHref}>
+                          {failure.actionLabel}
+                        </a>
+                        <span className="text-xs text-slate-500">{failure.actionReason}</span>
+                      </div>
+                    )}
                   </div>
                 ))}
                 {dashboard.recentFailures.length === 0 ? <p className="text-sm text-slate-600">暂无失败任务。</p> : null}

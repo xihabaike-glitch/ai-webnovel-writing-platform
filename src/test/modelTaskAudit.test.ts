@@ -219,4 +219,94 @@ test("buildModelTaskAuditDashboard", async (t) => {
     assert.equal(dashboard.recentFailures.find((failure) => failure.id === "unresolved-review")?.recoveryStatus, "unresolved");
     assert.ok(dashboard.riskFlags.some((flag) => flag.includes("未恢复失败")));
   });
+
+  await t.test("builds repair actions for unresolved recent failures", () => {
+    const dashboard = buildModelTaskAuditDashboard([
+      {
+        id: "retryable-review",
+        projectId: "project-1",
+        chapterId: "chapter-1",
+        taskType: "chapter_review",
+        model: "mock-novel",
+        status: "failed",
+        inputSnapshot: JSON.stringify({ chapterId: "chapter-1" }),
+        inputTokens: 700,
+        outputTokens: 0,
+        costUsd: 0.002,
+        outputText: null,
+        errorMessage: "503 provider timeout",
+        createdAt: "2026-01-01T00:00:00.000Z",
+        modelProvider: { providerId: "mock", displayName: "Mock" },
+        chapter: { title: "第一章" },
+      },
+      {
+        id: "config-review",
+        projectId: "project-1",
+        chapterId: "chapter-2",
+        taskType: "chapter_review",
+        model: "deepseek-chat",
+        status: "failed",
+        inputSnapshot: JSON.stringify({ chapterId: "chapter-2" }),
+        inputTokens: 700,
+        outputTokens: 0,
+        costUsd: 0.002,
+        outputText: null,
+        errorMessage: "API key missing",
+        createdAt: "2026-01-01T00:01:00.000Z",
+        modelProvider: { providerId: "deepseek", displayName: "DeepSeek" },
+        chapter: { title: "第二章" },
+      },
+      {
+        id: "old-draft-failure",
+        projectId: "project-1",
+        chapterId: "chapter-3",
+        taskType: "chapter_draft",
+        model: "mock-novel",
+        status: "failed",
+        inputSnapshot: JSON.stringify({ chapterId: "chapter-3" }),
+        inputTokens: 700,
+        outputTokens: 0,
+        costUsd: 0.002,
+        outputText: null,
+        errorMessage: "429 too many requests",
+        createdAt: "2026-01-01T00:02:00.000Z",
+        modelProvider: { providerId: "mock", displayName: "Mock" },
+        chapter: { title: "第三章" },
+      },
+      {
+        id: "new-draft-success",
+        projectId: "project-1",
+        chapterId: "chapter-3",
+        taskType: "chapter_draft",
+        model: "mock-novel",
+        status: "succeeded",
+        inputTokens: 700,
+        outputTokens: 1800,
+        costUsd: 0.01,
+        outputText: "重试后正文。",
+        errorMessage: null,
+        createdAt: "2026-01-01T00:05:00.000Z",
+        modelProvider: { providerId: "mock", displayName: "Mock" },
+        chapter: { title: "第三章" },
+      },
+    ], providers);
+
+    const retryable = dashboard.recentFailures.find((failure) => failure.id === "retryable-review");
+    const config = dashboard.recentFailures.find((failure) => failure.id === "config-review");
+    const recovered = dashboard.recentFailures.find((failure) => failure.id === "old-draft-failure");
+
+    assert.equal(retryable?.directRetrySupported, true);
+    assert.equal(retryable?.actionLabel, "一键重试");
+    assert.equal(retryable?.actionHref, "/projects/project-1/chapters/chapter-1");
+    assert.match(retryable?.actionReason ?? "", /复用当前章节/);
+
+    assert.equal(config?.directRetrySupported, false);
+    assert.equal(config?.actionLabel, "去模型设置");
+    assert.equal(config?.actionHref, "/settings/models");
+    assert.match(config?.actionReason ?? "", /API Key/);
+
+    assert.equal(recovered?.recoveryStatus, "recovered");
+    assert.equal(recovered?.directRetrySupported, false);
+    assert.equal(recovered?.actionLabel, "查看恢复记录");
+  });
 });

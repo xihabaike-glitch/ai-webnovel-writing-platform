@@ -2654,6 +2654,89 @@ export function buildGateProjectStartMetricDispatchItems(
     .filter((item): item is GatePlatformGrowthDispatchItem => Boolean(item));
 }
 
+function projectStartMetricFollowupSpec(task: PersistedGatePlatformDispatchTask) {
+  if (task.stage === "start_repair_packaging") {
+    return {
+      suffix: "publish_finalize",
+      stage: "start_publish_finalize" as const,
+      ownerRole: "发布包主编",
+      titleSuffix: "修包装后发布包复检",
+      detail: `${task.platformName} 已完成首轮包装修复，必须回到发布包定稿复检，确认标题、简介、标签和前三章兑现没有打架。`,
+      dueLabel: "今天",
+      actionLabel: "派给发布主编",
+      anchor: "#platform-export",
+      acceptanceCriteria: ["修复后的标题简介标签已进入发布包复检", "新入口承诺与前三章兑现一致", "保存修复后发布包基准版本"],
+    };
+  }
+
+  if (task.stage === "start_rewrite_opening") {
+    return {
+      suffix: "first_three_recheck",
+      stage: "start_first_three_review" as const,
+      ownerRole: "前三章审稿编辑",
+      titleSuffix: "开头重写后三章重验",
+      detail: `${task.platformName} 已完成首轮开头重写，回到前三章审稿验证钩子、追读点和爽点兑现。`,
+      dueLabel: "今天",
+      actionLabel: "派给审稿编辑",
+      anchor: "#first-three-rewrite",
+      acceptanceCriteria: ["重写后的前三章已重新审稿", "第一章钩子和第三章追读点重新打分", "保留重写后审稿结论"],
+    };
+  }
+
+  if (task.stage === "scale_up" && task.dispatchKey.includes(":start_metric:")) {
+    return {
+      suffix: "next_metrics_recovery",
+      stage: "start_metrics_recovery" as const,
+      ownerRole: "首轮数据运营",
+      titleSuffix: "加码后二轮数据回收",
+      detail: `${task.platformName} 已完成首轮小步加码，下一步只能回收加码后的真实数据，不能直接继续扩量。`,
+      dueLabel: "加码后 24 小时",
+      actionLabel: "派给数据运营",
+      anchor: "#platform-export",
+      acceptanceCriteria: ["加码后的曝光、点击、追读或收藏已回收", "加码范围与首轮基准可对照", "下一轮平台判断口径已保存"],
+    };
+  }
+
+  return null;
+}
+
+export function buildGateProjectStartMetricFollowupDispatchItems(
+  tasks: PersistedGatePlatformDispatchTask[],
+  persistedTasks: PersistedGatePlatformDispatchTask[] = [],
+): GatePlatformGrowthDispatchItem[] {
+  const persistedByKey = new Map(persistedTasks.map((task) => [task.dispatchKey, task]));
+
+  return tasks
+    .filter((task) => task.state === "completed" && task.completionEvidence.trim())
+    .map((task): GatePlatformGrowthDispatchItem | null => {
+      const spec = projectStartMetricFollowupSpec(task);
+      if (!spec) return null;
+      const projectId = task.projectId ?? projectIdFromReceiptHref(task.href) ?? "unknown";
+      const dispatchKey = `${task.platformId}:start_metric_followup:${spec.suffix}:${projectId}`;
+      const persisted = persistedByKey.get(dispatchKey);
+      const href = projectId !== "unknown" ? `/projects/${projectId}${spec.anchor}` : task.href;
+
+      return {
+        id: dispatchKey,
+        platformId: task.platformId,
+        platformName: task.platformName,
+        stage: spec.stage,
+        state: persisted?.state ?? "queued",
+        priorityScore: Math.max(task.priorityScore, 72),
+        ownerRole: spec.ownerRole,
+        title: `${task.platformName} ${spec.titleSuffix}`,
+        detail: spec.detail,
+        dueLabel: spec.dueLabel,
+        actionLabel: spec.actionLabel,
+        href,
+        acceptanceCriteria: spec.acceptanceCriteria,
+        evidence: [`上轮完成依据：${task.completionEvidence.trim()}`, ...task.evidence].slice(0, 4),
+        reviewLatestAt: task.completedAt ?? task.updatedAt,
+      };
+    })
+    .filter((item): item is GatePlatformGrowthDispatchItem => Boolean(item));
+}
+
 export function buildGatePlatformScaleGate(
   reviews: GatePlatformGrowthReview[],
   dispatchEvidenceReview: GateDispatchEvidenceReview,

@@ -27,6 +27,7 @@ import {
   buildGateProjectStartNextDispatchItems,
   buildGateProjectStartMetricDecision,
   buildGateProjectStartMetricDispatchItems,
+  buildGateProjectStartMetricFollowupDispatchItems,
   buildGatePlatformGrowthReview,
   clearGateActionReceipts,
   clearPersistedGateActionReceipts,
@@ -297,6 +298,7 @@ export function GateActionWorkspace({ actions }: { actions: PrePublishGateAction
     ...buildGateProjectStartValidationDispatchItems(receipts, persistedDispatchTasks),
     ...buildGateProjectStartNextDispatchItems(allStartValidationReview, persistedDispatchTasks),
     ...buildGateProjectStartMetricDispatchItems(allStartMetricDecision, persistedDispatchTasks),
+    ...buildGateProjectStartMetricFollowupDispatchItems(persistedDispatchTasks, persistedDispatchTasks),
     ...buildGatePlatformGrowthDispatchItems(receipts, 6, persistedDispatchTasks),
   ]
     .sort((a, b) => b.priorityScore - a.priorityScore || a.title.localeCompare(b.title))

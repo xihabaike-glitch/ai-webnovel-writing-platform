@@ -137,6 +137,8 @@ export type GatePlatformGrowthReviewStage =
   | "start_first_three_review"
   | "start_opening_diagnostic"
   | "start_platform_package"
+  | "start_publish_finalize"
+  | "start_metrics_recovery"
   | "watch";
 
 export interface GatePlatformGrowthReview {
@@ -2324,6 +2326,77 @@ export function buildGateProjectStartValidationReview(
       return new Date(right.latestAt).getTime() - new Date(left.latestAt).getTime();
     }),
   };
+}
+
+export function buildGateProjectStartNextDispatchItems(
+  review: GateProjectStartValidationReview,
+  persistedTasks: PersistedGatePlatformDispatchTask[] = [],
+): GatePlatformGrowthDispatchItem[] {
+  const persistedByKey = new Map(persistedTasks.map((task) => [task.dispatchKey, task]));
+  const specs: Array<{
+    suffix: string;
+    stage: GatePlatformGrowthReviewStage;
+    ownerRole: string;
+    titleSuffix: string;
+    detail: string;
+    dueLabel: string;
+    actionLabel: string;
+    anchor: string;
+    acceptanceCriteria: string[];
+    priorityScore: number;
+  }> = [
+    {
+      suffix: "publish_finalize",
+      stage: "start_publish_finalize",
+      ownerRole: "发布包主编",
+      titleSuffix: "发布包定稿",
+      detail: "在首轮验证通过后，把标题、简介、标签、前三章卖点和平台避坑检查压成一个可发布基准版本。",
+      dueLabel: "今天",
+      actionLabel: "派给发布主编",
+      anchor: "#platform-export",
+      acceptanceCriteria: ["发布包定稿版本已保存", "标题简介标签与前三章承诺一致", "平台避坑检查没有未处理红项"],
+      priorityScore: 76,
+    },
+    {
+      suffix: "metrics_recovery",
+      stage: "start_metrics_recovery",
+      ownerRole: "首轮数据运营",
+      titleSuffix: "首轮数据回收",
+      detail: "定义首轮投放后的数据口径和回收节奏，至少要能拿到曝光、点击、追读或收藏中的核心指标。",
+      dueLabel: "发布后 24 小时",
+      actionLabel: "派给数据运营",
+      anchor: "#platform-export",
+      acceptanceCriteria: ["首轮曝光、点击、追读或收藏口径已确定", "数据回收时间点已写清", "下一轮优化判断口径已保存"],
+      priorityScore: 68,
+    },
+  ];
+
+  return review.plans
+    .filter((plan) => plan.status === "ready")
+    .flatMap((plan) => specs.map((spec): GatePlatformGrowthDispatchItem => {
+      const projectId = plan.projectId ?? "unknown";
+      const dispatchKey = `${plan.platformId}:start_next:${spec.suffix}:${projectId}`;
+      const persisted = persistedByKey.get(dispatchKey);
+      const href = plan.projectId ? `/projects/${plan.projectId}${spec.anchor}` : plan.href;
+
+      return {
+        id: dispatchKey,
+        platformId: plan.platformId,
+        platformName: plan.platformName,
+        stage: spec.stage,
+        state: persisted?.state ?? "queued",
+        priorityScore: spec.priorityScore,
+        ownerRole: spec.ownerRole,
+        title: `${plan.platformName} ${spec.titleSuffix}`,
+        detail: spec.detail,
+        dueLabel: spec.dueLabel,
+        actionLabel: spec.actionLabel,
+        href,
+        acceptanceCriteria: spec.acceptanceCriteria,
+        evidence: plan.evidence,
+        reviewLatestAt: plan.latestAt,
+      };
+    }));
 }
 
 export function buildGatePlatformScaleGate(

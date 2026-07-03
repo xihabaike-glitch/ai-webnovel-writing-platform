@@ -24,6 +24,7 @@ import {
   buildGatePlatformGrowthDispatchItems,
   buildGateProjectStartValidationDispatchItems,
   buildGateProjectStartValidationReview,
+  buildGateProjectStartNextDispatchItems,
   buildGatePlatformGrowthReview,
   clearGateActionReceipts,
   clearPersistedGateActionReceipts,
@@ -118,6 +119,8 @@ function growthStageClass(stage: GatePlatformGrowthReview["stage"]) {
   if (stage === "start_first_three_review") return "bg-indigo-50 text-indigo-700";
   if (stage === "start_opening_diagnostic") return "bg-cyan-50 text-cyan-700";
   if (stage === "start_platform_package") return "bg-fuchsia-50 text-fuchsia-700";
+  if (stage === "start_publish_finalize") return "bg-violet-50 text-violet-700";
+  if (stage === "start_metrics_recovery") return "bg-teal-50 text-teal-700";
   if (stage === "fix_failure") return "bg-rose-50 text-rose-700";
   if (stage === "record_metrics") return "bg-amber-50 text-amber-700";
   if (stage === "adopt_asset") return "bg-blue-50 text-blue-700";
@@ -129,6 +132,8 @@ function growthStageLabel(stage: GatePlatformGrowthReview["stage"]) {
   if (stage === "start_first_three_review") return "前三章审稿";
   if (stage === "start_opening_diagnostic") return "开头钩子诊断";
   if (stage === "start_platform_package") return "平台包装";
+  if (stage === "start_publish_finalize") return "发布包定稿";
+  if (stage === "start_metrics_recovery") return "首轮数据回收";
   if (stage === "fix_failure") return "修失败";
   if (stage === "record_metrics") return "补数据";
   if (stage === "adopt_asset") return "采纳资产";
@@ -272,8 +277,10 @@ export function GateActionWorkspace({ actions }: { actions: PrePublishGateAction
   const filteredSummary = buildGateActionReceiptSummary(filteredReceipts);
   const reviewAdvice = buildGateActionReviewAdvice(filteredReceipts);
   const platformGrowthReview = buildGatePlatformGrowthReview(receipts);
+  const allStartValidationReview = buildGateProjectStartValidationReview(persistedDispatchTasks);
   const platformDispatchItems = [
     ...buildGateProjectStartValidationDispatchItems(receipts, persistedDispatchTasks),
+    ...buildGateProjectStartNextDispatchItems(allStartValidationReview, persistedDispatchTasks),
     ...buildGatePlatformGrowthDispatchItems(receipts, 6, persistedDispatchTasks),
   ]
     .sort((a, b) => b.priorityScore - a.priorityScore || a.title.localeCompare(b.title))

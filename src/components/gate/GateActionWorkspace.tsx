@@ -10,6 +10,7 @@ import {
   buildGateFailureRepairReceiptReview,
   buildGateFailureRepairRecheckDispatchItems,
   buildGateFailureRepairRecheckResolution,
+  buildGateFailureRepairThirdRoundDispatchItems,
   buildGateDispatchEvidenceReview,
   buildGatePlatformScaleFollowup,
   buildGatePlatformScaleCadence,
@@ -347,6 +348,7 @@ export function GateActionWorkspace({
   const allSecondMetricDecision = buildGateProjectSecondMetricDecision(persistedDispatchTasks, receipts);
   const platformDispatchItems = [
     ...buildGateFailureRepairRecheckDispatchItems(failureRepairReview, failureRepairBatch, persistedDispatchTasks),
+    ...buildGateFailureRepairThirdRoundDispatchItems(failureRepairResolution, failureRepairBatch, persistedDispatchTasks),
     ...buildGateProjectStartValidationDispatchItems(receipts, persistedDispatchTasks),
     ...buildGateProjectStartNextDispatchItems(allStartValidationReview, persistedDispatchTasks),
     ...buildGateProjectStartMetricDispatchItems(allStartMetricDecision, persistedDispatchTasks),

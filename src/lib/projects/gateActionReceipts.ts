@@ -159,6 +159,10 @@ export type GatePlatformGrowthReviewStage =
   | "pivot_platform"
   | "pause_platform"
   | "failure_repair_recheck"
+  | "failure_config_repair"
+  | "failure_route_repair"
+  | "failure_retry_repair"
+  | "failure_manual_review"
   | "start_first_three_review"
   | "start_opening_diagnostic"
   | "start_platform_package"
@@ -1172,6 +1176,141 @@ export function buildGateFailureRepairRecheckResolution(
     latestDispatchKey: latestCompleted.dispatchKey,
     evidence,
   };
+}
+
+function failureRepairThirdRoundState(
+  dispatchKey: string,
+  persistedTasks: PersistedGatePlatformDispatchTask[],
+): GatePlatformGrowthDispatchState {
+  return persistedTasks.find((task) => task.dispatchKey === dispatchKey)?.state ?? "queued";
+}
+
+function failureRepairThirdRoundEvidence(
+  resolution: GateFailureRepairRecheckResolution,
+  batch: FailureRepairBatch,
+  kind?: FailureRepairBatch["items"][number]["repairKind"],
+) {
+  const scopedItems = kind ? batch.items.filter((item) => item.repairKind === kind) : batch.items;
+  return [
+    ...resolution.evidence,
+    ...scopedItems.slice(0, 3).map((item) => `${item.projectTitle} · ${item.taskLabel} · ${item.providerName}/${item.model}：${item.errorMessage}`),
+    `未恢复失败 ${batch.summary.unresolvedFailures} 个`,
+  ].slice(0, 6);
+}
+
+export function buildGateFailureRepairThirdRoundDispatchItems(
+  resolution: GateFailureRepairRecheckResolution,
+  batch: FailureRepairBatch,
+  persistedTasks: PersistedGatePlatformDispatchTask[] = [],
+): GatePlatformGrowthDispatchItem[] {
+  if (resolution.status !== "failed" || batch.summary.unresolvedFailures <= 0) return [];
+
+  const now = new Date().toISOString();
+  const items: GatePlatformGrowthDispatchItem[] = [];
+  const firstRetry = batch.items.find((item) => item.repairKind === "retry");
+  const firstManual = batch.items.find((item) => item.repairKind === "manual");
+
+  if (batch.summary.configFailures > 0) {
+    const dispatchKey = "global:failure_third_round:config";
+    items.push({
+      id: dispatchKey,
+      platformId: "global",
+      platformName: "全局任务",
+      stage: "failure_config_repair",
+      state: failureRepairThirdRoundState(dispatchKey, persistedTasks),
+      priorityScore: 99,
+      ownerRole: "模型配置负责人",
+      title: "第三轮模型配置修复",
+      detail: `${batch.summary.configFailures} 个失败仍指向 API Key、权限或模型配置。先把配置链路验清楚，否则后面的重试只是重复失败。`,
+      dueLabel: "立即",
+      actionLabel: "派给配置负责人",
+      href: "/settings/models",
+      acceptanceCriteria: [
+        "API Key、权限和模型配置已完成复检",
+        "至少一个失败样本完成配置修复后的成功验证",
+        "仍异常的提供商已标记为暂缓使用",
+      ],
+      evidence: failureRepairThirdRoundEvidence(resolution, batch, "config"),
+      reviewLatestAt: now,
+    });
+  }
+
+  if (batch.summary.affectedProviders > 0) {
+    const dispatchKey = "global:failure_third_round:route";
+    items.push({
+      id: dispatchKey,
+      platformId: "global",
+      platformName: "全局任务",
+      stage: "failure_route_repair",
+      state: failureRepairThirdRoundState(dispatchKey, persistedTasks),
+      priorityScore: 96,
+      ownerRole: "模型路由负责人",
+      title: "第三轮模型路线降级",
+      detail: `${batch.summary.affectedProviders} 个模型/提供商组合受影响。需要给失败任务配置备用模型、降级路线或暂停高风险路线。`,
+      dueLabel: "今天",
+      actionLabel: "派给路由负责人",
+      href: "/settings/models",
+      acceptanceCriteria: [
+        "已给失败任务配置备用模型或降级路线",
+        "高失败率模型已暂停或降权",
+        "下一轮批量执行前有小样本验证计划",
+      ],
+      evidence: failureRepairThirdRoundEvidence(resolution, batch),
+      reviewLatestAt: now,
+    });
+  }
+
+  if (batch.summary.retryableFailures > 0 && firstRetry) {
+    const dispatchKey = "global:failure_third_round:retry";
+    items.push({
+      id: dispatchKey,
+      platformId: "global",
+      platformName: "全局任务",
+      stage: "failure_retry_repair",
+      state: failureRepairThirdRoundState(dispatchKey, persistedTasks),
+      priorityScore: 92,
+      ownerRole: "章节重试负责人",
+      title: "第三轮失败章节重试",
+      detail: `${batch.summary.retryableFailures} 个失败可直接重试。先按章节抽样重试，确认通过后再恢复批量。`,
+      dueLabel: "今天",
+      actionLabel: "派给重试负责人",
+      href: firstRetry.href,
+      acceptanceCriteria: [
+        "至少一个可重试失败样本已成功恢复",
+        "失败章节的重试结果已回填任务中心",
+        "批量恢复前失败率低于安全阈值",
+      ],
+      evidence: failureRepairThirdRoundEvidence(resolution, batch, "retry"),
+      reviewLatestAt: now,
+    });
+  }
+
+  if (batch.summary.manualFailures > 0 && firstManual) {
+    const dispatchKey = "global:failure_third_round:manual";
+    items.push({
+      id: dispatchKey,
+      platformId: "global",
+      platformName: "全局任务",
+      stage: "failure_manual_review",
+      state: failureRepairThirdRoundState(dispatchKey, persistedTasks),
+      priorityScore: 90,
+      ownerRole: "故障复盘负责人",
+      title: "第三轮人工故障复盘",
+      detail: `${batch.summary.manualFailures} 个失败不能直接配置或重试解决，需要人工拆原因、定责任人和下一步动作。`,
+      dueLabel: "今天",
+      actionLabel: "派给复盘负责人",
+      href: firstManual.href,
+      acceptanceCriteria: [
+        "每个人工失败都有明确原因分类",
+        "下一步动作已拆到具体负责人",
+        "不可恢复任务已标记为暂停或重建",
+      ],
+      evidence: failureRepairThirdRoundEvidence(resolution, batch, "manual"),
+      reviewLatestAt: now,
+    });
+  }
+
+  return items;
 }
 
 export function buildGatePlatformStrategyReceipt(input: {

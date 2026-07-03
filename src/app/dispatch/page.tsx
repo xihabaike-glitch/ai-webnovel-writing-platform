@@ -5,6 +5,8 @@ import { prisma } from "@/lib/db/prisma";
 import {
   buildGateFailureRepairReceiptReview,
   buildGateFailureRepairRecheckDispatchItems,
+  buildGateFailureRepairRecheckResolution,
+  buildGateFailureRepairThirdRoundDispatchItems,
   type GateActionReceipt,
   type GatePlatformGrowthDispatchItem,
   type GatePlatformGrowthDispatchState,
@@ -250,12 +252,20 @@ export default async function DispatchPage() {
     batchHistory: buildTaskBatchHistory(recentTasksWithChapter),
   });
   const failureRepairReview = buildGateFailureRepairReceiptReview(gate.failureRepairBatch, receiptItems);
+  const failureRepairResolution = buildGateFailureRepairRecheckResolution(gate.failureRepairBatch, persistedTasks);
   const persistedByKey = new Map(persistedTasks.map((task) => [task.dispatchKey, task]));
-  const generatedTasks = buildGateFailureRepairRecheckDispatchItems(
-    failureRepairReview,
-    gate.failureRepairBatch,
-    persistedTasks,
-  ).map((item) => toVirtualTask(item, persistedByKey.get(item.id)));
+  const generatedTasks = [
+    ...buildGateFailureRepairRecheckDispatchItems(
+      failureRepairReview,
+      gate.failureRepairBatch,
+      persistedTasks,
+    ),
+    ...buildGateFailureRepairThirdRoundDispatchItems(
+      failureRepairResolution,
+      gate.failureRepairBatch,
+      persistedTasks,
+    ),
+  ].map((item) => toVirtualTask(item, persistedByKey.get(item.id)));
   const generatedKeys = new Set(generatedTasks.map((task) => task.dispatchKey));
   const mergedTasks = [
     ...generatedTasks,

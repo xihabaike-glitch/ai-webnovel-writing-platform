@@ -9,6 +9,7 @@ import {
   buildGateFailureRepairReceiptReview,
   buildGateFailureRepairRecheckDispatchItems,
   buildGateFailureRepairRecheckResolution,
+  buildGateFailureRepairThirdRoundDispatchItems,
   buildGatePlatformGrowthReview,
   buildGatePlatformGrowthDispatchItems,
   buildGateProjectStartValidationDispatchItems,
@@ -535,6 +536,69 @@ test("buildGateActionReceipt", async (t) => {
     assert.equal(cleared.status, "resolved");
     assert.equal(cleared.label, "复检闭环");
     assert.equal(cleared.actionLabel, "查看任务中心");
+  });
+
+  await t.test("splits failed rechecks into third-round role dispatch cards", () => {
+    const resolution = buildGateFailureRepairRecheckResolution(failureRepairBatch, [{
+      id: "global:failure_repair_recheck:failure-repair-batch",
+      dispatchKey: "global:failure_repair_recheck:failure-repair-batch",
+      databaseId: "dispatch-db-recheck",
+      projectId: null,
+      platformId: "global",
+      platformName: "全局任务",
+      stage: "failure_repair_recheck",
+      state: "completed",
+      priorityScore: 94,
+      ownerRole: "故障复检负责人",
+      title: "失败修复后复检",
+      detail: "复检仍未清空失败。",
+      dueLabel: "今天",
+      actionLabel: "派给复检负责人",
+      href: "/gate",
+      acceptanceCriteria: ["总闸门未恢复失败数降为 0"],
+      evidence: ["已记录模型配置修复。"],
+      sourceReceiptId: null,
+      completionEvidence: "复检后仍有配置和重试失败。",
+      reviewLatestAt: "2026-01-01T00:00:00.000Z",
+      assignedAt: "2026-01-01T00:05:00.000Z",
+      completedAt: "2026-01-01T00:30:00.000Z",
+      createdAt: "2026-01-01T00:05:00.000Z",
+      updatedAt: "2026-01-01T00:30:00.000Z",
+    }]);
+    const thirdRound = buildGateFailureRepairThirdRoundDispatchItems(resolution, failureRepairBatch);
+    const resolved = buildGateFailureRepairThirdRoundDispatchItems({
+      ...resolution,
+      status: "resolved",
+      label: "复检闭环",
+      unresolvedFailures: 0,
+    }, {
+      ...failureRepairBatch,
+      status: "clear",
+      summary: {
+        unresolvedFailures: 0,
+        configFailures: 0,
+        retryableFailures: 0,
+        manualFailures: 0,
+        affectedProjects: 0,
+        affectedProviders: 0,
+      },
+      items: [],
+    });
+
+    assert.deepEqual(thirdRound.map((item) => item.stage), [
+      "failure_config_repair",
+      "failure_route_repair",
+      "failure_retry_repair",
+    ]);
+    assert.equal(thirdRound[0].ownerRole, "模型配置负责人");
+    assert.equal(thirdRound[0].href, "/settings/models");
+    assert.ok(thirdRound[0].acceptanceCriteria.includes("API Key、权限和模型配置已完成复检"));
+    assert.equal(thirdRound[1].ownerRole, "模型路由负责人");
+    assert.ok(thirdRound[1].acceptanceCriteria.includes("已给失败任务配置备用模型或降级路线"));
+    assert.equal(thirdRound[2].ownerRole, "章节重试负责人");
+    assert.equal(thirdRound[2].href, "/projects/project-1/chapters/chapter-2");
+    assert.ok(thirdRound[2].evidence.some((line) => line.includes("503 provider timeout")));
+    assert.equal(resolved.length, 0);
   });
 
   await t.test("turns repeated failures into urgent review advice", () => {

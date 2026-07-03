@@ -145,6 +145,7 @@ export function ProjectControlDashboardPanel({ projectId }: { projectId: string 
   const [isLoading, setIsLoading] = useState(false);
   const [runningActionId, setRunningActionId] = useState<string | null>(null);
   const [runningVerdictAction, setRunningVerdictAction] = useState(false);
+  const [runningStartDecision, setRunningStartDecision] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
   async function loadDashboard() {
@@ -254,6 +255,32 @@ export function ProjectControlDashboardPanel({ projectId }: { projectId: string 
     }
   }
 
+  async function executeStartDecisionAction() {
+    if (!dashboard) return;
+    setRunningStartDecision(true);
+    setMessage(null);
+    try {
+      const response = await fetch(`/api/projects/${projectId}/start-decision/execute`, {
+        method: "POST",
+      });
+      const payload = await response.json().catch(() => null) as {
+        receipt?: { message?: string };
+        targetAnchor?: string;
+        error?: string;
+      } | null;
+      if (!response.ok) throw new Error(payload?.error ?? "执行开书策略动作失败。");
+      await loadDashboard();
+      setMessage(payload?.receipt?.message ?? "开书策略动作已记录。");
+      if (payload?.targetAnchor && typeof window !== "undefined") {
+        window.location.hash = payload.targetAnchor;
+      }
+    } catch (caught) {
+      setMessage(caught instanceof Error ? caught.message : "执行开书策略动作失败。");
+    } finally {
+      setRunningStartDecision(false);
+    }
+  }
+
   return (
     <section className="rounded-md border border-slate-200 bg-white p-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -323,12 +350,14 @@ export function ProjectControlDashboardPanel({ projectId }: { projectId: string 
                   下一轮实验：{dashboard.startDecision.nextExperiment}
                 </div>
               </div>
-              <Link
-                className="inline-flex w-fit items-center justify-center rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white hover:bg-slate-800"
-                href={`/projects/${projectId}#${dashboard.startDecision.targetAnchor}`}
+              <button
+                className="inline-flex w-fit items-center justify-center rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white hover:bg-slate-800 disabled:opacity-50"
+                disabled={runningStartDecision}
+                onClick={() => void executeStartDecisionAction()}
+                type="button"
               >
-                {dashboard.startDecision.actionLabel}
-              </Link>
+                {runningStartDecision ? "执行中" : dashboard.startDecision.actionLabel}
+              </button>
             </div>
             <div className="mt-3 grid gap-2 md:grid-cols-3">
               {dashboard.startDecision.evidence.slice(0, 3).map((item) => (

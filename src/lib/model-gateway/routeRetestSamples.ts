@@ -27,6 +27,28 @@ export interface RouteRetestSamplePlan {
   warning: string;
 }
 
+export interface RouteRetestEvidencePlan {
+  providerName: string;
+  model: string | null;
+  taskScope: string;
+  sampleCount: number;
+}
+
+export interface RouteRetestEvidenceResult {
+  status: string;
+  score: number | null;
+  routeRole: string | null;
+  error: string | null;
+}
+
+export interface RouteRetestEvidence {
+  successRatePercent: number;
+  averageQualityScore: number | null;
+  fallbackUsed: boolean;
+  completionEvidence: string;
+  evidence: string[];
+}
+
 function unsupportedPlan(item: RouteAvoidanceRetestQueueItem, status: RouteRetestSamplePlan["status"], reason: string): RouteRetestSamplePlan {
   return {
     canRun: false,
@@ -82,4 +104,49 @@ export function buildRouteAvoidanceRetestSamplePlan(
   }
 
   return unsupportedPlan(item, "no_samples", `当前没有适合「${item.taskScope}」的复测样本。`);
+}
+
+export function buildRouteAvoidanceRetestEvidence({
+  plan,
+  results,
+}: {
+  plan: RouteRetestEvidencePlan;
+  results: RouteRetestEvidenceResult[];
+}): RouteRetestEvidence {
+  const total = results.length || plan.sampleCount;
+  const succeeded = results.filter((result) => result.status === "succeeded").length;
+  const successRatePercent = total > 0 ? Math.round((succeeded / total) * 100) : 0;
+  const scores = results
+    .map((result) => result.score)
+    .filter((score): score is number => typeof score === "number");
+  const averageQualityScore = scores.length
+    ? Math.round(scores.reduce((sum, score) => sum + score, 0) / scores.length)
+    : null;
+  const fallbackUsed = results.some((result) => result.routeRole === "fallback" || result.routeRole === "auto" || result.routeRole === "primary");
+  const errors = results
+    .map((result) => result.error)
+    .filter((error): error is string => Boolean(error?.trim()));
+  const fallbackEvidence = fallbackUsed ? "命中备用路线" : "未命中备用路线";
+  const errorEvidence = errors.length ? `失败原因：${errors.slice(0, 2).join("；")}` : "执行稳定";
+  const qualityText = averageQualityScore === null ? "未填" : String(averageQualityScore);
+  const completionEvidence = [
+    `完成 ${total} 个「${plan.taskScope}」小样本复测`,
+    `${plan.providerName} · ${plan.model ?? "默认模型"}`,
+    `成功率 ${successRatePercent}%`,
+    `质量 ${qualityText}`,
+    fallbackEvidence,
+    errorEvidence,
+  ].join("，");
+
+  return {
+    successRatePercent,
+    averageQualityScore,
+    fallbackUsed,
+    completionEvidence,
+    evidence: [
+      completionEvidence,
+      `复测模型：${plan.providerName} · ${plan.model ?? "默认模型"}`,
+      `复测样本：${total} 个，成功 ${succeeded} 个`,
+    ],
+  };
 }

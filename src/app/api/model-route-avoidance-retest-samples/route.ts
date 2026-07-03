@@ -6,11 +6,15 @@ import { prisma } from "@/lib/db/prisma";
 import {
   applyRouteAvoidanceOverrides,
   buildRouteAvoidanceGovernance,
+  buildRouteAvoidanceRetestDispatch,
   buildRouteAvoidanceRulesFromDispatchTasks,
   routeAvoidanceOverrideFromRecord,
   type RouteAvoidanceOverride,
 } from "@/lib/model-gateway/routeRecommendations";
-import { buildRouteAvoidanceRetestSamplePlan } from "@/lib/model-gateway/routeRetestSamples";
+import {
+  buildRouteAvoidanceRetestEvidence,
+  buildRouteAvoidanceRetestSamplePlan,
+} from "@/lib/model-gateway/routeRetestSamples";
 
 const runRetestSamplesSchema = z.object({
   ruleKey: z.string().min(3),
@@ -108,7 +112,7 @@ export async function POST(request: Request) {
         model: result.provider.model,
         routeRole: result.attempts.find((attempt) => attempt.taskId === result.task.id)?.role ?? null,
         score: "error" in result ? null : result.draftQuality.score,
-        error: "error" in result ? result.error : null,
+        error: "error" in result ? result.error ?? null : null,
       });
       continue;
     }
@@ -123,14 +127,77 @@ export async function POST(request: Request) {
         model: result.provider.model,
         routeRole: result.attempts.find((attempt) => attempt.taskId === result.task.id)?.role ?? null,
         score: "error" in result ? null : result.result.score,
-        error: "error" in result ? result.error : null,
+        error: "error" in result ? result.error ?? null : null,
       });
     }
   }
 
+  const retestEvidence = buildRouteAvoidanceRetestEvidence({
+    plan: {
+      providerName: item.providerName,
+      model: plan.model,
+      taskScope: item.taskScope,
+      sampleCount: plan.sampleCount,
+    },
+    results,
+  });
+  const dispatch = buildRouteAvoidanceRetestDispatch(item);
+  const now = new Date();
+  const retestTask = await prisma.gateDispatchTask.upsert({
+    where: { dispatchKey: dispatch.dispatchKey },
+    create: {
+      dispatchKey: dispatch.dispatchKey,
+      projectId: null,
+      platformId: dispatch.platformId,
+      platformName: dispatch.platformName,
+      stage: dispatch.stage,
+      state: "completed",
+      priorityScore: dispatch.priorityScore,
+      ownerRole: dispatch.ownerRole,
+      title: dispatch.title,
+      detail: dispatch.detail,
+      dueLabel: dispatch.dueLabel,
+      actionLabel: dispatch.actionLabel,
+      href: dispatch.href,
+      acceptanceCriteria: JSON.stringify(dispatch.acceptanceCriteria),
+      evidence: JSON.stringify(Array.from(new Set([...dispatch.evidence, ...retestEvidence.evidence]))),
+      sourceReceiptId: null,
+      completionEvidence: retestEvidence.completionEvidence,
+      reviewLatestAt: new Date(dispatch.reviewLatestAt),
+      assignedAt: now,
+      completedAt: now,
+    },
+    update: {
+      platformId: dispatch.platformId,
+      platformName: dispatch.platformName,
+      stage: dispatch.stage,
+      state: "completed",
+      priorityScore: dispatch.priorityScore,
+      ownerRole: dispatch.ownerRole,
+      title: dispatch.title,
+      detail: dispatch.detail,
+      dueLabel: dispatch.dueLabel,
+      actionLabel: dispatch.actionLabel,
+      href: dispatch.href,
+      acceptanceCriteria: JSON.stringify(dispatch.acceptanceCriteria),
+      evidence: JSON.stringify(Array.from(new Set([...dispatch.evidence, ...retestEvidence.evidence]))),
+      completionEvidence: retestEvidence.completionEvidence,
+      reviewLatestAt: new Date(dispatch.reviewLatestAt),
+      assignedAt: now,
+      completedAt: now,
+    },
+  });
+
   return NextResponse.json({
     plan,
     results,
+    retestEvidence,
+    retestTask: {
+      dispatchKey: retestTask.dispatchKey,
+      state: retestTask.state,
+      completionEvidence: retestTask.completionEvidence,
+      completedAt: retestTask.completedAt?.toISOString() ?? null,
+    },
     warning: `已强制使用「${plan.providerId ?? plan.providerConfigId ?? "指定模型"} · ${plan.model ?? "默认模型"}」执行复测样本。`,
   });
 }

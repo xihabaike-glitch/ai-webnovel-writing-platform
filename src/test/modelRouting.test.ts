@@ -14,7 +14,10 @@ import {
   buildRouteAvoidanceRulesFromDispatchTasks,
   buildRouteRecommendations,
 } from "../lib/model-gateway/routeRecommendations.ts";
-import { buildRouteAvoidanceRetestSamplePlan } from "../lib/model-gateway/routeRetestSamples.ts";
+import {
+  buildRouteAvoidanceRetestEvidence,
+  buildRouteAvoidanceRetestSamplePlan,
+} from "../lib/model-gateway/routeRetestSamples.ts";
 import { labelForRoutedTask, modelTaskRouteOptions } from "../lib/model-gateway/taskRouting.ts";
 
 const mockProvider = {
@@ -831,5 +834,57 @@ test("model task routing", async (t) => {
     assert.equal(globalPlan.canRun, false);
     assert.equal(globalPlan.status, "needs_scope");
     assert.ok(globalPlan.reason.includes("限定任务"));
+  });
+
+  await t.test("turns forced retest sample results into governance evidence", () => {
+    const evidence = buildRouteAvoidanceRetestEvidence({
+      plan: {
+        providerName: "DeepSeek",
+        model: "deepseek-chat",
+        taskScope: "章节审稿",
+        sampleCount: 2,
+      },
+      results: [
+        { status: "succeeded", score: 86, routeRole: "forced", error: null },
+        { status: "succeeded", score: 84, routeRole: "forced", error: null },
+      ],
+    });
+    const governance = buildRouteAvoidanceGovernance([
+      {
+        taskType: "chapter_review",
+        providerConfigId: "deepseek-provider",
+        providerId: "deepseek",
+        model: "deepseek-chat",
+        reason: "审稿 JSON 不稳定。",
+        evidence: ["历史失败"],
+        watchUntil: "2026-07-01T00:00:00.000Z",
+      },
+    ], [
+      {
+        id: "deepseek-provider",
+        providerId: "deepseek",
+        displayName: "DeepSeek",
+        defaultModel: "deepseek-chat",
+        enabled: true,
+        encryptedApiKey: "key",
+      },
+    ], {
+      now: "2026-07-03T00:00:00.000Z",
+      retestDispatches: [{
+        dispatchKey: "model-route-retest:deepseek-provider:deepseek-chat",
+        stage: "model_route_retest",
+        state: "completed",
+        completionEvidence: evidence.completionEvidence,
+        evidence: evidence.evidence,
+        completedAt: "2026-07-03T00:00:00.000Z",
+      }],
+    });
+
+    assert.equal(evidence.successRatePercent, 100);
+    assert.equal(evidence.averageQualityScore, 85);
+    assert.ok(evidence.completionEvidence.includes("成功率 100%"));
+    assert.ok(evidence.completionEvidence.includes("质量 85"));
+    assert.ok(evidence.completionEvidence.includes("未命中备用路线"));
+    assert.equal(governance.retestReview.items[0].recommendedAction, "dismiss");
   });
 });

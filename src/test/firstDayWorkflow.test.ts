@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { getPlatformProfile } from "../lib/platforms/platformProfiles.ts";
-import { buildFirstDayWorkflow } from "../lib/projects/firstDayWorkflow.ts";
+import { buildFirstDayLaunchReceipt, buildFirstDayWorkflow } from "../lib/projects/firstDayWorkflow.ts";
 
 const project = {
   id: "project-1",
@@ -64,6 +64,33 @@ test("buildFirstDayWorkflow", async (t) => {
     assert.equal(workflow.nextStep.id, "first-draft");
     assert.equal(workflow.steps.find((step) => step.id === "first-draft")?.status, "active");
     assert.ok(workflow.nextStep.href.endsWith("/chapters/chapter-1"));
+  });
+
+  await t.test("summarizes a created project launch receipt with the first executable step", () => {
+    const workflow = buildFirstDayWorkflow({
+      project,
+      platform: getPlatformProfile("fanqie"),
+      chapters: [chapter, { ...chapter, id: "chapter-2", order: 2 }, { ...chapter, id: "chapter-3", order: 3 }],
+      outlineNodes,
+      characters,
+      worldEntries,
+      aiTasks: [],
+      submissionChecklist: checklist,
+    });
+
+    const receipt = buildFirstDayLaunchReceipt(workflow);
+
+    assert.equal(receipt.title, "首日启动回执");
+    assert.equal(receipt.nextStepId, "first-draft");
+    assert.equal(receipt.owner, "AI");
+    assert.equal(receipt.actionLabel, "生成第一章");
+    assert.equal(receipt.href, "/projects/project-1/chapters/chapter-1");
+    assert.equal(receipt.completedCount, 3);
+    assert.equal(receipt.totalSteps, 7);
+    assert.equal(receipt.progressPercent, 43);
+    assert.ok(receipt.message.includes("下一步"));
+    assert.ok(receipt.message.includes("生成第一章正文"));
+    assert.deepEqual(receipt.readyStepIds, ["skeleton", "opening-hook", "story-support"]);
   });
 
   await t.test("locks downstream work when the skeleton is empty", () => {

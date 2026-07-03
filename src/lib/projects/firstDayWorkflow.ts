@@ -80,6 +80,20 @@ export interface FirstDayWorkflow {
   steps: FirstDayWorkflowStep[];
 }
 
+export interface FirstDayLaunchReceipt {
+  title: string;
+  platformName: string;
+  message: string;
+  nextStepId: string;
+  owner: FirstDayWorkflowStep["owner"];
+  actionLabel: string;
+  href: string;
+  completedCount: number;
+  totalSteps: number;
+  progressPercent: number;
+  readyStepIds: string[];
+}
+
 function compact(text: string) {
   return text.replace(/\s+/g, " ").trim();
 }
@@ -259,5 +273,23 @@ export function buildFirstDayWorkflow(input: FirstDayWorkflowInput): FirstDayWor
     verdict: verdict(completedCount, steps.length),
     nextStep,
     steps,
+  };
+}
+
+export function buildFirstDayLaunchReceipt(workflow: FirstDayWorkflow): FirstDayLaunchReceipt {
+  const readyStepIds = workflow.steps.filter((item) => item.status === "done").map((item) => item.id);
+
+  return {
+    title: "首日启动回执",
+    platformName: workflow.platformName,
+    message: `已完成 ${workflow.completedCount}/${workflow.totalSteps} 个首日节点。下一步：${workflow.nextStep.label}。${workflow.nextStep.instruction}`,
+    nextStepId: workflow.nextStep.id,
+    owner: workflow.nextStep.owner,
+    actionLabel: workflow.nextStep.actionLabel,
+    href: workflow.nextStep.href,
+    completedCount: workflow.completedCount,
+    totalSteps: workflow.totalSteps,
+    progressPercent: workflow.progressPercent,
+    readyStepIds,
   };
 }

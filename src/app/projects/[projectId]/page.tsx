@@ -122,7 +122,9 @@ export default async function ProjectPage({ params }: { params: Promise<{ projec
         <div id="project-control">
           <ProjectControlDashboardPanel projectId={project.id} />
         </div>
-        <FirstDayWorkflowPanel projectId={project.id} />
+        <div id="first-day-workflow">
+          <FirstDayWorkflowPanel projectId={project.id} />
+        </div>
         <section className="grid gap-4 md:grid-cols-[1.4fr_1fr]">
           <div className="rounded-md border border-slate-200 bg-white p-4">
             <div className="flex items-start justify-between gap-4">

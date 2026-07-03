@@ -176,8 +176,11 @@ export function ProjectForm() {
         throw new Error("创建作品失败，请检查必填字段。");
       }
 
-      const payload = (await response.json()) as { project: { id: string } };
-      router.push(`/projects/${payload.project.id}`);
+      const payload = (await response.json()) as {
+        project: { id: string };
+        launchReceipt?: { href: string; nextStepId: string } | null;
+      };
+      router.push(`/projects/${payload.project.id}#first-day-workflow`);
       router.refresh();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "创建作品失败。");

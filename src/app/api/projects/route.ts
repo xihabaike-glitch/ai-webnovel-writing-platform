@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { buildDefaultOutlineNodes } from "@/lib/outlines/defaultOutline";
+import { buildFirstDayLaunchReceipt, buildFirstDayWorkflow } from "@/lib/projects/firstDayWorkflow";
 import { buildProjectDefaults } from "@/lib/projects/projectDefaults";
 import { buildProjectStartTacticAdvice, buildProjectStartTacticWorldEntry } from "@/lib/projects/projectStartTactics";
+import { buildSubmissionChecklist } from "@/lib/projects/submissionChecklist";
 import {
   buildTemplateChapterSeeds,
   buildTemplateCharacterSeed,
@@ -97,5 +99,48 @@ export async function POST(request: Request) {
     return created;
   });
 
-  return NextResponse.json({ project }, { status: 201 });
+  const launchProject = await prisma.project.findUnique({
+    where: { id: project.id },
+    include: {
+      chapters: { orderBy: { order: "asc" } },
+      outlineNodes: { orderBy: [{ depth: "asc" }, { order: "asc" }] },
+      characters: { orderBy: { createdAt: "asc" } },
+      worldEntries: { orderBy: [{ type: "asc" }, { createdAt: "asc" }] },
+      aiTasks: { orderBy: { createdAt: "desc" } },
+    },
+  });
+  const launchReceipt = launchProject ? (() => {
+    const platform = getPlatformProfile(launchProject.targetPlatform as PlatformId);
+    const submissionChecklist = buildSubmissionChecklist({
+      title: launchProject.title,
+      genre: launchProject.genre,
+      sellingPoint: launchProject.sellingPoint,
+      currentWordCount: launchProject.currentWordCount,
+      targetWordCount: launchProject.targetWordCount,
+      platform,
+      chapters: launchProject.chapters,
+      aiTasks: launchProject.aiTasks.map((task) => ({
+        taskType: task.taskType,
+        status: task.status,
+        chapter: task.chapterId ? { id: task.chapterId } : null,
+      })),
+    });
+
+    return buildFirstDayLaunchReceipt(buildFirstDayWorkflow({
+      project: {
+        id: launchProject.id,
+        title: launchProject.title,
+        currentWordCount: launchProject.currentWordCount,
+      },
+      platform,
+      chapters: launchProject.chapters,
+      outlineNodes: launchProject.outlineNodes,
+      characters: launchProject.characters,
+      worldEntries: launchProject.worldEntries,
+      aiTasks: launchProject.aiTasks,
+      submissionChecklist,
+    }));
+  })() : null;
+
+  return NextResponse.json({ project, launchReceipt }, { status: 201 });
 }

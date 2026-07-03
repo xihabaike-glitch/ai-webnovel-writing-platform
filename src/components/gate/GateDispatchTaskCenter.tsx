@@ -16,6 +16,7 @@ import {
   type PersistedGatePlatformDispatchTask,
 } from "@/lib/projects/gateActionReceipts";
 import {
+  buildRouteDispatchCompletionTemplate,
   filterRouteConfirmationDispatchTasks,
   type RouteConfirmationDispatchFlow,
   type RouteConfirmationDispatchFlowLaneId,
@@ -125,6 +126,12 @@ export function GateDispatchTaskCenter({
     } finally {
       setRunningKey(null);
     }
+  }
+
+  function insertCompletionTemplate(task: PersistedGatePlatformDispatchTask) {
+    const template = buildRouteDispatchCompletionTemplate(task);
+    if (!template) return;
+    setCompletionDrafts((current) => ({ ...current, [task.dispatchKey]: template }));
   }
 
   return (
@@ -367,7 +374,9 @@ export function GateDispatchTaskCenter({
       ) : null}
 
       <section className="grid gap-3">
-        {filteredTasks.map((task) => (
+        {filteredTasks.map((task) => {
+          const completionTemplate = buildRouteDispatchCompletionTemplate(task);
+          return (
           <div className="rounded-md border border-slate-200 bg-white p-4" key={task.dispatchKey}>
             <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
               <div>
@@ -389,15 +398,26 @@ export function GateDispatchTaskCenter({
                   ))}
                 </div>
                 {task.state === "assigned" ? (
-                  <label className="mt-3 grid gap-1 text-xs font-medium text-slate-600">
-                    完成依据
+                  <div className="mt-3 grid gap-1">
+                    <div className="flex flex-wrap items-center justify-between gap-2 text-xs font-medium text-slate-600">
+                      <span>完成依据</span>
+                      {completionTemplate ? (
+                        <button
+                          className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                          onClick={() => insertCompletionTemplate(task)}
+                          type="button"
+                        >
+                          填入模板
+                        </button>
+                      ) : null}
+                    </div>
                     <textarea
                       className="min-h-20 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-normal text-slate-800"
                       onChange={(event) => setCompletionDrafts((current) => ({ ...current, [task.dispatchKey]: event.target.value }))}
                       placeholder="写清楚完成了什么、证据在哪里、是否已回填数据。"
                       value={completionDrafts[task.dispatchKey] ?? ""}
                     />
-                  </label>
+                  </div>
                 ) : null}
                 {task.completionEvidence ? (
                   <p className="mt-3 rounded-md bg-emerald-50 p-3 text-sm leading-6 text-emerald-800">
@@ -420,7 +440,8 @@ export function GateDispatchTaskCenter({
               </div>
             </div>
           </div>
-        ))}
+          );
+        })}
         {filteredTasks.length === 0 ? (
           <p className="rounded-md border border-dashed border-slate-300 bg-white p-4 text-sm text-slate-600">
             当前筛选下没有派单任务。

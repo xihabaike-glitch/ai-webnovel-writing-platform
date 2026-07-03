@@ -74,6 +74,12 @@ export interface RouteConfirmationDispatchFlowTask {
   reviewLatestAt: string;
 }
 
+export interface RouteDispatchCompletionTemplateTask {
+  stage: string;
+  title: string;
+  actionLabel: string;
+}
+
 export type RouteConfirmationDispatchFlowLaneId = "needs_governance" | "waiting_recheck" | "confirmed" | "completed";
 export type RouteConfirmationDispatchTaskFilter = "all" | "needs_governance" | "waiting_recheck" | "completed";
 
@@ -767,6 +773,34 @@ export function filterRouteConfirmationDispatchTasks<T extends RouteConfirmation
     return tasks.filter((task) => task.stage === "model_route_confirmation_recheck" && task.state !== "completed");
   }
   return tasks.filter((task) => isRouteConfirmationTask(task) && task.state === "completed");
+}
+
+export function buildRouteDispatchCompletionTemplate(task: RouteDispatchCompletionTemplateTask) {
+  if (task.stage === "model_route_governance") {
+    return [
+      `${task.title}`,
+      `处理动作：${task.actionLabel}`,
+      "新首选模型：",
+      "新备用模型：",
+      "复跑样本数：2",
+      "成功率：",
+      "质量：",
+      "备用命中：未命中备用 / 仍命中备用",
+      "治理结论：已治理完成 / 继续观察 / 仍需换模型",
+    ].join("\n");
+  }
+  if (task.stage === "model_route_confirmation_recheck") {
+    return [
+      `${task.title}`,
+      "样本数：2",
+      "成功率：",
+      "质量：",
+      "成本：",
+      "备用命中：未命中备用 / 命中备用",
+      "是否需要治理：否 / 是，原因：",
+    ].join("\n");
+  }
+  return null;
 }
 
 export function buildRouteConfirmationRecheckEvidenceFromDispatchTasks(

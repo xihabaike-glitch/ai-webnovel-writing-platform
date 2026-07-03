@@ -13,6 +13,7 @@ import {
   buildRouteConfirmationGovernanceFollowUpDispatches,
   buildRouteConfirmationDispatchFlow,
   buildRouteConfirmationHistory,
+  buildRouteDispatchCompletionTemplate,
   filterRouteConfirmationDispatchTasks,
   buildModelRouteConfirmationDispatch,
   buildModelRouteConfirmationReceipt,
@@ -658,6 +659,28 @@ test("model task routing", async (t) => {
       "model-route-governance:chapter_draft:extend_watch:2026-07-04T13:00:00.000Z",
     ]);
     assert.equal(filterRouteConfirmationDispatchTasks(tasks, "all").length, tasks.length);
+  });
+
+  await t.test("builds structured completion templates for route dispatch tasks", () => {
+    const governanceTemplate = buildRouteDispatchCompletionTemplate({
+      stage: "model_route_governance",
+      title: "处理章节审稿路由复检问题",
+      actionLabel: "切备用/重分配",
+    });
+    const recheckTemplate = buildRouteDispatchCompletionTemplate({
+      stage: "model_route_confirmation_recheck",
+      title: "复检章节审稿路由确认",
+      actionLabel: "复检模型路由",
+    });
+
+    assert.ok(governanceTemplate?.includes("处理动作"));
+    assert.ok(governanceTemplate?.includes("新首选模型"));
+    assert.ok(governanceTemplate?.includes("成功率"));
+    assert.ok(governanceTemplate?.includes("备用命中"));
+    assert.ok(recheckTemplate?.includes("样本数"));
+    assert.ok(recheckTemplate?.includes("质量"));
+    assert.ok(recheckTemplate?.includes("是否需要治理"));
+    assert.equal(buildRouteDispatchCompletionTemplate({ stage: "record_metrics", title: "记录数据", actionLabel: "记录" }), null);
   });
 
   await t.test("marks the current route when it already matches the recommendation", () => {

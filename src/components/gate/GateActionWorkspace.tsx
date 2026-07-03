@@ -22,6 +22,7 @@ import {
   buildGatePlatformTacticExperienceMarkdown,
   buildGatePlatformDispatchReceipt,
   buildGatePlatformGrowthDispatchItems,
+  buildGateProjectStartValidationDispatchItems,
   buildGatePlatformGrowthReview,
   clearGateActionReceipts,
   clearPersistedGateActionReceipts,
@@ -112,6 +113,9 @@ function adviceActionTitle(kind: GateActionReviewAdviceAction["kind"]) {
 }
 
 function growthStageClass(stage: GatePlatformGrowthReview["stage"]) {
+  if (stage === "start_first_three_review") return "bg-indigo-50 text-indigo-700";
+  if (stage === "start_opening_diagnostic") return "bg-cyan-50 text-cyan-700";
+  if (stage === "start_platform_package") return "bg-fuchsia-50 text-fuchsia-700";
   if (stage === "fix_failure") return "bg-rose-50 text-rose-700";
   if (stage === "record_metrics") return "bg-amber-50 text-amber-700";
   if (stage === "adopt_asset") return "bg-blue-50 text-blue-700";
@@ -246,7 +250,12 @@ export function GateActionWorkspace({ actions }: { actions: PrePublishGateAction
   const filteredSummary = buildGateActionReceiptSummary(filteredReceipts);
   const reviewAdvice = buildGateActionReviewAdvice(filteredReceipts);
   const platformGrowthReview = buildGatePlatformGrowthReview(receipts);
-  const platformDispatchItems = buildGatePlatformGrowthDispatchItems(receipts, 6, persistedDispatchTasks);
+  const platformDispatchItems = [
+    ...buildGateProjectStartValidationDispatchItems(receipts, persistedDispatchTasks),
+    ...buildGatePlatformGrowthDispatchItems(receipts, 6, persistedDispatchTasks),
+  ]
+    .sort((a, b) => b.priorityScore - a.priorityScore || a.title.localeCompare(b.title))
+    .slice(0, 9);
   const visibleDispatchTasks = platformFilter === "all"
     ? persistedDispatchTasks
     : persistedDispatchTasks.filter((task) => task.platformId === platformFilter);

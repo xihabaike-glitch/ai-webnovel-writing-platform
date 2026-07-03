@@ -8,6 +8,7 @@ import {
   buildGateActionReviewAdvice,
   buildGatePlatformGrowthReview,
   buildGatePlatformGrowthDispatchItems,
+  buildGateProjectStartValidationDispatchItems,
   buildGatePlatformDispatchReceipt,
   buildGateDispatchEvidenceReview,
   buildGatePlatformScaleGate,
@@ -656,6 +657,47 @@ test("buildGateActionReceipt", async (t) => {
     assert.equal(dispatchItems[0].ownerRole, "运营数据编辑");
     assert.equal(dispatchItems[0].actionLabel, "派给数据编辑");
     assert.ok(dispatchItems[0].acceptanceCriteria.includes("曝光点击已填写"));
+  });
+
+  await t.test("turns project start validation advice into three dispatch cards", () => {
+    const startReceipt = buildProjectStartDecisionActionReceipt({
+      projectId: "project-1",
+      projectTitle: "夜雨系统",
+      platformId: "fanqie",
+      platformName: "番茄小说",
+      decision: {
+        status: "seed",
+        label: "先建打法",
+        headline: "这个项目还没有首轮平台打法，先别让 AI 自由发挥。",
+        nextExperiment: "先生成平台土壤和首轮开书打法，再进入前三章、审稿和发布包装。",
+        actionLabel: "补平台土壤",
+        targetAnchor: "world-bible",
+        evidence: ["未找到首轮平台打法记录。"],
+      },
+      startTactic: null,
+      created: ["核心规则", "首轮平台打法：番茄小说"],
+      skipped: null,
+      now: "2026-01-01T00:00:00.000Z",
+    });
+
+    const dispatchItems = buildGateProjectStartValidationDispatchItems([startReceipt]);
+
+    assert.equal(dispatchItems.length, 3);
+    assert.deepEqual(dispatchItems.map((item) => item.stage), [
+      "start_first_three_review",
+      "start_opening_diagnostic",
+      "start_platform_package",
+    ]);
+    assert.equal(dispatchItems[0].id, "fanqie:start_validation:first_three_review:project-1");
+    assert.equal(dispatchItems[0].state, "queued");
+    assert.equal(dispatchItems[0].ownerRole, "首轮审稿编辑");
+    assert.equal(dispatchItems[0].actionLabel, "派给审稿编辑");
+    assert.equal(dispatchItems[0].href, "/projects/project-1#ai-pipeline");
+    assert.ok(dispatchItems[0].acceptanceCriteria.includes("前三章至少完成一轮审稿"));
+    assert.equal(dispatchItems[1].href, "/projects/project-1#first-three-rewrite");
+    assert.ok(dispatchItems[1].acceptanceCriteria.includes("开头钩子诊断已完成"));
+    assert.equal(dispatchItems[2].href, "/projects/project-1#platform-export");
+    assert.ok(dispatchItems[2].acceptanceCriteria.includes("标题简介标签已有候选"));
   });
 
   await t.test("gates platform scale-up behind verified dispatch evidence", () => {

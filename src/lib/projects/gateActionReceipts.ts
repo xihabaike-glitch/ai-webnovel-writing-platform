@@ -134,6 +134,9 @@ export type GatePlatformGrowthReviewStage =
   | "repair_tactic"
   | "pivot_platform"
   | "pause_platform"
+  | "start_first_three_review"
+  | "start_opening_diagnostic"
+  | "start_platform_package"
   | "watch";
 
 export interface GatePlatformGrowthReview {
@@ -1069,6 +1072,10 @@ function projectAnchorHref(href: string, anchor: string) {
   return match?.[1] ? `/projects/${match[1]}${anchor}` : href;
 }
 
+function projectIdFromReceiptHref(href: string) {
+  return href.match(/\/projects\/([^/#?]+)/)?.[1] ?? "unknown";
+}
+
 function growthEvidence(input: {
   failed: number;
   assetRuns: number;
@@ -1327,6 +1334,95 @@ export function buildGatePlatformGrowthDispatchItems(
       evidence: review.evidence,
       reviewLatestAt: review.latestAt,
     };
+  });
+}
+
+export function buildGateProjectStartValidationDispatchItems(
+  receipts: GateActionReceipt[],
+  persistedTasks: PersistedGatePlatformDispatchTask[] = [],
+): GatePlatformGrowthDispatchItem[] {
+  const sorted = trimGateActionReceipts(receipts, defaultGateActionReceiptLimit);
+  const persistedByKey = new Map(persistedTasks.map((task) => [task.dispatchKey, task]));
+  const latestByPlatform = new Map<string, GateActionReceipt>();
+
+  for (const receipt of sorted) {
+    if (!isProjectStartDecisionReceipt(receipt) || receipt.status !== "succeeded") continue;
+    if (receipt.recheck.status === "blocked" || projectStartDecisionStatus(receipt) === "pause") continue;
+    const platform = gateActionReceiptPlatform(receipt);
+    if (!latestByPlatform.has(platform.id)) latestByPlatform.set(platform.id, receipt);
+  }
+
+  const specs: Array<{
+    suffix: string;
+    stage: GatePlatformGrowthReviewStage;
+    ownerRole: string;
+    titleSuffix: string;
+    detail: string;
+    dueLabel: string;
+    actionLabel: string;
+    anchor: string;
+    acceptanceCriteria: string[];
+  }> = [
+    {
+      suffix: "first_three_review",
+      stage: "start_first_three_review",
+      ownerRole: "首轮审稿编辑",
+      titleSuffix: "前三章审稿验证",
+      detail: "检查前三章是否执行首轮平台打法，重点看开头兑现、冲突升级、章末追读和平台调性。",
+      dueLabel: "今天",
+      actionLabel: "派给审稿编辑",
+      anchor: "#ai-pipeline",
+      acceptanceCriteria: ["前三章至少完成一轮审稿", "首轮打法执行问题已列出", "低分章节进入二改或重写队列"],
+    },
+    {
+      suffix: "opening_diagnostic",
+      stage: "start_opening_diagnostic",
+      ownerRole: "开头诊断编辑",
+      titleSuffix: "开头钩子诊断",
+      detail: "只盯第一屏和第一章：钩子是否够快、人物压力是否明确、平台避坑是否被真正避开。",
+      dueLabel: "今天",
+      actionLabel: "派给开头编辑",
+      anchor: "#first-three-rewrite",
+      acceptanceCriteria: ["开头钩子诊断已完成", "慢热或设定解释问题已标出", "需要重写的段落有明确处理入口"],
+    },
+    {
+      suffix: "platform_package",
+      stage: "start_platform_package",
+      ownerRole: "平台包装编辑",
+      titleSuffix: "平台包装验证",
+      detail: "把标题、简介、标签和卖点按目标平台重排，确认开书打法不只存在于正文，也进入投稿包装。",
+      dueLabel: "24 小时内",
+      actionLabel: "派给包装编辑",
+      anchor: "#platform-export",
+      acceptanceCriteria: ["标题简介标签已有候选", "卖点和目标平台读者承诺一致", "保存或准备保存发布包基准"],
+    },
+  ];
+
+  return [...latestByPlatform.entries()].flatMap(([platformId, receipt]) => {
+    const platform = gateActionReceiptPlatform(receipt);
+    const projectId = projectIdFromReceiptHref(receipt.href);
+
+    return specs.map((spec): GatePlatformGrowthDispatchItem => {
+      const dispatchKey = `${platformId}:start_validation:${spec.suffix}:${projectId}`;
+      const persisted = persistedByKey.get(dispatchKey);
+      return {
+        id: dispatchKey,
+        platformId,
+        platformName: platform.name,
+        stage: spec.stage,
+        state: persisted?.state ?? "queued",
+        priorityScore: spec.stage === "start_first_three_review" ? 82 : spec.stage === "start_opening_diagnostic" ? 78 : 72,
+        ownerRole: spec.ownerRole,
+        title: `${platform.name} ${spec.titleSuffix}`,
+        detail: spec.detail,
+        dueLabel: spec.dueLabel,
+        actionLabel: spec.actionLabel,
+        href: projectAnchorHref(receipt.href, spec.anchor),
+        acceptanceCriteria: spec.acceptanceCriteria,
+        evidence: adviceEvidence([receipt]),
+        reviewLatestAt: receipt.createdAt,
+      };
+    });
   });
 }
 

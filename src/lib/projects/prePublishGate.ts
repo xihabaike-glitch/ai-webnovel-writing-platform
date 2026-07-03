@@ -1,5 +1,6 @@
 import { buildFailureReviewCenter, type FailureReviewTask } from "../ai/failureReviewCenter.ts";
 import type { TaskBatchHistoryItem } from "../ai/taskBatchHistory.ts";
+import { buildTaskRunConsole, type FailureRepairBatch, type TaskRunInput } from "../ai/taskRunConsole.ts";
 import { getPlatformProfile, type PlatformId } from "../platforms/platformProfiles.ts";
 import { buildBatchExecutionSafety } from "./batchExecutionSafety.ts";
 import { getBatchExecutionStrategy, type BatchExecutionStrategyId } from "./batchExecutionStrategy.ts";
@@ -228,6 +229,7 @@ export interface PrePublishGate {
     canRunBatch: boolean;
   };
   items: PrePublishGateItem[];
+  failureRepairBatch: FailureRepairBatch;
   projectStatuses: PrePublishGateProjectStatus[];
   strategyReview: PrePublishGateStrategyReview;
   priorityActions: PrePublishGateAction[];
@@ -490,6 +492,44 @@ function uniqueActions(actions: PrePublishGateAction[]) {
   }).slice(0, 6);
 }
 
+function failureTaskToRunInput(task: FailureReviewTask): TaskRunInput {
+  return {
+    id: task.id,
+    projectId: task.projectId,
+    chapterId: task.chapterId ?? null,
+    taskType: task.taskType,
+    model: task.model,
+    status: task.status,
+    inputTokens: null,
+    outputTokens: null,
+    costUsd: null,
+    errorMessage: task.errorMessage,
+    inputSnapshot: "{}",
+    createdAt: task.createdAt,
+    updatedAt: task.createdAt,
+    project: task.project ?? null,
+    chapter: task.chapter ?? null,
+    modelProvider: task.modelProvider ?? null,
+  };
+}
+
+function failureGateStatus(batch: FailureRepairBatch): PrePublishGateItem["status"] {
+  if (batch.status === "clear") return "pass";
+  if (batch.status === "retry_sample") return "warn";
+  return "block";
+}
+
+function failureRepairAction(batch: FailureRepairBatch): PrePublishGateAction | null {
+  if (batch.status === "clear") return null;
+  return action(
+    "failure-repair-batch",
+    batch.primaryActionLabel,
+    `${batch.title}：${batch.detail}`,
+    batch.primaryActionHref,
+    batch.status === "retry_sample" ? "review" : "repair",
+  );
+}
+
 function strategyRecommendationLabel(recommendation: PrePublishGateStrategyPlatform["recommendation"]) {
   if (recommendation === "scale") return "主推放大";
   if (recommendation === "repair") return "先修再投";
@@ -664,13 +704,13 @@ export function buildPrePublishGate(input: PrePublishGateInput): PrePublishGate 
   const comparison = buildBatchStrategyComparison(queue.items, safetyProjects, input.batchHistory ?? []);
   const decision = buildBatchStrategyDecision(comparison, strategy.id);
   const failureCenter = buildFailureReviewCenter(input.failureTasks ?? []);
+  const failureRepairBatch = buildTaskRunConsole((input.failureTasks ?? []).map(failureTaskToRunInput)).failureRepairBatch;
   const projectStatuses = projects.map(projectStatus);
   const readyPackages = projectStatuses.filter((project) => project.status === "ready").length;
   const repairPackages = projectStatuses.filter((project) => project.status === "needs_repair").length;
   const emptyProjects = projectStatuses.filter((project) => project.status === "empty").length;
   const runnableTasks = queue.items.filter((item) => item.category !== "blocked" && item.category !== "export").length;
-  const failedTasks = failureCenter.summary.totalFailures;
-  const nonRetryableFailures = failedTasks - failureCenter.summary.retryableFailures;
+  const failedTasks = failureRepairBatch.summary.unresolvedFailures;
   const hasPublishableWork = projectStatuses.some((project) => project.publishableChapters > 0);
   const taskBlockers = queue.overview.publishBlocked + queue.overview.chapterCardBlocked;
 
@@ -704,12 +744,12 @@ export function buildPrePublishGate(input: PrePublishGateInput): PrePublishGate 
     gateItem({
       id: "ai-failures",
       label: "失败复盘",
-      status: nonRetryableFailures > 0 ? "block" : failedTasks > 0 ? "warn" : "pass",
+      status: failureGateStatus(failureRepairBatch),
       detail: failedTasks > 0
-        ? `${failedTasks} 个失败任务，其中 ${failureCenter.summary.retryableFailures} 个可重试。`
+        ? failureRepairBatch.detail
         : "近期没有失败任务记录。",
-      actionLabel: failedTasks > 0 ? "处理失败任务" : "查看复盘",
-      href: "/failures",
+      actionLabel: failedTasks > 0 ? failureRepairBatch.primaryActionLabel : "查看复盘",
+      href: failedTasks > 0 ? failureRepairBatch.primaryActionHref : "/failures",
     }),
     gateItem({
       id: "batch-safety",
@@ -754,6 +794,18 @@ export function buildPrePublishGate(input: PrePublishGateInput): PrePublishGate 
         project.href,
         "repair",
         project.execution,
+      )),
+    failureRepairAction(failureRepairBatch),
+    ...failureRepairBatch.items
+      .filter((item) => item.directRetrySupported)
+      .slice(0, 2)
+      .map((item) => action(
+        `repair-batch-retry:${item.id}`,
+        item.actionLabel,
+        `${item.projectTitle} · ${item.chapterTitle} · ${item.retryReason}`,
+        item.href,
+        "review",
+        { type: "retry_task", taskId: item.id },
       )),
     ...failureCenter.recentFailures
       .filter((failure) => failure.retryable)
@@ -800,10 +852,11 @@ export function buildPrePublishGate(input: PrePublishGateInput): PrePublishGate 
       blockedTasks: queue.overview.blockedCards,
       publishBlocked: queue.overview.publishBlocked,
       failureTasks: failedTasks,
-      retryableFailures: failureCenter.summary.retryableFailures,
+      retryableFailures: failureRepairBatch.summary.retryableFailures,
       canRunBatch: safety.canRunRecommendedBatch,
     },
     items,
+    failureRepairBatch,
     projectStatuses,
     strategyReview,
     priorityActions,

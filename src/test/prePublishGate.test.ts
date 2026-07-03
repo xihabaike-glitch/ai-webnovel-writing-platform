@@ -128,6 +128,52 @@ test("buildPrePublishGate", async (t) => {
     assert.ok(gate.priorityActions.some((action) => action.href === "/failures"));
   });
 
+  await t.test("routes unresolved model failures through the global repair batch", () => {
+    const gate = buildPrePublishGate({
+      projects: [readyProject],
+      failureTasks: [
+        {
+          id: "config-failure",
+          projectId: "project-ready",
+          chapterId: "chapter-1",
+          taskType: "chapter_review",
+          model: "deepseek-chat",
+          status: "failed",
+          errorMessage: "API key missing",
+          createdAt: "2026-01-08T00:00:00.000Z",
+          project: { title: "夜雨系统" },
+          chapter: { title: "第1夜" },
+          modelProvider: { providerId: "deepseek", displayName: "DeepSeek" },
+        },
+        {
+          id: "timeout-failure",
+          projectId: "project-ready",
+          chapterId: "chapter-2",
+          taskType: "chapter_draft",
+          model: "mock-writer",
+          status: "failed",
+          errorMessage: "Model request failed: 503 provider timeout",
+          createdAt: "2026-01-08T00:01:00.000Z",
+          project: { title: "夜雨系统" },
+          chapter: { title: "第2夜" },
+          modelProvider: { providerId: "mock", displayName: "Mock" },
+        },
+      ],
+      batchHistory: [],
+    });
+    const failureItem = gate.items.find((item) => item.id === "ai-failures");
+
+    assert.equal(gate.failureRepairBatch.status, "fix_config");
+    assert.equal(gate.failureRepairBatch.summary.configFailures, 1);
+    assert.equal(gate.failureRepairBatch.summary.retryableFailures, 1);
+    assert.equal(failureItem?.status, "block");
+    assert.equal(failureItem?.actionLabel, "去模型设置");
+    assert.equal(failureItem?.href, "/settings/models");
+    assert.match(failureItem?.detail ?? "", /先修配置/);
+    assert.ok(gate.priorityActions.some((action) => action.id === "failure-repair-batch" && action.href === "/settings/models"));
+    assert.ok(gate.priorityActions.some((action) => action.execution?.type === "retry_task" && action.execution.taskId === "timeout-failure"));
+  });
+
   await t.test("summarizes publish effect metrics for launch review", () => {
     const gate = buildPrePublishGate({
       projects: [{

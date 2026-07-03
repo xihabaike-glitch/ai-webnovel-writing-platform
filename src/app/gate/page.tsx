@@ -30,6 +30,12 @@ function checkTone(status: PrePublishGateItem["status"]) {
   return "bg-rose-50 text-rose-700";
 }
 
+function repairBatchTone(status: ReturnType<typeof buildPrePublishGate>["failureRepairBatch"]["status"]) {
+  if (status === "clear") return "border-emerald-200 bg-emerald-50 text-emerald-800";
+  if (status === "retry_sample") return "border-amber-200 bg-amber-50 text-amber-800";
+  return "border-rose-200 bg-rose-50 text-rose-800";
+}
+
 export default async function GatePage() {
   const [projects, recentAiTasks, chapters] = await Promise.all([
     prisma.project.findMany({
@@ -141,6 +147,26 @@ export default async function GatePage() {
         <div className="rounded-md border border-slate-200 bg-white p-3">
           <div className="text-xs text-slate-500">失败任务</div>
           <div className="mt-1 text-2xl font-semibold">{gate.overview.failureTasks}</div>
+        </div>
+      </section>
+
+      <section className={`mb-6 rounded-md border p-4 ${repairBatchTone(gate.failureRepairBatch.status)}`}>
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <h2 className="font-medium">失败修复批次</h2>
+            <p className="mt-1 text-sm leading-6">{gate.failureRepairBatch.title}：{gate.failureRepairBatch.detail}</p>
+          </div>
+          <Link className="w-fit rounded-md bg-slate-950 px-4 py-2 text-sm font-medium text-white" href={gate.failureRepairBatch.primaryActionHref}>
+            {gate.failureRepairBatch.primaryActionLabel}
+          </Link>
+        </div>
+        <div className="mt-3 grid gap-2 text-sm md:grid-cols-3 lg:grid-cols-6">
+          <div className="rounded-md bg-white/70 px-3 py-2">未恢复 {gate.failureRepairBatch.summary.unresolvedFailures}</div>
+          <div className="rounded-md bg-white/70 px-3 py-2">配置类 {gate.failureRepairBatch.summary.configFailures}</div>
+          <div className="rounded-md bg-white/70 px-3 py-2">可重试 {gate.failureRepairBatch.summary.retryableFailures}</div>
+          <div className="rounded-md bg-white/70 px-3 py-2">人工复盘 {gate.failureRepairBatch.summary.manualFailures}</div>
+          <div className="rounded-md bg-white/70 px-3 py-2">项目 {gate.failureRepairBatch.summary.affectedProjects}</div>
+          <div className="rounded-md bg-white/70 px-3 py-2">模型 {gate.failureRepairBatch.summary.affectedProviders}</div>
         </div>
       </section>
 

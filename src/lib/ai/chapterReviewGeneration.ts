@@ -1,5 +1,6 @@
 import { buildChapterReviewPrompt } from "@/lib/ai/buildChapterReviewPrompt";
 import { prisma } from "@/lib/db/prisma";
+import type { ForcedProviderTarget } from "@/lib/model-gateway/providerSelection";
 import { runRoutedGeneration } from "@/lib/model-gateway/routedGeneration";
 import { getPlatformProfile, type PlatformId } from "@/lib/platforms/platformProfiles";
 import { findProjectStartTacticSummary } from "@/lib/projects/projectStartTactics";
@@ -17,7 +18,11 @@ export interface ChapterReviewResult {
   summary: string;
 }
 
-export async function reviewChapterDraft(chapterId: string) {
+export interface ReviewChapterDraftOptions {
+  forcedProvider?: ForcedProviderTarget;
+}
+
+export async function reviewChapterDraft(chapterId: string, options: ReviewChapterDraftOptions = {}) {
   const chapter = await prisma.chapter.findUnique({
     where: { id: chapterId },
     include: {
@@ -62,6 +67,7 @@ export async function reviewChapterDraft(chapterId: string) {
     validateResult: (result) => {
       JSON.parse(result.text);
     },
+    forcedProvider: options.forcedProvider,
   });
 
   if (generation.ok) {

@@ -1,7 +1,13 @@
 import type { ModelProvider } from "@prisma/client";
 import { prisma } from "../db/prisma.ts";
 import { createModelAdapter } from "./adapterFactory.ts";
-import { selectModelProviderCandidatesForTask, selectModelProviderForTask } from "./providerSelection.ts";
+import {
+  selectForcedModelProviderCandidate,
+  selectModelProviderCandidatesForTask,
+  selectModelProviderForTask,
+  type ForcedProviderTarget,
+  type ProviderCandidateRole,
+} from "./providerSelection.ts";
 import type { RoutedModelTaskType } from "./taskRouting.ts";
 import type { ModelAdapter } from "./types.ts";
 
@@ -11,7 +17,7 @@ export interface SelectedModelProvider {
 }
 
 export interface SelectedModelProviderCandidate extends SelectedModelProvider {
-  role: "primary" | "fallback" | "auto";
+  role: ProviderCandidateRole;
 }
 
 async function ensureMockProvider() {
@@ -55,13 +61,29 @@ export async function getActiveModelProvider(taskType?: RoutedModelTaskType): Pr
   };
 }
 
-export async function getModelProviderCandidates(taskType?: RoutedModelTaskType): Promise<SelectedModelProviderCandidate[]> {
+export interface ModelProviderCandidateOptions {
+  forcedProvider?: ForcedProviderTarget;
+}
+
+export async function getModelProviderCandidates(
+  taskType?: RoutedModelTaskType,
+  options: ModelProviderCandidateOptions = {},
+): Promise<SelectedModelProviderCandidate[]> {
   let providers = await prisma.modelProvider.findMany({
     orderBy: { updatedAt: "desc" },
   });
 
   if (providers.length === 0) {
     providers = [await ensureMockProvider()];
+  }
+
+  if (options.forcedProvider) {
+    const candidate = selectForcedModelProviderCandidate(providers, options.forcedProvider);
+    return candidate ? [{
+      role: candidate.role,
+      provider: candidate.provider,
+      adapter: createModelAdapter(candidate.provider),
+    }] : [];
   }
 
   let route: {

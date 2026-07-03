@@ -3,7 +3,7 @@ export interface BatchRouteEffectItem {
   taskId: string;
   providerName: string;
   model: string;
-  role?: "primary" | "fallback" | "auto" | null;
+  role?: "primary" | "fallback" | "auto" | "forced" | null;
   inputTokens?: number | null;
   outputTokens?: number | null;
   costUsd?: number | null;
@@ -22,6 +22,7 @@ export interface BatchRouteEffectSummary {
   primaryTasks: number;
   fallbackTasks: number;
   autoTasks: number;
+  forcedTasks: number;
   providerLabels: string[];
   verdict: string;
 }
@@ -71,6 +72,7 @@ export function buildBatchRouteEffectSummary(items: BatchRouteEffectItem[]): Bat
   const primaryTasks = items.filter((item) => item.role === "primary").length;
   const fallbackTasks = items.filter((item) => item.role === "fallback").length;
   const autoTasks = items.filter((item) => !item.role || item.role === "auto").length;
+  const forcedTasks = items.filter((item) => item.role === "forced").length;
   const successRatePercent = successRate(succeededTasks, items.length);
 
   return {
@@ -85,6 +87,7 @@ export function buildBatchRouteEffectSummary(items: BatchRouteEffectItem[]): Bat
     primaryTasks,
     fallbackTasks,
     autoTasks,
+    forcedTasks,
     providerLabels: [...new Set(items.map((item) => `${item.providerName} · ${item.model}`))],
     verdict: verdictFor({
       totalTasks: items.length,

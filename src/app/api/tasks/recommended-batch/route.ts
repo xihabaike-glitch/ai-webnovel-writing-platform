@@ -11,7 +11,7 @@ import { findProjectStartTacticSummary } from "@/lib/projects/projectStartTactic
 import { buildTaskQueueCenter } from "@/lib/projects/taskQueueCenter";
 import { buildTaskQueueExecutionPlan } from "@/lib/projects/taskQueueExecutionPlan";
 
-function roleFor(result: { attempts: Array<{ taskId: string; role: "primary" | "fallback" | "auto" }> }, taskId: string) {
+function roleFor(result: { attempts: Array<{ taskId: string; role: "primary" | "fallback" | "auto" | "forced" }> }, taskId: string) {
   return result.attempts.find((attempt) => attempt.taskId === taskId)?.role ?? null;
 }
 

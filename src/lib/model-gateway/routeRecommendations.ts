@@ -77,6 +77,7 @@ export interface RouteAvoidanceGovernanceItem {
   id: string;
   ruleKey: string;
   providerName: string;
+  providerConfigId: string | null;
   providerId: string | null;
   model: string;
   taskScope: string;
@@ -98,6 +99,8 @@ export interface RouteAvoidanceRetestQueueItem {
   id: string;
   ruleKey: string;
   providerName: string;
+  providerConfigId: string | null;
+  providerId: string | null;
   model: string;
   taskScope: string;
   taskType: string | null;
@@ -452,6 +455,8 @@ function buildRetestQueue(
       id: `${item.id}:retest`,
       ruleKey: item.ruleKey,
       providerName: item.providerName,
+      providerConfigId: item.providerConfigId,
+      providerId: item.providerId,
       model: item.model,
       taskScope: item.taskScope,
       taskType: item.scopedTaskType,
@@ -627,6 +632,7 @@ export function buildRouteAvoidanceGovernance(
       id: routeAvoidanceRuleId(rule, index),
       ruleKey: buildRouteAvoidanceRuleKey(rule),
       providerName,
+      providerConfigId: provider?.id ?? rule.providerConfigId ?? null,
       providerId: provider?.providerId ?? rule.providerId ?? null,
       model,
       taskScope,

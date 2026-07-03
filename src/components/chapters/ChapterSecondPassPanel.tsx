@@ -28,7 +28,7 @@ interface SecondPassResult {
   };
   attempts?: Array<{
     status: "succeeded" | "failed";
-    role: "primary" | "fallback" | "auto";
+    role: "primary" | "fallback" | "auto" | "forced";
     displayName: string;
     model: string;
   }>;
@@ -54,9 +54,10 @@ const modeOptions: Array<{ value: SecondPassMode; label: string }> = [
   { value: "more_emotion", label: "情绪更重" },
 ];
 
-function roleLabel(role: "primary" | "fallback" | "auto") {
+function roleLabel(role: "primary" | "fallback" | "auto" | "forced") {
   if (role === "primary") return "首选";
   if (role === "fallback") return "备用";
+  if (role === "forced") return "指定";
   return "自动";
 }
 

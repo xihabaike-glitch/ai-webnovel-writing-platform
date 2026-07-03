@@ -1,7 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { buildPresetRouteBlueprint } from "../lib/model-gateway/presetRouteBlueprint.ts";
-import { selectModelProviderCandidatesForTask, selectModelProviderForTask } from "../lib/model-gateway/providerSelection.ts";
+import {
+  selectForcedModelProviderCandidate,
+  selectModelProviderCandidatesForTask,
+  selectModelProviderForTask,
+} from "../lib/model-gateway/providerSelection.ts";
 import {
   applyRouteAvoidanceOverrides,
   buildRouteAvoidanceGovernance,
@@ -17,6 +21,7 @@ const mockProvider = {
   id: "mock-provider",
   providerId: "mock",
   displayName: "Mock",
+  defaultModel: "mock-writer",
   enabled: true,
   encryptedApiKey: null,
 };
@@ -25,6 +30,7 @@ const gptProvider = {
   id: "gpt-provider",
   providerId: "gpt",
   displayName: "GPT",
+  defaultModel: "gpt-5-mini",
   enabled: true,
   encryptedApiKey: "key",
 };
@@ -33,6 +39,7 @@ const disabledClaude = {
   id: "claude-provider",
   providerId: "claude",
   displayName: "Claude",
+  defaultModel: "claude-sonnet-4-5",
   enabled: false,
   encryptedApiKey: "key",
 };
@@ -64,6 +71,23 @@ test("model task routing", async (t) => {
 
     assert.deepEqual(candidates.map((candidate) => candidate.provider.id), ["gpt-provider", "mock-provider"]);
     assert.deepEqual(candidates.map((candidate) => candidate.role), ["primary", "fallback"]);
+  });
+
+  await t.test("selects a forced observed provider for route retests", () => {
+    const selected = selectForcedModelProviderCandidate([mockProvider, gptProvider], {
+      providerConfigId: "mock-provider",
+      providerId: "mock",
+      model: "mock-writer",
+    });
+    const disabled = selectForcedModelProviderCandidate([disabledClaude, gptProvider], {
+      providerConfigId: "claude-provider",
+      providerId: "claude",
+      model: "claude-sonnet-4-5",
+    });
+
+    assert.equal(selected?.provider.id, "mock-provider");
+    assert.equal(selected?.role, "forced");
+    assert.equal(disabled, null);
   });
 
   await t.test("deduplicates the automatic fallback candidate", () => {
@@ -796,6 +820,9 @@ test("model task routing", async (t) => {
 
     assert.equal(scopedPlan.canRun, true);
     assert.equal(scopedPlan.taskType, "chapter_review");
+    assert.equal(scopedPlan.providerConfigId, "deepseek-provider");
+    assert.equal(scopedPlan.providerId, "deepseek");
+    assert.equal(scopedPlan.model, "deepseek-chat");
     assert.equal(scopedPlan.projectId, "project-1");
     assert.deepEqual(scopedPlan.chapterIds, ["chapter-1"]);
     assert.equal(scopedPlan.sampleCount, 1);

@@ -9,9 +9,17 @@ export interface RouteProviderChoice<TProvider> {
   fallbackProvider?: TProvider | null;
 }
 
+export type ProviderCandidateRole = "primary" | "fallback" | "auto" | "forced";
+
 export interface ProviderCandidate<TProvider> {
   provider: TProvider;
-  role: "primary" | "fallback" | "auto";
+  role: ProviderCandidateRole;
+}
+
+export interface ForcedProviderTarget {
+  providerConfigId?: string | null;
+  providerId?: string | null;
+  model?: string | null;
 }
 
 export function canUseProvider(provider: SelectableProvider) {
@@ -59,4 +67,26 @@ export function selectModelProviderCandidatesForTask<TProvider extends Selectabl
   pushCandidate(candidates, pickDefaultProvider(providers), "auto");
 
   return candidates;
+}
+
+function sameText(left: string | null | undefined, right: string | null | undefined) {
+  return Boolean(left && right && left.toLowerCase() === right.toLowerCase());
+}
+
+export function selectForcedModelProviderCandidate<TProvider extends SelectableProvider & { id?: string; defaultModel?: string | null }>(
+  providers: TProvider[],
+  target: ForcedProviderTarget,
+): ProviderCandidate<TProvider> | null {
+  const hasTarget = Boolean(target.providerConfigId || target.providerId || target.model);
+  if (!hasTarget) return null;
+
+  const provider = providers.find((candidate) => {
+    if (!canUseProvider(candidate)) return false;
+    if (target.providerConfigId && !sameText(target.providerConfigId, candidate.id)) return false;
+    if (target.providerId && !sameText(target.providerId, candidate.providerId)) return false;
+    if (target.model && !sameText(target.model, candidate.defaultModel)) return false;
+    return true;
+  });
+
+  return provider ? { provider, role: "forced" } : null;
 }

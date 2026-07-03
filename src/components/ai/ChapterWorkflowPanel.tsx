@@ -74,7 +74,7 @@ interface WorkflowPayload {
     baseUrl: string | null;
   };
   modelRoute: Array<{
-    role: "primary" | "fallback" | "auto";
+    role: "primary" | "fallback" | "auto" | "forced";
     providerId: string;
     displayName: string;
     model: string;
@@ -116,9 +116,10 @@ function parseReview(outputText: string | null) {
   }
 }
 
-function modelRouteRoleLabel(role: "primary" | "fallback" | "auto") {
+function modelRouteRoleLabel(role: "primary" | "fallback" | "auto" | "forced") {
   if (role === "primary") return "首选";
   if (role === "fallback") return "备用";
+  if (role === "forced") return "指定";
   return "自动";
 }
 

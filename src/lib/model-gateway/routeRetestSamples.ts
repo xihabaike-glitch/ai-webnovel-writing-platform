@@ -15,6 +15,9 @@ export interface RouteRetestSamplePlan {
   canRun: boolean;
   status: "ready" | "needs_scope" | "unsupported" | "no_samples";
   taskType: string | null;
+  providerConfigId: string | null;
+  providerId: string | null;
+  model: string | null;
   projectId: string | null;
   projectTitle: string | null;
   chapterIds: string[];
@@ -29,6 +32,9 @@ function unsupportedPlan(item: RouteAvoidanceRetestQueueItem, status: RouteRetes
     canRun: false,
     status,
     taskType: item.taskType,
+    providerConfigId: item.providerConfigId,
+    providerId: item.providerId,
+    model: item.model,
     projectId: null,
     projectTitle: null,
     chapterIds: [],
@@ -61,13 +67,16 @@ export function buildRouteAvoidanceRetestSamplePlan(
         canRun: true,
         status: "ready",
         taskType: item.taskType,
+        providerConfigId: item.providerConfigId,
+        providerId: item.providerId,
+        model: item.model,
         projectId: project.id,
         projectTitle: project.title,
         chapterIds,
         sampleCount: chapterIds.length,
         actionLabel: `运行 ${chapterIds.length} 个复测样本`,
         reason: `已从「${project.title}」挑出 ${chapterIds.length} 个「${item.taskScope}」样本。`,
-        warning: "复测模式会标记样本来源；下一步需要指定被观察模型执行，避免普通路由绕开它。",
+        warning: `复测模式将强制使用「${item.providerName} · ${item.model}」，不会走普通备用路线。`,
       };
     }
   }

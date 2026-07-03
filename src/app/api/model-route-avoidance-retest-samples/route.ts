@@ -91,16 +91,22 @@ export async function POST(request: Request) {
     return NextResponse.json({ plan, results: [] });
   }
 
+  const forcedProvider = {
+    providerConfigId: plan.providerConfigId,
+    providerId: plan.providerId,
+    model: plan.model,
+  };
   const results = [];
   for (const chapterId of plan.chapterIds) {
     if (plan.taskType === "chapter_draft") {
-      const result = await generateChapterDraft({ chapterId });
+      const result = await generateChapterDraft({ chapterId, forcedProvider });
       results.push({
         chapterId,
         taskId: result.task.id,
         status: "error" in result ? "failed" : "succeeded",
         providerName: result.provider.displayName,
         model: result.provider.model,
+        routeRole: result.attempts.find((attempt) => attempt.taskId === result.task.id)?.role ?? null,
         score: "error" in result ? null : result.draftQuality.score,
         error: "error" in result ? result.error : null,
       });
@@ -108,13 +114,14 @@ export async function POST(request: Request) {
     }
 
     if (plan.taskType === "chapter_review") {
-      const result = await reviewChapterDraft(chapterId);
+      const result = await reviewChapterDraft(chapterId, { forcedProvider });
       results.push({
         chapterId,
         taskId: result.task.id,
         status: "error" in result ? "failed" : "succeeded",
         providerName: result.provider.displayName,
         model: result.provider.model,
+        routeRole: result.attempts.find((attempt) => attempt.taskId === result.task.id)?.role ?? null,
         score: "error" in result ? null : result.result.score,
         error: "error" in result ? result.error : null,
       });
@@ -124,6 +131,6 @@ export async function POST(request: Request) {
   return NextResponse.json({
     plan,
     results,
-    warning: "当前复测样本使用普通任务路由执行；下一步需要接入强制指定被观察模型，才算完整模型复测。",
+    warning: `已强制使用「${plan.providerId ?? plan.providerConfigId ?? "指定模型"} · ${plan.model ?? "默认模型"}」执行复测样本。`,
   });
 }

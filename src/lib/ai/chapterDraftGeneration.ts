@@ -2,6 +2,7 @@ import { buildChapterDraftPrompt } from "@/lib/ai/buildChapterDraftPrompt";
 import { buildDraftQualityAudit } from "@/lib/ai/draftQualityAudit";
 import { prisma } from "@/lib/db/prisma";
 import { runRoutedGeneration } from "@/lib/model-gateway/routedGeneration";
+import type { ForcedProviderTarget } from "@/lib/model-gateway/providerSelection";
 import { getPlatformProfile, type PlatformId } from "@/lib/platforms/platformProfiles";
 import { findProjectStartTacticSummary } from "@/lib/projects/projectStartTactics";
 import { countWords } from "@/lib/text/wordCount";
@@ -9,6 +10,7 @@ import { countWords } from "@/lib/text/wordCount";
 export interface GenerateChapterDraftOptions {
   chapterId: string;
   targetWords?: number;
+  forcedProvider?: ForcedProviderTarget;
 }
 
 export async function generateChapterDraft(options: GenerateChapterDraftOptions) {
@@ -58,6 +60,7 @@ export async function generateChapterDraft(options: GenerateChapterDraftOptions)
       temperature: 0.8,
       maxTokens: 2400,
     },
+    forcedProvider: options.forcedProvider,
   });
 
   if (generation.ok) {

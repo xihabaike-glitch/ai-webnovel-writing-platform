@@ -2,6 +2,7 @@ import type { AiTask, ModelProvider } from "@prisma/client";
 import { prisma } from "../db/prisma.ts";
 import { buildModelBudgetGuard, type ModelBudgetGuard } from "../ai/modelBudget.ts";
 import { getModelProviderCandidates, type SelectedModelProviderCandidate } from "./activeProvider.ts";
+import type { ForcedProviderTarget, ProviderCandidateRole } from "./providerSelection.ts";
 import type { RoutedModelTaskType } from "./taskRouting.ts";
 import type { GenerateRequest, GenerateResult, ModelProviderId } from "./types.ts";
 
@@ -11,7 +12,7 @@ export interface RoutedGenerationAttempt {
   providerId: string;
   displayName: string;
   model: string;
-  role: "primary" | "fallback" | "auto";
+  role: ProviderCandidateRole;
   status: "succeeded" | "failed";
   errorMessage?: string;
 }
@@ -42,6 +43,7 @@ export interface RunRoutedGenerationOptions {
   inputSnapshot: unknown;
   request: Omit<GenerateRequest, "providerId" | "model">;
   validateResult?: (result: GenerateResult, provider: ModelProvider) => void;
+  forcedProvider?: ForcedProviderTarget;
 }
 
 function providerLabel(candidate: SelectedModelProviderCandidate) {
@@ -63,7 +65,12 @@ function snapshotWithAttempt(inputSnapshot: unknown, candidate: SelectedModelPro
 }
 
 export async function runRoutedGeneration(options: RunRoutedGenerationOptions): Promise<RoutedGenerationSuccess | RoutedGenerationFailure> {
-  const candidates = await getModelProviderCandidates(options.taskType);
+  const candidates = await getModelProviderCandidates(options.taskType, {
+    forcedProvider: options.forcedProvider,
+  });
+  if (candidates.length === 0) {
+    throw new Error("指定复测模型不可用，请检查模型是否启用、密钥是否可用，或重新限定避坑规则。");
+  }
   const attempts: RoutedGenerationAttempt[] = [];
   let lastFailure: RoutedGenerationFailure | null = null;
   const [project, budgetTasks] = await Promise.all([

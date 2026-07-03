@@ -8,7 +8,13 @@ import { buildModelBudgetGuard } from "@/lib/ai/modelBudget";
 import { prisma } from "@/lib/db/prisma";
 import { getActiveModelProvider } from "@/lib/model-gateway/activeProvider";
 import { buildBatchRouteEffectSummary } from "@/lib/model-gateway/batchRouteEffectSummary";
-import { buildRouteAvoidanceRulesFromDispatchTasks, buildRouteRecommendations } from "@/lib/model-gateway/routeRecommendations";
+import {
+  applyRouteAvoidanceOverrides,
+  buildRouteAvoidanceRulesFromDispatchTasks,
+  buildRouteRecommendations,
+  routeAvoidanceOverrideFromRecord,
+  type RouteAvoidanceOverride,
+} from "@/lib/model-gateway/routeRecommendations";
 import { getPlatformProfile, type PlatformId } from "@/lib/platforms/platformProfiles";
 
 interface Params {
@@ -69,7 +75,7 @@ async function getRecentBudgetTasks(projectId: string) {
 }
 
 async function getRouteRecommendation(projectId: string) {
-  const [tasks, routes, providers, completedRouteRepairs] = await Promise.all([
+  const [tasks, routes, providers, completedRouteRepairs, routeAvoidanceOverrides] = await Promise.all([
     prisma.aiTask.findMany({
       where: { projectId },
       orderBy: { createdAt: "desc" },
@@ -118,8 +124,21 @@ async function getRouteRecommendation(projectId: string) {
         evidence: true,
       },
     }),
+    prisma.modelRouteAvoidanceOverride.findMany({
+      orderBy: { updatedAt: "desc" },
+      select: {
+        ruleKey: true,
+        action: true,
+        taskType: true,
+        note: true,
+        expiresAt: true,
+      },
+    }),
   ]);
-  const avoidanceRules = buildRouteAvoidanceRulesFromDispatchTasks(completedRouteRepairs, providers);
+  const avoidanceRules = applyRouteAvoidanceOverrides(
+    buildRouteAvoidanceRulesFromDispatchTasks(completedRouteRepairs, providers),
+    routeAvoidanceOverrides.map(routeAvoidanceOverrideFromRecord).filter((override): override is RouteAvoidanceOverride => Boolean(override)),
+  );
 
   return buildRouteRecommendations(tasks, routes, providers, { avoidanceRules }).find((recommendation) => recommendation.taskType === "chapter_draft") ?? null;
 }

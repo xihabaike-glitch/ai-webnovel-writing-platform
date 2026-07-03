@@ -5,7 +5,14 @@ import { buildPresetRouteBlueprint } from "@/lib/model-gateway/presetRouteBluepr
 import { providerModelPresets, providerOptions } from "@/lib/model-gateway/providerDefaults";
 import { buildProviderHealthDashboard } from "@/lib/model-gateway/providerHealth";
 import { buildRouteEffectAudit } from "@/lib/model-gateway/routeEffectAudit";
-import { buildRouteAvoidanceGovernance, buildRouteAvoidanceRulesFromDispatchTasks, buildRouteRecommendations } from "@/lib/model-gateway/routeRecommendations";
+import {
+  applyRouteAvoidanceOverrides,
+  buildRouteAvoidanceGovernance,
+  buildRouteAvoidanceRulesFromDispatchTasks,
+  buildRouteRecommendations,
+  routeAvoidanceOverrideFromRecord,
+  type RouteAvoidanceOverride,
+} from "@/lib/model-gateway/routeRecommendations";
 import { modelTaskRouteOptions } from "@/lib/model-gateway/taskRouting";
 
 export const dynamic = "force-dynamic";
@@ -35,7 +42,7 @@ function maskProvider(provider: {
 }
 
 export default async function ModelSettingsPage() {
-  const [providers, routes, recentTasks, completedRouteRepairs] = await Promise.all([
+  const [providers, routes, recentTasks, completedRouteRepairs, routeAvoidanceOverrides] = await Promise.all([
     prisma.modelProvider.findMany({
       orderBy: { updatedAt: "desc" },
     }),
@@ -71,6 +78,16 @@ export default async function ModelSettingsPage() {
         evidence: true,
       },
     }),
+    prisma.modelRouteAvoidanceOverride.findMany({
+      orderBy: { updatedAt: "desc" },
+      select: {
+        ruleKey: true,
+        action: true,
+        taskType: true,
+        note: true,
+        expiresAt: true,
+      },
+    }),
   ]);
   const maskedProviders = providers.map(maskProvider);
   const routeProviders = providers.map((provider) => ({
@@ -81,7 +98,10 @@ export default async function ModelSettingsPage() {
     enabled: provider.enabled,
     encryptedApiKey: provider.encryptedApiKey,
   }));
-  const routeAvoidanceRules = buildRouteAvoidanceRulesFromDispatchTasks(completedRouteRepairs, routeProviders);
+  const routeAvoidanceRules = applyRouteAvoidanceOverrides(
+    buildRouteAvoidanceRulesFromDispatchTasks(completedRouteRepairs, routeProviders),
+    routeAvoidanceOverrides.map(routeAvoidanceOverrideFromRecord).filter((override): override is RouteAvoidanceOverride => Boolean(override)),
+  );
   const routeAvoidanceGovernance = buildRouteAvoidanceGovernance(routeAvoidanceRules, routeProviders);
   const healthDashboard = buildProviderHealthDashboard(maskedProviders);
   const routeEffectAudit = buildRouteEffectAudit(

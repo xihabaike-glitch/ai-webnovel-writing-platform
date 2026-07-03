@@ -1,7 +1,12 @@
 import { NextResponse } from "next/server";
 import { buildModelTaskAuditDashboard } from "@/lib/ai/modelTaskAudit";
 import { prisma } from "@/lib/db/prisma";
-import { buildRouteAvoidanceRulesFromDispatchTasks } from "@/lib/model-gateway/routeRecommendations";
+import {
+  applyRouteAvoidanceOverrides,
+  buildRouteAvoidanceRulesFromDispatchTasks,
+  routeAvoidanceOverrideFromRecord,
+  type RouteAvoidanceOverride,
+} from "@/lib/model-gateway/routeRecommendations";
 
 interface Params {
   params: Promise<{ projectId: string }>;
@@ -25,7 +30,7 @@ export async function GET(_request: Request, { params }: Params) {
     return NextResponse.json({ error: "Project not found" }, { status: 404 });
   }
 
-  const [tasks, providers, routes, chapters, completedRouteRepairs] = await Promise.all([
+  const [tasks, providers, routes, chapters, completedRouteRepairs, routeAvoidanceOverrides] = await Promise.all([
     prisma.aiTask.findMany({
       where: { projectId },
       include: {
@@ -68,9 +73,22 @@ export async function GET(_request: Request, { params }: Params) {
         evidence: true,
       },
     }),
+    prisma.modelRouteAvoidanceOverride.findMany({
+      orderBy: { updatedAt: "desc" },
+      select: {
+        ruleKey: true,
+        action: true,
+        taskType: true,
+        note: true,
+        expiresAt: true,
+      },
+    }),
   ]);
   const chaptersById = new Map(chapters.map((chapter) => [chapter.id, chapter]));
-  const routeAvoidanceRules = buildRouteAvoidanceRulesFromDispatchTasks(completedRouteRepairs, providers);
+  const routeAvoidanceRules = applyRouteAvoidanceOverrides(
+    buildRouteAvoidanceRulesFromDispatchTasks(completedRouteRepairs, providers),
+    routeAvoidanceOverrides.map(routeAvoidanceOverrideFromRecord).filter((override): override is RouteAvoidanceOverride => Boolean(override)),
+  );
 
   return NextResponse.json({
     dashboard: buildModelTaskAuditDashboard(

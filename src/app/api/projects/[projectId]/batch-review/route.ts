@@ -9,7 +9,13 @@ import { buildModelBudgetGuard } from "@/lib/ai/modelBudget";
 import { prisma } from "@/lib/db/prisma";
 import { getActiveModelProvider } from "@/lib/model-gateway/activeProvider";
 import { buildBatchRouteEffectSummary } from "@/lib/model-gateway/batchRouteEffectSummary";
-import { buildRouteAvoidanceRulesFromDispatchTasks, buildRouteRecommendations } from "@/lib/model-gateway/routeRecommendations";
+import {
+  applyRouteAvoidanceOverrides,
+  buildRouteAvoidanceRulesFromDispatchTasks,
+  buildRouteRecommendations,
+  routeAvoidanceOverrideFromRecord,
+  type RouteAvoidanceOverride,
+} from "@/lib/model-gateway/routeRecommendations";
 import { findProjectStartTacticSummary } from "@/lib/projects/projectStartTactics";
 
 interface Params {
@@ -72,7 +78,7 @@ async function getRecentBudgetTasks(projectId: string) {
 }
 
 async function getRouteRecommendations(projectId: string) {
-  const [tasks, routes, providers, completedRouteRepairs] = await Promise.all([
+  const [tasks, routes, providers, completedRouteRepairs, routeAvoidanceOverrides] = await Promise.all([
     prisma.aiTask.findMany({
       where: { projectId },
       orderBy: { createdAt: "desc" },
@@ -121,8 +127,21 @@ async function getRouteRecommendations(projectId: string) {
         evidence: true,
       },
     }),
+    prisma.modelRouteAvoidanceOverride.findMany({
+      orderBy: { updatedAt: "desc" },
+      select: {
+        ruleKey: true,
+        action: true,
+        taskType: true,
+        note: true,
+        expiresAt: true,
+      },
+    }),
   ]);
-  const avoidanceRules = buildRouteAvoidanceRulesFromDispatchTasks(completedRouteRepairs, providers);
+  const avoidanceRules = applyRouteAvoidanceOverrides(
+    buildRouteAvoidanceRulesFromDispatchTasks(completedRouteRepairs, providers),
+    routeAvoidanceOverrides.map(routeAvoidanceOverrideFromRecord).filter((override): override is RouteAvoidanceOverride => Boolean(override)),
+  );
   const recommendations = buildRouteRecommendations(tasks, routes, providers, { avoidanceRules });
 
   return {

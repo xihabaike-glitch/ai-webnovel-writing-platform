@@ -2,7 +2,13 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { buildPresetRouteBlueprint } from "../lib/model-gateway/presetRouteBlueprint.ts";
 import { selectModelProviderCandidatesForTask, selectModelProviderForTask } from "../lib/model-gateway/providerSelection.ts";
-import { buildRouteAvoidanceGovernance, buildRouteAvoidanceRulesFromDispatchTasks, buildRouteRecommendations } from "../lib/model-gateway/routeRecommendations.ts";
+import {
+  applyRouteAvoidanceOverrides,
+  buildRouteAvoidanceGovernance,
+  buildRouteAvoidanceRuleKey,
+  buildRouteAvoidanceRulesFromDispatchTasks,
+  buildRouteRecommendations,
+} from "../lib/model-gateway/routeRecommendations.ts";
 import { labelForRoutedTask, modelTaskRouteOptions } from "../lib/model-gateway/taskRouting.ts";
 
 const mockProvider = {
@@ -413,5 +419,113 @@ test("model task routing", async (t) => {
     assert.ok(governance.items[0].reviewAction.includes("人工解除观察"));
     assert.equal(governance.items[1].taskScope, "章节审稿");
     assert.ok(governance.nextActions.some((action) => action.includes("全局避坑规则")));
+  });
+
+  await t.test("applies manual avoidance governance actions before routing", () => {
+    const rawRules = [
+      {
+        providerConfigId: "deepseek-provider",
+        providerId: "deepseek",
+        model: "deepseek-chat",
+        reason: "DeepSeek 失败路线降级到 Kimi。",
+        evidence: ["第三轮恢复闭环"],
+      },
+      {
+        providerConfigId: "gpt-provider",
+        providerId: "gpt",
+        model: "gpt-4.1",
+        reason: "GPT 审稿 JSON 不稳定。",
+        evidence: ["审稿失败 2 次"],
+      },
+    ];
+    const effective = applyRouteAvoidanceOverrides(rawRules, [
+      {
+        ruleKey: buildRouteAvoidanceRuleKey(rawRules[0]),
+        action: "scope_task",
+        taskType: "chapter_review",
+        note: "只在审稿任务继续观察。",
+      },
+      {
+        ruleKey: buildRouteAvoidanceRuleKey(rawRules[1]),
+        action: "dismiss",
+        note: "人工复测通过，解除观察。",
+      },
+    ]);
+
+    assert.equal(effective.length, 1);
+    assert.equal(effective[0].providerId, "deepseek");
+    assert.equal(effective[0].taskType, "chapter_review");
+    assert.ok(effective[0].governanceNote?.includes("继续观察"));
+
+    const recommendations = buildRouteRecommendations([
+      {
+        id: "draft-deepseek-1",
+        taskType: "chapter_draft",
+        providerConfigId: "deepseek-provider",
+        status: "succeeded",
+        inputTokens: 1000,
+        outputTokens: 1200,
+        costUsd: 0.002,
+        outputText: JSON.stringify({ score: 86 }),
+      },
+      {
+        id: "draft-deepseek-2",
+        taskType: "chapter_draft",
+        providerConfigId: "deepseek-provider",
+        status: "succeeded",
+        inputTokens: 1000,
+        outputTokens: 1200,
+        costUsd: 0.002,
+        outputText: JSON.stringify({ score: 85 }),
+      },
+    ], [], [
+      {
+        id: "deepseek-provider",
+        providerId: "deepseek",
+        displayName: "DeepSeek",
+        defaultModel: "deepseek-chat",
+        enabled: true,
+        encryptedApiKey: "key",
+      },
+    ], { avoidanceRules: effective });
+
+    const draft = recommendations.find((item) => item.taskType === "chapter_draft");
+
+    assert.equal(draft?.recommendedPrimaryProviderConfigId, "deepseek-provider");
+    assert.equal(draft?.avoidance.status, "none");
+  });
+
+  await t.test("shows extended watch windows in governance", () => {
+    const rawRules = [
+      {
+        providerConfigId: "deepseek-provider",
+        providerId: "deepseek",
+        model: "deepseek-chat",
+        reason: "DeepSeek 批量路线需要继续观察。",
+        evidence: ["第三轮恢复闭环"],
+      },
+    ];
+    const effective = applyRouteAvoidanceOverrides(rawRules, [
+      {
+        ruleKey: buildRouteAvoidanceRuleKey(rawRules[0]),
+        action: "extend_watch",
+        expiresAt: "2026-07-20T00:00:00.000Z",
+        note: "再跑两批后复核。",
+      },
+    ]);
+    const governance = buildRouteAvoidanceGovernance(effective, [
+      {
+        id: "deepseek-provider",
+        providerId: "deepseek",
+        displayName: "DeepSeek",
+        defaultModel: "deepseek-chat",
+        enabled: true,
+        encryptedApiKey: "key",
+      },
+    ]);
+
+    assert.equal(governance.items[0].watchUntil, "2026-07-20T00:00:00.000Z");
+    assert.ok(governance.items[0].reviewAction.includes("2026-07-20"));
+    assert.ok(governance.items[0].reviewAction.includes("再跑两批"));
   });
 });

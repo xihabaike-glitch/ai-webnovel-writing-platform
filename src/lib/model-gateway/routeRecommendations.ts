@@ -33,6 +33,26 @@ export interface RouteAvoidanceRule {
   model?: string | null;
   reason: string;
   evidence?: string[];
+  governanceNote?: string | null;
+  watchUntil?: string | null;
+}
+
+export type RouteAvoidanceOverrideAction = "dismiss" | "scope_task" | "extend_watch";
+
+export interface RouteAvoidanceOverride {
+  ruleKey: string;
+  action: RouteAvoidanceOverrideAction;
+  taskType?: string | null;
+  note?: string | null;
+  expiresAt?: string | null;
+}
+
+export interface RouteAvoidanceOverrideRecord {
+  ruleKey: string;
+  action: string;
+  taskType: string | null;
+  note: string;
+  expiresAt: Date | string | null;
 }
 
 export interface RouteRecommendationAvoidance {
@@ -55,6 +75,7 @@ export interface RouteAvoidanceDispatchTask {
 
 export interface RouteAvoidanceGovernanceItem {
   id: string;
+  ruleKey: string;
   providerName: string;
   providerId: string | null;
   model: string;
@@ -64,6 +85,8 @@ export interface RouteAvoidanceGovernanceItem {
   reviewAction: string;
   reason: string;
   evidence: string[];
+  governanceNote: string | null;
+  watchUntil: string | null;
 }
 
 export interface RouteAvoidanceGovernance {
@@ -239,6 +262,49 @@ export function buildRouteAvoidanceRulesFromDispatchTasks(
   return Array.from(rules.values());
 }
 
+export function buildRouteAvoidanceRuleKey(rule: RouteAvoidanceRule) {
+  return [
+    rule.providerConfigId ?? rule.providerId ?? "provider",
+    rule.model ?? "model",
+  ].join(":");
+}
+
+export function applyRouteAvoidanceOverrides(
+  rules: RouteAvoidanceRule[],
+  overrides: RouteAvoidanceOverride[],
+): RouteAvoidanceRule[] {
+  const overridesByKey = new Map(overrides.map((override) => [override.ruleKey, override]));
+
+  return rules.flatMap((rule) => {
+    const override = overridesByKey.get(buildRouteAvoidanceRuleKey(rule));
+    if (!override) return [rule];
+    if (override.action === "dismiss") return [];
+    if (override.action === "scope_task") {
+      return [{
+        ...rule,
+        taskType: override.taskType ?? rule.taskType ?? null,
+        governanceNote: override.note ?? null,
+      }];
+    }
+    return [{
+      ...rule,
+      governanceNote: override.note ?? null,
+      watchUntil: override.expiresAt ?? null,
+    }];
+  });
+}
+
+export function routeAvoidanceOverrideFromRecord(record: RouteAvoidanceOverrideRecord): RouteAvoidanceOverride | null {
+  if (record.action !== "dismiss" && record.action !== "scope_task" && record.action !== "extend_watch") return null;
+  return {
+    ruleKey: record.ruleKey,
+    action: record.action,
+    taskType: record.taskType,
+    note: record.note,
+    expiresAt: record.expiresAt instanceof Date ? record.expiresAt.toISOString() : record.expiresAt,
+  };
+}
+
 function providerForRule(
   rule: RouteAvoidanceRule,
   providers: RouteRecommendationProvider[],
@@ -272,17 +338,22 @@ export function buildRouteAvoidanceGovernance(
 
     return {
       id: routeAvoidanceRuleId(rule, index),
+      ruleKey: buildRouteAvoidanceRuleKey(rule),
       providerName,
       providerId: provider?.providerId ?? rule.providerId ?? null,
       model,
       taskScope,
       riskLevel: scoped ? "medium" : "high",
       actionLabel: scoped ? "人工复核" : "限定任务类型",
-      reviewAction: scoped
-        ? `人工解除观察：如果「${taskScope}」连续小批量通过，可移除这条避坑规则。`
-        : `人工解除观察前，先把「${providerName}」限定到具体任务类型，避免全局误伤。`,
+      reviewAction: rule.watchUntil
+        ? `延长观察到 ${rule.watchUntil.slice(0, 10)}：${rule.governanceNote ?? "到期后再决定是否解除。"}`
+        : scoped
+          ? `人工解除观察：如果「${taskScope}」连续小批量通过，可移除这条避坑规则。`
+          : `人工解除观察前，先把「${providerName}」限定到具体任务类型，避免全局误伤。`,
       reason: rule.reason,
       evidence: rule.evidence ?? [],
+      governanceNote: rule.governanceNote ?? null,
+      watchUntil: rule.watchUntil ?? null,
     };
   }).sort((left, right) => (
     (left.riskLevel === "high" ? 0 : 1) - (right.riskLevel === "high" ? 0 : 1)

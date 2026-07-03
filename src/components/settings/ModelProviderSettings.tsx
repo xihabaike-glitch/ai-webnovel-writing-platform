@@ -114,6 +114,7 @@ interface RouteAvoidanceGovernanceView {
   };
   items: Array<{
     id: string;
+    ruleKey: string;
     providerName: string;
     providerId: string | null;
     model: string;
@@ -123,6 +124,8 @@ interface RouteAvoidanceGovernanceView {
     reviewAction: string;
     reason: string;
     evidence: string[];
+    governanceNote: string | null;
+    watchUntil: string | null;
   }>;
   nextActions: string[];
 }
@@ -246,6 +249,7 @@ export function ModelProviderSettings({
   ));
   const [savingRouteType, setSavingRouteType] = useState<string | null>(null);
   const [applyingRecommendationType, setApplyingRecommendationType] = useState<string | null>(null);
+  const [governingRuleKey, setGoverningRuleKey] = useState<string | null>(null);
   const [routeMessage, setRouteMessage] = useState<string | null>(null);
   const currentTestResult = testResults[selectedProviderId];
 
@@ -392,6 +396,40 @@ export function ModelProviderSettings({
       setRouteMessage(caught instanceof Error ? caught.message : "应用路由建议失败。");
     } finally {
       setApplyingRecommendationType(null);
+    }
+  }
+
+  async function saveAvoidanceOverride(
+    item: RouteAvoidanceGovernanceView["items"][number],
+    action: "dismiss" | "scope_task" | "extend_watch",
+  ) {
+    setGoverningRuleKey(`${item.ruleKey}:${action}`);
+    setRouteMessage(null);
+    const expiresAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString();
+
+    try {
+      const response = await fetch("/api/model-route-avoidance-overrides", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ruleKey: item.ruleKey,
+          action,
+          taskType: action === "scope_task" ? "chapter_review" : null,
+          note: action === "dismiss"
+            ? "人工复测通过，解除观察。"
+            : action === "scope_task"
+              ? "先限定在章节审稿任务继续观察。"
+              : "延长观察 14 天，再跑两批后复核。",
+          expiresAt: action === "extend_watch" ? expiresAt : null,
+        }),
+      });
+      if (!response.ok) throw new Error("保存避坑规则治理动作失败。");
+      setRouteMessage("避坑规则治理动作已保存");
+      router.refresh();
+    } catch (caught) {
+      setRouteMessage(caught instanceof Error ? caught.message : "保存避坑规则治理动作失败。");
+    } finally {
+      setGoverningRuleKey(null);
     }
   }
 
@@ -635,6 +673,32 @@ export function ModelProviderSettings({
                     {item.evidence.slice(0, 2).map((evidence) => <div key={evidence}>{evidence}</div>)}
                   </div>
                 ) : null}
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <button
+                    className="rounded-md bg-slate-950 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50"
+                    disabled={governingRuleKey === `${item.ruleKey}:scope_task`}
+                    onClick={() => saveAvoidanceOverride(item, "scope_task")}
+                    type="button"
+                  >
+                    {governingRuleKey === `${item.ruleKey}:scope_task` ? "保存中" : "限定到审稿"}
+                  </button>
+                  <button
+                    className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 disabled:opacity-50"
+                    disabled={governingRuleKey === `${item.ruleKey}:extend_watch`}
+                    onClick={() => saveAvoidanceOverride(item, "extend_watch")}
+                    type="button"
+                  >
+                    {governingRuleKey === `${item.ruleKey}:extend_watch` ? "保存中" : "延长 14 天"}
+                  </button>
+                  <button
+                    className="rounded-md border border-emerald-200 bg-white px-3 py-1.5 text-xs font-medium text-emerald-700 disabled:opacity-50"
+                    disabled={governingRuleKey === `${item.ruleKey}:dismiss`}
+                    onClick={() => saveAvoidanceOverride(item, "dismiss")}
+                    type="button"
+                  >
+                    {governingRuleKey === `${item.ruleKey}:dismiss` ? "保存中" : "解除观察"}
+                  </button>
+                </div>
               </div>
             ))}
             {routeAvoidanceGovernance.items.length === 0 ? (

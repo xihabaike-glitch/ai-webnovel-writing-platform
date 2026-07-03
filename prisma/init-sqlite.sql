@@ -157,6 +157,17 @@ CREATE TABLE IF NOT EXISTS "ModelTaskRoute" (
   CONSTRAINT "ModelTaskRoute_fallbackProviderConfigId_fkey" FOREIGN KEY ("fallbackProviderConfigId") REFERENCES "ModelProvider" ("id") ON DELETE SET NULL ON UPDATE CASCADE
 );
 
+CREATE TABLE IF NOT EXISTS "ModelRouteAvoidanceOverride" (
+  "id" TEXT NOT NULL PRIMARY KEY,
+  "ruleKey" TEXT NOT NULL UNIQUE,
+  "action" TEXT NOT NULL,
+  "taskType" TEXT,
+  "note" TEXT NOT NULL DEFAULT '',
+  "expiresAt" DATETIME,
+  "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE TABLE IF NOT EXISTS "AiTask" (
   "id" TEXT NOT NULL PRIMARY KEY,
   "projectId" TEXT NOT NULL,

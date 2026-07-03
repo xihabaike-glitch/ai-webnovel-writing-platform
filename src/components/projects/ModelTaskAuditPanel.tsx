@@ -38,6 +38,9 @@ interface RecentFailure {
   model: string;
   chapterTitle: string;
   errorMessage: string;
+  recoveryStatus: "recovered" | "unresolved";
+  recoveredByTaskId: string | null;
+  recoveryLabel: string;
   createdAt: string;
 }
 
@@ -110,6 +113,9 @@ interface ModelTaskAuditDashboard {
     totalTasks: number;
     succeededTasks: number;
     failedTasks: number;
+    recoveredFailures: number;
+    unresolvedFailures: number;
+    failureRecoveryRatePercent: number;
     runningTasks: number;
     queuedTasks: number;
     failureRatePercent: number;
@@ -296,7 +302,7 @@ export function ModelTaskAuditPanel({ projectId }: { projectId: string }) {
               </div>
               <p className="mt-3 text-sm leading-6 text-slate-600">{dashboard.verdict}</p>
             </div>
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-8">
               <div className="rounded-md bg-slate-50 p-3">
                 <div className="text-xs text-slate-500">任务</div>
                 <div className="mt-1 text-2xl font-semibold text-slate-950">{dashboard.summary.totalTasks}</div>
@@ -308,6 +314,14 @@ export function ModelTaskAuditPanel({ projectId }: { projectId: string }) {
               <div className="rounded-md bg-slate-50 p-3">
                 <div className="text-xs text-slate-500">失败率</div>
                 <div className="mt-1 text-2xl font-semibold text-slate-950">{dashboard.summary.failureRatePercent}%</div>
+              </div>
+              <div className="rounded-md bg-slate-50 p-3">
+                <div className="text-xs text-slate-500">未恢复</div>
+                <div className="mt-1 text-2xl font-semibold text-slate-950">{dashboard.summary.unresolvedFailures}</div>
+              </div>
+              <div className="rounded-md bg-slate-50 p-3">
+                <div className="text-xs text-slate-500">恢复率</div>
+                <div className="mt-1 text-2xl font-semibold text-slate-950">{dashboard.summary.failureRecoveryRatePercent}%</div>
               </div>
               <div className="rounded-md bg-slate-50 p-3">
                 <div className="text-xs text-slate-500">Token</div>
@@ -560,9 +574,19 @@ export function ModelTaskAuditPanel({ projectId }: { projectId: string }) {
               <div className="mt-3 grid gap-2">
                 {dashboard.recentFailures.map((failure) => (
                   <div className="rounded-md bg-slate-50 p-3 text-sm" key={failure.id}>
-                    <div className="font-medium text-slate-950">{failure.label} · {failure.chapterTitle}</div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <div className="font-medium text-slate-950">{failure.label} · {failure.chapterTitle}</div>
+                      <span className={`rounded-md px-2 py-1 text-xs font-medium ${
+                        failure.recoveryStatus === "recovered"
+                          ? "bg-emerald-50 text-emerald-700"
+                          : "bg-amber-50 text-amber-700"
+                      }`}>
+                        {failure.recoveryStatus === "recovered" ? "已恢复" : "未恢复"}
+                      </span>
+                    </div>
                     <div className="mt-1 text-slate-500">{failure.providerName} · {failure.model} · {new Date(failure.createdAt).toLocaleString()}</div>
                     <p className="mt-1 text-slate-600">{failure.errorMessage}</p>
+                    <p className="mt-1 text-xs text-slate-500">{failure.recoveryLabel}</p>
                   </div>
                 ))}
                 {dashboard.recentFailures.length === 0 ? <p className="text-sm text-slate-600">暂无失败任务。</p> : null}

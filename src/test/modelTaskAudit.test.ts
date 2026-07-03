@@ -160,4 +160,63 @@ test("buildModelTaskAuditDashboard", async (t) => {
     assert.equal(reviewRoute?.primaryProviderName, "Mock · mock-novel");
     assert.equal(dashboard.recentFailures.length, 0);
   });
+
+  await t.test("tracks recovered and unresolved failures inside project audit", () => {
+    const dashboard = buildModelTaskAuditDashboard([
+      {
+        id: "failed-draft",
+        chapterId: "chapter-1",
+        taskType: "chapter_draft",
+        model: "mock-novel",
+        status: "failed",
+        inputTokens: 800,
+        outputTokens: 0,
+        costUsd: 0.002,
+        outputText: null,
+        errorMessage: "503 provider timeout",
+        createdAt: "2026-01-01T00:00:00.000Z",
+        modelProvider: { providerId: "mock", displayName: "Mock" },
+        chapter: { title: "第一章" },
+      },
+      {
+        id: "recovered-draft",
+        chapterId: "chapter-1",
+        taskType: "chapter_draft",
+        model: "mock-novel",
+        status: "succeeded",
+        inputTokens: 900,
+        outputTokens: 1800,
+        costUsd: 0.01,
+        outputText: "重试后生成正文。",
+        errorMessage: null,
+        createdAt: "2026-01-01T00:04:00.000Z",
+        modelProvider: { providerId: "mock", displayName: "Mock" },
+        chapter: { title: "第一章" },
+      },
+      {
+        id: "unresolved-review",
+        chapterId: "chapter-2",
+        taskType: "chapter_review",
+        model: "mock-novel",
+        status: "failed",
+        inputTokens: 700,
+        outputTokens: 0,
+        costUsd: 0.002,
+        outputText: null,
+        errorMessage: "Rate limit exceeded 429",
+        createdAt: "2026-01-01T00:06:00.000Z",
+        modelProvider: { providerId: "mock", displayName: "Mock" },
+        chapter: { title: "第二章" },
+      },
+    ], [providers[0]]);
+
+    assert.equal(dashboard.summary.failedTasks, 2);
+    assert.equal(dashboard.summary.recoveredFailures, 1);
+    assert.equal(dashboard.summary.unresolvedFailures, 1);
+    assert.equal(dashboard.summary.failureRecoveryRatePercent, 50);
+    assert.equal(dashboard.recentFailures.find((failure) => failure.id === "failed-draft")?.recoveryStatus, "recovered");
+    assert.equal(dashboard.recentFailures.find((failure) => failure.id === "failed-draft")?.recoveredByTaskId, "recovered-draft");
+    assert.equal(dashboard.recentFailures.find((failure) => failure.id === "unresolved-review")?.recoveryStatus, "unresolved");
+    assert.ok(dashboard.riskFlags.some((flag) => flag.includes("未恢复失败")));
+  });
 });

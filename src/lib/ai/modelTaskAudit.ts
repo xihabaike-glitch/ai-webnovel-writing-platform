@@ -3,6 +3,7 @@ import { buildRouteRecommendations, type RouteRecommendation } from "../model-ga
 
 export interface ModelAuditTask {
   id: string;
+  chapterId?: string | null;
   taskType: string;
   providerConfigId?: string;
   model: string;
@@ -73,6 +74,9 @@ export interface RecentFailure {
   model: string;
   chapterTitle: string;
   errorMessage: string;
+  recoveryStatus: "recovered" | "unresolved";
+  recoveredByTaskId: string | null;
+  recoveryLabel: string;
   createdAt: string;
 }
 
@@ -123,6 +127,9 @@ export interface ModelTaskAuditDashboard {
     totalTasks: number;
     succeededTasks: number;
     failedTasks: number;
+    recoveredFailures: number;
+    unresolvedFailures: number;
+    failureRecoveryRatePercent: number;
     runningTasks: number;
     queuedTasks: number;
     failureRatePercent: number;
@@ -186,6 +193,27 @@ function money(value: number) {
 
 function dateIso(value: Date | string) {
   return new Date(value).toISOString();
+}
+
+function failureRecovery(task: ModelAuditTask, tasks: ModelAuditTask[]) {
+  if (task.status !== "failed") return null;
+  const createdAt = new Date(task.createdAt).getTime();
+  const recoveredBy = tasks
+    .filter((candidate) => (
+      candidate.id !== task.id
+      && candidate.status === "succeeded"
+      && candidate.taskType === task.taskType
+      && Boolean(task.chapterId)
+      && candidate.chapterId === task.chapterId
+      && new Date(candidate.createdAt).getTime() > createdAt
+    ))
+    .sort((left, right) => new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime())[0];
+
+  return {
+    recoveryStatus: recoveredBy ? "recovered" as const : "unresolved" as const,
+    recoveredByTaskId: recoveredBy?.id ?? null,
+    recoveryLabel: recoveredBy ? `已由后续任务 ${recoveredBy.id} 恢复。` : "尚未看到后续成功记录。",
+  };
 }
 
 function parseJsonObject(value: string | null | undefined) {
@@ -392,6 +420,11 @@ function buildRecentFailures(tasks: ModelAuditTask[]): RecentFailure[] {
       model: task.model,
       chapterTitle: task.chapter?.title ?? "项目任务",
       errorMessage: task.errorMessage || "任务失败，但没有记录错误信息。",
+      ...(failureRecovery(task, tasks) ?? {
+        recoveryStatus: "unresolved" as const,
+        recoveredByTaskId: null,
+        recoveryLabel: "尚未看到后续成功记录。",
+      }),
       createdAt: dateIso(task.createdAt),
     }));
 }
@@ -423,7 +456,8 @@ function verdictFor(status: ModelTaskAuditDashboard["status"], summary: ModelTas
 function buildRiskFlags(summary: ModelTaskAuditDashboard["summary"], readiness: ModelTaskAuditDashboard["providerReadiness"]) {
   const flags: string[] = [];
   if (summary.totalTasks === 0) flags.push("还没有任务样本，无法判断哪个模型最稳。");
-  if (summary.failureRatePercent >= 20) flags.push(`失败率 ${summary.failureRatePercent}%，需要先查供应商、模型或提示词。`);
+  if (summary.unresolvedFailures > 0) flags.push(`${summary.unresolvedFailures} 个未恢复失败还在拖慢生产链路。`);
+  if (summary.failureRatePercent >= 20) flags.push(`历史失败率 ${summary.failureRatePercent}%，需要先查供应商、模型或提示词。`);
   if (summary.missingUsageTasks > 0) flags.push(`${summary.missingUsageTasks} 个成功任务缺少 Token 记录，成本口径不完整。`);
   if (readiness.unconfiguredEnabledProviders > 0) flags.push(`${readiness.unconfiguredEnabledProviders} 个启用模型缺少 API Key。`);
   if (summary.runningTasks > 5) flags.push(`${summary.runningTasks} 个任务排队或运行中，注意批量并发。`);
@@ -544,12 +578,17 @@ export function buildModelTaskAuditDashboard(
 ): ModelTaskAuditDashboard {
   const succeededTasks = tasks.filter((task) => task.status === "succeeded").length;
   const failedTasks = tasks.filter((task) => task.status === "failed").length;
+  const recoveredFailures = tasks.filter((task) => failureRecovery(task, tasks)?.recoveryStatus === "recovered").length;
+  const unresolvedFailures = failedTasks - recoveredFailures;
   const runningTasks = tasks.filter((task) => task.status === "running").length;
   const queuedTasks = tasks.filter((task) => task.status === "queued").length;
   const summary = {
     totalTasks: tasks.length,
     succeededTasks,
     failedTasks,
+    recoveredFailures,
+    unresolvedFailures,
+    failureRecoveryRatePercent: failedTasks > 0 ? Math.round((recoveredFailures / failedTasks) * 100) : 0,
     runningTasks,
     queuedTasks,
     failureRatePercent: failureRate(failedTasks, tasks.length),

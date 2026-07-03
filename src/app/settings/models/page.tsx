@@ -42,7 +42,7 @@ function maskProvider(provider: {
 }
 
 export default async function ModelSettingsPage() {
-  const [providers, routes, recentTasks, completedRouteRepairs, routeAvoidanceOverrides] = await Promise.all([
+  const [providers, routes, recentTasks, completedRouteRepairs, completedRouteRetests, routeAvoidanceOverrides] = await Promise.all([
     prisma.modelProvider.findMany({
       orderBy: { updatedAt: "desc" },
     }),
@@ -78,6 +78,22 @@ export default async function ModelSettingsPage() {
         evidence: true,
       },
     }),
+    prisma.gateDispatchTask.findMany({
+      where: {
+        stage: "model_route_retest",
+        state: "completed",
+      },
+      orderBy: { completedAt: "desc" },
+      take: 100,
+      select: {
+        dispatchKey: true,
+        stage: true,
+        state: true,
+        completionEvidence: true,
+        evidence: true,
+        completedAt: true,
+      },
+    }),
     prisma.modelRouteAvoidanceOverride.findMany({
       orderBy: { updatedAt: "desc" },
       select: {
@@ -102,7 +118,9 @@ export default async function ModelSettingsPage() {
     buildRouteAvoidanceRulesFromDispatchTasks(completedRouteRepairs, routeProviders),
     routeAvoidanceOverrides.map(routeAvoidanceOverrideFromRecord).filter((override): override is RouteAvoidanceOverride => Boolean(override)),
   );
-  const routeAvoidanceGovernance = buildRouteAvoidanceGovernance(routeAvoidanceRules, routeProviders);
+  const routeAvoidanceGovernance = buildRouteAvoidanceGovernance(routeAvoidanceRules, routeProviders, {
+    retestDispatches: completedRouteRetests,
+  });
   const healthDashboard = buildProviderHealthDashboard(maskedProviders);
   const routeEffectAudit = buildRouteEffectAudit(
     recentTasks,

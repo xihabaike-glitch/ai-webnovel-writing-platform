@@ -130,6 +130,30 @@ export interface RouteAvoidanceRetestDispatch {
   reviewLatestAt: string;
 }
 
+export interface RouteAvoidanceRetestDispatchTask {
+  dispatchKey: string;
+  stage: string;
+  state: string;
+  completionEvidence: string;
+  evidence?: string[] | string | null;
+  completedAt?: string | Date | null;
+}
+
+export interface RouteAvoidanceRetestReviewItem {
+  id: string;
+  ruleKey: string;
+  providerName: string;
+  model: string;
+  taskScope: string;
+  recommendedAction: "dismiss" | "extend_watch" | "manual_review";
+  confidence: "high" | "medium";
+  actionLabel: string;
+  rationale: string;
+  completionEvidence: string;
+  evidence: string[];
+  completedAt: string | null;
+}
+
 export interface RouteAvoidanceGovernance {
   summary: {
     totalRules: number;
@@ -147,11 +171,21 @@ export interface RouteAvoidanceGovernance {
     };
     items: RouteAvoidanceRetestQueueItem[];
   };
+  retestReview: {
+    summary: {
+      total: number;
+      dismissRecommended: number;
+      extendWatchRecommended: number;
+      manualReviewRecommended: number;
+    };
+    items: RouteAvoidanceRetestReviewItem[];
+  };
   nextActions: string[];
 }
 
 export interface RouteAvoidanceGovernanceOptions {
   now?: string | Date;
+  retestDispatches?: RouteAvoidanceRetestDispatchTask[];
 }
 
 export interface RouteRecommendation {
@@ -485,6 +519,98 @@ export function buildRouteAvoidanceRetestDispatch(item: RouteAvoidanceRetestQueu
   };
 }
 
+function numericPercentAfter(label: string, text: string) {
+  const match = text.match(new RegExp(`${label}\\s*[:：]?\\s*(\\d{1,3})\\s*%?`));
+  if (!match) return null;
+  const value = Number(match[1]);
+  return Number.isFinite(value) ? value : null;
+}
+
+function completedAtIso(value: string | Date | null | undefined) {
+  if (!value) return null;
+  const date = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date.toISOString();
+}
+
+function classifyRetestEvidence(completionEvidence: string): Pick<RouteAvoidanceRetestReviewItem, "recommendedAction" | "confidence" | "actionLabel" | "rationale"> {
+  const normalized = completionEvidence.replace(/\s+/g, "");
+  const successRate = numericPercentAfter("成功率", completionEvidence);
+  const qualityScore = numericPercentAfter("质量", completionEvidence);
+  const hasNoFallback = normalized.includes("未命中备用") || normalized.includes("未走备用") || normalized.includes("未使用备用");
+  const hasFallback = !hasNoFallback && (normalized.includes("命中备用") || normalized.includes("走备用") || normalized.includes("使用备用"));
+  const hasFailure = /(失败|超时|报错|异常|不可用|JSON不稳定|格式错误)/.test(normalized);
+  const strongPass = (successRate ?? 0) >= 90 && (qualityScore ?? 0) >= 80 && !hasFailure && !hasFallback;
+  const usablePass = (successRate ?? 0) >= 80 && (qualityScore ?? 0) >= 70 && !hasFailure;
+
+  if (strongPass || (usablePass && hasNoFallback)) {
+    return {
+      recommendedAction: "dismiss",
+      confidence: strongPass ? "high" : "medium",
+      actionLabel: "建议解除观察",
+      rationale: `复测样本已恢复：成功率 ${successRate ?? "未填"}%，质量 ${qualityScore ?? "未填"}，未出现硬失败。`,
+    };
+  }
+
+  if (hasFailure || hasFallback || (successRate !== null && successRate < 80) || (qualityScore !== null && qualityScore < 70)) {
+    return {
+      recommendedAction: "extend_watch",
+      confidence: hasFailure || hasFallback ? "high" : "medium",
+      actionLabel: "建议继续观察",
+      rationale: `复测仍有风险：成功率 ${successRate ?? "未填"}%，质量 ${qualityScore ?? "未填"}${hasFallback ? "，仍依赖备用路线" : ""}。`,
+    };
+  }
+
+  return {
+    recommendedAction: "manual_review",
+    confidence: "medium",
+    actionLabel: "建议人工复核",
+    rationale: "复测证据没有写清成功率、质量分或备用路线，需要人工判断。",
+  };
+}
+
+function buildRetestReview(
+  items: RouteAvoidanceGovernanceItem[],
+  dispatches: RouteAvoidanceRetestDispatchTask[],
+): RouteAvoidanceGovernance["retestReview"] {
+  const itemsByRuleKey = new Map(items.map((item) => [item.ruleKey, item]));
+  const reviewItems = dispatches
+    .filter((dispatch) => dispatch.stage === "model_route_retest" && dispatch.state === "completed" && dispatch.completionEvidence.trim())
+    .flatMap((dispatch): RouteAvoidanceRetestReviewItem[] => {
+      const ruleKey = dispatch.dispatchKey.replace(/^model-route-retest:/, "");
+      const item = itemsByRuleKey.get(ruleKey);
+      if (!item) return [];
+      const decision = classifyRetestEvidence(dispatch.completionEvidence);
+
+      return [{
+        id: `${dispatch.dispatchKey}:review`,
+        ruleKey,
+        providerName: item.providerName,
+        model: item.model,
+        taskScope: item.taskScope,
+        ...decision,
+        completionEvidence: dispatch.completionEvidence,
+        evidence: Array.from(new Set([...evidenceList(dispatch.evidence), dispatch.completionEvidence])),
+        completedAt: completedAtIso(dispatch.completedAt),
+      }];
+    })
+    .sort((left, right) => {
+      const actionRank = { extend_watch: 0, manual_review: 1, dismiss: 2 };
+      return actionRank[left.recommendedAction] - actionRank[right.recommendedAction]
+        || (right.completedAt ?? "").localeCompare(left.completedAt ?? "")
+        || left.providerName.localeCompare(right.providerName);
+    });
+
+  return {
+    summary: {
+      total: reviewItems.length,
+      dismissRecommended: reviewItems.filter((item) => item.recommendedAction === "dismiss").length,
+      extendWatchRecommended: reviewItems.filter((item) => item.recommendedAction === "extend_watch").length,
+      manualReviewRecommended: reviewItems.filter((item) => item.recommendedAction === "manual_review").length,
+    },
+    items: reviewItems,
+  };
+}
+
 export function buildRouteAvoidanceGovernance(
   rules: RouteAvoidanceRule[],
   providers: RouteRecommendationProvider[],
@@ -530,7 +656,10 @@ export function buildRouteAvoidanceGovernance(
   const highRiskRules = items.filter((item) => item.riskLevel === "high").length;
   const now = options.now instanceof Date ? options.now : new Date(options.now ?? Date.now());
   const retestQueue = buildRetestQueue(items, now);
+  const retestReview = buildRetestReview(items, options.retestDispatches ?? []);
   const nextActions = [
+    retestReview.summary.dismissRecommended > 0 ? `${retestReview.summary.dismissRecommended} 条复测已通过，建议解除观察。` : "",
+    retestReview.summary.extendWatchRecommended > 0 ? `${retestReview.summary.extendWatchRecommended} 条复测仍异常，建议延长观察。` : "",
     retestQueue.summary.due > 0 ? `${retestQueue.summary.due} 条避坑规则已到复测日，先跑小样本再决定是否解除观察。` : "",
     retestQueue.summary.upcoming > 0 ? `${retestQueue.summary.upcoming} 条避坑规则将在 3 天内复测，提前准备样本。` : "",
     globalRules > 0 ? `有 ${globalRules} 条全局避坑规则，先限定到任务类型再长期生效。` : "",
@@ -547,6 +676,7 @@ export function buildRouteAvoidanceGovernance(
     },
     items,
     retestQueue,
+    retestReview,
     nextActions,
   };
 }

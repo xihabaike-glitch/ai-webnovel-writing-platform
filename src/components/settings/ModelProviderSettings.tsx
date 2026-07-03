@@ -156,6 +156,28 @@ interface RouteAvoidanceGovernanceView {
       recommendation: string;
     }>;
   };
+  retestReview: {
+    summary: {
+      total: number;
+      dismissRecommended: number;
+      extendWatchRecommended: number;
+      manualReviewRecommended: number;
+    };
+    items: Array<{
+      id: string;
+      ruleKey: string;
+      providerName: string;
+      model: string;
+      taskScope: string;
+      recommendedAction: "dismiss" | "extend_watch" | "manual_review";
+      confidence: "high" | "medium";
+      actionLabel: string;
+      rationale: string;
+      completionEvidence: string;
+      evidence: string[];
+      completedAt: string | null;
+    }>;
+  };
   nextActions: string[];
 }
 
@@ -454,6 +476,16 @@ export function ModelProviderSettings({
     }
   }
 
+  async function applyRetestDecision(item: RouteAvoidanceGovernanceView["retestReview"]["items"][number]) {
+    if (item.recommendedAction === "manual_review") return;
+    const governanceItem = routeAvoidanceGovernance.items.find((candidate) => candidate.ruleKey === item.ruleKey);
+    if (!governanceItem) {
+      setRouteMessage("没有找到对应避坑规则，无法应用复测建议。");
+      return;
+    }
+    await saveAvoidanceOverride(governanceItem, item.recommendedAction);
+  }
+
   async function saveAvoidanceOverride(
     item: RouteAvoidanceGovernanceView["items"][number],
     action: "dismiss" | "scope_task" | "extend_watch",
@@ -705,6 +737,7 @@ export function ModelProviderSettings({
               <span className="rounded-md bg-slate-50 px-2 py-1">任务级 {routeAvoidanceGovernance.summary.scopedRules}</span>
               <span className="rounded-md bg-slate-50 px-2 py-1">高风险 {routeAvoidanceGovernance.summary.highRiskRules}</span>
               <span className="rounded-md bg-slate-50 px-2 py-1">待复测 {routeAvoidanceGovernance.retestQueue.summary.due}</span>
+              <span className="rounded-md bg-slate-50 px-2 py-1">已判定 {routeAvoidanceGovernance.retestReview.summary.total}</span>
             </div>
           </div>
           {routeAvoidanceGovernance.nextActions.length ? (
@@ -712,6 +745,52 @@ export function ModelProviderSettings({
               {routeAvoidanceGovernance.nextActions.map((action) => (
                 <div className="rounded-md bg-amber-50 p-2 text-xs leading-5 text-amber-900" key={action}>{action}</div>
               ))}
+            </div>
+          ) : null}
+          {routeAvoidanceGovernance.retestReview.items.length ? (
+            <div className="mt-3 rounded-md border border-slate-200 bg-white p-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="text-sm font-medium text-slate-950">复测判定</div>
+                <div className="flex flex-wrap gap-2 text-xs text-slate-600">
+                  <span className="rounded-md bg-emerald-50 px-2 py-1 text-emerald-700">可解除 {routeAvoidanceGovernance.retestReview.summary.dismissRecommended}</span>
+                  <span className="rounded-md bg-amber-50 px-2 py-1 text-amber-700">继续观察 {routeAvoidanceGovernance.retestReview.summary.extendWatchRecommended}</span>
+                  <span className="rounded-md bg-slate-50 px-2 py-1">人工复核 {routeAvoidanceGovernance.retestReview.summary.manualReviewRecommended}</span>
+                </div>
+              </div>
+              <div className="mt-3 grid gap-2 lg:grid-cols-2">
+                {routeAvoidanceGovernance.retestReview.items.slice(0, 6).map((item) => (
+                  <div className="rounded-md border border-slate-200 bg-slate-50 p-3 text-sm" key={item.id}>
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <div>
+                        <div className="font-medium text-slate-950">{item.providerName} · {item.model}</div>
+                        <div className="mt-1 text-xs text-slate-500">{item.taskScope} · {item.confidence === "high" ? "高置信" : "中置信"}</div>
+                      </div>
+                      <span className={`rounded-md px-2 py-1 text-xs font-medium ${
+                        item.recommendedAction === "dismiss"
+                          ? "bg-emerald-50 text-emerald-700"
+                          : item.recommendedAction === "extend_watch"
+                            ? "bg-amber-50 text-amber-700"
+                            : "bg-white text-slate-600"
+                      }`}>{item.actionLabel}</span>
+                    </div>
+                    <p className="mt-2 leading-6 text-slate-600">{item.rationale}</p>
+                    <div className="mt-2 rounded-md bg-white p-2 text-xs leading-5 text-slate-500">{item.completionEvidence}</div>
+                    <div className="mt-3 flex flex-wrap items-center gap-2">
+                      {item.completedAt ? <span className="rounded-md bg-white px-2 py-1 text-xs text-slate-500">{item.completedAt.slice(0, 10)}</span> : null}
+                      {item.recommendedAction !== "manual_review" ? (
+                        <button
+                          className="rounded-md bg-slate-950 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50"
+                          disabled={governingRuleKey === `${item.ruleKey}:${item.recommendedAction}`}
+                          onClick={() => applyRetestDecision(item)}
+                          type="button"
+                        >
+                          {governingRuleKey === `${item.ruleKey}:${item.recommendedAction}` ? "应用中" : "应用建议"}
+                        </button>
+                      ) : null}
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           ) : null}
           {routeAvoidanceGovernance.retestQueue.items.length ? (

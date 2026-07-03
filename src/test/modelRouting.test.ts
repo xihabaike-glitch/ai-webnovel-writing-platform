@@ -637,4 +637,75 @@ test("model task routing", async (t) => {
     assert.ok(dispatch.acceptanceCriteria.some((item) => item.includes("2 个小样本")));
     assert.ok(dispatch.evidence.some((item) => item.includes("审稿失败 2 次")));
   });
+
+  await t.test("recommends governance actions from completed route retest evidence", () => {
+    const governance = buildRouteAvoidanceGovernance([
+      {
+        taskType: "chapter_review",
+        providerConfigId: "deepseek-provider",
+        providerId: "deepseek",
+        model: "deepseek-chat",
+        reason: "审稿 JSON 不稳定。",
+        evidence: ["审稿失败 2 次"],
+        watchUntil: "2026-07-01T00:00:00.000Z",
+      },
+      {
+        taskType: "chapter_draft",
+        providerConfigId: "kimi-provider",
+        providerId: "kimi",
+        model: "kimi-k2.6",
+        reason: "正文初稿速度波动。",
+        evidence: ["超时 1 次"],
+        watchUntil: "2026-07-01T00:00:00.000Z",
+      },
+    ], [
+      {
+        id: "deepseek-provider",
+        providerId: "deepseek",
+        displayName: "DeepSeek",
+        defaultModel: "deepseek-chat",
+        enabled: true,
+        encryptedApiKey: "key",
+      },
+      {
+        id: "kimi-provider",
+        providerId: "kimi",
+        displayName: "Kimi",
+        defaultModel: "kimi-k2.6",
+        enabled: true,
+        encryptedApiKey: "key",
+      },
+    ], {
+      now: "2026-07-03T00:00:00.000Z",
+      retestDispatches: [
+        {
+          dispatchKey: "model-route-retest:deepseek-provider:deepseek-chat",
+          stage: "model_route_retest",
+          state: "completed",
+          completionEvidence: "完成 3 个小样本复测，成功率 100%，质量 86，成本正常，未命中备用路线。",
+          evidence: ["复测通过"],
+          completedAt: "2026-07-03T02:00:00.000Z",
+        },
+        {
+          dispatchKey: "model-route-retest:kimi-provider:kimi-k2.6",
+          stage: "model_route_retest",
+          state: "completed",
+          completionEvidence: "完成 2 个小样本复测，1 个超时，成功率 50%，质量 62，命中备用路线。",
+          evidence: ["复测失败"],
+          completedAt: "2026-07-03T03:00:00.000Z",
+        },
+      ],
+    });
+
+    assert.equal(governance.retestReview.summary.total, 2);
+    assert.equal(governance.retestReview.summary.dismissRecommended, 1);
+    assert.equal(governance.retestReview.summary.extendWatchRecommended, 1);
+    assert.equal(governance.retestReview.items[0].recommendedAction, "extend_watch");
+    assert.equal(governance.retestReview.items[0].providerName, "Kimi");
+    assert.ok(governance.retestReview.items[0].actionLabel.includes("继续观察"));
+    assert.equal(governance.retestReview.items[1].recommendedAction, "dismiss");
+    assert.equal(governance.retestReview.items[1].confidence, "high");
+    assert.ok(governance.retestReview.items[1].actionLabel.includes("解除观察"));
+    assert.ok(governance.nextActions.some((action) => action.includes("1 条复测已通过")));
+  });
 });

@@ -497,6 +497,34 @@ test("model task routing", async (t) => {
     assert.ok(recheck?.acceptanceCriteria.some((item) => item.includes("成功率")));
   });
 
+  await t.test("stops route adjustment follow-up after a newer route confirmation exists", () => {
+    const routeGovernanceEvidence = buildRouteConfirmationGovernanceEvidenceFromDispatchTasks([{
+      dispatchKey: "model-route-governance:chapter_review:switch_route:2026-07-04T13:00:00.000Z",
+      stage: "model_route_governance",
+      state: "completed",
+      completionEvidence: "已处理章节审稿路由，复跑 2 个小样本仍命中备用，成功率 50%，质量 62，仍需换模型。",
+      evidence: ["最近路由复检需观察：成功率 50%，质量 62，仍命中备用路线。"],
+      completedAt: "2026-07-04T15:00:00.000Z",
+    }]);
+    const confirmation = buildModelRouteConfirmationReceipt({
+      taskType: "chapter_review",
+      primaryProviderName: "DeepSeek · deepseek-chat",
+      fallbackProviderName: "Kimi · kimi-k2.6",
+      reason: "完成调整模型路由派单，已保存新首选模型。",
+      source: "manual",
+      createdAt: "2026-07-04T15:30:00.000Z",
+    });
+
+    const followUps = buildRouteConfirmationGovernanceFollowUpDispatches(routeGovernanceEvidence, {
+      routeConfirmations: [confirmation],
+    });
+    const recheck = buildModelRouteConfirmationDispatch(confirmation);
+
+    assert.equal(followUps.some((item) => item.actionLabel === "调整模型路由"), false);
+    assert.equal(recheck.stage, "model_route_confirmation_recheck");
+    assert.ok(recheck.detail.includes("DeepSeek"));
+  });
+
   await t.test("marks the current route when it already matches the recommendation", () => {
     const recommendations = buildRouteRecommendations([
       {

@@ -129,6 +129,10 @@ export interface RouteConfirmationGovernanceEvidence {
 
 export type RouteConfirmationGovernanceFollowUpDispatch = GatePlatformGrowthDispatchItem & { dispatchKey: string };
 
+export interface RouteConfirmationGovernanceFollowUpOptions {
+  routeConfirmations?: ModelRouteConfirmationReceipt[];
+}
+
 export interface RouteConfirmationRecheckAdviceItem {
   id: string;
   taskType: RoutedModelTaskType;
@@ -408,6 +412,17 @@ function routeGovernanceFollowUpReviewLatestAt(item: RouteConfirmationGovernance
   return item.completedAt ?? new Date().toISOString();
 }
 
+function routeConfirmationAfterGovernance(
+  item: RouteConfirmationGovernanceEvidence,
+  confirmations: ModelRouteConfirmationReceipt[] | undefined,
+) {
+  if (!item.completedAt) return false;
+  return Boolean(confirmations?.some((receipt) => (
+    receipt.payload.taskType === item.taskType
+    && receipt.createdAt > item.completedAt!
+  )));
+}
+
 export function buildModelRouteConfirmationReceipt(input: ModelRouteConfirmationInput): ModelRouteConfirmationReceipt {
   const taskLabel = labelForRoutedTask(input.taskType);
   const source = input.source ?? "manual";
@@ -583,12 +598,14 @@ export function buildRouteConfirmationGovernanceEvidenceFromDispatchTasks(
 
 export function buildRouteConfirmationGovernanceFollowUpDispatches(
   evidence: RouteConfirmationGovernanceEvidence[],
+  options: RouteConfirmationGovernanceFollowUpOptions = {},
 ): RouteConfirmationGovernanceFollowUpDispatch[] {
   return evidence.flatMap((item): RouteConfirmationGovernanceFollowUpDispatch[] => {
     const label = labelForRoutedTask(item.taskType);
     const reviewLatestAt = routeGovernanceFollowUpReviewLatestAt(item);
     const evidenceList = routeGovernanceFollowUpEvidence(item);
     if (item.status === "needs_switch") {
+      if (routeConfirmationAfterGovernance(item, options.routeConfirmations)) return [];
       const dispatchKey = routeGovernanceFollowUpKey(item, "adjust_route");
       return [{
         id: dispatchKey,

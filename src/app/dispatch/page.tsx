@@ -260,12 +260,14 @@ export default async function DispatchPage() {
   const failureRepairReview = buildGateFailureRepairReceiptReview(gate.failureRepairBatch, receiptItems);
   const failureRepairResolution = buildGateFailureRepairRecheckResolution(gate.failureRepairBatch, persistedTasks);
   const persistedByKey = new Map(persistedTasks.map((task) => [task.dispatchKey, task]));
-  const routeConfirmationDispatches = receipts
+  const routeConfirmationReceipts = receipts
     .map(modelRouteConfirmationReceiptFromAudit)
-    .filter((receipt): receipt is NonNullable<ReturnType<typeof modelRouteConfirmationReceiptFromAudit>> => Boolean(receipt))
-    .map(buildModelRouteConfirmationDispatch);
+    .filter((receipt): receipt is NonNullable<ReturnType<typeof modelRouteConfirmationReceiptFromAudit>> => Boolean(receipt));
+  const routeConfirmationDispatches = routeConfirmationReceipts.map(buildModelRouteConfirmationDispatch);
   const routeGovernanceEvidence = buildRouteConfirmationGovernanceEvidenceFromDispatchTasks(persistedTasks);
-  const routeGovernanceFollowUps = buildRouteConfirmationGovernanceFollowUpDispatches(routeGovernanceEvidence);
+  const routeGovernanceFollowUps = buildRouteConfirmationGovernanceFollowUpDispatches(routeGovernanceEvidence, {
+    routeConfirmations: routeConfirmationReceipts,
+  });
   const generatedTasks = [
     ...routeConfirmationDispatches,
     ...routeGovernanceFollowUps,

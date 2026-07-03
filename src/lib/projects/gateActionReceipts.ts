@@ -139,6 +139,8 @@ export type GatePlatformGrowthReviewStage =
   | "start_platform_package"
   | "start_publish_finalize"
   | "start_metrics_recovery"
+  | "start_repair_packaging"
+  | "start_rewrite_opening"
   | "watch";
 
 export interface GatePlatformGrowthReview {
@@ -2569,6 +2571,87 @@ export function buildGateProjectStartMetricDecision(
       return left.platformName.localeCompare(right.platformName);
     }),
   };
+}
+
+function projectStartMetricDispatchSpec(item: GateProjectStartMetricDecisionItem) {
+  if (item.status === "repair_packaging") {
+    return {
+      suffix: "repair_packaging",
+      stage: "start_repair_packaging" as const,
+      ownerRole: "平台包装编辑",
+      titleSuffix: "首轮包装修复",
+      detail: `${item.detail} 基于首轮数据修正标题、简介、标签和入口卖点，先修入口再谈扩量。`,
+      dueLabel: "今天",
+      actionLabel: "派给包装编辑",
+      acceptanceCriteria: ["标题简介标签完成首轮修复", "新卖点与前三章兑现一致", "保存修复前后对照依据"],
+      href: item.href,
+    };
+  }
+
+  if (item.status === "rewrite_opening") {
+    return {
+      suffix: "rewrite_opening",
+      stage: "start_rewrite_opening" as const,
+      ownerRole: "开头重写编辑",
+      titleSuffix: "首轮开头重写",
+      detail: `${item.detail} 重点重写第一章钩子、前三章追读点和兑现节奏。`,
+      dueLabel: "今天",
+      actionLabel: "派给开头编辑",
+      acceptanceCriteria: ["第一章钩子和前三章追读点完成重写", "重写后再次跑开头诊断", "保留旧版与新版对照"],
+      href: item.href,
+    };
+  }
+
+  if (item.status === "scale") {
+    return {
+      suffix: "scale",
+      stage: "scale_up" as const,
+      ownerRole: "增长运营",
+      titleSuffix: "首轮小步加码",
+      detail: `${item.detail} 加码只能小范围推进，并且下一轮必须继续回填效果。`,
+      dueLabel: "下一轮更新前",
+      actionLabel: "派给增长运营",
+      acceptanceCriteria: ["小步加码范围已限定", "加码版本和基准版本已写清", "下一轮效果回收时间已确定"],
+      href: item.href,
+    };
+  }
+
+  return null;
+}
+
+export function buildGateProjectStartMetricDispatchItems(
+  decision: GateProjectStartMetricDecision,
+  persistedTasks: PersistedGatePlatformDispatchTask[] = [],
+): GatePlatformGrowthDispatchItem[] {
+  const persistedByKey = new Map(persistedTasks.map((task) => [task.dispatchKey, task]));
+
+  return decision.items
+    .map((item): GatePlatformGrowthDispatchItem | null => {
+      const spec = projectStartMetricDispatchSpec(item);
+      if (!spec) return null;
+      const projectId = item.projectId ?? "unknown";
+      const dispatchKey = `${item.platformId}:start_metric:${spec.suffix}:${projectId}`;
+      const persisted = persistedByKey.get(dispatchKey);
+
+      return {
+        id: dispatchKey,
+        platformId: item.platformId,
+        platformName: item.platformName,
+        stage: spec.stage,
+        state: persisted?.state ?? "queued",
+        priorityScore: item.priorityScore,
+        ownerRole: spec.ownerRole,
+        title: `${item.platformName} ${spec.titleSuffix}`,
+        detail: spec.detail,
+        dueLabel: spec.dueLabel,
+        actionLabel: spec.actionLabel,
+        href: spec.href,
+        acceptanceCriteria: spec.acceptanceCriteria,
+        evidence: item.evidence,
+        reviewLatestAt: item.metricAt ?? new Date().toISOString(),
+      };
+    })
+    .filter((item): item is GatePlatformGrowthDispatchItem => Boolean(item));
 }
 
 export function buildGatePlatformScaleGate(

@@ -13,6 +13,7 @@ function actionTone(tone: PrePublishGateAction["tone"]) {
 }
 
 function executeLabel(action: PrePublishGateAction) {
+  if (!action.execution && action.id === "failure-repair-batch") return "记录已处理";
   if (!action.execution) return null;
   if (action.execution.type === "publish_repair") return "立即处理";
   if (action.execution.type === "retry_task") return "一键重试";
@@ -34,7 +35,17 @@ export function GatePriorityActionCard({
   const label = executeLabel(action);
 
   async function runAction() {
-    if (!action.execution) return;
+    if (!action.execution) {
+      const receipt = buildGateActionReceipt({
+        action,
+        payload: { message: "已记录失败修复批次处理，刷新后确认未恢复失败是否清空。" },
+        status: "succeeded",
+      });
+      setMessage(receipt.message);
+      onReceipt?.(receipt);
+      router.refresh();
+      return;
+    }
     setIsRunning(true);
     setMessage(null);
     try {

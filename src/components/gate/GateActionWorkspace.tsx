@@ -7,6 +7,7 @@ import {
   buildGateAdviceActionReceipt,
   buildGateActionReceiptSummary,
   buildGateActionReviewAdvice,
+  buildGateFailureRepairReceiptReview,
   buildGateDispatchEvidenceReview,
   buildGatePlatformScaleFollowup,
   buildGatePlatformScaleCadence,
@@ -72,6 +73,7 @@ import {
   type GatePlatformGrowthReview,
   type PersistedGatePlatformDispatchTask,
 } from "@/lib/projects/gateActionReceipts";
+import type { FailureRepairBatch } from "@/lib/ai/taskRunConsole";
 import type { PrePublishGateAction } from "@/lib/projects/prePublishGate";
 import { GatePriorityActionCard } from "./GatePriorityActionCard";
 
@@ -83,6 +85,13 @@ function receiptStatusClass(status: GateActionReceipt["status"]) {
 function recheckClass(status: GateActionReceipt["recheck"]["status"]) {
   if (status === "ready") return "border-emerald-200 bg-emerald-50 text-emerald-800";
   return "border-rose-200 bg-rose-50 text-rose-800";
+}
+
+function failureRepairReviewClass(status: ReturnType<typeof buildGateFailureRepairReceiptReview>["status"]) {
+  if (status === "cleared" || status === "clear") return "border-emerald-200 bg-emerald-50 text-emerald-900";
+  if (status === "recheck") return "border-blue-200 bg-blue-50 text-blue-900";
+  if (status === "blocked") return "border-rose-200 bg-rose-50 text-rose-900";
+  return "border-amber-200 bg-amber-50 text-amber-900";
 }
 
 function executionLabel(type: GateActionReceipt["executionType"]) {
@@ -297,7 +306,13 @@ function batchTacticEffectLabel(status: GateBatchTacticEffectStatus) {
   return "可复用";
 }
 
-export function GateActionWorkspace({ actions }: { actions: PrePublishGateAction[] }) {
+export function GateActionWorkspace({
+  actions,
+  failureRepairBatch,
+}: {
+  actions: PrePublishGateAction[];
+  failureRepairBatch: FailureRepairBatch;
+}) {
   const router = useRouter();
   const [receipts, setReceipts] = useState<GateActionReceipt[]>([]);
   const [statusFilter, setStatusFilter] = useState<GateActionReceiptStatusFilter>("all");
@@ -314,6 +329,7 @@ export function GateActionWorkspace({ actions }: { actions: PrePublishGateAction
   });
   const summary = buildGateActionReceiptSummary(receipts);
   const filteredSummary = buildGateActionReceiptSummary(filteredReceipts);
+  const failureRepairReview = buildGateFailureRepairReceiptReview(failureRepairBatch, receipts);
   const reviewAdvice = buildGateActionReviewAdvice(filteredReceipts);
   const platformGrowthReview = buildGatePlatformGrowthReview(receipts);
   const allStartValidationReview = buildGateProjectStartValidationReview(persistedDispatchTasks);
@@ -550,6 +566,30 @@ export function GateActionWorkspace({ actions }: { actions: PrePublishGateAction
           </label>
         </div>
         <div className="mt-3 grid gap-2">
+          <div className={`rounded-md border p-3 ${failureRepairReviewClass(failureRepairReview.status)}`}>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <div className="text-sm font-medium">{failureRepairReview.label}</div>
+                <p className="mt-1 text-xs leading-5 opacity-85">{failureRepairReview.detail}</p>
+              </div>
+              <Link
+                className="w-fit rounded-md bg-white px-3 py-2 text-xs font-medium text-slate-950"
+                href={failureRepairReview.href}
+              >
+                {failureRepairReview.actionLabel}
+              </Link>
+            </div>
+            <div className="mt-3 grid gap-2 text-xs sm:grid-cols-3">
+              <div className="rounded-md bg-white/70 px-3 py-2">相关回执 {failureRepairReview.receipts}</div>
+              <div className="rounded-md bg-white/70 px-3 py-2">未恢复 {failureRepairBatch.summary.unresolvedFailures}</div>
+              <div className="rounded-md bg-white/70 px-3 py-2">可重试 {failureRepairBatch.summary.retryableFailures}</div>
+            </div>
+            {failureRepairReview.evidence.length ? (
+              <div className="mt-2 grid gap-1 text-xs opacity-80">
+                {failureRepairReview.evidence.map((item) => <div key={item}>{item}</div>)}
+              </div>
+            ) : null}
+          </div>
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <div className="text-xs font-medium text-slate-500">派单证据总控</div>

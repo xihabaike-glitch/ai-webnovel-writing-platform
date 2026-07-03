@@ -6,6 +6,7 @@ import {
   buildGateActionReceipt,
   buildGatePlatformStrategyReceipt,
   buildGateActionReviewAdvice,
+  buildGateFailureRepairReceiptReview,
   buildGatePlatformGrowthReview,
   buildGatePlatformGrowthDispatchItems,
   buildGateProjectStartValidationDispatchItems,
@@ -44,6 +45,7 @@ import {
 } from "../lib/projects/gateActionReceipts.ts";
 import { buildProjectStartDecisionActionReceipt } from "../lib/projects/projectStartDecisionActions.ts";
 import type { PrePublishGateAction, PrePublishGateStrategyPlatform } from "../lib/projects/prePublishGate.ts";
+import type { FailureRepairBatch } from "../lib/ai/taskRunConsole.ts";
 
 const action: PrePublishGateAction = {
   id: "strategy",
@@ -82,6 +84,57 @@ const strategyPlatform: PrePublishGateStrategyPlatform = {
     loopLabel: "先采纳候选",
     href: "/projects/project-1#submission-asset-editor",
   }],
+};
+
+const failureRepairBatch: FailureRepairBatch = {
+  status: "fix_config",
+  title: "先修配置，再谈重试",
+  detail: "1 个未恢复失败指向 API Key、权限或模型配置。",
+  primaryActionLabel: "去模型设置",
+  primaryActionHref: "/settings/models",
+  summary: {
+    unresolvedFailures: 2,
+    configFailures: 1,
+    retryableFailures: 1,
+    manualFailures: 0,
+    affectedProjects: 1,
+    affectedProviders: 2,
+  },
+  guidance: ["先修配置类失败，再处理可重试任务。"],
+  items: [
+    {
+      id: "config-failure",
+      projectId: "project-1",
+      projectTitle: "夜雨系统",
+      chapterTitle: "第一章",
+      taskLabel: "章节审稿",
+      providerName: "DeepSeek",
+      model: "deepseek-chat",
+      retryable: false,
+      retryReason: "这类失败更像 API Key、权限或模型配置问题，先修配置再继续。",
+      actionLabel: "去模型设置",
+      href: "/settings/models",
+      errorMessage: "API key missing",
+      directRetrySupported: false,
+      repairKind: "config",
+    },
+    {
+      id: "timeout-failure",
+      projectId: "project-1",
+      projectTitle: "夜雨系统",
+      chapterTitle: "第二章",
+      taskLabel: "正文初稿",
+      providerName: "Mock",
+      model: "mock-writer",
+      retryable: true,
+      retryReason: "可直接复用当前章节内容重新执行。",
+      actionLabel: "一键重试",
+      href: "/projects/project-1/chapters/chapter-2",
+      errorMessage: "503 provider timeout",
+      directRetrySupported: true,
+      repairKind: "retry",
+    },
+  ],
 };
 
 test("buildGateActionReceipt", async (t) => {
@@ -297,6 +350,60 @@ test("buildGateActionReceipt", async (t) => {
     assert.equal(summary.platforms.find((platform) => platform.id === "fanqie")?.total, 1);
     assert.equal(failedFanqie.length, 1);
     assert.equal(failedFanqie[0].actionId, "platform-strategy:fanqie:generate_asset_variants");
+  });
+
+  await t.test("tracks failure repair batch receipts until the batch clears", () => {
+    const pending = buildGateFailureRepairReceiptReview(failureRepairBatch, []);
+    const manualRepair = buildGateActionReceipt({
+      action: {
+        id: "failure-repair-batch",
+        label: "去模型设置",
+        detail: "先修配置，再谈重试：1 个未恢复失败指向 API Key、权限或模型配置。",
+        href: "/settings/models",
+        tone: "repair",
+        execution: null,
+      },
+      status: "succeeded",
+      now: "2026-01-01T00:00:00.000Z",
+      payload: { message: "已记录模型配置修复。" },
+    });
+    const retryReceipt = buildGateActionReceipt({
+      action: {
+        id: "repair-batch-retry:timeout-failure",
+        label: "一键重试",
+        detail: "夜雨系统 · 第二章 · 可直接复用当前章节内容重新执行。",
+        href: "/projects/project-1/chapters/chapter-2",
+        tone: "review",
+        execution: { type: "retry_task", taskId: "timeout-failure" },
+      },
+      status: "succeeded",
+      now: "2026-01-01T00:01:00.000Z",
+      payload: { task: { id: "timeout-failure-retry", status: "succeeded" } },
+    });
+    const responded = buildGateFailureRepairReceiptReview(failureRepairBatch, [retryReceipt, manualRepair]);
+    const cleared = buildGateFailureRepairReceiptReview({
+      ...failureRepairBatch,
+      status: "clear",
+      title: "失败修复批次已清空",
+      detail: "没有未恢复失败。",
+      summary: {
+        unresolvedFailures: 0,
+        configFailures: 0,
+        retryableFailures: 0,
+        manualFailures: 0,
+        affectedProjects: 0,
+        affectedProviders: 0,
+      },
+      items: [],
+    }, [retryReceipt, manualRepair]);
+
+    assert.equal(pending.status, "open");
+    assert.equal(pending.actionLabel, "去模型设置");
+    assert.equal(responded.status, "recheck");
+    assert.equal(responded.receipts, 2);
+    assert.match(responded.detail, /当前仍有 2 个未恢复失败/);
+    assert.equal(cleared.status, "cleared");
+    assert.match(cleared.detail, /已清空/);
   });
 
   await t.test("turns repeated failures into urgent review advice", () => {

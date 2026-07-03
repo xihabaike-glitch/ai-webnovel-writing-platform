@@ -1,4 +1,5 @@
 import type { PrePublishGateAction, PrePublishGateActionExecution, PrePublishGateStrategyPlatform } from "./prePublishGate.ts";
+import type { FailureRepairBatch } from "../ai/taskRunConsole.ts";
 
 export const gateActionReceiptStorageKey = "ai-webnovel-gate-action-receipts";
 export const gateActionReceiptUpdatedEvent = "ai-webnovel-gate-action-receipts-updated";
@@ -102,6 +103,17 @@ export interface GateActionReceiptSummary {
     total: number;
     failed: number;
   }>;
+}
+
+export interface GateFailureRepairReceiptReview {
+  status: "clear" | "open" | "recheck" | "blocked" | "cleared";
+  label: string;
+  detail: string;
+  actionLabel: string;
+  href: string;
+  receipts: number;
+  latestReceiptId: string | null;
+  evidence: string[];
 }
 
 export type GateActionReviewAdviceSeverity = "urgent" | "warning" | "opportunity" | "healthy";
@@ -768,6 +780,7 @@ function receiptMessage(input: {
   }
 
   if (executionType === "publish_repair") return "发布修复动作已完成。";
+  if (input.action.id === "failure-repair-batch") return input.payload.message ?? "已记录失败修复批次处理。";
   return "已打开处理位置。";
 }
 
@@ -948,6 +961,88 @@ export function buildGateActionReceipt(input: {
       message,
     }),
     createdAt,
+  };
+}
+
+function failureRepairReceiptIds(batch: FailureRepairBatch) {
+  return new Set([
+    "failure-repair-batch",
+    ...batch.items.flatMap((item) => [
+      `repair-batch-retry:${item.id}`,
+      `retry:${item.id}`,
+    ]),
+  ]);
+}
+
+function failureRepairReceipts(batch: FailureRepairBatch, receipts: GateActionReceipt[]) {
+  const ids = failureRepairReceiptIds(batch);
+  const taskIds = new Set(batch.items.map((item) => item.id));
+  return trimGateActionReceipts(receipts.filter((receipt) => (
+    ids.has(receipt.actionId)
+    || (receipt.executionType === "retry_task" && receipt.taskId && taskIds.has(receipt.taskId))
+  )), defaultGateActionReceiptLimit);
+}
+
+export function buildGateFailureRepairReceiptReview(
+  batch: FailureRepairBatch,
+  receipts: GateActionReceipt[],
+): GateFailureRepairReceiptReview {
+  const related = failureRepairReceipts(batch, receipts);
+  const latest = related[0] ?? null;
+  const evidence = related.slice(0, 3).map((receipt) => (
+    `${receipt.label}：${receipt.status === "succeeded" ? "成功" : "失败"}｜${receipt.message}`
+  ));
+
+  if (batch.status === "clear") {
+    return {
+      status: related.length > 0 ? "cleared" : "clear",
+      label: related.length > 0 ? "失败已清空" : "暂无失败",
+      detail: related.length > 0
+        ? `失败修复批次已清空，已找到 ${related.length} 条相关处理回执。`
+        : "当前没有未恢复失败，也没有需要追踪的修复回执。",
+      actionLabel: "查看任务中心",
+      href: "/tasks",
+      receipts: related.length,
+      latestReceiptId: latest?.id ?? null,
+      evidence,
+    };
+  }
+
+  if (!latest) {
+    return {
+      status: "open",
+      label: "等待修复回执",
+      detail: `${batch.summary.unresolvedFailures} 个未恢复失败还没有处理回执，先执行修复批次主动作。`,
+      actionLabel: batch.primaryActionLabel,
+      href: batch.primaryActionHref,
+      receipts: 0,
+      latestReceiptId: null,
+      evidence: batch.guidance.slice(0, 3),
+    };
+  }
+
+  if (latest.status === "failed") {
+    return {
+      status: "blocked",
+      label: "修复动作失败",
+      detail: `最近一次修复回执失败：${latest.message}`,
+      actionLabel: "打开失败位置",
+      href: latest.href,
+      receipts: related.length,
+      latestReceiptId: latest.id,
+      evidence,
+    };
+  }
+
+  return {
+    status: "recheck",
+    label: "已响应待复检",
+    detail: `已有 ${related.length} 条失败修复回执，但当前仍有 ${batch.summary.unresolvedFailures} 个未恢复失败；刷新或继续处理后再确认是否清空。`,
+    actionLabel: "刷新总闸门",
+    href: "/gate",
+    receipts: related.length,
+    latestReceiptId: latest.id,
+    evidence,
   };
 }
 

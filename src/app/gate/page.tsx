@@ -199,7 +199,7 @@ export default async function GatePage() {
 
         <div className="rounded-md border border-slate-200 bg-white p-4">
           <div className="mb-3 font-medium text-slate-950">优先动作</div>
-          <GateActionWorkspace actions={gate.priorityActions} />
+          <GateActionWorkspace actions={gate.priorityActions} failureRepairBatch={gate.failureRepairBatch} />
         </div>
       </section>
 

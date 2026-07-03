@@ -527,6 +527,84 @@ test("model task routing", async (t) => {
     assert.equal(draft?.avoidance.status, "none");
   });
 
+  await t.test("explains restored candidates after dismissing a passed route retest", () => {
+    const rawRules = [
+      {
+        taskType: "chapter_draft",
+        providerConfigId: "deepseek-provider",
+        providerId: "deepseek",
+        model: "deepseek-chat",
+        reason: "DeepSeek 初稿路线曾经失败。",
+        evidence: ["第三轮恢复闭环"],
+        watchUntil: "2026-07-01T00:00:00.000Z",
+      },
+    ];
+    const providers = [
+      {
+        id: "deepseek-provider",
+        providerId: "deepseek",
+        displayName: "DeepSeek",
+        defaultModel: "deepseek-chat",
+        enabled: true,
+        encryptedApiKey: "key",
+      },
+    ];
+    const overrides = [
+      {
+        ruleKey: buildRouteAvoidanceRuleKey(rawRules[0]),
+        action: "dismiss" as const,
+        note: "复测通过，解除观察。",
+        updatedAt: "2026-07-04T08:00:00.000Z",
+      },
+    ];
+    const decisionHistory = buildRouteAvoidanceDecisionHistory(rawRules, overrides, providers, {
+      retestDispatches: [
+        {
+          dispatchKey: "model-route-retest:deepseek-provider:deepseek-chat",
+          stage: "model_route_retest",
+          state: "completed",
+          completionEvidence: "完成 3 个小样本复测，成功率 100%，质量 86，成本正常，未命中备用路线。",
+          evidence: ["复测通过"],
+          completedAt: "2026-07-04T07:30:00.000Z",
+        },
+      ],
+    });
+    const effective = applyRouteAvoidanceOverrides(rawRules, overrides);
+    const recommendations = buildRouteRecommendations([
+      {
+        id: "draft-deepseek-1",
+        taskType: "chapter_draft",
+        providerConfigId: "deepseek-provider",
+        status: "succeeded",
+        inputTokens: 1000,
+        outputTokens: 1200,
+        costUsd: 0.002,
+        outputText: JSON.stringify({ score: 88 }),
+      },
+      {
+        id: "draft-deepseek-2",
+        taskType: "chapter_draft",
+        providerConfigId: "deepseek-provider",
+        status: "succeeded",
+        inputTokens: 1000,
+        outputTokens: 1200,
+        costUsd: 0.002,
+        outputText: JSON.stringify({ score: 87 }),
+      },
+    ], [], providers, {
+      avoidanceRules: effective,
+      routeAvoidanceDecisionHistory: decisionHistory,
+    });
+
+    const draft = recommendations.find((item) => item.taskType === "chapter_draft");
+
+    assert.equal(draft?.recommendedPrimaryProviderConfigId, "deepseek-provider");
+    assert.equal(draft?.avoidance.status, "none");
+    assert.ok(draft?.reason.includes("复测通过，恢复候选"));
+    assert.ok(draft?.reason.includes("成功率 100%"));
+    assert.ok(draft?.reason.includes("质量 86"));
+  });
+
   await t.test("explains extended watch governance inside route recommendations", () => {
     const rawRules = [
       {

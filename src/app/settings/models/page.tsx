@@ -139,6 +139,7 @@ export default async function ModelSettingsPage() {
   );
   const routeRecommendations = buildRouteRecommendations(recentTasks, routes, routeProviders, {
     avoidanceRules: routeAvoidanceRules,
+    routeAvoidanceDecisionHistory,
   });
   const presetRouteBlueprint = buildPresetRouteBlueprint(routeProviders, routes);
 

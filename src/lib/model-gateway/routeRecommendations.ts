@@ -66,6 +66,7 @@ export interface RouteRecommendationAvoidance {
 
 export interface RouteRecommendationOptions {
   avoidanceRules?: RouteAvoidanceRule[];
+  routeAvoidanceDecisionHistory?: RouteAvoidanceDecisionHistory;
 }
 
 export interface RouteAvoidanceDispatchTask {
@@ -366,6 +367,40 @@ function avoidanceReason(rule: RouteAvoidanceRule) {
   }
   if (rule.governanceNote) return `${rule.governanceNote} 原始原因：${rule.reason}`;
   return rule.reason;
+}
+
+function routeDecisionMatchesProvider(
+  item: RouteAvoidanceDecisionHistoryItem,
+  provider: RouteRecommendationProvider,
+) {
+  return [
+    `${provider.id}:${provider.defaultModel}`,
+    `${provider.providerId}:${provider.defaultModel}`,
+  ].some((key) => sameText(item.ruleKey, key));
+}
+
+function restoredDecisionForTask(
+  taskType: string,
+  provider: RouteRecommendationProvider | undefined,
+  history: RouteAvoidanceDecisionHistory | undefined,
+) {
+  if (!provider || !history) return null;
+  const taskScope = labelForRoutedTask(taskType);
+  return history.items.find((item) => (
+    item.action === "dismiss"
+    && item.latestRetest?.recommendedAction === "dismiss"
+    && routeDecisionMatchesProvider(item, provider)
+    && (item.taskScope === "全部写作任务" || item.taskScope === taskScope)
+  )) ?? null;
+}
+
+function restoredCandidateReason(item: RouteAvoidanceDecisionHistoryItem | null) {
+  if (!item?.latestRetest) return "";
+  const successRate = item.latestRetest.successRatePercent === null ? "未填" : `${item.latestRetest.successRatePercent}%`;
+  const quality = item.latestRetest.qualityScore ?? "未填";
+  const date = item.latestRetest.completedAt ? `，复测日期 ${item.latestRetest.completedAt.slice(0, 10)}` : "";
+  const note = item.note ? `，${item.note}` : "";
+  return `复测通过，恢复候选：成功率 ${successRate}，质量 ${quality}${date}${note}。`;
 }
 
 export function buildRouteAvoidanceRulesFromDispatchTasks(
@@ -910,6 +945,9 @@ export function buildRouteRecommendations(
     const baseReason = primary
       ? `近 ${primary.totalTasks} 次样本成功率 ${primary.successRatePercent}%，质量 ${primary.averageQualityScore || "缺"}，单次成功成本 $${primary.averageCostPerSucceededTaskUsd.toFixed(4)}。`
       : `「${option.label}」还没有足够可用样本，先各跑 2 次再让系统接管路由。`;
+    const restorationReason = restoredCandidateReason(
+      restoredDecisionForTask(option.taskType, primary?.provider, options.routeAvoidanceDecisionHistory),
+    );
 
     return {
       taskType: option.taskType,
@@ -926,7 +964,7 @@ export function buildRouteRecommendations(
       averageQualityScore: primary?.averageQualityScore ?? 0,
       averageCostPerSucceededTaskUsd: primary?.averageCostPerSucceededTaskUsd ?? 0,
       avoidance,
-      reason: avoidance.reason ? `${avoidance.reason} ${baseReason}` : baseReason,
+      reason: [avoidance.reason, restorationReason, baseReason].filter(Boolean).join(" "),
     };
   });
 }

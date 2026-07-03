@@ -17,6 +17,7 @@ import {
   buildGatePlatformRetreatRecheckDispatchItems,
   buildGatePlatformDecisionTimeline,
   buildGatePlatformDecisionSummaryMarkdown,
+  buildGateBatchTacticEffectReview,
   buildGatePlatformTacticExperienceLibrary,
   buildGatePlatformTacticExperienceMarkdown,
   buildGatePlatformDispatchReceipt,
@@ -50,6 +51,7 @@ import {
   type GatePlatformDecisionTimelineEventType,
   type GatePlatformDecisionTimelineStatus,
   type GatePlatformDecisionTimelineItem,
+  type GateBatchTacticEffectStatus,
   type GatePlatformTacticExperienceItem,
   type GatePlatformTacticExperienceStatus,
   type GatePlatformGrowthDispatchItem,
@@ -214,6 +216,12 @@ function tacticExperienceStatusLabel(status: GatePlatformTacticExperienceStatus)
   return "可复用";
 }
 
+function batchTacticEffectLabel(status: GateBatchTacticEffectStatus) {
+  if (status === "blocked") return "避坑";
+  if (status === "watch") return "观察";
+  return "可复用";
+}
+
 export function GateActionWorkspace({ actions }: { actions: PrePublishGateAction[] }) {
   const router = useRouter();
   const [receipts, setReceipts] = useState<GateActionReceipt[]>([]);
@@ -265,6 +273,7 @@ export function GateActionWorkspace({ actions }: { actions: PrePublishGateAction
     eventType: timelineEventFilter,
   });
   const tacticExperienceLibrary = buildGatePlatformTacticExperienceLibrary(decisionTimeline);
+  const batchTacticEffectReview = buildGateBatchTacticEffectReview(receipts);
   const latestReceipt = filteredReceipts[0] ?? null;
 
   useEffect(() => {
@@ -1161,6 +1170,68 @@ export function GateActionWorkspace({ actions }: { actions: PrePublishGateAction
           ) : (
             <p className="rounded-md border border-dashed border-slate-300 bg-white p-3 text-sm text-slate-600">
               暂无平台决策链。先产生平台效果回执或派单任务。
+            </p>
+          )}
+        </div>
+        <div className="mt-3 grid gap-2">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <div className="text-xs font-medium text-slate-500">批量打法效果复盘</div>
+              <p className="mt-1 text-xs text-slate-500">把推荐批次里的首轮打法和成功率、质量分、成本放在一起，判断可复用、观察或避坑。</p>
+            </div>
+            {batchTacticEffectReview.summary.total ? (
+              <div className="flex flex-wrap gap-2 text-xs">
+                <span className="rounded-md border border-emerald-200 bg-emerald-50 px-2 py-1 text-emerald-800">
+                  可复用 {batchTacticEffectReview.summary.usable}
+                </span>
+                <span className="rounded-md border border-amber-200 bg-amber-50 px-2 py-1 text-amber-800">
+                  观察 {batchTacticEffectReview.summary.watch}
+                </span>
+                <span className="rounded-md border border-rose-200 bg-rose-50 px-2 py-1 text-rose-800">
+                  避坑 {batchTacticEffectReview.summary.blocked}
+                </span>
+              </div>
+            ) : null}
+          </div>
+          {batchTacticEffectReview.nextActions.length ? (
+            <div className="grid gap-2 xl:grid-cols-3">
+              {batchTacticEffectReview.nextActions.map((action) => (
+                <div className="rounded-md bg-white p-3 text-sm leading-6 text-slate-600" key={action}>{action}</div>
+              ))}
+            </div>
+          ) : null}
+          {batchTacticEffectReview.items.length ? (
+            <div className="grid gap-2 xl:grid-cols-3">
+              {batchTacticEffectReview.items.map((item) => (
+                <div className={`rounded-md border p-3 text-sm ${tacticExperienceClass(item.status)}`} key={item.id}>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-medium">{item.tacticLabel}</span>
+                    <span className="rounded-md bg-white/70 px-2 py-1 text-xs font-medium">{batchTacticEffectLabel(item.status)}</span>
+                  </div>
+                  <div className="mt-3 rounded-md bg-white/70 p-3">
+                    <div className="text-xs font-medium opacity-70">开头动作</div>
+                    <p className="mt-1 font-medium leading-6">{item.openingMove || item.primaryTactic}</p>
+                  </div>
+                  <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+                    <div className="rounded-md bg-white/70 p-2">批次 {item.sampleBatches}</div>
+                    <div className="rounded-md bg-white/70 p-2">成功率 {item.successRatePercent}%</div>
+                    <div className="rounded-md bg-white/70 p-2">质量 {item.averageQualityScore ?? "缺"}</div>
+                    <div className="rounded-md bg-white/70 p-2">成本 ${item.knownCostUsd.toFixed(4)}</div>
+                  </div>
+                  <p className="mt-3 leading-6 opacity-85">{item.nextAction}</p>
+                  {item.evidence.length ? (
+                    <div className="mt-3 grid gap-1">
+                      {item.evidence.slice(0, 2).map((evidence) => (
+                        <p className="rounded-md border border-white/70 bg-white/60 p-2 text-xs leading-5 opacity-80" key={evidence}>{evidence}</p>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="rounded-md border border-dashed border-slate-300 bg-white p-3 text-sm text-slate-600">
+              暂无批量打法样本。先从总闸或任务中心执行带首轮打法的推荐批次。
             </p>
           )}
         </div>

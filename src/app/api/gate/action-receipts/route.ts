@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
-import type { GateActionReceipt, GateActionReceiptStartTactic } from "@/lib/projects/gateActionReceipts";
+import type { GateActionReceipt, GateActionReceiptBatchEffectSummary, GateActionReceiptStartTactic } from "@/lib/projects/gateActionReceipts";
 
 function text(value: unknown, fallback = "") {
   return typeof value === "string" ? value : fallback;
@@ -33,7 +33,11 @@ function platformNameFromDetail(detail: string) {
 
 function parsePayload(payload: string) {
   try {
-    const parsed = JSON.parse(payload) as { startTactics?: GateActionReceiptStartTactic[]; plan?: { strategyBases?: GateActionReceiptStartTactic[] } };
+    const parsed = JSON.parse(payload) as {
+      startTactics?: GateActionReceiptStartTactic[];
+      plan?: { strategyBases?: GateActionReceiptStartTactic[] };
+      routeEffectSummary?: GateActionReceiptBatchEffectSummary;
+    };
     return parsed && typeof parsed === "object" ? parsed : {};
   } catch {
     return {};
@@ -44,6 +48,17 @@ function startTacticsFromPayload(payload: string) {
   const parsed = parsePayload(payload);
   const startTactics = parsed.startTactics?.length ? parsed.startTactics : parsed.plan?.strategyBases ?? [];
   return startTactics.filter((item) => item && typeof item.title === "string" && typeof item.primaryTactic === "string");
+}
+
+function batchEffectSummaryFromPayload(payload: string): GateActionReceiptBatchEffectSummary | null {
+  const route = parsePayload(payload).routeEffectSummary;
+  if (!route || typeof route.successRatePercent !== "number" || typeof route.knownCostUsd !== "number") return null;
+  return {
+    successRatePercent: route.successRatePercent,
+    knownCostUsd: route.knownCostUsd,
+    averageQualityScore: typeof route.averageQualityScore === "number" ? route.averageQualityScore : null,
+    verdict: typeof route.verdict === "string" ? route.verdict : undefined,
+  };
 }
 
 function toReceipt(item: {
@@ -82,6 +97,7 @@ function toReceipt(item: {
     platformId: item.platformId,
     platformName: item.platformName,
     startTactics: startTacticsFromPayload(item.payload),
+    batchEffectSummary: batchEffectSummaryFromPayload(item.payload),
     recheck: {
       status: item.recheckStatus === "blocked" ? "blocked" : "ready",
       label: item.recheckLabel,
@@ -155,7 +171,10 @@ export async function POST(request: Request) {
     recheckLabel: text(receipt.recheck?.label),
     recheckDetail: text(receipt.recheck?.detail),
     recheckAction: text(receipt.recheck?.actionLabel, "刷新总闸门"),
-    payload: JSON.stringify(body?.payload ?? { startTactics: receipt.startTactics ?? [] }),
+    payload: JSON.stringify(body?.payload ?? {
+      startTactics: receipt.startTactics ?? [],
+      routeEffectSummary: receipt.batchEffectSummary ?? undefined,
+    }),
     createdAt: date(receipt.createdAt),
   };
   const audit = await prisma.gateActionAudit.upsert({

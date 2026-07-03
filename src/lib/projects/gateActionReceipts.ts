@@ -32,6 +32,7 @@ export interface GateActionReceiptPayload {
     successRatePercent: number;
     knownCostUsd: number;
     averageQualityScore: number | null;
+    verdict?: string;
   };
 }
 
@@ -42,6 +43,13 @@ export interface GateActionReceiptStartTactic {
   openingMove: string;
   verificationMove: string;
   risk?: string;
+}
+
+export interface GateActionReceiptBatchEffectSummary {
+  successRatePercent: number;
+  knownCostUsd: number;
+  averageQualityScore: number | null;
+  verdict?: string;
 }
 
 export interface GateActionReceipt {
@@ -59,6 +67,7 @@ export interface GateActionReceipt {
   platformId?: string;
   platformName?: string;
   startTactics?: GateActionReceiptStartTactic[];
+  batchEffectSummary?: GateActionReceiptBatchEffectSummary | null;
   recheck: {
     status: "ready" | "blocked";
     label: string;
@@ -498,6 +507,40 @@ export interface GatePlatformTacticExperienceLibrary {
   items: GatePlatformTacticExperienceItem[];
 }
 
+export type GateBatchTacticEffectStatus = "blocked" | "watch" | "usable";
+
+export interface GateBatchTacticEffectItem {
+  id: string;
+  status: GateBatchTacticEffectStatus;
+  label: string;
+  tacticTitle: string;
+  tacticLabel: string;
+  primaryTactic: string;
+  openingMove: string;
+  verificationMove: string;
+  risk: string;
+  sampleBatches: number;
+  succeededTasks: number;
+  failedTasks: number;
+  successRatePercent: number;
+  averageQualityScore: number | null;
+  knownCostUsd: number;
+  latestAt: string;
+  evidence: string[];
+  nextAction: string;
+}
+
+export interface GateBatchTacticEffectReview {
+  summary: {
+    total: number;
+    blocked: number;
+    watch: number;
+    usable: number;
+  };
+  nextActions: string[];
+  items: GateBatchTacticEffectItem[];
+}
+
 export interface GatePlatformStrategyReceiptPayload {
   message?: string;
   error?: string;
@@ -547,6 +590,17 @@ function startTacticReceiptText(startTactics: GateActionReceiptStartTactic[]) {
     .slice(0, 2)
     .map((item) => `${item.label}｜${item.openingMove || item.primaryTactic}`)
     .join("；")}。`;
+}
+
+function batchEffectSummaryFromPayload(payload: GateActionReceiptPayload): GateActionReceiptBatchEffectSummary | null {
+  const route = payload.routeEffectSummary;
+  if (!route) return null;
+  return {
+    successRatePercent: route.successRatePercent,
+    knownCostUsd: route.knownCostUsd,
+    averageQualityScore: route.averageQualityScore,
+    verdict: route.verdict,
+  };
 }
 
 function receiptMessage(input: {
@@ -722,6 +776,7 @@ export function buildGateActionReceipt(input: {
   const payload = input.payload ?? {};
   const counts = countStatus(payload);
   const startTactics = startTacticsFromPayload(payload);
+  const batchEffectSummary = batchEffectSummaryFromPayload(payload);
   const createdAt = input.now ? new Date(input.now).toISOString() : new Date().toISOString();
   const taskId = payload.task?.id ?? payload.result?.taskId ?? payload.results?.find((result) => result.taskId)?.taskId ?? null;
   const message = receiptMessage({
@@ -746,6 +801,7 @@ export function buildGateActionReceipt(input: {
     platformId: platformIdFromActionId(input.action.id),
     platformName: platformNameFromDetail(input.action.detail),
     startTactics,
+    batchEffectSummary,
     recheck: recheckHint({
       action: input.action,
       status: input.status,
@@ -1591,7 +1647,10 @@ export async function fetchPersistedGateActionReceipts(options?: GateActionRecei
 }
 
 export async function persistGateActionReceipt(receipt: GateActionReceipt, payload?: unknown) {
-  const persistedPayload = payload ?? { startTactics: receipt.startTactics ?? [] };
+  const persistedPayload = payload ?? {
+    startTactics: receipt.startTactics ?? [],
+    routeEffectSummary: receipt.batchEffectSummary ?? undefined,
+  };
   const response = await fetch("/api/gate/action-receipts", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -3163,6 +3222,135 @@ export function buildGatePlatformTacticExperienceLibrary(
       blocked > 0 ? `${blocked} 个避坑样本要先沉淀撤退条件，别让错误打法复用。` : null,
       watch > 0 ? `${watch} 个观察样本只复用流程，等效果回填后再写成标准打法。` : null,
       usable > 0 ? `${usable} 个可复用打法可以进入新项目平台选择参考。` : null,
+    ].filter((action): action is string => Boolean(action)),
+    items: sortedItems,
+  };
+}
+
+function batchTacticKey(tactic: GateActionReceiptStartTactic) {
+  return `${markdownLine(tactic.title)}::${markdownLine(tactic.openingMove || tactic.primaryTactic)}`;
+}
+
+function batchTacticStatus(input: {
+  sampleBatches: number;
+  successRatePercent: number;
+  averageQualityScore: number | null;
+  failedTasks: number;
+}): GateBatchTacticEffectStatus {
+  if (input.failedTasks > 0 && input.successRatePercent < 80) return "blocked";
+  if (input.averageQualityScore !== null && input.averageQualityScore < 75) return "blocked";
+  if (input.sampleBatches < 2) return "watch";
+  if (input.successRatePercent < 90) return "watch";
+  if (input.averageQualityScore !== null && input.averageQualityScore < 85) return "watch";
+  return "usable";
+}
+
+function batchTacticLabel(status: GateBatchTacticEffectStatus) {
+  if (status === "blocked") return "避坑打法";
+  if (status === "watch") return "观察打法";
+  return "可复用打法";
+}
+
+export function buildGateBatchTacticEffectReview(
+  receipts: GateActionReceipt[],
+  limit = 6,
+): GateBatchTacticEffectReview {
+  const groups = new Map<string, {
+    tactic: GateActionReceiptStartTactic;
+    receipts: GateActionReceipt[];
+  }>();
+
+  for (const receipt of receipts) {
+    if (receipt.executionType !== "recommended_batch") continue;
+    for (const tactic of receipt.startTactics ?? []) {
+      if (!tactic.title || !tactic.primaryTactic) continue;
+      const key = batchTacticKey(tactic);
+      const group = groups.get(key) ?? { tactic, receipts: [] };
+      group.receipts.push(receipt);
+      groups.set(key, group);
+    }
+  }
+
+  const items = [...groups.entries()].map(([id, group]): GateBatchTacticEffectItem => {
+    const sortedReceipts = [...group.receipts].sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime());
+    const succeededTasks = sortedReceipts.reduce((sum, receipt) => sum + receipt.succeededCount, 0);
+    const failedTasks = sortedReceipts.reduce((sum, receipt) => sum + receipt.failedCount, 0);
+    const totalTasks = succeededTasks + failedTasks;
+    const successRatePercent = totalTasks ? Math.round((succeededTasks / totalTasks) * 100) : 0;
+    const qualitySamples = sortedReceipts
+      .map((receipt) => receipt.batchEffectSummary?.averageQualityScore ?? null)
+      .filter((score): score is number => typeof score === "number");
+    const averageQualityScore = qualitySamples.length
+      ? Math.round(qualitySamples.reduce((sum, score) => sum + score, 0) / qualitySamples.length)
+      : null;
+    const knownCostUsd = Number(sortedReceipts.reduce((sum, receipt) => sum + (receipt.batchEffectSummary?.knownCostUsd ?? 0), 0).toFixed(4));
+    const status = batchTacticStatus({
+      sampleBatches: sortedReceipts.length,
+      successRatePercent,
+      averageQualityScore,
+      failedTasks,
+    });
+    const label = batchTacticLabel(status);
+    const evidence = sortedReceipts.slice(0, 3).map((receipt) => {
+      const quality = receipt.batchEffectSummary?.averageQualityScore ?? "缺";
+      return `${receipt.label}：成功 ${receipt.succeededCount}，失败 ${receipt.failedCount}，质量 ${quality}`;
+    });
+    const nextAction = status === "blocked"
+      ? "先拆失败样本和低分原因，暂停把这套打法继续放进新批次。"
+      : status === "watch"
+        ? "只允许小批继续验证，等至少两批稳定后再写入可复用打法。"
+        : "可以进入新项目开书参考，但仍保留小步验证和回执追踪。";
+
+    return {
+      id,
+      status,
+      label,
+      tacticTitle: group.tactic.title,
+      tacticLabel: group.tactic.label || "首轮打法",
+      primaryTactic: group.tactic.primaryTactic,
+      openingMove: group.tactic.openingMove,
+      verificationMove: group.tactic.verificationMove,
+      risk: group.tactic.risk || "继续按批量回执和平台数据复盘。",
+      sampleBatches: sortedReceipts.length,
+      succeededTasks,
+      failedTasks,
+      successRatePercent,
+      averageQualityScore,
+      knownCostUsd,
+      latestAt: sortedReceipts[0]?.createdAt ?? new Date(0).toISOString(),
+      evidence,
+      nextAction,
+    };
+  });
+
+  const statusWeight: Record<GateBatchTacticEffectStatus, number> = {
+    blocked: 0,
+    watch: 1,
+    usable: 2,
+  };
+  const sortedItems = items
+    .sort((left, right) => {
+      const statusDiff = statusWeight[left.status] - statusWeight[right.status];
+      if (statusDiff !== 0) return statusDiff;
+      if (right.failedTasks !== left.failedTasks) return right.failedTasks - left.failedTasks;
+      return new Date(right.latestAt).getTime() - new Date(left.latestAt).getTime();
+    })
+    .slice(0, limit);
+  const blocked = sortedItems.filter((item) => item.status === "blocked").length;
+  const watch = sortedItems.filter((item) => item.status === "watch").length;
+  const usable = sortedItems.filter((item) => item.status === "usable").length;
+
+  return {
+    summary: {
+      total: sortedItems.length,
+      blocked,
+      watch,
+      usable,
+    },
+    nextActions: [
+      blocked > 0 ? `${blocked} 套批量打法已经触发避坑条件，先停用并复盘失败样本。` : null,
+      watch > 0 ? `${watch} 套批量打法样本还薄，只能小批观察。` : null,
+      usable > 0 ? `${usable} 套批量打法可作为新项目首轮打法参考。` : null,
     ].filter((action): action is string => Boolean(action)),
     items: sortedItems,
   };

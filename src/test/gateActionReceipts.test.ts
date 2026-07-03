@@ -19,6 +19,7 @@ import {
   buildGatePlatformRetreatRecheckDispatchItems,
   buildGatePlatformDecisionTimeline,
   buildGatePlatformDecisionSummaryMarkdown,
+  buildGateBatchTacticEffectReview,
   buildGatePlatformTacticExperienceLibrary,
   buildGatePlatformTacticExperienceMarkdown,
   filterGatePlatformDecisionTimelineItems,
@@ -113,6 +114,65 @@ test("buildGateActionReceipt", async (t) => {
     assert.ok(receipt.startTactics?.[0].openingMove.includes("倒计时"));
     assert.equal(receipt.recheck.status, "ready");
     assert.equal(receipt.recheck.label, "复检任务队列");
+  });
+
+  await t.test("reviews batch tactic effects from recommended batch receipts", () => {
+    const stableTactic = {
+      title: "首轮平台打法：番茄小说",
+      label: "模板推荐",
+      primaryTactic: "先抓首章钩子，再用前三章连续兑现爽点。",
+      openingMove: "第一段给倒计时和不可逆损失。",
+      verificationMove: "批量后复检前三章追读。",
+      risk: "解释过多会掉首秀。",
+    };
+    const weakTactic = {
+      ...stableTactic,
+      title: "首轮平台打法：七猫小说",
+      label: "历史观察",
+      openingMove: "第一段慢慢铺关系。",
+    };
+    const firstStable = buildGateActionReceipt({
+      action,
+      status: "succeeded",
+      now: "2026-01-01T00:00:00.000Z",
+      payload: {
+        results: [{ status: "succeeded", taskId: "task-1" }],
+        routeEffectSummary: { successRatePercent: 100, knownCostUsd: 0.01, averageQualityScore: 88 },
+        plan: { strategyBases: [stableTactic] },
+      },
+    });
+    const secondStable = buildGateActionReceipt({
+      action,
+      status: "succeeded",
+      now: "2026-01-02T00:00:00.000Z",
+      payload: {
+        results: [{ status: "succeeded", taskId: "task-2" }],
+        routeEffectSummary: { successRatePercent: 100, knownCostUsd: 0.02, averageQualityScore: 90 },
+        plan: { strategyBases: [stableTactic] },
+      },
+    });
+    const weak = buildGateActionReceipt({
+      action,
+      status: "succeeded",
+      now: "2026-01-03T00:00:00.000Z",
+      payload: {
+        results: [{ status: "failed", taskId: "task-3" }],
+        routeEffectSummary: { successRatePercent: 0, knownCostUsd: 0.03, averageQualityScore: 68 },
+        plan: { strategyBases: [weakTactic] },
+      },
+    });
+    const review = buildGateBatchTacticEffectReview([weak, secondStable, firstStable]);
+    const usable = review.items.find((item) => item.openingMove.includes("不可逆损失"));
+    const blocked = review.items.find((item) => item.openingMove.includes("慢慢铺关系"));
+
+    assert.equal(review.summary.usable, 1);
+    assert.equal(review.summary.blocked, 1);
+    assert.equal(usable?.status, "usable");
+    assert.equal(usable?.sampleBatches, 2);
+    assert.equal(usable?.successRatePercent, 100);
+    assert.equal(usable?.averageQualityScore, 89);
+    assert.equal(blocked?.status, "blocked");
+    assert.ok(blocked?.nextAction.includes("暂停"));
   });
 
   await t.test("keeps failed action errors readable", () => {

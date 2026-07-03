@@ -99,6 +99,27 @@ interface RouteRecommendationView {
   reason: string;
 }
 
+interface PresetRouteBlueprintView {
+  summary: {
+    total: number;
+    ready: number;
+    current: number;
+    missing: number;
+  };
+  nextActions: string[];
+  items: Array<{
+    taskType: string;
+    label: string;
+    status: "ready" | "current" | "missing";
+    recommendedPrimaryProviderConfigId: string | null;
+    recommendedFallbackProviderConfigId: string | null;
+    primaryProviderName: string;
+    fallbackProviderName: string | null;
+    matchedTags: string[];
+    reason: string;
+  }>;
+}
+
 interface RouteDraft {
   primaryProviderConfigId: string;
   fallbackProviderConfigId: string;
@@ -153,6 +174,7 @@ export function ModelProviderSettings({
   healthDashboard,
   options,
   presets,
+  presetRouteBlueprint,
   providers,
   routeEffectAudit,
   routeRecommendations,
@@ -162,6 +184,7 @@ export function ModelProviderSettings({
   healthDashboard: ProviderHealthDashboard;
   options: ProviderOptionView[];
   presets: ProviderModelPresetView[];
+  presetRouteBlueprint: PresetRouteBlueprintView;
   providers: ProviderView[];
   routeEffectAudit: RouteEffectAuditView;
   routeRecommendations: RouteRecommendationView[];
@@ -342,6 +365,37 @@ export function ModelProviderSettings({
     }
   }
 
+  async function applyPresetRoute(item: PresetRouteBlueprintView["items"][number]) {
+    if (!item.recommendedPrimaryProviderConfigId) return;
+    setApplyingRecommendationType(item.taskType);
+    setRouteMessage(null);
+    try {
+      const response = await fetch("/api/model-task-routes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          taskType: item.taskType,
+          primaryProviderConfigId: item.recommendedPrimaryProviderConfigId,
+          fallbackProviderConfigId: item.recommendedFallbackProviderConfigId,
+        }),
+      });
+      if (!response.ok) throw new Error("应用冷启动路由失败。");
+      setRouteDrafts((current) => ({
+        ...current,
+        [item.taskType]: {
+          primaryProviderConfigId: item.recommendedPrimaryProviderConfigId ?? "",
+          fallbackProviderConfigId: item.recommendedFallbackProviderConfigId ?? "",
+        },
+      }));
+      setRouteMessage(`已应用「${item.label}」冷启动路由`);
+      router.refresh();
+    } catch (caught) {
+      setRouteMessage(caught instanceof Error ? caught.message : "应用冷启动路由失败。");
+    } finally {
+      setApplyingRecommendationType(null);
+    }
+  }
+
   return (
     <div className="mt-6 grid gap-5">
       <section className="grid gap-3">
@@ -458,6 +512,62 @@ export function ModelProviderSettings({
             下一条建议补齐：{routeEffectAudit.summary.nextUnconfiguredTaskLabel}
           </div>
         ) : null}
+        <div className="mt-4 rounded-md border border-slate-200 p-3">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <div className="text-sm font-medium text-slate-950">冷启动路由蓝图</div>
+              <p className="mt-1 text-sm text-slate-600">没有历史样本时，先按写作任务模型预设初始化路由。</p>
+            </div>
+            <div className="flex flex-wrap gap-2 text-xs text-slate-600">
+              <span className="rounded-md bg-slate-50 px-2 py-1">可初始化 {presetRouteBlueprint.summary.ready}</span>
+              <span className="rounded-md bg-slate-50 px-2 py-1">已符合 {presetRouteBlueprint.summary.current}</span>
+              <span className="rounded-md bg-slate-50 px-2 py-1">缺配置 {presetRouteBlueprint.summary.missing}</span>
+            </div>
+          </div>
+          {presetRouteBlueprint.nextActions.length ? (
+            <div className="mt-3 grid gap-2 md:grid-cols-3">
+              {presetRouteBlueprint.nextActions.map((action) => (
+                <div className="rounded-md bg-slate-50 p-2 text-xs leading-5 text-slate-600" key={action}>{action}</div>
+              ))}
+            </div>
+          ) : null}
+          <div className="mt-3 grid gap-2 lg:grid-cols-2">
+            {presetRouteBlueprint.items.map((item) => (
+              <div className="rounded-md bg-slate-50 p-3 text-sm" key={item.taskType}>
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <div className="font-medium text-slate-950">{item.label}</div>
+                    <div className="mt-1 text-xs text-slate-500">
+                      {item.status === "ready" ? "可初始化" : item.status === "current" ? "已符合蓝图" : "缺少可用模型"}
+                    </div>
+                  </div>
+                  {item.status === "ready" ? (
+                    <button
+                      className="rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white disabled:opacity-50"
+                      disabled={applyingRecommendationType === item.taskType}
+                      onClick={() => applyPresetRoute(item)}
+                      type="button"
+                    >
+                      {applyingRecommendationType === item.taskType ? "应用中" : "应用蓝图"}
+                    </button>
+                  ) : null}
+                </div>
+                <div className="mt-2 grid gap-1 text-xs text-slate-600 md:grid-cols-2">
+                  <div>首选：{item.primaryProviderName}</div>
+                  <div>备用：{item.fallbackProviderName ?? "无"}</div>
+                </div>
+                {item.matchedTags.length ? (
+                  <div className="mt-2 flex flex-wrap gap-1">
+                    {item.matchedTags.map((tag) => (
+                      <span className="rounded-md bg-white px-2 py-1 text-xs text-slate-600" key={tag}>{tag}</span>
+                    ))}
+                  </div>
+                ) : null}
+                <p className="mt-2 leading-6 text-slate-600">{item.reason}</p>
+              </div>
+            ))}
+          </div>
+        </div>
         <div className="mt-4 rounded-md border border-slate-200 p-3">
           <div className="text-sm font-medium text-slate-950">系统路由建议</div>
           <div className="mt-3 grid gap-2 lg:grid-cols-2">

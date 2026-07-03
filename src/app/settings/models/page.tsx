@@ -1,6 +1,7 @@
 import { AppShell } from "@/components/app-shell/AppShell";
 import { ModelProviderSettings } from "@/components/settings/ModelProviderSettings";
 import { prisma } from "@/lib/db/prisma";
+import { buildPresetRouteBlueprint } from "@/lib/model-gateway/presetRouteBlueprint";
 import { providerModelPresets, providerOptions } from "@/lib/model-gateway/providerDefaults";
 import { buildProviderHealthDashboard } from "@/lib/model-gateway/providerHealth";
 import { buildRouteEffectAudit } from "@/lib/model-gateway/routeEffectAudit";
@@ -76,6 +77,14 @@ export default async function ModelSettingsPage() {
     enabled: provider.enabled,
     encryptedApiKey: provider.encryptedApiKey,
   })));
+  const presetRouteBlueprint = buildPresetRouteBlueprint(providers.map((provider) => ({
+    id: provider.id,
+    providerId: provider.providerId,
+    displayName: provider.displayName,
+    defaultModel: provider.defaultModel,
+    enabled: provider.enabled,
+    encryptedApiKey: provider.encryptedApiKey,
+  })), routes);
 
   return (
     <AppShell>
@@ -85,6 +94,7 @@ export default async function ModelSettingsPage() {
         healthDashboard={healthDashboard}
         options={providerOptions}
         presets={providerModelPresets}
+        presetRouteBlueprint={presetRouteBlueprint}
         providers={maskedProviders}
         routeEffectAudit={routeEffectAudit}
         routeRecommendations={routeRecommendations}

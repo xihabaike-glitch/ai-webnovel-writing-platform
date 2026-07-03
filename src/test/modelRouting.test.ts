@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { buildPresetRouteBlueprint } from "../lib/model-gateway/presetRouteBlueprint.ts";
 import { selectModelProviderCandidatesForTask, selectModelProviderForTask } from "../lib/model-gateway/providerSelection.ts";
 import { buildRouteRecommendations } from "../lib/model-gateway/routeRecommendations.ts";
 import { labelForRoutedTask, modelTaskRouteOptions } from "../lib/model-gateway/taskRouting.ts";
@@ -77,6 +78,55 @@ test("model task routing", async (t) => {
     assert.ok(modelTaskRouteOptions.some((option) => option.taskType === "control_asset_generate"));
     assert.equal(labelForRoutedTask("chapter_second_pass"), "章节二改");
     assert.equal(labelForRoutedTask("control_asset_generate"), "总控资料生成");
+  });
+
+  await t.test("builds a cold-start route blueprint from writing model presets", () => {
+    const blueprint = buildPresetRouteBlueprint([
+      {
+        id: "deepseek-provider",
+        providerId: "deepseek",
+        displayName: "DeepSeek",
+        defaultModel: "deepseek-chat",
+        enabled: true,
+        encryptedApiKey: "key",
+      },
+      {
+        id: "kimi-provider",
+        providerId: "kimi",
+        displayName: "Kimi",
+        defaultModel: "kimi-k2.6",
+        enabled: true,
+        encryptedApiKey: "key",
+      },
+      {
+        id: "claude-provider",
+        providerId: "claude",
+        displayName: "Claude",
+        defaultModel: "claude-sonnet-4-5",
+        enabled: true,
+        encryptedApiKey: "key",
+      },
+      {
+        id: "mock-provider",
+        providerId: "mock",
+        displayName: "Mock",
+        defaultModel: "mock-writer",
+        enabled: true,
+        encryptedApiKey: null,
+      },
+    ], []);
+
+    const draft = blueprint.items.find((item) => item.taskType === "chapter_draft");
+    const control = blueprint.items.find((item) => item.taskType === "control_asset_generate");
+
+    assert.equal(blueprint.summary.ready, 6);
+    assert.equal(draft?.status, "ready");
+    assert.equal(draft?.recommendedPrimaryProviderConfigId, "deepseek-provider");
+    assert.equal(draft?.recommendedFallbackProviderConfigId, "kimi-provider");
+    assert.ok(draft?.reason.includes("低成本批量"));
+    assert.equal(control?.recommendedPrimaryProviderConfigId, "kimi-provider");
+    assert.equal(control?.recommendedFallbackProviderConfigId, "claude-provider");
+    assert.ok(control?.reason.includes("长篇规划"));
   });
 
   await t.test("builds route recommendations from successful model samples", () => {

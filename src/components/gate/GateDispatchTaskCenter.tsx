@@ -18,10 +18,12 @@ import {
 import {
   buildRouteDispatchCompletionTemplate,
   filterRouteConfirmationDispatchTasks,
+  parseRouteDispatchCompletionEvidence,
   reviewRouteDispatchCompletionEvidence,
   type RouteConfirmationDispatchFlow,
   type RouteConfirmationDispatchFlowLaneId,
   type RouteConfirmationDispatchTaskFilter,
+  type RouteDispatchCompletionRecord,
 } from "@/lib/model-gateway/routeConfirmation";
 
 function stateClass(state: GatePlatformGrowthDispatchState) {
@@ -72,6 +74,22 @@ function routeFlowLaneClass(laneId: RouteConfirmationDispatchFlowLaneId) {
 function routeFlowFilterFromLane(laneId: RouteConfirmationDispatchFlowLaneId): RouteConfirmationDispatchTaskFilter | null {
   if (laneId === "confirmed") return null;
   return laneId;
+}
+
+function routeCompletionRecordChips(record: RouteDispatchCompletionRecord) {
+  const chips: string[] = [];
+  if (record.sampleCount !== null) chips.push(`样本 ${record.sampleCount}`);
+  if (record.successRatePercent !== null) chips.push(`成功率 ${record.successRatePercent}%`);
+  if (record.qualityScore !== null) chips.push(`质量 ${record.qualityScore}`);
+  if (record.cost) chips.push(`成本 ${record.cost}`);
+  if (record.fallbackHit !== null) chips.push(record.fallbackHit ? "命中备用" : "未命中备用");
+  if (record.needsGovernance !== null) chips.push(record.needsGovernance ? "需要治理" : "无需治理");
+  if (record.governanceConclusion === "resolved") chips.push("治理完成");
+  if (record.governanceConclusion === "watch") chips.push("继续观察");
+  if (record.governanceConclusion === "needs_switch") chips.push("仍需换模型");
+  if (record.primaryProviderName) chips.push(`首选 ${record.primaryProviderName}`);
+  if (record.fallbackProviderName) chips.push(`备用 ${record.fallbackProviderName}`);
+  return chips;
 }
 
 export function GateDispatchTaskCenter({
@@ -384,6 +402,10 @@ export function GateDispatchTaskCenter({
       <section className="grid gap-3">
         {filteredTasks.map((task) => {
           const completionTemplate = buildRouteDispatchCompletionTemplate(task);
+          const completionRecord = task.completionEvidence
+            ? parseRouteDispatchCompletionEvidence(task, task.completionEvidence)
+            : null;
+          const completionRecordChips = completionRecord ? routeCompletionRecordChips(completionRecord) : [];
           return (
           <div className="rounded-md border border-slate-200 bg-white p-4" key={task.dispatchKey}>
             <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
@@ -428,9 +450,16 @@ export function GateDispatchTaskCenter({
                   </div>
                 ) : null}
                 {task.completionEvidence ? (
-                  <p className="mt-3 rounded-md bg-emerald-50 p-3 text-sm leading-6 text-emerald-800">
-                    完成依据：{task.completionEvidence}
-                  </p>
+                  <div className="mt-3 rounded-md bg-emerald-50 p-3 text-sm leading-6 text-emerald-800">
+                    <p>完成依据：{task.completionEvidence}</p>
+                    {completionRecordChips.length ? (
+                      <div className="mt-2 flex flex-wrap gap-2 text-xs">
+                        {completionRecordChips.map((chip) => (
+                          <span className="rounded-md bg-white px-2 py-1 font-medium text-emerald-900" key={chip}>{chip}</span>
+                        ))}
+                      </div>
+                    ) : null}
+                  </div>
                 ) : null}
               </div>
               <div className="flex shrink-0 flex-wrap gap-2 lg:justify-end">

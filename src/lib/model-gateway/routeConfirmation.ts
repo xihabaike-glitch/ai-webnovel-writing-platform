@@ -80,6 +80,23 @@ export interface RouteDispatchCompletionTemplateTask {
   actionLabel: string;
 }
 
+export type RouteDispatchCompletionEvidenceKind = "route_recheck" | "route_governance";
+export type RouteDispatchCompletionGovernanceConclusion = "resolved" | "watch" | "needs_switch" | "manual_review";
+
+export interface RouteDispatchCompletionRecord {
+  kind: RouteDispatchCompletionEvidenceKind;
+  successRatePercent: number | null;
+  qualityScore: number | null;
+  sampleCount: number | null;
+  cost: string | null;
+  fallbackHit: boolean | null;
+  fallbackLabel: string | null;
+  needsGovernance: boolean | null;
+  governanceConclusion: RouteDispatchCompletionGovernanceConclusion | null;
+  primaryProviderName: string | null;
+  fallbackProviderName: string | null;
+}
+
 export type RouteConfirmationDispatchFlowLaneId = "needs_governance" | "waiting_recheck" | "confirmed" | "completed";
 export type RouteConfirmationDispatchTaskFilter = "all" | "needs_governance" | "waiting_recheck" | "completed";
 
@@ -281,6 +298,13 @@ function stringOrNull(value: unknown) {
 
 function numericPercentAfter(label: string, text: string) {
   const match = text.match(new RegExp(`${label}\\s*[:：]?\\s*(\\d{1,3})\\s*%?`));
+  if (!match) return null;
+  const value = Number(match[1]);
+  return Number.isFinite(value) ? value : null;
+}
+
+function numericCountAfter(label: string, text: string) {
+  const match = text.match(new RegExp(`${label}\\s*[:：]?\\s*(\\d+)`));
   if (!match) return null;
   const value = Number(match[1]);
   return Number.isFinite(value) ? value : null;
@@ -839,6 +863,80 @@ function hasGovernanceConclusion(text: string) {
       && /(已治理完成|继续观察|仍需换模型|治理完成)/.test(value);
   }
   return /(已治理完成|继续观察|仍需换模型|治理完成)/.test(text.replace(/\s+/g, ""));
+}
+
+function parseRouteDispatchSampleCount(text: string) {
+  return numericCountAfter("复跑样本数", text)
+    ?? numericCountAfter("样本数", text)
+    ?? numericCountAfter("完成", text)
+    ?? numericCountAfter("复跑", text);
+}
+
+function parseRouteDispatchFallback(text: string) {
+  const labeledValue = valueAfterCompletionLabel("备用命中", text);
+  const source = hasConcreteCompletionValue(labeledValue) ? labeledValue : text;
+  if (!source) {
+    return {
+      fallbackHit: null,
+      fallbackLabel: null,
+    };
+  }
+  const normalized = source.replace(/\s+/g, "");
+  const fallbackHit = normalized.includes("未命中备用") || normalized.includes("未走备用") || normalized.includes("未使用备用")
+    ? false
+    : hasFallbackSignal(normalized)
+      ? true
+      : null;
+  return {
+    fallbackHit,
+    fallbackLabel: fallbackHit === null ? null : source.trim(),
+  };
+}
+
+function parseRouteRecheckNeedsGovernance(text: string) {
+  const labeledValue = valueAfterCompletionLabel("是否需要治理", text);
+  const source = hasConcreteCompletionValue(labeledValue) ? labeledValue : text;
+  if (!source) return null;
+  const normalized = source.replace(/\s+/g, "");
+  if (/^(否|不|无需|不用|暂不)/.test(normalized) || normalized.includes("不需要治理") || normalized.includes("无需治理")) return false;
+  if (/^(是|需要)/.test(normalized) || normalized.includes("需要治理") || normalized.includes("仍需治理")) return true;
+  return null;
+}
+
+function parseRouteGovernanceConclusion(text: string): RouteDispatchCompletionGovernanceConclusion | null {
+  const labeledValue = valueAfterCompletionLabel("治理结论", text);
+  const source = hasConcreteCompletionValue(labeledValue) ? labeledValue : text;
+  if (!source) return null;
+  const normalized = source.replace(/\s+/g, "");
+  if (normalized.includes("仍需换模型") || normalized.includes("换模型")) return "needs_switch";
+  if (normalized.includes("继续观察") || normalized.includes("延长观察") || normalized.includes("观察期")) return "watch";
+  if (normalized.includes("已治理完成") || normalized.includes("治理完成") || normalized.includes("已治理")) return "resolved";
+  return null;
+}
+
+export function parseRouteDispatchCompletionEvidence(
+  task: RouteDispatchCompletionTemplateTask,
+  completionEvidence: string,
+): RouteDispatchCompletionRecord | null {
+  if (task.stage !== "model_route_governance" && task.stage !== "model_route_confirmation_recheck") return null;
+  const fallback = parseRouteDispatchFallback(completionEvidence);
+  return {
+    kind: task.stage === "model_route_governance" ? "route_governance" : "route_recheck",
+    successRatePercent: numericPercentAfter("成功率", completionEvidence),
+    qualityScore: numericPercentAfter("质量", completionEvidence),
+    sampleCount: parseRouteDispatchSampleCount(completionEvidence),
+    cost: valueAfterCompletionLabel("成本", completionEvidence),
+    fallbackHit: fallback.fallbackHit,
+    fallbackLabel: fallback.fallbackLabel,
+    needsGovernance: task.stage === "model_route_confirmation_recheck" ? parseRouteRecheckNeedsGovernance(completionEvidence) : null,
+    governanceConclusion: task.stage === "model_route_governance" ? parseRouteGovernanceConclusion(completionEvidence) : null,
+    primaryProviderName: hasConcreteCompletionValue(valueAfterCompletionLabel("新首选模型", completionEvidence))
+      ? valueAfterCompletionLabel("新首选模型", completionEvidence)
+      : null,
+    fallbackProviderName: hasConcreteCompletionValue(valueAfterCompletionLabel("新备用模型", completionEvidence))
+      ? valueAfterCompletionLabel("新备用模型", completionEvidence)
+      : null,
+  };
 }
 
 export function reviewRouteDispatchCompletionEvidence(

@@ -14,6 +14,7 @@ import {
   buildRouteConfirmationDispatchFlow,
   buildRouteConfirmationHistory,
   buildRouteDispatchCompletionTemplate,
+  parseRouteDispatchCompletionEvidence,
   reviewRouteDispatchCompletionEvidence,
   filterRouteConfirmationDispatchTasks,
   buildModelRouteConfirmationDispatch,
@@ -721,6 +722,52 @@ test("model task routing", async (t) => {
       "治理结论：已治理完成",
     ].join("\n")), null);
     assert.equal(reviewRouteDispatchCompletionEvidence({ stage: "record_metrics", title: "记录数据", actionLabel: "记录" }, "已记录平台数据。"), null);
+  });
+
+  await t.test("parses structured route dispatch completion evidence", () => {
+    const recheckTask = {
+      stage: "model_route_confirmation_recheck",
+      title: "复检章节审稿路由确认",
+      actionLabel: "复检模型路由",
+    };
+    const governanceTask = {
+      stage: "model_route_governance",
+      title: "处理章节审稿路由复检问题",
+      actionLabel: "切备用/重分配",
+    };
+    const recheckRecord = parseRouteDispatchCompletionEvidence(recheckTask, [
+      "复检章节审稿路由确认",
+      "样本数：2",
+      "成功率：100%",
+      "质量：86",
+      "成本：正常",
+      "备用命中：未命中备用",
+      "是否需要治理：否",
+    ].join("\n"));
+    const governanceRecord = parseRouteDispatchCompletionEvidence(governanceTask, [
+      "处理章节审稿路由复检问题",
+      "处理动作：切备用/重分配",
+      "新首选模型：DeepSeek · deepseek-chat",
+      "新备用模型：Kimi · kimi-k2.6",
+      "复跑样本数：2",
+      "成功率：100%",
+      "质量：86",
+      "备用命中：未命中备用",
+      "治理结论：已治理完成",
+    ].join("\n"));
+
+    assert.equal(recheckRecord?.kind, "route_recheck");
+    assert.equal(recheckRecord?.sampleCount, 2);
+    assert.equal(recheckRecord?.successRatePercent, 100);
+    assert.equal(recheckRecord?.qualityScore, 86);
+    assert.equal(recheckRecord?.cost, "正常");
+    assert.equal(recheckRecord?.fallbackHit, false);
+    assert.equal(recheckRecord?.needsGovernance, false);
+    assert.equal(governanceRecord?.kind, "route_governance");
+    assert.equal(governanceRecord?.primaryProviderName, "DeepSeek · deepseek-chat");
+    assert.equal(governanceRecord?.fallbackProviderName, "Kimi · kimi-k2.6");
+    assert.equal(governanceRecord?.governanceConclusion, "resolved");
+    assert.equal(parseRouteDispatchCompletionEvidence({ stage: "record_metrics", title: "记录数据", actionLabel: "记录" }, "已记录平台数据。"), null);
   });
 
   await t.test("marks the current route when it already matches the recommendation", () => {

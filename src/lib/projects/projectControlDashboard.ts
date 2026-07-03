@@ -174,6 +174,7 @@ export interface ProjectControlDashboard {
   verdict: string;
   platformVerdict: PlatformControlVerdictSummary;
   startTactic: ProjectStartTacticSummary | null;
+  startDecision: ProjectStartDecision;
   areas: ControlArea[];
   priorityActions: ControlPriorityAction[];
   criticalActions: string[];
@@ -204,6 +205,16 @@ export interface PlatformControlVerdictSummary {
   blockedPlatformNames: string[];
   evidenceGaps: string[];
   targetAnchor: string;
+}
+
+export interface ProjectStartDecision {
+  status: "seed" | "watch" | "scale" | "pause";
+  label: string;
+  headline: string;
+  nextExperiment: string;
+  actionLabel: string;
+  targetAnchor: string;
+  evidence: string[];
 }
 
 function platformVerdictAction(
@@ -333,6 +344,73 @@ function verdict(score: number) {
   if (score >= 70) return "项目生产链基本打通，但仍有模块会拖慢发布。";
   if (score >= 50) return "项目有雏形，但缺口会导致写作和发布互相卡住。";
   return "项目还在搭骨架，先别急着批量扩写或投放。";
+}
+
+function buildProjectStartDecision(startTactic: ProjectStartTacticSummary | null): ProjectStartDecision {
+  if (!startTactic) {
+    return {
+      status: "seed",
+      label: "先建打法",
+      headline: "这个项目还没有首轮平台打法，先别让 AI 自由发挥。",
+      nextExperiment: "先生成平台土壤和首轮开书打法，再进入前三章、审稿和发布包装。",
+      actionLabel: "补平台土壤",
+      targetAnchor: "world-bible",
+      evidence: ["未找到首轮平台打法记录。"],
+    };
+  }
+
+  const evidence = [
+    `来源：${startTactic.label}`,
+    startTactic.openingMove ? `开头：${startTactic.openingMove}` : null,
+    startTactic.verificationMove ? `验证：${startTactic.verificationMove}` : null,
+  ].filter((item): item is string => Boolean(item));
+  const labelText = `${startTactic.label} ${startTactic.primaryTactic} ${startTactic.risk}`;
+
+  if (labelText.includes("避坑") || labelText.includes("失败") || labelText.includes("暂停") || labelText.includes("不要复用")) {
+    return {
+      status: "pause",
+      label: "先停用",
+      headline: "这套开书打法已经带着避坑信号，别再复用到新批次。",
+      nextExperiment: "先重写前三章开头和平台包装，只做小批验证，等审稿分和失败率回正再恢复。",
+      actionLabel: "重写前三章",
+      targetAnchor: "first-three-rewrite",
+      evidence,
+    };
+  }
+
+  if (labelText.includes("观察") || labelText.includes("小批") || labelText.includes("样本还薄")) {
+    return {
+      status: "watch",
+      label: "先观察",
+      headline: "这套打法可以继续试，但证据还不够支撑放量。",
+      nextExperiment: "只跑前三章和少量审稿任务，回填质量分、失败样本和平台包装效果。",
+      actionLabel: "小批验证",
+      targetAnchor: "ai-pipeline",
+      evidence,
+    };
+  }
+
+  if (labelText.includes("可复用") || labelText.includes("可作为") || labelText.includes("复用")) {
+    return {
+      status: "scale",
+      label: "可放大",
+      headline: "这套开书打法已经有复用证据，可以进入项目首轮小批放大。",
+      nextExperiment: "先用前三章验证开头兑现，再批量审稿和记录平台包装效果。",
+      actionLabel: "进入小批放大",
+      targetAnchor: "ai-pipeline",
+      evidence,
+    };
+  }
+
+  return {
+    status: "watch",
+    label: "先观察",
+    headline: "这套打法来自模板或早期判断，还需要项目内证据确认。",
+    nextExperiment: "跑完前三章、审稿和平台包装后，再决定是否放大到更多章节。",
+    actionLabel: "跑首轮验证",
+    targetAnchor: "ai-pipeline",
+    evidence,
+  };
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -536,6 +614,7 @@ export function buildProjectControlDashboard(input: ProjectControlDashboardInput
     verdict: verdict(overallScore),
     platformVerdict,
     startTactic,
+    startDecision: buildProjectStartDecision(startTactic),
     areas,
     priorityActions,
     criticalActions,

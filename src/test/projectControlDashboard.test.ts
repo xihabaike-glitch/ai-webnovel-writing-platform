@@ -181,8 +181,51 @@ test("buildProjectControlDashboard", async (t) => {
     assert.equal(dashboard.startTactic?.label, "历史可复用");
     assert.ok(dashboard.startTactic?.openingMove.includes("小步重验"));
     assert.ok(dashboard.startTactic?.verificationMove.includes("首轮曝光"));
+    assert.equal(dashboard.startDecision.status, "scale");
+    assert.equal(dashboard.startDecision.label, "可放大");
+    assert.equal(dashboard.startDecision.actionLabel, "进入小批放大");
+    assert.equal(dashboard.startDecision.targetAnchor, "ai-pipeline");
+    assert.ok(dashboard.startDecision.nextExperiment.includes("前三章"));
+    assert.ok(dashboard.startDecision.evidence.some((item) => item.includes("历史可复用")));
     assert.equal(dashboard.areas.find((area) => area.id === "world")?.status, "good");
     assert.equal(dashboard.areas.find((area) => area.id === "export")?.status, "good");
+  });
+
+  await t.test("pauses project starts when the stored tactic is a historical avoidance signal", () => {
+    const dashboard = buildProjectControlDashboard({
+      project,
+      platform: getPlatformProfile("qimao"),
+      chapters: [chapter],
+      outlineNodes: [],
+      characters: [],
+      worldEntries: [
+        {
+          id: "w-avoid",
+          type: "platform_soil",
+          title: "首轮平台打法：七猫免费小说",
+          content: [
+            "状态：批量避坑",
+            "打法：不要复用开场三页设定说明，先回到强冲突和强情绪。",
+            "开头动作：避开已验证失败开头：主角先讲设定再遇危机；改用：第一屏先给身份暴露和保底悬念。",
+            "验证动作：创建后只做小批验证，先看前三章审稿分、失败率和平台包装，不允许直接放量。",
+            "风险：先拆失败样本和低分原因，暂停把这套打法继续放进新批次。",
+          ].join("\n"),
+        },
+      ],
+      foreshadows: [],
+      plotThreads: [],
+      aiTasks: [],
+      submissionChecklist: checklist,
+    });
+
+    assert.equal(dashboard.startTactic?.label, "批量避坑");
+    assert.equal(dashboard.startDecision.status, "pause");
+    assert.equal(dashboard.startDecision.label, "先停用");
+    assert.equal(dashboard.startDecision.actionLabel, "重写前三章");
+    assert.equal(dashboard.startDecision.targetAnchor, "first-three-rewrite");
+    assert.ok(dashboard.startDecision.headline.includes("别再复用"));
+    assert.ok(dashboard.startDecision.nextExperiment.includes("小批验证"));
+    assert.ok(dashboard.startDecision.evidence.some((item) => item.includes("批量避坑")));
   });
 
   await t.test("promotes executable asset generation after evidence baseline exists", () => {

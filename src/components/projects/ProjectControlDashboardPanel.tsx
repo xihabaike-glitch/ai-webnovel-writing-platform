@@ -51,6 +51,7 @@ interface ProjectControlDashboard {
   verdict: string;
   platformVerdict: PlatformControlVerdictSummary;
   startTactic: ProjectStartTacticSummary | null;
+  startDecision: ProjectStartDecision;
   areas: ControlArea[];
   priorityActions: ControlPriorityAction[];
   criticalActions: string[];
@@ -72,6 +73,16 @@ interface ProjectStartTacticSummary {
   openingMove: string;
   verificationMove: string;
   risk: string;
+}
+
+interface ProjectStartDecision {
+  status: "seed" | "watch" | "scale" | "pause";
+  label: string;
+  headline: string;
+  nextExperiment: string;
+  actionLabel: string;
+  targetAnchor: string;
+  evidence: string[];
 }
 
 interface PlatformControlVerdictSummary {
@@ -120,6 +131,13 @@ function platformVerdictStatusClass(status: PlatformControlVerdictSummary["statu
   if (status === "ready") return "bg-emerald-50 text-emerald-700";
   if (status === "needs_repair") return "bg-rose-50 text-rose-700";
   return "bg-amber-50 text-amber-700";
+}
+
+function startDecisionStatusClass(status: ProjectStartDecision["status"]) {
+  if (status === "scale") return "bg-emerald-50 text-emerald-700";
+  if (status === "pause") return "bg-rose-50 text-rose-700";
+  if (status === "watch") return "bg-amber-50 text-amber-700";
+  return "bg-slate-100 text-slate-700";
 }
 
 export function ProjectControlDashboardPanel({ projectId }: { projectId: string }) {
@@ -288,6 +306,36 @@ export function ProjectControlDashboardPanel({ projectId }: { projectId: string 
                 <div className="text-xs text-slate-500">可导出</div>
                 <div className="mt-1 text-2xl font-semibold text-slate-950">{dashboard.metrics.publishableChapters}</div>
               </div>
+            </div>
+          </div>
+
+          <div className="rounded-md border border-slate-200 p-3">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+              <div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="font-medium text-slate-950">开书策略决策</div>
+                  <span className={`rounded-md px-2 py-1 text-[11px] font-medium ${startDecisionStatusClass(dashboard.startDecision.status)}`}>
+                    {dashboard.startDecision.label}
+                  </span>
+                </div>
+                <p className="mt-1 text-sm leading-6 text-slate-600">{dashboard.startDecision.headline}</p>
+                <div className="mt-2 rounded-md bg-slate-50 px-2 py-1 text-xs leading-5 text-slate-600">
+                  下一轮实验：{dashboard.startDecision.nextExperiment}
+                </div>
+              </div>
+              <Link
+                className="inline-flex w-fit items-center justify-center rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white hover:bg-slate-800"
+                href={`/projects/${projectId}#${dashboard.startDecision.targetAnchor}`}
+              >
+                {dashboard.startDecision.actionLabel}
+              </Link>
+            </div>
+            <div className="mt-3 grid gap-2 md:grid-cols-3">
+              {dashboard.startDecision.evidence.slice(0, 3).map((item) => (
+                <div className="rounded-md bg-slate-50 p-3 text-xs leading-5 text-slate-600" key={item}>
+                  {item}
+                </div>
+              ))}
             </div>
           </div>
 

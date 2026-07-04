@@ -23,6 +23,7 @@ const plan: TaskQueueExecutionPlan = {
     verificationMove: "批量后检查前三章追读。",
     risk: "慢热会掉节奏。",
   }],
+  scaleGate: "none",
   actionLabel: "批量初稿 1 个",
   detail: "夜雨系统 · 待生成 · 第一章",
   warnings: [],
@@ -105,6 +106,68 @@ test("buildTaskQueueBatchReceipt flags fallback and cost pressure before expandi
   assert.equal(receipt.status, "watch_cost");
   assert.equal(receipt.primaryHref, "/projects/project-1#model-task-audit");
   assert.ok(receipt.warnings.some((warning) => warning.includes("成本")));
+});
+
+test("buildTaskQueueBatchReceipt turns a watch sample into task-center acceptance evidence", () => {
+  const receipt = buildTaskQueueBatchReceipt({
+    plan: {
+      ...plan,
+      scaleGate: "sample_only",
+      actionLabel: "批量初稿 1 个",
+      warnings: ["当前处于观察小样本闸门，只运行 1 个样本。"],
+    },
+    results: [{ status: "succeeded", taskId: "task-1", chapterTitle: "第一章", error: null, qualityScore: 86 }],
+    routeEffectSummary: routeEffect,
+  });
+
+  assert.equal(receipt.status, "continue");
+  assert.equal(receipt.headline, "小样本已跑完，先回填验收");
+  assert.equal(receipt.primaryHref, "/dispatch");
+  assert.ok(receipt.completionEvidenceTemplate?.includes("通过线"));
+  assert.ok(receipt.completionEvidenceTemplate?.includes("不可接受项"));
+  assert.ok(receipt.completionEvidenceTemplate?.includes("复查证据"));
+  assert.ok(receipt.completionEvidenceTemplate?.includes("放量结论：通过"));
+});
+
+test("buildTaskQueueBatchReceipt keeps failed watch samples from producing pass evidence", () => {
+  const receipt = buildTaskQueueBatchReceipt({
+    plan: {
+      ...plan,
+      scaleGate: "sample_only",
+      actionLabel: "批量初稿 1 个",
+      warnings: ["当前处于观察小样本闸门，只运行 1 个样本。"],
+    },
+    results: [{ status: "succeeded", taskId: "task-1", chapterTitle: "第一章", error: null, qualityScore: 72 }],
+    routeEffectSummary: {
+      ...routeEffect,
+      averageQualityScore: 72,
+      verdict: "质量偏低，暂不放量。",
+    },
+  });
+
+  assert.equal(receipt.status, "review_quality");
+  assert.ok(receipt.completionEvidenceTemplate?.includes("放量结论：未通过"));
+  assert.ok(receipt.completionEvidenceTemplate?.includes("暂不放量"));
+});
+
+test("buildTaskQueueBatchReceipt does not pass a watch sample without quality evidence", () => {
+  const receipt = buildTaskQueueBatchReceipt({
+    plan: {
+      ...plan,
+      scaleGate: "sample_only",
+      actionLabel: "批量初稿 1 个",
+    },
+    results: [{ status: "succeeded", taskId: "task-1", chapterTitle: "第一章", error: null, qualityScore: null }],
+    routeEffectSummary: {
+      ...routeEffect,
+      averageQualityScore: null,
+      verdict: "缺少质量复查样本。",
+    },
+  });
+
+  assert.equal(receipt.primaryHref, "/dispatch");
+  assert.ok(receipt.completionEvidenceTemplate?.includes("质量 缺样本"));
+  assert.ok(receipt.completionEvidenceTemplate?.includes("放量结论：未通过"));
 });
 
 test("buildTaskQueueBatchGateActionReceipt turns a recommended batch into gate experience", () => {

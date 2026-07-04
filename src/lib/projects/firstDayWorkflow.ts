@@ -291,9 +291,9 @@ export function buildFirstDayRiskProfile(startTactic?: ProjectStartTacticSummary
       level,
       label: startTactic?.label ?? "观察",
       headline: "观察平台首日只跑小样本验证。",
-      instruction: "把通过线、不可接受项和复查证据写清楚，先看首轮数据再决定是否扩大。",
+      instruction: "把通过线、不可接受项、复查证据和放量结论写清楚，先看首轮数据再决定是否扩大。",
       acceptanceCriteria: [
-        "写清首轮小样本通过线和不可接受项。",
+        "写清首轮小样本通过线、不可接受项和放量结论。",
         "保留第一章或前三章复查证据，后续按数据决定是否扩大。",
       ],
       missingEvidence: ["缺少观察平台首轮小样本验证口径。"],

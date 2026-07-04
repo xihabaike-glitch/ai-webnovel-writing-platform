@@ -4,7 +4,7 @@ import { updatePersistedGateDispatchTaskState, type PersistedGatePlatformDispatc
 const ACCEPTANCE_MARKER = "任务中心已验收：";
 const MIN_COMPLETION_EVIDENCE_LENGTH = 8;
 const BLOCKED_COMPLETION_KEYWORDS = ["恢复条件", "入口卖点", "前三章兑现", "平台匹配度", "改掉", "重做", "修复"];
-const WATCH_COMPLETION_REQUIRED_KEYWORDS = ["通过线", "不可接受", "复查证据"];
+const WATCH_COMPLETION_REQUIRED_KEYWORDS = ["通过线", "不可接受", "复查证据", "放量结论"];
 
 function cleanEvidence(value: string) {
   return value.trim().replace(/。{2,}$/u, "。");
@@ -231,7 +231,7 @@ function firstDayCompletionRiskLevel(input: Pick<FirstDayDispatchCompletionValid
   ].filter((item): item is string => Boolean(item)).join(" ");
 
   if (/止损|避坑|恢复条件/u.test(joined)) return "blocked";
-  if (/观察|小样本|通过线|不可接受|复查证据/u.test(joined)) return "watch";
+  if (/观察|小样本|通过线|不可接受|复查证据|放量结论/u.test(joined)) return "watch";
   return "standard";
 }
 
@@ -327,7 +327,7 @@ export function buildFirstDayDispatchCompletionHint(task: Pick<PersistedGatePlat
   const stepId = firstDayStepId(task.dispatchKey);
   const riskLevel = firstDayCompletionRiskLevel(task);
   if (stepId === "first-draft" && riskLevel === "watch") {
-    return "这条完成依据会决定是否解除观察放量闸门，必须同时写清通过线、不可接受项和复查证据。";
+    return "这条完成依据会决定是否解除观察放量闸门，必须同时写清通过线、不可接受项、复查证据和放量结论。";
   }
   if (stepId === "risk-recovery") {
     return "这是恢复验证，不是正文完成；完成后只会进入恢复观察小样本。";

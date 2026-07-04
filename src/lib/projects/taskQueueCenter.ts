@@ -131,7 +131,12 @@ function watchDraftScaleCleared(project: TaskQueueProject) {
   ));
   const evidence = draftDispatch?.completionEvidence ?? "";
 
-  return /通过线/u.test(evidence) && /不可接受/u.test(evidence) && /复查证据/u.test(evidence);
+  return /通过线/u.test(evidence)
+    && /不可接受/u.test(evidence)
+    && /复查证据/u.test(evidence)
+    && /放量结论/u.test(evidence)
+    && /(通过|允许|可以恢复|可恢复|恢复后续)/u.test(evidence)
+    && !/未通过|暂不放量|继续停留观察/u.test(evidence);
 }
 
 export function buildTaskQueueCenter(projects: TaskQueueProject[]): TaskQueueCenter {
@@ -144,7 +149,7 @@ export function buildTaskQueueCenter(projects: TaskQueueProject[]): TaskQueueCen
       ? `${riskProfile.headline}${riskProfile.instruction}`
       : riskProfile.level === "watch"
         ? watchDraftScaleCleared(project)
-          ? "小样本验收依据已过线：通过线、不可接受项和复查证据齐全，可以谨慎进入后续初稿批次。"
+          ? "小样本验收依据已过线：通过线、不可接受项、复查证据和放量结论齐全，可以谨慎进入后续初稿批次。"
           : `${riskProfile.headline}${riskProfile.instruction}`
         : null;
     const scaleGate: QueueScaleGate = riskProfile.level === "watch"
@@ -223,7 +228,7 @@ export function buildTaskQueueCenter(projects: TaskQueueProject[]): TaskQueueCen
         category: "blocked",
         blockerType: "watch_scale_gate",
         chapterTitle: "观察放量闸门",
-        evidence: `还有 ${readyDraftCandidates.length - draftCandidatesForQueue.length} 个初稿候选，需先完成小样本验收：通过线、不可接受项和复查证据齐全后再放量。`,
+        evidence: `还有 ${readyDraftCandidates.length - draftCandidatesForQueue.length} 个初稿候选，需先完成小样本验收：通过线、不可接受项、复查证据和放量结论齐全后再放量。`,
         strategyBasis: startTactic,
         riskLevel: riskProfile.level,
         riskLabel: riskProfile.label,

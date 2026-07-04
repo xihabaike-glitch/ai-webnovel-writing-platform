@@ -115,7 +115,7 @@ export function buildBatchExecutionSafety(
         ? clearedWatchCount > 0
           ? `${clearedWatchCount} 个观察任务已通过小样本验收，可以谨慎进入批次。`
           : "当前没有观察期小样本闸门。"
-        : `当前只允许单章小样本，本批不会扩大；完成依据需写清通过线、不可接受项和复查证据。`,
+        : `当前只允许单章小样本，本批不会扩大；完成依据需写清通过线、不可接受项、复查证据和放量结论。`,
     ),
     safetyItem(
       "mixed-actions",

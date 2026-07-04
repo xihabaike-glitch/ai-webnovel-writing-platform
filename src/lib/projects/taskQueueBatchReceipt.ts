@@ -33,6 +33,7 @@ export interface TaskQueueBatchReceipt {
   secondaryHref: string;
   evidenceItems: string[];
   warnings: string[];
+  completionEvidenceTemplate?: string;
 }
 
 export interface TaskQueueBatchGateActionReceipt {
@@ -81,6 +82,23 @@ function receiptStatusFromBatchReceipt(batchReceipt: TaskQueueBatchReceipt) {
   return batchReceipt.status === "repair" ? "failed" : "succeeded";
 }
 
+function sampleCompletionEvidenceTemplate(input: {
+  plan: TaskQueueExecutionPlan;
+  results: TaskQueueBatchRunResult[];
+  routeEffectSummary: TaskQueueBatchRouteEffect;
+  passed: boolean;
+}) {
+  const quality = input.routeEffectSummary.averageQualityScore;
+  const taskIds = input.results.map((result) => result.taskId).filter((taskId): taskId is string => Boolean(taskId));
+  return [
+    "小样本验证已完成：",
+    `通过线：成功率 ${input.routeEffectSummary.successRatePercent}%，质量 ${quality ?? "缺样本"}，目标是成功率不低于 80%、质量不低于 80。`,
+    `不可接受项：${input.passed ? "未出现失败、质量低于 80、备用命中或成本异常。" : "存在失败、质量低于 80、备用命中或成本异常，暂不放量。"}`,
+    `复查证据：${taskIds.length ? `AI 任务 ${taskIds.join("、")}` : "请补充任务 ID 或章节复查链接"}；章节 ${input.results.map((result) => result.chapterTitle).join("、")}；${input.routeEffectSummary.verdict}`,
+    `放量结论：${input.passed ? "通过，可以恢复后续初稿批次。" : "未通过，继续停留观察并修复后再测。"}`,
+  ].join("\n");
+}
+
 export function buildTaskQueueBatchReceipt(input: {
   plan: TaskQueueExecutionPlan;
   results: TaskQueueBatchRunResult[];
@@ -96,6 +114,16 @@ export function buildTaskQueueBatchReceipt(input: {
     `质量：${quality ?? "缺样本"}`,
     `成本：$${input.routeEffectSummary.knownCostUsd.toFixed(4)}`,
   ];
+  const sampleOnly = input.plan.scaleGate === "sample_only";
+  const samplePassed = input.routeEffectSummary.successRatePercent >= 80
+    && quality !== null
+    && quality >= 80
+    && input.routeEffectSummary.fallbackTasks === 0
+    && input.routeEffectSummary.averageCostPerSucceededTaskUsd <= 0.05
+    && failed.length === 0;
+  const sampleTemplate = sampleOnly
+    ? sampleCompletionEvidenceTemplate({ ...input, passed: samplePassed })
+    : undefined;
 
   if (failed.length > 0 || input.routeEffectSummary.successRatePercent < 80) {
     return {
@@ -109,6 +137,7 @@ export function buildTaskQueueBatchReceipt(input: {
       secondaryLabel: "回任务队列",
       secondaryHref: "/tasks",
       evidenceItems,
+      completionEvidenceTemplate: sampleTemplate,
       warnings: [
         input.routeEffectSummary.verdict,
         "失败批次不要继续放大，先修配置、重试样本或降级模型路线。",
@@ -126,6 +155,7 @@ export function buildTaskQueueBatchReceipt(input: {
       secondaryLabel: "查看任务队列",
       secondaryHref: "/tasks",
       evidenceItems,
+      completionEvidenceTemplate: sampleTemplate,
       warnings: [
         input.routeEffectSummary.verdict,
         "质量分低于 80 时，先修开头压力、爽点兑现和章末追读。",
@@ -143,6 +173,7 @@ export function buildTaskQueueBatchReceipt(input: {
       secondaryLabel: "回任务队列",
       secondaryHref: "/tasks",
       evidenceItems,
+      completionEvidenceTemplate: sampleTemplate,
       warnings: [
         input.routeEffectSummary.verdict,
         "成本或备用命中异常时，先确认首选/备用模型，再扩大生产。",
@@ -151,6 +182,24 @@ export function buildTaskQueueBatchReceipt(input: {
   }
 
   const next = nextSuccessAction(input.plan);
+  if (sampleOnly) {
+    return {
+      status: "continue",
+      headline: "小样本已跑完，先回填验收",
+      detail: "这不是放量完成。把下面的验收依据回填到首日小样本派单，系统才会判断是否解除观察闸门。",
+      primaryLabel: "回任务中心验收",
+      primaryHref: "/dispatch",
+      secondaryLabel: "查看任务队列",
+      secondaryHref: "/tasks",
+      evidenceItems,
+      completionEvidenceTemplate: sampleTemplate,
+      warnings: [
+        input.routeEffectSummary.verdict,
+        "别继续点批量。先完成小样本验收，再让系统决定是否恢复后续初稿批次。",
+      ],
+    };
+  }
+
   return {
     status: "continue",
     headline: next.headline,

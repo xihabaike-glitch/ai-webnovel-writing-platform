@@ -33,6 +33,7 @@ interface BatchRunResponse {
     secondaryHref: string;
     evidenceItems: string[];
     warnings: string[];
+    completionEvidenceTemplate?: string;
   };
 }
 
@@ -110,6 +111,12 @@ export function RunRecommendedBatchButton({ disabled, strategyId }: { disabled: 
               <div className="rounded-md bg-white/70 px-2 py-1" key={item}>{item}</div>
             ))}
           </div>
+          {batchReceipt.completionEvidenceTemplate ? (
+            <div className="mt-3 rounded-md bg-white/75 p-3 text-xs leading-5 text-slate-900">
+              <div className="font-medium">可粘贴到任务中心的验收依据</div>
+              <pre className="mt-2 whitespace-pre-wrap break-words font-sans">{batchReceipt.completionEvidenceTemplate}</pre>
+            </div>
+          ) : null}
           {batchReceipt.warnings.length > 0 ? (
             <div className="mt-2 grid gap-1 text-xs leading-5 opacity-90">
               {batchReceipt.warnings.map((warning) => (

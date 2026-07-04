@@ -172,7 +172,7 @@ test("buildTaskQueueCenter", async (t) => {
     assert.equal(drafts[0].scaleGate, "sample_only");
     assert.equal(drafts[0].actionLabel, "生成小样本");
     assert.ok(drafts[0].riskNotice?.includes("小样本验证"));
-    assert.ok(gate?.evidence.includes("通过线、不可接受项和复查证据"));
+    assert.ok(gate?.evidence.includes("通过线、不可接受项、复查证据和放量结论"));
   });
 
   await t.test("allows watch drafts to scale after sample acceptance evidence clears the gate", () => {
@@ -206,7 +206,7 @@ test("buildTaskQueueCenter", async (t) => {
         {
           dispatchKey: "first-day:watch-cleared-project:first-draft",
           state: "completed",
-          completionEvidence: "小样本首轮通过线已写清，不可接受项和复查证据已补齐。",
+          completionEvidence: "小样本首轮通过线已写清，不可接受项和复查证据已补齐。放量结论：通过，可以恢复后续初稿批次。",
         },
       ],
     };
@@ -220,5 +220,50 @@ test("buildTaskQueueCenter", async (t) => {
     assert.ok(drafts.every((item) => item.scaleGate === "cleared"));
     assert.ok(drafts.every((item) => item.actionLabel === "生成初稿"));
     assert.ok(drafts.every((item) => item.riskNotice?.includes("小样本验收依据已过线")));
+  });
+
+  await t.test("keeps the watch gate closed when sample evidence says not passed", () => {
+    const notPassedProject: TaskQueueProject = {
+      ...project,
+      id: "watch-not-passed-project",
+      chapters: [
+        baseChapter,
+        {
+          ...baseChapter,
+          id: "chapter-ready-draft-2",
+          order: 2,
+          title: "第二章 第二个样本",
+        },
+      ],
+      aiTasks: [],
+      worldEntries: [
+        {
+          type: "platform_soil",
+          title: "首轮平台打法：番茄小说",
+          content: [
+            "状态：历史观察",
+            "打法：先用第一章小样本验证读者反馈。",
+            "开头动作：第一段给强冲突。",
+            "验证动作：写清通过线和不可接受项。",
+            "风险：观察期不要批量。",
+          ].join("\n"),
+        },
+      ],
+      gateDispatchTasks: [
+        {
+          dispatchKey: "first-day:watch-not-passed-project:first-draft",
+          state: "completed",
+          completionEvidence: "小样本首轮通过线已写清，不可接受项和复查证据已补齐。放量结论：未通过，继续停留观察。",
+        },
+      ],
+    };
+    const queue = buildTaskQueueCenter([notPassedProject]);
+    const drafts = queue.items.filter((item) => item.category === "draft");
+    const gate = queue.items.find((item) => item.blockerType === "watch_scale_gate");
+
+    assert.equal(drafts.length, 1);
+    assert.equal(gate?.scaleGate, "sample_only");
+    assert.equal(queue.overview.watchScaleBlocked, 1);
+    assert.equal(queue.overview.watchCleared, 0);
   });
 });

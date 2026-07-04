@@ -340,7 +340,7 @@ test("buildFirstDayDispatchCompletionHint explains scale gates", () => {
   });
 
   assert.ok(hint?.includes("放量闸门"));
-  assert.ok(hint?.includes("通过线、不可接受项和复查证据"));
+  assert.ok(hint?.includes("通过线、不可接受项、复查证据和放量结论"));
   assert.ok(recoveryHint?.includes("恢复观察小样本"));
 });
 
@@ -383,7 +383,7 @@ test("validateFirstDayDispatchCompletionEvidence enforces risky first-day eviden
     title: "夜雨系统 · 小样本验证 · 生成第一章正文",
     acceptanceCriteria: ["写清首轮小样本通过线和不可接受项。"],
     evidence: ["缺少观察平台首轮小样本验证口径。"],
-    completionEvidence: "小样本首轮通过线已写清，不可接受项和复查证据已补齐。",
+    completionEvidence: "小样本首轮通过线已写清，不可接受项和复查证据已补齐。放量结论：通过，可以恢复后续初稿批次。",
   });
 
   assert.equal(blockedThin.valid, false);

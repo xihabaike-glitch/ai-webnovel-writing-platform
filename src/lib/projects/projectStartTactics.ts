@@ -1,7 +1,15 @@
 import type { PlatformProfile } from "../platforms/platformProfiles.ts";
 import type { PlatformWritingStyleTemplate } from "../platforms/writingStyleTemplates.ts";
 import type { ModelRouteConfirmationReceipt } from "../model-gateway/routeConfirmation.ts";
-import type { GateActionReceipt, GateBatchTacticEffectItem, GatePlatformTacticExperienceItem } from "./gateActionReceipts.ts";
+import {
+  buildGateBatchTacticEffectReview,
+  buildGatePlatformDecisionTimeline,
+  buildGatePlatformTacticExperienceLibrary,
+  type GateActionReceipt,
+  type GateBatchTacticEffectItem,
+  type GatePlatformTacticExperienceItem,
+  type PersistedGatePlatformDispatchTask,
+} from "./gateActionReceipts.ts";
 import type { ProjectTemplate } from "./projectTemplates.ts";
 
 export type ProjectStartTacticAdviceStatus = "history_blocked" | "history_watch" | "history_usable" | "template";
@@ -78,6 +86,14 @@ export interface ProjectStartTacticEvidenceSelection {
   guideItem: ProjectStartPlatformExperienceItem | null;
   experience: GatePlatformTacticExperienceItem | null;
   batchEffect: GateBatchTacticEffectItem | null;
+}
+
+export interface ProjectStartGateExperience {
+  advice: ProjectStartTacticAdvice;
+  selection: ProjectStartTacticEvidenceSelection;
+  experiences: GatePlatformTacticExperienceItem[];
+  batchEffects: GateBatchTacticEffectItem[];
+  modelRoutes: ProjectStartModelRouteExperience[];
 }
 
 function routeDetailValue(detail: string, label: string) {
@@ -483,6 +499,48 @@ export function buildProjectStartTacticAdvice(input: {
       `模板前三章：${firstThreeTitles}`,
       `必须具备：${style.mustHave.join("、")}`,
     ]),
+  };
+}
+
+export function buildProjectStartGateExperience(input: {
+  platform: PlatformProfile;
+  template: ProjectTemplate;
+  style: PlatformWritingStyleTemplate;
+  receipts: GateActionReceipt[];
+  tasks?: PersistedGatePlatformDispatchTask[];
+  timelineLimit?: number;
+  batchLimit?: number;
+}): ProjectStartGateExperience {
+  const receipts = input.receipts;
+  const tasks = input.tasks ?? [];
+  const timeline = buildGatePlatformDecisionTimeline({
+    receipts,
+    tasks,
+    limit: input.timelineLimit ?? 20,
+  });
+  const experiences = buildGatePlatformTacticExperienceLibrary(timeline, input.timelineLimit ?? 20).items;
+  const batchEffects = buildGateBatchTacticEffectReview(receipts, input.batchLimit ?? 20).items;
+  const modelRoutes = buildProjectStartModelRouteExperienceFromReceipts(receipts);
+  const selection = selectProjectStartTacticEvidence({
+    platform: input.platform,
+    experiences,
+    batchEffects,
+  });
+  const advice = buildProjectStartTacticAdvice({
+    platform: input.platform,
+    template: input.template,
+    style: input.style,
+    experience: selection.experience,
+    batchEffect: selection.batchEffect,
+    modelRoutes,
+  });
+
+  return {
+    advice,
+    selection,
+    experiences,
+    batchEffects,
+    modelRoutes,
   };
 }
 

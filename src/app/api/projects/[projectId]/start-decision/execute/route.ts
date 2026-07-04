@@ -5,7 +5,9 @@ import { getPlatformWritingStyle } from "@/lib/platforms/writingStyleTemplates";
 import { buildWorldActionSeeds } from "@/lib/projects/controlActionSeeds";
 import { buildProjectControlDashboard } from "@/lib/projects/projectControlDashboard";
 import { buildProjectStartDecisionActionReceipt } from "@/lib/projects/projectStartDecisionActions";
-import { buildProjectStartTacticAdvice, buildProjectStartTacticWorldEntry } from "@/lib/projects/projectStartTactics";
+import { gateActionReceiptFromAuditRecord } from "@/lib/projects/gateActionReceipts";
+import { gatePlatformDispatchTaskFromRecord } from "@/lib/projects/gateDispatchTaskRecords";
+import { buildProjectStartGateExperience, buildProjectStartTacticWorldEntry } from "@/lib/projects/projectStartTactics";
 import { parsePublishSnapshotTags } from "@/lib/projects/platformPublishExport";
 import { buildSubmissionChecklist } from "@/lib/projects/submissionChecklist";
 import { getDefaultTemplateForPlatform } from "@/lib/projects/projectTemplates";
@@ -144,8 +146,25 @@ export async function POST(_request: Request, { params }: Params) {
     const worldSeeds = buildWorldActionSeeds(project, platform, project.worldEntries);
     const template = getDefaultTemplateForPlatform(platformId);
     const style = getPlatformWritingStyle(platformId);
+    const [gateAudits, gateTasks] = await Promise.all([
+      prisma.gateActionAudit.findMany({
+        orderBy: { createdAt: "desc" },
+        take: 100,
+      }),
+      prisma.gateDispatchTask.findMany({
+        orderBy: { updatedAt: "desc" },
+        take: 100,
+      }),
+    ]);
+    const startExperience = buildProjectStartGateExperience({
+      platform,
+      template,
+      style,
+      receipts: gateAudits.map(gateActionReceiptFromAuditRecord),
+      tasks: gateTasks.map(gatePlatformDispatchTaskFromRecord),
+    });
     const startTacticEntry = buildProjectStartTacticWorldEntry(
-      buildProjectStartTacticAdvice({ platform, template, style }),
+      startExperience.advice,
       platform.name,
     );
     const hasStartTactic = project.worldEntries.some((entry) => (

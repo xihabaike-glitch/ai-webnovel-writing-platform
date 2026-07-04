@@ -3,9 +3,10 @@ import assert from "node:assert/strict";
 import { buildModelRouteConfirmationReceipt } from "../lib/model-gateway/routeConfirmation.ts";
 import { getPlatformProfile } from "../lib/platforms/platformProfiles.ts";
 import { getPlatformWritingStyle } from "../lib/platforms/writingStyleTemplates.ts";
-import type { GateBatchTacticEffectItem, GatePlatformTacticExperienceItem } from "../lib/projects/gateActionReceipts.ts";
+import type { GateBatchTacticEffectItem, GatePlatformTacticExperienceItem, PersistedGatePlatformDispatchTask } from "../lib/projects/gateActionReceipts.ts";
 import {
   buildProjectStartPlatformExperienceGuide,
+  buildProjectStartGateExperience,
   buildProjectStartModelRouteExperienceFromConfirmations,
   buildProjectStartModelRouteExperienceFromReceipts,
   buildProjectStartTacticAdvice,
@@ -428,6 +429,54 @@ test("buildProjectStartTacticAdvice", async (t) => {
     assert.equal(blockedSelection.guideItem?.source, "batch");
     assert.equal(blockedSelection.experience, null);
     assert.equal(blockedSelection.batchEffect?.status, "blocked");
+  });
+
+  await t.test("feeds evidence loop rechecks back into new project start advice", () => {
+    const platform = getPlatformProfile("fanqie");
+    const template = getDefaultTemplateForPlatform(platform.id);
+    const style = getPlatformWritingStyle(platform.id);
+    const task: PersistedGatePlatformDispatchTask = {
+      databaseId: "task-1",
+      dispatchKey: "gate-evidence-loop:fanqie:2026-07-04",
+      id: "gate-evidence-loop:fanqie:2026-07-04",
+      projectId: "project-1",
+      platformId: "fanqie",
+      platformName: "番茄小说",
+      stage: "watch",
+      state: "completed",
+      priorityScore: 88,
+      ownerRole: "平台运营",
+      title: "补齐番茄证据闭环",
+      detail: "补平台包装、前三章兑现和复检证据。",
+      dueLabel: "今日",
+      actionLabel: "查看项目",
+      href: "/projects/project-1",
+      acceptanceCriteria: ["回填证据闭环复检"],
+      evidence: ["证据闭环复检：53 -> 71 分，分数变好：继续观察"],
+      sourceReceiptId: null,
+      completionEvidence: "完成平台包装和前三章兑现复检。",
+      reviewLatestAt: "2026-07-04T08:00:00.000Z",
+      assignedAt: "2026-07-04T08:10:00.000Z",
+      completedAt: "2026-07-04T09:00:00.000Z",
+      createdAt: "2026-07-04T08:05:00.000Z",
+      updatedAt: "2026-07-04T09:00:00.000Z",
+    };
+
+    const result = buildProjectStartGateExperience({
+      platform,
+      template,
+      style,
+      receipts: [],
+      tasks: [task],
+    });
+
+    assert.equal(result.selection.experience?.status, "usable");
+    assert.equal(result.selection.experience?.tactic, "证据闭环提分打法");
+    assert.equal(result.advice.status, "history_usable");
+    assert.equal(result.advice.label, "历史可复用");
+    assert.ok(result.advice.title.includes("证据闭环提分打法"));
+    assert.ok(result.advice.primaryTactic.includes("53 分提升到 71 分"));
+    assert.ok(result.advice.evidence.some((item) => item.includes("分数变好")));
   });
 
   await t.test("turns start advice into a reusable platform soil entry", () => {

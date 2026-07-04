@@ -3,15 +3,11 @@ import { prisma } from "@/lib/db/prisma";
 import { buildDefaultOutlineNodes } from "@/lib/outlines/defaultOutline";
 import { buildFirstDayLaunchPackage, buildFirstDayWorkflow, type FirstDayLaunchPackage } from "@/lib/projects/firstDayWorkflow";
 import { buildProjectDefaults } from "@/lib/projects/projectDefaults";
+import { gateActionReceiptFromAuditRecord } from "@/lib/projects/gateActionReceipts";
+import { gatePlatformDispatchTaskFromRecord } from "@/lib/projects/gateDispatchTaskRecords";
 import {
-  buildGateBatchTacticEffectReview,
-  gateActionReceiptFromAuditRecord,
-} from "@/lib/projects/gateActionReceipts";
-import {
-  buildProjectStartModelRouteExperienceFromReceipts,
-  buildProjectStartTacticAdvice,
+  buildProjectStartGateExperience,
   buildProjectStartTacticWorldEntry,
-  selectProjectStartTacticEvidence,
 } from "@/lib/projects/projectStartTactics";
 import { buildSubmissionChecklist } from "@/lib/projects/submissionChecklist";
 import {
@@ -105,9 +101,14 @@ export async function POST(request: Request) {
       orderBy: { createdAt: "desc" },
       take: 100,
     });
+  const gateTasks = input.startTacticAdvice || !template
+    ? []
+    : await prisma.gateDispatchTask.findMany({
+      orderBy: { updatedAt: "desc" },
+      take: 100,
+    });
   const gateReceipts = gateAudits.map(gateActionReceiptFromAuditRecord);
-  const modelRouteExperience = buildProjectStartModelRouteExperienceFromReceipts(gateReceipts);
-  const batchTacticEffects = buildGateBatchTacticEffectReview(gateReceipts, 20).items;
+  const persistedGateTasks = gateTasks.map(gatePlatformDispatchTaskFromRecord);
 
   const project = await prisma.$transaction(async (tx) => {
     const created = await tx.project.create({ data: projectInput });
@@ -115,17 +116,14 @@ export async function POST(request: Request) {
     if (template) {
       const platform = getPlatformProfile(platformId);
       const style = getPlatformWritingStyle(platformId);
-      const tacticEvidence = selectProjectStartTacticEvidence({
-        platform,
-        batchEffects: batchTacticEffects,
-      });
-      const startTacticAdvice = input.startTacticAdvice ?? buildProjectStartTacticAdvice({
+      const startExperience = buildProjectStartGateExperience({
         platform,
         template,
         style,
-        batchEffect: tacticEvidence.batchEffect,
-        modelRoutes: modelRouteExperience,
+        receipts: gateReceipts,
+        tasks: persistedGateTasks,
       });
+      const startTacticAdvice = input.startTacticAdvice ?? startExperience.advice;
       const startTacticEntry = buildProjectStartTacticWorldEntry(startTacticAdvice, platform.name);
       const outlineNodes = buildDefaultOutlineNodes({
         projectId: created.id,

@@ -34,6 +34,8 @@ import {
   buildRouteRecommendations,
 } from "../lib/model-gateway/routeRecommendations.ts";
 import {
+  buildRouteConfirmationRecheckExecutionEvidence,
+  buildRouteConfirmationRecheckExecutionPlan,
   buildRouteAvoidanceRetestEvidence,
   buildRouteAvoidanceRetestSamplePlan,
 } from "../lib/model-gateway/routeRetestSamples.ts";
@@ -368,6 +370,88 @@ test("model task routing", async (t) => {
     assert.ok(dispatch.detail.includes("DeepSeek"));
     assert.ok(dispatch.acceptanceCriteria.some((item) => item.includes("成功率")));
     assert.ok(dispatch.evidence.some((item) => item.includes("是否需要治理")));
+  });
+
+  await t.test("builds an executable route confirmation recheck sample plan", () => {
+    const evidence = buildRouteConfirmationRecheckEvidenceFromDispatchTasks([{
+      dispatchKey: "model-route-confirmation-recheck:chapter_draft:2026-07-04T10:00:00.000Z",
+      stage: "model_route_confirmation_recheck",
+      state: "completed",
+      completionEvidence: "样本数：2\n成功率：100%\n质量：86\n成本：偏高\n备用命中：未命中备用\n是否需要治理：是，原因：成本超出预算线",
+      evidence: ["已确认正文初稿模型路由。"],
+      completedAt: "2026-07-04T12:00:00.000Z",
+    }]);
+    const advice = buildRouteConfirmationRecheckAdvice(evidence);
+    const samplePlan = buildRouteConfirmationRecheckSamplePlan(advice.items[0], {
+      primaryProviderName: "DeepSeek · deepseek-chat",
+      fallbackProviderName: "Kimi · kimi-k2.6",
+    });
+
+    const executionPlan = buildRouteConfirmationRecheckExecutionPlan(advice.items[0], samplePlan, [
+      {
+        id: "project-1",
+        title: "雨夜系统",
+        targetPlatform: "fanqie",
+        chapters: [
+          {
+            id: "chapter-1",
+            order: 1,
+            title: "第一章 雨夜系统",
+            wordCount: 0,
+            status: "planned",
+            goal: "遭遇系统",
+            hook: "雨夜倒计时出现",
+            conflict: "必须救人",
+            valueShift: "普通生活转向危机",
+            cliffhanger: "第二个任务刷新",
+          },
+          {
+            id: "chapter-2",
+            order: 2,
+            title: "第二章 已有正文",
+            wordCount: 1200,
+            status: "draft",
+            goal: "逃出小区",
+            hook: "门外有人敲门",
+            conflict: "邻居不可信",
+            valueShift: "求生转向反击",
+            cliffhanger: "奖励变成惩罚",
+          },
+        ],
+        aiTasks: [],
+      },
+    ]);
+
+    assert.equal(executionPlan.canRun, true);
+    assert.equal(executionPlan.status, "ready");
+    assert.equal(executionPlan.taskType, "chapter_draft");
+    assert.equal(executionPlan.projectId, "project-1");
+    assert.deepEqual(executionPlan.chapterIds, ["chapter-1"]);
+    assert.equal(executionPlan.sampleCount, 1);
+    assert.ok(executionPlan.reason.includes("雨夜系统"));
+    assert.ok(executionPlan.warning.includes("当前模型路由"));
+  });
+
+  await t.test("turns route confirmation recheck sample results into completion evidence", () => {
+    const evidence = buildRouteConfirmationRecheckExecutionEvidence({
+      plan: {
+        routeLabel: "DeepSeek · deepseek-chat -> Kimi · kimi-k2.6",
+        taskScope: "正文初稿",
+        sampleCount: 2,
+      },
+      results: [
+        { status: "succeeded", score: 86, routeRole: "primary", error: null },
+        { status: "succeeded", score: 84, routeRole: "fallback", error: null },
+      ],
+    });
+
+    assert.equal(evidence.successRatePercent, 100);
+    assert.equal(evidence.averageQualityScore, 85);
+    assert.equal(evidence.fallbackUsed, true);
+    assert.ok(evidence.completionEvidence.includes("成功率：100%"));
+    assert.ok(evidence.completionEvidence.includes("质量：85"));
+    assert.ok(evidence.completionEvidence.includes("备用命中：命中备用"));
+    assert.ok(evidence.completionEvidence.includes("是否需要治理：是"));
   });
 
   await t.test("builds an auditable dispatch action from route recheck governance advice", () => {

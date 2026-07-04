@@ -393,6 +393,7 @@ export function ModelProviderSettings({
   const [runningRetestRuleKey, setRunningRetestRuleKey] = useState<string | null>(null);
   const [executingRouteAdviceId, setExecutingRouteAdviceId] = useState<string | null>(null);
   const [creatingRouteRecheckPlanId, setCreatingRouteRecheckPlanId] = useState<string | null>(null);
+  const [runningRouteRecheckPlanId, setRunningRouteRecheckPlanId] = useState<string | null>(null);
   const [scopeDrafts, setScopeDrafts] = useState<Record<string, string>>(() => Object.fromEntries(
     routeAvoidanceGovernance.items.map((item) => [
       item.ruleKey,
@@ -672,6 +673,28 @@ export function ModelProviderSettings({
       setRouteMessage(caught instanceof Error ? caught.message : "生成复检样本派单失败。");
     } finally {
       setCreatingRouteRecheckPlanId(null);
+    }
+  }
+
+  async function runRouteConfirmationRecheckSamples(item: RouteConfirmationRecheckAdviceView["items"][number]) {
+    setRunningRouteRecheckPlanId(item.id);
+    setRouteMessage(null);
+    try {
+      const response = await fetch("/api/model-route-confirmation-recheck-samples", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ advice: item, execute: true }),
+      });
+      const payload = await response.json().catch(() => null) as { results?: Array<{ status: string }>; error?: string } | null;
+      if (!response.ok) throw new Error(payload?.error ?? "运行模型路由复检样本失败。");
+      const succeeded = payload?.results?.filter((result) => result.status === "succeeded").length ?? 0;
+      const total = payload?.results?.length ?? 0;
+      setRouteMessage(`已运行「${item.label}」复检样本：${succeeded}/${total} 成功`);
+      router.refresh();
+    } catch (caught) {
+      setRouteMessage(caught instanceof Error ? caught.message : "运行模型路由复检样本失败。");
+    } finally {
+      setRunningRouteRecheckPlanId(null);
     }
   }
 
@@ -966,6 +989,14 @@ export function ModelProviderSettings({
                       type="button"
                     >
                       {creatingRouteRecheckPlanId === item.id ? "生成中" : "生成复检派单"}
+                    </button>
+                    <button
+                      className="rounded-md border border-sky-200 bg-sky-50 px-3 py-2 text-xs font-medium text-sky-800 hover:bg-sky-100 disabled:cursor-not-allowed disabled:opacity-60"
+                      disabled={runningRouteRecheckPlanId === item.id}
+                      onClick={() => void runRouteConfirmationRecheckSamples(item)}
+                      type="button"
+                    >
+                      {runningRouteRecheckPlanId === item.id ? "运行中" : "运行复检样本"}
                     </button>
                     <button
                       className="rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"

@@ -40,9 +40,25 @@ interface SerializationOpsDashboard {
   submissionAssetStatus: SerializationSubmissionAssetStatus;
   finalSubmissionGate: SerializationFinalSubmissionGate;
   publishBaselineStatus: SerializationPublishBaselineStatus;
+  publishVersionHistory: SerializationPublishVersionHistoryItem[];
   nextPublishChapter: SerializationChapter | null;
   actions: SerializationAction[];
   warnings: string[];
+}
+
+interface SerializationPublishVersionHistoryItem {
+  id: string;
+  action: string;
+  actionLabel: string;
+  title: string;
+  platformName: string;
+  chapterCount: number;
+  wordCount: number;
+  preflightScore: number;
+  canExport: boolean;
+  createdAt: string;
+  href: string;
+  downloadHref: string;
 }
 
 interface SerializationPublishBaselineStatus {
@@ -114,6 +130,18 @@ function finalGateStatusLabel(status: SerializationFinalSubmissionGate["status"]
   return "待判断";
 }
 
+function formatTime(value: string | null | undefined) {
+  if (!value) return "暂无时间";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "暂无时间";
+  return date.toLocaleString("zh-CN", {
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 function projectHref(projectId: string, href: string) {
   return href.startsWith("#") ? `/projects/${projectId}${href}` : href;
 }
@@ -140,6 +168,7 @@ export function SerializationOpsPanel({ projectId }: { projectId: string }) {
   const [checklist, setChecklist] = useState<SubmissionChecklist | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [runningActionId, setRunningActionId] = useState<string | null>(null);
+  const [restoringVersionId, setRestoringVersionId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
   async function loadOps() {
@@ -184,6 +213,28 @@ export function SerializationOpsPanel({ projectId }: { projectId: string }) {
       setMessage(caught instanceof Error ? caught.message : "执行运营动作失败。");
     } finally {
       setRunningActionId(null);
+    }
+  }
+
+  async function restorePublishVersion(version: SerializationPublishVersionHistoryItem) {
+    setRestoringVersionId(version.id);
+    setMessage(null);
+    try {
+      const response = await fetch(`/api/projects/${projectId}/platform-export`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "restore", versionId: version.id }),
+      });
+      const payload = (await response.json().catch(() => null)) as { error?: string; message?: string } | null;
+      if (!response.ok) {
+        throw new Error(payload?.error ?? "恢复历史发布包失败。");
+      }
+      await loadOps();
+      setMessage(payload?.message ?? `已恢复「${version.title}」历史发布包。`);
+    } catch (caught) {
+      setMessage(caught instanceof Error ? caught.message : "恢复历史发布包失败。");
+    } finally {
+      setRestoringVersionId(null);
     }
   }
 
@@ -341,12 +392,21 @@ export function SerializationOpsPanel({ projectId }: { projectId: string }) {
                   <div className="text-xs text-slate-500">发布基准</div>
                   <div className="mt-1 font-medium text-slate-950">{dashboard.publishBaselineStatus.exists ? "已保存" : "未保存"}</div>
                 </div>
-                <Link
-                  className="rounded-md border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
-                  href={projectHref(projectId, dashboard.publishBaselineStatus.exists ? dashboard.publishBaselineStatus.downloadHref : dashboard.publishBaselineStatus.href)}
-                >
-                  {dashboard.publishBaselineStatus.actionLabel}
-                </Link>
+                {dashboard.publishBaselineStatus.exists ? (
+                  <a
+                    className="rounded-md border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                    href={dashboard.publishBaselineStatus.downloadHref}
+                  >
+                    {dashboard.publishBaselineStatus.actionLabel}
+                  </a>
+                ) : (
+                  <Link
+                    className="rounded-md border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                    href={projectHref(projectId, dashboard.publishBaselineStatus.href)}
+                  >
+                    {dashboard.publishBaselineStatus.actionLabel}
+                  </Link>
+                )}
               </div>
               <p className="mt-2 leading-6 text-slate-600">{dashboard.publishBaselineStatus.verdict}</p>
               {dashboard.publishBaselineStatus.exists ? (
@@ -354,6 +414,67 @@ export function SerializationOpsPanel({ projectId }: { projectId: string }) {
                   {dashboard.publishBaselineStatus.chapterCount} 章 · {dashboard.publishBaselineStatus.wordCount} 字
                 </div>
               ) : null}
+            </div>
+            <div className="mt-3 rounded-md bg-slate-50 p-3 text-sm">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <div className="text-xs text-slate-500">发布版本历史</div>
+                  <div className="mt-1 font-medium text-slate-950">
+                    最近 {dashboard.publishVersionHistory.length} 个版本
+                  </div>
+                </div>
+                <Link
+                  className="rounded-md border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                  href={`/projects/${projectId}#package-version-history`}
+                >
+                  全部版本
+                </Link>
+              </div>
+              <div className="mt-3 grid gap-2">
+                {dashboard.publishVersionHistory.map((version) => (
+                  <div className="rounded-md border border-slate-200 bg-white p-3" key={version.id}>
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                      <div>
+                        <div className="font-medium text-slate-950">{version.title}</div>
+                        <div className="mt-1 text-xs text-slate-500">
+                          {version.actionLabel} · {formatTime(version.createdAt)}
+                        </div>
+                      </div>
+                      <div className={`w-fit rounded-md px-2 py-1 text-xs font-medium ${
+                        version.canExport ? "bg-emerald-50 text-emerald-700" : "bg-rose-50 text-rose-700"
+                      }`}>
+                        质检 {version.preflightScore}
+                      </div>
+                    </div>
+                    <div className="mt-2 flex flex-wrap gap-2 text-xs text-slate-500">
+                      <span>{version.chapterCount} 章</span>
+                      <span>{version.wordCount} 字</span>
+                      <span>{version.platformName}</span>
+                    </div>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <a
+                        className="rounded-md border border-slate-200 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                        href={version.downloadHref}
+                      >
+                        下载此版
+                      </a>
+                      <button
+                        className="rounded-md border border-slate-200 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                        disabled={restoringVersionId === version.id}
+                        onClick={() => void restorePublishVersion(version)}
+                        type="button"
+                      >
+                        {restoringVersionId === version.id ? "恢复中" : "恢复此版"}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+                {!dashboard.publishVersionHistory.length ? (
+                  <div className="rounded-md border border-slate-200 bg-white p-3 text-slate-600">
+                    暂无版本记录。先保存发布基准，后面每次复制、下载、恢复都会留下痕迹。
+                  </div>
+                ) : null}
+              </div>
             </div>
           </div>
         </div>

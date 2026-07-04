@@ -103,6 +103,21 @@ export interface SerializationPublishBaselineStatus {
   actionLabel: string;
 }
 
+export interface SerializationPublishVersionHistoryItem {
+  id: string;
+  action: string;
+  actionLabel: string;
+  title: string;
+  platformName: string;
+  chapterCount: number;
+  wordCount: number;
+  preflightScore: number;
+  canExport: boolean;
+  createdAt: Date | string;
+  href: string;
+  downloadHref: string;
+}
+
 export interface SerializationOpsInput {
   project: SerializationProject;
   platform: PlatformProfile;
@@ -144,6 +159,7 @@ export interface SerializationOpsDashboard {
   submissionAssetStatus: SerializationSubmissionAssetStatus;
   finalSubmissionGate: SerializationFinalSubmissionGate;
   publishBaselineStatus: SerializationPublishBaselineStatus;
+  publishVersionHistory: SerializationPublishVersionHistoryItem[];
   nextPublishChapter: SerializationChapter | null;
   actions: SerializationAction[];
   warnings: string[];
@@ -262,6 +278,27 @@ export function buildSerializationPublishBaselineStatus(input: Pick<Serializatio
     downloadHref,
     actionLabel: "下载发布包",
   };
+}
+
+export function buildSerializationPublishVersionHistory(input: Pick<SerializationOpsInput, "project" | "platform" | "publishSnapshots">): SerializationPublishVersionHistoryItem[] {
+  return (input.publishSnapshots ?? [])
+    .filter((snapshot) => snapshot.platformId === input.platform.id)
+    .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime())
+    .slice(0, 5)
+    .map((snapshot) => ({
+      id: snapshot.id,
+      action: snapshot.action,
+      actionLabel: actionLabel(snapshot.action),
+      title: snapshot.title,
+      platformName: snapshot.platformName,
+      chapterCount: snapshot.chapterCount,
+      wordCount: snapshot.wordCount,
+      preflightScore: snapshot.preflightScore,
+      canExport: snapshot.canExport,
+      createdAt: snapshot.createdAt,
+      href: "#package-version-history",
+      downloadHref: `/api/projects/${input.project.id ?? "current"}/platform-export?versionId=${snapshot.id}&format=markdown`,
+    }));
 }
 
 function parseJsonObject(text: string | null | undefined) {
@@ -548,6 +585,7 @@ export function buildSerializationOpsDashboard(input: SerializationOpsInput): Se
   const submissionAssetStatus = buildSerializationSubmissionAssetStatus(input);
   const finalSubmissionGate = normalizeFinalSubmissionGate(input.finalGate);
   const publishBaselineStatus = buildSerializationPublishBaselineStatus(input);
+  const publishVersionHistory = buildSerializationPublishVersionHistory(input);
   const draftedChapters = input.chapters.filter((chapter) => chapter.wordCount > 0);
   const reviewQueue = draftedChapters.filter((chapter) => !reviewed(chapter, input.aiTasks));
   const revisionQueue = draftedChapters.filter((chapter) => {
@@ -592,6 +630,7 @@ export function buildSerializationOpsDashboard(input: SerializationOpsInput): Se
     submissionAssetStatus,
     finalSubmissionGate,
     publishBaselineStatus,
+    publishVersionHistory,
     nextPublishChapter: publishReady[0] ?? null,
     actions: buildActions(input, reviewQueue, revisionQueue, publishReady, submissionAssetStatus, finalSubmissionGate, publishBaselineStatus),
     warnings,

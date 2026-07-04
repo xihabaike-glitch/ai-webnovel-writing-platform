@@ -247,6 +247,15 @@ export async function GET(request: Request, { params }: Params) {
       return NextResponse.json({ error: "Publish package version not found" }, { status: 404 });
     }
 
+    if (searchParams.get("format") === "markdown") {
+      return new NextResponse(snapshot.markdown, {
+        headers: {
+          "Content-Type": "text/markdown; charset=utf-8",
+          "Content-Disposition": `attachment; filename="${encodeURIComponent(`${snapshot.title}-${snapshot.platformName}-历史发布包.md`)}"`,
+        },
+      });
+    }
+
     const currentPack = center.packages.find((item) => item.platformId === snapshot.platformId)
       ?? center.packages[0];
     const version: PublishPackageSnapshotDetail = {

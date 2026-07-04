@@ -261,12 +261,41 @@ test("buildSerializationOpsDashboard", async (t) => {
           canExport: true,
           createdAt: "2026-01-03T00:00:00.000Z",
         },
+        {
+          id: "download-1",
+          platformId: "fanqie",
+          platformName: "番茄小说",
+          title: "夜雨系统下载版",
+          action: "download",
+          chapterCount: 4,
+          wordCount: 12800,
+          preflightScore: 98,
+          canExport: true,
+          createdAt: "2026-01-04T00:00:00.000Z",
+        },
+        {
+          id: "other-platform",
+          platformId: "qidian",
+          platformName: "起点中文网",
+          title: "夜雨系统起点版",
+          action: "snapshot",
+          chapterCount: 5,
+          wordCount: 16000,
+          preflightScore: 92,
+          canExport: true,
+          createdAt: "2026-01-05T00:00:00.000Z",
+        },
       ],
     });
 
     assert.equal(dashboard.publishBaselineStatus.exists, true);
     assert.equal(dashboard.publishBaselineStatus.preflightScore, 96);
     assert.ok(dashboard.publishBaselineStatus.downloadHref.includes("format=markdown"));
+    assert.equal(dashboard.publishVersionHistory.length, 2);
+    assert.equal(dashboard.publishVersionHistory[0].id, "download-1");
+    assert.equal(dashboard.publishVersionHistory[0].actionLabel, "下载记录");
+    assert.equal(dashboard.publishVersionHistory[0].downloadHref, "/api/projects/project-1/platform-export?versionId=download-1&format=markdown");
+    assert.equal(dashboard.publishVersionHistory.some((version) => version.id === "other-platform"), false);
     assert.equal(dashboard.actions.some((action) => action.id === "save-publish-baseline"), false);
     const downloadAction = dashboard.actions.find((action) => action.id === "download-publish-package");
     assert.equal(downloadAction?.href, "/api/projects/project-1/platform-export?format=markdown&platformId=fanqie");

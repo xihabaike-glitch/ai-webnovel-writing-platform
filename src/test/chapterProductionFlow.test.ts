@@ -297,3 +297,50 @@ test("buildChapterProductionFlow points completed unresolved dispatches back to 
   }]);
   assert.ok(flow.recheckNotice?.detail.includes("投稿预检"));
 });
+
+test("buildChapterProductionFlow surfaces active recheck follow-up dispatches", () => {
+  const flow = buildChapterProductionFlow({
+    projectId: "project-1",
+    chapters: [
+      {
+        id: "chapter-1",
+        title: "第一章",
+        order: 1,
+        status: "draft",
+        wordCount: 1800,
+        hook: "女主醒来发现自己被写进追杀名单。",
+        cliffhanger: "名单最后一行出现了她母亲的名字。",
+      },
+    ],
+    aiTasks: [],
+    gateTasks: [
+      {
+        dispatchKey: "story-tree-followup:project-1:chapter-1:chapter_draft:74",
+        state: "assigned",
+        href: "/projects/project-1/chapters/chapter-1#chapter-second-pass",
+        title: "第一章 · 大树复查未解除",
+        actionLabel: "进入二改",
+        ownerRole: "作者",
+        priorityScore: 91,
+      },
+      {
+        dispatchKey: "submission-recheck-followup:project-1:title:58",
+        state: "completed",
+        href: "/projects/project-1#submission-package",
+        title: "标题 · 投稿复查已解除",
+        actionLabel: "查看投稿包",
+        ownerRole: "主编",
+        priorityScore: 58,
+      },
+    ],
+    submissionChecklist: checklistReady,
+  });
+
+  assert.equal(flow.followUpNotice?.title, "有 1 个复查返工派单待处理");
+  assert.equal(flow.followUpNotice?.href, "/dispatch");
+  assert.equal(flow.followUpNotice?.actionLabel, "查看派单");
+  assert.equal(flow.followUpNotice?.count, 1);
+  assert.ok(flow.followUpNotice?.detail.includes("第一章 · 大树复查未解除"));
+  assert.ok(flow.followUpNotice?.detail.includes("负责人：作者"));
+  assert.ok(flow.followUpNotice?.detail.includes("动作：进入二改"));
+});

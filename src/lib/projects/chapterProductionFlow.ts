@@ -61,6 +61,10 @@ export interface ChapterProductionFlowGateTask {
   state: string;
   href: string;
   completionEvidence?: string | null;
+  title?: string | null;
+  actionLabel?: string | null;
+  ownerRole?: string | null;
+  priorityScore?: number | null;
 }
 
 export interface ChapterProductionFlowStage {
@@ -96,8 +100,17 @@ export interface ChapterProductionFlow {
   nextActionLabel: string;
   nextHref: string;
   bottleneck: ChapterProductionFlowStageId;
+  followUpNotice?: ChapterProductionFlowFollowUpNotice;
   recheckNotice?: ChapterProductionFlowRecheckNotice;
   stages: ChapterProductionFlowStage[];
+}
+
+export interface ChapterProductionFlowFollowUpNotice {
+  title: string;
+  detail: string;
+  href: string;
+  actionLabel: string;
+  count: number;
 }
 
 export interface ChapterProductionFlowRecheckNotice {
@@ -172,6 +185,37 @@ function submissionPrecheckItemIds(tasks: ChapterProductionFlowGateTask[]) {
     if (itemId) ids.add(itemId);
   }
   return ids;
+}
+
+function isRecheckFollowUpTask(task: ChapterProductionFlowGateTask) {
+  return task.dispatchKey.startsWith("story-tree-followup:")
+    || task.dispatchKey.startsWith("submission-recheck-followup:");
+}
+
+function recheckFollowUpNotice(tasks: ChapterProductionFlowGateTask[]): ChapterProductionFlowFollowUpNotice | undefined {
+  const activeTasks = tasks
+    .filter((task) => isRecheckFollowUpTask(task) && task.state !== "completed")
+    .sort((left, right) => (right.priorityScore ?? 0) - (left.priorityScore ?? 0));
+
+  if (activeTasks.length === 0) return undefined;
+
+  const sampleTasks = activeTasks.slice(0, 3);
+  const taskLabels = sampleTasks.map((task) => {
+    const title = task.title?.trim() || task.dispatchKey;
+    const owner = task.ownerRole?.trim();
+    const action = task.actionLabel?.trim();
+    return [title, owner ? `负责人：${owner}` : null, action ? `动作：${action}` : null]
+      .filter(Boolean)
+      .join("，");
+  });
+
+  return {
+    title: `有 ${activeTasks.length} 个复查返工派单待处理`,
+    detail: taskLabels.join("；"),
+    href: "/dispatch",
+    actionLabel: "查看派单",
+    count: activeTasks.length,
+  };
 }
 
 function storyTreeDispatchSummary(tasks: ChapterProductionFlowGateTask[], chapterIds: string[]): ChapterProductionFlowDispatchSummary | undefined {
@@ -454,6 +498,7 @@ export function buildChapterProductionFlow(input: {
         },
       }
     : undefined;
+  const followUpNotice = recheckFollowUpNotice(input.gateTasks);
   const status = stages.every((stage) => stage.status === "ready") && input.submissionChecklist.riskCount === 0
     ? "ready"
     : bottleneck.status === "blocked" ? "blocked" : "working";
@@ -470,6 +515,7 @@ export function buildChapterProductionFlow(input: {
     nextActionLabel: status === "ready" ? "查看投稿预检" : bottleneck.actionLabel,
     nextHref: bottleneck.href,
     bottleneck: bottleneck.id,
+    followUpNotice,
     recheckNotice,
     stages,
   };

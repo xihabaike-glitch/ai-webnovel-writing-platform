@@ -212,6 +212,20 @@ export function ChapterProductionFlowPanel({ flow }: { flow: ChapterProductionFl
           ) : null}
         </div>
       ) : null}
+      {flow.followUpNotice ? (
+        <div className="mt-3 flex flex-col gap-2 rounded-md border border-rose-200 bg-rose-50 p-3 text-sm text-rose-950 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <div className="font-medium">{flow.followUpNotice.title}</div>
+            <p className="mt-1 text-xs leading-5 text-rose-800">{flow.followUpNotice.detail}</p>
+          </div>
+          <Link
+            className="w-fit rounded-md bg-rose-950 px-3 py-1.5 text-xs font-medium text-white hover:bg-rose-900"
+            href={flow.followUpNotice.href}
+          >
+            {flow.followUpNotice.actionLabel}
+          </Link>
+        </div>
+      ) : null}
       {flow.recheckNotice ? (
         <div className="mt-3 flex flex-col gap-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 sm:flex-row sm:items-center sm:justify-between">
           <div>

@@ -133,7 +133,9 @@ export default async function ProjectPage({ params }: { params: Promise<{ projec
       OR: [
         { dispatchKey: { startsWith: "story-tree:" } },
         { dispatchKey: { startsWith: "story-tree-experience:" } },
+        { dispatchKey: { startsWith: "story-tree-followup:" } },
         { dispatchKey: { startsWith: "submission-precheck:" } },
+        { dispatchKey: { startsWith: "submission-recheck-followup:" } },
       ],
     },
     select: {
@@ -141,6 +143,10 @@ export default async function ProjectPage({ params }: { params: Promise<{ projec
       state: true,
       href: true,
       completionEvidence: true,
+      title: true,
+      actionLabel: true,
+      ownerRole: true,
+      priorityScore: true,
     },
     take: 100,
   });
@@ -183,6 +189,10 @@ export default async function ProjectPage({ params }: { params: Promise<{ projec
       state: task.state,
       href: task.href,
       completionEvidence: task.completionEvidence,
+      title: task.title,
+      actionLabel: task.actionLabel,
+      ownerRole: task.ownerRole,
+      priorityScore: task.priorityScore,
     })),
     submissionChecklist,
   });

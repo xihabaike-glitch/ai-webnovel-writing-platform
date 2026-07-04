@@ -612,6 +612,20 @@ interface PlatformStrategyExecutionReceipt {
   severity: "success" | "needs_action";
 }
 
+interface PlatformKnowledgeFeedbackReceipt {
+  id: string;
+  platformId: string;
+  platformName: string;
+  actionLabel: string;
+  title: string;
+  message: string;
+  completedStepLabel: string;
+  stopReason: string;
+  nextAction: string;
+  href: string;
+  severity: "success" | "needs_action";
+}
+
 interface PlatformKnowledgeApplication {
   area: "submission_asset" | "first_three" | "strategy";
   label: string;
@@ -1201,6 +1215,37 @@ function buildStrategyExecutionReceipt(
   };
 }
 
+function buildKnowledgeFeedbackReceipt(
+  item: PlatformKnowledgeInsight,
+  step: PlatformStrategySwitchStep | null,
+  executionReceipt: PlatformStrategyExecutionReceipt | null,
+): PlatformKnowledgeFeedbackReceipt {
+  const completedStepLabel = executionReceipt
+    ? step?.label ?? executionReceipt.title
+    : "启动执行链";
+  const stopReason = executionReceipt
+    ? executionReceipt.severity === "success"
+      ? "第一步已自动完成，系统停在下一段执行链，避免把需要确认的动作一口气跑完。"
+      : "自动动作已经推进到需要人工确认的位置，继续硬跑会把低质量样本写进系统。"
+    : step
+      ? "当前步骤需要人工处理或等待前置条件，系统已经定位到对应区域。"
+      : "当前执行链没有新的可自动动作，回到策略排行榜复盘即可。";
+
+  return {
+    id: `${item.platformId}:${Date.now()}`,
+    platformId: item.platformId,
+    platformName: item.platformName,
+    actionLabel: item.feedbackLoop.actionLabel,
+    title: `${item.platformName}｜反哺链路回执`,
+    message: item.feedbackLoop.headline,
+    completedStepLabel,
+    stopReason,
+    nextAction: executionReceipt?.nextAction ?? `下一步：${step?.label ?? item.feedbackLoop.nextStepLabel}`,
+    href: executionReceipt?.href ?? step?.href ?? item.feedbackLoop.nextStepHref,
+    severity: executionReceipt?.severity ?? (step?.executable === false ? "needs_action" : "success"),
+  };
+}
+
 function normalizeVersionAction(action: string): PublishPackageVersionActionFilter {
   if (action === "copy" || action === "download" || action === "archive" || action === "snapshot" || action === "restore") return action;
   return "snapshot";
@@ -1237,6 +1282,7 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
   const [strategySwitchPlan, setStrategySwitchPlan] = useState<PlatformStrategySwitchPlan | null>(null);
   const [strategyExecutionReceipt, setStrategyExecutionReceipt] = useState<PlatformStrategyExecutionReceipt | null>(null);
   const [strategyReviewTaskReceipt, setStrategyReviewTaskReceipt] = useState<PlatformStrategyReviewTaskReceipt | null>(null);
+  const [knowledgeFeedbackReceipt, setKnowledgeFeedbackReceipt] = useState<PlatformKnowledgeFeedbackReceipt | null>(null);
   const [latestEffectReview, setLatestEffectReview] = useState<PlatformPublishEffectSaveReview | null>(null);
   const [assetOptimizationVariants, setAssetOptimizationVariants] = useState<PlatformSubmissionAssetOptimizationVariant[]>([]);
   const [versionActionFilter, setVersionActionFilter] = useState<PublishPackageVersionActionFilter>("all");
@@ -1507,6 +1553,7 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
     setRunningKnowledgePlatformId(item.platformId);
     setStrategyExecutionReceipt(null);
     setStrategyReviewTaskReceipt(null);
+    setKnowledgeFeedbackReceipt(null);
     setMessage(null);
     try {
       const response = await fetch(`/api/projects/${projectId}/platform-export`, {
@@ -1528,9 +1575,11 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
       setStrategyExecutionReceipt(buildStrategyExecutionReceipt(payload.switchPlan, "switch-target-platform"));
       const nextStep = payload.switchPlan.steps.find((step) => step.status === "next");
       if (nextStep?.executable) {
-        await executeStrategyStep(payload.switchPlan, nextStep, { messagePrefix: item.feedbackLoop.headline });
+        const executionReceipt = await executeStrategyStep(payload.switchPlan, nextStep, { messagePrefix: item.feedbackLoop.headline });
+        setKnowledgeFeedbackReceipt(buildKnowledgeFeedbackReceipt(item, nextStep, executionReceipt));
       } else {
         await loadCenter({ keepMessage: true });
+        setKnowledgeFeedbackReceipt(buildKnowledgeFeedbackReceipt(item, nextStep ?? null, null));
         setMessage(`${item.feedbackLoop.headline} 已启动执行链，下一步：${nextStep?.label ?? item.feedbackLoop.nextStepLabel}。`);
         window.location.hash = nextStep?.href.replace(/^#/, "") ?? "platform-strategy-ranking";
       }
@@ -1657,7 +1706,7 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
     options?: { messagePrefix?: string },
   ) {
     const strategyPackage = center?.packages.find((pack) => pack.platformId === plan.platformId) ?? selectedPackage;
-    if (!strategyPackage) return;
+    if (!strategyPackage) return null;
     setSelectedPlatformId(strategyPackage.platformId);
     setRunningStrategyStepId(step.id);
     setMessage(null);
@@ -1674,9 +1723,11 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
         setVersionActionFilter("snapshot");
         await loadCenter({ keepMessage: true });
         const refreshedPlan = await refreshStrategyPlan(strategyPackage.platformId);
-        setStrategyExecutionReceipt(buildStrategyExecutionReceipt(refreshedPlan, step.id));
+        const receipt = buildStrategyExecutionReceipt(refreshedPlan, step.id);
+        setStrategyExecutionReceipt(receipt);
         setMessage(`${options?.messagePrefix ? `${options.messagePrefix} ` : ""}${payload?.message ?? `已保存 ${strategyPackage.platformName} 证据基准。`}`);
         window.location.hash = "package-version-history";
+        return receipt;
       } else if (step.id === "fix-submission-asset") {
         const nextDraft = {
           title: strategyPackage.title,
@@ -1708,9 +1759,11 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
         } | null;
         if (!response.ok || !payload?.variants) throw new Error(payload?.error ?? "AI 优化投稿资产失败。");
         setAssetOptimizationVariants(payload.variants.map((variant) => ({ ...variant, sourceTaskId: payload.task?.id })));
-        setStrategyExecutionReceipt(buildStrategyExecutionReceipt(plan, step.id, payload.variants.length));
+        const receipt = buildStrategyExecutionReceipt(plan, step.id, payload.variants.length);
+        setStrategyExecutionReceipt(receipt);
         setMessage(`${options?.messagePrefix ? `${options.messagePrefix} ` : ""}已按执行链生成 ${payload.variants.length} 个 ${strategyPackage.platformName} 投稿资产候选。`);
         window.location.hash = "submission-asset-editor";
+        return receipt;
       } else if (step.id === "rewrite-first-three") {
         const response = await fetch(`/api/projects/${projectId}/first-three-rewrite/generate`, {
           method: "POST",
@@ -1724,19 +1777,25 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
         if (!response.ok || !payload?.results) throw new Error(payload?.error ?? "前三章二轮重写失败。");
         await loadCenter({ keepMessage: true });
         const refreshedPlan = await refreshStrategyPlan(strategyPackage.platformId);
-        setStrategyExecutionReceipt(buildStrategyExecutionReceipt(refreshedPlan, step.id, payload.results.length));
+        const receipt = buildStrategyExecutionReceipt(refreshedPlan, step.id, payload.results.length);
+        setStrategyExecutionReceipt(receipt);
         setMessage(`${options?.messagePrefix ? `${options.messagePrefix} ` : ""}已按执行链重写 ${strategyPackage.platformName} 前三章，共 ${payload.results.length} 章，策略链已刷新。`);
+        return receipt;
       } else if (step.id === "record-publish-effect") {
         window.location.hash = "publish-effect-panel";
-        setStrategyExecutionReceipt(buildStrategyExecutionReceipt(plan, step.id));
+        const receipt = buildStrategyExecutionReceipt(plan, step.id);
+        setStrategyExecutionReceipt(receipt);
         setMessage(`${options?.messagePrefix ? `${options.messagePrefix} ` : ""}下一步是录入真实发布效果：把曝光、点击、收藏、追读和编辑反馈填进去。`);
+        return receipt;
       }
     } catch (caught) {
       setMessage(caught instanceof Error ? caught.message : "执行策略下一步失败。");
+      return null;
     } finally {
       setIsOptimizingAsset(false);
       setRunningStrategyStepId(null);
     }
+    return null;
   }
 
   async function executeStrategyNextStep() {
@@ -2782,6 +2841,42 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
                       </a>
                     ))}
                   </div>
+                  {knowledgeFeedbackReceipt ? (
+                    <div className={`mt-3 rounded-md border p-3 text-sm ${
+                      knowledgeFeedbackReceipt.severity === "success"
+                        ? "border-cyan-100 bg-cyan-50"
+                        : "border-amber-100 bg-amber-50"
+                    }`}>
+                      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                        <div>
+                          <div className={knowledgeFeedbackReceipt.severity === "success" ? "font-medium text-cyan-950" : "font-medium text-amber-900"}>
+                            {knowledgeFeedbackReceipt.title}
+                          </div>
+                          <p className={knowledgeFeedbackReceipt.severity === "success" ? "mt-1 leading-6 text-cyan-800" : "mt-1 leading-6 text-amber-800"}>
+                            {knowledgeFeedbackReceipt.message}
+                          </p>
+                          <div className="mt-2 flex flex-wrap gap-1.5 text-xs">
+                            <span className="rounded-md bg-white px-2 py-1 font-medium text-slate-700">
+                              来源：{knowledgeFeedbackReceipt.actionLabel}
+                            </span>
+                            <span className="rounded-md bg-white px-2 py-1 font-medium text-slate-700">
+                              已推进：{knowledgeFeedbackReceipt.completedStepLabel}
+                            </span>
+                          </div>
+                          <div className="mt-2 rounded-md bg-white px-2 py-1 text-xs leading-5 text-slate-600">
+                            停在这里：{knowledgeFeedbackReceipt.stopReason}
+                          </div>
+                          <p className="mt-2 leading-6 text-slate-700">下一刀：{knowledgeFeedbackReceipt.nextAction}</p>
+                        </div>
+                        <a
+                          className="w-fit rounded-md bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                          href={knowledgeFeedbackReceipt.href}
+                        >
+                          去处理
+                        </a>
+                      </div>
+                    </div>
+                  ) : null}
                   {strategyExecutionReceipt ? (
                     <div className={`mt-3 rounded-md border p-3 text-sm ${
                       strategyExecutionReceipt.severity === "success"

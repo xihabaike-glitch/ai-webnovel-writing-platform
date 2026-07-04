@@ -52,6 +52,19 @@ interface FirstDayExecutionReceipt {
   detailItems: string[];
 }
 
+interface FirstDayContinuationAction {
+  status: "first_day_active" | "ready" | "blocked" | "complete";
+  headline: string;
+  detail: string;
+  primaryLabel: string;
+  primaryHref: string;
+  secondaryLabel: string;
+  secondaryHref: string;
+  queueCategory: "draft" | "review" | "second_pass" | "export" | "blocked" | null;
+  itemCount: number;
+  warnings: string[];
+}
+
 type FirstDayModelRouteStatus = FirstDayExecutionRouteStatus;
 type FirstDayMessageAction = "execute_current_step";
 
@@ -89,6 +102,20 @@ function refreshedRouteNotice(route: FirstDayModelRouteStatus): { message: strin
     };
   }
   return { message: `已刷新首日模型路线：${blockMessage}` };
+}
+
+function continuationTone(status: FirstDayContinuationAction["status"]) {
+  if (status === "ready") return "border-emerald-200 bg-emerald-50 text-emerald-900";
+  if (status === "blocked") return "border-amber-200 bg-amber-50 text-amber-900";
+  if (status === "complete") return "border-slate-200 bg-slate-50 text-slate-900";
+  return "border-blue-200 bg-blue-50 text-blue-900";
+}
+
+function continuationStatusLabel(status: FirstDayContinuationAction["status"]) {
+  if (status === "ready") return "可进入连续生产";
+  if (status === "blocked") return "先处理阻塞";
+  if (status === "complete") return "已收口";
+  return "首日未完成";
 }
 
 function FirstDayStepCard({ step, index }: { step: FirstDayWorkflowStep; index: number }) {
@@ -134,6 +161,7 @@ export function FirstDayWorkflowPanel({ projectId }: { projectId: string }) {
   const [message, setMessage] = useState<string | null>(null);
   const [messageAction, setMessageAction] = useState<FirstDayMessageAction | null>(null);
   const [executionReceipt, setExecutionReceipt] = useState<FirstDayExecutionReceipt | null>(null);
+  const [continuation, setContinuation] = useState<FirstDayContinuationAction | null>(null);
 
   function showMessage(nextMessage: string | null, action?: FirstDayMessageAction) {
     setMessage(nextMessage);
@@ -153,10 +181,12 @@ export function FirstDayWorkflowPanel({ projectId }: { projectId: string }) {
         workflow: FirstDayWorkflow;
         dispatch: GatePlatformGrowthDispatchItem;
         modelRoute: FirstDayModelRouteStatus;
+        continuation: FirstDayContinuationAction;
       };
       setWorkflow(payload.workflow);
       setDispatch(payload.dispatch);
       setModelRoute(payload.modelRoute);
+      setContinuation(payload.continuation);
       if (options?.fromRouteRepair) {
         const notice = refreshedRouteNotice(payload.modelRoute);
         showMessage(notice.message, notice.action);
@@ -203,6 +233,7 @@ export function FirstDayWorkflowPanel({ projectId }: { projectId: string }) {
         workflow?: FirstDayWorkflow;
         dispatch?: GatePlatformGrowthDispatchItem;
         modelRoute?: FirstDayModelRouteStatus;
+        continuation?: FirstDayContinuationAction;
         executionReceipt?: FirstDayExecutionReceipt;
         completionEvidence?: string;
         error?: string;
@@ -213,6 +244,7 @@ export function FirstDayWorkflowPanel({ projectId }: { projectId: string }) {
       if (payload.workflow) setWorkflow(payload.workflow);
       if (payload.dispatch) setDispatch(payload.dispatch);
       if (payload.modelRoute) setModelRoute(payload.modelRoute);
+      if (payload.continuation) setContinuation(payload.continuation);
       if (payload.executionReceipt) setExecutionReceipt(payload.executionReceipt);
       if (payload.completionEvidence) setCompletionEvidence(payload.completionEvidence);
       showMessage(payload.executionReceipt?.summary ?? `AI 已执行当前节点：${workflow.nextStep.label}。请检查结果后完成派单验收。`);
@@ -293,6 +325,33 @@ export function FirstDayWorkflowPanel({ projectId }: { projectId: string }) {
             >
               {isExecutingAi ? "执行中" : "继续执行当前节点"}
             </button>
+          ) : null}
+        </div>
+      ) : null}
+
+      {continuation ? (
+        <div className={`mt-3 rounded-md border px-3 py-3 text-sm ${continuationTone(continuation.status)}`}>
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <div className="text-xs font-medium opacity-75">{continuationStatusLabel(continuation.status)}</div>
+              <div className="mt-1 font-medium">{continuation.headline}</div>
+              <p className="mt-1 leading-6 opacity-90">{continuation.detail}</p>
+            </div>
+            <div className="flex shrink-0 flex-wrap gap-2">
+              <Link className="w-fit rounded-md bg-slate-950 px-3 py-2 text-sm font-medium text-white" href={continuation.primaryHref}>
+                {continuation.primaryLabel}
+              </Link>
+              <Link className="w-fit rounded-md bg-white/80 px-3 py-2 text-sm font-medium text-slate-900 hover:bg-white" href={continuation.secondaryHref}>
+                {continuation.secondaryLabel}
+              </Link>
+            </div>
+          </div>
+          {continuation.warnings.length > 0 ? (
+            <div className="mt-3 grid gap-2 text-xs sm:grid-cols-2">
+              {continuation.warnings.map((warning) => (
+                <div className="rounded-md bg-white/70 px-2 py-1" key={warning}>{warning}</div>
+              ))}
+            </div>
           ) : null}
         </div>
       ) : null}

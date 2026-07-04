@@ -5,6 +5,7 @@ import { reviewChapterDraft } from "@/lib/ai/chapterReviewGeneration";
 import { prisma } from "@/lib/db/prisma";
 import { buildFirstDayExecutionRouteBlockMessage, buildFirstDayExecutionRouteStatus } from "@/lib/model-gateway/firstDayExecutionRoute";
 import { getPlatformProfile, type PlatformId } from "@/lib/platforms/platformProfiles";
+import { buildFirstDayContinuationAction } from "@/lib/projects/firstDayContinuation";
 import { buildFirstDayDispatchItem, buildFirstDayExecutionReceipt, buildFirstDayModelExecutionPlan, buildFirstDayWorkflow } from "@/lib/projects/firstDayWorkflow";
 import { generateControlAssets, type ControlAssetAreaId } from "@/lib/projects/controlAssetGeneration";
 import { buildSubmissionChecklist } from "@/lib/projects/submissionChecklist";
@@ -88,6 +89,21 @@ async function buildWorkflowPayload(projectId: string) {
       taskType: executionPlan.taskType ?? null,
       providers,
       routes,
+    }),
+    continuation: buildFirstDayContinuationAction({
+      project: {
+        id: project.id,
+        title: project.title,
+        targetPlatform: project.targetPlatform,
+        targetWordCount: project.targetWordCount,
+        currentWordCount: project.currentWordCount,
+        genre: project.genre,
+        sellingPoint: project.sellingPoint,
+        chapters: project.chapters,
+        aiTasks: project.aiTasks,
+        worldEntries: project.worldEntries,
+      },
+      workflow,
     }),
     dispatch: buildFirstDayDispatchItem({
       project: workflowProject,

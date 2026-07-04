@@ -5,6 +5,7 @@ import { CreateChapterForm } from "@/components/chapters/CreateChapterForm";
 import { OutlineTreePanel } from "@/components/outlines/OutlineTreePanel";
 import { BatchDraftCenterPanel } from "@/components/projects/BatchDraftCenterPanel";
 import { BatchReviewPipelinePanel } from "@/components/projects/BatchReviewPipelinePanel";
+import { ChapterProductionFlowPanel } from "@/components/projects/ChapterProductionFlowPanel";
 import { ChapterProductionPanel } from "@/components/projects/ChapterProductionPanel";
 import { CharacterArcPanel } from "@/components/projects/CharacterArcPanel";
 import { ExportMarkdownButton } from "@/components/projects/ExportMarkdownButton";
@@ -29,6 +30,7 @@ import { buildProjectDashboard } from "@/lib/projects/projectDashboard";
 import { buildSubmissionChecklist } from "@/lib/projects/submissionChecklist";
 import { buildSubmissionPackage } from "@/lib/projects/submissionPackage";
 import { buildWritingWorkbench } from "@/lib/projects/writingWorkbench";
+import { buildChapterProductionFlow } from "@/lib/projects/chapterProductionFlow";
 
 function aiTaskLabel(taskType: string) {
   const labels: Record<string, string> = {
@@ -111,6 +113,18 @@ export default async function ProjectPage({ params }: { params: Promise<{ projec
       hasReturnedEffect: task.evidence.includes("经验应用效果"),
     };
   });
+  const productionAiTasks = await prisma.aiTask.findMany({
+    where: {
+      projectId: project.id,
+      status: "succeeded",
+      taskType: { in: ["chapter_review", "chapter_second_pass"] },
+    },
+    select: {
+      taskType: true,
+      status: true,
+      chapterId: true,
+    },
+  });
   const dashboard = buildProjectDashboard({
     currentWordCount: project.currentWordCount,
     targetWordCount: project.targetWordCount,
@@ -134,6 +148,21 @@ export default async function ProjectPage({ params }: { params: Promise<{ projec
       status: task.status,
       chapter: task.chapterId ? { id: task.chapterId } : null,
     })),
+  });
+  const chapterProductionFlow = buildChapterProductionFlow({
+    projectId: project.id,
+    chapters: project.chapters,
+    aiTasks: productionAiTasks.map((task) => ({
+      taskType: task.taskType,
+      status: task.status,
+      chapter: task.chapterId ? { id: task.chapterId } : null,
+    })),
+    gateTasks: project.gateDispatchTasks.map((task) => ({
+      dispatchKey: task.dispatchKey,
+      state: task.state,
+      href: task.href,
+    })),
+    submissionChecklist,
   });
   const submissionPackage = buildSubmissionPackage({
     title: project.title,
@@ -255,6 +284,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ projec
         <div id="first-day-workflow">
           <FirstDayWorkflowPanel projectId={project.id} />
         </div>
+        <ChapterProductionFlowPanel flow={chapterProductionFlow} />
         <section className="grid gap-4 md:grid-cols-[1.4fr_1fr]">
           <div className="rounded-md border border-slate-200 bg-white p-4">
             <div className="flex items-start justify-between gap-4">
@@ -323,7 +353,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ projec
           projectId={project.id}
           reviewBacklog={storyTreeExperienceReviewBacklog}
         />
-        <section className="rounded-md border border-slate-200 bg-white p-4">
+        <section className="rounded-md border border-slate-200 bg-white p-4" id="submission-precheck">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <h2 className="font-medium">投稿前检查</h2>

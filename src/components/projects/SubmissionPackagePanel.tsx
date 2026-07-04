@@ -47,6 +47,21 @@ interface MultiPlatformSubmissionVariant {
     overseasSynopsis: string;
     tags: string[];
   };
+  packageMatrix: {
+    status: "ready" | "needs_work";
+    readyFields: number;
+    totalFields: number;
+    packageFileName: string;
+    sampleChapterCount: number;
+    wordCount: number;
+    nextAction: string;
+    items: Array<{
+      id: string;
+      label: string;
+      status: "ready" | "warning" | "missing";
+      detail: string;
+    }>;
+  };
 }
 
 interface MultiPlatformSubmission {
@@ -54,6 +69,12 @@ interface MultiPlatformSubmission {
   targetPlatformId: string;
   recommendedPlatformId: string;
   variants: MultiPlatformSubmissionVariant[];
+  packageSummary: {
+    readyPlatforms: number;
+    needsWorkPlatforms: number;
+    totalPlatforms: number;
+    readyToArchive: boolean;
+  };
   markdown: string;
 }
 
@@ -109,6 +130,12 @@ function categoryLabel(category: string) {
     overseas: "海外平台",
   };
   return labels[category] ?? category;
+}
+
+function matrixStatusClass(status: "ready" | "warning" | "missing" | "needs_work") {
+  if (status === "ready") return "bg-emerald-50 text-emerald-700";
+  if (status === "warning" || status === "needs_work") return "bg-amber-50 text-amber-700";
+  return "bg-rose-50 text-rose-700";
 }
 
 export function SubmissionPackagePanel({
@@ -461,6 +488,8 @@ export function SubmissionPackagePanel({
               <div className="text-sm font-medium">多平台投稿版本</div>
               <p className="mt-1 text-xs text-slate-500">
                 推荐：{multiPlatform.variants.find((variant) => variant.platformId === multiPlatform.recommendedPlatformId)?.platformName ?? "待判断"}
+                {" · "}
+                可归档 {multiPlatform.packageSummary.readyPlatforms}/{multiPlatform.packageSummary.totalPlatforms}
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -501,6 +530,10 @@ export function SubmissionPackagePanel({
                 <p className="mt-3 text-sm leading-6 text-slate-700">{variant.positioning}</p>
                 <div className="mt-3 grid gap-2 text-sm text-slate-600">
                   <div>
+                    <span className="font-medium text-slate-900">平台包：</span>
+                    {variant.packageMatrix.readyFields}/{variant.packageMatrix.totalFields} 字段 · {variant.packageMatrix.packageFileName}
+                  </div>
+                  <div>
                     <span className="font-medium text-slate-900">机会：</span>
                     {variant.opportunity}
                   </div>
@@ -516,6 +549,25 @@ export function SubmissionPackagePanel({
                     <span className="font-medium text-slate-900">风险：</span>
                     {variant.risks.join("、")}
                   </div>
+                </div>
+                <div className="mt-3 rounded-md bg-white p-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="text-xs font-medium text-slate-500">字段矩阵</div>
+                    <span className={`rounded-md px-2 py-1 text-xs font-medium ${matrixStatusClass(variant.packageMatrix.status)}`}>
+                      {variant.packageMatrix.status === "ready" ? "可归档" : "需补齐"}
+                    </span>
+                  </div>
+                  <div className="mt-2 grid gap-1">
+                    {variant.packageMatrix.items.map((item) => (
+                      <div className="flex flex-wrap items-center justify-between gap-2 text-xs" key={item.id}>
+                        <span className="text-slate-700">{item.label}</span>
+                        <span className={`rounded-md px-2 py-1 ${matrixStatusClass(item.status)}`}>
+                          {item.status === "ready" ? "已齐" : item.status === "warning" ? "补强" : "缺失"}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="mt-2 text-xs leading-5 text-slate-600">{variant.packageMatrix.nextAction}</p>
                 </div>
               </div>
             ))}

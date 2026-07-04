@@ -59,7 +59,12 @@ test("buildMultiPlatformSubmission", async (t) => {
     assert.ok(result.variants[0].fitScore >= result.variants[1].fitScore);
     assert.ok(result.variants.some((variant) => variant.platformId === "qidian"));
     assert.ok(result.variants.some((variant) => variant.platformId === "webnovel"));
+    assert.equal(result.packageSummary.totalPlatforms, 8);
+    assert.ok(result.packageSummary.readyToArchive);
+    assert.ok(result.variants.every((variant) => variant.packageMatrix.totalFields === 6));
+    assert.ok(result.variants.every((variant) => variant.packageMatrix.packageFileName.endsWith("-投稿包.md")));
     assert.ok(result.markdown.includes("多平台投稿版本"));
+    assert.ok(result.markdown.includes("平台包字段"));
   });
 
   await t.test("keeps overseas synopsis visible for overseas platforms", () => {
@@ -78,6 +83,29 @@ test("buildMultiPlatformSubmission", async (t) => {
     assert.ok(webnovel);
     assert.equal(webnovel.category, "overseas");
     assert.ok(webnovel.positioning.includes(webnovel.submissionPackage.overseasSynopsis));
+    assert.equal(webnovel.packageMatrix.items.find((item) => item.id === "overseas_synopsis")?.status, "ready");
+    assert.ok(webnovel.packageMatrix.nextAction.includes("归档") || webnovel.packageMatrix.nextAction.includes("先补"));
     assert.ok(result.markdown.includes("WebNovel"));
+  });
+
+  await t.test("flags weak platform packages before archive", () => {
+    const result = buildMultiPlatformSubmission({
+      title: "",
+      genre: "",
+      sellingPoint: "",
+      currentWordCount: 0,
+      targetWordCount: 10000,
+      targetPlatformId: "zhihu_yanxuan",
+      chapters: [],
+      aiTasks: [],
+    });
+    const zhihu = result.variants.find((variant) => variant.platformId === "zhihu_yanxuan");
+
+    assert.ok(zhihu);
+    assert.equal(zhihu.packageMatrix.status, "needs_work");
+    assert.ok(zhihu.packageMatrix.items.some((item) => item.id === "title" && item.status === "missing"));
+    assert.ok(zhihu.packageMatrix.items.some((item) => item.id === "sample_chapters" && item.status === "warning"));
+    assert.equal(result.packageSummary.readyToArchive, result.packageSummary.readyPlatforms > 0);
+    assert.ok(result.markdown.includes("需补齐"));
   });
 });

@@ -26,6 +26,7 @@ export interface MultiPlatformSubmissionVariant {
   rewriteFocus: string[];
   risks: string[];
   submissionPackage: SubmissionPackage;
+  packageMatrix: MultiPlatformPackageMatrix;
 }
 
 export interface MultiPlatformSubmission {
@@ -33,7 +34,31 @@ export interface MultiPlatformSubmission {
   targetPlatformId: string;
   recommendedPlatformId: string;
   variants: MultiPlatformSubmissionVariant[];
+  packageSummary: {
+    readyPlatforms: number;
+    needsWorkPlatforms: number;
+    totalPlatforms: number;
+    readyToArchive: boolean;
+  };
   markdown: string;
+}
+
+export interface MultiPlatformPackageMatrixItem {
+  id: "title" | "logline" | "synopsis" | "tags" | "sample_chapters" | "overseas_synopsis";
+  label: string;
+  status: "ready" | "warning" | "missing";
+  detail: string;
+}
+
+export interface MultiPlatformPackageMatrix {
+  status: "ready" | "needs_work";
+  readyFields: number;
+  totalFields: number;
+  packageFileName: string;
+  sampleChapterCount: number;
+  wordCount: number;
+  items: MultiPlatformPackageMatrixItem[];
+  nextAction: string;
 }
 
 const categoryOpportunity: Record<PlatformProfile["category"], string> = {
@@ -85,6 +110,57 @@ function buildPositioning(input: MultiPlatformSubmissionInput, platform: Platfor
   return `${platform.name} 版本主打${focus}，简介核心为：${primarySynopsis}`;
 }
 
+function safeFileName(value: string) {
+  return value.replace(/[\\/:*?"<>|]+/g, "-").replace(/\s+/g, "").slice(0, 80) || "submission";
+}
+
+function matrixItem(
+  id: MultiPlatformPackageMatrixItem["id"],
+  label: string,
+  status: MultiPlatformPackageMatrixItem["status"],
+  detail: string,
+): MultiPlatformPackageMatrixItem {
+  return { id, label, status, detail };
+}
+
+function buildPackageMatrix(title: string, platform: PlatformProfile, submissionPackage: SubmissionPackage): MultiPlatformPackageMatrix {
+  const sampleChapterCount = submissionPackage.firstThreeSummaries.filter((chapter) => !chapter.summary.includes("待补充")).length;
+  const wordCount = submissionPackage.firstThreeSummaries.reduce((sum, chapter) => sum + chapter.summary.length, 0);
+  const items: MultiPlatformPackageMatrixItem[] = [
+    matrixItem("title", "书名", submissionPackage.title.trim().length >= 2 ? "ready" : "missing", submissionPackage.title || "缺少书名。"),
+    matrixItem("logline", "一句话卖点", submissionPackage.logline.trim().length >= 12 ? "ready" : "missing", submissionPackage.logline || "缺少一句话卖点。"),
+    matrixItem("synopsis", "中文简介", submissionPackage.synopsis.trim().length >= 80 ? "ready" : "warning", `简介 ${submissionPackage.synopsis.trim().length} 字。`),
+    matrixItem("tags", "标签", submissionPackage.tags.length >= 3 ? "ready" : "warning", `${submissionPackage.tags.length} 个标签：${submissionPackage.tags.join("、") || "缺少标签"}`),
+    matrixItem("sample_chapters", "样章摘要", sampleChapterCount >= 3 ? "ready" : "warning", `已准备 ${sampleChapterCount}/3 章样章摘要。`),
+    matrixItem(
+      "overseas_synopsis",
+      "海外 Synopsis",
+      platform.category === "overseas"
+        ? submissionPackage.overseasSynopsis.trim().length >= 80 ? "ready" : "missing"
+        : submissionPackage.overseasSynopsis.trim().length >= 80 ? "ready" : "warning",
+      platform.category === "overseas"
+        ? `出海平台必须准备英文 synopsis，当前 ${submissionPackage.overseasSynopsis.trim().length} 字符。`
+        : `非出海平台可选，当前 ${submissionPackage.overseasSynopsis.trim().length} 字符。`,
+    ),
+  ];
+  const readyFields = items.filter((item) => item.status === "ready").length;
+  const blockers = items.filter((item) => item.status === "missing").length;
+  const status: MultiPlatformPackageMatrix["status"] = blockers === 0 && readyFields >= items.length - 1 ? "ready" : "needs_work";
+
+  return {
+    status,
+    readyFields,
+    totalFields: items.length,
+    packageFileName: `${safeFileName(title)}-${safeFileName(platform.name)}-投稿包.md`,
+    sampleChapterCount,
+    wordCount,
+    items,
+    nextAction: status === "ready"
+      ? "平台包字段已齐，可以归档、复制或进入投放小样本。"
+      : `先补 ${items.filter((item) => item.status !== "ready").map((item) => item.label).join("、")}，再归档平台包。`,
+  };
+}
+
 function buildVariant(input: MultiPlatformSubmissionInput, platform: PlatformProfile): MultiPlatformSubmissionVariant {
   const submissionPackage = buildSubmissionPackage({
     title: input.title,
@@ -131,6 +207,7 @@ function buildVariant(input: MultiPlatformSubmissionInput, platform: PlatformPro
     ],
     risks: platform.risks,
     submissionPackage,
+    packageMatrix: buildPackageMatrix(input.title, platform, submissionPackage),
   };
 }
 
@@ -149,8 +226,11 @@ function buildMarkdown(title: string, variants: MultiPlatformSubmissionVariant[]
       `动作：${variant.actionLabel}`,
       `定位：${variant.positioning}`,
       `机会：${variant.opportunity}`,
+      `包状态：${variant.packageMatrix.status === "ready" ? "可归档" : "需补齐"}｜字段 ${variant.packageMatrix.readyFields}/${variant.packageMatrix.totalFields}｜文件 ${variant.packageMatrix.packageFileName}`,
       "重写重点：",
       ...variant.rewriteFocus.map((focus) => `- ${focus}`),
+      "平台包字段：",
+      ...variant.packageMatrix.items.map((item) => `- ${item.label}：${item.status === "ready" ? "已齐" : item.status === "warning" ? "需补强" : "缺失"}｜${item.detail}`),
       "风险：",
       ...variant.risks.map((risk) => `- ${risk}`),
       "",
@@ -171,12 +251,19 @@ export function buildMultiPlatformSubmission(input: MultiPlatformSubmissionInput
   const variants = platformProfiles
     .map((platform) => buildVariant(input, platform))
     .sort((left, right) => right.fitScore - left.fitScore || left.platformName.localeCompare(right.platformName));
+  const readyPlatforms = variants.filter((variant) => variant.packageMatrix.status === "ready").length;
 
   return {
     title: input.title,
     targetPlatformId: input.targetPlatformId,
     recommendedPlatformId: variants[0]?.platformId ?? input.targetPlatformId,
     variants,
+    packageSummary: {
+      readyPlatforms,
+      needsWorkPlatforms: variants.length - readyPlatforms,
+      totalPlatforms: variants.length,
+      readyToArchive: readyPlatforms > 0,
+    },
     markdown: buildMarkdown(input.title, variants),
   };
 }

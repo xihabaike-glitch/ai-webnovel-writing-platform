@@ -197,6 +197,12 @@ export interface RouteConfirmationOnboarding {
   items: RouteConfirmationOnboardingItem[];
 }
 
+export interface RouteConfirmationDispatchFollowUp {
+  message: string;
+  href: "/dispatch";
+  actionLabel: string;
+}
+
 export interface ModelRouteConfirmationDispatch {
   id: string;
   dispatchKey: string;
@@ -1042,6 +1048,16 @@ export function buildRouteConfirmationOnboarding({
     },
     nextAction: readyItems[0] ?? items.find((item) => item.status === "missing_route") ?? null,
     items,
+  };
+}
+
+export function buildRouteConfirmationDispatchFollowUp(taskType: RoutedModelTaskType): RouteConfirmationDispatchFollowUp {
+  const label = labelForRoutedTask(taskType);
+
+  return {
+    message: `${label}模型路由已确认，系统已记录确认回执；下一步到派单中心查看复检派单。`,
+    href: "/dispatch",
+    actionLabel: "去派单中心查看复检任务",
   };
 }
 

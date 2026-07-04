@@ -15,6 +15,7 @@ import {
   buildRouteConfirmationGovernanceEvidenceFromDispatchTasks,
   buildRouteConfirmationGovernanceFollowUpDispatches,
   buildRouteConfirmationDispatchFlow,
+  buildRouteConfirmationDispatchFollowUp,
   buildRouteConfirmationHistory,
   buildRouteConfirmationOnboarding,
   buildRouteDispatchCompletionTemplate,
@@ -986,6 +987,15 @@ test("model task routing", async (t) => {
     assert.equal(onboarding.summary.missingRoute, 1);
     assert.equal(onboarding.nextAction?.taskType, modelTaskRouteOptions[1].taskType);
     assert.equal(onboarding.nextAction?.actionLabel, "确认并生成复检派单");
+  });
+
+  await t.test("builds a dispatch follow-up after confirming a route", () => {
+    const followUp = buildRouteConfirmationDispatchFollowUp("chapter_draft");
+
+    assert.equal(followUp.href, "/dispatch");
+    assert.equal(followUp.actionLabel, "去派单中心查看复检任务");
+    assert.ok(followUp.message.includes("正文初稿"));
+    assert.ok(followUp.message.includes("复检派单"));
   });
 
   await t.test("builds route governance closed-loop trails for dispatch review", () => {

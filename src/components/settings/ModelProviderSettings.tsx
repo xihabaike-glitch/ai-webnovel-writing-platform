@@ -1,8 +1,10 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
+  buildRouteConfirmationDispatchFollowUp,
   buildRouteConfirmationRecheckSampleDispatch,
   buildRouteConfirmationRecheckSamplePlan,
 } from "@/lib/model-gateway/routeConfirmation";
@@ -309,6 +311,12 @@ interface ConnectionTestResult {
   repairHint: string | null;
 }
 
+interface RouteNotice {
+  message: string;
+  href?: string;
+  actionLabel?: string;
+}
+
 const statusCopy: Record<ProviderHealthStatus, { label: string; className: string }> = {
   ready: { label: "可用", className: "border-emerald-200 bg-emerald-50 text-emerald-700" },
   warn: { label: "需注意", className: "border-amber-200 bg-amber-50 text-amber-700" },
@@ -409,7 +417,7 @@ export function ModelProviderSettings({
       item.scopedTaskType ?? item.scopeOptions[0]?.taskType ?? "chapter_review",
     ]),
   ));
-  const [routeMessage, setRouteMessage] = useState<string | null>(null);
+  const [routeNotice, setRouteNotice] = useState<RouteNotice | null>(null);
   const currentTestResult = testResults[selectedProviderId];
   const latestRetestReviewByRuleKey = useMemo(() => {
     const reviewsByRuleKey = new Map<string, RouteAvoidanceGovernanceView["retestReview"]["items"][number]>();
@@ -531,7 +539,7 @@ export function ModelProviderSettings({
   async function saveRoute(taskType: string) {
     const draftRoute = routeDrafts[taskType] ?? { primaryProviderConfigId: "", fallbackProviderConfigId: "" };
     setSavingRouteType(taskType);
-    setRouteMessage(null);
+    setRouteNotice(null);
     try {
       const response = await fetch("/api/model-task-routes", {
         method: "POST",
@@ -549,10 +557,10 @@ export function ModelProviderSettings({
         }),
       });
       if (!response.ok) throw new Error("保存模型路由失败。");
-      setRouteMessage("模型路由已保存");
+      setRouteNotice(buildRouteConfirmationDispatchFollowUp(taskType as RoutedModelTaskType));
       router.refresh();
     } catch (caught) {
-      setRouteMessage(caught instanceof Error ? caught.message : "保存模型路由失败。");
+      setRouteNotice({ message: caught instanceof Error ? caught.message : "保存模型路由失败。" });
     } finally {
       setSavingRouteType(null);
     }
@@ -561,7 +569,7 @@ export function ModelProviderSettings({
   async function applyRecommendation(recommendation: RouteRecommendationView) {
     if (!recommendation.recommendedPrimaryProviderConfigId) return;
     setApplyingRecommendationType(recommendation.taskType);
-    setRouteMessage(null);
+    setRouteNotice(null);
     try {
       const response = await fetch("/api/model-task-routes", {
         method: "POST",
@@ -589,10 +597,10 @@ export function ModelProviderSettings({
           fallbackProviderConfigId: recommendation.recommendedFallbackProviderConfigId ?? "",
         },
       }));
-      setRouteMessage(`已应用「${recommendation.label}」路由建议`);
+      setRouteNotice(buildRouteConfirmationDispatchFollowUp(recommendation.taskType as RoutedModelTaskType));
       router.refresh();
     } catch (caught) {
-      setRouteMessage(caught instanceof Error ? caught.message : "应用路由建议失败。");
+      setRouteNotice({ message: caught instanceof Error ? caught.message : "应用路由建议失败。" });
     } finally {
       setApplyingRecommendationType(null);
     }
@@ -600,7 +608,7 @@ export function ModelProviderSettings({
 
   async function createRetestDispatch(item: RouteAvoidanceGovernanceView["retestQueue"]["items"][number]) {
     setCreatingRetestRuleKey(item.ruleKey);
-    setRouteMessage(null);
+    setRouteNotice(null);
     try {
       const response = await fetch("/api/model-route-avoidance-retests", {
         method: "POST",
@@ -608,10 +616,10 @@ export function ModelProviderSettings({
         body: JSON.stringify({ ruleKey: item.ruleKey }),
       });
       if (!response.ok) throw new Error("生成复测派单失败。");
-      setRouteMessage(`已生成「${item.providerName}」复测派单`);
+      setRouteNotice({ message: `已生成「${item.providerName}」复测派单` });
       router.refresh();
     } catch (caught) {
-      setRouteMessage(caught instanceof Error ? caught.message : "生成复测派单失败。");
+      setRouteNotice({ message: caught instanceof Error ? caught.message : "生成复测派单失败。" });
     } finally {
       setCreatingRetestRuleKey(null);
     }
@@ -619,7 +627,7 @@ export function ModelProviderSettings({
 
   async function runRetestSamples(item: RouteAvoidanceGovernanceView["retestQueue"]["items"][number]) {
     setRunningRetestRuleKey(item.ruleKey);
-    setRouteMessage(null);
+    setRouteNotice(null);
     try {
       const response = await fetch("/api/model-route-avoidance-retest-samples", {
         method: "POST",
@@ -630,10 +638,10 @@ export function ModelProviderSettings({
       if (!response.ok) throw new Error(payload?.error ?? "运行复测样本失败。");
       const succeeded = payload?.results?.filter((result) => result.status === "succeeded").length ?? 0;
       const total = payload?.results?.length ?? 0;
-      setRouteMessage(`已运行复测样本：${succeeded}/${total} 成功`);
+      setRouteNotice({ message: `已运行复测样本：${succeeded}/${total} 成功` });
       router.refresh();
     } catch (caught) {
-      setRouteMessage(caught instanceof Error ? caught.message : "运行复测样本失败。");
+      setRouteNotice({ message: caught instanceof Error ? caught.message : "运行复测样本失败。" });
     } finally {
       setRunningRetestRuleKey(null);
     }
@@ -643,7 +651,7 @@ export function ModelProviderSettings({
     if (item.recommendedAction === "manual_review") return;
     const governanceItem = routeAvoidanceGovernance.items.find((candidate) => candidate.ruleKey === item.ruleKey);
     if (!governanceItem) {
-      setRouteMessage("没有找到对应避坑规则，无法应用复测建议。");
+      setRouteNotice({ message: "没有找到对应避坑规则，无法应用复测建议。" });
       return;
     }
     await saveAvoidanceOverride(governanceItem, item.recommendedAction);
@@ -651,7 +659,7 @@ export function ModelProviderSettings({
 
   async function executeRouteRecheckAdvice(item: RouteConfirmationRecheckAdviceView["items"][number]) {
     setExecutingRouteAdviceId(item.id);
-    setRouteMessage(null);
+    setRouteNotice(null);
     try {
       const response = await fetch("/api/model-route-confirmation-governance", {
         method: "POST",
@@ -660,10 +668,10 @@ export function ModelProviderSettings({
       });
       const payload = await response.json().catch(() => null) as { error?: string } | null;
       if (!response.ok) throw new Error(payload?.error ?? "生成模型路由治理派单失败。");
-      setRouteMessage(`已生成「${item.label}」模型路由治理派单`);
+      setRouteNotice({ message: `已生成「${item.label}」模型路由治理派单`, href: "/dispatch", actionLabel: "去派单中心查看治理任务" });
       router.refresh();
     } catch (caught) {
-      setRouteMessage(caught instanceof Error ? caught.message : "生成模型路由治理派单失败。");
+      setRouteNotice({ message: caught instanceof Error ? caught.message : "生成模型路由治理派单失败。" });
     } finally {
       setExecutingRouteAdviceId(null);
     }
@@ -671,15 +679,15 @@ export function ModelProviderSettings({
 
   async function createRouteRecheckSampleDispatch(item: RouteConfirmationRecheckAdviceView["items"][number]) {
     setCreatingRouteRecheckPlanId(item.id);
-    setRouteMessage(null);
+    setRouteNotice(null);
     try {
       const samplePlan = routeConfirmationSamplePlanForAdvice(item);
       const dispatch = buildRouteConfirmationRecheckSampleDispatch(item, samplePlan);
       await persistGateDispatchTask(dispatch);
-      setRouteMessage(`已生成「${item.label}」复检样本派单`);
+      setRouteNotice({ message: `已生成「${item.label}」复检样本派单`, href: "/dispatch", actionLabel: "去派单中心查看复检任务" });
       router.refresh();
     } catch (caught) {
-      setRouteMessage(caught instanceof Error ? caught.message : "生成复检样本派单失败。");
+      setRouteNotice({ message: caught instanceof Error ? caught.message : "生成复检样本派单失败。" });
     } finally {
       setCreatingRouteRecheckPlanId(null);
     }
@@ -687,7 +695,7 @@ export function ModelProviderSettings({
 
   async function runRouteConfirmationRecheckSamples(item: RouteConfirmationRecheckAdviceView["items"][number]) {
     setRunningRouteRecheckPlanId(item.id);
-    setRouteMessage(null);
+    setRouteNotice(null);
     try {
       const response = await fetch("/api/model-route-confirmation-recheck-samples", {
         method: "POST",
@@ -698,10 +706,10 @@ export function ModelProviderSettings({
       if (!response.ok) throw new Error(payload?.error ?? "运行模型路由复检样本失败。");
       const succeeded = payload?.results?.filter((result) => result.status === "succeeded").length ?? 0;
       const total = payload?.results?.length ?? 0;
-      setRouteMessage(`已运行「${item.label}」复检样本：${succeeded}/${total} 成功`);
+      setRouteNotice({ message: `已运行「${item.label}」复检样本：${succeeded}/${total} 成功` });
       router.refresh();
     } catch (caught) {
-      setRouteMessage(caught instanceof Error ? caught.message : "运行模型路由复检样本失败。");
+      setRouteNotice({ message: caught instanceof Error ? caught.message : "运行模型路由复检样本失败。" });
     } finally {
       setRunningRouteRecheckPlanId(null);
     }
@@ -712,7 +720,7 @@ export function ModelProviderSettings({
     action: "dismiss" | "scope_task" | "extend_watch",
   ) {
     setGoverningRuleKey(`${item.ruleKey}:${action}`);
-    setRouteMessage(null);
+    setRouteNotice(null);
     const expiresAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString();
     const selectedTaskType = scopeDrafts[item.ruleKey] ?? item.scopedTaskType ?? item.scopeOptions[0]?.taskType ?? "chapter_review";
     const selectedTaskLabel = item.scopeOptions.find((option) => option.taskType === selectedTaskType)?.label ?? "所选任务";
@@ -734,10 +742,10 @@ export function ModelProviderSettings({
         }),
       });
       if (!response.ok) throw new Error("保存避坑规则治理动作失败。");
-      setRouteMessage("避坑规则治理动作已保存");
+      setRouteNotice({ message: "避坑规则治理动作已保存" });
       router.refresh();
     } catch (caught) {
-      setRouteMessage(caught instanceof Error ? caught.message : "保存避坑规则治理动作失败。");
+      setRouteNotice({ message: caught instanceof Error ? caught.message : "保存避坑规则治理动作失败。" });
     } finally {
       setGoverningRuleKey(null);
     }
@@ -746,7 +754,7 @@ export function ModelProviderSettings({
   async function applyPresetRoute(item: PresetRouteBlueprintView["items"][number]) {
     if (!item.recommendedPrimaryProviderConfigId) return;
     setApplyingRecommendationType(item.taskType);
-    setRouteMessage(null);
+    setRouteNotice(null);
     try {
       const response = await fetch("/api/model-task-routes", {
         method: "POST",
@@ -772,10 +780,10 @@ export function ModelProviderSettings({
           fallbackProviderConfigId: item.recommendedFallbackProviderConfigId ?? "",
         },
       }));
-      setRouteMessage(`已应用「${item.label}」冷启动路由`);
+      setRouteNotice(buildRouteConfirmationDispatchFollowUp(item.taskType as RoutedModelTaskType));
       router.refresh();
     } catch (caught) {
-      setRouteMessage(caught instanceof Error ? caught.message : "应用冷启动路由失败。");
+      setRouteNotice({ message: caught instanceof Error ? caught.message : "应用冷启动路由失败。" });
     } finally {
       setApplyingRecommendationType(null);
     }
@@ -856,7 +864,16 @@ export function ModelProviderSettings({
             <h2 className="font-medium text-slate-950">模型路由策略</h2>
             <p className="mt-1 text-sm text-slate-600">给不同 AI 任务指定首选模型和备用模型，未配置时自动使用当前可用模型。</p>
           </div>
-          {routeMessage ? <div className="rounded-md bg-slate-50 px-3 py-2 text-sm text-slate-600">{routeMessage}</div> : null}
+          {routeNotice ? (
+            <div className="flex flex-wrap items-center gap-2 rounded-md bg-slate-50 px-3 py-2 text-sm text-slate-600">
+              <span>{routeNotice.message}</span>
+              {routeNotice.href && routeNotice.actionLabel ? (
+                <Link className="rounded-md bg-white px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-100" href={routeNotice.href}>
+                  {routeNotice.actionLabel}
+                </Link>
+              ) : null}
+            </div>
+          ) : null}
         </div>
         <div className="mt-4 rounded-md border border-sky-200 bg-sky-50/50 p-4">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">

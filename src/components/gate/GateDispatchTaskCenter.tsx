@@ -18,6 +18,7 @@ import {
 } from "@/lib/projects/gateActionReceipts";
 import {
   buildRouteDispatchCompletionTemplate,
+  buildRouteRecheckExecutionDesk,
   filterRouteConfirmationDispatchTasks,
   parseRouteDispatchCompletionEvidence,
   reviewRouteDispatchCompletionEvidence,
@@ -86,6 +87,11 @@ function routeTrailStatusLabel(status: RouteConfirmationDispatchFlow["trails"][n
   return "处理中";
 }
 
+function routeDeskStageClass(stageLabel: "复检" | "治理") {
+  if (stageLabel === "治理") return "bg-amber-50 text-amber-800";
+  return "bg-sky-50 text-sky-800";
+}
+
 function routeFlowFilterFromLane(laneId: RouteConfirmationDispatchFlowLaneId): RouteConfirmationDispatchTaskFilter | null {
   if (laneId === "confirmed") return null;
   return laneId;
@@ -130,6 +136,8 @@ export function GateDispatchTaskCenter({
   const [errorMessage, setErrorMessage] = useState("");
   const center = useMemo(() => buildGateDispatchTaskCenter(tasks), [tasks]);
   const evidenceReview = useMemo(() => buildGateDispatchEvidenceReview(tasks, initialReceipts), [initialReceipts, tasks]);
+  const routeExecutionDesk = useMemo(() => buildRouteRecheckExecutionDesk(tasks), [tasks]);
+  const routeTaskByKey = useMemo(() => new Map(tasks.map((task) => [task.dispatchKey, task])), [tasks]);
   const evidenceIssues = evidenceReview.items.filter((item) => item.status !== "verified").slice(0, 5);
   const hasRouteFlow =
     Boolean(routeConfirmationDispatchFlow.emptyGuide)
@@ -451,6 +459,125 @@ export function GateDispatchTaskCenter({
           ) : null}
         </section>
       ) : null}
+
+      <section className="rounded-md border border-slate-200 bg-white p-4">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <div className="font-medium text-slate-950">模型路由复检执行台</div>
+            <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-600">
+              把路由确认后的复检、治理和治理后复检集中收口，先处理最高优先级卡片，再回填完成依据。
+            </p>
+          </div>
+          <div className="grid grid-cols-4 gap-2 text-center text-xs text-slate-600">
+            <div className="rounded-md bg-slate-50 px-3 py-2">
+              <div className="font-semibold text-slate-950">{routeExecutionDesk.summary.active}</div>
+              <div>未闭环</div>
+            </div>
+            <div className="rounded-md bg-sky-50 px-3 py-2 text-sky-800">
+              <div className="font-semibold">{routeExecutionDesk.summary.waitingRecheck}</div>
+              <div>待复检</div>
+            </div>
+            <div className="rounded-md bg-amber-50 px-3 py-2 text-amber-800">
+              <div className="font-semibold">{routeExecutionDesk.summary.needsGovernance}</div>
+              <div>需治理</div>
+            </div>
+            <div className="rounded-md bg-emerald-50 px-3 py-2 text-emerald-800">
+              <div className="font-semibold">{routeExecutionDesk.summary.completed}</div>
+              <div>已完成</div>
+            </div>
+          </div>
+        </div>
+        {routeExecutionDesk.emptyState ? (
+          <div className="mt-4 flex flex-col gap-3 rounded-md bg-slate-50 p-4 text-sm lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <div className="font-medium text-slate-950">{routeExecutionDesk.emptyState.title}</div>
+              <p className="mt-1 text-slate-600">{routeExecutionDesk.emptyState.detail}</p>
+            </div>
+            <Link className="w-fit rounded-md bg-slate-950 px-3 py-2 font-medium text-white hover:bg-slate-800" href={routeExecutionDesk.emptyState.href}>
+              {routeExecutionDesk.emptyState.actionLabel}
+            </Link>
+          </div>
+        ) : null}
+        {routeExecutionDesk.nextTask ? (
+          <div className="mt-4 rounded-md bg-slate-950 p-4 text-white">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+              <div>
+                <div className="text-xs font-medium uppercase text-slate-300">下一张优先卡</div>
+                <div className="mt-1 font-semibold">{routeExecutionDesk.nextTask.title}</div>
+                <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-200">{routeExecutionDesk.nextTask.detail}</p>
+                <div className="mt-3 flex flex-wrap gap-2 text-xs text-slate-200">
+                  <span className="rounded-md bg-white/10 px-2 py-1">{routeExecutionDesk.nextTask.taskTypeLabel}</span>
+                  <span className="rounded-md bg-white/10 px-2 py-1">{routeExecutionDesk.nextTask.stageLabel}</span>
+                  <span className="rounded-md bg-white/10 px-2 py-1">优先级 {routeExecutionDesk.nextTask.priorityScore}</span>
+                </div>
+              </div>
+              <div className="flex shrink-0 flex-wrap gap-2 lg:justify-end">
+                {(() => {
+                  const task = routeTaskByKey.get(routeExecutionDesk.nextTask.dispatchKey);
+                  return task?.stage === "model_route_confirmation_recheck" && task.state === "assigned" ? (
+                    <button
+                      className="rounded-md bg-white px-3 py-2 text-sm font-medium text-slate-950 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
+                      disabled={runningRouteRecheckKey === task.dispatchKey}
+                      onClick={() => void runRouteRecheckTask(task)}
+                      type="button"
+                    >
+                      {runningRouteRecheckKey === task.dispatchKey ? "运行中" : routeExecutionDesk.nextTask.primaryActionLabel}
+                    </button>
+                  ) : null;
+                })()}
+                <Link className="rounded-md border border-white/20 px-3 py-2 text-sm font-medium text-white hover:bg-white/10" href={routeExecutionDesk.nextTask.href}>
+                  打开入口
+                </Link>
+              </div>
+            </div>
+          </div>
+        ) : null}
+        {routeExecutionDesk.cards.length ? (
+          <div className="mt-4 grid gap-3 lg:grid-cols-3">
+            {routeExecutionDesk.cards.slice(0, 6).map((card) => {
+              const task = routeTaskByKey.get(card.dispatchKey);
+              return (
+                <div className="rounded-md bg-slate-50 p-3 text-sm" key={card.dispatchKey}>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className={`rounded-md px-2 py-1 text-xs font-medium ${routeDeskStageClass(card.stageLabel)}`}>{card.stageLabel}</span>
+                    <span className="rounded-md bg-white px-2 py-1 text-xs font-medium text-slate-600">{card.stateLabel}</span>
+                    <span className="font-medium text-slate-950">{card.taskTypeLabel}</span>
+                  </div>
+                  <div className="mt-2 font-medium text-slate-950">{card.title}</div>
+                  <p className="mt-1 line-clamp-2 leading-6 text-slate-600">{card.detail}</p>
+                  <div className="mt-3 grid gap-1 text-xs text-slate-600">
+                    {card.evidencePrompts.slice(0, 3).map((prompt) => (
+                      <div className="rounded-md bg-white px-2 py-1" key={prompt}>{prompt}</div>
+                    ))}
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {task?.stage === "model_route_confirmation_recheck" && task.state === "assigned" ? (
+                      <button
+                        className="rounded-md border border-sky-200 bg-sky-50 px-2 py-1 text-xs font-medium text-sky-800 hover:bg-sky-100 disabled:cursor-not-allowed disabled:opacity-60"
+                        disabled={runningRouteRecheckKey === task.dispatchKey}
+                        onClick={() => void runRouteRecheckTask(task)}
+                        type="button"
+                      >
+                        {runningRouteRecheckKey === task.dispatchKey ? "运行中" : card.primaryActionLabel}
+                      </button>
+                    ) : null}
+                    <button
+                      className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                      onClick={() => setRouteFlowFilter(card.stageLabel === "治理" ? "needs_governance" : card.stateLabel === "完成" ? "completed" : "waiting_recheck")}
+                      type="button"
+                    >
+                      定位任务
+                    </button>
+                    <Link className="rounded-md bg-white px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50" href={card.href}>
+                      {card.secondaryActionLabel}
+                    </Link>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : null}
+      </section>
 
       <section className="grid gap-4 lg:grid-cols-[0.85fr_1.15fr]">
         <div className="rounded-md border border-slate-200 bg-white p-4">

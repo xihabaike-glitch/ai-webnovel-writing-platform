@@ -163,6 +163,47 @@ export interface RouteConfirmationDispatchFlow {
   emptyGuide: RouteConfirmationDispatchEmptyGuide | null;
 }
 
+export type RouteRecheckExecutionStageLabel = "复检" | "治理";
+
+export interface RouteRecheckExecutionDeskTask extends RouteConfirmationDispatchFlowTask {
+  acceptanceCriteria?: string[];
+}
+
+export interface RouteRecheckExecutionDeskCard {
+  dispatchKey: string;
+  title: string;
+  detail: string;
+  taskTypeLabel: string;
+  stageLabel: RouteRecheckExecutionStageLabel;
+  stateLabel: string;
+  href: string;
+  priorityScore: number;
+  latestAt: string;
+  primaryActionLabel: string;
+  secondaryActionLabel: string;
+  completionTemplate: string;
+  completionRecord: RouteDispatchCompletionRecord | null;
+  evidencePrompts: string[];
+}
+
+export interface RouteRecheckExecutionDesk {
+  summary: {
+    total: number;
+    active: number;
+    waitingRecheck: number;
+    needsGovernance: number;
+    completed: number;
+  };
+  nextTask: RouteRecheckExecutionDeskCard | null;
+  cards: RouteRecheckExecutionDeskCard[];
+  emptyState: {
+    title: string;
+    detail: string;
+    href: string;
+    actionLabel: string;
+  } | null;
+}
+
 export interface RouteConfirmationOnboardingRouteOption {
   taskType: string;
   label: string;
@@ -1326,6 +1367,102 @@ export function buildRouteConfirmationDispatchFlow(
     lanes,
     trails: buildRouteConfirmationClosedLoopTrails(confirmations, activeDispatches, completedGovernance, completedRechecks),
     emptyGuide: buildRouteConfirmationEmptyGuide(confirmations, dispatches),
+  };
+}
+
+function routeExecutionTaskTypeLabel(task: RouteConfirmationDispatchFlowTask) {
+  const taskType = task.stage === "model_route_governance"
+    ? taskTypeFromGovernanceKey(task.dispatchKey)
+    : taskTypeFromConfirmationRecheckKey(task.dispatchKey);
+  return taskType ? labelForRoutedTask(taskType) : "模型路由";
+}
+
+function routeExecutionStageLabel(task: RouteConfirmationDispatchFlowTask): RouteRecheckExecutionStageLabel {
+  return task.stage === "model_route_governance" ? "治理" : "复检";
+}
+
+function routeExecutionStateLabel(state: string) {
+  if (state === "queued") return "待派";
+  if (state === "assigned") return "已派";
+  if (state === "completed") return "完成";
+  return state || "未知";
+}
+
+function routeExecutionPrimaryAction(task: RouteConfirmationDispatchFlowTask) {
+  if (task.state === "completed") return "查看完成依据";
+  if (task.stage === "model_route_confirmation_recheck") return "运行复检样本";
+  return task.actionLabel || "处理治理任务";
+}
+
+function routeExecutionEvidencePrompts(task: RouteRecheckExecutionDeskTask) {
+  if (task.acceptanceCriteria?.length) return task.acceptanceCriteria;
+  if (task.stage === "model_route_governance") {
+    return [
+      "说明是否调整首选模型或备用模型。",
+      "记录复跑样本数、成功率、质量和备用命中。",
+      "写清治理结论：已治理完成、继续观察或仍需换模型。",
+    ];
+  }
+  return [
+    "至少记录 2 个同类型小样本。",
+    "写清成功率、平均质量、成本和备用命中。",
+    "明确是否需要进入模型路由治理。",
+  ];
+}
+
+function routeExecutionSort(left: RouteRecheckExecutionDeskCard, right: RouteRecheckExecutionDeskCard) {
+  const leftCompleted = left.stateLabel === "完成" ? 1 : 0;
+  const rightCompleted = right.stateLabel === "完成" ? 1 : 0;
+  return leftCompleted - rightCompleted
+    || right.priorityScore - left.priorityScore
+    || right.latestAt.localeCompare(left.latestAt);
+}
+
+function routeExecutionCard(task: RouteRecheckExecutionDeskTask): RouteRecheckExecutionDeskCard {
+  const completionTemplate = buildRouteDispatchCompletionTemplate(task) ?? "";
+  const completionRecord = typeof task.completionEvidence === "string" && task.completionEvidence.trim()
+    ? parseRouteDispatchCompletionEvidence(task, task.completionEvidence)
+    : null;
+
+  return {
+    dispatchKey: task.dispatchKey,
+    title: task.title,
+    detail: task.detail,
+    taskTypeLabel: routeExecutionTaskTypeLabel(task),
+    stageLabel: routeExecutionStageLabel(task),
+    stateLabel: routeExecutionStateLabel(task.state),
+    href: task.href,
+    priorityScore: task.priorityScore,
+    latestAt: task.reviewLatestAt,
+    primaryActionLabel: routeExecutionPrimaryAction(task),
+    secondaryActionLabel: task.stage === "model_route_governance" ? "打开模型设置" : "填写完成依据",
+    completionTemplate,
+    completionRecord,
+    evidencePrompts: routeExecutionEvidencePrompts(task),
+  };
+}
+
+export function buildRouteRecheckExecutionDesk(tasks: RouteRecheckExecutionDeskTask[]): RouteRecheckExecutionDesk {
+  const routeTasks = tasks.filter(isRouteConfirmationTask);
+  const activeTasks = routeTasks.filter((task) => task.state !== "completed");
+  const cards = routeTasks.map(routeExecutionCard).sort(routeExecutionSort);
+
+  return {
+    summary: {
+      total: routeTasks.length,
+      active: activeTasks.length,
+      waitingRecheck: activeTasks.filter((task) => task.stage === "model_route_confirmation_recheck").length,
+      needsGovernance: activeTasks.filter((task) => task.stage === "model_route_governance").length,
+      completed: routeTasks.filter((task) => task.state === "completed").length,
+    },
+    nextTask: cards.find((card) => card.stateLabel !== "完成") ?? null,
+    cards,
+    emptyState: routeTasks.length ? null : {
+      title: "暂无模型路由复检任务",
+      detail: "先在模型设置里确认首轮任务路由，系统会把复检样本派到这里。",
+      href: "/settings/models",
+      actionLabel: "去确认模型路由",
+    },
   };
 }
 

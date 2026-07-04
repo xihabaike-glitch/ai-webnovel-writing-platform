@@ -18,6 +18,7 @@ import {
   buildRouteConfirmationDispatchFollowUp,
   buildRouteConfirmationHistory,
   buildRouteConfirmationOnboarding,
+  buildRouteRecheckExecutionDesk,
   buildRouteDispatchCompletionTemplate,
   buildRouteConfirmationRecheckAdviceFromDispatchTask,
   buildRouteConfirmationRecheckSampleDispatch,
@@ -996,6 +997,69 @@ test("model task routing", async (t) => {
     assert.equal(followUp.actionLabel, "去派单中心查看复检任务");
     assert.ok(followUp.message.includes("正文初稿"));
     assert.ok(followUp.message.includes("复检派单"));
+  });
+
+  await t.test("builds an execution desk for active route recheck tasks", () => {
+    const desk = buildRouteRecheckExecutionDesk([
+      {
+        dispatchKey: "fanqie:scale_up",
+        stage: "scale_up",
+        state: "assigned",
+        title: "番茄放量",
+        detail: "不是模型路由任务。",
+        actionLabel: "执行",
+        href: "/gate",
+        priorityScore: 99,
+        reviewLatestAt: "2026-07-04T18:00:00.000Z",
+      },
+      {
+        dispatchKey: "model-route-confirmation-recheck:chapter_draft:2026-07-04T15:30:00.000Z",
+        stage: "model_route_confirmation_recheck",
+        state: "assigned",
+        title: "复检正文初稿路由确认",
+        detail: "正文初稿已切到首选 DeepSeek。",
+        actionLabel: "复检模型路由",
+        href: "/settings/models",
+        priorityScore: 72,
+        reviewLatestAt: "2026-07-04T15:30:00.000Z",
+      },
+      {
+        dispatchKey: "model-route-governance:chapter_review:switch_route:2026-07-04T16:00:00.000Z",
+        stage: "model_route_governance",
+        state: "assigned",
+        title: "处理章节审稿路由复检问题",
+        detail: "复检仍命中备用路线。",
+        actionLabel: "调整模型路由",
+        href: "/settings/models",
+        priorityScore: 88,
+        reviewLatestAt: "2026-07-04T16:00:00.000Z",
+      },
+      {
+        dispatchKey: "model-route-confirmation-recheck:opening_rewrite:2026-07-04T14:00:00.000Z",
+        stage: "model_route_confirmation_recheck",
+        state: "completed",
+        title: "复检开头改写路由确认",
+        detail: "复检已通过。",
+        actionLabel: "复检模型路由",
+        href: "/settings/models",
+        priorityScore: 70,
+        reviewLatestAt: "2026-07-04T14:00:00.000Z",
+        completionEvidence: "样本数：2\n成功率：100%\n质量：86\n成本：正常\n备用命中：未命中备用\n是否需要治理：否",
+        completedAt: "2026-07-04T14:30:00.000Z",
+      },
+    ]);
+
+    assert.equal(desk.summary.total, 3);
+    assert.equal(desk.summary.active, 2);
+    assert.equal(desk.summary.waitingRecheck, 1);
+    assert.equal(desk.summary.needsGovernance, 1);
+    assert.equal(desk.summary.completed, 1);
+    assert.equal(desk.nextTask?.dispatchKey, "model-route-governance:chapter_review:switch_route:2026-07-04T16:00:00.000Z");
+    assert.equal(desk.nextTask?.stageLabel, "治理");
+    assert.equal(desk.nextTask?.primaryActionLabel, "调整模型路由");
+    assert.ok(desk.nextTask?.completionTemplate.includes("治理结论"));
+    assert.ok(desk.cards.some((card) => card.stageLabel === "复检" && card.taskTypeLabel === "正文初稿"));
+    assert.equal(desk.emptyState, null);
   });
 
   await t.test("builds route governance closed-loop trails for dispatch review", () => {

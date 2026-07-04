@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { SecondPassMode } from "@/lib/ai/buildChapterSecondPassPrompt";
-import type { StoryTreeChapterExperienceRecommendation, StoryTreeExperienceEffectFeedback, StoryTreeExperienceEffectStatus, StoryTreeExperienceSecondPassAdvice, StoryTreeExperienceStatus } from "@/lib/ai/storyTreeExperience";
+import type { StoryTreeChapterExperienceRecommendation, StoryTreeExperienceEffectFeedback, StoryTreeExperienceEffectStatus, StoryTreeExperienceReviewBacklog, StoryTreeExperienceReviewBacklogItem, StoryTreeExperienceSecondPassAdvice, StoryTreeExperienceStatus } from "@/lib/ai/storyTreeExperience";
 
 interface SecondPassResult {
   task: {
@@ -36,6 +36,20 @@ interface SecondPassResult {
     displayName: string;
     model: string;
   }>;
+}
+
+interface StoryTreeExperienceEffectResult {
+  alreadyReturned: boolean;
+  effect: StoryTreeExperienceEffectFeedback | { line: string };
+  audit?: {
+    score: number;
+    label: string;
+  };
+  task?: {
+    dispatchKey: string;
+    title: string;
+  };
+  error?: string;
 }
 
 interface BudgetRepairAction {
@@ -95,12 +109,14 @@ export function ChapterSecondPassPanel({
   currentWordCount,
   recommendedStoryTreeExperience = [],
   storyTreeExperienceAdvice = [],
+  storyTreeExperienceReviewBacklog,
 }: {
   projectId: string;
   chapterId: string;
   currentWordCount: number;
   recommendedStoryTreeExperience?: StoryTreeChapterExperienceRecommendation[];
   storyTreeExperienceAdvice?: StoryTreeExperienceSecondPassAdvice[];
+  storyTreeExperienceReviewBacklog?: StoryTreeExperienceReviewBacklog;
 }) {
   const router = useRouter();
   const [instruction, setInstruction] = useState(
@@ -111,6 +127,7 @@ export function ChapterSecondPassPanel({
   const [isRunning, setIsRunning] = useState(false);
   const [runningRecommendationId, setRunningRecommendationId] = useState<string | null>(null);
   const [runningAdviceId, setRunningAdviceId] = useState<string | null>(null);
+  const [runningReviewId, setRunningReviewId] = useState<string | null>(null);
   const [result, setResult] = useState<SecondPassResult | null>(null);
   const [budgetGuard, setBudgetGuard] = useState<BudgetGuardView | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -178,6 +195,29 @@ export function ChapterSecondPassPanel({
       setMessage(caught instanceof Error ? caught.message : "结构经验派单失败。");
     } finally {
       setRunningRecommendationId(null);
+    }
+  }
+
+  async function reviewStoryTreeExperience(item: StoryTreeExperienceReviewBacklogItem) {
+    setRunningReviewId(item.id);
+    setMessage(null);
+    try {
+      const response = await fetch(`/api/chapters/${chapterId}/story-tree-experience/effect`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ dispatchKey: item.id }),
+      });
+      const payload = (await response.json()) as StoryTreeExperienceEffectResult;
+      if (!response.ok) {
+        throw new Error(payload.error || "补写经验应用效果失败。");
+      }
+      const auditText = payload.audit ? `，当前大树 ${payload.audit.score} 分` : "";
+      setMessage(`${payload.alreadyReturned ? "已存在回流效果" : "已补写经验应用效果"}：${payload.effect.line}${auditText}`);
+      router.refresh();
+    } catch (caught) {
+      setMessage(caught instanceof Error ? caught.message : "补写经验应用效果失败。");
+    } finally {
+      setRunningReviewId(null);
     }
   }
 
@@ -266,6 +306,45 @@ export function ChapterSecondPassPanel({
                     type="button"
                   >
                     {runningRecommendationId === recommendation.id ? "派单中" : "生成结构派单"}
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
+      {storyTreeExperienceReviewBacklog?.items.length ? (
+        <div className="mt-4 rounded-md border border-amber-200 bg-amber-50 p-3">
+          <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+            <div className="font-medium text-slate-950">待复盘结构经验</div>
+            <div className="text-xs text-amber-700">{storyTreeExperienceReviewBacklog.total} 条完成后还缺效果回流</div>
+          </div>
+          <div className="mt-3 grid gap-2 lg:grid-cols-2">
+            {storyTreeExperienceReviewBacklog.items.map((item) => (
+              <div className="rounded-md bg-white p-3 text-sm" key={item.id}>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className={`rounded-md px-2 py-1 text-xs font-medium ${experienceStatusClass(item.status)}`}>
+                    {experienceStatusLabel(item.status)}
+                  </span>
+                  <span className="text-xs text-slate-500">{item.axisLabel}{item.sourceScore !== null ? ` · 原分 ${item.sourceScore}` : ""}</span>
+                </div>
+                <div className="mt-2 font-medium text-slate-950">{item.title}</div>
+                <p className="mt-2 leading-6 text-slate-600">{item.reviewPrompt}</p>
+                {item.action ? <p className="mt-2 text-xs leading-5 text-slate-500">经验动作：{item.action}</p> : null}
+                {item.completionEvidence ? (
+                  <div className="mt-2 border-l-2 border-amber-200 pl-3 text-xs leading-5 text-slate-600">
+                    <div className="font-medium text-slate-700">完成依据</div>
+                    <p>{item.completionEvidence}</p>
+                  </div>
+                ) : null}
+                <div className="mt-3">
+                  <button
+                    className="rounded-md bg-slate-950 px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
+                    disabled={runningReviewId === item.id}
+                    onClick={() => reviewStoryTreeExperience(item)}
+                    type="button"
+                  >
+                    {runningReviewId === item.id ? "复盘中" : "补回流效果"}
                   </button>
                 </div>
               </div>

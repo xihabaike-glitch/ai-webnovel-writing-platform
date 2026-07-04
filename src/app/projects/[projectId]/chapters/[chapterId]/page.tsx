@@ -3,7 +3,7 @@ import { AppShell } from "@/components/app-shell/AppShell";
 import { ChapterEditor } from "@/components/chapters/ChapterEditor";
 import { ChapterRevisionWorkbench } from "@/components/chapters/ChapterRevisionWorkbench";
 import { ChapterSecondPassPanel } from "@/components/chapters/ChapterSecondPassPanel";
-import { buildStoryTreeChapterExperienceRecommendations, buildStoryTreeExperienceGuide, buildStoryTreeExperienceSecondPassAdvice } from "@/lib/ai/storyTreeExperience";
+import { buildStoryTreeChapterExperienceRecommendations, buildStoryTreeExperienceGuide, buildStoryTreeExperienceReviewBacklog, buildStoryTreeExperienceSecondPassAdvice } from "@/lib/ai/storyTreeExperience";
 import { buildStoryTreeQualityAudit } from "@/lib/ai/storyTreeQualityAudit";
 import { prisma } from "@/lib/db/prisma";
 import { getPlatformProfile, type PlatformId } from "@/lib/platforms/platformProfiles";
@@ -58,6 +58,9 @@ export default async function ChapterPage({
     persistedStoryTreeTasks,
     chapter.id,
   );
+  const storyTreeExperienceReviewBacklog = buildStoryTreeExperienceReviewBacklog(
+    persistedStoryTreeTasks.filter((task) => task.href.includes(`/chapters/${chapter.id}`)),
+  );
   const recommendedStoryTreeExperience = buildStoryTreeChapterExperienceRecommendations({
     guide: storyTreeExperienceGuide,
     audit: storyTreeAudit,
@@ -93,6 +96,7 @@ export default async function ChapterPage({
               currentWordCount={chapter.wordCount}
               recommendedStoryTreeExperience={recommendedStoryTreeExperience}
               storyTreeExperienceAdvice={storyTreeExperienceAdvice}
+              storyTreeExperienceReviewBacklog={storyTreeExperienceReviewBacklog}
             />
           </div>
           <div id="chapter-revisions">

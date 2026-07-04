@@ -53,6 +53,38 @@ const passedReviews = finalChapters.map((chapter, index) => ({
   createdAt: `2026-01-0${index + 1}T00:00:00.000Z`,
 }));
 
+const assetOptimizationOutput = JSON.stringify({
+  variants: [
+    {
+      strategy: "强钩子爽点版",
+      title: "夜雨系统：倒计时重生",
+      logline: "系统每晚倒计时，女主用选择把绝境打成爽点。",
+      synopsis: "林晚在雨夜绑定倒计时系统，每一次选择都牵动生死与复仇。她必须把系统惩罚反手变成翻盘筹码，沿着隐藏任务追查真相，并把背叛者拖回雨夜审判。",
+      overseasSynopsis: "Night Rain System follows Lin Wan through deadly timed choices.",
+      tags: ["系统", "重生", "强爽点"],
+      rationale: ["标题保留倒计时危机", "卖点直接突出连续翻盘"],
+    },
+    {
+      strategy: "主线悬疑版",
+      title: "雨夜倒计时",
+      logline: "每次倒计时都逼她救人，也逼出当年背叛真相。",
+      synopsis: "林晚在雨夜接到系统倒计时，被迫在救人和自保间选择。每次任务都把她推近当年的背叛真相，也让新的敌人浮出水面。",
+      overseasSynopsis: "A countdown system forces Lin Wan to uncover betrayal in the rain.",
+      tags: ["系统", "悬疑", "复仇"],
+      rationale: ["强化主线谜团", "适合观察收藏动机"],
+    },
+    {
+      strategy: "情绪复仇版",
+      title: "倒计时复仇夜",
+      logline: "她被系统逼回雨夜，把背叛者一个个拖进审判。",
+      synopsis: "林晚死后重回雨夜，倒计时系统让她连续面对救人与复仇选择。她把每次惩罚改成奖励，反手清算背叛她的人。",
+      overseasSynopsis: "Lin Wan returns to a rainy night and turns system punishments into revenge.",
+      tags: ["重生", "复仇", "爽文"],
+      rationale: ["复仇情绪更强", "标题更短更适合点击"],
+    },
+  ],
+});
+
 const readyChecklist = {
   readinessPercent: 90,
   passCount: 9,
@@ -197,7 +229,7 @@ test("buildPlatformPublishExportCenter", async (t) => {
           taskType: "platform_submission_asset_optimize",
           status: "succeeded",
           inputSnapshot: JSON.stringify({ platformId: "fanqie" }),
-          outputText: JSON.stringify({ variants: [{ strategy: "强钩子爽点版" }, { strategy: "主线悬疑版" }, { strategy: "情绪复仇版" }] }),
+          outputText: assetOptimizationOutput,
           createdAt: "2026-01-07T07:00:00.000Z",
         },
       ],
@@ -240,7 +272,7 @@ test("buildPlatformPublishExportCenter", async (t) => {
           taskType: "platform_submission_asset_optimize",
           status: "succeeded",
           inputSnapshot: JSON.stringify({ platformId: "fanqie" }),
-          outputText: JSON.stringify({ variants: [{ strategy: "强钩子爽点版" }, { strategy: "主线悬疑版" }, { strategy: "情绪复仇版" }] }),
+          outputText: assetOptimizationOutput,
           createdAt: "2026-01-07T07:00:00.000Z",
         },
       ],
@@ -339,6 +371,9 @@ test("buildPlatformPublishExportCenter", async (t) => {
     assert.equal(pack.publishEffect.comparison.status, "none");
     assert.equal(pack.effectOptimization.status, "scale");
     assert.ok(pack.effectOptimization.actions.some((action) => action.label.includes("放大")));
+    assert.equal(pack.experimentPlan.status, "winner_found");
+    assert.equal(pack.experimentPlan.candidates.length, 3);
+    assert.ok(pack.experimentPlan.candidates.some((candidate) => candidate.recommended && candidate.title.includes("夜雨系统")));
     const saveReview = buildPlatformPublishEffectSaveReview(pack);
     assert.equal(saveReview.status, "scale");
     assert.equal(saveReview.effectStatus, "promising");
@@ -350,6 +385,7 @@ test("buildPlatformPublishExportCenter", async (t) => {
     assert.ok(pack.markdown.includes("发布效果复盘"));
     assert.ok(pack.markdown.includes("执行前后对照"));
     assert.ok(pack.markdown.includes("二轮优化清单"));
+    assert.ok(pack.markdown.includes("下一轮A/B实验"));
   });
 
   await t.test("compares publish metrics before and after an optimization round", () => {
@@ -530,6 +566,8 @@ test("buildPlatformPublishExportCenter", async (t) => {
       && action.label.includes("收藏动机")
     )));
     assert.ok(pack.effectOptimization.actions.some((action) => action.evidence.includes("开头慢")));
+    assert.equal(pack.experimentPlan.status, "needs_candidates");
+    assert.ok(pack.experimentPlan.nextAction.includes("生成"));
     const saveReview = buildPlatformPublishEffectSaveReview(pack);
     assert.equal(saveReview.status, "urgent_rework");
     assert.equal(saveReview.effectStatus, "weak");

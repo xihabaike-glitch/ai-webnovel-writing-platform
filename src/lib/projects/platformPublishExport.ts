@@ -271,6 +271,31 @@ export interface PlatformPublishEffectOptimization {
   actions: PlatformPublishOptimizationAction[];
 }
 
+export interface PlatformABExperimentCandidate {
+  id: string;
+  sourceTaskId: string;
+  strategy: string;
+  title: string;
+  logline: string;
+  synopsis: string;
+  overseasSynopsis: string;
+  tags: string[];
+  auditScore: number;
+  auditStatus: PlatformSubmissionAssetAudit["status"];
+  rationale: string[];
+  recommended: boolean;
+}
+
+export interface PlatformABExperimentPlan {
+  status: "waiting_effect" | "needs_candidates" | "ready_to_test" | "running" | "winner_found" | "watch";
+  headline: string;
+  hypothesis: string;
+  nextAction: string;
+  baselineMetricId: string | null;
+  targetMetrics: string[];
+  candidates: PlatformABExperimentCandidate[];
+}
+
 export interface PlatformPublishEffectSaveReview {
   platformId: string;
   platformName: string;
@@ -363,6 +388,7 @@ export interface PlatformPublishPackage {
   submissionAssetAdoption: PlatformSubmissionAssetAdoptionSummary;
   publishEffect: PlatformPublishEffectSummary;
   effectOptimization: PlatformPublishEffectOptimization;
+  experimentPlan: PlatformABExperimentPlan;
   title: string;
   logline: string;
   synopsis: string;
@@ -2442,6 +2468,15 @@ function buildMarkdown(pack: Omit<PlatformPublishPackage, "markdown">) {
     pack.effectOptimization.headline,
     ...pack.effectOptimization.actions.map((action) => `- [${action.priority}] ${action.label}｜${action.target}｜${action.detail}｜依据：${action.evidence}`),
     "",
+    "## 下一轮A/B实验",
+    pack.experimentPlan.headline,
+    `实验假设：${pack.experimentPlan.hypothesis}`,
+    `下一步：${pack.experimentPlan.nextAction}`,
+    `观察指标：${pack.experimentPlan.targetMetrics.join("、")}`,
+    ...(pack.experimentPlan.candidates.length
+      ? pack.experimentPlan.candidates.map((candidate) => `- ${candidate.recommended ? "优先" : "备选"}｜${candidate.strategy}｜${candidate.title}｜质检 ${candidate.auditScore}｜${candidate.logline}`)
+      : ["- 暂无候选。"]),
+    "",
     "## 风险提醒",
     ...(pack.warnings.length ? pack.warnings.map((warning) => `- ${warning}`) : ["- 暂无明显风险。"]),
     "",
@@ -2585,16 +2620,73 @@ function countOptimizationVariants(task: PublishExportAiTask) {
   return Array.isArray(variants) ? variants.length : 0;
 }
 
+function optimizationTasksForPlatform(platform: PlatformProfile, tasks: PublishExportAiTask[]) {
+  return tasks
+    .filter((task) => (
+      task.taskType === "platform_submission_asset_optimize"
+      && taskPlatformId(task) === platform.id
+      && task.status === "succeeded"
+    ))
+    .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime());
+}
+
+function parseOptimizationCandidates(platform: PlatformProfile, task: PublishExportAiTask | undefined): PlatformABExperimentCandidate[] {
+  if (!task?.id || task.status !== "succeeded") return [];
+  const taskId = task.id;
+  const parsed = parseJsonObject(task.outputText ?? "");
+  const variants = Array.isArray(parsed?.variants) ? parsed.variants : [];
+  const candidates = variants.flatMap((variant, index): PlatformABExperimentCandidate[] => {
+    if (!variant || typeof variant !== "object") return [];
+    const item = variant as Record<string, unknown>;
+    const strategy = typeof item.strategy === "string" ? item.strategy.trim() : "";
+    const title = typeof item.title === "string" ? item.title.trim() : "";
+    const logline = typeof item.logline === "string" ? item.logline.trim() : "";
+    const synopsis = typeof item.synopsis === "string" ? item.synopsis.trim() : "";
+    const overseasSynopsis = typeof item.overseasSynopsis === "string" ? item.overseasSynopsis.trim() : "";
+    const tags = Array.isArray(item.tags) ? item.tags.map((tag) => String(tag).trim()).filter(Boolean).slice(0, 8) : [];
+    if (!strategy || !title || !logline || !synopsis || !tags.length) return [];
+    const rationale = Array.isArray(item.rationale) ? item.rationale.map((reason) => String(reason).trim()).filter(Boolean).slice(0, 4) : [];
+    const audit = buildSubmissionAssetAudit(platform, {
+      title,
+      logline,
+      synopsis,
+      overseasSynopsis,
+      tags,
+    });
+
+    return [{
+      id: `${taskId}-${index + 1}`,
+      sourceTaskId: taskId,
+      strategy,
+      title,
+      logline,
+      synopsis,
+      overseasSynopsis,
+      tags,
+      auditScore: audit.score,
+      auditStatus: audit.status,
+      rationale,
+      recommended: false,
+    }];
+  });
+  const bestIndex = candidates.reduce((best, candidate, index) => {
+    if (best === -1) return index;
+    if (candidate.auditStatus === "ready" && candidates[best].auditStatus !== "ready") return index;
+    return candidate.auditScore > candidates[best].auditScore ? index : best;
+  }, -1);
+
+  return candidates.map((candidate, index) => ({
+    ...candidate,
+    recommended: index === bestIndex,
+  }));
+}
+
 function buildSubmissionAssetAdoptionSummary(
   platform: PlatformProfile,
   tasks: PublishExportAiTask[],
   versions: PlatformSubmissionAssetVersionInput[],
 ): PlatformSubmissionAssetAdoptionSummary {
-  const optimizationTasks = tasks.filter((task) => (
-    task.taskType === "platform_submission_asset_optimize"
-    && taskPlatformId(task) === platform.id
-    && task.status === "succeeded"
-  ));
+  const optimizationTasks = optimizationTasksForPlatform(platform, tasks);
   const generatedVariants = optimizationTasks.reduce((sum, task) => sum + countOptimizationVariants(task), 0);
   const adoptedVersions = versions.filter((version) => version.platformId === platform.id && version.action === "adopt");
   const adoptionRatePercent = generatedVariants ? Math.round((adoptedVersions.length / generatedVariants) * 100) : 0;
@@ -2616,6 +2708,79 @@ function buildSubmissionAssetAdoptionSummary(
       : adoptedVersions.length === 0
         ? "候选还没被采纳，先别自嗨，拿一个方案落库验证。"
         : `已采纳 ${adoptedVersions.length}/${generatedVariants} 个候选，最高质检 ${bestAdoptedScore} 分。`,
+  };
+}
+
+function experimentHypothesis(platform: PlatformProfile, effect: PlatformPublishEffectSummary) {
+  if (effect.status === "empty") return "先建立首轮数据基线，再决定测标题、简介还是前三章。";
+  if (platform.category === "overseas" && effect.status === "weak") return "海外表达实验：测试本土化标题、简介和标签是否能抬高点击。";
+  if (effect.totalViews >= 100 && effect.clickRatePercent < 5) return "入口点击实验：测试标题、一句话卖点和标签能不能让读者点进来。";
+  if (effect.totalViews >= 100 && effect.followRatePercent < 1) return "前三章兑现实验：测试开头承诺和章末悬念能不能接住追读。";
+  if (effect.totalViews >= 100 && effect.favoriteRatePercent < 2) return "收藏动机实验：测试长期奖励、关系拉扯或主线谜团是否足够清楚。";
+  return "平台包装实验：保留主卖点，只调整入口表达并观察下一轮变化。";
+}
+
+function buildABExperimentPlan(input: {
+  platform: PlatformProfile;
+  tasks: PublishExportAiTask[];
+  versions: PlatformSubmissionAssetVersionInput[];
+  effect: PlatformPublishEffectSummary;
+  optimization: PlatformPublishEffectOptimization;
+  adoption: PlatformSubmissionAssetAdoptionSummary;
+}): PlatformABExperimentPlan {
+  const latestOptimizationTask = optimizationTasksForPlatform(input.platform, input.tasks)[0];
+  const candidates = parseOptimizationCandidates(input.platform, latestOptimizationTask).slice(0, 3);
+  const adoptedFromLatest = latestOptimizationTask
+    ? input.versions.some((version) => version.sourceTaskId === latestOptimizationTask.id && version.action === "adopt")
+    : false;
+  const hasWinner = input.effect.status === "signed"
+    || input.effect.status === "promising"
+    || input.effect.comparison.status === "improved";
+  const needsCandidates = input.optimization.status === "urgent_rework" || input.effect.comparison.status === "declined";
+  const hasAdoptedCandidate = adoptedFromLatest || (input.adoption.adoptedVersions > 0 && !needsCandidates);
+  const status: PlatformABExperimentPlan["status"] = hasWinner
+    ? "winner_found"
+    : input.effect.status === "empty"
+      ? "waiting_effect"
+      : candidates.length && hasAdoptedCandidate
+        ? "running"
+        : candidates.length
+          ? "ready_to_test"
+          : needsCandidates
+            ? "needs_candidates"
+            : "watch";
+  const headline = status === "winner_found"
+    ? "已有有效信号，别乱换方案，先保护胜出包装。"
+    : status === "waiting_effect"
+      ? "还没有数据基线，先录首轮效果。"
+      : status === "ready_to_test"
+        ? "A/B 候选已生成，下一步采纳一个方案做实测。"
+        : status === "running"
+          ? "实验已经在跑，下一轮只看真实数据，不凭手感换方向。"
+          : status === "needs_candidates"
+            ? "复盘已指出短板，先生成 3 个候选再测。"
+            : "当前样本不够硬，先保留方向，补第二轮对照。";
+  const recommendedCandidate = candidates.find((candidate) => candidate.recommended);
+  const nextAction = status === "winner_found"
+    ? "保留当前标题简介和卖点方向，下一轮加更后继续记录效果。"
+    : status === "waiting_effect"
+      ? "录入曝光、点击、收藏、追读和编辑反馈，建立首轮基线。"
+      : status === "ready_to_test"
+        ? `优先采纳「${recommendedCandidate?.strategy ?? candidates[0]?.strategy ?? "评分最高候选"}」，保存发布包基准后投放。`
+        : status === "running"
+          ? "下一轮录入同口径数据，对照点击率、收藏率和追读率是否变好。"
+          : status === "needs_candidates"
+            ? "点击“生成方案”，先拿到 3 个标题/简介/标签候选。"
+            : "补第二轮数据，若点击或追读仍低，再进入候选生成。";
+
+  return {
+    status,
+    headline,
+    hypothesis: experimentHypothesis(input.platform, input.effect),
+    nextAction,
+    baselineMetricId: input.effect.latest?.id ?? null,
+    targetMetrics: ["点击率", "收藏率", "追读率", "编辑反馈"],
+    candidates,
   };
 }
 
@@ -3153,6 +3318,14 @@ function buildPlatformPackage(
     chapters,
     submissionAssetAdoption,
   );
+  const experimentPlan = buildABExperimentPlan({
+    platform,
+    tasks: input.aiTasks ?? [],
+    versions: input.submissionAssetVersions ?? [],
+    effect: publishEffect,
+    optimization: effectOptimization,
+    adoption: submissionAssetAdoption,
+  });
   const packWithoutMarkdown = {
     platformId: platform.id,
     platformName: platform.name,
@@ -3167,6 +3340,7 @@ function buildPlatformPackage(
     submissionAssetAdoption,
     publishEffect,
     effectOptimization,
+    experimentPlan,
     title,
     logline,
     synopsis,

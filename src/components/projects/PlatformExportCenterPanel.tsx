@@ -319,6 +319,31 @@ interface PlatformPublishEffectOptimization {
   actions: PlatformPublishOptimizationAction[];
 }
 
+interface PlatformABExperimentCandidate {
+  id: string;
+  sourceTaskId: string;
+  strategy: string;
+  title: string;
+  logline: string;
+  synopsis: string;
+  overseasSynopsis: string;
+  tags: string[];
+  auditScore: number;
+  auditStatus: PlatformSubmissionAssetAudit["status"];
+  rationale: string[];
+  recommended: boolean;
+}
+
+interface PlatformABExperimentPlan {
+  status: "waiting_effect" | "needs_candidates" | "ready_to_test" | "running" | "winner_found" | "watch";
+  headline: string;
+  hypothesis: string;
+  nextAction: string;
+  baselineMetricId: string | null;
+  targetMetrics: string[];
+  candidates: PlatformABExperimentCandidate[];
+}
+
 interface PlatformPublishEffectSaveReview {
   platformId: string;
   platformName: string;
@@ -341,6 +366,7 @@ interface PlatformPublishPackage {
   submissionAssetAdoption: PlatformSubmissionAssetAdoption;
   publishEffect: PlatformPublishEffect;
   effectOptimization: PlatformPublishEffectOptimization;
+  experimentPlan: PlatformABExperimentPlan;
   title: string;
   logline: string;
   synopsis: string;
@@ -739,6 +765,23 @@ function comparisonStatusClass(status: PlatformPublishEffectComparison["status"]
   if (status === "improved") return "bg-emerald-50 text-emerald-700";
   if (status === "declined") return "bg-rose-50 text-rose-700";
   if (status === "mixed") return "bg-amber-50 text-amber-700";
+  return "bg-slate-100 text-slate-600";
+}
+
+function experimentStatusLabel(status: PlatformABExperimentPlan["status"]) {
+  if (status === "winner_found") return "已有胜出";
+  if (status === "running") return "实验中";
+  if (status === "ready_to_test") return "待采纳";
+  if (status === "needs_candidates") return "需候选";
+  if (status === "waiting_effect") return "待基线";
+  return "观察";
+}
+
+function experimentStatusClass(status: PlatformABExperimentPlan["status"]) {
+  if (status === "winner_found" || status === "running") return "bg-emerald-50 text-emerald-700";
+  if (status === "ready_to_test") return "bg-cyan-50 text-cyan-700";
+  if (status === "needs_candidates") return "bg-rose-50 text-rose-700";
+  if (status === "waiting_effect") return "bg-amber-50 text-amber-700";
   return "bg-slate-100 text-slate-600";
 }
 
@@ -1582,6 +1625,7 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
       if (!response.ok || !payload?.variants) throw new Error(payload?.error ?? "AI 优化投稿资产失败。");
       setAssetOptimizationVariants(payload.variants.map((variant) => ({ ...variant, sourceTaskId: payload.task?.id })));
       setMessage(`已生成 ${payload.variants.length} 个 ${selectedPackage.platformName} 投稿优化方案。`);
+      await loadCenter({ keepMessage: true });
       return true;
     } catch (caught) {
       setMessage(caught instanceof Error ? caught.message : "AI 优化投稿资产失败。");
@@ -1651,6 +1695,27 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
     } catch (caught) {
       setStrategyExecutionReceipt(buildStrategyExecutionReceipt(strategySwitchPlan, "adopt-submission-asset"));
       setMessage(caught instanceof Error ? caught.message : "投稿资产已保存，但策略链刷新失败。");
+    }
+  }
+
+  async function applyExperimentCandidate(candidate: PlatformABExperimentCandidate) {
+    const nextDraft = {
+      title: candidate.title,
+      logline: candidate.logline,
+      synopsis: candidate.synopsis,
+      overseasSynopsis: candidate.overseasSynopsis,
+      tags: candidate.tags.join("、"),
+      note: assetDraft.note,
+    };
+    setAssetDraft(nextDraft);
+    const saved = await saveSubmissionAsset(nextDraft, {
+      message: `已采纳 A/B 候选「${candidate.strategy}」。下一步保存发布基准并投放测试。`,
+      saveAction: "adopt",
+      sourceTaskId: candidate.sourceTaskId,
+      strategy: candidate.strategy,
+    });
+    if (saved) {
+      await loadCenter({ keepMessage: true });
     }
   }
 
@@ -3353,6 +3418,73 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
                 ) : null}
               </div>
             ) : null}
+            <div className="mt-3 rounded-md border border-slate-200 p-3">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <div className="font-medium text-slate-950">下一轮 A/B 实验</div>
+                  <p className="mt-1 text-sm leading-6 text-slate-600">{selectedPackage.experimentPlan.headline}</p>
+                </div>
+                <span className={`w-fit rounded-md px-2 py-1 text-xs font-medium ${experimentStatusClass(selectedPackage.experimentPlan.status)}`}>
+                  {experimentStatusLabel(selectedPackage.experimentPlan.status)}
+                </span>
+              </div>
+              <div className="mt-3 grid gap-2 text-sm lg:grid-cols-2">
+                <div className="rounded-md bg-slate-50 p-3">
+                  <div className="text-xs text-slate-500">实验假设</div>
+                  <div className="mt-1 leading-6 text-slate-700">{selectedPackage.experimentPlan.hypothesis}</div>
+                </div>
+                <div className="rounded-md bg-slate-50 p-3">
+                  <div className="text-xs text-slate-500">下一步</div>
+                  <div className="mt-1 leading-6 text-slate-700">{selectedPackage.experimentPlan.nextAction}</div>
+                </div>
+              </div>
+              <div className="mt-2 text-xs text-slate-500">
+                观察指标：{selectedPackage.experimentPlan.targetMetrics.join("、")}
+              </div>
+              {selectedPackage.experimentPlan.status === "needs_candidates" ? (
+                <button
+                  className="mt-3 rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white disabled:opacity-50"
+                  disabled={Boolean(runningOptimizationActionId) || isOptimizingAsset}
+                  onClick={() => {
+                    const action = selectedPackage.effectOptimization.actions.find((item) => item.execution === "generate_asset_variants");
+                    if (action) void runEffectOptimizationAction(action);
+                  }}
+                  type="button"
+                >
+                  {isOptimizingAsset ? "生成中" : "生成 A/B 候选"}
+                </button>
+              ) : null}
+              {selectedPackage.experimentPlan.candidates.length ? (
+                <div className="mt-3 grid gap-2 lg:grid-cols-3">
+                  {selectedPackage.experimentPlan.candidates.map((candidate) => (
+                    <div className="rounded-md bg-slate-50 p-3 text-sm" key={candidate.id}>
+                      <div className="flex flex-wrap items-center gap-2">
+                        {candidate.recommended ? (
+                          <span className="rounded-md bg-cyan-50 px-2 py-1 text-xs font-medium text-cyan-700">优先</span>
+                        ) : null}
+                        <span className="rounded-md bg-white px-2 py-1 text-xs text-slate-600">质检 {candidate.auditScore}</span>
+                      </div>
+                      <div className="mt-2 font-medium text-slate-950">{candidate.strategy}</div>
+                      <div className="mt-1 text-slate-700">{candidate.title}</div>
+                      <p className="mt-2 line-clamp-3 leading-6 text-slate-600">{candidate.logline}</p>
+                      <div className="mt-2 flex flex-wrap gap-1">
+                        {candidate.tags.slice(0, 5).map((tag) => (
+                          <span className="rounded-md bg-white px-2 py-1 text-xs text-slate-500" key={tag}>{tag}</span>
+                        ))}
+                      </div>
+                      <button
+                        className="mt-3 rounded-md border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                        disabled={isSavingAsset}
+                        onClick={() => void applyExperimentCandidate(candidate)}
+                        type="button"
+                      >
+                        采纳做实验
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+            </div>
             <div className="mt-3 rounded-md border border-slate-200 p-3">
               <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                 <div>

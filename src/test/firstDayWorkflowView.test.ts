@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildFirstDayStepView } from "../lib/projects/firstDayWorkflowView.ts";
+import { buildFirstDayStepView, completeFirstDayDispatchStep } from "../lib/projects/firstDayWorkflowView.ts";
 
 test("buildFirstDayStepView separates task center acceptance evidence", () => {
   const view = buildFirstDayStepView({
@@ -35,4 +35,60 @@ test("buildFirstDayStepView keeps normal evidence unchanged", () => {
   assert.equal(view.primaryEvidence, "第一章：天降系统。钩子：主角被迫当天逆袭。");
   assert.equal(view.acceptanceEvidence, null);
   assert.equal(view.hasTaskAcceptance, false);
+});
+
+test("completeFirstDayDispatchStep completes the matching task center dispatch", async () => {
+  const calls: Array<{ url: string; init: RequestInit }> = [];
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (async (url: string | URL | Request, init?: RequestInit) => {
+    calls.push({ url: String(url), init: init ?? {} });
+    return new Response(JSON.stringify({
+      task: {
+        dispatchKey: "first-day:project-1:first-draft",
+        state: "completed",
+        completionEvidence: "第一章正文已经生成并写回章节，作者已确认可以进入审稿。",
+      },
+      followUpTasks: [],
+    }), { status: 200, headers: { "Content-Type": "application/json" } });
+  }) as typeof fetch;
+
+  try {
+    const result = await completeFirstDayDispatchStep(
+      "project-1",
+      "first-draft",
+      "第一章正文已经生成并写回章节，作者已确认可以进入审稿。",
+    );
+
+    assert.equal(result.task.dispatchKey, "first-day:project-1:first-draft");
+    assert.equal(result.task.state, "completed");
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].url, "/api/gate/dispatch-tasks");
+    assert.equal(calls[0].init.method, "PATCH");
+    assert.deepEqual(JSON.parse(String(calls[0].init.body)), {
+      dispatchKey: "first-day:project-1:first-draft",
+      state: "completed",
+      completionEvidence: "第一章正文已经生成并写回章节，作者已确认可以进入审稿。",
+    });
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("completeFirstDayDispatchStep rejects thin acceptance evidence before calling the api", async () => {
+  const originalFetch = globalThis.fetch;
+  let called = false;
+  globalThis.fetch = (async () => {
+    called = true;
+    return new Response("{}", { status: 200 });
+  }) as typeof fetch;
+
+  try {
+    await assert.rejects(
+      completeFirstDayDispatchStep("project-1", "first-draft", "已完成"),
+      /完成派单前，请写清楚完成依据，至少 8 个字。/,
+    );
+    assert.equal(called, false);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 });

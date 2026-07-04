@@ -1,6 +1,8 @@
 import type { FirstDayWorkflowStep } from "./firstDayWorkflow.ts";
+import { updatePersistedGateDispatchTaskState } from "./gateActionReceipts.ts";
 
 const ACCEPTANCE_MARKER = "任务中心已验收：";
+const MIN_COMPLETION_EVIDENCE_LENGTH = 8;
 
 function cleanEvidence(value: string) {
   return value.trim().replace(/。{2,}$/u, "。");
@@ -35,4 +37,15 @@ export function buildFirstDayStepView(step: FirstDayWorkflowStep): FirstDayStepV
     acceptanceEvidence,
     hasTaskAcceptance: acceptanceEvidence.length > 0,
   };
+}
+
+export async function completeFirstDayDispatchStep(projectId: string, stepId: string, completionEvidence: string) {
+  const trimmedEvidence = completionEvidence.trim();
+  if (trimmedEvidence.length < MIN_COMPLETION_EVIDENCE_LENGTH) {
+    throw new Error("完成派单前，请写清楚完成依据，至少 8 个字。");
+  }
+
+  return updatePersistedGateDispatchTaskState(`first-day:${projectId}:${stepId}`, "completed", {
+    completionEvidence: trimmedEvidence,
+  });
 }

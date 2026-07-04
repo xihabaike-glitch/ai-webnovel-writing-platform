@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { buildFirstDayStepView } from "@/lib/projects/firstDayWorkflowView";
+import { buildFirstDayStepView, completeFirstDayDispatchStep } from "@/lib/projects/firstDayWorkflowView";
 import { persistGateDispatchTask, type GatePlatformGrowthDispatchItem } from "@/lib/projects/gateActionReceipts";
 
 interface FirstDayWorkflowStep {
@@ -85,6 +85,8 @@ export function FirstDayWorkflowPanel({ projectId }: { projectId: string }) {
   const [dispatch, setDispatch] = useState<GatePlatformGrowthDispatchItem | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isDispatching, setIsDispatching] = useState(false);
+  const [isCompletingDispatch, setIsCompletingDispatch] = useState(false);
+  const [completionEvidence, setCompletionEvidence] = useState("");
   const [message, setMessage] = useState<string | null>(null);
 
   async function loadWorkflow() {
@@ -116,6 +118,23 @@ export function FirstDayWorkflowPanel({ projectId }: { projectId: string }) {
       setMessage(caught instanceof Error ? caught.message : "首日任务派单失败。");
     } finally {
       setIsDispatching(false);
+    }
+  }
+
+  async function completeCurrentDispatch() {
+    if (!workflow || !dispatch) return;
+    setIsCompletingDispatch(true);
+    setMessage(null);
+    try {
+      await persistGateDispatchTask(dispatch);
+      const result = await completeFirstDayDispatchStep(projectId, workflow.executionPackage.stepId, completionEvidence);
+      setCompletionEvidence("");
+      await loadWorkflow();
+      setMessage(`已完成当前派单：${result.task.title}`);
+    } catch (caught) {
+      setMessage(caught instanceof Error ? caught.message : "首日派单验收失败。");
+    } finally {
+      setIsCompletingDispatch(false);
     }
   }
 
@@ -205,6 +224,30 @@ export function FirstDayWorkflowPanel({ projectId }: { projectId: string }) {
                     <li className="rounded-md bg-amber-50 px-3 py-2 text-amber-800" key={evidence}>{evidence}</li>
                   ))}
                 </ul>
+              </div>
+            </div>
+            <div className="mt-4 rounded-md border border-slate-200 bg-slate-50 p-3">
+              <label className="text-xs font-medium text-slate-500" htmlFor={`first-day-completion-${projectId}`}>
+                当前派单验收依据
+              </label>
+              <textarea
+                className="mt-2 min-h-24 w-full resize-y rounded-md border border-slate-200 bg-white px-3 py-2 text-sm leading-6 outline-none focus:border-slate-400"
+                disabled={isCompletingDispatch}
+                id={`first-day-completion-${projectId}`}
+                onChange={(event) => setCompletionEvidence(event.target.value)}
+                placeholder="写清楚已经完成了什么，例如：第一章正文已生成并写回章节，钩子、冲突和章末追读已按验收标准检查。"
+                value={completionEvidence}
+              />
+              <div className="mt-2 flex flex-wrap items-center gap-3">
+                <button
+                  className="rounded-md bg-emerald-700 px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
+                  disabled={isCompletingDispatch || !dispatch || completionEvidence.trim().length < 8}
+                  onClick={completeCurrentDispatch}
+                  type="button"
+                >
+                  {isCompletingDispatch ? "验收中" : "完成当前派单"}
+                </button>
+                <span className="text-xs text-slate-500">至少 8 个字，完成后会刷新首日工作流。</span>
               </div>
             </div>
           </div>

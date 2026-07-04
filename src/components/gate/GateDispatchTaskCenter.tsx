@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import {
   buildGateDispatchEvidenceReview,
@@ -101,12 +102,15 @@ export function GateDispatchTaskCenter({
   initialTasks: PersistedGatePlatformDispatchTask[];
   routeConfirmationDispatchFlow: RouteConfirmationDispatchFlow;
 }) {
+  const router = useRouter();
   const [tasks, setTasks] = useState(initialTasks);
   const [stateFilter, setStateFilter] = useState<GateDispatchTaskStateFilter>("all");
   const [platformFilter, setPlatformFilter] = useState("all");
   const [roleFilter, setRoleFilter] = useState("all");
   const [routeFlowFilter, setRouteFlowFilter] = useState<RouteConfirmationDispatchTaskFilter>("all");
   const [runningKey, setRunningKey] = useState<string | null>(null);
+  const [runningRouteAdviceId, setRunningRouteAdviceId] = useState<string | null>(null);
+  const [routeActionMessage, setRouteActionMessage] = useState("");
   const [completionDrafts, setCompletionDrafts] = useState<Record<string, string>>({});
   const [errorMessage, setErrorMessage] = useState("");
   const center = useMemo(() => buildGateDispatchTaskCenter(tasks), [tasks]);
@@ -158,6 +162,28 @@ export function GateDispatchTaskCenter({
     const template = buildRouteDispatchCompletionTemplate(task);
     if (!template) return;
     setCompletionDrafts((current) => ({ ...current, [task.dispatchKey]: template }));
+  }
+
+  async function executeRouteGovernanceAdvice(item: RouteConfirmationDispatchFlow["lanes"][number]["items"][number]) {
+    if (!item.governanceAdvice) return;
+    setRunningRouteAdviceId(item.id);
+    setErrorMessage("");
+    setRouteActionMessage("");
+    try {
+      const response = await fetch("/api/model-route-confirmation-governance", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ advice: item.governanceAdvice }),
+      });
+      const payload = await response.json().catch(() => null) as { error?: string } | null;
+      if (!response.ok) throw new Error(payload?.error ?? "生成模型路由治理派单失败。");
+      setRouteActionMessage(`已生成「${item.label}」模型路由治理派单`);
+      router.refresh();
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "生成模型路由治理派单失败。");
+    } finally {
+      setRunningRouteAdviceId(null);
+    }
   }
 
   return (
@@ -235,11 +261,32 @@ export function GateDispatchTaskCenter({
                   </div>
                   <div className="mt-3 grid gap-2">
                     {lane.items.map((item) => (
-                      <Link className="rounded-md bg-white/70 p-2 text-xs leading-5 hover:bg-white" href={item.href} key={item.id}>
-                        <div className="font-medium">{item.label}</div>
-                        <div className="mt-1 line-clamp-2 opacity-80">{item.detail}</div>
-                        <div className="mt-1 opacity-70">{item.actionLabel} · 优先级 {item.priorityScore}</div>
-                      </Link>
+                      item.governanceAdvice ? (
+                        <div className="rounded-md bg-white/70 p-2 text-xs leading-5" key={item.id}>
+                          <div className="font-medium">{item.label}</div>
+                          <div className="mt-1 line-clamp-2 opacity-80">{item.detail}</div>
+                          <div className="mt-1 opacity-70">{item.actionLabel} · 优先级 {item.priorityScore}</div>
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            <button
+                              className="rounded-md bg-slate-950 px-2 py-1 text-xs font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+                              disabled={runningRouteAdviceId === item.id}
+                              onClick={() => void executeRouteGovernanceAdvice(item)}
+                              type="button"
+                            >
+                              {runningRouteAdviceId === item.id ? "生成中" : "生成治理派单"}
+                            </button>
+                            <Link className="rounded-md bg-white px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50" href={item.href}>
+                              查看模型
+                            </Link>
+                          </div>
+                        </div>
+                      ) : (
+                        <Link className="rounded-md bg-white/70 p-2 text-xs leading-5 hover:bg-white" href={item.href} key={item.id}>
+                          <div className="font-medium">{item.label}</div>
+                          <div className="mt-1 line-clamp-2 opacity-80">{item.detail}</div>
+                          <div className="mt-1 opacity-70">{item.actionLabel} · 优先级 {item.priorityScore}</div>
+                        </Link>
+                      )
                     ))}
                     {lane.items.length === 0 ? (
                       <div className="rounded-md bg-white/60 p-2 text-xs opacity-70">暂无</div>
@@ -260,6 +307,9 @@ export function GateDispatchTaskCenter({
                 清除
               </button>
             </div>
+          ) : null}
+          {routeActionMessage ? (
+            <p className="rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">{routeActionMessage}</p>
           ) : null}
         </section>
       ) : null}

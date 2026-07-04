@@ -111,6 +111,7 @@ export interface RouteConfirmationDispatchFlowItem {
   href: string;
   priorityScore: number;
   latestAt: string;
+  governanceAdvice?: RouteConfirmationRecheckAdviceItem;
 }
 
 export interface RouteConfirmationDispatchFlowLane {
@@ -716,6 +717,7 @@ function flowItemFromRecheckAdvice(item: RouteConfirmationRecheckAdviceItem): Ro
     href: "/settings/models",
     priorityScore: item.severity === "blocked" ? 94 : 82,
     latestAt: item.completedAt ?? "",
+    governanceAdvice: item,
   };
 }
 

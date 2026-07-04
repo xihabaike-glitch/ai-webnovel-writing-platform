@@ -852,6 +852,39 @@ test("model task routing", async (t) => {
     assert.ok(governanceLane?.items.some((item) => item.actionLabel === "延长观察"));
   });
 
+  await t.test("exposes executable route governance advice in the dispatch flow", () => {
+    const flow = buildRouteConfirmationDispatchFlow([], [
+      {
+        dispatchKey: "model-route-confirmation-recheck-sample:chapter_review:2026-07-04T18:00:00.000Z",
+        stage: "model_route_confirmation_recheck",
+        state: "completed",
+        title: "复检章节审稿模型路由",
+        detail: "已运行章节审稿复检样本。",
+        actionLabel: "复检小样本",
+        href: "/settings/models",
+        priorityScore: 72,
+        reviewLatestAt: "2026-07-04T18:00:00.000Z",
+        completionEvidence: [
+          "复检章节审稿模型路由",
+          "样本数：2",
+          "成功率：50%",
+          "质量：62",
+          "成本：偏高",
+          "备用命中：命中备用",
+          "是否需要治理：是，原因：仍命中备用",
+        ].join("\n"),
+        completedAt: "2026-07-04T18:20:00.000Z",
+      },
+    ]);
+
+    const governanceItem = flow.lanes.find((lane) => lane.id === "needs_governance")?.items[0];
+
+    assert.equal(governanceItem?.governanceAdvice?.taskType, "chapter_review");
+    assert.equal(governanceItem?.governanceAdvice?.action, "extend_watch");
+    assert.equal(governanceItem?.governanceAdvice?.actionLabel, "延长观察");
+    assert.ok(governanceItem?.governanceAdvice?.evidence.some((entry) => entry.includes("成功率 50")));
+  });
+
   await t.test("filters dispatch tasks by route flow lane", () => {
     const tasks = [
       {

@@ -2,10 +2,14 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { buildRouteConfirmationRecheckSamplePlan } from "@/lib/model-gateway/routeConfirmation";
+import {
+  buildRouteConfirmationRecheckSampleDispatch,
+  buildRouteConfirmationRecheckSamplePlan,
+} from "@/lib/model-gateway/routeConfirmation";
 import type { ProviderHealthDashboard, ProviderHealthStatus } from "@/lib/model-gateway/providerHealth";
 import type { RoutedModelTaskType } from "@/lib/model-gateway/taskRouting";
 import type { ModelProviderId } from "@/lib/model-gateway/types";
+import { persistGateDispatchTask } from "@/lib/projects/gateActionReceipts";
 
 interface ProviderOptionView {
   providerId: ModelProviderId;
@@ -388,6 +392,7 @@ export function ModelProviderSettings({
   const [creatingRetestRuleKey, setCreatingRetestRuleKey] = useState<string | null>(null);
   const [runningRetestRuleKey, setRunningRetestRuleKey] = useState<string | null>(null);
   const [executingRouteAdviceId, setExecutingRouteAdviceId] = useState<string | null>(null);
+  const [creatingRouteRecheckPlanId, setCreatingRouteRecheckPlanId] = useState<string | null>(null);
   const [scopeDrafts, setScopeDrafts] = useState<Record<string, string>>(() => Object.fromEntries(
     routeAvoidanceGovernance.items.map((item) => [
       item.ruleKey,
@@ -412,6 +417,14 @@ export function ModelProviderSettings({
     if (!providerConfigId) return null;
     const provider = providers.find((item) => item.id === providerConfigId);
     return provider ? `${provider.displayName} · ${provider.defaultModel}` : null;
+  }
+
+  function routeConfirmationSamplePlanForAdvice(item: RouteConfirmationRecheckAdviceView["items"][number]) {
+    const routeDraft = routeDrafts[item.taskType] ?? routes.find((route) => route.taskType === item.taskType);
+    return buildRouteConfirmationRecheckSamplePlan(item, {
+      primaryProviderName: providerNameForRoute(routeDraft?.primaryProviderConfigId),
+      fallbackProviderName: providerNameForRoute(routeDraft?.fallbackProviderConfigId),
+    });
   }
 
   function selectProvider(providerId: ModelProviderId) {
@@ -643,6 +656,22 @@ export function ModelProviderSettings({
       setRouteMessage(caught instanceof Error ? caught.message : "生成模型路由治理派单失败。");
     } finally {
       setExecutingRouteAdviceId(null);
+    }
+  }
+
+  async function createRouteRecheckSampleDispatch(item: RouteConfirmationRecheckAdviceView["items"][number]) {
+    setCreatingRouteRecheckPlanId(item.id);
+    setRouteMessage(null);
+    try {
+      const samplePlan = routeConfirmationSamplePlanForAdvice(item);
+      const dispatch = buildRouteConfirmationRecheckSampleDispatch(item, samplePlan);
+      await persistGateDispatchTask(dispatch);
+      setRouteMessage(`已生成「${item.label}」复检样本派单`);
+      router.refresh();
+    } catch (caught) {
+      setRouteMessage(caught instanceof Error ? caught.message : "生成复检样本派单失败。");
+    } finally {
+      setCreatingRouteRecheckPlanId(null);
     }
   }
 
@@ -883,11 +912,7 @@ export function ModelProviderSettings({
             </div>
             <div className="mt-3 grid gap-2 lg:grid-cols-2">
               {routeConfirmationRecheckAdvice.items.slice(0, 6).map((item) => {
-                const routeDraft = routeDrafts[item.taskType] ?? routes.find((route) => route.taskType === item.taskType);
-                const samplePlan = buildRouteConfirmationRecheckSamplePlan(item, {
-                  primaryProviderName: providerNameForRoute(routeDraft?.primaryProviderConfigId),
-                  fallbackProviderName: providerNameForRoute(routeDraft?.fallbackProviderConfigId),
-                });
+                const samplePlan = routeConfirmationSamplePlanForAdvice(item);
                 return (
                   <div
                     className={`rounded-md border bg-white p-3 text-sm ${
@@ -934,6 +959,14 @@ export function ModelProviderSettings({
                     ))}
                   </div>
                   <div className="mt-3 flex flex-wrap justify-end gap-2">
+                    <button
+                      className="rounded-md border border-slate-200 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                      disabled={creatingRouteRecheckPlanId === item.id}
+                      onClick={() => void createRouteRecheckSampleDispatch(item)}
+                      type="button"
+                    >
+                      {creatingRouteRecheckPlanId === item.id ? "生成中" : "生成复检派单"}
+                    </button>
                     <button
                       className="rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
                       disabled={executingRouteAdviceId === item.id}

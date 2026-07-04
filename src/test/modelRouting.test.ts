@@ -14,6 +14,7 @@ import {
   buildRouteConfirmationDispatchFlow,
   buildRouteConfirmationHistory,
   buildRouteDispatchCompletionTemplate,
+  buildRouteConfirmationRecheckSampleDispatch,
   buildRouteConfirmationRecheckSamplePlan,
   parseRouteDispatchCompletionEvidence,
   reviewRouteDispatchCompletionEvidence,
@@ -329,6 +330,44 @@ test("model task routing", async (t) => {
     assert.ok(plan.acceptanceCriteria.some((item) => item.includes("备用命中")));
     assert.ok(plan.completionTemplate.includes("是否需要治理"));
     assert.ok(plan.actionLabel.includes("2 个"));
+  });
+
+  await t.test("turns a route confirmation recheck sample plan into a dispatch", () => {
+    const evidence = buildRouteConfirmationRecheckEvidenceFromDispatchTasks([{
+      dispatchKey: "model-route-confirmation-recheck:chapter_draft:2026-07-04T10:00:00.000Z",
+      stage: "model_route_confirmation_recheck",
+      state: "completed",
+      completionEvidence: [
+        "复检正文初稿路由确认",
+        "样本数：2",
+        "成功率：100%",
+        "质量：86",
+        "成本：偏高",
+        "备用命中：未命中备用",
+        "是否需要治理：是，原因：成本超出预算线",
+      ].join("\n"),
+      evidence: ["已确认正文初稿模型路由。"],
+      completedAt: "2026-07-04T12:00:00.000Z",
+    }]);
+    const advice = buildRouteConfirmationRecheckAdvice(evidence);
+    const plan = buildRouteConfirmationRecheckSamplePlan(advice.items[0], {
+      primaryProviderName: "DeepSeek · deepseek-chat",
+      fallbackProviderName: "Kimi · kimi-k2.6",
+    });
+
+    const dispatch = buildRouteConfirmationRecheckSampleDispatch(advice.items[0], plan, {
+      createdAt: "2026-07-04T13:00:00.000Z",
+    });
+
+    assert.equal(dispatch.dispatchKey, "model-route-confirmation-recheck-sample:chapter_draft:2026-07-04T13:00:00.000Z");
+    assert.equal(dispatch.stage, "model_route_confirmation_recheck");
+    assert.equal(dispatch.platformId, "model-routing");
+    assert.equal(dispatch.actionLabel, "复检小样本");
+    assert.equal(dispatch.priorityScore, 82);
+    assert.ok(dispatch.title.includes("正文初稿"));
+    assert.ok(dispatch.detail.includes("DeepSeek"));
+    assert.ok(dispatch.acceptanceCriteria.some((item) => item.includes("成功率")));
+    assert.ok(dispatch.evidence.some((item) => item.includes("是否需要治理")));
   });
 
   await t.test("builds an auditable dispatch action from route recheck governance advice", () => {

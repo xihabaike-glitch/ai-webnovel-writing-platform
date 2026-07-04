@@ -263,6 +263,10 @@ export interface RouteConfirmationRecheckSamplePlan {
   warning: string;
 }
 
+export interface RouteConfirmationRecheckSampleDispatchOptions {
+  createdAt?: string | Date;
+}
+
 export interface RouteConfirmationRecheckGovernanceAction {
   receipt: GateActionReceipt;
   dispatch: GatePlatformGrowthDispatchItem & { dispatchKey: string };
@@ -558,6 +562,38 @@ export function buildRouteConfirmationRecheckSamplePlan(
       "是否需要治理：否 / 是，原因：",
     ].join("\n"),
     warning: "复检样本只验证模型路线，不直接扩大批量生产。",
+  };
+}
+
+export function buildRouteConfirmationRecheckSampleDispatch(
+  advice: RouteConfirmationRecheckAdviceItem,
+  plan: RouteConfirmationRecheckSamplePlan,
+  options: RouteConfirmationRecheckSampleDispatchOptions = {},
+): RouteConfirmationGovernanceFollowUpDispatch {
+  const createdAt = asIsoString(options.createdAt);
+  const dispatchKey = `model-route-confirmation-recheck-sample:${advice.taskType}:${createdAt}`;
+  return {
+    id: dispatchKey,
+    dispatchKey,
+    platformId: "model-routing",
+    platformName: "模型路由",
+    stage: "model_route_confirmation_recheck",
+    state: "assigned",
+    priorityScore: advice.severity === "blocked" ? 88 : 82,
+    ownerRole: "模型治理",
+    title: `复检${plan.label}模型路由小样本`,
+    detail: `${plan.reason} 模型组合：${plan.routeLabel}。${plan.warning}`,
+    dueLabel: "下一批任务前",
+    actionLabel: "复检小样本",
+    href: "/settings/models",
+    acceptanceCriteria: plan.acceptanceCriteria,
+    evidence: Array.from(new Set([
+      advice.recommendation,
+      plan.reason,
+      plan.completionTemplate,
+      ...advice.evidence,
+    ])).slice(0, 5),
+    reviewLatestAt: createdAt,
   };
 }
 

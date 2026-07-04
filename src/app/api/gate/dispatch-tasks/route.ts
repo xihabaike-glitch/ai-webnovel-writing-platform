@@ -13,6 +13,7 @@ import {
 } from "@/lib/model-gateway/routeConfirmation";
 import { getPlatformProfile, type PlatformId } from "@/lib/platforms/platformProfiles";
 import { buildFirstDayFollowUpDispatch, buildFirstDayWorkflow } from "@/lib/projects/firstDayWorkflow";
+import { validateFirstDayDispatchCompletionEvidence } from "@/lib/projects/firstDayWorkflowView";
 import { buildChapterProductionRecheckFollowUpTasks } from "@/lib/projects/chapterProductionRecheckFollowUp";
 import { buildProjectControlDashboard } from "@/lib/projects/projectControlDashboard";
 import type {
@@ -650,6 +651,25 @@ export async function PATCH(request: Request) {
   const completionEvidence = text(body?.completionEvidence).trim();
   if (nextState === "completed" && completionEvidence.length < 8) {
     return NextResponse.json({ error: "完成派单前，请写清楚完成依据，至少 8 个字。" }, { status: 400 });
+  }
+  const existingTask = await prisma.gateDispatchTask.findUnique({
+    where: { dispatchKey },
+  });
+  if (!existingTask) {
+    return NextResponse.json({ error: "派单不存在。" }, { status: 404 });
+  }
+  if (nextState === "completed") {
+    const validation = validateFirstDayDispatchCompletionEvidence({
+      dispatchKey,
+      dueLabel: existingTask.dueLabel,
+      title: existingTask.title,
+      acceptanceCriteria: parseJsonList(existingTask.acceptanceCriteria),
+      evidence: parseJsonList(existingTask.evidence),
+      completionEvidence,
+    });
+    if (!validation.valid) {
+      return NextResponse.json({ error: validation.error ?? "完成派单前，请写清楚完成依据。" }, { status: 400 });
+    }
   }
   const now = new Date();
   const task = await prisma.gateDispatchTask.update({

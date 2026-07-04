@@ -293,7 +293,12 @@ export function FirstDayWorkflowPanel({ projectId }: { projectId: string }) {
     setExecutionReceipt(null);
     try {
       await persistGateDispatchTask(dispatch);
-      const result = await completeFirstDayDispatchStep(projectId, workflow.executionPackage.stepId, completionEvidence);
+      const result = await completeFirstDayDispatchStep(projectId, workflow.executionPackage.stepId, completionEvidence, {
+        dueLabel: dispatch.dueLabel,
+        title: dispatch.title,
+        acceptanceCriteria: dispatch.acceptanceCriteria,
+        evidence: dispatch.evidence,
+      });
       setCompletionEvidence("");
       await loadWorkflow();
       showMessage(`已完成当前派单：${result.task.title}`);

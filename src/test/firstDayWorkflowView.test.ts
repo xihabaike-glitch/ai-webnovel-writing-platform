@@ -7,6 +7,7 @@ import {
   buildFirstDayReceiptCompletionAction,
   buildFirstDayStepView,
   completeFirstDayDispatchStep,
+  validateFirstDayDispatchCompletionEvidence,
 } from "../lib/projects/firstDayWorkflowView.ts";
 
 test("buildFirstDayStepView separates task center acceptance evidence", () => {
@@ -195,6 +196,20 @@ test("buildFirstDayDispatchCompletionTemplate covers first-day step types", () =
     acceptanceCriteria: [],
   }).includes("第一章正文已生成"));
   assert.ok(buildFirstDayDispatchCompletionTemplate({
+    dispatchKey: "first-day:project-1:first-draft",
+    dueLabel: "今天止损验证",
+    title: "夜雨系统 · 止损验证 · 生成第一章正文",
+    acceptanceCriteria: ["写清本次恢复条件：入口卖点、前三章兑现或平台匹配度至少改掉一项。"],
+    evidence: ["缺少避坑平台恢复条件确认。"],
+  }).includes("恢复条件"));
+  assert.ok(buildFirstDayDispatchCompletionTemplate({
+    dispatchKey: "first-day:project-1:first-draft",
+    dueLabel: "今天小样本验证",
+    title: "夜雨系统 · 小样本验证 · 生成第一章正文",
+    acceptanceCriteria: ["写清首轮小样本通过线和不可接受项。"],
+    evidence: ["缺少观察平台首轮小样本验证口径。"],
+  }).includes("首轮通过线"));
+  assert.ok(buildFirstDayDispatchCompletionTemplate({
     dispatchKey: "first-day:project-1:publish-precheck",
     acceptanceCriteria: [],
   }).includes("平台包预检已完成"));
@@ -202,6 +217,50 @@ test("buildFirstDayDispatchCompletionTemplate covers first-day step types", () =
     dispatchKey: "manual",
     acceptanceCriteria: ["完成当前动作"],
   }), "");
+});
+
+test("validateFirstDayDispatchCompletionEvidence enforces risky first-day evidence", () => {
+  const blockedThin = validateFirstDayDispatchCompletionEvidence({
+    dispatchKey: "first-day:project-1:first-draft",
+    dueLabel: "今天止损验证",
+    title: "夜雨系统 · 止损验证 · 生成第一章正文",
+    acceptanceCriteria: ["写清本次恢复条件：入口卖点、前三章兑现或平台匹配度至少改掉一项。"],
+    evidence: ["缺少避坑平台恢复条件确认。"],
+    completionEvidence: "已经全部处理完成，可以继续下一步。",
+  });
+  const blockedReady = validateFirstDayDispatchCompletionEvidence({
+    dispatchKey: "first-day:project-1:first-draft",
+    dueLabel: "今天止损验证",
+    title: "夜雨系统 · 止损验证 · 生成第一章正文",
+    acceptanceCriteria: ["写清本次恢复条件：入口卖点、前三章兑现或平台匹配度至少改掉一项。"],
+    evidence: ["缺少避坑平台恢复条件确认。"],
+    completionEvidence: "恢复条件已写清：入口卖点已重做，前三章兑现问题已列出。",
+  });
+  const watchThin = validateFirstDayDispatchCompletionEvidence({
+    dispatchKey: "first-day:project-1:first-draft",
+    dueLabel: "今天小样本验证",
+    title: "夜雨系统 · 小样本验证 · 生成第一章正文",
+    acceptanceCriteria: ["写清首轮小样本通过线和不可接受项。"],
+    evidence: ["缺少观察平台首轮小样本验证口径。"],
+    completionEvidence: "已经全部处理完成，可以继续下一步。",
+  });
+  const watchReady = validateFirstDayDispatchCompletionEvidence({
+    dispatchKey: "first-day:project-1:first-draft",
+    dueLabel: "今天小样本验证",
+    title: "夜雨系统 · 小样本验证 · 生成第一章正文",
+    acceptanceCriteria: ["写清首轮小样本通过线和不可接受项。"],
+    evidence: ["缺少观察平台首轮小样本验证口径。"],
+    completionEvidence: "小样本首轮通过线已写清，不可接受项和复查证据已补齐。",
+  });
+
+  assert.equal(blockedThin.valid, false);
+  assert.equal(blockedThin.level, "blocked");
+  assert.ok(blockedThin.error?.includes("恢复条件"));
+  assert.equal(blockedReady.valid, true);
+  assert.equal(watchThin.valid, false);
+  assert.equal(watchThin.level, "watch");
+  assert.ok(watchThin.error?.includes("小样本验证"));
+  assert.equal(watchReady.valid, true);
 });
 
 test("completeFirstDayDispatchStep completes the matching task center dispatch", async () => {
@@ -236,6 +295,30 @@ test("completeFirstDayDispatchStep completes the matching task center dispatch",
       state: "completed",
       completionEvidence: "第一章正文已经生成并写回章节，作者已确认可以进入审稿。",
     });
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("completeFirstDayDispatchStep rejects risky completion evidence before calling the api", async () => {
+  const originalFetch = globalThis.fetch;
+  let called = false;
+  globalThis.fetch = (async () => {
+    called = true;
+    return new Response("{}", { status: 200 });
+  }) as typeof fetch;
+
+  try {
+    await assert.rejects(
+      completeFirstDayDispatchStep("project-1", "first-draft", "已经全部处理完成，可以继续下一步。", {
+        dueLabel: "今天止损验证",
+        title: "夜雨系统 · 止损验证 · 生成第一章正文",
+        acceptanceCriteria: ["写清本次恢复条件：入口卖点、前三章兑现或平台匹配度至少改掉一项。"],
+        evidence: ["缺少避坑平台恢复条件确认。"],
+      }),
+      /止损验证派单必须写清恢复条件/,
+    );
+    assert.equal(called, false);
   } finally {
     globalThis.fetch = originalFetch;
   }

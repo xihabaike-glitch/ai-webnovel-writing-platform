@@ -3,6 +3,8 @@ import { updatePersistedGateDispatchTaskState, type PersistedGatePlatformDispatc
 
 const ACCEPTANCE_MARKER = "任务中心已验收：";
 const MIN_COMPLETION_EVIDENCE_LENGTH = 8;
+const BLOCKED_COMPLETION_KEYWORDS = ["恢复条件", "入口卖点", "前三章兑现", "平台匹配度", "改掉", "重做", "修复"];
+const WATCH_COMPLETION_KEYWORDS = ["小样本", "通过线", "不可接受", "复查证据", "首轮", "观察"];
 
 function cleanEvidence(value: string) {
   return value.trim().replace(/。{2,}$/u, "。");
@@ -27,6 +29,21 @@ export interface FirstDayReceiptCompletionAction {
   canComplete: boolean;
   label: string;
   reason: string;
+}
+
+export interface FirstDayDispatchCompletionValidationInput {
+  dispatchKey: string;
+  dueLabel?: string;
+  title?: string;
+  acceptanceCriteria?: string[];
+  evidence?: string[];
+  completionEvidence: string;
+}
+
+export interface FirstDayDispatchCompletionValidation {
+  valid: boolean;
+  level: FirstDayRiskLevel;
+  error: string | null;
 }
 
 export interface FirstDayExecutionRiskNotice {
@@ -185,6 +202,58 @@ function firstDayStepId(dispatchKey: string) {
   return parts[2] ?? "";
 }
 
+function includesAnyKeyword(value: string, keywords: string[]) {
+  return keywords.some((keyword) => value.includes(keyword));
+}
+
+function firstDayCompletionRiskLevel(input: Pick<FirstDayDispatchCompletionValidationInput, "dispatchKey" | "dueLabel" | "title" | "acceptanceCriteria" | "evidence">): FirstDayRiskLevel {
+  if (!isFirstDayDispatchTask({ dispatchKey: input.dispatchKey })) return "standard";
+  const joined = [
+    input.dueLabel,
+    input.title,
+    ...(input.acceptanceCriteria ?? []),
+    ...(input.evidence ?? []),
+  ].filter((item): item is string => Boolean(item)).join(" ");
+
+  if (/止损|避坑|恢复条件/u.test(joined)) return "blocked";
+  if (/观察|小样本|通过线|不可接受|复查证据/u.test(joined)) return "watch";
+  return "standard";
+}
+
+export function validateFirstDayDispatchCompletionEvidence(input: FirstDayDispatchCompletionValidationInput): FirstDayDispatchCompletionValidation {
+  const trimmedEvidence = input.completionEvidence.trim();
+  const level = firstDayCompletionRiskLevel(input);
+  if (trimmedEvidence.length < MIN_COMPLETION_EVIDENCE_LENGTH) {
+    return {
+      valid: false,
+      level,
+      error: "完成派单前，请写清楚完成依据，至少 8 个字。",
+    };
+  }
+
+  if (level === "blocked" && !includesAnyKeyword(trimmedEvidence, BLOCKED_COMPLETION_KEYWORDS)) {
+    return {
+      valid: false,
+      level,
+      error: "止损验证派单必须写清恢复条件，例如入口卖点、前三章兑现或平台匹配度具体改了什么。",
+    };
+  }
+
+  if (level === "watch" && !includesAnyKeyword(trimmedEvidence, WATCH_COMPLETION_KEYWORDS)) {
+    return {
+      valid: false,
+      level,
+      error: "小样本验证派单必须写清首轮通过线、不可接受项或复查证据。",
+    };
+  }
+
+  return {
+    valid: true,
+    level,
+    error: null,
+  };
+}
+
 function firstDayStepLabel(stepId: string) {
   if (stepId === "skeleton") return "作品骨架";
   if (stepId === "opening-hook") return "第一章钩子";
@@ -213,9 +282,12 @@ export function isFirstDayDispatchTask(task: Pick<PersistedGatePlatformDispatchT
   return task.dispatchKey.startsWith("first-day:");
 }
 
-export function buildFirstDayDispatchCompletionTemplate(task: Pick<PersistedGatePlatformDispatchTask, "dispatchKey" | "acceptanceCriteria">) {
+export function buildFirstDayDispatchCompletionTemplate(task: Pick<PersistedGatePlatformDispatchTask, "dispatchKey" | "acceptanceCriteria"> & Partial<Pick<PersistedGatePlatformDispatchTask, "dueLabel" | "title" | "evidence">>) {
   if (!isFirstDayDispatchTask(task)) return "";
   const stepId = firstDayStepId(task.dispatchKey);
+  const riskLevel = firstDayCompletionRiskLevel(task);
+  if (stepId === "first-draft" && riskLevel === "blocked") return "止损验证已完成：恢复条件已写清，入口卖点、前三章兑现或平台匹配度已至少改掉一项，暂不批量生成正文。";
+  if (stepId === "first-draft" && riskLevel === "watch") return "小样本验证已完成：首轮通过线、不可接受项和复查证据已写清，后续按数据决定是否扩大。";
   if (stepId === "first-draft") return "第一章正文已生成并写回章节，钩子、冲突和章末追读已按首轮平台打法检查，可以进入审稿。";
   if (stepId === "first-review") return "第一章审稿已完成，钩子、爽点、冲突、解释密度和章末追读问题已列出，可以进入二改。";
   if (stepId === "first-rewrite") return "第一章二改或前三章改写已完成，审稿问题已逐项处理，并保留版本对照。";
@@ -283,10 +355,20 @@ export function buildFirstDayDispatchDesk(tasks: PersistedGatePlatformDispatchTa
   };
 }
 
-export async function completeFirstDayDispatchStep(projectId: string, stepId: string, completionEvidence: string) {
+export async function completeFirstDayDispatchStep(
+  projectId: string,
+  stepId: string,
+  completionEvidence: string,
+  validationContext?: Omit<FirstDayDispatchCompletionValidationInput, "dispatchKey" | "completionEvidence">,
+) {
   const trimmedEvidence = completionEvidence.trim();
-  if (trimmedEvidence.length < MIN_COMPLETION_EVIDENCE_LENGTH) {
-    throw new Error("完成派单前，请写清楚完成依据，至少 8 个字。");
+  const validation = validateFirstDayDispatchCompletionEvidence({
+    dispatchKey: `first-day:${projectId}:${stepId}`,
+    ...validationContext,
+    completionEvidence: trimmedEvidence,
+  });
+  if (!validation.valid) {
+    throw new Error(validation.error ?? "完成派单前，请写清楚完成依据。");
   }
 
   return updatePersistedGateDispatchTaskState(`first-day:${projectId}:${stepId}`, "completed", {

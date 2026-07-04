@@ -12,6 +12,7 @@ import {
   updatePersistedGateDispatchTaskState,
   type GateActionReceipt,
   type GateDispatchEvidenceReviewStatus,
+  type GateDispatchRecheckFollowUpChain,
   type GateDispatchTaskStateFilter,
   type GateDispatchTaskCloseoutStatus,
   type GatePlatformGrowthDispatchState,
@@ -143,6 +144,7 @@ export function GateDispatchTaskCenter({
   const [runningKey, setRunningKey] = useState<string | null>(null);
   const [runningRouteAdviceId, setRunningRouteAdviceId] = useState<string | null>(null);
   const [runningRouteRecheckKey, setRunningRouteRecheckKey] = useState<string | null>(null);
+  const [runningRecheckAdviceKey, setRunningRecheckAdviceKey] = useState<string | null>(null);
   const [routeActionMessage, setRouteActionMessage] = useState("");
   const [completionDrafts, setCompletionDrafts] = useState<Record<string, string>>({});
   const [errorMessage, setErrorMessage] = useState("");
@@ -299,6 +301,27 @@ export function GateDispatchTaskCenter({
       setErrorMessage(error instanceof Error ? error.message : "生成模型路由治理派单失败。");
     } finally {
       setRunningRouteAdviceId(null);
+    }
+  }
+
+  async function createRecheckReviewDispatch(chain: GateDispatchRecheckFollowUpChain) {
+    if (!chain.reviewAdvice) return;
+    setRunningRecheckAdviceKey(chain.rootDispatchKey);
+    setErrorMessage("");
+    setRouteActionMessage("");
+    try {
+      const created = await persistGateDispatchTask(chain.reviewAdvice.dispatch);
+      setTasks((current) => {
+        const nextByKey = new Map(current.map((item) => [item.dispatchKey, item]));
+        nextByKey.set(created.dispatchKey, created);
+        return Array.from(nextByKey.values());
+      });
+      setRouteActionMessage(`已生成复盘派单：${created.title}`);
+      setQueueFilter("all");
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "生成复盘派单失败。");
+    } finally {
+      setRunningRecheckAdviceKey(null);
     }
   }
 
@@ -550,7 +573,17 @@ export function GateDispatchTaskCenter({
                     <div className="font-medium">{chain.reviewAdvice.title}</div>
                     <p className="mt-1">{chain.reviewAdvice.detail}</p>
                     <p className="mt-1 font-medium">下一步：{chain.reviewAdvice.nextAction}</p>
-                    <p className="mt-1 opacity-80">负责人：{chain.reviewAdvice.ownerRole}</p>
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      <span className="opacity-80">负责人：{chain.reviewAdvice.ownerRole}</span>
+                      <button
+                        className="rounded-md bg-white/80 px-2 py-1 font-medium hover:bg-white disabled:opacity-50"
+                        disabled={runningRecheckAdviceKey !== null}
+                        onClick={() => createRecheckReviewDispatch(chain)}
+                        type="button"
+                      >
+                        {runningRecheckAdviceKey === chain.rootDispatchKey ? "生成中" : chain.reviewAdvice.dispatch.actionLabel}
+                      </button>
+                    </div>
                   </div>
                 ) : null}
                 <Link className="mt-3 inline-flex rounded-md border border-slate-200 bg-white px-2 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50" href={chain.latestHref}>

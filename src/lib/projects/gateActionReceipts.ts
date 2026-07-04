@@ -352,6 +352,7 @@ export interface GateDispatchRecheckFollowUpChain {
   rootDispatchKey: string;
   latestDispatchKey: string;
   projectId: string | null;
+  platformId: string;
   platformName: string;
   total: number;
   active: number;
@@ -382,6 +383,7 @@ export interface GateDispatchRecheckFollowUpReviewAdvice {
   detail: string;
   nextAction: string;
   ownerRole: string;
+  dispatch: GatePlatformGrowthDispatchItem;
 }
 
 export type GateDispatchTaskCloseoutStatus = "overdue" | "today" | "planned" | "done";
@@ -418,6 +420,10 @@ function taskReviewText(task: PersistedGatePlatformDispatchTask) {
     ...task.acceptanceCriteria,
     ...task.evidence,
   ].join(" ");
+}
+
+function safeDispatchKeyPart(value: string) {
+  return value.replace(/[^a-zA-Z0-9_-]/g, "-").slice(0, 96);
 }
 
 export type GateDispatchEvidenceReviewStatus = "verified" | "needs_receipt" | "missing_evidence" | "active";
@@ -2995,6 +3001,7 @@ function buildGateDispatchRecheckFollowUpChains(tasks: PersistedGatePlatformDisp
     rootDispatchKey: string,
     chainTasks: PersistedGatePlatformDispatchTask[],
     maxRound: number,
+    latest: PersistedGatePlatformDispatchTask,
   ): GateDispatchRecheckFollowUpReviewAdvice | undefined {
     if (maxRound < 2) return undefined;
     const combinedText = chainTasks.map(taskReviewText).join(" ");
@@ -3003,47 +3010,144 @@ function buildGateDispatchRecheckFollowUpChains(tasks: PersistedGatePlatformDisp
     const isSubmissionChain = rootDispatchKey.startsWith("submission-")
       || chainTasks.some((task) => task.dispatchKey.startsWith("submission-recheck-followup:"));
     const unchangedSignal = /分数未变|unchanged|仍需修复|仍低于|没有明显变好/.test(combinedText);
+    const baseEvidence = [
+      `返工链根：${rootDispatchKey}`,
+      `最新派单：${latest.dispatchKey}`,
+      `当前轮次：第 ${maxRound} 轮`,
+      `链路状态：未闭环 ${chainTasks.filter((task) => task.state !== "completed").length}/${chainTasks.length}`,
+    ];
+
+    function dispatchForAdvice(input: {
+      type: GateDispatchRecheckFollowUpReviewAdviceType;
+      title: string;
+      detail: string;
+      nextAction: string;
+      ownerRole: string;
+      stage: GatePlatformGrowthReviewStage;
+      priorityScore: number;
+      actionLabel: string;
+      acceptanceCriteria: string[];
+    }): GatePlatformGrowthDispatchItem {
+      return {
+        id: `recheck-review:${input.type}:${safeDispatchKeyPart(rootDispatchKey)}:${maxRound}`,
+        platformId: latest.platformId,
+        platformName: latest.platformName,
+        stage: input.stage,
+        state: "queued",
+        priorityScore: input.priorityScore,
+        ownerRole: input.ownerRole,
+        title: `${latest.platformName} · ${input.title}`,
+        detail: `${input.detail} ${input.nextAction}`,
+        dueLabel: "今天复盘",
+        actionLabel: input.actionLabel,
+        href: latest.href || "/dispatch",
+        acceptanceCriteria: input.acceptanceCriteria,
+        evidence: [
+          ...baseEvidence,
+          `复盘建议：${input.title}`,
+          `下一步：${input.nextAction}`,
+          ...chainTasks.flatMap((task) => task.evidence.slice(0, 2)).slice(0, 4),
+        ],
+        reviewLatestAt: latest.updatedAt,
+      };
+    }
 
     if (isSubmissionChain && maxRound >= 2) {
-      return {
-        type: "direction_pause",
-        tone: "rose",
+      const advice = {
+        type: "direction_pause" as const,
         title: "平台方向先暂停",
         detail: "投稿复查已经进入二轮以上，继续补小材料大概率只是把错误投入放大。",
         nextAction: "先停平台加码，回到投稿包、前三章兑现和目标平台匹配度重判，再决定是否继续修包。",
         ownerRole: "主编",
       };
+      return {
+        ...advice,
+        tone: "rose",
+        dispatch: dispatchForAdvice({
+          ...advice,
+          stage: "pause_platform",
+          priorityScore: 96,
+          actionLabel: "暂停平台",
+          acceptanceCriteria: [
+            "写清是否暂停当前平台加码，以及暂停原因。",
+            "重判投稿包、前三章兑现和目标平台匹配度，给出继续/转向结论。",
+            "补充下一轮只验证一个变量的复测方案。",
+          ],
+        }),
+      };
     }
 
     if (missingCompletionEvidence || /无基准|验收标准|无法提升/.test(combinedText)) {
-      return {
-        type: "acceptance_mismatch",
-        tone: "sky",
+      const advice = {
+        type: "acceptance_mismatch" as const,
         title: "验收标准先补清楚",
         detail: "返工已经进入二轮，但链路里缺少能证明改动有效的完成证据，容易变成机械返工。",
         nextAction: "先把通过线、不可接受项、必须改动的段落写清楚，再派作者继续二改。",
         ownerRole: "主编",
       };
+      return {
+        ...advice,
+        tone: "sky",
+        dispatch: dispatchForAdvice({
+          ...advice,
+          stage: "watch",
+          priorityScore: 88,
+          actionLabel: "补验收标准",
+          acceptanceCriteria: [
+            "补齐通过线、不可接受项、必须改动段落和复查证据格式。",
+            "标明下一轮返工只允许解决的一个核心问题。",
+            "完成后再派作者执行二改，避免继续模糊返工。",
+          ],
+        }),
+      };
     }
 
     if (unchangedSignal) {
-      return {
-        type: "weak_execution",
-        tone: "amber",
+      const advice = {
+        type: "weak_execution" as const,
         title: "执行动作太虚",
         detail: "复查分数没有有效上移，说明上一轮动作可能只改了表层，没有打到主线压力或人物选择。",
         nextAction: "要求返工证据写明改了哪一段、服务哪条主线、如何改变读者追读理由。",
         ownerRole: "作者",
       };
+      return {
+        ...advice,
+        tone: "amber",
+        dispatch: dispatchForAdvice({
+          ...advice,
+          stage: "start_rewrite_opening",
+          priorityScore: 90,
+          actionLabel: "重写动作",
+          acceptanceCriteria: [
+            "写清改了哪一段、服务哪条主线、如何改变读者追读理由。",
+            "返工必须带一条可复查的分数或证据变化。",
+            "不能只改措辞，必须改变冲突、选择或代价。",
+          ],
+        }),
+      };
     }
 
-    return {
-      type: "weak_execution",
-      tone: "amber",
+    const advice = {
+      type: "weak_execution" as const,
       title: "二轮返工先复盘动作",
       detail: "链路已经进入第二轮，继续派单前先确认上一轮动作为什么没有一次打穿。",
       nextAction: "复盘上一轮验收证据，保留有效动作，删除无效动作，再生成下一轮返工要求。",
       ownerRole: "作者",
+    };
+    return {
+      ...advice,
+      tone: "amber",
+      dispatch: dispatchForAdvice({
+        ...advice,
+        stage: "start_rewrite_opening",
+        priorityScore: 86,
+        actionLabel: "复盘动作",
+        acceptanceCriteria: [
+          "列出上一轮有效动作、无效动作和遗漏动作。",
+          "下一轮返工只保留一个核心目标。",
+          "完成后回填可复查证据。",
+        ],
+      }),
     };
   }
 
@@ -3071,6 +3175,7 @@ function buildGateDispatchRecheckFollowUpChains(tasks: PersistedGatePlatformDisp
       rootDispatchKey,
       latestDispatchKey: latest.dispatchKey,
       projectId: latest.projectId,
+      platformId: latest.platformId,
       platformName: latest.platformName,
       total: chainTasks.length,
       active,
@@ -3081,7 +3186,7 @@ function buildGateDispatchRecheckFollowUpChains(tasks: PersistedGatePlatformDisp
       latestActionLabel: latest.actionLabel,
       latestHref: latest.href,
       latestUpdatedAt: latest.updatedAt,
-      reviewAdvice: reviewAdviceForChain(rootDispatchKey, chainTasks, maxRound),
+      reviewAdvice: reviewAdviceForChain(rootDispatchKey, chainTasks, maxRound, latest),
       rounds,
     };
   }).sort((left, right) => (

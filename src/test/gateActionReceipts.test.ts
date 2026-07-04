@@ -3163,6 +3163,10 @@ test("buildGateActionReceipt", async (t) => {
     assert.equal(center.recheckFollowUpChains[0].reviewAdvice?.type, "acceptance_mismatch");
     assert.equal(center.recheckFollowUpChains[0].reviewAdvice?.title, "验收标准先补清楚");
     assert.ok(center.recheckFollowUpChains[0].reviewAdvice?.nextAction.includes("通过线"));
+    assert.equal(center.recheckFollowUpChains[0].reviewAdvice?.dispatch.stage, "watch");
+    assert.equal(center.recheckFollowUpChains[0].reviewAdvice?.dispatch.actionLabel, "补验收标准");
+    assert.ok(center.recheckFollowUpChains[0].reviewAdvice?.dispatch.id.startsWith("recheck-review:acceptance_mismatch:"));
+    assert.ok(center.recheckFollowUpChains[0].reviewAdvice?.dispatch.acceptanceCriteria.some((item) => item.includes("通过线")));
     assert.deepEqual(center.recheckFollowUpChains[0].rounds.map((round) => `${round.round}:${round.dispatchKey}`), [
       "1:story-tree-followup:project-1:chapter-1:source:74",
       "2:story-tree-followup:project-1:chapter-1:story-tree-followup-project-1-chapter-1-source-74:77",
@@ -3237,6 +3241,9 @@ test("buildGateActionReceipt", async (t) => {
     assert.equal(center.recheckFollowUpChains[0].reviewAdvice?.type, "direction_pause");
     assert.equal(center.recheckFollowUpChains[0].reviewAdvice?.title, "平台方向先暂停");
     assert.equal(center.recheckFollowUpChains[0].reviewAdvice?.ownerRole, "主编");
+    assert.equal(center.recheckFollowUpChains[0].reviewAdvice?.dispatch.stage, "pause_platform");
+    assert.equal(center.recheckFollowUpChains[0].reviewAdvice?.dispatch.actionLabel, "暂停平台");
+    assert.equal(center.recheckFollowUpChains[0].reviewAdvice?.dispatch.platformId, "qimao");
     assert.ok(center.recheckFollowUpChains[0].reviewAdvice?.nextAction.includes("停平台加码"));
   });
 

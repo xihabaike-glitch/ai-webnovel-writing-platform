@@ -62,6 +62,23 @@ interface MultiPlatformSubmissionVariant {
       detail: string;
     }>;
   };
+  effectTracking: {
+    status: "needs_data" | "weak" | "watch" | "promising" | "signed";
+    label: string;
+    records: number;
+    latestSnapshotDate: string | null;
+    views: number;
+    clicks: number;
+    favorites: number;
+    follows: number;
+    comments: number;
+    paidReads: number;
+    clickRatePercent: number;
+    favoriteRatePercent: number;
+    followRatePercent: number;
+    nextAction: string;
+    evidence: string[];
+  };
 }
 
 interface MultiPlatformSubmission {
@@ -75,6 +92,15 @@ interface MultiPlatformSubmission {
     totalPlatforms: number;
     readyToArchive: boolean;
   };
+  effectSummary: {
+    trackedPlatforms: number;
+    needsDataPlatforms: number;
+    weakPlatforms: number;
+    promisingPlatforms: number;
+    signedPlatforms: number;
+    bestPlatformId: string | null;
+    nextAction: string;
+  };
   archive: {
     archiveFileName: string;
     readyCount: number;
@@ -86,6 +112,8 @@ interface MultiPlatformSubmission {
       platformId: string;
       platformName: string;
       status: "ready" | "needs_work";
+      effectStatus: "needs_data" | "weak" | "watch" | "promising" | "signed";
+      effectLabel: string;
       fileName: string;
       readyFields: number;
       totalFields: number;
@@ -154,6 +182,13 @@ function matrixStatusClass(status: "ready" | "warning" | "missing" | "needs_work
   if (status === "ready") return "bg-emerald-50 text-emerald-700";
   if (status === "warning" || status === "needs_work") return "bg-amber-50 text-amber-700";
   return "bg-rose-50 text-rose-700";
+}
+
+function effectStatusClass(status: "needs_data" | "weak" | "watch" | "promising" | "signed") {
+  if (status === "signed" || status === "promising") return "bg-emerald-50 text-emerald-700";
+  if (status === "weak") return "bg-rose-50 text-rose-700";
+  if (status === "watch") return "bg-blue-50 text-blue-700";
+  return "bg-amber-50 text-amber-700";
 }
 
 export function SubmissionPackagePanel({
@@ -558,6 +593,8 @@ export function SubmissionPackagePanel({
                 {" · "}
                 可归档 {multiPlatform.packageSummary.readyPlatforms}/{multiPlatform.packageSummary.totalPlatforms}
                 {" · "}
+                已追踪 {multiPlatform.effectSummary.trackedPlatforms}/{multiPlatform.packageSummary.totalPlatforms}
+                {" · "}
                 {multiPlatform.archive.archiveFileName}
               </p>
             </div>
@@ -601,6 +638,42 @@ export function SubmissionPackagePanel({
             <div className="rounded-md bg-slate-50 p-3">
               <div className="text-xs text-slate-500">归档样章</div>
               <div className="mt-1 text-lg font-semibold text-slate-900">{multiPlatform.archive.totalSampleChapterCount}</div>
+            </div>
+          </div>
+          <div className="mt-3 rounded-md border border-slate-200 bg-slate-50 p-3">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <div className="text-sm font-medium text-slate-900">投放追踪</div>
+                <p className="mt-1 text-sm leading-6 text-slate-600">{multiPlatform.effectSummary.nextAction}</p>
+              </div>
+              <a
+                className="w-fit rounded-md border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                href="#publish-effect-panel"
+              >
+                进入效果回填
+              </a>
+            </div>
+            <div className="mt-3 grid gap-2 text-xs sm:grid-cols-5">
+              <div className="rounded-md bg-white p-2">
+                <div className="text-slate-500">已追踪</div>
+                <div className="mt-1 font-semibold text-slate-900">{multiPlatform.effectSummary.trackedPlatforms}</div>
+              </div>
+              <div className="rounded-md bg-white p-2">
+                <div className="text-slate-500">待回填</div>
+                <div className="mt-1 font-semibold text-amber-700">{multiPlatform.effectSummary.needsDataPlatforms}</div>
+              </div>
+              <div className="rounded-md bg-white p-2">
+                <div className="text-slate-500">偏弱</div>
+                <div className="mt-1 font-semibold text-rose-700">{multiPlatform.effectSummary.weakPlatforms}</div>
+              </div>
+              <div className="rounded-md bg-white p-2">
+                <div className="text-slate-500">有苗头</div>
+                <div className="mt-1 font-semibold text-emerald-700">{multiPlatform.effectSummary.promisingPlatforms}</div>
+              </div>
+              <div className="rounded-md bg-white p-2">
+                <div className="text-slate-500">邀约/签约</div>
+                <div className="mt-1 font-semibold text-emerald-700">{multiPlatform.effectSummary.signedPlatforms}</div>
+              </div>
             </div>
           </div>
           <div className="mt-3 grid gap-3 lg:grid-cols-2">
@@ -671,6 +744,36 @@ export function SubmissionPackagePanel({
                     ))}
                   </div>
                   <p className="mt-2 text-xs leading-5 text-slate-600">{variant.packageMatrix.nextAction}</p>
+                </div>
+                <div className="mt-3 rounded-md bg-white p-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="text-xs font-medium text-slate-500">投放追踪</div>
+                    <span className={`rounded-md px-2 py-1 text-xs font-medium ${effectStatusClass(variant.effectTracking.status)}`}>
+                      {variant.effectTracking.label}
+                    </span>
+                  </div>
+                  <div className="mt-2 grid gap-2 text-xs sm:grid-cols-4">
+                    <div>
+                      <div className="text-slate-500">曝光</div>
+                      <div className="mt-1 font-medium text-slate-900">{variant.effectTracking.views}</div>
+                    </div>
+                    <div>
+                      <div className="text-slate-500">点击率</div>
+                      <div className="mt-1 font-medium text-slate-900">{variant.effectTracking.clickRatePercent}%</div>
+                    </div>
+                    <div>
+                      <div className="text-slate-500">收藏率</div>
+                      <div className="mt-1 font-medium text-slate-900">{variant.effectTracking.favoriteRatePercent}%</div>
+                    </div>
+                    <div>
+                      <div className="text-slate-500">追读率</div>
+                      <div className="mt-1 font-medium text-slate-900">{variant.effectTracking.followRatePercent}%</div>
+                    </div>
+                  </div>
+                  <p className="mt-2 text-xs leading-5 text-slate-600">{variant.effectTracking.nextAction}</p>
+                  <a className="mt-2 inline-flex w-fit rounded-md border border-slate-200 px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50" href="#publish-effect-panel">
+                    回填这轮数据
+                  </a>
                 </div>
               </div>
             ))}

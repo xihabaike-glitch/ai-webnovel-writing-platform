@@ -17,6 +17,10 @@ export async function GET(request: Request, { params }: Params) {
         orderBy: { createdAt: "desc" },
         take: 100,
       },
+      platformPublishMetrics: {
+        orderBy: { snapshotDate: "desc" },
+        take: 100,
+      },
     },
   });
 
@@ -37,6 +41,7 @@ export async function GET(request: Request, { params }: Params) {
       status: task.status,
       chapter: task.chapterId ? { id: task.chapterId } : null,
     })),
+    platformPublishMetrics: project.platformPublishMetrics,
   });
 
   const format = searchParams.get("format");

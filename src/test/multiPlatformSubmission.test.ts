@@ -71,8 +71,11 @@ test("buildMultiPlatformSubmission", async (t) => {
     assert.equal(result.archive.readyCount, result.packageSummary.readyPlatforms);
     assert.ok(result.archive.archiveFileName.endsWith(".md"));
     assert.ok(result.archive.markdown.includes("多平台投稿包归档"));
+    assert.equal(result.effectSummary.trackedPlatforms, 0);
+    assert.equal(result.effectSummary.needsDataPlatforms, 8);
     assert.ok(result.markdown.includes("多平台投稿版本"));
     assert.ok(result.markdown.includes("平台包字段"));
+    assert.ok(result.markdown.includes("投放追踪"));
   });
 
   await t.test("keeps overseas synopsis visible for overseas platforms", () => {
@@ -134,12 +137,90 @@ test("buildMultiPlatformSubmission", async (t) => {
 
     assert.ok(fanqie);
     assert.ok(archive.archiveFileName.includes("夜雨-系统-多平台投稿包归档.md"));
-    assert.ok(archive.markdown.includes("| 平台 | 状态 | 字段 | 样章 | 摘要字数 | 文件/待补字段 |"));
+    assert.ok(archive.markdown.includes("| 平台 | 状态 | 追踪 | 字段 | 样章 | 摘要字数 | 文件/待补字段 |"));
     assert.ok(archive.markdown.includes("已就绪平台投稿包"));
     assert.ok(archive.platforms.some((platform) => platform.fileName.includes("夜雨-系统-番茄小说-投稿包.md")));
     const singlePackage = buildSinglePlatformSubmissionMarkdown(fanqie);
     assert.ok(singlePackage.includes("# 夜雨|系统 番茄小说 投稿包"));
     assert.ok(singlePackage.includes("## 字段矩阵"));
     assert.ok(singlePackage.includes("## 样章摘要"));
+    assert.ok(singlePackage.includes("## 投放追踪证据"));
+  });
+
+  await t.test("summarizes post-submission effect tracking", () => {
+    const result = buildMultiPlatformSubmission({
+      title: "夜雨系统",
+      genre: "都市系统",
+      sellingPoint: "雨夜危机中觉醒系统，主角用一次次选择翻盘。",
+      currentWordCount: 9000,
+      targetWordCount: 300000,
+      targetPlatformId: "fanqie",
+      chapters,
+      aiTasks: [],
+      platformPublishMetrics: [
+        {
+          platformId: "fanqie",
+          platformName: "番茄小说",
+          views: 1200,
+          clicks: 180,
+          favorites: 72,
+          follows: 36,
+          comments: 12,
+          paidReads: 0,
+          editorFeedback: "开头钩子有效。",
+          contractStatus: "unknown",
+          publishUrl: "https://example.com/fanqie",
+          notes: "首轮小样本",
+          snapshotDate: "2026-01-06T08:00:00.000Z",
+        },
+        {
+          platformId: "qimao",
+          platformName: "七猫",
+          views: 200,
+          clicks: 6,
+          favorites: 1,
+          follows: 0,
+          comments: 0,
+          paidReads: 0,
+          editorFeedback: "",
+          contractStatus: "unknown",
+          publishUrl: "",
+          notes: "入口弱",
+          snapshotDate: "2026-01-06T08:00:00.000Z",
+        },
+        {
+          platformId: "webnovel",
+          platformName: "WebNovel",
+          views: 300,
+          clicks: 45,
+          favorites: 18,
+          follows: 9,
+          comments: 3,
+          paidReads: 0,
+          editorFeedback: "Editor invite.",
+          contractStatus: "invited",
+          publishUrl: "https://example.com/webnovel",
+          notes: "海外反馈",
+          snapshotDate: "2026-01-06T08:00:00.000Z",
+        },
+      ],
+    });
+    const fanqie = result.variants.find((variant) => variant.platformId === "fanqie");
+    const qimao = result.variants.find((variant) => variant.platformId === "qimao");
+    const webnovel = result.variants.find((variant) => variant.platformId === "webnovel");
+
+    assert.ok(fanqie);
+    assert.equal(fanqie.effectTracking.status, "promising");
+    assert.equal(fanqie.effectTracking.clickRatePercent, 15);
+    assert.equal(fanqie.effectTracking.favoriteRatePercent, 6);
+    assert.ok(qimao);
+    assert.equal(qimao.effectTracking.status, "weak");
+    assert.ok(webnovel);
+    assert.equal(webnovel.effectTracking.status, "signed");
+    assert.equal(result.effectSummary.trackedPlatforms, 3);
+    assert.equal(result.effectSummary.weakPlatforms, 1);
+    assert.equal(result.effectSummary.promisingPlatforms, 1);
+    assert.equal(result.effectSummary.signedPlatforms, 1);
+    assert.ok(result.archive.markdown.includes("有苗头"));
   });
 });

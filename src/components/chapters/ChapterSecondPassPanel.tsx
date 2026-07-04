@@ -98,11 +98,12 @@ export function ChapterSecondPassPanel({
   const [targetWords, setTargetWords] = useState(Math.max(1200, currentWordCount));
   const [isRunning, setIsRunning] = useState(false);
   const [runningRecommendationId, setRunningRecommendationId] = useState<string | null>(null);
+  const [runningAdviceId, setRunningAdviceId] = useState<string | null>(null);
   const [result, setResult] = useState<SecondPassResult | null>(null);
   const [budgetGuard, setBudgetGuard] = useState<BudgetGuardView | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
-  async function runSecondPass() {
+  async function executeSecondPass(nextInstruction: string) {
     setIsRunning(true);
     setMessage(null);
     setBudgetGuard(null);
@@ -110,7 +111,7 @@ export function ChapterSecondPassPanel({
       const response = await fetch(`/api/chapters/${chapterId}/second-pass`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ instruction, mode, targetWords }),
+        body: JSON.stringify({ instruction: nextInstruction, mode, targetWords }),
       });
       const payload = (await response.json()) as SecondPassResult & { error?: string; budgetGuard?: BudgetGuardView };
       if (!response.ok) {
@@ -129,6 +130,20 @@ export function ChapterSecondPassPanel({
       setMessage(caught instanceof Error ? caught.message : "二改失败。");
     } finally {
       setIsRunning(false);
+    }
+  }
+
+  async function runSecondPass() {
+    await executeSecondPass(instruction);
+  }
+
+  async function runAdviceSecondPass(advice: StoryTreeExperienceSecondPassAdvice) {
+    setInstruction(advice.instruction);
+    setRunningAdviceId(advice.id);
+    try {
+      await executeSecondPass(advice.instruction);
+    } finally {
+      setRunningAdviceId(null);
     }
   }
 
@@ -270,13 +285,23 @@ export function ChapterSecondPassPanel({
                   </div>
                 ) : null}
                 <p className="mt-2 text-xs leading-5 text-slate-500">源复检：{advice.detail}</p>
-                <button
-                  className="mt-3 rounded-md border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-                  onClick={() => setInstruction(advice.instruction)}
-                  type="button"
-                >
-                  填入回流指令
-                </button>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <button
+                    className="rounded-md border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                    onClick={() => setInstruction(advice.instruction)}
+                    type="button"
+                  >
+                    填入回流指令
+                  </button>
+                  <button
+                    className="rounded-md bg-slate-950 px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
+                    disabled={isRunning}
+                    onClick={() => runAdviceSecondPass(advice)}
+                    type="button"
+                  >
+                    {runningAdviceId === advice.id ? "回流二改中" : "执行回流二改"}
+                  </button>
+                </div>
               </div>
             ))}
           </div>

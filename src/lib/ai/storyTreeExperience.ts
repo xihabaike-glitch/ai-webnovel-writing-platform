@@ -1,5 +1,6 @@
 import type { GatePlatformGrowthDispatchItem, GatePlatformGrowthReviewStage, PersistedGatePlatformDispatchTask } from "../projects/gateActionReceipts.ts";
 import type { PlatformProfile } from "../platforms/platformProfiles.ts";
+import type { StoryTreeQualityAudit } from "./storyTreeQualityAudit.ts";
 
 export type StoryTreeExperienceStatus = "usable" | "avoid" | "watch";
 
@@ -36,13 +37,29 @@ export interface StoryTreeExperienceGuide {
 
 export interface StoryTreeExperienceSecondPassAdvice {
   id: string;
+  databaseId?: string;
   title: string;
   status: StoryTreeExperienceStatus;
+  axisId: string;
   axisLabel: string;
+  sourceScore: number | null;
   instruction: string;
   detail: string;
   href: string;
   completedAt: string | null;
+}
+
+export type StoryTreeExperienceEffectStatus = "reinforced" | "weakened" | "watch";
+
+export interface StoryTreeExperienceEffectFeedback {
+  adviceId: string;
+  databaseId?: string;
+  axisId: string;
+  axisLabel: string;
+  status: StoryTreeExperienceEffectStatus;
+  sourceScore: number | null;
+  currentScore: number | null;
+  line: string;
 }
 
 interface StoryTreeRecheckEvidence {
@@ -222,6 +239,11 @@ function taskActionFromEvidence(evidence: string[]) {
   return recheckLine?.split("返工动作：").at(1)?.trim() ?? "";
 }
 
+function taskSourceScoreFromEvidence(evidence: string[]) {
+  const recheckLine = evidence.find((item) => item.startsWith("大树结构复检："));
+  return recheckLine ? parseStoryTreeRecheckEvidenceLine(recheckLine)?.currentScore ?? null : null;
+}
+
 function buildPromptBlock(items: StoryTreeExperienceItem[]) {
   if (items.length === 0) return "";
   return [
@@ -293,7 +315,7 @@ export function buildStoryTreeExperienceApplyDispatch(input: {
 }
 
 export function buildStoryTreeExperienceSecondPassAdvice(
-  tasks: Pick<PersistedGatePlatformDispatchTask, "dispatchKey" | "state" | "title" | "detail" | "href" | "evidence" | "completionEvidence" | "completedAt" | "updatedAt">[],
+  tasks: Pick<PersistedGatePlatformDispatchTask, "databaseId" | "dispatchKey" | "state" | "title" | "detail" | "href" | "evidence" | "completionEvidence" | "completedAt" | "updatedAt">[],
   chapterId: string,
   limit = 4,
 ): StoryTreeExperienceSecondPassAdvice[] {
@@ -306,6 +328,7 @@ export function buildStoryTreeExperienceSecondPassAdvice(
       const axisLabel = axisLabels[axisId] ?? "大树结构";
       const status = taskStatusFromEvidence(task.evidence);
       const action = taskActionFromEvidence(task.evidence);
+      const sourceScore = taskSourceScoreFromEvidence(task.evidence);
       const completion = task.completionEvidence.trim();
       const instruction = [
         action ? `按已验证经验处理「${axisLabel}」：${action}` : `按已验证经验处理「${axisLabel}」。`,
@@ -315,9 +338,12 @@ export function buildStoryTreeExperienceSecondPassAdvice(
       if (!instruction) return null;
       return {
         id: task.dispatchKey,
+        databaseId: task.databaseId,
         title: task.title,
         status,
+        axisId,
         axisLabel,
+        sourceScore,
         instruction,
         detail: task.evidence.find((item) => item.includes("复检")) ?? task.evidence[0] ?? task.detail ?? "",
         href: task.href,
@@ -327,4 +353,55 @@ export function buildStoryTreeExperienceSecondPassAdvice(
     .filter((item): item is StoryTreeExperienceSecondPassAdvice => Boolean(item))
     .sort((left, right) => dateValue(right.completedAt) - dateValue(left.completedAt))
     .slice(0, limit);
+}
+
+export function matchStoryTreeExperienceAdviceForInstruction(
+  advice: StoryTreeExperienceSecondPassAdvice[],
+  instruction: string,
+) {
+  const normalized = instruction.trim();
+  return advice.filter((item) => {
+    const partialInstruction = item.instruction.slice(0, 24);
+    return normalized.includes(item.instruction) || (normalized.includes(item.axisLabel) && normalized.includes(partialInstruction));
+  });
+}
+
+export function buildStoryTreeExperienceEffectFeedback(input: {
+  advice: StoryTreeExperienceSecondPassAdvice;
+  audit: StoryTreeQualityAudit;
+}): StoryTreeExperienceEffectFeedback {
+  const axis = input.audit.axes.find((item) => item.id === input.advice.axisId);
+  const currentScore = axis?.score ?? null;
+  const sourceScore = input.advice.sourceScore;
+  let status: StoryTreeExperienceEffectStatus = "watch";
+
+  if (currentScore !== null && sourceScore !== null) {
+    if (currentScore >= Math.max(80, sourceScore)) status = "reinforced";
+    else if (currentScore <= sourceScore - 6 || axis?.status === "fail") status = "weakened";
+  } else if (currentScore !== null && currentScore >= 80) {
+    status = "reinforced";
+  } else if (axis?.status === "fail") {
+    status = "weakened";
+  }
+
+  const statusText: Record<StoryTreeExperienceEffectStatus, string> = {
+    reinforced: "继续有效",
+    weakened: "效果变弱",
+    watch: "继续观察",
+  };
+  const scoreText = sourceScore === null || currentScore === null
+    ? `${currentScore ?? "缺"} 分`
+    : `${sourceScore} -> ${currentScore} 分`;
+  const suggestion = axis?.suggestion ?? "继续结合章节现场复检这条结构经验。";
+
+  return {
+    adviceId: input.advice.id,
+    databaseId: input.advice.databaseId,
+    axisId: input.advice.axisId,
+    axisLabel: input.advice.axisLabel,
+    status,
+    sourceScore,
+    currentScore,
+    line: `经验应用效果：${input.advice.axisLabel} ${scoreText}，${statusText[status]}：${suggestion}`,
+  };
 }

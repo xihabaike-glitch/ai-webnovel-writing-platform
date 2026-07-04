@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { SecondPassMode } from "@/lib/ai/buildChapterSecondPassPrompt";
-import type { StoryTreeExperienceSecondPassAdvice, StoryTreeExperienceStatus } from "@/lib/ai/storyTreeExperience";
+import type { StoryTreeExperienceEffectFeedback, StoryTreeExperienceSecondPassAdvice, StoryTreeExperienceStatus } from "@/lib/ai/storyTreeExperience";
 
 interface SecondPassResult {
   task: {
@@ -28,6 +28,7 @@ interface SecondPassResult {
     treeAudit?: { score: number; label: string };
     issues: Array<{ type: string; suggestion: string }>;
   };
+  storyTreeExperienceEffects?: StoryTreeExperienceEffectFeedback[];
   storyTreeDispatches?: Array<{ dispatchKey: string }>;
   attempts?: Array<{
     status: "succeeded" | "failed";
@@ -114,7 +115,10 @@ export function ChapterSecondPassPanel({
       setResult(payload);
       const fallbackUsed = payload.attempts?.some((attempt) => attempt.status === "failed");
       const dispatchText = payload.storyTreeDispatches?.length ? `，已派发 ${payload.storyTreeDispatches.length} 个结构返工任务` : "";
-      setMessage(`已完成章节二改${fallbackUsed ? "，已自动切换备用模型" : ""}，复检 ${payload.secondPassAudit.score} 分，大树结构 ${payload.secondPassAudit.treeAudit?.score ?? "缺"} 分${dispatchText}${payload.secondPassAudit.shouldSecondPass ? "，仍建议继续二改。" : "，可进入发布检查。"}`);
+      const effectText = payload.storyTreeExperienceEffects?.length
+        ? `，经验反馈：${payload.storyTreeExperienceEffects.map((effect) => effect.line.replace("经验应用效果：", "")).join("；")}`
+        : "";
+      setMessage(`已完成章节二改${fallbackUsed ? "，已自动切换备用模型" : ""}，复检 ${payload.secondPassAudit.score} 分，大树结构 ${payload.secondPassAudit.treeAudit?.score ?? "缺"} 分${dispatchText}${effectText}${payload.secondPassAudit.shouldSecondPass ? "，仍建议继续二改。" : "，可进入发布检查。"}`);
       router.refresh();
     } catch (caught) {
       setMessage(caught instanceof Error ? caught.message : "二改失败。");
@@ -243,6 +247,13 @@ export function ChapterSecondPassPanel({
             <div className="mt-2 grid gap-1 text-slate-500">
               {result.secondPassAudit.issues.slice(0, 3).map((issue) => (
                 <div key={`${issue.type}-${issue.suggestion}`}>复检建议：{issue.suggestion}</div>
+              ))}
+            </div>
+          ) : null}
+          {result.storyTreeExperienceEffects?.length ? (
+            <div className="mt-2 grid gap-1 text-slate-500">
+              {result.storyTreeExperienceEffects.map((effect) => (
+                <div key={`${effect.adviceId}-${effect.axisId}`}>{effect.line}</div>
               ))}
             </div>
           ) : null}

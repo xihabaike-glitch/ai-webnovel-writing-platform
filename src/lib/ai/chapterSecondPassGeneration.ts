@@ -4,10 +4,16 @@ import {
 } from "@/lib/ai/buildChapterSecondPassPrompt";
 import { buildDraftQualityAudit } from "@/lib/ai/draftQualityAudit";
 import { buildStoryTreeRewriteDispatchItems } from "@/lib/ai/storyTreeDispatch";
+import {
+  buildStoryTreeExperienceEffectFeedback,
+  buildStoryTreeExperienceSecondPassAdvice,
+  matchStoryTreeExperienceAdviceForInstruction,
+} from "@/lib/ai/storyTreeExperience";
 import { prisma } from "@/lib/db/prisma";
 import { runRoutedGeneration } from "@/lib/model-gateway/routedGeneration";
 import { getPlatformProfile, type PlatformId } from "@/lib/platforms/platformProfiles";
 import { persistServerGateDispatchTask } from "@/lib/projects/gateDispatchTaskPersistence";
+import { gatePlatformDispatchTaskFromRecord } from "@/lib/projects/gateDispatchTaskRecords";
 import { findProjectStartTacticSummary } from "@/lib/projects/projectStartTactics";
 import { countWords } from "@/lib/text/wordCount";
 
@@ -23,6 +29,18 @@ const validModes: SecondPassMode[] = [
 
 export function normalizeSecondPassMode(mode: string | undefined): SecondPassMode {
   return validModes.includes(mode as SecondPassMode) ? (mode as SecondPassMode) : "platform_fit";
+}
+
+function stringList(value: unknown) {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
+}
+
+function parseJsonList(value: string) {
+  try {
+    return stringList(JSON.parse(value) as unknown);
+  } catch {
+    return [];
+  }
 }
 
 export interface GenerateChapterSecondPassOptions {
@@ -44,6 +62,15 @@ export async function generateChapterSecondPass(options: GenerateChapterSecondPa
       project: {
         include: {
           worldEntries: true,
+          gateDispatchTasks: {
+            where: {
+              state: "completed",
+              dispatchKey: { startsWith: "story-tree-experience:" },
+              href: { contains: `/chapters/${options.chapterId}` },
+            },
+            orderBy: { completedAt: "desc" },
+            take: 12,
+          },
         },
       },
     },
@@ -56,6 +83,11 @@ export async function generateChapterSecondPass(options: GenerateChapterSecondPa
   const mode = normalizeSecondPassMode(options.mode);
   const platform = getPlatformProfile(chapter.project.targetPlatform as PlatformId);
   const startTactic = findProjectStartTacticSummary(chapter.project.worldEntries);
+  const storyTreeExperienceAdvice = buildStoryTreeExperienceSecondPassAdvice(
+    chapter.project.gateDispatchTasks.map(gatePlatformDispatchTaskFromRecord),
+    chapter.id,
+  );
+  const usedStoryTreeExperienceAdvice = matchStoryTreeExperienceAdviceForInstruction(storyTreeExperienceAdvice, instruction);
   const prompt = buildChapterSecondPassPrompt({
     projectTitle: chapter.project.title,
     genre: chapter.project.genre,
@@ -80,7 +112,7 @@ export async function generateChapterSecondPass(options: GenerateChapterSecondPa
     projectId: chapter.projectId,
     chapterId: chapter.id,
     taskType: "chapter_second_pass",
-    inputSnapshot: { prompt, instruction, mode, startTactic },
+    inputSnapshot: { prompt, instruction, mode, startTactic, storyTreeExperienceAdvice: usedStoryTreeExperienceAdvice },
     request: {
       systemPrompt: prompt.systemPrompt,
       userPrompt: prompt.userPrompt,
@@ -106,6 +138,10 @@ export async function generateChapterSecondPass(options: GenerateChapterSecondPa
         cliffhanger: chapter.cliffhanger,
       },
     });
+    const storyTreeExperienceEffects = usedStoryTreeExperienceAdvice.map((advice) => buildStoryTreeExperienceEffectFeedback({
+      advice,
+      audit: secondPassAudit.treeAudit,
+    }));
 
     const [updatedTask, updatedChapter] = await prisma.$transaction(async (tx) => {
       const savedTask = await tx.aiTask.update({
@@ -156,13 +192,24 @@ export async function generateChapterSecondPass(options: GenerateChapterSecondPa
             secondPassTaskId: task.id,
             platformId: platform.id,
             targetWords: options.targetWords ?? Math.max(1200, chapter.wordCount),
+            storyTreeExperienceEffects,
           }),
-          outputText: JSON.stringify(secondPassAudit),
+          outputText: JSON.stringify({ ...secondPassAudit, storyTreeExperienceEffects }),
           inputTokens: 0,
           outputTokens: 0,
           costUsd: 0,
         },
       });
+      for (const effect of storyTreeExperienceEffects) {
+        if (!effect.databaseId) continue;
+        const sourceTask = chapter.project.gateDispatchTasks.find((item) => item.id === effect.databaseId);
+        const evidence = sourceTask ? parseJsonList(sourceTask.evidence) : [];
+        if (evidence.includes(effect.line)) continue;
+        await tx.gateDispatchTask.update({
+          where: { id: effect.databaseId },
+          data: { evidence: JSON.stringify([...evidence, effect.line]) },
+        });
+      }
       const chapters = await tx.chapter.findMany({
         where: { projectId: chapter.projectId },
         select: { wordCount: true },
@@ -192,6 +239,7 @@ export async function generateChapterSecondPass(options: GenerateChapterSecondPa
       chapter: updatedChapter,
       content: result.text,
       secondPassAudit,
+      storyTreeExperienceEffects,
       storyTreeDispatches,
       activeProvider: {
         id: provider.id,

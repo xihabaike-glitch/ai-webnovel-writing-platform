@@ -205,6 +205,13 @@ export function GateDispatchTaskCenter({
           detail: string;
           nextActionLabel: string;
         } | null;
+        autoGovernance?: {
+          task: {
+            dispatchKey: string;
+            title: string;
+            actionLabel: string;
+          };
+        } | null;
         recheckTask?: {
           dispatchKey: string;
           state: GatePlatformGrowthDispatchState;
@@ -229,7 +236,10 @@ export function GateDispatchTaskCenter({
       const decisionText = payload?.decision
         ? `，决策：${payload.decision.label}，下一步：${payload.decision.nextActionLabel}`
         : "";
-      setRouteActionMessage(`已运行「${task.title}」复检样本：${succeeded}/${total} 成功${decisionText}`);
+      const governanceText = payload?.autoGovernance
+        ? `；已自动生成治理派单：${payload.autoGovernance.task.title}`
+        : "";
+      setRouteActionMessage(`已运行「${task.title}」复检样本：${succeeded}/${total} 成功${decisionText}${governanceText}`);
       router.refresh();
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "运行模型路由复检样本失败。");

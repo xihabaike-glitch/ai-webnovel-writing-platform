@@ -1448,3 +1448,13 @@ export function buildRouteConfirmationRecheckGovernanceAction(
 
   return { receipt, dispatch, payload };
 }
+
+export function buildRouteConfirmationRecheckAutoGovernanceAction(
+  evidence: RouteConfirmationRecheckEvidence,
+  options: { createdAt?: string | Date } = {},
+): RouteConfirmationRecheckGovernanceAction | null {
+  const decision = buildRouteConfirmationRecheckDecision(evidence);
+  if (decision.status !== "needs_governance") return null;
+  const advice = buildRouteConfirmationRecheckAdvice([evidence]).items[0];
+  return advice ? buildRouteConfirmationRecheckGovernanceAction(advice, options) : null;
+}

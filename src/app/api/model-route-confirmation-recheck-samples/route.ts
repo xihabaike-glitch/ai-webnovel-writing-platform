@@ -4,11 +4,13 @@ import { generateChapterDraft } from "@/lib/ai/chapterDraftGeneration";
 import { reviewChapterDraft } from "@/lib/ai/chapterReviewGeneration";
 import { prisma } from "@/lib/db/prisma";
 import {
+  buildRouteConfirmationRecheckAutoGovernanceAction,
   buildRouteConfirmationRecheckDecision,
   buildRouteConfirmationRecheckAdviceFromDispatchTask,
   buildRouteConfirmationRecheckEvidenceFromDispatchTasks,
   buildRouteConfirmationRecheckSampleDispatch,
   buildRouteConfirmationRecheckSamplePlan,
+  type RouteConfirmationRecheckGovernanceAction,
   type RouteConfirmationRecheckAdviceItem,
 } from "@/lib/model-gateway/routeConfirmation";
 import {
@@ -96,6 +98,94 @@ function dispatchAdviceFromBody(raw: Record<string, unknown>): RouteConfirmation
 
 function providerName(provider: { displayName: string; defaultModel: string } | undefined) {
   return provider ? `${provider.displayName} · ${provider.defaultModel}` : null;
+}
+
+async function persistAutoGovernanceAction(action: RouteConfirmationRecheckGovernanceAction | null) {
+  if (!action) return null;
+  const reviewLatestAt = new Date(action.dispatch.reviewLatestAt);
+  const createdAt = new Date(action.receipt.createdAt);
+  const [audit, task] = await prisma.$transaction([
+    prisma.gateActionAudit.upsert({
+      where: { receiptId: action.receipt.id },
+      create: {
+        receiptId: action.receipt.id,
+        actionId: action.receipt.actionId,
+        projectId: null,
+        platformId: action.receipt.platformId ?? "model-routing",
+        platformName: action.receipt.platformName ?? "模型路由",
+        label: action.receipt.label,
+        detail: action.receipt.detail,
+        href: action.receipt.href,
+        status: action.receipt.status,
+        message: action.receipt.message,
+        executionType: action.receipt.executionType,
+        succeededCount: action.receipt.succeededCount,
+        failedCount: action.receipt.failedCount,
+        taskId: null,
+        recheckStatus: action.receipt.recheck.status,
+        recheckLabel: action.receipt.recheck.label,
+        recheckDetail: action.receipt.recheck.detail,
+        recheckAction: action.receipt.recheck.actionLabel,
+        payload: JSON.stringify(action.payload),
+        createdAt,
+      },
+      update: {
+        detail: action.receipt.detail,
+        message: action.receipt.message,
+        payload: JSON.stringify(action.payload),
+      },
+    }),
+    prisma.gateDispatchTask.upsert({
+      where: { dispatchKey: action.dispatch.dispatchKey },
+      create: {
+        dispatchKey: action.dispatch.dispatchKey,
+        projectId: null,
+        platformId: action.dispatch.platformId,
+        platformName: action.dispatch.platformName,
+        stage: action.dispatch.stage,
+        state: action.dispatch.state,
+        priorityScore: action.dispatch.priorityScore,
+        ownerRole: action.dispatch.ownerRole,
+        title: action.dispatch.title,
+        detail: action.dispatch.detail,
+        dueLabel: action.dispatch.dueLabel,
+        actionLabel: action.dispatch.actionLabel,
+        href: action.dispatch.href,
+        acceptanceCriteria: JSON.stringify(action.dispatch.acceptanceCriteria),
+        evidence: JSON.stringify(action.dispatch.evidence),
+        sourceReceiptId: action.receipt.id,
+        completionEvidence: "",
+        reviewLatestAt,
+        assignedAt: new Date(),
+        completedAt: null,
+      },
+      update: {
+        state: action.dispatch.state,
+        priorityScore: action.dispatch.priorityScore,
+        detail: action.dispatch.detail,
+        acceptanceCriteria: JSON.stringify(action.dispatch.acceptanceCriteria),
+        evidence: JSON.stringify(action.dispatch.evidence),
+        sourceReceiptId: action.receipt.id,
+        assignedAt: new Date(),
+        completedAt: null,
+      },
+    }),
+  ]);
+
+  return {
+    receipt: {
+      ...action.receipt,
+      createdAt: audit.createdAt.toISOString(),
+    },
+    task: {
+      dispatchKey: task.dispatchKey,
+      stage: task.stage,
+      state: task.state,
+      title: task.title,
+      href: task.href,
+      actionLabel: task.actionLabel,
+    },
+  };
 }
 
 async function loadRouteContext(taskType: RouteConfirmationRecheckAdviceItem["taskType"]) {
@@ -245,6 +335,9 @@ export async function POST(request: Request) {
     completedAt: task.completedAt,
   }])[0] ?? null;
   const decision = completedRecheck ? buildRouteConfirmationRecheckDecision(completedRecheck) : null;
+  const autoGovernance = await persistAutoGovernanceAction(completedRecheck
+    ? buildRouteConfirmationRecheckAutoGovernanceAction(completedRecheck, { createdAt: now })
+    : null);
 
   return NextResponse.json({
     samplePlan,
@@ -252,6 +345,7 @@ export async function POST(request: Request) {
     results,
     recheckEvidence,
     decision,
+    autoGovernance,
     recheckTask: {
       dispatchKey: task.dispatchKey,
       state: task.state,

@@ -100,6 +100,16 @@ export interface ChapterProductionItem {
   lineBeats: string[];
   missingFields: string[];
   action: string;
+  quickFix: ChapterProductionQuickFix | null;
+}
+
+export interface ChapterProductionQuickFix {
+  id: string;
+  label: string;
+  description: string;
+  method: "PATCH";
+  endpoint: string;
+  payload: Record<string, string>;
 }
 
 export interface ChapterProductionDashboard {
@@ -226,6 +236,57 @@ function actionForItem(status: ChapterProductionItem["status"], missingFields: s
   return `先补${missingFields.join("、") || "摘要"}，否则生成章节会空转。`;
 }
 
+function repairPayloadForNode(
+  node: ProductionOutlineNode,
+  missingFields: string[],
+  platform: PlatformProfile,
+): Record<string, string> {
+  const payload: Record<string, string> = {};
+  const title = compact(node.title) || "当前排期卡";
+  const hasMissing = (field: string) => missingFields.includes(field);
+
+  if (!compact(node.summary)) {
+    payload.summary = `围绕「${title}」推进本阶段承诺：先给压力，再让主角做选择，最后抬高下一章问题。`;
+  }
+  if (hasMissing("目标")) {
+    payload.goal = `让「${title}」完成一次明确推进：主角获得新信息、新代价或新敌人，故事不能原地解释。`;
+  }
+  if (hasMissing("钩子")) {
+    payload.hook = platform.openingRules[0] || `开场先给「${title}」相关的异常、危机或不可逆选择。`;
+  }
+  if (hasMissing("冲突")) {
+    payload.conflict = "主角必须在保住当前利益和承担更高代价之间做选择，且不能靠解释绕开。";
+  }
+  if (hasMissing("转变")) {
+    payload.valueShift = "从被动承压转为主动选择，或从表面胜利转向更大的主线风险。";
+  }
+  if (!compact(node.platformNote)) {
+    payload.platformNote = platform.reviewFocus[0] || "章末必须抛出和主线相关的新问题，形成追读理由。";
+  }
+
+  return payload;
+}
+
+function quickFixForItem(
+  node: ProductionOutlineNode,
+  status: ChapterProductionItem["status"],
+  missingFields: string[],
+  platform: PlatformProfile,
+): ChapterProductionQuickFix | null {
+  if (status !== "blocked") return null;
+  const payload = repairPayloadForNode(node, missingFields, platform);
+  if (Object.keys(payload).length === 0) return null;
+
+  return {
+    id: `outline-repair-${node.id}`,
+    label: "补排期卡",
+    description: "先补成可生成章节卡的最小结构，避免正文生产空转。",
+    method: "PATCH",
+    endpoint: `/api/outline-nodes/${node.id}`,
+    payload,
+  };
+}
+
 function suggestedDailyWords(project: ProductionProject, platform: PlatformProfile) {
   if (project.updateCadence.includes("6k") || project.updateCadence.includes("6000")) return 6000;
   if (project.updateCadence.includes("4k") || project.updateCadence.includes("4000")) return 4000;
@@ -283,6 +344,7 @@ export function buildChapterProductionSchedule(input: ChapterProductionInput): C
       lineBeats: lineBeatsForChapter(chapterId ?? null, input.foreshadows, input.plotThreads),
       missingFields,
       action: actionForItem(status, missingFields, Boolean(chapter)),
+      quickFix: quickFixForItem(node, status, missingFields, input.platform),
     };
   });
 

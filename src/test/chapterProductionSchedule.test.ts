@@ -102,6 +102,8 @@ test("buildChapterProductionSchedule", async (t) => {
     assert.equal(schedule.dashboard.suggestedDailyWords, 4000);
     assert.equal(schedule.items[0].status, "card_ready");
     assert.equal(schedule.items[1].status, "outline_ready");
+    assert.equal(schedule.items[0].quickFix, null);
+    assert.equal(schedule.items[1].quickFix, null);
     assert.ok(schedule.items[0].lineBeats.some((beat) => beat.includes("系统来源异常")));
     assert.ok(schedule.items[1].worldAnchors.includes("系统任务规则"));
   });
@@ -137,7 +139,48 @@ test("buildChapterProductionSchedule", async (t) => {
     assert.equal(schedule.dashboard.blockedItems, 1);
     assert.equal(schedule.items[0].status, "blocked");
     assert.deepEqual(schedule.items[0].missingFields, ["目标", "钩子", "冲突", "转变"]);
+    assert.equal(schedule.items[0].quickFix?.method, "PATCH");
+    assert.equal(schedule.items[0].quickFix?.endpoint, "/api/outline-nodes/branch-1");
+    assert.ok(schedule.items[0].quickFix?.payload.summary.includes("支线压力"));
+    assert.ok(schedule.items[0].quickFix?.payload.goal.includes("支线压力"));
+    assert.ok(schedule.items[0].quickFix?.payload.hook);
+    assert.ok(schedule.items[0].quickFix?.payload.conflict.includes("选择"));
+    assert.ok(schedule.items[0].quickFix?.payload.valueShift.includes("主线风险"));
+    assert.ok(schedule.items[0].quickFix?.payload.platformNote);
     assert.ok(schedule.dashboard.warnings.some((warning) => warning.includes("人物弧光")));
     assert.ok(schedule.dashboard.warnings.some((warning) => warning.includes("世界观设定")));
+  });
+
+  await t.test("repairs summary-only blocked cards without overwriting complete core fields", () => {
+    const schedule = buildChapterProductionSchedule({
+      project,
+      platform,
+      chapters: [],
+      outlineNodes: [
+        {
+          id: "leaf-1",
+          chapterId: null,
+          type: "leaf",
+          title: "生活压力",
+          summary: "",
+          goal: "让主角被现实问题逼到墙角。",
+          hook: "房东堵门。",
+          conflict: "交租和救人只能选一个。",
+          valueShift: "主角从回避变成正面处理。",
+          platformNote: "",
+          order: 1,
+          depth: 1,
+          status: "planned",
+        },
+      ],
+      characters: [],
+      worldEntries: [],
+      foreshadows: [],
+      plotThreads: [],
+    });
+
+    assert.equal(schedule.items[0].status, "blocked");
+    assert.deepEqual(schedule.items[0].missingFields, []);
+    assert.deepEqual(Object.keys(schedule.items[0].quickFix?.payload ?? {}).sort(), ["platformNote", "summary"]);
   });
 });

@@ -20,6 +20,16 @@ interface ChapterProductionItem {
   lineBeats: string[];
   missingFields: string[];
   action: string;
+  quickFix: ChapterProductionQuickFix | null;
+}
+
+interface ChapterProductionQuickFix {
+  id: string;
+  label: string;
+  description: string;
+  method: "PATCH";
+  endpoint: string;
+  payload: Record<string, string>;
 }
 
 interface ChapterProductionDashboard {
@@ -52,10 +62,25 @@ function statusLabel(status: ChapterProductionItem["status"]) {
   return labels[status];
 }
 
+function fieldLabel(field: string) {
+  const labels: Record<string, string> = {
+    summary: "摘要",
+    goal: "目标",
+    hook: "钩子",
+    conflict: "冲突",
+    valueShift: "转变",
+    platformNote: "章末追读",
+  };
+
+  return labels[field] ?? field;
+}
+
 export function ChapterProductionPanel({ projectId }: { projectId: string }) {
   const [schedule, setSchedule] = useState<ChapterProductionSchedule | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [creatingNodeId, setCreatingNodeId] = useState<string | null>(null);
+  const [repairingFixId, setRepairingFixId] = useState<string | null>(null);
+  const [repairDrafts, setRepairDrafts] = useState<Record<string, Record<string, string>>>({});
   const [message, setMessage] = useState<string | null>(null);
 
   async function loadSchedule() {
@@ -68,10 +93,46 @@ export function ChapterProductionPanel({ projectId }: { projectId: string }) {
       }
       const payload = (await response.json()) as { schedule: ChapterProductionSchedule };
       setSchedule(payload.schedule);
+      setRepairDrafts(Object.fromEntries(
+        payload.schedule.items
+          .filter((item) => item.quickFix)
+          .map((item) => [item.quickFix!.id, item.quickFix!.payload]),
+      ));
     } catch (caught) {
       setMessage(caught instanceof Error ? caught.message : "读取章节生产排期失败。");
     } finally {
       setIsLoading(false);
+    }
+  }
+
+  function updateRepairDraft(fixId: string, field: string, value: string) {
+    setRepairDrafts((current) => ({
+      ...current,
+      [fixId]: {
+        ...(current[fixId] ?? {}),
+        [field]: value,
+      },
+    }));
+  }
+
+  async function applyQuickFix(fix: ChapterProductionQuickFix) {
+    setRepairingFixId(fix.id);
+    setMessage(null);
+    try {
+      const response = await fetch(fix.endpoint, {
+        method: fix.method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(repairDrafts[fix.id] ?? fix.payload),
+      });
+      if (!response.ok) {
+        throw new Error("保存排期卡失败，请检查字段后重试。");
+      }
+      await loadSchedule();
+      setMessage(`已保存：${fix.label}`);
+    } catch (caught) {
+      setMessage(caught instanceof Error ? caught.message : "保存排期卡失败。");
+    } finally {
+      setRepairingFixId(null);
     }
   }
 
@@ -243,6 +304,37 @@ export function ChapterProductionPanel({ projectId }: { projectId: string }) {
 
             {item.missingFields.length ? (
               <p className="mt-3 text-sm text-slate-600">缺口：{item.missingFields.join("、")}</p>
+            ) : null}
+
+            {item.quickFix ? (
+              <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 p-3">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <div className="font-medium text-slate-950">{item.quickFix.label}</div>
+                    <p className="mt-1 text-sm text-slate-600">{item.quickFix.description}</p>
+                  </div>
+                  <button
+                    className="w-fit rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white disabled:opacity-50"
+                    disabled={repairingFixId === item.quickFix.id}
+                    onClick={() => item.quickFix ? void applyQuickFix(item.quickFix) : undefined}
+                    type="button"
+                  >
+                    {repairingFixId === item.quickFix.id ? "保存中" : "保存排期卡"}
+                  </button>
+                </div>
+                <div className="mt-3 grid gap-2 lg:grid-cols-2">
+                  {Object.entries(repairDrafts[item.quickFix.id] ?? item.quickFix.payload).map(([field, value]) => (
+                    <label className="grid gap-1" key={`${item.quickFix?.id}:${field}`}>
+                      <span className="text-xs font-medium text-slate-600">{fieldLabel(field)}</span>
+                      <textarea
+                        className="min-h-20 resize-y rounded-md border border-amber-200 bg-white px-3 py-2 text-sm leading-6 outline-none focus:border-amber-400"
+                        onChange={(event) => item.quickFix ? updateRepairDraft(item.quickFix.id, field, event.target.value) : undefined}
+                        value={value}
+                      />
+                    </label>
+                  ))}
+                </div>
+              </div>
             ) : null}
           </div>
         ))}

@@ -113,6 +113,43 @@ test("buildSerializationOpsDashboard", async (t) => {
     assert.equal(publishAction?.execution?.payload.status, "final");
   });
 
+  await t.test("routes submission gaps to the matching repair workspace", () => {
+    const dashboard = buildSerializationOpsDashboard({
+      project,
+      platform,
+      chapters: [chapter],
+      aiTasks: [
+        {
+          id: "review-1",
+          chapterId: "chapter-1",
+          taskType: "chapter_review",
+          status: "succeeded",
+          outputText: JSON.stringify({ score: 90, shouldSecondPass: false, issues: [] }),
+          createdAt: "2026-01-01T00:00:00.000Z",
+        },
+        {
+          id: "second-1",
+          chapterId: "chapter-1",
+          taskType: "chapter_second_pass",
+          status: "succeeded",
+          outputText: "二改正文",
+          createdAt: "2026-01-02T00:00:00.000Z",
+        },
+      ],
+      submissionChecklist: {
+        ...checklist,
+        items: [
+          { id: "opening-hooks", label: "前三章钩子", status: "todo" as const, detail: "缺少开头钩子。" },
+        ],
+      },
+    });
+
+    const submissionAction = dashboard.actions.find((action) => action.id === "submission-gap");
+    assert.equal(submissionAction?.href, "#retention-diagnostic");
+    assert.equal(submissionAction?.hrefLabel, "补开头钩子");
+    assert.ok(submissionAction?.detail.includes("下一步"));
+  });
+
   await t.test("requires second-pass recheck before publish readiness", () => {
     const failedRecheck = buildSerializationOpsDashboard({
       project,

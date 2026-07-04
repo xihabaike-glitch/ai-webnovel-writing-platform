@@ -42,6 +42,8 @@ export interface SerializationAction {
   priority: "high" | "medium" | "low";
   detail: string;
   chapterId?: string;
+  href?: string;
+  hrefLabel?: string;
   execution: SerializationActionExecution | null;
 }
 
@@ -163,11 +165,14 @@ function buildActions(input: SerializationOpsInput, reviewQueue: SerializationCh
     });
   }
   if (failedChecklist[0]) {
+    const repairTarget = submissionGapRepairTarget(failedChecklist[0].id);
     actions.push({
       id: "submission-gap",
       label: "补投稿资料",
       priority: failedChecklist[0].status === "todo" ? "high" : "medium",
-      detail: `${failedChecklist[0].label}：${failedChecklist[0].detail}`,
+      detail: `${failedChecklist[0].label}：${failedChecklist[0].detail} 下一步：${repairTarget.nextStep}`,
+      href: repairTarget.href,
+      hrefLabel: repairTarget.label,
       execution: null,
     });
   }
@@ -182,6 +187,67 @@ function buildActions(input: SerializationOpsInput, reviewQueue: SerializationCh
   }
 
   return actions;
+}
+
+function submissionGapRepairTarget(itemId: string) {
+  const targets: Record<string, { href: string; label: string; nextStep: string }> = {
+    title: {
+      href: "#submission-asset-editor",
+      label: "编辑发布资料",
+      nextStep: "进入发布资料编辑器，补标题和平台展示文案。",
+    },
+    genre: {
+      href: "#submission-asset-editor",
+      label: "编辑发布资料",
+      nextStep: "进入发布资料编辑器，补题材标签和平台定位。",
+    },
+    "selling-point": {
+      href: "#submission-asset-editor",
+      label: "优化卖点",
+      nextStep: "进入发布资料编辑器或投稿包，补一句话卖点。",
+    },
+    "word-count": {
+      href: "#ai-pipeline",
+      label: "补正文",
+      nextStep: "进入批量初稿中心，先把可投稿正文量补上。",
+    },
+    "first-three": {
+      href: "#chapter-production",
+      label: "补前三章",
+      nextStep: "补齐前三章卡片，再进入批量初稿生产。",
+    },
+    "opening-hooks": {
+      href: "#retention-diagnostic",
+      label: "补开头钩子",
+      nextStep: "进入留存诊断，逐章补开头钩子。",
+    },
+    cliffhangers: {
+      href: "#retention-diagnostic",
+      label: "补章末悬念",
+      nextStep: "进入留存诊断，逐章补章末悬念。",
+    },
+    "reviewed-first-three": {
+      href: "#review-pipeline",
+      label: "审前三章",
+      nextStep: "进入批量审稿流水线，先审前三章。",
+    },
+    "final-readiness": {
+      href: "#serialization-ops",
+      label: "处理定稿",
+      nextStep: "优先完成审稿、二改，再把可发布章节标记定稿。",
+    },
+    "platform-risk": {
+      href: "#platform-export",
+      label: "做平台适配",
+      nextStep: "进入平台发布中心，生成平台适配版资料并留下版本记录。",
+    },
+  };
+
+  return targets[itemId] ?? {
+    href: "#submission-package",
+    label: "查看投稿包",
+    nextStep: "进入投稿资料区，按检查项补齐。",
+  };
 }
 
 export function buildSerializationOpsDashboard(input: SerializationOpsInput): SerializationOpsDashboard {

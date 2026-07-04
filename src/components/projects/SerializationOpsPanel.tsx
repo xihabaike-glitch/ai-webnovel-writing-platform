@@ -17,6 +17,8 @@ interface SerializationAction {
   priority: "high" | "medium" | "low";
   detail: string;
   chapterId?: string;
+  href?: string;
+  hrefLabel?: string;
   execution: SerializationActionExecution | null;
 }
 
@@ -56,6 +58,27 @@ function priorityLabel(priority: SerializationAction["priority"]) {
   if (priority === "high") return "高优先级";
   if (priority === "medium") return "中优先级";
   return "低优先级";
+}
+
+function projectHref(projectId: string, href: string) {
+  return href.startsWith("#") ? `/projects/${projectId}${href}` : href;
+}
+
+function checklistRepairTarget(itemId: string) {
+  const targets: Record<string, { href: string; label: string }> = {
+    title: { href: "#submission-asset-editor", label: "编辑发布资料" },
+    genre: { href: "#submission-asset-editor", label: "编辑发布资料" },
+    "selling-point": { href: "#submission-asset-editor", label: "优化卖点" },
+    "word-count": { href: "#ai-pipeline", label: "补正文" },
+    "first-three": { href: "#chapter-production", label: "补前三章" },
+    "opening-hooks": { href: "#retention-diagnostic", label: "补钩子" },
+    cliffhangers: { href: "#retention-diagnostic", label: "补悬念" },
+    "reviewed-first-three": { href: "#review-pipeline", label: "去审稿" },
+    "final-readiness": { href: "#serialization-ops", label: "处理定稿" },
+    "platform-risk": { href: "#platform-export", label: "平台适配" },
+  };
+
+  return targets[itemId] ?? { href: "#submission-package", label: "查看投稿包" };
 }
 
 export function SerializationOpsPanel({ projectId }: { projectId: string }) {
@@ -181,6 +204,11 @@ export function SerializationOpsPanel({ projectId }: { projectId: string }) {
                         {runningActionId === action.id ? "执行中" : action.execution.label}
                       </button>
                     ) : null}
+                    {action.href ? (
+                      <Link className="rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white hover:bg-slate-800" href={projectHref(projectId, action.href)}>
+                        {action.hrefLabel ?? "去处理"}
+                      </Link>
+                    ) : null}
                     {action.chapterId ? (
                       <Link className="rounded-md border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50" href={`/projects/${projectId}/chapters/${action.chapterId}`}>
                         打开章节
@@ -221,7 +249,15 @@ export function SerializationOpsPanel({ projectId }: { projectId: string }) {
           <div className="mt-3 grid gap-2 lg:grid-cols-2">
             {checklist.items.filter((item) => item.status !== "pass").map((item) => (
               <div className="rounded-md bg-slate-50 p-3 text-sm" key={item.id}>
-                <div className="font-medium text-slate-950">{item.label}</div>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="font-medium text-slate-950">{item.label}</div>
+                  <Link
+                    className="rounded-md border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                    href={projectHref(projectId, checklistRepairTarget(item.id).href)}
+                  >
+                    {checklistRepairTarget(item.id).label}
+                  </Link>
+                </div>
                 <p className="mt-1 text-slate-600">{item.detail}</p>
               </div>
             ))}

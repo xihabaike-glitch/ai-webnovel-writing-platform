@@ -79,6 +79,16 @@ interface MultiPlatformSubmissionVariant {
     nextAction: string;
     evidence: string[];
   };
+  decision: {
+    kind: "main" | "scale" | "watch" | "repair" | "collect_data" | "prepare_package" | "pause";
+    label: string;
+    priority: "high" | "medium" | "low";
+    score: number;
+    reason: string;
+    nextAction: string;
+    actionHref: "#publish-effect-panel" | "#submission-package" | "#platform-export";
+    evidence: string[];
+  };
 }
 
 interface MultiPlatformSubmission {
@@ -100,6 +110,19 @@ interface MultiPlatformSubmission {
     signedPlatforms: number;
     bestPlatformId: string | null;
     nextAction: string;
+  };
+  decisionBoard: {
+    status: "no_data" | "needs_repair" | "watch" | "ready_to_scale" | "main_locked";
+    headline: string;
+    primaryPlatformId: string | null;
+    primaryPlatformName: string | null;
+    lanes: Array<{
+      kind: "main" | "scale" | "watch" | "repair" | "collect_data" | "prepare_package" | "pause";
+      label: string;
+      count: number;
+      platformIds: string[];
+    }>;
+    nextActions: string[];
   };
   archive: {
     archiveFileName: string;
@@ -189,6 +212,14 @@ function effectStatusClass(status: "needs_data" | "weak" | "watch" | "promising"
   if (status === "weak") return "bg-rose-50 text-rose-700";
   if (status === "watch") return "bg-blue-50 text-blue-700";
   return "bg-amber-50 text-amber-700";
+}
+
+function decisionStatusClass(kind: MultiPlatformSubmissionVariant["decision"]["kind"]) {
+  if (kind === "main" || kind === "scale") return "bg-emerald-50 text-emerald-700";
+  if (kind === "repair" || kind === "prepare_package") return "bg-rose-50 text-rose-700";
+  if (kind === "watch") return "bg-blue-50 text-blue-700";
+  if (kind === "collect_data") return "bg-amber-50 text-amber-700";
+  return "bg-slate-100 text-slate-600";
 }
 
 export function SubmissionPackagePanel({
@@ -676,6 +707,29 @@ export function SubmissionPackagePanel({
               </div>
             </div>
           </div>
+          <div className="mt-3 rounded-md border border-slate-200 bg-white p-3">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <div className="text-sm font-medium text-slate-900">投放决策板</div>
+                <p className="mt-1 text-sm leading-6 text-slate-600">{multiPlatform.decisionBoard.headline}</p>
+              </div>
+              <div className="w-fit rounded-md bg-slate-50 px-3 py-2 text-xs font-medium text-slate-700">
+                主平台：{multiPlatform.decisionBoard.primaryPlatformName ?? "待确认"}
+              </div>
+            </div>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {multiPlatform.decisionBoard.lanes.map((lane) => (
+                <span className={`rounded-md px-2 py-1 text-xs font-medium ${decisionStatusClass(lane.kind)}`} key={lane.kind}>
+                  {lane.label} {lane.count}
+                </span>
+              ))}
+            </div>
+            <div className="mt-3 grid gap-2">
+              {multiPlatform.decisionBoard.nextActions.map((action) => (
+                <div className="rounded-md bg-slate-50 p-2 text-xs leading-5 text-slate-700" key={action}>{action}</div>
+              ))}
+            </div>
+          </div>
           <div className="mt-3 grid gap-3 lg:grid-cols-2">
             {multiPlatform.variants.map((variant) => (
               <div className="rounded-md bg-slate-50 p-3" key={variant.platformId}>
@@ -704,6 +758,19 @@ export function SubmissionPackagePanel({
                   </div>
                 </div>
                 <p className="mt-3 text-sm leading-6 text-slate-700">{variant.positioning}</p>
+                <div className="mt-3 rounded-md border border-slate-200 bg-white p-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="text-xs font-medium text-slate-500">投放决策</div>
+                    <span className={`rounded-md px-2 py-1 text-xs font-medium ${decisionStatusClass(variant.decision.kind)}`}>
+                      {variant.decision.label} · {variant.decision.score}
+                    </span>
+                  </div>
+                  <p className="mt-2 text-xs leading-5 text-slate-600">{variant.decision.reason}</p>
+                  <p className="mt-1 text-xs leading-5 text-slate-600">{variant.decision.nextAction}</p>
+                  <a className="mt-2 inline-flex w-fit rounded-md border border-slate-200 px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50" href={variant.decision.actionHref}>
+                    去执行
+                  </a>
+                </div>
                 <div className="mt-3 grid gap-2 text-sm text-slate-600">
                   <div>
                     <span className="font-medium text-slate-900">平台包：</span>

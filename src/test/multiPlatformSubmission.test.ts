@@ -73,9 +73,12 @@ test("buildMultiPlatformSubmission", async (t) => {
     assert.ok(result.archive.markdown.includes("多平台投稿包归档"));
     assert.equal(result.effectSummary.trackedPlatforms, 0);
     assert.equal(result.effectSummary.needsDataPlatforms, 8);
+    assert.equal(result.decisionBoard.status, "no_data");
+    assert.ok(result.decisionBoard.lanes.some((lane) => lane.kind === "collect_data"));
     assert.ok(result.markdown.includes("多平台投稿版本"));
     assert.ok(result.markdown.includes("平台包字段"));
     assert.ok(result.markdown.includes("投放追踪"));
+    assert.ok(result.markdown.includes("投放决策"));
   });
 
   await t.test("keeps overseas synopsis visible for overseas platforms", () => {
@@ -114,6 +117,7 @@ test("buildMultiPlatformSubmission", async (t) => {
 
     assert.ok(zhihu);
     assert.equal(zhihu.packageMatrix.status, "needs_work");
+    assert.equal(zhihu.decision.kind, "prepare_package");
     assert.ok(zhihu.packageMatrix.items.some((item) => item.id === "title" && item.status === "missing"));
     assert.ok(zhihu.packageMatrix.items.some((item) => item.id === "sample_chapters" && item.status === "warning"));
     assert.equal(result.packageSummary.readyToArchive, result.packageSummary.readyPlatforms > 0);
@@ -139,12 +143,14 @@ test("buildMultiPlatformSubmission", async (t) => {
     assert.ok(archive.archiveFileName.includes("夜雨-系统-多平台投稿包归档.md"));
     assert.ok(archive.markdown.includes("| 平台 | 状态 | 追踪 | 字段 | 样章 | 摘要字数 | 文件/待补字段 |"));
     assert.ok(archive.markdown.includes("已就绪平台投稿包"));
+    assert.ok(archive.markdown.includes("投放决策板"));
     assert.ok(archive.platforms.some((platform) => platform.fileName.includes("夜雨-系统-番茄小说-投稿包.md")));
     const singlePackage = buildSinglePlatformSubmissionMarkdown(fanqie);
     assert.ok(singlePackage.includes("# 夜雨|系统 番茄小说 投稿包"));
     assert.ok(singlePackage.includes("## 字段矩阵"));
     assert.ok(singlePackage.includes("## 样章摘要"));
     assert.ok(singlePackage.includes("## 投放追踪证据"));
+    assert.ok(singlePackage.includes("## 投放决策证据"));
   });
 
   await t.test("summarizes post-submission effect tracking", () => {
@@ -211,16 +217,23 @@ test("buildMultiPlatformSubmission", async (t) => {
 
     assert.ok(fanqie);
     assert.equal(fanqie.effectTracking.status, "promising");
+    assert.equal(fanqie.decision.kind, "scale");
     assert.equal(fanqie.effectTracking.clickRatePercent, 15);
     assert.equal(fanqie.effectTracking.favoriteRatePercent, 6);
     assert.ok(qimao);
     assert.equal(qimao.effectTracking.status, "weak");
+    assert.equal(qimao.decision.kind, "repair");
     assert.ok(webnovel);
     assert.equal(webnovel.effectTracking.status, "signed");
+    assert.equal(webnovel.decision.kind, "main");
     assert.equal(result.effectSummary.trackedPlatforms, 3);
     assert.equal(result.effectSummary.weakPlatforms, 1);
     assert.equal(result.effectSummary.promisingPlatforms, 1);
     assert.equal(result.effectSummary.signedPlatforms, 1);
+    assert.equal(result.decisionBoard.status, "main_locked");
+    assert.equal(result.decisionBoard.primaryPlatformId, "webnovel");
+    assert.ok(result.decisionBoard.lanes.some((lane) => lane.kind === "repair" && lane.count === 1));
+    assert.ok(result.decisionBoard.nextActions.some((action) => action.includes("WebNovel")));
     assert.ok(result.archive.markdown.includes("有苗头"));
   });
 });

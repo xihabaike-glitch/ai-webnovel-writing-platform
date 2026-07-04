@@ -23,6 +23,7 @@ export interface SubmissionPackageInput {
 
 export interface SubmissionPackage {
   title: string;
+  platformId: string;
   platformName: string;
   logline: string;
   synopsis: string;
@@ -139,6 +140,7 @@ export function buildSubmissionPackage(input: SubmissionPackageInput): Submissio
 
   return {
     title: input.title,
+    platformId: input.platform.id,
     platformName: input.platform.name,
     logline,
     synopsis,

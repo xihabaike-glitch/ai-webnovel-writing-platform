@@ -1,9 +1,11 @@
 "use client";
 
 import { useState } from "react";
+import { buildSubmissionAssetSavePayload } from "@/lib/projects/submissionAssetSavePayload";
 
 interface SubmissionPackageView {
   title: string;
+  platformId: string;
   platformName: string;
   logline: string;
   synopsis: string;
@@ -25,6 +27,7 @@ interface OptimizedSubmissionPackage {
   overseasSynopsis: string;
   tags: string[];
   rationale: string[];
+  sourceTaskId?: string;
 }
 
 interface MultiPlatformSubmissionVariant {
@@ -118,6 +121,7 @@ export function SubmissionPackagePanel({
   const [message, setMessage] = useState<string | null>(null);
   const [isDownloading, setIsDownloading] = useState(false);
   const [isOptimizing, setIsOptimizing] = useState(false);
+  const [isSavingAsset, setIsSavingAsset] = useState(false);
   const [optimized, setOptimized] = useState<OptimizedSubmissionPackage | null>(null);
   const [isLoadingMultiPlatform, setIsLoadingMultiPlatform] = useState(false);
   const [isDownloadingMultiPlatform, setIsDownloadingMultiPlatform] = useState(false);
@@ -164,8 +168,8 @@ export function SubmissionPackagePanel({
       if (!response.ok) {
         throw new Error("优化投稿资料失败。");
       }
-      const payload = (await response.json()) as { optimized: OptimizedSubmissionPackage };
-      setOptimized(payload.optimized);
+      const payload = (await response.json()) as { task?: { id: string }; optimized: OptimizedSubmissionPackage };
+      setOptimized({ ...payload.optimized, sourceTaskId: payload.task?.id });
       setMessage("已生成平台优化版");
     } catch (caught) {
       setMessage(caught instanceof Error ? caught.message : "优化投稿资料失败。");
@@ -178,6 +182,50 @@ export function SubmissionPackagePanel({
     if (!optimized) return;
     await navigator.clipboard.writeText(optimizedMarkdown(submissionPackage.title, optimized));
     setMessage("已复制优化版投稿资料");
+  }
+
+  async function saveSubmissionAsset(source: "base" | "optimized") {
+    const assetSource = source === "optimized" && optimized
+      ? {
+        title: submissionPackage.title,
+        logline: optimized.logline,
+        synopsis: optimized.synopsis,
+        overseasSynopsis: optimized.overseasSynopsis,
+        tags: optimized.tags,
+      }
+      : {
+        title: submissionPackage.title,
+        logline: submissionPackage.logline,
+        synopsis: submissionPackage.synopsis,
+        overseasSynopsis: submissionPackage.overseasSynopsis,
+        tags: submissionPackage.tags,
+      };
+    setIsSavingAsset(true);
+    setMessage(null);
+    try {
+      const response = await fetch(`/api/projects/${projectId}/platform-export`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(buildSubmissionAssetSavePayload({
+          platformId: submissionPackage.platformId,
+          source: assetSource,
+          note: source === "optimized" ? "由投稿资料面板采纳 AI 优化版。" : "由投稿资料面板保存原始投稿包。",
+          sourceTaskId: source === "optimized" ? optimized?.sourceTaskId : undefined,
+          strategy: source === "optimized" ? "投稿资料优化版" : "原始投稿资料",
+          adopt: source === "optimized",
+        })),
+      });
+      const payload = (await response.json().catch(() => null)) as { message?: string; error?: string; audit?: { score: number } } | null;
+      if (!response.ok) {
+        throw new Error(payload?.error ?? "保存发布资产失败。");
+      }
+      const scoreText = payload?.audit?.score ? `，质检 ${payload.audit.score} 分` : "";
+      setMessage(source === "optimized" ? `已采纳优化版到发布资产${scoreText}` : `已保存到发布资产${scoreText}`);
+    } catch (caught) {
+      setMessage(caught instanceof Error ? caught.message : "保存发布资产失败。");
+    } finally {
+      setIsSavingAsset(false);
+    }
   }
 
   async function loadMultiPlatformVersions() {
@@ -291,6 +339,14 @@ export function SubmissionPackagePanel({
           </button>
           <button
             className="rounded-md border border-slate-200 px-3 py-2 text-sm font-medium hover:bg-slate-50 disabled:opacity-50"
+            disabled={isSavingAsset}
+            onClick={() => void saveSubmissionAsset("base")}
+            type="button"
+          >
+            {isSavingAsset ? "保存中" : "保存为发布资产"}
+          </button>
+          <button
+            className="rounded-md border border-slate-200 px-3 py-2 text-sm font-medium hover:bg-slate-50 disabled:opacity-50"
             disabled={isOptimizing}
             onClick={optimizePackage}
             type="button"
@@ -356,13 +412,23 @@ export function SubmissionPackagePanel({
         <div className="mt-4 rounded-md border border-slate-200 p-3">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div className="text-sm font-medium">平台优化版</div>
-            <button
-              className="w-fit rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white"
-              onClick={copyOptimizedMarkdown}
-              type="button"
-            >
-              复制优化版
-            </button>
+            <div className="flex flex-wrap gap-2">
+              <button
+                className="w-fit rounded-md border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                onClick={copyOptimizedMarkdown}
+                type="button"
+              >
+                复制优化版
+              </button>
+              <button
+                className="w-fit rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white disabled:opacity-50"
+                disabled={isSavingAsset}
+                onClick={() => void saveSubmissionAsset("optimized")}
+                type="button"
+              >
+                {isSavingAsset ? "保存中" : "采纳到发布资产"}
+              </button>
+            </div>
           </div>
           <div className="mt-3 grid gap-3">
             <div className="rounded-md bg-slate-50 p-3">

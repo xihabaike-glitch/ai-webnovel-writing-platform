@@ -1,5 +1,6 @@
 import type { PlatformProfile } from "../platforms/platformProfiles.ts";
 import type { GatePlatformGrowthDispatchItem, GatePlatformGrowthReviewStage } from "./gateActionReceipts.ts";
+import type { ProjectStartTacticSummary } from "./projectStartTactics.ts";
 import type { SubmissionChecklist } from "./submissionChecklist.ts";
 
 export interface FirstDayProject {
@@ -63,6 +64,7 @@ export interface FirstDayWorkflowInput {
   worldEntries: FirstDayWorldEntry[];
   aiTasks: FirstDayAiTask[];
   dispatchTasks?: FirstDayDispatchTask[];
+  startTactic?: ProjectStartTacticSummary | null;
   submissionChecklist: SubmissionChecklist;
 }
 
@@ -80,6 +82,10 @@ export interface FirstDayWorkflowStep {
 export interface FirstDayExecutionPackage {
   stepId: string;
   owner: FirstDayWorkflowStep["owner"];
+  riskLevel: FirstDayRiskLevel;
+  riskLabel: string;
+  riskPriorityBoost: number;
+  riskDueLabel: string;
   headline: string;
   actionLabel: string;
   href: string;
@@ -89,6 +95,19 @@ export interface FirstDayExecutionPackage {
   handoffNote: string;
   modelPrompt: string;
   completionEvidenceTemplate: string;
+}
+
+export type FirstDayRiskLevel = "standard" | "watch" | "blocked";
+
+export interface FirstDayRiskProfile {
+  level: FirstDayRiskLevel;
+  label: string;
+  headline: string;
+  instruction: string;
+  acceptanceCriteria: string[];
+  missingEvidence: string[];
+  priorityBoost: number;
+  dueLabel: string;
 }
 
 export interface FirstDayModelExecutionPlan {
@@ -241,6 +260,60 @@ function verdict(completedCount: number, totalSteps: number) {
   return "新书还在冷启动，先把大纲、人物、设定和第一章钩子咬住。";
 }
 
+function startTacticRiskLevel(startTactic: ProjectStartTacticSummary | null | undefined): FirstDayRiskLevel {
+  const label = startTactic?.label ?? "";
+  if (/止损|避坑|blocked/i.test(label)) return "blocked";
+  if (/观察|验收|动作|watch/i.test(label)) return "watch";
+  return "standard";
+}
+
+export function buildFirstDayRiskProfile(startTactic?: ProjectStartTacticSummary | null): FirstDayRiskProfile {
+  const level = startTacticRiskLevel(startTactic);
+
+  if (level === "blocked") {
+    return {
+      level,
+      label: startTactic?.label ?? "避坑",
+      headline: "避坑平台首日只做恢复条件验证。",
+      instruction: "先证明入口卖点、前三章兑现或平台匹配度已经改掉一项，再进入正文生成。",
+      acceptanceCriteria: [
+        "写清本次恢复条件：入口卖点、前三章兑现或平台匹配度至少改掉一项。",
+        "首日只验证一个变量，不允许直接批量生成或平台加码。",
+      ],
+      missingEvidence: ["缺少避坑平台恢复条件确认。"],
+      priorityBoost: 16,
+      dueLabel: "今天止损验证",
+    };
+  }
+
+  if (level === "watch") {
+    return {
+      level,
+      label: startTactic?.label ?? "观察",
+      headline: "观察平台首日只跑小样本验证。",
+      instruction: "把通过线、不可接受项和复查证据写清楚，先看首轮数据再决定是否扩大。",
+      acceptanceCriteria: [
+        "写清首轮小样本通过线和不可接受项。",
+        "保留第一章或前三章复查证据，后续按数据决定是否扩大。",
+      ],
+      missingEvidence: ["缺少观察平台首轮小样本验证口径。"],
+      priorityBoost: 8,
+      dueLabel: "今天小样本验证",
+    };
+  }
+
+  return {
+    level,
+    label: startTactic?.label ?? "标准",
+    headline: "标准首日验证。",
+    instruction: "按普通首日流程推进。",
+    acceptanceCriteria: [],
+    missingEvidence: [],
+    priorityBoost: 0,
+    dueLabel: "今天收口",
+  };
+}
+
 function completionEvidenceTemplate(step: FirstDayWorkflowStep, acceptanceCriteria: string[]) {
   if (step.id === "first-draft") return "第一章正文已生成并写回章节，已覆盖钩子、冲突和章末追读，可以进入审稿。";
   if (step.id === "first-review") return "第一章审稿已完成，已输出钩子、爽点、冲突、解释密度和追读问题，可以进入二改。";
@@ -286,19 +359,29 @@ function executionPackage(step: FirstDayWorkflowStep, context: {
   project: FirstDayProject;
   platform: PlatformProfile;
   chapter: FirstDayChapter | null;
+  riskProfile: FirstDayRiskProfile;
 }): FirstDayExecutionPackage {
+  const withRiskCriteria = (criteria: string[]) => [...criteria, ...context.riskProfile.acceptanceCriteria];
+  const withRiskEvidence = (evidence: string[]) => [...evidence, ...context.riskProfile.missingEvidence];
+  const withRiskHandoff = (handoffNote: string) => context.riskProfile.level === "standard"
+    ? handoffNote
+    : `${context.riskProfile.headline}${context.riskProfile.instruction} ${handoffNote}`;
   const base = {
     stepId: step.id,
     owner: step.owner,
+    riskLevel: context.riskProfile.level,
+    riskLabel: context.riskProfile.label,
+    riskPriorityBoost: context.riskProfile.priorityBoost,
+    riskDueLabel: context.riskProfile.dueLabel,
     actionLabel: step.actionLabel,
     href: step.href,
     chapterId: context.chapter?.id,
   };
 
   if (step.id === "first-draft") {
-    const acceptanceCriteria = ["第一章正文已生成并写回章节", "正文执行了第一章钩子、冲突和章末悬念", "本次生成留下可审稿的任务记录"];
-    const missingEvidence = ["缺少第一章正文或成功初稿任务"];
-    const handoffNote = "别批量开跑。先用第一章验证平台语气、模型路线和成本，再决定是否扩到前三章。";
+    const acceptanceCriteria = withRiskCriteria(["第一章正文已生成并写回章节", "正文执行了第一章钩子、冲突和章末悬念", "本次生成留下可审稿的任务记录"]);
+    const missingEvidence = withRiskEvidence(["缺少第一章正文或成功初稿任务"]);
+    const handoffNote = withRiskHandoff("别批量开跑。先用第一章验证平台语气、模型路线和成本，再决定是否扩到前三章。");
     return {
       ...base,
       headline: "AI 接手第一章初稿，但作者先守住节奏和设定边界。",
@@ -311,9 +394,9 @@ function executionPackage(step: FirstDayWorkflowStep, context: {
   }
 
   if (step.id === "first-review") {
-    const acceptanceCriteria = ["第一章已有结构化审稿结果", "钩子、爽点、冲突、解释密度和章末追读均有判断", "低分问题进入二改或重写队列"];
-    const missingEvidence = ["缺少第一章成功审稿任务"];
-    const handoffNote = "审稿不是夸稿。必须把不适合平台的地方翻出来，下一步才有改稿抓手。";
+    const acceptanceCriteria = withRiskCriteria(["第一章已有结构化审稿结果", "钩子、爽点、冲突、解释密度和章末追读均有判断", "低分问题进入二改或重写队列"]);
+    const missingEvidence = withRiskEvidence(["缺少第一章成功审稿任务"]);
+    const handoffNote = withRiskHandoff("审稿不是夸稿。必须把不适合平台的地方翻出来，下一步才有改稿抓手。");
     return {
       ...base,
       headline: "AI 先当毒舌审稿编辑，别急着自我感动。",
@@ -326,9 +409,9 @@ function executionPackage(step: FirstDayWorkflowStep, context: {
   }
 
   if (step.id === "first-rewrite") {
-    const acceptanceCriteria = ["二改或前三章改写任务已成功", "审稿问题被逐项处理", "改写后保留版本对照和复检入口"];
-    const missingEvidence = ["缺少二改或前三章改写结果"];
-    const handoffNote = "不要只换句子。重点修开头压力、爽点兑现和章末追读。";
+    const acceptanceCriteria = withRiskCriteria(["二改或前三章改写任务已成功", "审稿问题被逐项处理", "改写后保留版本对照和复检入口"]);
+    const missingEvidence = withRiskEvidence(["缺少二改或前三章改写结果"]);
+    const handoffNote = withRiskHandoff("不要只换句子。重点修开头压力、爽点兑现和章末追读。");
     return {
       ...base,
       headline: "AI 做二改，目标是让前三章能被平台读者继续点下去。",
@@ -341,9 +424,9 @@ function executionPackage(step: FirstDayWorkflowStep, context: {
   }
 
   if (step.id === "publish-precheck") {
-    const acceptanceCriteria = ["标题、简介、标签、卖点和样章准备度达标", "平台风险清单已处理或明确保留", "首轮曝光、点击、收藏、追读回收口径已写清"];
-    const missingEvidence = ["投稿准备度或首轮数据回收口径不足"];
-    const handoffNote = "平台包不是装饰。它要能和正文前三章互相兑现，方便首轮数据复盘。";
+    const acceptanceCriteria = withRiskCriteria(["标题、简介、标签、卖点和样章准备度达标", "平台风险清单已处理或明确保留", "首轮曝光、点击、收藏、追读回收口径已写清"]);
+    const missingEvidence = withRiskEvidence(["投稿准备度或首轮数据回收口径不足"]);
+    const handoffNote = withRiskHandoff("平台包不是装饰。它要能和正文前三章互相兑现，方便首轮数据复盘。");
     return {
       ...base,
       headline: "运营收口平台包，先做可验证的小投放基准。",
@@ -356,9 +439,9 @@ function executionPackage(step: FirstDayWorkflowStep, context: {
   }
 
   if (step.id === "story-support") {
-    const acceptanceCriteria = ["主角欲望、需求、缺陷、起点和终点完整", "系统规则、禁忌和平台土壤均已落库", "后续初稿能引用这些支撑材料"];
-    const missingEvidence = ["缺少完整人物弧光或核心设定土壤"];
-    const handoffNote = "人物和设定是土壤，不是百科摆设。每条都要能喂给第一章生成和审稿。";
+    const acceptanceCriteria = withRiskCriteria(["主角欲望、需求、缺陷、起点和终点完整", "系统规则、禁忌和平台土壤均已落库", "后续初稿能引用这些支撑材料"]);
+    const missingEvidence = withRiskEvidence(["缺少完整人物弧光或核心设定土壤"]);
+    const handoffNote = withRiskHandoff("人物和设定是土壤，不是百科摆设。每条都要能喂给第一章生成和审稿。");
     return {
       ...base,
       headline: "策划补齐人物和设定，别让模型在空地上编。",
@@ -371,9 +454,9 @@ function executionPackage(step: FirstDayWorkflowStep, context: {
   }
 
   if (step.id === "opening-hook") {
-    const acceptanceCriteria = ["第一章目标、钩子、冲突、转变和章末悬念完整", "开头动作贴合目标平台", "章节卡可以直接进入初稿生成"];
-    const missingEvidence = ["缺少第一章完整章节卡"];
-    const handoffNote = "这里决定读者会不会留下。先补高压选择、明确冲突和章末追读。";
+    const acceptanceCriteria = withRiskCriteria(["第一章目标、钩子、冲突、转变和章末悬念完整", "开头动作贴合目标平台", "章节卡可以直接进入初稿生成"]);
+    const missingEvidence = withRiskEvidence(["缺少第一章完整章节卡"]);
+    const handoffNote = withRiskHandoff("这里决定读者会不会留下。先补高压选择、明确冲突和章末追读。");
     return {
       ...base,
       headline: "作者先咬住第一章钩子，别把开头写成说明书。",
@@ -385,9 +468,9 @@ function executionPackage(step: FirstDayWorkflowStep, context: {
     };
   }
 
-  const acceptanceCriteria = ["大纲树包含开头、结尾、主干、分支、叶片和土壤", "至少有前三章章节卡", "下一步能打开第一章继续补钩子"];
-  const missingEvidence = ["缺少完整大纲树或前三章章节卡"];
-  const handoffNote = "骨架没落地前，不要进入正文生成。先让项目有开头、结尾、主干和可执行章节卡。";
+  const acceptanceCriteria = withRiskCriteria(["大纲树包含开头、结尾、主干、分支、叶片和土壤", "至少有前三章章节卡", "下一步能打开第一章继续补钩子"]);
+  const missingEvidence = withRiskEvidence(["缺少完整大纲树或前三章章节卡"]);
+  const handoffNote = withRiskHandoff("骨架没落地前，不要进入正文生成。先让项目有开头、结尾、主干和可执行章节卡。");
   return {
     ...base,
     headline: "策划先把作品骨架落地，别让 AI 自由发挥。",
@@ -647,6 +730,7 @@ function dispatchStageForStep(stepId: string): GatePlatformGrowthReviewStage {
 
 export function buildFirstDayWorkflow(input: FirstDayWorkflowInput): FirstDayWorkflow {
   const chapter = firstChapter(input.chapters);
+  const riskProfile = buildFirstDayRiskProfile(input.startTactic);
   const projectHref = `/projects/${input.project.id}`;
   const firstChapterHref = chapter ? `${projectHref}/chapters/${chapter.id}` : projectHref;
   const skeletonDispatch = completedDispatchForStep(input, "skeleton");
@@ -762,6 +846,7 @@ export function buildFirstDayWorkflow(input: FirstDayWorkflowInput): FirstDayWor
       project: input.project,
       platform: input.platform,
       chapter,
+      riskProfile,
     }),
     steps,
   };
@@ -769,6 +854,12 @@ export function buildFirstDayWorkflow(input: FirstDayWorkflowInput): FirstDayWor
 
 export function buildFirstDayDispatchItem(input: FirstDayDispatchInput): GatePlatformGrowthDispatchItem {
   const execution = input.workflow.executionPackage;
+  const priorityScore = Math.min(99, Math.max(40, 100 - input.workflow.progressPercent + execution.riskPriorityBoost));
+  const riskTitlePrefix = execution.riskLevel === "blocked"
+    ? "止损验证 · "
+    : execution.riskLevel === "watch"
+      ? "小样本验证 · "
+      : "";
 
   return {
     id: `first-day:${input.project.id}:${execution.stepId}`,
@@ -776,11 +867,11 @@ export function buildFirstDayDispatchItem(input: FirstDayDispatchInput): GatePla
     platformName: input.platform.name,
     stage: dispatchStageForStep(execution.stepId),
     state: "assigned",
-    priorityScore: Math.max(40, 100 - input.workflow.progressPercent),
+    priorityScore,
     ownerRole: execution.owner,
-    title: `${input.project.title} · ${input.workflow.nextStep.label}`,
+    title: `${input.project.title} · ${riskTitlePrefix}${input.workflow.nextStep.label}`,
     detail: `${execution.headline}${execution.handoffNote ? ` ${execution.handoffNote}` : ""}`,
-    dueLabel: "今天收口",
+    dueLabel: execution.riskDueLabel,
     actionLabel: execution.actionLabel,
     href: execution.href,
     acceptanceCriteria: execution.acceptanceCriteria,

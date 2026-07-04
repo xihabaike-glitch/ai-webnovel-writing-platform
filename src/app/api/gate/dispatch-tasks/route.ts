@@ -536,6 +536,7 @@ async function buildFirstDayFollowUpTasks(task: Awaited<ReturnType<typeof prisma
     characters: project.characters,
     worldEntries: project.worldEntries,
     aiTasks: project.aiTasks,
+    startTactic: findProjectStartTacticSummary(project.worldEntries),
     dispatchTasks: project.gateDispatchTasks.map((dispatchTask) => ({
       dispatchKey: dispatchTask.dispatchKey,
       state: dispatchTask.state,

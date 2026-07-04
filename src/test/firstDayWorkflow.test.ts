@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { getPlatformProfile } from "../lib/platforms/platformProfiles.ts";
-import { buildFirstDayDispatchItem, buildFirstDayExecutionReceipt, buildFirstDayFollowUpDispatch, buildFirstDayLaunchPackage, buildFirstDayLaunchReceipt, buildFirstDayModelExecutionPlan, buildFirstDayWorkflow } from "../lib/projects/firstDayWorkflow.ts";
+import { buildFirstDayDispatchItem, buildFirstDayExecutionReceipt, buildFirstDayFollowUpDispatch, buildFirstDayLaunchPackage, buildFirstDayLaunchReceipt, buildFirstDayModelExecutionPlan, buildFirstDayRiskProfile, buildFirstDayWorkflow } from "../lib/projects/firstDayWorkflow.ts";
 
 const project = {
   id: "project-1",
@@ -302,6 +302,82 @@ test("buildFirstDayWorkflow", async (t) => {
     assert.ok(dispatch.title.includes("夜雨系统"));
     assert.ok(dispatch.acceptanceCriteria.includes("第一章正文已生成并写回章节"));
     assert.ok(dispatch.evidence.includes("缺少第一章正文或成功初稿任务"));
+  });
+
+  await t.test("raises first-day dispatch intensity for blocked start tactics", () => {
+    const platform = getPlatformProfile("qimao");
+    const startTactic = {
+      title: "首轮平台打法：七猫小说",
+      label: "复盘止损",
+      primaryTactic: "七猫小说 返工链复盘已完成，结论是先暂停当前平台方向。",
+      openingMove: "先按避坑样本重做开头钩子。",
+      verificationMove: "如必须验证，只允许一轮小样本。",
+      risk: "已暂停七猫加码，转回投稿包和前三章兑现重判。",
+    };
+    const workflow = buildFirstDayWorkflow({
+      project,
+      platform,
+      chapters: [chapter, { ...chapter, id: "chapter-2", order: 2 }, { ...chapter, id: "chapter-3", order: 3 }],
+      outlineNodes,
+      characters,
+      worldEntries,
+      aiTasks: [],
+      startTactic,
+      submissionChecklist: checklist,
+    });
+
+    const dispatch = buildFirstDayDispatchItem({ workflow, project, platform });
+
+    assert.equal(workflow.executionPackage.riskLevel, "blocked");
+    assert.equal(workflow.executionPackage.riskLabel, "复盘止损");
+    assert.equal(workflow.executionPackage.riskPriorityBoost, 16);
+    assert.ok(workflow.executionPackage.acceptanceCriteria.some((criterion) => criterion.includes("恢复条件")));
+    assert.ok(workflow.executionPackage.missingEvidence.some((evidence) => evidence.includes("恢复条件")));
+    assert.ok(workflow.executionPackage.handoffNote.includes("避坑平台首日"));
+    assert.equal(dispatch.dueLabel, "今天止损验证");
+    assert.ok(dispatch.title.includes("止损验证"));
+    assert.equal(dispatch.priorityScore, 73);
+    assert.ok(dispatch.evidence.some((evidence) => evidence.includes("恢复条件")));
+  });
+
+  await t.test("keeps watch start tactics on a small-sample first-day path", () => {
+    const platform = getPlatformProfile("webnovel");
+    const riskProfile = buildFirstDayRiskProfile({
+      title: "首轮平台打法：WebNovel",
+      label: "验收观察",
+      primaryTactic: "先跑英文网文小样本。",
+      openingMove: "第一章先验海外钩子。",
+      verificationMove: "保留小样本通过线。",
+      risk: "扩大前必须复查留存。",
+    });
+    const workflow = buildFirstDayWorkflow({
+      project,
+      platform,
+      chapters: [chapter, { ...chapter, id: "chapter-2", order: 2 }, { ...chapter, id: "chapter-3", order: 3 }],
+      outlineNodes,
+      characters,
+      worldEntries,
+      aiTasks: [],
+      startTactic: {
+        title: "首轮平台打法：WebNovel",
+        label: "验收观察",
+        primaryTactic: "先跑英文网文小样本。",
+        openingMove: "第一章先验海外钩子。",
+        verificationMove: "保留小样本通过线。",
+        risk: "扩大前必须复查留存。",
+      },
+      submissionChecklist: checklist,
+    });
+
+    const dispatch = buildFirstDayDispatchItem({ workflow, project, platform });
+
+    assert.equal(riskProfile.level, "watch");
+    assert.equal(riskProfile.dueLabel, "今天小样本验证");
+    assert.equal(workflow.executionPackage.riskLevel, "watch");
+    assert.ok(workflow.executionPackage.acceptanceCriteria.some((criterion) => criterion.includes("小样本通过线")));
+    assert.equal(dispatch.dueLabel, "今天小样本验证");
+    assert.ok(dispatch.title.includes("小样本验证"));
+    assert.equal(dispatch.priorityScore, 65);
   });
 
   await t.test("uses completed first-day dispatch evidence to advance the workflow", () => {

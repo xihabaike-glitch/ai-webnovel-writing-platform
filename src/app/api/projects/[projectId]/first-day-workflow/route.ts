@@ -8,6 +8,7 @@ import { getPlatformProfile, type PlatformId } from "@/lib/platforms/platformPro
 import { buildFirstDayContinuationAction } from "@/lib/projects/firstDayContinuation";
 import { buildFirstDayDispatchItem, buildFirstDayExecutionReceipt, buildFirstDayModelExecutionPlan, buildFirstDayWorkflow } from "@/lib/projects/firstDayWorkflow";
 import { generateControlAssets, type ControlAssetAreaId } from "@/lib/projects/controlAssetGeneration";
+import { findProjectStartTacticSummary } from "@/lib/projects/projectStartTactics";
 import { buildSubmissionChecklist } from "@/lib/projects/submissionChecklist";
 
 interface Params {
@@ -73,6 +74,7 @@ async function buildWorkflowPayload(projectId: string) {
     characters: project.characters,
     worldEntries: project.worldEntries,
     aiTasks: project.aiTasks,
+    startTactic: findProjectStartTacticSummary(project.worldEntries),
     dispatchTasks: project.gateDispatchTasks.map((task) => ({
       dispatchKey: task.dispatchKey,
       state: task.state,

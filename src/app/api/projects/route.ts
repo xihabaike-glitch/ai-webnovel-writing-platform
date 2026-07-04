@@ -8,6 +8,7 @@ import { gatePlatformDispatchTaskFromRecord } from "@/lib/projects/gateDispatchT
 import {
   buildProjectStartGateExperience,
   buildProjectStartTacticWorldEntry,
+  findProjectStartTacticSummary,
 } from "@/lib/projects/projectStartTactics";
 import { buildSubmissionChecklist } from "@/lib/projects/submissionChecklist";
 import {
@@ -213,6 +214,7 @@ export async function POST(request: Request) {
       characters: launchProject.characters,
       worldEntries: launchProject.worldEntries,
       aiTasks: launchProject.aiTasks,
+      startTactic: findProjectStartTacticSummary(launchProject.worldEntries),
       submissionChecklist,
     });
 

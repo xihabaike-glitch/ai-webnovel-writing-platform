@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import type { StoryTreeExperienceAxisFilter, StoryTreeExperienceGuide, StoryTreeExperienceItem, StoryTreeExperienceStatus } from "@/lib/ai/storyTreeExperience";
+import type { StoryTreeExperienceAxisFilter, StoryTreeExperienceEffectDashboard, StoryTreeExperienceGuide, StoryTreeExperienceItem, StoryTreeExperienceStatus } from "@/lib/ai/storyTreeExperience";
 
 function statusLabel(status: StoryTreeExperienceStatus) {
   if (status === "usable") return "可复用";
@@ -27,7 +27,19 @@ function actionLabel(status: StoryTreeExperienceStatus) {
   return "生成验证派单";
 }
 
-export function StoryTreeExperiencePanel({ guide, projectId }: { guide: StoryTreeExperienceGuide; projectId: string }) {
+function decisionItemLine(item: StoryTreeExperienceItem) {
+  return `${item.axisLabel}｜${item.action}`;
+}
+
+export function StoryTreeExperiencePanel({
+  effectDashboard,
+  guide,
+  projectId,
+}: {
+  effectDashboard: StoryTreeExperienceEffectDashboard;
+  guide: StoryTreeExperienceGuide;
+  projectId: string;
+}) {
   const [axisFilter, setAxisFilter] = useState<StoryTreeExperienceAxisFilter>("all");
   const filteredItems = axisFilter === "all" ? guide.items : guide.items.filter((item) => item.axisId === axisFilter);
   const topItems = filteredItems.slice(0, 6);
@@ -72,6 +84,67 @@ export function StoryTreeExperiencePanel({ guide, projectId }: { guide: StoryTre
         </Link>
       </div>
       {message ? <p className="mt-3 text-sm text-slate-600">{message}</p> : null}
+      <div className="mt-4 rounded-md border border-slate-200 bg-slate-50 p-3">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <div className="font-medium text-slate-950">回流效果决策台</div>
+            <p className="mt-1 text-sm text-slate-600">{effectDashboard.decision}</p>
+          </div>
+          <div className="grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
+            <div className="rounded-md bg-white p-2">
+              <div className="text-slate-500">继续有效</div>
+              <div className="mt-1 font-medium text-emerald-700">{effectDashboard.summary.reinforced}</div>
+            </div>
+            <div className="rounded-md bg-white p-2">
+              <div className="text-slate-500">效果变弱</div>
+              <div className="mt-1 font-medium text-rose-700">{effectDashboard.summary.weakened}</div>
+            </div>
+            <div className="rounded-md bg-white p-2">
+              <div className="text-slate-500">继续观察</div>
+              <div className="mt-1 font-medium text-amber-700">{effectDashboard.summary.watch}</div>
+            </div>
+            <div className="rounded-md bg-white p-2">
+              <div className="text-slate-500">待回流</div>
+              <div className="mt-1 font-medium text-slate-700">{effectDashboard.summary.noFeedback}</div>
+            </div>
+          </div>
+        </div>
+        <div className="mt-3 grid gap-3 lg:grid-cols-3">
+          <div className="rounded-md bg-white p-3">
+            <div className="text-sm font-medium text-emerald-700">优先复用</div>
+            <div className="mt-2 grid gap-2 text-sm text-slate-600">
+              {effectDashboard.reusableItems.map((item) => (
+                <Link className="hover:text-slate-950 hover:underline" href={item.href} key={item.id}>
+                  {decisionItemLine(item)}
+                </Link>
+              ))}
+              {effectDashboard.reusableItems.length === 0 ? <div>暂无持续有效证据。</div> : null}
+            </div>
+          </div>
+          <div className="rounded-md bg-white p-3">
+            <div className="text-sm font-medium text-rose-700">先做避坑</div>
+            <div className="mt-2 grid gap-2 text-sm text-slate-600">
+              {effectDashboard.avoidItems.map((item) => (
+                <Link className="hover:text-slate-950 hover:underline" href={item.href} key={item.id}>
+                  {decisionItemLine(item)}
+                </Link>
+              ))}
+              {effectDashboard.avoidItems.length === 0 ? <div>暂无变弱经验。</div> : null}
+            </div>
+          </div>
+          <div className="rounded-md bg-white p-3">
+            <div className="text-sm font-medium text-amber-700">继续观察</div>
+            <div className="mt-2 grid gap-2 text-sm text-slate-600">
+              {effectDashboard.watchItems.map((item) => (
+                <Link className="hover:text-slate-950 hover:underline" href={item.href} key={item.id}>
+                  {decisionItemLine(item)}
+                </Link>
+              ))}
+              {effectDashboard.watchItems.length === 0 ? <div>暂无待观察经验。</div> : null}
+            </div>
+          </div>
+        </div>
+      </div>
       <div className="mt-4 flex flex-wrap gap-2">
         {guide.groups.map((group) => (
           <button

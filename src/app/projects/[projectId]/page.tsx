@@ -21,7 +21,7 @@ import { StoryStructureDiagnosticPanel } from "@/components/projects/StoryStruct
 import { SubmissionPackagePanel } from "@/components/projects/SubmissionPackagePanel";
 import { WorldBiblePanel } from "@/components/projects/WorldBiblePanel";
 import { WritingWorkbenchPanel } from "@/components/projects/WritingWorkbenchPanel";
-import { buildStoryTreeExperienceGuide } from "@/lib/ai/storyTreeExperience";
+import { buildStoryTreeExperienceEffectDashboard, buildStoryTreeExperienceGuide } from "@/lib/ai/storyTreeExperience";
 import { prisma } from "@/lib/db/prisma";
 import { getPlatformProfile, type PlatformId } from "@/lib/platforms/platformProfiles";
 import { gatePlatformDispatchTaskFromRecord } from "@/lib/projects/gateDispatchTaskRecords";
@@ -83,6 +83,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ projec
   const storyTreeExperience = buildStoryTreeExperienceGuide(
     project.gateDispatchTasks.map(gatePlatformDispatchTaskFromRecord),
   );
+  const storyTreeExperienceEffectDashboard = buildStoryTreeExperienceEffectDashboard(storyTreeExperience);
   const dashboard = buildProjectDashboard({
     currentWordCount: project.currentWordCount,
     targetWordCount: project.targetWordCount,
@@ -287,7 +288,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ projec
             </div>
           </div>
         </section>
-        <StoryTreeExperiencePanel guide={storyTreeExperience} projectId={project.id} />
+        <StoryTreeExperiencePanel effectDashboard={storyTreeExperienceEffectDashboard} guide={storyTreeExperience} projectId={project.id} />
         <section className="rounded-md border border-slate-200 bg-white p-4">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>

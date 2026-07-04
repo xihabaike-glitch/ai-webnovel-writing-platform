@@ -4,6 +4,7 @@ import {
   buildStoryTreeChapterExperienceRecommendations,
   buildStoryTreeExperienceEffectFeedback,
   buildStoryTreeExperienceApplyDispatch,
+  buildStoryTreeExperienceEffectDashboard,
   buildStoryTreeExperienceGuide,
   buildStoryTreeExperienceSecondPassAdvice,
   matchStoryTreeExperienceAdviceForInstruction,
@@ -97,6 +98,54 @@ test("buildStoryTreeExperienceGuide promotes latest effect feedback and dedupes 
   assert.ok(guide.items[0].effectLine?.includes("效果变弱"));
   assert.ok(guide.promptBlock.includes("避坑｜分支因果"));
   assert.ok(guide.promptBlock.includes("经验应用效果"));
+});
+
+test("buildStoryTreeExperienceEffectDashboard summarizes returned advice effects", () => {
+  const guide = buildStoryTreeExperienceGuide([
+    {
+      dispatchKey: "story-tree-experience:project-1:chapter_draft:branch_causality:reinforced",
+      title: "应用分支因果",
+      href: "/projects/project-1/chapters/chapter-1",
+      evidence: [
+        "大树结构复检：68 -> 78 分，分数变好：结构待精修；返工动作：分支因果：把支线改成主线压力的直接后果。",
+        "经验动作：分支因果：把支线改成主线压力的直接后果。",
+        "经验应用效果：分支因果 78 -> 84 分，继续有效：支线已经反压主线。",
+      ],
+      completedAt: "2026-07-05T11:00:00.000Z",
+      updatedAt: "2026-07-05T11:00:00.000Z",
+    },
+    {
+      dispatchKey: "story-tree-experience:project-1:chapter_draft:opening_ending:weakened",
+      title: "应用开头结尾",
+      href: "/projects/project-1/chapters/chapter-2",
+      evidence: [
+        "大树结构复检：82 -> 72 分，分数变差：开头钩子被削弱；返工动作：开头结尾：删掉开篇解释，先给不可逆选择。",
+        "经验应用效果：开头结尾 72 -> 62 分，效果变弱：开头解释又变多。",
+      ],
+      completedAt: "2026-07-05T10:00:00.000Z",
+      updatedAt: "2026-07-05T10:00:00.000Z",
+    },
+    {
+      dispatchKey: "story-tree:project-1:chapter-3:chapter_draft:trunk_motion",
+      title: "补主干推进",
+      href: "/projects/project-1/chapters/chapter-3",
+      evidence: [
+        "大树结构复检：70 -> 74 分，分数未变：推进还需要观察；返工动作：主干推进：每 800 字必须出现新选择。",
+      ],
+      completedAt: "2026-07-05T09:00:00.000Z",
+      updatedAt: "2026-07-05T09:00:00.000Z",
+    },
+  ]);
+  const dashboard = buildStoryTreeExperienceEffectDashboard(guide);
+
+  assert.equal(dashboard.summary.total, 3);
+  assert.equal(dashboard.summary.reinforced, 1);
+  assert.equal(dashboard.summary.weakened, 1);
+  assert.equal(dashboard.summary.noFeedback, 1);
+  assert.ok(dashboard.decision.includes("有效和变弱经验并存"));
+  assert.equal(dashboard.reusableItems[0].axisLabel, "分支因果");
+  assert.equal(dashboard.avoidItems[0].axisLabel, "开头结尾");
+  assert.equal(dashboard.watchItems[0].axisLabel, "主干推进");
 });
 
 test("buildStoryTreeChapterExperienceRecommendations matches weak chapter axes", () => {

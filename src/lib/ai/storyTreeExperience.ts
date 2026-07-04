@@ -39,6 +39,20 @@ export interface StoryTreeExperienceGuide {
   promptBlock: string;
 }
 
+export interface StoryTreeExperienceEffectDashboard {
+  summary: {
+    total: number;
+    reinforced: number;
+    weakened: number;
+    watch: number;
+    noFeedback: number;
+  };
+  decision: string;
+  reusableItems: StoryTreeExperienceItem[];
+  avoidItems: StoryTreeExperienceItem[];
+  watchItems: StoryTreeExperienceItem[];
+}
+
 export interface StoryTreeExperienceAxisGroup {
   axisId: StoryTreeExperienceAxisFilter;
   axisLabel: string;
@@ -448,6 +462,40 @@ export function buildStoryTreeExperienceGuide(tasks: Pick<PersistedGatePlatformD
     groups: buildAxisGroups(items),
     items,
     promptBlock: buildPromptBlock(items),
+  };
+}
+
+export function buildStoryTreeExperienceEffectDashboard(guide: StoryTreeExperienceGuide): StoryTreeExperienceEffectDashboard {
+  const reinforcedItems = guide.items.filter((item) => item.effectStatus === "reinforced");
+  const weakenedItems = guide.items.filter((item) => item.effectStatus === "weakened");
+  const watchEffectItems = guide.items.filter((item) => item.effectStatus === "watch");
+  const noFeedbackItems = guide.items.filter((item) => !item.effectStatus);
+  const effectTime = (item: StoryTreeExperienceItem) => dateValue(item.completedAt);
+  const byRecent = (left: StoryTreeExperienceItem, right: StoryTreeExperienceItem) => effectTime(right) - effectTime(left);
+
+  let decision = "还没有回流效果证据，先完成一条结构经验派单并复检。";
+  if (reinforcedItems.length > 0 && weakenedItems.length === 0) {
+    decision = "已出现持续有效经验，下章优先复用这些结构动作。";
+  } else if (weakenedItems.length > reinforcedItems.length) {
+    decision = "变弱经验偏多，先避坑或缩小验证范围，不要批量复用。";
+  } else if (reinforcedItems.length > 0 && weakenedItems.length > 0) {
+    decision = "有效和变弱经验并存，先复用持续有效项，同时把变弱项改成避坑检查。";
+  } else if (watchEffectItems.length > 0) {
+    decision = "多数经验还在观察，继续小步验证并补足复检证据。";
+  }
+
+  return {
+    summary: {
+      total: guide.items.length,
+      reinforced: reinforcedItems.length,
+      weakened: weakenedItems.length,
+      watch: watchEffectItems.length,
+      noFeedback: noFeedbackItems.length,
+    },
+    decision,
+    reusableItems: reinforcedItems.sort(byRecent).slice(0, 3),
+    avoidItems: weakenedItems.sort(byRecent).slice(0, 3),
+    watchItems: [...watchEffectItems, ...noFeedbackItems].sort(byRecent).slice(0, 3),
   };
 }
 

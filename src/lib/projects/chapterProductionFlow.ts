@@ -123,6 +123,7 @@ export interface ChapterProductionFlowFollowUpResultNotice {
   actionLabel: string;
   count: number;
   status: "cleared" | "needs_action" | "watch";
+  runAction?: ChapterProductionFlowRecheckAction;
 }
 
 export interface ChapterProductionFlowRecheckNotice {
@@ -237,6 +238,8 @@ function parseFollowUpRecheckResult(task: ChapterProductionFlowGateTask) {
       return {
         status: verdictStatus(storyTreeMatch[3], currentScore),
         line: `大树结构 ${previousScore === null ? currentScore : `${previousScore} -> ${currentScore}`} 分，${storyTreeMatch[3]}：${storyTreeMatch[4].trim()}`,
+        completionEvidence: task.completionEvidence?.trim()
+          || `项目页根据返工验收结果继续复查大树结构：${previousScore === null ? currentScore : `${previousScore} -> ${currentScore}`} 分，${storyTreeMatch[3]}。`,
       };
     }
 
@@ -248,6 +251,8 @@ function parseFollowUpRecheckResult(task: ChapterProductionFlowGateTask) {
       return {
         status: verdictStatus(evidenceLoopMatch[3], currentScore),
         line: `平台证据 ${previousScore === null ? currentScore : `${previousScore} -> ${currentScore}`} 分，${evidenceLoopMatch[3]}：${evidenceLoopMatch[4].trim()}`,
+        completionEvidence: task.completionEvidence?.trim()
+          || `项目页根据返工验收结果继续复查平台证据：${previousScore === null ? currentScore : `${previousScore} -> ${currentScore}`} 分，${evidenceLoopMatch[3]}。`,
       };
     }
   }
@@ -301,6 +306,13 @@ function recheckFollowUpResultNotice(tasks: ChapterProductionFlowGateTask[]): Ch
     const title = task.title?.trim() || task.dispatchKey;
     return `${title}：${result.line}`;
   }).join("；");
+  const unresolvedDispatches = completedTasks
+    .filter((item) => item.result.status === "needs_action")
+    .map((item) => ({
+      dispatchKey: item.task.dispatchKey,
+      completionEvidence: item.result.completionEvidence,
+    }))
+    .slice(0, 10);
 
   return {
     title: `${titlePrefix}：${completedTasks.length} 个完成派单${titleSuffix}`,
@@ -309,6 +321,14 @@ function recheckFollowUpResultNotice(tasks: ChapterProductionFlowGateTask[]): Ch
     actionLabel: "查看派单",
     count: completedTasks.length,
     status,
+    runAction: status === "needs_action" && unresolvedDispatches.length > 0
+      ? {
+          endpoint: "/api/gate/dispatch-tasks",
+          dispatches: unresolvedDispatches,
+          label: `一键再派单 ${unresolvedDispatches.length} 个`,
+          completionEvidence: "项目页返工验收未解除，继续生成下一轮精准返工派单。",
+        }
+      : undefined,
   };
 }
 

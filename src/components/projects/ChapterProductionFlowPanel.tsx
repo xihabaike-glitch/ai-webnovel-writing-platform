@@ -63,6 +63,7 @@ export function ChapterProductionFlowPanel({ flow }: { flow: ChapterProductionFl
   const router = useRouter();
   const [runningStageId, setRunningStageId] = useState<string | null>(null);
   const [runningRecheck, setRunningRecheck] = useState(false);
+  const [runningFollowUpResult, setRunningFollowUpResult] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [followUp, setFollowUp] = useState<ChapterProductionFlowRunAction["afterSuccess"] | null>(null);
   const nextStage = useMemo(
@@ -176,6 +177,59 @@ export function ChapterProductionFlowPanel({ flow }: { flow: ChapterProductionFl
     }
   }
 
+  async function runFollowUpResultNotice() {
+    const notice = flow.followUpResultNotice;
+    const action = notice?.runAction;
+    if (!notice || !action || action.dispatches.length === 0) return;
+    setRunningFollowUpResult(true);
+    setMessage(null);
+    setFollowUp(null);
+    try {
+      const results = await Promise.all(action.dispatches.map(async (dispatch): Promise<ChapterProductionRecheckPayload> => {
+        const response = await fetch(action.endpoint, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            dispatchKey: dispatch.dispatchKey,
+            state: "completed",
+            completionEvidence: dispatch.completionEvidence || action.completionEvidence,
+          }),
+        });
+        const payload = await response.json().catch(() => null) as {
+          storyTreeRecheck?: ChapterProductionRecheckPayload["storyTreeRecheck"];
+          evidenceLoopRecheck?: ChapterProductionRecheckPayload["evidenceLoopRecheck"];
+          followUpTasks?: unknown[];
+          error?: string;
+        } | null;
+        if (!response.ok) throw new Error(payload?.error ?? "再派单失败。");
+        return {
+          storyTreeRecheck: payload?.storyTreeRecheck ?? null,
+          evidenceLoopRecheck: payload?.evidenceLoopRecheck ?? null,
+          followUpTasks: payload?.followUpTasks ?? [],
+        };
+      }));
+      const followUpTaskCount = results.reduce((sum, result) => sum + (result.followUpTasks?.length ?? 0), 0);
+      const decision = buildChapterProductionRecheckDecision(results, {
+        href: notice.href,
+        label: notice.actionLabel,
+      });
+      setMessage(followUpTaskCount > 0 ? "下一轮返工派单已生成" : decision.title);
+      setFollowUp({
+        href: followUpTaskCount > 0 ? "/dispatch" : decision.href,
+        label: followUpTaskCount > 0 ? "查看派单" : decision.label,
+        detail: followUpTaskCount > 0
+          ? `${decision.detail} 已自动生成 ${followUpTaskCount} 条下一轮返工派单。`
+          : decision.detail,
+      });
+      router.refresh();
+    } catch (caught) {
+      setMessage(caught instanceof Error ? caught.message : "再派单失败。");
+      setFollowUp(null);
+    } finally {
+      setRunningFollowUpResult(false);
+    }
+  }
+
   function renderStageAction(stage: ChapterProductionFlowStage, primary = false) {
     const buttonClass = primary
       ? "w-fit rounded-md bg-slate-950 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50"
@@ -255,12 +309,24 @@ export function ChapterProductionFlowPanel({ flow }: { flow: ChapterProductionFl
             <div className="font-medium">{flow.followUpResultNotice.title}</div>
             <p className={`mt-1 text-xs leading-5 ${followUpResultTone.detail}`}>{flow.followUpResultNotice.detail}</p>
           </div>
-          <Link
-            className={`w-fit rounded-md px-3 py-1.5 text-xs font-medium ${followUpResultTone.action}`}
-            href={flow.followUpResultNotice.href}
-          >
-            {flow.followUpResultNotice.actionLabel}
-          </Link>
+          <div className="flex flex-wrap gap-2">
+            {flow.followUpResultNotice.runAction ? (
+              <button
+                className={`w-fit rounded-md px-3 py-1.5 text-xs font-medium disabled:opacity-50 ${followUpResultTone.action}`}
+                disabled={runningFollowUpResult || runningRecheck || runningStageId !== null}
+                onClick={runFollowUpResultNotice}
+                type="button"
+              >
+                {runningFollowUpResult ? "再派单中" : flow.followUpResultNotice.runAction.label}
+              </button>
+            ) : null}
+            <Link
+              className={`w-fit rounded-md px-3 py-1.5 text-xs font-medium ${followUpResultTone.action}`}
+              href={flow.followUpResultNotice.href}
+            >
+              {flow.followUpResultNotice.actionLabel}
+            </Link>
+          </div>
         </div>
       ) : null}
       {flow.recheckNotice ? (

@@ -105,3 +105,29 @@ test("buildChapterProductionRecheckFollowUpTasks skips already persisted follow 
 
   assert.equal(dispatches.length, 0);
 });
+
+test("buildChapterProductionRecheckFollowUpTasks can create a second-round follow up from a failed follow-up dispatch", () => {
+  const dispatches = buildChapterProductionRecheckFollowUpTasks({
+    projectTitle: "夜雨系统",
+    platformId: "fanqie",
+    platformName: "番茄小说",
+    sourceDispatchKey: "story-tree-followup:project-1:chapter-1:story-tree-project-1-chapter-1-chapter_draft-opening_ending:74",
+    now: "2026-07-05T00:00:00.000Z",
+    storyTreeRecheck: {
+      projectId: "project-1",
+      chapterId: "chapter-1",
+      previousScore: 74,
+      currentScore: 77,
+      delta: 3,
+      label: "仍低于放行线",
+      verdict: "improved",
+      topAction: "继续补人物选择的不可逆代价。",
+      axisSummary: ["人物弧光 72 分/watch", "主线推进 77 分/watch"],
+    },
+  });
+
+  assert.equal(dispatches.length, 1);
+  assert.ok(dispatches[0].id.startsWith("story-tree-followup:project-1:chapter-1:story-tree-followup-project-1-chapter-1"));
+  assert.ok(dispatches[0].detail.includes("仍低于放行线"));
+  assert.ok(dispatches[0].acceptanceCriteria.some((item) => item.includes("80 分以上")));
+});

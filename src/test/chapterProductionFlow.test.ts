@@ -386,4 +386,39 @@ test("buildChapterProductionFlow summarizes completed recheck follow-up results"
   assert.equal(flow.followUpResultNotice?.actionLabel, "查看派单");
   assert.ok(flow.followUpResultNotice?.detail.includes("第一章 · 大树复查未解除"));
   assert.ok(flow.followUpResultNotice?.detail.includes("大树结构 74 -> 86 分，分数变好"));
+  assert.equal(flow.followUpResultNotice?.runAction, undefined);
+});
+
+test("buildChapterProductionFlow exposes rerun action for unresolved follow-up results", () => {
+  const flow = buildChapterProductionFlow({
+    projectId: "project-1",
+    chapters: [],
+    aiTasks: [],
+    gateTasks: [
+      {
+        dispatchKey: "submission-recheck-followup:project-1:qimao:submission-precheck-project-1-platform-risk:72",
+        state: "completed",
+        href: "/projects/project-1#submission-precheck",
+        title: "夜雨系统 · 投稿复查未解除",
+        actionLabel: "修投稿包",
+        ownerRole: "运营",
+        priorityScore: 84,
+        completedAt: "2026-07-05T11:00:00.000Z",
+        evidence: [
+          "来源派单：submission-precheck:project-1:platform-risk",
+          "证据闭环复检：72 -> 72 分，分数未变：仍需修复",
+        ],
+      },
+    ],
+    submissionChecklist: checklistReady,
+  });
+
+  assert.equal(flow.followUpResultNotice?.status, "needs_action");
+  assert.equal(flow.followUpResultNotice?.title, "返工验收未解除：1 个完成派单仍需处理");
+  assert.equal(flow.followUpResultNotice?.runAction?.endpoint, "/api/gate/dispatch-tasks");
+  assert.equal(flow.followUpResultNotice?.runAction?.label, "一键再派单 1 个");
+  assert.deepEqual(flow.followUpResultNotice?.runAction?.dispatches, [{
+    dispatchKey: "submission-recheck-followup:project-1:qimao:submission-precheck-project-1-platform-risk:72",
+    completionEvidence: "项目页根据返工验收结果继续复查平台证据：72 -> 72 分，分数未变。",
+  }]);
 });

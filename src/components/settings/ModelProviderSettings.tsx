@@ -560,7 +560,9 @@ export function ModelProviderSettings({
   const firstDayFocusTaskType = searchParams.get("taskType");
   const firstDayReturnProjectId = searchParams.get("projectId");
   const isFirstDayRouteFocus = searchParams.get("focus") === "first-day-route";
-  const firstDayReturnHref = firstDayReturnProjectId ? `/projects/${encodeURIComponent(firstDayReturnProjectId)}` : "/projects";
+  const firstDayReturnHref = firstDayReturnProjectId
+    ? `/projects/${encodeURIComponent(firstDayReturnProjectId)}?firstDayRoute=repaired#first-day-workflow`
+    : "/projects";
   const existingByProvider = useMemo(
     () => new Map(providers.map((provider) => [provider.providerId, provider])),
     [providers],

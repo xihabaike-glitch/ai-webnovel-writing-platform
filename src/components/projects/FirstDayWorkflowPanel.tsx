@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { buildFirstDayExecutionRouteBlockMessage, type FirstDayExecutionRouteStatus } from "@/lib/model-gateway/firstDayExecutionRoute";
 import { buildFirstDayStepView, completeFirstDayDispatchStep } from "@/lib/projects/firstDayWorkflowView";
 import { persistGateDispatchTask, type GatePlatformGrowthDispatchItem } from "@/lib/projects/gateActionReceipts";
@@ -69,6 +70,12 @@ function modelSettingsRepairHref(route: FirstDayModelRouteStatus, projectId: str
   return `/settings/models?${params.toString()}`;
 }
 
+function refreshedRouteMessage(route: FirstDayModelRouteStatus) {
+  const blockMessage = buildFirstDayExecutionRouteBlockMessage(route);
+  if (!blockMessage) return `已刷新首日模型路线：${route.taskLabel}路线就绪，可以继续执行当前节点。`;
+  return `已刷新首日模型路线：${blockMessage}`;
+}
+
 function FirstDayStepCard({ step, index }: { step: FirstDayWorkflowStep; index: number }) {
   const view = buildFirstDayStepView(step);
 
@@ -99,6 +106,8 @@ function FirstDayStepCard({ step, index }: { step: FirstDayWorkflowStep; index: 
 }
 
 export function FirstDayWorkflowPanel({ projectId }: { projectId: string }) {
+  const searchParams = useSearchParams();
+  const routeRepairReturn = searchParams.get("firstDayRoute") === "repaired";
   const [workflow, setWorkflow] = useState<FirstDayWorkflow | null>(null);
   const [dispatch, setDispatch] = useState<GatePlatformGrowthDispatchItem | null>(null);
   const [modelRoute, setModelRoute] = useState<FirstDayModelRouteStatus | null>(null);
@@ -109,7 +118,7 @@ export function FirstDayWorkflowPanel({ projectId }: { projectId: string }) {
   const [completionEvidence, setCompletionEvidence] = useState("");
   const [message, setMessage] = useState<string | null>(null);
 
-  async function loadWorkflow() {
+  async function loadWorkflow(options?: { fromRouteRepair?: boolean }) {
     setIsLoading(true);
     setMessage(null);
     try {
@@ -125,6 +134,9 @@ export function FirstDayWorkflowPanel({ projectId }: { projectId: string }) {
       setWorkflow(payload.workflow);
       setDispatch(payload.dispatch);
       setModelRoute(payload.modelRoute);
+      if (options?.fromRouteRepair) {
+        setMessage(refreshedRouteMessage(payload.modelRoute));
+      }
     } catch (caught) {
       setMessage(caught instanceof Error ? caught.message : "读取首日工作流失败。");
     } finally {
@@ -201,8 +213,8 @@ export function FirstDayWorkflowPanel({ projectId }: { projectId: string }) {
   }
 
   useEffect(() => {
-    void loadWorkflow();
-  }, [projectId]);
+    void loadWorkflow({ fromRouteRepair: routeRepairReturn });
+  }, [projectId, routeRepairReturn]);
 
   const routeBlockMessage = modelRoute ? buildFirstDayExecutionRouteBlockMessage(modelRoute) : null;
 
@@ -216,7 +228,7 @@ export function FirstDayWorkflowPanel({ projectId }: { projectId: string }) {
         <button
           className="rounded-md border border-slate-200 px-3 py-2 text-sm font-medium hover:bg-slate-50 disabled:opacity-50"
           disabled={isLoading}
-          onClick={loadWorkflow}
+          onClick={() => void loadWorkflow()}
           type="button"
         >
           {isLoading ? "读取中" : "刷新工作流"}

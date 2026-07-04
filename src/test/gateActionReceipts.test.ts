@@ -3101,23 +3101,48 @@ test("buildGateActionReceipt", async (t) => {
         createdAt: "2026-01-01T00:00:03.000Z",
         updatedAt: "2026-01-01T00:00:04.000Z",
       },
+      {
+        ...baseDispatch,
+        id: "story-tree-followup:project-1:chapter-1:source:74",
+        databaseId: "dispatch-db-4",
+        dispatchKey: "story-tree-followup:project-1:chapter-1:source:74",
+        projectId: "project-1",
+        sourceReceiptId: null,
+        completionEvidence: "",
+        platformId: "fanqie",
+        platformName: "番茄小说",
+        stage: "start_rewrite_opening" as const,
+        state: "assigned" as const,
+        ownerRole: "作者",
+        priorityScore: 91,
+        assignedAt: "2026-01-01T00:00:05.000Z",
+        completedAt: null,
+        createdAt: "2026-01-01T00:00:05.000Z",
+        updatedAt: "2026-01-01T00:00:05.000Z",
+      },
     ];
 
     const center = buildGateDispatchTaskCenter(tasks);
     const assigned = filterGateDispatchTasks(tasks, { state: "assigned" });
     const fanqie = filterGateDispatchTasks(tasks, { platformId: "fanqie" });
+    const recheckFollowUps = filterGateDispatchTasks(tasks, { recheckFollowUpOnly: true });
 
-    assert.equal(center.summary.total, 3);
-    assert.equal(center.summary.active, 2);
+    assert.equal(center.summary.total, 4);
+    assert.equal(center.summary.active, 3);
     assert.equal(center.summary.queued, 1);
-    assert.equal(center.summary.assigned, 1);
+    assert.equal(center.summary.assigned, 2);
     assert.equal(center.summary.completed, 1);
+    assert.equal(center.summary.recheckFollowUp, 1);
+    assert.equal(center.summary.activeRecheckFollowUp, 1);
     assert.equal(center.platforms[0].id, "fanqie");
+    assert.ok(center.nextActions.some((actionText) => actionText.includes("复查失败返工")));
     assert.ok(center.nextActions.some((actionText) => actionText.includes("高优先级")));
-    assert.equal(assigned.length, 1);
-    assert.equal(assigned[0].platformId, "qimao");
-    assert.equal(fanqie.length, 1);
+    assert.equal(assigned.length, 2);
+    assert.equal(assigned[0].dispatchKey, "story-tree-followup:project-1:chapter-1:source:74");
+    assert.equal(fanqie.length, 2);
     assert.equal(fanqie[0].ownerRole, "投稿资产编辑");
+    assert.equal(recheckFollowUps.length, 1);
+    assert.equal(recheckFollowUps[0].ownerRole, "作者");
   });
 
   await t.test("flags overdue and today dispatch closeout items", () => {

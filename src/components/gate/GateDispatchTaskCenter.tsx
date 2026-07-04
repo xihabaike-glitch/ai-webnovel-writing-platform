@@ -7,6 +7,7 @@ import {
   buildGateDispatchEvidenceReview,
   buildGateDispatchTaskCenter,
   filterGateDispatchTasks,
+  isChapterProductionRecheckFollowUpTask,
   persistGateDispatchTask,
   updatePersistedGateDispatchTaskState,
   type GateActionReceipt,
@@ -131,6 +132,7 @@ export function GateDispatchTaskCenter({
   const [stateFilter, setStateFilter] = useState<GateDispatchTaskStateFilter>("all");
   const [platformFilter, setPlatformFilter] = useState("all");
   const [roleFilter, setRoleFilter] = useState("all");
+  const [queueFilter, setQueueFilter] = useState<"all" | "recheck_followup">("all");
   const [routeFlowFilter, setRouteFlowFilter] = useState<RouteConfirmationDispatchTaskFilter>("all");
   const [runningKey, setRunningKey] = useState<string | null>(null);
   const [runningRouteAdviceId, setRunningRouteAdviceId] = useState<string | null>(null);
@@ -154,9 +156,10 @@ export function GateDispatchTaskCenter({
       state: stateFilter,
       platformId: platformFilter,
       ownerRole: roleFilter,
+      recheckFollowUpOnly: queueFilter === "recheck_followup",
     });
     return filterRouteConfirmationDispatchTasks(baseTasks, routeFlowFilter);
-  }, [platformFilter, roleFilter, routeFlowFilter, stateFilter, tasks]);
+  }, [platformFilter, queueFilter, roleFilter, routeFlowFilter, stateFilter, tasks]);
 
   function evidenceLoopRecheckMessage(updated: Awaited<ReturnType<typeof updatePersistedGateDispatchTaskState>>) {
     const recheck = updated.evidenceLoopRecheck;
@@ -360,6 +363,15 @@ export function GateDispatchTaskCenter({
           <div className="text-xs text-slate-500">已逾期</div>
           <div className="mt-1 text-2xl font-semibold">{center.summary.overdue}</div>
         </div>
+        <button
+          className={`rounded-md border p-3 text-left ${queueFilter === "recheck_followup" ? "border-amber-300 bg-amber-50 text-amber-900" : "border-slate-200 bg-white"}`}
+          onClick={() => setQueueFilter((current) => current === "recheck_followup" ? "all" : "recheck_followup")}
+          type="button"
+        >
+          <div className="text-xs opacity-75">复查返工</div>
+          <div className="mt-1 text-2xl font-semibold">{center.summary.activeRecheckFollowUp}</div>
+          <div className="mt-1 text-xs opacity-75">共 {center.summary.recheckFollowUp}</div>
+        </button>
         <div className="rounded-md border border-slate-200 bg-white p-3">
           <div className="text-xs text-slate-500">今天收</div>
           <div className="mt-1 text-2xl font-semibold">{center.summary.dueToday}</div>
@@ -803,7 +815,18 @@ export function GateDispatchTaskCenter({
 
       <section className="rounded-md border border-slate-200 bg-white p-4">
         <div className="font-medium text-slate-950">筛选</div>
-        <div className="mt-3 grid gap-2 md:grid-cols-3">
+        <div className="mt-3 grid gap-2 md:grid-cols-4">
+          <label className="grid gap-1 text-xs font-medium text-slate-600">
+            队列
+            <select
+              className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800"
+              onChange={(event) => setQueueFilter(event.target.value as "all" | "recheck_followup")}
+              value={queueFilter}
+            >
+              <option value="all">全部队列</option>
+              <option value="recheck_followup">复查失败返工</option>
+            </select>
+          </label>
           <label className="grid gap-1 text-xs font-medium text-slate-600">
             状态
             <select
@@ -857,12 +880,14 @@ export function GateDispatchTaskCenter({
             ? parseRouteDispatchCompletionEvidence(task, task.completionEvidence)
             : null;
           const completionRecordChips = completionRecord ? routeCompletionRecordChips(completionRecord) : [];
+          const isRecheckFollowUp = isChapterProductionRecheckFollowUpTask(task);
           return (
           <div className="rounded-md border border-slate-200 bg-white p-4" key={task.dispatchKey}>
             <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
               <div>
                 <div className="flex flex-wrap items-center gap-2">
                   <span className={`rounded-md px-2 py-1 text-xs font-medium ${stateClass(task.state)}`}>{stateLabel(task.state)}</span>
+                  {isRecheckFollowUp ? <span className="rounded-md bg-amber-50 px-2 py-1 text-xs font-medium text-amber-800">复查返工</span> : null}
                   <span className="font-semibold text-slate-950">{task.title}</span>
                   <span className="text-sm text-slate-500">{task.platformName}</span>
                 </div>

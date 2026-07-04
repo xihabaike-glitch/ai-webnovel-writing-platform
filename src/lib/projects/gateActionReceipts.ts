@@ -312,6 +312,7 @@ export interface GateDispatchTaskFilters {
   state?: GateDispatchTaskStateFilter;
   platformId?: string;
   ownerRole?: string;
+  recheckFollowUpOnly?: boolean;
 }
 
 export interface GateDispatchTaskCenter {
@@ -323,6 +324,8 @@ export interface GateDispatchTaskCenter {
     active: number;
     overdue: number;
     dueToday: number;
+    recheckFollowUp: number;
+    activeRecheckFollowUp: number;
     averagePriorityScore: number;
   };
   platforms: Array<{
@@ -356,6 +359,11 @@ export interface GateDispatchTaskCloseoutItem {
   detail: string;
   href: string;
   dueAt: string | null;
+}
+
+export function isChapterProductionRecheckFollowUpTask(task: Pick<PersistedGatePlatformDispatchTask, "dispatchKey">) {
+  return task.dispatchKey.startsWith("story-tree-followup:")
+    || task.dispatchKey.startsWith("submission-recheck-followup:");
 }
 
 export type GateDispatchEvidenceReviewStatus = "verified" | "needs_receipt" | "missing_evidence" | "active";
@@ -2806,7 +2814,8 @@ export function filterGateDispatchTasks(
     .filter((task) => true
       && (!filters.state || filters.state === "all" || task.state === filters.state)
       && (!filters.platformId || filters.platformId === "all" || task.platformId === filters.platformId)
-      && (!filters.ownerRole || filters.ownerRole === "all" || task.ownerRole === filters.ownerRole))
+      && (!filters.ownerRole || filters.ownerRole === "all" || task.ownerRole === filters.ownerRole)
+      && (!filters.recheckFollowUpOnly || isChapterProductionRecheckFollowUpTask(task)))
     .sort((left, right) => {
       const stateWeight: Record<GatePlatformGrowthDispatchState, number> = { queued: 0, assigned: 1, completed: 2 };
       const stateDiff = stateWeight[left.state] - stateWeight[right.state];
@@ -2935,6 +2944,8 @@ export function buildGateDispatchTaskCenter(
   const queued = tasks.filter((task) => task.state === "queued").length;
   const assigned = tasks.filter((task) => task.state === "assigned").length;
   const completed = tasks.filter((task) => task.state === "completed").length;
+  const recheckFollowUp = tasks.filter(isChapterProductionRecheckFollowUpTask).length;
+  const activeRecheckFollowUp = tasks.filter((task) => task.state !== "completed" && isChapterProductionRecheckFollowUpTask(task)).length;
   const highPriorityQueued = tasks.filter((task) => task.state === "queued" && task.priorityScore >= 70).length;
   const activeRoles = [...roleMap.values()].filter((role) => role.active > 0).length;
   const topPlatform = [...platformMap.values()].sort((left, right) => right.active - left.active || right.total - left.total)[0] ?? null;
@@ -2960,6 +2971,8 @@ export function buildGateDispatchTaskCenter(
       active: queued + assigned,
       overdue,
       dueToday,
+      recheckFollowUp,
+      activeRecheckFollowUp,
       averagePriorityScore: tasks.length ? Math.round(totalPriorityScore / tasks.length) : 0,
     },
     platforms: [...platformMap.values()].sort((left, right) => (
@@ -2977,6 +2990,7 @@ export function buildGateDispatchTaskCenter(
     nextActions: [
       overdue > 0 ? `先收 ${overdue} 个逾期派单，拖着不处理就是假闭环。` : null,
       dueToday > 0 ? `今天必须收 ${dueToday} 个派单，至少补齐证据或阻塞原因。` : null,
+      activeRecheckFollowUp > 0 ? `先处理 ${activeRecheckFollowUp} 个复查失败返工派单，别让同一个卡点重复冒烟。` : null,
       highPriorityQueued > 0 ? `先派掉 ${highPriorityQueued} 个高优先级任务，别让平台机会窗口过期。` : null,
       assigned > 0 ? `跟进 ${assigned} 个已派任务，要求按验收标准回填证据。` : null,
       topPlatform && topPlatform.active > 0 ? `${topPlatform.name} 当前活跃派单最多，先压低它的未闭环数量。` : null,

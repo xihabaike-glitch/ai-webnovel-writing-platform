@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { buildModelSetupOnboarding } from "../lib/model-gateway/modelSetupOnboarding.ts";
 import { getProviderModelPresets, providerModelPresets, providerOptions } from "../lib/model-gateway/providerDefaults.ts";
 import { buildProviderSetupGuide } from "../lib/model-gateway/providerSetupGuide.ts";
+import { buildProviderSetupWizard } from "../lib/model-gateway/providerSetupWizard.ts";
 
 test("provider model presets", async (t) => {
   await t.test("covers the named cloud providers with writing task presets", () => {
@@ -76,6 +77,56 @@ test("provider model presets", async (t) => {
     assert.ok(kimi?.taskTags.includes("长篇规划"));
     assert.equal(guide.summary.ready, 1);
     assert.ok(guide.nextActions.some((action) => action.includes("API Key")));
+  });
+
+  await t.test("builds a true model setup wizard before first-day routing", () => {
+    const wizard = buildProviderSetupWizard({
+      options: providerOptions,
+      presets: providerModelPresets,
+      providers: [
+        {
+          providerId: "deepseek",
+          enabled: true,
+          hasApiKey: true,
+          baseUrl: "https://api.deepseek.com",
+          defaultModel: "deepseek-chat",
+          maxContextTokens: 64000,
+        },
+        {
+          providerId: "kimi",
+          enabled: true,
+          hasApiKey: false,
+          baseUrl: "https://api.moonshot.ai/v1",
+          defaultModel: "kimi-k2.6",
+          maxContextTokens: 128000,
+        },
+        {
+          providerId: "claude",
+          enabled: false,
+          hasApiKey: true,
+          baseUrl: "https://api.anthropic.com",
+          defaultModel: "claude-sonnet-4-5",
+          maxContextTokens: 200000,
+        },
+      ],
+    });
+
+    const ids = wizard.items.map((item) => item.providerId);
+    const deepseek = wizard.items.find((item) => item.providerId === "deepseek");
+    const kimi = wizard.items.find((item) => item.providerId === "kimi");
+    const claude = wizard.items.find((item) => item.providerId === "claude");
+    const gpt = wizard.items.find((item) => item.providerId === "gpt");
+
+    assert.deepEqual(ids, ["deepseek", "kimi", "claude", "gpt"]);
+    assert.equal(deepseek?.status, "ready");
+    assert.equal(kimi?.status, "needs_key");
+    assert.equal(claude?.status, "needs_save");
+    assert.equal(gpt?.status, "needs_key");
+    assert.equal(wizard.summary.ready, 1);
+    assert.equal(wizard.summary.needsKey, 2);
+    assert.equal(wizard.summary.needsSave, 1);
+    assert.ok(deepseek?.fitTags.includes("正文初稿"));
+    assert.ok(wizard.nextActions.some((action) => action.includes("至少先接入 2 个真实模型")));
   });
 
   await t.test("builds a continuous setup onboarding flow before first-day execution", () => {

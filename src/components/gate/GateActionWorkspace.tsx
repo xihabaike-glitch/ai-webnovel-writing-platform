@@ -27,6 +27,7 @@ import {
   buildGatePlatformTacticExperienceMarkdown,
   buildGatePlatformDispatchReceipt,
   buildGateKnowledgeFeedbackDispatchItems,
+  buildGatePlatformEvidenceLoopDispatchItems,
   buildGatePlatformGrowthDispatchItems,
   buildGateProjectStartValidationDispatchItems,
   buildGateProjectStartValidationReview,
@@ -46,6 +47,7 @@ import {
   fetchPersistedGateActionReceipts,
   fetchPersistedGateDispatchTasks,
   fetchGateKnowledgeFeedbackReceipts,
+  fetchGatePlatformEvidenceLoops,
   gateActionReceiptUpdatedEvent,
   loadGateActionReceipts,
   mergeGateActionReceipts,
@@ -77,6 +79,7 @@ import {
   type GatePlatformTacticExperienceStatus,
   type GatePlatformGrowthDispatchItem,
   type GateKnowledgeFeedbackReceipt,
+  type GatePlatformEvidenceLoop,
   type GatePlatformGrowthReview,
   type PersistedGatePlatformDispatchTask,
 } from "@/lib/projects/gateActionReceipts";
@@ -345,6 +348,7 @@ export function GateActionWorkspace({
   const [timelineExportMessage, setTimelineExportMessage] = useState("");
   const [persistedDispatchTasks, setPersistedDispatchTasks] = useState<PersistedGatePlatformDispatchTask[]>([]);
   const [knowledgeFeedbackReceipts, setKnowledgeFeedbackReceipts] = useState<GateKnowledgeFeedbackReceipt[]>([]);
+  const [platformEvidenceLoops, setPlatformEvidenceLoops] = useState<GatePlatformEvidenceLoop[]>([]);
   const filteredReceipts = filterGateActionReceipts(receipts, {
     status: statusFilter,
     executionType: executionFilter,
@@ -369,6 +373,7 @@ export function GateActionWorkspace({
     ...buildGateProjectStartMetricFollowupDispatchItems(persistedDispatchTasks, persistedDispatchTasks),
     ...buildGateProjectSecondMetricDispatchItems(allSecondMetricDecision, persistedDispatchTasks),
     ...buildGateProjectSecondMetricFollowupDispatchItems(persistedDispatchTasks, persistedDispatchTasks),
+    ...buildGatePlatformEvidenceLoopDispatchItems(platformEvidenceLoops, 5, persistedDispatchTasks),
     ...buildGateKnowledgeFeedbackDispatchItems(knowledgeFeedbackReceipts, 4, persistedDispatchTasks),
     ...buildGatePlatformGrowthDispatchItems(receipts, 6, persistedDispatchTasks),
   ]
@@ -431,6 +436,9 @@ export function GateActionWorkspace({
       .catch(() => undefined);
     void fetchGateKnowledgeFeedbackReceipts({ limit: 20 })
       .then(setKnowledgeFeedbackReceipts)
+      .catch(() => undefined);
+    void fetchGatePlatformEvidenceLoops({ limit: 20 })
+      .then(setPlatformEvidenceLoops)
       .catch(() => undefined);
 
     function handleReceiptUpdate(event: Event) {

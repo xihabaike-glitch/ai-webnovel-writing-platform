@@ -14,6 +14,7 @@ import {
   buildGatePlatformGrowthReview,
   buildGatePlatformGrowthDispatchItems,
   buildGateKnowledgeFeedbackDispatchItems,
+  buildGatePlatformEvidenceLoopDispatchItems,
   buildGateProjectStartValidationDispatchItems,
   buildGateProjectStartValidationReview,
   buildGateProjectStartNextDispatchItems,
@@ -1196,6 +1197,82 @@ test("buildGateActionReceipt", async (t) => {
     }]);
 
     assert.equal(dispatchItems.length, 0);
+  });
+
+  await t.test("turns platform evidence loop scores into gate dispatch cards", () => {
+    const dispatchItems = buildGatePlatformEvidenceLoopDispatchItems([
+      {
+        projectId: "project-1",
+        projectTitle: "夜雨系统",
+        platformId: "fanqie",
+        platformName: "番茄小说",
+        score: 86,
+        status: "scale",
+        label: "可加码",
+        headline: "番茄小说 证据闭环够硬，可以小步加码。",
+        nextAction: "扩大一个可控变量，保留旧版本做对照。",
+        actionLabel: "进入小步加码",
+        targetAnchor: "platform-export",
+        evidence: ["反哺回执 2 条，其中 Gate 完成回灌 1 条。", "最新数据：曝光 1600，点击 320。"],
+        metricsCount: 1,
+        feedbackCount: 2,
+        gateCompletionCount: 1,
+      },
+      {
+        projectId: "project-2",
+        projectTitle: "雨夜备选",
+        platformId: "qimao",
+        platformName: "七猫",
+        score: 42,
+        status: "repair",
+        label: "先修打法",
+        headline: "七猫 证据偏软，先别扩大投入。",
+        nextAction: "优先修标题简介、前三章钩子或投稿资产。",
+        actionLabel: "修平台打法",
+        targetAnchor: "first-three-rewrite",
+        evidence: ["还没有平台反哺回执。", "最新数据：曝光 1200，点击 180。"],
+        metricsCount: 1,
+        feedbackCount: 0,
+        gateCompletionCount: 0,
+      },
+    ], 5, [{
+      databaseId: "task-evidence-loop",
+      dispatchKey: "evidence-loop:project-1:fanqie:scale",
+      id: "evidence-loop:project-1:fanqie:scale",
+      projectId: "project-1",
+      platformId: "fanqie",
+      platformName: "番茄小说",
+      stage: "scale_up",
+      state: "assigned",
+      priorityScore: 88,
+      ownerRole: "增长运营",
+      title: "番茄小说 可加码派单",
+      detail: "旧任务",
+      dueLabel: "下一轮更新前",
+      actionLabel: "进入小步加码",
+      href: "/projects/project-1#platform-export",
+      acceptanceCriteria: [],
+      evidence: [],
+      sourceReceiptId: null,
+      completionEvidence: "",
+      reviewLatestAt: "2026-01-07T00:00:00.000Z",
+      assignedAt: "2026-01-07T00:00:00.000Z",
+      completedAt: null,
+      createdAt: "2026-01-07T00:00:00.000Z",
+      updatedAt: "2026-01-07T00:00:00.000Z",
+    }]);
+
+    assert.equal(dispatchItems.length, 2);
+    const repairDispatch = dispatchItems.find((item) => item.id === "evidence-loop:project-2:qimao:repair");
+    const scaleDispatch = dispatchItems.find((item) => item.id === "evidence-loop:project-1:fanqie:scale");
+    assert.ok(repairDispatch);
+    assert.equal(repairDispatch.stage, "repair_tactic");
+    assert.equal(repairDispatch.ownerRole, "主编");
+    assert.equal(repairDispatch.href, "/projects/project-2#first-three-rewrite");
+    assert.ok(scaleDispatch);
+    assert.equal(scaleDispatch.stage, "scale_up");
+    assert.equal(scaleDispatch.state, "assigned");
+    assert.ok(scaleDispatch.detail.includes("证据闭环 86 分"));
   });
 
   await t.test("turns project start validation advice into three dispatch cards", () => {

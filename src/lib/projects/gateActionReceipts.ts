@@ -249,6 +249,24 @@ export interface GateKnowledgeFeedbackReceipt {
   createdAt: string;
 }
 
+export interface GatePlatformEvidenceLoop {
+  projectId: string;
+  projectTitle: string;
+  platformId: string;
+  platformName: string;
+  score: number;
+  status: "empty" | "pause" | "repair" | "watch" | "scale";
+  label: string;
+  headline: string;
+  nextAction: string;
+  actionLabel: string;
+  targetAnchor: string;
+  evidence: string[];
+  metricsCount: number;
+  feedbackCount: number;
+  gateCompletionCount: number;
+}
+
 export interface PersistedGatePlatformDispatchTask extends GatePlatformGrowthDispatchItem {
   databaseId: string;
   dispatchKey: string;
@@ -2142,6 +2160,81 @@ export function buildGateKnowledgeFeedbackDispatchItems(
     .slice(0, limit);
 }
 
+function evidenceLoopStage(status: GatePlatformEvidenceLoop["status"]): GatePlatformGrowthReviewStage {
+  if (status === "scale") return "scale_up";
+  if (status === "watch") return "record_metrics";
+  if (status === "repair") return "repair_tactic";
+  if (status === "pause") return "pause_platform";
+  return "adopt_asset";
+}
+
+function evidenceLoopOwnerRole(status: GatePlatformEvidenceLoop["status"]) {
+  if (status === "scale") return "增长运营";
+  if (status === "watch") return "运营数据编辑";
+  if (status === "repair") return "主编";
+  if (status === "pause") return "主编";
+  return "包装运营";
+}
+
+function evidenceLoopDueLabel(status: GatePlatformEvidenceLoop["status"]) {
+  if (status === "scale") return "下一轮更新前";
+  if (status === "watch") return "48小时内补证据";
+  if (status === "repair") return "今天修打法";
+  if (status === "pause") return "今天止损";
+  return "今天启动";
+}
+
+export function buildGatePlatformEvidenceLoopDispatchItems(
+  loops: GatePlatformEvidenceLoop[],
+  limit = 5,
+  persistedTasks: PersistedGatePlatformDispatchTask[] = [],
+): GatePlatformGrowthDispatchItem[] {
+  const persistedByKey = new Map(persistedTasks.map((task) => [task.dispatchKey, task]));
+  return [...loops]
+    .sort((left, right) => right.score - left.score || left.projectTitle.localeCompare(right.projectTitle))
+    .map((loop): GatePlatformGrowthDispatchItem => {
+      const stage = evidenceLoopStage(loop.status);
+      const dispatchKey = `evidence-loop:${loop.projectId}:${loop.platformId}:${loop.status}`;
+      const persisted = persistedByKey.get(dispatchKey);
+      const projectLabel = `《${loop.projectTitle}》`;
+      const title = `${loop.platformName} ${loop.label}派单`;
+      return {
+        id: dispatchKey,
+        platformId: loop.platformId,
+        platformName: loop.platformName,
+        stage,
+        state: persisted?.state ?? "queued",
+        priorityScore: loop.status === "pause"
+          ? 96
+          : loop.status === "repair"
+            ? 92
+            : loop.status === "scale"
+              ? 88
+              : loop.status === "empty"
+                ? 84
+                : 78,
+        ownerRole: evidenceLoopOwnerRole(loop.status),
+        title,
+        detail: `${projectLabel} ${loop.headline} 证据闭环 ${loop.score} 分。下一步：${loop.nextAction}`,
+        dueLabel: evidenceLoopDueLabel(loop.status),
+        actionLabel: loop.actionLabel,
+        href: `/projects/${loop.projectId}#${loop.targetAnchor}`,
+        acceptanceCriteria: [
+          `证据闭环状态已处理：${loop.label}`,
+          `已执行下一步：${loop.nextAction}`,
+          "项目控制台或平台导出中心已有新的证据回填",
+        ],
+        evidence: [
+          `证据闭环 ${loop.score} 分：${loop.label}`,
+          ...loop.evidence,
+        ].slice(0, 4),
+        reviewLatestAt: new Date().toISOString(),
+      };
+    })
+    .filter((item, index, allItems) => allItems.findIndex((candidate) => candidate.id === item.id) === index)
+    .slice(0, limit);
+}
+
 export function buildGateProjectStartValidationDispatchItems(
   receipts: GateActionReceipt[],
   persistedTasks: PersistedGatePlatformDispatchTask[] = [],
@@ -2663,6 +2756,19 @@ export async function fetchGateKnowledgeFeedbackReceipts(options?: { limit?: num
   } | null;
   if (!response.ok) throw new Error(payload?.error ?? "读取平台反哺记录失败。");
   return payload?.receipts ?? [];
+}
+
+export async function fetchGatePlatformEvidenceLoops(options?: { limit?: number }) {
+  const params = new URLSearchParams();
+  if (options?.limit) params.set("limit", String(options.limit));
+  const query = params.toString() ? `?${params.toString()}` : "";
+  const response = await fetch(`/api/gate/evidence-loops${query}`, { cache: "no-store" });
+  const payload = (await response.json().catch(() => null)) as {
+    loops?: GatePlatformEvidenceLoop[];
+    error?: string;
+  } | null;
+  if (!response.ok) throw new Error(payload?.error ?? "读取平台证据闭环评分失败。");
+  return payload?.loops ?? [];
 }
 
 export function filterGateDispatchTasks(

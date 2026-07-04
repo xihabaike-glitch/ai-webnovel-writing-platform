@@ -364,6 +364,7 @@ export interface GateDispatchRecheckFollowUpChain {
   latestHref: string;
   latestUpdatedAt: string;
   reviewAdvice?: GateDispatchRecheckFollowUpReviewAdvice;
+  reviewIntervention?: GateDispatchRecheckFollowUpIntervention;
   rounds: Array<{
     round: number;
     dispatchKey: string;
@@ -384,6 +385,20 @@ export interface GateDispatchRecheckFollowUpReviewAdvice {
   nextAction: string;
   ownerRole: string;
   dispatch: GatePlatformGrowthDispatchItem;
+}
+
+export type GateDispatchRecheckFollowUpInterventionStatus = "intervened" | "stopped" | "continue_rework";
+
+export interface GateDispatchRecheckFollowUpIntervention {
+  dispatchKey: string;
+  status: GateDispatchRecheckFollowUpInterventionStatus;
+  label: string;
+  detail: string;
+  state: GatePlatformGrowthDispatchState;
+  title: string;
+  ownerRole: string;
+  href: string;
+  completedAt: string | null;
 }
 
 export type GateDispatchTaskCloseoutStatus = "overdue" | "today" | "planned" | "done";
@@ -407,9 +422,18 @@ export function isChapterProductionRecheckFollowUpTask(task: Pick<PersistedGateP
     || task.dispatchKey.startsWith("submission-recheck-followup:");
 }
 
+function isRecheckReviewDispatchTask(task: Pick<PersistedGatePlatformDispatchTask, "dispatchKey">) {
+  return task.dispatchKey.startsWith("recheck-review:");
+}
+
 function sourceDispatchKeyFromEvidence(task: Pick<PersistedGatePlatformDispatchTask, "evidence">) {
   const sourceLine = task.evidence.find((line) => line.startsWith("来源派单："));
   return sourceLine?.replace("来源派单：", "").trim() || null;
+}
+
+function recheckChainRootFromEvidence(task: Pick<PersistedGatePlatformDispatchTask, "evidence">) {
+  const rootLine = task.evidence.find((line) => line.startsWith("返工链根："));
+  return rootLine?.replace("返工链根：", "").trim() || null;
 }
 
 function taskReviewText(task: PersistedGatePlatformDispatchTask) {
@@ -2967,6 +2991,7 @@ export function buildGateDispatchTaskCloseoutItem(
 
 function buildGateDispatchRecheckFollowUpChains(tasks: PersistedGatePlatformDispatchTask[]): GateDispatchRecheckFollowUpChain[] {
   const followUps = tasks.filter(isChapterProductionRecheckFollowUpTask);
+  const reviewDispatches = tasks.filter(isRecheckReviewDispatchTask);
   const taskByKey = new Map(followUps.map((task) => [task.dispatchKey, task]));
   const rootMemo = new Map<string, string>();
   const roundMemo = new Map<string, number>();
@@ -2995,6 +3020,12 @@ function buildGateDispatchRecheckFollowUpChains(tasks: PersistedGatePlatformDisp
   for (const task of followUps) {
     const root = rootFor(task);
     chains.set(root, [...(chains.get(root) ?? []), task]);
+  }
+  const reviewDispatchesByRoot = new Map<string, PersistedGatePlatformDispatchTask[]>();
+  for (const task of reviewDispatches) {
+    const root = recheckChainRootFromEvidence(task);
+    if (!root) continue;
+    reviewDispatchesByRoot.set(root, [...(reviewDispatchesByRoot.get(root) ?? []), task]);
   }
 
   function reviewAdviceForChain(
@@ -3151,6 +3182,47 @@ function buildGateDispatchRecheckFollowUpChains(tasks: PersistedGatePlatformDisp
     };
   }
 
+  function reviewInterventionForChain(rootDispatchKey: string): GateDispatchRecheckFollowUpIntervention | undefined {
+    const reviewTasks = reviewDispatchesByRoot.get(rootDispatchKey);
+    if (!reviewTasks?.length) return undefined;
+    const latestReview = [...reviewTasks].sort((left, right) => (
+      new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime()
+      || right.priorityScore - left.priorityScore
+    ))[0];
+    const reviewType = latestReview.dispatchKey.includes(":direction_pause:")
+      ? "direction_pause"
+      : latestReview.dispatchKey.includes(":acceptance_mismatch:")
+        ? "acceptance_mismatch"
+        : "weak_execution";
+    const status: GateDispatchRecheckFollowUpInterventionStatus = latestReview.state !== "completed"
+      ? "intervened"
+      : reviewType === "direction_pause"
+        ? "stopped"
+        : "continue_rework";
+    const label = status === "intervened"
+      ? "复盘已介入"
+      : status === "stopped"
+        ? "已止损"
+        : "继续返工";
+    const detail = status === "intervened"
+      ? "复盘派单已生成，先收口复盘结论，再决定是否继续返工。"
+      : status === "stopped"
+        ? "复盘派单已完成，当前链路应先暂停方向或平台加码。"
+        : "复盘派单已完成，可以按新验收标准或新动作继续返工。";
+
+    return {
+      dispatchKey: latestReview.dispatchKey,
+      status,
+      label,
+      detail,
+      state: latestReview.state,
+      title: latestReview.title,
+      ownerRole: latestReview.ownerRole,
+      href: latestReview.href,
+      completedAt: latestReview.completedAt,
+    };
+  }
+
   return [...chains.entries()].map(([rootDispatchKey, chainTasks]) => {
     const rounds = chainTasks
       .map((task) => ({
@@ -3187,6 +3259,7 @@ function buildGateDispatchRecheckFollowUpChains(tasks: PersistedGatePlatformDisp
       latestHref: latest.href,
       latestUpdatedAt: latest.updatedAt,
       reviewAdvice: reviewAdviceForChain(rootDispatchKey, chainTasks, maxRound, latest),
+      reviewIntervention: reviewInterventionForChain(rootDispatchKey),
       rounds,
     };
   }).sort((left, right) => (

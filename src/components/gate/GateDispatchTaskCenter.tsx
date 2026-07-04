@@ -59,6 +59,12 @@ function recheckAdviceClass(tone: "amber" | "rose" | "sky") {
   return "border-amber-200 bg-amber-50 text-amber-900";
 }
 
+function recheckInterventionClass(status: NonNullable<GateDispatchRecheckFollowUpChain["reviewIntervention"]>["status"]) {
+  if (status === "stopped") return "border-rose-200 bg-rose-50 text-rose-900";
+  if (status === "continue_rework") return "border-amber-200 bg-amber-50 text-amber-900";
+  return "border-sky-200 bg-sky-50 text-sky-900";
+}
+
 function evidenceClass(status: GateDispatchEvidenceReviewStatus) {
   if (status === "missing_evidence") return "border-rose-200 bg-rose-50 text-rose-800";
   if (status === "needs_receipt") return "border-amber-200 bg-amber-50 text-amber-800";
@@ -305,7 +311,7 @@ export function GateDispatchTaskCenter({
   }
 
   async function createRecheckReviewDispatch(chain: GateDispatchRecheckFollowUpChain) {
-    if (!chain.reviewAdvice) return;
+    if (!chain.reviewAdvice || chain.reviewIntervention) return;
     setRunningRecheckAdviceKey(chain.rootDispatchKey);
     setErrorMessage("");
     setRouteActionMessage("");
@@ -558,6 +564,19 @@ export function GateDispatchTaskCenter({
                   <span className="rounded-md bg-white px-2 py-1">未闭环 {chain.active}</span>
                   <span className="rounded-md bg-white px-2 py-1">完成 {chain.completed}</span>
                 </div>
+                {chain.reviewIntervention ? (
+                  <div className={`mt-3 rounded-md border p-3 text-xs leading-5 ${recheckInterventionClass(chain.reviewIntervention.status)}`}>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-medium">{chain.reviewIntervention.label}</span>
+                      <span className="rounded-md bg-white/70 px-2 py-1">{stateLabel(chain.reviewIntervention.state)}</span>
+                      <span className="opacity-80">{chain.reviewIntervention.ownerRole}</span>
+                    </div>
+                    <p className="mt-1">{chain.reviewIntervention.detail}</p>
+                    <Link className="mt-2 inline-flex rounded-md bg-white/80 px-2 py-1 font-medium hover:bg-white" href={chain.reviewIntervention.href}>
+                      查看复盘派单
+                    </Link>
+                  </div>
+                ) : null}
                 <div className="mt-2 flex flex-wrap gap-1">
                   {chain.rounds.map((round) => (
                     <span
@@ -568,7 +587,7 @@ export function GateDispatchTaskCenter({
                     </span>
                   ))}
                 </div>
-                {chain.reviewAdvice ? (
+                {chain.reviewAdvice && !chain.reviewIntervention ? (
                   <div className={`mt-3 rounded-md border p-3 text-xs leading-5 ${recheckAdviceClass(chain.reviewAdvice.tone)}`}>
                     <div className="font-medium">{chain.reviewAdvice.title}</div>
                     <p className="mt-1">{chain.reviewAdvice.detail}</p>

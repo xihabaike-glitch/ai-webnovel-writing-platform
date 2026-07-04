@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { SecondPassMode } from "@/lib/ai/buildChapterSecondPassPrompt";
-import type { StoryTreeChapterExperienceRecommendation, StoryTreeExperienceEffectFeedback, StoryTreeExperienceSecondPassAdvice, StoryTreeExperienceStatus } from "@/lib/ai/storyTreeExperience";
+import type { StoryTreeChapterExperienceRecommendation, StoryTreeExperienceEffectFeedback, StoryTreeExperienceEffectStatus, StoryTreeExperienceSecondPassAdvice, StoryTreeExperienceStatus } from "@/lib/ai/storyTreeExperience";
 
 interface SecondPassResult {
   task: {
@@ -74,6 +74,18 @@ function experienceStatusLabel(status: StoryTreeExperienceStatus) {
 function experienceStatusClass(status: StoryTreeExperienceStatus) {
   if (status === "usable") return "bg-emerald-50 text-emerald-700";
   if (status === "avoid") return "bg-rose-50 text-rose-700";
+  return "bg-amber-50 text-amber-700";
+}
+
+function experienceEffectLabel(status: StoryTreeExperienceEffectStatus) {
+  if (status === "reinforced") return "继续有效";
+  if (status === "weakened") return "效果变弱";
+  return "继续观察";
+}
+
+function experienceEffectClass(status: StoryTreeExperienceEffectStatus) {
+  if (status === "reinforced") return "bg-emerald-50 text-emerald-700";
+  if (status === "weakened") return "bg-rose-50 text-rose-700";
   return "bg-amber-50 text-amber-700";
 }
 
@@ -275,9 +287,20 @@ export function ChapterSecondPassPanel({
                     {experienceStatusLabel(advice.status)}
                   </span>
                   <span className="text-xs text-slate-500">{advice.axisLabel}</span>
+                  {advice.effectStatus ? (
+                    <span className={`rounded-md px-2 py-1 text-xs font-medium ${experienceEffectClass(advice.effectStatus)}`}>
+                      {experienceEffectLabel(advice.effectStatus)}
+                    </span>
+                  ) : null}
                 </div>
                 <div className="mt-2 font-medium text-slate-950">{advice.title}</div>
                 <p className="mt-2 leading-6 text-slate-600">{advice.instruction}</p>
+                {advice.effectLine ? (
+                  <div className="mt-2 rounded-md bg-slate-50 px-3 py-2 text-xs leading-5 text-slate-600">
+                    <div className="font-medium text-slate-700">上次回流效果</div>
+                    <p>{advice.effectLine}</p>
+                  </div>
+                ) : null}
                 {advice.completionEvidence ? (
                   <div className="mt-2 border-l-2 border-slate-200 pl-3 text-xs leading-5 text-slate-500">
                     <div className="font-medium text-slate-700">派单完成依据</div>

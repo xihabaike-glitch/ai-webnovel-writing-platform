@@ -259,6 +259,7 @@ test("buildStoryTreeExperienceSecondPassAdvice turns completed apply dispatches 
       evidence: [
         "大树结构复检：68 -> 78 分，分数变好：结构待精修；返工动作：分支因果：把支线改成主线压力的直接后果。",
         "经验动作：分支因果：把支线改成主线压力的直接后果。",
+        "经验应用效果：分支因果 78 -> 84 分，继续有效：继续让支线服务主线压力。",
       ],
       completionEvidence: "已把妹妹支线改成反派逼迫主角暴露系统的直接压力。",
       completedAt: "2026-07-05T10:00:00.000Z",
@@ -284,6 +285,8 @@ test("buildStoryTreeExperienceSecondPassAdvice turns completed apply dispatches 
   assert.equal(advice[0].axisId, "branch_causality");
   assert.equal(advice[0].sourceScore, 78);
   assert.equal(advice[0].status, "usable");
+  assert.equal(advice[0].effectStatus, "reinforced");
+  assert.ok(advice[0].effectLine?.includes("继续有效"));
   assert.equal(advice[0].action, "分支因果：把支线改成主线压力的直接后果。");
   assert.equal(advice[0].completionEvidence, "已把妹妹支线改成反派逼迫主角暴露系统的直接压力。");
   assert.ok(advice[0].instruction.includes("沿用已完成派单结论二改「分支因果」"));

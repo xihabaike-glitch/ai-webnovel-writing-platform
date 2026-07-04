@@ -53,6 +53,8 @@ export interface StoryTreeExperienceSecondPassAdvice {
   databaseId?: string;
   title: string;
   status: StoryTreeExperienceStatus;
+  effectStatus: StoryTreeExperienceEffectStatus | null;
+  effectLine: string | null;
   axisId: string;
   axisLabel: string;
   sourceScore: number | null;
@@ -501,6 +503,7 @@ export function buildStoryTreeExperienceSecondPassAdvice(
       const { axisId } = taskAxisFromApplyDispatchKey(task.dispatchKey);
       const axisLabel = axisLabels[axisId] ?? "大树结构";
       const status = taskStatusFromEvidence(task.evidence);
+      const effect = taskEffectFromEvidence(task.evidence);
       const action = taskActionFromEvidence(task.evidence);
       const sourceScore = taskSourceScoreFromEvidence(task.evidence);
       const completion = task.completionEvidence.trim();
@@ -514,6 +517,8 @@ export function buildStoryTreeExperienceSecondPassAdvice(
         databaseId: task.databaseId,
         title: task.title,
         status,
+        effectStatus: effect.effectStatus,
+        effectLine: effect.effectLine,
         axisId,
         axisLabel,
         sourceScore,

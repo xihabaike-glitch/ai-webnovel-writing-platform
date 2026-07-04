@@ -18,7 +18,7 @@ async function dashboardForProject(projectId: string) {
 
 export async function PATCH(request: Request, { params }: Params) {
   const { foreshadowId } = await params;
-  const body = await request.json();
+  const body = await request.json() as Record<string, unknown>;
   const input = foreshadowPayloadSchema.parse(body);
   const existing = await prisma.foreshadow.findUnique({ where: { id: foreshadowId } });
 
@@ -32,7 +32,9 @@ export async function PATCH(request: Request, { params }: Params) {
       title: input.title,
       setupChapterId: input.setupChapterId,
       payoffChapterId: input.payoffChapterId,
-      relatedCharacterIds: JSON.stringify(input.relatedCharacterIds),
+      relatedCharacterIds: Array.isArray(body.relatedCharacterIds)
+        ? JSON.stringify(input.relatedCharacterIds)
+        : existing.relatedCharacterIds,
       status: input.status,
       notes: input.notes,
     },

@@ -135,7 +135,7 @@ export interface WritingWorkbench {
 
 export interface WritingWorkbenchQuickFix {
   id: string;
-  kind: "chapter_hook" | "chapter_card" | "character_seed" | "story_line_seed" | "world_seed";
+  kind: "chapter_hook" | "chapter_card" | "character_seed" | "story_line_seed" | "foreshadow_seed" | "world_seed";
   label: string;
   description: string;
   method: "PATCH" | "POST";
@@ -429,6 +429,43 @@ function buildQuickFixes(
         status: "active",
       },
     });
+  }
+
+  if (storyLineBlock?.missing.includes("缺少伏笔卡")) {
+    fixes.push({
+      id: "foreshadow-seed",
+      kind: "foreshadow_seed",
+      label: "补开篇伏笔卡",
+      description: "给开头埋一个后续必须兑现的钩子，避免正文只靠单章爽点往前推。",
+      method: "POST",
+      endpoint: `/api/projects/${input.project.id}/story-lines`,
+      payload: {
+        title: `${input.project.title}开篇伏笔`,
+        setupChapterId: nextChapter?.id ?? "",
+        payoffChapterId: "",
+        status: "planned",
+        notes: `围绕「${input.project.sellingPoint || input.project.genre}」埋下一个读者会记住的问题，并在中后段用反转或代价兑现。`,
+      },
+    });
+  } else if (storyLineBlock?.missing.includes("伏笔缺少埋设说明")) {
+    const weakForeshadow = input.foreshadows?.find((item) => !item.setupChapterId && !hasText(item.notes));
+    if (weakForeshadow) {
+      fixes.push({
+        id: `foreshadow-setup-${weakForeshadow.id}`,
+        kind: "foreshadow_seed",
+        label: "补伏笔埋设说明",
+        description: `「${weakForeshadow.title}」缺少埋点或说明，先补成可被模型召回的线索卡。`,
+        method: "PATCH",
+        endpoint: `/api/foreshadows/${weakForeshadow.id}`,
+        payload: {
+          title: weakForeshadow.title,
+          setupChapterId: nextChapter?.id ?? "",
+          payoffChapterId: weakForeshadow.payoffChapterId ?? "",
+          status: weakForeshadow.status || "planned",
+          notes: `埋设方式：在${nextChapter ? `「${nextChapter.title}」` : "开篇"}出现一个异常细节，让读者暂时误以为是背景信息；回收时揭示它与主线选择或人物代价有关。`,
+        },
+      });
+    }
   }
 
   const hasSoil = input.worldEntries.length > 0 || input.outlineNodes.some((node) => node.type === "soil");

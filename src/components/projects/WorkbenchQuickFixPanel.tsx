@@ -23,7 +23,10 @@ function fieldLabel(field: string) {
     title: "标题",
     startChapterId: "起点章节",
     endChapterId: "终点章节",
+    setupChapterId: "埋设章节",
+    payoffChapterId: "回收章节",
     status: "状态",
+    notes: "伏笔说明",
     content: "内容",
   };
 

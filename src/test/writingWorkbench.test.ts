@@ -133,6 +133,12 @@ test("buildWritingWorkbench", async (t) => {
       && fix.payload.kind === "plot_thread"
       && fix.payload.startChapterId === "c1"
     )));
+    assert.ok(workbench.quickFixes.some((fix) => (
+      fix.kind === "foreshadow_seed"
+      && fix.endpoint === "/api/projects/p1/story-lines"
+      && fix.payload.setupChapterId === "c1"
+      && fix.payload.notes.includes("雨夜危机")
+    )));
     assert.ok(workbench.quickFixes.some((fix) => fix.kind === "world_seed" && fix.payload.type === "platform_soil"));
     assert.ok(workbench.modelActions.some((action) => action.kind === "opening_diagnostic" && action.method === "GET"));
     assert.ok(workbench.modelActions.some((action) => action.kind === "chapter_draft" && action.endpoint === "/api/ai/tasks/chapter-draft"));
@@ -189,6 +195,11 @@ test("buildWritingWorkbench", async (t) => {
       && fix.payload.kind === "plot_thread"
       && fix.payload.startChapterId === ""
     )));
+    assert.ok(workbench.quickFixes.some((fix) => (
+      fix.kind === "foreshadow_seed"
+      && fix.payload.setupChapterId === ""
+      && fix.payload.notes.includes("废脉少年")
+    )));
     assert.ok(!workbench.quickFixes.some((fix) => fix.kind === "world_seed"));
     assert.ok(workbench.modelActions.every((action) => action.disabledReason?.includes("先创建第一章")));
     assert.ok(workbench.contextFocus.summary.includes("设定 1"));
@@ -228,6 +239,59 @@ test("buildWritingWorkbench", async (t) => {
     assert.equal(item.retryAction?.supported, false);
     assert.equal(item.retryAction?.label, "回项目处理");
     assert.ok(item.retryAction?.reason.includes("没有绑定章节"));
+  });
+
+  await t.test("turns weak foreshadow cards into editable setup quick fixes", () => {
+    const workbench = buildWritingWorkbench({
+      project: {
+        id: "p5",
+        title: "旧约倒计时",
+        genre: "悬疑都市",
+        sellingPoint: "女主收到未来自己的死亡短信。",
+        targetPlatformName: "番茄小说",
+        targetWordCount: 300000,
+        currentWordCount: 2000,
+      },
+      chapters: [
+        {
+          id: "c5",
+          title: "第一章 死亡短信",
+          order: 1,
+          status: "draft",
+          wordCount: 2000,
+          hook: "凌晨三点，她收到来自明天的死亡短信。",
+          conflict: "报警会暴露秘密，不报警就会按短信死去。",
+          cliffhanger: "短信最后一行写着：不要相信你最亲近的人。",
+        },
+      ],
+      outlineNodes: [],
+      characters: [],
+      worldEntries: [{ id: "w5", type: "platform_soil", title: "番茄土壤", content: "开篇危机要快，每章给选择、反转和章末钩子。" }],
+      plotThreads: [{ id: "pt5", type: "main", title: "死亡短信主线", startChapterId: "c5", endChapterId: null, status: "active" }],
+      foreshadows: [
+        {
+          id: "fs5",
+          title: "短信发件人",
+          setupChapterId: null,
+          payoffChapterId: null,
+          relatedCharacterIds: [],
+          status: "planned",
+          notes: "",
+        },
+      ],
+      aiTasks: [],
+    });
+
+    assert.ok(workbench.contextFocus.warnings.some((warning) => warning.includes("伏笔缺少埋设说明")));
+    assert.ok(workbench.quickFixes.some((fix) => (
+      fix.kind === "foreshadow_seed"
+      && fix.method === "PATCH"
+      && fix.endpoint === "/api/foreshadows/fs5"
+      && fix.payload.title === "短信发件人"
+      && fix.payload.setupChapterId === "c5"
+      && fix.payload.notes.includes("异常细节")
+    )));
+    assert.ok(!workbench.quickFixes.some((fix) => fix.kind === "story_line_seed"));
   });
 
   await t.test("marks a failed timeline task as recovered by a later same-chapter success", () => {

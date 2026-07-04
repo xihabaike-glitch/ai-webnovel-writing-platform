@@ -313,6 +313,20 @@ export interface PlatformFinalSubmissionGate {
   items: PlatformFinalGateItem[];
 }
 
+export interface SubmissionAssetPostSaveReview {
+  status: "ready_for_baseline" | "ready_for_download" | "fix_first" | "blocked";
+  platformName: string;
+  assetScore: number;
+  assetStatus: PlatformSubmissionAssetAudit["status"];
+  finalGateStatus: PlatformFinalSubmissionGate["status"];
+  finalGateScore: number;
+  headline: string;
+  verdict: string;
+  nextAction: string;
+  href: string;
+  actionLabel: string;
+}
+
 export interface PlatformPublishChapter {
   id: string;
   order: number;
@@ -352,6 +366,76 @@ export interface PlatformPublishPackage {
   publishVersions: PublishPackageVersionItem[];
   warnings: string[];
   markdown: string;
+}
+
+export function buildSubmissionAssetPostSaveReview(input: {
+  platformName: string;
+  assetAudit: PlatformSubmissionAssetAudit;
+  finalGate: PlatformFinalSubmissionGate;
+  canExport: boolean;
+  baselineSaved: boolean;
+}): SubmissionAssetPostSaveReview {
+  if (input.finalGate.status === "ready_to_submit" && input.canExport && input.baselineSaved) {
+    return {
+      status: "ready_for_download",
+      platformName: input.platformName,
+      assetScore: input.assetAudit.score,
+      assetStatus: input.assetAudit.status,
+      finalGateStatus: input.finalGate.status,
+      finalGateScore: input.finalGate.score,
+      headline: `${input.platformName} 终检已过，发布基准也已保存。`,
+      verdict: input.finalGate.verdict,
+      nextAction: "可以下载发布包，或去版本历史核对最近基准。",
+      href: "#package-version-history",
+      actionLabel: "下载发布包",
+    };
+  }
+
+  if (input.finalGate.status === "ready_to_submit" && input.canExport) {
+    return {
+      status: "ready_for_baseline",
+      platformName: input.platformName,
+      assetScore: input.assetAudit.score,
+      assetStatus: input.assetAudit.status,
+      finalGateStatus: input.finalGate.status,
+      finalGateScore: input.finalGate.score,
+      headline: `${input.platformName} 终检已过，下一步别乱动文案。`,
+      verdict: input.finalGate.verdict,
+      nextAction: "保存发布基准，再下载或复制发布包。",
+      href: "#platform-export",
+      actionLabel: "保存发布基准",
+    };
+  }
+
+  if (input.finalGate.status === "fix_first") {
+    return {
+      status: "fix_first",
+      platformName: input.platformName,
+      assetScore: input.assetAudit.score,
+      assetStatus: input.assetAudit.status,
+      finalGateStatus: input.finalGate.status,
+      finalGateScore: input.finalGate.score,
+      headline: `${input.platformName} 候选已采纳，但终检还没过。`,
+      verdict: input.finalGate.verdict,
+      nextAction: input.finalGate.nextAction,
+      href: input.finalGate.items.find((item) => item.status !== "pass")?.href ?? "#platform-export",
+      actionLabel: "继续修",
+    };
+  }
+
+  return {
+    status: "blocked",
+    platformName: input.platformName,
+    assetScore: input.assetAudit.score,
+    assetStatus: input.assetAudit.status,
+    finalGateStatus: input.finalGate.status,
+    finalGateScore: input.finalGate.score,
+    headline: `${input.platformName} 采纳后仍不适合提交。`,
+    verdict: input.finalGate.verdict,
+    nextAction: input.finalGate.nextAction,
+    href: input.finalGate.items.find((item) => item.status === "block")?.href ?? "#platform-export",
+    actionLabel: "处理阻塞",
+  };
 }
 
 export interface PlatformPublishWorkspaceAction extends PublishRepairAction {

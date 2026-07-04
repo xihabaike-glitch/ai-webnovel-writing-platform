@@ -8,6 +8,7 @@ import {
   buildPublishPackageRestorePatch,
   buildPublishPackageVersionComparison,
   buildSubmissionAssetAudit,
+  buildSubmissionAssetPostSaveReview,
   parsePublishSnapshotTags,
   type PublishPackageArchiveGroup,
   type PlatformPublishPackage,
@@ -548,6 +549,20 @@ export async function POST(request: Request, { params }: Params) {
       });
       return [savedAsset, savedVersion];
     });
+    const refreshedContext = await buildCenter(projectId);
+    const refreshedPack = refreshedContext?.center.packages.find((item) => item.platformId === platform.id) ?? null;
+    const baselineSaved = refreshedContext?.project.publishSnapshots.some((snapshot) => (
+      snapshot.platformId === platform.id && snapshot.action === "snapshot" && snapshot.canExport
+    )) ?? false;
+    const postSaveReview = refreshedPack
+      ? buildSubmissionAssetPostSaveReview({
+        platformName: platform.name,
+        assetAudit: refreshedPack.submissionAssetAudit,
+        finalGate: refreshedPack.finalGate,
+        canExport: refreshedPack.canExport,
+        baselineSaved,
+      })
+      : null;
 
     return NextResponse.json({
       message: `已保存 ${platform.name} 投稿资产。`,
@@ -560,6 +575,7 @@ export async function POST(request: Request, { params }: Params) {
         tags: parsePublishSnapshotTags(assetVersion.tags),
       },
       audit,
+      postSaveReview,
     }, { status: 201 });
   }
 

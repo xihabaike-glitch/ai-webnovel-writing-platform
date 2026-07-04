@@ -29,6 +29,12 @@ interface SerializationActionExecution {
   payload: Record<string, string | number | boolean | string[] | number[]>;
 }
 
+interface OpsMessage {
+  text: string;
+  href?: string;
+  hrefLabel?: string;
+}
+
 interface SerializationOpsDashboard {
   platformName: string;
   dailyWordTarget: number;
@@ -71,6 +77,15 @@ interface SerializationSubmissionAssetCandidateBatch {
   variants: SerializationSubmissionAssetCandidate[];
   verdict: string;
   href: string;
+}
+
+interface SubmissionAssetPostSaveReview {
+  status: "ready_for_baseline" | "ready_for_download" | "fix_first" | "blocked";
+  finalGateScore: number;
+  headline: string;
+  nextAction: string;
+  href: string;
+  actionLabel: string;
 }
 
 interface SerializationPublishEffectAction {
@@ -247,7 +262,7 @@ export function SerializationOpsPanel({ projectId }: { projectId: string }) {
   const [runningEffectActionId, setRunningEffectActionId] = useState<string | null>(null);
   const [runningCandidateId, setRunningCandidateId] = useState<string | null>(null);
   const [restoringVersionId, setRestoringVersionId] = useState<string | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
+  const [message, setMessage] = useState<OpsMessage | null>(null);
 
   async function loadOps() {
     setIsLoading(true);
@@ -264,7 +279,7 @@ export function SerializationOpsPanel({ projectId }: { projectId: string }) {
       setDashboard(payload.dashboard);
       setChecklist(payload.submissionChecklist);
     } catch (caught) {
-      setMessage(caught instanceof Error ? caught.message : "读取连载运营看板失败。");
+      setMessage({ text: caught instanceof Error ? caught.message : "读取连载运营看板失败。" });
     } finally {
       setIsLoading(false);
     }
@@ -295,15 +310,17 @@ export function SerializationOpsPanel({ projectId }: { projectId: string }) {
       const score = payload?.result?.score ?? payload?.secondPassAudit?.score;
       const generatedCount = payload?.variants?.length;
       const rewrittenCount = payload?.results?.length;
-      setMessage(score
-        ? `已完成：${action.label}，复检 ${score} 分。`
-        : generatedCount
-          ? `已完成：${action.label}，生成 ${generatedCount} 个候选。`
-          : rewrittenCount
-            ? `已完成：${action.label}，重写 ${rewrittenCount} 章。`
-            : `已完成：${action.label}`);
+      setMessage({
+        text: score
+          ? `已完成：${action.label}，复检 ${score} 分。`
+          : generatedCount
+            ? `已完成：${action.label}，生成 ${generatedCount} 个候选。`
+            : rewrittenCount
+              ? `已完成：${action.label}，重写 ${rewrittenCount} 章。`
+              : `已完成：${action.label}`,
+      });
     } catch (caught) {
-      setMessage(caught instanceof Error ? caught.message : "执行运营动作失败。");
+      setMessage({ text: caught instanceof Error ? caught.message : "执行运营动作失败。" });
     } finally {
       setRunningActionId(null);
     }
@@ -330,13 +347,15 @@ export function SerializationOpsPanel({ projectId }: { projectId: string }) {
       await loadOps();
       const generatedCount = payload?.variants?.length;
       const rewrittenCount = payload?.results?.length;
-      setMessage(generatedCount
-        ? `已按「${action.label}」生成 ${generatedCount} 个候选。`
-        : rewrittenCount
-          ? `已按「${action.label}」重写 ${rewrittenCount} 章。`
-          : `已执行「${action.label}」。`);
+      setMessage({
+        text: generatedCount
+          ? `已按「${action.label}」生成 ${generatedCount} 个候选。`
+          : rewrittenCount
+            ? `已按「${action.label}」重写 ${rewrittenCount} 章。`
+            : `已执行「${action.label}」。`,
+      });
     } catch (caught) {
-      setMessage(caught instanceof Error ? caught.message : "执行发布效果动作失败。");
+      setMessage({ text: caught instanceof Error ? caught.message : "执行发布效果动作失败。" });
     } finally {
       setRunningEffectActionId(null);
     }
@@ -352,16 +371,30 @@ export function SerializationOpsPanel({ projectId }: { projectId: string }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(candidate.execution.payload),
       });
-      const payload = (await response.json().catch(() => null)) as { error?: string; message?: string; audit?: { score?: number } } | null;
+      const payload = (await response.json().catch(() => null)) as {
+        error?: string;
+        message?: string;
+        audit?: { score?: number };
+        postSaveReview?: SubmissionAssetPostSaveReview | null;
+      } | null;
       if (!response.ok) {
         throw new Error(payload?.error ?? "采纳投稿资产候选失败。");
       }
       await loadOps();
-      setMessage(payload?.audit?.score
-        ? `已采纳「${candidate.strategy}」，质检 ${payload.audit.score} 分。`
-        : payload?.message ?? `已采纳「${candidate.strategy}」。`);
+      const review = payload?.postSaveReview;
+      setMessage(review
+        ? {
+          text: `已采纳「${candidate.strategy}」，${review.headline} 终检 ${review.finalGateScore} 分。下一步：${review.nextAction}`,
+          href: review.href,
+          hrefLabel: review.actionLabel,
+        }
+        : {
+          text: payload?.audit?.score
+            ? `已采纳「${candidate.strategy}」，质检 ${payload.audit.score} 分。`
+            : payload?.message ?? `已采纳「${candidate.strategy}」。`,
+        });
     } catch (caught) {
-      setMessage(caught instanceof Error ? caught.message : "采纳投稿资产候选失败。");
+      setMessage({ text: caught instanceof Error ? caught.message : "采纳投稿资产候选失败。" });
     } finally {
       setRunningCandidateId(null);
     }
@@ -381,9 +414,9 @@ export function SerializationOpsPanel({ projectId }: { projectId: string }) {
         throw new Error(payload?.error ?? "恢复历史发布包失败。");
       }
       await loadOps();
-      setMessage(payload?.message ?? `已恢复「${version.title}」历史发布包。`);
+      setMessage({ text: payload?.message ?? `已恢复「${version.title}」历史发布包。` });
     } catch (caught) {
-      setMessage(caught instanceof Error ? caught.message : "恢复历史发布包失败。");
+      setMessage({ text: caught instanceof Error ? caught.message : "恢复历史发布包失败。" });
     } finally {
       setRestoringVersionId(null);
     }
@@ -456,7 +489,16 @@ export function SerializationOpsPanel({ projectId }: { projectId: string }) {
         </div>
       ) : null}
 
-      {message ? <p className="mt-3 text-sm text-slate-600">{message}</p> : null}
+      {message ? (
+        <div className="mt-3 flex flex-wrap items-center gap-2 rounded-md bg-slate-50 p-3 text-sm text-slate-600">
+          <span>{message.text}</span>
+          {message.href ? (
+            <Link className="rounded-md border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50" href={projectHref(projectId, message.href)}>
+              {message.hrefLabel ?? "去处理"}
+            </Link>
+          ) : null}
+        </div>
+      ) : null}
 
       {dashboard ? (
         <div className="mt-4 grid gap-4 lg:grid-cols-[1.2fr_1fr]">

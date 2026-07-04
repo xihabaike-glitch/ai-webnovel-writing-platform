@@ -123,7 +123,23 @@ export interface ProjectControlDashboardInput {
   submissionAssets?: PlatformSubmissionAssetInput[];
   submissionAssetVersions?: PlatformSubmissionAssetVersionInput[];
   platformPublishMetrics?: PlatformPublishMetricInput[];
+  platformKnowledgeFeedbackReceipts?: ControlPlatformFeedbackReceipt[];
   submissionChecklist: SubmissionChecklist;
+}
+
+export interface ControlPlatformFeedbackReceipt {
+  id: string;
+  platformId: string;
+  platformName: string;
+  actionLabel: string;
+  title: string;
+  message: string;
+  completedStepLabel: string;
+  stopReason: string;
+  nextAction: string;
+  href: string;
+  severity: "success" | "needs_action";
+  createdAt: Date | string;
 }
 
 export interface ControlArea {
@@ -173,6 +189,7 @@ export interface ProjectControlDashboard {
   overallScore: number;
   verdict: string;
   platformVerdict: PlatformControlVerdictSummary;
+  platformFeedback: PlatformFeedbackSummary;
   startTactic: ProjectStartTacticSummary | null;
   startDecision: ProjectStartDecision;
   areas: ControlArea[];
@@ -187,6 +204,17 @@ export interface ProjectControlDashboard {
     worldEntries: number;
     publishableChapters: number;
   };
+}
+
+export interface PlatformFeedbackSummary {
+  total: number;
+  successCount: number;
+  needsActionCount: number;
+  latest: ControlPlatformFeedbackReceipt | null;
+  recent: ControlPlatformFeedbackReceipt[];
+  headline: string;
+  nextAction: string;
+  targetAnchor: string;
 }
 
 export interface PlatformControlVerdictSummary {
@@ -499,6 +527,39 @@ function buildControlAssetQualityReports(tasks: ControlAiTask[]): ControlAssetQu
     .slice(0, 3);
 }
 
+function buildPlatformFeedbackSummary(receipts: ControlPlatformFeedbackReceipt[] = []): PlatformFeedbackSummary {
+  const recent = [...receipts]
+    .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime())
+    .slice(0, 5);
+  const latest = recent[0] ?? null;
+  const successCount = recent.filter((item) => item.severity === "success").length;
+  const needsActionCount = recent.filter((item) => item.severity === "needs_action").length;
+
+  if (!latest) {
+    return {
+      total: 0,
+      successCount: 0,
+      needsActionCount: 0,
+      latest: null,
+      recent,
+      headline: "还没有平台反哺链路回执，总控缺一条真实运营证据。",
+      nextAction: "去平台导出中心启动一次知识库反哺链。",
+      targetAnchor: "platform-knowledge",
+    };
+  }
+
+  return {
+    total: receipts.length,
+    successCount,
+    needsActionCount,
+    latest,
+    recent,
+    headline: `${latest.platformName} 最近执行了「${latest.actionLabel}」，已推进：${latest.completedStepLabel}。`,
+    nextAction: latest.nextAction,
+    targetAnchor: latest.href.replace(/^#/, "") || "platform-strategy-ranking",
+  };
+}
+
 export function buildProjectControlDashboard(input: ProjectControlDashboardInput): ProjectControlDashboard {
   const characterDashboard = buildCharacterArcDashboard(input.characters);
   const worldDashboard = buildWorldBibleDashboard(input.worldEntries);
@@ -608,11 +669,13 @@ export function buildProjectControlDashboard(input: ProjectControlDashboardInput
     }));
   const criticalActions = priorityActions.map((item) => `${item.label}：${item.reason}`);
   const controlAssetQualityReports = buildControlAssetQualityReports(input.aiTasks);
+  const platformFeedback = buildPlatformFeedbackSummary(input.platformKnowledgeFeedbackReceipts);
 
   return {
     overallScore,
     verdict: verdict(overallScore),
     platformVerdict,
+    platformFeedback,
     startTactic,
     startDecision: buildProjectStartDecision(startTactic),
     areas,

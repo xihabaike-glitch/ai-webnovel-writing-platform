@@ -25,6 +25,7 @@ export async function GET(_request: Request, { params }: Params) {
       submissionAssets: { orderBy: { updatedAt: "desc" } },
       submissionAssetVersions: { orderBy: { createdAt: "desc" }, take: 80 },
       platformPublishMetrics: { orderBy: { snapshotDate: "desc" }, take: 80 },
+      platformKnowledgeFeedbackReceipts: { orderBy: { createdAt: "desc" }, take: 10 },
     },
   });
 
@@ -114,6 +115,20 @@ export async function GET(_request: Request, { params }: Params) {
       snapshotDate: metric.snapshotDate,
       createdAt: metric.createdAt,
       updatedAt: metric.updatedAt,
+    })),
+    platformKnowledgeFeedbackReceipts: project.platformKnowledgeFeedbackReceipts.map((receipt) => ({
+      id: receipt.receiptId,
+      platformId: receipt.platformId,
+      platformName: receipt.platformName,
+      actionLabel: receipt.actionLabel,
+      title: receipt.title,
+      message: receipt.message,
+      completedStepLabel: receipt.completedStepLabel,
+      stopReason: receipt.stopReason,
+      nextAction: receipt.nextAction,
+      href: receipt.href,
+      severity: receipt.severity === "success" ? "success" : "needs_action",
+      createdAt: receipt.createdAt,
     })),
     submissionChecklist,
   });

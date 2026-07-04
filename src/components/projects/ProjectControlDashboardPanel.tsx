@@ -50,6 +50,7 @@ interface ProjectControlDashboard {
   overallScore: number;
   verdict: string;
   platformVerdict: PlatformControlVerdictSummary;
+  platformFeedback: PlatformFeedbackSummary;
   startTactic: ProjectStartTacticSummary | null;
   startDecision: ProjectStartDecision;
   areas: ControlArea[];
@@ -64,6 +65,32 @@ interface ProjectControlDashboard {
     worldEntries: number;
     publishableChapters: number;
   };
+}
+
+interface PlatformFeedbackReceipt {
+  id: string;
+  platformId: string;
+  platformName: string;
+  actionLabel: string;
+  title: string;
+  message: string;
+  completedStepLabel: string;
+  stopReason: string;
+  nextAction: string;
+  href: string;
+  severity: "success" | "needs_action";
+  createdAt: string;
+}
+
+interface PlatformFeedbackSummary {
+  total: number;
+  successCount: number;
+  needsActionCount: number;
+  latest: PlatformFeedbackReceipt | null;
+  recent: PlatformFeedbackReceipt[];
+  headline: string;
+  nextAction: string;
+  targetAnchor: string;
 }
 
 interface ProjectStartTacticSummary {
@@ -138,6 +165,17 @@ function startDecisionStatusClass(status: ProjectStartDecision["status"]) {
   if (status === "pause") return "bg-rose-50 text-rose-700";
   if (status === "watch") return "bg-amber-50 text-amber-700";
   return "bg-slate-100 text-slate-700";
+}
+
+function platformFeedbackSeverityClass(severity: PlatformFeedbackReceipt["severity"]) {
+  if (severity === "success") return "bg-emerald-50 text-emerald-700";
+  return "bg-amber-50 text-amber-700";
+}
+
+function shortTime(value: string) {
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return value;
+  return parsed.toLocaleDateString("zh-CN", { month: "2-digit", day: "2-digit" });
 }
 
 export function ProjectControlDashboardPanel({ projectId }: { projectId: string }) {
@@ -465,6 +503,54 @@ export function ProjectControlDashboardPanel({ projectId }: { projectId: string 
               <div className="mt-2 flex flex-wrap gap-1.5">
                 {dashboard.platformVerdict.evidenceGaps.map((gap) => (
                   <span className="rounded-md bg-amber-50 px-2 py-1 text-[11px] text-amber-700" key={gap}>{gap}</span>
+                ))}
+              </div>
+            ) : null}
+          </div>
+
+          <div className="rounded-md border border-slate-200 p-3">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+              <div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="font-medium text-slate-950">平台反哺证据</div>
+                  <span className="rounded-md bg-slate-100 px-2 py-1 text-[11px] font-medium text-slate-700">
+                    {dashboard.platformFeedback.total} 条
+                  </span>
+                  {dashboard.platformFeedback.needsActionCount ? (
+                    <span className="rounded-md bg-amber-50 px-2 py-1 text-[11px] font-medium text-amber-700">
+                      待处理 {dashboard.platformFeedback.needsActionCount}
+                    </span>
+                  ) : null}
+                </div>
+                <p className="mt-1 text-sm leading-6 text-slate-600">{dashboard.platformFeedback.headline}</p>
+                <div className="mt-2 rounded-md bg-slate-50 px-2 py-1 text-xs leading-5 text-slate-600">
+                  下一刀：{dashboard.platformFeedback.nextAction}
+                </div>
+              </div>
+              <Link
+                className="inline-flex w-fit items-center justify-center rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white hover:bg-slate-800"
+                href={`/projects/${projectId}#${dashboard.platformFeedback.targetAnchor}`}
+              >
+                看反哺证据
+              </Link>
+            </div>
+            {dashboard.platformFeedback.recent.length ? (
+              <div className="mt-3 grid gap-2 md:grid-cols-3">
+                {dashboard.platformFeedback.recent.slice(0, 3).map((receipt) => (
+                  <Link
+                    className="rounded-md bg-slate-50 p-3 text-sm hover:bg-slate-100"
+                    href={`/projects/${projectId}#${receipt.href.replace(/^#/, "")}`}
+                    key={receipt.id}
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="font-medium text-slate-950">{receipt.platformName}</div>
+                      <span className={`rounded-md px-1.5 py-0.5 text-[11px] font-medium ${platformFeedbackSeverityClass(receipt.severity)}`}>
+                        {shortTime(receipt.createdAt)}
+                      </span>
+                    </div>
+                    <div className="mt-1 text-xs text-slate-500">{receipt.actionLabel}</div>
+                    <p className="mt-1 line-clamp-2 leading-5 text-slate-600">已推进：{receipt.completedStepLabel}</p>
+                  </Link>
                 ))}
               </div>
             ) : null}

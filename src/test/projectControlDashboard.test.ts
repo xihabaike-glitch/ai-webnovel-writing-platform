@@ -82,6 +82,9 @@ test("buildProjectControlDashboard", async (t) => {
     assert.equal(dashboard.platformVerdict.actionExecutable, true);
     assert.equal(dashboard.platformVerdict.actionLabel, "保存证据基准");
     assert.equal(dashboard.platformVerdict.targetAnchor, "platform-strategy-verdict");
+    assert.equal(dashboard.platformFeedback.total, 0);
+    assert.equal(dashboard.platformFeedback.targetAnchor, "platform-knowledge");
+    assert.ok(dashboard.platformFeedback.headline.includes("还没有平台反哺链路回执"));
     assert.equal(dashboard.areas.find((area) => area.id === "export")?.status, "blocked");
     assert.ok(dashboard.areas.find((area) => area.id === "export")?.nextAction.includes("先处理"));
     assert.equal(dashboard.priorityActions.length, 4);
@@ -95,6 +98,44 @@ test("buildProjectControlDashboard", async (t) => {
     assert.equal(dashboard.controlAssetQualityReports[0].repaired, true);
     assert.ok(dashboard.overallScore > 0);
     assert.ok(dashboard.criticalActions.some((action) => action.includes("人物弧光")));
+  });
+
+  await t.test("surfaces platform feedback receipts as control evidence", () => {
+    const dashboard = buildProjectControlDashboard({
+      project,
+      platform: getPlatformProfile("fanqie"),
+      chapters: [chapter],
+      outlineNodes: [],
+      characters: [],
+      worldEntries: [],
+      foreshadows: [],
+      plotThreads: [],
+      aiTasks: [],
+      platformKnowledgeFeedbackReceipts: [
+        {
+          id: "feedback-1",
+          platformId: "fanqie",
+          platformName: "番茄小说",
+          actionLabel: "执行正反馈链",
+          title: "番茄小说｜反哺链路回执",
+          message: "把正反馈经验继续喂给生成链路。",
+          completedStepLabel: "保存证据基准",
+          stopReason: "第一步已自动完成。",
+          nextAction: "继续生成投稿资产候选。",
+          href: "#package-version-history",
+          severity: "success",
+          createdAt: "2026-01-06T00:00:00.000Z",
+        },
+      ],
+      submissionChecklist: checklist,
+    });
+
+    assert.equal(dashboard.platformFeedback.total, 1);
+    assert.equal(dashboard.platformFeedback.successCount, 1);
+    assert.equal(dashboard.platformFeedback.latest?.platformName, "番茄小说");
+    assert.equal(dashboard.platformFeedback.latest?.completedStepLabel, "保存证据基准");
+    assert.equal(dashboard.platformFeedback.targetAnchor, "package-version-history");
+    assert.ok(dashboard.platformFeedback.headline.includes("执行正反馈链"));
   });
 
   await t.test("rewards a more complete production system", () => {

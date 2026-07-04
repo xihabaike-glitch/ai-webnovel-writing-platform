@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { getPlatformProfile, type PlatformId } from "@/lib/platforms/platformProfiles";
 import { buildSerializationOpsDashboard } from "@/lib/projects/serializationOps";
+import { parsePublishSnapshotTags } from "@/lib/projects/platformPublishExport";
 import { buildSubmissionChecklist } from "@/lib/projects/submissionChecklist";
 
 interface Params {
@@ -17,6 +18,8 @@ export async function GET(_request: Request, { params }: Params) {
       aiTasks: {
         orderBy: { createdAt: "desc" },
       },
+      submissionAssets: { orderBy: { updatedAt: "desc" } },
+      submissionAssetVersions: { orderBy: { createdAt: "desc" }, take: 80 },
     },
   });
 
@@ -50,6 +53,26 @@ export async function GET(_request: Request, { params }: Params) {
     chapters: project.chapters,
     aiTasks: project.aiTasks,
     submissionChecklist,
+    submissionAssets: project.submissionAssets.map((asset) => ({
+      platformId: asset.platformId,
+      platformName: asset.platformName,
+      title: asset.title,
+      logline: asset.logline,
+      synopsis: asset.synopsis,
+      overseasSynopsis: asset.overseasSynopsis,
+      tags: parsePublishSnapshotTags(asset.tags),
+      note: asset.note,
+      source: asset.source,
+      updatedAt: asset.updatedAt,
+    })),
+    submissionAssetVersions: project.submissionAssetVersions.map((version) => ({
+      platformId: version.platformId,
+      auditScore: version.auditScore,
+      auditStatus: version.auditStatus === "ready" || version.auditStatus === "blocked" ? version.auditStatus : "needs_work",
+      action: version.action,
+      strategy: version.strategy,
+      createdAt: version.createdAt,
+    })),
   });
 
   return NextResponse.json({

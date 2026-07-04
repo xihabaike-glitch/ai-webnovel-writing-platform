@@ -150,6 +150,57 @@ test("buildSerializationOpsDashboard", async (t) => {
     assert.ok(submissionAction?.detail.includes("下一步"));
   });
 
+  await t.test("surfaces publish asset adoption as an ops signal", () => {
+    const dashboard = buildSerializationOpsDashboard({
+      project,
+      platform,
+      chapters: [chapter],
+      aiTasks: [
+        {
+          id: "asset-task-1",
+          chapterId: null,
+          taskType: "platform_submission_asset_optimize",
+          status: "succeeded",
+          inputSnapshot: JSON.stringify({ platformId: "fanqie" }),
+          outputText: JSON.stringify({ variants: [{ strategy: "强钩子版" }, { strategy: "爽点版" }] }),
+          createdAt: "2026-01-01T00:00:00.000Z",
+        },
+      ],
+      submissionChecklist: { ...checklist, readinessPercent: 90, items: [] },
+      submissionAssets: [
+        {
+          platformId: "fanqie",
+          platformName: "番茄小说",
+          title: "夜雨系统",
+          logline: "雨夜倒计时降临，主角在救人与逃跑之间连续选择，用系统奖励一步步翻盘。",
+          synopsis: "林晚在雨夜觉醒系统，每次选择都会让危机升级。他必须在救人、逃跑和揭开规则真相之间做决定，借连续任务翻盘。第一卷围绕系统倒计时、城市危机和隐藏对手展开，让主角用爽点明确的选择一步步逆袭，并把每次奖励都变成新的追读悬念。",
+          overseasSynopsis: "Lin Wan awakens a system in the rain and survives escalating choices.",
+          tags: ["都市系统", "爽文", "危机"],
+          note: "",
+          source: "ai_variant",
+          updatedAt: "2026-01-02T00:00:00.000Z",
+        },
+      ],
+      submissionAssetVersions: [
+        {
+          platformId: "fanqie",
+          auditScore: 100,
+          auditStatus: "ready",
+          action: "adopt",
+          strategy: "强钩子版",
+          createdAt: "2026-01-02T00:00:00.000Z",
+        },
+      ],
+    });
+
+    assert.equal(dashboard.submissionAssetStatus.status, "ready");
+    assert.equal(dashboard.submissionAssetStatus.adoptedVersions, 1);
+    assert.equal(dashboard.submissionAssetStatus.generatedVariants, 2);
+    assert.equal(dashboard.submissionAssetStatus.latestStrategy, "强钩子版");
+    assert.ok(dashboard.submissionAssetStatus.verdict.includes("已采纳"));
+    assert.equal(dashboard.actions.some((action) => action.id === "submission-asset-gap"), false);
+  });
+
   await t.test("requires second-pass recheck before publish readiness", () => {
     const failedRecheck = buildSerializationOpsDashboard({
       project,

@@ -37,9 +37,22 @@ interface SerializationOpsDashboard {
   reviewQueueCount: number;
   revisionQueueCount: number;
   submissionReadinessPercent: number;
+  submissionAssetStatus: SerializationSubmissionAssetStatus;
   nextPublishChapter: SerializationChapter | null;
   actions: SerializationAction[];
   warnings: string[];
+}
+
+interface SerializationSubmissionAssetStatus {
+  exists: boolean;
+  score: number;
+  status: "ready" | "needs_work" | "blocked" | "missing";
+  adoptedVersions: number;
+  generatedVariants: number;
+  latestStrategy: string;
+  verdict: string;
+  href: string;
+  actionLabel: string;
 }
 
 interface SubmissionChecklistItem {
@@ -58,6 +71,13 @@ function priorityLabel(priority: SerializationAction["priority"]) {
   if (priority === "high") return "高优先级";
   if (priority === "medium") return "中优先级";
   return "低优先级";
+}
+
+function assetStatusLabel(status: SerializationSubmissionAssetStatus["status"]) {
+  if (status === "ready") return "可用";
+  if (status === "needs_work") return "需打磨";
+  if (status === "blocked") return "阻塞";
+  return "未保存";
 }
 
 function projectHref(projectId: string, href: string) {
@@ -155,7 +175,7 @@ export function SerializationOpsPanel({ projectId }: { projectId: string }) {
       </div>
 
       {dashboard ? (
-        <div className="mt-4 grid gap-3 sm:grid-cols-5">
+        <div className="mt-4 grid gap-3 sm:grid-cols-6">
           <div className="rounded-md bg-slate-50 p-3">
             <div className="text-xs text-slate-500">目标平台</div>
             <div className="mt-1 text-sm font-medium text-slate-950">{dashboard.platformName}</div>
@@ -175,6 +195,13 @@ export function SerializationOpsPanel({ projectId }: { projectId: string }) {
           <div className="rounded-md bg-slate-50 p-3">
             <div className="text-xs text-slate-500">投稿准备</div>
             <div className="mt-1 text-2xl font-semibold text-slate-950">{dashboard.submissionReadinessPercent}%</div>
+          </div>
+          <div className="rounded-md bg-slate-50 p-3">
+            <div className="text-xs text-slate-500">发布资产</div>
+            <div className="mt-1 text-2xl font-semibold text-slate-950">
+              {dashboard.submissionAssetStatus.status === "missing" ? "缺" : dashboard.submissionAssetStatus.score}
+            </div>
+            <div className="mt-1 text-xs text-slate-500">{assetStatusLabel(dashboard.submissionAssetStatus.status)}</div>
           </div>
         </div>
       ) : null}
@@ -236,6 +263,22 @@ export function SerializationOpsPanel({ projectId }: { projectId: string }) {
                 <div className="mt-1 text-slate-600">{dashboard.nextPublishChapter.wordCount} 字 · {dashboard.nextPublishChapter.status}</div>
               </div>
             ) : null}
+            <div className="mt-3 rounded-md bg-slate-50 p-3 text-sm">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <div className="text-xs text-slate-500">投稿资产状态</div>
+                  <div className="mt-1 font-medium text-slate-950">{assetStatusLabel(dashboard.submissionAssetStatus.status)}</div>
+                </div>
+                <Link className="rounded-md border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50" href={projectHref(projectId, dashboard.submissionAssetStatus.href)}>
+                  {dashboard.submissionAssetStatus.actionLabel}
+                </Link>
+              </div>
+              <p className="mt-2 leading-6 text-slate-600">{dashboard.submissionAssetStatus.verdict}</p>
+              <div className="mt-2 text-xs text-slate-500">
+                候选 {dashboard.submissionAssetStatus.generatedVariants} · 采纳 {dashboard.submissionAssetStatus.adoptedVersions}
+                {dashboard.submissionAssetStatus.latestStrategy ? ` · ${dashboard.submissionAssetStatus.latestStrategy}` : ""}
+              </div>
+            </div>
           </div>
         </div>
       ) : null}

@@ -16,12 +16,15 @@ import { ProjectControlDashboardPanel } from "@/components/projects/ProjectContr
 import { RetentionDiagnosticPanel } from "@/components/projects/RetentionDiagnosticPanel";
 import { SerializationOpsPanel } from "@/components/projects/SerializationOpsPanel";
 import { StoryLinePanel } from "@/components/projects/StoryLinePanel";
+import { StoryTreeExperiencePanel } from "@/components/projects/StoryTreeExperiencePanel";
 import { StoryStructureDiagnosticPanel } from "@/components/projects/StoryStructureDiagnosticPanel";
 import { SubmissionPackagePanel } from "@/components/projects/SubmissionPackagePanel";
 import { WorldBiblePanel } from "@/components/projects/WorldBiblePanel";
 import { WritingWorkbenchPanel } from "@/components/projects/WritingWorkbenchPanel";
+import { buildStoryTreeExperienceGuide } from "@/lib/ai/storyTreeExperience";
 import { prisma } from "@/lib/db/prisma";
 import { getPlatformProfile, type PlatformId } from "@/lib/platforms/platformProfiles";
+import { gatePlatformDispatchTaskFromRecord } from "@/lib/projects/gateDispatchTaskRecords";
 import { buildProjectDashboard } from "@/lib/projects/projectDashboard";
 import { buildSubmissionChecklist } from "@/lib/projects/submissionChecklist";
 import { buildSubmissionPackage } from "@/lib/projects/submissionPackage";
@@ -57,6 +60,14 @@ export default async function ProjectPage({ params }: { params: Promise<{ projec
         orderBy: { createdAt: "desc" },
         take: 12,
       },
+      gateDispatchTasks: {
+        where: {
+          state: "completed",
+          dispatchKey: { startsWith: "story-tree:" },
+        },
+        orderBy: { completedAt: "desc" },
+        take: 30,
+      },
     },
   });
 
@@ -66,6 +77,9 @@ export default async function ProjectPage({ params }: { params: Promise<{ projec
 
   const platform = getPlatformProfile(project.targetPlatform as PlatformId);
   const chaptersById = new Map(project.chapters.map((chapter) => [chapter.id, chapter]));
+  const storyTreeExperience = buildStoryTreeExperienceGuide(
+    project.gateDispatchTasks.map(gatePlatformDispatchTaskFromRecord),
+  );
   const dashboard = buildProjectDashboard({
     currentWordCount: project.currentWordCount,
     targetWordCount: project.targetWordCount,
@@ -270,6 +284,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ projec
             </div>
           </div>
         </section>
+        <StoryTreeExperiencePanel guide={storyTreeExperience} />
         <section className="rounded-md border border-slate-200 bg-white p-4">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>

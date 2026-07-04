@@ -17,6 +17,8 @@ export interface StoryTreeExperienceItem {
   lesson: string;
   action: string;
   evidence: string;
+  title: string;
+  href: string;
   completedAt: string | null;
 }
 
@@ -114,7 +116,7 @@ function buildLesson(input: {
   return `${scoreLine}，先作为观察经验小步验证：${input.message}`;
 }
 
-function itemFromTask(task: Pick<PersistedGatePlatformDispatchTask, "dispatchKey" | "evidence" | "completedAt" | "updatedAt">): StoryTreeExperienceItem | null {
+function itemFromTask(task: Pick<PersistedGatePlatformDispatchTask, "dispatchKey" | "evidence" | "completedAt" | "updatedAt" | "title" | "href">): StoryTreeExperienceItem | null {
   const recheckLine = task.evidence.find((line) => line.startsWith("大树结构复检："));
   if (!recheckLine) return null;
 
@@ -150,6 +152,8 @@ function itemFromTask(task: Pick<PersistedGatePlatformDispatchTask, "dispatchKey
     }),
     action,
     evidence: recheckLine,
+    title: task.title,
+    href: task.href,
     completedAt: task.completedAt ?? task.updatedAt ?? null,
   };
 }
@@ -167,7 +171,7 @@ function buildPromptBlock(items: StoryTreeExperienceItem[]) {
   ].join("\n");
 }
 
-export function buildStoryTreeExperienceGuide(tasks: Pick<PersistedGatePlatformDispatchTask, "dispatchKey" | "evidence" | "completedAt" | "updatedAt">[]): StoryTreeExperienceGuide {
+export function buildStoryTreeExperienceGuide(tasks: Pick<PersistedGatePlatformDispatchTask, "dispatchKey" | "evidence" | "completedAt" | "updatedAt" | "title" | "href">[]): StoryTreeExperienceGuide {
   const items = tasks
     .map(itemFromTask)
     .filter((item): item is StoryTreeExperienceItem => Boolean(item))

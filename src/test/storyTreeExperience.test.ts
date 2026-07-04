@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   buildStoryTreeExperienceApplyDispatch,
   buildStoryTreeExperienceGuide,
+  buildStoryTreeExperienceSecondPassAdvice,
   parseStoryTreeRecheckEvidenceLine,
 } from "../lib/ai/storyTreeExperience.ts";
 import { getPlatformProfile } from "../lib/platforms/platformProfiles.ts";
@@ -85,4 +86,41 @@ test("buildStoryTreeExperienceApplyDispatch turns a learned action into an assig
   assert.ok(dispatch.priorityScore > 86);
   assert.ok(dispatch.acceptanceCriteria.some((item) => item.includes("重新保存或复检")));
   assert.ok(dispatch.evidence.some((item) => item.includes("大树结构复检")));
+});
+
+test("buildStoryTreeExperienceSecondPassAdvice turns completed apply dispatches into chapter rewrite advice", () => {
+  const advice = buildStoryTreeExperienceSecondPassAdvice([
+    {
+      dispatchKey: "story-tree-experience:project-1:chapter_draft:branch_causality:story-tree_project-1_chapter-1_chapter_draft_branch_causality",
+      state: "completed",
+      title: "夜雨系统 · 应用经验分支因果",
+      detail: "章节初稿复检沉淀。",
+      href: "/projects/project-1/chapters/chapter-1",
+      evidence: [
+        "大树结构复检：68 -> 78 分，分数变好：结构待精修；返工动作：分支因果：把支线改成主线压力的直接后果。",
+        "经验动作：分支因果：把支线改成主线压力的直接后果。",
+      ],
+      completionEvidence: "已把妹妹支线改成反派逼迫主角暴露系统的直接压力。",
+      completedAt: "2026-07-05T10:00:00.000Z",
+      updatedAt: "2026-07-05T10:00:00.000Z",
+    },
+    {
+      dispatchKey: "story-tree-experience:project-1:chapter_draft:opening_ending:story-tree_project-1_chapter-2_chapter_draft_opening_ending",
+      state: "completed",
+      title: "夜雨系统 · 应用经验开头结尾",
+      detail: "另一章经验。",
+      href: "/projects/project-1/chapters/chapter-2",
+      evidence: ["经验动作：开头结尾：先给不可逆选择。"],
+      completionEvidence: "已处理。",
+      completedAt: "2026-07-05T11:00:00.000Z",
+      updatedAt: "2026-07-05T11:00:00.000Z",
+    },
+  ], "chapter-1");
+
+  assert.equal(advice.length, 1);
+  assert.equal(advice[0].axisLabel, "分支因果");
+  assert.equal(advice[0].status, "usable");
+  assert.ok(advice[0].instruction.includes("按已验证经验处理「分支因果」"));
+  assert.ok(advice[0].instruction.includes("把支线改成主线压力的直接后果"));
+  assert.ok(advice[0].instruction.includes("完成依据"));
 });

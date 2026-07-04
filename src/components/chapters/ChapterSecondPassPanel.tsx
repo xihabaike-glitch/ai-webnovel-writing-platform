@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { SecondPassMode } from "@/lib/ai/buildChapterSecondPassPrompt";
+import type { StoryTreeExperienceSecondPassAdvice, StoryTreeExperienceStatus } from "@/lib/ai/storyTreeExperience";
 
 interface SecondPassResult {
   task: {
@@ -63,9 +64,31 @@ function roleLabel(role: "primary" | "fallback" | "auto" | "forced") {
   return "自动";
 }
 
-export function ChapterSecondPassPanel({ chapterId, currentWordCount }: { chapterId: string; currentWordCount: number }) {
+function experienceStatusLabel(status: StoryTreeExperienceStatus) {
+  if (status === "usable") return "可复用";
+  if (status === "avoid") return "避坑";
+  return "观察";
+}
+
+function experienceStatusClass(status: StoryTreeExperienceStatus) {
+  if (status === "usable") return "bg-emerald-50 text-emerald-700";
+  if (status === "avoid") return "bg-rose-50 text-rose-700";
+  return "bg-amber-50 text-amber-700";
+}
+
+export function ChapterSecondPassPanel({
+  chapterId,
+  currentWordCount,
+  storyTreeExperienceAdvice = [],
+}: {
+  chapterId: string;
+  currentWordCount: number;
+  storyTreeExperienceAdvice?: StoryTreeExperienceSecondPassAdvice[];
+}) {
   const router = useRouter();
-  const [instruction, setInstruction] = useState("更像番茄，开头更快，减少解释，章末更想点下一章。");
+  const [instruction, setInstruction] = useState(
+    storyTreeExperienceAdvice[0]?.instruction ?? "更像番茄，开头更快，减少解释，章末更想点下一章。",
+  );
   const [mode, setMode] = useState<SecondPassMode>("platform_fit");
   const [targetWords, setTargetWords] = useState(Math.max(1200, currentWordCount));
   const [isRunning, setIsRunning] = useState(false);
@@ -153,6 +176,35 @@ export function ChapterSecondPassPanel({ chapterId, currentWordCount }: { chapte
       </div>
 
       {message ? <p className="mt-3 text-sm text-slate-600">{message}</p> : null}
+      {storyTreeExperienceAdvice.length ? (
+        <div className="mt-4 rounded-md border border-slate-200 bg-slate-50 p-3">
+          <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+            <div className="font-medium text-slate-950">已回写的结构经验</div>
+            <div className="text-xs text-slate-500">{storyTreeExperienceAdvice.length} 条可用于二改</div>
+          </div>
+          <div className="mt-3 grid gap-2 lg:grid-cols-2">
+            {storyTreeExperienceAdvice.map((advice) => (
+              <div className="rounded-md bg-white p-3 text-sm" key={advice.id}>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className={`rounded-md px-2 py-1 text-xs font-medium ${experienceStatusClass(advice.status)}`}>
+                    {experienceStatusLabel(advice.status)}
+                  </span>
+                  <span className="text-xs text-slate-500">{advice.axisLabel}</span>
+                </div>
+                <div className="mt-2 font-medium text-slate-950">{advice.title}</div>
+                <p className="mt-2 leading-6 text-slate-600">{advice.instruction}</p>
+                <button
+                  className="mt-3 rounded-md border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                  onClick={() => setInstruction(advice.instruction)}
+                  type="button"
+                >
+                  填入二改指令
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
       {budgetGuard ? (
         <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
           <div className="font-medium">预算修复建议</div>

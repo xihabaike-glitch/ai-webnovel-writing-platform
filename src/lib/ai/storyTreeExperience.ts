@@ -34,6 +34,17 @@ export interface StoryTreeExperienceGuide {
   promptBlock: string;
 }
 
+export interface StoryTreeExperienceSecondPassAdvice {
+  id: string;
+  title: string;
+  status: StoryTreeExperienceStatus;
+  axisLabel: string;
+  instruction: string;
+  detail: string;
+  href: string;
+  completedAt: string | null;
+}
+
 interface StoryTreeRecheckEvidence {
   previousScore: number | null;
   currentScore: number;
@@ -190,6 +201,27 @@ function applyDispatchId(projectId: string, item: StoryTreeExperienceItem) {
   return `story-tree-experience:${projectId}:${item.source}:${item.axisId}:${item.dispatchKey.replace(/[^a-zA-Z0-9_-]/g, "_")}`;
 }
 
+function taskAxisFromApplyDispatchKey(dispatchKey: string) {
+  const parts = dispatchKey.split(":");
+  return {
+    source: parts[2] ?? "unknown",
+    axisId: parts[3] ?? "unknown",
+  };
+}
+
+function taskStatusFromEvidence(evidence: string[]): StoryTreeExperienceStatus {
+  if (evidence.some((item) => item.includes("分数变差") || item.includes("避坑"))) return "avoid";
+  if (evidence.some((item) => item.includes("分数变好") || item.includes("说明这类返工动作有效"))) return "usable";
+  return "watch";
+}
+
+function taskActionFromEvidence(evidence: string[]) {
+  const actionLine = evidence.find((item) => item.startsWith("经验动作："));
+  if (actionLine) return actionLine.replace("经验动作：", "").trim();
+  const recheckLine = evidence.find((item) => item.includes("返工动作："));
+  return recheckLine?.split("返工动作：").at(1)?.trim() ?? "";
+}
+
 function buildPromptBlock(items: StoryTreeExperienceItem[]) {
   if (items.length === 0) return "";
   return [
@@ -258,4 +290,41 @@ export function buildStoryTreeExperienceApplyDispatch(input: {
     ],
     reviewLatestAt: now,
   };
+}
+
+export function buildStoryTreeExperienceSecondPassAdvice(
+  tasks: Pick<PersistedGatePlatformDispatchTask, "dispatchKey" | "state" | "title" | "detail" | "href" | "evidence" | "completionEvidence" | "completedAt" | "updatedAt">[],
+  chapterId: string,
+  limit = 4,
+): StoryTreeExperienceSecondPassAdvice[] {
+  return tasks
+    .filter((task) => task.state === "completed")
+    .filter((task) => task.dispatchKey.startsWith("story-tree-experience:"))
+    .filter((task) => task.href.includes(`/chapters/${chapterId}`))
+    .map((task): StoryTreeExperienceSecondPassAdvice | null => {
+      const { axisId } = taskAxisFromApplyDispatchKey(task.dispatchKey);
+      const axisLabel = axisLabels[axisId] ?? "大树结构";
+      const status = taskStatusFromEvidence(task.evidence);
+      const action = taskActionFromEvidence(task.evidence);
+      const completion = task.completionEvidence.trim();
+      const instruction = [
+        action ? `按已验证经验处理「${axisLabel}」：${action}` : `按已验证经验处理「${axisLabel}」。`,
+        completion ? `完成依据：${completion}` : "",
+      ].filter(Boolean).join(" ");
+
+      if (!instruction) return null;
+      return {
+        id: task.dispatchKey,
+        title: task.title,
+        status,
+        axisLabel,
+        instruction,
+        detail: task.evidence.find((item) => item.includes("复检")) ?? task.evidence[0] ?? task.detail ?? "",
+        href: task.href,
+        completedAt: task.completedAt ?? task.updatedAt ?? null,
+      };
+    })
+    .filter((item): item is StoryTreeExperienceSecondPassAdvice => Boolean(item))
+    .sort((left, right) => dateValue(right.completedAt) - dateValue(left.completedAt))
+    .slice(0, limit);
 }

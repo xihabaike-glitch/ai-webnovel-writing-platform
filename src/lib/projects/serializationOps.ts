@@ -1,8 +1,9 @@
 import type { PlatformProfile } from "../platforms/platformProfiles.ts";
-import { buildSubmissionAssetAudit, type PlatformSubmissionAssetAudit } from "./platformPublishExport.ts";
+import { buildSubmissionAssetAudit, type PlatformFinalSubmissionGate, type PlatformSubmissionAssetAudit } from "./platformPublishExport.ts";
 import type { SubmissionChecklist } from "./submissionChecklist.ts";
 
 export interface SerializationProject {
+  id?: string;
   title: string;
   currentWordCount: number;
   targetWordCount: number;
@@ -64,6 +65,16 @@ export interface SerializationSubmissionAssetStatus {
   actionLabel: string;
 }
 
+export interface SerializationFinalSubmissionGate {
+  status: PlatformFinalSubmissionGate["status"] | "unknown";
+  label: string;
+  headline: string;
+  verdict: string;
+  nextAction: string;
+  score: number;
+  blockers: string[];
+}
+
 export interface SerializationOpsInput {
   project: SerializationProject;
   platform: PlatformProfile;
@@ -72,6 +83,7 @@ export interface SerializationOpsInput {
   submissionChecklist: SubmissionChecklist;
   submissionAssets?: SerializationSubmissionAsset[];
   submissionAssetVersions?: SerializationSubmissionAssetVersion[];
+  finalGate?: PlatformFinalSubmissionGate | null;
 }
 
 export interface SerializationAction {
@@ -101,6 +113,7 @@ export interface SerializationOpsDashboard {
   revisionQueueCount: number;
   submissionReadinessPercent: number;
   submissionAssetStatus: SerializationSubmissionAssetStatus;
+  finalSubmissionGate: SerializationFinalSubmissionGate;
   nextPublishChapter: SerializationChapter | null;
   actions: SerializationAction[];
   warnings: string[];
@@ -146,6 +159,30 @@ function reviewed(chapter: SerializationChapter, tasks: SerializationTask[]) {
 
 function secondPassed(chapter: SerializationChapter, tasks: SerializationTask[]) {
   return latestTask(tasks, chapter.id, "chapter_second_pass")?.status === "succeeded";
+}
+
+function normalizeFinalSubmissionGate(finalGate: PlatformFinalSubmissionGate | null | undefined): SerializationFinalSubmissionGate {
+  if (!finalGate) {
+    return {
+      status: "unknown",
+      label: "待判断",
+      headline: "发布终检还没有生成。",
+      verdict: "进入发布中心后才能得到最终投前判断。",
+      nextAction: "查看发布中心",
+      score: 0,
+      blockers: [],
+    };
+  }
+
+  return {
+    status: finalGate.status,
+    label: finalGate.label,
+    headline: finalGate.headline,
+    verdict: finalGate.verdict,
+    nextAction: finalGate.nextAction,
+    score: finalGate.score,
+    blockers: finalGate.blockers,
+  };
 }
 
 function parseJsonObject(text: string | null | undefined) {
@@ -230,7 +267,14 @@ export function buildSerializationSubmissionAssetStatus(input: Pick<Serializatio
   };
 }
 
-function buildActions(input: SerializationOpsInput, reviewQueue: SerializationChapter[], revisionQueue: SerializationChapter[], publishReady: SerializationChapter[], assetStatus: SerializationSubmissionAssetStatus) {
+function buildActions(
+  input: SerializationOpsInput,
+  reviewQueue: SerializationChapter[],
+  revisionQueue: SerializationChapter[],
+  publishReady: SerializationChapter[],
+  assetStatus: SerializationSubmissionAssetStatus,
+  finalGate: SerializationFinalSubmissionGate,
+) {
   const actions: SerializationAction[] = [];
   const failedChecklist = input.submissionChecklist.items.filter((item) => item.status === "todo" || item.status === "risk");
 
@@ -319,6 +363,22 @@ function buildActions(input: SerializationOpsInput, reviewQueue: SerializationCh
       execution: null,
     });
   }
+  if (!failedChecklist[0] && assetStatus.status === "ready" && finalGate.status === "ready_to_submit") {
+    actions.push({
+      id: "save-publish-baseline",
+      label: "保存发布基准",
+      priority: "high",
+      detail: `${finalGate.headline} ${finalGate.nextAction}`,
+      href: "#platform-export",
+      hrefLabel: "查看发布包",
+      execution: {
+        label: "保存基准",
+        method: "POST",
+        endpoint: `/api/projects/${input.project.id ?? "current"}/platform-export`,
+        payload: { action: "snapshot", platformId: input.platform.id },
+      },
+    });
+  }
   if (actions.length === 0) {
     actions.push({
       id: "expand-production",
@@ -395,6 +455,7 @@ function submissionGapRepairTarget(itemId: string) {
 
 export function buildSerializationOpsDashboard(input: SerializationOpsInput): SerializationOpsDashboard {
   const submissionAssetStatus = buildSerializationSubmissionAssetStatus(input);
+  const finalSubmissionGate = normalizeFinalSubmissionGate(input.finalGate);
   const draftedChapters = input.chapters.filter((chapter) => chapter.wordCount > 0);
   const reviewQueue = draftedChapters.filter((chapter) => !reviewed(chapter, input.aiTasks));
   const revisionQueue = draftedChapters.filter((chapter) => {
@@ -424,6 +485,8 @@ export function buildSerializationOpsDashboard(input: SerializationOpsInput): Se
   if (submissionAssetStatus.status === "ready" && submissionAssetStatus.generatedVariants > 0 && submissionAssetStatus.adoptedVersions === 0) {
     warnings.push(`已生成 ${submissionAssetStatus.generatedVariants} 个投稿资产候选，但还没有采纳版本。`);
   }
+  if (finalSubmissionGate.status === "fix_first") warnings.push(`最终闸门 ${finalSubmissionGate.score} 分：${finalSubmissionGate.nextAction}`);
+  if (finalSubmissionGate.status === "do_not_submit") warnings.push(`最终闸门 ${finalSubmissionGate.score} 分，别投：${finalSubmissionGate.blockers[0] ?? finalSubmissionGate.verdict}`);
 
   return {
     platformName: input.platform.name,
@@ -434,8 +497,9 @@ export function buildSerializationOpsDashboard(input: SerializationOpsInput): Se
     revisionQueueCount: revisionQueue.length,
     submissionReadinessPercent: input.submissionChecklist.readinessPercent,
     submissionAssetStatus,
+    finalSubmissionGate,
     nextPublishChapter: publishReady[0] ?? null,
-    actions: buildActions(input, reviewQueue, revisionQueue, publishReady, submissionAssetStatus),
+    actions: buildActions(input, reviewQueue, revisionQueue, publishReady, submissionAssetStatus, finalSubmissionGate),
     warnings,
   };
 }

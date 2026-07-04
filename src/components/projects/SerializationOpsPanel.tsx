@@ -38,9 +38,20 @@ interface SerializationOpsDashboard {
   revisionQueueCount: number;
   submissionReadinessPercent: number;
   submissionAssetStatus: SerializationSubmissionAssetStatus;
+  finalSubmissionGate: SerializationFinalSubmissionGate;
   nextPublishChapter: SerializationChapter | null;
   actions: SerializationAction[];
   warnings: string[];
+}
+
+interface SerializationFinalSubmissionGate {
+  status: "ready_to_submit" | "fix_first" | "do_not_submit" | "unknown";
+  label: string;
+  headline: string;
+  verdict: string;
+  nextAction: string;
+  score: number;
+  blockers: string[];
 }
 
 interface SerializationSubmissionAssetStatus {
@@ -78,6 +89,13 @@ function assetStatusLabel(status: SerializationSubmissionAssetStatus["status"]) 
   if (status === "needs_work") return "需打磨";
   if (status === "blocked") return "阻塞";
   return "未保存";
+}
+
+function finalGateStatusLabel(status: SerializationFinalSubmissionGate["status"]) {
+  if (status === "ready_to_submit") return "可投";
+  if (status === "fix_first") return "先修";
+  if (status === "do_not_submit") return "别投";
+  return "待判断";
 }
 
 function projectHref(projectId: string, href: string) {
@@ -175,7 +193,7 @@ export function SerializationOpsPanel({ projectId }: { projectId: string }) {
       </div>
 
       {dashboard ? (
-        <div className="mt-4 grid gap-3 sm:grid-cols-6">
+        <div className="mt-4 grid gap-3 sm:grid-cols-7">
           <div className="rounded-md bg-slate-50 p-3">
             <div className="text-xs text-slate-500">目标平台</div>
             <div className="mt-1 text-sm font-medium text-slate-950">{dashboard.platformName}</div>
@@ -202,6 +220,13 @@ export function SerializationOpsPanel({ projectId }: { projectId: string }) {
               {dashboard.submissionAssetStatus.status === "missing" ? "缺" : dashboard.submissionAssetStatus.score}
             </div>
             <div className="mt-1 text-xs text-slate-500">{assetStatusLabel(dashboard.submissionAssetStatus.status)}</div>
+          </div>
+          <div className="rounded-md bg-slate-50 p-3">
+            <div className="text-xs text-slate-500">最终闸门</div>
+            <div className="mt-1 text-2xl font-semibold text-slate-950">
+              {dashboard.finalSubmissionGate.status === "unknown" ? "待" : dashboard.finalSubmissionGate.score}
+            </div>
+            <div className="mt-1 text-xs text-slate-500">{finalGateStatusLabel(dashboard.finalSubmissionGate.status)}</div>
           </div>
         </div>
       ) : null}
@@ -278,6 +303,14 @@ export function SerializationOpsPanel({ projectId }: { projectId: string }) {
                 候选 {dashboard.submissionAssetStatus.generatedVariants} · 采纳 {dashboard.submissionAssetStatus.adoptedVersions}
                 {dashboard.submissionAssetStatus.latestStrategy ? ` · ${dashboard.submissionAssetStatus.latestStrategy}` : ""}
               </div>
+            </div>
+            <div className="mt-3 rounded-md bg-slate-50 p-3 text-sm">
+              <div className="text-xs text-slate-500">最终投前闸门</div>
+              <div className="mt-1 font-medium text-slate-950">
+                {finalGateStatusLabel(dashboard.finalSubmissionGate.status)} · {dashboard.finalSubmissionGate.score || "待判断"} 分
+              </div>
+              <p className="mt-2 leading-6 text-slate-600">{dashboard.finalSubmissionGate.verdict}</p>
+              <div className="mt-2 text-xs text-slate-500">下一步：{dashboard.finalSubmissionGate.nextAction}</div>
             </div>
           </div>
         </div>

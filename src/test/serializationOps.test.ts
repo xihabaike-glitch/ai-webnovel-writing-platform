@@ -152,9 +152,9 @@ test("buildSerializationOpsDashboard", async (t) => {
 
   await t.test("surfaces publish asset adoption as an ops signal", () => {
     const dashboard = buildSerializationOpsDashboard({
-      project,
+      project: { ...project, id: "project-1" },
       platform,
-      chapters: [chapter],
+      chapters: [],
       aiTasks: [
         {
           id: "asset-task-1",
@@ -191,6 +191,16 @@ test("buildSerializationOpsDashboard", async (t) => {
           createdAt: "2026-01-02T00:00:00.000Z",
         },
       ],
+      finalGate: {
+        status: "ready_to_submit",
+        label: "可投",
+        headline: "番茄小说 发布门槛已过，可以保存基准后投。",
+        verdict: "标题、简介、前三章、字数、审稿和投稿资产都过了投前线。",
+        nextAction: "保存发布包版本基准，然后下载或复制发布包。",
+        score: 100,
+        blockers: [],
+        items: [],
+      },
     });
 
     assert.equal(dashboard.submissionAssetStatus.status, "ready");
@@ -199,6 +209,10 @@ test("buildSerializationOpsDashboard", async (t) => {
     assert.equal(dashboard.submissionAssetStatus.latestStrategy, "强钩子版");
     assert.ok(dashboard.submissionAssetStatus.verdict.includes("已采纳"));
     assert.equal(dashboard.actions.some((action) => action.id === "submission-asset-gap"), false);
+    assert.equal(dashboard.finalSubmissionGate.status, "ready_to_submit");
+    const baselineAction = dashboard.actions.find((action) => action.id === "save-publish-baseline");
+    assert.equal(baselineAction?.execution?.endpoint, "/api/projects/project-1/platform-export");
+    assert.equal(baselineAction?.execution?.payload.action, "snapshot");
   });
 
   await t.test("requires second-pass recheck before publish readiness", () => {

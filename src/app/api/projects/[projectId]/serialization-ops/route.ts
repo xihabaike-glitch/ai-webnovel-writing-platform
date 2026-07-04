@@ -2,11 +2,16 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { getPlatformProfile, type PlatformId } from "@/lib/platforms/platformProfiles";
 import { buildSerializationOpsDashboard } from "@/lib/projects/serializationOps";
-import { parsePublishSnapshotTags } from "@/lib/projects/platformPublishExport";
+import { buildPlatformPublishExportCenter, parsePublishSnapshotTags } from "@/lib/projects/platformPublishExport";
 import { buildSubmissionChecklist } from "@/lib/projects/submissionChecklist";
 
 interface Params {
   params: Promise<{ projectId: string }>;
+}
+
+function normalizeAuditStatus(status: string): "ready" | "blocked" | "needs_work" {
+  if (status === "ready" || status === "blocked") return status;
+  return "needs_work";
 }
 
 export async function GET(_request: Request, { params }: Params) {
@@ -18,8 +23,10 @@ export async function GET(_request: Request, { params }: Params) {
       aiTasks: {
         orderBy: { createdAt: "desc" },
       },
+      publishSnapshots: { orderBy: { createdAt: "desc" }, take: 80 },
       submissionAssets: { orderBy: { updatedAt: "desc" } },
       submissionAssetVersions: { orderBy: { createdAt: "desc" }, take: 80 },
+      platformPublishMetrics: { orderBy: { snapshotDate: "desc" }, take: 80 },
     },
   });
 
@@ -42,8 +49,58 @@ export async function GET(_request: Request, { params }: Params) {
       chapter: task.chapterId ? { id: task.chapterId } : null,
     })),
   });
+  const submissionAssets = project.submissionAssets.map((asset) => ({
+    platformId: asset.platformId,
+    platformName: asset.platformName,
+    title: asset.title,
+    logline: asset.logline,
+    synopsis: asset.synopsis,
+    overseasSynopsis: asset.overseasSynopsis,
+    tags: parsePublishSnapshotTags(asset.tags),
+    note: asset.note,
+    source: asset.source,
+    updatedAt: asset.updatedAt,
+  }));
+  const submissionAssetVersions = project.submissionAssetVersions.map((version) => ({
+    id: version.id,
+    platformId: version.platformId,
+    platformName: version.platformName,
+    title: version.title,
+    logline: version.logline,
+    synopsis: version.synopsis,
+    overseasSynopsis: version.overseasSynopsis,
+    tags: parsePublishSnapshotTags(version.tags),
+    note: version.note,
+    source: version.source,
+    auditScore: version.auditScore,
+    auditStatus: normalizeAuditStatus(version.auditStatus),
+    action: version.action,
+    sourceTaskId: version.sourceTaskId,
+    strategy: version.strategy,
+    createdAt: version.createdAt,
+  }));
+  const publishCenter = buildPlatformPublishExportCenter({
+    project: {
+      title: project.title,
+      genre: project.genre,
+      sellingPoint: project.sellingPoint,
+      currentWordCount: project.currentWordCount,
+      targetWordCount: project.targetWordCount,
+    },
+    targetPlatform: platform,
+    platforms: [platform],
+    chapters: project.chapters,
+    aiTasks: project.aiTasks,
+    publishSnapshots: project.publishSnapshots,
+    submissionAssets,
+    submissionAssetVersions,
+    platformPublishMetrics: project.platformPublishMetrics,
+    submissionChecklist,
+  });
+  const targetPackage = publishCenter.packages.find((pack) => pack.platformId === platform.id) ?? publishCenter.packages[0] ?? null;
   const dashboard = buildSerializationOpsDashboard({
     project: {
+      id: project.id,
       title: project.title,
       currentWordCount: project.currentWordCount,
       targetWordCount: project.targetWordCount,
@@ -53,26 +110,9 @@ export async function GET(_request: Request, { params }: Params) {
     chapters: project.chapters,
     aiTasks: project.aiTasks,
     submissionChecklist,
-    submissionAssets: project.submissionAssets.map((asset) => ({
-      platformId: asset.platformId,
-      platformName: asset.platformName,
-      title: asset.title,
-      logline: asset.logline,
-      synopsis: asset.synopsis,
-      overseasSynopsis: asset.overseasSynopsis,
-      tags: parsePublishSnapshotTags(asset.tags),
-      note: asset.note,
-      source: asset.source,
-      updatedAt: asset.updatedAt,
-    })),
-    submissionAssetVersions: project.submissionAssetVersions.map((version) => ({
-      platformId: version.platformId,
-      auditScore: version.auditScore,
-      auditStatus: version.auditStatus === "ready" || version.auditStatus === "blocked" ? version.auditStatus : "needs_work",
-      action: version.action,
-      strategy: version.strategy,
-      createdAt: version.createdAt,
-    })),
+    submissionAssets,
+    submissionAssetVersions,
+    finalGate: targetPackage?.finalGate ?? null,
   });
 
   return NextResponse.json({

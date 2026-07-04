@@ -51,5 +51,16 @@ export function buildChapterReviewPrompt(input: ChapterReviewPromptInput) {
     input.projectContext ? "审稿时必须单独判断正文是否违背项目上下文召回包；如果人物弧光、世界观规则、伏笔状态或历史章节承接冲突，把 type 标成 continuity 或 context_fit。" : "",
   ].join("\n");
 
-  return { systemPrompt, userPrompt };
+  return {
+    systemPrompt,
+    userPrompt,
+    sourceContext: input.projectContext
+      ? {
+        status: input.projectContext.status,
+        summary: input.projectContext.summary,
+        warnings: input.projectContext.warnings,
+        sourceCounts: input.projectContext.sourceCounts,
+      }
+      : null,
+  };
 }

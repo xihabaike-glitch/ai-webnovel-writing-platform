@@ -119,5 +119,7 @@ describe("buildChapterReviewPrompt", () => {
     assert.match(prompt.userPrompt, /第 1 章 雨夜系统/);
     assert.match(prompt.userPrompt, /continuity/);
     assert.match(prompt.userPrompt, /context_fit/);
+    assert.equal(prompt.sourceContext?.sourceCounts.characters, 1);
+    assert.ok(prompt.sourceContext?.summary.includes("设定 3"));
   });
 });

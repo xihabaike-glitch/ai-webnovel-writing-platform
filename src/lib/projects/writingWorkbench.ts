@@ -1,5 +1,5 @@
 import { buildTaskRetryPlan } from "../ai/taskRetry.ts";
-import { buildProjectContextPack, type ProjectContextPack, type ProjectContextPlotThread, type ProjectContextForeshadow } from "./projectContextPack.ts";
+import { buildProjectContextPack, type ProjectContextPack, type ProjectContextPlotThread, type ProjectContextForeshadow, type ProjectContextStatus } from "./projectContextPack.ts";
 
 export type WorkbenchStatus = "pass" | "warn" | "fail";
 
@@ -171,8 +171,16 @@ export interface WritingWorkbenchModelTimelineItem {
   summary: string;
   costLabel: string;
   nextAction: string;
+  sourceContext: WritingWorkbenchModelSourceContext | null;
   retryAction: WritingWorkbenchModelTimelineRetryAction | null;
   recovery: WritingWorkbenchModelTimelineRecovery | null;
+}
+
+export interface WritingWorkbenchModelSourceContext {
+  status: ProjectContextStatus;
+  summary: string;
+  warnings: string[];
+  sourceCounts: ProjectContextPack["sourceCounts"];
 }
 
 export interface WritingWorkbenchModelTimelineRetryAction {
@@ -547,6 +555,45 @@ function buildTimelineRecovery(task: WritingWorkbenchAiTask, tasks: WritingWorkb
   };
 }
 
+function parseJsonObject(value: string | null | undefined): Record<string, unknown> | null {
+  if (!value) return null;
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed as Record<string, unknown> : null;
+  } catch {
+    return null;
+  }
+}
+
+function isSourceContext(value: unknown): value is WritingWorkbenchModelSourceContext {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const record = value as Record<string, unknown>;
+  const counts = record.sourceCounts;
+  return (
+    (record.status === "pass" || record.status === "warn" || record.status === "fail")
+    && typeof record.summary === "string"
+    && Array.isArray(record.warnings)
+    && Boolean(counts && typeof counts === "object" && !Array.isArray(counts))
+  );
+}
+
+function findSourceContext(value: unknown, depth = 0): WritingWorkbenchModelSourceContext | null {
+  if (depth > 4) return null;
+  if (isSourceContext(value)) return value;
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const record = value as Record<string, unknown>;
+  if (isSourceContext(record.sourceContext)) return record.sourceContext;
+  for (const key of ["input", "prompt", "payload"]) {
+    const found = findSourceContext(record[key], depth + 1);
+    if (found) return found;
+  }
+  return null;
+}
+
+function sourceContextForTask(task: WritingWorkbenchAiTask) {
+  return findSourceContext(parseJsonObject(task.inputSnapshot));
+}
+
 function buildModelTimeline(tasks: WritingWorkbenchAiTask[]): WritingWorkbenchModelTimeline {
   const items = [...tasks]
     .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime())
@@ -561,6 +608,7 @@ function buildModelTimeline(tasks: WritingWorkbenchAiTask[]): WritingWorkbenchMo
       summary: summarizeTask(task),
       costLabel: typeof task.costUsd === "number" ? `$${task.costUsd.toFixed(3)}` : "未记录费用",
       nextAction: nextActionForTask(task),
+      sourceContext: sourceContextForTask(task),
       retryAction: buildTimelineRetryAction(task),
       recovery: buildTimelineRecovery(task, tasks),
     }));

@@ -44,6 +44,21 @@ export function WorkbenchModelTimelinePanel({ timeline }: { timeline: WritingWor
               </span>
             </div>
             <p className="mt-2 text-slate-600">{item.summary}</p>
+            {item.sourceContext ? (
+              <div className="mt-3 rounded-md border border-slate-200 bg-white px-3 py-2 text-xs text-slate-600">
+                <div className="font-medium text-slate-950">来源上下文</div>
+                <p className="mt-1 leading-5">{item.sourceContext.summary}</p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <span className="rounded-md bg-slate-100 px-2 py-1">人物 {item.sourceContext.sourceCounts.characters}</span>
+                  <span className="rounded-md bg-slate-100 px-2 py-1">设定 {item.sourceContext.sourceCounts.worldEntries}</span>
+                  <span className="rounded-md bg-slate-100 px-2 py-1">线索 {item.sourceContext.sourceCounts.storyLines}</span>
+                  <span className="rounded-md bg-slate-100 px-2 py-1">历史 {item.sourceContext.sourceCounts.historyChapters}</span>
+                </div>
+                {item.sourceContext.warnings[0] ? (
+                  <p className="mt-2 leading-5 text-amber-700">{item.sourceContext.warnings[0]}</p>
+                ) : null}
+              </div>
+            ) : null}
             <p className="mt-2 text-slate-500">下一步：{item.nextAction}</p>
             {item.recovery ? (
               <div className={`mt-3 rounded-md border px-3 py-2 text-xs ${

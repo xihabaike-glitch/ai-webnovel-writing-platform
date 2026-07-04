@@ -144,5 +144,8 @@ test("buildChapterDraftPrompt", async (t) => {
     assert.ok(contextPrompt.userPrompt.includes("系统规则"));
     assert.ok(contextPrompt.userPrompt.includes("第 1 章 雨夜系统"));
     assert.ok(contextPrompt.userPrompt.includes("不要写出与人物弧光"));
+    assert.equal(contextPrompt.sourceContext?.status, "fail");
+    assert.equal(contextPrompt.sourceContext?.sourceCounts.characters, 1);
+    assert.ok(contextPrompt.sourceContext?.summary.includes("人物 1"));
   });
 });

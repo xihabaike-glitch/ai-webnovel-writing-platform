@@ -66,5 +66,16 @@ export function buildChapterDraftPrompt(input: ChapterDraftPromptInput) {
     input.projectContext ? "5. 必须遵守项目上下文召回包；不要写出与人物弧光、系统规则、伏笔状态和历史章节矛盾的内容。" : "",
   ].join("\n");
 
-  return { systemPrompt, userPrompt };
+  return {
+    systemPrompt,
+    userPrompt,
+    sourceContext: input.projectContext
+      ? {
+        status: input.projectContext.status,
+        summary: input.projectContext.summary,
+        warnings: input.projectContext.warnings,
+        sourceCounts: input.projectContext.sourceCounts,
+      }
+      : null,
+  };
 }

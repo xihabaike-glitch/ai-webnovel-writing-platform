@@ -89,6 +89,21 @@ test("buildWritingWorkbench", async (t) => {
           model: "claude-sonnet",
           outputText: "节奏合格，但人物选择还可以更狠。",
           costUsd: 0.034,
+          inputSnapshot: JSON.stringify({
+            input: {
+              sourceContext: {
+                status: "warn",
+                summary: "上下文需要补强：人物 1，设定 2，线索 1，历史章节 1。",
+                warnings: ["世界观与平台土壤：缺少禁忌/限制"],
+                sourceCounts: {
+                  characters: 1,
+                  worldEntries: 2,
+                  storyLines: 1,
+                  historyChapters: 1,
+                },
+              },
+            },
+          }),
           createdAt: "2026-07-03T00:05:00.000Z",
         },
       ],
@@ -119,6 +134,9 @@ test("buildWritingWorkbench", async (t) => {
     assert.equal(workbench.modelTimeline.totalRuns, 2);
     assert.equal(workbench.modelTimeline.items[0].id, "task2");
     assert.ok(workbench.modelTimeline.items[0].summary.includes("节奏合格"));
+    assert.equal(workbench.modelTimeline.items[0].sourceContext?.status, "warn");
+    assert.equal(workbench.modelTimeline.items[0].sourceContext?.sourceCounts.historyChapters, 1);
+    assert.ok(workbench.modelTimeline.items[0].sourceContext?.warnings[0].includes("禁忌"));
     assert.ok(workbench.modelTimeline.items.some((item) => item.status === "failed" && item.nextAction.includes("复盘")));
     const failedItem = workbench.modelTimeline.items.find((item) => item.id === "task1");
     assert.equal(failedItem?.retryAction?.supported, true);

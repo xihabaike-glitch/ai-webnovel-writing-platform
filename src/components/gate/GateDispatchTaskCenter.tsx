@@ -52,6 +52,12 @@ function closeoutClass(status: GateDispatchTaskCloseoutStatus) {
   return "border-slate-200 bg-slate-50 text-slate-700";
 }
 
+function recheckAdviceClass(tone: "amber" | "rose" | "sky") {
+  if (tone === "rose") return "border-rose-200 bg-rose-50 text-rose-900";
+  if (tone === "sky") return "border-sky-200 bg-sky-50 text-sky-900";
+  return "border-amber-200 bg-amber-50 text-amber-900";
+}
+
 function evidenceClass(status: GateDispatchEvidenceReviewStatus) {
   if (status === "missing_evidence") return "border-rose-200 bg-rose-50 text-rose-800";
   if (status === "needs_receipt") return "border-amber-200 bg-amber-50 text-amber-800";
@@ -539,6 +545,14 @@ export function GateDispatchTaskCenter({
                     </span>
                   ))}
                 </div>
+                {chain.reviewAdvice ? (
+                  <div className={`mt-3 rounded-md border p-3 text-xs leading-5 ${recheckAdviceClass(chain.reviewAdvice.tone)}`}>
+                    <div className="font-medium">{chain.reviewAdvice.title}</div>
+                    <p className="mt-1">{chain.reviewAdvice.detail}</p>
+                    <p className="mt-1 font-medium">下一步：{chain.reviewAdvice.nextAction}</p>
+                    <p className="mt-1 opacity-80">负责人：{chain.reviewAdvice.ownerRole}</p>
+                  </div>
+                ) : null}
                 <Link className="mt-3 inline-flex rounded-md border border-slate-200 bg-white px-2 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50" href={chain.latestHref}>
                   {chain.latestActionLabel}
                 </Link>

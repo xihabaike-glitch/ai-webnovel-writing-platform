@@ -3160,6 +3160,9 @@ test("buildGateActionReceipt", async (t) => {
     assert.equal(center.recheckFollowUpChains[0].rootDispatchKey, "story-tree:project-1:chapter-1:chapter_draft:opening_ending");
     assert.equal(center.recheckFollowUpChains[0].maxRound, 2);
     assert.equal(center.recheckFollowUpChains[0].active, 2);
+    assert.equal(center.recheckFollowUpChains[0].reviewAdvice?.type, "acceptance_mismatch");
+    assert.equal(center.recheckFollowUpChains[0].reviewAdvice?.title, "验收标准先补清楚");
+    assert.ok(center.recheckFollowUpChains[0].reviewAdvice?.nextAction.includes("通过线"));
     assert.deepEqual(center.recheckFollowUpChains[0].rounds.map((round) => `${round.round}:${round.dispatchKey}`), [
       "1:story-tree-followup:project-1:chapter-1:source:74",
       "2:story-tree-followup:project-1:chapter-1:story-tree-followup-project-1-chapter-1-source-74:77",
@@ -3174,6 +3177,67 @@ test("buildGateActionReceipt", async (t) => {
     assert.equal(fanqie[0].ownerRole, "投稿资产编辑");
     assert.equal(recheckFollowUps.length, 2);
     assert.equal(recheckFollowUps[0].ownerRole, "作者");
+  });
+
+  await t.test("suggests pausing platform direction for repeated submission follow-up chains", () => {
+    const baseDispatch = buildGatePlatformGrowthDispatchItems([buildGatePlatformStrategyReceipt({
+      item: strategyPlatform,
+      status: "succeeded",
+      now: "2026-01-01T00:00:00.000Z",
+      payload: {
+        variants: [{ strategy: "强钩子版" }],
+      },
+    })])[0];
+    const tasks = [
+      {
+        ...baseDispatch,
+        id: "submission-recheck-followup:project-1:qimao:submission-precheck-project-1-platform-risk:72",
+        databaseId: "dispatch-db-6",
+        dispatchKey: "submission-recheck-followup:project-1:qimao:submission-precheck-project-1-platform-risk:72",
+        projectId: "project-1",
+        sourceReceiptId: null,
+        completionEvidence: "已补投稿包但平台证据仍未改善。",
+        platformId: "qimao",
+        platformName: "七猫小说",
+        stage: "start_repair_packaging" as const,
+        state: "completed" as const,
+        ownerRole: "运营",
+        priorityScore: 84,
+        evidence: ["来源派单：submission-precheck:project-1:platform-risk", "证据闭环复检：72 -> 72 分，分数未变：仍需修复"],
+        assignedAt: "2026-01-01T00:00:05.000Z",
+        completedAt: "2026-01-01T00:00:06.000Z",
+        createdAt: "2026-01-01T00:00:05.000Z",
+        updatedAt: "2026-01-01T00:00:06.000Z",
+      },
+      {
+        ...baseDispatch,
+        id: "submission-recheck-followup:project-1:qimao:submission-recheck-followup-project-1-qimao-submission-precheck-project-1-platform-risk-72:70",
+        databaseId: "dispatch-db-7",
+        dispatchKey: "submission-recheck-followup:project-1:qimao:submission-recheck-followup-project-1-qimao-submission-precheck-project-1-platform-risk-72:70",
+        projectId: "project-1",
+        sourceReceiptId: null,
+        completionEvidence: "",
+        platformId: "qimao",
+        platformName: "七猫小说",
+        stage: "pause_platform" as const,
+        state: "assigned" as const,
+        ownerRole: "主编",
+        priorityScore: 92,
+        evidence: ["来源派单：submission-recheck-followup:project-1:qimao:submission-precheck-project-1-platform-risk:72"],
+        assignedAt: "2026-01-01T00:00:07.000Z",
+        completedAt: null,
+        createdAt: "2026-01-01T00:00:07.000Z",
+        updatedAt: "2026-01-01T00:00:07.000Z",
+      },
+    ];
+
+    const center = buildGateDispatchTaskCenter(tasks);
+
+    assert.equal(center.recheckFollowUpChains.length, 1);
+    assert.equal(center.recheckFollowUpChains[0].reviewAdvice?.type, "direction_pause");
+    assert.equal(center.recheckFollowUpChains[0].reviewAdvice?.title, "平台方向先暂停");
+    assert.equal(center.recheckFollowUpChains[0].reviewAdvice?.ownerRole, "主编");
+    assert.ok(center.recheckFollowUpChains[0].reviewAdvice?.nextAction.includes("停平台加码"));
   });
 
   await t.test("flags overdue and today dispatch closeout items", () => {

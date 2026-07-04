@@ -362,6 +362,7 @@ export interface GateDispatchRecheckFollowUpChain {
   latestActionLabel: string;
   latestHref: string;
   latestUpdatedAt: string;
+  reviewAdvice?: GateDispatchRecheckFollowUpReviewAdvice;
   rounds: Array<{
     round: number;
     dispatchKey: string;
@@ -370,6 +371,17 @@ export interface GateDispatchRecheckFollowUpChain {
     priorityScore: number;
     ownerRole: string;
   }>;
+}
+
+export type GateDispatchRecheckFollowUpReviewAdviceType = "acceptance_mismatch" | "weak_execution" | "direction_pause";
+
+export interface GateDispatchRecheckFollowUpReviewAdvice {
+  type: GateDispatchRecheckFollowUpReviewAdviceType;
+  tone: "amber" | "rose" | "sky";
+  title: string;
+  detail: string;
+  nextAction: string;
+  ownerRole: string;
 }
 
 export type GateDispatchTaskCloseoutStatus = "overdue" | "today" | "planned" | "done";
@@ -396,6 +408,16 @@ export function isChapterProductionRecheckFollowUpTask(task: Pick<PersistedGateP
 function sourceDispatchKeyFromEvidence(task: Pick<PersistedGatePlatformDispatchTask, "evidence">) {
   const sourceLine = task.evidence.find((line) => line.startsWith("来源派单："));
   return sourceLine?.replace("来源派单：", "").trim() || null;
+}
+
+function taskReviewText(task: PersistedGatePlatformDispatchTask) {
+  return [
+    task.title,
+    task.detail,
+    task.completionEvidence,
+    ...task.acceptanceCriteria,
+    ...task.evidence,
+  ].join(" ");
 }
 
 export type GateDispatchEvidenceReviewStatus = "verified" | "needs_receipt" | "missing_evidence" | "active";
@@ -2969,6 +2991,62 @@ function buildGateDispatchRecheckFollowUpChains(tasks: PersistedGatePlatformDisp
     chains.set(root, [...(chains.get(root) ?? []), task]);
   }
 
+  function reviewAdviceForChain(
+    rootDispatchKey: string,
+    chainTasks: PersistedGatePlatformDispatchTask[],
+    maxRound: number,
+  ): GateDispatchRecheckFollowUpReviewAdvice | undefined {
+    if (maxRound < 2) return undefined;
+    const combinedText = chainTasks.map(taskReviewText).join(" ");
+    const completedTasks = chainTasks.filter((task) => task.state === "completed");
+    const missingCompletionEvidence = completedTasks.length === 0 || completedTasks.some((task) => task.completionEvidence.trim().length < 8);
+    const isSubmissionChain = rootDispatchKey.startsWith("submission-")
+      || chainTasks.some((task) => task.dispatchKey.startsWith("submission-recheck-followup:"));
+    const unchangedSignal = /分数未变|unchanged|仍需修复|仍低于|没有明显变好/.test(combinedText);
+
+    if (isSubmissionChain && maxRound >= 2) {
+      return {
+        type: "direction_pause",
+        tone: "rose",
+        title: "平台方向先暂停",
+        detail: "投稿复查已经进入二轮以上，继续补小材料大概率只是把错误投入放大。",
+        nextAction: "先停平台加码，回到投稿包、前三章兑现和目标平台匹配度重判，再决定是否继续修包。",
+        ownerRole: "主编",
+      };
+    }
+
+    if (missingCompletionEvidence || /无基准|验收标准|无法提升/.test(combinedText)) {
+      return {
+        type: "acceptance_mismatch",
+        tone: "sky",
+        title: "验收标准先补清楚",
+        detail: "返工已经进入二轮，但链路里缺少能证明改动有效的完成证据，容易变成机械返工。",
+        nextAction: "先把通过线、不可接受项、必须改动的段落写清楚，再派作者继续二改。",
+        ownerRole: "主编",
+      };
+    }
+
+    if (unchangedSignal) {
+      return {
+        type: "weak_execution",
+        tone: "amber",
+        title: "执行动作太虚",
+        detail: "复查分数没有有效上移，说明上一轮动作可能只改了表层，没有打到主线压力或人物选择。",
+        nextAction: "要求返工证据写明改了哪一段、服务哪条主线、如何改变读者追读理由。",
+        ownerRole: "作者",
+      };
+    }
+
+    return {
+      type: "weak_execution",
+      tone: "amber",
+      title: "二轮返工先复盘动作",
+      detail: "链路已经进入第二轮，继续派单前先确认上一轮动作为什么没有一次打穿。",
+      nextAction: "复盘上一轮验收证据，保留有效动作，删除无效动作，再生成下一轮返工要求。",
+      ownerRole: "作者",
+    };
+  }
+
   return [...chains.entries()].map(([rootDispatchKey, chainTasks]) => {
     const rounds = chainTasks
       .map((task) => ({
@@ -2987,6 +3065,7 @@ function buildGateDispatchRecheckFollowUpChains(tasks: PersistedGatePlatformDisp
     const latest = sortedByLatest[0];
     const active = chainTasks.filter((task) => task.state !== "completed").length;
     const completed = chainTasks.length - active;
+    const maxRound = Math.max(...rounds.map((round) => round.round));
 
     return {
       rootDispatchKey,
@@ -2996,12 +3075,13 @@ function buildGateDispatchRecheckFollowUpChains(tasks: PersistedGatePlatformDisp
       total: chainTasks.length,
       active,
       completed,
-      maxRound: Math.max(...rounds.map((round) => round.round)),
+      maxRound,
       status: active > 0 ? "active" as const : "completed" as const,
       latestTitle: latest.title,
       latestActionLabel: latest.actionLabel,
       latestHref: latest.href,
       latestUpdatedAt: latest.updatedAt,
+      reviewAdvice: reviewAdviceForChain(rootDispatchKey, chainTasks, maxRound),
       rounds,
     };
   }).sort((left, right) => (

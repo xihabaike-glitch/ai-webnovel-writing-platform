@@ -44,6 +44,7 @@ interface FirstDayWorkflow {
 }
 
 type FirstDayModelRouteStatus = FirstDayExecutionRouteStatus;
+type FirstDayMessageAction = "execute_current_step";
 
 function statusLabel(status: FirstDayWorkflowStep["status"]) {
   if (status === "done") return "完成";
@@ -70,10 +71,15 @@ function modelSettingsRepairHref(route: FirstDayModelRouteStatus, projectId: str
   return `/settings/models?${params.toString()}`;
 }
 
-function refreshedRouteMessage(route: FirstDayModelRouteStatus) {
+function refreshedRouteNotice(route: FirstDayModelRouteStatus): { message: string; action?: FirstDayMessageAction } {
   const blockMessage = buildFirstDayExecutionRouteBlockMessage(route);
-  if (!blockMessage) return `已刷新首日模型路线：${route.taskLabel}路线就绪，可以继续执行当前节点。`;
-  return `已刷新首日模型路线：${blockMessage}`;
+  if (!blockMessage) {
+    return {
+      message: `已刷新首日模型路线：${route.taskLabel}路线就绪，可以继续执行当前节点。`,
+      action: "execute_current_step",
+    };
+  }
+  return { message: `已刷新首日模型路线：${blockMessage}` };
 }
 
 function FirstDayStepCard({ step, index }: { step: FirstDayWorkflowStep; index: number }) {
@@ -117,10 +123,16 @@ export function FirstDayWorkflowPanel({ projectId }: { projectId: string }) {
   const [isCompletingDispatch, setIsCompletingDispatch] = useState(false);
   const [completionEvidence, setCompletionEvidence] = useState("");
   const [message, setMessage] = useState<string | null>(null);
+  const [messageAction, setMessageAction] = useState<FirstDayMessageAction | null>(null);
+
+  function showMessage(nextMessage: string | null, action?: FirstDayMessageAction) {
+    setMessage(nextMessage);
+    setMessageAction(action ?? null);
+  }
 
   async function loadWorkflow(options?: { fromRouteRepair?: boolean }) {
     setIsLoading(true);
-    setMessage(null);
+    showMessage(null);
     try {
       const response = await fetch(`/api/projects/${projectId}/first-day-workflow`);
       if (!response.ok) {
@@ -135,10 +147,11 @@ export function FirstDayWorkflowPanel({ projectId }: { projectId: string }) {
       setDispatch(payload.dispatch);
       setModelRoute(payload.modelRoute);
       if (options?.fromRouteRepair) {
-        setMessage(refreshedRouteMessage(payload.modelRoute));
+        const notice = refreshedRouteNotice(payload.modelRoute);
+        showMessage(notice.message, notice.action);
       }
     } catch (caught) {
-      setMessage(caught instanceof Error ? caught.message : "读取首日工作流失败。");
+      showMessage(caught instanceof Error ? caught.message : "读取首日工作流失败。");
     } finally {
       setIsLoading(false);
     }
@@ -147,12 +160,12 @@ export function FirstDayWorkflowPanel({ projectId }: { projectId: string }) {
   async function assignFirstDayDispatch() {
     if (!dispatch) return;
     setIsDispatching(true);
-    setMessage(null);
+    showMessage(null);
     try {
       const task = await persistGateDispatchTask(dispatch);
-      setMessage(`已派到任务中心：${task.title}`);
+      showMessage(`已派到任务中心：${task.title}`);
     } catch (caught) {
-      setMessage(caught instanceof Error ? caught.message : "首日任务派单失败。");
+      showMessage(caught instanceof Error ? caught.message : "首日任务派单失败。");
     } finally {
       setIsDispatching(false);
     }
@@ -163,12 +176,12 @@ export function FirstDayWorkflowPanel({ projectId }: { projectId: string }) {
     if (modelRoute) {
       const routeBlockMessage = buildFirstDayExecutionRouteBlockMessage(modelRoute);
       if (routeBlockMessage) {
-        setMessage(routeBlockMessage);
+        showMessage(routeBlockMessage);
         return;
       }
     }
     setIsExecutingAi(true);
-    setMessage(null);
+    showMessage(null);
     try {
       const response = await fetch(`/api/projects/${projectId}/first-day-workflow`, {
         method: "POST",
@@ -187,9 +200,9 @@ export function FirstDayWorkflowPanel({ projectId }: { projectId: string }) {
       if (payload.dispatch) setDispatch(payload.dispatch);
       if (payload.modelRoute) setModelRoute(payload.modelRoute);
       if (payload.completionEvidence) setCompletionEvidence(payload.completionEvidence);
-      setMessage(`AI 已执行当前节点：${workflow.nextStep.label}。请检查结果后完成派单验收。`);
+      showMessage(`AI 已执行当前节点：${workflow.nextStep.label}。请检查结果后完成派单验收。`);
     } catch (caught) {
-      setMessage(caught instanceof Error ? caught.message : "首日 AI 执行失败。");
+      showMessage(caught instanceof Error ? caught.message : "首日 AI 执行失败。");
     } finally {
       setIsExecutingAi(false);
     }
@@ -198,15 +211,15 @@ export function FirstDayWorkflowPanel({ projectId }: { projectId: string }) {
   async function completeCurrentDispatch() {
     if (!workflow || !dispatch) return;
     setIsCompletingDispatch(true);
-    setMessage(null);
+    showMessage(null);
     try {
       await persistGateDispatchTask(dispatch);
       const result = await completeFirstDayDispatchStep(projectId, workflow.executionPackage.stepId, completionEvidence);
       setCompletionEvidence("");
       await loadWorkflow();
-      setMessage(`已完成当前派单：${result.task.title}`);
+      showMessage(`已完成当前派单：${result.task.title}`);
     } catch (caught) {
-      setMessage(caught instanceof Error ? caught.message : "首日派单验收失败。");
+      showMessage(caught instanceof Error ? caught.message : "首日派单验收失败。");
     } finally {
       setIsCompletingDispatch(false);
     }
@@ -235,7 +248,21 @@ export function FirstDayWorkflowPanel({ projectId }: { projectId: string }) {
         </button>
       </div>
 
-      {message ? <p className="mt-3 text-sm text-slate-600">{message}</p> : null}
+      {message ? (
+        <div className="mt-3 flex flex-col gap-2 rounded-md bg-slate-50 px-3 py-2 text-sm text-slate-600 sm:flex-row sm:items-center sm:justify-between">
+          <p>{message}</p>
+          {messageAction === "execute_current_step" ? (
+            <button
+              className="w-fit rounded-md bg-slate-950 px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
+              disabled={isExecutingAi || Boolean(routeBlockMessage)}
+              onClick={executeCurrentStepWithAi}
+              type="button"
+            >
+              {isExecutingAi ? "执行中" : "继续执行当前节点"}
+            </button>
+          ) : null}
+        </div>
+      ) : null}
 
       {workflow ? (
         <div className="mt-4 grid gap-4">

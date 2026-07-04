@@ -3295,6 +3295,95 @@ test("buildGateActionReceipt", async (t) => {
     assert.ok(center.recheckFollowUpChains[0].reviewAdvice?.nextAction.includes("停平台加码"));
   });
 
+  await t.test("feeds completed recheck review dispatches into platform tactic experience", () => {
+    function reviewTask(input: {
+      dispatchKey: string;
+      platformId: string;
+      platformName: string;
+      stage: "pause_platform" | "watch";
+      title: string;
+      completionEvidence: string;
+      completedAt: string;
+      priorityScore: number;
+      evidence: string[];
+    }) {
+      return {
+        id: input.dispatchKey,
+        databaseId: `dispatch-db-${input.platformId}-review`,
+        dispatchKey: input.dispatchKey,
+        projectId: "project-1",
+        sourceReceiptId: null,
+        platformId: input.platformId,
+        platformName: input.platformName,
+        stage: input.stage,
+        state: "completed" as const,
+        priorityScore: input.priorityScore,
+        ownerRole: "主编",
+        title: input.title,
+        detail: "返工链复盘派单。",
+        dueLabel: "今天复盘",
+        actionLabel: "查看复盘",
+        href: "/dispatch",
+        acceptanceCriteria: ["写清复盘结论和下一轮边界。"],
+        evidence: input.evidence,
+        completionEvidence: input.completionEvidence,
+        reviewLatestAt: input.completedAt,
+        assignedAt: "2026-01-01T00:00:00.000Z",
+        completedAt: input.completedAt,
+        createdAt: "2026-01-01T00:00:00.000Z",
+        updatedAt: input.completedAt,
+      };
+    }
+
+    const timeline = buildGatePlatformDecisionTimeline({
+      receipts: [],
+      tasks: [
+        reviewTask({
+          dispatchKey: "recheck-review:direction_pause:submission-precheck-project-1-platform-risk:2",
+          platformId: "qimao",
+          platformName: "七猫小说",
+          stage: "pause_platform",
+          title: "七猫小说 · 平台方向先暂停",
+          completionEvidence: "已暂停七猫加码，转回投稿包和前三章兑现重判。",
+          completedAt: "2026-01-01T01:00:00.000Z",
+          priorityScore: 96,
+          evidence: ["返工链根：submission-precheck:project-1:platform-risk", "复盘建议：平台方向先暂停"],
+        }),
+        reviewTask({
+          dispatchKey: "recheck-review:acceptance_mismatch:story-tree-project-1-chapter-1-chapter_draft-opening_ending:2",
+          platformId: "fanqie",
+          platformName: "番茄小说",
+          stage: "watch",
+          title: "番茄小说 · 验收标准先补清楚",
+          completionEvidence: "已补通过线、不可接受项和下一轮只验证一个核心问题。",
+          completedAt: "2026-01-01T02:00:00.000Z",
+          priorityScore: 88,
+          evidence: ["返工链根：story-tree:project-1:chapter-1:chapter_draft:opening_ending", "复盘建议：验收标准先补清楚"],
+        }),
+      ],
+      limit: 10,
+    });
+    const qimaoTimeline = timeline.items.find((item) => item.platformId === "qimao");
+    const fanqieTimeline = timeline.items.find((item) => item.platformId === "fanqie");
+    const tacticLibrary = buildGatePlatformTacticExperienceLibrary(timeline, 10);
+    const qimaoExperience = tacticLibrary.items.find((item) => item.platformId === "qimao");
+    const fanqieExperience = tacticLibrary.items.find((item) => item.platformId === "fanqie");
+    const qimaoMarkdown = buildGatePlatformTacticExperienceMarkdown(qimaoExperience!);
+
+    assert.equal(qimaoTimeline?.status, "blocked");
+    assert.equal(qimaoTimeline?.label, "复盘止损");
+    assert.equal(qimaoTimeline?.events[0].label, "复盘完成");
+    assert.ok(qimaoTimeline?.events[0].evidence.some((line) => line.includes("平台方向暂停")));
+    assert.equal(qimaoExperience?.status, "blocked");
+    assert.equal(qimaoExperience?.tactic, "复盘止损样本");
+    assert.ok(qimaoExperience?.risk.includes("已暂停七猫加码"));
+    assert.ok(qimaoMarkdown.includes("复盘止损样本"));
+    assert.equal(fanqieTimeline?.events[0].label, "复盘完成");
+    assert.equal(fanqieExperience?.status, "watch");
+    assert.equal(fanqieExperience?.tactic, "验收标准修正打法");
+    assert.ok(fanqieExperience?.reuseHint.includes("验收收口流程"));
+  });
+
   await t.test("flags overdue and today dispatch closeout items", () => {
     const baseDispatch = buildGatePlatformGrowthDispatchItems([buildGatePlatformStrategyReceipt({
       item: strategyPlatform,

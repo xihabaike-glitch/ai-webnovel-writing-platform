@@ -426,6 +426,18 @@ function isRecheckReviewDispatchTask(task: Pick<PersistedGatePlatformDispatchTas
   return task.dispatchKey.startsWith("recheck-review:");
 }
 
+function recheckReviewTypeFromDispatchKey(dispatchKey: string): GateDispatchRecheckFollowUpReviewAdviceType {
+  if (dispatchKey.includes(":direction_pause:")) return "direction_pause";
+  if (dispatchKey.includes(":acceptance_mismatch:")) return "acceptance_mismatch";
+  return "weak_execution";
+}
+
+function recheckReviewTypeLabel(type: GateDispatchRecheckFollowUpReviewAdviceType) {
+  if (type === "direction_pause") return "平台方向暂停";
+  if (type === "acceptance_mismatch") return "验收标准修正";
+  return "执行动作复盘";
+}
+
 function sourceDispatchKeyFromEvidence(task: Pick<PersistedGatePlatformDispatchTask, "evidence">) {
   const sourceLine = task.evidence.find((line) => line.startsWith("来源派单："));
   return sourceLine?.replace("来源派单：", "").trim() || null;
@@ -3189,11 +3201,7 @@ function buildGateDispatchRecheckFollowUpChains(tasks: PersistedGatePlatformDisp
       new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime()
       || right.priorityScore - left.priorityScore
     ))[0];
-    const reviewType = latestReview.dispatchKey.includes(":direction_pause:")
-      ? "direction_pause"
-      : latestReview.dispatchKey.includes(":acceptance_mismatch:")
-        ? "acceptance_mismatch"
-        : "weak_execution";
+    const reviewType = recheckReviewTypeFromDispatchKey(latestReview.dispatchKey);
     const status: GateDispatchRecheckFollowUpInterventionStatus = latestReview.state !== "completed"
       ? "intervened"
       : reviewType === "direction_pause"
@@ -5450,21 +5458,28 @@ export function buildGatePlatformDecisionTimeline(input: {
   for (const task of tasks) {
     const eventPlatform = ensurePlatform(task.platformId, task.platformName, task.href);
     eventPlatform.priorityScore = Math.max(eventPlatform.priorityScore, task.priorityScore);
+    const isRecheckReview = isRecheckReviewDispatchTask(task);
     const isRetreatRepair = isRetreatDispatchStage(task.stage);
     const isRetreatRecheck = isRetreatRecheckDispatchTask(task);
+    const recheckReviewType = isRecheckReview ? recheckReviewTypeFromDispatchKey(task.dispatchKey) : null;
     const completedAt = task.completedAt ?? task.updatedAt;
     eventPlatform.events.push({
       id: `task:${task.dispatchKey}`,
-      type: isRetreatRecheck ? "recheck" : isRetreatRepair ? "repair" : "dispatch",
+      type: isRecheckReview || isRetreatRecheck ? "recheck" : isRetreatRepair ? "repair" : "dispatch",
       label: task.state === "completed"
-        ? isRetreatRecheck ? "重验完成" : isRetreatRepair ? "修复完成" : "派单完成"
-        : isRetreatRecheck ? "重验派单" : isRetreatRepair ? "修复派单" : "平台派单",
+        ? isRecheckReview ? "复盘完成" : isRetreatRecheck ? "重验完成" : isRetreatRepair ? "修复完成" : "派单完成"
+        : isRecheckReview ? "复盘派单" : isRetreatRecheck ? "重验派单" : isRetreatRepair ? "修复派单" : "平台派单",
       detail: task.state === "completed" && task.completionEvidence.trim()
         ? task.completionEvidence.trim()
         : `${task.ownerRole} · ${task.title}`,
       href: task.state === "completed" ? "/dispatch" : task.href,
       createdAt: task.state === "completed" ? completedAt : task.updatedAt,
-      evidence: Array.from(new Set([...task.evidence, ...task.acceptanceCriteria])).slice(0, 4),
+      evidence: Array.from(new Set([
+        ...(recheckReviewType ? [`复盘类型：${recheckReviewTypeLabel(recheckReviewType)}`] : []),
+        ...(isRecheckReview && task.state === "completed" && task.completionEvidence.trim() ? [`复盘结论：${task.completionEvidence.trim()}`] : []),
+        ...task.evidence,
+        ...task.acceptanceCriteria,
+      ])).slice(0, 4),
     });
   }
 
@@ -5538,13 +5553,21 @@ export function buildGatePlatformDecisionTimeline(input: {
     const retreat = retreatByPlatform.get(platform.platformId);
     const resolution = resolutionByPlatform.get(platform.platformId);
     const recheckFollowup = recheckFollowupByPlatform.get(platform.platformId);
+    const completedRecheckReviewEvent = sortedEvents.find((event) => event.id.startsWith("task:recheck-review:") && event.label === "复盘完成");
+    const completedRecheckReviewType = completedRecheckReviewEvent ? recheckReviewTypeFromDispatchKey(completedRecheckReviewEvent.id.replace(/^task:/, "")) : null;
     let status: GatePlatformDecisionTimelineStatus = "healthy";
     let label = "健康观察";
     let detail = `${platform.platformName} 当前没有撤退修复债，继续按总闸门节奏观察。`;
     let actionLabel = "查看平台";
     let href = platform.href;
 
-    if (retreat && ["pause", "pivot_platform", "repair_tactic"].includes(retreat.status) && resolution?.status !== "resolved") {
+    if (completedRecheckReviewType === "direction_pause") {
+      status = "blocked";
+      label = "复盘止损";
+      detail = `${platform.platformName} 返工链复盘已完成，当前方向先暂停，避免继续放大错误投入。`;
+      actionLabel = "查看复盘派单";
+      href = "/dispatch";
+    } else if (retreat && ["pause", "pivot_platform", "repair_tactic"].includes(retreat.status) && resolution?.status !== "resolved") {
       status = "blocked";
       label = retreat.label;
       detail = retreat.detail;
@@ -5670,12 +5693,31 @@ function evidenceLoopRecheckFromTimeline(item: GatePlatformDecisionTimelineItem)
   return null;
 }
 
+function completedRecheckReviewFromTimeline(item: GatePlatformDecisionTimelineItem) {
+  const reviewEvents = item.events
+    .filter((event) => event.id.startsWith("task:recheck-review:") && event.label === "复盘完成")
+    .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime());
+  const event = reviewEvents[0] ?? null;
+  if (!event) return null;
+  const dispatchKey = event.id.replace(/^task:/, "");
+  const type = recheckReviewTypeFromDispatchKey(dispatchKey);
+  const conclusion = event.evidence.find((line) => line.startsWith("复盘结论："))?.replace("复盘结论：", "").trim() || event.detail;
+
+  return {
+    event,
+    type,
+    typeLabel: recheckReviewTypeLabel(type),
+    conclusion: markdownLine(conclusion),
+  };
+}
+
 export function buildGatePlatformTacticExperienceLibrary(
   timeline: GatePlatformDecisionTimeline,
   limit = 6,
 ): GatePlatformTacticExperienceLibrary {
   const items = timeline.items.map((item): GatePlatformTacticExperienceItem => {
     const finalEvent = item.events.find((event) => event.type === "final") ?? null;
+    const completedRecheckReview = completedRecheckReviewFromTimeline(item);
     const evidenceLoopRecheck = evidenceLoopRecheckFromTimeline(item);
     const evidence = item.events.slice(0, 3).map((event) => `${event.label}：${markdownLine(event.detail)}`);
     const base = {
@@ -5688,6 +5730,57 @@ export function buildGatePlatformTacticExperienceLibrary(
       latestAt: item.latestAt,
       evidence,
     };
+
+    if (completedRecheckReview?.type === "direction_pause") {
+      return {
+        ...base,
+        status: "blocked",
+        label: "避坑样本",
+        tactic: "复盘止损样本",
+        lesson: `${item.platformName} 返工链复盘已完成，结论是先暂停当前平台方向或加码，避免把错误投入继续放大。`,
+        reuseHint: "同类项目遇到二轮以上投稿包返工时，先复用这条暂停条件，回到投稿包、前三章兑现和平台匹配度重判。",
+        risk: completedRecheckReview.conclusion || "没有写清恢复条件前，不要继续平台加码。",
+        evidence: [
+          `复盘类型：${completedRecheckReview.typeLabel}`,
+          `复盘结论：${completedRecheckReview.conclusion}`,
+          ...base.evidence,
+        ].slice(0, 4),
+      };
+    }
+
+    if (completedRecheckReview?.type === "acceptance_mismatch") {
+      return {
+        ...base,
+        status: "watch",
+        label: "观察样本",
+        tactic: "验收标准修正打法",
+        lesson: `${item.platformName} 返工链复盘发现验收标准不够硬，下一轮要先补通过线、不可接受项和证据格式，再继续返工。`,
+        reuseHint: "同类项目可复用这套验收收口流程，但必须等下一轮复查或发布效果证明它真的提分。",
+        risk: completedRecheckReview.conclusion || "只补标准不等于改动有效，缺复测前不能写成成功打法。",
+        evidence: [
+          `复盘类型：${completedRecheckReview.typeLabel}`,
+          `复盘结论：${completedRecheckReview.conclusion}`,
+          ...base.evidence,
+        ].slice(0, 4),
+      };
+    }
+
+    if (completedRecheckReview?.type === "weak_execution") {
+      return {
+        ...base,
+        status: "watch",
+        label: "观察样本",
+        tactic: "返工动作收口打法",
+        lesson: `${item.platformName} 返工链复盘发现执行动作太虚，下一轮必须写清改哪一段、服务哪条主线、改变什么追读理由。`,
+        reuseHint: "同类项目可复用动作收口清单，先小步验证，不要把模糊返工继续批量复制。",
+        risk: completedRecheckReview.conclusion || "没有段落级改动和复查证据时，任务完成容易被误判为业务改善。",
+        evidence: [
+          `复盘类型：${completedRecheckReview.typeLabel}`,
+          `复盘结论：${completedRecheckReview.conclusion}`,
+          ...base.evidence,
+        ].slice(0, 4),
+      };
+    }
 
     if (evidenceLoopRecheck?.verdict === "improved") {
       return {

@@ -140,6 +140,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ projec
       dispatchKey: true,
       state: true,
       href: true,
+      completionEvidence: true,
     },
     take: 100,
   });
@@ -181,6 +182,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ projec
       dispatchKey: task.dispatchKey,
       state: task.state,
       href: task.href,
+      completionEvidence: task.completionEvidence,
     })),
     submissionChecklist,
   });

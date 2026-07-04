@@ -60,6 +60,7 @@ export interface ChapterProductionFlowGateTask {
   dispatchKey: string;
   state: string;
   href: string;
+  completionEvidence?: string | null;
 }
 
 export interface ChapterProductionFlowStage {
@@ -81,6 +82,7 @@ export interface ChapterProductionFlowDispatchSummary {
   assigned: number;
   completed: number;
   pending: number;
+  completedDispatches: ChapterProductionFlowCompletedDispatch[];
   label: string;
   detail: string;
   href: string;
@@ -104,6 +106,19 @@ export interface ChapterProductionFlowRecheckNotice {
   href: string;
   actionLabel: string;
   count: number;
+  runAction?: ChapterProductionFlowRecheckAction;
+}
+
+export interface ChapterProductionFlowRecheckAction {
+  endpoint: string;
+  dispatches: ChapterProductionFlowCompletedDispatch[];
+  label: string;
+  completionEvidence: string;
+}
+
+export interface ChapterProductionFlowCompletedDispatch {
+  dispatchKey: string;
+  completionEvidence: string;
 }
 
 function hasText(value: string) {
@@ -169,11 +184,18 @@ function storyTreeDispatchSummary(tasks: ChapterProductionFlowGateTask[], chapte
   const completedIds = new Set(matched.filter((task) => task.state === "completed").map((task) => chapterIdFromHref(task.href)).filter((id): id is string => Boolean(id)));
   const pendingIds = new Set(matched.filter((task) => task.state !== "completed").map((task) => chapterIdFromHref(task.href)).filter((id): id is string => Boolean(id)));
   const assignedIds = new Set([...completedIds, ...pendingIds]);
+  const completedDispatches = matched
+    .filter((task) => task.state === "completed")
+    .map((task) => ({
+      dispatchKey: task.dispatchKey,
+      completionEvidence: task.completionEvidence?.trim() || "项目页复查已完成的大树结构派单，重新计算章节结构复检结果。",
+    }));
 
   return {
     assigned: assignedIds.size,
     completed: completedIds.size,
     pending: pendingIds.size,
+    completedDispatches,
     label: `已派单 ${assignedIds.size} 章`,
     detail: pendingIds.size > 0
       ? `待完成 ${pendingIds.size} 章，完成后会回流为大树结构经验。`
@@ -191,11 +213,18 @@ function submissionDispatchSummary(tasks: ChapterProductionFlowGateTask[], faile
   if (matched.length === 0) return undefined;
   const completed = matched.filter((task) => task.state === "completed").length;
   const pending = matched.length - completed;
+  const completedDispatches = matched
+    .filter((task) => task.state === "completed")
+    .map((task) => ({
+      dispatchKey: task.dispatchKey,
+      completionEvidence: task.completionEvidence?.trim() || "项目页复查已完成的投稿预检派单，重新计算发布准备与平台风险。",
+    }));
 
   return {
     assigned: matched.length,
     completed,
     pending,
+    completedDispatches,
     label: `已派单 ${matched.length} 项`,
     detail: pending > 0
       ? `待完成 ${pending} 项，完成后再刷新投稿预检。`
@@ -417,6 +446,12 @@ export function buildChapterProductionFlow(input: {
         href: recheckStages[0].dispatchSummary?.href ?? "#chapter-production-flow",
         actionLabel: recheckStages[0].dispatchSummary?.actionLabel ?? "去复查",
         count: recheckStages.length,
+        runAction: {
+          endpoint: "/api/gate/dispatch-tasks",
+          dispatches: recheckStages.flatMap((stage) => stage.dispatchSummary?.completedDispatches ?? []).slice(0, 10),
+          label: "一键复查",
+          completionEvidence: "项目页流水线复查已完成派单，刷新卡点状态和复检证据。",
+        },
       }
     : undefined;
   const status = stages.every((stage) => stage.status === "ready") && input.submissionChecklist.riskCount === 0

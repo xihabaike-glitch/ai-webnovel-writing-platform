@@ -39,6 +39,7 @@ function doneLabel(action: ChapterProductionFlowRunAction) {
 export function ChapterProductionFlowPanel({ flow }: { flow: ChapterProductionFlow }) {
   const router = useRouter();
   const [runningStageId, setRunningStageId] = useState<string | null>(null);
+  const [runningRecheck, setRunningRecheck] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [followUp, setFollowUp] = useState<ChapterProductionFlowRunAction["afterSuccess"] | null>(null);
   const nextStage = useMemo(
@@ -95,6 +96,53 @@ export function ChapterProductionFlowPanel({ flow }: { flow: ChapterProductionFl
       setFollowUp(null);
     } finally {
       setRunningStageId(null);
+    }
+  }
+
+  async function runRecheckNotice() {
+    const notice = flow.recheckNotice;
+    const action = notice?.runAction;
+    if (!notice || !action || action.dispatches.length === 0) return;
+    setRunningRecheck(true);
+    setMessage(null);
+    setFollowUp(null);
+    try {
+      const results = await Promise.all(action.dispatches.map(async (dispatch) => {
+        const response = await fetch(action.endpoint, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            dispatchKey: dispatch.dispatchKey,
+            state: "completed",
+            completionEvidence: dispatch.completionEvidence || action.completionEvidence,
+          }),
+        });
+        const payload = await response.json().catch(() => null) as {
+          storyTreeRecheck?: unknown;
+          evidenceLoopRecheck?: unknown;
+          error?: string;
+        } | null;
+        if (!response.ok) throw new Error(payload?.error ?? "派单复查失败。");
+        return payload;
+      }));
+      const storyTreeCount = results.filter((result) => result?.storyTreeRecheck).length;
+      const evidenceLoopCount = results.filter((result) => result?.evidenceLoopRecheck).length;
+      const detailParts = [
+        storyTreeCount > 0 ? `大树结构复查 ${storyTreeCount} 项` : "",
+        evidenceLoopCount > 0 ? `证据闭环复查 ${evidenceLoopCount} 项` : "",
+      ].filter(Boolean);
+      setMessage(`复查完成：已处理 ${results.length} 条完成派单。`);
+      setFollowUp({
+        href: notice.href,
+        label: notice.actionLabel,
+        detail: detailParts.length > 0 ? detailParts.join("，") : "已刷新派单完成证据，请查看对应复查区域。",
+      });
+      router.refresh();
+    } catch (caught) {
+      setMessage(caught instanceof Error ? caught.message : "派单复查失败。");
+      setFollowUp(null);
+    } finally {
+      setRunningRecheck(false);
     }
   }
 
@@ -163,12 +211,24 @@ export function ChapterProductionFlowPanel({ flow }: { flow: ChapterProductionFl
             <div className="font-medium">{flow.recheckNotice.title}</div>
             <p className="mt-1 text-xs leading-5">{flow.recheckNotice.detail}</p>
           </div>
-          <Link
-            className="w-fit rounded-md border border-amber-300 bg-white px-3 py-1.5 text-xs font-medium text-amber-950 hover:bg-amber-100"
-            href={flow.recheckNotice.href}
-          >
-            {flow.recheckNotice.actionLabel}
-          </Link>
+          <div className="flex flex-wrap gap-2">
+            {flow.recheckNotice.runAction ? (
+              <button
+                className="w-fit rounded-md bg-amber-950 px-3 py-1.5 text-xs font-medium text-white hover:bg-amber-900 disabled:opacity-50"
+                disabled={runningRecheck || runningStageId !== null}
+                onClick={runRecheckNotice}
+                type="button"
+              >
+                {runningRecheck ? "复查中" : flow.recheckNotice.runAction.label}
+              </button>
+            ) : null}
+            <Link
+              className="w-fit rounded-md border border-amber-300 bg-white px-3 py-1.5 text-xs font-medium text-amber-950 hover:bg-amber-100"
+              href={flow.recheckNotice.href}
+            >
+              {flow.recheckNotice.actionLabel}
+            </Link>
+          </div>
         </div>
       ) : null}
       <div className="mt-4 grid gap-2 md:grid-cols-3 xl:grid-cols-6">

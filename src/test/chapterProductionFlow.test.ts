@@ -195,6 +195,7 @@ test("buildChapterProductionFlow exposes story tree recheck dispatch action for 
   assert.equal(storyTreeStage?.runAction?.afterSuccess.label, "查看派单");
   assert.equal(storyTreeStage?.dispatchSummary?.assigned, 1);
   assert.equal(storyTreeStage?.dispatchSummary?.pending, 1);
+  assert.equal(storyTreeStage?.dispatchSummary?.completedDispatches.length, 0);
   assert.ok(storyTreeStage?.dispatchSummary?.detail.includes("待完成 1 章"));
   assert.equal(storyTreeStage?.dispatchSummary?.href, "/dispatch");
   assert.equal(storyTreeStage?.dispatchSummary?.actionLabel, "完成派单");
@@ -216,6 +217,7 @@ test("buildChapterProductionFlow exposes submission repair dispatch action for u
         dispatchKey: "submission-precheck:project-1:platform-risk",
         state: "completed",
         href: "/projects/project-1#platform-export",
+        completionEvidence: "已补充平台风险说明和投稿版本。",
       },
     ],
     submissionChecklist: {
@@ -241,6 +243,10 @@ test("buildChapterProductionFlow exposes submission repair dispatch action for u
   assert.equal(submissionStage?.dispatchSummary?.assigned, 2);
   assert.equal(submissionStage?.dispatchSummary?.pending, 1);
   assert.equal(submissionStage?.dispatchSummary?.completed, 1);
+  assert.deepEqual(submissionStage?.dispatchSummary?.completedDispatches, [{
+    dispatchKey: "submission-precheck:project-1:platform-risk",
+    completionEvidence: "已补充平台风险说明和投稿版本。",
+  }]);
   assert.equal(submissionStage?.dispatchSummary?.label, "已派单 2 项");
   assert.equal(submissionStage?.dispatchSummary?.href, "/dispatch");
   assert.equal(submissionStage?.dispatchSummary?.actionLabel, "完成派单");
@@ -256,6 +262,7 @@ test("buildChapterProductionFlow points completed unresolved dispatches back to 
         dispatchKey: "submission-precheck:project-1:platform-risk",
         state: "completed",
         href: "/projects/project-1#platform-export",
+        completionEvidence: "已补充平台风险说明和投稿版本。",
       },
     ],
     submissionChecklist: {
@@ -272,11 +279,21 @@ test("buildChapterProductionFlow points completed unresolved dispatches back to 
 
   assert.equal(submissionStage?.dispatchSummary?.pending, 0);
   assert.equal(submissionStage?.dispatchSummary?.completed, 1);
+  assert.deepEqual(submissionStage?.dispatchSummary?.completedDispatches, [{
+    dispatchKey: "submission-precheck:project-1:platform-risk",
+    completionEvidence: "已补充平台风险说明和投稿版本。",
+  }]);
   assert.equal(submissionStage?.dispatchSummary?.href, "#submission-precheck");
   assert.equal(submissionStage?.dispatchSummary?.actionLabel, "复查预检");
   assert.ok(submissionStage?.dispatchSummary?.detail.includes("预检仍未通过"));
   assert.equal(flow.recheckNotice?.title, "有 1 个完成派单待复查");
   assert.equal(flow.recheckNotice?.href, "#submission-precheck");
   assert.equal(flow.recheckNotice?.actionLabel, "复查预检");
+  assert.equal(flow.recheckNotice?.runAction?.endpoint, "/api/gate/dispatch-tasks");
+  assert.equal(flow.recheckNotice?.runAction?.label, "一键复查");
+  assert.deepEqual(flow.recheckNotice?.runAction?.dispatches, [{
+    dispatchKey: "submission-precheck:project-1:platform-risk",
+    completionEvidence: "已补充平台风险说明和投稿版本。",
+  }]);
   assert.ok(flow.recheckNotice?.detail.includes("投稿预检"));
 });

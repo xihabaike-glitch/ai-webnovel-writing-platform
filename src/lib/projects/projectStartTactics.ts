@@ -1,6 +1,6 @@
 import type { PlatformProfile } from "../platforms/platformProfiles.ts";
 import type { PlatformWritingStyleTemplate } from "../platforms/writingStyleTemplates.ts";
-import type { GateBatchTacticEffectItem, GatePlatformTacticExperienceItem } from "./gateActionReceipts.ts";
+import type { GateActionReceipt, GateBatchTacticEffectItem, GatePlatformTacticExperienceItem } from "./gateActionReceipts.ts";
 import type { ProjectTemplate } from "./projectTemplates.ts";
 
 export type ProjectStartTacticAdviceStatus = "history_blocked" | "history_watch" | "history_usable" | "template";
@@ -63,6 +63,70 @@ export interface ProjectStartTacticEntryLike {
   type: string;
   title: string;
   content: string;
+}
+
+export interface ProjectStartModelRouteExperience {
+  taskLabel: string;
+  primaryProviderName: string;
+  fallbackProviderName: string | null;
+  recommendationSummary: string | null;
+  evidence: string[];
+}
+
+function routeDetailValue(detail: string, label: string) {
+  const match = detail.match(new RegExp(`${label}：([^；;]+)`));
+  return match?.[1]?.trim() || null;
+}
+
+function routeRecommendationSummary(detail: string) {
+  const match = detail.match(/推荐依据：(.+?)(?:[；;]依据：|$)/);
+  return match?.[1]?.trim() || null;
+}
+
+const modelRouteTaskOrder = new Map([
+  ["正文初稿", 0],
+  ["章节审稿", 1],
+  ["章节二改", 2],
+  ["前三章重写", 3],
+  ["投稿包装优化", 4],
+  ["总控资料生成", 5],
+]);
+
+export function buildProjectStartModelRouteExperienceFromReceipts(receipts: GateActionReceipt[]): ProjectStartModelRouteExperience[] {
+  const routes = receipts
+    .filter((receipt) => receipt.executionType === "model_route" && receipt.status === "succeeded")
+    .map((receipt) => {
+      const primaryProviderName = routeDetailValue(receipt.detail, "首选");
+      if (!primaryProviderName) return null;
+      const taskLabel = receipt.label.replace(/路由已确认$/, "").trim() || receipt.label;
+      const recommendationSummary = routeRecommendationSummary(receipt.detail);
+      const fallbackProviderName = routeDetailValue(receipt.detail, "备用");
+      return {
+        taskLabel,
+        primaryProviderName,
+        fallbackProviderName: fallbackProviderName === "无备用" ? null : fallbackProviderName,
+        recommendationSummary,
+        evidence: [
+          `${taskLabel}首选 ${primaryProviderName}${fallbackProviderName && fallbackProviderName !== "无备用" ? `，备用 ${fallbackProviderName}` : ""}`,
+          recommendationSummary ? `推荐依据：${recommendationSummary}` : receipt.message,
+        ].filter((item): item is string => Boolean(item)),
+        createdAt: receipt.createdAt,
+      };
+    })
+    .filter((route): route is ProjectStartModelRouteExperience & { createdAt: string } => Boolean(route))
+    .sort((left, right) => {
+      const orderDiff = (modelRouteTaskOrder.get(left.taskLabel) ?? 99) - (modelRouteTaskOrder.get(right.taskLabel) ?? 99);
+      if (orderDiff !== 0) return orderDiff;
+      return right.createdAt.localeCompare(left.createdAt);
+    });
+  const usedTaskLabels = new Set<string>();
+
+  return routes.flatMap((route): ProjectStartModelRouteExperience[] => {
+    if (usedTaskLabels.has(route.taskLabel)) return [];
+    usedTaskLabels.add(route.taskLabel);
+    const { createdAt: _createdAt, ...experience } = route;
+    return [experience];
+  });
 }
 
 function defaultTacticForCategory(platform: PlatformProfile) {
@@ -254,9 +318,20 @@ export function buildProjectStartTacticAdvice(input: {
   style: PlatformWritingStyleTemplate;
   experience?: GatePlatformTacticExperienceItem | null;
   batchEffect?: GateBatchTacticEffectItem | null;
+  modelRoutes?: ProjectStartModelRouteExperience[];
 }): ProjectStartTacticAdvice {
   const { platform, template, style, experience, batchEffect } = input;
   const firstThreeTitles = template.firstThree.map((chapter) => chapter.title).join(" / ");
+  const modelRoutes = input.modelRoutes ?? [];
+  const modelRouteEvidence = modelRoutes.flatMap((route) => route.evidence).slice(0, 4);
+  const modelRouteChecklist = modelRoutes.length
+    ? [`模型路线底座：${modelRoutes.map((route) => route.taskLabel).join("、")}`]
+    : [];
+  const modelRouteVerification = modelRoutes.length
+    ? `；首批同时做模型路由复检，确认${modelRoutes.map((route) => route.taskLabel).join("、")}成功率、质量和成本。`
+    : "";
+  const withModelEvidence = (evidence: string[]) => [...evidence, ...modelRouteEvidence].slice(0, 5);
+  const withModelChecklist = (checklist: string[]) => [...checklist, ...modelRouteChecklist].slice(0, 6);
 
   if (batchEffect) {
     const batchEvidence = [
@@ -272,14 +347,14 @@ export function buildProjectStartTacticAdvice(input: {
         title: `${platform.name}：避开已跑崩打法`,
         primaryTactic: `不要复用「${batchEffect.openingMove || batchEffect.primaryTactic}」。先回到平台模板打法，再重做钩子、节奏和前三章兑现。`,
         openingMove: `避开已验证失败开头：${batchEffect.openingMove || batchEffect.primaryTactic}；改用：${style.openingHook}`,
-        verificationMove: "创建后只做小批验证，先看前三章审稿分、失败率和平台包装，不允许直接放量。",
+        verificationMove: `创建后只做小批验证，先看前三章审稿分、失败率和平台包装，不允许直接放量。${modelRouteVerification}`,
         risk: batchEffect.nextAction,
-        evidence: batchEvidence,
-        checklist: [
+        evidence: withModelEvidence(batchEvidence),
+        checklist: withModelChecklist([
           `模板前三章：${firstThreeTitles}`,
           `必须具备：${style.mustHave.join("、")}`,
           `避坑动作：不要复制 ${batchEffect.tacticLabel}`,
-        ],
+        ]),
       };
     }
 
@@ -289,14 +364,14 @@ export function buildProjectStartTacticAdvice(input: {
       title: `${platform.name}：${batchEffect.tacticLabel} 批量复盘`,
       primaryTactic: batchEffect.primaryTactic,
       openingMove: batchEffect.openingMove || style.openingHook,
-      verificationMove: `${batchEffect.verificationMove || "创建后跑前三章与批量审稿。"}；首批复盘继续看成功率、质量分和失败样本。`,
+      verificationMove: `${batchEffect.verificationMove || "创建后跑前三章与批量审稿。"}；首批复盘继续看成功率、质量分和失败样本。${modelRouteVerification}`,
       risk: batchEffect.status === "usable" ? batchEffect.risk : batchEffect.nextAction,
-      evidence: batchEvidence,
-      checklist: [
+      evidence: withModelEvidence(batchEvidence),
+      checklist: withModelChecklist([
         `批量状态：${batchEffect.label}`,
         `模板前三章：${firstThreeTitles}`,
         `必须具备：${style.mustHave.join("、")}`,
-      ],
+      ]),
     };
   }
 
@@ -310,15 +385,15 @@ export function buildProjectStartTacticAdvice(input: {
         ? `先按避坑样本修正开头：${style.openingHook}`
         : experience.reuseHint,
       verificationMove: experience.status === "usable"
-        ? "创建后先跑前三章和平台包装，再记录首轮曝光、点击、收藏、追读。"
-        : "创建后只复用流程，不复用成功结论，必须等第一轮真实数据回填。",
+        ? `创建后先跑前三章和平台包装，再记录首轮曝光、点击、收藏、追读。${modelRouteVerification}`
+        : `创建后只复用流程，不复用成功结论，必须等第一轮真实数据回填。${modelRouteVerification}`,
       risk: experience.risk,
-      evidence: experience.evidence,
-      checklist: [
+      evidence: withModelEvidence(experience.evidence),
+      checklist: withModelChecklist([
         `模板前三章：${firstThreeTitles}`,
         `首屏钩子：${style.firstScreen}`,
         `必须具备：${style.mustHave.join("、")}`,
-      ],
+      ]),
     };
   }
 
@@ -328,14 +403,14 @@ export function buildProjectStartTacticAdvice(input: {
     title: `${platform.name} 首轮开书打法`,
     primaryTactic: defaultTacticForCategory(platform),
     openingMove: style.openingHook,
-    verificationMove: "创建后先完成前三章、人物弧光、世界规则和平台包装，再进入总闸复盘。",
+    verificationMove: `创建后先完成前三章、人物弧光、世界规则和平台包装，再进入总闸复盘。${modelRouteVerification}`,
     risk: platform.risks.join("；"),
-    evidence: [],
-    checklist: [
+    evidence: modelRouteEvidence.slice(0, 5),
+    checklist: withModelChecklist([
       `模板定位：${template.positioning}`,
       `模板前三章：${firstThreeTitles}`,
       `必须具备：${style.mustHave.join("、")}`,
-    ],
+    ]),
   };
 }
 

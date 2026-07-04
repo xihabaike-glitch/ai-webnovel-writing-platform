@@ -15,8 +15,10 @@ import {
 } from "@/lib/projects/gateActionReceipts";
 import {
   buildProjectStartPlatformExperienceGuide,
+  buildProjectStartModelRouteExperienceFromReceipts,
   buildProjectStartTacticAdvice,
   selectProjectStartTemplateFromExperienceGuide,
+  type ProjectStartModelRouteExperience,
   type ProjectStartPlatformExperienceStatus,
   type ProjectStartTacticAdviceStatus,
 } from "@/lib/projects/projectStartTactics";
@@ -57,6 +59,7 @@ export function ProjectForm() {
   const [sellingPoint, setSellingPoint] = useState(defaultTemplate.sellingPoint);
   const [historyExperiences, setHistoryExperiences] = useState<GatePlatformTacticExperienceItem[]>([]);
   const [batchTacticEffects, setBatchTacticEffects] = useState<GateBatchTacticEffectItem[]>([]);
+  const [modelRouteExperience, setModelRouteExperience] = useState<ProjectStartModelRouteExperience[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const selectedProfile = platformProfiles.find((profile) => profile.id === platformId) ?? platformProfiles[0];
@@ -77,6 +80,7 @@ export function ProjectForm() {
     style: selectedStyle,
     experience: selectedExperience,
     batchEffect: selectedBatchEffect,
+    modelRoutes: modelRouteExperience,
   });
 
   useEffect(() => {
@@ -84,9 +88,10 @@ export function ProjectForm() {
 
     async function loadHistoricalExperience() {
       try {
-        const [receipts, tasks] = await Promise.all([
+        const [receipts, tasks, modelRouteReceipts] = await Promise.all([
           fetchPersistedGateActionReceipts(),
           fetchPersistedGateDispatchTasks(),
+          fetchPersistedGateActionReceipts({ executionType: "model_route", limit: 20 }),
         ]);
         if (ignore) return;
         const timeline = buildGatePlatformDecisionTimeline({
@@ -98,6 +103,7 @@ export function ProjectForm() {
         const batchEffectReview = buildGateBatchTacticEffectReview(receipts, platformProfiles.length);
         setHistoryExperiences(library.items);
         setBatchTacticEffects(batchEffectReview.items);
+        setModelRouteExperience(buildProjectStartModelRouteExperienceFromReceipts(modelRouteReceipts));
         const historicalGuide = buildProjectStartPlatformExperienceGuide({
           platforms: platformProfiles,
           experiences: library.items,
@@ -116,6 +122,7 @@ export function ProjectForm() {
         if (!ignore) {
           setHistoryExperiences([]);
           setBatchTacticEffects([]);
+          setModelRouteExperience([]);
         }
       }
     }

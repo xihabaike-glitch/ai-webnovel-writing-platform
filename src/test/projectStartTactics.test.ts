@@ -5,6 +5,7 @@ import { getPlatformWritingStyle } from "../lib/platforms/writingStyleTemplates.
 import type { GateBatchTacticEffectItem, GatePlatformTacticExperienceItem } from "../lib/projects/gateActionReceipts.ts";
 import {
   buildProjectStartPlatformExperienceGuide,
+  buildProjectStartModelRouteExperienceFromReceipts,
   buildProjectStartTacticAdvice,
   buildProjectStartTacticWorldEntry,
   findProjectStartTacticSummary,
@@ -87,6 +88,66 @@ test("buildProjectStartTacticAdvice", async (t) => {
     assert.equal(advice.label, "批量可复用");
     assert.ok(advice.openingMove.includes("身份暴露风险"));
     assert.ok(advice.evidence[0].includes("成功率 100%"));
+  });
+
+  await t.test("adds confirmed model routes to new project start advice", () => {
+    const platform = getPlatformProfile("fanqie");
+    const template = getDefaultTemplateForPlatform(platform.id);
+    const style = getPlatformWritingStyle(platform.id);
+    const modelRoutes = buildProjectStartModelRouteExperienceFromReceipts([
+      {
+        id: "model-route:chapter_draft:2026-07-04T10:00:00.000Z",
+        actionId: "model-route:chapter_draft:confirm",
+        label: "正文初稿路由已确认",
+        detail: "来源：系统建议；首选：DeepSeek · deepseek-chat；备用：Kimi · kimi-k2.6；推荐依据：历史样本 2 次；成本 $0.0000/次；依据：近 2 次样本成功率 100%。",
+        href: "/settings/models",
+        status: "succeeded",
+        message: "已确认正文初稿模型路由。",
+        executionType: "model_route",
+        succeededCount: 1,
+        failedCount: 0,
+        taskId: null,
+        platformId: "model-routing",
+        platformName: "模型路由",
+        recheck: {
+          status: "ready",
+          label: "复检模型路由",
+          detail: "下一批任务后复看成功率、质量、成本和备用命中。",
+          actionLabel: "查看模型设置",
+        },
+        createdAt: "2026-07-04T10:00:00.000Z",
+      },
+      {
+        id: "model-route:chapter_review:2026-07-04T11:00:00.000Z",
+        actionId: "model-route:chapter_review:confirm",
+        label: "章节审稿路由已确认",
+        detail: "来源：系统建议；首选：GPT · gpt-5-mini；备用：DeepSeek · deepseek-chat；推荐依据：历史样本 4 次；治理后复检 +30。",
+        href: "/settings/models",
+        status: "succeeded",
+        message: "已确认章节审稿模型路由。",
+        executionType: "model_route",
+        succeededCount: 1,
+        failedCount: 0,
+        taskId: null,
+        platformId: "model-routing",
+        platformName: "模型路由",
+        recheck: {
+          status: "ready",
+          label: "复检模型路由",
+          detail: "下一批任务后复看成功率、质量、成本和备用命中。",
+          actionLabel: "查看模型设置",
+        },
+        createdAt: "2026-07-04T11:00:00.000Z",
+      },
+    ]);
+
+    const advice = buildProjectStartTacticAdvice({ platform, template, style, modelRoutes });
+
+    assert.equal(modelRoutes.length, 2);
+    assert.ok(advice.verificationMove.includes("模型路由复检"));
+    assert.ok(advice.evidence.some((item) => item.includes("正文初稿首选 DeepSeek · deepseek-chat")));
+    assert.ok(advice.evidence.some((item) => item.includes("治理后复检 +30")));
+    assert.ok(advice.checklist.some((item) => item.includes("模型路线底座：正文初稿、章节审稿")));
   });
 
   await t.test("turns blocked batch tactic effects into avoidance advice", () => {

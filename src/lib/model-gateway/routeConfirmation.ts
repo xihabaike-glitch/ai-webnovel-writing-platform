@@ -302,6 +302,10 @@ export interface RouteConfirmationGovernanceDispatchTask {
   completedAt?: string | Date | null;
 }
 
+export interface RouteConfirmationGovernanceStatusTask extends RouteConfirmationGovernanceDispatchTask {
+  reviewLatestAt?: string | Date | null;
+}
+
 export interface RouteConfirmationRecheckEvidence {
   id: string;
   taskType: RoutedModelTaskType;
@@ -391,6 +395,29 @@ export interface RouteConfirmationRecheckAdvice {
     manualReview: number;
   };
   items: RouteConfirmationRecheckAdviceItem[];
+}
+
+export interface RouteConfirmationGovernanceStatusItem {
+  adviceId: string;
+  taskType: RoutedModelTaskType;
+  action: RouteConfirmationRecheckAdviceItem["action"];
+  label: string;
+  status: "not_created" | "assigned" | "completed";
+  statusLabel: string;
+  detail: string;
+  actionLabel: string;
+  dispatchKey: string | null;
+  latestAt: string | null;
+}
+
+export interface RouteConfirmationGovernanceStatusSummary {
+  summary: {
+    total: number;
+    notCreated: number;
+    assigned: number;
+    completed: number;
+  };
+  items: RouteConfirmationGovernanceStatusItem[];
 }
 
 export interface RouteConfirmationRecheckSamplePlanOptions {
@@ -529,6 +556,18 @@ function taskTypeFromGovernanceKey(dispatchKey: string) {
   const match = dispatchKey.match(/^model-route-governance:([^:]+):/);
   const taskType = match?.[1] ?? "";
   return isRoutedModelTaskType(taskType) ? taskType : null;
+}
+
+function actionFromGovernanceKey(dispatchKey: string): RouteConfirmationRecheckAdviceItem["action"] | null {
+  const match = dispatchKey.match(/^model-route-governance:[^:]+:([^:]+):/);
+  const action = match?.[1] ?? "";
+  if (action === "switch_route" || action === "extend_watch" || action === "manual_review") return action;
+  return null;
+}
+
+function createdAtFromGovernanceKey(dispatchKey: string) {
+  const match = dispatchKey.match(/^model-route-governance:[^:]+:[^:]+:(.+)$/);
+  return match?.[1] ?? "";
 }
 
 function classifyConfirmationRecheck(completionEvidence: string) {
@@ -1971,6 +2010,72 @@ export function buildRouteConfirmationRecheckGovernanceAction(
   };
 
   return { receipt, dispatch, payload };
+}
+
+function governanceStatusTaskLatestAt(task: RouteConfirmationGovernanceStatusTask) {
+  const completedAt = completedAtIso(task.completedAt);
+  if (completedAt) return completedAt;
+  const reviewLatestAt = completedAtIso(task.reviewLatestAt);
+  if (reviewLatestAt) return reviewLatestAt;
+  return createdAtFromGovernanceKey(task.dispatchKey);
+}
+
+function governanceStatusForTask(task: RouteConfirmationGovernanceStatusTask): RouteConfirmationGovernanceStatusItem["status"] {
+  return task.state === "completed" ? "completed" : "assigned";
+}
+
+function governanceStatusLabel(status: RouteConfirmationGovernanceStatusItem["status"]) {
+  if (status === "completed") return "治理已完成";
+  if (status === "assigned") return "治理已派单";
+  return "待生成治理";
+}
+
+function governanceStatusActionLabel(status: RouteConfirmationGovernanceStatusItem["status"]) {
+  if (status === "completed") return "查看完成依据";
+  if (status === "assigned") return "去派单中心";
+  return "生成治理派单";
+}
+
+export function buildRouteConfirmationGovernanceStatusSummary(
+  advice: RouteConfirmationRecheckAdvice,
+  dispatches: RouteConfirmationGovernanceStatusTask[],
+): RouteConfirmationGovernanceStatusSummary {
+  const items = advice.items.map((item): RouteConfirmationGovernanceStatusItem => {
+    const relatedDispatches = dispatches
+      .filter((task) => (
+        task.stage === "model_route_governance"
+        && taskTypeFromGovernanceKey(task.dispatchKey) === item.taskType
+        && actionFromGovernanceKey(task.dispatchKey) === item.action
+      ))
+      .sort((left, right) => governanceStatusTaskLatestAt(right).localeCompare(governanceStatusTaskLatestAt(left)));
+    const latestDispatch = relatedDispatches[0] ?? null;
+    const status = latestDispatch ? governanceStatusForTask(latestDispatch) : "not_created";
+
+    return {
+      adviceId: item.id,
+      taskType: item.taskType,
+      action: item.action,
+      label: item.label,
+      status,
+      statusLabel: governanceStatusLabel(status),
+      detail: latestDispatch
+        ? `${item.label}的「${item.actionLabel}」治理任务${status === "completed" ? "已完成，设置页会继续读取完成依据。" : "已派发到派单中心，处理完会回填治理结果。"}`
+        : `${item.label}还没有生成「${item.actionLabel}」治理派单。`,
+      actionLabel: governanceStatusActionLabel(status),
+      dispatchKey: latestDispatch?.dispatchKey ?? null,
+      latestAt: latestDispatch ? governanceStatusTaskLatestAt(latestDispatch) : item.completedAt,
+    };
+  });
+
+  return {
+    summary: {
+      total: items.length,
+      notCreated: items.filter((item) => item.status === "not_created").length,
+      assigned: items.filter((item) => item.status === "assigned").length,
+      completed: items.filter((item) => item.status === "completed").length,
+    },
+    items,
+  };
 }
 
 export function buildRouteConfirmationRecheckAutoGovernanceAction(

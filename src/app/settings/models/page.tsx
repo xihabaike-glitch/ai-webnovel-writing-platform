@@ -7,6 +7,7 @@ import { buildProviderHealthDashboard } from "@/lib/model-gateway/providerHealth
 import { buildRouteEffectAudit } from "@/lib/model-gateway/routeEffectAudit";
 import {
   buildRouteConfirmationHistory,
+  buildRouteConfirmationGovernanceStatusSummary,
   buildRouteConfirmationGovernanceEvidenceFromDispatchTasks,
   buildRouteConfirmationOnboarding,
   buildRouteConfirmationRecheckAdvice,
@@ -59,7 +60,7 @@ export default async function ModelSettingsPage() {
     completedRouteRepairs,
     completedRouteRetests,
     completedRouteConfirmationRechecks,
-    completedRouteGovernanceTasks,
+    routeGovernanceDispatchTasks,
     routeAvoidanceOverrides,
     routeConfirmationAudits,
   ] = await Promise.all([
@@ -133,9 +134,8 @@ export default async function ModelSettingsPage() {
     prisma.gateDispatchTask.findMany({
       where: {
         stage: "model_route_governance",
-        state: "completed",
       },
-      orderBy: { completedAt: "desc" },
+      orderBy: { reviewLatestAt: "desc" },
       take: 100,
       select: {
         dispatchKey: true,
@@ -143,6 +143,7 @@ export default async function ModelSettingsPage() {
         state: true,
         completionEvidence: true,
         evidence: true,
+        reviewLatestAt: true,
         completedAt: true,
       },
     }),
@@ -206,11 +207,12 @@ export default async function ModelSettingsPage() {
   const routeConfirmationRechecks = buildRouteConfirmationRecheckEvidenceFromDispatchTasks(completedRouteConfirmationRechecks);
   const routeConfirmationRecheckAdvice = buildRouteConfirmationRecheckAdvice(routeConfirmationRechecks);
   const routeConfirmationRecheckResultSummary = buildRouteConfirmationRecheckResultSummary(routeConfirmationRechecks);
+  const routeConfirmationGovernanceStatus = buildRouteConfirmationGovernanceStatusSummary(routeConfirmationRecheckAdvice, routeGovernanceDispatchTasks);
   const routeConfirmationReceipts = routeConfirmationAudits
     .map(modelRouteConfirmationReceiptFromAudit)
     .filter((receipt): receipt is NonNullable<ReturnType<typeof modelRouteConfirmationReceiptFromAudit>> => Boolean(receipt));
   const routeConfirmationHistory = buildRouteConfirmationHistory(routeConfirmationReceipts, routeConfirmationRechecks);
-  const routeGovernanceEvidence = buildRouteConfirmationGovernanceEvidenceFromDispatchTasks(completedRouteGovernanceTasks);
+  const routeGovernanceEvidence = buildRouteConfirmationGovernanceEvidenceFromDispatchTasks(routeGovernanceDispatchTasks);
   const healthDashboard = buildProviderHealthDashboard(maskedProviders);
   const routeEffectAudit = buildRouteEffectAudit(
     recentTasks,
@@ -249,6 +251,7 @@ export default async function ModelSettingsPage() {
         routeAvoidanceGovernance={routeAvoidanceGovernance}
         routeConfirmationHistory={routeConfirmationHistory}
         routeConfirmationOnboarding={routeConfirmationOnboarding}
+        routeConfirmationGovernanceStatus={routeConfirmationGovernanceStatus}
         routeConfirmationRecheckAdvice={routeConfirmationRecheckAdvice}
         routeConfirmationRecheckResultSummary={routeConfirmationRecheckResultSummary}
         routeRecommendations={routeRecommendations}

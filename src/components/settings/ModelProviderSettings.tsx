@@ -8,7 +8,11 @@ import {
   buildRouteConfirmationRecheckSampleDispatch,
   buildRouteConfirmationRecheckSamplePlan,
 } from "@/lib/model-gateway/routeConfirmation";
-import type { RouteConfirmationOnboarding, RouteConfirmationRecheckResultSummary } from "@/lib/model-gateway/routeConfirmation";
+import type {
+  RouteConfirmationGovernanceStatusSummary,
+  RouteConfirmationOnboarding,
+  RouteConfirmationRecheckResultSummary,
+} from "@/lib/model-gateway/routeConfirmation";
 import type { ProviderHealthDashboard, ProviderHealthStatus } from "@/lib/model-gateway/providerHealth";
 import type { RoutedModelTaskType } from "@/lib/model-gateway/taskRouting";
 import type { ModelProviderId } from "@/lib/model-gateway/types";
@@ -342,6 +346,12 @@ const routeRecheckResultStatusCopy: Record<RouteConfirmationRecheckResultSummary
   manual_review: { className: "bg-rose-50 text-rose-700" },
 };
 
+const routeGovernanceStatusCopy: Record<RouteConfirmationGovernanceStatusSummary["items"][number]["status"], { className: string }> = {
+  not_created: { className: "bg-slate-50 text-slate-600" },
+  assigned: { className: "bg-sky-50 text-sky-700" },
+  completed: { className: "bg-emerald-50 text-emerald-700" },
+};
+
 function draftFromOption(option: ProviderOptionView, existing?: ProviderView): DraftProvider {
   return {
     id: existing?.id,
@@ -365,6 +375,7 @@ export function ModelProviderSettings({
   routeAvoidanceDecisionHistory,
   routeAvoidanceGovernance,
   routeConfirmationHistory,
+  routeConfirmationGovernanceStatus,
   routeConfirmationOnboarding,
   routeConfirmationRecheckAdvice,
   routeConfirmationRecheckResultSummary,
@@ -381,6 +392,7 @@ export function ModelProviderSettings({
   routeAvoidanceDecisionHistory: RouteAvoidanceDecisionHistoryView;
   routeAvoidanceGovernance: RouteAvoidanceGovernanceView;
   routeConfirmationHistory: RouteConfirmationHistoryView[];
+  routeConfirmationGovernanceStatus: RouteConfirmationGovernanceStatusSummary;
   routeConfirmationOnboarding: RouteConfirmationOnboarding;
   routeConfirmationRecheckAdvice: RouteConfirmationRecheckAdviceView;
   routeConfirmationRecheckResultSummary: RouteConfirmationRecheckResultSummary;
@@ -1076,6 +1088,8 @@ export function ModelProviderSettings({
             <div className="mt-3 grid gap-2 lg:grid-cols-2">
               {routeConfirmationRecheckAdvice.items.slice(0, 6).map((item) => {
                 const samplePlan = routeConfirmationSamplePlanForAdvice(item);
+                const governanceStatus = routeConfirmationGovernanceStatus.items.find((status) => status.adviceId === item.id);
+                const governanceStatusStyle = governanceStatus ? routeGovernanceStatusCopy[governanceStatus.status] : null;
                 return (
                   <div
                     className={`rounded-md border bg-white p-3 text-sm ${
@@ -1094,6 +1108,29 @@ export function ModelProviderSettings({
                       {item.actionLabel}
                     </span>
                   </div>
+                  {governanceStatus ? (
+                    <div className="mt-2 rounded-md border border-slate-100 bg-slate-50 p-2 text-xs leading-5 text-slate-600">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <span className="font-medium text-slate-700">治理派单状态</span>
+                        <span className={`rounded-md px-2 py-1 font-medium ${governanceStatusStyle?.className ?? "bg-slate-100 text-slate-600"}`}>
+                          {governanceStatus.statusLabel}
+                        </span>
+                      </div>
+                      <p className="mt-1">{governanceStatus.detail}</p>
+                      <div className="mt-2 flex flex-wrap items-center gap-2">
+                        {governanceStatus.latestAt ? (
+                          <span className="rounded-md bg-white px-2 py-1">{governanceStatus.latestAt.slice(0, 10)}</span>
+                        ) : null}
+                        {governanceStatus.status === "assigned" ? (
+                          <Link className="rounded-md bg-white px-2 py-1 font-medium text-sky-700 hover:bg-sky-50" href="/dispatch">
+                            {governanceStatus.actionLabel}
+                          </Link>
+                        ) : (
+                          <span className="rounded-md bg-white px-2 py-1 font-medium text-slate-600">{governanceStatus.actionLabel}</span>
+                        )}
+                      </div>
+                    </div>
+                  ) : null}
                   <p className="mt-2 leading-6 text-slate-700">{item.recommendation}</p>
                   <div className="mt-2 flex flex-wrap gap-2 text-xs text-slate-600">
                     {item.sampleCount !== null ? <span className="rounded-md bg-slate-50 px-2 py-1">样本 {item.sampleCount}</span> : null}
@@ -1140,11 +1177,17 @@ export function ModelProviderSettings({
                     </button>
                     <button
                       className="rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
-                      disabled={executingRouteAdviceId === item.id}
+                      disabled={executingRouteAdviceId === item.id || governanceStatus?.status === "assigned" || governanceStatus?.status === "completed"}
                       onClick={() => void executeRouteRecheckAdvice(item)}
                       type="button"
                     >
-                      {executingRouteAdviceId === item.id ? "生成中" : "生成治理派单"}
+                      {executingRouteAdviceId === item.id
+                        ? "生成中"
+                        : governanceStatus?.status === "assigned"
+                          ? "治理已派单"
+                          : governanceStatus?.status === "completed"
+                            ? "治理已完成"
+                            : "生成治理派单"}
                     </button>
                   </div>
                 </div>

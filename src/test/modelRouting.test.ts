@@ -11,6 +11,7 @@ import {
   buildRouteConfirmationRecheckAutoGovernanceAction,
   buildRouteConfirmationRecheckDecision,
   buildRouteConfirmationRecheckGovernanceAction,
+  buildRouteConfirmationGovernanceStatusSummary,
   buildRouteConfirmationGovernanceAutoFollowUpDispatches,
   buildRouteConfirmationGovernanceEvidenceFromDispatchTasks,
   buildRouteConfirmationGovernanceFollowUpDispatches,
@@ -588,6 +589,40 @@ test("model task routing", async (t) => {
     assert.equal(action.dispatch.ownerRole, "模型治理");
     assert.ok(action.dispatch.acceptanceCriteria.some((item) => item.includes("首选模型")));
     assert.ok(action.payload.evidence.some((item) => item.includes("成功率 50")));
+  });
+
+  await t.test("summarizes governance dispatch status for route recheck advice", () => {
+    const evidence = buildRouteConfirmationRecheckEvidenceFromDispatchTasks([{
+      dispatchKey: "model-route-confirmation-recheck:chapter_review:2026-07-04T10:00:00.000Z",
+      stage: "model_route_confirmation_recheck",
+      state: "completed",
+      completionEvidence: "完成 2 个章节审稿小样本，1 个超时，成功率 50%，质量 62，命中备用路线。",
+      evidence: ["已确认章节审稿模型路由。"],
+      completedAt: "2026-07-04T12:00:00.000Z",
+    }]);
+    const advice = buildRouteConfirmationRecheckAdvice(evidence);
+    const action = buildRouteConfirmationRecheckGovernanceAction(advice.items[0], {
+      createdAt: "2026-07-04T13:00:00.000Z",
+    });
+
+    const summary = buildRouteConfirmationGovernanceStatusSummary(advice, [
+      {
+        dispatchKey: action.dispatch.dispatchKey,
+        stage: "model_route_governance",
+        state: "assigned",
+        completionEvidence: "",
+        evidence: action.dispatch.evidence,
+        completedAt: null,
+      },
+    ]);
+
+    assert.equal(summary.summary.total, 1);
+    assert.equal(summary.summary.assigned, 1);
+    assert.equal(summary.summary.completed, 0);
+    assert.equal(summary.items[0].status, "assigned");
+    assert.equal(summary.items[0].statusLabel, "治理已派单");
+    assert.equal(summary.items[0].actionLabel, "去派单中心");
+    assert.equal(summary.items[0].dispatchKey, action.dispatch.dispatchKey);
   });
 
   await t.test("automatically builds route governance dispatches for weak rechecks only", () => {

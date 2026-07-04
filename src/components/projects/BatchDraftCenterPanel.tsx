@@ -107,6 +107,16 @@ interface RouteRecommendationView {
     reason: string | null;
     evidence: string[];
   };
+  explanation: {
+    headline: string;
+    items: Array<{
+      id: "history" | "cost" | "governance_recheck" | "avoidance";
+      label: string;
+      value: string;
+      detail: string;
+      tone: "positive" | "warning" | "neutral";
+    }>;
+  };
   reason: string;
 }
 
@@ -315,6 +325,7 @@ export function BatchDraftCenterPanel({ projectId }: { projectId: string }) {
             routeStatus: routeRecommendation.status,
             avoidanceStatus: routeRecommendation.avoidance.status,
             restoredCandidate: routeRecommendation.reason.includes("复测通过"),
+            recommendationExplanation: routeRecommendation.explanation,
           },
         }),
       });

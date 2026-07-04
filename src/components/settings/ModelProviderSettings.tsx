@@ -622,6 +622,7 @@ export function ModelProviderSettings({
             routeStatus: recommendation.status,
             avoidanceStatus: recommendation.avoidance.status,
             restoredCandidate: recommendation.reason.includes("复测通过"),
+            recommendationExplanation: recommendation.explanation,
           },
         }),
       });

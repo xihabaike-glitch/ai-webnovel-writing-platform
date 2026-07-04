@@ -1,5 +1,16 @@
 import { z } from "zod";
 
+const routeRecommendationExplanationSchema = z.object({
+  headline: z.string().max(80),
+  items: z.array(z.object({
+    id: z.enum(["history", "cost", "governance_recheck", "avoidance"]),
+    label: z.string().min(1).max(40),
+    value: z.string().min(1).max(80),
+    detail: z.string().max(300),
+    tone: z.enum(["positive", "warning", "neutral"]),
+  })).max(8),
+});
+
 export const saveModelProviderSchema = z.object({
   id: z.string().optional(),
   providerId: z.enum(["claude", "deepseek", "kimi", "gpt", "openai_compatible", "ollama", "mock"]),
@@ -38,6 +49,7 @@ export const saveModelTaskRouteSchema = z.object({
     routeStatus: z.enum(["ready", "current", "insufficient"]).optional().nullable(),
     avoidanceStatus: z.enum(["none", "applied"]).optional().nullable(),
     restoredCandidate: z.boolean().optional().nullable(),
+    recommendationExplanation: routeRecommendationExplanationSchema.optional().nullable(),
   }).optional(),
 });
 

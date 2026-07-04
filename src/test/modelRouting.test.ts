@@ -152,6 +152,15 @@ test("model task routing", async (t) => {
       fallbackProviderName: "Kimi · kimi-k2.6",
       reason: "复测通过，恢复候选：成功率 100%，质量 86。近 2 次样本成功率 100%。",
       source: "recommendation",
+      recommendationExplanation: {
+        headline: "推荐依据分解",
+        items: [
+          { id: "history", label: "历史样本", value: "2 次", detail: "成功率 100%，质量 86。", tone: "positive" },
+          { id: "cost", label: "成本", value: "$0.0000/次", detail: "按成功任务均摊成本。", tone: "neutral" },
+          { id: "governance_recheck", label: "治理后复检", value: "+30", detail: "当前路线获得加权保留。", tone: "positive" },
+          { id: "avoidance", label: "避坑规则", value: "未触发", detail: "没有命中需要避开的模型路线。", tone: "neutral" },
+        ],
+      },
       createdAt: "2026-07-04T10:00:00.000Z",
     });
 
@@ -160,8 +169,15 @@ test("model task routing", async (t) => {
     assert.equal(receipt.label, "正文初稿路由已确认");
     assert.ok(receipt.detail.includes("DeepSeek · deepseek-chat"));
     assert.ok(receipt.detail.includes("Kimi · kimi-k2.6"));
+    assert.ok(receipt.detail.includes("推荐依据：历史样本 2 次；成本 $0.0000/次；治理后复检 +30；避坑规则 未触发"));
     assert.ok(receipt.message.includes("复测通过恢复候选"));
     assert.equal(receipt.recheck.label, "复检模型路由");
+    assert.deepEqual(receipt.payload.recommendationExplanation?.items.map((item) => item.label), [
+      "历史样本",
+      "成本",
+      "治理后复检",
+      "避坑规则",
+    ]);
   });
 
   await t.test("turns route confirmations into follow-up dispatch tasks", () => {
@@ -216,12 +232,22 @@ test("model task routing", async (t) => {
       recheckLabel: receipt.recheck.label,
       recheckDetail: receipt.recheck.detail,
       recheckAction: receipt.recheck.action,
-      payload: JSON.stringify(receipt.payload),
+      payload: JSON.stringify({
+        ...receipt.payload,
+        recommendationExplanation: {
+          headline: "推荐依据分解",
+          items: [
+            { id: "history", label: "历史样本", value: "3 次", detail: "成功率 100%。", tone: "positive" },
+            { id: "cost", label: "成本", value: "$0.0000/次", detail: "成本稳定。", tone: "neutral" },
+          ],
+        },
+      }),
       createdAt: new Date(receipt.createdAt),
     });
 
     assert.equal(restored?.payload.taskType, "chapter_second_pass");
     assert.equal(restored?.payload.primaryProviderName, "Kimi · kimi-k2.6");
+    assert.equal(restored?.payload.recommendationExplanation?.items[0]?.label, "历史样本");
     assert.equal(restored?.createdAt, "2026-07-04T11:00:00.000Z");
     assert.equal(modelRouteConfirmationReceiptFromAudit({ ...restored!, executionType: "manual", receiptId: restored!.id, recheckStatus: "ready", recheckAction: restored!.recheck.action, payload: "{}" }), null);
   });

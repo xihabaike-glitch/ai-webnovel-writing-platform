@@ -68,6 +68,7 @@ export async function POST(request: Request) {
       routeStatus: input.confirmation.routeStatus,
       avoidanceStatus: input.confirmation.avoidanceStatus,
       restoredCandidate: input.confirmation.restoredCandidate,
+      recommendationExplanation: input.confirmation.recommendationExplanation,
     });
 
     await prisma.gateActionAudit.upsert({

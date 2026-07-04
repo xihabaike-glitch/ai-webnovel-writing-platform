@@ -12,7 +12,21 @@ export interface ModelRouteConfirmationInput {
   routeStatus?: "ready" | "current" | "insufficient" | null;
   avoidanceStatus?: "none" | "applied" | null;
   restoredCandidate?: boolean | null;
+  recommendationExplanation?: ModelRouteRecommendationExplanation | null;
   createdAt?: string | Date;
+}
+
+export interface ModelRouteRecommendationExplanationItem {
+  id: "history" | "cost" | "governance_recheck" | "avoidance";
+  label: string;
+  value: string;
+  detail: string;
+  tone: "positive" | "warning" | "neutral";
+}
+
+export interface ModelRouteRecommendationExplanation {
+  headline: string;
+  items: ModelRouteRecommendationExplanationItem[];
 }
 
 export interface ModelRouteConfirmationReceipt {
@@ -43,6 +57,7 @@ export interface ModelRouteConfirmationReceipt {
     routeStatus: "ready" | "current" | "insufficient" | null;
     avoidanceStatus: "none" | "applied" | null;
     restoredCandidate: boolean;
+    recommendationExplanation: ModelRouteRecommendationExplanation | null;
   };
   createdAt: string;
 }
@@ -523,6 +538,46 @@ function avoidanceStatus(value: unknown): ModelRouteConfirmationReceipt["payload
 
 function stringOrNull(value: unknown) {
   return typeof value === "string" && value.trim() ? value : null;
+}
+
+function recommendationExplanationItemId(value: unknown): ModelRouteRecommendationExplanationItem["id"] | null {
+  return value === "history" || value === "cost" || value === "governance_recheck" || value === "avoidance" ? value : null;
+}
+
+function recommendationExplanationTone(value: unknown): ModelRouteRecommendationExplanationItem["tone"] {
+  return value === "positive" || value === "warning" || value === "neutral" ? value : "neutral";
+}
+
+function normalizeRecommendationExplanation(value: unknown): ModelRouteRecommendationExplanation | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const raw = value as Record<string, unknown>;
+  if (!Array.isArray(raw.items)) return null;
+  const items = raw.items.flatMap((item): ModelRouteRecommendationExplanationItem[] => {
+    if (!item || typeof item !== "object" || Array.isArray(item)) return [];
+    const row = item as Record<string, unknown>;
+    const id = recommendationExplanationItemId(row.id);
+    const label = stringOrNull(row.label);
+    const itemValue = stringOrNull(row.value);
+    if (!id || !label || !itemValue) return [];
+    return [{
+      id,
+      label,
+      value: itemValue,
+      detail: stringOrNull(row.detail) ?? "",
+      tone: recommendationExplanationTone(row.tone),
+    }];
+  });
+
+  if (!items.length) return null;
+  return {
+    headline: stringOrNull(raw.headline) ?? "推荐依据分解",
+    items,
+  };
+}
+
+function recommendationExplanationSummary(explanation: ModelRouteRecommendationExplanation | null) {
+  if (!explanation?.items.length) return null;
+  return `推荐依据：${explanation.items.map((item) => `${item.label} ${item.value}`).join("；")}`;
 }
 
 function numericPercentAfter(label: string, text: string) {
@@ -1186,6 +1241,8 @@ export function buildModelRouteConfirmationReceipt(input: ModelRouteConfirmation
   const sourceLabel = sourceLabels[source];
   const restoredCopy = restoredCandidate ? "复测通过恢复候选。" : "";
   const avoidanceCopy = input.avoidanceStatus === "applied" ? "已带入避坑规则。" : "";
+  const recommendationExplanation = normalizeRecommendationExplanation(input.recommendationExplanation);
+  const recommendationSummary = recommendationExplanationSummary(recommendationExplanation);
 
   return {
     id: `model-route:${input.taskType}:${createdAt}`,
@@ -1197,6 +1254,7 @@ export function buildModelRouteConfirmationReceipt(input: ModelRouteConfirmation
       `来源：${sourceLabel}`,
       `首选：${primaryProviderName}`,
       `备用：${fallbackProviderName}`,
+      recommendationSummary,
       reason ? `依据：${reason}` : null,
     ].filter(Boolean).join("；"),
     href: "/settings/models",
@@ -1220,6 +1278,7 @@ export function buildModelRouteConfirmationReceipt(input: ModelRouteConfirmation
       routeStatus: input.routeStatus ?? null,
       avoidanceStatus: input.avoidanceStatus ?? null,
       restoredCandidate,
+      recommendationExplanation,
     },
     createdAt,
   };
@@ -1293,6 +1352,7 @@ export function modelRouteConfirmationReceiptFromAudit(record: ModelRouteConfirm
       routeStatus: routeStatus(payload.routeStatus),
       avoidanceStatus: avoidanceStatus(payload.avoidanceStatus),
       restoredCandidate: Boolean(payload.restoredCandidate),
+      recommendationExplanation: normalizeRecommendationExplanation(payload.recommendationExplanation),
     },
     createdAt,
   };

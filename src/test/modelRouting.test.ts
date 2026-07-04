@@ -943,6 +943,16 @@ test("model task routing", async (t) => {
     assert.equal(review?.recommendedFallbackProviderConfigId, "gpt-provider");
     assert.equal(review?.status, "current");
     assert.ok(review?.reason.includes("治理后复检通过，当前路线加权保留"));
+    assert.deepEqual(review?.explanation.items.map((item) => item.label), [
+      "历史样本",
+      "成本",
+      "治理后复检",
+      "避坑规则",
+    ]);
+    assert.equal(review?.explanation.items.find((item) => item.id === "history")?.tone, "positive");
+    assert.equal(review?.explanation.items.find((item) => item.id === "governance_recheck")?.value, "+30");
+    assert.ok(review?.explanation.items.find((item) => item.id === "cost")?.detail.includes("$0.0000"));
+    assert.equal(review?.explanation.items.find((item) => item.id === "avoidance")?.value, "未触发");
   });
 
   await t.test("turns completed route governance evidence into follow-up dispatches", () => {

@@ -115,6 +115,16 @@ interface RouteRecommendationView {
     reason: string | null;
     evidence: string[];
   };
+  explanation: {
+    headline: string;
+    items: Array<{
+      id: "history" | "cost" | "governance_recheck" | "avoidance";
+      label: string;
+      value: string;
+      detail: string;
+      tone: "positive" | "warning" | "neutral";
+    }>;
+  };
   reason: string;
 }
 
@@ -350,6 +360,12 @@ const routeGovernanceStatusCopy: Record<RouteConfirmationGovernanceStatusSummary
   not_created: { className: "bg-slate-50 text-slate-600" },
   assigned: { className: "bg-sky-50 text-sky-700" },
   completed: { className: "bg-emerald-50 text-emerald-700" },
+};
+
+const routeRecommendationExplanationToneCopy: Record<RouteRecommendationView["explanation"]["items"][number]["tone"], string> = {
+  positive: "border-emerald-200 bg-emerald-50 text-emerald-800",
+  warning: "border-amber-200 bg-amber-50 text-amber-800",
+  neutral: "border-slate-200 bg-white text-slate-700",
 };
 
 function draftFromOption(option: ProviderOptionView, existing?: ProviderView): DraftProvider {
@@ -1567,6 +1583,23 @@ export function ModelProviderSettings({
                   <span className="rounded-md bg-white px-2 py-1">${recommendation.averageCostPerSucceededTaskUsd.toFixed(4)}/次</span>
                 </div>
                 <p className="mt-2 leading-6 text-slate-600">{recommendation.reason}</p>
+                <div className="mt-3 border-t border-slate-200 pt-3">
+                  <div className="text-xs font-medium text-slate-700">{recommendation.explanation.headline}</div>
+                  <div className="mt-2 grid gap-2 md:grid-cols-2">
+                    {recommendation.explanation.items.map((item) => (
+                      <div
+                        className={`rounded-md border px-2 py-1.5 text-xs leading-5 ${routeRecommendationExplanationToneCopy[item.tone]}`}
+                        key={item.id}
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="font-medium">{item.label}</span>
+                          <span className="shrink-0">{item.value}</span>
+                        </div>
+                        <p className="mt-1">{item.detail}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
                 {recommendation.avoidance.status === "applied" ? (
                   <div className="mt-2 rounded-md border border-amber-200 bg-amber-50 p-2 text-xs leading-5 text-amber-900">
                     <div className="font-medium">已应用避坑规则 · {recommendation.avoidance.appliedRules} 条</div>

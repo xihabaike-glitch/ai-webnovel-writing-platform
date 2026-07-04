@@ -65,6 +65,19 @@ export interface RouteRecommendationAvoidance {
   evidence: string[];
 }
 
+export interface RouteRecommendationExplanationItem {
+  id: "history" | "cost" | "governance_recheck" | "avoidance";
+  label: string;
+  value: string;
+  detail: string;
+  tone: "positive" | "warning" | "neutral";
+}
+
+export interface RouteRecommendationExplanation {
+  headline: string;
+  items: RouteRecommendationExplanationItem[];
+}
+
 export interface RouteRecommendationOptions {
   avoidanceRules?: RouteAvoidanceRule[];
   routeAvoidanceDecisionHistory?: RouteAvoidanceDecisionHistory;
@@ -238,6 +251,7 @@ export interface RouteRecommendation {
   averageQualityScore: number;
   averageCostPerSucceededTaskUsd: number;
   avoidance: RouteRecommendationAvoidance;
+  explanation: RouteRecommendationExplanation;
   reason: string;
 }
 
@@ -432,6 +446,55 @@ function governanceRecheckBoostReason(
   const successRate = recheck.successRatePercent === null ? "未填" : `${recheck.successRatePercent}%`;
   const quality = recheck.qualityScore ?? "未填";
   return `治理后复检通过，当前路线加权保留：成功率 ${successRate}，质量 ${quality}。`;
+}
+
+function buildRecommendationExplanation(
+  primary: ReturnType<typeof buildProviderCandidate> | null,
+  avoidance: RouteRecommendationAvoidance,
+  recheck: RouteConfirmationRecheckEvidence | null,
+  recheckBoosted: boolean,
+): RouteRecommendationExplanation {
+  const successRate = recheck?.successRatePercent === null ? "未填" : `${recheck?.successRatePercent}%`;
+  const quality = recheck?.qualityScore ?? "未填";
+  return {
+    headline: "推荐依据分解",
+    items: [
+      {
+        id: "history",
+        label: "历史样本",
+        value: primary ? `${primary.totalTasks} 次` : "不足",
+        detail: primary
+          ? `成功率 ${primary.successRatePercent}%，质量 ${primary.averageQualityScore || "缺"}。`
+          : "还没有达到 2 次可用样本，暂不自动推荐。",
+        tone: primary && primary.successRatePercent >= 80 && (primary.averageQualityScore === 0 || primary.averageQualityScore >= 70) ? "positive" : "neutral",
+      },
+      {
+        id: "cost",
+        label: "成本",
+        value: primary ? `$${primary.averageCostPerSucceededTaskUsd.toFixed(4)}/次` : "未知",
+        detail: primary
+          ? `按成功任务均摊成本，当前候选为 $${primary.averageCostPerSucceededTaskUsd.toFixed(4)}/次。`
+          : "样本不足，无法估算单次成功成本。",
+        tone: primary && primary.averageCostPerSucceededTaskUsd > 0.05 ? "warning" : "neutral",
+      },
+      {
+        id: "governance_recheck",
+        label: "治理后复检",
+        value: recheckBoosted ? "+30" : recheck ? "通过未加权" : "无",
+        detail: recheck
+          ? `治理后复检成功率 ${successRate}，质量 ${quality}${recheckBoosted ? "，当前已确认路线获得加权保留。" : "，但未命中当前首选路线。"}`
+          : "暂无治理后复检通过证据。",
+        tone: recheckBoosted ? "positive" : "neutral",
+      },
+      {
+        id: "avoidance",
+        label: "避坑规则",
+        value: avoidance.status === "applied" ? `${avoidance.appliedRules} 条` : "未触发",
+        detail: avoidance.reason ?? "没有命中需要避开的模型路线。",
+        tone: avoidance.status === "applied" ? "warning" : "neutral",
+      },
+    ],
+  };
 }
 
 function latestRouteGovernanceReason(
@@ -995,9 +1058,10 @@ export function buildRouteRecommendations(
     );
     const confirmationRecheckReason = latestRouteConfirmationRecheckReason(option.taskType, options.routeConfirmationRechecks);
     const governanceReason = latestRouteGovernanceReason(option.taskType, options.routeGovernanceEvidence);
+    const governanceRecheckBoosted = Boolean(passedGovernanceRecheck && primary?.provider.id === route?.primaryProviderConfigId);
     const governanceBoostReason = governanceRecheckBoostReason(
       passedGovernanceRecheck,
-      Boolean(passedGovernanceRecheck && primary?.provider.id === route?.primaryProviderConfigId),
+      governanceRecheckBoosted,
     );
 
     return {
@@ -1015,6 +1079,7 @@ export function buildRouteRecommendations(
       averageQualityScore: primary?.averageQualityScore ?? 0,
       averageCostPerSucceededTaskUsd: primary?.averageCostPerSucceededTaskUsd ?? 0,
       avoidance,
+      explanation: buildRecommendationExplanation(primary, avoidance, passedGovernanceRecheck, governanceRecheckBoosted),
       reason: [avoidance.reason, restorationReason, confirmationRecheckReason, governanceReason, governanceBoostReason, baseReason].filter(Boolean).join(" "),
     };
   });

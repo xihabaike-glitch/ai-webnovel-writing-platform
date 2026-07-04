@@ -5,7 +5,9 @@ import { getActiveModelProvider } from "@/lib/model-gateway/activeProvider";
 import type { ModelProviderId } from "@/lib/model-gateway/types";
 import { getPlatformProfile, type PlatformId } from "@/lib/platforms/platformProfiles";
 import { buildFirstThreeRewriteEvaluation, buildFirstThreeRewritePackage } from "@/lib/projects/firstThreeRewrite";
+import { buildPlatformPublishExportCenter, parsePublishSnapshotTags } from "@/lib/projects/platformPublishExport";
 import { findProjectStartTacticSummary } from "@/lib/projects/projectStartTactics";
+import { buildSubmissionChecklist } from "@/lib/projects/submissionChecklist";
 import { countWords } from "@/lib/text/wordCount";
 
 interface Params {
@@ -54,6 +56,11 @@ export async function POST(request: Request, { params }: Params) {
     where: { id: projectId },
     include: {
       chapters: { orderBy: { order: "asc" } },
+      aiTasks: { orderBy: { createdAt: "desc" } },
+      publishSnapshots: { orderBy: { createdAt: "desc" }, take: 80 },
+      submissionAssets: { orderBy: { updatedAt: "desc" } },
+      submissionAssetVersions: { orderBy: { createdAt: "desc" }, take: 80 },
+      platformPublishMetrics: { orderBy: { snapshotDate: "desc" }, take: 80 },
       worldEntries: true,
     },
   });
@@ -64,6 +71,85 @@ export async function POST(request: Request, { params }: Params) {
 
   const platform = getPlatformProfile((body.platformId ?? project.targetPlatform) as PlatformId);
   const startTactic = findProjectStartTacticSummary(project.worldEntries);
+  const submissionChecklist = buildSubmissionChecklist({
+    title: project.title,
+    genre: project.genre,
+    sellingPoint: project.sellingPoint,
+    currentWordCount: project.currentWordCount,
+    targetWordCount: project.targetWordCount,
+    platform,
+    chapters: project.chapters,
+    aiTasks: project.aiTasks.map((task) => ({
+      taskType: task.taskType,
+      status: task.status,
+      chapter: task.chapterId ? { id: task.chapterId } : null,
+    })),
+  });
+  const center = buildPlatformPublishExportCenter({
+    project: {
+      title: project.title,
+      genre: project.genre,
+      sellingPoint: project.sellingPoint,
+      currentWordCount: project.currentWordCount,
+      targetWordCount: project.targetWordCount,
+    },
+    targetPlatform: platform,
+    platforms: [platform],
+    chapters: project.chapters,
+    aiTasks: project.aiTasks,
+    publishSnapshots: project.publishSnapshots,
+    submissionAssets: project.submissionAssets.map((asset) => ({
+      id: asset.id,
+      platformId: asset.platformId,
+      platformName: asset.platformName,
+      title: asset.title,
+      logline: asset.logline,
+      synopsis: asset.synopsis,
+      overseasSynopsis: asset.overseasSynopsis,
+      tags: parsePublishSnapshotTags(asset.tags),
+      note: asset.note,
+      source: asset.source,
+      updatedAt: asset.updatedAt,
+    })),
+    submissionAssetVersions: project.submissionAssetVersions.map((version) => ({
+      id: version.id,
+      platformId: version.platformId,
+      platformName: version.platformName,
+      title: version.title,
+      logline: version.logline,
+      synopsis: version.synopsis,
+      overseasSynopsis: version.overseasSynopsis,
+      tags: parsePublishSnapshotTags(version.tags),
+      note: version.note,
+      source: version.source,
+      auditScore: version.auditScore,
+      auditStatus: version.auditStatus === "ready" || version.auditStatus === "blocked" ? version.auditStatus : "needs_work",
+      action: version.action,
+      sourceTaskId: version.sourceTaskId,
+      strategy: version.strategy,
+      createdAt: version.createdAt,
+    })),
+    platformPublishMetrics: project.platformPublishMetrics.map((metric) => ({
+      id: metric.id,
+      platformId: metric.platformId,
+      platformName: metric.platformName,
+      views: metric.views,
+      clicks: metric.clicks,
+      favorites: metric.favorites,
+      follows: metric.follows,
+      comments: metric.comments,
+      paidReads: metric.paidReads,
+      editorFeedback: metric.editorFeedback,
+      contractStatus: metric.contractStatus,
+      publishUrl: metric.publishUrl,
+      notes: metric.notes,
+      snapshotDate: metric.snapshotDate,
+      createdAt: metric.createdAt,
+      updatedAt: metric.updatedAt,
+    })),
+    submissionChecklist,
+  });
+  const platformKnowledge = center.platformKnowledge.find((item) => item.platformId === platform.id) ?? null;
   const rewritePackage = buildFirstThreeRewritePackage({
     projectTitle: project.title,
     platform,
@@ -99,6 +185,7 @@ export async function POST(request: Request, { params }: Params) {
       sellingPoint: project.sellingPoint,
       platform,
       startTactic,
+      platformKnowledge,
       targetWords: body.targetWords ?? 1600,
       chapter: {
         order: chapter.order,

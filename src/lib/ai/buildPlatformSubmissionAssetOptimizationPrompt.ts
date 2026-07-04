@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { PlatformProfile } from "@/lib/platforms/platformProfiles";
-import type { PlatformSubmissionAssetAudit } from "@/lib/projects/platformPublishExport";
+import type { PlatformKnowledgeInsight, PlatformSubmissionAssetAudit } from "@/lib/projects/platformPublishExport";
 
 export interface PlatformSubmissionAssetOptimizationInput {
   platform: PlatformProfile;
@@ -21,6 +21,7 @@ export interface PlatformSubmissionAssetOptimizationInput {
     conflict: string;
     cliffhanger: string;
   }[];
+  platformKnowledge?: PlatformKnowledgeInsight | null;
 }
 
 export interface PlatformSubmissionAssetOptimizationVariant {
@@ -55,6 +56,17 @@ export function buildPlatformSubmissionAssetOptimizationPrompt(input: PlatformSu
   const issueText = input.audit.issues.length
     ? input.audit.issues.map((issue) => `${issue.severity}｜${issue.field}｜${issue.label}：${issue.detail}`).join("\n")
     : "当前质检暂无阻塞，但仍要提升平台点击率和投稿辨识度。";
+  const knowledgeLines = input.platformKnowledge
+    ? [
+        "平台知识库反哺：",
+        `知识状态：${input.platformKnowledge.status}`,
+        `置信度：${input.platformKnowledge.confidence}`,
+        `打法摘要：${input.platformKnowledge.tacticSummary}`,
+        `可复用信号：${input.platformKnowledge.winningSignals.join("；") || "暂无"}`,
+        `避坑信号：${input.platformKnowledge.avoidSignals.join("；") || "暂无"}`,
+        `下一步建议：${input.platformKnowledge.nextAction}`,
+      ]
+    : ["平台知识库反哺：暂无可用经验，按平台基础规则生成。"];
 
   const userPrompt = [
     `目标平台：${input.platform.name}`,
@@ -65,6 +77,7 @@ export function buildPlatformSubmissionAssetOptimizationPrompt(input: PlatformSu
     `平台风险：${input.platform.risks.join("、")}`,
     `当前质检分：${input.audit.score}`,
     `当前质检状态：${input.audit.status}`,
+    ...knowledgeLines,
     "当前质检问题：",
     issueText,
     `当前标题：${input.asset.title}`,

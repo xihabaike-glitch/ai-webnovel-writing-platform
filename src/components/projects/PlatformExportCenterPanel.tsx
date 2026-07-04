@@ -432,6 +432,7 @@ interface PlatformStrategyRankItem {
     effect: number;
     comparison: number;
     adoption: number;
+    knowledge: number;
   };
   reasons: string[];
   risks: string[];

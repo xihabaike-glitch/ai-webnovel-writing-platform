@@ -96,4 +96,42 @@ test("buildFirstThreeRewritePrompt", async (t) => {
     assert.ok(tacticPrompt.userPrompt.includes("只复用小步重验流程"));
     assert.ok(tacticPrompt.userPrompt.includes("等下一轮效果回填后再加码"));
   });
+
+  await t.test("feeds platform knowledge into rewrite instructions", () => {
+    const knowledgePrompt = buildFirstThreeRewritePrompt({
+      projectTitle: "夜雨系统",
+      genre: "都市系统",
+      sellingPoint: "雨夜系统翻盘",
+      platform: getPlatformProfile("fanqie"),
+      platformKnowledge: {
+        platformId: "fanqie",
+        platformName: "番茄小说",
+        status: "learned",
+        confidence: 90,
+        evidenceCount: 4,
+        positiveCount: 1,
+        negativeCount: 0,
+        winningSignals: ["胜出标题：夜雨系统：倒计时重生", "追读率 +2%"],
+        avoidSignals: ["别把系统规则解释太久"],
+        tacticSummary: "番茄小说 已有可复用打法：第一屏压倒计时选择。",
+        nextAction: "把胜出钩子写进前三章。",
+      },
+      targetWords: 1600,
+      chapter: {
+        order: 1,
+        title: "第一章 雨夜系统",
+        content: "林晚推开门，系统提示音在雨夜响起。",
+        goal: "让主角遭遇不可逆事件。",
+        hook: "雨夜、系统、门后未知风险。",
+        conflict: "主角必须在危险和逃避之间选择。",
+        valueShift: "普通生活转向失控危机。",
+        cliffhanger: "系统给出第一个选择。",
+      },
+      plan,
+    });
+
+    assert.ok(knowledgePrompt.userPrompt.includes("平台知识库反哺"));
+    assert.ok(knowledgePrompt.userPrompt.includes("第一屏压倒计时选择"));
+    assert.ok(knowledgePrompt.userPrompt.includes("别把系统规则解释太久"));
+  });
 });

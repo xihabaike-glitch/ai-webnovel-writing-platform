@@ -485,6 +485,8 @@ test("buildPlatformPublishExportCenter", async (t) => {
     assert.equal(knowledge?.status, "learned");
     assert.equal(knowledge?.positiveCount, 1);
     assert.ok(knowledge?.winningSignals.some((signal) => signal.includes("夜雨系统")));
+    assert.ok(center.platformStrategy[0].scores.knowledge >= 80);
+    assert.ok(center.platformStrategy[0].reasons.some((reason) => reason.includes("知识库")));
     assert.ok(center.packages[0].markdown.includes("实验结果归因"));
   });
 

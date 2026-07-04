@@ -47,6 +47,7 @@ export async function POST(request: Request, { params }: Params) {
       publishSnapshots: { orderBy: { createdAt: "desc" }, take: 80 },
       submissionAssets: { orderBy: { updatedAt: "desc" } },
       submissionAssetVersions: { orderBy: { createdAt: "desc" }, take: 80 },
+      platformPublishMetrics: { orderBy: { snapshotDate: "desc" }, take: 80 },
     },
   });
 
@@ -113,9 +114,28 @@ export async function POST(request: Request, { params }: Params) {
       strategy: version.strategy,
       createdAt: version.createdAt,
     })),
+    platformPublishMetrics: project.platformPublishMetrics.map((metric) => ({
+      id: metric.id,
+      platformId: metric.platformId,
+      platformName: metric.platformName,
+      views: metric.views,
+      clicks: metric.clicks,
+      favorites: metric.favorites,
+      follows: metric.follows,
+      comments: metric.comments,
+      paidReads: metric.paidReads,
+      editorFeedback: metric.editorFeedback,
+      contractStatus: metric.contractStatus,
+      publishUrl: metric.publishUrl,
+      notes: metric.notes,
+      snapshotDate: metric.snapshotDate,
+      createdAt: metric.createdAt,
+      updatedAt: metric.updatedAt,
+    })),
     submissionChecklist,
   });
   const pack = center.packages.find((item) => item.platformId === platform.id) ?? center.packages[0];
+  const platformKnowledge = center.platformKnowledge.find((item) => item.platformId === platform.id) ?? null;
   const asset = {
     title: trimText(body.title, pack.title),
     logline: trimText(body.logline, pack.logline),
@@ -137,6 +157,7 @@ export async function POST(request: Request, { params }: Params) {
       conflict: chapter.conflict,
       cliffhanger: chapter.cliffhanger,
     })),
+    platformKnowledge,
   });
   const { provider, adapter } = await getActiveModelProvider("submission_package_optimize");
   const task = await prisma.aiTask.create({

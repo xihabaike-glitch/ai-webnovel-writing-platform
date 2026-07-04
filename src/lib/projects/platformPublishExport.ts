@@ -524,6 +524,7 @@ export interface PlatformStrategyRankItem {
     effect: number;
     comparison: number;
     adoption: number;
+    knowledge: number;
   };
   reasons: string[];
   risks: string[];
@@ -1475,6 +1476,7 @@ function buildPlatformStrategyEvidenceLedger(pack: PlatformPublishPackage): Plat
 }
 
 function platformStrategyComponentScores(pack: PlatformPublishPackage): PlatformStrategyRankItem["scores"] {
+  const knowledge = platformKnowledgeScore(pack);
   return {
     preflight: pack.preflight.score,
     asset: pack.submissionAssetAudit.score,
@@ -1483,7 +1485,17 @@ function platformStrategyComponentScores(pack: PlatformPublishPackage): Platform
     adoption: pack.submissionAssetAdoption.adoptionRatePercent
       ? Math.min(100, 50 + pack.submissionAssetAdoption.adoptionRatePercent)
       : pack.submissionAssetAdoption.generatedVariants ? 35 : 45,
+    knowledge,
   };
+}
+
+function platformKnowledgeScore(pack: PlatformPublishPackage) {
+  const status = pack.experimentPlan.attribution.status;
+  if (status === "positive") return 90;
+  if (status === "negative") return 28;
+  if (status === "mixed") return 48;
+  if (status === "no_experiment") return 36;
+  return pack.publishEffect.records ? 50 : 42;
 }
 
 function reviewTaskRankTarget(task: PlatformStrategyReviewTaskDraft): PlatformStrategyReviewTask["rankTarget"] {
@@ -1520,6 +1532,7 @@ function reviewTaskRankReason(
     effect: "真实效果",
     comparison: "二轮对照",
     adoption: "候选采纳",
+    knowledge: "平台知识库",
   };
   return `${labels[target]} ${score} 分，是当前需要继续盯的指标。`;
 }
@@ -1856,6 +1869,8 @@ function buildPlatformStrategyReviewDecision(
 
 function buildPlatformStrategy(packages: PlatformPublishPackage[]): PlatformStrategyRankItem[] {
   const ranked = packages.map((pack) => {
+    const attribution = pack.experimentPlan.attribution;
+    const knowledgeScore = platformKnowledgeScore(pack);
     const scores = {
       preflight: pack.preflight.score,
       asset: pack.submissionAssetAudit.score,
@@ -1864,13 +1879,15 @@ function buildPlatformStrategy(packages: PlatformPublishPackage[]): PlatformStra
       adoption: pack.submissionAssetAdoption.adoptionRatePercent
         ? Math.min(100, 50 + pack.submissionAssetAdoption.adoptionRatePercent)
         : pack.submissionAssetAdoption.generatedVariants ? 35 : 45,
+      knowledge: knowledgeScore,
     };
     const score = Math.round(
-      scores.preflight * 0.25
-      + scores.asset * 0.2
-      + scores.effect * 0.28
-      + scores.comparison * 0.17
-      + scores.adoption * 0.1,
+      scores.preflight * 0.23
+      + scores.asset * 0.18
+      + scores.effect * 0.26
+      + scores.comparison * 0.15
+      + scores.adoption * 0.08
+      + scores.knowledge * 0.1,
     );
     const recommendation: PlatformStrategyRankItem["recommendation"] = score >= 82
       ? "focus"
@@ -1887,12 +1904,14 @@ function buildPlatformStrategy(packages: PlatformPublishPackage[]): PlatformStra
       pack.publishEffect.records ? `真实效果 ${pack.publishEffect.status}` : "还没真实数据",
       pack.publishEffect.comparison.status !== "none" ? `二轮对照 ${pack.publishEffect.comparison.status}` : "缺前后对照",
       pack.submissionAssetAdoption.adoptedVersions ? `已采纳 ${pack.submissionAssetAdoption.adoptedVersions} 个候选` : "候选采纳不足",
-    ];
+      attribution.status === "positive" ? "平台知识库已有正反馈" : attribution.status === "negative" ? "平台知识库有负反馈" : "",
+    ].filter(Boolean);
     const risks = [
       ...pack.preflight.blocked.slice(0, 2),
       ...pack.submissionAssetAudit.issues.slice(0, 2).map((issue) => issue.label),
       pack.publishEffect.status === "weak" ? "真实转化偏弱" : "",
       pack.publishEffect.comparison.status === "declined" ? "二轮后数据下滑" : "",
+      attribution.status === "negative" ? "知识库负向归因" : "",
     ].filter(Boolean);
     const verdict = recommendation === "focus"
       ? `${pack.platformName} 当前最值得优先打，数据和准备度都别浪费。`

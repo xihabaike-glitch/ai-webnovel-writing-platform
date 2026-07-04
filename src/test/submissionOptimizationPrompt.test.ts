@@ -101,6 +101,32 @@ test("buildPlatformSubmissionAssetOptimizationPrompt", async (t) => {
     assert.ok(prompt.userPrompt.includes("当前一句话卖点：系统"));
   });
 
+  await t.test("feeds platform knowledge back into asset variants", () => {
+    const prompt = buildPlatformSubmissionAssetOptimizationPrompt({
+      platform,
+      asset,
+      audit,
+      chapters: [],
+      platformKnowledge: {
+        platformId: "fanqie",
+        platformName: "番茄小说",
+        status: "learned",
+        confidence: 88,
+        evidenceCount: 4,
+        positiveCount: 1,
+        negativeCount: 0,
+        winningSignals: ["胜出标题：夜雨系统：倒计时重生", "点击率 +7%"],
+        avoidSignals: ["不要把系统卖点写得太泛"],
+        tacticSummary: "番茄小说 已有可复用打法：优先沿用正反馈包装。",
+        nextAction: "把胜出标题/卖点写入下一版发布包。",
+      },
+    });
+
+    assert.ok(prompt.userPrompt.includes("平台知识库反哺"));
+    assert.ok(prompt.userPrompt.includes("胜出标题：夜雨系统：倒计时重生"));
+    assert.ok(prompt.userPrompt.includes("不要把系统卖点写得太泛"));
+  });
+
   await t.test("mock adapter returns parseable platform asset variants", async () => {
     const prompt = buildPlatformSubmissionAssetOptimizationPrompt({
       platform,

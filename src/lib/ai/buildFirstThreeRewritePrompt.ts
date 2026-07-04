@@ -1,6 +1,7 @@
 import type { ChapterRewritePlan } from "../projects/firstThreeRewrite.ts";
 import type { PlatformProfile } from "../platforms/platformProfiles.ts";
 import type { ProjectStartTacticSummary } from "../projects/projectStartTactics.ts";
+import type { PlatformKnowledgeInsight } from "../projects/platformPublishExport.ts";
 
 interface FirstThreeRewritePromptInput {
   projectTitle: string;
@@ -8,6 +9,7 @@ interface FirstThreeRewritePromptInput {
   sellingPoint: string;
   platform: PlatformProfile;
   startTactic?: ProjectStartTacticSummary | null;
+  platformKnowledge?: PlatformKnowledgeInsight | null;
   targetWords: number;
   chapter: {
     order: number;
@@ -38,6 +40,18 @@ export function buildFirstThreeRewritePrompt(input: FirstThreeRewritePromptInput
         "",
       ]
     : [];
+  const knowledgeLines = input.platformKnowledge
+    ? [
+        "平台知识库反哺：",
+        `知识状态：${input.platformKnowledge.status}`,
+        `置信度：${input.platformKnowledge.confidence}`,
+        `打法摘要：${input.platformKnowledge.tacticSummary}`,
+        `可复用信号：${input.platformKnowledge.winningSignals.join("；") || "暂无"}`,
+        `避坑信号：${input.platformKnowledge.avoidSignals.join("；") || "暂无"}`,
+        `下一步建议：${input.platformKnowledge.nextAction}`,
+        "",
+      ]
+    : [];
   const systemPrompt = [
     "你是高执行力网文改稿写手，只输出改写后的正文，不输出解释、标题、Markdown、清单或审稿意见。",
     "你必须严格按改稿处方执行：先抓开头，再压主干，最后用章末悬念把读者推到下一章。",
@@ -52,6 +66,7 @@ export function buildFirstThreeRewritePrompt(input: FirstThreeRewritePromptInput
     `平台开头规则：${input.platform.openingRules.join("；")}`,
     `平台审稿重点：${input.platform.reviewFocus.join("、")}`,
     ...startTacticLines,
+    ...knowledgeLines,
     `目标字数：约 ${input.targetWords} 字`,
     "",
     `章节：第 ${input.chapter.order} 章 ${input.chapter.title}`,

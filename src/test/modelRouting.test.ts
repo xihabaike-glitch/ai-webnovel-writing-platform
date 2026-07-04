@@ -944,6 +944,15 @@ test("model task routing", async (t) => {
     assert.equal(flow.lanes.find((lane) => lane.id === "confirmed")?.items[0]?.label, "章节审稿路由已确认");
   });
 
+  await t.test("shows an empty guide before any route dispatch exists", () => {
+    const flow = buildRouteConfirmationDispatchFlow([], []);
+
+    assert.equal(flow.emptyGuide?.title, "模型路由闭环");
+    assert.deepEqual(flow.emptyGuide?.steps.map((step) => step.label), ["确认路线", "复检样本", "治理闭环"]);
+    assert.equal(flow.emptyGuide?.primaryHref, "/settings/models");
+    assert.equal(flow.emptyGuide?.secondaryHref, "/gate");
+  });
+
   await t.test("builds route governance closed-loop trails for dispatch review", () => {
     const flow = buildRouteConfirmationDispatchFlow([], [
       {

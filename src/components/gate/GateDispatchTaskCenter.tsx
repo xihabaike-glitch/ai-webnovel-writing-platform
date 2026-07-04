@@ -131,6 +131,11 @@ export function GateDispatchTaskCenter({
   const center = useMemo(() => buildGateDispatchTaskCenter(tasks), [tasks]);
   const evidenceReview = useMemo(() => buildGateDispatchEvidenceReview(tasks, initialReceipts), [initialReceipts, tasks]);
   const evidenceIssues = evidenceReview.items.filter((item) => item.status !== "verified").slice(0, 5);
+  const hasRouteFlow =
+    Boolean(routeConfirmationDispatchFlow.emptyGuide)
+    || routeConfirmationDispatchFlow.summary.confirmed > 0
+    || routeConfirmationDispatchFlow.summary.dispatched > 0
+    || routeConfirmationDispatchFlow.summary.completed > 0;
   const filteredTasks = useMemo(() => {
     const baseTasks = filterGateDispatchTasks(tasks, {
       state: stateFilter,
@@ -310,7 +315,7 @@ export function GateDispatchTaskCenter({
         </div>
       </section>
 
-      {routeConfirmationDispatchFlow.summary.confirmed || routeConfirmationDispatchFlow.summary.dispatched || routeConfirmationDispatchFlow.summary.completed ? (
+      {hasRouteFlow ? (
         <section className="grid gap-3">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
             <div>
@@ -344,6 +349,32 @@ export function GateDispatchTaskCenter({
                   <p className="mt-2 line-clamp-2 text-xs leading-5 opacity-80">{trail.summary}</p>
                 </div>
               ))}
+            </div>
+          ) : null}
+          {routeConfirmationDispatchFlow.emptyGuide ? (
+            <div className="rounded-md border border-slate-200 bg-white p-4">
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                <div>
+                  <div className="text-sm font-medium text-slate-950">{routeConfirmationDispatchFlow.emptyGuide.title}</div>
+                  <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">{routeConfirmationDispatchFlow.emptyGuide.detail}</p>
+                </div>
+                <div className="flex shrink-0 flex-wrap gap-2">
+                  <Link className="rounded-md bg-slate-950 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800" href={routeConfirmationDispatchFlow.emptyGuide.primaryHref}>
+                    {routeConfirmationDispatchFlow.emptyGuide.primaryLabel}
+                  </Link>
+                  <Link className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50" href={routeConfirmationDispatchFlow.emptyGuide.secondaryHref}>
+                    {routeConfirmationDispatchFlow.emptyGuide.secondaryLabel}
+                  </Link>
+                </div>
+              </div>
+              <div className="mt-4 grid gap-2 md:grid-cols-3">
+                {routeConfirmationDispatchFlow.emptyGuide.steps.map((step) => (
+                  <div className="rounded-md bg-slate-50 p-3 text-sm" key={step.label}>
+                    <div className="font-medium text-slate-950">{step.label}</div>
+                    <p className="mt-1 leading-6 text-slate-600">{step.detail}</p>
+                  </div>
+                ))}
+              </div>
             </div>
           ) : null}
           <div className="grid gap-3 lg:grid-cols-4">

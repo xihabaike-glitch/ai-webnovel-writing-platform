@@ -137,6 +137,19 @@ export interface RouteConfirmationClosedLoopTrail {
   steps: RouteConfirmationClosedLoopStep[];
 }
 
+export interface RouteConfirmationDispatchEmptyGuide {
+  title: string;
+  detail: string;
+  primaryHref: string;
+  primaryLabel: string;
+  secondaryHref: string;
+  secondaryLabel: string;
+  steps: Array<{
+    label: string;
+    detail: string;
+  }>;
+}
+
 export interface RouteConfirmationDispatchFlow {
   summary: {
     confirmed: number;
@@ -147,6 +160,7 @@ export interface RouteConfirmationDispatchFlow {
   };
   lanes: RouteConfirmationDispatchFlowLane[];
   trails: RouteConfirmationClosedLoopTrail[];
+  emptyGuide: RouteConfirmationDispatchEmptyGuide | null;
 }
 
 export interface ModelRouteConfirmationDispatch {
@@ -912,6 +926,36 @@ function buildRouteConfirmationClosedLoopTrails(
   }).sort((left, right) => right.latestAt.localeCompare(left.latestAt));
 }
 
+function buildRouteConfirmationEmptyGuide(
+  confirmations: ModelRouteConfirmationReceipt[],
+  dispatches: RouteConfirmationDispatchFlowTask[],
+): RouteConfirmationDispatchEmptyGuide | null {
+  if (confirmations.length || dispatches.some(isRouteConfirmationTask)) return null;
+
+  return {
+    title: "模型路由闭环",
+    detail: "先在模型设置里确认写作任务路线，再从总闸门或任务执行里沉淀复检样本；一旦样本变弱，这里会自动显示治理派单和治理后复检。",
+    primaryHref: "/settings/models",
+    primaryLabel: "配置模型路线",
+    secondaryHref: "/gate",
+    secondaryLabel: "回总闸门派单",
+    steps: [
+      {
+        label: "确认路线",
+        detail: "给正文初稿、审稿、改写等任务确认首选和备用模型。",
+      },
+      {
+        label: "复检样本",
+        detail: "用小样本验证成功率、质量、成本和备用命中情况。",
+      },
+      {
+        label: "治理闭环",
+        detail: "弱样本自动进入治理派单，处理后再复检到已确认。",
+      },
+    ],
+  };
+}
+
 export function buildModelRouteConfirmationReceipt(input: ModelRouteConfirmationInput): ModelRouteConfirmationReceipt {
   const taskLabel = labelForRoutedTask(input.taskType);
   const source = input.source ?? "manual";
@@ -1176,6 +1220,7 @@ export function buildRouteConfirmationDispatchFlow(
     },
     lanes,
     trails: buildRouteConfirmationClosedLoopTrails(confirmations, activeDispatches, completedGovernance, completedRechecks),
+    emptyGuide: buildRouteConfirmationEmptyGuide(confirmations, dispatches),
   };
 }
 

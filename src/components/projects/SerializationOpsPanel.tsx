@@ -38,6 +38,7 @@ interface SerializationOpsDashboard {
   revisionQueueCount: number;
   submissionReadinessPercent: number;
   submissionAssetStatus: SerializationSubmissionAssetStatus;
+  submissionAssetCandidates: SerializationSubmissionAssetCandidateBatch;
   finalSubmissionGate: SerializationFinalSubmissionGate;
   publishBaselineStatus: SerializationPublishBaselineStatus;
   publishVersionHistory: SerializationPublishVersionHistoryItem[];
@@ -45,6 +46,31 @@ interface SerializationOpsDashboard {
   nextPublishChapter: SerializationChapter | null;
   actions: SerializationAction[];
   warnings: string[];
+}
+
+interface SerializationSubmissionAssetCandidate {
+  id: string;
+  sourceTaskId: string;
+  strategy: string;
+  title: string;
+  logline: string;
+  synopsis: string;
+  overseasSynopsis: string;
+  tags: string[];
+  rationale: string[];
+  auditScore: number;
+  auditStatus: "ready" | "needs_work" | "blocked";
+  adopted: boolean;
+  execution: SerializationActionExecution;
+}
+
+interface SerializationSubmissionAssetCandidateBatch {
+  exists: boolean;
+  sourceTaskId: string | null;
+  generatedAt: string | null;
+  variants: SerializationSubmissionAssetCandidate[];
+  verdict: string;
+  href: string;
 }
 
 interface SerializationPublishEffectAction {
@@ -154,6 +180,18 @@ function assetStatusLabel(status: SerializationSubmissionAssetStatus["status"]) 
   return "未保存";
 }
 
+function auditStatusLabel(status: SerializationSubmissionAssetCandidate["auditStatus"]) {
+  if (status === "ready") return "可用";
+  if (status === "blocked") return "阻塞";
+  return "需打磨";
+}
+
+function auditStatusClass(status: SerializationSubmissionAssetCandidate["auditStatus"]) {
+  if (status === "ready") return "bg-emerald-50 text-emerald-700";
+  if (status === "blocked") return "bg-rose-50 text-rose-700";
+  return "bg-amber-50 text-amber-700";
+}
+
 function finalGateStatusLabel(status: SerializationFinalSubmissionGate["status"]) {
   if (status === "ready_to_submit") return "可投";
   if (status === "fix_first") return "先修";
@@ -207,6 +245,7 @@ export function SerializationOpsPanel({ projectId }: { projectId: string }) {
   const [isLoading, setIsLoading] = useState(false);
   const [runningActionId, setRunningActionId] = useState<string | null>(null);
   const [runningEffectActionId, setRunningEffectActionId] = useState<string | null>(null);
+  const [runningCandidateId, setRunningCandidateId] = useState<string | null>(null);
   const [restoringVersionId, setRestoringVersionId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
@@ -300,6 +339,31 @@ export function SerializationOpsPanel({ projectId }: { projectId: string }) {
       setMessage(caught instanceof Error ? caught.message : "执行发布效果动作失败。");
     } finally {
       setRunningEffectActionId(null);
+    }
+  }
+
+  async function adoptSubmissionAssetCandidate(candidate: SerializationSubmissionAssetCandidate) {
+    if (candidate.adopted) return;
+    setRunningCandidateId(candidate.id);
+    setMessage(null);
+    try {
+      const response = await fetch(candidate.execution.endpoint, {
+        method: candidate.execution.method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(candidate.execution.payload),
+      });
+      const payload = (await response.json().catch(() => null)) as { error?: string; message?: string; audit?: { score?: number } } | null;
+      if (!response.ok) {
+        throw new Error(payload?.error ?? "采纳投稿资产候选失败。");
+      }
+      await loadOps();
+      setMessage(payload?.audit?.score
+        ? `已采纳「${candidate.strategy}」，质检 ${payload.audit.score} 分。`
+        : payload?.message ?? `已采纳「${candidate.strategy}」。`);
+    } catch (caught) {
+      setMessage(caught instanceof Error ? caught.message : "采纳投稿资产候选失败。");
+    } finally {
+      setRunningCandidateId(null);
     }
   }
 
@@ -465,6 +529,57 @@ export function SerializationOpsPanel({ projectId }: { projectId: string }) {
                 {dashboard.submissionAssetStatus.latestStrategy ? ` · ${dashboard.submissionAssetStatus.latestStrategy}` : ""}
               </div>
             </div>
+            {dashboard.submissionAssetCandidates.exists ? (
+              <div className="mt-3 rounded-md bg-slate-50 p-3 text-sm">
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div>
+                    <div className="text-xs text-slate-500">最新投稿候选</div>
+                    <div className="mt-1 font-medium text-slate-950">
+                      {dashboard.submissionAssetCandidates.variants.length} 个候选 · {formatTime(dashboard.submissionAssetCandidates.generatedAt)}
+                    </div>
+                  </div>
+                  <Link
+                    className="rounded-md border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                    href={projectHref(projectId, dashboard.submissionAssetCandidates.href)}
+                  >
+                    候选工作区
+                  </Link>
+                </div>
+                <p className="mt-2 leading-6 text-slate-600">{dashboard.submissionAssetCandidates.verdict}</p>
+                <div className="mt-3 grid gap-2">
+                  {dashboard.submissionAssetCandidates.variants.map((candidate) => (
+                    <div className="rounded-md border border-slate-200 bg-white p-3" key={candidate.id}>
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                        <div>
+                          <div className="font-medium text-slate-950">{candidate.strategy}</div>
+                          <div className="mt-1 text-xs text-slate-500">{candidate.title}</div>
+                        </div>
+                        <span className={`w-fit rounded-md px-2 py-1 text-xs font-medium ${auditStatusClass(candidate.auditStatus)}`}>
+                          {auditStatusLabel(candidate.auditStatus)} {candidate.auditScore}
+                        </span>
+                      </div>
+                      <p className="mt-2 leading-6 text-slate-600">{candidate.logline}</p>
+                      <div className="mt-2 flex flex-wrap gap-1">
+                        {candidate.tags.slice(0, 6).map((tag) => (
+                          <span className="rounded-md bg-slate-100 px-2 py-1 text-xs text-slate-600" key={tag}>{tag}</span>
+                        ))}
+                      </div>
+                      {candidate.rationale.length ? (
+                        <div className="mt-2 text-xs text-slate-500">理由：{candidate.rationale.slice(0, 2).join("；")}</div>
+                      ) : null}
+                      <button
+                        className="mt-3 rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white disabled:opacity-50"
+                        disabled={candidate.adopted || runningCandidateId === candidate.id}
+                        onClick={() => void adoptSubmissionAssetCandidate(candidate)}
+                        type="button"
+                      >
+                        {candidate.adopted ? "已采纳" : runningCandidateId === candidate.id ? "采纳中" : candidate.execution.label}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null}
             <div className="mt-3 rounded-md bg-slate-50 p-3 text-sm">
               <div className="text-xs text-slate-500">最终投前闸门</div>
               <div className="mt-1 font-medium text-slate-950">

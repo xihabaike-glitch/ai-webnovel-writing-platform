@@ -55,6 +55,7 @@ export interface SerializationSubmissionAssetVersion {
   auditScore: number;
   auditStatus: PlatformSubmissionAssetAudit["status"];
   action: string;
+  sourceTaskId?: string | null;
   strategy?: string | null;
   createdAt: Date | string;
 }
@@ -154,6 +155,31 @@ export interface SerializationPublishEffectStatus {
   actions: SerializationPublishEffectAction[];
 }
 
+export interface SerializationSubmissionAssetCandidate {
+  id: string;
+  sourceTaskId: string;
+  strategy: string;
+  title: string;
+  logline: string;
+  synopsis: string;
+  overseasSynopsis: string;
+  tags: string[];
+  rationale: string[];
+  auditScore: number;
+  auditStatus: PlatformSubmissionAssetAudit["status"];
+  adopted: boolean;
+  execution: SerializationActionExecution;
+}
+
+export interface SerializationSubmissionAssetCandidateBatch {
+  exists: boolean;
+  sourceTaskId: string | null;
+  generatedAt: Date | string | null;
+  variants: SerializationSubmissionAssetCandidate[];
+  verdict: string;
+  href: string;
+}
+
 export interface SerializationOpsInput {
   project: SerializationProject;
   platform: PlatformProfile;
@@ -197,6 +223,7 @@ export interface SerializationOpsDashboard {
   revisionQueueCount: number;
   submissionReadinessPercent: number;
   submissionAssetStatus: SerializationSubmissionAssetStatus;
+  submissionAssetCandidates: SerializationSubmissionAssetCandidateBatch;
   finalSubmissionGate: SerializationFinalSubmissionGate;
   publishBaselineStatus: SerializationPublishBaselineStatus;
   publishVersionHistory: SerializationPublishVersionHistoryItem[];
@@ -452,6 +479,120 @@ function countOptimizationVariants(task: SerializationTask) {
   const parsed = parseJsonObject(task.outputText);
   const variants = parsed?.variants;
   return Array.isArray(variants) ? variants.length : 0;
+}
+
+function stringArray(value: unknown) {
+  return Array.isArray(value) ? value.map((item) => String(item).trim()).filter(Boolean) : [];
+}
+
+function readOptimizationVariants(task: SerializationTask | undefined) {
+  if (!task?.outputText || task.status !== "succeeded") return [];
+  const parsed = parseJsonObject(task.outputText);
+  const variants = parsed?.variants;
+  if (!Array.isArray(variants)) return [];
+  return variants
+    .map((variant, index) => {
+      if (!variant || typeof variant !== "object") return null;
+      const item = variant as Record<string, unknown>;
+      const strategy = typeof item.strategy === "string" ? item.strategy.trim() : `候选 ${index + 1}`;
+      const title = typeof item.title === "string" ? item.title.trim() : "";
+      const logline = typeof item.logline === "string" ? item.logline.trim() : "";
+      const synopsis = typeof item.synopsis === "string" ? item.synopsis.trim() : "";
+      const overseasSynopsis = typeof item.overseasSynopsis === "string" ? item.overseasSynopsis.trim() : "";
+      const tags = stringArray(item.tags);
+      const rationale = stringArray(item.rationale);
+      if (!title || !logline || !synopsis || !tags.length) return null;
+      return {
+        strategy,
+        title,
+        logline,
+        synopsis,
+        overseasSynopsis,
+        tags,
+        rationale,
+      };
+    })
+    .filter((variant): variant is {
+      strategy: string;
+      title: string;
+      logline: string;
+      synopsis: string;
+      overseasSynopsis: string;
+      tags: string[];
+      rationale: string[];
+    } => Boolean(variant));
+}
+
+export function buildSerializationSubmissionAssetCandidates(input: Pick<SerializationOpsInput, "project" | "platform" | "aiTasks" | "submissionAssetVersions">): SerializationSubmissionAssetCandidateBatch {
+  const latest = input.aiTasks
+    .filter((task) => task.taskType === "platform_submission_asset_optimize" && taskPlatformId(task) === input.platform.id && task.status === "succeeded")
+    .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime())[0];
+  const variants = readOptimizationVariants(latest);
+
+  if (!latest || variants.length === 0) {
+    return {
+      exists: false,
+      sourceTaskId: null,
+      generatedAt: null,
+      variants: [],
+      verdict: "还没有可采纳的投稿资产候选。",
+      href: "#submission-asset-editor",
+    };
+  }
+
+  const adoptedVersions = (input.submissionAssetVersions ?? []).filter((version) => (
+    version.platformId === input.platform.id
+    && version.action === "adopt"
+    && version.sourceTaskId === latest.id
+  ));
+  const candidates = variants.map((variant, index) => {
+    const audit = buildSubmissionAssetAudit(input.platform, variant);
+    const adopted = adoptedVersions.some((version) => version.strategy === variant.strategy);
+    return {
+      id: `${latest.id}:${index}`,
+      sourceTaskId: latest.id,
+      strategy: variant.strategy,
+      title: variant.title,
+      logline: variant.logline,
+      synopsis: variant.synopsis,
+      overseasSynopsis: variant.overseasSynopsis,
+      tags: variant.tags,
+      rationale: variant.rationale,
+      auditScore: audit.score,
+      auditStatus: audit.status,
+      adopted,
+      execution: {
+        label: adopted ? "已采纳" : "采纳候选",
+        method: "POST" as const,
+        endpoint: `/api/projects/${input.project.id ?? "current"}/platform-export`,
+        payload: {
+          action: "save-asset",
+          platformId: input.platform.id,
+          title: variant.title,
+          logline: variant.logline,
+          synopsis: variant.synopsis,
+          overseasSynopsis: variant.overseasSynopsis,
+          tags: variant.tags,
+          note: "",
+          saveAction: "adopt",
+          sourceTaskId: latest.id,
+          strategy: variant.strategy,
+        },
+      },
+    };
+  });
+  const adoptedCount = candidates.filter((candidate) => candidate.adopted).length;
+
+  return {
+    exists: true,
+    sourceTaskId: latest.id,
+    generatedAt: latest.createdAt,
+    variants: candidates,
+    verdict: adoptedCount
+      ? `最近一批候选 ${candidates.length} 个，已采纳 ${adoptedCount} 个。`
+      : `最近一批候选 ${candidates.length} 个还没采纳，别让模型结果躺在任务日志里。`,
+    href: "#submission-asset-editor",
+  };
 }
 
 export function buildSerializationSubmissionAssetStatus(input: Pick<SerializationOpsInput, "platform" | "submissionAssets" | "submissionAssetVersions" | "aiTasks">): SerializationSubmissionAssetStatus {
@@ -738,6 +879,7 @@ function submissionGapRepairTarget(itemId: string) {
 
 export function buildSerializationOpsDashboard(input: SerializationOpsInput): SerializationOpsDashboard {
   const submissionAssetStatus = buildSerializationSubmissionAssetStatus(input);
+  const submissionAssetCandidates = buildSerializationSubmissionAssetCandidates(input);
   const finalSubmissionGate = normalizeFinalSubmissionGate(input.finalGate);
   const publishBaselineStatus = buildSerializationPublishBaselineStatus(input);
   const publishVersionHistory = buildSerializationPublishVersionHistory(input);
@@ -771,6 +913,9 @@ export function buildSerializationOpsDashboard(input: SerializationOpsInput): Se
   if (submissionAssetStatus.status === "ready" && submissionAssetStatus.generatedVariants > 0 && submissionAssetStatus.adoptedVersions === 0) {
     warnings.push(`已生成 ${submissionAssetStatus.generatedVariants} 个投稿资产候选，但还没有采纳版本。`);
   }
+  if (submissionAssetCandidates.exists && submissionAssetCandidates.variants.some((candidate) => !candidate.adopted)) {
+    warnings.push("最新投稿资产候选已生成，但还没有全部采纳或明确放弃。");
+  }
   if (finalSubmissionGate.status === "fix_first") warnings.push(`最终闸门 ${finalSubmissionGate.score} 分：${finalSubmissionGate.nextAction}`);
   if (finalSubmissionGate.status === "do_not_submit") warnings.push(`最终闸门 ${finalSubmissionGate.score} 分，别投：${finalSubmissionGate.blockers[0] ?? finalSubmissionGate.verdict}`);
   if (finalSubmissionGate.status === "ready_to_submit" && !publishBaselineStatus.exists) warnings.push("终检已过，但还没有保存发布基准。");
@@ -787,6 +932,7 @@ export function buildSerializationOpsDashboard(input: SerializationOpsInput): Se
     revisionQueueCount: revisionQueue.length,
     submissionReadinessPercent: input.submissionChecklist.readinessPercent,
     submissionAssetStatus,
+    submissionAssetCandidates,
     finalSubmissionGate,
     publishBaselineStatus,
     publishVersionHistory,

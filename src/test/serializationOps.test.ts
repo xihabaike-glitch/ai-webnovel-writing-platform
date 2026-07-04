@@ -281,7 +281,28 @@ test("buildSerializationOpsDashboard", async (t) => {
           taskType: "platform_submission_asset_optimize",
           status: "succeeded",
           inputSnapshot: JSON.stringify({ platformId: "fanqie" }),
-          outputText: JSON.stringify({ variants: [{ strategy: "强钩子版" }, { strategy: "爽点版" }] }),
+          outputText: JSON.stringify({
+            variants: [
+              {
+                strategy: "强钩子版",
+                title: "夜雨系统：三次选择后我封神",
+                logline: "雨夜倒计时降临，主角每次选择都会触发更大的危机，却也拿到翻盘奖励。",
+                synopsis: "林晚在雨夜觉醒选择系统，每一次救人、自保或反击都会让倒计时升级。她必须用连续任务换来奖励，破解城市危机背后的隐藏规则。第一卷主打高压选择、系统奖励和连续翻盘，让每章都有明确爽点和追读悬念。",
+                overseasSynopsis: "Lin Wan awakens a choice system in a storm and turns escalating missions into survival rewards.",
+                tags: ["都市系统", "爽文", "危机选择"],
+                rationale: ["标题直接打系统和选择", "卖点更适合番茄快读"],
+              },
+              {
+                strategy: "爽点版",
+                title: "雨夜倒计时，我靠系统一路翻盘",
+                logline: "主角被系统逼进连续危机，每次完成任务都能获得奖励，并把敌人的布局反杀回去。",
+                synopsis: "林晚原本只是雨夜里的普通人，却在倒计时中得到系统。任务越危险，奖励越锋利，她从被追杀到主动设局，逐步揭开规则背后的敌人。故事用连续任务、反杀奖励和章末危机推动追读。",
+                overseasSynopsis: "A countdown system pushes Lin Wan through missions, rewards, and escalating reversals.",
+                tags: ["系统流", "逆袭", "反杀"],
+                rationale: ["强化反杀期待", "标签更贴近分发"],
+              },
+            ],
+          }),
           createdAt: "2026-01-01T00:00:00.000Z",
         },
       ],
@@ -306,6 +327,7 @@ test("buildSerializationOpsDashboard", async (t) => {
           auditScore: 100,
           auditStatus: "ready",
           action: "adopt",
+          sourceTaskId: "asset-task-1",
           strategy: "强钩子版",
           createdAt: "2026-01-02T00:00:00.000Z",
         },
@@ -327,6 +349,13 @@ test("buildSerializationOpsDashboard", async (t) => {
     assert.equal(dashboard.submissionAssetStatus.generatedVariants, 2);
     assert.equal(dashboard.submissionAssetStatus.latestStrategy, "强钩子版");
     assert.ok(dashboard.submissionAssetStatus.verdict.includes("已采纳"));
+    assert.equal(dashboard.submissionAssetCandidates.exists, true);
+    assert.equal(dashboard.submissionAssetCandidates.variants.length, 2);
+    assert.equal(dashboard.submissionAssetCandidates.variants[0].adopted, true);
+    assert.equal(dashboard.submissionAssetCandidates.variants[1].execution.endpoint, "/api/projects/project-1/platform-export");
+    assert.equal(dashboard.submissionAssetCandidates.variants[1].execution.payload.action, "save-asset");
+    assert.equal(dashboard.submissionAssetCandidates.variants[1].execution.payload.sourceTaskId, "asset-task-1");
+    assert.equal(dashboard.submissionAssetCandidates.variants[1].execution.payload.saveAction, "adopt");
     assert.equal(dashboard.actions.some((action) => action.id === "submission-asset-gap"), false);
     assert.equal(dashboard.finalSubmissionGate.status, "ready_to_submit");
     const baselineAction = dashboard.actions.find((action) => action.id === "save-publish-baseline");

@@ -366,6 +366,15 @@ interface PresetRouteBlueprintView {
     fallbackProviderName: string | null;
     matchedTags: string[];
     reason: string;
+    routingRole: string;
+    fallbackPlan: string;
+    costEstimate: {
+      tier: "low" | "medium" | "high" | "unknown";
+      label: string;
+      detail: string;
+    };
+    manualConfirmation: string;
+    reasonItems: string[];
   }>;
 }
 
@@ -471,6 +480,13 @@ const routeRecommendationExplanationToneCopy: Record<RouteRecommendationView["ex
   positive: "border-emerald-200 bg-emerald-50 text-emerald-800",
   warning: "border-amber-200 bg-amber-50 text-amber-800",
   neutral: "border-slate-200 bg-white text-slate-700",
+};
+
+const routeCostTierCopy: Record<PresetRouteBlueprintView["items"][number]["costEstimate"]["tier"], string> = {
+  low: "bg-emerald-50 text-emerald-700",
+  medium: "bg-sky-50 text-sky-700",
+  high: "bg-amber-50 text-amber-700",
+  unknown: "bg-slate-100 text-slate-600",
 };
 
 const firstDayRouteStatusCopy: Record<FirstDayRouteSummaryView["items"][number]["status"], { label: string; className: string }> = {
@@ -1727,6 +1743,18 @@ export function ModelProviderSettings({
                   <div>首选：{item.primaryProviderName}</div>
                   <div>备用：{item.fallbackProviderName ?? "无"}</div>
                 </div>
+                <div className="mt-3 rounded-md bg-white p-3 text-xs leading-5 text-slate-600">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className={`rounded-md px-2 py-1 font-medium ${routeCostTierCopy[item.costEstimate.tier]}`}>
+                      {item.costEstimate.label}
+                    </span>
+                    <span className="rounded-md bg-slate-100 px-2 py-1">人工确认</span>
+                  </div>
+                  <div className="mt-2 font-medium text-slate-950">{item.routingRole}</div>
+                  <p className="mt-1">{item.costEstimate.detail}</p>
+                  <p className="mt-1">{item.fallbackPlan}</p>
+                  <p className="mt-1 text-amber-700">{item.manualConfirmation}</p>
+                </div>
                 {item.matchedTags.length ? (
                   <div className="mt-2 flex flex-wrap gap-1">
                     {item.matchedTags.map((tag) => (
@@ -1735,6 +1763,11 @@ export function ModelProviderSettings({
                   </div>
                 ) : null}
                 <p className="mt-2 leading-6 text-slate-600">{item.reason}</p>
+                <div className="mt-2 grid gap-1">
+                  {item.reasonItems.map((reason) => (
+                    <div className="rounded-md bg-white px-2 py-1 text-xs leading-5 text-slate-600" key={reason}>{reason}</div>
+                  ))}
+                </div>
               </div>
             ))}
           </div>

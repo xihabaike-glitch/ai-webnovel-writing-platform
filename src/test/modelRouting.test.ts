@@ -768,9 +768,17 @@ test("model task routing", async (t) => {
     assert.equal(draft?.recommendedPrimaryProviderConfigId, "deepseek-provider");
     assert.equal(draft?.recommendedFallbackProviderConfigId, "kimi-provider");
     assert.ok(draft?.reason.includes("低成本批量"));
+    assert.equal(draft?.costEstimate.tier, "low");
+    assert.ok(draft?.routingRole.includes("正文生产"));
+    assert.ok(draft?.fallbackPlan.includes("Kimi"));
+    assert.ok(draft?.manualConfirmation.includes("首轮只跑 1 章样本"));
+    assert.ok(draft?.reasonItems.some((item) => item.includes("备用路线")));
     assert.equal(control?.recommendedPrimaryProviderConfigId, "kimi-provider");
     assert.equal(control?.recommendedFallbackProviderConfigId, "claude-provider");
     assert.ok(control?.reason.includes("长篇规划"));
+    assert.equal(control?.costEstimate.tier, "high");
+    assert.ok(control?.routingRole.includes("总控策划"));
+    assert.ok(control?.manualConfirmation.includes("项目土壤候选"));
   });
 
   await t.test("summarizes first-day workflow model routes", () => {

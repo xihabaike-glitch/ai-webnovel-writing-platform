@@ -4,6 +4,12 @@ import Link from "next/link";
 import { useState } from "react";
 import type { StoryTreeExperienceAxisFilter, StoryTreeExperienceEffectDashboard, StoryTreeExperienceGuide, StoryTreeExperienceItem, StoryTreeExperienceStatus } from "@/lib/ai/storyTreeExperience";
 
+interface AppliedStoryTreeExperienceDispatch {
+  dispatchKey: string;
+  state: string;
+  hasReturnedEffect: boolean;
+}
+
 function statusLabel(status: StoryTreeExperienceStatus) {
   if (status === "usable") return "可复用";
   if (status === "avoid") return "避坑";
@@ -31,13 +37,34 @@ function decisionItemLine(item: StoryTreeExperienceItem) {
   return `${item.axisLabel}｜${item.action}`;
 }
 
+function appliedStateLabel(item: AppliedStoryTreeExperienceDispatch) {
+  if (item.hasReturnedEffect) return "已回流";
+  if (item.state === "completed") return "已完成";
+  return "待执行";
+}
+
+function appliedStateClass(item: AppliedStoryTreeExperienceDispatch) {
+  if (item.hasReturnedEffect) return "bg-emerald-50 text-emerald-700";
+  if (item.state === "completed") return "bg-sky-50 text-sky-700";
+  return "bg-amber-50 text-amber-700";
+}
+
+function AppliedDispatchBadge({ dispatch }: { dispatch: AppliedStoryTreeExperienceDispatch | null }) {
+  if (!dispatch) return null;
+  return (
+    <span className={`rounded-md px-2 py-1 text-xs ${appliedStateClass(dispatch)}`}>
+      {appliedStateLabel(dispatch)}
+    </span>
+  );
+}
+
 export function StoryTreeExperiencePanel({
-  appliedDispatchKeys,
+  appliedDispatches = [],
   effectDashboard,
   guide,
   projectId,
 }: {
-  appliedDispatchKeys?: string[];
+  appliedDispatches?: AppliedStoryTreeExperienceDispatch[];
   effectDashboard: StoryTreeExperienceEffectDashboard;
   guide: StoryTreeExperienceGuide;
   projectId: string;
@@ -49,14 +76,23 @@ export function StoryTreeExperiencePanel({
   const [runningBatchKey, setRunningBatchKey] = useState<string | null>(null);
   const [createdDispatchKeys, setCreatedDispatchKeys] = useState<string[]>([]);
   const [message, setMessage] = useState<string | null>(null);
-  const dispatchedKeys = new Set([...(appliedDispatchKeys ?? []), ...createdDispatchKeys]);
+  const appliedDispatchMap = new Map(appliedDispatches.map((item) => [item.dispatchKey, item]));
+  const createdDispatchMap = new Map(createdDispatchKeys.map((dispatchKey) => [dispatchKey, {
+    dispatchKey,
+    state: "assigned",
+    hasReturnedEffect: false,
+  } satisfies AppliedStoryTreeExperienceDispatch]));
 
-  function isDispatched(item: StoryTreeExperienceItem) {
-    return dispatchedKeys.has(item.dispatchKey);
+  function appliedDispatch(item: StoryTreeExperienceItem) {
+    return createdDispatchMap.get(item.dispatchKey) ?? appliedDispatchMap.get(item.dispatchKey) ?? null;
+  }
+
+  function hasDispatch(item: StoryTreeExperienceItem) {
+    return Boolean(appliedDispatch(item));
   }
 
   function hasPendingDispatch(items: StoryTreeExperienceItem[]) {
-    return items.some((item) => !isDispatched(item));
+    return items.some((item) => !hasDispatch(item));
   }
 
   function batchButtonLabel(batchKey: string, items: StoryTreeExperienceItem[]) {
@@ -92,7 +128,7 @@ export function StoryTreeExperiencePanel({
   }
 
   async function applyDecisionBatch(batchKey: string, label: string, items: StoryTreeExperienceItem[]) {
-    const pendingItems = items.filter((item) => !isDispatched(item));
+    const pendingItems = items.filter((item) => !hasDispatch(item));
     if (pendingItems.length === 0) {
       setMessage(`「${label}」里的结构经验都已派单。`);
       return;
@@ -182,7 +218,7 @@ export function StoryTreeExperiencePanel({
                   <Link className="hover:text-slate-950 hover:underline" href={item.href}>
                     {decisionItemLine(item)}
                   </Link>
-                  {isDispatched(item) ? <span className="rounded-md bg-slate-100 px-2 py-1 text-xs text-slate-500">已派单</span> : null}
+                  <AppliedDispatchBadge dispatch={appliedDispatch(item)} />
                 </div>
               ))}
               {effectDashboard.reusableItems.length === 0 ? <div>暂无持续有效证据。</div> : null}
@@ -206,7 +242,7 @@ export function StoryTreeExperiencePanel({
                   <Link className="hover:text-slate-950 hover:underline" href={item.href}>
                     {decisionItemLine(item)}
                   </Link>
-                  {isDispatched(item) ? <span className="rounded-md bg-slate-100 px-2 py-1 text-xs text-slate-500">已派单</span> : null}
+                  <AppliedDispatchBadge dispatch={appliedDispatch(item)} />
                 </div>
               ))}
               {effectDashboard.avoidItems.length === 0 ? <div>暂无变弱经验。</div> : null}
@@ -230,7 +266,7 @@ export function StoryTreeExperiencePanel({
                   <Link className="hover:text-slate-950 hover:underline" href={item.href}>
                     {decisionItemLine(item)}
                   </Link>
-                  {isDispatched(item) ? <span className="rounded-md bg-slate-100 px-2 py-1 text-xs text-slate-500">已派单</span> : null}
+                  <AppliedDispatchBadge dispatch={appliedDispatch(item)} />
                 </div>
               ))}
               {effectDashboard.watchItems.length === 0 ? <div>暂无待观察经验。</div> : null}
@@ -274,11 +310,11 @@ export function StoryTreeExperiencePanel({
               <div className="mt-3 flex flex-wrap items-center gap-2">
                 <button
                   className="rounded-md bg-slate-950 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50"
-                  disabled={runningKey === item.dispatchKey || isDispatched(item)}
+                  disabled={runningKey === item.dispatchKey || hasDispatch(item)}
                   onClick={() => applyExperience(item)}
                   type="button"
                 >
-                  {runningKey === item.dispatchKey ? "生成中" : isDispatched(item) ? "已派单" : actionLabel(item.status)}
+                  {runningKey === item.dispatchKey ? "生成中" : appliedDispatch(item) ? appliedStateLabel(appliedDispatch(item)!) : actionLabel(item.status)}
                 </button>
                 <Link className="font-medium text-slate-950 hover:underline" href={item.href}>
                   回到章节

@@ -89,12 +89,22 @@ export default async function ProjectPage({ params }: { params: Promise<{ projec
       projectId: project.id,
       dispatchKey: { startsWith: "story-tree-experience:" },
     },
-    select: { dispatchKey: true },
+    select: {
+      dispatchKey: true,
+      state: true,
+      evidence: true,
+    },
   });
-  const appliedStoryTreeExperienceKeys = new Set(appliedStoryTreeExperienceTasks.map((task) => task.dispatchKey));
-  const appliedStoryTreeExperienceItemKeys = storyTreeExperience.items
-    .filter((item) => appliedStoryTreeExperienceKeys.has(buildStoryTreeExperienceApplyDispatchKey(project.id, item)))
-    .map((item) => item.dispatchKey);
+  const appliedStoryTreeExperienceMap = new Map(appliedStoryTreeExperienceTasks.map((task) => [task.dispatchKey, task]));
+  const appliedStoryTreeExperienceItems = storyTreeExperience.items.flatMap((item) => {
+    const task = appliedStoryTreeExperienceMap.get(buildStoryTreeExperienceApplyDispatchKey(project.id, item));
+    if (!task) return [];
+    return {
+      dispatchKey: item.dispatchKey,
+      state: task.state,
+      hasReturnedEffect: task.evidence.includes("经验应用效果"),
+    };
+  });
   const dashboard = buildProjectDashboard({
     currentWordCount: project.currentWordCount,
     targetWordCount: project.targetWordCount,
@@ -300,7 +310,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ projec
           </div>
         </section>
         <StoryTreeExperiencePanel
-          appliedDispatchKeys={appliedStoryTreeExperienceItemKeys}
+          appliedDispatches={appliedStoryTreeExperienceItems}
           effectDashboard={storyTreeExperienceEffectDashboard}
           guide={storyTreeExperience}
           projectId={project.id}

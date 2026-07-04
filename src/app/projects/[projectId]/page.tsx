@@ -21,7 +21,7 @@ import { StoryStructureDiagnosticPanel } from "@/components/projects/StoryStruct
 import { SubmissionPackagePanel } from "@/components/projects/SubmissionPackagePanel";
 import { WorldBiblePanel } from "@/components/projects/WorldBiblePanel";
 import { WritingWorkbenchPanel } from "@/components/projects/WritingWorkbenchPanel";
-import { buildStoryTreeExperienceApplyDispatchKey, buildStoryTreeExperienceEffectDashboard, buildStoryTreeExperienceGuide } from "@/lib/ai/storyTreeExperience";
+import { buildStoryTreeExperienceApplyDispatchKey, buildStoryTreeExperienceEffectDashboard, buildStoryTreeExperienceGuide, buildStoryTreeExperienceReviewBacklog } from "@/lib/ai/storyTreeExperience";
 import { prisma } from "@/lib/db/prisma";
 import { getPlatformProfile, type PlatformId } from "@/lib/platforms/platformProfiles";
 import { gatePlatformDispatchTaskFromRecord } from "@/lib/projects/gateDispatchTaskRecords";
@@ -80,10 +80,10 @@ export default async function ProjectPage({ params }: { params: Promise<{ projec
 
   const platform = getPlatformProfile(project.targetPlatform as PlatformId);
   const chaptersById = new Map(project.chapters.map((chapter) => [chapter.id, chapter]));
-  const storyTreeExperience = buildStoryTreeExperienceGuide(
-    project.gateDispatchTasks.map(gatePlatformDispatchTaskFromRecord),
-  );
+  const persistedStoryTreeTasks = project.gateDispatchTasks.map(gatePlatformDispatchTaskFromRecord);
+  const storyTreeExperience = buildStoryTreeExperienceGuide(persistedStoryTreeTasks);
   const storyTreeExperienceEffectDashboard = buildStoryTreeExperienceEffectDashboard(storyTreeExperience);
+  const storyTreeExperienceReviewBacklog = buildStoryTreeExperienceReviewBacklog(persistedStoryTreeTasks);
   const appliedStoryTreeExperienceTasks = await prisma.gateDispatchTask.findMany({
     where: {
       projectId: project.id,
@@ -314,6 +314,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ projec
           effectDashboard={storyTreeExperienceEffectDashboard}
           guide={storyTreeExperience}
           projectId={project.id}
+          reviewBacklog={storyTreeExperienceReviewBacklog}
         />
         <section className="rounded-md border border-slate-200 bg-white p-4">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">

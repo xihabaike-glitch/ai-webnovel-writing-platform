@@ -53,6 +53,27 @@ export interface StoryTreeExperienceEffectDashboard {
   watchItems: StoryTreeExperienceItem[];
 }
 
+export interface StoryTreeExperienceReviewBacklogItem {
+  id: string;
+  databaseId?: string;
+  title: string;
+  axisId: string;
+  axisLabel: string;
+  status: StoryTreeExperienceStatus;
+  sourceScore: number | null;
+  action: string;
+  completionEvidence: string;
+  reviewPrompt: string;
+  href: string;
+  completedAt: string | null;
+}
+
+export interface StoryTreeExperienceReviewBacklog {
+  total: number;
+  nextItem: StoryTreeExperienceReviewBacklogItem | null;
+  items: StoryTreeExperienceReviewBacklogItem[];
+}
+
 export interface StoryTreeExperienceAxisGroup {
   axisId: StoryTreeExperienceAxisFilter;
   axisLabel: string;
@@ -496,6 +517,49 @@ export function buildStoryTreeExperienceEffectDashboard(guide: StoryTreeExperien
     reusableItems: reinforcedItems.sort(byRecent).slice(0, 3),
     avoidItems: weakenedItems.sort(byRecent).slice(0, 3),
     watchItems: [...watchEffectItems, ...noFeedbackItems].sort(byRecent).slice(0, 3),
+  };
+}
+
+export function buildStoryTreeExperienceReviewBacklog(
+  tasks: Pick<PersistedGatePlatformDispatchTask, "databaseId" | "dispatchKey" | "state" | "title" | "detail" | "href" | "evidence" | "completionEvidence" | "completedAt" | "updatedAt">[],
+  limit = 5,
+): StoryTreeExperienceReviewBacklog {
+  const items = tasks
+    .filter((task) => task.state === "completed")
+    .filter((task) => task.dispatchKey.startsWith("story-tree-experience:"))
+    .filter((task) => !taskEffectFromEvidence(task.evidence).effectLine)
+    .map((task): StoryTreeExperienceReviewBacklogItem => {
+      const { axisId } = taskAxisFromApplyDispatchKey(task.dispatchKey);
+      const axisLabel = axisLabels[axisId] ?? "大树结构";
+      const status = taskStatusFromEvidence(task.evidence);
+      const action = taskActionFromEvidence(task.evidence);
+      const sourceScore = taskSourceScoreFromEvidence(task.evidence);
+      const completionEvidence = task.completionEvidence.trim();
+      const reviewPrompt = completionEvidence
+        ? `用完成依据复检「${axisLabel}」：${sentenceWithPeriod(completionEvidence)}补一条经验应用效果。`
+        : `回到章节复检「${axisLabel}」并补一条经验应用效果，避免这条经验停在已完成但不可学习。`;
+
+      return {
+        id: task.dispatchKey,
+        databaseId: task.databaseId,
+        title: task.title,
+        axisId,
+        axisLabel,
+        status,
+        sourceScore,
+        action,
+        completionEvidence,
+        reviewPrompt,
+        href: task.href,
+        completedAt: task.completedAt ?? task.updatedAt ?? null,
+      };
+    })
+    .sort((left, right) => dateValue(right.completedAt) - dateValue(left.completedAt));
+
+  return {
+    total: items.length,
+    nextItem: items[0] ?? null,
+    items: items.slice(0, limit),
   };
 }
 

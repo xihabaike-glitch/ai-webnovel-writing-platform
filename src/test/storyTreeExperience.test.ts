@@ -7,6 +7,7 @@ import {
   buildStoryTreeExperienceApplyDispatchKey,
   buildStoryTreeExperienceEffectDashboard,
   buildStoryTreeExperienceGuide,
+  buildStoryTreeExperienceReviewBacklog,
   buildStoryTreeExperienceSecondPassAdvice,
   matchStoryTreeExperienceAdviceForInstruction,
   parseStoryTreeRecheckEvidenceLine,
@@ -147,6 +148,75 @@ test("buildStoryTreeExperienceEffectDashboard summarizes returned advice effects
   assert.equal(dashboard.reusableItems[0].axisLabel, "分支因果");
   assert.equal(dashboard.avoidItems[0].axisLabel, "开头结尾");
   assert.equal(dashboard.watchItems[0].axisLabel, "主干推进");
+});
+
+test("buildStoryTreeExperienceReviewBacklog collects completed advice without returned effects", () => {
+  const backlog = buildStoryTreeExperienceReviewBacklog([
+    {
+      databaseId: "task-1",
+      dispatchKey: "story-tree-experience:project-1:chapter_draft:branch_causality:story-tree_project-1_chapter-1_chapter_draft_branch_causality",
+      state: "completed",
+      title: "夜雨系统 · 应用经验分支因果",
+      detail: "章节初稿复检沉淀。",
+      href: "/projects/project-1/chapters/chapter-1",
+      evidence: [
+        "大树结构复检：68 -> 78 分，分数变好：结构待精修；返工动作：分支因果：把支线改成主线压力的直接后果。",
+        "经验动作：分支因果：把支线改成主线压力的直接后果。",
+      ],
+      completionEvidence: "已把妹妹支线改成反派逼迫主角暴露系统的直接压力。",
+      completedAt: "2026-07-05T10:00:00.000Z",
+      updatedAt: "2026-07-05T10:00:00.000Z",
+    },
+    {
+      databaseId: "task-2",
+      dispatchKey: "story-tree-experience:project-1:chapter_draft:opening_ending:story-tree_project-1_chapter-2_chapter_draft_opening_ending",
+      state: "completed",
+      title: "夜雨系统 · 应用经验开头结尾",
+      detail: "已经回流的经验。",
+      href: "/projects/project-1/chapters/chapter-2",
+      evidence: [
+        "大树结构复检：82 -> 72 分，分数变差：开头钩子被削弱；返工动作：开头结尾：删掉开篇解释，先给不可逆选择。",
+        "经验应用效果：开头结尾 72 -> 62 分，效果变弱：开头解释又变多。",
+      ],
+      completionEvidence: "已处理。",
+      completedAt: "2026-07-05T11:00:00.000Z",
+      updatedAt: "2026-07-05T11:00:00.000Z",
+    },
+    {
+      databaseId: "task-3",
+      dispatchKey: "story-tree-experience:project-1:chapter_draft:trunk_motion:story-tree_project-1_chapter-3_chapter_draft_trunk_motion",
+      state: "assigned",
+      title: "夜雨系统 · 应用经验主干推进",
+      detail: "还没完成。",
+      href: "/projects/project-1/chapters/chapter-3",
+      evidence: ["经验动作：主干推进：每 800 字必须出现新选择。"],
+      completionEvidence: "",
+      completedAt: null,
+      updatedAt: "2026-07-05T12:00:00.000Z",
+    },
+    {
+      databaseId: "task-4",
+      dispatchKey: "story-tree-experience:project-1:chapter_draft:leaf_soil:story-tree_project-1_chapter-4_chapter_draft_leaf_soil",
+      state: "completed",
+      title: "夜雨系统 · 应用经验叶片土壤",
+      detail: "已经有非标准回流句。",
+      href: "/projects/project-1/chapters/chapter-4",
+      evidence: [
+        "经验动作：叶片土壤：补充平台关键词和章节细节。",
+        "经验应用效果：叶片土壤回填完成，等待下一轮量化。",
+      ],
+      completionEvidence: "已处理。",
+      completedAt: "2026-07-05T12:00:00.000Z",
+      updatedAt: "2026-07-05T12:00:00.000Z",
+    },
+  ]);
+
+  assert.equal(backlog.total, 1);
+  assert.equal(backlog.nextItem?.databaseId, "task-1");
+  assert.equal(backlog.nextItem?.axisLabel, "分支因果");
+  assert.equal(backlog.nextItem?.status, "usable");
+  assert.equal(backlog.nextItem?.sourceScore, 78);
+  assert.ok(backlog.nextItem?.reviewPrompt.includes("补一条经验应用效果"));
 });
 
 test("buildStoryTreeChapterExperienceRecommendations matches weak chapter axes", () => {

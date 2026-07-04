@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import type { StoryTreeExperienceAxisFilter, StoryTreeExperienceEffectDashboard, StoryTreeExperienceGuide, StoryTreeExperienceItem, StoryTreeExperienceStatus } from "@/lib/ai/storyTreeExperience";
+import type { StoryTreeExperienceAxisFilter, StoryTreeExperienceEffectDashboard, StoryTreeExperienceGuide, StoryTreeExperienceItem, StoryTreeExperienceReviewBacklog, StoryTreeExperienceStatus } from "@/lib/ai/storyTreeExperience";
 
 interface AppliedStoryTreeExperienceDispatch {
   dispatchKey: string;
@@ -63,11 +63,13 @@ export function StoryTreeExperiencePanel({
   effectDashboard,
   guide,
   projectId,
+  reviewBacklog,
 }: {
   appliedDispatches?: AppliedStoryTreeExperienceDispatch[];
   effectDashboard: StoryTreeExperienceEffectDashboard;
   guide: StoryTreeExperienceGuide;
   projectId: string;
+  reviewBacklog: StoryTreeExperienceReviewBacklog;
 }) {
   const [axisFilter, setAxisFilter] = useState<StoryTreeExperienceAxisFilter>("all");
   const filteredItems = axisFilter === "all" ? guide.items : guide.items.filter((item) => item.axisId === axisFilter);
@@ -199,6 +201,39 @@ export function StoryTreeExperiencePanel({
             </div>
           </div>
         </div>
+        {reviewBacklog.total > 0 ? (
+          <div className="mt-3 rounded-md border border-amber-200 bg-white p-3">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+              <div>
+                <div className="text-sm font-medium text-amber-700">待复盘清单 · {reviewBacklog.total}</div>
+                <p className="mt-1 text-sm leading-6 text-slate-600">
+                  {reviewBacklog.nextItem?.reviewPrompt}
+                </p>
+              </div>
+              {reviewBacklog.nextItem ? (
+                <Link
+                  className="w-fit rounded-md bg-slate-950 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800"
+                  href={reviewBacklog.nextItem.href}
+                >
+                  去复盘
+                </Link>
+              ) : null}
+            </div>
+            <div className="mt-3 grid gap-2 text-sm text-slate-600">
+              {reviewBacklog.items.map((item) => (
+                <div className="flex flex-wrap items-center gap-2" key={item.id}>
+                  <span className={`rounded-md px-2 py-1 text-xs font-medium ${statusClass(item.status)}`}>
+                    {statusLabel(item.status)}
+                  </span>
+                  <Link className="font-medium text-slate-950 hover:underline" href={item.href}>
+                    {item.axisLabel}｜{item.title}
+                  </Link>
+                  {item.sourceScore !== null ? <span className="text-xs text-slate-500">原分 {item.sourceScore}</span> : null}
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
         <div className="mt-3 grid gap-3 lg:grid-cols-3">
           <div className="rounded-md bg-white p-3">
             <div className="flex items-center justify-between gap-2">

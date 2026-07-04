@@ -4,6 +4,7 @@ import {
   buildStoryTreeChapterExperienceRecommendations,
   buildStoryTreeExperienceEffectFeedback,
   buildStoryTreeExperienceApplyDispatch,
+  buildStoryTreeExperienceApplyDispatchKey,
   buildStoryTreeExperienceEffectDashboard,
   buildStoryTreeExperienceGuide,
   buildStoryTreeExperienceSecondPassAdvice,
@@ -228,6 +229,7 @@ test("recommended story tree experience can become an apply dispatch", () => {
   });
 
   assert.equal(dispatch.state, "assigned");
+  assert.equal(dispatch.id, buildStoryTreeExperienceApplyDispatchKey("project-1", recommendations[0].item));
   assert.equal(dispatch.actionLabel, "应用经验");
   assert.equal(dispatch.href, "/projects/project-1/chapters/chapter-1");
   assert.ok(dispatch.evidence.some((item) => item.includes("经验动作")));

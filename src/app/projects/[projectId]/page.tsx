@@ -21,7 +21,7 @@ import { StoryStructureDiagnosticPanel } from "@/components/projects/StoryStruct
 import { SubmissionPackagePanel } from "@/components/projects/SubmissionPackagePanel";
 import { WorldBiblePanel } from "@/components/projects/WorldBiblePanel";
 import { WritingWorkbenchPanel } from "@/components/projects/WritingWorkbenchPanel";
-import { buildStoryTreeExperienceEffectDashboard, buildStoryTreeExperienceGuide } from "@/lib/ai/storyTreeExperience";
+import { buildStoryTreeExperienceApplyDispatchKey, buildStoryTreeExperienceEffectDashboard, buildStoryTreeExperienceGuide } from "@/lib/ai/storyTreeExperience";
 import { prisma } from "@/lib/db/prisma";
 import { getPlatformProfile, type PlatformId } from "@/lib/platforms/platformProfiles";
 import { gatePlatformDispatchTaskFromRecord } from "@/lib/projects/gateDispatchTaskRecords";
@@ -84,6 +84,17 @@ export default async function ProjectPage({ params }: { params: Promise<{ projec
     project.gateDispatchTasks.map(gatePlatformDispatchTaskFromRecord),
   );
   const storyTreeExperienceEffectDashboard = buildStoryTreeExperienceEffectDashboard(storyTreeExperience);
+  const appliedStoryTreeExperienceTasks = await prisma.gateDispatchTask.findMany({
+    where: {
+      projectId: project.id,
+      dispatchKey: { startsWith: "story-tree-experience:" },
+    },
+    select: { dispatchKey: true },
+  });
+  const appliedStoryTreeExperienceKeys = new Set(appliedStoryTreeExperienceTasks.map((task) => task.dispatchKey));
+  const appliedStoryTreeExperienceItemKeys = storyTreeExperience.items
+    .filter((item) => appliedStoryTreeExperienceKeys.has(buildStoryTreeExperienceApplyDispatchKey(project.id, item)))
+    .map((item) => item.dispatchKey);
   const dashboard = buildProjectDashboard({
     currentWordCount: project.currentWordCount,
     targetWordCount: project.targetWordCount,
@@ -288,7 +299,12 @@ export default async function ProjectPage({ params }: { params: Promise<{ projec
             </div>
           </div>
         </section>
-        <StoryTreeExperiencePanel effectDashboard={storyTreeExperienceEffectDashboard} guide={storyTreeExperience} projectId={project.id} />
+        <StoryTreeExperiencePanel
+          appliedDispatchKeys={appliedStoryTreeExperienceItemKeys}
+          effectDashboard={storyTreeExperienceEffectDashboard}
+          guide={storyTreeExperience}
+          projectId={project.id}
+        />
         <section className="rounded-md border border-slate-200 bg-white p-4">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>

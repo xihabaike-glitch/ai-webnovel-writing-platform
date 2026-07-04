@@ -276,7 +276,7 @@ function applyActionLabel(status: StoryTreeExperienceStatus) {
   return "小步验证";
 }
 
-function applyDispatchId(projectId: string, item: StoryTreeExperienceItem) {
+export function buildStoryTreeExperienceApplyDispatchKey(projectId: string, item: Pick<StoryTreeExperienceItem, "source" | "axisId" | "dispatchKey">) {
   return `story-tree-experience:${projectId}:${item.source}:${item.axisId}:${item.dispatchKey.replace(/[^a-zA-Z0-9_-]/g, "_")}`;
 }
 
@@ -512,7 +512,7 @@ export function buildStoryTreeExperienceApplyDispatch(input: {
   const label = applyActionLabel(input.item.status);
 
   return {
-    id: applyDispatchId(input.projectId, input.item),
+    id: buildStoryTreeExperienceApplyDispatchKey(input.projectId, input.item),
     platformId: input.platform.id,
     platformName: input.platform.name,
     stage: axisStage[input.item.axisId] ?? "start_first_three_review",

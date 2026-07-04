@@ -19,6 +19,12 @@ export type ChapterProductionFlowRunAction =
       chapterIds: string[];
       source: "chapter_draft" | "chapter_second_pass" | "first_three_rewrite";
       label: string;
+    }
+  | {
+      type: "submission_precheck_repair";
+      endpoint: string;
+      itemIds: string[];
+      label: string;
     };
 
 export interface ChapterProductionFlowChapter {
@@ -109,6 +115,17 @@ function storyTreeChapterIds(tasks: ChapterProductionFlowGateTask[], completedOn
   return ids;
 }
 
+function submissionPrecheckItemIds(tasks: ChapterProductionFlowGateTask[]) {
+  const ids = new Set<string>();
+  for (const task of tasks) {
+    if (!task.dispatchKey.startsWith("submission-precheck:")) continue;
+    if (task.state === "completed") continue;
+    const itemId = task.dispatchKey.split(":").at(2);
+    if (itemId) ids.add(itemId);
+  }
+  return ids;
+}
+
 function taskCreatedAt(task: ChapterProductionFlowAiTask) {
   return task.createdAt ? new Date(task.createdAt).getTime() : 0;
 }
@@ -166,6 +183,12 @@ export function buildChapterProductionFlow(input: {
   const storyTreeEndpoint = `/api/projects/${input.projectId}/story-tree-recheck`;
   const submissionTarget = input.submissionChecklist.items.length || 1;
   const submissionReady = input.submissionChecklist.passCount;
+  const submissionAssignedItemIds = submissionPrecheckItemIds(input.gateTasks);
+  const submissionActionItemIds = input.submissionChecklist.items
+    .filter((item) => item.status === "todo" || item.status === "risk")
+    .map((item) => item.id)
+    .filter((id) => !submissionAssignedItemIds.has(id))
+    .slice(0, 5);
   const stages: ChapterProductionFlowStage[] = [
     {
       id: "hooks",
@@ -266,6 +289,14 @@ export function buildChapterProductionFlow(input: {
       action: "清掉投稿前检查里的待处理和风险项。",
       actionLabel: "修预检",
       href: "#submission-precheck",
+      runAction: submissionActionItemIds.length > 0
+        ? {
+            type: "submission_precheck_repair",
+            endpoint: `/api/projects/${input.projectId}/submission-precheck/repair`,
+            itemIds: submissionActionItemIds,
+            label: `一键派发修复 ${submissionActionItemIds.length} 项`,
+          }
+        : undefined,
     },
   ];
   const bottleneck = stages.find((stage) => stage.status !== "ready") ?? stages.find((stage) => stage.tone === "rose") ?? stages.at(-1) as ChapterProductionFlowStage;

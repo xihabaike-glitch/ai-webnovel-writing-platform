@@ -103,9 +103,10 @@ test("buildChapterProductionFlow exposes one-click review action for drafted cha
   });
   const reviewStage = flow.stages.find((stage) => stage.id === "reviews");
 
-  assert.equal(reviewStage?.runAction?.action, "review");
+  assert.equal(reviewStage?.runAction?.type, "batch_review");
+  assert.equal(reviewStage?.runAction?.type === "batch_review" ? reviewStage.runAction.action : null, "review");
   assert.equal(reviewStage?.runAction?.endpoint, "/api/projects/project-1/batch-review");
-  assert.deepEqual(reviewStage?.runAction?.chapterIds, ["chapter-1", "chapter-2", "chapter-3"]);
+  assert.deepEqual(reviewStage?.runAction?.type === "batch_review" ? reviewStage.runAction.chapterIds : [], ["chapter-1", "chapter-2", "chapter-3"]);
   assert.equal(reviewStage?.runAction?.label, "一键送审 3 章");
 });
 
@@ -151,9 +152,10 @@ test("buildChapterProductionFlow exposes one-click second pass action only when 
   });
   const secondPassStage = flow.stages.find((stage) => stage.id === "second_pass");
 
-  assert.equal(secondPassStage?.runAction?.action, "second_pass");
-  assert.deepEqual(secondPassStage?.runAction?.chapterIds, ["chapter-1"]);
-  assert.equal(secondPassStage?.runAction?.targetWords, 1200);
+  assert.equal(secondPassStage?.runAction?.type, "batch_review");
+  assert.equal(secondPassStage?.runAction?.type === "batch_review" ? secondPassStage.runAction.action : null, "second_pass");
+  assert.deepEqual(secondPassStage?.runAction?.type === "batch_review" ? secondPassStage.runAction.chapterIds : [], ["chapter-1"]);
+  assert.equal(secondPassStage?.runAction?.type === "batch_review" ? secondPassStage.runAction.targetWords : null, 1200);
   assert.equal(secondPassStage?.runAction?.label, "一键二改 1 章");
 });
 
@@ -186,4 +188,41 @@ test("buildChapterProductionFlow exposes story tree recheck dispatch action for 
   assert.equal(storyTreeStage?.runAction?.endpoint, "/api/projects/project-1/story-tree-recheck");
   assert.deepEqual(storyTreeStage?.runAction?.chapterIds, ["chapter-1", "chapter-3"]);
   assert.equal(storyTreeStage?.runAction?.label, "一键派发复检 2 章");
+});
+
+test("buildChapterProductionFlow exposes submission repair dispatch action for unassigned failed items", () => {
+  const flow = buildChapterProductionFlow({
+    projectId: "project-1",
+    chapters: [],
+    aiTasks: [],
+    gateTasks: [
+      {
+        dispatchKey: "submission-precheck:project-1:title",
+        state: "assigned",
+        href: "/projects/project-1#submission-package",
+      },
+      {
+        dispatchKey: "submission-precheck:project-1:platform-risk",
+        state: "completed",
+        href: "/projects/project-1#platform-export",
+      },
+    ],
+    submissionChecklist: {
+      readinessPercent: 70,
+      passCount: 7,
+      todoCount: 2,
+      riskCount: 1,
+      items: [
+        { id: "title", label: "作品标题", status: "todo", detail: "标题过短。" },
+        { id: "selling-point", label: "一句话卖点", status: "todo", detail: "卖点太弱。" },
+        { id: "platform-risk", label: "平台风险", status: "risk", detail: "版权归属需确认。" },
+      ],
+    },
+  });
+  const submissionStage = flow.stages.find((stage) => stage.id === "submission");
+
+  assert.equal(submissionStage?.runAction?.type, "submission_precheck_repair");
+  assert.equal(submissionStage?.runAction?.endpoint, "/api/projects/project-1/submission-precheck/repair");
+  assert.deepEqual(submissionStage?.runAction?.type === "submission_precheck_repair" ? submissionStage.runAction.itemIds : [], ["selling-point", "platform-risk"]);
+  assert.equal(submissionStage?.runAction?.label, "一键派发修复 2 项");
 });

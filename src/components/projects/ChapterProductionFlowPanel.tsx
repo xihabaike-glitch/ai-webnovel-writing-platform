@@ -26,11 +26,13 @@ function statusLabel(status: ChapterProductionFlow["status"]) {
 
 function runningLabel(action: ChapterProductionFlowRunAction) {
   if (action.type === "story_tree_recheck") return "派单中";
+  if (action.type === "submission_precheck_repair") return "派单中";
   return action.action === "review" ? "审稿中" : "二改中";
 }
 
 function doneLabel(action: ChapterProductionFlowRunAction) {
   if (action.type === "story_tree_recheck") return "大树复检派单";
+  if (action.type === "submission_precheck_repair") return "投稿修复派单";
   return action.action === "review" ? "批量审稿" : "批量二改";
 }
 
@@ -57,14 +59,16 @@ export function ChapterProductionFlowPanel({ flow }: { flow: ChapterProductionFl
               chapterIds: stage.runAction.chapterIds,
               targetWords: stage.runAction.targetWords,
             }
-          : {
+          : stage.runAction.type === "story_tree_recheck" ? {
               chapterIds: stage.runAction.chapterIds,
               source: stage.runAction.source,
-            }),
+            }
+          : {}),
       });
       const payload = await response.json().catch(() => null) as {
         results?: Array<{ status: "succeeded" | "failed" }>;
         summary?: { totalChapters: number; rewriteChapters: number; dispatches: number };
+        dispatches?: unknown[];
         error?: string;
         guard?: { warnings?: string[] };
       } | null;
@@ -74,6 +78,8 @@ export function ChapterProductionFlowPanel({ flow }: { flow: ChapterProductionFl
       if (stage.runAction.type === "story_tree_recheck") {
         const summary = payload?.summary;
         setMessage(`${doneLabel(stage.runAction)}完成：复检 ${summary?.totalChapters ?? stage.runAction.chapterIds.length} 章，生成 ${summary?.dispatches ?? 0} 条派单。`);
+      } else if (stage.runAction.type === "submission_precheck_repair") {
+        setMessage(`${doneLabel(stage.runAction)}完成：生成 ${payload?.dispatches?.length ?? 0} 条派单。`);
       } else {
         const results = payload?.results ?? [];
         const succeeded = results.filter((result) => result.status === "succeeded").length;

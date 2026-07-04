@@ -133,6 +133,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ projec
       OR: [
         { dispatchKey: { startsWith: "story-tree:" } },
         { dispatchKey: { startsWith: "story-tree-experience:" } },
+        { dispatchKey: { startsWith: "submission-precheck:" } },
       ],
     },
     select: {

@@ -27,6 +27,11 @@ test("buildChapterDraftPrompt", async (t) => {
     assert.ok(prompt.systemPrompt.includes("正文初稿"));
     assert.ok(prompt.userPrompt.includes("番茄小说"));
     assert.ok(prompt.userPrompt.includes("平台风格模板"));
+    assert.ok(prompt.systemPrompt.includes("大树结构"));
+    assert.ok(prompt.userPrompt.includes("大树结构生产准则"));
+    assert.ok(prompt.userPrompt.includes("开头与结尾先定"));
+    assert.ok(prompt.userPrompt.includes("人物弧光"));
+    assert.ok(prompt.userPrompt.includes("分支"));
     assert.ok(prompt.userPrompt.includes("每 300-500 字"));
     assert.ok(prompt.userPrompt.includes("章节目标：让主角遭遇不可逆事件。"));
     assert.ok(prompt.userPrompt.includes("第一段必须进入事件现场"));
@@ -140,6 +145,8 @@ test("buildChapterDraftPrompt", async (t) => {
     });
 
     assert.ok(contextPrompt.userPrompt.includes("项目上下文召回包"));
+    assert.ok(contextPrompt.userPrompt.includes("上下文缺口较大"));
+    assert.ok(contextPrompt.userPrompt.includes("主线支线"));
     assert.ok(contextPrompt.userPrompt.includes("林晚"));
     assert.ok(contextPrompt.userPrompt.includes("系统规则"));
     assert.ok(contextPrompt.userPrompt.includes("第 1 章 雨夜系统"));

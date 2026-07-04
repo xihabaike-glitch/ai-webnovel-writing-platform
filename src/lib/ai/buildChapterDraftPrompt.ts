@@ -2,6 +2,7 @@ import type { PlatformProfile } from "../platforms/platformProfiles.ts";
 import { buildPlatformWritingStylePromptBlock } from "../platforms/writingStyleTemplates.ts";
 import type { ProjectContextPack } from "../projects/projectContextPack.ts";
 import type { ProjectStartTacticSummary } from "../projects/projectStartTactics.ts";
+import { buildStoryTreeProductionBlock } from "./storyTreeProduction.ts";
 
 interface ChapterDraftPromptInput {
   projectTitle: string;
@@ -12,6 +13,7 @@ interface ChapterDraftPromptInput {
   projectContext?: ProjectContextPack | null;
   targetWords: number;
   chapter: {
+    order?: number;
     title: string;
     goal: string;
     hook: string;
@@ -37,8 +39,15 @@ export function buildChapterDraftPrompt(input: ChapterDraftPromptInput) {
   const systemPrompt = [
     "你是高执行力网文写手，只输出正文初稿，不输出解释、标题、Markdown 或审稿意见。",
     "优先满足平台读者预期：开头有钩子，中段有冲突推进，结尾有明确悬念。",
+    "必须按大树结构写作：开头和结尾先定，主干推动剧情，分支服务主线，叶片与土壤只做内容填充。",
     "正文要可继续人工修改，不能只写梗概。",
   ].join("\n");
+  const storyTreeBlock = buildStoryTreeProductionBlock({
+    phase: "chapter_draft",
+    chapterOrder: input.chapter.order,
+    startTactic: input.startTactic,
+    projectContext: input.projectContext,
+  });
 
   const userPrompt = [
     `作品：${input.projectTitle}`,
@@ -49,6 +58,7 @@ export function buildChapterDraftPrompt(input: ChapterDraftPromptInput) {
     `平台审稿重点：${input.platform.reviewFocus.join("、")}`,
     platformStyle,
     startTacticLines,
+    storyTreeBlock,
     input.projectContext?.promptBlock ?? "",
     `目标字数：约 ${input.targetWords} 字`,
     `章节标题：${input.chapter.title}`,
@@ -63,7 +73,8 @@ export function buildChapterDraftPrompt(input: ChapterDraftPromptInput) {
     "2. 第一段必须进入事件现场。",
     "3. 每 300-500 字至少推动一次信息、冲突或选择。",
     "4. 结尾必须扣住章末悬念。",
-    input.projectContext ? "5. 必须遵守项目上下文召回包；不要写出与人物弧光、系统规则、伏笔状态和历史章节矛盾的内容。" : "",
+    "5. 必须让人物弧光、主线支线和平台土壤进入具体行动，不要只写成说明。",
+    input.projectContext ? "6. 必须遵守项目上下文召回包；不要写出与人物弧光、系统规则、伏笔状态和历史章节矛盾的内容。" : "",
   ].join("\n");
 
   return {

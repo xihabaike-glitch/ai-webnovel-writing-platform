@@ -53,6 +53,7 @@ export async function generateChapterDraft(options: GenerateChapterDraftOptions)
     projectContext,
     targetWords: options.targetWords ?? 1200,
     chapter: {
+      order: chapter.order,
       title: chapter.title,
       goal: chapter.goal,
       hook: chapter.hook,

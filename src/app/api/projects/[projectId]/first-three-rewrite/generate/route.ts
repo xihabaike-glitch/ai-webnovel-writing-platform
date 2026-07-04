@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db/prisma";
 import { getActiveModelProvider } from "@/lib/model-gateway/activeProvider";
 import type { ModelProviderId } from "@/lib/model-gateway/types";
 import { getPlatformProfile, type PlatformId } from "@/lib/platforms/platformProfiles";
+import { buildProjectContextPack } from "@/lib/projects/projectContextPack";
 import { buildFirstThreeRewriteEvaluation, buildFirstThreeRewritePackage } from "@/lib/projects/firstThreeRewrite";
 import { buildPlatformPublishExportCenter, parsePublishSnapshotTags } from "@/lib/projects/platformPublishExport";
 import { findProjectStartTacticSummary } from "@/lib/projects/projectStartTactics";
@@ -58,6 +59,9 @@ export async function POST(request: Request, { params }: Params) {
       chapters: { orderBy: { order: "asc" } },
       aiTasks: { orderBy: { createdAt: "desc" } },
       publishSnapshots: { orderBy: { createdAt: "desc" }, take: 80 },
+      characters: { orderBy: { createdAt: "asc" } },
+      foreshadows: { orderBy: { createdAt: "asc" } },
+      plotThreads: { orderBy: { createdAt: "asc" } },
       submissionAssets: { orderBy: { updatedAt: "desc" } },
       submissionAssetVersions: { orderBy: { createdAt: "desc" }, take: 80 },
       platformPublishMetrics: { orderBy: { snapshotDate: "desc" }, take: 80 },
@@ -185,6 +189,14 @@ export async function POST(request: Request, { params }: Params) {
       sellingPoint: project.sellingPoint,
       platform,
       startTactic,
+      projectContext: buildProjectContextPack({
+        currentChapterId: chapter.id,
+        chapters: project.chapters,
+        characters: project.characters,
+        worldEntries: project.worldEntries,
+        foreshadows: project.foreshadows,
+        plotThreads: project.plotThreads,
+      }),
       platformKnowledge,
       targetWords: body.targetWords ?? 1600,
       chapter: {

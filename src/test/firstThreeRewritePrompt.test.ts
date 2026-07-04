@@ -43,7 +43,11 @@ const prompt = buildFirstThreeRewritePrompt({
 test("buildFirstThreeRewritePrompt", async (t) => {
   await t.test("turns the rewrite plan into executable model instructions", () => {
     assert.ok(prompt.systemPrompt.includes("网文改稿写手"));
+    assert.ok(prompt.systemPrompt.includes("大树结构"));
     assert.ok(prompt.userPrompt.includes("改稿处方"));
+    assert.ok(prompt.userPrompt.includes("大树结构生产准则"));
+    assert.ok(prompt.userPrompt.includes("前三章先形成追读链"));
+    assert.ok(prompt.userPrompt.includes("人物弧光"));
     assert.ok(prompt.userPrompt.includes("必须保留"));
     assert.ok(prompt.userPrompt.includes("必须删除或压缩"));
     assert.ok(prompt.userPrompt.includes("必须补写"));
@@ -133,5 +137,51 @@ test("buildFirstThreeRewritePrompt", async (t) => {
     assert.ok(knowledgePrompt.userPrompt.includes("平台知识库反哺"));
     assert.ok(knowledgePrompt.userPrompt.includes("第一屏压倒计时选择"));
     assert.ok(knowledgePrompt.userPrompt.includes("别把系统规则解释太久"));
+  });
+
+  await t.test("includes project context in first-three rewrite instructions", () => {
+    const contextPrompt = buildFirstThreeRewritePrompt({
+      projectTitle: "夜雨系统",
+      genre: "都市系统",
+      sellingPoint: "雨夜系统翻盘",
+      platform: getPlatformProfile("fanqie"),
+      projectContext: {
+        status: "warn",
+        summary: "上下文需要补强：人物 1，设定 2，线索 1，历史章节 1。",
+        warnings: ["主线支线与伏笔：伏笔缺少埋设说明"],
+        sourceCounts: {
+          characters: 1,
+          worldEntries: 2,
+          storyLines: 1,
+          historyChapters: 1,
+        },
+        blocks: [],
+        promptBlock: [
+          "项目上下文召回包：",
+          "【人物弧光｜可用】",
+          "- 林晚（主角）；欲望：查清系统来源；需求：学会承担代价；缺陷：总想独自解决；弧光：被系统推着走 -> 反过来定义规则",
+          "【主线支线与伏笔｜需谨慎】",
+          "- 剧情线：系统追猎；类型：主线；状态：推进中；有起点；缺终点",
+        ].join("\n"),
+      },
+      targetWords: 1600,
+      chapter: {
+        order: 1,
+        title: "第一章 雨夜系统",
+        content: "林晚推开门，系统提示音在雨夜响起。",
+        goal: "让主角遭遇不可逆事件。",
+        hook: "雨夜、系统、门后未知风险。",
+        conflict: "主角必须在危险和逃避之间选择。",
+        valueShift: "普通生活转向失控危机。",
+        cliffhanger: "系统给出第一个选择。",
+      },
+      plan,
+    });
+
+    assert.ok(contextPrompt.userPrompt.includes("上下文需要补强"));
+    assert.ok(contextPrompt.userPrompt.includes("写作时优先补齐警告项"));
+    assert.ok(contextPrompt.userPrompt.includes("项目上下文召回包"));
+    assert.ok(contextPrompt.userPrompt.includes("林晚"));
+    assert.ok(contextPrompt.userPrompt.includes("系统追猎"));
   });
 });

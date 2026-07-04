@@ -1,7 +1,9 @@
 import type { ChapterRewritePlan } from "../projects/firstThreeRewrite.ts";
 import type { PlatformProfile } from "../platforms/platformProfiles.ts";
+import type { ProjectContextPack } from "../projects/projectContextPack.ts";
 import type { ProjectStartTacticSummary } from "../projects/projectStartTactics.ts";
 import type { PlatformKnowledgeInsight } from "../projects/platformPublishExport.ts";
+import { buildStoryTreeProductionBlock } from "./storyTreeProduction.ts";
 
 interface FirstThreeRewritePromptInput {
   projectTitle: string;
@@ -9,6 +11,7 @@ interface FirstThreeRewritePromptInput {
   sellingPoint: string;
   platform: PlatformProfile;
   startTactic?: ProjectStartTacticSummary | null;
+  projectContext?: ProjectContextPack | null;
   platformKnowledge?: PlatformKnowledgeInsight | null;
   targetWords: number;
   chapter: {
@@ -55,8 +58,15 @@ export function buildFirstThreeRewritePrompt(input: FirstThreeRewritePromptInput
   const systemPrompt = [
     "你是高执行力网文改稿写手，只输出改写后的正文，不输出解释、标题、Markdown、清单或审稿意见。",
     "你必须严格按改稿处方执行：先抓开头，再压主干，最后用章末悬念把读者推到下一章。",
+    "必须按大树结构改稿：开头和结尾先定，主干负责追读，分支和叶片只能服务主线。",
     "正文要像平台连载稿，不要像故事梗概；每一段都要发生具体动作、信息变化或情绪推进。",
   ].join("\n");
+  const storyTreeBlock = buildStoryTreeProductionBlock({
+    phase: "first_three_rewrite",
+    chapterOrder: input.chapter.order,
+    startTactic: input.startTactic,
+    projectContext: input.projectContext,
+  });
 
   const userPrompt = [
     `作品：${input.projectTitle}`,
@@ -67,6 +77,8 @@ export function buildFirstThreeRewritePrompt(input: FirstThreeRewritePromptInput
     `平台审稿重点：${input.platform.reviewFocus.join("、")}`,
     ...startTacticLines,
     ...knowledgeLines,
+    storyTreeBlock,
+    input.projectContext?.promptBlock ?? "",
     `目标字数：约 ${input.targetWords} 字`,
     "",
     `章节：第 ${input.chapter.order} 章 ${input.chapter.title}`,
@@ -100,7 +112,8 @@ export function buildFirstThreeRewritePrompt(input: FirstThreeRewritePromptInput
     "2. 第一段必须进入现场，不能先解释设定。",
     "3. 中段每 300-500 字至少推动一次选择、冲突、线索或爽点。",
     "4. 结尾必须按处方制造章末追读，不允许平收。",
-    "5. 不要出现“根据处方”“以下是改写”等说明文字。",
+    "5. 必须让人物弧光、主线支线和平台土壤进入具体行动，不要只写成说明。",
+    "6. 不要出现“根据处方”“以下是改写”等说明文字。",
   ].join("\n");
 
   return { systemPrompt, userPrompt };

@@ -83,3 +83,76 @@ test("buildChapterProductionFlow marks a full first-three pipeline ready", () =>
   assert.equal(flow.stages.find((stage) => stage.id === "second_pass")?.actionLabel, "执行二改");
   assert.ok(flow.headline.includes("已跑通"));
 });
+
+test("buildChapterProductionFlow exposes one-click review action for drafted chapters", () => {
+  const chapters = [1, 2, 3].map((order) => ({
+    id: `chapter-${order}`,
+    title: `第 ${order} 章`,
+    order,
+    status: "draft",
+    wordCount: 1800,
+    hook: "主角醒来发现命运倒计时。",
+    cliffhanger: "门后的声音喊出了他的旧名。",
+  }));
+  const flow = buildChapterProductionFlow({
+    projectId: "project-1",
+    chapters,
+    aiTasks: [],
+    gateTasks: [],
+    submissionChecklist: checklistReady,
+  });
+  const reviewStage = flow.stages.find((stage) => stage.id === "reviews");
+
+  assert.equal(reviewStage?.runAction?.action, "review");
+  assert.equal(reviewStage?.runAction?.endpoint, "/api/projects/project-1/batch-review");
+  assert.deepEqual(reviewStage?.runAction?.chapterIds, ["chapter-1", "chapter-2", "chapter-3"]);
+  assert.equal(reviewStage?.runAction?.label, "一键送审 3 章");
+});
+
+test("buildChapterProductionFlow exposes one-click second pass action only when review asks for it", () => {
+  const chapters = [1, 2, 3].map((order) => ({
+    id: `chapter-${order}`,
+    title: `第 ${order} 章`,
+    order,
+    status: "draft",
+    wordCount: 1800,
+    hook: "主角醒来发现命运倒计时。",
+    cliffhanger: "门后的声音喊出了他的旧名。",
+  }));
+  const flow = buildChapterProductionFlow({
+    projectId: "project-1",
+    chapters,
+    aiTasks: [
+      {
+        taskType: "chapter_review",
+        status: "succeeded",
+        chapter: { id: "chapter-1" },
+        createdAt: "2026-01-01T00:00:00.000Z",
+        outputText: JSON.stringify({
+          score: 72,
+          shouldSecondPass: true,
+          issues: [{ type: "hook", suggestion: "强化开头钩子。" }],
+        }),
+      },
+      {
+        taskType: "chapter_review",
+        status: "succeeded",
+        chapter: { id: "chapter-2" },
+        createdAt: "2026-01-01T00:00:00.000Z",
+        outputText: JSON.stringify({
+          score: 92,
+          shouldSecondPass: false,
+          issues: [],
+        }),
+      },
+    ],
+    gateTasks: [],
+    submissionChecklist: checklistReady,
+  });
+  const secondPassStage = flow.stages.find((stage) => stage.id === "second_pass");
+
+  assert.equal(secondPassStage?.runAction?.action, "second_pass");
+  assert.deepEqual(secondPassStage?.runAction?.chapterIds, ["chapter-1"]);
+  assert.equal(secondPassStage?.runAction?.targetWords, 1200);
+  assert.equal(secondPassStage?.runAction?.label, "一键二改 1 章");
+});

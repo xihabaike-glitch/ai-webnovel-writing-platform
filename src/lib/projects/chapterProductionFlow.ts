@@ -3,6 +3,7 @@ import type { SubmissionChecklist } from "./submissionChecklist.ts";
 export type ChapterProductionFlowStageId = "hooks" | "drafts" | "reviews" | "second_pass" | "story_tree" | "submission";
 export type ChapterProductionFlowStatus = "blocked" | "working" | "ready";
 export type ChapterProductionFlowTone = "slate" | "amber" | "sky" | "emerald" | "rose";
+export type ChapterProductionFlowBatchAction = "review" | "second_pass";
 
 export interface ChapterProductionFlowChapter {
   id: string;
@@ -17,6 +18,8 @@ export interface ChapterProductionFlowChapter {
 export interface ChapterProductionFlowAiTask {
   taskType: string;
   status: string;
+  outputText?: string | null;
+  createdAt?: Date | string;
   chapter?: {
     id: string;
   } | null;
@@ -39,6 +42,14 @@ export interface ChapterProductionFlowStage {
   action: string;
   actionLabel: string;
   href: string;
+  runAction?: {
+    type: "batch_review";
+    action: ChapterProductionFlowBatchAction;
+    endpoint: string;
+    chapterIds: string[];
+    targetWords?: number;
+    label: string;
+  };
 }
 
 export interface ChapterProductionFlow {
@@ -89,6 +100,33 @@ function storyTreeChapterIds(tasks: ChapterProductionFlowGateTask[]) {
   return ids;
 }
 
+function taskCreatedAt(task: ChapterProductionFlowAiTask) {
+  return task.createdAt ? new Date(task.createdAt).getTime() : 0;
+}
+
+function latestSuccessfulReview(tasks: ChapterProductionFlowAiTask[], chapterId: string) {
+  return [...tasks]
+    .filter((task) => task.taskType === "chapter_review" && task.status === "succeeded" && task.chapter?.id === chapterId)
+    .sort((left, right) => taskCreatedAt(right) - taskCreatedAt(left))
+    .at(0);
+}
+
+function needsSecondPass(outputText: string | null | undefined) {
+  if (!outputText) return false;
+  try {
+    const review = JSON.parse(outputText) as {
+      score?: number;
+      shouldSecondPass?: boolean;
+      issues?: unknown[];
+    };
+    if (typeof review.shouldSecondPass === "boolean") return review.shouldSecondPass;
+    if (typeof review.score === "number" && review.score < 85) return true;
+    return (review.issues?.length ?? 0) > 0;
+  } catch {
+    return false;
+  }
+}
+
 export function buildChapterProductionFlow(input: {
   projectId: string;
   chapters: ChapterProductionFlowChapter[];
@@ -109,6 +147,11 @@ export function buildChapterProductionFlow(input: {
   const reviewReady = draftedFirstThreeIds.filter((id) => reviewedIds.has(id)).length;
   const secondPassReady = draftedFirstThreeIds.filter((id) => secondPassIds.has(id)).length;
   const storyTreeReady = draftedFirstThreeIds.filter((id) => treeIds.has(id)).length;
+  const batchEndpoint = `/api/projects/${input.projectId}/batch-review`;
+  const reviewActionIds = draftedFirstThreeIds.filter((id) => !reviewedIds.has(id)).slice(0, 5);
+  const secondPassActionIds = draftedFirstThreeIds
+    .filter((id) => !secondPassIds.has(id) && needsSecondPass(latestSuccessfulReview(input.aiTasks, id)?.outputText))
+    .slice(0, 5);
   const submissionTarget = input.submissionChecklist.items.length || 1;
   const submissionReady = input.submissionChecklist.passCount;
   const stages: ChapterProductionFlowStage[] = [
@@ -147,6 +190,15 @@ export function buildChapterProductionFlow(input: {
       action: "把已有正文送进批量审稿，不要裸稿继续堆字。",
       actionLabel: "送审稿",
       href: "#ai-pipeline",
+      runAction: reviewActionIds.length > 0
+        ? {
+            type: "batch_review",
+            action: "review",
+            endpoint: batchEndpoint,
+            chapterIds: reviewActionIds,
+            label: `一键送审 ${reviewActionIds.length} 章`,
+          }
+        : undefined,
     },
     {
       id: "second_pass",
@@ -159,6 +211,16 @@ export function buildChapterProductionFlow(input: {
       action: "先按审稿问题完成二改，再进入发布准备。",
       actionLabel: "执行二改",
       href: "#review-pipeline",
+      runAction: secondPassActionIds.length > 0
+        ? {
+            type: "batch_review",
+            action: "second_pass",
+            endpoint: batchEndpoint,
+            chapterIds: secondPassActionIds,
+            targetWords: 1200,
+            label: `一键二改 ${secondPassActionIds.length} 章`,
+          }
+        : undefined,
     },
     {
       id: "story_tree",

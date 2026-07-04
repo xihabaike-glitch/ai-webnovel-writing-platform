@@ -1,5 +1,14 @@
+"use client";
+
 import Link from "next/link";
-import type { ChapterProductionFlow, ChapterProductionFlowTone } from "@/lib/projects/chapterProductionFlow";
+import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import type {
+  ChapterProductionFlow,
+  ChapterProductionFlowBatchAction,
+  ChapterProductionFlowStage,
+  ChapterProductionFlowTone,
+} from "@/lib/projects/chapterProductionFlow";
 
 function toneClass(tone: ChapterProductionFlowTone) {
   if (tone === "emerald") return "bg-emerald-50 text-emerald-700";
@@ -15,7 +24,85 @@ function statusLabel(status: ChapterProductionFlow["status"]) {
   return "有卡点";
 }
 
+function runningLabel(action: ChapterProductionFlowBatchAction) {
+  return action === "review" ? "审稿中" : "二改中";
+}
+
+function doneLabel(action: ChapterProductionFlowBatchAction) {
+  return action === "review" ? "批量审稿" : "批量二改";
+}
+
 export function ChapterProductionFlowPanel({ flow }: { flow: ChapterProductionFlow }) {
+  const router = useRouter();
+  const [runningStageId, setRunningStageId] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
+  const nextStage = useMemo(
+    () => flow.stages.find((stage) => stage.id === flow.bottleneck),
+    [flow.bottleneck, flow.stages],
+  );
+
+  async function runStageAction(stage: ChapterProductionFlowStage) {
+    if (!stage.runAction) return;
+    setRunningStageId(stage.id);
+    setMessage(null);
+    try {
+      const response = await fetch(stage.runAction.endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: stage.runAction.action,
+          chapterIds: stage.runAction.chapterIds,
+          targetWords: stage.runAction.targetWords,
+        }),
+      });
+      const payload = await response.json().catch(() => null) as {
+        results?: Array<{ status: "succeeded" | "failed" }>;
+        error?: string;
+        guard?: { warnings?: string[] };
+      } | null;
+      if (!response.ok) {
+        throw new Error([payload?.error, ...(payload?.guard?.warnings ?? [])].filter(Boolean).join(" ") || "流水线执行失败。");
+      }
+      const results = payload?.results ?? [];
+      const succeeded = results.filter((result) => result.status === "succeeded").length;
+      const failed = results.filter((result) => result.status === "failed").length;
+      setMessage(`${doneLabel(stage.runAction.action)}完成：成功 ${succeeded} 章，失败 ${failed} 章。`);
+      router.refresh();
+    } catch (caught) {
+      setMessage(caught instanceof Error ? caught.message : "流水线执行失败。");
+    } finally {
+      setRunningStageId(null);
+    }
+  }
+
+  function renderStageAction(stage: ChapterProductionFlowStage, primary = false) {
+    const buttonClass = primary
+      ? "w-fit rounded-md bg-slate-950 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50"
+      : "mt-3 inline-flex rounded-md border border-slate-200 bg-white px-2 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50";
+    const linkClass = primary
+      ? "w-fit rounded-md bg-slate-950 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800"
+      : "mt-3 inline-flex rounded-md border border-slate-200 bg-white px-2 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50";
+
+    if (stage.runAction) {
+      return (
+        <button
+          className={buttonClass}
+          disabled={runningStageId !== null}
+          onClick={() => runStageAction(stage)}
+          type="button"
+        >
+          {runningStageId === stage.id ? runningLabel(stage.runAction.action) : stage.runAction.label}
+        </button>
+      );
+    }
+
+    return (
+      <Link className={linkClass} href={primary ? flow.nextHref : stage.href}>
+        {primary ? flow.nextActionLabel : stage.actionLabel}
+      </Link>
+    );
+  }
+
   return (
     <section className="rounded-md border border-slate-200 bg-white p-4" id="chapter-production-flow">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
@@ -29,13 +116,9 @@ export function ChapterProductionFlowPanel({ flow }: { flow: ChapterProductionFl
           <p className="mt-1 text-sm leading-6 text-slate-600">{flow.headline}</p>
           <p className="mt-1 text-sm leading-6 text-slate-600">{flow.nextAction}</p>
         </div>
-        <Link
-          className="w-fit rounded-md bg-slate-950 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800"
-          href={flow.nextHref}
-        >
-          {flow.nextActionLabel}
-        </Link>
+        {nextStage ? renderStageAction(nextStage, true) : null}
       </div>
+      {message ? <p className="mt-3 text-sm text-slate-600">{message}</p> : null}
       <div className="mt-4 grid gap-2 md:grid-cols-3 xl:grid-cols-6">
         {flow.stages.map((stage) => (
           <div
@@ -49,12 +132,7 @@ export function ChapterProductionFlowPanel({ flow }: { flow: ChapterProductionFl
               </span>
             </div>
             <p className="mt-2 text-xs leading-5 text-slate-600">{stage.detail}</p>
-            <Link
-              className="mt-3 inline-flex rounded-md border border-slate-200 bg-white px-2 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
-              href={stage.href}
-            >
-              {stage.actionLabel}
-            </Link>
+            {renderStageAction(stage)}
           </div>
         ))}
       </div>

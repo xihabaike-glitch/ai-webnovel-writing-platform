@@ -122,6 +122,8 @@ export default async function ProjectPage({ params }: { params: Promise<{ projec
     select: {
       taskType: true,
       status: true,
+      outputText: true,
+      createdAt: true,
       chapterId: true,
     },
   });
@@ -155,6 +157,8 @@ export default async function ProjectPage({ params }: { params: Promise<{ projec
     aiTasks: productionAiTasks.map((task) => ({
       taskType: task.taskType,
       status: task.status,
+      outputText: task.outputText,
+      createdAt: task.createdAt,
       chapter: task.chapterId ? { id: task.chapterId } : null,
     })),
     gateTasks: project.gateDispatchTasks.map((task) => ({

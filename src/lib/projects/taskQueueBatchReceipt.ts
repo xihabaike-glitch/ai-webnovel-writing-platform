@@ -268,6 +268,9 @@ export function buildTaskQueueBatchGateActionReceipt(input: {
     strategyId: input.strategyId,
     plan: {
       strategyBases: input.plan.strategyBases,
+      scaleGate: input.plan.scaleGate,
+      actionLabel: input.plan.actionLabel,
+      category: input.plan.category,
     },
     results: input.results.map((result) => ({
       status: result.status,

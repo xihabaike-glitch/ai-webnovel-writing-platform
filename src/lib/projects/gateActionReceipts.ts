@@ -14,6 +14,9 @@ export interface GateActionReceiptPayload {
   error?: string;
   plan?: {
     strategyBases?: GateActionReceiptStartTactic[];
+    scaleGate?: string;
+    actionLabel?: string;
+    category?: string | null;
   };
   startTactics?: GateActionReceiptStartTactic[];
   variants?: unknown[];
@@ -35,6 +38,12 @@ export interface GateActionReceiptPayload {
     averageQualityScore: number | null;
     verdict?: string;
   };
+  batchReceipt?: {
+    status?: string;
+    headline?: string;
+    detail?: string;
+    warnings?: string[];
+  };
 }
 
 export interface GateActionReceiptStartTactic {
@@ -53,6 +62,14 @@ export interface GateActionReceiptBatchEffectSummary {
   verdict?: string;
 }
 
+export interface GateActionReceiptBatchContext {
+  scaleGate: "none" | "sample_only" | "cleared";
+  actionLabel: string;
+  category: string | null;
+  receiptHeadline: string;
+  receiptStatus: string;
+}
+
 export interface GateActionReceipt {
   id: string;
   actionId: string;
@@ -69,6 +86,7 @@ export interface GateActionReceipt {
   platformName?: string;
   startTactics?: GateActionReceiptStartTactic[];
   batchEffectSummary?: GateActionReceiptBatchEffectSummary | null;
+  batchContext?: GateActionReceiptBatchContext | null;
   recheck: {
     status: "ready" | "blocked";
     label: string;
@@ -880,6 +898,7 @@ export interface GateBatchTacticEffectItem {
   successRatePercent: number;
   averageQualityScore: number | null;
   knownCostUsd: number;
+  recoveryBatches: number;
   latestAt: string;
   evidence: string[];
   nextAction: string;
@@ -956,6 +975,35 @@ function batchEffectSummaryFromPayload(payload: GateActionReceiptPayload): GateA
     averageQualityScore: route.averageQualityScore,
     verdict: route.verdict,
   };
+}
+
+function batchScaleGate(value: unknown): GateActionReceiptBatchContext["scaleGate"] {
+  if (value === "sample_only" || value === "cleared") return value;
+  return "none";
+}
+
+function batchContextFromPayload(payload: GateActionReceiptPayload): GateActionReceiptBatchContext | null {
+  const scaleGate = batchScaleGate(payload.plan?.scaleGate);
+  const actionLabel = payload.plan?.actionLabel ?? "";
+  const category = typeof payload.plan?.category === "string" ? payload.plan.category : null;
+  const receiptHeadline = payload.batchReceipt?.headline ?? "";
+  const receiptStatus = payload.batchReceipt?.status ?? "";
+  if (scaleGate === "none" && !actionLabel && !receiptHeadline) return null;
+
+  return {
+    scaleGate,
+    actionLabel,
+    category,
+    receiptHeadline,
+    receiptStatus,
+  };
+}
+
+function batchContextText(context?: GateActionReceiptBatchContext | null) {
+  if (!context) return "";
+  if (context.scaleGate === "cleared") return "恢复放量";
+  if (context.scaleGate === "sample_only") return "小样本";
+  return "";
 }
 
 function receiptMessage(input: {
@@ -1177,6 +1225,7 @@ export function gateActionReceiptFromAuditRecord(record: GateActionAuditRecord):
     platformName: record.platformName,
     startTactics: startTacticsFromPayload(payload),
     batchEffectSummary: batchEffectSummaryFromPayload(payload),
+    batchContext: batchContextFromPayload(payload),
     recheck: {
       status: record.recheckStatus === "blocked" ? "blocked" : "ready",
       label: record.recheckLabel,
@@ -1198,6 +1247,7 @@ export function buildGateActionReceipt(input: {
   const counts = countStatus(payload);
   const startTactics = startTacticsFromPayload(payload);
   const batchEffectSummary = batchEffectSummaryFromPayload(payload);
+  const batchContext = batchContextFromPayload(payload);
   const createdAt = input.now ? new Date(input.now).toISOString() : new Date().toISOString();
   const taskId = payload.task?.id ?? payload.result?.taskId ?? payload.results?.find((result) => result.taskId)?.taskId ?? null;
   const message = receiptMessage({
@@ -1223,6 +1273,7 @@ export function buildGateActionReceipt(input: {
     platformName: platformNameFromDetail(input.action.detail),
     startTactics,
     batchEffectSummary,
+    batchContext,
     recheck: recheckHint({
       action: input.action,
       status: input.status,
@@ -6023,22 +6074,31 @@ export function buildGateBatchTacticEffectReview(
       ? Math.round(qualitySamples.reduce((sum, score) => sum + score, 0) / qualitySamples.length)
       : null;
     const knownCostUsd = Number(sortedReceipts.reduce((sum, receipt) => sum + (receipt.batchEffectSummary?.knownCostUsd ?? 0), 0).toFixed(4));
-    const status = batchTacticStatus({
+    const recoveryBatches = sortedReceipts.filter((receipt) => receipt.batchContext?.scaleGate === "cleared").length;
+    const baseStatus = batchTacticStatus({
       sampleBatches: sortedReceipts.length,
       successRatePercent,
       averageQualityScore,
       failedTasks,
     });
-    const label = batchTacticLabel(status);
+    const status = recoveryBatches > 0 && baseStatus === "usable" && recoveryBatches < 2 ? "watch" : baseStatus;
+    const label = recoveryBatches > 0
+      ? status === "usable" ? "恢复放量打法" : status === "blocked" ? "恢复放量避坑" : "恢复放量观察"
+      : batchTacticLabel(status);
     const evidence = sortedReceipts.slice(0, 3).map((receipt) => {
       const quality = receipt.batchEffectSummary?.averageQualityScore ?? "缺";
-      return `${receipt.label}：成功 ${receipt.succeededCount}，失败 ${receipt.failedCount}，质量 ${quality}`;
+      const context = batchContextText(receipt.batchContext);
+      return `${receipt.label}${context ? `｜${context}` : ""}：成功 ${receipt.succeededCount}，失败 ${receipt.failedCount}，质量 ${quality}`;
     });
     const nextAction = status === "blocked"
       ? "先拆失败样本和低分原因，暂停把这套打法继续放进新批次。"
       : status === "watch"
-        ? "只允许小批继续验证，等至少两批稳定后再写入可复用打法。"
-        : "可以进入新项目开书参考，但仍保留小步验证和回执追踪。";
+        ? recoveryBatches > 0
+          ? "恢复放量样本还薄，至少再跑一轮稳定批次后，才允许写成新项目可复用打法。"
+          : "只允许小批继续验证，等至少两批稳定后再写入可复用打法。"
+        : recoveryBatches > 0
+          ? "恢复放量已经连续稳定，可作为观察平台解除闸门后的参考打法，但新项目仍先跑小样本。"
+          : "可以进入新项目开书参考，但仍保留小步验证和回执追踪。";
 
     return {
       id,
@@ -6056,6 +6116,7 @@ export function buildGateBatchTacticEffectReview(
       successRatePercent,
       averageQualityScore,
       knownCostUsd,
+      recoveryBatches,
       latestAt: sortedReceipts[0]?.createdAt ?? new Date(0).toISOString(),
       evidence,
       nextAction,

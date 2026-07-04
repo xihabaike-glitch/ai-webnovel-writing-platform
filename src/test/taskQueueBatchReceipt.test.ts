@@ -252,6 +252,10 @@ test("buildTaskQueueBatchGateActionReceipt turns a recommended batch into gate e
   assert.equal(gateReceipt.receipt.taskId, "task-1");
   assert.equal(gateReceipt.receipt.batchEffectSummary?.successRatePercent, 100);
   assert.equal(gateReceipt.receipt.startTactics?.[0].title, "首轮平台打法：番茄小说");
+  assert.equal(gateReceipt.receipt.batchContext?.scaleGate, "none");
+  assert.equal(gateReceipt.payload.plan.scaleGate, "none");
+  assert.equal(gateReceipt.payload.plan.actionLabel, "批量初稿 1 个");
+  assert.equal(gateReceipt.payload.plan.category, "draft");
   assert.equal(gateReceipt.payload.batchReceipt.status, "continue");
   assert.equal(gateReceipt.payload.strategyId, "standard");
 });

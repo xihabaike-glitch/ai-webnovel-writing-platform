@@ -242,8 +242,86 @@ test("buildGateActionReceipt", async (t) => {
     assert.equal(usable?.sampleBatches, 2);
     assert.equal(usable?.successRatePercent, 100);
     assert.equal(usable?.averageQualityScore, 89);
+    assert.equal(usable?.recoveryBatches, 0);
     assert.equal(blocked?.status, "blocked");
     assert.ok(blocked?.nextAction.includes("暂停"));
+  });
+
+  await t.test("keeps cleared watch batch tactics in recovery watch until repeated", () => {
+    const tactic = {
+      title: "首轮平台打法：番茄小说",
+      label: "批量可复用",
+      primaryTactic: "首章先给不可逆危机，三章内连续兑现爽点。",
+      openingMove: "第一段给倒计时和身份暴露风险。",
+      verificationMove: "批量后复检前三章追读。",
+      risk: "解释过多会掉首秀。",
+    };
+    const receipt = buildGateActionReceipt({
+      action,
+      status: "succeeded",
+      now: "2026-01-01T00:00:00.000Z",
+      payload: {
+        results: [{ status: "succeeded", taskId: "task-1" }],
+        routeEffectSummary: { successRatePercent: 100, knownCostUsd: 0.01, averageQualityScore: 88 },
+        plan: {
+          strategyBases: [tactic],
+          scaleGate: "cleared",
+          actionLabel: "批量初稿 2 个",
+          category: "draft",
+        },
+        batchReceipt: {
+          status: "continue",
+          headline: "准放量批次稳定，下一批仍小步走",
+        },
+      },
+    });
+    const review = buildGateBatchTacticEffectReview([receipt]);
+
+    assert.equal(receipt.batchContext?.scaleGate, "cleared");
+    assert.equal(review.items[0]?.status, "watch");
+    assert.equal(review.items[0]?.label, "恢复放量观察");
+    assert.equal(review.items[0]?.recoveryBatches, 1);
+    assert.ok(review.items[0]?.evidence[0].includes("恢复放量"));
+    assert.ok(review.items[0]?.nextAction.includes("至少再跑一轮"));
+  });
+
+  await t.test("turns repeated cleared watch batches into reusable recovery tactics", () => {
+    const tactic = {
+      title: "首轮平台打法：番茄小说",
+      label: "批量可复用",
+      primaryTactic: "首章先给不可逆危机，三章内连续兑现爽点。",
+      openingMove: "第一段给倒计时和身份暴露风险。",
+      verificationMove: "批量后复检前三章追读。",
+      risk: "解释过多会掉首秀。",
+    };
+    const first = buildGateActionReceipt({
+      action,
+      status: "succeeded",
+      now: "2026-01-01T00:00:00.000Z",
+      payload: {
+        results: [{ status: "succeeded", taskId: "task-1" }],
+        routeEffectSummary: { successRatePercent: 100, knownCostUsd: 0.01, averageQualityScore: 88 },
+        plan: { strategyBases: [tactic], scaleGate: "cleared", actionLabel: "批量初稿 2 个", category: "draft" },
+        batchReceipt: { status: "continue", headline: "准放量批次稳定，下一批仍小步走" },
+      },
+    });
+    const second = buildGateActionReceipt({
+      action,
+      status: "succeeded",
+      now: "2026-01-02T00:00:00.000Z",
+      payload: {
+        results: [{ status: "succeeded", taskId: "task-2" }],
+        routeEffectSummary: { successRatePercent: 100, knownCostUsd: 0.02, averageQualityScore: 90 },
+        plan: { strategyBases: [tactic], scaleGate: "cleared", actionLabel: "批量初稿 2 个", category: "draft" },
+        batchReceipt: { status: "continue", headline: "准放量批次稳定，下一批仍小步走" },
+      },
+    });
+    const review = buildGateBatchTacticEffectReview([second, first]);
+
+    assert.equal(review.items[0]?.status, "usable");
+    assert.equal(review.items[0]?.label, "恢复放量打法");
+    assert.equal(review.items[0]?.recoveryBatches, 2);
+    assert.ok(review.items[0]?.nextAction.includes("新项目仍先跑小样本"));
   });
 
   await t.test("restores recommended batch receipts from persisted audits", () => {

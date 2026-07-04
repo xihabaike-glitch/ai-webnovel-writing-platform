@@ -319,6 +319,7 @@ function completionEvidenceTemplate(step: FirstDayWorkflowStep, acceptanceCriter
   if (step.id === "first-review") return "第一章审稿已完成，已输出钩子、爽点、冲突、解释密度和追读问题，可以进入二改。";
   if (step.id === "first-rewrite") return "二改或前三章改写已完成，审稿问题已逐项处理，并保留了版本对照。";
   if (step.id === "publish-precheck") return "平台包预检已完成，标题、简介、标签、卖点、样章和风险清单已整理。";
+  if (step.id === "risk-recovery") return "止损恢复条件已写清，入口卖点、前三章兑现或平台匹配度至少改掉一项，并明确只验证一个变量。";
   if (step.id === "story-support") return "人物弧光和核心设定已补齐，主角欲望、需求、缺陷、规则、禁忌和平台土壤可供后续生成引用。";
   if (step.id === "opening-hook") return "第一章章节卡已补齐，目标、钩子、冲突、转变和章末悬念已按平台开头规则检查。";
   return `首日节点已完成：${acceptanceCriteria.join("；")}。`;
@@ -445,6 +446,21 @@ function executionPackage(step: FirstDayWorkflowStep, context: {
     return {
       ...base,
       headline: "策划补齐人物和设定，别让模型在空地上编。",
+      acceptanceCriteria,
+      missingEvidence,
+      handoffNote,
+      modelPrompt: modelPrompt({ ...context, step, acceptanceCriteria, missingEvidence, handoffNote }),
+      completionEvidenceTemplate: completionEvidenceTemplate(step, acceptanceCriteria),
+    };
+  }
+
+  if (step.id === "risk-recovery") {
+    const acceptanceCriteria = withRiskCriteria(["恢复条件已写清", "入口卖点、前三章兑现或平台匹配度至少改掉一项", "只验证一个变量，暂不进入批量正文生成"]);
+    const missingEvidence = withRiskEvidence(["缺少止损恢复条件或变量范围"]);
+    const handoffNote = withRiskHandoff("这是止损恢复，不是正文完成。先证明问题已经改掉，再进入第一章小样本验证。");
+    return {
+      ...base,
+      headline: "策划先做止损恢复验证，别把坑继续挖深。",
       acceptanceCriteria,
       missingEvidence,
       handoffNote,
@@ -740,24 +756,45 @@ function dispatchStageForStep(stepId: string): GatePlatformGrowthReviewStage {
   return "start_opening_diagnostic";
 }
 
+function recoveredRiskProfile(profile: FirstDayRiskProfile): FirstDayRiskProfile {
+  if (profile.level !== "blocked") return profile;
+  return {
+    level: "watch",
+    label: "恢复观察",
+    headline: "止损恢复后只跑小样本验证。",
+    instruction: "恢复条件已写清，下一步只允许小样本正文验证，先看首轮证据再扩大。",
+    acceptanceCriteria: [
+      "写清恢复后的首轮小样本通过线和不可接受项。",
+      "保留第一章或前三章复查证据，后续按数据决定是否扩大。",
+    ],
+    missingEvidence: ["缺少恢复后小样本验证口径。"],
+    priorityBoost: 8,
+    dueLabel: "今天小样本验证",
+  };
+}
+
 export function buildFirstDayWorkflow(input: FirstDayWorkflowInput): FirstDayWorkflow {
   const chapter = firstChapter(input.chapters);
-  const riskProfile = buildFirstDayRiskProfile(input.startTactic);
   const projectHref = `/projects/${input.project.id}`;
   const firstChapterHref = chapter ? `${projectHref}/chapters/${chapter.id}` : projectHref;
   const skeletonDispatch = completedDispatchForStep(input, "skeleton");
   const hookDispatch = completedDispatchForStep(input, "opening-hook");
   const supportDispatch = completedDispatchForStep(input, "story-support");
+  const riskRecoveryDispatch = completedDispatchForStep(input, "risk-recovery");
   const draftDispatch = completedDispatchForStep(input, "first-draft");
   const reviewDispatch = completedDispatchForStep(input, "first-review");
   const rewriteDispatch = completedDispatchForStep(input, "first-rewrite");
   const exportDispatch = completedDispatchForStep(input, "publish-precheck");
+  const startRiskProfile = buildFirstDayRiskProfile(input.startTactic);
+  const riskProfile = riskRecoveryDispatch ? recoveredRiskProfile(startRiskProfile) : startRiskProfile;
   const structureComplete = (outlineReady(input.outlineNodes) && input.chapters.length >= 3) || Boolean(skeletonDispatch);
   const characterComplete = characterReady(input.characters);
   const worldComplete = worldReady(input.worldEntries);
   const hookComplete = chapterCardReady(chapter) || Boolean(hookDispatch);
   const supportComplete = (characterComplete && worldComplete) || Boolean(supportDispatch);
-  const draftComplete = Boolean(chapter && chapter.wordCount > 0) || hasSucceededTask(input.aiTasks, "chapter_draft", chapter?.id) || Boolean(draftDispatch);
+  const draftDispatchCountsAsDraft = Boolean(draftDispatch) && (startRiskProfile.level !== "blocked" || Boolean(riskRecoveryDispatch));
+  const riskRecoveryComplete = startRiskProfile.level !== "blocked" || Boolean(riskRecoveryDispatch);
+  const draftComplete = Boolean(chapter && chapter.wordCount > 0) || hasSucceededTask(input.aiTasks, "chapter_draft", chapter?.id) || draftDispatchCountsAsDraft;
   const reviewComplete = hasSucceededTask(input.aiTasks, "chapter_review", chapter?.id) || Boolean(reviewDispatch);
   const rewriteComplete = hasSucceededTask(input.aiTasks, "chapter_second_pass", chapter?.id)
     || hasSucceededTask(input.aiTasks, "first_three_rewrite")
@@ -798,12 +835,23 @@ export function buildFirstDayWorkflow(input: FirstDayWorkflowInput): FirstDayWor
       actionLabel: "补人物设定",
       href: `${projectHref}#character-arc`,
     }),
+    ...(startRiskProfile.level === "blocked" ? [step({
+      id: "risk-recovery",
+      label: "恢复条件验证",
+      owner: "策划" as const,
+      complete: riskRecoveryComplete,
+      unlocked: supportComplete,
+      evidence: evidenceWithDispatch("止损平台需要先证明入口卖点、前三章兑现或平台匹配度至少改掉一项。", riskRecoveryDispatch),
+      instruction: "先写清恢复条件和只验证一个变量的范围，不允许把这一步当正文完成。",
+      actionLabel: "写恢复条件",
+      href: `${projectHref}#project-control`,
+    })] : []),
     step({
       id: "first-draft",
       label: "生成第一章正文",
       owner: "AI",
       complete: draftComplete,
-      unlocked: hookComplete && supportComplete,
+      unlocked: hookComplete && supportComplete && riskRecoveryComplete,
       evidence: evidenceWithDispatch(chapter ? `${chapter.wordCount} 字正文，初稿任务${hasSucceededTask(input.aiTasks, "chapter_draft", chapter.id) ? "已成功" : "未完成"}。` : "还没有可生成的章节。", draftDispatch),
       instruction: "用章节卡生成正文，先跑一章验证平台语气和节奏。",
       actionLabel: "生成第一章",

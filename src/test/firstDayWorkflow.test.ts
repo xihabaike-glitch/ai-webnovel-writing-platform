@@ -328,19 +328,22 @@ test("buildFirstDayWorkflow", async (t) => {
 
     const dispatch = buildFirstDayDispatchItem({ workflow, project, platform });
 
+    assert.equal(workflow.nextStep.id, "risk-recovery");
     assert.equal(workflow.executionPackage.riskLevel, "blocked");
     assert.equal(workflow.executionPackage.riskLabel, "复盘止损");
     assert.equal(workflow.executionPackage.riskPriorityBoost, 16);
+    assert.ok(workflow.executionPackage.headline.includes("止损恢复"));
     assert.ok(workflow.executionPackage.acceptanceCriteria.some((criterion) => criterion.includes("恢复条件")));
     assert.ok(workflow.executionPackage.missingEvidence.some((evidence) => evidence.includes("恢复条件")));
     assert.ok(workflow.executionPackage.handoffNote.includes("避坑平台首日"));
     assert.equal(dispatch.dueLabel, "今天止损验证");
     assert.ok(dispatch.title.includes("止损验证"));
-    assert.equal(dispatch.priorityScore, 73);
+    assert.equal(dispatch.id, "first-day:project-1:risk-recovery");
+    assert.equal(dispatch.priorityScore, 78);
     assert.ok(dispatch.evidence.some((evidence) => evidence.includes("恢复条件")));
   });
 
-  await t.test("blocks direct first draft execution for blocked start tactics", () => {
+  await t.test("keeps recovery validation separate from first draft completion", () => {
     const workflow = buildFirstDayWorkflow({
       project,
       platform: getPlatformProfile("qimao"),
@@ -363,13 +366,81 @@ test("buildFirstDayWorkflow", async (t) => {
     const plan = buildFirstDayModelExecutionPlan(workflow);
 
     assert.equal(workflow.executionPackage.riskLevel, "blocked");
-    assert.equal(workflow.executionPackage.stepId, "first-draft");
+    assert.equal(workflow.executionPackage.stepId, "risk-recovery");
+    assert.equal(workflow.nextStep.id, "risk-recovery");
     assert.equal(plan.executable, false);
     assert.equal(plan.actionKind, "manual");
     assert.equal(plan.taskType, undefined);
-    assert.ok(plan.blockedReason?.includes("止损验证"));
-    assert.ok(plan.blockedReason?.includes("不能直接生成第一章正文"));
-    assert.ok(plan.blockedReason?.includes("恢复条件"));
+    assert.ok(plan.blockedReason?.includes("人工确认"));
+    assert.equal(workflow.steps.find((step) => step.id === "first-draft")?.status, "locked");
+  });
+
+  await t.test("moves blocked starts to watch mode after recovery evidence", () => {
+    const workflow = buildFirstDayWorkflow({
+      project,
+      platform: getPlatformProfile("qimao"),
+      chapters: [chapter, { ...chapter, id: "chapter-2", order: 2 }, { ...chapter, id: "chapter-3", order: 3 }],
+      outlineNodes,
+      characters,
+      worldEntries,
+      aiTasks: [],
+      dispatchTasks: [{
+        dispatchKey: "first-day:project-1:risk-recovery",
+        state: "completed",
+        completionEvidence: "恢复条件已写清：入口卖点已重做，前三章兑现问题已列出。",
+      }],
+      startTactic: {
+        title: "首轮平台打法：七猫小说",
+        label: "复盘止损",
+        primaryTactic: "七猫小说方向暂时暂停。",
+        openingMove: "先重做开头钩子。",
+        verificationMove: "只允许恢复条件验证。",
+        risk: "未证明恢复条件前不能生成正文。",
+      },
+      submissionChecklist: checklist,
+    });
+
+    const plan = buildFirstDayModelExecutionPlan(workflow);
+    const dispatch = buildFirstDayDispatchItem({ workflow, project, platform: getPlatformProfile("qimao") });
+
+    assert.equal(workflow.nextStep.id, "first-draft");
+    assert.equal(workflow.executionPackage.riskLevel, "watch");
+    assert.equal(workflow.executionPackage.riskLabel, "恢复观察");
+    assert.equal(plan.executable, true);
+    assert.equal(plan.actionKind, "chapter_draft");
+    assert.equal(dispatch.id, "first-day:project-1:first-draft");
+    assert.equal(dispatch.dueLabel, "今天小样本验证");
+    assert.ok(dispatch.title.includes("小样本验证"));
+  });
+
+  await t.test("does not treat old blocked draft dispatch evidence as completed prose", () => {
+    const workflow = buildFirstDayWorkflow({
+      project,
+      platform: getPlatformProfile("qimao"),
+      chapters: [chapter, { ...chapter, id: "chapter-2", order: 2 }, { ...chapter, id: "chapter-3", order: 3 }],
+      outlineNodes,
+      characters,
+      worldEntries,
+      aiTasks: [],
+      dispatchTasks: [{
+        dispatchKey: "first-day:project-1:first-draft",
+        state: "completed",
+        completionEvidence: "恢复条件已写清：入口卖点已重做，前三章兑现问题已列出。",
+      }],
+      startTactic: {
+        title: "首轮平台打法：七猫小说",
+        label: "复盘止损",
+        primaryTactic: "七猫小说方向暂时暂停。",
+        openingMove: "先重做开头钩子。",
+        verificationMove: "只允许恢复条件验证。",
+        risk: "未证明恢复条件前不能生成正文。",
+      },
+      submissionChecklist: checklist,
+    });
+
+    assert.equal(workflow.nextStep.id, "risk-recovery");
+    assert.equal(workflow.steps.find((step) => step.id === "first-draft")?.status, "locked");
+    assert.equal(workflow.steps.find((step) => step.id === "first-review")?.status, "locked");
   });
 
   await t.test("keeps watch start tactics on a small-sample first-day path", () => {

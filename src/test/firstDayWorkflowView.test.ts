@@ -213,6 +213,10 @@ test("buildFirstDayDispatchCompletionTemplate covers first-day step types", () =
     dispatchKey: "first-day:project-1:publish-precheck",
     acceptanceCriteria: [],
   }).includes("平台包预检已完成"));
+  assert.ok(buildFirstDayDispatchCompletionTemplate({
+    dispatchKey: "first-day:project-1:risk-recovery",
+    acceptanceCriteria: [],
+  }).includes("止损恢复条件已写清"));
   assert.equal(buildFirstDayDispatchCompletionTemplate({
     dispatchKey: "manual",
     acceptanceCriteria: ["完成当前动作"],

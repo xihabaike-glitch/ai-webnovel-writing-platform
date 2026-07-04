@@ -258,6 +258,7 @@ function firstDayStepLabel(stepId: string) {
   if (stepId === "skeleton") return "作品骨架";
   if (stepId === "opening-hook") return "第一章钩子";
   if (stepId === "story-support") return "人物设定支撑";
+  if (stepId === "risk-recovery") return "恢复条件验证";
   if (stepId === "first-draft") return "第一章初稿";
   if (stepId === "first-review") return "第一章审稿";
   if (stepId === "first-rewrite") return "第一章二改";
@@ -293,6 +294,7 @@ export function buildFirstDayDispatchCompletionTemplate(task: Pick<PersistedGate
   if (stepId === "first-rewrite") return "第一章二改或前三章改写已完成，审稿问题已逐项处理，并保留版本对照。";
   if (stepId === "publish-precheck") return "平台包预检已完成，标题、简介、标签、卖点、样章和首轮数据回收口径已整理。";
   if (stepId === "story-support") return "人物弧光、核心设定和平台土壤已补齐，后续正文生成可以直接引用。";
+  if (stepId === "risk-recovery") return "止损恢复条件已写清：入口卖点、前三章兑现或平台匹配度已至少改掉一项，并明确只验证一个变量。";
   if (stepId === "opening-hook") return "第一章目标、钩子、冲突、转变和章末悬念已补齐，并按目标平台开头规则检查。";
   if (stepId === "skeleton") return "作品骨架已完成，开头、结尾、主干、分支、叶片和土壤均已落地。";
   return task.acceptanceCriteria.length ? `首日派单已完成：${task.acceptanceCriteria.join("；")}。` : "";

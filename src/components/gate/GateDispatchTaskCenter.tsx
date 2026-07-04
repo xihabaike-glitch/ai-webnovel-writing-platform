@@ -158,6 +158,22 @@ export function GateDispatchTaskCenter({
     return filterRouteConfirmationDispatchTasks(baseTasks, routeFlowFilter);
   }, [platformFilter, roleFilter, routeFlowFilter, stateFilter, tasks]);
 
+  function evidenceLoopRecheckMessage(updated: Awaited<ReturnType<typeof updatePersistedGateDispatchTaskState>>) {
+    const recheck = updated.evidenceLoopRecheck;
+    if (!recheck) return "";
+    const scoreText = recheck.previousScore === null
+      ? `复检 ${recheck.currentScore} 分`
+      : `复检 ${recheck.previousScore} -> ${recheck.currentScore} 分`;
+    const verdictText = recheck.verdict === "improved"
+      ? "分数变好"
+      : recheck.verdict === "declined"
+        ? "分数变差"
+        : recheck.verdict === "unchanged"
+          ? "分数未变"
+          : "无历史基准";
+    return `证据闭环${scoreText}，${verdictText}：${recheck.label}`;
+  }
+
   async function updateTask(task: PersistedGatePlatformDispatchTask) {
     const targetState = nextState(task.state);
     const completionEvidence = completionDrafts[task.dispatchKey]?.trim() ?? "";
@@ -183,8 +199,11 @@ export function GateDispatchTaskCenter({
           for (const followUp of updated.followUpTasks) nextByKey.set(followUp.dispatchKey, followUp);
           return Array.from(nextByKey.values());
         });
+        const recheckMessage = evidenceLoopRecheckMessage(updated);
         if (updated.followUpTasks.length) {
-          setRouteActionMessage(`已自动生成治理后复检派单：${updated.followUpTasks.map((item) => item.title).join("、")}`);
+          setRouteActionMessage(`已自动生成治理后复检派单：${updated.followUpTasks.map((item) => item.title).join("、")}${recheckMessage ? `；${recheckMessage}` : ""}`);
+        } else if (recheckMessage) {
+          setRouteActionMessage(recheckMessage);
         } else if (updated.knowledgeFeedbackReceipt) {
           setRouteActionMessage(`已回灌到项目反哺证据：${updated.knowledgeFeedbackReceipt.platformName} · ${updated.knowledgeFeedbackReceipt.completedStepLabel}`);
         }

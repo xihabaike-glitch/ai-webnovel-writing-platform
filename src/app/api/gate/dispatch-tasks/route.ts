@@ -7,12 +7,15 @@ import {
 } from "@/lib/model-gateway/routeConfirmation";
 import { getPlatformProfile, type PlatformId } from "@/lib/platforms/platformProfiles";
 import { buildFirstDayFollowUpDispatch, buildFirstDayWorkflow } from "@/lib/projects/firstDayWorkflow";
+import { buildProjectControlDashboard } from "@/lib/projects/projectControlDashboard";
 import type {
+  GateEvidenceLoopRecheck,
   GateActionReceipt,
   GatePlatformGrowthDispatchItem,
   GatePlatformGrowthDispatchState,
   PersistedGatePlatformDispatchTask,
 } from "@/lib/projects/gateActionReceipts";
+import { parsePublishSnapshotTags } from "@/lib/projects/platformPublishExport";
 import { buildSubmissionChecklist } from "@/lib/projects/submissionChecklist";
 
 function text(value: unknown, fallback = "") {
@@ -150,6 +153,164 @@ async function writeDispatchCompletionKnowledgeFeedback(task: Awaited<ReturnType
       createdAt: task.completedAt ?? new Date(),
     },
   });
+}
+
+function baselineEvidenceLoopScore(task: Awaited<ReturnType<typeof prisma.gateDispatchTask.update>>) {
+  const evidence = parseJsonList(task.evidence);
+  for (const item of evidence) {
+    const match = item.match(/证据闭环\s*(\d+)\s*分/);
+    if (!match) continue;
+    const parsed = Number(match[1]);
+    if (Number.isFinite(parsed)) return Math.max(0, Math.min(100, Math.round(parsed)));
+  }
+  return null;
+}
+
+function recheckVerdict(previousScore: number | null, currentScore: number): GateEvidenceLoopRecheck["verdict"] {
+  if (previousScore === null) return "unknown";
+  const delta = currentScore - previousScore;
+  if (delta >= 3) return "improved";
+  if (delta <= -3) return "declined";
+  return "unchanged";
+}
+
+async function buildEvidenceLoopRecheck(task: Awaited<ReturnType<typeof prisma.gateDispatchTask.update>>): Promise<GateEvidenceLoopRecheck | null> {
+  if (!task.projectId || task.platformId === "model-routing") return null;
+  const project = await prisma.project.findUnique({
+    where: { id: task.projectId },
+    include: {
+      chapters: { orderBy: { order: "asc" } },
+      outlineNodes: { orderBy: [{ depth: "asc" }, { order: "asc" }, { createdAt: "asc" }] },
+      characters: { orderBy: { createdAt: "asc" } },
+      worldEntries: { orderBy: [{ type: "asc" }, { createdAt: "asc" }] },
+      foreshadows: { orderBy: { createdAt: "asc" } },
+      plotThreads: { orderBy: { createdAt: "asc" } },
+      aiTasks: { orderBy: { createdAt: "desc" } },
+      publishSnapshots: { orderBy: { createdAt: "desc" }, take: 80 },
+      submissionAssets: { orderBy: { updatedAt: "desc" } },
+      submissionAssetVersions: { orderBy: { createdAt: "desc" }, take: 80 },
+      platformPublishMetrics: { orderBy: { snapshotDate: "desc" }, take: 80 },
+      platformKnowledgeFeedbackReceipts: { orderBy: { createdAt: "desc" }, take: 20 },
+    },
+  });
+  if (!project) return null;
+
+  const platform = getPlatformProfile(project.targetPlatform as PlatformId);
+  const submissionChecklist = buildSubmissionChecklist({
+    title: project.title,
+    genre: project.genre,
+    sellingPoint: project.sellingPoint,
+    currentWordCount: project.currentWordCount,
+    targetWordCount: project.targetWordCount,
+    platform,
+    chapters: project.chapters,
+    aiTasks: project.aiTasks.map((aiTask) => ({
+      taskType: aiTask.taskType,
+      status: aiTask.status,
+      chapter: aiTask.chapterId ? { id: aiTask.chapterId } : null,
+    })),
+  });
+  const dashboard = buildProjectControlDashboard({
+    project: {
+      title: project.title,
+      genre: project.genre,
+      sellingPoint: project.sellingPoint,
+      targetLengthType: project.targetLengthType,
+      targetWordCount: project.targetWordCount,
+      currentWordCount: project.currentWordCount,
+      updateCadence: project.updateCadence,
+    },
+    platform,
+    chapters: project.chapters,
+    outlineNodes: project.outlineNodes,
+    characters: project.characters,
+    worldEntries: project.worldEntries,
+    foreshadows: project.foreshadows,
+    plotThreads: project.plotThreads,
+    aiTasks: project.aiTasks,
+    publishSnapshots: project.publishSnapshots,
+    submissionAssets: project.submissionAssets.map((asset) => ({
+      id: asset.id,
+      platformId: asset.platformId,
+      platformName: asset.platformName,
+      title: asset.title,
+      logline: asset.logline,
+      synopsis: asset.synopsis,
+      overseasSynopsis: asset.overseasSynopsis,
+      tags: parsePublishSnapshotTags(asset.tags),
+      note: asset.note,
+      source: asset.source,
+      updatedAt: asset.updatedAt,
+    })),
+    submissionAssetVersions: project.submissionAssetVersions.map((version) => ({
+      id: version.id,
+      platformId: version.platformId,
+      platformName: version.platformName,
+      title: version.title,
+      logline: version.logline,
+      synopsis: version.synopsis,
+      overseasSynopsis: version.overseasSynopsis,
+      tags: parsePublishSnapshotTags(version.tags),
+      note: version.note,
+      source: version.source,
+      auditScore: version.auditScore,
+      auditStatus: version.auditStatus === "ready" || version.auditStatus === "blocked" ? version.auditStatus : "needs_work",
+      action: version.action,
+      sourceTaskId: version.sourceTaskId,
+      strategy: version.strategy,
+      createdAt: version.createdAt,
+    })),
+    platformPublishMetrics: project.platformPublishMetrics.map((metric) => ({
+      id: metric.id,
+      platformId: metric.platformId,
+      platformName: metric.platformName,
+      views: metric.views,
+      clicks: metric.clicks,
+      favorites: metric.favorites,
+      follows: metric.follows,
+      comments: metric.comments,
+      paidReads: metric.paidReads,
+      editorFeedback: metric.editorFeedback,
+      contractStatus: metric.contractStatus,
+      publishUrl: metric.publishUrl,
+      notes: metric.notes,
+      snapshotDate: metric.snapshotDate,
+      createdAt: metric.createdAt,
+      updatedAt: metric.updatedAt,
+    })),
+    platformKnowledgeFeedbackReceipts: project.platformKnowledgeFeedbackReceipts.map((receipt) => ({
+      id: receipt.receiptId,
+      platformId: receipt.platformId,
+      platformName: receipt.platformName,
+      actionLabel: receipt.actionLabel,
+      title: receipt.title,
+      message: receipt.message,
+      completedStepLabel: receipt.completedStepLabel,
+      stopReason: receipt.stopReason,
+      nextAction: receipt.nextAction,
+      href: receipt.href,
+      severity: receipt.severity === "success" ? "success" : "needs_action",
+      createdAt: receipt.createdAt,
+    })),
+    submissionChecklist,
+  });
+  const loop = dashboard.platformEvidenceLoop;
+  if (loop.platformId !== task.platformId) return null;
+  const previousScore = baselineEvidenceLoopScore(task);
+  return {
+    projectId: project.id,
+    platformId: loop.platformId,
+    platformName: loop.platformName,
+    previousScore,
+    currentScore: loop.score,
+    delta: previousScore === null ? null : loop.score - previousScore,
+    status: loop.status,
+    label: loop.label,
+    verdict: recheckVerdict(previousScore, loop.score),
+    headline: loop.headline,
+    nextAction: loop.nextAction,
+    evidence: loop.evidence,
+  };
 }
 
 function takeLimit(value: string | null) {
@@ -408,6 +569,9 @@ export async function PATCH(request: Request) {
   const knowledgeFeedbackReceipt = nextState === "completed"
     ? await writeDispatchCompletionKnowledgeFeedback(task)
     : null;
+  const evidenceLoopRecheck = nextState === "completed"
+    ? await buildEvidenceLoopRecheck(task)
+    : null;
 
   return NextResponse.json({
     task: toTask(task),
@@ -427,5 +591,6 @@ export async function PATCH(request: Request) {
       severity: knowledgeFeedbackReceipt.severity,
       createdAt: knowledgeFeedbackReceipt.createdAt.toISOString(),
     } : null,
+    evidenceLoopRecheck,
   });
 }

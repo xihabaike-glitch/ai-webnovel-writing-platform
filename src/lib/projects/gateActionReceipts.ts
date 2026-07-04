@@ -267,6 +267,21 @@ export interface GatePlatformEvidenceLoop {
   gateCompletionCount: number;
 }
 
+export interface GateEvidenceLoopRecheck {
+  projectId: string;
+  platformId: string;
+  platformName: string;
+  previousScore: number | null;
+  currentScore: number;
+  delta: number | null;
+  status: GatePlatformEvidenceLoop["status"];
+  label: string;
+  verdict: "improved" | "unchanged" | "declined" | "unknown";
+  headline: string;
+  nextAction: string;
+  evidence: string[];
+}
+
 export interface PersistedGatePlatformDispatchTask extends GatePlatformGrowthDispatchItem {
   databaseId: string;
   dispatchKey: string;
@@ -5606,6 +5621,7 @@ export async function updatePersistedGateDispatchTaskState(
     task?: PersistedGatePlatformDispatchTask;
     followUpTasks?: PersistedGatePlatformDispatchTask[];
     knowledgeFeedbackReceipt?: GateKnowledgeFeedbackReceipt | null;
+    evidenceLoopRecheck?: GateEvidenceLoopRecheck | null;
     error?: string;
   } | null;
   if (!response.ok || !payload?.task) throw new Error(payload?.error ?? "更新平台派单失败。");
@@ -5613,6 +5629,7 @@ export async function updatePersistedGateDispatchTaskState(
     task: payload.task,
     followUpTasks: payload.followUpTasks ?? [],
     knowledgeFeedbackReceipt: payload.knowledgeFeedbackReceipt ?? null,
+    evidenceLoopRecheck: payload.evidenceLoopRecheck ?? null,
   };
 }
 

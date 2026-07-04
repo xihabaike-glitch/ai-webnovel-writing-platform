@@ -83,11 +83,24 @@ export interface FirstDayExecutionPackage {
   headline: string;
   actionLabel: string;
   href: string;
+  chapterId?: string;
   acceptanceCriteria: string[];
   missingEvidence: string[];
   handoffNote: string;
   modelPrompt: string;
   completionEvidenceTemplate: string;
+}
+
+export interface FirstDayModelExecutionPlan {
+  executable: boolean;
+  stepId: string;
+  actionKind: "chapter_draft" | "chapter_review" | "chapter_second_pass" | "control_assets" | "manual";
+  taskType?: "chapter_draft" | "chapter_review" | "chapter_second_pass" | "control_asset_generate";
+  chapterId?: string;
+  controlAreaIds?: Array<"characters" | "world" | "story-lines">;
+  modelPrompt: string;
+  completionEvidence: string;
+  blockedReason?: string;
 }
 
 export interface FirstDayWorkflow {
@@ -260,6 +273,7 @@ function executionPackage(step: FirstDayWorkflowStep, context: {
     owner: step.owner,
     actionLabel: step.actionLabel,
     href: step.href,
+    chapterId: context.chapter?.id,
   };
 
   if (step.id === "first-draft") {
@@ -363,6 +377,65 @@ function executionPackage(step: FirstDayWorkflowStep, context: {
     handoffNote,
     modelPrompt: modelPrompt({ ...context, step, acceptanceCriteria, missingEvidence, handoffNote }),
     completionEvidenceTemplate: completionEvidenceTemplate(step, acceptanceCriteria),
+  };
+}
+
+export function buildFirstDayModelExecutionPlan(workflow: FirstDayWorkflow): FirstDayModelExecutionPlan {
+  const execution = workflow.executionPackage;
+  const base = {
+    stepId: execution.stepId,
+    modelPrompt: execution.modelPrompt,
+    completionEvidence: execution.completionEvidenceTemplate,
+  };
+
+  if (execution.stepId === "story-support") {
+    return {
+      ...base,
+      executable: true,
+      actionKind: "control_assets",
+      taskType: "control_asset_generate",
+      controlAreaIds: ["characters", "world", "story-lines"],
+    };
+  }
+
+  if (execution.stepId === "first-draft") {
+    return {
+      ...base,
+      executable: Boolean(execution.chapterId),
+      actionKind: "chapter_draft",
+      taskType: "chapter_draft",
+      chapterId: execution.chapterId,
+      blockedReason: execution.chapterId ? undefined : "缺少第一章章节卡，不能生成正文。",
+    };
+  }
+
+  if (execution.stepId === "first-review") {
+    return {
+      ...base,
+      executable: Boolean(execution.chapterId),
+      actionKind: "chapter_review",
+      taskType: "chapter_review",
+      chapterId: execution.chapterId,
+      blockedReason: execution.chapterId ? undefined : "缺少第一章章节卡，不能审稿。",
+    };
+  }
+
+  if (execution.stepId === "first-rewrite") {
+    return {
+      ...base,
+      executable: Boolean(execution.chapterId),
+      actionKind: "chapter_second_pass",
+      taskType: "chapter_second_pass",
+      chapterId: execution.chapterId,
+      blockedReason: execution.chapterId ? undefined : "缺少第一章章节卡，不能二改。",
+    };
+  }
+
+  return {
+    ...base,
+    executable: false,
+    actionKind: "manual",
+    blockedReason: "当前首日节点需要人工确认或运营收口，暂不自动调用模型。",
   };
 }
 

@@ -87,6 +87,7 @@ export function FirstDayWorkflowPanel({ projectId }: { projectId: string }) {
   const [dispatch, setDispatch] = useState<GatePlatformGrowthDispatchItem | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isDispatching, setIsDispatching] = useState(false);
+  const [isExecutingAi, setIsExecutingAi] = useState(false);
   const [isCompletingDispatch, setIsCompletingDispatch] = useState(false);
   const [completionEvidence, setCompletionEvidence] = useState("");
   const [message, setMessage] = useState<string | null>(null);
@@ -120,6 +121,34 @@ export function FirstDayWorkflowPanel({ projectId }: { projectId: string }) {
       setMessage(caught instanceof Error ? caught.message : "首日任务派单失败。");
     } finally {
       setIsDispatching(false);
+    }
+  }
+
+  async function executeCurrentStepWithAi() {
+    if (!workflow) return;
+    setIsExecutingAi(true);
+    setMessage(null);
+    try {
+      const response = await fetch(`/api/projects/${projectId}/first-day-workflow`, {
+        method: "POST",
+      });
+      const payload = (await response.json()) as {
+        workflow?: FirstDayWorkflow;
+        dispatch?: GatePlatformGrowthDispatchItem;
+        completionEvidence?: string;
+        error?: string;
+      };
+      if (!response.ok) {
+        throw new Error(payload.error ?? "首日 AI 执行失败。");
+      }
+      if (payload.workflow) setWorkflow(payload.workflow);
+      if (payload.dispatch) setDispatch(payload.dispatch);
+      if (payload.completionEvidence) setCompletionEvidence(payload.completionEvidence);
+      setMessage(`AI 已执行当前节点：${workflow.nextStep.label}。请检查结果后完成派单验收。`);
+    } catch (caught) {
+      setMessage(caught instanceof Error ? caught.message : "首日 AI 执行失败。");
+    } finally {
+      setIsExecutingAi(false);
     }
   }
 
@@ -232,15 +261,25 @@ export function FirstDayWorkflowPanel({ projectId }: { projectId: string }) {
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <div className="text-xs font-medium text-slate-500">AI 执行草稿</div>
-                  <p className="mt-1 text-sm leading-6 text-slate-600">复制给 Claude、DeepSeek、Kimi、GPT 或其他模型执行，再把结果写回对应位置。</p>
+                  <p className="mt-1 text-sm leading-6 text-slate-600">可以直接让平台执行；也可以复制给 Claude、DeepSeek、Kimi、GPT 或其他模型手动执行。</p>
                 </div>
-                <button
-                  className="w-fit rounded-md border border-slate-200 px-3 py-2 text-sm font-medium hover:bg-slate-50"
-                  onClick={() => setCompletionEvidence(workflow.executionPackage.completionEvidenceTemplate)}
-                  type="button"
-                >
-                  套用验收模板
-                </button>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    className="w-fit rounded-md bg-slate-950 px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
+                    disabled={isExecutingAi}
+                    onClick={executeCurrentStepWithAi}
+                    type="button"
+                  >
+                    {isExecutingAi ? "AI 执行中" : "AI 执行当前节点"}
+                  </button>
+                  <button
+                    className="w-fit rounded-md border border-slate-200 px-3 py-2 text-sm font-medium hover:bg-slate-50"
+                    onClick={() => setCompletionEvidence(workflow.executionPackage.completionEvidenceTemplate)}
+                    type="button"
+                  >
+                    套用验收模板
+                  </button>
+                </div>
               </div>
               <textarea
                 className="mt-3 min-h-56 w-full resize-y rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm leading-6 text-slate-700 outline-none"

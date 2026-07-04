@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { getPlatformProfile } from "../lib/platforms/platformProfiles.ts";
-import { buildFirstDayDispatchItem, buildFirstDayLaunchReceipt, buildFirstDayWorkflow } from "../lib/projects/firstDayWorkflow.ts";
+import { buildFirstDayDispatchItem, buildFirstDayLaunchReceipt, buildFirstDayModelExecutionPlan, buildFirstDayWorkflow } from "../lib/projects/firstDayWorkflow.ts";
 
 const project = {
   id: "project-1",
@@ -119,6 +119,29 @@ test("buildFirstDayWorkflow", async (t) => {
     assert.ok(workflow.executionPackage.modelPrompt.includes("第一章 雨夜系统"));
     assert.ok(workflow.executionPackage.modelPrompt.includes("第一章正文已生成并写回章节"));
     assert.ok(workflow.executionPackage.completionEvidenceTemplate.includes("第一章正文已生成"));
+  });
+
+  await t.test("turns the current first-day package into a model execution plan", () => {
+    const workflow = buildFirstDayWorkflow({
+      project,
+      platform: getPlatformProfile("fanqie"),
+      chapters: [chapter, { ...chapter, id: "chapter-2", order: 2 }, { ...chapter, id: "chapter-3", order: 3 }],
+      outlineNodes,
+      characters,
+      worldEntries,
+      aiTasks: [],
+      submissionChecklist: checklist,
+    });
+
+    const plan = buildFirstDayModelExecutionPlan(workflow);
+
+    assert.equal(plan.executable, true);
+    assert.equal(plan.stepId, "first-draft");
+    assert.equal(plan.taskType, "chapter_draft");
+    assert.equal(plan.chapterId, "chapter-1");
+    assert.equal(plan.actionKind, "chapter_draft");
+    assert.ok(plan.modelPrompt.includes("第一章 雨夜系统"));
+    assert.ok(plan.completionEvidence.includes("第一章正文已生成"));
   });
 
   await t.test("turns the current first-day execution package into a dispatch task", () => {

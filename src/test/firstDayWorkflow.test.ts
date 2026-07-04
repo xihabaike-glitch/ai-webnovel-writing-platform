@@ -143,6 +143,43 @@ test("buildFirstDayWorkflow", async (t) => {
     assert.ok(workflow.executionPackage.completionEvidenceTemplate.includes("第一章正文已生成"));
   });
 
+  await t.test("injects project start tactics and model route recheck into first-day execution", () => {
+    const platform = getPlatformProfile("fanqie");
+    const startTactic = {
+      title: "首轮平台打法：番茄小说",
+      label: "恢复放量打法",
+      primaryTactic: "首章先给不可逆危机，三章内连续兑现爽点。",
+      openingMove: "第一段给倒计时和身份暴露风险。",
+      verificationMove: "批量后复检前三章追读；首批同时做模型路由复检，确认正文初稿、章节审稿成功率、质量和成本。",
+      risk: "新项目仍先跑小样本，不要直接放量。",
+    };
+    const workflow = buildFirstDayWorkflow({
+      project,
+      platform,
+      chapters: [chapter, { ...chapter, id: "chapter-2", order: 2 }, { ...chapter, id: "chapter-3", order: 3 }],
+      outlineNodes,
+      characters,
+      worldEntries,
+      aiTasks: [],
+      startTactic,
+      submissionChecklist: checklist,
+    });
+    const dispatch = buildFirstDayDispatchItem({ workflow, project, platform });
+
+    assert.equal(workflow.nextStep.id, "first-draft");
+    assert.equal(workflow.executionPackage.tacticFocus?.label, "恢复放量打法");
+    assert.ok(workflow.executionPackage.tacticFocus?.openingMove.includes("倒计时"));
+    assert.ok(workflow.executionPackage.acceptanceCriteria.some((criterion) => criterion.includes("第一章正文必须执行开头动作")));
+    assert.ok(workflow.executionPackage.acceptanceCriteria.some((criterion) => criterion.includes("模型路线复检")));
+    assert.ok(workflow.executionPackage.missingEvidence.some((evidence) => evidence.includes("开头动作")));
+    assert.ok(workflow.executionPackage.missingEvidence.some((evidence) => evidence.includes("模型路线复检")));
+    assert.ok(workflow.executionPackage.handoffNote.includes("开书打法要落地"));
+    assert.ok(workflow.executionPackage.modelPrompt.includes("开书打法约束"));
+    assert.ok(workflow.executionPackage.modelPrompt.includes("恢复放量打法"));
+    assert.ok(workflow.executionPackage.modelPrompt.includes("模型路线复检"));
+    assert.ok(dispatch.acceptanceCriteria.some((criterion) => criterion.includes("模型路线复检")));
+  });
+
   await t.test("turns the current first-day package into a model execution plan", () => {
     const workflow = buildFirstDayWorkflow({
       project,

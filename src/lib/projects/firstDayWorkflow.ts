@@ -95,6 +95,7 @@ export interface FirstDayExecutionPackage {
   handoffNote: string;
   modelPrompt: string;
   completionEvidenceTemplate: string;
+  tacticFocus: FirstDayTacticFocus | null;
 }
 
 export type FirstDayRiskLevel = "standard" | "watch" | "blocked";
@@ -108,6 +109,17 @@ export interface FirstDayRiskProfile {
   missingEvidence: string[];
   priorityBoost: number;
   dueLabel: string;
+}
+
+export interface FirstDayTacticFocus {
+  title: string;
+  label: string;
+  primaryTactic: string;
+  openingMove: string;
+  verificationMove: string;
+  risk: string;
+  acceptanceCriteria: string[];
+  missingEvidence: string[];
 }
 
 export interface FirstDayModelExecutionPlan {
@@ -325,6 +337,60 @@ function completionEvidenceTemplate(step: FirstDayWorkflowStep, acceptanceCriter
   return `首日节点已完成：${acceptanceCriteria.join("；")}。`;
 }
 
+function modelRouteRecheckCriteria(stepId: string) {
+  if (!["story-support", "first-draft", "first-review", "first-rewrite"].includes(stepId)) {
+    return {
+      acceptanceCriteria: [],
+      missingEvidence: [],
+    };
+  }
+
+  return {
+    acceptanceCriteria: ["模型路线复检：记录当前节点成功率、质量和成本，避免首日链路靠默认路线。"],
+    missingEvidence: ["缺少当前节点模型路线复检证据。"],
+  };
+}
+
+function tacticFocusForStep(startTactic: ProjectStartTacticSummary | null | undefined, stepId: string): FirstDayTacticFocus | null {
+  if (!startTactic) return null;
+  const openingMove = compact(startTactic.openingMove);
+  const verificationMove = compact(startTactic.verificationMove);
+  const primaryTactic = compact(startTactic.primaryTactic);
+  const risk = compact(startTactic.risk);
+
+  const criterionByStep: Record<string, string> = {
+    skeleton: primaryTactic ? `骨架必须能支撑开书打法：${primaryTactic}` : "骨架必须能支撑当前开书打法。",
+    "opening-hook": openingMove ? `开头动作必须落地：${openingMove}` : "第一章钩子必须贴合当前开书打法。",
+    "story-support": primaryTactic ? `人物弧光、主线支线和设定土壤要服务打法：${primaryTactic}` : "人物弧光、主线支线和设定土壤要服务当前打法。",
+    "risk-recovery": risk ? `恢复验证必须回应风险：${risk}` : "恢复验证必须回应当前开书风险。",
+    "first-draft": openingMove ? `第一章正文必须执行开头动作：${openingMove}` : "第一章正文必须执行当前开书动作。",
+    "first-review": verificationMove ? `审稿必须复查验证动作：${verificationMove}` : "审稿必须复查当前开书打法是否落地。",
+    "first-rewrite": risk ? `改稿必须处理打法风险：${risk}` : "改稿必须处理当前打法风险。",
+    "publish-precheck": verificationMove ? `平台包必须回收验证动作：${verificationMove}` : "平台包必须能回收当前开书验证动作。",
+  };
+  const missingByStep: Record<string, string> = {
+    skeleton: "缺少能支撑开书打法的大纲骨架证据。",
+    "opening-hook": "缺少开头动作落地证据。",
+    "story-support": "缺少人物弧光、主线支线或设定土壤对开书打法的支撑证据。",
+    "risk-recovery": "缺少风险恢复验证证据。",
+    "first-draft": "缺少第一章正文执行开头动作的证据。",
+    "first-review": "缺少审稿复查开书验证动作的证据。",
+    "first-rewrite": "缺少改稿处理打法风险的证据。",
+    "publish-precheck": "缺少平台包回收开书验证动作的证据。",
+  };
+
+  return {
+    title: startTactic.title,
+    label: startTactic.label,
+    primaryTactic,
+    openingMove,
+    verificationMove,
+    risk,
+    acceptanceCriteria: [criterionByStep[stepId] ?? "当前节点必须服务开书打法。"],
+    missingEvidence: [missingByStep[stepId] ?? "缺少开书打法落地证据。"],
+  };
+}
+
 function modelPrompt(input: {
   project: FirstDayProject;
   platform: PlatformProfile;
@@ -333,6 +399,7 @@ function modelPrompt(input: {
   acceptanceCriteria: string[];
   missingEvidence: string[];
   handoffNote: string;
+  tacticFocus: FirstDayTacticFocus | null;
 }) {
   const chapterLine = input.chapter
     ? `第一章：${input.chapter.title}。目标：${input.chapter.goal || "未填写"}。钩子：${input.chapter.hook || "未填写"}。冲突：${input.chapter.conflict || "未填写"}。转变：${input.chapter.valueShift || "未填写"}。章末悬念：${input.chapter.cliffhanger || "未填写"}。`
@@ -344,6 +411,14 @@ function modelPrompt(input: {
     `当前节点：${input.step.label}`,
     `节点目标：${input.step.instruction}`,
     chapterLine,
+    input.tacticFocus ? [
+      "开书打法约束：",
+      `- 来源：${input.tacticFocus.title}（${input.tacticFocus.label}）`,
+      input.tacticFocus.primaryTactic ? `- 打法：${input.tacticFocus.primaryTactic}` : "",
+      input.tacticFocus.openingMove ? `- 开头动作：${input.tacticFocus.openingMove}` : "",
+      input.tacticFocus.verificationMove ? `- 验证动作：${input.tacticFocus.verificationMove}` : "",
+      input.tacticFocus.risk ? `- 风险：${input.tacticFocus.risk}` : "",
+    ].filter(Boolean).join("\n") : "",
     `交接要求：${input.handoffNote}`,
     "验收标准：",
     ...input.acceptanceCriteria.map((criterion) => `- ${criterion}`),
@@ -361,12 +436,27 @@ function executionPackage(step: FirstDayWorkflowStep, context: {
   platform: PlatformProfile;
   chapter: FirstDayChapter | null;
   riskProfile: FirstDayRiskProfile;
+  startTactic?: ProjectStartTacticSummary | null;
 }): FirstDayExecutionPackage {
-  const withRiskCriteria = (criteria: string[]) => [...criteria, ...context.riskProfile.acceptanceCriteria];
-  const withRiskEvidence = (evidence: string[]) => [...evidence, ...context.riskProfile.missingEvidence];
+  const tacticFocus = tacticFocusForStep(context.startTactic, step.id);
+  const routeRecheck = modelRouteRecheckCriteria(step.id);
+  const withRiskCriteria = (criteria: string[]) => [
+    ...criteria,
+    ...(tacticFocus?.acceptanceCriteria ?? []),
+    ...routeRecheck.acceptanceCriteria,
+    ...context.riskProfile.acceptanceCriteria,
+  ];
+  const withRiskEvidence = (evidence: string[]) => [
+    ...evidence,
+    ...(tacticFocus?.missingEvidence ?? []),
+    ...routeRecheck.missingEvidence,
+    ...context.riskProfile.missingEvidence,
+  ];
   const withRiskHandoff = (handoffNote: string) => context.riskProfile.level === "standard"
-    ? handoffNote
-    : `${context.riskProfile.headline}${context.riskProfile.instruction} ${handoffNote}`;
+    ? tacticFocus
+      ? `${handoffNote} 开书打法要落地：${tacticFocus.acceptanceCriteria.join(" ")}`
+      : handoffNote
+    : `${context.riskProfile.headline}${context.riskProfile.instruction} ${handoffNote}${tacticFocus ? ` 开书打法要落地：${tacticFocus.acceptanceCriteria.join(" ")}` : ""}`;
   const base = {
     stepId: step.id,
     owner: step.owner,
@@ -377,6 +467,7 @@ function executionPackage(step: FirstDayWorkflowStep, context: {
     actionLabel: step.actionLabel,
     href: step.href,
     chapterId: context.chapter?.id,
+    tacticFocus,
   };
 
   if (step.id === "first-draft") {
@@ -389,7 +480,7 @@ function executionPackage(step: FirstDayWorkflowStep, context: {
       acceptanceCriteria,
       missingEvidence,
       handoffNote,
-      modelPrompt: modelPrompt({ ...context, step, acceptanceCriteria, missingEvidence, handoffNote }),
+      modelPrompt: modelPrompt({ ...context, step, acceptanceCriteria, missingEvidence, handoffNote, tacticFocus }),
       completionEvidenceTemplate: completionEvidenceTemplate(step, acceptanceCriteria),
     };
   }
@@ -404,7 +495,7 @@ function executionPackage(step: FirstDayWorkflowStep, context: {
       acceptanceCriteria,
       missingEvidence,
       handoffNote,
-      modelPrompt: modelPrompt({ ...context, step, acceptanceCriteria, missingEvidence, handoffNote }),
+      modelPrompt: modelPrompt({ ...context, step, acceptanceCriteria, missingEvidence, handoffNote, tacticFocus }),
       completionEvidenceTemplate: completionEvidenceTemplate(step, acceptanceCriteria),
     };
   }
@@ -419,7 +510,7 @@ function executionPackage(step: FirstDayWorkflowStep, context: {
       acceptanceCriteria,
       missingEvidence,
       handoffNote,
-      modelPrompt: modelPrompt({ ...context, step, acceptanceCriteria, missingEvidence, handoffNote }),
+      modelPrompt: modelPrompt({ ...context, step, acceptanceCriteria, missingEvidence, handoffNote, tacticFocus }),
       completionEvidenceTemplate: completionEvidenceTemplate(step, acceptanceCriteria),
     };
   }
@@ -434,7 +525,7 @@ function executionPackage(step: FirstDayWorkflowStep, context: {
       acceptanceCriteria,
       missingEvidence,
       handoffNote,
-      modelPrompt: modelPrompt({ ...context, step, acceptanceCriteria, missingEvidence, handoffNote }),
+      modelPrompt: modelPrompt({ ...context, step, acceptanceCriteria, missingEvidence, handoffNote, tacticFocus }),
       completionEvidenceTemplate: completionEvidenceTemplate(step, acceptanceCriteria),
     };
   }
@@ -449,7 +540,7 @@ function executionPackage(step: FirstDayWorkflowStep, context: {
       acceptanceCriteria,
       missingEvidence,
       handoffNote,
-      modelPrompt: modelPrompt({ ...context, step, acceptanceCriteria, missingEvidence, handoffNote }),
+      modelPrompt: modelPrompt({ ...context, step, acceptanceCriteria, missingEvidence, handoffNote, tacticFocus }),
       completionEvidenceTemplate: completionEvidenceTemplate(step, acceptanceCriteria),
     };
   }
@@ -464,7 +555,7 @@ function executionPackage(step: FirstDayWorkflowStep, context: {
       acceptanceCriteria,
       missingEvidence,
       handoffNote,
-      modelPrompt: modelPrompt({ ...context, step, acceptanceCriteria, missingEvidence, handoffNote }),
+      modelPrompt: modelPrompt({ ...context, step, acceptanceCriteria, missingEvidence, handoffNote, tacticFocus }),
       completionEvidenceTemplate: completionEvidenceTemplate(step, acceptanceCriteria),
     };
   }
@@ -479,7 +570,7 @@ function executionPackage(step: FirstDayWorkflowStep, context: {
       acceptanceCriteria,
       missingEvidence,
       handoffNote,
-      modelPrompt: modelPrompt({ ...context, step, acceptanceCriteria, missingEvidence, handoffNote }),
+      modelPrompt: modelPrompt({ ...context, step, acceptanceCriteria, missingEvidence, handoffNote, tacticFocus }),
       completionEvidenceTemplate: completionEvidenceTemplate(step, acceptanceCriteria),
     };
   }
@@ -493,7 +584,7 @@ function executionPackage(step: FirstDayWorkflowStep, context: {
     acceptanceCriteria,
     missingEvidence,
     handoffNote,
-    modelPrompt: modelPrompt({ ...context, step, acceptanceCriteria, missingEvidence, handoffNote }),
+    modelPrompt: modelPrompt({ ...context, step, acceptanceCriteria, missingEvidence, handoffNote, tacticFocus }),
     completionEvidenceTemplate: completionEvidenceTemplate(step, acceptanceCriteria),
   };
 }
@@ -907,6 +998,7 @@ export function buildFirstDayWorkflow(input: FirstDayWorkflowInput): FirstDayWor
       platform: input.platform,
       chapter,
       riskProfile,
+      startTactic: input.startTactic,
     }),
     steps,
   };

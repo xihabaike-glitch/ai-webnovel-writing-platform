@@ -33,6 +33,16 @@ interface FirstDayExecutionPackage {
   handoffNote: string;
   modelPrompt: string;
   completionEvidenceTemplate: string;
+  tacticFocus: {
+    title: string;
+    label: string;
+    primaryTactic: string;
+    openingMove: string;
+    verificationMove: string;
+    risk: string;
+    acceptanceCriteria: string[];
+    missingEvidence: string[];
+  } | null;
 }
 
 interface FirstDayWorkflow {
@@ -504,6 +514,31 @@ export function FirstDayWorkflowPanel({ projectId }: { projectId: string }) {
                       <span className="rounded-md bg-white/70 px-2 py-1 text-xs font-medium" key={badge}>{badge}</span>
                     ))}
                   </div>
+                </div>
+              </div>
+            ) : null}
+            {workflow.executionPackage.tacticFocus ? (
+              <div className="mt-4 rounded-md border border-slate-200 bg-slate-50 px-3 py-3 text-sm">
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                  <div>
+                    <div className="text-xs font-medium text-slate-500">开书打法约束</div>
+                    <div className="mt-1 font-semibold text-slate-950">{workflow.executionPackage.tacticFocus.title}</div>
+                    <p className="mt-1 leading-6 text-slate-600">{workflow.executionPackage.tacticFocus.primaryTactic}</p>
+                  </div>
+                  <span className="w-fit rounded-md bg-white px-2 py-1 text-xs font-medium text-slate-700">
+                    {workflow.executionPackage.tacticFocus.label}
+                  </span>
+                </div>
+                <div className="mt-3 grid gap-2 text-xs text-slate-600 md:grid-cols-3">
+                  {workflow.executionPackage.tacticFocus.openingMove ? (
+                    <div className="rounded-md bg-white px-2 py-2 leading-5">开头：{workflow.executionPackage.tacticFocus.openingMove}</div>
+                  ) : null}
+                  {workflow.executionPackage.tacticFocus.verificationMove ? (
+                    <div className="rounded-md bg-white px-2 py-2 leading-5">验证：{workflow.executionPackage.tacticFocus.verificationMove}</div>
+                  ) : null}
+                  {workflow.executionPackage.tacticFocus.risk ? (
+                    <div className="rounded-md bg-white px-2 py-2 leading-5">风险：{workflow.executionPackage.tacticFocus.risk}</div>
+                  ) : null}
                 </div>
               </div>
             ) : null}

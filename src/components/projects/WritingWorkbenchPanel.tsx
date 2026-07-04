@@ -82,7 +82,11 @@ export function WritingWorkbenchPanel({ workbench }: { workbench: WritingWorkben
               </span>
             </div>
             <div className="mt-1 text-xs text-slate-500">{block.count} 个素材</div>
-            <p className="mt-2 text-sm text-slate-600">{block.note}</p>
+            <Link className="mt-3 block text-sm font-medium text-slate-950 hover:text-slate-700" href={block.href}>
+              {block.focusTitle}
+            </Link>
+            <p className="mt-1 line-clamp-2 text-xs leading-5 text-slate-500">{block.focusDetail}</p>
+            <p className="mt-2 text-sm text-slate-600">{block.nextAction || block.note}</p>
           </div>
         ))}
       </div>

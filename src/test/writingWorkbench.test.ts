@@ -116,6 +116,23 @@ test("buildWritingWorkbench", async (t) => {
     assert.equal(workbench.heroAction.href, "/projects/p1/chapters/c1#chapter-editor");
     assert.ok(workbench.treeBlocks.some((block) => block.type === "ending" && block.status === "fail"));
     assert.ok(workbench.treeBlocks.some((block) => block.type === "soil" && block.status === "fail"));
+    assert.ok(workbench.treeBlocks.some((block) => (
+      block.type === "opening"
+      && block.focusTitle === "雨夜倒计时"
+      && block.nextAction.includes("目标、钩子、冲突")
+      && block.href === "/projects/p1#outline-tree"
+    )));
+    assert.ok(workbench.treeBlocks.some((block) => (
+      block.type === "leaf"
+      && block.focusTitle === "第一章 雨夜系统"
+      && block.href === "/projects/p1/chapters/c1#chapter-editor"
+      && block.nextAction.includes("章节钩子")
+    )));
+    assert.ok(workbench.treeBlocks.some((block) => (
+      block.type === "ending"
+      && block.focusTitle === "结尾未定义"
+      && block.nextAction.includes("先写结尾")
+    )));
     assert.equal(workbench.chapterFocus.nextChapter?.id, "c1");
     assert.equal(workbench.chapterFocus.hookStatus, "fail");
     assert.ok(workbench.characterFocus.nextAction.includes("人物弧光"));
@@ -188,6 +205,17 @@ test("buildWritingWorkbench", async (t) => {
     assert.equal(workbench.heroAction.label, "创建第一章");
     assert.equal(workbench.heroAction.href, "/projects/p2#create-chapter");
     assert.equal(workbench.chapterFocus.nextChapter, null);
+    assert.ok(workbench.treeBlocks.some((block) => (
+      block.type === "soil"
+      && block.focusTitle === "万象体系"
+      && block.href === "/projects/p2#world-bible"
+      && block.nextAction.includes("平台土壤")
+    )));
+    assert.ok(workbench.treeBlocks.some((block) => (
+      block.type === "leaf"
+      && block.href === "/projects/p2#create-chapter"
+      && block.nextAction.includes("创建第一章")
+    )));
     assert.ok(workbench.characterFocus.nextAction.includes("主角人物卡"));
     assert.ok(workbench.quickFixes.some((fix) => fix.kind === "character_seed"));
     assert.ok(workbench.quickFixes.some((fix) => (

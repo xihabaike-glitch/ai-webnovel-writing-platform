@@ -85,6 +85,10 @@ export interface WritingWorkbenchTreeBlock {
   status: WorkbenchStatus;
   count: number;
   note: string;
+  focusTitle: string;
+  focusDetail: string;
+  nextAction: string;
+  href: string;
 }
 
 export interface WritingWorkbench {
@@ -218,19 +222,110 @@ function clampPercent(value: number) {
   return Math.max(0, Math.min(100, Math.round(value)));
 }
 
-function buildTreeBlocks(nodes: WritingWorkbenchOutlineNode[], worldEntries: WritingWorkbenchWorldEntry[]): WritingWorkbenchTreeBlock[] {
+function completeFields(node: WritingWorkbenchOutlineNode) {
+  return [node.goal, node.hook, node.conflict, node.valueShift].every(hasText);
+}
+
+function treeBlockFocus(input: WritingWorkbenchInput, type: WritingWorkbenchTreeBlock["type"], status: WorkbenchStatus) {
+  const projectHref = `/projects/${input.project.id}`;
+  const firstNodeOfType = input.outlineNodes.find((node) => node.type === type);
+  const weakNodeOfType = input.outlineNodes.find((node) => node.type === type && !completeFields(node));
+  const focusNode = weakNodeOfType ?? firstNodeOfType;
+
+  if (type === "leaf") {
+    const nextChapter = pickNextChapter(input.chapters);
+    if (nextChapter) {
+      return {
+        focusTitle: nextChapter.title,
+        focusDetail: `第 ${nextChapter.order} 章 · ${nextChapter.wordCount} 字 · ${nextChapter.status}`,
+        nextAction: hasText(nextChapter.hook) && hasText(nextChapter.conflict) && hasText(nextChapter.cliffhanger)
+          ? "章节卡已能承接正文，继续写作、审稿或二改。"
+          : "先补齐章节钩子、冲突和章末悬念，再进入模型生成。",
+        href: `${projectHref}/chapters/${nextChapter.id}#chapter-editor`,
+      };
+    }
+  }
+
+  if (type === "soil") {
+    const worldEntry = input.worldEntries[0];
+    const soilNode = input.outlineNodes.find((node) => node.type === "soil");
+    if (worldEntry || soilNode) {
+      return {
+        focusTitle: worldEntry?.title ?? soilNode?.title ?? "项目土壤",
+        focusDetail: worldEntry
+          ? `${worldEntry.type} · ${worldEntry.content.slice(0, 48)}`
+          : soilNode?.goal || "平台规则、人物设定和读者预期需要沉淀。",
+        nextAction: status === "pass"
+          ? "把平台土壤写进下一章提示词，避免正文只靠临场发挥。"
+          : "补平台规则、禁忌代价和读者期待，让模型有可召回依据。",
+        href: `${projectHref}#world-bible`,
+      };
+    }
+  }
+
+  if (focusNode) {
+    return {
+      focusTitle: focusNode.title,
+      focusDetail: focusNode.goal || focusNode.hook || focusNode.conflict || "已有节点，但关键字段还没填实。",
+      nextAction: completeFields(focusNode)
+        ? "把这块继续绑定到章节卡和人物选择里。"
+        : "补齐目标、钩子、冲突和价值变化，别让大树只有标题。",
+      href: `${projectHref}#outline-tree`,
+    };
+  }
+
+  const emptyCopy: Record<WritingWorkbenchTreeBlock["type"], { focusTitle: string; focusDetail: string; nextAction: string; href: string }> = {
+    opening: {
+      focusTitle: "开头钩子未落地",
+      focusDetail: "还没有能抓人的开篇危机或第一章承诺。",
+      nextAction: "先写开头：第一屏给危机、选择和不可逆代价。",
+      href: `${projectHref}#outline-tree`,
+    },
+    ending: {
+      focusTitle: "结尾未定义",
+      focusDetail: "还不知道情绪、真相或人物弧光最后要落在哪里。",
+      nextAction: "先写结尾承诺，再倒推主干和分支。",
+      href: `${projectHref}#outline-tree`,
+    },
+    trunk: {
+      focusTitle: "主干未成形",
+      focusDetail: "主线目标、阶段阻力和长期期待还没连起来。",
+      nextAction: "补主干：主角追什么、谁阻止、每卷怎么升级。",
+      href: `${projectHref}#outline-tree`,
+    },
+    branch: {
+      focusTitle: "分支不足",
+      focusDetail: "支线还不能支撑人物关系、势力、伏笔或情绪供给。",
+      nextAction: "补 3 条分支：关系线、对抗线、世界/秘密线。",
+      href: `${projectHref}#outline-tree`,
+    },
+    leaf: {
+      focusTitle: "章节叶片未生成",
+      focusDetail: "还没有可写的章节卡。",
+      nextAction: "先创建第一章，把开头节点落成章节卡。",
+      href: `${projectHref}#create-chapter`,
+    },
+    soil: {
+      focusTitle: "项目土壤缺失",
+      focusDetail: "平台规则、人物设定、世界观和读者期待还没沉淀。",
+      nextAction: "先补平台土壤，避免模型生成时没有口味边界。",
+      href: `${projectHref}#world-bible`,
+    },
+  };
+
+  return emptyCopy[type];
+}
+
+function buildTreeBlocks(input: WritingWorkbenchInput): WritingWorkbenchTreeBlock[] {
   return treeRequirements.map((requirement) => {
     const count = requirement.type === "soil"
-      ? nodes.filter((node) => node.type === "soil").length + worldEntries.length
-      : nodes.filter((node) => node.type === requirement.type).length;
+      ? input.outlineNodes.filter((node) => node.type === "soil").length + input.worldEntries.length
+      : input.outlineNodes.filter((node) => node.type === requirement.type).length;
     const completeNode = requirement.type === "soil"
       ? count >= requirement.required
-      : nodes.some((node) => (
+      : input.outlineNodes.some((node) => (
         node.type === requirement.type
-        && hasText(node.goal)
-        && hasText(node.hook)
-        && hasText(node.conflict)
-        && hasText(node.valueShift)
+        && completeFields(node)
       ));
     const status: WorkbenchStatus = count >= requirement.required && completeNode
       ? "pass"
@@ -248,6 +343,7 @@ function buildTreeBlocks(nodes: WritingWorkbenchOutlineNode[], worldEntries: Wri
         : status === "warn"
           ? `${requirement.label}已有素材，但数量或关键字段还不够。`
           : `缺少${requirement.label}，大树结构还断着。`,
+      ...treeBlockFocus(input, requirement.type, status),
     };
   });
 }
@@ -682,7 +778,7 @@ function buildModelTimeline(tasks: WritingWorkbenchAiTask[]): WritingWorkbenchMo
 }
 
 export function buildWritingWorkbench(input: WritingWorkbenchInput): WritingWorkbench {
-  const treeBlocks = buildTreeBlocks(input.outlineNodes, input.worldEntries);
+  const treeBlocks = buildTreeBlocks(input);
   const nextChapter = pickNextChapter(input.chapters);
   const projectContext = buildProjectContextPack({
     currentChapterId: nextChapter?.id ?? null,

@@ -18,6 +18,12 @@ export async function GET(_request: Request, { params }: Params) {
       characters: { orderBy: { createdAt: "asc" } },
       worldEntries: { orderBy: [{ type: "asc" }, { createdAt: "asc" }] },
       aiTasks: { orderBy: { createdAt: "desc" } },
+      gateDispatchTasks: {
+        where: {
+          dispatchKey: { startsWith: `first-day:${projectId}:` },
+        },
+        orderBy: { updatedAt: "desc" },
+      },
     },
   });
 
@@ -54,6 +60,11 @@ export async function GET(_request: Request, { params }: Params) {
     characters: project.characters,
     worldEntries: project.worldEntries,
     aiTasks: project.aiTasks,
+    dispatchTasks: project.gateDispatchTasks.map((task) => ({
+      dispatchKey: task.dispatchKey,
+      state: task.state,
+      completionEvidence: task.completionEvidence,
+    })),
     submissionChecklist,
   });
 

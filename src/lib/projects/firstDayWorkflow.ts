@@ -48,6 +48,12 @@ export interface FirstDayAiTask {
   status: string;
 }
 
+export interface FirstDayDispatchTask {
+  dispatchKey: string;
+  state: string;
+  completionEvidence: string;
+}
+
 export interface FirstDayWorkflowInput {
   project: FirstDayProject;
   platform: PlatformProfile;
@@ -56,6 +62,7 @@ export interface FirstDayWorkflowInput {
   characters: FirstDayCharacter[];
   worldEntries: FirstDayWorldEntry[];
   aiTasks: FirstDayAiTask[];
+  dispatchTasks?: FirstDayDispatchTask[];
   submissionChecklist: SubmissionChecklist;
 }
 
@@ -131,6 +138,20 @@ function hasSucceededTask(tasks: FirstDayAiTask[], taskType: string, chapterId?:
     && task.status === "succeeded"
     && (!chapterId || task.chapterId === chapterId)
   ));
+}
+
+function completedDispatchForStep(input: FirstDayWorkflowInput, stepId: string) {
+  const dispatchKey = `first-day:${input.project.id}:${stepId}`;
+  return input.dispatchTasks?.find((task) => (
+    task.dispatchKey === dispatchKey
+    && task.state === "completed"
+    && hasText(task.completionEvidence, 8)
+  )) ?? null;
+}
+
+function evidenceWithDispatch(evidence: string, dispatch: FirstDayDispatchTask | null) {
+  if (!dispatch) return evidence;
+  return `${evidence} 任务中心已验收：${compact(dispatch.completionEvidence)}。`;
 }
 
 function outlineReady(nodes: FirstDayOutlineNode[]) {
@@ -273,16 +294,24 @@ export function buildFirstDayWorkflow(input: FirstDayWorkflowInput): FirstDayWor
   const chapter = firstChapter(input.chapters);
   const projectHref = `/projects/${input.project.id}`;
   const firstChapterHref = chapter ? `${projectHref}/chapters/${chapter.id}` : projectHref;
-  const structureComplete = outlineReady(input.outlineNodes) && input.chapters.length >= 3;
+  const skeletonDispatch = completedDispatchForStep(input, "skeleton");
+  const hookDispatch = completedDispatchForStep(input, "opening-hook");
+  const supportDispatch = completedDispatchForStep(input, "story-support");
+  const draftDispatch = completedDispatchForStep(input, "first-draft");
+  const reviewDispatch = completedDispatchForStep(input, "first-review");
+  const rewriteDispatch = completedDispatchForStep(input, "first-rewrite");
+  const exportDispatch = completedDispatchForStep(input, "publish-precheck");
+  const structureComplete = (outlineReady(input.outlineNodes) && input.chapters.length >= 3) || Boolean(skeletonDispatch);
   const characterComplete = characterReady(input.characters);
   const worldComplete = worldReady(input.worldEntries);
-  const hookComplete = chapterCardReady(chapter);
-  const draftComplete = Boolean(chapter && chapter.wordCount > 0) || hasSucceededTask(input.aiTasks, "chapter_draft", chapter?.id);
-  const reviewComplete = hasSucceededTask(input.aiTasks, "chapter_review", chapter?.id);
+  const hookComplete = chapterCardReady(chapter) || Boolean(hookDispatch);
+  const supportComplete = (characterComplete && worldComplete) || Boolean(supportDispatch);
+  const draftComplete = Boolean(chapter && chapter.wordCount > 0) || hasSucceededTask(input.aiTasks, "chapter_draft", chapter?.id) || Boolean(draftDispatch);
+  const reviewComplete = hasSucceededTask(input.aiTasks, "chapter_review", chapter?.id) || Boolean(reviewDispatch);
   const rewriteComplete = hasSucceededTask(input.aiTasks, "chapter_second_pass", chapter?.id)
-    || hasSucceededTask(input.aiTasks, "first_three_rewrite");
-  const exportComplete = input.submissionChecklist.readinessPercent >= 70 && draftComplete && reviewComplete;
-  const supportComplete = characterComplete && worldComplete;
+    || hasSucceededTask(input.aiTasks, "first_three_rewrite")
+    || Boolean(rewriteDispatch);
+  const exportComplete = (input.submissionChecklist.readinessPercent >= 70 && draftComplete && reviewComplete) || Boolean(exportDispatch);
 
   const steps = [
     step({
@@ -291,7 +320,7 @@ export function buildFirstDayWorkflow(input: FirstDayWorkflowInput): FirstDayWor
       owner: "策划",
       complete: structureComplete,
       unlocked: true,
-      evidence: `${input.outlineNodes.length} 个大纲节点，${input.chapters.length} 张章节卡。`,
+      evidence: evidenceWithDispatch(`${input.outlineNodes.length} 个大纲节点，${input.chapters.length} 张章节卡。`, skeletonDispatch),
       instruction: "确认开头、结尾、主干、分支、叶片和土壤都已经生成。",
       actionLabel: "看项目总控",
       href: `${projectHref}#project-control`,
@@ -302,7 +331,7 @@ export function buildFirstDayWorkflow(input: FirstDayWorkflowInput): FirstDayWor
       owner: "作者",
       complete: hookComplete,
       unlocked: structureComplete,
-      evidence: chapter ? `第一章：${chapter.title}。钩子：${chapter.hook || "未填写"}。` : "还没有第一章。",
+      evidence: evidenceWithDispatch(chapter ? `第一章：${chapter.title}。钩子：${chapter.hook || "未填写"}。` : "还没有第一章。", hookDispatch),
       instruction: `按${input.platform.name}开头规则，把目标、钩子、冲突、转变、章末悬念补完整。`,
       actionLabel: "打开第一章",
       href: firstChapterHref,
@@ -313,7 +342,7 @@ export function buildFirstDayWorkflow(input: FirstDayWorkflowInput): FirstDayWor
       owner: "策划",
       complete: supportComplete,
       unlocked: hookComplete,
-      evidence: `${input.characters.length} 个人物，${input.worldEntries.length} 条设定。`,
+      evidence: evidenceWithDispatch(`${input.characters.length} 个人物，${input.worldEntries.length} 条设定。`, supportDispatch),
       instruction: "确认主角欲望、需求、缺陷、起点终点，以及系统规则、禁忌、平台土壤。",
       actionLabel: "补人物设定",
       href: `${projectHref}#character-arc`,
@@ -324,7 +353,7 @@ export function buildFirstDayWorkflow(input: FirstDayWorkflowInput): FirstDayWor
       owner: "AI",
       complete: draftComplete,
       unlocked: hookComplete && supportComplete,
-      evidence: chapter ? `${chapter.wordCount} 字正文，初稿任务${hasSucceededTask(input.aiTasks, "chapter_draft", chapter.id) ? "已成功" : "未完成"}。` : "还没有可生成的章节。",
+      evidence: evidenceWithDispatch(chapter ? `${chapter.wordCount} 字正文，初稿任务${hasSucceededTask(input.aiTasks, "chapter_draft", chapter.id) ? "已成功" : "未完成"}。` : "还没有可生成的章节。", draftDispatch),
       instruction: "用章节卡生成正文，先跑一章验证平台语气和节奏。",
       actionLabel: "生成第一章",
       href: firstChapterHref,
@@ -335,7 +364,7 @@ export function buildFirstDayWorkflow(input: FirstDayWorkflowInput): FirstDayWor
       owner: "AI",
       complete: reviewComplete,
       unlocked: draftComplete,
-      evidence: reviewComplete ? "第一章已有成功审稿任务。" : "第一章还没有成功审稿记录。",
+      evidence: evidenceWithDispatch(hasSucceededTask(input.aiTasks, "chapter_review", chapter?.id) ? "第一章已有成功审稿任务。" : "第一章还没有成功审稿记录。", reviewDispatch),
       instruction: "先审第一章的钩子、爽点、冲突、解释密度和章末追读。",
       actionLabel: "去审稿",
       href: firstChapterHref,
@@ -346,7 +375,7 @@ export function buildFirstDayWorkflow(input: FirstDayWorkflowInput): FirstDayWor
       owner: "AI",
       complete: rewriteComplete,
       unlocked: reviewComplete,
-      evidence: rewriteComplete ? "已有二改或前三章改写结果。" : "还没有二改或前三章改写结果。",
+      evidence: evidenceWithDispatch(hasSucceededTask(input.aiTasks, "chapter_second_pass", chapter?.id) || hasSucceededTask(input.aiTasks, "first_three_rewrite") ? "已有二改或前三章改写结果。" : "还没有二改或前三章改写结果。", rewriteDispatch),
       instruction: "按审稿问题做二改，再决定是否启动前三章整体改写。",
       actionLabel: "启动二改",
       href: firstChapterHref,
@@ -357,7 +386,7 @@ export function buildFirstDayWorkflow(input: FirstDayWorkflowInput): FirstDayWor
       owner: "运营",
       complete: exportComplete,
       unlocked: draftComplete,
-      evidence: `投稿准备度 ${input.submissionChecklist.readinessPercent}%。`,
+      evidence: evidenceWithDispatch(`投稿准备度 ${input.submissionChecklist.readinessPercent}%。`, exportDispatch),
       instruction: "生成简介、标签、卖点、样章和平台风险清单，准备小范围投放或投稿。",
       actionLabel: "看平台导出",
       href: `${projectHref}#platform-export`,

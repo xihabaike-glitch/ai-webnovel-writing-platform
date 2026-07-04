@@ -143,6 +143,32 @@ test("buildFirstDayWorkflow", async (t) => {
     assert.ok(dispatch.evidence.includes("缺少第一章正文或成功初稿任务"));
   });
 
+  await t.test("uses completed first-day dispatch evidence to advance the workflow", () => {
+    const workflow = buildFirstDayWorkflow({
+      project,
+      platform: getPlatformProfile("fanqie"),
+      chapters: [chapter, { ...chapter, id: "chapter-2", order: 2 }, { ...chapter, id: "chapter-3", order: 3 }],
+      outlineNodes,
+      characters,
+      worldEntries,
+      aiTasks: [],
+      dispatchTasks: [{
+        dispatchKey: "first-day:project-1:first-draft",
+        state: "completed",
+        completionEvidence: "第一章正文已经生成并写回章节，作者已确认可以进入审稿。",
+      }],
+      submissionChecklist: checklist,
+    });
+
+    const draftStep = workflow.steps.find((step) => step.id === "first-draft");
+
+    assert.equal(draftStep?.status, "done");
+    assert.equal(workflow.completedCount, 4);
+    assert.equal(workflow.nextStep.id, "first-review");
+    assert.ok(draftStep?.evidence.includes("任务中心已验收"));
+    assert.ok(draftStep?.evidence.includes("第一章正文已经生成"));
+  });
+
   await t.test("locks downstream work when the skeleton is empty", () => {
     const workflow = buildFirstDayWorkflow({
       project,

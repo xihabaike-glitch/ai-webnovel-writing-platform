@@ -12,6 +12,7 @@ export type ChapterProductionFlowRunAction =
       chapterIds: string[];
       targetWords?: number;
       label: string;
+      afterSuccess: ChapterProductionFlowFollowUp;
     }
   | {
       type: "story_tree_recheck";
@@ -19,13 +20,21 @@ export type ChapterProductionFlowRunAction =
       chapterIds: string[];
       source: "chapter_draft" | "chapter_second_pass" | "first_three_rewrite";
       label: string;
+      afterSuccess: ChapterProductionFlowFollowUp;
     }
   | {
       type: "submission_precheck_repair";
       endpoint: string;
       itemIds: string[];
       label: string;
+      afterSuccess: ChapterProductionFlowFollowUp;
     };
+
+export interface ChapterProductionFlowFollowUp {
+  href: string;
+  label: string;
+  detail: string;
+}
 
 export interface ChapterProductionFlowChapter {
   id: string;
@@ -232,6 +241,11 @@ export function buildChapterProductionFlow(input: {
             endpoint: batchEndpoint,
             chapterIds: reviewActionIds,
             label: `一键送审 ${reviewActionIds.length} 章`,
+            afterSuccess: {
+              href: "#review-pipeline",
+              label: "查看审稿结果",
+              detail: "回到批量审稿与二改生产线，确认评分、问题和下一批二改候选。",
+            },
           }
         : undefined,
     },
@@ -254,6 +268,11 @@ export function buildChapterProductionFlow(input: {
             chapterIds: secondPassActionIds,
             targetWords: 1200,
             label: `一键二改 ${secondPassActionIds.length} 章`,
+            afterSuccess: {
+              href: "#story-tree-experience",
+              label: "看结构复检",
+              detail: "进入大树结构经验库，确认二改后的结构问题有没有回流成可复用经验。",
+            },
           }
         : undefined,
     },
@@ -275,6 +294,11 @@ export function buildChapterProductionFlow(input: {
             chapterIds: storyTreeActionIds,
             source: "chapter_draft",
             label: `一键派发复检 ${storyTreeActionIds.length} 章`,
+            afterSuccess: {
+              href: "/dispatch",
+              label: "查看派单",
+              detail: "进入派单中心处理大树复检返工任务，完成后再回流结构经验。",
+            },
           }
         : undefined,
     },
@@ -295,6 +319,11 @@ export function buildChapterProductionFlow(input: {
             endpoint: `/api/projects/${input.projectId}/submission-precheck/repair`,
             itemIds: submissionActionItemIds,
             label: `一键派发修复 ${submissionActionItemIds.length} 项`,
+            afterSuccess: {
+              href: "/dispatch",
+              label: "查看派单",
+              detail: "进入派单中心处理投稿预检缺口，补齐证据后再回到项目页复检。",
+            },
           }
         : undefined,
     },

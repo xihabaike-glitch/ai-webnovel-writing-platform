@@ -40,6 +40,7 @@ export function ChapterProductionFlowPanel({ flow }: { flow: ChapterProductionFl
   const router = useRouter();
   const [runningStageId, setRunningStageId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [followUp, setFollowUp] = useState<ChapterProductionFlowRunAction["afterSuccess"] | null>(null);
   const nextStage = useMemo(
     () => flow.stages.find((stage) => stage.id === flow.bottleneck),
     [flow.bottleneck, flow.stages],
@@ -49,6 +50,7 @@ export function ChapterProductionFlowPanel({ flow }: { flow: ChapterProductionFl
     if (!stage.runAction) return;
     setRunningStageId(stage.id);
     setMessage(null);
+    setFollowUp(null);
     try {
       const response = await fetch(stage.runAction.endpoint, {
         method: "POST",
@@ -86,9 +88,11 @@ export function ChapterProductionFlowPanel({ flow }: { flow: ChapterProductionFl
         const failed = results.filter((result) => result.status === "failed").length;
         setMessage(`${doneLabel(stage.runAction)}完成：成功 ${succeeded} 章，失败 ${failed} 章。`);
       }
+      setFollowUp(stage.runAction.afterSuccess);
       router.refresh();
     } catch (caught) {
       setMessage(caught instanceof Error ? caught.message : "流水线执行失败。");
+      setFollowUp(null);
     } finally {
       setRunningStageId(null);
     }
@@ -137,7 +141,22 @@ export function ChapterProductionFlowPanel({ flow }: { flow: ChapterProductionFl
         </div>
         {nextStage ? renderStageAction(nextStage, true) : null}
       </div>
-      {message ? <p className="mt-3 text-sm text-slate-600">{message}</p> : null}
+      {message ? (
+        <div className="mt-3 flex flex-col gap-2 rounded-md bg-slate-50 p-3 text-sm text-slate-600 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p>{message}</p>
+            {followUp?.detail ? <p className="mt-1 text-xs text-slate-500">{followUp.detail}</p> : null}
+          </div>
+          {followUp ? (
+            <Link
+              className="w-fit rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+              href={followUp.href}
+            >
+              {followUp.label}
+            </Link>
+          ) : null}
+        </div>
+      ) : null}
       <div className="mt-4 grid gap-2 md:grid-cols-3 xl:grid-cols-6">
         {flow.stages.map((stage) => (
           <div

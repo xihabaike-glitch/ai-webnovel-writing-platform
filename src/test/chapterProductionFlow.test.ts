@@ -108,6 +108,8 @@ test("buildChapterProductionFlow exposes one-click review action for drafted cha
   assert.equal(reviewStage?.runAction?.endpoint, "/api/projects/project-1/batch-review");
   assert.deepEqual(reviewStage?.runAction?.type === "batch_review" ? reviewStage.runAction.chapterIds : [], ["chapter-1", "chapter-2", "chapter-3"]);
   assert.equal(reviewStage?.runAction?.label, "一键送审 3 章");
+  assert.equal(reviewStage?.runAction?.afterSuccess.href, "#review-pipeline");
+  assert.equal(reviewStage?.runAction?.afterSuccess.label, "查看审稿结果");
 });
 
 test("buildChapterProductionFlow exposes one-click second pass action only when review asks for it", () => {
@@ -157,6 +159,7 @@ test("buildChapterProductionFlow exposes one-click second pass action only when 
   assert.deepEqual(secondPassStage?.runAction?.type === "batch_review" ? secondPassStage.runAction.chapterIds : [], ["chapter-1"]);
   assert.equal(secondPassStage?.runAction?.type === "batch_review" ? secondPassStage.runAction.targetWords : null, 1200);
   assert.equal(secondPassStage?.runAction?.label, "一键二改 1 章");
+  assert.equal(secondPassStage?.runAction?.afterSuccess.href, "#story-tree-experience");
 });
 
 test("buildChapterProductionFlow exposes story tree recheck dispatch action for unassigned drafted chapters", () => {
@@ -188,6 +191,8 @@ test("buildChapterProductionFlow exposes story tree recheck dispatch action for 
   assert.equal(storyTreeStage?.runAction?.endpoint, "/api/projects/project-1/story-tree-recheck");
   assert.deepEqual(storyTreeStage?.runAction?.chapterIds, ["chapter-1", "chapter-3"]);
   assert.equal(storyTreeStage?.runAction?.label, "一键派发复检 2 章");
+  assert.equal(storyTreeStage?.runAction?.afterSuccess.href, "/dispatch");
+  assert.equal(storyTreeStage?.runAction?.afterSuccess.label, "查看派单");
 });
 
 test("buildChapterProductionFlow exposes submission repair dispatch action for unassigned failed items", () => {
@@ -225,4 +230,6 @@ test("buildChapterProductionFlow exposes submission repair dispatch action for u
   assert.equal(submissionStage?.runAction?.endpoint, "/api/projects/project-1/submission-precheck/repair");
   assert.deepEqual(submissionStage?.runAction?.type === "submission_precheck_repair" ? submissionStage.runAction.itemIds : [], ["selling-point", "platform-risk"]);
   assert.equal(submissionStage?.runAction?.label, "一键派发修复 2 项");
+  assert.equal(submissionStage?.runAction?.afterSuccess.href, "/dispatch");
+  assert.ok(submissionStage?.runAction?.afterSuccess.detail.includes("投稿预检"));
 });

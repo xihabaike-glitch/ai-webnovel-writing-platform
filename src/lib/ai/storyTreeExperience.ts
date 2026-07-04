@@ -3,6 +3,7 @@ import type { PlatformProfile } from "../platforms/platformProfiles.ts";
 import type { StoryTreeQualityAudit } from "./storyTreeQualityAudit.ts";
 
 export type StoryTreeExperienceStatus = "usable" | "avoid" | "watch";
+export type StoryTreeExperienceAxisFilter = "all" | "opening_ending" | "trunk_motion" | "branch_causality" | "leaf_soil" | "character_arc";
 
 export interface StoryTreeExperienceItem {
   id: string;
@@ -33,8 +34,18 @@ export interface StoryTreeExperienceGuide {
     avoid: number;
     watch: number;
   };
+  groups: StoryTreeExperienceAxisGroup[];
   items: StoryTreeExperienceItem[];
   promptBlock: string;
+}
+
+export interface StoryTreeExperienceAxisGroup {
+  axisId: StoryTreeExperienceAxisFilter;
+  axisLabel: string;
+  total: number;
+  usable: number;
+  avoid: number;
+  watch: number;
 }
 
 export interface StoryTreeExperienceSecondPassAdvice {
@@ -79,6 +90,14 @@ const axisLabels: Record<string, string> = {
   leaf_soil: "叶片土壤",
   character_arc: "人物弧光",
 };
+
+const axisOrder: Exclude<StoryTreeExperienceAxisFilter, "all">[] = [
+  "opening_ending",
+  "trunk_motion",
+  "branch_causality",
+  "leaf_soil",
+  "character_arc",
+];
 
 const sourceLabels: Record<string, string> = {
   chapter_draft: "章节初稿",
@@ -288,6 +307,32 @@ function buildPromptBlock(items: StoryTreeExperienceItem[]) {
   ].join("\n");
 }
 
+function buildAxisGroups(items: StoryTreeExperienceItem[]): StoryTreeExperienceAxisGroup[] {
+  const allGroup: StoryTreeExperienceAxisGroup = {
+    axisId: "all",
+    axisLabel: "全部",
+    total: items.length,
+    usable: items.filter((item) => item.status === "usable").length,
+    avoid: items.filter((item) => item.status === "avoid").length,
+    watch: items.filter((item) => item.status === "watch").length,
+  };
+
+  return [
+    allGroup,
+    ...axisOrder.map((axisId) => {
+      const axisItems = items.filter((item) => item.axisId === axisId);
+      return {
+        axisId,
+        axisLabel: axisLabels[axisId],
+        total: axisItems.length,
+        usable: axisItems.filter((item) => item.status === "usable").length,
+        avoid: axisItems.filter((item) => item.status === "avoid").length,
+        watch: axisItems.filter((item) => item.status === "watch").length,
+      };
+    }),
+  ];
+}
+
 export function buildStoryTreeExperienceGuide(tasks: Pick<PersistedGatePlatformDispatchTask, "dispatchKey" | "evidence" | "completedAt" | "updatedAt" | "title" | "href">[]): StoryTreeExperienceGuide {
   const rawItems = tasks
     .map(itemFromTask)
@@ -327,6 +372,7 @@ export function buildStoryTreeExperienceGuide(tasks: Pick<PersistedGatePlatformD
       avoid: items.filter((item) => item.status === "avoid").length,
       watch: items.filter((item) => item.status === "watch").length,
     },
+    groups: buildAxisGroups(items),
     items,
     promptBlock: buildPromptBlock(items),
   };

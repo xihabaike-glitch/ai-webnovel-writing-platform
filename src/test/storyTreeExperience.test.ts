@@ -49,6 +49,11 @@ test("buildStoryTreeExperienceGuide turns rechecks into prompt memory", () => {
   assert.equal(guide.summary.total, 2);
   assert.equal(guide.summary.usable, 1);
   assert.equal(guide.summary.avoid, 1);
+  assert.equal(guide.groups.length, 6);
+  assert.equal(guide.groups.find((group) => group.axisId === "all")?.total, 2);
+  assert.equal(guide.groups.find((group) => group.axisId === "branch_causality")?.usable, 1);
+  assert.equal(guide.groups.find((group) => group.axisId === "opening_ending")?.avoid, 1);
+  assert.equal(guide.groups.find((group) => group.axisId === "character_arc")?.total, 0);
   assert.equal(guide.items[0].status, "usable");
   assert.equal(guide.items[0].axisLabel, "分支因果");
   assert.equal(guide.items[0].title, "补分支因果");

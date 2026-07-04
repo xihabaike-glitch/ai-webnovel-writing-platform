@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import type { StoryTreeExperienceGuide, StoryTreeExperienceItem, StoryTreeExperienceStatus } from "@/lib/ai/storyTreeExperience";
+import type { StoryTreeExperienceAxisFilter, StoryTreeExperienceGuide, StoryTreeExperienceItem, StoryTreeExperienceStatus } from "@/lib/ai/storyTreeExperience";
 
 function statusLabel(status: StoryTreeExperienceStatus) {
   if (status === "usable") return "可复用";
@@ -28,7 +28,9 @@ function actionLabel(status: StoryTreeExperienceStatus) {
 }
 
 export function StoryTreeExperiencePanel({ guide, projectId }: { guide: StoryTreeExperienceGuide; projectId: string }) {
-  const topItems = guide.items.slice(0, 6);
+  const [axisFilter, setAxisFilter] = useState<StoryTreeExperienceAxisFilter>("all");
+  const filteredItems = axisFilter === "all" ? guide.items : guide.items.filter((item) => item.axisId === axisFilter);
+  const topItems = filteredItems.slice(0, 6);
   const [runningKey, setRunningKey] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
@@ -70,6 +72,22 @@ export function StoryTreeExperiencePanel({ guide, projectId }: { guide: StoryTre
         </Link>
       </div>
       {message ? <p className="mt-3 text-sm text-slate-600">{message}</p> : null}
+      <div className="mt-4 flex flex-wrap gap-2">
+        {guide.groups.map((group) => (
+          <button
+            className={`rounded-md border px-3 py-2 text-sm font-medium ${
+              axisFilter === group.axisId
+                ? "border-slate-950 bg-slate-950 text-white"
+                : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+            }`}
+            key={group.axisId}
+            onClick={() => setAxisFilter(group.axisId)}
+            type="button"
+          >
+            {group.axisLabel} · {group.total}
+          </button>
+        ))}
+      </div>
 
       {topItems.length > 0 ? (
         <div className="mt-4 grid gap-3 lg:grid-cols-3">
@@ -105,7 +123,7 @@ export function StoryTreeExperiencePanel({ guide, projectId }: { guide: StoryTre
         </div>
       ) : (
         <div className="mt-4 rounded-md border border-dashed border-slate-200 p-4 text-sm text-slate-600">
-          还没有完成过的大树结构复检任务。
+          当前分类还没有完成过的大树结构复检任务。
         </div>
       )}
     </section>

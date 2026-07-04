@@ -94,7 +94,16 @@ export interface ChapterProductionFlow {
   nextActionLabel: string;
   nextHref: string;
   bottleneck: ChapterProductionFlowStageId;
+  recheckNotice?: ChapterProductionFlowRecheckNotice;
   stages: ChapterProductionFlowStage[];
+}
+
+export interface ChapterProductionFlowRecheckNotice {
+  title: string;
+  detail: string;
+  href: string;
+  actionLabel: string;
+  count: number;
 }
 
 function hasText(value: string) {
@@ -395,6 +404,21 @@ export function buildChapterProductionFlow(input: {
     },
   ];
   const bottleneck = stages.find((stage) => stage.status !== "ready") ?? stages.find((stage) => stage.tone === "rose") ?? stages.at(-1) as ChapterProductionFlowStage;
+  const recheckStages = stages.filter((stage) => (
+    stage.dispatchSummary
+    && stage.dispatchSummary.pending === 0
+    && stage.dispatchSummary.completed > 0
+    && (stage.status !== "ready" || stage.tone === "rose")
+  ));
+  const recheckNotice = recheckStages.length > 0
+    ? {
+        title: `有 ${recheckStages.length} 个完成派单待复查`,
+        detail: recheckStages.map((stage) => `${stage.label}：${stage.dispatchSummary?.detail}`).join(" "),
+        href: recheckStages[0].dispatchSummary?.href ?? "#chapter-production-flow",
+        actionLabel: recheckStages[0].dispatchSummary?.actionLabel ?? "去复查",
+        count: recheckStages.length,
+      }
+    : undefined;
   const status = stages.every((stage) => stage.status === "ready") && input.submissionChecklist.riskCount === 0
     ? "ready"
     : bottleneck.status === "blocked" ? "blocked" : "working";
@@ -411,6 +435,7 @@ export function buildChapterProductionFlow(input: {
     nextActionLabel: status === "ready" ? "查看投稿预检" : bottleneck.actionLabel,
     nextHref: bottleneck.href,
     bottleneck: bottleneck.id,
+    recheckNotice,
     stages,
   };
 }

@@ -432,7 +432,8 @@ interface RouteNotice {
 interface ProviderSetupNotice {
   message: string;
   actionLabel?: string;
-  action?: "apply_first_day_routes";
+  action?: "apply_first_day_routes" | "return_project";
+  href?: string;
 }
 
 const statusCopy: Record<ProviderHealthStatus, { label: string; className: string }> = {
@@ -557,7 +558,9 @@ export function ModelProviderSettings({
   const router = useRouter();
   const searchParams = useSearchParams();
   const firstDayFocusTaskType = searchParams.get("taskType");
+  const firstDayReturnProjectId = searchParams.get("projectId");
   const isFirstDayRouteFocus = searchParams.get("focus") === "first-day-route";
+  const firstDayReturnHref = firstDayReturnProjectId ? `/projects/${encodeURIComponent(firstDayReturnProjectId)}` : "/projects";
   const existingByProvider = useMemo(
     () => new Map(providers.map((provider) => [provider.providerId, provider])),
     [providers],
@@ -916,6 +919,19 @@ export function ModelProviderSettings({
         return next;
       });
       setRouteNotice({ message: taskType ? `已修复「${applicableItems[0]?.stage}」模型路线` : `已应用 ${applicableItems.length} 条首日推荐路线` });
+      if (firstDayReturnProjectId) {
+        setProviderSetupNotice({
+          message: "首日路线已应用，可以回到作品继续执行首日工作流。",
+          actionLabel: "回到作品",
+          action: "return_project",
+          href: firstDayReturnHref,
+        });
+        setRouteNotice({
+          message: taskType ? `已修复「${applicableItems[0]?.stage}」模型路线，可以回到作品继续首日工作流。` : `已应用 ${applicableItems.length} 条首日推荐路线，可以回到作品继续首日工作流。`,
+          href: firstDayReturnHref,
+          actionLabel: "回到作品",
+        });
+      }
       router.refresh();
     } catch (caught) {
       setRouteNotice({ message: caught instanceof Error ? caught.message : "应用首日推荐路线失败。" });
@@ -1319,6 +1335,7 @@ export function ModelProviderSettings({
                   {focusedFirstDayRoute
                     ? `从首日工作流跳转而来：优先修复「${focusedFirstDayRoute.stage}」路线。`
                     : "从首日工作流跳转而来：先检查下面四条关键路线。"}
+                  {firstDayReturnProjectId ? " 修好后可直接回到原作品继续执行。" : ""}
                 </div>
               ) : null}
             </div>
@@ -2395,6 +2412,11 @@ export function ModelProviderSettings({
                 >
                   {applyingFirstDayRouteType === "all" ? "应用中" : providerSetupNotice.actionLabel}
                 </button>
+              ) : null}
+              {providerSetupNotice.action === "return_project" && providerSetupNotice.href ? (
+                <Link className="w-fit rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white" href={providerSetupNotice.href}>
+                  {providerSetupNotice.actionLabel}
+                </Link>
               ) : null}
             </div>
           ) : null}

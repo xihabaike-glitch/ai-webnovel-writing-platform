@@ -63,8 +63,8 @@ function modelRouteStatusCopy(status: FirstDayModelRouteStatus["status"]) {
   return { label: "缺路线", className: "bg-amber-50 text-amber-700" };
 }
 
-function modelSettingsRepairHref(route: FirstDayModelRouteStatus) {
-  const params = new URLSearchParams({ focus: "first-day-route" });
+function modelSettingsRepairHref(route: FirstDayModelRouteStatus, projectId: string) {
+  const params = new URLSearchParams({ focus: "first-day-route", projectId });
   if (route.taskType) params.set("taskType", route.taskType);
   return `/settings/models?${params.toString()}`;
 }
@@ -333,7 +333,7 @@ export function FirstDayWorkflowPanel({ projectId }: { projectId: string }) {
                   {routeBlockMessage ? (
                     <div className="mt-3 flex flex-col gap-2 rounded-md bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-800 sm:flex-row sm:items-center sm:justify-between">
                       <span>{routeBlockMessage}</span>
-                      <Link className="font-medium text-amber-900 underline underline-offset-2" href={modelSettingsRepairHref(modelRoute)}>
+                      <Link className="font-medium text-amber-900 underline underline-offset-2" href={modelSettingsRepairHref(modelRoute, projectId)}>
                         去配置
                       </Link>
                     </div>

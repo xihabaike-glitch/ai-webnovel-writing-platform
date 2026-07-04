@@ -1,4 +1,7 @@
+"use client";
+
 import Link from "next/link";
+import { useState } from "react";
 import type { StoryTreeExperienceGuide, StoryTreeExperienceItem, StoryTreeExperienceStatus } from "@/lib/ai/storyTreeExperience";
 
 function statusLabel(status: StoryTreeExperienceStatus) {
@@ -18,8 +21,37 @@ function sourceLine(item: StoryTreeExperienceItem) {
   return `${item.sourceLabel} · ${item.axisLabel} · ${score}`;
 }
 
-export function StoryTreeExperiencePanel({ guide }: { guide: StoryTreeExperienceGuide }) {
+function actionLabel(status: StoryTreeExperienceStatus) {
+  if (status === "usable") return "生成应用派单";
+  if (status === "avoid") return "生成避坑派单";
+  return "生成验证派单";
+}
+
+export function StoryTreeExperiencePanel({ guide, projectId }: { guide: StoryTreeExperienceGuide; projectId: string }) {
   const topItems = guide.items.slice(0, 6);
+  const [runningKey, setRunningKey] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
+
+  async function applyExperience(item: StoryTreeExperienceItem) {
+    setRunningKey(item.dispatchKey);
+    setMessage(null);
+    try {
+      const response = await fetch(`/api/projects/${projectId}/story-tree-experience/apply`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ dispatchKey: item.dispatchKey }),
+      });
+      const payload = (await response.json().catch(() => null)) as { task?: { title?: string }; error?: string } | null;
+      if (!response.ok) {
+        throw new Error(payload?.error ?? "生成结构经验派单失败。");
+      }
+      setMessage(`已生成派单：${payload?.task?.title ?? item.title}`);
+    } catch (caught) {
+      setMessage(caught instanceof Error ? caught.message : "生成结构经验派单失败。");
+    } finally {
+      setRunningKey(null);
+    }
+  }
 
   return (
     <section className="rounded-md border border-slate-200 bg-white p-4" id="story-tree-experience">
@@ -37,6 +69,7 @@ export function StoryTreeExperiencePanel({ guide }: { guide: StoryTreeExperience
           查看派单
         </Link>
       </div>
+      {message ? <p className="mt-3 text-sm text-slate-600">{message}</p> : null}
 
       {topItems.length > 0 ? (
         <div className="mt-4 grid gap-3 lg:grid-cols-3">
@@ -51,9 +84,19 @@ export function StoryTreeExperiencePanel({ guide }: { guide: StoryTreeExperience
               <div className="mt-3 font-medium text-slate-950">{item.title}</div>
               <p className="mt-2 leading-6 text-slate-600">{item.action}</p>
               <p className="mt-2 leading-6 text-slate-500">{item.lesson}</p>
-              <Link className="mt-3 inline-block font-medium text-slate-950 hover:underline" href={item.href}>
-                回到章节
-              </Link>
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <button
+                  className="rounded-md bg-slate-950 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50"
+                  disabled={runningKey === item.dispatchKey}
+                  onClick={() => applyExperience(item)}
+                  type="button"
+                >
+                  {runningKey === item.dispatchKey ? "生成中" : actionLabel(item.status)}
+                </button>
+                <Link className="font-medium text-slate-950 hover:underline" href={item.href}>
+                  回到章节
+                </Link>
+              </div>
             </div>
           ))}
         </div>

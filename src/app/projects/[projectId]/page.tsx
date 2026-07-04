@@ -284,7 +284,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ projec
             </div>
           </div>
         </section>
-        <StoryTreeExperiencePanel guide={storyTreeExperience} />
+        <StoryTreeExperiencePanel guide={storyTreeExperience} projectId={project.id} />
         <section className="rounded-md border border-slate-200 bg-white p-4">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>

@@ -1,4 +1,5 @@
-import type { PersistedGatePlatformDispatchTask } from "../projects/gateActionReceipts.ts";
+import type { GatePlatformGrowthDispatchItem, GatePlatformGrowthReviewStage, PersistedGatePlatformDispatchTask } from "../projects/gateActionReceipts.ts";
+import type { PlatformProfile } from "../platforms/platformProfiles.ts";
 
 export type StoryTreeExperienceStatus = "usable" | "avoid" | "watch";
 
@@ -53,6 +54,22 @@ const sourceLabels: Record<string, string> = {
   chapter_draft: "章节初稿",
   chapter_second_pass: "章节二改",
   first_three_rewrite: "前三章改写",
+};
+
+const axisStage: Record<string, GatePlatformGrowthReviewStage> = {
+  opening_ending: "start_rewrite_opening",
+  trunk_motion: "start_first_three_review",
+  branch_causality: "start_repair_packaging",
+  leaf_soil: "start_platform_package",
+  character_arc: "start_first_three_review",
+};
+
+const axisOwner: Record<string, string> = {
+  opening_ending: "作者",
+  trunk_motion: "作者",
+  branch_causality: "策划",
+  leaf_soil: "策划",
+  character_arc: "作者",
 };
 
 const verdictStatus: Record<string, StoryTreeExperienceStatus> = {
@@ -163,6 +180,16 @@ function promptLine(item: StoryTreeExperienceItem) {
   return `- ${statusLabel(item.status)}｜${item.axisLabel}｜${delta}：${item.action}`;
 }
 
+function applyActionLabel(status: StoryTreeExperienceStatus) {
+  if (status === "usable") return "应用经验";
+  if (status === "avoid") return "转避坑检查";
+  return "小步验证";
+}
+
+function applyDispatchId(projectId: string, item: StoryTreeExperienceItem) {
+  return `story-tree-experience:${projectId}:${item.source}:${item.axisId}:${item.dispatchKey.replace(/[^a-zA-Z0-9_-]/g, "_")}`;
+}
+
 function buildPromptBlock(items: StoryTreeExperienceItem[]) {
   if (items.length === 0) return "";
   return [
@@ -191,5 +218,44 @@ export function buildStoryTreeExperienceGuide(tasks: Pick<PersistedGatePlatformD
     },
     items,
     promptBlock: buildPromptBlock(items),
+  };
+}
+
+export function buildStoryTreeExperienceApplyDispatch(input: {
+  projectId: string;
+  projectTitle: string;
+  platform: PlatformProfile;
+  item: StoryTreeExperienceItem;
+  now?: string;
+}): GatePlatformGrowthDispatchItem {
+  const now = input.now ?? new Date().toISOString();
+  const priorityBase: Record<StoryTreeExperienceStatus, number> = { usable: 86, avoid: 78, watch: 72 };
+  const deltaBoost = input.item.delta && input.item.delta > 0 ? Math.min(8, input.item.delta) : 0;
+  const label = applyActionLabel(input.item.status);
+
+  return {
+    id: applyDispatchId(input.projectId, input.item),
+    platformId: input.platform.id,
+    platformName: input.platform.name,
+    stage: axisStage[input.item.axisId] ?? "start_first_three_review",
+    state: "assigned",
+    priorityScore: Math.min(99, priorityBase[input.item.status] + deltaBoost),
+    ownerRole: axisOwner[input.item.axisId] ?? "作者",
+    title: `${input.projectTitle} · ${label}${input.item.axisLabel}`,
+    detail: `${input.item.sourceLabel}复检沉淀：${input.item.lesson} 本次动作：${input.item.action}`,
+    dueLabel: input.item.status === "usable" ? "下次写作前" : "下次改稿前",
+    actionLabel: label,
+    href: input.item.href,
+    acceptanceCriteria: [
+      `把「${input.item.axisLabel}」经验写进当前章节返工说明。`,
+      "完成后重新保存或复检章节，形成新的大树结构复检证据。",
+      input.item.status === "avoid" ? "明确删掉或替换曾经拉低分数的处理方式。" : "说明这次复用动作服务哪条主线、哪次人物选择或哪个章末追读。",
+    ],
+    evidence: [
+      input.item.evidence,
+      input.item.lesson,
+      `经验动作：${input.item.action}`,
+    ],
+    reviewLatestAt: now,
   };
 }

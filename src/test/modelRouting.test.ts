@@ -14,6 +14,7 @@ import {
   buildRouteConfirmationDispatchFlow,
   buildRouteConfirmationHistory,
   buildRouteDispatchCompletionTemplate,
+  buildRouteConfirmationRecheckAdviceFromDispatchTask,
   buildRouteConfirmationRecheckSampleDispatch,
   buildRouteConfirmationRecheckSamplePlan,
   parseRouteDispatchCompletionEvidence,
@@ -370,6 +371,34 @@ test("model task routing", async (t) => {
     assert.ok(dispatch.detail.includes("DeepSeek"));
     assert.ok(dispatch.acceptanceCriteria.some((item) => item.includes("成功率")));
     assert.ok(dispatch.evidence.some((item) => item.includes("是否需要治理")));
+  });
+
+  await t.test("restores executable recheck advice from a dispatch task", () => {
+    const advice = buildRouteConfirmationRecheckAdviceFromDispatchTask({
+      dispatchKey: "model-route-confirmation-recheck:chapter_review:governance:2026-07-04T16:00:00.000Z",
+      stage: "model_route_confirmation_recheck",
+      state: "assigned",
+      title: "复检章节审稿治理后小样本",
+      detail: "路由治理已完成，下一批同类型任务后复看成功率和质量。",
+      actionLabel: "复检小样本",
+      href: "/settings/models",
+      priorityScore: 74,
+      reviewLatestAt: "2026-07-04T16:00:00.000Z",
+      evidence: ["路由治理已完成：章节审稿路线已处理。"],
+    });
+    const samplePlan = advice ? buildRouteConfirmationRecheckSamplePlan(advice) : null;
+    const dispatch = advice && samplePlan
+      ? buildRouteConfirmationRecheckSampleDispatch(advice, samplePlan, {
+        dispatchKey: "model-route-confirmation-recheck:chapter_review:governance:2026-07-04T16:00:00.000Z",
+        createdAt: "2026-07-04T16:00:00.000Z",
+      })
+      : null;
+
+    assert.equal(advice?.taskType, "chapter_review");
+    assert.equal(advice?.action, "extend_watch");
+    assert.equal(advice?.severity, "warning");
+    assert.ok(advice?.recommendation.includes("下一批同类型任务"));
+    assert.equal(dispatch?.dispatchKey, "model-route-confirmation-recheck:chapter_review:governance:2026-07-04T16:00:00.000Z");
   });
 
   await t.test("builds an executable route confirmation recheck sample plan", () => {

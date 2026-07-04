@@ -110,6 +110,7 @@ export function GateDispatchTaskCenter({
   const [routeFlowFilter, setRouteFlowFilter] = useState<RouteConfirmationDispatchTaskFilter>("all");
   const [runningKey, setRunningKey] = useState<string | null>(null);
   const [runningRouteAdviceId, setRunningRouteAdviceId] = useState<string | null>(null);
+  const [runningRouteRecheckKey, setRunningRouteRecheckKey] = useState<string | null>(null);
   const [routeActionMessage, setRouteActionMessage] = useState("");
   const [completionDrafts, setCompletionDrafts] = useState<Record<string, string>>({});
   const [errorMessage, setErrorMessage] = useState("");
@@ -183,6 +184,49 @@ export function GateDispatchTaskCenter({
       setErrorMessage(error instanceof Error ? error.message : "生成模型路由治理派单失败。");
     } finally {
       setRunningRouteAdviceId(null);
+    }
+  }
+
+  async function runRouteRecheckTask(task: PersistedGatePlatformDispatchTask) {
+    setRunningRouteRecheckKey(task.dispatchKey);
+    setErrorMessage("");
+    setRouteActionMessage("");
+    try {
+      const response = await fetch("/api/model-route-confirmation-recheck-samples", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ dispatch: task, execute: true }),
+      });
+      const payload = await response.json().catch(() => null) as {
+        error?: string;
+        results?: Array<{ status: string }>;
+        recheckTask?: {
+          dispatchKey: string;
+          state: GatePlatformGrowthDispatchState;
+          completionEvidence: string;
+          completedAt: string | null;
+        };
+      } | null;
+      if (!response.ok) throw new Error(payload?.error ?? "运行模型路由复检样本失败。");
+      const succeeded = payload?.results?.filter((result) => result.status === "succeeded").length ?? 0;
+      const total = payload?.results?.length ?? 0;
+      if (payload?.recheckTask) {
+        setTasks((current) => current.map((item) => item.dispatchKey === payload.recheckTask?.dispatchKey
+          ? {
+            ...item,
+            state: payload.recheckTask.state,
+            completionEvidence: payload.recheckTask.completionEvidence,
+            completedAt: payload.recheckTask.completedAt,
+            updatedAt: payload.recheckTask.completedAt ?? item.updatedAt,
+          }
+          : item));
+      }
+      setRouteActionMessage(`已运行「${task.title}」复检样本：${succeeded}/${total} 成功`);
+      router.refresh();
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "运行模型路由复检样本失败。");
+    } finally {
+      setRunningRouteRecheckKey(null);
     }
   }
 
@@ -513,9 +557,19 @@ export function GateDispatchTaskCenter({
                 ) : null}
               </div>
               <div className="flex shrink-0 flex-wrap gap-2 lg:justify-end">
+                {task.stage === "model_route_confirmation_recheck" && task.state === "assigned" ? (
+                  <button
+                    className="rounded-md border border-sky-200 bg-sky-50 px-3 py-2 text-sm font-medium text-sky-800 hover:bg-sky-100 disabled:cursor-not-allowed disabled:opacity-60"
+                    disabled={runningRouteRecheckKey === task.dispatchKey}
+                    onClick={() => void runRouteRecheckTask(task)}
+                    type="button"
+                  >
+                    {runningRouteRecheckKey === task.dispatchKey ? "运行中" : "运行复检样本"}
+                  </button>
+                ) : null}
                 <button
                   className="rounded-md border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
-                  disabled={runningKey === task.dispatchKey}
+                  disabled={runningKey === task.dispatchKey || runningRouteRecheckKey === task.dispatchKey}
                   onClick={() => void updateTask(task)}
                   type="button"
                 >

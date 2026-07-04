@@ -269,6 +269,20 @@ export interface RouteConfirmationRecheckSamplePlan {
 
 export interface RouteConfirmationRecheckSampleDispatchOptions {
   createdAt?: string | Date;
+  dispatchKey?: string;
+}
+
+export interface RouteConfirmationRecheckAdviceDispatchTask {
+  dispatchKey: string;
+  stage: string;
+  state?: string;
+  title: string;
+  detail: string;
+  actionLabel: string;
+  href?: string;
+  priorityScore?: number;
+  reviewLatestAt: string;
+  evidence?: string[] | string | null;
 }
 
 export interface RouteConfirmationRecheckGovernanceAction {
@@ -575,7 +589,7 @@ export function buildRouteConfirmationRecheckSampleDispatch(
   options: RouteConfirmationRecheckSampleDispatchOptions = {},
 ): RouteConfirmationGovernanceFollowUpDispatch {
   const createdAt = asIsoString(options.createdAt);
-  const dispatchKey = `model-route-confirmation-recheck-sample:${advice.taskType}:${createdAt}`;
+  const dispatchKey = options.dispatchKey ?? `model-route-confirmation-recheck-sample:${advice.taskType}:${createdAt}`;
   return {
     id: dispatchKey,
     dispatchKey,
@@ -598,6 +612,38 @@ export function buildRouteConfirmationRecheckSampleDispatch(
       ...advice.evidence,
     ])).slice(0, 5),
     reviewLatestAt: createdAt,
+  };
+}
+
+export function buildRouteConfirmationRecheckAdviceFromDispatchTask(
+  task: RouteConfirmationRecheckAdviceDispatchTask,
+): RouteConfirmationRecheckAdviceItem | null {
+  if (task.stage !== "model_route_confirmation_recheck") return null;
+  const taskType = taskTypeFromConfirmationRecheckKey(task.dispatchKey);
+  if (!taskType) return null;
+  const label = labelForRoutedTask(taskType);
+  const evidence = evidenceList(task.evidence);
+  const recommendation = task.detail.trim() || `「${label}」需要运行复检小样本，确认治理后的模型路线是否恢复。`;
+  return {
+    id: `${task.dispatchKey}:dispatch-advice`,
+    taskType,
+    label,
+    severity: (task.priorityScore ?? 0) >= 88 ? "blocked" : "warning",
+    action: "extend_watch",
+    actionLabel: task.actionLabel || "复检小样本",
+    recommendation,
+    sampleCount: null,
+    successRatePercent: null,
+    qualityScore: null,
+    cost: null,
+    fallbackHit: null,
+    needsGovernance: null,
+    evidence: Array.from(new Set([
+      recommendation,
+      ...evidence,
+      task.title,
+    ].filter((item) => item.trim().length > 0))).slice(0, 4),
+    completedAt: null,
   };
 }
 

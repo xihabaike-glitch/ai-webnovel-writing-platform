@@ -4,6 +4,7 @@ import { generateChapterDraft } from "@/lib/ai/chapterDraftGeneration";
 import { reviewChapterDraft } from "@/lib/ai/chapterReviewGeneration";
 import { prisma } from "@/lib/db/prisma";
 import {
+  buildRouteConfirmationRecheckAdviceFromDispatchTask,
   buildRouteConfirmationRecheckSampleDispatch,
   buildRouteConfirmationRecheckSamplePlan,
   type RouteConfirmationRecheckAdviceItem,
@@ -15,7 +16,8 @@ import {
 import { isRoutedModelTaskType } from "@/lib/model-gateway/taskRouting";
 
 const runRecheckSamplesSchema = z.object({
-  advice: z.record(z.string(), z.unknown()),
+  advice: z.record(z.string(), z.unknown()).optional(),
+  dispatch: z.record(z.string(), z.unknown()).optional(),
   execute: z.boolean().default(false),
 });
 
@@ -75,6 +77,21 @@ function adviceFromBody(raw: Record<string, unknown>): RouteConfirmationRecheckA
   };
 }
 
+function dispatchAdviceFromBody(raw: Record<string, unknown>): RouteConfirmationRecheckAdviceItem | null {
+  return buildRouteConfirmationRecheckAdviceFromDispatchTask({
+    dispatchKey: text(raw.dispatchKey),
+    stage: text(raw.stage),
+    state: text(raw.state),
+    title: text(raw.title),
+    detail: text(raw.detail),
+    actionLabel: text(raw.actionLabel),
+    href: text(raw.href),
+    priorityScore: nullableNumber(raw.priorityScore) ?? undefined,
+    reviewLatestAt: text(raw.reviewLatestAt, new Date().toISOString()),
+    evidence: stringList(raw.evidence),
+  });
+}
+
 function providerName(provider: { displayName: string; defaultModel: string } | undefined) {
   return provider ? `${provider.displayName} · ${provider.defaultModel}` : null;
 }
@@ -115,10 +132,12 @@ async function loadRouteContext(taskType: RouteConfirmationRecheckAdviceItem["ta
 
 export async function POST(request: Request) {
   const input = runRecheckSamplesSchema.parse(await request.json());
-  const advice = adviceFromBody(input.advice);
+  const advice = input.advice ? adviceFromBody(input.advice) : input.dispatch ? dispatchAdviceFromBody(input.dispatch) : null;
   if (!advice) {
     return NextResponse.json({ error: "缺少有效模型路由复检建议。" }, { status: 400 });
   }
+  const sourceDispatchKey = input.dispatch ? text(input.dispatch.dispatchKey) : "";
+  const sourceReviewLatestAt = input.dispatch ? text(input.dispatch.reviewLatestAt) : "";
 
   const context = await loadRouteContext(advice.taskType);
   const samplePlan = buildRouteConfirmationRecheckSamplePlan(advice, {
@@ -174,7 +193,10 @@ export async function POST(request: Request) {
     },
     results,
   });
-  const dispatch = buildRouteConfirmationRecheckSampleDispatch(advice, samplePlan);
+  const dispatch = buildRouteConfirmationRecheckSampleDispatch(advice, samplePlan, {
+    dispatchKey: sourceDispatchKey || undefined,
+    createdAt: sourceReviewLatestAt || undefined,
+  });
   const now = new Date();
   const task = await prisma.gateDispatchTask.upsert({
     where: { dispatchKey: dispatch.dispatchKey },

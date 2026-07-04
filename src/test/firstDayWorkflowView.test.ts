@@ -1,6 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildFirstDayReceiptCompletionAction, buildFirstDayStepView, completeFirstDayDispatchStep } from "../lib/projects/firstDayWorkflowView.ts";
+import {
+  buildFirstDayDispatchCompletionTemplate,
+  buildFirstDayDispatchDesk,
+  buildFirstDayReceiptCompletionAction,
+  buildFirstDayStepView,
+  completeFirstDayDispatchStep,
+} from "../lib/projects/firstDayWorkflowView.ts";
 
 test("buildFirstDayStepView separates task center acceptance evidence", () => {
   const view = buildFirstDayStepView({
@@ -72,6 +78,87 @@ test("buildFirstDayReceiptCompletionAction only allows successful receipts with 
   assert.equal(ready.visible, true);
   assert.equal(ready.canComplete, true);
   assert.equal(ready.label, "验收并进入下一步");
+});
+
+test("buildFirstDayDispatchDesk highlights the next first-day task", () => {
+  const desk = buildFirstDayDispatchDesk([
+    {
+      databaseId: "db-1",
+      dispatchKey: "first-day:project-1:first-review",
+      id: "first-day:project-1:first-review",
+      projectId: "project-1",
+      platformId: "fanqie",
+      platformName: "番茄小说",
+      stage: "start_first_three_review",
+      state: "assigned",
+      priorityScore: 70,
+      ownerRole: "AI",
+      title: "夜雨系统 · 第一章审稿",
+      detail: "AI 先当毒舌审稿编辑。",
+      dueLabel: "今天收口",
+      actionLabel: "去审稿",
+      href: "/projects/project-1/chapters/chapter-1",
+      acceptanceCriteria: ["第一章已有结构化审稿结果"],
+      evidence: ["缺少第一章成功审稿任务"],
+      sourceReceiptId: null,
+      completionEvidence: "",
+      reviewLatestAt: "2026-01-01T00:00:00.000Z",
+      assignedAt: "2026-01-01T00:00:00.000Z",
+      completedAt: null,
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    },
+    {
+      databaseId: "db-2",
+      dispatchKey: "first-day:project-1:first-draft",
+      id: "first-day:project-1:first-draft",
+      projectId: "project-1",
+      platformId: "fanqie",
+      platformName: "番茄小说",
+      stage: "start_first_three_review",
+      state: "completed",
+      priorityScore: 80,
+      ownerRole: "AI",
+      title: "夜雨系统 · 生成第一章正文",
+      detail: "AI 接手第一章初稿。",
+      dueLabel: "今天收口",
+      actionLabel: "生成第一章",
+      href: "/projects/project-1/chapters/chapter-1",
+      acceptanceCriteria: ["第一章正文已生成并写回章节"],
+      evidence: [],
+      sourceReceiptId: null,
+      completionEvidence: "第一章正文已生成并写回章节。",
+      reviewLatestAt: "2026-01-01T00:00:00.000Z",
+      assignedAt: "2026-01-01T00:00:00.000Z",
+      completedAt: "2026-01-01T00:10:00.000Z",
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:10:00.000Z",
+    },
+  ]);
+
+  assert.equal(desk.summary.total, 2);
+  assert.equal(desk.summary.active, 1);
+  assert.equal(desk.summary.completed, 1);
+  assert.equal(desk.nextTask?.stepId, "first-review");
+  assert.equal(desk.nextTask?.stepLabel, "第一章审稿");
+  assert.equal(desk.nextTask?.firstDayHref, "/projects/project-1?firstDayLaunch=1&nextStep=first-review#first-day-workflow");
+  assert.ok(desk.nextTask?.completionTemplate.includes("第一章审稿已完成"));
+  assert.ok(desk.nextActions[0].includes("第一章审稿"));
+});
+
+test("buildFirstDayDispatchCompletionTemplate covers first-day step types", () => {
+  assert.ok(buildFirstDayDispatchCompletionTemplate({
+    dispatchKey: "first-day:project-1:first-draft",
+    acceptanceCriteria: [],
+  }).includes("第一章正文已生成"));
+  assert.ok(buildFirstDayDispatchCompletionTemplate({
+    dispatchKey: "first-day:project-1:publish-precheck",
+    acceptanceCriteria: [],
+  }).includes("平台包预检已完成"));
+  assert.equal(buildFirstDayDispatchCompletionTemplate({
+    dispatchKey: "manual",
+    acceptanceCriteria: ["完成当前动作"],
+  }), "");
 });
 
 test("completeFirstDayDispatchStep completes the matching task center dispatch", async () => {

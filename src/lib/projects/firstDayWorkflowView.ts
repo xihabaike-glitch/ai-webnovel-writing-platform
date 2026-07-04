@@ -1,4 +1,4 @@
-import type { FirstDayWorkflowStep } from "./firstDayWorkflow.ts";
+import type { FirstDayRiskLevel, FirstDayWorkflowStep } from "./firstDayWorkflow.ts";
 import { updatePersistedGateDispatchTaskState, type PersistedGatePlatformDispatchTask } from "./gateActionReceipts.ts";
 
 const ACCEPTANCE_MARKER = "任务中心已验收：";
@@ -29,6 +29,25 @@ export interface FirstDayReceiptCompletionAction {
   reason: string;
 }
 
+export interface FirstDayExecutionRiskNotice {
+  visible: boolean;
+  level: FirstDayRiskLevel;
+  label: string;
+  headline: string;
+  detail: string;
+  badges: string[];
+}
+
+export interface FirstDayExecutionRiskNoticeInput {
+  riskLevel?: FirstDayRiskLevel;
+  riskLabel?: string;
+  riskPriorityBoost?: number;
+  riskDueLabel?: string;
+  owner: FirstDayWorkflowStep["owner"];
+  acceptanceCriteria: string[];
+  missingEvidence: string[];
+}
+
 export interface FirstDayDispatchDeskCard {
   dispatchKey: string;
   projectId: string | null;
@@ -40,6 +59,7 @@ export interface FirstDayDispatchDeskCard {
   stateLabel: string;
   ownerRole: string;
   priorityScore: number;
+  dueLabel: string;
   href: string;
   firstDayHref: string;
   actionLabel: string;
@@ -121,6 +141,45 @@ export function buildFirstDayReceiptCompletionAction(input: FirstDayReceiptCompl
   };
 }
 
+export function buildFirstDayExecutionRiskNotice(input: FirstDayExecutionRiskNoticeInput): FirstDayExecutionRiskNotice {
+  const level = input.riskLevel ?? "standard";
+  const boost = input.riskPriorityBoost ?? 0;
+  const dueLabel = input.riskDueLabel ?? "今天收口";
+  const evidenceCount = input.missingEvidence.length;
+  const criteriaCount = input.acceptanceCriteria.length;
+
+  if (level === "blocked") {
+    return {
+      visible: true,
+      level,
+      label: input.riskLabel || "避坑",
+      headline: "止损验证模式",
+      detail: `当前开书策略被标记为高风险，${input.owner}只验证恢复条件，不进入批量正文生成。`,
+      badges: [dueLabel, `优先级 +${boost}`, `${criteriaCount} 条验收线`, `${evidenceCount} 条缺失证据`],
+    };
+  }
+
+  if (level === "watch") {
+    return {
+      visible: true,
+      level,
+      label: input.riskLabel || "观察",
+      headline: "小样本验证模式",
+      detail: `当前开书策略还在观察期，${input.owner}先跑首轮样本和复查证据，通过后再扩大。`,
+      badges: [dueLabel, `优先级 +${boost}`, `${criteriaCount} 条验收线`, `${evidenceCount} 条缺失证据`],
+    };
+  }
+
+  return {
+    visible: false,
+    level,
+    label: input.riskLabel || "标准",
+    headline: "标准首日验证",
+    detail: "当前开书策略按普通首日流程推进。",
+    badges: [dueLabel],
+  };
+}
+
 function firstDayStepId(dispatchKey: string) {
   const parts = dispatchKey.split(":");
   return parts[2] ?? "";
@@ -180,6 +239,7 @@ function toFirstDayCard(task: PersistedGatePlatformDispatchTask): FirstDayDispat
     stateLabel: stateLabel(task.state),
     ownerRole: task.ownerRole,
     priorityScore: task.priorityScore,
+    dueLabel: task.dueLabel,
     href: task.href,
     firstDayHref: firstDayHref(task, stepId),
     actionLabel: task.actionLabel,

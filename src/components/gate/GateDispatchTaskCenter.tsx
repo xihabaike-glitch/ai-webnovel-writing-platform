@@ -481,6 +481,7 @@ export function GateDispatchTaskCenter({
                   <div className="mt-3 flex flex-wrap gap-2 text-xs text-slate-200">
                     <span className="rounded-md bg-white/10 px-2 py-1">{firstDayDesk.nextTask.stepLabel}</span>
                     <span className="rounded-md bg-white/10 px-2 py-1">{firstDayDesk.nextTask.ownerRole}</span>
+                    <span className="rounded-md bg-white/10 px-2 py-1">{firstDayDesk.nextTask.dueLabel}</span>
                     <span className="rounded-md bg-white/10 px-2 py-1">优先级 {firstDayDesk.nextTask.priorityScore}</span>
                   </div>
                 </div>
@@ -518,6 +519,10 @@ export function GateDispatchTaskCenter({
                 </div>
                 <div className="mt-2 font-medium text-slate-950">{card.title}</div>
                 <p className="mt-1 line-clamp-2 leading-6 text-slate-600">{card.detail}</p>
+                <div className="mt-2 flex flex-wrap gap-2 text-xs text-slate-500">
+                  <span className="rounded-md bg-white px-2 py-1">{card.dueLabel}</span>
+                  <span className="rounded-md bg-white px-2 py-1">优先级 {card.priorityScore}</span>
+                </div>
                 <div className="mt-3 flex flex-wrap gap-2">
                   <Link className="rounded-md bg-slate-950 px-2 py-1 text-xs font-medium text-white hover:bg-slate-800" href={card.firstDayHref}>
                     回作品

@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   buildFirstDayDispatchCompletionTemplate,
   buildFirstDayDispatchDesk,
+  buildFirstDayExecutionRiskNotice,
   buildFirstDayReceiptCompletionAction,
   buildFirstDayStepView,
   completeFirstDayDispatchStep,
@@ -80,6 +81,47 @@ test("buildFirstDayReceiptCompletionAction only allows successful receipts with 
   assert.equal(ready.label, "验收并进入下一步");
 });
 
+test("buildFirstDayExecutionRiskNotice surfaces blocked and watch modes", () => {
+  const blocked = buildFirstDayExecutionRiskNotice({
+    riskLevel: "blocked",
+    riskLabel: "复盘止损",
+    riskPriorityBoost: 16,
+    riskDueLabel: "今天止损验证",
+    owner: "AI",
+    acceptanceCriteria: ["写清恢复条件", "只验证一个变量"],
+    missingEvidence: ["缺少恢复条件"],
+  });
+  const watch = buildFirstDayExecutionRiskNotice({
+    riskLevel: "watch",
+    riskLabel: "验收观察",
+    riskPriorityBoost: 8,
+    riskDueLabel: "今天小样本验证",
+    owner: "作者",
+    acceptanceCriteria: ["写清首轮通过线"],
+    missingEvidence: ["缺少小样本口径"],
+  });
+  const standard = buildFirstDayExecutionRiskNotice({
+    riskLevel: "standard",
+    riskLabel: "标准",
+    riskPriorityBoost: 0,
+    riskDueLabel: "今天收口",
+    owner: "AI",
+    acceptanceCriteria: [],
+    missingEvidence: [],
+  });
+
+  assert.equal(blocked.visible, true);
+  assert.equal(blocked.headline, "止损验证模式");
+  assert.ok(blocked.detail.includes("只验证恢复条件"));
+  assert.ok(blocked.badges.includes("今天止损验证"));
+  assert.ok(blocked.badges.includes("优先级 +16"));
+  assert.equal(watch.visible, true);
+  assert.equal(watch.headline, "小样本验证模式");
+  assert.ok(watch.detail.includes("观察期"));
+  assert.ok(watch.badges.includes("今天小样本验证"));
+  assert.equal(standard.visible, false);
+});
+
 test("buildFirstDayDispatchDesk highlights the next first-day task", () => {
   const desk = buildFirstDayDispatchDesk([
     {
@@ -141,6 +183,7 @@ test("buildFirstDayDispatchDesk highlights the next first-day task", () => {
   assert.equal(desk.summary.completed, 1);
   assert.equal(desk.nextTask?.stepId, "first-review");
   assert.equal(desk.nextTask?.stepLabel, "第一章审稿");
+  assert.equal(desk.nextTask?.dueLabel, "今天收口");
   assert.equal(desk.nextTask?.firstDayHref, "/projects/project-1?firstDayLaunch=1&nextStep=first-review#first-day-workflow");
   assert.ok(desk.nextTask?.completionTemplate.includes("第一章审稿已完成"));
   assert.ok(desk.nextActions[0].includes("第一章审稿"));

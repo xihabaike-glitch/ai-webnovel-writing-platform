@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { buildFirstDayExecutionRouteBlockMessage, type FirstDayExecutionRouteStatus } from "@/lib/model-gateway/firstDayExecutionRoute";
-import { buildFirstDayReceiptCompletionAction, buildFirstDayStepView, completeFirstDayDispatchStep } from "@/lib/projects/firstDayWorkflowView";
+import { buildFirstDayExecutionRiskNotice, buildFirstDayReceiptCompletionAction, buildFirstDayStepView, completeFirstDayDispatchStep } from "@/lib/projects/firstDayWorkflowView";
 import { persistGateDispatchTask, type GatePlatformGrowthDispatchItem } from "@/lib/projects/gateActionReceipts";
 
 interface FirstDayWorkflowStep {
@@ -21,6 +21,10 @@ interface FirstDayWorkflowStep {
 interface FirstDayExecutionPackage {
   stepId: string;
   owner: FirstDayWorkflowStep["owner"];
+  riskLevel: "standard" | "watch" | "blocked";
+  riskLabel: string;
+  riskPriorityBoost: number;
+  riskDueLabel: string;
   headline: string;
   actionLabel: string;
   href: string;
@@ -116,6 +120,12 @@ function continuationStatusLabel(status: FirstDayContinuationAction["status"]) {
   if (status === "blocked") return "先处理阻塞";
   if (status === "complete") return "已收口";
   return "首日未完成";
+}
+
+function riskNoticeTone(level: "standard" | "watch" | "blocked") {
+  if (level === "blocked") return "border-rose-200 bg-rose-50 text-rose-950";
+  if (level === "watch") return "border-amber-200 bg-amber-50 text-amber-950";
+  return "border-slate-200 bg-slate-50 text-slate-900";
 }
 
 function FirstDayStepCard({ step, index }: { step: FirstDayWorkflowStep; index: number }) {
@@ -301,6 +311,15 @@ export function FirstDayWorkflowPanel({ projectId }: { projectId: string }) {
     hasDispatch: Boolean(dispatch),
     isCompleting: isCompletingDispatch,
   });
+  const riskNotice = workflow ? buildFirstDayExecutionRiskNotice({
+    riskLevel: workflow.executionPackage.riskLevel,
+    riskLabel: workflow.executionPackage.riskLabel,
+    riskPriorityBoost: workflow.executionPackage.riskPriorityBoost,
+    riskDueLabel: workflow.executionPackage.riskDueLabel,
+    owner: workflow.executionPackage.owner,
+    acceptanceCriteria: workflow.executionPackage.acceptanceCriteria,
+    missingEvidence: workflow.executionPackage.missingEvidence,
+  }) : null;
 
   return (
     <section className="rounded-md border border-slate-200 bg-white p-4">
@@ -447,6 +466,22 @@ export function FirstDayWorkflowPanel({ projectId }: { projectId: string }) {
                 </Link>
               </div>
             </div>
+            {riskNotice?.visible ? (
+              <div className={`mt-4 rounded-md border px-3 py-3 text-sm ${riskNoticeTone(riskNotice.level)}`}>
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                  <div>
+                    <div className="text-xs font-medium opacity-75">{riskNotice.label}</div>
+                    <div className="mt-1 font-semibold">{riskNotice.headline}</div>
+                    <p className="mt-1 leading-6 opacity-90">{riskNotice.detail}</p>
+                  </div>
+                  <div className="flex shrink-0 flex-wrap gap-2">
+                    {riskNotice.badges.map((badge) => (
+                      <span className="rounded-md bg-white/70 px-2 py-1 text-xs font-medium" key={badge}>{badge}</span>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            ) : null}
             <div className="mt-4 grid gap-4 md:grid-cols-2">
               <div>
                 <div className="text-xs font-medium text-slate-500">验收标准</div>

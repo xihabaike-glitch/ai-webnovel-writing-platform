@@ -489,6 +489,9 @@ test("buildPlatformPublishExportCenter", async (t) => {
     assert.ok(knowledge?.applications.some((item) => item.area === "submission_asset" && item.status === "reuse"));
     assert.ok(knowledge?.applications.some((item) => item.area === "first_three" && item.impact.includes("钩子")));
     assert.ok(knowledge?.applications.some((item) => item.area === "strategy" && item.impact.includes("知识库分")));
+    assert.equal(knowledge?.feedbackLoop.actionLabel, "执行正反馈链");
+    assert.ok(knowledge?.feedbackLoop.headline.includes("正反馈经验"));
+    assert.ok(knowledge?.feedbackLoop.nextStepLabel.length);
     assert.ok(center.platformStrategy[0].scores.knowledge >= 80);
     assert.ok(center.platformStrategy[0].reasons.some((reason) => reason.includes("知识库")));
     assert.ok(center.packages[0].markdown.includes("实验结果归因"));
@@ -552,6 +555,8 @@ test("buildPlatformPublishExportCenter", async (t) => {
     assert.ok(knowledge?.avoidSignals.some((signal) => signal.includes("缺采纳版本")));
     assert.ok(knowledge?.applications.every((item) => item.status === "collect"));
     assert.ok(knowledge?.applications.some((item) => item.impact.includes("补证据")));
+    assert.equal(knowledge?.feedbackLoop.actionLabel, "启动补证据链");
+    assert.ok(knowledge?.feedbackLoop.nextStepLabel.includes("保存") || knowledge?.feedbackLoop.nextStepLabel.includes("候选"));
     assert.ok(attribution.verdict.includes("不能证明"));
     assert.ok(attribution.nextAction.includes("采纳"));
   });

@@ -620,6 +620,13 @@ interface PlatformKnowledgeApplication {
   href: string;
 }
 
+interface PlatformKnowledgeFeedbackLoop {
+  actionLabel: string;
+  headline: string;
+  nextStepLabel: string;
+  nextStepHref: string;
+}
+
 interface PlatformKnowledgeInsight {
   platformId: string;
   platformName: string;
@@ -633,6 +640,7 @@ interface PlatformKnowledgeInsight {
   tacticSummary: string;
   nextAction: string;
   applications: PlatformKnowledgeApplication[];
+  feedbackLoop: PlatformKnowledgeFeedbackLoop;
 }
 
 interface PlatformPublishExportCenter {
@@ -1223,6 +1231,7 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
   const [isSavingEffect, setIsSavingEffect] = useState(false);
   const [runningOptimizationActionId, setRunningOptimizationActionId] = useState<string | null>(null);
   const [applyingStrategyPlatformId, setApplyingStrategyPlatformId] = useState<string | null>(null);
+  const [runningKnowledgePlatformId, setRunningKnowledgePlatformId] = useState<string | null>(null);
   const [runningStrategyStepId, setRunningStrategyStepId] = useState<string | null>(null);
   const [runningStrategyReviewTaskId, setRunningStrategyReviewTaskId] = useState<string | null>(null);
   const [strategySwitchPlan, setStrategySwitchPlan] = useState<PlatformStrategySwitchPlan | null>(null);
@@ -1485,6 +1494,46 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
       return null;
     } finally {
       setApplyingStrategyPlatformId(null);
+    }
+  }
+
+  async function startKnowledgeFeedbackLoop(item: PlatformKnowledgeInsight) {
+    const strategy = center?.platformStrategy.find((strategyItem) => strategyItem.platformId === item.platformId);
+    if (!strategy) {
+      setMessage(`没有找到 ${item.platformName} 的平台策略，先刷新发布中心。`);
+      return;
+    }
+
+    setRunningKnowledgePlatformId(item.platformId);
+    setStrategyExecutionReceipt(null);
+    setStrategyReviewTaskReceipt(null);
+    setMessage(null);
+    try {
+      const response = await fetch(`/api/projects/${projectId}/platform-export`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "apply-strategy", platformId: item.platformId }),
+      });
+      const payload = (await response.json().catch(() => null)) as {
+        message?: string;
+        error?: string;
+        switchPlan?: PlatformStrategySwitchPlan;
+      } | null;
+      if (!response.ok || !payload?.switchPlan) throw new Error(payload?.error ?? "启动知识库反哺链失败。");
+      setSelectedPlatformId(item.platformId);
+      setSelectedVersionId(null);
+      setVersionDetail(null);
+      setVersionActionFilter("all");
+      setStrategySwitchPlan(payload.switchPlan);
+      setStrategyExecutionReceipt(buildStrategyExecutionReceipt(payload.switchPlan, "switch-target-platform"));
+      await loadCenter({ keepMessage: true });
+      const nextStep = payload.switchPlan.steps.find((step) => step.status === "next");
+      setMessage(`${item.feedbackLoop.headline} 已启动执行链，下一步：${nextStep?.label ?? item.feedbackLoop.nextStepLabel}。`);
+      window.location.hash = "platform-strategy-ranking";
+    } catch (caught) {
+      setMessage(caught instanceof Error ? caught.message : "启动知识库反哺链失败。");
+    } finally {
+      setRunningKnowledgePlatformId(null);
     }
   }
 
@@ -2305,6 +2354,28 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
                       <div>正/负 <span className="font-medium text-slate-950">{item.positiveCount}/{item.negativeCount}</span></div>
                     </div>
                     <p className="mt-2 leading-6 text-slate-600">{item.tacticSummary}</p>
+                    <div className="mt-2 rounded-md border border-cyan-100 bg-cyan-50 p-2 text-xs">
+                      <div className="font-medium text-cyan-950">{item.feedbackLoop.actionLabel}</div>
+                      <div className="mt-1 leading-5 text-cyan-800">{item.feedbackLoop.headline}</div>
+                      <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+                        <a className="text-cyan-700 hover:text-cyan-900" href={item.feedbackLoop.nextStepHref}>
+                          下一步：{item.feedbackLoop.nextStepLabel}
+                        </a>
+                        <button
+                          className="rounded-md bg-cyan-950 px-2 py-1 text-[11px] font-medium text-white disabled:opacity-50"
+                          disabled={Boolean(
+                            runningKnowledgePlatformId
+                            || applyingStrategyPlatformId
+                            || runningStrategyStepId
+                            || runningStrategyReviewTaskId,
+                          )}
+                          onClick={() => void startKnowledgeFeedbackLoop(item)}
+                          type="button"
+                        >
+                          {runningKnowledgePlatformId === item.platformId ? "启动中" : item.feedbackLoop.actionLabel}
+                        </button>
+                      </div>
+                    </div>
                     {item.applications.length ? (
                       <div className="mt-2 rounded-md bg-white p-2 text-xs">
                         <div className="font-medium text-slate-800">已反哺到</div>

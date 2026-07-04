@@ -689,6 +689,13 @@ export interface PlatformKnowledgeApplication {
   href: string;
 }
 
+export interface PlatformKnowledgeFeedbackLoop {
+  actionLabel: string;
+  headline: string;
+  nextStepLabel: string;
+  nextStepHref: string;
+}
+
 export interface PlatformKnowledgeInsight {
   platformId: PlatformId;
   platformName: string;
@@ -702,6 +709,7 @@ export interface PlatformKnowledgeInsight {
   tacticSummary: string;
   nextAction: string;
   applications: PlatformKnowledgeApplication[];
+  feedbackLoop: PlatformKnowledgeFeedbackLoop;
 }
 
 export interface PlatformPublishExportCenter {
@@ -2044,6 +2052,25 @@ function buildPlatformKnowledge(packages: PlatformPublishPackage[]): PlatformKno
           href: "#platform-strategy-ranking",
         },
       ];
+      const nextLoopStep = !pack.publishVersions.length
+        ? { label: "保存证据基准", href: "#package-version-history" }
+        : pack.submissionAssetAudit.status !== "ready"
+          ? { label: "生成并采纳标题/简介候选", href: "#submission-asset-editor" }
+          : !pack.canExport
+            ? { label: "重写前三章", href: "#first-three-rewrite" }
+            : !pack.publishEffect.records
+              ? { label: "记录发布效果", href: "#publish-effect-panel" }
+              : { label: "复盘平台策略排序", href: "#platform-strategy-ranking" };
+      const feedbackLoop: PlatformKnowledgeFeedbackLoop = {
+        actionLabel: status === "learned" ? "执行正反馈链" : status === "warning" ? "执行避坑链" : "启动补证据链",
+        headline: status === "learned"
+          ? `把 ${pack.platformName} 的正反馈经验继续喂给生成链路。`
+          : status === "warning"
+            ? `先让 ${pack.platformName} 的负反馈变成避坑动作。`
+            : `先给 ${pack.platformName} 补一轮可归因证据。`,
+        nextStepLabel: nextLoopStep.label,
+        nextStepHref: nextLoopStep.href,
+      };
 
       return {
         platformId: pack.platformId,
@@ -2058,6 +2085,7 @@ function buildPlatformKnowledge(packages: PlatformPublishPackage[]): PlatformKno
         tacticSummary,
         nextAction,
         applications,
+        feedbackLoop,
       };
     })
     .sort((left, right) => (

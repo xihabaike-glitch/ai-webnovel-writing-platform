@@ -624,6 +624,7 @@ interface PlatformKnowledgeFeedbackReceipt {
   nextAction: string;
   href: string;
   severity: "success" | "needs_action";
+  createdAt: string;
 }
 
 interface PlatformKnowledgeApplication {
@@ -1220,6 +1221,7 @@ function buildKnowledgeFeedbackReceipt(
   step: PlatformStrategySwitchStep | null,
   executionReceipt: PlatformStrategyExecutionReceipt | null,
 ): PlatformKnowledgeFeedbackReceipt {
+  const createdAt = new Date().toISOString();
   const completedStepLabel = executionReceipt
     ? step?.label ?? executionReceipt.title
     : "启动执行链";
@@ -1232,7 +1234,7 @@ function buildKnowledgeFeedbackReceipt(
       : "当前执行链没有新的可自动动作，回到策略排行榜复盘即可。";
 
   return {
-    id: `${item.platformId}:${Date.now()}`,
+    id: `${item.platformId}:${createdAt}`,
     platformId: item.platformId,
     platformName: item.platformName,
     actionLabel: item.feedbackLoop.actionLabel,
@@ -1243,7 +1245,49 @@ function buildKnowledgeFeedbackReceipt(
     nextAction: executionReceipt?.nextAction ?? `下一步：${step?.label ?? item.feedbackLoop.nextStepLabel}`,
     href: executionReceipt?.href ?? step?.href ?? item.feedbackLoop.nextStepHref,
     severity: executionReceipt?.severity ?? (step?.executable === false ? "needs_action" : "success"),
+    createdAt,
   };
+}
+
+function knowledgeFeedbackHistoryKey(projectId: string) {
+  return `ai-webnovel-knowledge-feedback-history:${projectId}`;
+}
+
+function isKnowledgeFeedbackReceipt(value: unknown): value is PlatformKnowledgeFeedbackReceipt {
+  if (!value || typeof value !== "object") return false;
+  const receipt = value as Partial<PlatformKnowledgeFeedbackReceipt>;
+  return typeof receipt.id === "string"
+    && typeof receipt.platformId === "string"
+    && typeof receipt.platformName === "string"
+    && typeof receipt.actionLabel === "string"
+    && typeof receipt.title === "string"
+    && typeof receipt.message === "string"
+    && typeof receipt.completedStepLabel === "string"
+    && typeof receipt.stopReason === "string"
+    && typeof receipt.nextAction === "string"
+    && typeof receipt.href === "string"
+    && typeof receipt.createdAt === "string"
+    && (receipt.severity === "success" || receipt.severity === "needs_action");
+}
+
+function loadKnowledgeFeedbackHistory(projectId: string): PlatformKnowledgeFeedbackReceipt[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.localStorage.getItem(knowledgeFeedbackHistoryKey(projectId));
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as unknown;
+    return Array.isArray(parsed) ? parsed.filter(isKnowledgeFeedbackReceipt).slice(0, 10) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveKnowledgeFeedbackHistory(projectId: string, receipts: PlatformKnowledgeFeedbackReceipt[]) {
+  const next = receipts.slice(0, 10);
+  if (typeof window !== "undefined") {
+    window.localStorage.setItem(knowledgeFeedbackHistoryKey(projectId), JSON.stringify(next));
+  }
+  return next;
 }
 
 function normalizeVersionAction(action: string): PublishPackageVersionActionFilter {
@@ -1283,6 +1327,7 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
   const [strategyExecutionReceipt, setStrategyExecutionReceipt] = useState<PlatformStrategyExecutionReceipt | null>(null);
   const [strategyReviewTaskReceipt, setStrategyReviewTaskReceipt] = useState<PlatformStrategyReviewTaskReceipt | null>(null);
   const [knowledgeFeedbackReceipt, setKnowledgeFeedbackReceipt] = useState<PlatformKnowledgeFeedbackReceipt | null>(null);
+  const [knowledgeFeedbackHistory, setKnowledgeFeedbackHistory] = useState<PlatformKnowledgeFeedbackReceipt[]>([]);
   const [latestEffectReview, setLatestEffectReview] = useState<PlatformPublishEffectSaveReview | null>(null);
   const [assetOptimizationVariants, setAssetOptimizationVariants] = useState<PlatformSubmissionAssetOptimizationVariant[]>([]);
   const [versionActionFilter, setVersionActionFilter] = useState<PublishPackageVersionActionFilter>("all");
@@ -1350,6 +1395,11 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
     if (versionActionFilter === "all") return versions;
     return versions.filter((version) => normalizeVersionAction(version.action) === versionActionFilter);
   }, [selectedPackage, versionActionFilter]);
+
+  function recordKnowledgeFeedbackReceipt(receipt: PlatformKnowledgeFeedbackReceipt) {
+    setKnowledgeFeedbackReceipt(receipt);
+    setKnowledgeFeedbackHistory((current) => saveKnowledgeFeedbackHistory(projectId, [receipt, ...current]));
+  }
 
   async function loadCenter(options?: { keepMessage?: boolean }) {
     setIsLoading(true);
@@ -1576,10 +1626,10 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
       const nextStep = payload.switchPlan.steps.find((step) => step.status === "next");
       if (nextStep?.executable) {
         const executionReceipt = await executeStrategyStep(payload.switchPlan, nextStep, { messagePrefix: item.feedbackLoop.headline });
-        setKnowledgeFeedbackReceipt(buildKnowledgeFeedbackReceipt(item, nextStep, executionReceipt));
+        recordKnowledgeFeedbackReceipt(buildKnowledgeFeedbackReceipt(item, nextStep, executionReceipt));
       } else {
         await loadCenter({ keepMessage: true });
-        setKnowledgeFeedbackReceipt(buildKnowledgeFeedbackReceipt(item, nextStep ?? null, null));
+        recordKnowledgeFeedbackReceipt(buildKnowledgeFeedbackReceipt(item, nextStep ?? null, null));
         setMessage(`${item.feedbackLoop.headline} 已启动执行链，下一步：${nextStep?.label ?? item.feedbackLoop.nextStepLabel}。`);
         window.location.hash = nextStep?.href.replace(/^#/, "") ?? "platform-strategy-ranking";
       }
@@ -2122,6 +2172,12 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
 
   useEffect(() => {
     void loadCenter();
+  }, [projectId]);
+
+  useEffect(() => {
+    const history = loadKnowledgeFeedbackHistory(projectId);
+    setKnowledgeFeedbackHistory(history);
+    setKnowledgeFeedbackReceipt(history[0] ?? null);
   }, [projectId]);
 
   useEffect(() => {
@@ -2874,6 +2930,48 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
                         >
                           去处理
                         </a>
+                      </div>
+                    </div>
+                  ) : null}
+                  {knowledgeFeedbackHistory.length ? (
+                    <div className="mt-3 rounded-md border border-slate-200 bg-white p-3 text-sm">
+                      <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
+                        <div>
+                          <div className="font-medium text-slate-950">反哺链路历史</div>
+                          <p className="mt-1 text-xs leading-5 text-slate-500">保留最近 {Math.min(10, knowledgeFeedbackHistory.length)} 次自动反哺，方便复盘哪次经验被执行过。</p>
+                        </div>
+                        <button
+                          className="w-fit rounded-md border border-slate-200 px-2 py-1 text-[11px] font-medium text-slate-600 hover:bg-slate-50"
+                          onClick={() => {
+                            saveKnowledgeFeedbackHistory(projectId, []);
+                            setKnowledgeFeedbackHistory([]);
+                            setKnowledgeFeedbackReceipt(null);
+                          }}
+                          type="button"
+                        >
+                          清空
+                        </button>
+                      </div>
+                      <div className="mt-3 grid gap-2 lg:grid-cols-2">
+                        {knowledgeFeedbackHistory.slice(0, 4).map((receipt) => (
+                          <a
+                            className="block rounded-md bg-slate-50 p-2 hover:bg-slate-100"
+                            href={receipt.href}
+                            key={receipt.id}
+                            onClick={() => setKnowledgeFeedbackReceipt(receipt)}
+                          >
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <span className="font-medium text-slate-800">{receipt.platformName}｜{receipt.actionLabel}</span>
+                              <span className={`rounded-md px-1.5 py-0.5 text-[11px] font-medium ${
+                                receipt.severity === "success" ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"
+                              }`}>
+                                {formatTime(receipt.createdAt)}
+                              </span>
+                            </div>
+                            <div className="mt-1 leading-5 text-slate-500">已推进：{receipt.completedStepLabel}</div>
+                            <div className="mt-1 line-clamp-2 leading-5 text-slate-500">停点：{receipt.stopReason}</div>
+                          </a>
+                        ))}
                       </div>
                     </div>
                   ) : null}

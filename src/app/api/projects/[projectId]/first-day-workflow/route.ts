@@ -5,7 +5,7 @@ import { reviewChapterDraft } from "@/lib/ai/chapterReviewGeneration";
 import { prisma } from "@/lib/db/prisma";
 import { buildFirstDayExecutionRouteBlockMessage, buildFirstDayExecutionRouteStatus } from "@/lib/model-gateway/firstDayExecutionRoute";
 import { getPlatformProfile, type PlatformId } from "@/lib/platforms/platformProfiles";
-import { buildFirstDayDispatchItem, buildFirstDayModelExecutionPlan, buildFirstDayWorkflow } from "@/lib/projects/firstDayWorkflow";
+import { buildFirstDayDispatchItem, buildFirstDayExecutionReceipt, buildFirstDayModelExecutionPlan, buildFirstDayWorkflow } from "@/lib/projects/firstDayWorkflow";
 import { generateControlAssets, type ControlAssetAreaId } from "@/lib/projects/controlAssetGeneration";
 import { buildSubmissionChecklist } from "@/lib/projects/submissionChecklist";
 
@@ -158,12 +158,17 @@ export async function POST(_request: Request, { params }: Params) {
       result = await Promise.all(areaIds.map((areaId) => generateControlAssets(projectId, areaId as ControlAssetAreaId)));
     }
 
+    const executionReceipt = buildFirstDayExecutionReceipt({
+      plan: executionPlan,
+      result,
+    });
     const refreshed = await buildWorkflowPayload(projectId);
     return NextResponse.json({
       ...(refreshed ?? payload),
       executionPlan,
+      executionReceipt,
       result,
-      completionEvidence: executionPlan.completionEvidence,
+      completionEvidence: executionReceipt.success ? executionReceipt.completionEvidence || executionPlan.completionEvidence : "",
     });
   } catch (caught) {
     const message = caught instanceof Error ? caught.message : "首日 AI 执行失败。";

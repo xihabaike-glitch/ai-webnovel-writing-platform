@@ -43,6 +43,15 @@ interface FirstDayWorkflow {
   steps: FirstDayWorkflowStep[];
 }
 
+interface FirstDayExecutionReceipt {
+  success: boolean;
+  summary: string;
+  writeBackTarget: string;
+  nextAction: string;
+  completionEvidence: string;
+  detailItems: string[];
+}
+
 type FirstDayModelRouteStatus = FirstDayExecutionRouteStatus;
 type FirstDayMessageAction = "execute_current_step";
 
@@ -124,6 +133,7 @@ export function FirstDayWorkflowPanel({ projectId }: { projectId: string }) {
   const [completionEvidence, setCompletionEvidence] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [messageAction, setMessageAction] = useState<FirstDayMessageAction | null>(null);
+  const [executionReceipt, setExecutionReceipt] = useState<FirstDayExecutionReceipt | null>(null);
 
   function showMessage(nextMessage: string | null, action?: FirstDayMessageAction) {
     setMessage(nextMessage);
@@ -133,6 +143,7 @@ export function FirstDayWorkflowPanel({ projectId }: { projectId: string }) {
   async function loadWorkflow(options?: { fromRouteRepair?: boolean }) {
     setIsLoading(true);
     showMessage(null);
+    setExecutionReceipt(null);
     try {
       const response = await fetch(`/api/projects/${projectId}/first-day-workflow`);
       if (!response.ok) {
@@ -161,6 +172,7 @@ export function FirstDayWorkflowPanel({ projectId }: { projectId: string }) {
     if (!dispatch) return;
     setIsDispatching(true);
     showMessage(null);
+    setExecutionReceipt(null);
     try {
       const task = await persistGateDispatchTask(dispatch);
       showMessage(`已派到任务中心：${task.title}`);
@@ -182,6 +194,7 @@ export function FirstDayWorkflowPanel({ projectId }: { projectId: string }) {
     }
     setIsExecutingAi(true);
     showMessage(null);
+    setExecutionReceipt(null);
     try {
       const response = await fetch(`/api/projects/${projectId}/first-day-workflow`, {
         method: "POST",
@@ -190,6 +203,7 @@ export function FirstDayWorkflowPanel({ projectId }: { projectId: string }) {
         workflow?: FirstDayWorkflow;
         dispatch?: GatePlatformGrowthDispatchItem;
         modelRoute?: FirstDayModelRouteStatus;
+        executionReceipt?: FirstDayExecutionReceipt;
         completionEvidence?: string;
         error?: string;
       };
@@ -199,8 +213,9 @@ export function FirstDayWorkflowPanel({ projectId }: { projectId: string }) {
       if (payload.workflow) setWorkflow(payload.workflow);
       if (payload.dispatch) setDispatch(payload.dispatch);
       if (payload.modelRoute) setModelRoute(payload.modelRoute);
+      if (payload.executionReceipt) setExecutionReceipt(payload.executionReceipt);
       if (payload.completionEvidence) setCompletionEvidence(payload.completionEvidence);
-      showMessage(`AI 已执行当前节点：${workflow.nextStep.label}。请检查结果后完成派单验收。`);
+      showMessage(payload.executionReceipt?.summary ?? `AI 已执行当前节点：${workflow.nextStep.label}。请检查结果后完成派单验收。`);
     } catch (caught) {
       showMessage(caught instanceof Error ? caught.message : "首日 AI 执行失败。");
     } finally {
@@ -212,6 +227,7 @@ export function FirstDayWorkflowPanel({ projectId }: { projectId: string }) {
     if (!workflow || !dispatch) return;
     setIsCompletingDispatch(true);
     showMessage(null);
+    setExecutionReceipt(null);
     try {
       await persistGateDispatchTask(dispatch);
       const result = await completeFirstDayDispatchStep(projectId, workflow.executionPackage.stepId, completionEvidence);
@@ -230,6 +246,17 @@ export function FirstDayWorkflowPanel({ projectId }: { projectId: string }) {
   }, [projectId, routeRepairReturn]);
 
   const routeBlockMessage = modelRoute ? buildFirstDayExecutionRouteBlockMessage(modelRoute) : null;
+  const receiptTone = executionReceipt?.success
+    ? {
+      panel: "border-emerald-100 bg-emerald-50 text-emerald-900",
+      label: "text-emerald-700",
+      body: "text-emerald-800",
+    }
+    : {
+      panel: "border-amber-100 bg-amber-50 text-amber-900",
+      label: "text-amber-700",
+      body: "text-amber-800",
+    };
 
   return (
     <section className="rounded-md border border-slate-200 bg-white p-4">
@@ -260,6 +287,31 @@ export function FirstDayWorkflowPanel({ projectId }: { projectId: string }) {
             >
               {isExecutingAi ? "执行中" : "继续执行当前节点"}
             </button>
+          ) : null}
+        </div>
+      ) : null}
+
+      {executionReceipt ? (
+        <div className={`mt-3 rounded-md border px-3 py-3 text-sm ${receiptTone.panel}`}>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <div className={`text-xs font-medium ${receiptTone.label}`}>AI 执行回执</div>
+              <p className="mt-1 leading-6">{executionReceipt.summary}</p>
+            </div>
+            <span className={`w-fit rounded-md bg-white px-2 py-1 text-xs font-medium ${receiptTone.label}`}>
+              {executionReceipt.success ? "可验收" : "需处理"}
+            </span>
+          </div>
+          <div className={`mt-2 grid gap-2 text-xs ${receiptTone.body} sm:grid-cols-2`}>
+            <span className="rounded-md bg-white px-2 py-1">写回：{executionReceipt.writeBackTarget}</span>
+            <span className="rounded-md bg-white px-2 py-1">下一步：{executionReceipt.nextAction}</span>
+          </div>
+          {executionReceipt.detailItems.length > 0 ? (
+            <ul className={`mt-2 grid gap-1 text-xs leading-5 ${receiptTone.body}`}>
+              {executionReceipt.detailItems.map((item) => (
+                <li key={item}>· {item}</li>
+              ))}
+            </ul>
           ) : null}
         </div>
       ) : null}

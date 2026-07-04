@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { getPlatformProfile } from "../lib/platforms/platformProfiles.ts";
-import { buildFirstDayDispatchItem, buildFirstDayLaunchReceipt, buildFirstDayModelExecutionPlan, buildFirstDayWorkflow } from "../lib/projects/firstDayWorkflow.ts";
+import { buildFirstDayDispatchItem, buildFirstDayExecutionReceipt, buildFirstDayLaunchReceipt, buildFirstDayModelExecutionPlan, buildFirstDayWorkflow } from "../lib/projects/firstDayWorkflow.ts";
 
 const project = {
   id: "project-1",
@@ -142,6 +142,116 @@ test("buildFirstDayWorkflow", async (t) => {
     assert.equal(plan.actionKind, "chapter_draft");
     assert.ok(plan.modelPrompt.includes("第一章 雨夜系统"));
     assert.ok(plan.completionEvidence.includes("第一章正文已生成"));
+  });
+
+  await t.test("builds a write-back receipt for first-day chapter draft execution", () => {
+    const workflow = buildFirstDayWorkflow({
+      project,
+      platform: getPlatformProfile("fanqie"),
+      chapters: [chapter, { ...chapter, id: "chapter-2", order: 2 }, { ...chapter, id: "chapter-3", order: 3 }],
+      outlineNodes,
+      characters,
+      worldEntries,
+      aiTasks: [],
+      submissionChecklist: checklist,
+    });
+    const plan = buildFirstDayModelExecutionPlan(workflow);
+    const receipt = buildFirstDayExecutionReceipt({
+      plan,
+      result: {
+        chapter: { title: "第一章 雨夜系统", wordCount: 1320 },
+        provider: { displayName: "DeepSeek" },
+        draftQuality: { score: 86 },
+      },
+    });
+
+    assert.equal(receipt.success, true);
+    assert.equal(receipt.writeBackTarget, "第一章 雨夜系统");
+    assert.ok(receipt.summary.includes("已写回"));
+    assert.ok(receipt.completionEvidence.includes("1320 字"));
+    assert.ok(receipt.completionEvidence.includes("DeepSeek"));
+    assert.ok(receipt.detailItems.some((item) => item.includes("自动质检")));
+  });
+
+  await t.test("builds a task receipt for first-day chapter review execution", () => {
+    const plan = {
+      executable: true,
+      stepId: "first-review",
+      actionKind: "chapter_review" as const,
+      taskType: "chapter_review" as const,
+      chapterId: "chapter-1",
+      modelPrompt: "",
+      completionEvidence: "",
+    };
+    const receipt = buildFirstDayExecutionReceipt({
+      plan,
+      result: {
+        chapter: { title: "第一章 雨夜系统" },
+        provider: { displayName: "Kimi" },
+        result: {
+          score: 72,
+          summary: "钩子明确，但解释密度偏高。",
+          issues: [{ severity: "medium" }, { severity: "low" }],
+        },
+      },
+    });
+
+    assert.equal(receipt.success, true);
+    assert.equal(receipt.writeBackTarget, "AI 任务审稿记录");
+    assert.ok(receipt.completionEvidence.includes("评分 72"));
+    assert.ok(receipt.completionEvidence.includes("2 个问题"));
+    assert.ok(receipt.nextAction.includes("二改"));
+  });
+
+  await t.test("builds a write-back receipt for first-day second pass execution", () => {
+    const plan = {
+      executable: true,
+      stepId: "first-rewrite",
+      actionKind: "chapter_second_pass" as const,
+      taskType: "chapter_second_pass" as const,
+      chapterId: "chapter-1",
+      modelPrompt: "",
+      completionEvidence: "",
+    };
+    const receipt = buildFirstDayExecutionReceipt({
+      plan,
+      result: {
+        chapter: { title: "第一章 雨夜系统", wordCount: 1480 },
+        activeProvider: { displayName: "Claude" },
+        secondPassAudit: { score: 90 },
+      },
+    });
+
+    assert.equal(receipt.success, true);
+    assert.ok(receipt.summary.includes("二改已写回"));
+    assert.ok(receipt.completionEvidence.includes("保留改前版本"));
+    assert.ok(receipt.completionEvidence.includes("90 分复检"));
+  });
+
+  await t.test("builds a write-back receipt for first-day control assets execution", () => {
+    const plan = {
+      executable: true,
+      stepId: "story-support",
+      actionKind: "control_assets" as const,
+      taskType: "control_asset_generate" as const,
+      controlAreaIds: ["characters", "world", "story-lines"] as const,
+      modelPrompt: "",
+      completionEvidence: "",
+    };
+    const receipt = buildFirstDayExecutionReceipt({
+      plan,
+      result: [
+        { areaId: "characters", created: ["林晚"] },
+        { areaId: "world", created: ["选择系统", "回档禁忌"] },
+        { areaId: "story-lines", created: ["雨夜主线"] },
+      ],
+    });
+
+    assert.equal(receipt.success, true);
+    assert.equal(receipt.writeBackTarget, "人物弧光、核心设定、主线支线");
+    assert.ok(receipt.completionEvidence.includes("新增 4 项"));
+    assert.ok(receipt.completionEvidence.includes("林晚"));
+    assert.ok(receipt.nextAction.includes("第一章初稿"));
   });
 
   await t.test("turns the current first-day execution package into a dispatch task", () => {

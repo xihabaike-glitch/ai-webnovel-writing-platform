@@ -129,6 +129,15 @@ export interface FirstDayLaunchReceipt {
   readyStepIds: string[];
 }
 
+export interface FirstDayExecutionReceipt {
+  success: boolean;
+  summary: string;
+  writeBackTarget: string;
+  nextAction: string;
+  completionEvidence: string;
+  detailItems: string[];
+}
+
 export interface FirstDayDispatchInput {
   workflow: FirstDayWorkflow;
   project: FirstDayProject;
@@ -436,6 +445,187 @@ export function buildFirstDayModelExecutionPlan(workflow: FirstDayWorkflow): Fir
     executable: false,
     actionKind: "manual",
     blockedReason: "当前首日节点需要人工确认或运营收口，暂不自动调用模型。",
+  };
+}
+
+function record(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : null;
+}
+
+function textValue(value: unknown) {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function numberValue(value: unknown) {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function arrayValue(value: unknown) {
+  return Array.isArray(value) ? value : [];
+}
+
+function resultError(result: unknown) {
+  const item = record(result);
+  return item ? textValue(item.error) : "";
+}
+
+function providerLabel(result: unknown) {
+  const item = record(result);
+  const provider = record(item?.provider) ?? record(item?.activeProvider);
+  return textValue(provider?.displayName) || textValue(provider?.model) || "当前模型路线";
+}
+
+function chapterLabel(result: unknown) {
+  const item = record(result);
+  const chapter = record(item?.chapter);
+  return textValue(chapter?.title) || "当前章节";
+}
+
+function chapterWordCount(result: unknown) {
+  const item = record(result);
+  const chapter = record(item?.chapter);
+  return numberValue(chapter?.wordCount) ?? numberValue(item?.wordCount) ?? 0;
+}
+
+function auditScore(result: unknown, key: "draftQuality" | "secondPassAudit") {
+  const item = record(result);
+  const audit = record(item?.[key]);
+  return numberValue(audit?.score);
+}
+
+function reviewResult(result: unknown) {
+  const item = record(result);
+  const review = record(item?.result);
+  return {
+    score: numberValue(review?.score),
+    summary: textValue(review?.summary),
+    issueCount: arrayValue(review?.issues).length,
+  };
+}
+
+function controlAreaLabel(areaId: string) {
+  if (areaId === "characters") return "人物弧光";
+  if (areaId === "world") return "核心设定";
+  if (areaId === "story-lines") return "主线支线";
+  return "资料卡";
+}
+
+function controlAssetReceipt(result: unknown) {
+  const items = arrayValue(result).map((item) => record(item)).filter((item): item is Record<string, unknown> => Boolean(item));
+  const created = items.flatMap((item) => arrayValue(item.created).map((name) => textValue(name)).filter(Boolean));
+  const failed = items.filter((item) => textValue(item.error)).map((item) => `${controlAreaLabel(textValue(item.areaId))}：${textValue(item.error)}`);
+  const areaLabels = items.map((item) => controlAreaLabel(textValue(item.areaId)));
+  return {
+    created,
+    failed,
+    areaLabels: Array.from(new Set(areaLabels)),
+  };
+}
+
+export function buildFirstDayExecutionReceipt(input: {
+  plan: FirstDayModelExecutionPlan;
+  result: unknown;
+}): FirstDayExecutionReceipt {
+  const error = resultError(input.result);
+  if (error) {
+    return {
+      success: false,
+      summary: `AI 执行未完成：${error}`,
+      writeBackTarget: "未写回",
+      nextAction: "修复模型路线、预算或素材问题后重试当前节点。",
+      completionEvidence: "",
+      detailItems: [error],
+    };
+  }
+
+  if (input.plan.actionKind === "chapter_draft") {
+    const title = chapterLabel(input.result);
+    const wordCount = chapterWordCount(input.result);
+    const provider = providerLabel(input.result);
+    const score = auditScore(input.result, "draftQuality");
+    return {
+      success: true,
+      summary: `第一章初稿已写回：${title}，当前 ${wordCount} 字。`,
+      writeBackTarget: title,
+      nextAction: "检查正文后完成派单验收，再进入第一章审稿。",
+      completionEvidence: `第一章正文已生成并写回章节《${title}》，当前 ${wordCount} 字；使用 ${provider}，已留下初稿任务${score === null ? "" : `和 ${score} 分自动质检`}，可以进入审稿。`,
+      detailItems: [
+        `写回章节：${title}`,
+        `当前字数：${wordCount}`,
+        `执行模型：${provider}`,
+        score === null ? "自动质检：待查看任务记录" : `自动质检：${score} 分`,
+      ],
+    };
+  }
+
+  if (input.plan.actionKind === "chapter_review") {
+    const title = chapterLabel(input.result);
+    const provider = providerLabel(input.result);
+    const review = reviewResult(input.result);
+    return {
+      success: true,
+      summary: `第一章审稿已完成：${title}${review.score === null ? "" : `，评分 ${review.score}`}。`,
+      writeBackTarget: "AI 任务审稿记录",
+      nextAction: "按审稿问题做二改，不要直接扩大批量生成。",
+      completionEvidence: `第一章审稿已完成：《${title}》${review.score === null ? "" : `评分 ${review.score}`}，发现 ${review.issueCount} 个问题；使用 ${provider}，审稿结果已记录，可以进入二改。`,
+      detailItems: [
+        `审稿章节：${title}`,
+        review.score === null ? "审稿评分：待查看任务记录" : `审稿评分：${review.score}`,
+        `问题数量：${review.issueCount}`,
+        review.summary ? `审稿摘要：${review.summary}` : `执行模型：${provider}`,
+      ],
+    };
+  }
+
+  if (input.plan.actionKind === "chapter_second_pass") {
+    const title = chapterLabel(input.result);
+    const wordCount = chapterWordCount(input.result);
+    const provider = providerLabel(input.result);
+    const score = auditScore(input.result, "secondPassAudit");
+    return {
+      success: true,
+      summary: `第一章二改已写回：${title}，当前 ${wordCount} 字。`,
+      writeBackTarget: title,
+      nextAction: "检查改前版本对照和复检分数，再进入平台包预检。",
+      completionEvidence: `二改已写回章节《${title}》，当前 ${wordCount} 字；使用 ${provider}，已保留改前版本${score === null ? "" : `并完成 ${score} 分复检`}，可以进入平台包预检。`,
+      detailItems: [
+        `写回章节：${title}`,
+        `当前字数：${wordCount}`,
+        `执行模型：${provider}`,
+        score === null ? "复检：待查看任务记录" : `复检：${score} 分`,
+      ],
+    };
+  }
+
+  if (input.plan.actionKind === "control_assets") {
+    const receipt = controlAssetReceipt(input.result);
+    const createdPreview = receipt.created.slice(0, 6).join("、");
+    return {
+      success: receipt.failed.length === 0 && receipt.created.length > 0,
+      summary: receipt.created.length > 0
+        ? `人物和设定支撑已落库：新增 ${receipt.created.length} 项。`
+        : "人物和设定支撑未生成可落库内容。",
+      writeBackTarget: receipt.areaLabels.join("、") || "作品资料",
+      nextAction: receipt.failed.length > 0 ? "先处理失败的资料区，再进入正文生成。" : "检查资料卡后完成派单验收，再生成第一章初稿。",
+      completionEvidence: receipt.failed.length > 0 || receipt.created.length === 0
+        ? ""
+        : `人物和设定支撑已生成并落库：新增 ${receipt.created.length} 项${createdPreview ? `（${createdPreview}）` : ""}；覆盖 ${receipt.areaLabels.join("、")}，可以进入第一章初稿。`,
+      detailItems: [
+        `新增资料：${receipt.created.length} 项`,
+        `覆盖范围：${receipt.areaLabels.join("、") || "待确认"}`,
+        ...(createdPreview ? [`代表条目：${createdPreview}`] : []),
+        ...receipt.failed,
+      ],
+    };
+  }
+
+  return {
+    success: false,
+    summary: "当前首日节点暂不支持自动执行。",
+    writeBackTarget: "未写回",
+    nextAction: input.plan.blockedReason ?? "请按当前节点说明人工处理。",
+    completionEvidence: "",
+    detailItems: [input.plan.blockedReason ?? "人工节点"],
   };
 }
 

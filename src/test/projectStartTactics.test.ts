@@ -96,6 +96,88 @@ test("buildProjectStartTacticAdvice", async (t) => {
     assert.ok(advice.evidence[0].includes("成功率 100%"));
   });
 
+  await t.test("keeps recovery scale-up batch advice in watch mode until repeated", () => {
+    const platform = getPlatformProfile("fanqie");
+    const template = getDefaultTemplateForPlatform(platform.id);
+    const style = getPlatformWritingStyle(platform.id);
+    const batchEffect: GateBatchTacticEffectItem = {
+      id: "fanqie:recovery-hook",
+      status: "watch",
+      label: "恢复放量观察",
+      tacticTitle: "首轮平台打法：番茄小说",
+      tacticLabel: "恢复放量观察",
+      primaryTactic: "首章先给不可逆危机，三章内连续兑现爽点。",
+      openingMove: "第一段给倒计时和身份暴露风险。",
+      verificationMove: "批量后复检前三章追读。",
+      risk: "解释过多会掉首秀。",
+      sampleBatches: 1,
+      succeededTasks: 2,
+      failedTasks: 0,
+      successRatePercent: 100,
+      averageQualityScore: 88,
+      knownCostUsd: 0.02,
+      recoveryBatches: 1,
+      latestAt: "2026-01-02T00:00:00.000Z",
+      evidence: ["沉淀批量初稿 2 个经验｜恢复放量：成功 2，失败 0，质量 88"],
+      nextAction: "恢复放量样本还薄，至少再跑一轮稳定批次后，才允许写成新项目可复用打法。",
+    };
+    const advice = buildProjectStartTacticAdvice({ platform, template, style, batchEffect });
+    const guide = buildProjectStartPlatformExperienceGuide({
+      platforms: [platform],
+      batchEffects: [batchEffect],
+    });
+
+    assert.equal(advice.status, "history_watch");
+    assert.equal(advice.label, "恢复放量观察");
+    assert.ok(advice.verificationMove.includes("新项目先小样本复验"));
+    assert.ok(advice.risk.includes("至少再跑一轮"));
+    assert.ok(advice.evidence.some((item) => item.includes("恢复放量：1 批")));
+    assert.ok(advice.checklist.some((item) => item.includes("恢复放量：已验证 1 批")));
+    assert.equal(guide.items[0]?.label, "恢复放量观察");
+    assert.equal(guide.items[0]?.status, "watch");
+    assert.ok(guide.items[0]?.detail.includes("解除闸门"));
+  });
+
+  await t.test("surfaces repeated recovery scale-up as a cautious reusable tactic", () => {
+    const platform = getPlatformProfile("fanqie");
+    const template = getDefaultTemplateForPlatform(platform.id);
+    const style = getPlatformWritingStyle(platform.id);
+    const batchEffect: GateBatchTacticEffectItem = {
+      id: "fanqie:recovery-hook",
+      status: "usable",
+      label: "恢复放量打法",
+      tacticTitle: "首轮平台打法：番茄小说",
+      tacticLabel: "恢复放量打法",
+      primaryTactic: "首章先给不可逆危机，三章内连续兑现爽点。",
+      openingMove: "第一段给倒计时和身份暴露风险。",
+      verificationMove: "批量后复检前三章追读。",
+      risk: "解释过多会掉首秀。",
+      sampleBatches: 2,
+      succeededTasks: 4,
+      failedTasks: 0,
+      successRatePercent: 100,
+      averageQualityScore: 89,
+      knownCostUsd: 0.03,
+      recoveryBatches: 2,
+      latestAt: "2026-01-03T00:00:00.000Z",
+      evidence: ["沉淀批量初稿 2 个经验｜恢复放量：成功 2，失败 0，质量 90"],
+      nextAction: "恢复放量已经连续稳定，可作为观察平台解除闸门后的参考打法，但新项目仍先跑小样本。",
+    };
+    const advice = buildProjectStartTacticAdvice({ platform, template, style, batchEffect });
+    const guide = buildProjectStartPlatformExperienceGuide({
+      platforms: [platform],
+      batchEffects: [batchEffect],
+    });
+
+    assert.equal(advice.status, "history_usable");
+    assert.equal(advice.label, "恢复放量打法");
+    assert.ok(advice.risk.includes("新项目仍先跑小样本"));
+    assert.ok(advice.evidence.some((item) => item.includes("恢复放量：2 批")));
+    assert.equal(guide.items[0]?.status, "recommended");
+    assert.equal(guide.items[0]?.label, "恢复放量打法");
+    assert.ok(guide.items[0]?.detail.includes("新项目仍先跑小样本"));
+  });
+
   await t.test("adds confirmed model routes to new project start advice", () => {
     const platform = getPlatformProfile("fanqie");
     const template = getDefaultTemplateForPlatform(platform.id);
@@ -299,6 +381,7 @@ test("buildProjectStartTacticAdvice", async (t) => {
     assert.ok(guide.items[0].detail.includes("稳定加码池"));
     assert.ok(guide.items[0].evidence[0].includes("最终判定"));
     assert.equal(guide.items.find((item) => item.platformId === "qimao")?.status, "avoid");
+    assert.equal(guide.items.find((item) => item.platformId === "qimao")?.label, "批量避坑");
     assert.ok(guide.items.find((item) => item.platformId === "qimao")?.detail.includes("批量避坑"));
     assert.equal(guide.items.find((item) => item.platformId === "webnovel")?.status, "avoid");
     assert.ok(guide.nextActions.some((action) => action.includes("优先参考 番茄小说")));

@@ -227,6 +227,27 @@ function batchEffectForPlatform(batchEffects: GateBatchTacticEffectItem[], platf
   return batchEffects.find((item) => item.tacticTitle.includes(platform.name)) ?? null;
 }
 
+function isRecoveryBatchEffect(batchEffect: GateBatchTacticEffectItem | null | undefined) {
+  return (batchEffect?.recoveryBatches ?? 0) > 0;
+}
+
+function batchRecoveryLabel(batchEffect: GateBatchTacticEffectItem) {
+  if (!isRecoveryBatchEffect(batchEffect)) {
+    if (batchEffect.status === "usable") return "批量可复用";
+    if (batchEffect.status === "blocked") return "批量避坑";
+    return "批量观察";
+  }
+  if (batchEffect.status === "usable") return "恢复放量打法";
+  if (batchEffect.status === "blocked") return "恢复放量避坑";
+  return "恢复放量观察";
+}
+
+function batchRecoveryEvidence(batchEffect: GateBatchTacticEffectItem) {
+  return isRecoveryBatchEffect(batchEffect)
+    ? [`恢复放量：${batchEffect.recoveryBatches} 批，仍按小样本节奏复用`]
+    : [];
+}
+
 export function buildProjectStartPlatformExperienceGuide(input: {
   platforms: PlatformProfile[];
   experiences?: GatePlatformTacticExperienceItem[];
@@ -240,18 +261,22 @@ export function buildProjectStartPlatformExperienceGuide(input: {
     const batchEffect = batchEffectForPlatform(batchEffects, platform);
 
     if (batchEffect?.status === "blocked") {
+      const recovery = isRecoveryBatchEffect(batchEffect);
       return {
         platformId: platform.id,
         platformName: platform.name,
         status: "avoid",
-        label: "批量避坑",
-        headline: `${platform.name} 暂不优先`,
-        detail: `批量样本已经标记为 ${batchEffect.tacticLabel}，先避开「${batchEffect.openingMove || batchEffect.primaryTactic}」。`,
+        label: batchRecoveryLabel(batchEffect),
+        headline: recovery ? `${platform.name} 恢复放量先刹车` : `${platform.name} 暂不优先`,
+        detail: recovery
+          ? `恢复放量批次已经变成避坑样本，先拆失败原因，避开「${batchEffect.openingMove || batchEffect.primaryTactic}」。`
+          : `批量样本已经标记为 ${batchEffect.tacticLabel}，先避开「${batchEffect.openingMove || batchEffect.primaryTactic}」。`,
         priorityScore: 100 + batchEffect.failedTasks,
         source: "batch",
         href: "/gate",
         evidence: [
           `批量样本：${batchEffect.sampleBatches} 批，成功率 ${batchEffect.successRatePercent}%，失败 ${batchEffect.failedTasks}`,
+          ...batchRecoveryEvidence(batchEffect),
           ...batchEffect.evidence.slice(0, 2),
         ],
       };
@@ -291,18 +316,22 @@ export function buildProjectStartPlatformExperienceGuide(input: {
     }
 
     if (batchEffect?.status === "usable") {
+      const recovery = isRecoveryBatchEffect(batchEffect);
       return {
         platformId: platform.id,
         platformName: platform.name,
         status: "recommended",
-        label: "批量可复用",
-        headline: `${platform.name} 可复用批量打法`,
-        detail: `${batchEffect.primaryTactic} ${batchEffect.nextAction}`,
+        label: batchRecoveryLabel(batchEffect),
+        headline: recovery ? `${platform.name} 恢复放量已站住` : `${platform.name} 可复用批量打法`,
+        detail: recovery
+          ? `${batchEffect.primaryTactic} 恢复放量连续稳定，但新项目仍先跑小样本。`
+          : `${batchEffect.primaryTactic} ${batchEffect.nextAction}`,
         priorityScore: batchEffect.successRatePercent,
         source: "batch",
         href: "/gate",
         evidence: [
           `批量样本：${batchEffect.sampleBatches} 批，成功率 ${batchEffect.successRatePercent}%，质量 ${batchEffect.averageQualityScore ?? "缺"}`,
+          ...batchRecoveryEvidence(batchEffect),
           ...batchEffect.evidence.slice(0, 2),
         ],
       };
@@ -320,23 +349,28 @@ export function buildProjectStartPlatformExperienceGuide(input: {
           ? "验收观察"
           : isWeakExecutionReview
             ? "动作观察"
-            : experience?.status === "watch" ? "历史观察" : "批量观察",
+            : experience?.status === "watch" ? "历史观察" : batchEffect ? batchRecoveryLabel(batchEffect) : "批量观察",
         headline: isAcceptanceReview
           ? `${platform.name} 先补验收线`
           : isWeakExecutionReview
             ? `${platform.name} 先收口动作`
-            : `${platform.name} 小样本观察`,
+            : isRecoveryBatchEffect(batchEffect) ? `${platform.name} 恢复放量继续观察` : `${platform.name} 小样本观察`,
         detail: experience?.status === "watch"
           ? isAcceptanceReview
             ? `历史返工复盘暴露验收标准不硬。${experience.reuseHint}`
             : isWeakExecutionReview
               ? `历史返工复盘暴露执行动作太虚。${experience.reuseHint}`
               : `${experience.tactic} 还不能写成成功打法。${experience.reuseHint}`
-          : `${batchEffect?.tacticLabel ?? "批量样本"} 样本还薄，只能小批验证。`,
+          : isRecoveryBatchEffect(batchEffect)
+            ? `${batchEffect?.tacticLabel ?? "恢复放量观察"} 样本还薄，解除闸门后也只能小批验证。`
+            : `${batchEffect?.tacticLabel ?? "批量样本"} 样本还薄，只能小批验证。`,
         priorityScore: experience?.status === "watch" ? experience.priorityScore : batchEffect?.successRatePercent ?? 40,
         source: experience?.status === "watch" ? "experience" : "batch",
         href: experience?.href ?? "/gate",
-        evidence: experience?.evidence.slice(0, 3) ?? batchEffect?.evidence.slice(0, 3) ?? [],
+        evidence: experience?.evidence.slice(0, 3) ?? [
+          ...(batchEffect ? batchRecoveryEvidence(batchEffect) : []),
+          ...(batchEffect?.evidence.slice(0, 3) ?? []),
+        ],
       };
     }
 
@@ -511,17 +545,20 @@ export function buildProjectStartTacticAdvice(input: {
   const withModelChecklist = (checklist: string[]) => [...checklist, ...modelRouteChecklist].slice(0, 6);
 
   if (batchEffect) {
+    const recovery = isRecoveryBatchEffect(batchEffect);
+    const batchLabel = batchRecoveryLabel(batchEffect);
     const batchEvidence = [
       `批量样本：${batchEffect.sampleBatches} 批，成功率 ${batchEffect.successRatePercent}%，质量 ${batchEffect.averageQualityScore ?? "缺"}`,
       `任务结果：成功 ${batchEffect.succeededTasks}，失败 ${batchEffect.failedTasks}，成本 $${batchEffect.knownCostUsd.toFixed(4)}`,
+      ...batchRecoveryEvidence(batchEffect),
       ...batchEffect.evidence.slice(0, 2),
     ];
 
     if (batchEffect.status === "blocked") {
       return {
         status: "history_blocked",
-        label: "批量避坑",
-        title: `${platform.name}：避开已跑崩打法`,
+        label: recovery ? "恢复放量避坑" : "批量避坑",
+        title: recovery ? `${platform.name}：恢复放量失败，先停再拆` : `${platform.name}：避开已跑崩打法`,
         primaryTactic: `不要复用「${batchEffect.openingMove || batchEffect.primaryTactic}」。先回到平台模板打法，再重做钩子、节奏和前三章兑现。`,
         openingMove: `避开已验证失败开头：${batchEffect.openingMove || batchEffect.primaryTactic}；改用：${style.openingHook}`,
         verificationMove: `创建后只做小批验证，先看前三章审稿分、失败率和平台包装，不允许直接放量。${modelRouteVerification}`,
@@ -530,22 +567,25 @@ export function buildProjectStartTacticAdvice(input: {
         checklist: withModelChecklist([
           `模板前三章：${firstThreeTitles}`,
           `必须具备：${style.mustHave.join("、")}`,
-          `避坑动作：不要复制 ${batchEffect.tacticLabel}`,
+          `避坑动作：不要复制 ${batchLabel}`,
         ]),
       };
     }
 
     return {
       status: batchEffect.status === "usable" ? "history_usable" : "history_watch",
-      label: batchEffect.status === "usable" ? "批量可复用" : "批量观察",
+      label: batchLabel,
       title: `${platform.name}：${batchEffect.tacticLabel} 批量复盘`,
       primaryTactic: batchEffect.primaryTactic,
       openingMove: batchEffect.openingMove || style.openingHook,
-      verificationMove: `${batchEffect.verificationMove || "创建后跑前三章与批量审稿。"}；首批复盘继续看成功率、质量分和失败样本。${modelRouteVerification}`,
-      risk: batchEffect.status === "usable" ? batchEffect.risk : batchEffect.nextAction,
+      verificationMove: recovery
+        ? `${batchEffect.verificationMove || "创建后跑前三章与批量审稿。"}；恢复放量打法只能作为参考，新项目先小样本复验成功率、质量分和失败样本。${modelRouteVerification}`
+        : `${batchEffect.verificationMove || "创建后跑前三章与批量审稿。"}；首批复盘继续看成功率、质量分和失败样本。${modelRouteVerification}`,
+      risk: recovery ? batchEffect.nextAction : batchEffect.status === "usable" ? batchEffect.risk : batchEffect.nextAction,
       evidence: withModelEvidence(batchEvidence),
       checklist: withModelChecklist([
-        `批量状态：${batchEffect.label}`,
+        `批量状态：${batchLabel}`,
+        ...(recovery ? [`恢复放量：已验证 ${batchEffect.recoveryBatches} 批`] : []),
         `模板前三章：${firstThreeTitles}`,
         `必须具备：${style.mustHave.join("、")}`,
       ]),

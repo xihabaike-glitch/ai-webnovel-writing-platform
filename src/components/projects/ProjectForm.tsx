@@ -301,6 +301,9 @@ export function ProjectForm() {
             <div className="rounded-md bg-white/70 p-2">成功率 {selectedBatchEffect.successRatePercent}%</div>
             <div className="rounded-md bg-white/70 p-2">质量 {selectedBatchEffect.averageQualityScore ?? "缺"}</div>
             <div className="rounded-md bg-white/70 p-2">失败 {selectedBatchEffect.failedTasks}</div>
+            {selectedBatchEffect.recoveryBatches > 0 ? (
+              <div className="rounded-md bg-white/70 p-2 md:col-span-2">恢复放量 {selectedBatchEffect.recoveryBatches} 批，新项目仍先小样本</div>
+            ) : null}
           </div>
           <p className="mt-3 leading-6 opacity-85">{selectedBatchEffect.nextAction}</p>
         </div>

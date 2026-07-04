@@ -345,6 +345,9 @@ test("buildGateActionReceipt", async (t) => {
       recheckAction: "刷新总闸门",
       payload: JSON.stringify({
         plan: {
+          scaleGate: "cleared",
+          actionLabel: "批量初稿 1 个",
+          category: "draft",
           strategyBases: [{
             title: "首轮平台打法：番茄小说",
             label: "批量可复用",
@@ -353,6 +356,10 @@ test("buildGateActionReceipt", async (t) => {
             verificationMove: "批量后复检前三章追读。",
             risk: "解释过多会掉首秀。",
           }],
+        },
+        batchReceipt: {
+          status: "continue",
+          headline: "准放量批次稳定，下一批仍小步走",
         },
         routeEffectSummary: { successRatePercent: 100, knownCostUsd: 0.01, averageQualityScore: 88 },
       }),
@@ -363,7 +370,10 @@ test("buildGateActionReceipt", async (t) => {
     assert.equal(receipt.executionType, "recommended_batch");
     assert.equal(receipt.startTactics?.[0].title, "首轮平台打法：番茄小说");
     assert.equal(receipt.batchEffectSummary?.averageQualityScore, 88);
+    assert.equal(receipt.batchContext?.scaleGate, "cleared");
     assert.equal(review.items[0]?.status, "watch");
+    assert.equal(review.items[0]?.label, "恢复放量观察");
+    assert.equal(review.items[0]?.recoveryBatches, 1);
     assert.ok(review.items[0]?.openingMove.includes("倒计时"));
   });
 

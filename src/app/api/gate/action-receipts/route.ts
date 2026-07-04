@@ -1,7 +1,11 @@
 import { NextResponse } from "next/server";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
-import type { GateActionReceipt, GateActionReceiptBatchEffectSummary, GateActionReceiptStartTactic } from "@/lib/projects/gateActionReceipts";
+import {
+  gateActionReceiptFromAuditRecord,
+  type GateActionAuditRecord,
+  type GateActionReceipt,
+} from "@/lib/projects/gateActionReceipts";
 
 function text(value: unknown, fallback = "") {
   return typeof value === "string" ? value : fallback;
@@ -31,81 +35,8 @@ function platformNameFromDetail(detail: string) {
   return detail.split("·")[0]?.trim() ?? "";
 }
 
-function parsePayload(payload: string) {
-  try {
-    const parsed = JSON.parse(payload) as {
-      startTactics?: GateActionReceiptStartTactic[];
-      plan?: { strategyBases?: GateActionReceiptStartTactic[] };
-      routeEffectSummary?: GateActionReceiptBatchEffectSummary;
-    };
-    return parsed && typeof parsed === "object" ? parsed : {};
-  } catch {
-    return {};
-  }
-}
-
-function startTacticsFromPayload(payload: string) {
-  const parsed = parsePayload(payload);
-  const startTactics = parsed.startTactics?.length ? parsed.startTactics : parsed.plan?.strategyBases ?? [];
-  return startTactics.filter((item) => item && typeof item.title === "string" && typeof item.primaryTactic === "string");
-}
-
-function batchEffectSummaryFromPayload(payload: string): GateActionReceiptBatchEffectSummary | null {
-  const route = parsePayload(payload).routeEffectSummary;
-  if (!route || typeof route.successRatePercent !== "number" || typeof route.knownCostUsd !== "number") return null;
-  return {
-    successRatePercent: route.successRatePercent,
-    knownCostUsd: route.knownCostUsd,
-    averageQualityScore: typeof route.averageQualityScore === "number" ? route.averageQualityScore : null,
-    verdict: typeof route.verdict === "string" ? route.verdict : undefined,
-  };
-}
-
-function toReceipt(item: {
-  receiptId: string;
-  actionId: string;
-  label: string;
-  detail: string;
-  href: string;
-  status: string;
-  message: string;
-  executionType: string;
-  succeededCount: number;
-  failedCount: number;
-  taskId: string | null;
-  platformId: string;
-  platformName: string;
-  recheckStatus: string;
-  recheckLabel: string;
-  recheckDetail: string;
-  recheckAction: string;
-  payload: string;
-  createdAt: Date;
-}): GateActionReceipt {
-  return {
-    id: item.receiptId,
-    actionId: item.actionId,
-    label: item.label,
-    detail: item.detail,
-    href: item.href,
-    status: item.status === "failed" ? "failed" : "succeeded",
-    message: item.message,
-    executionType: item.executionType as GateActionReceipt["executionType"],
-    succeededCount: item.succeededCount,
-    failedCount: item.failedCount,
-    taskId: item.taskId,
-    platformId: item.platformId,
-    platformName: item.platformName,
-    startTactics: startTacticsFromPayload(item.payload),
-    batchEffectSummary: batchEffectSummaryFromPayload(item.payload),
-    recheck: {
-      status: item.recheckStatus === "blocked" ? "blocked" : "ready",
-      label: item.recheckLabel,
-      detail: item.recheckDetail,
-      actionLabel: item.recheckAction,
-    },
-    createdAt: item.createdAt.toISOString(),
-  };
+function toReceipt(item: GateActionAuditRecord): GateActionReceipt {
+  return gateActionReceiptFromAuditRecord(item);
 }
 
 function takeLimit(value: string | null) {

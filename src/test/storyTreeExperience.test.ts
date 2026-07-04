@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  buildStoryTreeChapterExperienceRecommendations,
   buildStoryTreeExperienceEffectFeedback,
   buildStoryTreeExperienceApplyDispatch,
   buildStoryTreeExperienceGuide,
@@ -96,6 +97,51 @@ test("buildStoryTreeExperienceGuide promotes latest effect feedback and dedupes 
   assert.ok(guide.items[0].effectLine?.includes("效果变弱"));
   assert.ok(guide.promptBlock.includes("避坑｜分支因果"));
   assert.ok(guide.promptBlock.includes("经验应用效果"));
+});
+
+test("buildStoryTreeChapterExperienceRecommendations matches weak chapter axes", () => {
+  const guide = buildStoryTreeExperienceGuide([
+    {
+      dispatchKey: "story-tree:project-1:chapter-1:chapter_draft:branch_causality",
+      title: "补分支因果",
+      href: "/projects/project-1/chapters/chapter-1",
+      evidence: [
+        "大树结构复检：68 -> 82 分，分数变好：结构可用；返工动作：分支因果：把支线改成主线压力的直接后果。",
+      ],
+      completedAt: "2026-07-05T08:00:00.000Z",
+      updatedAt: "2026-07-05T08:00:00.000Z",
+    },
+    {
+      dispatchKey: "story-tree:project-1:chapter-2:chapter_draft:opening_ending",
+      title: "重写开头结尾",
+      href: "/projects/project-1/chapters/chapter-2",
+      evidence: [
+        "大树结构复检：70 -> 84 分，分数变好：结构可用；返工动作：开头结尾：先给不可逆选择。",
+      ],
+      completedAt: "2026-07-05T09:00:00.000Z",
+      updatedAt: "2026-07-05T09:00:00.000Z",
+    },
+  ]);
+  const recommendations = buildStoryTreeChapterExperienceRecommendations({
+    guide,
+    audit: {
+      score: 66,
+      label: "结构需二改",
+      summary: "大树质检：结构需二改。",
+      shouldRewrite: true,
+      topActions: ["分支因果：支线必须绑定主线压力。"],
+      axes: [
+        { id: "branch_causality", label: "分支因果", score: 45, status: "fail", evidence: "支线游离。", suggestion: "支线必须绑定主线压力。" },
+        { id: "opening_ending", label: "开头结尾", score: 82, status: "pass", evidence: "开头结尾可用。", suggestion: "保持。" },
+      ],
+    },
+  });
+
+  assert.equal(recommendations.length, 1);
+  assert.equal(recommendations[0].axisId, "branch_causality");
+  assert.equal(recommendations[0].status, "usable");
+  assert.ok(recommendations[0].reason.includes("45 分"));
+  assert.ok(recommendations[0].instruction.includes("复用已验证"));
 });
 
 test("buildStoryTreeExperienceApplyDispatch turns a learned action into an assigned task", () => {

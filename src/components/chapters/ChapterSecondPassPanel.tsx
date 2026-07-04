@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { SecondPassMode } from "@/lib/ai/buildChapterSecondPassPrompt";
-import type { StoryTreeExperienceEffectFeedback, StoryTreeExperienceSecondPassAdvice, StoryTreeExperienceStatus } from "@/lib/ai/storyTreeExperience";
+import type { StoryTreeChapterExperienceRecommendation, StoryTreeExperienceEffectFeedback, StoryTreeExperienceSecondPassAdvice, StoryTreeExperienceStatus } from "@/lib/ai/storyTreeExperience";
 
 interface SecondPassResult {
   task: {
@@ -80,10 +80,12 @@ function experienceStatusClass(status: StoryTreeExperienceStatus) {
 export function ChapterSecondPassPanel({
   chapterId,
   currentWordCount,
+  recommendedStoryTreeExperience = [],
   storyTreeExperienceAdvice = [],
 }: {
   chapterId: string;
   currentWordCount: number;
+  recommendedStoryTreeExperience?: StoryTreeChapterExperienceRecommendation[];
   storyTreeExperienceAdvice?: StoryTreeExperienceSecondPassAdvice[];
 }) {
   const router = useRouter();
@@ -180,6 +182,35 @@ export function ChapterSecondPassPanel({
       </div>
 
       {message ? <p className="mt-3 text-sm text-slate-600">{message}</p> : null}
+      {recommendedStoryTreeExperience.length ? (
+        <div className="mt-4 rounded-md border border-slate-200 bg-white p-3">
+          <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+            <div className="font-medium text-slate-950">本章推荐结构经验</div>
+            <div className="text-xs text-slate-500">{recommendedStoryTreeExperience.length} 条按薄弱轴匹配</div>
+          </div>
+          <div className="mt-3 grid gap-2 lg:grid-cols-2">
+            {recommendedStoryTreeExperience.map((recommendation) => (
+              <div className="rounded-md bg-slate-50 p-3 text-sm" key={recommendation.id}>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className={`rounded-md px-2 py-1 text-xs font-medium ${experienceStatusClass(recommendation.status)}`}>
+                    {experienceStatusLabel(recommendation.status)}
+                  </span>
+                  <span className="text-xs text-slate-500">{recommendation.axisLabel} · 优先级 {recommendation.priorityScore}</span>
+                </div>
+                <p className="mt-2 leading-6 text-slate-600">{recommendation.reason}</p>
+                <p className="mt-2 leading-6 text-slate-600">{recommendation.instruction}</p>
+                <button
+                  className="mt-3 rounded-md border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                  onClick={() => setInstruction(recommendation.instruction)}
+                  type="button"
+                >
+                  填入推荐指令
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
       {storyTreeExperienceAdvice.length ? (
         <div className="mt-4 rounded-md border border-slate-200 bg-slate-50 p-3">
           <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">

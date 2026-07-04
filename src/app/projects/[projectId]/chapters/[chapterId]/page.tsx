@@ -3,7 +3,8 @@ import { AppShell } from "@/components/app-shell/AppShell";
 import { ChapterEditor } from "@/components/chapters/ChapterEditor";
 import { ChapterRevisionWorkbench } from "@/components/chapters/ChapterRevisionWorkbench";
 import { ChapterSecondPassPanel } from "@/components/chapters/ChapterSecondPassPanel";
-import { buildStoryTreeExperienceSecondPassAdvice } from "@/lib/ai/storyTreeExperience";
+import { buildStoryTreeChapterExperienceRecommendations, buildStoryTreeExperienceGuide, buildStoryTreeExperienceSecondPassAdvice } from "@/lib/ai/storyTreeExperience";
+import { buildStoryTreeQualityAudit } from "@/lib/ai/storyTreeQualityAudit";
 import { prisma } from "@/lib/db/prisma";
 import { getPlatformProfile, type PlatformId } from "@/lib/platforms/platformProfiles";
 import { gatePlatformDispatchTaskFromRecord } from "@/lib/projects/gateDispatchTaskRecords";
@@ -23,11 +24,13 @@ export default async function ChapterPage({
           gateDispatchTasks: {
             where: {
               state: "completed",
-              dispatchKey: { startsWith: "story-tree-experience:" },
-              href: { contains: `/chapters/${chapterId}` },
+              OR: [
+                { dispatchKey: { startsWith: "story-tree:" } },
+                { dispatchKey: { startsWith: "story-tree-experience:" } },
+              ],
             },
             orderBy: { completedAt: "desc" },
-            take: 12,
+            take: 80,
           },
         },
       },
@@ -38,8 +41,25 @@ export default async function ChapterPage({
     notFound();
   }
   const platform = getPlatformProfile(chapter.project.targetPlatform as PlatformId);
+  const persistedStoryTreeTasks = chapter.project.gateDispatchTasks.map(gatePlatformDispatchTaskFromRecord);
+  const storyTreeExperienceGuide = buildStoryTreeExperienceGuide(persistedStoryTreeTasks);
+  const storyTreeAudit = buildStoryTreeQualityAudit({
+    content: chapter.content,
+    chapter: {
+      title: chapter.title,
+      goal: chapter.goal,
+      hook: chapter.hook,
+      conflict: chapter.conflict,
+      valueShift: chapter.valueShift,
+      cliffhanger: chapter.cliffhanger,
+    },
+  });
+  const recommendedStoryTreeExperience = buildStoryTreeChapterExperienceRecommendations({
+    guide: storyTreeExperienceGuide,
+    audit: storyTreeAudit,
+  });
   const storyTreeExperienceAdvice = buildStoryTreeExperienceSecondPassAdvice(
-    chapter.project.gateDispatchTasks.map(gatePlatformDispatchTaskFromRecord),
+    persistedStoryTreeTasks,
     chapter.id,
   );
   const editableChapter = {
@@ -69,6 +89,7 @@ export default async function ChapterPage({
             <ChapterSecondPassPanel
               chapterId={chapter.id}
               currentWordCount={chapter.wordCount}
+              recommendedStoryTreeExperience={recommendedStoryTreeExperience}
               storyTreeExperienceAdvice={storyTreeExperienceAdvice}
             />
           </div>

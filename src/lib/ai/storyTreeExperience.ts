@@ -75,6 +75,17 @@ export interface StoryTreeExperienceEffectFeedback {
   line: string;
 }
 
+export interface StoryTreeChapterExperienceRecommendation {
+  id: string;
+  axisId: string;
+  axisLabel: string;
+  status: StoryTreeExperienceStatus;
+  priorityScore: number;
+  reason: string;
+  instruction: string;
+  item: StoryTreeExperienceItem;
+}
+
 interface StoryTreeRecheckEvidence {
   previousScore: number | null;
   currentScore: number;
@@ -331,6 +342,57 @@ function buildAxisGroups(items: StoryTreeExperienceItem[]): StoryTreeExperienceA
       };
     }),
   ];
+}
+
+function experienceInstruction(item: StoryTreeExperienceItem) {
+  if (item.status === "avoid") {
+    return `避开已失效打法「${item.axisLabel}」：不要直接复用“${item.action}”，先改成服务当前主线压力和人物选择的动作。`;
+  }
+  if (item.status === "watch") {
+    return `小步验证「${item.axisLabel}」经验：${item.action} 完成后重新复检，不要直接放大成固定套路。`;
+  }
+  return `复用已验证「${item.axisLabel}」经验：${item.action}`;
+}
+
+export function buildStoryTreeChapterExperienceRecommendations(input: {
+  guide: StoryTreeExperienceGuide;
+  audit: StoryTreeQualityAudit;
+  limit?: number;
+}): StoryTreeChapterExperienceRecommendation[] {
+  const weakAxes = input.audit.axes
+    .filter((axis) => axis.status !== "pass")
+    .sort((left, right) => {
+      if (left.status !== right.status) return left.status === "fail" ? -1 : 1;
+      return left.score - right.score;
+    });
+  const targetAxes = weakAxes.length ? weakAxes : input.audit.axes.sort((left, right) => left.score - right.score).slice(0, 2);
+  const axisRank = new Map<string, { axis: StoryTreeQualityAudit["axes"][number]; index: number }>(targetAxes.map((axis, index) => [axis.id, { axis, index }]));
+  const statusWeight: Record<StoryTreeExperienceStatus, number> = { usable: 30, watch: 16, avoid: 12 };
+
+  return input.guide.items
+    .filter((item) => axisRank.has(item.axisId))
+    .map((item): StoryTreeChapterExperienceRecommendation => {
+      const ranked = axisRank.get(item.axisId);
+      const axis = ranked?.axis;
+      const weakness = axis ? 100 - axis.score : 0;
+      const priorityScore = Math.max(0, Math.min(99, weakness + statusWeight[item.status] - (ranked?.index ?? 0) * 4));
+      const reason = axis
+        ? `当前章节「${axis.label}」${axis.score} 分：${axis.suggestion}`
+        : `当前章节需要补强「${item.axisLabel}」。`;
+
+      return {
+        id: `${item.id}:recommendation`,
+        axisId: item.axisId,
+        axisLabel: item.axisLabel,
+        status: item.status,
+        priorityScore,
+        reason,
+        instruction: experienceInstruction(item),
+        item,
+      };
+    })
+    .sort((left, right) => right.priorityScore - left.priorityScore)
+    .slice(0, input.limit ?? 4);
 }
 
 export function buildStoryTreeExperienceGuide(tasks: Pick<PersistedGatePlatformDispatchTask, "dispatchKey" | "evidence" | "completedAt" | "updatedAt" | "title" | "href">[]): StoryTreeExperienceGuide {

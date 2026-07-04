@@ -17,6 +17,7 @@ import {
   buildProjectStartPlatformExperienceGuide,
   buildProjectStartModelRouteExperienceFromReceipts,
   buildProjectStartTacticAdvice,
+  selectProjectStartTacticEvidence,
   selectProjectStartTemplateFromExperienceGuide,
   type ProjectStartModelRouteExperience,
   type ProjectStartPlatformExperienceStatus,
@@ -65,21 +66,25 @@ export function ProjectForm() {
   const selectedProfile = platformProfiles.find((profile) => profile.id === platformId) ?? platformProfiles[0];
   const selectedTemplate = projectTemplates.find((template) => template.id === templateId) ?? defaultTemplate;
   const selectedStyle = getPlatformWritingStyle(selectedProfile.id);
-  const selectedExperience = historyExperiences.find((item) => item.platformId === selectedProfile.id) ?? null;
-  const selectedBatchEffect = batchTacticEffects.find((item) => item.tacticTitle.includes(selectedProfile.name)) ?? null;
   const platformExperienceGuide = buildProjectStartPlatformExperienceGuide({
     platforms: platformProfiles,
     experiences: historyExperiences,
     batchEffects: batchTacticEffects,
     limit: 4,
   });
-  const selectedPlatformGuide = platformExperienceGuide.items.find((item) => item.platformId === selectedProfile.id) ?? null;
+  const selectedEvidence = selectProjectStartTacticEvidence({
+    platform: selectedProfile,
+    experiences: historyExperiences,
+    batchEffects: batchTacticEffects,
+  });
+  const selectedPlatformGuide = selectedEvidence.guideItem;
+  const selectedBatchEffect = selectedEvidence.batchEffect;
   const tacticAdvice = buildProjectStartTacticAdvice({
     platform: selectedProfile,
     template: selectedTemplate,
     style: selectedStyle,
-    experience: selectedExperience,
-    batchEffect: selectedBatchEffect,
+    experience: selectedEvidence.experience,
+    batchEffect: selectedEvidence.batchEffect,
     modelRoutes: modelRouteExperience,
   });
 

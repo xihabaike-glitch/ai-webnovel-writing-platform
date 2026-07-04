@@ -12,6 +12,7 @@ import {
   buildProjectStartTacticWorldEntry,
   findProjectStartTacticSummary,
   parseProjectStartTacticSummary,
+  selectProjectStartTacticEvidence,
   selectProjectStartTemplateFromExperienceGuide,
 } from "../lib/projects/projectStartTactics.ts";
 import { getDefaultTemplateForPlatform, projectTemplates } from "../lib/projects/projectTemplates.ts";
@@ -358,6 +359,75 @@ test("buildProjectStartTacticAdvice", async (t) => {
     });
 
     assert.equal(conservativeSelected.id, fallbackTemplate.id);
+  });
+
+  await t.test("selects tactic evidence with the same priority as the platform guide", () => {
+    const platform = getPlatformProfile("fanqie");
+    const experience: GatePlatformTacticExperienceItem = {
+      platformId: "fanqie",
+      platformName: "番茄小说",
+      status: "usable",
+      label: "可复用打法",
+      tactic: "三轮稳定加码打法",
+      lesson: "真实数据已经连续站住。",
+      reuseHint: "新项目优先复用平台包装和前三章兑现。",
+      risk: "仍要小步验证。",
+      href: "/gate",
+      sourceStatus: "healthy",
+      sourceLabel: "稳定加码",
+      priorityScore: 93,
+      latestAt: "2026-01-18T00:00:00.000Z",
+      evidence: ["最终判定：稳定加码。"],
+    };
+    const usableBatch: GateBatchTacticEffectItem = {
+      id: "fanqie:fast-hook",
+      status: "usable",
+      label: "可复用打法",
+      tacticTitle: "首轮平台打法：番茄小说",
+      tacticLabel: "批量可复用",
+      primaryTactic: "首章先给不可逆危机。",
+      openingMove: "第一段给倒计时。",
+      verificationMove: "批量后复检前三章追读。",
+      risk: "解释过多会掉首秀。",
+      sampleBatches: 2,
+      succeededTasks: 4,
+      failedTasks: 0,
+      successRatePercent: 100,
+      averageQualityScore: 89,
+      knownCostUsd: 0.03,
+      latestAt: "2026-01-02T00:00:00.000Z",
+      evidence: ["执行推荐批次：成功 2，失败 0，质量 90"],
+      nextAction: "可以进入新项目开书参考。",
+    };
+    const selection = selectProjectStartTacticEvidence({
+      platform,
+      experiences: [experience],
+      batchEffects: [usableBatch],
+    });
+
+    assert.equal(selection.guideItem?.source, "experience");
+    assert.equal(selection.experience?.tactic, "三轮稳定加码打法");
+    assert.equal(selection.batchEffect, null);
+
+    const blockedBatch: GateBatchTacticEffectItem = {
+      ...usableBatch,
+      status: "blocked",
+      label: "避坑打法",
+      tacticLabel: "批量避坑",
+      failedTasks: 2,
+      successRatePercent: 0,
+      averageQualityScore: 68,
+      nextAction: "先停用并复盘失败样本。",
+    };
+    const blockedSelection = selectProjectStartTacticEvidence({
+      platform,
+      experiences: [experience],
+      batchEffects: [blockedBatch],
+    });
+
+    assert.equal(blockedSelection.guideItem?.source, "batch");
+    assert.equal(blockedSelection.experience, null);
+    assert.equal(blockedSelection.batchEffect?.status, "blocked");
   });
 
   await t.test("turns start advice into a reusable platform soil entry", () => {

@@ -1,13 +1,17 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { buildDefaultOutlineNodes } from "@/lib/outlines/defaultOutline";
-import { modelRouteConfirmationReceiptFromAudit } from "@/lib/model-gateway/routeConfirmation";
 import { buildFirstDayLaunchReceipt, buildFirstDayWorkflow } from "@/lib/projects/firstDayWorkflow";
 import { buildProjectDefaults } from "@/lib/projects/projectDefaults";
 import {
-  buildProjectStartModelRouteExperienceFromConfirmations,
+  buildGateBatchTacticEffectReview,
+  gateActionReceiptFromAuditRecord,
+} from "@/lib/projects/gateActionReceipts";
+import {
+  buildProjectStartModelRouteExperienceFromReceipts,
   buildProjectStartTacticAdvice,
   buildProjectStartTacticWorldEntry,
+  selectProjectStartTacticEvidence,
 } from "@/lib/projects/projectStartTactics";
 import { buildSubmissionChecklist } from "@/lib/projects/submissionChecklist";
 import {
@@ -47,18 +51,15 @@ export async function POST(request: Request) {
     sellingPoint: input.sellingPoint,
     updateCadence: input.updateCadence,
   };
-  const routeConfirmationAudits = input.startTacticAdvice
+  const gateAudits = input.startTacticAdvice
     ? []
     : await prisma.gateActionAudit.findMany({
-      where: { executionType: "model_route" },
       orderBy: { createdAt: "desc" },
-      take: 20,
+      take: 100,
     });
-  const modelRouteExperience = buildProjectStartModelRouteExperienceFromConfirmations(
-    routeConfirmationAudits
-      .map(modelRouteConfirmationReceiptFromAudit)
-      .filter((receipt): receipt is NonNullable<ReturnType<typeof modelRouteConfirmationReceiptFromAudit>> => Boolean(receipt)),
-  );
+  const gateReceipts = gateAudits.map(gateActionReceiptFromAuditRecord);
+  const modelRouteExperience = buildProjectStartModelRouteExperienceFromReceipts(gateReceipts);
+  const batchTacticEffects = buildGateBatchTacticEffectReview(gateReceipts, 20).items;
 
   const project = await prisma.$transaction(async (tx) => {
     const created = await tx.project.create({ data: projectInput });
@@ -66,10 +67,15 @@ export async function POST(request: Request) {
     if (template) {
       const platform = getPlatformProfile(platformId);
       const style = getPlatformWritingStyle(platformId);
+      const tacticEvidence = selectProjectStartTacticEvidence({
+        platform,
+        batchEffects: batchTacticEffects,
+      });
       const startTacticAdvice = input.startTacticAdvice ?? buildProjectStartTacticAdvice({
         platform,
         template,
         style,
+        batchEffect: tacticEvidence.batchEffect,
         modelRoutes: modelRouteExperience,
       });
       const startTacticEntry = buildProjectStartTacticWorldEntry(startTacticAdvice, platform.name);

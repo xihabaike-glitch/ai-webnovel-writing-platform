@@ -74,6 +74,12 @@ export interface ProjectStartModelRouteExperience {
   evidence: string[];
 }
 
+export interface ProjectStartTacticEvidenceSelection {
+  guideItem: ProjectStartPlatformExperienceItem | null;
+  experience: GatePlatformTacticExperienceItem | null;
+  batchEffect: GateBatchTacticEffectItem | null;
+}
+
 function routeDetailValue(detail: string, label: string) {
   const match = detail.match(new RegExp(`${label}：([^；;]+)`));
   return match?.[1]?.trim() || null;
@@ -338,6 +344,44 @@ export function selectProjectStartTemplateFromExperienceGuide(input: {
   const recommendedPlatform = input.guide.items.find((item) => item.status === "recommended");
   if (!recommendedPlatform) return input.fallbackTemplate;
   return input.templates.find((template) => template.platformId === recommendedPlatform.platformId) ?? input.fallbackTemplate;
+}
+
+export function selectProjectStartTacticEvidence(input: {
+  platform: PlatformProfile;
+  experiences?: GatePlatformTacticExperienceItem[];
+  batchEffects?: GateBatchTacticEffectItem[];
+}): ProjectStartTacticEvidenceSelection {
+  const experiences = input.experiences ?? [];
+  const batchEffects = input.batchEffects ?? [];
+  const guide = buildProjectStartPlatformExperienceGuide({
+    platforms: [input.platform],
+    experiences,
+    batchEffects,
+    limit: 1,
+  });
+  const guideItem = guide.items[0] ?? null;
+
+  if (guideItem?.source === "experience") {
+    return {
+      guideItem,
+      experience: experiences.find((item) => item.platformId === input.platform.id) ?? null,
+      batchEffect: null,
+    };
+  }
+
+  if (guideItem?.source === "batch") {
+    return {
+      guideItem,
+      experience: null,
+      batchEffect: batchEffectForPlatform(batchEffects, input.platform),
+    };
+  }
+
+  return {
+    guideItem,
+    experience: null,
+    batchEffect: null,
+  };
 }
 
 export function buildProjectStartTacticAdvice(input: {

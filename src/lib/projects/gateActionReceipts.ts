@@ -956,6 +956,71 @@ export function gateActionReceiptPlatform(receipt: GateActionReceipt) {
   };
 }
 
+export interface GateActionAuditRecord {
+  receiptId: string;
+  actionId: string;
+  label: string;
+  detail: string;
+  href: string;
+  status: string;
+  message: string;
+  executionType: string;
+  succeededCount: number;
+  failedCount: number;
+  taskId?: string | null;
+  platformId: string;
+  platformName: string;
+  recheckStatus: string;
+  recheckLabel: string;
+  recheckDetail: string;
+  recheckAction: string;
+  payload: string;
+  createdAt: string | Date;
+}
+
+function parseGateActionReceiptPayload(payload: string): GateActionReceiptPayload {
+  try {
+    const parsed = JSON.parse(payload) as GateActionReceiptPayload;
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function auditCreatedAt(value: string | Date) {
+  const date = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(date.getTime()) ? new Date().toISOString() : date.toISOString();
+}
+
+export function gateActionReceiptFromAuditRecord(record: GateActionAuditRecord): GateActionReceipt {
+  const payload = parseGateActionReceiptPayload(record.payload);
+
+  return {
+    id: record.receiptId,
+    actionId: record.actionId,
+    label: record.label,
+    detail: record.detail,
+    href: record.href,
+    status: record.status === "failed" ? "failed" : "succeeded",
+    message: record.message,
+    executionType: record.executionType as GateActionReceipt["executionType"],
+    succeededCount: record.succeededCount,
+    failedCount: record.failedCount,
+    taskId: record.taskId ?? null,
+    platformId: record.platformId,
+    platformName: record.platformName,
+    startTactics: startTacticsFromPayload(payload),
+    batchEffectSummary: batchEffectSummaryFromPayload(payload),
+    recheck: {
+      status: record.recheckStatus === "blocked" ? "blocked" : "ready",
+      label: record.recheckLabel,
+      detail: record.recheckDetail,
+      actionLabel: record.recheckAction,
+    },
+    createdAt: auditCreatedAt(record.createdAt),
+  };
+}
+
 export function buildGateActionReceipt(input: {
   action: PrePublishGateAction;
   payload?: GateActionReceiptPayload;

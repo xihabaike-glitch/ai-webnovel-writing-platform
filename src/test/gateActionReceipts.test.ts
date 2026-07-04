@@ -37,6 +37,7 @@ import {
   buildGateBatchTacticEffectReview,
   buildGatePlatformTacticExperienceLibrary,
   buildGatePlatformTacticExperienceMarkdown,
+  gateActionReceiptFromAuditRecord,
   filterGatePlatformDecisionTimelineItems,
   buildGateDispatchTaskCenter,
   buildGateDispatchTaskCloseoutItem,
@@ -241,6 +242,49 @@ test("buildGateActionReceipt", async (t) => {
     assert.equal(usable?.averageQualityScore, 89);
     assert.equal(blocked?.status, "blocked");
     assert.ok(blocked?.nextAction.includes("暂停"));
+  });
+
+  await t.test("restores recommended batch receipts from persisted audits", () => {
+    const receipt = gateActionReceiptFromAuditRecord({
+      receiptId: "recommended-batch:standard:draft:project-1:2026-01-01T00:00:00.000Z",
+      actionId: "recommended-batch:standard:draft:project-1",
+      label: "沉淀批量初稿 1 个经验",
+      detail: "番茄小说 · 夜雨系统 · 批量初稿 1 个",
+      href: "/projects/project-1#ai-pipeline",
+      status: "succeeded",
+      message: "推荐批次完成：成功 1，失败 0。",
+      executionType: "recommended_batch",
+      succeededCount: 1,
+      failedCount: 0,
+      taskId: "task-1",
+      platformId: "fanqie",
+      platformName: "番茄小说",
+      recheckStatus: "ready",
+      recheckLabel: "复检任务队列",
+      recheckDetail: "推荐批次已执行，刷新后确认生产任务、阻塞项和下一批策略是否变化。",
+      recheckAction: "刷新总闸门",
+      payload: JSON.stringify({
+        plan: {
+          strategyBases: [{
+            title: "首轮平台打法：番茄小说",
+            label: "批量可复用",
+            primaryTactic: "首章先给不可逆危机。",
+            openingMove: "第一段给倒计时。",
+            verificationMove: "批量后复检前三章追读。",
+            risk: "解释过多会掉首秀。",
+          }],
+        },
+        routeEffectSummary: { successRatePercent: 100, knownCostUsd: 0.01, averageQualityScore: 88 },
+      }),
+      createdAt: "2026-01-01T00:00:00.000Z",
+    });
+    const review = buildGateBatchTacticEffectReview([receipt]);
+
+    assert.equal(receipt.executionType, "recommended_batch");
+    assert.equal(receipt.startTactics?.[0].title, "首轮平台打法：番茄小说");
+    assert.equal(receipt.batchEffectSummary?.averageQualityScore, 88);
+    assert.equal(review.items[0]?.status, "watch");
+    assert.ok(review.items[0]?.openingMove.includes("倒计时"));
   });
 
   await t.test("keeps failed action errors readable", () => {

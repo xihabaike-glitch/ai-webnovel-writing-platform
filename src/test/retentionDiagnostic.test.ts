@@ -53,7 +53,9 @@ test("buildRetentionDiagnostic", async (t) => {
     assert.equal(diagnostic.chapterSignals.length, 3);
     assert.ok(diagnostic.score >= 70);
     assert.ok(diagnostic.items.some((item) => item.id === "cliffhanger-chain" && item.status === "pass"));
+    assert.deepEqual(diagnostic.quickFixes, []);
     assert.ok(diagnostic.markdown.includes("前三章追读诊断"));
+    assert.ok(diagnostic.markdown.includes("暂无章节卡快修"));
   });
 
   await t.test("flags missing chapters and weak hooks", () => {
@@ -73,5 +75,31 @@ test("buildRetentionDiagnostic", async (t) => {
     assert.ok(diagnostic.score < 60);
     assert.ok(diagnostic.items.some((item) => item.id === "chapter-count" && item.status === "warn"));
     assert.ok(diagnostic.items.some((item) => item.status === "fail"));
+    assert.equal(diagnostic.quickFixes.length, 1);
+    assert.equal(diagnostic.quickFixes[0].method, "PATCH");
+    assert.equal(diagnostic.quickFixes[0].endpoint, "/api/chapters/chapter-1");
+    assert.equal(diagnostic.quickFixes[0].label, "补第 1 章追读卡");
+    assert.ok(diagnostic.quickFixes[0].payload.hook);
+    assert.ok(diagnostic.quickFixes[0].payload.cliffhanger?.includes("下一章"));
+    assert.ok(!("conflict" in diagnostic.quickFixes[0].payload));
+    assert.ok(diagnostic.markdown.includes("补第 1 章追读卡"));
+  });
+
+  await t.test("builds quick fixes for missing goal and mainline pressure", () => {
+    const diagnostic = buildRetentionDiagnostic({
+      projectTitle: "夜雨系统",
+      platform: getPlatformProfile("fanqie"),
+      chapters: [
+        {
+          ...strongChapters[0],
+          goal: "",
+          conflict: "",
+        },
+      ],
+    });
+
+    assert.equal(diagnostic.quickFixes.length, 1);
+    assert.ok(diagnostic.quickFixes[0].payload.goal.includes("可见推进"));
+    assert.ok(diagnostic.quickFixes[0].payload.conflict.includes("更高代价"));
   });
 });

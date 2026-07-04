@@ -46,7 +46,17 @@ export interface RetentionDiagnostic {
   chapterSignals: RetentionChapterSignal[];
   items: RetentionDiagnosticItem[];
   rewritePlan: string[];
+  quickFixes: RetentionQuickFix[];
   markdown: string;
+}
+
+export interface RetentionQuickFix {
+  id: string;
+  label: string;
+  description: string;
+  method: "PATCH";
+  endpoint: string;
+  payload: Record<string, string>;
 }
 
 const payoffWords = ["获得", "赢", "反杀", "升级", "奖励", "技能", "翻盘", "解决", "真相", "线索", "救", "发现"];
@@ -210,6 +220,36 @@ function buildRewritePlan(items: RetentionDiagnosticItem[], platform: PlatformPr
   ];
 }
 
+function buildQuickFixes(input: RetentionDiagnosticInput): RetentionQuickFix[] {
+  return input.chapters.slice(0, 3).flatMap((chapter) => {
+    const payload: Record<string, string> = {};
+
+    if (!chapter.goal.trim()) {
+      payload.goal = `让「${chapter.title}」完成一次可见推进：主角获得线索、能力、关系变化或明确代价。`;
+    }
+    if (!chapter.hook.trim()) {
+      payload.hook = input.platform.openingRules[0] || `开场先给「${chapter.title}」相关的危机、反差或不可逆选择。`;
+    }
+    if (!chapter.conflict.trim()) {
+      payload.conflict = "主角必须在保住当前利益和承担更高代价之间做选择，且不能靠解释绕开。";
+    }
+    if (!chapter.cliffhanger.trim()) {
+      payload.cliffhanger = "章末抛出和主线直接相关的新证据、新敌人或新代价，让读者必须点下一章。";
+    }
+
+    if (Object.keys(payload).length === 0) return [];
+
+    return [{
+      id: `retention-card-${chapter.id}`,
+      label: `补第 ${chapter.order} 章追读卡`,
+      description: `「${chapter.title}」缺少首轮留存信号，先补齐钩子、冲突或章末悬念。`,
+      method: "PATCH" as const,
+      endpoint: `/api/chapters/${chapter.id}`,
+      payload,
+    }];
+  }).slice(0, 3);
+}
+
 function buildMarkdown(input: RetentionDiagnosticInput, diagnostic: Omit<RetentionDiagnostic, "markdown">) {
   return [
     `# ${input.projectTitle} 前三章追读诊断`,
@@ -236,6 +276,11 @@ function buildMarkdown(input: RetentionDiagnosticInput, diagnostic: Omit<Retenti
     "## 修订顺序",
     ...diagnostic.rewritePlan.map((step, index) => `${index + 1}. ${step}`),
     "",
+    "## 可执行快修",
+    ...(diagnostic.quickFixes.length
+      ? diagnostic.quickFixes.map((fix, index) => `${index + 1}. ${fix.label}：${fix.description}`)
+      : ["暂无章节卡快修。"]),
+    "",
   ].join("\n");
 }
 
@@ -250,6 +295,7 @@ export function buildRetentionDiagnostic(input: RetentionDiagnosticInput): Reten
     chapterSignals,
     items,
     rewritePlan: buildRewritePlan(items, input.platform),
+    quickFixes: buildQuickFixes(input),
   };
 
   return {

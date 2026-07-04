@@ -29,7 +29,17 @@ interface RetentionDiagnostic {
   chapterSignals: RetentionChapterSignal[];
   items: RetentionDiagnosticItem[];
   rewritePlan: string[];
+  quickFixes: RetentionQuickFix[];
   markdown: string;
+}
+
+interface RetentionQuickFix {
+  id: string;
+  label: string;
+  description: string;
+  method: "PATCH";
+  endpoint: string;
+  payload: Record<string, string>;
 }
 
 function statusLabel(status: RetentionDiagnosticItem["status"]) {
@@ -41,10 +51,23 @@ function statusLabel(status: RetentionDiagnosticItem["status"]) {
   return labels[status];
 }
 
+function fieldLabel(field: string) {
+  const labels: Record<string, string> = {
+    goal: "目标",
+    hook: "开头钩子",
+    conflict: "本章冲突",
+    cliffhanger: "章末悬念",
+  };
+
+  return labels[field] ?? field;
+}
+
 export function RetentionDiagnosticPanel({ projectId }: { projectId: string }) {
   const [diagnostic, setDiagnostic] = useState<RetentionDiagnostic | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
+  const [savingFixId, setSavingFixId] = useState<string | null>(null);
+  const [fixDrafts, setFixDrafts] = useState<Record<string, Record<string, string>>>({});
   const [message, setMessage] = useState<string | null>(null);
 
   async function loadDiagnostic() {
@@ -57,11 +80,43 @@ export function RetentionDiagnosticPanel({ projectId }: { projectId: string }) {
       }
       const payload = (await response.json()) as { diagnostic: RetentionDiagnostic };
       setDiagnostic(payload.diagnostic);
+      setFixDrafts(Object.fromEntries(payload.diagnostic.quickFixes.map((fix) => [fix.id, fix.payload])));
       setMessage("已生成前三章追读诊断");
     } catch (caught) {
       setMessage(caught instanceof Error ? caught.message : "生成追读诊断失败。");
     } finally {
       setIsLoading(false);
+    }
+  }
+
+  function updateFixDraft(fixId: string, field: string, value: string) {
+    setFixDrafts((current) => ({
+      ...current,
+      [fixId]: {
+        ...(current[fixId] ?? {}),
+        [field]: value,
+      },
+    }));
+  }
+
+  async function applyQuickFix(fix: RetentionQuickFix) {
+    setSavingFixId(fix.id);
+    setMessage(null);
+    try {
+      const response = await fetch(fix.endpoint, {
+        method: fix.method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(fixDrafts[fix.id] ?? fix.payload),
+      });
+      if (!response.ok) {
+        throw new Error("保存追读卡失败，请检查字段后重试。");
+      }
+      await loadDiagnostic();
+      setMessage(`已保存：${fix.label}`);
+    } catch (caught) {
+      setMessage(caught instanceof Error ? caught.message : "保存追读卡失败。");
+    } finally {
+      setSavingFixId(null);
     }
   }
 
@@ -173,6 +228,47 @@ export function RetentionDiagnosticPanel({ projectId }: { projectId: string }) {
               ))}
             </div>
           </div>
+          {diagnostic.quickFixes.length ? (
+            <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm">
+              <div className="font-medium text-slate-950">追读卡快修</div>
+              <div className="mt-3 grid gap-3">
+                {diagnostic.quickFixes.map((fix) => {
+                  const draft = fixDrafts[fix.id] ?? fix.payload;
+
+                  return (
+                    <div className="rounded-md border border-amber-200 bg-white p-3" key={fix.id}>
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                        <div>
+                          <div className="font-medium text-slate-950">{fix.label}</div>
+                          <p className="mt-1 text-slate-600">{fix.description}</p>
+                        </div>
+                        <button
+                          className="w-fit rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white disabled:opacity-50"
+                          disabled={savingFixId === fix.id}
+                          onClick={() => void applyQuickFix(fix)}
+                          type="button"
+                        >
+                          {savingFixId === fix.id ? "保存中" : "保存追读卡"}
+                        </button>
+                      </div>
+                      <div className="mt-3 grid gap-2 lg:grid-cols-2">
+                        {Object.entries(draft).map(([field, value]) => (
+                          <label className="grid gap-1" key={`${fix.id}:${field}`}>
+                            <span className="text-xs font-medium text-slate-600">{fieldLabel(field)}</span>
+                            <textarea
+                              className="min-h-20 resize-y rounded-md border border-amber-200 px-3 py-2 text-sm leading-6 outline-none focus:border-amber-400"
+                              onChange={(event) => updateFixDraft(fix.id, field, event.target.value)}
+                              value={value}
+                            />
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ) : null}
         </div>
       ) : (
         <p className="mt-4 text-sm text-slate-600">生成后会显示前三章留存评分、逐章风险和修订顺序。</p>

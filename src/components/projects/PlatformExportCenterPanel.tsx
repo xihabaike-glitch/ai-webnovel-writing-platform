@@ -1526,10 +1526,14 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
       setVersionActionFilter("all");
       setStrategySwitchPlan(payload.switchPlan);
       setStrategyExecutionReceipt(buildStrategyExecutionReceipt(payload.switchPlan, "switch-target-platform"));
-      await loadCenter({ keepMessage: true });
       const nextStep = payload.switchPlan.steps.find((step) => step.status === "next");
-      setMessage(`${item.feedbackLoop.headline} 已启动执行链，下一步：${nextStep?.label ?? item.feedbackLoop.nextStepLabel}。`);
-      window.location.hash = "platform-strategy-ranking";
+      if (nextStep?.executable) {
+        await executeStrategyStep(payload.switchPlan, nextStep, { messagePrefix: item.feedbackLoop.headline });
+      } else {
+        await loadCenter({ keepMessage: true });
+        setMessage(`${item.feedbackLoop.headline} 已启动执行链，下一步：${nextStep?.label ?? item.feedbackLoop.nextStepLabel}。`);
+        window.location.hash = nextStep?.href.replace(/^#/, "") ?? "platform-strategy-ranking";
+      }
     } catch (caught) {
       setMessage(caught instanceof Error ? caught.message : "启动知识库反哺链失败。");
     } finally {
@@ -1647,16 +1651,19 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
     }
   }
 
-  async function executeStrategyNextStep() {
-    if (!strategySwitchPlan || !strategyNextStep) return;
-    const strategyPackage = center?.packages.find((pack) => pack.platformId === strategySwitchPlan.platformId) ?? selectedPackage;
+  async function executeStrategyStep(
+    plan: PlatformStrategySwitchPlan,
+    step: PlatformStrategySwitchStep,
+    options?: { messagePrefix?: string },
+  ) {
+    const strategyPackage = center?.packages.find((pack) => pack.platformId === plan.platformId) ?? selectedPackage;
     if (!strategyPackage) return;
     setSelectedPlatformId(strategyPackage.platformId);
-    setRunningStrategyStepId(strategyNextStep.id);
+    setRunningStrategyStepId(step.id);
     setMessage(null);
 
     try {
-      if (strategyNextStep.id === "save-evidence-baseline") {
+      if (step.id === "save-evidence-baseline") {
         const response = await fetch(`/api/projects/${projectId}/platform-export`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -1667,10 +1674,10 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
         setVersionActionFilter("snapshot");
         await loadCenter({ keepMessage: true });
         const refreshedPlan = await refreshStrategyPlan(strategyPackage.platformId);
-        setStrategyExecutionReceipt(buildStrategyExecutionReceipt(refreshedPlan, strategyNextStep.id));
-        setMessage(payload?.message ?? `已保存 ${strategyPackage.platformName} 证据基准。`);
+        setStrategyExecutionReceipt(buildStrategyExecutionReceipt(refreshedPlan, step.id));
+        setMessage(`${options?.messagePrefix ? `${options.messagePrefix} ` : ""}${payload?.message ?? `已保存 ${strategyPackage.platformName} 证据基准。`}`);
         window.location.hash = "package-version-history";
-      } else if (strategyNextStep.id === "fix-submission-asset") {
+      } else if (step.id === "fix-submission-asset") {
         const nextDraft = {
           title: strategyPackage.title,
           logline: strategyPackage.logline,
@@ -1701,9 +1708,10 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
         } | null;
         if (!response.ok || !payload?.variants) throw new Error(payload?.error ?? "AI 优化投稿资产失败。");
         setAssetOptimizationVariants(payload.variants.map((variant) => ({ ...variant, sourceTaskId: payload.task?.id })));
-        setStrategyExecutionReceipt(buildStrategyExecutionReceipt(strategySwitchPlan, strategyNextStep.id, payload.variants.length));
-        setMessage(`已按执行链生成 ${payload.variants.length} 个 ${strategyPackage.platformName} 投稿资产候选。`);
-      } else if (strategyNextStep.id === "rewrite-first-three") {
+        setStrategyExecutionReceipt(buildStrategyExecutionReceipt(plan, step.id, payload.variants.length));
+        setMessage(`${options?.messagePrefix ? `${options.messagePrefix} ` : ""}已按执行链生成 ${payload.variants.length} 个 ${strategyPackage.platformName} 投稿资产候选。`);
+        window.location.hash = "submission-asset-editor";
+      } else if (step.id === "rewrite-first-three") {
         const response = await fetch(`/api/projects/${projectId}/first-three-rewrite/generate`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -1716,12 +1724,12 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
         if (!response.ok || !payload?.results) throw new Error(payload?.error ?? "前三章二轮重写失败。");
         await loadCenter({ keepMessage: true });
         const refreshedPlan = await refreshStrategyPlan(strategyPackage.platformId);
-        setStrategyExecutionReceipt(buildStrategyExecutionReceipt(refreshedPlan, strategyNextStep.id, payload.results.length));
-        setMessage(`已按执行链重写 ${strategyPackage.platformName} 前三章，共 ${payload.results.length} 章，策略链已刷新。`);
-      } else if (strategyNextStep.id === "record-publish-effect") {
+        setStrategyExecutionReceipt(buildStrategyExecutionReceipt(refreshedPlan, step.id, payload.results.length));
+        setMessage(`${options?.messagePrefix ? `${options.messagePrefix} ` : ""}已按执行链重写 ${strategyPackage.platformName} 前三章，共 ${payload.results.length} 章，策略链已刷新。`);
+      } else if (step.id === "record-publish-effect") {
         window.location.hash = "publish-effect-panel";
-        setStrategyExecutionReceipt(buildStrategyExecutionReceipt(strategySwitchPlan, strategyNextStep.id));
-        setMessage("下一步是录入真实发布效果：把曝光、点击、收藏、追读和编辑反馈填进去。");
+        setStrategyExecutionReceipt(buildStrategyExecutionReceipt(plan, step.id));
+        setMessage(`${options?.messagePrefix ? `${options.messagePrefix} ` : ""}下一步是录入真实发布效果：把曝光、点击、收藏、追读和编辑反馈填进去。`);
       }
     } catch (caught) {
       setMessage(caught instanceof Error ? caught.message : "执行策略下一步失败。");
@@ -1729,6 +1737,11 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
       setIsOptimizingAsset(false);
       setRunningStrategyStepId(null);
     }
+  }
+
+  async function executeStrategyNextStep() {
+    if (!strategySwitchPlan || !strategyNextStep) return;
+    await executeStrategyStep(strategySwitchPlan, strategyNextStep);
   }
 
   async function optimizeSubmissionAsset() {

@@ -1,6 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { buildFirstDayExecutionRouteStatus } from "../lib/model-gateway/firstDayExecutionRoute.ts";
+import {
+  buildFirstDayExecutionRouteBlockMessage,
+  buildFirstDayExecutionRouteStatus,
+  canExecuteFirstDayRouteWithAi,
+} from "../lib/model-gateway/firstDayExecutionRoute.ts";
 import { buildFirstDayRouteSummary } from "../lib/model-gateway/firstDayRouteSummary.ts";
 import { buildPresetRouteBlueprint } from "../lib/model-gateway/presetRouteBlueprint.ts";
 import {
@@ -955,6 +959,17 @@ test("model task routing", async (t) => {
       providers: [],
       routes: [],
     });
+    const mockFallback = buildFirstDayExecutionRouteStatus({
+      taskType: "chapter_draft",
+      providers: [mockProvider],
+      routes: [
+        {
+          taskType: "chapter_draft",
+          primaryProviderConfigId: "mock-provider",
+          fallbackProviderConfigId: null,
+        },
+      ],
+    });
     const manual = buildFirstDayExecutionRouteStatus({
       taskType: null,
       providers: [],
@@ -966,10 +981,18 @@ test("model task routing", async (t) => {
     assert.equal(ready.primaryProviderName, "Claude · claude-sonnet-4-5");
     assert.equal(ready.fallbackProviderName, "Kimi · kimi-k2.6");
     assert.ok(ready.detail.includes("优先走已配置模型路线"));
+    assert.equal(canExecuteFirstDayRouteWithAi(ready), true);
+    assert.equal(buildFirstDayExecutionRouteBlockMessage(ready), null);
     assert.equal(missing.status, "missing_route");
     assert.ok(missing.detail.includes("默认模型选择"));
+    assert.equal(canExecuteFirstDayRouteWithAi(missing), false);
+    assert.ok(buildFirstDayExecutionRouteBlockMessage(missing)?.includes("模型配置中心"));
+    assert.equal(mockFallback.status, "mock_fallback");
+    assert.equal(canExecuteFirstDayRouteWithAi(mockFallback), false);
+    assert.ok(buildFirstDayExecutionRouteBlockMessage(mockFallback)?.includes("Mock 兜底"));
     assert.equal(manual.status, "manual");
     assert.equal(manual.primaryProviderName, "无需模型");
+    assert.equal(canExecuteFirstDayRouteWithAi(manual), false);
   });
 
   await t.test("builds route recommendations from successful model samples", () => {

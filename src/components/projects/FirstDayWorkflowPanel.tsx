@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { buildFirstDayExecutionRouteBlockMessage, type FirstDayExecutionRouteStatus } from "@/lib/model-gateway/firstDayExecutionRoute";
 import { buildFirstDayStepView, completeFirstDayDispatchStep } from "@/lib/projects/firstDayWorkflowView";
 import { persistGateDispatchTask, type GatePlatformGrowthDispatchItem } from "@/lib/projects/gateActionReceipts";
 
@@ -41,14 +42,7 @@ interface FirstDayWorkflow {
   steps: FirstDayWorkflowStep[];
 }
 
-interface FirstDayModelRouteStatus {
-  taskType: string | null;
-  taskLabel: string;
-  primaryProviderName: string;
-  fallbackProviderName: string;
-  status: "ready" | "missing_route" | "mock_fallback" | "manual";
-  detail: string;
-}
+type FirstDayModelRouteStatus = FirstDayExecutionRouteStatus;
 
 function statusLabel(status: FirstDayWorkflowStep["status"]) {
   if (status === "done") return "完成";
@@ -148,6 +142,13 @@ export function FirstDayWorkflowPanel({ projectId }: { projectId: string }) {
 
   async function executeCurrentStepWithAi() {
     if (!workflow) return;
+    if (modelRoute) {
+      const routeBlockMessage = buildFirstDayExecutionRouteBlockMessage(modelRoute);
+      if (routeBlockMessage) {
+        setMessage(routeBlockMessage);
+        return;
+      }
+    }
     setIsExecutingAi(true);
     setMessage(null);
     try {
@@ -196,6 +197,8 @@ export function FirstDayWorkflowPanel({ projectId }: { projectId: string }) {
   useEffect(() => {
     void loadWorkflow();
   }, [projectId]);
+
+  const routeBlockMessage = modelRoute ? buildFirstDayExecutionRouteBlockMessage(modelRoute) : null;
 
   return (
     <section className="rounded-md border border-slate-200 bg-white p-4">
@@ -294,7 +297,7 @@ export function FirstDayWorkflowPanel({ projectId }: { projectId: string }) {
                     onClick={executeCurrentStepWithAi}
                     type="button"
                   >
-                    {isExecutingAi ? "AI 执行中" : "AI 执行当前节点"}
+                    {isExecutingAi ? "AI 执行中" : routeBlockMessage ? "检查模型路线" : "AI 执行当前节点"}
                   </button>
                   <button
                     className="w-fit rounded-md border border-slate-200 px-3 py-2 text-sm font-medium hover:bg-slate-50"
@@ -321,6 +324,14 @@ export function FirstDayWorkflowPanel({ projectId }: { projectId: string }) {
                     <span className="rounded-md bg-slate-50 px-2 py-1">备用 {modelRoute.fallbackProviderName}</span>
                   </div>
                   <p className="mt-2 leading-6 text-slate-600">{modelRoute.detail}</p>
+                  {routeBlockMessage ? (
+                    <div className="mt-3 flex flex-col gap-2 rounded-md bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-800 sm:flex-row sm:items-center sm:justify-between">
+                      <span>{routeBlockMessage}</span>
+                      <Link className="font-medium text-amber-900 underline underline-offset-2" href="/settings/models">
+                        去配置
+                      </Link>
+                    </div>
+                  ) : null}
                 </div>
               ) : null}
               <textarea

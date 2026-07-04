@@ -3,7 +3,7 @@ import { generateChapterDraft } from "@/lib/ai/chapterDraftGeneration";
 import { generateChapterSecondPass } from "@/lib/ai/chapterSecondPassGeneration";
 import { reviewChapterDraft } from "@/lib/ai/chapterReviewGeneration";
 import { prisma } from "@/lib/db/prisma";
-import { buildFirstDayExecutionRouteStatus } from "@/lib/model-gateway/firstDayExecutionRoute";
+import { buildFirstDayExecutionRouteBlockMessage, buildFirstDayExecutionRouteStatus } from "@/lib/model-gateway/firstDayExecutionRoute";
 import { getPlatformProfile, type PlatformId } from "@/lib/platforms/platformProfiles";
 import { buildFirstDayDispatchItem, buildFirstDayModelExecutionPlan, buildFirstDayWorkflow } from "@/lib/projects/firstDayWorkflow";
 import { generateControlAssets, type ControlAssetAreaId } from "@/lib/projects/controlAssetGeneration";
@@ -122,7 +122,19 @@ export async function POST(_request: Request, { params }: Params) {
       workflow: payload.workflow,
       dispatch: payload.dispatch,
       executionPlan,
+      modelRoute: payload.modelRoute,
       error: executionPlan.blockedReason ?? "当前首日节点暂不支持自动执行。",
+    }, { status: 400 });
+  }
+
+  const routeBlockMessage = buildFirstDayExecutionRouteBlockMessage(payload.modelRoute);
+  if (routeBlockMessage) {
+    return NextResponse.json({
+      workflow: payload.workflow,
+      dispatch: payload.dispatch,
+      executionPlan,
+      modelRoute: payload.modelRoute,
+      error: routeBlockMessage,
     }, { status: 400 });
   }
 
@@ -159,6 +171,7 @@ export async function POST(_request: Request, { params }: Params) {
       workflow: payload.workflow,
       dispatch: payload.dispatch,
       executionPlan,
+      modelRoute: payload.modelRoute,
       error: message,
     }, { status: message === "Chapter not found" ? 404 : 500 });
   }

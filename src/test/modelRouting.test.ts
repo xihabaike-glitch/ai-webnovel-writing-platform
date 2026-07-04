@@ -814,6 +814,36 @@ test("model task routing", async (t) => {
     assert.equal(secondPass.length, 0);
   });
 
+  await t.test("restores executable recheck samples from generated governance follow-ups", () => {
+    const routeGovernanceEvidence = buildRouteConfirmationGovernanceEvidenceFromDispatchTasks([{
+      dispatchKey: "model-route-governance:chapter_draft:extend_watch:2026-07-04T14:00:00.000Z",
+      stage: "model_route_governance",
+      state: "completed",
+      completionEvidence: "正文初稿路由已治理，已切换首选模型，复跑 2 个小样本成功率 100%，质量 86，未命中备用。",
+      evidence: ["已生成模型路由治理派单。"],
+      completedAt: "2026-07-04T16:00:00.000Z",
+    }]);
+    const followUp = buildRouteConfirmationGovernanceAutoFollowUpDispatches(routeGovernanceEvidence)[0];
+    const advice = buildRouteConfirmationRecheckAdviceFromDispatchTask(followUp);
+    const plan = advice ? buildRouteConfirmationRecheckSamplePlan(advice, {
+      primaryProviderName: "DeepSeek · deepseek-chat",
+      fallbackProviderName: "Kimi · kimi-k2.6",
+    }) : null;
+    const sampleDispatch = advice && plan
+      ? buildRouteConfirmationRecheckSampleDispatch(advice, plan, {
+        dispatchKey: followUp.dispatchKey,
+        createdAt: followUp.reviewLatestAt,
+      })
+      : null;
+
+    assert.equal(advice?.taskType, "chapter_draft");
+    assert.equal(plan?.sampleCount, 2);
+    assert.ok(plan?.routeLabel.includes("DeepSeek"));
+    assert.equal(sampleDispatch?.dispatchKey, followUp.dispatchKey);
+    assert.equal(sampleDispatch?.stage, "model_route_confirmation_recheck");
+    assert.ok(sampleDispatch?.evidence.some((item) => item.includes("治理已完成")));
+  });
+
   await t.test("stops route adjustment follow-up after a newer route confirmation exists", () => {
     const routeGovernanceEvidence = buildRouteConfirmationGovernanceEvidenceFromDispatchTasks([{
       dispatchKey: "model-route-governance:chapter_review:switch_route:2026-07-04T13:00:00.000Z",

@@ -413,6 +413,27 @@ function latestRouteConfirmationRecheckReason(
   return routeConfirmationRechecks?.find((item) => item.taskType === taskType)?.summary ?? "";
 }
 
+function passedGovernanceRecheckForTask(
+  taskType: string,
+  routeConfirmationRechecks: RouteConfirmationRecheckEvidence[] | undefined,
+) {
+  return routeConfirmationRechecks?.find((item) => (
+    item.taskType === taskType
+    && item.recommendedAction === "keep"
+    && item.id.includes(":governance:")
+  )) ?? null;
+}
+
+function governanceRecheckBoostReason(
+  recheck: RouteConfirmationRecheckEvidence | null,
+  boosted: boolean,
+) {
+  if (!recheck || !boosted) return "";
+  const successRate = recheck.successRatePercent === null ? "未填" : `${recheck.successRatePercent}%`;
+  const quality = recheck.qualityScore ?? "未填";
+  return `治理后复检通过，当前路线加权保留：成功率 ${successRate}，质量 ${quality}。`;
+}
+
 function latestRouteGovernanceReason(
   taskType: string,
   routeGovernanceEvidence: RouteConfirmationGovernanceEvidence[] | undefined,
@@ -932,6 +953,7 @@ export function buildRouteRecommendations(
 
   return modelTaskRouteOptions.map((option): RouteRecommendation => {
     const route = routesByTaskType.get(option.taskType);
+    const passedGovernanceRecheck = passedGovernanceRecheckForTask(option.taskType, options.routeConfirmationRechecks);
     const candidates = usableProviders
       .map((provider) => buildProviderCandidate(option.taskType, provider, tasks))
       .filter((candidate) => (
@@ -940,6 +962,12 @@ export function buildRouteRecommendations(
         && (candidate.averageQualityScore === 0 || candidate.averageQualityScore >= 70)
         && !avoidanceRules.some((rule) => matchesAvoidanceRule(option.taskType, candidate.provider, rule))
       ))
+      .map((candidate) => {
+        if (passedGovernanceRecheck && candidate.provider.id === route?.primaryProviderConfigId) {
+          return { ...candidate, score: candidate.score + 30 };
+        }
+        return candidate;
+      })
       .sort((left, right) => (
         right.score - left.score
         || right.successRatePercent - left.successRatePercent
@@ -967,6 +995,10 @@ export function buildRouteRecommendations(
     );
     const confirmationRecheckReason = latestRouteConfirmationRecheckReason(option.taskType, options.routeConfirmationRechecks);
     const governanceReason = latestRouteGovernanceReason(option.taskType, options.routeGovernanceEvidence);
+    const governanceBoostReason = governanceRecheckBoostReason(
+      passedGovernanceRecheck,
+      Boolean(passedGovernanceRecheck && primary?.provider.id === route?.primaryProviderConfigId),
+    );
 
     return {
       taskType: option.taskType,
@@ -983,7 +1015,7 @@ export function buildRouteRecommendations(
       averageQualityScore: primary?.averageQualityScore ?? 0,
       averageCostPerSucceededTaskUsd: primary?.averageCostPerSucceededTaskUsd ?? 0,
       avoidance,
-      reason: [avoidance.reason, restorationReason, confirmationRecheckReason, governanceReason, baseReason].filter(Boolean).join(" "),
+      reason: [avoidance.reason, restorationReason, confirmationRecheckReason, governanceReason, governanceBoostReason, baseReason].filter(Boolean).join(" "),
     };
   });
 }

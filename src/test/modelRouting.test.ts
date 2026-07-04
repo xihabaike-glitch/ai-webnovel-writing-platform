@@ -875,6 +875,76 @@ test("model task routing", async (t) => {
     assert.ok(review?.reason.includes("成功率 50"));
   });
 
+  await t.test("boosts the confirmed route after governance recheck passes", () => {
+    const routeConfirmationRechecks = buildRouteConfirmationRecheckEvidenceFromDispatchTasks([{
+      dispatchKey: "model-route-confirmation-recheck:chapter_review:governance:2026-07-04T16:00:00.000Z",
+      stage: "model_route_confirmation_recheck",
+      state: "completed",
+      completionEvidence: "完成 2 个章节审稿治理后小样本，成功率 100%，质量 86，未命中备用路线，是否需要治理：否。",
+      evidence: ["治理结论：已治理完成"],
+      completedAt: "2026-07-04T17:00:00.000Z",
+    }]);
+    const recommendations = buildRouteRecommendations([
+      {
+        id: "review-gpt-1",
+        taskType: "chapter_review",
+        providerConfigId: "gpt-provider",
+        status: "succeeded",
+        inputTokens: 1000,
+        outputTokens: 800,
+        costUsd: 0.008,
+        outputText: JSON.stringify({ score: 94 }),
+      },
+      {
+        id: "review-gpt-2",
+        taskType: "chapter_review",
+        providerConfigId: "gpt-provider",
+        status: "succeeded",
+        inputTokens: 980,
+        outputTokens: 780,
+        costUsd: 0.006,
+        outputText: JSON.stringify({ score: 92 }),
+      },
+      {
+        id: "review-mock-1",
+        taskType: "chapter_review",
+        providerConfigId: "mock-provider",
+        status: "succeeded",
+        inputTokens: 900,
+        outputTokens: 640,
+        costUsd: 0,
+        outputText: JSON.stringify({ score: 75 }),
+      },
+      {
+        id: "review-mock-2",
+        taskType: "chapter_review",
+        providerConfigId: "mock-provider",
+        status: "succeeded",
+        inputTokens: 900,
+        outputTokens: 630,
+        costUsd: 0,
+        outputText: JSON.stringify({ score: 76 }),
+      },
+    ], [{
+      taskType: "chapter_review",
+      primaryProviderConfigId: "mock-provider",
+      fallbackProviderConfigId: "gpt-provider",
+    }], [
+      { ...gptProvider, defaultModel: "gpt-5-mini" },
+      { ...mockProvider, defaultModel: "mock-novel" },
+    ], {
+      routeConfirmationRechecks,
+    });
+
+    const review = recommendations.find((item) => item.taskType === "chapter_review");
+
+    assert.equal(routeConfirmationRechecks[0].recommendedAction, "keep");
+    assert.equal(review?.recommendedPrimaryProviderConfigId, "mock-provider");
+    assert.equal(review?.recommendedFallbackProviderConfigId, "gpt-provider");
+    assert.equal(review?.status, "current");
+    assert.ok(review?.reason.includes("治理后复检通过，当前路线加权保留"));
+  });
+
   await t.test("turns completed route governance evidence into follow-up dispatches", () => {
     const routeGovernanceEvidence = buildRouteConfirmationGovernanceEvidenceFromDispatchTasks([
       {

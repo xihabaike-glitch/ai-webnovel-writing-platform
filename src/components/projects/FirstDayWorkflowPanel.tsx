@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { persistGateDispatchTask, type GatePlatformGrowthDispatchItem } from "@/lib/projects/gateActionReceipts";
 
 interface FirstDayWorkflowStep {
   id: string;
@@ -51,7 +52,9 @@ function statusClass(status: FirstDayWorkflowStep["status"]) {
 
 export function FirstDayWorkflowPanel({ projectId }: { projectId: string }) {
   const [workflow, setWorkflow] = useState<FirstDayWorkflow | null>(null);
+  const [dispatch, setDispatch] = useState<GatePlatformGrowthDispatchItem | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isDispatching, setIsDispatching] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
   async function loadWorkflow() {
@@ -62,12 +65,27 @@ export function FirstDayWorkflowPanel({ projectId }: { projectId: string }) {
       if (!response.ok) {
         throw new Error("读取首日工作流失败。");
       }
-      const payload = (await response.json()) as { workflow: FirstDayWorkflow };
+      const payload = (await response.json()) as { workflow: FirstDayWorkflow; dispatch: GatePlatformGrowthDispatchItem };
       setWorkflow(payload.workflow);
+      setDispatch(payload.dispatch);
     } catch (caught) {
       setMessage(caught instanceof Error ? caught.message : "读取首日工作流失败。");
     } finally {
       setIsLoading(false);
+    }
+  }
+
+  async function assignFirstDayDispatch() {
+    if (!dispatch) return;
+    setIsDispatching(true);
+    setMessage(null);
+    try {
+      const task = await persistGateDispatchTask(dispatch);
+      setMessage(`已派到任务中心：${task.title}`);
+    } catch (caught) {
+      setMessage(caught instanceof Error ? caught.message : "首日任务派单失败。");
+    } finally {
+      setIsDispatching(false);
     }
   }
 
@@ -124,9 +142,22 @@ export function FirstDayWorkflowPanel({ projectId }: { projectId: string }) {
                 <h3 className="mt-1 text-base font-semibold text-slate-950">{workflow.executionPackage.headline}</h3>
                 <p className="mt-2 text-sm leading-6 text-slate-600">{workflow.executionPackage.handoffNote}</p>
               </div>
-              <Link className="w-fit rounded-md bg-slate-950 px-3 py-2 text-sm font-medium text-white" href={workflow.executionPackage.href}>
-                {workflow.executionPackage.actionLabel}
-              </Link>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  className="w-fit rounded-md bg-slate-950 px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
+                  disabled={isDispatching || !dispatch}
+                  onClick={assignFirstDayDispatch}
+                  type="button"
+                >
+                  {isDispatching ? "派单中" : "派到任务中心"}
+                </button>
+                <Link className="w-fit rounded-md border border-slate-200 px-3 py-2 text-sm font-medium hover:bg-slate-50" href={workflow.executionPackage.href}>
+                  {workflow.executionPackage.actionLabel}
+                </Link>
+                <Link className="w-fit rounded-md border border-slate-200 px-3 py-2 text-sm font-medium hover:bg-slate-50" href="/dispatch">
+                  打开任务中心
+                </Link>
+              </div>
             </div>
             <div className="mt-4 grid gap-4 md:grid-cols-2">
               <div>

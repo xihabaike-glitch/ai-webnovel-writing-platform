@@ -1,4 +1,5 @@
 import type { PlatformProfile } from "../platforms/platformProfiles.ts";
+import type { GatePlatformGrowthDispatchItem, GatePlatformGrowthReviewStage } from "./gateActionReceipts.ts";
 import type { SubmissionChecklist } from "./submissionChecklist.ts";
 
 export interface FirstDayProject {
@@ -104,6 +105,12 @@ export interface FirstDayLaunchReceipt {
   totalSteps: number;
   progressPercent: number;
   readyStepIds: string[];
+}
+
+export interface FirstDayDispatchInput {
+  workflow: FirstDayWorkflow;
+  project: FirstDayProject;
+  platform: PlatformProfile;
 }
 
 function compact(text: string) {
@@ -256,6 +263,12 @@ function executionPackage(step: FirstDayWorkflowStep): FirstDayExecutionPackage 
   };
 }
 
+function dispatchStageForStep(stepId: string): GatePlatformGrowthReviewStage {
+  if (stepId === "publish-precheck") return "start_platform_package";
+  if (stepId === "first-draft" || stepId === "first-review" || stepId === "first-rewrite") return "start_first_three_review";
+  return "start_opening_diagnostic";
+}
+
 export function buildFirstDayWorkflow(input: FirstDayWorkflowInput): FirstDayWorkflow {
   const chapter = firstChapter(input.chapters);
   const projectHref = `/projects/${input.project.id}`;
@@ -363,6 +376,28 @@ export function buildFirstDayWorkflow(input: FirstDayWorkflowInput): FirstDayWor
     nextStep,
     executionPackage: executionPackage(nextStep),
     steps,
+  };
+}
+
+export function buildFirstDayDispatchItem(input: FirstDayDispatchInput): GatePlatformGrowthDispatchItem {
+  const execution = input.workflow.executionPackage;
+
+  return {
+    id: `first-day:${input.project.id}:${execution.stepId}`,
+    platformId: input.platform.id,
+    platformName: input.platform.name,
+    stage: dispatchStageForStep(execution.stepId),
+    state: "assigned",
+    priorityScore: Math.max(40, 100 - input.workflow.progressPercent),
+    ownerRole: execution.owner,
+    title: `${input.project.title} · ${input.workflow.nextStep.label}`,
+    detail: `${execution.headline}${execution.handoffNote ? ` ${execution.handoffNote}` : ""}`,
+    dueLabel: "今天收口",
+    actionLabel: execution.actionLabel,
+    href: execution.href,
+    acceptanceCriteria: execution.acceptanceCriteria,
+    evidence: execution.missingEvidence,
+    reviewLatestAt: new Date().toISOString(),
   };
 }
 

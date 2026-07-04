@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { getPlatformProfile } from "../lib/platforms/platformProfiles.ts";
-import { buildFirstDayLaunchReceipt, buildFirstDayWorkflow } from "../lib/projects/firstDayWorkflow.ts";
+import { buildFirstDayDispatchItem, buildFirstDayLaunchReceipt, buildFirstDayWorkflow } from "../lib/projects/firstDayWorkflow.ts";
 
 const project = {
   id: "project-1",
@@ -113,6 +113,34 @@ test("buildFirstDayWorkflow", async (t) => {
     assert.ok(workflow.executionPackage.acceptanceCriteria.includes("第一章正文已生成并写回章节"));
     assert.ok(workflow.executionPackage.missingEvidence.includes("缺少第一章正文或成功初稿任务"));
     assert.ok(workflow.executionPackage.handoffNote.includes("别批量开跑"));
+  });
+
+  await t.test("turns the current first-day execution package into a dispatch task", () => {
+    const platform = getPlatformProfile("fanqie");
+    const workflow = buildFirstDayWorkflow({
+      project,
+      platform,
+      chapters: [chapter, { ...chapter, id: "chapter-2", order: 2 }, { ...chapter, id: "chapter-3", order: 3 }],
+      outlineNodes,
+      characters,
+      worldEntries,
+      aiTasks: [],
+      submissionChecklist: checklist,
+    });
+
+    const dispatch = buildFirstDayDispatchItem({ workflow, project, platform });
+
+    assert.equal(dispatch.id, "first-day:project-1:first-draft");
+    assert.equal(dispatch.platformId, "fanqie");
+    assert.equal(dispatch.platformName, "番茄小说");
+    assert.equal(dispatch.stage, "start_first_three_review");
+    assert.equal(dispatch.state, "assigned");
+    assert.equal(dispatch.ownerRole, "AI");
+    assert.equal(dispatch.actionLabel, "生成第一章");
+    assert.equal(dispatch.href, "/projects/project-1/chapters/chapter-1");
+    assert.ok(dispatch.title.includes("夜雨系统"));
+    assert.ok(dispatch.acceptanceCriteria.includes("第一章正文已生成并写回章节"));
+    assert.ok(dispatch.evidence.includes("缺少第一章正文或成功初稿任务"));
   });
 
   await t.test("locks downstream work when the skeleton is empty", () => {

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { getPlatformProfile, type PlatformId } from "@/lib/platforms/platformProfiles";
-import { buildFirstDayWorkflow } from "@/lib/projects/firstDayWorkflow";
+import { buildFirstDayDispatchItem, buildFirstDayWorkflow } from "@/lib/projects/firstDayWorkflow";
 import { buildSubmissionChecklist } from "@/lib/projects/submissionChecklist";
 
 interface Params {
@@ -41,20 +41,28 @@ export async function GET(_request: Request, { params }: Params) {
     })),
   });
 
+  const workflowProject = {
+    id: project.id,
+    title: project.title,
+    currentWordCount: project.currentWordCount,
+  };
+  const workflow = buildFirstDayWorkflow({
+    project: workflowProject,
+    platform,
+    chapters: project.chapters,
+    outlineNodes: project.outlineNodes,
+    characters: project.characters,
+    worldEntries: project.worldEntries,
+    aiTasks: project.aiTasks,
+    submissionChecklist,
+  });
+
   return NextResponse.json({
-    workflow: buildFirstDayWorkflow({
-      project: {
-        id: project.id,
-        title: project.title,
-        currentWordCount: project.currentWordCount,
-      },
+    workflow,
+    dispatch: buildFirstDayDispatchItem({
+      project: workflowProject,
       platform,
-      chapters: project.chapters,
-      outlineNodes: project.outlineNodes,
-      characters: project.characters,
-      worldEntries: project.worldEntries,
-      aiTasks: project.aiTasks,
-      submissionChecklist,
+      workflow,
     }),
   });
 }

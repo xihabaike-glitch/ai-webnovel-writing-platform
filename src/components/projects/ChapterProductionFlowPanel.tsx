@@ -121,23 +121,28 @@ export function ChapterProductionFlowPanel({ flow }: { flow: ChapterProductionFl
         const payload = await response.json().catch(() => null) as {
           storyTreeRecheck?: ChapterProductionRecheckPayload["storyTreeRecheck"];
           evidenceLoopRecheck?: ChapterProductionRecheckPayload["evidenceLoopRecheck"];
+          followUpTasks?: unknown[];
           error?: string;
         } | null;
         if (!response.ok) throw new Error(payload?.error ?? "派单复查失败。");
         return {
           storyTreeRecheck: payload?.storyTreeRecheck ?? null,
           evidenceLoopRecheck: payload?.evidenceLoopRecheck ?? null,
+          followUpTasks: payload?.followUpTasks ?? [],
         };
       }));
+      const followUpTaskCount = results.reduce((sum, result) => sum + (result.followUpTasks?.length ?? 0), 0);
       const decision = buildChapterProductionRecheckDecision(results, {
         href: notice.href,
         label: notice.actionLabel,
       });
       setMessage(decision.title);
       setFollowUp({
-        href: decision.href,
-        label: decision.label,
-        detail: decision.detail,
+        href: followUpTaskCount > 0 ? "/dispatch" : decision.href,
+        label: followUpTaskCount > 0 ? "查看派单" : decision.label,
+        detail: followUpTaskCount > 0
+          ? `${decision.detail} 已自动生成 ${followUpTaskCount} 条后续派单。`
+          : decision.detail,
       });
       router.refresh();
     } catch (caught) {

@@ -13,6 +13,7 @@ import {
 } from "@/lib/model-gateway/routeConfirmation";
 import { getPlatformProfile, type PlatformId } from "@/lib/platforms/platformProfiles";
 import { buildFirstDayFollowUpDispatch, buildFirstDayWorkflow } from "@/lib/projects/firstDayWorkflow";
+import { buildChapterProductionRecheckFollowUpTasks } from "@/lib/projects/chapterProductionRecheckFollowUp";
 import { buildProjectControlDashboard } from "@/lib/projects/projectControlDashboard";
 import type {
   GateEvidenceLoopRecheck,
@@ -685,6 +686,31 @@ export async function PATCH(request: Request) {
     : null;
   const evidenceLoopTask = await persistEvidenceLoopRecheck(task, evidenceLoopRecheck);
   const responseTask = await persistStoryTreeRecheck(evidenceLoopTask, storyTreeRecheck);
+  if (nextState === "completed" && (storyTreeRecheck || evidenceLoopRecheck)) {
+    const existingFollowUpTasks = await prisma.gateDispatchTask.findMany({
+      where: {
+        projectId: task.projectId ?? undefined,
+        OR: [
+          { dispatchKey: { startsWith: "story-tree-followup:" } },
+          { dispatchKey: { startsWith: "submission-recheck-followup:" } },
+        ],
+      },
+      select: { dispatchKey: true },
+    });
+    const recheckFollowUps = buildChapterProductionRecheckFollowUpTasks({
+      projectTitle: task.title.split(" · ").at(0) || task.title,
+      platformId: task.platformId,
+      platformName: task.platformName,
+      sourceDispatchKey: task.dispatchKey,
+      existingDispatchKeys: existingFollowUpTasks.map((item) => item.dispatchKey),
+      storyTreeRecheck,
+      evidenceLoopRecheck,
+    });
+    followUpTasks = [
+      ...followUpTasks,
+      ...await Promise.all(recheckFollowUps.map((dispatch) => persistGeneratedDispatch({ ...dispatch, dispatchKey: dispatch.id }))),
+    ];
+  }
 
   return NextResponse.json({
     task: toTask(responseTask),

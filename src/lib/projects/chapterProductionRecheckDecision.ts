@@ -3,6 +3,7 @@ import type { GateEvidenceLoopRecheck, GateStoryTreeRecheck } from "./gateAction
 export interface ChapterProductionRecheckPayload {
   storyTreeRecheck?: GateStoryTreeRecheck | null;
   evidenceLoopRecheck?: GateEvidenceLoopRecheck | null;
+  followUpTasks?: unknown[];
 }
 
 export interface ChapterProductionRecheckDecision {

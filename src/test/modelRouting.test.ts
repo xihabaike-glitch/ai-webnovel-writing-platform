@@ -8,6 +8,7 @@ import {
 } from "../lib/model-gateway/providerSelection.ts";
 import {
   buildRouteConfirmationRecheckAdvice,
+  buildRouteConfirmationRecheckDecision,
   buildRouteConfirmationRecheckGovernanceAction,
   buildRouteConfirmationGovernanceEvidenceFromDispatchTasks,
   buildRouteConfirmationGovernanceFollowUpDispatches,
@@ -264,6 +265,38 @@ test("model task routing", async (t) => {
     assert.equal(advice.items[0].action, "switch_route");
     assert.equal(advice.items[0].severity, "blocked");
     assert.ok(advice.items[0].recommendation.includes("命中备用路线"));
+  });
+
+  await t.test("summarizes route confirmation recheck decisions for operators", () => {
+    const evidence = buildRouteConfirmationRecheckEvidenceFromDispatchTasks([
+      {
+        dispatchKey: "model-route-confirmation-recheck:chapter_draft:2026-07-04T09:00:00.000Z",
+        stage: "model_route_confirmation_recheck",
+        state: "completed",
+        completionEvidence: "完成 2 个正文初稿小样本，成功率 100%，质量 86，未命中备用路线，是否需要治理：否。",
+        evidence: [],
+        completedAt: "2026-07-04T11:00:00.000Z",
+      },
+      {
+        dispatchKey: "model-route-confirmation-recheck:chapter_review:2026-07-04T10:00:00.000Z",
+        stage: "model_route_confirmation_recheck",
+        state: "completed",
+        completionEvidence: "完成 2 个章节审稿小样本，1 个超时，成功率 50%，质量 62，命中备用路线，是否需要治理：是。",
+        evidence: ["已确认章节审稿模型路由。"],
+        completedAt: "2026-07-04T12:00:00.000Z",
+      },
+    ]);
+
+    const passed = buildRouteConfirmationRecheckDecision(evidence.find((item) => item.taskType === "chapter_draft")!);
+    const weak = buildRouteConfirmationRecheckDecision(evidence.find((item) => item.taskType === "chapter_review")!);
+
+    assert.equal(passed.status, "confirmed");
+    assert.equal(passed.label, "已确认");
+    assert.equal(passed.nextActionLabel, "保持当前路线");
+    assert.equal(weak.status, "needs_governance");
+    assert.equal(weak.label, "需治理");
+    assert.equal(weak.nextActionLabel, "生成治理派单");
+    assert.ok(weak.detail.includes("成功率 50"));
   });
 
   await t.test("respects explicit route recheck governance decisions from structured evidence", () => {

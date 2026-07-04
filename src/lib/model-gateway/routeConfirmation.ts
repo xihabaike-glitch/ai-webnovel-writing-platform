@@ -206,6 +206,13 @@ export interface RouteConfirmationRecheckEvidence {
   completedAt: string | null;
 }
 
+export interface RouteConfirmationRecheckDecision {
+  status: "confirmed" | "needs_governance" | "manual_review";
+  label: string;
+  detail: string;
+  nextActionLabel: string;
+}
+
 export interface RouteConfirmationGovernanceEvidence {
   id: string;
   taskType: RoutedModelTaskType;
@@ -1068,8 +1075,10 @@ export function buildRouteDispatchCompletionTemplate(task: RouteDispatchCompleti
 }
 
 function valueAfterCompletionLabel(label: string, text: string) {
-  const match = text.match(new RegExp(`^\\s*${label}\\s*[:：]\\s*(.+?)\\s*$`, "m"));
-  return match?.[1]?.trim() ?? null;
+  const lineMatch = text.match(new RegExp(`^\\s*${label}\\s*[:：]\\s*(.+?)\\s*$`, "m"));
+  if (lineMatch?.[1]) return lineMatch[1].trim();
+  const inlineMatch = text.match(new RegExp(`${label}\\s*[:：]\\s*([^，,；;。\\n]+)`));
+  return inlineMatch?.[1]?.trim() ?? null;
 }
 
 function hasConcreteCompletionValue(value: string | null) {
@@ -1223,6 +1232,34 @@ export function buildRouteConfirmationRecheckEvidenceFromDispatchTasks(
       }];
     })
     .sort((left, right) => (right.completedAt ?? "").localeCompare(left.completedAt ?? ""));
+}
+
+export function buildRouteConfirmationRecheckDecision(
+  evidence: RouteConfirmationRecheckEvidence,
+): RouteConfirmationRecheckDecision {
+  const label = labelForRoutedTask(evidence.taskType);
+  if (evidence.recommendedAction === "keep") {
+    return {
+      status: "confirmed",
+      label: "已确认",
+      detail: `「${label}」复检通过，${evidence.summary}`,
+      nextActionLabel: "保持当前路线",
+    };
+  }
+  if (evidence.recommendedAction === "manual_review") {
+    return {
+      status: "manual_review",
+      label: "需人工复核",
+      detail: `「${label}」复检证据不足，${evidence.summary}`,
+      nextActionLabel: "人工补齐证据",
+    };
+  }
+  return {
+    status: "needs_governance",
+    label: "需治理",
+    detail: `「${label}」复检未达标，${evidence.summary}`,
+    nextActionLabel: "生成治理派单",
+  };
 }
 
 export function buildRouteConfirmationGovernanceEvidenceFromDispatchTasks(

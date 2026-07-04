@@ -4,7 +4,9 @@ import { generateChapterDraft } from "@/lib/ai/chapterDraftGeneration";
 import { reviewChapterDraft } from "@/lib/ai/chapterReviewGeneration";
 import { prisma } from "@/lib/db/prisma";
 import {
+  buildRouteConfirmationRecheckDecision,
   buildRouteConfirmationRecheckAdviceFromDispatchTask,
+  buildRouteConfirmationRecheckEvidenceFromDispatchTasks,
   buildRouteConfirmationRecheckSampleDispatch,
   buildRouteConfirmationRecheckSamplePlan,
   type RouteConfirmationRecheckAdviceItem,
@@ -234,12 +236,22 @@ export async function POST(request: Request) {
       completedAt: now,
     },
   });
+  const completedRecheck = buildRouteConfirmationRecheckEvidenceFromDispatchTasks([{
+    dispatchKey: task.dispatchKey,
+    stage: task.stage,
+    state: task.state,
+    completionEvidence: task.completionEvidence,
+    evidence: task.evidence,
+    completedAt: task.completedAt,
+  }])[0] ?? null;
+  const decision = completedRecheck ? buildRouteConfirmationRecheckDecision(completedRecheck) : null;
 
   return NextResponse.json({
     samplePlan,
     executionPlan,
     results,
     recheckEvidence,
+    decision,
     recheckTask: {
       dispatchKey: task.dispatchKey,
       state: task.state,

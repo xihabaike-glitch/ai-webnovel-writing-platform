@@ -200,6 +200,11 @@ export function GateDispatchTaskCenter({
       const payload = await response.json().catch(() => null) as {
         error?: string;
         results?: Array<{ status: string }>;
+        decision?: {
+          label: string;
+          detail: string;
+          nextActionLabel: string;
+        } | null;
         recheckTask?: {
           dispatchKey: string;
           state: GatePlatformGrowthDispatchState;
@@ -221,7 +226,10 @@ export function GateDispatchTaskCenter({
           }
           : item));
       }
-      setRouteActionMessage(`已运行「${task.title}」复检样本：${succeeded}/${total} 成功`);
+      const decisionText = payload?.decision
+        ? `，决策：${payload.decision.label}，下一步：${payload.decision.nextActionLabel}`
+        : "";
+      setRouteActionMessage(`已运行「${task.title}」复检样本：${succeeded}/${total} 成功${decisionText}`);
       router.refresh();
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "运行模型路由复检样本失败。");

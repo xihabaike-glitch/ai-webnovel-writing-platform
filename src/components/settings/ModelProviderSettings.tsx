@@ -1,8 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   buildRouteConfirmationDispatchFollowUp,
   buildRouteConfirmationRecheckSampleDispatch,
@@ -514,6 +514,9 @@ export function ModelProviderSettings({
   routes: RouteView[];
 }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const firstDayFocusTaskType = searchParams.get("taskType");
+  const isFirstDayRouteFocus = searchParams.get("focus") === "first-day-route";
   const existingByProvider = useMemo(
     () => new Map(providers.map((provider) => [provider.providerId, provider])),
     [providers],
@@ -539,7 +542,7 @@ export function ModelProviderSettings({
   ));
   const [savingRouteType, setSavingRouteType] = useState<string | null>(null);
   const [applyingRecommendationType, setApplyingRecommendationType] = useState<string | null>(null);
-  const [isApplyingFirstDayRoutes, setIsApplyingFirstDayRoutes] = useState(false);
+  const [applyingFirstDayRouteType, setApplyingFirstDayRouteType] = useState<string | "all" | null>(null);
   const [governingRuleKey, setGoverningRuleKey] = useState<string | null>(null);
   const [creatingRetestRuleKey, setCreatingRetestRuleKey] = useState<string | null>(null);
   const [runningRetestRuleKey, setRunningRetestRuleKey] = useState<string | null>(null);
@@ -761,13 +764,24 @@ export function ModelProviderSettings({
     }
   }
 
-  async function applyFirstDayRecommendedRoutes() {
+  const focusedFirstDayRoute = isFirstDayRouteFocus
+    ? firstDayRouteSummary.items.find((item) => item.taskType === firstDayFocusTaskType) ?? null
+    : null;
+
+  useEffect(() => {
+    if (!isFirstDayRouteFocus) return;
+    const target = document.getElementById("first-day-routes");
+    target?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [isFirstDayRouteFocus]);
+
+  async function applyFirstDayRecommendedRoutes(taskType?: string) {
     const applicableItems = firstDayRouteSummary.items.filter((item) => (
       item.canApplyRecommendation && item.recommendedPrimaryProviderConfigId
+      && (!taskType || item.taskType === taskType)
     ));
     if (!applicableItems.length) return;
 
-    setIsApplyingFirstDayRoutes(true);
+    setApplyingFirstDayRouteType(taskType ?? "all");
     setRouteNotice(null);
     try {
       for (const item of applicableItems) {
@@ -800,12 +814,12 @@ export function ModelProviderSettings({
         });
         return next;
       });
-      setRouteNotice({ message: `已应用 ${applicableItems.length} 条首日推荐路线` });
+      setRouteNotice({ message: taskType ? `已修复「${applicableItems[0]?.stage}」模型路线` : `已应用 ${applicableItems.length} 条首日推荐路线` });
       router.refresh();
     } catch (caught) {
       setRouteNotice({ message: caught instanceof Error ? caught.message : "应用首日推荐路线失败。" });
     } finally {
-      setIsApplyingFirstDayRoutes(false);
+      setApplyingFirstDayRouteType(null);
     }
   }
 
@@ -1127,13 +1141,25 @@ export function ModelProviderSettings({
             })}
           </div>
         </div>
-        <div className="mt-4 rounded-md border border-slate-200 bg-white p-4">
+        <div
+          className={`mt-4 rounded-md border bg-white p-4 ${
+            isFirstDayRouteFocus ? "border-amber-300 ring-2 ring-amber-100" : "border-slate-200"
+          }`}
+          id="first-day-routes"
+        >
           <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
             <div>
               <div className="text-sm font-medium text-slate-950">首日工作流模型路线</div>
               <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-600">
                 首日按钮会依次用到总控资料、第一章初稿、第一章审稿和二改路线。这里先把关键路线露出来，避免执行时才发现模型不对。
               </p>
+              {isFirstDayRouteFocus ? (
+                <div className="mt-3 rounded-md bg-amber-50 px-3 py-2 text-sm leading-6 text-amber-800">
+                  {focusedFirstDayRoute
+                    ? `从首日工作流跳转而来：优先修复「${focusedFirstDayRoute.stage}」路线。`
+                    : "从首日工作流跳转而来：先检查下面四条关键路线。"}
+                </div>
+              ) : null}
             </div>
             <div className="flex flex-col gap-2 sm:items-end">
               <div className="flex flex-wrap gap-2 text-xs text-slate-600">
@@ -1144,11 +1170,11 @@ export function ModelProviderSettings({
               </div>
               <button
                 className="rounded-md bg-slate-950 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
-                disabled={isApplyingFirstDayRoutes || firstDayRouteSummary.summary.applicableRecommendations === 0}
+                disabled={Boolean(applyingFirstDayRouteType) || firstDayRouteSummary.summary.applicableRecommendations === 0}
                 onClick={() => void applyFirstDayRecommendedRoutes()}
                 type="button"
               >
-                {isApplyingFirstDayRoutes ? "应用中" : "一键应用首日推荐"}
+                {applyingFirstDayRouteType === "all" ? "应用中" : "一键应用首日推荐"}
               </button>
             </div>
           </div>
@@ -1156,13 +1182,32 @@ export function ModelProviderSettings({
             {firstDayRouteSummary.items.map((item) => {
               const status = firstDayRouteStatusCopy[item.status];
               return (
-                <div className="rounded-md bg-slate-50 p-3 text-sm" key={item.taskType}>
+                <div
+                  className={`rounded-md p-3 text-sm ${
+                    isFirstDayRouteFocus && item.taskType === firstDayFocusTaskType
+                      ? "border border-amber-200 bg-amber-50/70"
+                      : "bg-slate-50"
+                  }`}
+                  key={item.taskType}
+                >
                   <div className="flex flex-wrap items-start justify-between gap-2">
                     <div>
                       <div className="font-medium text-slate-950">{item.stage}</div>
                       <div className="mt-1 text-xs text-slate-500">{item.label}</div>
                     </div>
-                    <span className={`rounded-md px-2 py-1 text-xs font-medium ${status.className}`}>{status.label}</span>
+                    <div className="flex flex-wrap justify-end gap-2">
+                      <span className={`rounded-md px-2 py-1 text-xs font-medium ${status.className}`}>{status.label}</span>
+                      {item.canApplyRecommendation ? (
+                        <button
+                          className="rounded-md bg-slate-950 px-2 py-1 text-xs font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
+                          disabled={Boolean(applyingFirstDayRouteType)}
+                          onClick={() => void applyFirstDayRecommendedRoutes(item.taskType)}
+                          type="button"
+                        >
+                          {applyingFirstDayRouteType === item.taskType ? "修复中" : "修复此路线"}
+                        </button>
+                      ) : null}
+                    </div>
                   </div>
                   <div className="mt-3 grid gap-2 text-xs text-slate-600 sm:grid-cols-2">
                     <span className="rounded-md bg-white px-2 py-1">首选 {item.primaryProviderName}</span>
@@ -1953,11 +1998,11 @@ export function ModelProviderSettings({
             ) : (
               <button
                 className="rounded-md bg-slate-950 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
-                disabled={isApplyingFirstDayRoutes && modelSetupOnboarding.currentStep.action === "apply_routes"}
+                disabled={Boolean(applyingFirstDayRouteType) && modelSetupOnboarding.currentStep.action === "apply_routes"}
                 onClick={() => handleModelSetupAction(modelSetupOnboarding.currentStep.action)}
                 type="button"
               >
-                {isApplyingFirstDayRoutes && modelSetupOnboarding.currentStep.action === "apply_routes"
+                {applyingFirstDayRouteType === "all" && modelSetupOnboarding.currentStep.action === "apply_routes"
                   ? "应用中"
                   : modelSetupOnboarding.currentStep.actionLabel}
               </button>

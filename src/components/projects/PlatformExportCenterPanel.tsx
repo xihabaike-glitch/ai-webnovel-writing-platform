@@ -612,6 +612,14 @@ interface PlatformStrategyExecutionReceipt {
   severity: "success" | "needs_action";
 }
 
+interface PlatformKnowledgeApplication {
+  area: "submission_asset" | "first_three" | "strategy";
+  label: string;
+  status: "reuse" | "avoid" | "collect";
+  impact: string;
+  href: string;
+}
+
 interface PlatformKnowledgeInsight {
   platformId: string;
   platformName: string;
@@ -624,6 +632,7 @@ interface PlatformKnowledgeInsight {
   avoidSignals: string[];
   tacticSummary: string;
   nextAction: string;
+  applications: PlatformKnowledgeApplication[];
 }
 
 interface PlatformPublishExportCenter {
@@ -910,6 +919,18 @@ function platformKnowledgeStatusClass(status: PlatformKnowledgeInsight["status"]
   return "bg-slate-100 text-slate-600";
 }
 
+function platformKnowledgeApplicationLabel(status: PlatformKnowledgeApplication["status"]) {
+  if (status === "reuse") return "复用";
+  if (status === "avoid") return "避坑";
+  return "补证据";
+}
+
+function platformKnowledgeApplicationClass(status: PlatformKnowledgeApplication["status"]) {
+  if (status === "reuse") return "bg-emerald-50 text-emerald-700";
+  if (status === "avoid") return "bg-rose-50 text-rose-700";
+  return "bg-amber-50 text-amber-700";
+}
+
 function strategyReviewDecisionClass(kind: PlatformStrategyReviewDecision["kind"]) {
   if (kind === "scale") return "bg-emerald-50 text-emerald-700";
   if (kind === "iterate") return "bg-cyan-50 text-cyan-700";
@@ -975,6 +996,7 @@ const strategyScoreLabels: { key: keyof PlatformStrategyRankItem["scores"]; labe
   { key: "effect", label: "效果" },
   { key: "comparison", label: "对照" },
   { key: "adoption", label: "采纳" },
+  { key: "knowledge", label: "知识库" },
 ];
 
 function buildStrategyScoreChanges(
@@ -2263,8 +2285,8 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
             <div className="mt-3 rounded-md border border-slate-200 p-3" id="platform-knowledge">
               <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
                 <div>
-                  <div className="font-medium text-slate-950">平台知识库</div>
-                  <p className="mt-1 text-sm leading-6 text-slate-600">自动沉淀 A/B 归因、候选采纳和真实效果，给后续标题、简介、前三章提供打法经验。</p>
+                  <div className="font-medium text-slate-950">平台知识库反哺</div>
+                  <p className="mt-1 text-sm leading-6 text-slate-600">把 A/B 归因、候选采纳和真实效果翻译成可执行经验，直接影响标题简介、前三章重写和平台排序。</p>
                 </div>
                 <div className="text-xs text-slate-500">Top {Math.min(3, center.platformKnowledge.length)}</div>
               </div>
@@ -2283,6 +2305,28 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
                       <div>正/负 <span className="font-medium text-slate-950">{item.positiveCount}/{item.negativeCount}</span></div>
                     </div>
                     <p className="mt-2 leading-6 text-slate-600">{item.tacticSummary}</p>
+                    {item.applications.length ? (
+                      <div className="mt-2 rounded-md bg-white p-2 text-xs">
+                        <div className="font-medium text-slate-800">已反哺到</div>
+                        <div className="mt-2 grid gap-1.5">
+                          {item.applications.map((application) => (
+                            <a
+                              className="block rounded-md border border-slate-100 bg-slate-50 p-2 hover:bg-slate-100"
+                              href={application.href}
+                              key={`${item.platformId}-${application.area}`}
+                            >
+                              <div className="flex flex-wrap items-center justify-between gap-2">
+                                <span className="font-medium text-slate-800">{application.label}</span>
+                                <span className={`rounded-md px-1.5 py-0.5 text-[11px] font-medium ${platformKnowledgeApplicationClass(application.status)}`}>
+                                  {platformKnowledgeApplicationLabel(application.status)}
+                                </span>
+                              </div>
+                              <div className="mt-1 leading-5 text-slate-500">{application.impact}</div>
+                            </a>
+                          ))}
+                        </div>
+                      </div>
+                    ) : null}
                     {item.winningSignals.length ? (
                       <div className="mt-2 rounded-md bg-white p-2 text-xs leading-5 text-slate-600">
                         <div className="font-medium text-slate-800">可复用</div>

@@ -681,6 +681,14 @@ export interface PlatformStrategyExecutionReceipt {
   severity: "success" | "needs_action";
 }
 
+export interface PlatformKnowledgeApplication {
+  area: "submission_asset" | "first_three" | "strategy";
+  label: string;
+  status: "reuse" | "avoid" | "collect";
+  impact: string;
+  href: string;
+}
+
 export interface PlatformKnowledgeInsight {
   platformId: PlatformId;
   platformName: string;
@@ -693,6 +701,7 @@ export interface PlatformKnowledgeInsight {
   avoidSignals: string[];
   tacticSummary: string;
   nextAction: string;
+  applications: PlatformKnowledgeApplication[];
 }
 
 export interface PlatformPublishExportCenter {
@@ -1997,6 +2006,44 @@ function buildPlatformKnowledge(packages: PlatformPublishPackage[]): PlatformKno
         : status === "warning"
           ? attribution.nextAction
           : pack.experimentPlan.nextAction;
+      const primaryWin = winningSignals[0] ?? "当前正反馈包装";
+      const primaryAvoid = avoidSignals[0] ?? "当前负反馈表达";
+      const applicationStatus: PlatformKnowledgeApplication["status"] = status === "learned"
+        ? "reuse"
+        : status === "warning"
+          ? "avoid"
+          : "collect";
+      const applications: PlatformKnowledgeApplication[] = [
+        {
+          area: "submission_asset",
+          label: "标题/简介优化",
+          status: applicationStatus,
+          impact: status === "learned"
+            ? `候选生成会优先复用「${primaryWin}」，避免重新盲试包装。`
+            : status === "warning"
+              ? `候选生成会避开「${primaryAvoid}」，先换标题钩子和卖点表达。`
+              : "候选生成仍按平台基础规则跑，优先产出可采纳版本来补证据。",
+          href: "#submission-assets",
+        },
+        {
+          area: "first_three",
+          label: "前三章重写",
+          status: applicationStatus,
+          impact: status === "learned"
+            ? `开头重写会沿用「${primaryWin}」对应的钩子强度和爽点节奏。`
+            : status === "warning"
+              ? `开头重写会避开「${primaryAvoid}」暴露的问题，降低低效样本重复。`
+              : "前三章重写会先保证平台基础钩子，再等待真实效果回填。",
+          href: "#first-three-rewrite",
+        },
+        {
+          area: "strategy",
+          label: "平台策略排序",
+          status: applicationStatus,
+          impact: `知识库分 ${platformKnowledgeScore(pack)} 已计入平台策略榜，用来决定主推、观察或降权。`,
+          href: "#platform-strategy-ranking",
+        },
+      ];
 
       return {
         platformId: pack.platformId,
@@ -2010,6 +2057,7 @@ function buildPlatformKnowledge(packages: PlatformPublishPackage[]): PlatformKno
         avoidSignals,
         tacticSummary,
         nextAction,
+        applications,
       };
     })
     .sort((left, right) => (

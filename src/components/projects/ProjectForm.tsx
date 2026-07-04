@@ -70,7 +70,7 @@ export function ProjectForm() {
     platforms: platformProfiles,
     experiences: historyExperiences,
     batchEffects: batchTacticEffects,
-    limit: 4,
+    limit: platformProfiles.length,
   });
   const selectedEvidence = selectProjectStartTacticEvidence({
     platform: selectedProfile,
@@ -238,7 +238,9 @@ export function ProjectForm() {
             </div>
             <div className="flex flex-wrap gap-2 text-xs">
               <span className="rounded-md border border-emerald-200 bg-white px-2 py-1 text-emerald-700">推荐 {platformExperienceGuide.summary.recommended}</span>
+              <span className="rounded-md border border-amber-200 bg-white px-2 py-1 text-amber-700">观察 {platformExperienceGuide.summary.watch}</span>
               <span className="rounded-md border border-rose-200 bg-white px-2 py-1 text-rose-700">避坑 {platformExperienceGuide.summary.avoid}</span>
+              <span className="rounded-md border border-slate-200 bg-white px-2 py-1 text-slate-600">模板 {platformExperienceGuide.summary.template}</span>
             </div>
           </div>
           {platformExperienceGuide.nextActions.length ? (
@@ -248,10 +250,10 @@ export function ProjectForm() {
               ))}
             </div>
           ) : null}
-          <div className="grid gap-2 md:grid-cols-2">
+          <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
             {platformExperienceGuide.items.map((item) => (
               <button
-                className={`rounded-md border p-3 text-left ${platformExperienceClass(item.status)}`}
+                className={`rounded-md border p-3 text-left transition hover:-translate-y-0.5 ${platformExperienceClass(item.status)} ${item.platformId === platformId ? "ring-2 ring-slate-950 ring-offset-2" : ""}`}
                 key={item.platformId}
                 onClick={() => applyPlatform(item.platformId)}
                 type="button"
@@ -259,8 +261,14 @@ export function ProjectForm() {
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="font-medium">{item.platformName}</span>
                   <span className="rounded-md bg-white/70 px-2 py-1 text-xs font-medium">{item.label}</span>
+                  {item.platformId === platformId ? (
+                    <span className="rounded-md bg-slate-950 px-2 py-1 text-xs font-medium text-white">已选</span>
+                  ) : null}
                 </div>
                 <p className="mt-2 text-xs leading-5 opacity-85">{item.detail}</p>
+                {item.evidence[0] ? (
+                  <p className="mt-2 rounded-md bg-white/70 p-2 text-xs leading-5 opacity-80">{item.evidence[0]}</p>
+                ) : null}
               </button>
             ))}
           </div>

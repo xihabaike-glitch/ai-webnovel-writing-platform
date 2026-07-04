@@ -301,6 +301,55 @@ test("buildProjectStartTacticAdvice", async (t) => {
     assert.ok(guide.nextActions.some((action) => action.includes("2 个平台有避坑信号")));
   });
 
+  await t.test("keeps the full platform matrix available for project creation", () => {
+    const fanqieExperience: GatePlatformTacticExperienceItem = {
+      platformId: "fanqie",
+      platformName: "番茄小说",
+      status: "watch",
+      label: "观察样本",
+      tactic: "验收标准修正打法",
+      lesson: "返工链复盘发现验收标准不够硬。",
+      reuseHint: "同类项目可复用这套验收收口流程。",
+      risk: "缺复测前不能写成成功打法。",
+      href: "/gate",
+      sourceStatus: "healthy",
+      sourceLabel: "复盘完成",
+      priorityScore: 88,
+      latestAt: "2026-01-18T00:00:00.000Z",
+      evidence: ["复盘类型：验收标准修正"],
+    };
+    const webnovelExperience: GatePlatformTacticExperienceItem = {
+      platformId: "webnovel",
+      platformName: "WebNovel",
+      status: "blocked",
+      label: "避坑样本",
+      tactic: "复盘止损样本",
+      lesson: "返工链复盘已完成，结论是先暂停当前平台方向。",
+      reuseHint: "同类项目遇到二轮以上投稿包返工时，先复用这条暂停条件。",
+      risk: "没有写清恢复条件前，不要继续平台加码。",
+      href: "/gate",
+      sourceStatus: "blocked",
+      sourceLabel: "复盘止损",
+      priorityScore: 96,
+      latestAt: "2026-01-18T00:10:00.000Z",
+      evidence: ["复盘类型：平台方向暂停"],
+    };
+
+    const guide = buildProjectStartPlatformExperienceGuide({
+      platforms: projectTemplates.map((template) => getPlatformProfile(template.platformId)),
+      experiences: [fanqieExperience, webnovelExperience],
+      limit: projectTemplates.length,
+    });
+
+    assert.equal(guide.items.length, projectTemplates.length);
+    assert.equal(guide.summary.watch, 1);
+    assert.equal(guide.summary.avoid, 1);
+    assert.ok(guide.summary.template >= 1);
+    assert.equal(guide.items.find((item) => item.platformId === "fanqie")?.label, "验收观察");
+    assert.equal(guide.items.find((item) => item.platformId === "webnovel")?.label, "复盘止损");
+    assert.ok(guide.items.some((item) => item.status === "template"));
+  });
+
   await t.test("selects a reusable platform template for new project defaults", () => {
     const fallbackTemplate = getDefaultTemplateForPlatform("qidian");
     const fanqieExperience: GatePlatformTacticExperienceItem = {

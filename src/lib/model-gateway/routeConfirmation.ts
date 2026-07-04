@@ -246,6 +246,23 @@ export interface RouteConfirmationRecheckAdvice {
   items: RouteConfirmationRecheckAdviceItem[];
 }
 
+export interface RouteConfirmationRecheckSamplePlanOptions {
+  primaryProviderName?: string | null;
+  fallbackProviderName?: string | null;
+}
+
+export interface RouteConfirmationRecheckSamplePlan {
+  taskType: RoutedModelTaskType;
+  label: string;
+  sampleCount: number;
+  routeLabel: string;
+  actionLabel: string;
+  reason: string;
+  acceptanceCriteria: string[];
+  completionTemplate: string;
+  warning: string;
+}
+
 export interface RouteConfirmationRecheckGovernanceAction {
   receipt: GateActionReceipt;
   dispatch: GatePlatformGrowthDispatchItem & { dispatchKey: string };
@@ -486,6 +503,61 @@ function routeRecheckAction(item: RouteConfirmationRecheckEvidence, hasFallback:
     action: "extend_watch",
     actionLabel: "延长观察",
     recommendation: `「${label}」复检未达标，延长观察并先跑小样本。`,
+  };
+}
+
+function routeRecheckSampleCount(advice: RouteConfirmationRecheckAdviceItem) {
+  const baseCount = advice.sampleCount ?? 2;
+  if (advice.action === "switch_route" || advice.severity === "blocked") return Math.max(3, baseCount);
+  return Math.max(2, baseCount);
+}
+
+function routeRecheckPlanRouteLabel(options: RouteConfirmationRecheckSamplePlanOptions) {
+  const primary = options.primaryProviderName?.trim();
+  const fallback = options.fallbackProviderName?.trim();
+  if (primary && fallback) return `${primary} -> ${fallback}`;
+  if (primary) return primary;
+  return "当前模型路由配置";
+}
+
+export function buildRouteConfirmationRecheckSamplePlan(
+  advice: RouteConfirmationRecheckAdviceItem,
+  options: RouteConfirmationRecheckSamplePlanOptions = {},
+): RouteConfirmationRecheckSamplePlan {
+  const label = labelForRoutedTask(advice.taskType);
+  const sampleCount = routeRecheckSampleCount(advice);
+  const routeLabel = routeRecheckPlanRouteLabel(options);
+  const cost = advice.cost ? `，当前成本记录为「${advice.cost}」` : "";
+  const reason = advice.needsGovernance
+    ? `「${label}」复检完成依据要求治理${cost}，下一轮先用 ${sampleCount} 个小样本验证路线是否恢复。`
+    : advice.action === "switch_route"
+      ? `「${label}」复检仍命中备用或失败，下一轮先用 ${sampleCount} 个小样本验证调整后的模型组合。`
+      : `「${label}」复检未完全达标，下一轮先用 ${sampleCount} 个小样本延长观察。`;
+
+  return {
+    taskType: advice.taskType,
+    label,
+    sampleCount,
+    routeLabel,
+    actionLabel: `准备 ${sampleCount} 个复检样本`,
+    reason,
+    acceptanceCriteria: [
+      `复跑 ${sampleCount} 个「${label}」小样本。`,
+      "记录成功率、质量、成本和备用命中。",
+      "成功率不低于 90%，质量不低于 80。",
+      "如果仍命中备用、成本继续偏高或出现失败，继续保留治理派单。",
+    ],
+    completionTemplate: [
+      `复检${label}模型路由`,
+      `样本数：${sampleCount}`,
+      `模型组合：${routeLabel}`,
+      "成功率：",
+      "质量：",
+      "成本：",
+      "备用命中：未命中备用 / 命中备用",
+      "是否需要治理：否 / 是，原因：",
+    ].join("\n"),
+    warning: "复检样本只验证模型路线，不直接扩大批量生产。",
   };
 }
 

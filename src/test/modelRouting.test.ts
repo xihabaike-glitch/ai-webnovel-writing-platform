@@ -14,6 +14,7 @@ import {
   buildRouteConfirmationDispatchFlow,
   buildRouteConfirmationHistory,
   buildRouteDispatchCompletionTemplate,
+  buildRouteConfirmationRecheckSamplePlan,
   parseRouteDispatchCompletionEvidence,
   reviewRouteDispatchCompletionEvidence,
   filterRouteConfirmationDispatchTasks,
@@ -293,6 +294,41 @@ test("model task routing", async (t) => {
     assert.equal(advice.items[0].needsGovernance, true);
     assert.ok(advice.items[0].recommendation.includes("需要治理"));
     assert.ok(advice.items[0].recommendation.includes("成本"));
+  });
+
+  await t.test("builds a route confirmation recheck sample plan from governance advice", () => {
+    const evidence = buildRouteConfirmationRecheckEvidenceFromDispatchTasks([{
+      dispatchKey: "model-route-confirmation-recheck:chapter_draft:2026-07-04T10:00:00.000Z",
+      stage: "model_route_confirmation_recheck",
+      state: "completed",
+      completionEvidence: [
+        "复检正文初稿路由确认",
+        "样本数：2",
+        "成功率：100%",
+        "质量：86",
+        "成本：偏高",
+        "备用命中：未命中备用",
+        "是否需要治理：是，原因：成本超出预算线",
+      ].join("\n"),
+      evidence: ["已确认正文初稿模型路由。"],
+      completedAt: "2026-07-04T12:00:00.000Z",
+    }]);
+    const advice = buildRouteConfirmationRecheckAdvice(evidence);
+
+    const plan = buildRouteConfirmationRecheckSamplePlan(advice.items[0], {
+      primaryProviderName: "DeepSeek · deepseek-chat",
+      fallbackProviderName: "Kimi · kimi-k2.6",
+    });
+
+    assert.equal(plan.taskType, "chapter_draft");
+    assert.equal(plan.label, "正文初稿");
+    assert.equal(plan.sampleCount, 2);
+    assert.equal(plan.routeLabel, "DeepSeek · deepseek-chat -> Kimi · kimi-k2.6");
+    assert.ok(plan.reason.includes("成本"));
+    assert.ok(plan.acceptanceCriteria.some((item) => item.includes("成功率")));
+    assert.ok(plan.acceptanceCriteria.some((item) => item.includes("备用命中")));
+    assert.ok(plan.completionTemplate.includes("是否需要治理"));
+    assert.ok(plan.actionLabel.includes("2 个"));
   });
 
   await t.test("builds an auditable dispatch action from route recheck governance advice", () => {

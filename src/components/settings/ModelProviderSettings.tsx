@@ -2,7 +2,9 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { buildRouteConfirmationRecheckSamplePlan } from "@/lib/model-gateway/routeConfirmation";
 import type { ProviderHealthDashboard, ProviderHealthStatus } from "@/lib/model-gateway/providerHealth";
+import type { RoutedModelTaskType } from "@/lib/model-gateway/taskRouting";
 import type { ModelProviderId } from "@/lib/model-gateway/types";
 
 interface ProviderOptionView {
@@ -234,7 +236,7 @@ interface RouteConfirmationRecheckAdviceView {
   };
   items: Array<{
     id: string;
-    taskType: string;
+    taskType: RoutedModelTaskType;
     label: string;
     severity: "warning" | "blocked";
     action: "switch_route" | "extend_watch" | "manual_review";
@@ -880,13 +882,19 @@ export function ModelProviderSettings({
               </div>
             </div>
             <div className="mt-3 grid gap-2 lg:grid-cols-2">
-              {routeConfirmationRecheckAdvice.items.slice(0, 6).map((item) => (
-                <div
-                  className={`rounded-md border bg-white p-3 text-sm ${
-                    item.severity === "blocked" ? "border-rose-200" : "border-amber-200"
-                  }`}
-                  key={item.id}
-                >
+              {routeConfirmationRecheckAdvice.items.slice(0, 6).map((item) => {
+                const routeDraft = routeDrafts[item.taskType] ?? routes.find((route) => route.taskType === item.taskType);
+                const samplePlan = buildRouteConfirmationRecheckSamplePlan(item, {
+                  primaryProviderName: providerNameForRoute(routeDraft?.primaryProviderConfigId),
+                  fallbackProviderName: providerNameForRoute(routeDraft?.fallbackProviderConfigId),
+                });
+                return (
+                  <div
+                    className={`rounded-md border bg-white p-3 text-sm ${
+                      item.severity === "blocked" ? "border-rose-200" : "border-amber-200"
+                    }`}
+                    key={item.id}
+                  >
                   <div className="flex flex-wrap items-start justify-between gap-2">
                     <div>
                       <div className="font-medium text-slate-950">{item.label}</div>
@@ -907,6 +915,19 @@ export function ModelProviderSettings({
                     {item.fallbackHit !== null ? <span className="rounded-md bg-slate-50 px-2 py-1">{item.fallbackHit ? "命中备用" : "未命中备用"}</span> : null}
                     {item.needsGovernance !== null ? <span className="rounded-md bg-slate-50 px-2 py-1">{item.needsGovernance ? "需要治理" : "无需治理"}</span> : null}
                   </div>
+                  <div className="mt-3 rounded-md border border-sky-100 bg-sky-50 p-2 text-xs leading-5 text-sky-900">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="font-medium">下一轮复检计划</span>
+                      <span className="rounded-md bg-white px-2 py-1">{samplePlan.actionLabel}</span>
+                    </div>
+                    <p className="mt-2">{samplePlan.reason}</p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      <span className="rounded-md bg-white px-2 py-1">{samplePlan.routeLabel}</span>
+                      {samplePlan.acceptanceCriteria.slice(1, 4).map((criterion) => (
+                        <span className="rounded-md bg-white px-2 py-1" key={criterion}>{criterion}</span>
+                      ))}
+                    </div>
+                  </div>
                   <div className="mt-2 grid gap-1">
                     {item.evidence.slice(0, 3).map((entry) => (
                       <div className="rounded-md bg-slate-50 px-2 py-1 text-xs leading-5 text-slate-500" key={entry}>{entry}</div>
@@ -923,7 +944,8 @@ export function ModelProviderSettings({
                     </button>
                   </div>
                 </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         ) : null}

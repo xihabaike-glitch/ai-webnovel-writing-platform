@@ -365,6 +365,8 @@ test("buildSerializationOpsDashboard", async (t) => {
     assert.equal(baselineAction?.execution?.label, "保存并下载");
     assert.equal(baselineAction?.afterSuccess?.behavior, "download");
     assert.equal(baselineAction?.afterSuccess?.href, "/api/projects/project-1/platform-export?format=markdown&platformId=fanqie");
+    assert.equal(baselineAction?.afterSuccess?.nextHref, "#publish-effect-panel");
+    assert.equal(baselineAction?.afterSuccess?.nextLabel, "录入发布效果");
     assert.equal(dashboard.publishBaselineStatus.exists, false);
     assert.ok(dashboard.warnings.some((warning) => warning.includes("还没有保存发布基准")));
   });
@@ -459,6 +461,10 @@ test("buildSerializationOpsDashboard", async (t) => {
     assert.equal(dashboard.actions.some((action) => action.id === "save-publish-baseline"), false);
     const downloadAction = dashboard.actions.find((action) => action.id === "download-publish-package");
     assert.equal(downloadAction?.href, "/api/projects/project-1/platform-export?format=markdown&platformId=fanqie");
+    assert.equal(downloadAction?.afterSuccess?.behavior, "download");
+    assert.ok(downloadAction?.afterSuccess?.message.includes("录入真实发布效果"));
+    assert.equal(downloadAction?.afterSuccess?.nextHref, "#publish-effect-panel");
+    assert.equal(downloadAction?.afterSuccess?.nextLabel, "录入发布效果");
   });
 
   await t.test("routes weak publish effect to optimization work", () => {

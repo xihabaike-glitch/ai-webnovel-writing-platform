@@ -35,6 +35,8 @@ interface SerializationActionAfterSuccess {
   href: string;
   label: string;
   message: string;
+  nextHref?: string;
+  nextLabel?: string;
 }
 
 interface OpsMessage {
@@ -252,6 +254,14 @@ function triggerDownload(href: string) {
   link.click();
 }
 
+function afterSuccessMessage(afterSuccess: SerializationActionAfterSuccess): OpsMessage {
+  return {
+    text: afterSuccess.message,
+    href: afterSuccess.nextHref ?? afterSuccess.href,
+    hrefLabel: afterSuccess.nextLabel ?? afterSuccess.label,
+  };
+}
+
 function checklistRepairTarget(itemId: string) {
   const targets: Record<string, { href: string; label: string }> = {
     title: { href: "#submission-asset-editor", label: "编辑发布资料" },
@@ -331,11 +341,7 @@ export function SerializationOpsPanel({ projectId }: { projectId: string }) {
         window.location.href = projectHref(projectId, action.afterSuccess.href);
       }
       setMessage(action.afterSuccess
-        ? {
-          text: action.afterSuccess.message,
-          href: action.afterSuccess.href,
-          hrefLabel: action.afterSuccess.label,
-        }
+        ? afterSuccessMessage(action.afterSuccess)
         : {
           text: score
             ? `已完成：${action.label}，复检 ${score} 分。`
@@ -349,6 +355,12 @@ export function SerializationOpsPanel({ projectId }: { projectId: string }) {
       setMessage({ text: caught instanceof Error ? caught.message : "执行运营动作失败。" });
     } finally {
       setRunningActionId(null);
+    }
+  }
+
+  function markActionHrefClick(action: SerializationAction) {
+    if (action.afterSuccess) {
+      setMessage(afterSuccessMessage(action.afterSuccess));
     }
   }
 
@@ -553,8 +565,20 @@ export function SerializationOpsPanel({ projectId }: { projectId: string }) {
                         {runningActionId === action.id ? "执行中" : action.execution.label}
                       </button>
                     ) : null}
-                    {action.href ? (
-                      <Link className="rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white hover:bg-slate-800" href={projectHref(projectId, action.href)}>
+                    {action.href?.startsWith("/api/") ? (
+                      <a
+                        className="rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white hover:bg-slate-800"
+                        href={action.href}
+                        onClick={() => markActionHrefClick(action)}
+                      >
+                        {action.hrefLabel ?? "下载"}
+                      </a>
+                    ) : action.href ? (
+                      <Link
+                        className="rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white hover:bg-slate-800"
+                        href={projectHref(projectId, action.href)}
+                        onClick={() => markActionHrefClick(action)}
+                      >
                         {action.hrefLabel ?? "去处理"}
                       </Link>
                     ) : null}
@@ -670,6 +694,15 @@ export function SerializationOpsPanel({ projectId }: { projectId: string }) {
                   <a
                     className="rounded-md border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
                     href={dashboard.publishBaselineStatus.downloadHref}
+                    onClick={() => {
+                      if (dashboard.publishEffectStatus.status === "empty") {
+                        setMessage({
+                          text: "发布包下载已开始。下一步录入真实发布效果。",
+                          href: "#publish-effect-panel",
+                          hrefLabel: "录入发布效果",
+                        });
+                      }
+                    }}
                   >
                     {dashboard.publishBaselineStatus.actionLabel}
                   </a>

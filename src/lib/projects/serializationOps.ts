@@ -220,6 +220,8 @@ export interface SerializationActionAfterSuccess {
   href: string;
   label: string;
   message: string;
+  nextHref?: string;
+  nextLabel?: string;
 }
 
 export interface SerializationOpsDashboard {
@@ -778,8 +780,10 @@ function buildActions(
       afterSuccess: {
         behavior: "download",
         href: baselineStatus.downloadHref,
-        label: "下载发布包",
-        message: "发布基准已保存，正在下载当前平台发布包。",
+        label: "重新下载发布包",
+        message: "发布基准已保存，发布包下载已开始。下一步录入真实发布效果。",
+        nextHref: "#publish-effect-panel",
+        nextLabel: "录入发布效果",
       },
     });
   }
@@ -792,6 +796,14 @@ function buildActions(
       href: baselineStatus.downloadHref,
       hrefLabel: "下载发布包",
       execution: null,
+      afterSuccess: {
+        behavior: "download",
+        href: baselineStatus.downloadHref,
+        label: "重新下载发布包",
+        message: "发布包下载已开始。下一步录入真实发布效果。",
+        nextHref: "#publish-effect-panel",
+        nextLabel: "录入发布效果",
+      },
     });
   }
   if (!failedChecklist[0] && baselineStatus.exists && effectStatus.status === "empty") {

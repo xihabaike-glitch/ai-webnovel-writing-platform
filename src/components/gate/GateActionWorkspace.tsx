@@ -26,6 +26,7 @@ import {
   buildGatePlatformTacticExperienceLibrary,
   buildGatePlatformTacticExperienceMarkdown,
   buildGatePlatformDispatchReceipt,
+  buildGateKnowledgeFeedbackDispatchItems,
   buildGatePlatformGrowthDispatchItems,
   buildGateProjectStartValidationDispatchItems,
   buildGateProjectStartValidationReview,
@@ -44,6 +45,7 @@ import {
   filterGatePlatformDecisionTimelineItems,
   fetchPersistedGateActionReceipts,
   fetchPersistedGateDispatchTasks,
+  fetchGateKnowledgeFeedbackReceipts,
   gateActionReceiptUpdatedEvent,
   loadGateActionReceipts,
   mergeGateActionReceipts,
@@ -74,6 +76,7 @@ import {
   type GatePlatformTacticExperienceItem,
   type GatePlatformTacticExperienceStatus,
   type GatePlatformGrowthDispatchItem,
+  type GateKnowledgeFeedbackReceipt,
   type GatePlatformGrowthReview,
   type PersistedGatePlatformDispatchTask,
 } from "@/lib/projects/gateActionReceipts";
@@ -341,6 +344,7 @@ export function GateActionWorkspace({
   const [timelineEventFilter, setTimelineEventFilter] = useState<GatePlatformDecisionTimelineEventType | "all">("all");
   const [timelineExportMessage, setTimelineExportMessage] = useState("");
   const [persistedDispatchTasks, setPersistedDispatchTasks] = useState<PersistedGatePlatformDispatchTask[]>([]);
+  const [knowledgeFeedbackReceipts, setKnowledgeFeedbackReceipts] = useState<GateKnowledgeFeedbackReceipt[]>([]);
   const filteredReceipts = filterGateActionReceipts(receipts, {
     status: statusFilter,
     executionType: executionFilter,
@@ -365,6 +369,7 @@ export function GateActionWorkspace({
     ...buildGateProjectStartMetricFollowupDispatchItems(persistedDispatchTasks, persistedDispatchTasks),
     ...buildGateProjectSecondMetricDispatchItems(allSecondMetricDecision, persistedDispatchTasks),
     ...buildGateProjectSecondMetricFollowupDispatchItems(persistedDispatchTasks, persistedDispatchTasks),
+    ...buildGateKnowledgeFeedbackDispatchItems(knowledgeFeedbackReceipts, 4, persistedDispatchTasks),
     ...buildGatePlatformGrowthDispatchItems(receipts, 6, persistedDispatchTasks),
   ]
     .sort((a, b) => b.priorityScore - a.priorityScore || a.title.localeCompare(b.title))
@@ -423,6 +428,9 @@ export function GateActionWorkspace({
       .catch(() => undefined);
     void fetchPersistedGateDispatchTasks()
       .then(setPersistedDispatchTasks)
+      .catch(() => undefined);
+    void fetchGateKnowledgeFeedbackReceipts({ limit: 20 })
+      .then(setKnowledgeFeedbackReceipts)
       .catch(() => undefined);
 
     function handleReceiptUpdate(event: Event) {

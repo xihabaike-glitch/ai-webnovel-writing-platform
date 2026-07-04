@@ -232,6 +232,23 @@ export interface GatePlatformGrowthDispatchItem {
   reviewLatestAt: string;
 }
 
+export interface GateKnowledgeFeedbackReceipt {
+  id: string;
+  projectId: string | null;
+  projectTitle?: string | null;
+  platformId: string;
+  platformName: string;
+  actionLabel: string;
+  title: string;
+  message: string;
+  completedStepLabel: string;
+  stopReason: string;
+  nextAction: string;
+  href: string;
+  severity: "success" | "needs_action";
+  createdAt: string;
+}
+
 export interface PersistedGatePlatformDispatchTask extends GatePlatformGrowthDispatchItem {
   databaseId: string;
   dispatchKey: string;
@@ -2040,6 +2057,90 @@ export function buildGatePlatformGrowthDispatchItems(
   });
 }
 
+function knowledgeFeedbackDispatchStage(receipt: GateKnowledgeFeedbackReceipt): GatePlatformGrowthReviewStage {
+  const text = [
+    receipt.actionLabel,
+    receipt.title,
+    receipt.completedStepLabel,
+    receipt.stopReason,
+    receipt.nextAction,
+    receipt.href,
+  ].join(" ");
+  if (/asset|投稿资产|候选|采纳|素材|简介|标题|标签/i.test(text)) return "adopt_asset";
+  if (/metric|effect|数据|曝光|点击|阅读|追读|收藏|转化|效果/i.test(text)) return "record_metrics";
+  if (/失败|错误|重试|修复|配置|模型|key|api/i.test(text)) return "fix_failure";
+  return "repair_tactic";
+}
+
+function knowledgeFeedbackHref(receipt: GateKnowledgeFeedbackReceipt) {
+  if (receipt.href.startsWith("/")) return receipt.href;
+  if (receipt.projectId && receipt.href.startsWith("#")) return `/projects/${receipt.projectId}${receipt.href}`;
+  if (receipt.projectId) return `/projects/${receipt.projectId}#platform-export`;
+  return "/gate";
+}
+
+function knowledgeFeedbackOwnerRole(stage: GatePlatformGrowthReviewStage) {
+  if (stage === "record_metrics") return "运营数据编辑";
+  if (stage === "adopt_asset") return "包装运营";
+  if (stage === "fix_failure") return "技术运营";
+  return "主编";
+}
+
+function knowledgeFeedbackActionLabel(stage: GatePlatformGrowthReviewStage) {
+  if (stage === "record_metrics") return "派给数据编辑";
+  if (stage === "adopt_asset") return "派给包装运营";
+  if (stage === "fix_failure") return "派给技术运营";
+  return "派给主编修打法";
+}
+
+export function buildGateKnowledgeFeedbackDispatchItems(
+  feedbackReceipts: GateKnowledgeFeedbackReceipt[],
+  limit = 4,
+  persistedTasks: PersistedGatePlatformDispatchTask[] = [],
+): GatePlatformGrowthDispatchItem[] {
+  const persistedByKey = new Map(persistedTasks.map((task) => [task.dispatchKey, task]));
+  return [...feedbackReceipts]
+    .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime())
+    .map((receipt): GatePlatformGrowthDispatchItem => {
+      const stage = knowledgeFeedbackDispatchStage(receipt);
+      const dispatchKey = `knowledge-feedback:${receipt.id}`;
+      const persisted = persistedByKey.get(dispatchKey);
+      const stopReason = receipt.stopReason.trim() || "反哺链路需要人工收口";
+      const nextAction = receipt.nextAction.trim() || "处理平台反哺停点，并回填新的证据。";
+      const completedStep = receipt.completedStepLabel.trim() || receipt.actionLabel.trim() || "平台反哺";
+      const projectLabel = receipt.projectTitle?.trim() ? `《${receipt.projectTitle.trim()}》` : "对应项目";
+      const evidence = [
+        `${completedStep}：${receipt.actionLabel || receipt.platformName}`,
+        `停点：${stopReason}`,
+        `下一步：${nextAction}`,
+      ];
+
+      return {
+        id: dispatchKey,
+        platformId: receipt.platformId,
+        platformName: receipt.platformName,
+        stage,
+        state: persisted?.state ?? "queued",
+        priorityScore: receipt.severity === "needs_action" ? 92 : 76,
+        ownerRole: knowledgeFeedbackOwnerRole(stage),
+        title: `${receipt.platformName} 反哺停点收口`,
+        detail: `${projectLabel} 已完成「${completedStep}」，现在卡在「${stopReason}」。下一步：${nextAction}`,
+        dueLabel: receipt.severity === "needs_action" ? "今天收口" : "48小时内复核",
+        actionLabel: knowledgeFeedbackActionLabel(stage),
+        href: knowledgeFeedbackHref(receipt),
+        acceptanceCriteria: [
+          `已处理停点：${stopReason}`,
+          `已完成下一步：${nextAction}`,
+          "平台导出中心已有新的反哺记录或完成证据",
+        ],
+        evidence,
+        reviewLatestAt: receipt.createdAt,
+      };
+    })
+    .filter((item, index, allItems) => allItems.findIndex((candidate) => candidate.id === item.id) === index)
+    .slice(0, limit);
+}
+
 export function buildGateProjectStartValidationDispatchItems(
   receipts: GateActionReceipt[],
   persistedTasks: PersistedGatePlatformDispatchTask[] = [],
@@ -2223,9 +2324,12 @@ export function buildGatePlatformDispatchReceipt(input: {
   now?: Date | string;
 }): GateActionReceipt {
   const createdAt = input.now ? new Date(input.now).toISOString() : new Date().toISOString();
+  const actionKey = input.dispatch.id.startsWith("knowledge-feedback:")
+    ? input.dispatch.id
+    : input.dispatch.stage;
   return {
     id: `gate-platform-dispatch:${input.dispatch.id}:${createdAt}`,
-    actionId: `gate-platform-dispatch:${input.dispatch.stage}:${input.dispatch.platformId}`,
+    actionId: `gate-platform-dispatch:${actionKey}:${input.dispatch.platformId}`,
     label: input.dispatch.actionLabel,
     detail: `${input.dispatch.platformName} · ${input.dispatch.title}`,
     href: input.dispatch.href,
@@ -2545,6 +2649,19 @@ export async function fetchPersistedGateDispatchTasks(options?: {
   const payload = (await response.json().catch(() => null)) as { tasks?: PersistedGatePlatformDispatchTask[]; error?: string } | null;
   if (!response.ok) throw new Error(payload?.error ?? "读取平台派单失败。");
   return payload?.tasks ?? [];
+}
+
+export async function fetchGateKnowledgeFeedbackReceipts(options?: { limit?: number }) {
+  const params = new URLSearchParams();
+  if (options?.limit) params.set("limit", String(options.limit));
+  const query = params.toString() ? `?${params.toString()}` : "";
+  const response = await fetch(`/api/gate/knowledge-feedback${query}`, { cache: "no-store" });
+  const payload = (await response.json().catch(() => null)) as {
+    receipts?: GateKnowledgeFeedbackReceipt[];
+    error?: string;
+  } | null;
+  if (!response.ok) throw new Error(payload?.error ?? "读取平台反哺记录失败。");
+  return payload?.receipts ?? [];
 }
 
 export function filterGateDispatchTasks(

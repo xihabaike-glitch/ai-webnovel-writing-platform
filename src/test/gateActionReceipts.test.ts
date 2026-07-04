@@ -13,6 +13,7 @@ import {
   buildGateFailureRepairThirdRoundResolution,
   buildGatePlatformGrowthReview,
   buildGatePlatformGrowthDispatchItems,
+  buildGateKnowledgeFeedbackDispatchItems,
   buildGateProjectStartValidationDispatchItems,
   buildGateProjectStartValidationReview,
   buildGateProjectStartNextDispatchItems,
@@ -1085,6 +1086,95 @@ test("buildGateActionReceipt", async (t) => {
     assert.equal(dispatchItems[0].ownerRole, "运营数据编辑");
     assert.equal(dispatchItems[0].actionLabel, "派给数据编辑");
     assert.ok(dispatchItems[0].acceptanceCriteria.includes("曝光点击已填写"));
+  });
+
+  await t.test("turns platform knowledge feedback into gate dispatch cards", () => {
+    const dispatchItems = buildGateKnowledgeFeedbackDispatchItems([{
+      id: "feedback-1",
+      projectId: "project-1",
+      projectTitle: "夜雨系统",
+      platformId: "fanqie",
+      platformName: "番茄小说",
+      actionLabel: "保存反哺证据",
+      title: "已记录平台反哺",
+      message: "候选素材已采纳，等待下一步包装验证。",
+      completedStepLabel: "候选资产采纳",
+      stopReason: "简介候选还没有进入发布包",
+      nextAction: "进入投稿资产编辑器完成标题简介标签定稿",
+      href: "#submission-asset-editor",
+      severity: "needs_action",
+      createdAt: "2026-01-02T00:00:00.000Z",
+    }], 4, [{
+      databaseId: "task-1",
+      dispatchKey: "knowledge-feedback:feedback-1",
+      id: "knowledge-feedback:feedback-1",
+      projectId: "project-1",
+      platformId: "fanqie",
+      platformName: "番茄小说",
+      stage: "adopt_asset",
+      state: "assigned",
+      priorityScore: 92,
+      ownerRole: "包装运营",
+      title: "番茄小说 反哺停点收口",
+      detail: "旧任务",
+      dueLabel: "今天收口",
+      actionLabel: "派给包装运营",
+      href: "/projects/project-1#submission-asset-editor",
+      acceptanceCriteria: [],
+      evidence: [],
+      sourceReceiptId: null,
+      completionEvidence: "",
+      reviewLatestAt: "2026-01-02T00:00:00.000Z",
+      assignedAt: "2026-01-02T00:00:00.000Z",
+      completedAt: null,
+      createdAt: "2026-01-02T00:00:00.000Z",
+      updatedAt: "2026-01-02T00:00:00.000Z",
+    }]);
+
+    assert.equal(dispatchItems.length, 1);
+    assert.equal(dispatchItems[0].id, "knowledge-feedback:feedback-1");
+    assert.equal(dispatchItems[0].stage, "adopt_asset");
+    assert.equal(dispatchItems[0].state, "assigned");
+    assert.equal(dispatchItems[0].ownerRole, "包装运营");
+    assert.equal(dispatchItems[0].href, "/projects/project-1#submission-asset-editor");
+    assert.ok(dispatchItems[0].detail.includes("夜雨系统"));
+    assert.ok(dispatchItems[0].acceptanceCriteria.some((criterion) => criterion.includes("简介候选")));
+  });
+
+  await t.test("keeps knowledge feedback dispatch receipts from assigning growth dispatches", () => {
+    const assetReceipt = buildGatePlatformStrategyReceipt({
+      item: strategyPlatform,
+      status: "succeeded",
+      now: "2026-01-01T00:00:00.000Z",
+      payload: {
+        variants: [{ strategy: "强钩子版" }],
+      },
+    });
+    const knowledgeDispatch = buildGateKnowledgeFeedbackDispatchItems([{
+      id: "feedback-asset",
+      projectId: "project-1",
+      projectTitle: "夜雨系统",
+      platformId: "fanqie",
+      platformName: "番茄小说",
+      actionLabel: "保存反哺证据",
+      title: "已记录平台反哺",
+      message: "候选素材需要继续定稿。",
+      completedStepLabel: "候选资产采纳",
+      stopReason: "标题简介还没有锁版",
+      nextAction: "完成标题简介标签定稿",
+      href: "#submission-asset-editor",
+      severity: "needs_action",
+      createdAt: "2026-01-01T00:00:02.000Z",
+    }])[0];
+    const knowledgeReceipt = buildGatePlatformDispatchReceipt({
+      dispatch: knowledgeDispatch,
+      now: "2026-01-01T00:00:03.000Z",
+    });
+    const growthDispatch = buildGatePlatformGrowthDispatchItems([assetReceipt, knowledgeReceipt])[0];
+
+    assert.equal(knowledgeReceipt.actionId, "gate-platform-dispatch:knowledge-feedback:feedback-asset:fanqie");
+    assert.equal(growthDispatch.stage, "adopt_asset");
+    assert.equal(growthDispatch.state, "queued");
   });
 
   await t.test("turns project start validation advice into three dispatch cards", () => {

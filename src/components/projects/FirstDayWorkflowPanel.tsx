@@ -25,6 +25,8 @@ interface FirstDayExecutionPackage {
   acceptanceCriteria: string[];
   missingEvidence: string[];
   handoffNote: string;
+  modelPrompt: string;
+  completionEvidenceTemplate: string;
 }
 
 interface FirstDayWorkflow {
@@ -225,6 +227,26 @@ export function FirstDayWorkflowPanel({ projectId }: { projectId: string }) {
                   ))}
                 </ul>
               </div>
+            </div>
+            <div className="mt-4 rounded-md border border-slate-200 p-3">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <div className="text-xs font-medium text-slate-500">AI 执行草稿</div>
+                  <p className="mt-1 text-sm leading-6 text-slate-600">复制给 Claude、DeepSeek、Kimi、GPT 或其他模型执行，再把结果写回对应位置。</p>
+                </div>
+                <button
+                  className="w-fit rounded-md border border-slate-200 px-3 py-2 text-sm font-medium hover:bg-slate-50"
+                  onClick={() => setCompletionEvidence(workflow.executionPackage.completionEvidenceTemplate)}
+                  type="button"
+                >
+                  套用验收模板
+                </button>
+              </div>
+              <textarea
+                className="mt-3 min-h-56 w-full resize-y rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm leading-6 text-slate-700 outline-none"
+                readOnly
+                value={workflow.executionPackage.modelPrompt}
+              />
             </div>
             <div className="mt-4 rounded-md border border-slate-200 bg-slate-50 p-3">
               <label className="text-xs font-medium text-slate-500" htmlFor={`first-day-completion-${projectId}`}>

@@ -113,6 +113,12 @@ test("buildFirstDayWorkflow", async (t) => {
     assert.ok(workflow.executionPackage.acceptanceCriteria.includes("第一章正文已生成并写回章节"));
     assert.ok(workflow.executionPackage.missingEvidence.includes("缺少第一章正文或成功初稿任务"));
     assert.ok(workflow.executionPackage.handoffNote.includes("别批量开跑"));
+    assert.ok(workflow.executionPackage.modelPrompt.includes("你是网文首日执行助手"));
+    assert.ok(workflow.executionPackage.modelPrompt.includes("夜雨系统"));
+    assert.ok(workflow.executionPackage.modelPrompt.includes("番茄小说"));
+    assert.ok(workflow.executionPackage.modelPrompt.includes("第一章 雨夜系统"));
+    assert.ok(workflow.executionPackage.modelPrompt.includes("第一章正文已生成并写回章节"));
+    assert.ok(workflow.executionPackage.completionEvidenceTemplate.includes("第一章正文已生成"));
   });
 
   await t.test("turns the current first-day execution package into a dispatch task", () => {

@@ -86,6 +86,8 @@ export interface FirstDayExecutionPackage {
   acceptanceCriteria: string[];
   missingEvidence: string[];
   handoffNote: string;
+  modelPrompt: string;
+  completionEvidenceTemplate: string;
 }
 
 export interface FirstDayWorkflow {
@@ -207,7 +209,52 @@ function verdict(completedCount: number, totalSteps: number) {
   return "新书还在冷启动，先把大纲、人物、设定和第一章钩子咬住。";
 }
 
-function executionPackage(step: FirstDayWorkflowStep): FirstDayExecutionPackage {
+function completionEvidenceTemplate(step: FirstDayWorkflowStep, acceptanceCriteria: string[]) {
+  if (step.id === "first-draft") return "第一章正文已生成并写回章节，已覆盖钩子、冲突和章末追读，可以进入审稿。";
+  if (step.id === "first-review") return "第一章审稿已完成，已输出钩子、爽点、冲突、解释密度和追读问题，可以进入二改。";
+  if (step.id === "first-rewrite") return "二改或前三章改写已完成，审稿问题已逐项处理，并保留了版本对照。";
+  if (step.id === "publish-precheck") return "平台包预检已完成，标题、简介、标签、卖点、样章和风险清单已整理。";
+  if (step.id === "story-support") return "人物弧光和核心设定已补齐，主角欲望、需求、缺陷、规则、禁忌和平台土壤可供后续生成引用。";
+  if (step.id === "opening-hook") return "第一章章节卡已补齐，目标、钩子、冲突、转变和章末悬念已按平台开头规则检查。";
+  return `首日节点已完成：${acceptanceCriteria.join("；")}。`;
+}
+
+function modelPrompt(input: {
+  project: FirstDayProject;
+  platform: PlatformProfile;
+  step: FirstDayWorkflowStep;
+  chapter: FirstDayChapter | null;
+  acceptanceCriteria: string[];
+  missingEvidence: string[];
+  handoffNote: string;
+}) {
+  const chapterLine = input.chapter
+    ? `第一章：${input.chapter.title}。目标：${input.chapter.goal || "未填写"}。钩子：${input.chapter.hook || "未填写"}。冲突：${input.chapter.conflict || "未填写"}。转变：${input.chapter.valueShift || "未填写"}。章末悬念：${input.chapter.cliffhanger || "未填写"}。`
+    : "第一章：当前还没有章节卡，请先输出可落库的章节卡草稿。";
+  return [
+    "你是网文首日执行助手，按毒舌产品经理 5.0 的口径工作：只交付能推进平台验证的内容，不写空泛建议。",
+    `项目：${input.project.title}`,
+    `目标平台：${input.platform.name}`,
+    `当前节点：${input.step.label}`,
+    `节点目标：${input.step.instruction}`,
+    chapterLine,
+    `交接要求：${input.handoffNote}`,
+    "验收标准：",
+    ...input.acceptanceCriteria.map((criterion) => `- ${criterion}`),
+    "当前缺失证据：",
+    ...input.missingEvidence.map((evidence) => `- ${evidence}`),
+    "输出格式：",
+    "1. 先给可直接落库或复制到编辑器的正文/卡片/审稿内容。",
+    "2. 再列出本次满足的验收标准。",
+    "3. 最后给一句可粘贴到任务中心的完成依据。",
+  ].join("\n");
+}
+
+function executionPackage(step: FirstDayWorkflowStep, context: {
+  project: FirstDayProject;
+  platform: PlatformProfile;
+  chapter: FirstDayChapter | null;
+}): FirstDayExecutionPackage {
   const base = {
     stepId: step.id,
     owner: step.owner,
@@ -216,71 +263,106 @@ function executionPackage(step: FirstDayWorkflowStep): FirstDayExecutionPackage 
   };
 
   if (step.id === "first-draft") {
+    const acceptanceCriteria = ["第一章正文已生成并写回章节", "正文执行了第一章钩子、冲突和章末悬念", "本次生成留下可审稿的任务记录"];
+    const missingEvidence = ["缺少第一章正文或成功初稿任务"];
+    const handoffNote = "别批量开跑。先用第一章验证平台语气、模型路线和成本，再决定是否扩到前三章。";
     return {
       ...base,
       headline: "AI 接手第一章初稿，但作者先守住节奏和设定边界。",
-      acceptanceCriteria: ["第一章正文已生成并写回章节", "正文执行了第一章钩子、冲突和章末悬念", "本次生成留下可审稿的任务记录"],
-      missingEvidence: ["缺少第一章正文或成功初稿任务"],
-      handoffNote: "别批量开跑。先用第一章验证平台语气、模型路线和成本，再决定是否扩到前三章。",
+      acceptanceCriteria,
+      missingEvidence,
+      handoffNote,
+      modelPrompt: modelPrompt({ ...context, step, acceptanceCriteria, missingEvidence, handoffNote }),
+      completionEvidenceTemplate: completionEvidenceTemplate(step, acceptanceCriteria),
     };
   }
 
   if (step.id === "first-review") {
+    const acceptanceCriteria = ["第一章已有结构化审稿结果", "钩子、爽点、冲突、解释密度和章末追读均有判断", "低分问题进入二改或重写队列"];
+    const missingEvidence = ["缺少第一章成功审稿任务"];
+    const handoffNote = "审稿不是夸稿。必须把不适合平台的地方翻出来，下一步才有改稿抓手。";
     return {
       ...base,
       headline: "AI 先当毒舌审稿编辑，别急着自我感动。",
-      acceptanceCriteria: ["第一章已有结构化审稿结果", "钩子、爽点、冲突、解释密度和章末追读均有判断", "低分问题进入二改或重写队列"],
-      missingEvidence: ["缺少第一章成功审稿任务"],
-      handoffNote: "审稿不是夸稿。必须把不适合平台的地方翻出来，下一步才有改稿抓手。",
+      acceptanceCriteria,
+      missingEvidence,
+      handoffNote,
+      modelPrompt: modelPrompt({ ...context, step, acceptanceCriteria, missingEvidence, handoffNote }),
+      completionEvidenceTemplate: completionEvidenceTemplate(step, acceptanceCriteria),
     };
   }
 
   if (step.id === "first-rewrite") {
+    const acceptanceCriteria = ["二改或前三章改写任务已成功", "审稿问题被逐项处理", "改写后保留版本对照和复检入口"];
+    const missingEvidence = ["缺少二改或前三章改写结果"];
+    const handoffNote = "不要只换句子。重点修开头压力、爽点兑现和章末追读。";
     return {
       ...base,
       headline: "AI 做二改，目标是让前三章能被平台读者继续点下去。",
-      acceptanceCriteria: ["二改或前三章改写任务已成功", "审稿问题被逐项处理", "改写后保留版本对照和复检入口"],
-      missingEvidence: ["缺少二改或前三章改写结果"],
-      handoffNote: "不要只换句子。重点修开头压力、爽点兑现和章末追读。",
+      acceptanceCriteria,
+      missingEvidence,
+      handoffNote,
+      modelPrompt: modelPrompt({ ...context, step, acceptanceCriteria, missingEvidence, handoffNote }),
+      completionEvidenceTemplate: completionEvidenceTemplate(step, acceptanceCriteria),
     };
   }
 
   if (step.id === "publish-precheck") {
+    const acceptanceCriteria = ["标题、简介、标签、卖点和样章准备度达标", "平台风险清单已处理或明确保留", "首轮曝光、点击、收藏、追读回收口径已写清"];
+    const missingEvidence = ["投稿准备度或首轮数据回收口径不足"];
+    const handoffNote = "平台包不是装饰。它要能和正文前三章互相兑现，方便首轮数据复盘。";
     return {
       ...base,
       headline: "运营收口平台包，先做可验证的小投放基准。",
-      acceptanceCriteria: ["标题、简介、标签、卖点和样章准备度达标", "平台风险清单已处理或明确保留", "首轮曝光、点击、收藏、追读回收口径已写清"],
-      missingEvidence: ["投稿准备度或首轮数据回收口径不足"],
-      handoffNote: "平台包不是装饰。它要能和正文前三章互相兑现，方便首轮数据复盘。",
+      acceptanceCriteria,
+      missingEvidence,
+      handoffNote,
+      modelPrompt: modelPrompt({ ...context, step, acceptanceCriteria, missingEvidence, handoffNote }),
+      completionEvidenceTemplate: completionEvidenceTemplate(step, acceptanceCriteria),
     };
   }
 
   if (step.id === "story-support") {
+    const acceptanceCriteria = ["主角欲望、需求、缺陷、起点和终点完整", "系统规则、禁忌和平台土壤均已落库", "后续初稿能引用这些支撑材料"];
+    const missingEvidence = ["缺少完整人物弧光或核心设定土壤"];
+    const handoffNote = "人物和设定是土壤，不是百科摆设。每条都要能喂给第一章生成和审稿。";
     return {
       ...base,
       headline: "策划补齐人物和设定，别让模型在空地上编。",
-      acceptanceCriteria: ["主角欲望、需求、缺陷、起点和终点完整", "系统规则、禁忌和平台土壤均已落库", "后续初稿能引用这些支撑材料"],
-      missingEvidence: ["缺少完整人物弧光或核心设定土壤"],
-      handoffNote: "人物和设定是土壤，不是百科摆设。每条都要能喂给第一章生成和审稿。",
+      acceptanceCriteria,
+      missingEvidence,
+      handoffNote,
+      modelPrompt: modelPrompt({ ...context, step, acceptanceCriteria, missingEvidence, handoffNote }),
+      completionEvidenceTemplate: completionEvidenceTemplate(step, acceptanceCriteria),
     };
   }
 
   if (step.id === "opening-hook") {
+    const acceptanceCriteria = ["第一章目标、钩子、冲突、转变和章末悬念完整", "开头动作贴合目标平台", "章节卡可以直接进入初稿生成"];
+    const missingEvidence = ["缺少第一章完整章节卡"];
+    const handoffNote = "这里决定读者会不会留下。先补高压选择、明确冲突和章末追读。";
     return {
       ...base,
       headline: "作者先咬住第一章钩子，别把开头写成说明书。",
-      acceptanceCriteria: ["第一章目标、钩子、冲突、转变和章末悬念完整", "开头动作贴合目标平台", "章节卡可以直接进入初稿生成"],
-      missingEvidence: ["缺少第一章完整章节卡"],
-      handoffNote: "这里决定读者会不会留下。先补高压选择、明确冲突和章末追读。",
+      acceptanceCriteria,
+      missingEvidence,
+      handoffNote,
+      modelPrompt: modelPrompt({ ...context, step, acceptanceCriteria, missingEvidence, handoffNote }),
+      completionEvidenceTemplate: completionEvidenceTemplate(step, acceptanceCriteria),
     };
   }
 
+  const acceptanceCriteria = ["大纲树包含开头、结尾、主干、分支、叶片和土壤", "至少有前三章章节卡", "下一步能打开第一章继续补钩子"];
+  const missingEvidence = ["缺少完整大纲树或前三章章节卡"];
+  const handoffNote = "骨架没落地前，不要进入正文生成。先让项目有开头、结尾、主干和可执行章节卡。";
   return {
     ...base,
     headline: "策划先把作品骨架落地，别让 AI 自由发挥。",
-    acceptanceCriteria: ["大纲树包含开头、结尾、主干、分支、叶片和土壤", "至少有前三章章节卡", "下一步能打开第一章继续补钩子"],
-    missingEvidence: ["缺少完整大纲树或前三章章节卡"],
-    handoffNote: "骨架没落地前，不要进入正文生成。先让项目有开头、结尾、主干和可执行章节卡。",
+    acceptanceCriteria,
+    missingEvidence,
+    handoffNote,
+    modelPrompt: modelPrompt({ ...context, step, acceptanceCriteria, missingEvidence, handoffNote }),
+    completionEvidenceTemplate: completionEvidenceTemplate(step, acceptanceCriteria),
   };
 }
 
@@ -403,7 +485,11 @@ export function buildFirstDayWorkflow(input: FirstDayWorkflowInput): FirstDayWor
     progressPercent: Math.round((completedCount / steps.length) * 100),
     verdict: verdict(completedCount, steps.length),
     nextStep,
-    executionPackage: executionPackage(nextStep),
+    executionPackage: executionPackage(nextStep, {
+      project: input.project,
+      platform: input.platform,
+      chapter,
+    }),
     steps,
   };
 }

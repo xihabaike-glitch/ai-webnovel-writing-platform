@@ -21,6 +21,7 @@ import {
 } from "@/lib/projects/gateActionReceipts";
 import { buildPrePublishGate } from "@/lib/projects/prePublishGate";
 import { parsePublishSnapshotTags } from "@/lib/projects/platformPublishExport";
+import { buildWatchSampleCompletionEvidenceSuggestions } from "@/lib/projects/watchSampleCompletionEvidence";
 
 export const dynamic = "force-dynamic";
 
@@ -289,6 +290,7 @@ export default async function DispatchPage() {
     ...persistedTasks.filter((task) => !generatedKeys.has(task.dispatchKey)),
   ];
   const routeConfirmationDispatchFlow = buildRouteConfirmationDispatchFlow(routeConfirmationReceipts, mergedTasks);
+  const completionEvidenceSuggestions = buildWatchSampleCompletionEvidenceSuggestions(receipts);
 
   return (
     <AppShell>
@@ -304,6 +306,7 @@ export default async function DispatchPage() {
       <GateDispatchTaskCenter
         initialReceipts={receiptItems}
         initialTasks={mergedTasks}
+        initialCompletionSuggestions={completionEvidenceSuggestions}
         routeConfirmationDispatchFlow={routeConfirmationDispatchFlow}
       />
     </AppShell>

@@ -24,6 +24,7 @@ import {
   buildFirstDayDispatchCompletionHint,
   buildFirstDayDispatchUpdateSummary,
 } from "@/lib/projects/firstDayWorkflowView";
+import type { WatchSampleCompletionEvidenceSuggestion } from "@/lib/projects/watchSampleCompletionEvidence";
 import {
   buildRouteDispatchCompletionTemplate,
   buildRouteRecheckExecutionDesk,
@@ -136,10 +137,12 @@ function routeCompletionRecordChips(record: RouteDispatchCompletionRecord) {
 export function GateDispatchTaskCenter({
   initialReceipts,
   initialTasks,
+  initialCompletionSuggestions,
   routeConfirmationDispatchFlow,
 }: {
   initialReceipts: GateActionReceipt[];
   initialTasks: PersistedGatePlatformDispatchTask[];
+  initialCompletionSuggestions: WatchSampleCompletionEvidenceSuggestion[];
   routeConfirmationDispatchFlow: RouteConfirmationDispatchFlow;
 }) {
   const router = useRouter();
@@ -161,6 +164,9 @@ export function GateDispatchTaskCenter({
   const evidenceReview = useMemo(() => buildGateDispatchEvidenceReview(tasks, initialReceipts), [initialReceipts, tasks]);
   const routeExecutionDesk = useMemo(() => buildRouteRecheckExecutionDesk(tasks), [tasks]);
   const routeTaskByKey = useMemo(() => new Map(tasks.map((task) => [task.dispatchKey, task])), [tasks]);
+  const completionSuggestionByKey = useMemo(() => (
+    new Map(initialCompletionSuggestions.map((suggestion) => [suggestion.dispatchKey, suggestion]))
+  ), [initialCompletionSuggestions]);
   const recheckChainByDispatchKey = useMemo(() => {
     const map = new Map<string, {
       rootDispatchKey: string;
@@ -188,6 +194,9 @@ export function GateDispatchTaskCenter({
     || routeConfirmationDispatchFlow.summary.confirmed > 0
     || routeConfirmationDispatchFlow.summary.dispatched > 0
     || routeConfirmationDispatchFlow.summary.completed > 0;
+  const firstDayNextSuggestion = firstDayDesk.nextTask
+    ? completionSuggestionByKey.get(firstDayDesk.nextTask.dispatchKey)
+    : null;
   const filteredTasks = useMemo(() => {
     const baseTasks = filterGateDispatchTasks(tasks, {
       state: stateFilter,
@@ -287,8 +296,14 @@ export function GateDispatchTaskCenter({
     }
   }
 
+  function completionTextForTask(task: PersistedGatePlatformDispatchTask) {
+    return completionSuggestionByKey.get(task.dispatchKey)?.completionEvidence
+      || buildRouteDispatchCompletionTemplate(task)
+      || buildFirstDayDispatchCompletionTemplate(task);
+  }
+
   function insertCompletionTemplate(task: PersistedGatePlatformDispatchTask) {
-    const template = buildRouteDispatchCompletionTemplate(task) || buildFirstDayDispatchCompletionTemplate(task);
+    const template = completionTextForTask(task);
     if (!template) return;
     setCompletionDrafts((current) => ({ ...current, [task.dispatchKey]: template }));
   }
@@ -501,11 +516,11 @@ export function GateDispatchTaskCenter({
                     className="rounded-md border border-white/20 px-3 py-2 text-sm font-medium text-white hover:bg-white/10"
                     onClick={() => setCompletionDrafts((current) => ({
                       ...current,
-                      [firstDayDesk.nextTask!.dispatchKey]: firstDayDesk.nextTask!.completionTemplate,
+                      [firstDayDesk.nextTask!.dispatchKey]: firstDayNextSuggestion?.completionEvidence ?? firstDayDesk.nextTask!.completionTemplate,
                     }))}
                     type="button"
                   >
-                    填验收模板
+                    {firstDayNextSuggestion ? "填小样本结果" : "填验收模板"}
                   </button>
                 </div>
               </div>
@@ -1034,7 +1049,8 @@ export function GateDispatchTaskCenter({
 
       <section className="grid gap-3">
         {filteredTasks.map((task) => {
-          const completionTemplate = buildRouteDispatchCompletionTemplate(task) || buildFirstDayDispatchCompletionTemplate(task);
+          const completionSuggestion = completionSuggestionByKey.get(task.dispatchKey);
+          const completionTemplate = completionTextForTask(task);
           const firstDayCompletionHint = buildFirstDayDispatchCompletionHint(task);
           const completionRecord = task.completionEvidence
             ? parseRouteDispatchCompletionEvidence(task, task.completionEvidence)
@@ -1076,10 +1092,15 @@ export function GateDispatchTaskCenter({
                           onClick={() => insertCompletionTemplate(task)}
                           type="button"
                         >
-                          填入模板
+                          {completionSuggestion ? "填入小样本结果" : "填入模板"}
                         </button>
                       ) : null}
                     </div>
+                    {completionSuggestion ? (
+                      <p className="rounded-md bg-emerald-50 px-2 py-1 text-xs leading-5 text-emerald-800">
+                        已找到最近小样本结果：{completionSuggestion.label}
+                      </p>
+                    ) : null}
                     {firstDayCompletionHint ? (
                       <p className="rounded-md bg-amber-50 px-2 py-1 text-xs leading-5 text-amber-800">{firstDayCompletionHint}</p>
                     ) : null}

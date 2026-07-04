@@ -5,6 +5,7 @@ import {
   buildPlatformPublishExportCenter,
   buildPlatformPublishArchive,
   buildPlatformStrategySwitchPlan,
+  buildPlatformPublishEffectSaveReview,
   buildPublishPackageRestorePatch,
   buildPublishPackageVersionComparison,
   buildSubmissionAssetAudit,
@@ -467,10 +468,16 @@ export async function POST(request: Request, { params }: Params) {
         snapshotDate: normalizeSnapshotDate(body.snapshotDate),
       },
     });
+    const refreshedContext = await buildCenter(projectId);
+    const refreshedPack = refreshedContext?.center.packages.find((item) => item.platformId === platform.id) ?? null;
+    const effectReview = refreshedPack ? buildPlatformPublishEffectSaveReview(refreshedPack) : null;
 
     return NextResponse.json({
-      message: `已记录 ${platform.name} 发布效果。`,
+      message: effectReview
+        ? `已记录 ${platform.name} 发布效果。${effectReview.headline}`
+        : `已记录 ${platform.name} 发布效果。`,
       metric,
+      effectReview,
     }, { status: 201 });
   }
 

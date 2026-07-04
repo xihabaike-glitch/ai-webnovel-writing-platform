@@ -4,6 +4,7 @@ import { getPlatformProfile, platformProfiles } from "../lib/platforms/platformP
 import {
   buildPlatformPublishExportCenter,
   buildPlatformPublishArchive,
+  buildPlatformPublishEffectSaveReview,
   buildPlatformStrategyExecutionReceipt,
   buildPlatformStrategySwitchPlan,
   buildPublishPackageRestorePatch,
@@ -338,6 +339,11 @@ test("buildPlatformPublishExportCenter", async (t) => {
     assert.equal(pack.publishEffect.comparison.status, "none");
     assert.equal(pack.effectOptimization.status, "scale");
     assert.ok(pack.effectOptimization.actions.some((action) => action.label.includes("放大")));
+    const saveReview = buildPlatformPublishEffectSaveReview(pack);
+    assert.equal(saveReview.status, "scale");
+    assert.equal(saveReview.effectStatus, "promising");
+    assert.ok(saveReview.headline.includes("可以加码"));
+    assert.ok(saveReview.recommendedAction?.label.includes("放大"));
     assert.ok(pack.publishNote.includes("首秀前强调前三章钩子。"));
     assert.ok(pack.markdown.includes("夜雨系统：倒计时重生"));
     assert.ok(pack.markdown.includes("投稿资产质检"));
@@ -524,6 +530,11 @@ test("buildPlatformPublishExportCenter", async (t) => {
       && action.label.includes("收藏动机")
     )));
     assert.ok(pack.effectOptimization.actions.some((action) => action.evidence.includes("开头慢")));
+    const saveReview = buildPlatformPublishEffectSaveReview(pack);
+    assert.equal(saveReview.status, "urgent_rework");
+    assert.equal(saveReview.effectStatus, "weak");
+    assert.ok(saveReview.headline.includes("先返工"));
+    assert.equal(saveReview.recommendedAction?.execution, "generate_asset_variants");
   });
 
   await t.test("reranks strategy review tasks from the weakest current bottleneck", () => {

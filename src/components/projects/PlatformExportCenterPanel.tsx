@@ -319,6 +319,18 @@ interface PlatformPublishEffectOptimization {
   actions: PlatformPublishOptimizationAction[];
 }
 
+interface PlatformPublishEffectSaveReview {
+  platformId: string;
+  platformName: string;
+  status: PlatformPublishEffectOptimization["status"];
+  effectStatus: PlatformPublishEffect["status"];
+  comparisonStatus: PlatformPublishEffectComparison["status"];
+  headline: string;
+  verdict: string;
+  nextAction: string;
+  recommendedAction: PlatformPublishOptimizationAction | null;
+}
+
 interface PlatformPublishPackage {
   platformId: string;
   platformName: string;
@@ -730,6 +742,11 @@ function comparisonStatusClass(status: PlatformPublishEffectComparison["status"]
   return "bg-slate-100 text-slate-600";
 }
 
+function saveReviewMessage(review: PlatformPublishEffectSaveReview) {
+  const action = review.recommendedAction?.label ?? "查看发布效果复盘";
+  return `${review.headline} 下一步：${action}。`;
+}
+
 function finalGateStatusClass(status: PlatformFinalSubmissionGate["status"]) {
   if (status === "ready_to_submit") return "bg-emerald-50 text-emerald-700";
   if (status === "do_not_submit") return "bg-rose-50 text-rose-700";
@@ -1089,6 +1106,7 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
   const [strategySwitchPlan, setStrategySwitchPlan] = useState<PlatformStrategySwitchPlan | null>(null);
   const [strategyExecutionReceipt, setStrategyExecutionReceipt] = useState<PlatformStrategyExecutionReceipt | null>(null);
   const [strategyReviewTaskReceipt, setStrategyReviewTaskReceipt] = useState<PlatformStrategyReviewTaskReceipt | null>(null);
+  const [latestEffectReview, setLatestEffectReview] = useState<PlatformPublishEffectSaveReview | null>(null);
   const [assetOptimizationVariants, setAssetOptimizationVariants] = useState<PlatformSubmissionAssetOptimizationVariant[]>([]);
   const [versionActionFilter, setVersionActionFilter] = useState<PublishPackageVersionActionFilter>("all");
   const [assetDraft, setAssetDraft] = useState<SubmissionAssetDraft>({
@@ -1282,7 +1300,12 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
           note: effectDraft.notes,
         }),
       });
-      const payload = (await response.json().catch(() => null)) as { message?: string; metric?: PlatformPublishMetric; error?: string } | null;
+      const payload = (await response.json().catch(() => null)) as {
+        message?: string;
+        metric?: PlatformPublishMetric;
+        effectReview?: PlatformPublishEffectSaveReview | null;
+        error?: string;
+      } | null;
       if (!response.ok) throw new Error(payload?.error ?? "保存发布效果失败。");
       if (payload?.metric) {
         addGateActionReceipt(buildGatePublishEffectReceipt({
@@ -1292,12 +1315,18 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
           metric: payload.metric,
         }));
       }
-      setMessage(payload?.message ?? "发布效果已记录。");
+      if (payload?.effectReview) {
+        setLatestEffectReview(payload.effectReview);
+      }
+      const reviewMessage = payload?.effectReview
+        ? saveReviewMessage(payload.effectReview)
+        : payload?.message ?? "发布效果已记录。";
+      setMessage(reviewMessage);
       await loadCenter({ keepMessage: true });
       if (strategySwitchPlan?.platformId === platformId) {
         const refreshedPlan = await refreshStrategyPlan(platformId);
         setStrategyExecutionReceipt(buildStrategyExecutionReceipt(refreshedPlan, "save-publish-effect"));
-        setMessage(`${payload?.message ?? "发布效果已记录。"} 策略链已刷新。`);
+        setMessage(`${reviewMessage} 策略链已刷新。`);
       }
     } catch (caught) {
       setMessage(caught instanceof Error ? caught.message : "保存发布效果失败。");
@@ -3293,6 +3322,37 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
             <div className="mt-3 rounded-md bg-slate-50 p-3 text-sm text-slate-700">
               <span className="font-medium text-slate-950">下一步：</span>{selectedPackage.publishEffect.nextAction}
             </div>
+            {latestEffectReview?.platformId === selectedPackage.platformId ? (
+              <div className="mt-3 rounded-md border border-cyan-200 bg-cyan-50 p-3 text-sm">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <div className="font-medium text-slate-950">刚刚自动复盘</div>
+                    <p className="mt-1 leading-6 text-slate-700">{latestEffectReview.headline}</p>
+                  </div>
+                  <span className="w-fit rounded-md bg-white px-2 py-1 text-xs font-medium text-cyan-700">
+                    {optimizationStatusLabel(latestEffectReview.status)}
+                  </span>
+                </div>
+                <p className="mt-2 leading-6 text-slate-700">{latestEffectReview.verdict}</p>
+                <div className="mt-2 rounded-md bg-white p-2 text-slate-700">
+                  <span className="font-medium text-slate-950">建议动作：</span>{latestEffectReview.nextAction}
+                </div>
+                {latestEffectReview.recommendedAction ? (
+                  <button
+                    className="mt-3 rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white disabled:opacity-50"
+                    disabled={Boolean(runningOptimizationActionId) || isOptimizingAsset}
+                    onClick={() => void runEffectOptimizationAction(latestEffectReview.recommendedAction as PlatformPublishOptimizationAction)}
+                    type="button"
+                  >
+                    {latestEffectReview.recommendedAction.execution === "generate_asset_variants"
+                      ? "生成方案"
+                      : latestEffectReview.recommendedAction.execution === "rewrite_first_three"
+                        ? "重写前三章"
+                        : "打开位置"}
+                  </button>
+                ) : null}
+              </div>
+            ) : null}
             <div className="mt-3 rounded-md border border-slate-200 p-3">
               <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                 <div>

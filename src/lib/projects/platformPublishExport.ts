@@ -271,6 +271,18 @@ export interface PlatformPublishEffectOptimization {
   actions: PlatformPublishOptimizationAction[];
 }
 
+export interface PlatformPublishEffectSaveReview {
+  platformId: string;
+  platformName: string;
+  status: PlatformPublishEffectOptimization["status"];
+  effectStatus: PlatformPublishEffectSummary["status"];
+  comparisonStatus: PlatformPublishEffectComparison["status"];
+  headline: string;
+  verdict: string;
+  nextAction: string;
+  recommendedAction: PlatformPublishOptimizationAction | null;
+}
+
 export interface PlatformPublishExportInput {
   project: PublishExportProject;
   chapters: PublishExportChapter[];
@@ -3018,6 +3030,32 @@ function buildPlatformEffectOptimization(
         ? "数据已经给方向了，现在要放大，不要乱换靶子。"
         : "继续迭代，但别把观察样本当平台结论。",
     actions: uniqueActions,
+  };
+}
+
+export function buildPlatformPublishEffectSaveReview(pack: PlatformPublishPackage): PlatformPublishEffectSaveReview {
+  const recommendedAction = pack.effectOptimization.actions[0] ?? null;
+  const headline = pack.effectOptimization.status === "urgent_rework"
+    ? "刚录完，别等：这组数据要求先返工。"
+    : pack.effectOptimization.status === "scale"
+      ? "刚录完，可以加码：数据已经给出可放大的信号。"
+      : pack.effectOptimization.status === "collect_data"
+        ? "还缺有效样本，先把首轮数据补完整。"
+        : "刚录完，先观察迭代：样本还没硬到能定生死。";
+  const verdict = pack.publishEffect.comparison.status === "none"
+    ? pack.publishEffect.verdict
+    : `${pack.publishEffect.verdict} ${pack.publishEffect.comparison.verdict}`;
+
+  return {
+    platformId: pack.platformId,
+    platformName: pack.platformName,
+    status: pack.effectOptimization.status,
+    effectStatus: pack.publishEffect.status,
+    comparisonStatus: pack.publishEffect.comparison.status,
+    headline,
+    verdict,
+    nextAction: recommendedAction?.detail ?? pack.publishEffect.nextAction,
+    recommendedAction,
   };
 }
 

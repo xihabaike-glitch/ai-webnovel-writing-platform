@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { buildFirstDayExecutionRouteStatus } from "../lib/model-gateway/firstDayExecutionRoute.ts";
 import { buildFirstDayRouteSummary } from "../lib/model-gateway/firstDayRouteSummary.ts";
 import { buildPresetRouteBlueprint } from "../lib/model-gateway/presetRouteBlueprint.ts";
 import {
@@ -918,6 +919,57 @@ test("model task routing", async (t) => {
     assert.equal(control?.recommendedRouteLabel, "Kimi · kimi-k2.6 / Claude · claude-sonnet-4-5");
     assert.equal(review?.canApplyRecommendation, true);
     assert.ok(summary.nextActions[0].includes("一键应用 3 条"));
+  });
+
+  await t.test("summarizes the current first-day execution model route", () => {
+    const ready = buildFirstDayExecutionRouteStatus({
+      taskType: "chapter_review",
+      providers: [
+        {
+          id: "claude-provider",
+          providerId: "claude",
+          displayName: "Claude",
+          defaultModel: "claude-sonnet-4-5",
+          enabled: true,
+          encryptedApiKey: "key",
+        },
+        {
+          id: "kimi-provider",
+          providerId: "kimi",
+          displayName: "Kimi",
+          defaultModel: "kimi-k2.6",
+          enabled: true,
+          encryptedApiKey: "key",
+        },
+      ],
+      routes: [
+        {
+          taskType: "chapter_review",
+          primaryProviderConfigId: "claude-provider",
+          fallbackProviderConfigId: "kimi-provider",
+        },
+      ],
+    });
+    const missing = buildFirstDayExecutionRouteStatus({
+      taskType: "chapter_second_pass",
+      providers: [],
+      routes: [],
+    });
+    const manual = buildFirstDayExecutionRouteStatus({
+      taskType: null,
+      providers: [],
+      routes: [],
+    });
+
+    assert.equal(ready.status, "ready");
+    assert.equal(ready.taskLabel, "章节审稿");
+    assert.equal(ready.primaryProviderName, "Claude · claude-sonnet-4-5");
+    assert.equal(ready.fallbackProviderName, "Kimi · kimi-k2.6");
+    assert.ok(ready.detail.includes("优先走已配置模型路线"));
+    assert.equal(missing.status, "missing_route");
+    assert.ok(missing.detail.includes("默认模型选择"));
+    assert.equal(manual.status, "manual");
+    assert.equal(manual.primaryProviderName, "无需模型");
   });
 
   await t.test("builds route recommendations from successful model samples", () => {

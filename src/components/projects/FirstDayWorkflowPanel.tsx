@@ -41,6 +41,15 @@ interface FirstDayWorkflow {
   steps: FirstDayWorkflowStep[];
 }
 
+interface FirstDayModelRouteStatus {
+  taskType: string | null;
+  taskLabel: string;
+  primaryProviderName: string;
+  fallbackProviderName: string;
+  status: "ready" | "missing_route" | "mock_fallback" | "manual";
+  detail: string;
+}
+
 function statusLabel(status: FirstDayWorkflowStep["status"]) {
   if (status === "done") return "完成";
   if (status === "active") return "当前";
@@ -51,6 +60,13 @@ function statusClass(status: FirstDayWorkflowStep["status"]) {
   if (status === "done") return "border-emerald-200 bg-emerald-50 text-emerald-700";
   if (status === "active") return "border-slate-950 bg-slate-950 text-white";
   return "border-slate-200 bg-slate-50 text-slate-500";
+}
+
+function modelRouteStatusCopy(status: FirstDayModelRouteStatus["status"]) {
+  if (status === "ready") return { label: "路线就绪", className: "bg-emerald-50 text-emerald-700" };
+  if (status === "mock_fallback") return { label: "Mock 兜底", className: "bg-sky-50 text-sky-700" };
+  if (status === "manual") return { label: "人工节点", className: "bg-slate-100 text-slate-600" };
+  return { label: "缺路线", className: "bg-amber-50 text-amber-700" };
 }
 
 function FirstDayStepCard({ step, index }: { step: FirstDayWorkflowStep; index: number }) {
@@ -85,6 +101,7 @@ function FirstDayStepCard({ step, index }: { step: FirstDayWorkflowStep; index: 
 export function FirstDayWorkflowPanel({ projectId }: { projectId: string }) {
   const [workflow, setWorkflow] = useState<FirstDayWorkflow | null>(null);
   const [dispatch, setDispatch] = useState<GatePlatformGrowthDispatchItem | null>(null);
+  const [modelRoute, setModelRoute] = useState<FirstDayModelRouteStatus | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isDispatching, setIsDispatching] = useState(false);
   const [isExecutingAi, setIsExecutingAi] = useState(false);
@@ -100,9 +117,14 @@ export function FirstDayWorkflowPanel({ projectId }: { projectId: string }) {
       if (!response.ok) {
         throw new Error("读取首日工作流失败。");
       }
-      const payload = (await response.json()) as { workflow: FirstDayWorkflow; dispatch: GatePlatformGrowthDispatchItem };
+      const payload = (await response.json()) as {
+        workflow: FirstDayWorkflow;
+        dispatch: GatePlatformGrowthDispatchItem;
+        modelRoute: FirstDayModelRouteStatus;
+      };
       setWorkflow(payload.workflow);
       setDispatch(payload.dispatch);
+      setModelRoute(payload.modelRoute);
     } catch (caught) {
       setMessage(caught instanceof Error ? caught.message : "读取首日工作流失败。");
     } finally {
@@ -135,6 +157,7 @@ export function FirstDayWorkflowPanel({ projectId }: { projectId: string }) {
       const payload = (await response.json()) as {
         workflow?: FirstDayWorkflow;
         dispatch?: GatePlatformGrowthDispatchItem;
+        modelRoute?: FirstDayModelRouteStatus;
         completionEvidence?: string;
         error?: string;
       };
@@ -143,6 +166,7 @@ export function FirstDayWorkflowPanel({ projectId }: { projectId: string }) {
       }
       if (payload.workflow) setWorkflow(payload.workflow);
       if (payload.dispatch) setDispatch(payload.dispatch);
+      if (payload.modelRoute) setModelRoute(payload.modelRoute);
       if (payload.completionEvidence) setCompletionEvidence(payload.completionEvidence);
       setMessage(`AI 已执行当前节点：${workflow.nextStep.label}。请检查结果后完成派单验收。`);
     } catch (caught) {
@@ -281,6 +305,24 @@ export function FirstDayWorkflowPanel({ projectId }: { projectId: string }) {
                   </button>
                 </div>
               </div>
+              {modelRoute ? (
+                <div className="mt-3 rounded-md bg-white p-3 text-sm">
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div>
+                      <div className="text-xs font-medium text-slate-500">当前模型路线</div>
+                      <div className="mt-1 font-medium text-slate-950">{modelRoute.taskLabel}</div>
+                    </div>
+                    <span className={`rounded-md px-2 py-1 text-xs font-medium ${modelRouteStatusCopy(modelRoute.status).className}`}>
+                      {modelRouteStatusCopy(modelRoute.status).label}
+                    </span>
+                  </div>
+                  <div className="mt-3 grid gap-2 text-xs text-slate-600 sm:grid-cols-2">
+                    <span className="rounded-md bg-slate-50 px-2 py-1">首选 {modelRoute.primaryProviderName}</span>
+                    <span className="rounded-md bg-slate-50 px-2 py-1">备用 {modelRoute.fallbackProviderName}</span>
+                  </div>
+                  <p className="mt-2 leading-6 text-slate-600">{modelRoute.detail}</p>
+                </div>
+              ) : null}
               <textarea
                 className="mt-3 min-h-56 w-full resize-y rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm leading-6 text-slate-700 outline-none"
                 readOnly

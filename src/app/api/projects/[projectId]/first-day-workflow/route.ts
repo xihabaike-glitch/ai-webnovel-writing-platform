@@ -3,6 +3,7 @@ import { generateChapterDraft } from "@/lib/ai/chapterDraftGeneration";
 import { generateChapterSecondPass } from "@/lib/ai/chapterSecondPassGeneration";
 import { reviewChapterDraft } from "@/lib/ai/chapterReviewGeneration";
 import { prisma } from "@/lib/db/prisma";
+import { buildFirstDayExecutionRouteStatus } from "@/lib/model-gateway/firstDayExecutionRoute";
 import { getPlatformProfile, type PlatformId } from "@/lib/platforms/platformProfiles";
 import { buildFirstDayDispatchItem, buildFirstDayModelExecutionPlan, buildFirstDayWorkflow } from "@/lib/projects/firstDayWorkflow";
 import { generateControlAssets, type ControlAssetAreaId } from "@/lib/projects/controlAssetGeneration";
@@ -13,22 +14,30 @@ interface Params {
 }
 
 async function buildWorkflowPayload(projectId: string) {
-  const project = await prisma.project.findUnique({
-    where: { id: projectId },
-    include: {
-      chapters: { orderBy: { order: "asc" } },
-      outlineNodes: { orderBy: [{ depth: "asc" }, { order: "asc" }] },
-      characters: { orderBy: { createdAt: "asc" } },
-      worldEntries: { orderBy: [{ type: "asc" }, { createdAt: "asc" }] },
-      aiTasks: { orderBy: { createdAt: "desc" } },
-      gateDispatchTasks: {
-        where: {
-          dispatchKey: { startsWith: `first-day:${projectId}:` },
+  const [project, providers, routes] = await Promise.all([
+    prisma.project.findUnique({
+      where: { id: projectId },
+      include: {
+        chapters: { orderBy: { order: "asc" } },
+        outlineNodes: { orderBy: [{ depth: "asc" }, { order: "asc" }] },
+        characters: { orderBy: { createdAt: "asc" } },
+        worldEntries: { orderBy: [{ type: "asc" }, { createdAt: "asc" }] },
+        aiTasks: { orderBy: { createdAt: "desc" } },
+        gateDispatchTasks: {
+          where: {
+            dispatchKey: { startsWith: `first-day:${projectId}:` },
+          },
+          orderBy: { updatedAt: "desc" },
         },
-        orderBy: { updatedAt: "desc" },
       },
-    },
-  });
+    }),
+    prisma.modelProvider.findMany({
+      orderBy: { updatedAt: "desc" },
+    }),
+    prisma.modelTaskRoute.findMany({
+      orderBy: { taskType: "asc" },
+    }),
+  ]);
 
   if (!project) {
     return null;
@@ -70,9 +79,16 @@ async function buildWorkflowPayload(projectId: string) {
     })),
     submissionChecklist,
   });
+  const executionPlan = buildFirstDayModelExecutionPlan(workflow);
 
   return {
     workflow,
+    executionPlan,
+    modelRoute: buildFirstDayExecutionRouteStatus({
+      taskType: executionPlan.taskType ?? null,
+      providers,
+      routes,
+    }),
     dispatch: buildFirstDayDispatchItem({
       project: workflowProject,
       platform,
@@ -100,7 +116,7 @@ export async function POST(_request: Request, { params }: Params) {
     return NextResponse.json({ error: "Project not found" }, { status: 404 });
   }
 
-  const executionPlan = buildFirstDayModelExecutionPlan(payload.workflow);
+  const executionPlan = payload.executionPlan;
   if (!executionPlan.executable) {
     return NextResponse.json({
       workflow: payload.workflow,

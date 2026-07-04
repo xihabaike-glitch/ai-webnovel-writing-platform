@@ -2100,6 +2100,7 @@ export function buildGateKnowledgeFeedbackDispatchItems(
 ): GatePlatformGrowthDispatchItem[] {
   const persistedByKey = new Map(persistedTasks.map((task) => [task.dispatchKey, task]));
   return [...feedbackReceipts]
+    .filter((receipt) => !receipt.id.startsWith("gate-dispatch-completion:"))
     .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime())
     .map((receipt): GatePlatformGrowthDispatchItem => {
       const stage = knowledgeFeedbackDispatchStage(receipt);
@@ -5498,12 +5499,14 @@ export async function updatePersistedGateDispatchTaskState(
   const payload = (await response.json().catch(() => null)) as {
     task?: PersistedGatePlatformDispatchTask;
     followUpTasks?: PersistedGatePlatformDispatchTask[];
+    knowledgeFeedbackReceipt?: GateKnowledgeFeedbackReceipt | null;
     error?: string;
   } | null;
   if (!response.ok || !payload?.task) throw new Error(payload?.error ?? "更新平台派单失败。");
   return {
     task: payload.task,
     followUpTasks: payload.followUpTasks ?? [],
+    knowledgeFeedbackReceipt: payload.knowledgeFeedbackReceipt ?? null,
   };
 }
 

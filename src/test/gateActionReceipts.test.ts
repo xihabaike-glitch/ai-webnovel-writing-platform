@@ -1177,6 +1177,27 @@ test("buildGateActionReceipt", async (t) => {
     assert.equal(growthDispatch.state, "queued");
   });
 
+  await t.test("does not turn gate completion feedback back into a new dispatch", () => {
+    const dispatchItems = buildGateKnowledgeFeedbackDispatchItems([{
+      id: "gate-dispatch-completion:knowledge-feedback:feedback-asset",
+      projectId: "project-1",
+      projectTitle: "夜雨系统",
+      platformId: "fanqie",
+      platformName: "番茄小说",
+      actionLabel: "Gate 派单完成回灌",
+      title: "番茄小说｜Gate 派单完成回灌",
+      message: "Gate 派单已完成。",
+      completedStepLabel: "Gate 派单完成：番茄小说 反哺停点收口",
+      stopReason: "已收口派单完成证据，无需再次派单。",
+      nextAction: "回到平台导出中心复核反哺历史，并刷新项目控制台。",
+      href: "/projects/project-1#submission-asset-editor",
+      severity: "success",
+      createdAt: "2026-01-03T00:00:00.000Z",
+    }]);
+
+    assert.equal(dispatchItems.length, 0);
+  });
+
   await t.test("turns project start validation advice into three dispatch cards", () => {
     const startReceipt = buildProjectStartDecisionActionReceipt({
       projectId: "project-1",

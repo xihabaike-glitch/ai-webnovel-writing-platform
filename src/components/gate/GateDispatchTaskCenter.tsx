@@ -185,6 +185,8 @@ export function GateDispatchTaskCenter({
         });
         if (updated.followUpTasks.length) {
           setRouteActionMessage(`已自动生成治理后复检派单：${updated.followUpTasks.map((item) => item.title).join("、")}`);
+        } else if (updated.knowledgeFeedbackReceipt) {
+          setRouteActionMessage(`已回灌到项目反哺证据：${updated.knowledgeFeedbackReceipt.platformName} · ${updated.knowledgeFeedbackReceipt.completedStepLabel}`);
         }
       } else {
         const updated = await persistGateDispatchTask({ ...task, state: targetState });

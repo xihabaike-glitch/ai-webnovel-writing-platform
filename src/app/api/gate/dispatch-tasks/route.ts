@@ -106,6 +106,52 @@ function toTask(item: {
   };
 }
 
+function shouldWriteKnowledgeFeedback(task: {
+  projectId: string | null;
+  platformId: string;
+}) {
+  return Boolean(task.projectId && task.platformId && task.platformId !== "model-routing");
+}
+
+async function writeDispatchCompletionKnowledgeFeedback(task: Awaited<ReturnType<typeof prisma.gateDispatchTask.update>>) {
+  if (!shouldWriteKnowledgeFeedback(task)) return null;
+  const receiptId = `gate-dispatch-completion:${task.dispatchKey}`;
+  const evidence = task.completionEvidence.trim();
+  if (!evidence) return null;
+
+  return prisma.platformKnowledgeFeedbackReceipt.upsert({
+    where: { receiptId },
+    create: {
+      receiptId,
+      projectId: task.projectId as string,
+      platformId: task.platformId,
+      platformName: task.platformName,
+      actionLabel: "Gate 派单完成回灌",
+      title: `${task.platformName}｜Gate 派单完成回灌`,
+      message: `Gate 派单「${task.title}」已完成：${evidence}`,
+      completedStepLabel: `Gate 派单完成：${task.title}`,
+      stopReason: "已收口派单完成证据，无需再次派单。",
+      nextAction: "回到平台导出中心复核反哺历史，并刷新项目控制台。",
+      href: task.href || "#platform-export",
+      severity: "success",
+      createdAt: task.completedAt ?? new Date(),
+    },
+    update: {
+      platformId: task.platformId,
+      platformName: task.platformName,
+      actionLabel: "Gate 派单完成回灌",
+      title: `${task.platformName}｜Gate 派单完成回灌`,
+      message: `Gate 派单「${task.title}」已完成：${evidence}`,
+      completedStepLabel: `Gate 派单完成：${task.title}`,
+      stopReason: "已收口派单完成证据，无需再次派单。",
+      nextAction: "回到平台导出中心复核反哺历史，并刷新项目控制台。",
+      href: task.href || "#platform-export",
+      severity: "success",
+      createdAt: task.completedAt ?? new Date(),
+    },
+  });
+}
+
 function takeLimit(value: string | null) {
   const parsed = Number(value);
   if (!Number.isFinite(parsed)) return 50;
@@ -359,6 +405,27 @@ export async function PATCH(request: Request) {
       ...await buildFirstDayFollowUpTasks(task),
     ];
   }
+  const knowledgeFeedbackReceipt = nextState === "completed"
+    ? await writeDispatchCompletionKnowledgeFeedback(task)
+    : null;
 
-  return NextResponse.json({ task: toTask(task), followUpTasks });
+  return NextResponse.json({
+    task: toTask(task),
+    followUpTasks,
+    knowledgeFeedbackReceipt: knowledgeFeedbackReceipt ? {
+      id: knowledgeFeedbackReceipt.receiptId,
+      projectId: knowledgeFeedbackReceipt.projectId,
+      platformId: knowledgeFeedbackReceipt.platformId,
+      platformName: knowledgeFeedbackReceipt.platformName,
+      actionLabel: knowledgeFeedbackReceipt.actionLabel,
+      title: knowledgeFeedbackReceipt.title,
+      message: knowledgeFeedbackReceipt.message,
+      completedStepLabel: knowledgeFeedbackReceipt.completedStepLabel,
+      stopReason: knowledgeFeedbackReceipt.stopReason,
+      nextAction: knowledgeFeedbackReceipt.nextAction,
+      href: knowledgeFeedbackReceipt.href,
+      severity: knowledgeFeedbackReceipt.severity,
+      createdAt: knowledgeFeedbackReceipt.createdAt.toISOString(),
+    } : null,
+  });
 }

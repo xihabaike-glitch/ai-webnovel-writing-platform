@@ -39,9 +39,25 @@ interface SerializationOpsDashboard {
   submissionReadinessPercent: number;
   submissionAssetStatus: SerializationSubmissionAssetStatus;
   finalSubmissionGate: SerializationFinalSubmissionGate;
+  publishBaselineStatus: SerializationPublishBaselineStatus;
   nextPublishChapter: SerializationChapter | null;
   actions: SerializationAction[];
   warnings: string[];
+}
+
+interface SerializationPublishBaselineStatus {
+  exists: boolean;
+  id: string | null;
+  action: string;
+  title: string;
+  preflightScore: number;
+  chapterCount: number;
+  wordCount: number;
+  createdAt: string | null;
+  verdict: string;
+  href: string;
+  downloadHref: string;
+  actionLabel: string;
 }
 
 interface SerializationFinalSubmissionGate {
@@ -193,7 +209,7 @@ export function SerializationOpsPanel({ projectId }: { projectId: string }) {
       </div>
 
       {dashboard ? (
-        <div className="mt-4 grid gap-3 sm:grid-cols-7">
+        <div className="mt-4 grid gap-3 sm:grid-cols-8">
           <div className="rounded-md bg-slate-50 p-3">
             <div className="text-xs text-slate-500">目标平台</div>
             <div className="mt-1 text-sm font-medium text-slate-950">{dashboard.platformName}</div>
@@ -227,6 +243,13 @@ export function SerializationOpsPanel({ projectId }: { projectId: string }) {
               {dashboard.finalSubmissionGate.status === "unknown" ? "待" : dashboard.finalSubmissionGate.score}
             </div>
             <div className="mt-1 text-xs text-slate-500">{finalGateStatusLabel(dashboard.finalSubmissionGate.status)}</div>
+          </div>
+          <div className="rounded-md bg-slate-50 p-3">
+            <div className="text-xs text-slate-500">发布基准</div>
+            <div className="mt-1 text-2xl font-semibold text-slate-950">
+              {dashboard.publishBaselineStatus.exists ? dashboard.publishBaselineStatus.preflightScore : "缺"}
+            </div>
+            <div className="mt-1 text-xs text-slate-500">{dashboard.publishBaselineStatus.exists ? "已保存" : "未保存"}</div>
           </div>
         </div>
       ) : null}
@@ -311,6 +334,26 @@ export function SerializationOpsPanel({ projectId }: { projectId: string }) {
               </div>
               <p className="mt-2 leading-6 text-slate-600">{dashboard.finalSubmissionGate.verdict}</p>
               <div className="mt-2 text-xs text-slate-500">下一步：{dashboard.finalSubmissionGate.nextAction}</div>
+            </div>
+            <div className="mt-3 rounded-md bg-slate-50 p-3 text-sm">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <div className="text-xs text-slate-500">发布基准</div>
+                  <div className="mt-1 font-medium text-slate-950">{dashboard.publishBaselineStatus.exists ? "已保存" : "未保存"}</div>
+                </div>
+                <Link
+                  className="rounded-md border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                  href={projectHref(projectId, dashboard.publishBaselineStatus.exists ? dashboard.publishBaselineStatus.downloadHref : dashboard.publishBaselineStatus.href)}
+                >
+                  {dashboard.publishBaselineStatus.actionLabel}
+                </Link>
+              </div>
+              <p className="mt-2 leading-6 text-slate-600">{dashboard.publishBaselineStatus.verdict}</p>
+              {dashboard.publishBaselineStatus.exists ? (
+                <div className="mt-2 text-xs text-slate-500">
+                  {dashboard.publishBaselineStatus.chapterCount} 章 · {dashboard.publishBaselineStatus.wordCount} 字
+                </div>
+              ) : null}
             </div>
           </div>
         </div>

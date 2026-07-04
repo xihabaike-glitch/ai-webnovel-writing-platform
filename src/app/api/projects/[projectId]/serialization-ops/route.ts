@@ -113,6 +113,18 @@ export async function GET(_request: Request, { params }: Params) {
     submissionAssets,
     submissionAssetVersions,
     finalGate: targetPackage?.finalGate ?? null,
+    publishSnapshots: project.publishSnapshots.map((snapshot) => ({
+      id: snapshot.id,
+      platformId: snapshot.platformId,
+      platformName: snapshot.platformName,
+      title: snapshot.title,
+      action: snapshot.action,
+      chapterCount: snapshot.chapterCount,
+      wordCount: snapshot.wordCount,
+      preflightScore: snapshot.preflightScore,
+      canExport: snapshot.canExport,
+      createdAt: snapshot.createdAt,
+    })),
   });
 
   return NextResponse.json({

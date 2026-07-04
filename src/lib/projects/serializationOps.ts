@@ -75,6 +75,34 @@ export interface SerializationFinalSubmissionGate {
   blockers: string[];
 }
 
+export interface SerializationPublishSnapshot {
+  id: string;
+  platformId: string;
+  platformName: string;
+  title: string;
+  action: string;
+  chapterCount: number;
+  wordCount: number;
+  preflightScore: number;
+  canExport: boolean;
+  createdAt: Date | string;
+}
+
+export interface SerializationPublishBaselineStatus {
+  exists: boolean;
+  id: string | null;
+  action: string;
+  title: string;
+  preflightScore: number;
+  chapterCount: number;
+  wordCount: number;
+  createdAt: Date | string | null;
+  verdict: string;
+  href: string;
+  downloadHref: string;
+  actionLabel: string;
+}
+
 export interface SerializationOpsInput {
   project: SerializationProject;
   platform: PlatformProfile;
@@ -84,6 +112,7 @@ export interface SerializationOpsInput {
   submissionAssets?: SerializationSubmissionAsset[];
   submissionAssetVersions?: SerializationSubmissionAssetVersion[];
   finalGate?: PlatformFinalSubmissionGate | null;
+  publishSnapshots?: SerializationPublishSnapshot[];
 }
 
 export interface SerializationAction {
@@ -114,6 +143,7 @@ export interface SerializationOpsDashboard {
   submissionReadinessPercent: number;
   submissionAssetStatus: SerializationSubmissionAssetStatus;
   finalSubmissionGate: SerializationFinalSubmissionGate;
+  publishBaselineStatus: SerializationPublishBaselineStatus;
   nextPublishChapter: SerializationChapter | null;
   actions: SerializationAction[];
   warnings: string[];
@@ -182,6 +212,55 @@ function normalizeFinalSubmissionGate(finalGate: PlatformFinalSubmissionGate | n
     nextAction: finalGate.nextAction,
     score: finalGate.score,
     blockers: finalGate.blockers,
+  };
+}
+
+function actionLabel(action: string) {
+  if (action === "snapshot") return "发布基准";
+  if (action === "download") return "下载记录";
+  if (action === "archive") return "全平台归档";
+  if (action === "restore") return "恢复版本";
+  if (action === "copy") return "复制记录";
+  return "发布版本";
+}
+
+export function buildSerializationPublishBaselineStatus(input: Pick<SerializationOpsInput, "project" | "platform" | "publishSnapshots">): SerializationPublishBaselineStatus {
+  const records = (input.publishSnapshots ?? [])
+    .filter((snapshot) => snapshot.platformId === input.platform.id && snapshot.canExport)
+    .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime());
+  const latest = records.find((snapshot) => snapshot.action === "snapshot") ?? records[0] ?? null;
+  const downloadHref = `/api/projects/${input.project.id ?? "current"}/platform-export?format=markdown&platformId=${input.platform.id}`;
+
+  if (!latest) {
+    return {
+      exists: false,
+      id: null,
+      action: "",
+      title: "",
+      preflightScore: 0,
+      chapterCount: 0,
+      wordCount: 0,
+      createdAt: null,
+      verdict: "还没有保存发布包基准。",
+      href: "#platform-export",
+      downloadHref,
+      actionLabel: "保存发布基准",
+    };
+  }
+
+  return {
+    exists: true,
+    id: latest.id,
+    action: latest.action,
+    title: latest.title,
+    preflightScore: latest.preflightScore,
+    chapterCount: latest.chapterCount,
+    wordCount: latest.wordCount,
+    createdAt: latest.createdAt,
+    verdict: `最近${actionLabel(latest.action)}：${latest.title}，质检 ${latest.preflightScore} 分，${latest.chapterCount} 章 / ${latest.wordCount} 字。`,
+    href: "#package-version-history",
+    downloadHref,
+    actionLabel: "下载发布包",
   };
 }
 
@@ -274,6 +353,7 @@ function buildActions(
   publishReady: SerializationChapter[],
   assetStatus: SerializationSubmissionAssetStatus,
   finalGate: SerializationFinalSubmissionGate,
+  baselineStatus: SerializationPublishBaselineStatus,
 ) {
   const actions: SerializationAction[] = [];
   const failedChecklist = input.submissionChecklist.items.filter((item) => item.status === "todo" || item.status === "risk");
@@ -363,7 +443,7 @@ function buildActions(
       execution: null,
     });
   }
-  if (!failedChecklist[0] && assetStatus.status === "ready" && finalGate.status === "ready_to_submit") {
+  if (!failedChecklist[0] && assetStatus.status === "ready" && finalGate.status === "ready_to_submit" && !baselineStatus.exists) {
     actions.push({
       id: "save-publish-baseline",
       label: "保存发布基准",
@@ -377,6 +457,17 @@ function buildActions(
         endpoint: `/api/projects/${input.project.id ?? "current"}/platform-export`,
         payload: { action: "snapshot", platformId: input.platform.id },
       },
+    });
+  }
+  if (!failedChecklist[0] && assetStatus.status === "ready" && finalGate.status === "ready_to_submit" && baselineStatus.exists) {
+    actions.push({
+      id: "download-publish-package",
+      label: "下载发布包",
+      priority: "medium",
+      detail: `${baselineStatus.verdict} 可以下载当前发布包或查看版本历史。`,
+      href: baselineStatus.downloadHref,
+      hrefLabel: "下载发布包",
+      execution: null,
     });
   }
   if (actions.length === 0) {
@@ -456,6 +547,7 @@ function submissionGapRepairTarget(itemId: string) {
 export function buildSerializationOpsDashboard(input: SerializationOpsInput): SerializationOpsDashboard {
   const submissionAssetStatus = buildSerializationSubmissionAssetStatus(input);
   const finalSubmissionGate = normalizeFinalSubmissionGate(input.finalGate);
+  const publishBaselineStatus = buildSerializationPublishBaselineStatus(input);
   const draftedChapters = input.chapters.filter((chapter) => chapter.wordCount > 0);
   const reviewQueue = draftedChapters.filter((chapter) => !reviewed(chapter, input.aiTasks));
   const revisionQueue = draftedChapters.filter((chapter) => {
@@ -487,6 +579,7 @@ export function buildSerializationOpsDashboard(input: SerializationOpsInput): Se
   }
   if (finalSubmissionGate.status === "fix_first") warnings.push(`最终闸门 ${finalSubmissionGate.score} 分：${finalSubmissionGate.nextAction}`);
   if (finalSubmissionGate.status === "do_not_submit") warnings.push(`最终闸门 ${finalSubmissionGate.score} 分，别投：${finalSubmissionGate.blockers[0] ?? finalSubmissionGate.verdict}`);
+  if (finalSubmissionGate.status === "ready_to_submit" && !publishBaselineStatus.exists) warnings.push("终检已过，但还没有保存发布基准。");
 
   return {
     platformName: input.platform.name,
@@ -498,8 +591,9 @@ export function buildSerializationOpsDashboard(input: SerializationOpsInput): Se
     submissionReadinessPercent: input.submissionChecklist.readinessPercent,
     submissionAssetStatus,
     finalSubmissionGate,
+    publishBaselineStatus,
     nextPublishChapter: publishReady[0] ?? null,
-    actions: buildActions(input, reviewQueue, revisionQueue, publishReady, submissionAssetStatus, finalSubmissionGate),
+    actions: buildActions(input, reviewQueue, revisionQueue, publishReady, submissionAssetStatus, finalSubmissionGate, publishBaselineStatus),
     warnings,
   };
 }

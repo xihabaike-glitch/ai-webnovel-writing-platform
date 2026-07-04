@@ -213,6 +213,63 @@ test("buildSerializationOpsDashboard", async (t) => {
     const baselineAction = dashboard.actions.find((action) => action.id === "save-publish-baseline");
     assert.equal(baselineAction?.execution?.endpoint, "/api/projects/project-1/platform-export");
     assert.equal(baselineAction?.execution?.payload.action, "snapshot");
+    assert.equal(dashboard.publishBaselineStatus.exists, false);
+    assert.ok(dashboard.warnings.some((warning) => warning.includes("还没有保存发布基准")));
+  });
+
+  await t.test("switches to download after a publish baseline exists", () => {
+    const dashboard = buildSerializationOpsDashboard({
+      project: { ...project, id: "project-1" },
+      platform,
+      chapters: [],
+      aiTasks: [],
+      submissionChecklist: { ...checklist, readinessPercent: 90, items: [] },
+      submissionAssets: [
+        {
+          platformId: "fanqie",
+          platformName: "番茄小说",
+          title: "夜雨系统",
+          logline: "雨夜倒计时降临，主角在救人与逃跑之间连续选择，用系统奖励一步步翻盘。",
+          synopsis: "林晚在雨夜觉醒系统，每次选择都会让危机升级。他必须在救人、逃跑和揭开规则真相之间做决定，借连续任务翻盘。第一卷围绕系统倒计时、城市危机和隐藏对手展开，让主角用爽点明确的选择一步步逆袭，并把每次奖励都变成新的追读悬念。",
+          overseasSynopsis: "Lin Wan awakens a system in the rain and survives escalating choices.",
+          tags: ["都市系统", "爽文", "危机"],
+          note: "",
+          source: "ai_variant",
+          updatedAt: "2026-01-02T00:00:00.000Z",
+        },
+      ],
+      finalGate: {
+        status: "ready_to_submit",
+        label: "可投",
+        headline: "番茄小说 发布门槛已过，可以保存基准后投。",
+        verdict: "标题、简介、前三章、字数、审稿和投稿资产都过了投前线。",
+        nextAction: "保存发布包版本基准，然后下载或复制发布包。",
+        score: 100,
+        blockers: [],
+        items: [],
+      },
+      publishSnapshots: [
+        {
+          id: "snapshot-1",
+          platformId: "fanqie",
+          platformName: "番茄小说",
+          title: "夜雨系统",
+          action: "snapshot",
+          chapterCount: 3,
+          wordCount: 9600,
+          preflightScore: 96,
+          canExport: true,
+          createdAt: "2026-01-03T00:00:00.000Z",
+        },
+      ],
+    });
+
+    assert.equal(dashboard.publishBaselineStatus.exists, true);
+    assert.equal(dashboard.publishBaselineStatus.preflightScore, 96);
+    assert.ok(dashboard.publishBaselineStatus.downloadHref.includes("format=markdown"));
+    assert.equal(dashboard.actions.some((action) => action.id === "save-publish-baseline"), false);
+    const downloadAction = dashboard.actions.find((action) => action.id === "download-publish-package");
+    assert.equal(downloadAction?.href, "/api/projects/project-1/platform-export?format=markdown&platformId=fanqie");
   });
 
   await t.test("requires second-pass recheck before publish readiness", () => {

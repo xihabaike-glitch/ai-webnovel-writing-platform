@@ -58,6 +58,41 @@ test("buildStoryTreeExperienceGuide turns rechecks into prompt memory", () => {
   assert.ok(guide.promptBlock.includes("避坑｜开头结尾｜82 -> 72 分"));
 });
 
+test("buildStoryTreeExperienceGuide promotes latest effect feedback and dedupes learned actions", () => {
+  const guide = buildStoryTreeExperienceGuide([
+    {
+      dispatchKey: "story-tree:project-1:chapter-1:chapter_draft:branch_causality",
+      title: "补分支因果",
+      href: "/projects/project-1/chapters/chapter-1",
+      evidence: [
+        "大树结构复检：68 -> 78 分，分数变好：结构待精修；返工动作：分支因果：把支线改成主线压力的直接后果。",
+      ],
+      completedAt: "2026-07-05T08:00:00.000Z",
+      updatedAt: "2026-07-05T08:00:00.000Z",
+    },
+    {
+      dispatchKey: "story-tree-experience:project-1:chapter_draft:branch_causality:story-tree_project-1_chapter-1_chapter_draft_branch_causality",
+      title: "夜雨系统 · 应用经验分支因果",
+      href: "/projects/project-1/chapters/chapter-1",
+      evidence: [
+        "大树结构复检：68 -> 78 分，分数变好：结构待精修；返工动作：分支因果：把支线改成主线压力的直接后果。",
+        "经验动作：分支因果：把支线改成主线压力的直接后果。",
+        "经验应用效果：分支因果 78 -> 68 分，效果变弱：支线没有绑定主线压力。",
+      ],
+      completedAt: "2026-07-05T10:00:00.000Z",
+      updatedAt: "2026-07-05T10:00:00.000Z",
+    },
+  ]);
+
+  assert.equal(guide.summary.total, 1);
+  assert.equal(guide.summary.avoid, 1);
+  assert.equal(guide.items[0].status, "avoid");
+  assert.equal(guide.items[0].effectStatus, "weakened");
+  assert.ok(guide.items[0].effectLine?.includes("效果变弱"));
+  assert.ok(guide.promptBlock.includes("避坑｜分支因果"));
+  assert.ok(guide.promptBlock.includes("经验应用效果"));
+});
+
 test("buildStoryTreeExperienceApplyDispatch turns a learned action into an assigned task", () => {
   const guide = buildStoryTreeExperienceGuide([
     {

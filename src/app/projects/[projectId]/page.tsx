@@ -63,7 +63,10 @@ export default async function ProjectPage({ params }: { params: Promise<{ projec
       gateDispatchTasks: {
         where: {
           state: "completed",
-          dispatchKey: { startsWith: "story-tree:" },
+          OR: [
+            { dispatchKey: { startsWith: "story-tree:" } },
+            { dispatchKey: { startsWith: "story-tree-experience:" } },
+          ],
         },
         orderBy: { completedAt: "desc" },
         take: 30,

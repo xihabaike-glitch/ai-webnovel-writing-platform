@@ -83,6 +83,9 @@ export function StoryTreeExperiencePanel({ guide, projectId }: { guide: StoryTre
               </div>
               <div className="mt-3 font-medium text-slate-950">{item.title}</div>
               <p className="mt-2 leading-6 text-slate-600">{item.action}</p>
+              {item.effectLine ? (
+                <p className="mt-2 rounded-md bg-slate-50 p-2 leading-6 text-slate-600">{item.effectLine}</p>
+              ) : null}
               <p className="mt-2 leading-6 text-slate-500">{item.lesson}</p>
               <div className="mt-3 flex flex-wrap items-center gap-2">
                 <button

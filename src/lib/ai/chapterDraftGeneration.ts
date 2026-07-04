@@ -32,7 +32,10 @@ export async function generateChapterDraft(options: GenerateChapterDraftOptions)
           gateDispatchTasks: {
             where: {
               state: "completed",
-              dispatchKey: { startsWith: "story-tree:" },
+              OR: [
+                { dispatchKey: { startsWith: "story-tree:" } },
+                { dispatchKey: { startsWith: "story-tree-experience:" } },
+              ],
             },
             orderBy: { completedAt: "desc" },
             take: 30,

@@ -19,6 +19,8 @@ export interface StoryTreeExperienceItem {
   lesson: string;
   action: string;
   evidence: string;
+  effectStatus: StoryTreeExperienceEffectStatus | null;
+  effectLine: string | null;
   title: string;
   href: string;
   completedAt: string | null;
@@ -109,6 +111,13 @@ const verdictStatus: Record<string, StoryTreeExperienceStatus> = {
 
 function parseDispatchKey(dispatchKey: string) {
   const parts = dispatchKey.split(":");
+  if (parts[0] === "story-tree-experience") {
+    return {
+      source: parts[2] ?? "unknown",
+      axisId: parts[3] ?? "unknown",
+    };
+  }
+
   return {
     source: parts[3] ?? "unknown",
     axisId: parts[4] ?? "unknown",
@@ -172,6 +181,8 @@ function itemFromTask(task: Pick<PersistedGatePlatformDispatchTask, "dispatchKey
   const axisLabel = axisLabels[axisId] ?? "大树结构";
   const sourceLabel = sourceLabels[source] ?? "历史写作";
   const status = verdictStatus[parsed.verdict] ?? "watch";
+  const effect = taskEffectFromEvidence(task.evidence);
+  const effectiveStatus = statusFromEffect(status, effect.effectStatus);
   const delta = parsed.previousScore === null ? null : parsed.currentScore - parsed.previousScore;
   const action = parsed.action || `${axisLabel}：延续已复检过的返工动作。`;
 
@@ -182,7 +193,7 @@ function itemFromTask(task: Pick<PersistedGatePlatformDispatchTask, "dispatchKey
     axisLabel,
     source,
     sourceLabel,
-    status,
+    status: effectiveStatus,
     previousScore: parsed.previousScore,
     currentScore: parsed.currentScore,
     delta,
@@ -190,13 +201,15 @@ function itemFromTask(task: Pick<PersistedGatePlatformDispatchTask, "dispatchKey
     lesson: buildLesson({
       axisLabel,
       sourceLabel,
-      status,
+      status: effectiveStatus,
       previousScore: parsed.previousScore,
       currentScore: parsed.currentScore,
       message: parsed.message,
     }),
     action,
     evidence: recheckLine,
+    effectStatus: effect.effectStatus,
+    effectLine: effect.effectLine,
     title: task.title,
     href: task.href,
     completedAt: task.completedAt ?? task.updatedAt ?? null,
@@ -205,7 +218,8 @@ function itemFromTask(task: Pick<PersistedGatePlatformDispatchTask, "dispatchKey
 
 function promptLine(item: StoryTreeExperienceItem) {
   const delta = item.delta === null ? `${item.currentScore} 分` : `${item.previousScore} -> ${item.currentScore} 分`;
-  return `- ${statusLabel(item.status)}｜${item.axisLabel}｜${delta}：${item.action}`;
+  const effect = item.effectLine ? `；${item.effectLine}` : "";
+  return `- ${statusLabel(item.status)}｜${item.axisLabel}｜${delta}：${item.action}${effect}`;
 }
 
 function applyActionLabel(status: StoryTreeExperienceStatus) {
@@ -244,6 +258,28 @@ function taskSourceScoreFromEvidence(evidence: string[]) {
   return recheckLine ? parseStoryTreeRecheckEvidenceLine(recheckLine)?.currentScore ?? null : null;
 }
 
+function effectStatusFromLine(line: string): StoryTreeExperienceEffectStatus | null {
+  if (line.includes("继续有效")) return "reinforced";
+  if (line.includes("效果变弱")) return "weakened";
+  if (line.includes("继续观察")) return "watch";
+  return null;
+}
+
+function taskEffectFromEvidence(evidence: string[]) {
+  const effectLine = [...evidence].reverse().find((item) => item.startsWith("经验应用效果：")) ?? null;
+  return {
+    effectLine,
+    effectStatus: effectLine ? effectStatusFromLine(effectLine) : null,
+  };
+}
+
+function statusFromEffect(status: StoryTreeExperienceStatus, effectStatus: StoryTreeExperienceEffectStatus | null): StoryTreeExperienceStatus {
+  if (effectStatus === "reinforced") return "usable";
+  if (effectStatus === "weakened") return "avoid";
+  if (effectStatus === "watch") return "watch";
+  return status;
+}
+
 function buildPromptBlock(items: StoryTreeExperienceItem[]) {
   if (items.length === 0) return "";
   return [
@@ -253,12 +289,33 @@ function buildPromptBlock(items: StoryTreeExperienceItem[]) {
 }
 
 export function buildStoryTreeExperienceGuide(tasks: Pick<PersistedGatePlatformDispatchTask, "dispatchKey" | "evidence" | "completedAt" | "updatedAt" | "title" | "href">[]): StoryTreeExperienceGuide {
-  const items = tasks
+  const rawItems = tasks
     .map(itemFromTask)
-    .filter((item): item is StoryTreeExperienceItem => Boolean(item))
+    .filter((item): item is StoryTreeExperienceItem => Boolean(item));
+  const itemMap = new Map<string, StoryTreeExperienceItem>();
+
+  for (const item of rawItems) {
+    const key = `${item.axisId}:${item.evidence}:${item.action}`;
+    const existing = itemMap.get(key);
+    if (!existing) {
+      itemMap.set(key, item);
+      continue;
+    }
+
+    const itemEffectWeight = item.effectStatus ? 1 : 0;
+    const existingEffectWeight = existing.effectStatus ? 1 : 0;
+    if (itemEffectWeight > existingEffectWeight || (itemEffectWeight === existingEffectWeight && dateValue(item.completedAt) > dateValue(existing.completedAt))) {
+      itemMap.set(key, item);
+    }
+  }
+
+  const items = [...itemMap.values()]
     .sort((left, right) => {
+      const effectWeight: Record<StoryTreeExperienceEffectStatus, number> = { reinforced: 3, watch: 2, weakened: 1 };
       const statusWeight: Record<StoryTreeExperienceStatus, number> = { usable: 3, watch: 2, avoid: 1 };
-      const scoreDelta = statusWeight[right.status] - statusWeight[left.status];
+      const leftWeight = left.effectStatus ? effectWeight[left.effectStatus] : statusWeight[left.status];
+      const rightWeight = right.effectStatus ? effectWeight[right.effectStatus] : statusWeight[right.status];
+      const scoreDelta = rightWeight - leftWeight;
       if (scoreDelta !== 0) return scoreDelta;
       return dateValue(right.completedAt) - dateValue(left.completedAt);
     });

@@ -156,3 +156,34 @@ test("buildChapterProductionFlow exposes one-click second pass action only when 
   assert.equal(secondPassStage?.runAction?.targetWords, 1200);
   assert.equal(secondPassStage?.runAction?.label, "一键二改 1 章");
 });
+
+test("buildChapterProductionFlow exposes story tree recheck dispatch action for unassigned drafted chapters", () => {
+  const chapters = [1, 2, 3].map((order) => ({
+    id: `chapter-${order}`,
+    title: `第 ${order} 章`,
+    order,
+    status: "draft",
+    wordCount: 1800,
+    hook: "主角醒来发现命运倒计时。",
+    cliffhanger: "门后的声音喊出了他的旧名。",
+  }));
+  const flow = buildChapterProductionFlow({
+    projectId: "project-1",
+    chapters,
+    aiTasks: [],
+    gateTasks: [
+      {
+        dispatchKey: "story-tree:project-1:chapter-2:chapter_draft:opening_ending",
+        state: "assigned",
+        href: "/projects/project-1/chapters/chapter-2#chapter-second-pass",
+      },
+    ],
+    submissionChecklist: checklistReady,
+  });
+  const storyTreeStage = flow.stages.find((stage) => stage.id === "story_tree");
+
+  assert.equal(storyTreeStage?.runAction?.type, "story_tree_recheck");
+  assert.equal(storyTreeStage?.runAction?.endpoint, "/api/projects/project-1/story-tree-recheck");
+  assert.deepEqual(storyTreeStage?.runAction?.chapterIds, ["chapter-1", "chapter-3"]);
+  assert.equal(storyTreeStage?.runAction?.label, "一键派发复检 2 章");
+});

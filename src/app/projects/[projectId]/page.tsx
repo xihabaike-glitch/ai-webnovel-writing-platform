@@ -127,6 +127,21 @@ export default async function ProjectPage({ params }: { params: Promise<{ projec
       chapterId: true,
     },
   });
+  const productionGateTasks = await prisma.gateDispatchTask.findMany({
+    where: {
+      projectId: project.id,
+      OR: [
+        { dispatchKey: { startsWith: "story-tree:" } },
+        { dispatchKey: { startsWith: "story-tree-experience:" } },
+      ],
+    },
+    select: {
+      dispatchKey: true,
+      state: true,
+      href: true,
+    },
+    take: 100,
+  });
   const dashboard = buildProjectDashboard({
     currentWordCount: project.currentWordCount,
     targetWordCount: project.targetWordCount,
@@ -161,7 +176,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ projec
       createdAt: task.createdAt,
       chapter: task.chapterId ? { id: task.chapterId } : null,
     })),
-    gateTasks: project.gateDispatchTasks.map((task) => ({
+    gateTasks: productionGateTasks.map((task) => ({
       dispatchKey: task.dispatchKey,
       state: task.state,
       href: task.href,

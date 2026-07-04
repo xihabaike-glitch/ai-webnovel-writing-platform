@@ -4,6 +4,22 @@ export type ChapterProductionFlowStageId = "hooks" | "drafts" | "reviews" | "sec
 export type ChapterProductionFlowStatus = "blocked" | "working" | "ready";
 export type ChapterProductionFlowTone = "slate" | "amber" | "sky" | "emerald" | "rose";
 export type ChapterProductionFlowBatchAction = "review" | "second_pass";
+export type ChapterProductionFlowRunAction =
+  | {
+      type: "batch_review";
+      action: ChapterProductionFlowBatchAction;
+      endpoint: string;
+      chapterIds: string[];
+      targetWords?: number;
+      label: string;
+    }
+  | {
+      type: "story_tree_recheck";
+      endpoint: string;
+      chapterIds: string[];
+      source: "chapter_draft" | "chapter_second_pass" | "first_three_rewrite";
+      label: string;
+    };
 
 export interface ChapterProductionFlowChapter {
   id: string;
@@ -42,14 +58,7 @@ export interface ChapterProductionFlowStage {
   action: string;
   actionLabel: string;
   href: string;
-  runAction?: {
-    type: "batch_review";
-    action: ChapterProductionFlowBatchAction;
-    endpoint: string;
-    chapterIds: string[];
-    targetWords?: number;
-    label: string;
-  };
+  runAction?: ChapterProductionFlowRunAction;
 }
 
 export interface ChapterProductionFlow {
@@ -89,10 +98,10 @@ function completedTaskChapterIds(tasks: ChapterProductionFlowAiTask[], taskType:
     .filter((id): id is string => Boolean(id)));
 }
 
-function storyTreeChapterIds(tasks: ChapterProductionFlowGateTask[]) {
+function storyTreeChapterIds(tasks: ChapterProductionFlowGateTask[], completedOnly: boolean) {
   const ids = new Set<string>();
   for (const task of tasks) {
-    if (task.state !== "completed") continue;
+    if (completedOnly && task.state !== "completed") continue;
     if (!task.dispatchKey.startsWith("story-tree:") && !task.dispatchKey.startsWith("story-tree-experience:")) continue;
     const match = task.href.match(/\/chapters\/([^/#?]+)/);
     if (match?.[1]) ids.add(match[1]);
@@ -142,7 +151,8 @@ export function buildChapterProductionFlow(input: {
   const draftTarget = Math.max(1, firstThreeTarget);
   const reviewedIds = completedTaskChapterIds(input.aiTasks, "chapter_review");
   const secondPassIds = completedTaskChapterIds(input.aiTasks, "chapter_second_pass");
-  const treeIds = storyTreeChapterIds(input.gateTasks);
+  const treeIds = storyTreeChapterIds(input.gateTasks, true);
+  const treeAssignedIds = storyTreeChapterIds(input.gateTasks, false);
   const draftedFirstThreeIds = firstThree.filter((chapter) => chapter.wordCount > 0).map((chapter) => chapter.id);
   const reviewReady = draftedFirstThreeIds.filter((id) => reviewedIds.has(id)).length;
   const secondPassReady = draftedFirstThreeIds.filter((id) => secondPassIds.has(id)).length;
@@ -152,6 +162,8 @@ export function buildChapterProductionFlow(input: {
   const secondPassActionIds = draftedFirstThreeIds
     .filter((id) => !secondPassIds.has(id) && needsSecondPass(latestSuccessfulReview(input.aiTasks, id)?.outputText))
     .slice(0, 5);
+  const storyTreeActionIds = draftedFirstThreeIds.filter((id) => !treeAssignedIds.has(id)).slice(0, 5);
+  const storyTreeEndpoint = `/api/projects/${input.projectId}/story-tree-recheck`;
   const submissionTarget = input.submissionChecklist.items.length || 1;
   const submissionReady = input.submissionChecklist.passCount;
   const stages: ChapterProductionFlowStage[] = [
@@ -233,6 +245,15 @@ export function buildChapterProductionFlow(input: {
       action: "补大树结构复检，确认开头、主干、分支、叶片和人物弧光。",
       actionLabel: "补复检",
       href: "#story-tree-experience",
+      runAction: storyTreeActionIds.length > 0
+        ? {
+            type: "story_tree_recheck",
+            endpoint: storyTreeEndpoint,
+            chapterIds: storyTreeActionIds,
+            source: "chapter_draft",
+            label: `一键派发复检 ${storyTreeActionIds.length} 章`,
+          }
+        : undefined,
     },
     {
       id: "submission",

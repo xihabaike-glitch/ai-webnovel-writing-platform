@@ -5,7 +5,7 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import type {
   ChapterProductionFlow,
-  ChapterProductionFlowBatchAction,
+  ChapterProductionFlowRunAction,
   ChapterProductionFlowStage,
   ChapterProductionFlowTone,
 } from "@/lib/projects/chapterProductionFlow";
@@ -24,12 +24,14 @@ function statusLabel(status: ChapterProductionFlow["status"]) {
   return "有卡点";
 }
 
-function runningLabel(action: ChapterProductionFlowBatchAction) {
-  return action === "review" ? "审稿中" : "二改中";
+function runningLabel(action: ChapterProductionFlowRunAction) {
+  if (action.type === "story_tree_recheck") return "派单中";
+  return action.action === "review" ? "审稿中" : "二改中";
 }
 
-function doneLabel(action: ChapterProductionFlowBatchAction) {
-  return action === "review" ? "批量审稿" : "批量二改";
+function doneLabel(action: ChapterProductionFlowRunAction) {
+  if (action.type === "story_tree_recheck") return "大树复检派单";
+  return action.action === "review" ? "批量审稿" : "批量二改";
 }
 
 export function ChapterProductionFlowPanel({ flow }: { flow: ChapterProductionFlow }) {
@@ -49,24 +51,35 @@ export function ChapterProductionFlowPanel({ flow }: { flow: ChapterProductionFl
       const response = await fetch(stage.runAction.endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: stage.runAction.action,
-          chapterIds: stage.runAction.chapterIds,
-          targetWords: stage.runAction.targetWords,
-        }),
+        body: JSON.stringify(stage.runAction.type === "batch_review"
+          ? {
+              action: stage.runAction.action,
+              chapterIds: stage.runAction.chapterIds,
+              targetWords: stage.runAction.targetWords,
+            }
+          : {
+              chapterIds: stage.runAction.chapterIds,
+              source: stage.runAction.source,
+            }),
       });
       const payload = await response.json().catch(() => null) as {
         results?: Array<{ status: "succeeded" | "failed" }>;
+        summary?: { totalChapters: number; rewriteChapters: number; dispatches: number };
         error?: string;
         guard?: { warnings?: string[] };
       } | null;
       if (!response.ok) {
         throw new Error([payload?.error, ...(payload?.guard?.warnings ?? [])].filter(Boolean).join(" ") || "流水线执行失败。");
       }
-      const results = payload?.results ?? [];
-      const succeeded = results.filter((result) => result.status === "succeeded").length;
-      const failed = results.filter((result) => result.status === "failed").length;
-      setMessage(`${doneLabel(stage.runAction.action)}完成：成功 ${succeeded} 章，失败 ${failed} 章。`);
+      if (stage.runAction.type === "story_tree_recheck") {
+        const summary = payload?.summary;
+        setMessage(`${doneLabel(stage.runAction)}完成：复检 ${summary?.totalChapters ?? stage.runAction.chapterIds.length} 章，生成 ${summary?.dispatches ?? 0} 条派单。`);
+      } else {
+        const results = payload?.results ?? [];
+        const succeeded = results.filter((result) => result.status === "succeeded").length;
+        const failed = results.filter((result) => result.status === "failed").length;
+        setMessage(`${doneLabel(stage.runAction)}完成：成功 ${succeeded} 章，失败 ${failed} 章。`);
+      }
       router.refresh();
     } catch (caught) {
       setMessage(caught instanceof Error ? caught.message : "流水线执行失败。");
@@ -91,7 +104,7 @@ export function ChapterProductionFlowPanel({ flow }: { flow: ChapterProductionFl
           onClick={() => runStageAction(stage)}
           type="button"
         >
-          {runningStageId === stage.id ? runningLabel(stage.runAction.action) : stage.runAction.label}
+          {runningStageId === stage.id ? runningLabel(stage.runAction) : stage.runAction.label}
         </button>
       );
     }

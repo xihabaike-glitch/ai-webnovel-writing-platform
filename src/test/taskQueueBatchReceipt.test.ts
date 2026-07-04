@@ -170,6 +170,65 @@ test("buildTaskQueueBatchReceipt does not pass a watch sample without quality ev
   assert.ok(receipt.completionEvidenceTemplate?.includes("放量结论：未通过"));
 });
 
+test("buildTaskQueueBatchReceipt audits cleared watch scale-up batches with a stricter quality line", () => {
+  const receipt = buildTaskQueueBatchReceipt({
+    plan: {
+      ...plan,
+      scaleGate: "cleared",
+      actionLabel: "批量初稿 2 个",
+      itemIds: ["project-1:draft:chapter-2", "project-1:draft:chapter-3"],
+      chapterIds: ["chapter-2", "chapter-3"],
+    },
+    results: [
+      { status: "succeeded", taskId: "task-2", chapterTitle: "第二章", error: null, qualityScore: 82 },
+      { status: "succeeded", taskId: "task-3", chapterTitle: "第三章", error: null, qualityScore: 82 },
+    ],
+    routeEffectSummary: {
+      ...routeEffect,
+      totalTasks: 2,
+      succeededTasks: 2,
+      averageQualityScore: 82,
+      knownCostUsd: 0.02,
+      verdict: "恢复放量质量偏紧。",
+    },
+  });
+
+  assert.equal(receipt.status, "review_quality");
+  assert.equal(receipt.headline, "准放量质量不够，先停一下");
+  assert.ok(receipt.detail.includes("85"));
+  assert.ok(receipt.warnings.some((warning) => warning.includes("刚解锁")));
+});
+
+test("buildTaskQueueBatchReceipt keeps healthy cleared watch scale-up batches small-step", () => {
+  const receipt = buildTaskQueueBatchReceipt({
+    plan: {
+      ...plan,
+      scaleGate: "cleared",
+      actionLabel: "批量初稿 2 个",
+      itemIds: ["project-1:draft:chapter-2", "project-1:draft:chapter-3"],
+      chapterIds: ["chapter-2", "chapter-3"],
+    },
+    results: [
+      { status: "succeeded", taskId: "task-2", chapterTitle: "第二章", error: null, qualityScore: 88 },
+      { status: "succeeded", taskId: "task-3", chapterTitle: "第三章", error: null, qualityScore: 88 },
+    ],
+    routeEffectSummary: {
+      ...routeEffect,
+      totalTasks: 2,
+      succeededTasks: 2,
+      averageQualityScore: 88,
+      knownCostUsd: 0.02,
+      verdict: "恢复放量稳定。",
+    },
+  });
+
+  assert.equal(receipt.status, "continue");
+  assert.equal(receipt.headline, "准放量批次稳定，下一批仍小步走");
+  assert.equal(receipt.primaryHref, "/tasks");
+  assert.ok(receipt.detail.includes("不证明可以一次拉满"));
+  assert.ok(receipt.warnings.some((warning) => warning.includes("下一批仍看成功率")));
+});
+
 test("buildTaskQueueBatchGateActionReceipt turns a recommended batch into gate experience", () => {
   const batchReceipt = buildTaskQueueBatchReceipt({
     plan,

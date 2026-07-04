@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { buildFirstDayStepView } from "@/lib/projects/firstDayWorkflowView";
 import { persistGateDispatchTask, type GatePlatformGrowthDispatchItem } from "@/lib/projects/gateActionReceipts";
 
 interface FirstDayWorkflowStep {
@@ -48,6 +49,35 @@ function statusClass(status: FirstDayWorkflowStep["status"]) {
   if (status === "done") return "border-emerald-200 bg-emerald-50 text-emerald-700";
   if (status === "active") return "border-slate-950 bg-slate-950 text-white";
   return "border-slate-200 bg-slate-50 text-slate-500";
+}
+
+function FirstDayStepCard({ step, index }: { step: FirstDayWorkflowStep; index: number }) {
+  const view = buildFirstDayStepView(step);
+
+  return (
+    <div className="rounded-md border border-slate-200 p-3 text-sm">
+      <div className="flex items-start justify-between gap-2">
+        <div>
+          <div className="text-xs text-slate-500">第 {index + 1} 步 · {view.owner}</div>
+          <div className="mt-1 font-medium text-slate-950">{view.label}</div>
+        </div>
+        <span className={`shrink-0 rounded-md border px-2 py-1 text-xs ${statusClass(view.status)}`}>
+          {statusLabel(view.status)}
+        </span>
+      </div>
+      <p className="mt-2 leading-6 text-slate-600">{view.primaryEvidence}</p>
+      {view.hasTaskAcceptance ? (
+        <div className="mt-2 border-l-2 border-emerald-400 pl-3 leading-6 text-emerald-800">
+          <div className="text-xs font-medium text-emerald-700">{view.acceptanceLabel}</div>
+          <p>{view.acceptanceEvidence}</p>
+        </div>
+      ) : null}
+      <p className="mt-1 leading-6 text-slate-500">{view.instruction}</p>
+      <Link className="mt-2 inline-block font-medium text-slate-950" href={view.href}>
+        {view.actionLabel}
+      </Link>
+    </div>
+  );
 }
 
 export function FirstDayWorkflowPanel({ projectId }: { projectId: string }) {
@@ -185,22 +215,7 @@ export function FirstDayWorkflowPanel({ projectId }: { projectId: string }) {
 
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
             {workflow.steps.map((step, index) => (
-              <div className="rounded-md border border-slate-200 p-3 text-sm" key={step.id}>
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <div className="text-xs text-slate-500">第 {index + 1} 步 · {step.owner}</div>
-                    <div className="mt-1 font-medium text-slate-950">{step.label}</div>
-                  </div>
-                  <span className={`shrink-0 rounded-md border px-2 py-1 text-xs ${statusClass(step.status)}`}>
-                    {statusLabel(step.status)}
-                  </span>
-                </div>
-                <p className="mt-2 leading-6 text-slate-600">{step.evidence}</p>
-                <p className="mt-1 leading-6 text-slate-500">{step.instruction}</p>
-                <Link className="mt-2 inline-block font-medium text-slate-950" href={step.href}>
-                  {step.actionLabel}
-                </Link>
-              </div>
+              <FirstDayStepCard index={index} key={step.id} step={step} />
             ))}
           </div>
         </div>

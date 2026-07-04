@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { buildDraftQualityAudit } from "../lib/ai/draftQualityAudit.ts";
+import { buildStoryTreeRewriteDispatchItems } from "../lib/ai/storyTreeDispatch.ts";
 import { getPlatformProfile } from "../lib/platforms/platformProfiles.ts";
 
 const chapter = {
@@ -38,6 +39,16 @@ test("buildDraftQualityAudit", async (t) => {
     assert.ok(audit.treeAudit.axes.some((axis) => axis.id === "character_arc" && axis.score >= 70));
     assert.equal(audit.shouldSecondPass, false);
     assert.equal(audit.issues.some((issue) => issue.severity === "high"), false);
+    assert.equal(buildStoryTreeRewriteDispatchItems({
+      source: "chapter_draft",
+      projectId: "project-1",
+      projectTitle: "夜雨系统",
+      chapterId: "chapter-1",
+      chapterOrder: 1,
+      chapterTitle: chapter.title,
+      platform: getPlatformProfile("fanqie"),
+      audit: audit.treeAudit,
+    }).length, 0);
   });
 
   await t.test("marks thin generated prose for second pass", () => {
@@ -54,5 +65,21 @@ test("buildDraftQualityAudit", async (t) => {
     assert.equal(audit.shouldSecondPass, true);
     assert.ok(audit.issues.some((issue) => issue.type === "length"));
     assert.ok(audit.issues.some((issue) => issue.type === "payoff"));
+    const dispatches = buildStoryTreeRewriteDispatchItems({
+      source: "chapter_draft",
+      projectId: "project-1",
+      projectTitle: "夜雨系统",
+      chapterId: "chapter-1",
+      chapterOrder: 1,
+      chapterTitle: chapter.title,
+      platform: getPlatformProfile("fanqie"),
+      audit: audit.treeAudit,
+    });
+
+    assert.ok(dispatches.length > 0);
+    assert.ok(dispatches[0].id.startsWith("story-tree:project-1:chapter-1:chapter_draft:"));
+    assert.equal(dispatches[0].state, "assigned");
+    assert.ok(dispatches[0].acceptanceCriteria.some((item) => item.includes("80 分以上")));
+    assert.ok(dispatches[0].href.includes("/projects/project-1/chapters/chapter-1#chapter-second-pass"));
   });
 });

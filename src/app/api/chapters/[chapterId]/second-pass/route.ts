@@ -42,6 +42,7 @@ export async function POST(request: Request, { params }: Params) {
       content: result.content,
       activeProvider: result.activeProvider,
       secondPassAudit: result.secondPassAudit,
+      storyTreeDispatches: result.storyTreeDispatches,
       attempts: result.attempts,
     });
   } catch (caught) {

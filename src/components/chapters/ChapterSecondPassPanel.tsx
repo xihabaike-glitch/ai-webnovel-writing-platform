@@ -24,8 +24,10 @@ interface SecondPassResult {
   secondPassAudit: {
     score: number;
     shouldSecondPass: boolean;
+    treeAudit?: { score: number; label: string };
     issues: Array<{ type: string; suggestion: string }>;
   };
+  storyTreeDispatches?: Array<{ dispatchKey: string }>;
   attempts?: Array<{
     status: "succeeded" | "failed";
     role: "primary" | "fallback" | "auto" | "forced";
@@ -88,7 +90,8 @@ export function ChapterSecondPassPanel({ chapterId, currentWordCount }: { chapte
       }
       setResult(payload);
       const fallbackUsed = payload.attempts?.some((attempt) => attempt.status === "failed");
-      setMessage(`已完成章节二改${fallbackUsed ? "，已自动切换备用模型" : ""}，复检 ${payload.secondPassAudit.score} 分${payload.secondPassAudit.shouldSecondPass ? "，仍建议继续二改。" : "，可进入发布检查。"}`);
+      const dispatchText = payload.storyTreeDispatches?.length ? `，已派发 ${payload.storyTreeDispatches.length} 个结构返工任务` : "";
+      setMessage(`已完成章节二改${fallbackUsed ? "，已自动切换备用模型" : ""}，复检 ${payload.secondPassAudit.score} 分，大树结构 ${payload.secondPassAudit.treeAudit?.score ?? "缺"} 分${dispatchText}${payload.secondPassAudit.shouldSecondPass ? "，仍建议继续二改。" : "，可进入发布检查。"}`);
       router.refresh();
     } catch (caught) {
       setMessage(caught instanceof Error ? caught.message : "二改失败。");

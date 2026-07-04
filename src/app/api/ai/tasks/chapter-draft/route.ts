@@ -20,6 +20,7 @@ export async function POST(request: Request) {
       chapter: result.chapter,
       content: result.content,
       draftQuality: result.draftQuality,
+      storyTreeDispatches: result.storyTreeDispatches,
       attempts: result.attempts,
     });
   } catch (caught) {

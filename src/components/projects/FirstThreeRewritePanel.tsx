@@ -64,6 +64,7 @@ interface GeneratedRewriteResult {
   content: string;
   rollbackRevisionId?: string;
   evaluation?: FirstThreeRewriteEvaluation;
+  storyTreeDispatches?: Array<{ dispatchKey: string }>;
 }
 
 interface GenerateRewriteResponse {
@@ -243,9 +244,14 @@ export function FirstThreeRewritePanel({ projectId }: { projectId: string }) {
             targetWords: Math.max(1200, result.chapter.wordCount),
           }),
         });
-        const payload = await response.json().catch(() => null) as { secondPassAudit?: { score: number; shouldSecondPass: boolean }; error?: string } | null;
+        const payload = await response.json().catch(() => null) as {
+          secondPassAudit?: { score: number; shouldSecondPass: boolean; treeAudit?: { score: number } };
+          storyTreeDispatches?: Array<{ dispatchKey: string }>;
+          error?: string;
+        } | null;
         if (!response.ok || !payload?.secondPassAudit) throw new Error(payload?.error ?? "执行二改失败。");
-        setMessage(`已执行第 ${result.order} 章二改，复检 ${payload.secondPassAudit.score} 分${payload.secondPassAudit.shouldSecondPass ? "，还要继续压。" : "，可以回到发布质检。"}`);
+        const dispatchText = payload.storyTreeDispatches?.length ? `，已派发 ${payload.storyTreeDispatches.length} 个结构返工任务` : "";
+        setMessage(`已执行第 ${result.order} 章二改，复检 ${payload.secondPassAudit.score} 分，大树结构 ${payload.secondPassAudit.treeAudit?.score ?? "缺"} 分${dispatchText}${payload.secondPassAudit.shouldSecondPass ? "，还要继续压。" : "，可以回到发布质检。"}`);
         router.refresh();
         return;
       }
@@ -434,10 +440,13 @@ export function FirstThreeRewritePanel({ projectId }: { projectId: string }) {
                         <p className="text-xs leading-5 text-slate-600">{result.evaluation.verdict}</p>
                         {result.evaluation.storyTreeAudit ? (
                           <div className="rounded-md border border-emerald-100 bg-emerald-50 p-3 text-xs text-emerald-900">
-                            <div className="font-medium">大树质检 · {result.evaluation.storyTreeAudit.label}</div>
-                            <div className="mt-1">{result.evaluation.storyTreeAudit.topActions[0]}</div>
-                          </div>
-                        ) : null}
+                          <div className="font-medium">大树质检 · {result.evaluation.storyTreeAudit.label}</div>
+                          <div className="mt-1">{result.evaluation.storyTreeAudit.topActions[0]}</div>
+                          {result.storyTreeDispatches?.length ? (
+                            <div className="mt-1">已派发 {result.storyTreeDispatches.length} 个结构返工任务。</div>
+                          ) : null}
+                        </div>
+                      ) : null}
                         <div className="rounded-md border border-slate-200 bg-white p-3 text-xs">
                           <div className="flex flex-wrap items-center justify-between gap-2">
                             <span className={`rounded-md px-2 py-1 font-medium ${decisionClass(result.evaluation.decision.severity)}`}>

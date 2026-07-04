@@ -3,9 +3,11 @@ import {
   type SecondPassMode,
 } from "@/lib/ai/buildChapterSecondPassPrompt";
 import { buildDraftQualityAudit } from "@/lib/ai/draftQualityAudit";
+import { buildStoryTreeRewriteDispatchItems } from "@/lib/ai/storyTreeDispatch";
 import { prisma } from "@/lib/db/prisma";
 import { runRoutedGeneration } from "@/lib/model-gateway/routedGeneration";
 import { getPlatformProfile, type PlatformId } from "@/lib/platforms/platformProfiles";
+import { persistServerGateDispatchTask } from "@/lib/projects/gateDispatchTaskPersistence";
 import { findProjectStartTacticSummary } from "@/lib/projects/projectStartTactics";
 import { countWords } from "@/lib/text/wordCount";
 
@@ -174,12 +176,23 @@ export async function generateChapterSecondPass(options: GenerateChapterSecondPa
 
       return [savedTask, savedChapter];
     });
+    const storyTreeDispatches = await Promise.all(buildStoryTreeRewriteDispatchItems({
+      source: "chapter_second_pass",
+      projectId: chapter.projectId,
+      projectTitle: chapter.project.title,
+      chapterId: chapter.id,
+      chapterOrder: chapter.order,
+      chapterTitle: chapter.title,
+      platform,
+      audit: secondPassAudit.treeAudit,
+    }).map(persistServerGateDispatchTask));
 
     return {
       task: updatedTask,
       chapter: updatedChapter,
       content: result.text,
       secondPassAudit,
+      storyTreeDispatches,
       activeProvider: {
         id: provider.id,
         providerId: provider.providerId,

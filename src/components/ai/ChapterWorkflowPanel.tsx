@@ -201,6 +201,7 @@ export function ChapterWorkflowPanel({
       const payload = (await response.json()) as {
         error?: string;
         draftQuality?: { score: number; shouldSecondPass: boolean; treeAudit?: { score: number; label: string } };
+        storyTreeDispatches?: Array<{ dispatchKey: string }>;
         budgetGuard?: BudgetGuardView;
         attempts?: Array<{ status: "succeeded" | "failed"; role: string; displayName: string; model: string }>;
       };
@@ -209,8 +210,9 @@ export function ChapterWorkflowPanel({
         throw new Error(payload.error || "生成正文失败。");
       }
       const fallbackUsed = payload.attempts?.some((attempt) => attempt.status === "failed");
+      const dispatchText = payload.storyTreeDispatches?.length ? `，已派发 ${payload.storyTreeDispatches.length} 个结构返工任务` : "";
       setMessage(payload.draftQuality
-        ? `已生成正文初稿${fallbackUsed ? "，已自动切换备用模型" : ""}，自动体检 ${payload.draftQuality.score} 分，大树结构 ${payload.draftQuality.treeAudit?.score ?? "缺"} 分${payload.draftQuality.shouldSecondPass ? "，建议进入二改。" : "。"}`
+        ? `已生成正文初稿${fallbackUsed ? "，已自动切换备用模型" : ""}，自动体检 ${payload.draftQuality.score} 分，大树结构 ${payload.draftQuality.treeAudit?.score ?? "缺"} 分${dispatchText}${payload.draftQuality.shouldSecondPass ? "，建议进入二改。" : "。"}`
         : "已生成正文初稿");
       await loadWorkflow();
       await loadRevisions();

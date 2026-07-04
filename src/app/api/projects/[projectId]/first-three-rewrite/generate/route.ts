@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { buildFirstThreeRewritePrompt } from "@/lib/ai/buildFirstThreeRewritePrompt";
+import { buildStoryTreeRewriteDispatchItems } from "@/lib/ai/storyTreeDispatch";
 import { prisma } from "@/lib/db/prisma";
 import { getActiveModelProvider } from "@/lib/model-gateway/activeProvider";
 import type { ModelProviderId } from "@/lib/model-gateway/types";
@@ -7,6 +8,7 @@ import { getPlatformProfile, type PlatformId } from "@/lib/platforms/platformPro
 import { buildProjectContextPack } from "@/lib/projects/projectContextPack";
 import { buildFirstThreeRewriteEvaluation, buildFirstThreeRewritePackage } from "@/lib/projects/firstThreeRewrite";
 import { buildPlatformPublishExportCenter, parsePublishSnapshotTags } from "@/lib/projects/platformPublishExport";
+import { persistServerGateDispatchTask } from "@/lib/projects/gateDispatchTaskPersistence";
 import { findProjectStartTacticSummary } from "@/lib/projects/projectStartTactics";
 import { buildSubmissionChecklist } from "@/lib/projects/submissionChecklist";
 import { countWords } from "@/lib/text/wordCount";
@@ -277,6 +279,24 @@ export async function POST(request: Request, { params }: Params) {
       });
 
       chaptersByOrder.set(plan.order, updatedChapter);
+      const evaluation = buildFirstThreeRewriteEvaluation({
+        platform,
+        before: chapter,
+        after: updatedChapter,
+        projectContext,
+        startTactic,
+      });
+      const storyTreeDispatches = await Promise.all(buildStoryTreeRewriteDispatchItems({
+        source: "first_three_rewrite",
+        projectId: project.id,
+        projectTitle: project.title,
+        chapterId: updatedChapter.id,
+        chapterOrder: updatedChapter.order,
+        chapterTitle: updatedChapter.title,
+        platform,
+        audit: evaluation.storyTreeAudit,
+      }).map(persistServerGateDispatchTask));
+
       results.push({
         order: plan.order,
         createdChapter,
@@ -284,13 +304,8 @@ export async function POST(request: Request, { params }: Params) {
         chapter: updatedChapter,
         content: generated.text,
         rollbackRevisionId: rollbackRevision.id,
-        evaluation: buildFirstThreeRewriteEvaluation({
-          platform,
-          before: chapter,
-          after: updatedChapter,
-          projectContext,
-          startTactic,
-        }),
+        evaluation,
+        storyTreeDispatches,
       });
     } catch (caught) {
       const message = caught instanceof Error ? caught.message : "Unknown first-three rewrite error";

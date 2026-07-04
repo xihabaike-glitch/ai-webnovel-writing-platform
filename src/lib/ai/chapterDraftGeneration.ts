@@ -1,9 +1,11 @@
 import { buildChapterDraftPrompt } from "@/lib/ai/buildChapterDraftPrompt";
 import { buildDraftQualityAudit } from "@/lib/ai/draftQualityAudit";
+import { buildStoryTreeRewriteDispatchItems } from "@/lib/ai/storyTreeDispatch";
 import { prisma } from "@/lib/db/prisma";
 import { runRoutedGeneration } from "@/lib/model-gateway/routedGeneration";
 import type { ForcedProviderTarget } from "@/lib/model-gateway/providerSelection";
 import { getPlatformProfile, type PlatformId } from "@/lib/platforms/platformProfiles";
+import { persistServerGateDispatchTask } from "@/lib/projects/gateDispatchTaskPersistence";
 import { buildProjectContextPack } from "@/lib/projects/projectContextPack";
 import { findProjectStartTacticSummary } from "@/lib/projects/projectStartTactics";
 import { countWords } from "@/lib/text/wordCount";
@@ -166,12 +168,23 @@ export async function generateChapterDraft(options: GenerateChapterDraftOptions)
 
       return [savedTask, savedChapter];
     });
+    const storyTreeDispatches = await Promise.all(buildStoryTreeRewriteDispatchItems({
+      source: "chapter_draft",
+      projectId: chapter.projectId,
+      projectTitle: chapter.project.title,
+      chapterId: chapter.id,
+      chapterOrder: chapter.order,
+      chapterTitle: chapter.title,
+      platform,
+      audit: draftQuality.treeAudit,
+    }).map(persistServerGateDispatchTask));
 
     return {
       task: updatedTask,
       chapter: updatedChapter,
       content: result.text,
       draftQuality,
+      storyTreeDispatches,
       provider: {
         id: provider.id,
         providerId: provider.providerId,

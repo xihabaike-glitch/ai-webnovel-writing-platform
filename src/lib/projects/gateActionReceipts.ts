@@ -282,6 +282,18 @@ export interface GateEvidenceLoopRecheck {
   evidence: string[];
 }
 
+export interface GateStoryTreeRecheck {
+  projectId: string;
+  chapterId: string;
+  previousScore: number | null;
+  currentScore: number;
+  delta: number | null;
+  label: string;
+  verdict: "improved" | "unchanged" | "declined" | "unknown";
+  topAction: string;
+  axisSummary: string[];
+}
+
 export interface PersistedGatePlatformDispatchTask extends GatePlatformGrowthDispatchItem {
   databaseId: string;
   dispatchKey: string;
@@ -5689,6 +5701,7 @@ export async function updatePersistedGateDispatchTaskState(
     followUpTasks?: PersistedGatePlatformDispatchTask[];
     knowledgeFeedbackReceipt?: GateKnowledgeFeedbackReceipt | null;
     evidenceLoopRecheck?: GateEvidenceLoopRecheck | null;
+    storyTreeRecheck?: GateStoryTreeRecheck | null;
     error?: string;
   } | null;
   if (!response.ok || !payload?.task) throw new Error(payload?.error ?? "更新平台派单失败。");
@@ -5697,6 +5710,7 @@ export async function updatePersistedGateDispatchTaskState(
     followUpTasks: payload.followUpTasks ?? [],
     knowledgeFeedbackReceipt: payload.knowledgeFeedbackReceipt ?? null,
     evidenceLoopRecheck: payload.evidenceLoopRecheck ?? null,
+    storyTreeRecheck: payload.storyTreeRecheck ?? null,
   };
 }
 

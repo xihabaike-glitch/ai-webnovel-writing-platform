@@ -1,6 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { buildDraftQualityAudit } from "../lib/ai/draftQualityAudit.ts";
+import {
+  buildStoryTreeRecheck,
+  storyTreeBaselineScore,
+  storyTreeRecheckLine,
+} from "../lib/ai/storyTreeRecheck.ts";
 import { buildStoryTreeRewriteDispatchItems } from "../lib/ai/storyTreeDispatch.ts";
 import { getPlatformProfile } from "../lib/platforms/platformProfiles.ts";
 
@@ -81,5 +86,34 @@ test("buildDraftQualityAudit", async (t) => {
     assert.equal(dispatches[0].state, "assigned");
     assert.ok(dispatches[0].acceptanceCriteria.some((item) => item.includes("80 分以上")));
     assert.ok(dispatches[0].href.includes("/projects/project-1/chapters/chapter-1#chapter-second-pass"));
+  });
+
+  await t.test("builds a recheck line from story tree dispatch evidence", () => {
+    const previousScore = storyTreeBaselineScore([
+      "大树质检：结构重写，62 分；优先看开头结尾、主干推进。",
+    ]);
+    const audit = buildDraftQualityAudit({
+      platform: getPlatformProfile("fanqie"),
+      chapter,
+      content: [
+        "系统倒计时只剩十秒，林晚必须在逃跑和救人之间选择。",
+        "她冲进雨里，系统规则刷新，证据袋露出一枚标记。",
+        "林晚终于意识到自己不能再逃，决定先救人再追问系统。",
+        "下一秒，系统刷新第二个任务。",
+      ].join("\n"),
+      targetWords: 500,
+    });
+    const recheck = buildStoryTreeRecheck({
+      projectId: "project-1",
+      chapterId: "chapter-1",
+      previousScore,
+      audit: audit.treeAudit,
+    });
+    const line = storyTreeRecheckLine(recheck);
+
+    assert.equal(previousScore, 62);
+    assert.equal(recheck.verdict, "improved");
+    assert.ok(line.includes("大树结构复检：62 ->"));
+    assert.ok(line.includes("分数变好"));
   });
 });

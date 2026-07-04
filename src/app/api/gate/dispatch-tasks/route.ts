@@ -1,5 +1,11 @@
 import { NextResponse } from "next/server";
 import type { Prisma } from "@prisma/client";
+import {
+  buildStoryTreeRecheck,
+  storyTreeBaselineScore,
+  storyTreeRecheckLine,
+} from "@/lib/ai/storyTreeRecheck";
+import { buildStoryTreeQualityAudit } from "@/lib/ai/storyTreeQualityAudit";
 import { prisma } from "@/lib/db/prisma";
 import {
   buildRouteConfirmationGovernanceAutoFollowUpDispatches,
@@ -10,12 +16,15 @@ import { buildFirstDayFollowUpDispatch, buildFirstDayWorkflow } from "@/lib/proj
 import { buildProjectControlDashboard } from "@/lib/projects/projectControlDashboard";
 import type {
   GateEvidenceLoopRecheck,
+  GateStoryTreeRecheck,
   GateActionReceipt,
   GatePlatformGrowthDispatchItem,
   GatePlatformGrowthDispatchState,
   PersistedGatePlatformDispatchTask,
 } from "@/lib/projects/gateActionReceipts";
 import { parsePublishSnapshotTags } from "@/lib/projects/platformPublishExport";
+import { buildProjectContextPack } from "@/lib/projects/projectContextPack";
+import { findProjectStartTacticSummary } from "@/lib/projects/projectStartTactics";
 import { buildSubmissionChecklist } from "@/lib/projects/submissionChecklist";
 
 function text(value: unknown, fallback = "") {
@@ -195,6 +204,78 @@ async function persistEvidenceLoopRecheck(
   if (!recheck) return task;
   const line = evidenceLoopRecheckLine(recheck);
   const evidence = Array.from(new Set([...parseJsonList(task.evidence), line]));
+  return prisma.gateDispatchTask.update({
+    where: { dispatchKey: task.dispatchKey },
+    data: { evidence: JSON.stringify(evidence) },
+  });
+}
+
+function storyTreeDispatchIds(dispatchKey: string) {
+  const match = dispatchKey.match(/^story-tree:([^:]+):([^:]+):([^:]+):([^:]+)$/);
+  if (!match) return null;
+  return {
+    projectId: match[1],
+    chapterId: match[2],
+    source: match[3],
+    axisId: match[4],
+  };
+}
+
+async function buildStoryTreeTaskRecheck(task: Awaited<ReturnType<typeof prisma.gateDispatchTask.update>>): Promise<GateStoryTreeRecheck | null> {
+  const ids = storyTreeDispatchIds(task.dispatchKey);
+  if (!ids) return null;
+  const projectId = task.projectId ?? ids.projectId;
+  const project = await prisma.project.findUnique({
+    where: { id: projectId },
+    include: {
+      chapters: { orderBy: { order: "asc" } },
+      characters: { orderBy: { createdAt: "asc" } },
+      worldEntries: { orderBy: [{ type: "asc" }, { createdAt: "asc" }] },
+      foreshadows: { orderBy: { createdAt: "asc" } },
+      plotThreads: { orderBy: { createdAt: "asc" } },
+    },
+  });
+  if (!project) return null;
+  const chapter = project.chapters.find((item) => item.id === ids.chapterId);
+  if (!chapter) return null;
+  const platform = getPlatformProfile(project.targetPlatform as PlatformId);
+  const projectContext = buildProjectContextPack({
+    currentChapterId: chapter.id,
+    chapters: project.chapters,
+    characters: project.characters,
+    worldEntries: project.worldEntries,
+    foreshadows: project.foreshadows,
+    plotThreads: project.plotThreads,
+  });
+  const audit = buildStoryTreeQualityAudit({
+    content: chapter.content,
+    projectContext,
+    startTactic: findProjectStartTacticSummary(project.worldEntries),
+    chapter: {
+      title: chapter.title,
+      goal: chapter.goal,
+      hook: chapter.hook,
+      conflict: chapter.conflict,
+      valueShift: chapter.valueShift,
+      cliffhanger: chapter.cliffhanger,
+    },
+  });
+
+  return buildStoryTreeRecheck({
+    projectId,
+    chapterId: chapter.id,
+    previousScore: storyTreeBaselineScore(parseJsonList(task.evidence)),
+    audit,
+  });
+}
+
+async function persistStoryTreeRecheck(
+  task: Awaited<ReturnType<typeof prisma.gateDispatchTask.update>>,
+  recheck: GateStoryTreeRecheck | null,
+) {
+  if (!recheck) return task;
+  const line = storyTreeRecheckLine(recheck);
+  const evidence = Array.from(new Set([...parseJsonList(task.evidence), line, ...recheck.axisSummary.slice(0, 3)]));
   return prisma.gateDispatchTask.update({
     where: { dispatchKey: task.dispatchKey },
     data: { evidence: JSON.stringify(evidence) },
@@ -599,7 +680,11 @@ export async function PATCH(request: Request) {
   const evidenceLoopRecheck = nextState === "completed"
     ? await buildEvidenceLoopRecheck(task)
     : null;
-  const responseTask = await persistEvidenceLoopRecheck(task, evidenceLoopRecheck);
+  const storyTreeRecheck = nextState === "completed"
+    ? await buildStoryTreeTaskRecheck(task)
+    : null;
+  const evidenceLoopTask = await persistEvidenceLoopRecheck(task, evidenceLoopRecheck);
+  const responseTask = await persistStoryTreeRecheck(evidenceLoopTask, storyTreeRecheck);
 
   return NextResponse.json({
     task: toTask(responseTask),
@@ -620,5 +705,6 @@ export async function PATCH(request: Request) {
       createdAt: knowledgeFeedbackReceipt.createdAt.toISOString(),
     } : null,
     evidenceLoopRecheck,
+    storyTreeRecheck,
   });
 }

@@ -174,6 +174,22 @@ export function GateDispatchTaskCenter({
     return `证据闭环${scoreText}，${verdictText}：${recheck.label}`;
   }
 
+  function storyTreeRecheckMessage(updated: Awaited<ReturnType<typeof updatePersistedGateDispatchTaskState>>) {
+    const recheck = updated.storyTreeRecheck;
+    if (!recheck) return "";
+    const scoreText = recheck.previousScore === null
+      ? `复检 ${recheck.currentScore} 分`
+      : `复检 ${recheck.previousScore} -> ${recheck.currentScore} 分`;
+    const verdictText = recheck.verdict === "improved"
+      ? "结构变好"
+      : recheck.verdict === "declined"
+        ? "结构变差"
+        : recheck.verdict === "unchanged"
+          ? "结构持平"
+          : "无历史基准";
+    return `大树结构${scoreText}，${verdictText}：${recheck.label}`;
+  }
+
   async function updateTask(task: PersistedGatePlatformDispatchTask) {
     const targetState = nextState(task.state);
     const completionEvidence = completionDrafts[task.dispatchKey]?.trim() ?? "";
@@ -200,8 +216,13 @@ export function GateDispatchTaskCenter({
           return Array.from(nextByKey.values());
         });
         const recheckMessage = evidenceLoopRecheckMessage(updated);
+        const storyTreeMessage = storyTreeRecheckMessage(updated);
         if (updated.followUpTasks.length) {
-          setRouteActionMessage(`已自动生成治理后复检派单：${updated.followUpTasks.map((item) => item.title).join("、")}${recheckMessage ? `；${recheckMessage}` : ""}`);
+          setRouteActionMessage(`已自动生成治理后复检派单：${updated.followUpTasks.map((item) => item.title).join("、")}${recheckMessage ? `；${recheckMessage}` : ""}${storyTreeMessage ? `；${storyTreeMessage}` : ""}`);
+        } else if (storyTreeMessage && recheckMessage) {
+          setRouteActionMessage(`${storyTreeMessage}；${recheckMessage}`);
+        } else if (storyTreeMessage) {
+          setRouteActionMessage(storyTreeMessage);
         } else if (recheckMessage) {
           setRouteActionMessage(recheckMessage);
         } else if (updated.knowledgeFeedbackReceipt) {

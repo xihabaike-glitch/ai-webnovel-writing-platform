@@ -340,6 +340,38 @@ test("buildFirstDayWorkflow", async (t) => {
     assert.ok(dispatch.evidence.some((evidence) => evidence.includes("恢复条件")));
   });
 
+  await t.test("blocks direct first draft execution for blocked start tactics", () => {
+    const workflow = buildFirstDayWorkflow({
+      project,
+      platform: getPlatformProfile("qimao"),
+      chapters: [chapter, { ...chapter, id: "chapter-2", order: 2 }, { ...chapter, id: "chapter-3", order: 3 }],
+      outlineNodes,
+      characters,
+      worldEntries,
+      aiTasks: [],
+      startTactic: {
+        title: "首轮平台打法：七猫小说",
+        label: "复盘止损",
+        primaryTactic: "七猫小说方向暂时暂停。",
+        openingMove: "先重做开头钩子。",
+        verificationMove: "只允许恢复条件验证。",
+        risk: "未证明恢复条件前不能生成正文。",
+      },
+      submissionChecklist: checklist,
+    });
+
+    const plan = buildFirstDayModelExecutionPlan(workflow);
+
+    assert.equal(workflow.executionPackage.riskLevel, "blocked");
+    assert.equal(workflow.executionPackage.stepId, "first-draft");
+    assert.equal(plan.executable, false);
+    assert.equal(plan.actionKind, "manual");
+    assert.equal(plan.taskType, undefined);
+    assert.ok(plan.blockedReason?.includes("止损验证"));
+    assert.ok(plan.blockedReason?.includes("不能直接生成第一章正文"));
+    assert.ok(plan.blockedReason?.includes("恢复条件"));
+  });
+
   await t.test("keeps watch start tactics on a small-sample first-day path", () => {
     const platform = getPlatformProfile("webnovel");
     const riskProfile = buildFirstDayRiskProfile({

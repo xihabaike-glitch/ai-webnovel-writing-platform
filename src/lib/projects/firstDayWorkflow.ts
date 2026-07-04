@@ -489,6 +489,18 @@ export function buildFirstDayModelExecutionPlan(workflow: FirstDayWorkflow): Fir
     modelPrompt: execution.modelPrompt,
     completionEvidence: execution.completionEvidenceTemplate,
   };
+  const riskBlockedReason = execution.riskLevel === "blocked" && execution.stepId === "first-draft"
+    ? "当前开书策略为止损验证，不能直接生成第一章正文。先写清恢复条件：入口卖点、前三章兑现或平台匹配度至少改掉一项，再进入正文生成。"
+    : null;
+
+  if (riskBlockedReason) {
+    return {
+      ...base,
+      executable: false,
+      actionKind: "manual",
+      blockedReason: riskBlockedReason,
+    };
+  }
 
   if (execution.stepId === "story-support") {
     return {

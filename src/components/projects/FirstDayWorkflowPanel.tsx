@@ -56,6 +56,12 @@ interface FirstDayExecutionReceipt {
   detailItems: string[];
 }
 
+interface FirstDayModelExecutionPlan {
+  executable: boolean;
+  taskType?: string;
+  blockedReason?: string;
+}
+
 interface FirstDayContinuationAction {
   status: "first_day_active" | "ready" | "blocked" | "complete";
   headline: string;
@@ -163,6 +169,7 @@ export function FirstDayWorkflowPanel({ projectId }: { projectId: string }) {
   const createdLaunch = searchParams.get("firstDayLaunch") === "1";
   const [workflow, setWorkflow] = useState<FirstDayWorkflow | null>(null);
   const [dispatch, setDispatch] = useState<GatePlatformGrowthDispatchItem | null>(null);
+  const [executionPlan, setExecutionPlan] = useState<FirstDayModelExecutionPlan | null>(null);
   const [modelRoute, setModelRoute] = useState<FirstDayModelRouteStatus | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isDispatching, setIsDispatching] = useState(false);
@@ -191,11 +198,13 @@ export function FirstDayWorkflowPanel({ projectId }: { projectId: string }) {
       const payload = (await response.json()) as {
         workflow: FirstDayWorkflow;
         dispatch: GatePlatformGrowthDispatchItem;
+        executionPlan: FirstDayModelExecutionPlan;
         modelRoute: FirstDayModelRouteStatus;
         continuation: FirstDayContinuationAction;
       };
       setWorkflow(payload.workflow);
       setDispatch(payload.dispatch);
+      setExecutionPlan(payload.executionPlan);
       setModelRoute(payload.modelRoute);
       setContinuation(payload.continuation);
       if (options?.fromRouteRepair) {
@@ -231,6 +240,10 @@ export function FirstDayWorkflowPanel({ projectId }: { projectId: string }) {
 
   async function executeCurrentStepWithAi() {
     if (!workflow) return;
+    if (executionPlan && !executionPlan.executable) {
+      showMessage(executionPlan.blockedReason ?? "当前首日节点暂不支持自动执行。");
+      return;
+    }
     if (modelRoute) {
       const routeBlockMessage = buildFirstDayExecutionRouteBlockMessage(modelRoute);
       if (routeBlockMessage) {
@@ -248,6 +261,7 @@ export function FirstDayWorkflowPanel({ projectId }: { projectId: string }) {
       const payload = (await response.json()) as {
         workflow?: FirstDayWorkflow;
         dispatch?: GatePlatformGrowthDispatchItem;
+        executionPlan?: FirstDayModelExecutionPlan;
         modelRoute?: FirstDayModelRouteStatus;
         continuation?: FirstDayContinuationAction;
         executionReceipt?: FirstDayExecutionReceipt;
@@ -259,6 +273,7 @@ export function FirstDayWorkflowPanel({ projectId }: { projectId: string }) {
       }
       if (payload.workflow) setWorkflow(payload.workflow);
       if (payload.dispatch) setDispatch(payload.dispatch);
+      if (payload.executionPlan) setExecutionPlan(payload.executionPlan);
       if (payload.modelRoute) setModelRoute(payload.modelRoute);
       if (payload.continuation) setContinuation(payload.continuation);
       if (payload.executionReceipt) setExecutionReceipt(payload.executionReceipt);
@@ -294,6 +309,10 @@ export function FirstDayWorkflowPanel({ projectId }: { projectId: string }) {
   }, [projectId, routeRepairReturn, createdLaunch]);
 
   const routeBlockMessage = modelRoute ? buildFirstDayExecutionRouteBlockMessage(modelRoute) : null;
+  const executionBlockMessage = executionPlan && !executionPlan.executable
+    ? executionPlan.blockedReason ?? "当前首日节点暂不支持自动执行。"
+    : null;
+  const aiBlockMessage = executionBlockMessage ?? routeBlockMessage;
   const receiptTone = executionReceipt?.success
     ? {
       panel: "border-emerald-100 bg-emerald-50 text-emerald-900",
@@ -344,7 +363,7 @@ export function FirstDayWorkflowPanel({ projectId }: { projectId: string }) {
           {messageAction === "execute_current_step" ? (
             <button
               className="w-fit rounded-md bg-slate-950 px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
-              disabled={isExecutingAi || Boolean(routeBlockMessage)}
+              disabled={isExecutingAi || Boolean(aiBlockMessage)}
               onClick={executeCurrentStepWithAi}
               type="button"
             >
@@ -513,7 +532,7 @@ export function FirstDayWorkflowPanel({ projectId }: { projectId: string }) {
                     onClick={executeCurrentStepWithAi}
                     type="button"
                   >
-                    {isExecutingAi ? "AI 执行中" : routeBlockMessage ? "检查模型路线" : "AI 执行当前节点"}
+                    {isExecutingAi ? "AI 执行中" : aiBlockMessage ? "查看阻断原因" : "AI 执行当前节点"}
                   </button>
                   <button
                     className="w-fit rounded-md border border-slate-200 px-3 py-2 text-sm font-medium hover:bg-slate-50"
@@ -540,12 +559,14 @@ export function FirstDayWorkflowPanel({ projectId }: { projectId: string }) {
                     <span className="rounded-md bg-slate-50 px-2 py-1">备用 {modelRoute.fallbackProviderName}</span>
                   </div>
                   <p className="mt-2 leading-6 text-slate-600">{modelRoute.detail}</p>
-                  {routeBlockMessage ? (
+                  {aiBlockMessage ? (
                     <div className="mt-3 flex flex-col gap-2 rounded-md bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-800 sm:flex-row sm:items-center sm:justify-between">
-                      <span>{routeBlockMessage}</span>
-                      <Link className="font-medium text-amber-900 underline underline-offset-2" href={modelSettingsRepairHref(modelRoute, projectId)}>
-                        去配置
-                      </Link>
+                      <span>{aiBlockMessage}</span>
+                      {executionBlockMessage ? null : (
+                        <Link className="font-medium text-amber-900 underline underline-offset-2" href={modelSettingsRepairHref(modelRoute, projectId)}>
+                          去配置
+                        </Link>
+                      )}
                     </div>
                   ) : null}
                 </div>

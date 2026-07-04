@@ -1,6 +1,7 @@
 import { buildModelTaskAuditDashboard, type ModelAuditProvider, type ModelAuditTask } from "../ai/modelTaskAudit.ts";
 import { getPlatformProfile, type PlatformId } from "../platforms/platformProfiles.ts";
-import { buildFirstDayWorkflow, type FirstDayAiTask, type FirstDayChapter, type FirstDayCharacter, type FirstDayOutlineNode, type FirstDayWorldEntry } from "./firstDayWorkflow.ts";
+import { buildFirstDayRiskProfile, buildFirstDayWorkflow, type FirstDayAiTask, type FirstDayChapter, type FirstDayCharacter, type FirstDayOutlineNode, type FirstDayRiskLevel, type FirstDayWorldEntry } from "./firstDayWorkflow.ts";
+import { findProjectStartTacticSummary } from "./projectStartTactics.ts";
 import { buildSubmissionChecklist } from "./submissionChecklist.ts";
 
 export interface ProjectListProject {
@@ -42,6 +43,10 @@ export interface ProjectListItem {
   aiCostUsd: number;
   aiFailureRatePercent: number;
   reviewCoveragePercent: number;
+  riskLevel: FirstDayRiskLevel;
+  riskLabel: string;
+  riskHeadline: string;
+  riskDetail: string;
   riskFlags: string[];
 }
 
@@ -53,6 +58,9 @@ export interface ProjectListDashboard {
     totalWords: number;
     totalAiCostUsd: number;
     projectsNeedingAction: number;
+    standardProjects: number;
+    watchProjects: number;
+    blockedProjects: number;
   };
   items: ProjectListItem[];
 }
@@ -104,8 +112,12 @@ function riskFlags(input: {
   reviewCoveragePercent: number;
   wordProgressPercent: number;
   chapterCount: number;
+  riskLevel: FirstDayRiskLevel;
+  riskLabel: string;
 }) {
   const flags: string[] = [];
+  if (input.riskLevel === "blocked") flags.push(`开书策略：${input.riskLabel}，先止损恢复`);
+  if (input.riskLevel === "watch") flags.push(`开书策略：${input.riskLabel}，只跑小样本`);
   if (input.chapterCount === 0) flags.push("没有章节卡");
   if (input.firstDayProgress < 50) flags.push("首日链路未过半");
   if (input.aiFailureRate >= 20) flags.push(`AI 失败率 ${input.aiFailureRate}%`);
@@ -121,6 +133,8 @@ export function buildProjectListDashboard(
 ): ProjectListDashboard {
   const items = projects.map((project) => {
     const platform = getPlatformProfile(project.targetPlatform as PlatformId);
+    const startTactic = findProjectStartTacticSummary(project.worldEntries);
+    const riskProfile = buildFirstDayRiskProfile(startTactic);
     const submissionChecklist = buildSubmissionChecklist({
       title: project.title,
       genre: project.genre,
@@ -147,6 +161,7 @@ export function buildProjectListDashboard(
       characters: project.characters,
       worldEntries: project.worldEntries,
       aiTasks: project.aiTasks,
+      startTactic,
       submissionChecklist,
     });
     const modelAudit = buildModelTaskAuditDashboard(project.aiTasks, providers);
@@ -154,7 +169,7 @@ export function buildProjectListDashboard(
       ? clampPercent((project.currentWordCount / project.targetWordCount) * 100)
       : 0;
     const reviewCoveragePercent = reviewCoverage(project.chapters, project.aiTasks);
-    const healthScore = Math.round(average([
+    const rawHealthScore = Math.round(average([
       firstDay.progressPercent,
       outlineCoverage(project.outlineNodes),
       supportCoverage(project),
@@ -162,6 +177,11 @@ export function buildProjectListDashboard(
       project.chapters.length > 0 ? 60 : 20,
       reviewCoveragePercent > 0 ? reviewCoveragePercent : project.currentWordCount > 0 ? 30 : 50,
     ]));
+    const healthScore = riskProfile.level === "blocked"
+      ? Math.min(rawHealthScore, 49)
+      : riskProfile.level === "watch"
+        ? Math.min(rawHealthScore, 74)
+        : rawHealthScore;
     const aiFailureRatePercent = modelAudit.summary.failureRatePercent;
 
     return {
@@ -182,12 +202,18 @@ export function buildProjectListDashboard(
       aiCostUsd: money(modelAudit.summary.knownCostUsd),
       aiFailureRatePercent,
       reviewCoveragePercent,
+      riskLevel: riskProfile.level,
+      riskLabel: riskProfile.label,
+      riskHeadline: riskProfile.headline,
+      riskDetail: riskProfile.instruction,
       riskFlags: riskFlags({
         firstDayProgress: firstDay.progressPercent,
         aiFailureRate: aiFailureRatePercent,
         reviewCoveragePercent,
         wordProgressPercent,
         chapterCount: project.chapters.length,
+        riskLevel: riskProfile.level,
+        riskLabel: riskProfile.label,
       }),
     };
   }).sort((left, right) => (
@@ -203,6 +229,9 @@ export function buildProjectListDashboard(
       totalWords: items.reduce((sum, item) => sum + item.currentWordCount, 0),
       totalAiCostUsd: money(items.reduce((sum, item) => sum + item.aiCostUsd, 0)),
       projectsNeedingAction: items.filter((item) => item.healthScore < 75).length,
+      standardProjects: items.filter((item) => item.riskLevel === "standard").length,
+      watchProjects: items.filter((item) => item.riskLevel === "watch").length,
+      blockedProjects: items.filter((item) => item.riskLevel === "blocked").length,
     },
     items,
   };

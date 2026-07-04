@@ -24,7 +24,20 @@ function categoryClass(category: QueueItem["category"]) {
 function blockerTypeLabel(entry: QueueItem) {
   if (entry.blockerType === "publish_repair") return "发布阻塞";
   if (entry.blockerType === "chapter_card") return "章节卡住";
+  if (entry.blockerType === "risk_recovery") return "开书止损";
   return entry.label;
+}
+
+function riskClass(level: QueueItem["riskLevel"]) {
+  if (level === "blocked") return "border-rose-200 bg-rose-50 text-rose-800";
+  if (level === "watch") return "border-amber-200 bg-amber-50 text-amber-800";
+  return "border-emerald-200 bg-emerald-50 text-emerald-800";
+}
+
+function riskLabel(level: QueueItem["riskLevel"]) {
+  if (level === "blocked") return "止损";
+  if (level === "watch") return "观察";
+  return "标准";
 }
 
 function runStatusClass(status: string) {
@@ -161,6 +174,14 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
         <div className="rounded-md border border-slate-200 bg-white p-3">
           <div className="text-xs text-slate-500">章节卡住</div>
           <div className="mt-1 text-2xl font-semibold">{queue.overview.chapterCardBlocked}</div>
+        </div>
+        <div className="rounded-md border border-slate-200 bg-white p-3">
+          <div className="text-xs text-slate-500">开书止损</div>
+          <div className="mt-1 text-2xl font-semibold">{queue.overview.riskRecoveryBlocked}</div>
+        </div>
+        <div className="rounded-md border border-slate-200 bg-white p-3">
+          <div className="text-xs text-slate-500">观察任务</div>
+          <div className="mt-1 text-2xl font-semibold">{queue.overview.watchItems}</div>
         </div>
       </section>
 
@@ -555,6 +576,9 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
               <div>
                 <div className="flex flex-wrap items-center gap-2">
                   <span className={`rounded-md px-2 py-1 text-xs font-medium ${categoryClass(entry.category)}`}>{blockerTypeLabel(entry)}</span>
+                  <span className={`rounded-md border px-2 py-1 text-xs font-medium ${riskClass(entry.riskLevel)}`}>
+                    {riskLabel(entry.riskLevel)} · {entry.riskLabel}
+                  </span>
                   <Link className="font-semibold text-slate-950 hover:underline" href={`/projects/${entry.projectId}`}>
                     {entry.projectTitle}
                   </Link>
@@ -563,6 +587,11 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
                   {entry.platformName} · {entry.chapterTitle}
                 </div>
                 <p className="mt-2 text-sm leading-6 text-slate-600">{entry.evidence}</p>
+                {entry.riskNotice ? (
+                  <div className={`mt-3 rounded-md border px-3 py-2 text-xs leading-5 ${riskClass(entry.riskLevel)}`}>
+                    {entry.riskNotice}
+                  </div>
+                ) : null}
                 {entry.strategyBasis ? (
                   <div className="mt-3 border-l-2 border-emerald-500 pl-3 text-xs leading-5 text-emerald-900">
                     <div className="font-medium">首轮平台打法 · {entry.strategyBasis.label}</div>

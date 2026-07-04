@@ -3,6 +3,7 @@ import { AppShell } from "@/components/app-shell/AppShell";
 import { ProjectForm } from "@/components/projects/ProjectForm";
 import { prisma } from "@/lib/db/prisma";
 import { buildProjectListDashboard } from "@/lib/projects/projectListDashboard";
+import type { FirstDayRiskLevel } from "@/lib/projects/firstDayWorkflow";
 
 function numberText(value: number) {
   return new Intl.NumberFormat("zh-CN").format(value);
@@ -10,6 +11,18 @@ function numberText(value: number) {
 
 function moneyText(value: number) {
   return `$${value.toFixed(4)}`;
+}
+
+function riskClass(level: FirstDayRiskLevel) {
+  if (level === "blocked") return "border-rose-200 bg-rose-50 text-rose-800";
+  if (level === "watch") return "border-amber-200 bg-amber-50 text-amber-800";
+  return "border-emerald-200 bg-emerald-50 text-emerald-800";
+}
+
+function riskLevelLabel(level: FirstDayRiskLevel) {
+  if (level === "blocked") return "止损";
+  if (level === "watch") return "观察";
+  return "标准";
 }
 
 export default async function ProjectsPage() {
@@ -77,6 +90,23 @@ export default async function ProjectsPage() {
           <div className="mt-1 text-2xl font-semibold">{dashboard.overview.projectsNeedingAction}</div>
         </div>
       </section>
+      <section className="mb-6 grid gap-3 md:grid-cols-3">
+        <div className="rounded-md border border-emerald-200 bg-emerald-50 p-3 text-emerald-900">
+          <div className="text-xs opacity-75">标准推进</div>
+          <div className="mt-1 text-2xl font-semibold">{dashboard.overview.standardProjects}</div>
+          <div className="mt-1 text-xs opacity-75">可以按首日流程进入生成、审稿和发布预检。</div>
+        </div>
+        <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-amber-900">
+          <div className="text-xs opacity-75">观察小样本</div>
+          <div className="mt-1 text-2xl font-semibold">{dashboard.overview.watchProjects}</div>
+          <div className="mt-1 text-xs opacity-75">只验证首轮通过线，别急着批量放大。</div>
+        </div>
+        <div className="rounded-md border border-rose-200 bg-rose-50 p-3 text-rose-900">
+          <div className="text-xs opacity-75">止损恢复</div>
+          <div className="mt-1 text-2xl font-semibold">{dashboard.overview.blockedProjects}</div>
+          <div className="mt-1 text-xs opacity-75">先证明问题改掉，再允许正文生产。</div>
+        </div>
+      </section>
       <section className="grid gap-3">
         {dashboard.items.map((item) => (
           <div
@@ -90,10 +120,18 @@ export default async function ProjectsPage() {
                     {item.title}
                   </Link>
                   <span className="rounded-md bg-slate-100 px-2 py-1 text-xs text-slate-600">{item.healthLabel}</span>
+                  <span className={`rounded-md border px-2 py-1 text-xs font-medium ${riskClass(item.riskLevel)}`}>
+                    {riskLevelLabel(item.riskLevel)} · {item.riskLabel}
+                  </span>
                 </div>
                 <div className="mt-1 text-sm text-slate-600">
                   {item.platformName} · {item.genre} · {item.chapterCount} 章 · 更新 {new Date(item.updatedAt).toLocaleDateString()}
                 </div>
+                {item.riskLevel !== "standard" ? (
+                  <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
+                    {item.riskHeadline}{item.riskDetail}
+                  </p>
+                ) : null}
               </div>
               <div className="flex flex-wrap gap-2 text-sm">
                 <Link className="rounded-md bg-slate-950 px-3 py-2 font-medium text-white" href={item.nextActionHref}>

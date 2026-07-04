@@ -83,6 +83,8 @@ test("buildTaskQueueCenter", async (t) => {
     assert.equal(queue.overview.blockedCards, 2);
     assert.equal(queue.overview.publishBlocked, 1);
     assert.equal(queue.overview.chapterCardBlocked, 1);
+    assert.equal(queue.overview.riskRecoveryBlocked, 0);
+    assert.equal(queue.overview.watchItems, 0);
     assert.equal(queue.overview.totalItems, 5);
     assert.equal(queue.recommendedNext?.category, "review");
     assert.deepEqual(
@@ -97,5 +99,61 @@ test("buildTaskQueueCenter", async (t) => {
     assert.ok(publishBlocker?.evidence.includes("先处理"));
     assert.equal(queue.recommendedNext?.strategyBasis?.label, "模板推荐");
     assert.ok(queue.items.every((item) => item.strategyBasis?.openingMove.includes("倒计时")));
+  });
+
+  await t.test("blocks risky first drafts behind recovery validation", () => {
+    const blockedProject: TaskQueueProject = {
+      ...project,
+      id: "blocked-project",
+      worldEntries: [
+        {
+          type: "platform_soil",
+          title: "首轮平台打法：番茄小说",
+          content: [
+            "状态：历史避坑",
+            "打法：旧样本首章解释过多，先重做入口卖点。",
+            "开头动作：第一段给不可逆危机。",
+            "验证动作：只看前三章兑现是否改掉。",
+            "风险：没有恢复条件前不能放量。",
+          ].join("\n"),
+        },
+      ],
+    };
+    const queue = buildTaskQueueCenter([blockedProject]);
+
+    assert.equal(queue.overview.riskRecoveryBlocked, 1);
+    assert.equal(queue.items.some((item) => item.category === "draft"), false);
+    const recovery = queue.items.find((item) => item.blockerType === "risk_recovery");
+    assert.equal(recovery?.riskLevel, "blocked");
+    assert.equal(recovery?.actionLabel, "做恢复验证");
+    assert.ok(recovery?.href.endsWith("#first-day-workflow"));
+    assert.ok(recovery?.evidence.includes("恢复条件"));
+  });
+
+  await t.test("keeps watch projects as small-sample draft tasks", () => {
+    const watchProject: TaskQueueProject = {
+      ...project,
+      id: "watch-project",
+      worldEntries: [
+        {
+          type: "platform_soil",
+          title: "首轮平台打法：番茄小说",
+          content: [
+            "状态：历史观察",
+            "打法：先用第一章小样本验证读者反馈。",
+            "开头动作：第一段给强冲突。",
+            "验证动作：写清通过线和不可接受项。",
+            "风险：观察期不要批量。",
+          ].join("\n"),
+        },
+      ],
+    };
+    const queue = buildTaskQueueCenter([watchProject]);
+    const draft = queue.items.find((item) => item.category === "draft");
+
+    assert.equal(queue.overview.watchItems, queue.items.length);
+    assert.equal(draft?.riskLevel, "watch");
+    assert.equal(draft?.actionLabel, "生成小样本");
+    assert.ok(draft?.riskNotice?.includes("小样本验证"));
   });
 });

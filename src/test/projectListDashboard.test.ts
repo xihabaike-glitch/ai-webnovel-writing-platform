@@ -73,6 +73,48 @@ const emptyProject: ProjectListProject = {
   aiTasks: [],
 };
 
+const blockedProject: ProjectListProject = {
+  ...completeProject,
+  id: "blocked-project",
+  title: "避坑旧坑",
+  updatedAt: "2026-01-04T00:00:00.000Z",
+  worldEntries: [
+    ...completeProject.worldEntries.filter((entry) => entry.title !== "番茄土壤"),
+    {
+      type: "platform_soil",
+      title: "首轮平台打法：番茄小说",
+      content: [
+        "状态：历史避坑",
+        "打法：旧样本首章解释过多，先重做入口卖点。",
+        "开头动作：第一段给不可逆危机。",
+        "验证动作：只看前三章兑现是否改掉。",
+        "风险：没有恢复条件前不能放量。",
+      ].join("\n"),
+    },
+  ],
+};
+
+const watchProject: ProjectListProject = {
+  ...completeProject,
+  id: "watch-project",
+  title: "观察新坑",
+  updatedAt: "2026-01-05T00:00:00.000Z",
+  worldEntries: [
+    ...completeProject.worldEntries.filter((entry) => entry.title !== "番茄土壤"),
+    {
+      type: "platform_soil",
+      title: "首轮平台打法：七猫小说",
+      content: [
+        "状态：历史观察",
+        "打法：先用第一章小样本验证读者反馈。",
+        "开头动作：第一段给强冲突。",
+        "验证动作：写清通过线和不可接受项。",
+        "风险：观察期不要批量。",
+      ].join("\n"),
+    },
+  ],
+};
+
 test("buildProjectListDashboard", async (t) => {
   await t.test("sorts projects by operational urgency and summarizes portfolio metrics", () => {
     const dashboard = buildProjectListDashboard([completeProject, emptyProject], [
@@ -95,5 +137,30 @@ test("buildProjectListDashboard", async (t) => {
     assert.ok(dashboard.items[0].riskFlags.includes("没有章节卡"));
     assert.equal(dashboard.items[1].aiCostUsd, 0.01);
     assert.equal(dashboard.items[1].nextAction, "二改或前三章改写");
+  });
+
+  await t.test("surfaces first-day risk lanes in portfolio cards", () => {
+    const dashboard = buildProjectListDashboard([completeProject, blockedProject, watchProject], [
+      {
+        id: "provider-1",
+        providerId: "mock",
+        displayName: "Mock",
+        defaultModel: "mock-novel",
+        enabled: true,
+        encryptedApiKey: "secret",
+      },
+    ]);
+
+    assert.equal(dashboard.overview.standardProjects, 1);
+    assert.equal(dashboard.overview.watchProjects, 1);
+    assert.equal(dashboard.overview.blockedProjects, 1);
+    const blocked = dashboard.items.find((item) => item.id === "blocked-project");
+    const watch = dashboard.items.find((item) => item.id === "watch-project");
+    assert.equal(blocked?.riskLevel, "blocked");
+    assert.equal(blocked?.healthScore, 49);
+    assert.ok(blocked?.riskFlags.some((flag) => flag.includes("先止损恢复")));
+    assert.equal(watch?.riskLevel, "watch");
+    assert.ok((watch?.healthScore ?? 100) <= 74);
+    assert.ok(watch?.riskFlags.some((flag) => flag.includes("只跑小样本")));
   });
 });

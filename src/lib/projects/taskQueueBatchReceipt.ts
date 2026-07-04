@@ -1,7 +1,11 @@
 import type { TaskQueueExecutionPlan } from "./taskQueueExecutionPlan.ts";
+import type { BatchExecutionStrategyId } from "./batchExecutionStrategy.ts";
+import { buildGateActionReceipt, type GateActionReceipt, type GateActionReceiptPayload } from "./gateActionReceipts.ts";
+import { platformProfiles } from "../platforms/platformProfiles.ts";
 
 export interface TaskQueueBatchRunResult {
   status: "succeeded" | "failed";
+  taskId?: string;
   chapterTitle: string;
   error: string | null;
   qualityScore: number | null;
@@ -31,6 +35,14 @@ export interface TaskQueueBatchReceipt {
   warnings: string[];
 }
 
+export interface TaskQueueBatchGateActionReceipt {
+  receipt: GateActionReceipt;
+  payload: GateActionReceiptPayload & {
+    strategyId: BatchExecutionStrategyId;
+    batchReceipt: TaskQueueBatchReceipt;
+  };
+}
+
 function projectHref(plan: Pick<TaskQueueExecutionPlan, "projectId">) {
   return plan.projectId ? `/projects/${plan.projectId}` : "/tasks";
 }
@@ -58,6 +70,15 @@ function nextSuccessAction(plan: Pick<TaskQueueExecutionPlan, "category" | "proj
     primaryLabel: "进入平台导出",
     primaryHref: `${projectHref(plan)}#platform-export`,
   };
+}
+
+function platformFromStrategyTitle(title: string | undefined) {
+  if (!title) return null;
+  return platformProfiles.find((platform) => title.includes(platform.name)) ?? null;
+}
+
+function receiptStatusFromBatchReceipt(batchReceipt: TaskQueueBatchReceipt) {
+  return batchReceipt.status === "repair" ? "failed" : "succeeded";
 }
 
 export function buildTaskQueueBatchReceipt(input: {
@@ -143,5 +164,56 @@ export function buildTaskQueueBatchReceipt(input: {
       input.routeEffectSummary.verdict,
       input.plan.strategyBases[0] ? `沿用打法：${input.plan.strategyBases[0].label}。` : "执行后继续回填数据，形成可复用打法。",
     ],
+  };
+}
+
+export function buildTaskQueueBatchGateActionReceipt(input: {
+  plan: TaskQueueExecutionPlan;
+  results: TaskQueueBatchRunResult[];
+  routeEffectSummary: TaskQueueBatchRouteEffect;
+  batchReceipt: TaskQueueBatchReceipt;
+  strategyId: BatchExecutionStrategyId;
+  now?: Date | string;
+}): TaskQueueBatchGateActionReceipt {
+  const platform = platformFromStrategyTitle(input.plan.strategyBases[0]?.title);
+  const platformName = platform?.name ?? "任务中心";
+  const projectTitle = input.plan.projectTitle ?? "多项目批次";
+  const payload: TaskQueueBatchGateActionReceipt["payload"] = {
+    strategyId: input.strategyId,
+    plan: {
+      strategyBases: input.plan.strategyBases,
+    },
+    results: input.results.map((result) => ({
+      status: result.status,
+      taskId: result.taskId,
+    })),
+    routeEffectSummary: input.routeEffectSummary,
+    batchReceipt: input.batchReceipt,
+  };
+  const receipt = buildGateActionReceipt({
+    action: {
+      id: `recommended-batch:${input.strategyId}:${input.plan.category ?? "none"}:${input.plan.projectId ?? "multi"}`,
+      label: `沉淀${input.plan.actionLabel}经验`,
+      detail: `${platformName} · ${projectTitle} · ${input.plan.actionLabel}`,
+      href: "/gate",
+      tone: receiptStatusFromBatchReceipt(input.batchReceipt) === "failed" ? "repair" : "primary",
+      execution: {
+        type: "recommended_batch",
+        strategyId: input.strategyId,
+      },
+    },
+    payload,
+    status: receiptStatusFromBatchReceipt(input.batchReceipt),
+    now: input.now,
+  });
+
+  return {
+    receipt: {
+      ...receipt,
+      platformId: platform?.id ?? receipt.platformId,
+      platformName,
+      href: input.batchReceipt.primaryHref || receipt.href,
+    },
+    payload,
   };
 }

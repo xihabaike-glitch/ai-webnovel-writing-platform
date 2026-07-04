@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildTaskQueueBatchReceipt, type TaskQueueBatchRouteEffect } from "../lib/projects/taskQueueBatchReceipt.ts";
+import {
+  buildTaskQueueBatchGateActionReceipt,
+  buildTaskQueueBatchReceipt,
+  type TaskQueueBatchRouteEffect,
+} from "../lib/projects/taskQueueBatchReceipt.ts";
 import type { TaskQueueExecutionPlan } from "../lib/projects/taskQueueExecutionPlan.ts";
 
 const plan: TaskQueueExecutionPlan = {
@@ -101,4 +105,31 @@ test("buildTaskQueueBatchReceipt flags fallback and cost pressure before expandi
   assert.equal(receipt.status, "watch_cost");
   assert.equal(receipt.primaryHref, "/projects/project-1#model-task-audit");
   assert.ok(receipt.warnings.some((warning) => warning.includes("成本")));
+});
+
+test("buildTaskQueueBatchGateActionReceipt turns a recommended batch into gate experience", () => {
+  const batchReceipt = buildTaskQueueBatchReceipt({
+    plan,
+    results: [{ status: "succeeded", taskId: "task-1", chapterTitle: "第一章", error: null, qualityScore: 86 }],
+    routeEffectSummary: routeEffect,
+  });
+  const gateReceipt = buildTaskQueueBatchGateActionReceipt({
+    plan,
+    results: [{ status: "succeeded", taskId: "task-1", chapterTitle: "第一章", error: null, qualityScore: 86 }],
+    routeEffectSummary: routeEffect,
+    batchReceipt,
+    strategyId: "standard",
+    now: "2026-01-01T00:00:00.000Z",
+  });
+
+  assert.equal(gateReceipt.receipt.executionType, "recommended_batch");
+  assert.equal(gateReceipt.receipt.platformId, "fanqie");
+  assert.equal(gateReceipt.receipt.platformName, "番茄小说");
+  assert.equal(gateReceipt.receipt.succeededCount, 1);
+  assert.equal(gateReceipt.receipt.failedCount, 0);
+  assert.equal(gateReceipt.receipt.taskId, "task-1");
+  assert.equal(gateReceipt.receipt.batchEffectSummary?.successRatePercent, 100);
+  assert.equal(gateReceipt.receipt.startTactics?.[0].title, "首轮平台打法：番茄小说");
+  assert.equal(gateReceipt.payload.batchReceipt.status, "continue");
+  assert.equal(gateReceipt.payload.strategyId, "standard");
 });

@@ -8,7 +8,7 @@ import { buildBatchRouteEffectSummary } from "@/lib/model-gateway/batchRouteEffe
 import { buildBatchExecutionSafety } from "@/lib/projects/batchExecutionSafety";
 import { getBatchExecutionStrategy } from "@/lib/projects/batchExecutionStrategy";
 import { findProjectStartTacticSummary } from "@/lib/projects/projectStartTactics";
-import { buildTaskQueueBatchReceipt } from "@/lib/projects/taskQueueBatchReceipt";
+import { buildTaskQueueBatchGateActionReceipt, buildTaskQueueBatchReceipt } from "@/lib/projects/taskQueueBatchReceipt";
 import { buildTaskQueueCenter } from "@/lib/projects/taskQueueCenter";
 import { buildTaskQueueExecutionPlan } from "@/lib/projects/taskQueueExecutionPlan";
 
@@ -148,6 +148,58 @@ export async function POST(request: Request) {
     results,
     routeEffectSummary,
   });
+  const gateReceipt = buildTaskQueueBatchGateActionReceipt({
+    plan,
+    results,
+    routeEffectSummary,
+    batchReceipt,
+    strategyId: strategy.id,
+  });
+  await prisma.gateActionAudit.upsert({
+    where: { receiptId: gateReceipt.receipt.id },
+    create: {
+      receiptId: gateReceipt.receipt.id,
+      actionId: gateReceipt.receipt.actionId,
+      projectId: plan.projectIds.length === 1 ? plan.projectId : null,
+      platformId: gateReceipt.receipt.platformId ?? "",
+      platformName: gateReceipt.receipt.platformName ?? "",
+      label: gateReceipt.receipt.label,
+      detail: gateReceipt.receipt.detail,
+      href: gateReceipt.receipt.href,
+      status: gateReceipt.receipt.status,
+      message: gateReceipt.receipt.message,
+      executionType: gateReceipt.receipt.executionType,
+      succeededCount: gateReceipt.receipt.succeededCount,
+      failedCount: gateReceipt.receipt.failedCount,
+      taskId: gateReceipt.receipt.taskId,
+      recheckStatus: gateReceipt.receipt.recheck.status,
+      recheckLabel: gateReceipt.receipt.recheck.label,
+      recheckDetail: gateReceipt.receipt.recheck.detail,
+      recheckAction: gateReceipt.receipt.recheck.actionLabel,
+      payload: JSON.stringify(gateReceipt.payload),
+      createdAt: new Date(gateReceipt.receipt.createdAt),
+    },
+    update: {
+      actionId: gateReceipt.receipt.actionId,
+      projectId: plan.projectIds.length === 1 ? plan.projectId : null,
+      platformId: gateReceipt.receipt.platformId ?? "",
+      platformName: gateReceipt.receipt.platformName ?? "",
+      label: gateReceipt.receipt.label,
+      detail: gateReceipt.receipt.detail,
+      href: gateReceipt.receipt.href,
+      status: gateReceipt.receipt.status,
+      message: gateReceipt.receipt.message,
+      executionType: gateReceipt.receipt.executionType,
+      succeededCount: gateReceipt.receipt.succeededCount,
+      failedCount: gateReceipt.receipt.failedCount,
+      taskId: gateReceipt.receipt.taskId,
+      recheckStatus: gateReceipt.receipt.recheck.status,
+      recheckLabel: gateReceipt.receipt.recheck.label,
+      recheckDetail: gateReceipt.receipt.recheck.detail,
+      recheckAction: gateReceipt.receipt.recheck.actionLabel,
+      payload: JSON.stringify(gateReceipt.payload),
+    },
+  });
 
   return NextResponse.json({
     plan,
@@ -155,5 +207,6 @@ export async function POST(request: Request) {
     results,
     routeEffectSummary,
     batchReceipt,
+    gateReceipt: gateReceipt.receipt,
   });
 }

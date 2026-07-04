@@ -3115,10 +3115,31 @@ test("buildGateActionReceipt", async (t) => {
         state: "assigned" as const,
         ownerRole: "作者",
         priorityScore: 91,
+        evidence: ["来源派单：story-tree:project-1:chapter-1:chapter_draft:opening_ending"],
         assignedAt: "2026-01-01T00:00:05.000Z",
         completedAt: null,
         createdAt: "2026-01-01T00:00:05.000Z",
         updatedAt: "2026-01-01T00:00:05.000Z",
+      },
+      {
+        ...baseDispatch,
+        id: "story-tree-followup:project-1:chapter-1:story-tree-followup-project-1-chapter-1-source-74:77",
+        databaseId: "dispatch-db-5",
+        dispatchKey: "story-tree-followup:project-1:chapter-1:story-tree-followup-project-1-chapter-1-source-74:77",
+        projectId: "project-1",
+        sourceReceiptId: null,
+        completionEvidence: "",
+        platformId: "fanqie",
+        platformName: "番茄小说",
+        stage: "start_rewrite_opening" as const,
+        state: "assigned" as const,
+        ownerRole: "作者",
+        priorityScore: 89,
+        evidence: ["来源派单：story-tree-followup:project-1:chapter-1:source:74"],
+        assignedAt: "2026-01-01T00:00:06.000Z",
+        completedAt: null,
+        createdAt: "2026-01-01T00:00:06.000Z",
+        updatedAt: "2026-01-01T00:00:06.000Z",
       },
     ];
 
@@ -3127,21 +3148,31 @@ test("buildGateActionReceipt", async (t) => {
     const fanqie = filterGateDispatchTasks(tasks, { platformId: "fanqie" });
     const recheckFollowUps = filterGateDispatchTasks(tasks, { recheckFollowUpOnly: true });
 
-    assert.equal(center.summary.total, 4);
-    assert.equal(center.summary.active, 3);
+    assert.equal(center.summary.total, 5);
+    assert.equal(center.summary.active, 4);
     assert.equal(center.summary.queued, 1);
-    assert.equal(center.summary.assigned, 2);
+    assert.equal(center.summary.assigned, 3);
     assert.equal(center.summary.completed, 1);
-    assert.equal(center.summary.recheckFollowUp, 1);
-    assert.equal(center.summary.activeRecheckFollowUp, 1);
+    assert.equal(center.summary.recheckFollowUp, 2);
+    assert.equal(center.summary.activeRecheckFollowUp, 2);
+    assert.equal(center.summary.recheckFollowUpChains, 1);
+    assert.equal(center.summary.repeatedRecheckFollowUpChains, 1);
+    assert.equal(center.recheckFollowUpChains[0].rootDispatchKey, "story-tree:project-1:chapter-1:chapter_draft:opening_ending");
+    assert.equal(center.recheckFollowUpChains[0].maxRound, 2);
+    assert.equal(center.recheckFollowUpChains[0].active, 2);
+    assert.deepEqual(center.recheckFollowUpChains[0].rounds.map((round) => `${round.round}:${round.dispatchKey}`), [
+      "1:story-tree-followup:project-1:chapter-1:source:74",
+      "2:story-tree-followup:project-1:chapter-1:story-tree-followup-project-1-chapter-1-source-74:77",
+    ]);
     assert.equal(center.platforms[0].id, "fanqie");
     assert.ok(center.nextActions.some((actionText) => actionText.includes("复查失败返工")));
+    assert.ok(center.nextActions.some((actionText) => actionText.includes("二轮以上")));
     assert.ok(center.nextActions.some((actionText) => actionText.includes("高优先级")));
-    assert.equal(assigned.length, 2);
+    assert.equal(assigned.length, 3);
     assert.equal(assigned[0].dispatchKey, "story-tree-followup:project-1:chapter-1:source:74");
-    assert.equal(fanqie.length, 2);
+    assert.equal(fanqie.length, 3);
     assert.equal(fanqie[0].ownerRole, "投稿资产编辑");
-    assert.equal(recheckFollowUps.length, 1);
+    assert.equal(recheckFollowUps.length, 2);
     assert.equal(recheckFollowUps[0].ownerRole, "作者");
   });
 

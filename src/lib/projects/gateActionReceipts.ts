@@ -326,6 +326,8 @@ export interface GateDispatchTaskCenter {
     dueToday: number;
     recheckFollowUp: number;
     activeRecheckFollowUp: number;
+    recheckFollowUpChains: number;
+    repeatedRecheckFollowUpChains: number;
     averagePriorityScore: number;
   };
   platforms: Array<{
@@ -343,6 +345,31 @@ export interface GateDispatchTaskCenter {
   }>;
   nextActions: string[];
   closeoutItems: GateDispatchTaskCloseoutItem[];
+  recheckFollowUpChains: GateDispatchRecheckFollowUpChain[];
+}
+
+export interface GateDispatchRecheckFollowUpChain {
+  rootDispatchKey: string;
+  latestDispatchKey: string;
+  projectId: string | null;
+  platformName: string;
+  total: number;
+  active: number;
+  completed: number;
+  maxRound: number;
+  status: "active" | "completed";
+  latestTitle: string;
+  latestActionLabel: string;
+  latestHref: string;
+  latestUpdatedAt: string;
+  rounds: Array<{
+    round: number;
+    dispatchKey: string;
+    state: GatePlatformGrowthDispatchState;
+    title: string;
+    priorityScore: number;
+    ownerRole: string;
+  }>;
 }
 
 export type GateDispatchTaskCloseoutStatus = "overdue" | "today" | "planned" | "done";
@@ -364,6 +391,11 @@ export interface GateDispatchTaskCloseoutItem {
 export function isChapterProductionRecheckFollowUpTask(task: Pick<PersistedGatePlatformDispatchTask, "dispatchKey">) {
   return task.dispatchKey.startsWith("story-tree-followup:")
     || task.dispatchKey.startsWith("submission-recheck-followup:");
+}
+
+function sourceDispatchKeyFromEvidence(task: Pick<PersistedGatePlatformDispatchTask, "evidence">) {
+  const sourceLine = task.evidence.find((line) => line.startsWith("来源派单："));
+  return sourceLine?.replace("来源派单：", "").trim() || null;
 }
 
 export type GateDispatchEvidenceReviewStatus = "verified" | "needs_receipt" | "missing_evidence" | "active";
@@ -2905,6 +2937,80 @@ export function buildGateDispatchTaskCloseoutItem(
   };
 }
 
+function buildGateDispatchRecheckFollowUpChains(tasks: PersistedGatePlatformDispatchTask[]): GateDispatchRecheckFollowUpChain[] {
+  const followUps = tasks.filter(isChapterProductionRecheckFollowUpTask);
+  const taskByKey = new Map(followUps.map((task) => [task.dispatchKey, task]));
+  const rootMemo = new Map<string, string>();
+  const roundMemo = new Map<string, number>();
+
+  function rootFor(task: PersistedGatePlatformDispatchTask): string {
+    const cached = rootMemo.get(task.dispatchKey);
+    if (cached) return cached;
+    const sourceKey = sourceDispatchKeyFromEvidence(task);
+    const sourceTask = sourceKey ? taskByKey.get(sourceKey) : null;
+    const root = sourceTask ? rootFor(sourceTask) : sourceKey || task.dispatchKey;
+    rootMemo.set(task.dispatchKey, root);
+    return root;
+  }
+
+  function roundFor(task: PersistedGatePlatformDispatchTask): number {
+    const cached = roundMemo.get(task.dispatchKey);
+    if (cached) return cached;
+    const sourceKey = sourceDispatchKeyFromEvidence(task);
+    const sourceTask = sourceKey ? taskByKey.get(sourceKey) : null;
+    const round = sourceTask ? roundFor(sourceTask) + 1 : 1;
+    roundMemo.set(task.dispatchKey, round);
+    return round;
+  }
+
+  const chains = new Map<string, PersistedGatePlatformDispatchTask[]>();
+  for (const task of followUps) {
+    const root = rootFor(task);
+    chains.set(root, [...(chains.get(root) ?? []), task]);
+  }
+
+  return [...chains.entries()].map(([rootDispatchKey, chainTasks]) => {
+    const rounds = chainTasks
+      .map((task) => ({
+        round: roundFor(task),
+        dispatchKey: task.dispatchKey,
+        state: task.state,
+        title: task.title,
+        priorityScore: task.priorityScore,
+        ownerRole: task.ownerRole,
+      }))
+      .sort((left, right) => left.round - right.round || right.priorityScore - left.priorityScore);
+    const sortedByLatest = [...chainTasks].sort((left, right) => (
+      new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime()
+      || right.priorityScore - left.priorityScore
+    ));
+    const latest = sortedByLatest[0];
+    const active = chainTasks.filter((task) => task.state !== "completed").length;
+    const completed = chainTasks.length - active;
+
+    return {
+      rootDispatchKey,
+      latestDispatchKey: latest.dispatchKey,
+      projectId: latest.projectId,
+      platformName: latest.platformName,
+      total: chainTasks.length,
+      active,
+      completed,
+      maxRound: Math.max(...rounds.map((round) => round.round)),
+      status: active > 0 ? "active" as const : "completed" as const,
+      latestTitle: latest.title,
+      latestActionLabel: latest.actionLabel,
+      latestHref: latest.href,
+      latestUpdatedAt: latest.updatedAt,
+      rounds,
+    };
+  }).sort((left, right) => (
+    right.active - left.active
+    || right.maxRound - left.maxRound
+    || new Date(right.latestUpdatedAt).getTime() - new Date(left.latestUpdatedAt).getTime()
+  ));
+}
+
 export function buildGateDispatchTaskCenter(
   tasks: PersistedGatePlatformDispatchTask[],
   now: Date | string = new Date(),
@@ -2946,6 +3052,8 @@ export function buildGateDispatchTaskCenter(
   const completed = tasks.filter((task) => task.state === "completed").length;
   const recheckFollowUp = tasks.filter(isChapterProductionRecheckFollowUpTask).length;
   const activeRecheckFollowUp = tasks.filter((task) => task.state !== "completed" && isChapterProductionRecheckFollowUpTask(task)).length;
+  const recheckFollowUpChains = buildGateDispatchRecheckFollowUpChains(tasks);
+  const repeatedRecheckFollowUpChains = recheckFollowUpChains.filter((chain) => chain.maxRound > 1).length;
   const highPriorityQueued = tasks.filter((task) => task.state === "queued" && task.priorityScore >= 70).length;
   const activeRoles = [...roleMap.values()].filter((role) => role.active > 0).length;
   const topPlatform = [...platformMap.values()].sort((left, right) => right.active - left.active || right.total - left.total)[0] ?? null;
@@ -2973,6 +3081,8 @@ export function buildGateDispatchTaskCenter(
       dueToday,
       recheckFollowUp,
       activeRecheckFollowUp,
+      recheckFollowUpChains: recheckFollowUpChains.length,
+      repeatedRecheckFollowUpChains,
       averagePriorityScore: tasks.length ? Math.round(totalPriorityScore / tasks.length) : 0,
     },
     platforms: [...platformMap.values()].sort((left, right) => (
@@ -2991,6 +3101,7 @@ export function buildGateDispatchTaskCenter(
       overdue > 0 ? `先收 ${overdue} 个逾期派单，拖着不处理就是假闭环。` : null,
       dueToday > 0 ? `今天必须收 ${dueToday} 个派单，至少补齐证据或阻塞原因。` : null,
       activeRecheckFollowUp > 0 ? `先处理 ${activeRecheckFollowUp} 个复查失败返工派单，别让同一个卡点重复冒烟。` : null,
+      repeatedRecheckFollowUpChains > 0 ? `${repeatedRecheckFollowUpChains} 条返工链已经进入二轮以上，先复盘为什么第一轮没有打穿。` : null,
       highPriorityQueued > 0 ? `先派掉 ${highPriorityQueued} 个高优先级任务，别让平台机会窗口过期。` : null,
       assigned > 0 ? `跟进 ${assigned} 个已派任务，要求按验收标准回填证据。` : null,
       topPlatform && topPlatform.active > 0 ? `${topPlatform.name} 当前活跃派单最多，先压低它的未闭环数量。` : null,
@@ -2998,6 +3109,7 @@ export function buildGateDispatchTaskCenter(
       tasks.length === 0 ? "还没有派单任务，先从总闸门执行平台复盘和派单。" : null,
     ].filter((action): action is string => Boolean(action)),
     closeoutItems,
+    recheckFollowUpChains,
   };
 }
 

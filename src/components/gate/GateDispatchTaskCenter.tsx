@@ -145,6 +145,27 @@ export function GateDispatchTaskCenter({
   const evidenceReview = useMemo(() => buildGateDispatchEvidenceReview(tasks, initialReceipts), [initialReceipts, tasks]);
   const routeExecutionDesk = useMemo(() => buildRouteRecheckExecutionDesk(tasks), [tasks]);
   const routeTaskByKey = useMemo(() => new Map(tasks.map((task) => [task.dispatchKey, task])), [tasks]);
+  const recheckChainByDispatchKey = useMemo(() => {
+    const map = new Map<string, {
+      rootDispatchKey: string;
+      maxRound: number;
+      active: number;
+      total: number;
+      round: number;
+    }>();
+    for (const chain of center.recheckFollowUpChains) {
+      for (const round of chain.rounds) {
+        map.set(round.dispatchKey, {
+          rootDispatchKey: chain.rootDispatchKey,
+          maxRound: chain.maxRound,
+          active: chain.active,
+          total: chain.total,
+          round: round.round,
+        });
+      }
+    }
+    return map;
+  }, [center.recheckFollowUpChains]);
   const evidenceIssues = evidenceReview.items.filter((item) => item.status !== "verified").slice(0, 5);
   const hasRouteFlow =
     Boolean(routeConfirmationDispatchFlow.emptyGuide)
@@ -373,6 +394,11 @@ export function GateDispatchTaskCenter({
           <div className="mt-1 text-xs opacity-75">共 {center.summary.recheckFollowUp}</div>
         </button>
         <div className="rounded-md border border-slate-200 bg-white p-3">
+          <div className="text-xs text-slate-500">返工链</div>
+          <div className="mt-1 text-2xl font-semibold">{center.summary.recheckFollowUpChains}</div>
+          <div className="mt-1 text-xs text-slate-500">二轮+ {center.summary.repeatedRecheckFollowUpChains}</div>
+        </div>
+        <div className="rounded-md border border-slate-200 bg-white p-3">
           <div className="text-xs text-slate-500">今天收</div>
           <div className="mt-1 text-2xl font-semibold">{center.summary.dueToday}</div>
         </div>
@@ -465,6 +491,57 @@ export function GateDispatchTaskCenter({
                     {card.actionLabel}
                   </Link>
                 </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
+      {center.recheckFollowUpChains.length > 0 ? (
+        <section className="rounded-md border border-slate-200 bg-white p-4">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <div className="font-medium text-slate-950">返工轮次链路</div>
+              <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-600">
+                同一个复查卡点的返工会串成链，二轮以上优先复盘验收标准和实际改动是否错位。
+              </p>
+            </div>
+            <button
+              className="w-fit rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-900 hover:bg-amber-100"
+              onClick={() => setQueueFilter("recheck_followup")}
+              type="button"
+            >
+              只看返工
+            </button>
+          </div>
+          <div className="mt-3 grid gap-2 lg:grid-cols-2">
+            {center.recheckFollowUpChains.slice(0, 4).map((chain) => (
+              <div className="rounded-md border border-slate-200 bg-slate-50 p-3 text-sm" key={chain.rootDispatchKey}>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className={`rounded-md px-2 py-1 text-xs font-medium ${chain.status === "active" ? "bg-amber-100 text-amber-900" : "bg-emerald-100 text-emerald-900"}`}>
+                    {chain.status === "active" ? "处理中" : "已收口"}
+                  </span>
+                  <span className="font-medium text-slate-950">{chain.latestTitle}</span>
+                  <span className="text-xs text-slate-500">{chain.platformName}</span>
+                </div>
+                <div className="mt-2 flex flex-wrap gap-2 text-xs text-slate-600">
+                  <span className="rounded-md bg-white px-2 py-1">第 {chain.maxRound} 轮</span>
+                  <span className="rounded-md bg-white px-2 py-1">未闭环 {chain.active}</span>
+                  <span className="rounded-md bg-white px-2 py-1">完成 {chain.completed}</span>
+                </div>
+                <div className="mt-2 flex flex-wrap gap-1">
+                  {chain.rounds.map((round) => (
+                    <span
+                      className={`rounded-md px-2 py-1 text-xs ${round.state === "completed" ? "bg-emerald-50 text-emerald-800" : "bg-amber-50 text-amber-800"}`}
+                      key={round.dispatchKey}
+                    >
+                      R{round.round} · {stateLabel(round.state)} · {round.ownerRole}
+                    </span>
+                  ))}
+                </div>
+                <Link className="mt-3 inline-flex rounded-md border border-slate-200 bg-white px-2 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50" href={chain.latestHref}>
+                  {chain.latestActionLabel}
+                </Link>
               </div>
             ))}
           </div>
@@ -881,6 +958,7 @@ export function GateDispatchTaskCenter({
             : null;
           const completionRecordChips = completionRecord ? routeCompletionRecordChips(completionRecord) : [];
           const isRecheckFollowUp = isChapterProductionRecheckFollowUpTask(task);
+          const recheckChain = recheckChainByDispatchKey.get(task.dispatchKey);
           return (
           <div className="rounded-md border border-slate-200 bg-white p-4" key={task.dispatchKey}>
             <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
@@ -888,6 +966,7 @@ export function GateDispatchTaskCenter({
                 <div className="flex flex-wrap items-center gap-2">
                   <span className={`rounded-md px-2 py-1 text-xs font-medium ${stateClass(task.state)}`}>{stateLabel(task.state)}</span>
                   {isRecheckFollowUp ? <span className="rounded-md bg-amber-50 px-2 py-1 text-xs font-medium text-amber-800">复查返工</span> : null}
+                  {recheckChain ? <span className="rounded-md bg-sky-50 px-2 py-1 text-xs font-medium text-sky-800">R{recheckChain.round}/R{recheckChain.maxRound}</span> : null}
                   <span className="font-semibold text-slate-950">{task.title}</span>
                   <span className="text-sm text-slate-500">{task.platformName}</span>
                 </div>
@@ -896,6 +975,7 @@ export function GateDispatchTaskCenter({
                   <span className="rounded-md bg-slate-50 px-2 py-1">{task.ownerRole}</span>
                   <span className="rounded-md bg-slate-50 px-2 py-1">{task.dueLabel}</span>
                   <span className="rounded-md bg-slate-50 px-2 py-1">优先级 {task.priorityScore}</span>
+                  {recheckChain ? <span className="rounded-md bg-slate-50 px-2 py-1">链路 {recheckChain.active}/{recheckChain.total} 未闭环</span> : null}
                   {task.completedAt ? <span className="rounded-md bg-slate-50 px-2 py-1">完成 {new Date(task.completedAt).toLocaleString()}</span> : null}
                 </div>
                 <div className="mt-3 flex flex-wrap gap-2 text-xs text-slate-500">

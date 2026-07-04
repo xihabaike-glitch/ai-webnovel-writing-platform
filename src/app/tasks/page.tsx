@@ -25,6 +25,7 @@ function blockerTypeLabel(entry: QueueItem) {
   if (entry.blockerType === "publish_repair") return "发布阻塞";
   if (entry.blockerType === "chapter_card") return "章节卡住";
   if (entry.blockerType === "risk_recovery") return "开书止损";
+  if (entry.blockerType === "watch_scale_gate") return "观察闸门";
   return entry.label;
 }
 
@@ -98,6 +99,14 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
         chapters: { orderBy: { order: "asc" } },
         aiTasks: { orderBy: { createdAt: "desc" } },
         worldEntries: { orderBy: [{ type: "asc" }, { createdAt: "asc" }] },
+        gateDispatchTasks: {
+          where: { dispatchKey: { startsWith: "first-day:" } },
+          select: {
+            dispatchKey: true,
+            state: true,
+            completionEvidence: true,
+          },
+        },
       },
       orderBy: { updatedAt: "desc" },
     }),
@@ -182,6 +191,14 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
         <div className="rounded-md border border-slate-200 bg-white p-3">
           <div className="text-xs text-slate-500">观察任务</div>
           <div className="mt-1 text-2xl font-semibold">{queue.overview.watchItems}</div>
+        </div>
+        <div className="rounded-md border border-slate-200 bg-white p-3">
+          <div className="text-xs text-slate-500">小样本闸门</div>
+          <div className="mt-1 text-2xl font-semibold">{queue.overview.watchScaleBlocked}</div>
+        </div>
+        <div className="rounded-md border border-slate-200 bg-white p-3">
+          <div className="text-xs text-slate-500">已准放量</div>
+          <div className="mt-1 text-2xl font-semibold">{queue.overview.watchCleared}</div>
         </div>
       </section>
 

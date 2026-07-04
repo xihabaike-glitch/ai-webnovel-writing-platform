@@ -58,9 +58,11 @@ export function buildTaskQueueExecutionPlan(
     };
   }
 
-  const batch = executable
-    .filter((item) => item.category === first.category && (strategy.allowCrossProject || item.projectId === first.projectId))
-    .slice(0, maxBatchSize);
+  const batch = first.scaleGate === "sample_only"
+    ? [first]
+    : executable
+      .filter((item) => item.category === first.category && (strategy.allowCrossProject || item.projectId === first.projectId))
+      .slice(0, maxBatchSize);
   const sameCategoryOtherProjects = executable.filter((item) => item.category === first.category && item.projectId !== first.projectId).length;
   const projectIds = [...new Set(batch.map((item) => item.projectId))];
   const projectTitles = [...new Set(batch.map((item) => item.projectTitle))];
@@ -85,6 +87,7 @@ export function buildTaskQueueExecutionPlan(
     actionLabel: `${categoryActionLabel(first.category)} ${batch.length} 个`,
     detail: `${projectTitles.join("、")} · ${first.label} · ${batch.map((item) => item.chapterTitle).join("、")}`,
     warnings: [
+      first.scaleGate === "sample_only" ? "当前处于观察小样本闸门，只运行 1 个样本；验收依据写清通过线、不可接受项和复查证据后才允许批量生成。" : null,
       sameCategoryOtherProjects > 0 && !strategy.allowCrossProject ? `还有 ${sameCategoryOtherProjects} 个同类任务分布在其他项目，本批先保持单项目上下文。` : null,
       projectIds.length > 1 ? `本批跨 ${projectIds.length} 个项目，执行前确认模型路线和风格稳定。` : null,
       batch.length >= maxBatchSize ? `本批已达到 ${maxBatchSize} 个上限，剩余任务下一批继续。` : null,

@@ -14,6 +14,10 @@ const baseItem: QueueItem = {
   label: "待审稿",
   chapterTitle: "第一章",
   evidence: "已有正文但未审稿。",
+  riskLevel: "standard",
+  riskLabel: "标准",
+  riskNotice: null,
+  scaleGate: "none",
   actionLabel: "审稿",
   href: "/projects/project-1/chapters/chapter-1",
   priority: 10,
@@ -75,5 +79,19 @@ test("buildBatchExecutionSafety", async (t) => {
     assert.equal(aggressive.maxBatchSize, 8);
     assert.equal(aggressive.strategy.allowCrossProject, true);
     assert.equal(aggressive.items.find((item) => item.id === "mixed-projects")?.status, "pass");
+  });
+
+  await t.test("limits watch drafts to one small sample before scale-up", () => {
+    const safety = buildBatchExecutionSafety([
+      { ...baseItem, id: "watch-draft-1", category: "draft", label: "待生成", scaleGate: "sample_only", riskLevel: "watch", riskLabel: "恢复观察", actionLabel: "生成小样本" },
+      { ...baseItem, id: "watch-draft-2", category: "draft", label: "待生成", scaleGate: "sample_only", riskLevel: "watch", riskLabel: "恢复观察", actionLabel: "生成小样本" },
+    ], [{ aiTasks: [] }], getBatchExecutionStrategy("aggressive"));
+
+    assert.deepEqual(safety.recommendedBatchIds, ["watch-draft-1"]);
+    assert.equal(safety.recommendedBatchSize, 1);
+    assert.equal(safety.canRunRecommendedBatch, true);
+    const gate = safety.items.find((item) => item.id === "watch-scale-gate");
+    assert.equal(gate?.status, "warn");
+    assert.ok(gate?.detail.includes("单章小样本"));
   });
 });

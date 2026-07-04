@@ -74,8 +74,13 @@ export function buildBatchExecutionSafety(
   strategy: BatchExecutionStrategy = defaultBatchExecutionStrategy,
 ): BatchExecutionSafety {
   const runnable = queueItems.filter((item) => item.category !== "blocked");
-  const recommended = runnable.slice(0, strategy.maxBatchSize);
+  const firstRunnable = runnable[0] ?? null;
+  const recommended = firstRunnable?.scaleGate === "sample_only"
+    ? [firstRunnable]
+    : runnable.slice(0, strategy.maxBatchSize);
   const blockedCount = queueItems.filter((item) => item.category === "blocked").length;
+  const sampleOnlyCount = queueItems.filter((item) => item.scaleGate === "sample_only" && item.category !== "blocked").length;
+  const clearedWatchCount = queueItems.filter((item) => item.scaleGate === "cleared" && item.category !== "blocked").length;
   const estimatedTokens = recommended.reduce((sum, item) => sum + estimatedTokensByCategory[item.category], 0);
   const costPerToken = historicalCostPerToken(projects);
   const estimatedCostUsd = money(estimatedTokens * costPerToken);
@@ -101,6 +106,16 @@ export function buildBatchExecutionSafety(
       "阻塞任务",
       blockedCount === 0 ? "pass" : "warn",
       blockedCount === 0 ? "本批没有阻塞项。" : `${blockedCount} 个任务卡住，不能进入批量执行。`,
+    ),
+    safetyItem(
+      "watch-scale-gate",
+      "观察放量闸门",
+      sampleOnlyCount === 0 ? "pass" : "warn",
+      sampleOnlyCount === 0
+        ? clearedWatchCount > 0
+          ? `${clearedWatchCount} 个观察任务已通过小样本验收，可以谨慎进入批次。`
+          : "当前没有观察期小样本闸门。"
+        : `当前只允许单章小样本，本批不会扩大；完成依据需写清通过线、不可接受项和复查证据。`,
     ),
     safetyItem(
       "mixed-actions",

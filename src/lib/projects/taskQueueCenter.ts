@@ -36,7 +36,14 @@ export interface TaskQueueProject {
     createdAt: Date | string;
   }>;
   worldEntries?: ProjectStartTacticEntryLike[];
+  gateDispatchTasks?: Array<{
+    dispatchKey: string;
+    state: string;
+    completionEvidence: string;
+  }>;
 }
+
+export type QueueScaleGate = "none" | "sample_only" | "cleared";
 
 export interface QueueItem {
   id: string;
@@ -44,7 +51,7 @@ export interface QueueItem {
   projectTitle: string;
   platformName: string;
   category: "draft" | "review" | "second_pass" | "export" | "blocked";
-  blockerType: "chapter_card" | "publish_repair" | "risk_recovery" | null;
+  blockerType: "chapter_card" | "publish_repair" | "risk_recovery" | "watch_scale_gate" | null;
   label: string;
   chapterTitle: string;
   evidence: string;
@@ -52,6 +59,7 @@ export interface QueueItem {
   riskLevel: FirstDayRiskLevel;
   riskLabel: string;
   riskNotice: string | null;
+  scaleGate: QueueScaleGate;
   actionLabel: string;
   href: string;
   priority: number;
@@ -68,7 +76,10 @@ export interface TaskQueueCenter {
     publishBlocked: number;
     chapterCardBlocked: number;
     riskRecoveryBlocked: number;
+    watchScaleBlocked: number;
     watchItems: number;
+    watchSampleOnly: number;
+    watchCleared: number;
   };
   items: QueueItem[];
   recommendedNext: QueueItem | null;
@@ -93,11 +104,12 @@ function categoryLabel(category: QueueItem["category"]) {
   return labels[category];
 }
 
-function item(input: Omit<QueueItem, "label" | "priority" | "blockerType" | "riskLevel" | "riskLabel" | "riskNotice"> & {
+function item(input: Omit<QueueItem, "label" | "priority" | "blockerType" | "riskLevel" | "riskLabel" | "riskNotice" | "scaleGate"> & {
   blockerType?: QueueItem["blockerType"];
   riskLevel?: QueueItem["riskLevel"];
   riskLabel?: string;
   riskNotice?: string | null;
+  scaleGate?: QueueScaleGate;
 }): QueueItem {
   return {
     ...input,
@@ -105,9 +117,21 @@ function item(input: Omit<QueueItem, "label" | "priority" | "blockerType" | "ris
     riskLevel: input.riskLevel ?? "standard",
     riskLabel: input.riskLabel ?? "标准",
     riskNotice: input.riskNotice ?? null,
+    scaleGate: input.scaleGate ?? "none",
     label: categoryLabel(input.category),
     priority: categoryPriority[input.category],
   };
+}
+
+function watchDraftScaleCleared(project: TaskQueueProject) {
+  const draftDispatch = project.gateDispatchTasks?.find((task) => (
+    task.dispatchKey === `first-day:${project.id}:first-draft`
+    && task.state === "completed"
+    && task.completionEvidence.trim().length >= 8
+  ));
+  const evidence = draftDispatch?.completionEvidence ?? "";
+
+  return /通过线/u.test(evidence) && /不可接受/u.test(evidence) && /复查证据/u.test(evidence);
 }
 
 export function buildTaskQueueCenter(projects: TaskQueueProject[]): TaskQueueCenter {
@@ -119,8 +143,13 @@ export function buildTaskQueueCenter(projects: TaskQueueProject[]): TaskQueueCen
     const riskNotice = riskProfile.level === "blocked"
       ? `${riskProfile.headline}${riskProfile.instruction}`
       : riskProfile.level === "watch"
-        ? `${riskProfile.headline}${riskProfile.instruction}`
+        ? watchDraftScaleCleared(project)
+          ? "小样本验收依据已过线：通过线、不可接受项和复查证据齐全，可以谨慎进入后续初稿批次。"
+          : `${riskProfile.headline}${riskProfile.instruction}`
         : null;
+    const scaleGate: QueueScaleGate = riskProfile.level === "watch"
+      ? watchDraftScaleCleared(project) ? "cleared" : "sample_only"
+      : "none";
     const draftQueue = buildBatchDraftQueue(project.chapters, project.aiTasks, platform);
     const reviewQueue = buildReviewPipelineQueue(project.chapters, project.aiTasks, 5, startTactic);
     const exportCenter = buildPlatformPublishExportCenter({
@@ -156,7 +185,12 @@ export function buildTaskQueueCenter(projects: TaskQueueProject[]): TaskQueueCen
       }));
     }
 
-    for (const candidate of draftQueue.candidates.filter((candidate) => candidate.status === "ready")) {
+    const readyDraftCandidates = draftQueue.candidates.filter((candidate) => candidate.status === "ready");
+    const draftCandidatesForQueue = riskProfile.level === "watch" && scaleGate === "sample_only"
+      ? readyDraftCandidates.slice(0, 1)
+      : readyDraftCandidates;
+
+    for (const candidate of draftCandidatesForQueue) {
       if (riskProfile.level === "blocked") continue;
       queueItems.push(item({
         id: `${project.id}:draft:${candidate.chapterId}`,
@@ -165,13 +199,38 @@ export function buildTaskQueueCenter(projects: TaskQueueProject[]): TaskQueueCen
         platformName: platform.name,
         category: "draft",
         chapterTitle: candidate.title,
-        evidence: riskProfile.level === "watch" ? `${candidate.reason} ${riskProfile.instruction}` : candidate.reason,
+        evidence: riskProfile.level === "watch" && scaleGate === "sample_only"
+          ? `${candidate.reason} ${riskProfile.instruction}`
+          : riskProfile.level === "watch" && scaleGate === "cleared"
+            ? `${candidate.reason} 小样本验收已过线，仍需按同一平台打法谨慎放量。`
+            : candidate.reason,
         strategyBasis: startTactic,
         riskLevel: riskProfile.level,
         riskLabel: riskProfile.label,
         riskNotice,
-        actionLabel: riskProfile.level === "watch" ? "生成小样本" : "生成初稿",
+        scaleGate,
+        actionLabel: riskProfile.level === "watch" && scaleGate === "sample_only" ? "生成小样本" : "生成初稿",
         href: `${projectHref}/chapters/${candidate.chapterId}`,
+      }));
+    }
+
+    if (riskProfile.level === "watch" && scaleGate === "sample_only" && readyDraftCandidates.length > draftCandidatesForQueue.length) {
+      queueItems.push(item({
+        id: `${project.id}:watch-scale-gate:${platform.id}`,
+        projectId: project.id,
+        projectTitle: project.title,
+        platformName: platform.name,
+        category: "blocked",
+        blockerType: "watch_scale_gate",
+        chapterTitle: "观察放量闸门",
+        evidence: `还有 ${readyDraftCandidates.length - draftCandidatesForQueue.length} 个初稿候选，需先完成小样本验收：通过线、不可接受项和复查证据齐全后再放量。`,
+        strategyBasis: startTactic,
+        riskLevel: riskProfile.level,
+        riskLabel: riskProfile.label,
+        riskNotice,
+        scaleGate,
+        actionLabel: "完成小样本验收",
+        href: `${projectHref}#first-day-workflow`,
       }));
     }
 
@@ -188,6 +247,7 @@ export function buildTaskQueueCenter(projects: TaskQueueProject[]): TaskQueueCen
         riskLevel: riskProfile.level,
         riskLabel: riskProfile.label,
         riskNotice,
+        scaleGate,
         actionLabel: "审稿",
         href: `${projectHref}/chapters/${candidate.chapterId}`,
       }));
@@ -206,6 +266,7 @@ export function buildTaskQueueCenter(projects: TaskQueueProject[]): TaskQueueCen
         riskLevel: riskProfile.level,
         riskLabel: riskProfile.label,
         riskNotice,
+        scaleGate,
         actionLabel: "二改",
         href: `${projectHref}/chapters/${candidate.chapterId}`,
       }));
@@ -225,6 +286,7 @@ export function buildTaskQueueCenter(projects: TaskQueueProject[]): TaskQueueCen
         riskLevel: riskProfile.level,
         riskLabel: riskProfile.label,
         riskNotice,
+        scaleGate,
         actionLabel: "导出平台包",
         href: `${projectHref}#platform-export`,
       }));
@@ -242,6 +304,7 @@ export function buildTaskQueueCenter(projects: TaskQueueProject[]): TaskQueueCen
         riskLevel: riskProfile.level,
         riskLabel: riskProfile.label,
         riskNotice,
+        scaleGate,
         actionLabel: targetPackage.repairPath.nextStep?.label ?? "处理发布阻塞",
         href: `${projectHref}#platform-export`,
       }));
@@ -261,6 +324,7 @@ export function buildTaskQueueCenter(projects: TaskQueueProject[]): TaskQueueCen
         riskLevel: riskProfile.level,
         riskLabel: riskProfile.label,
         riskNotice,
+        scaleGate,
         actionLabel: "补章节卡",
         href: `${projectHref}/chapters/${candidate.chapterId}`,
       }));
@@ -284,7 +348,10 @@ export function buildTaskQueueCenter(projects: TaskQueueProject[]): TaskQueueCen
       publishBlocked: items.filter((entry) => entry.blockerType === "publish_repair").length,
       chapterCardBlocked: items.filter((entry) => entry.blockerType === "chapter_card").length,
       riskRecoveryBlocked: items.filter((entry) => entry.blockerType === "risk_recovery").length,
+      watchScaleBlocked: items.filter((entry) => entry.blockerType === "watch_scale_gate").length,
       watchItems: items.filter((entry) => entry.riskLevel === "watch").length,
+      watchSampleOnly: items.filter((entry) => entry.scaleGate === "sample_only").length,
+      watchCleared: items.filter((entry) => entry.scaleGate === "cleared").length,
     },
     items,
     recommendedNext: items.find((entry) => entry.category !== "blocked") ?? items[0] ?? null,

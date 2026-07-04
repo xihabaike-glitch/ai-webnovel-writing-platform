@@ -84,7 +84,10 @@ test("buildTaskQueueCenter", async (t) => {
     assert.equal(queue.overview.publishBlocked, 1);
     assert.equal(queue.overview.chapterCardBlocked, 1);
     assert.equal(queue.overview.riskRecoveryBlocked, 0);
+    assert.equal(queue.overview.watchScaleBlocked, 0);
     assert.equal(queue.overview.watchItems, 0);
+    assert.equal(queue.overview.watchSampleOnly, 0);
+    assert.equal(queue.overview.watchCleared, 0);
     assert.equal(queue.overview.totalItems, 5);
     assert.equal(queue.recommendedNext?.category, "review");
     assert.deepEqual(
@@ -134,6 +137,16 @@ test("buildTaskQueueCenter", async (t) => {
     const watchProject: TaskQueueProject = {
       ...project,
       id: "watch-project",
+      chapters: [
+        baseChapter,
+        {
+          ...baseChapter,
+          id: "chapter-ready-draft-2",
+          order: 2,
+          title: "第二章 第二个样本",
+        },
+      ],
+      aiTasks: [],
       worldEntries: [
         {
           type: "platform_soil",
@@ -149,11 +162,63 @@ test("buildTaskQueueCenter", async (t) => {
       ],
     };
     const queue = buildTaskQueueCenter([watchProject]);
-    const draft = queue.items.find((item) => item.category === "draft");
+    const drafts = queue.items.filter((item) => item.category === "draft");
+    const gate = queue.items.find((item) => item.blockerType === "watch_scale_gate");
 
-    assert.equal(queue.overview.watchItems, queue.items.length);
-    assert.equal(draft?.riskLevel, "watch");
-    assert.equal(draft?.actionLabel, "生成小样本");
-    assert.ok(draft?.riskNotice?.includes("小样本验证"));
+    assert.equal(drafts.length, 1);
+    assert.equal(queue.overview.watchScaleBlocked, 1);
+    assert.equal(queue.overview.watchSampleOnly, 2);
+    assert.equal(drafts[0].riskLevel, "watch");
+    assert.equal(drafts[0].scaleGate, "sample_only");
+    assert.equal(drafts[0].actionLabel, "生成小样本");
+    assert.ok(drafts[0].riskNotice?.includes("小样本验证"));
+    assert.ok(gate?.evidence.includes("通过线、不可接受项和复查证据"));
+  });
+
+  await t.test("allows watch drafts to scale after sample acceptance evidence clears the gate", () => {
+    const clearedProject: TaskQueueProject = {
+      ...project,
+      id: "watch-cleared-project",
+      chapters: [
+        baseChapter,
+        {
+          ...baseChapter,
+          id: "chapter-ready-draft-2",
+          order: 2,
+          title: "第二章 第二个样本",
+        },
+      ],
+      aiTasks: [],
+      worldEntries: [
+        {
+          type: "platform_soil",
+          title: "首轮平台打法：番茄小说",
+          content: [
+            "状态：历史观察",
+            "打法：先用第一章小样本验证读者反馈。",
+            "开头动作：第一段给强冲突。",
+            "验证动作：写清通过线和不可接受项。",
+            "风险：观察期不要批量。",
+          ].join("\n"),
+        },
+      ],
+      gateDispatchTasks: [
+        {
+          dispatchKey: "first-day:watch-cleared-project:first-draft",
+          state: "completed",
+          completionEvidence: "小样本首轮通过线已写清，不可接受项和复查证据已补齐。",
+        },
+      ],
+    };
+    const queue = buildTaskQueueCenter([clearedProject]);
+    const drafts = queue.items.filter((item) => item.category === "draft");
+
+    assert.equal(drafts.length, 2);
+    assert.equal(queue.overview.watchScaleBlocked, 0);
+    assert.equal(queue.overview.watchSampleOnly, 0);
+    assert.equal(queue.overview.watchCleared, 2);
+    assert.ok(drafts.every((item) => item.scaleGate === "cleared"));
+    assert.ok(drafts.every((item) => item.actionLabel === "生成初稿"));
+    assert.ok(drafts.every((item) => item.riskNotice?.includes("小样本验收依据已过线")));
   });
 });

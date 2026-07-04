@@ -38,6 +38,14 @@ export async function POST(request: Request) {
       chapters: { orderBy: { order: "asc" } },
       aiTasks: { orderBy: { createdAt: "desc" } },
       worldEntries: { orderBy: [{ type: "asc" }, { createdAt: "asc" }] },
+      gateDispatchTasks: {
+        where: { dispatchKey: { startsWith: "first-day:" } },
+        select: {
+          dispatchKey: true,
+          state: true,
+          completionEvidence: true,
+        },
+      },
     },
     orderBy: { updatedAt: "desc" },
   });

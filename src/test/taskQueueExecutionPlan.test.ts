@@ -10,6 +10,10 @@ function queueItem(input: Partial<QueueItem> & Pick<QueueItem, "id" | "category"
     blockerType: null,
     label: input.category,
     evidence: "可执行",
+    riskLevel: "standard",
+    riskLabel: "标准",
+    riskNotice: null,
+    scaleGate: "none",
     actionLabel: "执行",
     href: "/projects/project-1",
     priority: input.category === "review" ? 10 : input.category === "second_pass" ? 20 : 30,
@@ -72,5 +76,17 @@ test("buildTaskQueueExecutionPlan", async (t) => {
     assert.deepEqual(plan.projectIds, ["project-1", "project-2", "project-3"]);
     assert.deepEqual(plan.chapterIds, ["chapter-1", "chapter-2", "chapter-3"]);
     assert.ok(plan.warnings.some((warning) => warning.includes("跨 3 个项目")));
+  });
+
+  await t.test("keeps watch scale-up gate to one sample even in aggressive mode", () => {
+    const plan = buildTaskQueueExecutionPlan([
+      queueItem({ id: "project-1:draft:chapter-1", category: "draft", projectId: "project-1", projectTitle: "项目一", chapterTitle: "第一章", riskLevel: "watch", riskLabel: "恢复观察", scaleGate: "sample_only", actionLabel: "生成小样本" }),
+      queueItem({ id: "project-2:draft:chapter-2", category: "draft", projectId: "project-2", projectTitle: "项目二", chapterTitle: "第二章", riskLevel: "watch", riskLabel: "恢复观察", scaleGate: "sample_only", actionLabel: "生成小样本" }),
+    ], 8, getBatchExecutionStrategy("aggressive"));
+
+    assert.equal(plan.canRun, true);
+    assert.deepEqual(plan.itemIds, ["project-1:draft:chapter-1"]);
+    assert.deepEqual(plan.chapterIds, ["chapter-1"]);
+    assert.ok(plan.warnings.some((warning) => warning.includes("小样本闸门")));
   });
 });

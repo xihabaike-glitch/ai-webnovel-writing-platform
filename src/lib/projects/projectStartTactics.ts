@@ -1,5 +1,6 @@
 import type { PlatformProfile } from "../platforms/platformProfiles.ts";
 import type { PlatformWritingStyleTemplate } from "../platforms/writingStyleTemplates.ts";
+import type { ModelRouteConfirmationReceipt } from "../model-gateway/routeConfirmation.ts";
 import type { GateActionReceipt, GateBatchTacticEffectItem, GatePlatformTacticExperienceItem } from "./gateActionReceipts.ts";
 import type { ProjectTemplate } from "./projectTemplates.ts";
 
@@ -127,6 +128,33 @@ export function buildProjectStartModelRouteExperienceFromReceipts(receipts: Gate
     const { createdAt: _createdAt, ...experience } = route;
     return [experience];
   });
+}
+
+export function buildProjectStartModelRouteExperienceFromConfirmations(confirmations: ModelRouteConfirmationReceipt[]): ProjectStartModelRouteExperience[] {
+  const receipts: GateActionReceipt[] = confirmations.map((confirmation) => ({
+    id: confirmation.id,
+    actionId: confirmation.actionId,
+    label: confirmation.label,
+    detail: confirmation.detail,
+    href: confirmation.href,
+    status: confirmation.status,
+    message: confirmation.message,
+    executionType: confirmation.executionType,
+    succeededCount: confirmation.succeededCount,
+    failedCount: confirmation.failedCount,
+    taskId: null,
+    platformId: confirmation.platformId,
+    platformName: confirmation.platformName,
+    recheck: {
+      status: confirmation.recheck.status,
+      label: confirmation.recheck.label,
+      detail: confirmation.recheck.detail,
+      actionLabel: confirmation.recheck.action,
+    },
+    createdAt: confirmation.createdAt,
+  }));
+
+  return buildProjectStartModelRouteExperienceFromReceipts(receipts);
 }
 
 function defaultTacticForCategory(platform: PlatformProfile) {

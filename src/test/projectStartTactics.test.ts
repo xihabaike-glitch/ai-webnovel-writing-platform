@@ -1,10 +1,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { buildModelRouteConfirmationReceipt } from "../lib/model-gateway/routeConfirmation.ts";
 import { getPlatformProfile } from "../lib/platforms/platformProfiles.ts";
 import { getPlatformWritingStyle } from "../lib/platforms/writingStyleTemplates.ts";
 import type { GateBatchTacticEffectItem, GatePlatformTacticExperienceItem } from "../lib/projects/gateActionReceipts.ts";
 import {
   buildProjectStartPlatformExperienceGuide,
+  buildProjectStartModelRouteExperienceFromConfirmations,
   buildProjectStartModelRouteExperienceFromReceipts,
   buildProjectStartTacticAdvice,
   buildProjectStartTacticWorldEntry,
@@ -148,6 +150,45 @@ test("buildProjectStartTacticAdvice", async (t) => {
     assert.ok(advice.evidence.some((item) => item.includes("正文初稿首选 DeepSeek · deepseek-chat")));
     assert.ok(advice.evidence.some((item) => item.includes("治理后复检 +30")));
     assert.ok(advice.checklist.some((item) => item.includes("模型路线底座：正文初稿、章节审稿")));
+  });
+
+  await t.test("builds project start model route experience from backend confirmations", () => {
+    const confirmations = [
+      buildModelRouteConfirmationReceipt({
+        taskType: "chapter_review",
+        primaryProviderName: "GPT · gpt-5-mini",
+        fallbackProviderName: "DeepSeek · deepseek-chat",
+        source: "recommendation",
+        recommendationExplanation: {
+          headline: "推荐依据分解",
+          items: [
+            { id: "history", label: "历史样本", value: "4 次", detail: "成功率 100%。", tone: "positive" },
+            { id: "governance_recheck", label: "治理后复检", value: "+30", detail: "当前路线获得加权保留。", tone: "positive" },
+          ],
+        },
+        createdAt: "2026-07-04T11:00:00.000Z",
+      }),
+      buildModelRouteConfirmationReceipt({
+        taskType: "chapter_draft",
+        primaryProviderName: "DeepSeek · deepseek-chat",
+        fallbackProviderName: "Kimi · kimi-k2.6",
+        source: "recommendation",
+        recommendationExplanation: {
+          headline: "推荐依据分解",
+          items: [
+            { id: "history", label: "历史样本", value: "2 次", detail: "成功率 100%。", tone: "positive" },
+            { id: "cost", label: "成本", value: "$0.0000/次", detail: "成本稳定。", tone: "neutral" },
+          ],
+        },
+        createdAt: "2026-07-04T10:00:00.000Z",
+      }),
+    ];
+
+    const modelRoutes = buildProjectStartModelRouteExperienceFromConfirmations(confirmations);
+
+    assert.deepEqual(modelRoutes.map((route) => route.taskLabel), ["正文初稿", "章节审稿"]);
+    assert.ok(modelRoutes[0].evidence.some((item) => item.includes("DeepSeek · deepseek-chat")));
+    assert.ok(modelRoutes[1].evidence.some((item) => item.includes("治理后复检 +30")));
   });
 
   await t.test("turns blocked batch tactic effects into avoidance advice", () => {

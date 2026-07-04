@@ -1,9 +1,14 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { buildDefaultOutlineNodes } from "@/lib/outlines/defaultOutline";
+import { modelRouteConfirmationReceiptFromAudit } from "@/lib/model-gateway/routeConfirmation";
 import { buildFirstDayLaunchReceipt, buildFirstDayWorkflow } from "@/lib/projects/firstDayWorkflow";
 import { buildProjectDefaults } from "@/lib/projects/projectDefaults";
-import { buildProjectStartTacticAdvice, buildProjectStartTacticWorldEntry } from "@/lib/projects/projectStartTactics";
+import {
+  buildProjectStartModelRouteExperienceFromConfirmations,
+  buildProjectStartTacticAdvice,
+  buildProjectStartTacticWorldEntry,
+} from "@/lib/projects/projectStartTactics";
 import { buildSubmissionChecklist } from "@/lib/projects/submissionChecklist";
 import {
   buildTemplateChapterSeeds,
@@ -42,6 +47,18 @@ export async function POST(request: Request) {
     sellingPoint: input.sellingPoint,
     updateCadence: input.updateCadence,
   };
+  const routeConfirmationAudits = input.startTacticAdvice
+    ? []
+    : await prisma.gateActionAudit.findMany({
+      where: { executionType: "model_route" },
+      orderBy: { createdAt: "desc" },
+      take: 20,
+    });
+  const modelRouteExperience = buildProjectStartModelRouteExperienceFromConfirmations(
+    routeConfirmationAudits
+      .map(modelRouteConfirmationReceiptFromAudit)
+      .filter((receipt): receipt is NonNullable<ReturnType<typeof modelRouteConfirmationReceiptFromAudit>> => Boolean(receipt)),
+  );
 
   const project = await prisma.$transaction(async (tx) => {
     const created = await tx.project.create({ data: projectInput });
@@ -53,6 +70,7 @@ export async function POST(request: Request) {
         platform,
         template,
         style,
+        modelRoutes: modelRouteExperience,
       });
       const startTacticEntry = buildProjectStartTacticWorldEntry(startTacticAdvice, platform.name);
       const outlineNodes = buildDefaultOutlineNodes({

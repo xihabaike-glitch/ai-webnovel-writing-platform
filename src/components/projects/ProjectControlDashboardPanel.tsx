@@ -51,6 +51,7 @@ interface ProjectControlDashboard {
   verdict: string;
   platformVerdict: PlatformControlVerdictSummary;
   platformFeedback: PlatformFeedbackSummary;
+  platformEvidenceLoop: PlatformEvidenceLoopSummary;
   startTactic: ProjectStartTacticSummary | null;
   startDecision: ProjectStartDecision;
   areas: ControlArea[];
@@ -91,6 +92,22 @@ interface PlatformFeedbackSummary {
   headline: string;
   nextAction: string;
   targetAnchor: string;
+}
+
+interface PlatformEvidenceLoopSummary {
+  score: number;
+  status: "empty" | "pause" | "repair" | "watch" | "scale";
+  label: string;
+  platformId: string;
+  platformName: string;
+  headline: string;
+  nextAction: string;
+  actionLabel: string;
+  targetAnchor: string;
+  evidence: string[];
+  metricsCount: number;
+  feedbackCount: number;
+  gateCompletionCount: number;
 }
 
 interface ProjectStartTacticSummary {
@@ -170,6 +187,14 @@ function startDecisionStatusClass(status: ProjectStartDecision["status"]) {
 function platformFeedbackSeverityClass(severity: PlatformFeedbackReceipt["severity"]) {
   if (severity === "success") return "bg-emerald-50 text-emerald-700";
   return "bg-amber-50 text-amber-700";
+}
+
+function platformEvidenceLoopClass(status: PlatformEvidenceLoopSummary["status"]) {
+  if (status === "scale") return "border-emerald-200 bg-emerald-50 text-emerald-900";
+  if (status === "watch") return "border-blue-200 bg-blue-50 text-blue-900";
+  if (status === "repair") return "border-amber-200 bg-amber-50 text-amber-900";
+  if (status === "pause") return "border-rose-200 bg-rose-50 text-rose-900";
+  return "border-slate-200 bg-slate-50 text-slate-700";
 }
 
 function shortTime(value: string) {
@@ -533,6 +558,32 @@ export function ProjectControlDashboardPanel({ projectId }: { projectId: string 
               >
                 看反哺证据
               </Link>
+            </div>
+            <div className={`mt-3 rounded-md border p-3 text-sm ${platformEvidenceLoopClass(dashboard.platformEvidenceLoop.status)}`}>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-medium">证据闭环 {dashboard.platformEvidenceLoop.score} 分</span>
+                    <span className="rounded-md bg-white/70 px-2 py-1 text-[11px] font-medium">{dashboard.platformEvidenceLoop.label}</span>
+                    <span className="text-xs opacity-75">{dashboard.platformEvidenceLoop.platformName}</span>
+                  </div>
+                  <p className="mt-2 leading-6 opacity-85">{dashboard.platformEvidenceLoop.headline}</p>
+                  <div className="mt-2 flex flex-wrap gap-1.5 text-xs opacity-75">
+                    {dashboard.platformEvidenceLoop.evidence.slice(0, 3).map((item) => (
+                      <span className="rounded-md bg-white/70 px-2 py-1" key={item}>{item}</span>
+                    ))}
+                  </div>
+                </div>
+                <Link
+                  className="inline-flex w-fit shrink-0 items-center justify-center rounded-md bg-white px-3 py-2 text-xs font-medium text-slate-950"
+                  href={`/projects/${projectId}#${dashboard.platformEvidenceLoop.targetAnchor}`}
+                >
+                  {dashboard.platformEvidenceLoop.actionLabel}
+                </Link>
+              </div>
+              <div className="mt-2 rounded-md bg-white/70 px-2 py-1 text-xs leading-5 opacity-85">
+                下一刀：{dashboard.platformEvidenceLoop.nextAction}
+              </div>
             </div>
             {dashboard.platformFeedback.recent.length ? (
               <div className="mt-3 grid gap-2 md:grid-cols-3">

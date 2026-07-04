@@ -85,6 +85,9 @@ test("buildProjectControlDashboard", async (t) => {
     assert.equal(dashboard.platformFeedback.total, 0);
     assert.equal(dashboard.platformFeedback.targetAnchor, "platform-knowledge");
     assert.ok(dashboard.platformFeedback.headline.includes("还没有平台反哺链路回执"));
+    assert.equal(dashboard.platformEvidenceLoop.status, "empty");
+    assert.equal(dashboard.platformEvidenceLoop.score, 0);
+    assert.equal(dashboard.platformEvidenceLoop.actionLabel, "启动证据闭环");
     assert.equal(dashboard.areas.find((area) => area.id === "export")?.status, "blocked");
     assert.ok(dashboard.areas.find((area) => area.id === "export")?.nextAction.includes("先处理"));
     assert.equal(dashboard.priorityActions.length, 4);
@@ -136,6 +139,79 @@ test("buildProjectControlDashboard", async (t) => {
     assert.equal(dashboard.platformFeedback.latest?.completedStepLabel, "保存证据基准");
     assert.equal(dashboard.platformFeedback.targetAnchor, "package-version-history");
     assert.ok(dashboard.platformFeedback.headline.includes("执行正反馈链"));
+    assert.equal(dashboard.platformEvidenceLoop.platformName, "番茄小说");
+    assert.equal(dashboard.platformEvidenceLoop.feedbackCount, 1);
+    assert.ok(dashboard.platformEvidenceLoop.score > 0);
+  });
+
+  await t.test("scores platform evidence loop from gate completion and publish metrics", () => {
+    const dashboard = buildProjectControlDashboard({
+      project,
+      platform: getPlatformProfile("fanqie"),
+      chapters: [chapter],
+      outlineNodes: [],
+      characters: [],
+      worldEntries: [],
+      foreshadows: [],
+      plotThreads: [],
+      aiTasks: [],
+      platformPublishMetrics: [
+        {
+          id: "metric-fanqie",
+          platformId: "fanqie",
+          platformName: "番茄小说",
+          views: 1600,
+          clicks: 320,
+          favorites: 120,
+          follows: 80,
+          comments: 18,
+          paidReads: 4,
+          editorFeedback: "编辑建议继续放量。",
+          contractStatus: "pending",
+          publishUrl: "",
+          notes: "首轮数据转好。",
+          snapshotDate: "2026-01-07T00:00:00.000Z",
+        },
+      ],
+      platformKnowledgeFeedbackReceipts: [
+        {
+          id: "gate-dispatch-completion:feedback-1",
+          platformId: "fanqie",
+          platformName: "番茄小说",
+          actionLabel: "Gate 派单完成回灌",
+          title: "番茄小说｜Gate 派单完成回灌",
+          message: "Gate 派单已完成。",
+          completedStepLabel: "Gate 派单完成：修平台包装",
+          stopReason: "已收口派单完成证据，无需再次派单。",
+          nextAction: "回到平台导出中心复核反哺历史，并刷新项目控制台。",
+          href: "/projects/demo-project#platform-export",
+          severity: "success",
+          createdAt: "2026-01-07T01:00:00.000Z",
+        },
+        {
+          id: "feedback-2",
+          platformId: "fanqie",
+          platformName: "番茄小说",
+          actionLabel: "保存证据基准",
+          title: "番茄小说｜反哺链路回执",
+          message: "保存改版前证据。",
+          completedStepLabel: "保存证据基准",
+          stopReason: "基准已保存。",
+          nextAction: "观察下一轮发布效果。",
+          href: "#platform-export",
+          severity: "success",
+          createdAt: "2026-01-06T00:00:00.000Z",
+        },
+      ],
+      submissionChecklist: checklist,
+    });
+
+    assert.equal(dashboard.platformEvidenceLoop.status, "scale");
+    assert.equal(dashboard.platformEvidenceLoop.label, "可加码");
+    assert.ok(dashboard.platformEvidenceLoop.score >= 80);
+    assert.equal(dashboard.platformEvidenceLoop.gateCompletionCount, 1);
+    assert.equal(dashboard.platformEvidenceLoop.metricsCount, 1);
+    assert.ok(dashboard.platformEvidenceLoop.evidence.some((item) => item.includes("Gate 完成回灌")));
   });
 
   await t.test("rewards a more complete production system", () => {

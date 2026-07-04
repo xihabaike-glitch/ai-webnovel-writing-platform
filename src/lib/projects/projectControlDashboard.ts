@@ -190,6 +190,7 @@ export interface ProjectControlDashboard {
   verdict: string;
   platformVerdict: PlatformControlVerdictSummary;
   platformFeedback: PlatformFeedbackSummary;
+  platformEvidenceLoop: PlatformEvidenceLoopSummary;
   startTactic: ProjectStartTacticSummary | null;
   startDecision: ProjectStartDecision;
   areas: ControlArea[];
@@ -215,6 +216,22 @@ export interface PlatformFeedbackSummary {
   headline: string;
   nextAction: string;
   targetAnchor: string;
+}
+
+export interface PlatformEvidenceLoopSummary {
+  score: number;
+  status: "empty" | "pause" | "repair" | "watch" | "scale";
+  label: string;
+  platformId: string;
+  platformName: string;
+  headline: string;
+  nextAction: string;
+  actionLabel: string;
+  targetAnchor: string;
+  evidence: string[];
+  metricsCount: number;
+  feedbackCount: number;
+  gateCompletionCount: number;
 }
 
 export interface PlatformControlVerdictSummary {
@@ -560,6 +577,147 @@ function buildPlatformFeedbackSummary(receipts: ControlPlatformFeedbackReceipt[]
   };
 }
 
+function latestMetricForPlatform(metrics: PlatformPublishMetricInput[] = [], platformId: string) {
+  return [...metrics]
+    .filter((metric) => metric.platformId === platformId)
+    .sort((left, right) => new Date(right.snapshotDate).getTime() - new Date(left.snapshotDate).getTime())[0] ?? null;
+}
+
+function platformMetricScore(metric: PlatformPublishMetricInput | null) {
+  if (!metric) return 0;
+  const volumeScore = Math.min(25, metric.views / 40);
+  const clickRate = percent(metric.clicks, metric.views);
+  const favoriteRate = percent(metric.favorites, metric.views);
+  const followRate = percent(metric.follows, metric.views);
+  const conversionScore = Math.min(30, clickRate * 1.2 + favoriteRate * 2 + followRate * 2.5);
+  const engagementScore = Math.min(15, metric.comments * 1.2 + metric.paidReads * 2);
+  const contract = `${metric.contractStatus} ${metric.editorFeedback}`.toLowerCase();
+  const contractScore = /签约|signed|contracted|通过/.test(contract)
+    ? 30
+    : /拒|reject|fail|淘汰/.test(contract)
+      ? -15
+      : /编辑|editor|继续|观察|pending/.test(contract)
+        ? 8
+        : 0;
+  return clampScore(volumeScore + conversionScore + engagementScore + contractScore);
+}
+
+function percent(part: number, total: number) {
+  if (total <= 0) return 0;
+  return (part / total) * 100;
+}
+
+function buildPlatformEvidenceLoopSummary(input: {
+  platform: PlatformProfile;
+  metrics?: PlatformPublishMetricInput[];
+  receipts?: ControlPlatformFeedbackReceipt[];
+}): PlatformEvidenceLoopSummary {
+  const platformReceipts = (input.receipts ?? [])
+    .filter((receipt) => receipt.platformId === input.platform.id)
+    .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime());
+  const latestMetric = latestMetricForPlatform(input.metrics, input.platform.id);
+  const successCount = platformReceipts.filter((receipt) => receipt.severity === "success").length;
+  const needsActionCount = platformReceipts.filter((receipt) => receipt.severity === "needs_action").length;
+  const gateCompletionCount = platformReceipts.filter((receipt) => receipt.id.startsWith("gate-dispatch-completion:")).length;
+  const feedbackScore = Math.min(35, successCount * 10 + gateCompletionCount * 8) - Math.min(25, needsActionCount * 12);
+  const metricScore = platformMetricScore(latestMetric);
+  const hasEvidence = platformReceipts.length > 0 || Boolean(latestMetric);
+  const score = clampScore((hasEvidence ? 20 : 0) + feedbackScore + metricScore * 0.45);
+  const evidence = [
+    platformReceipts.length ? `反哺回执 ${platformReceipts.length} 条，其中 Gate 完成回灌 ${gateCompletionCount} 条。` : "还没有平台反哺回执。",
+    latestMetric ? `最新数据：曝光 ${latestMetric.views}，点击 ${latestMetric.clicks}，收藏 ${latestMetric.favorites}，追读 ${latestMetric.follows}。` : "还没有发布效果数据。",
+    needsActionCount ? `仍有 ${needsActionCount} 条反哺停点未收口。` : "当前没有未收口反哺停点。",
+  ];
+
+  if (!hasEvidence) {
+    return {
+      score: 0,
+      status: "empty",
+      label: "缺证据",
+      platformId: input.platform.id,
+      platformName: input.platform.name,
+      headline: `${input.platform.name} 还没有形成证据闭环，别急着判断好坏。`,
+      nextAction: "先保存证据基准，生成投稿资产，再收第一轮真实数据。",
+      actionLabel: "启动证据闭环",
+      targetAnchor: "platform-knowledge",
+      evidence,
+      metricsCount: 0,
+      feedbackCount: 0,
+      gateCompletionCount: 0,
+    };
+  }
+
+  if (score >= 80) {
+    return {
+      score,
+      status: "scale",
+      label: "可加码",
+      platformId: input.platform.id,
+      platformName: input.platform.name,
+      headline: `${input.platform.name} 证据闭环够硬，可以小步加码。`,
+      nextAction: "扩大一个可控变量，保留旧版本做对照，下一轮继续回填数据。",
+      actionLabel: "进入小步加码",
+      targetAnchor: "platform-export",
+      evidence,
+      metricsCount: latestMetric ? 1 : 0,
+      feedbackCount: platformReceipts.length,
+      gateCompletionCount,
+    };
+  }
+
+  if (score >= 60) {
+    return {
+      score,
+      status: "watch",
+      label: "继续观察",
+      platformId: input.platform.id,
+      platformName: input.platform.name,
+      headline: `${input.platform.name} 有证据，但还不到放量程度。`,
+      nextAction: "补一轮发布效果或完成未收口派单，再决定是否加码。",
+      actionLabel: "补一轮证据",
+      targetAnchor: "platform-export",
+      evidence,
+      metricsCount: latestMetric ? 1 : 0,
+      feedbackCount: platformReceipts.length,
+      gateCompletionCount,
+    };
+  }
+
+  if (score >= 40) {
+    return {
+      score,
+      status: "repair",
+      label: "先修打法",
+      platformId: input.platform.id,
+      platformName: input.platform.name,
+      headline: `${input.platform.name} 证据偏软，先别扩大投入。`,
+      nextAction: "优先修标题简介、前三章钩子或投稿资产，再让 Gate 派单验收。",
+      actionLabel: "修平台打法",
+      targetAnchor: "first-three-rewrite",
+      evidence,
+      metricsCount: latestMetric ? 1 : 0,
+      feedbackCount: platformReceipts.length,
+      gateCompletionCount,
+    };
+  }
+
+  return {
+    score,
+    status: "pause",
+    label: "暂停扩量",
+    platformId: input.platform.id,
+    platformName: input.platform.name,
+    headline: `${input.platform.name} 当前证据不支持继续投入。`,
+    nextAction: "暂停加码，先换平台小样本或重做开头包装。",
+    actionLabel: "暂停并换样本",
+    targetAnchor: "platform-strategy-ranking",
+    evidence,
+    metricsCount: latestMetric ? 1 : 0,
+    feedbackCount: platformReceipts.length,
+    gateCompletionCount,
+  };
+}
+
 export function buildProjectControlDashboard(input: ProjectControlDashboardInput): ProjectControlDashboard {
   const characterDashboard = buildCharacterArcDashboard(input.characters);
   const worldDashboard = buildWorldBibleDashboard(input.worldEntries);
@@ -670,12 +828,18 @@ export function buildProjectControlDashboard(input: ProjectControlDashboardInput
   const criticalActions = priorityActions.map((item) => `${item.label}：${item.reason}`);
   const controlAssetQualityReports = buildControlAssetQualityReports(input.aiTasks);
   const platformFeedback = buildPlatformFeedbackSummary(input.platformKnowledgeFeedbackReceipts);
+  const platformEvidenceLoop = buildPlatformEvidenceLoopSummary({
+    platform: input.platform,
+    metrics: input.platformPublishMetrics,
+    receipts: input.platformKnowledgeFeedbackReceipts,
+  });
 
   return {
     overallScore,
     verdict: verdict(overallScore),
     platformVerdict,
     platformFeedback,
+    platformEvidenceLoop,
     startTactic,
     startDecision: buildProjectStartDecision(startTactic),
     areas,

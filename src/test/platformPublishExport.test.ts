@@ -478,9 +478,13 @@ test("buildPlatformPublishExportCenter", async (t) => {
     assert.ok(comparison.wins.some((item) => item.includes("点击率")));
     assert.ok(comparison.verdict.includes("正反馈"));
     const attribution = center.packages[0].experimentPlan.attribution;
+    const knowledge = center.platformKnowledge.find((item) => item.platformId === "fanqie");
     assert.equal(attribution.status, "positive");
     assert.equal(attribution.attributedStrategy, "强钩子爽点版");
     assert.ok(attribution.platformLearnings.some((learning) => learning.includes("番茄小说")));
+    assert.equal(knowledge?.status, "learned");
+    assert.equal(knowledge?.positiveCount, 1);
+    assert.ok(knowledge?.winningSignals.some((signal) => signal.includes("夜雨系统")));
     assert.ok(center.packages[0].markdown.includes("实验结果归因"));
   });
 
@@ -534,9 +538,12 @@ test("buildPlatformPublishExportCenter", async (t) => {
       ],
     });
     const attribution = center.packages[0].experimentPlan.attribution;
+    const knowledge = center.platformKnowledge.find((item) => item.platformId === "fanqie");
 
     assert.equal(center.packages[0].publishEffect.comparison.status, "improved");
     assert.equal(attribution.status, "no_experiment");
+    assert.equal(knowledge?.status, "insufficient");
+    assert.ok(knowledge?.avoidSignals.some((signal) => signal.includes("缺采纳版本")));
     assert.ok(attribution.verdict.includes("不能证明"));
     assert.ok(attribution.nextAction.includes("采纳"));
   });

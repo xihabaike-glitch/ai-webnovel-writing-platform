@@ -611,6 +611,20 @@ interface PlatformStrategyExecutionReceipt {
   severity: "success" | "needs_action";
 }
 
+interface PlatformKnowledgeInsight {
+  platformId: string;
+  platformName: string;
+  status: "learned" | "warning" | "insufficient";
+  confidence: number;
+  evidenceCount: number;
+  positiveCount: number;
+  negativeCount: number;
+  winningSignals: string[];
+  avoidSignals: string[];
+  tacticSummary: string;
+  nextAction: string;
+}
+
 interface PlatformPublishExportCenter {
   packages: PlatformPublishPackage[];
   recommendedPlatformId: string;
@@ -618,6 +632,7 @@ interface PlatformPublishExportCenter {
   workspace: PlatformPublishWorkspace;
   platformStrategy: PlatformStrategyRankItem[];
   strategyVerdict: PlatformStrategyAutoVerdict;
+  platformKnowledge: PlatformKnowledgeInsight[];
   activeStrategyPlan: PlatformStrategySwitchPlan | null;
 }
 
@@ -879,6 +894,18 @@ function strategyVerdictRoleLabel(role: PlatformStrategyAutoVerdictItem["role"])
 function strategyVerdictRoleClass(role: PlatformStrategyAutoVerdictItem["role"]) {
   if (role === "primary") return "bg-slate-950 text-white";
   if (role === "backup") return "bg-cyan-50 text-cyan-700";
+  return "bg-slate-100 text-slate-600";
+}
+
+function platformKnowledgeStatusLabel(status: PlatformKnowledgeInsight["status"]) {
+  if (status === "learned") return "已沉淀";
+  if (status === "warning") return "需避坑";
+  return "证据不足";
+}
+
+function platformKnowledgeStatusClass(status: PlatformKnowledgeInsight["status"]) {
+  if (status === "learned") return "bg-emerald-50 text-emerald-700";
+  if (status === "warning") return "bg-rose-50 text-rose-700";
   return "bg-slate-100 text-slate-600";
 }
 
@@ -2231,6 +2258,54 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
               ))}
             </div>
           </div>
+          {center.platformKnowledge.length ? (
+            <div className="mt-3 rounded-md border border-slate-200 p-3" id="platform-knowledge">
+              <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <div className="font-medium text-slate-950">平台知识库</div>
+                  <p className="mt-1 text-sm leading-6 text-slate-600">自动沉淀 A/B 归因、候选采纳和真实效果，给后续标题、简介、前三章提供打法经验。</p>
+                </div>
+                <div className="text-xs text-slate-500">Top {Math.min(3, center.platformKnowledge.length)}</div>
+              </div>
+              <div className="mt-3 grid gap-2 lg:grid-cols-3">
+                {center.platformKnowledge.slice(0, 3).map((item) => (
+                  <div className="rounded-md bg-slate-50 p-3 text-sm" key={item.platformId}>
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="font-medium text-slate-950">{item.platformName}</div>
+                      <span className={`rounded-md px-2 py-1 text-xs font-medium ${platformKnowledgeStatusClass(item.status)}`}>
+                        {platformKnowledgeStatusLabel(item.status)}
+                      </span>
+                    </div>
+                    <div className="mt-2 grid grid-cols-3 gap-2 text-xs text-slate-500">
+                      <div>置信 <span className="font-medium text-slate-950">{item.confidence}</span></div>
+                      <div>证据 <span className="font-medium text-slate-950">{item.evidenceCount}</span></div>
+                      <div>正/负 <span className="font-medium text-slate-950">{item.positiveCount}/{item.negativeCount}</span></div>
+                    </div>
+                    <p className="mt-2 leading-6 text-slate-600">{item.tacticSummary}</p>
+                    {item.winningSignals.length ? (
+                      <div className="mt-2 rounded-md bg-white p-2 text-xs leading-5 text-slate-600">
+                        <div className="font-medium text-slate-800">可复用</div>
+                        {item.winningSignals.slice(0, 2).map((signal) => (
+                          <div className="mt-1" key={signal}>{signal}</div>
+                        ))}
+                      </div>
+                    ) : null}
+                    {item.avoidSignals.length ? (
+                      <div className="mt-2 rounded-md bg-white p-2 text-xs leading-5 text-slate-600">
+                        <div className="font-medium text-slate-800">避坑</div>
+                        {item.avoidSignals.slice(0, 2).map((signal) => (
+                          <div className="mt-1" key={signal}>{signal}</div>
+                        ))}
+                      </div>
+                    ) : null}
+                    <div className="mt-2 rounded-md bg-white px-2 py-1 text-xs leading-5 text-slate-500">
+                      下一步：{item.nextAction}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
           {center.platformStrategy.length ? (
             <div className="mt-3 rounded-md border border-slate-200 p-3" id="platform-strategy-ranking">
               <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">

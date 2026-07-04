@@ -680,6 +680,20 @@ export interface PlatformStrategyExecutionReceipt {
   severity: "success" | "needs_action";
 }
 
+export interface PlatformKnowledgeInsight {
+  platformId: PlatformId;
+  platformName: string;
+  status: "learned" | "warning" | "insufficient";
+  confidence: number;
+  evidenceCount: number;
+  positiveCount: number;
+  negativeCount: number;
+  winningSignals: string[];
+  avoidSignals: string[];
+  tacticSummary: string;
+  nextAction: string;
+}
+
 export interface PlatformPublishExportCenter {
   packages: PlatformPublishPackage[];
   recommendedPlatformId: PlatformId;
@@ -687,6 +701,7 @@ export interface PlatformPublishExportCenter {
   workspace: PlatformPublishWorkspace;
   platformStrategy: PlatformStrategyRankItem[];
   strategyVerdict: PlatformStrategyAutoVerdict;
+  platformKnowledge: PlatformKnowledgeInsight[];
   activeStrategyPlan: PlatformStrategySwitchPlan | null;
 }
 
@@ -1919,6 +1934,69 @@ function buildPlatformStrategy(packages: PlatformPublishPackage[]): PlatformStra
       || left.platformName.localeCompare(right.platformName)
     ))
     .map((item, index) => ({ ...item, rank: index + 1 }));
+}
+
+function buildPlatformKnowledge(packages: PlatformPublishPackage[]): PlatformKnowledgeInsight[] {
+  return packages
+    .map((pack) => {
+      const attribution = pack.experimentPlan.attribution;
+      const positiveCount = attribution.status === "positive" ? 1 : 0;
+      const negativeCount = attribution.status === "negative" ? 1 : 0;
+      const evidenceCount = pack.publishEffect.records
+        + pack.submissionAssetAdoption.adoptedVersions
+        + (attribution.status === "positive" || attribution.status === "negative" || attribution.status === "mixed" ? 1 : 0);
+      const status: PlatformKnowledgeInsight["status"] = positiveCount
+        ? "learned"
+        : negativeCount || attribution.status === "mixed"
+          ? "warning"
+          : "insufficient";
+      const confidence = Math.max(0, Math.min(100, Math.round(
+        pack.publishEffect.records * 18
+        + pack.submissionAssetAdoption.adoptedVersions * 16
+        + (attribution.status === "positive" ? 36 : attribution.status === "negative" ? 28 : attribution.status === "mixed" ? 20 : 0)
+        + (pack.publishEffect.comparison.status !== "none" ? 18 : 0),
+      )));
+      const winningSignals = [
+        ...(attribution.status === "positive" ? attribution.platformLearnings : []),
+        attribution.attributedTitle && attribution.status === "positive" ? `胜出标题：${attribution.attributedTitle}` : "",
+        pack.publishEffect.status === "promising" || pack.publishEffect.status === "signed" ? pack.publishEffect.verdict : "",
+        ...pack.submissionAssetAdoption.recentStrategies.map((strategy) => `已采纳策略：${strategy}`),
+      ].filter(Boolean).slice(0, 4);
+      const avoidSignals = [
+        ...(attribution.status === "negative" || attribution.status === "mixed" ? attribution.platformLearnings : []),
+        attribution.status === "no_experiment" ? "有数据但缺采纳版本，无法证明是哪套包装生效。" : "",
+        pack.publishEffect.status === "weak" ? pack.publishEffect.verdict : "",
+        ...pack.submissionAssetAudit.issues.slice(0, 2).map((issue) => `${issue.label}：${issue.detail}`),
+      ].filter(Boolean).slice(0, 4);
+      const tacticSummary = status === "learned"
+        ? `${pack.platformName} 已有可复用打法：优先沿用正反馈包装，再用下一轮数据确认。`
+        : status === "warning"
+          ? `${pack.platformName} 已暴露风险：先避开负反馈表达，别继续加码同款问题。`
+          : `${pack.platformName} 证据还薄：先补候选采纳和二轮数据，别提前定打法。`;
+      const nextAction = status === "learned"
+        ? "把胜出标题/卖点写入新章节和下一版发布包，继续记录同口径效果。"
+        : status === "warning"
+          ? attribution.nextAction
+          : pack.experimentPlan.nextAction;
+
+      return {
+        platformId: pack.platformId,
+        platformName: pack.platformName,
+        status,
+        confidence,
+        evidenceCount,
+        positiveCount,
+        negativeCount,
+        winningSignals,
+        avoidSignals,
+        tacticSummary,
+        nextAction,
+      };
+    })
+    .sort((left, right) => (
+      right.confidence - left.confidence
+      || left.platformName.localeCompare(right.platformName)
+    ));
 }
 
 function verdictItem(
@@ -3514,6 +3592,7 @@ export function buildPlatformPublishExportCenter(input: PlatformPublishExportInp
   const packages = platforms.map((platform) => buildPlatformPackage(input, platform));
   const platformStrategy = buildPlatformStrategy(packages);
   const strategyVerdict = buildPlatformStrategyAutoVerdict(platformStrategy);
+  const platformKnowledge = buildPlatformKnowledge(packages);
   const activeStrategy = platformStrategy.find((strategy) => strategy.platformId === input.targetPlatform.id) ?? null;
   const activePackage = packages.find((pack) => pack.platformId === input.targetPlatform.id);
 
@@ -3524,6 +3603,7 @@ export function buildPlatformPublishExportCenter(input: PlatformPublishExportInp
     workspace: buildPublishWorkspace(packages),
     platformStrategy,
     strategyVerdict,
+    platformKnowledge,
     activeStrategyPlan: activeStrategy
       ? buildPlatformStrategySwitchPlan(activeStrategy, input.targetPlatform, activePackage)
       : null,

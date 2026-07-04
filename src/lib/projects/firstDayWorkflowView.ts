@@ -98,6 +98,16 @@ export interface FirstDayDispatchDesk {
   nextActions: string[];
 }
 
+export interface FirstDayDispatchUpdateSummary {
+  visible: boolean;
+  status: "none" | "advanced" | "risk_recovered" | "completed";
+  title: string;
+  detail: string;
+  actionLabel: string;
+  href: string;
+  badges: string[];
+}
+
 export function buildFirstDayStepView(step: FirstDayWorkflowStep): FirstDayStepView {
   const markerIndex = step.evidence.indexOf(ACCEPTANCE_MARKER);
   if (markerIndex < 0) {
@@ -338,6 +348,8 @@ export function buildFirstDayDispatchDesk(tasks: PersistedGatePlatformDispatchTa
   const completed = cards.filter((card) => card.state === "completed").length;
   const dueToday = active.length;
   const nextTask = active[0] ?? null;
+  const hasCompletedRiskRecovery = cards.some((card) => card.stepId === "risk-recovery" && card.state === "completed");
+  const isRecoveredWatchDraft = hasCompletedRiskRecovery && nextTask?.stepId === "first-draft";
 
   return {
     summary: {
@@ -350,10 +362,74 @@ export function buildFirstDayDispatchDesk(tasks: PersistedGatePlatformDispatchTa
     nextTask,
     cards,
     nextActions: [
+      isRecoveredWatchDraft ? "止损恢复已验收，当前是恢复观察小样本；第一章通过线没过前不要批量放大。" : null,
       nextTask ? `先收口「${nextTask.stepLabel}」：${nextTask.actionLabel}。` : null,
       active.length > 1 ? `还有 ${active.length - 1} 张首日卡排队，完成当前节点后再推进下一张。` : null,
       cards.length > 0 && active.length === 0 ? "首日派单已全部完成，可以进入批量生产和平台包复盘。" : null,
     ].filter((action): action is string => Boolean(action)),
+  };
+}
+
+export function buildFirstDayDispatchUpdateSummary(input: {
+  task: Pick<PersistedGatePlatformDispatchTask, "dispatchKey" | "state" | "title" | "completionEvidence" | "href">;
+  followUpTasks?: Array<Pick<PersistedGatePlatformDispatchTask, "dispatchKey" | "projectId" | "title" | "actionLabel" | "href" | "dueLabel" | "state">>;
+}): FirstDayDispatchUpdateSummary {
+  if (!isFirstDayDispatchTask(input.task) || input.task.state !== "completed") {
+    return {
+      visible: false,
+      status: "none",
+      title: "",
+      detail: "",
+      actionLabel: "",
+      href: "",
+      badges: [],
+    };
+  }
+
+  const completedStepId = firstDayStepId(input.task.dispatchKey);
+  const completedStepLabel = firstDayStepLabel(completedStepId);
+  const firstDayFollowUp = input.followUpTasks?.find(isFirstDayDispatchTask) ?? null;
+  const followUpStepId = firstDayFollowUp ? firstDayStepId(firstDayFollowUp.dispatchKey) : "";
+  const followUpStepLabel = followUpStepId ? firstDayStepLabel(followUpStepId) : "";
+
+  if (completedStepId === "risk-recovery") {
+    return {
+      visible: true,
+      status: "risk_recovered",
+      title: "止损已解除，进入恢复观察",
+      detail: firstDayFollowUp
+        ? `恢复验证已验收，下一张首日卡是「${followUpStepLabel}」。先跑小样本，通过线和复查证据没过之前不要放量。`
+        : "恢复验证已验收。请刷新首日工作流，确认下一步是否进入小样本生成。",
+      actionLabel: firstDayFollowUp?.actionLabel || "回作品看恢复观察",
+      href: firstDayFollowUp ? firstDayHref(firstDayFollowUp as PersistedGatePlatformDispatchTask, followUpStepId) : input.task.href,
+      badges: [
+        "已完成恢复条件",
+        "转入观察小样本",
+        firstDayFollowUp?.dueLabel ?? "今天小样本验证",
+      ],
+    };
+  }
+
+  if (firstDayFollowUp) {
+    return {
+      visible: true,
+      status: "advanced",
+      title: "首日节点已推进",
+      detail: `「${completedStepLabel}」已验收，下一张首日卡是「${followUpStepLabel}」。先完成当前节点，再考虑批量扩大。`,
+      actionLabel: firstDayFollowUp.actionLabel,
+      href: firstDayHref(firstDayFollowUp as PersistedGatePlatformDispatchTask, followUpStepId),
+      badges: [completedStepLabel, followUpStepLabel, firstDayFollowUp.dueLabel],
+    };
+  }
+
+  return {
+    visible: true,
+    status: "completed",
+    title: "首日派单已收口",
+    detail: `「${completedStepLabel}」已验收，当前没有新的首日派单。可以回到作品页检查是否进入批量生产或平台包复盘。`,
+    actionLabel: "回作品检查",
+    href: input.task.href,
+    badges: [completedStepLabel, "无新增首日卡"],
   };
 }
 

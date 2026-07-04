@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { buildFirstDayExecutionRouteBlockMessage, type FirstDayExecutionRouteStatus } from "@/lib/model-gateway/firstDayExecutionRoute";
-import { buildFirstDayExecutionRiskNotice, buildFirstDayReceiptCompletionAction, buildFirstDayStepView, completeFirstDayDispatchStep } from "@/lib/projects/firstDayWorkflowView";
+import { buildFirstDayDispatchUpdateSummary, buildFirstDayExecutionRiskNotice, buildFirstDayReceiptCompletionAction, buildFirstDayStepView, completeFirstDayDispatchStep } from "@/lib/projects/firstDayWorkflowView";
 import { persistGateDispatchTask, type GatePlatformGrowthDispatchItem } from "@/lib/projects/gateActionReceipts";
 
 interface FirstDayWorkflowStep {
@@ -301,7 +301,8 @@ export function FirstDayWorkflowPanel({ projectId }: { projectId: string }) {
       });
       setCompletionEvidence("");
       await loadWorkflow();
-      showMessage(`已完成当前派单：${result.task.title}`);
+      const updateSummary = buildFirstDayDispatchUpdateSummary(result);
+      showMessage(updateSummary.visible ? `${updateSummary.title}：${updateSummary.detail}` : `已完成当前派单：${result.task.title}`);
     } catch (caught) {
       showMessage(caught instanceof Error ? caught.message : "首日派单验收失败。");
     } finally {

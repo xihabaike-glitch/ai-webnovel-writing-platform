@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   buildFirstDayDispatchCompletionTemplate,
   buildFirstDayDispatchDesk,
+  buildFirstDayDispatchUpdateSummary,
   buildFirstDayExecutionRiskNotice,
   buildFirstDayReceiptCompletionAction,
   buildFirstDayStepView,
@@ -188,6 +189,99 @@ test("buildFirstDayDispatchDesk highlights the next first-day task", () => {
   assert.equal(desk.nextTask?.firstDayHref, "/projects/project-1?firstDayLaunch=1&nextStep=first-review#first-day-workflow");
   assert.ok(desk.nextTask?.completionTemplate.includes("第一章审稿已完成"));
   assert.ok(desk.nextActions[0].includes("第一章审稿"));
+});
+
+test("buildFirstDayDispatchDesk keeps recovered watch state visible", () => {
+  const desk = buildFirstDayDispatchDesk([
+    {
+      databaseId: "db-1",
+      dispatchKey: "first-day:project-1:risk-recovery",
+      id: "first-day:project-1:risk-recovery",
+      projectId: "project-1",
+      platformId: "qimao",
+      platformName: "七猫小说",
+      stage: "start_first_three_review",
+      state: "completed",
+      priorityScore: 96,
+      ownerRole: "策划",
+      title: "夜雨系统 · 止损恢复验证",
+      detail: "先证明入口卖点已经改掉。",
+      dueLabel: "今天止损验证",
+      actionLabel: "做恢复验证",
+      href: "/projects/project-1#first-day-workflow",
+      acceptanceCriteria: ["恢复条件已写清"],
+      evidence: ["缺少止损恢复条件"],
+      sourceReceiptId: null,
+      completionEvidence: "恢复条件已写清，入口卖点已重做，只验证一个变量。",
+      reviewLatestAt: "2026-01-01T00:00:00.000Z",
+      assignedAt: "2026-01-01T00:00:00.000Z",
+      completedAt: "2026-01-01T00:10:00.000Z",
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:10:00.000Z",
+    },
+    {
+      databaseId: "db-2",
+      dispatchKey: "first-day:project-1:first-draft",
+      id: "first-day:project-1:first-draft",
+      projectId: "project-1",
+      platformId: "qimao",
+      platformName: "七猫小说",
+      stage: "start_first_three_review",
+      state: "assigned",
+      priorityScore: 88,
+      ownerRole: "AI",
+      title: "夜雨系统 · 恢复观察 · 生成第一章正文",
+      detail: "恢复后先跑小样本。",
+      dueLabel: "今天小样本验证",
+      actionLabel: "生成小样本",
+      href: "/projects/project-1/chapters/chapter-1",
+      acceptanceCriteria: ["写清首轮小样本通过线"],
+      evidence: ["缺少观察平台首轮小样本验证口径"],
+      sourceReceiptId: null,
+      completionEvidence: "",
+      reviewLatestAt: "2026-01-01T00:00:00.000Z",
+      assignedAt: "2026-01-01T00:11:00.000Z",
+      completedAt: null,
+      createdAt: "2026-01-01T00:11:00.000Z",
+      updatedAt: "2026-01-01T00:11:00.000Z",
+    },
+  ]);
+
+  assert.equal(desk.nextTask?.stepId, "first-draft");
+  assert.ok(desk.nextActions[0].includes("恢复观察小样本"));
+  assert.ok(desk.nextActions[0].includes("不要批量放大"));
+});
+
+test("buildFirstDayDispatchUpdateSummary explains risk recovery handoff", () => {
+  const summary = buildFirstDayDispatchUpdateSummary({
+    task: {
+      dispatchKey: "first-day:project-1:risk-recovery",
+      state: "completed",
+      title: "夜雨系统 · 止损恢复验证",
+      completionEvidence: "恢复条件已写清，入口卖点已重做，只验证一个变量。",
+      href: "/projects/project-1#first-day-workflow",
+    },
+    followUpTasks: [
+      {
+        dispatchKey: "first-day:project-1:first-draft",
+        projectId: "project-1",
+        title: "夜雨系统 · 恢复观察 · 生成第一章正文",
+        actionLabel: "生成小样本",
+        href: "/projects/project-1/chapters/chapter-1",
+        dueLabel: "今天小样本验证",
+        state: "assigned",
+      },
+    ],
+  });
+
+  assert.equal(summary.visible, true);
+  assert.equal(summary.status, "risk_recovered");
+  assert.equal(summary.title, "止损已解除，进入恢复观察");
+  assert.ok(summary.detail.includes("下一张首日卡是「第一章初稿」"));
+  assert.ok(summary.detail.includes("不要放量"));
+  assert.equal(summary.actionLabel, "生成小样本");
+  assert.equal(summary.href, "/projects/project-1?firstDayLaunch=1&nextStep=first-draft#first-day-workflow");
+  assert.ok(summary.badges.includes("转入观察小样本"));
 });
 
 test("buildFirstDayDispatchCompletionTemplate covers first-day step types", () => {

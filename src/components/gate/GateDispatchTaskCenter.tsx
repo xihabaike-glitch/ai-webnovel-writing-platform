@@ -21,6 +21,7 @@ import {
 import {
   buildFirstDayDispatchCompletionTemplate,
   buildFirstDayDispatchDesk,
+  buildFirstDayDispatchUpdateSummary,
 } from "@/lib/projects/firstDayWorkflowView";
 import {
   buildRouteDispatchCompletionTemplate,
@@ -255,7 +256,10 @@ export function GateDispatchTaskCenter({
         });
         const recheckMessage = evidenceLoopRecheckMessage(updated);
         const storyTreeMessage = storyTreeRecheckMessage(updated);
-        if (updated.followUpTasks.length) {
+        const firstDayUpdate = buildFirstDayDispatchUpdateSummary(updated);
+        if (firstDayUpdate.visible) {
+          setRouteActionMessage(`${firstDayUpdate.title}：${firstDayUpdate.detail}`);
+        } else if (updated.followUpTasks.length) {
           setRouteActionMessage(`已自动生成治理后复检派单：${updated.followUpTasks.map((item) => item.title).join("、")}${recheckMessage ? `；${recheckMessage}` : ""}${storyTreeMessage ? `；${storyTreeMessage}` : ""}`);
         } else if (storyTreeMessage && recheckMessage) {
           setRouteActionMessage(`${storyTreeMessage}；${recheckMessage}`);

@@ -69,6 +69,17 @@ export interface FirstDayWorkflowStep {
   href: string;
 }
 
+export interface FirstDayExecutionPackage {
+  stepId: string;
+  owner: FirstDayWorkflowStep["owner"];
+  headline: string;
+  actionLabel: string;
+  href: string;
+  acceptanceCriteria: string[];
+  missingEvidence: string[];
+  handoffNote: string;
+}
+
 export interface FirstDayWorkflow {
   title: string;
   platformName: string;
@@ -77,6 +88,7 @@ export interface FirstDayWorkflow {
   progressPercent: number;
   verdict: string;
   nextStep: FirstDayWorkflowStep;
+  executionPackage: FirstDayExecutionPackage;
   steps: FirstDayWorkflowStep[];
 }
 
@@ -165,6 +177,83 @@ function verdict(completedCount: number, totalSteps: number) {
   if (completedCount >= 4) return "首日链路过半，先把审稿和二改补完，别急着开新坑。";
   if (completedCount >= 2) return "项目骨架已经有了，下一步要把第一章变成可审稿正文。";
   return "新书还在冷启动，先把大纲、人物、设定和第一章钩子咬住。";
+}
+
+function executionPackage(step: FirstDayWorkflowStep): FirstDayExecutionPackage {
+  const base = {
+    stepId: step.id,
+    owner: step.owner,
+    actionLabel: step.actionLabel,
+    href: step.href,
+  };
+
+  if (step.id === "first-draft") {
+    return {
+      ...base,
+      headline: "AI 接手第一章初稿，但作者先守住节奏和设定边界。",
+      acceptanceCriteria: ["第一章正文已生成并写回章节", "正文执行了第一章钩子、冲突和章末悬念", "本次生成留下可审稿的任务记录"],
+      missingEvidence: ["缺少第一章正文或成功初稿任务"],
+      handoffNote: "别批量开跑。先用第一章验证平台语气、模型路线和成本，再决定是否扩到前三章。",
+    };
+  }
+
+  if (step.id === "first-review") {
+    return {
+      ...base,
+      headline: "AI 先当毒舌审稿编辑，别急着自我感动。",
+      acceptanceCriteria: ["第一章已有结构化审稿结果", "钩子、爽点、冲突、解释密度和章末追读均有判断", "低分问题进入二改或重写队列"],
+      missingEvidence: ["缺少第一章成功审稿任务"],
+      handoffNote: "审稿不是夸稿。必须把不适合平台的地方翻出来，下一步才有改稿抓手。",
+    };
+  }
+
+  if (step.id === "first-rewrite") {
+    return {
+      ...base,
+      headline: "AI 做二改，目标是让前三章能被平台读者继续点下去。",
+      acceptanceCriteria: ["二改或前三章改写任务已成功", "审稿问题被逐项处理", "改写后保留版本对照和复检入口"],
+      missingEvidence: ["缺少二改或前三章改写结果"],
+      handoffNote: "不要只换句子。重点修开头压力、爽点兑现和章末追读。",
+    };
+  }
+
+  if (step.id === "publish-precheck") {
+    return {
+      ...base,
+      headline: "运营收口平台包，先做可验证的小投放基准。",
+      acceptanceCriteria: ["标题、简介、标签、卖点和样章准备度达标", "平台风险清单已处理或明确保留", "首轮曝光、点击、收藏、追读回收口径已写清"],
+      missingEvidence: ["投稿准备度或首轮数据回收口径不足"],
+      handoffNote: "平台包不是装饰。它要能和正文前三章互相兑现，方便首轮数据复盘。",
+    };
+  }
+
+  if (step.id === "story-support") {
+    return {
+      ...base,
+      headline: "策划补齐人物和设定，别让模型在空地上编。",
+      acceptanceCriteria: ["主角欲望、需求、缺陷、起点和终点完整", "系统规则、禁忌和平台土壤均已落库", "后续初稿能引用这些支撑材料"],
+      missingEvidence: ["缺少完整人物弧光或核心设定土壤"],
+      handoffNote: "人物和设定是土壤，不是百科摆设。每条都要能喂给第一章生成和审稿。",
+    };
+  }
+
+  if (step.id === "opening-hook") {
+    return {
+      ...base,
+      headline: "作者先咬住第一章钩子，别把开头写成说明书。",
+      acceptanceCriteria: ["第一章目标、钩子、冲突、转变和章末悬念完整", "开头动作贴合目标平台", "章节卡可以直接进入初稿生成"],
+      missingEvidence: ["缺少第一章完整章节卡"],
+      handoffNote: "这里决定读者会不会留下。先补高压选择、明确冲突和章末追读。",
+    };
+  }
+
+  return {
+    ...base,
+    headline: "策划先把作品骨架落地，别让 AI 自由发挥。",
+    acceptanceCriteria: ["大纲树包含开头、结尾、主干、分支、叶片和土壤", "至少有前三章章节卡", "下一步能打开第一章继续补钩子"],
+    missingEvidence: ["缺少完整大纲树或前三章章节卡"],
+    handoffNote: "骨架没落地前，不要进入正文生成。先让项目有开头、结尾、主干和可执行章节卡。",
+  };
 }
 
 export function buildFirstDayWorkflow(input: FirstDayWorkflowInput): FirstDayWorkflow {
@@ -272,6 +361,7 @@ export function buildFirstDayWorkflow(input: FirstDayWorkflowInput): FirstDayWor
     progressPercent: Math.round((completedCount / steps.length) * 100),
     verdict: verdict(completedCount, steps.length),
     nextStep,
+    executionPackage: executionPackage(nextStep),
     steps,
   };
 }

@@ -93,6 +93,28 @@ test("buildFirstDayWorkflow", async (t) => {
     assert.deepEqual(receipt.readyStepIds, ["skeleton", "opening-hook", "story-support"]);
   });
 
+  await t.test("builds an execution package for the current first-day step", () => {
+    const workflow = buildFirstDayWorkflow({
+      project,
+      platform: getPlatformProfile("fanqie"),
+      chapters: [chapter, { ...chapter, id: "chapter-2", order: 2 }, { ...chapter, id: "chapter-3", order: 3 }],
+      outlineNodes,
+      characters,
+      worldEntries,
+      aiTasks: [],
+      submissionChecklist: checklist,
+    });
+
+    assert.equal(workflow.executionPackage.stepId, "first-draft");
+    assert.equal(workflow.executionPackage.owner, "AI");
+    assert.equal(workflow.executionPackage.actionLabel, "生成第一章");
+    assert.equal(workflow.executionPackage.href, "/projects/project-1/chapters/chapter-1");
+    assert.ok(workflow.executionPackage.headline.includes("AI"));
+    assert.ok(workflow.executionPackage.acceptanceCriteria.includes("第一章正文已生成并写回章节"));
+    assert.ok(workflow.executionPackage.missingEvidence.includes("缺少第一章正文或成功初稿任务"));
+    assert.ok(workflow.executionPackage.handoffNote.includes("别批量开跑"));
+  });
+
   await t.test("locks downstream work when the skeleton is empty", () => {
     const workflow = buildFirstDayWorkflow({
       project,

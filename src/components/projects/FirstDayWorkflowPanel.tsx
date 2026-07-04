@@ -14,6 +14,17 @@ interface FirstDayWorkflowStep {
   href: string;
 }
 
+interface FirstDayExecutionPackage {
+  stepId: string;
+  owner: FirstDayWorkflowStep["owner"];
+  headline: string;
+  actionLabel: string;
+  href: string;
+  acceptanceCriteria: string[];
+  missingEvidence: string[];
+  handoffNote: string;
+}
+
 interface FirstDayWorkflow {
   title: string;
   platformName: string;
@@ -22,6 +33,7 @@ interface FirstDayWorkflow {
   progressPercent: number;
   verdict: string;
   nextStep: FirstDayWorkflowStep;
+  executionPackage: FirstDayExecutionPackage;
   steps: FirstDayWorkflowStep[];
 }
 
@@ -101,6 +113,37 @@ export function FirstDayWorkflowPanel({ projectId }: { projectId: string }) {
                 <span className="text-slate-500">
                   {workflow.completedCount}/{workflow.totalSteps} 完成
                 </span>
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-md border border-slate-200 p-4">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+              <div>
+                <div className="text-xs font-medium text-slate-500">下一步执行包 · {workflow.executionPackage.owner}</div>
+                <h3 className="mt-1 text-base font-semibold text-slate-950">{workflow.executionPackage.headline}</h3>
+                <p className="mt-2 text-sm leading-6 text-slate-600">{workflow.executionPackage.handoffNote}</p>
+              </div>
+              <Link className="w-fit rounded-md bg-slate-950 px-3 py-2 text-sm font-medium text-white" href={workflow.executionPackage.href}>
+                {workflow.executionPackage.actionLabel}
+              </Link>
+            </div>
+            <div className="mt-4 grid gap-4 md:grid-cols-2">
+              <div>
+                <div className="text-xs font-medium text-slate-500">验收标准</div>
+                <ul className="mt-2 grid gap-2 text-sm leading-6 text-slate-600">
+                  {workflow.executionPackage.acceptanceCriteria.map((criterion) => (
+                    <li className="rounded-md bg-emerald-50 px-3 py-2 text-emerald-800" key={criterion}>{criterion}</li>
+                  ))}
+                </ul>
+              </div>
+              <div>
+                <div className="text-xs font-medium text-slate-500">缺失证据</div>
+                <ul className="mt-2 grid gap-2 text-sm leading-6 text-slate-600">
+                  {workflow.executionPackage.missingEvidence.map((evidence) => (
+                    <li className="rounded-md bg-amber-50 px-3 py-2 text-amber-800" key={evidence}>{evidence}</li>
+                  ))}
+                </ul>
               </div>
             </div>
           </div>

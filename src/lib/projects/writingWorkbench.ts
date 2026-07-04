@@ -1,4 +1,5 @@
 import { buildTaskRetryPlan } from "../ai/taskRetry.ts";
+import { buildProjectContextPack, type ProjectContextPack, type ProjectContextPlotThread, type ProjectContextForeshadow } from "./projectContextPack.ts";
 
 export type WorkbenchStatus = "pass" | "warn" | "fail";
 
@@ -18,6 +19,7 @@ export interface WritingWorkbenchChapter {
   order: number;
   status: string;
   wordCount: number;
+  content?: string;
   hook: string;
   conflict: string;
   cliffhanger: string;
@@ -72,6 +74,8 @@ export interface WritingWorkbenchInput {
   outlineNodes: WritingWorkbenchOutlineNode[];
   characters: WritingWorkbenchCharacter[];
   worldEntries: WritingWorkbenchWorldEntry[];
+  foreshadows?: ProjectContextForeshadow[];
+  plotThreads?: ProjectContextPlotThread[];
   aiTasks: WritingWorkbenchAiTask[];
 }
 
@@ -106,6 +110,12 @@ export interface WritingWorkbench {
     completeCharacters: number;
     totalCharacters: number;
     nextAction: string;
+  };
+  contextFocus: {
+    status: ProjectContextPack["status"];
+    summary: string;
+    warnings: string[];
+    sourceCounts: ProjectContextPack["sourceCounts"];
   };
   modelFocus: {
     failedTaskCount: number;
@@ -565,6 +575,23 @@ function buildModelTimeline(tasks: WritingWorkbenchAiTask[]): WritingWorkbenchMo
 export function buildWritingWorkbench(input: WritingWorkbenchInput): WritingWorkbench {
   const treeBlocks = buildTreeBlocks(input.outlineNodes, input.worldEntries);
   const nextChapter = pickNextChapter(input.chapters);
+  const projectContext = buildProjectContextPack({
+    currentChapterId: nextChapter?.id ?? null,
+    chapters: input.chapters.map((chapter) => ({
+      id: chapter.id,
+      order: chapter.order,
+      title: chapter.title,
+      content: chapter.content ?? "",
+      hook: chapter.hook,
+      conflict: chapter.conflict,
+      cliffhanger: chapter.cliffhanger,
+      status: chapter.status,
+    })),
+    characters: input.characters,
+    worldEntries: input.worldEntries,
+    foreshadows: input.foreshadows ?? [],
+    plotThreads: input.plotThreads ?? [],
+  });
   const hookStatus: WorkbenchStatus = nextChapter
     ? hasText(nextChapter.hook)
       ? "pass"
@@ -606,6 +633,12 @@ export function buildWritingWorkbench(input: WritingWorkbenchInput): WritingWork
         : input.characters.length > 0
           ? "补齐人物弧光：真正需求、终局变化和关系压力。"
           : "先创建主角人物卡，写清欲望、缺陷和终局变化。",
+    },
+    contextFocus: {
+      status: projectContext.status,
+      summary: projectContext.summary,
+      warnings: projectContext.warnings,
+      sourceCounts: projectContext.sourceCounts,
     },
     modelFocus: {
       failedTaskCount: input.aiTasks.filter((task) => task.status === "failed").length,

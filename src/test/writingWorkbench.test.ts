@@ -104,6 +104,10 @@ test("buildWritingWorkbench", async (t) => {
     assert.equal(workbench.chapterFocus.nextChapter?.id, "c1");
     assert.equal(workbench.chapterFocus.hookStatus, "fail");
     assert.ok(workbench.characterFocus.nextAction.includes("人物弧光"));
+    assert.equal(workbench.contextFocus.status, "fail");
+    assert.equal(workbench.contextFocus.sourceCounts.characters, 1);
+    assert.equal(workbench.contextFocus.sourceCounts.worldEntries, 0);
+    assert.ok(workbench.contextFocus.warnings.some((warning) => warning.includes("平台土壤")));
     assert.ok(workbench.modelFocus.nextRoutes.some((route) => route.task.includes("开头钩子")));
     assert.ok(workbench.quickLinks.some((link) => link.href === "/projects/p1#outline-tree"));
     assert.ok(workbench.quickFixes.some((fix) => fix.kind === "chapter_hook" && fix.endpoint === "/api/chapters/c1"));
@@ -158,6 +162,7 @@ test("buildWritingWorkbench", async (t) => {
     assert.ok(workbench.quickFixes.some((fix) => fix.kind === "character_seed"));
     assert.ok(!workbench.quickFixes.some((fix) => fix.kind === "world_seed"));
     assert.ok(workbench.modelActions.every((action) => action.disabledReason?.includes("先创建第一章")));
+    assert.ok(workbench.contextFocus.summary.includes("设定 1"));
     assert.equal(workbench.modelTimeline.emptyState, "还没有模型执行记录。");
   });
 

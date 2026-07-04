@@ -87,7 +87,7 @@ export function WritingWorkbenchPanel({ workbench }: { workbench: WritingWorkben
         ))}
       </div>
 
-      <div className="mt-4 grid gap-3 lg:grid-cols-3">
+      <div className="mt-4 grid gap-3 lg:grid-cols-4">
         <div className="rounded-md bg-slate-50 p-3">
           <div className="text-sm font-medium text-slate-950">章节焦点</div>
           <div className="mt-2 text-sm text-slate-600">
@@ -111,6 +111,25 @@ export function WritingWorkbenchPanel({ workbench }: { workbench: WritingWorkben
             完整 {workbench.characterFocus.completeCharacters}/{workbench.characterFocus.totalCharacters} 个
           </div>
           <p className="mt-2 text-sm text-slate-600">{workbench.characterFocus.nextAction}</p>
+        </div>
+
+        <div className="rounded-md bg-slate-50 p-3">
+          <div className="flex items-center justify-between gap-2">
+            <div className="text-sm font-medium text-slate-950">上下文召回</div>
+            <span className={`rounded-md border px-2 py-1 text-xs ${statusClass(workbench.contextFocus.status)}`}>
+              {statusLabel(workbench.contextFocus.status)}
+            </span>
+          </div>
+          <p className="mt-2 text-sm leading-6 text-slate-600">{workbench.contextFocus.summary}</p>
+          <div className="mt-2 grid grid-cols-2 gap-2 text-xs text-slate-500">
+            <div>人物 {workbench.contextFocus.sourceCounts.characters}</div>
+            <div>设定 {workbench.contextFocus.sourceCounts.worldEntries}</div>
+            <div>线索 {workbench.contextFocus.sourceCounts.storyLines}</div>
+            <div>历史 {workbench.contextFocus.sourceCounts.historyChapters}</div>
+          </div>
+          {workbench.contextFocus.warnings[0] ? (
+            <p className="mt-2 text-xs leading-5 text-amber-700">{workbench.contextFocus.warnings[0]}</p>
+          ) : null}
         </div>
 
         <div className="rounded-md bg-slate-50 p-3">

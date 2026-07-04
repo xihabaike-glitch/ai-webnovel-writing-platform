@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db/prisma";
 import type { ForcedProviderTarget } from "@/lib/model-gateway/providerSelection";
 import { runRoutedGeneration } from "@/lib/model-gateway/routedGeneration";
 import { getPlatformProfile, type PlatformId } from "@/lib/platforms/platformProfiles";
+import { buildProjectContextPack } from "@/lib/projects/projectContextPack";
 import { findProjectStartTacticSummary } from "@/lib/projects/projectStartTactics";
 
 export interface ReviewIssueResult {
@@ -28,7 +29,11 @@ export async function reviewChapterDraft(chapterId: string, options: ReviewChapt
     include: {
       project: {
         include: {
+          chapters: { orderBy: { order: "asc" } },
+          characters: { orderBy: { createdAt: "asc" } },
           worldEntries: true,
+          foreshadows: { orderBy: { createdAt: "asc" } },
+          plotThreads: { orderBy: { createdAt: "asc" } },
         },
       },
     },
@@ -40,10 +45,19 @@ export async function reviewChapterDraft(chapterId: string, options: ReviewChapt
 
   const platform = getPlatformProfile(chapter.project.targetPlatform as PlatformId);
   const startTactic = findProjectStartTacticSummary(chapter.project.worldEntries);
+  const projectContext = buildProjectContextPack({
+    currentChapterId: chapter.id,
+    chapters: chapter.project.chapters,
+    characters: chapter.project.characters,
+    worldEntries: chapter.project.worldEntries,
+    foreshadows: chapter.project.foreshadows,
+    plotThreads: chapter.project.plotThreads,
+  });
   const prompt = buildChapterReviewPrompt({
     projectTitle: chapter.project.title,
     platform,
     startTactic,
+    projectContext,
     chapter: {
       title: chapter.title,
       content: chapter.content,

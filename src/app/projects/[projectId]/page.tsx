@@ -48,6 +48,8 @@ export default async function ProjectPage({ params }: { params: Promise<{ projec
       outlineNodes: { orderBy: [{ depth: "asc" }, { order: "asc" }, { createdAt: "asc" }] },
       characters: { orderBy: { createdAt: "asc" } },
       worldEntries: { orderBy: [{ type: "asc" }, { createdAt: "asc" }] },
+      foreshadows: { orderBy: { createdAt: "asc" } },
+      plotThreads: { orderBy: { createdAt: "asc" } },
       aiTasks: {
         include: {
           modelProvider: { select: { providerId: true, displayName: true } },
@@ -129,6 +131,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ projec
       order: chapter.order,
       status: chapter.status,
       wordCount: chapter.wordCount,
+      content: chapter.content,
       hook: chapter.hook,
       conflict: chapter.conflict,
       cliffhanger: chapter.cliffhanger,
@@ -159,6 +162,23 @@ export default async function ProjectPage({ params }: { params: Promise<{ projec
       type: entry.type,
       title: entry.title,
       content: entry.content,
+    })),
+    foreshadows: project.foreshadows.map((foreshadow) => ({
+      id: foreshadow.id,
+      title: foreshadow.title,
+      setupChapterId: foreshadow.setupChapterId,
+      payoffChapterId: foreshadow.payoffChapterId,
+      relatedCharacterIds: foreshadow.relatedCharacterIds,
+      status: foreshadow.status,
+      notes: foreshadow.notes,
+    })),
+    plotThreads: project.plotThreads.map((thread) => ({
+      id: thread.id,
+      type: thread.type,
+      title: thread.title,
+      startChapterId: thread.startChapterId,
+      endChapterId: thread.endChapterId,
+      status: thread.status,
     })),
     aiTasks: project.aiTasks.map((task) => ({
       id: task.id,

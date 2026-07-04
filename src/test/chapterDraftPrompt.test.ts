@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { buildChapterDraftPrompt } from "../lib/ai/buildChapterDraftPrompt.ts";
 import { MockAdapter } from "../lib/model-gateway/mockAdapter.ts";
 import { getPlatformProfile } from "../lib/platforms/platformProfiles.ts";
+import { buildProjectContextPack } from "../lib/projects/projectContextPack.ts";
 
 const prompt = buildChapterDraftPrompt({
   projectTitle: "夜雨系统",
@@ -74,5 +75,74 @@ test("buildChapterDraftPrompt", async (t) => {
     assert.ok(tacticPrompt.userPrompt.includes("历史可复用"));
     assert.ok(tacticPrompt.userPrompt.includes("先修标题简介标签和前三章兑现"));
     assert.ok(tacticPrompt.userPrompt.includes("记录首轮曝光、点击、收藏、追读"));
+  });
+
+  await t.test("includes project context recall when available", () => {
+    const projectContext = buildProjectContextPack({
+      currentChapterId: "chapter-2",
+      chapters: [
+        {
+          id: "chapter-1",
+          order: 1,
+          title: "雨夜系统",
+          content: "林晚在雨夜第一次触发系统。",
+          hook: "系统倒计时只剩十秒。",
+          conflict: "救人会暴露自己。",
+          cliffhanger: "黑伞人出现。",
+          status: "draft",
+        },
+        {
+          id: "chapter-2",
+          order: 2,
+          title: "第二章",
+          content: "",
+          hook: "黑伞人说出系统编号。",
+          conflict: "追查会牵连妹妹。",
+          cliffhanger: "系统要求支付记忆。",
+          status: "outline",
+        },
+      ],
+      characters: [{
+        id: "character-1",
+        name: "林晚",
+        role: "主角",
+        desire: "查清系统来源",
+        need: "学会承担代价",
+        flaw: "总想独自解决",
+        arcStart: "被系统推着走",
+        arcEnd: "反过来定义规则",
+        relationshipNotes: "妹妹是软肋。",
+      }],
+      worldEntries: [
+        { id: "w1", type: "system_rule", title: "系统规则", content: "奖励必须伴随记忆代价，不能无成本升级。" },
+        { id: "w2", type: "taboo", title: "禁忌", content: "不能公开说出系统编号，否则触发追猎。" },
+        { id: "w3", type: "platform_soil", title: "番茄土壤", content: "每章前半段给危机，后半段给反击或新问题。" },
+      ],
+      foreshadows: [],
+      plotThreads: [],
+    });
+    const contextPrompt = buildChapterDraftPrompt({
+      projectTitle: "夜雨系统",
+      genre: "都市系统",
+      sellingPoint: "雨夜系统翻盘",
+      platform: getPlatformProfile("fanqie"),
+      projectContext,
+      targetWords: 1200,
+      chapter: {
+        title: "第二章",
+        goal: "让主角意识到系统代价。",
+        hook: "黑伞人说出系统编号。",
+        conflict: "追查会牵连妹妹。",
+        valueShift: "从被动逃生到主动追查。",
+        cliffhanger: "系统要求支付记忆。",
+        content: "",
+      },
+    });
+
+    assert.ok(contextPrompt.userPrompt.includes("项目上下文召回包"));
+    assert.ok(contextPrompt.userPrompt.includes("林晚"));
+    assert.ok(contextPrompt.userPrompt.includes("系统规则"));
+    assert.ok(contextPrompt.userPrompt.includes("第 1 章 雨夜系统"));
+    assert.ok(contextPrompt.userPrompt.includes("不要写出与人物弧光"));
   });
 });

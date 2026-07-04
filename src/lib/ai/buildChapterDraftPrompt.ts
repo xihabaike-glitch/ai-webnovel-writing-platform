@@ -1,5 +1,6 @@
 import type { PlatformProfile } from "../platforms/platformProfiles.ts";
 import { buildPlatformWritingStylePromptBlock } from "../platforms/writingStyleTemplates.ts";
+import type { ProjectContextPack } from "../projects/projectContextPack.ts";
 import type { ProjectStartTacticSummary } from "../projects/projectStartTactics.ts";
 
 interface ChapterDraftPromptInput {
@@ -8,6 +9,7 @@ interface ChapterDraftPromptInput {
   sellingPoint: string;
   platform: PlatformProfile;
   startTactic?: ProjectStartTacticSummary | null;
+  projectContext?: ProjectContextPack | null;
   targetWords: number;
   chapter: {
     title: string;
@@ -47,6 +49,7 @@ export function buildChapterDraftPrompt(input: ChapterDraftPromptInput) {
     `平台审稿重点：${input.platform.reviewFocus.join("、")}`,
     platformStyle,
     startTacticLines,
+    input.projectContext?.promptBlock ?? "",
     `目标字数：约 ${input.targetWords} 字`,
     `章节标题：${input.chapter.title}`,
     `章节目标：${input.chapter.goal}`,
@@ -60,6 +63,7 @@ export function buildChapterDraftPrompt(input: ChapterDraftPromptInput) {
     "2. 第一段必须进入事件现场。",
     "3. 每 300-500 字至少推动一次信息、冲突或选择。",
     "4. 结尾必须扣住章末悬念。",
+    input.projectContext ? "5. 必须遵守项目上下文召回包；不要写出与人物弧光、系统规则、伏笔状态和历史章节矛盾的内容。" : "",
   ].join("\n");
 
   return { systemPrompt, userPrompt };

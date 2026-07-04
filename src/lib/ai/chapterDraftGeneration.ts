@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db/prisma";
 import { runRoutedGeneration } from "@/lib/model-gateway/routedGeneration";
 import type { ForcedProviderTarget } from "@/lib/model-gateway/providerSelection";
 import { getPlatformProfile, type PlatformId } from "@/lib/platforms/platformProfiles";
+import { buildProjectContextPack } from "@/lib/projects/projectContextPack";
 import { findProjectStartTacticSummary } from "@/lib/projects/projectStartTactics";
 import { countWords } from "@/lib/text/wordCount";
 
@@ -19,7 +20,11 @@ export async function generateChapterDraft(options: GenerateChapterDraftOptions)
     include: {
       project: {
         include: {
+          chapters: { orderBy: { order: "asc" } },
+          characters: { orderBy: { createdAt: "asc" } },
           worldEntries: true,
+          foreshadows: { orderBy: { createdAt: "asc" } },
+          plotThreads: { orderBy: { createdAt: "asc" } },
         },
       },
     },
@@ -31,12 +36,21 @@ export async function generateChapterDraft(options: GenerateChapterDraftOptions)
 
   const platform = getPlatformProfile(chapter.project.targetPlatform as PlatformId);
   const startTactic = findProjectStartTacticSummary(chapter.project.worldEntries);
+  const projectContext = buildProjectContextPack({
+    currentChapterId: chapter.id,
+    chapters: chapter.project.chapters,
+    characters: chapter.project.characters,
+    worldEntries: chapter.project.worldEntries,
+    foreshadows: chapter.project.foreshadows,
+    plotThreads: chapter.project.plotThreads,
+  });
   const prompt = buildChapterDraftPrompt({
     projectTitle: chapter.project.title,
     genre: chapter.project.genre,
     sellingPoint: chapter.project.sellingPoint,
     platform,
     startTactic,
+    projectContext,
     targetWords: options.targetWords ?? 1200,
     chapter: {
       title: chapter.title,

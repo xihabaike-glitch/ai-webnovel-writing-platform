@@ -1,10 +1,12 @@
 import type { PlatformProfile } from "../platforms/platformProfiles.ts";
+import type { ProjectContextPack } from "../projects/projectContextPack.ts";
 import type { ProjectStartTacticSummary } from "../projects/projectStartTactics.ts";
 
 interface ChapterReviewPromptInput {
   projectTitle: string;
   platform: PlatformProfile;
   startTactic?: ProjectStartTacticSummary | null;
+  projectContext?: ProjectContextPack | null;
   chapter: {
     title: string;
     content: string;
@@ -35,6 +37,7 @@ export function buildChapterReviewPrompt(input: ChapterReviewPromptInput) {
     `目标平台：${input.platform.name}`,
     `平台审稿重点：${input.platform.reviewFocus.join("、")}`,
     ...startTacticLines,
+    input.projectContext?.promptBlock ?? "",
     `章节标题：${input.chapter.title}`,
     `章节目标：${input.chapter.goal}`,
     `开头钩子：${input.chapter.hook}`,
@@ -45,6 +48,7 @@ export function buildChapterReviewPrompt(input: ChapterReviewPromptInput) {
     input.chapter.content,
     "输出 JSON 字段：score, issues, summary。issues 内含 severity, type, message, suggestion。",
     input.startTactic ? "审稿时必须单独判断正文是否执行了首轮平台打法；没执行就把 type 标成 start_tactic 或 platform_fit。" : "",
+    input.projectContext ? "审稿时必须单独判断正文是否违背项目上下文召回包；如果人物弧光、世界观规则、伏笔状态或历史章节承接冲突，把 type 标成 continuity 或 context_fit。" : "",
   ].join("\n");
 
   return { systemPrompt, userPrompt };

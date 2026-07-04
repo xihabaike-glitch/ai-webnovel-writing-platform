@@ -213,12 +213,22 @@ async function persistEvidenceLoopRecheck(
 
 function storyTreeDispatchIds(dispatchKey: string) {
   const match = dispatchKey.match(/^story-tree:([^:]+):([^:]+):([^:]+):([^:]+)$/);
-  if (!match) return null;
+  if (match) {
+    return {
+      projectId: match[1],
+      chapterId: match[2],
+      source: match[3],
+      axisId: match[4],
+    };
+  }
+
+  const followUpMatch = dispatchKey.match(/^story-tree-followup:([^:]+):([^:]+):/);
+  if (!followUpMatch) return null;
   return {
-    projectId: match[1],
-    chapterId: match[2],
-    source: match[3],
-    axisId: match[4],
+    projectId: followUpMatch[1],
+    chapterId: followUpMatch[2],
+    source: "followup",
+    axisId: "recheck",
   };
 }
 

@@ -25,6 +25,28 @@ function statusLabel(status: ChapterProductionFlow["status"]) {
   return "有卡点";
 }
 
+function followUpResultClass(status: NonNullable<ChapterProductionFlow["followUpResultNotice"]>["status"]) {
+  if (status === "cleared") {
+    return {
+      box: "border-emerald-200 bg-emerald-50 text-emerald-950",
+      detail: "text-emerald-800",
+      action: "bg-emerald-950 text-white hover:bg-emerald-900",
+    };
+  }
+  if (status === "needs_action") {
+    return {
+      box: "border-rose-200 bg-rose-50 text-rose-950",
+      detail: "text-rose-800",
+      action: "bg-rose-950 text-white hover:bg-rose-900",
+    };
+  }
+  return {
+    box: "border-amber-200 bg-amber-50 text-amber-950",
+    detail: "text-amber-800",
+    action: "bg-amber-950 text-white hover:bg-amber-900",
+  };
+}
+
 function runningLabel(action: ChapterProductionFlowRunAction) {
   if (action.type === "story_tree_recheck") return "派单中";
   if (action.type === "submission_precheck_repair") return "派单中";
@@ -47,6 +69,7 @@ export function ChapterProductionFlowPanel({ flow }: { flow: ChapterProductionFl
     () => flow.stages.find((stage) => stage.id === flow.bottleneck),
     [flow.bottleneck, flow.stages],
   );
+  const followUpResultTone = flow.followUpResultNotice ? followUpResultClass(flow.followUpResultNotice.status) : null;
 
   async function runStageAction(stage: ChapterProductionFlowStage) {
     if (!stage.runAction) return;
@@ -223,6 +246,20 @@ export function ChapterProductionFlowPanel({ flow }: { flow: ChapterProductionFl
             href={flow.followUpNotice.href}
           >
             {flow.followUpNotice.actionLabel}
+          </Link>
+        </div>
+      ) : null}
+      {flow.followUpResultNotice && followUpResultTone ? (
+        <div className={`mt-3 flex flex-col gap-2 rounded-md border p-3 text-sm sm:flex-row sm:items-center sm:justify-between ${followUpResultTone.box}`}>
+          <div>
+            <div className="font-medium">{flow.followUpResultNotice.title}</div>
+            <p className={`mt-1 text-xs leading-5 ${followUpResultTone.detail}`}>{flow.followUpResultNotice.detail}</p>
+          </div>
+          <Link
+            className={`w-fit rounded-md px-3 py-1.5 text-xs font-medium ${followUpResultTone.action}`}
+            href={flow.followUpResultNotice.href}
+          >
+            {flow.followUpResultNotice.actionLabel}
           </Link>
         </div>
       ) : null}

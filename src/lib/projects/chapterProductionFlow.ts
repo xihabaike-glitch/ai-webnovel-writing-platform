@@ -61,6 +61,8 @@ export interface ChapterProductionFlowGateTask {
   state: string;
   href: string;
   completionEvidence?: string | null;
+  evidence?: string[] | string | null;
+  completedAt?: Date | string | null;
   title?: string | null;
   actionLabel?: string | null;
   ownerRole?: string | null;
@@ -101,6 +103,7 @@ export interface ChapterProductionFlow {
   nextHref: string;
   bottleneck: ChapterProductionFlowStageId;
   followUpNotice?: ChapterProductionFlowFollowUpNotice;
+  followUpResultNotice?: ChapterProductionFlowFollowUpResultNotice;
   recheckNotice?: ChapterProductionFlowRecheckNotice;
   stages: ChapterProductionFlowStage[];
 }
@@ -111,6 +114,15 @@ export interface ChapterProductionFlowFollowUpNotice {
   href: string;
   actionLabel: string;
   count: number;
+}
+
+export interface ChapterProductionFlowFollowUpResultNotice {
+  title: string;
+  detail: string;
+  href: string;
+  actionLabel: string;
+  count: number;
+  status: "cleared" | "needs_action" | "watch";
 }
 
 export interface ChapterProductionFlowRecheckNotice {
@@ -192,6 +204,57 @@ function isRecheckFollowUpTask(task: ChapterProductionFlowGateTask) {
     || task.dispatchKey.startsWith("submission-recheck-followup:");
 }
 
+function evidenceLines(value: ChapterProductionFlowGateTask["evidence"]) {
+  if (Array.isArray(value)) return value;
+  if (typeof value !== "string" || !value.trim()) return [];
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === "string") : [];
+  } catch {
+    return [value];
+  }
+}
+
+function completedAtTime(task: ChapterProductionFlowGateTask) {
+  if (!task.completedAt) return 0;
+  const time = new Date(task.completedAt).getTime();
+  return Number.isFinite(time) ? time : 0;
+}
+
+function verdictStatus(verdict: string, currentScore: number): ChapterProductionFlowFollowUpResultNotice["status"] {
+  if (verdict === "分数变差" || verdict === "分数未变" || currentScore < 80) return "needs_action";
+  if (verdict === "无历史基准") return "watch";
+  return "cleared";
+}
+
+function parseFollowUpRecheckResult(task: ChapterProductionFlowGateTask) {
+  for (const line of evidenceLines(task.evidence)) {
+    const storyTreeMatch = line.match(/大树结构复检：(?:(\d+)\s*->\s*)?(\d+)\s*分，(分数变好|分数变差|分数未变|无历史基准)：(.+)/);
+    if (storyTreeMatch) {
+      const previousScore = storyTreeMatch[1] ? Number(storyTreeMatch[1]) : null;
+      const currentScore = Number(storyTreeMatch[2]);
+      if (!Number.isFinite(currentScore)) continue;
+      return {
+        status: verdictStatus(storyTreeMatch[3], currentScore),
+        line: `大树结构 ${previousScore === null ? currentScore : `${previousScore} -> ${currentScore}`} 分，${storyTreeMatch[3]}：${storyTreeMatch[4].trim()}`,
+      };
+    }
+
+    const evidenceLoopMatch = line.match(/证据闭环复检：(?:(\d+)\s*->\s*)?(\d+)\s*分，(分数变好|分数变差|分数未变|无历史基准)：(.+)/);
+    if (evidenceLoopMatch) {
+      const previousScore = evidenceLoopMatch[1] ? Number(evidenceLoopMatch[1]) : null;
+      const currentScore = Number(evidenceLoopMatch[2]);
+      if (!Number.isFinite(currentScore)) continue;
+      return {
+        status: verdictStatus(evidenceLoopMatch[3], currentScore),
+        line: `平台证据 ${previousScore === null ? currentScore : `${previousScore} -> ${currentScore}`} 分，${evidenceLoopMatch[3]}：${evidenceLoopMatch[4].trim()}`,
+      };
+    }
+  }
+
+  return null;
+}
+
 function recheckFollowUpNotice(tasks: ChapterProductionFlowGateTask[]): ChapterProductionFlowFollowUpNotice | undefined {
   const activeTasks = tasks
     .filter((task) => isRecheckFollowUpTask(task) && task.state !== "completed")
@@ -215,6 +278,37 @@ function recheckFollowUpNotice(tasks: ChapterProductionFlowGateTask[]): ChapterP
     href: "/dispatch",
     actionLabel: "查看派单",
     count: activeTasks.length,
+  };
+}
+
+function recheckFollowUpResultNotice(tasks: ChapterProductionFlowGateTask[]): ChapterProductionFlowFollowUpResultNotice | undefined {
+  const completedTasks = tasks
+    .filter((task) => isRecheckFollowUpTask(task) && task.state === "completed")
+    .map((task) => ({ task, result: parseFollowUpRecheckResult(task) }))
+    .filter((item): item is { task: ChapterProductionFlowGateTask; result: NonNullable<ReturnType<typeof parseFollowUpRecheckResult>> } => Boolean(item.result))
+    .sort((left, right) => completedAtTime(right.task) - completedAtTime(left.task));
+
+  if (completedTasks.length === 0) return undefined;
+
+  const status: ChapterProductionFlowFollowUpResultNotice["status"] = completedTasks.some((item) => item.result.status === "needs_action")
+    ? "needs_action"
+    : completedTasks.some((item) => item.result.status === "watch")
+      ? "watch"
+      : "cleared";
+  const titlePrefix = status === "cleared" ? "返工验收通过" : status === "needs_action" ? "返工验收未解除" : "返工验收观察";
+  const titleSuffix = status === "cleared" ? "已解除" : status === "needs_action" ? "仍需处理" : "待确认";
+  const detail = completedTasks.slice(0, 3).map(({ task, result }) => {
+    const title = task.title?.trim() || task.dispatchKey;
+    return `${title}：${result.line}`;
+  }).join("；");
+
+  return {
+    title: `${titlePrefix}：${completedTasks.length} 个完成派单${titleSuffix}`,
+    detail,
+    href: "/dispatch",
+    actionLabel: "查看派单",
+    count: completedTasks.length,
+    status,
   };
 }
 
@@ -499,6 +593,7 @@ export function buildChapterProductionFlow(input: {
       }
     : undefined;
   const followUpNotice = recheckFollowUpNotice(input.gateTasks);
+  const followUpResultNotice = recheckFollowUpResultNotice(input.gateTasks);
   const status = stages.every((stage) => stage.status === "ready") && input.submissionChecklist.riskCount === 0
     ? "ready"
     : bottleneck.status === "blocked" ? "blocked" : "working";
@@ -516,6 +611,7 @@ export function buildChapterProductionFlow(input: {
     nextHref: bottleneck.href,
     bottleneck: bottleneck.id,
     followUpNotice,
+    followUpResultNotice,
     recheckNotice,
     stages,
   };

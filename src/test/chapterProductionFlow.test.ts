@@ -344,3 +344,46 @@ test("buildChapterProductionFlow surfaces active recheck follow-up dispatches", 
   assert.ok(flow.followUpNotice?.detail.includes("负责人：作者"));
   assert.ok(flow.followUpNotice?.detail.includes("动作：进入二改"));
 });
+
+test("buildChapterProductionFlow summarizes completed recheck follow-up results", () => {
+  const flow = buildChapterProductionFlow({
+    projectId: "project-1",
+    chapters: [
+      {
+        id: "chapter-1",
+        title: "第一章",
+        order: 1,
+        status: "draft",
+        wordCount: 1800,
+        hook: "女主醒来发现自己被写进追杀名单。",
+        cliffhanger: "名单最后一行出现了她母亲的名字。",
+      },
+    ],
+    aiTasks: [],
+    gateTasks: [
+      {
+        dispatchKey: "story-tree-followup:project-1:chapter-1:chapter_draft-74:86",
+        state: "completed",
+        href: "/projects/project-1/chapters/chapter-1#chapter-second-pass",
+        title: "第一章 · 大树复查未解除",
+        actionLabel: "进入二改",
+        ownerRole: "作者",
+        priorityScore: 91,
+        completedAt: "2026-07-05T10:00:00.000Z",
+        evidence: JSON.stringify([
+          "来源派单：story-tree:project-1:chapter-1:chapter_draft:opening_ending",
+          "大树结构复检：74 -> 86 分，分数变好：结构可放行；返工动作：强化章末选择压力。",
+        ]),
+      },
+    ],
+    submissionChecklist: checklistReady,
+  });
+
+  assert.equal(flow.followUpNotice, undefined);
+  assert.equal(flow.followUpResultNotice?.status, "cleared");
+  assert.equal(flow.followUpResultNotice?.title, "返工验收通过：1 个完成派单已解除");
+  assert.equal(flow.followUpResultNotice?.href, "/dispatch");
+  assert.equal(flow.followUpResultNotice?.actionLabel, "查看派单");
+  assert.ok(flow.followUpResultNotice?.detail.includes("第一章 · 大树复查未解除"));
+  assert.ok(flow.followUpResultNotice?.detail.includes("大树结构 74 -> 86 分，分数变好"));
+});

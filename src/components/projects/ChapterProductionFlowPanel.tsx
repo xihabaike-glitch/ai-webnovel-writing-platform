@@ -9,6 +9,7 @@ import type {
   ChapterProductionFlowStage,
   ChapterProductionFlowTone,
 } from "@/lib/projects/chapterProductionFlow";
+import { buildChapterProductionRecheckDecision, type ChapterProductionRecheckPayload } from "@/lib/projects/chapterProductionRecheckDecision";
 
 function toneClass(tone: ChapterProductionFlowTone) {
   if (tone === "emerald") return "bg-emerald-50 text-emerald-700";
@@ -107,7 +108,7 @@ export function ChapterProductionFlowPanel({ flow }: { flow: ChapterProductionFl
     setMessage(null);
     setFollowUp(null);
     try {
-      const results = await Promise.all(action.dispatches.map(async (dispatch) => {
+      const results = await Promise.all(action.dispatches.map(async (dispatch): Promise<ChapterProductionRecheckPayload> => {
         const response = await fetch(action.endpoint, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
@@ -118,24 +119,25 @@ export function ChapterProductionFlowPanel({ flow }: { flow: ChapterProductionFl
           }),
         });
         const payload = await response.json().catch(() => null) as {
-          storyTreeRecheck?: unknown;
-          evidenceLoopRecheck?: unknown;
+          storyTreeRecheck?: ChapterProductionRecheckPayload["storyTreeRecheck"];
+          evidenceLoopRecheck?: ChapterProductionRecheckPayload["evidenceLoopRecheck"];
           error?: string;
         } | null;
         if (!response.ok) throw new Error(payload?.error ?? "派单复查失败。");
-        return payload;
+        return {
+          storyTreeRecheck: payload?.storyTreeRecheck ?? null,
+          evidenceLoopRecheck: payload?.evidenceLoopRecheck ?? null,
+        };
       }));
-      const storyTreeCount = results.filter((result) => result?.storyTreeRecheck).length;
-      const evidenceLoopCount = results.filter((result) => result?.evidenceLoopRecheck).length;
-      const detailParts = [
-        storyTreeCount > 0 ? `大树结构复查 ${storyTreeCount} 项` : "",
-        evidenceLoopCount > 0 ? `证据闭环复查 ${evidenceLoopCount} 项` : "",
-      ].filter(Boolean);
-      setMessage(`复查完成：已处理 ${results.length} 条完成派单。`);
-      setFollowUp({
+      const decision = buildChapterProductionRecheckDecision(results, {
         href: notice.href,
         label: notice.actionLabel,
-        detail: detailParts.length > 0 ? detailParts.join("，") : "已刷新派单完成证据，请查看对应复查区域。",
+      });
+      setMessage(decision.title);
+      setFollowUp({
+        href: decision.href,
+        label: decision.label,
+        detail: decision.detail,
       });
       router.refresh();
     } catch (caught) {

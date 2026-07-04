@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { buildFirstDayExecutionRouteBlockMessage, type FirstDayExecutionRouteStatus } from "@/lib/model-gateway/firstDayExecutionRoute";
-import { buildFirstDayStepView, completeFirstDayDispatchStep } from "@/lib/projects/firstDayWorkflowView";
+import { buildFirstDayReceiptCompletionAction, buildFirstDayStepView, completeFirstDayDispatchStep } from "@/lib/projects/firstDayWorkflowView";
 import { persistGateDispatchTask, type GatePlatformGrowthDispatchItem } from "@/lib/projects/gateActionReceipts";
 
 interface FirstDayWorkflowStep {
@@ -257,6 +257,12 @@ export function FirstDayWorkflowPanel({ projectId }: { projectId: string }) {
       label: "text-amber-700",
       body: "text-amber-800",
     };
+  const receiptCompletionAction = buildFirstDayReceiptCompletionAction({
+    receipt: executionReceipt,
+    completionEvidence,
+    hasDispatch: Boolean(dispatch),
+    isCompleting: isCompletingDispatch,
+  });
 
   return (
     <section className="rounded-md border border-slate-200 bg-white p-4">
@@ -312,6 +318,19 @@ export function FirstDayWorkflowPanel({ projectId }: { projectId: string }) {
                 <li key={item}>· {item}</li>
               ))}
             </ul>
+          ) : null}
+          {receiptCompletionAction.visible ? (
+            <div className="mt-3 flex flex-col gap-2 border-t border-white/70 pt-3 sm:flex-row sm:items-center sm:justify-between">
+              <span className={`text-xs ${receiptTone.body}`}>{receiptCompletionAction.reason}</span>
+              <button
+                className="w-fit rounded-md bg-emerald-700 px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
+                disabled={!receiptCompletionAction.canComplete}
+                onClick={completeCurrentDispatch}
+                type="button"
+              >
+                {receiptCompletionAction.label}
+              </button>
+            </div>
           ) : null}
         </div>
       ) : null}

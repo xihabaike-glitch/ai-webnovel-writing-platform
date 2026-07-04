@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildFirstDayStepView, completeFirstDayDispatchStep } from "../lib/projects/firstDayWorkflowView.ts";
+import { buildFirstDayReceiptCompletionAction, buildFirstDayStepView, completeFirstDayDispatchStep } from "../lib/projects/firstDayWorkflowView.ts";
 
 test("buildFirstDayStepView separates task center acceptance evidence", () => {
   const view = buildFirstDayStepView({
@@ -35,6 +35,43 @@ test("buildFirstDayStepView keeps normal evidence unchanged", () => {
   assert.equal(view.primaryEvidence, "第一章：天降系统。钩子：主角被迫当天逆袭。");
   assert.equal(view.acceptanceEvidence, null);
   assert.equal(view.hasTaskAcceptance, false);
+});
+
+test("buildFirstDayReceiptCompletionAction only allows successful receipts with enough evidence", () => {
+  const hidden = buildFirstDayReceiptCompletionAction({
+    receipt: { success: false, completionEvidence: "" },
+    completionEvidence: "",
+    hasDispatch: true,
+    isCompleting: false,
+  });
+  const missingDispatch = buildFirstDayReceiptCompletionAction({
+    receipt: { success: true, completionEvidence: "第一章正文已生成并写回章节。" },
+    completionEvidence: "第一章正文已生成并写回章节。",
+    hasDispatch: false,
+    isCompleting: false,
+  });
+  const thinEvidence = buildFirstDayReceiptCompletionAction({
+    receipt: { success: true, completionEvidence: "已完成" },
+    completionEvidence: "已完成",
+    hasDispatch: true,
+    isCompleting: false,
+  });
+  const ready = buildFirstDayReceiptCompletionAction({
+    receipt: { success: true, completionEvidence: "第一章正文已生成并写回章节。" },
+    completionEvidence: "第一章正文已生成并写回章节。",
+    hasDispatch: true,
+    isCompleting: false,
+  });
+
+  assert.equal(hidden.visible, false);
+  assert.equal(missingDispatch.visible, true);
+  assert.equal(missingDispatch.canComplete, false);
+  assert.ok(missingDispatch.reason.includes("派到任务中心"));
+  assert.equal(thinEvidence.canComplete, false);
+  assert.ok(thinEvidence.reason.includes("至少 8 个字"));
+  assert.equal(ready.visible, true);
+  assert.equal(ready.canComplete, true);
+  assert.equal(ready.label, "验收并进入下一步");
 });
 
 test("completeFirstDayDispatchStep completes the matching task center dispatch", async () => {

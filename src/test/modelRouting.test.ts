@@ -14,6 +14,7 @@ import {
   buildRouteConfirmationGovernanceAutoFollowUpDispatches,
   buildRouteConfirmationGovernanceEvidenceFromDispatchTasks,
   buildRouteConfirmationGovernanceFollowUpDispatches,
+  buildRouteConfirmationRecheckResultSummary,
   buildRouteConfirmationDispatchFlow,
   buildRouteConfirmationDispatchFollowUp,
   buildRouteConfirmationHistory,
@@ -302,6 +303,48 @@ test("model task routing", async (t) => {
     assert.equal(weak.label, "需治理");
     assert.equal(weak.nextActionLabel, "生成治理派单");
     assert.ok(weak.detail.includes("成功率 50"));
+  });
+
+  await t.test("builds a settings-facing recheck result summary", () => {
+    const evidence = buildRouteConfirmationRecheckEvidenceFromDispatchTasks([
+      {
+        dispatchKey: "model-route-confirmation-recheck:chapter_draft:2026-07-04T09:00:00.000Z",
+        stage: "model_route_confirmation_recheck",
+        state: "completed",
+        completionEvidence: "完成 2 个正文初稿小样本，成功率 100%，质量 86，未命中备用路线，是否需要治理：否。",
+        evidence: [],
+        completedAt: "2026-07-04T11:00:00.000Z",
+      },
+      {
+        dispatchKey: "model-route-confirmation-recheck:chapter_review:2026-07-04T10:00:00.000Z",
+        stage: "model_route_confirmation_recheck",
+        state: "completed",
+        completionEvidence: "完成 2 个章节审稿小样本，1 个超时，成功率 50%，质量 62，命中备用路线，是否需要治理：是。",
+        evidence: ["已确认章节审稿模型路由。"],
+        completedAt: "2026-07-04T12:00:00.000Z",
+      },
+      {
+        dispatchKey: "model-route-confirmation-recheck:chapter_second_pass:2026-07-04T13:00:00.000Z",
+        stage: "model_route_confirmation_recheck",
+        state: "completed",
+        completionEvidence: "完成小样本复检，但未写成功率和质量。",
+        evidence: [],
+        completedAt: "2026-07-04T13:00:00.000Z",
+      },
+    ]);
+
+    const summary = buildRouteConfirmationRecheckResultSummary(evidence);
+
+    assert.equal(summary.summary.total, 3);
+    assert.equal(summary.summary.keep, 1);
+    assert.equal(summary.summary.watch, 1);
+    assert.equal(summary.summary.manualReview, 1);
+    assert.equal(summary.headline, "模型路由复检结果");
+    assert.equal(summary.items[0].taskType, "chapter_second_pass");
+    assert.equal(summary.items[0].status, "manual_review");
+    assert.equal(summary.items.find((item) => item.taskType === "chapter_draft")?.actionLabel, "继续沿用");
+    assert.equal(summary.items.find((item) => item.taskType === "chapter_review")?.actionLabel, "生成治理派单");
+    assert.ok(summary.items.find((item) => item.taskType === "chapter_review")?.metricChips.includes("成功率 50%"));
   });
 
   await t.test("respects explicit route recheck governance decisions from structured evidence", () => {

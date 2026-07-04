@@ -8,7 +8,7 @@ import {
   buildRouteConfirmationRecheckSampleDispatch,
   buildRouteConfirmationRecheckSamplePlan,
 } from "@/lib/model-gateway/routeConfirmation";
-import type { RouteConfirmationOnboarding } from "@/lib/model-gateway/routeConfirmation";
+import type { RouteConfirmationOnboarding, RouteConfirmationRecheckResultSummary } from "@/lib/model-gateway/routeConfirmation";
 import type { ProviderHealthDashboard, ProviderHealthStatus } from "@/lib/model-gateway/providerHealth";
 import type { RoutedModelTaskType } from "@/lib/model-gateway/taskRouting";
 import type { ModelProviderId } from "@/lib/model-gateway/types";
@@ -336,6 +336,12 @@ const routeOnboardingStatusCopy: Record<RouteConfirmationOnboarding["items"][num
   missing_route: { label: "缺路线", className: "bg-amber-50 text-amber-700" },
 };
 
+const routeRecheckResultStatusCopy: Record<RouteConfirmationRecheckResultSummary["items"][number]["status"], { className: string }> = {
+  confirmed: { className: "bg-emerald-50 text-emerald-700" },
+  needs_governance: { className: "bg-amber-50 text-amber-700" },
+  manual_review: { className: "bg-rose-50 text-rose-700" },
+};
+
 function draftFromOption(option: ProviderOptionView, existing?: ProviderView): DraftProvider {
   return {
     id: existing?.id,
@@ -361,6 +367,7 @@ export function ModelProviderSettings({
   routeConfirmationHistory,
   routeConfirmationOnboarding,
   routeConfirmationRecheckAdvice,
+  routeConfirmationRecheckResultSummary,
   routeRecommendations,
   routeOptions,
   routes,
@@ -376,6 +383,7 @@ export function ModelProviderSettings({
   routeConfirmationHistory: RouteConfirmationHistoryView[];
   routeConfirmationOnboarding: RouteConfirmationOnboarding;
   routeConfirmationRecheckAdvice: RouteConfirmationRecheckAdviceView;
+  routeConfirmationRecheckResultSummary: RouteConfirmationRecheckResultSummary;
   routeRecommendations: RouteRecommendationView[];
   routeOptions: RouteOptionView[];
   routes: RouteView[];
@@ -995,8 +1003,65 @@ export function ModelProviderSettings({
             </div>
           </div>
         ) : null}
+        <div className="mt-4 rounded-md border border-slate-200 bg-white p-3">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <div className="text-sm font-medium text-slate-950">{routeConfirmationRecheckResultSummary.headline}</div>
+              <p className="mt-1 text-sm leading-6 text-slate-600">{routeConfirmationRecheckResultSummary.detail}</p>
+            </div>
+            <div className="flex flex-wrap gap-2 text-xs text-slate-600">
+              <span className="rounded-md bg-emerald-50 px-2 py-1 text-emerald-700">沿用 {routeConfirmationRecheckResultSummary.summary.keep}</span>
+              <span className="rounded-md bg-amber-50 px-2 py-1 text-amber-700">治理 {routeConfirmationRecheckResultSummary.summary.watch}</span>
+              <span className="rounded-md bg-rose-50 px-2 py-1 text-rose-700">复核 {routeConfirmationRecheckResultSummary.summary.manualReview}</span>
+            </div>
+          </div>
+          {routeConfirmationRecheckResultSummary.items.length ? (
+            <div className="mt-3 grid gap-2 lg:grid-cols-3">
+              {routeConfirmationRecheckResultSummary.items.slice(0, 6).map((item) => {
+                const resultStatus = routeRecheckResultStatusCopy[item.status];
+                return (
+                  <div className="rounded-md bg-slate-50 p-3 text-sm" key={item.id}>
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <div>
+                        <div className="font-medium text-slate-950">{item.label}</div>
+                        <div className="mt-1 text-xs text-slate-500">{item.completedAt ? item.completedAt.slice(0, 10) : "待补日期"}</div>
+                      </div>
+                      <span className={`rounded-md px-2 py-1 text-xs font-medium ${resultStatus.className}`}>{item.statusLabel}</span>
+                    </div>
+                    <p className="mt-2 line-clamp-3 leading-6 text-slate-600">{item.detail}</p>
+                    <div className="mt-2 flex flex-wrap gap-2 text-xs text-slate-600">
+                      {item.metricChips.slice(0, 5).map((chip) => (
+                        <span className="rounded-md bg-white px-2 py-1" key={chip}>{chip}</span>
+                      ))}
+                    </div>
+                    <div className="mt-3 flex justify-end">
+                      {item.status === "confirmed" ? (
+                        <span className="rounded-md bg-white px-2 py-1 text-xs font-medium text-emerald-700">{item.actionLabel}</span>
+                      ) : (
+                        <button
+                          className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                          onClick={() => {
+                            const target = document.getElementById("route-recheck-governance-advice");
+                            target?.scrollIntoView({ behavior: "smooth", block: "start" });
+                          }}
+                          type="button"
+                        >
+                          {item.actionLabel}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="mt-3 rounded-md bg-slate-50 p-3 text-sm leading-6 text-slate-600">
+              暂无派单中心回填的复检结果。先确认模型路由并到派单中心完成小样本复检，这里会自动显示继续沿用、治理或人工复核结论。
+            </div>
+          )}
+        </div>
         {routeConfirmationRecheckAdvice.summary.total ? (
-          <div className="mt-4 rounded-md border border-amber-200 bg-amber-50/40 p-3">
+          <div className="mt-4 rounded-md border border-amber-200 bg-amber-50/40 p-3" id="route-recheck-governance-advice">
             <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
               <div>
                 <div className="text-sm font-medium text-slate-950">复检治理建议</div>

@@ -11,6 +11,7 @@ import {
   buildRouteConfirmationOnboarding,
   buildRouteConfirmationRecheckAdvice,
   buildRouteConfirmationRecheckEvidenceFromDispatchTasks,
+  buildRouteConfirmationRecheckResultSummary,
   modelRouteConfirmationReceiptFromAudit,
 } from "@/lib/model-gateway/routeConfirmation";
 import {
@@ -204,6 +205,7 @@ export default async function ModelSettingsPage() {
   });
   const routeConfirmationRechecks = buildRouteConfirmationRecheckEvidenceFromDispatchTasks(completedRouteConfirmationRechecks);
   const routeConfirmationRecheckAdvice = buildRouteConfirmationRecheckAdvice(routeConfirmationRechecks);
+  const routeConfirmationRecheckResultSummary = buildRouteConfirmationRecheckResultSummary(routeConfirmationRechecks);
   const routeConfirmationReceipts = routeConfirmationAudits
     .map(modelRouteConfirmationReceiptFromAudit)
     .filter((receipt): receipt is NonNullable<ReturnType<typeof modelRouteConfirmationReceiptFromAudit>> => Boolean(receipt));
@@ -248,6 +250,7 @@ export default async function ModelSettingsPage() {
         routeConfirmationHistory={routeConfirmationHistory}
         routeConfirmationOnboarding={routeConfirmationOnboarding}
         routeConfirmationRecheckAdvice={routeConfirmationRecheckAdvice}
+        routeConfirmationRecheckResultSummary={routeConfirmationRecheckResultSummary}
         routeRecommendations={routeRecommendations}
         routeOptions={modelTaskRouteOptions}
         routes={routes.map((route) => ({

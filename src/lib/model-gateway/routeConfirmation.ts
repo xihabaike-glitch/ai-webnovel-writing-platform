@@ -325,6 +325,30 @@ export interface RouteConfirmationRecheckDecision {
   nextActionLabel: string;
 }
 
+export interface RouteConfirmationRecheckResultSummaryItem {
+  id: string;
+  taskType: RoutedModelTaskType;
+  label: string;
+  status: RouteConfirmationRecheckDecision["status"];
+  statusLabel: string;
+  detail: string;
+  actionLabel: string;
+  metricChips: string[];
+  completedAt: string | null;
+}
+
+export interface RouteConfirmationRecheckResultSummary {
+  headline: string;
+  detail: string;
+  summary: {
+    total: number;
+    keep: number;
+    watch: number;
+    manualReview: number;
+  };
+  items: RouteConfirmationRecheckResultSummaryItem[];
+}
+
 export interface RouteConfirmationGovernanceEvidence {
   id: string;
   taskType: RoutedModelTaskType;
@@ -1693,6 +1717,63 @@ export function buildRouteConfirmationRecheckDecision(
     label: "需治理",
     detail: `「${label}」复检未达标，${evidence.summary}`,
     nextActionLabel: "生成治理派单",
+  };
+}
+
+function recheckResultMetricChips(evidence: RouteConfirmationRecheckEvidence) {
+  const chips: string[] = [];
+  if (evidence.sampleCount !== null) chips.push(`样本 ${evidence.sampleCount}`);
+  if (evidence.successRatePercent !== null) chips.push(`成功率 ${evidence.successRatePercent}%`);
+  if (evidence.qualityScore !== null) chips.push(`质量 ${evidence.qualityScore}`);
+  if (evidence.cost) chips.push(`成本 ${evidence.cost}`);
+  if (evidence.fallbackHit !== null) chips.push(evidence.fallbackHit ? "命中备用" : "未命中备用");
+  if (evidence.needsGovernance !== null) chips.push(evidence.needsGovernance ? "需要治理" : "无需治理");
+  return chips;
+}
+
+function recheckResultActionLabel(decision: RouteConfirmationRecheckDecision) {
+  if (decision.status === "confirmed") return "继续沿用";
+  if (decision.status === "manual_review") return "人工复核";
+  return "生成治理派单";
+}
+
+function recheckResultRank(status: RouteConfirmationRecheckDecision["status"]) {
+  if (status === "manual_review") return 0;
+  if (status === "needs_governance") return 1;
+  return 2;
+}
+
+export function buildRouteConfirmationRecheckResultSummary(
+  evidence: RouteConfirmationRecheckEvidence[],
+): RouteConfirmationRecheckResultSummary {
+  const items = evidence.map((item): RouteConfirmationRecheckResultSummaryItem => {
+    const decision = buildRouteConfirmationRecheckDecision(item);
+    return {
+      id: item.id,
+      taskType: item.taskType,
+      label: labelForRoutedTask(item.taskType),
+      status: decision.status,
+      statusLabel: decision.label,
+      detail: decision.detail,
+      actionLabel: recheckResultActionLabel(decision),
+      metricChips: recheckResultMetricChips(item),
+      completedAt: item.completedAt,
+    };
+  }).sort((left, right) => (
+    recheckResultRank(left.status) - recheckResultRank(right.status)
+    || (right.completedAt ?? "").localeCompare(left.completedAt ?? "")
+  ));
+
+  return {
+    headline: "模型路由复检结果",
+    detail: "汇总派单中心回填的复检结果：通过的路线继续沿用，弱样本进入治理，证据不足的先人工复核。",
+    summary: {
+      total: items.length,
+      keep: items.filter((item) => item.status === "confirmed").length,
+      watch: items.filter((item) => item.status === "needs_governance").length,
+      manualReview: items.filter((item) => item.status === "manual_review").length,
+    },
+    items,
   };
 }
 

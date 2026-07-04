@@ -203,6 +203,7 @@ export interface SerializationAction {
   href?: string;
   hrefLabel?: string;
   execution: SerializationActionExecution | null;
+  afterSuccess?: SerializationActionAfterSuccess;
 }
 
 export type SerializationActionPayloadValue = string | number | boolean | string[] | number[];
@@ -212,6 +213,13 @@ export interface SerializationActionExecution {
   method: "PATCH" | "POST";
   endpoint: string;
   payload: Record<string, SerializationActionPayloadValue>;
+}
+
+export interface SerializationActionAfterSuccess {
+  behavior: "download" | "navigate";
+  href: string;
+  label: string;
+  message: string;
 }
 
 export interface SerializationOpsDashboard {
@@ -756,16 +764,22 @@ function buildActions(
   if (!failedChecklist[0] && assetStatus.status === "ready" && finalGate.status === "ready_to_submit" && !baselineStatus.exists) {
     actions.push({
       id: "save-publish-baseline",
-      label: "保存发布基准",
+      label: "保存基准并下载",
       priority: "high",
-      detail: `${finalGate.headline} ${finalGate.nextAction}`,
+      detail: `${finalGate.headline} 先保存发布基准，然后自动下载当前平台发布包。`,
       href: "#platform-export",
       hrefLabel: "查看发布包",
       execution: {
-        label: "保存基准",
+        label: "保存并下载",
         method: "POST",
         endpoint: `/api/projects/${input.project.id ?? "current"}/platform-export`,
         payload: { action: "snapshot", platformId: input.platform.id },
+      },
+      afterSuccess: {
+        behavior: "download",
+        href: baselineStatus.downloadHref,
+        label: "下载发布包",
+        message: "发布基准已保存，正在下载当前平台发布包。",
       },
     });
   }

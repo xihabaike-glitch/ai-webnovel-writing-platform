@@ -361,6 +361,10 @@ test("buildSerializationOpsDashboard", async (t) => {
     const baselineAction = dashboard.actions.find((action) => action.id === "save-publish-baseline");
     assert.equal(baselineAction?.execution?.endpoint, "/api/projects/project-1/platform-export");
     assert.equal(baselineAction?.execution?.payload.action, "snapshot");
+    assert.equal(baselineAction?.label, "保存基准并下载");
+    assert.equal(baselineAction?.execution?.label, "保存并下载");
+    assert.equal(baselineAction?.afterSuccess?.behavior, "download");
+    assert.equal(baselineAction?.afterSuccess?.href, "/api/projects/project-1/platform-export?format=markdown&platformId=fanqie");
     assert.equal(dashboard.publishBaselineStatus.exists, false);
     assert.ok(dashboard.warnings.some((warning) => warning.includes("还没有保存发布基准")));
   });

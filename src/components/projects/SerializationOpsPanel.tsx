@@ -20,6 +20,7 @@ interface SerializationAction {
   href?: string;
   hrefLabel?: string;
   execution: SerializationActionExecution | null;
+  afterSuccess?: SerializationActionAfterSuccess;
 }
 
 interface SerializationActionExecution {
@@ -27,6 +28,13 @@ interface SerializationActionExecution {
   method: "PATCH" | "POST";
   endpoint: string;
   payload: Record<string, string | number | boolean | string[] | number[]>;
+}
+
+interface SerializationActionAfterSuccess {
+  behavior: "download" | "navigate";
+  href: string;
+  label: string;
+  message: string;
 }
 
 interface OpsMessage {
@@ -237,6 +245,13 @@ function projectHref(projectId: string, href: string) {
   return href.startsWith("#") ? `/projects/${projectId}${href}` : href;
 }
 
+function triggerDownload(href: string) {
+  const link = document.createElement("a");
+  link.href = href;
+  link.rel = "noopener";
+  link.click();
+}
+
 function checklistRepairTarget(itemId: string) {
   const targets: Record<string, { href: string; label: string }> = {
     title: { href: "#submission-asset-editor", label: "编辑发布资料" },
@@ -310,15 +325,26 @@ export function SerializationOpsPanel({ projectId }: { projectId: string }) {
       const score = payload?.result?.score ?? payload?.secondPassAudit?.score;
       const generatedCount = payload?.variants?.length;
       const rewrittenCount = payload?.results?.length;
-      setMessage({
-        text: score
-          ? `已完成：${action.label}，复检 ${score} 分。`
-          : generatedCount
-            ? `已完成：${action.label}，生成 ${generatedCount} 个候选。`
-            : rewrittenCount
-              ? `已完成：${action.label}，重写 ${rewrittenCount} 章。`
-              : `已完成：${action.label}`,
-      });
+      if (action.afterSuccess?.behavior === "download") {
+        triggerDownload(action.afterSuccess.href);
+      } else if (action.afterSuccess?.behavior === "navigate") {
+        window.location.href = projectHref(projectId, action.afterSuccess.href);
+      }
+      setMessage(action.afterSuccess
+        ? {
+          text: action.afterSuccess.message,
+          href: action.afterSuccess.href,
+          hrefLabel: action.afterSuccess.label,
+        }
+        : {
+          text: score
+            ? `已完成：${action.label}，复检 ${score} 分。`
+            : generatedCount
+              ? `已完成：${action.label}，生成 ${generatedCount} 个候选。`
+              : rewrittenCount
+                ? `已完成：${action.label}，重写 ${rewrittenCount} 章。`
+                : `已完成：${action.label}`,
+        });
     } catch (caught) {
       setMessage({ text: caught instanceof Error ? caught.message : "执行运营动作失败。" });
     } finally {
@@ -492,7 +518,11 @@ export function SerializationOpsPanel({ projectId }: { projectId: string }) {
       {message ? (
         <div className="mt-3 flex flex-wrap items-center gap-2 rounded-md bg-slate-50 p-3 text-sm text-slate-600">
           <span>{message.text}</span>
-          {message.href ? (
+          {message.href?.startsWith("/api/") ? (
+            <a className="rounded-md border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50" href={message.href}>
+              {message.hrefLabel ?? "下载"}
+            </a>
+          ) : message.href ? (
             <Link className="rounded-md border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50" href={projectHref(projectId, message.href)}>
               {message.hrefLabel ?? "去处理"}
             </Link>

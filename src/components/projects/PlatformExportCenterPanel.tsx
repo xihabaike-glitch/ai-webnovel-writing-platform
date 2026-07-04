@@ -334,6 +334,18 @@ interface PlatformABExperimentCandidate {
   recommended: boolean;
 }
 
+interface PlatformABExperimentAttribution {
+  status: "no_data" | "no_experiment" | "positive" | "negative" | "mixed" | "inconclusive";
+  headline: string;
+  verdict: string;
+  attributedStrategy: string | null;
+  attributedTitle: string | null;
+  sourceVersionId: string | null;
+  evidence: string[];
+  platformLearnings: string[];
+  nextAction: string;
+}
+
 interface PlatformABExperimentPlan {
   status: "waiting_effect" | "needs_candidates" | "ready_to_test" | "running" | "winner_found" | "watch";
   headline: string;
@@ -342,6 +354,7 @@ interface PlatformABExperimentPlan {
   baselineMetricId: string | null;
   targetMetrics: string[];
   candidates: PlatformABExperimentCandidate[];
+  attribution: PlatformABExperimentAttribution;
 }
 
 interface PlatformPublishEffectSaveReview {
@@ -782,6 +795,22 @@ function experimentStatusClass(status: PlatformABExperimentPlan["status"]) {
   if (status === "ready_to_test") return "bg-cyan-50 text-cyan-700";
   if (status === "needs_candidates") return "bg-rose-50 text-rose-700";
   if (status === "waiting_effect") return "bg-amber-50 text-amber-700";
+  return "bg-slate-100 text-slate-600";
+}
+
+function attributionStatusLabel(status: PlatformABExperimentAttribution["status"]) {
+  if (status === "positive") return "正向归因";
+  if (status === "negative") return "负向归因";
+  if (status === "mixed") return "混合信号";
+  if (status === "inconclusive") return "无明显变化";
+  if (status === "no_experiment") return "链路断点";
+  return "待对照";
+}
+
+function attributionStatusClass(status: PlatformABExperimentAttribution["status"]) {
+  if (status === "positive") return "bg-emerald-50 text-emerald-700";
+  if (status === "negative") return "bg-rose-50 text-rose-700";
+  if (status === "mixed") return "bg-amber-50 text-amber-700";
   return "bg-slate-100 text-slate-600";
 }
 
@@ -3519,6 +3548,38 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
                   <div>下滑：{selectedPackage.publishEffect.comparison.losses.join("、") || "无"}</div>
                 </div>
               ) : null}
+              <div className="mt-3 rounded-md bg-slate-50 p-3 text-sm">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <div className="font-medium text-slate-950">实验结果归因</div>
+                    <p className="mt-1 leading-6 text-slate-600">{selectedPackage.experimentPlan.attribution.headline}</p>
+                  </div>
+                  <span className={`w-fit rounded-md px-2 py-1 text-xs font-medium ${attributionStatusClass(selectedPackage.experimentPlan.attribution.status)}`}>
+                    {attributionStatusLabel(selectedPackage.experimentPlan.attribution.status)}
+                  </span>
+                </div>
+                <p className="mt-2 leading-6 text-slate-700">{selectedPackage.experimentPlan.attribution.verdict}</p>
+                <div className="mt-2 grid gap-2 lg:grid-cols-2">
+                  <div className="rounded-md bg-white p-2">
+                    <div className="text-xs text-slate-500">归因候选</div>
+                    <div className="mt-1 text-slate-700">
+                      {selectedPackage.experimentPlan.attribution.attributedStrategy ?? "暂无"}
+                      {selectedPackage.experimentPlan.attribution.attributedTitle ? ` · ${selectedPackage.experimentPlan.attribution.attributedTitle}` : ""}
+                    </div>
+                  </div>
+                  <div className="rounded-md bg-white p-2">
+                    <div className="text-xs text-slate-500">下一步</div>
+                    <div className="mt-1 text-slate-700">{selectedPackage.experimentPlan.attribution.nextAction}</div>
+                  </div>
+                </div>
+                {selectedPackage.experimentPlan.attribution.platformLearnings.length ? (
+                  <div className="mt-2 grid gap-1 text-xs text-slate-500">
+                    {selectedPackage.experimentPlan.attribution.platformLearnings.map((learning) => (
+                      <div key={learning}>经验：{learning}</div>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
             </div>
             <div className="mt-3 rounded-md border border-slate-200 p-3">
               <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">

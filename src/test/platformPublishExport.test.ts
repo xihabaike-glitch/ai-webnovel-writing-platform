@@ -399,9 +399,40 @@ test("buildPlatformPublishExportCenter", async (t) => {
       },
       targetPlatform: getPlatformProfile("fanqie"),
       chapters: finalChapters,
-      aiTasks: passedReviews,
+      aiTasks: [
+        ...passedReviews,
+        {
+          id: "asset-optimize-1",
+          chapterId: null,
+          taskType: "platform_submission_asset_optimize",
+          status: "succeeded",
+          inputSnapshot: JSON.stringify({ platformId: "fanqie" }),
+          outputText: assetOptimizationOutput,
+          createdAt: "2026-01-09T09:00:00.000Z",
+        },
+      ],
       submissionChecklist: readyChecklist,
       platforms: [getPlatformProfile("fanqie")],
+      submissionAssetVersions: [
+        {
+          id: "asset-version-ab",
+          platformId: "fanqie",
+          platformName: "番茄小说",
+          title: "夜雨系统：倒计时重生",
+          logline: "系统每晚倒计时，女主用选择把绝境打成爽点。",
+          synopsis: "林晚在雨夜绑定倒计时系统，每一次选择都牵动生死与复仇。她必须把系统惩罚反手变成翻盘筹码，沿着隐藏任务追查真相，并把背叛者拖回雨夜审判。",
+          overseasSynopsis: "Night Rain System follows Lin Wan through deadly timed choices.",
+          tags: ["系统", "重生", "强爽点"],
+          note: "采纳 A/B 候选。",
+          source: "ai_variant",
+          auditScore: 100,
+          auditStatus: "ready",
+          action: "adopt",
+          sourceTaskId: "asset-optimize-1",
+          strategy: "强钩子爽点版",
+          createdAt: "2026-01-09T10:00:00.000Z",
+        },
+      ],
       platformPublishMetrics: [
         {
           id: "metric-after",
@@ -446,6 +477,68 @@ test("buildPlatformPublishExportCenter", async (t) => {
     assert.equal(comparison.followRateDeltaPercent, 2);
     assert.ok(comparison.wins.some((item) => item.includes("点击率")));
     assert.ok(comparison.verdict.includes("正反馈"));
+    const attribution = center.packages[0].experimentPlan.attribution;
+    assert.equal(attribution.status, "positive");
+    assert.equal(attribution.attributedStrategy, "强钩子爽点版");
+    assert.ok(attribution.platformLearnings.some((learning) => learning.includes("番茄小说")));
+    assert.ok(center.packages[0].markdown.includes("实验结果归因"));
+  });
+
+  await t.test("does not attribute comparison changes without an adopted experiment version", () => {
+    const center = buildPlatformPublishExportCenter({
+      project: {
+        title: "夜雨系统",
+        genre: "都市系统",
+        sellingPoint: "雨夜危机中觉醒系统，主角用选择翻盘。",
+        currentWordCount: 9000,
+        targetWordCount: 300000,
+      },
+      targetPlatform: getPlatformProfile("fanqie"),
+      chapters: finalChapters,
+      aiTasks: passedReviews,
+      submissionChecklist: readyChecklist,
+      platforms: [getPlatformProfile("fanqie")],
+      platformPublishMetrics: [
+        {
+          id: "metric-after-no-version",
+          platformId: "fanqie",
+          platformName: "番茄小说",
+          views: 1200,
+          clicks: 180,
+          favorites: 72,
+          follows: 36,
+          comments: 12,
+          paidReads: 0,
+          editorFeedback: "二轮后点击和追读变好。",
+          contractStatus: "pending",
+          publishUrl: "",
+          notes: "二轮后。",
+          snapshotDate: "2026-01-10T08:00:00.000Z",
+        },
+        {
+          id: "metric-before-no-version",
+          platformId: "fanqie",
+          platformName: "番茄小说",
+          views: 1000,
+          clicks: 80,
+          favorites: 20,
+          follows: 10,
+          comments: 3,
+          paidReads: 0,
+          editorFeedback: "二轮前数据。",
+          contractStatus: "pending",
+          publishUrl: "",
+          notes: "二轮前。",
+          snapshotDate: "2026-01-09T08:00:00.000Z",
+        },
+      ],
+    });
+    const attribution = center.packages[0].experimentPlan.attribution;
+
+    assert.equal(center.packages[0].publishEffect.comparison.status, "improved");
+    assert.equal(attribution.status, "no_experiment");
+    assert.ok(attribution.verdict.includes("不能证明"));
+    assert.ok(attribution.nextAction.includes("采纳"));
   });
 
   await t.test("ranks platform strategy from readiness, assets, effects, and comparison", () => {

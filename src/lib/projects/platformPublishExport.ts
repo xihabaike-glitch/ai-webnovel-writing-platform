@@ -286,6 +286,18 @@ export interface PlatformABExperimentCandidate {
   recommended: boolean;
 }
 
+export interface PlatformABExperimentAttribution {
+  status: "no_data" | "no_experiment" | "positive" | "negative" | "mixed" | "inconclusive";
+  headline: string;
+  verdict: string;
+  attributedStrategy: string | null;
+  attributedTitle: string | null;
+  sourceVersionId: string | null;
+  evidence: string[];
+  platformLearnings: string[];
+  nextAction: string;
+}
+
 export interface PlatformABExperimentPlan {
   status: "waiting_effect" | "needs_candidates" | "ready_to_test" | "running" | "winner_found" | "watch";
   headline: string;
@@ -294,6 +306,7 @@ export interface PlatformABExperimentPlan {
   baselineMetricId: string | null;
   targetMetrics: string[];
   candidates: PlatformABExperimentCandidate[];
+  attribution: PlatformABExperimentAttribution;
 }
 
 export interface PlatformPublishEffectSaveReview {
@@ -2477,6 +2490,15 @@ function buildMarkdown(pack: Omit<PlatformPublishPackage, "markdown">) {
       ? pack.experimentPlan.candidates.map((candidate) => `- ${candidate.recommended ? "优先" : "备选"}｜${candidate.strategy}｜${candidate.title}｜质检 ${candidate.auditScore}｜${candidate.logline}`)
       : ["- 暂无候选。"]),
     "",
+    "## 实验结果归因",
+    pack.experimentPlan.attribution.headline,
+    `归因候选：${pack.experimentPlan.attribution.attributedStrategy ?? "暂无"}`,
+    `归因标题：${pack.experimentPlan.attribution.attributedTitle ?? "暂无"}`,
+    `判断：${pack.experimentPlan.attribution.verdict}`,
+    `证据：${pack.experimentPlan.attribution.evidence.join("、") || "暂无"}`,
+    `下一步：${pack.experimentPlan.attribution.nextAction}`,
+    ...pack.experimentPlan.attribution.platformLearnings.map((learning) => `- ${learning}`),
+    "",
     "## 风险提醒",
     ...(pack.warnings.length ? pack.warnings.map((warning) => `- ${warning}`) : ["- 暂无明显风险。"]),
     "",
@@ -2720,6 +2742,123 @@ function experimentHypothesis(platform: PlatformProfile, effect: PlatformPublish
   return "平台包装实验：保留主卖点，只调整入口表达并观察下一轮变化。";
 }
 
+function latestAdoptedVersionForAttribution(
+  versions: PlatformSubmissionAssetVersionInput[],
+  effect: PlatformPublishEffectSummary,
+) {
+  const currentTime = effect.comparison.current
+    ? new Date(effect.comparison.current.snapshotDate).getTime()
+    : Number.POSITIVE_INFINITY;
+  return versions
+    .filter((version) => (
+      version.action === "adopt"
+      && (!Number.isFinite(currentTime) || new Date(version.createdAt).getTime() <= currentTime)
+    ))
+    .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime())[0] ?? null;
+}
+
+function buildExperimentAttribution(input: {
+  platform: PlatformProfile;
+  versions: PlatformSubmissionAssetVersionInput[];
+  effect: PlatformPublishEffectSummary;
+  candidates: PlatformABExperimentCandidate[];
+}): PlatformABExperimentAttribution {
+  const comparison = input.effect.comparison;
+  const adoptedVersion = latestAdoptedVersionForAttribution(input.versions, input.effect);
+  const candidate = adoptedVersion?.sourceTaskId
+    ? input.candidates.find((item) => item.sourceTaskId === adoptedVersion.sourceTaskId && item.strategy === adoptedVersion.strategy)
+    : null;
+  const attributedStrategy = adoptedVersion?.strategy?.trim() || candidate?.strategy || null;
+  const attributedTitle = adoptedVersion?.title?.trim() || candidate?.title || null;
+  const evidence = [
+    ...comparison.wins,
+    ...comparison.losses,
+    comparison.viewsDelta ? `曝光 ${comparison.viewsDelta > 0 ? "+" : ""}${comparison.viewsDelta}` : "",
+  ].filter(Boolean);
+
+  if (comparison.status === "none") {
+    return {
+      status: "no_data",
+      headline: "还没有二轮对照，暂时不能归因。",
+      verdict: "至少需要两次同口径发布效果记录，才能判断候选方案有没有带来变化。",
+      attributedStrategy,
+      attributedTitle,
+      sourceVersionId: adoptedVersion?.id ?? null,
+      evidence,
+      platformLearnings: ["先建立前后数据，不要拿单次波动当结论。"],
+      nextAction: "继续录入下一轮曝光、点击、收藏、追读和编辑反馈。",
+    };
+  }
+
+  if (!adoptedVersion) {
+    return {
+      status: "no_experiment",
+      headline: "有前后数据，但没有采纳记录，归因链断了。",
+      verdict: "这轮数据能看涨跌，却不能证明是哪套标题简介导致的变化。",
+      attributedStrategy: null,
+      attributedTitle: null,
+      sourceVersionId: null,
+      evidence,
+      platformLearnings: ["每次测试前必须先采纳候选并保存版本，否则后面无法复盘。"],
+      nextAction: "下一轮先采纳一个 A/B 候选，再保存发布基准后投放。",
+    };
+  }
+
+  const status: PlatformABExperimentAttribution["status"] = comparison.status === "improved"
+    ? "positive"
+    : comparison.status === "declined"
+      ? "negative"
+      : comparison.status === "mixed"
+        ? "mixed"
+        : "inconclusive";
+  const headline = status === "positive"
+    ? "这轮可以归因到候选包装的正反馈。"
+    : status === "negative"
+      ? "这轮候选包装大概率拖累了数据。"
+      : status === "mixed"
+        ? "这轮候选包装有得有失，别急着判生死。"
+        : "这轮候选包装没有打出明显变化。";
+  const verdict = status === "positive"
+    ? `「${attributedStrategy ?? "已采纳候选"}」让 ${input.platform.name} 的关键指标变好，可以沉淀为可复用包装方向。`
+    : status === "negative"
+      ? `「${attributedStrategy ?? "已采纳候选"}」没有接住 ${input.platform.name} 的读者，优先回滚或改写入口承诺。`
+      : status === "mixed"
+        ? `「${attributedStrategy ?? "已采纳候选"}」可能提升入口，但留存或互动仍有损耗，要拆开看。`
+        : `「${attributedStrategy ?? "已采纳候选"}」还没有显著拉动数据，需要更强差异或更大样本。`;
+  const platformLearnings = status === "positive"
+    ? [
+      attributedTitle ? `${input.platform.name} 对「${attributedTitle}」这类入口表达有正反馈。` : `${input.platform.name} 对当前候选包装有正反馈。`,
+      comparison.wins.join("、") || "关键指标有正向变化。",
+    ]
+    : status === "negative"
+      ? [
+        `${input.platform.name} 当前不吃这轮包装承诺，别继续加码同款表达。`,
+        comparison.losses.join("、") || "关键指标有下滑。",
+      ]
+      : status === "mixed"
+        ? ["入口和留存信号不一致，下一轮只改一个变量。"]
+        : ["样本或差异不够，下一轮候选要更明确地区分标题、卖点和标签。"];
+  const nextAction = status === "positive"
+    ? "保留胜出包装，保存版本并继续加更观察。"
+    : status === "negative"
+      ? "回滚到上一版包装，重新生成候选或重查前三章兑现。"
+      : status === "mixed"
+        ? "拆分变量，只保留上涨项，再做一轮更小实验。"
+        : "补第二轮样本，或生成差异更大的候选再测。";
+
+  return {
+    status,
+    headline,
+    verdict,
+    attributedStrategy,
+    attributedTitle,
+    sourceVersionId: adoptedVersion.id ?? null,
+    evidence,
+    platformLearnings,
+    nextAction,
+  };
+}
+
 function buildABExperimentPlan(input: {
   platform: PlatformProfile;
   tasks: PublishExportAiTask[];
@@ -2730,6 +2869,12 @@ function buildABExperimentPlan(input: {
 }): PlatformABExperimentPlan {
   const latestOptimizationTask = optimizationTasksForPlatform(input.platform, input.tasks)[0];
   const candidates = parseOptimizationCandidates(input.platform, latestOptimizationTask).slice(0, 3);
+  const attribution = buildExperimentAttribution({
+    platform: input.platform,
+    versions: input.versions.filter((version) => version.platformId === input.platform.id),
+    effect: input.effect,
+    candidates,
+  });
   const adoptedFromLatest = latestOptimizationTask
     ? input.versions.some((version) => version.sourceTaskId === latestOptimizationTask.id && version.action === "adopt")
     : false;
@@ -2781,6 +2926,7 @@ function buildABExperimentPlan(input: {
     baselineMetricId: input.effect.latest?.id ?? null,
     targetMetrics: ["点击率", "收藏率", "追读率", "编辑反馈"],
     candidates,
+    attribution,
   };
 }
 

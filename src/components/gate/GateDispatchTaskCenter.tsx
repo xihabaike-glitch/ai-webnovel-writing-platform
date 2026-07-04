@@ -143,10 +143,21 @@ export function GateDispatchTaskCenter({
     setRunningKey(task.dispatchKey);
     setErrorMessage("");
     try {
-      const updated = task.databaseId
-        ? await updatePersistedGateDispatchTaskState(task.dispatchKey, targetState, { completionEvidence })
-        : await persistGateDispatchTask({ ...task, state: targetState });
-      setTasks((current) => current.map((item) => item.dispatchKey === updated.dispatchKey ? updated : item));
+      if (task.databaseId) {
+        const updated = await updatePersistedGateDispatchTaskState(task.dispatchKey, targetState, { completionEvidence });
+        setTasks((current) => {
+          const nextByKey = new Map(current.map((item) => [item.dispatchKey, item]));
+          nextByKey.set(updated.task.dispatchKey, updated.task);
+          for (const followUp of updated.followUpTasks) nextByKey.set(followUp.dispatchKey, followUp);
+          return Array.from(nextByKey.values());
+        });
+        if (updated.followUpTasks.length) {
+          setRouteActionMessage(`已自动生成治理后复检派单：${updated.followUpTasks.map((item) => item.title).join("、")}`);
+        }
+      } else {
+        const updated = await persistGateDispatchTask({ ...task, state: targetState });
+        setTasks((current) => current.map((item) => item.dispatchKey === updated.dispatchKey ? updated : item));
+      }
       setCompletionDrafts((current) => {
         const next = { ...current };
         delete next[task.dispatchKey];

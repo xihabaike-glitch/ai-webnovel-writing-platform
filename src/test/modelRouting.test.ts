@@ -11,6 +11,7 @@ import {
   buildRouteConfirmationRecheckAutoGovernanceAction,
   buildRouteConfirmationRecheckDecision,
   buildRouteConfirmationRecheckGovernanceAction,
+  buildRouteConfirmationGovernanceAutoFollowUpDispatches,
   buildRouteConfirmationGovernanceEvidenceFromDispatchTasks,
   buildRouteConfirmationGovernanceFollowUpDispatches,
   buildRouteConfirmationDispatchFlow,
@@ -792,6 +793,25 @@ test("model task routing", async (t) => {
     assert.equal(recheck?.stage, "model_route_confirmation_recheck");
     assert.equal(recheck?.actionLabel, "复检小样本");
     assert.ok(recheck?.acceptanceCriteria.some((item) => item.includes("成功率")));
+  });
+
+  await t.test("filters route governance follow-up dispatches already persisted", () => {
+    const routeGovernanceEvidence = buildRouteConfirmationGovernanceEvidenceFromDispatchTasks([{
+      dispatchKey: "model-route-governance:chapter_draft:extend_watch:2026-07-04T14:00:00.000Z",
+      stage: "model_route_governance",
+      state: "completed",
+      completionEvidence: "正文初稿路由已治理，已切换首选模型，复跑 2 个小样本成功率 100%，质量 86，未命中备用。",
+      evidence: ["已生成模型路由治理派单。"],
+      completedAt: "2026-07-04T16:00:00.000Z",
+    }]);
+    const firstPass = buildRouteConfirmationGovernanceAutoFollowUpDispatches(routeGovernanceEvidence);
+    const secondPass = buildRouteConfirmationGovernanceAutoFollowUpDispatches(routeGovernanceEvidence, {
+      existingDispatchKeys: firstPass.map((item) => item.dispatchKey),
+    });
+
+    assert.equal(firstPass.length, 1);
+    assert.equal(firstPass[0].stage, "model_route_confirmation_recheck");
+    assert.equal(secondPass.length, 0);
   });
 
   await t.test("stops route adjustment follow-up after a newer route confirmation exists", () => {

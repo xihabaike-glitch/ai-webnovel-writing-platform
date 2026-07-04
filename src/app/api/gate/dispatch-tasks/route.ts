@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
+import {
+  buildRouteConfirmationGovernanceAutoFollowUpDispatches,
+  buildRouteConfirmationGovernanceEvidenceFromDispatchTasks,
+} from "@/lib/model-gateway/routeConfirmation";
 import type {
   GateActionReceipt,
   GatePlatformGrowthDispatchItem,
@@ -103,6 +107,45 @@ function takeLimit(value: string | null) {
   const parsed = Number(value);
   if (!Number.isFinite(parsed)) return 50;
   return Math.min(100, Math.max(1, Math.round(parsed)));
+}
+
+async function persistGeneratedDispatch(dispatch: GatePlatformGrowthDispatchItem & { dispatchKey: string }) {
+  const now = new Date();
+  const task = await prisma.gateDispatchTask.upsert({
+    where: { dispatchKey: dispatch.dispatchKey },
+    create: {
+      dispatchKey: dispatch.dispatchKey,
+      projectId: null,
+      platformId: dispatch.platformId,
+      platformName: dispatch.platformName,
+      stage: dispatch.stage,
+      state: dispatch.state,
+      priorityScore: dispatch.priorityScore,
+      ownerRole: dispatch.ownerRole,
+      title: dispatch.title,
+      detail: dispatch.detail,
+      dueLabel: dispatch.dueLabel,
+      actionLabel: dispatch.actionLabel,
+      href: dispatch.href,
+      acceptanceCriteria: JSON.stringify(dispatch.acceptanceCriteria),
+      evidence: JSON.stringify(dispatch.evidence),
+      sourceReceiptId: null,
+      completionEvidence: "",
+      reviewLatestAt: date(dispatch.reviewLatestAt),
+      assignedAt: dispatch.state === "assigned" ? now : null,
+      completedAt: dispatch.state === "completed" ? now : null,
+    },
+    update: {
+      state: dispatch.state,
+      priorityScore: dispatch.priorityScore,
+      detail: dispatch.detail,
+      acceptanceCriteria: JSON.stringify(dispatch.acceptanceCriteria),
+      evidence: JSON.stringify(dispatch.evidence),
+      assignedAt: dispatch.state === "assigned" ? now : undefined,
+      completedAt: dispatch.state === "completed" ? now : null,
+    },
+  });
+  return toTask(task);
 }
 
 export async function GET(request: Request) {
@@ -211,6 +254,25 @@ export async function PATCH(request: Request) {
       completionEvidence: nextState === "completed" ? completionEvidence : nextState === "queued" || nextState === "assigned" ? "" : undefined,
     },
   });
+  let followUpTasks: PersistedGatePlatformDispatchTask[] = [];
+  if (nextState === "completed" && task.stage === "model_route_governance") {
+    const existingTasks = await prisma.gateDispatchTask.findMany({
+      where: { platformId: "model-routing" },
+      select: { dispatchKey: true },
+    });
+    const evidence = buildRouteConfirmationGovernanceEvidenceFromDispatchTasks([{
+      dispatchKey: task.dispatchKey,
+      stage: task.stage,
+      state: task.state,
+      completionEvidence: task.completionEvidence,
+      evidence: task.evidence,
+      completedAt: task.completedAt,
+    }]);
+    const followUps = buildRouteConfirmationGovernanceAutoFollowUpDispatches(evidence, {
+      existingDispatchKeys: existingTasks.map((item) => item.dispatchKey),
+    });
+    followUpTasks = await Promise.all(followUps.map(persistGeneratedDispatch));
+  }
 
-  return NextResponse.json({ task: toTask(task) });
+  return NextResponse.json({ task: toTask(task), followUpTasks });
 }

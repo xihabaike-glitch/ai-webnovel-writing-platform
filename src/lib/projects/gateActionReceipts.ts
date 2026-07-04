@@ -5313,9 +5313,16 @@ export async function updatePersistedGateDispatchTaskState(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ dispatchKey, state, completionEvidence: options?.completionEvidence }),
   });
-  const payload = (await response.json().catch(() => null)) as { task?: PersistedGatePlatformDispatchTask; error?: string } | null;
+  const payload = (await response.json().catch(() => null)) as {
+    task?: PersistedGatePlatformDispatchTask;
+    followUpTasks?: PersistedGatePlatformDispatchTask[];
+    error?: string;
+  } | null;
   if (!response.ok || !payload?.task) throw new Error(payload?.error ?? "更新平台派单失败。");
-  return payload.task;
+  return {
+    task: payload.task,
+    followUpTasks: payload.followUpTasks ?? [],
+  };
 }
 
 export function addGateActionReceipt(receipt: GateActionReceipt) {

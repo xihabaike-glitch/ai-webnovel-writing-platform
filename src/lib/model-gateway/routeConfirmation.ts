@@ -1350,6 +1350,15 @@ export function buildRouteConfirmationGovernanceFollowUpDispatches(
   }).sort((left, right) => right.priorityScore - left.priorityScore || right.reviewLatestAt.localeCompare(left.reviewLatestAt));
 }
 
+export function buildRouteConfirmationGovernanceAutoFollowUpDispatches(
+  evidence: RouteConfirmationGovernanceEvidence[],
+  options: RouteConfirmationGovernanceFollowUpOptions & { existingDispatchKeys?: Iterable<string> } = {},
+): RouteConfirmationGovernanceFollowUpDispatch[] {
+  const existingDispatchKeys = new Set(options.existingDispatchKeys ?? []);
+  return buildRouteConfirmationGovernanceFollowUpDispatches(evidence, options)
+    .filter((item) => !existingDispatchKeys.has(item.dispatchKey));
+}
+
 export function buildRouteConfirmationRecheckAdvice(
   evidence: RouteConfirmationRecheckEvidence[],
 ): RouteConfirmationRecheckAdvice {

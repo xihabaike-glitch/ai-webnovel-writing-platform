@@ -60,6 +60,31 @@ interface ProviderSetupGuideView {
   nextActions: string[];
 }
 
+interface ModelSetupOnboardingView {
+  summary: {
+    total: number;
+    done: number;
+    actionable: number;
+    blocked: number;
+  };
+  currentStep: {
+    id: "providers" | "connection" | "routes" | "first_day";
+    title: string;
+    detail: string;
+    status: "done" | "actionable" | "blocked";
+    actionLabel: string;
+    action: "select_provider" | "test_provider" | "apply_routes" | "open_projects";
+  };
+  steps: Array<{
+    id: "providers" | "connection" | "routes" | "first_day";
+    title: string;
+    detail: string;
+    status: "done" | "actionable" | "blocked";
+    actionLabel: string;
+    action: "select_provider" | "test_provider" | "apply_routes" | "open_projects";
+  }>;
+}
+
 interface ProviderView {
   id: string;
   providerId: string;
@@ -428,6 +453,12 @@ const providerSetupStatusCopy: Record<ProviderSetupGuideView["items"][number]["s
   optional: { label: "演示", className: "bg-slate-100 text-slate-600" },
 };
 
+const modelSetupStepStatusCopy: Record<ModelSetupOnboardingView["steps"][number]["status"], { label: string; className: string }> = {
+  done: { label: "完成", className: "bg-emerald-50 text-emerald-700" },
+  actionable: { label: "当前", className: "bg-slate-950 text-white" },
+  blocked: { label: "等待", className: "bg-slate-100 text-slate-600" },
+};
+
 function draftFromOption(option: ProviderOptionView, existing?: ProviderView): DraftProvider {
   return {
     id: existing?.id,
@@ -446,6 +477,7 @@ export function ModelProviderSettings({
   options,
   presets,
   providerSetupGuide,
+  modelSetupOnboarding,
   firstDayRouteSummary,
   presetRouteBlueprint,
   providers,
@@ -465,6 +497,7 @@ export function ModelProviderSettings({
   options: ProviderOptionView[];
   presets: ProviderModelPresetView[];
   providerSetupGuide: ProviderSetupGuideView;
+  modelSetupOnboarding: ModelSetupOnboardingView;
   firstDayRouteSummary: FirstDayRouteSummaryView;
   presetRouteBlueprint: PresetRouteBlueprintView;
   providers: ProviderView[];
@@ -552,6 +585,25 @@ export function ModelProviderSettings({
     setSelectedProviderId(providerId);
     setDraft(draftFromOption(option, existingByProvider.get(providerId)));
     setMessage(null);
+  }
+
+  function selectProviderBySetupStatus(statuses: ProviderSetupGuideView["items"][number]["status"][]) {
+    const item = providerSetupGuide.items.find((candidate) => statuses.includes(candidate.status));
+    selectProvider(item?.providerId ?? selectedProviderId);
+  }
+
+  function handleModelSetupAction(action: ModelSetupOnboardingView["steps"][number]["action"]) {
+    if (action === "select_provider") {
+      selectProviderBySetupStatus(["needs_key", "needs_test"]);
+      return;
+    }
+    if (action === "test_provider") {
+      selectProviderBySetupStatus(["needs_test", "needs_key"]);
+      return;
+    }
+    if (action === "apply_routes") {
+      void applyFirstDayRecommendedRoutes();
+    }
   }
 
   function applyPreset(preset: ProviderModelPresetView) {
@@ -1873,6 +1925,58 @@ export function ModelProviderSettings({
                     {savingRouteType === option.taskType ? "保存中" : "保存路由"}
                   </button>
                 </div>
+              </div>
+            );
+          })}
+        </div>
+      </section>
+      <section className="rounded-md border border-slate-200 bg-white p-4">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <h2 className="font-medium text-slate-950">模型上线流程</h2>
+            <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-600">
+              从补 Key 到首日执行只走一条路：先让真实模型可用，再应用首日路线，最后进作品页跑首日工作流。
+            </p>
+          </div>
+          <div className="flex flex-col gap-2 sm:items-end">
+            <div className="flex flex-wrap gap-2 text-xs text-slate-600">
+              <span className="rounded-md bg-emerald-50 px-2 py-1 text-emerald-700">完成 {modelSetupOnboarding.summary.done}</span>
+              <span className="rounded-md bg-slate-100 px-2 py-1 text-slate-600">等待 {modelSetupOnboarding.summary.blocked}</span>
+            </div>
+            {modelSetupOnboarding.currentStep.action === "open_projects" ? (
+              <Link
+                className="rounded-md bg-slate-950 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800"
+                href="/projects"
+              >
+                {modelSetupOnboarding.currentStep.actionLabel}
+              </Link>
+            ) : (
+              <button
+                className="rounded-md bg-slate-950 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={isApplyingFirstDayRoutes && modelSetupOnboarding.currentStep.action === "apply_routes"}
+                onClick={() => handleModelSetupAction(modelSetupOnboarding.currentStep.action)}
+                type="button"
+              >
+                {isApplyingFirstDayRoutes && modelSetupOnboarding.currentStep.action === "apply_routes"
+                  ? "应用中"
+                  : modelSetupOnboarding.currentStep.actionLabel}
+              </button>
+            )}
+          </div>
+        </div>
+        <div className="mt-3 grid gap-2 lg:grid-cols-4">
+          {modelSetupOnboarding.steps.map((item, index) => {
+            const status = modelSetupStepStatusCopy[item.status];
+            return (
+              <div className="rounded-md bg-slate-50 p-3 text-sm" key={item.id}>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="font-medium text-slate-950">{index + 1}. {item.title}</span>
+                  <span className={`rounded-md px-2 py-1 text-xs font-medium ${status.className}`}>{status.label}</span>
+                </div>
+                <p className="mt-2 min-h-12 text-xs leading-5 text-slate-600">{item.detail}</p>
+                {item.status === "actionable" ? (
+                  <div className="mt-2 text-xs font-medium text-slate-950">下一步：{item.actionLabel}</div>
+                ) : null}
               </div>
             );
           })}

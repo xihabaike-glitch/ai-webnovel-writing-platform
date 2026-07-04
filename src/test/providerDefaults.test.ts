@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { buildModelSetupOnboarding } from "../lib/model-gateway/modelSetupOnboarding.ts";
 import { getProviderModelPresets, providerModelPresets, providerOptions } from "../lib/model-gateway/providerDefaults.ts";
 import { buildProviderSetupGuide } from "../lib/model-gateway/providerSetupGuide.ts";
 
@@ -75,5 +76,41 @@ test("provider model presets", async (t) => {
     assert.ok(kimi?.taskTags.includes("长篇规划"));
     assert.equal(guide.summary.ready, 1);
     assert.ok(guide.nextActions.some((action) => action.includes("API Key")));
+  });
+
+  await t.test("builds a continuous setup onboarding flow before first-day execution", () => {
+    const blocked = buildModelSetupOnboarding({
+      providerSummary: {
+        ready: 0,
+        needsKey: 4,
+        needsTest: 0,
+      },
+      firstDayRouteSummary: {
+        configured: 0,
+        needsRoute: 4,
+        mockFallback: 0,
+        applicableRecommendations: 0,
+      },
+    });
+    const actionable = buildModelSetupOnboarding({
+      providerSummary: {
+        ready: 3,
+        needsKey: 0,
+        needsTest: 0,
+      },
+      firstDayRouteSummary: {
+        configured: 1,
+        needsRoute: 3,
+        mockFallback: 0,
+        applicableRecommendations: 3,
+      },
+    });
+
+    assert.equal(blocked.currentStep.id, "providers");
+    assert.equal(blocked.steps.find((item) => item.id === "connection")?.status, "blocked");
+    assert.equal(actionable.currentStep.id, "routes");
+    assert.equal(actionable.steps.find((item) => item.id === "providers")?.status, "done");
+    assert.equal(actionable.steps.find((item) => item.id === "routes")?.action, "apply_routes");
+    assert.ok(actionable.currentStep.detail.includes("3 条"));
   });
 });

@@ -44,27 +44,53 @@ export function StoryTreeExperiencePanel({
   const filteredItems = axisFilter === "all" ? guide.items : guide.items.filter((item) => item.axisId === axisFilter);
   const topItems = filteredItems.slice(0, 6);
   const [runningKey, setRunningKey] = useState<string | null>(null);
+  const [runningBatchKey, setRunningBatchKey] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+
+  async function createExperienceDispatch(item: StoryTreeExperienceItem) {
+    const response = await fetch(`/api/projects/${projectId}/story-tree-experience/apply`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ dispatchKey: item.dispatchKey }),
+    });
+    const payload = (await response.json().catch(() => null)) as { task?: { title?: string }; error?: string } | null;
+    if (!response.ok) {
+      throw new Error(payload?.error ?? "生成结构经验派单失败。");
+    }
+    return payload?.task?.title ?? item.title;
+  }
 
   async function applyExperience(item: StoryTreeExperienceItem) {
     setRunningKey(item.dispatchKey);
     setMessage(null);
     try {
-      const response = await fetch(`/api/projects/${projectId}/story-tree-experience/apply`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ dispatchKey: item.dispatchKey }),
-      });
-      const payload = (await response.json().catch(() => null)) as { task?: { title?: string }; error?: string } | null;
-      if (!response.ok) {
-        throw new Error(payload?.error ?? "生成结构经验派单失败。");
-      }
-      setMessage(`已生成派单：${payload?.task?.title ?? item.title}`);
+      const title = await createExperienceDispatch(item);
+      setMessage(`已生成派单：${title}`);
     } catch (caught) {
       setMessage(caught instanceof Error ? caught.message : "生成结构经验派单失败。");
     } finally {
       setRunningKey(null);
     }
+  }
+
+  async function applyDecisionBatch(batchKey: string, label: string, items: StoryTreeExperienceItem[]) {
+    if (items.length === 0) return;
+    setRunningBatchKey(batchKey);
+    setMessage(null);
+    let succeeded = 0;
+    let failed = 0;
+
+    for (const item of items) {
+      try {
+        await createExperienceDispatch(item);
+        succeeded += 1;
+      } catch {
+        failed += 1;
+      }
+    }
+
+    setMessage(`已按「${label}」生成 ${succeeded} 条结构经验派单${failed ? `，${failed} 条失败` : ""}。`);
+    setRunningBatchKey(null);
   }
 
   return (
@@ -111,7 +137,17 @@ export function StoryTreeExperiencePanel({
         </div>
         <div className="mt-3 grid gap-3 lg:grid-cols-3">
           <div className="rounded-md bg-white p-3">
-            <div className="text-sm font-medium text-emerald-700">优先复用</div>
+            <div className="flex items-center justify-between gap-2">
+              <div className="text-sm font-medium text-emerald-700">优先复用</div>
+              <button
+                className="rounded-md border border-slate-200 px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                disabled={effectDashboard.reusableItems.length === 0 || Boolean(runningBatchKey)}
+                onClick={() => applyDecisionBatch("reusable", "优先复用", effectDashboard.reusableItems)}
+                type="button"
+              >
+                {runningBatchKey === "reusable" ? "派单中" : "批量派单"}
+              </button>
+            </div>
             <div className="mt-2 grid gap-2 text-sm text-slate-600">
               {effectDashboard.reusableItems.map((item) => (
                 <Link className="hover:text-slate-950 hover:underline" href={item.href} key={item.id}>
@@ -122,7 +158,17 @@ export function StoryTreeExperiencePanel({
             </div>
           </div>
           <div className="rounded-md bg-white p-3">
-            <div className="text-sm font-medium text-rose-700">先做避坑</div>
+            <div className="flex items-center justify-between gap-2">
+              <div className="text-sm font-medium text-rose-700">先做避坑</div>
+              <button
+                className="rounded-md border border-slate-200 px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                disabled={effectDashboard.avoidItems.length === 0 || Boolean(runningBatchKey)}
+                onClick={() => applyDecisionBatch("avoid", "先做避坑", effectDashboard.avoidItems)}
+                type="button"
+              >
+                {runningBatchKey === "avoid" ? "派单中" : "批量派单"}
+              </button>
+            </div>
             <div className="mt-2 grid gap-2 text-sm text-slate-600">
               {effectDashboard.avoidItems.map((item) => (
                 <Link className="hover:text-slate-950 hover:underline" href={item.href} key={item.id}>
@@ -133,7 +179,17 @@ export function StoryTreeExperiencePanel({
             </div>
           </div>
           <div className="rounded-md bg-white p-3">
-            <div className="text-sm font-medium text-amber-700">继续观察</div>
+            <div className="flex items-center justify-between gap-2">
+              <div className="text-sm font-medium text-amber-700">继续观察</div>
+              <button
+                className="rounded-md border border-slate-200 px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                disabled={effectDashboard.watchItems.length === 0 || Boolean(runningBatchKey)}
+                onClick={() => applyDecisionBatch("watch", "继续观察", effectDashboard.watchItems)}
+                type="button"
+              >
+                {runningBatchKey === "watch" ? "派单中" : "批量派单"}
+              </button>
+            </div>
             <div className="mt-2 grid gap-2 text-sm text-slate-600">
               {effectDashboard.watchItems.map((item) => (
                 <Link className="hover:text-slate-950 hover:underline" href={item.href} key={item.id}>

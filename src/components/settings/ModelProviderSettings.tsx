@@ -295,6 +295,25 @@ interface PresetRouteBlueprintView {
   }>;
 }
 
+interface FirstDayRouteSummaryView {
+  summary: {
+    total: number;
+    configured: number;
+    needsRoute: number;
+    mockFallback: number;
+  };
+  nextActions: string[];
+  items: Array<{
+    taskType: string;
+    label: string;
+    stage: string;
+    primaryProviderName: string;
+    fallbackProviderName: string;
+    status: "configured" | "needs_route" | "mock_fallback";
+    recommendation: string;
+  }>;
+}
+
 interface RouteDraft {
   primaryProviderConfigId: string;
   fallbackProviderConfigId: string;
@@ -368,6 +387,12 @@ const routeRecommendationExplanationToneCopy: Record<RouteRecommendationView["ex
   neutral: "border-slate-200 bg-white text-slate-700",
 };
 
+const firstDayRouteStatusCopy: Record<FirstDayRouteSummaryView["items"][number]["status"], { label: string; className: string }> = {
+  configured: { label: "已配置", className: "bg-emerald-50 text-emerald-700" },
+  needs_route: { label: "缺路线", className: "bg-amber-50 text-amber-700" },
+  mock_fallback: { label: "Mock 兜底", className: "bg-sky-50 text-sky-700" },
+};
+
 function draftFromOption(option: ProviderOptionView, existing?: ProviderView): DraftProvider {
   return {
     id: existing?.id,
@@ -385,6 +410,7 @@ export function ModelProviderSettings({
   healthDashboard,
   options,
   presets,
+  firstDayRouteSummary,
   presetRouteBlueprint,
   providers,
   routeEffectAudit,
@@ -402,6 +428,7 @@ export function ModelProviderSettings({
   healthDashboard: ProviderHealthDashboard;
   options: ProviderOptionView[];
   presets: ProviderModelPresetView[];
+  firstDayRouteSummary: FirstDayRouteSummaryView;
   presetRouteBlueprint: PresetRouteBlueprintView;
   providers: ProviderView[];
   routeEffectAudit: RouteEffectAuditView;
@@ -959,6 +986,47 @@ export function ModelProviderSettings({
                 </div>
               );
             })}
+          </div>
+        </div>
+        <div className="mt-4 rounded-md border border-slate-200 bg-white p-4">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <div className="text-sm font-medium text-slate-950">首日工作流模型路线</div>
+              <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-600">
+                首日按钮会依次用到总控资料、第一章初稿、第一章审稿和二改路线。这里先把关键路线露出来，避免执行时才发现模型不对。
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2 text-xs text-slate-600">
+              <span className="rounded-md bg-emerald-50 px-2 py-1 text-emerald-700">已配 {firstDayRouteSummary.summary.configured}</span>
+              <span className="rounded-md bg-amber-50 px-2 py-1 text-amber-700">缺路线 {firstDayRouteSummary.summary.needsRoute}</span>
+              <span className="rounded-md bg-sky-50 px-2 py-1 text-sky-700">Mock {firstDayRouteSummary.summary.mockFallback}</span>
+            </div>
+          </div>
+          <div className="mt-3 grid gap-2 lg:grid-cols-2">
+            {firstDayRouteSummary.items.map((item) => {
+              const status = firstDayRouteStatusCopy[item.status];
+              return (
+                <div className="rounded-md bg-slate-50 p-3 text-sm" key={item.taskType}>
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div>
+                      <div className="font-medium text-slate-950">{item.stage}</div>
+                      <div className="mt-1 text-xs text-slate-500">{item.label}</div>
+                    </div>
+                    <span className={`rounded-md px-2 py-1 text-xs font-medium ${status.className}`}>{status.label}</span>
+                  </div>
+                  <div className="mt-3 grid gap-2 text-xs text-slate-600 sm:grid-cols-2">
+                    <span className="rounded-md bg-white px-2 py-1">首选 {item.primaryProviderName}</span>
+                    <span className="rounded-md bg-white px-2 py-1">备用 {item.fallbackProviderName}</span>
+                  </div>
+                  <p className="mt-2 leading-6 text-slate-600">{item.recommendation}</p>
+                </div>
+              );
+            })}
+          </div>
+          <div className="mt-3 grid gap-2 text-sm leading-6 text-slate-600">
+            {firstDayRouteSummary.nextActions.map((action) => (
+              <div className="rounded-md bg-slate-50 px-3 py-2" key={action}>{action}</div>
+            ))}
           </div>
         </div>
         <div className="mt-4 grid gap-3 md:grid-cols-3 lg:grid-cols-6">

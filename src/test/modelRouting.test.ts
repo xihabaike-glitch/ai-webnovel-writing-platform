@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { buildFirstDayRouteSummary } from "../lib/model-gateway/firstDayRouteSummary.ts";
 import { buildPresetRouteBlueprint } from "../lib/model-gateway/presetRouteBlueprint.ts";
 import {
   selectForcedModelProviderCandidate,
@@ -765,6 +766,64 @@ test("model task routing", async (t) => {
     assert.equal(control?.recommendedPrimaryProviderConfigId, "kimi-provider");
     assert.equal(control?.recommendedFallbackProviderConfigId, "claude-provider");
     assert.ok(control?.reason.includes("长篇规划"));
+  });
+
+  await t.test("summarizes first-day workflow model routes", () => {
+    const summary = buildFirstDayRouteSummary({
+      providers: [
+        {
+          id: "deepseek-provider",
+          providerId: "deepseek",
+          displayName: "DeepSeek",
+          defaultModel: "deepseek-chat",
+          enabled: true,
+          encryptedApiKey: "key",
+        },
+        {
+          id: "kimi-provider",
+          providerId: "kimi",
+          displayName: "Kimi",
+          defaultModel: "kimi-k2.6",
+          enabled: true,
+          encryptedApiKey: "key",
+        },
+        {
+          id: "claude-provider",
+          providerId: "claude",
+          displayName: "Claude",
+          defaultModel: "claude-sonnet-4-5",
+          enabled: true,
+          encryptedApiKey: "key",
+        },
+        mockProvider,
+      ],
+      routes: [
+        {
+          taskType: "chapter_draft",
+          primaryProviderConfigId: "deepseek-provider",
+          fallbackProviderConfigId: "kimi-provider",
+        },
+        {
+          taskType: "control_asset_generate",
+          primaryProviderConfigId: "kimi-provider",
+          fallbackProviderConfigId: "claude-provider",
+        },
+      ],
+    });
+
+    const draft = summary.items.find((item) => item.taskType === "chapter_draft");
+    const review = summary.items.find((item) => item.taskType === "chapter_review");
+    const control = summary.items.find((item) => item.taskType === "control_asset_generate");
+
+    assert.equal(summary.summary.total, 4);
+    assert.equal(summary.summary.configured, 2);
+    assert.equal(summary.summary.needsRoute, 2);
+    assert.equal(summary.summary.mockFallback, 0);
+    assert.equal(draft?.primaryProviderName, "DeepSeek · deepseek-chat");
+    assert.equal(draft?.fallbackProviderName, "Kimi · kimi-k2.6");
+    assert.equal(control?.stage, "人物和设定支撑");
+    assert.equal(review?.status, "needs_route");
+    assert.ok(summary.nextActions[0].includes("第一章审稿"));
   });
 
   await t.test("builds route recommendations from successful model samples", () => {

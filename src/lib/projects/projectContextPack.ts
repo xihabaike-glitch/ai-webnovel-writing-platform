@@ -66,6 +66,16 @@ export interface ProjectContextBlock {
   missing: string[];
 }
 
+export interface ProjectContextRecallCard {
+  id: ProjectContextBlock["id"];
+  label: string;
+  status: ProjectContextStatus;
+  sourceCount: number;
+  headline: string;
+  detail: string;
+  nextAction: string;
+}
+
 export interface ProjectContextPack {
   status: ProjectContextStatus;
   summary: string;
@@ -78,6 +88,7 @@ export interface ProjectContextPack {
     historyChapters: number;
   };
   blocks: ProjectContextBlock[];
+  recallCards: ProjectContextRecallCard[];
 }
 
 function hasText(value: string | null | undefined) {
@@ -255,6 +266,56 @@ function buildPromptBlock(blocks: ProjectContextBlock[], warnings: string[]) {
   return lines.join("\n");
 }
 
+function sourceCountForBlock(block: ProjectContextBlock) {
+  if (block.id === "history" && block.items[0]?.includes("无需历史章节")) return 0;
+  return block.items.length;
+}
+
+function recallNextAction(block: ProjectContextBlock) {
+  if (block.id === "characters") {
+    if (block.status === "pass") return "把人物欲望、缺陷和终局变化绑定到下一章选择里。";
+    return block.items.length ? "补齐人物真正需求、终局变化和关系压力。" : "先创建主角人物卡，写清欲望、缺陷和弧光终点。";
+  }
+  if (block.id === "world") {
+    if (block.status === "pass") return "生成和审稿时强制引用系统规则、禁忌代价和平台土壤。";
+    return "补系统规则、禁忌代价和平台土壤，别让模型凭感觉续写。";
+  }
+  if (block.id === "story_lines") {
+    if (block.status === "pass") return "把主线、支线和伏笔状态写进下一章的冲突与章末钩子。";
+    return "补主线/支线和伏笔埋设说明，让章节有长期追读线。";
+  }
+  if (block.status === "pass") return "继续用最近历史章节承接人物选择、伏笔状态和章末问题。";
+  return "补最近章节摘要，否则后续生成容易断设定和断情绪。";
+}
+
+function buildRecallCards(blocks: ProjectContextBlock[]): ProjectContextRecallCard[] {
+  return blocks.map((block) => {
+    const sourceCount = sourceCountForBlock(block);
+    const firstItem = block.items[0] ?? "";
+    const missing = block.missing[0] ?? "";
+    const headline = block.status === "pass"
+      ? `${block.label}可召回`
+      : block.status === "warn"
+        ? `${block.label}需补强`
+        : `${block.label}缺失`;
+    const detail = block.status === "pass"
+      ? firstItem || "当前块可作为模型上下文来源。"
+      : missing
+        ? `缺口：${missing}`
+        : firstItem || "当前块缺少可用素材。";
+
+    return {
+      id: block.id,
+      label: block.label,
+      status: block.status,
+      sourceCount,
+      headline,
+      detail,
+      nextAction: recallNextAction(block),
+    };
+  });
+}
+
 export function buildProjectContextPack(input: ProjectContextPackInput): ProjectContextPack {
   const blocks = [
     buildCharacterBlock(input.characters),
@@ -278,5 +339,6 @@ export function buildProjectContextPack(input: ProjectContextPackInput): Project
     warnings,
     sourceCounts,
     blocks,
+    recallCards: buildRecallCards(blocks),
   };
 }

@@ -98,6 +98,18 @@ test("buildProjectContextPack", async (t) => {
     assert.ok(pack.promptBlock.includes("系统任务规则"));
     assert.ok(pack.promptBlock.includes("黑伞人知道系统编号"));
     assert.ok(pack.promptBlock.includes("第 1 章 雨夜系统"));
+    assert.equal(pack.recallCards.length, 4);
+    assert.ok(pack.recallCards.every((card) => card.status === "pass"));
+    assert.ok(pack.recallCards.some((card) => (
+      card.id === "world"
+      && card.headline === "世界观与平台土壤可召回"
+      && card.nextAction.includes("系统规则")
+    )));
+    assert.ok(pack.recallCards.some((card) => (
+      card.id === "history"
+      && card.sourceCount === 1
+      && card.detail.includes("第 1 章")
+    )));
     assert.equal(pack.warnings.length, 0);
   });
 
@@ -115,5 +127,15 @@ test("buildProjectContextPack", async (t) => {
     assert.ok(pack.warnings.some((warning) => warning.includes("缺少人物卡")));
     assert.ok(pack.warnings.some((warning) => warning.includes("缺少平台土壤")));
     assert.ok(pack.promptBlock.includes("缺口"));
+    assert.ok(pack.recallCards.some((card) => (
+      card.id === "characters"
+      && card.status === "fail"
+      && card.nextAction.includes("创建主角人物卡")
+    )));
+    assert.ok(pack.recallCards.some((card) => (
+      card.id === "story_lines"
+      && card.status === "fail"
+      && card.nextAction.includes("补主线/支线")
+    )));
   });
 });

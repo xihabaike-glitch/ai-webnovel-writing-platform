@@ -151,6 +151,34 @@ export function WritingWorkbenchPanel({ workbench }: { workbench: WritingWorkben
           </div>
         </div>
       </div>
+
+      <div className="mt-4 rounded-md border border-slate-200 bg-white p-3">
+        <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <div className="text-sm font-medium text-slate-950">项目土壤召回</div>
+            <p className="mt-1 text-xs text-slate-500">人物、世界观、伏笔和历史章节会进入模型上下文；缺口会直接影响生成和审稿。</p>
+          </div>
+          <span className={`w-fit rounded-md border px-2 py-1 text-xs ${statusClass(workbench.contextFocus.status)}`}>
+            {statusLabel(workbench.contextFocus.status)}
+          </span>
+        </div>
+        <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-4">
+          {workbench.contextFocus.recallCards.map((card) => (
+            <div className="rounded-md bg-slate-50 p-3" key={card.id}>
+              <div className="flex items-center justify-between gap-2">
+                <div className="text-sm font-medium text-slate-950">{card.label}</div>
+                <span className={`rounded-md border px-2 py-1 text-xs ${statusClass(card.status)}`}>
+                  {statusLabel(card.status)}
+                </span>
+              </div>
+              <div className="mt-1 text-xs text-slate-500">{card.sourceCount} 条可召回素材</div>
+              <div className="mt-2 text-sm font-medium text-slate-950">{card.headline}</div>
+              <p className="mt-1 line-clamp-2 text-xs leading-5 text-slate-600">{card.detail}</p>
+              <p className="mt-2 text-xs leading-5 text-slate-600">{card.nextAction}</p>
+            </div>
+          ))}
+        </div>
+      </div>
     </section>
   );
 }

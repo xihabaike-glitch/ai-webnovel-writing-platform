@@ -120,6 +120,7 @@ export interface WritingWorkbench {
     summary: string;
     warnings: string[];
     sourceCounts: ProjectContextPack["sourceCounts"];
+    recallCards: ProjectContextPack["recallCards"];
   };
   modelFocus: {
     failedTaskCount: number;
@@ -844,6 +845,7 @@ export function buildWritingWorkbench(input: WritingWorkbenchInput): WritingWork
       summary: projectContext.summary,
       warnings: projectContext.warnings,
       sourceCounts: projectContext.sourceCounts,
+      recallCards: projectContext.recallCards,
     },
     modelFocus: {
       failedTaskCount: input.aiTasks.filter((task) => task.status === "failed").length,

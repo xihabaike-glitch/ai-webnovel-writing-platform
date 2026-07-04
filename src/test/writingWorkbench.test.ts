@@ -140,6 +140,17 @@ test("buildWritingWorkbench", async (t) => {
     assert.equal(workbench.contextFocus.sourceCounts.characters, 1);
     assert.equal(workbench.contextFocus.sourceCounts.worldEntries, 0);
     assert.ok(workbench.contextFocus.warnings.some((warning) => warning.includes("平台土壤")));
+    assert.equal(workbench.contextFocus.recallCards.length, 4);
+    assert.ok(workbench.contextFocus.recallCards.some((card) => (
+      card.id === "characters"
+      && card.status === "warn"
+      && card.nextAction.includes("人物真正需求")
+    )));
+    assert.ok(workbench.contextFocus.recallCards.some((card) => (
+      card.id === "world"
+      && card.status === "fail"
+      && card.nextAction.includes("模型凭感觉")
+    )));
     assert.ok(workbench.modelFocus.nextRoutes.some((route) => route.task.includes("开头钩子")));
     assert.ok(workbench.quickLinks.some((link) => link.href === "/projects/p1#outline-tree"));
     assert.ok(workbench.quickFixes.some((fix) => fix.kind === "chapter_hook" && fix.endpoint === "/api/chapters/c1"));
@@ -231,6 +242,11 @@ test("buildWritingWorkbench", async (t) => {
     assert.ok(!workbench.quickFixes.some((fix) => fix.kind === "world_seed"));
     assert.ok(workbench.modelActions.every((action) => action.disabledReason?.includes("先创建第一章")));
     assert.ok(workbench.contextFocus.summary.includes("设定 1"));
+    assert.ok(workbench.contextFocus.recallCards.some((card) => (
+      card.id === "history"
+      && card.status === "pass"
+      && card.detail.includes("无需历史章节")
+    )));
     assert.equal(workbench.modelTimeline.emptyState, "还没有模型执行记录。");
   });
 

@@ -9,6 +9,7 @@ import {
   buildProjectStartGateExperience,
   buildProjectStartModelRouteExperienceFromConfirmations,
   buildProjectStartModelRouteExperienceFromReceipts,
+  buildProjectStartRiskGate,
   buildProjectStartTacticAdvice,
   buildProjectStartTacticWorldEntry,
   findProjectStartTacticSummary,
@@ -348,6 +349,55 @@ test("buildProjectStartTacticAdvice", async (t) => {
     assert.equal(guide.items.find((item) => item.platformId === "fanqie")?.label, "验收观察");
     assert.equal(guide.items.find((item) => item.platformId === "webnovel")?.label, "复盘止损");
     assert.ok(guide.items.some((item) => item.status === "template"));
+  });
+
+  await t.test("requires confirmation before creating from avoidance platforms", () => {
+    const avoidGate = buildProjectStartRiskGate({
+      platformId: "qimao",
+      platformName: "七猫小说",
+      status: "avoid",
+      label: "复盘止损",
+      headline: "七猫小说 先暂停方向",
+      detail: "历史返工复盘已经判定当前方向要止损。",
+      priorityScore: 96,
+      source: "experience",
+      href: "/gate",
+      evidence: ["复盘类型：平台方向暂停"],
+    });
+    const watchGate = buildProjectStartRiskGate({
+      platformId: "fanqie",
+      platformName: "番茄小说",
+      status: "watch",
+      label: "验收观察",
+      headline: "番茄小说 先补验收线",
+      detail: "历史返工复盘暴露验收标准不硬。",
+      priorityScore: 88,
+      source: "experience",
+      href: "/gate",
+      evidence: ["复盘类型：验收标准修正"],
+    });
+    const recommendedGate = buildProjectStartRiskGate({
+      platformId: "qidian",
+      platformName: "起点中文网",
+      status: "recommended",
+      label: "历史可复用",
+      headline: "起点中文网 优先参考",
+      detail: "三轮稳定加码打法可作为新项目开书参考。",
+      priorityScore: 92,
+      source: "experience",
+      href: "/gate",
+      evidence: ["最终判定：稳定加码"],
+    });
+
+    assert.equal(avoidGate.level, "blocked");
+    assert.equal(avoidGate.requiresConfirmation, true);
+    assert.ok(avoidGate.detail.includes("恢复条件"));
+    assert.ok(avoidGate.actionLabel.includes("确认"));
+    assert.equal(watchGate.level, "watch");
+    assert.equal(watchGate.requiresConfirmation, false);
+    assert.ok(watchGate.detail.includes("首轮数据回收"));
+    assert.equal(recommendedGate.level, "pass");
+    assert.equal(recommendedGate.requiresConfirmation, false);
   });
 
   await t.test("selects a reusable platform template for new project defaults", () => {

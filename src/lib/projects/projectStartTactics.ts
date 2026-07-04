@@ -68,6 +68,18 @@ export interface ProjectStartPlatformExperienceGuide {
   items: ProjectStartPlatformExperienceItem[];
 }
 
+export type ProjectStartRiskGateLevel = "pass" | "watch" | "blocked";
+
+export interface ProjectStartRiskGate {
+  level: ProjectStartRiskGateLevel;
+  requiresConfirmation: boolean;
+  label: string;
+  title: string;
+  detail: string;
+  actionLabel: string;
+  evidence: string[];
+}
+
 export interface ProjectStartTacticEntryLike {
   type: string;
   title: string;
@@ -389,6 +401,54 @@ export function selectProjectStartTemplateFromExperienceGuide(input: {
   const recommendedPlatform = input.guide.items.find((item) => item.status === "recommended");
   if (!recommendedPlatform) return input.fallbackTemplate;
   return input.templates.find((template) => template.platformId === recommendedPlatform.platformId) ?? input.fallbackTemplate;
+}
+
+export function buildProjectStartRiskGate(item: ProjectStartPlatformExperienceItem | null): ProjectStartRiskGate {
+  if (!item) {
+    return {
+      level: "pass",
+      requiresConfirmation: false,
+      label: "可创建",
+      title: "暂无平台风险信号",
+      detail: "当前平台没有命中历史避坑或观察样本，可以按模板进入首轮验证。",
+      actionLabel: "创建作品",
+      evidence: [],
+    };
+  }
+
+  if (item.status === "avoid") {
+    return {
+      level: "blocked",
+      requiresConfirmation: true,
+      label: "需确认",
+      title: `${item.platformName} 命中避坑信号`,
+      detail: `${item.detail} 创建前必须确认恢复条件，至少改掉入口卖点、前三章兑现或平台匹配度中的一项。`,
+      actionLabel: "确认恢复条件后创建",
+      evidence: item.evidence.slice(0, 3),
+    };
+  }
+
+  if (item.status === "watch") {
+    return {
+      level: "watch",
+      requiresConfirmation: false,
+      label: "观察",
+      title: `${item.platformName} 只能小样本观察`,
+      detail: `${item.detail} 创建后先跑首轮数据回收，不要直接放量或批量复制。`,
+      actionLabel: "小样本创建",
+      evidence: item.evidence.slice(0, 3),
+    };
+  }
+
+  return {
+    level: "pass",
+    requiresConfirmation: false,
+    label: item.status === "recommended" ? "可优先" : "可创建",
+    title: item.headline,
+    detail: item.detail,
+    actionLabel: "创建作品",
+    evidence: item.evidence.slice(0, 3),
+  };
 }
 
 export function selectProjectStartTacticEvidence(input: {

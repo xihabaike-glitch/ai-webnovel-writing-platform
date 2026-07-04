@@ -14,6 +14,7 @@ import {
   type GatePlatformTacticExperienceItem,
 } from "@/lib/projects/gateActionReceipts";
 import {
+  buildProjectStartRiskGate,
   buildProjectStartPlatformExperienceGuide,
   buildProjectStartModelRouteExperienceFromReceipts,
   buildProjectStartTacticAdvice,
@@ -21,6 +22,7 @@ import {
   selectProjectStartTemplateFromExperienceGuide,
   type ProjectStartModelRouteExperience,
   type ProjectStartPlatformExperienceStatus,
+  type ProjectStartRiskGateLevel,
   type ProjectStartTacticAdviceStatus,
 } from "@/lib/projects/projectStartTactics";
 import { projectTemplates, type ProjectTemplate } from "@/lib/projects/projectTemplates";
@@ -46,6 +48,12 @@ function platformExperienceClass(status: ProjectStartPlatformExperienceStatus) {
   return "border-slate-200 bg-slate-50 text-slate-800";
 }
 
+function riskGateClass(level: ProjectStartRiskGateLevel) {
+  if (level === "blocked") return "border-rose-200 bg-rose-50 text-rose-900";
+  if (level === "watch") return "border-amber-200 bg-amber-50 text-amber-900";
+  return "border-emerald-200 bg-emerald-50 text-emerald-900";
+}
+
 export function ProjectForm() {
   const router = useRouter();
   const defaultTemplate = projectTemplates[0];
@@ -61,6 +69,7 @@ export function ProjectForm() {
   const [historyExperiences, setHistoryExperiences] = useState<GatePlatformTacticExperienceItem[]>([]);
   const [batchTacticEffects, setBatchTacticEffects] = useState<GateBatchTacticEffectItem[]>([]);
   const [modelRouteExperience, setModelRouteExperience] = useState<ProjectStartModelRouteExperience[]>([]);
+  const [riskAcknowledged, setRiskAcknowledged] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const selectedProfile = platformProfiles.find((profile) => profile.id === platformId) ?? platformProfiles[0];
@@ -79,6 +88,8 @@ export function ProjectForm() {
   });
   const selectedPlatformGuide = selectedEvidence.guideItem;
   const selectedBatchEffect = selectedEvidence.batchEffect;
+  const selectedRiskGate = buildProjectStartRiskGate(selectedPlatformGuide);
+  const canSubmit = !selectedRiskGate.requiresConfirmation || riskAcknowledged;
   const tacticAdvice = buildProjectStartTacticAdvice({
     platform: selectedProfile,
     template: selectedTemplate,
@@ -151,6 +162,7 @@ export function ProjectForm() {
     setPlatformId(template.platformId);
     setLengthType(template.lengthType);
     setSellingPoint(template.sellingPoint);
+    setRiskAcknowledged(false);
   }
 
   function applyTemplate(nextTemplateId: string) {
@@ -166,8 +178,12 @@ export function ProjectForm() {
   }
 
   async function createProject(formData: FormData) {
-    setIsSubmitting(true);
     setError(null);
+    if (selectedRiskGate.requiresConfirmation && !riskAcknowledged) {
+      setError("这个平台命中避坑信号。请先确认恢复条件，再创建作品。");
+      return;
+    }
+    setIsSubmitting(true);
     try {
       const response = await fetch("/api/projects", {
         method: "POST",
@@ -441,6 +457,31 @@ export function ProjectForm() {
           </div>
         ) : null}
       </div>
+      <div className={`rounded-md border p-3 text-sm ${riskGateClass(selectedRiskGate.level)}`}>
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="font-medium">{selectedRiskGate.title}</div>
+          <span className="rounded-md bg-white/70 px-2 py-1 text-xs font-medium">{selectedRiskGate.label}</span>
+        </div>
+        <p className="mt-2 leading-6 opacity-85">{selectedRiskGate.detail}</p>
+        {selectedRiskGate.evidence.length ? (
+          <div className="mt-3 grid gap-1">
+            {selectedRiskGate.evidence.slice(0, 2).map((evidence) => (
+              <p className="rounded-md border border-white/70 bg-white/60 p-2 text-xs leading-5 opacity-80" key={evidence}>{evidence}</p>
+            ))}
+          </div>
+        ) : null}
+        {selectedRiskGate.requiresConfirmation ? (
+          <label className="mt-3 flex items-start gap-2 rounded-md bg-white/70 p-3 text-xs leading-5">
+            <input
+              checked={riskAcknowledged}
+              className="mt-1"
+              onChange={(event) => setRiskAcknowledged(event.target.checked)}
+              type="checkbox"
+            />
+            <span>我已确认恢复条件：入口卖点、前三章兑现或平台匹配度至少改掉一项，本次只做小样本验证。</span>
+          </label>
+        ) : null}
+      </div>
       <div>
         <label className="text-sm font-medium" htmlFor="sellingPoint">
           核心卖点
@@ -459,10 +500,10 @@ export function ProjectForm() {
       {error ? <p className="text-sm text-red-600">{error}</p> : null}
       <button
         className="w-fit rounded-md bg-slate-950 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-        disabled={isSubmitting}
+        disabled={isSubmitting || !canSubmit}
         type="submit"
       >
-        {isSubmitting ? "创建中" : "创建作品"}
+        {isSubmitting ? "创建中" : selectedRiskGate.actionLabel}
       </button>
     </form>
   );

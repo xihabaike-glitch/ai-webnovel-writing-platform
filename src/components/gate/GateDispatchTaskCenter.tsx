@@ -21,6 +21,7 @@ import {
 import {
   buildFirstDayDispatchCompletionTemplate,
   buildFirstDayDispatchDesk,
+  buildFirstDayDispatchCompletionHint,
   buildFirstDayDispatchUpdateSummary,
 } from "@/lib/projects/firstDayWorkflowView";
 import {
@@ -482,6 +483,9 @@ export function GateDispatchTaskCenter({
                   <div className="text-xs font-medium uppercase text-slate-300">下一张首日卡</div>
                   <div className="mt-1 font-semibold">{firstDayDesk.nextTask.title}</div>
                   <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-200">{firstDayDesk.nextTask.detail}</p>
+                  {firstDayDesk.nextTask.completionHint ? (
+                    <p className="mt-2 max-w-3xl text-xs leading-5 text-amber-100">{firstDayDesk.nextTask.completionHint}</p>
+                  ) : null}
                   <div className="mt-3 flex flex-wrap gap-2 text-xs text-slate-200">
                     <span className="rounded-md bg-white/10 px-2 py-1">{firstDayDesk.nextTask.stepLabel}</span>
                     <span className="rounded-md bg-white/10 px-2 py-1">{firstDayDesk.nextTask.ownerRole}</span>
@@ -523,6 +527,9 @@ export function GateDispatchTaskCenter({
                 </div>
                 <div className="mt-2 font-medium text-slate-950">{card.title}</div>
                 <p className="mt-1 line-clamp-2 leading-6 text-slate-600">{card.detail}</p>
+                {card.completionHint ? (
+                  <p className="mt-2 rounded-md bg-amber-50 px-2 py-1 text-xs leading-5 text-amber-800">{card.completionHint}</p>
+                ) : null}
                 <div className="mt-2 flex flex-wrap gap-2 text-xs text-slate-500">
                   <span className="rounded-md bg-white px-2 py-1">{card.dueLabel}</span>
                   <span className="rounded-md bg-white px-2 py-1">优先级 {card.priorityScore}</span>
@@ -1028,6 +1035,7 @@ export function GateDispatchTaskCenter({
       <section className="grid gap-3">
         {filteredTasks.map((task) => {
           const completionTemplate = buildRouteDispatchCompletionTemplate(task) || buildFirstDayDispatchCompletionTemplate(task);
+          const firstDayCompletionHint = buildFirstDayDispatchCompletionHint(task);
           const completionRecord = task.completionEvidence
             ? parseRouteDispatchCompletionEvidence(task, task.completionEvidence)
             : null;
@@ -1072,6 +1080,9 @@ export function GateDispatchTaskCenter({
                         </button>
                       ) : null}
                     </div>
+                    {firstDayCompletionHint ? (
+                      <p className="rounded-md bg-amber-50 px-2 py-1 text-xs leading-5 text-amber-800">{firstDayCompletionHint}</p>
+                    ) : null}
                     <textarea
                       className="min-h-20 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-normal text-slate-800"
                       onChange={(event) => setCompletionDrafts((current) => ({ ...current, [task.dispatchKey]: event.target.value }))}

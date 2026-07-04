@@ -4,7 +4,7 @@ import { updatePersistedGateDispatchTaskState, type PersistedGatePlatformDispatc
 const ACCEPTANCE_MARKER = "任务中心已验收：";
 const MIN_COMPLETION_EVIDENCE_LENGTH = 8;
 const BLOCKED_COMPLETION_KEYWORDS = ["恢复条件", "入口卖点", "前三章兑现", "平台匹配度", "改掉", "重做", "修复"];
-const WATCH_COMPLETION_KEYWORDS = ["小样本", "通过线", "不可接受", "复查证据", "首轮", "观察"];
+const WATCH_COMPLETION_REQUIRED_KEYWORDS = ["通过线", "不可接受", "复查证据"];
 
 function cleanEvidence(value: string) {
   return value.trim().replace(/。{2,}$/u, "。");
@@ -83,6 +83,7 @@ export interface FirstDayDispatchDeskCard {
   completionTemplate: string;
   acceptanceCriteria: string[];
   evidence: string[];
+  completionHint: string | null;
 }
 
 export interface FirstDayDispatchDesk {
@@ -216,6 +217,10 @@ function includesAnyKeyword(value: string, keywords: string[]) {
   return keywords.some((keyword) => value.includes(keyword));
 }
 
+function missingKeywords(value: string, keywords: string[]) {
+  return keywords.filter((keyword) => !value.includes(keyword));
+}
+
 function firstDayCompletionRiskLevel(input: Pick<FirstDayDispatchCompletionValidationInput, "dispatchKey" | "dueLabel" | "title" | "acceptanceCriteria" | "evidence">): FirstDayRiskLevel {
   if (!isFirstDayDispatchTask({ dispatchKey: input.dispatchKey })) return "standard";
   const joined = [
@@ -249,11 +254,12 @@ export function validateFirstDayDispatchCompletionEvidence(input: FirstDayDispat
     };
   }
 
-  if (level === "watch" && !includesAnyKeyword(trimmedEvidence, WATCH_COMPLETION_KEYWORDS)) {
+  const missingWatchKeywords = level === "watch" ? missingKeywords(trimmedEvidence, WATCH_COMPLETION_REQUIRED_KEYWORDS) : [];
+  if (missingWatchKeywords.length > 0) {
     return {
       valid: false,
       level,
-      error: "小样本验证派单必须写清首轮通过线、不可接受项或复查证据。",
+      error: `小样本验证派单必须同时写清：${missingWatchKeywords.join("、")}。`,
     };
   }
 
@@ -298,7 +304,13 @@ export function buildFirstDayDispatchCompletionTemplate(task: Pick<PersistedGate
   const stepId = firstDayStepId(task.dispatchKey);
   const riskLevel = firstDayCompletionRiskLevel(task);
   if (stepId === "first-draft" && riskLevel === "blocked") return "止损验证已完成：恢复条件已写清，入口卖点、前三章兑现或平台匹配度已至少改掉一项，暂不批量生成正文。";
-  if (stepId === "first-draft" && riskLevel === "watch") return "小样本验证已完成：首轮通过线、不可接受项和复查证据已写清，后续按数据决定是否扩大。";
+  if (stepId === "first-draft" && riskLevel === "watch") return [
+    "小样本验证已完成：",
+    "通过线：第一章钩子、冲突、爽点兑现或平台语气已达到本轮最低要求。",
+    "不可接受项：未出现慢热解释、卖点不兑现、平台风格错位或正文空转。",
+    "复查证据：已保留第一章正文/审稿分数/人工复核结论，可回到任务中心或章节页复查。",
+    "放量结论：通过后才允许恢复后续初稿批次；未过线则继续停留观察。",
+  ].join("\n");
   if (stepId === "first-draft") return "第一章正文已生成并写回章节，钩子、冲突和章末追读已按首轮平台打法检查，可以进入审稿。";
   if (stepId === "first-review") return "第一章审稿已完成，钩子、爽点、冲突、解释密度和章末追读问题已列出，可以进入二改。";
   if (stepId === "first-rewrite") return "第一章二改或前三章改写已完成，审稿问题已逐项处理，并保留版本对照。";
@@ -308,6 +320,22 @@ export function buildFirstDayDispatchCompletionTemplate(task: Pick<PersistedGate
   if (stepId === "opening-hook") return "第一章目标、钩子、冲突、转变和章末悬念已补齐，并按目标平台开头规则检查。";
   if (stepId === "skeleton") return "作品骨架已完成，开头、结尾、主干、分支、叶片和土壤均已落地。";
   return task.acceptanceCriteria.length ? `首日派单已完成：${task.acceptanceCriteria.join("；")}。` : "";
+}
+
+export function buildFirstDayDispatchCompletionHint(task: Pick<PersistedGatePlatformDispatchTask, "dispatchKey" | "acceptanceCriteria"> & Partial<Pick<PersistedGatePlatformDispatchTask, "dueLabel" | "title" | "evidence">>) {
+  if (!isFirstDayDispatchTask(task)) return null;
+  const stepId = firstDayStepId(task.dispatchKey);
+  const riskLevel = firstDayCompletionRiskLevel(task);
+  if (stepId === "first-draft" && riskLevel === "watch") {
+    return "这条完成依据会决定是否解除观察放量闸门，必须同时写清通过线、不可接受项和复查证据。";
+  }
+  if (stepId === "risk-recovery") {
+    return "这是恢复验证，不是正文完成；完成后只会进入恢复观察小样本。";
+  }
+  if (stepId === "first-draft" && riskLevel === "blocked") {
+    return "当前是止损验证，不允许用正文完成替代恢复条件。";
+  }
+  return null;
 }
 
 function toFirstDayCard(task: PersistedGatePlatformDispatchTask): FirstDayDispatchDeskCard {
@@ -330,6 +358,7 @@ function toFirstDayCard(task: PersistedGatePlatformDispatchTask): FirstDayDispat
     completionTemplate: buildFirstDayDispatchCompletionTemplate(task),
     acceptanceCriteria: task.acceptanceCriteria,
     evidence: task.evidence,
+    completionHint: buildFirstDayDispatchCompletionHint(task),
   };
 }
 

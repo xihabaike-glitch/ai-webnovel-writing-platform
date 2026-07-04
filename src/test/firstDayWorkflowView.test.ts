@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   buildFirstDayDispatchCompletionTemplate,
   buildFirstDayDispatchDesk,
+  buildFirstDayDispatchCompletionHint,
   buildFirstDayDispatchUpdateSummary,
   buildFirstDayExecutionRiskNotice,
   buildFirstDayReceiptCompletionAction,
@@ -250,6 +251,7 @@ test("buildFirstDayDispatchDesk keeps recovered watch state visible", () => {
   assert.equal(desk.nextTask?.stepId, "first-draft");
   assert.ok(desk.nextActions[0].includes("恢复观察小样本"));
   assert.ok(desk.nextActions[0].includes("不要批量放大"));
+  assert.ok(desk.nextTask?.completionHint?.includes("放量闸门"));
 });
 
 test("buildFirstDayDispatchUpdateSummary explains risk recovery handoff", () => {
@@ -302,7 +304,14 @@ test("buildFirstDayDispatchCompletionTemplate covers first-day step types", () =
     title: "夜雨系统 · 小样本验证 · 生成第一章正文",
     acceptanceCriteria: ["写清首轮小样本通过线和不可接受项。"],
     evidence: ["缺少观察平台首轮小样本验证口径。"],
-  }).includes("首轮通过线"));
+  }).includes("通过线"));
+  assert.ok(buildFirstDayDispatchCompletionTemplate({
+    dispatchKey: "first-day:project-1:first-draft",
+    dueLabel: "今天小样本验证",
+    title: "夜雨系统 · 小样本验证 · 生成第一章正文",
+    acceptanceCriteria: ["写清首轮小样本通过线和不可接受项。"],
+    evidence: ["缺少观察平台首轮小样本验证口径。"],
+  }).includes("放量结论"));
   assert.ok(buildFirstDayDispatchCompletionTemplate({
     dispatchKey: "first-day:project-1:publish-precheck",
     acceptanceCriteria: [],
@@ -315,6 +324,24 @@ test("buildFirstDayDispatchCompletionTemplate covers first-day step types", () =
     dispatchKey: "manual",
     acceptanceCriteria: ["完成当前动作"],
   }), "");
+});
+
+test("buildFirstDayDispatchCompletionHint explains scale gates", () => {
+  const hint = buildFirstDayDispatchCompletionHint({
+    dispatchKey: "first-day:project-1:first-draft",
+    dueLabel: "今天小样本验证",
+    title: "夜雨系统 · 小样本验证 · 生成第一章正文",
+    acceptanceCriteria: ["写清首轮小样本通过线和不可接受项。"],
+    evidence: ["缺少观察平台首轮小样本验证口径。"],
+  });
+  const recoveryHint = buildFirstDayDispatchCompletionHint({
+    dispatchKey: "first-day:project-1:risk-recovery",
+    acceptanceCriteria: [],
+  });
+
+  assert.ok(hint?.includes("放量闸门"));
+  assert.ok(hint?.includes("通过线、不可接受项和复查证据"));
+  assert.ok(recoveryHint?.includes("恢复观察小样本"));
 });
 
 test("validateFirstDayDispatchCompletionEvidence enforces risky first-day evidence", () => {
@@ -342,6 +369,14 @@ test("validateFirstDayDispatchCompletionEvidence enforces risky first-day eviden
     evidence: ["缺少观察平台首轮小样本验证口径。"],
     completionEvidence: "已经全部处理完成，可以继续下一步。",
   });
+  const watchMissingEvidence = validateFirstDayDispatchCompletionEvidence({
+    dispatchKey: "first-day:project-1:first-draft",
+    dueLabel: "今天小样本验证",
+    title: "夜雨系统 · 小样本验证 · 生成第一章正文",
+    acceptanceCriteria: ["写清首轮小样本通过线和不可接受项。"],
+    evidence: ["缺少观察平台首轮小样本验证口径。"],
+    completionEvidence: "小样本首轮通过线已写清，不可接受项已补齐。",
+  });
   const watchReady = validateFirstDayDispatchCompletionEvidence({
     dispatchKey: "first-day:project-1:first-draft",
     dueLabel: "今天小样本验证",
@@ -358,6 +393,8 @@ test("validateFirstDayDispatchCompletionEvidence enforces risky first-day eviden
   assert.equal(watchThin.valid, false);
   assert.equal(watchThin.level, "watch");
   assert.ok(watchThin.error?.includes("小样本验证"));
+  assert.equal(watchMissingEvidence.valid, false);
+  assert.ok(watchMissingEvidence.error?.includes("复查证据"));
   assert.equal(watchReady.valid, true);
 });
 

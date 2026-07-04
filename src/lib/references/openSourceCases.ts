@@ -32,6 +32,25 @@ export interface ReferenceCaseDevelopmentPlan {
   nextBuildMoves: string[];
 }
 
+export interface ReferenceCaseLibraryView {
+  totalCases: number;
+  selectedCategory: ReferenceCaseCategory | "all";
+  categoryTabs: Array<{
+    id: ReferenceCaseCategory | "all";
+    label: string;
+    count: number;
+    href: string;
+    productQuestion: string;
+  }>;
+  visibleCases: OpenSourceReferenceCase[];
+  productManagerNotes: string[];
+  nextBuildMoves: string[];
+  topTags: Array<{
+    tag: string;
+    count: number;
+  }>;
+}
+
 export const referenceCaseCategories: ReferenceCaseCategoryMeta[] = [
   {
     id: "writing_tool",
@@ -375,6 +394,10 @@ const categoryPriority: ReferenceCaseCategory[] = [
   "publishing_pipeline",
 ];
 
+function isReferenceCaseCategory(value: string | null | undefined): value is ReferenceCaseCategory {
+  return referenceCaseCategories.some((category) => category.id === value);
+}
+
 export function buildReferenceCaseDevelopmentPlan(
   cases: OpenSourceReferenceCase[] = openSourceReferenceCases,
 ): ReferenceCaseDevelopmentPlan {
@@ -398,5 +421,60 @@ export function buildReferenceCaseDevelopmentPlan(
       "知识库：参考 Logseq、Joplin、Outline，把世界观、伏笔、人物关系和历史章节做成可召回的项目土壤。",
       "发布流水线：参考 mdBook、HonKit、Pandoc，把起点、番茄、七猫、知乎盐选、WebNovel、Royal Road、Wattpad 的投稿包做成可导出版本。",
     ],
+  };
+}
+
+export function buildReferenceCaseLibraryView(input?: {
+  selectedCategory?: string | null;
+  cases?: OpenSourceReferenceCase[];
+}): ReferenceCaseLibraryView {
+  const cases = input?.cases ?? openSourceReferenceCases;
+  const plan = buildReferenceCaseDevelopmentPlan(cases);
+  const selectedCategory = isReferenceCaseCategory(input?.selectedCategory)
+    ? input.selectedCategory
+    : "all";
+  const visibleCases = selectedCategory === "all"
+    ? cases
+    : cases.filter((item) => item.category === selectedCategory);
+  const categoryTabs: ReferenceCaseLibraryView["categoryTabs"] = [
+    {
+      id: "all",
+      label: "全部案例",
+      count: cases.length,
+      href: "/references",
+      productQuestion: "从传统写作、AI 工作流、知识库和发布流水线四条线看产品缺口。",
+    },
+    ...referenceCaseCategories.map((category) => ({
+      id: category.id,
+      label: category.label,
+      count: cases.filter((item) => item.category === category.id).length,
+      href: `/references?category=${category.id}`,
+      productQuestion: category.productQuestion,
+    })),
+  ];
+  const tagCounts = new Map<string, number>();
+
+  for (const item of visibleCases) {
+    for (const tag of item.tags) {
+      tagCounts.set(tag, (tagCounts.get(tag) ?? 0) + 1);
+    }
+  }
+
+  return {
+    totalCases: plan.totalCases,
+    selectedCategory,
+    categoryTabs,
+    visibleCases,
+    productManagerNotes: [
+      "别抄聊天产品。网文作者要的是作品生产系统，不是另一个对话框。",
+      "传统写作资产要先站稳：大纲树、人物弧光、伏笔、章节正文都得能单独使用。",
+      "AI 必须任务化：模型按开书、审稿、二改、发布包和复盘分工，失败后有替代路线。",
+      "平台适配要闭环：国内与海外平台的标题、简介、标签、样章和效果复盘要分别沉淀。",
+    ],
+    nextBuildMoves: plan.nextBuildMoves,
+    topTags: [...tagCounts.entries()]
+      .map(([tag, count]) => ({ tag, count }))
+      .sort((a, b) => b.count - a.count || a.tag.localeCompare(b.tag))
+      .slice(0, 12),
   };
 }

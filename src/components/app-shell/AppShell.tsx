@@ -14,6 +14,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             <Link href="/tasks">任务</Link>
             <Link href="/dispatch">派单</Link>
             <Link href="/gate">总闸门</Link>
+            <Link href="/references">参考库</Link>
             <Link href="/failures">复盘</Link>
             <Link href="/settings/models">模型设置</Link>
           </nav>

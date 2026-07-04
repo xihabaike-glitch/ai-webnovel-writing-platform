@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  buildReferenceCaseLibraryView,
   buildReferenceCaseDevelopmentPlan,
   openSourceReferenceCases,
   referenceCaseCategories,
@@ -50,5 +51,26 @@ test("open source reference cases", async (t) => {
     assert.ok(plan.categoryBlocks.every((block) => block.cases.length >= 4));
     assert.ok(plan.nextBuildMoves.some((move) => move.includes("写作工作台")));
     assert.ok(plan.nextBuildMoves.some((move) => move.includes("模型")));
+  });
+
+  await t.test("builds a filterable product reference library view", () => {
+    const allView = buildReferenceCaseLibraryView();
+    const aiView = buildReferenceCaseLibraryView({ selectedCategory: "ai_workflow" });
+    const fallbackView = buildReferenceCaseLibraryView({ selectedCategory: "unknown" });
+
+    assert.equal(allView.selectedCategory, "all");
+    assert.equal(allView.visibleCases.length, openSourceReferenceCases.length);
+    assert.equal(allView.categoryTabs.length, referenceCaseCategories.length + 1);
+    assert.ok(allView.categoryTabs.some((tab) => tab.href === "/references?category=ai_workflow"));
+    assert.ok(allView.productManagerNotes.some((note) => note.includes("聊天")));
+    assert.ok(allView.nextBuildMoves.some((move) => move.includes("发布流水线")));
+    assert.ok(allView.topTags.length > 0);
+
+    assert.equal(aiView.selectedCategory, "ai_workflow");
+    assert.ok(aiView.visibleCases.length >= 4);
+    assert.ok(aiView.visibleCases.every((item) => item.category === "ai_workflow"));
+    assert.ok(aiView.topTags.some((item) => item.tag === "rag" || item.tag === "workflow"));
+
+    assert.equal(fallbackView.selectedCategory, "all");
   });
 });

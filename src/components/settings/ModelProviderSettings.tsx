@@ -429,6 +429,12 @@ interface RouteNotice {
   actionLabel?: string;
 }
 
+interface ProviderSetupNotice {
+  message: string;
+  actionLabel?: string;
+  action?: "apply_first_day_routes";
+}
+
 const statusCopy: Record<ProviderHealthStatus, { label: string; className: string }> = {
   ready: { label: "可用", className: "border-emerald-200 bg-emerald-50 text-emerald-700" },
   warn: { label: "需注意", className: "border-amber-200 bg-amber-50 text-amber-700" },
@@ -563,6 +569,7 @@ export function ModelProviderSettings({
   const existing = existingByProvider.get(selectedProviderId);
   const [draft, setDraft] = useState<DraftProvider>(() => draftFromOption(selectedOption, existing));
   const [message, setMessage] = useState<string | null>(null);
+  const [providerSetupNotice, setProviderSetupNotice] = useState<ProviderSetupNotice | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [testingProviderId, setTestingProviderId] = useState<ModelProviderId | null>(null);
   const [testResults, setTestResults] = useState<Record<string, ConnectionTestResult>>({});
@@ -665,10 +672,61 @@ export function ModelProviderSettings({
     setMessage(`已套用「${preset.label}」`);
   }
 
+  async function runProviderConnectionTest(input: {
+    id?: string;
+    providerId: ModelProviderId;
+    baseUrl: string;
+    apiKey: string;
+    defaultModel: string;
+    clearMessage?: boolean;
+  }) {
+    setTestingProviderId(input.providerId);
+    if (input.clearMessage) setMessage(null);
+
+    try {
+      const response = await fetch("/api/model-providers/test", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: input.id,
+          providerId: input.providerId,
+          baseUrl: input.baseUrl.trim(),
+          apiKey: input.apiKey.trim() || undefined,
+          defaultModel: input.defaultModel.trim(),
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("模型连接测试失败。");
+      }
+
+      const payload = (await response.json()) as { result: ConnectionTestResult };
+      setTestResults((current) => ({ ...current, [input.providerId]: payload.result }));
+      return payload.result;
+    } catch (caught) {
+      const result: ConnectionTestResult = {
+        ok: false,
+        status: "failed",
+        latencyMs: 0,
+        testedAt: new Date().toISOString(),
+        sampleText: null,
+        usage: null,
+        errorMessage: caught instanceof Error ? caught.message : "模型连接测试失败。",
+        repairHint: "检查模型名、Base URL 和 API Key 后重新测试。",
+      };
+      setTestResults((current) => ({ ...current, [input.providerId]: result }));
+      return result;
+    } finally {
+      setTestingProviderId(null);
+    }
+  }
+
   async function saveProvider(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const draftSnapshot = { ...draft };
     setIsSaving(true);
     setMessage(null);
+    setProviderSetupNotice(null);
 
     try {
       const response = await fetch("/api/model-providers", {
@@ -688,8 +746,28 @@ export function ModelProviderSettings({
       }
 
       const payload = (await response.json()) as { provider: ProviderView };
-      setMessage("已保存模型配置");
+      const testResult = await runProviderConnectionTest({
+        id: payload.provider.id,
+        providerId: draftSnapshot.providerId,
+        baseUrl: draftSnapshot.baseUrl,
+        apiKey: draftSnapshot.apiKey,
+        defaultModel: draftSnapshot.defaultModel,
+      });
+
       setDraft((current) => ({ ...current, id: payload.provider.id, apiKey: "" }));
+      if (testResult.ok) {
+        setMessage("已保存并测试通过");
+        setProviderSetupNotice({
+          message: firstDayRouteSummary.summary.applicableRecommendations > 0
+            ? `连接已通过，还有 ${firstDayRouteSummary.summary.applicableRecommendations} 条首日推荐路线可应用。`
+            : "连接已通过；下一步检查并应用首日路线。",
+          actionLabel: "应用首日路线",
+          action: "apply_first_day_routes",
+        });
+      } else {
+        setMessage("已保存，但连接测试失败");
+        setProviderSetupNotice({ message: "先按下方错误建议修好连接，再应用首日路线。" });
+      }
       router.refresh();
     } catch (caught) {
       setMessage(caught instanceof Error ? caught.message : "保存模型配置失败。");
@@ -699,44 +777,16 @@ export function ModelProviderSettings({
   }
 
   async function testProviderConnection() {
-    setTestingProviderId(draft.providerId);
-    setMessage(null);
-
-    try {
-      const response = await fetch("/api/model-providers/test", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          id: draft.id,
-          providerId: draft.providerId,
-          baseUrl: draft.baseUrl.trim(),
-          apiKey: draft.apiKey.trim() || undefined,
-          defaultModel: draft.defaultModel.trim(),
-        }),
+    setProviderSetupNotice(null);
+    const result = await runProviderConnectionTest({ ...draft, clearMessage: true });
+    if (result.ok) {
+      setProviderSetupNotice({
+        message: firstDayRouteSummary.summary.applicableRecommendations > 0
+          ? `连接测试通过，还有 ${firstDayRouteSummary.summary.applicableRecommendations} 条首日推荐路线可应用。`
+          : "连接测试通过；下一步检查并应用首日路线。",
+        actionLabel: "应用首日路线",
+        action: "apply_first_day_routes",
       });
-
-      if (!response.ok) {
-        throw new Error("模型连接测试失败。");
-      }
-
-      const payload = (await response.json()) as { result: ConnectionTestResult };
-      setTestResults((current) => ({ ...current, [draft.providerId]: payload.result }));
-    } catch (caught) {
-      setTestResults((current) => ({
-        ...current,
-        [draft.providerId]: {
-          ok: false,
-          status: "failed",
-          latencyMs: 0,
-          testedAt: new Date().toISOString(),
-          sampleText: null,
-          usage: null,
-          errorMessage: caught instanceof Error ? caught.message : "模型连接测试失败。",
-          repairHint: "检查模型名、Base URL 和 API Key 后重新测试。",
-        },
-      }));
-    } finally {
-      setTestingProviderId(null);
     }
   }
 
@@ -826,7 +876,11 @@ export function ModelProviderSettings({
       item.canApplyRecommendation && item.recommendedPrimaryProviderConfigId
       && (!taskType || item.taskType === taskType)
     ));
-    if (!applicableItems.length) return;
+    if (!applicableItems.length) {
+      setRouteNotice({ message: "当前没有可直接应用的首日推荐路线；先确认至少两个真实模型已保存并测试通过。" });
+      document.getElementById("first-day-routes")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      return;
+    }
 
     setApplyingFirstDayRouteType(taskType ?? "all");
     setRouteNotice(null);
@@ -2314,14 +2368,14 @@ export function ModelProviderSettings({
           <div className="flex items-center gap-3">
             <button
               className="rounded-md bg-slate-950 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-              disabled={isSaving}
+              disabled={isSaving || testingProviderId === draft.providerId}
               type="submit"
             >
-              {isSaving ? "保存中" : "保存配置"}
+              {isSaving ? "保存并测试中" : "保存配置"}
             </button>
             <button
               className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 disabled:opacity-50"
-              disabled={testingProviderId === draft.providerId}
+              disabled={isSaving || testingProviderId === draft.providerId}
               onClick={testProviderConnection}
               type="button"
             >
@@ -2329,6 +2383,21 @@ export function ModelProviderSettings({
             </button>
             {message ? <span className="text-sm text-slate-600">{message}</span> : null}
           </div>
+          {providerSetupNotice ? (
+            <div className="flex flex-col gap-2 rounded-md border border-sky-200 bg-sky-50 p-3 text-sm text-sky-900 sm:flex-row sm:items-center sm:justify-between">
+              <span>{providerSetupNotice.message}</span>
+              {providerSetupNotice.action === "apply_first_day_routes" ? (
+                <button
+                  className="w-fit rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
+                  disabled={Boolean(applyingFirstDayRouteType)}
+                  onClick={() => void applyFirstDayRecommendedRoutes()}
+                  type="button"
+                >
+                  {applyingFirstDayRouteType === "all" ? "应用中" : providerSetupNotice.actionLabel}
+                </button>
+              ) : null}
+            </div>
+          ) : null}
           {currentTestResult ? (
             <div className={`rounded-md border p-4 text-sm ${currentTestResult.ok ? "border-emerald-200 bg-emerald-50" : "border-rose-200 bg-rose-50"}`}>
               <div className="flex flex-wrap items-center justify-between gap-2">

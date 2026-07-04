@@ -72,6 +72,20 @@ function routeFlowLaneClass(laneId: RouteConfirmationDispatchFlowLaneId) {
   return "border-slate-200 bg-slate-50 text-slate-800";
 }
 
+function routeTrailClass(status: RouteConfirmationDispatchFlow["trails"][number]["status"]) {
+  if (status === "confirmed") return "border-emerald-200 bg-emerald-50 text-emerald-900";
+  if (status === "needs_governance") return "border-amber-200 bg-amber-50 text-amber-900";
+  if (status === "manual_review") return "border-rose-200 bg-rose-50 text-rose-900";
+  return "border-sky-200 bg-sky-50 text-sky-900";
+}
+
+function routeTrailStatusLabel(status: RouteConfirmationDispatchFlow["trails"][number]["status"]) {
+  if (status === "confirmed") return "已确认";
+  if (status === "needs_governance") return "继续治理";
+  if (status === "manual_review") return "人工复核";
+  return "处理中";
+}
+
 function routeFlowFilterFromLane(laneId: RouteConfirmationDispatchFlowLaneId): RouteConfirmationDispatchTaskFilter | null {
   if (laneId === "confirmed") return null;
   return laneId;
@@ -312,6 +326,26 @@ export function GateDispatchTaskCenter({
               已完成 {routeConfirmationDispatchFlow.summary.completed}
             </div>
           </div>
+          {routeConfirmationDispatchFlow.trails.length ? (
+            <div className="grid gap-3 lg:grid-cols-2">
+              {routeConfirmationDispatchFlow.trails.slice(0, 4).map((trail) => (
+                <div className={`rounded-md border p-3 text-sm ${routeTrailClass(trail.status)}`} key={trail.id}>
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="font-medium">{trail.label}闭环</div>
+                    <span className="rounded-md bg-white/70 px-2 py-1 text-xs font-medium">{routeTrailStatusLabel(trail.status)}</span>
+                  </div>
+                  <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
+                    {trail.steps.map((step) => (
+                      <span className="rounded-md bg-white/70 px-2 py-1 font-medium" key={`${trail.id}:${step.label}:${step.latestAt}`}>
+                        {step.label}
+                      </span>
+                    ))}
+                  </div>
+                  <p className="mt-2 line-clamp-2 text-xs leading-5 opacity-80">{trail.summary}</p>
+                </div>
+              ))}
+            </div>
+          ) : null}
           <div className="grid gap-3 lg:grid-cols-4">
             {routeConfirmationDispatchFlow.lanes.map((lane) => {
               const laneFilter = routeFlowFilterFromLane(lane.id);

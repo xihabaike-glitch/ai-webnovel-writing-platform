@@ -944,6 +944,45 @@ test("model task routing", async (t) => {
     assert.equal(flow.lanes.find((lane) => lane.id === "confirmed")?.items[0]?.label, "章节审稿路由已确认");
   });
 
+  await t.test("builds route governance closed-loop trails for dispatch review", () => {
+    const flow = buildRouteConfirmationDispatchFlow([], [
+      {
+        dispatchKey: "model-route-governance:chapter_draft:extend_watch:2026-07-04T14:00:00.000Z",
+        stage: "model_route_governance",
+        state: "completed",
+        title: "处理正文初稿路由复检问题",
+        detail: "正文初稿路由治理已完成。",
+        actionLabel: "延长观察",
+        href: "/settings/models",
+        priorityScore: 76,
+        reviewLatestAt: "2026-07-04T14:00:00.000Z",
+        completionEvidence: "治理结论：已治理完成\n处理动作：延长观察\n成功率：100%\n质量：86\n备用命中：未命中备用",
+        evidence: ["最近路由复检需观察：成功率 50%，质量 62。"],
+        completedAt: "2026-07-04T15:00:00.000Z",
+      },
+      {
+        dispatchKey: "model-route-confirmation-recheck:chapter_draft:governance:2026-07-04T16:00:00.000Z",
+        stage: "model_route_confirmation_recheck",
+        state: "completed",
+        title: "复检正文初稿治理后小样本",
+        detail: "治理后复检正文初稿路线。",
+        actionLabel: "复检小样本",
+        href: "/settings/models",
+        priorityScore: 74,
+        reviewLatestAt: "2026-07-04T16:00:00.000Z",
+        completionEvidence: "样本数：2\n成功率：100%\n质量：86\n成本：正常\n备用命中：未命中备用\n是否需要治理：否",
+        evidence: ["路由治理已完成：正文初稿路线已处理。"],
+        completedAt: "2026-07-04T17:00:00.000Z",
+      },
+    ]);
+
+    assert.equal(flow.trails.length, 1);
+    assert.equal(flow.trails[0].taskType, "chapter_draft");
+    assert.equal(flow.trails[0].status, "confirmed");
+    assert.deepEqual(flow.trails[0].steps.map((step) => step.label), ["治理完成", "治理后复检", "已确认"]);
+    assert.ok(flow.trails[0].summary.includes("正文初稿"));
+  });
+
   await t.test("classifies executed route recheck samples in the dispatch flow", () => {
     const flow = buildRouteConfirmationDispatchFlow([], [
       {

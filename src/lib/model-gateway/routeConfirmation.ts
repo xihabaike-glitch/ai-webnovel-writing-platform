@@ -121,6 +121,22 @@ export interface RouteConfirmationDispatchFlowLane {
   items: RouteConfirmationDispatchFlowItem[];
 }
 
+export interface RouteConfirmationClosedLoopStep {
+  label: string;
+  detail: string;
+  latestAt: string;
+}
+
+export interface RouteConfirmationClosedLoopTrail {
+  id: string;
+  taskType: RoutedModelTaskType;
+  label: string;
+  status: "confirmed" | "needs_governance" | "manual_review" | "in_progress";
+  summary: string;
+  latestAt: string;
+  steps: RouteConfirmationClosedLoopStep[];
+}
+
 export interface RouteConfirmationDispatchFlow {
   summary: {
     confirmed: number;
@@ -130,6 +146,7 @@ export interface RouteConfirmationDispatchFlow {
     completed: number;
   };
   lanes: RouteConfirmationDispatchFlowLane[];
+  trails: RouteConfirmationClosedLoopTrail[];
 }
 
 export interface ModelRouteConfirmationDispatch {
@@ -784,6 +801,117 @@ function isRouteConfirmationTask(task: RouteConfirmationDispatchFlowTask) {
   return task.stage === "model_route_confirmation_recheck" || task.stage === "model_route_governance";
 }
 
+function latestByCompletedAt<T extends { completedAt: string | null }>(items: T[]) {
+  return items.slice().sort((left, right) => (right.completedAt ?? "").localeCompare(left.completedAt ?? ""))[0] ?? null;
+}
+
+function latestByTime<T extends { latestAt: string }>(items: T[]) {
+  return items.slice().sort((left, right) => right.latestAt.localeCompare(left.latestAt))[0] ?? null;
+}
+
+function governanceStepLabel(status: RouteConfirmationGovernanceEvidence["status"]) {
+  if (status === "resolved") return "治理完成";
+  if (status === "needs_switch") return "仍需换模型";
+  if (status === "watch") return "继续观察";
+  return "人工复核";
+}
+
+function buildRouteConfirmationClosedLoopTrails(
+  confirmations: ModelRouteConfirmationReceipt[],
+  activeDispatches: RouteConfirmationDispatchFlowTask[],
+  governanceEvidence: RouteConfirmationGovernanceEvidence[],
+  recheckEvidence: RouteConfirmationRecheckEvidence[],
+): RouteConfirmationClosedLoopTrail[] {
+  const taskTypes = new Set<RoutedModelTaskType>();
+  for (const receipt of confirmations) taskTypes.add(receipt.payload.taskType);
+  for (const item of governanceEvidence) taskTypes.add(item.taskType);
+  for (const item of recheckEvidence) taskTypes.add(item.taskType);
+  for (const task of activeDispatches) {
+    const taskType = task.stage === "model_route_governance"
+      ? taskTypeFromGovernanceKey(task.dispatchKey)
+      : taskTypeFromConfirmationRecheckKey(task.dispatchKey);
+    if (taskType) taskTypes.add(taskType);
+  }
+
+  return Array.from(taskTypes).flatMap((taskType): RouteConfirmationClosedLoopTrail[] => {
+    const label = labelForRoutedTask(taskType);
+    const steps: RouteConfirmationClosedLoopStep[] = [];
+    const activeGovernance = activeDispatches
+      .filter((task) => task.stage === "model_route_governance" && taskTypeFromGovernanceKey(task.dispatchKey) === taskType)
+      .map(flowItemFromTask);
+    const activeRechecks = activeDispatches
+      .filter((task) => task.stage === "model_route_confirmation_recheck" && taskTypeFromConfirmationRecheckKey(task.dispatchKey) === taskType)
+      .map(flowItemFromTask);
+    const latestGovernance = latestByCompletedAt(governanceEvidence.filter((item) => item.taskType === taskType));
+    const latestRecheck = latestByCompletedAt(recheckEvidence.filter((item) => item.taskType === taskType));
+    const latestConfirmation = confirmations
+      .filter((receipt) => receipt.payload.taskType === taskType)
+      .slice()
+      .sort((left, right) => right.createdAt.localeCompare(left.createdAt))[0] ?? null;
+
+    if (latestGovernance) {
+      steps.push({
+        label: governanceStepLabel(latestGovernance.status),
+        detail: latestGovernance.summary,
+        latestAt: latestGovernance.completedAt ?? "",
+      });
+    }
+    const activeGovernanceItem = latestByTime(activeGovernance);
+    if (activeGovernanceItem && !latestGovernance) {
+      steps.push({
+        label: "治理派单",
+        detail: activeGovernanceItem.detail,
+        latestAt: activeGovernanceItem.latestAt,
+      });
+    }
+    if (latestRecheck) {
+      steps.push({
+        label: latestRecheck.id.includes(":governance:") ? "治理后复检" : "复检样本",
+        detail: latestRecheck.summary,
+        latestAt: latestRecheck.completedAt ?? "",
+      });
+      const decision = buildRouteConfirmationRecheckDecision(latestRecheck);
+      steps.push({
+        label: decision.label,
+        detail: decision.detail,
+        latestAt: latestRecheck.completedAt ?? "",
+      });
+    }
+    const activeRecheckItem = latestByTime(activeRechecks);
+    if (activeRecheckItem && !latestRecheck) {
+      steps.push({
+        label: activeRecheckItem.id.includes(":governance:") ? "等待治理后复检" : "等待复检",
+        detail: activeRecheckItem.detail,
+        latestAt: activeRecheckItem.latestAt,
+      });
+    }
+    if (latestConfirmation && !latestRecheck) {
+      steps.push({
+        label: "已确认路线",
+        detail: latestConfirmation.detail,
+        latestAt: latestConfirmation.createdAt,
+      });
+    }
+    if (!steps.length) return [];
+
+    const latestStep = latestByTime(steps);
+    const status: RouteConfirmationClosedLoopTrail["status"] = latestRecheck
+      ? buildRouteConfirmationRecheckDecision(latestRecheck).status
+      : activeGovernanceItem || activeRecheckItem
+        ? "in_progress"
+        : "confirmed";
+    return [{
+      id: `route-loop:${taskType}:${latestStep?.latestAt ?? ""}`,
+      taskType,
+      label,
+      status,
+      summary: `「${label}」${steps.map((step) => step.label).join(" → ")}`,
+      latestAt: latestStep?.latestAt ?? "",
+      steps: steps.sort((left, right) => left.latestAt.localeCompare(right.latestAt)),
+    }];
+  }).sort((left, right) => right.latestAt.localeCompare(left.latestAt));
+}
+
 export function buildModelRouteConfirmationReceipt(input: ModelRouteConfirmationInput): ModelRouteConfirmationReceipt {
   const taskLabel = labelForRoutedTask(input.taskType);
   const source = input.source ?? "manual";
@@ -982,7 +1110,25 @@ export function buildRouteConfirmationDispatchFlow(
       completedAt: task.completedAt,
     }];
   });
+  const completedGovernanceTasks: RouteConfirmationGovernanceDispatchTask[] = completed.flatMap((task) => {
+    if (
+      task.stage !== "model_route_governance"
+      || typeof task.completionEvidence !== "string"
+      || !task.completionEvidence.trim()
+    ) {
+      return [];
+    }
+    return [{
+      dispatchKey: task.dispatchKey,
+      stage: task.stage,
+      state: task.state,
+      completionEvidence: task.completionEvidence,
+      evidence: task.evidence,
+      completedAt: task.completedAt,
+    }];
+  });
   const completedRechecks = buildRouteConfirmationRecheckEvidenceFromDispatchTasks(completedRecheckTasks);
+  const completedGovernance = buildRouteConfirmationGovernanceEvidenceFromDispatchTasks(completedGovernanceTasks);
   const passedRechecks = completedRechecks.filter((item) => item.recommendedAction === "keep");
   const recheckAdvice = buildRouteConfirmationRecheckAdvice(completedRechecks).items;
   const needsGovernanceItems = [
@@ -1029,6 +1175,7 @@ export function buildRouteConfirmationDispatchFlow(
       completed: completed.length,
     },
     lanes,
+    trails: buildRouteConfirmationClosedLoopTrails(confirmations, activeDispatches, completedGovernance, completedRechecks),
   };
 }
 

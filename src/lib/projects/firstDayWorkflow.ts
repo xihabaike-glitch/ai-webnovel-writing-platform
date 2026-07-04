@@ -129,6 +129,11 @@ export interface FirstDayLaunchReceipt {
   readyStepIds: string[];
 }
 
+export interface FirstDayLaunchPackage {
+  receipt: FirstDayLaunchReceipt;
+  dispatch: GatePlatformGrowthDispatchItem;
+}
+
 export interface FirstDayExecutionReceipt {
   success: boolean;
   summary: string;
@@ -794,5 +799,12 @@ export function buildFirstDayLaunchReceipt(workflow: FirstDayWorkflow): FirstDay
     totalSteps: workflow.totalSteps,
     progressPercent: workflow.progressPercent,
     readyStepIds,
+  };
+}
+
+export function buildFirstDayLaunchPackage(input: FirstDayDispatchInput): FirstDayLaunchPackage {
+  return {
+    receipt: buildFirstDayLaunchReceipt(input.workflow),
+    dispatch: buildFirstDayDispatchItem(input),
   };
 }

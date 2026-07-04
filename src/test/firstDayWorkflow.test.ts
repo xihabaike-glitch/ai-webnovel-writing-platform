@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { getPlatformProfile } from "../lib/platforms/platformProfiles.ts";
-import { buildFirstDayDispatchItem, buildFirstDayExecutionReceipt, buildFirstDayLaunchReceipt, buildFirstDayModelExecutionPlan, buildFirstDayWorkflow } from "../lib/projects/firstDayWorkflow.ts";
+import { buildFirstDayDispatchItem, buildFirstDayExecutionReceipt, buildFirstDayLaunchPackage, buildFirstDayLaunchReceipt, buildFirstDayModelExecutionPlan, buildFirstDayWorkflow } from "../lib/projects/firstDayWorkflow.ts";
 
 const project = {
   id: "project-1",
@@ -91,6 +91,28 @@ test("buildFirstDayWorkflow", async (t) => {
     assert.ok(receipt.message.includes("下一步"));
     assert.ok(receipt.message.includes("生成第一章正文"));
     assert.deepEqual(receipt.readyStepIds, ["skeleton", "opening-hook", "story-support"]);
+  });
+
+  await t.test("builds a launch package with the first-day dispatch", () => {
+    const platform = getPlatformProfile("fanqie");
+    const workflow = buildFirstDayWorkflow({
+      project,
+      platform,
+      chapters: [chapter, { ...chapter, id: "chapter-2", order: 2 }, { ...chapter, id: "chapter-3", order: 3 }],
+      outlineNodes,
+      characters,
+      worldEntries,
+      aiTasks: [],
+      submissionChecklist: checklist,
+    });
+    const launchPackage = buildFirstDayLaunchPackage({ workflow, project, platform });
+
+    assert.equal(launchPackage.receipt.nextStepId, "first-draft");
+    assert.equal(launchPackage.dispatch.id, "first-day:project-1:first-draft");
+    assert.equal(launchPackage.dispatch.state, "assigned");
+    assert.equal(launchPackage.dispatch.dueLabel, "今天收口");
+    assert.equal(launchPackage.dispatch.actionLabel, launchPackage.receipt.actionLabel);
+    assert.ok(launchPackage.dispatch.acceptanceCriteria.includes("第一章正文已生成并写回章节"));
   });
 
   await t.test("builds an execution package for the current first-day step", () => {

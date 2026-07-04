@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { buildDefaultOutlineNodes } from "@/lib/outlines/defaultOutline";
-import { buildFirstDayLaunchReceipt, buildFirstDayWorkflow } from "@/lib/projects/firstDayWorkflow";
+import { buildFirstDayLaunchPackage, buildFirstDayWorkflow, type FirstDayLaunchPackage } from "@/lib/projects/firstDayWorkflow";
 import { buildProjectDefaults } from "@/lib/projects/projectDefaults";
 import {
   buildGateBatchTacticEffectReview,
@@ -24,6 +24,54 @@ import { getPlatformProfile } from "@/lib/platforms/platformProfiles";
 import type { LengthType, PlatformId } from "@/lib/platforms/platformProfiles";
 import { getPlatformWritingStyle } from "@/lib/platforms/writingStyleTemplates";
 import { createProjectSchema } from "@/lib/validators/project";
+
+async function persistFirstDayLaunchDispatch(projectId: string, launchPackage: FirstDayLaunchPackage) {
+  const dispatch = launchPackage.dispatch;
+  const now = new Date();
+  return prisma.gateDispatchTask.upsert({
+    where: { dispatchKey: dispatch.id },
+    create: {
+      dispatchKey: dispatch.id,
+      projectId,
+      platformId: dispatch.platformId,
+      platformName: dispatch.platformName,
+      stage: dispatch.stage,
+      state: "assigned",
+      priorityScore: dispatch.priorityScore,
+      ownerRole: dispatch.ownerRole,
+      title: dispatch.title,
+      detail: dispatch.detail,
+      dueLabel: dispatch.dueLabel,
+      actionLabel: dispatch.actionLabel,
+      href: dispatch.href,
+      acceptanceCriteria: JSON.stringify(dispatch.acceptanceCriteria),
+      evidence: JSON.stringify(dispatch.evidence),
+      sourceReceiptId: null,
+      completionEvidence: "",
+      reviewLatestAt: new Date(dispatch.reviewLatestAt),
+      assignedAt: now,
+      completedAt: null,
+    },
+    update: {
+      projectId,
+      platformId: dispatch.platformId,
+      platformName: dispatch.platformName,
+      stage: dispatch.stage,
+      state: "assigned",
+      priorityScore: dispatch.priorityScore,
+      ownerRole: dispatch.ownerRole,
+      title: dispatch.title,
+      detail: dispatch.detail,
+      dueLabel: dispatch.dueLabel,
+      actionLabel: dispatch.actionLabel,
+      href: dispatch.href,
+      acceptanceCriteria: JSON.stringify(dispatch.acceptanceCriteria),
+      evidence: JSON.stringify(dispatch.evidence),
+      reviewLatestAt: new Date(dispatch.reviewLatestAt),
+      assignedAt: now,
+    },
+  });
+}
 
 export async function GET() {
   const projects = await prisma.project.findMany({
@@ -133,7 +181,7 @@ export async function POST(request: Request) {
       aiTasks: { orderBy: { createdAt: "desc" } },
     },
   });
-  const launchReceipt = launchProject ? (() => {
+  const launchPackage = launchProject ? (() => {
     const platform = getPlatformProfile(launchProject.targetPlatform as PlatformId);
     const submissionChecklist = buildSubmissionChecklist({
       title: launchProject.title,
@@ -150,7 +198,12 @@ export async function POST(request: Request) {
       })),
     });
 
-    return buildFirstDayLaunchReceipt(buildFirstDayWorkflow({
+    const workflowProject = {
+      id: launchProject.id,
+      title: launchProject.title,
+      currentWordCount: launchProject.currentWordCount,
+    };
+    const workflow = buildFirstDayWorkflow({
       project: {
         id: launchProject.id,
         title: launchProject.title,
@@ -163,8 +216,22 @@ export async function POST(request: Request) {
       worldEntries: launchProject.worldEntries,
       aiTasks: launchProject.aiTasks,
       submissionChecklist,
-    }));
+    });
+
+    return buildFirstDayLaunchPackage({
+      workflow,
+      project: workflowProject,
+      platform,
+    });
   })() : null;
 
-  return NextResponse.json({ project, launchReceipt }, { status: 201 });
+  if (launchPackage) {
+    await persistFirstDayLaunchDispatch(project.id, launchPackage);
+  }
+
+  return NextResponse.json({
+    project,
+    launchReceipt: launchPackage?.receipt ?? null,
+    launchDispatch: launchPackage?.dispatch ?? null,
+  }, { status: 201 });
 }

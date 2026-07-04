@@ -190,9 +190,12 @@ export function ProjectForm() {
 
       const payload = (await response.json()) as {
         project: { id: string };
-        launchReceipt?: { href: string; nextStepId: string } | null;
+        launchReceipt?: { href: string; nextStepId: string; actionLabel: string } | null;
       };
-      router.push(`/projects/${payload.project.id}#first-day-workflow`);
+      const params = payload.launchReceipt
+        ? `?firstDayLaunch=1&nextStep=${encodeURIComponent(payload.launchReceipt.nextStepId)}`
+        : "";
+      router.push(`/projects/${payload.project.id}${params}#first-day-workflow`);
       router.refresh();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "创建作品失败。");

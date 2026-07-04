@@ -150,6 +150,7 @@ function FirstDayStepCard({ step, index }: { step: FirstDayWorkflowStep; index: 
 export function FirstDayWorkflowPanel({ projectId }: { projectId: string }) {
   const searchParams = useSearchParams();
   const routeRepairReturn = searchParams.get("firstDayRoute") === "repaired";
+  const createdLaunch = searchParams.get("firstDayLaunch") === "1";
   const [workflow, setWorkflow] = useState<FirstDayWorkflow | null>(null);
   const [dispatch, setDispatch] = useState<GatePlatformGrowthDispatchItem | null>(null);
   const [modelRoute, setModelRoute] = useState<FirstDayModelRouteStatus | null>(null);
@@ -190,6 +191,11 @@ export function FirstDayWorkflowPanel({ projectId }: { projectId: string }) {
       if (options?.fromRouteRepair) {
         const notice = refreshedRouteNotice(payload.modelRoute);
         showMessage(notice.message, notice.action);
+      } else if (createdLaunch) {
+        showMessage(
+          `作品已创建，首日派单已自动进入任务中心：${payload.workflow.nextStep.label}。`,
+          payload.workflow.nextStep.owner === "AI" ? "execute_current_step" : undefined,
+        );
       }
     } catch (caught) {
       showMessage(caught instanceof Error ? caught.message : "读取首日工作流失败。");
@@ -275,7 +281,7 @@ export function FirstDayWorkflowPanel({ projectId }: { projectId: string }) {
 
   useEffect(() => {
     void loadWorkflow({ fromRouteRepair: routeRepairReturn });
-  }, [projectId, routeRepairReturn]);
+  }, [projectId, routeRepairReturn, createdLaunch]);
 
   const routeBlockMessage = modelRoute ? buildFirstDayExecutionRouteBlockMessage(modelRoute) : null;
   const receiptTone = executionReceipt?.success

@@ -184,4 +184,37 @@ test("buildFirstThreeRewritePrompt", async (t) => {
     assert.ok(contextPrompt.userPrompt.includes("林晚"));
     assert.ok(contextPrompt.userPrompt.includes("系统追猎"));
   });
+
+  await t.test("feeds story tree recheck experience into rewrite instructions", () => {
+    const experiencePrompt = buildFirstThreeRewritePrompt({
+      projectTitle: "夜雨系统",
+      genre: "都市系统",
+      sellingPoint: "雨夜系统翻盘",
+      platform: getPlatformProfile("fanqie"),
+      storyTreeExperience: {
+        summary: { total: 1, usable: 1, avoid: 0, watch: 0 },
+        items: [],
+        promptBlock: [
+          "大树复检经验：",
+          "- 可复用｜开头结尾｜70 -> 84 分：开头结尾：先给不可逆选择，章末追加更坏任务。",
+        ].join("\n"),
+      },
+      targetWords: 1600,
+      chapter: {
+        order: 1,
+        title: "第一章 雨夜系统",
+        content: "林晚推开门，系统提示音在雨夜响起。",
+        goal: "让主角遭遇不可逆事件。",
+        hook: "雨夜、系统、门后未知风险。",
+        conflict: "主角必须在危险和逃避之间选择。",
+        valueShift: "普通生活转向失控危机。",
+        cliffhanger: "系统给出第一个选择。",
+      },
+      plan,
+    });
+
+    assert.ok(experiencePrompt.userPrompt.includes("大树复检经验"));
+    assert.ok(experiencePrompt.userPrompt.includes("可复用｜开头结尾｜70 -> 84 分"));
+    assert.ok(experiencePrompt.userPrompt.includes("先给不可逆选择"));
+  });
 });

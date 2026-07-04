@@ -155,4 +155,35 @@ test("buildChapterDraftPrompt", async (t) => {
     assert.equal(contextPrompt.sourceContext?.sourceCounts.characters, 1);
     assert.ok(contextPrompt.sourceContext?.summary.includes("人物 1"));
   });
+
+  await t.test("feeds story tree recheck experience into draft instructions", () => {
+    const experiencePrompt = buildChapterDraftPrompt({
+      projectTitle: "夜雨系统",
+      genre: "都市系统",
+      sellingPoint: "雨夜系统翻盘",
+      platform: getPlatformProfile("fanqie"),
+      storyTreeExperience: {
+        summary: { total: 1, usable: 1, avoid: 0, watch: 0 },
+        items: [],
+        promptBlock: [
+          "大树复检经验：",
+          "- 可复用｜分支因果｜68 -> 78 分：分支因果：把支线改成主线压力的直接后果。",
+        ].join("\n"),
+      },
+      targetWords: 1200,
+      chapter: {
+        title: "第三章",
+        goal: "让支线反压主线。",
+        hook: "黑伞人留下第二个编号。",
+        conflict: "救妹妹会暴露系统。",
+        valueShift: "从被动逃生到主动设局。",
+        cliffhanger: "系统要求删除一段记忆。",
+        content: "",
+      },
+    });
+
+    assert.ok(experiencePrompt.userPrompt.includes("大树复检经验"));
+    assert.ok(experiencePrompt.userPrompt.includes("可复用｜分支因果｜68 -> 78 分"));
+    assert.ok(experiencePrompt.userPrompt.includes("把支线改成主线压力的直接后果"));
+  });
 });

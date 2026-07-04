@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { buildFirstThreeRewritePrompt } from "@/lib/ai/buildFirstThreeRewritePrompt";
 import { buildStoryTreeRewriteDispatchItems } from "@/lib/ai/storyTreeDispatch";
+import { buildStoryTreeExperienceGuide } from "@/lib/ai/storyTreeExperience";
 import { prisma } from "@/lib/db/prisma";
 import { getActiveModelProvider } from "@/lib/model-gateway/activeProvider";
 import type { ModelProviderId } from "@/lib/model-gateway/types";
@@ -9,6 +10,7 @@ import { buildProjectContextPack } from "@/lib/projects/projectContextPack";
 import { buildFirstThreeRewriteEvaluation, buildFirstThreeRewritePackage } from "@/lib/projects/firstThreeRewrite";
 import { buildPlatformPublishExportCenter, parsePublishSnapshotTags } from "@/lib/projects/platformPublishExport";
 import { persistServerGateDispatchTask } from "@/lib/projects/gateDispatchTaskPersistence";
+import { gatePlatformDispatchTaskFromRecord } from "@/lib/projects/gateDispatchTaskRecords";
 import { findProjectStartTacticSummary } from "@/lib/projects/projectStartTactics";
 import { buildSubmissionChecklist } from "@/lib/projects/submissionChecklist";
 import { countWords } from "@/lib/text/wordCount";
@@ -68,6 +70,14 @@ export async function POST(request: Request, { params }: Params) {
       submissionAssetVersions: { orderBy: { createdAt: "desc" }, take: 80 },
       platformPublishMetrics: { orderBy: { snapshotDate: "desc" }, take: 80 },
       worldEntries: true,
+      gateDispatchTasks: {
+        where: {
+          state: "completed",
+          dispatchKey: { startsWith: "story-tree:" },
+        },
+        orderBy: { completedAt: "desc" },
+        take: 30,
+      },
     },
   });
 
@@ -77,6 +87,9 @@ export async function POST(request: Request, { params }: Params) {
 
   const platform = getPlatformProfile((body.platformId ?? project.targetPlatform) as PlatformId);
   const startTactic = findProjectStartTacticSummary(project.worldEntries);
+  const storyTreeExperience = buildStoryTreeExperienceGuide(
+    project.gateDispatchTasks.map(gatePlatformDispatchTaskFromRecord),
+  );
   const submissionChecklist = buildSubmissionChecklist({
     title: project.title,
     genre: project.genre,
@@ -200,6 +213,7 @@ export async function POST(request: Request, { params }: Params) {
       platform,
       startTactic,
       projectContext,
+      storyTreeExperience,
       platformKnowledge,
       targetWords: body.targetWords ?? 1600,
       chapter: {

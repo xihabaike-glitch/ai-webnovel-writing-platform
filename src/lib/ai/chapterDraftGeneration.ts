@@ -1,11 +1,13 @@
 import { buildChapterDraftPrompt } from "@/lib/ai/buildChapterDraftPrompt";
 import { buildDraftQualityAudit } from "@/lib/ai/draftQualityAudit";
 import { buildStoryTreeRewriteDispatchItems } from "@/lib/ai/storyTreeDispatch";
+import { buildStoryTreeExperienceGuide } from "@/lib/ai/storyTreeExperience";
 import { prisma } from "@/lib/db/prisma";
 import { runRoutedGeneration } from "@/lib/model-gateway/routedGeneration";
 import type { ForcedProviderTarget } from "@/lib/model-gateway/providerSelection";
 import { getPlatformProfile, type PlatformId } from "@/lib/platforms/platformProfiles";
 import { persistServerGateDispatchTask } from "@/lib/projects/gateDispatchTaskPersistence";
+import { gatePlatformDispatchTaskFromRecord } from "@/lib/projects/gateDispatchTaskRecords";
 import { buildProjectContextPack } from "@/lib/projects/projectContextPack";
 import { findProjectStartTacticSummary } from "@/lib/projects/projectStartTactics";
 import { countWords } from "@/lib/text/wordCount";
@@ -27,6 +29,14 @@ export async function generateChapterDraft(options: GenerateChapterDraftOptions)
           worldEntries: true,
           foreshadows: { orderBy: { createdAt: "asc" } },
           plotThreads: { orderBy: { createdAt: "asc" } },
+          gateDispatchTasks: {
+            where: {
+              state: "completed",
+              dispatchKey: { startsWith: "story-tree:" },
+            },
+            orderBy: { completedAt: "desc" },
+            take: 30,
+          },
         },
       },
     },
@@ -38,6 +48,9 @@ export async function generateChapterDraft(options: GenerateChapterDraftOptions)
 
   const platform = getPlatformProfile(chapter.project.targetPlatform as PlatformId);
   const startTactic = findProjectStartTacticSummary(chapter.project.worldEntries);
+  const storyTreeExperience = buildStoryTreeExperienceGuide(
+    chapter.project.gateDispatchTasks.map(gatePlatformDispatchTaskFromRecord),
+  );
   const projectContext = buildProjectContextPack({
     currentChapterId: chapter.id,
     chapters: chapter.project.chapters,
@@ -53,6 +66,7 @@ export async function generateChapterDraft(options: GenerateChapterDraftOptions)
     platform,
     startTactic,
     projectContext,
+    storyTreeExperience,
     targetWords: options.targetWords ?? 1200,
     chapter: {
       order: chapter.order,

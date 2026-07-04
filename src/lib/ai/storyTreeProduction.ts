@@ -1,5 +1,6 @@
 import type { ProjectContextPack } from "../projects/projectContextPack.ts";
 import type { ProjectStartTacticSummary } from "../projects/projectStartTactics.ts";
+import type { StoryTreeExperienceGuide } from "./storyTreeExperience.ts";
 
 export type StoryTreeProductionPhase = "chapter_draft" | "first_three_rewrite";
 
@@ -8,6 +9,7 @@ export interface StoryTreeProductionInput {
   chapterOrder?: number | null;
   startTactic?: ProjectStartTacticSummary | null;
   projectContext?: ProjectContextPack | null;
+  storyTreeExperience?: StoryTreeExperienceGuide | null;
 }
 
 function phaseLine(input: StoryTreeProductionInput) {
@@ -39,5 +41,6 @@ export function buildStoryTreeProductionBlock(input: StoryTreeProductionInput) {
     "- 人物弧光：每章都让主角在欲望、缺陷、需求之间做一个可见选择，并让结果改变后续局面。",
     input.startTactic ? `- 平台打法优先级：执行「${input.startTactic.label}」的开头动作和验证动作，避免触碰风险提醒。` : "- 平台打法优先级：没有历史打法时，按目标平台开头规则和审稿重点小步验证。",
     `- 上下文约束：${contextLine(input.projectContext)}`,
+    input.storyTreeExperience?.promptBlock ? input.storyTreeExperience.promptBlock : "- 大树复检经验：暂无历史复检结论，先按本章大树质检标准生成。",
   ].join("\n");
 }

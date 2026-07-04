@@ -2,6 +2,7 @@ import type { PlatformProfile } from "../platforms/platformProfiles.ts";
 import { buildPlatformWritingStylePromptBlock } from "../platforms/writingStyleTemplates.ts";
 import type { ProjectContextPack } from "../projects/projectContextPack.ts";
 import type { ProjectStartTacticSummary } from "../projects/projectStartTactics.ts";
+import type { StoryTreeExperienceGuide } from "./storyTreeExperience.ts";
 import { buildStoryTreeProductionBlock } from "./storyTreeProduction.ts";
 
 interface ChapterDraftPromptInput {
@@ -11,6 +12,7 @@ interface ChapterDraftPromptInput {
   platform: PlatformProfile;
   startTactic?: ProjectStartTacticSummary | null;
   projectContext?: ProjectContextPack | null;
+  storyTreeExperience?: StoryTreeExperienceGuide | null;
   targetWords: number;
   chapter: {
     order?: number;
@@ -47,6 +49,7 @@ export function buildChapterDraftPrompt(input: ChapterDraftPromptInput) {
     chapterOrder: input.chapter.order,
     startTactic: input.startTactic,
     projectContext: input.projectContext,
+    storyTreeExperience: input.storyTreeExperience,
   });
 
   const userPrompt = [

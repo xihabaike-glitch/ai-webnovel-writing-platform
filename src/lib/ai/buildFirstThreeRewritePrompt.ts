@@ -3,6 +3,7 @@ import type { PlatformProfile } from "../platforms/platformProfiles.ts";
 import type { ProjectContextPack } from "../projects/projectContextPack.ts";
 import type { ProjectStartTacticSummary } from "../projects/projectStartTactics.ts";
 import type { PlatformKnowledgeInsight } from "../projects/platformPublishExport.ts";
+import type { StoryTreeExperienceGuide } from "./storyTreeExperience.ts";
 import { buildStoryTreeProductionBlock } from "./storyTreeProduction.ts";
 
 interface FirstThreeRewritePromptInput {
@@ -12,6 +13,7 @@ interface FirstThreeRewritePromptInput {
   platform: PlatformProfile;
   startTactic?: ProjectStartTacticSummary | null;
   projectContext?: ProjectContextPack | null;
+  storyTreeExperience?: StoryTreeExperienceGuide | null;
   platformKnowledge?: PlatformKnowledgeInsight | null;
   targetWords: number;
   chapter: {
@@ -66,6 +68,7 @@ export function buildFirstThreeRewritePrompt(input: FirstThreeRewritePromptInput
     chapterOrder: input.chapter.order,
     startTactic: input.startTactic,
     projectContext: input.projectContext,
+    storyTreeExperience: input.storyTreeExperience,
   });
 
   const userPrompt = [

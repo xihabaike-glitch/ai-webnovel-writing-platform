@@ -55,6 +55,32 @@ function activeWorkflow() {
   });
 }
 
+function recoveredWatchWorkflow() {
+  return buildFirstDayWorkflow({
+    project: { id: "project-1", title: "夜雨系统", currentWordCount: 0 },
+    platform: getPlatformProfile("qimao"),
+    chapters: [chapter, { ...chapter, id: "chapter-2", order: 2 }, { ...chapter, id: "chapter-3", order: 3 }],
+    outlineNodes,
+    characters,
+    worldEntries,
+    aiTasks: [],
+    dispatchTasks: [{
+      dispatchKey: "first-day:project-1:risk-recovery",
+      state: "completed",
+      completionEvidence: "恢复条件已写清：入口卖点已重做，前三章兑现问题已列出。",
+    }],
+    startTactic: {
+      title: "首轮平台打法：七猫小说",
+      label: "复盘止损",
+      primaryTactic: "七猫小说方向暂时暂停。",
+      openingMove: "先重做开头钩子。",
+      verificationMove: "只允许恢复条件验证。",
+      risk: "未证明恢复条件前不能生成正文。",
+    },
+    submissionChecklist: checklist,
+  });
+}
+
 function completedWorkflow(): FirstDayWorkflow {
   return buildFirstDayWorkflow({
     project: { id: "project-1", title: "夜雨系统", currentWordCount: 2400 },
@@ -102,6 +128,22 @@ test("buildFirstDayContinuationAction keeps unfinished first-day work ahead of b
   assert.equal(action.queueCategory, null);
   assert.ok(action.headline.includes("首日链路"));
   assert.ok(action.warnings.some((warning) => warning.includes("不建议扩大批量")));
+});
+
+test("buildFirstDayContinuationAction explains recovered watch mode before scale-up", () => {
+  const workflow = recoveredWatchWorkflow();
+  const action = buildFirstDayContinuationAction({
+    project: project({ targetPlatform: "qimao" }),
+    workflow,
+  });
+
+  assert.equal(workflow.nextStep.id, "first-draft");
+  assert.equal(workflow.executionPackage.riskLabel, "恢复观察");
+  assert.equal(action.status, "first_day_active");
+  assert.equal(action.headline, "恢复后先跑小样本");
+  assert.ok(action.detail.includes("恢复条件已过线"));
+  assert.ok(action.detail.includes("不进入放量"));
+  assert.ok(action.warnings.some((warning) => warning.includes("观察期")));
 });
 
 test("buildFirstDayContinuationAction routes completed first-day work into the AI pipeline", () => {

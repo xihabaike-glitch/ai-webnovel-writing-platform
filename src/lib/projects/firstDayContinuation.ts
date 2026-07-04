@@ -29,17 +29,36 @@ function absoluteProjectHref(projectId: string, href: string) {
 }
 
 function activeFirstDayAction(projectId: string, workflow: FirstDayWorkflow): FirstDayContinuationAction {
+  const execution = workflow.executionPackage;
+  const riskCopy = execution.riskLevel === "blocked"
+    ? {
+      headline: "先做止损恢复验证",
+      detail: `当前卡在「${workflow.nextStep.label}」。这是避坑恢复，不是正文完成；先证明入口卖点、前三章兑现或平台匹配度已经改掉。`,
+      warning: "止损恢复未完成前，不允许生成正文或扩大批量。",
+    }
+    : execution.riskLevel === "watch"
+      ? {
+        headline: execution.riskLabel === "恢复观察" ? "恢复后先跑小样本" : "观察平台先跑小样本",
+        detail: `当前卡在「${workflow.nextStep.label}」。${execution.riskLabel === "恢复观察" ? "恢复条件已过线，但" : ""}这里只验证首轮样本、通过线和复查证据，不进入放量。`,
+        warning: "观察期只看小样本证据，首轮通过前不要批量生成或多平台加码。",
+      }
+      : {
+        headline: "先把首日链路跑完",
+        detail: `当前卡在「${workflow.nextStep.label}」。别急着放大批量，先让首章完成生成、审稿、二改和发布预检。`,
+        warning: "首日链路未完成前，不建议扩大批量生产。",
+      };
+
   return {
     status: "first_day_active",
-    headline: "先把首日链路跑完",
-    detail: `当前卡在「${workflow.nextStep.label}」。别急着放大批量，先让首章完成生成、审稿、二改和发布预检。`,
+    headline: riskCopy.headline,
+    detail: riskCopy.detail,
     primaryLabel: workflow.nextStep.actionLabel,
     primaryHref: workflow.nextStep.href,
     secondaryLabel: "回到首日工作流",
     secondaryHref: `/projects/${projectId}#first-day-workflow`,
     queueCategory: null,
     itemCount: 0,
-    warnings: ["首日链路未完成前，不建议扩大批量生产。"],
+    warnings: [riskCopy.warning],
   };
 }
 

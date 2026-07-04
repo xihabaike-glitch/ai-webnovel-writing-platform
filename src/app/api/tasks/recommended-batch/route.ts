@@ -8,12 +8,28 @@ import { buildBatchRouteEffectSummary } from "@/lib/model-gateway/batchRouteEffe
 import { buildBatchExecutionSafety } from "@/lib/projects/batchExecutionSafety";
 import { getBatchExecutionStrategy } from "@/lib/projects/batchExecutionStrategy";
 import { findProjectStartTacticSummary } from "@/lib/projects/projectStartTactics";
+import { buildTaskQueueBatchReceipt } from "@/lib/projects/taskQueueBatchReceipt";
 import { buildTaskQueueCenter } from "@/lib/projects/taskQueueCenter";
 import { buildTaskQueueExecutionPlan } from "@/lib/projects/taskQueueExecutionPlan";
 
 function roleFor(result: { attempts: Array<{ taskId: string; role: "primary" | "fallback" | "auto" | "forced" }> }, taskId: string) {
   return result.attempts.find((attempt) => attempt.taskId === taskId)?.role ?? null;
 }
+
+type RecommendedBatchResult = {
+  chapterId: string;
+  status: "succeeded" | "failed";
+  taskId: string;
+  chapterTitle: string;
+  error: string | null;
+  providerName: string;
+  model: string;
+  role: "primary" | "fallback" | "auto" | "forced" | null;
+  inputTokens: number | null;
+  outputTokens: number | null;
+  costUsd: number | null;
+  qualityScore: number | null;
+};
 
 export async function POST(request: Request) {
   const strategy = getBatchExecutionStrategy(new URL(request.url).searchParams.get("strategy"));
@@ -53,7 +69,7 @@ export async function POST(request: Request) {
       }
     }
   }
-  const results = [];
+  const results: RecommendedBatchResult[] = [];
 
   for (const chapterId of plan.chapterIds) {
     if (plan.category === "draft") {
@@ -63,7 +79,7 @@ export async function POST(request: Request) {
         status: "error" in result ? "failed" : "succeeded",
         taskId: result.task.id,
         chapterTitle: result.chapter.title,
-        error: "error" in result ? result.error : null,
+        error: "error" in result ? result.error ?? null : null,
         providerName: result.provider.displayName,
         model: result.provider.model,
         role: roleFor(result, result.task.id),
@@ -82,7 +98,7 @@ export async function POST(request: Request) {
         status: "error" in result ? "failed" : "succeeded",
         taskId: result.task.id,
         chapterTitle: result.chapter.title,
-        error: "error" in result ? result.error : null,
+        error: "error" in result ? result.error ?? null : null,
         providerName: result.provider.displayName,
         model: result.provider.model,
         role: roleFor(result, result.task.id),
@@ -105,7 +121,7 @@ export async function POST(request: Request) {
       status: "error" in result ? "failed" : "succeeded",
       taskId: result.task.id,
       chapterTitle: result.chapter.title,
-      error: "error" in result ? result.error : null,
+      error: "error" in result ? result.error ?? null : null,
       providerName: result.activeProvider.displayName,
       model: result.activeProvider.model,
       role: roleFor(result, result.task.id),
@@ -116,20 +132,28 @@ export async function POST(request: Request) {
     });
   }
 
+  const routeEffectSummary = buildBatchRouteEffectSummary(results.map((result) => ({
+    status: result.status as "succeeded" | "failed",
+    taskId: result.taskId,
+    providerName: result.providerName,
+    model: result.model,
+    role: result.role,
+    inputTokens: result.inputTokens,
+    outputTokens: result.outputTokens,
+    costUsd: result.costUsd,
+    qualityScore: result.qualityScore,
+  })));
+  const batchReceipt = buildTaskQueueBatchReceipt({
+    plan,
+    results,
+    routeEffectSummary,
+  });
+
   return NextResponse.json({
     plan,
     safety,
     results,
-    routeEffectSummary: buildBatchRouteEffectSummary(results.map((result) => ({
-      status: result.status as "succeeded" | "failed",
-      taskId: result.taskId,
-      providerName: result.providerName,
-      model: result.model,
-      role: result.role,
-      inputTokens: result.inputTokens,
-      outputTokens: result.outputTokens,
-      costUsd: result.costUsd,
-      qualityScore: result.qualityScore,
-    }))),
+    routeEffectSummary,
+    batchReceipt,
   });
 }

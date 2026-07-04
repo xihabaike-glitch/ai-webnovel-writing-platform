@@ -234,6 +234,7 @@ export default async function ModelSettingsPage() {
   const firstDayRouteSummary = buildFirstDayRouteSummary({
     providers: routeProviders,
     routes,
+    blueprintItems: presetRouteBlueprint.items,
   });
   const routeConfirmationOnboarding = buildRouteConfirmationOnboarding({
     routeOptions: modelTaskRouteOptions,

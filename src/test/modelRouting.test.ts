@@ -826,6 +826,100 @@ test("model task routing", async (t) => {
     assert.ok(summary.nextActions[0].includes("第一章审稿"));
   });
 
+  await t.test("turns first-day blueprint routes into a one-click apply plan", () => {
+    const summary = buildFirstDayRouteSummary({
+      providers: [
+        {
+          id: "deepseek-provider",
+          providerId: "deepseek",
+          displayName: "DeepSeek",
+          defaultModel: "deepseek-chat",
+          enabled: true,
+          encryptedApiKey: "key",
+        },
+        {
+          id: "kimi-provider",
+          providerId: "kimi",
+          displayName: "Kimi",
+          defaultModel: "kimi-k2.6",
+          enabled: true,
+          encryptedApiKey: "key",
+        },
+        {
+          id: "claude-provider",
+          providerId: "claude",
+          displayName: "Claude",
+          defaultModel: "claude-sonnet-4-5",
+          enabled: true,
+          encryptedApiKey: "key",
+        },
+        mockProvider,
+      ],
+      routes: [
+        {
+          taskType: "chapter_draft",
+          primaryProviderConfigId: "deepseek-provider",
+          fallbackProviderConfigId: "kimi-provider",
+        },
+        {
+          taskType: "control_asset_generate",
+          primaryProviderConfigId: "mock-provider",
+          fallbackProviderConfigId: null,
+        },
+      ],
+      blueprintItems: [
+        {
+          taskType: "chapter_draft",
+          status: "current",
+          recommendedPrimaryProviderConfigId: "deepseek-provider",
+          recommendedFallbackProviderConfigId: "kimi-provider",
+          primaryProviderName: "DeepSeek · deepseek-chat",
+          fallbackProviderName: "Kimi · kimi-k2.6",
+          reason: "当前初稿路线已经符合首日蓝图。",
+        },
+        {
+          taskType: "control_asset_generate",
+          status: "ready",
+          recommendedPrimaryProviderConfigId: "kimi-provider",
+          recommendedFallbackProviderConfigId: "claude-provider",
+          primaryProviderName: "Kimi · kimi-k2.6",
+          fallbackProviderName: "Claude · claude-sonnet-4-5",
+          reason: "总控资料建议用长上下文模型。",
+        },
+        {
+          taskType: "chapter_review",
+          status: "ready",
+          recommendedPrimaryProviderConfigId: "claude-provider",
+          recommendedFallbackProviderConfigId: "kimi-provider",
+          primaryProviderName: "Claude · claude-sonnet-4-5",
+          fallbackProviderName: "Kimi · kimi-k2.6",
+          reason: "审稿二改建议用 Claude。",
+        },
+        {
+          taskType: "chapter_second_pass",
+          status: "ready",
+          recommendedPrimaryProviderConfigId: "claude-provider",
+          recommendedFallbackProviderConfigId: "kimi-provider",
+          primaryProviderName: "Claude · claude-sonnet-4-5",
+          fallbackProviderName: "Kimi · kimi-k2.6",
+          reason: "二改建议用审稿模型。",
+        },
+      ],
+    });
+
+    const draft = summary.items.find((item) => item.taskType === "chapter_draft");
+    const control = summary.items.find((item) => item.taskType === "control_asset_generate");
+    const review = summary.items.find((item) => item.taskType === "chapter_review");
+
+    assert.equal(summary.summary.applicableRecommendations, 3);
+    assert.equal(draft?.canApplyRecommendation, false);
+    assert.equal(control?.canApplyRecommendation, true);
+    assert.equal(control?.recommendedPrimaryProviderConfigId, "kimi-provider");
+    assert.equal(control?.recommendedRouteLabel, "Kimi · kimi-k2.6 / Claude · claude-sonnet-4-5");
+    assert.equal(review?.canApplyRecommendation, true);
+    assert.ok(summary.nextActions[0].includes("一键应用 3 条"));
+  });
+
   await t.test("builds route recommendations from successful model samples", () => {
     const routeConfirmationRechecks = buildRouteConfirmationRecheckEvidenceFromDispatchTasks([{
       dispatchKey: "model-route-confirmation-recheck:chapter_review:2026-07-04T10:00:00.000Z",

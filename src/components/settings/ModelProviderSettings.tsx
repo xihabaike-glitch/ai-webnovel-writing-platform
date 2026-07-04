@@ -301,6 +301,7 @@ interface FirstDayRouteSummaryView {
     configured: number;
     needsRoute: number;
     mockFallback: number;
+    applicableRecommendations: number;
   };
   nextActions: string[];
   items: Array<{
@@ -311,6 +312,10 @@ interface FirstDayRouteSummaryView {
     fallbackProviderName: string;
     status: "configured" | "needs_route" | "mock_fallback";
     recommendation: string;
+    recommendedPrimaryProviderConfigId: string | null;
+    recommendedFallbackProviderConfigId: string | null;
+    recommendedRouteLabel: string | null;
+    canApplyRecommendation: boolean;
   }>;
 }
 
@@ -468,6 +473,7 @@ export function ModelProviderSettings({
   ));
   const [savingRouteType, setSavingRouteType] = useState<string | null>(null);
   const [applyingRecommendationType, setApplyingRecommendationType] = useState<string | null>(null);
+  const [isApplyingFirstDayRoutes, setIsApplyingFirstDayRoutes] = useState(false);
   const [governingRuleKey, setGoverningRuleKey] = useState<string | null>(null);
   const [creatingRetestRuleKey, setCreatingRetestRuleKey] = useState<string | null>(null);
   const [runningRetestRuleKey, setRunningRetestRuleKey] = useState<string | null>(null);
@@ -667,6 +673,54 @@ export function ModelProviderSettings({
       setRouteNotice({ message: caught instanceof Error ? caught.message : "应用路由建议失败。" });
     } finally {
       setApplyingRecommendationType(null);
+    }
+  }
+
+  async function applyFirstDayRecommendedRoutes() {
+    const applicableItems = firstDayRouteSummary.items.filter((item) => (
+      item.canApplyRecommendation && item.recommendedPrimaryProviderConfigId
+    ));
+    if (!applicableItems.length) return;
+
+    setIsApplyingFirstDayRoutes(true);
+    setRouteNotice(null);
+    try {
+      for (const item of applicableItems) {
+        const response = await fetch("/api/model-task-routes", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            taskType: item.taskType,
+            primaryProviderConfigId: item.recommendedPrimaryProviderConfigId,
+            fallbackProviderConfigId: item.recommendedFallbackProviderConfigId,
+            confirmation: {
+              source: "preset",
+              reason: `首日工作流推荐路线：${item.stage}。`,
+              primaryProviderName: providerNameForRoute(item.recommendedPrimaryProviderConfigId),
+              fallbackProviderName: providerNameForRoute(item.recommendedFallbackProviderConfigId),
+              routeStatus: "ready",
+            },
+          }),
+        });
+        if (!response.ok) throw new Error(`应用「${item.stage}」推荐路线失败。`);
+      }
+
+      setRouteDrafts((current) => {
+        const next = { ...current };
+        applicableItems.forEach((item) => {
+          next[item.taskType] = {
+            primaryProviderConfigId: item.recommendedPrimaryProviderConfigId ?? "",
+            fallbackProviderConfigId: item.recommendedFallbackProviderConfigId ?? "",
+          };
+        });
+        return next;
+      });
+      setRouteNotice({ message: `已应用 ${applicableItems.length} 条首日推荐路线` });
+      router.refresh();
+    } catch (caught) {
+      setRouteNotice({ message: caught instanceof Error ? caught.message : "应用首日推荐路线失败。" });
+    } finally {
+      setIsApplyingFirstDayRoutes(false);
     }
   }
 
@@ -996,10 +1050,21 @@ export function ModelProviderSettings({
                 首日按钮会依次用到总控资料、第一章初稿、第一章审稿和二改路线。这里先把关键路线露出来，避免执行时才发现模型不对。
               </p>
             </div>
-            <div className="flex flex-wrap gap-2 text-xs text-slate-600">
-              <span className="rounded-md bg-emerald-50 px-2 py-1 text-emerald-700">已配 {firstDayRouteSummary.summary.configured}</span>
-              <span className="rounded-md bg-amber-50 px-2 py-1 text-amber-700">缺路线 {firstDayRouteSummary.summary.needsRoute}</span>
-              <span className="rounded-md bg-sky-50 px-2 py-1 text-sky-700">Mock {firstDayRouteSummary.summary.mockFallback}</span>
+            <div className="flex flex-col gap-2 sm:items-end">
+              <div className="flex flex-wrap gap-2 text-xs text-slate-600">
+                <span className="rounded-md bg-emerald-50 px-2 py-1 text-emerald-700">已配 {firstDayRouteSummary.summary.configured}</span>
+                <span className="rounded-md bg-amber-50 px-2 py-1 text-amber-700">缺路线 {firstDayRouteSummary.summary.needsRoute}</span>
+                <span className="rounded-md bg-sky-50 px-2 py-1 text-sky-700">Mock {firstDayRouteSummary.summary.mockFallback}</span>
+                <span className="rounded-md bg-violet-50 px-2 py-1 text-violet-700">可应用 {firstDayRouteSummary.summary.applicableRecommendations}</span>
+              </div>
+              <button
+                className="rounded-md bg-slate-950 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={isApplyingFirstDayRoutes || firstDayRouteSummary.summary.applicableRecommendations === 0}
+                onClick={() => void applyFirstDayRecommendedRoutes()}
+                type="button"
+              >
+                {isApplyingFirstDayRoutes ? "应用中" : "一键应用首日推荐"}
+              </button>
             </div>
           </div>
           <div className="mt-3 grid gap-2 lg:grid-cols-2">
@@ -1018,6 +1083,11 @@ export function ModelProviderSettings({
                     <span className="rounded-md bg-white px-2 py-1">首选 {item.primaryProviderName}</span>
                     <span className="rounded-md bg-white px-2 py-1">备用 {item.fallbackProviderName}</span>
                   </div>
+                  {item.recommendedRouteLabel ? (
+                    <div className={`mt-2 rounded-md px-2 py-1 text-xs ${item.canApplyRecommendation ? "bg-amber-50 text-amber-800" : "bg-white text-slate-600"}`}>
+                      推荐 {item.recommendedRouteLabel}
+                    </div>
+                  ) : null}
                   <p className="mt-2 leading-6 text-slate-600">{item.recommendation}</p>
                 </div>
               );

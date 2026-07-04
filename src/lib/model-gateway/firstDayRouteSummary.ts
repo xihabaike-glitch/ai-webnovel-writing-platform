@@ -17,6 +17,16 @@ export interface FirstDayRouteConfig {
   fallbackProviderConfigId: string | null;
 }
 
+export interface FirstDayRouteBlueprintItem {
+  taskType: string;
+  status: "ready" | "current" | "missing";
+  recommendedPrimaryProviderConfigId: string | null;
+  recommendedFallbackProviderConfigId: string | null;
+  primaryProviderName: string;
+  fallbackProviderName: string | null;
+  reason: string;
+}
+
 export interface FirstDayRouteSummaryItem {
   taskType: FirstDayRouteTaskType;
   label: string;
@@ -25,6 +35,10 @@ export interface FirstDayRouteSummaryItem {
   fallbackProviderName: string;
   status: "configured" | "needs_route" | "mock_fallback";
   recommendation: string;
+  recommendedPrimaryProviderConfigId: string | null;
+  recommendedFallbackProviderConfigId: string | null;
+  recommendedRouteLabel: string | null;
+  canApplyRecommendation: boolean;
 }
 
 export interface FirstDayRouteSummary {
@@ -33,6 +47,7 @@ export interface FirstDayRouteSummary {
     configured: number;
     needsRoute: number;
     mockFallback: number;
+    applicableRecommendations: number;
   };
   items: FirstDayRouteSummaryItem[];
   nextActions: string[];
@@ -63,17 +78,36 @@ function recommendationFor(status: FirstDayRouteSummaryItem["status"], stage: st
   return `${stage}还没有明确模型路线，建议先配置首选和备用模型，别让首日执行靠默认选择。`;
 }
 
+function routeMatchesBlueprint(route: FirstDayRouteConfig | undefined, blueprint: FirstDayRouteBlueprintItem | undefined) {
+  if (!blueprint?.recommendedPrimaryProviderConfigId) return true;
+  return (route?.primaryProviderConfigId ?? null) === blueprint.recommendedPrimaryProviderConfigId
+    && (route?.fallbackProviderConfigId ?? null) === blueprint.recommendedFallbackProviderConfigId;
+}
+
+function recommendedRouteLabel(blueprint: FirstDayRouteBlueprintItem | undefined) {
+  if (!blueprint?.recommendedPrimaryProviderConfigId) return null;
+  return `${blueprint.primaryProviderName} / ${blueprint.fallbackProviderName ?? "无备用"}`;
+}
+
 export function buildFirstDayRouteSummary(input: {
   providers: FirstDayRouteProvider[];
   routes: FirstDayRouteConfig[];
+  blueprintItems?: FirstDayRouteBlueprintItem[];
 }): FirstDayRouteSummary {
   const providersById = new Map(input.providers.map((provider) => [provider.id, provider]));
   const routesByTaskType = new Map(input.routes.map((route) => [route.taskType, route]));
+  const blueprintByTaskType = new Map((input.blueprintItems ?? []).map((item) => [item.taskType, item]));
   const items = firstDayRouteTasks.map(({ taskType, stage }): FirstDayRouteSummaryItem => {
     const route = routesByTaskType.get(taskType);
+    const blueprint = blueprintByTaskType.get(taskType);
     const configured = Boolean(route?.primaryProviderConfigId || route?.fallbackProviderConfigId);
     const mockRoute = isMockRoute(providersById, route);
     const status: FirstDayRouteSummaryItem["status"] = mockRoute ? "mock_fallback" : configured ? "configured" : "needs_route";
+    const canApplyRecommendation = Boolean(
+      blueprint?.recommendedPrimaryProviderConfigId
+      && blueprint.status !== "missing"
+      && !routeMatchesBlueprint(route, blueprint),
+    );
 
     return {
       taskType,
@@ -83,6 +117,10 @@ export function buildFirstDayRouteSummary(input: {
       fallbackProviderName: providerName(providersById, route?.fallbackProviderConfigId),
       status,
       recommendation: recommendationFor(status, stage),
+      recommendedPrimaryProviderConfigId: blueprint?.recommendedPrimaryProviderConfigId ?? null,
+      recommendedFallbackProviderConfigId: blueprint?.recommendedFallbackProviderConfigId ?? null,
+      recommendedRouteLabel: recommendedRouteLabel(blueprint),
+      canApplyRecommendation,
     };
   });
   const summary = {
@@ -90,9 +128,11 @@ export function buildFirstDayRouteSummary(input: {
     configured: items.filter((item) => item.status === "configured").length,
     needsRoute: items.filter((item) => item.status === "needs_route").length,
     mockFallback: items.filter((item) => item.status === "mock_fallback").length,
+    applicableRecommendations: items.filter((item) => item.canApplyRecommendation).length,
   };
   const missing = items.filter((item) => item.status === "needs_route").map((item) => item.stage);
   const nextActions = [
+    summary.applicableRecommendations > 0 ? `可一键应用 ${summary.applicableRecommendations} 条首日推荐路线。` : null,
     missing.length ? `先补齐${missing.join("、")}的模型路线。` : null,
     summary.mockFallback > 0 ? "Mock 兜底只适合本地验收，接平台前要替换为 Claude、DeepSeek、Kimi、GPT 等有效供应商。" : null,
     "首日工作流至少要保证总控资料、第一章初稿、第一章审稿、二改四条路线可解释。",

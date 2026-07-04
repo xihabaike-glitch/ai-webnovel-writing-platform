@@ -41,6 +41,18 @@ function riskLabel(level: QueueItem["riskLevel"]) {
   return "标准";
 }
 
+function scaleGateClass(scaleGate: QueueItem["scaleGate"]) {
+  if (scaleGate === "sample_only") return "border-amber-200 bg-amber-50 text-amber-800";
+  if (scaleGate === "cleared") return "border-emerald-200 bg-emerald-50 text-emerald-800";
+  return "border-slate-200 bg-slate-50 text-slate-600";
+}
+
+function scaleGateLabel(scaleGate: QueueItem["scaleGate"]) {
+  if (scaleGate === "sample_only") return "小样本";
+  if (scaleGate === "cleared") return "准放量";
+  return "标准批次";
+}
+
 function runStatusClass(status: string) {
   if (status === "succeeded") return "bg-emerald-50 text-emerald-700";
   if (status === "failed") return "bg-rose-50 text-rose-700";
@@ -136,6 +148,7 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
   })));
   const strategyComparison = buildBatchStrategyComparison(queue.items, projects, batchHistory);
   const strategyDecision = buildBatchStrategyDecision(strategyComparison, activeStrategy.id);
+  const unlockedDrafts = queue.items.filter((entry) => entry.category === "draft" && entry.scaleGate === "cleared");
 
   return (
     <AppShell>
@@ -201,6 +214,34 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
           <div className="mt-1 text-2xl font-semibold">{queue.overview.watchCleared}</div>
         </div>
       </section>
+
+      {unlockedDrafts.length > 0 ? (
+        <section className="mb-6 rounded-md border border-emerald-200 bg-emerald-50 p-4 text-emerald-900">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <h2 className="font-medium">小样本已过线，后续初稿可恢复</h2>
+              <p className="mt-1 max-w-3xl text-sm leading-6">
+                这些不是普通待生成任务，是刚从观察闸门里放出来的后续初稿。先按同一平台打法小批次恢复，别一口气放大到失控。
+              </p>
+            </div>
+            <div className="w-fit rounded-md bg-white/70 px-3 py-2 text-sm font-medium">
+              {unlockedDrafts.length} 个准放量初稿
+            </div>
+          </div>
+          <div className="mt-3 grid gap-2 lg:grid-cols-3">
+            {unlockedDrafts.slice(0, 6).map((entry) => (
+              <Link className="rounded-md bg-white/80 p-3 text-sm hover:bg-white" href={entry.href} key={entry.id}>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="rounded-md bg-emerald-100 px-2 py-1 text-xs font-medium text-emerald-800">准放量</span>
+                  <span className="font-medium text-slate-950">{entry.chapterTitle}</span>
+                </div>
+                <div className="mt-2 text-slate-600">{entry.projectTitle} · {entry.platformName}</div>
+                <p className="mt-2 line-clamp-2 leading-6 text-slate-600">{entry.evidence}</p>
+              </Link>
+            ))}
+          </div>
+        </section>
+      ) : null}
 
       <section className="mb-6 rounded-md border border-slate-200 bg-white p-4">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
@@ -596,6 +637,11 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
                   <span className={`rounded-md border px-2 py-1 text-xs font-medium ${riskClass(entry.riskLevel)}`}>
                     {riskLabel(entry.riskLevel)} · {entry.riskLabel}
                   </span>
+                  {entry.scaleGate !== "none" ? (
+                    <span className={`rounded-md border px-2 py-1 text-xs font-medium ${scaleGateClass(entry.scaleGate)}`}>
+                      {scaleGateLabel(entry.scaleGate)}
+                    </span>
+                  ) : null}
                   <Link className="font-semibold text-slate-950 hover:underline" href={`/projects/${entry.projectId}`}>
                     {entry.projectTitle}
                   </Link>

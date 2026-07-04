@@ -89,4 +89,15 @@ test("buildTaskQueueExecutionPlan", async (t) => {
     assert.deepEqual(plan.chapterIds, ["chapter-1"]);
     assert.ok(plan.warnings.some((warning) => warning.includes("小样本闸门")));
   });
+
+  await t.test("marks cleared watch drafts as recovery scale-up batches", () => {
+    const plan = buildTaskQueueExecutionPlan([
+      queueItem({ id: "project-1:draft:chapter-1", category: "draft", projectId: "project-1", projectTitle: "项目一", chapterTitle: "第一章", riskLevel: "watch", riskLabel: "恢复观察", scaleGate: "cleared", actionLabel: "生成初稿" }),
+      queueItem({ id: "project-1:draft:chapter-2", category: "draft", projectId: "project-1", projectTitle: "项目一", chapterTitle: "第二章", riskLevel: "watch", riskLabel: "恢复观察", scaleGate: "cleared", actionLabel: "生成初稿" }),
+    ]);
+
+    assert.equal(plan.scaleGate, "cleared");
+    assert.deepEqual(plan.chapterIds, ["chapter-1", "chapter-2"]);
+    assert.ok(plan.warnings.some((warning) => warning.includes("恢复放量")));
+  });
 });

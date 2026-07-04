@@ -184,6 +184,37 @@ test("recommended story tree experience can become an apply dispatch", () => {
   assert.ok(dispatch.evidence.some((item) => item.includes("经验动作")));
 });
 
+test("buildStoryTreeChapterExperienceRecommendations excludes already returned dispatches", () => {
+  const guide = buildStoryTreeExperienceGuide([
+    {
+      dispatchKey: "story-tree:project-1:chapter-1:chapter_draft:branch_causality",
+      title: "补分支因果",
+      href: "/projects/project-1/chapters/chapter-1",
+      evidence: [
+        "大树结构复检：68 -> 82 分，分数变好：结构可用；返工动作：分支因果：把支线改成主线压力的直接后果。",
+      ],
+      completedAt: "2026-07-05T08:00:00.000Z",
+      updatedAt: "2026-07-05T08:00:00.000Z",
+    },
+  ]);
+  const recommendations = buildStoryTreeChapterExperienceRecommendations({
+    guide,
+    audit: {
+      score: 61,
+      label: "结构需二改",
+      summary: "大树质检：结构需二改。",
+      shouldRewrite: true,
+      topActions: ["分支因果：支线必须绑定主线压力。"],
+      axes: [
+        { id: "branch_causality", label: "分支因果", score: 41, status: "fail", evidence: "支线游离。", suggestion: "支线必须绑定主线压力。" },
+      ],
+    },
+    excludeDispatchKeys: ["story-tree:project-1:chapter-1:chapter_draft:branch_causality"],
+  });
+
+  assert.equal(recommendations.length, 0);
+});
+
 test("buildStoryTreeExperienceApplyDispatch turns a learned action into an assigned task", () => {
   const guide = buildStoryTreeExperienceGuide([
     {
@@ -253,9 +284,12 @@ test("buildStoryTreeExperienceSecondPassAdvice turns completed apply dispatches 
   assert.equal(advice[0].axisId, "branch_causality");
   assert.equal(advice[0].sourceScore, 78);
   assert.equal(advice[0].status, "usable");
-  assert.ok(advice[0].instruction.includes("按已验证经验处理「分支因果」"));
+  assert.equal(advice[0].action, "分支因果：把支线改成主线压力的直接后果。");
+  assert.equal(advice[0].completionEvidence, "已把妹妹支线改成反派逼迫主角暴露系统的直接压力。");
+  assert.ok(advice[0].instruction.includes("沿用已完成派单结论二改「分支因果」"));
   assert.ok(advice[0].instruction.includes("把支线改成主线压力的直接后果"));
-  assert.ok(advice[0].instruction.includes("完成依据"));
+  assert.ok(advice[0].instruction.includes("已把妹妹支线改成反派逼迫主角暴露系统的直接压力"));
+  assert.equal(advice[0].instruction.includes("。。结构动作"), false);
 });
 
 test("matches used story tree advice and scores its second-pass effect", () => {

@@ -56,6 +56,8 @@ export interface StoryTreeExperienceSecondPassAdvice {
   axisId: string;
   axisLabel: string;
   sourceScore: number | null;
+  action: string;
+  completionEvidence: string;
   instruction: string;
   detail: string;
   href: string;
@@ -354,9 +356,14 @@ function experienceInstruction(item: StoryTreeExperienceItem) {
   return `复用已验证「${item.axisLabel}」经验：${item.action}`;
 }
 
+function sentenceWithPeriod(text: string) {
+  return /[。！？.!?]$/.test(text) ? text : `${text}。`;
+}
+
 export function buildStoryTreeChapterExperienceRecommendations(input: {
   guide: StoryTreeExperienceGuide;
   audit: StoryTreeQualityAudit;
+  excludeDispatchKeys?: string[];
   limit?: number;
 }): StoryTreeChapterExperienceRecommendation[] {
   const weakAxes = input.audit.axes
@@ -368,8 +375,10 @@ export function buildStoryTreeChapterExperienceRecommendations(input: {
   const targetAxes = weakAxes.length ? weakAxes : input.audit.axes.sort((left, right) => left.score - right.score).slice(0, 2);
   const axisRank = new Map<string, { axis: StoryTreeQualityAudit["axes"][number]; index: number }>(targetAxes.map((axis, index) => [axis.id, { axis, index }]));
   const statusWeight: Record<StoryTreeExperienceStatus, number> = { usable: 30, watch: 16, avoid: 12 };
+  const excludedDispatchKeys = new Set(input.excludeDispatchKeys ?? []);
 
   return input.guide.items
+    .filter((item) => !excludedDispatchKeys.has(item.dispatchKey))
     .filter((item) => axisRank.has(item.axisId))
     .map((item): StoryTreeChapterExperienceRecommendation => {
       const ranked = axisRank.get(item.axisId);
@@ -495,10 +504,9 @@ export function buildStoryTreeExperienceSecondPassAdvice(
       const action = taskActionFromEvidence(task.evidence);
       const sourceScore = taskSourceScoreFromEvidence(task.evidence);
       const completion = task.completionEvidence.trim();
-      const instruction = [
-        action ? `按已验证经验处理「${axisLabel}」：${action}` : `按已验证经验处理「${axisLabel}」。`,
-        completion ? `完成依据：${completion}` : "",
-      ].filter(Boolean).join(" ");
+      const instruction = completion
+        ? `沿用已完成派单结论二改「${axisLabel}」：${sentenceWithPeriod(completion)}${action ? `结构动作继续保持：${action}` : "继续保持完成依据中已经验证的处理。"}`
+        : action ? `按已验证经验处理「${axisLabel}」：${action}` : `按已验证经验处理「${axisLabel}」。`;
 
       if (!instruction) return null;
       return {
@@ -509,6 +517,8 @@ export function buildStoryTreeExperienceSecondPassAdvice(
         axisId,
         axisLabel,
         sourceScore,
+        action,
+        completionEvidence: completion,
         instruction,
         detail: task.evidence.find((item) => item.includes("复检")) ?? task.evidence[0] ?? task.detail ?? "",
         href: task.href,

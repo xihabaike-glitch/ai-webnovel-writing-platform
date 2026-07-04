@@ -54,14 +54,15 @@ export default async function ChapterPage({
       cliffhanger: chapter.cliffhanger,
     },
   });
-  const recommendedStoryTreeExperience = buildStoryTreeChapterExperienceRecommendations({
-    guide: storyTreeExperienceGuide,
-    audit: storyTreeAudit,
-  });
   const storyTreeExperienceAdvice = buildStoryTreeExperienceSecondPassAdvice(
     persistedStoryTreeTasks,
     chapter.id,
   );
+  const recommendedStoryTreeExperience = buildStoryTreeChapterExperienceRecommendations({
+    guide: storyTreeExperienceGuide,
+    audit: storyTreeAudit,
+    excludeDispatchKeys: storyTreeExperienceAdvice.map((item) => item.id),
+  });
   const editableChapter = {
     id: chapter.id,
     title: chapter.title,

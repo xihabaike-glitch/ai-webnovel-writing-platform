@@ -249,8 +249,8 @@ export function ChapterSecondPassPanel({
       {storyTreeExperienceAdvice.length ? (
         <div className="mt-4 rounded-md border border-slate-200 bg-slate-50 p-3">
           <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-            <div className="font-medium text-slate-950">已回写的结构经验</div>
-            <div className="text-xs text-slate-500">{storyTreeExperienceAdvice.length} 条可用于二改</div>
+            <div className="font-medium text-slate-950">已回流的结构经验</div>
+            <div className="text-xs text-slate-500">{storyTreeExperienceAdvice.length} 条派单完成后可用于二改</div>
           </div>
           <div className="mt-3 grid gap-2 lg:grid-cols-2">
             {storyTreeExperienceAdvice.map((advice) => (
@@ -263,12 +263,19 @@ export function ChapterSecondPassPanel({
                 </div>
                 <div className="mt-2 font-medium text-slate-950">{advice.title}</div>
                 <p className="mt-2 leading-6 text-slate-600">{advice.instruction}</p>
+                {advice.completionEvidence ? (
+                  <div className="mt-2 border-l-2 border-slate-200 pl-3 text-xs leading-5 text-slate-500">
+                    <div className="font-medium text-slate-700">派单完成依据</div>
+                    <p>{advice.completionEvidence}</p>
+                  </div>
+                ) : null}
+                <p className="mt-2 text-xs leading-5 text-slate-500">源复检：{advice.detail}</p>
                 <button
                   className="mt-3 rounded-md border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
                   onClick={() => setInstruction(advice.instruction)}
                   type="button"
                 >
-                  填入二改指令
+                  填入回流指令
                 </button>
               </div>
             ))}

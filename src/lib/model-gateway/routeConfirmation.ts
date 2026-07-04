@@ -72,6 +72,9 @@ export interface RouteConfirmationDispatchFlowTask {
   href: string;
   priorityScore: number;
   reviewLatestAt: string;
+  completionEvidence?: string;
+  evidence?: string[] | string | null;
+  completedAt?: string | Date | null;
 }
 
 export interface RouteDispatchCompletionTemplateTask {
@@ -359,7 +362,7 @@ function evidenceList(value: RouteConfirmationRecheckDispatchTask["evidence"]) {
 }
 
 function taskTypeFromConfirmationRecheckKey(dispatchKey: string) {
-  const match = dispatchKey.match(/^model-route-confirmation-recheck:([^:]+):/);
+  const match = dispatchKey.match(/^model-route-confirmation-recheck(?:-sample)?:([^:]+):/);
   const taskType = match?.[1] ?? "";
   return isRoutedModelTaskType(taskType) ? taskType : null;
 }
@@ -692,6 +695,30 @@ function flowItemFromReceipt(receipt: ModelRouteConfirmationReceipt): RouteConfi
   };
 }
 
+function flowItemFromPassedRecheck(item: RouteConfirmationRecheckEvidence): RouteConfirmationDispatchFlowItem {
+  return {
+    id: item.id,
+    label: `${labelForRoutedTask(item.taskType)}路由已复检通过`,
+    detail: item.summary,
+    actionLabel: "已确认",
+    href: "/settings/models",
+    priorityScore: 78,
+    latestAt: item.completedAt ?? "",
+  };
+}
+
+function flowItemFromRecheckAdvice(item: RouteConfirmationRecheckAdviceItem): RouteConfirmationDispatchFlowItem {
+  return {
+    id: item.id,
+    label: item.label,
+    detail: item.recommendation,
+    actionLabel: item.actionLabel,
+    href: "/settings/models",
+    priorityScore: item.severity === "blocked" ? 94 : 82,
+    latestAt: item.completedAt ?? "",
+  };
+}
+
 function sortFlowItems(items: RouteConfirmationDispatchFlowItem[]) {
   return [...items].sort((left, right) => (
     right.priorityScore - left.priorityScore || right.latestAt.localeCompare(left.latestAt)
@@ -883,12 +910,40 @@ export function buildRouteConfirmationDispatchFlow(
   const waitingRecheck = activeDispatches.filter((task) => task.stage === "model_route_confirmation_recheck");
   const needsGovernance = activeDispatches.filter((task) => task.stage === "model_route_governance");
   const completed = modelRouteDispatches.filter((task) => task.state === "completed");
+  const completedRecheckTasks: RouteConfirmationRecheckDispatchTask[] = completed.flatMap((task) => {
+    if (
+      task.stage !== "model_route_confirmation_recheck"
+      || typeof task.completionEvidence !== "string"
+      || !task.completionEvidence.trim()
+    ) {
+      return [];
+    }
+    return [{
+      dispatchKey: task.dispatchKey,
+      stage: task.stage,
+      state: task.state,
+      completionEvidence: task.completionEvidence,
+      evidence: task.evidence,
+      completedAt: task.completedAt,
+    }];
+  });
+  const completedRechecks = buildRouteConfirmationRecheckEvidenceFromDispatchTasks(completedRecheckTasks);
+  const passedRechecks = completedRechecks.filter((item) => item.recommendedAction === "keep");
+  const recheckAdvice = buildRouteConfirmationRecheckAdvice(completedRechecks).items;
+  const needsGovernanceItems = [
+    ...needsGovernance.map(flowItemFromTask),
+    ...recheckAdvice.map(flowItemFromRecheckAdvice),
+  ];
+  const confirmedItems = [
+    ...confirmations.map(flowItemFromReceipt),
+    ...passedRechecks.map(flowItemFromPassedRecheck),
+  ];
   const lanes: RouteConfirmationDispatchFlowLane[] = [
     {
       id: "needs_governance",
       label: "需治理",
-      count: needsGovernance.length,
-      items: sortFlowItems(needsGovernance.map(flowItemFromTask)).slice(0, 4),
+      count: needsGovernanceItems.length,
+      items: sortFlowItems(needsGovernanceItems).slice(0, 4),
     },
     {
       id: "waiting_recheck",
@@ -899,8 +954,8 @@ export function buildRouteConfirmationDispatchFlow(
     {
       id: "confirmed",
       label: "已确认",
-      count: confirmations.length,
-      items: sortFlowItems(confirmations.map(flowItemFromReceipt)).slice(0, 4),
+      count: confirmedItems.length,
+      items: sortFlowItems(confirmedItems).slice(0, 4),
     },
     {
       id: "completed",
@@ -912,10 +967,10 @@ export function buildRouteConfirmationDispatchFlow(
 
   return {
     summary: {
-      confirmed: confirmations.length,
+      confirmed: confirmedItems.length,
       dispatched: activeDispatches.length,
       waitingRecheck: waitingRecheck.length,
-      needsGovernance: needsGovernance.length,
+      needsGovernance: needsGovernanceItems.length,
       completed: completed.length,
     },
     lanes,

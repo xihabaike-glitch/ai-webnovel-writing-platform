@@ -796,6 +796,62 @@ test("model task routing", async (t) => {
     assert.equal(flow.lanes.find((lane) => lane.id === "confirmed")?.items[0]?.label, "章节审稿路由已确认");
   });
 
+  await t.test("classifies executed route recheck samples in the dispatch flow", () => {
+    const flow = buildRouteConfirmationDispatchFlow([], [
+      {
+        dispatchKey: "model-route-confirmation-recheck-sample:chapter_draft:2026-07-04T17:00:00.000Z",
+        stage: "model_route_confirmation_recheck",
+        state: "completed",
+        title: "复检正文初稿模型路由",
+        detail: "已运行正文初稿复检样本。",
+        actionLabel: "复检小样本",
+        href: "/settings/models",
+        priorityScore: 72,
+        reviewLatestAt: "2026-07-04T17:00:00.000Z",
+        completionEvidence: [
+          "复检正文初稿模型路由",
+          "样本数：2",
+          "成功率：100%",
+          "质量：86",
+          "成本：正常",
+          "备用命中：未命中备用",
+          "是否需要治理：否",
+        ].join("\n"),
+        completedAt: "2026-07-04T17:20:00.000Z",
+      },
+      {
+        dispatchKey: "model-route-confirmation-recheck-sample:chapter_review:2026-07-04T18:00:00.000Z",
+        stage: "model_route_confirmation_recheck",
+        state: "completed",
+        title: "复检章节审稿模型路由",
+        detail: "已运行章节审稿复检样本。",
+        actionLabel: "复检小样本",
+        href: "/settings/models",
+        priorityScore: 72,
+        reviewLatestAt: "2026-07-04T18:00:00.000Z",
+        completionEvidence: [
+          "复检章节审稿模型路由",
+          "样本数：2",
+          "成功率：50%",
+          "质量：62",
+          "成本：偏高",
+          "备用命中：命中备用",
+          "是否需要治理：是，原因：仍命中备用",
+        ].join("\n"),
+        completedAt: "2026-07-04T18:20:00.000Z",
+      },
+    ]);
+
+    const confirmedLane = flow.lanes.find((lane) => lane.id === "confirmed");
+    const governanceLane = flow.lanes.find((lane) => lane.id === "needs_governance");
+
+    assert.equal(flow.summary.confirmed, 1);
+    assert.equal(flow.summary.needsGovernance, 1);
+    assert.ok(confirmedLane?.items.some((item) => item.id.includes("chapter_draft")));
+    assert.ok(governanceLane?.items.some((item) => item.id.includes("chapter_review")));
+    assert.ok(governanceLane?.items.some((item) => item.actionLabel === "延长观察"));
+  });
+
   await t.test("filters dispatch tasks by route flow lane", () => {
     const tasks = [
       {

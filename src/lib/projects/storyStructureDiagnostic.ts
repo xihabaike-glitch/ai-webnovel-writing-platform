@@ -1,6 +1,7 @@
 import type { PlatformProfile } from "../platforms/platformProfiles.ts";
 
 export interface StructureProject {
+  id: string;
   title: string;
   genre: string;
   sellingPoint: string;
@@ -99,7 +100,20 @@ export interface StoryStructureDiagnostic {
   treeSignals: StructureTreeSignal[];
   items: StructureDiagnosticItem[];
   actionPlan: string[];
+  quickFixes: StoryStructureQuickFix[];
   markdown: string;
+}
+
+export interface StoryStructureQuickFix {
+  id: string;
+  label: string;
+  description: string;
+  method: "POST";
+  endpoint: string;
+  payload: {
+    areaId: "outline" | "characters" | "world" | "story-lines";
+    mode: "seed";
+  };
 }
 
 const typeLabels: Record<string, string> = {
@@ -307,6 +321,52 @@ function buildActionPlan(items: StructureDiagnosticItem[], platform: PlatformPro
   ];
 }
 
+function buildQuickFixes(input: StoryStructureDiagnosticInput, items: StructureDiagnosticItem[]): StoryStructureQuickFix[] {
+  const weakIds = new Set(items.filter((item) => item.status !== "pass").map((item) => item.id));
+  const candidates: StoryStructureQuickFix[] = [
+    {
+      id: "structure-outline-seed",
+      label: "补大树骨架",
+      description: "自动补齐开头、结尾、主干、分支、叶片和土壤基础节点。",
+      method: "POST",
+      endpoint: `/api/projects/${input.project.id}/control-actions`,
+      payload: { areaId: "outline", mode: "seed" },
+    },
+    {
+      id: "structure-character-seed",
+      label: "补人物弧光卡",
+      description: "自动创建主角、反派压力源和关系镜像角色的基础人物卡。",
+      method: "POST",
+      endpoint: `/api/projects/${input.project.id}/control-actions`,
+      payload: { areaId: "characters", mode: "seed" },
+    },
+    {
+      id: "structure-story-line-seed",
+      label: "补主线伏笔",
+      description: "自动创建主线问题和开局异常伏笔，让结构有连续追读链。",
+      method: "POST",
+      endpoint: `/api/projects/${input.project.id}/control-actions`,
+      payload: { areaId: "story-lines", mode: "seed" },
+    },
+    {
+      id: "structure-world-seed",
+      label: "补平台土壤",
+      description: "自动创建核心规则、禁忌限制和平台土壤，给长篇扩写加约束。",
+      method: "POST",
+      endpoint: `/api/projects/${input.project.id}/control-actions`,
+      payload: { areaId: "world", mode: "seed" },
+    },
+  ];
+  const shouldShow = new Map<string, boolean>([
+    ["structure-outline-seed", weakIds.has("tree-skeleton") || weakIds.has("opening-ending") || weakIds.has("branch-coverage")],
+    ["structure-character-seed", weakIds.has("character-arc")],
+    ["structure-story-line-seed", weakIds.has("trunk-pressure") || weakIds.has("branch-coverage") || weakIds.has("foreshadow-payoff")],
+    ["structure-world-seed", weakIds.has("platform-fit")],
+  ]);
+
+  return candidates.filter((fix) => shouldShow.get(fix.id)).slice(0, 4);
+}
+
 function buildMarkdown(input: StoryStructureDiagnosticInput, diagnostic: Omit<StoryStructureDiagnostic, "markdown">) {
   return [
     `# ${input.project.title} 整书结构健康度诊断`,
@@ -324,6 +384,11 @@ function buildMarkdown(input: StoryStructureDiagnosticInput, diagnostic: Omit<St
     "## 下一步动作",
     ...diagnostic.actionPlan.map((step, index) => `${index + 1}. ${step}`),
     "",
+    "## 可执行快修",
+    ...(diagnostic.quickFixes.length
+      ? diagnostic.quickFixes.map((fix, index) => `${index + 1}. ${fix.label}：${fix.description}`)
+      : ["暂无结构快修。"]),
+    "",
   ].join("\n");
 }
 
@@ -338,6 +403,7 @@ export function buildStoryStructureDiagnostic(input: StoryStructureDiagnosticInp
     treeSignals,
     items,
     actionPlan: buildActionPlan(items, input.platform),
+    quickFixes: buildQuickFixes(input, items),
   };
 
   return {

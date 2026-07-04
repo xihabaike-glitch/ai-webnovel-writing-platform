@@ -26,7 +26,20 @@ interface StoryStructureDiagnostic {
   treeSignals: StructureTreeSignal[];
   items: StructureDiagnosticItem[];
   actionPlan: string[];
+  quickFixes: StoryStructureQuickFix[];
   markdown: string;
+}
+
+interface StoryStructureQuickFix {
+  id: string;
+  label: string;
+  description: string;
+  method: "POST";
+  endpoint: string;
+  payload: {
+    areaId: "outline" | "characters" | "world" | "story-lines";
+    mode: "seed";
+  };
 }
 
 function statusLabel(status: StructureDiagnosticItem["status"]) {
@@ -42,6 +55,7 @@ export function StoryStructureDiagnosticPanel({ projectId }: { projectId: string
   const [diagnostic, setDiagnostic] = useState<StoryStructureDiagnostic | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
+  const [runningFixId, setRunningFixId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
   async function loadDiagnostic() {
@@ -59,6 +73,28 @@ export function StoryStructureDiagnosticPanel({ projectId }: { projectId: string
       setMessage(caught instanceof Error ? caught.message : "生成整书结构诊断失败。");
     } finally {
       setIsLoading(false);
+    }
+  }
+
+  async function runQuickFix(fix: StoryStructureQuickFix) {
+    setRunningFixId(fix.id);
+    setMessage(null);
+    try {
+      const response = await fetch(fix.endpoint, {
+        method: fix.method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(fix.payload),
+      });
+      const payload = (await response.json().catch(() => null)) as { message?: string; error?: string } | null;
+      if (!response.ok) {
+        throw new Error(payload?.error ?? "执行结构快修失败。");
+      }
+      await loadDiagnostic();
+      setMessage(payload?.message ?? `已执行：${fix.label}`);
+    } catch (caught) {
+      setMessage(caught instanceof Error ? caught.message : "执行结构快修失败。");
+    } finally {
+      setRunningFixId(null);
     }
   }
 
@@ -171,6 +207,28 @@ export function StoryStructureDiagnosticPanel({ projectId }: { projectId: string
               ))}
             </div>
           </div>
+
+          {diagnostic.quickFixes.length ? (
+            <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm">
+              <div className="font-medium text-slate-950">结构快修</div>
+              <div className="mt-3 grid gap-3 md:grid-cols-2">
+                {diagnostic.quickFixes.map((fix) => (
+                  <div className="rounded-md border border-amber-200 bg-white p-3" key={fix.id}>
+                    <div className="font-medium text-slate-950">{fix.label}</div>
+                    <p className="mt-1 leading-6 text-slate-600">{fix.description}</p>
+                    <button
+                      className="mt-3 rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white disabled:opacity-50"
+                      disabled={runningFixId === fix.id}
+                      onClick={() => void runQuickFix(fix)}
+                      type="button"
+                    >
+                      {runningFixId === fix.id ? "执行中" : "执行快修"}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
         </div>
       ) : (
         <p className="mt-4 text-sm text-slate-600">生成后会显示整书结构分、大树节点状态、风险项和下一步动作。</p>

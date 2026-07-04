@@ -28,6 +28,7 @@ export async function GET(request: Request, { params }: Params) {
   const platform = getPlatformProfile(project.targetPlatform as PlatformId);
   const diagnostic = buildStoryStructureDiagnostic({
     project: {
+      id: project.id,
       title: project.title,
       genre: project.genre,
       sellingPoint: project.sellingPoint,

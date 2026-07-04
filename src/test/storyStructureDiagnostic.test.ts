@@ -6,6 +6,7 @@ import { buildStoryStructureDiagnostic } from "../lib/projects/storyStructureDia
 
 const platform = getPlatformProfile("fanqie");
 const project = {
+  id: "project-1",
   title: "夜雨系统",
   genre: "都市系统",
   sellingPoint: "雨夜系统翻盘",
@@ -93,7 +94,9 @@ test("buildStoryStructureDiagnostic", async (t) => {
     assert.ok(diagnostic.score >= 80);
     assert.ok(diagnostic.treeSignals.every((signal) => signal.count > 0));
     assert.ok(diagnostic.items.some((item) => item.id === "character-arc" && item.status === "pass"));
+    assert.deepEqual(diagnostic.quickFixes, []);
     assert.ok(diagnostic.markdown.includes("整书结构健康度诊断"));
+    assert.ok(diagnostic.markdown.includes("暂无结构快修"));
   });
 
   await t.test("flags missing structure support", () => {
@@ -115,5 +118,12 @@ test("buildStoryStructureDiagnostic", async (t) => {
     assert.ok(diagnostic.treeSignals.some((signal) => signal.status === "fail"));
     assert.ok(diagnostic.items.some((item) => item.id === "tree-skeleton" && item.status === "fail"));
     assert.ok(diagnostic.actionPlan.length >= 3);
+    assert.deepEqual(
+      diagnostic.quickFixes.map((fix) => fix.payload.areaId),
+      ["outline", "characters", "story-lines", "world"],
+    );
+    assert.ok(diagnostic.quickFixes.every((fix) => fix.method === "POST"));
+    assert.ok(diagnostic.quickFixes.every((fix) => fix.endpoint === "/api/projects/project-1/control-actions"));
+    assert.ok(diagnostic.markdown.includes("补大树骨架"));
   });
 });

@@ -31,6 +31,125 @@ const checklist = {
   ],
 };
 
+const emptyEffectComparison = {
+  status: "none" as const,
+  previous: null,
+  current: null,
+  viewsDelta: 0,
+  clicksDelta: 0,
+  favoritesDelta: 0,
+  followsDelta: 0,
+  clickRateDeltaPercent: 0,
+  favoriteRateDeltaPercent: 0,
+  followRateDeltaPercent: 0,
+  verdict: "还没有前后对照样本。",
+  wins: [],
+  losses: [],
+};
+
+function emptyPublishEffect() {
+  return {
+    status: "empty" as const,
+    records: 0,
+    latest: null,
+    comparison: emptyEffectComparison,
+    totalViews: 0,
+    totalClicks: 0,
+    totalFavorites: 0,
+    totalFollows: 0,
+    totalComments: 0,
+    totalPaidReads: 0,
+    clickRatePercent: 0,
+    favoriteRatePercent: 0,
+    followRatePercent: 0,
+    commentRatePercent: 0,
+    paidReadRatePercent: 0,
+    verdict: "还没有发布效果记录。",
+    nextAction: "发布后录入曝光、点击、收藏、追读、评论和编辑反馈。",
+    history: [],
+  };
+}
+
+function collectDataOptimization() {
+  return {
+    status: "collect_data" as const,
+    headline: "先别玄学复盘，缺数据就只是在自我感动。",
+    actions: [
+      {
+        id: "fanqie-collect-effect-data",
+        priority: "high" as const,
+        area: "data" as const,
+        execution: "open_target" as const,
+        label: "录入首轮发布数据",
+        detail: "至少补曝光、点击、收藏、追读、评论和编辑反馈。",
+        evidence: "当前没有任何发布效果记录。",
+        target: "发布效果复盘",
+        href: "#publish-effect-panel",
+      },
+    ],
+  };
+}
+
+function weakPublishEffect() {
+  const latest = {
+    id: "metric-1",
+    platformId: "fanqie",
+    platformName: "番茄小说",
+    views: 1200,
+    clicks: 36,
+    favorites: 12,
+    follows: 4,
+    comments: 1,
+    paidReads: 0,
+    editorFeedback: "开头慢，卖点不够直。",
+    contractStatus: "pending",
+    publishUrl: "",
+    notes: "",
+    snapshotDate: "2026-01-04T00:00:00.000Z",
+  };
+
+  return {
+    status: "weak" as const,
+    records: 1,
+    latest,
+    comparison: { ...emptyEffectComparison, current: latest },
+    totalViews: 1200,
+    totalClicks: 36,
+    totalFavorites: 12,
+    totalFollows: 4,
+    totalComments: 1,
+    totalPaidReads: 0,
+    clickRatePercent: 3,
+    favoriteRatePercent: 1,
+    followRatePercent: 0.3,
+    commentRatePercent: 0.1,
+    paidReadRatePercent: 0,
+    verdict: "番茄小说 当前转化偏弱，先检查标题卖点和前三章兑现。",
+    nextAction: "先改标题、一句话卖点和标签，解决读者点不进来的问题。",
+    history: [latest],
+  };
+}
+
+function urgentEffectOptimization() {
+  return {
+    status: "urgent_rework" as const,
+    headline: "转化漏斗已经漏风，别继续硬投。",
+    actions: [
+      {
+        id: "fanqie-fix-click-package",
+        priority: "high" as const,
+        area: "asset" as const,
+        execution: "generate_asset_variants" as const,
+        label: "重做标题、卖点和标签",
+        detail: "读者没点进来，先把标题改成能一眼看懂冲突和爽点。",
+        evidence: "点击率 3%，低于 5%。",
+        target: "投稿资产",
+        href: "#submission-asset-editor",
+      },
+    ],
+  };
+}
+
 test("buildSerializationOpsDashboard", async (t) => {
   await t.test("prioritizes review for drafted unreviewed chapters", () => {
     const dashboard = buildSerializationOpsDashboard({
@@ -248,6 +367,8 @@ test("buildSerializationOpsDashboard", async (t) => {
         blockers: [],
         items: [],
       },
+      publishEffect: emptyPublishEffect(),
+      effectOptimization: collectDataOptimization(),
       publishSnapshots: [
         {
           id: "snapshot-1",
@@ -296,9 +417,72 @@ test("buildSerializationOpsDashboard", async (t) => {
     assert.equal(dashboard.publishVersionHistory[0].actionLabel, "下载记录");
     assert.equal(dashboard.publishVersionHistory[0].downloadHref, "/api/projects/project-1/platform-export?versionId=download-1&format=markdown");
     assert.equal(dashboard.publishVersionHistory.some((version) => version.id === "other-platform"), false);
+    assert.equal(dashboard.publishEffectStatus.status, "empty");
+    assert.equal(dashboard.publishEffectStatus.actionLabel, "录入发布效果");
+    assert.equal(dashboard.publishEffectStatus.actions[0].href, "#publish-effect-panel");
+    assert.equal(dashboard.actions.some((action) => action.id === "record-publish-effect"), true);
+    assert.ok(dashboard.warnings.some((warning) => warning.includes("还没录入真实发布效果")));
     assert.equal(dashboard.actions.some((action) => action.id === "save-publish-baseline"), false);
     const downloadAction = dashboard.actions.find((action) => action.id === "download-publish-package");
     assert.equal(downloadAction?.href, "/api/projects/project-1/platform-export?format=markdown&platformId=fanqie");
+  });
+
+  await t.test("routes weak publish effect to optimization work", () => {
+    const dashboard = buildSerializationOpsDashboard({
+      project: { ...project, id: "project-1" },
+      platform,
+      chapters: [],
+      aiTasks: [],
+      submissionChecklist: { ...checklist, readinessPercent: 90, items: [] },
+      submissionAssets: [
+        {
+          platformId: "fanqie",
+          platformName: "番茄小说",
+          title: "夜雨系统",
+          logline: "雨夜倒计时降临，主角在救人与逃跑之间连续选择，用系统奖励一步步翻盘。",
+          synopsis: "林晚在雨夜觉醒系统，每次选择都会让危机升级。他必须在救人、逃跑和揭开规则真相之间做决定，借连续任务翻盘。第一卷围绕系统倒计时、城市危机和隐藏对手展开，让主角用爽点明确的选择一步步逆袭，并把每次奖励都变成新的追读悬念。",
+          overseasSynopsis: "Lin Wan awakens a system in the rain and survives escalating choices.",
+          tags: ["都市系统", "爽文", "危机"],
+          note: "",
+          source: "ai_variant",
+          updatedAt: "2026-01-02T00:00:00.000Z",
+        },
+      ],
+      finalGate: {
+        status: "ready_to_submit",
+        label: "可投",
+        headline: "番茄小说 发布门槛已过，可以保存基准后投。",
+        verdict: "标题、简介、前三章、字数、审稿和投稿资产都过了投前线。",
+        nextAction: "保存发布包版本基准，然后下载或复制发布包。",
+        score: 100,
+        blockers: [],
+        items: [],
+      },
+      publishSnapshots: [
+        {
+          id: "snapshot-1",
+          platformId: "fanqie",
+          platformName: "番茄小说",
+          title: "夜雨系统",
+          action: "snapshot",
+          chapterCount: 3,
+          wordCount: 9600,
+          preflightScore: 96,
+          canExport: true,
+          createdAt: "2026-01-03T00:00:00.000Z",
+        },
+      ],
+      publishEffect: weakPublishEffect(),
+      effectOptimization: urgentEffectOptimization(),
+    });
+
+    assert.equal(dashboard.publishEffectStatus.status, "weak");
+    assert.equal(dashboard.publishEffectStatus.label, "偏弱");
+    assert.equal(dashboard.publishEffectStatus.actions[0].actionLabel, "生成候选");
+    const optimizeAction = dashboard.actions.find((action) => action.id === "optimize-publish-effect");
+    assert.equal(optimizeAction?.priority, "high");
+    assert.equal(optimizeAction?.href, "#submission-asset-editor");
+    assert.ok(dashboard.warnings.some((warning) => warning.includes("发布效果偏弱")));
   });
 
   await t.test("requires second-pass recheck before publish readiness", () => {

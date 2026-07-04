@@ -41,9 +41,39 @@ interface SerializationOpsDashboard {
   finalSubmissionGate: SerializationFinalSubmissionGate;
   publishBaselineStatus: SerializationPublishBaselineStatus;
   publishVersionHistory: SerializationPublishVersionHistoryItem[];
+  publishEffectStatus: SerializationPublishEffectStatus;
   nextPublishChapter: SerializationChapter | null;
   actions: SerializationAction[];
   warnings: string[];
+}
+
+interface SerializationPublishEffectAction {
+  id: string;
+  label: string;
+  priority: "high" | "medium" | "low";
+  area: string;
+  detail: string;
+  evidence: string;
+  href: string;
+  actionLabel: string;
+}
+
+interface SerializationPublishEffectStatus {
+  status: "empty" | "weak" | "watch" | "promising" | "signed" | "unknown";
+  label: string;
+  records: number;
+  totalViews: number;
+  clickRatePercent: number;
+  favoriteRatePercent: number;
+  followRatePercent: number;
+  comparisonStatus: "none" | "improved" | "declined" | "mixed" | "flat";
+  verdict: string;
+  nextAction: string;
+  href: string;
+  actionLabel: string;
+  optimizationStatus: "collect_data" | "urgent_rework" | "iterate" | "scale" | "unknown";
+  optimizationHeadline: string;
+  actions: SerializationPublishEffectAction[];
 }
 
 interface SerializationPublishVersionHistoryItem {
@@ -128,6 +158,13 @@ function finalGateStatusLabel(status: SerializationFinalSubmissionGate["status"]
   if (status === "fix_first") return "先修";
   if (status === "do_not_submit") return "别投";
   return "待判断";
+}
+
+function effectStatusClass(status: SerializationPublishEffectStatus["status"]) {
+  if (status === "signed" || status === "promising") return "bg-emerald-50 text-emerald-700";
+  if (status === "weak") return "bg-rose-50 text-rose-700";
+  if (status === "watch") return "bg-amber-50 text-amber-700";
+  return "bg-slate-100 text-slate-600";
 }
 
 function formatTime(value: string | null | undefined) {
@@ -412,6 +449,70 @@ export function SerializationOpsPanel({ projectId }: { projectId: string }) {
               {dashboard.publishBaselineStatus.exists ? (
                 <div className="mt-2 text-xs text-slate-500">
                   {dashboard.publishBaselineStatus.chapterCount} 章 · {dashboard.publishBaselineStatus.wordCount} 字
+                </div>
+              ) : null}
+            </div>
+            <div className="mt-3 rounded-md bg-slate-50 p-3 text-sm">
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <div>
+                  <div className="text-xs text-slate-500">发布效果回收</div>
+                  <div className="mt-1 font-medium text-slate-950">
+                    {dashboard.publishEffectStatus.records} 次记录 · {dashboard.publishEffectStatus.totalViews} 曝光
+                  </div>
+                </div>
+                <span className={`w-fit rounded-md px-2 py-1 text-xs font-medium ${effectStatusClass(dashboard.publishEffectStatus.status)}`}>
+                  {dashboard.publishEffectStatus.label}
+                </span>
+              </div>
+              <div className="mt-3 grid gap-2 sm:grid-cols-3">
+                <div className="rounded-md border border-slate-200 bg-white p-2">
+                  <div className="text-xs text-slate-500">点击率</div>
+                  <div className="mt-1 font-medium text-slate-950">{dashboard.publishEffectStatus.clickRatePercent}%</div>
+                </div>
+                <div className="rounded-md border border-slate-200 bg-white p-2">
+                  <div className="text-xs text-slate-500">收藏率</div>
+                  <div className="mt-1 font-medium text-slate-950">{dashboard.publishEffectStatus.favoriteRatePercent}%</div>
+                </div>
+                <div className="rounded-md border border-slate-200 bg-white p-2">
+                  <div className="text-xs text-slate-500">追读率</div>
+                  <div className="mt-1 font-medium text-slate-950">{dashboard.publishEffectStatus.followRatePercent}%</div>
+                </div>
+              </div>
+              <p className="mt-2 leading-6 text-slate-600">{dashboard.publishEffectStatus.verdict}</p>
+              <div className="mt-2 text-xs text-slate-500">下一步：{dashboard.publishEffectStatus.nextAction}</div>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <Link
+                  className="rounded-md border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                  href={projectHref(projectId, dashboard.publishEffectStatus.href)}
+                >
+                  {dashboard.publishEffectStatus.actionLabel}
+                </Link>
+                <Link
+                  className="rounded-md border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                  href={`/projects/${projectId}#publish-effect-panel`}
+                >
+                  效果面板
+                </Link>
+              </div>
+              {dashboard.publishEffectStatus.actions.length ? (
+                <div className="mt-3 grid gap-2">
+                  <div className="text-xs text-slate-500">{dashboard.publishEffectStatus.optimizationHeadline}</div>
+                  {dashboard.publishEffectStatus.actions.map((action) => (
+                    <div className="rounded-md border border-slate-200 bg-white p-3" key={action.id}>
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div className="font-medium text-slate-950">{action.label}</div>
+                        <span className="text-xs text-slate-500">{priorityLabel(action.priority)}</span>
+                      </div>
+                      <p className="mt-1 leading-6 text-slate-600">{action.detail}</p>
+                      <div className="mt-2 text-xs text-slate-500">依据：{action.evidence}</div>
+                      <Link
+                        className="mt-3 inline-flex rounded-md border border-slate-200 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                        href={projectHref(projectId, action.href)}
+                      >
+                        {action.actionLabel}
+                      </Link>
+                    </div>
+                  ))}
                 </div>
               ) : null}
             </div>

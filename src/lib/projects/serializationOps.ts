@@ -1,5 +1,11 @@
 import type { PlatformProfile } from "../platforms/platformProfiles.ts";
-import { buildSubmissionAssetAudit, type PlatformFinalSubmissionGate, type PlatformSubmissionAssetAudit } from "./platformPublishExport.ts";
+import {
+  buildSubmissionAssetAudit,
+  type PlatformFinalSubmissionGate,
+  type PlatformPublishEffectOptimization,
+  type PlatformPublishEffectSummary,
+  type PlatformSubmissionAssetAudit,
+} from "./platformPublishExport.ts";
 import type { SubmissionChecklist } from "./submissionChecklist.ts";
 
 export interface SerializationProject {
@@ -118,6 +124,35 @@ export interface SerializationPublishVersionHistoryItem {
   downloadHref: string;
 }
 
+export interface SerializationPublishEffectAction {
+  id: string;
+  label: string;
+  priority: "high" | "medium" | "low";
+  area: string;
+  detail: string;
+  evidence: string;
+  href: string;
+  actionLabel: string;
+}
+
+export interface SerializationPublishEffectStatus {
+  status: PlatformPublishEffectSummary["status"] | "unknown";
+  label: string;
+  records: number;
+  totalViews: number;
+  clickRatePercent: number;
+  favoriteRatePercent: number;
+  followRatePercent: number;
+  comparisonStatus: PlatformPublishEffectSummary["comparison"]["status"];
+  verdict: string;
+  nextAction: string;
+  href: string;
+  actionLabel: string;
+  optimizationStatus: PlatformPublishEffectOptimization["status"] | "unknown";
+  optimizationHeadline: string;
+  actions: SerializationPublishEffectAction[];
+}
+
 export interface SerializationOpsInput {
   project: SerializationProject;
   platform: PlatformProfile;
@@ -128,6 +163,8 @@ export interface SerializationOpsInput {
   submissionAssetVersions?: SerializationSubmissionAssetVersion[];
   finalGate?: PlatformFinalSubmissionGate | null;
   publishSnapshots?: SerializationPublishSnapshot[];
+  publishEffect?: PlatformPublishEffectSummary | null;
+  effectOptimization?: PlatformPublishEffectOptimization | null;
 }
 
 export interface SerializationAction {
@@ -160,6 +197,7 @@ export interface SerializationOpsDashboard {
   finalSubmissionGate: SerializationFinalSubmissionGate;
   publishBaselineStatus: SerializationPublishBaselineStatus;
   publishVersionHistory: SerializationPublishVersionHistoryItem[];
+  publishEffectStatus: SerializationPublishEffectStatus;
   nextPublishChapter: SerializationChapter | null;
   actions: SerializationAction[];
   warnings: string[];
@@ -301,6 +339,75 @@ export function buildSerializationPublishVersionHistory(input: Pick<Serializatio
     }));
 }
 
+function publishEffectLabel(status: SerializationPublishEffectStatus["status"]) {
+  if (status === "empty") return "待回收";
+  if (status === "weak") return "偏弱";
+  if (status === "watch") return "观察";
+  if (status === "promising") return "有苗头";
+  if (status === "signed") return "已验证";
+  return "待判断";
+}
+
+function publishEffectActionLabel(execution: string) {
+  if (execution === "generate_asset_variants") return "生成候选";
+  if (execution === "rewrite_first_three") return "重写前三章";
+  return "去处理";
+}
+
+export function buildSerializationPublishEffectStatus(input: Pick<SerializationOpsInput, "publishEffect" | "effectOptimization">): SerializationPublishEffectStatus {
+  const effect = input.publishEffect ?? null;
+  const optimization = input.effectOptimization ?? null;
+
+  if (!effect) {
+    return {
+      status: "unknown",
+      label: "待判断",
+      records: 0,
+      totalViews: 0,
+      clickRatePercent: 0,
+      favoriteRatePercent: 0,
+      followRatePercent: 0,
+      comparisonStatus: "none",
+      verdict: "发布效果还没有生成判断。",
+      nextAction: "进入发布中心录入真实数据。",
+      href: "#publish-effect-panel",
+      actionLabel: "录入发布效果",
+      optimizationStatus: optimization?.status ?? "unknown",
+      optimizationHeadline: optimization?.headline ?? "暂无发布效果优化动作。",
+      actions: [],
+    };
+  }
+
+  const actions = (optimization?.actions ?? []).slice(0, 3).map((action) => ({
+    id: action.id,
+    label: action.label,
+    priority: action.priority,
+    area: action.area,
+    detail: action.detail,
+    evidence: action.evidence,
+    href: action.href,
+    actionLabel: publishEffectActionLabel(action.execution),
+  }));
+
+  return {
+    status: effect.status,
+    label: publishEffectLabel(effect.status),
+    records: effect.records,
+    totalViews: effect.totalViews,
+    clickRatePercent: effect.clickRatePercent,
+    favoriteRatePercent: effect.favoriteRatePercent,
+    followRatePercent: effect.followRatePercent,
+    comparisonStatus: effect.comparison.status,
+    verdict: effect.verdict,
+    nextAction: effect.nextAction,
+    href: effect.status === "empty" ? "#publish-effect-panel" : actions[0]?.href ?? "#publish-effect-panel",
+    actionLabel: effect.status === "empty" ? "录入发布效果" : actions[0]?.actionLabel ?? "查看复盘",
+    optimizationStatus: optimization?.status ?? "unknown",
+    optimizationHeadline: optimization?.headline ?? "暂无发布效果优化动作。",
+    actions,
+  };
+}
+
 function parseJsonObject(text: string | null | undefined) {
   if (!text) return null;
   try {
@@ -391,6 +498,7 @@ function buildActions(
   assetStatus: SerializationSubmissionAssetStatus,
   finalGate: SerializationFinalSubmissionGate,
   baselineStatus: SerializationPublishBaselineStatus,
+  effectStatus: SerializationPublishEffectStatus,
 ) {
   const actions: SerializationAction[] = [];
   const failedChecklist = input.submissionChecklist.items.filter((item) => item.status === "todo" || item.status === "risk");
@@ -507,6 +615,28 @@ function buildActions(
       execution: null,
     });
   }
+  if (!failedChecklist[0] && baselineStatus.exists && effectStatus.status === "empty") {
+    actions.push({
+      id: "record-publish-effect",
+      label: "回收发布效果",
+      priority: "high",
+      detail: `${effectStatus.verdict} ${effectStatus.nextAction}`,
+      href: effectStatus.href,
+      hrefLabel: effectStatus.actionLabel,
+      execution: null,
+    });
+  }
+  if (!failedChecklist[0] && baselineStatus.exists && effectStatus.status !== "empty" && effectStatus.actions[0]) {
+    actions.push({
+      id: "optimize-publish-effect",
+      label: "按效果优化",
+      priority: effectStatus.status === "weak" || effectStatus.comparisonStatus === "declined" ? "high" : "medium",
+      detail: `${effectStatus.optimizationHeadline} 下一步：${effectStatus.actions[0].detail}`,
+      href: effectStatus.actions[0].href,
+      hrefLabel: effectStatus.actions[0].actionLabel,
+      execution: null,
+    });
+  }
   if (actions.length === 0) {
     actions.push({
       id: "expand-production",
@@ -586,6 +716,7 @@ export function buildSerializationOpsDashboard(input: SerializationOpsInput): Se
   const finalSubmissionGate = normalizeFinalSubmissionGate(input.finalGate);
   const publishBaselineStatus = buildSerializationPublishBaselineStatus(input);
   const publishVersionHistory = buildSerializationPublishVersionHistory(input);
+  const publishEffectStatus = buildSerializationPublishEffectStatus(input);
   const draftedChapters = input.chapters.filter((chapter) => chapter.wordCount > 0);
   const reviewQueue = draftedChapters.filter((chapter) => !reviewed(chapter, input.aiTasks));
   const revisionQueue = draftedChapters.filter((chapter) => {
@@ -618,6 +749,9 @@ export function buildSerializationOpsDashboard(input: SerializationOpsInput): Se
   if (finalSubmissionGate.status === "fix_first") warnings.push(`最终闸门 ${finalSubmissionGate.score} 分：${finalSubmissionGate.nextAction}`);
   if (finalSubmissionGate.status === "do_not_submit") warnings.push(`最终闸门 ${finalSubmissionGate.score} 分，别投：${finalSubmissionGate.blockers[0] ?? finalSubmissionGate.verdict}`);
   if (finalSubmissionGate.status === "ready_to_submit" && !publishBaselineStatus.exists) warnings.push("终检已过，但还没有保存发布基准。");
+  if (publishBaselineStatus.exists && publishEffectStatus.status === "empty") warnings.push("发布包已有基准，但还没录入真实发布效果。");
+  if (publishEffectStatus.status === "weak") warnings.push(`发布效果偏弱：${publishEffectStatus.nextAction}`);
+  if (publishEffectStatus.comparisonStatus === "declined") warnings.push("最近一轮发布效果对照下滑，先复盘再继续加码。");
 
   return {
     platformName: input.platform.name,
@@ -631,8 +765,9 @@ export function buildSerializationOpsDashboard(input: SerializationOpsInput): Se
     finalSubmissionGate,
     publishBaselineStatus,
     publishVersionHistory,
+    publishEffectStatus,
     nextPublishChapter: publishReady[0] ?? null,
-    actions: buildActions(input, reviewQueue, revisionQueue, publishReady, submissionAssetStatus, finalSubmissionGate, publishBaselineStatus),
+    actions: buildActions(input, reviewQueue, revisionQueue, publishReady, submissionAssetStatus, finalSubmissionGate, publishBaselineStatus, publishEffectStatus),
     warnings,
   };
 }

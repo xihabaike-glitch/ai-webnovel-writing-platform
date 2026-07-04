@@ -113,6 +113,8 @@ export async function GET(_request: Request, { params }: Params) {
     submissionAssets,
     submissionAssetVersions,
     finalGate: targetPackage?.finalGate ?? null,
+    publishEffect: targetPackage?.publishEffect ?? null,
+    effectOptimization: targetPackage?.effectOptimization ?? null,
     publishSnapshots: project.publishSnapshots.map((snapshot) => ({
       id: snapshot.id,
       platformId: snapshot.platformId,

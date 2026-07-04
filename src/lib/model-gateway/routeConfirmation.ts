@@ -408,6 +408,16 @@ export interface RouteConfirmationGovernanceStatusItem {
   actionLabel: string;
   dispatchKey: string | null;
   latestAt: string | null;
+  completionEvidence: string | null;
+  nextRecheck: {
+    dispatchKey: string;
+    stage: RouteConfirmationGovernanceFollowUpDispatch["stage"];
+    title: string;
+    detail: string;
+    actionLabel: string;
+    href: "/dispatch";
+    acceptanceCriteria: string[];
+  } | null;
 }
 
 export interface RouteConfirmationGovernanceStatusSummary {
@@ -2036,6 +2046,23 @@ function governanceStatusActionLabel(status: RouteConfirmationGovernanceStatusIt
   return "生成治理派单";
 }
 
+function governanceStatusNextRecheck(task: RouteConfirmationGovernanceStatusTask | null): RouteConfirmationGovernanceStatusItem["nextRecheck"] {
+  if (!task || task.state !== "completed" || !task.completionEvidence.trim()) return null;
+  const evidence = buildRouteConfirmationGovernanceEvidenceFromDispatchTasks([task]);
+  const followUp = buildRouteConfirmationGovernanceFollowUpDispatches(evidence)
+    .find((item) => item.stage === "model_route_confirmation_recheck");
+  if (!followUp) return null;
+  return {
+    dispatchKey: followUp.dispatchKey,
+    stage: followUp.stage,
+    title: followUp.title,
+    detail: followUp.detail,
+    actionLabel: followUp.actionLabel,
+    href: "/dispatch",
+    acceptanceCriteria: followUp.acceptanceCriteria,
+  };
+}
+
 export function buildRouteConfirmationGovernanceStatusSummary(
   advice: RouteConfirmationRecheckAdvice,
   dispatches: RouteConfirmationGovernanceStatusTask[],
@@ -2064,6 +2091,10 @@ export function buildRouteConfirmationGovernanceStatusSummary(
       actionLabel: governanceStatusActionLabel(status),
       dispatchKey: latestDispatch?.dispatchKey ?? null,
       latestAt: latestDispatch ? governanceStatusTaskLatestAt(latestDispatch) : item.completedAt,
+      completionEvidence: latestDispatch?.state === "completed" && latestDispatch.completionEvidence.trim()
+        ? latestDispatch.completionEvidence
+        : null,
+      nextRecheck: governanceStatusNextRecheck(latestDispatch),
     };
   });
 

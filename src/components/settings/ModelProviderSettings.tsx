@@ -1117,6 +1117,28 @@ export function ModelProviderSettings({
                         </span>
                       </div>
                       <p className="mt-1">{governanceStatus.detail}</p>
+                      {governanceStatus.completionEvidence ? (
+                        <div className="mt-2 rounded-md bg-white p-2">
+                          <div className="font-medium text-slate-700">治理完成依据</div>
+                          <p className="mt-1 line-clamp-3 whitespace-pre-line text-slate-600">{governanceStatus.completionEvidence}</p>
+                        </div>
+                      ) : null}
+                      {governanceStatus.nextRecheck ? (
+                        <div className="mt-2 rounded-md border border-sky-100 bg-sky-50 p-2 text-sky-900">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <span className="font-medium">下一轮复检入口</span>
+                            <Link className="rounded-md bg-white px-2 py-1 font-medium text-sky-700 hover:bg-sky-100" href={governanceStatus.nextRecheck.href}>
+                              {governanceStatus.nextRecheck.actionLabel}
+                            </Link>
+                          </div>
+                          <p className="mt-1">{governanceStatus.nextRecheck.detail}</p>
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            {governanceStatus.nextRecheck.acceptanceCriteria.slice(0, 3).map((criterion) => (
+                              <span className="rounded-md bg-white px-2 py-1" key={criterion}>{criterion}</span>
+                            ))}
+                          </div>
+                        </div>
+                      ) : null}
                       <div className="mt-2 flex flex-wrap items-center gap-2">
                         {governanceStatus.latestAt ? (
                           <span className="rounded-md bg-white px-2 py-1">{governanceStatus.latestAt.slice(0, 10)}</span>

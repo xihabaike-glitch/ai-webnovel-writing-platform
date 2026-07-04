@@ -625,6 +625,38 @@ test("model task routing", async (t) => {
     assert.equal(summary.items[0].dispatchKey, action.dispatch.dispatchKey);
   });
 
+  await t.test("surfaces completed governance evidence and next recheck entry", () => {
+    const evidence = buildRouteConfirmationRecheckEvidenceFromDispatchTasks([{
+      dispatchKey: "model-route-confirmation-recheck:chapter_review:2026-07-04T10:00:00.000Z",
+      stage: "model_route_confirmation_recheck",
+      state: "completed",
+      completionEvidence: "完成 2 个章节审稿小样本，1 个超时，成功率 50%，质量 62，命中备用路线。",
+      evidence: ["已确认章节审稿模型路由。"],
+      completedAt: "2026-07-04T12:00:00.000Z",
+    }]);
+    const advice = buildRouteConfirmationRecheckAdvice(evidence);
+    const action = buildRouteConfirmationRecheckGovernanceAction(advice.items[0], {
+      createdAt: "2026-07-04T13:00:00.000Z",
+    });
+
+    const summary = buildRouteConfirmationGovernanceStatusSummary(advice, [
+      {
+        dispatchKey: action.dispatch.dispatchKey,
+        stage: "model_route_governance",
+        state: "completed",
+        completionEvidence: "治理结论：已治理完成\n处理动作：切换章节审稿备用模型\n成功率：100%\n质量：86\n备用命中：未命中备用",
+        evidence: action.dispatch.evidence,
+        completedAt: "2026-07-04T16:00:00.000Z",
+      },
+    ]);
+
+    assert.equal(summary.items[0].status, "completed");
+    assert.ok(summary.items[0].completionEvidence?.includes("治理结论：已治理完成"));
+    assert.equal(summary.items[0].nextRecheck?.actionLabel, "复检小样本");
+    assert.equal(summary.items[0].nextRecheck?.stage, "model_route_confirmation_recheck");
+    assert.ok(summary.items[0].nextRecheck?.dispatchKey.includes("chapter_review"));
+  });
+
   await t.test("automatically builds route governance dispatches for weak rechecks only", () => {
     const evidence = buildRouteConfirmationRecheckEvidenceFromDispatchTasks([
       {

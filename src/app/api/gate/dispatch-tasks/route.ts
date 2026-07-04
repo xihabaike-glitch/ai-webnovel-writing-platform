@@ -174,6 +174,33 @@ function recheckVerdict(previousScore: number | null, currentScore: number): Gat
   return "unchanged";
 }
 
+function evidenceLoopRecheckLine(recheck: GateEvidenceLoopRecheck) {
+  const scoreText = recheck.previousScore === null
+    ? `${recheck.currentScore} 分`
+    : `${recheck.previousScore} -> ${recheck.currentScore} 分`;
+  const verdictText = recheck.verdict === "improved"
+    ? "分数变好"
+    : recheck.verdict === "declined"
+      ? "分数变差"
+      : recheck.verdict === "unchanged"
+        ? "分数未变"
+        : "无历史基准";
+  return `证据闭环复检：${scoreText}，${verdictText}：${recheck.label}`;
+}
+
+async function persistEvidenceLoopRecheck(
+  task: Awaited<ReturnType<typeof prisma.gateDispatchTask.update>>,
+  recheck: GateEvidenceLoopRecheck | null,
+) {
+  if (!recheck) return task;
+  const line = evidenceLoopRecheckLine(recheck);
+  const evidence = Array.from(new Set([...parseJsonList(task.evidence), line]));
+  return prisma.gateDispatchTask.update({
+    where: { dispatchKey: task.dispatchKey },
+    data: { evidence: JSON.stringify(evidence) },
+  });
+}
+
 async function buildEvidenceLoopRecheck(task: Awaited<ReturnType<typeof prisma.gateDispatchTask.update>>): Promise<GateEvidenceLoopRecheck | null> {
   if (!task.projectId || task.platformId === "model-routing") return null;
   const project = await prisma.project.findUnique({
@@ -572,9 +599,10 @@ export async function PATCH(request: Request) {
   const evidenceLoopRecheck = nextState === "completed"
     ? await buildEvidenceLoopRecheck(task)
     : null;
+  const responseTask = await persistEvidenceLoopRecheck(task, evidenceLoopRecheck);
 
   return NextResponse.json({
-    task: toTask(task),
+    task: toTask(responseTask),
     followUpTasks,
     knowledgeFeedbackReceipt: knowledgeFeedbackReceipt ? {
       id: knowledgeFeedbackReceipt.receiptId,

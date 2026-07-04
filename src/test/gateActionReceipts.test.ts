@@ -1275,6 +1275,52 @@ test("buildGateActionReceipt", async (t) => {
     assert.ok(scaleDispatch.detail.includes("证据闭环 86 分"));
   });
 
+  await t.test("turns evidence loop rechecks into tactic experience items", () => {
+    const completedTask = {
+      databaseId: "task-evidence-loop-recheck",
+      dispatchKey: "evidence-loop:project-1:fanqie:repair",
+      id: "evidence-loop:project-1:fanqie:repair",
+      projectId: "project-1",
+      platformId: "fanqie",
+      platformName: "番茄小说",
+      stage: "repair_tactic" as const,
+      state: "completed" as const,
+      priorityScore: 92,
+      ownerRole: "主编",
+      title: "番茄小说 先修打法派单",
+      detail: "旧任务",
+      dueLabel: "今天修打法",
+      actionLabel: "修平台打法",
+      href: "/projects/project-1#first-three-rewrite",
+      acceptanceCriteria: ["已执行下一步：优先修标题简介、前三章钩子或投稿资产。"],
+      evidence: [
+        "证据闭环 53 分：先修打法",
+        "证据闭环复检：53 -> 71 分，分数变好：继续观察",
+      ],
+      sourceReceiptId: null,
+      completionEvidence: "已重写标题简介和前三章钩子，并回填 Gate 完成证据。",
+      reviewLatestAt: "2026-01-07T00:00:00.000Z",
+      assignedAt: "2026-01-07T00:00:00.000Z",
+      completedAt: "2026-01-07T01:00:00.000Z",
+      createdAt: "2026-01-07T00:00:00.000Z",
+      updatedAt: "2026-01-07T01:00:00.000Z",
+    };
+    const decisionTimeline = buildGatePlatformDecisionTimeline({
+      receipts: [],
+      tasks: [completedTask],
+      limit: 10,
+    });
+    const tacticLibrary = buildGatePlatformTacticExperienceLibrary(decisionTimeline);
+    const tacticItem = tacticLibrary.items.find((item) => item.platformId === "fanqie");
+
+    assert.ok(tacticItem);
+    assert.equal(tacticItem.status, "usable");
+    assert.equal(tacticItem.tactic, "证据闭环提分打法");
+    assert.ok(tacticItem.lesson.includes("53"));
+    assert.ok(tacticItem.lesson.includes("71"));
+    assert.ok(tacticItem.evidence.some((item) => item.includes("分数变好")));
+  });
+
   await t.test("turns project start validation advice into three dispatch cards", () => {
     const startReceipt = buildProjectStartDecisionActionReceipt({
       projectId: "project-1",

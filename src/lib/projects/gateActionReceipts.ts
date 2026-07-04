@@ -5068,7 +5068,7 @@ export function buildGatePlatformDecisionTimeline(input: {
         : `${task.ownerRole} · ${task.title}`,
       href: task.state === "completed" ? "/dispatch" : task.href,
       createdAt: task.state === "completed" ? completedAt : task.updatedAt,
-      evidence: task.acceptanceCriteria.slice(0, 3),
+      evidence: Array.from(new Set([...task.evidence, ...task.acceptanceCriteria])).slice(0, 4),
     });
   }
 
@@ -5247,12 +5247,40 @@ function markdownLine(input: string) {
   return input.replace(/\s+/g, " ").trim();
 }
 
+function evidenceLoopRecheckFromTimeline(item: GatePlatformDecisionTimelineItem) {
+  const lines = item.events.flatMap((event) => event.evidence);
+  for (const line of lines) {
+    const match = line.match(/证据闭环复检：(?:(\d+)\s*->\s*)?(\d+)\s*分，(分数变好|分数变差|分数未变|无历史基准)：(.+)/);
+    if (!match) continue;
+    const previousScore = match[1] ? Number(match[1]) : null;
+    const currentScore = Number(match[2]);
+    if (!Number.isFinite(currentScore)) continue;
+    const verdict = match[3] === "分数变好"
+      ? "improved"
+      : match[3] === "分数变差"
+        ? "declined"
+        : match[3] === "分数未变"
+          ? "unchanged"
+          : "unknown";
+    return {
+      previousScore,
+      currentScore,
+      delta: previousScore === null ? null : currentScore - previousScore,
+      verdict,
+      label: markdownLine(match[4]),
+      line,
+    };
+  }
+  return null;
+}
+
 export function buildGatePlatformTacticExperienceLibrary(
   timeline: GatePlatformDecisionTimeline,
   limit = 6,
 ): GatePlatformTacticExperienceLibrary {
   const items = timeline.items.map((item): GatePlatformTacticExperienceItem => {
     const finalEvent = item.events.find((event) => event.type === "final") ?? null;
+    const evidenceLoopRecheck = evidenceLoopRecheckFromTimeline(item);
     const evidence = item.events.slice(0, 3).map((event) => `${event.label}：${markdownLine(event.detail)}`);
     const base = {
       platformId: item.platformId,
@@ -5264,6 +5292,45 @@ export function buildGatePlatformTacticExperienceLibrary(
       latestAt: item.latestAt,
       evidence,
     };
+
+    if (evidenceLoopRecheck?.verdict === "improved") {
+      return {
+        ...base,
+        status: "usable",
+        label: "可复用打法",
+        tactic: "证据闭环提分打法",
+        lesson: `${item.platformName} 派单完成后证据闭环从 ${evidenceLoopRecheck.previousScore ?? "无基准"} 分提升到 ${evidenceLoopRecheck.currentScore} 分，说明这次运营动作能把平台证据链往前推。`,
+        reuseHint: "同类项目可复用这张派单的处理动作和验收口径，但仍要保留发布效果对照。",
+        risk: "只证明证据链变硬，不等于已经可以无限加码；下一轮仍要看真实曝光、点击、收藏和追读。",
+        evidence: [evidenceLoopRecheck.line, ...base.evidence].slice(0, 4),
+      };
+    }
+
+    if (evidenceLoopRecheck?.verdict === "declined") {
+      return {
+        ...base,
+        status: "blocked",
+        label: "避坑样本",
+        tactic: "证据闭环降分样本",
+        lesson: `${item.platformName} 派单完成后证据闭环掉到 ${evidenceLoopRecheck.currentScore} 分，这个动作没有解决核心平台问题。`,
+        reuseHint: "同类项目不要照抄这次处理动作，先复盘标题简介、前三章兑现和平台匹配。",
+        risk: "继续加码会把错误投入放大；先重做小样本，再决定是否恢复。",
+        evidence: [evidenceLoopRecheck.line, ...base.evidence].slice(0, 4),
+      };
+    }
+
+    if (evidenceLoopRecheck?.verdict === "unchanged" || evidenceLoopRecheck?.verdict === "unknown") {
+      return {
+        ...base,
+        status: "watch",
+        label: "观察样本",
+        tactic: "证据闭环待验证动作",
+        lesson: `${item.platformName} 派单完成后证据闭环没有明显变好，动作可能只补了形式证据，还没带来有效平台判断。`,
+        reuseHint: "同类项目只能复用检查清单，不能复用加码结论；必须补一轮发布效果或新的 Gate 完成回灌。",
+        risk: "无分数提升时不要把任务完成误判成业务改善。",
+        evidence: [evidenceLoopRecheck.line, ...base.evidence].slice(0, 4),
+      };
+    }
 
     if (finalEvent?.label === "稳定加码") {
       return {

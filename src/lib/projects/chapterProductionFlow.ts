@@ -74,6 +74,16 @@ export interface ChapterProductionFlowStage {
   actionLabel: string;
   href: string;
   runAction?: ChapterProductionFlowRunAction;
+  dispatchSummary?: ChapterProductionFlowDispatchSummary;
+}
+
+export interface ChapterProductionFlowDispatchSummary {
+  assigned: number;
+  completed: number;
+  pending: number;
+  label: string;
+  detail: string;
+  href: string;
 }
 
 export interface ChapterProductionFlow {
@@ -113,13 +123,17 @@ function completedTaskChapterIds(tasks: ChapterProductionFlowAiTask[], taskType:
     .filter((id): id is string => Boolean(id)));
 }
 
+function chapterIdFromHref(href: string) {
+  return href.match(/\/chapters\/([^/#?]+)/)?.[1] ?? null;
+}
+
 function storyTreeChapterIds(tasks: ChapterProductionFlowGateTask[], completedOnly: boolean) {
   const ids = new Set<string>();
   for (const task of tasks) {
     if (completedOnly && task.state !== "completed") continue;
     if (!task.dispatchKey.startsWith("story-tree:") && !task.dispatchKey.startsWith("story-tree-experience:")) continue;
-    const match = task.href.match(/\/chapters\/([^/#?]+)/);
-    if (match?.[1]) ids.add(match[1]);
+    const chapterId = chapterIdFromHref(task.href);
+    if (chapterId) ids.add(chapterId);
   }
   return ids;
 }
@@ -133,6 +147,50 @@ function submissionPrecheckItemIds(tasks: ChapterProductionFlowGateTask[]) {
     if (itemId) ids.add(itemId);
   }
   return ids;
+}
+
+function storyTreeDispatchSummary(tasks: ChapterProductionFlowGateTask[], chapterIds: string[]): ChapterProductionFlowDispatchSummary | undefined {
+  const targetIds = new Set(chapterIds);
+  const matched = tasks.filter((task) => (
+    (task.dispatchKey.startsWith("story-tree:") || task.dispatchKey.startsWith("story-tree-experience:"))
+    && targetIds.has(chapterIdFromHref(task.href) ?? "")
+  ));
+  if (matched.length === 0) return undefined;
+  const completedIds = new Set(matched.filter((task) => task.state === "completed").map((task) => chapterIdFromHref(task.href)).filter((id): id is string => Boolean(id)));
+  const pendingIds = new Set(matched.filter((task) => task.state !== "completed").map((task) => chapterIdFromHref(task.href)).filter((id): id is string => Boolean(id)));
+  const assignedIds = new Set([...completedIds, ...pendingIds]);
+
+  return {
+    assigned: assignedIds.size,
+    completed: completedIds.size,
+    pending: pendingIds.size,
+    label: `已派单 ${assignedIds.size} 章`,
+    detail: pendingIds.size > 0
+      ? `待完成 ${pendingIds.size} 章，完成后会回流为大树结构经验。`
+      : `已完成 ${completedIds.size} 章派单，等待复检结果解除卡点。`,
+    href: "/dispatch",
+  };
+}
+
+function submissionDispatchSummary(tasks: ChapterProductionFlowGateTask[], failedItemIds: string[]): ChapterProductionFlowDispatchSummary | undefined {
+  const failedIds = new Set(failedItemIds);
+  const matched = tasks
+    .filter((task) => task.dispatchKey.startsWith("submission-precheck:"))
+    .filter((task) => failedIds.has(task.dispatchKey.split(":").at(2) ?? ""));
+  if (matched.length === 0) return undefined;
+  const completed = matched.filter((task) => task.state === "completed").length;
+  const pending = matched.length - completed;
+
+  return {
+    assigned: matched.length,
+    completed,
+    pending,
+    label: `已派单 ${matched.length} 项`,
+    detail: pending > 0
+      ? `待完成 ${pending} 项，完成后再刷新投稿预检。`
+      : `已完成 ${completed} 项派单，但预检仍未通过，需要补证据或重新派发。`,
+    href: "/dispatch",
+  };
 }
 
 function taskCreatedAt(task: ChapterProductionFlowAiTask) {
@@ -198,6 +256,9 @@ export function buildChapterProductionFlow(input: {
     .map((item) => item.id)
     .filter((id) => !submissionAssignedItemIds.has(id))
     .slice(0, 5);
+  const failedSubmissionItemIds = input.submissionChecklist.items
+    .filter((item) => item.status === "todo" || item.status === "risk")
+    .map((item) => item.id);
   const stages: ChapterProductionFlowStage[] = [
     {
       id: "hooks",
@@ -287,6 +348,7 @@ export function buildChapterProductionFlow(input: {
       action: "补大树结构复检，确认开头、主干、分支、叶片和人物弧光。",
       actionLabel: "补复检",
       href: "#story-tree-experience",
+      dispatchSummary: storyTreeDispatchSummary(input.gateTasks, draftedFirstThreeIds),
       runAction: storyTreeActionIds.length > 0
         ? {
             type: "story_tree_recheck",
@@ -313,6 +375,7 @@ export function buildChapterProductionFlow(input: {
       action: "清掉投稿前检查里的待处理和风险项。",
       actionLabel: "修预检",
       href: "#submission-precheck",
+      dispatchSummary: submissionDispatchSummary(input.gateTasks, failedSubmissionItemIds),
       runAction: submissionActionItemIds.length > 0
         ? {
             type: "submission_precheck_repair",

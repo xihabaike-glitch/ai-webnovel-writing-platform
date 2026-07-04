@@ -170,6 +170,17 @@ export function ChapterProductionFlowPanel({ flow }: { flow: ChapterProductionFl
               </span>
             </div>
             <p className="mt-2 text-xs leading-5 text-slate-600">{stage.detail}</p>
+            {stage.dispatchSummary ? (
+              <div className="mt-2 rounded-md border border-slate-200 bg-white p-2 text-xs leading-5 text-slate-600">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-medium text-slate-800">{stage.dispatchSummary.label}</span>
+                  <Link className="font-medium text-slate-950" href={stage.dispatchSummary.href}>
+                    查看
+                  </Link>
+                </div>
+                <p className="mt-1">{stage.dispatchSummary.detail}</p>
+              </div>
+            ) : null}
             {renderStageAction(stage)}
           </div>
         ))}

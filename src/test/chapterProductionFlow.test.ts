@@ -193,6 +193,9 @@ test("buildChapterProductionFlow exposes story tree recheck dispatch action for 
   assert.equal(storyTreeStage?.runAction?.label, "一键派发复检 2 章");
   assert.equal(storyTreeStage?.runAction?.afterSuccess.href, "/dispatch");
   assert.equal(storyTreeStage?.runAction?.afterSuccess.label, "查看派单");
+  assert.equal(storyTreeStage?.dispatchSummary?.assigned, 1);
+  assert.equal(storyTreeStage?.dispatchSummary?.pending, 1);
+  assert.ok(storyTreeStage?.dispatchSummary?.detail.includes("待完成 1 章"));
 });
 
 test("buildChapterProductionFlow exposes submission repair dispatch action for unassigned failed items", () => {
@@ -232,4 +235,8 @@ test("buildChapterProductionFlow exposes submission repair dispatch action for u
   assert.equal(submissionStage?.runAction?.label, "一键派发修复 2 项");
   assert.equal(submissionStage?.runAction?.afterSuccess.href, "/dispatch");
   assert.ok(submissionStage?.runAction?.afterSuccess.detail.includes("投稿预检"));
+  assert.equal(submissionStage?.dispatchSummary?.assigned, 2);
+  assert.equal(submissionStage?.dispatchSummary?.pending, 1);
+  assert.equal(submissionStage?.dispatchSummary?.completed, 1);
+  assert.equal(submissionStage?.dispatchSummary?.label, "已派单 2 项");
 });

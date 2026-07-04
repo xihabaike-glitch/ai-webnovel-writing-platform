@@ -21,6 +21,7 @@ test("buildDraftQualityAudit", async (t) => {
       "楼道里的灯一盏盏熄灭，求救声却越来越近。林晚没有时间解释，她把手机塞进口袋，顺着血迹追到消防门后。",
       "门后的人捂着伤口，怀里抱着被雨水泡软的证据袋。对方看见她，第一句话不是求救，而是问她为什么又回来了。",
       "系统冷冰冰地提示，选择救人会失去逃跑机会，选择逃跑会永久删除证据。林晚咬住牙，终于明白自己已经被推到规则中央。",
+      "她不再把自己当成普通生活里的旁观者，而是决定先救人，再反过来追问系统为什么选中她。",
       "她没有再退，反手把消防门抵住。门外脚步声逼近，证据袋里的照片却露出一角，上面正是她三小时前参加葬礼的画面。",
       "门开的一瞬间，男人把证据袋塞进她怀里。下一秒，系统刷新第二个任务：亲手交出证据。",
     ].join("\n");
@@ -32,6 +33,9 @@ test("buildDraftQualityAudit", async (t) => {
     });
 
     assert.ok(audit.score >= 85);
+    assert.ok(audit.treeAudit.score >= 75);
+    assert.equal(audit.treeAudit.shouldRewrite, false);
+    assert.ok(audit.treeAudit.axes.some((axis) => axis.id === "character_arc" && axis.score >= 70));
     assert.equal(audit.shouldSecondPass, false);
     assert.equal(audit.issues.some((issue) => issue.severity === "high"), false);
   });
@@ -45,6 +49,8 @@ test("buildDraftQualityAudit", async (t) => {
     });
 
     assert.ok(audit.score < 85);
+    assert.ok(audit.treeAudit.score < 75);
+    assert.equal(audit.treeAudit.shouldRewrite, true);
     assert.equal(audit.shouldSecondPass, true);
     assert.ok(audit.issues.some((issue) => issue.type === "length"));
     assert.ok(audit.issues.some((issue) => issue.type === "payoff"));

@@ -97,7 +97,13 @@ test("buildFirstThreeRewritePackage", async (t) => {
       },
       after: {
         title: "雨夜系统",
-        content: "系统倒计时只剩十秒，林晚必须在逃跑和救人之间选择，否则任务惩罚会立刻抹掉她的记忆。",
+        content: [
+          "系统倒计时只剩十秒，林晚必须在逃跑和救人之间选择，否则任务惩罚会立刻抹掉她的记忆。",
+          "她抓住门把冲进雨里，系统规则和奖励同时刷新：救下门外的人，才能保住那袋证据。",
+          "门外的人把照片塞进她怀里，照片背面露出一枚系统标记，这条线索把她和追猎者第一次绑在一起。",
+          "林晚终于意识到自己不再只是逃跑的人，她决定用这次代价反过来逼系统露出规则破绽。",
+          "下一秒，系统刷新第二个任务，目标名字出现在名单背面。",
+        ].join("\n"),
         wordCount: 1600,
         goal: "让主角在雨夜被系统逼入不可逆选择。",
         hook: "系统倒计时只剩十秒。",
@@ -116,6 +122,8 @@ test("buildFirstThreeRewritePackage", async (t) => {
     assert.ok(evaluation.oldPreview.includes("林晚醒来"));
     assert.ok(evaluation.newPreview.includes("系统倒计时"));
     assert.ok(evaluation.verdict.length > 0);
+    assert.ok(evaluation.storyTreeAudit.score >= 75);
+    assert.equal(evaluation.storyTreeAudit.shouldRewrite, false);
     assert.equal(evaluation.decision.action, "keep");
     assert.ok(evaluation.decision.reasons.some((reason) => reason.includes("平台分")));
   });

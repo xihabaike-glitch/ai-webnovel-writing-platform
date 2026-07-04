@@ -85,6 +85,8 @@ export async function generateChapterDraft(options: GenerateChapterDraftOptions)
       platform,
       targetWords: options.targetWords ?? 1200,
       content: result.text,
+      projectContext,
+      startTactic,
       chapter: {
         title: chapter.title,
         goal: chapter.goal,

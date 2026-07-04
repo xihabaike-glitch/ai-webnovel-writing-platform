@@ -97,6 +97,11 @@ interface FirstThreeRewriteEvaluation {
   decision: FirstThreeRewriteDecision;
   itemDeltas: FirstThreeRewriteEvaluationItem[];
   priorityFixes: string[];
+  storyTreeAudit?: {
+    score: number;
+    label: string;
+    topActions: string[];
+  };
 }
 
 interface FirstThreeRewriteDecision {
@@ -400,7 +405,7 @@ export function FirstThreeRewritePanel({ projectId }: { projectId: string }) {
                     <p className="mt-2 line-clamp-4 text-slate-600">{result.content}</p>
                     {result.evaluation ? (
                       <div className="mt-3 grid gap-3 border-t border-slate-200 pt-3">
-                        <div className="grid grid-cols-3 gap-2 text-xs">
+                        <div className="grid grid-cols-2 gap-2 text-xs md:grid-cols-4">
                           <div>
                             <div className="text-slate-500">平台分</div>
                             <div className="mt-1 font-medium text-slate-950">
@@ -419,8 +424,20 @@ export function FirstThreeRewritePanel({ projectId }: { projectId: string }) {
                               {signedNumber(result.evaluation.wordDelta)}
                             </div>
                           </div>
+                          <div>
+                            <div className="text-slate-500">大树</div>
+                            <div className={`mt-1 font-medium ${evaluationTone((result.evaluation.storyTreeAudit?.score ?? 0) - 75)}`}>
+                              {result.evaluation.storyTreeAudit?.score ?? "缺"}
+                            </div>
+                          </div>
                         </div>
                         <p className="text-xs leading-5 text-slate-600">{result.evaluation.verdict}</p>
+                        {result.evaluation.storyTreeAudit ? (
+                          <div className="rounded-md border border-emerald-100 bg-emerald-50 p-3 text-xs text-emerald-900">
+                            <div className="font-medium">大树质检 · {result.evaluation.storyTreeAudit.label}</div>
+                            <div className="mt-1">{result.evaluation.storyTreeAudit.topActions[0]}</div>
+                          </div>
+                        ) : null}
                         <div className="rounded-md border border-slate-200 bg-white p-3 text-xs">
                           <div className="flex flex-wrap items-center justify-between gap-2">
                             <span className={`rounded-md px-2 py-1 font-medium ${decisionClass(result.evaluation.decision.severity)}`}>

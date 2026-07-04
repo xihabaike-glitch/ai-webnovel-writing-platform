@@ -1,4 +1,7 @@
 import { buildPlatformStyleScore, type PlatformStyleScoreItem } from "../chapters/platformStyleScore.ts";
+import { buildStoryTreeQualityAudit, type StoryTreeQualityAudit } from "../ai/storyTreeQualityAudit.ts";
+import type { ProjectContextPack } from "./projectContextPack.ts";
+import type { ProjectStartTacticSummary } from "./projectStartTactics.ts";
 import { previewRevisionContent } from "../chapters/revisions.ts";
 import type { PlatformProfile } from "../platforms/platformProfiles.ts";
 import {
@@ -95,6 +98,7 @@ export interface FirstThreeRewriteEvaluation {
   decision: FirstThreeRewriteDecision;
   itemDeltas: FirstThreeRewriteScoreItemDelta[];
   priorityFixes: string[];
+  storyTreeAudit: StoryTreeQualityAudit;
 }
 
 const fallbackChapters: RetentionChapter[] = [
@@ -405,6 +409,7 @@ function buildRewriteDecision(input: {
   afterScore: number;
   itemDeltas: FirstThreeRewriteScoreItemDelta[];
   priorityFixes: string[];
+  storyTreeAudit?: StoryTreeQualityAudit;
 }): FirstThreeRewriteDecision {
   const failedItems = input.itemDeltas.filter((item) => item.status === "fail");
   const improvedItems = input.itemDeltas.filter((item) => item.delta > 0);
@@ -414,6 +419,7 @@ function buildRewriteDecision(input: {
     improvedItems.length ? `提升项：${improvedItems.slice(0, 2).map((item) => item.label).join("、")}。` : "",
     weakenedItems.length ? `变弱项：${weakenedItems.slice(0, 2).map((item) => item.label).join("、")}。` : "",
     failedItems.length ? `仍失败：${failedItems.slice(0, 2).map((item) => item.label).join("、")}。` : "",
+    input.storyTreeAudit ? `大树结构 ${input.storyTreeAudit.score} 分：${input.storyTreeAudit.label}。` : "",
   ].filter(Boolean);
 
   if (input.scoreDelta <= 0 || (input.afterScore < 50 && input.scoreDelta < 8)) {
@@ -423,6 +429,17 @@ function buildRewriteDecision(input: {
       severity: "danger",
       rationale: "这版没有证明自己比旧稿更适合平台，继续往下投只会污染判断。",
       nextAction: "打开章节版本，回滚到改写前旧稿，再按失败项重写。",
+      reasons,
+    };
+  }
+
+  if (input.storyTreeAudit?.shouldRewrite) {
+    return {
+      action: "second_pass",
+      label: "继续二改",
+      severity: "needs_work",
+      rationale: "平台分有收益，但大树结构还没站稳，不能只看钩子分就当终稿。",
+      nextAction: input.storyTreeAudit.topActions[0] ?? "按大树结构补强主干、分支和人物弧光。",
       reasons,
     };
   }
@@ -452,6 +469,8 @@ export function buildFirstThreeRewriteEvaluation(input: {
   platform: PlatformProfile;
   before: FirstThreeRewriteComparableChapter;
   after: FirstThreeRewriteComparableChapter;
+  projectContext?: ProjectContextPack | null;
+  startTactic?: ProjectStartTacticSummary | null;
 }): FirstThreeRewriteEvaluation {
   const beforeScore = buildPlatformStyleScore({
     platform: input.platform,
@@ -502,11 +521,25 @@ export function buildFirstThreeRewriteEvaluation(input: {
     .map(([, label]) => label);
   const scoreDelta = afterScore.score - beforeScore.score;
   const priorityFixes = afterScore.priorityFixes;
+  const storyTreeAudit = buildStoryTreeQualityAudit({
+    content: input.after.content,
+    chapter: {
+      title: input.after.title,
+      goal: input.after.goal,
+      hook: input.after.hook,
+      conflict: input.after.conflict,
+      valueShift: input.after.valueShift,
+      cliffhanger: input.after.cliffhanger,
+    },
+    projectContext: input.projectContext,
+    startTactic: input.startTactic,
+  });
   const decision = buildRewriteDecision({
     scoreDelta,
     afterScore: afterScore.score,
     itemDeltas,
     priorityFixes,
+    storyTreeAudit,
   });
 
   return {
@@ -521,6 +554,7 @@ export function buildFirstThreeRewriteEvaluation(input: {
     decision,
     itemDeltas,
     priorityFixes,
+    storyTreeAudit,
   };
 }
 

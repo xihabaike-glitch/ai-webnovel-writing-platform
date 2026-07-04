@@ -183,20 +183,21 @@ export async function POST(request: Request, { params }: Params) {
       createdChapter = true;
     }
 
+    const projectContext = buildProjectContextPack({
+      currentChapterId: chapter.id,
+      chapters: project.chapters,
+      characters: project.characters,
+      worldEntries: project.worldEntries,
+      foreshadows: project.foreshadows,
+      plotThreads: project.plotThreads,
+    });
     const prompt = buildFirstThreeRewritePrompt({
       projectTitle: project.title,
       genre: project.genre,
       sellingPoint: project.sellingPoint,
       platform,
       startTactic,
-      projectContext: buildProjectContextPack({
-        currentChapterId: chapter.id,
-        chapters: project.chapters,
-        characters: project.characters,
-        worldEntries: project.worldEntries,
-        foreshadows: project.foreshadows,
-        plotThreads: project.plotThreads,
-      }),
+      projectContext,
       platformKnowledge,
       targetWords: body.targetWords ?? 1600,
       chapter: {
@@ -287,6 +288,8 @@ export async function POST(request: Request, { params }: Params) {
           platform,
           before: chapter,
           after: updatedChapter,
+          projectContext,
+          startTactic,
         }),
       });
     } catch (caught) {

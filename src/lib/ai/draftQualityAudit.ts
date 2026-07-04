@@ -1,6 +1,9 @@
 import type { PlatformProfile } from "../platforms/platformProfiles.ts";
+import type { ProjectContextPack } from "../projects/projectContextPack.ts";
+import type { ProjectStartTacticSummary } from "../projects/projectStartTactics.ts";
 import { getPlatformWritingStyle } from "../platforms/writingStyleTemplates.ts";
 import { countWords } from "../text/wordCount.ts";
+import { buildStoryTreeQualityAudit, type StoryTreeQualityAudit } from "./storyTreeQualityAudit.ts";
 
 export interface DraftQualityChapterCard {
   title: string;
@@ -25,6 +28,7 @@ export interface DraftQualityAudit {
   platformName: string;
   wordCount: number;
   shouldSecondPass: boolean;
+  treeAudit: StoryTreeQualityAudit;
 }
 
 const crisisWords = ["倒计时", "系统", "死亡", "死", "血", "背叛", "选择", "任务", "秘密", "危机", "求救", "monster", "system", "death", "dead", "choice", "secret", "contract", "trial"];
@@ -71,6 +75,8 @@ export function buildDraftQualityAudit(input: {
   chapter: DraftQualityChapterCard;
   content: string;
   targetWords?: number;
+  projectContext?: ProjectContextPack | null;
+  startTactic?: ProjectStartTacticSummary | null;
 }): DraftQualityAudit {
   const style = getPlatformWritingStyle(input.platform.id);
   const content = compact(input.content);
@@ -81,6 +87,12 @@ export function buildDraftQualityAudit(input: {
   const wordCount = countWords(content);
   const issues: DraftQualityIssue[] = [];
   let score = 100;
+  const treeAudit = buildStoryTreeQualityAudit({
+    content,
+    chapter: input.chapter,
+    projectContext: input.projectContext,
+    startTactic: input.startTactic,
+  });
 
   if (!content) {
     return {
@@ -92,6 +104,7 @@ export function buildDraftQualityAudit(input: {
       platformName: input.platform.name,
       wordCount,
       shouldSecondPass: true,
+      treeAudit,
     };
   }
 
@@ -135,10 +148,15 @@ export function buildDraftQualityAudit(input: {
     issues.push(issue("low", "character", "本章价值变化不够清楚。", `让主角明确从“${input.chapter.valueShift}”这条变化里跨过去。`));
   }
 
+  if (treeAudit.shouldRewrite) {
+    score -= treeAudit.score < 55 ? 14 : 8;
+    issues.push(issue("medium", "pacing", `大树结构 ${treeAudit.score} 分：${treeAudit.label}。`, treeAudit.topActions[0] ?? "按大树结构补强主干、分支和人物弧光。"));
+  }
+
   const normalizedScore = clampScore(score);
   const summary = issues.length
-    ? `自动平台体检：${input.platform.name}适配度 ${normalizedScore} 分，优先处理${issues.slice(0, 2).map((item) => item.type).join("、")}问题。`
-    : `自动平台体检：${input.platform.name}适配度 ${normalizedScore} 分，初稿可以进入人工精修或发布前审稿。`;
+    ? `自动平台体检：${input.platform.name}适配度 ${normalizedScore} 分，大树结构 ${treeAudit.score} 分，优先处理${issues.slice(0, 2).map((item) => item.type).join("、")}问题。`
+    : `自动平台体检：${input.platform.name}适配度 ${normalizedScore} 分，大树结构 ${treeAudit.score} 分，初稿可以进入人工精修或发布前审稿。`;
 
   return {
     score: normalizedScore,
@@ -146,6 +164,7 @@ export function buildDraftQualityAudit(input: {
     summary,
     platformName: input.platform.name,
     wordCount,
-    shouldSecondPass: normalizedScore < 85 || issues.some((item) => item.severity === "high"),
+    shouldSecondPass: normalizedScore < 85 || treeAudit.shouldRewrite || issues.some((item) => item.severity === "high"),
+    treeAudit,
   };
 }

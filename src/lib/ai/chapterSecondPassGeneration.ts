@@ -94,6 +94,7 @@ export async function generateChapterSecondPass(options: GenerateChapterSecondPa
       platform,
       targetWords: options.targetWords ?? Math.max(1200, chapter.wordCount),
       content: result.text,
+      startTactic,
       chapter: {
         title: chapter.title,
         goal: chapter.goal,

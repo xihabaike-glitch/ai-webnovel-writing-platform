@@ -163,6 +163,40 @@ export interface RouteConfirmationDispatchFlow {
   emptyGuide: RouteConfirmationDispatchEmptyGuide | null;
 }
 
+export interface RouteConfirmationOnboardingRouteOption {
+  taskType: string;
+  label: string;
+  description?: string;
+}
+
+export interface RouteConfirmationOnboardingRoute {
+  taskType: string;
+  primaryProviderConfigId: string | null;
+  fallbackProviderConfigId: string | null;
+}
+
+export interface RouteConfirmationOnboardingItem {
+  taskType: RoutedModelTaskType;
+  label: string;
+  description: string;
+  status: "confirmed" | "ready_to_confirm" | "missing_route";
+  actionLabel: string;
+  detail: string;
+}
+
+export interface RouteConfirmationOnboarding {
+  title: string;
+  detail: string;
+  summary: {
+    total: number;
+    confirmed: number;
+    readyToConfirm: number;
+    missingRoute: number;
+  };
+  nextAction: RouteConfirmationOnboardingItem | null;
+  items: RouteConfirmationOnboardingItem[];
+}
+
 export interface ModelRouteConfirmationDispatch {
   id: string;
   dispatchKey: string;
@@ -953,6 +987,61 @@ function buildRouteConfirmationEmptyGuide(
         detail: "弱样本自动进入治理派单，处理后再复检到已确认。",
       },
     ],
+  };
+}
+
+export function buildRouteConfirmationOnboarding({
+  routeOptions,
+  routes,
+  confirmations,
+}: {
+  routeOptions: RouteConfirmationOnboardingRouteOption[];
+  routes: RouteConfirmationOnboardingRoute[];
+  confirmations: ModelRouteConfirmationReceipt[];
+}): RouteConfirmationOnboarding {
+  const routeByTaskType = new Map(routes.map((route) => [route.taskType, route]));
+  const confirmedTaskTypes = new Set(confirmations.map((confirmation) => confirmation.payload.taskType));
+  const items = routeOptions.flatMap((option): RouteConfirmationOnboardingItem[] => {
+    if (!isRoutedModelTaskType(option.taskType)) return [];
+    const route = routeByTaskType.get(option.taskType);
+    const hasRoute = Boolean(route?.primaryProviderConfigId);
+    const status: RouteConfirmationOnboardingItem["status"] = confirmedTaskTypes.has(option.taskType)
+      ? "confirmed"
+      : hasRoute
+        ? "ready_to_confirm"
+        : "missing_route";
+    const actionLabel = status === "confirmed"
+      ? "已确认"
+      : status === "ready_to_confirm"
+        ? "确认并生成复检派单"
+        : "先配置路线";
+    const detail = status === "confirmed"
+      ? "这条写作任务路线已有确认记录，后续看复检样本是否稳定。"
+      : status === "ready_to_confirm"
+        ? "首选模型已配置，可以确认路线并进入小样本复检。"
+        : "还没有首选模型，先选择首选和备用模型。";
+    return [{
+      taskType: option.taskType,
+      label: option.label,
+      description: option.description ?? "",
+      status,
+      actionLabel,
+      detail,
+    }];
+  });
+  const readyItems = items.filter((item) => item.status === "ready_to_confirm");
+
+  return {
+    title: "首轮路由确认",
+    detail: "先把核心写作任务的首选和备用模型确认下来，再生成复检派单，避免后面批量写作时靠默认模型乱跑。",
+    summary: {
+      total: items.length,
+      confirmed: items.filter((item) => item.status === "confirmed").length,
+      readyToConfirm: readyItems.length,
+      missingRoute: items.filter((item) => item.status === "missing_route").length,
+    },
+    nextAction: readyItems[0] ?? items.find((item) => item.status === "missing_route") ?? null,
+    items,
   };
 }
 

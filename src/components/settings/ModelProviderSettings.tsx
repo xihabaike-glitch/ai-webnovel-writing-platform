@@ -6,6 +6,7 @@ import {
   buildRouteConfirmationRecheckSampleDispatch,
   buildRouteConfirmationRecheckSamplePlan,
 } from "@/lib/model-gateway/routeConfirmation";
+import type { RouteConfirmationOnboarding } from "@/lib/model-gateway/routeConfirmation";
 import type { ProviderHealthDashboard, ProviderHealthStatus } from "@/lib/model-gateway/providerHealth";
 import type { RoutedModelTaskType } from "@/lib/model-gateway/taskRouting";
 import type { ModelProviderId } from "@/lib/model-gateway/types";
@@ -321,6 +322,12 @@ const routeRecheckStatusCopy: Record<RouteConfirmationHistoryView["recheckStatus
   recheck_needs_governance: { className: "border-amber-200 bg-amber-50 text-amber-700" },
 };
 
+const routeOnboardingStatusCopy: Record<RouteConfirmationOnboarding["items"][number]["status"], { label: string; className: string }> = {
+  confirmed: { label: "已确认", className: "bg-emerald-50 text-emerald-700" },
+  ready_to_confirm: { label: "待确认", className: "bg-sky-50 text-sky-700" },
+  missing_route: { label: "缺路线", className: "bg-amber-50 text-amber-700" },
+};
+
 function draftFromOption(option: ProviderOptionView, existing?: ProviderView): DraftProvider {
   return {
     id: existing?.id,
@@ -344,6 +351,7 @@ export function ModelProviderSettings({
   routeAvoidanceDecisionHistory,
   routeAvoidanceGovernance,
   routeConfirmationHistory,
+  routeConfirmationOnboarding,
   routeConfirmationRecheckAdvice,
   routeRecommendations,
   routeOptions,
@@ -358,6 +366,7 @@ export function ModelProviderSettings({
   routeAvoidanceDecisionHistory: RouteAvoidanceDecisionHistoryView;
   routeAvoidanceGovernance: RouteAvoidanceGovernanceView;
   routeConfirmationHistory: RouteConfirmationHistoryView[];
+  routeConfirmationOnboarding: RouteConfirmationOnboarding;
   routeConfirmationRecheckAdvice: RouteConfirmationRecheckAdviceView;
   routeRecommendations: RouteRecommendationView[];
   routeOptions: RouteOptionView[];
@@ -848,6 +857,55 @@ export function ModelProviderSettings({
             <p className="mt-1 text-sm text-slate-600">给不同 AI 任务指定首选模型和备用模型，未配置时自动使用当前可用模型。</p>
           </div>
           {routeMessage ? <div className="rounded-md bg-slate-50 px-3 py-2 text-sm text-slate-600">{routeMessage}</div> : null}
+        </div>
+        <div className="mt-4 rounded-md border border-sky-200 bg-sky-50/50 p-4">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <div className="text-sm font-medium text-slate-950">{routeConfirmationOnboarding.title}</div>
+              <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-600">{routeConfirmationOnboarding.detail}</p>
+            </div>
+            <div className="flex flex-wrap gap-2 text-xs text-slate-600">
+              <span className="rounded-md bg-white px-2 py-1">已确认 {routeConfirmationOnboarding.summary.confirmed}</span>
+              <span className="rounded-md bg-white px-2 py-1">待确认 {routeConfirmationOnboarding.summary.readyToConfirm}</span>
+              <span className="rounded-md bg-white px-2 py-1">缺路线 {routeConfirmationOnboarding.summary.missingRoute}</span>
+            </div>
+          </div>
+          {routeConfirmationOnboarding.nextAction ? (
+            <div className="mt-3 flex flex-col gap-3 rounded-md bg-white p-3 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <div className="text-sm font-medium text-slate-950">下一条：{routeConfirmationOnboarding.nextAction.label}</div>
+                <p className="mt-1 text-sm leading-6 text-slate-600">{routeConfirmationOnboarding.nextAction.detail}</p>
+              </div>
+              {routeConfirmationOnboarding.nextAction.status === "ready_to_confirm" ? (
+                <button
+                  className="rounded-md bg-slate-950 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+                  disabled={savingRouteType === routeConfirmationOnboarding.nextAction.taskType}
+                  onClick={() => void saveRoute(routeConfirmationOnboarding.nextAction?.taskType ?? "")}
+                  type="button"
+                >
+                  {savingRouteType === routeConfirmationOnboarding.nextAction.taskType ? "确认中" : routeConfirmationOnboarding.nextAction.actionLabel}
+                </button>
+              ) : (
+                <span className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-800">
+                  {routeConfirmationOnboarding.nextAction.actionLabel}
+                </span>
+              )}
+            </div>
+          ) : null}
+          <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-4">
+            {routeConfirmationOnboarding.items.slice(0, 4).map((item) => {
+              const status = routeOnboardingStatusCopy[item.status];
+              return (
+                <div className="rounded-md bg-white p-3 text-sm" key={item.taskType}>
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="font-medium text-slate-950">{item.label}</span>
+                    <span className={`rounded-md px-2 py-1 text-xs font-medium ${status.className}`}>{status.label}</span>
+                  </div>
+                  <p className="mt-2 line-clamp-2 text-xs leading-5 text-slate-600">{item.detail}</p>
+                </div>
+              );
+            })}
+          </div>
         </div>
         <div className="mt-4 grid gap-3 md:grid-cols-3 lg:grid-cols-6">
           <div className="rounded-md bg-slate-50 p-3">

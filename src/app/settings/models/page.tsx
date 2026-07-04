@@ -8,6 +8,7 @@ import { buildRouteEffectAudit } from "@/lib/model-gateway/routeEffectAudit";
 import {
   buildRouteConfirmationHistory,
   buildRouteConfirmationGovernanceEvidenceFromDispatchTasks,
+  buildRouteConfirmationOnboarding,
   buildRouteConfirmationRecheckAdvice,
   buildRouteConfirmationRecheckEvidenceFromDispatchTasks,
   modelRouteConfirmationReceiptFromAudit,
@@ -225,6 +226,11 @@ export default async function ModelSettingsPage() {
     routeGovernanceEvidence,
   });
   const presetRouteBlueprint = buildPresetRouteBlueprint(routeProviders, routes);
+  const routeConfirmationOnboarding = buildRouteConfirmationOnboarding({
+    routeOptions: modelTaskRouteOptions,
+    routes,
+    confirmations: routeConfirmationReceipts,
+  });
 
   return (
     <AppShell>
@@ -240,6 +246,7 @@ export default async function ModelSettingsPage() {
         routeAvoidanceDecisionHistory={routeAvoidanceDecisionHistory}
         routeAvoidanceGovernance={routeAvoidanceGovernance}
         routeConfirmationHistory={routeConfirmationHistory}
+        routeConfirmationOnboarding={routeConfirmationOnboarding}
         routeConfirmationRecheckAdvice={routeConfirmationRecheckAdvice}
         routeRecommendations={routeRecommendations}
         routeOptions={modelTaskRouteOptions}

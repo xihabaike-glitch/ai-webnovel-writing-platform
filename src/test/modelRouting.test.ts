@@ -16,6 +16,7 @@ import {
   buildRouteConfirmationGovernanceFollowUpDispatches,
   buildRouteConfirmationDispatchFlow,
   buildRouteConfirmationHistory,
+  buildRouteConfirmationOnboarding,
   buildRouteDispatchCompletionTemplate,
   buildRouteConfirmationRecheckAdviceFromDispatchTask,
   buildRouteConfirmationRecheckSampleDispatch,
@@ -951,6 +952,40 @@ test("model task routing", async (t) => {
     assert.deepEqual(flow.emptyGuide?.steps.map((step) => step.label), ["确认路线", "复检样本", "治理闭环"]);
     assert.equal(flow.emptyGuide?.primaryHref, "/settings/models");
     assert.equal(flow.emptyGuide?.secondaryHref, "/gate");
+  });
+
+  await t.test("builds a first route confirmation onboarding action", () => {
+    const onboarding = buildRouteConfirmationOnboarding({
+      routeOptions: modelTaskRouteOptions.slice(0, 3),
+      routes: [
+        {
+          taskType: modelTaskRouteOptions[0].taskType,
+          primaryProviderConfigId: "gpt-provider",
+          fallbackProviderConfigId: "mock-provider",
+        },
+        {
+          taskType: modelTaskRouteOptions[1].taskType,
+          primaryProviderConfigId: "mock-provider",
+          fallbackProviderConfigId: null,
+        },
+      ],
+      confirmations: [
+        buildModelRouteConfirmationReceipt({
+          taskType: modelTaskRouteOptions[0].taskType,
+          primaryProviderName: "GPT · gpt-5-mini",
+          fallbackProviderName: "Mock · mock-writer",
+          reason: "已完成首轮路线确认。",
+          source: "manual",
+          createdAt: "2026-07-04T10:00:00.000Z",
+        }),
+      ],
+    });
+
+    assert.equal(onboarding.summary.confirmed, 1);
+    assert.equal(onboarding.summary.readyToConfirm, 1);
+    assert.equal(onboarding.summary.missingRoute, 1);
+    assert.equal(onboarding.nextAction?.taskType, modelTaskRouteOptions[1].taskType);
+    assert.equal(onboarding.nextAction?.actionLabel, "确认并生成复检派单");
   });
 
   await t.test("builds route governance closed-loop trails for dispatch review", () => {

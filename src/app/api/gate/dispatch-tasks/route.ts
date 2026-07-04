@@ -5,12 +5,15 @@ import {
   buildRouteConfirmationGovernanceAutoFollowUpDispatches,
   buildRouteConfirmationGovernanceEvidenceFromDispatchTasks,
 } from "@/lib/model-gateway/routeConfirmation";
+import { getPlatformProfile, type PlatformId } from "@/lib/platforms/platformProfiles";
+import { buildFirstDayFollowUpDispatch, buildFirstDayWorkflow } from "@/lib/projects/firstDayWorkflow";
 import type {
   GateActionReceipt,
   GatePlatformGrowthDispatchItem,
   GatePlatformGrowthDispatchState,
   PersistedGatePlatformDispatchTask,
 } from "@/lib/projects/gateActionReceipts";
+import { buildSubmissionChecklist } from "@/lib/projects/submissionChecklist";
 
 function text(value: unknown, fallback = "") {
   return typeof value === "string" ? value : fallback;
@@ -111,11 +114,12 @@ function takeLimit(value: string | null) {
 
 async function persistGeneratedDispatch(dispatch: GatePlatformGrowthDispatchItem & { dispatchKey: string }) {
   const now = new Date();
+  const projectId = projectIdFromHref(dispatch.href);
   const task = await prisma.gateDispatchTask.upsert({
     where: { dispatchKey: dispatch.dispatchKey },
     create: {
       dispatchKey: dispatch.dispatchKey,
-      projectId: null,
+      projectId,
       platformId: dispatch.platformId,
       platformName: dispatch.platformName,
       stage: dispatch.stage,
@@ -136,6 +140,7 @@ async function persistGeneratedDispatch(dispatch: GatePlatformGrowthDispatchItem
       completedAt: dispatch.state === "completed" ? now : null,
     },
     update: {
+      projectId,
       state: dispatch.state,
       priorityScore: dispatch.priorityScore,
       detail: dispatch.detail,
@@ -146,6 +151,81 @@ async function persistGeneratedDispatch(dispatch: GatePlatformGrowthDispatchItem
     },
   });
   return toTask(task);
+}
+
+function firstDayDispatchProjectId(dispatchKey: string, projectId: string | null) {
+  if (projectId) return projectId;
+  const match = dispatchKey.match(/^first-day:([^:]+):/);
+  return match?.[1] ?? null;
+}
+
+async function buildFirstDayFollowUpTasks(task: Awaited<ReturnType<typeof prisma.gateDispatchTask.update>>) {
+  if (!task.dispatchKey.startsWith("first-day:") || task.state !== "completed") return [];
+  const projectId = firstDayDispatchProjectId(task.dispatchKey, task.projectId);
+  if (!projectId) return [];
+
+  const project = await prisma.project.findUnique({
+    where: { id: projectId },
+    include: {
+      chapters: { orderBy: { order: "asc" } },
+      outlineNodes: { orderBy: [{ depth: "asc" }, { order: "asc" }] },
+      characters: { orderBy: { createdAt: "asc" } },
+      worldEntries: { orderBy: [{ type: "asc" }, { createdAt: "asc" }] },
+      aiTasks: { orderBy: { createdAt: "desc" } },
+      gateDispatchTasks: {
+        where: {
+          dispatchKey: { startsWith: `first-day:${projectId}:` },
+        },
+        orderBy: { updatedAt: "desc" },
+      },
+    },
+  });
+  if (!project) return [];
+
+  const platform = getPlatformProfile(project.targetPlatform as PlatformId);
+  const submissionChecklist = buildSubmissionChecklist({
+    title: project.title,
+    genre: project.genre,
+    sellingPoint: project.sellingPoint,
+    currentWordCount: project.currentWordCount,
+    targetWordCount: project.targetWordCount,
+    platform,
+    chapters: project.chapters,
+    aiTasks: project.aiTasks.map((aiTask) => ({
+      taskType: aiTask.taskType,
+      status: aiTask.status,
+      chapter: aiTask.chapterId ? { id: aiTask.chapterId } : null,
+    })),
+  });
+  const workflowProject = {
+    id: project.id,
+    title: project.title,
+    currentWordCount: project.currentWordCount,
+  };
+  const workflow = buildFirstDayWorkflow({
+    project: workflowProject,
+    platform,
+    chapters: project.chapters,
+    outlineNodes: project.outlineNodes,
+    characters: project.characters,
+    worldEntries: project.worldEntries,
+    aiTasks: project.aiTasks,
+    dispatchTasks: project.gateDispatchTasks.map((dispatchTask) => ({
+      dispatchKey: dispatchTask.dispatchKey,
+      state: dispatchTask.state,
+      completionEvidence: dispatchTask.completionEvidence,
+    })),
+    submissionChecklist,
+  });
+  const dispatch = buildFirstDayFollowUpDispatch({
+    workflow,
+    project: workflowProject,
+    platform,
+    completedDispatchKey: task.dispatchKey,
+    existingDispatchKeys: project.gateDispatchTasks.map((dispatchTask) => dispatchTask.dispatchKey),
+  });
+
+  return dispatch ? [await persistGeneratedDispatch({ ...dispatch, dispatchKey: dispatch.id })] : [];
 }
 
 export async function GET(request: Request) {
@@ -272,6 +352,12 @@ export async function PATCH(request: Request) {
       existingDispatchKeys: existingTasks.map((item) => item.dispatchKey),
     });
     followUpTasks = await Promise.all(followUps.map(persistGeneratedDispatch));
+  }
+  if (nextState === "completed") {
+    followUpTasks = [
+      ...followUpTasks,
+      ...await buildFirstDayFollowUpTasks(task),
+    ];
   }
 
   return NextResponse.json({ task: toTask(task), followUpTasks });

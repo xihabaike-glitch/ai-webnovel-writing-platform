@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { getPlatformProfile } from "../lib/platforms/platformProfiles.ts";
-import { buildFirstDayDispatchItem, buildFirstDayExecutionReceipt, buildFirstDayLaunchPackage, buildFirstDayLaunchReceipt, buildFirstDayModelExecutionPlan, buildFirstDayWorkflow } from "../lib/projects/firstDayWorkflow.ts";
+import { buildFirstDayDispatchItem, buildFirstDayExecutionReceipt, buildFirstDayFollowUpDispatch, buildFirstDayLaunchPackage, buildFirstDayLaunchReceipt, buildFirstDayModelExecutionPlan, buildFirstDayWorkflow } from "../lib/projects/firstDayWorkflow.ts";
 
 const project = {
   id: "project-1",
@@ -330,6 +330,44 @@ test("buildFirstDayWorkflow", async (t) => {
     assert.ok(draftStep?.evidence.includes("第一章正文已经生成"));
   });
 
+  await t.test("builds the next first-day dispatch after a completed task", () => {
+    const platform = getPlatformProfile("fanqie");
+    const workflow = buildFirstDayWorkflow({
+      project,
+      platform,
+      chapters: [chapter, { ...chapter, id: "chapter-2", order: 2 }, { ...chapter, id: "chapter-3", order: 3 }],
+      outlineNodes,
+      characters,
+      worldEntries,
+      aiTasks: [],
+      dispatchTasks: [{
+        dispatchKey: "first-day:project-1:first-draft",
+        state: "completed",
+        completionEvidence: "第一章正文已经生成并写回章节，作者已确认可以进入审稿。",
+      }],
+      submissionChecklist: checklist,
+    });
+    const followUp = buildFirstDayFollowUpDispatch({
+      workflow,
+      project,
+      platform,
+      completedDispatchKey: "first-day:project-1:first-draft",
+      existingDispatchKeys: ["first-day:project-1:first-draft"],
+    });
+
+    assert.equal(workflow.nextStep.id, "first-review");
+    assert.equal(followUp?.id, "first-day:project-1:first-review");
+    assert.equal(followUp?.title, "夜雨系统 · 第一章审稿");
+    assert.equal(followUp?.state, "assigned");
+
+    assert.equal(buildFirstDayFollowUpDispatch({
+      workflow,
+      project,
+      platform,
+      existingDispatchKeys: ["first-day:project-1:first-review"],
+    }), null);
+  });
+
   await t.test("locks downstream work when the skeleton is empty", () => {
     const workflow = buildFirstDayWorkflow({
       project,
@@ -367,5 +405,10 @@ test("buildFirstDayWorkflow", async (t) => {
     assert.equal(workflow.progressPercent, 100);
     assert.equal(workflow.nextStep.id, "publish-precheck");
     assert.equal(workflow.steps.every((step) => step.status === "done"), true);
+    assert.equal(buildFirstDayFollowUpDispatch({
+      workflow,
+      project: { ...project, currentWordCount: 2400 },
+      platform: getPlatformProfile("fanqie"),
+    }), null);
   });
 });

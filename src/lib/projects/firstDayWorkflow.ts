@@ -134,6 +134,11 @@ export interface FirstDayLaunchPackage {
   dispatch: GatePlatformGrowthDispatchItem;
 }
 
+export interface FirstDayFollowUpDispatchInput extends FirstDayDispatchInput {
+  completedDispatchKey?: string | null;
+  existingDispatchKeys?: string[];
+}
+
 export interface FirstDayExecutionReceipt {
   success: boolean;
   summary: string;
@@ -807,4 +812,12 @@ export function buildFirstDayLaunchPackage(input: FirstDayDispatchInput): FirstD
     receipt: buildFirstDayLaunchReceipt(input.workflow),
     dispatch: buildFirstDayDispatchItem(input),
   };
+}
+
+export function buildFirstDayFollowUpDispatch(input: FirstDayFollowUpDispatchInput): GatePlatformGrowthDispatchItem | null {
+  if (input.workflow.completedCount >= input.workflow.totalSteps) return null;
+  const dispatch = buildFirstDayDispatchItem(input);
+  if (dispatch.id === input.completedDispatchKey) return null;
+  if (input.existingDispatchKeys?.includes(dispatch.id)) return null;
+  return dispatch;
 }

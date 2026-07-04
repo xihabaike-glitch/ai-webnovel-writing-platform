@@ -479,6 +479,105 @@ test("buildProjectStartTacticAdvice", async (t) => {
     assert.ok(result.advice.evidence.some((item) => item.includes("分数变好")));
   });
 
+  await t.test("feeds completed recheck review dispatches into new project start advice", () => {
+    function reviewTask(input: {
+      dispatchKey: string;
+      platformId: "qimao" | "fanqie";
+      platformName: string;
+      stage: "pause_platform" | "watch";
+      title: string;
+      completionEvidence: string;
+      completedAt: string;
+      priorityScore: number;
+      evidence: string[];
+    }): PersistedGatePlatformDispatchTask {
+      return {
+        databaseId: `task-${input.platformId}-recheck-review`,
+        dispatchKey: input.dispatchKey,
+        id: input.dispatchKey,
+        projectId: "project-1",
+        platformId: input.platformId,
+        platformName: input.platformName,
+        stage: input.stage,
+        state: "completed",
+        priorityScore: input.priorityScore,
+        ownerRole: "主编",
+        title: input.title,
+        detail: "返工链复盘派单。",
+        dueLabel: "今天复盘",
+        actionLabel: "查看复盘",
+        href: "/dispatch",
+        acceptanceCriteria: ["写清复盘结论和下一轮边界。"],
+        evidence: input.evidence,
+        sourceReceiptId: null,
+        completionEvidence: input.completionEvidence,
+        reviewLatestAt: input.completedAt,
+        assignedAt: "2026-01-01T00:00:00.000Z",
+        completedAt: input.completedAt,
+        createdAt: "2026-01-01T00:00:00.000Z",
+        updatedAt: input.completedAt,
+      };
+    }
+
+    const qimaoPlatform = getPlatformProfile("qimao");
+    const qimaoResult = buildProjectStartGateExperience({
+      platform: qimaoPlatform,
+      template: getDefaultTemplateForPlatform(qimaoPlatform.id),
+      style: getPlatformWritingStyle(qimaoPlatform.id),
+      receipts: [],
+      tasks: [
+        reviewTask({
+          dispatchKey: "recheck-review:direction_pause:submission-precheck-project-1-platform-risk:2",
+          platformId: "qimao",
+          platformName: "七猫小说",
+          stage: "pause_platform",
+          title: "七猫小说 · 平台方向先暂停",
+          completionEvidence: "已暂停七猫加码，转回投稿包和前三章兑现重判。",
+          completedAt: "2026-01-01T01:00:00.000Z",
+          priorityScore: 96,
+          evidence: ["返工链根：submission-precheck:project-1:platform-risk", "复盘建议：平台方向先暂停"],
+        }),
+      ],
+    });
+
+    assert.equal(qimaoResult.selection.guideItem?.label, "复盘止损");
+    assert.equal(qimaoResult.selection.experience?.tactic, "复盘止损样本");
+    assert.equal(qimaoResult.advice.status, "history_blocked");
+    assert.equal(qimaoResult.advice.label, "复盘止损");
+    assert.ok(qimaoResult.advice.title.includes("先不做主平台"));
+    assert.ok(qimaoResult.advice.verificationMove.includes("不允许直接加码"));
+    assert.ok(qimaoResult.advice.checklist.some((item) => item.includes("恢复条件")));
+
+    const fanqiePlatform = getPlatformProfile("fanqie");
+    const fanqieResult = buildProjectStartGateExperience({
+      platform: fanqiePlatform,
+      template: getDefaultTemplateForPlatform(fanqiePlatform.id),
+      style: getPlatformWritingStyle(fanqiePlatform.id),
+      receipts: [],
+      tasks: [
+        reviewTask({
+          dispatchKey: "recheck-review:acceptance_mismatch:story-tree-project-1-chapter-1-chapter_draft-opening_ending:2",
+          platformId: "fanqie",
+          platformName: "番茄小说",
+          stage: "watch",
+          title: "番茄小说 · 验收标准先补清楚",
+          completionEvidence: "已补通过线、不可接受项和下一轮只验证一个核心问题。",
+          completedAt: "2026-01-01T02:00:00.000Z",
+          priorityScore: 88,
+          evidence: ["返工链根：story-tree:project-1:chapter-1:chapter_draft:opening_ending", "复盘建议：验收标准先补清楚"],
+        }),
+      ],
+    });
+
+    assert.equal(fanqieResult.selection.guideItem?.label, "验收观察");
+    assert.equal(fanqieResult.selection.experience?.tactic, "验收标准修正打法");
+    assert.equal(fanqieResult.advice.status, "history_watch");
+    assert.equal(fanqieResult.advice.label, "验收观察");
+    assert.ok(fanqieResult.advice.title.includes("先补验收标准"));
+    assert.ok(fanqieResult.advice.verificationMove.includes("通过线"));
+    assert.ok(fanqieResult.advice.checklist.some((item) => item.includes("不可接受项")));
+  });
+
   await t.test("turns start advice into a reusable platform soil entry", () => {
     const platform = getPlatformProfile("fanqie");
     const template = getDefaultTemplateForPlatform(platform.id);

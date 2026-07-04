@@ -199,6 +199,18 @@ function historyLabel(experience: GatePlatformTacticExperienceItem) {
   return "历史可复用";
 }
 
+function isRecheckStopExperience(experience: GatePlatformTacticExperienceItem) {
+  return experience.tactic === "复盘止损样本";
+}
+
+function isAcceptanceReviewExperience(experience: GatePlatformTacticExperienceItem) {
+  return experience.tactic === "验收标准修正打法";
+}
+
+function isWeakExecutionReviewExperience(experience: GatePlatformTacticExperienceItem) {
+  return experience.tactic === "返工动作收口打法";
+}
+
 function batchEffectForPlatform(batchEffects: GateBatchTacticEffectItem[], platform: PlatformProfile) {
   return batchEffects.find((item) => item.tacticTitle.includes(platform.name)) ?? null;
 }
@@ -234,13 +246,16 @@ export function buildProjectStartPlatformExperienceGuide(input: {
     }
 
     if (experience?.status === "blocked") {
+      const isStopReview = isRecheckStopExperience(experience);
       return {
         platformId: platform.id,
         platformName: platform.name,
         status: "avoid",
-        label: "历史避坑",
-        headline: `${platform.name} 先别硬上`,
-        detail: `${experience.tactic} 已经沉淀为避坑样本。${experience.reuseHint}`,
+        label: isStopReview ? "复盘止损" : "历史避坑",
+        headline: isStopReview ? `${platform.name} 先暂停方向` : `${platform.name} 先别硬上`,
+        detail: isStopReview
+          ? `历史返工复盘已经判定当前方向要止损。${experience.reuseHint}`
+          : `${experience.tactic} 已经沉淀为避坑样本。${experience.reuseHint}`,
         priorityScore: experience.priorityScore,
         source: "experience",
         href: experience.href,
@@ -283,14 +298,28 @@ export function buildProjectStartPlatformExperienceGuide(input: {
 
     if (experience?.status === "watch" || batchEffect?.status === "watch") {
       const source = experience?.status === "watch" ? experience : batchEffect;
+      const isAcceptanceReview = experience ? isAcceptanceReviewExperience(experience) : false;
+      const isWeakExecutionReview = experience ? isWeakExecutionReviewExperience(experience) : false;
       return {
         platformId: platform.id,
         platformName: platform.name,
         status: "watch",
-        label: experience?.status === "watch" ? "历史观察" : "批量观察",
-        headline: `${platform.name} 小样本观察`,
+        label: isAcceptanceReview
+          ? "验收观察"
+          : isWeakExecutionReview
+            ? "动作观察"
+            : experience?.status === "watch" ? "历史观察" : "批量观察",
+        headline: isAcceptanceReview
+          ? `${platform.name} 先补验收线`
+          : isWeakExecutionReview
+            ? `${platform.name} 先收口动作`
+            : `${platform.name} 小样本观察`,
         detail: experience?.status === "watch"
-          ? `${experience.tactic} 还不能写成成功打法。${experience.reuseHint}`
+          ? isAcceptanceReview
+            ? `历史返工复盘暴露验收标准不硬。${experience.reuseHint}`
+            : isWeakExecutionReview
+              ? `历史返工复盘暴露执行动作太虚。${experience.reuseHint}`
+              : `${experience.tactic} 还不能写成成功打法。${experience.reuseHint}`
           : `${batchEffect?.tacticLabel ?? "批量样本"} 样本还薄，只能小批验证。`,
         priorityScore: experience?.status === "watch" ? experience.priorityScore : batchEffect?.successRatePercent ?? 40,
         source: experience?.status === "watch" ? "experience" : "batch",
@@ -464,6 +493,63 @@ export function buildProjectStartTacticAdvice(input: {
   }
 
   if (experience) {
+    if (isRecheckStopExperience(experience)) {
+      return {
+        status: "history_blocked",
+        label: "复盘止损",
+        title: `${platform.name}：复盘止损，先不做主平台`,
+        primaryTactic: `${experience.lesson} 新项目先不要把 ${platform.name} 当主推平台，除非入口卖点、前三章兑现和平台匹配度已经重做。`,
+        openingMove: `先按避坑样本重做开头钩子：${style.openingHook}`,
+        verificationMove: `如必须验证，只允许一轮小样本，先看投稿包、前三章兑现和平台匹配度，不允许直接加码。${modelRouteVerification}`,
+        risk: experience.risk,
+        evidence: withModelEvidence(experience.evidence),
+        checklist: withModelChecklist([
+          `复盘止损：不要直接复用 ${platform.name} 旧方向`,
+          `模板前三章：${firstThreeTitles}`,
+          `必须具备：${style.mustHave.join("、")}`,
+          "恢复条件：入口卖点、前三章兑现、平台匹配度至少改掉一项",
+        ]),
+      };
+    }
+
+    if (isAcceptanceReviewExperience(experience)) {
+      return {
+        status: "history_watch",
+        label: "验收观察",
+        title: `${platform.name}：先补验收标准再开书`,
+        primaryTactic: experience.lesson,
+        openingMove: `先按平台钩子写开头，但每一章必须绑定可验收通过线：${style.openingHook}`,
+        verificationMove: `创建后先跑前三章验收：通过线、不可接受项、必须改动段落和复查证据格式都要写清。${modelRouteVerification}`,
+        risk: experience.risk,
+        evidence: withModelEvidence(experience.evidence),
+        checklist: withModelChecklist([
+          "通过线：首章钩子、前三章兑现、平台包装各有明确分数或证据",
+          "不可接受项：不能只改措辞，必须改变冲突、选择或代价",
+          `模板前三章：${firstThreeTitles}`,
+          `必须具备：${style.mustHave.join("、")}`,
+        ]),
+      };
+    }
+
+    if (isWeakExecutionReviewExperience(experience)) {
+      return {
+        status: "history_watch",
+        label: "动作观察",
+        title: `${platform.name}：先收口返工动作再开书`,
+        primaryTactic: experience.lesson,
+        openingMove: `开头动作必须段落级落地：${style.openingHook}`,
+        verificationMove: `创建后只验证一个核心动作：改哪一段、服务哪条主线、如何改变追读理由，写不清就不进入批量。${modelRouteVerification}`,
+        risk: experience.risk,
+        evidence: withModelEvidence(experience.evidence),
+        checklist: withModelChecklist([
+          "动作边界：只验证一个核心问题",
+          "段落证据：写清改动段落、主线压力和读者追读理由",
+          `模板前三章：${firstThreeTitles}`,
+          `必须具备：${style.mustHave.join("、")}`,
+        ]),
+      };
+    }
+
     return {
       status: historyStatus(experience),
       label: historyLabel(experience),

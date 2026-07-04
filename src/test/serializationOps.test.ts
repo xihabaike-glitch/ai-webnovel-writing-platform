@@ -46,6 +46,9 @@ test("buildSerializationOpsDashboard", async (t) => {
     assert.equal(dashboard.revisionQueueCount, 0);
     assert.equal(dashboard.publishReadyCount, 0);
     assert.equal(dashboard.actions[0].id, "review-next");
+    assert.equal(dashboard.actions[0].execution?.method, "POST");
+    assert.equal(dashboard.actions[0].execution?.endpoint, "/api/ai/tasks/chapter-review");
+    assert.equal(dashboard.actions[0].execution?.payload.chapterId, "chapter-1");
     assert.ok(dashboard.warnings.some((warning) => warning.includes("未审稿")));
   });
 
@@ -70,6 +73,9 @@ test("buildSerializationOpsDashboard", async (t) => {
     assert.equal(dashboard.reviewQueueCount, 0);
     assert.equal(dashboard.revisionQueueCount, 1);
     assert.equal(dashboard.actions[0].id, "revise-next");
+    assert.equal(dashboard.actions[0].execution?.endpoint, "/api/chapters/chapter-1/second-pass");
+    assert.equal(dashboard.actions[0].execution?.payload.mode, "platform_fit");
+    assert.equal(dashboard.actions[0].execution?.payload.targetWords, 1200);
   });
 
   await t.test("counts reviewed and second-passed chapters as publish ready", () => {
@@ -101,6 +107,10 @@ test("buildSerializationOpsDashboard", async (t) => {
     assert.equal(dashboard.publishReadyCount, 1);
     assert.equal(dashboard.nextPublishChapter?.id, "chapter-1");
     assert.equal(dashboard.actions.some((action) => action.id === "publish-next"), true);
+    const publishAction = dashboard.actions.find((action) => action.id === "publish-next");
+    assert.equal(publishAction?.execution?.method, "PATCH");
+    assert.equal(publishAction?.execution?.endpoint, "/api/chapters/chapter-1");
+    assert.equal(publishAction?.execution?.payload.status, "final");
   });
 
   await t.test("requires second-pass recheck before publish readiness", () => {

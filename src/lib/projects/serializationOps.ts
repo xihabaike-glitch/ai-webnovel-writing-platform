@@ -42,6 +42,14 @@ export interface SerializationAction {
   priority: "high" | "medium" | "low";
   detail: string;
   chapterId?: string;
+  execution: SerializationActionExecution | null;
+}
+
+export interface SerializationActionExecution {
+  label: string;
+  method: "PATCH" | "POST";
+  endpoint: string;
+  payload: Record<string, string | number | boolean>;
 }
 
 export interface SerializationOpsDashboard {
@@ -110,24 +118,48 @@ function buildActions(input: SerializationOpsInput, reviewQueue: SerializationCh
       priority: "high",
       chapterId: reviewQueue[0].id,
       detail: `第 ${reviewQueue[0].order} 章《${reviewQueue[0].title}》已有正文但未审稿。`,
+      execution: {
+        label: "执行审稿",
+        method: "POST",
+        endpoint: "/api/ai/tasks/chapter-review",
+        payload: { chapterId: reviewQueue[0].id },
+      },
     });
   }
   if (revisionQueue[0]) {
+    const chapter = revisionQueue[0];
     actions.push({
       id: "revise-next",
       label: "先二改",
       priority: "high",
-      chapterId: revisionQueue[0].id,
-      detail: `第 ${revisionQueue[0].order} 章《${revisionQueue[0].title}》审稿分偏低或仍有问题。`,
+      chapterId: chapter.id,
+      detail: `第 ${chapter.order} 章《${chapter.title}》审稿分偏低或仍有问题。`,
+      execution: {
+        label: "执行二改",
+        method: "POST",
+        endpoint: `/api/chapters/${chapter.id}/second-pass`,
+        payload: {
+          instruction: "按最近一次审稿结论执行二改：强化开头钩子、爽点兑现、人物选择和章末追读，保留原主线事实。",
+          mode: "platform_fit",
+          targetWords: Math.max(chapter.wordCount, 1200),
+        },
+      },
     });
   }
   if (publishReady[0]) {
+    const chapter = publishReady[0];
     actions.push({
       id: "publish-next",
       label: "可发布",
       priority: "medium",
-      chapterId: publishReady[0].id,
-      detail: `第 ${publishReady[0].order} 章《${publishReady[0].title}》已审稿并二改，可进入发布/定稿检查。`,
+      chapterId: chapter.id,
+      detail: `第 ${chapter.order} 章《${chapter.title}》已审稿并二改，可进入发布/定稿检查。`,
+      execution: {
+        label: "标记定稿",
+        method: "PATCH",
+        endpoint: `/api/chapters/${chapter.id}`,
+        payload: { status: "final" },
+      },
     });
   }
   if (failedChecklist[0]) {
@@ -136,6 +168,7 @@ function buildActions(input: SerializationOpsInput, reviewQueue: SerializationCh
       label: "补投稿资料",
       priority: failedChecklist[0].status === "todo" ? "high" : "medium",
       detail: `${failedChecklist[0].label}：${failedChecklist[0].detail}`,
+      execution: null,
     });
   }
   if (actions.length === 0) {
@@ -144,6 +177,7 @@ function buildActions(input: SerializationOpsInput, reviewQueue: SerializationCh
       label: "扩展生产",
       priority: "low",
       detail: "当前没有明显运营卡点，可以继续扩展章节排期或准备多平台投稿版本。",
+      execution: null,
     });
   }
 

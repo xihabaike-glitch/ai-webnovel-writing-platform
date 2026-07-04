@@ -17,6 +17,14 @@ interface SerializationAction {
   priority: "high" | "medium" | "low";
   detail: string;
   chapterId?: string;
+  execution: SerializationActionExecution | null;
+}
+
+interface SerializationActionExecution {
+  label: string;
+  method: "PATCH" | "POST";
+  endpoint: string;
+  payload: Record<string, string | number | boolean>;
 }
 
 interface SerializationOpsDashboard {
@@ -54,6 +62,7 @@ export function SerializationOpsPanel({ projectId }: { projectId: string }) {
   const [dashboard, setDashboard] = useState<SerializationOpsDashboard | null>(null);
   const [checklist, setChecklist] = useState<SubmissionChecklist | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [runningActionId, setRunningActionId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
   async function loadOps() {
@@ -74,6 +83,30 @@ export function SerializationOpsPanel({ projectId }: { projectId: string }) {
       setMessage(caught instanceof Error ? caught.message : "读取连载运营看板失败。");
     } finally {
       setIsLoading(false);
+    }
+  }
+
+  async function runAction(action: SerializationAction) {
+    if (!action.execution) return;
+    setRunningActionId(action.id);
+    setMessage(null);
+    try {
+      const response = await fetch(action.execution.endpoint, {
+        method: action.execution.method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(action.execution.payload),
+      });
+      const payload = (await response.json().catch(() => null)) as { error?: string; message?: string; result?: { score?: number }; secondPassAudit?: { score?: number } } | null;
+      if (!response.ok) {
+        throw new Error(payload?.error ?? "执行运营动作失败。");
+      }
+      await loadOps();
+      const score = payload?.result?.score ?? payload?.secondPassAudit?.score;
+      setMessage(score ? `已完成：${action.label}，复检 ${score} 分。` : `已完成：${action.label}`);
+    } catch (caught) {
+      setMessage(caught instanceof Error ? caught.message : "执行运营动作失败。");
+    } finally {
+      setRunningActionId(null);
     }
   }
 
@@ -137,11 +170,23 @@ export function SerializationOpsPanel({ projectId }: { projectId: string }) {
                     <span className="text-xs text-slate-500">{priorityLabel(action.priority)}</span>
                   </div>
                   <p className="mt-1 text-slate-600">{action.detail}</p>
-                  {action.chapterId ? (
-                    <Link className="mt-2 inline-block text-xs font-medium text-slate-950" href={`/projects/${projectId}/chapters/${action.chapterId}`}>
-                      打开章节
-                    </Link>
-                  ) : null}
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {action.execution ? (
+                      <button
+                        className="rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white disabled:opacity-50"
+                        disabled={runningActionId === action.id}
+                        onClick={() => void runAction(action)}
+                        type="button"
+                      >
+                        {runningActionId === action.id ? "执行中" : action.execution.label}
+                      </button>
+                    ) : null}
+                    {action.chapterId ? (
+                      <Link className="rounded-md border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50" href={`/projects/${projectId}/chapters/${action.chapterId}`}>
+                        打开章节
+                      </Link>
+                    ) : null}
+                  </div>
                 </div>
               ))}
             </div>

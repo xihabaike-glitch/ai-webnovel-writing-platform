@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import type { StoryTreeExperienceAxisFilter, StoryTreeExperienceEffectDashboard, StoryTreeExperienceGuide, StoryTreeExperienceItem, StoryTreeExperienceReviewBacklog, StoryTreeExperienceStatus } from "@/lib/ai/storyTreeExperience";
+import type { StoryTreeExperienceAxisFilter, StoryTreeExperienceEffectDashboard, StoryTreeExperienceFlow, StoryTreeExperienceFlowTone, StoryTreeExperienceGuide, StoryTreeExperienceItem, StoryTreeExperienceReviewBacklog, StoryTreeExperienceStatus } from "@/lib/ai/storyTreeExperience";
 
 interface AppliedStoryTreeExperienceDispatch {
   dispatchKey: string;
@@ -58,15 +58,25 @@ function AppliedDispatchBadge({ dispatch }: { dispatch: AppliedStoryTreeExperien
   );
 }
 
+function flowToneClass(tone: StoryTreeExperienceFlowTone) {
+  if (tone === "emerald") return "bg-emerald-50 text-emerald-700";
+  if (tone === "rose") return "bg-rose-50 text-rose-700";
+  if (tone === "amber") return "bg-amber-50 text-amber-700";
+  if (tone === "sky") return "bg-sky-50 text-sky-700";
+  return "bg-slate-100 text-slate-700";
+}
+
 export function StoryTreeExperiencePanel({
   appliedDispatches = [],
   effectDashboard,
+  flow,
   guide,
   projectId,
   reviewBacklog,
 }: {
   appliedDispatches?: AppliedStoryTreeExperienceDispatch[];
   effectDashboard: StoryTreeExperienceEffectDashboard;
+  flow: StoryTreeExperienceFlow;
   guide: StoryTreeExperienceGuide;
   projectId: string;
   reviewBacklog: StoryTreeExperienceReviewBacklog;
@@ -176,6 +186,42 @@ export function StoryTreeExperiencePanel({
         </Link>
       </div>
       {message ? <p className="mt-3 text-sm text-slate-600">{message}</p> : null}
+      <div className="mt-4 rounded-md border border-slate-200 bg-white p-3">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <div className="font-medium text-slate-950">结构经验闭环</div>
+            <p className="mt-1 text-sm leading-6 text-slate-600">{flow.headline}</p>
+            <p className="mt-1 text-sm leading-6 text-slate-600">{flow.nextAction}</p>
+          </div>
+          {flow.nextHref ? (
+            <Link
+              className="w-fit rounded-md bg-slate-950 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800"
+              href={flow.nextHref}
+            >
+              处理卡点
+            </Link>
+          ) : null}
+        </div>
+        <div className="mt-3 grid gap-2 sm:grid-cols-5">
+          {flow.stages.map((stage) => (
+            <div
+              className={`rounded-md p-3 text-sm ${flow.bottleneck === stage.id ? "ring-1 ring-slate-950" : "bg-slate-50"}`}
+              key={stage.id}
+            >
+              <div className="flex items-center justify-between gap-2">
+                <div className="text-slate-500">{stage.label}</div>
+                <span className={`rounded-md px-2 py-1 text-xs font-medium ${flowToneClass(stage.tone)}`}>
+                  {stage.count}
+                </span>
+              </div>
+              <p className="mt-2 text-xs leading-5 text-slate-600">{stage.detail}</p>
+            </div>
+          ))}
+        </div>
+        <div className="mt-3 text-xs text-slate-500">
+          已沉淀 {flow.summary.learned} 条 · 已回流 {flow.summary.returned} 条 · 变弱避坑 {flow.summary.weakened} 条
+        </div>
+      </div>
       <div className="mt-4 rounded-md border border-slate-200 bg-slate-50 p-3">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div>

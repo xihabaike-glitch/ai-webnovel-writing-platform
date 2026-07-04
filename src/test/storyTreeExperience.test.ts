@@ -6,6 +6,7 @@ import {
   buildStoryTreeExperienceApplyDispatch,
   buildStoryTreeExperienceApplyDispatchKey,
   buildStoryTreeExperienceEffectDashboard,
+  buildStoryTreeExperienceFlow,
   buildStoryTreeExperienceGuide,
   buildStoryTreeExperienceReviewBacklog,
   buildStoryTreeExperienceSecondPassAdvice,
@@ -217,6 +218,104 @@ test("buildStoryTreeExperienceReviewBacklog collects completed advice without re
   assert.equal(backlog.nextItem?.status, "usable");
   assert.equal(backlog.nextItem?.sourceScore, 78);
   assert.ok(backlog.nextItem?.reviewPrompt.includes("补一条经验应用效果"));
+});
+
+test("buildStoryTreeExperienceFlow summarizes the closed-loop pipeline", () => {
+  const guide = buildStoryTreeExperienceGuide([
+    {
+      dispatchKey: "story-tree:project-1:chapter-1:chapter_draft:branch_causality",
+      title: "补分支因果",
+      href: "/projects/project-1/chapters/chapter-1",
+      evidence: [
+        "大树结构复检：68 -> 78 分，分数变好：结构待精修；返工动作：分支因果：把支线改成主线压力的直接后果。",
+      ],
+      completedAt: "2026-07-05T08:00:00.000Z",
+      updatedAt: "2026-07-05T08:00:00.000Z",
+    },
+    {
+      dispatchKey: "story-tree:project-1:chapter-2:chapter_draft:opening_ending",
+      title: "重压开头结尾",
+      href: "/projects/project-1/chapters/chapter-2",
+      evidence: [
+        "大树结构复检：82 -> 72 分，分数变差：开头钩子被削弱；返工动作：开头结尾：删掉开篇解释，先给不可逆选择。",
+      ],
+      completedAt: "2026-07-05T09:00:00.000Z",
+      updatedAt: "2026-07-05T09:00:00.000Z",
+    },
+    {
+      dispatchKey: "story-tree:project-1:chapter-3:chapter_draft:trunk_motion",
+      title: "补主干推进",
+      href: "/projects/project-1/chapters/chapter-3",
+      evidence: [
+        "大树结构复检：70 -> 74 分，分数未变：推进还需要观察；返工动作：主干推进：每 800 字必须出现新选择。",
+      ],
+      completedAt: "2026-07-05T10:00:00.000Z",
+      updatedAt: "2026-07-05T10:00:00.000Z",
+    },
+    {
+      dispatchKey: "story-tree:project-1:chapter-4:chapter_draft:leaf_soil",
+      title: "补叶片土壤",
+      href: "/projects/project-1/chapters/chapter-4",
+      evidence: [
+        "大树结构复检：63 -> 81 分，分数变好：土壤承托增强；返工动作：叶片土壤：把系统规则绑定本章选择。",
+      ],
+      completedAt: "2026-07-05T11:00:00.000Z",
+      updatedAt: "2026-07-05T11:00:00.000Z",
+    },
+  ]);
+  const appliedTasks = [
+    {
+      dispatchKey: buildStoryTreeExperienceApplyDispatchKey("project-1", guide.items.find((item) => item.axisId === "branch_causality")!),
+      state: "assigned",
+      evidence: JSON.stringify(["经验动作：分支因果：把支线改成主线压力的直接后果。"]),
+      title: "应用经验分支因果",
+      href: "/projects/project-1/chapters/chapter-1",
+    },
+    {
+      dispatchKey: buildStoryTreeExperienceApplyDispatchKey("project-1", guide.items.find((item) => item.axisId === "opening_ending")!),
+      state: "completed",
+      evidence: JSON.stringify([
+        "大树结构复检：82 -> 72 分，分数变差：开头钩子被削弱；返工动作：开头结尾：删掉开篇解释，先给不可逆选择。",
+        "经验动作：开头结尾：删掉开篇解释，先给不可逆选择。",
+      ]),
+      title: "应用经验开头结尾",
+      href: "/projects/project-1/chapters/chapter-2",
+    },
+    {
+      dispatchKey: buildStoryTreeExperienceApplyDispatchKey("project-1", guide.items.find((item) => item.axisId === "trunk_motion")!),
+      state: "completed",
+      evidence: JSON.stringify([
+        "大树结构复检：70 -> 74 分，分数未变：推进还需要观察；返工动作：主干推进：每 800 字必须出现新选择。",
+        "经验应用效果：主干推进 74 -> 84 分，继续有效：主线推进更清楚。",
+      ]),
+      title: "应用经验主干推进",
+      href: "/projects/project-1/chapters/chapter-3",
+    },
+  ];
+  const reviewBacklog = buildStoryTreeExperienceReviewBacklog(appliedTasks.map((task) => ({
+    ...task,
+    evidence: JSON.parse(task.evidence) as string[],
+    completionEvidence: "",
+    completedAt: task.state === "completed" ? "2026-07-05T12:00:00.000Z" : null,
+    updatedAt: "2026-07-05T12:00:00.000Z",
+  })));
+  const flow = buildStoryTreeExperienceFlow({
+    projectId: "project-1",
+    guide,
+    appliedTasks,
+    reviewBacklog,
+  });
+
+  assert.equal(flow.summary.learned, 4);
+  assert.equal(flow.summary.pendingDispatch, 1);
+  assert.equal(flow.summary.activeDispatch, 1);
+  assert.equal(flow.summary.reviewBacklog, 1);
+  assert.equal(flow.summary.returned, 1);
+  assert.equal(flow.summary.weakened, 0);
+  assert.equal(flow.status, "review");
+  assert.equal(flow.bottleneck, "review_backlog");
+  assert.ok(flow.nextAction.includes("补一条经验应用效果"));
+  assert.equal(flow.stages.find((stage) => stage.id === "pending_dispatch")?.count, 1);
 });
 
 test("buildStoryTreeChapterExperienceRecommendations matches weak chapter axes", () => {

@@ -21,7 +21,7 @@ import { StoryStructureDiagnosticPanel } from "@/components/projects/StoryStruct
 import { SubmissionPackagePanel } from "@/components/projects/SubmissionPackagePanel";
 import { WorldBiblePanel } from "@/components/projects/WorldBiblePanel";
 import { WritingWorkbenchPanel } from "@/components/projects/WritingWorkbenchPanel";
-import { buildStoryTreeExperienceApplyDispatchKey, buildStoryTreeExperienceEffectDashboard, buildStoryTreeExperienceGuide, buildStoryTreeExperienceReviewBacklog } from "@/lib/ai/storyTreeExperience";
+import { buildStoryTreeExperienceApplyDispatchKey, buildStoryTreeExperienceEffectDashboard, buildStoryTreeExperienceFlow, buildStoryTreeExperienceGuide, buildStoryTreeExperienceReviewBacklog } from "@/lib/ai/storyTreeExperience";
 import { prisma } from "@/lib/db/prisma";
 import { getPlatformProfile, type PlatformId } from "@/lib/platforms/platformProfiles";
 import { gatePlatformDispatchTaskFromRecord } from "@/lib/projects/gateDispatchTaskRecords";
@@ -94,6 +94,12 @@ export default async function ProjectPage({ params }: { params: Promise<{ projec
       state: true,
       evidence: true,
     },
+  });
+  const storyTreeExperienceFlow = buildStoryTreeExperienceFlow({
+    projectId: project.id,
+    guide: storyTreeExperience,
+    appliedTasks: appliedStoryTreeExperienceTasks,
+    reviewBacklog: storyTreeExperienceReviewBacklog,
   });
   const appliedStoryTreeExperienceMap = new Map(appliedStoryTreeExperienceTasks.map((task) => [task.dispatchKey, task]));
   const appliedStoryTreeExperienceItems = storyTreeExperience.items.flatMap((item) => {
@@ -312,6 +318,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ projec
         <StoryTreeExperiencePanel
           appliedDispatches={appliedStoryTreeExperienceItems}
           effectDashboard={storyTreeExperienceEffectDashboard}
+          flow={storyTreeExperienceFlow}
           guide={storyTreeExperience}
           projectId={project.id}
           reviewBacklog={storyTreeExperienceReviewBacklog}

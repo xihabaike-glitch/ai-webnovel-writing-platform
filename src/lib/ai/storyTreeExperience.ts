@@ -74,6 +74,43 @@ export interface StoryTreeExperienceReviewBacklog {
   items: StoryTreeExperienceReviewBacklogItem[];
 }
 
+export type StoryTreeExperienceFlowStageId = "pending_dispatch" | "active_dispatch" | "review_backlog" | "returned" | "weakened";
+export type StoryTreeExperienceFlowStatus = "empty" | "ready" | "working" | "review" | "learning" | "risk";
+export type StoryTreeExperienceFlowTone = "slate" | "amber" | "sky" | "emerald" | "rose";
+
+export interface StoryTreeExperienceAppliedTask {
+  dispatchKey: string;
+  state: string;
+  evidence: string;
+  title?: string | null;
+  href?: string | null;
+}
+
+export interface StoryTreeExperienceFlowStage {
+  id: StoryTreeExperienceFlowStageId;
+  label: string;
+  count: number;
+  tone: StoryTreeExperienceFlowTone;
+  detail: string;
+}
+
+export interface StoryTreeExperienceFlow {
+  status: StoryTreeExperienceFlowStatus;
+  headline: string;
+  nextAction: string;
+  nextHref: string | null;
+  bottleneck: StoryTreeExperienceFlowStageId | null;
+  summary: {
+    learned: number;
+    pendingDispatch: number;
+    activeDispatch: number;
+    reviewBacklog: number;
+    returned: number;
+    weakened: number;
+  };
+  stages: StoryTreeExperienceFlowStage[];
+}
+
 export interface StoryTreeExperienceAxisGroup {
   axisId: StoryTreeExperienceAxisFilter;
   axisLabel: string;
@@ -298,6 +335,7 @@ function applyActionLabel(status: StoryTreeExperienceStatus) {
 }
 
 export function buildStoryTreeExperienceApplyDispatchKey(projectId: string, item: Pick<StoryTreeExperienceItem, "source" | "axisId" | "dispatchKey">) {
+  if (item.dispatchKey.startsWith("story-tree-experience:")) return item.dispatchKey;
   return `story-tree-experience:${projectId}:${item.source}:${item.axisId}:${item.dispatchKey.replace(/[^a-zA-Z0-9_-]/g, "_")}`;
 }
 
@@ -325,6 +363,15 @@ function taskActionFromEvidence(evidence: string[]) {
 function taskSourceScoreFromEvidence(evidence: string[]) {
   const recheckLine = evidence.find((item) => item.startsWith("大树结构复检："));
   return recheckLine ? parseStoryTreeRecheckEvidenceLine(recheckLine)?.currentScore ?? null : null;
+}
+
+function parseEvidenceList(value: string) {
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === "string") : [];
+  } catch {
+    return [];
+  }
 }
 
 function effectStatusFromLine(line: string): StoryTreeExperienceEffectStatus | null {
@@ -560,6 +607,120 @@ export function buildStoryTreeExperienceReviewBacklog(
     total: items.length,
     nextItem: items[0] ?? null,
     items: items.slice(0, limit),
+  };
+}
+
+export function buildStoryTreeExperienceFlow(input: {
+  projectId: string;
+  guide: StoryTreeExperienceGuide;
+  appliedTasks: StoryTreeExperienceAppliedTask[];
+  reviewBacklog: StoryTreeExperienceReviewBacklog;
+}): StoryTreeExperienceFlow {
+  const appliedTaskMap = new Map(input.appliedTasks.map((task) => [task.dispatchKey, task]));
+  const pendingItems = input.guide.items.filter((item) => !appliedTaskMap.has(buildStoryTreeExperienceApplyDispatchKey(input.projectId, item)));
+  const activeTasks = input.appliedTasks.filter((task) => task.state !== "completed");
+  const returnedTasks = input.appliedTasks.filter((task) => task.state === "completed" && Boolean(taskEffectFromEvidence(parseEvidenceList(task.evidence)).effectLine));
+  const weakenedTasks = input.appliedTasks.filter((task) => task.state === "completed" && taskEffectFromEvidence(parseEvidenceList(task.evidence)).effectStatus === "weakened");
+  const firstActiveTask = activeTasks[0] ?? null;
+  const nextReviewItem = input.reviewBacklog.nextItem;
+  const firstPendingItem = pendingItems[0] ?? null;
+  let status: StoryTreeExperienceFlowStatus = "empty";
+  let headline = "结构经验还没形成闭环。";
+  let nextAction = "先完成一条大树结构复检，沉淀第一条可用经验。";
+  let nextHref: string | null = null;
+  let bottleneck: StoryTreeExperienceFlowStageId | null = null;
+
+  if (input.guide.items.length > 0) {
+    status = "ready";
+    headline = "已有结构经验，下一步要让它进入派单和回流。";
+    nextAction = firstPendingItem ? `先派发「${firstPendingItem.axisLabel}」经验，别让可用动作停在库里。` : "继续观察结构经验流转。";
+    nextHref = firstPendingItem?.href ?? null;
+    bottleneck = firstPendingItem ? "pending_dispatch" : null;
+  }
+  if (activeTasks.length > 0) {
+    status = "working";
+    headline = "结构经验正在执行，别急着复用更多。";
+    nextAction = `先完成「${firstActiveTask?.title ?? "结构经验派单"}」，否则经验会卡在执行中。`;
+    nextHref = firstActiveTask?.href ?? null;
+    bottleneck = "active_dispatch";
+  }
+  if (input.reviewBacklog.total > 0) {
+    status = "review";
+    headline = "结构经验已经完成，但还缺效果回流。";
+    nextAction = nextReviewItem?.reviewPrompt ?? "先补一条经验应用效果。";
+    nextHref = nextReviewItem?.href ?? null;
+    bottleneck = "review_backlog";
+  }
+  if (returnedTasks.length > 0 && activeTasks.length === 0 && input.reviewBacklog.total === 0) {
+    status = "learning";
+    headline = "结构经验闭环已经跑通，可以开始挑选稳定打法。";
+    nextAction = weakenedTasks.length > 0
+      ? "先处理变弱经验，把它们变成避坑清单，再复用稳定项。"
+      : "优先复用继续有效的结构动作，下一章继续验证。";
+    nextHref = returnedTasks[0]?.href ?? null;
+    bottleneck = weakenedTasks.length > 0 ? "weakened" : "returned";
+  }
+  if (weakenedTasks.length > 0 && activeTasks.length === 0 && input.reviewBacklog.total === 0 && weakenedTasks.length >= returnedTasks.length / 2) {
+    status = "risk";
+    headline = "变弱经验偏多，说明结构动作有过期风险。";
+    nextAction = "先把变弱项改成避坑检查，不要批量复制旧打法。";
+    nextHref = weakenedTasks[0]?.href ?? nextHref;
+    bottleneck = "weakened";
+  }
+
+  const stages: StoryTreeExperienceFlowStage[] = [
+    {
+      id: "pending_dispatch",
+      label: "未派单",
+      count: pendingItems.length,
+      tone: "slate",
+      detail: "已沉淀但还没有进入执行。",
+    },
+    {
+      id: "active_dispatch",
+      label: "执行中",
+      count: activeTasks.length,
+      tone: "sky",
+      detail: "已派发，等作者或策划完成。",
+    },
+    {
+      id: "review_backlog",
+      label: "待复盘",
+      count: input.reviewBacklog.total,
+      tone: "amber",
+      detail: "已完成，但还缺效果回流。",
+    },
+    {
+      id: "returned",
+      label: "已回流",
+      count: returnedTasks.length,
+      tone: "emerald",
+      detail: "已经形成经验应用效果。",
+    },
+    {
+      id: "weakened",
+      label: "变弱避坑",
+      count: weakenedTasks.length,
+      tone: "rose",
+      detail: "回流后证明旧动作变弱。",
+    },
+  ];
+
+  return {
+    status,
+    headline,
+    nextAction,
+    nextHref,
+    bottleneck,
+    summary: {
+      learned: input.guide.items.length,
+      pendingDispatch: pendingItems.length,
+      activeDispatch: activeTasks.length,
+      reviewBacklog: input.reviewBacklog.total,
+      returned: returnedTasks.length,
+      weakened: weakenedTasks.length,
+    },
+    stages,
   };
 }
 

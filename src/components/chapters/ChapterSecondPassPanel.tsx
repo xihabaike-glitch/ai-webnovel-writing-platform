@@ -78,11 +78,13 @@ function experienceStatusClass(status: StoryTreeExperienceStatus) {
 }
 
 export function ChapterSecondPassPanel({
+  projectId,
   chapterId,
   currentWordCount,
   recommendedStoryTreeExperience = [],
   storyTreeExperienceAdvice = [],
 }: {
+  projectId: string;
   chapterId: string;
   currentWordCount: number;
   recommendedStoryTreeExperience?: StoryTreeChapterExperienceRecommendation[];
@@ -95,6 +97,7 @@ export function ChapterSecondPassPanel({
   const [mode, setMode] = useState<SecondPassMode>("platform_fit");
   const [targetWords, setTargetWords] = useState(Math.max(1200, currentWordCount));
   const [isRunning, setIsRunning] = useState(false);
+  const [runningRecommendationId, setRunningRecommendationId] = useState<string | null>(null);
   const [result, setResult] = useState<SecondPassResult | null>(null);
   const [budgetGuard, setBudgetGuard] = useState<BudgetGuardView | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -126,6 +129,28 @@ export function ChapterSecondPassPanel({
       setMessage(caught instanceof Error ? caught.message : "二改失败。");
     } finally {
       setIsRunning(false);
+    }
+  }
+
+  async function applyRecommendedExperience(recommendation: StoryTreeChapterExperienceRecommendation) {
+    setRunningRecommendationId(recommendation.id);
+    setMessage(null);
+    try {
+      const response = await fetch(`/api/projects/${projectId}/story-tree-experience/apply`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ dispatchKey: recommendation.item.dispatchKey }),
+      });
+      const payload = (await response.json()) as { task?: { title?: string }; error?: string };
+      if (!response.ok) {
+        throw new Error(payload.error || "结构经验派单失败。");
+      }
+      setMessage(`已生成结构经验派单：${payload.task?.title ?? recommendation.axisLabel}`);
+      router.refresh();
+    } catch (caught) {
+      setMessage(caught instanceof Error ? caught.message : "结构经验派单失败。");
+    } finally {
+      setRunningRecommendationId(null);
     }
   }
 
@@ -199,13 +224,23 @@ export function ChapterSecondPassPanel({
                 </div>
                 <p className="mt-2 leading-6 text-slate-600">{recommendation.reason}</p>
                 <p className="mt-2 leading-6 text-slate-600">{recommendation.instruction}</p>
-                <button
-                  className="mt-3 rounded-md border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-                  onClick={() => setInstruction(recommendation.instruction)}
-                  type="button"
-                >
-                  填入推荐指令
-                </button>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <button
+                    className="rounded-md border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-white"
+                    onClick={() => setInstruction(recommendation.instruction)}
+                    type="button"
+                  >
+                    填入推荐指令
+                  </button>
+                  <button
+                    className="rounded-md bg-slate-950 px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
+                    disabled={runningRecommendationId === recommendation.id}
+                    onClick={() => applyRecommendedExperience(recommendation)}
+                    type="button"
+                  >
+                    {runningRecommendationId === recommendation.id ? "派单中" : "生成结构派单"}
+                  </button>
+                </div>
               </div>
             ))}
           </div>

@@ -87,6 +87,7 @@ export default async function ChapterPage({
           </div>
           <div id="chapter-second-pass">
             <ChapterSecondPassPanel
+              projectId={chapter.projectId}
               chapterId={chapter.id}
               currentWordCount={chapter.wordCount}
               recommendedStoryTreeExperience={recommendedStoryTreeExperience}

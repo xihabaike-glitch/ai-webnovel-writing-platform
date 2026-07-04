@@ -144,6 +144,46 @@ test("buildStoryTreeChapterExperienceRecommendations matches weak chapter axes",
   assert.ok(recommendations[0].instruction.includes("复用已验证"));
 });
 
+test("recommended story tree experience can become an apply dispatch", () => {
+  const guide = buildStoryTreeExperienceGuide([
+    {
+      dispatchKey: "story-tree:project-1:chapter-1:chapter_draft:branch_causality",
+      title: "补分支因果",
+      href: "/projects/project-1/chapters/chapter-1",
+      evidence: [
+        "大树结构复检：68 -> 82 分，分数变好：结构可用；返工动作：分支因果：把支线改成主线压力的直接后果。",
+      ],
+      completedAt: "2026-07-05T08:00:00.000Z",
+      updatedAt: "2026-07-05T08:00:00.000Z",
+    },
+  ]);
+  const recommendations = buildStoryTreeChapterExperienceRecommendations({
+    guide,
+    audit: {
+      score: 61,
+      label: "结构需二改",
+      summary: "大树质检：结构需二改。",
+      shouldRewrite: true,
+      topActions: ["分支因果：支线必须绑定主线压力。"],
+      axes: [
+        { id: "branch_causality", label: "分支因果", score: 41, status: "fail", evidence: "支线游离。", suggestion: "支线必须绑定主线压力。" },
+      ],
+    },
+  });
+  const dispatch = buildStoryTreeExperienceApplyDispatch({
+    projectId: "project-1",
+    projectTitle: "夜雨系统",
+    platform: getPlatformProfile("fanqie"),
+    item: recommendations[0].item,
+    now: "2026-07-05T10:00:00.000Z",
+  });
+
+  assert.equal(dispatch.state, "assigned");
+  assert.equal(dispatch.actionLabel, "应用经验");
+  assert.equal(dispatch.href, "/projects/project-1/chapters/chapter-1");
+  assert.ok(dispatch.evidence.some((item) => item.includes("经验动作")));
+});
+
 test("buildStoryTreeExperienceApplyDispatch turns a learned action into an assigned task", () => {
   const guide = buildStoryTreeExperienceGuide([
     {

@@ -41,8 +41,10 @@ test("buildChapterProductionFlow blocks on missing hooks before drafting", () =>
 
   assert.equal(flow.status, "blocked");
   assert.equal(flow.bottleneck, "hooks");
+  assert.equal(flow.nextActionLabel, "补钩子");
   assert.ok(flow.headline.includes("开头钩子"));
   assert.equal(flow.stages.find((stage) => stage.id === "hooks")?.count, 0);
+  assert.equal(flow.stages.find((stage) => stage.id === "drafts")?.actionLabel, "生成初稿");
 });
 
 test("buildChapterProductionFlow marks a full first-three pipeline ready", () => {
@@ -74,7 +76,10 @@ test("buildChapterProductionFlow marks a full first-three pipeline ready", () =>
 
   assert.equal(flow.status, "ready");
   assert.equal(flow.bottleneck, "submission");
+  assert.equal(flow.nextActionLabel, "查看投稿预检");
   assert.equal(flow.stages.find((stage) => stage.id === "drafts")?.count, 3);
   assert.equal(flow.stages.find((stage) => stage.id === "story_tree")?.count, 3);
+  assert.equal(flow.stages.find((stage) => stage.id === "reviews")?.actionLabel, "送审稿");
+  assert.equal(flow.stages.find((stage) => stage.id === "second_pass")?.actionLabel, "执行二改");
   assert.ok(flow.headline.includes("已跑通"));
 });

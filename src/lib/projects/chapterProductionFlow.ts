@@ -37,6 +37,7 @@ export interface ChapterProductionFlowStage {
   tone: ChapterProductionFlowTone;
   detail: string;
   action: string;
+  actionLabel: string;
   href: string;
 }
 
@@ -44,6 +45,7 @@ export interface ChapterProductionFlow {
   status: ChapterProductionFlowStatus;
   headline: string;
   nextAction: string;
+  nextActionLabel: string;
   nextHref: string;
   bottleneck: ChapterProductionFlowStageId;
   stages: ChapterProductionFlowStage[];
@@ -119,6 +121,7 @@ export function buildChapterProductionFlow(input: {
       tone: stageTone(stageStatus(hookReady, firstThreeTarget)),
       detail: `前三章钩子和章末悬念 ${hookReady}/${firstThreeTarget}。`,
       action: "先补前三章钩子和章末追读点。",
+      actionLabel: "补钩子",
       href: `#create-chapter`,
     },
     {
@@ -130,6 +133,7 @@ export function buildChapterProductionFlow(input: {
       tone: stageTone(stageStatus(draftedChapters.length, draftTarget)),
       detail: `已有正文 ${draftedChapters.length}/${draftTarget} 章。`,
       action: "先用章节生产排期或批量初稿中心把正文跑出来。",
+      actionLabel: "生成初稿",
       href: "#chapter-production",
     },
     {
@@ -141,6 +145,7 @@ export function buildChapterProductionFlow(input: {
       tone: stageTone(stageStatus(reviewReady, draftTarget)),
       detail: `前三章已审稿 ${reviewReady}/${draftTarget}。`,
       action: "把已有正文送进批量审稿，不要裸稿继续堆字。",
+      actionLabel: "送审稿",
       href: "#ai-pipeline",
     },
     {
@@ -152,6 +157,7 @@ export function buildChapterProductionFlow(input: {
       tone: stageTone(stageStatus(secondPassReady, draftTarget)),
       detail: `前三章完成二改 ${secondPassReady}/${draftTarget}。`,
       action: "先按审稿问题完成二改，再进入发布准备。",
+      actionLabel: "执行二改",
       href: "#review-pipeline",
     },
     {
@@ -163,6 +169,7 @@ export function buildChapterProductionFlow(input: {
       tone: stageTone(stageStatus(storyTreeReady, draftTarget)),
       detail: `前三章有结构复检 ${storyTreeReady}/${draftTarget}。`,
       action: "补大树结构复检，确认开头、主干、分支、叶片和人物弧光。",
+      actionLabel: "补复检",
       href: "#story-tree-experience",
     },
     {
@@ -174,6 +181,7 @@ export function buildChapterProductionFlow(input: {
       tone: input.submissionChecklist.riskCount > 0 ? "rose" : stageTone(stageStatus(submissionReady, submissionTarget)),
       detail: `投稿准备度 ${clampPercent((submissionReady / submissionTarget) * 100)}%，待处理 ${input.submissionChecklist.todoCount} 项，风险 ${input.submissionChecklist.riskCount} 项。`,
       action: "清掉投稿前检查里的待处理和风险项。",
+      actionLabel: "修预检",
       href: "#submission-precheck",
     },
   ];
@@ -191,6 +199,7 @@ export function buildChapterProductionFlow(input: {
     status,
     headline,
     nextAction: bottleneck.action,
+    nextActionLabel: status === "ready" ? "查看投稿预检" : bottleneck.actionLabel,
     nextHref: bottleneck.href,
     bottleneck: bottleneck.id,
     stages,

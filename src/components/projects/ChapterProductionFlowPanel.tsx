@@ -33,14 +33,13 @@ export function ChapterProductionFlowPanel({ flow }: { flow: ChapterProductionFl
           className="w-fit rounded-md bg-slate-950 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800"
           href={flow.nextHref}
         >
-          {flow.status === "ready" ? "查看投稿预检" : "处理当前卡点"}
+          {flow.nextActionLabel}
         </Link>
       </div>
       <div className="mt-4 grid gap-2 md:grid-cols-3 xl:grid-cols-6">
         {flow.stages.map((stage) => (
-          <Link
-            className={`rounded-md p-3 text-sm hover:bg-slate-100 ${flow.bottleneck === stage.id ? "ring-1 ring-slate-950" : "bg-slate-50"}`}
-            href={stage.href}
+          <div
+            className={`rounded-md p-3 text-sm ${flow.bottleneck === stage.id ? "ring-1 ring-slate-950" : "bg-slate-50"}`}
             key={stage.id}
           >
             <div className="flex items-center justify-between gap-2">
@@ -50,7 +49,13 @@ export function ChapterProductionFlowPanel({ flow }: { flow: ChapterProductionFl
               </span>
             </div>
             <p className="mt-2 text-xs leading-5 text-slate-600">{stage.detail}</p>
-          </Link>
+            <Link
+              className="mt-3 inline-flex rounded-md border border-slate-200 bg-white px-2 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+              href={stage.href}
+            >
+              {stage.actionLabel}
+            </Link>
+          </div>
         ))}
       </div>
     </section>

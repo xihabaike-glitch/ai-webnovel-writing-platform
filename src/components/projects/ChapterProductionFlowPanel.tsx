@@ -175,7 +175,7 @@ export function ChapterProductionFlowPanel({ flow }: { flow: ChapterProductionFl
                 <div className="flex items-center justify-between gap-2">
                   <span className="font-medium text-slate-800">{stage.dispatchSummary.label}</span>
                   <Link className="font-medium text-slate-950" href={stage.dispatchSummary.href}>
-                    查看
+                    {stage.dispatchSummary.actionLabel}
                   </Link>
                 </div>
                 <p className="mt-1">{stage.dispatchSummary.detail}</p>

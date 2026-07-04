@@ -196,6 +196,8 @@ test("buildChapterProductionFlow exposes story tree recheck dispatch action for 
   assert.equal(storyTreeStage?.dispatchSummary?.assigned, 1);
   assert.equal(storyTreeStage?.dispatchSummary?.pending, 1);
   assert.ok(storyTreeStage?.dispatchSummary?.detail.includes("待完成 1 章"));
+  assert.equal(storyTreeStage?.dispatchSummary?.href, "/dispatch");
+  assert.equal(storyTreeStage?.dispatchSummary?.actionLabel, "完成派单");
 });
 
 test("buildChapterProductionFlow exposes submission repair dispatch action for unassigned failed items", () => {
@@ -239,4 +241,37 @@ test("buildChapterProductionFlow exposes submission repair dispatch action for u
   assert.equal(submissionStage?.dispatchSummary?.pending, 1);
   assert.equal(submissionStage?.dispatchSummary?.completed, 1);
   assert.equal(submissionStage?.dispatchSummary?.label, "已派单 2 项");
+  assert.equal(submissionStage?.dispatchSummary?.href, "/dispatch");
+  assert.equal(submissionStage?.dispatchSummary?.actionLabel, "完成派单");
+});
+
+test("buildChapterProductionFlow points completed unresolved dispatches back to recheck areas", () => {
+  const flow = buildChapterProductionFlow({
+    projectId: "project-1",
+    chapters: [],
+    aiTasks: [],
+    gateTasks: [
+      {
+        dispatchKey: "submission-precheck:project-1:platform-risk",
+        state: "completed",
+        href: "/projects/project-1#platform-export",
+      },
+    ],
+    submissionChecklist: {
+      readinessPercent: 90,
+      passCount: 9,
+      todoCount: 0,
+      riskCount: 1,
+      items: [
+        { id: "platform-risk", label: "平台风险", status: "risk", detail: "版权归属需确认。" },
+      ],
+    },
+  });
+  const submissionStage = flow.stages.find((stage) => stage.id === "submission");
+
+  assert.equal(submissionStage?.dispatchSummary?.pending, 0);
+  assert.equal(submissionStage?.dispatchSummary?.completed, 1);
+  assert.equal(submissionStage?.dispatchSummary?.href, "#submission-precheck");
+  assert.equal(submissionStage?.dispatchSummary?.actionLabel, "复查预检");
+  assert.ok(submissionStage?.dispatchSummary?.detail.includes("预检仍未通过"));
 });

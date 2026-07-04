@@ -84,6 +84,7 @@ export interface ChapterProductionFlowDispatchSummary {
   label: string;
   detail: string;
   href: string;
+  actionLabel: string;
 }
 
 export interface ChapterProductionFlow {
@@ -168,7 +169,8 @@ function storyTreeDispatchSummary(tasks: ChapterProductionFlowGateTask[], chapte
     detail: pendingIds.size > 0
       ? `待完成 ${pendingIds.size} 章，完成后会回流为大树结构经验。`
       : `已完成 ${completedIds.size} 章派单，等待复检结果解除卡点。`,
-    href: "/dispatch",
+    href: pendingIds.size > 0 ? "/dispatch" : "#story-tree-experience",
+    actionLabel: pendingIds.size > 0 ? "完成派单" : "看复检结果",
   };
 }
 
@@ -189,7 +191,8 @@ function submissionDispatchSummary(tasks: ChapterProductionFlowGateTask[], faile
     detail: pending > 0
       ? `待完成 ${pending} 项，完成后再刷新投稿预检。`
       : `已完成 ${completed} 项派单，但预检仍未通过，需要补证据或重新派发。`,
-    href: "/dispatch",
+    href: pending > 0 ? "/dispatch" : "#submission-precheck",
+    actionLabel: pending > 0 ? "完成派单" : "复查预检",
   };
 }
 

@@ -666,6 +666,7 @@ interface PlatformPublishExportCenter {
   platformStrategy: PlatformStrategyRankItem[];
   strategyVerdict: PlatformStrategyAutoVerdict;
   platformKnowledge: PlatformKnowledgeInsight[];
+  knowledgeFeedbackHistory: PlatformKnowledgeFeedbackReceipt[];
   activeStrategyPlan: PlatformStrategySwitchPlan | null;
 }
 
@@ -1396,9 +1397,45 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
     return versions.filter((version) => normalizeVersionAction(version.action) === versionActionFilter);
   }, [selectedPackage, versionActionFilter]);
 
-  function recordKnowledgeFeedbackReceipt(receipt: PlatformKnowledgeFeedbackReceipt) {
+  async function persistKnowledgeFeedbackReceipt(receipt: PlatformKnowledgeFeedbackReceipt) {
+    const response = await fetch(`/api/projects/${projectId}/platform-export`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "save-knowledge-feedback", receipt }),
+    });
+    const payload = (await response.json().catch(() => null)) as {
+      receipt?: PlatformKnowledgeFeedbackReceipt;
+      history?: PlatformKnowledgeFeedbackReceipt[];
+      error?: string;
+    } | null;
+    if (!response.ok || !payload?.history) throw new Error(payload?.error ?? "保存反哺链路历史失败。");
+    return payload;
+  }
+
+  async function clearKnowledgeFeedbackHistory() {
+    const response = await fetch(`/api/projects/${projectId}/platform-export`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "clear-knowledge-feedback" }),
+    });
+    const payload = (await response.json().catch(() => null)) as {
+      history?: PlatformKnowledgeFeedbackReceipt[];
+      error?: string;
+    } | null;
+    if (!response.ok || !payload) throw new Error(payload?.error ?? "清空反哺链路历史失败。");
+    return payload.history ?? [];
+  }
+
+  async function recordKnowledgeFeedbackReceipt(receipt: PlatformKnowledgeFeedbackReceipt) {
     setKnowledgeFeedbackReceipt(receipt);
     setKnowledgeFeedbackHistory((current) => saveKnowledgeFeedbackHistory(projectId, [receipt, ...current]));
+    try {
+      const payload = await persistKnowledgeFeedbackReceipt(receipt);
+      setKnowledgeFeedbackReceipt(payload.receipt ?? receipt);
+      setKnowledgeFeedbackHistory(saveKnowledgeFeedbackHistory(projectId, payload.history ?? [receipt]));
+    } catch {
+      // Keep local history as a fallback when the server is unavailable.
+    }
   }
 
   async function loadCenter(options?: { keepMessage?: boolean }) {
@@ -1413,6 +1450,15 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
       setCenter(payload.center);
       setSelectedPlatformId((current) => current || payload.center.recommendedPlatformId);
       setStrategySwitchPlan((current) => current ?? payload.center.activeStrategyPlan);
+      const serverHistory = payload.center.knowledgeFeedbackHistory ?? [];
+      if (serverHistory.length) {
+        setKnowledgeFeedbackHistory(saveKnowledgeFeedbackHistory(projectId, serverHistory));
+        setKnowledgeFeedbackReceipt((current) => current ?? serverHistory[0] ?? null);
+      } else {
+        const localHistory = loadKnowledgeFeedbackHistory(projectId);
+        setKnowledgeFeedbackHistory(localHistory);
+        setKnowledgeFeedbackReceipt((current) => current ?? localHistory[0] ?? null);
+      }
       return payload.center;
     } catch (caught) {
       setMessage(caught instanceof Error ? caught.message : "读取平台发布包失败。");
@@ -1626,10 +1672,10 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
       const nextStep = payload.switchPlan.steps.find((step) => step.status === "next");
       if (nextStep?.executable) {
         const executionReceipt = await executeStrategyStep(payload.switchPlan, nextStep, { messagePrefix: item.feedbackLoop.headline });
-        recordKnowledgeFeedbackReceipt(buildKnowledgeFeedbackReceipt(item, nextStep, executionReceipt));
+        await recordKnowledgeFeedbackReceipt(buildKnowledgeFeedbackReceipt(item, nextStep, executionReceipt));
       } else {
         await loadCenter({ keepMessage: true });
-        recordKnowledgeFeedbackReceipt(buildKnowledgeFeedbackReceipt(item, nextStep ?? null, null));
+        await recordKnowledgeFeedbackReceipt(buildKnowledgeFeedbackReceipt(item, nextStep ?? null, null));
         setMessage(`${item.feedbackLoop.headline} 已启动执行链，下一步：${nextStep?.label ?? item.feedbackLoop.nextStepLabel}。`);
         window.location.hash = nextStep?.href.replace(/^#/, "") ?? "platform-strategy-ranking";
       }
@@ -2943,9 +2989,17 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
                         <button
                           className="w-fit rounded-md border border-slate-200 px-2 py-1 text-[11px] font-medium text-slate-600 hover:bg-slate-50"
                           onClick={() => {
-                            saveKnowledgeFeedbackHistory(projectId, []);
-                            setKnowledgeFeedbackHistory([]);
-                            setKnowledgeFeedbackReceipt(null);
+                            void clearKnowledgeFeedbackHistory()
+                              .then((history) => {
+                                saveKnowledgeFeedbackHistory(projectId, history);
+                                setKnowledgeFeedbackHistory(history);
+                                setKnowledgeFeedbackReceipt(history[0] ?? null);
+                              })
+                              .catch(() => {
+                                saveKnowledgeFeedbackHistory(projectId, []);
+                                setKnowledgeFeedbackHistory([]);
+                                setKnowledgeFeedbackReceipt(null);
+                              });
                           }}
                           type="button"
                         >

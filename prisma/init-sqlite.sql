@@ -274,6 +274,27 @@ CREATE TABLE IF NOT EXISTS "PlatformPublishMetric" (
 
 CREATE INDEX IF NOT EXISTS "PlatformPublishMetric_projectId_platformId_snapshotDate_idx" ON "PlatformPublishMetric"("projectId", "platformId", "snapshotDate");
 
+CREATE TABLE IF NOT EXISTS "PlatformKnowledgeFeedbackReceipt" (
+  "id" TEXT NOT NULL PRIMARY KEY,
+  "receiptId" TEXT NOT NULL UNIQUE,
+  "projectId" TEXT NOT NULL,
+  "platformId" TEXT NOT NULL,
+  "platformName" TEXT NOT NULL,
+  "actionLabel" TEXT NOT NULL,
+  "title" TEXT NOT NULL,
+  "message" TEXT NOT NULL,
+  "completedStepLabel" TEXT NOT NULL,
+  "stopReason" TEXT NOT NULL,
+  "nextAction" TEXT NOT NULL,
+  "href" TEXT NOT NULL,
+  "severity" TEXT NOT NULL,
+  "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT "PlatformKnowledgeFeedbackReceipt_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "Project" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS "PlatformKnowledgeFeedbackReceipt_projectId_createdAt_idx" ON "PlatformKnowledgeFeedbackReceipt"("projectId", "createdAt");
+CREATE INDEX IF NOT EXISTS "PlatformKnowledgeFeedbackReceipt_projectId_platformId_createdAt_idx" ON "PlatformKnowledgeFeedbackReceipt"("projectId", "platformId", "createdAt");
+
 CREATE TABLE IF NOT EXISTS "GateActionAudit" (
   "id" TEXT NOT NULL PRIMARY KEY,
   "receiptId" TEXT NOT NULL UNIQUE,

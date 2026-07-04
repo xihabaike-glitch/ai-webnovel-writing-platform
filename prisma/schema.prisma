@@ -38,6 +38,7 @@ model Project {
   platformPublishMetrics PlatformPublishMetric[]
   gateActionAudits GateActionAudit[]
   gateDispatchTasks GateDispatchTask[]
+  platformKnowledgeFeedbackReceipts PlatformKnowledgeFeedbackReceipt[]
 }
 
 model Chapter {
@@ -317,6 +318,28 @@ model PlatformPublishMetric {
   project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@index([projectId, platformId, snapshotDate])
+}
+
+model PlatformKnowledgeFeedbackReceipt {
+  id                 String   @id @default(cuid())
+  receiptId          String   @unique
+  projectId          String
+  platformId         String
+  platformName       String
+  actionLabel        String
+  title              String
+  message            String
+  completedStepLabel String
+  stopReason         String
+  nextAction         String
+  href               String
+  severity           String
+  createdAt          DateTime @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, createdAt])
+  @@index([projectId, platformId, createdAt])
 }
 
 model GateActionAudit {

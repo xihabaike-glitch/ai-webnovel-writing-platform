@@ -63,6 +63,12 @@ function normalizeSnapshotDate(value: unknown) {
   return Number.isNaN(parsed.getTime()) ? new Date() : parsed;
 }
 
+function normalizeCreatedAt(value: unknown) {
+  if (typeof value !== "string" || !value.trim()) return new Date();
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? new Date() : parsed;
+}
+
 function normalizeContractStatus(value: unknown) {
   if (value === "signed" || value === "invited" || value === "rejected" || value === "pending") return value;
   return "unknown";
@@ -75,6 +81,49 @@ function strategyUpdateCadence(platform: ReturnType<typeof selectedPlatform>, fa
   if (platform.category === "overseas") return "3_5_chapters_weekly_en";
   if (platform.category === "female") return "daily_3000_emotion_arc";
   return "daily_4000_long_form";
+}
+
+function normalizeKnowledgeReceiptSeverity(value: unknown) {
+  return value === "success" || value === "needs_action" ? value : "needs_action";
+}
+
+function toKnowledgeFeedbackReceipt(item: {
+  receiptId: string;
+  platformId: string;
+  platformName: string;
+  actionLabel: string;
+  title: string;
+  message: string;
+  completedStepLabel: string;
+  stopReason: string;
+  nextAction: string;
+  href: string;
+  severity: string;
+  createdAt: Date;
+}) {
+  return {
+    id: item.receiptId,
+    platformId: item.platformId,
+    platformName: item.platformName,
+    actionLabel: item.actionLabel,
+    title: item.title,
+    message: item.message,
+    completedStepLabel: item.completedStepLabel,
+    stopReason: item.stopReason,
+    nextAction: item.nextAction,
+    href: item.href,
+    severity: normalizeKnowledgeReceiptSeverity(item.severity),
+    createdAt: item.createdAt,
+  };
+}
+
+async function listKnowledgeFeedbackReceipts(projectId: string) {
+  const receipts = await prisma.platformKnowledgeFeedbackReceipt.findMany({
+    where: { projectId },
+    orderBy: { createdAt: "desc" },
+    take: 10,
+  });
+  return receipts.map(toKnowledgeFeedbackReceipt);
 }
 
 async function buildCenter(projectId: string) {
@@ -173,7 +222,16 @@ async function buildCenter(projectId: string) {
     submissionChecklist,
   });
 
-  return { project, targetPlatform, center };
+  const knowledgeFeedbackHistory = await listKnowledgeFeedbackReceipts(projectId);
+
+  return {
+    project,
+    targetPlatform,
+    center: {
+      ...center,
+      knowledgeFeedbackHistory,
+    },
+  };
 }
 
 async function createPublishSnapshot(projectId: string, pack: PlatformPublishPackage, action: string) {
@@ -382,11 +440,84 @@ export async function POST(request: Request, { params }: Params) {
     contractStatus?: unknown;
     publishUrl?: unknown;
     snapshotDate?: unknown;
+    receipt?: {
+      id?: unknown;
+      platformId?: unknown;
+      platformName?: unknown;
+      actionLabel?: unknown;
+      title?: unknown;
+      message?: unknown;
+      completedStepLabel?: unknown;
+      stopReason?: unknown;
+      nextAction?: unknown;
+      href?: unknown;
+      severity?: unknown;
+      createdAt?: unknown;
+    };
   };
   const context = await buildCenter(projectId);
 
   if (!context) {
     return NextResponse.json({ error: "Project not found" }, { status: 404 });
+  }
+
+  if (body.action === "save-knowledge-feedback") {
+    const receipt = body.receipt;
+    const platform = selectedPlatform(trimText(receipt?.platformId) || null);
+    const platformId = platform?.id ?? trimText(receipt?.platformId);
+    const platformName = platform?.name ?? trimText(receipt?.platformName);
+    const receiptId = trimText(receipt?.id);
+
+    if (!receiptId || !platformId || !platformName) {
+      return NextResponse.json({ error: "反哺回执缺少平台或回执 ID。" }, { status: 400 });
+    }
+
+    const savedReceipt = await prisma.platformKnowledgeFeedbackReceipt.upsert({
+      where: { receiptId },
+      create: {
+        receiptId,
+        projectId,
+        platformId,
+        platformName,
+        actionLabel: trimText(receipt?.actionLabel),
+        title: trimText(receipt?.title),
+        message: trimText(receipt?.message),
+        completedStepLabel: trimText(receipt?.completedStepLabel),
+        stopReason: trimText(receipt?.stopReason),
+        nextAction: trimText(receipt?.nextAction),
+        href: trimText(receipt?.href, "#platform-strategy-ranking"),
+        severity: normalizeKnowledgeReceiptSeverity(receipt?.severity),
+        createdAt: normalizeCreatedAt(receipt?.createdAt),
+      },
+      update: {
+        platformId,
+        platformName,
+        actionLabel: trimText(receipt?.actionLabel),
+        title: trimText(receipt?.title),
+        message: trimText(receipt?.message),
+        completedStepLabel: trimText(receipt?.completedStepLabel),
+        stopReason: trimText(receipt?.stopReason),
+        nextAction: trimText(receipt?.nextAction),
+        href: trimText(receipt?.href, "#platform-strategy-ranking"),
+        severity: normalizeKnowledgeReceiptSeverity(receipt?.severity),
+        createdAt: normalizeCreatedAt(receipt?.createdAt),
+      },
+    });
+    const history = await listKnowledgeFeedbackReceipts(projectId);
+
+    return NextResponse.json({
+      message: `已记录 ${platformName} 反哺链路回执。`,
+      receipt: toKnowledgeFeedbackReceipt(savedReceipt),
+      history,
+    }, { status: 201 });
+  }
+
+  if (body.action === "clear-knowledge-feedback") {
+    await prisma.platformKnowledgeFeedbackReceipt.deleteMany({ where: { projectId } });
+    return NextResponse.json({
+      message: "已清空项目反哺链路历史。",
+      history: [],
+    });
   }
 
   if (body.action === "apply-strategy") {

@@ -101,7 +101,7 @@ export interface FirstDayDispatchDesk {
 
 export interface FirstDayDispatchUpdateSummary {
   visible: boolean;
-  status: "none" | "advanced" | "risk_recovered" | "completed";
+  status: "none" | "advanced" | "risk_recovered" | "watch_cleared" | "watch_blocked" | "completed";
   title: string;
   detail: string;
   actionLabel: string;
@@ -288,6 +288,20 @@ function stateLabel(state: PersistedGatePlatformDispatchTask["state"]) {
   return "待派单";
 }
 
+function watchSampleCompletionCleared(completionEvidence: string) {
+  return /小样本|通过线|放量结论/u.test(completionEvidence)
+    && /通过线/u.test(completionEvidence)
+    && /不可接受/u.test(completionEvidence)
+    && /复查证据/u.test(completionEvidence)
+    && /放量结论/u.test(completionEvidence)
+    && /(通过|允许|可以恢复|可恢复|恢复后续)/u.test(completionEvidence)
+    && !/未通过|暂不放量|继续停留观察/u.test(completionEvidence);
+}
+
+function isWatchSampleCompletion(completionEvidence: string) {
+  return /小样本|通过线|不可接受|复查证据|放量结论/u.test(completionEvidence);
+}
+
 function firstDayHref(task: PersistedGatePlatformDispatchTask, stepId: string) {
   if (task.projectId) {
     return `/projects/${task.projectId}?firstDayLaunch=1&nextStep=${encodeURIComponent(stepId)}#first-day-workflow`;
@@ -436,6 +450,23 @@ export function buildFirstDayDispatchUpdateSummary(input: {
         "转入观察小样本",
         firstDayFollowUp?.dueLabel ?? "今天小样本验证",
       ],
+    };
+  }
+
+  if (completedStepId === "first-draft" && isWatchSampleCompletion(input.task.completionEvidence)) {
+    const cleared = watchSampleCompletionCleared(input.task.completionEvidence);
+    return {
+      visible: true,
+      status: cleared ? "watch_cleared" : "watch_blocked",
+      title: cleared ? "小样本已过线，放量闸门已解除" : "小样本未过线，继续观察",
+      detail: cleared
+        ? "完成依据已写清通过线、不可接受项、复查证据和通过结论。任务队列会恢复后续初稿批次，下一步回到任务队列谨慎放量。"
+        : "完成依据没有明确通过，或包含未通过、暂不放量、继续观察等结论。后续初稿仍保持小样本闸门，先修问题再测。",
+      actionLabel: cleared ? "回任务队列放量" : "回任务队列复查",
+      href: "/tasks",
+      badges: cleared
+        ? ["小样本过线", "放量闸门解除", "恢复后续初稿"]
+        : ["小样本未过线", "继续观察", "禁止批量放大"],
     };
   }
 

@@ -286,6 +286,49 @@ test("buildFirstDayDispatchUpdateSummary explains risk recovery handoff", () => 
   assert.ok(summary.badges.includes("转入观察小样本"));
 });
 
+test("buildFirstDayDispatchUpdateSummary explains watch sample scale-up status", () => {
+  const cleared = buildFirstDayDispatchUpdateSummary({
+    task: {
+      dispatchKey: "first-day:project-1:first-draft",
+      state: "completed",
+      title: "夜雨系统 · 小样本验证 · 生成第一章正文",
+      completionEvidence: [
+        "小样本验证已完成：",
+        "通过线：成功率 100%，质量 86。",
+        "不可接受项：未出现失败、质量低于 80、备用命中或成本异常。",
+        "复查证据：AI 任务 task-1；章节 第一章。",
+        "放量结论：通过，可以恢复后续初稿批次。",
+      ].join("\n"),
+      href: "/projects/project-1/chapters/chapter-1",
+    },
+  });
+  const blocked = buildFirstDayDispatchUpdateSummary({
+    task: {
+      dispatchKey: "first-day:project-1:first-draft",
+      state: "completed",
+      title: "夜雨系统 · 小样本验证 · 生成第一章正文",
+      completionEvidence: [
+        "小样本验证已完成：",
+        "通过线：成功率 100%，质量 72。",
+        "不可接受项：存在质量低于 80，暂不放量。",
+        "复查证据：AI 任务 task-1；章节 第一章。",
+        "放量结论：未通过，继续停留观察并修复后再测。",
+      ].join("\n"),
+      href: "/projects/project-1/chapters/chapter-1",
+    },
+  });
+
+  assert.equal(cleared.status, "watch_cleared");
+  assert.equal(cleared.title, "小样本已过线，放量闸门已解除");
+  assert.equal(cleared.href, "/tasks");
+  assert.ok(cleared.detail.includes("恢复后续初稿批次"));
+  assert.ok(cleared.badges.includes("放量闸门解除"));
+  assert.equal(blocked.status, "watch_blocked");
+  assert.equal(blocked.title, "小样本未过线，继续观察");
+  assert.ok(blocked.detail.includes("仍保持小样本闸门"));
+  assert.ok(blocked.badges.includes("禁止批量放大"));
+});
+
 test("buildFirstDayDispatchCompletionTemplate covers first-day step types", () => {
   assert.ok(buildFirstDayDispatchCompletionTemplate({
     dispatchKey: "first-day:project-1:first-draft",

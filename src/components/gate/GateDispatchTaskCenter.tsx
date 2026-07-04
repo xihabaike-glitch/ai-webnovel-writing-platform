@@ -268,7 +268,8 @@ export function GateDispatchTaskCenter({
         const storyTreeMessage = storyTreeRecheckMessage(updated);
         const firstDayUpdate = buildFirstDayDispatchUpdateSummary(updated);
         if (firstDayUpdate.visible) {
-          setRouteActionMessage(`${firstDayUpdate.title}：${firstDayUpdate.detail}`);
+          setRouteActionMessage(`${firstDayUpdate.title}：${firstDayUpdate.detail} 下一步：${firstDayUpdate.actionLabel}。`);
+          router.refresh();
         } else if (updated.followUpTasks.length) {
           setRouteActionMessage(`已自动生成治理后复检派单：${updated.followUpTasks.map((item) => item.title).join("、")}${recheckMessage ? `；${recheckMessage}` : ""}${storyTreeMessage ? `；${storyTreeMessage}` : ""}`);
         } else if (storyTreeMessage && recheckMessage) {

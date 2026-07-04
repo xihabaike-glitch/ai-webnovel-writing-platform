@@ -26,7 +26,7 @@ interface SerializationActionExecution {
   label: string;
   method: "PATCH" | "POST";
   endpoint: string;
-  payload: Record<string, string | number | boolean>;
+  payload: Record<string, string | number | boolean | string[] | number[]>;
 }
 
 interface SerializationOpsDashboard {
@@ -56,6 +56,7 @@ interface SerializationPublishEffectAction {
   evidence: string;
   href: string;
   actionLabel: string;
+  execution: SerializationActionExecution | null;
 }
 
 interface SerializationPublishEffectStatus {
@@ -205,6 +206,7 @@ export function SerializationOpsPanel({ projectId }: { projectId: string }) {
   const [checklist, setChecklist] = useState<SubmissionChecklist | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [runningActionId, setRunningActionId] = useState<string | null>(null);
+  const [runningEffectActionId, setRunningEffectActionId] = useState<string | null>(null);
   const [restoringVersionId, setRestoringVersionId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
@@ -239,17 +241,65 @@ export function SerializationOpsPanel({ projectId }: { projectId: string }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(action.execution.payload),
       });
-      const payload = (await response.json().catch(() => null)) as { error?: string; message?: string; result?: { score?: number }; secondPassAudit?: { score?: number } } | null;
+      const payload = (await response.json().catch(() => null)) as {
+        error?: string;
+        message?: string;
+        result?: { score?: number };
+        secondPassAudit?: { score?: number };
+        variants?: unknown[];
+        results?: unknown[];
+      } | null;
       if (!response.ok) {
         throw new Error(payload?.error ?? "执行运营动作失败。");
       }
       await loadOps();
       const score = payload?.result?.score ?? payload?.secondPassAudit?.score;
-      setMessage(score ? `已完成：${action.label}，复检 ${score} 分。` : `已完成：${action.label}`);
+      const generatedCount = payload?.variants?.length;
+      const rewrittenCount = payload?.results?.length;
+      setMessage(score
+        ? `已完成：${action.label}，复检 ${score} 分。`
+        : generatedCount
+          ? `已完成：${action.label}，生成 ${generatedCount} 个候选。`
+          : rewrittenCount
+            ? `已完成：${action.label}，重写 ${rewrittenCount} 章。`
+            : `已完成：${action.label}`);
     } catch (caught) {
       setMessage(caught instanceof Error ? caught.message : "执行运营动作失败。");
     } finally {
       setRunningActionId(null);
+    }
+  }
+
+  async function runPublishEffectAction(action: SerializationPublishEffectAction) {
+    if (!action.execution) return;
+    setRunningEffectActionId(action.id);
+    setMessage(null);
+    try {
+      const response = await fetch(action.execution.endpoint, {
+        method: action.execution.method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(action.execution.payload),
+      });
+      const payload = (await response.json().catch(() => null)) as {
+        error?: string;
+        variants?: unknown[];
+        results?: unknown[];
+      } | null;
+      if (!response.ok) {
+        throw new Error(payload?.error ?? "执行发布效果动作失败。");
+      }
+      await loadOps();
+      const generatedCount = payload?.variants?.length;
+      const rewrittenCount = payload?.results?.length;
+      setMessage(generatedCount
+        ? `已按「${action.label}」生成 ${generatedCount} 个候选。`
+        : rewrittenCount
+          ? `已按「${action.label}」重写 ${rewrittenCount} 章。`
+          : `已执行「${action.label}」。`);
+    } catch (caught) {
+      setMessage(caught instanceof Error ? caught.message : "执行发布效果动作失败。");
+    } finally {
+      setRunningEffectActionId(null);
     }
   }
 
@@ -505,12 +555,24 @@ export function SerializationOpsPanel({ projectId }: { projectId: string }) {
                       </div>
                       <p className="mt-1 leading-6 text-slate-600">{action.detail}</p>
                       <div className="mt-2 text-xs text-slate-500">依据：{action.evidence}</div>
-                      <Link
-                        className="mt-3 inline-flex rounded-md border border-slate-200 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
-                        href={projectHref(projectId, action.href)}
-                      >
-                        {action.actionLabel}
-                      </Link>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {action.execution ? (
+                          <button
+                            className="rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white disabled:opacity-50"
+                            disabled={runningEffectActionId === action.id}
+                            onClick={() => void runPublishEffectAction(action)}
+                            type="button"
+                          >
+                            {runningEffectActionId === action.id ? "执行中" : action.execution.label}
+                          </button>
+                        ) : null}
+                        <Link
+                          className="inline-flex rounded-md border border-slate-200 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                          href={projectHref(projectId, action.href)}
+                        >
+                          {action.execution ? "打开工作区" : action.actionLabel}
+                        </Link>
+                      </div>
                     </div>
                   ))}
                 </div>

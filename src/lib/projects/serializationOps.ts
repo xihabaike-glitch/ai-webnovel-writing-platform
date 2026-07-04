@@ -133,6 +133,7 @@ export interface SerializationPublishEffectAction {
   evidence: string;
   href: string;
   actionLabel: string;
+  execution: SerializationActionExecution | null;
 }
 
 export interface SerializationPublishEffectStatus {
@@ -178,11 +179,13 @@ export interface SerializationAction {
   execution: SerializationActionExecution | null;
 }
 
+export type SerializationActionPayloadValue = string | number | boolean | string[] | number[];
+
 export interface SerializationActionExecution {
   label: string;
   method: "PATCH" | "POST";
   endpoint: string;
-  payload: Record<string, string | number | boolean>;
+  payload: Record<string, SerializationActionPayloadValue>;
 }
 
 export interface SerializationOpsDashboard {
@@ -354,7 +357,27 @@ function publishEffectActionLabel(execution: string) {
   return "去处理";
 }
 
-export function buildSerializationPublishEffectStatus(input: Pick<SerializationOpsInput, "publishEffect" | "effectOptimization">): SerializationPublishEffectStatus {
+function publishEffectExecution(input: Pick<SerializationOpsInput, "project" | "platform">, execution: string): SerializationActionExecution | null {
+  if (execution === "generate_asset_variants") {
+    return {
+      label: "生成候选",
+      method: "POST",
+      endpoint: `/api/projects/${input.project.id ?? "current"}/platform-export/asset-optimize`,
+      payload: { platformId: input.platform.id },
+    };
+  }
+  if (execution === "rewrite_first_three") {
+    return {
+      label: "重写前三章",
+      method: "POST",
+      endpoint: `/api/projects/${input.project.id ?? "current"}/first-three-rewrite/generate`,
+      payload: { platformId: input.platform.id, chapterOrders: [1, 2, 3], targetWords: 1600 },
+    };
+  }
+  return null;
+}
+
+export function buildSerializationPublishEffectStatus(input: Pick<SerializationOpsInput, "project" | "platform" | "publishEffect" | "effectOptimization">): SerializationPublishEffectStatus {
   const effect = input.publishEffect ?? null;
   const optimization = input.effectOptimization ?? null;
 
@@ -387,6 +410,7 @@ export function buildSerializationPublishEffectStatus(input: Pick<SerializationO
     evidence: action.evidence,
     href: action.href,
     actionLabel: publishEffectActionLabel(action.execution),
+    execution: publishEffectExecution(input, action.execution),
   }));
 
   return {
@@ -627,14 +651,15 @@ function buildActions(
     });
   }
   if (!failedChecklist[0] && baselineStatus.exists && effectStatus.status !== "empty" && effectStatus.actions[0]) {
+    const effectAction = effectStatus.actions[0];
     actions.push({
       id: "optimize-publish-effect",
       label: "按效果优化",
       priority: effectStatus.status === "weak" || effectStatus.comparisonStatus === "declined" ? "high" : "medium",
-      detail: `${effectStatus.optimizationHeadline} 下一步：${effectStatus.actions[0].detail}`,
-      href: effectStatus.actions[0].href,
-      hrefLabel: effectStatus.actions[0].actionLabel,
-      execution: null,
+      detail: `${effectStatus.optimizationHeadline} 下一步：${effectAction.detail}`,
+      href: effectAction.href,
+      hrefLabel: effectAction.execution ? "打开工作区" : effectAction.actionLabel,
+      execution: effectAction.execution,
     });
   }
   if (actions.length === 0) {

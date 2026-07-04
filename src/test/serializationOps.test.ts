@@ -420,6 +420,7 @@ test("buildSerializationOpsDashboard", async (t) => {
     assert.equal(dashboard.publishEffectStatus.status, "empty");
     assert.equal(dashboard.publishEffectStatus.actionLabel, "录入发布效果");
     assert.equal(dashboard.publishEffectStatus.actions[0].href, "#publish-effect-panel");
+    assert.equal(dashboard.publishEffectStatus.actions[0].execution, null);
     assert.equal(dashboard.actions.some((action) => action.id === "record-publish-effect"), true);
     assert.ok(dashboard.warnings.some((warning) => warning.includes("还没录入真实发布效果")));
     assert.equal(dashboard.actions.some((action) => action.id === "save-publish-baseline"), false);
@@ -479,9 +480,13 @@ test("buildSerializationOpsDashboard", async (t) => {
     assert.equal(dashboard.publishEffectStatus.status, "weak");
     assert.equal(dashboard.publishEffectStatus.label, "偏弱");
     assert.equal(dashboard.publishEffectStatus.actions[0].actionLabel, "生成候选");
+    assert.equal(dashboard.publishEffectStatus.actions[0].execution?.endpoint, "/api/projects/project-1/platform-export/asset-optimize");
+    assert.equal(dashboard.publishEffectStatus.actions[0].execution?.payload.platformId, "fanqie");
     const optimizeAction = dashboard.actions.find((action) => action.id === "optimize-publish-effect");
     assert.equal(optimizeAction?.priority, "high");
     assert.equal(optimizeAction?.href, "#submission-asset-editor");
+    assert.equal(optimizeAction?.execution?.label, "生成候选");
+    assert.equal(optimizeAction?.execution?.endpoint, "/api/projects/project-1/platform-export/asset-optimize");
     assert.ok(dashboard.warnings.some((warning) => warning.includes("发布效果偏弱")));
   });
 

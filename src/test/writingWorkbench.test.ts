@@ -127,6 +127,12 @@ test("buildWritingWorkbench", async (t) => {
     assert.ok(workbench.quickLinks.some((link) => link.href === "/projects/p1#outline-tree"));
     assert.ok(workbench.quickFixes.some((fix) => fix.kind === "chapter_hook" && fix.endpoint === "/api/chapters/c1"));
     assert.ok(workbench.quickFixes.some((fix) => fix.kind === "character_seed" && fix.endpoint === "/api/projects/p1/characters"));
+    assert.ok(workbench.quickFixes.some((fix) => (
+      fix.kind === "story_line_seed"
+      && fix.endpoint === "/api/projects/p1/story-lines"
+      && fix.payload.kind === "plot_thread"
+      && fix.payload.startChapterId === "c1"
+    )));
     assert.ok(workbench.quickFixes.some((fix) => fix.kind === "world_seed" && fix.payload.type === "platform_soil"));
     assert.ok(workbench.modelActions.some((action) => action.kind === "opening_diagnostic" && action.method === "GET"));
     assert.ok(workbench.modelActions.some((action) => action.kind === "chapter_draft" && action.endpoint === "/api/ai/tasks/chapter-draft"));
@@ -178,6 +184,11 @@ test("buildWritingWorkbench", async (t) => {
     assert.equal(workbench.chapterFocus.nextChapter, null);
     assert.ok(workbench.characterFocus.nextAction.includes("主角人物卡"));
     assert.ok(workbench.quickFixes.some((fix) => fix.kind === "character_seed"));
+    assert.ok(workbench.quickFixes.some((fix) => (
+      fix.kind === "story_line_seed"
+      && fix.payload.kind === "plot_thread"
+      && fix.payload.startChapterId === ""
+    )));
     assert.ok(!workbench.quickFixes.some((fix) => fix.kind === "world_seed"));
     assert.ok(workbench.modelActions.every((action) => action.disabledReason?.includes("先创建第一章")));
     assert.ok(workbench.contextFocus.summary.includes("设定 1"));

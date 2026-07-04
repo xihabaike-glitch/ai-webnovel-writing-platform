@@ -18,8 +18,12 @@ function fieldLabel(field: string) {
     arcEnd: "弧光终点",
     voice: "人物声音",
     relationshipNotes: "关系压力",
+    kind: "保存类型",
     type: "资料类型",
     title: "标题",
+    startChapterId: "起点章节",
+    endChapterId: "终点章节",
+    status: "状态",
     content: "内容",
   };
 
@@ -105,7 +109,7 @@ export function WorkbenchQuickFixPanel({ quickFixes }: { quickFixes: WritingWork
               </div>
 
               <div className="mt-3 grid gap-2">
-                {Object.entries(draft).map(([field, value]) => (
+                {Object.entries(draft).filter(([field]) => field !== "kind").map(([field, value]) => (
                   <label className="grid gap-1 text-sm" key={field}>
                     <span className="font-medium text-slate-700">{fieldLabel(field)}</span>
                     <textarea

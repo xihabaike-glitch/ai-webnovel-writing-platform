@@ -135,7 +135,7 @@ export interface WritingWorkbench {
 
 export interface WritingWorkbenchQuickFix {
   id: string;
-  kind: "chapter_hook" | "chapter_card" | "character_seed" | "world_seed";
+  kind: "chapter_hook" | "chapter_card" | "character_seed" | "story_line_seed" | "world_seed";
   label: string;
   description: string;
   method: "PATCH" | "POST";
@@ -334,7 +334,11 @@ function buildModelRoutes(input: WritingWorkbenchInput, nextChapter: WritingWork
     : routes;
 }
 
-function buildQuickFixes(input: WritingWorkbenchInput, nextChapter: WritingWorkbenchChapter | null): WritingWorkbenchQuickFix[] {
+function buildQuickFixes(
+  input: WritingWorkbenchInput,
+  nextChapter: WritingWorkbenchChapter | null,
+  projectContext: ProjectContextPack,
+): WritingWorkbenchQuickFix[] {
   const fixes: WritingWorkbenchQuickFix[] = [];
   const projectHook = input.project.sellingPoint
     ? `${input.project.sellingPoint}但第一段必须先给危机、选择和不可逆代价。`
@@ -407,6 +411,26 @@ function buildQuickFixes(input: WritingWorkbenchInput, nextChapter: WritingWorkb
     });
   }
 
+  const storyLineBlock = projectContext.blocks.find((block) => block.id === "story_lines");
+  if (storyLineBlock?.missing.includes("缺少主线/支线")) {
+    fixes.push({
+      id: "story-line-seed",
+      kind: "story_line_seed",
+      label: "补故事主线卡",
+      description: "上下文召回缺少主线或支线，先补一条能约束后续章节的追读链。",
+      method: "POST",
+      endpoint: `/api/projects/${input.project.id}/story-lines`,
+      payload: {
+        kind: "plot_thread",
+        type: "main",
+        title: `${input.project.title}主线`,
+        startChapterId: nextChapter?.id ?? "",
+        endChapterId: "",
+        status: "active",
+      },
+    });
+  }
+
   const hasSoil = input.worldEntries.length > 0 || input.outlineNodes.some((node) => node.type === "soil");
   if (!hasSoil) {
     fixes.push({
@@ -424,7 +448,7 @@ function buildQuickFixes(input: WritingWorkbenchInput, nextChapter: WritingWorkb
     });
   }
 
-  return fixes.slice(0, 4);
+  return fixes.slice(0, 5);
 }
 
 function buildModelActions(input: WritingWorkbenchInput, nextChapter: WritingWorkbenchChapter | null): WritingWorkbenchModelAction[] {
@@ -701,6 +725,6 @@ export function buildWritingWorkbench(input: WritingWorkbenchInput): WritingWork
       { label: "模型任务", href: `/projects/${input.project.id}#ai-pipeline` },
       { label: "发布包", href: `/projects/${input.project.id}#platform-export` },
     ],
-    quickFixes: buildQuickFixes(input, nextChapter),
+    quickFixes: buildQuickFixes(input, nextChapter, projectContext),
   };
 }

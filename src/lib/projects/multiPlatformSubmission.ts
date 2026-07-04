@@ -40,8 +40,11 @@ export interface MultiPlatformSubmission {
     totalPlatforms: number;
     readyToArchive: boolean;
   };
+  archive: MultiPlatformSubmissionArchive;
   markdown: string;
 }
+
+type MultiPlatformSubmissionArchiveSource = Omit<MultiPlatformSubmission, "archive">;
 
 export interface MultiPlatformPackageMatrixItem {
   id: "title" | "logline" | "synopsis" | "tags" | "sample_chapters" | "overseas_synopsis";
@@ -59,6 +62,33 @@ export interface MultiPlatformPackageMatrix {
   wordCount: number;
   items: MultiPlatformPackageMatrixItem[];
   nextAction: string;
+}
+
+export interface MultiPlatformSubmissionArchivePlatform {
+  platformId: string;
+  platformName: string;
+  category: PlatformProfile["category"];
+  status: "ready" | "needs_work";
+  fileName: string;
+  readyFields: number;
+  totalFields: number;
+  sampleChapterCount: number;
+  wordCount: number;
+  blockedFields: string[];
+  nextAction: string;
+}
+
+export interface MultiPlatformSubmissionArchive {
+  title: string;
+  archiveFileName: string;
+  generatedAt: string;
+  readyCount: number;
+  blockedCount: number;
+  totalPlatforms: number;
+  totalSampleChapterCount: number;
+  totalWordCount: number;
+  platforms: MultiPlatformSubmissionArchivePlatform[];
+  markdown: string;
 }
 
 const categoryOpportunity: Record<PlatformProfile["category"], string> = {
@@ -112,6 +142,10 @@ function buildPositioning(input: MultiPlatformSubmissionInput, platform: Platfor
 
 function safeFileName(value: string) {
   return value.replace(/[\\/:*?"<>|]+/g, "-").replace(/\s+/g, "").slice(0, 80) || "submission";
+}
+
+function markdownTableCell(value: string) {
+  return value.replace(/\|/g, "\\|").replace(/\n/g, " ");
 }
 
 function matrixItem(
@@ -247,13 +281,148 @@ function buildMarkdown(title: string, variants: MultiPlatformSubmissionVariant[]
   ].join("\n");
 }
 
+export function buildSinglePlatformSubmissionMarkdown(variant: MultiPlatformSubmissionVariant) {
+  return [
+    `# ${variant.submissionPackage.title} ${variant.platformName} 投稿包`,
+    "",
+    `包状态：${variant.packageMatrix.status === "ready" ? "可归档" : "需补齐"}`,
+    `适配分：${variant.fitScore}`,
+    `建议文件名：${variant.packageMatrix.packageFileName}`,
+    `下一步：${variant.packageMatrix.nextAction}`,
+    "",
+    "## 字段矩阵",
+    "",
+    "| 字段 | 状态 | 说明 |",
+    "| --- | --- | --- |",
+    ...variant.packageMatrix.items.map((item) => (
+      `| ${markdownTableCell(item.label)} | ${item.status === "ready" ? "已齐" : item.status === "warning" ? "需补强" : "缺失"} | ${markdownTableCell(item.detail)} |`
+    )),
+    "",
+    "## 一句话卖点",
+    variant.submissionPackage.logline,
+    "",
+    "## 简介",
+    variant.category === "overseas" ? variant.submissionPackage.overseasSynopsis : variant.submissionPackage.synopsis,
+    "",
+    "## 标签",
+    variant.submissionPackage.tags.join("、"),
+    "",
+    "## 样章摘要",
+    ...variant.submissionPackage.firstThreeSummaries.flatMap((chapter) => [
+      "",
+      `### 第 ${chapter.order} 章 ${chapter.title}`,
+      chapter.summary,
+    ]),
+    "",
+    "## 平台改稿重点",
+    ...variant.rewriteFocus.map((focus) => `- ${focus}`),
+    "",
+    "## 平台风险",
+    ...variant.risks.map((risk) => `- ${risk}`),
+    "",
+  ].join("\n");
+}
+
+export function buildMultiPlatformSubmissionArchive(
+  submission: MultiPlatformSubmissionArchiveSource,
+  generatedAt: Date | string = new Date(),
+): MultiPlatformSubmissionArchive {
+  const generatedDate = new Date(generatedAt);
+  const generatedText = new Intl.DateTimeFormat("zh-CN", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(generatedDate);
+  const platforms = submission.variants.map((variant) => {
+    const blockedFields = variant.packageMatrix.items
+      .filter((item) => item.status !== "ready")
+      .map((item) => item.label);
+    return {
+      platformId: variant.platformId,
+      platformName: variant.platformName,
+      category: variant.category,
+      status: variant.packageMatrix.status,
+      fileName: variant.packageMatrix.packageFileName,
+      readyFields: variant.packageMatrix.readyFields,
+      totalFields: variant.packageMatrix.totalFields,
+      sampleChapterCount: variant.packageMatrix.sampleChapterCount,
+      wordCount: variant.packageMatrix.wordCount,
+      blockedFields,
+      nextAction: variant.packageMatrix.nextAction,
+    };
+  });
+  const readyVariants = submission.variants.filter((variant) => variant.packageMatrix.status === "ready");
+  const readyPlatforms = platforms.filter((platform) => platform.status === "ready");
+  const totalSampleChapterCount = readyPlatforms.reduce((sum, platform) => sum + platform.sampleChapterCount, 0);
+  const totalWordCount = readyPlatforms.reduce((sum, platform) => sum + platform.wordCount, 0);
+  const manifestRows = platforms.map((platform) => [
+    platform.platformName,
+    platform.status === "ready" ? "可归档" : "需补齐",
+    `${platform.readyFields}/${platform.totalFields}`,
+    String(platform.sampleChapterCount),
+    String(platform.wordCount),
+    platform.status === "ready" ? platform.fileName : platform.blockedFields.join("、") || "暂无",
+  ]);
+  const markdown = [
+    `# ${submission.title || "未命名项目"} 多平台投稿包归档`,
+    "",
+    `生成时间：${generatedText}`,
+    `可归档平台：${readyPlatforms.length}/${platforms.length}`,
+    `归档样章合计：${totalSampleChapterCount}`,
+    `归档摘要字数：${totalWordCount}`,
+    "",
+    "## 平台清单",
+    "",
+    "| 平台 | 状态 | 字段 | 样章 | 摘要字数 | 文件/待补字段 |",
+    "| --- | --- | ---: | ---: | ---: | --- |",
+    ...manifestRows.map((row) => `| ${row.map(markdownTableCell).join(" | ")} |`),
+    "",
+    "## 已就绪平台投稿包",
+    ...(readyVariants.length
+      ? readyVariants.flatMap((variant) => [
+        "",
+        `### ${variant.platformName}`,
+        "",
+        `建议文件名：${variant.packageMatrix.packageFileName}`,
+        "",
+        buildSinglePlatformSubmissionMarkdown(variant),
+      ])
+      : ["", "暂无字段齐备的平台投稿包。"]),
+    "",
+    "## 待补齐平台",
+    ...platforms
+      .filter((platform) => platform.status !== "ready")
+      .flatMap((platform) => [
+        "",
+        `### ${platform.platformName}`,
+        `待补字段：${platform.blockedFields.join("、") || "暂无"}`,
+        `下一步：${platform.nextAction}`,
+      ]),
+    "",
+  ].join("\n");
+
+  return {
+    title: submission.title,
+    archiveFileName: `${safeFileName(`${submission.title || "未命名项目"}-多平台投稿包归档`)}.md`,
+    generatedAt: generatedDate.toISOString(),
+    readyCount: readyPlatforms.length,
+    blockedCount: platforms.length - readyPlatforms.length,
+    totalPlatforms: platforms.length,
+    totalSampleChapterCount,
+    totalWordCount,
+    platforms,
+    markdown,
+  };
+}
+
 export function buildMultiPlatformSubmission(input: MultiPlatformSubmissionInput): MultiPlatformSubmission {
   const variants = platformProfiles
     .map((platform) => buildVariant(input, platform))
     .sort((left, right) => right.fitScore - left.fitScore || left.platformName.localeCompare(right.platformName));
   const readyPlatforms = variants.filter((variant) => variant.packageMatrix.status === "ready").length;
-
-  return {
+  const submission: MultiPlatformSubmissionArchiveSource = {
     title: input.title,
     targetPlatformId: input.targetPlatformId,
     recommendedPlatformId: variants[0]?.platformId ?? input.targetPlatformId,
@@ -265,5 +434,10 @@ export function buildMultiPlatformSubmission(input: MultiPlatformSubmissionInput
       readyToArchive: readyPlatforms > 0,
     },
     markdown: buildMarkdown(input.title, variants),
+  };
+
+  return {
+    ...submission,
+    archive: buildMultiPlatformSubmissionArchive(submission),
   };
 }

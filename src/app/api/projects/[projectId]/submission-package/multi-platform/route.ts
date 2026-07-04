@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
-import { buildMultiPlatformSubmission } from "@/lib/projects/multiPlatformSubmission";
+import { buildMultiPlatformSubmission, buildSinglePlatformSubmissionMarkdown } from "@/lib/projects/multiPlatformSubmission";
 
 interface Params {
   params: Promise<{ projectId: string }>;
@@ -39,7 +39,33 @@ export async function GET(request: Request, { params }: Params) {
     })),
   });
 
-  if (searchParams.get("format") === "markdown") {
+  const format = searchParams.get("format");
+  const platformId = searchParams.get("platformId");
+
+  if (format === "archive") {
+    return new NextResponse(multiPlatformSubmission.archive.markdown, {
+      headers: {
+        "Content-Type": "text/markdown; charset=utf-8",
+        "Content-Disposition": `attachment; filename="${encodeURIComponent(multiPlatformSubmission.archive.archiveFileName)}"`,
+      },
+    });
+  }
+
+  if (format === "package") {
+    const variant = multiPlatformSubmission.variants.find((item) => item.platformId === platformId);
+    if (!variant) {
+      return NextResponse.json({ error: "Platform package not found" }, { status: 404 });
+    }
+
+    return new NextResponse(buildSinglePlatformSubmissionMarkdown(variant), {
+      headers: {
+        "Content-Type": "text/markdown; charset=utf-8",
+        "Content-Disposition": `attachment; filename="${encodeURIComponent(variant.packageMatrix.packageFileName)}"`,
+      },
+    });
+  }
+
+  if (format === "markdown") {
     return new NextResponse(multiPlatformSubmission.markdown, {
       headers: {
         "Content-Type": "text/markdown; charset=utf-8",

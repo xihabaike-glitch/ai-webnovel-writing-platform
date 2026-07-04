@@ -1,6 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { buildMultiPlatformSubmission } from "../lib/projects/multiPlatformSubmission.ts";
+import {
+  buildMultiPlatformSubmission,
+  buildMultiPlatformSubmissionArchive,
+  buildSinglePlatformSubmissionMarkdown,
+} from "../lib/projects/multiPlatformSubmission.ts";
 
 const chapters = [
   {
@@ -63,6 +67,10 @@ test("buildMultiPlatformSubmission", async (t) => {
     assert.ok(result.packageSummary.readyToArchive);
     assert.ok(result.variants.every((variant) => variant.packageMatrix.totalFields === 6));
     assert.ok(result.variants.every((variant) => variant.packageMatrix.packageFileName.endsWith("-投稿包.md")));
+    assert.equal(result.archive.totalPlatforms, 8);
+    assert.equal(result.archive.readyCount, result.packageSummary.readyPlatforms);
+    assert.ok(result.archive.archiveFileName.endsWith(".md"));
+    assert.ok(result.archive.markdown.includes("多平台投稿包归档"));
     assert.ok(result.markdown.includes("多平台投稿版本"));
     assert.ok(result.markdown.includes("平台包字段"));
   });
@@ -106,6 +114,32 @@ test("buildMultiPlatformSubmission", async (t) => {
     assert.ok(zhihu.packageMatrix.items.some((item) => item.id === "title" && item.status === "missing"));
     assert.ok(zhihu.packageMatrix.items.some((item) => item.id === "sample_chapters" && item.status === "warning"));
     assert.equal(result.packageSummary.readyToArchive, result.packageSummary.readyPlatforms > 0);
+    assert.equal(result.archive.blockedCount, result.archive.totalPlatforms - result.archive.readyCount);
     assert.ok(result.markdown.includes("需补齐"));
+  });
+
+  await t.test("builds a downloadable archive manifest and single platform package", () => {
+    const result = buildMultiPlatformSubmission({
+      title: "夜雨|系统",
+      genre: "都市系统",
+      sellingPoint: "雨夜危机中觉醒系统，主角用一次次选择翻盘。",
+      currentWordCount: 9000,
+      targetWordCount: 300000,
+      targetPlatformId: "fanqie",
+      chapters,
+      aiTasks: [],
+    });
+    const archive = buildMultiPlatformSubmissionArchive(result, "2026-01-06T08:00:00.000Z");
+    const fanqie = result.variants.find((variant) => variant.platformId === "fanqie");
+
+    assert.ok(fanqie);
+    assert.ok(archive.archiveFileName.includes("夜雨-系统-多平台投稿包归档.md"));
+    assert.ok(archive.markdown.includes("| 平台 | 状态 | 字段 | 样章 | 摘要字数 | 文件/待补字段 |"));
+    assert.ok(archive.markdown.includes("已就绪平台投稿包"));
+    assert.ok(archive.platforms.some((platform) => platform.fileName.includes("夜雨-系统-番茄小说-投稿包.md")));
+    const singlePackage = buildSinglePlatformSubmissionMarkdown(fanqie);
+    assert.ok(singlePackage.includes("# 夜雨|系统 番茄小说 投稿包"));
+    assert.ok(singlePackage.includes("## 字段矩阵"));
+    assert.ok(singlePackage.includes("## 样章摘要"));
   });
 });

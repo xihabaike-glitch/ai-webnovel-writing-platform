@@ -75,6 +75,24 @@ interface MultiPlatformSubmission {
     totalPlatforms: number;
     readyToArchive: boolean;
   };
+  archive: {
+    archiveFileName: string;
+    readyCount: number;
+    blockedCount: number;
+    totalPlatforms: number;
+    totalSampleChapterCount: number;
+    totalWordCount: number;
+    platforms: Array<{
+      platformId: string;
+      platformName: string;
+      status: "ready" | "needs_work";
+      fileName: string;
+      readyFields: number;
+      totalFields: number;
+      blockedFields: string[];
+      nextAction: string;
+    }>;
+  };
   markdown: string;
 }
 
@@ -152,6 +170,7 @@ export function SubmissionPackagePanel({
   const [optimized, setOptimized] = useState<OptimizedSubmissionPackage | null>(null);
   const [isLoadingMultiPlatform, setIsLoadingMultiPlatform] = useState(false);
   const [isDownloadingMultiPlatform, setIsDownloadingMultiPlatform] = useState(false);
+  const [isDownloadingMultiPlatformArchive, setIsDownloadingMultiPlatformArchive] = useState(false);
   const [multiPlatform, setMultiPlatform] = useState<MultiPlatformSubmission | null>(null);
   const [isLoadingAbTest, setIsLoadingAbTest] = useState(false);
   const [isDownloadingAbTest, setIsDownloadingAbTest] = useState(false);
@@ -297,6 +316,54 @@ export function SubmissionPackagePanel({
       URL.revokeObjectURL(url);
     } catch (caught) {
       setMessage(caught instanceof Error ? caught.message : "下载多平台版本失败。");
+    } finally {
+      setIsDownloadingMultiPlatform(false);
+    }
+  }
+
+  async function downloadMultiPlatformArchive() {
+    setIsDownloadingMultiPlatformArchive(true);
+    setMessage(null);
+    try {
+      const response = await fetch(`/api/projects/${projectId}/submission-package/multi-platform?format=archive`);
+      if (!response.ok) {
+        throw new Error("下载多平台归档包失败。");
+      }
+      const markdown = await response.text();
+      const blob = new Blob([markdown], { type: "text/markdown;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = multiPlatform?.archive.archiveFileName ?? `${submissionPackage.title}-多平台投稿包归档.md`;
+      link.click();
+      URL.revokeObjectURL(url);
+      setMessage("已下载多平台投稿包归档");
+    } catch (caught) {
+      setMessage(caught instanceof Error ? caught.message : "下载多平台归档包失败。");
+    } finally {
+      setIsDownloadingMultiPlatformArchive(false);
+    }
+  }
+
+  async function downloadPlatformPackage(variant: MultiPlatformSubmissionVariant) {
+    setIsDownloadingMultiPlatform(true);
+    setMessage(null);
+    try {
+      const response = await fetch(`/api/projects/${projectId}/submission-package/multi-platform?format=package&platformId=${variant.platformId}`);
+      if (!response.ok) {
+        throw new Error("下载平台投稿包失败。");
+      }
+      const markdown = await response.text();
+      const blob = new Blob([markdown], { type: "text/markdown;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = variant.packageMatrix.packageFileName;
+      link.click();
+      URL.revokeObjectURL(url);
+      setMessage(`已下载 ${variant.platformName} 投稿包`);
+    } catch (caught) {
+      setMessage(caught instanceof Error ? caught.message : "下载平台投稿包失败。");
     } finally {
       setIsDownloadingMultiPlatform(false);
     }
@@ -490,6 +557,8 @@ export function SubmissionPackagePanel({
                 推荐：{multiPlatform.variants.find((variant) => variant.platformId === multiPlatform.recommendedPlatformId)?.platformName ?? "待判断"}
                 {" · "}
                 可归档 {multiPlatform.packageSummary.readyPlatforms}/{multiPlatform.packageSummary.totalPlatforms}
+                {" · "}
+                {multiPlatform.archive.archiveFileName}
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -508,6 +577,30 @@ export function SubmissionPackagePanel({
               >
                 {isDownloadingMultiPlatform ? "下载中" : "下载多平台"}
               </button>
+              <button
+                className="rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white disabled:opacity-50"
+                disabled={isDownloadingMultiPlatformArchive}
+                onClick={downloadMultiPlatformArchive}
+                type="button"
+              >
+                {isDownloadingMultiPlatformArchive ? "归档中" : "下载归档包"}
+              </button>
+            </div>
+          </div>
+          <div className="mt-3 grid gap-2 sm:grid-cols-3">
+            <div className="rounded-md bg-slate-50 p-3">
+              <div className="text-xs text-slate-500">归档平台</div>
+              <div className="mt-1 text-lg font-semibold text-slate-900">
+                {multiPlatform.archive.readyCount}/{multiPlatform.archive.totalPlatforms}
+              </div>
+            </div>
+            <div className="rounded-md bg-slate-50 p-3">
+              <div className="text-xs text-slate-500">待补平台</div>
+              <div className="mt-1 text-lg font-semibold text-amber-700">{multiPlatform.archive.blockedCount}</div>
+            </div>
+            <div className="rounded-md bg-slate-50 p-3">
+              <div className="text-xs text-slate-500">归档样章</div>
+              <div className="mt-1 text-lg font-semibold text-slate-900">{multiPlatform.archive.totalSampleChapterCount}</div>
             </div>
           </div>
           <div className="mt-3 grid gap-3 lg:grid-cols-2">
@@ -523,8 +616,18 @@ export function SubmissionPackagePanel({
                     </div>
                     <div className="mt-1 text-xs text-slate-500">{categoryLabel(variant.category)} · 准备度 {variant.readinessPercent}%</div>
                   </div>
-                  <div className="w-fit rounded-md bg-white px-2 py-1 text-xs font-medium text-slate-700">
-                    {variant.fitScore} · {variant.actionLabel}
+                  <div className="flex flex-wrap items-center gap-2">
+                    <div className="w-fit rounded-md bg-white px-2 py-1 text-xs font-medium text-slate-700">
+                      {variant.fitScore} · {variant.actionLabel}
+                    </div>
+                    <button
+                      className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                      disabled={isDownloadingMultiPlatform}
+                      onClick={() => void downloadPlatformPackage(variant)}
+                      type="button"
+                    >
+                      下载单包
+                    </button>
                   </div>
                 </div>
                 <p className="mt-3 text-sm leading-6 text-slate-700">{variant.positioning}</p>

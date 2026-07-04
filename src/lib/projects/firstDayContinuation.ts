@@ -63,6 +63,21 @@ function activeFirstDayAction(projectId: string, workflow: FirstDayWorkflow): Fi
 }
 
 function blockedAction(projectId: string, item: QueueItem, itemCount: number): FirstDayContinuationAction {
+  if (item.blockerType === "first_day_gate") {
+    return {
+      status: "blocked",
+      headline: "先完成首日生产闸门",
+      detail: `${item.projectTitle} · ${item.chapterTitle}：${item.evidence}`,
+      primaryLabel: item.actionLabel,
+      primaryHref: item.href,
+      secondaryLabel: "查看任务队列",
+      secondaryHref: "/tasks",
+      queueCategory: item.category,
+      itemCount,
+      warnings: ["首日验收没有收口前，不建议进入批量初稿、批量审稿、批量二改或多平台导出。"],
+    };
+  }
+
   return {
     status: "blocked",
     headline: item.blockerType === "publish_repair" ? "发布前先修阻塞" : "批量前先补章节卡",
@@ -81,6 +96,25 @@ function blockedAction(projectId: string, item: QueueItem, itemCount: number): F
   };
 }
 
+function projectWithCompletedFirstDayGate(project: TaskQueueProject, workflow: FirstDayWorkflow): TaskQueueProject {
+  if (workflow.completedCount < workflow.totalSteps) return project;
+  const existingTasks = project.gateDispatchTasks ?? [];
+  const publishPrecheckKey = `first-day:${project.id}:publish-precheck`;
+  if (existingTasks.some((task) => task.dispatchKey === publishPrecheckKey && task.state === "completed")) return project;
+
+  return {
+    ...project,
+    gateDispatchTasks: [
+      ...existingTasks,
+      {
+        dispatchKey: publishPrecheckKey,
+        state: "completed",
+        completionEvidence: "首日工作流已完成，平台包预检已收口，可以进入后续小批量生产判断。",
+      },
+    ],
+  };
+}
+
 export function buildFirstDayContinuationAction(input: {
   project: TaskQueueProject;
   workflow: FirstDayWorkflow;
@@ -89,7 +123,7 @@ export function buildFirstDayContinuationAction(input: {
     return activeFirstDayAction(input.project.id, input.workflow);
   }
 
-  const queue = buildTaskQueueCenter([input.project]);
+  const queue = buildTaskQueueCenter([projectWithCompletedFirstDayGate(input.project, input.workflow)]);
   const next = queue.recommendedNext;
 
   if (!next) {

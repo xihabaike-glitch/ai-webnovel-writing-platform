@@ -72,15 +72,24 @@ const project: TaskQueueProject = {
   ],
 };
 
+function firstDayCompleteDispatches(projectId: string) {
+  return [{
+    dispatchKey: `first-day:${projectId}:publish-precheck`,
+    state: "completed",
+    completionEvidence: "首日平台包预检已完成，标题、简介、标签、卖点、样章和风险清单已验收。",
+  }];
+}
+
 test("buildTaskQueueCenter", async (t) => {
   await t.test("collects cross-project draft, review, second-pass, export, and blocked tasks", () => {
-    const queue = buildTaskQueueCenter([project]);
+    const queue = buildTaskQueueCenter([{ ...project, gateDispatchTasks: firstDayCompleteDispatches(project.id) }]);
 
     assert.equal(queue.overview.draftReady, 1);
     assert.equal(queue.overview.reviewReady, 1);
     assert.equal(queue.overview.secondPassReady, 1);
     assert.equal(queue.overview.exportReady, 0);
     assert.equal(queue.overview.blockedCards, 2);
+    assert.equal(queue.overview.firstDayBlocked, 0);
     assert.equal(queue.overview.publishBlocked, 1);
     assert.equal(queue.overview.chapterCardBlocked, 1);
     assert.equal(queue.overview.riskRecoveryBlocked, 0);
@@ -102,6 +111,22 @@ test("buildTaskQueueCenter", async (t) => {
     assert.ok(publishBlocker?.evidence.includes("先处理"));
     assert.equal(queue.recommendedNext?.strategyBasis?.label, "模板推荐");
     assert.ok(queue.items.every((item) => item.strategyBasis?.openingMove.includes("倒计时")));
+  });
+
+  await t.test("blocks production behind the first-day completion gate", () => {
+    const queue = buildTaskQueueCenter([project]);
+    const gate = queue.items.find((item) => item.blockerType === "first_day_gate");
+
+    assert.equal(queue.overview.draftReady, 0);
+    assert.equal(queue.overview.reviewReady, 0);
+    assert.equal(queue.overview.secondPassReady, 0);
+    assert.equal(queue.overview.exportReady, 0);
+    assert.equal(queue.overview.firstDayBlocked, 1);
+    assert.equal(queue.overview.publishBlocked, 0);
+    assert.equal(gate?.actionLabel, "完成首日链路");
+    assert.ok(gate?.evidence.includes("平台包预检验收"));
+    assert.ok(gate?.href.endsWith("#first-day-workflow"));
+    assert.equal(queue.recommendedNext?.blockerType, "first_day_gate");
   });
 
   await t.test("blocks risky first drafts behind recovery validation", () => {
@@ -164,14 +189,16 @@ test("buildTaskQueueCenter", async (t) => {
     const queue = buildTaskQueueCenter([watchProject]);
     const drafts = queue.items.filter((item) => item.category === "draft");
     const gate = queue.items.find((item) => item.blockerType === "watch_scale_gate");
+    const firstDayGate = queue.items.find((item) => item.blockerType === "first_day_gate");
 
-    assert.equal(drafts.length, 1);
+    assert.equal(drafts.length, 0);
+    assert.equal(queue.overview.firstDayBlocked, 1);
     assert.equal(queue.overview.watchScaleBlocked, 1);
     assert.equal(queue.overview.watchSampleOnly, 2);
-    assert.equal(drafts[0].riskLevel, "watch");
-    assert.equal(drafts[0].scaleGate, "sample_only");
-    assert.equal(drafts[0].actionLabel, "生成小样本");
-    assert.ok(drafts[0].riskNotice?.includes("小样本验证"));
+    assert.equal(firstDayGate?.riskLevel, "watch");
+    assert.equal(firstDayGate?.scaleGate, "sample_only");
+    assert.equal(firstDayGate?.actionLabel, "完成小样本验收");
+    assert.ok(firstDayGate?.evidence.includes("通过线"));
     assert.ok(gate?.evidence.includes("通过线、不可接受项、复查证据和放量结论"));
   });
 
@@ -215,6 +242,7 @@ test("buildTaskQueueCenter", async (t) => {
 
     assert.equal(drafts.length, 2);
     assert.equal(queue.overview.watchScaleBlocked, 0);
+    assert.equal(queue.overview.firstDayBlocked, 0);
     assert.equal(queue.overview.watchSampleOnly, 0);
     assert.equal(queue.overview.watchCleared, 2);
     assert.ok(drafts.every((item) => item.scaleGate === "cleared"));
@@ -260,9 +288,12 @@ test("buildTaskQueueCenter", async (t) => {
     const queue = buildTaskQueueCenter([notPassedProject]);
     const drafts = queue.items.filter((item) => item.category === "draft");
     const gate = queue.items.find((item) => item.blockerType === "watch_scale_gate");
+    const firstDayGate = queue.items.find((item) => item.blockerType === "first_day_gate");
 
-    assert.equal(drafts.length, 1);
+    assert.equal(drafts.length, 0);
+    assert.equal(firstDayGate?.actionLabel, "完成小样本验收");
     assert.equal(gate?.scaleGate, "sample_only");
+    assert.equal(queue.overview.firstDayBlocked, 1);
     assert.equal(queue.overview.watchScaleBlocked, 1);
     assert.equal(queue.overview.watchCleared, 0);
   });

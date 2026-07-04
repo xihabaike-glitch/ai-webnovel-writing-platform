@@ -104,6 +104,11 @@ async function buildWorkflowPayload(projectId: string) {
         chapters: project.chapters,
         aiTasks: project.aiTasks,
         worldEntries: project.worldEntries,
+        gateDispatchTasks: project.gateDispatchTasks.map((task) => ({
+          dispatchKey: task.dispatchKey,
+          state: task.state,
+          completionEvidence: task.completionEvidence,
+        })),
       },
       workflow,
     }),

@@ -26,6 +26,7 @@ function blockerTypeLabel(entry: QueueItem) {
   if (entry.blockerType === "chapter_card") return "章节卡住";
   if (entry.blockerType === "risk_recovery") return "开书止损";
   if (entry.blockerType === "watch_scale_gate") return "观察闸门";
+  if (entry.blockerType === "first_day_gate") return "首日闸门";
   return entry.label;
 }
 
@@ -188,6 +189,10 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
         <div className="rounded-md border border-slate-200 bg-white p-3">
           <div className="text-xs text-slate-500">卡住</div>
           <div className="mt-1 text-2xl font-semibold">{queue.overview.blockedCards}</div>
+        </div>
+        <div className="rounded-md border border-slate-200 bg-white p-3">
+          <div className="text-xs text-slate-500">首日闸门</div>
+          <div className="mt-1 text-2xl font-semibold">{queue.overview.firstDayBlocked}</div>
         </div>
         <div className="rounded-md border border-slate-200 bg-white p-3">
           <div className="text-xs text-slate-500">发布阻塞</div>

@@ -51,7 +51,7 @@ export interface QueueItem {
   projectTitle: string;
   platformName: string;
   category: "draft" | "review" | "second_pass" | "export" | "blocked";
-  blockerType: "chapter_card" | "publish_repair" | "risk_recovery" | "watch_scale_gate" | null;
+  blockerType: "chapter_card" | "publish_repair" | "risk_recovery" | "watch_scale_gate" | "first_day_gate" | null;
   label: string;
   chapterTitle: string;
   evidence: string;
@@ -73,6 +73,7 @@ export interface TaskQueueCenter {
     secondPassReady: number;
     exportReady: number;
     blockedCards: number;
+    firstDayBlocked: number;
     publishBlocked: number;
     chapterCardBlocked: number;
     riskRecoveryBlocked: number;
@@ -92,6 +93,15 @@ const categoryPriority: Record<QueueItem["category"], number> = {
   export: 40,
   blocked: 90,
 };
+
+function blockerPriority(blockerType: QueueItem["blockerType"]) {
+  if (blockerType === "first_day_gate") return 0;
+  if (blockerType === "risk_recovery") return 1;
+  if (blockerType === "watch_scale_gate") return 2;
+  if (blockerType === "publish_repair") return 3;
+  if (blockerType === "chapter_card") return 4;
+  return 9;
+}
 
 function categoryLabel(category: QueueItem["category"]) {
   const labels: Record<QueueItem["category"], string> = {
@@ -139,6 +149,19 @@ function watchDraftScaleCleared(project: TaskQueueProject) {
     && !/未通过|暂不放量|继续停留观察/u.test(evidence);
 }
 
+function completedFirstDayDispatch(project: TaskQueueProject, stepId: string) {
+  return project.gateDispatchTasks?.find((task) => (
+    task.dispatchKey === `first-day:${project.id}:${stepId}`
+    && task.state === "completed"
+    && task.completionEvidence.trim().length >= 8
+  )) ?? null;
+}
+
+function firstDayProductionGateCleared(project: TaskQueueProject, riskLevel: FirstDayRiskLevel, scaleGate: QueueScaleGate) {
+  if (riskLevel === "watch" && scaleGate === "cleared") return true;
+  return Boolean(completedFirstDayDispatch(project, "publish-precheck"));
+}
+
 export function buildTaskQueueCenter(projects: TaskQueueProject[]): TaskQueueCenter {
   const items = projects.flatMap((project) => {
     const platform = getPlatformProfile(project.targetPlatform as PlatformId);
@@ -155,6 +178,7 @@ export function buildTaskQueueCenter(projects: TaskQueueProject[]): TaskQueueCen
     const scaleGate: QueueScaleGate = riskProfile.level === "watch"
       ? watchDraftScaleCleared(project) ? "cleared" : "sample_only"
       : "none";
+    const firstDayGateCleared = firstDayProductionGateCleared(project, riskProfile.level, scaleGate);
     const draftQueue = buildBatchDraftQueue(project.chapters, project.aiTasks, platform);
     const reviewQueue = buildReviewPipelineQueue(project.chapters, project.aiTasks, 5, startTactic);
     const exportCenter = buildPlatformPublishExportCenter({
@@ -170,6 +194,28 @@ export function buildTaskQueueCenter(projects: TaskQueueProject[]): TaskQueueCen
       aiTasks: project.aiTasks,
     });
     const queueItems: QueueItem[] = [];
+
+    if (!firstDayGateCleared && riskProfile.level !== "blocked") {
+      queueItems.push(item({
+        id: `${project.id}:first-day-gate:${platform.id}`,
+        projectId: project.id,
+        projectTitle: project.title,
+        platformName: platform.name,
+        category: "blocked",
+        blockerType: "first_day_gate",
+        chapterTitle: "首日生产闸门",
+        evidence: riskProfile.level === "watch"
+          ? "观察项目必须先完成首日小样本验收，写清通过线、不可接受项、复查证据和放量结论。"
+          : "首日链路还没完成平台包预检验收，暂不允许进入批量初稿、批量审稿、批量二改或多平台导出。",
+        strategyBasis: startTactic,
+        riskLevel: riskProfile.level,
+        riskLabel: riskProfile.label,
+        riskNotice,
+        scaleGate,
+        actionLabel: riskProfile.level === "watch" ? "完成小样本验收" : "完成首日链路",
+        href: `${projectHref}#first-day-workflow`,
+      }));
+    }
 
     if (riskProfile.level === "blocked" && draftQueue.candidates.some((candidate) => candidate.status === "ready")) {
       queueItems.push(item({
@@ -197,6 +243,7 @@ export function buildTaskQueueCenter(projects: TaskQueueProject[]): TaskQueueCen
 
     for (const candidate of draftCandidatesForQueue) {
       if (riskProfile.level === "blocked") continue;
+      if (!firstDayGateCleared) continue;
       queueItems.push(item({
         id: `${project.id}:draft:${candidate.chapterId}`,
         projectId: project.id,
@@ -240,6 +287,7 @@ export function buildTaskQueueCenter(projects: TaskQueueProject[]): TaskQueueCen
     }
 
     for (const candidate of reviewQueue.candidates.filter((candidate) => candidate.recommendedReview)) {
+      if (!firstDayGateCleared) continue;
       queueItems.push(item({
         id: `${project.id}:review:${candidate.chapterId}`,
         projectId: project.id,
@@ -259,6 +307,7 @@ export function buildTaskQueueCenter(projects: TaskQueueProject[]): TaskQueueCen
     }
 
     for (const candidate of reviewQueue.candidates.filter((candidate) => candidate.recommendedSecondPass)) {
+      if (!firstDayGateCleared) continue;
       queueItems.push(item({
         id: `${project.id}:second-pass:${candidate.chapterId}`,
         projectId: project.id,
@@ -278,7 +327,7 @@ export function buildTaskQueueCenter(projects: TaskQueueProject[]): TaskQueueCen
     }
 
     const targetPackage = exportCenter.packages.find((pack) => pack.platformId === platform.id) ?? exportCenter.packages[0];
-    if (exportCenter.totalPublishableChapters > 0 && targetPackage.canExport) {
+    if (firstDayGateCleared && exportCenter.totalPublishableChapters > 0 && targetPackage.canExport) {
       queueItems.push(item({
         id: `${project.id}:export:${platform.id}`,
         projectId: project.id,
@@ -295,7 +344,7 @@ export function buildTaskQueueCenter(projects: TaskQueueProject[]): TaskQueueCen
         actionLabel: "导出平台包",
         href: `${projectHref}#platform-export`,
       }));
-    } else if (exportCenter.totalPublishableChapters > 0 && targetPackage.repairPath.status === "needs_repair") {
+    } else if (firstDayGateCleared && exportCenter.totalPublishableChapters > 0 && targetPackage.repairPath.status === "needs_repair") {
       queueItems.push(item({
         id: `${project.id}:publish-repair:${platform.id}`,
         projectId: project.id,
@@ -338,6 +387,7 @@ export function buildTaskQueueCenter(projects: TaskQueueProject[]): TaskQueueCen
     return queueItems;
   }).sort((left, right) => (
     left.priority - right.priority
+    || blockerPriority(left.blockerType) - blockerPriority(right.blockerType)
     || left.projectTitle.localeCompare(right.projectTitle)
     || left.chapterTitle.localeCompare(right.chapterTitle)
   ));
@@ -350,6 +400,7 @@ export function buildTaskQueueCenter(projects: TaskQueueProject[]): TaskQueueCen
       secondPassReady: items.filter((entry) => entry.category === "second_pass").length,
       exportReady: items.filter((entry) => entry.category === "export").length,
       blockedCards: items.filter((entry) => entry.category === "blocked").length,
+      firstDayBlocked: items.filter((entry) => entry.blockerType === "first_day_gate").length,
       publishBlocked: items.filter((entry) => entry.blockerType === "publish_repair").length,
       chapterCardBlocked: items.filter((entry) => entry.blockerType === "chapter_card").length,
       riskRecoveryBlocked: items.filter((entry) => entry.blockerType === "risk_recovery").length,

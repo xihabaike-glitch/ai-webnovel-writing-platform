@@ -37,6 +37,29 @@ interface ProviderModelPresetView {
   note: string;
 }
 
+interface ProviderSetupGuideView {
+  summary: {
+    total: number;
+    ready: number;
+    needsKey: number;
+    needsTest: number;
+    optional: number;
+  };
+  items: Array<{
+    providerId: ModelProviderId;
+    displayName: string;
+    status: "ready" | "needs_key" | "needs_test" | "optional";
+    headline: string;
+    actionLabel: string;
+    defaultBaseUrl: string;
+    defaultModel: string;
+    presetCount: number;
+    recommendedModels: string[];
+    taskTags: string[];
+  }>;
+  nextActions: string[];
+}
+
 interface ProviderView {
   id: string;
   providerId: string;
@@ -398,6 +421,13 @@ const firstDayRouteStatusCopy: Record<FirstDayRouteSummaryView["items"][number][
   mock_fallback: { label: "Mock 兜底", className: "bg-sky-50 text-sky-700" },
 };
 
+const providerSetupStatusCopy: Record<ProviderSetupGuideView["items"][number]["status"], { label: string; className: string }> = {
+  ready: { label: "可用", className: "bg-emerald-50 text-emerald-700" },
+  needs_key: { label: "缺 Key", className: "bg-amber-50 text-amber-700" },
+  needs_test: { label: "待测试", className: "bg-sky-50 text-sky-700" },
+  optional: { label: "演示", className: "bg-slate-100 text-slate-600" },
+};
+
 function draftFromOption(option: ProviderOptionView, existing?: ProviderView): DraftProvider {
   return {
     id: existing?.id,
@@ -415,6 +445,7 @@ export function ModelProviderSettings({
   healthDashboard,
   options,
   presets,
+  providerSetupGuide,
   firstDayRouteSummary,
   presetRouteBlueprint,
   providers,
@@ -433,6 +464,7 @@ export function ModelProviderSettings({
   healthDashboard: ProviderHealthDashboard;
   options: ProviderOptionView[];
   presets: ProviderModelPresetView[];
+  providerSetupGuide: ProviderSetupGuideView;
   firstDayRouteSummary: FirstDayRouteSummaryView;
   presetRouteBlueprint: PresetRouteBlueprintView;
   providers: ProviderView[];
@@ -456,6 +488,7 @@ export function ModelProviderSettings({
   const [selectedProviderId, setSelectedProviderId] = useState<ModelProviderId>(options[0]?.providerId ?? "mock");
   const selectedOption = options.find((option) => option.providerId === selectedProviderId) ?? options[0];
   const selectedPresets = presets.filter((preset) => preset.providerId === selectedProviderId);
+  const selectedSetupGuideItem = providerSetupGuide.items.find((item) => item.providerId === selectedProviderId);
   const existing = existingByProvider.get(selectedProviderId);
   const [draft, setDraft] = useState<DraftProvider>(() => draftFromOption(selectedOption, existing));
   const [message, setMessage] = useState<string | null>(null);
@@ -1845,6 +1878,54 @@ export function ModelProviderSettings({
           })}
         </div>
       </section>
+      <section className="rounded-md border border-slate-200 bg-white p-4">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <h2 className="font-medium text-slate-950">模型供应商配置向导</h2>
+            <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-600">
+              按首日上线优先级准备 DeepSeek、Kimi、Claude、GPT；真实模型就绪后，冷启动蓝图会自动给首日工作流分配路线。
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2 text-xs text-slate-600">
+            <span className="rounded-md bg-emerald-50 px-2 py-1 text-emerald-700">可用 {providerSetupGuide.summary.ready}</span>
+            <span className="rounded-md bg-amber-50 px-2 py-1 text-amber-700">缺 Key {providerSetupGuide.summary.needsKey}</span>
+            <span className="rounded-md bg-sky-50 px-2 py-1 text-sky-700">待测试 {providerSetupGuide.summary.needsTest}</span>
+            <span className="rounded-md bg-slate-100 px-2 py-1 text-slate-600">演示 {providerSetupGuide.summary.optional}</span>
+          </div>
+        </div>
+        <div className="mt-3 grid gap-2 lg:grid-cols-4">
+          {providerSetupGuide.items.slice(0, 4).map((item) => {
+            const status = providerSetupStatusCopy[item.status];
+            return (
+              <button
+                className={`rounded-md border p-3 text-left text-sm ${item.providerId === selectedProviderId ? "border-slate-950 bg-slate-50" : "border-slate-200 bg-white hover:bg-slate-50"}`}
+                key={item.providerId}
+                onClick={() => selectProvider(item.providerId)}
+                type="button"
+              >
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="font-medium text-slate-950">{item.displayName}</span>
+                  <span className={`rounded-md px-2 py-1 text-xs font-medium ${status.className}`}>{status.label}</span>
+                </div>
+                <p className="mt-2 min-h-10 text-xs leading-5 text-slate-600">{item.headline}</p>
+                <div className="mt-2 flex flex-wrap gap-1">
+                  {item.taskTags.slice(0, 3).map((tag) => (
+                    <span className="rounded-md bg-slate-100 px-2 py-1 text-xs text-slate-600" key={tag}>{tag}</span>
+                  ))}
+                </div>
+                <div className="mt-3 rounded-md bg-slate-950 px-3 py-2 text-center text-xs font-medium text-white">
+                  {item.actionLabel}
+                </div>
+              </button>
+            );
+          })}
+        </div>
+        <div className="mt-3 grid gap-2 md:grid-cols-3">
+          {providerSetupGuide.nextActions.map((action) => (
+            <div className="rounded-md bg-slate-50 px-3 py-2 text-sm leading-6 text-slate-600" key={action}>{action}</div>
+          ))}
+        </div>
+      </section>
       <div className="grid gap-4 lg:grid-cols-[260px_1fr]">
         <nav className="grid content-start gap-2">
           {options.map((option) => {
@@ -1867,8 +1948,31 @@ export function ModelProviderSettings({
         </nav>
         <form className="grid gap-4 rounded-md border border-slate-200 bg-white p-4" onSubmit={saveProvider}>
           <div>
-            <h2 className="font-medium">{selectedOption.displayName}</h2>
+            <div className="flex flex-wrap items-center gap-2">
+              <h2 className="font-medium">{selectedOption.displayName}</h2>
+              {selectedSetupGuideItem ? (
+                <span className={`rounded-md px-2 py-1 text-xs font-medium ${providerSetupStatusCopy[selectedSetupGuideItem.status].className}`}>
+                  {providerSetupStatusCopy[selectedSetupGuideItem.status].label}
+                </span>
+              ) : null}
+            </div>
             <p className="mt-1 text-sm text-slate-600">{selectedOption.note}</p>
+            {selectedSetupGuideItem ? (
+              <div className="mt-3 grid gap-2 rounded-md bg-slate-50 p-3 text-xs text-slate-600 md:grid-cols-3">
+                <div>
+                  <div className="font-medium text-slate-700">默认接口</div>
+                  <div className="mt-1 break-all">{selectedSetupGuideItem.defaultBaseUrl || "本地或演示模式"}</div>
+                </div>
+                <div>
+                  <div className="font-medium text-slate-700">推荐模型</div>
+                  <div className="mt-1">{selectedSetupGuideItem.recommendedModels.join(" / ") || selectedSetupGuideItem.defaultModel || "自定义模型"}</div>
+                </div>
+                <div>
+                  <div className="font-medium text-slate-700">写作预设</div>
+                  <div className="mt-1">{selectedSetupGuideItem.presetCount} 套</div>
+                </div>
+              </div>
+            ) : null}
           </div>
           {selectedPresets.length ? (
             <div className="grid gap-2">

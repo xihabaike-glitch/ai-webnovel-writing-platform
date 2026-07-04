@@ -5,6 +5,7 @@ import { buildFirstDayRouteSummary } from "@/lib/model-gateway/firstDayRouteSumm
 import { buildPresetRouteBlueprint } from "@/lib/model-gateway/presetRouteBlueprint";
 import { providerModelPresets, providerOptions } from "@/lib/model-gateway/providerDefaults";
 import { buildProviderHealthDashboard } from "@/lib/model-gateway/providerHealth";
+import { buildProviderSetupGuide } from "@/lib/model-gateway/providerSetupGuide";
 import { buildRouteEffectAudit } from "@/lib/model-gateway/routeEffectAudit";
 import {
   buildRouteConfirmationHistory,
@@ -230,6 +231,11 @@ export default async function ModelSettingsPage() {
     routeConfirmationRechecks,
     routeGovernanceEvidence,
   });
+  const providerSetupGuide = buildProviderSetupGuide({
+    options: providerOptions,
+    presets: providerModelPresets,
+    providers: maskedProviders,
+  });
   const presetRouteBlueprint = buildPresetRouteBlueprint(routeProviders, routes);
   const firstDayRouteSummary = buildFirstDayRouteSummary({
     providers: routeProviders,
@@ -250,6 +256,7 @@ export default async function ModelSettingsPage() {
         healthDashboard={healthDashboard}
         options={providerOptions}
         presets={providerModelPresets}
+        providerSetupGuide={providerSetupGuide}
         firstDayRouteSummary={firstDayRouteSummary}
         presetRouteBlueprint={presetRouteBlueprint}
         providers={maskedProviders}

@@ -670,19 +670,16 @@ function buildFirstThreeAdoptionClosure(projects: PrePublishGateProject[]): PreP
 }
 
 function buildFirstThreeAdoptionGateItem(closure: PrePublishGateAdoptionClosure) {
-  const firstAction = closure.items.find((item) => item.status === "block")
-    ?? closure.items.find((item) => item.status === "warn")
-    ?? null;
+  const firstAction = closure.repairQueue[0] ?? null;
+  const repairDetail = firstAction
+    ? `${closure.detail} 下一条：${firstAction.projectTitle} · ${firstAction.title} · ${firstAction.detail}`
+    : closure.detail;
   return gateItem({
     id: "first-three-adoption-loop",
     label: "采纳闭环",
     status: closure.status,
-    detail: closure.detail,
-    actionLabel: closure.pending > 0
-      ? firstAction?.actionLabel ?? "处理采纳后续"
-      : closure.missingEvidence > 0
-        ? "补验收证据"
-        : "查看闭环",
+    detail: repairDetail,
+    actionLabel: firstAction?.actionLabel ?? (closure.missingEvidence > 0 ? "补验收证据" : "查看闭环"),
     href: firstAction?.href ?? "/projects",
   });
 }

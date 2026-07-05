@@ -203,6 +203,8 @@ test("buildPrePublishGate", async (t) => {
     assert.equal(gate.firstThreeAdoptionClosure.timelines[0].nextActionLabel, "重新审稿");
     assert.equal(adoptionItem?.status, "block");
     assert.ok(adoptionItem?.detail.includes("正文变更后不能沿用旧审稿"));
+    assert.ok(adoptionItem?.detail.includes("下一条：夜雨系统 · 第 1 章采纳后重新审稿"));
+    assert.equal(adoptionItem?.href, "/projects/project-ready/chapters/chapter-1#chapter-workflow");
     assert.ok(gate.priorityActions.some((action) => action.id.includes(":review") && action.label === "重新审稿"));
     assert.equal(gate.priorityActions[0].id, "adoption-followup:first-three-adoption:project-ready:chapter-1:revision-1:review");
     assert.equal(gate.releaseAction?.label, "先解除阻塞：重新审稿");
@@ -242,6 +244,36 @@ test("buildPrePublishGate", async (t) => {
     assert.equal(adoptionItem?.status, "pass");
     assert.ok(adoptionItem?.detail.includes("已验收 2 个采纳后续任务"));
     assert.ok(gate.items.every((item) => item.status === "pass"));
+  });
+
+  await t.test("surfaces missing adoption evidence as the next gate repair", () => {
+    const gate = buildPrePublishGate({
+      projects: [{
+        ...readyProject,
+        gateDispatchTasks: [
+          ...firstDayCompleteDispatches("project-ready"),
+          {
+            dispatchKey: "first-three-adoption:project-ready:chapter-1:revision-1:review",
+            state: "completed",
+            completionEvidence: "",
+            title: "第 1 章采纳后重新审稿",
+            detail: "采纳后的新正文需要重新审稿。",
+            actionLabel: "重新审稿",
+            href: "/projects/project-ready/chapters/chapter-1#chapter-workflow",
+          },
+        ],
+      }],
+      failureTasks: [],
+      batchHistory: [],
+    });
+    const adoptionItem = gate.items.find((item) => item.id === "first-three-adoption-loop");
+
+    assert.equal(gate.status, "needs_repair");
+    assert.equal(gate.firstThreeAdoptionClosure.status, "warn");
+    assert.equal(gate.firstThreeAdoptionClosure.repairQueue[0].actionLabel, "补验收证据");
+    assert.equal(adoptionItem?.actionLabel, "补验收证据");
+    assert.ok(adoptionItem?.detail.includes("下一条：夜雨系统 · 第 1 章采纳后重新审稿"));
+    assert.ok(adoptionItem?.detail.includes("验收证据不足"));
   });
 
   await t.test("blocks launch when publish package and failed tasks are unresolved", () => {

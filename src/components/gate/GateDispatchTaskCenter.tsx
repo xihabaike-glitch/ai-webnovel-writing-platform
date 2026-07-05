@@ -285,6 +285,9 @@ export function GateDispatchTaskCenter({
           for (const startMetricTask of updated.startMetricAutoDispatch?.createdDispatches ?? []) {
             nextByKey.set(startMetricTask.dispatchKey, startMetricTask);
           }
+          for (const startMetricFollowup of updated.startMetricFollowupAutoDispatch?.createdDispatches ?? []) {
+            nextByKey.set(startMetricFollowup.dispatchKey, startMetricFollowup);
+          }
           return Array.from(nextByKey.values());
         });
         const recheckMessage = evidenceLoopRecheckMessage(updated);
@@ -296,6 +299,10 @@ export function GateDispatchTaskCenter({
         const startMetricMessage = startMetricTasks.length
           ? `已自动生成首轮数据后的二轮任务：${startMetricTasks.map((item) => item.title).join("、")}`
           : "";
+        const startMetricFollowups = updated.startMetricFollowupAutoDispatch?.createdDispatches ?? [];
+        const startMetricFollowupMessage = startMetricFollowups.length
+          ? `已自动生成二轮任务后的回流派单：${startMetricFollowups.map((item) => item.title).join("、")}`
+          : "";
         const firstDayUpdate = buildFirstDayDispatchUpdateSummary(updated);
         if (firstDayUpdate.visible) {
           setRouteActionMessage(`${firstDayUpdate.title}：${firstDayUpdate.detail} 下一步：${firstDayUpdate.actionLabel}。`);
@@ -303,6 +310,9 @@ export function GateDispatchTaskCenter({
           router.refresh();
         } else if (startMetricMessage) {
           setRouteActionMessage(`${startMetricMessage}${submissionEffectMessage ? `；${submissionEffectMessage}` : ""}`);
+          setRouteActionLink({ label: "回总闸门复查", href: "/gate" });
+        } else if (startMetricFollowupMessage) {
+          setRouteActionMessage(startMetricFollowupMessage);
           setRouteActionLink({ label: "回总闸门复查", href: "/gate" });
         } else if (updated.followUpTasks.length) {
           setRouteActionMessage(`已自动生成治理后复检派单：${updated.followUpTasks.map((item) => item.title).join("、")}${recheckMessage ? `；${recheckMessage}` : ""}${storyTreeMessage ? `；${storyTreeMessage}` : ""}${submissionEffectMessage ? `；${submissionEffectMessage}` : ""}`);

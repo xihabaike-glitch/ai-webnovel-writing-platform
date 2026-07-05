@@ -2,6 +2,7 @@ import { prisma } from "../db/prisma.ts";
 import {
   buildGateProjectStartMetricDecision,
   buildGateProjectStartMetricDispatchItems,
+  buildGateProjectStartMetricFollowupDispatchItems,
   gateActionReceiptFromAuditRecord,
   type GateProjectStartMetricDecision,
   type PersistedGatePlatformDispatchTask,
@@ -11,6 +12,11 @@ import { persistServerGateDispatchTask } from "./gateDispatchTaskPersistence.ts"
 
 export interface StartMetricAutoDispatchResult {
   decision: GateProjectStartMetricDecision;
+  createdDispatches: PersistedGatePlatformDispatchTask[];
+  skippedDispatches: PersistedGatePlatformDispatchTask[];
+}
+
+export interface StartMetricFollowupAutoDispatchResult {
   createdDispatches: PersistedGatePlatformDispatchTask[];
   skippedDispatches: PersistedGatePlatformDispatchTask[];
 }
@@ -56,6 +62,41 @@ export async function autoDispatchStartMetricDecision(input: {
 
   return {
     decision,
+    createdDispatches,
+    skippedDispatches,
+  };
+}
+
+export async function autoDispatchStartMetricFollowups(input: {
+  projectId: string;
+  platformId?: string | null;
+}): Promise<StartMetricFollowupAutoDispatchResult> {
+  const taskRecords = await prisma.gateDispatchTask.findMany({
+    where: {
+      projectId: input.projectId,
+      ...(input.platformId ? { platformId: input.platformId } : {}),
+    },
+    orderBy: { updatedAt: "desc" },
+  });
+  const persistedTasks = taskRecords.map(gatePlatformDispatchTaskFromRecord);
+  const existingKeys = new Set(persistedTasks.map((task) => task.dispatchKey));
+  const persistedByKey = new Map(persistedTasks.map((task) => [task.dispatchKey, task]));
+  const followups = buildGateProjectStartMetricFollowupDispatchItems(persistedTasks, persistedTasks);
+  const createdDispatches: PersistedGatePlatformDispatchTask[] = [];
+  const skippedDispatches: PersistedGatePlatformDispatchTask[] = [];
+
+  for (const dispatch of followups) {
+    if (existingKeys.has(dispatch.id)) {
+      const persisted = persistedByKey.get(dispatch.id);
+      if (persisted) skippedDispatches.push(persisted);
+      continue;
+    }
+    const assignedDispatch = { ...dispatch, state: "assigned" as const };
+    const persisted = await persistServerGateDispatchTask(assignedDispatch);
+    createdDispatches.push(persisted);
+  }
+
+  return {
     createdDispatches,
     skippedDispatches,
   };

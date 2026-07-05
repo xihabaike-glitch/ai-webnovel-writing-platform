@@ -6853,6 +6853,10 @@ export async function updatePersistedGateDispatchTaskState(
       createdDispatches: PersistedGatePlatformDispatchTask[];
       skippedDispatches: PersistedGatePlatformDispatchTask[];
     } | null;
+    startMetricFollowupAutoDispatch?: {
+      createdDispatches: PersistedGatePlatformDispatchTask[];
+      skippedDispatches: PersistedGatePlatformDispatchTask[];
+    } | null;
     knowledgeFeedbackReceipt?: GateKnowledgeFeedbackReceipt | null;
     dispatchCompletionReceipt?: GateActionReceipt | null;
     submissionEffectReview?: GateSubmissionCompletionEffectReview | null;
@@ -6865,6 +6869,7 @@ export async function updatePersistedGateDispatchTaskState(
     task: payload.task,
     followUpTasks: payload.followUpTasks ?? [],
     startMetricAutoDispatch: payload.startMetricAutoDispatch ?? null,
+    startMetricFollowupAutoDispatch: payload.startMetricFollowupAutoDispatch ?? null,
     knowledgeFeedbackReceipt: payload.knowledgeFeedbackReceipt ?? null,
     dispatchCompletionReceipt: payload.dispatchCompletionReceipt ?? null,
     submissionEffectReview: payload.submissionEffectReview ?? null,

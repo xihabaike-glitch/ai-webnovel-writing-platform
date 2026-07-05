@@ -133,6 +133,10 @@ export function GateFirstThreeAdoptionPanel({ closure }: { closure: PrePublishGa
   const reviewBatchItems = runnableReviewItems(closure.items);
   const publishBatchItems = runnablePublishItems(closure.items);
   const visibleRepairQueue = closure.repairQueue.slice(0, 4);
+  const primaryRepairItem = closure.repairQueue
+    .map((item) => itemsById.get(item.followupItemId) ?? null)
+    .find((item): item is PrePublishGateAdoptionFollowupItem => Boolean(item && executeLabel(item))) ?? null;
+  const primaryRepairLabel = primaryRepairItem ? executeLabel(primaryRepairItem) : null;
 
   useEffect(() => {
     setFollowupResults((current) => {
@@ -311,6 +315,16 @@ export function GateFirstThreeAdoptionPanel({ closure }: { closure: PrePublishGa
       </div>
       {reviewBatchItems.length || publishBatchItems.length ? (
         <div className="mt-3 flex flex-wrap items-center gap-2">
+          {primaryRepairItem && primaryRepairLabel ? (
+            <button
+              className="rounded-md bg-rose-700 px-3 py-2 text-xs font-medium text-white disabled:opacity-50"
+              disabled={runningId !== null}
+              onClick={() => void runFollowup(primaryRepairItem)}
+              type="button"
+            >
+              {runningId === primaryRepairItem.id ? "修复中" : `优先修复：${primaryRepairLabel}`}
+            </button>
+          ) : null}
           {reviewBatchItems.length ? (
             <button
               className="rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white disabled:opacity-50"

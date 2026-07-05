@@ -107,6 +107,31 @@ export function ExportVersionCenterPanel({
       </section>
 
       <section className="rounded-md border border-slate-200 bg-white p-4">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <h2 className="font-medium">推荐基准</h2>
+            {summary.baselineCandidate ? (
+              <div className="mt-2 text-sm text-slate-600">
+                <div className="font-medium text-slate-950">{summary.baselineCandidate.label}</div>
+                <div className="mt-1">{summary.baselineCandidate.fileName}</div>
+                <div className="mt-1">
+                  {timeText(summary.baselineCandidate.createdAt)} · 准备度 {summary.baselineCandidate.readinessPercent}%
+                </div>
+                <p className="mt-2 leading-6">{summary.baselineCandidate.reason}</p>
+              </div>
+            ) : (
+              <p className="mt-2 text-sm leading-6 text-slate-600">
+                暂无可锁定基准。先把完整资料包做到可交付，再把它作为后续版本对比、发布归档和回滚策略的锚点。
+              </p>
+            )}
+          </div>
+          <Link className="rounded-md border border-slate-200 px-3 py-2 text-sm font-medium hover:bg-slate-50" href={`${projectHref}#create-chapter`}>
+            回到写作
+          </Link>
+        </div>
+      </section>
+
+      <section className="rounded-md border border-slate-200 bg-white p-4">
         <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="font-medium">交付物覆盖</h2>
@@ -117,7 +142,12 @@ export function ExportVersionCenterPanel({
         <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-4">
           {summary.targets.map((target) => (
             <div className={`rounded-md border p-3 text-sm ${statusClass(target.status)}`} key={target.id}>
-              <div className="font-medium">{target.label}</div>
+              <div className="flex items-center justify-between gap-2">
+                <div className="font-medium">{target.label}</div>
+                {target.isBaselineCandidate ? (
+                  <span className="rounded-md bg-slate-950 px-2 py-1 text-xs font-medium text-white">基准</span>
+                ) : null}
+              </div>
               <div className="mt-1 opacity-80">{target.statusLabel} · {target.readinessPercent}% · {target.fileSizeLabel}</div>
               <div className="mt-1 text-xs opacity-70">{timeText(target.latestCreatedAt)}</div>
             </div>
@@ -155,7 +185,12 @@ export function ExportVersionCenterPanel({
             <div className="rounded-md border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600" key={snapshot.id}>
               <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
                 <div>
-                  <div className="font-medium text-slate-950">{snapshot.packageKindLabel} · {snapshot.formatLabel}</div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <div className="font-medium text-slate-950">{snapshot.packageKindLabel} · {snapshot.formatLabel}</div>
+                    {snapshot.id === summary.baselineCandidate?.snapshotId ? (
+                      <span className="rounded-md bg-slate-950 px-2 py-1 text-xs font-medium text-white">推荐基准</span>
+                    ) : null}
+                  </div>
                   <div className="mt-1">{snapshot.fileName}</div>
                 </div>
                 <div className="text-xs text-slate-500">{timeText(snapshot.createdAt)}</div>
@@ -219,4 +254,3 @@ export function ExportVersionCenterPanel({
     </div>
   );
 }
-

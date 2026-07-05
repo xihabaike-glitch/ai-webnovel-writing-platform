@@ -44,6 +44,8 @@ describe("export version center", () => {
     assert.equal(center.targetCoveragePercent, 38);
     assert.equal(center.readySnapshots, 2);
     assert.equal(center.averageReadinessPercent, 83);
+    assert.equal(center.baselineCandidate?.snapshotId, "full-md");
+    assert.equal(center.targets.find((target) => target.id === "full:markdown")?.isBaselineCandidate, true);
     assert.equal(center.nextAction.targetId, "outline:docx");
     assert.match(center.nextAction.label, /补齐/);
   });
@@ -65,5 +67,26 @@ describe("export version center", () => {
     assert.match(center.nextAction.label, /重导/);
     assert.equal(center.targets.find((target) => target.id === "chapters_zip:zip")?.statusLabel, "不建议交付");
   });
-});
 
+  it("prefers a ready full word package as the baseline candidate", () => {
+    const center = buildExportVersionCenter([
+      snapshot({ id: "outline-md", packageKind: "outline", format: "markdown", readinessPercent: 100, createdAt: "2026-07-05T03:00:00.000Z" }),
+      snapshot({ id: "full-md", packageKind: "full", format: "markdown", readinessPercent: 90, createdAt: "2026-07-05T02:00:00.000Z" }),
+      snapshot({ id: "full-docx", packageKind: "full", format: "docx", readinessPercent: 88, createdAt: "2026-07-05T01:00:00.000Z" }),
+    ]);
+
+    assert.equal(center.baselineCandidate?.snapshotId, "full-docx");
+    assert.equal(center.baselineCandidate?.targetId, "full:docx");
+    assert.match(center.baselineCandidate?.reason ?? "", /正式交付基准/);
+  });
+
+  it("keeps baseline empty when no snapshot is ready", () => {
+    const center = buildExportVersionCenter([
+      snapshot({ id: "full-md", packageKind: "full", format: "markdown", readinessStatus: "warning", readinessPercent: 70, createdAt: "2026-07-05T02:00:00.000Z" }),
+      snapshot({ id: "outline-md", packageKind: "outline", format: "markdown", readinessStatus: "blocked", readinessPercent: 40, createdAt: "2026-07-05T01:00:00.000Z" }),
+    ]);
+
+    assert.equal(center.baselineCandidate, null);
+    assert.equal(center.targets.some((target) => target.isBaselineCandidate), false);
+  });
+});

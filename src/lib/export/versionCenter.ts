@@ -11,6 +11,17 @@ export interface ExportVersionTarget {
   status: "ready" | "warning" | "blocked" | "missing";
   statusLabel: string;
   fileSizeLabel: string;
+  isBaselineCandidate: boolean;
+}
+
+export interface ExportBaselineCandidate {
+  snapshotId: string;
+  targetId: string;
+  label: string;
+  fileName: string;
+  createdAt: string | Date;
+  readinessPercent: number;
+  reason: string;
 }
 
 export interface ExportVersionCenterSummary {
@@ -23,6 +34,7 @@ export interface ExportVersionCenterSummary {
   averageReadinessPercent: number;
   changedSincePreviousCount: number;
   latestSnapshot: ExportPackageSnapshotView | null;
+  baselineCandidate: ExportBaselineCandidate | null;
   targets: ExportVersionTarget[];
   nextAction: {
     label: string;
@@ -57,9 +69,34 @@ function buildTargetId(packageKind: string, format: string) {
   return `${packageKind}:${format}`;
 }
 
+function pickBaselineCandidate(orderedSnapshots: ExportPackageSnapshotView[]): ExportBaselineCandidate | null {
+  const readySnapshots = orderedSnapshots.filter((snapshot) => snapshot.readinessStatus === "ready");
+  const candidate =
+    readySnapshots.find((snapshot) => snapshot.packageKind === "full" && snapshot.format === "docx")
+    ?? readySnapshots.find((snapshot) => snapshot.packageKind === "full" && snapshot.format === "markdown")
+    ?? readySnapshots[0]
+    ?? null;
+
+  if (!candidate) return null;
+
+  const isPreferred = candidate.packageKind === "full" && (candidate.format === "docx" || candidate.format === "markdown");
+  return {
+    snapshotId: candidate.id,
+    targetId: buildTargetId(candidate.packageKind, candidate.format),
+    label: `${candidate.packageKindLabel} · ${candidate.formatLabel}`,
+    fileName: candidate.fileName,
+    createdAt: candidate.createdAt,
+    readinessPercent: candidate.readinessPercent,
+    reason: isPreferred
+      ? "优先选择完整资料包作为正式交付基准，后续版本对比和发布归档都应围绕它展开。"
+      : "暂时没有可交付的完整资料包，先把最新可交付快照作为临时基准候选。",
+  };
+}
+
 export function buildExportVersionCenter(snapshots: ExportPackageSnapshotView[]): ExportVersionCenterSummary {
   const orderedSnapshots = [...snapshots].sort((a, b) => snapshotTime(b) - snapshotTime(a));
   const latestSnapshot = orderedSnapshots[0] ?? null;
+  const baselineCandidate = pickBaselineCandidate(orderedSnapshots);
   const targets = targetMatrix.map((target) => {
     const latest = orderedSnapshots.find((snapshot) => snapshot.packageKind === target.packageKind && snapshot.format === target.format) ?? null;
     const status = latest ? latest.readinessStatus as ExportVersionTarget["status"] : "missing";
@@ -72,6 +109,7 @@ export function buildExportVersionCenter(snapshots: ExportPackageSnapshotView[])
       status,
       statusLabel: readinessStatusLabel(status),
       fileSizeLabel: latest?.fileSizeLabel ?? "0 B",
+      isBaselineCandidate: Boolean(latest && baselineCandidate && latest.id === baselineCandidate.snapshotId),
     };
   });
   const coveredTargets = targets.filter((target) => target.latestSnapshotId).length;
@@ -91,6 +129,7 @@ export function buildExportVersionCenter(snapshots: ExportPackageSnapshotView[])
     averageReadinessPercent,
     changedSincePreviousCount: orderedSnapshots.filter((snapshot) => snapshot.comparison?.contentChanged).length,
     latestSnapshot,
+    baselineCandidate,
     targets,
     nextAction: missingTarget ? {
       label: `补齐 ${missingTarget.label}`,
@@ -100,11 +139,14 @@ export function buildExportVersionCenter(snapshots: ExportPackageSnapshotView[])
       label: `重导 ${weakTarget.label}`,
       detail: "覆盖齐了不等于能交付。先处理准备度偏低的包，再对外发。",
       targetId: weakTarget.id,
+    } : baselineCandidate ? {
+      label: "锁定推荐基准",
+      detail: `${baselineCandidate.label} 已满足交付口径，可以作为后续版本对比和发布归档的基准。`,
+      targetId: baselineCandidate.targetId,
     } : {
-      label: "版本库覆盖完整",
-      detail: "核心交付包都已有记录，下一步可以锁定基准或做平台发布包。",
+      label: "先生成可交付版本",
+      detail: "版本库已有记录，但还没有可交付快照，先处理准备度再谈基准。",
       targetId: null,
     },
   };
 }
-

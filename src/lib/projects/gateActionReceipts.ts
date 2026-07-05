@@ -25,6 +25,10 @@ export interface GateActionReceiptPayload {
   message?: string;
   error?: string;
   firstThreeAdoptionClosure?: GateFirstThreeAdoptionClosureSummary;
+  aiPipelineRecheck?: {
+    dispatchKey?: string;
+    mode?: "sample_recheck" | "small_batch_resume";
+  };
   plan?: {
     strategyBases?: GateActionReceiptStartTactic[];
     scaleGate?: string;
@@ -1065,7 +1069,12 @@ function batchScaleGate(value: unknown): GateActionReceiptBatchContext["scaleGat
 }
 
 function batchContextFromPayload(payload: GateActionReceiptPayload): GateActionReceiptBatchContext | null {
-  const scaleGate = batchScaleGate(payload.plan?.scaleGate);
+  const recheckMode = payload.aiPipelineRecheck?.mode;
+  const scaleGate = recheckMode === "small_batch_resume"
+    ? "cleared"
+    : recheckMode === "sample_recheck"
+      ? "sample_only"
+      : batchScaleGate(payload.plan?.scaleGate);
   const actionLabel = payload.plan?.actionLabel ?? "";
   const category = typeof payload.plan?.category === "string" ? payload.plan.category : null;
   const receiptHeadline = payload.batchReceipt?.headline ?? "";

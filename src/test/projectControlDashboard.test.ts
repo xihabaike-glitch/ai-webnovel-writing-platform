@@ -559,6 +559,58 @@ test("buildProjectControlDashboard", async (t) => {
     assert.ok(dashboard.aiPipelineBatchHealth.detail.includes("小步验证"));
   });
 
+  await t.test("surfaces AI small-batch recovery as batch health evidence", () => {
+    const tactic = {
+      title: "首轮平台打法：番茄小说",
+      label: "三轮稳住",
+      primaryTactic: "三轮数据已站住，可以小批放大。",
+      openingMove: "第一段给不可逆危机。",
+      verificationMove: "继续回填曝光、点击、收藏和追读。",
+      risk: "稳定加码不是无限放量。",
+    };
+    const dashboard = buildProjectControlDashboard({
+      project,
+      platform: getPlatformProfile("fanqie"),
+      chapters: [chapter],
+      outlineNodes: [],
+      characters: [],
+      worldEntries: [],
+      foreshadows: [],
+      plotThreads: [],
+      aiTasks: [],
+      gateActionAudits: [
+        {
+          receiptId: "ai-scale-1",
+          label: "AI 写审改小批恢复完成",
+          detail: "番茄小说 · 夜雨系统 · 批量初稿 3 个",
+          href: "/projects/demo-project#ai-pipeline",
+          status: "succeeded",
+          message: "AI 小批恢复完成。",
+          executionType: "recommended_batch",
+          succeededCount: 3,
+          failedCount: 0,
+          payload: JSON.stringify({
+            aiPipelineRecheck: {
+              dispatchKey: "ai-pipeline-recheck:demo-project:ai-plan-1:scale",
+              mode: "small_batch_resume",
+            },
+            plan: { strategyBases: [tactic], scaleGate: "none", actionLabel: "批量初稿 3 个", category: "draft" },
+            routeEffectSummary: { successRatePercent: 100, knownCostUsd: 0.03, averageQualityScore: 91 },
+            batchReceipt: { status: "continue", headline: "AI 小批恢复完成" },
+          }),
+          createdAt: "2026-01-04T00:00:00.000Z",
+        },
+      ],
+      submissionChecklist: checklist,
+    });
+
+    assert.equal(dashboard.aiPipelineBatchHealth.hasSamples, true);
+    assert.equal(dashboard.aiPipelineBatchHealth.sampleBatches, 1);
+    assert.equal(dashboard.aiPipelineBatchHealth.tacticLabel, "恢复放量观察");
+    assert.ok(dashboard.aiPipelineBatchHealth.evidence[0]?.includes("恢复放量"));
+    assert.ok(dashboard.aiPipelineBatchHealth.detail.includes("恢复放量样本还薄"));
+  });
+
   await t.test("uses blocked batch health to reprioritize AI pipeline repair", () => {
     const dashboard = buildProjectControlDashboard({
       project,

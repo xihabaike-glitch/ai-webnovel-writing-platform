@@ -11,6 +11,7 @@ function audit(input: {
   quality: number;
   createdAt: string;
   scaleGate?: "none" | "sample_only" | "cleared";
+  aiPipelineRecheckMode?: "sample_recheck" | "small_batch_resume";
 }): GateActionAuditRecord {
   const platformName = input.platformName ?? "番茄小说";
   return {
@@ -45,6 +46,10 @@ function audit(input: {
         actionLabel: "批量初稿 2 个",
         category: "draft",
       },
+      aiPipelineRecheck: input.aiPipelineRecheckMode ? {
+        dispatchKey: `ai-pipeline-recheck:project-1:${input.receiptId}:scale`,
+        mode: input.aiPipelineRecheckMode,
+      } : undefined,
       routeEffectSummary: {
         successRatePercent: 100,
         knownCostUsd: 0.02,
@@ -118,4 +123,22 @@ test("buildTaskQueueBatchHealthReview promotes repeated stable batches but not d
   assert.equal(stable?.label, "三轮稳住打法");
   assert.equal(downgrade?.status, "watch");
   assert.equal(downgrade?.label, "三轮降档观察");
+});
+
+test("buildTaskQueueBatchHealthReview treats AI small-batch recheck as recovery evidence", () => {
+  const review = buildTaskQueueBatchHealthReview([
+    audit({
+      receiptId: "ai-scale-1",
+      label: "AI 写审改小批恢复完成",
+      tacticLabel: "三轮稳住",
+      quality: 90,
+      aiPipelineRecheckMode: "small_batch_resume",
+      createdAt: "2026-01-03T00:00:00.000Z",
+    }),
+  ]);
+
+  assert.equal(review.items[0]?.recoveryBatches, 1);
+  assert.equal(review.items[0]?.label, "恢复放量观察");
+  assert.ok(review.items[0]?.evidence[0]?.includes("恢复放量"));
+  assert.ok(review.items[0]?.nextAction.includes("恢复放量样本还薄"));
 });

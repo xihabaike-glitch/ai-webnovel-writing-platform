@@ -10,7 +10,7 @@ import { buildBatchExecutionSafety } from "@/lib/projects/batchExecutionSafety";
 import { buildBatchStrategyComparison, buildBatchStrategyDecision } from "@/lib/projects/batchStrategyComparison";
 import { batchExecutionStrategies, getBatchExecutionStrategy } from "@/lib/projects/batchExecutionStrategy";
 import { buildRecommendedBatchModelRouteGate } from "@/lib/projects/recommendedBatchModelRouteGate";
-import { buildTaskQueueCenter, recommendedQueueActionLabel, type QueueItem } from "@/lib/projects/taskQueueCenter";
+import { buildTaskQueueCenter, recommendedQueueActionLabel, type QueueItem, type TaskQueueProject } from "@/lib/projects/taskQueueCenter";
 import { buildTaskQueueExecutionPlan } from "@/lib/projects/taskQueueExecutionPlan";
 
 export const dynamic = "force-dynamic";
@@ -20,6 +20,7 @@ function categoryClass(category: QueueItem["category"]) {
   if (category === "review") return "bg-blue-50 text-blue-700";
   if (category === "second_pass") return "bg-amber-50 text-amber-700";
   if (category === "draft") return "bg-emerald-50 text-emerald-700";
+  if (category === "effect") return "bg-cyan-50 text-cyan-700";
   if (category === "export") return "bg-slate-100 text-slate-700";
   return "bg-rose-50 text-rose-700";
 }
@@ -70,6 +71,32 @@ function runtimeLabel(ms: number) {
   const seconds = Math.round(ms / 1000);
   if (seconds < 60) return `${seconds}s`;
   return `${Math.round(seconds / 60)}m`;
+}
+
+function parseTaskQueueTags(value: string | string[] | null | undefined) {
+  if (Array.isArray(value)) return value;
+  return (value ?? "")
+    .split(/[、,，\s]+/u)
+    .map((tag) => tag.trim())
+    .filter(Boolean);
+}
+
+function normalizeTaskQueueProjects<T extends {
+  submissionAssets?: Array<{ tags: string | string[] | null }>;
+  submissionAssetVersions?: Array<{ tags: string | string[] | null; auditStatus: string }>;
+}>(projects: T[]): TaskQueueProject[] {
+  return projects.map((project) => ({
+    ...project,
+    submissionAssets: project.submissionAssets?.map((asset) => ({
+      ...asset,
+      tags: parseTaskQueueTags(asset.tags),
+    })) ?? [],
+    submissionAssetVersions: project.submissionAssetVersions?.map((version) => ({
+      ...version,
+      tags: parseTaskQueueTags(version.tags),
+      auditStatus: version.auditStatus === "ready" || version.auditStatus === "blocked" ? version.auditStatus : "needs_work",
+    })) ?? [],
+  })) as unknown as TaskQueueProject[];
 }
 
 function logMeta(log: TaskRunLog) {
@@ -141,6 +168,10 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
           },
         },
         worldEntries: { orderBy: [{ type: "asc" }, { createdAt: "asc" }] },
+        publishSnapshots: { orderBy: { createdAt: "desc" }, take: 80 },
+        submissionAssets: { orderBy: { updatedAt: "desc" } },
+        submissionAssetVersions: { orderBy: { createdAt: "desc" }, take: 80 },
+        platformPublishMetrics: { orderBy: { snapshotDate: "desc" }, take: 80 },
         gateDispatchTasks: {
           where: { dispatchKey: { startsWith: "first-day:" } },
           select: {
@@ -198,8 +229,17 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
     }),
   ]);
   const chaptersById = new Map(chapters.map((chapter) => [chapter.id, chapter]));
-  const queue = buildTaskQueueCenter(projects);
-  const safety = buildBatchExecutionSafety(queue.items, projects, activeStrategy);
+  const taskQueueProjects = normalizeTaskQueueProjects(projects);
+  const safetyProjects = projects.map((project) => ({
+    aiTasks: project.aiTasks.map((task) => ({
+      status: task.status,
+      inputTokens: task.inputTokens ?? null,
+      outputTokens: task.outputTokens ?? null,
+      costUsd: task.costUsd ?? null,
+    })),
+  }));
+  const queue = buildTaskQueueCenter(taskQueueProjects);
+  const safety = buildBatchExecutionSafety(queue.items, safetyProjects, activeStrategy);
   const executionPlan = buildTaskQueueExecutionPlan(queue.items, activeStrategy.maxBatchSize, activeStrategy);
   const runConsole = buildTaskRunConsole(recentAiTasks.map((task) => ({
     ...task,
@@ -209,7 +249,7 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
     ...task,
     chapter: task.chapterId ? chaptersById.get(task.chapterId) ?? null : null,
   })));
-  const strategyComparison = buildBatchStrategyComparison(queue.items, projects, batchHistory);
+  const strategyComparison = buildBatchStrategyComparison(queue.items, safetyProjects, batchHistory);
   const strategyDecision = buildBatchStrategyDecision(strategyComparison, activeStrategy.id);
   const unlockedDrafts = queue.items.filter((entry) => entry.category === "draft" && entry.scaleGate === "cleared");
   const modelRoutePreflightGate = executionPlan.canRun
@@ -258,6 +298,10 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
         <div className="rounded-md border border-slate-200 bg-white p-3">
           <div className="text-xs text-slate-500">待二改</div>
           <div className="mt-1 text-2xl font-semibold">{queue.overview.secondPassReady}</div>
+        </div>
+        <div className="rounded-md border border-slate-200 bg-white p-3">
+          <div className="text-xs text-slate-500">待复盘</div>
+          <div className="mt-1 text-2xl font-semibold">{queue.overview.effectReady}</div>
         </div>
         <div className="rounded-md border border-slate-200 bg-white p-3">
           <div className="text-xs text-slate-500">待导出</div>

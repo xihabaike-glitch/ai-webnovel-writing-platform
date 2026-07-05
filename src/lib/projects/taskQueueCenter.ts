@@ -3,7 +3,13 @@ import { buildReviewPipelineQueue } from "../ai/batchReviewPipeline.ts";
 import { getChapterRevisionSourceLabel, isChapterRevisionCandidate, previewRevisionContent } from "../chapters/revisions.ts";
 import { getPlatformProfile, type PlatformId } from "../platforms/platformProfiles.ts";
 import { buildFirstDayRiskProfile, type FirstDayRiskLevel } from "./firstDayWorkflow.ts";
-import { buildPlatformPublishExportCenter } from "./platformPublishExport.ts";
+import {
+  buildPlatformPublishExportCenter,
+  type PlatformPublishMetricInput,
+  type PlatformSubmissionAssetInput,
+  type PlatformSubmissionAssetVersionInput,
+  type PublishPackageVersionItem,
+} from "./platformPublishExport.ts";
 import { findProjectStartTacticSummary, type ProjectStartTacticEntryLike, type ProjectStartTacticSummary } from "./projectStartTactics.ts";
 
 export interface TaskQueueProject {
@@ -52,6 +58,10 @@ export interface TaskQueueProject {
     state: string;
     completionEvidence: string;
   }>;
+  publishSnapshots?: PublishPackageVersionItem[];
+  submissionAssets?: PlatformSubmissionAssetInput[];
+  submissionAssetVersions?: PlatformSubmissionAssetVersionInput[];
+  platformPublishMetrics?: PlatformPublishMetricInput[];
 }
 
 export type QueueScaleGate = "none" | "sample_only" | "cleared";
@@ -69,7 +79,7 @@ export interface QueueItem {
   projectId: string;
   projectTitle: string;
   platformName: string;
-  category: "candidate" | "draft" | "review" | "second_pass" | "export" | "blocked";
+  category: "candidate" | "draft" | "review" | "second_pass" | "effect" | "export" | "blocked";
   blockerType: "chapter_card" | "publish_repair" | "risk_recovery" | "watch_scale_gate" | "first_day_gate" | null;
   label: string;
   chapterTitle: string;
@@ -92,6 +102,7 @@ export interface TaskQueueCenter {
     draftReady: number;
     reviewReady: number;
     secondPassReady: number;
+    effectReady: number;
     exportReady: number;
     blockedCards: number;
     firstDayBlocked: number;
@@ -112,6 +123,7 @@ const categoryPriority: Record<QueueItem["category"], number> = {
   review: 10,
   second_pass: 20,
   draft: 30,
+  effect: 35,
   export: 40,
   blocked: 90,
 };
@@ -136,6 +148,7 @@ function categoryLabel(category: QueueItem["category"]) {
     draft: "待生成",
     review: "待审稿",
     second_pass: "待二改",
+    effect: "待复盘",
     export: "待导出",
     blocked: "卡住",
   };
@@ -262,6 +275,12 @@ function isAutomatedQueueItem(entry: QueueItem) {
   return entry.category === "draft" || entry.category === "review" || entry.category === "second_pass";
 }
 
+function effectActionLabel(execution: string) {
+  if (execution === "generate_asset_variants") return "生成候选";
+  if (execution === "rewrite_first_three") return "重写前三章";
+  return "去复盘";
+}
+
 export function buildTaskQueueCenter(projects: TaskQueueProject[]): TaskQueueCenter {
   const items = projects.flatMap((project) => {
     const platform = getPlatformProfile(project.targetPlatform as PlatformId);
@@ -311,6 +330,10 @@ export function buildTaskQueueCenter(projects: TaskQueueProject[]): TaskQueueCen
           createdAt: revision.createdAt,
         }))
       )),
+      publishSnapshots: project.publishSnapshots ?? [],
+      submissionAssets: project.submissionAssets ?? [],
+      submissionAssetVersions: project.submissionAssetVersions ?? [],
+      platformPublishMetrics: project.platformPublishMetrics ?? [],
     });
     const queueItems: QueueItem[] = [];
 
@@ -477,6 +500,44 @@ export function buildTaskQueueCenter(projects: TaskQueueProject[]): TaskQueueCen
     }
 
     const targetPackage = exportCenter.packages.find((pack) => pack.platformId === platform.id) ?? exportCenter.packages[0];
+    const primaryEffectAction = targetPackage.effectOptimization.actions[0] ?? null;
+
+    if (firstDayGateCleared && targetPackage.canExport && targetPackage.publishVersions.length > 0 && targetPackage.publishEffect.records === 0) {
+      queueItems.push(item({
+        id: `${project.id}:effect:${platform.id}:collect`,
+        projectId: project.id,
+        projectTitle: project.title,
+        platformName: platform.name,
+        category: "effect",
+        chapterTitle: `${targetPackage.platformName} 发布效果`,
+        evidence: "发布包已经保存过基准，但还没有录入曝光、点击、收藏、追读、评论、付费阅读或编辑反馈。",
+        strategyBasis: startTactic,
+        riskLevel: riskProfile.level,
+        riskLabel: riskProfile.label,
+        riskNotice,
+        scaleGate,
+        actionLabel: "录入发布效果",
+        href: `${projectHref}#publish-effect-panel`,
+      }));
+    } else if (firstDayGateCleared && targetPackage.canExport && targetPackage.publishEffect.records > 0 && primaryEffectAction) {
+      queueItems.push(item({
+        id: `${project.id}:effect:${platform.id}:${primaryEffectAction.id}`,
+        projectId: project.id,
+        projectTitle: project.title,
+        platformName: platform.name,
+        category: "effect",
+        chapterTitle: primaryEffectAction.target,
+        evidence: `${targetPackage.publishEffect.verdict} ${primaryEffectAction.evidence}`,
+        strategyBasis: startTactic,
+        riskLevel: riskProfile.level,
+        riskLabel: riskProfile.label,
+        riskNotice,
+        scaleGate,
+        actionLabel: effectActionLabel(primaryEffectAction.execution),
+        href: `${projectHref}${primaryEffectAction.href}`,
+      }));
+    }
+
     if (firstDayGateCleared && exportCenter.totalPublishableChapters > 0 && targetPackage.canExport) {
       queueItems.push(item({
         id: `${project.id}:export:${platform.id}`,
@@ -549,6 +610,7 @@ export function buildTaskQueueCenter(projects: TaskQueueProject[]): TaskQueueCen
       draftReady: items.filter((entry) => entry.category === "draft").length,
       reviewReady: items.filter((entry) => entry.category === "review").length,
       secondPassReady: items.filter((entry) => entry.category === "second_pass").length,
+      effectReady: items.filter((entry) => entry.category === "effect").length,
       exportReady: items.filter((entry) => entry.category === "export").length,
       blockedCards: items.filter((entry) => entry.category === "blocked").length,
       firstDayBlocked: items.filter((entry) => entry.blockerType === "first_day_gate").length,

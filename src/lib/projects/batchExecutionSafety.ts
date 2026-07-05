@@ -34,6 +34,7 @@ const estimatedTokensByCategory: Record<QueueItem["category"], number> = {
   draft: 3200,
   review: 1800,
   second_pass: 4200,
+  effect: 0,
   export: 0,
   blocked: 0,
 };

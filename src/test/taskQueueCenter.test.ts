@@ -80,6 +80,46 @@ function firstDayCompleteDispatches(projectId: string) {
   }];
 }
 
+function publishReadyProject(overrides: Partial<TaskQueueProject> = {}): TaskQueueProject {
+  const chapters = [1, 2, 3].map((order) => ({
+    ...baseChapter,
+    id: `ready-chapter-${order}`,
+    order,
+    title: `第${order}章 强钩子`,
+    content: "主角开局被逼到绝境，系统倒计时不断压迫，他用连续选择完成反杀并留下章末悬念。",
+    wordCount: 2200,
+    status: "reviewed",
+  }));
+  return {
+    ...project,
+    chapters,
+    aiTasks: chapters.map((chapter) => ({
+      id: `review-${chapter.id}`,
+      chapterId: chapter.id,
+      taskType: "chapter_review",
+      status: "succeeded",
+      outputText: JSON.stringify({ score: 92, issues: [] }),
+      errorMessage: null,
+      createdAt: "2026-07-01T00:00:00.000Z",
+    })),
+    gateDispatchTasks: firstDayCompleteDispatches(project.id),
+    ...overrides,
+  };
+}
+
+const publishBaseline = {
+  id: "snapshot-1",
+  platformId: "fanqie",
+  platformName: "番茄小说",
+  title: "夜雨系统",
+  action: "download",
+  chapterCount: 3,
+  wordCount: 6600,
+  preflightScore: 92,
+  canExport: true,
+  createdAt: "2026-07-02T00:00:00.000Z",
+};
+
 function handoffWorldEntries() {
   return [{
     type: "platform_soil",
@@ -209,6 +249,48 @@ test("buildTaskQueueCenter", async (t) => {
 
     assert.equal(adoptedQueue.overview.candidateReady, 0);
     assert.notEqual(adoptedQueue.recommendedNext?.category, "candidate");
+  });
+
+  await t.test("promotes saved publish baselines into effect recovery tasks", () => {
+    const queue = buildTaskQueueCenter([publishReadyProject({
+      publishSnapshots: [publishBaseline],
+      platformPublishMetrics: [],
+    })]);
+
+    assert.equal(queue.overview.effectReady, 1);
+    assert.equal(queue.overview.exportReady, 1);
+    assert.equal(queue.recommendedNext?.category, "effect");
+    assert.equal(queue.recommendedNext?.actionLabel, "录入发布效果");
+    assert.equal(queue.recommendedNext?.href, "/projects/project-1#publish-effect-panel");
+    assert.ok(queue.recommendedNext?.evidence.includes("发布包已经保存过基准"));
+  });
+
+  await t.test("turns weak publish effects into next optimization work", () => {
+    const queue = buildTaskQueueCenter([publishReadyProject({
+      publishSnapshots: [publishBaseline],
+      platformPublishMetrics: [{
+        id: "metric-weak",
+        platformId: "fanqie",
+        platformName: "番茄小说",
+        views: 1000,
+        clicks: 30,
+        favorites: 5,
+        follows: 2,
+        comments: 0,
+        paidReads: 0,
+        editorFeedback: "",
+        contractStatus: "unknown",
+        publishUrl: "",
+        notes: "",
+        snapshotDate: "2026-07-03T00:00:00.000Z",
+      }],
+    })]);
+
+    assert.equal(queue.overview.effectReady, 1);
+    assert.equal(queue.recommendedNext?.category, "effect");
+    assert.equal(queue.recommendedNext?.actionLabel, "生成候选");
+    assert.ok(queue.recommendedNext?.evidence.includes("点击率"));
+    assert.equal(queue.recommendedNext?.href, "/projects/project-1#submission-asset-editor");
   });
 
   await t.test("blocks production behind the first-day completion gate", () => {

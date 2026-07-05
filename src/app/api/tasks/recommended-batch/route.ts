@@ -10,7 +10,7 @@ import { buildBatchExecutionSafety } from "@/lib/projects/batchExecutionSafety";
 import { getBatchExecutionStrategy } from "@/lib/projects/batchExecutionStrategy";
 import { findProjectStartTacticSummary } from "@/lib/projects/projectStartTactics";
 import { buildTaskQueueBatchGateActionReceipt, buildTaskQueueBatchReceipt } from "@/lib/projects/taskQueueBatchReceipt";
-import { buildTaskQueueCenter } from "@/lib/projects/taskQueueCenter";
+import { buildTaskQueueCenter, type TaskQueueProject } from "@/lib/projects/taskQueueCenter";
 import { buildTaskQueueExecutionPlan } from "@/lib/projects/taskQueueExecutionPlan";
 import { applyRecommendedBatchModelRouteGate, buildRecommendedBatchModelRouteGate } from "@/lib/projects/recommendedBatchModelRouteGate";
 
@@ -32,6 +32,32 @@ type RecommendedBatchResult = {
   costUsd: number | null;
   qualityScore: number | null;
 };
+
+function parseTaskQueueTags(value: string | string[] | null | undefined) {
+  if (Array.isArray(value)) return value;
+  return (value ?? "")
+    .split(/[、,，\s]+/u)
+    .map((tag) => tag.trim())
+    .filter(Boolean);
+}
+
+function normalizeTaskQueueProjects<T extends {
+  submissionAssets?: Array<{ tags: string | string[] | null }>;
+  submissionAssetVersions?: Array<{ tags: string | string[] | null; auditStatus: string }>;
+}>(projects: T[]): TaskQueueProject[] {
+  return projects.map((project) => ({
+    ...project,
+    submissionAssets: project.submissionAssets?.map((asset) => ({
+      ...asset,
+      tags: parseTaskQueueTags(asset.tags),
+    })) ?? [],
+    submissionAssetVersions: project.submissionAssetVersions?.map((version) => ({
+      ...version,
+      tags: parseTaskQueueTags(version.tags),
+      auditStatus: version.auditStatus === "ready" || version.auditStatus === "blocked" ? version.auditStatus : "needs_work",
+    })) ?? [],
+  })) as unknown as TaskQueueProject[];
+}
 
 export async function POST(request: Request) {
   const strategy = getBatchExecutionStrategy(new URL(request.url).searchParams.get("strategy"));
@@ -59,6 +85,10 @@ export async function POST(request: Request) {
           },
         },
         worldEntries: { orderBy: [{ type: "asc" }, { createdAt: "asc" }] },
+        publishSnapshots: { orderBy: { createdAt: "desc" }, take: 80 },
+        submissionAssets: { orderBy: { updatedAt: "desc" } },
+        submissionAssetVersions: { orderBy: { createdAt: "desc" }, take: 80 },
+        platformPublishMetrics: { orderBy: { snapshotDate: "desc" }, take: 80 },
         gateDispatchTasks: {
           where: { dispatchKey: { startsWith: "first-day:" } },
           select: {
@@ -104,14 +134,23 @@ export async function POST(request: Request) {
       },
     }),
   ]);
-  const queue = buildTaskQueueCenter(projects);
-  const safety = buildBatchExecutionSafety(queue.items, projects, strategy);
+  const taskQueueProjects = normalizeTaskQueueProjects(projects);
+  const safetyProjects = projects.map((project) => ({
+    aiTasks: project.aiTasks.map((task) => ({
+      status: task.status,
+      inputTokens: task.inputTokens ?? null,
+      outputTokens: task.outputTokens ?? null,
+      costUsd: task.costUsd ?? null,
+    })),
+  }));
+  const queue = buildTaskQueueCenter(taskQueueProjects);
+  const safety = buildBatchExecutionSafety(queue.items, safetyProjects, strategy);
   const basePlan = buildTaskQueueExecutionPlan(queue.items, strategy.maxBatchSize, strategy);
 
   if (!basePlan.canRun || !basePlan.category || !basePlan.projectId || basePlan.projectIds.length === 0) {
     return NextResponse.json({ error: basePlan.detail, plan: basePlan, safety }, { status: 400 });
   }
-  const projectsById = new Map(projects.map((item) => [item.id, item]));
+  const projectsById = new Map(taskQueueProjects.map((item) => [item.id, item]));
   const missingProject = basePlan.projectIds.find((projectId) => !projectsById.has(projectId));
   if (missingProject) {
     return NextResponse.json({ error: "Project not found", plan: basePlan, safety }, { status: 404 });
@@ -139,7 +178,7 @@ export async function POST(request: Request) {
     for (const projectId of plan.projectIds) {
       const project = projectsById.get(projectId);
       if (!project) continue;
-      const startTactic = findProjectStartTacticSummary(project.worldEntries);
+      const startTactic = findProjectStartTacticSummary(project.worldEntries ?? []);
       for (const candidate of buildReviewPipelineQueue(project.chapters, project.aiTasks, 5, startTactic).candidates) {
         secondPassCandidates.set(candidate.chapterId, candidate);
       }

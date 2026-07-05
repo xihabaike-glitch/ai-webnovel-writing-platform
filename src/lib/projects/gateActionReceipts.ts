@@ -2,6 +2,7 @@ import type {
   PrePublishGateAction,
   PrePublishGateActionExecution,
   PrePublishGateAdoptionFollowupItem,
+  PrePublishGateExportVersionAction,
   PrePublishGateStrategyPlatform,
 } from "./prePublishGate.ts";
 import type { FailureRepairBatch } from "../ai/taskRunConsole.ts";
@@ -15,6 +16,7 @@ export type GateActionReceiptExecutionType =
   | "platform_strategy"
   | "model_route"
   | "first_three_adoption"
+  | "export_version"
   | "manual";
 export type GateActionReceiptStatusFilter = "all" | GateActionReceipt["status"];
 export type GateActionReceiptExecutionFilter = "all" | GateActionReceiptExecutionType;
@@ -1901,6 +1903,47 @@ export function buildGatePublishEffectReceipt(input: {
       status: "ready",
       label: "复检发布效果建议",
       detail: "真实投放数据已回填，刷新总闸门后确认平台策略、二轮优化和加码建议是否更新。",
+      actionLabel: "刷新总闸门",
+    },
+    createdAt,
+  };
+}
+
+export function buildGateExportVersionActionReceipt(input: {
+  projectId: string;
+  projectTitle: string;
+  action: PrePublishGateExportVersionAction;
+  message?: string;
+  now?: Date | string;
+}): GateActionReceipt {
+  const createdAt = input.now ? new Date(input.now).toISOString() : new Date().toISOString();
+  const execution = input.action.execution;
+  const actionType = execution?.type ?? "manual";
+  const snapshotId = execution?.snapshotId ?? "none";
+  const label = input.action.label;
+  const message = input.message
+    ?? (actionType === "lock_baseline"
+      ? `已处理 ${input.projectTitle} 的导出基准：${label}。`
+      : `已按快照重新生成 ${input.projectTitle} 的导出包。`);
+
+  return {
+    id: `export-version:${input.projectId}:${actionType}:${snapshotId}:${createdAt}`,
+    actionId: `export-version:${input.projectId}:${actionType}`,
+    label,
+    detail: `${input.projectTitle} · 导出版本门禁 · ${input.action.detail}`,
+    href: input.action.href,
+    status: "succeeded",
+    message,
+    executionType: "export_version",
+    succeededCount: 1,
+    failedCount: 0,
+    taskId: snapshotId === "none" ? null : snapshotId,
+    platformId: "export_version",
+    platformName: "导出版本",
+    recheck: {
+      status: "ready",
+      label: "复检导出版本门禁",
+      detail: "导出版本动作已执行，刷新总闸门后确认回退风险、基准状态和发布包下载是否恢复。",
       actionLabel: "刷新总闸门",
     },
     createdAt,

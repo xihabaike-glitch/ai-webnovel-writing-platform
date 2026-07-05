@@ -3,7 +3,12 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { addGateActionReceipt, buildGatePublishEffectReceipt, type GatePublishEffectReceiptMetric } from "@/lib/projects/gateActionReceipts";
+import {
+  addGateActionReceipt,
+  buildGateExportVersionActionReceipt,
+  buildGatePublishEffectReceipt,
+  type GatePublishEffectReceiptMetric,
+} from "@/lib/projects/gateActionReceipts";
 import type { PrePublishGateProjectStatus } from "@/lib/projects/prePublishGate";
 
 interface EffectDraft {
@@ -147,7 +152,14 @@ export function GateExportPackagePanel({ packages }: { packages: PrePublishGateP
         });
         const payload = (await response.json().catch(() => ({}))) as { message?: string; error?: string };
         if (!response.ok) throw new Error(payload.error ?? "更新导出基准失败。");
-        setMessage(payload.message ?? "已更新导出基准。");
+        const successMessage = payload.message ?? "已更新导出基准。";
+        addGateActionReceipt(buildGateExportVersionActionReceipt({
+          projectId: item.projectId,
+          projectTitle: item.projectTitle,
+          action,
+          message: successMessage,
+        }));
+        setMessage(successMessage);
         router.refresh();
         return;
       }
@@ -161,7 +173,14 @@ export function GateExportPackagePanel({ packages }: { packages: PrePublishGateP
       link.download = `${item.projectTitle}-导出重生成`;
       link.click();
       URL.revokeObjectURL(url);
-      setMessage(`${item.projectTitle} 已按导出快照重新生成。`);
+      const successMessage = `${item.projectTitle} 已按导出快照重新生成。`;
+      addGateActionReceipt(buildGateExportVersionActionReceipt({
+        projectId: item.projectId,
+        projectTitle: item.projectTitle,
+        action,
+        message: successMessage,
+      }));
+      setMessage(successMessage);
       router.refresh();
     } catch (caught) {
       setMessage(caught instanceof Error ? caught.message : "导出版本动作执行失败。");

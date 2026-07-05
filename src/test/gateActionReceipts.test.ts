@@ -44,6 +44,7 @@ import {
   buildGateDispatchTaskCenter,
   buildGateDispatchTaskCloseoutItem,
   buildGateFirstThreeAdoptionReceipt,
+  buildGateExportVersionActionReceipt,
   buildGatePublishEffectReceipt,
   filterGateDispatchTasks,
   filterGateActionReceipts,
@@ -1195,6 +1196,33 @@ test("buildGateActionReceipt", async (t) => {
     assert.equal(receipt.platformName, "番茄小说");
     assert.ok(receipt.message.includes("曝光 1200"));
     assert.equal(receipt.recheck.label, "复检发布效果建议");
+  });
+
+  await t.test("builds export version action receipts for executable gate repairs", () => {
+    const receipt = buildGateExportVersionActionReceipt({
+      projectId: "project-1",
+      projectTitle: "夜雨系统",
+      now: "2026-01-01T00:00:03.000Z",
+      action: {
+        id: "lock-recommended-baseline",
+        label: "锁定推荐基准",
+        detail: "先锁定正式基准，否则后续版本替换没有参照物。",
+        href: "/projects/project-1/exports#export-baseline-decision",
+        priority: "primary",
+        execution: {
+          type: "lock_baseline",
+          snapshotId: "snapshot-1",
+        },
+      },
+      message: "已锁定为导出基准。",
+    });
+
+    assert.equal(receipt.actionId, "export-version:project-1:lock_baseline");
+    assert.equal(receipt.executionType, "export_version");
+    assert.equal(receipt.taskId, "snapshot-1");
+    assert.equal(receipt.platformName, "导出版本");
+    assert.ok(receipt.message.includes("导出基准"));
+    assert.equal(receipt.recheck.label, "复检导出版本门禁");
   });
 
   await t.test("clears metrics advice after publish effect is recorded", () => {

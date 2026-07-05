@@ -668,6 +668,34 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
                     <div className="mt-1">验证：{entry.strategyBasis.verificationMove}</div>
                   </div>
                 ) : null}
+                {entry.handoffGuidance ? (
+                  <div className="mt-3 grid gap-2 rounded-md border border-cyan-200 bg-cyan-50 px-3 py-2 text-xs leading-5 text-cyan-950">
+                    <div className="font-medium">开书交接 · {entry.handoffGuidance.label}</div>
+                    {entry.handoffGuidance.detail ? (
+                      <div>{entry.handoffGuidance.detail}</div>
+                    ) : null}
+                    {entry.handoffGuidance.firstDayActions.length > 0 ? (
+                      <div>
+                        <div className="font-medium">首日动作</div>
+                        <div className="mt-1 grid gap-1">
+                          {entry.handoffGuidance.firstDayActions.slice(0, 3).map((action) => (
+                            <div key={action}>- {action}</div>
+                          ))}
+                        </div>
+                      </div>
+                    ) : null}
+                    {entry.handoffGuidance.avoidRules.length > 0 ? (
+                      <div>
+                        <div className="font-medium">避坑边界</div>
+                        <div className="mt-1 grid gap-1">
+                          {entry.handoffGuidance.avoidRules.slice(0, 3).map((rule) => (
+                            <div key={rule}>- {rule}</div>
+                          ))}
+                        </div>
+                      </div>
+                    ) : null}
+                  </div>
+                ) : null}
               </div>
               <Link className="w-fit rounded-md border border-slate-200 px-3 py-2 text-sm font-medium hover:bg-slate-50" href={entry.href}>
                 {entry.actionLabel}

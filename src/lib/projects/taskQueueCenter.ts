@@ -45,6 +45,14 @@ export interface TaskQueueProject {
 
 export type QueueScaleGate = "none" | "sample_only" | "cleared";
 
+export interface QueueHandoffGuidance {
+  label: string;
+  detail: string | null;
+  firstDayActions: string[];
+  avoidRules: string[];
+  evidence: string[];
+}
+
 export interface QueueItem {
   id: string;
   projectId: string;
@@ -56,6 +64,7 @@ export interface QueueItem {
   chapterTitle: string;
   evidence: string;
   strategyBasis?: ProjectStartTacticSummary | null;
+  handoffGuidance?: QueueHandoffGuidance | null;
   riskLevel: FirstDayRiskLevel;
   riskLabel: string;
   riskNotice: string | null;
@@ -114,6 +123,24 @@ function categoryLabel(category: QueueItem["category"]) {
   return labels[category];
 }
 
+function buildHandoffGuidance(startTactic: ProjectStartTacticSummary | null): QueueHandoffGuidance | null {
+  if (!startTactic) return null;
+  const firstDayActions = (startTactic.firstDayActions ?? []).filter(Boolean);
+  const avoidRules = (startTactic.avoidRules ?? []).filter(Boolean);
+  const evidence = (startTactic.handoffEvidence ?? []).filter(Boolean);
+  if (!startTactic.handoffLabel && !startTactic.handoffDetail && firstDayActions.length === 0 && avoidRules.length === 0 && evidence.length === 0) {
+    return null;
+  }
+
+  return {
+    label: startTactic.handoffLabel ?? startTactic.label,
+    detail: startTactic.handoffDetail ?? null,
+    firstDayActions,
+    avoidRules,
+    evidence,
+  };
+}
+
 function item(input: Omit<QueueItem, "label" | "priority" | "blockerType" | "riskLevel" | "riskLabel" | "riskNotice" | "scaleGate"> & {
   blockerType?: QueueItem["blockerType"];
   riskLevel?: QueueItem["riskLevel"];
@@ -126,6 +153,7 @@ function item(input: Omit<QueueItem, "label" | "priority" | "blockerType" | "ris
     blockerType: input.blockerType ?? null,
     riskLevel: input.riskLevel ?? "standard",
     riskLabel: input.riskLabel ?? "标准",
+    handoffGuidance: input.handoffGuidance ?? (input.strategyBasis ? buildHandoffGuidance(input.strategyBasis) : null),
     riskNotice: input.riskNotice ?? null,
     scaleGate: input.scaleGate ?? "none",
     label: categoryLabel(input.category),

@@ -165,6 +165,10 @@ test("buildTaskQueueCenter", async (t) => {
     assert.ok(gate?.evidence.includes("开书交接证据"));
     assert.ok(gate?.evidence.includes("交接动作落地"));
     assert.ok(gate?.evidence.includes("避坑边界确认"));
+    assert.equal(gate?.handoffGuidance?.label, "稳定加码");
+    assert.ok(gate?.handoffGuidance?.detail?.includes("番茄首章强钩子"));
+    assert.ok(gate?.handoffGuidance?.firstDayActions.some((action) => action.includes("倒计时")));
+    assert.ok(gate?.handoffGuidance?.avoidRules.some((rule) => rule.includes("小样本")));
     assert.equal(queue.recommendedNext?.blockerType, "first_day_gate");
   });
 
@@ -183,6 +187,8 @@ test("buildTaskQueueCenter", async (t) => {
     assert.equal(queue.overview.reviewReady, 1);
     assert.equal(queue.recommendedNext?.category, "review");
     assert.ok(queue.items.every((item) => item.actionLabel !== "补交接验收"));
+    assert.ok(queue.recommendedNext?.handoffGuidance?.firstDayActions.some((action) => action.includes("追读承诺")));
+    assert.ok(queue.recommendedNext?.handoffGuidance?.avoidRules.some((rule) => rule.includes("不要直接放量")));
   });
 
   await t.test("blocks risky first drafts behind recovery validation", () => {

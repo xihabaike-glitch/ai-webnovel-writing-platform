@@ -602,13 +602,19 @@ test("buildTaskQueueCenter", async (t) => {
     const publishFollowup = queue.items.find((item) => item.id.includes(":revision-1:publish-check"));
 
     assert.equal(reviewFollowup?.category, "review");
+    assert.equal(reviewFollowup?.sourceType, "first_three_adoption");
+    assert.equal(reviewFollowup?.sourceLabel, "采纳闭环");
+    assert.ok(reviewFollowup?.sourceDetail?.includes("旧审稿自动失效"));
     assert.equal(reviewFollowup?.actionLabel, "重新审稿");
     assert.equal(reviewFollowup?.href, "/projects/project-1/chapters/chapter-review#chapter-workflow");
     assert.equal(publishFollowup?.category, "export");
+    assert.equal(publishFollowup?.sourceType, "first_three_adoption");
+    assert.ok(publishFollowup?.sourceDetail?.includes("刷新质检后再导出"));
     assert.equal(publishFollowup?.actionLabel, "回发布质检");
     assert.equal(publishFollowup?.href, "/projects/project-1#platform-export");
     assert.ok(queue.overview.reviewReady >= 1);
     assert.ok(queue.overview.exportReady >= 1);
+    assert.equal(queue.overview.firstThreeAdoptionFollowups, 2);
   });
 
   await t.test("keeps completed first-three adoption follow-ups with missing evidence in the queue", () => {
@@ -631,6 +637,8 @@ test("buildTaskQueueCenter", async (t) => {
     const missingEvidence = queue.items.find((item) => item.id.includes(":revision-1:review"));
 
     assert.equal(missingEvidence?.category, "review");
+    assert.equal(missingEvidence?.sourceType, "first_three_adoption");
+    assert.ok(missingEvidence?.sourceDetail?.includes("验收证据没交齐"));
     assert.equal(missingEvidence?.actionLabel, "补验收证据");
     assert.equal(missingEvidence?.href, "/projects/project-1/chapters/chapter-review#chapter-workflow");
     assert.ok(missingEvidence?.evidence.includes("任务已标记完成，但缺少验收证据"));

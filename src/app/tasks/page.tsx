@@ -364,6 +364,10 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
           <div className="text-xs text-slate-500">已准放量</div>
           <div className="mt-1 text-2xl font-semibold">{queue.overview.watchCleared}</div>
         </div>
+        <div className="rounded-md border border-slate-200 bg-white p-3">
+          <div className="text-xs text-slate-500">采纳闭环</div>
+          <div className="mt-1 text-2xl font-semibold">{queue.overview.firstThreeAdoptionFollowups}</div>
+        </div>
       </section>
 
       {unlockedDrafts.length > 0 ? (
@@ -801,6 +805,11 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
                       {scaleGateLabel(entry.scaleGate)}
                     </span>
                   ) : null}
+                  {entry.sourceType === "first_three_adoption" ? (
+                    <span className="rounded-md bg-indigo-50 px-2 py-1 text-xs font-medium text-indigo-700">
+                      {entry.sourceLabel}
+                    </span>
+                  ) : null}
                   <Link className="font-semibold text-slate-950 hover:underline" href={`/projects/${entry.projectId}`}>
                     {entry.projectTitle}
                   </Link>
@@ -809,6 +818,11 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
                   {entry.platformName} · {entry.chapterTitle}
                 </div>
                 <p className="mt-2 text-sm leading-6 text-slate-600">{entry.evidence}</p>
+                {entry.sourceType === "first_three_adoption" && entry.sourceDetail ? (
+                  <div className="mt-3 rounded-md border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs leading-5 text-indigo-950">
+                    <span className="font-medium">{entry.sourceLabel}：</span>{entry.sourceDetail}
+                  </div>
+                ) : null}
                 {entry.riskNotice ? (
                   <div className={`mt-3 rounded-md border px-3 py-2 text-xs leading-5 ${riskClass(entry.riskLevel)}`}>
                     {entry.riskNotice}

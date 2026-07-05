@@ -95,6 +95,9 @@ export interface QueueItem {
   platformName: string;
   category: "candidate" | "draft" | "review" | "second_pass" | "effect" | "export" | "blocked";
   blockerType: "chapter_card" | "publish_repair" | "risk_recovery" | "watch_scale_gate" | "first_day_gate" | null;
+  sourceType?: "first_three_adoption";
+  sourceLabel?: string;
+  sourceDetail?: string;
   label: string;
   chapterTitle: string;
   evidence: string;
@@ -132,6 +135,7 @@ export interface TaskQueueCenter {
     watchItems: number;
     watchSampleOnly: number;
     watchCleared: number;
+    firstThreeAdoptionFollowups: number;
   };
   items: QueueItem[];
   recommendedNext: QueueItem | null;
@@ -316,6 +320,13 @@ function firstThreeAdoptionFollowupQueueItems(input: {
         projectTitle: input.project.title,
         platformName: input.platformName,
         category: isPublishCheck ? "export" : "review",
+        sourceType: "first_three_adoption",
+        sourceLabel: "采纳闭环",
+        sourceDetail: missingEvidence
+          ? "这不是普通已完成任务，是采纳后的验收证据没交齐。补证据前，总闸门不会真正放行。"
+          : isPublishCheck
+            ? "前三章采纳改变了发布包装判断，刷新质检后再导出。"
+            : "前三章正文已变更，旧审稿自动失效，必须重新审稿。",
         chapterTitle: task.title ?? (isPublishCheck ? "采纳后发布质检" : "采纳后重新审稿"),
         evidence: missingEvidence
           ? `任务已标记完成，但缺少验收证据。${task.detail ?? "补齐审稿分、问题数、发布包版本或质检结果后，再回总闸门复检。"}`
@@ -884,6 +895,7 @@ export function buildTaskQueueCenter(projects: TaskQueueProject[]): TaskQueueCen
       watchItems: items.filter((entry) => entry.riskLevel === "watch").length,
       watchSampleOnly: items.filter((entry) => entry.scaleGate === "sample_only" && isAutomatedQueueItem(entry)).length,
       watchCleared: items.filter((entry) => entry.scaleGate === "cleared" && isAutomatedQueueItem(entry)).length,
+      firstThreeAdoptionFollowups: items.filter((entry) => entry.sourceType === "first_three_adoption").length,
     },
     items,
     recommendedNext: items.find((entry) => entry.category !== "blocked") ?? items[0] ?? null,

@@ -900,7 +900,7 @@ test("buildFirstDayDispatchUpdateSummary explains watch sample scale-up status",
       title: "夜雨系统 · 小样本验证 · 生成第一章正文",
       completionEvidence: [
         "小样本验证已完成：",
-        "通过线：成功率 100%，质量 86。",
+        "通过线：成功率 100%，质量分 86，失败样本 0 个。",
         "不可接受项：未出现失败、质量低于 80、备用命中或成本异常。",
         "复查证据：AI 任务 task-1；章节 第一章。",
         "放量结论：通过，可以恢复后续初稿批次。",
@@ -923,6 +923,21 @@ test("buildFirstDayDispatchUpdateSummary explains watch sample scale-up status",
       href: "/projects/project-1/chapters/chapter-1",
     },
   });
+  const missingMetrics = buildFirstDayDispatchUpdateSummary({
+    task: {
+      dispatchKey: "first-day:project-1:first-draft",
+      state: "completed",
+      title: "夜雨系统 · 小样本验证 · 生成第一章正文",
+      completionEvidence: [
+        "小样本验证已完成：",
+        "通过线：成功率 100%，质量分 86。",
+        "不可接受项：未出现失败、质量低于 80、备用命中或成本异常。",
+        "复查证据：AI 任务 task-1；章节 第一章。",
+        "放量结论：通过，可以恢复后续初稿批次。",
+      ].join("\n"),
+      href: "/projects/project-1/chapters/chapter-1",
+    },
+  });
 
   assert.equal(cleared.status, "watch_cleared");
   assert.equal(cleared.title, "小样本已过线，放量闸门已解除");
@@ -938,6 +953,8 @@ test("buildFirstDayDispatchUpdateSummary explains watch sample scale-up status",
   assert.ok(blocked.detail.includes("总闸门确认卡点仍关闭"));
   assert.ok(blocked.detail.includes("修问题复测"));
   assert.ok(blocked.badges.includes("禁止批量放大"));
+  assert.equal(missingMetrics.status, "watch_blocked");
+  assert.ok(missingMetrics.detail.includes("缺少成功率、质量分或失败样本"));
 });
 
 test("buildFirstDayDispatchUpdateSummary routes closed first-day work back to gate", () => {
@@ -1263,13 +1280,33 @@ test("validateFirstDayDispatchCompletionEvidence enforces risky first-day eviden
     evidence: ["缺少观察平台首轮小样本验证口径。"],
     completionEvidence: "小样本首轮通过线已写清，不可接受项已补齐。",
   });
+  const watchMissingMetrics = validateFirstDayDispatchCompletionEvidence({
+    dispatchKey: "first-day:project-1:first-draft",
+    dueLabel: "今天小样本验证",
+    title: "夜雨系统 · 小样本验证 · 生成第一章正文",
+    acceptanceCriteria: ["写清首轮小样本通过线和不可接受项。"],
+    evidence: ["缺少观察平台首轮小样本验证口径。"],
+    completionEvidence: [
+      "小样本验证已完成：",
+      "通过线：成功率 100%，质量分 86。",
+      "不可接受项：未出现失败、质量低于 80、备用命中或成本异常。",
+      "复查证据：AI 任务 task-1；章节 第一章。",
+      "放量结论：通过，可以恢复后续初稿批次。",
+    ].join("\n"),
+  });
   const watchReady = validateFirstDayDispatchCompletionEvidence({
     dispatchKey: "first-day:project-1:first-draft",
     dueLabel: "今天小样本验证",
     title: "夜雨系统 · 小样本验证 · 生成第一章正文",
     acceptanceCriteria: ["写清首轮小样本通过线和不可接受项。"],
     evidence: ["缺少观察平台首轮小样本验证口径。"],
-    completionEvidence: "小样本首轮通过线已写清，不可接受项和复查证据已补齐。放量结论：通过，可以恢复后续初稿批次。",
+    completionEvidence: [
+      "小样本验证已完成：",
+      "通过线：成功率 100%，质量分 86，失败样本 0 个。",
+      "不可接受项：未出现失败、质量低于 80、备用命中或成本异常。",
+      "复查证据：AI 任务 task-1；章节 第一章。",
+      "放量结论：通过，可以恢复后续初稿批次。",
+    ].join("\n"),
   });
   const handoffMissingAction = validateFirstDayDispatchCompletionEvidence({
     dispatchKey: "first-day:project-1:first-draft",
@@ -1338,6 +1375,8 @@ test("validateFirstDayDispatchCompletionEvidence enforces risky first-day eviden
   assert.ok(watchThin.error?.includes("小样本验证"));
   assert.equal(watchMissingEvidence.valid, false);
   assert.ok(watchMissingEvidence.error?.includes("复查证据"));
+  assert.equal(watchMissingMetrics.valid, false);
+  assert.ok(watchMissingMetrics.error?.includes("失败样本"));
   assert.equal(watchReady.valid, true);
   assert.equal(handoffMissingAction.valid, false);
   assert.ok(handoffMissingAction.error?.includes("交接动作"));

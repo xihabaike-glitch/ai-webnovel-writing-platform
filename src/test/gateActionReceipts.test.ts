@@ -3811,10 +3811,14 @@ test("buildGateActionReceipt", async (t) => {
     assert.equal(review.items[0].status, "missing_evidence");
     assert.equal(review.items.find((item) => item.dispatchKey === verifiedTask.dispatchKey)?.status, "verified");
     assert.equal(review.items.find((item) => item.dispatchKey === verifiedTask.dispatchKey)?.actionLabel, "查看证据链");
+    assert.equal(review.items.find((item) => item.dispatchKey === verifiedTask.dispatchKey)?.href, verifiedTask.href);
     assert.equal(review.items.find((item) => item.dispatchKey === needsReceiptTask.dispatchKey)?.status, "needs_receipt");
     assert.equal(review.items.find((item) => item.dispatchKey === needsReceiptTask.dispatchKey)?.actionLabel, "回填发布效果");
+    assert.equal(review.items.find((item) => item.dispatchKey === needsReceiptTask.dispatchKey)?.href, "/projects/project-2#publish-effect-panel");
     assert.equal(review.items.find((item) => item.dispatchKey === missingEvidenceTask.dispatchKey)?.actionLabel, "补完成依据");
+    assert.equal(review.items.find((item) => item.dispatchKey === missingEvidenceTask.dispatchKey)?.href, "/dispatch");
     assert.equal(review.items.find((item) => item.dispatchKey === activeTask.dispatchKey)?.actionLabel, activeTask.actionLabel);
+    assert.equal(review.items.find((item) => item.dispatchKey === activeTask.dispatchKey)?.href, activeTask.href);
     assert.ok(review.nextActions.some((actionText) => actionText.includes("后续业务回执")));
   });
 

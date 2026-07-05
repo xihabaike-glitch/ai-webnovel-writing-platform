@@ -42,6 +42,7 @@ export function ExportMarkdownButton({
   const [error, setError] = useState<string | null>(null);
   const [filterId, setFilterId] = useState<ExportSnapshotFilterId>("all");
   const [message, setMessage] = useState<string | null>(null);
+  const [expandedSnapshotId, setExpandedSnapshotId] = useState<string | null>(null);
   const openItems = readiness.items.filter((item) => item.status !== "pass").slice(0, 4);
   const filterOptions = buildExportSnapshotFilterOptions(snapshots);
   const visibleSnapshots = filterId === "all"
@@ -296,14 +297,44 @@ export function ExportMarkdownButton({
                     暂无上一次同类导出可对比。
                   </div>
                 )}
-                <button
-                  className="mt-2 rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
-                  disabled={exporting !== null}
-                  onClick={() => void regenerateSnapshot(snapshot)}
-                  type="button"
-                >
-                  {exporting === `snapshot:${snapshot.id}` ? "生成中" : "重新生成"}
-                </button>
+                {expandedSnapshotId === snapshot.id ? (
+                  <div className="mt-2 border-t border-slate-200 pt-2">
+                    <div className="font-medium text-slate-900">{snapshot.detail.summary}</div>
+                    <div className="mt-2 grid gap-1 text-slate-600">
+                      {snapshot.detail.metadata.map((line) => (
+                        <div key={line}>{line}</div>
+                      ))}
+                    </div>
+                    <div className="mt-2 grid gap-1 text-slate-500">
+                      {snapshot.detail.technical.map((line) => (
+                        <div key={line}>{line}</div>
+                      ))}
+                    </div>
+                    <div className="mt-2 grid gap-1 text-slate-600">
+                      {snapshot.detail.comparison.map((line) => (
+                        <div key={line}>{line}</div>
+                      ))}
+                    </div>
+                    <p className="mt-2 text-slate-500">{snapshot.detail.boundary}</p>
+                  </div>
+                ) : null}
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <button
+                    className="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                    onClick={() => setExpandedSnapshotId(expandedSnapshotId === snapshot.id ? null : snapshot.id)}
+                    type="button"
+                  >
+                    {expandedSnapshotId === snapshot.id ? "收起详情" : "查看详情"}
+                  </button>
+                  <button
+                    className="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                    disabled={exporting !== null}
+                    onClick={() => void regenerateSnapshot(snapshot)}
+                    type="button"
+                  >
+                    {exporting === `snapshot:${snapshot.id}` ? "生成中" : "重新生成"}
+                  </button>
+                </div>
               </div>
             )) : (
               <div className="rounded-md bg-slate-50 p-3 text-xs text-slate-600">这个筛选下暂时没有导出快照。</div>

@@ -35,6 +35,7 @@ export interface ExportPackageSnapshotView {
   notes: string;
   createdAt: string | Date;
   comparison: ExportPackageSnapshotComparison | null;
+  detail: ExportPackageSnapshotDetail;
 }
 
 export interface ExportSnapshotTarget {
@@ -53,6 +54,14 @@ export interface ExportPackageSnapshotComparison {
   contentChanged: boolean;
   status: "improved" | "declined" | "changed" | "same";
   label: string;
+}
+
+export interface ExportPackageSnapshotDetail {
+  summary: string;
+  metadata: string[];
+  technical: string[];
+  comparison: string[];
+  boundary: string;
 }
 
 function byteLength(content: string | Buffer) {
@@ -115,6 +124,10 @@ function signedFileSizeDelta(value: number) {
   return `${prefix}${fileSizeLabel(Math.abs(value))}`;
 }
 
+function timestampLabel(value: string | Date) {
+  return value instanceof Date ? value.toISOString() : value;
+}
+
 function comparisonStatus(input: Pick<ExportPackageSnapshotComparison, "readinessDelta" | "chapterDelta" | "wordDelta" | "fileSizeDelta" | "contentChanged">): ExportPackageSnapshotComparison["status"] {
   if (input.readinessDelta > 0 || input.chapterDelta > 0 || input.wordDelta > 0) return "improved";
   if (input.readinessDelta < 0 || input.chapterDelta < 0 || input.wordDelta < 0) return "declined";
@@ -147,6 +160,47 @@ export function parseExportSnapshotTarget(packageKind: string, format: string): 
 
 export function regeneratedSnapshotMessage(target: ExportSnapshotTarget) {
   return `已按历史快照重新生成：${packageKindLabel(target.packageKind)} · ${formatLabel(target.format)}。`;
+}
+
+export function buildExportSnapshotDetail(snapshot: {
+  id: string;
+  packageKind: string;
+  format: string;
+  fileName: string;
+  contentType: string;
+  fileSize: number;
+  contentHash: string;
+  readinessStatus: string;
+  readinessPercent: number;
+  chapterCount: number;
+  wordCount: number;
+  createdAt: string | Date;
+}, comparison: ExportPackageSnapshotComparison | null = null): ExportPackageSnapshotDetail {
+  return {
+    summary: `${packageKindLabel(snapshot.packageKind)} · ${formatLabel(snapshot.format)} · ${readinessLabel(snapshot.readinessStatus)} · 准备度 ${snapshot.readinessPercent}%`,
+    metadata: [
+      `文件名：${snapshot.fileName}`,
+      `导出时间：${timestampLabel(snapshot.createdAt)}`,
+      `章节：${snapshot.chapterCount}`,
+      `字数：${snapshot.wordCount}`,
+      `文件大小：${fileSizeLabel(snapshot.fileSize)}`,
+    ],
+    technical: [
+      `内容类型：${snapshot.contentType}`,
+      `内容摘要：${snapshot.contentHash}`,
+      `快照记录：${snapshot.id}`,
+    ],
+    comparison: comparison ? [
+      `上次同类快照：${comparison.previousId}`,
+      `上次时间：${timestampLabel(comparison.previousCreatedAt)}`,
+      `准备度变化：${signedDelta(comparison.readinessDelta)}%`,
+      `章节变化：${signedDelta(comparison.chapterDelta)}`,
+      `字数变化：${signedDelta(comparison.wordDelta)}`,
+      `文件变化：${comparison.fileSizeDeltaLabel}`,
+      `内容摘要：${comparison.contentChanged ? "已变化" : "未变化"}`,
+    ] : ["暂无上一次同类导出可对比。"],
+    boundary: "快照只保存导出元信息和内容摘要；重新生成会使用当前项目内容，不回放旧稿原文。",
+  };
 }
 
 export function buildExportPackageSnapshot(input: ExportPackageSnapshotInput) {
@@ -191,6 +245,7 @@ export function exportSnapshotView(snapshot: {
     fileSizeLabel: fileSizeLabel(snapshot.fileSize),
     readinessLabel: readinessLabel(snapshot.readinessStatus),
     comparison,
+    detail: buildExportSnapshotDetail(snapshot, comparison),
   };
 }
 

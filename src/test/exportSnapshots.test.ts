@@ -72,6 +72,9 @@ describe("export package snapshots", () => {
     assert.equal(view.formatLabel, "CSV");
     assert.equal(view.fileSizeLabel, "2.0 KB");
     assert.equal(view.readinessLabel, "不建议交付");
+    assert.equal(view.detail.summary, "伏笔表 · CSV · 不建议交付 · 准备度 42%");
+    assert.ok(view.detail.technical.includes(`内容摘要：${"a".repeat(64)}`));
+    assert.match(view.detail.boundary, /当前项目内容/);
   });
 
   it("keeps label helpers explicit", () => {
@@ -156,6 +159,8 @@ describe("export package snapshots", () => {
     assert.equal(history[0].comparison?.wordDelta, 3000);
     assert.equal(history[0].comparison?.fileSizeDeltaLabel, "+500 B");
     assert.match(history[0].comparison?.label ?? "", /更完整/);
+    assert.ok(history[0].detail.comparison.includes("上次同类快照：old-full"));
+    assert.ok(history[0].detail.comparison.includes("准备度变化：+20%"));
     assert.equal(history[1].comparison, null);
   });
 

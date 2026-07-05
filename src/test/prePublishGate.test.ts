@@ -119,9 +119,9 @@ test("buildPrePublishGate", async (t) => {
     assert.ok(gate.projectStatuses[0].downloadHref?.includes("format=markdown"));
     assert.ok(gate.projectStatuses[0].downloadHref?.includes("platformId=fanqie"));
     assert.ok(gate.priorityActions.some((action) => action.label === "导出平台发布包"));
-    assert.equal(gate.releaseAction?.label, "下载平台发布包");
-    assert.ok(gate.releaseAction?.href.includes("/api/projects/project-ready/platform-export"));
-    assert.ok(gate.releaseAction?.detail.includes("保存发布包基准"));
+    assert.equal(gate.releaseAction?.label, "进入发布闭环");
+    assert.equal(gate.releaseAction?.href, "#gate-export-package");
+    assert.ok(gate.releaseAction?.detail.includes("采纳一个投稿资产候选"));
   });
 
   await t.test("blocks launch when first-day handoff evidence is missing", () => {
@@ -328,6 +328,9 @@ test("buildPrePublishGate", async (t) => {
     });
     assert.equal(needsBaselineGate.projectStatuses[0].loopTimeline.status, "needs_baseline");
     assert.ok(needsBaselineGate.projectStatuses[0].loopTimeline.items.some((item) => item.type === "asset"));
+    assert.equal(needsBaselineGate.releaseAction?.label, "保存基准并下载");
+    assert.equal(needsBaselineGate.releaseAction?.href, "#gate-export-package");
+    assert.ok(needsBaselineGate.releaseAction?.detail.includes("保存当前发布包基准"));
 
     const scalingGate = buildPrePublishGate({
       projects: [{

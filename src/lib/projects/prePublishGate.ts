@@ -513,11 +513,20 @@ function buildReleaseAction(
     ?? null;
 
   if (status === "ready" && readyProject) {
+    const releaseLabel = readyProject.loopTimeline.status === "needs_baseline"
+      ? "保存基准并下载"
+      : readyProject.loopTimeline.status === "needs_effect"
+        ? "回填平台效果"
+        : readyProject.loopTimeline.status === "needs_iteration"
+          ? "处理二轮优化"
+          : readyProject.loopTimeline.status === "scaling"
+            ? "继续加更复盘"
+            : "进入发布闭环";
     return action(
       `release:${readyProject.projectId}`,
-      readyProject.downloadHref ? "下载平台发布包" : "打开发布包",
-      `${readyProject.projectTitle} · ${readyProject.platformName} 已通过总闸门。下载后先保存发布包基准，投放后回填平台效果。`,
-      readyProject.downloadHref ?? readyProject.href,
+      releaseLabel,
+      `${readyProject.projectTitle} · ${readyProject.platformName} 已通过总闸门。下一步：${readyProject.loopTimeline.nextAction}`,
+      "#gate-export-package",
       "primary",
     );
   }

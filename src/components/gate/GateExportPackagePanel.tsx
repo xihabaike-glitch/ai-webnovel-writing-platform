@@ -42,6 +42,13 @@ function packageTone(status: PrePublishGateProjectStatus["status"]) {
   return "bg-rose-50 text-rose-700";
 }
 
+function loopTone(status: PrePublishGateProjectStatus["loopTimeline"]["status"]) {
+  if (status === "needs_effect") return "border-blue-200 bg-blue-50 text-blue-900";
+  if (status === "needs_iteration") return "border-rose-200 bg-rose-50 text-rose-900";
+  if (status === "scaling") return "border-emerald-200 bg-emerald-50 text-emerald-900";
+  return "border-amber-200 bg-amber-50 text-amber-900";
+}
+
 export function GateExportPackagePanel({ packages }: { packages: PrePublishGateProjectStatus[] }) {
   const router = useRouter();
   const [runningId, setRunningId] = useState<string | null>(null);
@@ -111,7 +118,7 @@ export function GateExportPackagePanel({ packages }: { packages: PrePublishGateP
   }
 
   return (
-    <section className="mb-6 rounded-md border border-slate-200 bg-white p-4">
+    <section className="mb-6 rounded-md border border-slate-200 bg-white p-4" id="gate-export-package">
       <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <h2 className="font-medium text-slate-950">发布包导出</h2>
@@ -171,6 +178,50 @@ export function GateExportPackagePanel({ packages }: { packages: PrePublishGateP
                 </Link>
               </div>
             </div>
+            {item.status === "ready" ? (
+              <div className={`mt-3 rounded-md border p-3 text-sm ${loopTone(item.loopTimeline.status)}`}>
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                  <div>
+                    <div className="font-medium">闭环下一步：{item.loopTimeline.label}</div>
+                    <p className="mt-1 leading-6">{item.loopTimeline.nextAction}</p>
+                  </div>
+                  <div className="flex shrink-0 flex-wrap gap-2">
+                    {item.loopTimeline.status === "needs_baseline" ? (
+                      <button
+                        className="rounded-md bg-white px-3 py-2 text-xs font-medium text-slate-950 hover:bg-slate-50 disabled:opacity-50"
+                        disabled={runningId === `${item.projectId}:snapshot`}
+                        onClick={() => void saveBaseline(item)}
+                        type="button"
+                      >
+                        {runningId === `${item.projectId}:snapshot` ? "保存中" : "保存基准"}
+                      </button>
+                    ) : null}
+                    {item.loopTimeline.status === "needs_effect" ? (
+                      <button
+                        className="rounded-md bg-white px-3 py-2 text-xs font-medium text-slate-950 hover:bg-slate-50"
+                        onClick={() => {
+                          setEffectPackageKey(packageKey(item));
+                          setEffectDraft(emptyEffectDraft);
+                        }}
+                        type="button"
+                      >
+                        回填效果
+                      </button>
+                    ) : null}
+                    {item.loopTimeline.status === "needs_iteration" || item.loopTimeline.status === "scaling" || item.loopTimeline.status === "needs_asset" ? (
+                      <Link className="rounded-md bg-white px-3 py-2 text-xs font-medium text-slate-950 hover:bg-slate-50" href={item.loopTimeline.actionHref}>
+                        打开下一步
+                      </Link>
+                    ) : null}
+                    {item.downloadHref ? (
+                      <a className="rounded-md border border-current px-3 py-2 text-xs font-medium" href={item.downloadHref}>
+                        下载发布包
+                      </a>
+                    ) : null}
+                  </div>
+                </div>
+              </div>
+            ) : null}
             {effectPackageKey === packageKey(item) ? (
               <div className="mt-3 rounded-md border border-slate-200 bg-white p-3">
                 <div className="mb-3 text-sm font-medium text-slate-950">回填平台效果</div>

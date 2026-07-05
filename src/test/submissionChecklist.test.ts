@@ -71,4 +71,34 @@ test("buildSubmissionChecklist", async (t) => {
     assert.equal(checklist.items.find((item) => item.id === "word-count")?.status, "pass");
     assert.equal(checklist.items.find((item) => item.id === "first-three")?.status, "todo");
   });
+
+  await t.test("requires fresh first-three reviews after adopting candidate prose", () => {
+    const checklist = buildSubmissionChecklist({
+      title: "夜雨系统",
+      genre: "都市系统",
+      sellingPoint: "雨夜危机中觉醒系统，主角用一次次选择翻盘。",
+      currentWordCount: 9000,
+      targetWordCount: 300000,
+      platform: getPlatformProfile("fanqie"),
+      chapters,
+      aiTasks: [
+        ...chapters.map((chapter, index) => ({
+          taskType: "chapter_review",
+          status: "succeeded",
+          chapter: { id: chapter.id },
+          createdAt: `2026-01-0${index + 1}T00:00:00.000Z`,
+        })),
+        {
+          taskType: "chapter_adopt_candidate",
+          status: "succeeded",
+          chapter: { id: "chapter-1" },
+          createdAt: "2026-01-05T00:00:00.000Z",
+        },
+      ],
+    });
+
+    const reviewItem = checklist.items.find((item) => item.id === "reviewed-first-three");
+    assert.equal(reviewItem?.status, "todo");
+    assert.ok(reviewItem?.detail.includes("已审稿 2/3"));
+  });
 });

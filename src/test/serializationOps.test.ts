@@ -232,6 +232,38 @@ test("buildSerializationOpsDashboard", async (t) => {
     assert.equal(publishAction?.execution?.payload.status, "final");
   });
 
+  await t.test("moves adopted candidate chapters back to review before publishing", () => {
+    const dashboard = buildSerializationOpsDashboard({
+      project,
+      platform,
+      chapters: [chapter],
+      aiTasks: [
+        {
+          id: "review-1",
+          chapterId: "chapter-1",
+          taskType: "chapter_review",
+          status: "succeeded",
+          outputText: JSON.stringify({ score: 92, shouldSecondPass: false, issues: [] }),
+          createdAt: "2026-01-01T00:00:00.000Z",
+        },
+        {
+          id: "adopt-1",
+          chapterId: "chapter-1",
+          taskType: "chapter_adopt_candidate",
+          status: "succeeded",
+          outputText: JSON.stringify({ adopted: true }),
+          createdAt: "2026-01-02T00:00:00.000Z",
+        },
+      ],
+      submissionChecklist: { ...checklist, readinessPercent: 90, items: [] },
+    });
+
+    assert.equal(dashboard.publishReadyCount, 0);
+    assert.equal(dashboard.reviewQueueCount, 1);
+    assert.equal(dashboard.actions[0].id, "review-next");
+    assert.ok(dashboard.warnings.some((warning) => warning.includes("旧审稿不能当发布通行证")));
+  });
+
   await t.test("routes submission gaps to the matching repair workspace", () => {
     const dashboard = buildSerializationOpsDashboard({
       project,

@@ -153,9 +153,11 @@ async function buildCenter(projectId: string) {
     platform: targetPlatform,
     chapters: project.chapters,
     aiTasks: project.aiTasks.map((task) => ({
+      chapterId: task.chapterId,
       taskType: task.taskType,
       status: task.status,
       chapter: task.chapterId ? { id: task.chapterId } : null,
+      createdAt: task.createdAt,
     })),
   });
   const center = buildPlatformPublishExportCenter({

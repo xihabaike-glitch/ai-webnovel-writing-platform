@@ -34,9 +34,11 @@ export async function GET(request: Request, { params }: Params) {
     platform,
     chapters: project.chapters,
     aiTasks: project.aiTasks.map((task) => ({
+      chapterId: task.chapterId,
       taskType: task.taskType,
       status: task.status,
       chapter: task.chapterId ? { id: task.chapterId } : null,
+      createdAt: task.createdAt,
     })),
   });
   const submissionPackage = buildSubmissionPackage({

@@ -253,6 +253,42 @@ test("buildPlatformPublishExportCenter", async (t) => {
     assert.ok(pack.markdown.includes("最终裁决：可投"));
   });
 
+  await t.test("blocks export when candidate adoption makes old reviews stale", () => {
+    const center = buildPlatformPublishExportCenter({
+      project: {
+        title: "夜雨系统",
+        genre: "都市系统",
+        sellingPoint: "雨夜危机中觉醒系统，主角用选择翻盘。",
+        currentWordCount: 9000,
+        targetWordCount: 300000,
+      },
+      targetPlatform: getPlatformProfile("fanqie"),
+      chapters: finalChapters,
+      aiTasks: [
+        ...passedReviews,
+        {
+          chapterId: "chapter-1",
+          taskType: "chapter_adopt_candidate",
+          status: "succeeded",
+          outputText: JSON.stringify({ adopted: true }),
+          createdAt: "2026-01-08T00:00:00.000Z",
+        },
+      ],
+      submissionChecklist: readyChecklist,
+      platforms: [getPlatformProfile("fanqie")],
+    });
+    const pack = center.packages[0];
+    const staleChapter = pack.chapters.find((item) => item.id === "chapter-1");
+
+    assert.equal(pack.canExport, false);
+    assert.equal(staleChapter?.ready, false);
+    assert.ok(staleChapter?.preflight.blocked.some((item) => item.includes("旧审稿")));
+    assert.equal(staleChapter?.repairActions[0]?.kind, "run_chapter_review");
+    assert.ok(pack.preflight.blocked.some((item) => item.includes("未通过发布前质检")));
+    assert.equal(pack.finalGate.status, "fix_first");
+    assert.ok(pack.markdown.includes("补章节审稿"));
+  });
+
   await t.test("prefers persisted platform submission assets", () => {
     const center = buildPlatformPublishExportCenter({
       project: {

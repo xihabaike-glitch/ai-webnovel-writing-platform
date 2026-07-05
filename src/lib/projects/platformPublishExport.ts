@@ -1,6 +1,7 @@
 import type { PlatformProfile } from "../platforms/platformProfiles.ts";
 import { platformProfiles, type PlatformId } from "../platforms/platformProfiles.ts";
 import { publishRepairTaskSource } from "./publishRepairActionExecution.ts";
+import { chapterTaskFreshness } from "./chapterPublishReadiness.ts";
 import type { SubmissionChecklist } from "./submissionChecklist.ts";
 import { buildSubmissionPackage, type SubmissionPackage, type SubmissionPackageChapter } from "./submissionPackage.ts";
 
@@ -959,7 +960,8 @@ function buildChapterPreflight(
   const passed: string[] = [];
   const softWarnings = [...warnings];
   const repairActions: PublishRepairAction[] = [];
-  const reviewDecision = parseReviewDecision(latestTask(tasks, chapter.id, "chapter_review"));
+  const reviewFreshness = chapterTaskFreshness(tasks, chapter.id, "chapter_review");
+  const reviewDecision = parseReviewDecision(reviewFreshness.isFresh ? reviewFreshness.task : undefined);
 
   if (compact(chapter.content).length > 0 && chapter.wordCount > 0) passed.push("正文已生成");
   else {
@@ -1002,12 +1004,14 @@ function buildChapterPreflight(
       "进入二改工作台按平台问题重写，并让系统自动复检。",
     ));
   } else {
-    blocked.push("缺少通过的审稿/复检记录。");
+    blocked.push(reviewFreshness.isStaleAfterAdoption ? "采纳候选稿后正文已变更，旧审稿/复检记录已过期。" : "缺少通过的审稿/复检记录。");
     repairActions.push(chapterAction(
       chapter,
       "run_chapter_review",
       "补章节审稿",
-      "进入章节工作台运行审稿，拿到通过的复检记录。",
+      reviewFreshness.isStaleAfterAdoption
+        ? "候选稿已进入正文，先重新审稿，再决定二改或发布。"
+        : "进入章节工作台运行审稿，拿到通过的复检记录。",
     ));
   }
   if (platform.category === "overseas") softWarnings.push("海外平台发布前建议人工英文化终稿。");

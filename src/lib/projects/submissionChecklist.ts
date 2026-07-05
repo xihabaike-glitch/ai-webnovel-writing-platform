@@ -1,4 +1,5 @@
 import type { PlatformProfile } from "@/lib/platforms/platformProfiles";
+import { chapterTaskFreshness } from "./chapterPublishReadiness.ts";
 
 export interface SubmissionChapter {
   id: string;
@@ -11,11 +12,13 @@ export interface SubmissionChapter {
 }
 
 export interface SubmissionAiTask {
+  chapterId?: string | null;
   taskType: string;
   status: string;
   chapter?: {
     id: string;
   } | null;
+  createdAt?: Date | string;
 }
 
 export interface SubmissionChecklistInput {
@@ -49,11 +52,7 @@ function item(id: string, label: string, status: SubmissionChecklistItem["status
 }
 
 function hasSucceededReview(tasks: SubmissionAiTask[], chapterId: string) {
-  return tasks.some((task) => (
-    task.taskType === "chapter_review"
-    && task.status === "succeeded"
-    && task.chapter?.id === chapterId
-  ));
+  return chapterTaskFreshness(tasks, chapterId, "chapter_review").isFresh;
 }
 
 function minimumSubmissionWords(platform: PlatformProfile) {

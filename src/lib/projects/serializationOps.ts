@@ -6,6 +6,7 @@ import {
   type PlatformPublishEffectSummary,
   type PlatformSubmissionAssetAudit,
 } from "./platformPublishExport.ts";
+import { chapterTaskFreshness } from "./chapterPublishReadiness.ts";
 import type { SubmissionChecklist } from "./submissionChecklist.ts";
 
 export interface SerializationProject {
@@ -278,11 +279,11 @@ function parseReviewDecision(task: SerializationTask | undefined) {
 }
 
 function reviewed(chapter: SerializationChapter, tasks: SerializationTask[]) {
-  return latestTask(tasks, chapter.id, "chapter_review")?.status === "succeeded";
+  return chapterTaskFreshness(tasks, chapter.id, "chapter_review").isFresh;
 }
 
 function secondPassed(chapter: SerializationChapter, tasks: SerializationTask[]) {
-  return latestTask(tasks, chapter.id, "chapter_second_pass")?.status === "succeeded";
+  return chapterTaskFreshness(tasks, chapter.id, "chapter_second_pass").isFresh;
 }
 
 function normalizeFinalSubmissionGate(finalGate: PlatformFinalSubmissionGate | null | undefined): SerializationFinalSubmissionGate {
@@ -912,8 +913,12 @@ export function buildSerializationOpsDashboard(input: SerializationOpsInput): Se
   const publishEffectStatus = buildSerializationPublishEffectStatus(input);
   const draftedChapters = input.chapters.filter((chapter) => chapter.wordCount > 0);
   const reviewQueue = draftedChapters.filter((chapter) => !reviewed(chapter, input.aiTasks));
+  const staleReviewQueue = reviewQueue.filter((chapter) => (
+    chapterTaskFreshness(input.aiTasks, chapter.id, "chapter_review").isStaleAfterAdoption
+  ));
   const revisionQueue = draftedChapters.filter((chapter) => {
-    const reviewTask = latestTask(input.aiTasks, chapter.id, "chapter_review");
+    const reviewFreshness = chapterTaskFreshness(input.aiTasks, chapter.id, "chapter_review");
+    const reviewTask = reviewFreshness.isFresh ? reviewFreshness.task : undefined;
     const decision = parseReviewDecision(reviewTask);
     return reviewed(chapter, input.aiTasks) && (decision?.shouldSecondPass ?? true);
   });
@@ -929,7 +934,8 @@ export function buildSerializationOpsDashboard(input: SerializationOpsInput): Se
   const warnings: string[] = [];
 
   if (draftedChapters.length === 0) warnings.push("还没有可运营正文，先用批量初稿生产中心出稿。");
-  if (reviewQueue.length > 0) warnings.push(`${reviewQueue.length} 章已有正文但未审稿，直接发布会放大留存风险。`);
+  if (staleReviewQueue.length > 0) warnings.push(`${staleReviewQueue.length} 章采纳候选稿后正文已变更，旧审稿不能当发布通行证。`);
+  if (reviewQueue.length > staleReviewQueue.length) warnings.push(`${reviewQueue.length - staleReviewQueue.length} 章已有正文但未审稿，直接发布会放大留存风险。`);
   if (revisionQueue.length > 0) warnings.push(`${revisionQueue.length} 章需要二改后再发布。`);
   if (publishReady.length === 0 && draftedChapters.length > 0) warnings.push("暂无发布就绪章节，先完成审稿和二改。");
   if (input.submissionChecklist.readinessPercent < 80) warnings.push(`投稿准备度 ${input.submissionChecklist.readinessPercent}%，还不适合正式投放。`);

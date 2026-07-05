@@ -204,7 +204,7 @@ test("buildFirstDayContinuationAction carries handoff guidance into ready batch 
       gateDispatchTasks: [{
         dispatchKey: "first-day:project-1:publish-precheck",
         state: "completed",
-        completionEvidence: "首日平台包预检已完成。交接动作已落地：开头第一段倒计时完成。避坑边界已确认：不要直接放量，先做小样本。",
+        completionEvidence: "首日平台包预检已完成。交接动作已落地：开头第一段倒计时完成。通过线已写清，前三章追读承诺必须兑现；不可接受项是慢热解释和卖点不兑现；复查证据入口已保存。平台回收口径已写清标题、简介、标签、样章、曝光、点击、收藏和追读。避坑边界已确认：不要直接放量，先做小样本。",
       }],
     }),
     workflow: completedWorkflow(),

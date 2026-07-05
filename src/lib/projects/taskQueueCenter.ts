@@ -5,6 +5,7 @@ import { buildExportSnapshotHistory } from "../export/snapshots.ts";
 import { buildExportVersionCenter } from "../export/versionCenter.ts";
 import { getPlatformProfile, type PlatformId } from "../platforms/platformProfiles.ts";
 import { buildFirstDayRiskProfile, type FirstDayRiskLevel } from "./firstDayWorkflow.ts";
+import { validateFirstDayDispatchCompletionEvidence } from "./firstDayWorkflowView.ts";
 import {
   buildPlatformPublishExportCenter,
   type PlatformPublishMetricInput,
@@ -284,21 +285,61 @@ function completedFirstDayHandoffEvidence(project: TaskQueueProject) {
     .join("\n");
 }
 
+function includesAny(text: string, keywords: string[]) {
+  return keywords.some((keyword) => text.includes(keyword));
+}
+
+function firstDayHandoffValidation(task: NonNullable<TaskQueueProject["gateDispatchTasks"]>[number]) {
+  if (!task.dispatchKey.startsWith("first-day-handoff:")) return { valid: true, error: null as string | null };
+  return validateFirstDayDispatchCompletionEvidence({
+    dispatchKey: task.dispatchKey,
+    title: task.title,
+    acceptanceCriteria: [],
+    completionEvidence: task.completionEvidence,
+  });
+}
+
+function completedFirstDayHandoffEvidenceInvalid(task: NonNullable<TaskQueueProject["gateDispatchTasks"]>[number]) {
+  if (!task.dispatchKey.startsWith("first-day-handoff:")) return false;
+  if (task.state !== "completed") return false;
+  if (task.completionEvidence.trim().length < 8) return true;
+  return !firstDayHandoffValidation(task).valid;
+}
+
 function handoffEvidenceStatus(project: TaskQueueProject, startTactic: ProjectStartTacticSummary | null, stepId: string) {
   const evidence = [
     completedFirstDayDispatch(project, stepId)?.completionEvidence ?? "",
     completedFirstDayHandoffEvidence(project),
   ].filter(Boolean).join("\n");
-  const requiresAction = (startTactic?.firstDayActions?.length ?? 0) > 0;
-  const requiresAvoidRule = (startTactic?.avoidRules?.length ?? 0) > 0;
-  const actionCleared = !requiresAction || /交接动作|首日动作|开头|验证|落地/u.test(evidence);
-  const avoidRuleCleared = !requiresAvoidRule || /避坑边界|避开|不要|小样本|不放量|暂停/u.test(evidence);
+  const hasHandoffSignal = Boolean(
+    startTactic?.handoffLabel
+    || startTactic?.handoffDetail
+    || (startTactic?.firstDayActions?.length ?? 0) > 0
+    || (startTactic?.avoidRules?.length ?? 0) > 0
+    || (startTactic?.handoffEvidence?.length ?? 0) > 0
+  );
+  const requiresAction = hasHandoffSignal;
+  const requiresVerification = hasHandoffSignal;
+  const requiresPackage = hasHandoffSignal;
+  const requiresAvoidRule = hasHandoffSignal || (startTactic?.avoidRules?.length ?? 0) > 0;
+  const invalidCompletedHandoffs = (project.gateDispatchTasks ?? []).filter(completedFirstDayHandoffEvidenceInvalid);
+  const actionCleared = !requiresAction || includesAny(evidence, ["交接动作", "首日动作", "开头", "第一章", "首屏", "钩子", "危机", "追读", "落地"]);
+  const verificationCleared = !requiresVerification || (
+    evidence.includes("通过线")
+    && evidence.includes("不可接受")
+    && evidence.includes("复查证据")
+  );
+  const packageCleared = !requiresPackage || includesAny(evidence, ["平台回收", "回收口径", "标题", "简介", "标签", "样章", "曝光", "点击", "收藏", "追读"]);
+  const avoidRuleCleared = !requiresAvoidRule || includesAny(evidence, ["避坑边界", "避开", "不要", "小样本", "不放量", "暂停"]);
 
   return {
-    required: requiresAction || requiresAvoidRule,
-    cleared: actionCleared && avoidRuleCleared,
+    required: hasHandoffSignal,
+    cleared: actionCleared && verificationCleared && packageCleared && avoidRuleCleared && invalidCompletedHandoffs.length === 0,
     missingAction: requiresAction && !actionCleared,
+    missingVerification: requiresVerification && !verificationCleared,
+    missingPackage: requiresPackage && !packageCleared,
     missingAvoidRule: requiresAvoidRule && !avoidRuleCleared,
+    invalidCompletedHandoffs,
   };
 }
 
@@ -502,10 +543,12 @@ function firstDayExperienceHandoffQueueItems(input: {
   return (input.project.gateDispatchTasks ?? [])
     .filter((task) => {
       if (!task.dispatchKey.startsWith(`first-day-handoff:${input.project.id}:`)) return false;
-      return task.state !== "completed" || task.completionEvidence.trim().length < 8;
+      return task.state !== "completed" || task.completionEvidence.trim().length < 8 || !firstDayHandoffValidation(task).valid;
     })
     .map((task): QueueItem => {
       const missingEvidence = task.state === "completed" && task.completionEvidence.trim().length < 8;
+      const validation = firstDayHandoffValidation(task);
+      const invalidEvidence = task.state === "completed" && task.completionEvidence.trim().length >= 8 && !validation.valid;
       return item({
         id: `${input.project.id}:first-day-handoff:${task.dispatchKey}`,
         projectId: input.project.id,
@@ -514,11 +557,15 @@ function firstDayExperienceHandoffQueueItems(input: {
         category: "handoff",
         sourceType: "first_day_handoff",
         sourceLabel: "经验开书",
-        sourceDetail: missingEvidence
+        sourceDetail: invalidEvidence
+          ? `交接派单已标记完成，但证据没过首日审计：${validation.error ?? "请补齐三段交接证据。"}`
+          : missingEvidence
           ? "交接派单已标记完成，但验收证据太薄。补齐动作、边界和回收口径后，经验才算真正落地。"
           : "这不是普通生产任务，是把历史打法拆给首日角色的交接工单。先闭环它，再让后续批量生产吃到正确上下文。",
         chapterTitle: task.title ?? "经验开书交接",
-        evidence: missingEvidence
+        evidence: invalidEvidence
+          ? `任务已标记完成，但交接质量不合格。${validation.error ?? "补齐开头打法、首轮验收和平台回收口径后再复查。"}`
+          : missingEvidence
           ? `任务已标记完成，但缺少可验收依据。${task.detail ?? "补齐交接动作、避坑边界和首轮回收口径。"}`
           : task.detail ?? "经验开书交接还未完成，需要确认开头打法、首轮验收或平台回收口径。",
         strategyBasis: input.startTactic,
@@ -527,7 +574,7 @@ function firstDayExperienceHandoffQueueItems(input: {
         riskLabel: input.riskLabel,
         riskNotice: input.riskNotice,
         scaleGate: input.scaleGate,
-        actionLabel: missingEvidence ? "补交接证据" : task.actionLabel ?? "处理交接",
+        actionLabel: missingEvidence || invalidEvidence ? "补交接证据" : task.actionLabel ?? "处理交接",
         href: task.href ?? firstDayDispatchHref(input.project.id),
       });
     });
@@ -913,7 +960,10 @@ export function buildTaskQueueCenter(projects: TaskQueueProject[]): TaskQueueCen
       const missingHandoffEvidence = productionGateCleared && handoffStatus.required && !handoffStatus.cleared;
       const missingParts = [
         handoffStatus.missingAction ? "交接动作落地" : null,
+        handoffStatus.missingVerification ? "首轮验收口径" : null,
+        handoffStatus.missingPackage ? "平台回收口径" : null,
         handoffStatus.missingAvoidRule ? "避坑边界确认" : null,
+        handoffStatus.invalidCompletedHandoffs.length ? "薄弱交接证据重写" : null,
       ].filter((part): part is string => Boolean(part));
       queueItems.push(item({
         id: `${project.id}:first-day-gate:${platform.id}`,

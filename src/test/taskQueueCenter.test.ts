@@ -702,7 +702,7 @@ test("buildTaskQueueCenter", async (t) => {
       gateDispatchTasks: [{
         dispatchKey: `first-day:${project.id}:publish-precheck`,
         state: "completed",
-        completionEvidence: "首日平台包预检已完成。交接动作已落地：开头第一段倒计时完成，验证前三章追读承诺。避坑边界已确认：不要直接放量，先做小样本。",
+        completionEvidence: "首日平台包预检已完成。交接动作已落地：开头第一段倒计时完成。通过线已写清，前三章追读承诺必须兑现；不可接受项是慢热解释和卖点不兑现；复查证据入口已保存。平台回收口径已写清标题、简介、标签、样章、曝光、点击、收藏和追读。避坑边界已确认：不要直接放量，先做小样本。",
       }],
     }]);
 
@@ -716,6 +716,51 @@ test("buildTaskQueueCenter", async (t) => {
   });
 
   await t.test("allows production when completed handoff dispatches carry closure evidence", () => {
+    const queue = buildTaskQueueCenter([{
+      ...project,
+      worldEntries: handoffWorldEntries(),
+      gateDispatchTasks: [
+        ...firstDayCompleteDispatches(project.id),
+        {
+          dispatchKey: "first-day-handoff:project-1:opening",
+          stage: "start_opening_diagnostic",
+          state: "completed",
+          title: "夜雨系统 · 经验开书交接：开头打法",
+          detail: "把稳定加码拆到第一章首屏。",
+          actionLabel: "锁定开头打法",
+          href: "/projects/project-1/chapters/chapter-ready-draft",
+          completionEvidence: "交接动作已落地：开头第一段倒计时完成，首日动作已写入第一章。",
+        },
+        {
+          dispatchKey: "first-day-handoff:project-1:verification",
+          stage: "start_first_three_review",
+          state: "completed",
+          title: "夜雨系统 · 经验开书交接：首轮验收",
+          detail: "把历史打法转成前三章验收标准。",
+          actionLabel: "设置验收口径",
+          href: "/projects/project-1/chapters/chapter-ready-draft",
+          completionEvidence: "验证动作已落地：通过线已写清，前三章追读承诺必须兑现；不可接受项是慢热解释和卖点不兑现；复查证据口径已保存。",
+        },
+        {
+          dispatchKey: "first-day-handoff:project-1:platform-package",
+          stage: "start_platform_package",
+          state: "completed",
+          title: "夜雨系统 · 经验开书交接：平台回收",
+          detail: "把可复用经验落到标题、简介、标签、样章和首轮数据回收口径。",
+          actionLabel: "准备平台回收",
+          href: "/projects/project-1#platform-export",
+          completionEvidence: "避坑边界已确认：不要直接放量，先做小样本；平台回收口径已写清。",
+        },
+      ],
+    }]);
+
+    assert.equal(queue.overview.firstDayBlocked, 0);
+    assert.equal(queue.overview.firstDayHandoffs, 0);
+    assert.equal(queue.overview.reviewReady, 1);
+    assert.equal(queue.recommendedNext?.category, "review");
+  });
+
+  await t.test("keeps completed but weak handoff evidence in the queue", () => {
     const queue = buildTaskQueueCenter([{
       ...project,
       worldEntries: handoffWorldEntries(),
@@ -753,11 +798,16 @@ test("buildTaskQueueCenter", async (t) => {
         },
       ],
     }]);
+    const handoff = queue.items.find((item) => item.sourceType === "first_day_handoff");
+    const gate = queue.items.find((item) => item.blockerType === "first_day_gate");
 
-    assert.equal(queue.overview.firstDayBlocked, 0);
-    assert.equal(queue.overview.firstDayHandoffs, 0);
-    assert.equal(queue.overview.reviewReady, 1);
-    assert.equal(queue.recommendedNext?.category, "review");
+    assert.equal(queue.overview.firstDayBlocked, 1);
+    assert.equal(queue.overview.firstDayHandoffs, 1);
+    assert.equal(handoff?.actionLabel, "补交接证据");
+    assert.ok(handoff?.sourceDetail?.includes("证据没过首日审计"));
+    assert.ok(handoff?.evidence.includes("不可接受"));
+    assert.ok(gate?.evidence.includes("薄弱交接证据重写"));
+    assert.equal(queue.recommendedNext?.sourceType, "first_day_handoff");
   });
 
   await t.test("surfaces first-three adoption follow-up dispatches in the queue", () => {

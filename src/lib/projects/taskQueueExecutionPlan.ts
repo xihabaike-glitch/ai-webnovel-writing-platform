@@ -14,6 +14,7 @@ export interface TaskQueueExecutionPlan {
   chapterIds: string[];
   strategyBases: NonNullable<QueueItem["strategyBasis"]>[];
   scaleGate: QueueScaleGate;
+  adoptionFollowupCount: number;
   actionLabel: string;
   detail: string;
   warnings: string[];
@@ -54,6 +55,7 @@ export function buildTaskQueueExecutionPlan(
       chapterIds: [],
       strategyBases: [],
       scaleGate: "none",
+      adoptionFollowupCount: 0,
       actionLabel: "暂无可执行批次",
       detail: "当前队列没有可直接运行的初稿、审稿或二改任务。",
       warnings: ["先补章节卡、处理发布阻塞，或进入项目生成新的可执行任务。"],
@@ -68,6 +70,7 @@ export function buildTaskQueueExecutionPlan(
   const sameCategoryOtherProjects = executable.filter((item) => item.category === first.category && item.projectId !== first.projectId).length;
   const projectIds = [...new Set(batch.map((item) => item.projectId))];
   const projectTitles = [...new Set(batch.map((item) => item.projectTitle))];
+  const adoptionFollowupCount = batch.filter((item) => item.sourceType === "first_three_adoption").length;
   const strategyBases = [
     ...new Map(
       batch
@@ -87,9 +90,11 @@ export function buildTaskQueueExecutionPlan(
     chapterIds: batch.map(chapterIdFromItem).filter(Boolean),
     strategyBases,
     scaleGate: first.scaleGate,
+    adoptionFollowupCount,
     actionLabel: `${categoryActionLabel(first.category)} ${batch.length} 个`,
     detail: `${projectTitles.join("、")} · ${first.label} · ${batch.map((item) => item.chapterTitle).join("、")}`,
     warnings: [
+      adoptionFollowupCount > 0 ? `本批包含 ${adoptionFollowupCount} 个采纳闭环任务；它们不是普通审稿，执行后必须回总闸门复检。` : null,
       first.scaleGate === "sample_only" ? "当前处于观察小样本闸门，只运行 1 个样本；验收依据写清通过线、不可接受项、复查证据和放量结论后才允许批量生成。" : null,
       first.scaleGate === "cleared" ? "小样本验收已过线，本批属于恢复放量；先保持同一平台打法和小批次节奏，别一次拉满。" : null,
       sameCategoryOtherProjects > 0 && !strategy.allowCrossProject ? `还有 ${sameCategoryOtherProjects} 个同类任务分布在其他项目，本批先保持单项目上下文。` : null,

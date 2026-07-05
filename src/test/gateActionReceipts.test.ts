@@ -4833,6 +4833,62 @@ test("buildGateActionReceipt", async (t) => {
     }), "");
   });
 
+  await t.test("builds and validates AI pipeline recovery completion templates", () => {
+    const sampleTask = {
+      stage: "ai_pipeline_sample_recheck" as const,
+      title: "AI 写审改：跑 1 章小样本复验",
+      actionLabel: "跑小样本复验",
+      platformName: "AI 写审改",
+    };
+    const scaleTask = {
+      ...sampleTask,
+      stage: "ai_pipeline_small_batch" as const,
+      title: "AI 写审改：回推荐批量队列",
+      actionLabel: "回推荐批量",
+    };
+    const rollbackTask = {
+      ...sampleTask,
+      title: "AI 写审改：恢复小批跌线修复",
+      actionLabel: "回滚观察修复",
+      evidence: ["回滚原因：恢复小批跌破 85 分复盘线或缺少质量证据。"],
+    };
+
+    assert.ok(buildGateDispatchCompletionTemplate(sampleTask).includes("样本范围"));
+    assert.ok(buildGateDispatchCompletionTemplate(sampleTask).includes("放量结论"));
+    assert.ok(buildGateDispatchCompletionTemplate(scaleTask).includes("小批范围"));
+    assert.ok(buildGateDispatchCompletionTemplate(scaleTask).includes("下一步节奏"));
+    assert.ok(buildGateDispatchCompletionTemplate(rollbackTask).includes("修复动作"));
+    assert.ok(buildGateDispatchCompletionTemplate(rollbackTask).includes("复验结论"));
+
+    assert.equal(reviewGateDispatchCompletionEvidence(sampleTask, [
+      "AI 写审改：跑 1 章小样本复验",
+      "样本范围：第 1 章",
+      "成功率：100%",
+      "质量：86",
+      "失败/成本：无失败，成本正常",
+      "放量结论：通过，只恢复小批",
+    ].join("\n")), null);
+    assert.equal(reviewGateDispatchCompletionEvidence(scaleTask, [
+      "AI 写审改：回推荐批量队列",
+      "小批范围：第 2-3 章",
+      "成功率：100%",
+      "平均质量：88",
+      "失败/成本：无失败，成本正常",
+      "下一步节奏：继续恢复小批",
+    ].join("\n")), null);
+    assert.equal(reviewGateDispatchCompletionEvidence(rollbackTask, [
+      "AI 写审改：恢复小批跌线修复",
+      "修复对象：第 2 章",
+      "跌线原因：质量 82，钩子弱",
+      "修复动作：重写前三段和章末追读",
+      "复验结论：重新跑 1 章小样本",
+      "下一步：观察，不放量",
+    ].join("\n")), null);
+    assert.ok(reviewGateDispatchCompletionEvidence(sampleTask, "已完成")?.includes("样本范围"));
+    assert.ok(reviewGateDispatchCompletionEvidence(scaleTask, "成功率：100%\n下一步节奏：继续")?.includes("小批范围"));
+    assert.ok(reviewGateDispatchCompletionEvidence(rollbackTask, "修复对象：第 2 章\n修复动作：重写")?.includes("跌线原因"));
+  });
+
   await t.test("builds platform strategy receipts for the unified gate audit log", () => {
     const receipt = buildGatePlatformStrategyReceipt({
       item: strategyPlatform,

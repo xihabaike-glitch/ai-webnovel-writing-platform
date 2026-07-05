@@ -4128,7 +4128,57 @@ const openingCompletionStages = new Set<GatePlatformGrowthReviewStage>([
   "start_rewrite_opening",
 ]);
 
+function isAiPipelineSampleCompletionTask(task: GateDispatchCompletionTemplateTask) {
+  const text = `${task.title} ${task.actionLabel} ${(task.evidence ?? []).join(" ")}`;
+  return task.stage === "ai_pipeline_sample_recheck" && !/回滚|跌线|修复/u.test(text);
+}
+
+function isAiPipelineScaleCompletionTask(task: GateDispatchCompletionTemplateTask) {
+  return task.stage === "ai_pipeline_small_batch";
+}
+
+function isAiPipelineRollbackCompletionTask(task: GateDispatchCompletionTemplateTask) {
+  const text = `${task.title} ${task.actionLabel} ${(task.evidence ?? []).join(" ")}`;
+  return task.stage === "ai_pipeline_sample_recheck" && /回滚|跌线|修复/u.test(text);
+}
+
+function isAiPipelineCompletionTask(task: GateDispatchCompletionTemplateTask) {
+  return isAiPipelineSampleCompletionTask(task)
+    || isAiPipelineScaleCompletionTask(task)
+    || isAiPipelineRollbackCompletionTask(task);
+}
+
 export function buildGateDispatchCompletionTemplate(task: GateDispatchCompletionTemplateTask) {
+  if (isAiPipelineRollbackCompletionTask(task)) {
+    return [
+      `${task.title}`,
+      "修复对象：",
+      "跌线原因：",
+      `修复动作：${task.actionLabel}`,
+      "复验结论：",
+      "下一步：观察 / 重新小样本 / 暂停恢复小批",
+    ].join("\n");
+  }
+  if (isAiPipelineScaleCompletionTask(task)) {
+    return [
+      `${task.title}`,
+      "小批范围：",
+      "成功率：",
+      "平均质量：",
+      "失败/成本：",
+      "下一步节奏：继续恢复小批 / 回滚观察修复 / 暂停",
+    ].join("\n");
+  }
+  if (isAiPipelineSampleCompletionTask(task)) {
+    return [
+      `${task.title}`,
+      "样本范围：",
+      "成功率：",
+      "质量：",
+      "失败/成本：",
+      "放量结论：通过恢复小批 / 未通过继续观察",
+    ].join("\n");
+  }
   if (metricCompletionStages.has(task.stage)) {
     return [
       `${task.title}`,
@@ -4197,6 +4247,19 @@ export function reviewGateDispatchCompletionEvidence(
 ) {
   const text = completionEvidence.trim();
   if (!buildGateDispatchCompletionTemplate(task)) return null;
+
+  if (isAiPipelineCompletionTask(task)) {
+    const labels = isAiPipelineRollbackCompletionTask(task)
+      ? ["修复对象", "跌线原因", "修复动作", "复验结论", "下一步"]
+      : isAiPipelineScaleCompletionTask(task)
+        ? ["小批范围", "成功率", "平均质量", "失败/成本", "下一步节奏"]
+        : ["样本范围", "成功率", "质量", "失败/成本", "放量结论"];
+    const filled = completedLabels(text, labels);
+    return filled.length >= 4
+      ? null
+      : `请补齐 AI 写审改完成依据：${labels.join("、")}至少写清 4 项。`;
+  }
+
   if (text.length < 8) return "完成派单前，请写清楚完成依据，至少 8 个字。";
 
   if (metricCompletionStages.has(task.stage)) {

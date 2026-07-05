@@ -45,6 +45,9 @@ export interface ExportBaselineComparison {
 
 export interface ExportBaselineTimelineItem {
   snapshotId: string;
+  targetId: string;
+  packageKind: string;
+  format: string;
   label: string;
   fileName: string;
   createdAt: string | Date;
@@ -52,6 +55,7 @@ export interface ExportBaselineTimelineItem {
   readinessPercent: number;
   isCurrent: boolean;
   statusLabel: string;
+  actionLabel: string;
   detail: string;
 }
 
@@ -243,6 +247,9 @@ function buildBaselineTimeline(orderedSnapshots: ExportPackageSnapshotView[]): E
       const label = `${snapshot.packageKindLabel} · ${snapshot.formatLabel}`;
       return {
         snapshotId: snapshot.id,
+        targetId: buildTargetId(snapshot.packageKind, snapshot.format),
+        packageKind: snapshot.packageKind,
+        format: snapshot.format,
         label,
         fileName: snapshot.fileName,
         createdAt: snapshot.createdAt,
@@ -250,6 +257,7 @@ function buildBaselineTimeline(orderedSnapshots: ExportPackageSnapshotView[]): E
         readinessPercent: snapshot.readinessPercent,
         isCurrent: snapshot.isBaseline,
         statusLabel: snapshot.isBaseline ? "当前正式基准" : "历史基准",
+        actionLabel: snapshot.isBaseline ? "按当前基准重导" : "按历史基准重导",
         detail: snapshot.isBaseline
           ? "当前版本对比、发布归档和回滚判断都围绕它展开。"
           : "这条快照曾经作为正式基准，后续被更新版本替换。",

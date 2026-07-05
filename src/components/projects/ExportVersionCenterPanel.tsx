@@ -50,6 +50,7 @@ export function ExportVersionCenterPanel({
   const [error, setError] = useState<string | null>(null);
   const filterOptions = buildExportSnapshotFilterOptions(snapshots);
   const visibleSnapshots = filterExportSnapshots(snapshots, filterId);
+  const snapshotById = new Map(snapshots.map((snapshot) => [snapshot.id, snapshot]));
 
   async function regenerateSnapshot(snapshot: ExportPackageSnapshotView) {
     setRunningId(snapshot.id);
@@ -189,6 +190,16 @@ export function ExportVersionCenterPanel({
                     </div>
                     <div className="mt-1 text-slate-600">{item.fileName}</div>
                     <p className="mt-2 text-slate-600">{item.detail}</p>
+                    {snapshotById.get(item.snapshotId) ? (
+                      <button
+                        className="mt-3 rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                        disabled={runningId !== null}
+                        onClick={() => void regenerateSnapshot(snapshotById.get(item.snapshotId)!)}
+                        type="button"
+                      >
+                        {runningId === item.snapshotId ? "生成中" : item.actionLabel}
+                      </button>
+                    ) : null}
                   </div>
                   <div className="text-xs leading-5 text-slate-500 md:text-right">
                     <div>锁定 {timeText(item.lockedAt)}</div>

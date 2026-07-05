@@ -140,11 +140,15 @@ describe("export version center", () => {
 
     assert.equal(center.baselineTimeline.length, 2);
     assert.equal(center.baselineTimeline[0].snapshotId, "full-md-current");
+    assert.equal(center.baselineTimeline[0].targetId, "full:markdown");
     assert.equal(center.baselineTimeline[0].isCurrent, true);
     assert.equal(center.baselineTimeline[0].statusLabel, "当前正式基准");
+    assert.equal(center.baselineTimeline[0].actionLabel, "按当前基准重导");
     assert.equal(center.baselineTimeline[1].snapshotId, "full-md-old");
+    assert.equal(center.baselineTimeline[1].targetId, "full:markdown");
     assert.equal(center.baselineTimeline[1].isCurrent, false);
     assert.equal(center.baselineTimeline[1].statusLabel, "历史基准");
+    assert.equal(center.baselineTimeline[1].actionLabel, "按历史基准重导");
   });
 
   it("asks for a locked baseline before comparing versions", () => {

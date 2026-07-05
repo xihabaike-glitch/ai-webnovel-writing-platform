@@ -1118,10 +1118,10 @@ export function buildFirstDayDispatchUpdateSummary(input: {
       status: cleared ? "watch_cleared" : "watch_blocked",
       title: cleared ? "小样本已过线，放量闸门已解除" : "小样本未过线，继续观察",
       detail: cleared
-        ? "完成依据已写清通过线、不可接受项、复查证据和通过结论。先回总闸门复查放行状态，再进入任务队列谨慎放量。"
+        ? "完成依据已写清通过线、不可接受项、复查证据和通过结论。回任务队列复查推荐批次，按恢复小批节奏谨慎放量。"
         : "完成依据缺少成功率、质量分或失败样本，或包含未通过、暂不放量、继续观察等结论。先回总闸门确认卡点仍关闭，再修问题复测。",
-      actionLabel: "回总闸门复查",
-      href: "/gate",
+      actionLabel: cleared ? "回任务队列恢复小批" : "回总闸门复查",
+      href: cleared ? "/tasks#recommended-batch" : "/gate",
       badges: cleared
         ? ["小样本过线", "放量闸门解除", "恢复后续初稿"]
         : ["小样本未过线", "继续观察", "禁止批量放大"],

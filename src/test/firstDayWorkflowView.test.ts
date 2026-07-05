@@ -970,9 +970,9 @@ test("buildFirstDayDispatchUpdateSummary explains watch sample scale-up status",
 
   assert.equal(cleared.status, "watch_cleared");
   assert.equal(cleared.title, "小样本已过线，放量闸门已解除");
-  assert.equal(cleared.actionLabel, "回总闸门复查");
-  assert.equal(cleared.href, "/gate");
-  assert.ok(cleared.detail.includes("回总闸门复查"));
+  assert.equal(cleared.actionLabel, "回任务队列恢复小批");
+  assert.equal(cleared.href, "/tasks#recommended-batch");
+  assert.ok(cleared.detail.includes("回任务队列"));
   assert.ok(cleared.detail.includes("谨慎放量"));
   assert.ok(cleared.badges.includes("放量闸门解除"));
   assert.equal(blocked.status, "watch_blocked");

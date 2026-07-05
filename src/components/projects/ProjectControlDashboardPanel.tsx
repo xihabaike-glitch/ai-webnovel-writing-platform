@@ -62,6 +62,10 @@ interface AiPipelineRecentBatchSummary {
   detail: string;
   actionLabel: string;
   targetHref: string;
+  actionExecutable: boolean;
+  actionAreaId: string | null;
+  actionMode: "seed" | null;
+  executeLabel: string;
   secondaryActionLabel: string;
   secondaryTargetHref: string;
   evidenceBadges: string[];
@@ -399,6 +403,7 @@ export function ProjectControlDashboardPanel({ projectId }: { projectId: string 
   const [runningStartDecision, setRunningStartDecision] = useState(false);
   const [runningFoundationAction, setRunningFoundationAction] = useState(false);
   const [runningBatchHealthAction, setRunningBatchHealthAction] = useState(false);
+  const [runningRecentBatchAction, setRunningRecentBatchAction] = useState(false);
   const [runningChecklistItemId, setRunningChecklistItemId] = useState<string | null>(null);
   const [runningBatchRecheck, setRunningBatchRecheck] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -541,6 +546,41 @@ export function ProjectControlDashboardPanel({ projectId }: { projectId: string 
       setMessage(caught instanceof Error ? caught.message : "生成批量健康动作失败。");
     } finally {
       setRunningBatchHealthAction(false);
+    }
+  }
+
+  async function executeRecentBatchAction() {
+    if (!dashboard?.aiPipelineRecentBatch.actionExecutable || !dashboard.aiPipelineRecentBatch.actionAreaId || !dashboard.aiPipelineRecentBatch.actionMode) return;
+    setRunningRecentBatchAction(true);
+    setMessage(null);
+    try {
+      const response = await fetch(`/api/projects/${projectId}/control-actions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          areaId: dashboard.aiPipelineRecentBatch.actionAreaId,
+          mode: dashboard.aiPipelineRecentBatch.actionMode,
+        }),
+      });
+      const payload = await response.json() as {
+        message?: string;
+        error?: string;
+        targetAnchor?: string;
+        created?: string[];
+      };
+      if (!response.ok) {
+        throw new Error(payload.error ?? "生成最近批次修复动作失败。");
+      }
+      await loadDashboard();
+      const created = payload.created?.length ? `清单：${payload.created.slice(0, 3).join("；")}。` : "";
+      setMessage([payload.message ?? "最近批次修复动作已生成。", created].filter(Boolean).join(" "));
+      if (payload.targetAnchor && typeof window !== "undefined") {
+        window.location.hash = payload.targetAnchor;
+      }
+    } catch (caught) {
+      setMessage(caught instanceof Error ? caught.message : "生成最近批次修复动作失败。");
+    } finally {
+      setRunningRecentBatchAction(false);
     }
   }
 
@@ -1216,20 +1256,32 @@ export function ProjectControlDashboardPanel({ projectId }: { projectId: string 
                   {dashboard.aiPipelineRecentBatch.detail}
                 </div>
               </div>
-              <Link
-                className="inline-flex w-fit items-center justify-center rounded-md border border-slate-200 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
-                href={dashboard.aiPipelineRecentBatch.targetHref}
-              >
-                {dashboard.aiPipelineRecentBatch.actionLabel}
-              </Link>
-              {dashboard.aiPipelineRecentBatch.secondaryActionLabel && dashboard.aiPipelineRecentBatch.secondaryTargetHref ? (
+              <div className="flex shrink-0 flex-wrap gap-2">
+                {dashboard.aiPipelineRecentBatch.actionExecutable ? (
+                  <button
+                    className="inline-flex w-fit items-center justify-center rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+                    disabled={runningRecentBatchAction}
+                    onClick={() => void executeRecentBatchAction()}
+                    type="button"
+                  >
+                    {runningRecentBatchAction ? "生成中" : dashboard.aiPipelineRecentBatch.executeLabel}
+                  </button>
+                ) : null}
                 <Link
-                  className="inline-flex w-fit items-center justify-center rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-white"
-                  href={dashboard.aiPipelineRecentBatch.secondaryTargetHref}
+                  className="inline-flex w-fit items-center justify-center rounded-md border border-slate-200 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                  href={dashboard.aiPipelineRecentBatch.targetHref}
                 >
-                  {dashboard.aiPipelineRecentBatch.secondaryActionLabel}
+                  {dashboard.aiPipelineRecentBatch.actionLabel}
                 </Link>
-              ) : null}
+                {dashboard.aiPipelineRecentBatch.secondaryActionLabel && dashboard.aiPipelineRecentBatch.secondaryTargetHref ? (
+                  <Link
+                    className="inline-flex w-fit items-center justify-center rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-white"
+                    href={dashboard.aiPipelineRecentBatch.secondaryTargetHref}
+                  >
+                    {dashboard.aiPipelineRecentBatch.secondaryActionLabel}
+                  </Link>
+                ) : null}
+              </div>
             </div>
             {dashboard.aiPipelineRecentBatch.evidenceBadges.length ? (
               <div className="mt-3 flex flex-wrap gap-2 text-xs text-slate-600">

@@ -496,6 +496,10 @@ test("buildProjectControlDashboard", async (t) => {
     assert.equal(dashboard.aiPipelineRecentBatch.secondaryActionLabel, "回任务队列");
     assert.equal(dashboard.aiPipelineRecentBatch.secondaryTargetHref, "/tasks");
     assert.deepEqual(dashboard.aiPipelineRecentBatch.evidenceBadges.slice(0, 3), ["成功/失败：3/1", "成功率：75%", "质量：78"]);
+    assert.equal(dashboard.aiPipelineRecentBatch.actionExecutable, true);
+    assert.equal(dashboard.aiPipelineRecentBatch.actionAreaId, "ai-pipeline");
+    assert.equal(dashboard.aiPipelineRecentBatch.actionMode, "seed");
+    assert.equal(dashboard.aiPipelineRecentBatch.executeLabel, "生成修复清单");
     assert.ok(dashboard.aiPipelineRecentBatch.warnings.some((warning) => warning.includes("不要继续放大")));
     assert.equal(dashboard.aiPipelineBatchHealth.hasSamples, false);
   });

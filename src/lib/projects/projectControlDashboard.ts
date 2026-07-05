@@ -385,6 +385,10 @@ export interface AiPipelineRecentBatchSummary {
   detail: string;
   actionLabel: string;
   targetHref: string;
+  actionExecutable: boolean;
+  actionAreaId: string | null;
+  actionMode: "seed" | null;
+  executeLabel: string;
   secondaryActionLabel: string;
   secondaryTargetHref: string;
   evidenceBadges: string[];
@@ -810,6 +814,10 @@ function buildAiPipelineRecentBatchSummary(audits: ControlBatchAudit[] = []): Ai
       detail: "先执行一次推荐批次，项目总控才有成功率、质量和成本证据。",
       actionLabel: "去任务中心",
       targetHref: "/tasks#recommended-batch",
+      actionExecutable: false,
+      actionAreaId: null,
+      actionMode: null,
+      executeLabel: "",
       secondaryActionLabel: "",
       secondaryTargetHref: "",
       evidenceBadges: [],
@@ -844,6 +852,7 @@ function buildAiPipelineRecentBatchSummary(audits: ControlBatchAudit[] = []): Ai
   const primaryHref = typeof batchReceipt?.primaryHref === "string" && batchReceipt.primaryHref
     ? batchReceipt.primaryHref
     : latest.href || "/tasks#recommended-batch";
+  const actionExecutable = status === "repair";
   const secondaryLabel = typeof batchReceipt?.secondaryLabel === "string" ? batchReceipt.secondaryLabel : "";
   const secondaryHref = typeof batchReceipt?.secondaryHref === "string" ? batchReceipt.secondaryHref : "";
   const evidenceBadges = stringArray(batchReceipt?.evidenceItems).slice(0, 5);
@@ -856,6 +865,10 @@ function buildAiPipelineRecentBatchSummary(audits: ControlBatchAudit[] = []): Ai
     detail,
     actionLabel: primaryLabel,
     targetHref: primaryHref,
+    actionExecutable,
+    actionAreaId: actionExecutable ? "ai-pipeline" : null,
+    actionMode: actionExecutable ? "seed" : null,
+    executeLabel: actionExecutable ? "生成修复清单" : "",
     secondaryActionLabel: secondaryLabel,
     secondaryTargetHref: secondaryHref,
     evidenceBadges,

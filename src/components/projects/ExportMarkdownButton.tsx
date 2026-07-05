@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { ExportMarkdownMode, ExportPackageReadiness } from "@/lib/export/markdown";
 
 type ExportFormat = "markdown" | "docx";
+type ExportSingleFile = "chaptersZip" | "foreshadowsCsv";
 
 function statusClass(status: ExportPackageReadiness["status"]) {
   if (status === "ready") return "border-emerald-200 bg-emerald-50 text-emerald-800";
@@ -26,7 +27,7 @@ export function ExportMarkdownButton({
   readiness: ExportPackageReadiness;
   title: string;
 }) {
-  const [exporting, setExporting] = useState<{ format: ExportFormat; mode: ExportMarkdownMode } | null>(null);
+  const [exporting, setExporting] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const openItems = readiness.items.filter((item) => item.status !== "pass").slice(0, 4);
 
@@ -35,11 +36,11 @@ export function ExportMarkdownButton({
   }
 
   function isExporting(format: ExportFormat, mode: ExportMarkdownMode) {
-    return exporting?.format === format && exporting.mode === mode;
+    return exporting === `${format}:${mode}`;
   }
 
   async function exportPackage(format: ExportFormat, mode: ExportMarkdownMode) {
-    setExporting({ format, mode });
+    setExporting(`${format}:${mode}`);
     setError(null);
     try {
       const response = await fetch(`/api/export/${format === "docx" ? "docx" : "markdown"}`, {
@@ -58,6 +59,37 @@ export function ExportMarkdownButton({
       const link = document.createElement("a");
       link.href = url;
       link.download = `${title}-${modeSuffix(mode)}.${extension}`;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "导出失败。");
+    } finally {
+      setExporting(null);
+    }
+  }
+
+  async function exportSingleFile(kind: ExportSingleFile) {
+    setExporting(kind);
+    setError(null);
+    try {
+      const endpoint = kind === "chaptersZip" ? "chapters-zip" : "foreshadows-csv";
+      const response = await fetch(`/api/export/${endpoint}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ projectId }),
+      });
+
+      if (!response.ok) {
+        throw new Error("导出失败，请稍后重试。");
+      }
+
+      const content = await response.blob();
+      const extension = kind === "chaptersZip" ? "zip" : "csv";
+      const suffix = kind === "chaptersZip" ? "章节包" : "伏笔表";
+      const url = URL.createObjectURL(content);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `${title}-${suffix}.${extension}`;
       link.click();
       URL.revokeObjectURL(url);
     } catch (caught) {
@@ -146,6 +178,24 @@ export function ExportMarkdownButton({
           type="button"
         >
           {isExporting("docx", "characters") ? "导出中" : "人物伏笔 Word"}
+        </button>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        <button
+          className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-800 hover:bg-slate-50 disabled:opacity-50"
+          disabled={exporting !== null}
+          onClick={() => void exportSingleFile("chaptersZip")}
+          type="button"
+        >
+          {exporting === "chaptersZip" ? "导出中" : "章节 ZIP"}
+        </button>
+        <button
+          className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-800 hover:bg-slate-50 disabled:opacity-50"
+          disabled={exporting !== null}
+          onClick={() => void exportSingleFile("foreshadowsCsv")}
+          type="button"
+        >
+          {exporting === "foreshadowsCsv" ? "导出中" : "伏笔 CSV"}
         </button>
       </div>
       {error ? <p className="text-sm text-red-600">{error}</p> : null}

@@ -1,4 +1,5 @@
 import { exportMarkdownFileSuffix, exportProjectMarkdownByMode, type ExportMarkdownMode, type ExportProject } from "./markdown.ts";
+import { createStoredZip } from "./zip.ts";
 
 const XML_DECLARATION = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>';
 
@@ -54,104 +55,9 @@ function stylesXml() {
   return `${XML_DECLARATION}<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/><w:rPr><w:rFonts w:ascii="Arial" w:eastAsia="Microsoft YaHei" w:hAnsi="Arial"/><w:sz w:val="22"/></w:rPr></w:style><w:style w:type="paragraph" w:styleId="Title"><w:name w:val="Title"/><w:basedOn w:val="Normal"/><w:rPr><w:b/><w:rFonts w:ascii="Arial" w:eastAsia="Microsoft YaHei" w:hAnsi="Arial"/><w:sz w:val="36"/></w:rPr></w:style><w:style w:type="paragraph" w:styleId="Heading1"><w:name w:val="heading 1"/><w:basedOn w:val="Normal"/><w:rPr><w:b/><w:rFonts w:ascii="Arial" w:eastAsia="Microsoft YaHei" w:hAnsi="Arial"/><w:sz w:val="30"/></w:rPr></w:style><w:style w:type="paragraph" w:styleId="Heading2"><w:name w:val="heading 2"/><w:basedOn w:val="Normal"/><w:rPr><w:b/><w:rFonts w:ascii="Arial" w:eastAsia="Microsoft YaHei" w:hAnsi="Arial"/><w:sz w:val="26"/></w:rPr></w:style><w:style w:type="paragraph" w:styleId="Heading3"><w:name w:val="heading 3"/><w:basedOn w:val="Normal"/><w:rPr><w:b/><w:rFonts w:ascii="Arial" w:eastAsia="Microsoft YaHei" w:hAnsi="Arial"/><w:sz w:val="24"/></w:rPr></w:style></w:styles>`;
 }
 
-function crc32(buffer: Buffer) {
-  let crc = 0xffffffff;
-  for (const byte of buffer) {
-    crc ^= byte;
-    for (let bit = 0; bit < 8; bit += 1) {
-      crc = (crc >>> 1) ^ (0xedb88320 & -(crc & 1));
-    }
-  }
-  return (crc ^ 0xffffffff) >>> 0;
-}
-
-function writeUInt16(value: number) {
-  const buffer = Buffer.alloc(2);
-  buffer.writeUInt16LE(value, 0);
-  return buffer;
-}
-
-function writeUInt32(value: number) {
-  const buffer = Buffer.alloc(4);
-  buffer.writeUInt32LE(value >>> 0, 0);
-  return buffer;
-}
-
-function zipDateTime(date = new Date("2026-01-01T00:00:00Z")) {
-  const dosTime = (date.getUTCHours() << 11) | (date.getUTCMinutes() << 5) | Math.floor(date.getUTCSeconds() / 2);
-  const dosDate = ((date.getUTCFullYear() - 1980) << 9) | ((date.getUTCMonth() + 1) << 5) | date.getUTCDate();
-  return { dosDate, dosTime };
-}
-
-function createZip(files: Array<{ path: string; content: string }>) {
-  const localParts: Buffer[] = [];
-  const centralParts: Buffer[] = [];
-  const { dosDate, dosTime } = zipDateTime();
-  let offset = 0;
-
-  for (const file of files) {
-    const name = Buffer.from(file.path, "utf8");
-    const content = Buffer.from(file.content, "utf8");
-    const crc = crc32(content);
-
-    const localHeader = Buffer.concat([
-      writeUInt32(0x04034b50),
-      writeUInt16(20),
-      writeUInt16(0),
-      writeUInt16(0),
-      writeUInt16(dosTime),
-      writeUInt16(dosDate),
-      writeUInt32(crc),
-      writeUInt32(content.length),
-      writeUInt32(content.length),
-      writeUInt16(name.length),
-      writeUInt16(0),
-      name,
-    ]);
-    localParts.push(localHeader, content);
-
-    centralParts.push(Buffer.concat([
-      writeUInt32(0x02014b50),
-      writeUInt16(20),
-      writeUInt16(20),
-      writeUInt16(0),
-      writeUInt16(0),
-      writeUInt16(dosTime),
-      writeUInt16(dosDate),
-      writeUInt32(crc),
-      writeUInt32(content.length),
-      writeUInt32(content.length),
-      writeUInt16(name.length),
-      writeUInt16(0),
-      writeUInt16(0),
-      writeUInt16(0),
-      writeUInt16(0),
-      writeUInt32(0),
-      writeUInt32(offset),
-      name,
-    ]));
-
-    offset += localHeader.length + content.length;
-  }
-
-  const centralDirectory = Buffer.concat(centralParts);
-  const end = Buffer.concat([
-    writeUInt32(0x06054b50),
-    writeUInt16(0),
-    writeUInt16(0),
-    writeUInt16(files.length),
-    writeUInt16(files.length),
-    writeUInt32(centralDirectory.length),
-    writeUInt32(offset),
-    writeUInt16(0),
-  ]);
-
-  return Buffer.concat([...localParts, centralDirectory, end]);
-}
-
 export function exportProjectDocxByMode(project: ExportProject, mode: ExportMarkdownMode = "full") {
   const markdown = exportProjectMarkdownByMode(project, mode);
-  return createZip([
+  return createStoredZip([
     { path: "[Content_Types].xml", content: contentTypesXml() },
     { path: "_rels/.rels", content: relationshipsXml() },
     { path: "word/document.xml", content: buildDocumentXml(markdown) },

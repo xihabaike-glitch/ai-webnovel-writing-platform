@@ -28,6 +28,7 @@ function categoryClass(category: QueueItem["category"]) {
 
 function blockerTypeLabel(entry: QueueItem) {
   if (entry.blockerType === "publish_repair") return "发布阻塞";
+  if (entry.blockerType === "export_version") return "导出版本";
   if (entry.blockerType === "chapter_card") return "章节卡住";
   if (entry.blockerType === "risk_recovery") return "开书止损";
   if (entry.blockerType === "watch_scale_gate") return "观察闸门";
@@ -170,11 +171,12 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
         },
         worldEntries: { orderBy: [{ type: "asc" }, { createdAt: "asc" }] },
         publishSnapshots: { orderBy: { createdAt: "desc" }, take: 80 },
+        exportPackageSnapshots: { orderBy: { createdAt: "desc" }, take: 120 },
         submissionAssets: { orderBy: { updatedAt: "desc" } },
         submissionAssetVersions: { orderBy: { createdAt: "desc" }, take: 80 },
         platformPublishMetrics: { orderBy: { snapshotDate: "desc" }, take: 80 },
         gateActionAudits: {
-          where: { executionType: "platform_strategy" },
+          where: { executionType: { in: ["platform_strategy", "export_version"] } },
           orderBy: { createdAt: "desc" },
           take: 80,
           select: {
@@ -182,8 +184,11 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
             executionType: true,
             status: true,
             succeededCount: true,
+            failedCount: true,
             taskId: true,
             platformId: true,
+            label: true,
+            message: true,
             createdAt: true,
           },
         },

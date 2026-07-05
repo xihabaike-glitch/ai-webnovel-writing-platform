@@ -120,6 +120,28 @@ const publishBaseline = {
   createdAt: "2026-07-02T00:00:00.000Z",
 };
 
+function exportSnapshot(overrides: Partial<NonNullable<TaskQueueProject["exportPackageSnapshots"]>[number]> = {}) {
+  return {
+    id: "export-baseline",
+    packageKind: "full",
+    format: "markdown",
+    title: "夜雨系统",
+    fileName: "夜雨系统-完整资料包.md",
+    contentType: "text/markdown; charset=utf-8",
+    fileSize: 30000,
+    contentHash: "baseline-hash",
+    readinessStatus: "ready",
+    readinessPercent: 96,
+    chapterCount: 8,
+    wordCount: 24000,
+    notes: "完整资料包 · Markdown · 可交付",
+    isBaseline: false,
+    baselineLockedAt: null,
+    createdAt: "2026-07-05T00:00:00.000Z",
+    ...overrides,
+  };
+}
+
 const adoptedAssetVersion = {
   id: "asset-version-adopted",
   platformId: "fanqie",
@@ -284,6 +306,76 @@ test("buildTaskQueueCenter", async (t) => {
     assert.equal(queue.recommendedNext?.effectAction?.execution, "open_target");
     assert.equal(queue.recommendedNext?.effectAction?.platformId, "fanqie");
     assert.ok(queue.recommendedNext?.evidence.includes("发布包已经保存过基准"));
+  });
+
+  await t.test("blocks export when the export version center reports regression risk", () => {
+    const queue = buildTaskQueueCenter([publishReadyProject({
+      exportPackageSnapshots: [
+        exportSnapshot({
+          id: "latest-regressed",
+          readinessStatus: "blocked",
+          readinessPercent: 60,
+          chapterCount: 6,
+          wordCount: 18000,
+          contentHash: "regressed-hash",
+          createdAt: "2026-07-05T02:00:00.000Z",
+        }),
+        exportSnapshot({
+          id: "locked-baseline",
+          isBaseline: true,
+          baselineLockedAt: "2026-07-05T01:00:00.000Z",
+          createdAt: "2026-07-05T01:00:00.000Z",
+        }),
+      ],
+    })]);
+
+    const versionItem = queue.items.find((entry) => entry.id === "project-1:export-version:risk");
+    assert.equal(versionItem?.category, "blocked");
+    assert.equal(versionItem?.blockerType, "export_version");
+    assert.equal(versionItem?.actionLabel, "处理导出版本");
+    assert.equal(queue.overview.exportVersionBlocked, 1);
+    assert.ok(!queue.items.some((entry) => entry.id === "project-1:export:fanqie"));
+  });
+
+  await t.test("turns an export version receipt into a recheck queue item", () => {
+    const queue = buildTaskQueueCenter([publishReadyProject({
+      exportPackageSnapshots: [
+        exportSnapshot({
+          id: "latest-regressed",
+          readinessStatus: "blocked",
+          readinessPercent: 60,
+          chapterCount: 6,
+          wordCount: 18000,
+          contentHash: "regressed-hash",
+          createdAt: "2026-07-05T02:00:00.000Z",
+        }),
+        exportSnapshot({
+          id: "locked-baseline",
+          isBaseline: true,
+          baselineLockedAt: "2026-07-05T01:00:00.000Z",
+          createdAt: "2026-07-05T01:00:00.000Z",
+        }),
+      ],
+      gateActionAudits: [{
+        actionId: "export-version:project-1:regenerate_snapshot",
+        executionType: "export_version",
+        status: "succeeded",
+        succeededCount: 1,
+        failedCount: 0,
+        taskId: "latest-regressed",
+        platformId: "export_version",
+        label: "重导最新包",
+        message: "夜雨系统 已按导出快照重新生成。",
+        createdAt: "2026-07-05T02:05:00.000Z",
+      }],
+    })]);
+
+    const versionItem = queue.items.find((entry) => entry.id === "project-1:export-version:recheck");
+    assert.equal(versionItem?.category, "export");
+    assert.equal(versionItem?.sourceType, "export_version_recheck");
+    assert.equal(versionItem?.actionLabel, "复检总闸门");
+    assert.equal(versionItem?.href, "/gate#gate-export-package");
+    assert.equal(queue.overview.exportVersionBlocked, 0);
   });
 
   await t.test("turns weak publish effects into next optimization work", () => {

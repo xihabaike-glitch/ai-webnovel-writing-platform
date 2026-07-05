@@ -332,6 +332,17 @@ export function GateExportPackagePanel({ packages }: { packages: PrePublishGateP
                     ))}
                   </div>
                 ) : null}
+                {item.exportVersionGate.receiptReview.status === "handled" ? (
+                  <div className="mt-3 flex flex-col gap-2 rounded-md bg-white/70 px-3 py-2 text-xs lg:flex-row lg:items-center lg:justify-between">
+                    <div>
+                      <div className="font-medium text-slate-950">{item.exportVersionGate.receiptReview.label}</div>
+                      <p className="mt-1 leading-5 opacity-80">{item.exportVersionGate.receiptReview.detail}</p>
+                    </div>
+                    <Link className="w-fit rounded-md border border-slate-200 bg-white px-3 py-2 font-medium text-slate-700 hover:bg-slate-50" href={item.exportVersionGate.receiptReview.href}>
+                      {item.exportVersionGate.receiptReview.actionLabel}
+                    </Link>
+                  </div>
+                ) : null}
               </div>
             ) : null}
             {effectPackageKey === packageKey(item) ? (

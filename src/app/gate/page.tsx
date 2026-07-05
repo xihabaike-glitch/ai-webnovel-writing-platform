@@ -63,7 +63,7 @@ export default async function GatePage() {
           },
         },
         gateActionAudits: {
-          where: { executionType: "recommended_batch" },
+          where: { executionType: { in: ["recommended_batch", "export_version"] } },
           orderBy: { createdAt: "desc" },
           take: 80,
           select: {

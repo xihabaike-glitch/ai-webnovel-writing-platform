@@ -188,7 +188,18 @@ export interface PrePublishGateExportVersionGate {
   href: string;
   snapshotCount: number;
   decisionStatus: string | null;
+  receiptReview: PrePublishGateExportVersionReceiptReview;
   repairActions: PrePublishGateExportVersionAction[];
+}
+
+export interface PrePublishGateExportVersionReceiptReview {
+  status: "none" | "handled";
+  label: string;
+  detail: string;
+  actionLabel: string;
+  href: string;
+  latestActionId: string | null;
+  latestAt: Date | string | null;
 }
 
 export interface PrePublishGateExportVersionAction {
@@ -209,6 +220,22 @@ export type PrePublishGateExportVersionActionExecution =
     type: "lock_baseline";
     snapshotId: string;
   };
+
+function auditTime(value: Date | string | null | undefined) {
+  if (!value) return 0;
+  const time = new Date(value).getTime();
+  return Number.isFinite(time) ? time : 0;
+}
+
+function latestExportVersionAudit(project: Pick<PrePublishGateProject, "id" | "gateActionAudits">) {
+  return (project.gateActionAudits ?? [])
+    .filter((audit) => (
+      audit.executionType === "export_version"
+      && audit.status === "succeeded"
+      && audit.actionId.startsWith(`export-version:${project.id}:`)
+    ))
+    .sort((left, right) => auditTime(right.createdAt) - auditTime(left.createdAt))[0] ?? null;
+}
 
 export interface PrePublishGateStrategyProject {
   projectId: string;
@@ -1071,6 +1098,26 @@ function buildLoopTimeline(projectId: string, pack: PlatformPublishPackage): Pre
 
 function buildExportVersionGate(project: PrePublishGateProject): PrePublishGateExportVersionGate {
   const href = `/projects/${project.id}/exports`;
+  const latestReceipt = latestExportVersionAudit(project);
+  const receiptReview: PrePublishGateExportVersionReceiptReview = latestReceipt
+    ? {
+      status: "handled",
+      label: latestReceipt.label ?? "导出版本动作已执行",
+      detail: latestReceipt.message ?? "已经留下导出版本处理回执，刷新后继续确认基准、差异和发布包风险。",
+      actionLabel: "复检总闸门",
+      href: "/gate#gate-export-package",
+      latestActionId: latestReceipt.actionId,
+      latestAt: latestReceipt.createdAt,
+    }
+    : {
+      status: "none",
+      label: "等待处理回执",
+      detail: "还没有导出版本处理回执；执行重导、锁定或替换基准后，总闸门会追踪下一步复检。",
+      actionLabel: "处理导出版本",
+      href,
+      latestActionId: null,
+      latestAt: null,
+    };
   const actionHref = (hash: string) => `${href}${hash}`;
   const action = (
     id: string,
@@ -1097,6 +1144,7 @@ function buildExportVersionGate(project: PrePublishGateProject): PrePublishGateE
       href,
       snapshotCount: 0,
       decisionStatus: null,
+      receiptReview,
       repairActions: [
         action("open-version-center", "打开版本中心", "先生成一次导出快照，后续总闸门才能判断版本替换和回退。", "", "secondary"),
       ],
@@ -1118,6 +1166,7 @@ function buildExportVersionGate(project: PrePublishGateProject): PrePublishGateE
       href,
       snapshotCount: snapshots.length,
       decisionStatus: decision.status,
+      receiptReview,
       repairActions: [
         action(
           "regenerate-latest",
@@ -1170,6 +1219,7 @@ function buildExportVersionGate(project: PrePublishGateProject): PrePublishGateE
       href,
       snapshotCount: snapshots.length,
       decisionStatus: decision.status,
+      receiptReview,
       repairActions,
     };
   }
@@ -1182,6 +1232,7 @@ function buildExportVersionGate(project: PrePublishGateProject): PrePublishGateE
     href,
     snapshotCount: snapshots.length,
     decisionStatus: decision.status,
+    receiptReview,
     repairActions: baseActions,
   };
 }

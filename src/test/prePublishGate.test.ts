@@ -226,6 +226,55 @@ test("buildPrePublishGate", async (t) => {
     assert.equal(gate.releaseAction?.href, "/projects/project-ready/exports");
   });
 
+  await t.test("surfaces export version receipts for gate recheck", () => {
+    const gate = buildPrePublishGate({
+      projects: [{
+        ...readyProject,
+        gateActionAudits: [{
+          actionId: "export-version:project-ready:regenerate_snapshot",
+          executionType: "export_version",
+          status: "succeeded",
+          succeededCount: 1,
+          failedCount: 0,
+          taskId: "latest-regressed",
+          platformId: "export_version",
+          label: "重导最新包",
+          message: "夜雨系统 已按导出快照重新生成。",
+          createdAt: "2026-07-05T05:05:00.000Z",
+        }],
+        exportPackageSnapshots: [
+          exportSnapshot({
+            id: "latest-regressed",
+            readinessPercent: 82,
+            chapterCount: 2,
+            wordCount: 6000,
+            contentHash: "b".repeat(64),
+            createdAt: "2026-07-05T05:00:00.000Z",
+          }),
+          exportSnapshot({
+            id: "locked-baseline",
+            isBaseline: true,
+            baselineLockedAt: "2026-07-05T04:00:00.000Z",
+            readinessPercent: 92,
+            chapterCount: 3,
+            wordCount: 9000,
+            contentHash: "a".repeat(64),
+            createdAt: "2026-07-05T04:00:00.000Z",
+          }),
+        ],
+      }],
+      failureTasks: [],
+      batchHistory: [],
+    });
+    const receiptReview = gate.projectStatuses[0].exportVersionGate.receiptReview;
+
+    assert.equal(receiptReview.status, "handled");
+    assert.equal(receiptReview.label, "重导最新包");
+    assert.equal(receiptReview.actionLabel, "复检总闸门");
+    assert.equal(receiptReview.href, "/gate#gate-export-package");
+    assert.ok(receiptReview.detail.includes("重新生成"));
+  });
+
   await t.test("warns launch when export version center recommends replacing baseline", () => {
     const gate = buildPrePublishGate({
       projects: [{

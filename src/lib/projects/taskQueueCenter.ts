@@ -1,6 +1,8 @@
 import { buildBatchDraftQueue } from "../ai/batchDrafts.ts";
 import { buildReviewPipelineQueue } from "../ai/batchReviewPipeline.ts";
 import { getChapterRevisionSourceLabel, isChapterRevisionCandidate, previewRevisionContent } from "../chapters/revisions.ts";
+import { buildExportSnapshotHistory } from "../export/snapshots.ts";
+import { buildExportVersionCenter } from "../export/versionCenter.ts";
 import { getPlatformProfile, type PlatformId } from "../platforms/platformProfiles.ts";
 import { buildFirstDayRiskProfile, type FirstDayRiskLevel } from "./firstDayWorkflow.ts";
 import {
@@ -67,6 +69,24 @@ export interface TaskQueueProject {
   submissionAssets?: PlatformSubmissionAssetInput[];
   submissionAssetVersions?: PlatformSubmissionAssetVersionInput[];
   platformPublishMetrics?: PlatformPublishMetricInput[];
+  exportPackageSnapshots?: Array<{
+    id: string;
+    packageKind: string;
+    format: string;
+    title: string;
+    fileName: string;
+    contentType: string;
+    fileSize: number;
+    contentHash: string;
+    readinessStatus: string;
+    readinessPercent: number;
+    chapterCount: number;
+    wordCount: number;
+    notes: string;
+    isBaseline?: boolean;
+    baselineLockedAt?: Date | string | null;
+    createdAt: Date | string;
+  }>;
   gateActionAudits?: Array<{
     actionId: string;
     executionType: string;
@@ -75,6 +95,8 @@ export interface TaskQueueProject {
     failedCount?: number;
     taskId?: string | null;
     platformId: string;
+    label?: string;
+    message?: string;
     payload?: string;
     createdAt: Date | string;
   }>;
@@ -96,8 +118,8 @@ export interface QueueItem {
   projectTitle: string;
   platformName: string;
   category: "candidate" | "draft" | "review" | "second_pass" | "effect" | "export" | "blocked";
-  blockerType: "chapter_card" | "publish_repair" | "risk_recovery" | "watch_scale_gate" | "first_day_gate" | null;
-  sourceType?: "first_three_adoption";
+  blockerType: "chapter_card" | "publish_repair" | "export_version" | "risk_recovery" | "watch_scale_gate" | "first_day_gate" | null;
+  sourceType?: "first_three_adoption" | "export_version_recheck";
   sourceLabel?: string;
   sourceDetail?: string;
   label: string;
@@ -132,6 +154,7 @@ export interface TaskQueueCenter {
     blockedCards: number;
     firstDayBlocked: number;
     publishBlocked: number;
+    exportVersionBlocked: number;
     chapterCardBlocked: number;
     riskRecoveryBlocked: number;
     watchScaleBlocked: number;
@@ -161,7 +184,8 @@ function blockerPriority(blockerType: QueueItem["blockerType"]) {
   if (blockerType === "risk_recovery") return 1;
   if (blockerType === "watch_scale_gate") return 2;
   if (blockerType === "publish_repair") return 3;
-  if (blockerType === "chapter_card") return 4;
+  if (blockerType === "export_version") return 4;
+  if (blockerType === "chapter_card") return 5;
   return 9;
 }
 
@@ -463,6 +487,150 @@ function timestamp(value: Date | string | null | undefined) {
   if (!value) return null;
   const time = new Date(value).getTime();
   return Number.isFinite(time) ? time : null;
+}
+
+function latestExportVersionAudit(project: TaskQueueProject) {
+  return (project.gateActionAudits ?? [])
+    .filter((audit) => (
+      audit.executionType === "export_version"
+      && audit.status === "succeeded"
+      && audit.succeededCount > 0
+      && audit.actionId.startsWith(`export-version:${project.id}:`)
+    ))
+    .sort((left, right) => (timestamp(right.createdAt) ?? 0) - (timestamp(left.createdAt) ?? 0))[0] ?? null;
+}
+
+function exportVersionQueueItem(input: {
+  project: TaskQueueProject;
+  projectHref: string;
+  platformName: string;
+  startTactic: ProjectStartTacticSummary | null;
+  riskLevel: FirstDayRiskLevel;
+  riskLabel: string;
+  riskNotice: string | null;
+  scaleGate: QueueScaleGate;
+}): QueueItem | null {
+  const rawSnapshots = input.project.exportPackageSnapshots ?? [];
+  if (rawSnapshots.length === 0) return null;
+
+  const snapshots = buildExportSnapshotHistory(rawSnapshots);
+  const versionCenter = buildExportVersionCenter(snapshots);
+  const decision = versionCenter.baselineDecision;
+  const latestReceipt = latestExportVersionAudit(input.project);
+  const latestSnapshotTime = timestamp(versionCenter.latestSnapshot?.createdAt) ?? 0;
+  const receiptTime = timestamp(latestReceipt?.createdAt) ?? 0;
+  const receiptAfterLatestSnapshot = Boolean(latestReceipt && receiptTime >= latestSnapshotTime);
+  const receiptAction = latestReceipt?.actionId.includes(":lock_baseline")
+    ? "基准动作"
+    : latestReceipt?.actionId.includes(":regenerate_snapshot")
+      ? "重导动作"
+      : "导出版本动作";
+  const common = {
+    projectId: input.project.id,
+    projectTitle: input.project.title,
+    platformName: input.platformName,
+    strategyBasis: input.startTactic,
+    riskLevel: input.riskLevel,
+    riskLabel: input.riskLabel,
+    riskNotice: input.riskNotice,
+    scaleGate: input.scaleGate,
+  };
+
+  if (decision.status === "risk") {
+    if (receiptAfterLatestSnapshot) {
+      return item({
+        ...common,
+        id: `${input.project.id}:export-version:recheck`,
+        category: "export",
+        sourceType: "export_version_recheck",
+        sourceLabel: "导出版本回执",
+        sourceDetail: latestReceipt?.message ?? "导出版本动作已经执行，下一步需要回总闸门确认风险是否解除。",
+        chapterTitle: "导出版本复检",
+        evidence: `${receiptAction}已留下回执，但最新版本仍需要总闸门复检：${decision.detail}`,
+        actionLabel: "复检总闸门",
+        href: "/gate#gate-export-package",
+      });
+    }
+
+    return item({
+      ...common,
+      id: `${input.project.id}:export-version:risk`,
+      category: "blocked",
+      blockerType: "export_version",
+      chapterTitle: "导出版本风险",
+      evidence: `${decision.label}：${decision.detail}`,
+      actionLabel: "处理导出版本",
+      href: `${input.projectHref}/exports#export-baseline-comparison`,
+    });
+  }
+
+  if (decision.status === "needs_baseline") {
+    if (receiptAfterLatestSnapshot && latestReceipt?.actionId.includes(":lock_baseline")) {
+      return item({
+        ...common,
+        id: `${input.project.id}:export-version:baseline-recheck`,
+        category: "export",
+        sourceType: "export_version_recheck",
+        sourceLabel: "导出基准回执",
+        sourceDetail: latestReceipt.message ?? "基准动作已经执行，下一步回总闸门复检。",
+        chapterTitle: "导出基准复检",
+        evidence: "导出基准动作已经留下回执，回总闸门确认正式基准是否生效。",
+        actionLabel: "复检总闸门",
+        href: "/gate#gate-export-package",
+      });
+    }
+
+    return item({
+      ...common,
+      id: `${input.project.id}:export-version:lock-baseline`,
+      category: "export",
+      chapterTitle: "导出正式基准",
+      evidence: decision.detail,
+      actionLabel: "锁定推荐基准",
+      href: `${input.projectHref}/exports#export-baseline-decision`,
+    });
+  }
+
+  if (decision.status === "replace") {
+    if (receiptAfterLatestSnapshot && latestReceipt?.actionId.includes(":lock_baseline") && latestReceipt.taskId === decision.actionSnapshotId) {
+      return item({
+        ...common,
+        id: `${input.project.id}:export-version:replace-recheck`,
+        category: "export",
+        sourceType: "export_version_recheck",
+        sourceLabel: "导出基准回执",
+        sourceDetail: latestReceipt.message ?? "替换基准已经执行，下一步回总闸门复检。",
+        chapterTitle: "新基准复检",
+        evidence: "新导出基准已经留下回执，回总闸门确认版本替换是否完成。",
+        actionLabel: "复检总闸门",
+        href: "/gate#gate-export-package",
+      });
+    }
+
+    return item({
+      ...common,
+      id: `${input.project.id}:export-version:replace-baseline`,
+      category: "export",
+      chapterTitle: "替换导出基准",
+      evidence: decision.detail,
+      actionLabel: "替换为新基准",
+      href: `${input.projectHref}/exports#export-baseline-decision`,
+    });
+  }
+
+  if (decision.status === "observe") {
+    return item({
+      ...common,
+      id: `${input.project.id}:export-version:observe`,
+      category: "export",
+      chapterTitle: "导出差异确认",
+      evidence: decision.detail,
+      actionLabel: "人工确认差异",
+      href: `${input.projectHref}/exports#export-baseline-comparison`,
+    });
+  }
+
+  return null;
 }
 
 function latestCompletedPublishEffectAction(input: {
@@ -917,7 +1085,22 @@ export function buildTaskQueueCenter(projects: TaskQueueProject[]): TaskQueueCen
       }));
     }
 
-    if (firstDayGateCleared && exportCenter.totalPublishableChapters > 0 && targetPackage.canExport) {
+    const versionQueueItem = firstDayGateCleared && exportCenter.totalPublishableChapters > 0 && targetPackage.canExport
+      ? exportVersionQueueItem({
+        project,
+        projectHref,
+        platformName: platform.name,
+        startTactic,
+        riskLevel: riskProfile.level,
+        riskLabel: riskProfile.label,
+        riskNotice,
+        scaleGate,
+      })
+      : null;
+
+    if (versionQueueItem) {
+      queueItems.push(versionQueueItem);
+    } else if (firstDayGateCleared && exportCenter.totalPublishableChapters > 0 && targetPackage.canExport) {
       queueItems.push(item({
         id: `${project.id}:export:${platform.id}`,
         projectId: project.id,
@@ -994,6 +1177,7 @@ export function buildTaskQueueCenter(projects: TaskQueueProject[]): TaskQueueCen
       blockedCards: items.filter((entry) => entry.category === "blocked").length,
       firstDayBlocked: items.filter((entry) => entry.blockerType === "first_day_gate").length,
       publishBlocked: items.filter((entry) => entry.blockerType === "publish_repair").length,
+      exportVersionBlocked: items.filter((entry) => entry.blockerType === "export_version").length,
       chapterCardBlocked: items.filter((entry) => entry.blockerType === "chapter_card").length,
       riskRecoveryBlocked: items.filter((entry) => entry.blockerType === "risk_recovery").length,
       watchScaleBlocked: items.filter((entry) => entry.blockerType === "watch_scale_gate").length,

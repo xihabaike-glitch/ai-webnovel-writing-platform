@@ -174,6 +174,51 @@ test("buildPrePublishGate", async (t) => {
     assert.ok(notice.badges.includes("首日链路通过"));
   });
 
+  await t.test("focuses first-day completion on executable small-batch production", () => {
+    const gate = buildPrePublishGate({
+      projects: [readyProject],
+      failureTasks: [],
+      batchHistory: [],
+    });
+    const queueLink = {
+      id: "queue:next",
+      label: "打开任务队列",
+      detail: "夜雨系统 · 第四章 · 有 1 个任务可继续处理。",
+      href: "/tasks#recommended-batch",
+      tone: "review" as const,
+      execution: null,
+    };
+    const smallBatchAction = {
+      id: "strategy",
+      label: "批量审稿 1 个",
+      detail: "夜雨系统 · 第四章 · 先跑 1 个小批样本。",
+      href: "/tasks#recommended-batch",
+      tone: "primary" as const,
+      execution: {
+        type: "recommended_batch" as const,
+        strategyId: "standard" as const,
+      },
+    };
+    const notice = buildPrePublishGateFocusNotice({
+      focus: "first-day-complete",
+      gate: {
+        ...gate,
+        status: "needs_repair",
+        priorityActions: [queueLink, smallBatchAction],
+        releaseAction: queueLink,
+      },
+    });
+
+    assert.equal(notice.visible, true);
+    assert.equal(notice.tone, "ready");
+    assert.equal(notice.headline, "首日链路已放行，可以执行小批生产");
+    assert.equal(notice.primaryLabel, "批量审稿 1 个");
+    assert.equal(notice.primaryHref, "/tasks#recommended-batch");
+    assert.equal(notice.primaryAction?.execution?.type, "recommended_batch");
+    assert.ok(notice.detail.includes("先跑推荐小批"));
+    assert.ok(notice.badges.includes("一键小批生产"));
+  });
+
   await t.test("blocks launch when first-day handoff evidence is missing", () => {
     const gate = buildPrePublishGate({
       projects: [handoffBlockedProject],

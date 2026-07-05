@@ -5,6 +5,7 @@ import { GateActionWorkspace } from "@/components/gate/GateActionWorkspace";
 import { GateExportPackagePanel } from "@/components/gate/GateExportPackagePanel";
 import { GateFirstThreeAdoptionPanel } from "@/components/gate/GateFirstThreeAdoptionPanel";
 import { GatePlatformStrategyReviewPanel } from "@/components/gate/GatePlatformStrategyReviewPanel";
+import { GatePriorityActionCard } from "@/components/gate/GatePriorityActionCard";
 import { GatePublishEffectReviewPanel } from "@/components/gate/GatePublishEffectReviewPanel";
 import { buildTaskBatchHistory } from "@/lib/ai/taskBatchHistory";
 import { prisma } from "@/lib/db/prisma";
@@ -199,9 +200,15 @@ export default async function GatePage({
                 ))}
               </div>
             </div>
-            <Link className="w-fit shrink-0 rounded-md bg-white px-4 py-2 text-sm font-medium text-slate-950 hover:bg-slate-50" href={focusNotice.primaryHref}>
-              {focusNotice.primaryLabel}
-            </Link>
+            {focusNotice.primaryAction?.execution ? (
+              <div className="w-full shrink-0 lg:max-w-sm">
+                <GatePriorityActionCard action={focusNotice.primaryAction} index={0} />
+              </div>
+            ) : (
+              <Link className="w-fit shrink-0 rounded-md bg-white px-4 py-2 text-sm font-medium text-slate-950 hover:bg-slate-50" href={focusNotice.primaryHref}>
+                {focusNotice.primaryLabel}
+              </Link>
+            )}
           </div>
         </section>
       ) : null}

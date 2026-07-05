@@ -8,7 +8,11 @@ import {
   buildGateFirstThreeAdoptionReceipt,
   type GateFirstThreeAdoptionReceiptResult,
 } from "@/lib/projects/gateActionReceipts";
-import type { PrePublishGateAdoptionClosure, PrePublishGateAdoptionFollowupItem } from "@/lib/projects/prePublishGate";
+import type {
+  PrePublishGateAdoptionClosure,
+  PrePublishGateAdoptionFollowupItem,
+  PrePublishGateAdoptionTimelineStep,
+} from "@/lib/projects/prePublishGate";
 
 function panelTone(status: PrePublishGateAdoptionClosure["status"]) {
   if (status === "pass") return "border-emerald-200 bg-emerald-50";
@@ -26,6 +30,20 @@ function statusText(status: PrePublishGateAdoptionFollowupItem["status"]) {
   if (status === "pass") return "已完成";
   if (status === "warn") return "缺证据";
   return "待处理";
+}
+
+function timelineStepTone(status: PrePublishGateAdoptionTimelineStep["status"]) {
+  if (status === "pass") return "border-emerald-200 bg-emerald-50 text-emerald-800";
+  if (status === "warn") return "border-amber-200 bg-amber-50 text-amber-800";
+  if (status === "waiting") return "border-slate-200 bg-slate-50 text-slate-500";
+  return "border-rose-200 bg-rose-50 text-rose-800";
+}
+
+function timelineStepText(status: PrePublishGateAdoptionTimelineStep["status"]) {
+  if (status === "pass") return "完成";
+  if (status === "warn") return "缺证据";
+  if (status === "waiting") return "等待";
+  return "阻塞";
 }
 
 function stateText(state: string) {
@@ -72,6 +90,7 @@ export function GateFirstThreeAdoptionPanel({ closure }: { closure: PrePublishGa
   const [runningId, setRunningId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const visibleItems = closure.items.slice(0, 6);
+  const visibleTimelines = closure.timelines.slice(0, 4);
   const reviewBatchItems = runnableReviewItems(closure.items);
   const publishBatchItems = runnablePublishItems(closure.items);
 
@@ -224,6 +243,40 @@ export function GateFirstThreeAdoptionPanel({ closure }: { closure: PrePublishGa
         </div>
       ) : null}
       {message ? <div className="mt-3 rounded-md bg-white/80 px-3 py-2 text-sm text-slate-700">{message}</div> : null}
+
+      {visibleTimelines.length ? (
+        <div className="mt-4 grid gap-3">
+          <div>
+            <div className="text-sm font-medium text-slate-950">采纳后发布链路</div>
+            <p className="mt-1 text-xs leading-5 text-slate-600">先确认候选已写入正文，再重新审稿、刷新发布质检，最后回总闸门判断是否放行。</p>
+          </div>
+          {visibleTimelines.map((timeline) => (
+            <div className="rounded-md border border-white/70 bg-white p-3 text-sm shadow-sm" key={timeline.id}>
+              <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
+                <div>
+                  <div className="font-medium text-slate-950">{timeline.label}</div>
+                  <p className="mt-1 text-xs leading-5 text-slate-600">{timeline.detail}</p>
+                </div>
+                <Link className="w-fit rounded-md border border-slate-200 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50" href={timeline.href}>
+                  {timeline.nextActionLabel}
+                </Link>
+              </div>
+              <div className="mt-3 grid gap-2 md:grid-cols-4">
+                {timeline.steps.map((step) => (
+                  <div className={`rounded-md border p-3 ${timelineStepTone(step.status)}`} key={step.id}>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-medium">{step.label}</span>
+                      <span className="text-xs">{timelineStepText(step.status)}</span>
+                    </div>
+                    <p className="mt-2 line-clamp-2 text-xs leading-5 opacity-80">{step.evidence || step.detail}</p>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-2 text-xs text-slate-500">进度 {timeline.completedSteps}/{timeline.totalSteps}</div>
+            </div>
+          ))}
+        </div>
+      ) : null}
 
       {visibleItems.length ? (
         <div className="mt-4 grid gap-3 lg:grid-cols-2">

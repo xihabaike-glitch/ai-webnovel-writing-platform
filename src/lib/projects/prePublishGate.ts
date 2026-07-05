@@ -228,6 +228,37 @@ export type PrePublishGateAdoptionFollowupExecution =
     platformId: string | null;
   };
 
+export type PrePublishGateAdoptionTimelineStepType = "adopted" | "review" | "publish_check" | "release";
+export type PrePublishGateAdoptionTimelineStepStatus = PrePublishGateItem["status"] | "waiting";
+
+export interface PrePublishGateAdoptionTimelineStep {
+  id: string;
+  type: PrePublishGateAdoptionTimelineStepType;
+  label: string;
+  status: PrePublishGateAdoptionTimelineStepStatus;
+  detail: string;
+  evidence: string;
+  actionLabel: string;
+  href: string;
+}
+
+export interface PrePublishGateAdoptionTimeline {
+  id: string;
+  projectId: string;
+  projectTitle: string;
+  chapterId: string | null;
+  revisionId: string | null;
+  platformId: string | null;
+  status: PrePublishGateItem["status"];
+  label: string;
+  detail: string;
+  nextActionLabel: string;
+  href: string;
+  completedSteps: number;
+  totalSteps: number;
+  steps: PrePublishGateAdoptionTimelineStep[];
+}
+
 export interface PrePublishGateAdoptionClosure {
   status: PrePublishGateItem["status"];
   label: string;
@@ -241,6 +272,7 @@ export interface PrePublishGateAdoptionClosure {
   executableReviewCount: number;
   executablePublishCheckCount: number;
   items: PrePublishGateAdoptionFollowupItem[];
+  timelines: PrePublishGateAdoptionTimeline[];
 }
 
 export interface PrePublishGateAction {
@@ -377,6 +409,127 @@ function firstThreeFollowupExecution(input: {
   return null;
 }
 
+function firstThreeAdoptionTimelineStatus(steps: PrePublishGateAdoptionTimelineStep[]): PrePublishGateItem["status"] {
+  if (steps.some((step) => step.status === "block" || step.status === "waiting")) return "block";
+  if (steps.some((step) => step.status === "warn")) return "warn";
+  return "pass";
+}
+
+function firstThreeAdoptionTimelineStep(input: {
+  id: string;
+  type: PrePublishGateAdoptionTimelineStepType;
+  label: string;
+  item: PrePublishGateAdoptionFollowupItem | null;
+  fallbackStatus: PrePublishGateAdoptionTimelineStepStatus;
+  detail: string;
+  actionLabel: string;
+  href: string;
+}): PrePublishGateAdoptionTimelineStep {
+  return {
+    id: input.id,
+    type: input.type,
+    label: input.label,
+    status: input.item?.status ?? input.fallbackStatus,
+    detail: input.item?.detail ?? input.detail,
+    evidence: input.item?.evidence ?? "",
+    actionLabel: input.item?.actionLabel ?? input.actionLabel,
+    href: input.item?.href ?? input.href,
+  };
+}
+
+function buildFirstThreeAdoptionTimelines(items: PrePublishGateAdoptionFollowupItem[]): PrePublishGateAdoptionTimeline[] {
+  const groups = new Map<string, PrePublishGateAdoptionFollowupItem[]>();
+  for (const item of items) {
+    const key = `${item.projectId}:${item.chapterId ?? "unknown"}:${item.revisionId ?? "unknown"}`;
+    groups.set(key, [...(groups.get(key) ?? []), item]);
+  }
+
+  return [...groups.entries()].map(([id, group]) => {
+    const first = group[0];
+    const review = group.find((item) => item.type === "review") ?? null;
+    const publish = group.find((item) => item.type === "publish_check") ?? null;
+    const projectHref = `/projects/${first.projectId}`;
+    const releaseStatus: PrePublishGateAdoptionTimelineStepStatus = review?.status === "pass" && publish?.status === "pass"
+      ? "pass"
+      : review?.status === "warn" || publish?.status === "warn"
+        ? "warn"
+        : "waiting";
+    const releaseDetail = releaseStatus === "pass"
+      ? "重新审稿和发布质检都已回填，可以回到总闸门判断发布放行。"
+      : releaseStatus === "warn"
+        ? "存在缺证据的闭环任务，补齐验收证据后再判断发布放行。"
+        : "等待重新审稿和发布质检全部闭合后，再判断发布放行。";
+    const steps: PrePublishGateAdoptionTimelineStep[] = [
+      {
+        id: `${id}:adopted`,
+        type: "adopted",
+        label: "候选已采纳",
+        status: "pass",
+        detail: "前三章候选已经写入正文，旧审稿与旧发布质检自动过期。",
+        evidence: "正文已采用候选版本。",
+        actionLabel: "查看作品",
+        href: projectHref,
+      },
+      firstThreeAdoptionTimelineStep({
+        id: `${id}:review`,
+        type: "review",
+        label: "重新审稿",
+        item: review,
+        fallbackStatus: "block",
+        detail: "缺少采纳后的重新审稿任务，不能沿用旧稿判断。",
+        actionLabel: "重新审稿",
+        href: projectHref,
+      }),
+      firstThreeAdoptionTimelineStep({
+        id: `${id}:publish-check`,
+        type: "publish_check",
+        label: "发布质检",
+        item: publish,
+        fallbackStatus: review?.status === "pass" ? "block" : "waiting",
+        detail: review?.status === "pass" ? "重新审稿已完成，等待刷新发布质检。" : "先完成采纳后重新审稿，再回发布质检。",
+        actionLabel: "回发布质检",
+        href: projectHref,
+      }),
+      {
+        id: `${id}:release`,
+        type: "release",
+        label: "发布放行",
+        status: releaseStatus,
+        detail: releaseDetail,
+        evidence: releaseStatus === "pass" ? "总闸门可以使用新正文的审稿与发布质检证据。" : "",
+        actionLabel: "刷新总闸门",
+        href: "/gate",
+      },
+    ];
+    const status = firstThreeAdoptionTimelineStatus(steps);
+    const nextStep = steps.find((step) => step.status === "block" || step.status === "warn" || step.status === "waiting") ?? steps[steps.length - 1];
+    const completedSteps = steps.filter((step) => step.status === "pass").length;
+    const platformId = group.find((item) => item.platformId)?.platformId ?? null;
+
+    return {
+      id,
+      projectId: first.projectId,
+      projectTitle: first.projectTitle,
+      chapterId: first.chapterId,
+      revisionId: first.revisionId,
+      platformId,
+      status,
+      label: `${first.projectTitle} · ${review?.title ?? publish?.title ?? "前三章采纳"}`,
+      detail: status === "pass"
+        ? "采纳后的审稿、发布质检和放行判断已经闭合。"
+        : `${nextStep.label}：${nextStep.detail}`,
+      nextActionLabel: nextStep.actionLabel,
+      href: nextStep.href,
+      completedSteps,
+      totalSteps: steps.length,
+      steps,
+    };
+  }).sort((left, right) => {
+    const statusRank: Record<PrePublishGateItem["status"], number> = { block: 0, warn: 1, pass: 2 };
+    return statusRank[left.status] - statusRank[right.status] || left.projectTitle.localeCompare(right.projectTitle);
+  });
+}
+
 function buildFirstThreeAdoptionClosure(projects: PrePublishGateProject[]): PrePublishGateAdoptionClosure {
   const followups = firstThreeAdoptionFollowups(projects);
   const items = followups.map(({ project, task }): PrePublishGateAdoptionFollowupItem => {
@@ -446,6 +599,7 @@ function buildFirstThreeAdoptionClosure(projects: PrePublishGateProject[]): PreP
     executableReviewCount: executableReviewChapterIds.size,
     executablePublishCheckCount: executablePublishTargets.size,
     items,
+    timelines: buildFirstThreeAdoptionTimelines(items),
   };
 }
 

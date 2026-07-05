@@ -6548,6 +6548,30 @@ function completedFirstDayHandoffFromTimeline(events: GatePlatformDecisionTimeli
   };
 }
 
+function completedRecoveryFollowupFromTimeline(events: GatePlatformDecisionTimelineEvent[]) {
+  const followupEvents = events
+    .filter((event) => event.id.includes(":tactic_experience_followup:") && event.label.endsWith("完成"))
+    .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime());
+  const event = followupEvents[0] ?? null;
+  if (!event) return null;
+  const text = `${event.id} ${event.detail} ${event.evidence.join(" ")}`;
+  const outcome: GatePlatformTacticExperienceStatus = /:blocked-|重做打法|暂停迁移|暂停|未过线|不允许继续放量/u.test(text)
+    ? "blocked"
+    : /:watch-|补追读证据|继续观察|证据不足|追读证据不足/u.test(text)
+      ? "watch"
+      : "usable";
+
+  return {
+    event,
+    outcome,
+    conclusion: markdownLine(event.detail),
+    evidence: Array.from(new Set([
+      `后续任务完成：${markdownLine(event.detail)}`,
+      ...event.evidence,
+    ])).slice(0, 5),
+  };
+}
+
 export function buildGatePlatformTacticExperienceLibrary(
   timeline: GatePlatformDecisionTimeline,
   limit = 6,
@@ -6557,6 +6581,7 @@ export function buildGatePlatformTacticExperienceLibrary(
     const finalEvent = item.events.find((event) => event.type === "final") ?? null;
     const completedRecheckReview = completedRecheckReviewFromTimeline(item);
     const completedFirstDayHandoff = completedFirstDayHandoffFromTimeline(item.events);
+    const completedRecoveryFollowup = completedRecoveryFollowupFromTimeline(item.events);
     const evidenceLoopRecheck = evidenceLoopRecheckFromTimeline(item);
     const dispatchCompletionEvent = item.events.find((event) => event.id.startsWith("dispatch-completion-receipt:")) ?? null;
     const reusableEffectEvent = latestReusablePublishEffectEvent(item.events, dispatchCompletionEvent);
@@ -6620,6 +6645,39 @@ export function buildGatePlatformTacticExperienceLibrary(
           `复盘结论：${completedRecheckReview.conclusion}`,
           ...base.evidence,
         ].slice(0, 4),
+      };
+    }
+
+    if (completedRecoveryFollowup) {
+      const outcome = completedRecoveryFollowup.outcome;
+      const conclusion = completedRecoveryFollowup.conclusion || "恢复放量后续任务已完成，等待下一轮数据回填。";
+      return {
+        ...base,
+        status: outcome,
+        label: outcome === "blocked" ? "避坑样本" : outcome === "watch" ? "观察样本" : "可复用打法",
+        tactic: outcome === "blocked" ? "恢复放量避坑" : outcome === "watch" ? "恢复放量观察" : "恢复放量打法",
+        lesson: outcome === "blocked"
+          ? `${item.platformName} 恢复放量后续任务仍未过线，这条打法要进入避坑库，先重做开头、前三章兑现或平台包装。`
+          : outcome === "watch"
+            ? `${item.platformName} 恢复放量后续任务还缺追读证据，只能继续观察，不能当成可复用成功打法。`
+            : `${item.platformName} 恢复放量后续小样本已过线，可以沉淀为谨慎复用打法，但仍不允许跳过新样本。`,
+        reuseHint: outcome === "blocked"
+          ? "同类项目先暂停迁移这套恢复放量节奏，重做打法后重新跑小样本。"
+          : outcome === "watch"
+            ? "继续观察并补追读证据，不要把任务完成误判为可复用放量结论。"
+            : "新项目可以参考这套恢复放量节奏，但仍先跑小样本，确认前三章兑现和追读信号后再加码。",
+        risk: outcome === "blocked"
+          ? conclusion
+          : outcome === "watch"
+            ? "缺少明确过线结论前，不允许扩大恢复放量批次。"
+            : "恢复放量只证明这一轮小样本过线，跨题材、跨平台或换模型路线时必须重新验证。",
+        sourceLabel: outcome === "blocked" ? "恢复放量避坑" : outcome === "watch" ? "恢复放量观察" : "恢复放量闭环",
+        href: completedRecoveryFollowup.event.href,
+        evidence: [
+          `恢复放量后续闭环：${outcome === "blocked" ? "暂停" : outcome === "watch" ? "继续观察" : "通过"}`,
+          ...completedRecoveryFollowup.evidence,
+          ...base.evidence,
+        ].slice(0, 5),
       };
     }
 

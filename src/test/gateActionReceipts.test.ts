@@ -4214,6 +4214,99 @@ test("buildGateActionReceipt", async (t) => {
     assert.equal(generic, null);
   });
 
+  await t.test("feeds completed recovery follow-up dispatches back into tactic experience", () => {
+    const base = {
+      platformId: "fanqie",
+      platformName: "番茄小说",
+      label: "可复用打法",
+      lesson: "恢复放量首日小样本已跑通。",
+      reuseHint: "新项目仍先跑小样本。",
+      risk: "不能无限复用。",
+      href: "/gate#platform-tactic-experience",
+      sourceStatus: "healthy" as const,
+      priorityScore: 90,
+      latestAt: "2026-01-01T00:00:00.000Z",
+      evidence: ["恢复放量首日闭环：通过"],
+    };
+    function completedTask(input: {
+      status: "usable" | "watch" | "blocked";
+      tactic: string;
+      sourceLabel: string;
+      completionEvidence: string;
+      completedAt: string;
+    }): PersistedGatePlatformDispatchTask {
+      const dispatch = buildGatePlatformTacticExperienceFollowupDispatch({
+        ...base,
+        status: input.status,
+        label: input.status === "usable" ? "可复用打法" : input.status === "watch" ? "观察样本" : "避坑样本",
+        tactic: input.tactic,
+        sourceLabel: input.sourceLabel,
+      });
+      assert.ok(dispatch);
+      return {
+        ...dispatch,
+        databaseId: `dispatch-db-${input.status}`,
+        dispatchKey: dispatch.id,
+        projectId: null,
+        sourceReceiptId: null,
+        state: "completed",
+        completionEvidence: input.completionEvidence,
+        assignedAt: "2026-01-01T00:00:00.000Z",
+        completedAt: input.completedAt,
+        createdAt: "2026-01-01T00:00:00.000Z",
+        updatedAt: input.completedAt,
+      };
+    }
+
+    const passTimeline = buildGatePlatformDecisionTimeline({
+      receipts: [],
+      tasks: [completedTask({
+        status: "usable",
+        tactic: "恢复放量打法",
+        sourceLabel: "恢复放量闭环",
+        completionEvidence: "恢复放量继续小样本已通过：曝光 320，点击率 8%，追读率 2.4%，可以继续谨慎复用。",
+        completedAt: "2026-01-02T00:00:00.000Z",
+      })],
+      limit: 10,
+    });
+    const watchTimeline = buildGatePlatformDecisionTimeline({
+      receipts: [],
+      tasks: [completedTask({
+        status: "watch",
+        tactic: "恢复放量观察",
+        sourceLabel: "恢复放量观察",
+        completionEvidence: "恢复放量继续观察：曝光 210，追读证据不足，先补第二轮追读证据。",
+        completedAt: "2026-01-03T00:00:00.000Z",
+      })],
+      limit: 10,
+    });
+    const blockedTimeline = buildGatePlatformDecisionTimeline({
+      receipts: [],
+      tasks: [completedTask({
+        status: "blocked",
+        tactic: "恢复放量避坑",
+        sourceLabel: "恢复放量避坑",
+        completionEvidence: "恢复放量重做打法后仍未过线：点击率 2%，追读 0，暂停迁移。",
+        completedAt: "2026-01-04T00:00:00.000Z",
+      })],
+      limit: 10,
+    });
+
+    const passExperience = buildGatePlatformTacticExperienceLibrary(passTimeline, 10).items[0];
+    const watchExperience = buildGatePlatformTacticExperienceLibrary(watchTimeline, 10).items[0];
+    const blockedExperience = buildGatePlatformTacticExperienceLibrary(blockedTimeline, 10).items[0];
+
+    assert.equal(passExperience?.status, "usable");
+    assert.equal(passExperience?.tactic, "恢复放量打法");
+    assert.ok(passExperience?.evidence.some((line) => line.includes("继续小样本已通过")));
+    assert.equal(watchExperience?.status, "watch");
+    assert.equal(watchExperience?.tactic, "恢复放量观察");
+    assert.ok(watchExperience?.reuseHint.includes("继续观察"));
+    assert.equal(blockedExperience?.status, "blocked");
+    assert.equal(blockedExperience?.tactic, "恢复放量避坑");
+    assert.ok(blockedExperience?.risk.includes("暂停迁移"));
+  });
+
   await t.test("flags overdue and today dispatch closeout items", () => {
     const baseDispatch = buildGatePlatformGrowthDispatchItems([buildGatePlatformStrategyReceipt({
       item: strategyPlatform,

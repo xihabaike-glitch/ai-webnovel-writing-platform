@@ -122,7 +122,7 @@ function routeFlowFilterFromLane(laneId: RouteConfirmationDispatchFlowLaneId): R
   return laneId;
 }
 
-type DispatchQueueFilter = "all" | "recheck_followup" | "ai_pipeline";
+export type DispatchQueueFilter = "all" | "recheck_followup" | "ai_pipeline";
 
 interface RouteActionExecution {
   method: "POST";
@@ -166,19 +166,21 @@ export function GateDispatchTaskCenter({
   initialTasks,
   initialCompletionSuggestions,
   routeConfirmationDispatchFlow,
+  initialQueueFilter = "all",
 }: {
   initialFirstDayFocus?: FirstDayDispatchFocusInput;
   initialReceipts: GateActionReceipt[];
   initialTasks: PersistedGatePlatformDispatchTask[];
   initialCompletionSuggestions: WatchSampleCompletionEvidenceSuggestion[];
   routeConfirmationDispatchFlow: RouteConfirmationDispatchFlow;
+  initialQueueFilter?: DispatchQueueFilter;
 }) {
   const router = useRouter();
   const [tasks, setTasks] = useState(initialTasks);
   const [stateFilter, setStateFilter] = useState<GateDispatchTaskStateFilter>("all");
   const [platformFilter, setPlatformFilter] = useState("all");
   const [roleFilter, setRoleFilter] = useState("all");
-  const [queueFilter, setQueueFilter] = useState<DispatchQueueFilter>("all");
+  const [queueFilter, setQueueFilter] = useState<DispatchQueueFilter>(initialQueueFilter);
   const [routeFlowFilter, setRouteFlowFilter] = useState<RouteConfirmationDispatchTaskFilter>("all");
   const [runningKey, setRunningKey] = useState<string | null>(null);
   const [runningRouteAdviceId, setRunningRouteAdviceId] = useState<string | null>(null);

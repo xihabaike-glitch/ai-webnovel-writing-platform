@@ -1,5 +1,5 @@
 import { AppShell } from "@/components/app-shell/AppShell";
-import { GateDispatchTaskCenter } from "@/components/gate/GateDispatchTaskCenter";
+import { GateDispatchTaskCenter, type DispatchQueueFilter } from "@/components/gate/GateDispatchTaskCenter";
 import { buildTaskBatchHistory } from "@/lib/ai/taskBatchHistory";
 import { prisma } from "@/lib/db/prisma";
 import {
@@ -30,6 +30,11 @@ type DispatchSearchParams = Record<string, string | string[] | undefined>;
 function searchValue(params: DispatchSearchParams, key: string) {
   const value = params[key];
   return Array.isArray(value) ? value[0] ?? "" : value ?? "";
+}
+
+function dispatchQueueFilter(value: string): DispatchQueueFilter {
+  if (value === "ai_pipeline" || value === "recheck_followup") return value;
+  return "all";
 }
 
 function normalizeAssetAuditStatus(status: string): "ready" | "blocked" | "needs_work" {
@@ -192,6 +197,7 @@ export default async function DispatchPage({
   const firstDayProjectId = searchValue(resolvedSearchParams, "firstDayProject");
   const firstDayStepId = searchValue(resolvedSearchParams, "step");
   const focusDispatchKey = searchValue(resolvedSearchParams, "focus");
+  const initialQueueFilter = dispatchQueueFilter(searchValue(resolvedSearchParams, "queue"));
   const [tasks, receipts, projects, recentAiTasks, chapters] = await Promise.all([
     prisma.gateDispatchTask.findMany({
       orderBy: [
@@ -337,6 +343,7 @@ export default async function DispatchPage({
         initialTasks={mergedTasks}
         initialCompletionSuggestions={completionEvidenceSuggestions}
         routeConfirmationDispatchFlow={routeConfirmationDispatchFlow}
+        initialQueueFilter={initialQueueFilter}
       />
     </AppShell>
   );

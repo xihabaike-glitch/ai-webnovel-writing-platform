@@ -765,6 +765,9 @@ test("buildProjectControlDashboard", async (t) => {
     assert.equal(dashboard.aiPipelineControlPlan.recheckStatus, "sample_required");
     assert.equal(dashboard.aiPipelineControlPlan.recheckDispatchKey, "ai-pipeline-recheck:demo-project:ai-plan-dispatched:sample");
     assert.equal(dashboard.aiPipelineControlPlan.recheckDispatchTitle, "AI 写审改：跑 1 章小样本复验");
+    assert.equal(dashboard.aiPipelineControlPlan.recheckDispatchHref, "/dispatch?queue=ai_pipeline#dispatch-ai-pipeline-recheck:demo-project:ai-plan-dispatched:sample");
+    assert.equal(dashboard.aiPipelineControlPlan.recheckActionLabel, "运行 1 章复验");
+    assert.equal(dashboard.aiPipelineControlPlan.canRecheck, false);
   });
 
   await t.test("summarizes model route health for the project control dashboard", () => {

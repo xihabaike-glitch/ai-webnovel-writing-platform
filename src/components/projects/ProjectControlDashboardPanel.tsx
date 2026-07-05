@@ -121,6 +121,8 @@ interface AiPipelineControlPlanSummary {
   recheckMessage: string | null;
   recheckDispatchKey: string | null;
   recheckDispatchTitle: string | null;
+  recheckDispatchHref: string | null;
+  recheckActionLabel: string | null;
   createdAt: string | null;
 }
 
@@ -1040,6 +1042,14 @@ export function ProjectControlDashboardPanel({ projectId }: { projectId: string 
                     {dashboard.aiPipelineControlPlan.recheckMessage}
                     {dashboard.aiPipelineControlPlan.recheckDispatchTitle ? (
                       <span className="block">已派单：{dashboard.aiPipelineControlPlan.recheckDispatchTitle}</span>
+                    ) : null}
+                    {dashboard.aiPipelineControlPlan.recheckDispatchHref && dashboard.aiPipelineControlPlan.recheckActionLabel ? (
+                      <Link
+                        className="mt-2 inline-flex w-fit rounded-md bg-white px-2 py-1 font-medium text-slate-800 hover:bg-slate-100"
+                        href={dashboard.aiPipelineControlPlan.recheckDispatchHref}
+                      >
+                        {dashboard.aiPipelineControlPlan.recheckActionLabel}
+                      </Link>
                     ) : null}
                   </div>
                 ) : null}

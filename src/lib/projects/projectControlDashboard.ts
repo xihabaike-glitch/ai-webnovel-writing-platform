@@ -277,6 +277,8 @@ export interface AiPipelineControlPlanSummary {
   recheckMessage: string | null;
   recheckDispatchKey: string | null;
   recheckDispatchTitle: string | null;
+  recheckDispatchHref: string | null;
+  recheckActionLabel: string | null;
   createdAt: string | null;
 }
 
@@ -1126,6 +1128,8 @@ function buildAiPipelineControlPlanSummary(audits: ControlBatchAudit[] = []): Ai
       recheckMessage: null,
       recheckDispatchKey: null,
       recheckDispatchTitle: null,
+      recheckDispatchHref: null,
+      recheckActionLabel: null,
       createdAt: null,
     };
   }
@@ -1148,6 +1152,12 @@ function buildAiPipelineControlPlanSummary(audits: ControlBatchAudit[] = []): Ai
     : null;
   const recheckDispatchKey = typeof recheck?.dispatchKey === "string" && recheck.dispatchKey ? recheck.dispatchKey : null;
   const recheckDispatchTitle = typeof recheck?.dispatchTitle === "string" && recheck.dispatchTitle ? recheck.dispatchTitle : null;
+  const recheckDispatchHref = recheckDispatchKey ? `/dispatch?queue=ai_pipeline#dispatch-${recheckDispatchKey}` : null;
+  const recheckActionLabel = recheckStatus === "small_batch_ready"
+    ? "恢复小批执行"
+    : recheckStatus === "sample_required"
+      ? "运行 1 章复验"
+      : null;
 
   return {
     hasPlan: true,
@@ -1164,12 +1174,14 @@ function buildAiPipelineControlPlanSummary(audits: ControlBatchAudit[] = []): Ai
     completedCount,
     totalCount,
     items,
-    canRecheck: totalCount > 0 && completedCount === totalCount,
+    canRecheck: totalCount > 0 && completedCount === totalCount && !recheckDispatchKey,
     recheckLabel: "复检批量健康",
     recheckStatus,
     recheckMessage,
     recheckDispatchKey,
     recheckDispatchTitle,
+    recheckDispatchHref,
+    recheckActionLabel,
     createdAt: new Date(latest.createdAt).toISOString(),
   };
 }

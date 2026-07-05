@@ -115,6 +115,8 @@ test("buildPlatformPublishExportCenter", async (t) => {
     assert.ok(center.packages[0].repairActions.some((action) => action.kind === "run_chapter_review"));
     assert.equal(center.packages[0].repairPath.status, "needs_repair");
     assert.equal(center.packages[0].repairPath.nextStep?.kind, "run_chapter_review");
+    assert.equal(center.packages[0].repairPath.steps[0]?.kind, "run_chapter_review");
+    assert.equal(center.packages[0].repairPath.steps[0]?.status, "active");
     assert.equal(center.packages[0].repairPath.executableActions, 1);
     assert.equal(center.packages[0].repairPath.manualActions, 0);
     assert.equal(center.workspace.readyPlatforms, 0);
@@ -328,6 +330,8 @@ test("buildPlatformPublishExportCenter", async (t) => {
     )));
     assert.equal(pack.repairPath.nextStep?.kind, "adopt_candidate");
     assert.equal(pack.repairPath.nextStep?.candidateRevisionId, "revision-second-pass");
+    assert.equal(pack.repairPath.steps[0]?.kind, "adopt_candidate");
+    assert.equal(pack.repairPath.steps[0]?.status, "active");
     assert.equal(pack.repairPath.executableActions, 1);
     assert.equal(pack.repairPath.manualActions, 0);
   });
@@ -1001,9 +1005,45 @@ test("buildPlatformPublishExportCenter", async (t) => {
     assert.ok(pack.preflight.blocked.some((item) => item.includes("1 章未通过")));
     assert.ok(pack.repairActions.some((action) => action.kind === "run_second_pass" && action.chapterId === "chapter-1"));
     assert.equal(pack.repairPath.nextStep?.kind, "run_second_pass");
+    assert.equal(pack.repairPath.steps[0]?.kind, "run_second_pass");
+    assert.equal(pack.repairPath.steps[0]?.status, "active");
     assert.equal(pack.repairPath.executableActions, 1);
     assert.equal(pack.repairPath.groups.some((group) => group.kind === "run_second_pass" && group.count === 1), true);
     assert.ok(pack.chapters[0].preflight.blocked.some((item) => item.includes("仍要求二改")));
+  });
+
+  await t.test("builds an ordered repair pipeline for mixed blockers", () => {
+    const center = buildPlatformPublishExportCenter({
+      project: {
+        title: "夜雨系统",
+        genre: "都市系统",
+        sellingPoint: "雨夜危机中觉醒系统，主角用选择翻盘。",
+        currentWordCount: 9000,
+        targetWordCount: 300000,
+      },
+      targetPlatform: getPlatformProfile("fanqie"),
+      chapters: finalChapters,
+      aiTasks: [
+        ...passedReviews.slice(1),
+        {
+          chapterId: "chapter-1",
+          taskType: "chapter_review",
+          status: "succeeded",
+          outputText: JSON.stringify({ score: 72, shouldSecondPass: true }),
+          createdAt: "2026-01-09T00:00:00.000Z",
+        },
+      ],
+      submissionChecklist: { ...readyChecklist, readinessPercent: 70 },
+      platforms: [getPlatformProfile("fanqie")],
+    });
+    const pack = center.packages[0];
+
+    assert.equal(pack.canExport, false);
+    assert.equal(pack.repairPath.steps.length, 2);
+    assert.equal(pack.repairPath.steps[0]?.kind, "run_second_pass");
+    assert.equal(pack.repairPath.steps[0]?.status, "active");
+    assert.equal(pack.repairPath.steps[1]?.kind, "open_submission_package");
+    assert.equal(pack.repairPath.steps[1]?.status, "queued");
   });
 
   await t.test("blocks export when submission readiness is below threshold", () => {

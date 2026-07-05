@@ -79,6 +79,8 @@ export interface PublishRepairHistoryItem {
 export interface PublishRepairPathStep {
   id: string;
   kind: PublishRepairActionKind;
+  order: number;
+  status: "active" | "queued";
   priority: PublishRepairAction["priority"];
   label: string;
   detail: string;
@@ -101,6 +103,7 @@ export interface PublishRepairPath {
   status: "ready" | "needs_repair";
   headline: string;
   nextStep: PublishRepairPathStep | null;
+  steps: PublishRepairPathStep[];
   totalActions: number;
   executableActions: number;
   manualActions: number;
@@ -2508,9 +2511,11 @@ function buildRepairPath(preflight: PublishPreflight): PublishRepairPath {
     || (left.chapterTitle ?? "").localeCompare(right.chapterTitle ?? "")
     || left.label.localeCompare(right.label)
   ));
-  const steps = sortedActions.map((action): PublishRepairPathStep => ({
+  const steps = sortedActions.map((action, index): PublishRepairPathStep => ({
     id: action.id,
     kind: action.kind,
+    order: index + 1,
+    status: index === 0 ? "active" : "queued",
     priority: action.priority,
     label: action.label,
     detail: action.detail,
@@ -2548,6 +2553,7 @@ function buildRepairPath(preflight: PublishPreflight): PublishRepairPath {
       status: "ready",
       headline: "当前发布包已通过质检，可以复制、下载或加入全平台归档。",
       nextStep: null,
+      steps: [],
       totalActions: 0,
       executableActions: 0,
       manualActions: 0,
@@ -2564,6 +2570,7 @@ function buildRepairPath(preflight: PublishPreflight): PublishRepairPath {
       ? `先处理：${steps[0].label}${steps[0].chapterTitle ? `（${steps[0].chapterTitle}）` : ""}`
       : "先补齐阻塞项，再回到发布前质检。",
     nextStep: steps[0] ?? null,
+    steps,
     totalActions: steps.length,
     executableActions,
     manualActions,

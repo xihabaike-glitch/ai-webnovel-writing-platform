@@ -48,6 +48,8 @@ interface PublishRepairHistoryItem {
 interface PublishRepairPathStep {
   id: string;
   kind: PublishRepairActionKind;
+  order: number;
+  status: "active" | "queued";
   priority: "high" | "medium" | "low";
   label: string;
   detail: string;
@@ -70,6 +72,7 @@ interface PublishRepairPath {
   status: "ready" | "needs_repair";
   headline: string;
   nextStep: PublishRepairPathStep | null;
+  steps: PublishRepairPathStep[];
   totalActions: number;
   executableActions: number;
   manualActions: number;
@@ -3292,6 +3295,37 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
                   <div className="mt-1 font-medium text-slate-950">{selectedPackage.repairPath.affectedChapters}</div>
                 </div>
               </div>
+              {selectedPackage.repairPath.steps.length ? (
+                <div className="mt-3 rounded-md bg-white/80 p-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="text-xs font-medium text-slate-900">修复流水线</div>
+                    <div className="text-xs text-slate-500">{selectedPackage.repairPath.totalActions} 步</div>
+                  </div>
+                  <div className="mt-2 grid gap-2 lg:grid-cols-3">
+                    {selectedPackage.repairPath.steps.slice(0, 6).map((step) => (
+                      <div
+                        className={`rounded-md border p-2 ${
+                          step.status === "active"
+                            ? "border-slate-950 bg-white text-slate-950"
+                            : "border-slate-200 bg-slate-50 text-slate-600"
+                        }`}
+                        key={step.id}
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-xs font-medium">第 {step.order} 步</span>
+                          <span className={`rounded-md px-2 py-0.5 text-[11px] ${
+                            step.executable ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"
+                          }`}>
+                            {step.executable ? "可一键" : "需打开"}
+                          </span>
+                        </div>
+                        <div className="mt-1 font-medium">{step.label}</div>
+                        {step.chapterTitle ? <div className="mt-1 line-clamp-1 text-xs text-slate-500">{step.chapterTitle}</div> : null}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
               {selectedPackage.repairPath.groups.length ? (
                 <div className="mt-3 grid gap-2 lg:grid-cols-2">
                   {selectedPackage.repairPath.groups.map((group) => (

@@ -46,6 +46,23 @@ interface BatchRunResponse {
     preferredRoutes: string[];
     avoidedRoutes: string[];
     warnings: string[];
+    recheckAdvice: {
+      id: string;
+      taskType: string;
+      label: string;
+      severity: "warning" | "blocked";
+      action: "switch_route" | "extend_watch" | "manual_review";
+      actionLabel: string;
+      recommendation: string;
+      sampleCount: number | null;
+      successRatePercent: number | null;
+      qualityScore: number | null;
+      cost: string | null;
+      fallbackHit: boolean | null;
+      needsGovernance: boolean | null;
+      evidence: string[];
+      completedAt: string | null;
+    } | null;
   };
 }
 
@@ -68,6 +85,7 @@ export function RunRecommendedBatchButton({ disabled, strategyId }: { disabled: 
   const [message, setMessage] = useState<string | null>(null);
   const [batchReceipt, setBatchReceipt] = useState<BatchRunResponse["batchReceipt"] | null>(null);
   const [modelRouteGate, setModelRouteGate] = useState<BatchRunResponse["modelRouteGate"] | null>(null);
+  const [isCreatingRecheck, setIsCreatingRecheck] = useState(false);
 
   async function runBatch() {
     setIsRunning(true);
@@ -102,6 +120,33 @@ export function RunRecommendedBatchButton({ disabled, strategyId }: { disabled: 
     }
   }
 
+  async function createModelRouteRecheckDispatch() {
+    if (!modelRouteGate?.recheckAdvice) return;
+    setIsCreatingRecheck(true);
+    setMessage(null);
+    try {
+      const response = await fetch("/api/model-route-confirmation-recheck-dispatch", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ advice: modelRouteGate.recheckAdvice }),
+      });
+      const payload = await response.json().catch(() => null) as {
+        task?: { title?: string; href?: string };
+        error?: string;
+      } | null;
+      if (!response.ok || !payload?.task) {
+        throw new Error(payload?.error ?? "生成模型路线复检派单失败。");
+      }
+      setMessage(`已生成「${payload.task.title ?? modelRouteGate.recheckAdvice.label}」复检派单。`);
+      router.push(payload.task.href ?? "/dispatch");
+      router.refresh();
+    } catch (caught) {
+      setMessage(caught instanceof Error ? caught.message : "生成模型路线复检派单失败。");
+    } finally {
+      setIsCreatingRecheck(false);
+    }
+  }
+
   return (
     <div className="flex flex-col gap-2 sm:items-end">
       <button
@@ -121,9 +166,21 @@ export function RunRecommendedBatchButton({ disabled, strategyId }: { disabled: 
               <p className="mt-1 leading-6 opacity-90">{modelRouteGate.headline}</p>
               <div className="mt-2 rounded-md bg-white/70 px-2 py-1 text-xs leading-5">{modelRouteGate.detail}</div>
             </div>
-            <a className="w-fit shrink-0 rounded-md bg-white px-3 py-2 text-xs font-medium text-slate-950" href={modelRouteGate.targetHref}>
-              {modelRouteGate.actionLabel}
-            </a>
+            <div className="flex shrink-0 flex-wrap gap-2">
+              {modelRouteGate.recheckAdvice ? (
+                <button
+                  className="w-fit rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white disabled:opacity-50"
+                  disabled={isCreatingRecheck}
+                  onClick={() => void createModelRouteRecheckDispatch()}
+                  type="button"
+                >
+                  {isCreatingRecheck ? "生成中" : "生成复检派单"}
+                </button>
+              ) : null}
+              <a className="w-fit rounded-md bg-white px-3 py-2 text-xs font-medium text-slate-950" href={modelRouteGate.targetHref}>
+                {modelRouteGate.actionLabel}
+              </a>
+            </div>
           </div>
           {modelRouteGate.preferredRoutes.length || modelRouteGate.avoidedRoutes.length ? (
             <div className="mt-3 flex flex-wrap gap-1.5 text-xs">

@@ -111,6 +111,10 @@ test("recommended batch model route gate", async (t) => {
 
     assert.equal(gate.status, "block");
     assert.equal(gate.maxBatchSize, 0);
+    assert.equal(gate.recheckAdvice?.taskType, "chapter_review");
+    assert.equal(gate.recheckAdvice?.severity, "blocked");
+    assert.equal(gate.recheckAdvice?.action, "switch_route");
+    assert.ok(gate.recheckAdvice?.recommendation.includes("推荐批次"));
     assert.ok(gate.avoidedRoutes.some((route) => route.includes("章节审稿")));
     assert.equal(guardedPlan.canRun, false);
     assert.equal(guardedPlan.chapterIds.length, 0);
@@ -127,6 +131,9 @@ test("recommended batch model route gate", async (t) => {
 
     assert.equal(gate.status, "sample");
     assert.equal(gate.maxBatchSize, 1);
+    assert.equal(gate.recheckAdvice?.taskType, "chapter_review");
+    assert.equal(gate.recheckAdvice?.severity, "warning");
+    assert.equal(gate.recheckAdvice?.action, "extend_watch");
     assert.equal(guardedPlan.canRun, true);
     assert.deepEqual(guardedPlan.chapterIds, ["chapter-1"]);
     assert.ok(guardedPlan.warnings.some((warning) => warning.includes("降级")));

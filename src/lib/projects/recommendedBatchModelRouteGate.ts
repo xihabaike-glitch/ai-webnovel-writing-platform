@@ -1,4 +1,6 @@
 import { buildModelTaskAuditDashboard, type ModelAuditProvider, type ModelAuditRoute, type ModelAuditTask } from "../ai/modelTaskAudit.ts";
+import { labelForRoutedTask, type RoutedModelTaskType } from "../model-gateway/taskRouting.ts";
+import type { RouteConfirmationRecheckAdviceItem } from "../model-gateway/routeConfirmation.ts";
 import type { ExecutableQueueCategory, TaskQueueExecutionPlan } from "./taskQueueExecutionPlan.ts";
 
 export interface RecommendedBatchModelRouteGateProject {
@@ -28,9 +30,10 @@ export interface RecommendedBatchModelRouteGate {
   preferredRoutes: string[];
   avoidedRoutes: string[];
   warnings: string[];
+  recheckAdvice: RouteConfirmationRecheckAdviceItem | null;
 }
 
-function taskTypeForCategory(category: ExecutableQueueCategory | null) {
+function taskTypeForCategory(category: ExecutableQueueCategory | null): RoutedModelTaskType | null {
   if (category === "draft") return "chapter_draft";
   if (category === "review") return "chapter_review";
   if (category === "second_pass") return "chapter_second_pass";
@@ -54,6 +57,52 @@ function settingsFromProjects(projects: RecommendedBatchModelRouteGateProject[])
     aiMaxBatchCostUsd: first?.aiMaxBatchCostUsd,
     aiMaxFailureRatePercent: first?.aiMaxFailureRatePercent,
     aiBudgetEnforcement: first?.aiBudgetEnforcement,
+  };
+}
+
+function buildGateRecheckAdvice(input: {
+  status: RecommendedBatchModelRouteGate["status"];
+  taskType: RoutedModelTaskType | null;
+  headline: string;
+  detail: string;
+  successRatePercent: number;
+  knownCostUsd: number;
+  fallbackAttemptRatePercent: number;
+  avoidedRoutes: string[];
+  warnings: string[];
+}): RouteConfirmationRecheckAdviceItem | null {
+  if (input.status === "allow" || !input.taskType) return null;
+  const label = labelForRoutedTask(input.taskType);
+  const fallbackHit = input.fallbackAttemptRatePercent > 0 ? true : input.fallbackAttemptRatePercent === 0 ? false : null;
+  const action: RouteConfirmationRecheckAdviceItem["action"] = input.status === "block" && input.avoidedRoutes.length > 0
+    ? "switch_route"
+    : "extend_watch";
+  const actionLabel = action === "switch_route" ? "切备用/重分配" : "延长观察";
+  const recommendation = input.status === "block"
+    ? `推荐批次被模型路线闸门拦截：「${label}」需要先复检并治理，避免继续放大失败路线。`
+    : `推荐批次被模型路线闸门降级：「${label}」先跑小样本复检，证据过线后再恢复批量。`;
+
+  return {
+    id: `recommended-batch-gate:${input.taskType}:${input.status}`,
+    taskType: input.taskType,
+    label,
+    severity: input.status === "block" ? "blocked" : "warning",
+    action,
+    actionLabel,
+    recommendation,
+    sampleCount: input.status === "block" ? 3 : 2,
+    successRatePercent: input.successRatePercent,
+    qualityScore: null,
+    cost: `$${input.knownCostUsd.toFixed(4)}`,
+    fallbackHit,
+    needsGovernance: input.status === "block",
+    evidence: Array.from(new Set([
+      input.headline,
+      input.detail,
+      ...input.avoidedRoutes.map((route) => `避用路线：${route}`),
+      ...input.warnings,
+    ])).slice(0, 5),
+    completedAt: null,
   };
 }
 
@@ -117,6 +166,8 @@ export function buildRecommendedBatchModelRouteGate(input: {
     ...audit.riskFlags.slice(0, 3),
     ...avoidedRoutes.map((route) => `避用路线：${route}`),
   ].filter((item): item is string => Boolean(item));
+  const successRatePercent = successRate(audit.summary.succeededTasks, audit.summary.totalTasks);
+  const normalizedWarnings = warnings.length ? warnings : ["模型路线暂无明显执行风险。"];
 
   return {
     status,
@@ -127,13 +178,24 @@ export function buildRecommendedBatchModelRouteGate(input: {
     targetHref: status === "block" ? "/settings/models" : "/tasks#recommended-batch",
     maxBatchSize,
     totalTasks: audit.summary.totalTasks,
-    successRatePercent: successRate(audit.summary.succeededTasks, audit.summary.totalTasks),
+    successRatePercent,
     failureRatePercent: audit.summary.failureRatePercent,
     knownCostUsd: audit.summary.knownCostUsd,
     fallbackAttemptRatePercent: audit.budgetCenter.fallbackAttemptRatePercent,
     preferredRoutes,
     avoidedRoutes,
-    warnings: warnings.length ? warnings : ["模型路线暂无明显执行风险。"],
+    warnings: normalizedWarnings,
+    recheckAdvice: buildGateRecheckAdvice({
+      status,
+      taskType,
+      headline,
+      detail,
+      successRatePercent,
+      knownCostUsd: audit.summary.knownCostUsd,
+      fallbackAttemptRatePercent: audit.budgetCenter.fallbackAttemptRatePercent,
+      avoidedRoutes,
+      warnings: normalizedWarnings,
+    }),
   };
 }
 

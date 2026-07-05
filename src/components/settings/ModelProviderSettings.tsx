@@ -13,6 +13,7 @@ import type {
   RouteConfirmationOnboarding,
   RouteConfirmationRecheckResultSummary,
 } from "@/lib/model-gateway/routeConfirmation";
+import type { ModelRoleMatrix, ModelWritingRoleStatus } from "@/lib/model-gateway/modelRoleMatrix";
 import type { ProviderHealthDashboard, ProviderHealthStatus } from "@/lib/model-gateway/providerHealth";
 import type { RoutedModelTaskType } from "@/lib/model-gateway/taskRouting";
 import type { ModelProviderId } from "@/lib/model-gateway/types";
@@ -515,6 +516,12 @@ const modelSetupStepStatusCopy: Record<ModelSetupOnboardingView["steps"][number]
   blocked: { label: "等待", className: "bg-slate-100 text-slate-600" },
 };
 
+const modelRoleStatusCopy: Record<ModelWritingRoleStatus, { label: string; className: string }> = {
+  ready: { label: "已就位", className: "bg-emerald-50 text-emerald-700" },
+  partial: { label: "可顶岗", className: "bg-amber-50 text-amber-700" },
+  missing: { label: "缺岗位", className: "bg-rose-50 text-rose-700" },
+};
+
 function draftFromOption(option: ProviderOptionView, existing?: ProviderView): DraftProvider {
   return {
     id: existing?.id,
@@ -535,6 +542,7 @@ export function ModelProviderSettings({
   providerSetupGuide,
   providerSetupWizard,
   modelSetupOnboarding,
+  modelRoleMatrix,
   firstDayRouteSummary,
   presetRouteBlueprint,
   providers,
@@ -556,6 +564,7 @@ export function ModelProviderSettings({
   providerSetupGuide: ProviderSetupGuideView;
   providerSetupWizard: ProviderSetupWizardView;
   modelSetupOnboarding: ModelSetupOnboardingView;
+  modelRoleMatrix: ModelRoleMatrix;
   firstDayRouteSummary: FirstDayRouteSummaryView;
   presetRouteBlueprint: PresetRouteBlueprintView;
   providers: ProviderView[];
@@ -1202,6 +1211,56 @@ export function ModelProviderSettings({
             {providerSetupWizard.nextActions.map((action) => (
               <div className="rounded-md bg-slate-50 px-3 py-2" key={action}>{action}</div>
             ))}
+          </div>
+        </div>
+        <div className="rounded-md border border-slate-200 bg-white p-4">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <h2 className="font-medium text-slate-950">模型编辑部职责矩阵</h2>
+              <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-600">{modelRoleMatrix.headline}</p>
+              <p className="mt-2 text-sm font-medium text-slate-950">下一步：{modelRoleMatrix.nextAction}</p>
+            </div>
+            <div className="grid grid-cols-3 gap-2 text-center text-xs text-slate-700">
+              <div className="rounded-md bg-emerald-50 px-3 py-2 text-emerald-700">
+                <div className="text-lg font-semibold">{modelRoleMatrix.summary.readyRoles}</div>
+                <div>已就位</div>
+              </div>
+              <div className="rounded-md bg-amber-50 px-3 py-2 text-amber-700">
+                <div className="text-lg font-semibold">{modelRoleMatrix.summary.partialRoles}</div>
+                <div>可顶岗</div>
+              </div>
+              <div className="rounded-md bg-rose-50 px-3 py-2 text-rose-700">
+                <div className="text-lg font-semibold">{modelRoleMatrix.summary.missingRoles}</div>
+                <div>缺岗位</div>
+              </div>
+            </div>
+          </div>
+          <div className="mt-4 grid gap-3 xl:grid-cols-2">
+            {modelRoleMatrix.roles.map((role) => {
+              const status = modelRoleStatusCopy[role.status];
+              return (
+                <article className="rounded-md border border-slate-200 bg-slate-50 p-3 text-sm" key={role.id}>
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div>
+                      <div className="text-xs text-slate-500">{role.ownerLabel}</div>
+                      <h3 className="mt-1 font-medium text-slate-950">{role.title}</h3>
+                    </div>
+                    <span className={`rounded-md px-2 py-1 text-xs font-medium ${status.className}`}>{status.label}</span>
+                  </div>
+                  <div className="mt-2 text-xs leading-5 text-slate-600">
+                    <div>模型：{role.providerName ? `${role.providerName} · ${role.model ?? "未填模型"}` : "未配置"}</div>
+                    <div>上下文要求：{role.minContextTokens.toLocaleString()} tokens</div>
+                  </div>
+                  <p className="mt-2 text-xs leading-5 text-slate-600">{role.reason}</p>
+                  <div className="mt-2 flex flex-wrap gap-1 text-xs text-slate-500">
+                    {role.deliverables.slice(0, 4).map((deliverable) => (
+                      <span className="rounded-md bg-white px-2 py-1" key={deliverable}>{deliverable}</span>
+                    ))}
+                  </div>
+                  <p className="mt-2 text-xs font-medium leading-5 text-slate-700">下一步：{role.nextAction}</p>
+                </article>
+              );
+            })}
           </div>
         </div>
         <div className="grid gap-3 md:grid-cols-4">

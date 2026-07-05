@@ -147,8 +147,11 @@ export function buildPublishRepairNextAction(
   const weakReview = results.find((result) => (
     result.status === "succeeded"
     && result.action === "run_chapter_review"
-    && typeof result.score === "number"
-    && result.score < 85
+    && (
+      result.shouldSecondPass
+      || (typeof result.score === "number" && result.score < 85)
+      || (typeof result.issueCount === "number" && result.issueCount > 0)
+    )
   ));
   if (weakReview) {
     return {

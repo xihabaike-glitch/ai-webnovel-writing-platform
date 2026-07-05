@@ -276,7 +276,7 @@ async function runPublishRepairAction(projectId: string, action: PublishRepairAc
       taskId: markedTask.id,
       score: review.result.score,
       issueCount: review.result.issues.length,
-      shouldSecondPass: review.result.score < 85,
+      shouldSecondPass: review.result.score < 85 || review.result.issues.length > 0,
     };
   }
 

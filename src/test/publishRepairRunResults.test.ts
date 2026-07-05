@@ -72,6 +72,40 @@ test("publish repair run result helpers", async (t) => {
     assert.equal(nextAction?.href, "/projects/project-1/chapters/chapter-1#chapter-second-pass");
   });
 
+  await t.test("routes high-scoring reviews with issues into second pass", () => {
+    const nextAction = buildPublishRepairNextAction([normalizeRunResult({
+      action: "run_chapter_review",
+      chapterId: "chapter-1",
+      chapterTitle: "雨夜系统",
+      status: "succeeded",
+      message: "已完成章节审稿。",
+      score: 88,
+      issueCount: 1,
+      shouldSecondPass: true,
+    })], "project-1");
+
+    assert.equal(nextAction?.kind, "run_second_pass");
+    assert.equal(nextAction?.action?.kind, "run_second_pass");
+    assert.equal(nextAction?.href, "/projects/project-1/chapters/chapter-1#chapter-second-pass");
+  });
+
+  await t.test("routes clean reviews back to publish recheck", () => {
+    const nextAction = buildPublishRepairNextAction([normalizeRunResult({
+      action: "run_chapter_review",
+      chapterId: "chapter-1",
+      chapterTitle: "雨夜系统",
+      status: "succeeded",
+      message: "已完成章节审稿。",
+      score: 92,
+      issueCount: 0,
+      shouldSecondPass: false,
+    })], "project-1");
+
+    assert.equal(nextAction?.kind, "recheck_publish");
+    assert.equal(nextAction?.label, "回发布质检");
+    assert.equal(nextAction?.href, "/projects/project-1#platform-export");
+  });
+
   await t.test("routes passed second pass candidates into adoption", () => {
     const nextAction = buildPublishRepairNextAction([normalizeRunResult({
       action: "run_second_pass",

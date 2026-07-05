@@ -123,6 +123,14 @@ export interface FirstDayDispatchDesk {
   nextTask: FirstDayDispatchDeskCard | null;
   cards: FirstDayDispatchDeskCard[];
   nextActions: string[];
+  completionGateCta: {
+    visible: boolean;
+    headline: string;
+    detail: string;
+    primaryLabel: string;
+    primaryHref: string;
+    badges: string[];
+  };
 }
 
 export interface FirstDayDispatchCardInlineAction {
@@ -846,6 +854,7 @@ export function buildFirstDayDispatchDesk(tasks: PersistedGatePlatformDispatchTa
   const nextTask = active[0] ?? null;
   const hasCompletedRiskRecovery = cards.some((card) => card.stepId === "risk-recovery" && card.state === "completed");
   const isRecoveredWatchDraft = hasCompletedRiskRecovery && nextTask?.stepId === "first-draft";
+  const allClosed = cards.length > 0 && active.length === 0;
 
   return {
     summary: {
@@ -863,6 +872,23 @@ export function buildFirstDayDispatchDesk(tasks: PersistedGatePlatformDispatchTa
       active.length > 1 ? `还有 ${active.length - 1} 张首日卡排队，完成当前节点后再推进下一张。` : null,
       cards.length > 0 && active.length === 0 ? "首日派单已全部完成，可以进入批量生产和平台包复盘。" : null,
     ].filter((action): action is string => Boolean(action)),
+    completionGateCta: allClosed
+      ? {
+        visible: true,
+        headline: "首日链路已收口",
+        detail: "所有首日派单已经完成。回总闸门复查放行状态，再决定是否进入批量初稿、批量审稿、批量二改或投稿包复盘。",
+        primaryLabel: "回总闸门复查",
+        primaryHref: "/gate?focus=first-day-complete",
+        badges: ["首日派单全完成", "进入批量前复查", "平台包复盘入口"],
+      }
+      : {
+        visible: false,
+        headline: "",
+        detail: "",
+        primaryLabel: "",
+        primaryHref: "",
+        badges: [],
+      },
   };
 }
 

@@ -927,6 +927,28 @@ export function GateDispatchTaskCenter({
               </div>
             </div>
           ) : null}
+          {firstDayDesk.completionGateCta.visible ? (
+            <div className="mt-4 rounded-md border border-emerald-200 bg-emerald-50 p-4 text-emerald-900">
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                <div>
+                  <div className="text-xs font-medium uppercase text-emerald-700">总闸门复查</div>
+                  <div className="mt-1 font-semibold">{firstDayDesk.completionGateCta.headline}</div>
+                  <p className="mt-2 max-w-3xl text-sm leading-6">{firstDayDesk.completionGateCta.detail}</p>
+                  <div className="mt-3 flex flex-wrap gap-2 text-xs">
+                    {firstDayDesk.completionGateCta.badges.map((badge) => (
+                      <span className="rounded-md bg-white px-2 py-1 font-medium" key={badge}>{badge}</span>
+                    ))}
+                  </div>
+                </div>
+                <Link
+                  className="w-fit shrink-0 rounded-md bg-emerald-900 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-800"
+                  href={firstDayDesk.completionGateCta.primaryHref}
+                >
+                  {firstDayDesk.completionGateCta.primaryLabel}
+                </Link>
+              </div>
+            </div>
+          ) : null}
           {firstDayDesk.nextActions.length ? (
             <div className="mt-3 grid gap-2 text-sm text-slate-600 md:grid-cols-2">
               {firstDayDesk.nextActions.map((action) => (

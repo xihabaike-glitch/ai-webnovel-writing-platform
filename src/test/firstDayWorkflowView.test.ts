@@ -412,6 +412,72 @@ test("buildFirstDayDispatchDesk highlights the next first-day task", () => {
   assert.ok(desk.nextActions[0].includes("第一章审稿"));
 });
 
+test("buildFirstDayDispatchDesk surfaces gate review when first-day cards are closed", () => {
+  const desk = buildFirstDayDispatchDesk([
+    {
+      databaseId: "db-1",
+      dispatchKey: "first-day:project-1:first-review",
+      id: "first-day:project-1:first-review",
+      projectId: "project-1",
+      platformId: "fanqie",
+      platformName: "番茄小说",
+      stage: "start_first_three_review",
+      state: "completed",
+      priorityScore: 70,
+      ownerRole: "AI",
+      title: "夜雨系统 · 第一章审稿",
+      detail: "AI 先当毒舌审稿编辑。",
+      dueLabel: "今天收口",
+      actionLabel: "去审稿",
+      href: "/projects/project-1/chapters/chapter-1",
+      acceptanceCriteria: ["第一章已有结构化审稿结果"],
+      evidence: [],
+      sourceReceiptId: null,
+      completionEvidence: "第一章审稿已完成，钩子、爽点和章末追读点已经复查。",
+      reviewLatestAt: "2026-01-01T00:00:00.000Z",
+      assignedAt: "2026-01-01T00:00:00.000Z",
+      completedAt: "2026-01-01T00:10:00.000Z",
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:10:00.000Z",
+    },
+    {
+      databaseId: "db-2",
+      dispatchKey: "first-day:project-1:publish-precheck",
+      id: "first-day:project-1:publish-precheck",
+      projectId: "project-1",
+      platformId: "fanqie",
+      platformName: "番茄小说",
+      stage: "submission_package_precheck",
+      state: "completed",
+      priorityScore: 60,
+      ownerRole: "运营",
+      title: "夜雨系统 · 平台包预检",
+      detail: "检查标题、简介、标签、样章和平台适配。",
+      dueLabel: "今天收口",
+      actionLabel: "检查平台包",
+      href: "/projects/project-1#platform-export",
+      acceptanceCriteria: ["平台包已完成预检"],
+      evidence: [],
+      sourceReceiptId: null,
+      completionEvidence: "平台包预检已完成，标题、简介、标签、样章和风险项都已经复查。",
+      reviewLatestAt: "2026-01-01T00:00:00.000Z",
+      assignedAt: "2026-01-01T00:00:00.000Z",
+      completedAt: "2026-01-01T00:20:00.000Z",
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:20:00.000Z",
+    },
+  ]);
+
+  assert.equal(desk.summary.active, 0);
+  assert.equal(desk.nextTask, null);
+  assert.equal(desk.completionGateCta.visible, true);
+  assert.equal(desk.completionGateCta.headline, "首日链路已收口");
+  assert.ok(desk.completionGateCta.detail.includes("回总闸门复查放行"));
+  assert.equal(desk.completionGateCta.primaryLabel, "回总闸门复查");
+  assert.equal(desk.completionGateCta.primaryHref, "/gate?focus=first-day-complete");
+  assert.ok(desk.completionGateCta.badges.includes("进入批量前复查"));
+});
+
 test("buildFirstDayDispatchCardInlineAction exposes AI execution on active first-day cards", () => {
   const baseTask = {
     databaseId: "db-1",

@@ -378,6 +378,16 @@ interface PlatformPublishEffectSaveReview {
   recommendedAction: PlatformPublishOptimizationAction | null;
 }
 
+interface PlatformDispatchCompletionEffectValidation {
+  status: "needs_effect" | "watch" | "rework" | "reusable_success";
+  label: string;
+  headline: string;
+  verdict: string;
+  nextAction: string;
+  evidence: string[];
+  href: string;
+}
+
 interface PlatformPublishPackage {
   platformId: string;
   platformName: string;
@@ -387,6 +397,7 @@ interface PlatformPublishPackage {
   submissionAssetVersions: PlatformSubmissionAssetVersion[];
   submissionAssetAdoption: PlatformSubmissionAssetAdoption;
   publishEffect: PlatformPublishEffect;
+  dispatchEffectValidation: PlatformDispatchCompletionEffectValidation;
   effectOptimization: PlatformPublishEffectOptimization;
   experimentPlan: PlatformABExperimentPlan;
   title: string;
@@ -831,6 +842,13 @@ function effectStatusClass(status: PlatformPublishEffect["status"]) {
   if (status === "signed") return "bg-emerald-50 text-emerald-700";
   if (status === "promising") return "bg-cyan-50 text-cyan-700";
   if (status === "weak") return "bg-rose-50 text-rose-700";
+  if (status === "watch") return "bg-amber-50 text-amber-700";
+  return "bg-slate-100 text-slate-600";
+}
+
+function dispatchValidationClass(status: PlatformDispatchCompletionEffectValidation["status"]) {
+  if (status === "reusable_success") return "bg-emerald-50 text-emerald-700";
+  if (status === "rework") return "bg-rose-50 text-rose-700";
   if (status === "watch") return "bg-amber-50 text-amber-700";
   return "bg-slate-100 text-slate-600";
 }
@@ -4103,6 +4121,25 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
             </div>
             <div className="mt-3 rounded-md bg-slate-50 p-3 text-sm text-slate-700">
               <span className="font-medium text-slate-950">下一步：</span>{selectedPackage.publishEffect.nextAction}
+            </div>
+            <div className="mt-3 rounded-md border border-slate-200 bg-white p-3 text-sm">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <div className="font-medium text-slate-950">{selectedPackage.dispatchEffectValidation.headline}</div>
+                  <p className="mt-1 leading-6 text-slate-600">{selectedPackage.dispatchEffectValidation.verdict}</p>
+                </div>
+                <span className={`w-fit rounded-md px-2 py-1 text-xs font-medium ${dispatchValidationClass(selectedPackage.dispatchEffectValidation.status)}`}>
+                  {selectedPackage.dispatchEffectValidation.label}
+                </span>
+              </div>
+              <div className="mt-2 rounded-md bg-slate-50 p-2 text-slate-700">
+                <span className="font-medium text-slate-950">验收结论：</span>{selectedPackage.dispatchEffectValidation.nextAction}
+              </div>
+              <div className="mt-2 flex flex-wrap gap-2 text-xs text-slate-500">
+                {selectedPackage.dispatchEffectValidation.evidence.map((item) => (
+                  <span className="rounded-md bg-slate-50 px-2 py-1" key={item}>{item}</span>
+                ))}
+              </div>
             </div>
             {latestEffectReview?.platformId === selectedPackage.platformId ? (
               <div className="mt-3 rounded-md border border-cyan-200 bg-cyan-50 p-3 text-sm">

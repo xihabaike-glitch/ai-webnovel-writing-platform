@@ -341,6 +341,16 @@ export interface PlatformPublishEffectSaveReview {
   recommendedAction: PlatformPublishOptimizationAction | null;
 }
 
+export interface PlatformDispatchCompletionEffectValidation {
+  status: "needs_effect" | "watch" | "rework" | "reusable_success";
+  label: string;
+  headline: string;
+  verdict: string;
+  nextAction: string;
+  evidence: string[];
+  href: string;
+}
+
 export interface PlatformPublishExportInput {
   project: PublishExportProject;
   chapters: PublishExportChapter[];
@@ -421,6 +431,7 @@ export interface PlatformPublishPackage {
   submissionAssetVersions: PlatformSubmissionAssetVersionInput[];
   submissionAssetAdoption: PlatformSubmissionAssetAdoptionSummary;
   publishEffect: PlatformPublishEffectSummary;
+  dispatchEffectValidation: PlatformDispatchCompletionEffectValidation;
   effectOptimization: PlatformPublishEffectOptimization;
   experimentPlan: PlatformABExperimentPlan;
   title: string;
@@ -2720,6 +2731,13 @@ function buildMarkdown(pack: Omit<PlatformPublishPackage, "markdown">) {
     `下一步：${pack.publishEffect.nextAction}`,
     ...(pack.publishEffect.latest?.editorFeedback ? [`编辑反馈：${pack.publishEffect.latest.editorFeedback}`] : []),
     "",
+    "## 验收后效果判定",
+    `状态：${pack.dispatchEffectValidation.label}`,
+    `判定：${pack.dispatchEffectValidation.headline}`,
+    `结论：${pack.dispatchEffectValidation.verdict}`,
+    `下一步：${pack.dispatchEffectValidation.nextAction}`,
+    `证据：${pack.dispatchEffectValidation.evidence.join("、")}`,
+    "",
     "## 执行前后对照",
     `状态：${pack.publishEffect.comparison.status}`,
     `曝光变化：${pack.publishEffect.comparison.viewsDelta}`,
@@ -3395,6 +3413,69 @@ function buildPlatformPublishEffect(
   };
 }
 
+function buildDispatchCompletionEffectValidation(
+  platform: PlatformProfile,
+  effect: PlatformPublishEffectSummary,
+): PlatformDispatchCompletionEffectValidation {
+  const rateEvidence = [
+    `曝光 ${effect.totalViews}`,
+    `点击率 ${effect.clickRatePercent}%`,
+    `收藏率 ${effect.favoriteRatePercent}%`,
+    `追读率 ${effect.followRatePercent}%`,
+  ];
+
+  if (effect.status === "empty") {
+    return {
+      status: "needs_effect",
+      label: "等待回填",
+      headline: `${platform.name} 验收完成后还缺真实效果。`,
+      verdict: "派单验收只能证明动作做完，不能证明平台增长有效。现在还不能把这套打法写成成功经验。",
+      nextAction: "回填曝光、点击、收藏、追读和编辑反馈，再让系统判断是否沉淀为成功打法。",
+      evidence: ["缺少首轮发布效果记录。"],
+      href: "#publish-effect-panel",
+    };
+  }
+
+  if (effect.status === "weak") {
+    return {
+      status: "rework",
+      label: "效果返工",
+      headline: `${platform.name} 有真实数据，但不能复用为成功结论。`,
+      verdict: `${effect.verdict} 派单验收口径可以保留，但不能复用为成功结论，标题卖点、投稿资产或前三章入口必须先返工。`,
+      nextAction: effect.nextAction,
+      evidence: rateEvidence,
+      href: "#publish-effect-panel",
+    };
+  }
+
+  if (effect.status === "promising" || effect.status === "signed") {
+    return {
+      status: "reusable_success",
+      label: "可沉淀",
+      headline: `${platform.name} 已补真实效果，可以沉淀为可复用打法。`,
+      verdict: `${effect.verdict} 这次不只是完成验收，而是有数据证明平台读者愿意继续看。`,
+      nextAction: "把标题卖点、前三章钩子、更新节奏和效果数据写入经验库，下一本同平台可作为首轮模板。",
+      evidence: [
+        ...rateEvidence,
+        effect.latest?.contractStatus === "signed" || effect.latest?.contractStatus === "invited"
+          ? `平台反馈：${contractStatusLabel(effect.latest.contractStatus)}`
+          : `记录 ${effect.records} 轮真实效果`,
+      ],
+      href: "#publish-effect-panel",
+    };
+  }
+
+  return {
+    status: "watch",
+    label: "继续观察",
+    headline: `${platform.name} 已回填效果，但样本还不够硬。`,
+    verdict: `${effect.verdict} 可以复用验收模板，但不能复用成功结论。`,
+    nextAction: "至少再补一轮数据，重点观察点击率、收藏率和追读率是否稳定上行。",
+    evidence: rateEvidence,
+    href: "#publish-effect-panel",
+  };
+}
+
 function effectAction(
   id: string,
   priority: PlatformPublishOptimizationAction["priority"],
@@ -3708,6 +3789,7 @@ function buildPlatformPackage(
     input.submissionAssetVersions ?? [],
   );
   const publishEffect = buildPlatformPublishEffect(platform, input.platformPublishMetrics ?? []);
+  const dispatchEffectValidation = buildDispatchCompletionEffectValidation(platform, publishEffect);
   const effectOptimization = buildPlatformEffectOptimization(
     platform,
     publishEffect,
@@ -3736,6 +3818,7 @@ function buildPlatformPackage(
     submissionAssetVersions,
     submissionAssetAdoption,
     publishEffect,
+    dispatchEffectValidation,
     effectOptimization,
     experimentPlan,
     title,

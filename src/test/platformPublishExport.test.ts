@@ -139,6 +139,9 @@ test("buildPlatformPublishExportCenter", async (t) => {
     );
     assert.equal(center.packages[0].publishEffect.status, "empty");
     assert.ok(center.packages[0].publishEffect.nextAction.includes("录入"));
+    assert.equal(center.packages[0].dispatchEffectValidation.status, "needs_effect");
+    assert.ok(center.packages[0].dispatchEffectValidation.verdict.includes("不能证明平台增长有效"));
+    assert.ok(center.packages[0].dispatchEffectValidation.nextAction.includes("曝光、点击、收藏、追读"));
     assert.equal(center.packages[0].effectOptimization.status, "collect_data");
     assert.ok(center.packages[0].effectOptimization.actions.some((action) => action.area === "data"));
     assert.ok(center.packages[0].effectOptimization.actions.some((action) => action.execution === "open_target" && action.href === "#publish-effect-panel"));
@@ -503,6 +506,9 @@ test("buildPlatformPublishExportCenter", async (t) => {
     assert.equal(pack.publishEffect.followRatePercent, 3);
     assert.ok(pack.publishEffect.verdict.includes("有可追的苗头"));
     assert.equal(pack.publishEffect.comparison.status, "none");
+    assert.equal(pack.dispatchEffectValidation.status, "reusable_success");
+    assert.equal(pack.dispatchEffectValidation.label, "可沉淀");
+    assert.ok(pack.dispatchEffectValidation.nextAction.includes("写入经验库"));
     assert.equal(pack.effectOptimization.status, "scale");
     assert.ok(pack.effectOptimization.actions.some((action) => action.label.includes("放大")));
     assert.equal(pack.experimentPlan.status, "winner_found");
@@ -517,6 +523,8 @@ test("buildPlatformPublishExportCenter", async (t) => {
     assert.ok(pack.markdown.includes("夜雨系统：倒计时重生"));
     assert.ok(pack.markdown.includes("投稿资产质检"));
     assert.ok(pack.markdown.includes("发布效果复盘"));
+    assert.ok(pack.markdown.includes("验收后效果判定"));
+    assert.ok(pack.markdown.includes("可沉淀"));
     assert.ok(pack.markdown.includes("执行前后对照"));
     assert.ok(pack.markdown.includes("二轮优化清单"));
     assert.ok(pack.markdown.includes("下一轮A/B实验"));
@@ -797,6 +805,8 @@ test("buildPlatformPublishExportCenter", async (t) => {
     const strategy = center.platformStrategy[0];
 
     assert.equal(pack.publishEffect.status, "weak");
+    assert.equal(pack.dispatchEffectValidation.status, "rework");
+    assert.ok(pack.dispatchEffectValidation.verdict.includes("不能复用为成功结论"));
     assert.equal(strategy.reviewDecision.kind, "repair");
     assert.ok(strategy.reviewDecision.tasks.some((task) => task.id === "rewrite-opening-hook" && task.priority === "high"));
     assert.equal(strategy.reviewDecision.tasks.find((task) => task.id === "fix-submission-asset")?.execution, "generate_asset_variants");

@@ -376,6 +376,8 @@ export interface GateDispatchTaskCenter {
     dueToday: number;
     recheckFollowUp: number;
     activeRecheckFollowUp: number;
+    aiPipeline: number;
+    activeAiPipeline: number;
     recheckFollowUpChains: number;
     repeatedRecheckFollowUpChains: number;
     averagePriorityScore: number;
@@ -395,6 +397,7 @@ export interface GateDispatchTaskCenter {
   }>;
   nextActions: string[];
   closeoutItems: GateDispatchTaskCloseoutItem[];
+  aiPipelineDispatches: PersistedGatePlatformDispatchTask[];
   recheckFollowUpChains: GateDispatchRecheckFollowUpChain[];
 }
 
@@ -3238,6 +3241,10 @@ export function filterGateDispatchTasks(
     });
 }
 
+function isAiPipelineDispatchTask(task: PersistedGatePlatformDispatchTask) {
+  return task.platformId === "ai-pipeline" || task.dispatchKey.startsWith("ai-pipeline-recheck:");
+}
+
 function validDate(value: string | null | undefined) {
   if (!value) return null;
   const dateValue = new Date(value);
@@ -3634,6 +3641,17 @@ export function buildGateDispatchTaskCenter(
   const completed = tasks.filter((task) => task.state === "completed").length;
   const recheckFollowUp = tasks.filter(isChapterProductionRecheckFollowUpTask).length;
   const activeRecheckFollowUp = tasks.filter((task) => task.state !== "completed" && isChapterProductionRecheckFollowUpTask(task)).length;
+  const aiPipelineDispatches = tasks
+    .filter(isAiPipelineDispatchTask)
+    .sort((left, right) => {
+      const stateWeight: Record<GatePlatformGrowthDispatchState, number> = { queued: 0, assigned: 1, completed: 2 };
+      const stateDiff = stateWeight[left.state] - stateWeight[right.state];
+      if (stateDiff !== 0) return stateDiff;
+      const priorityDiff = right.priorityScore - left.priorityScore;
+      if (priorityDiff !== 0) return priorityDiff;
+      return new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime();
+    });
+  const activeAiPipeline = aiPipelineDispatches.filter((task) => task.state !== "completed").length;
   const recheckFollowUpChains = buildGateDispatchRecheckFollowUpChains(tasks);
   const repeatedRecheckFollowUpChains = recheckFollowUpChains.filter((chain) => chain.maxRound > 1).length;
   const highPriorityQueued = tasks.filter((task) => task.state === "queued" && task.priorityScore >= 70).length;
@@ -3663,6 +3681,8 @@ export function buildGateDispatchTaskCenter(
       dueToday,
       recheckFollowUp,
       activeRecheckFollowUp,
+      aiPipeline: aiPipelineDispatches.length,
+      activeAiPipeline,
       recheckFollowUpChains: recheckFollowUpChains.length,
       repeatedRecheckFollowUpChains,
       averagePriorityScore: tasks.length ? Math.round(totalPriorityScore / tasks.length) : 0,
@@ -3682,6 +3702,7 @@ export function buildGateDispatchTaskCenter(
     nextActions: [
       overdue > 0 ? `先收 ${overdue} 个逾期派单，拖着不处理就是假闭环。` : null,
       dueToday > 0 ? `今天必须收 ${dueToday} 个派单，至少补齐证据或阻塞原因。` : null,
+      activeAiPipeline > 0 ? `AI 写审改还有 ${activeAiPipeline} 个复检后派单，先处理样本复验，别偷偷恢复批量。` : null,
       activeRecheckFollowUp > 0 ? `先处理 ${activeRecheckFollowUp} 个复查失败返工派单，别让同一个卡点重复冒烟。` : null,
       repeatedRecheckFollowUpChains > 0 ? `${repeatedRecheckFollowUpChains} 条返工链已经进入二轮以上，先复盘为什么第一轮没有打穿。` : null,
       highPriorityQueued > 0 ? `先派掉 ${highPriorityQueued} 个高优先级任务，别让平台机会窗口过期。` : null,
@@ -3691,6 +3712,7 @@ export function buildGateDispatchTaskCenter(
       tasks.length === 0 ? "还没有派单任务，先从总闸门执行平台复盘和派单。" : null,
     ].filter((action): action is string => Boolean(action)),
     closeoutItems,
+    aiPipelineDispatches,
     recheckFollowUpChains,
   };
 }

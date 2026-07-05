@@ -122,6 +122,8 @@ function routeFlowFilterFromLane(laneId: RouteConfirmationDispatchFlowLaneId): R
   return laneId;
 }
 
+type DispatchQueueFilter = "all" | "recheck_followup" | "ai_pipeline";
+
 function routeCompletionRecordChips(record: RouteDispatchCompletionRecord) {
   const chips: string[] = [];
   if (record.sampleCount !== null) chips.push(`样本 ${record.sampleCount}`);
@@ -156,7 +158,7 @@ export function GateDispatchTaskCenter({
   const [stateFilter, setStateFilter] = useState<GateDispatchTaskStateFilter>("all");
   const [platformFilter, setPlatformFilter] = useState("all");
   const [roleFilter, setRoleFilter] = useState("all");
-  const [queueFilter, setQueueFilter] = useState<"all" | "recheck_followup">("all");
+  const [queueFilter, setQueueFilter] = useState<DispatchQueueFilter>("all");
   const [routeFlowFilter, setRouteFlowFilter] = useState<RouteConfirmationDispatchTaskFilter>("all");
   const [runningKey, setRunningKey] = useState<string | null>(null);
   const [runningRouteAdviceId, setRunningRouteAdviceId] = useState<string | null>(null);
@@ -175,6 +177,9 @@ export function GateDispatchTaskCenter({
   const evidenceReview = useMemo(() => buildGateDispatchEvidenceReview(tasks, initialReceipts), [initialReceipts, tasks]);
   const routeExecutionDesk = useMemo(() => buildRouteRecheckExecutionDesk(tasks), [tasks]);
   const routeTaskByKey = useMemo(() => new Map(tasks.map((task) => [task.dispatchKey, task])), [tasks]);
+  const aiPipelineTaskKeys = useMemo(() => (
+    new Set(center.aiPipelineDispatches.map((task) => task.dispatchKey))
+  ), [center.aiPipelineDispatches]);
   const completionSuggestionByKey = useMemo(() => (
     new Map(initialCompletionSuggestions.map((suggestion) => [suggestion.dispatchKey, suggestion]))
   ), [initialCompletionSuggestions]);
@@ -217,8 +222,11 @@ export function GateDispatchTaskCenter({
       ownerRole: roleFilter,
       recheckFollowUpOnly: queueFilter === "recheck_followup",
     });
-    return filterRouteConfirmationDispatchTasks(baseTasks, routeFlowFilter);
-  }, [platformFilter, queueFilter, roleFilter, routeFlowFilter, stateFilter, tasks]);
+    const queueFilteredTasks = queueFilter === "ai_pipeline"
+      ? baseTasks.filter((task) => aiPipelineTaskKeys.has(task.dispatchKey))
+      : baseTasks;
+    return filterRouteConfirmationDispatchTasks(queueFilteredTasks, routeFlowFilter);
+  }, [aiPipelineTaskKeys, platformFilter, queueFilter, roleFilter, routeFlowFilter, stateFilter, tasks]);
 
   function evidenceLoopRecheckMessage(updated: Awaited<ReturnType<typeof updatePersistedGateDispatchTaskState>>) {
     const recheck = updated.evidenceLoopRecheck;
@@ -529,6 +537,15 @@ export function GateDispatchTaskCenter({
           <div className="mt-1 text-2xl font-semibold">{center.summary.activeRecheckFollowUp}</div>
           <div className="mt-1 text-xs opacity-75">共 {center.summary.recheckFollowUp}</div>
         </button>
+        <button
+          className={`rounded-md border p-3 text-left ${queueFilter === "ai_pipeline" ? "border-sky-300 bg-sky-50 text-sky-900" : "border-slate-200 bg-white"}`}
+          onClick={() => setQueueFilter((current) => current === "ai_pipeline" ? "all" : "ai_pipeline")}
+          type="button"
+        >
+          <div className="text-xs opacity-75">AI 写审改</div>
+          <div className="mt-1 text-2xl font-semibold">{center.summary.activeAiPipeline}</div>
+          <div className="mt-1 text-xs opacity-75">复检派单 {center.summary.aiPipeline}</div>
+        </button>
         <div className="rounded-md border border-slate-200 bg-white p-3">
           <div className="text-xs text-slate-500">返工链</div>
           <div className="mt-1 text-2xl font-semibold">{center.summary.recheckFollowUpChains}</div>
@@ -669,6 +686,46 @@ export function GateDispatchTaskCenter({
                   </Link>
                 </div>
               </div>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
+      {center.aiPipelineDispatches.length > 0 ? (
+        <section className="rounded-md border border-sky-200 bg-sky-50 p-4">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <div className="font-medium text-sky-950">AI 写审改复检派单</div>
+              <p className="mt-1 max-w-3xl text-sm leading-6 text-sky-800">
+                复检后生成的样本、小批和修复动作集中在这里，先完成复验，再恢复批量生产。
+              </p>
+            </div>
+            <button
+              className="w-fit rounded-md bg-white px-3 py-2 text-sm font-medium text-sky-900 hover:bg-sky-100"
+              onClick={() => setQueueFilter("ai_pipeline")}
+              type="button"
+            >
+              只看 AI 复检
+            </button>
+          </div>
+          <div className="mt-3 grid gap-2 lg:grid-cols-2">
+            {center.aiPipelineDispatches.slice(0, 4).map((task) => (
+              <Link
+                className="rounded-md border border-sky-100 bg-white/80 p-3 text-sm text-sky-950 hover:bg-white"
+                href={`#dispatch-${task.dispatchKey}`}
+                key={task.dispatchKey}
+              >
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className={`rounded-md px-2 py-1 text-xs font-medium ${stateClass(task.state)}`}>{stateLabel(task.state)}</span>
+                  <span className="font-medium">{task.title}</span>
+                </div>
+                <p className="mt-2 line-clamp-2 leading-6 text-sky-800">{task.detail}</p>
+                <div className="mt-2 flex flex-wrap gap-2 text-xs text-sky-700">
+                  <span className="rounded-md bg-sky-50 px-2 py-1">{task.ownerRole}</span>
+                  <span className="rounded-md bg-sky-50 px-2 py-1">{task.actionLabel}</span>
+                  <span className="rounded-md bg-sky-50 px-2 py-1">优先级 {task.priorityScore}</span>
+                </div>
+              </Link>
             ))}
           </div>
         </section>
@@ -1113,11 +1170,12 @@ export function GateDispatchTaskCenter({
             队列
             <select
               className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800"
-              onChange={(event) => setQueueFilter(event.target.value as "all" | "recheck_followup")}
+              onChange={(event) => setQueueFilter(event.target.value as DispatchQueueFilter)}
               value={queueFilter}
             >
               <option value="all">全部队列</option>
               <option value="recheck_followup">复查失败返工</option>
+              <option value="ai_pipeline">AI 写审改复检</option>
             </select>
           </label>
           <label className="grid gap-1 text-xs font-medium text-slate-600">
@@ -1188,6 +1246,7 @@ export function GateDispatchTaskCenter({
                 <div className="flex flex-wrap items-center gap-2">
                   <span className={`rounded-md px-2 py-1 text-xs font-medium ${stateClass(task.state)}`}>{stateLabel(task.state)}</span>
                   {isRecheckFollowUp ? <span className="rounded-md bg-amber-50 px-2 py-1 text-xs font-medium text-amber-800">复查返工</span> : null}
+                  {aiPipelineTaskKeys.has(task.dispatchKey) ? <span className="rounded-md bg-sky-50 px-2 py-1 text-xs font-medium text-sky-800">AI 复检</span> : null}
                   {recheckChain ? <span className="rounded-md bg-sky-50 px-2 py-1 text-xs font-medium text-sky-800">R{recheckChain.round}/R{recheckChain.maxRound}</span> : null}
                   <span className="font-semibold text-slate-950">{task.title}</span>
                   <span className="text-sm text-slate-500">{task.platformName}</span>

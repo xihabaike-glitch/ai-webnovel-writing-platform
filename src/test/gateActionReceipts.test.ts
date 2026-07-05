@@ -3680,6 +3680,53 @@ test("buildGateActionReceipt", async (t) => {
     assert.equal(recheckFollowUps[0].ownerRole, "作者");
   });
 
+  await t.test("surfaces AI pipeline recheck dispatches as a dedicated task lane", () => {
+    const aiTask: PersistedGatePlatformDispatchTask = {
+      databaseId: "dispatch-db-ai",
+      dispatchKey: "ai-pipeline-recheck:project-1:receipt-1:sample",
+      id: "ai-pipeline-recheck:project-1:receipt-1:sample",
+      projectId: "project-1",
+      platformId: "ai-pipeline",
+      platformName: "AI 写审改",
+      stage: "ai_pipeline_sample_recheck",
+      state: "queued",
+      priorityScore: 94,
+      ownerRole: "写作制片 / 审稿负责人",
+      title: "AI 写审改：跑 1 章小样本复验",
+      detail: "复检后只能小样本复验。",
+      dueLabel: "今天先跑 1 章",
+      actionLabel: "跑小样本复验",
+      href: "/projects/project-1#ai-pipeline",
+      acceptanceCriteria: ["复验完成前不能批量放量"],
+      evidence: ["来源清单：receipt-1"],
+      sourceReceiptId: "receipt-1",
+      completionEvidence: "",
+      reviewLatestAt: "2026-01-01T00:00:00.000Z",
+      assignedAt: null,
+      completedAt: null,
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    };
+    const center = buildGateDispatchTaskCenter([
+      {
+        ...aiTask,
+        dispatchKey: "fanqie:record_metrics",
+        id: "fanqie:record_metrics",
+        platformId: "fanqie",
+        platformName: "番茄小说",
+        stage: "record_metrics",
+        priorityScore: 61,
+        title: "番茄小说：补效果数据",
+      },
+      aiTask,
+    ]);
+
+    assert.equal(center.summary.aiPipeline, 1);
+    assert.equal(center.summary.activeAiPipeline, 1);
+    assert.equal(center.aiPipelineDispatches[0].dispatchKey, "ai-pipeline-recheck:project-1:receipt-1:sample");
+    assert.equal(center.aiPipelineDispatches[0].actionLabel, "跑小样本复验");
+  });
+
   await t.test("suggests pausing platform direction for repeated submission follow-up chains", () => {
     const baseDispatch = buildGatePlatformGrowthDispatchItems([buildGatePlatformStrategyReceipt({
       item: strategyPlatform,

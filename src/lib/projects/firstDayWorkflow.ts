@@ -118,6 +118,9 @@ export interface FirstDayTacticFocus {
   openingMove: string;
   verificationMove: string;
   risk: string;
+  handoffDetail: string;
+  firstDayActions: string[];
+  avoidRules: string[];
   acceptanceCriteria: string[];
   missingEvidence: string[];
 }
@@ -281,6 +284,8 @@ function startTacticRiskLevel(startTactic: ProjectStartTacticSummary | null | un
 
 export function buildFirstDayRiskProfile(startTactic?: ProjectStartTacticSummary | null): FirstDayRiskProfile {
   const level = startTacticRiskLevel(startTactic);
+  const avoidCriteria = (startTactic?.avoidRules ?? []).slice(0, 2).map((rule) => `避坑边界已落实：${rule}`);
+  const avoidEvidence = (startTactic?.avoidRules ?? []).length ? ["缺少开书交接避坑边界的落地说明。"] : [];
 
   if (level === "blocked") {
     return {
@@ -291,8 +296,9 @@ export function buildFirstDayRiskProfile(startTactic?: ProjectStartTacticSummary
       acceptanceCriteria: [
         "写清本次恢复条件：入口卖点、前三章兑现或平台匹配度至少改掉一项。",
         "首日只验证一个变量，不允许直接批量生成或平台加码。",
+        ...avoidCriteria,
       ],
-      missingEvidence: ["缺少避坑平台恢复条件确认。"],
+      missingEvidence: ["缺少避坑平台恢复条件确认。", ...avoidEvidence],
       priorityBoost: 16,
       dueLabel: "今天止损验证",
     };
@@ -307,8 +313,9 @@ export function buildFirstDayRiskProfile(startTactic?: ProjectStartTacticSummary
       acceptanceCriteria: [
         "写清首轮小样本通过线、不可接受项和放量结论。",
         "保留第一章或前三章复查证据，后续按数据决定是否扩大。",
+        ...avoidCriteria,
       ],
-      missingEvidence: ["缺少观察平台首轮小样本验证口径。"],
+      missingEvidence: ["缺少观察平台首轮小样本验证口径。", ...avoidEvidence],
       priorityBoost: 8,
       dueLabel: "今天小样本验证",
     };
@@ -357,6 +364,15 @@ function tacticFocusForStep(startTactic: ProjectStartTacticSummary | null | unde
   const verificationMove = compact(startTactic.verificationMove);
   const primaryTactic = compact(startTactic.primaryTactic);
   const risk = compact(startTactic.risk);
+  const handoffDetail = compact(startTactic.handoffDetail ?? "");
+  const firstDayActions = (startTactic.firstDayActions ?? []).map(compact).filter(Boolean);
+  const avoidRules = (startTactic.avoidRules ?? []).map(compact).filter(Boolean);
+  const actionByStep = firstDayActions.find((action) => {
+    if (["opening-hook", "first-draft"].includes(stepId)) return /开头|第一章|正文/.test(action);
+    if (["first-review", "publish-precheck"].includes(stepId)) return /验证|复查|回填|平台包/.test(action);
+    if (stepId === "risk-recovery") return /恢复|小样本|避坑/.test(action);
+    return false;
+  }) ?? firstDayActions[0] ?? "";
 
   const criterionByStep: Record<string, string> = {
     skeleton: primaryTactic ? `骨架必须能支撑开书打法：${primaryTactic}` : "骨架必须能支撑当前开书打法。",
@@ -368,6 +384,11 @@ function tacticFocusForStep(startTactic: ProjectStartTacticSummary | null | unde
     "first-rewrite": risk ? `改稿必须处理打法风险：${risk}` : "改稿必须处理当前打法风险。",
     "publish-precheck": verificationMove ? `平台包必须回收验证动作：${verificationMove}` : "平台包必须能回收当前开书验证动作。",
   };
+  const handoffCriteria = [
+    criterionByStep[stepId] ?? "当前节点必须服务开书打法。",
+    actionByStep ? `执行开书交接动作：${actionByStep}` : null,
+    avoidRules[0] ? `避开交接边界：${avoidRules[0]}` : null,
+  ].filter((item): item is string => Boolean(item));
   const missingByStep: Record<string, string> = {
     skeleton: "缺少能支撑开书打法的大纲骨架证据。",
     "opening-hook": "缺少开头动作落地证据。",
@@ -386,7 +407,10 @@ function tacticFocusForStep(startTactic: ProjectStartTacticSummary | null | unde
     openingMove,
     verificationMove,
     risk,
-    acceptanceCriteria: [criterionByStep[stepId] ?? "当前节点必须服务开书打法。"],
+    handoffDetail,
+    firstDayActions,
+    avoidRules,
+    acceptanceCriteria: handoffCriteria,
     missingEvidence: [missingByStep[stepId] ?? "缺少开书打法落地证据。"],
   };
 }
@@ -418,6 +442,9 @@ function modelPrompt(input: {
       input.tacticFocus.openingMove ? `- 开头动作：${input.tacticFocus.openingMove}` : "",
       input.tacticFocus.verificationMove ? `- 验证动作：${input.tacticFocus.verificationMove}` : "",
       input.tacticFocus.risk ? `- 风险：${input.tacticFocus.risk}` : "",
+      input.tacticFocus.handoffDetail ? `- 交接说明：${input.tacticFocus.handoffDetail}` : "",
+      ...input.tacticFocus.firstDayActions.map((action) => `- 首日动作：${action}`),
+      ...input.tacticFocus.avoidRules.map((rule) => `- 避坑边界：${rule}`),
     ].filter(Boolean).join("\n") : "",
     `交接要求：${input.handoffNote}`,
     "验收标准：",

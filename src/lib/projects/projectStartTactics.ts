@@ -39,6 +39,14 @@ export interface ProjectStartTacticSummary {
   openingMove: string;
   verificationMove: string;
   risk: string;
+  handoffStatus?: ProjectStartExperienceHandoffStatus;
+  handoffLabel?: string;
+  handoffDetail?: string;
+  recommendedPlatformName?: string | null;
+  recommendedTemplateId?: ProjectTemplate["id"] | null;
+  firstDayActions?: string[];
+  avoidRules?: string[];
+  handoffEvidence?: string[];
 }
 
 export type ProjectStartPlatformExperienceStatus = "recommended" | "watch" | "avoid" | "template";
@@ -838,9 +846,22 @@ function trimLine(value: string) {
 export function buildProjectStartTacticWorldEntry(
   advice: ProjectStartTacticAdvice,
   platformName: string,
+  handoff?: ProjectStartExperienceHandoff | null,
 ): ProjectStartTacticWorldEntry {
   const evidence = advice.evidence.slice(0, 2).map((item) => `证据：${trimLine(item)}`);
   const checklist = advice.checklist.slice(0, 3).map((item) => `检查：${trimLine(item)}`);
+  const handoffLines = handoff
+    ? [
+      `交接状态：${handoff.status}`,
+      `交接标签：${handoff.label}`,
+      `交接说明：${trimLine(handoff.detail)}`,
+      handoff.recommendedPlatformName ? `推荐平台：${handoff.recommendedPlatformName}` : null,
+      handoff.recommendedTemplateId ? `推荐模板：${handoff.recommendedTemplateId}` : null,
+      ...handoff.firstDayActions.slice(0, 3).map((item) => `首日动作：${trimLine(item)}`),
+      ...handoff.avoidRules.slice(0, 3).map((item) => `避坑边界：${trimLine(item)}`),
+      ...handoff.evidence.slice(0, 2).map((item) => `交接证据：${trimLine(item)}`),
+    ].filter((line): line is string => Boolean(line))
+    : [];
 
   return {
     type: "platform_soil",
@@ -851,6 +872,7 @@ export function buildProjectStartTacticWorldEntry(
       `开头动作：${trimLine(advice.openingMove)}`,
       `验证动作：${trimLine(advice.verificationMove)}`,
       `风险：${trimLine(advice.risk)}`,
+      ...handoffLines,
       ...checklist,
       ...evidence,
     ].join("\n"),
@@ -862,6 +884,13 @@ function lineValue(lines: string[], prefix: string) {
   return line ? line.slice(prefix.length).trim() : "";
 }
 
+function lineValues(lines: string[], prefix: string) {
+  return lines
+    .filter((item) => item.startsWith(prefix))
+    .map((item) => item.slice(prefix.length).trim())
+    .filter(Boolean);
+}
+
 export function parseProjectStartTacticSummary(entry: { title: string; content: string } | null | undefined): ProjectStartTacticSummary | null {
   if (!entry) return null;
   const lines = entry.content.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
@@ -870,6 +899,11 @@ export function parseProjectStartTacticSummary(entry: { title: string; content: 
   const openingMove = lineValue(lines, "开头动作：");
   const verificationMove = lineValue(lines, "验证动作：");
   const risk = lineValue(lines, "风险：");
+  const handoffStatus = lineValue(lines, "交接状态：") as ProjectStartExperienceHandoffStatus | "";
+  const handoffLabel = lineValue(lines, "交接标签：");
+  const handoffDetail = lineValue(lines, "交接说明：");
+  const recommendedPlatformName = lineValue(lines, "推荐平台：");
+  const recommendedTemplateId = lineValue(lines, "推荐模板：") as ProjectTemplate["id"] | "";
 
   if (!primaryTactic && !openingMove && !verificationMove) return null;
 
@@ -880,6 +914,14 @@ export function parseProjectStartTacticSummary(entry: { title: string; content: 
     openingMove,
     verificationMove,
     risk,
+    ...(handoffStatus ? { handoffStatus } : {}),
+    ...(handoffLabel ? { handoffLabel } : {}),
+    ...(handoffDetail ? { handoffDetail } : {}),
+    recommendedPlatformName: recommendedPlatformName || null,
+    recommendedTemplateId: recommendedTemplateId || null,
+    firstDayActions: lineValues(lines, "首日动作："),
+    avoidRules: lineValues(lines, "避坑边界："),
+    handoffEvidence: lineValues(lines, "交接证据："),
   };
 }
 

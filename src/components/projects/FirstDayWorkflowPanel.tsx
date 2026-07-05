@@ -40,6 +40,9 @@ interface FirstDayExecutionPackage {
     openingMove: string;
     verificationMove: string;
     risk: string;
+    handoffDetail: string;
+    firstDayActions: string[];
+    avoidRules: string[];
     acceptanceCriteria: string[];
     missingEvidence: string[];
   } | null;
@@ -540,6 +543,31 @@ export function FirstDayWorkflowPanel({ projectId }: { projectId: string }) {
                     <div className="rounded-md bg-white px-2 py-2 leading-5">风险：{workflow.executionPackage.tacticFocus.risk}</div>
                   ) : null}
                 </div>
+                {workflow.executionPackage.tacticFocus.handoffDetail ? (
+                  <div className="mt-3 rounded-md bg-white px-2 py-2 text-xs leading-5 text-slate-600">
+                    交接：{workflow.executionPackage.tacticFocus.handoffDetail}
+                  </div>
+                ) : null}
+                {workflow.executionPackage.tacticFocus.firstDayActions.length || workflow.executionPackage.tacticFocus.avoidRules.length ? (
+                  <div className="mt-3 grid gap-2 text-xs md:grid-cols-2">
+                    {workflow.executionPackage.tacticFocus.firstDayActions.length ? (
+                      <div className="rounded-md bg-white px-2 py-2 leading-5 text-emerald-700">
+                        <div className="font-medium">首日动作</div>
+                        {workflow.executionPackage.tacticFocus.firstDayActions.slice(0, 3).map((action) => (
+                          <p className="mt-1" key={action}>{action}</p>
+                        ))}
+                      </div>
+                    ) : null}
+                    {workflow.executionPackage.tacticFocus.avoidRules.length ? (
+                      <div className="rounded-md bg-white px-2 py-2 leading-5 text-rose-700">
+                        <div className="font-medium">避坑边界</div>
+                        {workflow.executionPackage.tacticFocus.avoidRules.slice(0, 3).map((rule) => (
+                          <p className="mt-1" key={rule}>{rule}</p>
+                        ))}
+                      </div>
+                    ) : null}
+                  </div>
+                ) : null}
               </div>
             ) : null}
             <div className="mt-4 grid gap-4 md:grid-cols-2">

@@ -211,6 +211,7 @@ export function ProjectForm() {
           updateCadence: String(formData.get("updateCadence") ?? ""),
           templateId: String(formData.get("templateId") ?? ""),
           startTacticAdvice: tacticAdvice,
+          startExperienceHandoff,
         }),
       });
 

@@ -117,6 +117,14 @@ interface ProjectStartTacticSummary {
   openingMove: string;
   verificationMove: string;
   risk: string;
+  handoffStatus?: "reuse" | "small_sample" | "blocked" | "template";
+  handoffLabel?: string;
+  handoffDetail?: string;
+  recommendedPlatformName?: string | null;
+  recommendedTemplateId?: string | null;
+  firstDayActions?: string[];
+  avoidRules?: string[];
+  handoffEvidence?: string[];
 }
 
 interface ProjectStartDecision {
@@ -440,6 +448,11 @@ export function ProjectControlDashboardPanel({ projectId }: { projectId: string 
                 </span>
               </div>
               <p className="mt-2 text-sm leading-6 text-slate-600">{dashboard.startTactic.primaryTactic}</p>
+              {dashboard.startTactic.handoffDetail ? (
+                <div className="mt-2 rounded-md bg-slate-50 p-3 text-xs leading-5 text-slate-600">
+                  {dashboard.startTactic.handoffLabel ? `${dashboard.startTactic.handoffLabel}：` : ""}{dashboard.startTactic.handoffDetail}
+                </div>
+              ) : null}
               <div className="mt-3 grid gap-2 md:grid-cols-3">
                 <div className="rounded-md bg-slate-50 p-3">
                   <div className="text-xs text-slate-500">开头动作</div>
@@ -454,6 +467,30 @@ export function ProjectControlDashboardPanel({ projectId }: { projectId: string 
                   <p className="mt-1 text-sm leading-6 text-slate-700">{dashboard.startTactic.risk || "按平台反馈继续校准。"}</p>
                 </div>
               </div>
+              {dashboard.startTactic.firstDayActions?.length || dashboard.startTactic.avoidRules?.length ? (
+                <div className="mt-3 grid gap-2 md:grid-cols-2">
+                  {dashboard.startTactic.firstDayActions?.length ? (
+                    <div className="rounded-md bg-emerald-50 p-3">
+                      <div className="text-xs font-medium text-emerald-700">首日动作</div>
+                      <div className="mt-2 grid gap-1 text-xs leading-5 text-emerald-800">
+                        {dashboard.startTactic.firstDayActions.slice(0, 3).map((action) => (
+                          <p key={action}>{action}</p>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
+                  {dashboard.startTactic.avoidRules?.length ? (
+                    <div className="rounded-md bg-rose-50 p-3">
+                      <div className="text-xs font-medium text-rose-700">避坑边界</div>
+                      <div className="mt-2 grid gap-1 text-xs leading-5 text-rose-800">
+                        {dashboard.startTactic.avoidRules.slice(0, 3).map((rule) => (
+                          <p key={rule}>{rule}</p>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
               <Link
                 className="mt-3 inline-flex w-fit items-center justify-center rounded-md border border-slate-200 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
                 href={`/projects/${projectId}#world-bible`}

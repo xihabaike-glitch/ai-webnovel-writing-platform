@@ -152,6 +152,14 @@ test("buildFirstDayWorkflow", async (t) => {
       openingMove: "第一段给倒计时和身份暴露风险。",
       verificationMove: "批量后复检前三章追读；首批同时做模型路由复检，确认正文初稿、章节审稿成功率、质量和成本。",
       risk: "新项目仍先跑小样本，不要直接放量。",
+      handoffStatus: "reuse" as const,
+      handoffLabel: "复用交接",
+      handoffDetail: "沿用番茄历史高压钩子，但首日必须回填数据证据。",
+      recommendedPlatformName: "番茄小说",
+      recommendedTemplateId: "fanqie_system_reversal" as const,
+      firstDayActions: ["开头：第一段给倒计时。", "验证：回填前三章追读。"],
+      avoidRules: ["不要直接放量，先做小样本。"],
+      handoffEvidence: ["最终判定：稳定加码。"],
     };
     const workflow = buildFirstDayWorkflow({
       project,
@@ -169,13 +177,21 @@ test("buildFirstDayWorkflow", async (t) => {
     assert.equal(workflow.nextStep.id, "first-draft");
     assert.equal(workflow.executionPackage.tacticFocus?.label, "恢复放量打法");
     assert.ok(workflow.executionPackage.tacticFocus?.openingMove.includes("倒计时"));
+    assert.equal(workflow.executionPackage.tacticFocus?.handoffDetail, "沿用番茄历史高压钩子，但首日必须回填数据证据。");
+    assert.ok(workflow.executionPackage.tacticFocus?.firstDayActions.some((action) => action.includes("第一段给倒计时")));
+    assert.ok(workflow.executionPackage.tacticFocus?.avoidRules.some((rule) => rule.includes("不要直接放量")));
     assert.ok(workflow.executionPackage.acceptanceCriteria.some((criterion) => criterion.includes("第一章正文必须执行开头动作")));
+    assert.ok(workflow.executionPackage.acceptanceCriteria.some((criterion) => criterion.includes("执行开书交接动作")));
+    assert.ok(workflow.executionPackage.acceptanceCriteria.some((criterion) => criterion.includes("避开交接边界")));
     assert.ok(workflow.executionPackage.acceptanceCriteria.some((criterion) => criterion.includes("模型路线复检")));
     assert.ok(workflow.executionPackage.missingEvidence.some((evidence) => evidence.includes("开头动作")));
     assert.ok(workflow.executionPackage.missingEvidence.some((evidence) => evidence.includes("模型路线复检")));
     assert.ok(workflow.executionPackage.handoffNote.includes("开书打法要落地"));
     assert.ok(workflow.executionPackage.modelPrompt.includes("开书打法约束"));
     assert.ok(workflow.executionPackage.modelPrompt.includes("恢复放量打法"));
+    assert.ok(workflow.executionPackage.modelPrompt.includes("交接说明"));
+    assert.ok(workflow.executionPackage.modelPrompt.includes("首日动作"));
+    assert.ok(workflow.executionPackage.modelPrompt.includes("避坑边界"));
     assert.ok(workflow.executionPackage.modelPrompt.includes("模型路线复检"));
     assert.ok(dispatch.acceptanceCriteria.some((criterion) => criterion.includes("模型路线复检")));
   });

@@ -406,10 +406,15 @@ function buildProjectStartDecision(startTactic: ProjectStartTacticSummary | null
 
   const evidence = [
     `来源：${startTactic.label}`,
+    startTactic.handoffLabel ? `交接：${startTactic.handoffLabel}${startTactic.handoffDetail ? `｜${startTactic.handoffDetail}` : ""}` : null,
+    startTactic.recommendedPlatformName ? `推荐平台：${startTactic.recommendedPlatformName}` : null,
+    startTactic.recommendedTemplateId ? `推荐模板：${startTactic.recommendedTemplateId}` : null,
     startTactic.openingMove ? `开头：${startTactic.openingMove}` : null,
     startTactic.verificationMove ? `验证：${startTactic.verificationMove}` : null,
+    ...(startTactic.firstDayActions ?? []).slice(0, 1).map((action) => `首日动作：${action}`),
+    ...(startTactic.avoidRules ?? []).slice(0, 1).map((rule) => `避坑边界：${rule}`),
   ].filter((item): item is string => Boolean(item));
-  const labelText = `${startTactic.label} ${startTactic.primaryTactic} ${startTactic.risk}`;
+  const labelText = `${startTactic.label} ${startTactic.handoffStatus ?? ""} ${startTactic.primaryTactic} ${startTactic.risk}`;
 
   if (labelText.includes("避坑") || labelText.includes("失败") || labelText.includes("暂停") || labelText.includes("不要复用")) {
     return {

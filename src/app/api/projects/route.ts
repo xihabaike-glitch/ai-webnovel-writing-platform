@@ -125,7 +125,7 @@ export async function POST(request: Request) {
         tasks: persistedGateTasks,
       });
       const startTacticAdvice = input.startTacticAdvice ?? startExperience.advice;
-      const startTacticEntry = buildProjectStartTacticWorldEntry(startTacticAdvice, platform.name);
+      const startTacticEntry = buildProjectStartTacticWorldEntry(startTacticAdvice, platform.name, input.startExperienceHandoff ?? null);
       const outlineNodes = buildDefaultOutlineNodes({
         projectId: created.id,
         title: created.title,

@@ -242,7 +242,7 @@ test("buildProjectControlDashboard", async (t) => {
         { id: "w1", type: "system_rule", title: "系统规则", content: "系统任务必须伴随代价，并推动主角做出高风险选择。每次奖励都要带出新的债务、敌人或关系压力。" },
         { id: "w2", type: "taboo", title: "复活禁忌", content: "不能无代价复活，任何复活都必须交换记忆或关系。禁忌一旦触发，会让主角失去最重要的证据。" },
         { id: "w3", type: "platform_soil", title: "平台土壤", content: "每章必须有爽点、冲突和章末追读，信息要前置。设定只服务选择压力，不能连续解释超过两段。" },
-        { id: "w4", type: "platform_soil", title: "首轮平台打法：番茄小说", content: "状态：历史可复用\n打法：番茄小说 已完成修复、复测、重验和效果回填，可以作为同类平台的恢复模板。\n开头动作：新项目可复用：先修标题简介标签和前三章兑现，再小步重验。\n验证动作：创建后先跑前三章和平台包装，再记录首轮曝光、点击、收藏、追读。\n风险：不要直接放量，先保留小步验证窗口。" },
+        { id: "w4", type: "platform_soil", title: "首轮平台打法：番茄小说", content: "状态：历史可复用\n打法：番茄小说 已完成修复、复测、重验和效果回填，可以作为同类平台的恢复模板。\n开头动作：新项目可复用：先修标题简介标签和前三章兑现，再小步重验。\n验证动作：创建后先跑前三章和平台包装，再记录首轮曝光、点击、收藏、追读。\n风险：不要直接放量，先保留小步验证窗口。\n交接状态：reuse\n交接标签：复用交接\n交接说明：沿用番茄历史高压钩子，但首日必须回填数据证据。\n推荐平台：番茄小说\n推荐模板：fanqie_system_reversal\n首日动作：开头：第一段给倒计时。\n首日动作：验证：回填前三章追读。\n避坑边界：不要直接放量，先做小样本。" },
       ],
       foreshadows: [
         { id: "f1", title: "系统异常", setupChapterId: "chapter-1", payoffChapterId: "chapter-1", relatedCharacterIds: "[]", status: "paid_off", notes: "已回收" },
@@ -296,6 +296,10 @@ test("buildProjectControlDashboard", async (t) => {
     assert.ok(dashboard.platformVerdict.primaryScore > 0);
     assert.ok(dashboard.platformVerdict.actionLabel.length > 0);
     assert.equal(dashboard.startTactic?.label, "历史可复用");
+    assert.equal(dashboard.startTactic?.handoffStatus, "reuse");
+    assert.equal(dashboard.startTactic?.handoffLabel, "复用交接");
+    assert.ok(dashboard.startTactic?.firstDayActions?.some((action) => action.includes("第一段给倒计时")));
+    assert.ok(dashboard.startTactic?.avoidRules?.some((rule) => rule.includes("不要直接放量")));
     assert.ok(dashboard.startTactic?.openingMove.includes("小步重验"));
     assert.ok(dashboard.startTactic?.verificationMove.includes("首轮曝光"));
     assert.equal(dashboard.startDecision.status, "scale");
@@ -304,6 +308,9 @@ test("buildProjectControlDashboard", async (t) => {
     assert.equal(dashboard.startDecision.targetAnchor, "ai-pipeline");
     assert.ok(dashboard.startDecision.nextExperiment.includes("前三章"));
     assert.ok(dashboard.startDecision.evidence.some((item) => item.includes("历史可复用")));
+    assert.ok(dashboard.startDecision.evidence.some((item) => item.includes("复用交接")));
+    assert.ok(dashboard.startDecision.evidence.some((item) => item.includes("推荐模板")));
+    assert.ok(dashboard.startDecision.evidence.some((item) => item.includes("避坑边界")));
     assert.equal(dashboard.areas.find((area) => area.id === "world")?.status, "good");
     assert.equal(dashboard.areas.find((area) => area.id === "export")?.status, "good");
   });

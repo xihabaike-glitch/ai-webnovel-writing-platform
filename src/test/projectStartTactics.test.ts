@@ -883,15 +883,38 @@ test("buildProjectStartTacticAdvice", async (t) => {
     const template = getDefaultTemplateForPlatform(platform.id);
     const style = getPlatformWritingStyle(platform.id);
     const advice = buildProjectStartTacticAdvice({ platform, template, style });
-    const entry = buildProjectStartTacticWorldEntry(advice, platform.name);
+    const entry = buildProjectStartTacticWorldEntry(advice, platform.name, {
+      status: "reuse",
+      label: "复用交接",
+      title: "番茄小说 可复用历史打法",
+      detail: "当前平台可以沿用历史高压钩子，但仍要回填首轮数据。",
+      selectedPlatformId: "fanqie",
+      selectedPlatformName: "番茄小说",
+      recommendedPlatformId: "fanqie",
+      recommendedPlatformName: "番茄小说",
+      recommendedTemplateId: template.id,
+      shouldSwitchTemplate: false,
+      firstDayActions: ["开头：第一段给不可逆危机。", "验证：回填前三章追读。"],
+      avoidRules: ["不要直接放量，先做小样本。"],
+      evidence: ["最终判定：稳定加码。"],
+    });
     const summary = parseProjectStartTacticSummary(entry);
 
     assert.equal(entry.type, "platform_soil");
     assert.equal(entry.title, "首轮平台打法：番茄小说");
     assert.ok(entry.content.includes("状态：模板推荐"));
+    assert.ok(entry.content.includes("交接状态：reuse"));
+    assert.ok(entry.content.includes("首日动作：开头"));
+    assert.ok(entry.content.includes("避坑边界：不要直接放量"));
     assert.ok(entry.content.includes("开头动作："));
     assert.ok(entry.content.includes("验证动作："));
     assert.equal(summary?.label, "模板推荐");
+    assert.equal(summary?.handoffStatus, "reuse");
+    assert.equal(summary?.handoffLabel, "复用交接");
+    assert.equal(summary?.recommendedTemplateId, template.id);
+    assert.deepEqual(summary?.firstDayActions, ["开头：第一段给不可逆危机。", "验证：回填前三章追读。"]);
+    assert.deepEqual(summary?.avoidRules, ["不要直接放量，先做小样本。"]);
+    assert.deepEqual(summary?.handoffEvidence, ["最终判定：稳定加码。"]);
     assert.ok(summary?.openingMove.includes("第一段"));
     assert.ok(summary?.verificationMove.includes("前三章"));
     assert.equal(findProjectStartTacticSummary([

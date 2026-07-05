@@ -216,6 +216,42 @@ test("buildPrePublishGate", async (t) => {
     assert.equal(gate.releaseAction?.label, "先解除阻塞：重新审稿");
   });
 
+  await t.test("adds executable gate action for adoption publish checks", () => {
+    const gate = buildPrePublishGate({
+      projects: [{
+        ...readyProject,
+        gateDispatchTasks: [
+          ...firstDayCompleteDispatches("project-ready"),
+          {
+            dispatchKey: "first-three-adoption:project-ready:chapter-1:revision-1:review",
+            state: "completed",
+            completionEvidence: "采纳后重新审稿已完成：审稿分 91，问题 0 个。",
+          },
+          {
+            dispatchKey: "first-three-adoption:project-ready:chapter-1:revision-1:publish-check",
+            platformId: "fanqie",
+            state: "assigned",
+            completionEvidence: "",
+            title: "第 1 章采纳后发布质检",
+            detail: "重新审稿后回发布包刷新质检。",
+            actionLabel: "回发布质检",
+            href: "/projects/project-ready#platform-export",
+          },
+        ],
+      }],
+      failureTasks: [],
+      batchHistory: [],
+    });
+
+    assert.equal(gate.priorityActions[0].label, "回发布质检");
+    assert.deepEqual(gate.priorityActions[0].execution, {
+      type: "first_three_adoption",
+      itemId: "first-three-adoption:project-ready:chapter-1:revision-1:publish-check",
+      title: "第 1 章采纳后发布质检",
+      execution: { type: "publish_check", projectId: "project-ready", platformId: "fanqie" },
+    });
+  });
+
   await t.test("passes launch gate after first-three adoption review and publish check are closed", () => {
     const gate = buildPrePublishGate({
       projects: [{

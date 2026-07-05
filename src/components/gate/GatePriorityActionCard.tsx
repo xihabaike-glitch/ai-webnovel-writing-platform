@@ -3,7 +3,12 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { buildGateActionReceipt, type GateActionReceipt, type GateActionReceiptPayload } from "@/lib/projects/gateActionReceipts";
+import {
+  buildGateActionReceipt,
+  updatePersistedGateDispatchTaskState,
+  type GateActionReceipt,
+  type GateActionReceiptPayload,
+} from "@/lib/projects/gateActionReceipts";
 import type { PrePublishGateAction } from "@/lib/projects/prePublishGate";
 
 function actionTone(tone: PrePublishGateAction["tone"]) {
@@ -33,6 +38,21 @@ function firstThreeAdoptionUrl(execution: Extract<NonNullable<PrePublishGateActi
   return execution.execution.type === "chapter_review"
     ? "/api/ai/tasks/chapter-review"
     : `/api/projects/${execution.execution.projectId}/platform-export`;
+}
+
+function firstThreeAdoptionCompletionEvidence(
+  execution: Extract<NonNullable<PrePublishGateAction["execution"]>, { type: "first_three_adoption" }>,
+  payload: GateActionReceiptPayload,
+) {
+  const taskId = payload.task?.id ?? payload.result?.taskId;
+  if (execution.execution.type === "chapter_review") {
+    const score = typeof payload.result === "object" && payload.result && "score" in payload.result
+      ? (payload.result as { score?: unknown }).score
+      : null;
+    const scoreText = typeof score === "number" ? `，审稿分 ${Math.round(score)}` : "";
+    return `采纳后重新审稿已完成：${execution.title}${taskId ? `，任务 ${taskId}` : ""}${scoreText}。`;
+  }
+  return `采纳后发布质检已刷新：${execution.title}${payload.message ? `，${payload.message}` : ""}。`;
 }
 
 export function GatePriorityActionCard({
@@ -103,6 +123,11 @@ export function GatePriorityActionCard({
       const receipt = buildGateActionReceipt({ action, payload: receiptPayload, status: "succeeded" });
       setMessage(receipt.message);
       onReceipt?.(receipt);
+      if (execution.type === "first_three_adoption") {
+        await updatePersistedGateDispatchTaskState(execution.itemId, "completed", {
+          completionEvidence: firstThreeAdoptionCompletionEvidence(execution, payload),
+        });
+      }
       router.refresh();
     } catch (caught) {
       const errorMessage = caught instanceof Error ? caught.message : "动作执行失败。";

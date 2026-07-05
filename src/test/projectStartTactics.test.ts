@@ -14,6 +14,7 @@ import {
 } from "../lib/projects/gateActionReceipts.ts";
 import {
   buildProjectStartExperienceHandoff,
+  buildProjectStartExperienceHandoffDispatchPackage,
   buildProjectStartRecoveryHandoffPanel,
   buildProjectStartPlatformExperienceGuide,
   buildProjectStartGateExperience,
@@ -1369,6 +1370,81 @@ test("buildProjectStartTacticAdvice", async (t) => {
     assert.ok(handoff.title.includes("恢复放量小样本"));
     assert.ok(handoff.firstDayActions.some((action) => action.includes("恢复放量小样本")));
     assert.ok(handoff.avoidRules.some((rule) => rule.includes("不直接放量")));
+  });
+
+  await t.test("turns a recovery experience handoff into a first-day dispatch package", () => {
+    const platform = getPlatformProfile("fanqie");
+    const template = getDefaultTemplateForPlatform(platform.id);
+    const style = getPlatformWritingStyle(platform.id);
+    const recoveryDispatch = buildGatePlatformTacticExperienceFollowupDispatch({
+      platformId: "fanqie",
+      platformName: "番茄小说",
+      status: "usable",
+      label: "可复用打法",
+      tactic: "恢复放量打法",
+      lesson: "恢复放量后续小样本已过线。",
+      reuseHint: "新项目可以参考这套恢复放量节奏，但仍先跑小样本。",
+      risk: "恢复放量不能跨题材无限复用。",
+      href: "/gate#platform-tactic-experience",
+      sourceStatus: "healthy",
+      sourceLabel: "恢复放量闭环",
+      priorityScore: 92,
+      latestAt: "2026-01-02T00:00:00.000Z",
+      evidence: ["加码范围：番茄小说 恢复放量继续小样本", "适用边界：只允许小步复用"],
+    });
+    assert.ok(recoveryDispatch);
+    const task: PersistedGatePlatformDispatchTask = {
+      ...recoveryDispatch,
+      databaseId: "task-recovery-followup",
+      dispatchKey: recoveryDispatch.id,
+      projectId: null,
+      sourceReceiptId: null,
+      state: "completed",
+      completionEvidence: "恢复放量继续小样本已通过：成功率 100%，质量 88，追读率 2.4%。",
+      assignedAt: "2026-01-02T00:00:00.000Z",
+      completedAt: "2026-01-02T03:00:00.000Z",
+      createdAt: "2026-01-02T00:00:00.000Z",
+      updatedAt: "2026-01-02T03:00:00.000Z",
+    };
+    const result = buildProjectStartGateExperience({
+      platform,
+      template,
+      style,
+      receipts: [],
+      tasks: [task],
+    });
+    const guide = buildProjectStartPlatformExperienceGuide({
+      platforms: [platform],
+      experiences: result.experiences,
+    });
+    const riskGate = buildProjectStartRiskGate(guide.items[0] ?? null);
+    const handoff = buildProjectStartExperienceHandoff({
+      platform,
+      template,
+      guide,
+      advice: result.advice,
+      riskGate,
+      recommendedTemplate: template,
+    });
+    const handoffPackage = buildProjectStartExperienceHandoffDispatchPackage({
+      project: { id: "project-new", title: "夜雨系统" },
+      platform,
+      handoff,
+      now: "2026-01-03T00:00:00.000Z",
+    });
+
+    assert.equal(handoffPackage.label, "恢复放量交接");
+    assert.deepEqual(handoffPackage.dispatches.map((item) => item.id), [
+      "first-day-handoff:project-new:opening",
+      "first-day-handoff:project-new:verification",
+      "first-day-handoff:project-new:platform-package",
+    ]);
+    assert.deepEqual(handoffPackage.dispatches.map((item) => item.ownerRole), ["开头编辑", "审稿编辑", "平台运营"]);
+    assert.ok(handoffPackage.dispatches[0]?.acceptanceCriteria.some((item) => item.includes("恢复放量小样本")));
+    assert.ok(handoffPackage.dispatches[1]?.acceptanceCriteria.some((item) => item.includes("通过线")));
+    assert.ok(handoffPackage.dispatches[2]?.acceptanceCriteria.some((item) => item.includes("首轮曝光")));
+    assert.ok(handoffPackage.dispatches.every((item) => item.evidence.some((line) => line.includes("恢复放量"))));
+    assert.ok(handoffPackage.nextAction.includes("派单中心"));
   });
 
   await t.test("builds a focused recovery handoff panel only for recovery scale starts", () => {

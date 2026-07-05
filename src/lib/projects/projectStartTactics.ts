@@ -8,6 +8,7 @@ import {
   type GateActionReceipt,
   type GateBatchTacticEffectItem,
   type GateKnowledgeFeedbackReceipt,
+  type GatePlatformGrowthDispatchItem,
   type GatePlatformTacticExperienceItem,
   type PersistedGatePlatformDispatchTask,
 } from "./gateActionReceipts.ts";
@@ -139,6 +140,13 @@ export interface ProjectStartExperienceHandoff {
   firstDayActions: string[];
   avoidRules: string[];
   evidence: string[];
+}
+
+export interface ProjectStartExperienceHandoffDispatchPackage {
+  label: string;
+  title: string;
+  nextAction: string;
+  dispatches: GatePlatformGrowthDispatchItem[];
 }
 
 export interface ProjectStartRecoveryHandoffPanel {
@@ -813,6 +821,117 @@ export function buildProjectStartRecoveryHandoffPanel(handoff: ProjectStartExper
     blockedRule: handoff.avoidRules.find((rule) => /不直接放量|小样本|放量/u.test(rule))
       ?? "未过小样本前不直接放量。",
     evidence: handoff.evidence.slice(0, 2),
+  };
+}
+
+function handoffDueLabel(status: ProjectStartExperienceHandoffStatus) {
+  if (status === "blocked") return "今天止损确认";
+  if (status === "small_sample" || status === "reuse") return "今天小样本验证";
+  return "今天开书准备";
+}
+
+function handoffEvidence(handoff: ProjectStartExperienceHandoff) {
+  return uniqueLines([
+    `交接类型：${handoff.label}`,
+    `交接目标：${handoff.title}`,
+    handoff.detail,
+    ...handoff.firstDayActions.map((action) => `首日动作：${action}`),
+    ...handoff.avoidRules.map((rule) => `避坑边界：${rule}`),
+    ...handoff.evidence,
+  ], 8);
+}
+
+function handoffProjectHref(projectId: string) {
+  return `/projects/${projectId}`;
+}
+
+export function buildProjectStartExperienceHandoffDispatchPackage(input: {
+  project: { id: string; title: string };
+  platform: PlatformProfile;
+  handoff: ProjectStartExperienceHandoff;
+  now?: Date | string;
+}): ProjectStartExperienceHandoffDispatchPackage {
+  const now = input.now ? new Date(input.now).toISOString() : new Date().toISOString();
+  const projectHref = handoffProjectHref(input.project.id);
+  const dueLabel = handoffDueLabel(input.handoff.status);
+  const evidence = handoffEvidence(input.handoff);
+  const recoveryScale = /恢复放量/u.test([
+    input.handoff.label,
+    input.handoff.title,
+    ...input.handoff.firstDayActions,
+    ...input.handoff.avoidRules,
+  ].join(" "));
+  const firstAction = input.handoff.firstDayActions[0] ?? "把经验打法拆进第一章首屏。";
+  const verificationAction = input.handoff.firstDayActions.find((action) => /验证|回填|追读|前三章|小样本/u.test(action))
+    ?? "写清前三章验收标准、通过线和不可接受项。";
+  const avoidRule = input.handoff.avoidRules[0] ?? "不要把经验结论当成免检放量。";
+
+  const shared = {
+    platformId: input.platform.id,
+    platformName: input.platform.name,
+    state: "assigned" as const,
+    dueLabel,
+    evidence,
+    reviewLatestAt: now,
+  };
+
+  return {
+    label: input.handoff.label,
+    title: input.handoff.title,
+    nextAction: "已生成首日经验交接任务包，去派单中心按顺序完成开头、验收和平台回收。",
+    dispatches: [
+      {
+        ...shared,
+        id: `first-day-handoff:${input.project.id}:opening`,
+        stage: "start_opening_diagnostic",
+        priorityScore: input.handoff.status === "blocked" ? 94 : 88,
+        ownerRole: "开头编辑",
+        title: `${input.project.title} · 经验开书交接：开头打法`,
+        detail: `把「${input.handoff.label}」拆到第一章首屏，先验证钩子、危机和追读问题。`,
+        actionLabel: "锁定开头打法",
+        href: `${projectHref}#first-day-workflow`,
+        acceptanceCriteria: [
+          `交接动作已落地：${firstAction}`,
+          recoveryScale ? "恢复放量小样本只进入第一章首屏验证，不直接扩成批量生产。" : null,
+          `避坑边界已确认：${avoidRule}`,
+          "第一章首屏必须能看出危机、选择、代价和继续读的理由。",
+        ].filter((item): item is string => Boolean(item)),
+      },
+      {
+        ...shared,
+        id: `first-day-handoff:${input.project.id}:verification`,
+        stage: "start_first_three_review",
+        priorityScore: input.handoff.status === "blocked" ? 90 : 84,
+        ownerRole: "审稿编辑",
+        title: `${input.project.title} · 经验开书交接：首轮验收`,
+        detail: "把经验卡转成前三章验收标准，防止只复用结论、不复用证据。",
+        actionLabel: "设置验收口径",
+        href: `${projectHref}#first-day-workflow`,
+        acceptanceCriteria: [
+          `验证动作已进入首轮复查：${verificationAction}`,
+          "前三章验收必须写清通过线、不可接受项和复查证据格式。",
+          "模型路线复检要记录成功率、质量和成本，不靠默认路线硬跑。",
+          recoveryScale ? "恢复放量首轮只看小样本，不把任务完成误判为可复用放量结论。" : null,
+        ].filter((item): item is string => Boolean(item)),
+      },
+      {
+        ...shared,
+        id: `first-day-handoff:${input.project.id}:platform-package`,
+        stage: "start_platform_package",
+        priorityScore: input.handoff.status === "blocked" ? 86 : 80,
+        ownerRole: "平台运营",
+        title: `${input.project.title} · 经验开书交接：平台回收`,
+        detail: "把经验卡落到标题、简介、标签、样章和首轮数据回收口径。",
+        actionLabel: "准备平台回收",
+        href: `${projectHref}#platform-export`,
+        acceptanceCriteria: [
+          "标题、简介、标签和样章能兑现本次开书打法。",
+          "首轮曝光、点击、收藏、追读或站内反馈的回收字段已写清。",
+          recoveryScale ? "恢复放量平台包必须先回收小样本曝光、点击、收藏、追读。" : null,
+          `避坑边界已进入平台包：${avoidRule}`,
+        ].filter((item): item is string => Boolean(item)),
+      },
+    ],
   };
 }
 

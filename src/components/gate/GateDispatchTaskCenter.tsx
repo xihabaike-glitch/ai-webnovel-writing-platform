@@ -561,6 +561,7 @@ export function GateDispatchTaskCenter({
           completionEvidence: string;
           completedAt: string | null;
         };
+        recoveryDispatch?: PersistedGatePlatformDispatchTask | null;
       } | null;
       if (!response.ok) throw new Error(payload?.error ?? "运行 AI 写审改复检失败。");
       if (payload?.recheckTask) {
@@ -574,14 +575,25 @@ export function GateDispatchTaskCenter({
           }
           : item));
       }
+      if (payload?.recoveryDispatch) {
+        setTasks((current) => {
+          const nextByKey = new Map(current.map((item) => [item.dispatchKey, item]));
+          nextByKey.set(payload.recoveryDispatch!.dispatchKey, payload.recoveryDispatch!);
+          return Array.from(nextByKey.values());
+        });
+      }
       const succeeded = payload?.results?.filter((result) => result.status === "succeeded").length ?? 0;
       const total = payload?.results?.length ?? 0;
       const qualityText = payload?.routeEffectSummary?.averageQualityScore === null || payload?.routeEffectSummary?.averageQualityScore === undefined
         ? "质量缺样本"
         : `质量 ${payload.routeEffectSummary.averageQualityScore}`;
+      const recoveryText = payload?.recoveryDispatch ? ` 已生成恢复派单：${payload.recoveryDispatch.title}。` : "";
       const nextActionText = payload?.nextAction ? ` 下一步：${payload.nextAction.detail}` : "";
-      setRouteActionMessage(`已运行「${task.title}」：${succeeded}/${total} 成功，成功率 ${payload?.routeEffectSummary?.successRatePercent ?? 0}%，${qualityText}。${payload?.batchReceipt?.headline ?? payload?.routeEffectSummary?.verdict ?? ""}${nextActionText}`);
-      setRouteActionLink(payload?.nextAction?.href ? {
+      setRouteActionMessage(`已运行「${task.title}」：${succeeded}/${total} 成功，成功率 ${payload?.routeEffectSummary?.successRatePercent ?? 0}%，${qualityText}。${payload?.batchReceipt?.headline ?? payload?.routeEffectSummary?.verdict ?? ""}${nextActionText}${recoveryText}`);
+      setRouteActionLink(payload?.recoveryDispatch ? {
+        label: payload.recoveryDispatch.actionLabel,
+        href: `/dispatch?queue=ai_pipeline#dispatch-${payload.recoveryDispatch.dispatchKey}`,
+      } : payload?.nextAction?.href ? {
         label: payload.nextAction.label,
         href: payload.nextAction.href,
         execution: payload.nextAction.execution,

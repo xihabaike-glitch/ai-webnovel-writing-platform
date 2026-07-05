@@ -1,4 +1,5 @@
 import { buildGateActionReceipt, type GateActionReceipt, type GateActionReceiptPayload } from "./gateActionReceipts.ts";
+import { buildAiPipelineRecheckDispatchPlan } from "./controlActionSeeds.ts";
 import type { TaskQueueBatchReceipt, TaskQueueBatchRouteEffect, TaskQueueBatchRunResult } from "./taskQueueBatchReceipt.ts";
 import type { TaskQueueExecutionPlan } from "./taskQueueExecutionPlan.ts";
 
@@ -39,6 +40,17 @@ function recheckMode(plan: Pick<TaskQueueExecutionPlan, "scaleGate" | "chapterId
 
 function receiptStatus(batchReceipt: TaskQueueBatchReceipt): GateActionReceipt["status"] {
   return batchReceipt.status === "repair" ? "failed" : "succeeded";
+}
+
+function receiptIdFromRecheckDispatchKey(dispatchKey: string, projectId: string) {
+  const prefix = `ai-pipeline-recheck:${projectId}:`;
+  if (!dispatchKey.startsWith(prefix)) return null;
+  const rest = dispatchKey.slice(prefix.length);
+  const suffixIndex = rest.lastIndexOf(":");
+  if (suffixIndex <= 0) return null;
+  const suffix = rest.slice(suffixIndex + 1);
+  if (suffix !== "sample" && suffix !== "scale") return null;
+  return rest.slice(0, suffixIndex);
 }
 
 function platformNameFromPlan(plan: Pick<TaskQueueExecutionPlan, "strategyBases">) {
@@ -94,6 +106,26 @@ export function buildAiPipelineRecheckNextAction(input: {
     detail: `AI 复检已过线，成功率 ${input.successRatePercent}%，质量 ${input.averageQualityScore ?? "缺样本"}。下一步只恢复小批，不要直接无限放量。`,
     href: projectHref,
   };
+}
+
+export function buildAiPipelineRecheckRecoveryDispatchPlan(input: {
+  projectId: string;
+  sourceDispatchKey: string;
+  mode: AiPipelineRecheckGateActionReceipt["payload"]["aiPipelineRecheck"]["mode"];
+  batchStatus: TaskQueueBatchReceipt["status"];
+  healthLabel: string;
+  healthDetail: string;
+}) {
+  if (input.mode !== "sample_recheck" || input.batchStatus !== "continue") return null;
+  const receiptId = receiptIdFromRecheckDispatchKey(input.sourceDispatchKey, input.projectId);
+  if (!receiptId) return null;
+  return buildAiPipelineRecheckDispatchPlan({
+    projectId: input.projectId,
+    receiptId,
+    recheckStatus: "small_batch_ready",
+    healthLabel: input.healthLabel,
+    healthDetail: input.healthDetail,
+  });
 }
 
 export function buildAiPipelineRecheckGateActionReceipt(input: {

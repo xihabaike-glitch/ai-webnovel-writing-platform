@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   buildAiPipelineRecheckGateActionReceipt,
+  buildAiPipelineRecheckRecoveryDispatchPlan,
   buildAiPipelineRecheckNextAction,
 } from "../lib/projects/aiPipelineRecheckReceipt.ts";
 import { buildTaskQueueBatchHealthReview } from "../lib/projects/taskQueueBatchHealth.ts";
@@ -133,4 +134,44 @@ test("buildAiPipelineRecheckNextAction points failed samples to repair checklist
     body: { areaId: "ai-pipeline" },
   });
   assert.ok(action.detail.includes("不要恢复批量"));
+});
+
+test("buildAiPipelineRecheckRecoveryDispatchPlan promotes passed samples to small-batch recovery", () => {
+  const dispatch = buildAiPipelineRecheckRecoveryDispatchPlan({
+    projectId: "project-1",
+    sourceDispatchKey: "ai-pipeline-recheck:project-1:ai-plan-1:sample",
+    mode: "sample_recheck",
+    batchStatus: "continue",
+    healthLabel: "样本复验通过",
+    healthDetail: "成功率 100%，质量 88，可以恢复小批。",
+  });
+
+  assert.equal(dispatch?.dispatchKey, "ai-pipeline-recheck:project-1:ai-plan-1:scale");
+  assert.equal(dispatch?.stage, "ai_pipeline_small_batch");
+  assert.equal(dispatch?.actionLabel, "回推荐批量");
+  assert.deepEqual(dispatch?.execution, {
+    mode: "small_batch_resume",
+    maxSampleCount: 3,
+    primaryActionLabel: "恢复小批执行",
+  });
+});
+
+test("buildAiPipelineRecheckRecoveryDispatchPlan does not promote failed or already scaled rechecks", () => {
+  assert.equal(buildAiPipelineRecheckRecoveryDispatchPlan({
+    projectId: "project-1",
+    sourceDispatchKey: "ai-pipeline-recheck:project-1:ai-plan-1:sample",
+    mode: "sample_recheck",
+    batchStatus: "repair",
+    healthLabel: "样本未过",
+    healthDetail: "失败率过高。",
+  }), null);
+
+  assert.equal(buildAiPipelineRecheckRecoveryDispatchPlan({
+    projectId: "project-1",
+    sourceDispatchKey: "ai-pipeline-recheck:project-1:ai-plan-1:scale",
+    mode: "small_batch_resume",
+    batchStatus: "continue",
+    healthLabel: "小批完成",
+    healthDetail: "不要重复生成。",
+  }), null);
 });

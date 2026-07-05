@@ -8,6 +8,7 @@ import { prisma } from "@/lib/db/prisma";
 import { buildBatchRouteEffectSummary } from "@/lib/model-gateway/batchRouteEffectSummary";
 import {
   buildAiPipelineRecheckGateActionReceipt,
+  buildAiPipelineRecheckRecoveryDispatchPlan,
   buildAiPipelineRecheckNextAction,
 } from "@/lib/projects/aiPipelineRecheckReceipt";
 import { buildTaskQueueBatchReceipt, type TaskQueueBatchRunResult } from "@/lib/projects/taskQueueBatchReceipt";
@@ -251,8 +252,16 @@ export async function POST(request: Request) {
     successRatePercent: routeEffectSummary.successRatePercent,
     averageQualityScore: routeEffectSummary.averageQualityScore,
   });
+  const recoveryDispatch = buildAiPipelineRecheckRecoveryDispatchPlan({
+    projectId,
+    sourceDispatchKey: dispatchKey,
+    mode: gateReceipt.payload.aiPipelineRecheck.mode,
+    batchStatus: batchReceipt.status,
+    healthLabel: batchReceipt.headline,
+    healthDetail: routeEffectSummary.verdict,
+  });
   const completionEvidence = completionEvidenceFor({ receipt: batchReceipt, plan });
-  const [task] = await prisma.$transaction([
+  const [task, , recoveryTask] = await prisma.$transaction([
     prisma.gateDispatchTask.update({
       where: { dispatchKey },
       data: {
@@ -309,6 +318,50 @@ export async function POST(request: Request) {
         payload: JSON.stringify(gateReceipt.payload),
       },
     }),
+    ...(recoveryDispatch ? [
+      prisma.gateDispatchTask.upsert({
+        where: { dispatchKey: recoveryDispatch.dispatchKey },
+        create: {
+          dispatchKey: recoveryDispatch.dispatchKey,
+          projectId,
+          platformId: recoveryDispatch.platformId,
+          platformName: recoveryDispatch.platformName,
+          stage: recoveryDispatch.stage,
+          state: recoveryDispatch.state,
+          priorityScore: recoveryDispatch.priorityScore,
+          ownerRole: recoveryDispatch.ownerRole,
+          title: recoveryDispatch.title,
+          detail: recoveryDispatch.detail,
+          dueLabel: recoveryDispatch.dueLabel,
+          actionLabel: recoveryDispatch.actionLabel,
+          href: recoveryDispatch.href,
+          acceptanceCriteria: JSON.stringify(recoveryDispatch.acceptanceCriteria),
+          evidence: JSON.stringify(recoveryDispatch.evidence),
+          sourceReceiptId: recoveryDispatch.sourceReceiptId,
+          completionEvidence: recoveryDispatch.completionEvidence,
+          reviewLatestAt: new Date(recoveryDispatch.reviewLatestAt),
+        },
+        update: {
+          projectId,
+          platformId: recoveryDispatch.platformId,
+          platformName: recoveryDispatch.platformName,
+          stage: recoveryDispatch.stage,
+          state: recoveryDispatch.state,
+          priorityScore: recoveryDispatch.priorityScore,
+          ownerRole: recoveryDispatch.ownerRole,
+          title: recoveryDispatch.title,
+          detail: recoveryDispatch.detail,
+          dueLabel: recoveryDispatch.dueLabel,
+          actionLabel: recoveryDispatch.actionLabel,
+          href: recoveryDispatch.href,
+          acceptanceCriteria: JSON.stringify(recoveryDispatch.acceptanceCriteria),
+          evidence: JSON.stringify(recoveryDispatch.evidence),
+          sourceReceiptId: recoveryDispatch.sourceReceiptId,
+          completionEvidence: recoveryDispatch.completionEvidence,
+          reviewLatestAt: new Date(recoveryDispatch.reviewLatestAt),
+        },
+      }),
+    ] : []),
   ]);
 
   return NextResponse.json({
@@ -324,5 +377,31 @@ export async function POST(request: Request) {
       completionEvidence: task.completionEvidence,
       completedAt: task.completedAt?.toISOString() ?? null,
     },
+    recoveryDispatch: recoveryDispatch && recoveryTask ? {
+      databaseId: recoveryTask.id,
+      dispatchKey: recoveryTask.dispatchKey,
+      id: recoveryTask.dispatchKey,
+      state: recoveryTask.state,
+      title: recoveryTask.title,
+      detail: recoveryTask.detail,
+      actionLabel: recoveryTask.actionLabel,
+      href: recoveryTask.href,
+      stage: recoveryTask.stage,
+      priorityScore: recoveryTask.priorityScore,
+      ownerRole: recoveryTask.ownerRole,
+      dueLabel: recoveryTask.dueLabel,
+      acceptanceCriteria: stringList(recoveryTask.acceptanceCriteria),
+      evidence: stringList(recoveryTask.evidence),
+      reviewLatestAt: recoveryTask.reviewLatestAt.toISOString(),
+      projectId: recoveryTask.projectId,
+      platformId: recoveryTask.platformId,
+      platformName: recoveryTask.platformName,
+      sourceReceiptId: recoveryTask.sourceReceiptId,
+      completionEvidence: recoveryTask.completionEvidence,
+      assignedAt: recoveryTask.assignedAt?.toISOString() ?? null,
+      completedAt: recoveryTask.completedAt?.toISOString() ?? null,
+      createdAt: recoveryTask.createdAt.toISOString(),
+      updatedAt: recoveryTask.updatedAt.toISOString(),
+    } : null,
   });
 }

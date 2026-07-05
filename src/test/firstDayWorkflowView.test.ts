@@ -395,13 +395,38 @@ test("buildFirstDayDispatchUpdateSummary explains watch sample scale-up status",
 
   assert.equal(cleared.status, "watch_cleared");
   assert.equal(cleared.title, "小样本已过线，放量闸门已解除");
-  assert.equal(cleared.href, "/tasks");
-  assert.ok(cleared.detail.includes("恢复后续初稿批次"));
+  assert.equal(cleared.actionLabel, "回总闸门复查");
+  assert.equal(cleared.href, "/gate");
+  assert.ok(cleared.detail.includes("回总闸门复查"));
+  assert.ok(cleared.detail.includes("谨慎放量"));
   assert.ok(cleared.badges.includes("放量闸门解除"));
   assert.equal(blocked.status, "watch_blocked");
   assert.equal(blocked.title, "小样本未过线，继续观察");
-  assert.ok(blocked.detail.includes("仍保持小样本闸门"));
+  assert.equal(blocked.actionLabel, "回总闸门复查");
+  assert.equal(blocked.href, "/gate");
+  assert.ok(blocked.detail.includes("总闸门确认卡点仍关闭"));
+  assert.ok(blocked.detail.includes("修问题复测"));
   assert.ok(blocked.badges.includes("禁止批量放大"));
+});
+
+test("buildFirstDayDispatchUpdateSummary routes closed first-day work back to gate", () => {
+  const summary = buildFirstDayDispatchUpdateSummary({
+    task: {
+      dispatchKey: "first-day:project-1:publish-precheck",
+      state: "completed",
+      title: "夜雨系统 · 平台包预检",
+      completionEvidence: "平台包预检已完成，标题、简介、标签、卖点、样章和首轮数据回收口径已整理。",
+      href: "/projects/project-1#first-day-workflow",
+    },
+  });
+
+  assert.equal(summary.visible, true);
+  assert.equal(summary.status, "completed");
+  assert.equal(summary.title, "首日派单已收口");
+  assert.equal(summary.actionLabel, "回总闸门复查");
+  assert.equal(summary.href, "/gate");
+  assert.ok(summary.detail.includes("放行批量生产"));
+  assert.ok(summary.badges.includes("复查放行"));
 });
 
 test("buildFirstDayDispatchCompletionTemplate covers first-day step types", () => {

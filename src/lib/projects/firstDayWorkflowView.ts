@@ -577,10 +577,10 @@ export function buildFirstDayDispatchUpdateSummary(input: {
       status: cleared ? "watch_cleared" : "watch_blocked",
       title: cleared ? "小样本已过线，放量闸门已解除" : "小样本未过线，继续观察",
       detail: cleared
-        ? "完成依据已写清通过线、不可接受项、复查证据和通过结论。任务队列会恢复后续初稿批次，下一步回到任务队列谨慎放量。"
-        : "完成依据没有明确通过，或包含未通过、暂不放量、继续观察等结论。后续初稿仍保持小样本闸门，先修问题再测。",
-      actionLabel: cleared ? "回任务队列放量" : "回任务队列复查",
-      href: "/tasks",
+        ? "完成依据已写清通过线、不可接受项、复查证据和通过结论。先回总闸门复查放行状态，再进入任务队列谨慎放量。"
+        : "完成依据没有明确通过，或包含未通过、暂不放量、继续观察等结论。先回总闸门确认卡点仍关闭，再修问题复测。",
+      actionLabel: "回总闸门复查",
+      href: "/gate",
       badges: cleared
         ? ["小样本过线", "放量闸门解除", "恢复后续初稿"]
         : ["小样本未过线", "继续观察", "禁止批量放大"],
@@ -603,10 +603,10 @@ export function buildFirstDayDispatchUpdateSummary(input: {
     visible: true,
     status: "completed",
     title: "首日派单已收口",
-    detail: `「${completedStepLabel}」已验收，当前没有新的首日派单。可以回到作品页检查是否进入批量生产或平台包复盘。`,
-    actionLabel: "回作品检查",
-    href: input.task.href,
-    badges: [completedStepLabel, "无新增首日卡"],
+    detail: `「${completedStepLabel}」已验收，当前没有新的首日派单。回总闸门复查是否已经放行批量生产或平台包复盘。`,
+    actionLabel: "回总闸门复查",
+    href: "/gate",
+    badges: [completedStepLabel, "无新增首日卡", "复查放行"],
   };
 }
 

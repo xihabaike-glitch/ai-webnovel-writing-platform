@@ -161,6 +161,7 @@ export function GateDispatchTaskCenter({
   const [runningRouteRecheckKey, setRunningRouteRecheckKey] = useState<string | null>(null);
   const [runningRecheckAdviceKey, setRunningRecheckAdviceKey] = useState<string | null>(null);
   const [routeActionMessage, setRouteActionMessage] = useState("");
+  const [routeActionLink, setRouteActionLink] = useState<{ label: string; href: string } | null>(null);
   const [completionDrafts, setCompletionDrafts] = useState<Record<string, string>>({});
   const [errorMessage, setErrorMessage] = useState("");
   const center = useMemo(() => buildGateDispatchTaskCenter(tasks), [tasks]);
@@ -282,19 +283,26 @@ export function GateDispatchTaskCenter({
         const firstDayUpdate = buildFirstDayDispatchUpdateSummary(updated);
         if (firstDayUpdate.visible) {
           setRouteActionMessage(`${firstDayUpdate.title}：${firstDayUpdate.detail} 下一步：${firstDayUpdate.actionLabel}。`);
+          setRouteActionLink({ label: firstDayUpdate.actionLabel, href: firstDayUpdate.href });
           router.refresh();
         } else if (updated.followUpTasks.length) {
           setRouteActionMessage(`已自动生成治理后复检派单：${updated.followUpTasks.map((item) => item.title).join("、")}${recheckMessage ? `；${recheckMessage}` : ""}${storyTreeMessage ? `；${storyTreeMessage}` : ""}${submissionEffectMessage ? `；${submissionEffectMessage}` : ""}`);
+          setRouteActionLink(null);
         } else if (storyTreeMessage && recheckMessage) {
           setRouteActionMessage(`${storyTreeMessage}；${recheckMessage}${submissionEffectMessage ? `；${submissionEffectMessage}` : ""}`);
+          setRouteActionLink(null);
         } else if (storyTreeMessage) {
           setRouteActionMessage(`${storyTreeMessage}${submissionEffectMessage ? `；${submissionEffectMessage}` : ""}`);
+          setRouteActionLink(null);
         } else if (recheckMessage) {
           setRouteActionMessage(`${recheckMessage}${submissionEffectMessage ? `；${submissionEffectMessage}` : ""}`);
+          setRouteActionLink(null);
         } else if (submissionEffectMessage) {
           setRouteActionMessage(submissionEffectMessage);
+          setRouteActionLink(null);
         } else if (updated.knowledgeFeedbackReceipt) {
           setRouteActionMessage(`已回灌到项目反哺证据：${updated.knowledgeFeedbackReceipt.platformName} · ${updated.knowledgeFeedbackReceipt.completedStepLabel}`);
+          setRouteActionLink(null);
         }
       } else {
         const updated = await persistGateDispatchTask({ ...task, state: targetState });
@@ -329,6 +337,7 @@ export function GateDispatchTaskCenter({
     setRunningRouteAdviceId(item.id);
     setErrorMessage("");
     setRouteActionMessage("");
+    setRouteActionLink(null);
     try {
       const response = await fetch("/api/model-route-confirmation-governance", {
         method: "POST",
@@ -351,6 +360,7 @@ export function GateDispatchTaskCenter({
     setRunningRecheckAdviceKey(chain.rootDispatchKey);
     setErrorMessage("");
     setRouteActionMessage("");
+    setRouteActionLink(null);
     try {
       const created = await persistGateDispatchTask(chain.reviewAdvice.dispatch);
       setTasks((current) => {
@@ -371,6 +381,7 @@ export function GateDispatchTaskCenter({
     setRunningRouteRecheckKey(task.dispatchKey);
     setErrorMessage("");
     setRouteActionMessage("");
+    setRouteActionLink(null);
     try {
       const response = await fetch("/api/model-route-confirmation-recheck-samples", {
         method: "POST",
@@ -420,6 +431,7 @@ export function GateDispatchTaskCenter({
         ? `；已自动生成治理派单：${payload.autoGovernance.task.title}`
         : "";
       setRouteActionMessage(`已运行「${task.title}」复检样本：${succeeded}/${total} 成功${decisionText}${governanceText}`);
+      setRouteActionLink(null);
       router.refresh();
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "运行模型路由复检样本失败。");
@@ -823,7 +835,14 @@ export function GateDispatchTaskCenter({
             </div>
           ) : null}
           {routeActionMessage ? (
-            <p className="rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">{routeActionMessage}</p>
+            <div className="flex flex-col gap-3 rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800 lg:flex-row lg:items-center lg:justify-between">
+              <p className="leading-6">{routeActionMessage}</p>
+              {routeActionLink ? (
+                <Link className="w-fit shrink-0 rounded-md bg-white px-3 py-2 text-xs font-medium text-emerald-900 hover:bg-emerald-100" href={routeActionLink.href}>
+                  {routeActionLink.label}
+                </Link>
+              ) : null}
+            </div>
           ) : null}
         </section>
       ) : null}

@@ -69,6 +69,7 @@ export async function POST(request: Request, { params }: Params) {
           OR: [
             { dispatchKey: { startsWith: "story-tree:" } },
             { dispatchKey: { startsWith: "story-tree-experience:" } },
+            { dispatchKey: { startsWith: "first-day:" } },
           ],
         },
         orderBy: { completedAt: "desc" },
@@ -83,7 +84,11 @@ export async function POST(request: Request, { params }: Params) {
 
   const platform = getPlatformProfile((body.platformId ?? project.targetPlatform) as PlatformId);
   const startTactic = findProjectStartTacticSummary(project.worldEntries);
-  const chapterOrders = normalizeFirstThreeRewriteOrders(requestedChapterOrders, startTactic);
+  const chapterOrders = normalizeFirstThreeRewriteOrders(
+    requestedChapterOrders,
+    startTactic,
+    project.gateDispatchTasks.map((task) => task.completionEvidence),
+  );
   const storyTreeExperience = buildStoryTreeExperienceGuide(
     project.gateDispatchTasks.map(gatePlatformDispatchTaskFromRecord),
   );

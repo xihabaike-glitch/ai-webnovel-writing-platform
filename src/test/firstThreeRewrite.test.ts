@@ -82,15 +82,32 @@ test("buildFirstThreeRewritePackage", async (t) => {
   });
 
   await t.test("forces recovered rewrite requests down to a first-chapter sample", () => {
-    const orders = normalizeFirstThreeRewriteOrders([1, 2, 3], {
+    const startTactic = {
       label: "恢复放量打法",
       primaryTactic: "上一轮恢复放量已过线，但新项目不能复制成功结论。",
       openingMove: "首章先验证开头承诺。",
       verificationMove: "恢复放量打法只能作为参考，新项目先小样本复验成功率、质量分和失败样本。",
       risk: "新项目仍先跑小样本，不直接批量生成前三章。",
-    });
+    };
+    const insufficientEvidence = [
+      "小样本验证已完成：",
+      "通过线：第一章钩子达到最低要求。",
+      "不可接受项：未出现卖点不兑现。",
+      "复查证据：已保留第一章正文。",
+      "放量结论：通过后才允许恢复后续初稿批次。",
+    ].join("\n");
+    const clearedEvidence = [
+      "小样本验证已完成：",
+      "通过线：成功率 100%，质量分 86，失败样本 0 个。",
+      "不可接受项：没有跳过小样本直接批量生产。",
+      "复查证据：已保留第一章正文、审稿分数和人工复核结论。",
+      "放量结论：通过，可以恢复后续初稿批次。",
+    ].join("\n");
+    const orders = normalizeFirstThreeRewriteOrders([1, 2, 3], startTactic);
 
     assert.deepEqual(orders, [1]);
+    assert.deepEqual(normalizeFirstThreeRewriteOrders([1, 2, 3], startTactic, [insufficientEvidence]), [1]);
+    assert.deepEqual(normalizeFirstThreeRewriteOrders([1, 2, 3], startTactic, [clearedEvidence]), [1, 2, 3]);
     assert.deepEqual(normalizeFirstThreeRewriteOrders([3, 2, 2, 1], null), [1, 2, 3]);
   });
 

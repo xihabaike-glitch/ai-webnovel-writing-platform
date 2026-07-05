@@ -104,6 +104,7 @@ export interface FirstThreeRewriteEvaluation {
 export function normalizeFirstThreeRewriteOrders(
   rawOrders: number[] | undefined,
   startTactic?: Pick<ProjectStartTacticSummary, "label" | "primaryTactic" | "openingMove" | "verificationMove" | "risk"> | null,
+  recoveryCompletionEvidence?: string[],
 ) {
   const orders = rawOrders?.length ? rawOrders : [1, 2, 3];
   const normalized = [...new Set(orders.filter((order) => [1, 2, 3].includes(order)))].sort((left, right) => left - right);
@@ -115,11 +116,25 @@ export function normalizeFirstThreeRewriteOrders(
     startTactic?.risk,
   ].filter(Boolean).join("\n");
 
-  if (normalized.length > 0 && /恢复放量|恢复打法|小样本|不直接批量生成前三章/u.test(tacticText)) {
+  const recoveryScale = /恢复放量|恢复打法|小样本|不直接批量生成前三章/u.test(tacticText);
+  const clearedRecoverySample = (recoveryCompletionEvidence ?? []).some(isClearedRecoverySampleEvidence);
+
+  if (normalized.length > 0 && recoveryScale && !clearedRecoverySample) {
     return [1];
   }
 
   return normalized;
+}
+
+function isClearedRecoverySampleEvidence(evidence: string) {
+  const text = evidence.trim();
+  if (!text.includes("小样本验证已完成")) return false;
+  if (!/成功率\s*[：:]?\s*\d+%/u.test(text)) return false;
+  if (!/质量分?\s*[：:]?\s*\d+/u.test(text)) return false;
+  if (!/失败样本\s*[：:]?\s*(?:0|无|\d+)/u.test(text)) return false;
+  if (!/放量结论\s*[：:][^\n]*(?:通过|允许|可以恢复|可恢复|恢复后续)/u.test(text)) return false;
+  if (/放量结论\s*[：:][^\n]*(?:未通过|继续(?:停留)?观察|暂不放量|不允许|不能放量)/u.test(text)) return false;
+  return true;
 }
 
 const fallbackChapters: RetentionChapter[] = [

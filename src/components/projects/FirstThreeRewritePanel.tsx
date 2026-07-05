@@ -62,7 +62,7 @@ interface GeneratedRewriteResult {
     status: string;
   };
   content: string;
-  rollbackRevisionId?: string;
+  candidateRevisionId?: string;
   evaluation?: FirstThreeRewriteEvaluation;
   storyTreeDispatches?: Array<{ dispatchKey: string }>;
 }
@@ -140,6 +140,12 @@ function decisionClass(severity: FirstThreeRewriteDecision["severity"]) {
   return "bg-amber-50 text-amber-700";
 }
 
+function decisionActionLabel(decision: FirstThreeRewriteDecision) {
+  if (decision.action === "rollback") return "保留当前正文";
+  if (decision.action === "second_pass") return "采纳后生成二改候选";
+  return "采纳候选稿";
+}
+
 export function FirstThreeRewritePanel({ projectId }: { projectId: string }) {
   const router = useRouter();
   const [rewritePackage, setRewritePackage] = useState<FirstThreeRewritePackage | null>(null);
@@ -180,14 +186,14 @@ export function FirstThreeRewritePanel({ projectId }: { projectId: string }) {
       });
       const payload = (await response.json()) as GenerateRewriteResponse & { error?: string };
       if (!response.ok) {
-        throw new Error(payload.error || "生成前三章改写稿失败。");
+        throw new Error(payload.error || "生成前三章改写候选失败。");
       }
       setRewritePackage(payload.rewritePackage);
       setGeneratedResults(payload.results);
       setProviderLabel(`${payload.activeProvider.displayName} · ${payload.activeProvider.model}`);
-      setMessage(`已生成 ${payload.results.length} 章改写稿`);
+      setMessage(`已生成 ${payload.results.length} 章前三章改写候选，采纳后才会写入正文。`);
     } catch (caught) {
-      setMessage(caught instanceof Error ? caught.message : "生成前三章改写稿失败。");
+      setMessage(caught instanceof Error ? caught.message : "生成前三章改写候选失败。");
     } finally {
       setIsGeneratingDrafts(false);
     }
@@ -222,6 +228,18 @@ export function FirstThreeRewritePanel({ projectId }: { projectId: string }) {
     }
   }
 
+  async function adoptCandidateRevision(result: GeneratedRewriteResult) {
+    if (!result.candidateRevisionId) {
+      window.location.href = `/projects/${projectId}/chapters/${result.chapter.id}#chapter-revisions`;
+      throw new Error("没有拿到可自动采纳的候选稿，已带你去版本台手动处理。");
+    }
+    const response = await fetch(`/api/chapters/${result.chapter.id}/revisions/${result.candidateRevisionId}/adopt`, {
+      method: "POST",
+    });
+    const payload = await response.json().catch(() => null) as { error?: string } | null;
+    if (!response.ok) throw new Error(payload?.error ?? "采纳候选稿失败。");
+  }
+
   async function executeDecision(result: GeneratedRewriteResult) {
     if (!result.evaluation) return;
     const decision = result.evaluation.decision;
@@ -229,12 +247,14 @@ export function FirstThreeRewritePanel({ projectId }: { projectId: string }) {
     setMessage(null);
     try {
       if (decision.action === "keep") {
+        await adoptCandidateRevision(result);
         window.location.href = `/projects/${projectId}#platform-export`;
-        setMessage("已定位到发布质检，保留稿也得过质检，别裸奔。");
+        setMessage("已采纳候选稿，并定位到发布质检。");
         return;
       }
 
       if (decision.action === "second_pass") {
+        await adoptCandidateRevision(result);
         const response = await fetch(`/api/chapters/${result.chapter.id}/second-pass`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -251,23 +271,13 @@ export function FirstThreeRewritePanel({ projectId }: { projectId: string }) {
         } | null;
         if (!response.ok || !payload?.secondPassAudit) throw new Error(payload?.error ?? "执行二改失败。");
         const dispatchText = payload.storyTreeDispatches?.length ? `，已派发 ${payload.storyTreeDispatches.length} 个结构返工任务` : "";
-        setMessage(`已执行第 ${result.order} 章二改，复检 ${payload.secondPassAudit.score} 分，大树结构 ${payload.secondPassAudit.treeAudit?.score ?? "缺"} 分${dispatchText}${payload.secondPassAudit.shouldSecondPass ? "，还要继续压。" : "，可以回到发布质检。"}`);
+        setMessage(`已采纳第 ${result.order} 章改写候选，并生成二改候选。复检 ${payload.secondPassAudit.score} 分，大树结构 ${payload.secondPassAudit.treeAudit?.score ?? "缺"} 分${dispatchText}${payload.secondPassAudit.shouldSecondPass ? "，采纳二改前还要继续压。" : "，采纳二改后可以回到发布质检。"}`);
         router.refresh();
         return;
       }
 
-      if (!result.rollbackRevisionId) {
-        window.location.href = `/projects/${projectId}/chapters/${result.chapter.id}#chapter-revisions`;
-        setMessage("没有拿到可自动回滚的快照，已带你去版本台手动处理。");
-        return;
-      }
-      const response = await fetch(`/api/chapters/${result.chapter.id}/revisions/${result.rollbackRevisionId}/restore`, {
-        method: "POST",
-      });
-      const payload = await response.json().catch(() => null) as { error?: string } | null;
-      if (!response.ok) throw new Error(payload?.error ?? "恢复旧稿失败。");
-      setMessage(`已回滚第 ${result.order} 章到改写前旧稿。`);
-      router.refresh();
+      window.location.href = `/projects/${projectId}/chapters/${result.chapter.id}#chapter-revisions`;
+      setMessage(`已保留当前正文；第 ${result.order} 章候选稿未采纳，可在版本台查看。`);
     } catch (caught) {
       setMessage(caught instanceof Error ? caught.message : "执行决策动作失败。");
     } finally {
@@ -309,7 +319,7 @@ export function FirstThreeRewritePanel({ projectId }: { projectId: string }) {
               onClick={generateRewriteDrafts}
               type="button"
             >
-              {isGeneratingDrafts ? "改写中" : "生成前三章改写稿"}
+              {isGeneratingDrafts ? "改写中" : "生成前三章候选稿"}
             </button>
           ) : null}
           <button
@@ -388,7 +398,7 @@ export function FirstThreeRewritePanel({ projectId }: { projectId: string }) {
           {generatedResults.length > 0 ? (
             <div className="rounded-md border border-slate-200 p-3 text-sm">
               <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-                <div className="font-medium text-slate-950">已生成改写稿</div>
+                <div className="font-medium text-slate-950">已生成改写候选</div>
                 {providerLabel ? <div className="text-xs text-slate-500">{providerLabel}</div> : null}
               </div>
               <div className="mt-3 grid gap-3 lg:grid-cols-3">
@@ -398,7 +408,7 @@ export function FirstThreeRewritePanel({ projectId }: { projectId: string }) {
                       <div>
                         <div className="font-medium text-slate-950">第 {result.order} 章 · {result.chapter.title}</div>
                         <div className="mt-1 text-xs text-slate-500">
-                          {result.createdChapter ? "新建章节" : "覆盖改写"} · {result.chapter.wordCount} 字 · {result.task.status}
+                          {result.createdChapter ? "新建空章节并生成候选" : "候选改写"} · {result.chapter.wordCount} 字 · {result.task.status}
                         </div>
                       </div>
                       <Link
@@ -409,6 +419,7 @@ export function FirstThreeRewritePanel({ projectId }: { projectId: string }) {
                       </Link>
                     </div>
                     <p className="mt-2 line-clamp-4 text-slate-600">{result.content}</p>
+                    <p className="mt-2 text-xs text-slate-500">这版还没有覆盖正文，点击决策后才会采纳或保留当前稿。</p>
                     {result.evaluation ? (
                       <div className="mt-3 grid gap-3 border-t border-slate-200 pt-3">
                         <div className="grid grid-cols-2 gap-2 text-xs md:grid-cols-4">
@@ -469,7 +480,7 @@ export function FirstThreeRewritePanel({ projectId }: { projectId: string }) {
                               onClick={() => executeDecision(result)}
                               type="button"
                             >
-                              {runningDecisionId === `${result.chapter.id}-${result.evaluation.decision.action}` ? "执行中" : result.evaluation.decision.label}
+                              {runningDecisionId === `${result.chapter.id}-${result.evaluation.decision.action}` ? "执行中" : decisionActionLabel(result.evaluation.decision)}
                             </button>
                             <Link
                               className="rounded-md border border-slate-200 px-3 py-2 font-medium text-slate-700 hover:bg-slate-50"

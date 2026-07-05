@@ -58,6 +58,7 @@ const sourceLabels: Record<string, string> = {
   ai_draft_before_overwrite: "AI 生成前旧稿",
   chapter_second_pass_candidate: "二改候选稿",
   chapter_second_pass_before_overwrite: "二改前旧稿",
+  first_three_rewrite_candidate: "前三章改写候选",
   first_three_rewrite_before_overwrite: "前三章改写前旧稿",
   manual_snapshot: "手动快照",
   adopt_candidate_before_overwrite: "采纳候选前旧稿",
@@ -65,7 +66,9 @@ const sourceLabels: Record<string, string> = {
 };
 
 export function isChapterRevisionCandidate(source: string) {
-  return source === "ai_draft_candidate" || source === "chapter_second_pass_candidate";
+  return source === "ai_draft_candidate"
+    || source === "chapter_second_pass_candidate"
+    || source === "first_three_rewrite_candidate";
 }
 
 export function previewRevisionContent(content: string) {

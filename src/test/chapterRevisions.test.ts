@@ -66,6 +66,25 @@ test("chapter revision summaries", async (t) => {
     assert.equal(summaries[0].sourceLabel, "前三章改写前旧稿");
   });
 
+  await t.test("labels first-three rewrite candidates as adoptable prose", () => {
+    const summaries = summarizeChapterRevisions([
+      {
+        id: "revision-first-three-candidate",
+        source: "first_three_rewrite_candidate",
+        sourceTaskId: "task-first-three",
+        title: "第一章 改写候选",
+        content: "候选稿第一段。",
+        wordCount: 8,
+        status: "draft",
+        notes: "前三章改写候选。采纳后才覆盖正文。",
+        createdAt: "2026-07-01T00:00:00.000Z",
+      },
+    ]);
+
+    assert.equal(summaries[0].sourceLabel, "前三章改写候选");
+    assert.equal(isChapterRevisionCandidate(summaries[0].source), true);
+  });
+
   await t.test("labels second-pass snapshots", () => {
     const summaries = summarizeChapterRevisions([
       {

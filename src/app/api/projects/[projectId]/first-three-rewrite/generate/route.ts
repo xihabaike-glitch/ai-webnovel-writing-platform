@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { buildFirstThreeRewritePrompt } from "@/lib/ai/buildFirstThreeRewritePrompt";
-import { buildStoryTreeRewriteDispatchItems } from "@/lib/ai/storyTreeDispatch";
 import { buildStoryTreeExperienceGuide } from "@/lib/ai/storyTreeExperience";
 import { prisma } from "@/lib/db/prisma";
 import { getActiveModelProvider } from "@/lib/model-gateway/activeProvider";
@@ -9,7 +8,6 @@ import { getPlatformProfile, type PlatformId } from "@/lib/platforms/platformPro
 import { buildProjectContextPack } from "@/lib/projects/projectContextPack";
 import { buildFirstThreeRewriteEvaluation, buildFirstThreeRewritePackage } from "@/lib/projects/firstThreeRewrite";
 import { buildPlatformPublishExportCenter, parsePublishSnapshotTags } from "@/lib/projects/platformPublishExport";
-import { persistServerGateDispatchTask } from "@/lib/projects/gateDispatchTaskPersistence";
 import { gatePlatformDispatchTaskFromRecord } from "@/lib/projects/gateDispatchTaskRecords";
 import { findProjectStartTacticSummary } from "@/lib/projects/projectStartTactics";
 import { buildSubmissionChecklist } from "@/lib/projects/submissionChecklist";
@@ -255,7 +253,7 @@ export async function POST(request: Request, { params }: Params) {
       });
       const wordCount = countWords(generated.text);
 
-      const [updatedTask, updatedChapter, rollbackRevision] = await prisma.$transaction(async (tx) => {
+      const [updatedTask, candidateRevision] = await prisma.$transaction(async (tx) => {
         const savedTask = await tx.aiTask.update({
           where: { id: task.id },
           data: {
@@ -266,63 +264,49 @@ export async function POST(request: Request, { params }: Params) {
             costUsd: generated.usage?.costUsd,
           },
         });
-        const savedRollbackRevision = await tx.chapterRevision.create({
+        const savedCandidateRevision = await tx.chapterRevision.create({
           data: {
             chapterId: chapter.id,
-            source: "first_three_rewrite_before_overwrite",
+            source: "first_three_rewrite_candidate",
             sourceTaskId: task.id,
-            title: chapter.title,
-            content: chapter.content,
-            wordCount: chapter.wordCount,
-            goal: chapter.goal,
-            hook: chapter.hook,
-            conflict: chapter.conflict,
-            valueShift: chapter.valueShift,
-            cliffhanger: chapter.cliffhanger,
-            status: chapter.status,
-            notes: createdChapter ? "前三章改写创建章节后的空白快照。" : "前三章处方改写前自动保存。",
-          },
-        });
-        const savedChapter = await tx.chapter.update({
-          where: { id: chapter.id },
-          data: {
-            ...fields,
+            title: fields.title,
             content: generated.text,
             wordCount,
+            goal: fields.goal,
+            hook: fields.hook,
+            conflict: fields.conflict,
+            valueShift: fields.valueShift,
+            cliffhanger: fields.cliffhanger,
             status: "draft",
+            notes: createdChapter ? "前三章改写候选。新章节已建为空白稿，采纳后才写入正文。" : "前三章改写候选。采纳后才覆盖正文。",
           },
         });
-        return [savedTask, savedChapter, savedRollbackRevision];
+        return [savedTask, savedCandidateRevision];
       });
 
-      chaptersByOrder.set(plan.order, updatedChapter);
+      const candidateChapter = {
+        ...chapter,
+        ...fields,
+        content: generated.text,
+        wordCount,
+        status: "draft",
+      };
       const evaluation = buildFirstThreeRewriteEvaluation({
         platform,
         before: chapter,
-        after: updatedChapter,
+        after: candidateChapter,
         projectContext,
         startTactic,
       });
-      const storyTreeDispatches = await Promise.all(buildStoryTreeRewriteDispatchItems({
-        source: "first_three_rewrite",
-        projectId: project.id,
-        projectTitle: project.title,
-        chapterId: updatedChapter.id,
-        chapterOrder: updatedChapter.order,
-        chapterTitle: updatedChapter.title,
-        platform,
-        audit: evaluation.storyTreeAudit,
-      }).map(persistServerGateDispatchTask));
-
       results.push({
         order: plan.order,
         createdChapter,
         task: updatedTask,
-        chapter: updatedChapter,
+        chapter: candidateChapter,
         content: generated.text,
-        rollbackRevisionId: rollbackRevision.id,
+        candidateRevisionId: candidateRevision.id,
         evaluation,
-        storyTreeDispatches,
+        storyTreeDispatches: [],
       });
     } catch (caught) {
       const message = caught instanceof Error ? caught.message : "Unknown first-three rewrite error";
@@ -348,17 +332,6 @@ export async function POST(request: Request, { params }: Params) {
       }, { status: 500 });
     }
   }
-
-  const allChapters = await prisma.chapter.findMany({
-    where: { projectId: project.id },
-    select: { wordCount: true },
-  });
-  await prisma.project.update({
-    where: { id: project.id },
-    data: {
-      currentWordCount: allChapters.reduce((sum, chapter) => sum + chapter.wordCount, 0),
-    },
-  });
 
   return NextResponse.json({
     rewritePackage,

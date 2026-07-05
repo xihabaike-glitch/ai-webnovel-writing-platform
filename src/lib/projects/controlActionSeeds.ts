@@ -587,18 +587,29 @@ export function buildAiPipelineControlActionPlan(audits: TaskQueueBatchHealthAud
   }
 
   if (primary.status === "watch") {
-    const created = [
-      `限制「${primary.label}」下一批只跑 1-2 章`,
-      "补齐质量分、失败样本和成本记录",
-      "复验通过前不进入连续批量生产",
-    ];
+    const recoveryWatch = primary.recoveryBatches > 0;
+    const created = recoveryWatch
+      ? [
+        `围绕「${primary.label}」再跑 1 轮 2-3 章稳定批次`,
+        "回填成功率、质量分、失败样本、成本和模型路由证据",
+        "连续稳定前不写入平台打法经验库",
+      ]
+      : [
+        `限制「${primary.label}」下一批只跑 1-2 章`,
+        "补齐质量分、失败样本和成本记录",
+        "复验通过前不进入连续批量生产",
+      ];
     return {
       status: "watch",
-      label: "批量小样本复验清单",
-      detail: `${primary.label}：样本还薄，暂时只能小步验证。`,
+      label: recoveryWatch ? "恢复放量稳定批次清单" : "批量小样本复验清单",
+      detail: recoveryWatch
+        ? `${primary.label}：恢复样本还薄，先再跑一轮稳定批次。`
+        : `${primary.label}：样本还薄，暂时只能小步验证。`,
       targetAnchor: "ai-pipeline",
       created,
-      message: "已生成小样本复验清单：下一批只跑少量章节，回填质量和失败证据后再决定是否放量。",
+      message: recoveryWatch
+        ? "已生成恢复放量稳定批次清单：再跑一轮稳定批次，证据够了再写入经验库。"
+        : "已生成小样本复验清单：下一批只跑少量章节，回填质量和失败证据后再决定是否放量。",
       payload: {
         status: "watch",
         tacticLabel: primary.label,

@@ -607,6 +607,8 @@ test("buildProjectControlDashboard", async (t) => {
     assert.equal(dashboard.aiPipelineBatchHealth.hasSamples, true);
     assert.equal(dashboard.aiPipelineBatchHealth.sampleBatches, 1);
     assert.equal(dashboard.aiPipelineBatchHealth.tacticLabel, "恢复放量观察");
+    assert.equal(dashboard.aiPipelineBatchHealth.executeLabel, "再跑稳定批次");
+    assert.equal(dashboard.areas.find((area) => area.id === "ai-pipeline")?.executeLabel, "再跑稳定批次");
     assert.ok(dashboard.aiPipelineBatchHealth.evidence[0]?.includes("恢复放量"));
     assert.ok(dashboard.aiPipelineBatchHealth.detail.includes("恢复放量样本还薄"));
   });

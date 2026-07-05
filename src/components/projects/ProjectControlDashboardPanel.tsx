@@ -88,6 +88,7 @@ interface AiPipelineBatchHealthSummary {
   watch: number;
   blocked: number;
   sampleBatches: number;
+  recoveryBatches: number;
   successRatePercent: number | null;
   averageQualityScore: number | null;
   failedTasks: number;

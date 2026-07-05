@@ -411,6 +411,7 @@ export interface AiPipelineBatchHealthSummary {
   watch: number;
   blocked: number;
   sampleBatches: number;
+  recoveryBatches: number;
   successRatePercent: number | null;
   averageQualityScore: number | null;
   failedTasks: number;
@@ -885,6 +886,7 @@ function buildAiPipelineBatchHealthSummary(audits: ControlBatchAudit[] = []): Ai
       watch: 0,
       blocked: 0,
       sampleBatches: 0,
+      recoveryBatches: 0,
       successRatePercent: null,
       averageQualityScore: null,
       failedTasks: 0,
@@ -907,12 +909,17 @@ function buildAiPipelineBatchHealthSummary(audits: ControlBatchAudit[] = []): Ai
     actionExecutable: primary.status === "blocked" || primary.status === "watch",
     actionAreaId: primary.status === "blocked" || primary.status === "watch" ? "ai-pipeline" : null,
     actionMode: primary.status === "blocked" || primary.status === "watch" ? "seed" : null,
-    executeLabel: primary.status === "blocked" ? "生成修复清单" : primary.status === "watch" ? "生成复验清单" : "继续小批",
+    executeLabel: primary.status === "blocked"
+      ? "生成修复清单"
+      : primary.status === "watch"
+        ? primary.recoveryBatches > 0 ? "再跑稳定批次" : "生成复验清单"
+        : "继续小批",
     total: review.summary.total,
     usable: review.summary.usable,
     watch: review.summary.watch,
     blocked: review.summary.blocked,
     sampleBatches: primary.sampleBatches,
+    recoveryBatches: primary.recoveryBatches,
     successRatePercent: primary.successRatePercent,
     averageQualityScore: primary.averageQualityScore,
     failedTasks: primary.failedTasks,
@@ -947,7 +954,7 @@ function aiPipelineAreaDecision(input: {
       nextAction: `${input.health.headline} ${input.health.detail}`,
       actionLabel: "小样本复验",
       canExecute: true,
-      executeLabel: "生成复验清单",
+      executeLabel: input.health.executeLabel,
     };
   }
   return {

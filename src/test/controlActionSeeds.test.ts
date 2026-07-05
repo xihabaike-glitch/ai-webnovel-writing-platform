@@ -183,6 +183,56 @@ test("control action seeds", async (t) => {
     assert.ok(plan.message.includes("还没有样本"));
   });
 
+  await t.test("builds a recovery stability plan for thin AI small-batch evidence", () => {
+    const plan = buildAiPipelineControlActionPlan([
+      {
+        receiptId: "ai-scale-1",
+        actionId: "ai-pipeline-recheck:demo-project:ai-plan-1:scale",
+        label: "AI 写审改小批恢复完成",
+        detail: "番茄小说 · 夜雨系统 · 批量初稿 3 个",
+        href: "/projects/demo-project#ai-pipeline",
+        status: "succeeded",
+        message: "AI 小批恢复完成。",
+        executionType: "recommended_batch",
+        succeededCount: 3,
+        failedCount: 0,
+        platformId: "fanqie",
+        platformName: "番茄小说",
+        recheckStatus: "ready",
+        recheckLabel: "复检",
+        recheckDetail: "复检",
+        recheckAction: "刷新",
+        payload: JSON.stringify({
+          aiPipelineRecheck: {
+            dispatchKey: "ai-pipeline-recheck:demo-project:ai-plan-1:scale",
+            mode: "small_batch_resume",
+          },
+          plan: {
+            strategyBases: [{
+              title: "首轮平台打法：番茄小说",
+              label: "三轮稳住",
+              primaryTactic: "三轮数据已站住，可以小批放大。",
+              openingMove: "第一段给不可逆危机。",
+              verificationMove: "继续回填曝光、点击、收藏和追读。",
+              risk: "稳定加码不是无限放量。",
+            }],
+            actionLabel: "批量初稿 3 个",
+            category: "draft",
+          },
+          routeEffectSummary: { successRatePercent: 100, knownCostUsd: 0.03, averageQualityScore: 91 },
+          batchReceipt: { status: "continue", headline: "AI 小批恢复完成" },
+        }),
+        createdAt: "2026-01-04T00:00:00.000Z",
+      },
+    ]);
+
+    assert.equal(plan.status, "watch");
+    assert.equal(plan.label, "恢复放量稳定批次清单");
+    assert.ok(plan.created.some((item) => item.includes("再跑 1 轮")));
+    assert.ok(plan.created.some((item) => item.includes("经验库")));
+    assert.ok(plan.message.includes("恢复放量"));
+  });
+
   await t.test("updates a single AI pipeline checklist item inside payload", () => {
     const updated = updateAiPipelineControlPlanItem(JSON.stringify({
       aiPipelineControlPlan: {

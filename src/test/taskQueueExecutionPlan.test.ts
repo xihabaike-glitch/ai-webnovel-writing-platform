@@ -127,4 +127,43 @@ test("buildTaskQueueExecutionPlan", async (t) => {
     assert.deepEqual(plan.chapterIds, ["chapter-1", "chapter-2"]);
     assert.ok(plan.warnings.some((warning) => warning.includes("恢复放量")));
   });
+
+  await t.test("labels third-round stable batches as cautious scale-up", () => {
+    const strategyBasis = {
+      title: "首轮平台打法：番茄小说",
+      label: "三轮稳住",
+      primaryTactic: "三轮数据已站住，可以小批放大。",
+      openingMove: "复用首章高压钩子。",
+      verificationMove: "继续回填曝光、点击、收藏和追读。",
+      risk: "稳定加码不是无限放量。",
+    };
+    const plan = buildTaskQueueExecutionPlan([
+      queueItem({ id: "project-1:draft:chapter-1", category: "draft", projectId: "project-1", projectTitle: "项目一", chapterTitle: "第一章", strategyBasis }),
+      queueItem({ id: "project-1:draft:chapter-2", category: "draft", projectId: "project-1", projectTitle: "项目一", chapterTitle: "第二章", strategyBasis }),
+    ]);
+
+    assert.equal(plan.canRun, true);
+    assert.deepEqual(plan.chapterIds, ["chapter-1", "chapter-2"]);
+    assert.ok(plan.warnings.some((warning) => warning.includes("三轮稳住样本")));
+    assert.ok(plan.warnings.some((warning) => warning.includes("不要把稳定加码理解成无限放量")));
+  });
+
+  await t.test("keeps third-round downgrade batches in repair sample language", () => {
+    const strategyBasis = {
+      title: "首轮平台打法：七猫",
+      label: "三轮降档",
+      primaryTactic: "只复用修复流程。",
+      openingMove: "重修前三章兑现。",
+      verificationMove: "小样本通过后再放大。",
+      risk: "不能直接进入稳定加码。",
+    };
+    const plan = buildTaskQueueExecutionPlan([
+      queueItem({ id: "project-1:draft:chapter-1", category: "draft", projectId: "project-1", projectTitle: "项目一", chapterTitle: "第一章", strategyBasis, riskLevel: "watch", riskLabel: "三轮降档", scaleGate: "sample_only", actionLabel: "生成小样本" }),
+      queueItem({ id: "project-1:draft:chapter-2", category: "draft", projectId: "project-1", projectTitle: "项目一", chapterTitle: "第二章", strategyBasis, riskLevel: "watch", riskLabel: "三轮降档", scaleGate: "sample_only", actionLabel: "生成小样本" }),
+    ]);
+
+    assert.deepEqual(plan.chapterIds, ["chapter-1"]);
+    assert.ok(plan.warnings.some((warning) => warning.includes("三轮降档样本")));
+    assert.ok(plan.warnings.some((warning) => warning.includes("观察小样本闸门")));
+  });
 });

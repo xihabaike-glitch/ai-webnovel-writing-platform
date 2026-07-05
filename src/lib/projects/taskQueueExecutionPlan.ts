@@ -42,6 +42,20 @@ export function adoptionFollowupBatchWarning(count: number) {
   return `本批包含 ${count} 个采纳闭环任务；它们不是普通审稿，执行后必须回总闸门复检。`;
 }
 
+function scaleWarningFromStrategyBases(strategyBases: NonNullable<QueueItem["strategyBasis"]>[]) {
+  const labels = strategyBases.map((basis) => basis.label).join(" ");
+  if (/三轮稳住/u.test(labels)) {
+    return "本批来自三轮稳住样本，可以小批放大；仍要保留曝光、点击、收藏和追读回收，不要把稳定加码理解成无限放量。";
+  }
+  if (/三轮降档/u.test(labels)) {
+    return "本批来自三轮降档样本，只能按修复型小样本推进；通过线没写清前，不要扩大到标准批量。";
+  }
+  if (/三轮暂停|三轮换平台/u.test(labels)) {
+    return "本批命中三轮避坑样本，理论上不应进入批量；如果看见这条提示，先回首日闸门确认恢复条件。";
+  }
+  return null;
+}
+
 export function buildTaskQueueExecutionPlan(
   queueItems: QueueItem[],
   maxBatchSize = defaultBatchExecutionStrategy.maxBatchSize,
@@ -104,6 +118,7 @@ export function buildTaskQueueExecutionPlan(
     detail: `${projectTitles.join("、")} · ${first.label} · ${batch.map((item) => item.chapterTitle).join("、")}`,
     warnings: [
       adoptionFollowupCount > 0 ? adoptionFollowupBatchWarning(adoptionFollowupCount) : null,
+      scaleWarningFromStrategyBases(strategyBases),
       first.scaleGate === "sample_only" ? "当前处于观察小样本闸门，只运行 1 个样本；验收依据写清通过线、不可接受项、复查证据和放量结论后才允许批量生成。" : null,
       first.scaleGate === "cleared" ? "小样本验收已过线，本批属于恢复放量；先保持同一平台打法和小批次节奏，别一次拉满。" : null,
       sameCategoryOtherProjects > 0 && !strategy.allowCrossProject ? `还有 ${sameCategoryOtherProjects} 个同类任务分布在其他项目，本批先保持单项目上下文。` : null,

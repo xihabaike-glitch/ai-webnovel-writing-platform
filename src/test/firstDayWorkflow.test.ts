@@ -618,6 +618,48 @@ test("buildFirstDayWorkflow", async (t) => {
     assert.equal(dispatch.priorityScore, 65);
   });
 
+  await t.test("maps third-round final labels to first-day risk levels", () => {
+    const stable = buildFirstDayRiskProfile({
+      title: "首轮平台打法：番茄小说",
+      label: "三轮稳住",
+      primaryTactic: "三轮数据已站住，可以小批放大。",
+      openingMove: "复用首章高压钩子。",
+      verificationMove: "继续回填曝光、点击、收藏和追读。",
+      risk: "稳定加码不是无限放量。",
+    });
+    const downgrade = buildFirstDayRiskProfile({
+      title: "首轮平台打法：七猫",
+      label: "三轮降档",
+      primaryTactic: "只复用修复流程。",
+      openingMove: "先重修前三章兑现。",
+      verificationMove: "小样本通过后再放大。",
+      risk: "不能直接进入稳定加码。",
+    });
+    const pause = buildFirstDayRiskProfile({
+      title: "首轮平台打法：WebNovel",
+      label: "三轮暂停",
+      primaryTactic: "三轮后归档暂停。",
+      openingMove: "重写入口卖点。",
+      verificationMove: "先写清恢复条件。",
+      risk: "未证明恢复条件前不要硬冲。",
+    });
+    const pivot = buildFirstDayRiskProfile({
+      title: "首轮平台打法：Royal Road",
+      label: "三轮换平台",
+      primaryTactic: "先换平台验证。",
+      openingMove: "按新平台读者入口重写开头。",
+      verificationMove: "旧平台只做对照组。",
+      risk: "别把旧平台弱匹配判成题材失败。",
+    });
+
+    assert.equal(stable.level, "standard");
+    assert.equal(downgrade.level, "watch");
+    assert.equal(downgrade.dueLabel, "今天小样本验证");
+    assert.equal(pause.level, "blocked");
+    assert.equal(pause.dueLabel, "今天止损验证");
+    assert.equal(pivot.level, "blocked");
+  });
+
   await t.test("uses completed first-day dispatch evidence to advance the workflow", () => {
     const workflow = buildFirstDayWorkflow({
       project,

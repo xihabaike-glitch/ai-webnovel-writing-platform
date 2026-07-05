@@ -326,8 +326,8 @@ function verdict(completedCount: number, totalSteps: number) {
 
 function startTacticRiskLevel(startTactic: ProjectStartTacticSummary | null | undefined): FirstDayRiskLevel {
   const label = startTactic?.label ?? "";
-  if (/止损|避坑|blocked/i.test(label)) return "blocked";
-  if (/观察|验收|动作|watch/i.test(label)) return "watch";
+  if (/三轮暂停|三轮换平台|止损|避坑|blocked/i.test(label)) return "blocked";
+  if (/三轮降档|观察|验收|动作|watch/i.test(label)) return "watch";
   return "standard";
 }
 

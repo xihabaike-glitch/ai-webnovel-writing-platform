@@ -1008,6 +1008,66 @@ test("buildTaskQueueCenter", async (t) => {
     assert.ok(recovery?.evidence.includes("恢复条件"));
   });
 
+  await t.test("applies third-round final outcomes to production scale gates", () => {
+    const pauseProject: TaskQueueProject = {
+      ...project,
+      id: "third-pause-project",
+      worldEntries: [
+        {
+          type: "platform_soil",
+          title: "首轮平台打法：WebNovel",
+          content: [
+            "状态：三轮暂停",
+            "打法：三轮后仍无有效转化，先归档暂停。",
+            "开头动作：重写入口卖点和第一章读者承诺。",
+            "验证动作：先写清恢复条件。",
+            "风险：未证明恢复条件前不要硬冲。",
+          ].join("\n"),
+        },
+      ],
+    };
+    const downgradeProject: TaskQueueProject = {
+      ...project,
+      id: "third-downgrade-project",
+      chapters: [
+        baseChapter,
+        {
+          ...baseChapter,
+          id: "chapter-ready-draft-2",
+          order: 2,
+          title: "第二章 第二个样本",
+        },
+      ],
+      aiTasks: [],
+      worldEntries: [
+        {
+          type: "platform_soil",
+          title: "首轮平台打法：七猫",
+          content: [
+            "状态：三轮降档",
+            "打法：三轮后只能降档修复。",
+            "开头动作：重修前三章兑现。",
+            "验证动作：写清通过线、不可接受项和复查证据。",
+            "风险：不能直接进入稳定加码。",
+          ].join("\n"),
+        },
+      ],
+    };
+    const queue = buildTaskQueueCenter([pauseProject, downgradeProject]);
+    const pauseRecovery = queue.items.find((item) => item.projectId === "third-pause-project" && item.blockerType === "risk_recovery");
+    const downgradeGate = queue.items.find((item) => item.projectId === "third-downgrade-project" && item.blockerType === "first_day_gate");
+    const downgradeScaleGate = queue.items.find((item) => item.projectId === "third-downgrade-project" && item.blockerType === "watch_scale_gate");
+
+    assert.equal(pauseRecovery?.riskLevel, "blocked");
+    assert.equal(pauseRecovery?.riskLabel, "三轮暂停");
+    assert.equal(pauseRecovery?.actionLabel, "做恢复验证");
+    assert.equal(downgradeGate?.riskLevel, "watch");
+    assert.equal(downgradeGate?.riskLabel, "三轮降档");
+    assert.equal(downgradeGate?.actionLabel, "完成小样本验收");
+    assert.equal(downgradeScaleGate?.scaleGate, "sample_only");
+    assert.ok(downgradeScaleGate?.evidence.includes("通过线、不可接受项、复查证据和放量结论"));
+  });
+
   await t.test("keeps watch projects as small-sample draft tasks", () => {
     const watchProject: TaskQueueProject = {
       ...project,

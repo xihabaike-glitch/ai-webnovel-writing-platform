@@ -53,6 +53,8 @@ describe("export version center", () => {
     assert.equal(center.readySnapshots, 2);
     assert.equal(center.averageReadinessPercent, 83);
     assert.equal(center.baselineCandidate?.snapshotId, "full-md");
+    assert.equal(center.baselineDecision.status, "needs_baseline");
+    assert.equal(center.baselineDecision.actionSnapshotId, "full-md");
     assert.equal(center.targets.find((target) => target.id === "full:markdown")?.isBaselineCandidate, true);
     assert.equal(center.nextAction.targetId, "outline:docx");
     assert.match(center.nextAction.label, /补齐/);
@@ -179,6 +181,8 @@ describe("export version center", () => {
     assert.equal(center.baselineComparison.baselineSnapshotId, "full-md-locked");
     assert.equal(center.baselineComparison.contentChanged, false);
     assert.equal(center.baselineComparison.canReplaceBaseline, false);
+    assert.equal(center.baselineDecision.status, "current");
+    assert.equal(center.baselineDecision.actionSnapshotId, null);
   });
 
   it("compares the latest export against a locked baseline", () => {
@@ -220,5 +224,38 @@ describe("export version center", () => {
     assert.equal(center.baselineComparison.fileSizeDeltaLabel, "+800 B");
     assert.equal(center.baselineComparison.contentChanged, true);
     assert.match(center.baselineComparison.detail, /内容摘要已变化/);
+    assert.equal(center.baselineDecision.status, "replace");
+    assert.equal(center.baselineDecision.actionSnapshotId, "full-md-new");
+    assert.equal(center.baselineDecision.actionLabel, "替换为新基准");
+  });
+
+  it("flags newer exports with regression risk before replacing the baseline", () => {
+    const center = buildExportVersionCenter([
+      snapshot({
+        id: "full-md-new",
+        packageKind: "full",
+        format: "markdown",
+        readinessPercent: 82,
+        chapterCount: 2,
+        wordCount: 7000,
+        createdAt: "2026-07-05T05:00:00.000Z",
+      }),
+      snapshot({
+        id: "full-md-locked",
+        packageKind: "full",
+        format: "markdown",
+        readinessPercent: 90,
+        chapterCount: 3,
+        wordCount: 9000,
+        isBaseline: true,
+        baselineLockedAt: "2026-07-05T04:00:00.000Z",
+        createdAt: "2026-07-05T04:00:00.000Z",
+      }),
+    ]);
+
+    assert.equal(center.baselineComparison.status, "newer_version");
+    assert.equal(center.baselineDecision.status, "risk");
+    assert.equal(center.baselineDecision.actionLabel, "保留旧基准");
+    assert.equal(center.baselineDecision.actionSnapshotId, null);
   });
 });

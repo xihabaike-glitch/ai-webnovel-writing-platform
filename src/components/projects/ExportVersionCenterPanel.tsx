@@ -27,6 +27,14 @@ function baselineComparisonClass(status: ExportVersionCenterSummary["baselineCom
   return "border-amber-200 bg-amber-50 text-amber-800";
 }
 
+function baselineDecisionClass(tone: ExportVersionCenterSummary["baselineDecision"]["tone"]) {
+  if (tone === "emerald") return "border-emerald-200 bg-emerald-50 text-emerald-800";
+  if (tone === "sky") return "border-sky-200 bg-sky-50 text-sky-800";
+  if (tone === "rose") return "border-rose-200 bg-rose-50 text-rose-800";
+  if (tone === "amber") return "border-amber-200 bg-amber-50 text-amber-800";
+  return "border-slate-200 bg-slate-50 text-slate-700";
+}
+
 function timeText(value: string | Date | null) {
   if (!value) return "无记录";
   return new Date(value).toLocaleString("zh-CN");
@@ -163,6 +171,27 @@ export function ExportVersionCenterPanel({
             <div className="rounded-md bg-white/70 px-2 py-1">内容 {summary.baselineComparison.contentChanged ? "已变化" : "未变化"}</div>
             <div className="rounded-md bg-white/70 px-2 py-1">类型 {summary.baselineComparison.targetChanged ? "不同" : "一致"}</div>
           </div>
+        </div>
+      </section>
+
+      <section className={`rounded-md border p-4 ${baselineDecisionClass(summary.baselineDecision.tone)}`}>
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <h2 className="font-medium">差异决策</h2>
+            <p className="mt-1 text-sm leading-6">{summary.baselineDecision.label}：{summary.baselineDecision.detail}</p>
+          </div>
+          {summary.baselineDecision.actionSnapshotId ? (
+            <button
+              className="rounded-md bg-slate-950 px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
+              disabled={baselineRunningId !== null}
+              onClick={() => void updateBaseline(summary.baselineDecision.actionSnapshotId!, "lock")}
+              type="button"
+            >
+              {baselineRunningId === summary.baselineDecision.actionSnapshotId ? "处理中" : summary.baselineDecision.actionLabel}
+            </button>
+          ) : (
+            <div className="rounded-md bg-white/70 px-3 py-2 text-sm font-medium">{summary.baselineDecision.actionLabel}</div>
+          )}
         </div>
       </section>
 

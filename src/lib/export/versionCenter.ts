@@ -59,6 +59,15 @@ export interface ExportBaselineTimelineItem {
   detail: string;
 }
 
+export interface ExportBaselineDecision {
+  status: "needs_baseline" | "current" | "replace" | "observe" | "risk";
+  tone: "amber" | "emerald" | "sky" | "slate" | "rose";
+  label: string;
+  detail: string;
+  actionLabel: string;
+  actionSnapshotId: string | null;
+}
+
 export interface ExportVersionCenterSummary {
   totalSnapshots: number;
   latestCreatedAt: string | Date | null;
@@ -71,6 +80,7 @@ export interface ExportVersionCenterSummary {
   latestSnapshot: ExportPackageSnapshotView | null;
   baselineCandidate: ExportBaselineCandidate | null;
   baselineComparison: ExportBaselineComparison;
+  baselineDecision: ExportBaselineDecision;
   baselineTimeline: ExportBaselineTimelineItem[];
   targets: ExportVersionTarget[];
   nextAction: {
@@ -265,11 +275,102 @@ function buildBaselineTimeline(orderedSnapshots: ExportPackageSnapshotView[]): E
     });
 }
 
+function buildBaselineDecision(
+  baselineComparison: ExportBaselineComparison,
+  baselineCandidate: ExportBaselineCandidate | null,
+  latestSnapshot: ExportPackageSnapshotView | null,
+): ExportBaselineDecision {
+  if (baselineComparison.status === "no_locked_baseline") {
+    if (baselineCandidate) {
+      return {
+        status: "needs_baseline",
+        tone: "amber",
+        label: "先锁定正式基准",
+        detail: `${baselineCandidate.label} 已经具备基准条件。没有基准，后续导出就只能堆版本，不能判断替换和回退。`,
+        actionLabel: "锁定推荐基准",
+        actionSnapshotId: baselineCandidate.snapshotId,
+      };
+    }
+
+    return {
+      status: "needs_baseline",
+      tone: "amber",
+      label: "先生成可交付基准",
+      detail: "当前还没有可锁定的正式基准。先把完整包或核心交付包做到可交付，再开始版本替换判断。",
+      actionLabel: "暂无可执行基准",
+      actionSnapshotId: null,
+    };
+  }
+
+  if (baselineComparison.status === "baseline_current") {
+    return {
+      status: "current",
+      tone: "emerald",
+      label: "保持当前基准",
+      detail: "正式基准已经是最新版本。现在不需要替换，继续写作或重新导出后再比较。",
+      actionLabel: "无需操作",
+      actionSnapshotId: null,
+    };
+  }
+
+  if (
+    latestSnapshot?.readinessStatus === "blocked"
+    || baselineComparison.readinessDelta < 0
+    || baselineComparison.chapterDelta < 0
+    || baselineComparison.wordDelta < 0
+  ) {
+    return {
+      status: "risk",
+      tone: "rose",
+      label: "不要急着替换",
+      detail: "最新版本存在准备度、章节或字数回退。先保留旧基准，把回退原因处理掉，再重新生成一版。",
+      actionLabel: "保留旧基准",
+      actionSnapshotId: null,
+    };
+  }
+
+  if (latestSnapshot?.readinessStatus === "warning" || baselineComparison.targetChanged) {
+    return {
+      status: "observe",
+      tone: "slate",
+      label: "先保留观察",
+      detail: baselineComparison.targetChanged
+        ? "最新版本和正式基准不是同一类交付物。先确认平台需要的是哪种交付格式，再决定是否替换。"
+        : "最新版本还不是稳定可交付状态。可以保留旧基准，等修完警告后再替换。",
+      actionLabel: "暂不替换",
+      actionSnapshotId: null,
+    };
+  }
+
+  if (baselineComparison.readinessDelta > 0 || baselineComparison.chapterDelta > 0 || baselineComparison.wordDelta > 0) {
+    return {
+      status: "replace",
+      tone: "sky",
+      label: "建议替换基准",
+      detail: "最新版本在准备度、章节或字数上明显前进，可以把它升级为新的正式交付基准。",
+      actionLabel: "替换为新基准",
+      actionSnapshotId: baselineComparison.replacementSnapshotId,
+    };
+  }
+
+  return {
+    status: "observe",
+    tone: "slate",
+    label: "内容变化，先观察",
+    detail: baselineComparison.contentChanged
+      ? "最新版本内容摘要已经变化，但核心交付指标没有增强。先人工确认变化是否更好，再替换基准。"
+      : "最新版本时间更新，但核心指标和内容摘要都没有明显变化。保留旧基准即可。",
+    actionLabel: "暂不替换",
+    actionSnapshotId: null,
+  };
+}
+
 export function buildExportVersionCenter(snapshots: ExportPackageSnapshotView[]): ExportVersionCenterSummary {
   const orderedSnapshots = [...snapshots].sort((a, b) => snapshotTime(b) - snapshotTime(a));
   const latestSnapshot = orderedSnapshots[0] ?? null;
   const baselineCandidate = pickBaselineCandidate(orderedSnapshots);
   const baselineComparison = buildBaselineComparison(orderedSnapshots, latestSnapshot);
+  const baselineDecision = buildBaselineDecision(baselineComparison, baselineCandidate, latestSnapshot);
   const baselineTimeline = buildBaselineTimeline(orderedSnapshots);
   const targets = targetMatrix.map((target) => {
     const latest = orderedSnapshots.find((snapshot) => snapshot.packageKind === target.packageKind && snapshot.format === target.format) ?? null;
@@ -305,6 +406,7 @@ export function buildExportVersionCenter(snapshots: ExportPackageSnapshotView[])
     latestSnapshot,
     baselineCandidate,
     baselineComparison,
+    baselineDecision,
     baselineTimeline,
     targets,
     nextAction: missingTarget ? {

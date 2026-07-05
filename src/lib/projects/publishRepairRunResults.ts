@@ -74,6 +74,20 @@ export function actionFromRunResult(result: PublishRepairRunResult): PublishRepa
   };
 }
 
+export function publishRepairResultForAction(
+  results: PublishRepairRunResult[],
+  action: Pick<PublishRepairAction, "kind" | "chapterId" | "candidateRevisionId">,
+) {
+  return results.find((result) => {
+    if (result.action !== action.kind) return false;
+    if ((result.chapterId ?? undefined) !== action.chapterId) return false;
+    if (action.kind === "adopt_candidate") {
+      return result.candidateRevisionId === action.candidateRevisionId;
+    }
+    return true;
+  }) ?? null;
+}
+
 function chapterHref(projectId: string | undefined, chapterId: string | null, hash: string) {
   if (!projectId || !chapterId) return undefined;
   return `/projects/${projectId}/chapters/${chapterId}${hash}`;

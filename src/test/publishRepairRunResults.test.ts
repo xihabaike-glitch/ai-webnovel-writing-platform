@@ -5,6 +5,7 @@ import {
   buildPublishRepairNextAction,
   normalizeRunResult,
   pendingResultFromAction,
+  publishRepairResultForAction,
 } from "../lib/projects/publishRepairRunResults.ts";
 
 test("publish repair run result helpers", async (t) => {
@@ -54,6 +55,38 @@ test("publish repair run result helpers", async (t) => {
     assert.equal(action.label, "执行二改");
     assert.equal(action.detail, "模型暂时不可用。");
     assert.equal(action.chapterId, "chapter-3");
+  });
+
+  await t.test("matches run results back to repair actions", () => {
+    const results = [
+      normalizeRunResult({
+        action: "adopt_candidate",
+        chapterId: "chapter-1",
+        chapterTitle: "雨夜系统",
+        status: "succeeded",
+        message: "已采纳候选稿。",
+        candidateRevisionId: "revision-1",
+      }),
+      normalizeRunResult({
+        action: "adopt_candidate",
+        chapterId: "chapter-1",
+        chapterTitle: "雨夜系统",
+        status: "failed",
+        error: "候选稿不存在。",
+        candidateRevisionId: "revision-2",
+      }),
+    ];
+
+    assert.equal(publishRepairResultForAction(results, {
+      kind: "adopt_candidate",
+      chapterId: "chapter-1",
+      candidateRevisionId: "revision-1",
+    })?.status, "succeeded");
+    assert.equal(publishRepairResultForAction(results, {
+      kind: "adopt_candidate",
+      chapterId: "chapter-1",
+      candidateRevisionId: "revision-3",
+    }), null);
   });
 
   await t.test("routes weak review results into second pass", () => {

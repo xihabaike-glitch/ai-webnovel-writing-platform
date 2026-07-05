@@ -7,6 +7,7 @@ import {
   labelForAction,
   normalizeRunResult,
   pendingResultFromAction,
+  publishRepairResultForAction,
   type PublishRepairNextAction,
   type PublishRepairRunResult,
   type RawPublishRepairRunResult,
@@ -3302,54 +3303,69 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
                     <div className="text-xs text-slate-500">{selectedPackage.repairPath.totalActions} 步</div>
                   </div>
                   <div className="mt-2 grid gap-2 lg:grid-cols-3">
-                    {selectedPackage.repairPath.steps.slice(0, 6).map((step) => (
-                      <div
-                        className={`rounded-md border p-2 ${
-                          step.status === "active"
-                            ? "border-slate-950 bg-white text-slate-950"
-                            : "border-slate-200 bg-slate-50 text-slate-600"
-                        }`}
-                        key={step.id}
-                      >
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="text-xs font-medium">第 {step.order} 步</span>
-                          <span className={`rounded-md px-2 py-0.5 text-[11px] ${
-                            step.executable ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"
-                          }`}>
-                            {step.executable ? "可一键" : "需打开"}
-                          </span>
+                    {selectedPackage.repairPath.steps.slice(0, 6).map((step) => {
+                      const stepResult = publishRepairResultForAction(runResults, step);
+                      const borderClass = stepResult?.status === "succeeded"
+                        ? "border-emerald-200 bg-emerald-50 text-emerald-950"
+                        : stepResult?.status === "failed"
+                          ? "border-rose-200 bg-rose-50 text-rose-950"
+                          : stepResult?.status === "pending"
+                            ? "border-amber-200 bg-amber-50 text-amber-950"
+                            : step.status === "active"
+                              ? "border-slate-950 bg-white text-slate-950"
+                              : "border-slate-200 bg-slate-50 text-slate-600";
+                      return (
+                        <div
+                          className={`rounded-md border p-2 ${borderClass}`}
+                          key={step.id}
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-xs font-medium">第 {step.order} 步</span>
+                            <span className={`rounded-md px-2 py-0.5 text-[11px] ${
+                              stepResult ? resultStatusClass(stepResult.status) : step.executable ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"
+                            }`}>
+                              {stepResult ? resultStatusLabel(stepResult.status) : step.executable ? "可一键" : "需打开"}
+                            </span>
+                          </div>
+                          <div className="mt-1 font-medium">{step.label}</div>
+                          {step.chapterTitle ? <div className="mt-1 line-clamp-1 text-xs text-slate-500">{step.chapterTitle}</div> : null}
+                          {stepResult ? (
+                            <div className="mt-1 line-clamp-2 text-xs text-slate-600">
+                              {stepResult.error ?? stepResult.message ?? "已记录本次处理结果。"}
+                            </div>
+                          ) : null}
+                          <div className="mt-2 flex flex-wrap items-center gap-2">
+                            {typeof stepResult?.score === "number" ? <span className="text-xs text-slate-500">评分 {stepResult.score}</span> : null}
+                            {typeof stepResult?.issueCount === "number" ? <span className="text-xs text-slate-500">问题 {stepResult.issueCount}</span> : null}
+                            {canRunAction(step) ? (
+                              <button
+                                className={`rounded-md px-2 py-1 text-xs font-medium disabled:opacity-50 ${
+                                  step.status === "active"
+                                    ? "bg-slate-950 text-white"
+                                    : "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                                }`}
+                                disabled={Boolean(runningActionId)}
+                                onClick={() => void runRepairAction(step)}
+                                type="button"
+                              >
+                                {runningActionId === step.id ? "处理中" : step.status === "active" ? "立即处理" : "处理此步"}
+                              </button>
+                            ) : (
+                              <Link
+                                className={`inline-flex rounded-md px-2 py-1 text-xs font-medium ${
+                                  step.status === "active"
+                                    ? "bg-slate-950 text-white"
+                                    : "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                                }`}
+                                href={actionHref(projectId, step)}
+                              >
+                                {step.status === "active" ? "打开处理" : "打开位置"}
+                              </Link>
+                            )}
+                          </div>
                         </div>
-                        <div className="mt-1 font-medium">{step.label}</div>
-                        {step.chapterTitle ? <div className="mt-1 line-clamp-1 text-xs text-slate-500">{step.chapterTitle}</div> : null}
-                        <div className="mt-2">
-                          {canRunAction(step) ? (
-                            <button
-                              className={`rounded-md px-2 py-1 text-xs font-medium disabled:opacity-50 ${
-                                step.status === "active"
-                                  ? "bg-slate-950 text-white"
-                                  : "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
-                              }`}
-                              disabled={Boolean(runningActionId)}
-                              onClick={() => void runRepairAction(step)}
-                              type="button"
-                            >
-                              {runningActionId === step.id ? "处理中" : step.status === "active" ? "立即处理" : "处理此步"}
-                            </button>
-                          ) : (
-                            <Link
-                              className={`inline-flex rounded-md px-2 py-1 text-xs font-medium ${
-                                step.status === "active"
-                                  ? "bg-slate-950 text-white"
-                                  : "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
-                              }`}
-                              href={actionHref(projectId, step)}
-                            >
-                              {step.status === "active" ? "打开处理" : "打开位置"}
-                            </Link>
-                          )}
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               ) : null}

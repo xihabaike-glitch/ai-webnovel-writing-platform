@@ -6155,6 +6155,56 @@ function markdownLine(input: string) {
   return input.replace(/\s+/g, " ").trim();
 }
 
+function numberAfterLabel(text: string, label: string) {
+  const escapedLabel = label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const match = text.match(new RegExp(`${escapedLabel}\\s*([0-9]+(?:\\.[0-9]+)?)`, "u"));
+  if (!match) return null;
+  const value = Number(match[1]);
+  return Number.isFinite(value) ? value : null;
+}
+
+function publishEffectEventMetrics(event: GatePlatformDecisionTimelineEvent) {
+  if (event.type !== "effect") return null;
+  const source = `${event.detail} ${event.evidence.join(" ")}`;
+  const views = numberAfterLabel(source, "曝光") ?? 0;
+  const clicks = numberAfterLabel(source, "点击") ?? 0;
+  const favorites = numberAfterLabel(source, "收藏") ?? 0;
+  const follows = numberAfterLabel(source, "追读") ?? 0;
+  const clickRatePercent = numberAfterLabel(source, "点击率") ?? percent(clicks, views);
+  const favoriteRatePercent = numberAfterLabel(source, "收藏率") ?? percent(favorites, views);
+  const followRatePercent = numberAfterLabel(source, "追读率") ?? percent(follows, views);
+
+  return {
+    views,
+    clicks,
+    favorites,
+    follows,
+    clickRatePercent,
+    favoriteRatePercent,
+    followRatePercent,
+  };
+}
+
+function isReusablePublishEffectEvent(event: GatePlatformDecisionTimelineEvent) {
+  const metrics = publishEffectEventMetrics(event);
+  if (!metrics) return false;
+  if (metrics.views < 100) return false;
+  if (metrics.clickRatePercent < 5 || metrics.followRatePercent < 1) return false;
+  return metrics.favoriteRatePercent >= 4 || metrics.followRatePercent >= 2;
+}
+
+function latestReusablePublishEffectEvent(
+  events: GatePlatformDecisionTimelineEvent[],
+  afterEvent?: GatePlatformDecisionTimelineEvent | null,
+) {
+  const afterTime = afterEvent ? new Date(afterEvent.createdAt).getTime() : null;
+  return events.find((event) => {
+    if (!isReusablePublishEffectEvent(event)) return false;
+    if (afterTime === null || Number.isNaN(afterTime)) return true;
+    return new Date(event.createdAt).getTime() >= afterTime;
+  }) ?? null;
+}
+
 function evidenceLoopRecheckFromTimeline(item: GatePlatformDecisionTimelineItem) {
   const lines = item.events.flatMap((event) => event.evidence);
   for (const line of lines) {
@@ -6209,6 +6259,7 @@ export function buildGatePlatformTacticExperienceLibrary(
     const completedRecheckReview = completedRecheckReviewFromTimeline(item);
     const evidenceLoopRecheck = evidenceLoopRecheckFromTimeline(item);
     const dispatchCompletionEvent = item.events.find((event) => event.id.startsWith("dispatch-completion-receipt:")) ?? null;
+    const reusableEffectEvent = latestReusablePublishEffectEvent(item.events, dispatchCompletionEvent);
     const evidence = item.events.slice(0, 3).map((event) => `${event.label}：${markdownLine(event.detail)}`);
     const base = {
       platformId: item.platformId,
@@ -6360,6 +6411,25 @@ export function buildGatePlatformTacticExperienceLibrary(
         reuseHint: "同类项目只复用收紧投入、复检发布包和前三章兑现的流程，暂不复用加码结论。",
         risk: "修复后必须再看新一轮效果，缺复测数据前不要恢复稳定加码。",
         evidence: [`最终判定：${finalEvent.label}：${markdownLine(finalEvent.detail)}`, ...base.evidence].slice(0, 4),
+      };
+    }
+
+    if ((item.status === "healthy" || dispatchCompletionEvent) && reusableEffectEvent) {
+      const metrics = publishEffectEventMetrics(reusableEffectEvent);
+      return {
+        ...base,
+        status: "usable",
+        label: "可复用打法",
+        tactic: dispatchCompletionEvent ? "验收后真实效果打法" : "真实效果沉淀打法",
+        lesson: `${item.platformName} 已经补齐真实效果，曝光 ${metrics?.views ?? "缺"}、点击率 ${metrics?.clickRatePercent ?? "缺"}%、收藏率 ${metrics?.favoriteRatePercent ?? "缺"}%、追读率 ${metrics?.followRatePercent ?? "缺"}%，可以把这次平台包装和前三章入口沉淀为首轮打法。`,
+        reuseHint: "新项目可复用这次标题卖点、前三章钩子、投稿包装和小步验证节奏，但首轮仍要继续回填曝光、点击、收藏、追读。",
+        risk: "成功样本只证明当前题材和包装有效，不等于跨题材无限复用；换题材、换平台或数据下滑时必须重新小样本验证。",
+        evidence: [
+          dispatchCompletionEvent ? `验收依据：${markdownLine(dispatchCompletionEvent.detail)}` : null,
+          `效果回填：${markdownLine(reusableEffectEvent.detail)}`,
+          ...reusableEffectEvent.evidence,
+          ...base.evidence,
+        ].filter((line): line is string => Boolean(line)).slice(0, 5),
       };
     }
 

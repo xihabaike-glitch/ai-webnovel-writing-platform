@@ -3,7 +3,13 @@ import assert from "node:assert/strict";
 import { buildModelRouteConfirmationReceipt } from "../lib/model-gateway/routeConfirmation.ts";
 import { getPlatformProfile } from "../lib/platforms/platformProfiles.ts";
 import { getPlatformWritingStyle } from "../lib/platforms/writingStyleTemplates.ts";
-import type { GateBatchTacticEffectItem, GatePlatformTacticExperienceItem, PersistedGatePlatformDispatchTask } from "../lib/projects/gateActionReceipts.ts";
+import {
+  buildGateDispatchCompletionReceipt,
+  buildGatePublishEffectReceipt,
+  type GateBatchTacticEffectItem,
+  type GatePlatformTacticExperienceItem,
+  type PersistedGatePlatformDispatchTask,
+} from "../lib/projects/gateActionReceipts.ts";
 import {
   buildProjectStartExperienceHandoff,
   buildProjectStartPlatformExperienceGuide,
@@ -864,6 +870,66 @@ test("buildProjectStartTacticAdvice", async (t) => {
     assert.ok(result.advice.title.includes("证据闭环提分打法"));
     assert.ok(result.advice.primaryTactic.includes("53 分提升到 71 分"));
     assert.ok(result.advice.evidence.some((item) => item.includes("分数变好")));
+  });
+
+  await t.test("feeds dispatch completion effect success into new project start advice", () => {
+    const platform = getPlatformProfile("fanqie");
+    const dispatch = {
+      id: "submission-decision:fanqie:publish-finalize",
+      platformId: "fanqie",
+      platformName: "番茄小说",
+      stage: "start_publish_finalize" as const,
+      state: "completed" as const,
+      priorityScore: 92,
+      ownerRole: "平台编辑",
+      title: "番茄小说 发布包定稿",
+      detail: "完成发布包验收。",
+      dueLabel: "今日",
+      actionLabel: "复检发布包",
+      href: "/projects/project-1#platform-export",
+      acceptanceCriteria: ["标题、简介、标签和前三章样章已完成验收。"],
+      evidence: ["标题：夜雨系统：倒计时重生", "标签：系统、重生、强爽点"],
+      reviewLatestAt: "2026-07-04T08:00:00.000Z",
+    };
+    const completionEvidence = [
+      "番茄小说 发布包定稿",
+      "标题：夜雨系统：倒计时重生",
+      "简介：第一章直接给冲突和反转",
+      "标签：系统、重生、强爽点",
+      "结论：可发布",
+    ].join("\n");
+    const completionReceipt = buildGateDispatchCompletionReceipt({
+      dispatch,
+      completionEvidence,
+      now: "2026-07-04T09:00:00.000Z",
+    });
+    const effectReceipt = buildGatePublishEffectReceipt({
+      projectId: "project-1",
+      platformId: "fanqie",
+      platformName: "番茄小说",
+      now: "2026-07-05T09:00:00.000Z",
+      metric: {
+        views: 1200,
+        clicks: 180,
+        favorites: 72,
+        follows: 36,
+        snapshotDate: "2026-07-05T00:00:00.000Z",
+      },
+    });
+    const result = buildProjectStartGateExperience({
+      platform,
+      template: getDefaultTemplateForPlatform(platform.id),
+      style: getPlatformWritingStyle(platform.id),
+      receipts: [completionReceipt, effectReceipt],
+    });
+
+    assert.equal(result.selection.experience?.status, "usable");
+    assert.equal(result.selection.experience?.tactic, "验收后真实效果打法");
+    assert.equal(result.advice.status, "history_usable");
+    assert.equal(result.advice.label, "历史可复用");
+    assert.ok(result.advice.primaryTactic.includes("点击率 15%"));
+    assert.ok(result.advice.openingMove.includes("标题卖点"));
+    assert.ok(result.advice.evidence.some((item) => item.includes("效果回填")));
   });
 
   await t.test("feeds platform knowledge feedback into new project start advice", () => {

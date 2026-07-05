@@ -133,4 +133,51 @@ test("project platform decision timeline", async (t) => {
     assert.equal(experience?.tactic, "派单验收打法");
     assert.ok(experience?.risk.includes("不证明平台增长有效"));
   });
+
+  await t.test("upgrades dispatch completion into reusable experience after strong publish effect", () => {
+    const completedDispatch = task({
+      stage: "start_publish_finalize",
+      actionLabel: "复检发布包",
+      title: "番茄小说 发布包定稿",
+      href: "/projects/project-1#platform-export",
+      completionEvidence: [
+        "番茄小说 发布包定稿",
+        "标题：夜雨系统：倒计时重生",
+        "简介：第一章直接给冲突和反转",
+        "标签：系统、重生、强爽点",
+        "结论：可发布",
+      ].join("\n"),
+      completedAt: "2026-01-09T10:00:00.000Z",
+    });
+    const completionReceipt = buildGateDispatchCompletionReceipt({
+      dispatch: completedDispatch,
+      completionEvidence: completedDispatch.completionEvidence,
+      now: "2026-01-09T10:00:01.000Z",
+    });
+    const effectReceipt = buildGatePublishEffectReceipt({
+      projectId: "project-1",
+      platformId: "fanqie",
+      platformName: "番茄小说",
+      now: "2026-01-10T10:00:01.000Z",
+      metric: {
+        views: 1200,
+        clicks: 180,
+        favorites: 72,
+        follows: 36,
+        snapshotDate: "2026-01-10T00:00:00.000Z",
+      },
+    });
+    const timeline = buildGatePlatformDecisionTimeline({
+      receipts: [completionReceipt, effectReceipt],
+      limit: 8,
+    });
+    const library = buildGatePlatformTacticExperienceLibrary(timeline, 8);
+    const experience = library.items.find((item) => item.platformId === "fanqie");
+
+    assert.equal(experience?.status, "usable");
+    assert.equal(experience?.tactic, "验收后真实效果打法");
+    assert.ok(experience?.lesson.includes("点击率 15%"));
+    assert.ok(experience?.reuseHint.includes("标题卖点"));
+    assert.ok(experience?.evidence.some((item) => item.includes("效果回填")));
+  });
 });

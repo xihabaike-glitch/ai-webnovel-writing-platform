@@ -124,6 +124,7 @@ function executionLabel(type: GateActionReceipt["executionType"]) {
   if (type === "recommended_batch") return "推荐批次";
   if (type === "platform_strategy") return "平台策略";
   if (type === "model_route") return "模型路由";
+  if (type === "first_three_adoption") return "采纳闭环";
   return "人工处理";
 }
 
@@ -2119,9 +2120,17 @@ export function GateActionWorkspace({
                 ) : null}
                 {receipt.taskId ? <span>任务 {receipt.taskId}</span> : null}
               </div>
-              <Link className="mt-2 inline-flex text-xs font-medium text-slate-700 hover:underline" href={receipt.href}>
-                打开相关位置
-              </Link>
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <span className={`rounded-md border px-2 py-1 text-xs font-medium ${recheckClass(receipt.recheck.status)}`}>
+                  {receipt.recheck.label}
+                </span>
+                <Link className="inline-flex text-xs font-medium text-slate-700 hover:underline" href={receipt.href}>
+                  打开相关位置
+                </Link>
+                <Link className="inline-flex text-xs font-medium text-slate-700 hover:underline" href="/gate">
+                  {receipt.recheck.actionLabel}
+                </Link>
+              </div>
             </div>
           ))}
           {receipts.length === 0 ? (

@@ -227,7 +227,7 @@ test("buildGateActionReceipt", async (t) => {
     });
 
     assert.equal(receipt.actionId, "first-three-adoption:single");
-    assert.equal(receipt.executionType, "manual");
+    assert.equal(receipt.executionType, "first_three_adoption");
     assert.equal(receipt.succeededCount, 1);
     assert.equal(receipt.failedCount, 0);
     assert.equal(receipt.platformId, "fanqie");
@@ -235,6 +235,11 @@ test("buildGateActionReceipt", async (t) => {
     assert.ok(receipt.message.includes("成功 1 个"));
     assert.equal(receipt.recheck.status, "ready");
     assert.equal(receipt.recheck.label, "复检采纳闭环");
+
+    const filtered = filterGateActionReceipts([receipt], { executionType: "first_three_adoption" });
+    const summary = buildGateActionReceiptSummary([receipt]);
+    assert.equal(filtered.length, 1);
+    assert.equal(summary.executionTypes[0]?.type, "first_three_adoption");
   });
 
   await t.test("records failed first-three adoption batch receipts", () => {

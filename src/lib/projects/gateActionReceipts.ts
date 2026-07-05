@@ -10,7 +10,12 @@ export const gateActionReceiptStorageKey = "ai-webnovel-gate-action-receipts";
 export const gateActionReceiptUpdatedEvent = "ai-webnovel-gate-action-receipts-updated";
 export const defaultGateActionReceiptLimit = 20;
 
-export type GateActionReceiptExecutionType = PrePublishGateActionExecution["type"] | "platform_strategy" | "model_route" | "manual";
+export type GateActionReceiptExecutionType =
+  | PrePublishGateActionExecution["type"]
+  | "platform_strategy"
+  | "model_route"
+  | "first_three_adoption"
+  | "manual";
 export type GateActionReceiptStatusFilter = "all" | GateActionReceipt["status"];
 export type GateActionReceiptExecutionFilter = "all" | GateActionReceiptExecutionType;
 
@@ -1894,7 +1899,7 @@ export function buildGateFirstThreeAdoptionReceipt(input: {
     href: firstItem?.href ?? "/gate#first-three-adoption-closure",
     status: failedCount > 0 ? "failed" : "succeeded",
     message,
-    executionType: "manual",
+    executionType: "first_three_adoption",
     succeededCount,
     failedCount,
     taskId: null,

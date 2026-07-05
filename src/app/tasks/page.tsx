@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { AppShell } from "@/components/app-shell/AppShell";
+import { CompleteTacticExperienceFollowupForm } from "@/components/tasks/CompleteTacticExperienceFollowupForm";
 import { RetryTaskButton } from "@/components/tasks/RetryTaskButton";
 import { RunRecommendedBatchButton } from "@/components/tasks/RunRecommendedBatchButton";
 import { RunPublishEffectQueueActionButton } from "@/components/tasks/RunPublishEffectQueueActionButton";
@@ -1008,6 +1009,13 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
                   <div className="mt-3 rounded-md border border-teal-200 bg-teal-50 px-3 py-2 text-xs leading-5 text-teal-950">
                     <span className="font-medium">{entry.sourceLabel}：</span>{entry.sourceDetail}
                   </div>
+                ) : null}
+                {entry.sourceType === "tactic_experience_followup" && entry.sourceDispatchKey ? (
+                  <CompleteTacticExperienceFollowupForm
+                    actionLabel={entry.actionLabel}
+                    completionEvidenceTemplate={entry.completionEvidenceTemplate}
+                    dispatchKey={entry.sourceDispatchKey}
+                  />
                 ) : null}
                 {entry.riskNotice ? (
                   <div className={`mt-3 rounded-md border px-3 py-2 text-xs leading-5 ${riskClass(entry.riskLevel)}`}>

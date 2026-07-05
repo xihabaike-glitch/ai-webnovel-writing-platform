@@ -719,6 +719,9 @@ test("buildTaskQueueCenter", async (t) => {
     assert.equal(followup?.sourceLabel, "打法闭环");
     assert.ok(followup?.sourceDetail?.includes("恢复放量"));
     assert.ok(followup?.evidence.includes("继续跑小样本"));
+    assert.equal(followup?.sourceDispatchKey, "fanqie:tactic_experience_followup:usable-recovery-scale:2026-01-01");
+    assert.ok(followup?.completionEvidenceTemplate?.includes("加码范围："));
+    assert.ok(followup?.completionEvidenceTemplate?.includes("风险边界："));
     assert.equal(followup?.actionLabel, "继续小样本");
     assert.equal(followup?.href, "/gate#platform-tactic-experience");
     assert.equal(queue.recommendedNext?.sourceType, "tactic_experience_followup");

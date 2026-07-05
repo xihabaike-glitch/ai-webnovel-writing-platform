@@ -6,6 +6,7 @@ import { buildExportVersionCenter } from "../export/versionCenter.ts";
 import { getPlatformProfile, type PlatformId } from "../platforms/platformProfiles.ts";
 import { buildFirstDayRiskProfile, type FirstDayRiskLevel } from "./firstDayWorkflow.ts";
 import { validateFirstDayDispatchCompletionEvidence } from "./firstDayWorkflowView.ts";
+import { buildGateDispatchCompletionTemplate, type GateDispatchCompletionTemplateTask } from "./gateActionReceipts.ts";
 import {
   buildPlatformPublishExportCenter,
   type PlatformPublishMetricInput,
@@ -123,6 +124,8 @@ export interface QueueItem {
   sourceType?: "first_day_handoff" | "first_three_adoption" | "tactic_experience_followup" | "export_version_recheck";
   sourceLabel?: string;
   sourceDetail?: string;
+  sourceDispatchKey?: string;
+  completionEvidenceTemplate?: string;
   label: string;
   chapterTitle: string;
   evidence: string;
@@ -596,27 +599,40 @@ function tacticExperienceFollowupQueueItems(input: {
       task.dispatchKey.includes(":tactic_experience_followup:")
       && task.state !== "completed"
     ))
-    .map((task): QueueItem => item({
-      id: `${input.project.id}:tactic-experience-followup:${task.dispatchKey}`,
-      projectId: input.project.id,
-      projectTitle: input.project.title,
-      platformName: input.platformName,
-      category: "handoff",
-      sourceType: "tactic_experience_followup",
-      sourceLabel: "打法闭环",
-      sourceDetail: task.detail
-        ? `总闸门经验卡派出的恢复放量后续动作：${task.detail}`
-        : "总闸门经验卡派出的恢复放量后续动作，先处理它，再把结论回流到平台打法库。",
-      chapterTitle: task.title ?? "恢复放量打法闭环",
-      evidence: task.detail ?? "恢复放量后续动作未完成，先补小样本、追读证据或打法重做结论。",
-      strategyBasis: input.startTactic,
-      riskLevel: input.riskLevel,
-      riskLabel: input.riskLabel,
-      riskNotice: input.riskNotice,
-      scaleGate: input.scaleGate,
-      actionLabel: task.actionLabel ?? "处理打法闭环",
-      href: task.href ?? "/gate#platform-tactic-experience",
-    }));
+    .map((task): QueueItem => {
+      const title = task.title ?? "恢复放量打法闭环";
+      const actionLabel = task.actionLabel ?? "处理打法闭环";
+      const stage = (task.stage ?? "scale_up") as GateDispatchCompletionTemplateTask["stage"];
+      return item({
+        id: `${input.project.id}:tactic-experience-followup:${task.dispatchKey}`,
+        projectId: input.project.id,
+        projectTitle: input.project.title,
+        platformName: input.platformName,
+        category: "handoff",
+        sourceType: "tactic_experience_followup",
+        sourceLabel: "打法闭环",
+        sourceDetail: task.detail
+          ? `总闸门经验卡派出的恢复放量后续动作：${task.detail}`
+          : "总闸门经验卡派出的恢复放量后续动作，先处理它，再把结论回流到平台打法库。",
+        sourceDispatchKey: task.dispatchKey,
+        completionEvidenceTemplate: buildGateDispatchCompletionTemplate({
+          stage,
+          title,
+          actionLabel,
+          platformName: input.platformName,
+          evidence: task.detail ? [task.detail] : [],
+        }),
+        chapterTitle: title,
+        evidence: task.detail ?? "恢复放量后续动作未完成，先补小样本、追读证据或打法重做结论。",
+        strategyBasis: input.startTactic,
+        riskLevel: input.riskLevel,
+        riskLabel: input.riskLabel,
+        riskNotice: input.riskNotice,
+        scaleGate: input.scaleGate,
+        actionLabel,
+        href: task.href ?? "/gate#platform-tactic-experience",
+      });
+    });
 }
 
 function isAutomatedQueueItem(entry: QueueItem) {

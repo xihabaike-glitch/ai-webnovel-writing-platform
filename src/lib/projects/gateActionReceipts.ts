@@ -921,6 +921,14 @@ export function filterGatePlatformTacticExperienceItems(
   return items.filter((item) => status === "all" || item.status === status);
 }
 
+export function buildGatePlatformTacticExperienceStartHref(item: Pick<GatePlatformTacticExperienceItem, "platformId" | "tactic" | "status">) {
+  const params = new URLSearchParams();
+  params.set("startPlatform", item.platformId);
+  params.set("startTactic", item.tactic);
+  params.set("startSource", item.status);
+  return `/projects?${params.toString()}`;
+}
+
 export type GateBatchTacticEffectStatus = "blocked" | "watch" | "usable";
 
 export interface GateBatchTacticEffectItem {

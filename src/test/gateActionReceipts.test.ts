@@ -41,6 +41,7 @@ import {
   buildGateBatchTacticEffectReview,
   buildGatePlatformTacticExperienceLibrary,
   buildGatePlatformTacticExperienceMarkdown,
+  buildGatePlatformTacticExperienceStartHref,
   gateActionReceiptFromAuditRecord,
   filterGatePlatformDecisionTimelineItems,
   filterGatePlatformTacticExperienceItems,
@@ -1618,6 +1619,20 @@ test("buildGateActionReceipt", async (t) => {
     assert.deepEqual(filterGatePlatformTacticExperienceItems(items, "usable").map((item) => item.platformId), ["fanqie"]);
     assert.deepEqual(filterGatePlatformTacticExperienceItems(items, "watch").map((item) => item.platformId), ["qimao"]);
     assert.deepEqual(filterGatePlatformTacticExperienceItems(items, "blocked").map((item) => item.platformId), ["webnovel"]);
+  });
+
+  await t.test("builds project start hrefs from reusable tactic experience", () => {
+    const href = buildGatePlatformTacticExperienceStartHref({
+      platformId: "fanqie",
+      tactic: "验收后真实效果打法",
+      status: "usable",
+    });
+    const url = new URL(href, "https://example.test");
+
+    assert.equal(url.pathname, "/projects");
+    assert.equal(url.searchParams.get("startPlatform"), "fanqie");
+    assert.equal(url.searchParams.get("startTactic"), "验收后真实效果打法");
+    assert.equal(url.searchParams.get("startSource"), "usable");
   });
 
   await t.test("turns project start validation advice into three dispatch cards", () => {

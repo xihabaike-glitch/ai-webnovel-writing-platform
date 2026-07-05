@@ -19,13 +19,27 @@ function riskClass(level: FirstDayRiskLevel) {
   return "border-emerald-200 bg-emerald-50 text-emerald-800";
 }
 
+interface ProjectsPageProps {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+}
+
+function firstValue(value: string | string[] | undefined) {
+  return Array.isArray(value) ? value[0] : value;
+}
+
 function riskLevelLabel(level: FirstDayRiskLevel) {
   if (level === "blocked") return "止损";
   if (level === "watch") return "观察";
   return "标准";
 }
 
-export default async function ProjectsPage() {
+export default async function ProjectsPage({ searchParams }: ProjectsPageProps) {
+  const params = await searchParams;
+  const experienceLaunch = {
+    platformId: firstValue(params?.startPlatform) ?? "",
+    tactic: firstValue(params?.startTactic) ?? "",
+    source: firstValue(params?.startSource) ?? "",
+  };
   const [projects, providers] = await Promise.all([
     prisma.project.findMany({
       include: {
@@ -70,7 +84,7 @@ export default async function ProjectsPage() {
         </div>
       </div>
       <div className="mb-6">
-        <ProjectForm />
+        <ProjectForm experienceLaunch={experienceLaunch} />
       </div>
       <section className="mb-6 grid gap-3 md:grid-cols-3 lg:grid-cols-6">
         <div className="rounded-md border border-slate-200 bg-white p-3">

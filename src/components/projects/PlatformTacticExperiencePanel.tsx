@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import {
   buildGatePlatformTacticExperienceMarkdown,
+  buildGatePlatformTacticExperienceStartHref,
   filterGatePlatformTacticExperienceItems,
   type GatePlatformTacticExperienceItem,
   type GatePlatformTacticExperienceLibrary,
@@ -140,6 +141,11 @@ export function PlatformTacticExperiencePanel({ library }: { library: GatePlatfo
                 <Link className="rounded-md border border-white/70 bg-white px-3 py-2 text-xs font-medium text-slate-950 hover:bg-white/80" href={item.href}>
                   查看来源
                 </Link>
+                {item.status === "usable" ? (
+                  <Link className="rounded-md border border-white/70 bg-slate-950 px-3 py-2 text-xs font-medium text-white hover:bg-slate-800" href={buildGatePlatformTacticExperienceStartHref(item)}>
+                    用此打法开项目
+                  </Link>
+                ) : null}
                 <button
                   className="rounded-md border border-white/70 bg-white/70 px-3 py-2 text-xs font-medium text-slate-950 hover:bg-white"
                   onClick={() => void copyExperience(item)}

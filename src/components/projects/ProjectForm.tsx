@@ -57,11 +57,33 @@ function riskGateClass(level: ProjectStartRiskGateLevel) {
   return "border-emerald-200 bg-emerald-50 text-emerald-900";
 }
 
-export function ProjectForm() {
+interface ProjectFormExperienceLaunch {
+  platformId?: string;
+  tactic?: string;
+  source?: string;
+}
+
+function launchPlatformId(input: ProjectFormExperienceLaunch | undefined): PlatformId | null {
+  const platform = platformProfiles.find((profile) => profile.id === input?.platformId);
+  return platform?.id ?? null;
+}
+
+function preferLaunchExperience(items: GatePlatformTacticExperienceItem[], launch: ProjectFormExperienceLaunch | undefined) {
+  const platformId = launchPlatformId(launch);
+  const tactic = launch?.tactic?.trim();
+  if (!platformId || !tactic) return items;
+  const matched = items.find((item) => item.platformId === platformId && item.tactic === tactic);
+  if (!matched) return items;
+  return [matched, ...items.filter((item) => item !== matched)];
+}
+
+export function ProjectForm({ experienceLaunch }: { experienceLaunch?: ProjectFormExperienceLaunch }) {
   const router = useRouter();
-  const defaultTemplate = projectTemplates[0];
+  const launchPlatform = launchPlatformId(experienceLaunch);
+  const defaultTemplate = projectTemplates.find((template) => template.platformId === launchPlatform) ?? projectTemplates[0];
   const userTouchedStartDefaultsRef = useRef(false);
-  const historyDefaultAppliedRef = useRef(false);
+  const historyDefaultAppliedRef = useRef(Boolean(launchPlatform));
+  const launchAppliedRef = useRef(false);
   const [templateId, setTemplateId] = useState(defaultTemplate.id);
   const [title, setTitle] = useState(defaultTemplate.titleSeed);
   const [genre, setGenre] = useState(defaultTemplate.genre);
@@ -114,6 +136,10 @@ export function ProjectForm() {
     riskGate: selectedRiskGate,
     recommendedTemplate: recommendedStartTemplate,
   });
+  const launchRequested = Boolean(launchPlatform && experienceLaunch?.tactic);
+  const launchMatched = launchRequested
+    && selectedEvidence.experience?.platformId === launchPlatform
+    && selectedEvidence.experience?.tactic === experienceLaunch?.tactic;
 
   useEffect(() => {
     let ignore = false;
@@ -135,7 +161,7 @@ export function ProjectForm() {
         const library = buildGatePlatformTacticExperienceLibrary(timeline, platformProfiles.length);
         const knowledgeExperiences = buildProjectStartKnowledgeFeedbackExperiences(knowledgeFeedbackReceipts, platformProfiles.length);
         const batchEffectReview = buildGateBatchTacticEffectReview(receipts, platformProfiles.length);
-        const mergedExperiences = [...knowledgeExperiences, ...library.items];
+        const mergedExperiences = preferLaunchExperience([...knowledgeExperiences, ...library.items], experienceLaunch);
         setHistoryExperiences(mergedExperiences);
         setBatchTacticEffects(batchEffectReview.items);
         setModelRouteExperience(buildProjectStartModelRouteExperienceFromReceipts(modelRouteReceipts));
@@ -149,7 +175,13 @@ export function ProjectForm() {
           guide: historicalGuide,
           fallbackTemplate: defaultTemplate,
         });
-        if (!userTouchedStartDefaultsRef.current && !historyDefaultAppliedRef.current && recommendedTemplate.id !== defaultTemplate.id) {
+        const launchTemplate = launchPlatform
+          ? projectTemplates.find((template) => template.platformId === launchPlatform) ?? null
+          : null;
+        if (!userTouchedStartDefaultsRef.current && !launchAppliedRef.current && launchTemplate) {
+          launchAppliedRef.current = true;
+          applyTemplateFields(launchTemplate);
+        } else if (!userTouchedStartDefaultsRef.current && !historyDefaultAppliedRef.current && recommendedTemplate.id !== defaultTemplate.id) {
           historyDefaultAppliedRef.current = true;
           applyTemplateFields(recommendedTemplate);
         }
@@ -167,7 +199,7 @@ export function ProjectForm() {
     return () => {
       ignore = true;
     };
-  }, []);
+  }, [experienceLaunch, launchPlatform]);
 
   function markUserTouchedStartDefaults() {
     userTouchedStartDefaultsRef.current = true;
@@ -242,6 +274,16 @@ export function ProjectForm() {
 
   return (
     <form action={createProject} className="grid gap-4 rounded-md border border-slate-200 bg-white p-4">
+      {launchRequested ? (
+        <div className={`rounded-md border p-3 text-sm ${launchMatched ? "border-emerald-200 bg-emerald-50 text-emerald-900" : "border-amber-200 bg-amber-50 text-amber-900"}`}>
+          <div className="font-medium">经验开书入口</div>
+          <p className="mt-1 leading-6">
+            {launchMatched
+              ? `已匹配「${selectedEvidence.experience?.platformName} · ${selectedEvidence.experience?.tactic}」，本次开书会优先使用这条历史打法。`
+              : `正在按「${experienceLaunch?.tactic}」寻找历史经验；若当前数据暂未加载到精确样本，会先切到对应平台模板。`}
+          </p>
+        </div>
+      ) : null}
       <div>
         <label className="text-sm font-medium" htmlFor="templateId">
           开书模板

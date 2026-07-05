@@ -25,6 +25,7 @@ import {
   buildGateBatchTacticEffectReview,
   buildGatePlatformTacticExperienceLibrary,
   buildGatePlatformTacticExperienceMarkdown,
+  buildGatePlatformTacticExperienceStartHref,
   buildGatePlatformDispatchReceipt,
   buildGateKnowledgeFeedbackDispatchItems,
   buildGatePlatformEvidenceLoopDispatchItems,
@@ -1901,6 +1902,11 @@ export function GateActionWorkspace({
                     >
                       只看该平台
                     </button>
+                    {item.status === "usable" ? (
+                      <Link className="rounded-md border border-white/70 bg-slate-950 px-3 py-2 text-xs font-medium text-white hover:bg-slate-800" href={buildGatePlatformTacticExperienceStartHref(item)}>
+                        用此打法开项目
+                      </Link>
+                    ) : null}
                     <button
                       className="rounded-md border border-white/70 bg-white/70 px-3 py-2 text-xs font-medium text-slate-950 hover:bg-white"
                       onClick={() => void copyTacticExperience(item)}

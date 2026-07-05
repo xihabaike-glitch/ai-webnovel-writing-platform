@@ -3977,13 +3977,20 @@ test("buildGateActionReceipt", async (t) => {
       dispatchKey: "ai-pipeline-recheck:project-1:receipt-1:scale",
       id: "ai-pipeline-recheck:project-1:receipt-1:scale",
       stage: "ai_pipeline_small_batch",
-      state: "queued",
+      state: "completed",
       priorityScore: 72,
       title: "AI 写审改：回推荐批量队列",
       detail: "恢复小批执行，但不直接放量。",
       actionLabel: "回推荐批量",
-      completionEvidence: "",
-      completedAt: null,
+      completionEvidence: [
+        "AI 写审改：回推荐批量队列",
+        "小批范围：第 2-3 章",
+        "成功率：100%",
+        "平均质量：91",
+        "失败/成本：无失败，成本 $0.021",
+        "下一步节奏：继续恢复小批",
+      ].join("\n"),
+      completedAt: "2026-01-01T00:22:00.000Z",
       updatedAt: "2026-01-01T00:20:00.000Z",
     };
     const rollback: PersistedGatePlatformDispatchTask = {
@@ -4009,13 +4016,19 @@ test("buildGateActionReceipt", async (t) => {
     assert.equal(panel.status, "blocked");
     assert.equal(panel.label, "先回滚修复");
     assert.equal(panel.summary.total, 3);
-    assert.equal(panel.summary.active, 2);
+    assert.equal(panel.summary.active, 1);
     assert.equal(panel.primaryAction.label, "先处理回滚修复");
     assert.equal(panel.primaryAction.href, "/dispatch?queue=ai_pipeline#dispatch-ai-pipeline-recheck:project-1:receipt-1:rollback");
+    assert.equal(panel.latestEvidence?.kind, "small_batch_resume");
+    assert.equal(panel.latestEvidence?.label, "最近恢复证据 · 恢复小批");
+    assert.equal(panel.latestEvidence?.outcome, "usable");
+    assert.equal(panel.latestEvidence?.nextAction, "继续恢复小批");
+    assert.equal(panel.latestEvidence?.completedAt, "2026-01-01T00:22:00.000Z");
+    assert.ok(panel.latestEvidence?.evidence.some((line) => line.includes("平均质量：91")));
     assert.deepEqual(panel.groups.map((group) => `${group.id}:${group.total}/${group.active}:${group.actionHref}`), [
       "rollback_repair:1/1:/dispatch?queue=ai_pipeline#dispatch-ai-pipeline-recheck:project-1:receipt-1:rollback",
       "sample_recheck:1/0:/dispatch?queue=ai_pipeline#dispatch-ai-pipeline-recheck:project-1:receipt-1:sample",
-      "small_batch_resume:1/1:/dispatch?queue=ai_pipeline#dispatch-ai-pipeline-recheck:project-1:receipt-1:scale",
+      "small_batch_resume:1/0:/dispatch?queue=ai_pipeline#dispatch-ai-pipeline-recheck:project-1:receipt-1:scale",
     ]);
   });
 

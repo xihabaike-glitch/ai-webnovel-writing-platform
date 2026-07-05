@@ -455,6 +455,16 @@ export interface GateAiPipelineRecoveryPanel {
     href: string;
     detail: string;
   };
+  latestEvidence: {
+    dispatchKey: string;
+    label: string;
+    kind: GateAiPipelineRecoveryCompletionKind;
+    outcome: GatePlatformTacticExperienceStatus;
+    nextAction: string;
+    evidence: string[];
+    completedAt: string | null;
+    href: string;
+  } | null;
   groups: Array<{
     id: GateDispatchTaskCenterAiPipelineGroupId;
     label: string;
@@ -3708,6 +3718,34 @@ export function buildGateAiPipelineRecoveryPanel(_tasks: PersistedGatePlatformDi
     return "查看恢复记录";
   }
 
+  function completionKindLabel(kind: GateAiPipelineRecoveryCompletionKind) {
+    if (kind === "rollback_repair") return "回滚修复";
+    if (kind === "small_batch_resume") return "恢复小批";
+    return "小样本复验";
+  }
+
+  const latestEvidence = center.aiPipelineDispatches
+    .filter((task) => task.state === "completed" && task.completionEvidence.trim().length > 0)
+    .map((task) => {
+      const completion = parseAiPipelineRecoveryCompletionEvidence(task, task.completionEvidence);
+      if (!completion) return null;
+      return {
+        dispatchKey: task.dispatchKey,
+        label: `最近恢复证据 · ${completionKindLabel(completion.kind)}`,
+        kind: completion.kind,
+        outcome: completion.outcome,
+        nextAction: completion.nextAction,
+        evidence: completion.evidence,
+        completedAt: task.completedAt,
+        updatedAt: task.updatedAt,
+        href: dispatchHref(task),
+      };
+    })
+    .filter((item): item is NonNullable<typeof item> => Boolean(item))
+    .sort((left, right) => (
+      new Date(right.completedAt ?? right.updatedAt).getTime() - new Date(left.completedAt ?? left.updatedAt).getTime()
+    ))[0] ?? null;
+
   return {
     anchorId: "ai-pipeline-recovery",
     visible: total > 0,
@@ -3734,6 +3772,16 @@ export function buildGateAiPipelineRecoveryPanel(_tasks: PersistedGatePlatformDi
       href: dispatchHref(fallbackPrimaryGroup?.topTask),
       detail: fallbackPrimaryGroup?.detail ?? "查看 AI 写审改复检派单。",
     },
+    latestEvidence: latestEvidence ? {
+      dispatchKey: latestEvidence.dispatchKey,
+      label: latestEvidence.label,
+      kind: latestEvidence.kind,
+      outcome: latestEvidence.outcome,
+      nextAction: latestEvidence.nextAction,
+      evidence: latestEvidence.evidence,
+      completedAt: latestEvidence.completedAt,
+      href: latestEvidence.href,
+    } : null,
     groups: groups.map((group) => ({
       id: group.id,
       label: group.label,

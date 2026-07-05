@@ -53,6 +53,16 @@ function aiRecoveryTone(status: ReturnType<typeof buildGateAiPipelineRecoveryPan
   return "border-slate-200 bg-white text-slate-700";
 }
 
+function shortDateTime(value: string | null) {
+  if (!value) return "未记录时间";
+  return new Intl.DateTimeFormat("zh-CN", {
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(value));
+}
+
 export default async function GatePage({
   searchParams,
 }: {
@@ -311,6 +321,22 @@ export default async function GatePage({
             <div className="rounded-md bg-white/70 px-3 py-2">复验 {aiRecoveryPanel.summary.sample}</div>
             <div className="rounded-md bg-white/70 px-3 py-2">小批 {aiRecoveryPanel.summary.smallBatch}</div>
           </div>
+          {aiRecoveryPanel.latestEvidence ? (
+            <Link className="mt-3 block rounded-md border border-white/70 bg-white/80 p-3 text-sm hover:bg-white" href={aiRecoveryPanel.latestEvidence.href}>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="font-medium">{aiRecoveryPanel.latestEvidence.label}</div>
+                <span className="rounded-md bg-slate-50 px-2 py-1 text-xs text-slate-700">
+                  {shortDateTime(aiRecoveryPanel.latestEvidence.completedAt)}
+                </span>
+              </div>
+              <p className="mt-1 text-xs leading-5 opacity-75">下一步：{aiRecoveryPanel.latestEvidence.nextAction || "待补恢复结论"}</p>
+              <div className="mt-2 grid gap-1 text-xs leading-5">
+                {aiRecoveryPanel.latestEvidence.evidence.slice(0, 3).map((line) => (
+                  <div className="rounded-md bg-white px-2 py-1" key={line}>{line}</div>
+                ))}
+              </div>
+            </Link>
+          ) : null}
           <div className="mt-3 grid gap-2 lg:grid-cols-3">
             {aiRecoveryPanel.groups.map((group) => (
               <Link className="rounded-md border border-white/70 bg-white/70 p-3 text-sm hover:bg-white" href={group.actionHref} key={group.id}>

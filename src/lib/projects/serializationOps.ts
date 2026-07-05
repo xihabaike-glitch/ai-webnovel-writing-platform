@@ -96,6 +96,13 @@ export interface SerializationPublishSnapshot {
   createdAt: Date | string;
 }
 
+export interface SerializationWorldEntry {
+  id?: string;
+  type: string;
+  title: string;
+  content: string;
+}
+
 export interface SerializationPublishBaselineStatus {
   exists: boolean;
   id: string | null;
@@ -193,6 +200,7 @@ export interface SerializationOpsInput {
   publishSnapshots?: SerializationPublishSnapshot[];
   publishEffect?: PlatformPublishEffectSummary | null;
   effectOptimization?: PlatformPublishEffectOptimization | null;
+  worldEntries?: SerializationWorldEntry[];
 }
 
 export interface SerializationAction {
@@ -389,13 +397,21 @@ function publishEffectLabel(status: SerializationPublishEffectStatus["status"]) 
   return "待判断";
 }
 
-function publishEffectActionLabel(execution: string) {
+function requiresFirstChapterSample(worldEntries: SerializationWorldEntry[] | undefined) {
+  const startTactic = (worldEntries ?? []).find((item) => (
+    item.type === "platform_soil" && item.title.startsWith("首轮平台打法：")
+  ));
+  if (!startTactic) return false;
+  return /恢复放量|恢复打法|小样本|不直接批量生成前三章/u.test(startTactic.content);
+}
+
+function publishEffectActionLabel(execution: string, firstChapterSample = false) {
   if (execution === "generate_asset_variants") return "生成候选";
-  if (execution === "rewrite_first_three") return "重写前三章";
+  if (execution === "rewrite_first_three") return firstChapterSample ? "重写首章小样本" : "重写前三章";
   return "去处理";
 }
 
-function publishEffectExecution(input: Pick<SerializationOpsInput, "project" | "platform">, execution: string): SerializationActionExecution | null {
+function publishEffectExecution(input: Pick<SerializationOpsInput, "project" | "platform" | "worldEntries">, execution: string): SerializationActionExecution | null {
   if (execution === "generate_asset_variants") {
     return {
       label: "生成候选",
@@ -405,19 +421,21 @@ function publishEffectExecution(input: Pick<SerializationOpsInput, "project" | "
     };
   }
   if (execution === "rewrite_first_three") {
+    const firstChapterSample = requiresFirstChapterSample(input.worldEntries);
     return {
-      label: "重写前三章",
+      label: firstChapterSample ? "重写首章小样本" : "重写前三章",
       method: "POST",
       endpoint: `/api/projects/${input.project.id ?? "current"}/first-three-rewrite/generate`,
-      payload: { platformId: input.platform.id, chapterOrders: [1, 2, 3], targetWords: 1600 },
+      payload: { platformId: input.platform.id, chapterOrders: firstChapterSample ? [1] : [1, 2, 3], targetWords: 1600 },
     };
   }
   return null;
 }
 
-export function buildSerializationPublishEffectStatus(input: Pick<SerializationOpsInput, "project" | "platform" | "publishEffect" | "effectOptimization">): SerializationPublishEffectStatus {
+export function buildSerializationPublishEffectStatus(input: Pick<SerializationOpsInput, "project" | "platform" | "publishEffect" | "effectOptimization" | "worldEntries">): SerializationPublishEffectStatus {
   const effect = input.publishEffect ?? null;
   const optimization = input.effectOptimization ?? null;
+  const firstChapterSample = requiresFirstChapterSample(input.worldEntries);
 
   if (!effect) {
     return {
@@ -447,7 +465,7 @@ export function buildSerializationPublishEffectStatus(input: Pick<SerializationO
     detail: action.detail,
     evidence: action.evidence,
     href: action.href,
-    actionLabel: publishEffectActionLabel(action.execution),
+    actionLabel: publishEffectActionLabel(action.execution, firstChapterSample),
     execution: publishEffectExecution(input, action.execution),
   }));
 

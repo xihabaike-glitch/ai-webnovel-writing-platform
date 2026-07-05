@@ -1534,6 +1534,7 @@ export function buildProjectControlDashboard(input: ProjectControlDashboardInput
     chapters: input.chapters,
     aiTasks: input.aiTasks,
     submissionChecklist: input.submissionChecklist,
+    worldEntries: input.worldEntries,
   });
   const platformExport = buildPlatformPublishExportCenter({
     project: input.project,

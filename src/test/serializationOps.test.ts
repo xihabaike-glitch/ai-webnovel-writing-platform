@@ -150,6 +150,26 @@ function urgentEffectOptimization() {
   };
 }
 
+function rewriteFirstThreeOptimization() {
+  return {
+    status: "urgent_rework" as const,
+    headline: "开头承诺没接住，先别继续铺量。",
+    actions: [
+      {
+        id: "fanqie-rewrite-first-three",
+        priority: "high" as const,
+        area: "opening" as const,
+        execution: "rewrite_first_three" as const,
+        label: "重写前三章兑现",
+        detail: "收藏和追读太弱，先重写前三章的开头承诺和连续兑现。",
+        evidence: "追读 0.3%，低于番茄首轮线。",
+        target: "前三章",
+        href: "#first-three-rewrite",
+      },
+    ],
+  };
+}
+
 test("buildSerializationOpsDashboard", async (t) => {
   await t.test("prioritizes review for drafted unreviewed chapters", () => {
     const dashboard = buildSerializationOpsDashboard({
@@ -559,6 +579,75 @@ test("buildSerializationOpsDashboard", async (t) => {
     assert.equal(optimizeAction?.execution?.label, "生成候选");
     assert.equal(optimizeAction?.execution?.endpoint, "/api/projects/project-1/platform-export/asset-optimize");
     assert.ok(dashboard.warnings.some((warning) => warning.includes("发布效果偏弱")));
+  });
+
+  await t.test("keeps recovered publish rewrite actions in first-chapter sample mode", () => {
+    const dashboard = buildSerializationOpsDashboard({
+      project: { ...project, id: "project-1" },
+      platform,
+      chapters: [],
+      aiTasks: [],
+      submissionChecklist: { ...checklist, readinessPercent: 90, items: [] },
+      submissionAssets: [
+        {
+          platformId: "fanqie",
+          platformName: "番茄小说",
+          title: "夜雨系统",
+          logline: "雨夜倒计时降临，主角在救人与逃跑之间连续选择，用系统奖励一步步翻盘。",
+          synopsis: "林晚在雨夜觉醒系统，每次选择都会让危机升级。他必须在救人、逃跑和揭开规则真相之间做决定，借连续任务翻盘。第一卷围绕系统倒计时、城市危机和隐藏对手展开，让主角用爽点明确的选择一步步逆袭，并把每次奖励都变成新的追读悬念。",
+          overseasSynopsis: "Lin Wan awakens a system in the rain and survives escalating choices.",
+          tags: ["都市系统", "爽文", "危机"],
+          note: "",
+          source: "ai_variant",
+          updatedAt: "2026-01-02T00:00:00.000Z",
+        },
+      ],
+      finalGate: {
+        status: "ready_to_submit",
+        label: "可投",
+        headline: "番茄小说 发布门槛已过，可以保存基准后投。",
+        verdict: "标题、简介、前三章、字数、审稿和投稿资产都过了投前线。",
+        nextAction: "保存发布包版本基准，然后下载或复制发布包。",
+        score: 100,
+        blockers: [],
+        items: [],
+      },
+      publishSnapshots: [
+        {
+          id: "snapshot-1",
+          platformId: "fanqie",
+          platformName: "番茄小说",
+          title: "夜雨系统",
+          action: "snapshot",
+          chapterCount: 3,
+          wordCount: 9600,
+          preflightScore: 96,
+          canExport: true,
+          createdAt: "2026-01-03T00:00:00.000Z",
+        },
+      ],
+      publishEffect: weakPublishEffect(),
+      effectOptimization: rewriteFirstThreeOptimization(),
+      worldEntries: [
+        {
+          id: "w-recovery-tactic",
+          type: "platform_soil",
+          title: "首轮平台打法：番茄小说",
+          content: [
+            "状态：恢复放量打法",
+            "打法：上一轮恢复放量已过线，但新项目不能复制成功结论。",
+            "验证动作：恢复放量打法只能作为参考，新项目先小样本复验成功率、质量分和失败样本。",
+            "风险：新项目仍先跑小样本，不直接批量生成前三章。",
+          ].join("\n"),
+        },
+      ],
+    });
+
+    assert.equal(dashboard.publishEffectStatus.actions[0].actionLabel, "重写首章小样本");
+    assert.deepEqual(dashboard.publishEffectStatus.actions[0].execution?.payload.chapterOrders, [1]);
+    const optimizeAction = dashboard.actions.find((action) => action.id === "optimize-publish-effect");
+    assert.equal(optimizeAction?.execution?.label, "重写首章小样本");
+    assert.deepEqual(optimizeAction?.execution?.payload.chapterOrders, [1]);
   });
 
   await t.test("requires second-pass recheck before publish readiness", () => {

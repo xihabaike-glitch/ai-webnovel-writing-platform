@@ -35,6 +35,7 @@ export async function GET(_request: Request, { params }: Params) {
       submissionAssets: { orderBy: { updatedAt: "desc" } },
       submissionAssetVersions: { orderBy: { createdAt: "desc" }, take: 80 },
       platformPublishMetrics: { orderBy: { snapshotDate: "desc" }, take: 80 },
+      worldEntries: { orderBy: [{ type: "asc" }, { createdAt: "asc" }] },
     },
   });
 
@@ -138,6 +139,7 @@ export async function GET(_request: Request, { params }: Params) {
     finalGate: targetPackage?.finalGate ?? null,
     publishEffect: targetPackage?.publishEffect ?? null,
     effectOptimization: targetPackage?.effectOptimization ?? null,
+    worldEntries: project.worldEntries,
     publishSnapshots: project.publishSnapshots.map((snapshot) => ({
       id: snapshot.id,
       platformId: snapshot.platformId,

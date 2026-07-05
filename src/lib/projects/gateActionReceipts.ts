@@ -6884,6 +6884,31 @@ function completedRecoveryFollowupFromTimeline(events: GatePlatformDecisionTimel
   };
 }
 
+function aiPipelineCompletionTaskFromTimelineEvent(event: GatePlatformDecisionTimelineEvent): GateDispatchCompletionTemplateTask | null {
+  if (!event.id.startsWith("task:ai-pipeline-recheck:") || event.label !== "派单完成") return null;
+  const eventText = `${event.id} ${event.detail} ${event.evidence.join(" ")}`;
+  return {
+    stage: /:scale\b/u.test(event.id) ? "ai_pipeline_small_batch" : "ai_pipeline_sample_recheck",
+    title: eventText,
+    actionLabel: eventText,
+    platformName: "AI 写审改",
+    evidence: event.evidence,
+  };
+}
+
+function completedAiPipelineRecoveryFromTimeline(events: GatePlatformDecisionTimelineEvent[]) {
+  const completedEvents = events
+    .filter((event) => aiPipelineCompletionTaskFromTimelineEvent(event))
+    .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime());
+  for (const event of completedEvents) {
+    const task = aiPipelineCompletionTaskFromTimelineEvent(event);
+    const completion = task ? parseAiPipelineRecoveryCompletionEvidence(task, event.detail) : null;
+    if (!completion) continue;
+    return { event, completion };
+  }
+  return null;
+}
+
 export function buildGatePlatformTacticExperienceLibrary(
   timeline: GatePlatformDecisionTimeline,
   limit = 6,
@@ -6894,6 +6919,7 @@ export function buildGatePlatformTacticExperienceLibrary(
     const completedRecheckReview = completedRecheckReviewFromTimeline(item);
     const completedFirstDayHandoff = completedFirstDayHandoffFromTimeline(item.events);
     const completedRecoveryFollowup = completedRecoveryFollowupFromTimeline(item.events);
+    const completedAiPipelineRecovery = completedAiPipelineRecoveryFromTimeline(item.events);
     const evidenceLoopRecheck = evidenceLoopRecheckFromTimeline(item);
     const dispatchCompletionEvent = item.events.find((event) => event.id.startsWith("dispatch-completion-receipt:")) ?? null;
     const reusableEffectEvent = latestReusablePublishEffectEvent(item.events, dispatchCompletionEvent);
@@ -6957,6 +6983,38 @@ export function buildGatePlatformTacticExperienceLibrary(
           `复盘结论：${completedRecheckReview.conclusion}`,
           ...base.evidence,
         ].slice(0, 4),
+      };
+    }
+
+    if (completedAiPipelineRecovery) {
+      const { event, completion } = completedAiPipelineRecovery;
+      const blocked = completion.outcome === "blocked";
+      const kindLabel = completion.kind === "rollback_repair"
+        ? "回滚修复"
+        : completion.kind === "small_batch_resume"
+          ? "恢复小批"
+          : "小样本复验";
+      return {
+        ...base,
+        status: blocked ? "blocked" : "watch",
+        label: blocked ? "避坑样本" : "观察样本",
+        tactic: blocked ? "恢复放量避坑" : "恢复放量观察",
+        lesson: blocked
+          ? `${item.platformName} ${kindLabel}完成后仍要求暂停或回滚，说明当前恢复节奏不能继续放大。`
+          : `${item.platformName} ${kindLabel}已经完成并给出继续恢复信号，但单次恢复闭环只能进入观察，不能写成稳定打法。`,
+        reuseHint: blocked
+          ? "同类项目先暂停迁移这条 AI 写审改恢复节奏，修低分章节、开头钩子和章末追读后再跑 1 章小样本。"
+          : "继续观察恢复小批，不要把一次完成依据误判为可复用放量结论；下一轮还要看成功率、质量、成本和失败样本。",
+        risk: completion.nextAction || (blocked ? "暂停恢复小批。" : "缺少连续稳定样本前，不允许扩大恢复放量批次。"),
+        sourceLabel: blocked ? "AI 恢复避坑" : "AI 恢复观察",
+        href: event.href,
+        evidence: [
+          `AI 写审改恢复闭环：${blocked ? "暂停" : "继续观察"}`,
+          `恢复阶段：${kindLabel}`,
+          ...completion.evidence,
+          completion.nextAction ? `下一步：${completion.nextAction}` : null,
+          ...base.evidence,
+        ].filter((line): line is string => Boolean(line)).slice(0, 5),
       };
     }
 

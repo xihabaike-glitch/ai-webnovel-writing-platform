@@ -4289,6 +4289,102 @@ test("buildGateActionReceipt", async (t) => {
     assert.ok(blockedExperience?.risk.includes("暂停"));
   });
 
+  await t.test("feeds completed AI pipeline recovery closeouts into tactic experience", () => {
+    function aiRecoveryTask(input: {
+      dispatchKey: string;
+      stage: "ai_pipeline_sample_recheck" | "ai_pipeline_small_batch";
+      title: string;
+      actionLabel: string;
+      completionEvidence: string;
+      completedAt: string;
+      evidence?: string[];
+    }): PersistedGatePlatformDispatchTask {
+      return {
+        id: input.dispatchKey,
+        databaseId: `dispatch-db-${input.dispatchKey}`,
+        dispatchKey: input.dispatchKey,
+        projectId: "project-1",
+        sourceReceiptId: "receipt-1",
+        platformId: "ai-pipeline",
+        platformName: "AI 写审改",
+        stage: input.stage,
+        state: "completed",
+        priorityScore: 94,
+        ownerRole: "写作制片 / 审稿负责人",
+        title: input.title,
+        detail: "复检后恢复链路派单。",
+        dueLabel: "今天",
+        actionLabel: input.actionLabel,
+        href: "/projects/project-1#ai-pipeline",
+        acceptanceCriteria: ["恢复链路完成依据已写清。"],
+        evidence: input.evidence ?? ["来源清单：receipt-1"],
+        completionEvidence: input.completionEvidence,
+        reviewLatestAt: input.completedAt,
+        assignedAt: "2026-01-01T00:00:00.000Z",
+        completedAt: input.completedAt,
+        createdAt: "2026-01-01T00:00:00.000Z",
+        updatedAt: input.completedAt,
+      };
+    }
+
+    const passTimeline = buildGatePlatformDecisionTimeline({
+      receipts: [],
+      tasks: [
+        aiRecoveryTask({
+          dispatchKey: "ai-pipeline-recheck:project-1:receipt-1:scale",
+          stage: "ai_pipeline_small_batch",
+          title: "AI 写审改：回推荐批量队列",
+          actionLabel: "回推荐批量",
+          completionEvidence: [
+            "AI 写审改：回推荐批量队列",
+            "小批范围：第 2-3 章",
+            "成功率：100%",
+            "平均质量：88",
+            "失败/成本：无失败，成本正常",
+            "下一步节奏：继续恢复小批",
+          ].join("\n"),
+          completedAt: "2026-01-01T01:00:00.000Z",
+        }),
+      ],
+      limit: 10,
+    });
+    const blockedTimeline = buildGatePlatformDecisionTimeline({
+      receipts: [],
+      tasks: [
+        aiRecoveryTask({
+          dispatchKey: "ai-pipeline-recheck:project-1:receipt-1:rollback",
+          stage: "ai_pipeline_sample_recheck",
+          title: "AI 写审改：恢复小批跌线修复",
+          actionLabel: "回滚观察修复",
+          evidence: ["回滚原因：恢复小批跌破 85 分复盘线或缺少质量证据。"],
+          completionEvidence: [
+            "AI 写审改：恢复小批跌线修复",
+            "修复对象：第 2 章",
+            "跌线原因：质量 82，钩子弱",
+            "修复动作：重写前三段和章末追读",
+            "复验结论：重新跑 1 章小样本",
+            "下一步：暂停恢复小批",
+          ].join("\n"),
+          completedAt: "2026-01-01T02:00:00.000Z",
+        }),
+      ],
+      limit: 10,
+    });
+
+    const passExperience = buildGatePlatformTacticExperienceLibrary(passTimeline, 10).items[0];
+    const blockedExperience = buildGatePlatformTacticExperienceLibrary(blockedTimeline, 10).items[0];
+
+    assert.equal(passExperience?.platformId, "ai-pipeline");
+    assert.equal(passExperience?.status, "watch");
+    assert.equal(passExperience?.tactic, "恢复放量观察");
+    assert.ok(passExperience?.evidence.some((line) => line.includes("小批范围：第 2-3 章")));
+    assert.ok(passExperience?.reuseHint.includes("继续观察"));
+    assert.equal(blockedExperience?.status, "blocked");
+    assert.equal(blockedExperience?.tactic, "恢复放量避坑");
+    assert.ok(blockedExperience?.risk.includes("暂停恢复小批"));
+    assert.ok(blockedExperience?.evidence.some((line) => line.includes("跌线原因：质量 82")));
+  });
+
   await t.test("builds display badges for recovery scale tactic experience cards", () => {
     const base = {
       platformId: "fanqie",

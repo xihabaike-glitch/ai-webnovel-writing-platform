@@ -526,6 +526,7 @@ export interface GateDispatchEvidenceReviewItem {
   status: GateDispatchEvidenceReviewStatus;
   label: string;
   detail: string;
+  actionLabel: string;
   href: string;
   completionEvidence: string;
   completedAt: string | null;
@@ -3631,6 +3632,17 @@ export function buildGateDispatchEvidenceReview(
 ): GateDispatchEvidenceReview {
   const operationalReceipts = trimGateActionReceipts(receipts, 100)
     .filter((receipt) => !isAuditMetaReceipt(receipt));
+  const reviewAction = (
+    task: PersistedGatePlatformDispatchTask,
+    status: Exclude<GateDispatchEvidenceReviewStatus, "verified">,
+  ) => {
+    if (status === "active") return task.actionLabel || "继续处理";
+    if (status === "missing_evidence") return "补完成依据";
+    if (task.stage === "start_metrics_recovery") return "回填发布效果";
+    if (task.stage === "start_publish_finalize" || task.stage === "start_platform_package") return "复检发布包";
+    if (task.stage === "start_repair_packaging" || task.stage === "repair_tactic") return "生成修复回执";
+    return "生成业务回执";
+  };
   const items = tasks.map((task): GateDispatchEvidenceReviewItem => {
     const completionEvidence = task.completionEvidence.trim();
     const completedAt = validDate(task.completedAt) ?? validDate(task.updatedAt);
@@ -3648,6 +3660,7 @@ export function buildGateDispatchEvidenceReview(
         status: "active",
         label: "未完成",
         detail: "先把派单推进到完成，再用依据和业务回执验收。",
+        actionLabel: reviewAction(task, "active"),
         href: task.href,
         completionEvidence,
         completedAt: task.completedAt,
@@ -3669,7 +3682,8 @@ export function buildGateDispatchEvidenceReview(
         status: "missing_evidence",
         label: "缺完成依据",
         detail: "状态已经完成，但没有写清楚完成了什么、证据在哪里。这个完成不能算数。",
-        href: task.href,
+        actionLabel: reviewAction(task, "missing_evidence"),
+        href: "/dispatch",
         completionEvidence,
         completedAt: task.completedAt,
         latestReceiptAt: null,
@@ -3697,6 +3711,7 @@ export function buildGateDispatchEvidenceReview(
         status: "verified",
         label: "真闭环",
         detail: "完成依据之后，已经看到同平台新的成功业务回执。",
+        actionLabel: "查看证据链",
         href: task.href,
         completionEvidence,
         completedAt: task.completedAt,
@@ -3717,6 +3732,7 @@ export function buildGateDispatchEvidenceReview(
       status: "needs_receipt",
       label: "待业务回执",
       detail: "已经有完成依据，但还没看到后续业务回执。刷新总闸门或执行对应动作，证明它真的闭环。",
+      actionLabel: reviewAction(task, "needs_receipt"),
       href: task.href,
       completionEvidence,
       completedAt: task.completedAt,

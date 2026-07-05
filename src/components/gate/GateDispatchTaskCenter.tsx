@@ -1040,6 +1040,7 @@ export function GateDispatchTaskCenter({
                   <span>{item.platformName}</span>
                   <span>{item.ownerRole}</span>
                   <span>优先级 {item.priorityScore}</span>
+                  <span>下一步 {item.actionLabel}</span>
                 </div>
               </Link>
             ))}

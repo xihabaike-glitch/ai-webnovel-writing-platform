@@ -743,9 +743,9 @@ export function GateActionWorkspace({
                   <div className="mt-3 flex flex-wrap items-center gap-2">
                     <Link
                       className="rounded-md bg-white px-3 py-2 text-xs font-medium text-slate-950"
-                      href={item.status === "active" ? item.href : "/dispatch"}
+                      href={item.href}
                     >
-                      {item.status === "active" ? "打开处理入口" : "补齐证据"}
+                      {item.actionLabel}
                     </Link>
                     {item.status === "needs_receipt" ? (
                       <button

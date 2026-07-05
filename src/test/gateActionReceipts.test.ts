@@ -3738,6 +3738,7 @@ test("buildGateActionReceipt", async (t) => {
       completionEvidence: "已完成数据整理，等待闸门回执。",
       platformId: "qimao",
       platformName: "七猫小说",
+      stage: "start_metrics_recovery" as const,
       state: "completed" as const,
       priorityScore: 55,
       assignedAt: "2026-01-01T00:30:00.000Z",
@@ -3809,7 +3810,11 @@ test("buildGateActionReceipt", async (t) => {
     assert.equal(review.summary.active, 1);
     assert.equal(review.items[0].status, "missing_evidence");
     assert.equal(review.items.find((item) => item.dispatchKey === verifiedTask.dispatchKey)?.status, "verified");
+    assert.equal(review.items.find((item) => item.dispatchKey === verifiedTask.dispatchKey)?.actionLabel, "查看证据链");
     assert.equal(review.items.find((item) => item.dispatchKey === needsReceiptTask.dispatchKey)?.status, "needs_receipt");
+    assert.equal(review.items.find((item) => item.dispatchKey === needsReceiptTask.dispatchKey)?.actionLabel, "回填发布效果");
+    assert.equal(review.items.find((item) => item.dispatchKey === missingEvidenceTask.dispatchKey)?.actionLabel, "补完成依据");
+    assert.equal(review.items.find((item) => item.dispatchKey === activeTask.dispatchKey)?.actionLabel, activeTask.actionLabel);
     assert.ok(review.nextActions.some((actionText) => actionText.includes("后续业务回执")));
   });
 

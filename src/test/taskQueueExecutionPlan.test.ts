@@ -125,6 +125,9 @@ test("buildTaskQueueExecutionPlan", async (t) => {
 
     assert.equal(plan.scaleGate, "cleared");
     assert.deepEqual(plan.chapterIds, ["chapter-1", "chapter-2"]);
+    assert.equal(plan.batchModeLabel, "复检通过恢复批");
+    assert.equal(plan.batchModeTone, "recovery");
+    assert.ok(plan.batchModeDetail.includes("谨慎恢复"));
     assert.ok(plan.warnings.some((warning) => warning.includes("恢复放量")));
   });
 

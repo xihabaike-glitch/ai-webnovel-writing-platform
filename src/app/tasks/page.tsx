@@ -64,6 +64,12 @@ function scaleGateLabel(scaleGate: QueueItem["scaleGate"]) {
   return "标准批次";
 }
 
+function executionBatchModeClass(tone: "standard" | "sample" | "recovery") {
+  if (tone === "recovery") return "border-emerald-200 bg-emerald-50 text-emerald-800";
+  if (tone === "sample") return "border-amber-200 bg-amber-50 text-amber-800";
+  return "border-slate-200 bg-white text-slate-700";
+}
+
 function runStatusClass(status: string) {
   if (status === "succeeded") return "bg-emerald-50 text-emerald-700";
   if (status === "failed") return "bg-rose-50 text-rose-700";
@@ -835,8 +841,16 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
           </div>
         </div>
         <div className="mt-4 rounded-md border border-slate-200 bg-slate-50 p-3 text-sm">
-          <div className="font-medium text-slate-950">{executionPlan.actionLabel}</div>
-          <p className="mt-1 leading-6 text-slate-600">{executionPlan.detail}</p>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <div className="font-medium text-slate-950">{executionPlan.actionLabel}</div>
+              <p className="mt-1 leading-6 text-slate-600">{executionPlan.detail}</p>
+            </div>
+            <div className={`w-fit rounded-md border px-2 py-1 text-xs font-medium ${executionBatchModeClass(executionPlan.batchModeTone)}`}>
+              {executionPlan.batchModeLabel}
+            </div>
+          </div>
+          <p className="mt-2 text-xs leading-5 text-slate-600">{executionPlan.batchModeDetail}</p>
           {executionPlan.strategyBases.length ? (
             <div className="mt-3 grid gap-2 lg:grid-cols-2">
               {executionPlan.strategyBases.map((basis) => (

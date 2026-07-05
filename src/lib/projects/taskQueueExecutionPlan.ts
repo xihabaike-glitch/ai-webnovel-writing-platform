@@ -18,6 +18,9 @@ export interface TaskQueueExecutionPlan {
   adoptionFollowupItemIds: string[];
   actionLabel: string;
   detail: string;
+  batchModeLabel: string;
+  batchModeTone: "standard" | "sample" | "recovery";
+  batchModeDetail: string;
   warnings: string[];
 }
 
@@ -56,6 +59,28 @@ function scaleWarningFromStrategyBases(strategyBases: NonNullable<QueueItem["str
   return null;
 }
 
+function batchModeFromScaleGate(scaleGate: QueueScaleGate) {
+  if (scaleGate === "cleared") {
+    return {
+      batchModeLabel: "复检通过恢复批",
+      batchModeTone: "recovery" as const,
+      batchModeDetail: "小样本复检已过线，本批是谨慎恢复，不是普通放量；执行后继续回收质量、失败和成本证据。",
+    };
+  }
+  if (scaleGate === "sample_only") {
+    return {
+      batchModeLabel: "观察小样本",
+      batchModeTone: "sample" as const,
+      batchModeDetail: "当前仍在观察闸门内，本批只跑 1 个样本，验收证据过线后再决定是否恢复。",
+    };
+  }
+  return {
+    batchModeLabel: "标准推荐批次",
+    batchModeTone: "standard" as const,
+    batchModeDetail: "按当前队列优先级生成推荐小批次，执行后回流总闸门复盘质量、成本和失败项。",
+  };
+}
+
 export function buildTaskQueueExecutionPlan(
   queueItems: QueueItem[],
   maxBatchSize = defaultBatchExecutionStrategy.maxBatchSize,
@@ -79,6 +104,9 @@ export function buildTaskQueueExecutionPlan(
       adoptionFollowupItemIds: [],
       actionLabel: "暂无可执行批次",
       detail: "当前队列没有可直接运行的初稿、审稿或二改任务。",
+      batchModeLabel: "暂无批次",
+      batchModeTone: "standard",
+      batchModeDetail: "当前没有可执行的小批次，先补章节卡、处理阻塞或回项目生成任务。",
       warnings: ["先补章节卡、处理发布阻塞，或进入项目生成新的可执行任务。"],
     };
   }
@@ -101,6 +129,7 @@ export function buildTaskQueueExecutionPlan(
         .map((basis) => [basis.title, basis]),
     ).values(),
   ];
+  const batchMode = batchModeFromScaleGate(first.scaleGate);
 
   return {
     canRun: batch.length > 0,
@@ -116,6 +145,7 @@ export function buildTaskQueueExecutionPlan(
     adoptionFollowupItemIds,
     actionLabel: `${categoryActionLabel(first.category)} ${batch.length} 个`,
     detail: `${projectTitles.join("、")} · ${first.label} · ${batch.map((item) => item.chapterTitle).join("、")}`,
+    ...batchMode,
     warnings: [
       adoptionFollowupCount > 0 ? adoptionFollowupBatchWarning(adoptionFollowupCount) : null,
       scaleWarningFromStrategyBases(strategyBases),

@@ -3321,6 +3321,33 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
                         </div>
                         <div className="mt-1 font-medium">{step.label}</div>
                         {step.chapterTitle ? <div className="mt-1 line-clamp-1 text-xs text-slate-500">{step.chapterTitle}</div> : null}
+                        <div className="mt-2">
+                          {canRunAction(step) ? (
+                            <button
+                              className={`rounded-md px-2 py-1 text-xs font-medium disabled:opacity-50 ${
+                                step.status === "active"
+                                  ? "bg-slate-950 text-white"
+                                  : "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                              }`}
+                              disabled={Boolean(runningActionId)}
+                              onClick={() => void runRepairAction(step)}
+                              type="button"
+                            >
+                              {runningActionId === step.id ? "处理中" : step.status === "active" ? "立即处理" : "处理此步"}
+                            </button>
+                          ) : (
+                            <Link
+                              className={`inline-flex rounded-md px-2 py-1 text-xs font-medium ${
+                                step.status === "active"
+                                  ? "bg-slate-950 text-white"
+                                  : "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                              }`}
+                              href={actionHref(projectId, step)}
+                            >
+                              {step.status === "active" ? "打开处理" : "打开位置"}
+                            </Link>
+                          )}
+                        </div>
                       </div>
                     ))}
                   </div>

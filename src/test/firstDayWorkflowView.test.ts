@@ -663,6 +663,39 @@ test("buildFirstDayDispatchUpdateSummary explains risk recovery handoff", () => 
   assert.ok(summary.badges.includes("转入观察小样本"));
 });
 
+test("buildFirstDayDispatchUpdateSummary promotes executable AI follow-up", () => {
+  const summary = buildFirstDayDispatchUpdateSummary({
+    task: {
+      dispatchKey: "first-day:project-1:first-draft",
+      state: "completed",
+      title: "夜雨系统 · 生成第一章正文",
+      completionEvidence: "第一章初稿已完成，钩子、冲突和章节末追读点都有落地证据。",
+      href: "/projects/project-1/chapters/chapter-1",
+    },
+    followUpTasks: [
+      {
+        dispatchKey: "first-day:project-1:first-review",
+        projectId: "project-1",
+        title: "夜雨系统 · 首轮审稿",
+        actionLabel: "去审稿",
+        href: "/projects/project-1/chapters/chapter-1",
+        dueLabel: "今天审完",
+        state: "assigned",
+      },
+    ],
+    executionPlan: {
+      executable: true,
+    },
+  });
+
+  assert.equal(summary.visible, true);
+  assert.equal(summary.status, "advanced");
+  assert.equal(summary.actionLabel, "继续 AI 执行");
+  assert.equal(summary.href, "/projects/project-1?firstDayLaunch=1&nextStep=first-review#first-day-workflow");
+  assert.ok(summary.detail.includes("下一张首日卡是「第一章审稿」"));
+  assert.ok(summary.badges.includes("AI 可继续"));
+});
+
 test("buildFirstDayDispatchUpdateSummary explains watch sample scale-up status", () => {
   const cleared = buildFirstDayDispatchUpdateSummary({
     task: {

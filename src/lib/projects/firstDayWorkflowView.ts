@@ -155,6 +155,11 @@ export interface FirstDayDispatchUpdateSummary {
   badges: string[];
 }
 
+export interface FirstDayDispatchUpdateExecutionPlan {
+  executable: boolean;
+  blockedReason?: string;
+}
+
 export type FirstDayWorkflowMessageAction = "execute_current_step" | "complete_current_dispatch" | "open_next_step";
 
 export interface FirstDayPostDispatchCompletionPrompt {
@@ -805,6 +810,7 @@ export function resolveFirstDayDispatchFocus(
 export function buildFirstDayDispatchUpdateSummary(input: {
   task: Pick<PersistedGatePlatformDispatchTask, "dispatchKey" | "state" | "title" | "completionEvidence" | "href">;
   followUpTasks?: Array<Pick<PersistedGatePlatformDispatchTask, "dispatchKey" | "projectId" | "title" | "actionLabel" | "href" | "dueLabel" | "state">>;
+  executionPlan?: FirstDayDispatchUpdateExecutionPlan | null;
 }): FirstDayDispatchUpdateSummary {
   if (isFirstDayHandoffDispatchTask(input.task) && input.task.state === "completed") {
     const handoffStepId = firstDayHandoffStepId(input.task.dispatchKey);
@@ -843,6 +849,10 @@ export function buildFirstDayDispatchUpdateSummary(input: {
   const firstDayFollowUp = input.followUpTasks?.find(isFirstDayDispatchTask) ?? null;
   const followUpStepId = firstDayFollowUp ? firstDayStepId(firstDayFollowUp.dispatchKey) : "";
   const followUpStepLabel = followUpStepId ? firstDayStepLabel(followUpStepId) : "";
+  const followUpHref = firstDayFollowUp ? firstDayHref(firstDayFollowUp as PersistedGatePlatformDispatchTask, followUpStepId) : "";
+  const aiExecutableFollowUp = firstDayFollowUp
+    && completedStepId !== "risk-recovery"
+    && (input.executionPlan?.executable ?? ["story-support", "first-draft", "first-review", "first-rewrite"].includes(followUpStepId));
 
   if (completedStepId === "risk-recovery") {
     return {
@@ -852,13 +862,14 @@ export function buildFirstDayDispatchUpdateSummary(input: {
       detail: firstDayFollowUp
         ? `恢复验证已验收，下一张首日卡是「${followUpStepLabel}」。先跑小样本，通过线和复查证据没过之前不要放量。`
         : "恢复验证已验收。请刷新首日工作流，确认下一步是否进入小样本生成。",
-      actionLabel: firstDayFollowUp?.actionLabel || "回作品看恢复观察",
-      href: firstDayFollowUp ? firstDayHref(firstDayFollowUp as PersistedGatePlatformDispatchTask, followUpStepId) : input.task.href,
+      actionLabel: aiExecutableFollowUp ? "继续 AI 执行" : firstDayFollowUp?.actionLabel || "回作品看恢复观察",
+      href: firstDayFollowUp ? followUpHref : input.task.href,
       badges: [
         "已完成恢复条件",
         "转入观察小样本",
         firstDayFollowUp?.dueLabel ?? "今天小样本验证",
-      ],
+        aiExecutableFollowUp ? "AI 可继续" : null,
+      ].filter(Boolean) as string[],
     };
   }
 
@@ -885,9 +896,14 @@ export function buildFirstDayDispatchUpdateSummary(input: {
       status: "advanced",
       title: "首日节点已推进",
       detail: `「${completedStepLabel}」已验收，下一张首日卡是「${followUpStepLabel}」。先完成当前节点，再考虑批量扩大。`,
-      actionLabel: firstDayFollowUp.actionLabel,
-      href: firstDayHref(firstDayFollowUp as PersistedGatePlatformDispatchTask, followUpStepId),
-      badges: [completedStepLabel, followUpStepLabel, firstDayFollowUp.dueLabel],
+      actionLabel: aiExecutableFollowUp ? "继续 AI 执行" : firstDayFollowUp.actionLabel,
+      href: followUpHref,
+      badges: [
+        completedStepLabel,
+        followUpStepLabel,
+        firstDayFollowUp.dueLabel,
+        aiExecutableFollowUp ? "AI 可继续" : null,
+      ].filter(Boolean) as string[],
     };
   }
 

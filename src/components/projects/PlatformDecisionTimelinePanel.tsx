@@ -1,6 +1,11 @@
+"use client";
+
 import Link from "next/link";
+import { useState } from "react";
+import { buildGatePlatformDecisionSummaryMarkdown } from "@/lib/projects/gateActionReceipts";
 import type {
   GatePlatformDecisionTimeline,
+  GatePlatformDecisionTimelineItem,
   GatePlatformDecisionTimelineEventType,
   GatePlatformDecisionTimelineStatus,
 } from "@/lib/projects/gateActionReceipts";
@@ -27,13 +32,36 @@ function timeText(value: string) {
   return Number.isNaN(date.getTime()) ? "未记录时间" : date.toLocaleString("zh-CN");
 }
 
+function summaryFileName(item: GatePlatformDecisionTimelineItem) {
+  return `${item.platformName.replace(/[\\/:*?"<>|]/g, "-")}-平台决策复盘.md`;
+}
+
 export function PlatformDecisionTimelinePanel({ timeline }: { timeline: GatePlatformDecisionTimeline }) {
+  const [message, setMessage] = useState("");
   const summaryItems = [
     { label: "平台轨迹", value: timeline.summary.total, className: "bg-slate-50 text-slate-700" },
     { label: "阻塞", value: timeline.summary.blocked, className: "bg-rose-50 text-rose-700" },
     { label: "待复测", value: timeline.summary.needsEffect, className: "bg-amber-50 text-amber-700" },
     { label: "恢复中", value: timeline.summary.recovering, className: "bg-emerald-50 text-emerald-700" },
   ];
+
+  async function copyDecisionSummary(item: GatePlatformDecisionTimelineItem) {
+    const markdown = buildGatePlatformDecisionSummaryMarkdown(item);
+    await navigator.clipboard.writeText(markdown);
+    setMessage(`${item.platformName} 复盘摘要已复制。`);
+  }
+
+  function downloadDecisionSummary(item: GatePlatformDecisionTimelineItem) {
+    const markdown = buildGatePlatformDecisionSummaryMarkdown(item);
+    const blob = new Blob([markdown], { type: "text/markdown;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = summaryFileName(item);
+    link.click();
+    URL.revokeObjectURL(url);
+    setMessage(`${item.platformName} 复盘摘要已下载。`);
+  }
 
   return (
     <section className="rounded-md border border-slate-200 bg-white p-4" id="platform-decision-timeline">
@@ -64,6 +92,9 @@ export function PlatformDecisionTimelinePanel({ timeline }: { timeline: GatePlat
             <div className="rounded-md bg-slate-50 p-3 text-sm leading-6 text-slate-600" key={action}>{action}</div>
           ))}
         </div>
+      ) : null}
+      {message ? (
+        <p className="mt-4 rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">{message}</p>
       ) : null}
 
       {timeline.items.length ? (
@@ -100,6 +131,22 @@ export function PlatformDecisionTimelinePanel({ timeline }: { timeline: GatePlat
                     ) : null}
                   </Link>
                 ))}
+              </div>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button
+                  className="rounded-md border border-white/70 bg-white px-3 py-2 text-xs font-medium text-slate-950 hover:bg-white/80"
+                  onClick={() => void copyDecisionSummary(item)}
+                  type="button"
+                >
+                  复制复盘摘要
+                </button>
+                <button
+                  className="rounded-md border border-white/70 bg-white/70 px-3 py-2 text-xs font-medium text-slate-950 hover:bg-white"
+                  onClick={() => downloadDecisionSummary(item)}
+                  type="button"
+                >
+                  下载复盘摘要
+                </button>
               </div>
             </div>
           ))}

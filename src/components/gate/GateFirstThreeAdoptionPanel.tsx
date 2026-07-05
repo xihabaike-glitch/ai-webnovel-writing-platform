@@ -370,21 +370,42 @@ export function GateFirstThreeAdoptionPanel({ closure }: { closure: PrePublishGa
             </span>
           </div>
           <div className="mt-3 grid gap-2 lg:grid-cols-2">
-            {visibleRepairQueue.map((item) => (
-              <Link
-                className={`rounded-md border p-3 transition hover:-translate-y-0.5 hover:shadow-sm ${repairTone(item.status)}`}
-                href={item.href}
-                key={item.id}
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <span className="font-medium">{item.label} · {item.projectTitle}</span>
-                  <span className="text-xs">P{item.priorityScore}</span>
+            {visibleRepairQueue.map((item) => {
+              const followupItem = itemsById.get(item.followupItemId) ?? null;
+              const itemResult = followupResults[item.followupItemId] ?? null;
+              const label = followupItem ? executeLabel(followupItem) : null;
+              return (
+                <div
+                  className={`rounded-md border p-3 ${itemResult ? followupResultTone(itemResult) : repairTone(item.status)}`}
+                  key={item.id}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-medium">{item.label} · {item.projectTitle}</span>
+                    <span className="text-xs">P{item.priorityScore}</span>
+                  </div>
+                  <div className="mt-1 text-xs font-medium opacity-90">{item.title}</div>
+                  <p className="mt-2 line-clamp-2 text-xs leading-5 opacity-80">
+                    {itemResult?.message ?? item.detail}
+                  </p>
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    {followupItem && label && itemResult?.status !== "succeeded" ? (
+                      <button
+                        className="rounded-md bg-white px-3 py-2 text-xs font-medium text-slate-950 disabled:opacity-50"
+                        disabled={runningId !== null}
+                        onClick={() => void runFollowup(followupItem)}
+                        type="button"
+                      >
+                        {runningId === followupItem.id ? "处理中" : label}
+                      </button>
+                    ) : null}
+                    <Link className="rounded-md border border-white/80 bg-white/70 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-white" href={item.href}>
+                      打开位置
+                    </Link>
+                    <span className="text-xs font-medium opacity-80">{itemResult ? followupResultText(itemResult) : item.actionLabel}</span>
+                  </div>
                 </div>
-                <div className="mt-1 text-xs font-medium opacity-90">{item.title}</div>
-                <p className="mt-2 line-clamp-2 text-xs leading-5 opacity-80">{item.detail}</p>
-                <div className="mt-3 text-xs font-medium">{item.actionLabel}</div>
-              </Link>
-            ))}
+              );
+            })}
           </div>
         </div>
       ) : null}

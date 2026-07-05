@@ -344,7 +344,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ projec
   const exportSnapshots = buildExportSnapshotHistory(project.exportPackageSnapshots.map((snapshot) => ({
     ...snapshot,
     createdAt: snapshot.createdAt.toISOString(),
-  })), 8);
+  })), 24);
   const continuityAudit = buildContinuityAudit({
     chapters: project.chapters.map((chapter) => ({
       id: chapter.id,

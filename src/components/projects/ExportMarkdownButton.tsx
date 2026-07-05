@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { ExportMarkdownMode, ExportPackageReadiness } from "@/lib/export/markdown";
+import { buildExportSnapshotFilterOptions, filterExportSnapshots, type ExportSnapshotFilterId } from "@/lib/export/snapshotFilters";
 import type { ExportPackageSnapshotView } from "@/lib/export/snapshots";
 
 type ExportFormat = "markdown" | "docx";
@@ -39,8 +40,13 @@ export function ExportMarkdownButton({
 }) {
   const [exporting, setExporting] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [filterId, setFilterId] = useState<ExportSnapshotFilterId>("all");
   const [message, setMessage] = useState<string | null>(null);
   const openItems = readiness.items.filter((item) => item.status !== "pass").slice(0, 4);
+  const filterOptions = buildExportSnapshotFilterOptions(snapshots);
+  const visibleSnapshots = filterId === "all"
+    ? snapshots.slice(0, 8)
+    : filterExportSnapshots(snapshots, filterId);
 
   function modeSuffix(mode: ExportMarkdownMode) {
     return mode === "outline" ? "大纲包" : mode === "characters" ? "人物伏笔包" : "完整资料包";
@@ -243,10 +249,27 @@ export function ExportMarkdownButton({
         <div className="rounded-md border border-slate-200 bg-white p-3">
           <div className="flex items-center justify-between gap-3">
             <div className="text-sm font-medium text-slate-950">最近导出快照</div>
-            <div className="text-xs text-slate-500">{snapshots.length} 条</div>
+            <div className="text-xs text-slate-500">{visibleSnapshots.length}/{snapshots.length} 条</div>
+          </div>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {filterOptions.map((option) => (
+              <button
+                className={`rounded-md border px-2.5 py-1.5 text-xs font-medium ${
+                  filterId === option.id
+                    ? "border-slate-900 bg-slate-950 text-white"
+                    : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                }`}
+                disabled={option.count === 0}
+                key={option.id}
+                onClick={() => setFilterId(option.id)}
+                type="button"
+              >
+                {option.label} {option.count}
+              </button>
+            ))}
           </div>
           <div className="mt-3 grid gap-2">
-            {snapshots.map((snapshot) => (
+            {visibleSnapshots.length ? visibleSnapshots.map((snapshot) => (
               <div className="rounded-md bg-slate-50 p-2 text-xs leading-5 text-slate-600" key={snapshot.id}>
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <span className="font-medium text-slate-950">{snapshot.packageKindLabel} · {snapshot.formatLabel}</span>
@@ -282,7 +305,9 @@ export function ExportMarkdownButton({
                   {exporting === `snapshot:${snapshot.id}` ? "生成中" : "重新生成"}
                 </button>
               </div>
-            ))}
+            )) : (
+              <div className="rounded-md bg-slate-50 p-3 text-xs text-slate-600">这个筛选下暂时没有导出快照。</div>
+            )}
           </div>
         </div>
       ) : (

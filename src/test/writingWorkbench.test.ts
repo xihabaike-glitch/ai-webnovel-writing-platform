@@ -171,6 +171,14 @@ test("buildWritingWorkbench", async (t) => {
     assert.ok(workbench.modelActions.some((action) => action.kind === "opening_diagnostic" && action.method === "GET"));
     assert.ok(workbench.modelActions.some((action) => action.kind === "chapter_draft" && action.endpoint === "/api/ai/tasks/chapter-draft"));
     assert.ok(workbench.modelActions.some((action) => action.kind === "chapter_review" && action.payload.chapterId === "c1"));
+    assert.ok(workbench.modelActions.some((action) => (
+      action.kind === "first_three_rewrite"
+      && action.endpoint === "/api/projects/p1/first-three-rewrite/generate"
+      && action.disabledReason?.includes("前三章")
+    )));
+    assert.equal(workbench.startSoil.status, "fail");
+    assert.equal(workbench.startSoil.assets.length, 7);
+    assert.ok(workbench.startSoil.assets.some((asset) => asset.id === "opening-hook" && asset.status === "fail"));
     assert.equal(workbench.modelTimeline.totalRuns, 2);
     assert.equal(workbench.modelTimeline.items[0].id, "task2");
     assert.ok(workbench.modelTimeline.items[0].summary.includes("节奏合格"));
@@ -240,7 +248,9 @@ test("buildWritingWorkbench", async (t) => {
       && fix.payload.notes.includes("废脉少年")
     )));
     assert.ok(!workbench.quickFixes.some((fix) => fix.kind === "world_seed"));
-    assert.ok(workbench.modelActions.every((action) => action.disabledReason?.includes("先创建第一章")));
+    assert.ok(workbench.modelActions.every((action) => action.disabledReason));
+    assert.ok(workbench.modelActions.some((action) => action.disabledReason?.includes("先创建第一章")));
+    assert.ok(workbench.modelActions.some((action) => action.disabledReason?.includes("先创建前三章")));
     assert.ok(workbench.contextFocus.summary.includes("设定 1"));
     assert.ok(workbench.contextFocus.recallCards.some((card) => (
       card.id === "history"
@@ -343,6 +353,53 @@ test("buildWritingWorkbench", async (t) => {
 
     assert.equal(adoptedWorkbench.pendingCandidates.length, 0);
     assert.notEqual(adoptedWorkbench.heroAction.label, "处理候选稿");
+  });
+
+  await t.test("surfaces project start soil and enables first-three generation", () => {
+    const workbench = buildWritingWorkbench({
+      project: {
+        id: "p-soil",
+        title: "夜雨系统",
+        genre: "都市系统",
+        sellingPoint: "雨夜危机中觉醒系统。",
+        targetPlatformName: "番茄小说",
+        targetWordCount: 300000,
+        currentWordCount: 5400,
+      },
+      chapters: [1, 2, 3].map((order) => ({
+        id: `soil-c${order}`,
+        title: `第 ${order} 章`,
+        order,
+        status: "draft",
+        wordCount: 1800,
+        hook: `第 ${order} 章开头危机`,
+        conflict: `第 ${order} 章选择冲突`,
+        cliffhanger: `第 ${order} 章章末追读`,
+      })),
+      outlineNodes: [],
+      characters: [],
+      worldEntries: [
+        { id: "w-tactic", type: "platform_soil", title: "首轮平台打法：番茄小说", content: "状态：历史可复用\n打法：首章先给不可逆危机。" },
+        { id: "w-hook", type: "platform_soil", title: "开局钩子土壤：番茄小说", content: "平台：番茄小说\n首屏承诺：第一屏给危机。" },
+        { id: "w-three", type: "platform_soil", title: "前三章节奏土壤：番茄小说", content: "平台：番茄小说\n目标：前三章完成钩子、规则证明、第一次升级。" },
+        { id: "w-arc", type: "platform_soil", title: "人物弧光土壤：番茄小说", content: "平台：番茄小说\n主角：林晚（主角）" },
+        { id: "w-tree", type: "platform_soil", title: "大树结构土壤：番茄小说", content: "平台：番茄小说\n开头：雨夜倒计时。" },
+        { id: "w-avoid", type: "platform_soil", title: "平台避坑清单：番茄小说", content: "平台：番茄小说\n风险摘要：不要慢热。" },
+        { id: "w-model", type: "platform_soil", title: "模型分工土壤：番茄小说", content: "平台：番茄小说\n任务：正文初稿\n首选：DeepSeek" },
+      ],
+      aiTasks: [],
+    });
+
+    assert.equal(workbench.startSoil.status, "pass");
+    assert.ok(workbench.startSoil.summary.includes("开局土壤齐全"));
+    assert.equal(workbench.startSoil.assets.every((asset) => asset.status === "pass"), true);
+    assert.equal(workbench.startSoil.assets.find((asset) => asset.id === "model-route")?.detail, "任务：正文初稿");
+    assert.ok(workbench.quickLinks.some((link) => link.label === "开局土壤"));
+    assert.ok(workbench.quickLinks.some((link) => link.href === "/projects/p-soil#first-three-rewrite"));
+    const firstThreeAction = workbench.modelActions.find((action) => action.kind === "first_three_rewrite");
+    assert.equal(firstThreeAction?.disabledReason, null);
+    assert.deepEqual(firstThreeAction?.payload.chapterOrders, [1, 2, 3]);
+    assert.equal(firstThreeAction?.refreshHref, "/projects/p-soil#first-three-rewrite");
   });
 
   await t.test("explains failed timeline tasks that cannot be retried directly", () => {

@@ -98,6 +98,36 @@ export function WritingWorkbenchPanel({ workbench }: { workbench: WritingWorkben
         </div>
       ) : null}
 
+      <div className="mt-4 rounded-md border border-slate-200 bg-white p-3">
+        <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <div className="text-sm font-medium text-slate-950">开局土壤资产</div>
+            <p className="mt-1 text-xs text-slate-500">{workbench.startSoil.summary}</p>
+          </div>
+          <span className={`w-fit rounded-md border px-2 py-1 text-xs ${statusClass(workbench.startSoil.status)}`}>
+            {statusLabel(workbench.startSoil.status)}
+          </span>
+        </div>
+        <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-4">
+          {workbench.startSoil.assets.map((asset) => (
+            <Link
+              className="rounded-md bg-slate-50 p-3 hover:bg-slate-100"
+              href={asset.href}
+              key={asset.id}
+            >
+              <div className="flex items-center justify-between gap-2">
+                <div className="text-sm font-medium text-slate-950">{asset.label}</div>
+                <span className={`rounded-md border px-2 py-1 text-xs ${statusClass(asset.status)}`}>
+                  {statusLabel(asset.status)}
+                </span>
+              </div>
+              <div className="mt-2 line-clamp-1 text-sm font-medium text-slate-950">{asset.title}</div>
+              <p className="mt-1 line-clamp-2 text-xs leading-5 text-slate-600">{asset.detail}</p>
+            </Link>
+          ))}
+        </div>
+      </div>
+
       <WorkbenchQuickFixPanel quickFixes={workbench.quickFixes} />
       <WorkbenchModelActionPanel actions={workbench.modelActions} />
       <WorkbenchModelTimelinePanel timeline={workbench.modelTimeline} />

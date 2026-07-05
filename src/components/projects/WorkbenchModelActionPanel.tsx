@@ -47,7 +47,7 @@ export function WorkbenchModelActionPanel({ actions }: { actions: WritingWorkben
         {message ? <div className="text-sm text-slate-600">{message}</div> : null}
       </div>
 
-      <div className="mt-3 grid gap-3 md:grid-cols-3">
+      <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
         {actions.map((action) => (
           <div className="rounded-md border border-slate-200 bg-white p-3" key={action.id}>
             <div className="font-medium text-slate-950">{action.label}</div>

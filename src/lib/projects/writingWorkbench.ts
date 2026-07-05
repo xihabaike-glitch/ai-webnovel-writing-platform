@@ -146,6 +146,11 @@ export interface WritingWorkbench {
   modelActions: WritingWorkbenchModelAction[];
   modelTimeline: WritingWorkbenchModelTimeline;
   pendingCandidates: WritingWorkbenchPendingCandidate[];
+  startSoil: {
+    status: WorkbenchStatus;
+    summary: string;
+    assets: WritingWorkbenchStartSoilAsset[];
+  };
   quickLinks: Array<{
     label: string;
     href: string;
@@ -168,6 +173,15 @@ export interface WritingWorkbenchPendingCandidate {
   href: string;
 }
 
+export interface WritingWorkbenchStartSoilAsset {
+  id: string;
+  title: string;
+  label: string;
+  status: WorkbenchStatus;
+  detail: string;
+  href: string;
+}
+
 export interface WritingWorkbenchQuickFix {
   id: string;
   kind: "chapter_hook" | "chapter_card" | "character_seed" | "story_line_seed" | "foreshadow_seed" | "world_seed";
@@ -180,12 +194,12 @@ export interface WritingWorkbenchQuickFix {
 
 export interface WritingWorkbenchModelAction {
   id: string;
-  kind: "opening_diagnostic" | "chapter_draft" | "chapter_review";
+  kind: "opening_diagnostic" | "chapter_draft" | "chapter_review" | "first_three_rewrite";
   label: string;
   description: string;
   method: "GET" | "POST";
   endpoint: string;
-  payload: Record<string, string | number>;
+  payload: Record<string, string | number | number[]>;
   refreshHref: string;
   disabledReason: string | null;
 }
@@ -485,6 +499,46 @@ function buildPendingCandidates(input: WritingWorkbenchInput): WritingWorkbenchP
     .slice(0, 5);
 }
 
+const startSoilSpecs = [
+  { key: "start-tactic", prefix: "首轮平台打法：", label: "平台打法" },
+  { key: "opening-hook", prefix: "开局钩子土壤：", label: "开局钩子" },
+  { key: "first-three", prefix: "前三章节奏土壤：", label: "前三章节奏" },
+  { key: "character-arc", prefix: "人物弧光土壤：", label: "人物弧光" },
+  { key: "tree-structure", prefix: "大树结构土壤：", label: "大树结构" },
+  { key: "avoid-rules", prefix: "平台避坑清单：", label: "避坑清单" },
+  { key: "model-route", prefix: "模型分工土壤：", label: "模型分工" },
+] as const;
+
+function buildStartSoil(input: WritingWorkbenchInput): WritingWorkbench["startSoil"] {
+  const projectHref = `/projects/${input.project.id}`;
+  const assets = startSoilSpecs.map((spec): WritingWorkbenchStartSoilAsset => {
+    const entry = input.worldEntries.find((item) => item.type === "platform_soil" && item.title.startsWith(spec.prefix));
+    const detail = entry?.content.split(/\r?\n/).find((line) => line.trim() && !line.startsWith("平台：")) ?? "";
+    return {
+      id: spec.key,
+      title: entry?.title ?? `${spec.label}未生成`,
+      label: spec.label,
+      status: entry ? "pass" : "fail",
+      detail: entry
+        ? detail || entry.content.slice(0, 72)
+        : `缺少${spec.label}，创建或补种开局土壤后再进入首章生产。`,
+      href: entry ? `${projectHref}#world-bible` : `${projectHref}#start-decision`,
+    };
+  });
+  const ready = assets.filter((asset) => asset.status === "pass").length;
+  const status: WorkbenchStatus = ready === assets.length ? "pass" : ready > 0 ? "warn" : "fail";
+
+  return {
+    status,
+    summary: ready === assets.length
+      ? "开局土壤齐全，可以直接承接首章、前三章和模型分工。"
+      : ready > 0
+        ? `已具备 ${ready}/${assets.length} 个开局土壤，先补缺口再放大生成。`
+        : "还没有开局土壤资产，先补平台打法、钩子、前三章和避坑边界。",
+    assets,
+  };
+}
+
 function buildModelRoutes(input: WritingWorkbenchInput, nextChapter: WritingWorkbenchChapter | null) {
   const routes = [
     {
@@ -681,6 +735,11 @@ function buildModelActions(input: WritingWorkbenchInput, nextChapter: WritingWor
   const chapterNeedsCard = nextChapter
     ? !hasText(nextChapter.hook) || !hasText(nextChapter.conflict) || !hasText(nextChapter.cliffhanger)
     : false;
+  const firstThreeChapters = input.chapters.filter((chapter) => chapter.order >= 1 && chapter.order <= 3);
+  const firstThreeReady = firstThreeChapters.length >= 3;
+  const firstThreeNeedsCard = firstThreeChapters.some((chapter) => (
+    !hasText(chapter.hook) || !hasText(chapter.conflict) || !hasText(chapter.cliffhanger)
+  ));
 
   return [
     {
@@ -718,6 +777,24 @@ function buildModelActions(input: WritingWorkbenchInput, nextChapter: WritingWor
       payload: { chapterId },
       refreshHref: chapterHref,
       disabledReason: noChapterReason ?? (nextChapter && nextChapter.wordCount <= 0 ? "先生成或粘贴正文，再执行平台复审。" : null),
+    },
+    {
+      id: "first-three-rewrite",
+      kind: "first_three_rewrite",
+      label: "生成前三章",
+      description: "按开局土壤和平台经验重写前三章，产出可采纳候选稿。",
+      method: "POST",
+      endpoint: `/api/projects/${input.project.id}/first-three-rewrite/generate`,
+      payload: {
+        targetWords: input.project.targetPlatformName.includes("起点") ? 2600 : 1800,
+        chapterOrders: [1, 2, 3],
+      },
+      refreshHref: `/projects/${input.project.id}#first-three-rewrite`,
+      disabledReason: !firstThreeReady
+        ? "先创建前三章章节卡，再执行前三章生成。"
+        : firstThreeNeedsCard
+          ? "前三章仍缺钩子、冲突或章末悬念，先补章节卡。"
+          : null,
     },
   ];
 }
@@ -899,6 +976,7 @@ export function buildWritingWorkbench(input: WritingWorkbenchInput): WritingWork
   const characterScore = completeCharacters > 0 ? 14 : input.characters.length > 0 ? 7 : 0;
   const maturityScore = clampPercent(treeScore + chapterScore + hookScore + characterScore);
   const pendingCandidates = buildPendingCandidates(input);
+  const startSoil = buildStartSoil(input);
   const nextChapterCandidate = nextChapter
     ? pendingCandidates.find((candidate) => candidate.chapterId === nextChapter.id)
     : null;
@@ -949,8 +1027,11 @@ export function buildWritingWorkbench(input: WritingWorkbenchInput): WritingWork
     modelActions: buildModelActions(input, nextChapter),
     modelTimeline: buildModelTimeline(input.aiTasks),
     pendingCandidates,
+    startSoil,
     quickLinks: [
       ...(pendingCandidates[0] ? [{ label: "待采纳", href: pendingCandidates[0].href }] : []),
+      { label: "开局土壤", href: `/projects/${input.project.id}#world-bible` },
+      { label: "前三章", href: `/projects/${input.project.id}#first-three-rewrite` },
       { label: "大树结构", href: `/projects/${input.project.id}#outline-tree` },
       { label: "人物弧光", href: `/projects/${input.project.id}#character-arc` },
       { label: "项目土壤", href: `/projects/${input.project.id}#world-bible` },

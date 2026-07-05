@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { buildFirstDayExecutionRouteBlockMessage, type FirstDayExecutionRouteStatus } from "@/lib/model-gateway/firstDayExecutionRoute";
-import { buildFirstDayDispatchUpdateSummary, buildFirstDayExecutionRiskNotice, buildFirstDayExecutionSafetyBanner, buildFirstDayHandoffGateCta, buildFirstDayPostDispatchCompletionPrompt, buildFirstDayReceiptCompletionAction, buildFirstDayReceiptCompletionEvidence, buildFirstDayStepView, completeFirstDayDispatchStep } from "@/lib/projects/firstDayWorkflowView";
+import { buildFirstDayDispatchUpdateSummary, buildFirstDayExecutionRiskNotice, buildFirstDayExecutionSafetyBanner, buildFirstDayHandoffGateCta, buildFirstDayPostDispatchCompletionPrompt, buildFirstDayReceiptCompletionAction, buildFirstDayReceiptCompletionEvidence, buildFirstDayRouteRepairReturnNotice, buildFirstDayStepView, completeFirstDayDispatchStep } from "@/lib/projects/firstDayWorkflowView";
 import { persistGateDispatchTask, type GatePlatformGrowthDispatchItem, type PersistedGatePlatformDispatchTask } from "@/lib/projects/gateActionReceipts";
 
 interface FirstDayWorkflowStep {
@@ -173,17 +173,6 @@ function modelSettingsRepairHref(route: FirstDayModelRouteStatus, projectId: str
   const params = new URLSearchParams({ focus: "first-day-route", projectId });
   if (route.taskType) params.set("taskType", route.taskType);
   return `/settings/models?${params.toString()}`;
-}
-
-function refreshedRouteNotice(route: FirstDayModelRouteStatus): { message: string; action?: FirstDayMessageAction } {
-  const blockMessage = buildFirstDayExecutionRouteBlockMessage(route);
-  if (!blockMessage) {
-    return {
-      message: `已刷新首日模型路线：${route.taskLabel}路线就绪，可以继续执行当前节点。`,
-      action: "execute_current_step",
-    };
-  }
-  return { message: `已刷新首日模型路线：${blockMessage}` };
 }
 
 function continuationTone(status: FirstDayContinuationAction["status"]) {
@@ -386,7 +375,11 @@ export function FirstDayWorkflowPanel({ projectId }: { projectId: string }) {
       setContinuation(payload.continuation);
       setHandoffFollowupDispatches(payload.handoffFollowupDispatches ?? []);
       if (options?.fromRouteRepair) {
-        const notice = refreshedRouteNotice(payload.modelRoute);
+        const notice = buildFirstDayRouteRepairReturnNotice({
+          taskLabel: payload.modelRoute.taskLabel,
+          routeBlockMessage: buildFirstDayExecutionRouteBlockMessage(payload.modelRoute),
+          executionPlan: payload.executionPlan,
+        });
         showMessage(notice.message, notice.action);
       } else if (createdLaunch) {
         showMessage(

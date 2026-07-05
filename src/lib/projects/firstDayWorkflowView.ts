@@ -922,6 +922,29 @@ export function buildFirstDayPostDispatchCompletionPrompt(input: {
   };
 }
 
+export function buildFirstDayRouteRepairReturnNotice(input: {
+  taskLabel: string;
+  routeBlockMessage: string | null;
+  executionPlan: { executable: boolean; blockedReason?: string } | null;
+}): FirstDayPostDispatchCompletionPrompt {
+  if (input.routeBlockMessage) {
+    return {
+      message: `已刷新首日模型路线：${input.routeBlockMessage}`,
+    };
+  }
+
+  if (!input.executionPlan?.executable) {
+    return {
+      message: `已刷新首日模型路线：${input.taskLabel}路线就绪；但${input.executionPlan?.blockedReason ?? "当前首日节点暂不支持自动执行。"}`,
+    };
+  }
+
+  return {
+    message: `已刷新首日模型路线：${input.taskLabel}路线就绪，可以继续执行当前节点。`,
+    action: "execute_current_step",
+  };
+}
+
 export async function completeFirstDayDispatchStep(
   projectId: string,
   stepId: string,

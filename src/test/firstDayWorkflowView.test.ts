@@ -9,6 +9,7 @@ import {
   buildFirstDayExecutionSafetyBanner,
   buildFirstDayHandoffGateCta,
   buildFirstDayPostDispatchCompletionPrompt,
+  buildFirstDayRouteRepairReturnNotice,
   buildFirstDayReceiptCompletionAction,
   buildFirstDayReceiptCompletionEvidence,
   buildFirstDayStepView,
@@ -725,6 +726,38 @@ test("buildFirstDayPostDispatchCompletionPrompt offers direct AI continuation wh
   assert.equal(ready.action, "execute_current_step");
   assert.equal(manual.message, "首日工作流已收口：可以进入后续生产。");
   assert.equal(manual.action, undefined);
+});
+
+test("buildFirstDayRouteRepairReturnNotice only offers AI continuation when route and plan are executable", () => {
+  const ready = buildFirstDayRouteRepairReturnNotice({
+    taskLabel: "章节审稿",
+    routeBlockMessage: null,
+    executionPlan: {
+      executable: true,
+    },
+  });
+  const routeStillBlocked = buildFirstDayRouteRepairReturnNotice({
+    taskLabel: "正文初稿",
+    routeBlockMessage: "当前节点「正文初稿」仍在使用 Mock 兜底，不能直接 AI 执行。",
+    executionPlan: {
+      executable: true,
+    },
+  });
+  const planStillBlocked = buildFirstDayRouteRepairReturnNotice({
+    taskLabel: "人工确认",
+    routeBlockMessage: null,
+    executionPlan: {
+      executable: false,
+      blockedReason: "当前首日节点暂不支持自动执行。",
+    },
+  });
+
+  assert.equal(ready.message, "已刷新首日模型路线：章节审稿路线就绪，可以继续执行当前节点。");
+  assert.equal(ready.action, "execute_current_step");
+  assert.equal(routeStillBlocked.message, "已刷新首日模型路线：当前节点「正文初稿」仍在使用 Mock 兜底，不能直接 AI 执行。");
+  assert.equal(routeStillBlocked.action, undefined);
+  assert.equal(planStillBlocked.message, "已刷新首日模型路线：人工确认路线就绪；但当前首日节点暂不支持自动执行。");
+  assert.equal(planStillBlocked.action, undefined);
 });
 
 test("buildFirstDayDispatchCompletionTemplate covers first-day step types", () => {

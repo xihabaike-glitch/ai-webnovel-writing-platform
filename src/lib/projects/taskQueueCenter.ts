@@ -93,6 +93,11 @@ export interface QueueItem {
   actionLabel: string;
   href: string;
   priority: number;
+  effectAction?: {
+    platformId: string;
+    execution: "generate_asset_variants" | "rewrite_first_three" | "open_target";
+    actionId: string;
+  } | null;
 }
 
 export interface TaskQueueCenter {
@@ -518,6 +523,11 @@ export function buildTaskQueueCenter(projects: TaskQueueProject[]): TaskQueueCen
         scaleGate,
         actionLabel: "录入发布效果",
         href: `${projectHref}#publish-effect-panel`,
+        effectAction: {
+          platformId: platform.id,
+          execution: "open_target",
+          actionId: "collect-effect-data",
+        },
       }));
     } else if (firstDayGateCleared && targetPackage.canExport && targetPackage.publishEffect.records > 0 && primaryEffectAction) {
       queueItems.push(item({
@@ -535,6 +545,11 @@ export function buildTaskQueueCenter(projects: TaskQueueProject[]): TaskQueueCen
         scaleGate,
         actionLabel: effectActionLabel(primaryEffectAction.execution),
         href: `${projectHref}${primaryEffectAction.href}`,
+        effectAction: {
+          platformId: platform.id,
+          execution: primaryEffectAction.execution,
+          actionId: primaryEffectAction.id,
+        },
       }));
     }
 

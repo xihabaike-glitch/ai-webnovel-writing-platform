@@ -262,6 +262,8 @@ test("buildTaskQueueCenter", async (t) => {
     assert.equal(queue.recommendedNext?.category, "effect");
     assert.equal(queue.recommendedNext?.actionLabel, "录入发布效果");
     assert.equal(queue.recommendedNext?.href, "/projects/project-1#publish-effect-panel");
+    assert.equal(queue.recommendedNext?.effectAction?.execution, "open_target");
+    assert.equal(queue.recommendedNext?.effectAction?.platformId, "fanqie");
     assert.ok(queue.recommendedNext?.evidence.includes("发布包已经保存过基准"));
   });
 
@@ -289,6 +291,8 @@ test("buildTaskQueueCenter", async (t) => {
     assert.equal(queue.overview.effectReady, 1);
     assert.equal(queue.recommendedNext?.category, "effect");
     assert.equal(queue.recommendedNext?.actionLabel, "生成候选");
+    assert.equal(queue.recommendedNext?.effectAction?.execution, "generate_asset_variants");
+    assert.equal(queue.recommendedNext?.effectAction?.platformId, "fanqie");
     assert.ok(queue.recommendedNext?.evidence.includes("点击率"));
     assert.equal(queue.recommendedNext?.href, "/projects/project-1#submission-asset-editor");
   });

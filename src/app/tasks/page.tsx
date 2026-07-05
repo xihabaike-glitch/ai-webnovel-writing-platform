@@ -2,6 +2,7 @@ import Link from "next/link";
 import { AppShell } from "@/components/app-shell/AppShell";
 import { RetryTaskButton } from "@/components/tasks/RetryTaskButton";
 import { RunRecommendedBatchButton } from "@/components/tasks/RunRecommendedBatchButton";
+import { RunPublishEffectQueueActionButton } from "@/components/tasks/RunPublishEffectQueueActionButton";
 import { buildTaskBatchHistory } from "@/lib/ai/taskBatchHistory";
 import { buildTaskRunConsole, type TaskRunLog } from "@/lib/ai/taskRunConsole";
 import { prisma } from "@/lib/db/prisma";
@@ -826,9 +827,18 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
                   </div>
                 ) : null}
               </div>
-              <Link className="w-fit rounded-md border border-slate-200 px-3 py-2 text-sm font-medium hover:bg-slate-50" href={entry.href}>
-                {entry.actionLabel}
-              </Link>
+              {entry.category === "effect" && entry.effectAction ? (
+                <RunPublishEffectQueueActionButton
+                  action={entry.effectAction}
+                  actionLabel={entry.actionLabel}
+                  href={entry.href}
+                  projectId={entry.projectId}
+                />
+              ) : (
+                <Link className="w-fit rounded-md border border-slate-200 px-3 py-2 text-sm font-medium hover:bg-slate-50" href={entry.href}>
+                  {entry.actionLabel}
+                </Link>
+              )}
             </div>
           </div>
         ))}

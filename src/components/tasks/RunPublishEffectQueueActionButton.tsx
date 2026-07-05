@@ -1,0 +1,94 @@
+"use client";
+
+import { useRouter } from "next/navigation";
+import { useState } from "react";
+
+export interface PublishEffectQueueAction {
+  platformId: string;
+  execution: "generate_asset_variants" | "rewrite_first_three" | "open_target";
+  actionId: string;
+}
+
+function resultMessage(
+  action: PublishEffectQueueAction,
+  payload: { variants?: unknown[]; results?: unknown[] } | null,
+) {
+  if (action.execution === "generate_asset_variants") {
+    return `已生成 ${payload?.variants?.length ?? 0} 个投稿资产候选。`;
+  }
+  if (action.execution === "rewrite_first_three") {
+    return `已重写前三章，共 ${payload?.results?.length ?? 0} 章。`;
+  }
+  return "已打开处理位置。";
+}
+
+export function RunPublishEffectQueueActionButton({
+  projectId,
+  actionLabel,
+  href,
+  action,
+}: {
+  projectId: string;
+  actionLabel: string;
+  href: string;
+  action: PublishEffectQueueAction;
+}) {
+  const router = useRouter();
+  const [isRunning, setIsRunning] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+
+  async function runAction() {
+    if (action.execution === "open_target") {
+      router.push(href);
+      return;
+    }
+
+    setIsRunning(true);
+    setMessage(null);
+    try {
+      const response = action.execution === "generate_asset_variants"
+        ? await fetch(`/api/projects/${projectId}/platform-export/asset-optimize`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ platformId: action.platformId }),
+        })
+        : await fetch(`/api/projects/${projectId}/first-three-rewrite/generate`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ platformId: action.platformId, chapterOrders: [1, 2, 3], targetWords: 1600 }),
+        });
+      const payload = await response.json().catch(() => null) as {
+        variants?: unknown[];
+        results?: unknown[];
+        error?: string;
+      } | null;
+      if (!response.ok) {
+        throw new Error(payload?.error ?? "复盘动作执行失败。");
+      }
+      setMessage(`${resultMessage(action, payload)} 去结果页采纳或复查。`);
+      router.refresh();
+    } catch (caught) {
+      setMessage(caught instanceof Error ? caught.message : "复盘动作执行失败。");
+    } finally {
+      setIsRunning(false);
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-2 sm:items-end">
+      <button
+        className="w-fit rounded-md bg-slate-950 px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
+        disabled={isRunning}
+        onClick={() => void runAction()}
+        type="button"
+      >
+        {isRunning ? "执行中" : actionLabel}
+      </button>
+      {message ? (
+        <div className="max-w-xs text-right text-xs leading-5 text-slate-600">
+          {message} <a className="font-medium text-slate-950 underline" href={href}>打开结果</a>
+        </div>
+      ) : null}
+    </div>
+  );
+}

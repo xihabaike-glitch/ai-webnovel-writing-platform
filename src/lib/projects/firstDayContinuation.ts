@@ -19,6 +19,7 @@ function categoryAction(category: QueueItem["category"]) {
   if (category === "draft") return { label: "进入批量初稿", href: "#ai-pipeline" };
   if (category === "review") return { label: "进入批量审稿", href: "#ai-pipeline" };
   if (category === "second_pass") return { label: "进入批量二改", href: "#ai-pipeline" };
+  if (category === "effect") return { label: "处理发布复盘", href: "#platform-export" };
   if (category === "export") return { label: "进入平台导出", href: "#platform-export" };
   return { label: "处理阻塞", href: "" };
 }

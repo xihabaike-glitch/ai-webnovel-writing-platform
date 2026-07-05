@@ -214,7 +214,12 @@ test("buildPrePublishGate", async (t) => {
       "打开版本中心",
     ]);
     assert.ok(gate.projectStatuses[0].exportVersionGate.repairActions[0].href.endsWith("#export-history"));
+    assert.deepEqual(gate.projectStatuses[0].exportVersionGate.repairActions[0].execution, {
+      type: "regenerate_snapshot",
+      snapshotId: "latest-regressed",
+    });
     assert.ok(gate.projectStatuses[0].exportVersionGate.repairActions[1].href.endsWith("#export-baseline-timeline"));
+    assert.equal(gate.projectStatuses[0].exportVersionGate.repairActions[1].execution, null);
     assert.equal(gate.projectStatuses[0].href, "/projects/project-ready/exports");
     assert.equal(exportItem?.status, "block");
     assert.ok(exportItem?.detail.includes("回退风险"));
@@ -258,6 +263,10 @@ test("buildPrePublishGate", async (t) => {
     assert.equal(gate.projectStatuses[0].exportVersionGate.decisionStatus, "replace");
     assert.equal(gate.projectStatuses[0].exportVersionGate.repairActions[0].label, "替换为新基准");
     assert.ok(gate.projectStatuses[0].exportVersionGate.repairActions[0].href.endsWith("#export-baseline-decision"));
+    assert.deepEqual(gate.projectStatuses[0].exportVersionGate.repairActions[0].execution, {
+      type: "lock_baseline",
+      snapshotId: "latest-better",
+    });
     assert.equal(exportItem?.status, "warn");
   });
 

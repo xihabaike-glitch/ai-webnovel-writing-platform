@@ -197,7 +197,18 @@ export interface PrePublishGateExportVersionAction {
   detail: string;
   href: string;
   priority: "primary" | "secondary" | "danger";
+  execution: PrePublishGateExportVersionActionExecution | null;
 }
+
+export type PrePublishGateExportVersionActionExecution =
+  | {
+    type: "regenerate_snapshot";
+    snapshotId: string;
+  }
+  | {
+    type: "lock_baseline";
+    snapshotId: string;
+  };
 
 export interface PrePublishGateStrategyProject {
   projectId: string;
@@ -1067,12 +1078,14 @@ function buildExportVersionGate(project: PrePublishGateProject): PrePublishGateE
     detail: string,
     hash: string,
     priority: PrePublishGateExportVersionAction["priority"],
+    execution: PrePublishGateExportVersionActionExecution | null = null,
   ): PrePublishGateExportVersionAction => ({
     id,
     label,
     detail,
     href: actionHref(hash),
     priority,
+    execution,
   });
   const rawSnapshots = project.exportPackageSnapshots ?? [];
   if (rawSnapshots.length === 0) {
@@ -1106,7 +1119,14 @@ function buildExportVersionGate(project: PrePublishGateProject): PrePublishGateE
       snapshotCount: snapshots.length,
       decisionStatus: decision.status,
       repairActions: [
-        action("regenerate-latest", "重导最新包", "最新版本出现回退，先按当前内容重新导出同类交付包，再复查差异决策。", "#export-history", "primary"),
+        action(
+          "regenerate-latest",
+          "重导最新包",
+          "最新版本出现回退，先按当前内容重新导出同类交付包，再复查差异决策。",
+          "#export-history",
+          "primary",
+          versionCenter.latestSnapshot ? { type: "regenerate_snapshot", snapshotId: versionCenter.latestSnapshot.id } : null,
+        ),
         action("keep-old-baseline", "保留旧基准", "旧基准暂时继续作为发布锚点；修完正文或交付包后再替换。", "#export-baseline-timeline", "danger"),
         ...baseActions,
       ],
@@ -1116,12 +1136,26 @@ function buildExportVersionGate(project: PrePublishGateProject): PrePublishGateE
   if (decision.status === "needs_baseline" || decision.status === "replace" || decision.status === "observe") {
     const repairActions = decision.status === "needs_baseline"
       ? [
-        action("lock-recommended-baseline", "锁定推荐基准", "先锁定正式基准，否则后续版本替换没有参照物。", "#export-baseline-decision", "primary"),
+        action(
+          "lock-recommended-baseline",
+          "锁定推荐基准",
+          "先锁定正式基准，否则后续版本替换没有参照物。",
+          "#export-baseline-decision",
+          "primary",
+          decision.actionSnapshotId ? { type: "lock_baseline", snapshotId: decision.actionSnapshotId } : null,
+        ),
         ...baseActions,
       ]
       : decision.status === "replace"
         ? [
-          action("replace-baseline", "替换为新基准", "最新版本已经明显前进，进入版本中心确认后替换正式基准。", "#export-baseline-decision", "primary"),
+          action(
+            "replace-baseline",
+            "替换为新基准",
+            "最新版本已经明显前进，进入版本中心确认后替换正式基准。",
+            "#export-baseline-decision",
+            "primary",
+            decision.actionSnapshotId ? { type: "lock_baseline", snapshotId: decision.actionSnapshotId } : null,
+          ),
           action("review-diff", "先看差异", "替换前查看准备度、章节、字数和内容摘要变化。", "#export-baseline-comparison", "secondary"),
         ]
         : [

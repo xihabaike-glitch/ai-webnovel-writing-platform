@@ -64,6 +64,7 @@ function exportVersionActionTone(priority: PrePublishGateProjectStatus["exportVe
 export function GateExportPackagePanel({ packages }: { packages: PrePublishGateProjectStatus[] }) {
   const router = useRouter();
   const [runningId, setRunningId] = useState<string | null>(null);
+  const [exportActionRunningId, setExportActionRunningId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [effectPackageKey, setEffectPackageKey] = useState<string | null>(null);
   const [effectDraft, setEffectDraft] = useState<EffectDraft>(emptyEffectDraft);
@@ -126,6 +127,46 @@ export function GateExportPackagePanel({ packages }: { packages: PrePublishGateP
       setMessage(caught instanceof Error ? caught.message : "保存发布效果失败。");
     } finally {
       setRunningId(null);
+    }
+  }
+
+  async function runExportVersionAction(
+    item: PrePublishGateProjectStatus,
+    action: PrePublishGateProjectStatus["exportVersionGate"]["repairActions"][number],
+  ) {
+    if (!action.execution) return;
+    const actionKey = `${item.projectId}:${action.id}`;
+    setExportActionRunningId(actionKey);
+    setMessage(null);
+    try {
+      if (action.execution.type === "lock_baseline") {
+        const response = await fetch(`/api/export/snapshots/${action.execution.snapshotId}/baseline`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "lock" }),
+        });
+        const payload = (await response.json().catch(() => ({}))) as { message?: string; error?: string };
+        if (!response.ok) throw new Error(payload.error ?? "更新导出基准失败。");
+        setMessage(payload.message ?? "已更新导出基准。");
+        router.refresh();
+        return;
+      }
+
+      const response = await fetch(`/api/export/snapshots/${action.execution.snapshotId}/download`);
+      if (!response.ok) throw new Error("重导最新包失败。");
+      const content = await response.blob();
+      const url = URL.createObjectURL(content);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `${item.projectTitle}-导出重生成`;
+      link.click();
+      URL.revokeObjectURL(url);
+      setMessage(`${item.projectTitle} 已按导出快照重新生成。`);
+      router.refresh();
+    } catch (caught) {
+      setMessage(caught instanceof Error ? caught.message : "导出版本动作执行失败。");
+    } finally {
+      setExportActionRunningId(null);
     }
   }
 
@@ -248,14 +289,27 @@ export function GateExportPackagePanel({ packages }: { packages: PrePublishGateP
                 {item.exportVersionGate.repairActions.length ? (
                   <div className="mt-3 grid gap-2 md:grid-cols-3">
                     {item.exportVersionGate.repairActions.map((action) => (
-                      <Link
-                        className={`rounded-md border px-3 py-2 text-xs font-medium ${exportVersionActionTone(action.priority)}`}
-                        href={action.href}
-                        key={action.id}
-                      >
-                        <div>{action.label}</div>
-                        <div className="mt-1 font-normal opacity-80">{action.detail}</div>
-                      </Link>
+                      action.execution ? (
+                        <button
+                          className={`rounded-md border px-3 py-2 text-left text-xs font-medium disabled:opacity-50 ${exportVersionActionTone(action.priority)}`}
+                          disabled={exportActionRunningId !== null}
+                          key={action.id}
+                          onClick={() => void runExportVersionAction(item, action)}
+                          type="button"
+                        >
+                          <div>{exportActionRunningId === `${item.projectId}:${action.id}` ? "处理中" : action.label}</div>
+                          <div className="mt-1 font-normal opacity-80">{action.detail}</div>
+                        </button>
+                      ) : (
+                        <Link
+                          className={`rounded-md border px-3 py-2 text-xs font-medium ${exportVersionActionTone(action.priority)}`}
+                          href={action.href}
+                          key={action.id}
+                        >
+                          <div>{action.label}</div>
+                          <div className="mt-1 font-normal opacity-80">{action.detail}</div>
+                        </Link>
+                      )
                     ))}
                   </div>
                 ) : null}

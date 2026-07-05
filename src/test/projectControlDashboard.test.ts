@@ -88,6 +88,10 @@ test("buildProjectControlDashboard", async (t) => {
     assert.equal(dashboard.platformEvidenceLoop.status, "empty");
     assert.equal(dashboard.platformEvidenceLoop.score, 0);
     assert.equal(dashboard.platformEvidenceLoop.actionLabel, "启动证据闭环");
+    assert.equal(dashboard.aiPipelineBatch.category, "second_pass");
+    assert.equal(dashboard.aiPipelineBatch.canRun, true);
+    assert.equal(dashboard.aiPipelineBatch.targetHref, "/tasks#recommended-batch");
+    assert.ok(dashboard.aiPipelineBatch.actionLabel.includes("批量二改"));
     assert.equal(dashboard.storyFoundation.status, "blocked");
     assert.equal(dashboard.storyFoundation.label, "先搭底座");
     assert.equal(dashboard.storyFoundation.axes.length, 5);
@@ -380,6 +384,39 @@ test("buildProjectControlDashboard", async (t) => {
     assert.equal(dashboard.storyFoundation.canExecute, true);
     assert.ok(dashboard.storyFoundation.actionLabel.includes("章节叶片"));
     assert.equal(dashboard.priorityActions.find((action) => action.areaId === "production")?.executeLabel, "生成章节卡");
+  });
+
+  await t.test("summarizes draft batches when cards are ready and no review work exists", () => {
+    const dashboard = buildProjectControlDashboard({
+      project,
+      platform: getPlatformProfile("fanqie"),
+      chapters: [
+        {
+          ...chapter,
+          id: "chapter-ready-draft",
+          wordCount: 0,
+          content: "",
+          status: "outline",
+          goal: "让主角被系统逼进不可逆选择。",
+          hook: "系统倒计时只剩十秒。",
+          conflict: "主角必须在逃跑和救人之间选择。",
+          valueShift: "平静生活转向失控危机。",
+          cliffhanger: "系统刷新第二个任务。",
+        },
+      ],
+      outlineNodes: [],
+      characters: [],
+      worldEntries: [],
+      foreshadows: [],
+      plotThreads: [],
+      aiTasks: [],
+      submissionChecklist: checklist,
+    });
+
+    assert.equal(dashboard.aiPipelineBatch.category, "draft");
+    assert.equal(dashboard.aiPipelineBatch.chapterIds[0], "chapter-ready-draft");
+    assert.ok(dashboard.aiPipelineBatch.headline.includes("小批生成正文"));
+    assert.ok(dashboard.areas.find((area) => area.id === "ai-pipeline")?.nextAction.includes("章节卡已过线"));
   });
 
   await t.test("pauses project starts when the stored tactic is a historical avoidance signal", () => {

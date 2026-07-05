@@ -218,6 +218,7 @@ export interface ProjectControlDashboard {
   startTactic: ProjectStartTacticSummary | null;
   startDecision: ProjectStartDecision;
   storyFoundation: StoryFoundationSummary;
+  aiPipelineBatch: AiPipelineBatchSummary;
   areas: ControlArea[];
   priorityActions: ControlPriorityAction[];
   criticalActions: string[];
@@ -285,6 +286,18 @@ export interface ProjectStartDecision {
   actionLabel: string;
   targetAnchor: string;
   evidence: string[];
+}
+
+export interface AiPipelineBatchSummary {
+  canRun: boolean;
+  category: "review" | "second_pass" | "draft" | null;
+  actionLabel: string;
+  headline: string;
+  detail: string;
+  chapterIds: string[];
+  chapterTitles: string[];
+  targetHref: string;
+  warnings: string[];
 }
 
 function platformVerdictAction(
@@ -545,6 +558,77 @@ function buildProjectStartDecision(startTactic: ProjectStartTacticSummary | null
     actionLabel: "跑首轮验证",
     targetAnchor: "ai-pipeline",
     evidence,
+  };
+}
+
+function buildAiPipelineBatchSummary(
+  batchDraft: ReturnType<typeof buildBatchDraftQueue>,
+  reviewPipeline: ReturnType<typeof buildReviewPipelineQueue>,
+): AiPipelineBatchSummary {
+  if (reviewPipeline.recommendedReviewChapterIds.length > 0) {
+    const chapterIds = reviewPipeline.recommendedReviewChapterIds;
+    const titles = reviewPipeline.candidates
+      .filter((candidate) => chapterIds.includes(candidate.chapterId))
+      .map((candidate) => candidate.title);
+    return {
+      canRun: true,
+      category: "review",
+      actionLabel: `批量审稿 ${chapterIds.length} 章`,
+      headline: "先审稿，别急着继续堆正文。",
+      detail: `待审：${titles.join("、")}`,
+      chapterIds,
+      chapterTitles: titles,
+      targetHref: "/tasks#recommended-batch",
+      warnings: reviewPipeline.warnings.slice(0, 2),
+    };
+  }
+
+  if (reviewPipeline.recommendedSecondPassChapterIds.length > 0) {
+    const chapterIds = reviewPipeline.recommendedSecondPassChapterIds;
+    const titles = reviewPipeline.candidates
+      .filter((candidate) => chapterIds.includes(candidate.chapterId))
+      .map((candidate) => candidate.title);
+    return {
+      canRun: true,
+      category: "second_pass",
+      actionLabel: `批量二改 ${chapterIds.length} 章`,
+      headline: "先二改，把已暴露的问题改掉。",
+      detail: `待二改：${titles.join("、")}`,
+      chapterIds,
+      chapterTitles: titles,
+      targetHref: "/tasks#recommended-batch",
+      warnings: reviewPipeline.warnings.slice(0, 2),
+    };
+  }
+
+  if (batchDraft.recommendedChapterIds.length > 0) {
+    const chapterIds = batchDraft.recommendedChapterIds;
+    const titles = batchDraft.candidates
+      .filter((candidate) => chapterIds.includes(candidate.chapterId))
+      .map((candidate) => candidate.title);
+    return {
+      canRun: true,
+      category: "draft",
+      actionLabel: `批量初稿 ${chapterIds.length} 章`,
+      headline: "章节卡已过线，可以小批生成正文。",
+      detail: `待初稿：${titles.join("、")}`,
+      chapterIds,
+      chapterTitles: titles,
+      targetHref: "/tasks#recommended-batch",
+      warnings: batchDraft.warnings.slice(0, 2),
+    };
+  }
+
+  return {
+    canRun: false,
+    category: null,
+    actionLabel: "暂无推荐批次",
+    headline: "AI 写审改还没有可直接执行的推荐批次。",
+    detail: "先补章节卡、生成正文，或处理正在运行和已卡住的任务。",
+    chapterIds: [],
+    chapterTitles: [],
+    targetHref: "/tasks#recommended-batch",
+    warnings: [...batchDraft.warnings, ...reviewPipeline.warnings].slice(0, 2),
   };
 }
 
@@ -881,6 +965,7 @@ export function buildProjectControlDashboard(input: ProjectControlDashboardInput
       input.chapters.length * 3,
     ) * 100
     : 0;
+  const aiPipelineBatch = buildAiPipelineBatchSummary(batchDraft, reviewPipeline);
 
   const areas = [
     area("outline", "大纲骨架", outline, `${input.outlineNodes.length} 个大纲节点。`, "补齐开头、结尾、主干、分支、叶片和土壤。", "补大纲骨架", "outline-tree", true, "生成骨架"),
@@ -888,7 +973,7 @@ export function buildProjectControlDashboard(input: ProjectControlDashboardInput
     area("world", "世界观资料", ratio(worldDashboard.completeEntries, Math.max(worldDashboard.totalEntries, 3)) * 100, `${worldDashboard.completeEntries}/${worldDashboard.totalEntries} 条设定完整。`, worldDashboard.nextActions[0], "补世界观", "world-bible", true, "补设定卡", true, "AI 生成设定"),
     area("story-lines", "伏笔主线", ratio(storyLineDashboard.foreshadowReady + storyLineDashboard.threadResolved, Math.max(storyLineDashboard.foreshadowTotal + storyLineDashboard.threadTotal, 2)) * 100, `${storyLineDashboard.foreshadowReady} 个伏笔已回收，${storyLineDashboard.threadResolved} 条剧情线有终点。`, storyLineDashboard.nextActions[0], "补主线伏笔", "story-lines", true, "补线索卡", true, "AI 生成线索"),
     area("production", "章节生产", productionScore, `${production.dashboard.totalItems} 张排期卡，${production.dashboard.blockedItems} 张卡住。`, production.dashboard.nextActions[0], "排章节生产", "chapter-production", true, "生成章节卡"),
-    area("ai-pipeline", "AI 写审改", aiPipelineScore, `${batchDraft.readyCandidates} 章可初稿，${reviewPipeline.reviewReadyCount} 章待审，${reviewPipeline.secondPassReadyCount} 章可二改。`, "按批量初稿、批量审稿、批量二改顺序清队列。", "清写审改队列", "ai-pipeline"),
+    area("ai-pipeline", "AI 写审改", aiPipelineScore, `${batchDraft.readyCandidates} 章可初稿，${reviewPipeline.reviewReadyCount} 章待审，${reviewPipeline.secondPassReadyCount} 章可二改。`, aiPipelineBatch.headline, "清写审改队列", "ai-pipeline"),
     area("ops", "连载运营", average([serialization.submissionReadinessPercent, serialization.publishReadyCount > 0 ? 100 : 40]), `${serialization.publishReadyCount} 章可发布，投稿准备度 ${serialization.submissionReadinessPercent}%。`, serialization.actions[0]?.detail ?? "继续推进运营动作。", "看运营动作", "serialization-ops"),
     area(
       "export",
@@ -937,6 +1022,7 @@ export function buildProjectControlDashboard(input: ProjectControlDashboardInput
     startTactic,
     startDecision: buildProjectStartDecision(startTactic),
     storyFoundation,
+    aiPipelineBatch,
     areas,
     priorityActions,
     criticalActions,

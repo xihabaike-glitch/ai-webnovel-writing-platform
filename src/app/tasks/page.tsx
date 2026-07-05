@@ -430,7 +430,7 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
         </div>
       </section>
 
-      <section className="mb-6 rounded-md border border-slate-200 bg-white p-4">
+      <section className="mb-6 rounded-md border border-slate-200 bg-white p-4" id="recommended-batch">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <h2 className="font-medium">批量执行安全阀</h2>

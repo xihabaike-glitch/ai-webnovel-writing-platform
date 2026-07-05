@@ -42,6 +42,18 @@ interface StoryFoundationSummary {
   axes: StoryFoundationAxis[];
 }
 
+interface AiPipelineBatchSummary {
+  canRun: boolean;
+  category: "review" | "second_pass" | "draft" | null;
+  actionLabel: string;
+  headline: string;
+  detail: string;
+  chapterIds: string[];
+  chapterTitles: string[];
+  targetHref: string;
+  warnings: string[];
+}
+
 interface ControlPriorityAction {
   id: string;
   areaId: string;
@@ -79,6 +91,7 @@ interface ProjectControlDashboard {
   startTactic: ProjectStartTacticSummary | null;
   startDecision: ProjectStartDecision;
   storyFoundation: StoryFoundationSummary;
+  aiPipelineBatch: AiPipelineBatchSummary;
   areas: ControlArea[];
   priorityActions: ControlPriorityAction[];
   criticalActions: string[];
@@ -234,6 +247,13 @@ function platformEvidenceLoopClass(status: PlatformEvidenceLoopSummary["status"]
   if (status === "repair") return "border-amber-200 bg-amber-50 text-amber-900";
   if (status === "pause") return "border-rose-200 bg-rose-50 text-rose-900";
   return "border-slate-200 bg-slate-50 text-slate-700";
+}
+
+function aiBatchCategoryClass(category: AiPipelineBatchSummary["category"]) {
+  if (category === "review") return "bg-blue-50 text-blue-700";
+  if (category === "second_pass") return "bg-amber-50 text-amber-700";
+  if (category === "draft") return "bg-emerald-50 text-emerald-700";
+  return "bg-slate-100 text-slate-700";
 }
 
 function shortTime(value: string) {
@@ -775,6 +795,43 @@ export function ProjectControlDashboardPanel({ projectId }: { projectId: string 
                     <div className="mt-1 text-xs text-slate-500">{receipt.actionLabel}</div>
                     <p className="mt-1 line-clamp-2 leading-5 text-slate-600">已推进：{receipt.completedStepLabel}</p>
                   </Link>
+                ))}
+              </div>
+            ) : null}
+          </div>
+
+          <div className="rounded-md border border-slate-200 p-3">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+              <div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="font-medium text-slate-950">AI 推荐批次</div>
+                  <span className={`rounded-md px-2 py-1 text-[11px] font-medium ${aiBatchCategoryClass(dashboard.aiPipelineBatch.category)}`}>
+                    {dashboard.aiPipelineBatch.actionLabel}
+                  </span>
+                </div>
+                <p className="mt-1 text-sm leading-6 text-slate-600">{dashboard.aiPipelineBatch.headline}</p>
+                <div className="mt-2 rounded-md bg-slate-50 px-2 py-1 text-xs leading-5 text-slate-600">
+                  {dashboard.aiPipelineBatch.detail}
+                </div>
+              </div>
+              <Link
+                className="inline-flex w-fit items-center justify-center rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white hover:bg-slate-800"
+                href={dashboard.aiPipelineBatch.targetHref}
+              >
+                {dashboard.aiPipelineBatch.canRun ? "去执行推荐批次" : "看任务中心"}
+              </Link>
+            </div>
+            {dashboard.aiPipelineBatch.chapterTitles.length ? (
+              <div className="mt-3 flex flex-wrap gap-1.5">
+                {dashboard.aiPipelineBatch.chapterTitles.slice(0, 5).map((title) => (
+                  <span className="rounded-md bg-slate-50 px-2 py-1 text-xs text-slate-600" key={title}>{title}</span>
+                ))}
+              </div>
+            ) : null}
+            {dashboard.aiPipelineBatch.warnings.length ? (
+              <div className="mt-2 grid gap-1 text-xs leading-5 text-amber-700">
+                {dashboard.aiPipelineBatch.warnings.map((warning) => (
+                  <p key={warning}>{warning}</p>
                 ))}
               </div>
             ) : null}

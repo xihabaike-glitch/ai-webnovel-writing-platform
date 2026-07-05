@@ -1,7 +1,7 @@
 import { buildModelTaskAuditDashboard, type ModelAuditProvider, type ModelAuditRoute, type ModelAuditTask } from "../ai/modelTaskAudit.ts";
 import { labelForRoutedTask, type RoutedModelTaskType } from "../model-gateway/taskRouting.ts";
 import type { RouteConfirmationRecheckAdviceItem, RouteConfirmationRecheckEvidence } from "../model-gateway/routeConfirmation.ts";
-import type { ExecutableQueueCategory, TaskQueueExecutionPlan } from "./taskQueueExecutionPlan.ts";
+import { adoptionFollowupBatchWarning, type ExecutableQueueCategory, type TaskQueueExecutionPlan } from "./taskQueueExecutionPlan.ts";
 
 export interface RecommendedBatchModelRouteGateProject {
   id: string;
@@ -346,18 +346,29 @@ export function applyRecommendedBatchModelRouteGate(
       canRun: false,
       itemIds: [],
       chapterIds: [],
+      adoptionFollowupCount: 0,
+      adoptionFollowupItemIds: [],
       actionLabel: "模型路线拦截",
       detail: gate.headline,
-      warnings: [...plan.warnings, ...gate.warnings],
+      warnings: [...plan.warnings.filter((warning) => !warning.includes("采纳闭环任务")), ...gate.warnings],
     };
   }
 
+  const itemIds = plan.itemIds.slice(0, gate.maxBatchSize);
+  const adoptionFollowupItemIds = plan.adoptionFollowupItemIds.filter((itemId) => itemIds.includes(itemId));
+  const adoptionFollowupCount = adoptionFollowupItemIds.length;
   return {
     ...plan,
-    itemIds: plan.itemIds.slice(0, gate.maxBatchSize),
+    itemIds,
     chapterIds: plan.chapterIds.slice(0, gate.maxBatchSize),
+    adoptionFollowupCount,
+    adoptionFollowupItemIds,
     actionLabel: `${plan.actionLabel.replace(/\s+\d+\s*个$/u, "")} ${gate.maxBatchSize} 个`,
     detail: `${plan.detail} · ${gate.headline}`,
-    warnings: [...plan.warnings, ...gate.warnings],
+    warnings: [
+      ...plan.warnings.filter((warning) => !warning.includes("采纳闭环任务")),
+      adoptionFollowupCount > 0 ? adoptionFollowupBatchWarning(adoptionFollowupCount) : null,
+      ...gate.warnings,
+    ].filter((warning): warning is string => Boolean(warning)),
   };
 }

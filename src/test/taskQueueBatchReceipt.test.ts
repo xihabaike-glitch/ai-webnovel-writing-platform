@@ -24,6 +24,8 @@ const plan: TaskQueueExecutionPlan = {
     risk: "慢热会掉节奏。",
   }],
   scaleGate: "none",
+  adoptionFollowupCount: 0,
+  adoptionFollowupItemIds: [],
   actionLabel: "批量初稿 1 个",
   detail: "夜雨系统 · 待生成 · 第一章",
   warnings: [],

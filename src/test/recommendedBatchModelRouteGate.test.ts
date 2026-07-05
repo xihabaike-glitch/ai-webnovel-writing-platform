@@ -18,6 +18,8 @@ function plan(overrides: Partial<TaskQueueExecutionPlan> = {}): TaskQueueExecuti
     chapterIds: ["chapter-1", "chapter-2", "chapter-3"],
     strategyBases: [],
     scaleGate: "none",
+    adoptionFollowupCount: 0,
+    adoptionFollowupItemIds: [],
     actionLabel: "批量审稿 3 个",
     detail: "夜雨系统 · 待审稿 · 第一章、第二章、第三章",
     warnings: [],
@@ -192,6 +194,30 @@ test("recommended batch model route gate", async (t) => {
     assert.equal(guardedPlan.canRun, true);
     assert.deepEqual(guardedPlan.chapterIds, ["chapter-1"]);
     assert.ok(guardedPlan.warnings.some((warning) => warning.includes("降级")));
+  });
+
+  await t.test("recounts adoption follow-ups after route gate samples a batch", () => {
+    const basePlan = plan({
+      itemIds: ["adoption-item", "item-2", "item-3"],
+      chapterIds: ["chapter-1", "chapter-2", "chapter-3"],
+      adoptionFollowupCount: 2,
+      adoptionFollowupItemIds: ["adoption-item", "item-3"],
+      warnings: ["本批包含 2 个采纳闭环任务；它们不是普通审稿，执行后必须回总闸门复检。"],
+    });
+    const gate = buildRecommendedBatchModelRouteGate({
+      plan: basePlan,
+      providers,
+      routes: [],
+      projects: [project()],
+    });
+    const guardedPlan = applyRecommendedBatchModelRouteGate(basePlan, gate);
+
+    assert.equal(gate.status, "sample");
+    assert.deepEqual(guardedPlan.itemIds, ["adoption-item"]);
+    assert.deepEqual(guardedPlan.adoptionFollowupItemIds, ["adoption-item"]);
+    assert.equal(guardedPlan.adoptionFollowupCount, 1);
+    assert.ok(guardedPlan.warnings.some((warning) => warning.includes("本批包含 1 个采纳闭环任务")));
+    assert.equal(guardedPlan.warnings.some((warning) => warning.includes("本批包含 2 个采纳闭环任务")), false);
   });
 
   await t.test("uses a passed route recheck to restore a blocked route as a sample", () => {

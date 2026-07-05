@@ -2154,6 +2154,10 @@ function isPlatformDispatchReceipt(receipt: GateActionReceipt) {
   return receipt.actionId.startsWith("gate-platform-dispatch:");
 }
 
+function isPlatformDispatchCompletionReceipt(receipt: GateActionReceipt) {
+  return receipt.actionId.startsWith("gate-dispatch-completion:");
+}
+
 function isAuditMetaReceipt(receipt: GateActionReceipt) {
   return isAdviceActionReceipt(receipt) || isPlatformDispatchReceipt(receipt);
 }
@@ -5927,6 +5931,16 @@ export function buildGatePlatformDecisionTimeline(input: {
         createdAt: receipt.createdAt,
         evidence: [receipt.message],
       });
+    } else if (isPlatformDispatchCompletionReceipt(receipt)) {
+      eventPlatform.events.push({
+        id: `dispatch-completion-receipt:${receipt.id}`,
+        type: "dispatch",
+        label: "派单完成回执",
+        detail: receipt.message,
+        href: receipt.href,
+        createdAt: receipt.createdAt,
+        evidence: [receipt.message, receipt.recheck.detail],
+      });
     }
   }
 
@@ -6194,6 +6208,7 @@ export function buildGatePlatformTacticExperienceLibrary(
     const finalEvent = item.events.find((event) => event.type === "final") ?? null;
     const completedRecheckReview = completedRecheckReviewFromTimeline(item);
     const evidenceLoopRecheck = evidenceLoopRecheckFromTimeline(item);
+    const dispatchCompletionEvent = item.events.find((event) => event.id.startsWith("dispatch-completion-receipt:")) ?? null;
     const evidence = item.events.slice(0, 3).map((event) => `${event.label}：${markdownLine(event.detail)}`);
     const base = {
       platformId: item.platformId,
@@ -6393,6 +6408,22 @@ export function buildGatePlatformTacticExperienceLibrary(
         lesson: `${item.platformName} 已完成修复、复测、重验和效果回填，可以作为同类平台的恢复模板。`,
         reuseHint: "新项目可复用：先修标题简介标签和前三章兑现，再小步重验。",
         risk: "不要直接放量，先保留小步验证窗口。",
+      };
+    }
+
+    if (dispatchCompletionEvent) {
+      return {
+        ...base,
+        status: "watch",
+        label: "待效果经验",
+        tactic: "派单验收打法",
+        lesson: `${item.platformName} 已经形成派单完成业务回执，说明验收口径可复用，但还需要发布效果、复查提分或三轮结论证明业务改善。`,
+        reuseHint: "同类项目可以复用这次完成依据模板和验收标准，下一步必须补曝光、点击、收藏、追读或证据闭环复检。",
+        risk: "派单完成只证明动作做完，不证明平台增长有效；缺效果前不要写成成功打法。",
+        evidence: [
+          `完成回执：${markdownLine(dispatchCompletionEvent.detail)}`,
+          ...base.evidence,
+        ].slice(0, 4),
       };
     }
 

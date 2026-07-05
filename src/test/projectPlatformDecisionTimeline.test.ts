@@ -4,6 +4,7 @@ import {
   buildGatePlatformDecisionTimeline,
   buildGatePlatformTacticExperienceLibrary,
   buildGatePlatformTacticExperienceMarkdown,
+  buildGateDispatchCompletionReceipt,
   buildGatePublishEffectReceipt,
   type PersistedGatePlatformDispatchTask,
 } from "../lib/projects/gateActionReceipts.ts";
@@ -98,5 +99,38 @@ test("project platform decision timeline", async (t) => {
     assert.ok(["usable", "watch", "blocked"].includes(experience.status));
     assert.ok(markdown.includes("# 番茄小说 平台打法经验"));
     assert.ok(markdown.includes("## 复用方式"));
+  });
+
+  await t.test("keeps dispatch completion receipts as pending effect experience", () => {
+    const completedDispatch = task({
+      stage: "start_publish_finalize",
+      actionLabel: "复检发布包",
+      title: "番茄小说 发布包定稿",
+      href: "/projects/project-1#platform-export",
+      completionEvidence: [
+        "番茄小说 发布包定稿",
+        "标题：重生后我靠毒舌系统爆红",
+        "简介：第一章直接给冲突和反转",
+        "标签：重生、系统、逆袭",
+        "结论：可发布",
+      ].join("\n"),
+    });
+    const receipt = buildGateDispatchCompletionReceipt({
+      dispatch: completedDispatch,
+      completionEvidence: completedDispatch.completionEvidence,
+      now: "2026-01-09T10:00:01.000Z",
+    });
+    const timeline = buildGatePlatformDecisionTimeline({
+      receipts: [receipt],
+      limit: 8,
+    });
+    const library = buildGatePlatformTacticExperienceLibrary(timeline, 8);
+    const fanqie = timeline.items.find((item) => item.platformId === "fanqie");
+    const experience = library.items.find((item) => item.platformId === "fanqie");
+
+    assert.ok(fanqie?.events.some((event) => event.label === "派单完成回执" && event.detail.includes("已验收")));
+    assert.equal(experience?.status, "watch");
+    assert.equal(experience?.tactic, "派单验收打法");
+    assert.ok(experience?.risk.includes("不证明平台增长有效"));
   });
 });

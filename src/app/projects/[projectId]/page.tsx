@@ -12,6 +12,7 @@ import { ExportMarkdownButton } from "@/components/projects/ExportMarkdownButton
 import { FirstDayWorkflowPanel } from "@/components/projects/FirstDayWorkflowPanel";
 import { FirstThreeRewritePanel } from "@/components/projects/FirstThreeRewritePanel";
 import { ModelTaskAuditPanel } from "@/components/projects/ModelTaskAuditPanel";
+import { PlatformDecisionTimelinePanel } from "@/components/projects/PlatformDecisionTimelinePanel";
 import { PlatformExportCenterPanel } from "@/components/projects/PlatformExportCenterPanel";
 import { ProjectControlDashboardPanel } from "@/components/projects/ProjectControlDashboardPanel";
 import { RetentionDiagnosticPanel } from "@/components/projects/RetentionDiagnosticPanel";
@@ -25,6 +26,7 @@ import { WritingWorkbenchPanel } from "@/components/projects/WritingWorkbenchPan
 import { buildStoryTreeExperienceApplyDispatchKey, buildStoryTreeExperienceEffectDashboard, buildStoryTreeExperienceFlow, buildStoryTreeExperienceGuide, buildStoryTreeExperienceReviewBacklog } from "@/lib/ai/storyTreeExperience";
 import { prisma } from "@/lib/db/prisma";
 import { getPlatformProfile, type PlatformId } from "@/lib/platforms/platformProfiles";
+import { buildGatePlatformDecisionTimeline, gateActionReceiptFromAuditRecord } from "@/lib/projects/gateActionReceipts";
 import { gatePlatformDispatchTaskFromRecord } from "@/lib/projects/gateDispatchTaskRecords";
 import { buildProjectDashboard } from "@/lib/projects/projectDashboard";
 import { buildSubmissionChecklist } from "@/lib/projects/submissionChecklist";
@@ -199,6 +201,23 @@ export default async function ProjectPage({ params }: { params: Promise<{ projec
       priorityScore: task.priorityScore,
     })),
     submissionChecklist,
+  });
+  const [projectDecisionAudits, projectDecisionTaskRecords] = await Promise.all([
+    prisma.gateActionAudit.findMany({
+      where: { projectId: project.id },
+      orderBy: { createdAt: "desc" },
+      take: 100,
+    }),
+    prisma.gateDispatchTask.findMany({
+      where: { projectId: project.id },
+      orderBy: { updatedAt: "desc" },
+      take: 100,
+    }),
+  ]);
+  const platformDecisionTimeline = buildGatePlatformDecisionTimeline({
+    receipts: projectDecisionAudits.map(gateActionReceiptFromAuditRecord),
+    tasks: projectDecisionTaskRecords.map(gatePlatformDispatchTaskFromRecord),
+    limit: 8,
   });
   const submissionPackage = buildSubmissionPackage({
     title: project.title,
@@ -459,6 +478,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ projec
         <div id="serialization-ops">
           <SerializationOpsPanel projectId={project.id} />
         </div>
+        <PlatformDecisionTimelinePanel timeline={platformDecisionTimeline} />
         <div id="platform-export">
           <PlatformExportCenterPanel projectId={project.id} />
         </div>

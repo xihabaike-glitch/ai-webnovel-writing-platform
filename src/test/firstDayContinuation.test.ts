@@ -191,6 +191,30 @@ test("buildFirstDayContinuationAction asks for handoff evidence before batch pro
   assert.equal(action.primaryHref, "/projects/project-1#first-day-workflow");
   assert.equal(action.queueCategory, "blocked");
   assert.ok(action.detail.includes("开书交接证据"));
+  assert.equal(action.handoffGuidance?.label, "稳定加码");
+  assert.ok(action.handoffGuidance?.detail?.includes("番茄首章强钩子"));
+  assert.ok(action.handoffGuidance?.firstDayActions.some((action) => action.includes("倒计时")));
+  assert.ok(action.handoffGuidance?.avoidRules.some((rule) => rule.includes("小样本")));
+});
+
+test("buildFirstDayContinuationAction carries handoff guidance into ready batch work", () => {
+  const action = buildFirstDayContinuationAction({
+    project: project({
+      worldEntries: handoffWorldEntries,
+      gateDispatchTasks: [{
+        dispatchKey: "first-day:project-1:publish-precheck",
+        state: "completed",
+        completionEvidence: "首日平台包预检已完成。交接动作已落地：开头第一段倒计时完成。避坑边界已确认：不要直接放量，先做小样本。",
+      }],
+    }),
+    workflow: completedWorkflow(),
+  });
+
+  assert.equal(action.status, "ready");
+  assert.equal(action.queueCategory, "review");
+  assert.equal(action.handoffGuidance?.label, "稳定加码");
+  assert.ok(action.handoffGuidance?.firstDayActions.some((item) => item.includes("倒计时")));
+  assert.ok(action.handoffGuidance?.avoidRules.some((item) => item.includes("不要直接放量")));
 });
 
 test("buildFirstDayContinuationAction gives a fallback when no direct batch item exists", () => {

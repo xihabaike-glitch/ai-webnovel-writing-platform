@@ -86,6 +86,13 @@ interface FirstDayContinuationAction {
   queueCategory: "draft" | "review" | "second_pass" | "export" | "blocked" | null;
   itemCount: number;
   warnings: string[];
+  handoffGuidance?: {
+    label: string;
+    detail: string | null;
+    firstDayActions: string[];
+    avoidRules: string[];
+    evidence: string[];
+  } | null;
 }
 
 type FirstDayModelRouteStatus = FirstDayExecutionRouteStatus;
@@ -414,6 +421,34 @@ export function FirstDayWorkflowPanel({ projectId }: { projectId: string }) {
               {continuation.warnings.map((warning) => (
                 <div className="rounded-md bg-white/70 px-2 py-1" key={warning}>{warning}</div>
               ))}
+            </div>
+          ) : null}
+          {continuation.handoffGuidance ? (
+            <div className="mt-3 grid gap-2 rounded-md bg-white/70 px-3 py-2 text-xs leading-5">
+              <div className="font-medium">开书交接 · {continuation.handoffGuidance.label}</div>
+              {continuation.handoffGuidance.detail ? (
+                <div>{continuation.handoffGuidance.detail}</div>
+              ) : null}
+              {continuation.handoffGuidance.firstDayActions.length > 0 ? (
+                <div>
+                  <div className="font-medium">首日动作</div>
+                  <div className="mt-1 grid gap-1">
+                    {continuation.handoffGuidance.firstDayActions.slice(0, 3).map((action) => (
+                      <div key={action}>- {action}</div>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+              {continuation.handoffGuidance.avoidRules.length > 0 ? (
+                <div>
+                  <div className="font-medium">避坑边界</div>
+                  <div className="mt-1 grid gap-1">
+                    {continuation.handoffGuidance.avoidRules.slice(0, 3).map((rule) => (
+                      <div key={rule}>- {rule}</div>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
             </div>
           ) : null}
         </div>

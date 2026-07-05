@@ -1,5 +1,5 @@
 import type { FirstDayWorkflow } from "./firstDayWorkflow.ts";
-import { buildTaskQueueCenter, type QueueItem, type TaskQueueProject } from "./taskQueueCenter.ts";
+import { buildTaskQueueCenter, type QueueHandoffGuidance, type QueueItem, type TaskQueueProject } from "./taskQueueCenter.ts";
 
 export interface FirstDayContinuationAction {
   status: "first_day_active" | "ready" | "blocked" | "complete";
@@ -12,6 +12,7 @@ export interface FirstDayContinuationAction {
   queueCategory: QueueItem["category"] | null;
   itemCount: number;
   warnings: string[];
+  handoffGuidance?: QueueHandoffGuidance | null;
 }
 
 function categoryAction(category: QueueItem["category"]) {
@@ -75,6 +76,7 @@ function blockedAction(projectId: string, item: QueueItem, itemCount: number): F
       queueCategory: item.category,
       itemCount,
       warnings: ["首日验收没有收口前，不建议进入批量初稿、批量审稿、批量二改或多平台导出。"],
+      handoffGuidance: item.handoffGuidance ?? null,
     };
   }
 
@@ -93,6 +95,7 @@ function blockedAction(projectId: string, item: QueueItem, itemCount: number): F
         ? "平台包质检未过，不要把未处理风险直接推到发布。"
         : "章节卡缺口会让批量正文空转，先补目标、钩子、冲突和章末悬念。",
     ],
+    handoffGuidance: item.handoffGuidance ?? null,
   };
 }
 
@@ -161,5 +164,6 @@ export function buildFirstDayContinuationAction(input: {
       itemCount > 1 ? `同类可执行任务 ${itemCount} 个，先按安全批量跑，不要一次性放大。` : "先跑小样本，确认质量和成本后再扩大。",
       next.strategyBasis ? `沿用首轮打法：${next.strategyBasis.label}。` : "暂无可复用打法记录，执行后要回填效果。",
     ],
+    handoffGuidance: next.handoffGuidance ?? null,
   };
 }

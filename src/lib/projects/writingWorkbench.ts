@@ -146,6 +146,7 @@ export interface WritingWorkbench {
   modelActions: WritingWorkbenchModelAction[];
   modelTimeline: WritingWorkbenchModelTimeline;
   pendingCandidates: WritingWorkbenchPendingCandidate[];
+  firstThreeAdoption: WritingWorkbenchFirstThreeAdoption;
   startSoil: {
     status: WorkbenchStatus;
     summary: string;
@@ -180,6 +181,17 @@ export interface WritingWorkbenchStartSoilAsset {
   status: WorkbenchStatus;
   detail: string;
   href: string;
+}
+
+export interface WritingWorkbenchFirstThreeAdoption {
+  status: "pending" | "clear" | "missing";
+  label: string;
+  title: string;
+  detail: string;
+  pendingCount: number;
+  href: string;
+  actionLabel: string;
+  candidates: WritingWorkbenchPendingCandidate[];
 }
 
 export interface WritingWorkbenchQuickFix {
@@ -421,6 +433,14 @@ function buildHeroAction(
 ) {
   const firstCandidate = pendingCandidates[0];
   if (firstCandidate) {
+    if (firstCandidate.source === "first_three_rewrite_candidate") {
+      return {
+        label: "采纳前三章",
+        href: firstCandidate.href,
+        reason: `前三章改写候选已经生成，先处理第 ${firstCandidate.chapterOrder} 章；采纳后正文才会真正更新。`,
+      };
+    }
+
     return {
       label: "处理候选稿",
       href: firstCandidate.href,
@@ -497,6 +517,54 @@ function buildPendingCandidates(input: WritingWorkbenchInput): WritingWorkbenchP
     })
     .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime())
     .slice(0, 5);
+}
+
+function buildFirstThreeAdoption(
+  input: WritingWorkbenchInput,
+  pendingCandidates: WritingWorkbenchPendingCandidate[],
+): WritingWorkbenchFirstThreeAdoption {
+  const candidates = pendingCandidates
+    .filter((candidate) => candidate.source === "first_three_rewrite_candidate" && candidate.chapterOrder >= 1 && candidate.chapterOrder <= 3)
+    .sort((left, right) => left.chapterOrder - right.chapterOrder);
+  const href = candidates[0]?.href ?? `/projects/${input.project.id}#first-three-rewrite`;
+
+  if (candidates.length > 0) {
+    return {
+      status: "pending",
+      label: "待采纳",
+      title: `前三章改写候选待处理`,
+      detail: `已生成 ${candidates.length} 章前三章候选稿，还没有写入正文。先逐章采纳、二改或保留当前稿，否则发布质检仍会看旧正文。`,
+      pendingCount: candidates.length,
+      href,
+      actionLabel: "进入采纳",
+      candidates,
+    };
+  }
+
+  const firstThreeChapters = input.chapters.filter((chapter) => chapter.order >= 1 && chapter.order <= 3);
+  if (firstThreeChapters.length >= 3 && firstThreeChapters.every((chapter) => chapter.wordCount > 0)) {
+    return {
+      status: "clear",
+      label: "已落稿",
+      title: "前三章正文已在位",
+      detail: "当前没有未采纳的前三章候选稿，可以继续审稿、二改或进入发布质检。",
+      pendingCount: 0,
+      href: `/projects/${input.project.id}#first-three-rewrite`,
+      actionLabel: "查看前三章",
+      candidates: [],
+    };
+  }
+
+  return {
+    status: "missing",
+    label: "待生成",
+    title: "前三章还没形成可采纳候选",
+    detail: "先补齐前三章章节卡，再生成前三章改写候选；候选通过采纳后才会覆盖正文。",
+    pendingCount: 0,
+    href: `/projects/${input.project.id}#first-three-rewrite`,
+    actionLabel: "生成前三章",
+    candidates: [],
+  };
 }
 
 const startSoilSpecs = [
@@ -976,6 +1044,7 @@ export function buildWritingWorkbench(input: WritingWorkbenchInput): WritingWork
   const characterScore = completeCharacters > 0 ? 14 : input.characters.length > 0 ? 7 : 0;
   const maturityScore = clampPercent(treeScore + chapterScore + hookScore + characterScore);
   const pendingCandidates = buildPendingCandidates(input);
+  const firstThreeAdoption = buildFirstThreeAdoption(input, pendingCandidates);
   const startSoil = buildStartSoil(input);
   const nextChapterCandidate = nextChapter
     ? pendingCandidates.find((candidate) => candidate.chapterId === nextChapter.id)
@@ -1027,6 +1096,7 @@ export function buildWritingWorkbench(input: WritingWorkbenchInput): WritingWork
     modelActions: buildModelActions(input, nextChapter),
     modelTimeline: buildModelTimeline(input.aiTasks),
     pendingCandidates,
+    firstThreeAdoption,
     startSoil,
     quickLinks: [
       ...(pendingCandidates[0] ? [{ label: "待采纳", href: pendingCandidates[0].href }] : []),

@@ -321,8 +321,12 @@ test("buildWritingWorkbench", async (t) => {
     assert.equal(workbench.pendingCandidates[0].id, "latest-candidate");
     assert.equal(workbench.pendingCandidates[0].sourceLabel, "前三章改写候选");
     assert.equal(workbench.pendingCandidates[0].href, "/projects/p-candidate/chapters/candidate-chapter#chapter-revisions");
-    assert.equal(workbench.heroAction.label, "处理候选稿");
-    assert.ok(workbench.heroAction.reason.includes("1 个 AI 候选稿"));
+    assert.equal(workbench.firstThreeAdoption.status, "pending");
+    assert.equal(workbench.firstThreeAdoption.pendingCount, 1);
+    assert.equal(workbench.firstThreeAdoption.actionLabel, "进入采纳");
+    assert.equal(workbench.firstThreeAdoption.href, "/projects/p-candidate/chapters/candidate-chapter#chapter-revisions");
+    assert.equal(workbench.heroAction.label, "采纳前三章");
+    assert.ok(workbench.heroAction.reason.includes("采纳后正文才会真正更新"));
     assert.ok(workbench.chapterFocus.nextAction.includes("待确认"));
     assert.equal(workbench.quickLinks[0].label, "待采纳");
 
@@ -352,7 +356,7 @@ test("buildWritingWorkbench", async (t) => {
     });
 
     assert.equal(adoptedWorkbench.pendingCandidates.length, 0);
-    assert.notEqual(adoptedWorkbench.heroAction.label, "处理候选稿");
+    assert.notEqual(adoptedWorkbench.heroAction.label, "采纳前三章");
   });
 
   await t.test("surfaces project start soil and enables first-three generation", () => {
@@ -394,6 +398,8 @@ test("buildWritingWorkbench", async (t) => {
     assert.ok(workbench.startSoil.summary.includes("开局土壤齐全"));
     assert.equal(workbench.startSoil.assets.every((asset) => asset.status === "pass"), true);
     assert.equal(workbench.startSoil.assets.find((asset) => asset.id === "model-route")?.detail, "任务：正文初稿");
+    assert.equal(workbench.firstThreeAdoption.status, "clear");
+    assert.equal(workbench.firstThreeAdoption.actionLabel, "查看前三章");
     assert.ok(workbench.quickLinks.some((link) => link.label === "开局土壤"));
     assert.ok(workbench.quickLinks.some((link) => link.href === "/projects/p-soil#first-three-rewrite"));
     const firstThreeAction = workbench.modelActions.find((action) => action.kind === "first_three_rewrite");

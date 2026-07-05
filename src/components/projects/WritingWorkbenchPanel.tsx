@@ -17,6 +17,8 @@ function statusClass(status: WorkbenchStatus) {
 }
 
 export function WritingWorkbenchPanel({ workbench }: { workbench: WritingWorkbench }) {
+  const generalPendingCandidates = workbench.pendingCandidates.filter((candidate) => candidate.source !== "first_three_rewrite_candidate");
+
   return (
     <section className="rounded-md border border-slate-200 bg-white p-4">
       <div className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
@@ -68,7 +70,33 @@ export function WritingWorkbenchPanel({ workbench }: { workbench: WritingWorkben
         </div>
       </div>
 
-      {workbench.pendingCandidates.length ? (
+      {workbench.firstThreeAdoption.status === "pending" ? (
+        <div className="mt-4 rounded-md border border-amber-200 bg-amber-50 p-3">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <div className="text-sm font-medium text-amber-950">{workbench.firstThreeAdoption.title}</div>
+              <p className="mt-1 text-xs leading-5 text-amber-800">{workbench.firstThreeAdoption.detail}</p>
+            </div>
+            <Link
+              className="inline-flex w-fit rounded-md bg-amber-950 px-3 py-2 text-sm font-medium text-white hover:bg-amber-900"
+              href={workbench.firstThreeAdoption.href}
+            >
+              {workbench.firstThreeAdoption.actionLabel}
+            </Link>
+          </div>
+          <div className="mt-3 grid gap-2 md:grid-cols-3">
+            {workbench.firstThreeAdoption.candidates.map((candidate) => (
+              <Link className="rounded-md bg-white p-3 text-sm hover:bg-amber-100" href={candidate.href} key={candidate.id}>
+                <div className="font-medium text-slate-950">第 {candidate.chapterOrder} 章 · {candidate.chapterTitle}</div>
+                <div className="mt-1 text-xs text-slate-500">{candidate.sourceLabel} · {candidate.wordCount} 字</div>
+                <p className="mt-2 line-clamp-2 text-xs leading-5 text-slate-600">{candidate.preview}</p>
+              </Link>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
+      {generalPendingCandidates.length ? (
         <div className="mt-4 rounded-md border border-amber-200 bg-amber-50 p-3">
           <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
             <div>
@@ -76,11 +104,11 @@ export function WritingWorkbenchPanel({ workbench }: { workbench: WritingWorkben
               <p className="mt-1 text-xs text-amber-800">AI 已经生成了候选正文，但还没有写入当前稿；先确认再继续放大生产。</p>
             </div>
             <span className="w-fit rounded-md bg-white px-2 py-1 text-xs font-medium text-amber-800">
-              {workbench.pendingCandidates.length} 个待处理
+              {generalPendingCandidates.length} 个待处理
             </span>
           </div>
           <div className="mt-3 grid gap-2 lg:grid-cols-3">
-            {workbench.pendingCandidates.map((candidate) => (
+            {generalPendingCandidates.map((candidate) => (
               <div className="rounded-md bg-white p-3 text-sm" key={candidate.id}>
                 <div className="flex items-start justify-between gap-3">
                   <div>

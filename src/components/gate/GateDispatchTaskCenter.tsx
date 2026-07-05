@@ -1648,12 +1648,19 @@ export function GateDispatchTaskCenter({
           const isFocusedCompletionTask = task.dispatchKey === focusedCompletionDispatchKey;
           const isFocusedTask = task.dispatchKey === focusedDispatchKey || isFocusedCompletionTask;
           const completionDraft = completionDrafts[task.dispatchKey] ?? "";
-          const focusedAcceptanceState = isFocusedCompletionTask
-            ? buildFirstDayReturnedEvidenceAcceptanceState({
-                completionEvidence: completionDraft,
-                hasDispatch: task.state === "assigned",
-              })
-            : null;
+          const completionAcceptanceState = buildFirstDayReturnedEvidenceAcceptanceState({
+            completionEvidence: completionDraft,
+            hasDispatch: task.state === "assigned",
+            dispatchKey: task.dispatchKey,
+            dueLabel: task.dueLabel,
+            title: task.title,
+            acceptanceCriteria: task.acceptanceCriteria,
+            evidence: task.evidence,
+          });
+          const shouldShowCompletionAcceptance = completionAcceptanceState.visible && (
+            isFocusedCompletionTask
+            || (Boolean(completionSuggestion) && completionAcceptanceState.canComplete)
+          );
           return (
           <div
             className={`rounded-md border bg-white p-4 ${isFocusedTask ? "border-amber-300 ring-2 ring-amber-200" : "border-slate-200"}`}
@@ -1708,16 +1715,16 @@ export function GateDispatchTaskCenter({
                     {isFocusedCompletionTask && focusedCompletionMessage ? (
                       <p className="rounded-md bg-emerald-50 px-2 py-1 text-xs leading-5 text-emerald-800">{focusedCompletionMessage}</p>
                     ) : null}
-                    {focusedAcceptanceState?.visible ? (
+                    {shouldShowCompletionAcceptance ? (
                       <div className="flex flex-wrap items-center justify-between gap-2 rounded-md bg-emerald-50 px-2 py-2 text-xs leading-5 text-emerald-800">
-                        <span>{focusedAcceptanceState.buttonHint}</span>
+                        <span>{completionAcceptanceState.buttonHint}</span>
                         <button
                           className="rounded-md border border-emerald-200 bg-white px-2 py-1 text-xs font-medium text-emerald-800 hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60"
-                          disabled={focusedAcceptanceState.primaryActionDisabled || runningKey === task.dispatchKey}
+                          disabled={completionAcceptanceState.primaryActionDisabled || runningKey === task.dispatchKey}
                           onClick={() => void updateTask(task)}
                           type="button"
                         >
-                          {runningKey === task.dispatchKey ? "处理中" : focusedAcceptanceState.primaryActionLabel}
+                          {runningKey === task.dispatchKey ? "处理中" : completionAcceptanceState.primaryActionLabel}
                         </button>
                       </div>
                     ) : null}

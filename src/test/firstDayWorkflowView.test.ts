@@ -896,6 +896,31 @@ test("buildFirstDayReturnedEvidenceAcceptanceState focuses a completable returne
   assert.equal(state.primaryActionDisabled, false);
 });
 
+test("buildFirstDayReturnedEvidenceAcceptanceState highlights cleared watch sample evidence", () => {
+  const state = buildFirstDayReturnedEvidenceAcceptanceState({
+    completionEvidence: [
+      "小样本验证已完成：",
+      "通过线：成功率 100%，质量分 86。",
+      "不可接受项：无失败样本。",
+      "复查证据：AI 任务 task-1。",
+      "成功率：100%",
+      "质量分：86",
+      "失败样本：0",
+      "放量结论：通过，可以恢复后续初稿批次。",
+    ].join("\n"),
+    hasDispatch: true,
+    dispatchKey: "first-day:project-1:first-draft",
+    dueLabel: "今天小样本验证",
+    title: "恢复观察小样本",
+    acceptanceCriteria: ["写清通过线", "写清不可接受项", "写清复查证据", "写清成功率、质量分、失败样本和放量结论"],
+    evidence: ["观察小样本验收"],
+  });
+
+  assert.equal(state.canComplete, true);
+  assert.ok(state.buttonHint.includes("解除观察闸门"));
+  assert.equal(state.primaryActionLabel, "验收并解除观察闸门");
+});
+
 test("buildFirstDayDispatchUpdateSummary explains watch sample scale-up status", () => {
   const cleared = buildFirstDayDispatchUpdateSummary({
     task: {

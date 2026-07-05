@@ -250,24 +250,47 @@ export function buildFirstDayReturnToAcceptanceHref(input: {
 export function buildFirstDayReturnedEvidenceAcceptanceState(input: {
   completionEvidence?: string | null;
   hasDispatch: boolean;
+  dispatchKey?: string | null;
+  dueLabel?: string | null;
+  title?: string | null;
+  acceptanceCriteria?: string[];
+  evidence?: string[];
 }) {
   const completionEvidence = cleanEvidence(input.completionEvidence ?? "");
   const visible = completionEvidence.length > 0;
-  const canComplete = input.hasDispatch && completionEvidence.length >= MIN_COMPLETION_EVIDENCE_LENGTH;
+  const validation = input.dispatchKey
+    ? validateFirstDayDispatchCompletionEvidence({
+        dispatchKey: input.dispatchKey,
+        dueLabel: input.dueLabel ?? undefined,
+        title: input.title ?? undefined,
+        acceptanceCriteria: input.acceptanceCriteria ?? [],
+        evidence: input.evidence ?? [],
+        completionEvidence,
+      })
+    : null;
+  const canComplete = input.hasDispatch && (validation ? validation.valid : completionEvidence.length >= MIN_COMPLETION_EVIDENCE_LENGTH);
+  const clearsWatchSample = canComplete && validation?.level === "watch";
+  const primaryActionLabel = canComplete
+    ? clearsWatchSample ? "验收并解除观察闸门" : "完成当前派单"
+    : "补足验收依据";
 
   return {
     visible,
     shouldFocusAcceptance: visible,
     canComplete,
-    message: canComplete
-      ? "已带回首日 AI 执行证据，验收依据已填好。检查后可以点击「完成当前派单」。"
-      : "已带回首日 AI 执行证据，请补足验收依据后完成当前派单。",
+    message: clearsWatchSample
+      ? "小样本结构化证据已填好，检查后可以验收并解除观察闸门。"
+      : canComplete
+        ? "已带回首日 AI 执行证据，验收依据已填好。检查后可以点击「完成当前派单」。"
+        : "已带回首日 AI 执行证据，请补足验收依据后完成当前派单。",
     buttonHint: canComplete
-      ? "当前证据已满足验收字数，可以直接验收。"
+      ? clearsWatchSample
+        ? "当前小样本证据已满足成功率、质量分、失败样本和正向放量结论，可以验收并解除观察闸门。"
+        : "当前证据已满足验收字数，可以直接验收。"
       : input.hasDispatch
-        ? "验收依据至少需要 8 个字。"
+        ? validation?.error ?? "验收依据至少需要 8 个字。"
         : "当前还没有可验收派单，请先刷新首日工作流。",
-    primaryActionLabel: canComplete ? "完成当前派单" : "补足验收依据",
+    primaryActionLabel,
     primaryActionDisabled: !canComplete,
   };
 }

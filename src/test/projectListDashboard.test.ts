@@ -115,6 +115,53 @@ const watchProject: ProjectListProject = {
   ],
 };
 
+const handoffBlockedProject: ProjectListProject = {
+  ...completeProject,
+  id: "handoff-blocked-project",
+  title: "交接缺证据",
+  aiTasks: [
+    {
+      ...completeProject.aiTasks[0],
+      id: "draft-task",
+      taskType: "chapter_draft",
+    },
+    {
+      ...completeProject.aiTasks[0],
+      id: "review-task",
+      taskType: "chapter_review",
+    },
+    {
+      ...completeProject.aiTasks[0],
+      id: "second-pass-task",
+      taskType: "chapter_second_pass",
+    },
+  ],
+  worldEntries: [
+    ...completeProject.worldEntries.filter((entry) => entry.title !== "番茄土壤"),
+    {
+      type: "platform_soil",
+      title: "首轮平台打法：番茄小说",
+      content: [
+        "状态：模板推荐",
+        "打法：首章先给不可逆危机，三章内连续兑现爽点。",
+        "开头动作：第一段给倒计时。",
+        "验证动作：批量前检查前三章追读。",
+        "风险：解释过多会掉节奏。",
+        "交接状态：reuse",
+        "交接标签：稳定加码",
+        "交接说明：沿用番茄首章强钩子打法。",
+        "首日动作：开头必须落地第一段倒计时。",
+        "避坑边界：不要直接放量，先做小样本。",
+      ].join("\n"),
+    },
+  ],
+  gateDispatchTasks: [{
+    dispatchKey: "first-day:handoff-blocked-project:publish-precheck",
+    state: "completed",
+    completionEvidence: "首日平台包预检已完成，标题、简介、标签、卖点、样章和风险清单已验收。",
+  }],
+};
+
 test("buildProjectListDashboard", async (t) => {
   await t.test("sorts projects by operational urgency and summarizes portfolio metrics", () => {
     const dashboard = buildProjectListDashboard([completeProject, emptyProject], [
@@ -136,7 +183,7 @@ test("buildProjectListDashboard", async (t) => {
     assert.equal(dashboard.items[0].healthLabel, "先救火");
     assert.ok(dashboard.items[0].riskFlags.includes("没有章节卡"));
     assert.equal(dashboard.items[1].aiCostUsd, 0.01);
-    assert.equal(dashboard.items[1].nextAction, "二改或前三章改写");
+    assert.equal(dashboard.items[1].nextAction, "启动二改");
   });
 
   await t.test("surfaces first-day risk lanes in portfolio cards", () => {
@@ -162,5 +209,25 @@ test("buildProjectListDashboard", async (t) => {
     assert.equal(watch?.riskLevel, "watch");
     assert.ok((watch?.healthScore ?? 100) <= 74);
     assert.ok(watch?.riskFlags.some((flag) => flag.includes("只跑小样本")));
+  });
+
+  await t.test("uses first-day continuation as the project list action", () => {
+    const dashboard = buildProjectListDashboard([handoffBlockedProject], [
+      {
+        id: "provider-1",
+        providerId: "mock",
+        displayName: "Mock",
+        defaultModel: "mock-novel",
+        enabled: true,
+        encryptedApiKey: "secret",
+      },
+    ]);
+    const item = dashboard.items[0];
+
+    assert.equal(item.nextAction, "补交接验收");
+    assert.equal(item.nextActionHref, "/projects/handoff-blocked-project#first-day-workflow");
+    assert.equal(item.continuationStatus, "blocked");
+    assert.equal(item.healthLabel, "需盯紧");
+    assert.ok(item.riskFlags.some((flag) => flag.includes("补交接验收")));
   });
 });

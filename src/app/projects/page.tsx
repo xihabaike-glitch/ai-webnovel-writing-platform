@@ -33,6 +33,14 @@ export default async function ProjectsPage() {
         outlineNodes: { orderBy: [{ depth: "asc" }, { order: "asc" }] },
         characters: { orderBy: { createdAt: "asc" } },
         worldEntries: { orderBy: [{ type: "asc" }, { createdAt: "asc" }] },
+        gateDispatchTasks: {
+          where: { dispatchKey: { startsWith: "first-day:" } },
+          select: {
+            dispatchKey: true,
+            state: true,
+            completionEvidence: true,
+          },
+        },
         aiTasks: {
           include: {
             modelProvider: {

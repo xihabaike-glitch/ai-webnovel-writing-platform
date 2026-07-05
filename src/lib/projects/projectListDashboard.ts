@@ -1,5 +1,6 @@
 import { buildModelTaskAuditDashboard, type ModelAuditProvider, type ModelAuditTask } from "../ai/modelTaskAudit.ts";
 import { getPlatformProfile, type PlatformId } from "../platforms/platformProfiles.ts";
+import { buildFirstDayContinuationAction } from "./firstDayContinuation.ts";
 import { buildFirstDayRiskProfile, buildFirstDayWorkflow, type FirstDayAiTask, type FirstDayChapter, type FirstDayCharacter, type FirstDayOutlineNode, type FirstDayRiskLevel, type FirstDayWorldEntry } from "./firstDayWorkflow.ts";
 import { findProjectStartTacticSummary } from "./projectStartTactics.ts";
 import { buildSubmissionChecklist } from "./submissionChecklist.ts";
@@ -23,6 +24,11 @@ export interface ProjectListProject {
   characters: FirstDayCharacter[];
   worldEntries: FirstDayWorldEntry[];
   aiTasks: Array<ModelAuditTask & FirstDayAiTask>;
+  gateDispatchTasks?: Array<{
+    dispatchKey: string;
+    state: string;
+    completionEvidence: string;
+  }>;
 }
 
 export interface ProjectListItem {
@@ -48,6 +54,7 @@ export interface ProjectListItem {
   riskHeadline: string;
   riskDetail: string;
   riskFlags: string[];
+  continuationStatus: "first_day_active" | "ready" | "blocked" | "complete";
 }
 
 export interface ProjectListDashboard {
@@ -114,8 +121,11 @@ function riskFlags(input: {
   chapterCount: number;
   riskLevel: FirstDayRiskLevel;
   riskLabel: string;
+  continuationStatus: ProjectListItem["continuationStatus"];
+  nextAction: string;
 }) {
   const flags: string[] = [];
+  if (input.continuationStatus === "blocked") flags.push(`下一步阻塞：${input.nextAction}`);
   if (input.riskLevel === "blocked") flags.push(`开书策略：${input.riskLabel}，先止损恢复`);
   if (input.riskLevel === "watch") flags.push(`开书策略：${input.riskLabel}，只跑小样本`);
   if (input.chapterCount === 0) flags.push("没有章节卡");
@@ -161,8 +171,33 @@ export function buildProjectListDashboard(
       characters: project.characters,
       worldEntries: project.worldEntries,
       aiTasks: project.aiTasks,
+      dispatchTasks: project.gateDispatchTasks ?? [],
       startTactic,
       submissionChecklist,
+    });
+    const continuation = buildFirstDayContinuationAction({
+      project: {
+        id: project.id,
+        title: project.title,
+        targetPlatform: project.targetPlatform,
+        targetWordCount: project.targetWordCount,
+        currentWordCount: project.currentWordCount,
+        genre: project.genre,
+        sellingPoint: project.sellingPoint,
+        chapters: project.chapters,
+        aiTasks: project.aiTasks.map((task) => ({
+          id: task.id,
+          chapterId: task.chapterId,
+          taskType: task.taskType,
+          status: task.status,
+          outputText: task.outputText ?? null,
+          errorMessage: task.errorMessage ?? null,
+          createdAt: task.createdAt,
+        })),
+        worldEntries: project.worldEntries,
+        gateDispatchTasks: project.gateDispatchTasks ?? [],
+      },
+      workflow: firstDay,
     });
     const modelAudit = buildModelTaskAuditDashboard(project.aiTasks, providers);
     const wordProgressPercent = project.targetWordCount > 0
@@ -181,6 +216,8 @@ export function buildProjectListDashboard(
       ? Math.min(rawHealthScore, 49)
       : riskProfile.level === "watch"
         ? Math.min(rawHealthScore, 74)
+        : continuation.status === "blocked"
+          ? Math.min(rawHealthScore, 74)
         : rawHealthScore;
     const aiFailureRatePercent = modelAudit.summary.failureRatePercent;
 
@@ -197,8 +234,8 @@ export function buildProjectListDashboard(
       healthScore,
       healthLabel: healthLabel(healthScore),
       firstDayProgressPercent: firstDay.progressPercent,
-      nextAction: firstDay.nextStep.label,
-      nextActionHref: firstDay.nextStep.href,
+      nextAction: continuation.primaryLabel,
+      nextActionHref: continuation.primaryHref,
       aiCostUsd: money(modelAudit.summary.knownCostUsd),
       aiFailureRatePercent,
       reviewCoveragePercent,
@@ -214,7 +251,10 @@ export function buildProjectListDashboard(
         chapterCount: project.chapters.length,
         riskLevel: riskProfile.level,
         riskLabel: riskProfile.label,
+        continuationStatus: continuation.status,
+        nextAction: continuation.primaryLabel,
       }),
+      continuationStatus: continuation.status,
     };
   }).sort((left, right) => (
     left.healthScore - right.healthScore

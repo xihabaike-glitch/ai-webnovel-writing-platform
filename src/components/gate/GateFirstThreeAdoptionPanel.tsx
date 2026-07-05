@@ -19,6 +19,13 @@ type LocalFollowupResult = {
   message: string;
 };
 
+type BatchFollowupReview = {
+  label: string;
+  succeeded: number;
+  failed: number;
+  results: GateFirstThreeAdoptionReceiptResult[];
+};
+
 function panelTone(status: PrePublishGateAdoptionClosure["status"]) {
   if (status === "pass") return "border-emerald-200 bg-emerald-50";
   if (status === "warn") return "border-amber-200 bg-amber-50";
@@ -114,6 +121,7 @@ export function GateFirstThreeAdoptionPanel({ closure }: { closure: PrePublishGa
   const [runningId, setRunningId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [followupResults, setFollowupResults] = useState<Record<string, LocalFollowupResult>>({});
+  const [batchReview, setBatchReview] = useState<BatchFollowupReview | null>(null);
   const visibleItems = closure.items.slice(0, 6);
   const visibleTimelines = closure.timelines.slice(0, 4);
   const itemsById = new Map(closure.items.map((item) => [item.id, item]));
@@ -158,6 +166,7 @@ export function GateFirstThreeAdoptionPanel({ closure }: { closure: PrePublishGa
   async function runFollowup(item: PrePublishGateAdoptionFollowupItem) {
     setRunningId(item.id);
     setMessage(null);
+    setBatchReview(null);
     try {
       const result = await executeFollowupRequest(item);
       setFollowupResults((current) => ({
@@ -215,6 +224,7 @@ export function GateFirstThreeAdoptionPanel({ closure }: { closure: PrePublishGa
     if (!batchItems.length) return;
     setRunningId(`batch:${kind}`);
     setMessage(null);
+    setBatchReview(null);
     const results: GateFirstThreeAdoptionReceiptResult[] = [];
     for (const item of batchItems) {
       try {
@@ -254,12 +264,19 @@ export function GateFirstThreeAdoptionPanel({ closure }: { closure: PrePublishGa
     });
     const succeeded = results.filter((result) => result.status === "succeeded").length;
     const failed = results.filter((result) => result.status === "failed").length;
+    const label = kind === "review" ? "批量重新审稿" : "批量刷新质检";
+    setBatchReview({
+      label,
+      succeeded,
+      failed,
+      results,
+    });
     addGateActionReceipt(buildGateFirstThreeAdoptionReceipt({
       mode: kind === "review" ? "batch_review" : "batch_publish",
       items: batchItems,
       results,
     }));
-    setMessage(`${kind === "review" ? "批量重新审稿" : "批量刷新质检"}完成：成功 ${succeeded} 个，失败 ${failed} 个。`);
+    setMessage(`${label}完成：成功 ${succeeded} 个，失败 ${failed} 个。`);
     setRunningId(null);
     router.refresh();
   }
@@ -311,6 +328,29 @@ export function GateFirstThreeAdoptionPanel({ closure }: { closure: PrePublishGa
         </div>
       ) : null}
       {message ? <div className="mt-3 rounded-md bg-white/80 px-3 py-2 text-sm text-slate-700">{message}</div> : null}
+      {batchReview ? (
+        <div className="mt-3 rounded-md border border-white/70 bg-white/80 p-3 text-sm text-slate-700">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="font-medium text-slate-950">{batchReview.label}分项复盘</div>
+            <div className="text-xs text-slate-500">成功 {batchReview.succeeded} · 失败 {batchReview.failed}</div>
+          </div>
+          <div className="mt-2 grid gap-2 lg:grid-cols-2">
+            {batchReview.results.map((result) => (
+              <div
+                className={`rounded-md border px-3 py-2 text-xs leading-5 ${
+                  result.status === "succeeded"
+                    ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                    : "border-rose-200 bg-rose-50 text-rose-800"
+                }`}
+                key={result.id}
+              >
+                <div className="font-medium">{result.status === "succeeded" ? "成功" : "失败"} · {result.title}</div>
+                <div className="mt-1 opacity-80">{result.message ?? result.label}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
 
       {visibleTimelines.length ? (
         <div className="mt-4 grid gap-3">

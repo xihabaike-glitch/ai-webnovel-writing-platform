@@ -143,6 +143,16 @@ export function ExportVersionCenterPanel({
           <div>
             <h2 className="font-medium">基准对比</h2>
             <p className="mt-1 text-sm leading-6">{summary.baselineComparison.label}：{summary.baselineComparison.detail}</p>
+            {summary.baselineComparison.canReplaceBaseline && summary.baselineComparison.replacementSnapshotId ? (
+              <button
+                className="mt-3 rounded-md bg-slate-950 px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
+                disabled={baselineRunningId !== null}
+                onClick={() => void updateBaseline(summary.baselineComparison.replacementSnapshotId!, "lock")}
+                type="button"
+              >
+                {baselineRunningId === summary.baselineComparison.replacementSnapshotId ? "替换中" : "替换为新基准"}
+              </button>
+            ) : null}
           </div>
           <div className="grid gap-2 text-xs sm:grid-cols-2 lg:min-w-[420px]">
             <div className="rounded-md bg-white/70 px-2 py-1">准备度 {summary.baselineComparison.readinessDelta > 0 ? "+" : ""}{summary.baselineComparison.readinessDelta}%</div>

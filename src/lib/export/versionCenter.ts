@@ -30,6 +30,8 @@ export interface ExportBaselineComparison {
   status: "no_locked_baseline" | "baseline_current" | "newer_version";
   baselineSnapshotId: string | null;
   comparedSnapshotId: string | null;
+  replacementSnapshotId: string | null;
+  canReplaceBaseline: boolean;
   label: string;
   detail: string;
   readinessDelta: number;
@@ -152,6 +154,8 @@ function buildBaselineComparison(orderedSnapshots: ExportPackageSnapshotView[], 
       status: "no_locked_baseline",
       baselineSnapshotId: null,
       comparedSnapshotId: latestSnapshot?.id ?? null,
+      replacementSnapshotId: null,
+      canReplaceBaseline: false,
       label: "尚未锁定正式基准",
       detail: "先锁定一个可交付快照，版本中心才能判断新版本是否值得替换基准。",
       readinessDelta: 0,
@@ -169,6 +173,8 @@ function buildBaselineComparison(orderedSnapshots: ExportPackageSnapshotView[], 
       status: "baseline_current",
       baselineSnapshotId: locked.id,
       comparedSnapshotId: locked.id,
+      replacementSnapshotId: null,
+      canReplaceBaseline: false,
       label: "当前基准就是最新版本",
       detail: "还没有比正式基准更新的导出记录；继续写作或重导后再做替换判断。",
       readinessDelta: 0,
@@ -200,6 +206,8 @@ function buildBaselineComparison(orderedSnapshots: ExportPackageSnapshotView[], 
     status: "newer_version",
     baselineSnapshotId: locked.id,
     comparedSnapshotId: latestSnapshot.id,
+    replacementSnapshotId: latestSnapshot.id,
+    canReplaceBaseline: true,
     label: "发现比基准更新的导出",
     detail: parts.length
       ? `最新版本相对正式基准：${parts.join("，")}。`

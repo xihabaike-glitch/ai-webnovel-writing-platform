@@ -125,6 +125,8 @@ describe("export version center", () => {
     assert.equal(center.baselineComparison.status, "no_locked_baseline");
     assert.equal(center.baselineComparison.baselineSnapshotId, null);
     assert.equal(center.baselineComparison.comparedSnapshotId, "full-md");
+    assert.equal(center.baselineComparison.canReplaceBaseline, false);
+    assert.equal(center.baselineComparison.replacementSnapshotId, null);
   });
 
   it("reports when the locked baseline is still current", () => {
@@ -142,6 +144,7 @@ describe("export version center", () => {
     assert.equal(center.baselineComparison.status, "baseline_current");
     assert.equal(center.baselineComparison.baselineSnapshotId, "full-md-locked");
     assert.equal(center.baselineComparison.contentChanged, false);
+    assert.equal(center.baselineComparison.canReplaceBaseline, false);
   });
 
   it("compares the latest export against a locked baseline", () => {
@@ -175,6 +178,8 @@ describe("export version center", () => {
     assert.equal(center.baselineComparison.status, "newer_version");
     assert.equal(center.baselineComparison.baselineSnapshotId, "full-md-locked");
     assert.equal(center.baselineComparison.comparedSnapshotId, "full-md-new");
+    assert.equal(center.baselineComparison.replacementSnapshotId, "full-md-new");
+    assert.equal(center.baselineComparison.canReplaceBaseline, true);
     assert.equal(center.baselineComparison.readinessDelta, 6);
     assert.equal(center.baselineComparison.chapterDelta, 1);
     assert.equal(center.baselineComparison.wordDelta, 3000);

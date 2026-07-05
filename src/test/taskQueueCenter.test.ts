@@ -778,6 +778,50 @@ test("buildTaskQueueCenter", async (t) => {
     assert.equal(followup?.completionEvidenceTemplateSource, "最近小样本回执：恢复放量小样本");
   });
 
+  await t.test("surfaces AI pipeline recovery follow-up dispatches with dedicated templates", () => {
+    const queue = buildTaskQueueCenter([{
+      ...project,
+      gateDispatchTasks: [
+        ...firstDayCompleteDispatches(project.id),
+        {
+          dispatchKey: "ai-pipeline:tactic_experience_followup:watch-ai-recovery:2026-01-01",
+          stage: "ai_pipeline_sample_recheck",
+          state: "queued",
+          title: "AI 写审改：恢复观察小样本复验",
+          detail: "AI 写审改恢复依据还在观察期，只准继续 1 章小样本复验，不回推荐批量，过线后再考虑恢复小批。",
+          actionLabel: "继续小样本",
+          href: "/projects/project-1#ai-pipeline",
+          completionEvidence: "",
+        },
+        {
+          dispatchKey: "ai-pipeline:tactic_experience_followup:blocked-ai-recovery:2026-01-01",
+          stage: "ai_pipeline_sample_recheck",
+          state: "assigned",
+          title: "AI 写审改：恢复小批跌线修复",
+          detail: "AI 写审改恢复小批已经进入暂停避坑，先回滚观察修复，修低分章节、开头钩子和章末追读，再重新跑 1 章小样本。",
+          actionLabel: "回滚观察修复",
+          href: "/projects/project-1#ai-pipeline",
+          completionEvidence: "",
+        },
+      ],
+    }]);
+    const followups = queue.items.filter((item) => item.sourceType === "tactic_experience_followup");
+    const sample = followups.find((item) => item.actionLabel === "继续小样本");
+    const rollback = followups.find((item) => item.actionLabel === "回滚观察修复");
+
+    assert.equal(followups.length, 2);
+    assert.equal(sample?.sourceLabel, "AI 写审改恢复");
+    assert.ok(sample?.sourceDetail?.includes("只准继续 1 章小样本复验"));
+    assert.ok(sample?.completionEvidenceTemplate?.includes("样本范围："));
+    assert.ok(sample?.completionEvidenceTemplate?.includes("放量结论：通过恢复小批 / 未通过继续观察"));
+    assert.equal(sample?.completionEvidenceTemplateSource, "AI 写审改恢复模板");
+    assert.equal(sample?.href, "/projects/project-1#ai-pipeline");
+    assert.equal(rollback?.sourceLabel, "AI 写审改恢复");
+    assert.ok(rollback?.sourceDetail?.includes("回滚观察修复"));
+    assert.ok(rollback?.completionEvidenceTemplate?.includes("修复对象："));
+    assert.ok(rollback?.completionEvidenceTemplate?.includes("下一步：观察 / 重新小样本 / 暂停恢复小批"));
+  });
+
   await t.test("allows production when first-day evidence includes handoff closure", () => {
     const queue = buildTaskQueueCenter([{
       ...project,

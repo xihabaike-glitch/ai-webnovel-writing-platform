@@ -673,6 +673,12 @@ function recoveryTacticCompletionEvidenceTemplate(input: {
   };
 }
 
+function isAiPipelineRecoveryFollowupTask(task: NonNullable<TaskQueueProject["gateDispatchTasks"]>[number]) {
+  return task.dispatchKey.startsWith("ai-pipeline:tactic_experience_followup:")
+    || task.stage === "ai_pipeline_sample_recheck"
+    || /AI 写审改/u.test(`${task.title ?? ""} ${task.detail ?? ""}`);
+}
+
 function tacticExperienceFollowupQueueItems(input: {
   project: TaskQueueProject;
   platformName: string;
@@ -691,30 +697,48 @@ function tacticExperienceFollowupQueueItems(input: {
       const title = task.title ?? "恢复放量打法闭环";
       const actionLabel = task.actionLabel ?? "处理打法闭环";
       const stage = (task.stage ?? "scale_up") as GateDispatchCompletionTemplateTask["stage"];
-      const completionEvidence = recoveryTacticCompletionEvidenceTemplate({
-        project: input.project,
-        task,
-        title,
-        actionLabel,
-        platformName: input.platformName,
-        stage,
-      });
+      const aiPipelineRecovery = isAiPipelineRecoveryFollowupTask(task);
+      const completionEvidence = aiPipelineRecovery
+        ? {
+            template: buildGateDispatchCompletionTemplate({
+              stage,
+              title,
+              actionLabel,
+              platformName: "AI 写审改",
+              evidence: task.detail ? [task.detail] : [],
+            }),
+            source: "AI 写审改恢复模板",
+          }
+        : recoveryTacticCompletionEvidenceTemplate({
+            project: input.project,
+            task,
+            title,
+            actionLabel,
+            platformName: input.platformName,
+            stage,
+          });
       return item({
         id: `${input.project.id}:tactic-experience-followup:${task.dispatchKey}`,
         projectId: input.project.id,
         projectTitle: input.project.title,
-        platformName: input.platformName,
+        platformName: aiPipelineRecovery ? "AI 写审改" : input.platformName,
         category: "handoff",
         sourceType: "tactic_experience_followup",
-        sourceLabel: "打法闭环",
+        sourceLabel: aiPipelineRecovery ? "AI 写审改恢复" : "打法闭环",
         sourceDetail: task.detail
-          ? `总闸门经验卡派出的恢复放量后续动作：${task.detail}`
-          : "总闸门经验卡派出的恢复放量后续动作，先处理它，再把结论回流到平台打法库。",
+          ? aiPipelineRecovery
+            ? `总闸门经验卡派出的 AI 写审改恢复动作：${task.detail}`
+            : `总闸门经验卡派出的恢复放量后续动作：${task.detail}`
+          : aiPipelineRecovery
+            ? "总闸门经验卡派出的 AI 写审改恢复动作，先跑小样本或回滚修复，再把结论回流到平台打法库。"
+            : "总闸门经验卡派出的恢复放量后续动作，先处理它，再把结论回流到平台打法库。",
         sourceDispatchKey: task.dispatchKey,
         completionEvidenceTemplate: completionEvidence.template,
         completionEvidenceTemplateSource: completionEvidence.source,
         chapterTitle: title,
-        evidence: task.detail ?? "恢复放量后续动作未完成，先补小样本、追读证据或打法重做结论。",
+        evidence: task.detail ?? (aiPipelineRecovery
+          ? "AI 写审改恢复动作未完成，先跑 1 章小样本或回滚修复，证据不闭合前不回推荐批量。"
+          : "恢复放量后续动作未完成，先补小样本、追读证据或打法重做结论。"),
         strategyBasis: input.startTactic,
         riskLevel: input.riskLevel,
         riskLabel: input.riskLabel,

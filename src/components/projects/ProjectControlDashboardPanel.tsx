@@ -141,6 +141,19 @@ interface AiPipelineControlPlanSummary {
   createdAt: string | null;
 }
 
+interface AiPipelinePromptMemorySummary {
+  hasMemory: boolean;
+  label: string;
+  headline: string;
+  detail: string;
+  promptBlock: string;
+  nextAction: string;
+  evidence: string[];
+  sourceLabel: string | null;
+  latestAt: string | null;
+  targetHref: string;
+}
+
 interface ModelRouteHealthSummary {
   status: "empty" | "healthy" | "watch" | "repair" | "cost_guard";
   score: number;
@@ -204,6 +217,7 @@ interface ProjectControlDashboard {
   aiPipelineRecentBatch: AiPipelineRecentBatchSummary;
   aiPipelineBatchHealth: AiPipelineBatchHealthSummary;
   aiPipelineControlPlan: AiPipelineControlPlanSummary;
+  aiPipelinePromptMemory: AiPipelinePromptMemorySummary;
   modelRouteHealth: ModelRouteHealthSummary;
   areas: ControlArea[];
   priorityActions: ControlPriorityAction[];
@@ -1077,6 +1091,36 @@ export function ProjectControlDashboardPanel({ projectId }: { projectId: string 
                 {dashboard.aiPipelineBatchHealth.evidence.map((evidence) => (
                   <p className="rounded-md bg-slate-50 px-2 py-1" key={evidence}>{evidence}</p>
                 ))}
+              </div>
+            ) : null}
+            {dashboard.aiPipelinePromptMemory.hasMemory ? (
+              <div className="mt-3 rounded-md border border-emerald-200 bg-emerald-50 p-3">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <div className="text-sm font-medium text-emerald-950">{dashboard.aiPipelinePromptMemory.label}</div>
+                      {dashboard.aiPipelinePromptMemory.latestAt ? (
+                        <span className="text-xs text-emerald-700">{shortTime(dashboard.aiPipelinePromptMemory.latestAt)}</span>
+                      ) : null}
+                    </div>
+                    <p className="mt-1 text-xs leading-5 text-emerald-900">{dashboard.aiPipelinePromptMemory.headline}</p>
+                    <p className="mt-1 text-xs leading-5 text-emerald-800">{dashboard.aiPipelinePromptMemory.detail}</p>
+                  </div>
+                  <Link
+                    className="inline-flex w-fit rounded-md bg-white px-2 py-1 text-xs font-medium text-emerald-900 hover:bg-emerald-100"
+                    href={dashboard.aiPipelinePromptMemory.targetHref}
+                  >
+                    看写审改
+                  </Link>
+                </div>
+                <div className="mt-2 grid gap-1 text-xs leading-5 text-emerald-900">
+                  {dashboard.aiPipelinePromptMemory.evidence.slice(0, 3).map((evidence) => (
+                    <p className="rounded-md bg-white/70 px-2 py-1" key={evidence}>{evidence}</p>
+                  ))}
+                </div>
+                <p className="mt-2 rounded-md bg-white/70 px-2 py-1 text-xs leading-5 text-emerald-900">
+                  下一步：{dashboard.aiPipelinePromptMemory.nextAction}
+                </p>
               </div>
             ) : null}
             {dashboard.aiPipelineControlPlan.hasPlan ? (

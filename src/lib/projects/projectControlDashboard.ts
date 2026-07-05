@@ -286,6 +286,19 @@ export interface AiPipelineControlPlanSummary {
   createdAt: string | null;
 }
 
+export interface AiPipelinePromptMemorySummary {
+  hasMemory: boolean;
+  label: string;
+  headline: string;
+  detail: string;
+  promptBlock: string;
+  nextAction: string;
+  evidence: string[];
+  sourceLabel: string | null;
+  latestAt: string | null;
+  targetHref: string;
+}
+
 export interface ProjectControlDashboard {
   overallScore: number;
   verdict: string;
@@ -299,6 +312,7 @@ export interface ProjectControlDashboard {
   aiPipelineRecentBatch: AiPipelineRecentBatchSummary;
   aiPipelineBatchHealth: AiPipelineBatchHealthSummary;
   aiPipelineControlPlan: AiPipelineControlPlanSummary;
+  aiPipelinePromptMemory: AiPipelinePromptMemorySummary;
   modelRouteHealth: ModelRouteHealthSummary;
   areas: ControlArea[];
   priorityActions: ControlPriorityAction[];
@@ -1150,6 +1164,10 @@ function stringArray(value: unknown) {
   return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
 }
 
+function textValue(value: unknown) {
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
 function aiPipelinePlanItem(value: unknown, index: number): AiPipelineControlPlanItem | null {
   if (!isRecord(value)) return null;
   const label = typeof value.label === "string" ? value.label.trim() : "";
@@ -1267,6 +1285,117 @@ function buildAiPipelineControlPlanSummary(audits: ControlBatchAudit[] = []): Ai
     recheckActionLabel,
     recheckActionHref,
     createdAt: new Date(latest.createdAt).toISOString(),
+  };
+}
+
+interface AiPipelinePromptMemoryCandidate {
+  healthLabel: string;
+  sourceLabel: string;
+  nextAction: string;
+  evidence: string[];
+  latestAt: string;
+}
+
+function compactEvidence(items: Array<string | null | undefined>) {
+  return items
+    .map((item) => item?.trim() ?? "")
+    .filter((item, index, all): item is string => Boolean(item) && all.indexOf(item) === index)
+    .slice(0, 4);
+}
+
+function buildAiPipelinePromptMemoryCandidate(audit: ControlBatchAudit): AiPipelinePromptMemoryCandidate | null {
+  const payload = parseJsonObject(audit.payload);
+  const controlPlan = isRecord(payload?.aiPipelineControlPlan) ? payload.aiPipelineControlPlan : null;
+  const controlRecheck = isRecord(controlPlan?.recheck) ? controlPlan.recheck : null;
+  const recheckStatus = controlRecheck?.status === "small_batch_ready" || controlRecheck?.status === "sample_required"
+    ? controlRecheck.status
+    : null;
+
+  if (recheckStatus) {
+    const healthLabel = textValue(controlRecheck?.healthLabel) ?? (recheckStatus === "small_batch_ready" ? "可小批恢复" : "继续小样本复验");
+    const detail = textValue(controlRecheck?.detail) ?? textValue(audit.recheckDetail) ?? audit.message;
+    return {
+      healthLabel,
+      sourceLabel: audit.label,
+      nextAction: recheckStatus === "small_batch_ready"
+        ? "只恢复小批执行，继续观察开头钩子、章末追读、质量分和失败率。"
+        : "先修复正文质量，再只跑 1 章小样本复验。",
+      evidence: compactEvidence([
+        `复检结论：${healthLabel}`,
+        detail,
+        audit.message,
+      ]),
+      latestAt: new Date(audit.createdAt).toISOString(),
+    };
+  }
+
+  const recheck = isRecord(payload?.aiPipelineRecheck) ? payload.aiPipelineRecheck : null;
+  const mode = recheck?.mode === "small_batch_resume" || recheck?.mode === "sample_recheck" ? recheck.mode : null;
+  if (!mode) return null;
+
+  const route = isRecord(payload?.routeEffectSummary) ? payload.routeEffectSummary : null;
+  const batchReceipt = isRecord(payload?.batchReceipt) ? payload.batchReceipt : null;
+  const successRate = numberValue(route?.successRatePercent);
+  const qualityScore = numberValue(route?.averageQualityScore);
+  const healthLabel = mode === "small_batch_resume" ? "恢复小批回流" : "小样本复验回流";
+  const batchStatus = batchReceiptStatus(batchReceipt?.status);
+  const nextAction = batchStatus === "repair" || batchStatus === "review_quality"
+    ? "回滚到小样本修复，不要继续扩大批量。"
+    : "继续小批观察，禁止直接恢复大批量。";
+
+  return {
+    healthLabel,
+    sourceLabel: audit.label,
+    nextAction,
+    evidence: compactEvidence([
+      textValue(batchReceipt?.headline) ?? audit.label,
+      textValue(batchReceipt?.detail) ?? audit.message,
+      successRate !== null ? `成功率 ${successRate}%` : null,
+      qualityScore !== null ? `质量 ${qualityScore}` : null,
+    ]),
+    latestAt: new Date(audit.createdAt).toISOString(),
+  };
+}
+
+function buildAiPipelinePromptMemorySummary(audits: ControlBatchAudit[] = []): AiPipelinePromptMemorySummary {
+  const candidate = audits
+    .map(buildAiPipelinePromptMemoryCandidate)
+    .filter((item): item is AiPipelinePromptMemoryCandidate => Boolean(item))
+    .sort((left, right) => new Date(right.latestAt).getTime() - new Date(left.latestAt).getTime())[0] ?? null;
+
+  if (!candidate) {
+    return {
+      hasMemory: false,
+      label: "暂无提示词记忆",
+      headline: "AI 写审改还没有恢复证据可带入提示词。",
+      detail: "先完成一次复检或小批恢复，总控会把结论变成后续初稿、审稿、二改的约束。",
+      promptBlock: "",
+      nextAction: "先跑复检或小批恢复，拿到真实回执后再写入提示词记忆。",
+      evidence: [],
+      sourceLabel: null,
+      latestAt: null,
+      targetHref: "#ai-pipeline",
+    };
+  }
+
+  const promptBlock = [
+    "AI 写审改恢复证据：",
+    `- ${candidate.healthLabel}：${candidate.evidence.slice(0, 3).join("；")}。`,
+    `- 下一步：${candidate.nextAction}。`,
+    "- 禁区：不要直接恢复大批量，不要弱化开头钩子和章末追读。",
+  ].join("\n");
+
+  return {
+    hasMemory: true,
+    label: "提示词已携带恢复记忆",
+    headline: `${candidate.healthLabel}，后续 AI 写审改会带上这条恢复证据。`,
+    detail: "初稿、审稿、二改都会先按恢复证据守住开头钩子、章末追读和小样本节奏。",
+    promptBlock,
+    nextAction: candidate.nextAction,
+    evidence: candidate.evidence,
+    sourceLabel: candidate.sourceLabel,
+    latestAt: candidate.latestAt,
+    targetHref: "#ai-pipeline",
   };
 }
 
@@ -1590,6 +1719,7 @@ export function buildProjectControlDashboard(input: ProjectControlDashboardInput
   const aiPipelineRecentBatch = buildAiPipelineRecentBatchSummary(input.gateActionAudits);
   const aiPipelineBatchHealth = buildAiPipelineBatchHealthSummary(input.gateActionAudits);
   const aiPipelineControlPlan = buildAiPipelineControlPlanSummary(input.gateActionAudits);
+  const aiPipelinePromptMemory = buildAiPipelinePromptMemorySummary(input.gateActionAudits);
   const modelRouteHealth = buildModelRouteHealthSummary(input);
   const aiPipelineBaseEvidence = `${batchDraft.readyCandidates} 章可初稿，${reviewPipeline.reviewReadyCount} 章待审，${reviewPipeline.secondPassReadyCount} 章可二改。`;
   const aiPipelineArea = aiPipelineAreaDecision({
@@ -1658,6 +1788,7 @@ export function buildProjectControlDashboard(input: ProjectControlDashboardInput
     aiPipelineRecentBatch,
     aiPipelineBatchHealth,
     aiPipelineControlPlan,
+    aiPipelinePromptMemory,
     modelRouteHealth,
     areas,
     priorityActions,

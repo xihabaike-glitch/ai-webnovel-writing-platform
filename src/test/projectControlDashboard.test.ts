@@ -957,6 +957,59 @@ test("buildProjectControlDashboard", async (t) => {
     assert.equal(dashboard.aiPipelineControlPlan.recheckActionHref, "/tasks#recommended-batch");
   });
 
+  await t.test("turns AI recovery outcome into visible prompt memory", () => {
+    const dashboard = buildProjectControlDashboard({
+      project,
+      platform: getPlatformProfile("fanqie"),
+      chapters: [chapter],
+      outlineNodes: [],
+      characters: [],
+      worldEntries: [],
+      foreshadows: [],
+      plotThreads: [],
+      aiTasks: [],
+      gateActionAudits: [
+        {
+          receiptId: "ai-plan-ready",
+          actionId: "ai-pipeline-control:demo-project",
+          label: "批量打法修复清单",
+          detail: "三轮稳住打法：成功率 0%，质量 68，失败 2。",
+          href: "/projects/demo-project#ai-pipeline",
+          status: "succeeded",
+          message: "复检完成：可小批恢复。",
+          executionType: "control_action",
+          succeededCount: 3,
+          failedCount: 0,
+          payload: JSON.stringify({
+            aiPipelineControlPlan: {
+              status: "watch",
+              items: [
+                { id: "stop-scale", label: "停用三轮稳住打法继续放量", completed: true },
+              ],
+              recheck: {
+                status: "small_batch_ready",
+                healthLabel: "可小批恢复",
+                detail: "小样本通过，可以恢复谨慎小批。",
+              },
+            },
+          }),
+          createdAt: "2026-01-03T00:00:00.000Z",
+        },
+      ],
+      submissionChecklist: checklist,
+    });
+
+    assert.equal(dashboard.aiPipelinePromptMemory.hasMemory, true);
+    assert.equal(dashboard.aiPipelinePromptMemory.label, "提示词已携带恢复记忆");
+    assert.ok(dashboard.aiPipelinePromptMemory.headline.includes("可小批恢复"));
+    assert.ok(dashboard.aiPipelinePromptMemory.detail.includes("初稿、审稿、二改"));
+    assert.ok(dashboard.aiPipelinePromptMemory.promptBlock.includes("AI 写审改恢复证据"));
+    assert.ok(dashboard.aiPipelinePromptMemory.promptBlock.includes("谨慎小批"));
+    assert.ok(dashboard.aiPipelinePromptMemory.evidence.some((item) => item.includes("小样本通过")));
+    assert.equal(dashboard.aiPipelinePromptMemory.targetHref, "#ai-pipeline");
+    assert.equal(dashboard.aiPipelinePromptMemory.latestAt, "2026-01-03T00:00:00.000Z");
+  });
+
   await t.test("summarizes model route health for the project control dashboard", () => {
     const dashboard = buildProjectControlDashboard({
       project: {

@@ -10,7 +10,9 @@ import { buildRouteConfirmationRecheckEvidenceFromDispatchTasks } from "@/lib/mo
 import { buildBatchExecutionSafety } from "@/lib/projects/batchExecutionSafety";
 import { buildBatchStrategyComparison, buildBatchStrategyDecision } from "@/lib/projects/batchStrategyComparison";
 import { batchExecutionStrategies, getBatchExecutionStrategy } from "@/lib/projects/batchExecutionStrategy";
+import type { GateBatchTacticEffectStatus } from "@/lib/projects/gateActionReceipts";
 import { buildRecommendedBatchModelRouteGate } from "@/lib/projects/recommendedBatchModelRouteGate";
+import { buildTaskQueueBatchHealthReview } from "@/lib/projects/taskQueueBatchHealth";
 import { buildTaskQueueCenter, recommendedQueueActionLabel, type QueueItem, type TaskQueueProject } from "@/lib/projects/taskQueueCenter";
 import { buildTaskQueueExecutionPlan } from "@/lib/projects/taskQueueExecutionPlan";
 
@@ -121,6 +123,18 @@ function batchTone(successRate: number, failedTasks: number, runningTasks: numbe
   if (runningTasks > 0) return "border-blue-200 bg-blue-50 text-blue-800";
   if (failedTasks > 0 || successRate < 80) return "border-rose-200 bg-rose-50 text-rose-800";
   return "border-emerald-200 bg-emerald-50 text-emerald-800";
+}
+
+function batchTacticTone(status: GateBatchTacticEffectStatus) {
+  if (status === "blocked") return "border-rose-200 bg-rose-50 text-rose-900";
+  if (status === "watch") return "border-amber-200 bg-amber-50 text-amber-900";
+  return "border-emerald-200 bg-emerald-50 text-emerald-900";
+}
+
+function batchTacticStatusText(status: GateBatchTacticEffectStatus) {
+  if (status === "blocked") return "先停用";
+  if (status === "watch") return "继续观察";
+  return "可参考";
 }
 
 function repairBatchTone(status: ReturnType<typeof buildTaskRunConsole>["failureRepairBatch"]["status"]) {
@@ -250,11 +264,23 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
       take: 50,
       select: {
         receiptId: true,
+        actionId: true,
         projectId: true,
         executionType: true,
         status: true,
+        label: true,
+        detail: true,
+        href: true,
+        message: true,
         succeededCount: true,
         failedCount: true,
+        taskId: true,
+        platformId: true,
+        platformName: true,
+        recheckStatus: true,
+        recheckLabel: true,
+        recheckDetail: true,
+        recheckAction: true,
         payload: true,
         createdAt: true,
       },
@@ -283,6 +309,7 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
   })));
   const strategyComparison = buildBatchStrategyComparison(queue.items, safetyProjects, batchHistory);
   const strategyDecision = buildBatchStrategyDecision(strategyComparison, activeStrategy.id);
+  const batchTacticEffectReview = buildTaskQueueBatchHealthReview(recentRecommendedBatchAudits, 5);
   const unlockedDrafts = queue.items.filter((entry) => entry.category === "draft" && entry.scaleGate === "cleared");
   const firstDayHandoffItems = queue.items.filter((entry) => entry.sourceType === "first_day_handoff");
   const modelRoutePreflightGate = executionPlan.canRun
@@ -622,6 +649,62 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
             ))}
             {runConsole.recentLogs.length === 0 ? <p className="text-sm text-slate-600">暂无运行日志。</p> : null}
           </div>
+        </div>
+      </section>
+
+      <section className="mb-6 rounded-md border border-slate-200 bg-white p-4">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <h2 className="font-medium">批量健康复盘</h2>
+            <p className="mt-1 text-sm leading-6 text-slate-600">
+              这里直接读取推荐批次回执，识别普通批量、恢复放量、三轮稳住和三轮降档，先判断打法能不能继续喂给下一批。
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2 text-xs">
+            <span className="rounded-md border border-emerald-200 bg-emerald-50 px-2 py-1 font-medium text-emerald-800">
+              可参考 {batchTacticEffectReview.summary.usable}
+            </span>
+            <span className="rounded-md border border-amber-200 bg-amber-50 px-2 py-1 font-medium text-amber-800">
+              观察 {batchTacticEffectReview.summary.watch}
+            </span>
+            <span className="rounded-md border border-rose-200 bg-rose-50 px-2 py-1 font-medium text-rose-800">
+              先停 {batchTacticEffectReview.summary.blocked}
+            </span>
+          </div>
+        </div>
+        {batchTacticEffectReview.nextActions.length ? (
+          <div className="mt-3 grid gap-2 lg:grid-cols-3">
+            {batchTacticEffectReview.nextActions.map((action) => (
+              <div className="rounded-md bg-slate-50 px-3 py-2 text-sm leading-6 text-slate-600" key={action}>{action}</div>
+            ))}
+          </div>
+        ) : null}
+        <div className="mt-4 grid gap-3 lg:grid-cols-3">
+          {batchTacticEffectReview.items.slice(0, 3).map((item) => (
+            <div className={`rounded-md border p-3 text-sm ${batchTacticTone(item.status)}`} key={item.id}>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="rounded-md bg-white/70 px-2 py-1 text-xs font-medium">{batchTacticStatusText(item.status)}</span>
+                <span className="font-medium">{item.label}</span>
+              </div>
+              <div className="mt-2 text-xs opacity-75">{item.tacticTitle}</div>
+              <p className="mt-2 leading-6">{item.openingMove || item.primaryTactic}</p>
+              <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+                <div className="rounded-md bg-white/70 p-2">批次 {item.sampleBatches}</div>
+                <div className="rounded-md bg-white/70 p-2">成功率 {item.successRatePercent}%</div>
+                <div className="rounded-md bg-white/70 p-2">质量 {item.averageQualityScore ?? "缺"}</div>
+                <div className="rounded-md bg-white/70 p-2">失败 {item.failedTasks}</div>
+              </div>
+              <p className="mt-3 leading-6 opacity-85">{item.nextAction}</p>
+              {item.evidence[0] ? (
+                <p className="mt-3 rounded-md bg-white/70 p-2 text-xs leading-5 opacity-80">{item.evidence[0]}</p>
+              ) : null}
+            </div>
+          ))}
+          {batchTacticEffectReview.items.length === 0 ? (
+            <p className="rounded-md border border-dashed border-slate-300 p-3 text-sm text-slate-600 lg:col-span-3">
+              还没有带首轮打法的推荐批次回执。先执行一次推荐批次，这里会显示可继续、观察或先停用的判断。
+            </p>
+          ) : null}
         </div>
       </section>
 

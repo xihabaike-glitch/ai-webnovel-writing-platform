@@ -125,9 +125,10 @@ function routeFlowFilterFromLane(laneId: RouteConfirmationDispatchFlowLaneId): R
 export type DispatchQueueFilter = "all" | "recheck_followup" | "ai_pipeline";
 
 interface RouteActionExecution {
+  kind?: "route_action" | "first_day_ai";
   method: "POST";
   endpoint: string;
-  body: {
+  body?: {
     areaId: string;
   };
 }
@@ -352,7 +353,17 @@ export function GateDispatchTaskCenter({
         const firstDayUpdate = buildFirstDayDispatchUpdateSummary(updated);
         if (firstDayUpdate.visible) {
           setRouteActionMessage(`${firstDayUpdate.title}：${firstDayUpdate.detail} 下一步：${firstDayUpdate.actionLabel}。`);
-          setRouteActionLink({ label: firstDayUpdate.actionLabel, href: firstDayUpdate.href });
+          setRouteActionLink({
+            label: firstDayUpdate.actionLabel,
+            href: firstDayUpdate.href,
+            execution: firstDayUpdate.actionExecution
+              ? {
+                kind: firstDayUpdate.actionExecution.kind,
+                method: "POST",
+                endpoint: firstDayUpdate.actionExecution.endpoint,
+              }
+              : undefined,
+          });
           router.refresh();
         } else if (startMetricMessage) {
           setRouteActionMessage(`${startMetricMessage}${submissionEffectMessage ? `；${submissionEffectMessage}` : ""}`);
@@ -617,14 +628,31 @@ export function GateDispatchTaskCenter({
       const response = await fetch(action.execution.endpoint, {
         method: action.execution.method,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(action.execution.body),
+        body: action.execution.body ? JSON.stringify(action.execution.body) : undefined,
       });
       const payload = await response.json().catch(() => null) as {
         error?: string;
         message?: string;
         dispatchKey?: string;
+        executionReceipt?: {
+          success?: boolean;
+          summary?: string;
+          nextAction?: string;
+        };
       } | null;
       if (!response.ok) throw new Error(payload?.error ?? "执行下一步失败。");
+      if (action.execution.kind === "first_day_ai") {
+        const receipt = payload?.executionReceipt;
+        const receiptText = receipt?.summary ? `：${receipt.summary}` : "";
+        const nextText = receipt?.nextAction ? ` 下一步：${receipt.nextAction}` : "";
+        setRouteActionMessage(`首日 AI 已执行${receiptText}。${nextText}`);
+        setRouteActionLink({
+          label: "回项目验收",
+          href: action.href,
+        });
+        router.refresh();
+        return;
+      }
       setRouteActionMessage(payload?.message ?? `${action.label}已执行。`);
       setRouteActionLink(payload?.dispatchKey ? {
         label: "查看 AI 复检派单",

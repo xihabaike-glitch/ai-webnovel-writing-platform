@@ -692,6 +692,10 @@ test("buildFirstDayDispatchUpdateSummary promotes executable AI follow-up", () =
   assert.equal(summary.status, "advanced");
   assert.equal(summary.actionLabel, "继续 AI 执行");
   assert.equal(summary.href, "/projects/project-1?firstDayLaunch=1&nextStep=first-review#first-day-workflow");
+  assert.deepEqual(summary.actionExecution, {
+    kind: "first_day_ai",
+    endpoint: "/api/projects/project-1/first-day-workflow",
+  });
   assert.ok(summary.detail.includes("下一张首日卡是「第一章审稿」"));
   assert.ok(summary.badges.includes("AI 可继续"));
 });

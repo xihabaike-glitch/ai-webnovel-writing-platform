@@ -152,12 +152,18 @@ export interface FirstDayDispatchUpdateSummary {
   detail: string;
   actionLabel: string;
   href: string;
+  actionExecution?: FirstDayDispatchUpdateActionExecution;
   badges: string[];
 }
 
 export interface FirstDayDispatchUpdateExecutionPlan {
   executable: boolean;
   blockedReason?: string;
+}
+
+export interface FirstDayDispatchUpdateActionExecution {
+  kind: "first_day_ai";
+  endpoint: string;
 }
 
 export type FirstDayWorkflowMessageAction = "execute_current_step" | "complete_current_dispatch" | "open_next_step";
@@ -853,6 +859,12 @@ export function buildFirstDayDispatchUpdateSummary(input: {
   const aiExecutableFollowUp = firstDayFollowUp
     && completedStepId !== "risk-recovery"
     && (input.executionPlan?.executable ?? ["story-support", "first-draft", "first-review", "first-rewrite"].includes(followUpStepId));
+  const aiFollowUpExecution = aiExecutableFollowUp && firstDayFollowUp.projectId
+    ? {
+      kind: "first_day_ai" as const,
+      endpoint: `/api/projects/${encodeURIComponent(firstDayFollowUp.projectId)}/first-day-workflow`,
+    }
+    : undefined;
 
   if (completedStepId === "risk-recovery") {
     return {
@@ -864,6 +876,7 @@ export function buildFirstDayDispatchUpdateSummary(input: {
         : "恢复验证已验收。请刷新首日工作流，确认下一步是否进入小样本生成。",
       actionLabel: aiExecutableFollowUp ? "继续 AI 执行" : firstDayFollowUp?.actionLabel || "回作品看恢复观察",
       href: firstDayFollowUp ? followUpHref : input.task.href,
+      actionExecution: aiFollowUpExecution,
       badges: [
         "已完成恢复条件",
         "转入观察小样本",
@@ -898,6 +911,7 @@ export function buildFirstDayDispatchUpdateSummary(input: {
       detail: `「${completedStepLabel}」已验收，下一张首日卡是「${followUpStepLabel}」。先完成当前节点，再考虑批量扩大。`,
       actionLabel: aiExecutableFollowUp ? "继续 AI 执行" : firstDayFollowUp.actionLabel,
       href: followUpHref,
+      actionExecution: aiFollowUpExecution,
       badges: [
         completedStepLabel,
         followUpStepLabel,

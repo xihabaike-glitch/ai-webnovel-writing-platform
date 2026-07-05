@@ -113,6 +113,22 @@ test("publish repair run result helpers", async (t) => {
       results: [fixedResult],
       nextAction,
     })?.primaryAction, "export");
+    const effectPrompt = buildPublishRepairExitPrompt({
+      canExport: true,
+      results: [fixedResult],
+      nextAction,
+      hasExportVersion: true,
+      hasPublishEffect: false,
+    });
+    assert.equal(effectPrompt?.status, "needs_effect");
+    assert.equal(effectPrompt?.primaryAction, "record_effect");
+    assert.equal(buildPublishRepairExitPrompt({
+      canExport: true,
+      results: [fixedResult],
+      nextAction,
+      hasExportVersion: true,
+      hasPublishEffect: true,
+    })?.primaryAction, "export");
     assert.equal(buildPublishRepairExitPrompt({
       canExport: false,
       results: [{ ...fixedResult, status: "failed", error: "模型不可用。" }],

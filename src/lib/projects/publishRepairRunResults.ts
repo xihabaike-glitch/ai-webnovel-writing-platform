@@ -27,10 +27,10 @@ export interface PublishRepairNextAction {
 }
 
 export interface PublishRepairExitPrompt {
-  status: "in_progress" | "retry_failed" | "needs_recheck" | "ready_to_export";
+  status: "in_progress" | "retry_failed" | "needs_recheck" | "ready_to_export" | "needs_effect";
   label: string;
   detail: string;
-  primaryAction: "wait" | "retry" | "recheck" | "export";
+  primaryAction: "wait" | "retry" | "recheck" | "export" | "record_effect";
 }
 
 export function labelForAction(kind: PublishRepairActionKind) {
@@ -99,8 +99,18 @@ export function buildPublishRepairExitPrompt(input: {
   canExport: boolean;
   results: PublishRepairRunResult[];
   nextAction?: Pick<PublishRepairNextAction, "kind" | "label" | "detail"> | null;
+  hasExportVersion?: boolean;
+  hasPublishEffect?: boolean;
 }): PublishRepairExitPrompt | null {
   if (input.canExport) {
+    if (input.hasExportVersion && !input.hasPublishEffect) {
+      return {
+        status: "needs_effect",
+        label: "出口：记录发布效果",
+        detail: "发布包已经留下版本基准，下一步录入曝光、点击、收藏、追读、评论、付费阅读或编辑反馈，让平台策略进入真实复盘。",
+        primaryAction: "record_effect",
+      };
+    }
     return {
       status: "ready_to_export",
       label: "出口：发布包已通过",

@@ -1428,6 +1428,8 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
       canExport: selectedPackage.canExport,
       results: runResults,
       nextAction: repairNextAction,
+      hasExportVersion: selectedPackage.publishVersions.length > 0,
+      hasPublishEffect: selectedPackage.publishEffect.records > 0,
     }) : null,
     [selectedPackage, runResults, repairNextAction],
   );
@@ -2088,7 +2090,7 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
       });
       const payload = (await response.json().catch(() => null)) as { message?: string; error?: string } | null;
       if (!response.ok) throw new Error(payload?.error ?? "发布包已复制，但版本保存失败。");
-      setMessage(`已复制 ${selectedPackage.platformName} 发布包，并保存版本。`);
+      setMessage(`已复制 ${selectedPackage.platformName} 发布包，并保存版本。下一步记录真实发布效果。`);
       await loadCenter({ keepMessage: true });
     } catch (caught) {
       setMessage(caught instanceof Error ? caught.message : "发布包已复制，但版本保存失败。");
@@ -2117,7 +2119,7 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
       link.download = `${selectedPackage.title}-${selectedPackage.platformName}-发布包.md`;
       link.click();
       URL.revokeObjectURL(url);
-      setMessage(`已下载 ${selectedPackage.platformName} 发布包，并保存版本。`);
+      setMessage(`已下载 ${selectedPackage.platformName} 发布包，并保存版本。下一步记录真实发布效果。`);
       await loadCenter({ keepMessage: true });
     } catch (caught) {
       setMessage(caught instanceof Error ? caught.message : "下载发布包失败。");
@@ -2147,7 +2149,7 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
       link.download = "全平台投稿包.md";
       link.click();
       URL.revokeObjectURL(url);
-      setMessage(`已下载全平台投稿包，包含 ${exportablePackages.length} 个通过质检的平台版本。`);
+      setMessage(`已下载全平台投稿包，包含 ${exportablePackages.length} 个通过质检的平台版本。下一步记录各平台真实效果。`);
       await loadCenter({ keepMessage: true });
     } catch (caught) {
       setMessage(caught instanceof Error ? caught.message : "下载全平台投稿包失败。");
@@ -3291,6 +3293,8 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
                 <div className={`mt-3 rounded-md border p-3 ${
                   repairExitPrompt.status === "ready_to_export"
                     ? "border-emerald-200 bg-emerald-50"
+                    : repairExitPrompt.status === "needs_effect"
+                      ? "border-cyan-200 bg-cyan-50"
                     : repairExitPrompt.status === "retry_failed"
                       ? "border-rose-200 bg-rose-50"
                       : repairExitPrompt.status === "in_progress"
@@ -3340,6 +3344,14 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
                             全平台包
                           </button>
                         </>
+                      ) : null}
+                      {repairExitPrompt.primaryAction === "record_effect" ? (
+                        <a
+                          className="rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white"
+                          href="#publish-effect-panel"
+                        >
+                          记录发布效果
+                        </a>
                       ) : null}
                       {repairExitPrompt.primaryAction === "retry" && repairNextAction?.action && canRunAction(repairNextAction.action) ? (
                         <button

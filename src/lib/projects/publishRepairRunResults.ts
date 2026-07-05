@@ -29,6 +29,7 @@ export interface PublishRepairNextAction {
 export function labelForAction(kind: PublishRepairActionKind) {
   if (kind === "run_second_pass") return "执行二改";
   if (kind === "run_chapter_review") return "补章节审稿";
+  if (kind === "adopt_candidate") return "采纳候选稿";
   if (kind === "edit_chapter") return "人工改章";
   if (kind === "add_publish_chapters") return "补发布章节";
   return "打开发布包";

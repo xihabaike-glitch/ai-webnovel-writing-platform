@@ -15,6 +15,7 @@ import { addGateActionReceipt, buildGatePublishEffectReceipt } from "@/lib/proje
 
 type PublishRepairActionKind =
   | "edit_chapter"
+  | "adopt_candidate"
   | "run_chapter_review"
   | "run_second_pass"
   | "open_submission_package"
@@ -702,6 +703,9 @@ interface PublishEffectDraft {
 }
 
 function actionHref(projectId: string, action: PublishRepairAction) {
+  if (action.kind === "adopt_candidate" && action.chapterId) {
+    return `/projects/${projectId}/chapters/${action.chapterId}#chapter-revisions`;
+  }
   if (action.kind === "open_submission_package") return `/projects/${projectId}#submission-package`;
   if (action.kind === "add_publish_chapters") return `/projects/${projectId}#create-chapter`;
   if (action.kind === "run_second_pass" && action.chapterId) {

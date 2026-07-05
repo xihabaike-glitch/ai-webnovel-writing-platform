@@ -298,6 +298,19 @@ export function buildTaskQueueCenter(projects: TaskQueueProject[]): TaskQueueCen
       targetPlatform: platform,
       chapters: project.chapters,
       aiTasks: project.aiTasks,
+      chapterRevisions: project.chapters.flatMap((chapter) => (
+        (chapter.revisions ?? []).map((revision) => ({
+          id: revision.id,
+          chapterId: chapter.id,
+          source: revision.source,
+          sourceTaskId: revision.sourceTaskId,
+          title: revision.title,
+          content: revision.content,
+          wordCount: revision.wordCount,
+          notes: revision.notes,
+          createdAt: revision.createdAt,
+        }))
+      )),
     });
     const queueItems: QueueItem[] = [];
 

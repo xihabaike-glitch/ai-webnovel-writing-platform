@@ -130,7 +130,15 @@ async function buildCenter(projectId: string) {
   const project = await prisma.project.findUnique({
     where: { id: projectId },
     include: {
-      chapters: { orderBy: { order: "asc" } },
+      chapters: {
+        orderBy: { order: "asc" },
+        include: {
+          revisions: {
+            orderBy: { createdAt: "desc" },
+            take: 10,
+          },
+        },
+      },
       aiTasks: { orderBy: { createdAt: "desc" } },
       publishSnapshots: { orderBy: { createdAt: "desc" }, take: 80 },
       submissionAssets: { orderBy: { updatedAt: "desc" } },
@@ -171,6 +179,19 @@ async function buildCenter(projectId: string) {
     targetPlatform,
     chapters: project.chapters,
     aiTasks: project.aiTasks,
+    chapterRevisions: project.chapters.flatMap((chapter) => (
+      chapter.revisions.map((revision) => ({
+        id: revision.id,
+        chapterId: chapter.id,
+        source: revision.source,
+        sourceTaskId: revision.sourceTaskId,
+        title: revision.title,
+        content: revision.content,
+        wordCount: revision.wordCount,
+        notes: revision.notes,
+        createdAt: revision.createdAt,
+      }))
+    )),
     publishSnapshots: project.publishSnapshots,
     submissionAssets: project.submissionAssets.map((asset) => ({
       id: asset.id,

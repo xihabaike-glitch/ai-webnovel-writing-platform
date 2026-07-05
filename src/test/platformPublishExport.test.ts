@@ -289,6 +289,94 @@ test("buildPlatformPublishExportCenter", async (t) => {
     assert.ok(pack.markdown.includes("补章节审稿"));
   });
 
+  await t.test("blocks export while a second-pass candidate is not adopted", () => {
+    const center = buildPlatformPublishExportCenter({
+      project: {
+        title: "夜雨系统",
+        genre: "都市系统",
+        sellingPoint: "雨夜危机中觉醒系统，主角用选择翻盘。",
+        currentWordCount: 9000,
+        targetWordCount: 300000,
+      },
+      targetPlatform: getPlatformProfile("fanqie"),
+      chapters: finalChapters,
+      aiTasks: passedReviews,
+      chapterRevisions: [
+        {
+          id: "revision-second-pass",
+          chapterId: "chapter-1",
+          source: "chapter_second_pass_candidate",
+          sourceTaskId: "second-pass-task",
+          title: "第1夜",
+          content: "二改候选稿正文，钩子更强，但还没有进入当前正文。",
+          wordCount: 2800,
+          notes: "二改候选稿。",
+          createdAt: "2026-01-08T00:00:00.000Z",
+        },
+      ],
+      submissionChecklist: readyChecklist,
+      platforms: [getPlatformProfile("fanqie")],
+    });
+    const pack = center.packages[0];
+
+    assert.equal(pack.canExport, false);
+    assert.ok(pack.chapters[0].preflight.blocked.some((item) => item.includes("未采纳的二改候选稿")));
+    assert.ok(pack.repairActions.some((action) => action.kind === "adopt_candidate" && action.chapterId === "chapter-1"));
+    assert.equal(pack.repairPath.nextStep?.kind, "adopt_candidate");
+    assert.equal(pack.repairPath.manualActions, 1);
+  });
+
+  await t.test("does not block an adopted second-pass candidate", () => {
+    const center = buildPlatformPublishExportCenter({
+      project: {
+        title: "夜雨系统",
+        genre: "都市系统",
+        sellingPoint: "雨夜危机中觉醒系统，主角用选择翻盘。",
+        currentWordCount: 9000,
+        targetWordCount: 300000,
+      },
+      targetPlatform: getPlatformProfile("fanqie"),
+      chapters: finalChapters,
+      aiTasks: [
+        ...passedReviews.slice(1),
+        {
+          chapterId: "chapter-1",
+          taskType: "chapter_adopt_candidate",
+          status: "succeeded",
+          outputText: JSON.stringify({ adopted: true }),
+          inputSnapshot: JSON.stringify({ revisionId: "revision-second-pass" }),
+          createdAt: "2026-01-09T00:00:00.000Z",
+        },
+        {
+          chapterId: "chapter-1",
+          taskType: "chapter_review",
+          status: "succeeded",
+          outputText: JSON.stringify({ score: 92, shouldSecondPass: false }),
+          createdAt: "2026-01-10T00:00:00.000Z",
+        },
+      ],
+      chapterRevisions: [
+        {
+          id: "revision-second-pass",
+          chapterId: "chapter-1",
+          source: "chapter_second_pass_candidate",
+          sourceTaskId: "second-pass-task",
+          title: "第1夜",
+          content: "二改候选稿正文，已经被采纳过。",
+          wordCount: 2800,
+          notes: "二改候选稿。",
+          createdAt: "2026-01-08T00:00:00.000Z",
+        },
+      ],
+      submissionChecklist: readyChecklist,
+      platforms: [getPlatformProfile("fanqie")],
+    });
+    const pack = center.packages[0];
+
+    assert.equal(pack.canExport, true);
+    assert.equal(pack.repairActions.some((action) => action.kind === "adopt_candidate"), false);
+  });
+
   await t.test("prefers persisted platform submission assets", () => {
     const center = buildPlatformPublishExportCenter({
       project: {

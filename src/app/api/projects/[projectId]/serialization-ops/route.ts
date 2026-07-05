@@ -19,7 +19,15 @@ export async function GET(_request: Request, { params }: Params) {
   const project = await prisma.project.findUnique({
     where: { id: projectId },
     include: {
-      chapters: { orderBy: { order: "asc" } },
+      chapters: {
+        orderBy: { order: "asc" },
+        include: {
+          revisions: {
+            orderBy: { createdAt: "desc" },
+            take: 10,
+          },
+        },
+      },
       aiTasks: {
         orderBy: { createdAt: "desc" },
       },
@@ -93,6 +101,19 @@ export async function GET(_request: Request, { params }: Params) {
     platforms: [platform],
     chapters: project.chapters,
     aiTasks: project.aiTasks,
+    chapterRevisions: project.chapters.flatMap((chapter) => (
+      chapter.revisions.map((revision) => ({
+        id: revision.id,
+        chapterId: chapter.id,
+        source: revision.source,
+        sourceTaskId: revision.sourceTaskId,
+        title: revision.title,
+        content: revision.content,
+        wordCount: revision.wordCount,
+        notes: revision.notes,
+        createdAt: revision.createdAt,
+      }))
+    )),
     publishSnapshots: project.publishSnapshots,
     submissionAssets,
     submissionAssetVersions,

@@ -11,6 +11,7 @@ test("publish repair action execution helpers", async (t) => {
   await t.test("allows executable chapter actions only", () => {
     assert.equal(canExecutePublishRepairAction({ kind: "run_chapter_review", chapterId: "chapter-1" }), true);
     assert.equal(canExecutePublishRepairAction({ kind: "run_second_pass", chapterId: "chapter-1" }), true);
+    assert.equal(canExecutePublishRepairAction({ kind: "adopt_candidate", chapterId: "chapter-1" }), false);
     assert.equal(canExecutePublishRepairAction({ kind: "run_second_pass" }), false);
     assert.equal(canExecutePublishRepairAction({ kind: "open_submission_package" }), false);
   });

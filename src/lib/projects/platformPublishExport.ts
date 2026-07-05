@@ -1,5 +1,6 @@
 import type { PlatformProfile } from "../platforms/platformProfiles.ts";
 import { platformProfiles, type PlatformId } from "../platforms/platformProfiles.ts";
+import { getChapterRevisionSourceLabel, isChapterRevisionCandidate } from "../chapters/revisions.ts";
 import { publishRepairTaskSource } from "./publishRepairActionExecution.ts";
 import { chapterTaskFreshness } from "./chapterPublishReadiness.ts";
 import type { SubmissionChecklist } from "./submissionChecklist.ts";
@@ -30,8 +31,21 @@ export interface PublishExportAiTask {
   createdAt: Date | string;
 }
 
+export interface PublishExportChapterRevision {
+  id: string;
+  chapterId: string;
+  source: string;
+  sourceTaskId?: string | null;
+  title: string;
+  content: string;
+  wordCount: number;
+  notes?: string;
+  createdAt: Date | string;
+}
+
 export type PublishRepairActionKind =
   | "edit_chapter"
+  | "adopt_candidate"
   | "run_chapter_review"
   | "run_second_pass"
   | "open_submission_package"
@@ -326,6 +340,7 @@ export interface PlatformPublishExportInput {
   project: PublishExportProject;
   chapters: PublishExportChapter[];
   aiTasks?: PublishExportAiTask[];
+  chapterRevisions?: PublishExportChapterRevision[];
   publishSnapshots?: PublishPackageVersionItem[];
   submissionAssets?: PlatformSubmissionAssetInput[];
   submissionAssetVersions?: PlatformSubmissionAssetVersionInput[];
@@ -876,6 +891,36 @@ function parseJsonObject(text: string | null | undefined) {
   }
 }
 
+function isCandidateAlreadyCurrent(chapter: PublishExportChapter, revision: PublishExportChapterRevision) {
+  return compact(chapter.title) === compact(revision.title)
+    && compact(chapter.content) === compact(revision.content)
+    && chapter.wordCount === revision.wordCount;
+}
+
+function adoptedRevisionIds(tasks: PublishExportAiTask[]) {
+  return new Set(tasks
+    .filter((task) => task.taskType === "chapter_adopt_candidate" && task.status === "succeeded")
+    .map((task) => {
+      const parsed = parseJsonObject(task.inputSnapshot);
+      return typeof parsed?.revisionId === "string" ? parsed.revisionId : null;
+    })
+    .filter((revisionId): revisionId is string => Boolean(revisionId)));
+}
+
+function latestUnadoptedCandidateRevision(
+  chapter: PublishExportChapter,
+  revisions: PublishExportChapterRevision[],
+  tasks: PublishExportAiTask[],
+) {
+  const adoptedIds = adoptedRevisionIds(tasks);
+  const latest = revisions
+    .filter((revision) => revision.chapterId === chapter.id && isChapterRevisionCandidate(revision.source))
+    .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime())[0];
+
+  if (!latest || adoptedIds.has(latest.id) || isCandidateAlreadyCurrent(chapter, latest)) return null;
+  return latest;
+}
+
 function preflightScore(blocked: string[], warnings: string[]) {
   return Math.max(0, Math.min(100, 100 - blocked.length * 22 - warnings.length * 6));
 }
@@ -954,6 +999,7 @@ function buildChapterPreflight(
   chapter: PublishExportChapter,
   platform: PlatformProfile,
   tasks: PublishExportAiTask[],
+  revisions: PublishExportChapterRevision[],
   warnings: string[],
 ): PublishPreflight {
   const blocked: string[] = [];
@@ -962,6 +1008,7 @@ function buildChapterPreflight(
   const repairActions: PublishRepairAction[] = [];
   const reviewFreshness = chapterTaskFreshness(tasks, chapter.id, "chapter_review");
   const reviewDecision = parseReviewDecision(reviewFreshness.isFresh ? reviewFreshness.task : undefined);
+  const pendingCandidate = latestUnadoptedCandidateRevision(chapter, revisions, tasks);
 
   if (compact(chapter.content).length > 0 && chapter.wordCount > 0) passed.push("正文已生成");
   else {
@@ -991,6 +1038,15 @@ function buildChapterPreflight(
       "edit_chapter",
       "补章末悬念",
       "进入章节编辑区补下一章追读问题。",
+    ));
+  }
+  if (pendingCandidate) {
+    blocked.push(`存在未采纳的${getChapterRevisionSourceLabel(pendingCandidate.source)}，当前正文还不是最新修复稿。`);
+    repairActions.push(chapterAction(
+      chapter,
+      "adopt_candidate",
+      "采纳候选稿",
+      `先到章节版本区处理 ${getChapterRevisionSourceLabel(pendingCandidate.source)}，确认采纳、继续二改或保留当前稿后再发布。`,
     ));
   }
   if (reviewDecision && !reviewDecision.shouldSecondPass) {
@@ -1248,6 +1304,7 @@ function dedupeRepairActions(actions: PublishRepairAction[]) {
 function repairLabel(kind: PublishRepairActionKind) {
   const labels: Record<PublishRepairActionKind, string> = {
     edit_chapter: "编辑章节",
+    adopt_candidate: "采纳候选稿",
     run_chapter_review: "补章节审稿",
     run_second_pass: "执行二改",
     open_submission_package: "补投稿资料",
@@ -1269,9 +1326,10 @@ function repairActionRank(action: PublishRepairAction) {
   const kindRank: Record<PublishRepairActionKind, number> = {
     add_publish_chapters: 0,
     edit_chapter: 1,
-    run_second_pass: 2,
-    run_chapter_review: 3,
-    open_submission_package: 4,
+    adopt_candidate: 2,
+    run_second_pass: 3,
+    run_chapter_review: 4,
+    open_submission_package: 5,
   };
   return priorityRank[action.priority] * 10 + kindRank[action.kind];
 }
@@ -3591,7 +3649,7 @@ function buildPlatformPackage(
   ].filter(Boolean).join("\n");
   const chapters = publishableChapters(input.chapters).map((chapter) => {
     const warnings = chapterWarnings(chapter, platform);
-    const preflight = buildChapterPreflight(chapter, platform, input.aiTasks ?? [], warnings);
+    const preflight = buildChapterPreflight(chapter, platform, input.aiTasks ?? [], input.chapterRevisions ?? [], warnings);
     return {
       id: chapter.id,
       order: chapter.order,

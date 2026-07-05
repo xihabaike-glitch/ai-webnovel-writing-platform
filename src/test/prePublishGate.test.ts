@@ -143,6 +143,73 @@ test("buildPrePublishGate", async (t) => {
     assert.equal(gate.releaseAction?.href, "/dispatch?firstDayProject=project-handoff-blocked&step=publish-precheck#first-day-dispatch");
   });
 
+  await t.test("blocks launch while first-three adoption follow-ups are unfinished", () => {
+    const gate = buildPrePublishGate({
+      projects: [{
+        ...readyProject,
+        gateDispatchTasks: [
+          ...firstDayCompleteDispatches("project-ready"),
+          {
+            dispatchKey: "first-three-adoption:project-ready:chapter-1:revision-1:review",
+            state: "assigned",
+            completionEvidence: "",
+            title: "第 1 章采纳后重新审稿",
+            detail: "采纳后的新正文需要重新审稿。",
+            actionLabel: "重新审稿",
+            href: "/projects/project-ready/chapters/chapter-1#chapter-workflow",
+          },
+          {
+            dispatchKey: "first-three-adoption:project-ready:chapter-1:revision-1:publish-check",
+            state: "queued",
+            completionEvidence: "",
+            title: "第 1 章采纳后发布质检",
+            detail: "重新审稿后回发布包刷新质检。",
+            actionLabel: "回发布质检",
+            href: "/projects/project-ready#platform-export",
+          },
+        ],
+      }],
+      failureTasks: [],
+      batchHistory: [],
+    });
+    const adoptionItem = gate.items.find((item) => item.id === "first-three-adoption-loop");
+
+    assert.equal(gate.status, "blocked");
+    assert.equal(adoptionItem?.status, "block");
+    assert.ok(adoptionItem?.detail.includes("正文变更后不能沿用旧审稿"));
+    assert.ok(gate.priorityActions.some((action) => action.id.includes(":review") && action.label === "重新审稿"));
+    assert.equal(gate.releaseAction?.label, "先解除阻塞：重新审稿");
+  });
+
+  await t.test("passes launch gate after first-three adoption review and publish check are closed", () => {
+    const gate = buildPrePublishGate({
+      projects: [{
+        ...readyProject,
+        gateDispatchTasks: [
+          ...firstDayCompleteDispatches("project-ready"),
+          {
+            dispatchKey: "first-three-adoption:project-ready:chapter-1:revision-1:review",
+            state: "completed",
+            completionEvidence: "采纳后重新审稿已完成：第 1 章《第1夜》，任务 review-1，审稿分 91，问题 0 个。",
+          },
+          {
+            dispatchKey: "first-three-adoption:project-ready:chapter-1:revision-1:publish-check",
+            state: "completed",
+            completionEvidence: "采纳后发布质检已刷新：番茄小说 发布包版本 snapshot-1，质检 92 分，可导出。",
+          },
+        ],
+      }],
+      failureTasks: [],
+      batchHistory: [],
+    });
+    const adoptionItem = gate.items.find((item) => item.id === "first-three-adoption-loop");
+
+    assert.equal(gate.status, "ready");
+    assert.equal(adoptionItem?.status, "pass");
+    assert.ok(adoptionItem?.detail.includes("已验收 2 个采纳后续任务"));
+    assert.ok(gate.items.every((item) => item.status === "pass"));
+  });
+
   await t.test("blocks launch when publish package and failed tasks are unresolved", () => {
     const gate = buildPrePublishGate({
       projects: [blockedProject],

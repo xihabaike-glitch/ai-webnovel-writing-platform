@@ -63,6 +63,10 @@ export interface PrePublishGateProject {
     dispatchKey: string;
     state: string;
     completionEvidence: string;
+    title?: string;
+    detail?: string;
+    actionLabel?: string;
+    href?: string;
   }>;
   publishSnapshots?: PublishPackageVersionItem[];
   submissionAssets?: PlatformSubmissionAssetInput[];
@@ -259,6 +263,62 @@ function clampScore(score: number) {
 
 function gateItem(input: PrePublishGateItem): PrePublishGateItem {
   return input;
+}
+
+type PrePublishGateDispatchTask = NonNullable<PrePublishGateProject["gateDispatchTasks"]>[number];
+
+function isFirstThreeAdoptionFollowup(task: PrePublishGateDispatchTask) {
+  return task.dispatchKey.startsWith("first-three-adoption:");
+}
+
+function firstThreeAdoptionFollowups(projects: PrePublishGateProject[]) {
+  return projects.flatMap((project) => (
+    (project.gateDispatchTasks ?? [])
+      .filter(isFirstThreeAdoptionFollowup)
+      .map((task) => ({ project, task }))
+  ));
+}
+
+function firstThreeFollowupHref(projectId: string, task: PrePublishGateDispatchTask) {
+  if (task.href) return task.href;
+  if (task.dispatchKey.endsWith(":publish-check")) return `/projects/${projectId}#platform-export`;
+  return `/projects/${projectId}`;
+}
+
+function buildFirstThreeAdoptionGateItem(projects: PrePublishGateProject[]) {
+  const followups = firstThreeAdoptionFollowups(projects);
+  const pending = followups.filter(({ task }) => task.state !== "completed");
+  const completedWithoutEvidence = followups.filter(({ task }) => (
+    task.state === "completed" && task.completionEvidence.trim().length < 8
+  ));
+  const reviewPending = pending.filter(({ task }) => task.dispatchKey.endsWith(":review")).length;
+  const publishPending = pending.filter(({ task }) => task.dispatchKey.endsWith(":publish-check")).length;
+  const affectedProjects = new Set(followups.map(({ project }) => project.id)).size;
+  const firstPending = pending[0] ?? completedWithoutEvidence[0] ?? null;
+  const status: PrePublishGateItem["status"] = pending.length > 0
+    ? "block"
+    : completedWithoutEvidence.length > 0
+      ? "warn"
+      : "pass";
+
+  return gateItem({
+    id: "first-three-adoption-loop",
+    label: "采纳闭环",
+    status,
+    detail: pending.length > 0
+      ? `${affectedProjects} 个项目有前三章采纳后续未闭环：${reviewPending} 个待重新审稿，${publishPending} 个待发布质检。正文变更后不能沿用旧审稿。`
+      : completedWithoutEvidence.length > 0
+        ? `${completedWithoutEvidence.length} 个采纳后续任务已完成但缺少验收证据，发布前补齐证据。`
+        : followups.length > 0
+          ? `已验收 ${followups.length} 个采纳后续任务，重新审稿和发布质检都已回填。`
+          : "当前没有未闭环的前三章采纳后续任务。",
+    actionLabel: pending.length > 0
+      ? firstPending?.task.actionLabel ?? "处理采纳后续"
+      : completedWithoutEvidence.length > 0
+        ? "补验收证据"
+        : "查看闭环",
+    href: firstPending ? firstThreeFollowupHref(firstPending.project.id, firstPending.task) : "/projects",
+  });
 }
 
 function actionHref(projectId: string, action: PublishRepairAction) {
@@ -504,6 +564,19 @@ function uniqueActions(actions: PrePublishGateAction[]) {
   }).slice(0, 6);
 }
 
+function firstThreeAdoptionPriorityActions(projects: PrePublishGateProject[]) {
+  return firstThreeAdoptionFollowups(projects)
+    .filter(({ task }) => task.state !== "completed")
+    .slice(0, 4)
+    .map(({ project, task }) => action(
+      `adoption-followup:${task.dispatchKey}`,
+      task.actionLabel ?? (task.dispatchKey.endsWith(":publish-check") ? "回发布质检" : "重新审稿"),
+      `${project.title} · ${task.title ?? "前三章采纳后续"} · ${task.detail ?? "采纳后的正文需要重新审稿并刷新发布质检。"}`,
+      firstThreeFollowupHref(project.id, task),
+      "repair",
+    ));
+}
+
 function buildReleaseAction(
   status: PrePublishGate["status"],
   projectStatuses: PrePublishGateProjectStatus[],
@@ -534,6 +607,7 @@ function buildReleaseAction(
 
   const nextAction = status === "blocked"
     ? priorityActions.find((item) => item.id === "queue:next")
+      ?? priorityActions.find((item) => item.id.startsWith("adoption-followup:"))
       ?? priorityActions.find((item) => item.id.startsWith("repair:"))
       ?? priorityActions[0]
       ?? null
@@ -810,6 +884,7 @@ export function buildPrePublishGate(input: PrePublishGateInput): PrePublishGate 
       actionLabel: taskBlockers > 0 || runnableTasks > 0 ? "打开任务队列" : "查看任务队列",
       href: "/tasks",
     }),
+    buildFirstThreeAdoptionGateItem(projects),
     gateItem({
       id: "ai-failures",
       label: "失败复盘",
@@ -854,6 +929,7 @@ export function buildPrePublishGate(input: PrePublishGateInput): PrePublishGate 
       ? "有项目已经能投，但仍存在未处理提醒；先按优先动作走一轮。"
       : "当前发布会把未修复风险带到平台，先完成阻塞项再放行。";
   const priorityActions = uniqueActions([
+    ...firstThreeAdoptionPriorityActions(projects),
     ...projectStatuses
       .filter((project) => project.status !== "ready")
       .map((project) => action(

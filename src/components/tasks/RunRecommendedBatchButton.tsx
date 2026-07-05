@@ -1,9 +1,10 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { buildRecommendedBatchRouteGateTimeline } from "@/lib/projects/recommendedBatchRouteGateView";
 
-interface BatchRunResponse {
+export interface BatchRunResponse {
   error?: string;
   plan?: {
     actionLabel: string;
@@ -80,19 +81,44 @@ function modelRouteGateTone(status: NonNullable<BatchRunResponse["modelRouteGate
   return "border-rose-200 bg-rose-50 text-rose-900";
 }
 
-export function RunRecommendedBatchButton({ disabled, strategyId }: { disabled: boolean; strategyId: string }) {
+function timelineToneClass(tone: ReturnType<typeof buildRecommendedBatchRouteGateTimeline>["tone"]) {
+  if (tone === "ok") return "border-emerald-200 bg-white/70 text-emerald-900";
+  if (tone === "watch") return "border-amber-200 bg-white/70 text-amber-900";
+  return "border-rose-200 bg-white/70 text-rose-900";
+}
+
+function timelineItemClass(status: ReturnType<typeof buildRecommendedBatchRouteGateTimeline>["items"][number]["status"]) {
+  if (status === "done") return "border-emerald-200 bg-emerald-50 text-emerald-800";
+  if (status === "active") return "border-slate-950 bg-slate-950 text-white";
+  return "border-slate-200 bg-slate-50 text-slate-500";
+}
+
+export function RunRecommendedBatchButton({
+  disabled,
+  strategyId,
+  initialModelRouteGate = null,
+}: {
+  disabled: boolean;
+  strategyId: string;
+  initialModelRouteGate?: BatchRunResponse["modelRouteGate"] | null;
+}) {
   const router = useRouter();
   const [isRunning, setIsRunning] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [batchReceipt, setBatchReceipt] = useState<BatchRunResponse["batchReceipt"] | null>(null);
-  const [modelRouteGate, setModelRouteGate] = useState<BatchRunResponse["modelRouteGate"] | null>(null);
+  const [modelRouteGate, setModelRouteGate] = useState<BatchRunResponse["modelRouteGate"] | null>(initialModelRouteGate);
   const [isCreatingRecheck, setIsCreatingRecheck] = useState(false);
+  const routeGateTimeline = modelRouteGate ? buildRecommendedBatchRouteGateTimeline(modelRouteGate) : null;
+
+  useEffect(() => {
+    setModelRouteGate(initialModelRouteGate);
+  }, [initialModelRouteGate]);
 
   async function runBatch() {
     setIsRunning(true);
     setMessage(null);
     setBatchReceipt(null);
-    setModelRouteGate(null);
+    setModelRouteGate(initialModelRouteGate);
     try {
       const response = await fetch(`/api/tasks/recommended-batch?strategy=${encodeURIComponent(strategyId)}`, {
         method: "POST",
@@ -166,6 +192,21 @@ export function RunRecommendedBatchButton({ disabled, strategyId }: { disabled: 
               <div className="font-medium">{modelRouteGate.label}</div>
               <p className="mt-1 leading-6 opacity-90">{modelRouteGate.headline}</p>
               <div className="mt-2 rounded-md bg-white/70 px-2 py-1 text-xs leading-5">{modelRouteGate.detail}</div>
+              {routeGateTimeline ? (
+                <div className={`mt-2 rounded-md border px-2 py-2 text-xs leading-5 ${timelineToneClass(routeGateTimeline.tone)}`}>
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="font-medium">{routeGateTimeline.label}</span>
+                    <span>{routeGateTimeline.summary}</span>
+                  </div>
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {routeGateTimeline.items.map((item) => (
+                      <span className={`rounded-md border px-2 py-1 font-medium ${timelineItemClass(item.status)}`} key={item.label}>
+                        {item.label}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
               {modelRouteGate.recoveryEvidence ? (
                 <div className="mt-2 rounded-md bg-white/80 px-2 py-1 text-xs leading-5">恢复依据：{modelRouteGate.recoveryEvidence}</div>
               ) : null}

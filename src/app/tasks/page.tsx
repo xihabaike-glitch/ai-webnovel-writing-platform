@@ -5,9 +5,11 @@ import { RunRecommendedBatchButton } from "@/components/tasks/RunRecommendedBatc
 import { buildTaskBatchHistory } from "@/lib/ai/taskBatchHistory";
 import { buildTaskRunConsole, type TaskRunLog } from "@/lib/ai/taskRunConsole";
 import { prisma } from "@/lib/db/prisma";
+import { buildRouteConfirmationRecheckEvidenceFromDispatchTasks } from "@/lib/model-gateway/routeConfirmation";
 import { buildBatchExecutionSafety } from "@/lib/projects/batchExecutionSafety";
 import { buildBatchStrategyComparison, buildBatchStrategyDecision } from "@/lib/projects/batchStrategyComparison";
 import { batchExecutionStrategies, getBatchExecutionStrategy } from "@/lib/projects/batchExecutionStrategy";
+import { buildRecommendedBatchModelRouteGate } from "@/lib/projects/recommendedBatchModelRouteGate";
 import { buildTaskQueueCenter, recommendedQueueActionLabel, type QueueItem } from "@/lib/projects/taskQueueCenter";
 import { buildTaskQueueExecutionPlan } from "@/lib/projects/taskQueueExecutionPlan";
 
@@ -106,11 +108,29 @@ function repairKindLabel(kind: ReturnType<typeof buildTaskRunConsole>["failureRe
 export default async function TasksPage({ searchParams }: { searchParams?: Promise<{ batchStrategy?: string }> }) {
   const resolvedSearchParams = searchParams ? await searchParams : {};
   const activeStrategy = getBatchExecutionStrategy(resolvedSearchParams.batchStrategy);
-  const [projects, recentAiTasks, chapters] = await Promise.all([
+  const [
+    projects,
+    recentAiTasks,
+    chapters,
+    modelProviders,
+    modelRoutes,
+    completedRouteConfirmationRechecks,
+    recentRecommendedBatchAudits,
+  ] = await Promise.all([
     prisma.project.findMany({
       include: {
         chapters: { orderBy: { order: "asc" } },
-        aiTasks: { orderBy: { createdAt: "desc" } },
+        aiTasks: {
+          orderBy: { createdAt: "desc" },
+          include: {
+            modelProvider: {
+              select: {
+                providerId: true,
+                displayName: true,
+              },
+            },
+          },
+        },
         worldEntries: { orderBy: [{ type: "asc" }, { createdAt: "asc" }] },
         gateDispatchTasks: {
           where: { dispatchKey: { startsWith: "first-day:" } },
@@ -134,6 +154,39 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
     prisma.chapter.findMany({
       select: { id: true, title: true },
     }),
+    prisma.modelProvider.findMany({ orderBy: { createdAt: "asc" } }),
+    prisma.modelTaskRoute.findMany({ orderBy: { taskType: "asc" } }),
+    prisma.gateDispatchTask.findMany({
+      where: {
+        stage: "model_route_confirmation_recheck",
+        state: "completed",
+      },
+      orderBy: { completedAt: "desc" },
+      take: 40,
+      select: {
+        dispatchKey: true,
+        stage: true,
+        state: true,
+        completionEvidence: true,
+        evidence: true,
+        completedAt: true,
+      },
+    }),
+    prisma.gateActionAudit.findMany({
+      where: { executionType: "recommended_batch" },
+      orderBy: { createdAt: "desc" },
+      take: 50,
+      select: {
+        receiptId: true,
+        projectId: true,
+        executionType: true,
+        status: true,
+        succeededCount: true,
+        failedCount: true,
+        payload: true,
+        createdAt: true,
+      },
+    }),
   ]);
   const chaptersById = new Map(chapters.map((chapter) => [chapter.id, chapter]));
   const queue = buildTaskQueueCenter(projects);
@@ -150,6 +203,17 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
   const strategyComparison = buildBatchStrategyComparison(queue.items, projects, batchHistory);
   const strategyDecision = buildBatchStrategyDecision(strategyComparison, activeStrategy.id);
   const unlockedDrafts = queue.items.filter((entry) => entry.category === "draft" && entry.scaleGate === "cleared");
+  const modelRoutePreflightGate = executionPlan.canRun
+    ? buildRecommendedBatchModelRouteGate({
+      plan: executionPlan,
+      projects,
+      providers: modelProviders,
+      routes: modelRoutes,
+      routeConfirmationRechecks: buildRouteConfirmationRecheckEvidenceFromDispatchTasks(completedRouteConfirmationRechecks),
+      recommendedBatchAudits: recentRecommendedBatchAudits,
+    })
+    : null;
+  const modelRouteBlocksRecommendedBatch = modelRoutePreflightGate?.status === "block";
 
   return (
     <AppShell>
@@ -438,9 +502,13 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
           </div>
           <div className="flex flex-col gap-2 lg:items-end">
             <div className="rounded-md bg-slate-50 px-3 py-2 text-sm font-medium text-slate-700">
-              {safety.canRunRecommendedBatch && executionPlan.canRun ? "建议批次可执行" : "建议先处理阻塞"}
+              {safety.canRunRecommendedBatch && executionPlan.canRun && !modelRouteBlocksRecommendedBatch ? "建议批次可执行" : "建议先处理阻塞"}
             </div>
-            <RunRecommendedBatchButton disabled={!safety.canRunRecommendedBatch || !executionPlan.canRun} strategyId={activeStrategy.id} />
+            <RunRecommendedBatchButton
+              disabled={!safety.canRunRecommendedBatch || !executionPlan.canRun || modelRouteBlocksRecommendedBatch}
+              initialModelRouteGate={modelRoutePreflightGate}
+              strategyId={activeStrategy.id}
+            />
           </div>
         </div>
         <div className="mt-4 grid gap-2 md:grid-cols-3">
@@ -469,7 +537,11 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
               <p className="mt-1 text-sm leading-6 text-slate-600">{strategyDecision.detail}</p>
             </div>
             {strategyDecision.status === "ready" ? (
-              <RunRecommendedBatchButton disabled={!strategyDecision.canRun} strategyId={strategyDecision.strategyId} />
+              <RunRecommendedBatchButton
+                disabled={!strategyDecision.canRun || modelRouteBlocksRecommendedBatch}
+                initialModelRouteGate={modelRoutePreflightGate}
+                strategyId={strategyDecision.strategyId}
+              />
             ) : (
               <Link className="w-fit rounded-md bg-slate-950 px-4 py-2 text-sm font-medium text-white" href={strategyDecision.actionHref}>
                 {strategyDecision.actionLabel}

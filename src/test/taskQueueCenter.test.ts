@@ -643,6 +643,58 @@ test("buildTaskQueueCenter", async (t) => {
     assert.equal(queue.recommendedNext?.blockerType, "first_day_gate");
   });
 
+  await t.test("surfaces first-day experience handoff dispatches as queue work", () => {
+    const queue = buildTaskQueueCenter([{
+      ...project,
+      worldEntries: handoffWorldEntries(),
+      gateDispatchTasks: [
+        ...firstDayCompleteDispatches(project.id),
+        {
+          dispatchKey: "first-day-handoff:project-1:opening",
+          stage: "start_opening_diagnostic",
+          state: "assigned",
+          title: "夜雨系统 · 经验开书交接：开头打法",
+          detail: "把「稳定加码」拆到第一章首屏，先验证钩子、危机和追读问题。",
+          actionLabel: "锁定开头打法",
+          href: "/projects/project-1/chapters/chapter-ready-draft",
+          completionEvidence: "",
+        },
+        {
+          dispatchKey: "first-day-handoff:project-1:verification",
+          stage: "start_first_three_review",
+          state: "assigned",
+          title: "夜雨系统 · 经验开书交接：首轮验收",
+          detail: "把历史打法转成前三章验收标准，防止只复用结论、不复用证据。",
+          actionLabel: "设置验收口径",
+          href: "/projects/project-1/chapters/chapter-ready-draft",
+          completionEvidence: "",
+        },
+        {
+          dispatchKey: "first-day-handoff:project-1:platform-package",
+          stage: "start_platform_package",
+          state: "completed",
+          title: "夜雨系统 · 经验开书交接：平台回收",
+          detail: "把可复用经验落到标题、简介、标签、样章和首轮数据回收口径。",
+          actionLabel: "准备平台回收",
+          href: "/projects/project-1#platform-export",
+          completionEvidence: "",
+        },
+      ],
+    }]);
+    const handoffs = queue.items.filter((item) => item.sourceType === "first_day_handoff");
+
+    assert.equal(queue.overview.firstDayHandoffs, 3);
+    assert.equal(handoffs.length, 3);
+    assert.deepEqual(handoffs.map((item) => item.category), ["handoff", "handoff", "handoff"]);
+    assert.deepEqual(handoffs.map((item) => item.actionLabel), ["补交接证据", "锁定开头打法", "设置验收口径"]);
+    assert.ok(handoffs[0]?.sourceDetail?.includes("证据太薄"));
+    assert.ok(handoffs.some((item) => item.sourceDetail?.includes("历史打法")));
+    assert.ok(handoffs[0]?.handoffGuidance?.firstDayActions.some((action) => action.includes("倒计时")));
+    assert.ok(handoffs[0]?.handoffGuidance?.avoidRules.some((rule) => rule.includes("小样本")));
+    assert.equal(queue.recommendedNext?.sourceType, "first_day_handoff");
+    assert.equal(recommendedQueueActionLabel(queue.recommendedNext), "下一步：补交接证据");
+  });
+
   await t.test("allows production when first-day evidence includes handoff closure", () => {
     const queue = buildTaskQueueCenter([{
       ...project,

@@ -18,6 +18,7 @@ export const dynamic = "force-dynamic";
 
 function categoryClass(category: QueueItem["category"]) {
   if (category === "candidate") return "bg-violet-50 text-violet-700";
+  if (category === "handoff") return "bg-cyan-50 text-cyan-700";
   if (category === "review") return "bg-blue-50 text-blue-700";
   if (category === "second_pass") return "bg-amber-50 text-amber-700";
   if (category === "draft") return "bg-emerald-50 text-emerald-700";
@@ -196,6 +197,7 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
           where: {
             OR: [
               { dispatchKey: { startsWith: "first-day:" } },
+              { dispatchKey: { startsWith: "first-day-handoff:" } },
               { dispatchKey: { startsWith: "first-three-adoption:" } },
             ],
           },
@@ -282,6 +284,7 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
   const strategyComparison = buildBatchStrategyComparison(queue.items, safetyProjects, batchHistory);
   const strategyDecision = buildBatchStrategyDecision(strategyComparison, activeStrategy.id);
   const unlockedDrafts = queue.items.filter((entry) => entry.category === "draft" && entry.scaleGate === "cleared");
+  const firstDayHandoffItems = queue.items.filter((entry) => entry.sourceType === "first_day_handoff");
   const modelRoutePreflightGate = executionPlan.canRun
     ? buildRecommendedBatchModelRouteGate({
       plan: executionPlan,
@@ -370,10 +373,47 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
           <div className="mt-1 text-2xl font-semibold">{queue.overview.watchCleared}</div>
         </div>
         <div className="rounded-md border border-slate-200 bg-white p-3">
+          <div className="text-xs text-slate-500">经验交接</div>
+          <div className="mt-1 text-2xl font-semibold">{queue.overview.firstDayHandoffs}</div>
+        </div>
+        <div className="rounded-md border border-slate-200 bg-white p-3">
           <div className="text-xs text-slate-500">采纳闭环</div>
           <div className="mt-1 text-2xl font-semibold">{queue.overview.firstThreeAdoptionFollowups}</div>
         </div>
       </section>
+
+      {firstDayHandoffItems.length > 0 ? (
+        <section className="mb-6 rounded-md border border-cyan-200 bg-cyan-50 p-4 text-cyan-950">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <h2 className="font-medium">经验开书交接</h2>
+              <p className="mt-1 max-w-3xl text-sm leading-6">
+                这些卡来自“用历史打法开项目”。先把开头打法、首轮验收和平台回收口径闭环，再进入批量生产。
+              </p>
+            </div>
+            <div className="w-fit rounded-md bg-white/80 px-3 py-2 text-sm font-medium">
+              {firstDayHandoffItems.length} 个交接待办
+            </div>
+          </div>
+          <div className="mt-3 grid gap-2 lg:grid-cols-3">
+            {firstDayHandoffItems.slice(0, 6).map((entry) => (
+              <Link className="rounded-md bg-white/80 p-3 text-sm hover:bg-white" href={entry.href} key={entry.id}>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="rounded-md bg-cyan-100 px-2 py-1 text-xs font-medium text-cyan-800">{entry.actionLabel}</span>
+                  <span className="font-medium text-slate-950">{entry.chapterTitle}</span>
+                </div>
+                <div className="mt-2 text-slate-600">{entry.projectTitle} · {entry.platformName}</div>
+                <p className="mt-2 line-clamp-2 leading-6 text-slate-600">{entry.evidence}</p>
+                {entry.handoffGuidance?.firstDayActions.length ? (
+                  <div className="mt-2 text-xs font-medium text-cyan-800">
+                    {entry.handoffGuidance.firstDayActions[0]}
+                  </div>
+                ) : null}
+              </Link>
+            ))}
+          </div>
+        </section>
+      ) : null}
 
       {unlockedDrafts.length > 0 ? (
         <section className="mb-6 rounded-md border border-emerald-200 bg-emerald-50 p-4 text-emerald-900">
@@ -815,6 +855,11 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
                       {entry.sourceLabel}
                     </span>
                   ) : null}
+                  {entry.sourceType === "first_day_handoff" ? (
+                    <span className="rounded-md bg-cyan-50 px-2 py-1 text-xs font-medium text-cyan-700">
+                      {entry.sourceLabel}
+                    </span>
+                  ) : null}
                   <Link className="font-semibold text-slate-950 hover:underline" href={`/projects/${entry.projectId}`}>
                     {entry.projectTitle}
                   </Link>
@@ -831,6 +876,11 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
                         回总闸门复检
                       </Link>
                     </div>
+                  </div>
+                ) : null}
+                {entry.sourceType === "first_day_handoff" && entry.sourceDetail ? (
+                  <div className="mt-3 rounded-md border border-cyan-200 bg-cyan-50 px-3 py-2 text-xs leading-5 text-cyan-950">
+                    <span className="font-medium">{entry.sourceLabel}：</span>{entry.sourceDetail}
                   </div>
                 ) : null}
                 {entry.riskNotice ? (

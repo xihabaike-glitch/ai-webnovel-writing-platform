@@ -1620,7 +1620,9 @@ export function buildPrePublishGate(input: PrePublishGateInput): PrePublishGate 
   const emptyProjects = projectStatuses.filter((project) => project.status === "empty").length;
   const exportVersionBlockers = projectStatuses.filter((project) => project.exportVersionGate.status === "block");
   const exportVersionWarnings = projectStatuses.filter((project) => project.exportVersionGate.status === "warn");
-  const runnableTasks = queue.items.filter((item) => item.category !== "blocked" && item.category !== "export").length;
+  const runnableTasks = queue.items.filter((item) => (
+    item.category === "draft" || item.category === "review" || item.category === "second_pass"
+  )).length;
   const failedTasks = failureRepairBatch.summary.unresolvedFailures;
   const hasPublishableWork = projectStatuses.some((project) => project.publishableChapters > 0);
   const taskBlockers = queue.overview.blockedCards;

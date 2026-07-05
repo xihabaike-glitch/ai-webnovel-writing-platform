@@ -117,9 +117,9 @@ export interface QueueItem {
   projectId: string;
   projectTitle: string;
   platformName: string;
-  category: "candidate" | "draft" | "review" | "second_pass" | "effect" | "export" | "blocked";
+  category: "candidate" | "handoff" | "draft" | "review" | "second_pass" | "effect" | "export" | "blocked";
   blockerType: "chapter_card" | "publish_repair" | "export_version" | "risk_recovery" | "watch_scale_gate" | "first_day_gate" | null;
-  sourceType?: "first_three_adoption" | "export_version_recheck";
+  sourceType?: "first_day_handoff" | "first_three_adoption" | "export_version_recheck";
   sourceLabel?: string;
   sourceDetail?: string;
   label: string;
@@ -161,6 +161,7 @@ export interface TaskQueueCenter {
     watchItems: number;
     watchSampleOnly: number;
     watchCleared: number;
+    firstDayHandoffs: number;
     firstThreeAdoptionFollowups: number;
   };
   items: QueueItem[];
@@ -171,6 +172,7 @@ type PublishEffectQueueExecution = NonNullable<QueueItem["effectAction"]>["execu
 
 const categoryPriority: Record<QueueItem["category"], number> = {
   candidate: 5,
+  handoff: 6,
   review: 10,
   second_pass: 20,
   draft: 30,
@@ -198,6 +200,7 @@ export function recommendedQueueActionLabel(entry: QueueItem | null) {
 function categoryLabel(category: QueueItem["category"]) {
   const labels: Record<QueueItem["category"], string> = {
     candidate: "待采纳",
+    handoff: "经验交接",
     draft: "待生成",
     review: "待审稿",
     second_pass: "待二改",
@@ -469,6 +472,49 @@ function firstThreeAdoptionFollowupQueueItems(input: {
         }),
         href: task.href ?? (isPublishCheck ? `${input.projectHref}#platform-export` : input.projectHref),
         executionChapterId: executionChapterId ?? undefined,
+      });
+    });
+}
+
+function firstDayExperienceHandoffQueueItems(input: {
+  project: TaskQueueProject;
+  platformName: string;
+  startTactic: ProjectStartTacticSummary | null;
+  riskLevel: FirstDayRiskLevel;
+  riskLabel: string;
+  riskNotice: string | null;
+  scaleGate: QueueScaleGate;
+}) {
+  return (input.project.gateDispatchTasks ?? [])
+    .filter((task) => {
+      if (!task.dispatchKey.startsWith(`first-day-handoff:${input.project.id}:`)) return false;
+      return task.state !== "completed" || task.completionEvidence.trim().length < 8;
+    })
+    .map((task): QueueItem => {
+      const missingEvidence = task.state === "completed" && task.completionEvidence.trim().length < 8;
+      return item({
+        id: `${input.project.id}:first-day-handoff:${task.dispatchKey}`,
+        projectId: input.project.id,
+        projectTitle: input.project.title,
+        platformName: input.platformName,
+        category: "handoff",
+        sourceType: "first_day_handoff",
+        sourceLabel: "经验开书",
+        sourceDetail: missingEvidence
+          ? "交接派单已标记完成，但验收证据太薄。补齐动作、边界和回收口径后，经验才算真正落地。"
+          : "这不是普通生产任务，是把历史打法拆给首日角色的交接工单。先闭环它，再让后续批量生产吃到正确上下文。",
+        chapterTitle: task.title ?? "经验开书交接",
+        evidence: missingEvidence
+          ? `任务已标记完成，但缺少可验收依据。${task.detail ?? "补齐交接动作、避坑边界和首轮回收口径。"}`
+          : task.detail ?? "经验开书交接还未完成，需要确认开头打法、首轮验收或平台回收口径。",
+        strategyBasis: input.startTactic,
+        handoffGuidance: input.startTactic ? buildHandoffGuidance(input.startTactic) : null,
+        riskLevel: input.riskLevel,
+        riskLabel: input.riskLabel,
+        riskNotice: input.riskNotice,
+        scaleGate: input.scaleGate,
+        actionLabel: missingEvidence ? "补交接证据" : task.actionLabel ?? "处理交接",
+        href: task.href ?? firstDayDispatchHref(input.project.id),
       });
     });
 }
@@ -808,6 +854,16 @@ export function buildTaskQueueCenter(projects: TaskQueueProject[]): TaskQueueCen
       platformPublishMetrics: project.platformPublishMetrics ?? [],
     });
     const queueItems: QueueItem[] = [];
+
+    queueItems.push(...firstDayExperienceHandoffQueueItems({
+      project,
+      platformName: platform.name,
+      startTactic,
+      riskLevel: riskProfile.level,
+      riskLabel: riskProfile.label,
+      riskNotice,
+      scaleGate,
+    }));
 
     queueItems.push(...firstThreeAdoptionFollowupQueueItems({
       project,
@@ -1184,6 +1240,7 @@ export function buildTaskQueueCenter(projects: TaskQueueProject[]): TaskQueueCen
       watchItems: items.filter((entry) => entry.riskLevel === "watch").length,
       watchSampleOnly: items.filter((entry) => entry.scaleGate === "sample_only" && isAutomatedQueueItem(entry)).length,
       watchCleared: items.filter((entry) => entry.scaleGate === "cleared" && isAutomatedQueueItem(entry)).length,
+      firstDayHandoffs: items.filter((entry) => entry.sourceType === "first_day_handoff").length,
       firstThreeAdoptionFollowups: items.filter((entry) => entry.sourceType === "first_three_adoption").length,
     },
     items,

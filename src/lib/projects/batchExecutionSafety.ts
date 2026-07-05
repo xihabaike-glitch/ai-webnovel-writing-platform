@@ -31,6 +31,7 @@ export interface BatchExecutionSafety {
 
 const estimatedTokensByCategory: Record<QueueItem["category"], number> = {
   candidate: 0,
+  handoff: 0,
   draft: 3200,
   review: 1800,
   second_pass: 4200,

@@ -16,6 +16,7 @@ export interface FirstDayContinuationAction {
 }
 
 function categoryAction(category: QueueItem["category"]) {
+  if (category === "handoff") return { label: "处理经验交接", href: "/tasks" };
   if (category === "draft") return { label: "进入批量初稿", href: "#ai-pipeline" };
   if (category === "review") return { label: "进入批量审稿", href: "#ai-pipeline" };
   if (category === "second_pass") return { label: "进入批量二改", href: "#ai-pipeline" };
@@ -100,6 +101,22 @@ function blockedAction(projectId: string, item: QueueItem, itemCount: number): F
   };
 }
 
+function handoffAction(item: QueueItem, itemCount: number): FirstDayContinuationAction {
+  return {
+    status: "blocked",
+    headline: "先闭环经验开书交接",
+    detail: `${item.projectTitle} · ${item.chapterTitle}：${item.evidence}`,
+    primaryLabel: item.actionLabel,
+    primaryHref: item.href,
+    secondaryLabel: "查看任务队列",
+    secondaryHref: "/tasks",
+    queueCategory: item.category,
+    itemCount,
+    warnings: ["经验交接没闭环前，不要把历史打法当成已落实的生产上下文。"],
+    handoffGuidance: item.handoffGuidance ?? null,
+  };
+}
+
 function projectWithCompletedFirstDayGate(project: TaskQueueProject, workflow: FirstDayWorkflow): TaskQueueProject {
   if (workflow.completedCount < workflow.totalSteps) return project;
   const existingTasks = project.gateDispatchTasks ?? [];
@@ -148,6 +165,9 @@ export function buildFirstDayContinuationAction(input: {
   const itemCount = queue.items.filter((item) => item.category === next.category).length;
   if (next.category === "blocked") {
     return blockedAction(input.project.id, next, itemCount);
+  }
+  if (next.category === "handoff") {
+    return handoffAction(next, itemCount);
   }
 
   const action = categoryAction(next.category);

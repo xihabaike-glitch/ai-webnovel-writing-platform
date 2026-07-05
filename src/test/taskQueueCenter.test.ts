@@ -728,6 +728,56 @@ test("buildTaskQueueCenter", async (t) => {
     assert.equal(recommendedQueueActionLabel(queue.recommendedNext), "下一步：打法闭环 · 继续小样本");
   });
 
+  await t.test("prefills recovery tactic follow-up evidence from the latest small-sample receipt", () => {
+    const queue = buildTaskQueueCenter([{
+      ...project,
+      gateDispatchTasks: [
+        ...firstDayCompleteDispatches(project.id),
+        {
+          dispatchKey: "fanqie:tactic_experience_followup:usable-recovery-scale:2026-01-01",
+          stage: "scale_up",
+          state: "queued",
+          title: "番茄小说 恢复放量继续小样本",
+          detail: "这条恢复放量经验只允许小步复用，继续跑小样本验证前三章兑现、平台反馈和追读信号。",
+          actionLabel: "继续小样本",
+          href: "/gate#platform-tactic-experience",
+          completionEvidence: "",
+        },
+      ],
+      gateActionAudits: [{
+        actionId: "recommended-batch:conservative:draft:project-1",
+        executionType: "recommended_batch",
+        status: "succeeded",
+        succeededCount: 2,
+        failedCount: 0,
+        taskId: "draft-task-2",
+        platformId: "fanqie",
+        label: "恢复放量小样本",
+        createdAt: "2026-01-10T00:00:00.000Z",
+        payload: JSON.stringify({
+          batchReceipt: {
+            status: "continue",
+            completionEvidenceTemplate: [
+              "小样本验证已完成：",
+              "通过线：成功率 100%，质量 88，目标是成功率不低于 80%、质量不低于 80。",
+              "不可接受项：未出现失败、质量低于 80、备用命中或成本异常。",
+              "复查证据：AI 任务 draft-task-2、draft-task-3；章节 第二章、第三章；恢复放量稳定。",
+              "放量结论：通过，可以恢复后续初稿批次。",
+            ].join("\n"),
+          },
+        }),
+      }],
+    }]);
+    const followup = queue.items.find((item) => item.sourceType === "tactic_experience_followup");
+
+    assert.ok(followup?.completionEvidenceTemplate?.includes("加码范围：番茄小说 恢复放量继续小样本"));
+    assert.ok(followup?.completionEvidenceTemplate?.includes("基准版本：最近小样本回执「恢复放量小样本」"));
+    assert.ok(followup?.completionEvidenceTemplate?.includes("风险边界：只允许小步复用"));
+    assert.ok(followup?.completionEvidenceTemplate?.includes("结论：继续小样本"));
+    assert.ok(followup?.completionEvidenceTemplate?.includes("小样本验证已完成"));
+    assert.equal(followup?.completionEvidenceTemplateSource, "最近小样本回执：恢复放量小样本");
+  });
+
   await t.test("allows production when first-day evidence includes handoff closure", () => {
     const queue = buildTaskQueueCenter([{
       ...project,

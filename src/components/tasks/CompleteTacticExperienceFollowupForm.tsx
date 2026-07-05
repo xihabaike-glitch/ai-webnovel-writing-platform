@@ -8,10 +8,12 @@ import { buildTacticExperienceFollowupCompletionMessage } from "@/lib/projects/t
 export function CompleteTacticExperienceFollowupForm({
   actionLabel,
   completionEvidenceTemplate,
+  completionEvidenceTemplateSource,
   dispatchKey,
 }: {
   actionLabel: string;
   completionEvidenceTemplate?: string;
+  completionEvidenceTemplateSource?: string;
   dispatchKey: string;
 }) {
   const router = useRouter();
@@ -56,7 +58,12 @@ export function CompleteTacticExperienceFollowupForm({
   return (
     <div className="mt-3 rounded-md border border-teal-200 bg-white p-3 text-sm">
       <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
-        <div className="font-medium text-teal-950">完成依据</div>
+        <div>
+          <div className="font-medium text-teal-950">完成依据</div>
+          {completionEvidenceTemplateSource ? (
+            <div className="mt-1 text-xs text-teal-700">{completionEvidenceTemplateSource}</div>
+          ) : null}
+        </div>
         {completionEvidenceTemplate ? (
           <button
             className="w-fit rounded-md border border-teal-200 px-2 py-1 text-xs font-medium text-teal-800 hover:bg-teal-50"

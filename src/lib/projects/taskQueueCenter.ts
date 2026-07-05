@@ -126,6 +126,7 @@ export interface QueueItem {
   sourceDetail?: string;
   sourceDispatchKey?: string;
   completionEvidenceTemplate?: string;
+  completionEvidenceTemplateSource?: string;
   label: string;
   chapterTitle: string;
   evidence: string;
@@ -585,6 +586,72 @@ function firstDayExperienceHandoffQueueItems(input: {
     });
 }
 
+function latestSmallSampleCompletionEvidence(project: TaskQueueProject) {
+  return (project.gateActionAudits ?? [])
+    .filter((audit) => audit.executionType === "recommended_batch")
+    .map((audit) => {
+      const payload = parseTaskQueueAuditPayload(audit.payload);
+      const batchReceipt = payload?.batchReceipt && typeof payload.batchReceipt === "object"
+        ? payload.batchReceipt as Record<string, unknown>
+        : null;
+      const completionEvidence = typeof batchReceipt?.completionEvidenceTemplate === "string"
+        ? batchReceipt.completionEvidenceTemplate.trim()
+        : "";
+      if (!completionEvidence.includes("小样本验证已完成")) return null;
+      return {
+        label: audit.label || "推荐批次",
+        completionEvidence,
+        createdAt: audit.createdAt,
+      };
+    })
+    .filter((item): item is { label: string; completionEvidence: string; createdAt: string | Date } => Boolean(item))
+    .sort((left, right) => (timestamp(right.createdAt) ?? 0) - (timestamp(left.createdAt) ?? 0))[0] ?? null;
+}
+
+function recoveryRiskBoundary(detail: string | undefined) {
+  if (!detail) return "只允许小步复用，继续验证前三章兑现、平台反馈和追读信号。";
+  const limited = detail.match(/(只允许[^，。；;\n]+)/u)?.[1]?.trim();
+  return limited || detail;
+}
+
+function recoveryTacticCompletionEvidenceTemplate(input: {
+  project: TaskQueueProject;
+  task: NonNullable<TaskQueueProject["gateDispatchTasks"]>[number];
+  title: string;
+  actionLabel: string;
+  platformName: string;
+  stage: GateDispatchCompletionTemplateTask["stage"];
+}) {
+  const sample = latestSmallSampleCompletionEvidence(input.project);
+  if (!sample) {
+    return {
+      template: buildGateDispatchCompletionTemplate({
+        stage: input.stage,
+        title: input.title,
+        actionLabel: input.actionLabel,
+        platformName: input.platformName,
+        evidence: input.task.detail ? [input.task.detail] : [],
+      }),
+      source: undefined,
+    };
+  }
+
+  return {
+    template: [
+      input.title,
+      `加码范围：${input.title}`,
+      `基准版本：最近小样本回执「${sample.label}」`,
+      "回收时间：按最近小样本批次完成时间回收",
+      `风险边界：${recoveryRiskBoundary(input.task.detail)}`,
+      `结论：${input.actionLabel}`,
+      "",
+      "## 小样本回执",
+      sample.completionEvidence,
+    ].join("\n"),
+    source: `最近小样本回执：${sample.label}`,
+  };
+}
+
 function tacticExperienceFollowupQueueItems(input: {
   project: TaskQueueProject;
   platformName: string;
@@ -603,6 +670,14 @@ function tacticExperienceFollowupQueueItems(input: {
       const title = task.title ?? "恢复放量打法闭环";
       const actionLabel = task.actionLabel ?? "处理打法闭环";
       const stage = (task.stage ?? "scale_up") as GateDispatchCompletionTemplateTask["stage"];
+      const completionEvidence = recoveryTacticCompletionEvidenceTemplate({
+        project: input.project,
+        task,
+        title,
+        actionLabel,
+        platformName: input.platformName,
+        stage,
+      });
       return item({
         id: `${input.project.id}:tactic-experience-followup:${task.dispatchKey}`,
         projectId: input.project.id,
@@ -615,13 +690,8 @@ function tacticExperienceFollowupQueueItems(input: {
           ? `总闸门经验卡派出的恢复放量后续动作：${task.detail}`
           : "总闸门经验卡派出的恢复放量后续动作，先处理它，再把结论回流到平台打法库。",
         sourceDispatchKey: task.dispatchKey,
-        completionEvidenceTemplate: buildGateDispatchCompletionTemplate({
-          stage,
-          title,
-          actionLabel,
-          platformName: input.platformName,
-          evidence: task.detail ? [task.detail] : [],
-        }),
+        completionEvidenceTemplate: completionEvidence.template,
+        completionEvidenceTemplateSource: completionEvidence.source,
         chapterTitle: title,
         evidence: task.detail ?? "恢复放量后续动作未完成，先补小样本、追读证据或打法重做结论。",
         strategyBasis: input.startTactic,

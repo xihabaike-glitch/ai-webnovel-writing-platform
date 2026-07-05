@@ -1014,6 +1014,7 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
                   <CompleteTacticExperienceFollowupForm
                     actionLabel={entry.actionLabel}
                     completionEvidenceTemplate={entry.completionEvidenceTemplate}
+                    completionEvidenceTemplateSource={entry.completionEvidenceTemplateSource}
                     dispatchKey={entry.sourceDispatchKey}
                   />
                 ) : null}

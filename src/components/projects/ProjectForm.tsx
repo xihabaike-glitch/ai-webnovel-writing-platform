@@ -158,9 +158,9 @@ export function ProjectForm({ experienceLaunch }: { experienceLaunch?: ProjectFo
           tasks,
           limit: platformProfiles.length,
         });
-        const library = buildGatePlatformTacticExperienceLibrary(timeline, platformProfiles.length);
-        const knowledgeExperiences = buildProjectStartKnowledgeFeedbackExperiences(knowledgeFeedbackReceipts, platformProfiles.length);
         const batchEffectReview = buildGateBatchTacticEffectReview(receipts, platformProfiles.length);
+        const library = buildGatePlatformTacticExperienceLibrary(timeline, platformProfiles.length, batchEffectReview.items);
+        const knowledgeExperiences = buildProjectStartKnowledgeFeedbackExperiences(knowledgeFeedbackReceipts, platformProfiles.length);
         const mergedExperiences = preferLaunchExperience([...knowledgeExperiences, ...library.items], experienceLaunch);
         setHistoryExperiences(mergedExperiences);
         setBatchTacticEffects(batchEffectReview.items);

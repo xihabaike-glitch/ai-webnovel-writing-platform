@@ -6,6 +6,7 @@ import type {
   PrePublishGateStrategyPlatform,
 } from "./prePublishGate.ts";
 import type { FailureRepairBatch } from "../ai/taskRunConsole.ts";
+import { platformProfiles } from "../platforms/platformProfiles.ts";
 
 export const gateActionReceiptStorageKey = "ai-webnovel-gate-action-receipts";
 export const gateActionReceiptUpdatedEvent = "ai-webnovel-gate-action-receipts-updated";
@@ -936,6 +937,53 @@ export function buildGatePlatformTacticExperienceStartHref(item: Pick<GatePlatfo
   params.set("startTactic", item.tactic);
   params.set("startSource", item.status);
   return `/projects?${params.toString()}`;
+}
+
+function platformFromBatchTacticTitle(title: string) {
+  const platformName = title.match(/首轮平台打法[:：](.+)$/u)?.[1]?.trim() ?? "";
+  return platformProfiles.find((platform) => platform.name === platformName)
+    ?? platformProfiles.find((platform) => title.includes(platform.name))
+    ?? null;
+}
+
+function batchTacticEffectExperienceItem(item: GateBatchTacticEffectItem): GatePlatformTacticExperienceItem | null {
+  const platform = platformFromBatchTacticTitle(item.tacticTitle);
+  if (!platform) return null;
+  const recovery = item.recoveryBatches > 0;
+  return {
+    platformId: platform.id,
+    platformName: platform.name,
+    status: item.status,
+    label: item.status === "usable" ? "可复用打法" : item.status === "blocked" ? "避坑样本" : "观察样本",
+    tactic: recovery
+      ? item.status === "usable" ? "恢复放量打法" : item.status === "blocked" ? "恢复放量避坑" : "恢复放量观察"
+      : item.label,
+    lesson: recovery
+      ? item.status === "usable"
+        ? `${platform.name} 恢复放量已经连续稳定，成功率 ${item.successRatePercent}%，质量 ${item.averageQualityScore ?? "缺"}，可以作为解除闸门后的谨慎参考打法。`
+        : item.status === "blocked"
+          ? `${platform.name} 恢复放量样本已经变成避坑信号，先停掉这套恢复节奏，拆失败和低分原因。`
+          : `${platform.name} 恢复放量样本还薄，只能作为观察流程，不能写成成功打法。`
+      : `${platform.name} ${item.label}，成功率 ${item.successRatePercent}%，质量 ${item.averageQualityScore ?? "缺"}。`,
+    reuseHint: recovery
+      ? item.status === "usable"
+        ? "新项目可以参考这套恢复后的平台节奏，但新项目仍先跑小样本，确认前三章兑现、模型路线和追读证据后再加码。"
+        : "新项目只能复用这套恢复验证清单，先小样本，不要直接放量。"
+      : item.nextAction,
+    risk: recovery
+      ? "恢复放量是解除闸门后的参考，不是跨题材无限复用；换题材、换平台或模型路线变化时必须重新小样本验证。"
+      : item.risk,
+    href: "/gate#platform-tactic-experience",
+    sourceStatus: item.status === "blocked" ? "blocked" : item.status === "watch" ? "needs_effect" : "healthy",
+    sourceLabel: item.label,
+    priorityScore: item.status === "usable" ? 88 : item.status === "watch" ? 68 : 95,
+    latestAt: item.latestAt,
+    evidence: [
+      recovery ? `恢复放量：已验证 ${item.recoveryBatches} 批` : null,
+      `批量效果：成功 ${item.succeededTasks}，失败 ${item.failedTasks}，成功率 ${item.successRatePercent}%，质量 ${item.averageQualityScore ?? "缺"}`,
+      ...item.evidence,
+    ].filter((line): line is string => Boolean(line)).slice(0, 5),
+  };
 }
 
 export type GateBatchTacticEffectStatus = "blocked" | "watch" | "usable";
@@ -6357,8 +6405,9 @@ function completedFirstDayHandoffFromTimeline(events: GatePlatformDecisionTimeli
 export function buildGatePlatformTacticExperienceLibrary(
   timeline: GatePlatformDecisionTimeline,
   limit = 6,
+  batchEffects: GateBatchTacticEffectItem[] = [],
 ): GatePlatformTacticExperienceLibrary {
-  const items = timeline.items.map((item): GatePlatformTacticExperienceItem => {
+  const timelineItems = timeline.items.map((item): GatePlatformTacticExperienceItem => {
     const finalEvent = item.events.find((event) => event.type === "final") ?? null;
     const completedRecheckReview = completedRecheckReviewFromTimeline(item);
     const completedFirstDayHandoff = completedFirstDayHandoffFromTimeline(item.events);
@@ -6638,7 +6687,18 @@ export function buildGatePlatformTacticExperienceLibrary(
     watch: 1,
     usable: 2,
   };
-  const sortedItems = items
+  const batchItems = batchEffects
+    .map(batchTacticEffectExperienceItem)
+    .filter((item): item is GatePlatformTacticExperienceItem => Boolean(item));
+  const itemsByKey = new Map<string, GatePlatformTacticExperienceItem>();
+  for (const item of [...timelineItems, ...batchItems]) {
+    const key = `${item.platformId}:${item.tactic}`;
+    const existing = itemsByKey.get(key);
+    if (!existing || item.priorityScore > existing.priorityScore || new Date(item.latestAt).getTime() > new Date(existing.latestAt).getTime()) {
+      itemsByKey.set(key, item);
+    }
+  }
+  const sortedItems = [...itemsByKey.values()]
     .sort((left, right) => {
       const statusDiff = statusWeight[left.status] - statusWeight[right.status];
       if (statusDiff !== 0) return statusDiff;

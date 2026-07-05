@@ -1740,6 +1740,40 @@ test("buildGateActionReceipt", async (t) => {
     assert.equal(url.searchParams.get("startSource"), "usable");
   });
 
+  await t.test("merges repeated recovery batch effects into tactic experience library", () => {
+    const library = buildGatePlatformTacticExperienceLibrary({
+      summary: { total: 0, healthy: 0, needsEffect: 0, repairing: 0, blocked: 0 },
+      items: [],
+      nextActions: [],
+    }, 6, [{
+      id: "fanqie:recovery-hook",
+      status: "usable",
+      label: "恢复放量打法",
+      tacticTitle: "首轮平台打法：番茄小说",
+      tacticLabel: "恢复放量打法",
+      primaryTactic: "首章先给不可逆危机，三章内连续兑现爽点。",
+      openingMove: "第一段给倒计时和身份暴露风险。",
+      verificationMove: "批量后复检前三章追读。",
+      risk: "解释过多会掉首秀。",
+      sampleBatches: 2,
+      succeededTasks: 6,
+      failedTasks: 0,
+      successRatePercent: 100,
+      averageQualityScore: 91,
+      knownCostUsd: 0.06,
+      recoveryBatches: 2,
+      latestAt: "2026-01-05T00:00:00.000Z",
+      evidence: ["AI 小批恢复完成｜恢复放量：成功 3，失败 0，质量 92"],
+      nextAction: "恢复放量已经连续稳定，可作为观察平台解除闸门后的参考打法，但新项目仍先跑小样本。",
+    }]);
+
+    assert.equal(library.summary.usable, 1);
+    assert.equal(library.items[0]?.platformId, "fanqie");
+    assert.equal(library.items[0]?.tactic, "恢复放量打法");
+    assert.ok(library.items[0]?.lesson.includes("连续稳定"));
+    assert.ok(library.items[0]?.reuseHint.includes("新项目仍先跑小样本"));
+  });
+
   await t.test("turns project start validation advice into three dispatch cards", () => {
     const startReceipt = buildProjectStartDecisionActionReceipt({
       projectId: "project-1",

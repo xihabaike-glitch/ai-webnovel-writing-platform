@@ -32,7 +32,7 @@ import { buildExportPackageReadiness } from "@/lib/export/markdown";
 import { buildExportSnapshotHistory } from "@/lib/export/snapshots";
 import { getPlatformProfile, type PlatformId } from "@/lib/platforms/platformProfiles";
 import { buildContinuityAudit } from "@/lib/projects/continuityAudit";
-import { buildGatePlatformDecisionTimeline, buildGatePlatformTacticExperienceLibrary, gateActionReceiptFromAuditRecord } from "@/lib/projects/gateActionReceipts";
+import { buildGateBatchTacticEffectReview, buildGatePlatformDecisionTimeline, buildGatePlatformTacticExperienceLibrary, gateActionReceiptFromAuditRecord } from "@/lib/projects/gateActionReceipts";
 import { gatePlatformDispatchTaskFromRecord } from "@/lib/projects/gateDispatchTaskRecords";
 import { buildPlatformKnowledgeBrief } from "@/lib/projects/platformKnowledgeBrief";
 import { buildProjectDashboard } from "@/lib/projects/projectDashboard";
@@ -244,12 +244,14 @@ export default async function ProjectPage({ params }: { params: Promise<{ projec
       take: 12,
     }),
   ]);
+  const projectDecisionReceipts = projectDecisionAudits.map(gateActionReceiptFromAuditRecord);
   const platformDecisionTimeline = buildGatePlatformDecisionTimeline({
-    receipts: projectDecisionAudits.map(gateActionReceiptFromAuditRecord),
+    receipts: projectDecisionReceipts,
     tasks: projectDecisionTaskRecords.map(gatePlatformDispatchTaskFromRecord),
     limit: 8,
   });
-  const platformTacticExperienceLibrary = buildGatePlatformTacticExperienceLibrary(platformDecisionTimeline, 8);
+  const batchTacticEffectReview = buildGateBatchTacticEffectReview(projectDecisionReceipts, 8);
+  const platformTacticExperienceLibrary = buildGatePlatformTacticExperienceLibrary(platformDecisionTimeline, 8, batchTacticEffectReview.items);
   const platformKnowledgeBrief = buildPlatformKnowledgeBrief({
     feedbackReceipts: platformKnowledgeFeedbackReceipts.map((receipt) => ({
       id: receipt.receiptId,

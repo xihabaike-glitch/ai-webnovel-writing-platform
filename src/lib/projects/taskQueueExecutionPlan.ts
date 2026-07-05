@@ -27,6 +27,7 @@ function isExecutableQueueItem(item: QueueItem): item is ExecutableQueueItem {
 }
 
 function chapterIdFromItem(item: QueueItem) {
+  if (item.executionChapterId) return item.executionChapterId;
   return item.id.split(":").at(-1) ?? "";
 }
 

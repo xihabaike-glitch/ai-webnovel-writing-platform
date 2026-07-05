@@ -110,6 +110,7 @@ export interface QueueItem {
   actionLabel: string;
   href: string;
   priority: number;
+  executionChapterId?: string;
   effectAction?: {
     platformId: string;
     execution: "generate_asset_variants" | "rewrite_first_three" | "open_target";
@@ -297,6 +298,12 @@ function latestPendingCandidates(project: TaskQueueProject) {
     .sort((left, right) => new Date(right.revision.createdAt).getTime() - new Date(left.revision.createdAt).getTime());
 }
 
+function firstThreeAdoptionChapterId(dispatchKey: string) {
+  const parts = dispatchKey.split(":");
+  if (parts.length < 5 || parts[0] !== "first-three-adoption") return null;
+  return parts[2] || null;
+}
+
 function firstThreeAdoptionFollowupQueueItems(input: {
   project: TaskQueueProject;
   projectHref: string;
@@ -315,6 +322,7 @@ function firstThreeAdoptionFollowupQueueItems(input: {
     .map((task): QueueItem => {
       const isPublishCheck = task.dispatchKey.endsWith(":publish-check");
       const missingEvidence = task.state === "completed" && task.completionEvidence.trim().length < 8;
+      const executionChapterId = firstThreeAdoptionChapterId(task.dispatchKey);
       return item({
         id: `${input.project.id}:adoption-followup:${task.dispatchKey}`,
         projectId: input.project.id,
@@ -341,6 +349,7 @@ function firstThreeAdoptionFollowupQueueItems(input: {
         scaleGate: input.scaleGate,
         actionLabel: missingEvidence ? "补验收证据" : task.actionLabel ?? (isPublishCheck ? "回发布质检" : "重新审稿"),
         href: task.href ?? (isPublishCheck ? `${input.projectHref}#platform-export` : input.projectHref),
+        executionChapterId: executionChapterId ?? undefined,
       });
     });
 }

@@ -605,6 +605,7 @@ test("buildTaskQueueCenter", async (t) => {
     assert.equal(reviewFollowup?.sourceType, "first_three_adoption");
     assert.equal(reviewFollowup?.sourceLabel, "采纳闭环");
     assert.ok(reviewFollowup?.sourceDetail?.includes("旧审稿自动失效"));
+    assert.equal(reviewFollowup?.executionChapterId, "chapter-review");
     assert.equal(reviewFollowup?.actionLabel, "重新审稿");
     assert.equal(reviewFollowup?.href, "/projects/project-1/chapters/chapter-review#chapter-workflow");
     assert.equal(publishFollowup?.category, "export");

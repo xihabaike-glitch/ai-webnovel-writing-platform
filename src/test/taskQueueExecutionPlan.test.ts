@@ -66,6 +66,7 @@ test("buildTaskQueueExecutionPlan", async (t) => {
         chapterTitle: "第 1 章采纳后重新审稿",
         sourceType: "first_three_adoption",
         sourceLabel: "采纳闭环",
+        executionChapterId: "chapter-1",
       }),
       queueItem({
         id: "project-1:review:chapter-2",
@@ -77,6 +78,7 @@ test("buildTaskQueueExecutionPlan", async (t) => {
     ]);
 
     assert.equal(plan.adoptionFollowupCount, 1);
+    assert.deepEqual(plan.chapterIds, ["chapter-1", "chapter-2"]);
     assert.ok(plan.warnings.some((warning) => warning.includes("采纳闭环任务")));
     assert.ok(plan.warnings.some((warning) => warning.includes("回总闸门复检")));
   });

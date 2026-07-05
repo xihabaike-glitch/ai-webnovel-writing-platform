@@ -264,9 +264,33 @@ function isFirstDayClosedLoopExperience(experience: GatePlatformTacticExperience
   return experience.sourceLabel === "新书开局闭环" || experience.tactic === "新书开局闭环打法";
 }
 
+function isThirdMetricStableExperience(experience: GatePlatformTacticExperienceItem) {
+  return experience.tactic === "三轮稳定加码打法";
+}
+
+function isThirdMetricArchivePauseExperience(experience: GatePlatformTacticExperienceItem) {
+  return experience.tactic === "三轮归档暂停样本";
+}
+
+function isThirdMetricPivotExperience(experience: GatePlatformTacticExperienceItem) {
+  return experience.tactic === "三轮换平台样本";
+}
+
+function isThirdMetricDowngradeExperience(experience: GatePlatformTacticExperienceItem) {
+  return experience.tactic === "三轮降档修复打法";
+}
+
+function isThirdMetricFinalExperience(experience: GatePlatformTacticExperienceItem) {
+  return isThirdMetricStableExperience(experience)
+    || isThirdMetricArchivePauseExperience(experience)
+    || isThirdMetricPivotExperience(experience)
+    || isThirdMetricDowngradeExperience(experience);
+}
+
 function experiencePriorityForProjectStart(experience: GatePlatformTacticExperienceItem) {
   if (experience.status === "blocked") return 4000 + experience.priorityScore;
   if (isFirstDayClosedLoopExperience(experience)) return 3500 + experience.priorityScore;
+  if (isThirdMetricFinalExperience(experience)) return 3300 + experience.priorityScore;
   if (experience.status === "usable") return 3000 + experience.priorityScore;
   if (experience.status === "watch") return 2000 + experience.priorityScore;
   return experience.priorityScore;
@@ -413,13 +437,23 @@ export function buildProjectStartPlatformExperienceGuide(input: {
 
     if (experience?.status === "blocked") {
       const isStopReview = isRecheckStopExperience(experience);
+      const isThirdArchive = isThirdMetricArchivePauseExperience(experience);
+      const isThirdPivot = isThirdMetricPivotExperience(experience);
       return {
         platformId: platform.id,
         platformName: platform.name,
         status: "avoid",
-        label: isStopReview ? "复盘止损" : "历史避坑",
-        headline: isStopReview ? `${platform.name} 先暂停方向` : `${platform.name} 先别硬上`,
-        detail: isStopReview
+        label: isThirdArchive ? "三轮暂停" : isThirdPivot ? "三轮换平台" : isStopReview ? "复盘止损" : "历史避坑",
+        headline: isThirdArchive
+          ? `${platform.name} 三轮后先停`
+          : isThirdPivot
+            ? `${platform.name} 三轮后转向`
+            : isStopReview ? `${platform.name} 先暂停方向` : `${platform.name} 先别硬上`,
+        detail: isThirdArchive
+          ? `第三轮最终结论已经归档暂停。${experience.reuseHint} 重启前先写清入口卖点、前三章兑现或平台匹配度的实际改动。`
+          : isThirdPivot
+            ? `第三轮最终结论已经要求换平台验证。${experience.reuseHint} 先别把旧平台失败误判成题材失败。`
+            : isStopReview
           ? `历史返工复盘已经判定当前方向要止损。${experience.reuseHint}`
           : `${experience.tactic} 已经沉淀为避坑样本。${experience.reuseHint}`,
         priorityScore: experience.priorityScore,
@@ -431,16 +465,19 @@ export function buildProjectStartPlatformExperienceGuide(input: {
 
     if (experience?.status === "usable") {
       const firstDayClosedLoop = isFirstDayClosedLoopExperience(experience);
+      const thirdStable = isThirdMetricStableExperience(experience);
       return {
         platformId: platform.id,
         platformName: platform.name,
         status: "recommended",
-        label: firstDayClosedLoop ? "开局闭环" : "历史可复用",
-        headline: firstDayClosedLoop ? `${platform.name} 优先开书` : `${platform.name} 优先参考`,
+        label: firstDayClosedLoop ? "开局闭环" : thirdStable ? "三轮稳住" : "历史可复用",
+        headline: firstDayClosedLoop ? `${platform.name} 优先开书` : thirdStable ? `${platform.name} 三轮已站住` : `${platform.name} 优先参考`,
         detail: firstDayClosedLoop
           ? `${experience.tactic} 已经被用于新书第一天流程并完成交接，优先作为本次开书默认打法。${experience.reuseHint}`
+          : thirdStable
+            ? `第三轮最终结论已经稳定加码。${experience.reuseHint} 新项目可优先用它做平台默认打法，但首轮仍要回填真实数据。`
           : `${experience.tactic} 可作为新项目开书参考。${experience.reuseHint}`,
-        priorityScore: firstDayClosedLoop ? experience.priorityScore + 12 : experience.priorityScore,
+        priorityScore: firstDayClosedLoop ? experience.priorityScore + 12 : thirdStable ? experience.priorityScore + 8 : experience.priorityScore,
         source: "experience",
         href: experience.href,
         evidence: experience.evidence.slice(0, 3),
@@ -474,18 +511,23 @@ export function buildProjectStartPlatformExperienceGuide(input: {
       const isAcceptanceReview = experience ? isAcceptanceReviewExperience(experience) : false;
       const isWeakExecutionReview = experience ? isWeakExecutionReviewExperience(experience) : false;
       const isDispatchCompletion = experience ? isDispatchCompletionExperience(experience) : false;
+      const isThirdDowngrade = experience ? isThirdMetricDowngradeExperience(experience) : false;
       return {
         platformId: platform.id,
         platformName: platform.name,
         status: "watch",
-        label: isAcceptanceReview
+        label: isThirdDowngrade
+          ? "三轮降档"
+          : isAcceptanceReview
           ? "验收观察"
           : isWeakExecutionReview
             ? "动作观察"
             : isDispatchCompletion
               ? "验收待效果"
               : experience?.status === "watch" ? "历史观察" : batchEffect ? batchRecoveryLabel(batchEffect) : "批量观察",
-        headline: isAcceptanceReview
+        headline: isThirdDowngrade
+          ? `${platform.name} 三轮后降档`
+          : isAcceptanceReview
           ? `${platform.name} 先补验收线`
           : isWeakExecutionReview
             ? `${platform.name} 先收口动作`
@@ -493,7 +535,9 @@ export function buildProjectStartPlatformExperienceGuide(input: {
               ? `${platform.name} 验收已完成，先补效果`
               : isRecoveryBatchEffect(batchEffect) ? `${platform.name} 恢复放量继续观察` : `${platform.name} 小样本观察`,
         detail: experience?.status === "watch"
-          ? isAcceptanceReview
+          ? isThirdDowngrade
+            ? `第三轮最终结论是降档修复。${experience.reuseHint} 新项目只能先按修复流程小样本验证，别直接加码。`
+            : isAcceptanceReview
             ? `历史返工复盘暴露验收标准不硬。${experience.reuseHint}`
             : isWeakExecutionReview
               ? `历史返工复盘暴露执行动作太虚。${experience.reuseHint}`
@@ -649,6 +693,9 @@ export function buildProjectStartExperienceHandoff(input: {
   const recommendedItem = input.guide.items.find((item) => item.status === "recommended") ?? null;
   const recommendedTemplate = input.recommendedTemplate ?? null;
   const firstDayClosedLoop = guideItem?.label === "开局闭环";
+  const thirdMetricStable = guideItem?.label === "三轮稳住";
+  const thirdMetricDowngrade = guideItem?.label === "三轮降档";
+  const thirdMetricAvoidance = guideItem?.label === "三轮暂停" || guideItem?.label === "三轮换平台";
   const shouldSwitchTemplate = Boolean(
     recommendedTemplate
       && recommendedTemplate.platformId !== input.platform.id
@@ -667,15 +714,19 @@ export function buildProjectStartExperienceHandoff(input: {
       ? `${input.platform.name} 只做小样本开书`
       : status === "reuse" && firstDayClosedLoop
         ? `${input.platform.name} 已闭环开书打法`
+        : status === "reuse" && thirdMetricStable
+          ? `${input.platform.name} 三轮站住，优先复用`
         : status === "reuse"
         ? `${input.platform.name} 可复用历史打法`
         : `${input.platform.name} 先按模板开书`;
   const label = status === "blocked"
-    ? "避坑交接"
+    ? thirdMetricAvoidance ? "三轮避坑交接" : "避坑交接"
     : status === "small_sample"
-      ? "观察交接"
+      ? thirdMetricDowngrade ? "三轮降档交接" : "观察交接"
       : status === "reuse" && firstDayClosedLoop
         ? "闭环交接"
+        : status === "reuse" && thirdMetricStable
+          ? "三轮复用交接"
         : status === "reuse"
         ? "复用交接"
         : "模板交接";
@@ -696,12 +747,15 @@ export function buildProjectStartExperienceHandoff(input: {
     shouldSwitchTemplate,
     firstDayActions: uniqueLines([
       firstDayClosedLoop ? "闭环复用：沿用已完成的新书开局三段交接。" : null,
+      thirdMetricStable ? "三轮复用：沿用已站住的平台包装、前三章兑现和小步加码节奏。" : null,
+      thirdMetricDowngrade ? "三轮降档：只复用修复流程，首轮不放量。" : null,
       `开头：${input.advice.openingMove}`,
       `验证：${input.advice.verificationMove}`,
       input.riskGate.requiresConfirmation ? "创建前写清恢复条件，只允许首轮小样本。" : "创建后回填前三章、平台包装和首轮数据证据。",
-    ], 3),
+    ], 4),
     avoidRules: uniqueLines([
       status === "blocked" ? "不要直接复用历史失败入口、题材包装或前三章兑现方式。" : null,
+      thirdMetricAvoidance ? "三轮最终结论已经避坑，未写清重启条件前不要硬上。" : null,
       guideItem?.status === "watch" ? "不要把观察样本当成成功样本放量。" : null,
       input.advice.risk,
     ], 3),
@@ -916,6 +970,82 @@ export function buildProjectStartTacticAdvice(input: {
           "验收交接：通过线、不可接受项、复查证据格式必须写清",
           "包装交接：标题、简介、标签、卖点必须回收平台避坑边界",
           `模板前三章：${firstThreeTitles}`,
+        ]),
+      };
+    }
+
+    if (isThirdMetricStableExperience(experience)) {
+      return {
+        status: "history_usable",
+        label: "三轮稳住",
+        title: `${platform.name}：三轮真实数据已站住`,
+        primaryTactic: experience.lesson,
+        openingMove: `优先复用三轮样本里的读者承诺和前三章兑现方式：${experience.reuseHint}`,
+        verificationMove: `创建后按三轮样本拆首轮基准：先跑前三章、平台包装和首轮曝光、点击、收藏、追读；数据站住再进入二轮加码。${modelRouteVerification}`,
+        risk: experience.risk,
+        evidence: withModelEvidence(experience.evidence),
+        checklist: withModelChecklist([
+          "三轮复用：只复用已被真实数据证明的入口卖点和小步加码节奏",
+          "首轮基准：曝光、点击、收藏、追读必须回填",
+          `模板前三章：${firstThreeTitles}`,
+          `必须具备：${style.mustHave.join("、")}`,
+        ]),
+      };
+    }
+
+    if (isThirdMetricArchivePauseExperience(experience)) {
+      return {
+        status: "history_blocked",
+        label: "三轮暂停",
+        title: `${platform.name}：三轮后归档暂停，别硬冲`,
+        primaryTactic: `${experience.lesson} 新项目不要把 ${platform.name} 当主推平台，除非已经重做入口卖点、前三章兑现或平台匹配度。`,
+        openingMove: `先按避坑样本重写首屏钩子：${style.openingHook}`,
+        verificationMove: `如必须验证，只允许首轮小样本，并写清重启条件；没有新包装、新开头或新题材定位，不允许进入二轮。${modelRouteVerification}`,
+        risk: experience.risk,
+        evidence: withModelEvidence(experience.evidence),
+        checklist: withModelChecklist([
+          "三轮避坑：不要把归档暂停样本包装成可复用打法",
+          "恢复条件：入口卖点、前三章兑现、平台匹配度至少改掉一项",
+          `模板前三章：${firstThreeTitles}`,
+          `必须具备：${style.mustHave.join("、")}`,
+        ]),
+      };
+    }
+
+    if (isThirdMetricPivotExperience(experience)) {
+      return {
+        status: "history_blocked",
+        label: "三轮换平台",
+        title: `${platform.name}：三轮后该换平台验证`,
+        primaryTactic: `${experience.lesson} 新项目优先把同题材拿去更匹配的平台小样本验证，别把旧平台失败直接判成题材失败。`,
+        openingMove: `保留题材承诺，但按新平台读者入口重写开头：${style.openingHook}`,
+        verificationMove: `如果仍选 ${platform.name}，只能做对照组小样本；主力资源先切到推荐平台或新包装方案。${modelRouteVerification}`,
+        risk: experience.risk,
+        evidence: withModelEvidence(experience.evidence),
+        checklist: withModelChecklist([
+          "三轮转向：先换平台验证，不把旧平台弱匹配当成题材死刑",
+          "对照组：旧平台只保留小样本，不进入主力加码",
+          `模板前三章：${firstThreeTitles}`,
+          `必须具备：${style.mustHave.join("、")}`,
+        ]),
+      };
+    }
+
+    if (isThirdMetricDowngradeExperience(experience)) {
+      return {
+        status: "history_watch",
+        label: "三轮降档",
+        title: `${platform.name}：三轮后只能降档修复`,
+        primaryTactic: experience.lesson,
+        openingMove: `先按平台钩子重修开头和前三章兑现：${style.openingHook}`,
+        verificationMove: `创建后只跑修复型小样本：先复检发布包、前三章兑现和首轮数据，不允许直接进入稳定加码。${modelRouteVerification}`,
+        risk: experience.risk,
+        evidence: withModelEvidence(experience.evidence),
+        checklist: withModelChecklist([
+          "三轮降档：复用修复流程，不复用加码结论",
+          "首轮限制：只做小样本，必须补发布效果再判断",
+          `模板前三章：${firstThreeTitles}`,
+          `必须具备：${style.mustHave.join("、")}`,
         ]),
       };
     }

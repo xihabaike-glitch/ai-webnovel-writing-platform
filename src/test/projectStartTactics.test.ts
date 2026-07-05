@@ -432,14 +432,82 @@ test("buildProjectStartTacticAdvice", async (t) => {
     assert.equal(guide.summary.avoid, 2);
     assert.equal(guide.items[0].platformId, "fanqie");
     assert.equal(guide.items[0].status, "recommended");
+    assert.equal(guide.items[0].label, "三轮稳住");
+    assert.ok(guide.items[0].headline.includes("三轮已站住"));
     assert.ok(guide.items[0].detail.includes("稳定加码池"));
     assert.ok(guide.items[0].evidence[0].includes("最终判定"));
     assert.equal(guide.items.find((item) => item.platformId === "qimao")?.status, "avoid");
     assert.equal(guide.items.find((item) => item.platformId === "qimao")?.label, "批量避坑");
     assert.ok(guide.items.find((item) => item.platformId === "qimao")?.detail.includes("批量避坑"));
     assert.equal(guide.items.find((item) => item.platformId === "webnovel")?.status, "avoid");
+    assert.equal(guide.items.find((item) => item.platformId === "webnovel")?.label, "三轮暂停");
     assert.ok(guide.nextActions.some((action) => action.includes("优先参考 番茄小说")));
     assert.ok(guide.nextActions.some((action) => action.includes("2 个平台有避坑信号")));
+  });
+
+  await t.test("turns third-round downgrade and pivot outcomes into strict start gates", () => {
+    const qimao = getPlatformProfile("qimao");
+    const royalRoad = getPlatformProfile("royal_road");
+    const qimaoTemplate = getDefaultTemplateForPlatform(qimao.id);
+    const royalRoadTemplate = getDefaultTemplateForPlatform(royalRoad.id);
+    const qimaoExperience: GatePlatformTacticExperienceItem = {
+      platformId: "qimao",
+      platformName: "七猫小说",
+      status: "watch",
+      label: "观察样本",
+      tactic: "三轮降档修复打法",
+      lesson: "三轮数据没有崩，但稳定性不足，只能降档修复。",
+      reuseHint: "同类项目只复用收紧投入、复检发布包和前三章兑现的流程。",
+      risk: "修复后必须再看新一轮效果。",
+      href: "/gate",
+      sourceStatus: "rechecking",
+      sourceLabel: "降档修复",
+      priorityScore: 89,
+      latestAt: "2026-01-18T00:00:00.000Z",
+      evidence: ["最终判定：降档修复。"],
+    };
+    const royalRoadExperience: GatePlatformTacticExperienceItem = {
+      platformId: "royal_road",
+      platformName: "Royal Road",
+      status: "blocked",
+      label: "避坑样本",
+      tactic: "三轮换平台样本",
+      lesson: "三轮后平台匹配仍弱。",
+      reuseHint: "同类项目优先复用平台转向条件和新平台验证清单。",
+      risk: "未完成新平台小样本验证前，不要把旧平台失败包装成题材失败。",
+      href: "/gate",
+      sourceStatus: "blocked",
+      sourceLabel: "换平台",
+      priorityScore: 91,
+      latestAt: "2026-01-18T00:10:00.000Z",
+      evidence: ["最终判定：换平台。"],
+    };
+
+    const guide = buildProjectStartPlatformExperienceGuide({
+      platforms: [qimao, royalRoad],
+      experiences: [qimaoExperience, royalRoadExperience],
+    });
+    const qimaoAdvice = buildProjectStartTacticAdvice({
+      platform: qimao,
+      template: qimaoTemplate,
+      style: getPlatformWritingStyle(qimao.id),
+      experience: qimaoExperience,
+    });
+    const royalRoadAdvice = buildProjectStartTacticAdvice({
+      platform: royalRoad,
+      template: royalRoadTemplate,
+      style: getPlatformWritingStyle(royalRoad.id),
+      experience: royalRoadExperience,
+    });
+
+    assert.equal(guide.items.find((item) => item.platformId === "qimao")?.label, "三轮降档");
+    assert.ok(guide.items.find((item) => item.platformId === "qimao")?.detail.includes("直接加码"));
+    assert.equal(qimaoAdvice.label, "三轮降档");
+    assert.ok(qimaoAdvice.verificationMove.includes("不允许直接进入稳定加码"));
+    assert.equal(guide.items.find((item) => item.platformId === "royal_road")?.label, "三轮换平台");
+    assert.ok(guide.items.find((item) => item.platformId === "royal_road")?.detail.includes("旧平台失败"));
+    assert.equal(royalRoadAdvice.label, "三轮换平台");
+    assert.ok(royalRoadAdvice.primaryTactic.includes("别把旧平台失败直接判成题材失败"));
   });
 
   await t.test("keeps the full platform matrix available for project creation", () => {
@@ -587,7 +655,7 @@ test("buildProjectStartTacticAdvice", async (t) => {
       platformName: "番茄小说",
       status: "usable",
       label: "可复用打法",
-      tactic: "首秀稳定加码打法",
+      tactic: "三轮稳定加码打法",
       lesson: "首秀数据连续站住。",
       reuseHint: "新项目可复用首章高压钩子和前三章兑现节奏。",
       risk: "先小步验证，不要直接放量。",
@@ -603,7 +671,7 @@ test("buildProjectStartTacticAdvice", async (t) => {
       platformName: "WebNovel",
       status: "blocked",
       label: "避坑样本",
-      tactic: "海外转化暂停样本",
+      tactic: "三轮归档暂停样本",
       lesson: "三轮仍未形成有效转化。",
       reuseHint: "同类项目先复用暂停原因。",
       risk: "重启条件必须写清。",
@@ -667,7 +735,7 @@ test("buildProjectStartTacticAdvice", async (t) => {
       platformName: "WebNovel",
       status: "blocked",
       label: "避坑样本",
-      tactic: "海外转化暂停样本",
+      tactic: "三轮归档暂停样本",
       lesson: "三轮仍未形成有效转化。",
       reuseHint: "同类项目先复用暂停原因。",
       risk: "重启条件必须写清。",
@@ -700,7 +768,8 @@ test("buildProjectStartTacticAdvice", async (t) => {
     });
 
     assert.equal(handoff.status, "blocked");
-    assert.equal(handoff.label, "避坑交接");
+    assert.equal(advice.label, "三轮暂停");
+    assert.equal(handoff.label, "三轮避坑交接");
     assert.equal(handoff.shouldSwitchTemplate, true);
     assert.equal(handoff.recommendedPlatformId, "fanqie");
     assert.equal(handoff.recommendedTemplateId, fanqieTemplate.id);
@@ -747,8 +816,13 @@ test("buildProjectStartTacticAdvice", async (t) => {
     });
 
     assert.equal(handoff.status, "reuse");
+    assert.equal(guideItem?.label, "三轮稳住");
+    assert.equal(advice.label, "三轮稳住");
+    assert.equal(handoff.label, "三轮复用交接");
+    assert.ok(handoff.title.includes("三轮站住"));
     assert.equal(handoff.shouldSwitchTemplate, false);
     assert.equal(handoff.recommendedPlatformId, "fanqie");
+    assert.ok(handoff.firstDayActions.some((action) => action.includes("三轮复用")));
     assert.ok(handoff.firstDayActions.some((action) => action.includes("开头")));
     assert.ok(handoff.firstDayActions.some((action) => action.includes("回填")));
     assert.ok(handoff.evidence.some((item) => item.includes("稳定加码")));

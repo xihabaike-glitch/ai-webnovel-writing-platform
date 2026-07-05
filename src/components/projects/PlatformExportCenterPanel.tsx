@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import {
   actionFromRunResult,
+  buildPublishRepairExitPrompt,
   labelForAction,
   normalizeRunResult,
   pendingResultFromAction,
@@ -1421,6 +1422,14 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
   const workspaceExecutableActions = useMemo(
     () => center?.workspace.nextActions.filter(canRunAction).slice(0, 5) ?? [],
     [center],
+  );
+  const repairExitPrompt = useMemo(
+    () => selectedPackage ? buildPublishRepairExitPrompt({
+      canExport: selectedPackage.canExport,
+      results: runResults,
+      nextAction: repairNextAction,
+    }) : null,
+    [selectedPackage, runResults, repairNextAction],
   );
   const versionActionCounts = useMemo(() => {
     const counts: Record<PublishPackageVersionActionFilter, number> = {
@@ -3278,6 +3287,74 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
                   )
                 ) : null}
               </div>
+              {repairExitPrompt ? (
+                <div className={`mt-3 rounded-md border p-3 ${
+                  repairExitPrompt.status === "ready_to_export"
+                    ? "border-emerald-200 bg-emerald-50"
+                    : repairExitPrompt.status === "retry_failed"
+                      ? "border-rose-200 bg-rose-50"
+                      : repairExitPrompt.status === "in_progress"
+                        ? "border-amber-200 bg-amber-50"
+                        : "border-slate-200 bg-white"
+                }`}>
+                  <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                    <div>
+                      <div className="font-medium text-slate-950">{repairExitPrompt.label}</div>
+                      <div className="mt-1 leading-5 text-slate-600">{repairExitPrompt.detail}</div>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {repairExitPrompt.primaryAction === "recheck" ? (
+                        <button
+                          className="rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white disabled:opacity-50"
+                          disabled={isLoading}
+                          onClick={() => void loadCenter({ keepMessage: true })}
+                          type="button"
+                        >
+                          {isLoading ? "刷新中" : "刷新质检"}
+                        </button>
+                      ) : null}
+                      {repairExitPrompt.primaryAction === "export" ? (
+                        <>
+                          <button
+                            className="rounded-md border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                            disabled={!selectedPackage.canExport}
+                            onClick={copyMarkdown}
+                            type="button"
+                          >
+                            复制发布包
+                          </button>
+                          <button
+                            className="rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white disabled:opacity-50"
+                            disabled={!selectedPackage.canExport || isLoading}
+                            onClick={downloadMarkdown}
+                            type="button"
+                          >
+                            下载发布包
+                          </button>
+                          <button
+                            className="rounded-md border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                            disabled={!exportablePackages.length || isLoading}
+                            onClick={downloadArchive}
+                            type="button"
+                          >
+                            全平台包
+                          </button>
+                        </>
+                      ) : null}
+                      {repairExitPrompt.primaryAction === "retry" && repairNextAction?.action && canRunAction(repairNextAction.action) ? (
+                        <button
+                          className="rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white disabled:opacity-50"
+                          disabled={Boolean(runningActionId)}
+                          onClick={() => repairNextAction.action && void runRepairAction(repairNextAction.action)}
+                          type="button"
+                        >
+                          {runningActionId === repairNextAction.action.id ? "重试中" : "重试失败项"}
+                        </button>
+                      ) : null}
+                    </div>
+                  </div>
+                </div>
+              ) : null}
               <div className="mt-3 grid gap-2 sm:grid-cols-4">
                 <div className="rounded-md bg-white/80 p-2">
                   <div className="text-xs text-slate-500">阻塞项</div>

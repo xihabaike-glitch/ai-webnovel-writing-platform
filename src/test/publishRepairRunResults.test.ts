@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   actionFromRunResult,
+  buildPublishRepairExitPrompt,
   buildPublishRepairNextAction,
   normalizeRunResult,
   pendingResultFromAction,
@@ -87,6 +88,36 @@ test("publish repair run result helpers", async (t) => {
       chapterId: "chapter-1",
       candidateRevisionId: "revision-3",
     }), null);
+  });
+
+  await t.test("builds exit prompts after repair runs", () => {
+    const fixedResult = normalizeRunResult({
+      action: "run_chapter_review",
+      chapterId: "chapter-1",
+      chapterTitle: "雨夜系统",
+      status: "succeeded",
+      message: "已完成章节审稿。",
+      score: 92,
+      issueCount: 0,
+      shouldSecondPass: false,
+    });
+    const nextAction = buildPublishRepairNextAction([fixedResult], "project-1");
+
+    assert.equal(buildPublishRepairExitPrompt({
+      canExport: false,
+      results: [fixedResult],
+      nextAction,
+    })?.primaryAction, "recheck");
+    assert.equal(buildPublishRepairExitPrompt({
+      canExport: true,
+      results: [fixedResult],
+      nextAction,
+    })?.primaryAction, "export");
+    assert.equal(buildPublishRepairExitPrompt({
+      canExport: false,
+      results: [{ ...fixedResult, status: "failed", error: "模型不可用。" }],
+      nextAction: null,
+    })?.primaryAction, "retry");
   });
 
   await t.test("routes weak review results into second pass", () => {

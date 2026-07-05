@@ -26,6 +26,13 @@ export interface PublishRepairNextAction {
   action?: PublishRepairAction;
 }
 
+export interface PublishRepairExitPrompt {
+  status: "in_progress" | "retry_failed" | "needs_recheck" | "ready_to_export";
+  label: string;
+  detail: string;
+  primaryAction: "wait" | "retry" | "recheck" | "export";
+}
+
 export function labelForAction(kind: PublishRepairActionKind) {
   if (kind === "run_second_pass") return "执行二改";
   if (kind === "run_chapter_review") return "补章节审稿";
@@ -86,6 +93,46 @@ export function publishRepairResultForAction(
     }
     return true;
   }) ?? null;
+}
+
+export function buildPublishRepairExitPrompt(input: {
+  canExport: boolean;
+  results: PublishRepairRunResult[];
+  nextAction?: Pick<PublishRepairNextAction, "kind" | "label" | "detail"> | null;
+}): PublishRepairExitPrompt | null {
+  if (input.canExport) {
+    return {
+      status: "ready_to_export",
+      label: "出口：发布包已通过",
+      detail: "当前平台包已经可以复制或下载；下载全平台包会把所有通过质检的平台一起归档。",
+      primaryAction: "export",
+    };
+  }
+  if (input.results.some((result) => result.status === "failed")) {
+    return {
+      status: "retry_failed",
+      label: "出口暂时堵住",
+      detail: "本轮修复里还有失败项，先重试失败项或切换模型，再回发布质检。",
+      primaryAction: "retry",
+    };
+  }
+  if (input.results.some((result) => result.status === "pending")) {
+    return {
+      status: "in_progress",
+      label: "修复正在路上",
+      detail: "等当前动作返回结果后，再决定是继续二改、采纳候选稿，还是回发布质检。",
+      primaryAction: "wait",
+    };
+  }
+  if (input.results.some((result) => result.status === "succeeded") && (!input.nextAction || input.nextAction.kind === "recheck_publish")) {
+    return {
+      status: "needs_recheck",
+      label: "出口：回发布质检",
+      detail: input.nextAction?.detail ?? "本轮自动修复动作已完成，刷新发布包质检；如果无阻塞，就复制或下载投稿包。",
+      primaryAction: "recheck",
+    };
+  }
+  return null;
 }
 
 function chapterHref(projectId: string | undefined, chapterId: string | null, hash: string) {

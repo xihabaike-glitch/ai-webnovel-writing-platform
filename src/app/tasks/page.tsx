@@ -14,7 +14,7 @@ import { batchExecutionStrategies, getBatchExecutionStrategy } from "@/lib/proje
 import type { GateBatchTacticEffectStatus } from "@/lib/projects/gateActionReceipts";
 import { buildRecommendedBatchModelRouteGate } from "@/lib/projects/recommendedBatchModelRouteGate";
 import { buildTaskQueueBatchHealthReview } from "@/lib/projects/taskQueueBatchHealth";
-import { buildTaskQueueCenter, recommendedQueueActionLabel, type QueueItem, type TaskQueueProject } from "@/lib/projects/taskQueueCenter";
+import { buildTaskQueueCenter, recommendedQueueActionLabel, taskQueueSourcePresentation, type QueueItem, type TaskQueueProject } from "@/lib/projects/taskQueueCenter";
 import { buildTaskQueueExecutionPlan } from "@/lib/projects/taskQueueExecutionPlan";
 
 export const dynamic = "force-dynamic";
@@ -981,18 +981,8 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
                       {scaleGateLabel(entry.scaleGate)}
                     </span>
                   ) : null}
-                  {entry.sourceType === "first_three_adoption" ? (
-                    <span className="rounded-md bg-indigo-50 px-2 py-1 text-xs font-medium text-indigo-700">
-                      {entry.sourceLabel}
-                    </span>
-                  ) : null}
-                  {entry.sourceType === "tactic_experience_followup" ? (
-                    <span className="rounded-md bg-teal-50 px-2 py-1 text-xs font-medium text-teal-700">
-                      {entry.sourceLabel}
-                    </span>
-                  ) : null}
-                  {entry.sourceType === "first_day_handoff" ? (
-                    <span className="rounded-md bg-cyan-50 px-2 py-1 text-xs font-medium text-cyan-700">
+                  {taskQueueSourcePresentation(entry) ? (
+                    <span className={`rounded-md px-2 py-1 text-xs font-medium ${taskQueueSourcePresentation(entry)?.badgeClass}`}>
                       {entry.sourceLabel}
                     </span>
                   ) : null}
@@ -1005,23 +995,32 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
                 </div>
                 <p className="mt-2 text-sm leading-6 text-slate-600">{entry.evidence}</p>
                 {entry.sourceType === "first_three_adoption" && entry.sourceDetail ? (
-                  <div className="mt-3 rounded-md border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs leading-5 text-indigo-950">
+                  <div className={`mt-3 rounded-md border px-3 py-2 text-xs leading-5 ${taskQueueSourcePresentation(entry)?.detailClass ?? "border-indigo-200 bg-indigo-50 text-indigo-950"}`}>
                     <span className="font-medium">{entry.sourceLabel}：</span>{entry.sourceDetail}
-                    <div className="mt-2">
-                      <Link className="inline-flex rounded-md bg-white/80 px-2 py-1 font-medium text-indigo-800 hover:bg-white" href="/gate#first-three-adoption-closure">
-                        回总闸门复检
-                      </Link>
-                    </div>
+                    {taskQueueSourcePresentation(entry)?.returnHref ? (
+                      <div className="mt-2">
+                        <Link className="inline-flex rounded-md bg-white/80 px-2 py-1 font-medium text-indigo-800 hover:bg-white" href={taskQueueSourcePresentation(entry)?.returnHref ?? "/gate"}>
+                          {taskQueueSourcePresentation(entry)?.returnLabel}
+                        </Link>
+                      </div>
+                    ) : null}
                   </div>
                 ) : null}
                 {entry.sourceType === "first_day_handoff" && entry.sourceDetail ? (
-                  <div className="mt-3 rounded-md border border-cyan-200 bg-cyan-50 px-3 py-2 text-xs leading-5 text-cyan-950">
+                  <div className={`mt-3 rounded-md border px-3 py-2 text-xs leading-5 ${taskQueueSourcePresentation(entry)?.detailClass ?? "border-cyan-200 bg-cyan-50 text-cyan-950"}`}>
                     <span className="font-medium">{entry.sourceLabel}：</span>{entry.sourceDetail}
                   </div>
                 ) : null}
                 {entry.sourceType === "tactic_experience_followup" && entry.sourceDetail ? (
-                  <div className="mt-3 rounded-md border border-teal-200 bg-teal-50 px-3 py-2 text-xs leading-5 text-teal-950">
+                  <div className={`mt-3 rounded-md border px-3 py-2 text-xs leading-5 ${taskQueueSourcePresentation(entry)?.detailClass ?? "border-teal-200 bg-teal-50 text-teal-950"}`}>
                     <span className="font-medium">{entry.sourceLabel}：</span>{entry.sourceDetail}
+                    {taskQueueSourcePresentation(entry)?.returnHref ? (
+                      <div className="mt-2">
+                        <Link className="inline-flex rounded-md bg-white/80 px-2 py-1 font-medium text-emerald-800 hover:bg-white" href={taskQueueSourcePresentation(entry)?.returnHref ?? "/gate"}>
+                          {taskQueueSourcePresentation(entry)?.returnLabel}
+                        </Link>
+                      </div>
+                    ) : null}
                   </div>
                 ) : null}
                 {entry.sourceType === "tactic_experience_followup" && entry.sourceDispatchKey ? (

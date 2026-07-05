@@ -174,6 +174,14 @@ export interface TaskQueueCenter {
   recommendedNext: QueueItem | null;
 }
 
+export interface TaskQueueSourcePresentation {
+  tone: "standard" | "ai_pipeline_recovery";
+  badgeClass: string;
+  detailClass: string;
+  returnHref: string | null;
+  returnLabel: string | null;
+}
+
 type PublishEffectQueueExecution = NonNullable<QueueItem["effectAction"]>["execution"];
 
 const categoryPriority: Record<QueueItem["category"], number> = {
@@ -200,8 +208,60 @@ function blockerPriority(blockerType: QueueItem["blockerType"]) {
 export function recommendedQueueActionLabel(entry: QueueItem | null) {
   if (!entry) return null;
   if (entry.sourceType === "first_three_adoption") return `下一步：采纳闭环 · ${entry.actionLabel}`;
+  if (isAiPipelineRecoveryFollowupItem(entry)) return `下一步：AI 写审改恢复 · ${entry.actionLabel}`;
   if (entry.sourceType === "tactic_experience_followup") return `下一步：打法闭环 · ${entry.actionLabel}`;
   return `下一步：${entry.actionLabel}`;
+}
+
+function isAiPipelineRecoveryFollowupItem(entry: QueueItem | null) {
+  if (!entry || entry.sourceType !== "tactic_experience_followup") return false;
+  return entry.sourceLabel === "AI 写审改恢复"
+    || entry.platformName === "AI 写审改"
+    || entry.sourceDispatchKey?.startsWith("ai-pipeline:") === true;
+}
+
+export function taskQueueSourcePresentation(entry: QueueItem | null): TaskQueueSourcePresentation | null {
+  if (isAiPipelineRecoveryFollowupItem(entry)) {
+    return {
+      tone: "ai_pipeline_recovery",
+      badgeClass: "bg-emerald-50 text-emerald-700",
+      detailClass: "border-emerald-200 bg-emerald-50 text-emerald-950",
+      returnHref: "/gate#ai-pipeline-recovery",
+      returnLabel: "回 AI 写审改恢复闸门",
+    };
+  }
+
+  if (entry?.sourceType === "tactic_experience_followup") {
+    return {
+      tone: "standard",
+      badgeClass: "bg-teal-50 text-teal-700",
+      detailClass: "border-teal-200 bg-teal-50 text-teal-950",
+      returnHref: null,
+      returnLabel: null,
+    };
+  }
+
+  if (entry?.sourceType === "first_three_adoption") {
+    return {
+      tone: "standard",
+      badgeClass: "bg-indigo-50 text-indigo-700",
+      detailClass: "border-indigo-200 bg-indigo-50 text-indigo-950",
+      returnHref: "/gate#first-three-adoption-closure",
+      returnLabel: "回总闸门复检",
+    };
+  }
+
+  if (entry?.sourceType === "first_day_handoff") {
+    return {
+      tone: "standard",
+      badgeClass: "bg-cyan-50 text-cyan-700",
+      detailClass: "border-cyan-200 bg-cyan-50 text-cyan-950",
+      returnHref: null,
+      returnLabel: null,
+    };
+  }
+
+  return null;
 }
 
 function categoryLabel(category: QueueItem["category"]) {

@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { buildTaskQueueCenter, recommendedQueueActionLabel, type TaskQueueProject } from "../lib/projects/taskQueueCenter.ts";
+import { buildTaskQueueCenter, recommendedQueueActionLabel, taskQueueSourcePresentation, type TaskQueueProject } from "../lib/projects/taskQueueCenter.ts";
 
 const baseChapter = {
   id: "chapter-ready-draft",
@@ -816,6 +816,14 @@ test("buildTaskQueueCenter", async (t) => {
     assert.ok(sample?.completionEvidenceTemplate?.includes("放量结论：通过恢复小批 / 未通过继续观察"));
     assert.equal(sample?.completionEvidenceTemplateSource, "AI 写审改恢复模板");
     assert.equal(sample?.href, "/projects/project-1#ai-pipeline");
+    assert.equal(recommendedQueueActionLabel(sample ?? null), "下一步：AI 写审改恢复 · 继续小样本");
+    assert.deepEqual(taskQueueSourcePresentation(sample ?? null), {
+      tone: "ai_pipeline_recovery",
+      badgeClass: "bg-emerald-50 text-emerald-700",
+      detailClass: "border-emerald-200 bg-emerald-50 text-emerald-950",
+      returnHref: "/gate#ai-pipeline-recovery",
+      returnLabel: "回 AI 写审改恢复闸门",
+    });
     assert.equal(rollback?.sourceLabel, "AI 写审改恢复");
     assert.ok(rollback?.sourceDetail?.includes("回滚观察修复"));
     assert.ok(rollback?.completionEvidenceTemplate?.includes("修复对象："));

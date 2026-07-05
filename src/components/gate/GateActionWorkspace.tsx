@@ -23,6 +23,7 @@ import {
   buildGatePlatformDecisionTimeline,
   buildGatePlatformDecisionSummaryMarkdown,
   buildGateBatchTacticEffectReview,
+  buildGateRecommendedBatchReceiptFocus,
   buildGatePlatformTacticExperienceLibrary,
   buildGatePlatformTacticExperienceDisplay,
   buildGatePlatformTacticExperienceFollowupDispatch,
@@ -79,6 +80,7 @@ import {
   type GatePlatformDecisionTimelineStatus,
   type GatePlatformDecisionTimelineItem,
   type GateBatchTacticEffectStatus,
+  type GateRecommendedBatchReceiptFocusTone,
   type GatePlatformTacticExperienceItem,
   type GatePlatformTacticExperienceStatus,
   type GatePlatformTacticExperienceStatusFilter,
@@ -100,6 +102,12 @@ function receiptStatusClass(status: GateActionReceipt["status"]) {
 function recheckClass(status: GateActionReceipt["recheck"]["status"]) {
   if (status === "ready") return "border-emerald-200 bg-emerald-50 text-emerald-800";
   return "border-rose-200 bg-rose-50 text-rose-800";
+}
+
+function recommendedBatchFocusClass(tone: GateRecommendedBatchReceiptFocusTone) {
+  if (tone === "ready") return "border-emerald-200 bg-emerald-50 text-emerald-900";
+  if (tone === "blocked") return "border-rose-200 bg-rose-50 text-rose-900";
+  return "border-amber-200 bg-amber-50 text-amber-900";
 }
 
 function failureRepairReviewClass(status: ReturnType<typeof buildGateFailureRepairReceiptReview>["status"]) {
@@ -435,6 +443,8 @@ export function GateActionWorkspace({
   const visibleTacticExperienceItems = filterGatePlatformTacticExperienceItems(tacticExperienceLibrary.items, tacticExperienceFilter);
   const batchTacticEffectReview = buildGateBatchTacticEffectReview(receipts);
   const latestReceipt = filteredReceipts[0] ?? null;
+  const latestRecommendedBatchReceipt = receipts.find((receipt) => receipt.executionType === "recommended_batch") ?? null;
+  const recommendedBatchFocus = buildGateRecommendedBatchReceiptFocus(latestRecommendedBatchReceipt);
 
   useEffect(() => {
     const localReceipts = loadGateActionReceipts();
@@ -540,6 +550,28 @@ export function GateActionWorkspace({
           <p className="rounded-md bg-slate-50 p-3 text-sm text-slate-600">暂无需要处理的动作。</p>
         ) : null}
       </div>
+
+      {recommendedBatchFocus.visible ? (
+        <div className={`rounded-md border p-3 text-sm ${recommendedBatchFocusClass(recommendedBatchFocus.tone)}`}>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <div className="font-medium">{recommendedBatchFocus.headline}</div>
+              <p className="mt-1 leading-6 opacity-85">{recommendedBatchFocus.detail}</p>
+              <div className="mt-2 flex flex-wrap gap-2 text-xs opacity-85">
+                {recommendedBatchFocus.badges.map((badge) => (
+                  <span className="rounded-md bg-white/70 px-2 py-1" key={badge}>{badge}</span>
+                ))}
+              </div>
+            </div>
+            <Link
+              className="w-fit shrink-0 rounded-md bg-white px-3 py-2 text-xs font-medium text-slate-950"
+              href={recommendedBatchFocus.primaryHref}
+            >
+              {recommendedBatchFocus.primaryLabel}
+            </Link>
+          </div>
+        </div>
+      ) : null}
 
       <div className="rounded-md border border-slate-200 bg-slate-50 p-3">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">

@@ -149,6 +149,18 @@ export interface GateActionReceiptSummary {
   }>;
 }
 
+export type GateRecommendedBatchReceiptFocusTone = "ready" | "review" | "blocked";
+
+export interface GateRecommendedBatchReceiptFocus {
+  visible: boolean;
+  tone: GateRecommendedBatchReceiptFocusTone;
+  headline: string;
+  detail: string;
+  primaryLabel: string;
+  primaryHref: string;
+  badges: string[];
+}
+
 export interface GateFailureRepairReceiptReview {
   status: "clear" | "open" | "recheck" | "blocked" | "cleared";
   label: string;
@@ -1273,6 +1285,74 @@ function batchContextText(context?: GateActionReceiptBatchContext | null) {
   if (context.scaleGate === "cleared") return "恢复放量";
   if (context.scaleGate === "sample_only") return "小样本";
   return "";
+}
+
+function emptyRecommendedBatchReceiptFocus(): GateRecommendedBatchReceiptFocus {
+  return {
+    visible: false,
+    tone: "review",
+    headline: "",
+    detail: "",
+    primaryLabel: "",
+    primaryHref: "/tasks",
+    badges: [],
+  };
+}
+
+function recommendedBatchFocusTone(receipt: GateActionReceipt): GateRecommendedBatchReceiptFocusTone {
+  const summary = receipt.batchEffectSummary;
+  if (receipt.status === "failed" || receipt.failedCount > 0) return "blocked";
+  if (typeof summary?.successRatePercent === "number" && summary.successRatePercent < 80) return "blocked";
+  if (typeof summary?.averageQualityScore === "number" && summary.averageQualityScore < 80) return "review";
+  return "ready";
+}
+
+function recommendedBatchFocusHeadline(tone: GateRecommendedBatchReceiptFocusTone) {
+  if (tone === "blocked") return "小批回执提示先修复";
+  if (tone === "review") return "小批质量需要复查";
+  return "小批回执已反哺总闸门";
+}
+
+function recommendedBatchFocusDetail(receipt: GateActionReceipt) {
+  const summary = receipt.batchEffectSummary;
+  const metrics = [
+    typeof summary?.successRatePercent === "number" ? `成功率 ${summary.successRatePercent}%` : null,
+    typeof summary?.averageQualityScore === "number" ? `质量 ${summary.averageQualityScore}` : "质量缺",
+    typeof summary?.knownCostUsd === "number" ? `成本 $${summary.knownCostUsd.toFixed(4)}` : null,
+  ].filter(Boolean).join("，");
+  const context = receipt.batchContext?.receiptHeadline || "";
+  const recheck = receipt.recheck.detail;
+  return [metrics, context, recheck].filter(Boolean).join("。");
+}
+
+function recommendedBatchFocusBadges(receipt: GateActionReceipt) {
+  const summary = receipt.batchEffectSummary;
+  const badges = [
+    `成功 ${receipt.succeededCount}`,
+    `失败 ${receipt.failedCount}`,
+  ];
+  if (typeof summary?.averageQualityScore === "number") badges.push(`质量 ${summary.averageQualityScore}`);
+  if (typeof summary?.knownCostUsd === "number") badges.push(`成本 $${summary.knownCostUsd.toFixed(4)}`);
+  if (receipt.batchContext?.scaleGate === "cleared") badges.push("恢复放量");
+  if (receipt.batchContext?.scaleGate === "sample_only") badges.push("小样本验证");
+  return badges;
+}
+
+export function buildGateRecommendedBatchReceiptFocus(
+  receipt?: GateActionReceipt | null,
+): GateRecommendedBatchReceiptFocus {
+  if (!receipt || receipt.executionType !== "recommended_batch") return emptyRecommendedBatchReceiptFocus();
+
+  const tone = recommendedBatchFocusTone(receipt);
+  return {
+    visible: true,
+    tone,
+    headline: recommendedBatchFocusHeadline(tone),
+    detail: recommendedBatchFocusDetail(receipt),
+    primaryLabel: receipt.recheck.label || "复检任务队列",
+    primaryHref: "/tasks",
+    badges: recommendedBatchFocusBadges(receipt),
+  };
 }
 
 function firstThreeAdoptionClosureFromPayload(payload: GateActionReceiptPayload): GateFirstThreeAdoptionClosureSummary | null {

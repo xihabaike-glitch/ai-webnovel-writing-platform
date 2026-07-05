@@ -4,6 +4,7 @@ import {
   buildGateAdviceActionReceipt,
   buildGateActionReceiptSummary,
   buildGateActionReceipt,
+  buildGateRecommendedBatchReceiptFocus,
   buildGatePlatformStrategyReceipt,
   buildGateActionReviewAdvice,
   buildGateFailureRepairReceiptReview,
@@ -217,6 +218,41 @@ test("buildGateActionReceipt", async (t) => {
     assert.ok(receipt.startTactics?.[0].openingMove.includes("倒计时"));
     assert.equal(receipt.recheck.status, "ready");
     assert.equal(receipt.recheck.label, "复检任务队列");
+  });
+
+  await t.test("builds a recommended batch focus summary for the latest receipt", () => {
+    const receipt = buildGateActionReceipt({
+      action,
+      status: "succeeded",
+      now: "2026-01-01T00:00:00.000Z",
+      payload: {
+        results: [
+          { status: "succeeded", taskId: "task-1" },
+        ],
+        routeEffectSummary: {
+          successRatePercent: 100,
+          knownCostUsd: 0.01,
+          averageQualityScore: 86,
+        },
+        batchReceipt: {
+          status: "continue",
+          headline: "小批稳定，可以继续下一批。",
+          detail: "首日链路已经跑通。",
+        },
+      },
+    });
+
+    const focus = buildGateRecommendedBatchReceiptFocus(receipt);
+
+    assert.equal(focus.visible, true);
+    assert.equal(focus.tone, "ready");
+    assert.equal(focus.headline, "小批回执已反哺总闸门");
+    assert.ok(focus.detail.includes("成功率 100%"));
+    assert.ok(focus.detail.includes("质量 86"));
+    assert.ok(focus.detail.includes("成本 $0.0100"));
+    assert.equal(focus.primaryLabel, "复检任务队列");
+    assert.equal(focus.primaryHref, "/tasks");
+    assert.deepEqual(focus.badges.slice(0, 2), ["成功 1", "失败 0"]);
   });
 
   await t.test("records first-three adoption follow-up execution receipts", () => {

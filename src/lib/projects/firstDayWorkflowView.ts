@@ -226,11 +226,13 @@ export function buildFirstDayDispatchAiExecutionNotice(input: {
   nextAction?: string | null;
   completionEvidence?: string | null;
   canCompleteInDispatch: boolean;
+  dispatchKey?: string | null;
 }) {
   const summary = cleanEvidence(input.summary ?? "") || "当前首日节点已执行";
   const nextAction = cleanEvidence(input.nextAction ?? "") || "检查结果并完成派单验收";
   const hasEvidence = cleanEvidence(input.completionEvidence ?? "").length >= MIN_COMPLETION_EVIDENCE_LENGTH;
   const canCompleteInDispatch = input.canCompleteInDispatch && hasEvidence;
+  const focusDispatchKey = canCompleteInDispatch ? cleanEvidence(input.dispatchKey ?? "") : "";
 
   return {
     message: canCompleteInDispatch
@@ -238,6 +240,8 @@ export function buildFirstDayDispatchAiExecutionNotice(input: {
       : `首日 AI 已执行：${summary}。下一步：${nextAction}。请回项目检查结果并补足验收依据。`,
     actionLabel: canCompleteInDispatch ? "当前页验收" : "回项目验收",
     canCompleteInDispatch,
+    focusDispatchKey,
+    focusMessage: focusDispatchKey ? "AI 执行证据已填入，检查后可以标记完成。" : "",
   };
 }
 

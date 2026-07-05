@@ -736,11 +736,14 @@ test("buildFirstDayDispatchAiExecutionNotice explains current-page acceptance", 
     nextAction: "回写验收依据",
     completionEvidence: "第一章审稿已完成：钩子、爽点和章末追读点已经复查。",
     canCompleteInDispatch: true,
+    dispatchKey: "first-day:project-1:first-review",
   });
 
   assert.equal(notice.message, "首日 AI 已执行：第一章审稿已完成。下一步：回写验收依据。验收依据已填入当前派单卡，可以直接在派单中心标记完成。");
   assert.equal(notice.actionLabel, "当前页验收");
   assert.equal(notice.canCompleteInDispatch, true);
+  assert.equal(notice.focusDispatchKey, "first-day:project-1:first-review");
+  assert.equal(notice.focusMessage, "AI 执行证据已填入，检查后可以标记完成。");
 });
 
 test("buildFirstDayReturnedEvidenceAcceptanceState focuses a completable returned receipt", () => {

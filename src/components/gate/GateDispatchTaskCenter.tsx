@@ -195,6 +195,8 @@ export function GateDispatchTaskCenter({
   const [routeActionMessage, setRouteActionMessage] = useState("");
   const [routeActionLink, setRouteActionLink] = useState<RouteActionLink | null>(null);
   const [completionDrafts, setCompletionDrafts] = useState<Record<string, string>>({});
+  const [focusedCompletionDispatchKey, setFocusedCompletionDispatchKey] = useState("");
+  const [focusedCompletionMessage, setFocusedCompletionMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
   const center = useMemo(() => buildGateDispatchTaskCenter(tasks), [tasks]);
   const firstDayDesk = useMemo(() => buildFirstDayDispatchDesk(tasks), [tasks]);
@@ -655,12 +657,23 @@ export function GateDispatchTaskCenter({
           nextAction: receipt?.nextAction,
           completionEvidence,
           canCompleteInDispatch: Boolean(dispatchKey),
+          dispatchKey,
         });
         if (notice.canCompleteInDispatch && dispatchKey) {
           setCompletionDrafts((current) => ({
             ...current,
             [dispatchKey]: completionEvidence,
           }));
+        }
+        if (notice.focusDispatchKey) {
+          setFocusedCompletionDispatchKey(notice.focusDispatchKey);
+          setFocusedCompletionMessage(notice.focusMessage);
+          requestAnimationFrame(() => {
+            document.getElementById(`dispatch-${notice.focusDispatchKey}`)?.scrollIntoView({
+              behavior: "smooth",
+              block: "center",
+            });
+          });
         }
         setRouteActionMessage(notice.message);
         setRouteActionLink({
@@ -1471,9 +1484,11 @@ export function GateDispatchTaskCenter({
           const completionRecordChips = completionRecord ? routeCompletionRecordChips(completionRecord) : [];
           const isRecheckFollowUp = isChapterProductionRecheckFollowUpTask(task);
           const recheckChain = recheckChainByDispatchKey.get(task.dispatchKey);
+          const isFocusedCompletionTask = task.dispatchKey === focusedCompletionDispatchKey;
+          const isFocusedTask = task.dispatchKey === focusedDispatchKey || isFocusedCompletionTask;
           return (
           <div
-            className={`rounded-md border bg-white p-4 ${task.dispatchKey === focusedDispatchKey ? "border-amber-300 ring-2 ring-amber-200" : "border-slate-200"}`}
+            className={`rounded-md border bg-white p-4 ${isFocusedTask ? "border-amber-300 ring-2 ring-amber-200" : "border-slate-200"}`}
             id={`dispatch-${task.dispatchKey}`}
             key={task.dispatchKey}
           >
@@ -1521,6 +1536,9 @@ export function GateDispatchTaskCenter({
                     ) : null}
                     {firstDayCompletionHint ? (
                       <p className="rounded-md bg-amber-50 px-2 py-1 text-xs leading-5 text-amber-800">{firstDayCompletionHint}</p>
+                    ) : null}
+                    {isFocusedCompletionTask && focusedCompletionMessage ? (
+                      <p className="rounded-md bg-emerald-50 px-2 py-1 text-xs leading-5 text-emerald-800">{focusedCompletionMessage}</p>
                     ) : null}
                     <textarea
                       className="min-h-20 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-normal text-slate-800"

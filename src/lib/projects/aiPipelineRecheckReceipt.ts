@@ -16,11 +16,20 @@ export interface AiPipelineRecheckGateActionReceipt {
 
 export type AiPipelineRecheckNextActionKind = "resume_small_batch" | "repair_checklist" | "review_quality" | "watch_cost";
 
+export interface AiPipelineRecheckNextActionExecution {
+  method: "POST";
+  endpoint: string;
+  body: {
+    areaId: "ai-pipeline";
+  };
+}
+
 export interface AiPipelineRecheckNextAction {
   kind: AiPipelineRecheckNextActionKind;
   label: string;
   detail: string;
   href: string;
+  execution?: AiPipelineRecheckNextActionExecution;
 }
 
 function recheckMode(plan: Pick<TaskQueueExecutionPlan, "scaleGate" | "chapterIds">): AiPipelineRecheckGateActionReceipt["payload"]["aiPipelineRecheck"]["mode"] {
@@ -54,6 +63,13 @@ export function buildAiPipelineRecheckNextAction(input: {
       label: "生成修复清单",
       detail: `AI 复检未过线，成功率 ${input.successRatePercent}%，质量 ${input.averageQualityScore ?? "缺样本"}。先生成修复清单，不要恢复批量。`,
       href: projectHref,
+      execution: input.projectId
+        ? {
+          method: "POST",
+          endpoint: `/api/projects/${input.projectId}/control-actions`,
+          body: { areaId: "ai-pipeline" },
+        }
+        : undefined,
     };
   }
   if (input.batchStatus === "review_quality") {

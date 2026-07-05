@@ -124,6 +124,20 @@ function routeFlowFilterFromLane(laneId: RouteConfirmationDispatchFlowLaneId): R
 
 type DispatchQueueFilter = "all" | "recheck_followup" | "ai_pipeline";
 
+interface RouteActionExecution {
+  method: "POST";
+  endpoint: string;
+  body: {
+    areaId: string;
+  };
+}
+
+interface RouteActionLink {
+  label: string;
+  href: string;
+  execution?: RouteActionExecution;
+}
+
 function isAiPipelineExecutableTask(task: PersistedGatePlatformDispatchTask) {
   return task.platformId === "ai-pipeline"
     && (task.stage === "ai_pipeline_sample_recheck" || task.stage === "ai_pipeline_small_batch")
@@ -171,8 +185,9 @@ export function GateDispatchTaskCenter({
   const [runningRouteRecheckKey, setRunningRouteRecheckKey] = useState<string | null>(null);
   const [runningAiPipelineKey, setRunningAiPipelineKey] = useState<string | null>(null);
   const [runningRecheckAdviceKey, setRunningRecheckAdviceKey] = useState<string | null>(null);
+  const [runningRouteActionLink, setRunningRouteActionLink] = useState(false);
   const [routeActionMessage, setRouteActionMessage] = useState("");
-  const [routeActionLink, setRouteActionLink] = useState<{ label: string; href: string } | null>(null);
+  const [routeActionLink, setRouteActionLink] = useState<RouteActionLink | null>(null);
   const [completionDrafts, setCompletionDrafts] = useState<Record<string, string>>({});
   const [errorMessage, setErrorMessage] = useState("");
   const center = useMemo(() => buildGateDispatchTaskCenter(tasks), [tasks]);
@@ -536,6 +551,7 @@ export function GateDispatchTaskCenter({
           label: string;
           detail: string;
           href: string;
+          execution?: RouteActionExecution;
         };
         recheckTask?: {
           dispatchKey: string;
@@ -566,6 +582,7 @@ export function GateDispatchTaskCenter({
       setRouteActionLink(payload?.nextAction?.href ? {
         label: payload.nextAction.label,
         href: payload.nextAction.href,
+        execution: payload.nextAction.execution,
       } : payload?.batchReceipt?.primaryHref ? {
         label: payload.batchReceipt.primaryLabel,
         href: payload.batchReceipt.primaryHref,
@@ -575,6 +592,38 @@ export function GateDispatchTaskCenter({
       setErrorMessage(error instanceof Error ? error.message : "运行 AI 写审改复检失败。");
     } finally {
       setRunningAiPipelineKey(null);
+    }
+  }
+
+  async function executeRouteActionLink(action: RouteActionLink) {
+    if (!action.execution) return;
+    setRunningRouteActionLink(true);
+    setErrorMessage("");
+    try {
+      const response = await fetch(action.execution.endpoint, {
+        method: action.execution.method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(action.execution.body),
+      });
+      const payload = await response.json().catch(() => null) as {
+        error?: string;
+        message?: string;
+        dispatchKey?: string;
+      } | null;
+      if (!response.ok) throw new Error(payload?.error ?? "执行下一步失败。");
+      setRouteActionMessage(payload?.message ?? `${action.label}已执行。`);
+      setRouteActionLink(payload?.dispatchKey ? {
+        label: "查看 AI 复检派单",
+        href: `/dispatch?queue=ai_pipeline#dispatch-${payload.dispatchKey}`,
+      } : {
+        label: "回项目控制台",
+        href: action.href,
+      });
+      router.refresh();
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "执行下一步失败。");
+    } finally {
+      setRunningRouteActionLink(false);
     }
   }
 
@@ -1042,9 +1091,20 @@ export function GateDispatchTaskCenter({
             <div className="flex flex-col gap-3 rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800 lg:flex-row lg:items-center lg:justify-between">
               <p className="leading-6">{routeActionMessage}</p>
               {routeActionLink ? (
-                <Link className="w-fit shrink-0 rounded-md bg-white px-3 py-2 text-xs font-medium text-emerald-900 hover:bg-emerald-100" href={routeActionLink.href}>
-                  {routeActionLink.label}
-                </Link>
+                routeActionLink.execution ? (
+                  <button
+                    className="w-fit shrink-0 rounded-md bg-white px-3 py-2 text-xs font-medium text-emerald-900 hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60"
+                    disabled={runningRouteActionLink}
+                    onClick={() => void executeRouteActionLink(routeActionLink)}
+                    type="button"
+                  >
+                    {runningRouteActionLink ? "执行中" : routeActionLink.label}
+                  </button>
+                ) : (
+                  <Link className="w-fit shrink-0 rounded-md bg-white px-3 py-2 text-xs font-medium text-emerald-900 hover:bg-emerald-100" href={routeActionLink.href}>
+                    {routeActionLink.label}
+                  </Link>
+                )
               ) : null}
             </div>
           ) : null}

@@ -127,5 +127,10 @@ test("buildAiPipelineRecheckNextAction points failed samples to repair checklist
   assert.equal(action.kind, "repair_checklist");
   assert.equal(action.label, "生成修复清单");
   assert.equal(action.href, "/projects/project-1#ai-pipeline");
+  assert.deepEqual(action.execution, {
+    method: "POST",
+    endpoint: "/api/projects/project-1/control-actions",
+    body: { areaId: "ai-pipeline" },
+  });
   assert.ok(action.detail.includes("不要恢复批量"));
 });

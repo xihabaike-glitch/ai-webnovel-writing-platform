@@ -255,6 +255,42 @@ test("buildGateActionReceipt", async (t) => {
     assert.deepEqual(focus.badges.slice(0, 2), ["成功 1", "失败 0"]);
   });
 
+  await t.test("keeps recovered batch identity in the recommended batch focus summary", () => {
+    const receipt = buildGateActionReceipt({
+      action,
+      status: "succeeded",
+      now: "2026-01-01T00:00:00.000Z",
+      payload: {
+        results: [
+          { status: "succeeded", taskId: "task-1" },
+          { status: "succeeded", taskId: "task-2" },
+        ],
+        routeEffectSummary: {
+          successRatePercent: 100,
+          knownCostUsd: 0.02,
+          averageQualityScore: 88,
+        },
+        plan: {
+          scaleGate: "cleared",
+          actionLabel: "批量初稿 2 个",
+          category: "draft",
+        },
+        batchReceipt: {
+          status: "continue",
+          headline: "准放量批次稳定，下一批仍小步走",
+          detail: "小样本后的第一轮恢复放量已过线。",
+        },
+      },
+    });
+
+    const focus = buildGateRecommendedBatchReceiptFocus(receipt);
+
+    assert.equal(focus.headline, "恢复批回执已反哺总闸门");
+    assert.ok(focus.detail.includes("恢复放量"));
+    assert.ok(focus.detail.includes("下一批仍小步走"));
+    assert.ok(focus.badges.includes("恢复放量"));
+  });
+
   await t.test("records first-three adoption follow-up execution receipts", () => {
     const receipt = buildGateFirstThreeAdoptionReceipt({
       mode: "single",

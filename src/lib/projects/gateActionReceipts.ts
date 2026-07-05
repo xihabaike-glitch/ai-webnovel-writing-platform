@@ -1307,7 +1307,17 @@ function recommendedBatchFocusTone(receipt: GateActionReceipt): GateRecommendedB
   return "ready";
 }
 
-function recommendedBatchFocusHeadline(tone: GateRecommendedBatchReceiptFocusTone) {
+function recommendedBatchFocusHeadline(tone: GateRecommendedBatchReceiptFocusTone, context?: GateActionReceiptBatchContext | null) {
+  if (context?.scaleGate === "cleared") {
+    if (tone === "blocked") return "恢复批回执提示先修复";
+    if (tone === "review") return "恢复批质量需要复查";
+    return "恢复批回执已反哺总闸门";
+  }
+  if (context?.scaleGate === "sample_only") {
+    if (tone === "blocked") return "小样本回执提示先修复";
+    if (tone === "review") return "小样本质量需要复查";
+    return "小样本回执已反哺总闸门";
+  }
   if (tone === "blocked") return "小批回执提示先修复";
   if (tone === "review") return "小批质量需要复查";
   return "小批回执已反哺总闸门";
@@ -1315,6 +1325,7 @@ function recommendedBatchFocusHeadline(tone: GateRecommendedBatchReceiptFocusTon
 
 function recommendedBatchFocusDetail(receipt: GateActionReceipt) {
   const summary = receipt.batchEffectSummary;
+  const batchContext = batchContextText(receipt.batchContext);
   const metrics = [
     typeof summary?.successRatePercent === "number" ? `成功率 ${summary.successRatePercent}%` : null,
     typeof summary?.averageQualityScore === "number" ? `质量 ${summary.averageQualityScore}` : "质量缺",
@@ -1322,7 +1333,7 @@ function recommendedBatchFocusDetail(receipt: GateActionReceipt) {
   ].filter(Boolean).join("，");
   const context = receipt.batchContext?.receiptHeadline || "";
   const recheck = receipt.recheck.detail;
-  return [metrics, context, recheck].filter(Boolean).join("。");
+  return [batchContext, metrics, context, recheck].filter(Boolean).join("。");
 }
 
 function recommendedBatchFocusBadges(receipt: GateActionReceipt) {
@@ -1347,7 +1358,7 @@ export function buildGateRecommendedBatchReceiptFocus(
   return {
     visible: true,
     tone,
-    headline: recommendedBatchFocusHeadline(tone),
+    headline: recommendedBatchFocusHeadline(tone, receipt.batchContext),
     detail: recommendedBatchFocusDetail(receipt),
     primaryLabel: receipt.recheck.label || "复检任务队列",
     primaryHref: "/tasks",

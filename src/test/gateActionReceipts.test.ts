@@ -232,7 +232,11 @@ test("buildGateActionReceipt", async (t) => {
     assert.equal(receipt.failedCount, 0);
     assert.equal(receipt.platformId, "fanqie");
     assert.equal(receipt.platformName, "前三章采纳闭环");
-    assert.ok(receipt.message.includes("成功 1 个"));
+    assert.ok(receipt.message.includes("已闭合 1 个"));
+    assert.equal(receipt.firstThreeAdoptionClosure?.closedCount, 1);
+    assert.equal(receipt.firstThreeAdoptionClosure?.blockedCount, 0);
+    assert.equal(receipt.firstThreeAdoptionClosure?.closed[0]?.title, "第 1 章采纳后重新审稿");
+    assert.ok(receipt.firstThreeAdoptionClosure?.nextAction.includes("刷新总闸门"));
     assert.equal(receipt.recheck.status, "ready");
     assert.equal(receipt.recheck.label, "复检采纳闭环");
 
@@ -272,7 +276,11 @@ test("buildGateActionReceipt", async (t) => {
     assert.equal(receipt.actionId, "first-three-adoption:batch_review");
     assert.equal(receipt.succeededCount, 1);
     assert.equal(receipt.failedCount, 1);
-    assert.ok(receipt.message.includes("失败 1 个"));
+    assert.ok(receipt.message.includes("仍需处理 1 个"));
+    assert.equal(receipt.firstThreeAdoptionClosure?.closedCount, 1);
+    assert.equal(receipt.firstThreeAdoptionClosure?.blockedCount, 1);
+    assert.equal(receipt.firstThreeAdoptionClosure?.blocked[0]?.title, "第 2 章采纳后重新审稿");
+    assert.ok(receipt.firstThreeAdoptionClosure?.nextAction.includes("处理失败项"));
     assert.ok(receipt.message.includes("预算拦截"));
     assert.equal(receipt.recheck.status, "blocked");
     assert.equal(receipt.recheck.label, "处理失败项后复检");
@@ -466,6 +474,58 @@ test("buildGateActionReceipt", async (t) => {
     assert.equal(review.items[0]?.label, "恢复放量观察");
     assert.equal(review.items[0]?.recoveryBatches, 1);
     assert.ok(review.items[0]?.openingMove.includes("倒计时"));
+  });
+
+  await t.test("restores first-three adoption closure summaries from persisted audits", () => {
+    const receipt = gateActionReceiptFromAuditRecord({
+      receiptId: "first-three-adoption:batch_review:2026-01-01T00:00:00.000Z",
+      actionId: "first-three-adoption:batch_review",
+      label: "批量重新审稿",
+      detail: "1 个项目 · 2 个后续任务 · 采纳后正文变更闭环",
+      href: "/gate#first-three-adoption-closure",
+      status: "failed",
+      message: "批量重新审稿完成：已闭合 1 个，仍需处理 1 个。",
+      executionType: "first_three_adoption",
+      succeededCount: 1,
+      failedCount: 1,
+      taskId: null,
+      platformId: "fanqie",
+      platformName: "前三章采纳闭环",
+      recheckStatus: "blocked",
+      recheckLabel: "处理失败项后复检",
+      recheckDetail: "已闭合 1 条采纳后续，1 条仍阻塞。先处理失败项，再刷新总闸门复检。",
+      recheckAction: "刷新总闸门",
+      payload: JSON.stringify({
+        firstThreeAdoptionClosure: {
+          closedCount: 1,
+          blockedCount: 1,
+          headline: "已闭合 1 条采纳后续，1 条仍阻塞。",
+          nextAction: "先处理失败项，再刷新总闸门复检。",
+          closed: [{
+            id: firstThreeFollowup.id,
+            projectId: "project-1",
+            projectTitle: "夜雨系统",
+            label: "重新审稿",
+            title: "第 1 章采纳后重新审稿",
+          }],
+          blocked: [{
+            id: "first-three-adoption:project-1:chapter-2:revision-2:review",
+            projectId: "project-1",
+            projectTitle: "夜雨系统",
+            label: "重新审稿",
+            title: "第 2 章采纳后重新审稿",
+            message: "预算拦截。",
+          }],
+        },
+      }),
+      createdAt: "2026-01-01T00:00:00.000Z",
+    });
+
+    assert.equal(receipt.executionType, "first_three_adoption");
+    assert.equal(receipt.firstThreeAdoptionClosure?.closedCount, 1);
+    assert.equal(receipt.firstThreeAdoptionClosure?.blockedCount, 1);
+    assert.equal(receipt.firstThreeAdoptionClosure?.blocked[0]?.message, "预算拦截。");
+    assert.ok(receipt.recheck.detail.includes("仍阻塞"));
   });
 
   await t.test("keeps failed action errors readable", () => {

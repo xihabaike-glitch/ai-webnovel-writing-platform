@@ -105,6 +105,7 @@ export async function POST(request: Request) {
     payload: JSON.stringify(body?.payload ?? {
       startTactics: receipt.startTactics ?? [],
       routeEffectSummary: receipt.batchEffectSummary ?? undefined,
+      firstThreeAdoptionClosure: receipt.firstThreeAdoptionClosure ?? undefined,
     }),
     createdAt: date(receipt.createdAt),
   };

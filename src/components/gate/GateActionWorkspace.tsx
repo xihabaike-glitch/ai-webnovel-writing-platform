@@ -2070,6 +2070,12 @@ export function GateActionWorkspace({
               <div>
                 <div className="font-medium">{latestReceipt.recheck.label}</div>
                 <p className="mt-1 leading-6 opacity-85">{latestReceipt.recheck.detail}</p>
+                {latestReceipt.firstThreeAdoptionClosure ? (
+                  <div className="mt-2 grid gap-1 text-xs opacity-85">
+                    <div>已闭合 {latestReceipt.firstThreeAdoptionClosure.closedCount} · 仍阻塞 {latestReceipt.firstThreeAdoptionClosure.blockedCount}</div>
+                    <div>下一步：{latestReceipt.firstThreeAdoptionClosure.nextAction}</div>
+                  </div>
+                ) : null}
               </div>
               {latestReceipt.recheck.status === "ready" ? (
                 <button
@@ -2100,6 +2106,25 @@ export function GateActionWorkspace({
                 </span>
               </div>
               <p className="mt-1 leading-6 text-slate-600">{receipt.message}</p>
+              {receipt.firstThreeAdoptionClosure ? (
+                <div className="mt-3 rounded-md border border-indigo-200 bg-indigo-50 p-3 text-xs leading-5 text-indigo-950">
+                  <div className="font-medium">采纳闭环摘要</div>
+                  <div className="mt-1">{receipt.firstThreeAdoptionClosure.headline}</div>
+                  <div className="mt-1">下一步：{receipt.firstThreeAdoptionClosure.nextAction}</div>
+                  {receipt.firstThreeAdoptionClosure.closed.length ? (
+                    <div className="mt-1 text-emerald-700">
+                      已闭合：{receipt.firstThreeAdoptionClosure.closed.slice(0, 3).map((item) => item.title).join("、")}
+                      {receipt.firstThreeAdoptionClosure.closed.length > 3 ? ` 等 ${receipt.firstThreeAdoptionClosure.closed.length} 项` : ""}
+                    </div>
+                  ) : null}
+                  {receipt.firstThreeAdoptionClosure.blocked.length ? (
+                    <div className="mt-1 text-rose-700">
+                      仍需处理：{receipt.firstThreeAdoptionClosure.blocked.slice(0, 3).map((item) => item.title).join("、")}
+                      {receipt.firstThreeAdoptionClosure.blocked.length > 3 ? ` 等 ${receipt.firstThreeAdoptionClosure.blocked.length} 项` : ""}
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
               {receipt.startTactics?.length ? (
                 <div className="mt-3 grid gap-2 lg:grid-cols-2">
                   {receipt.startTactics.slice(0, 2).map((tactic) => (

@@ -22,6 +22,7 @@ export type GateActionReceiptExecutionFilter = "all" | GateActionReceiptExecutio
 export interface GateActionReceiptPayload {
   message?: string;
   error?: string;
+  firstThreeAdoptionClosure?: GateFirstThreeAdoptionClosureSummary;
   plan?: {
     strategyBases?: GateActionReceiptStartTactic[];
     scaleGate?: string;
@@ -104,6 +105,7 @@ export interface GateActionReceipt {
   startTactics?: GateActionReceiptStartTactic[];
   batchEffectSummary?: GateActionReceiptBatchEffectSummary | null;
   batchContext?: GateActionReceiptBatchContext | null;
+  firstThreeAdoptionClosure?: GateFirstThreeAdoptionClosureSummary | null;
   recheck: {
     status: "ready" | "blocked";
     label: string;
@@ -974,6 +976,24 @@ export interface GateFirstThreeAdoptionReceiptResult {
   message?: string;
 }
 
+export interface GateFirstThreeAdoptionClosureSummaryItem {
+  id: string;
+  projectId: string;
+  projectTitle: string;
+  label: string;
+  title: string;
+  message?: string;
+}
+
+export interface GateFirstThreeAdoptionClosureSummary {
+  closedCount: number;
+  blockedCount: number;
+  headline: string;
+  nextAction: string;
+  closed: GateFirstThreeAdoptionClosureSummaryItem[];
+  blocked: GateFirstThreeAdoptionClosureSummaryItem[];
+}
+
 function countStatus(payload: GateActionReceiptPayload) {
   const results = payload.results?.length ? payload.results : payload.result ? [payload.result] : [];
   return {
@@ -1042,6 +1062,19 @@ function batchContextText(context?: GateActionReceiptBatchContext | null) {
   if (context.scaleGate === "cleared") return "恢复放量";
   if (context.scaleGate === "sample_only") return "小样本";
   return "";
+}
+
+function firstThreeAdoptionClosureFromPayload(payload: GateActionReceiptPayload): GateFirstThreeAdoptionClosureSummary | null {
+  const summary = payload.firstThreeAdoptionClosure;
+  if (!summary) return null;
+  return {
+    closedCount: Math.max(0, Math.round(summary.closedCount || 0)),
+    blockedCount: Math.max(0, Math.round(summary.blockedCount || 0)),
+    headline: summary.headline || "",
+    nextAction: summary.nextAction || "刷新总闸门复检。",
+    closed: Array.isArray(summary.closed) ? summary.closed : [],
+    blocked: Array.isArray(summary.blocked) ? summary.blocked : [],
+  };
 }
 
 function receiptMessage(input: {
@@ -1264,6 +1297,7 @@ export function gateActionReceiptFromAuditRecord(record: GateActionAuditRecord):
     startTactics: startTacticsFromPayload(payload),
     batchEffectSummary: batchEffectSummaryFromPayload(payload),
     batchContext: batchContextFromPayload(payload),
+    firstThreeAdoptionClosure: firstThreeAdoptionClosureFromPayload(payload),
     recheck: {
       status: record.recheckStatus === "blocked" ? "blocked" : "ready",
       label: record.recheckLabel,
@@ -1312,6 +1346,7 @@ export function buildGateActionReceipt(input: {
     startTactics,
     batchEffectSummary,
     batchContext,
+    firstThreeAdoptionClosure: firstThreeAdoptionClosureFromPayload(payload),
     recheck: recheckHint({
       action: input.action,
       status: input.status,
@@ -1894,9 +1929,10 @@ export function buildGateFirstThreeAdoptionReceipt(input: {
     ? `${projectCount} 个项目 · ${input.items.length} 个后续任务`
     : `${firstItem?.projectTitle ?? "项目"} · ${firstItem?.title ?? "采纳后续任务"}`;
   const failedMessage = input.results.find((result) => result.status === "failed")?.message;
+  const firstThreeAdoptionClosure = buildFirstThreeAdoptionClosureSummary(input.results);
   const message = failedCount > 0
-    ? `${modeLabel}完成：成功 ${succeededCount} 个，失败 ${failedCount} 个。${failedMessage ? `首个失败：${failedMessage}` : ""}`
-    : `${modeLabel}完成：成功 ${succeededCount} 个，采纳后的审稿和发布质检证据已回到总闸门。`;
+    ? `${modeLabel}完成：已闭合 ${succeededCount} 个，仍需处理 ${failedCount} 个。${failedMessage ? `首个失败：${failedMessage}` : ""}`
+    : `${modeLabel}完成：已闭合 ${succeededCount} 个，采纳后的审稿和发布质检证据已回到总闸门。`;
 
   return {
     id: `first-three-adoption:${input.mode}:${createdAt}`,
@@ -1912,15 +1948,40 @@ export function buildGateFirstThreeAdoptionReceipt(input: {
     taskId: null,
     platformId,
     platformName,
+    firstThreeAdoptionClosure,
     recheck: {
       status: failedCount > 0 ? "blocked" : "ready",
       label: failedCount > 0 ? "处理失败项后复检" : "复检采纳闭环",
-      detail: failedCount > 0
-        ? "有采纳后续动作失败，先处理失败项，再刷新总闸门确认闭环状态。"
-        : "采纳后续已执行，刷新总闸门确认重新审稿、发布质检和发布包状态是否全部闭合。",
+      detail: `${firstThreeAdoptionClosure.headline}${firstThreeAdoptionClosure.nextAction}`,
       actionLabel: "刷新总闸门",
     },
     createdAt,
+  };
+}
+
+export function buildFirstThreeAdoptionClosureSummary(
+  results: GateFirstThreeAdoptionReceiptResult[],
+): GateFirstThreeAdoptionClosureSummary {
+  const closed = results
+    .filter((result) => result.status === "succeeded")
+    .map(({ id, projectId, projectTitle, label, title, message }) => ({ id, projectId, projectTitle, label, title, message }));
+  const blocked = results
+    .filter((result) => result.status === "failed")
+    .map(({ id, projectId, projectTitle, label, title, message }) => ({ id, projectId, projectTitle, label, title, message }));
+  const headline = blocked.length > 0
+    ? `已闭合 ${closed.length} 条采纳后续，${blocked.length} 条仍阻塞。`
+    : `本批 ${closed.length} 条采纳后续已闭合。`;
+  const nextAction = blocked.length > 0
+    ? "先处理失败项，再刷新总闸门复检。"
+    : "刷新总闸门复检，确认前三章采纳链路放行。";
+
+  return {
+    closedCount: closed.length,
+    blockedCount: blocked.length,
+    headline,
+    nextAction,
+    closed,
+    blocked,
   };
 }
 
@@ -2983,6 +3044,7 @@ export async function persistGateActionReceipt(receipt: GateActionReceipt, paylo
   const persistedPayload = payload ?? {
     startTactics: receipt.startTactics ?? [],
     routeEffectSummary: receipt.batchEffectSummary ?? undefined,
+    firstThreeAdoptionClosure: receipt.firstThreeAdoptionClosure ?? undefined,
   };
   const response = await fetch("/api/gate/action-receipts", {
     method: "POST",

@@ -108,6 +108,24 @@ export interface ProjectStartGateExperience {
   modelRoutes: ProjectStartModelRouteExperience[];
 }
 
+export type ProjectStartExperienceHandoffStatus = "reuse" | "small_sample" | "blocked" | "template";
+
+export interface ProjectStartExperienceHandoff {
+  status: ProjectStartExperienceHandoffStatus;
+  label: string;
+  title: string;
+  detail: string;
+  selectedPlatformId: PlatformProfile["id"];
+  selectedPlatformName: string;
+  recommendedPlatformId: PlatformProfile["id"] | null;
+  recommendedPlatformName: string | null;
+  recommendedTemplateId: ProjectTemplate["id"] | null;
+  shouldSwitchTemplate: boolean;
+  firstDayActions: string[];
+  avoidRules: string[];
+  evidence: string[];
+}
+
 function routeDetailValue(detail: string, label: string) {
   const match = detail.match(new RegExp(`${label}：([^；;]+)`));
   return match?.[1]?.trim() || null;
@@ -482,6 +500,89 @@ export function buildProjectStartRiskGate(item: ProjectStartPlatformExperienceIt
     detail: item.detail,
     actionLabel: "创建作品",
     evidence: item.evidence.slice(0, 3),
+  };
+}
+
+function uniqueLines(lines: Array<string | null | undefined>, limit: number) {
+  const seen = new Set<string>();
+  return lines
+    .map((line) => line?.trim())
+    .filter((line): line is string => Boolean(line))
+    .filter((line) => {
+      if (seen.has(line)) return false;
+      seen.add(line);
+      return true;
+    })
+    .slice(0, limit);
+}
+
+export function buildProjectStartExperienceHandoff(input: {
+  platform: PlatformProfile;
+  template: ProjectTemplate;
+  guide: ProjectStartPlatformExperienceGuide;
+  advice: ProjectStartTacticAdvice;
+  riskGate: ProjectStartRiskGate;
+  recommendedTemplate?: ProjectTemplate | null;
+}): ProjectStartExperienceHandoff {
+  const guideItem = input.guide.items.find((item) => item.platformId === input.platform.id) ?? null;
+  const recommendedItem = input.guide.items.find((item) => item.status === "recommended") ?? null;
+  const recommendedTemplate = input.recommendedTemplate ?? null;
+  const shouldSwitchTemplate = Boolean(
+    recommendedTemplate
+      && recommendedTemplate.platformId !== input.platform.id
+      && guideItem?.status !== "recommended",
+  );
+  const status: ProjectStartExperienceHandoffStatus = input.riskGate.level === "blocked"
+    ? "blocked"
+    : input.riskGate.level === "watch"
+      ? "small_sample"
+      : guideItem?.status === "recommended"
+        ? "reuse"
+        : "template";
+  const title = status === "blocked"
+    ? `${input.platform.name} 开书前先过恢复条件`
+    : status === "small_sample"
+      ? `${input.platform.name} 只做小样本开书`
+      : status === "reuse"
+        ? `${input.platform.name} 可复用历史打法`
+        : `${input.platform.name} 先按模板开书`;
+  const label = status === "blocked"
+    ? "避坑交接"
+    : status === "small_sample"
+      ? "观察交接"
+      : status === "reuse"
+        ? "复用交接"
+        : "模板交接";
+  const switchAction = shouldSwitchTemplate && recommendedTemplate && recommendedItem
+    ? `可切到 ${recommendedItem.platformName} 的「${recommendedTemplate.label}」作为更稳开书底稿。`
+    : null;
+
+  return {
+    status,
+    label,
+    title,
+    detail: switchAction ?? input.riskGate.detail,
+    selectedPlatformId: input.platform.id,
+    selectedPlatformName: input.platform.name,
+    recommendedPlatformId: recommendedItem?.platformId ?? null,
+    recommendedPlatformName: recommendedItem?.platformName ?? null,
+    recommendedTemplateId: recommendedTemplate?.id ?? null,
+    shouldSwitchTemplate,
+    firstDayActions: uniqueLines([
+      `开头：${input.advice.openingMove}`,
+      `验证：${input.advice.verificationMove}`,
+      input.riskGate.requiresConfirmation ? "创建前写清恢复条件，只允许首轮小样本。" : "创建后回填前三章、平台包装和首轮数据证据。",
+    ], 3),
+    avoidRules: uniqueLines([
+      status === "blocked" ? "不要直接复用历史失败入口、题材包装或前三章兑现方式。" : null,
+      guideItem?.status === "watch" ? "不要把观察样本当成成功样本放量。" : null,
+      input.advice.risk,
+    ], 3),
+    evidence: uniqueLines([
+      ...(guideItem?.evidence ?? []),
+      ...input.riskGate.evidence,
+      ...input.advice.evidence,
+    ], 5),
   };
 }
 

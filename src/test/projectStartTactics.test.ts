@@ -5,6 +5,7 @@ import { getPlatformProfile } from "../lib/platforms/platformProfiles.ts";
 import { getPlatformWritingStyle } from "../lib/platforms/writingStyleTemplates.ts";
 import type { GateBatchTacticEffectItem, GatePlatformTacticExperienceItem, PersistedGatePlatformDispatchTask } from "../lib/projects/gateActionReceipts.ts";
 import {
+  buildProjectStartExperienceHandoff,
   buildProjectStartPlatformExperienceGuide,
   buildProjectStartGateExperience,
   buildProjectStartModelRouteExperienceFromConfirmations,
@@ -545,6 +546,119 @@ test("buildProjectStartTacticAdvice", async (t) => {
     });
 
     assert.equal(conservativeSelected.id, fallbackTemplate.id);
+  });
+
+  await t.test("builds a start handoff that can switch away from avoidance platforms", () => {
+    const selectedPlatform = getPlatformProfile("webnovel");
+    const selectedTemplate = getDefaultTemplateForPlatform(selectedPlatform.id);
+    const fanqieTemplate = getDefaultTemplateForPlatform("fanqie");
+    const style = getPlatformWritingStyle(selectedPlatform.id);
+    const fanqieExperience: GatePlatformTacticExperienceItem = {
+      platformId: "fanqie",
+      platformName: "番茄小说",
+      status: "usable",
+      label: "可复用打法",
+      tactic: "首秀稳定加码打法",
+      lesson: "首秀数据连续站住。",
+      reuseHint: "新项目可复用首章高压钩子和前三章兑现节奏。",
+      risk: "先小步验证，不要直接放量。",
+      href: "/gate",
+      sourceStatus: "healthy",
+      sourceLabel: "稳定加码",
+      priorityScore: 92,
+      latestAt: "2026-01-18T00:00:00.000Z",
+      evidence: ["最终判定：稳定加码。"],
+    };
+    const webnovelExperience: GatePlatformTacticExperienceItem = {
+      platformId: "webnovel",
+      platformName: "WebNovel",
+      status: "blocked",
+      label: "避坑样本",
+      tactic: "海外转化暂停样本",
+      lesson: "三轮仍未形成有效转化。",
+      reuseHint: "同类项目先复用暂停原因。",
+      risk: "重启条件必须写清。",
+      href: "/gate",
+      sourceStatus: "blocked",
+      sourceLabel: "归档暂停",
+      priorityScore: 98,
+      latestAt: "2026-01-18T00:10:00.000Z",
+      evidence: ["最终判定：归档暂停。"],
+    };
+    const guide = buildProjectStartPlatformExperienceGuide({
+      platforms: [getPlatformProfile("fanqie"), selectedPlatform],
+      experiences: [fanqieExperience, webnovelExperience],
+    });
+    const guideItem = guide.items.find((item) => item.platformId === selectedPlatform.id) ?? null;
+    const riskGate = buildProjectStartRiskGate(guideItem);
+    const advice = buildProjectStartTacticAdvice({
+      platform: selectedPlatform,
+      template: selectedTemplate,
+      style,
+      experience: webnovelExperience,
+    });
+    const handoff = buildProjectStartExperienceHandoff({
+      platform: selectedPlatform,
+      template: selectedTemplate,
+      guide,
+      advice,
+      riskGate,
+      recommendedTemplate: fanqieTemplate,
+    });
+
+    assert.equal(handoff.status, "blocked");
+    assert.equal(handoff.label, "避坑交接");
+    assert.equal(handoff.shouldSwitchTemplate, true);
+    assert.equal(handoff.recommendedPlatformId, "fanqie");
+    assert.equal(handoff.recommendedTemplateId, fanqieTemplate.id);
+    assert.ok(handoff.detail.includes("番茄小说"));
+    assert.ok(handoff.firstDayActions.some((action) => action.includes("恢复条件")));
+    assert.ok(handoff.avoidRules.some((rule) => rule.includes("不要直接复用")));
+    assert.ok(handoff.evidence.some((item) => item.includes("归档暂停")));
+  });
+
+  await t.test("builds a reusable start handoff for recommended platforms", () => {
+    const platform = getPlatformProfile("fanqie");
+    const template = getDefaultTemplateForPlatform(platform.id);
+    const style = getPlatformWritingStyle(platform.id);
+    const experience: GatePlatformTacticExperienceItem = {
+      platformId: "fanqie",
+      platformName: "番茄小说",
+      status: "usable",
+      label: "可复用打法",
+      tactic: "三轮稳定加码打法",
+      lesson: "真实数据已经连续站住。",
+      reuseHint: "新项目优先复用平台包装和前三章兑现。",
+      risk: "仍要小步验证。",
+      href: "/gate",
+      sourceStatus: "healthy",
+      sourceLabel: "稳定加码",
+      priorityScore: 93,
+      latestAt: "2026-01-18T00:00:00.000Z",
+      evidence: ["最终判定：稳定加码。"],
+    };
+    const guide = buildProjectStartPlatformExperienceGuide({
+      platforms: [platform],
+      experiences: [experience],
+    });
+    const guideItem = guide.items[0] ?? null;
+    const riskGate = buildProjectStartRiskGate(guideItem);
+    const advice = buildProjectStartTacticAdvice({ platform, template, style, experience });
+    const handoff = buildProjectStartExperienceHandoff({
+      platform,
+      template,
+      guide,
+      advice,
+      riskGate,
+      recommendedTemplate: template,
+    });
+
+    assert.equal(handoff.status, "reuse");
+    assert.equal(handoff.shouldSwitchTemplate, false);
+    assert.equal(handoff.recommendedPlatformId, "fanqie");
+    assert.ok(handoff.firstDayActions.some((action) => action.includes("开头")));
+    assert.ok(handoff.firstDayActions.some((action) => action.includes("回填")));
+    assert.ok(handoff.evidence.some((item) => item.includes("稳定加码")));
   });
 
   await t.test("selects tactic evidence with the same priority as the platform guide", () => {

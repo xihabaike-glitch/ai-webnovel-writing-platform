@@ -14,6 +14,7 @@ import {
   type GatePlatformTacticExperienceItem,
 } from "@/lib/projects/gateActionReceipts";
 import {
+  buildProjectStartExperienceHandoff,
   buildProjectStartRiskGate,
   buildProjectStartPlatformExperienceGuide,
   buildProjectStartModelRouteExperienceFromReceipts,
@@ -81,6 +82,11 @@ export function ProjectForm() {
     batchEffects: batchTacticEffects,
     limit: platformProfiles.length,
   });
+  const recommendedStartTemplate = selectProjectStartTemplateFromExperienceGuide({
+    templates: projectTemplates,
+    guide: platformExperienceGuide,
+    fallbackTemplate: defaultTemplate,
+  });
   const selectedEvidence = selectProjectStartTacticEvidence({
     platform: selectedProfile,
     experiences: historyExperiences,
@@ -97,6 +103,14 @@ export function ProjectForm() {
     experience: selectedEvidence.experience,
     batchEffect: selectedEvidence.batchEffect,
     modelRoutes: modelRouteExperience,
+  });
+  const startExperienceHandoff = buildProjectStartExperienceHandoff({
+    platform: selectedProfile,
+    template: selectedTemplate,
+    guide: platformExperienceGuide,
+    advice: tacticAdvice,
+    riskGate: selectedRiskGate,
+    recommendedTemplate: recommendedStartTemplate,
   });
 
   useEffect(() => {
@@ -308,6 +322,51 @@ export function ProjectForm() {
           <p className="mt-3 leading-6 opacity-85">{selectedBatchEffect.nextAction}</p>
         </div>
       ) : null}
+      <div className={`grid gap-3 rounded-md border p-3 text-sm ${riskGateClass(selectedRiskGate.level)}`}>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="font-medium">{startExperienceHandoff.title}</div>
+              <span className="rounded-md bg-white/70 px-2 py-1 text-xs font-medium">{startExperienceHandoff.label}</span>
+            </div>
+            <p className="mt-2 leading-6 opacity-85">{startExperienceHandoff.detail}</p>
+          </div>
+          {startExperienceHandoff.shouldSwitchTemplate && startExperienceHandoff.recommendedTemplateId ? (
+            <button
+              className="rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white"
+              onClick={() => applyTemplate(startExperienceHandoff.recommendedTemplateId ?? defaultTemplate.id)}
+              type="button"
+            >
+              切到推荐模板
+            </button>
+          ) : null}
+        </div>
+        <div className="grid gap-2 md:grid-cols-2">
+          <div className="rounded-md bg-white/70 p-3">
+            <div className="text-xs font-medium opacity-70">首日动作</div>
+            <div className="mt-2 grid gap-2">
+              {startExperienceHandoff.firstDayActions.map((action) => (
+                <p className="rounded-md bg-white/70 p-2 text-xs leading-5" key={action}>{action}</p>
+              ))}
+            </div>
+          </div>
+          <div className="rounded-md bg-white/70 p-3">
+            <div className="text-xs font-medium opacity-70">避坑边界</div>
+            <div className="mt-2 grid gap-2">
+              {startExperienceHandoff.avoidRules.map((rule) => (
+                <p className="rounded-md bg-white/70 p-2 text-xs leading-5" key={rule}>{rule}</p>
+              ))}
+            </div>
+          </div>
+        </div>
+        {startExperienceHandoff.evidence.length ? (
+          <div className="grid gap-1">
+            {startExperienceHandoff.evidence.slice(0, 2).map((evidence) => (
+              <p className="rounded-md border border-white/70 bg-white/60 p-2 text-xs leading-5 opacity-80" key={evidence}>{evidence}</p>
+            ))}
+          </div>
+        ) : null}
+      </div>
       <div>
         <label className="text-sm font-medium" htmlFor="title">
           作品名

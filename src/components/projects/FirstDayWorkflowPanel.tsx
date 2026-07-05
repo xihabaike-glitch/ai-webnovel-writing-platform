@@ -593,6 +593,9 @@ export function FirstDayWorkflowPanel({ projectId }: { projectId: string }) {
     handoffGateCta,
     riskNotice,
     nextStepLabel: workflow.nextStep.label,
+    routeRepairHref: modelRoute ? modelSettingsRepairHref(modelRoute, projectId) : "/settings/models",
+    gateReviewHref: "/gate?focus=first-day-risk",
+    workflowHref: "#first-day-workflow",
   }) : null;
 
   return (
@@ -629,11 +632,21 @@ export function FirstDayWorkflowPanel({ projectId }: { projectId: string }) {
               <div className="text-xs font-medium opacity-75">连续执行保护</div>
               <div className="mt-1 font-medium">{executionSafetyBanner.headline}</div>
               <p className="mt-1 leading-6 opacity-90">{executionSafetyBanner.detail}</p>
+              <div className="mt-2 flex flex-wrap gap-2 text-xs">
+                {executionSafetyBanner.badges.map((badge) => (
+                  <span className="rounded-md bg-white/70 px-2 py-1" key={badge}>{badge}</span>
+                ))}
+              </div>
             </div>
-            <div className="flex shrink-0 flex-wrap gap-2 text-xs">
-              {executionSafetyBanner.badges.map((badge) => (
-                <span className="rounded-md bg-white/70 px-2 py-1" key={badge}>{badge}</span>
-              ))}
+            <div className="flex shrink-0 flex-wrap gap-2">
+              <Link className="w-fit rounded-md bg-slate-950 px-3 py-2 text-sm font-medium text-white" href={executionSafetyBanner.primaryHref}>
+                {executionSafetyBanner.primaryLabel}
+              </Link>
+              {executionSafetyBanner.secondaryHref && executionSafetyBanner.secondaryLabel ? (
+                <Link className="w-fit rounded-md bg-white/80 px-3 py-2 text-sm font-medium text-slate-900 hover:bg-white" href={executionSafetyBanner.secondaryHref}>
+                  {executionSafetyBanner.secondaryLabel}
+                </Link>
+              ) : null}
             </div>
           </div>
         </div>

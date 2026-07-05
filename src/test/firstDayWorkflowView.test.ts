@@ -194,6 +194,7 @@ test("buildFirstDayExecutionSafetyBanner prioritizes route, handoff, and risk wa
     handoffGateCta: null,
     riskNotice: null,
     nextStepLabel: "第一章审稿",
+    routeRepairHref: "/settings/models?focus=first-day-route&projectId=project-1",
   });
   const handoffPending = buildFirstDayExecutionSafetyBanner({
     routeBlockMessage: null,
@@ -212,6 +213,7 @@ test("buildFirstDayExecutionSafetyBanner prioritizes route, handoff, and risk wa
     },
     riskNotice: null,
     nextStepLabel: "第一章审稿",
+    workflowHref: "#first-day-workflow",
   });
   const watchRisk = buildFirstDayExecutionSafetyBanner({
     routeBlockMessage: null,
@@ -237,6 +239,7 @@ test("buildFirstDayExecutionSafetyBanner prioritizes route, handoff, and risk wa
       badges: ["今天小样本验证"],
     },
     nextStepLabel: "第一章审稿",
+    gateReviewHref: "/gate?focus=first-day-risk",
   });
   const ready = buildFirstDayExecutionSafetyBanner({
     routeBlockMessage: null,
@@ -244,18 +247,29 @@ test("buildFirstDayExecutionSafetyBanner prioritizes route, handoff, and risk wa
     handoffGateCta: null,
     riskNotice: null,
     nextStepLabel: "第一章审稿",
+    workflowHref: "#first-day-workflow",
   });
 
   assert.equal(routeBlocked.level, "blocked");
   assert.equal(routeBlocked.headline, "连续执行已阻断");
   assert.ok(routeBlocked.detail.includes("当前节点还没有可用模型路线"));
+  assert.equal(routeBlocked.primaryLabel, "去模型配置");
+  assert.equal(routeBlocked.primaryHref, "/settings/models?focus=first-day-route&projectId=project-1");
   assert.equal(handoffPending.level, "blocked");
   assert.equal(handoffPending.headline, "先补交接闸门");
   assert.ok(handoffPending.badges.includes("等待：验收口径"));
+  assert.equal(handoffPending.primaryLabel, "去任务中心补交接");
+  assert.equal(handoffPending.primaryHref, "/dispatch");
+  assert.equal(handoffPending.secondaryLabel, "查看交接进度");
+  assert.equal(handoffPending.secondaryHref, "#first-day-workflow");
   assert.equal(watchRisk.level, "watch");
   assert.equal(watchRisk.headline, "小样本验证模式");
+  assert.equal(watchRisk.primaryLabel, "回总闸门复查");
+  assert.equal(watchRisk.primaryHref, "/gate?focus=first-day-risk");
   assert.equal(ready.level, "ready");
   assert.ok(ready.detail.includes("第一章审稿"));
+  assert.equal(ready.primaryLabel, "查看当前节点");
+  assert.equal(ready.primaryHref, "#first-day-workflow");
 });
 
 test("buildFirstDayDispatchDesk highlights the next first-day task", () => {

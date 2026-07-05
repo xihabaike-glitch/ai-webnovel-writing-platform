@@ -69,6 +69,10 @@ export interface FirstDayExecutionSafetyBanner {
   headline: string;
   detail: string;
   badges: string[];
+  primaryLabel: string;
+  primaryHref: string;
+  secondaryLabel?: string;
+  secondaryHref?: string;
 }
 
 export interface FirstDayExecutionRiskNoticeInput {
@@ -336,14 +340,22 @@ export function buildFirstDayExecutionSafetyBanner(input: {
   handoffGateCta: FirstDayHandoffGateCta | null;
   riskNotice: FirstDayExecutionRiskNotice | null;
   nextStepLabel: string;
+  routeRepairHref?: string | null;
+  gateReviewHref?: string | null;
+  workflowHref?: string | null;
 }): FirstDayExecutionSafetyBanner {
+  const workflowHref = input.workflowHref ?? "#first-day-workflow";
+  const gateReviewHref = input.gateReviewHref ?? "/gate";
   const blockMessage = input.executionBlockMessage ?? input.routeBlockMessage;
   if (blockMessage) {
+    const hasRouteBlock = Boolean(input.routeBlockMessage);
     return {
       level: "blocked",
       headline: "连续执行已阻断",
       detail: blockMessage,
       badges: ["模型路线", "先修复配置"],
+      primaryLabel: hasRouteBlock ? "去模型配置" : "查看阻断节点",
+      primaryHref: hasRouteBlock ? input.routeRepairHref ?? "/settings/models" : workflowHref,
     };
   }
 
@@ -353,6 +365,10 @@ export function buildFirstDayExecutionSafetyBanner(input: {
       headline: "先补交接闸门",
       detail: input.handoffGateCta.detail,
       badges: input.handoffGateCta.badges,
+      primaryLabel: input.handoffGateCta.primaryLabel,
+      primaryHref: input.handoffGateCta.primaryHref,
+      secondaryLabel: input.handoffGateCta.secondaryLabel,
+      secondaryHref: input.handoffGateCta.secondaryHref,
     };
   }
 
@@ -362,6 +378,8 @@ export function buildFirstDayExecutionSafetyBanner(input: {
       headline: input.riskNotice.headline,
       detail: input.riskNotice.detail,
       badges: input.riskNotice.badges,
+      primaryLabel: "回总闸门复查",
+      primaryHref: gateReviewHref,
     };
   }
 
@@ -371,6 +389,8 @@ export function buildFirstDayExecutionSafetyBanner(input: {
       headline: input.riskNotice.headline,
       detail: input.riskNotice.detail,
       badges: input.riskNotice.badges,
+      primaryLabel: "回总闸门复查",
+      primaryHref: gateReviewHref,
     };
   }
 
@@ -383,6 +403,8 @@ export function buildFirstDayExecutionSafetyBanner(input: {
       "模型路线可用",
       "风险标准",
     ],
+    primaryLabel: "查看当前节点",
+    primaryHref: workflowHref,
   };
 }
 

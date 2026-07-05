@@ -4,9 +4,11 @@ import Link from "next/link";
 import { useState } from "react";
 import {
   buildGatePlatformTacticExperienceMarkdown,
+  filterGatePlatformTacticExperienceItems,
   type GatePlatformTacticExperienceItem,
   type GatePlatformTacticExperienceLibrary,
   type GatePlatformTacticExperienceStatus,
+  type GatePlatformTacticExperienceStatusFilter,
 } from "@/lib/projects/gateActionReceipts";
 
 function experienceClass(status: GatePlatformTacticExperienceStatus) {
@@ -21,17 +23,26 @@ function statusLabel(status: GatePlatformTacticExperienceStatus) {
   return "可复用打法";
 }
 
+function filterLabel(status: GatePlatformTacticExperienceStatusFilter) {
+  if (status === "usable") return "可复用";
+  if (status === "watch") return "观察";
+  if (status === "blocked") return "避坑";
+  return "全部";
+}
+
 function fileName(item: GatePlatformTacticExperienceItem) {
   return `${item.platformName.replace(/[\\/:*?"<>|]/g, "-")}-平台打法经验.md`;
 }
 
 export function PlatformTacticExperiencePanel({ library }: { library: GatePlatformTacticExperienceLibrary }) {
   const [message, setMessage] = useState("");
+  const [statusFilter, setStatusFilter] = useState<GatePlatformTacticExperienceStatusFilter>("all");
+  const visibleItems = filterGatePlatformTacticExperienceItems(library.items, statusFilter);
   const summaryItems = [
-    { label: "经验", value: library.summary.total, className: "bg-slate-50 text-slate-700" },
-    { label: "可复用", value: library.summary.usable, className: "bg-emerald-50 text-emerald-700" },
-    { label: "观察", value: library.summary.watch, className: "bg-amber-50 text-amber-700" },
-    { label: "避坑", value: library.summary.blocked, className: "bg-rose-50 text-rose-700" },
+    { status: "all" as const, label: "经验", value: library.summary.total, className: "bg-slate-50 text-slate-700" },
+    { status: "usable" as const, label: "可复用", value: library.summary.usable, className: "bg-emerald-50 text-emerald-700" },
+    { status: "watch" as const, label: "观察", value: library.summary.watch, className: "bg-amber-50 text-amber-700" },
+    { status: "blocked" as const, label: "避坑", value: library.summary.blocked, className: "bg-rose-50 text-rose-700" },
   ];
 
   async function copyExperience(item: GatePlatformTacticExperienceItem) {
@@ -67,11 +78,21 @@ export function PlatformTacticExperiencePanel({ library }: { library: GatePlatfo
 
       <div className="mt-4 grid grid-cols-2 gap-2 md:grid-cols-4">
         {summaryItems.map((item) => (
-          <div className={`rounded-md px-3 py-2 ${item.className}`} key={item.label}>
+          <button
+            className={`rounded-md px-3 py-2 text-left transition ${item.className} ${statusFilter === item.status ? "ring-2 ring-slate-950" : "hover:ring-1 hover:ring-slate-300"}`}
+            key={item.label}
+            onClick={() => setStatusFilter(item.status)}
+            type="button"
+          >
             <div className="text-xs opacity-75">{item.label}</div>
             <div className="mt-1 text-2xl font-semibold">{item.value}</div>
-          </div>
+          </button>
         ))}
+      </div>
+
+      <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-slate-500">
+        <span className="rounded-md bg-slate-50 px-2 py-1">当前筛选：{filterLabel(statusFilter)}</span>
+        <span className="rounded-md bg-slate-50 px-2 py-1">显示 {visibleItems.length} 条</span>
       </div>
 
       {library.nextActions.length ? (
@@ -85,9 +106,9 @@ export function PlatformTacticExperiencePanel({ library }: { library: GatePlatfo
         <p className="mt-4 rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">{message}</p>
       ) : null}
 
-      {library.items.length ? (
+      {visibleItems.length ? (
         <div className="mt-4 grid gap-3 xl:grid-cols-3">
-          {library.items.map((item) => (
+          {visibleItems.map((item) => (
             <div className={`rounded-md border p-3 text-sm ${experienceClass(item.status)}`} key={item.platformId}>
               <div className="flex flex-wrap items-center gap-2">
                 <span className="font-medium">{item.platformName}</span>
@@ -139,7 +160,9 @@ export function PlatformTacticExperiencePanel({ library }: { library: GatePlatfo
         </div>
       ) : (
         <p className="mt-4 rounded-md border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-600">
-          暂无可沉淀的平台打法。先完成投稿派单、回填发布效果，平台决策时间线形成证据后，这里会自动生成经验样本。
+          {library.items.length
+            ? `当前没有${filterLabel(statusFilter)}经验，切换筛选查看其他样本。`
+            : "暂无可沉淀的平台打法。先完成投稿派单、回填发布效果，平台决策时间线形成证据后，这里会自动生成经验样本。"}
         </p>
       )}
     </section>

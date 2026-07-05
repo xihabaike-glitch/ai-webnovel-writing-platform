@@ -44,6 +44,7 @@ import {
   clearPersistedGateActionReceipts,
   filterGateActionReceipts,
   filterGatePlatformDecisionTimelineItems,
+  filterGatePlatformTacticExperienceItems,
   fetchPersistedGateActionReceipts,
   fetchPersistedGateDispatchTasks,
   fetchGateKnowledgeFeedbackReceipts,
@@ -77,6 +78,7 @@ import {
   type GateBatchTacticEffectStatus,
   type GatePlatformTacticExperienceItem,
   type GatePlatformTacticExperienceStatus,
+  type GatePlatformTacticExperienceStatusFilter,
   type GatePlatformGrowthDispatchItem,
   type GateKnowledgeFeedbackReceipt,
   type GatePlatformEvidenceLoop,
@@ -326,6 +328,13 @@ function tacticExperienceStatusLabel(status: GatePlatformTacticExperienceStatus)
   return "可复用";
 }
 
+function tacticExperienceFilterLabel(status: GatePlatformTacticExperienceStatusFilter) {
+  if (status === "blocked") return "避坑";
+  if (status === "watch") return "观察";
+  if (status === "usable") return "可复用";
+  return "全部";
+}
+
 function batchTacticEffectLabel(status: GateBatchTacticEffectStatus) {
   if (status === "blocked") return "避坑";
   if (status === "watch") return "观察";
@@ -346,6 +355,7 @@ export function GateActionWorkspace({
   const [platformFilter, setPlatformFilter] = useState("all");
   const [timelineStatusFilter, setTimelineStatusFilter] = useState<GatePlatformDecisionTimelineStatus | "all">("all");
   const [timelineEventFilter, setTimelineEventFilter] = useState<GatePlatformDecisionTimelineEventType | "all">("all");
+  const [tacticExperienceFilter, setTacticExperienceFilter] = useState<GatePlatformTacticExperienceStatusFilter>("all");
   const [timelineExportMessage, setTimelineExportMessage] = useState("");
   const [persistedDispatchTasks, setPersistedDispatchTasks] = useState<PersistedGatePlatformDispatchTask[]>([]);
   const [knowledgeFeedbackReceipts, setKnowledgeFeedbackReceipts] = useState<GateKnowledgeFeedbackReceipt[]>([]);
@@ -419,6 +429,7 @@ export function GateActionWorkspace({
     eventType: timelineEventFilter,
   });
   const tacticExperienceLibrary = buildGatePlatformTacticExperienceLibrary(decisionTimeline);
+  const visibleTacticExperienceItems = filterGatePlatformTacticExperienceItems(tacticExperienceLibrary.items, tacticExperienceFilter);
   const batchTacticEffectReview = buildGateBatchTacticEffectReview(receipts);
   const latestReceipt = filteredReceipts[0] ?? null;
 
@@ -1821,18 +1832,30 @@ export function GateActionWorkspace({
             </div>
             {tacticExperienceLibrary.summary.total ? (
               <div className="flex flex-wrap gap-2 text-xs">
-                <span className="rounded-md border border-emerald-200 bg-emerald-50 px-2 py-1 text-emerald-800">
-                  可复用 {tacticExperienceLibrary.summary.usable}
-                </span>
-                <span className="rounded-md border border-amber-200 bg-amber-50 px-2 py-1 text-amber-800">
-                  观察 {tacticExperienceLibrary.summary.watch}
-                </span>
-                <span className="rounded-md border border-rose-200 bg-rose-50 px-2 py-1 text-rose-800">
-                  避坑 {tacticExperienceLibrary.summary.blocked}
-                </span>
+                {[
+                  { status: "all" as const, label: "全部", value: tacticExperienceLibrary.summary.total, className: "border-slate-200 bg-white text-slate-700" },
+                  { status: "usable" as const, label: "可复用", value: tacticExperienceLibrary.summary.usable, className: "border-emerald-200 bg-emerald-50 text-emerald-800" },
+                  { status: "watch" as const, label: "观察", value: tacticExperienceLibrary.summary.watch, className: "border-amber-200 bg-amber-50 text-amber-800" },
+                  { status: "blocked" as const, label: "避坑", value: tacticExperienceLibrary.summary.blocked, className: "border-rose-200 bg-rose-50 text-rose-800" },
+                ].map((item) => (
+                  <button
+                    className={`rounded-md border px-2 py-1 ${item.className} ${tacticExperienceFilter === item.status ? "ring-2 ring-slate-950" : "hover:ring-1 hover:ring-slate-300"}`}
+                    key={item.status}
+                    onClick={() => setTacticExperienceFilter(item.status)}
+                    type="button"
+                  >
+                    {item.label} {item.value}
+                  </button>
+                ))}
               </div>
             ) : null}
           </div>
+          {tacticExperienceLibrary.summary.total ? (
+            <div className="flex flex-wrap gap-2 text-xs text-slate-500">
+              <span className="rounded-md bg-white px-2 py-1">当前筛选：{tacticExperienceFilterLabel(tacticExperienceFilter)}</span>
+              <span className="rounded-md bg-white px-2 py-1">显示 {visibleTacticExperienceItems.length} 条</span>
+            </div>
+          ) : null}
           {tacticExperienceLibrary.nextActions.length ? (
             <div className="grid gap-2 xl:grid-cols-3">
               {tacticExperienceLibrary.nextActions.map((action) => (
@@ -1840,9 +1863,9 @@ export function GateActionWorkspace({
               ))}
             </div>
           ) : null}
-          {tacticExperienceLibrary.items.length ? (
+          {visibleTacticExperienceItems.length ? (
             <div className="grid gap-2 xl:grid-cols-3">
-              {tacticExperienceLibrary.items.map((item) => (
+              {visibleTacticExperienceItems.map((item) => (
                 <div className={`rounded-md border p-3 text-sm ${tacticExperienceClass(item.status)}`} key={item.platformId}>
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="font-medium">{item.platformName}</span>
@@ -1898,7 +1921,9 @@ export function GateActionWorkspace({
             </div>
           ) : (
             <p className="rounded-md border border-dashed border-slate-300 bg-white p-3 text-sm text-slate-600">
-              暂无可沉淀的平台打法经验。先完成平台决策链。
+              {tacticExperienceLibrary.items.length
+                ? `当前没有${tacticExperienceFilterLabel(tacticExperienceFilter)}经验，切换筛选查看其他样本。`
+                : "暂无可沉淀的平台打法经验。先完成平台决策链。"}
             </p>
           )}
         </div>

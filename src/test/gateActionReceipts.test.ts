@@ -43,6 +43,7 @@ import {
   buildGatePlatformTacticExperienceMarkdown,
   gateActionReceiptFromAuditRecord,
   filterGatePlatformDecisionTimelineItems,
+  filterGatePlatformTacticExperienceItems,
   buildGateDispatchTaskCenter,
   buildGateDispatchTaskCloseoutItem,
   buildGateFirstThreeAdoptionReceipt,
@@ -1589,6 +1590,34 @@ test("buildGateActionReceipt", async (t) => {
     assert.ok(tacticItem.lesson.includes("53"));
     assert.ok(tacticItem.lesson.includes("71"));
     assert.ok(tacticItem.evidence.some((item) => item.includes("分数变好")));
+  });
+
+  await t.test("filters tactic experience cards by status", () => {
+    const baseExperience = {
+      platformId: "fanqie",
+      platformName: "番茄小说",
+      label: "可复用打法",
+      tactic: "验收后真实效果打法",
+      lesson: "点击、收藏、追读已站住。",
+      reuseHint: "复用标题卖点和前三章钩子。",
+      risk: "换题材要重验。",
+      href: "/gate",
+      sourceStatus: "healthy" as const,
+      sourceLabel: "健康观察",
+      priorityScore: 90,
+      latestAt: "2026-01-10T00:00:00.000Z",
+      evidence: ["效果回填：曝光 1200"],
+    };
+    const items = [
+      { ...baseExperience, platformId: "fanqie", status: "usable" as const },
+      { ...baseExperience, platformId: "qimao", platformName: "七猫", status: "watch" as const, label: "观察样本" },
+      { ...baseExperience, platformId: "webnovel", platformName: "WebNovel", status: "blocked" as const, label: "避坑样本" },
+    ];
+
+    assert.equal(filterGatePlatformTacticExperienceItems(items, "all").length, 3);
+    assert.deepEqual(filterGatePlatformTacticExperienceItems(items, "usable").map((item) => item.platformId), ["fanqie"]);
+    assert.deepEqual(filterGatePlatformTacticExperienceItems(items, "watch").map((item) => item.platformId), ["qimao"]);
+    assert.deepEqual(filterGatePlatformTacticExperienceItems(items, "blocked").map((item) => item.platformId), ["webnovel"]);
   });
 
   await t.test("turns project start validation advice into three dispatch cards", () => {

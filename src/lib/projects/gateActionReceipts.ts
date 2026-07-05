@@ -884,6 +884,7 @@ export interface GatePlatformDecisionTimelineFilters {
 }
 
 export type GatePlatformTacticExperienceStatus = "blocked" | "watch" | "usable";
+export type GatePlatformTacticExperienceStatusFilter = "all" | GatePlatformTacticExperienceStatus;
 
 export interface GatePlatformTacticExperienceItem {
   platformId: string;
@@ -911,6 +912,13 @@ export interface GatePlatformTacticExperienceLibrary {
   };
   nextActions: string[];
   items: GatePlatformTacticExperienceItem[];
+}
+
+export function filterGatePlatformTacticExperienceItems(
+  items: GatePlatformTacticExperienceItem[],
+  status: GatePlatformTacticExperienceStatusFilter = "all",
+) {
+  return items.filter((item) => status === "all" || item.status === status);
 }
 
 export type GateBatchTacticEffectStatus = "blocked" | "watch" | "usable";

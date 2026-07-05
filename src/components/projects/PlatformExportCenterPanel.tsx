@@ -29,6 +29,7 @@ interface PublishRepairAction {
   detail: string;
   chapterId?: string;
   chapterTitle?: string;
+  candidateRevisionId?: string;
 }
 
 interface PublishRepairHistoryItem {
@@ -53,6 +54,7 @@ interface PublishRepairPathStep {
   executable: boolean;
   chapterId?: string;
   chapterTitle?: string;
+  candidateRevisionId?: string;
 }
 
 interface PublishRepairPathGroup {
@@ -719,6 +721,7 @@ function actionHref(projectId: string, action: PublishRepairAction) {
 }
 
 function canRunAction(action: PublishRepairAction) {
+  if (action.kind === "adopt_candidate") return Boolean(action.chapterId && action.candidateRevisionId);
   return (action.kind === "run_chapter_review" || action.kind === "run_second_pass") && Boolean(action.chapterId);
 }
 
@@ -2154,6 +2157,7 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
           kind: action.kind,
           chapterId: action.chapterId,
           chapterTitle: action.chapterTitle,
+          candidateRevisionId: action.candidateRevisionId,
           detail: action.detail,
         }),
       });
@@ -2200,6 +2204,7 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
             kind: action.kind,
             chapterId: action.chapterId,
             chapterTitle: action.chapterTitle,
+            candidateRevisionId: action.candidateRevisionId,
             detail: action.detail,
           })),
         }),
@@ -2241,6 +2246,7 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
             kind: action.kind,
             chapterId: action.chapterId,
             chapterTitle: action.chapterTitle,
+            candidateRevisionId: action.candidateRevisionId,
             detail: action.detail,
           })),
         }),

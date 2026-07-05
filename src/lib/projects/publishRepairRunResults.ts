@@ -19,7 +19,7 @@ export interface PublishRepairRunResult {
 export type RawPublishRepairRunResult = Omit<PublishRepairRunResult, "id"> & { id?: string };
 
 export interface PublishRepairNextAction {
-  kind: "retry_failed" | "run_second_pass" | "adopt_candidate" | "recheck_publish";
+  kind: "retry_failed" | "run_chapter_review" | "run_second_pass" | "adopt_candidate" | "recheck_publish";
   label: string;
   detail: string;
   href?: string;
@@ -46,6 +46,7 @@ export function pendingResultFromAction(action: PublishRepairAction): PublishRep
     chapterTitle: action.chapterTitle ?? "项目资料",
     status: "pending" as const,
     message: "等待处理",
+    candidateRevisionId: action.candidateRevisionId,
   };
   return { ...result, id: resultId(result) };
 }
@@ -69,6 +70,7 @@ export function actionFromRunResult(result: PublishRepairRunResult): PublishRepa
     detail: result.error ?? result.message ?? "根据发布前质检结果重试。",
     chapterId: result.chapterId ?? undefined,
     chapterTitle: result.chapterTitle,
+    candidateRevisionId: result.candidateRevisionId,
   };
 }
 
@@ -109,13 +111,37 @@ export function buildPublishRepairNextAction(
       };
     }
     if (secondPass.candidateRevisionId) {
+      const action = actionFromRunResult({
+        ...secondPass,
+        action: "adopt_candidate",
+        message: "采纳二改候选稿。",
+      });
       return {
         kind: "adopt_candidate",
         label: "采纳二改候选稿",
         detail: `${secondPass.chapterTitle} 已生成二改候选稿，先采纳进正文，再重新跑发布质检。`,
         href: chapterHref(projectId, secondPass.chapterId, "#chapter-revisions"),
+        action,
       };
     }
+  }
+
+  const adoptedCandidate = results.find((result) => result.status === "succeeded" && result.action === "adopt_candidate");
+  if (adoptedCandidate) {
+    const action = {
+      ...actionFromRunResult(adoptedCandidate),
+      kind: "run_chapter_review" as const,
+      label: "重新审稿",
+      detail: "候选稿已进入正文，旧审稿不能继续当发布通行证；先补一次章节审稿。",
+      candidateRevisionId: undefined,
+    };
+    return {
+      kind: "run_chapter_review",
+      label: "重新审稿",
+      detail: `${adoptedCandidate.chapterTitle} 已采纳候选稿，先重新审稿，再决定是否还要二改。`,
+      href: chapterHref(projectId, adoptedCandidate.chapterId, "#chapter-workflow"),
+      action,
+    };
   }
 
   const weakReview = results.find((result) => (

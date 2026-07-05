@@ -3,11 +3,13 @@ import type { PublishRepairAction, PublishRepairActionKind } from "./platformPub
 export const publishRepairTaskSource = "publish_repair_action";
 
 export const executablePublishRepairKinds: PublishRepairActionKind[] = [
+  "adopt_candidate",
   "run_chapter_review",
   "run_second_pass",
 ];
 
-export function canExecutePublishRepairAction(action: Pick<PublishRepairAction, "kind" | "chapterId">) {
+export function canExecutePublishRepairAction(action: Pick<PublishRepairAction, "kind" | "chapterId" | "candidateRevisionId">) {
+  if (action.kind === "adopt_candidate") return Boolean(action.chapterId && action.candidateRevisionId);
   return executablePublishRepairKinds.includes(action.kind) && Boolean(action.chapterId);
 }
 
@@ -21,7 +23,7 @@ export function buildPublishRepairSecondPassInstruction(action: Pick<PublishRepa
 }
 
 export function buildPublishRepairTaskSnapshot(
-  action: Pick<PublishRepairAction, "kind" | "label" | "detail" | "chapterId" | "chapterTitle">,
+  action: Pick<PublishRepairAction, "kind" | "label" | "detail" | "chapterId" | "chapterTitle" | "candidateRevisionId">,
   originalInputSnapshot: string,
 ) {
   return JSON.stringify({
@@ -31,6 +33,8 @@ export function buildPublishRepairTaskSnapshot(
     actionDetail: action.detail,
     chapterId: action.chapterId,
     chapterTitle: action.chapterTitle,
+    revisionId: action.candidateRevisionId,
+    candidateRevisionId: action.candidateRevisionId,
     originalInputSnapshot,
   });
 }

@@ -60,6 +60,7 @@ export interface PublishRepairAction {
   detail: string;
   chapterId?: string;
   chapterTitle?: string;
+  candidateRevisionId?: string;
 }
 
 export interface PublishRepairHistoryItem {
@@ -84,6 +85,7 @@ export interface PublishRepairPathStep {
   executable: boolean;
   chapterId?: string;
   chapterTitle?: string;
+  candidateRevisionId?: string;
 }
 
 export interface PublishRepairPathGroup {
@@ -902,7 +904,8 @@ function adoptedRevisionIds(tasks: PublishExportAiTask[]) {
     .filter((task) => task.taskType === "chapter_adopt_candidate" && task.status === "succeeded")
     .map((task) => {
       const parsed = parseJsonObject(task.inputSnapshot);
-      return typeof parsed?.revisionId === "string" ? parsed.revisionId : null;
+      if (typeof parsed?.revisionId === "string") return parsed.revisionId;
+      return typeof parsed?.candidateRevisionId === "string" ? parsed.candidateRevisionId : null;
     })
     .filter((revisionId): revisionId is string => Boolean(revisionId)));
 }
@@ -931,15 +934,17 @@ function chapterAction(
   label: string,
   detail: string,
   priority: PublishRepairAction["priority"] = "high",
+  candidateRevisionId?: string,
 ): PublishRepairAction {
   return {
-    id: `${chapter.id}-${kind}`,
+    id: candidateRevisionId ? `${chapter.id}-${kind}-${candidateRevisionId}` : `${chapter.id}-${kind}`,
     kind,
     priority,
     label,
     detail,
     chapterId: chapter.id,
     chapterTitle: chapter.title,
+    candidateRevisionId,
   };
 }
 
@@ -1046,7 +1051,9 @@ function buildChapterPreflight(
       chapter,
       "adopt_candidate",
       "采纳候选稿",
-      `先到章节版本区处理 ${getChapterRevisionSourceLabel(pendingCandidate.source)}，确认采纳、继续二改或保留当前稿后再发布。`,
+      `直接采纳 ${getChapterRevisionSourceLabel(pendingCandidate.source)}，采纳后必须重新审稿，再回发布质检。`,
+      "high",
+      pendingCandidate.id,
     ));
   }
   if (reviewDecision && !reviewDecision.shouldSecondPass) {
@@ -1314,6 +1321,7 @@ function repairLabel(kind: PublishRepairActionKind) {
 }
 
 function canExecuteRepairAction(action: PublishRepairAction) {
+  if (action.kind === "adopt_candidate") return Boolean(action.chapterId && action.candidateRevisionId);
   return (action.kind === "run_chapter_review" || action.kind === "run_second_pass") && Boolean(action.chapterId);
 }
 
@@ -2509,6 +2517,7 @@ function buildRepairPath(preflight: PublishPreflight): PublishRepairPath {
     executable: canExecuteRepairAction(action),
     chapterId: action.chapterId,
     chapterTitle: action.chapterTitle,
+    candidateRevisionId: action.candidateRevisionId,
   }));
   const groups = Array.from(steps.reduce((map, step) => {
     const current = map.get(step.kind) ?? {

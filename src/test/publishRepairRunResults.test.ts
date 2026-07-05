@@ -86,7 +86,26 @@ test("publish repair run result helpers", async (t) => {
 
     assert.equal(nextAction?.kind, "adopt_candidate");
     assert.equal(nextAction?.label, "采纳二改候选稿");
+    assert.equal(nextAction?.action?.kind, "adopt_candidate");
+    assert.equal(nextAction?.action?.candidateRevisionId, "revision-1");
     assert.equal(nextAction?.href, "/projects/project-1/chapters/chapter-1#chapter-revisions");
+  });
+
+  await t.test("routes adopted candidates into fresh review", () => {
+    const nextAction = buildPublishRepairNextAction([normalizeRunResult({
+      action: "adopt_candidate",
+      chapterId: "chapter-1",
+      chapterTitle: "雨夜系统",
+      status: "succeeded",
+      message: "已采纳候选稿。",
+      candidateRevisionId: "revision-1",
+    })], "project-1");
+
+    assert.equal(nextAction?.kind, "run_chapter_review");
+    assert.equal(nextAction?.label, "重新审稿");
+    assert.equal(nextAction?.action?.kind, "run_chapter_review");
+    assert.equal(nextAction?.action?.candidateRevisionId, undefined);
+    assert.equal(nextAction?.href, "/projects/project-1/chapters/chapter-1#chapter-workflow");
   });
 
   await t.test("routes failures into retry", () => {

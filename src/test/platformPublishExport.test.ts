@@ -321,9 +321,15 @@ test("buildPlatformPublishExportCenter", async (t) => {
 
     assert.equal(pack.canExport, false);
     assert.ok(pack.chapters[0].preflight.blocked.some((item) => item.includes("未采纳的二改候选稿")));
-    assert.ok(pack.repairActions.some((action) => action.kind === "adopt_candidate" && action.chapterId === "chapter-1"));
+    assert.ok(pack.repairActions.some((action) => (
+      action.kind === "adopt_candidate"
+      && action.chapterId === "chapter-1"
+      && action.candidateRevisionId === "revision-second-pass"
+    )));
     assert.equal(pack.repairPath.nextStep?.kind, "adopt_candidate");
-    assert.equal(pack.repairPath.manualActions, 1);
+    assert.equal(pack.repairPath.nextStep?.candidateRevisionId, "revision-second-pass");
+    assert.equal(pack.repairPath.executableActions, 1);
+    assert.equal(pack.repairPath.manualActions, 0);
   });
 
   await t.test("does not block an adopted second-pass candidate", () => {

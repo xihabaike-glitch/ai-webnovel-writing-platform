@@ -2,12 +2,15 @@ import { NextResponse } from "next/server";
 import { buildBatchRunGuard } from "@/lib/ai/batchRunGuard";
 import { reviewChapterDraft } from "@/lib/ai/chapterReviewGeneration";
 import { generateChapterSecondPass } from "@/lib/ai/chapterSecondPassGeneration";
+import { isChapterRevisionCandidate } from "@/lib/chapters/revisions";
 import { prisma } from "@/lib/db/prisma";
+import { getActiveModelProvider } from "@/lib/model-gateway/activeProvider";
 import {
   buildPublishRepairTaskSnapshot,
   buildPublishRepairSecondPassInstruction,
   canExecutePublishRepairAction,
 } from "@/lib/projects/publishRepairActionExecution";
+import { countWords } from "@/lib/text/wordCount";
 import {
   buildPublishRepairNextAction,
   normalizeRunResult,
@@ -23,19 +26,26 @@ interface RepairBody {
   kind?: PublishRepairActionKind;
   chapterId?: string;
   chapterTitle?: string;
+  candidateRevisionId?: string;
   detail?: string;
   actions?: RepairBody[];
 }
 
 function actionFromBody(body: RepairBody): PublishRepairAction {
+  const label = body.kind === "adopt_candidate"
+    ? "采纳候选稿"
+    : body.kind === "run_second_pass"
+      ? "执行二改"
+      : "补章节审稿";
   return {
     id: `${body.chapterId ?? "project"}-${body.kind ?? "unknown"}`,
     kind: body.kind ?? "open_submission_package",
     priority: "high",
-    label: body.kind === "run_second_pass" ? "执行二改" : "补章节审稿",
+    label,
     detail: body.detail?.trim() || "根据发布前质检结果修复。",
     chapterId: body.chapterId,
     chapterTitle: body.chapterTitle,
+    candidateRevisionId: body.candidateRevisionId,
   };
 }
 
@@ -83,6 +93,159 @@ async function runPublishRepairAction(projectId: string, action: PublishRepairAc
       chapterTitle: action.chapterTitle ?? "未知章节",
       status: "failed",
       error: "Chapter not found in project",
+    };
+  }
+
+  if (action.kind === "adopt_candidate") {
+    const revision = action.candidateRevisionId
+      ? await prisma.chapterRevision.findFirst({
+        where: {
+          id: action.candidateRevisionId,
+          chapterId: chapter.id,
+        },
+      })
+      : null;
+
+    if (!revision) {
+      return {
+        action: action.kind,
+        chapterId: chapter.id,
+        chapterTitle: chapter.title,
+        status: "failed",
+        error: "Revision not found in chapter",
+      };
+    }
+
+    if (!isChapterRevisionCandidate(revision.source)) {
+      return {
+        action: action.kind,
+        chapterId: chapter.id,
+        chapterTitle: chapter.title,
+        status: "failed",
+        error: "Only AI candidate revisions can be adopted.",
+      };
+    }
+
+    const sourceTask = revision.sourceTaskId
+      ? await prisma.aiTask.findUnique({
+        where: { id: revision.sourceTaskId },
+        select: { providerConfigId: true, model: true },
+      })
+      : null;
+    const fallbackProvider = sourceTask ? null : await getActiveModelProvider();
+    const providerConfigId = sourceTask?.providerConfigId ?? fallbackProvider?.provider.id;
+    const model = sourceTask?.model ?? fallbackProvider?.provider.defaultModel;
+    if (!providerConfigId || !model) {
+      return {
+        action: action.kind,
+        chapterId: chapter.id,
+        chapterTitle: chapter.title,
+        status: "failed",
+        error: "No active model provider available for adoption record.",
+      };
+    }
+
+    const fullChapter = await prisma.chapter.findFirst({
+      where: {
+        id: chapter.id,
+        projectId,
+      },
+    });
+    if (!fullChapter) {
+      return {
+        action: action.kind,
+        chapterId: chapter.id,
+        chapterTitle: chapter.title,
+        status: "failed",
+        error: "Chapter not found in project",
+      };
+    }
+
+    const adoptedWordCount = countWords(revision.content);
+    const adoptionTask = await prisma.$transaction(async (tx) => {
+      await tx.chapterRevision.create({
+        data: {
+          chapterId: fullChapter.id,
+          source: "adopt_candidate_before_overwrite",
+          sourceTaskId: revision.sourceTaskId,
+          title: fullChapter.title,
+          content: fullChapter.content,
+          wordCount: fullChapter.wordCount,
+          goal: fullChapter.goal,
+          hook: fullChapter.hook,
+          conflict: fullChapter.conflict,
+          valueShift: fullChapter.valueShift,
+          cliffhanger: fullChapter.cliffhanger,
+          status: fullChapter.status,
+          notes: `发布修复采纳候选稿 ${revision.id} 前自动保存。`,
+        },
+      });
+
+      await tx.chapter.update({
+        where: { id: fullChapter.id },
+        data: {
+          title: revision.title,
+          content: revision.content,
+          wordCount: adoptedWordCount,
+          goal: revision.goal,
+          hook: revision.hook,
+          conflict: revision.conflict,
+          valueShift: revision.valueShift,
+          cliffhanger: revision.cliffhanger,
+          status: revision.status,
+        },
+      });
+
+      const task = await tx.aiTask.create({
+        data: {
+          projectId,
+          chapterId: fullChapter.id,
+          taskType: "chapter_adopt_candidate",
+          providerConfigId,
+          model,
+          status: "succeeded",
+          inputSnapshot: buildPublishRepairTaskSnapshot({
+            ...action,
+            chapterTitle: action.chapterTitle ?? fullChapter.title,
+          }, JSON.stringify({
+            chapterId: fullChapter.id,
+            revisionId: revision.id,
+            revisionSource: revision.source,
+            sourceTaskId: revision.sourceTaskId,
+            previousWordCount: fullChapter.wordCount,
+            adoptedWordCount,
+          })),
+          outputText: JSON.stringify({
+            adopted: true,
+            nextAction: "chapter_review",
+            message: "候选稿已采纳，正文发生变化。下一步应重新审稿，再决定二改或发布质检。",
+          }),
+        },
+      });
+
+      const chapters = await tx.chapter.findMany({
+        where: { projectId },
+        select: { wordCount: true },
+      });
+      await tx.project.update({
+        where: { id: projectId },
+        data: {
+          currentWordCount: chapters.reduce((sum, item) => sum + item.wordCount, 0),
+        },
+      });
+
+      return task;
+    });
+
+    return {
+      action: action.kind,
+      chapterId: chapter.id,
+      chapterTitle: revision.title || chapter.title,
+      status: "succeeded",
+      message: "已采纳候选稿，下一步请重新审稿。",
+      taskId: adoptionTask.id,
+      wordCount: adoptedWordCount,
+      candidateRevisionId: revision.id,
     };
   }
 
@@ -193,10 +356,11 @@ export async function POST(request: Request, { params }: Params) {
     );
   }
 
-  if (isBatch) {
+  const modelActions = actions.filter((action) => action.kind === "run_chapter_review" || action.kind === "run_second_pass");
+  if (isBatch && modelActions.length > 0) {
     const guard = buildBatchRunGuard({
-      action: actions.some((action) => action.kind === "run_second_pass") ? "second_pass" : "review",
-      batchSize: actions.length,
+      action: modelActions.some((action) => action.kind === "run_second_pass") ? "second_pass" : "review",
+      batchSize: modelActions.length,
       tasks: await prisma.aiTask.findMany({
         select: {
           status: true,

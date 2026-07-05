@@ -12,6 +12,7 @@ test("publish repair action execution helpers", async (t) => {
     assert.equal(canExecutePublishRepairAction({ kind: "run_chapter_review", chapterId: "chapter-1" }), true);
     assert.equal(canExecutePublishRepairAction({ kind: "run_second_pass", chapterId: "chapter-1" }), true);
     assert.equal(canExecutePublishRepairAction({ kind: "adopt_candidate", chapterId: "chapter-1" }), false);
+    assert.equal(canExecutePublishRepairAction({ kind: "adopt_candidate", chapterId: "chapter-1", candidateRevisionId: "revision-1" }), true);
     assert.equal(canExecutePublishRepairAction({ kind: "run_second_pass" }), false);
     assert.equal(canExecutePublishRepairAction({ kind: "open_submission_package" }), false);
   });
@@ -35,12 +36,15 @@ test("publish repair action execution helpers", async (t) => {
       detail: "补齐发布前审稿。",
       chapterId: "chapter-1",
       chapterTitle: "雨夜系统",
+      candidateRevisionId: "revision-1",
     }, "{\"prompt\":\"original\"}");
     const parsed = JSON.parse(snapshot) as Record<string, unknown>;
 
     assert.equal(parsed.source, publishRepairTaskSource);
     assert.equal(parsed.actionKind, "run_chapter_review");
     assert.equal(parsed.chapterTitle, "雨夜系统");
+    assert.equal(parsed.revisionId, "revision-1");
+    assert.equal(parsed.candidateRevisionId, "revision-1");
     assert.equal(parsed.originalInputSnapshot, "{\"prompt\":\"original\"}");
   });
 });

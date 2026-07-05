@@ -458,14 +458,14 @@ function recordArray(value: unknown) {
   return Array.isArray(value) ? value.filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === "object") : [];
 }
 
-function auditBatchReceiptEvidence(input: {
+function auditBatchReceiptOutcome(input: {
   project: PrePublishGateProject;
   task: PrePublishGateDispatchTask;
   chapterId: string | null;
-}) {
+}): { status: "pass" | "fail"; evidence: string } | null {
   const queueItemId = `${input.project.id}:adoption-followup:${input.task.dispatchKey}`;
   const audits = (input.project.gateActionAudits ?? [])
-    .filter((audit) => audit.executionType === "recommended_batch" && audit.status === "succeeded")
+    .filter((audit) => audit.executionType === "recommended_batch")
     .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime());
 
   for (const audit of audits) {
@@ -481,7 +481,6 @@ function auditBatchReceiptEvidence(input: {
     const resultSucceeded = matchingResult
       ? matchingResult.status === "succeeded"
       : audit.succeededCount > 0 && audit.failedCount === 0;
-    if (!resultSucceeded) continue;
 
     const batchReceipt = payload?.batchReceipt && typeof payload.batchReceipt === "object"
       ? payload.batchReceipt as Record<string, unknown>
@@ -489,11 +488,25 @@ function auditBatchReceiptEvidence(input: {
     const headline = typeof batchReceipt?.headline === "string" && batchReceipt.headline
       ? batchReceipt.headline
       : audit.label ?? "推荐批次已完成";
+    const chapterTitle = typeof matchingResult?.chapterTitle === "string" && matchingResult.chapterTitle
+      ? `，章节：${matchingResult.chapterTitle}`
+      : "";
+    const error = typeof matchingResult?.error === "string" && matchingResult.error
+      ? `，错误：${matchingResult.error}`
+      : "";
     const quality = payload?.routeEffectSummary && typeof payload.routeEffectSummary === "object"
       ? (payload.routeEffectSummary as Record<string, unknown>).averageQualityScore
       : null;
     const qualityText = typeof quality === "number" ? `，平均质量 ${Math.round(quality)} 分` : "";
-    return `任务中心批量回执已验收：${headline}，成功 ${audit.succeededCount} 个、失败 ${audit.failedCount} 个${qualityText}。`;
+    return resultSucceeded
+      ? {
+        status: "pass",
+        evidence: `任务中心批量回执已验收：${headline}，成功 ${audit.succeededCount} 个、失败 ${audit.failedCount} 个${qualityText}。`,
+      }
+      : {
+        status: "fail",
+        evidence: `任务中心批量回执失败：${headline}，成功 ${audit.succeededCount} 个、失败 ${audit.failedCount} 个${chapterTitle}${error}。`,
+      };
   }
 
   return null;
@@ -624,6 +637,9 @@ function buildFirstThreeAdoptionTimelines(items: PrePublishGateAdoptionFollowupI
 }
 
 function firstThreeAdoptionRepairDetail(item: PrePublishGateAdoptionFollowupItem) {
+  if (item.evidence.includes("任务中心批量回执失败")) {
+    return `${item.evidence} 先处理失败原因，再重跑采纳后续任务；失败项不能当作发布放行证据。`;
+  }
   if (item.status === "warn") {
     return "任务显示已完成，但验收证据不足。补齐审稿分、问题数、发布包版本或质检结果后，再刷新总闸门。";
   }
@@ -672,15 +688,17 @@ function buildFirstThreeAdoptionClosure(projects: PrePublishGateProject[]): PreP
   const items = followups.map(({ project, task }): PrePublishGateAdoptionFollowupItem => {
     const type = firstThreeFollowupType(task);
     const keyParts = parseFirstThreeAdoptionDispatchKey(task.dispatchKey);
-    const batchReceiptEvidence = auditBatchReceiptEvidence({
+    const batchReceiptOutcome = auditBatchReceiptOutcome({
       project,
       task,
       chapterId: keyParts.chapterId,
     });
     const directEvidence = task.completionEvidence.trim();
-    const evidence = directEvidence || batchReceiptEvidence || "";
+    const evidence = directEvidence || batchReceiptOutcome?.evidence || "";
     const missingEvidence = task.state === "completed" && evidence.trim().length < 8;
-    const status: PrePublishGateItem["status"] = task.state !== "completed" && !batchReceiptEvidence
+    const status: PrePublishGateItem["status"] = batchReceiptOutcome?.status === "fail"
+      ? "block"
+      : task.state !== "completed" && batchReceiptOutcome?.status !== "pass"
       ? "block"
       : missingEvidence
         ? "warn"
@@ -697,8 +715,10 @@ function buildFirstThreeAdoptionClosure(projects: PrePublishGateProject[]): PreP
       title: task.title ?? firstThreeFollowupLabel(type),
       status,
       state: task.state,
-      detail: batchReceiptEvidence && task.state !== "completed"
-        ? "任务中心批量执行已经产出验收回执，回总闸门后可用于复检放行。"
+      detail: batchReceiptOutcome?.status === "fail"
+        ? "任务中心批量执行失败，不能当作采纳闭环验收。先处理失败原因，再重跑采纳后续任务。"
+        : batchReceiptOutcome?.status === "pass" && task.state !== "completed"
+          ? "任务中心批量执行已经产出验收回执，回总闸门后可用于复检放行。"
         : task.detail ?? "采纳后的正文需要重新审稿并刷新发布质检。",
       evidence,
       actionLabel: task.actionLabel ?? (type === "publish_check" ? "回发布质检" : "重新审稿"),

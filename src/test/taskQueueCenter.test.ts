@@ -647,6 +647,53 @@ test("buildTaskQueueCenter", async (t) => {
     assert.equal(recommendedQueueActionLabel(queue.recommendedNext), "下一步：采纳闭环 · 补验收证据");
   });
 
+  await t.test("keeps failed adoption batch receipts in the queue with failure evidence", () => {
+    const dispatchKey = "first-three-adoption:project-1:chapter-review:revision-1:review";
+    const queue = buildTaskQueueCenter([{
+      ...project,
+      gateDispatchTasks: [
+        ...firstDayCompleteDispatches(project.id),
+        {
+          dispatchKey,
+          stage: "start_first_three_review",
+          state: "assigned",
+          title: "第 2 章采纳后重新审稿",
+          detail: "采纳后的新正文需要重新审稿。",
+          actionLabel: "重新审稿",
+          href: "/projects/project-1/chapters/chapter-review#chapter-workflow",
+          completionEvidence: "",
+        },
+      ],
+      gateActionAudits: [{
+        actionId: "recommended-batch:standard:review:project-1",
+        executionType: "recommended_batch",
+        status: "failed",
+        succeededCount: 0,
+        failedCount: 1,
+        taskId: "review-task-1",
+        platformId: "fanqie",
+        createdAt: "2026-01-09T00:00:00.000Z",
+        payload: JSON.stringify({
+          plan: {
+            actionLabel: "批量审稿 1 个",
+            category: "review",
+            adoptionFollowupCount: 1,
+            adoptionFollowupItemIds: [`project-1:adoption-followup:${dispatchKey}`],
+          },
+          results: [{ status: "failed", taskId: "review-task-1", chapterId: "chapter-review", error: "模型超时" }],
+          batchReceipt: { status: "repair", headline: "批次有失败，先修再放大" },
+        }),
+      }],
+    }]);
+    const failedFollowup = queue.items.find((item) => item.id.includes(":revision-1:review"));
+
+    assert.equal(failedFollowup?.sourceType, "first_three_adoption");
+    assert.ok(failedFollowup?.sourceDetail?.includes("批量执行失败"));
+    assert.ok(failedFollowup?.evidence.includes("模型超时"));
+    assert.equal(failedFollowup?.actionLabel, "重新审稿");
+    assert.equal(queue.recommendedNext?.id, failedFollowup?.id);
+  });
+
   await t.test("blocks risky first drafts behind recovery validation", () => {
     const blockedProject: TaskQueueProject = {
       ...project,

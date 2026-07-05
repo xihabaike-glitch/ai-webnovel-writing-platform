@@ -324,25 +324,35 @@ function taskQueueRecordArray(value: unknown) {
   return Array.isArray(value) ? value.filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === "object") : [];
 }
 
-function hasRecommendedBatchFollowupEvidence(input: {
+function recommendedBatchFollowupOutcome(input: {
   project: TaskQueueProject;
   dispatchKey: string;
   chapterId: string | null;
-}) {
+}): { status: "pass" | "fail"; evidence: string } | null {
   const queueItemId = `${input.project.id}:adoption-followup:${input.dispatchKey}`;
-  return (input.project.gateActionAudits ?? []).some((audit) => {
-    if (audit.executionType !== "recommended_batch" || audit.status !== "succeeded") return false;
+  const audits = (input.project.gateActionAudits ?? [])
+    .filter((audit) => audit.executionType === "recommended_batch")
+    .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime());
+
+  for (const audit of audits) {
     const payload = parseTaskQueueAuditPayload(audit.payload);
     const plan = payload?.plan && typeof payload.plan === "object" ? payload.plan as Record<string, unknown> : null;
-    if (!taskQueueStringArray(plan?.adoptionFollowupItemIds).includes(queueItemId)) return false;
+    if (!taskQueueStringArray(plan?.adoptionFollowupItemIds).includes(queueItemId)) continue;
     const matchingResult = taskQueueRecordArray(payload?.results).find((result) => (
       (!input.chapterId || result.chapterId === input.chapterId)
       && (result.status === "succeeded" || result.status === "failed")
     ));
-    return matchingResult
+    const succeeded = matchingResult
       ? matchingResult.status === "succeeded"
       : audit.succeededCount > 0 && (audit.failedCount ?? 0) === 0;
-  });
+    const error = typeof matchingResult?.error === "string" && matchingResult.error ? `错误：${matchingResult.error}` : "";
+    return {
+      status: succeeded ? "pass" : "fail",
+      evidence: succeeded ? "任务中心批量回执已验收。" : `上一轮任务中心批量回执失败。${error}`,
+    };
+  }
+
+  return null;
 }
 
 function firstThreeAdoptionFollowupQueueItems(input: {
@@ -359,16 +369,21 @@ function firstThreeAdoptionFollowupQueueItems(input: {
     .filter((task) => {
       if (!task.dispatchKey.startsWith(`first-three-adoption:${input.project.id}:`)) return false;
       if (task.state === "completed" && task.completionEvidence.trim().length >= 8) return false;
-      return !hasRecommendedBatchFollowupEvidence({
+      return recommendedBatchFollowupOutcome({
         project: input.project,
         dispatchKey: task.dispatchKey,
         chapterId: firstThreeAdoptionChapterId(task.dispatchKey),
-      });
+      })?.status !== "pass";
     })
     .map((task): QueueItem => {
       const isPublishCheck = task.dispatchKey.endsWith(":publish-check");
       const missingEvidence = task.state === "completed" && task.completionEvidence.trim().length < 8;
       const executionChapterId = firstThreeAdoptionChapterId(task.dispatchKey);
+      const batchOutcome = recommendedBatchFollowupOutcome({
+        project: input.project,
+        dispatchKey: task.dispatchKey,
+        chapterId: executionChapterId,
+      });
       return item({
         id: `${input.project.id}:adoption-followup:${task.dispatchKey}`,
         projectId: input.project.id,
@@ -377,13 +392,17 @@ function firstThreeAdoptionFollowupQueueItems(input: {
         category: isPublishCheck ? "export" : "review",
         sourceType: "first_three_adoption",
         sourceLabel: "采纳闭环",
-        sourceDetail: missingEvidence
+        sourceDetail: batchOutcome?.status === "fail"
+          ? "上一轮采纳闭环批量执行失败，不能当作验收。先处理错误后重跑。"
+          : missingEvidence
           ? "这不是普通已完成任务，是采纳后的验收证据没交齐。补证据前，总闸门不会真正放行。"
           : isPublishCheck
             ? "前三章采纳改变了发布包装判断，刷新质检后再导出。"
             : "前三章正文已变更，旧审稿自动失效，必须重新审稿。",
         chapterTitle: task.title ?? (isPublishCheck ? "采纳后发布质检" : "采纳后重新审稿"),
-        evidence: missingEvidence
+        evidence: batchOutcome?.status === "fail"
+          ? `${batchOutcome.evidence}${task.detail ? ` ${task.detail}` : ""}`
+          : missingEvidence
           ? `任务已标记完成，但缺少验收证据。${task.detail ?? "补齐审稿分、问题数、发布包版本或质检结果后，再回总闸门复检。"}`
           : task.detail ?? (isPublishCheck
             ? "前三章采纳后需要回发布质检，确认投稿包和新正文一致。"

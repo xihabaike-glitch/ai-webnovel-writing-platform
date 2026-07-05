@@ -284,6 +284,8 @@ test("buildTaskQueueBatchGateActionReceipt turns a recommended batch into gate e
   assert.deepEqual(gateReceipt.payload.plan.itemIds, plan.itemIds);
   assert.deepEqual(gateReceipt.payload.plan.adoptionFollowupItemIds, []);
   assert.equal(gateReceipt.payload.results[0]?.chapterId, "chapter-1");
+  assert.equal(gateReceipt.payload.results[0]?.chapterTitle, "第一章");
+  assert.equal(gateReceipt.payload.results[0]?.error, null);
   assert.equal(gateReceipt.payload.batchReceipt.status, "continue");
   assert.equal(gateReceipt.payload.strategyId, "standard");
 });

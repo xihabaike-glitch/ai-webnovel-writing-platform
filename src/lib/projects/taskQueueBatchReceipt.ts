@@ -301,6 +301,8 @@ export function buildTaskQueueBatchGateActionReceipt(input: {
       status: result.status,
       taskId: result.taskId,
       chapterId: result.chapterId,
+      chapterTitle: result.chapterTitle,
+      error: result.error,
     })),
     routeEffectSummary: input.routeEffectSummary,
     batchReceipt: input.batchReceipt,

@@ -38,6 +38,8 @@ export interface GateActionReceiptPayload {
     status?: string;
     taskId?: string;
     chapterId?: string;
+    chapterTitle?: string;
+    error?: string | null;
   }>;
   result?: {
     status?: string;

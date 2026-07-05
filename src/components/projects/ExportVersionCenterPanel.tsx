@@ -21,6 +21,12 @@ function comparisonClass(status: NonNullable<ExportPackageSnapshotView["comparis
   return "border-slate-200 bg-white text-slate-600";
 }
 
+function baselineComparisonClass(status: ExportVersionCenterSummary["baselineComparison"]["status"]) {
+  if (status === "newer_version") return "border-sky-200 bg-sky-50 text-sky-800";
+  if (status === "baseline_current") return "border-emerald-200 bg-emerald-50 text-emerald-800";
+  return "border-amber-200 bg-amber-50 text-amber-800";
+}
+
 function timeText(value: string | Date | null) {
   if (!value) return "无记录";
   return new Date(value).toLocaleString("zh-CN");
@@ -129,6 +135,23 @@ export function ExportVersionCenterPanel({
         </div>
         <div className="mt-4 h-2 overflow-hidden rounded bg-slate-100">
           <div className="h-full bg-slate-950" style={{ width: `${summary.targetCoveragePercent}%` }} />
+        </div>
+      </section>
+
+      <section className={`rounded-md border p-4 ${baselineComparisonClass(summary.baselineComparison.status)}`}>
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <h2 className="font-medium">基准对比</h2>
+            <p className="mt-1 text-sm leading-6">{summary.baselineComparison.label}：{summary.baselineComparison.detail}</p>
+          </div>
+          <div className="grid gap-2 text-xs sm:grid-cols-2 lg:min-w-[420px]">
+            <div className="rounded-md bg-white/70 px-2 py-1">准备度 {summary.baselineComparison.readinessDelta > 0 ? "+" : ""}{summary.baselineComparison.readinessDelta}%</div>
+            <div className="rounded-md bg-white/70 px-2 py-1">章节 {summary.baselineComparison.chapterDelta > 0 ? "+" : ""}{summary.baselineComparison.chapterDelta}</div>
+            <div className="rounded-md bg-white/70 px-2 py-1">字数 {summary.baselineComparison.wordDelta > 0 ? "+" : ""}{summary.baselineComparison.wordDelta}</div>
+            <div className="rounded-md bg-white/70 px-2 py-1">文件 {summary.baselineComparison.fileSizeDeltaLabel}</div>
+            <div className="rounded-md bg-white/70 px-2 py-1">内容 {summary.baselineComparison.contentChanged ? "已变化" : "未变化"}</div>
+            <div className="rounded-md bg-white/70 px-2 py-1">类型 {summary.baselineComparison.targetChanged ? "不同" : "一致"}</div>
+          </div>
         </div>
       </section>
 

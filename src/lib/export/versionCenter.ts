@@ -26,6 +26,21 @@ export interface ExportBaselineCandidate {
   reason: string;
 }
 
+export interface ExportBaselineComparison {
+  status: "no_locked_baseline" | "baseline_current" | "newer_version";
+  baselineSnapshotId: string | null;
+  comparedSnapshotId: string | null;
+  label: string;
+  detail: string;
+  readinessDelta: number;
+  chapterDelta: number;
+  wordDelta: number;
+  fileSizeDelta: number;
+  fileSizeDeltaLabel: string;
+  contentChanged: boolean;
+  targetChanged: boolean;
+}
+
 export interface ExportVersionCenterSummary {
   totalSnapshots: number;
   latestCreatedAt: string | Date | null;
@@ -37,6 +52,7 @@ export interface ExportVersionCenterSummary {
   changedSincePreviousCount: number;
   latestSnapshot: ExportPackageSnapshotView | null;
   baselineCandidate: ExportBaselineCandidate | null;
+  baselineComparison: ExportBaselineComparison;
   targets: ExportVersionTarget[];
   nextAction: {
     label: string;
@@ -69,6 +85,23 @@ function readinessStatusLabel(status: ExportVersionTarget["status"]) {
 
 function buildTargetId(packageKind: string, format: string) {
   return `${packageKind}:${format}`;
+}
+
+function fileSizeLabel(size: number) {
+  if (size >= 1024 * 1024) return `${(size / 1024 / 1024).toFixed(1)} MB`;
+  if (size >= 1024) return `${(size / 1024).toFixed(1)} KB`;
+  return `${size} B`;
+}
+
+function signedFileSizeDelta(value: number) {
+  if (value === 0) return "0 B";
+  const prefix = value > 0 ? "+" : "-";
+  return `${prefix}${fileSizeLabel(Math.abs(value))}`;
+}
+
+function signedDelta(value: number) {
+  if (value > 0) return `+${value}`;
+  return String(value);
 }
 
 function pickBaselineCandidate(orderedSnapshots: ExportPackageSnapshotView[]): ExportBaselineCandidate | null {
@@ -112,10 +145,80 @@ function pickBaselineCandidate(orderedSnapshots: ExportPackageSnapshotView[]): E
   };
 }
 
+function buildBaselineComparison(orderedSnapshots: ExportPackageSnapshotView[], latestSnapshot: ExportPackageSnapshotView | null): ExportBaselineComparison {
+  const locked = orderedSnapshots.find((snapshot) => snapshot.isBaseline) ?? null;
+  if (!locked) {
+    return {
+      status: "no_locked_baseline",
+      baselineSnapshotId: null,
+      comparedSnapshotId: latestSnapshot?.id ?? null,
+      label: "尚未锁定正式基准",
+      detail: "先锁定一个可交付快照，版本中心才能判断新版本是否值得替换基准。",
+      readinessDelta: 0,
+      chapterDelta: 0,
+      wordDelta: 0,
+      fileSizeDelta: 0,
+      fileSizeDeltaLabel: "0 B",
+      contentChanged: false,
+      targetChanged: false,
+    };
+  }
+
+  if (!latestSnapshot || latestSnapshot.id === locked.id) {
+    return {
+      status: "baseline_current",
+      baselineSnapshotId: locked.id,
+      comparedSnapshotId: locked.id,
+      label: "当前基准就是最新版本",
+      detail: "还没有比正式基准更新的导出记录；继续写作或重导后再做替换判断。",
+      readinessDelta: 0,
+      chapterDelta: 0,
+      wordDelta: 0,
+      fileSizeDelta: 0,
+      fileSizeDeltaLabel: "0 B",
+      contentChanged: false,
+      targetChanged: false,
+    };
+  }
+
+  const readinessDelta = latestSnapshot.readinessPercent - locked.readinessPercent;
+  const chapterDelta = latestSnapshot.chapterCount - locked.chapterCount;
+  const wordDelta = latestSnapshot.wordCount - locked.wordCount;
+  const fileSizeDelta = latestSnapshot.fileSize - locked.fileSize;
+  const contentChanged = latestSnapshot.contentHash !== locked.contentHash;
+  const targetChanged = latestSnapshot.packageKind !== locked.packageKind || latestSnapshot.format !== locked.format;
+  const parts = [
+    readinessDelta ? `准备度 ${signedDelta(readinessDelta)}%` : null,
+    chapterDelta ? `章节 ${signedDelta(chapterDelta)}` : null,
+    wordDelta ? `字数 ${signedDelta(wordDelta)}` : null,
+    fileSizeDelta ? `文件 ${signedFileSizeDelta(fileSizeDelta)}` : null,
+    contentChanged ? "内容摘要已变化" : null,
+    targetChanged ? "交付物类型不同" : null,
+  ].filter(Boolean);
+
+  return {
+    status: "newer_version",
+    baselineSnapshotId: locked.id,
+    comparedSnapshotId: latestSnapshot.id,
+    label: "发现比基准更新的导出",
+    detail: parts.length
+      ? `最新版本相对正式基准：${parts.join("，")}。`
+      : "最新版本时间更新，但核心元信息与正式基准一致。",
+    readinessDelta,
+    chapterDelta,
+    wordDelta,
+    fileSizeDelta,
+    fileSizeDeltaLabel: signedFileSizeDelta(fileSizeDelta),
+    contentChanged,
+    targetChanged,
+  };
+}
+
 export function buildExportVersionCenter(snapshots: ExportPackageSnapshotView[]): ExportVersionCenterSummary {
   const orderedSnapshots = [...snapshots].sort((a, b) => snapshotTime(b) - snapshotTime(a));
   const latestSnapshot = orderedSnapshots[0] ?? null;
   const baselineCandidate = pickBaselineCandidate(orderedSnapshots);
+  const baselineComparison = buildBaselineComparison(orderedSnapshots, latestSnapshot);
   const targets = targetMatrix.map((target) => {
     const latest = orderedSnapshots.find((snapshot) => snapshot.packageKind === target.packageKind && snapshot.format === target.format) ?? null;
     const status = latest ? latest.readinessStatus as ExportVersionTarget["status"] : "missing";
@@ -149,6 +252,7 @@ export function buildExportVersionCenter(snapshots: ExportPackageSnapshotView[])
     changedSincePreviousCount: orderedSnapshots.filter((snapshot) => snapshot.comparison?.contentChanged).length,
     latestSnapshot,
     baselineCandidate,
+    baselineComparison,
     targets,
     nextAction: missingTarget ? {
       label: `补齐 ${missingTarget.label}`,

@@ -9,6 +9,10 @@ function snapshot(input: {
   format: string;
   readinessStatus?: string;
   readinessPercent?: number;
+  fileSize?: number;
+  contentHash?: string;
+  chapterCount?: number;
+  wordCount?: number;
   isBaseline?: boolean;
   baselineLockedAt?: string;
   createdAt: string;
@@ -20,12 +24,12 @@ function snapshot(input: {
     title: "夜雨系统",
     fileName: `${input.id}.md`,
     contentType: "text/markdown",
-    fileSize: 1000,
-    contentHash: input.id.padEnd(64, "a").slice(0, 64),
+    fileSize: input.fileSize ?? 1000,
+    contentHash: input.contentHash ?? input.id.padEnd(64, "a").slice(0, 64),
     readinessStatus: input.readinessStatus ?? "ready",
     readinessPercent: input.readinessPercent ?? 90,
-    chapterCount: 3,
-    wordCount: 9000,
+    chapterCount: input.chapterCount ?? 3,
+    wordCount: input.wordCount ?? 9000,
     notes: "",
     isBaseline: input.isBaseline,
     baselineLockedAt: input.baselineLockedAt ?? null,
@@ -111,5 +115,71 @@ describe("export version center", () => {
     assert.equal(center.baselineCandidate?.source, "locked");
     assert.equal(center.baselineCandidate?.lockedAt, "2026-07-05T04:00:00.000Z");
     assert.match(center.nextAction.label, /补齐/);
+  });
+
+  it("asks for a locked baseline before comparing versions", () => {
+    const center = buildExportVersionCenter([
+      snapshot({ id: "full-md", packageKind: "full", format: "markdown", createdAt: "2026-07-05T02:00:00.000Z" }),
+    ]);
+
+    assert.equal(center.baselineComparison.status, "no_locked_baseline");
+    assert.equal(center.baselineComparison.baselineSnapshotId, null);
+    assert.equal(center.baselineComparison.comparedSnapshotId, "full-md");
+  });
+
+  it("reports when the locked baseline is still current", () => {
+    const center = buildExportVersionCenter([
+      snapshot({
+        id: "full-md-locked",
+        packageKind: "full",
+        format: "markdown",
+        isBaseline: true,
+        baselineLockedAt: "2026-07-05T04:00:00.000Z",
+        createdAt: "2026-07-05T04:00:00.000Z",
+      }),
+    ]);
+
+    assert.equal(center.baselineComparison.status, "baseline_current");
+    assert.equal(center.baselineComparison.baselineSnapshotId, "full-md-locked");
+    assert.equal(center.baselineComparison.contentChanged, false);
+  });
+
+  it("compares the latest export against a locked baseline", () => {
+    const center = buildExportVersionCenter([
+      snapshot({
+        id: "full-md-new",
+        packageKind: "full",
+        format: "markdown",
+        readinessPercent: 96,
+        fileSize: 1800,
+        contentHash: "b".repeat(64),
+        chapterCount: 4,
+        wordCount: 12000,
+        createdAt: "2026-07-05T05:00:00.000Z",
+      }),
+      snapshot({
+        id: "full-md-locked",
+        packageKind: "full",
+        format: "markdown",
+        readinessPercent: 90,
+        fileSize: 1000,
+        contentHash: "a".repeat(64),
+        chapterCount: 3,
+        wordCount: 9000,
+        isBaseline: true,
+        baselineLockedAt: "2026-07-05T04:00:00.000Z",
+        createdAt: "2026-07-05T04:00:00.000Z",
+      }),
+    ]);
+
+    assert.equal(center.baselineComparison.status, "newer_version");
+    assert.equal(center.baselineComparison.baselineSnapshotId, "full-md-locked");
+    assert.equal(center.baselineComparison.comparedSnapshotId, "full-md-new");
+    assert.equal(center.baselineComparison.readinessDelta, 6);
+    assert.equal(center.baselineComparison.chapterDelta, 1);
+    assert.equal(center.baselineComparison.wordDelta, 3000);
+    assert.equal(center.baselineComparison.fileSizeDeltaLabel, "+800 B");
+    assert.equal(center.baselineComparison.contentChanged, true);
+    assert.match(center.baselineComparison.detail, /内容摘要已变化/);
   });
 });

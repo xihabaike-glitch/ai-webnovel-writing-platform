@@ -8,6 +8,11 @@ import {
   buildPublishRepairSecondPassInstruction,
   canExecutePublishRepairAction,
 } from "@/lib/projects/publishRepairActionExecution";
+import {
+  buildPublishRepairNextAction,
+  normalizeRunResult,
+  type RawPublishRepairRunResult,
+} from "@/lib/projects/publishRepairRunResults";
 import type { PublishRepairAction, PublishRepairActionKind } from "@/lib/projects/platformPublishExport";
 
 interface Params {
@@ -48,7 +53,7 @@ function normalizeBatchActions(body: RepairBody) {
   return [actionFromBody(body)];
 }
 
-async function runPublishRepairAction(projectId: string, action: PublishRepairAction) {
+async function runPublishRepairAction(projectId: string, action: PublishRepairAction): Promise<RawPublishRepairRunResult> {
   if (!canExecutePublishRepairAction(action)) {
     return {
       action: action.kind,
@@ -108,6 +113,7 @@ async function runPublishRepairAction(projectId: string, action: PublishRepairAc
       taskId: markedTask.id,
       score: review.result.score,
       issueCount: review.result.issues.length,
+      shouldSecondPass: review.result.score < 85,
     };
   }
 
@@ -149,6 +155,7 @@ async function runPublishRepairAction(projectId: string, action: PublishRepairAc
       shouldSecondPass: secondPass.secondPassAudit.shouldSecondPass,
       issueCount: secondPass.secondPassAudit.issues.length,
       wordCount: secondPass.chapter.wordCount,
+      candidateRevisionId: secondPass.candidateRevision.id,
     };
   }
 
@@ -212,21 +219,29 @@ export async function POST(request: Request, { params }: Params) {
   }
 
   const failed = results.filter((result) => result.status === "failed");
+  const nextAction = buildPublishRepairNextAction(results.map(normalizeRunResult), projectId);
   if (!isBatch && failed.length) {
-    return NextResponse.json(failed[0], { status: failed[0].error === "Chapter not found in project" ? 404 : 500 });
+    return NextResponse.json({
+      ...failed[0],
+      nextAction,
+    }, { status: failed[0].error === "Chapter not found in project" ? 404 : 500 });
   }
   if (!isBatch) {
     return NextResponse.json({
-      message: results[0].message ?? "修复动作已完成。",
+      message: nextAction
+        ? `${results[0].message ?? "修复动作已完成。"} 下一步：${nextAction.label}。`
+        : results[0].message ?? "修复动作已完成。",
       result: results[0],
       results,
+      nextAction,
     });
   }
 
   return NextResponse.json({
     message: failed.length
-      ? `已执行 ${results.length} 个修复动作，其中 ${failed.length} 个失败。`
-      : `已执行 ${results.length} 个修复动作。`,
+      ? `已执行 ${results.length} 个修复动作，其中 ${failed.length} 个失败。${nextAction ? ` 下一步：${nextAction.label}。` : ""}`
+      : `已执行 ${results.length} 个修复动作。${nextAction ? ` 下一步：${nextAction.label}。` : ""}`,
     results,
+    nextAction,
   });
 }

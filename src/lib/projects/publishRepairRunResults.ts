@@ -8,12 +8,23 @@ export interface PublishRepairRunResult {
   status: "pending" | "succeeded" | "failed";
   message?: string;
   error?: string;
+  taskId?: string;
   score?: number | null;
   issueCount?: number;
   wordCount?: number;
+  shouldSecondPass?: boolean;
+  candidateRevisionId?: string;
 }
 
 export type RawPublishRepairRunResult = Omit<PublishRepairRunResult, "id"> & { id?: string };
+
+export interface PublishRepairNextAction {
+  kind: "retry_failed" | "run_second_pass" | "adopt_candidate" | "recheck_publish";
+  label: string;
+  detail: string;
+  href?: string;
+  action?: PublishRepairAction;
+}
 
 export function labelForAction(kind: PublishRepairActionKind) {
   if (kind === "run_second_pass") return "执行二改";
@@ -58,4 +69,82 @@ export function actionFromRunResult(result: PublishRepairRunResult): PublishRepa
     chapterId: result.chapterId ?? undefined,
     chapterTitle: result.chapterTitle,
   };
+}
+
+function chapterHref(projectId: string | undefined, chapterId: string | null, hash: string) {
+  if (!projectId || !chapterId) return undefined;
+  return `/projects/${projectId}/chapters/${chapterId}${hash}`;
+}
+
+function publishHref(projectId: string | undefined) {
+  return projectId ? `/projects/${projectId}#platform-export` : "#platform-export";
+}
+
+export function buildPublishRepairNextAction(
+  results: PublishRepairRunResult[],
+  projectId?: string,
+): PublishRepairNextAction | null {
+  const failed = results.find((result) => result.status === "failed");
+  if (failed) {
+    const action = actionFromRunResult(failed);
+    return {
+      kind: "retry_failed",
+      label: "重试失败项",
+      detail: `${failed.chapterTitle} 的${labelForAction(failed.action)}失败，先重试或切换模型后再回发布质检。`,
+      href: chapterHref(projectId, failed.chapterId, failed.action === "run_second_pass" ? "#chapter-second-pass" : "#chapter-workflow"),
+      action,
+    };
+  }
+
+  const secondPass = results.find((result) => result.status === "succeeded" && result.action === "run_second_pass");
+  if (secondPass) {
+    if (secondPass.shouldSecondPass) {
+      return {
+        kind: "run_second_pass",
+        label: "继续二改",
+        detail: `${secondPass.chapterTitle} 复检仍未过线${typeof secondPass.score === "number" ? `，当前 ${secondPass.score} 分` : ""}，继续按发布质检问题二改。`,
+        href: chapterHref(projectId, secondPass.chapterId, "#chapter-second-pass"),
+        action: actionFromRunResult(secondPass),
+      };
+    }
+    if (secondPass.candidateRevisionId) {
+      return {
+        kind: "adopt_candidate",
+        label: "采纳二改候选稿",
+        detail: `${secondPass.chapterTitle} 已生成二改候选稿，先采纳进正文，再重新跑发布质检。`,
+        href: chapterHref(projectId, secondPass.chapterId, "#chapter-revisions"),
+      };
+    }
+  }
+
+  const weakReview = results.find((result) => (
+    result.status === "succeeded"
+    && result.action === "run_chapter_review"
+    && typeof result.score === "number"
+    && result.score < 85
+  ));
+  if (weakReview) {
+    return {
+      kind: "run_second_pass",
+      label: "执行二改",
+      detail: `${weakReview.chapterTitle} 审稿 ${weakReview.score} 分，先按问题清单二改，再回发布质检。`,
+      href: chapterHref(projectId, weakReview.chapterId, "#chapter-second-pass"),
+      action: {
+        ...actionFromRunResult(weakReview),
+        kind: "run_second_pass",
+        label: "执行二改",
+      },
+    };
+  }
+
+  if (results.some((result) => result.status === "succeeded")) {
+    return {
+      kind: "recheck_publish",
+      label: "回发布质检",
+      detail: "自动修复动作已完成，刷新发布包质检；如果无阻塞，就保存发布基准并下载。",
+      href: publishHref(projectId),
+    };
+  }
+
+  return null;
 }

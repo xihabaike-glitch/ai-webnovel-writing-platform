@@ -7,6 +7,7 @@ import {
   labelForAction,
   normalizeRunResult,
   pendingResultFromAction,
+  type PublishRepairNextAction,
   type PublishRepairRunResult,
   type RawPublishRepairRunResult,
 } from "@/lib/projects/publishRepairRunResults";
@@ -729,6 +730,42 @@ function resultStatusClass(status: PublishRepairRunResult["status"]) {
   return "bg-rose-50 text-rose-700";
 }
 
+function RepairNextActionCallout({
+  nextAction,
+  onRunAction,
+  runningActionId,
+}: {
+  nextAction: PublishRepairNextAction;
+  onRunAction: (action: PublishRepairAction) => void;
+  runningActionId: string | null;
+}) {
+  const executable = nextAction.action && canRunAction(nextAction.action);
+
+  return (
+    <div className="mt-3 rounded-md border border-emerald-100 bg-emerald-50 p-3 text-sm">
+      <div className="font-medium text-emerald-950">下一步：{nextAction.label}</div>
+      <p className="mt-1 leading-5 text-emerald-700">{nextAction.detail}</p>
+      {executable ? (
+        <button
+          className="mt-3 rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white disabled:opacity-50"
+          disabled={Boolean(runningActionId)}
+          onClick={() => nextAction.action && onRunAction(nextAction.action)}
+          type="button"
+        >
+          {runningActionId === nextAction.action?.id ? "处理中" : nextAction.label}
+        </button>
+      ) : nextAction.href ? (
+        <Link
+          className="mt-3 inline-flex rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white"
+          href={nextAction.href}
+        >
+          {nextAction.label}
+        </Link>
+      ) : null}
+    </div>
+  );
+}
+
 function formatTime(value: string) {
   return new Intl.DateTimeFormat("zh-CN", {
     month: "2-digit",
@@ -1312,6 +1349,7 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
   const [runningActionId, setRunningActionId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [runResults, setRunResults] = useState<PublishRepairRunResult[]>([]);
+  const [repairNextAction, setRepairNextAction] = useState<PublishRepairNextAction | null>(null);
   const [selectedVersionId, setSelectedVersionId] = useState<string | null>(null);
   const [versionDetail, setVersionDetail] = useState<PublishPackageVersionDetailState | null>(null);
   const [isLoadingVersion, setIsLoadingVersion] = useState(false);
@@ -2103,6 +2141,7 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
     setRunningActionId(action.id);
     setMessage(null);
     setRunResults([pendingResultFromAction(action)]);
+    setRepairNextAction(null);
     try {
       const response = await fetch(`/api/projects/${projectId}/platform-export/repair`, {
         method: "POST",
@@ -2119,6 +2158,7 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
         error?: string;
         result?: RawPublishRepairRunResult;
         results?: RawPublishRepairRunResult[];
+        nextAction?: PublishRepairNextAction | null;
       } | null;
       if (!response.ok) {
         throw new Error(payload?.error ?? "修复动作执行失败。");
@@ -2130,6 +2170,7 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
           : [];
       setRunResults(results.length ? results : [{ ...pendingResultFromAction(action), status: "succeeded", message: payload?.message ?? "修复动作已完成。" }]);
       setMessage(payload?.message ?? "修复动作已完成。");
+      setRepairNextAction(payload?.nextAction ?? null);
       await loadCenter({ keepMessage: true });
     } catch (caught) {
       const errorMessage = caught instanceof Error ? caught.message : "修复动作执行失败。";
@@ -2145,6 +2186,7 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
     setRunningActionId("batch");
     setMessage(null);
     setRunResults(executableActions.map(pendingResultFromAction));
+    setRepairNextAction(null);
     try {
       const response = await fetch(`/api/projects/${projectId}/platform-export/repair`, {
         method: "POST",
@@ -2162,12 +2204,14 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
         message?: string;
         error?: string;
         results?: RawPublishRepairRunResult[];
+        nextAction?: PublishRepairNextAction | null;
       } | null;
       if (!response.ok) {
         throw new Error(payload?.error ?? "批量修复失败。");
       }
       setRunResults(payload?.results?.map(normalizeRunResult) ?? []);
       setMessage(payload?.message ?? "批量修复已完成。");
+      setRepairNextAction(payload?.nextAction ?? null);
       await loadCenter({ keepMessage: true });
     } catch (caught) {
       const errorMessage = caught instanceof Error ? caught.message : "批量修复失败。";
@@ -2183,6 +2227,7 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
     setRunningActionId("workspace-batch");
     setMessage(null);
     setRunResults(workspaceExecutableActions.map(pendingResultFromAction));
+    setRepairNextAction(null);
     try {
       const response = await fetch(`/api/projects/${projectId}/platform-export/repair`, {
         method: "POST",
@@ -2200,12 +2245,14 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
         message?: string;
         error?: string;
         results?: RawPublishRepairRunResult[];
+        nextAction?: PublishRepairNextAction | null;
       } | null;
       if (!response.ok) {
         throw new Error(payload?.error ?? "全平台批量修复失败。");
       }
       setRunResults(payload?.results?.map(normalizeRunResult) ?? []);
       setMessage(payload?.message ?? "全平台批量修复已完成。");
+      setRepairNextAction(payload?.nextAction ?? null);
       await loadCenter({ keepMessage: true });
     } catch (caught) {
       const errorMessage = caught instanceof Error ? caught.message : "全平台批量修复失败。";
@@ -3344,6 +3391,13 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
                         </button>
                       ) : null}
                     </div>
+                    {repairNextAction ? (
+                      <RepairNextActionCallout
+                        nextAction={repairNextAction}
+                        onRunAction={(action) => void runRepairAction(action)}
+                        runningActionId={runningActionId}
+                      />
+                    ) : null}
                     <div className="mt-3 grid gap-2">
                       {runResults.map((result) => {
                         const retryAction = actionFromRunResult(result);
@@ -3392,6 +3446,13 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
                   失败 {runResults.filter((result) => result.status === "failed").length} 项 ·
                   处理中 {runResults.filter((result) => result.status === "pending").length} 项
                 </div>
+                {repairNextAction ? (
+                  <RepairNextActionCallout
+                    nextAction={repairNextAction}
+                    onRunAction={(action) => void runRepairAction(action)}
+                    runningActionId={runningActionId}
+                  />
+                ) : null}
                 <div className="mt-3 grid gap-2">
                   {runResults.map((result) => (
                     <div className="rounded-md border border-slate-200 bg-white p-3" key={result.id}>

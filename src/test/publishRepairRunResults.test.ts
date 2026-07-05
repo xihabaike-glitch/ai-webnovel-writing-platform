@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   actionFromRunResult,
+  buildPublishRepairNextAction,
   normalizeRunResult,
   pendingResultFromAction,
 } from "../lib/projects/publishRepairRunResults.ts";
@@ -53,5 +54,52 @@ test("publish repair run result helpers", async (t) => {
     assert.equal(action.label, "执行二改");
     assert.equal(action.detail, "模型暂时不可用。");
     assert.equal(action.chapterId, "chapter-3");
+  });
+
+  await t.test("routes weak review results into second pass", () => {
+    const nextAction = buildPublishRepairNextAction([normalizeRunResult({
+      action: "run_chapter_review",
+      chapterId: "chapter-1",
+      chapterTitle: "雨夜系统",
+      status: "succeeded",
+      message: "已完成章节审稿。",
+      score: 72,
+      issueCount: 3,
+    })], "project-1");
+
+    assert.equal(nextAction?.kind, "run_second_pass");
+    assert.equal(nextAction?.action?.kind, "run_second_pass");
+    assert.equal(nextAction?.href, "/projects/project-1/chapters/chapter-1#chapter-second-pass");
+  });
+
+  await t.test("routes passed second pass candidates into adoption", () => {
+    const nextAction = buildPublishRepairNextAction([normalizeRunResult({
+      action: "run_second_pass",
+      chapterId: "chapter-1",
+      chapterTitle: "雨夜系统",
+      status: "succeeded",
+      message: "已完成二改，复检 90 分。",
+      score: 90,
+      shouldSecondPass: false,
+      candidateRevisionId: "revision-1",
+    })], "project-1");
+
+    assert.equal(nextAction?.kind, "adopt_candidate");
+    assert.equal(nextAction?.label, "采纳二改候选稿");
+    assert.equal(nextAction?.href, "/projects/project-1/chapters/chapter-1#chapter-revisions");
+  });
+
+  await t.test("routes failures into retry", () => {
+    const nextAction = buildPublishRepairNextAction([normalizeRunResult({
+      action: "run_chapter_review",
+      chapterId: "chapter-1",
+      chapterTitle: "雨夜系统",
+      status: "failed",
+      error: "模型暂时不可用。",
+    })], "project-1");
+
+    assert.equal(nextAction?.kind, "retry_failed");
+    assert.equal(nextAction?.action?.kind, "run_chapter_review");
+    assert.equal(nextAction?.href, "/projects/project-1/chapters/chapter-1#chapter-workflow");
   });
 });

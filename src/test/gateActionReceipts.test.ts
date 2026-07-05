@@ -41,6 +41,7 @@ import {
   buildGateBatchTacticEffectReview,
   buildGatePlatformTacticExperienceLibrary,
   buildGatePlatformTacticExperienceMarkdown,
+  buildGatePlatformTacticExperienceDisplay,
   buildGatePlatformTacticExperienceStartHref,
   gateActionReceiptFromAuditRecord,
   filterGatePlatformDecisionTimelineItems,
@@ -4105,6 +4106,54 @@ test("buildGateActionReceipt", async (t) => {
     assert.equal(blockedExperience?.status, "blocked");
     assert.equal(blockedExperience?.tactic, "恢复放量避坑");
     assert.ok(blockedExperience?.risk.includes("暂停"));
+  });
+
+  await t.test("builds display badges for recovery scale tactic experience cards", () => {
+    const base = {
+      platformId: "fanqie",
+      platformName: "番茄小说",
+      label: "可复用打法",
+      lesson: "恢复放量首日小样本已跑通。",
+      reuseHint: "新项目仍先跑小样本。",
+      risk: "不能无限复用。",
+      href: "/gate#platform-tactic-experience",
+      sourceStatus: "healthy" as const,
+      priorityScore: 90,
+      latestAt: "2026-01-01T00:00:00.000Z",
+      evidence: ["恢复放量首日闭环：通过"],
+    };
+    const usable = buildGatePlatformTacticExperienceDisplay({
+      ...base,
+      status: "usable",
+      tactic: "恢复放量打法",
+      sourceLabel: "恢复放量闭环",
+    });
+    const watch = buildGatePlatformTacticExperienceDisplay({
+      ...base,
+      status: "watch",
+      label: "观察样本",
+      tactic: "恢复放量观察",
+      sourceLabel: "恢复放量观察",
+      evidence: ["恢复放量首日闭环：继续观察"],
+    });
+    const blocked = buildGatePlatformTacticExperienceDisplay({
+      ...base,
+      status: "blocked",
+      label: "避坑样本",
+      tactic: "恢复放量避坑",
+      sourceLabel: "恢复放量避坑",
+      evidence: ["恢复放量首日闭环：暂停"],
+    });
+
+    assert.deepEqual(usable.badges, ["恢复放量", "小样本通过"]);
+    assert.equal(usable.outcomeLabel, "可继续小样本复用");
+    assert.equal(usable.nextStepLabel, "继续小样本");
+    assert.deepEqual(watch.badges, ["恢复放量", "继续观察"]);
+    assert.equal(watch.outcomeLabel, "继续观察，别放量");
+    assert.equal(watch.nextStepLabel, "补追读证据");
+    assert.deepEqual(blocked.badges, ["恢复放量", "暂停避坑"]);
+    assert.equal(blocked.outcomeLabel, "暂停迁移");
+    assert.equal(blocked.nextStepLabel, "重做打法");
   });
 
   await t.test("flags overdue and today dispatch closeout items", () => {

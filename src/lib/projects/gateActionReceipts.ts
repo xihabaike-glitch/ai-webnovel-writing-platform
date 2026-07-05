@@ -924,11 +924,55 @@ export interface GatePlatformTacticExperienceLibrary {
   items: GatePlatformTacticExperienceItem[];
 }
 
+export interface GatePlatformTacticExperienceDisplay {
+  badges: string[];
+  outcomeLabel: string;
+  nextStepLabel: string;
+}
+
 export function filterGatePlatformTacticExperienceItems(
   items: GatePlatformTacticExperienceItem[],
   status: GatePlatformTacticExperienceStatusFilter = "all",
 ) {
   return items.filter((item) => status === "all" || item.status === status);
+}
+
+export function buildGatePlatformTacticExperienceDisplay(item: GatePlatformTacticExperienceItem): GatePlatformTacticExperienceDisplay {
+  if (/恢复放量/u.test(`${item.tactic} ${item.sourceLabel} ${item.evidence.join(" ")}`)) {
+    if (item.status === "blocked") {
+      return {
+        badges: ["恢复放量", "暂停避坑"],
+        outcomeLabel: "暂停迁移",
+        nextStepLabel: "重做打法",
+      };
+    }
+    if (item.status === "watch") {
+      return {
+        badges: ["恢复放量", "继续观察"],
+        outcomeLabel: "继续观察，别放量",
+        nextStepLabel: "补追读证据",
+      };
+    }
+    return {
+      badges: ["恢复放量", "小样本通过"],
+      outcomeLabel: "可继续小样本复用",
+      nextStepLabel: "继续小样本",
+    };
+  }
+
+  if (item.sourceLabel === "新书开局闭环") {
+    return {
+      badges: ["已用于新书开局并闭环"],
+      outcomeLabel: "开局闭环",
+      nextStepLabel: "复用交接",
+    };
+  }
+
+  return {
+    badges: [],
+    outcomeLabel: item.label,
+    nextStepLabel: item.status === "usable" ? "可开新项目" : item.status === "watch" ? "继续补证据" : "先避坑",
+  };
 }
 
 export function buildGatePlatformTacticExperienceStartHref(item: Pick<GatePlatformTacticExperienceItem, "platformId" | "tactic" | "status">) {

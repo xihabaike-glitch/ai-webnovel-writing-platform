@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import {
+  buildGatePlatformTacticExperienceDisplay,
   buildGatePlatformTacticExperienceMarkdown,
   buildGatePlatformTacticExperienceStartHref,
   filterGatePlatformTacticExperienceItems,
@@ -111,59 +112,70 @@ export function PlatformTacticExperiencePanel({ library }: { library: GatePlatfo
         <div className="mt-4 grid gap-3 xl:grid-cols-3">
           {visibleItems.map((item) => (
             <div className={`rounded-md border p-3 text-sm ${experienceClass(item.status)}`} key={item.platformId}>
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="font-medium">{item.platformName}</span>
-                <span className="rounded-md bg-white/70 px-2 py-1 text-xs font-medium">{statusLabel(item.status)}</span>
-                {item.sourceLabel === "新书开局闭环" ? (
-                  <span className="rounded-md bg-white/80 px-2 py-1 text-xs font-medium">已用于新书开局并闭环</span>
-                ) : null}
-              </div>
-              <div className="mt-3 rounded-md bg-white/70 p-3">
-                <div className="text-xs font-medium opacity-70">打法</div>
-                <p className="mt-1 font-medium leading-6">{item.tactic}</p>
-              </div>
-              <p className="mt-3 leading-6 opacity-85">{item.lesson}</p>
-              <div className="mt-3 grid gap-2">
-                <div className="rounded-md bg-white/70 p-3">
-                  <div className="text-xs font-medium opacity-70">复用方式</div>
-                  <p className="mt-1 leading-6">{item.reuseHint}</p>
-                </div>
-                <div className="rounded-md bg-white/70 p-3">
-                  <div className="text-xs font-medium opacity-70">风险提醒</div>
-                  <p className="mt-1 leading-6">{item.risk}</p>
-                </div>
-              </div>
-              {item.evidence.length ? (
-                <div className="mt-3 grid gap-1">
-                  {item.evidence.slice(0, 2).map((evidence) => (
-                    <p className="rounded-md border border-white/70 bg-white/60 p-2 text-xs leading-5 opacity-80" key={evidence}>{evidence}</p>
-                  ))}
-                </div>
-              ) : null}
-              <div className="mt-3 flex flex-wrap gap-2">
-                <Link className="rounded-md border border-white/70 bg-white px-3 py-2 text-xs font-medium text-slate-950 hover:bg-white/80" href={item.href}>
-                  查看来源
-                </Link>
-                {item.status === "usable" ? (
-                  <Link className="rounded-md border border-white/70 bg-slate-950 px-3 py-2 text-xs font-medium text-white hover:bg-slate-800" href={buildGatePlatformTacticExperienceStartHref(item)}>
-                    用此打法开项目
-                  </Link>
-                ) : null}
-                <button
-                  className="rounded-md border border-white/70 bg-white/70 px-3 py-2 text-xs font-medium text-slate-950 hover:bg-white"
-                  onClick={() => void copyExperience(item)}
-                  type="button"
-                >
-                  复制经验
-                </button>
-                <button
-                  className="rounded-md border border-white/70 bg-white/70 px-3 py-2 text-xs font-medium text-slate-950 hover:bg-white"
-                  onClick={() => downloadExperience(item)}
-                  type="button"
-                >
-                  下载经验
-                </button>
-              </div>
+              {(() => {
+                const display = buildGatePlatformTacticExperienceDisplay(item);
+                return (
+                  <>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-medium">{item.platformName}</span>
+                      <span className="rounded-md bg-white/70 px-2 py-1 text-xs font-medium">{statusLabel(item.status)}</span>
+                      {display.badges.map((badge) => (
+                        <span className="rounded-md bg-white/80 px-2 py-1 text-xs font-medium" key={badge}>{badge}</span>
+                      ))}
+                    </div>
+                    <div className="mt-3 rounded-md bg-white/70 p-3">
+                      <div className="text-xs font-medium opacity-70">打法</div>
+                      <p className="mt-1 font-medium leading-6">{item.tactic}</p>
+                      <div className="mt-2 flex flex-wrap gap-2 text-xs">
+                        <span className="rounded-md bg-white/80 px-2 py-1 font-medium">{display.outcomeLabel}</span>
+                        <span className="rounded-md bg-white/80 px-2 py-1 font-medium">下一步：{display.nextStepLabel}</span>
+                      </div>
+                    </div>
+                    <p className="mt-3 leading-6 opacity-85">{item.lesson}</p>
+                    <div className="mt-3 grid gap-2">
+                      <div className="rounded-md bg-white/70 p-3">
+                        <div className="text-xs font-medium opacity-70">复用方式</div>
+                        <p className="mt-1 leading-6">{item.reuseHint}</p>
+                      </div>
+                      <div className="rounded-md bg-white/70 p-3">
+                        <div className="text-xs font-medium opacity-70">风险提醒</div>
+                        <p className="mt-1 leading-6">{item.risk}</p>
+                      </div>
+                    </div>
+                    {item.evidence.length ? (
+                      <div className="mt-3 grid gap-1">
+                        {item.evidence.slice(0, 2).map((evidence) => (
+                          <p className="rounded-md border border-white/70 bg-white/60 p-2 text-xs leading-5 opacity-80" key={evidence}>{evidence}</p>
+                        ))}
+                      </div>
+                    ) : null}
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <Link className="rounded-md border border-white/70 bg-white px-3 py-2 text-xs font-medium text-slate-950 hover:bg-white/80" href={item.href}>
+                        查看来源
+                      </Link>
+                      {item.status === "usable" ? (
+                        <Link className="rounded-md border border-white/70 bg-slate-950 px-3 py-2 text-xs font-medium text-white hover:bg-slate-800" href={buildGatePlatformTacticExperienceStartHref(item)}>
+                          用此打法开项目
+                        </Link>
+                      ) : null}
+                      <button
+                        className="rounded-md border border-white/70 bg-white/70 px-3 py-2 text-xs font-medium text-slate-950 hover:bg-white"
+                        onClick={() => void copyExperience(item)}
+                        type="button"
+                      >
+                        复制经验
+                      </button>
+                      <button
+                        className="rounded-md border border-white/70 bg-white/70 px-3 py-2 text-xs font-medium text-slate-950 hover:bg-white"
+                        onClick={() => downloadExperience(item)}
+                        type="button"
+                      >
+                        下载经验
+                      </button>
+                    </div>
+                  </>
+                );
+              })()}
             </div>
           ))}
         </div>

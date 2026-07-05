@@ -102,6 +102,31 @@ export interface FirstDayDispatchDesk {
   nextActions: string[];
 }
 
+export interface FirstDayHandoffGateCtaProgress {
+  visible: boolean;
+  label: string;
+  completedCount: number;
+  totalCount: number;
+  progressPercent: number;
+  nextAction: string;
+  items: Array<{
+    label: string;
+    status: "done" | "active" | "locked";
+  }>;
+}
+
+export interface FirstDayHandoffGateCta {
+  visible: boolean;
+  status: "pending" | "closed";
+  headline: string;
+  detail: string;
+  primaryLabel: string;
+  primaryHref: string;
+  secondaryLabel: string;
+  secondaryHref: string;
+  badges: string[];
+}
+
 export interface FirstDayDispatchUpdateSummary {
   visible: boolean;
   status: "none" | "advanced" | "risk_recovered" | "watch_cleared" | "watch_blocked" | "completed";
@@ -123,6 +148,48 @@ export interface FirstDayDispatchFocus {
   card: FirstDayDispatchDeskCard | null;
   matchedBy: "dispatch_key" | "project_step" | "project_active" | "project_latest" | "global_next" | "none";
   message: string;
+}
+
+export function buildFirstDayHandoffGateCta(input: {
+  projectId: string;
+  progress: FirstDayHandoffGateCtaProgress | null;
+  nextStep: Pick<FirstDayWorkflowStep, "label" | "actionLabel" | "href">;
+}): FirstDayHandoffGateCta | null {
+  if (!input.progress?.visible || input.progress.totalCount <= 0) return null;
+  const dispatchHref = `/dispatch?firstDayProject=${input.projectId}#first-day-dispatch`;
+  const closed = input.progress.completedCount >= input.progress.totalCount;
+  const waitingItem = input.progress.items.find((item) => item.status === "active")
+    ?? input.progress.items.find((item) => item.status !== "done");
+
+  if (closed) {
+    return {
+      visible: true,
+      status: "closed",
+      headline: "交接闸门已闭环",
+      detail: `开头、验收、平台包装三段交接已完成，当前可以继续：${input.nextStep.label}。`,
+      primaryLabel: input.nextStep.actionLabel || "继续当前节点",
+      primaryHref: input.nextStep.href,
+      secondaryLabel: "查看派单中心",
+      secondaryHref: dispatchHref,
+      badges: [input.progress.label, `${input.progress.completedCount}/${input.progress.totalCount}`, "可继续生产"],
+    };
+  }
+
+  return {
+    visible: true,
+    status: "pending",
+    headline: "交接闸门未闭环",
+    detail: input.progress.nextAction,
+    primaryLabel: "去任务中心补交接",
+    primaryHref: dispatchHref,
+    secondaryLabel: "查看交接进度",
+    secondaryHref: "#first-day-workflow",
+    badges: [
+      input.progress.label,
+      `${input.progress.completedCount}/${input.progress.totalCount}`,
+      waitingItem ? `等待：${waitingItem.label}` : "等待交接",
+    ],
+  };
 }
 
 export function buildFirstDayStepView(step: FirstDayWorkflowStep): FirstDayStepView {

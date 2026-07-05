@@ -6,6 +6,7 @@ import {
   buildFirstDayDispatchCompletionHint,
   buildFirstDayDispatchUpdateSummary,
   buildFirstDayExecutionRiskNotice,
+  buildFirstDayHandoffGateCta,
   buildFirstDayReceiptCompletionAction,
   buildFirstDayStepView,
   completeFirstDayDispatchStep,
@@ -253,6 +254,68 @@ test("buildFirstDayDispatchDesk keeps recovered watch state visible", () => {
   assert.ok(desk.nextActions[0].includes("恢复观察小样本"));
   assert.ok(desk.nextActions[0].includes("不要批量放大"));
   assert.ok(desk.nextTask?.completionHint?.includes("放量闸门"));
+});
+
+test("buildFirstDayHandoffGateCta makes handoff gate state actionable", () => {
+  const pending = buildFirstDayHandoffGateCta({
+    projectId: "project-1",
+    progress: {
+      visible: true,
+      label: "恢复放量交接",
+      headline: "开书交接执行进度",
+      detail: "把打法拆给三类角色。",
+      completedCount: 1,
+      totalCount: 3,
+      progressPercent: 33,
+      nextAction: "下一步：验收口径 · 写清首轮通过线。",
+      evidence: [],
+      items: [
+        { id: "opening", label: "开头打法", ownerRole: "开头编辑", status: "done", action: "开头", target: "首屏", evidence: "已完成", href: "/projects/project-1#first-day-workflow" },
+        { id: "verification", label: "验收口径", ownerRole: "审稿编辑", status: "active", action: "验收", target: "前三章", evidence: "等待任务中心回写完成证据。", href: "/projects/project-1#first-day-workflow" },
+        { id: "platform-package", label: "平台包装", ownerRole: "平台运营", status: "locked", action: "平台包", target: "回收", evidence: "等待任务中心回写完成证据。", href: "/projects/project-1#platform-export" },
+      ],
+    },
+    nextStep: {
+      label: "生成第一章正文",
+      actionLabel: "生成正文",
+      href: "/projects/project-1#first-day-workflow",
+    },
+  });
+  const closed = buildFirstDayHandoffGateCta({
+    projectId: "project-1",
+    progress: {
+      visible: true,
+      label: "闭环交接",
+      headline: "闭环打法执行进度",
+      detail: "三段交接都已经完成。",
+      completedCount: 3,
+      totalCount: 3,
+      progressPercent: 100,
+      nextAction: "三段交接已闭环，可以继续看首日工作流和平台数据回收。",
+      evidence: ["平台包装：标题、简介、标签已完成"],
+      items: [
+        { id: "opening", label: "开头打法", ownerRole: "开头编辑", status: "done", action: "开头", target: "首屏", evidence: "已完成", href: "/projects/project-1#first-day-workflow" },
+        { id: "verification", label: "验收口径", ownerRole: "审稿编辑", status: "done", action: "验收", target: "前三章", evidence: "已完成", href: "/projects/project-1#first-day-workflow" },
+        { id: "platform-package", label: "平台包装", ownerRole: "平台运营", status: "done", action: "平台包", target: "回收", evidence: "已完成", href: "/projects/project-1#platform-export" },
+      ],
+    },
+    nextStep: {
+      label: "首轮审稿",
+      actionLabel: "继续审稿",
+      href: "/projects/project-1?firstDayLaunch=1&nextStep=first-review#first-day-workflow",
+    },
+  });
+
+  assert.equal(pending?.status, "pending");
+  assert.equal(pending?.headline, "交接闸门未闭环");
+  assert.equal(pending?.primaryLabel, "去任务中心补交接");
+  assert.equal(pending?.primaryHref, "/dispatch?firstDayProject=project-1#first-day-dispatch");
+  assert.ok(pending?.badges.includes("等待：验收口径"));
+  assert.equal(closed?.status, "closed");
+  assert.equal(closed?.headline, "交接闸门已闭环");
+  assert.equal(closed?.primaryLabel, "继续审稿");
+  assert.equal(closed?.primaryHref, "/projects/project-1?firstDayLaunch=1&nextStep=first-review#first-day-workflow");
+  assert.ok(closed?.badges.includes("可继续生产"));
 });
 
 test("resolveFirstDayDispatchFocus locates gate handoff targets", () => {

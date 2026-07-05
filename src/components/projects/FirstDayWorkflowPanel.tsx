@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { buildFirstDayExecutionRouteBlockMessage, type FirstDayExecutionRouteStatus } from "@/lib/model-gateway/firstDayExecutionRoute";
-import { buildFirstDayDispatchUpdateSummary, buildFirstDayExecutionRiskNotice, buildFirstDayReceiptCompletionAction, buildFirstDayStepView, completeFirstDayDispatchStep } from "@/lib/projects/firstDayWorkflowView";
+import { buildFirstDayDispatchUpdateSummary, buildFirstDayExecutionRiskNotice, buildFirstDayHandoffGateCta, buildFirstDayReceiptCompletionAction, buildFirstDayStepView, completeFirstDayDispatchStep } from "@/lib/projects/firstDayWorkflowView";
 import { persistGateDispatchTask, type GatePlatformGrowthDispatchItem, type PersistedGatePlatformDispatchTask } from "@/lib/projects/gateActionReceipts";
 
 interface FirstDayWorkflowStep {
@@ -557,6 +557,14 @@ export function FirstDayWorkflowPanel({ projectId }: { projectId: string }) {
     acceptanceCriteria: workflow.executionPackage.acceptanceCriteria,
     missingEvidence: workflow.executionPackage.missingEvidence,
   }) : null;
+  const handoffGateCta = workflow ? buildFirstDayHandoffGateCta({
+    projectId,
+    progress: workflow.handoffProgress,
+    nextStep: workflow.nextStep,
+  }) : null;
+  const handoffGateTone = handoffGateCta?.status === "closed"
+    ? "border-emerald-200 bg-emerald-50 text-emerald-950"
+    : "border-amber-200 bg-amber-50 text-amber-950";
 
   return (
     <section className="rounded-md border border-slate-200 bg-white p-4">
@@ -598,6 +606,31 @@ export function FirstDayWorkflowPanel({ projectId }: { projectId: string }) {
               {isExecutingAi ? "执行中" : "继续执行当前节点"}
             </button>
           ) : null}
+        </div>
+      ) : null}
+
+      {handoffGateCta ? (
+        <div className={`mt-3 rounded-md border px-3 py-3 text-sm ${handoffGateTone}`}>
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <div className="text-xs font-medium opacity-75">经验交接闸门</div>
+              <div className="mt-1 font-medium">{handoffGateCta.headline}</div>
+              <p className="mt-1 leading-6 opacity-90">{handoffGateCta.detail}</p>
+              <div className="mt-2 flex flex-wrap gap-2 text-xs">
+                {handoffGateCta.badges.map((badge) => (
+                  <span className="rounded-md bg-white/70 px-2 py-1" key={badge}>{badge}</span>
+                ))}
+              </div>
+            </div>
+            <div className="flex shrink-0 flex-wrap gap-2">
+              <Link className="w-fit rounded-md bg-slate-950 px-3 py-2 text-sm font-medium text-white" href={handoffGateCta.primaryHref}>
+                {handoffGateCta.primaryLabel}
+              </Link>
+              <Link className="w-fit rounded-md bg-white/80 px-3 py-2 text-sm font-medium text-slate-900 hover:bg-white" href={handoffGateCta.secondaryHref}>
+                {handoffGateCta.secondaryLabel}
+              </Link>
+            </div>
+          </div>
         </div>
       ) : null}
 

@@ -689,7 +689,7 @@ function recoverySafeLines(acceptanceCriteria: string[]) {
   const joined = acceptanceCriteria.join(" ");
   if (!/小样本|恢复放量|放量结论/u.test(joined)) return [];
   return [
-    "通过线：本轮只验证一个首日变量，开头、前三章或平台包达到最低可继续标准。",
+    "通过线：成功率 __%，质量分 __，失败样本 __ 个；本轮只验证一个首日变量，开头、前三章或平台包达到最低可继续标准。",
     "不可接受项：没有把任务完成误判为可复用放量，没有跳过小样本直接批量生产。",
     "复查证据：已保留章节入口、审稿口径或平台回收字段，后续可以回到任务中心复核。",
     "放量结论：通过后才允许恢复后续小步生产；未过线则继续停留观察。",
@@ -761,7 +761,7 @@ export function buildFirstDayDispatchCompletionTemplate(task: Pick<PersistedGate
   );
   if (stepId === "first-draft" && riskLevel === "watch") return withHandoffCompletion([
     "小样本验证已完成：",
-    "通过线：第一章钩子、冲突、爽点兑现或平台语气已达到本轮最低要求。",
+    "通过线：成功率 __%，质量分 __，失败样本 __ 个；第一章钩子、冲突、爽点兑现或平台语气已达到本轮最低要求。",
     "不可接受项：未出现慢热解释、卖点不兑现、平台风格错位或正文空转。",
     "复查证据：已保留第一章正文/审稿分数/人工复核结论，可回到任务中心或章节页复查。",
     "放量结论：通过后才允许恢复后续初稿批次；未过线则继续停留观察。",

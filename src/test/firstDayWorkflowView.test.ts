@@ -1129,6 +1129,17 @@ test("buildFirstDayDispatchCompletionTemplate covers first-day step types", () =
     acceptanceCriteria: ["写清首轮小样本通过线和不可接受项。"],
     evidence: ["缺少观察平台首轮小样本验证口径。"],
   }).includes("放量结论"));
+  const sampleCompletionTemplate = buildFirstDayDispatchCompletionTemplate({
+    dispatchKey: "first-day:project-1:first-draft",
+    dueLabel: "今天小样本验证",
+    title: "夜雨系统 · 小样本验证 · 生成第一章正文",
+    acceptanceCriteria: ["写清首轮小样本通过线和不可接受项。"],
+    evidence: ["缺少观察平台首轮小样本验证口径。"],
+  });
+  assert.ok(sampleCompletionTemplate.includes("成功率"));
+  assert.ok(sampleCompletionTemplate.includes("质量分"));
+  assert.ok(sampleCompletionTemplate.includes("失败样本"));
+  assert.ok(sampleCompletionTemplate.includes("放量结论"));
   assert.ok(buildFirstDayDispatchCompletionTemplate({
     dispatchKey: "first-day:project-1:publish-precheck",
     acceptanceCriteria: [],

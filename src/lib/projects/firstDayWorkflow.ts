@@ -387,11 +387,21 @@ export function buildFirstDayRiskProfile(startTactic?: ProjectStartTacticSummary
 }
 
 function handoffCompletionLines(acceptanceCriteria: string[]) {
-  return acceptanceCriteria
+  const handoffLines = acceptanceCriteria
     .filter((criterion) => criterion.startsWith("执行开书交接动作：") || criterion.startsWith("避开交接边界："))
     .map((criterion) => criterion
       .replace(/^执行开书交接动作：/, "交接动作已落地：")
       .replace(/^避开交接边界：/, "避坑边界已确认："));
+  const joined = acceptanceCriteria.join(" ");
+  const recoveryLines = /小样本|恢复放量|放量结论/u.test(joined)
+    ? [
+        "通过线：成功率 __%，质量分 __，失败样本 __ 个；本轮只验证一个首日变量，达到最低可继续标准。",
+        "不可接受项：没有把任务完成误判为可复用放量，没有跳过小样本直接批量生产。",
+        "复查证据：已保留第一章正文/审稿分数/人工复核结论，可回到任务中心或章节页复查。",
+        "放量结论：通过后才允许恢复后续小步生产；未过线则继续停留观察。",
+      ]
+    : [];
+  return [...handoffLines, ...recoveryLines];
 }
 
 function withHandoffCompletion(base: string, acceptanceCriteria: string[]) {

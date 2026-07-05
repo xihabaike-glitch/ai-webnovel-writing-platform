@@ -187,6 +187,7 @@ test("buildProjectStartTacticAdvice", async (t) => {
     assert.equal(advice.label, "恢复放量打法");
     assert.ok(advice.risk.includes("新项目仍先跑小样本"));
     assert.ok(advice.evidence.some((item) => item.includes("恢复放量：2 批")));
+    assert.ok(advice.checklist.some((item) => item.includes("不直接批量生成前三章")));
     assert.equal(guide.items[0]?.status, "recommended");
     assert.equal(guide.items[0]?.label, "恢复放量打法");
     assert.ok(guide.items[0]?.detail.includes("新项目仍先跑小样本"));

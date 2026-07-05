@@ -1038,6 +1038,7 @@ export function buildProjectStartTacticAdvice(input: {
       checklist: withModelChecklist([
         `批量状态：${batchLabel}`,
         ...(recovery ? [`恢复放量：已验证 ${batchEffect.recoveryBatches} 批`] : []),
+        ...(recovery ? ["首日限制：只跑小样本，不直接批量生成前三章"] : []),
         `模板前三章：${firstThreeTitles}`,
         `必须具备：${style.mustHave.join("、")}`,
       ]),

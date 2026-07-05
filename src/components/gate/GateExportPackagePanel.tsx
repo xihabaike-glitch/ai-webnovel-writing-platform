@@ -55,6 +55,12 @@ function exportVersionTone(status: PrePublishGateProjectStatus["exportVersionGat
   return "border-rose-200 bg-rose-50 text-rose-800";
 }
 
+function exportVersionActionTone(priority: PrePublishGateProjectStatus["exportVersionGate"]["repairActions"][number]["priority"]) {
+  if (priority === "primary") return "border-slate-950 bg-slate-950 text-white";
+  if (priority === "danger") return "border-rose-200 bg-white text-rose-700";
+  return "border-slate-200 bg-white text-slate-700";
+}
+
 export function GateExportPackagePanel({ packages }: { packages: PrePublishGateProjectStatus[] }) {
   const router = useRouter();
   const [runningId, setRunningId] = useState<string | null>(null);
@@ -239,6 +245,20 @@ export function GateExportPackagePanel({ packages }: { packages: PrePublishGateP
                     {item.exportVersionGate.actionLabel}
                   </Link>
                 </div>
+                {item.exportVersionGate.repairActions.length ? (
+                  <div className="mt-3 grid gap-2 md:grid-cols-3">
+                    {item.exportVersionGate.repairActions.map((action) => (
+                      <Link
+                        className={`rounded-md border px-3 py-2 text-xs font-medium ${exportVersionActionTone(action.priority)}`}
+                        href={action.href}
+                        key={action.id}
+                      >
+                        <div>{action.label}</div>
+                        <div className="mt-1 font-normal opacity-80">{action.detail}</div>
+                      </Link>
+                    ))}
+                  </div>
+                ) : null}
               </div>
             ) : null}
             {effectPackageKey === packageKey(item) ? (

@@ -188,6 +188,15 @@ export interface PrePublishGateExportVersionGate {
   href: string;
   snapshotCount: number;
   decisionStatus: string | null;
+  repairActions: PrePublishGateExportVersionAction[];
+}
+
+export interface PrePublishGateExportVersionAction {
+  id: string;
+  label: string;
+  detail: string;
+  href: string;
+  priority: "primary" | "secondary" | "danger";
 }
 
 export interface PrePublishGateStrategyProject {
@@ -1051,6 +1060,20 @@ function buildLoopTimeline(projectId: string, pack: PlatformPublishPackage): Pre
 
 function buildExportVersionGate(project: PrePublishGateProject): PrePublishGateExportVersionGate {
   const href = `/projects/${project.id}/exports`;
+  const actionHref = (hash: string) => `${href}${hash}`;
+  const action = (
+    id: string,
+    label: string,
+    detail: string,
+    hash: string,
+    priority: PrePublishGateExportVersionAction["priority"],
+  ): PrePublishGateExportVersionAction => ({
+    id,
+    label,
+    detail,
+    href: actionHref(hash),
+    priority,
+  });
   const rawSnapshots = project.exportPackageSnapshots ?? [];
   if (rawSnapshots.length === 0) {
     return {
@@ -1061,12 +1084,18 @@ function buildExportVersionGate(project: PrePublishGateProject): PrePublishGateE
       href,
       snapshotCount: 0,
       decisionStatus: null,
+      repairActions: [
+        action("open-version-center", "打开版本中心", "先生成一次导出快照，后续总闸门才能判断版本替换和回退。", "", "secondary"),
+      ],
     };
   }
 
   const snapshots = buildExportSnapshotHistory(rawSnapshots);
   const versionCenter = buildExportVersionCenter(snapshots);
   const decision = versionCenter.baselineDecision;
+  const baseActions = [
+    action("open-version-center", "打开版本中心", "查看基准对比、时间线和全部导出快照。", "", "secondary"),
+  ];
   if (decision.status === "risk") {
     return {
       status: "block",
@@ -1076,10 +1105,29 @@ function buildExportVersionGate(project: PrePublishGateProject): PrePublishGateE
       href,
       snapshotCount: snapshots.length,
       decisionStatus: decision.status,
+      repairActions: [
+        action("regenerate-latest", "重导最新包", "最新版本出现回退，先按当前内容重新导出同类交付包，再复查差异决策。", "#export-history", "primary"),
+        action("keep-old-baseline", "保留旧基准", "旧基准暂时继续作为发布锚点；修完正文或交付包后再替换。", "#export-baseline-timeline", "danger"),
+        ...baseActions,
+      ],
     };
   }
 
   if (decision.status === "needs_baseline" || decision.status === "replace" || decision.status === "observe") {
+    const repairActions = decision.status === "needs_baseline"
+      ? [
+        action("lock-recommended-baseline", "锁定推荐基准", "先锁定正式基准，否则后续版本替换没有参照物。", "#export-baseline-decision", "primary"),
+        ...baseActions,
+      ]
+      : decision.status === "replace"
+        ? [
+          action("replace-baseline", "替换为新基准", "最新版本已经明显前进，进入版本中心确认后替换正式基准。", "#export-baseline-decision", "primary"),
+          action("review-diff", "先看差异", "替换前查看准备度、章节、字数和内容摘要变化。", "#export-baseline-comparison", "secondary"),
+        ]
+        : [
+          action("review-diff", "人工确认差异", "核心指标没有明确前进，先看差异再决定是否替换。", "#export-baseline-comparison", "primary"),
+          ...baseActions,
+        ];
     return {
       status: "warn",
       label: decision.label,
@@ -1088,6 +1136,7 @@ function buildExportVersionGate(project: PrePublishGateProject): PrePublishGateE
       href,
       snapshotCount: snapshots.length,
       decisionStatus: decision.status,
+      repairActions,
     };
   }
 
@@ -1099,6 +1148,7 @@ function buildExportVersionGate(project: PrePublishGateProject): PrePublishGateE
     href,
     snapshotCount: snapshots.length,
     decisionStatus: decision.status,
+    repairActions: baseActions,
   };
 }
 

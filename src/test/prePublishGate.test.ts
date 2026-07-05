@@ -208,10 +208,57 @@ test("buildPrePublishGate", async (t) => {
     assert.equal(gate.projectStatuses[0].downloadHref, null);
     assert.equal(gate.projectStatuses[0].exportVersionGate.status, "block");
     assert.equal(gate.projectStatuses[0].exportVersionGate.decisionStatus, "risk");
+    assert.deepEqual(gate.projectStatuses[0].exportVersionGate.repairActions.map((action) => action.label), [
+      "重导最新包",
+      "保留旧基准",
+      "打开版本中心",
+    ]);
+    assert.ok(gate.projectStatuses[0].exportVersionGate.repairActions[0].href.endsWith("#export-history"));
+    assert.ok(gate.projectStatuses[0].exportVersionGate.repairActions[1].href.endsWith("#export-baseline-timeline"));
     assert.equal(gate.projectStatuses[0].href, "/projects/project-ready/exports");
     assert.equal(exportItem?.status, "block");
     assert.ok(exportItem?.detail.includes("回退风险"));
     assert.equal(gate.releaseAction?.href, "/projects/project-ready/exports");
+  });
+
+  await t.test("warns launch when export version center recommends replacing baseline", () => {
+    const gate = buildPrePublishGate({
+      projects: [{
+        ...readyProject,
+        exportPackageSnapshots: [
+          exportSnapshot({
+            id: "latest-better",
+            readinessPercent: 96,
+            chapterCount: 4,
+            wordCount: 12000,
+            contentHash: "b".repeat(64),
+            createdAt: "2026-07-05T05:00:00.000Z",
+          }),
+          exportSnapshot({
+            id: "locked-baseline",
+            isBaseline: true,
+            baselineLockedAt: "2026-07-05T04:00:00.000Z",
+            readinessPercent: 88,
+            chapterCount: 3,
+            wordCount: 9000,
+            contentHash: "a".repeat(64),
+            createdAt: "2026-07-05T04:00:00.000Z",
+          }),
+        ],
+      }],
+      failureTasks: [],
+      batchHistory: [],
+    });
+    const exportItem = gate.items.find((item) => item.id === "export-version");
+
+    assert.equal(gate.status, "needs_repair");
+    assert.equal(gate.projectStatuses[0].status, "ready");
+    assert.ok(gate.projectStatuses[0].downloadHref);
+    assert.equal(gate.projectStatuses[0].exportVersionGate.status, "warn");
+    assert.equal(gate.projectStatuses[0].exportVersionGate.decisionStatus, "replace");
+    assert.equal(gate.projectStatuses[0].exportVersionGate.repairActions[0].label, "替换为新基准");
+    assert.ok(gate.projectStatuses[0].exportVersionGate.repairActions[0].href.endsWith("#export-baseline-decision"));
+    assert.equal(exportItem?.status, "warn");
   });
 
   await t.test("blocks launch while first-three adoption follow-ups are unfinished", () => {

@@ -147,7 +147,7 @@ export function ExportVersionCenterPanel({
         </div>
       </section>
 
-      <section className={`rounded-md border p-4 ${baselineComparisonClass(summary.baselineComparison.status)}`}>
+      <section className={`rounded-md border p-4 ${baselineComparisonClass(summary.baselineComparison.status)}`} id="export-baseline-comparison">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <h2 className="font-medium">基准对比</h2>
@@ -174,7 +174,7 @@ export function ExportVersionCenterPanel({
         </div>
       </section>
 
-      <section className={`rounded-md border p-4 ${baselineDecisionClass(summary.baselineDecision.tone)}`}>
+      <section className={`rounded-md border p-4 ${baselineDecisionClass(summary.baselineDecision.tone)}`} id="export-baseline-decision">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <h2 className="font-medium">差异决策</h2>
@@ -195,7 +195,7 @@ export function ExportVersionCenterPanel({
         </div>
       </section>
 
-      <section className="rounded-md border border-slate-200 bg-white p-4">
+      <section className="rounded-md border border-slate-200 bg-white p-4" id="export-baseline-timeline">
         <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <h2 className="font-medium">基准时间线</h2>
@@ -312,7 +312,7 @@ export function ExportVersionCenterPanel({
         </div>
       </section>
 
-      <section className="rounded-md border border-slate-200 bg-white p-4">
+      <section className="rounded-md border border-slate-200 bg-white p-4" id="export-history">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <h2 className="font-medium">版本历史</h2>

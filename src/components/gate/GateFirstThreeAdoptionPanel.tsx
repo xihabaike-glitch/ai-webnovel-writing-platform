@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   addGateActionReceipt,
   buildGateFirstThreeAdoptionReceipt,
@@ -119,6 +119,22 @@ export function GateFirstThreeAdoptionPanel({ closure }: { closure: PrePublishGa
   const itemsById = new Map(closure.items.map((item) => [item.id, item]));
   const reviewBatchItems = runnableReviewItems(closure.items);
   const publishBatchItems = runnablePublishItems(closure.items);
+
+  useEffect(() => {
+    setFollowupResults((current) => {
+      const unresolvedItemIds = new Set(closure.items.filter((item) => item.status !== "pass").map((item) => item.id));
+      let changed = false;
+      const next: Record<string, LocalFollowupResult> = {};
+      for (const [itemId, result] of Object.entries(current)) {
+        if (unresolvedItemIds.has(itemId)) {
+          next[itemId] = result;
+        } else {
+          changed = true;
+        }
+      }
+      return changed ? next : current;
+    });
+  }, [closure.items]);
 
   async function executeFollowupRequest(item: PrePublishGateAdoptionFollowupItem) {
     if (!item.execution) throw new Error("当前任务缺少执行配置。");

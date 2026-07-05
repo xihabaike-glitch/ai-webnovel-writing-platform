@@ -613,6 +613,69 @@ test("buildProjectControlDashboard", async (t) => {
     assert.ok(dashboard.aiPipelineBatchHealth.detail.includes("恢复放量样本还薄"));
   });
 
+  await t.test("points repeated recovery stability to platform tactic experience library", () => {
+    const tactic = {
+      title: "首轮平台打法：番茄小说",
+      label: "三轮稳住",
+      primaryTactic: "三轮数据已站住，可以小批放大。",
+      openingMove: "第一段给不可逆危机。",
+      verificationMove: "继续回填曝光、点击、收藏和追读。",
+      risk: "稳定加码不是无限放量。",
+    };
+    const scalePayload = (dispatchKey: string, quality: number) => JSON.stringify({
+      aiPipelineRecheck: { dispatchKey, mode: "small_batch_resume" },
+      plan: { strategyBases: [tactic], scaleGate: "none", actionLabel: "批量初稿 3 个", category: "draft" },
+      routeEffectSummary: { successRatePercent: 100, knownCostUsd: 0.03, averageQualityScore: quality },
+      batchReceipt: { status: "continue", headline: "AI 小批恢复完成" },
+    });
+    const dashboard = buildProjectControlDashboard({
+      project,
+      platform: getPlatformProfile("fanqie"),
+      chapters: [chapter],
+      outlineNodes: [],
+      characters: [],
+      worldEntries: [],
+      foreshadows: [],
+      plotThreads: [],
+      aiTasks: [],
+      gateActionAudits: [
+        {
+          receiptId: "ai-scale-2",
+          label: "AI 写审改小批恢复完成",
+          detail: "番茄小说 · 夜雨系统 · 批量初稿 3 个",
+          href: "/projects/demo-project#ai-pipeline",
+          status: "succeeded",
+          message: "AI 小批恢复完成。",
+          executionType: "recommended_batch",
+          succeededCount: 3,
+          failedCount: 0,
+          payload: scalePayload("ai-pipeline-recheck:demo-project:ai-plan-1:scale-2", 92),
+          createdAt: "2026-01-05T00:00:00.000Z",
+        },
+        {
+          receiptId: "ai-scale-1",
+          label: "AI 写审改小批恢复完成",
+          detail: "番茄小说 · 夜雨系统 · 批量初稿 3 个",
+          href: "/projects/demo-project#ai-pipeline",
+          status: "succeeded",
+          message: "AI 小批恢复完成。",
+          executionType: "recommended_batch",
+          succeededCount: 3,
+          failedCount: 0,
+          payload: scalePayload("ai-pipeline-recheck:demo-project:ai-plan-1:scale-1", 90),
+          createdAt: "2026-01-04T00:00:00.000Z",
+        },
+      ],
+      submissionChecklist: checklist,
+    });
+
+    assert.equal(dashboard.aiPipelineBatchHealth.status, "usable");
+    assert.equal(dashboard.aiPipelineBatchHealth.recoveryBatches, 2);
+    assert.equal(dashboard.aiPipelineBatchHealth.actionLabel, "写入经验库");
+    assert.equal(dashboard.aiPipelineBatchHealth.targetHref, "#platform-tactic-experience");
+    assert.equal(dashboard.areas.find((area) => area.id === "ai-pipeline")?.actionLabel, "沉淀经验库");
+  });
+
   await t.test("uses blocked batch health to reprioritize AI pipeline repair", () => {
     const dashboard = buildProjectControlDashboard({
       project,

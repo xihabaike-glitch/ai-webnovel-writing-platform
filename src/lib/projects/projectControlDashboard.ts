@@ -864,6 +864,7 @@ function batchHealthHeadline(status: AiPipelineBatchHealthSummary["status"], lab
 function buildAiPipelineBatchHealthSummary(audits: ControlBatchAudit[] = []): AiPipelineBatchHealthSummary {
   const review = buildTaskQueueBatchHealthReview(audits, 5);
   const primary = review.items[0] ?? null;
+  const canArchiveRecoveryExperience = primary?.status === "usable" && (primary.recoveryBatches ?? 0) >= 2;
   const latestAudit = [...audits]
     .filter((audit) => audit.executionType === "recommended_batch")
     .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime())[0] ?? null;
@@ -904,8 +905,8 @@ function buildAiPipelineBatchHealthSummary(audits: ControlBatchAudit[] = []): Ai
     label: batchHealthStatusLabel(primary.status),
     headline: batchHealthHeadline(primary.status, primary.label),
     detail: primary.nextAction,
-    actionLabel: primary.status === "blocked" ? "看失败复盘" : "看任务中心",
-    targetHref: primary.status === "blocked" ? "/failures" : latestAudit?.href || "/tasks#recommended-batch",
+    actionLabel: canArchiveRecoveryExperience ? "写入经验库" : primary.status === "blocked" ? "看失败复盘" : "看任务中心",
+    targetHref: canArchiveRecoveryExperience ? "#platform-tactic-experience" : primary.status === "blocked" ? "/failures" : latestAudit?.href || "/tasks#recommended-batch",
     actionExecutable: primary.status === "blocked" || primary.status === "watch",
     actionAreaId: primary.status === "blocked" || primary.status === "watch" ? "ai-pipeline" : null,
     actionMode: primary.status === "blocked" || primary.status === "watch" ? "seed" : null,
@@ -961,7 +962,7 @@ function aiPipelineAreaDecision(input: {
     score: input.baseScore,
     evidence: input.health.hasSamples ? `${input.baseEvidence} 批量健康：${input.health.tacticLabel}。` : input.baseEvidence,
     nextAction: input.batch.headline,
-    actionLabel: "清写审改队列",
+    actionLabel: input.health.status === "usable" && input.health.recoveryBatches >= 2 ? "沉淀经验库" : "清写审改队列",
     canExecute: false,
     executeLabel: "清写审改队列",
   };

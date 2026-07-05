@@ -669,7 +669,9 @@ export default async function ProjectPage({ params }: { params: Promise<{ projec
           <SerializationOpsPanel projectId={project.id} />
         </div>
         <PlatformDecisionTimelinePanel timeline={platformDecisionTimeline} />
-        <PlatformTacticExperiencePanel library={platformTacticExperienceLibrary} />
+        <div id="platform-tactic-experience">
+          <PlatformTacticExperiencePanel library={platformTacticExperienceLibrary} />
+        </div>
         <div id="platform-export">
           <PlatformExportCenterPanel projectId={project.id} />
         </div>

@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { getPlatformProfile, platformProfiles, type PlatformId } from "@/lib/platforms/platformProfiles";
+import { buildGatePublishEffectReceipt, type GateActionReceipt } from "@/lib/projects/gateActionReceipts";
+import { buildPublishEffectKnowledgeFeedbackReceipt } from "@/lib/projects/platformKnowledgeFeedbackReceipts";
 import {
   buildPlatformPublishExportCenter,
   buildPlatformPublishArchive,
@@ -115,6 +117,55 @@ function toKnowledgeFeedbackReceipt(item: {
     severity: normalizeKnowledgeReceiptSeverity(item.severity),
     createdAt: item.createdAt,
   };
+}
+
+async function saveGateActionAuditFromReceipt(projectId: string, receipt: GateActionReceipt, payload: unknown = {}) {
+  return prisma.gateActionAudit.upsert({
+    where: { receiptId: receipt.id },
+    create: {
+      receiptId: receipt.id,
+      actionId: receipt.actionId,
+      projectId,
+      platformId: receipt.platformId ?? "",
+      platformName: receipt.platformName ?? "",
+      label: receipt.label,
+      detail: receipt.detail,
+      href: receipt.href,
+      status: receipt.status,
+      message: receipt.message,
+      executionType: receipt.executionType,
+      succeededCount: receipt.succeededCount,
+      failedCount: receipt.failedCount,
+      taskId: receipt.taskId,
+      recheckStatus: receipt.recheck.status,
+      recheckLabel: receipt.recheck.label,
+      recheckDetail: receipt.recheck.detail,
+      recheckAction: receipt.recheck.actionLabel,
+      payload: JSON.stringify(payload),
+      createdAt: new Date(receipt.createdAt),
+    },
+    update: {
+      actionId: receipt.actionId,
+      projectId,
+      platformId: receipt.platformId ?? "",
+      platformName: receipt.platformName ?? "",
+      label: receipt.label,
+      detail: receipt.detail,
+      href: receipt.href,
+      status: receipt.status,
+      message: receipt.message,
+      executionType: receipt.executionType,
+      succeededCount: receipt.succeededCount,
+      failedCount: receipt.failedCount,
+      taskId: receipt.taskId,
+      recheckStatus: receipt.recheck.status,
+      recheckLabel: receipt.recheck.label,
+      recheckDetail: receipt.recheck.detail,
+      recheckAction: receipt.recheck.actionLabel,
+      payload: JSON.stringify(payload),
+      createdAt: new Date(receipt.createdAt),
+    },
+  });
 }
 
 async function listKnowledgeFeedbackReceipts(projectId: string) {
@@ -625,6 +676,68 @@ export async function POST(request: Request, { params }: Params) {
     const refreshedContext = await buildCenter(projectId);
     const refreshedPack = refreshedContext?.center.packages.find((item) => item.platformId === platform.id) ?? null;
     const effectReview = refreshedPack ? buildPlatformPublishEffectSaveReview(refreshedPack) : null;
+    const gateReceipt = buildGatePublishEffectReceipt({
+      projectId,
+      platformId: platform.id,
+      platformName: platform.name,
+      metric: {
+        views: metric.views,
+        clicks: metric.clicks,
+        favorites: metric.favorites,
+        follows: metric.follows,
+        snapshotDate: metric.snapshotDate,
+      },
+      now: metric.createdAt,
+    });
+    await saveGateActionAuditFromReceipt(projectId, gateReceipt, {
+      source: "platform_export_save_effect",
+      metricId: metric.id,
+      platformId: platform.id,
+    });
+    const platformKnowledge = refreshedContext?.center.platformKnowledge.find((item) => item.platformId === platform.id) ?? null;
+    const knowledgeFeedbackReceipt = platformKnowledge && effectReview
+      ? buildPublishEffectKnowledgeFeedbackReceipt({
+        projectId,
+        projectTitle: context.project.title,
+        metricId: metric.id,
+        platformKnowledge,
+        effectReviewHeadline: effectReview.headline,
+        createdAt: metric.createdAt,
+      })
+      : null;
+    const savedKnowledgeFeedbackReceipt = knowledgeFeedbackReceipt
+      ? await prisma.platformKnowledgeFeedbackReceipt.upsert({
+        where: { receiptId: knowledgeFeedbackReceipt.id },
+        create: {
+          receiptId: knowledgeFeedbackReceipt.id,
+          projectId,
+          platformId: knowledgeFeedbackReceipt.platformId,
+          platformName: knowledgeFeedbackReceipt.platformName,
+          actionLabel: knowledgeFeedbackReceipt.actionLabel,
+          title: knowledgeFeedbackReceipt.title,
+          message: knowledgeFeedbackReceipt.message,
+          completedStepLabel: knowledgeFeedbackReceipt.completedStepLabel,
+          stopReason: knowledgeFeedbackReceipt.stopReason,
+          nextAction: knowledgeFeedbackReceipt.nextAction,
+          href: knowledgeFeedbackReceipt.href,
+          severity: knowledgeFeedbackReceipt.severity,
+          createdAt: new Date(knowledgeFeedbackReceipt.createdAt),
+        },
+        update: {
+          platformId: knowledgeFeedbackReceipt.platformId,
+          platformName: knowledgeFeedbackReceipt.platformName,
+          actionLabel: knowledgeFeedbackReceipt.actionLabel,
+          title: knowledgeFeedbackReceipt.title,
+          message: knowledgeFeedbackReceipt.message,
+          completedStepLabel: knowledgeFeedbackReceipt.completedStepLabel,
+          stopReason: knowledgeFeedbackReceipt.stopReason,
+          nextAction: knowledgeFeedbackReceipt.nextAction,
+          href: knowledgeFeedbackReceipt.href,
+          severity: knowledgeFeedbackReceipt.severity,
+          createdAt: new Date(knowledgeFeedbackReceipt.createdAt),
+        },
+      })
+      : null;
 
     return NextResponse.json({
       message: effectReview
@@ -632,6 +745,8 @@ export async function POST(request: Request, { params }: Params) {
         : `已记录 ${platform.name} 发布效果。`,
       metric,
       effectReview,
+      gateReceipt,
+      knowledgeFeedbackReceipt: savedKnowledgeFeedbackReceipt ? toKnowledgeFeedbackReceipt(savedKnowledgeFeedbackReceipt) : null,
     }, { status: 201 });
   }
 

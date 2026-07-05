@@ -65,6 +65,10 @@ const sourceLabels: Record<string, string> = {
   restore_before_overwrite: "回滚前旧稿",
 };
 
+export function getChapterRevisionSourceLabel(source: string) {
+  return sourceLabels[source] ?? source;
+}
+
 export function isChapterRevisionCandidate(source: string) {
   return source === "ai_draft_candidate"
     || source === "chapter_second_pass_candidate"
@@ -81,7 +85,7 @@ export function summarizeChapterRevisions(revisions: ChapterRevisionInput[]): Ch
   return revisions.map((revision) => ({
     id: revision.id,
     source: revision.source,
-    sourceLabel: sourceLabels[revision.source] ?? revision.source,
+    sourceLabel: getChapterRevisionSourceLabel(revision.source),
     sourceTaskId: revision.sourceTaskId,
     title: revision.title,
     content: revision.content,

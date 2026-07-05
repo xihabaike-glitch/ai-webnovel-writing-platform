@@ -250,6 +250,101 @@ test("buildWritingWorkbench", async (t) => {
     assert.equal(workbench.modelTimeline.emptyState, "还没有模型执行记录。");
   });
 
+  await t.test("surfaces latest unadopted candidate revisions before more writing", () => {
+    const baseInput = {
+      project: {
+        id: "p-candidate",
+        title: "候选稿项目",
+        genre: "都市逆袭",
+        sellingPoint: "主角用一次选择改写人生。",
+        targetPlatformName: "番茄小说",
+        targetWordCount: 300000,
+        currentWordCount: 1800,
+      },
+      chapters: [
+        {
+          id: "candidate-chapter",
+          title: "第一章 旧雨夜",
+          order: 1,
+          status: "draft",
+          wordCount: 1800,
+          content: "当前正文仍然是旧版本。",
+          hook: "主角在雨夜接到最后通牒。",
+          conflict: "救人和自保只能选一个。",
+          cliffhanger: "系统提示这不是第一次失败。",
+        },
+      ],
+      outlineNodes: [],
+      characters: [],
+      worldEntries: [],
+      aiTasks: [],
+    };
+    const workbench = buildWritingWorkbench({
+      ...baseInput,
+      chapterRevisions: [
+        {
+          id: "older-candidate",
+          chapterId: "candidate-chapter",
+          source: "ai_draft_candidate",
+          sourceTaskId: "task-old",
+          title: "第一章 老候选",
+          content: "旧候选内容。",
+          wordCount: 1700,
+          notes: "较早候选。",
+          createdAt: "2026-07-03T01:00:00.000Z",
+        },
+        {
+          id: "latest-candidate",
+          chapterId: "candidate-chapter",
+          source: "first_three_rewrite_candidate",
+          sourceTaskId: "task-new",
+          title: "第一章 新候选",
+          content: "新候选内容，开头更快。",
+          wordCount: 1900,
+          notes: "前三章改写候选。",
+          createdAt: "2026-07-03T02:00:00.000Z",
+        },
+      ],
+    });
+
+    assert.equal(workbench.pendingCandidates.length, 1);
+    assert.equal(workbench.pendingCandidates[0].id, "latest-candidate");
+    assert.equal(workbench.pendingCandidates[0].sourceLabel, "前三章改写候选");
+    assert.equal(workbench.pendingCandidates[0].href, "/projects/p-candidate/chapters/candidate-chapter#chapter-revisions");
+    assert.equal(workbench.heroAction.label, "处理候选稿");
+    assert.ok(workbench.heroAction.reason.includes("1 个 AI 候选稿"));
+    assert.ok(workbench.chapterFocus.nextAction.includes("待确认"));
+    assert.equal(workbench.quickLinks[0].label, "待采纳");
+
+    const adoptedWorkbench = buildWritingWorkbench({
+      ...baseInput,
+      chapters: [
+        {
+          ...baseInput.chapters[0],
+          title: "第一章 新候选",
+          content: "新候选内容，开头更快。",
+          wordCount: 1900,
+        },
+      ],
+      chapterRevisions: [
+        {
+          id: "adopted-candidate",
+          chapterId: "candidate-chapter",
+          source: "first_three_rewrite_candidate",
+          sourceTaskId: "task-new",
+          title: "第一章 新候选",
+          content: "新候选内容，开头更快。",
+          wordCount: 1900,
+          notes: "已经采纳的候选。",
+          createdAt: "2026-07-03T02:00:00.000Z",
+        },
+      ],
+    });
+
+    assert.equal(adoptedWorkbench.pendingCandidates.length, 0);
+    assert.notEqual(adoptedWorkbench.heroAction.label, "处理候选稿");
+  });
+
   await t.test("explains failed timeline tasks that cannot be retried directly", () => {
     const workbench = buildWritingWorkbench({
       project: {

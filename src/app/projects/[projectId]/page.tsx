@@ -52,7 +52,15 @@ export default async function ProjectPage({ params }: { params: Promise<{ projec
   const project = await prisma.project.findUnique({
     where: { id: projectId },
     include: {
-      chapters: { orderBy: { order: "asc" } },
+      chapters: {
+        orderBy: { order: "asc" },
+        include: {
+          revisions: {
+            orderBy: { createdAt: "desc" },
+            take: 5,
+          },
+        },
+      },
       outlineNodes: { orderBy: [{ depth: "asc" }, { order: "asc" }, { createdAt: "asc" }] },
       characters: { orderBy: { createdAt: "asc" } },
       worldEntries: { orderBy: [{ type: "asc" }, { createdAt: "asc" }] },
@@ -323,6 +331,19 @@ export default async function ProjectPage({ params }: { params: Promise<{ projec
       costUsd: task.costUsd,
       errorMessage: task.errorMessage,
     })),
+    chapterRevisions: project.chapters.flatMap((chapter) => (
+      chapter.revisions.map((revision) => ({
+        id: revision.id,
+        chapterId: chapter.id,
+        source: revision.source,
+        sourceTaskId: revision.sourceTaskId,
+        title: revision.title,
+        content: revision.content,
+        wordCount: revision.wordCount,
+        notes: revision.notes,
+        createdAt: revision.createdAt,
+      }))
+    )),
   });
 
   return (

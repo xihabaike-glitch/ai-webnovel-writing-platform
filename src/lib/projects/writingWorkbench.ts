@@ -1,4 +1,5 @@
 import { buildTaskRetryPlan } from "../ai/taskRetry.ts";
+import { getChapterRevisionSourceLabel, isChapterRevisionCandidate, previewRevisionContent } from "../chapters/revisions.ts";
 import { buildProjectContextPack, type ProjectContextPack, type ProjectContextPlotThread, type ProjectContextForeshadow, type ProjectContextStatus } from "./projectContextPack.ts";
 
 export type WorkbenchStatus = "pass" | "warn" | "fail";
@@ -68,6 +69,18 @@ export interface WritingWorkbenchAiTask {
   errorMessage?: string | null;
 }
 
+export interface WritingWorkbenchChapterRevision {
+  id: string;
+  chapterId: string;
+  source: string;
+  sourceTaskId?: string | null;
+  title: string;
+  content: string;
+  wordCount: number;
+  notes: string;
+  createdAt: Date | string;
+}
+
 export interface WritingWorkbenchInput {
   project: WritingWorkbenchProject;
   chapters: WritingWorkbenchChapter[];
@@ -77,6 +90,7 @@ export interface WritingWorkbenchInput {
   foreshadows?: ProjectContextForeshadow[];
   plotThreads?: ProjectContextPlotThread[];
   aiTasks: WritingWorkbenchAiTask[];
+  chapterRevisions?: WritingWorkbenchChapterRevision[];
 }
 
 export interface WritingWorkbenchTreeBlock {
@@ -131,11 +145,27 @@ export interface WritingWorkbench {
   };
   modelActions: WritingWorkbenchModelAction[];
   modelTimeline: WritingWorkbenchModelTimeline;
+  pendingCandidates: WritingWorkbenchPendingCandidate[];
   quickLinks: Array<{
     label: string;
     href: string;
   }>;
   quickFixes: WritingWorkbenchQuickFix[];
+}
+
+export interface WritingWorkbenchPendingCandidate {
+  id: string;
+  chapterId: string;
+  chapterTitle: string;
+  chapterOrder: number;
+  source: string;
+  sourceLabel: string;
+  title: string;
+  wordCount: number;
+  preview: string;
+  notes: string;
+  createdAt: string;
+  href: string;
 }
 
 export interface WritingWorkbenchQuickFix {
@@ -217,6 +247,10 @@ const treeRequirements: Array<{
 
 function hasText(value: string | null | undefined) {
   return Boolean(value?.trim());
+}
+
+function normalized(text: string | undefined) {
+  return (text ?? "").replace(/\s+/g, " ").trim();
 }
 
 function clampPercent(value: number) {
@@ -366,7 +400,20 @@ function pickNextChapter(chapters: WritingWorkbenchChapter[]) {
     ?? null;
 }
 
-function buildHeroAction(input: WritingWorkbenchInput, nextChapter: WritingWorkbenchChapter | null) {
+function buildHeroAction(
+  input: WritingWorkbenchInput,
+  nextChapter: WritingWorkbenchChapter | null,
+  pendingCandidates: WritingWorkbenchPendingCandidate[],
+) {
+  const firstCandidate = pendingCandidates[0];
+  if (firstCandidate) {
+    return {
+      label: "处理候选稿",
+      href: firstCandidate.href,
+      reason: `还有 ${pendingCandidates.length} 个 AI 候选稿没有进入正文，先由作者确认采纳、二改或保留当前稿。`,
+    };
+  }
+
   if (!nextChapter) {
     return {
       label: "创建第一章",
@@ -396,6 +443,46 @@ function buildHeroAction(input: WritingWorkbenchInput, nextChapter: WritingWorkb
     href: `/projects/${input.project.id}/chapters/${nextChapter.id}#chapter-editor`,
     reason: "下一章章节卡具备，可以进入正文和复审。",
   };
+}
+
+function isCandidateAlreadyCurrent(chapter: WritingWorkbenchChapter, revision: WritingWorkbenchChapterRevision) {
+  return normalized(chapter.title) === normalized(revision.title)
+    && normalized(chapter.content) === normalized(revision.content)
+    && chapter.wordCount === revision.wordCount;
+}
+
+function buildPendingCandidates(input: WritingWorkbenchInput): WritingWorkbenchPendingCandidate[] {
+  const chaptersById = new Map(input.chapters.map((chapter) => [chapter.id, chapter]));
+  const latestCandidateByChapter = new Map<string, WritingWorkbenchChapterRevision>();
+  for (const revision of input.chapterRevisions ?? []) {
+    if (!isChapterRevisionCandidate(revision.source)) continue;
+    const current = latestCandidateByChapter.get(revision.chapterId);
+    if (!current || new Date(revision.createdAt).getTime() > new Date(current.createdAt).getTime()) {
+      latestCandidateByChapter.set(revision.chapterId, revision);
+    }
+  }
+
+  return [...latestCandidateByChapter.values()]
+    .flatMap((revision) => {
+      const chapter = chaptersById.get(revision.chapterId);
+      if (!chapter || isCandidateAlreadyCurrent(chapter, revision)) return [];
+      return {
+        id: revision.id,
+        chapterId: chapter.id,
+        chapterTitle: chapter.title,
+        chapterOrder: chapter.order,
+        source: revision.source,
+        sourceLabel: getChapterRevisionSourceLabel(revision.source),
+        title: revision.title,
+        wordCount: revision.wordCount,
+        preview: previewRevisionContent(revision.content),
+        notes: revision.notes,
+        createdAt: new Date(revision.createdAt).toISOString(),
+        href: `/projects/${input.project.id}/chapters/${chapter.id}#chapter-revisions`,
+      };
+    })
+    .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime())
+    .slice(0, 5);
 }
 
 function buildModelRoutes(input: WritingWorkbenchInput, nextChapter: WritingWorkbenchChapter | null) {
@@ -809,6 +896,10 @@ export function buildWritingWorkbench(input: WritingWorkbenchInput): WritingWork
   const hookScore = hookStatus === "pass" ? 14 : hookStatus === "warn" ? 6 : 0;
   const characterScore = completeCharacters > 0 ? 14 : input.characters.length > 0 ? 7 : 0;
   const maturityScore = clampPercent(treeScore + chapterScore + hookScore + characterScore);
+  const pendingCandidates = buildPendingCandidates(input);
+  const nextChapterCandidate = nextChapter
+    ? pendingCandidates.find((candidate) => candidate.chapterId === nextChapter.id)
+    : null;
 
   return {
     projectTitle: input.project.title,
@@ -820,13 +911,15 @@ export function buildWritingWorkbench(input: WritingWorkbenchInput): WritingWork
       maturityScore,
       oneLineBrief: `${input.project.genre}｜${input.project.sellingPoint}`,
     },
-    heroAction: buildHeroAction(input, nextChapter),
+    heroAction: buildHeroAction(input, nextChapter, pendingCandidates),
     treeBlocks,
     chapterFocus: {
       nextChapter,
       hookStatus,
       nextAction: nextChapter
-        ? hookStatus === "pass"
+        ? nextChapterCandidate
+          ? `「${nextChapter.title}」有${nextChapterCandidate.sourceLabel}待确认，先决定采纳、二改或保留当前正文。`
+          : hookStatus === "pass"
           ? `继续推进「${nextChapter.title}」正文和复审。`
           : `先补「${nextChapter.title}」的开头钩子，再进入正文扩写。`
         : "先创建第一章，把开头节点落成章节卡。",
@@ -853,7 +946,9 @@ export function buildWritingWorkbench(input: WritingWorkbenchInput): WritingWork
     },
     modelActions: buildModelActions(input, nextChapter),
     modelTimeline: buildModelTimeline(input.aiTasks),
+    pendingCandidates,
     quickLinks: [
+      ...(pendingCandidates[0] ? [{ label: "待采纳", href: pendingCandidates[0].href }] : []),
       { label: "大树结构", href: `/projects/${input.project.id}#outline-tree` },
       { label: "人物弧光", href: `/projects/${input.project.id}#character-arc` },
       { label: "项目土壤", href: `/projects/${input.project.id}#world-bible` },

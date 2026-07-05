@@ -68,6 +68,36 @@ export function WritingWorkbenchPanel({ workbench }: { workbench: WritingWorkben
         </div>
       </div>
 
+      {workbench.pendingCandidates.length ? (
+        <div className="mt-4 rounded-md border border-amber-200 bg-amber-50 p-3">
+          <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <div className="text-sm font-medium text-amber-950">待采纳候选稿</div>
+              <p className="mt-1 text-xs text-amber-800">AI 已经生成了候选正文，但还没有写入当前稿；先确认再继续放大生产。</p>
+            </div>
+            <span className="w-fit rounded-md bg-white px-2 py-1 text-xs font-medium text-amber-800">
+              {workbench.pendingCandidates.length} 个待处理
+            </span>
+          </div>
+          <div className="mt-3 grid gap-2 lg:grid-cols-3">
+            {workbench.pendingCandidates.map((candidate) => (
+              <div className="rounded-md bg-white p-3 text-sm" key={candidate.id}>
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <div className="font-medium text-slate-950">第 {candidate.chapterOrder} 章 · {candidate.chapterTitle}</div>
+                    <div className="mt-1 text-xs text-slate-500">{candidate.sourceLabel} · {candidate.wordCount} 字</div>
+                  </div>
+                  <Link className="shrink-0 text-xs font-medium text-slate-950 underline" href={candidate.href}>
+                    处理
+                  </Link>
+                </div>
+                <p className="mt-2 line-clamp-3 text-xs leading-5 text-slate-600">{candidate.preview}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
       <WorkbenchQuickFixPanel quickFixes={workbench.quickFixes} />
       <WorkbenchModelActionPanel actions={workbench.modelActions} />
       <WorkbenchModelTimelinePanel timeline={workbench.modelTimeline} />

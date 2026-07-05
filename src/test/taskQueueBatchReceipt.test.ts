@@ -231,6 +231,29 @@ test("buildTaskQueueBatchReceipt keeps healthy cleared watch scale-up batches sm
   assert.ok(receipt.warnings.some((warning) => warning.includes("下一批仍看成功率")));
 });
 
+test("buildTaskQueueBatchReceipt routes adoption follow-up batches back to the gate", () => {
+  const receipt = buildTaskQueueBatchReceipt({
+    plan: {
+      ...plan,
+      category: "review",
+      actionLabel: "批量审稿 1 个",
+      itemIds: ["project-1:adoption-followup:first-three-adoption:project-1:chapter-1:revision-1:review"],
+      chapterIds: ["chapter-1"],
+      adoptionFollowupCount: 1,
+      adoptionFollowupItemIds: ["project-1:adoption-followup:first-three-adoption:project-1:chapter-1:revision-1:review"],
+    },
+    results: [{ status: "succeeded", taskId: "task-1", chapterTitle: "第 1 章采纳后重新审稿", error: null, qualityScore: 88 }],
+    routeEffectSummary: routeEffect,
+  });
+
+  assert.equal(receipt.status, "continue");
+  assert.equal(receipt.primaryLabel, "回总闸门复检");
+  assert.equal(receipt.primaryHref, "/gate#first-three-adoption-closure");
+  assert.equal(receipt.secondaryLabel, "进入批量二改");
+  assert.ok(receipt.evidenceItems.some((item) => item.includes("采纳闭环：1 个")));
+  assert.ok(receipt.warnings.some((warning) => warning.includes("采纳闭环任务跑完不等于发布放行")));
+});
+
 test("buildTaskQueueBatchGateActionReceipt turns a recommended batch into gate experience", () => {
   const batchReceipt = buildTaskQueueBatchReceipt({
     plan,

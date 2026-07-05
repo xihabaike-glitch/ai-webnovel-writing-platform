@@ -82,6 +82,25 @@ function receiptStatusFromBatchReceipt(batchReceipt: TaskQueueBatchReceipt) {
   return batchReceipt.status === "repair" ? "failed" : "succeeded";
 }
 
+function adoptionFollowupEvidence(plan: TaskQueueExecutionPlan) {
+  return plan.adoptionFollowupCount > 0 ? `采纳闭环：${plan.adoptionFollowupCount} 个，执行后必须回总闸门复检。` : null;
+}
+
+function withAdoptionFollowupReturn(plan: TaskQueueExecutionPlan, receipt: TaskQueueBatchReceipt): TaskQueueBatchReceipt {
+  if (plan.adoptionFollowupCount === 0 || receipt.status !== "continue") return receipt;
+  return {
+    ...receipt,
+    primaryLabel: "回总闸门复检",
+    primaryHref: "/gate#first-three-adoption-closure",
+    secondaryLabel: receipt.primaryLabel,
+    secondaryHref: receipt.primaryHref,
+    warnings: [
+      ...receipt.warnings,
+      "采纳闭环任务跑完不等于发布放行，必须回总闸门确认审稿、发布质检和证据都闭合。",
+    ],
+  };
+}
+
 function sampleCompletionEvidenceTemplate(input: {
   plan: TaskQueueExecutionPlan;
   results: TaskQueueBatchRunResult[];
@@ -109,11 +128,12 @@ export function buildTaskQueueBatchReceipt(input: {
   const projectBase = projectHref(input.plan);
   const evidenceItems = [
     `执行批次：${input.plan.actionLabel}`,
+    adoptionFollowupEvidence(input.plan),
     `成功/失败：${input.routeEffectSummary.succeededTasks}/${input.routeEffectSummary.failedTasks}`,
     `成功率：${input.routeEffectSummary.successRatePercent}%`,
     `质量：${quality ?? "缺样本"}`,
     `成本：$${input.routeEffectSummary.knownCostUsd.toFixed(4)}`,
-  ];
+  ].filter((evidence): evidence is string => Boolean(evidence));
   const sampleOnly = input.plan.scaleGate === "sample_only";
   const samplePassed = input.routeEffectSummary.successRatePercent >= 80
     && quality !== null
@@ -203,7 +223,7 @@ export function buildTaskQueueBatchReceipt(input: {
 
   const next = nextSuccessAction(input.plan);
   if (sampleOnly) {
-    return {
+    return withAdoptionFollowupReturn(input.plan, {
       status: "continue",
       headline: "小样本已跑完，先回填验收",
       detail: "这不是放量完成。把下面的验收依据回填到首日小样本派单，系统才会判断是否解除观察闸门。",
@@ -217,11 +237,11 @@ export function buildTaskQueueBatchReceipt(input: {
         input.routeEffectSummary.verdict,
         "别继续点批量。先完成小样本验收，再让系统决定是否恢复后续初稿批次。",
       ],
-    };
+    });
   }
 
   if (scaleUpRecovery) {
-    return {
+    return withAdoptionFollowupReturn(input.plan, {
       status: "continue",
       headline: "准放量批次稳定，下一批仍小步走",
       detail: "小样本后的第一轮恢复放量已过线，但这只证明可以继续验证，不证明可以一次拉满。下一批继续按同一平台打法和安全阀推进。",
@@ -234,10 +254,10 @@ export function buildTaskQueueBatchReceipt(input: {
         input.routeEffectSummary.verdict,
         input.plan.strategyBases[0] ? `继续沿用打法：${input.plan.strategyBases[0].label}，下一批仍看成功率、质量、成本和备用命中。` : "继续小批次复盘，别把准放量误当成无上限放大。",
       ],
-    };
+    });
   }
 
-  return {
+  return withAdoptionFollowupReturn(input.plan, {
     status: "continue",
     headline: next.headline,
     detail: next.detail,
@@ -250,7 +270,7 @@ export function buildTaskQueueBatchReceipt(input: {
       input.routeEffectSummary.verdict,
       input.plan.strategyBases[0] ? `沿用打法：${input.plan.strategyBases[0].label}。` : "执行后继续回填数据，形成可复用打法。",
     ],
-  };
+  });
 }
 
 export function buildTaskQueueBatchGateActionReceipt(input: {

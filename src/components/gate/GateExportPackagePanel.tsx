@@ -49,6 +49,12 @@ function loopTone(status: PrePublishGateProjectStatus["loopTimeline"]["status"])
   return "border-amber-200 bg-amber-50 text-amber-900";
 }
 
+function exportVersionTone(status: PrePublishGateProjectStatus["exportVersionGate"]["status"]) {
+  if (status === "pass") return "border-emerald-200 bg-emerald-50 text-emerald-800";
+  if (status === "warn") return "border-amber-200 bg-amber-50 text-amber-800";
+  return "border-rose-200 bg-rose-50 text-rose-800";
+}
+
 export function GateExportPackagePanel({ packages }: { packages: PrePublishGateProjectStatus[] }) {
   const router = useRouter();
   const [runningId, setRunningId] = useState<string | null>(null);
@@ -219,6 +225,19 @@ export function GateExportPackagePanel({ packages }: { packages: PrePublishGateP
                       </a>
                     ) : null}
                   </div>
+                </div>
+              </div>
+            ) : null}
+            {item.exportVersionGate.snapshotCount > 0 || item.exportVersionGate.status !== "pass" ? (
+              <div className={`mt-3 rounded-md border p-3 text-sm ${exportVersionTone(item.exportVersionGate.status)}`}>
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                  <div>
+                    <div className="font-medium">导出版本门禁：{item.exportVersionGate.label}</div>
+                    <p className="mt-1 leading-6">{item.exportVersionGate.detail}</p>
+                  </div>
+                  <Link className="w-fit rounded-md bg-white px-3 py-2 text-xs font-medium text-slate-950 hover:bg-slate-50" href={item.exportVersionGate.href}>
+                    {item.exportVersionGate.actionLabel}
+                  </Link>
                 </div>
               </div>
             ) : null}

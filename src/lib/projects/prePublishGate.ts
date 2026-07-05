@@ -1,6 +1,8 @@
 import { buildFailureReviewCenter, type FailureReviewTask } from "../ai/failureReviewCenter.ts";
 import type { TaskBatchHistoryItem } from "../ai/taskBatchHistory.ts";
 import { buildTaskRunConsole, type FailureRepairBatch, type TaskRunInput } from "../ai/taskRunConsole.ts";
+import { buildExportSnapshotHistory } from "../export/snapshots.ts";
+import { buildExportVersionCenter } from "../export/versionCenter.ts";
 import { getPlatformProfile, type PlatformId } from "../platforms/platformProfiles.ts";
 import { buildBatchExecutionSafety } from "./batchExecutionSafety.ts";
 import { getBatchExecutionStrategy, type BatchExecutionStrategyId } from "./batchExecutionStrategy.ts";
@@ -83,6 +85,24 @@ export interface PrePublishGateProject {
     createdAt: Date | string;
   }>;
   publishSnapshots?: PublishPackageVersionItem[];
+  exportPackageSnapshots?: Array<{
+    id: string;
+    packageKind: string;
+    format: string;
+    title: string;
+    fileName: string;
+    contentType: string;
+    fileSize: number;
+    contentHash: string;
+    readinessStatus: string;
+    readinessPercent: number;
+    chapterCount: number;
+    wordCount: number;
+    notes: string;
+    isBaseline?: boolean;
+    baselineLockedAt?: Date | string | null;
+    createdAt: Date | string;
+  }>;
   submissionAssets?: PlatformSubmissionAssetInput[];
   submissionAssetVersions?: PlatformSubmissionAssetVersionInput[];
   platformPublishMetrics?: PlatformPublishMetricInput[];
@@ -155,8 +175,19 @@ export interface PrePublishGateProjectStatus {
   href: string;
   downloadHref: string | null;
   execution: PrePublishGateActionExecution | null;
+  exportVersionGate: PrePublishGateExportVersionGate;
   effectReview: PrePublishGateEffectReview;
   loopTimeline: PrePublishGateLoopTimeline;
+}
+
+export interface PrePublishGateExportVersionGate {
+  status: PrePublishGateItem["status"];
+  label: string;
+  detail: string;
+  actionLabel: string;
+  href: string;
+  snapshotCount: number;
+  decisionStatus: string | null;
 }
 
 export interface PrePublishGateStrategyProject {
@@ -1018,6 +1049,59 @@ function buildLoopTimeline(projectId: string, pack: PlatformPublishPackage): Pre
   };
 }
 
+function buildExportVersionGate(project: PrePublishGateProject): PrePublishGateExportVersionGate {
+  const href = `/projects/${project.id}/exports`;
+  const rawSnapshots = project.exportPackageSnapshots ?? [];
+  if (rawSnapshots.length === 0) {
+    return {
+      status: "pass",
+      label: "未接入导出版本中心",
+      detail: "这个项目还没有导出版本快照；总闸门暂不因版本中心阻塞发布。",
+      actionLabel: "打开版本中心",
+      href,
+      snapshotCount: 0,
+      decisionStatus: null,
+    };
+  }
+
+  const snapshots = buildExportSnapshotHistory(rawSnapshots);
+  const versionCenter = buildExportVersionCenter(snapshots);
+  const decision = versionCenter.baselineDecision;
+  if (decision.status === "risk") {
+    return {
+      status: "block",
+      label: "导出版本有回退风险",
+      detail: `${decision.label}：${decision.detail}`,
+      actionLabel: "处理导出版本",
+      href,
+      snapshotCount: snapshots.length,
+      decisionStatus: decision.status,
+    };
+  }
+
+  if (decision.status === "needs_baseline" || decision.status === "replace" || decision.status === "observe") {
+    return {
+      status: "warn",
+      label: decision.label,
+      detail: decision.detail,
+      actionLabel: decision.actionLabel,
+      href,
+      snapshotCount: snapshots.length,
+      decisionStatus: decision.status,
+    };
+  }
+
+  return {
+    status: "pass",
+    label: decision.label,
+    detail: decision.detail,
+    actionLabel: "查看版本中心",
+    href,
+    snapshotCount: snapshots.length,
+    decisionStatus: decision.status,
+  };
+}
+
 function projectStatus(project: PrePublishGateProject): PrePublishGateProjectStatus {
   const platform = getPlatformProfile(project.targetPlatform as PlatformId);
   const aiTasks = project.aiTasks.map((task) => ({
@@ -1047,8 +1131,18 @@ function projectStatus(project: PrePublishGateProject): PrePublishGateProjectSta
     ?? pack.repairActions[0]
     ?? null;
   const publishableChapters = center.totalPublishableChapters;
-  const ready = publishableChapters > 0 && pack.canExport && pack.finalGate.status === "ready_to_submit";
+  const exportVersionGate = buildExportVersionGate(project);
+  const exportVersionBlocked = exportVersionGate.status === "block";
+  const ready = publishableChapters > 0 && pack.canExport && pack.finalGate.status === "ready_to_submit" && !exportVersionBlocked;
   const empty = publishableChapters === 0;
+  const nextAction = exportVersionBlocked
+    ? exportVersionGate.actionLabel
+    : ready
+      ? "导出平台发布包"
+      : nextRepairAction?.label ?? pack.finalGate.nextAction ?? "回到项目工作台补齐发布资料";
+  const href = exportVersionBlocked
+    ? exportVersionGate.href
+    : nextRepairAction ? actionHref(project.id, nextRepairAction) : `/projects/${project.id}#platform-export`;
 
   return {
     projectId: project.id,
@@ -1061,14 +1155,13 @@ function projectStatus(project: PrePublishGateProject): PrePublishGateProjectSta
     finalGateLabel: pack.finalGate.label,
     publishableChapters,
     wordCount: pack.chapters.reduce((sum, chapter) => sum + chapter.wordCount, 0),
-    blockedCount: pack.preflight.blocked.length + pack.finalGate.blockers.length,
-    warningCount: pack.warnings.length + pack.preflight.warnings.length,
-    nextAction: ready
-      ? "导出平台发布包"
-      : nextRepairAction?.label ?? pack.finalGate.nextAction ?? "回到项目工作台补齐发布资料",
-    href: nextRepairAction ? actionHref(project.id, nextRepairAction) : `/projects/${project.id}#platform-export`,
+    blockedCount: pack.preflight.blocked.length + pack.finalGate.blockers.length + (exportVersionGate.status === "block" ? 1 : 0),
+    warningCount: pack.warnings.length + pack.preflight.warnings.length + (exportVersionGate.status === "warn" ? 1 : 0),
+    nextAction,
+    href,
     downloadHref: ready ? `/api/projects/${project.id}/platform-export?format=markdown&platformId=${pack.platformId}` : null,
-    execution: nextRepairAction ? publishRepairExecution(project.id, nextRepairAction) : null,
+    execution: exportVersionBlocked ? null : nextRepairAction ? publishRepairExecution(project.id, nextRepairAction) : null,
+    exportVersionGate,
     effectReview: effectReview(
       project.id,
       pack.publishEffect,
@@ -1147,7 +1240,8 @@ function buildReleaseAction(
   }
 
   const nextAction = status === "blocked"
-    ? priorityActions.find((item) => item.id === "queue:next")
+    ? priorityActions.find((item) => item.id.startsWith("export-version:"))
+      ?? priorityActions.find((item) => item.id === "queue:next")
       ?? priorityActions.find((item) => item.id.startsWith("adoption-followup:"))
       ?? priorityActions.find((item) => item.id.startsWith("repair:"))
       ?? priorityActions[0]
@@ -1389,6 +1483,8 @@ export function buildPrePublishGate(input: PrePublishGateInput): PrePublishGate 
   const readyPackages = projectStatuses.filter((project) => project.status === "ready").length;
   const repairPackages = projectStatuses.filter((project) => project.status === "needs_repair").length;
   const emptyProjects = projectStatuses.filter((project) => project.status === "empty").length;
+  const exportVersionBlockers = projectStatuses.filter((project) => project.exportVersionGate.status === "block");
+  const exportVersionWarnings = projectStatuses.filter((project) => project.exportVersionGate.status === "warn");
   const runnableTasks = queue.items.filter((item) => item.category !== "blocked" && item.category !== "export").length;
   const failedTasks = failureRepairBatch.summary.unresolvedFailures;
   const hasPublishableWork = projectStatuses.some((project) => project.publishableChapters > 0);
@@ -1427,6 +1523,22 @@ export function buildPrePublishGate(input: PrePublishGateInput): PrePublishGate 
       href: "/tasks",
     }),
     buildFirstThreeAdoptionGateItem(firstThreeAdoptionClosure),
+    gateItem({
+      id: "export-version",
+      label: "导出版本",
+      status: exportVersionBlockers.length > 0 ? "block" : exportVersionWarnings.length > 0 ? "warn" : "pass",
+      detail: exportVersionBlockers.length > 0
+        ? `${exportVersionBlockers.length} 个项目的导出版本存在回退风险，不能直接进入最终发布。`
+        : exportVersionWarnings.length > 0
+          ? `${exportVersionWarnings.length} 个项目的导出版本需要处理基准、替换或观察提醒。`
+          : "导出版本没有发现回退风险。",
+      actionLabel: exportVersionBlockers.length > 0
+        ? exportVersionBlockers[0].exportVersionGate.actionLabel
+        : exportVersionWarnings.length > 0
+          ? exportVersionWarnings[0].exportVersionGate.actionLabel
+          : "查看版本中心",
+      href: exportVersionBlockers[0]?.exportVersionGate.href ?? exportVersionWarnings[0]?.exportVersionGate.href ?? "/projects",
+    }),
     gateItem({
       id: "ai-failures",
       label: "失败复盘",
@@ -1475,9 +1587,11 @@ export function buildPrePublishGate(input: PrePublishGateInput): PrePublishGate 
     ...projectStatuses
       .filter((project) => project.status !== "ready")
       .map((project) => action(
-        `repair:${project.projectId}`,
+        project.exportVersionGate.status === "block" ? `export-version:${project.projectId}` : `repair:${project.projectId}`,
         project.nextAction,
-        `${project.projectTitle} · ${project.platformName} · ${project.finalGateLabel}`,
+        project.exportVersionGate.status === "block"
+          ? `${project.projectTitle} · ${project.exportVersionGate.label} · ${project.exportVersionGate.detail}`
+          : `${project.projectTitle} · ${project.platformName} · ${project.finalGateLabel}`,
         project.href,
         "repair",
         project.execution,

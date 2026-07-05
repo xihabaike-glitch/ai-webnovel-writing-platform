@@ -37,6 +37,36 @@ function firstDayCompleteDispatches(projectId: string) {
   }];
 }
 
+function exportSnapshot(input: {
+  id: string;
+  isBaseline?: boolean;
+  baselineLockedAt?: string | null;
+  readinessPercent: number;
+  chapterCount: number;
+  wordCount: number;
+  contentHash?: string;
+  createdAt: string;
+}) {
+  return {
+    id: input.id,
+    packageKind: "full",
+    format: "markdown",
+    title: "夜雨系统",
+    fileName: `${input.id}.md`,
+    contentType: "text/markdown",
+    fileSize: 1000,
+    contentHash: input.contentHash ?? input.id.padEnd(64, "a").slice(0, 64),
+    readinessStatus: "ready",
+    readinessPercent: input.readinessPercent,
+    chapterCount: input.chapterCount,
+    wordCount: input.wordCount,
+    notes: "",
+    isBaseline: input.isBaseline,
+    baselineLockedAt: input.baselineLockedAt ?? null,
+    createdAt: input.createdAt,
+  };
+}
+
 const readyProject: PrePublishGateProject = {
   id: "project-ready",
   title: "夜雨系统",
@@ -141,6 +171,47 @@ test("buildPrePublishGate", async (t) => {
     assert.ok(queueAction?.detail.includes("开书交接证据"));
     assert.equal(gate.releaseAction?.label, "先解除阻塞：补交接验收");
     assert.equal(gate.releaseAction?.href, "/dispatch?firstDayProject=project-handoff-blocked&step=publish-precheck#first-day-dispatch");
+  });
+
+  await t.test("blocks launch when export version center detects baseline regression", () => {
+    const gate = buildPrePublishGate({
+      projects: [{
+        ...readyProject,
+        exportPackageSnapshots: [
+          exportSnapshot({
+            id: "latest-regressed",
+            readinessPercent: 82,
+            chapterCount: 2,
+            wordCount: 6000,
+            contentHash: "b".repeat(64),
+            createdAt: "2026-07-05T05:00:00.000Z",
+          }),
+          exportSnapshot({
+            id: "locked-baseline",
+            isBaseline: true,
+            baselineLockedAt: "2026-07-05T04:00:00.000Z",
+            readinessPercent: 92,
+            chapterCount: 3,
+            wordCount: 9000,
+            contentHash: "a".repeat(64),
+            createdAt: "2026-07-05T04:00:00.000Z",
+          }),
+        ],
+      }],
+      failureTasks: [],
+      batchHistory: [],
+    });
+    const exportItem = gate.items.find((item) => item.id === "export-version");
+
+    assert.equal(gate.status, "blocked");
+    assert.equal(gate.projectStatuses[0].status, "needs_repair");
+    assert.equal(gate.projectStatuses[0].downloadHref, null);
+    assert.equal(gate.projectStatuses[0].exportVersionGate.status, "block");
+    assert.equal(gate.projectStatuses[0].exportVersionGate.decisionStatus, "risk");
+    assert.equal(gate.projectStatuses[0].href, "/projects/project-ready/exports");
+    assert.equal(exportItem?.status, "block");
+    assert.ok(exportItem?.detail.includes("回退风险"));
+    assert.equal(gate.releaseAction?.href, "/projects/project-ready/exports");
   });
 
   await t.test("blocks launch while first-three adoption follow-ups are unfinished", () => {

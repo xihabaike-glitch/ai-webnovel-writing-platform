@@ -81,6 +81,7 @@ export default async function GatePage() {
           },
         },
         publishSnapshots: { orderBy: { createdAt: "desc" }, take: 80 },
+        exportPackageSnapshots: { orderBy: { createdAt: "desc" }, take: 120 },
         submissionAssets: { orderBy: { updatedAt: "desc" } },
         submissionAssetVersions: { orderBy: { createdAt: "desc" }, take: 80 },
         platformPublishMetrics: { orderBy: { snapshotDate: "desc" }, take: 80 },

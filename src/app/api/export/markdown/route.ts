@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
-import { exportProjectMarkdown } from "@/lib/export/markdown";
+import { exportMarkdownFileSuffix, exportProjectMarkdownByMode, type ExportMarkdownMode } from "@/lib/export/markdown";
 import { getPlatformProfile, type PlatformId } from "@/lib/platforms/platformProfiles";
 
 export async function POST(request: Request) {
-  const body = (await request.json()) as { projectId: string };
+  const body = (await request.json()) as { projectId: string; mode?: ExportMarkdownMode };
   const project = await prisma.project.findUnique({
     where: { id: body.projectId },
     include: {
@@ -22,7 +22,8 @@ export async function POST(request: Request) {
   }
   const platform = getPlatformProfile(project.targetPlatform as PlatformId);
 
-  const markdown = exportProjectMarkdown({
+  const mode: ExportMarkdownMode = body.mode === "outline" || body.mode === "characters" ? body.mode : "full";
+  const markdown = exportProjectMarkdownByMode({
     title: project.title,
     genre: project.genre,
     targetPlatformName: platform.name,
@@ -85,12 +86,12 @@ export async function POST(request: Request) {
       title: entry.title,
       status: entry.status,
     })),
-  });
+  }, mode);
 
   return new NextResponse(markdown, {
     headers: {
       "Content-Type": "text/markdown; charset=utf-8",
-      "Content-Disposition": `attachment; filename="${encodeURIComponent(project.title)}.md"`,
+      "Content-Disposition": `attachment; filename="${encodeURIComponent(`${project.title}-${exportMarkdownFileSuffix(mode)}`)}.md"`,
     },
   });
 }

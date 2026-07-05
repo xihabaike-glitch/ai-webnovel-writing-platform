@@ -1,6 +1,13 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { buildExportPackageReadiness, exportProjectMarkdown } from "../lib/export/markdown.ts";
+import {
+  buildExportPackageReadiness,
+  exportMarkdownFileSuffix,
+  exportProjectCharacterForeshadowMarkdown,
+  exportProjectMarkdown,
+  exportProjectMarkdownByMode,
+  exportProjectOutlineMarkdown,
+} from "../lib/export/markdown.ts";
 
 describe("exportProjectMarkdown", () => {
   it("exports project title and ordered chapters by order field", () => {
@@ -67,6 +74,72 @@ describe("exportProjectMarkdown", () => {
     assert.match(markdown, /门锁声/);
     assert.match(markdown, /## 正文/);
     assert.match(markdown, /开头钩子/);
+  });
+
+  it("exports outline-only markdown without manuscript body", () => {
+    const markdown = exportProjectOutlineMarkdown({
+      title: "夜雨系统",
+      genre: "都市悬疑",
+      sellingPoint: "雨夜系统逼主角用破案换取记忆。",
+      chapters: [{ order: 1, title: "雨夜门开", content: "正文不应进入大纲包。" }],
+      outlineNodes: [
+        { type: "RootIdea", title: "核心卖点", summary: "破案换记忆。", depth: 0, order: 1 },
+        { type: "MainPlot", title: "旧案真相", summary: "追查幕后黑手。", depth: 1, order: 2 },
+      ],
+      characters: [{ name: "林晚", role: "主角" }],
+    });
+
+    assert.match(markdown, /# 夜雨系统 大纲包/);
+    assert.match(markdown, /## 大纲树/);
+    assert.match(markdown, /RootIdea｜核心卖点/);
+    assert.doesNotMatch(markdown, /## 正文/);
+    assert.doesNotMatch(markdown, /正文不应进入大纲包/);
+    assert.doesNotMatch(markdown, /## 人物设定/);
+  });
+
+  it("exports character and foreshadow markdown as a separate handoff package", () => {
+    const markdown = exportProjectCharacterForeshadowMarkdown({
+      title: "夜雨系统",
+      genre: "都市悬疑",
+      sellingPoint: "雨夜系统逼主角用破案换取记忆。",
+      chapters: [{ id: "chapter-1", order: 1, title: "雨夜门开", content: "正文不应进入人物伏笔包。" }],
+      characters: [{
+        name: "林晚",
+        role: "主角",
+        desire: "找回记忆",
+        flaw: "逃避",
+        arcStart: "被动",
+        arcEnd: "主动",
+      }],
+      worldEntries: [{ type: "规则", title: "系统代价", content: "不应进入人物伏笔包。" }],
+      foreshadows: [{ title: "门锁声", status: "planned", setupChapterId: "chapter-1", notes: "身份线。" }],
+      plotThreads: [{ type: "主线", title: "旧案真相", status: "active" }],
+    });
+
+    assert.match(markdown, /# 夜雨系统 人物伏笔包/);
+    assert.match(markdown, /## 人物设定/);
+    assert.match(markdown, /### 林晚/);
+    assert.match(markdown, /## 伏笔表/);
+    assert.match(markdown, /门锁声/);
+    assert.match(markdown, /## 故事线/);
+    assert.doesNotMatch(markdown, /## 正文/);
+    assert.doesNotMatch(markdown, /## 世界观\/设定/);
+    assert.doesNotMatch(markdown, /正文不应进入人物伏笔包/);
+  });
+
+  it("routes export modes and filenames explicitly", () => {
+    const project = {
+      title: "夜雨系统",
+      chapters: [{ order: 1, title: "雨夜门开", content: "门开了。" }],
+      outlineNodes: [{ type: "RootIdea", title: "核心卖点" }],
+    };
+
+    assert.match(exportProjectMarkdownByMode(project, "outline"), /大纲包/);
+    assert.match(exportProjectMarkdownByMode(project, "characters"), /人物伏笔包/);
+    assert.match(exportProjectMarkdownByMode(project, "full"), /## 正文/);
+    assert.equal(exportMarkdownFileSuffix("outline"), "大纲包");
+    assert.equal(exportMarkdownFileSuffix("characters"), "人物伏笔包");
+    assert.equal(exportMarkdownFileSuffix("full"), "完整资料包");
   });
 
   it("blocks export handoff when manuscript and core assets are missing", () => {

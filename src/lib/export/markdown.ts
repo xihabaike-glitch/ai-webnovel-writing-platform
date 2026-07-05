@@ -95,6 +95,8 @@ export interface ExportPackageReadiness {
   riskCount: number;
 }
 
+export type ExportMarkdownMode = "full" | "outline" | "characters";
+
 function line(value: string | undefined | null, fallback = "未填写") {
   const text = value?.trim();
   return text ? text : fallback;
@@ -135,6 +137,61 @@ function exportOutline(nodes: ExportOutlineNode[] = []) {
       ].filter(Boolean).join("；");
       return [`${indent}- ${node.type}｜${node.title}${node.status ? `｜${node.status}` : ""}${detail ? `：${detail}` : ""}`];
     });
+}
+
+function projectMetadata(project: ExportProject) {
+  return [
+    bullet("题材", project.genre),
+    bullet("目标平台", project.targetPlatformName),
+    bullet("篇幅类型", project.targetLengthType),
+    bullet("目标字数", project.targetWordCount),
+    bullet("当前字数", project.currentWordCount),
+    bullet("更新节奏", project.updateCadence),
+    bullet("一句话卖点", project.sellingPoint),
+  ];
+}
+
+function characterMarkdownLines(project: ExportProject) {
+  return (project.characters ?? []).flatMap((character) => [
+    `### ${character.name}`,
+    "",
+    bullet("定位", character.role),
+    bullet("欲望", character.desire),
+    bullet("真正需求", character.need),
+    bullet("缺陷", character.flaw),
+    bullet("弧光起点", character.arcStart),
+    bullet("弧光终点", character.arcEnd),
+    bullet("声音", character.voice),
+    bullet("关系压力", character.relationshipNotes),
+    "",
+  ]);
+}
+
+function worldMarkdownLines(project: ExportProject) {
+  return (project.worldEntries ?? []).flatMap((entry) => [
+    `### ${entry.type}｜${entry.title}`,
+    "",
+    line(entry.content),
+    "",
+  ]);
+}
+
+function foreshadowMarkdownLines(project: ExportProject, chapters: ExportChapter[]) {
+  return (project.foreshadows ?? []).map((entry) => [
+    `- ${entry.title}${entry.status ? `｜${entry.status}` : ""}`,
+    entry.setupChapterId || entry.payoffChapterId
+      ? `  - 章节：${chapterAnchor(entry.setupChapterId, chapters) || "未设置"} -> ${chapterAnchor(entry.payoffChapterId, chapters) || "未回收"}`
+      : null,
+    entry.notes ? `  - 备注：${entry.notes}` : null,
+  ].filter(Boolean).join("\n"));
+}
+
+function threadMarkdownLines(project: ExportProject) {
+  return (project.plotThreads ?? []).map((entry) => `- ${entry.type}｜${entry.title}${entry.status ? `｜${entry.status}` : ""}`);
+}
+
+function sortedChapters(project: ExportProject) {
+  return [...project.chapters].sort((a, b) => a.order - b.order);
 }
 
 export function buildExportPackageReadiness(project: ExportProject): ExportPackageReadiness {
@@ -220,43 +277,7 @@ export function buildExportPackageReadiness(project: ExportProject): ExportPacka
 }
 
 export function exportProjectMarkdown(project: ExportProject): string {
-  const chapters = [...project.chapters].sort((a, b) => a.order - b.order);
-  const metadata = [
-    bullet("题材", project.genre),
-    bullet("目标平台", project.targetPlatformName),
-    bullet("篇幅类型", project.targetLengthType),
-    bullet("目标字数", project.targetWordCount),
-    bullet("当前字数", project.currentWordCount),
-    bullet("更新节奏", project.updateCadence),
-    bullet("一句话卖点", project.sellingPoint),
-  ];
-  const characterLines = (project.characters ?? []).flatMap((character) => [
-    `### ${character.name}`,
-    "",
-    bullet("定位", character.role),
-    bullet("欲望", character.desire),
-    bullet("真正需求", character.need),
-    bullet("缺陷", character.flaw),
-    bullet("弧光起点", character.arcStart),
-    bullet("弧光终点", character.arcEnd),
-    bullet("声音", character.voice),
-    bullet("关系压力", character.relationshipNotes),
-    "",
-  ]);
-  const worldLines = (project.worldEntries ?? []).flatMap((entry) => [
-    `### ${entry.type}｜${entry.title}`,
-    "",
-    line(entry.content),
-    "",
-  ]);
-  const foreshadowLines = (project.foreshadows ?? []).map((entry) => [
-    `- ${entry.title}${entry.status ? `｜${entry.status}` : ""}`,
-    entry.setupChapterId || entry.payoffChapterId
-      ? `  - 章节：${chapterAnchor(entry.setupChapterId, chapters) || "未设置"} -> ${chapterAnchor(entry.payoffChapterId, chapters) || "未回收"}`
-      : null,
-    entry.notes ? `  - 备注：${entry.notes}` : null,
-  ].filter(Boolean).join("\n"));
-  const threadLines = (project.plotThreads ?? []).map((entry) => `- ${entry.type}｜${entry.title}${entry.status ? `｜${entry.status}` : ""}`);
+  const chapters = sortedChapters(project);
   const chapterLines = chapters.flatMap((chapter) => [
     `## 第 ${chapter.order} 章 ${chapter.title}`,
     "",
@@ -275,14 +296,47 @@ export function exportProjectMarkdown(project: ExportProject): string {
   return [
     `# ${project.title}`,
     "",
-    ...section("作品信息", metadata),
+    ...section("作品信息", projectMetadata(project)),
     ...section("大纲树", exportOutline(project.outlineNodes)),
-    ...section("人物设定", characterLines),
-    ...section("世界观/设定", worldLines),
-    ...section("伏笔表", foreshadowLines),
-    ...section("故事线", threadLines),
+    ...section("人物设定", characterMarkdownLines(project)),
+    ...section("世界观/设定", worldMarkdownLines(project)),
+    ...section("伏笔表", foreshadowMarkdownLines(project, chapters)),
+    ...section("故事线", threadMarkdownLines(project)),
     "## 正文",
     "",
     ...chapterLines,
   ].join("\n");
+}
+
+export function exportProjectOutlineMarkdown(project: ExportProject): string {
+  return [
+    `# ${project.title} 大纲包`,
+    "",
+    ...section("作品信息", projectMetadata(project)),
+    ...section("大纲树", exportOutline(project.outlineNodes)),
+  ].join("\n");
+}
+
+export function exportProjectCharacterForeshadowMarkdown(project: ExportProject): string {
+  const chapters = sortedChapters(project);
+  return [
+    `# ${project.title} 人物伏笔包`,
+    "",
+    ...section("作品信息", projectMetadata(project)),
+    ...section("人物设定", characterMarkdownLines(project)),
+    ...section("伏笔表", foreshadowMarkdownLines(project, chapters)),
+    ...section("故事线", threadMarkdownLines(project)),
+  ].join("\n");
+}
+
+export function exportProjectMarkdownByMode(project: ExportProject, mode: ExportMarkdownMode = "full"): string {
+  if (mode === "outline") return exportProjectOutlineMarkdown(project);
+  if (mode === "characters") return exportProjectCharacterForeshadowMarkdown(project);
+  return exportProjectMarkdown(project);
+}
+
+export function exportMarkdownFileSuffix(mode: ExportMarkdownMode = "full") {
+  if (mode === "outline") return "大纲包";
+  if (mode === "characters") return "人物伏笔包";
+  return "完整资料包";
 }

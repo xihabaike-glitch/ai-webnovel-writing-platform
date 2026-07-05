@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { ExportPackageReadiness } from "@/lib/export/markdown";
+import type { ExportMarkdownMode, ExportPackageReadiness } from "@/lib/export/markdown";
 
 function statusClass(status: ExportPackageReadiness["status"]) {
   if (status === "ready") return "border-emerald-200 bg-emerald-50 text-emerald-800";
@@ -24,18 +24,18 @@ export function ExportMarkdownButton({
   readiness: ExportPackageReadiness;
   title: string;
 }) {
-  const [isExporting, setIsExporting] = useState(false);
+  const [exportingMode, setExportingMode] = useState<ExportMarkdownMode | null>(null);
   const [error, setError] = useState<string | null>(null);
   const openItems = readiness.items.filter((item) => item.status !== "pass").slice(0, 4);
 
-  async function exportMarkdown() {
-    setIsExporting(true);
+  async function exportMarkdown(mode: ExportMarkdownMode) {
+    setExportingMode(mode);
     setError(null);
     try {
       const response = await fetch("/api/export/markdown", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ projectId }),
+        body: JSON.stringify({ projectId, mode }),
       });
 
       if (!response.ok) {
@@ -47,13 +47,13 @@ export function ExportMarkdownButton({
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      link.download = `${title}.md`;
+      link.download = `${title}-${mode === "outline" ? "大纲包" : mode === "characters" ? "人物伏笔包" : "完整资料包"}.md`;
       link.click();
       URL.revokeObjectURL(url);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "导出失败。");
     } finally {
-      setIsExporting(false);
+      setExportingMode(null);
     }
   }
 
@@ -86,14 +86,32 @@ export function ExportMarkdownButton({
           ))}
         </div>
       ) : null}
-      <button
-        className="w-fit rounded-md bg-slate-950 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-        disabled={isExporting}
-        onClick={exportMarkdown}
-        type="button"
-      >
-        {isExporting ? "导出中" : "导出完整资料包"}
-      </button>
+      <div className="flex flex-wrap gap-2">
+        <button
+          className="rounded-md bg-slate-950 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+          disabled={exportingMode !== null}
+          onClick={() => void exportMarkdown("full")}
+          type="button"
+        >
+          {exportingMode === "full" ? "导出中" : "完整资料包"}
+        </button>
+        <button
+          className="rounded-md border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+          disabled={exportingMode !== null}
+          onClick={() => void exportMarkdown("outline")}
+          type="button"
+        >
+          {exportingMode === "outline" ? "导出中" : "只导出大纲"}
+        </button>
+        <button
+          className="rounded-md border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+          disabled={exportingMode !== null}
+          onClick={() => void exportMarkdown("characters")}
+          type="button"
+        >
+          {exportingMode === "characters" ? "导出中" : "人物伏笔包"}
+        </button>
+      </div>
       {error ? <p className="text-sm text-red-600">{error}</p> : null}
     </div>
   );

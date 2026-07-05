@@ -210,6 +210,12 @@ function firstDayProductionGateCleared(project: TaskQueueProject, riskLevel: Fir
   return Boolean(completedFirstDayDispatch(project, "publish-precheck"));
 }
 
+function firstDayDispatchHref(projectId: string, stepId?: string) {
+  const params = new URLSearchParams({ firstDayProject: projectId });
+  if (stepId) params.set("step", stepId);
+  return `/dispatch?${params.toString()}#first-day-dispatch`;
+}
+
 export function buildTaskQueueCenter(projects: TaskQueueProject[]): TaskQueueCenter {
   const items = projects.flatMap((project) => {
     const platform = getPlatformProfile(project.targetPlatform as PlatformId);
@@ -276,7 +282,10 @@ export function buildTaskQueueCenter(projects: TaskQueueProject[]): TaskQueueCen
         actionLabel: missingHandoffEvidence
           ? "补交接验收"
           : riskProfile.level === "watch" ? "完成小样本验收" : "完成首日链路",
-        href: `${projectHref}#first-day-workflow`,
+        href: firstDayDispatchHref(
+          project.id,
+          missingHandoffEvidence || riskProfile.level !== "watch" ? "publish-precheck" : "first-draft",
+        ),
       }));
     }
 
@@ -295,7 +304,7 @@ export function buildTaskQueueCenter(projects: TaskQueueProject[]): TaskQueueCen
         riskLabel: riskProfile.label,
         riskNotice,
         actionLabel: "做恢复验证",
-        href: `${projectHref}#first-day-workflow`,
+        href: firstDayDispatchHref(project.id, "risk-recovery"),
       }));
     }
 
@@ -345,7 +354,7 @@ export function buildTaskQueueCenter(projects: TaskQueueProject[]): TaskQueueCen
         riskNotice,
         scaleGate,
         actionLabel: "完成小样本验收",
-        href: `${projectHref}#first-day-workflow`,
+        href: firstDayDispatchHref(project.id, "first-draft"),
       }));
     }
 

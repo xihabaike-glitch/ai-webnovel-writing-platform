@@ -188,7 +188,7 @@ test("buildFirstDayContinuationAction asks for handoff evidence before batch pro
 
   assert.equal(action.status, "blocked");
   assert.equal(action.primaryLabel, "补交接验收");
-  assert.equal(action.primaryHref, "/projects/project-1#first-day-workflow");
+  assert.equal(action.primaryHref, "/dispatch?firstDayProject=project-1&step=publish-precheck#first-day-dispatch");
   assert.equal(action.queueCategory, "blocked");
   assert.ok(action.detail.includes("开书交接证据"));
   assert.equal(action.handoffGuidance?.label, "稳定加码");

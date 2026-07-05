@@ -225,7 +225,7 @@ test("buildProjectListDashboard", async (t) => {
     const item = dashboard.items[0];
 
     assert.equal(item.nextAction, "补交接验收");
-    assert.equal(item.nextActionHref, "/projects/handoff-blocked-project#first-day-workflow");
+    assert.equal(item.nextActionHref, "/dispatch?firstDayProject=handoff-blocked-project&step=publish-precheck#first-day-dispatch");
     assert.equal(item.continuationStatus, "blocked");
     assert.equal(item.healthLabel, "需盯紧");
     assert.ok(item.riskFlags.some((flag) => flag.includes("补交接验收")));

@@ -25,6 +25,13 @@ import { buildWatchSampleCompletionEvidenceSuggestions } from "@/lib/projects/wa
 
 export const dynamic = "force-dynamic";
 
+type DispatchSearchParams = Record<string, string | string[] | undefined>;
+
+function searchValue(params: DispatchSearchParams, key: string) {
+  const value = params[key];
+  return Array.isArray(value) ? value[0] ?? "" : value ?? "";
+}
+
 function normalizeAssetAuditStatus(status: string): "ready" | "blocked" | "needs_work" {
   if (status === "ready" || status === "blocked") return status;
   return "needs_work";
@@ -176,7 +183,15 @@ function toVirtualTask(
   };
 }
 
-export default async function DispatchPage() {
+export default async function DispatchPage({
+  searchParams,
+}: {
+  searchParams?: Promise<DispatchSearchParams>;
+}) {
+  const resolvedSearchParams = await Promise.resolve(searchParams ?? {});
+  const firstDayProjectId = searchValue(resolvedSearchParams, "firstDayProject");
+  const firstDayStepId = searchValue(resolvedSearchParams, "step");
+  const focusDispatchKey = searchValue(resolvedSearchParams, "focus");
   const [tasks, receipts, projects, recentAiTasks, chapters] = await Promise.all([
     prisma.gateDispatchTask.findMany({
       orderBy: [
@@ -313,6 +328,11 @@ export default async function DispatchPage() {
         </div>
       </div>
       <GateDispatchTaskCenter
+        initialFirstDayFocus={{
+          dispatchKey: focusDispatchKey,
+          projectId: firstDayProjectId,
+          stepId: firstDayStepId,
+        }}
         initialReceipts={receiptItems}
         initialTasks={mergedTasks}
         initialCompletionSuggestions={completionEvidenceSuggestions}

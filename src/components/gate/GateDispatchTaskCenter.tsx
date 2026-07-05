@@ -23,6 +23,8 @@ import {
   buildFirstDayDispatchDesk,
   buildFirstDayDispatchCompletionHint,
   buildFirstDayDispatchUpdateSummary,
+  resolveFirstDayDispatchFocus,
+  type FirstDayDispatchFocusInput,
 } from "@/lib/projects/firstDayWorkflowView";
 import type { WatchSampleCompletionEvidenceSuggestion } from "@/lib/projects/watchSampleCompletionEvidence";
 import {
@@ -135,11 +137,13 @@ function routeCompletionRecordChips(record: RouteDispatchCompletionRecord) {
 }
 
 export function GateDispatchTaskCenter({
+  initialFirstDayFocus,
   initialReceipts,
   initialTasks,
   initialCompletionSuggestions,
   routeConfirmationDispatchFlow,
 }: {
+  initialFirstDayFocus?: FirstDayDispatchFocusInput;
   initialReceipts: GateActionReceipt[];
   initialTasks: PersistedGatePlatformDispatchTask[];
   initialCompletionSuggestions: WatchSampleCompletionEvidenceSuggestion[];
@@ -161,6 +165,10 @@ export function GateDispatchTaskCenter({
   const [errorMessage, setErrorMessage] = useState("");
   const center = useMemo(() => buildGateDispatchTaskCenter(tasks), [tasks]);
   const firstDayDesk = useMemo(() => buildFirstDayDispatchDesk(tasks), [tasks]);
+  const firstDayFocus = useMemo(() => resolveFirstDayDispatchFocus(tasks, initialFirstDayFocus ?? {}), [
+    initialFirstDayFocus,
+    tasks,
+  ]);
   const evidenceReview = useMemo(() => buildGateDispatchEvidenceReview(tasks, initialReceipts), [initialReceipts, tasks]);
   const routeExecutionDesk = useMemo(() => buildRouteRecheckExecutionDesk(tasks), [tasks]);
   const routeTaskByKey = useMemo(() => new Map(tasks.map((task) => [task.dispatchKey, task])), [tasks]);
@@ -197,6 +205,8 @@ export function GateDispatchTaskCenter({
   const firstDayNextSuggestion = firstDayDesk.nextTask
     ? completionSuggestionByKey.get(firstDayDesk.nextTask.dispatchKey)
     : null;
+  const focusedDispatchKey = firstDayFocus.card?.dispatchKey ?? "";
+  const focusedTask = focusedDispatchKey ? routeTaskByKey.get(focusedDispatchKey) ?? null : null;
   const filteredTasks = useMemo(() => {
     const baseTasks = filterGateDispatchTasks(tasks, {
       state: stateFilter,
@@ -470,7 +480,7 @@ export function GateDispatchTaskCenter({
       </section>
 
       {firstDayDesk.summary.total > 0 ? (
-        <section className="rounded-md border border-slate-200 bg-white p-4">
+        <section className="rounded-md border border-slate-200 bg-white p-4" id="first-day-dispatch">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
             <div>
               <div className="font-medium text-slate-950">首日执行台</div>
@@ -497,6 +507,33 @@ export function GateDispatchTaskCenter({
               </div>
             </div>
           </div>
+          {firstDayFocus.requested ? (
+            <div className="mt-4 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+              <div className="font-medium">总闸门定位</div>
+              <p className="mt-1 leading-6">{firstDayFocus.message}</p>
+              {firstDayFocus.card ? (
+                <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+                  <span className="rounded-md bg-white px-2 py-1">{firstDayFocus.card.stateLabel}</span>
+                  <span className="rounded-md bg-white px-2 py-1">{firstDayFocus.card.title}</span>
+                  <span className="rounded-md bg-white px-2 py-1">{firstDayFocus.card.actionLabel}</span>
+                </div>
+              ) : null}
+              <div className="mt-3 flex flex-wrap gap-2">
+                {focusedTask?.state === "assigned" && completionTextForTask(focusedTask) ? (
+                  <button
+                    className="rounded-md bg-white px-3 py-2 text-xs font-medium text-amber-950 hover:bg-amber-100"
+                    onClick={() => insertCompletionTemplate(focusedTask)}
+                    type="button"
+                  >
+                    填入验收模板
+                  </button>
+                ) : null}
+                <Link className="rounded-md border border-amber-300 bg-white/70 px-3 py-2 text-xs font-medium hover:bg-white" href="/gate">
+                  回总闸门
+                </Link>
+              </div>
+            </div>
+          ) : null}
           {firstDayDesk.nextTask ? (
             <div className="mt-4 rounded-md bg-slate-950 p-4 text-white">
               <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
@@ -541,7 +578,10 @@ export function GateDispatchTaskCenter({
           ) : null}
           <div className="mt-4 grid gap-3 lg:grid-cols-3">
             {firstDayDesk.cards.slice(0, 6).map((card) => (
-              <div className="rounded-md bg-slate-50 p-3 text-sm" key={card.dispatchKey}>
+              <div
+                className={`rounded-md p-3 text-sm ${card.dispatchKey === focusedDispatchKey ? "bg-amber-50 ring-2 ring-amber-300" : "bg-slate-50"}`}
+                key={card.dispatchKey}
+              >
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="rounded-md bg-white px-2 py-1 text-xs font-medium text-slate-600">{card.stateLabel}</span>
                   <span className="font-medium text-slate-950">{card.stepLabel}</span>
@@ -1065,7 +1105,11 @@ export function GateDispatchTaskCenter({
           const isRecheckFollowUp = isChapterProductionRecheckFollowUpTask(task);
           const recheckChain = recheckChainByDispatchKey.get(task.dispatchKey);
           return (
-          <div className="rounded-md border border-slate-200 bg-white p-4" key={task.dispatchKey}>
+          <div
+            className={`rounded-md border bg-white p-4 ${task.dispatchKey === focusedDispatchKey ? "border-amber-300 ring-2 ring-amber-200" : "border-slate-200"}`}
+            id={`dispatch-${task.dispatchKey}`}
+            key={task.dispatchKey}
+          >
             <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
               <div>
                 <div className="flex flex-wrap items-center gap-2">

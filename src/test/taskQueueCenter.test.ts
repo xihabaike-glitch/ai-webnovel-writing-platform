@@ -145,7 +145,7 @@ test("buildTaskQueueCenter", async (t) => {
     assert.equal(queue.overview.publishBlocked, 0);
     assert.equal(gate?.actionLabel, "完成首日链路");
     assert.ok(gate?.evidence.includes("平台包预检验收"));
-    assert.ok(gate?.href.endsWith("#first-day-workflow"));
+    assert.equal(gate?.href, "/dispatch?firstDayProject=project-1&step=publish-precheck#first-day-dispatch");
     assert.equal(queue.recommendedNext?.blockerType, "first_day_gate");
   });
 
@@ -170,6 +170,7 @@ test("buildTaskQueueCenter", async (t) => {
     assert.ok(gate?.handoffGuidance?.detail?.includes("番茄首章强钩子"));
     assert.ok(gate?.handoffGuidance?.firstDayActions.some((action) => action.includes("倒计时")));
     assert.ok(gate?.handoffGuidance?.avoidRules.some((rule) => rule.includes("小样本")));
+    assert.equal(gate?.href, "/dispatch?firstDayProject=project-1&step=publish-precheck#first-day-dispatch");
     assert.equal(queue.recommendedNext?.blockerType, "first_day_gate");
   });
 
@@ -218,7 +219,7 @@ test("buildTaskQueueCenter", async (t) => {
     const recovery = queue.items.find((item) => item.blockerType === "risk_recovery");
     assert.equal(recovery?.riskLevel, "blocked");
     assert.equal(recovery?.actionLabel, "做恢复验证");
-    assert.ok(recovery?.href.endsWith("#first-day-workflow"));
+    assert.equal(recovery?.href, "/dispatch?firstDayProject=blocked-project&step=risk-recovery#first-day-dispatch");
     assert.ok(recovery?.evidence.includes("恢复条件"));
   });
 
@@ -262,6 +263,8 @@ test("buildTaskQueueCenter", async (t) => {
     assert.equal(firstDayGate?.riskLevel, "watch");
     assert.equal(firstDayGate?.scaleGate, "sample_only");
     assert.equal(firstDayGate?.actionLabel, "完成小样本验收");
+    assert.equal(firstDayGate?.href, "/dispatch?firstDayProject=watch-project&step=first-draft#first-day-dispatch");
+    assert.equal(gate?.href, "/dispatch?firstDayProject=watch-project&step=first-draft#first-day-dispatch");
     assert.ok(firstDayGate?.evidence.includes("通过线"));
     assert.ok(gate?.evidence.includes("通过线、不可接受项、复查证据和放量结论"));
   });
@@ -356,7 +359,9 @@ test("buildTaskQueueCenter", async (t) => {
 
     assert.equal(drafts.length, 0);
     assert.equal(firstDayGate?.actionLabel, "完成小样本验收");
+    assert.equal(firstDayGate?.href, "/dispatch?firstDayProject=watch-not-passed-project&step=first-draft#first-day-dispatch");
     assert.equal(gate?.scaleGate, "sample_only");
+    assert.equal(gate?.href, "/dispatch?firstDayProject=watch-not-passed-project&step=first-draft#first-day-dispatch");
     assert.equal(queue.overview.firstDayBlocked, 1);
     assert.equal(queue.overview.watchScaleBlocked, 1);
     assert.equal(queue.overview.watchCleared, 0);

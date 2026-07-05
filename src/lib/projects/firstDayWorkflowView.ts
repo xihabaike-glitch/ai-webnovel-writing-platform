@@ -111,6 +111,19 @@ export interface FirstDayDispatchUpdateSummary {
   badges: string[];
 }
 
+export interface FirstDayDispatchFocusInput {
+  dispatchKey?: string | null;
+  projectId?: string | null;
+  stepId?: string | null;
+}
+
+export interface FirstDayDispatchFocus {
+  requested: boolean;
+  card: FirstDayDispatchDeskCard | null;
+  matchedBy: "dispatch_key" | "project_step" | "project_active" | "project_latest" | "global_next" | "none";
+  message: string;
+}
+
 export function buildFirstDayStepView(step: FirstDayWorkflowStep): FirstDayStepView {
   const markerIndex = step.evidence.indexOf(ACCEPTANCE_MARKER);
   if (markerIndex < 0) {
@@ -452,6 +465,68 @@ export function buildFirstDayDispatchDesk(tasks: PersistedGatePlatformDispatchTa
       active.length > 1 ? `还有 ${active.length - 1} 张首日卡排队，完成当前节点后再推进下一张。` : null,
       cards.length > 0 && active.length === 0 ? "首日派单已全部完成，可以进入批量生产和平台包复盘。" : null,
     ].filter((action): action is string => Boolean(action)),
+  };
+}
+
+export function resolveFirstDayDispatchFocus(
+  tasks: PersistedGatePlatformDispatchTask[],
+  input: FirstDayDispatchFocusInput,
+): FirstDayDispatchFocus {
+  const requested = Boolean(input.dispatchKey || input.projectId || input.stepId);
+  const desk = buildFirstDayDispatchDesk(tasks);
+  const cards = desk.cards;
+  const dispatchKey = input.dispatchKey?.trim() || "";
+  const projectId = input.projectId?.trim() || "";
+  const stepId = input.stepId?.trim() || "";
+
+  const exact = dispatchKey ? cards.find((card) => card.dispatchKey === dispatchKey) ?? null : null;
+  if (exact) {
+    return {
+      requested,
+      card: exact,
+      matchedBy: "dispatch_key",
+      message: `已定位到「${exact.stepLabel}」，先处理这张首日卡。`,
+    };
+  }
+
+  const projectCards = projectId ? cards.filter((card) => card.projectId === projectId) : [];
+  const projectStep = stepId ? projectCards.find((card) => card.stepId === stepId) ?? null : null;
+  if (projectStep) {
+    return {
+      requested,
+      card: projectStep,
+      matchedBy: "project_step",
+      message: `已定位到「${projectStep.stepLabel}」，先补这张卡的验收证据。`,
+    };
+  }
+
+  const projectActive = projectCards.find((card) => card.state !== "completed") ?? null;
+  if (projectActive) {
+    return {
+      requested,
+      card: projectActive,
+      matchedBy: "project_active",
+      message: `目标步骤暂未排到，先收口当前首日卡「${projectActive.stepLabel}」。`,
+    };
+  }
+
+  const projectLatest = projectCards[0] ?? null;
+  if (projectLatest) {
+    return {
+      requested,
+      card: projectLatest,
+      matchedBy: "project_latest",
+      message: `这个项目的首日卡已没有未闭环项，最近一张是「${projectLatest.stepLabel}」。`,
+    };
+  }
+
+  return {
+    requested,
+    card: desk.nextTask,
+    matchedBy: desk.nextTask ? "global_next" : "none",
+    message: desk.nextTask
+      ? `没有找到指定项目的首日卡，先处理全局下一张「${desk.nextTask.stepLabel}」。`
+      : "没有找到首日派单卡，请先从作品首日流程生成派单。",
   };
 }
 

@@ -9,6 +9,7 @@ import {
   buildFirstDayReceiptCompletionAction,
   buildFirstDayStepView,
   completeFirstDayDispatchStep,
+  resolveFirstDayDispatchFocus,
   validateFirstDayDispatchCompletionEvidence,
 } from "../lib/projects/firstDayWorkflowView.ts";
 
@@ -252,6 +253,80 @@ test("buildFirstDayDispatchDesk keeps recovered watch state visible", () => {
   assert.ok(desk.nextActions[0].includes("恢复观察小样本"));
   assert.ok(desk.nextActions[0].includes("不要批量放大"));
   assert.ok(desk.nextTask?.completionHint?.includes("放量闸门"));
+});
+
+test("resolveFirstDayDispatchFocus locates gate handoff targets", () => {
+  const tasks = [
+    {
+      databaseId: "db-1",
+      dispatchKey: "first-day:project-1:publish-precheck",
+      id: "first-day:project-1:publish-precheck",
+      projectId: "project-1",
+      platformId: "fanqie",
+      platformName: "番茄小说",
+      stage: "publish_precheck",
+      state: "completed" as const,
+      priorityScore: 60,
+      ownerRole: "运营",
+      title: "夜雨系统 · 平台包预检",
+      detail: "补齐发布包验收证据。",
+      dueLabel: "今天收口",
+      actionLabel: "补交接验收",
+      href: "/projects/project-1#first-day-workflow",
+      acceptanceCriteria: ["执行开书交接动作：第一段给倒计时"],
+      evidence: [],
+      sourceReceiptId: null,
+      completionEvidence: "首日平台包预检已完成。",
+      reviewLatestAt: "2026-01-01T00:00:00.000Z",
+      assignedAt: "2026-01-01T00:00:00.000Z",
+      completedAt: "2026-01-01T00:20:00.000Z",
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:20:00.000Z",
+    },
+    {
+      databaseId: "db-2",
+      dispatchKey: "first-day:project-2:first-review",
+      id: "first-day:project-2:first-review",
+      projectId: "project-2",
+      platformId: "qimao",
+      platformName: "七猫小说",
+      stage: "start_first_three_review",
+      state: "assigned" as const,
+      priorityScore: 80,
+      ownerRole: "AI",
+      title: "山海账本 · 第一章审稿",
+      detail: "先收口审稿。",
+      dueLabel: "今天收口",
+      actionLabel: "去审稿",
+      href: "/projects/project-2/chapters/chapter-1",
+      acceptanceCriteria: ["第一章已有结构化审稿结果"],
+      evidence: [],
+      sourceReceiptId: null,
+      completionEvidence: "",
+      reviewLatestAt: "2026-01-01T00:00:00.000Z",
+      assignedAt: "2026-01-01T00:00:00.000Z",
+      completedAt: null,
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    },
+  ];
+
+  const exact = resolveFirstDayDispatchFocus(tasks, {
+    projectId: "project-1",
+    stepId: "publish-precheck",
+  });
+  const fallback = resolveFirstDayDispatchFocus(tasks, {
+    projectId: "project-2",
+    stepId: "publish-precheck",
+  });
+
+  assert.equal(exact.requested, true);
+  assert.equal(exact.matchedBy, "project_step");
+  assert.equal(exact.card?.dispatchKey, "first-day:project-1:publish-precheck");
+  assert.ok(exact.message.includes("补这张卡"));
+  assert.equal(fallback.matchedBy, "project_active");
+  assert.equal(fallback.card?.dispatchKey, "first-day:project-2:first-review");
+  assert.ok(fallback.message.includes("当前首日卡"));
 });
 
 test("buildFirstDayDispatchUpdateSummary explains risk recovery handoff", () => {

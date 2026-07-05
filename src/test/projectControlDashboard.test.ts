@@ -94,6 +94,8 @@ test("buildProjectControlDashboard", async (t) => {
     assert.ok(dashboard.aiPipelineBatch.actionLabel.includes("批量二改"));
     assert.equal(dashboard.aiPipelineRecentBatch.hasRecent, false);
     assert.equal(dashboard.aiPipelineRecentBatch.status, "empty");
+    assert.equal(dashboard.aiPipelineBatchHealth.hasSamples, false);
+    assert.equal(dashboard.aiPipelineBatchHealth.status, "empty");
     assert.ok(dashboard.modelRouteHealth.totalTasks >= 1);
     assert.ok(dashboard.modelRouteHealth.nextActions.length > 0);
     assert.equal(dashboard.storyFoundation.status, "blocked");
@@ -486,6 +488,75 @@ test("buildProjectControlDashboard", async (t) => {
     assert.equal(dashboard.aiPipelineRecentBatch.failedCount, 1);
     assert.equal(dashboard.aiPipelineRecentBatch.targetHref, "/projects/demo-project#ai-pipeline");
     assert.ok(dashboard.aiPipelineRecentBatch.warnings.some((warning) => warning.includes("不要继续放大")));
+    assert.equal(dashboard.aiPipelineBatchHealth.hasSamples, false);
+  });
+
+  await t.test("summarizes project-scoped third-round batch health", () => {
+    const tactic = {
+      title: "首轮平台打法：番茄小说",
+      label: "三轮稳住",
+      primaryTactic: "三轮数据已站住，可以小批放大。",
+      openingMove: "第一段给不可逆危机。",
+      verificationMove: "继续回填曝光、点击、收藏和追读。",
+      risk: "稳定加码不是无限放量。",
+    };
+    const dashboard = buildProjectControlDashboard({
+      project,
+      platform: getPlatformProfile("fanqie"),
+      chapters: [chapter],
+      outlineNodes: [],
+      characters: [],
+      worldEntries: [],
+      foreshadows: [],
+      plotThreads: [],
+      aiTasks: [],
+      gateActionAudits: [
+        {
+          receiptId: "stable-2",
+          label: "三轮稳住批次健康，继续小步加码",
+          detail: "番茄小说 · 夜雨系统 · 批量初稿 2 个",
+          href: "/tasks#recommended-batch",
+          status: "succeeded",
+          message: "推荐批次完成。",
+          executionType: "recommended_batch",
+          succeededCount: 2,
+          failedCount: 0,
+          payload: JSON.stringify({
+            plan: { strategyBases: [tactic], actionLabel: "批量初稿 2 个", category: "draft" },
+            routeEffectSummary: { successRatePercent: 100, knownCostUsd: 0.02, averageQualityScore: 90 },
+            batchReceipt: { status: "continue", headline: "三轮稳住批次健康，继续小步加码" },
+          }),
+          createdAt: "2026-01-02T00:00:00.000Z",
+        },
+        {
+          receiptId: "stable-1",
+          label: "三轮稳住批次健康，继续小步加码",
+          detail: "番茄小说 · 夜雨系统 · 批量初稿 2 个",
+          href: "/tasks#recommended-batch",
+          status: "succeeded",
+          message: "推荐批次完成。",
+          executionType: "recommended_batch",
+          succeededCount: 2,
+          failedCount: 0,
+          payload: JSON.stringify({
+            plan: { strategyBases: [tactic], actionLabel: "批量初稿 2 个", category: "draft" },
+            routeEffectSummary: { successRatePercent: 100, knownCostUsd: 0.02, averageQualityScore: 88 },
+            batchReceipt: { status: "continue", headline: "三轮稳住批次健康，继续小步加码" },
+          }),
+          createdAt: "2026-01-01T00:00:00.000Z",
+        },
+      ],
+      submissionChecklist: checklist,
+    });
+
+    assert.equal(dashboard.aiPipelineBatchHealth.hasSamples, true);
+    assert.equal(dashboard.aiPipelineBatchHealth.status, "usable");
+    assert.equal(dashboard.aiPipelineBatchHealth.label, "可参考");
+    assert.equal(dashboard.aiPipelineBatchHealth.tacticLabel, "三轮稳住打法");
+    assert.equal(dashboard.aiPipelineBatchHealth.sampleBatches, 2);
+    assert.equal(dashboard.aiPipelineBatchHealth.successRatePercent, 100);
+    assert.equal(dashboard.aiPipelineBatchHealth.averageQualityScore, 89);
+    assert.ok(dashboard.aiPipelineBatchHealth.detail.includes("小步验证"));
   });
 
   await t.test("summarizes model route health for the project control dashboard", () => {

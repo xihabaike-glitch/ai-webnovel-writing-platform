@@ -71,6 +71,29 @@ interface AiPipelineRecentBatchSummary {
   createdAt: string | null;
 }
 
+interface AiPipelineBatchHealthSummary {
+  hasSamples: boolean;
+  status: "usable" | "watch" | "blocked" | "empty";
+  label: string;
+  headline: string;
+  detail: string;
+  actionLabel: string;
+  targetHref: string;
+  total: number;
+  usable: number;
+  watch: number;
+  blocked: number;
+  sampleBatches: number;
+  successRatePercent: number | null;
+  averageQualityScore: number | null;
+  failedTasks: number;
+  tacticLabel: string;
+  tacticTitle: string;
+  evidence: string[];
+  nextActions: string[];
+  latestAt: string | null;
+}
+
 interface ModelRouteHealthSummary {
   status: "empty" | "healthy" | "watch" | "repair" | "cost_guard";
   score: number;
@@ -132,6 +155,7 @@ interface ProjectControlDashboard {
   storyFoundation: StoryFoundationSummary;
   aiPipelineBatch: AiPipelineBatchSummary;
   aiPipelineRecentBatch: AiPipelineRecentBatchSummary;
+  aiPipelineBatchHealth: AiPipelineBatchHealthSummary;
   modelRouteHealth: ModelRouteHealthSummary;
   areas: ControlArea[];
   priorityActions: ControlPriorityAction[];
@@ -302,6 +326,13 @@ function aiRecentBatchClass(status: AiPipelineRecentBatchSummary["status"]) {
   if (status === "repair") return "bg-rose-50 text-rose-700";
   if (status === "review_quality") return "bg-amber-50 text-amber-700";
   if (status === "watch_cost") return "bg-blue-50 text-blue-700";
+  return "bg-slate-100 text-slate-700";
+}
+
+function aiBatchHealthClass(status: AiPipelineBatchHealthSummary["status"]) {
+  if (status === "usable") return "bg-emerald-50 text-emerald-700";
+  if (status === "blocked") return "bg-rose-50 text-rose-700";
+  if (status === "watch") return "bg-amber-50 text-amber-700";
   return "bg-slate-100 text-slate-700";
 }
 
@@ -782,6 +813,59 @@ export function ProjectControlDashboardPanel({ projectId }: { projectId: string 
               <div className="mt-2 flex flex-wrap gap-1.5">
                 {dashboard.platformVerdict.evidenceGaps.map((gap) => (
                   <span className="rounded-md bg-amber-50 px-2 py-1 text-[11px] text-amber-700" key={gap}>{gap}</span>
+                ))}
+              </div>
+            ) : null}
+          </div>
+
+          <div className="rounded-md border border-slate-200 p-3">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+              <div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="font-medium text-slate-950">本书批量健康</div>
+                  <span className={`rounded-md px-2 py-1 text-[11px] font-medium ${aiBatchHealthClass(dashboard.aiPipelineBatchHealth.status)}`}>
+                    {dashboard.aiPipelineBatchHealth.label}
+                  </span>
+                  {dashboard.aiPipelineBatchHealth.latestAt ? (
+                    <span className="text-xs text-slate-500">{shortTime(dashboard.aiPipelineBatchHealth.latestAt)}</span>
+                  ) : null}
+                </div>
+                <p className="mt-1 text-sm leading-6 text-slate-600">{dashboard.aiPipelineBatchHealth.headline}</p>
+                <div className="mt-2 rounded-md bg-slate-50 px-2 py-1 text-xs leading-5 text-slate-600">
+                  {dashboard.aiPipelineBatchHealth.detail}
+                </div>
+              </div>
+              <Link
+                className="inline-flex w-fit items-center justify-center rounded-md border border-slate-200 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                href={dashboard.aiPipelineBatchHealth.targetHref}
+              >
+                {dashboard.aiPipelineBatchHealth.actionLabel}
+              </Link>
+            </div>
+            <div className="mt-3 grid gap-2 sm:grid-cols-4">
+              <div className="rounded-md bg-slate-50 p-3">
+                <div className="text-xs text-slate-500">样本批次</div>
+                <div className="mt-1 text-lg font-semibold text-slate-950">{dashboard.aiPipelineBatchHealth.sampleBatches || "-"}</div>
+              </div>
+              <div className="rounded-md bg-slate-50 p-3">
+                <div className="text-xs text-slate-500">成功率</div>
+                <div className="mt-1 text-lg font-semibold text-slate-950">
+                  {dashboard.aiPipelineBatchHealth.successRatePercent ?? "-"}{dashboard.aiPipelineBatchHealth.successRatePercent !== null ? "%" : ""}
+                </div>
+              </div>
+              <div className="rounded-md bg-slate-50 p-3">
+                <div className="text-xs text-slate-500">质量</div>
+                <div className="mt-1 text-lg font-semibold text-slate-950">{dashboard.aiPipelineBatchHealth.averageQualityScore ?? "-"}</div>
+              </div>
+              <div className="rounded-md bg-slate-50 p-3">
+                <div className="text-xs text-slate-500">失败</div>
+                <div className="mt-1 text-lg font-semibold text-slate-950">{dashboard.aiPipelineBatchHealth.failedTasks}</div>
+              </div>
+            </div>
+            {dashboard.aiPipelineBatchHealth.evidence.length ? (
+              <div className="mt-2 grid gap-1 text-xs leading-5 text-slate-600">
+                {dashboard.aiPipelineBatchHealth.evidence.map((evidence) => (
+                  <p className="rounded-md bg-slate-50 px-2 py-1" key={evidence}>{evidence}</p>
                 ))}
               </div>
             ) : null}

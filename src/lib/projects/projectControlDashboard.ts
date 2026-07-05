@@ -16,6 +16,7 @@ import { findProjectStartTacticSummary, type ProjectStartTacticSummary } from ".
 import { buildSerializationOpsDashboard } from "./serializationOps.ts";
 import { buildStoryLineDashboard } from "./storyLines.ts";
 import type { SubmissionChecklist } from "./submissionChecklist.ts";
+import { buildTaskQueueBatchHealthReview } from "./taskQueueBatchHealth.ts";
 import { buildWorldBibleDashboard } from "./worldBible.ts";
 
 export interface ControlProject {
@@ -130,6 +131,7 @@ export interface ControlAiTask {
 
 export interface ControlBatchAudit {
   receiptId: string;
+  actionId?: string;
   label: string;
   detail: string;
   href: string;
@@ -138,6 +140,13 @@ export interface ControlBatchAudit {
   executionType: string;
   succeededCount: number;
   failedCount: number;
+  taskId?: string | null;
+  platformId?: string;
+  platformName?: string;
+  recheckStatus?: string;
+  recheckLabel?: string;
+  recheckDetail?: string;
+  recheckAction?: string;
   payload: string;
   createdAt: Date | string;
 }
@@ -256,6 +265,7 @@ export interface ProjectControlDashboard {
   storyFoundation: StoryFoundationSummary;
   aiPipelineBatch: AiPipelineBatchSummary;
   aiPipelineRecentBatch: AiPipelineRecentBatchSummary;
+  aiPipelineBatchHealth: AiPipelineBatchHealthSummary;
   modelRouteHealth: ModelRouteHealthSummary;
   areas: ControlArea[];
   priorityActions: ControlPriorityAction[];
@@ -353,6 +363,29 @@ export interface AiPipelineRecentBatchSummary {
   failedCount: number;
   warnings: string[];
   createdAt: string | null;
+}
+
+export interface AiPipelineBatchHealthSummary {
+  hasSamples: boolean;
+  status: "usable" | "watch" | "blocked" | "empty";
+  label: string;
+  headline: string;
+  detail: string;
+  actionLabel: string;
+  targetHref: string;
+  total: number;
+  usable: number;
+  watch: number;
+  blocked: number;
+  sampleBatches: number;
+  successRatePercent: number | null;
+  averageQualityScore: number | null;
+  failedTasks: number;
+  tacticLabel: string;
+  tacticTitle: string;
+  evidence: string[];
+  nextActions: string[];
+  latestAt: string | null;
 }
 
 export interface ModelRouteHealthSummary {
@@ -777,6 +810,76 @@ function buildAiPipelineRecentBatchSummary(audits: ControlBatchAudit[] = []): Ai
     failedCount: latest.failedCount,
     warnings: warnings.slice(0, 2),
     createdAt: new Date(latest.createdAt).toISOString(),
+  };
+}
+
+function batchHealthStatusLabel(status: AiPipelineBatchHealthSummary["status"]) {
+  if (status === "blocked") return "先停用";
+  if (status === "watch") return "继续观察";
+  if (status === "usable") return "可参考";
+  return "缺样本";
+}
+
+function batchHealthHeadline(status: AiPipelineBatchHealthSummary["status"], label: string) {
+  if (status === "blocked") return `${label}，本书先别继续复用这套批量打法。`;
+  if (status === "watch") return `${label}，本书下一批只能小步验证。`;
+  if (status === "usable") return `${label}，本书可以作为后续批量参考。`;
+  return "本书还没有可复盘的批量打法样本。";
+}
+
+function buildAiPipelineBatchHealthSummary(audits: ControlBatchAudit[] = []): AiPipelineBatchHealthSummary {
+  const review = buildTaskQueueBatchHealthReview(audits, 5);
+  const primary = review.items[0] ?? null;
+  const latestAudit = [...audits]
+    .filter((audit) => audit.executionType === "recommended_batch")
+    .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime())[0] ?? null;
+
+  if (!primary) {
+    return {
+      hasSamples: false,
+      status: "empty",
+      label: "缺样本",
+      headline: "本书还没有可复盘的批量打法样本。",
+      detail: "先从任务中心跑一次带首轮打法的推荐批次，项目总控才会判断这套打法能不能继续。",
+      actionLabel: "去任务中心",
+      targetHref: "/tasks#recommended-batch",
+      total: 0,
+      usable: 0,
+      watch: 0,
+      blocked: 0,
+      sampleBatches: 0,
+      successRatePercent: null,
+      averageQualityScore: null,
+      failedTasks: 0,
+      tacticLabel: "",
+      tacticTitle: "",
+      evidence: [],
+      nextActions: [],
+      latestAt: null,
+    };
+  }
+
+  return {
+    hasSamples: true,
+    status: primary.status,
+    label: batchHealthStatusLabel(primary.status),
+    headline: batchHealthHeadline(primary.status, primary.label),
+    detail: primary.nextAction,
+    actionLabel: primary.status === "blocked" ? "看失败复盘" : "看任务中心",
+    targetHref: primary.status === "blocked" ? "/failures" : latestAudit?.href || "/tasks#recommended-batch",
+    total: review.summary.total,
+    usable: review.summary.usable,
+    watch: review.summary.watch,
+    blocked: review.summary.blocked,
+    sampleBatches: primary.sampleBatches,
+    successRatePercent: primary.successRatePercent,
+    averageQualityScore: primary.averageQualityScore,
+    failedTasks: primary.failedTasks,
+    tacticLabel: primary.label,
+    tacticTitle: primary.tacticTitle,
+    evidence: primary.evidence.slice(0, 3),
+    nextActions: review.nextActions.slice(0, 3),
+    latestAt: primary.latestAt,
   };
 }
 
@@ -1231,6 +1334,7 @@ export function buildProjectControlDashboard(input: ProjectControlDashboardInput
     : 0;
   const aiPipelineBatch = buildAiPipelineBatchSummary(batchDraft, reviewPipeline);
   const aiPipelineRecentBatch = buildAiPipelineRecentBatchSummary(input.gateActionAudits);
+  const aiPipelineBatchHealth = buildAiPipelineBatchHealthSummary(input.gateActionAudits);
   const modelRouteHealth = buildModelRouteHealthSummary(input);
 
   const areas = [
@@ -1290,6 +1394,7 @@ export function buildProjectControlDashboard(input: ProjectControlDashboardInput
     storyFoundation,
     aiPipelineBatch,
     aiPipelineRecentBatch,
+    aiPipelineBatchHealth,
     modelRouteHealth,
     areas,
     priorityActions,

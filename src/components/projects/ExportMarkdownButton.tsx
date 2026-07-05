@@ -3,6 +3,8 @@
 import { useState } from "react";
 import type { ExportMarkdownMode, ExportPackageReadiness } from "@/lib/export/markdown";
 
+type ExportFormat = "markdown" | "docx";
+
 function statusClass(status: ExportPackageReadiness["status"]) {
   if (status === "ready") return "border-emerald-200 bg-emerald-50 text-emerald-800";
   if (status === "warning") return "border-amber-200 bg-amber-50 text-amber-800";
@@ -24,15 +26,23 @@ export function ExportMarkdownButton({
   readiness: ExportPackageReadiness;
   title: string;
 }) {
-  const [exportingMode, setExportingMode] = useState<ExportMarkdownMode | null>(null);
+  const [exporting, setExporting] = useState<{ format: ExportFormat; mode: ExportMarkdownMode } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const openItems = readiness.items.filter((item) => item.status !== "pass").slice(0, 4);
 
-  async function exportMarkdown(mode: ExportMarkdownMode) {
-    setExportingMode(mode);
+  function modeSuffix(mode: ExportMarkdownMode) {
+    return mode === "outline" ? "大纲包" : mode === "characters" ? "人物伏笔包" : "完整资料包";
+  }
+
+  function isExporting(format: ExportFormat, mode: ExportMarkdownMode) {
+    return exporting?.format === format && exporting.mode === mode;
+  }
+
+  async function exportPackage(format: ExportFormat, mode: ExportMarkdownMode) {
+    setExporting({ format, mode });
     setError(null);
     try {
-      const response = await fetch("/api/export/markdown", {
+      const response = await fetch(`/api/export/${format === "docx" ? "docx" : "markdown"}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ projectId, mode }),
@@ -42,18 +52,18 @@ export function ExportMarkdownButton({
         throw new Error("导出失败，请稍后重试。");
       }
 
-      const markdown = await response.text();
-      const blob = new Blob([markdown], { type: "text/markdown;charset=utf-8" });
-      const url = URL.createObjectURL(blob);
+      const extension = format === "docx" ? "docx" : "md";
+      const content = format === "docx" ? await response.blob() : new Blob([await response.text()], { type: "text/markdown;charset=utf-8" });
+      const url = URL.createObjectURL(content);
       const link = document.createElement("a");
       link.href = url;
-      link.download = `${title}-${mode === "outline" ? "大纲包" : mode === "characters" ? "人物伏笔包" : "完整资料包"}.md`;
+      link.download = `${title}-${modeSuffix(mode)}.${extension}`;
       link.click();
       URL.revokeObjectURL(url);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "导出失败。");
     } finally {
-      setExportingMode(null);
+      setExporting(null);
     }
   }
 
@@ -89,27 +99,53 @@ export function ExportMarkdownButton({
       <div className="flex flex-wrap gap-2">
         <button
           className="rounded-md bg-slate-950 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-          disabled={exportingMode !== null}
-          onClick={() => void exportMarkdown("full")}
+          disabled={exporting !== null}
+          onClick={() => void exportPackage("markdown", "full")}
           type="button"
         >
-          {exportingMode === "full" ? "导出中" : "完整资料包"}
+          {isExporting("markdown", "full") ? "导出中" : "完整资料包"}
         </button>
         <button
           className="rounded-md border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
-          disabled={exportingMode !== null}
-          onClick={() => void exportMarkdown("outline")}
+          disabled={exporting !== null}
+          onClick={() => void exportPackage("markdown", "outline")}
           type="button"
         >
-          {exportingMode === "outline" ? "导出中" : "只导出大纲"}
+          {isExporting("markdown", "outline") ? "导出中" : "只导出大纲"}
         </button>
         <button
           className="rounded-md border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
-          disabled={exportingMode !== null}
-          onClick={() => void exportMarkdown("characters")}
+          disabled={exporting !== null}
+          onClick={() => void exportPackage("markdown", "characters")}
           type="button"
         >
-          {exportingMode === "characters" ? "导出中" : "人物伏笔包"}
+          {isExporting("markdown", "characters") ? "导出中" : "人物伏笔包"}
+        </button>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        <button
+          className="rounded-md border border-slate-300 bg-slate-50 px-4 py-2 text-sm font-medium text-slate-800 hover:bg-white disabled:opacity-50"
+          disabled={exporting !== null}
+          onClick={() => void exportPackage("docx", "full")}
+          type="button"
+        >
+          {isExporting("docx", "full") ? "导出中" : "完整 Word"}
+        </button>
+        <button
+          className="rounded-md border border-slate-300 bg-slate-50 px-4 py-2 text-sm font-medium text-slate-800 hover:bg-white disabled:opacity-50"
+          disabled={exporting !== null}
+          onClick={() => void exportPackage("docx", "outline")}
+          type="button"
+        >
+          {isExporting("docx", "outline") ? "导出中" : "大纲 Word"}
+        </button>
+        <button
+          className="rounded-md border border-slate-300 bg-slate-50 px-4 py-2 text-sm font-medium text-slate-800 hover:bg-white disabled:opacity-50"
+          disabled={exporting !== null}
+          onClick={() => void exportPackage("docx", "characters")}
+          type="button"
+        >
+          {isExporting("docx", "characters") ? "导出中" : "人物伏笔 Word"}
         </button>
       </div>
       {error ? <p className="text-sm text-red-600">{error}</p> : null}

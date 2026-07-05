@@ -510,6 +510,48 @@ test("buildFirstDayDispatchCompletionTemplate covers first-day step types", () =
   }), "");
 });
 
+test("buildFirstDayDispatchCompletionTemplate builds role-specific recovery handoff evidence", () => {
+  const recoveryCriteria = [
+    "恢复放量小样本只进入第一章首屏验证，不直接扩成批量生产。",
+    "恢复放量首轮只看小样本，不把任务完成误判为可复用放量结论。",
+    "恢复放量平台包必须先回收小样本曝光、点击、收藏、追读。",
+  ];
+  const openingTemplate = buildFirstDayDispatchCompletionTemplate({
+    dispatchKey: "first-day-handoff:project-1:opening",
+    acceptanceCriteria: recoveryCriteria,
+  });
+  const verificationTemplate = buildFirstDayDispatchCompletionTemplate({
+    dispatchKey: "first-day-handoff:project-1:verification",
+    acceptanceCriteria: recoveryCriteria,
+  });
+  const platformTemplate = buildFirstDayDispatchCompletionTemplate({
+    dispatchKey: "first-day-handoff:project-1:platform-package",
+    acceptanceCriteria: recoveryCriteria,
+  });
+
+  assert.ok(openingTemplate.includes("开头编辑交付"));
+  assert.ok(openingTemplate.includes("首屏钩子"));
+  assert.ok(verificationTemplate.includes("审稿编辑交付"));
+  assert.ok(verificationTemplate.includes("前三章"));
+  assert.ok(platformTemplate.includes("平台运营交付"));
+  assert.ok(platformTemplate.includes("标题"));
+  assert.equal(validateFirstDayDispatchCompletionEvidence({
+    dispatchKey: "first-day-handoff:project-1:opening",
+    acceptanceCriteria: recoveryCriteria,
+    completionEvidence: openingTemplate,
+  }).valid, true);
+  assert.equal(validateFirstDayDispatchCompletionEvidence({
+    dispatchKey: "first-day-handoff:project-1:verification",
+    acceptanceCriteria: recoveryCriteria,
+    completionEvidence: verificationTemplate,
+  }).valid, true);
+  assert.equal(validateFirstDayDispatchCompletionEvidence({
+    dispatchKey: "first-day-handoff:project-1:platform-package",
+    acceptanceCriteria: recoveryCriteria,
+    completionEvidence: platformTemplate,
+  }).valid, true);
+});
+
 test("buildFirstDayDispatchCompletionHint explains scale gates", () => {
   const hint = buildFirstDayDispatchCompletionHint({
     dispatchKey: "first-day:project-1:first-draft",

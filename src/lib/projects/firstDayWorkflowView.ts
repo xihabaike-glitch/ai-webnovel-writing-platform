@@ -392,6 +392,17 @@ function withHandoffCompletion(base: string, acceptanceCriteria: string[]) {
   return handoffLines.length ? [base, ...handoffLines].join("\n") : base;
 }
 
+function recoverySafeLines(acceptanceCriteria: string[]) {
+  const joined = acceptanceCriteria.join(" ");
+  if (!/小样本|恢复放量|放量结论/u.test(joined)) return [];
+  return [
+    "通过线：本轮只验证一个首日变量，开头、前三章或平台包达到最低可继续标准。",
+    "不可接受项：没有把任务完成误判为可复用放量，没有跳过小样本直接批量生产。",
+    "复查证据：已保留章节入口、审稿口径或平台回收字段，后续可以回到任务中心复核。",
+    "放量结论：通过后才允许恢复后续小步生产；未过线则继续停留观察。",
+  ];
+}
+
 function firstDayHref(task: PersistedGatePlatformDispatchTask, stepId: string) {
   if (task.projectId) {
     return `/projects/${task.projectId}?firstDayLaunch=1&nextStep=${encodeURIComponent(stepId)}#first-day-workflow`;
@@ -410,14 +421,26 @@ export function isFirstDayHandoffDispatchTask(task: Pick<PersistedGatePlatformDi
 export function buildFirstDayDispatchCompletionTemplate(task: Pick<PersistedGatePlatformDispatchTask, "dispatchKey" | "acceptanceCriteria"> & Partial<Pick<PersistedGatePlatformDispatchTask, "dueLabel" | "title" | "evidence">>) {
   if (isFirstDayHandoffDispatchTask(task)) {
     const handoffStepId = firstDayHandoffStepId(task.dispatchKey);
-    if (handoffStepId === "opening") return "交接动作已落地：开头打法已拆到第一章首屏，危机、选择、代价和追读问题已写清。";
+    const recoveryLines = recoverySafeLines(task.acceptanceCriteria);
+    if (handoffStepId === "opening") return [
+      "开头编辑交付：交接动作已落地，开头打法已拆到第一章首屏。",
+      "首屏钩子：危机、选择、代价和追读问题已写清。",
+      "避坑边界已确认：不直接放量，先保留首轮验证窗口。",
+      ...recoveryLines,
+    ].join("\n");
     if (handoffStepId === "verification") return [
-      "验证动作已落地：",
+      "审稿编辑交付：验证动作已落地，前三章验收口径已保存。",
       "通过线：前三章钩子、兑现、平台语气和模型路线复检标准已写清。",
       "不可接受项：慢热解释、卖点不兑现、平台风格错位或正文空转。",
       "复查证据：已保留审稿分数、改稿问题和下一轮复查入口。",
+      "放量结论：通过后才允许进入后续小步生产；未过线则继续停留观察。",
     ].join("\n");
-    if (handoffStepId === "platform-package") return "避坑边界已确认：不要直接放量，先做小样本；平台回收口径已写清：标题、简介、标签、样章、曝光、点击、收藏和追读。";
+    if (handoffStepId === "platform-package") return [
+      "平台运营交付：标题、简介、标签和样章已按本次开书打法整理。",
+      "避坑边界已确认：不要直接放量，先做小样本。",
+      "平台回收口径已写清：曝光、点击、收藏和追读。",
+      ...recoveryLines,
+    ].join("\n");
     return "经验开书交接已完成：交接动作、避坑边界和首轮回收口径已写清。";
   }
   if (!isFirstDayDispatchTask(task)) return "";

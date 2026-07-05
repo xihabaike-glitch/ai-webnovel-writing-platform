@@ -197,6 +197,34 @@ export interface PrePublishGateItem {
   href: string;
 }
 
+export interface PrePublishGateAdoptionFollowupItem {
+  id: string;
+  projectId: string;
+  projectTitle: string;
+  type: "review" | "publish_check" | "other";
+  label: string;
+  title: string;
+  status: PrePublishGateItem["status"];
+  state: string;
+  detail: string;
+  evidence: string;
+  actionLabel: string;
+  href: string;
+}
+
+export interface PrePublishGateAdoptionClosure {
+  status: PrePublishGateItem["status"];
+  label: string;
+  detail: string;
+  total: number;
+  completed: number;
+  pending: number;
+  missingEvidence: number;
+  reviewPending: number;
+  publishPending: number;
+  items: PrePublishGateAdoptionFollowupItem[];
+}
+
 export interface PrePublishGateAction {
   id: string;
   label: string;
@@ -246,6 +274,7 @@ export interface PrePublishGate {
   failureRepairBatch: FailureRepairBatch;
   projectStatuses: PrePublishGateProjectStatus[];
   strategyReview: PrePublishGateStrategyReview;
+  firstThreeAdoptionClosure: PrePublishGateAdoptionClosure;
   priorityActions: PrePublishGateAction[];
   releaseAction: PrePublishGateAction | null;
 }
@@ -285,39 +314,85 @@ function firstThreeFollowupHref(projectId: string, task: PrePublishGateDispatchT
   return `/projects/${projectId}`;
 }
 
-function buildFirstThreeAdoptionGateItem(projects: PrePublishGateProject[]) {
+function firstThreeFollowupType(task: PrePublishGateDispatchTask): PrePublishGateAdoptionFollowupItem["type"] {
+  if (task.dispatchKey.endsWith(":review")) return "review";
+  if (task.dispatchKey.endsWith(":publish-check")) return "publish_check";
+  return "other";
+}
+
+function firstThreeFollowupLabel(type: PrePublishGateAdoptionFollowupItem["type"]) {
+  if (type === "review") return "重新审稿";
+  if (type === "publish_check") return "发布质检";
+  return "后续任务";
+}
+
+function buildFirstThreeAdoptionClosure(projects: PrePublishGateProject[]): PrePublishGateAdoptionClosure {
   const followups = firstThreeAdoptionFollowups(projects);
-  const pending = followups.filter(({ task }) => task.state !== "completed");
-  const completedWithoutEvidence = followups.filter(({ task }) => (
-    task.state === "completed" && task.completionEvidence.trim().length < 8
-  ));
-  const reviewPending = pending.filter(({ task }) => task.dispatchKey.endsWith(":review")).length;
-  const publishPending = pending.filter(({ task }) => task.dispatchKey.endsWith(":publish-check")).length;
+  const items = followups.map(({ project, task }): PrePublishGateAdoptionFollowupItem => {
+    const type = firstThreeFollowupType(task);
+    const missingEvidence = task.state === "completed" && task.completionEvidence.trim().length < 8;
+    return {
+      id: task.dispatchKey,
+      projectId: project.id,
+      projectTitle: project.title,
+      type,
+      label: firstThreeFollowupLabel(type),
+      title: task.title ?? firstThreeFollowupLabel(type),
+      status: task.state !== "completed" ? "block" : missingEvidence ? "warn" : "pass",
+      state: task.state,
+      detail: task.detail ?? "采纳后的正文需要重新审稿并刷新发布质检。",
+      evidence: task.completionEvidence,
+      actionLabel: task.actionLabel ?? (type === "publish_check" ? "回发布质检" : "重新审稿"),
+      href: firstThreeFollowupHref(project.id, task),
+    };
+  });
+  const pendingItems = items.filter((item) => item.status === "block");
+  const missingEvidenceItems = items.filter((item) => item.status === "warn");
+  const reviewPending = pendingItems.filter((item) => item.type === "review").length;
+  const publishPending = pendingItems.filter((item) => item.type === "publish_check").length;
   const affectedProjects = new Set(followups.map(({ project }) => project.id)).size;
-  const firstPending = pending[0] ?? completedWithoutEvidence[0] ?? null;
-  const status: PrePublishGateItem["status"] = pending.length > 0
+  const status: PrePublishGateItem["status"] = pendingItems.length > 0
     ? "block"
-    : completedWithoutEvidence.length > 0
+    : missingEvidenceItems.length > 0
       ? "warn"
       : "pass";
+  const detail = pendingItems.length > 0
+    ? `${affectedProjects} 个项目有前三章采纳后续未闭环：${reviewPending} 个待重新审稿，${publishPending} 个待发布质检。正文变更后不能沿用旧审稿。`
+    : missingEvidenceItems.length > 0
+      ? `${missingEvidenceItems.length} 个采纳后续任务已完成但缺少验收证据，发布前补齐证据。`
+      : followups.length > 0
+        ? `已验收 ${followups.length} 个采纳后续任务，重新审稿和发布质检都已回填。`
+        : "当前没有未闭环的前三章采纳后续任务。";
 
+  return {
+    status,
+    label: status === "pass" ? "采纳闭环通过" : status === "warn" ? "采纳闭环缺证据" : "采纳闭环阻塞",
+    detail,
+    total: items.length,
+    completed: items.filter((item) => item.status === "pass").length,
+    pending: pendingItems.length,
+    missingEvidence: missingEvidenceItems.length,
+    reviewPending,
+    publishPending,
+    items,
+  };
+}
+
+function buildFirstThreeAdoptionGateItem(closure: PrePublishGateAdoptionClosure) {
+  const firstAction = closure.items.find((item) => item.status === "block")
+    ?? closure.items.find((item) => item.status === "warn")
+    ?? null;
   return gateItem({
     id: "first-three-adoption-loop",
     label: "采纳闭环",
-    status,
-    detail: pending.length > 0
-      ? `${affectedProjects} 个项目有前三章采纳后续未闭环：${reviewPending} 个待重新审稿，${publishPending} 个待发布质检。正文变更后不能沿用旧审稿。`
-      : completedWithoutEvidence.length > 0
-        ? `${completedWithoutEvidence.length} 个采纳后续任务已完成但缺少验收证据，发布前补齐证据。`
-        : followups.length > 0
-          ? `已验收 ${followups.length} 个采纳后续任务，重新审稿和发布质检都已回填。`
-          : "当前没有未闭环的前三章采纳后续任务。",
-    actionLabel: pending.length > 0
-      ? firstPending?.task.actionLabel ?? "处理采纳后续"
-      : completedWithoutEvidence.length > 0
+    status: closure.status,
+    detail: closure.detail,
+    actionLabel: closure.pending > 0
+      ? firstAction?.actionLabel ?? "处理采纳后续"
+      : closure.missingEvidence > 0
         ? "补验收证据"
         : "查看闭环",
-    href: firstPending ? firstThreeFollowupHref(firstPending.project.id, firstPending.task) : "/projects",
+    href: firstAction?.href ?? "/projects",
   });
 }
 
@@ -856,6 +931,7 @@ export function buildPrePublishGate(input: PrePublishGateInput): PrePublishGate 
   const queueBlockerDetail = queue.recommendedNext?.category === "blocked"
     ? `${queue.recommendedNext.actionLabel}：${queue.recommendedNext.evidence}`
     : null;
+  const firstThreeAdoptionClosure = buildFirstThreeAdoptionClosure(projects);
 
   const items: PrePublishGateItem[] = [
     gateItem({
@@ -884,7 +960,7 @@ export function buildPrePublishGate(input: PrePublishGateInput): PrePublishGate 
       actionLabel: taskBlockers > 0 || runnableTasks > 0 ? "打开任务队列" : "查看任务队列",
       href: "/tasks",
     }),
-    buildFirstThreeAdoptionGateItem(projects),
+    buildFirstThreeAdoptionGateItem(firstThreeAdoptionClosure),
     gateItem({
       id: "ai-failures",
       label: "失败复盘",
@@ -1005,6 +1081,7 @@ export function buildPrePublishGate(input: PrePublishGateInput): PrePublishGate 
     failureRepairBatch,
     projectStatuses,
     strategyReview,
+    firstThreeAdoptionClosure,
     priorityActions,
     releaseAction,
   };

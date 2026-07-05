@@ -175,6 +175,12 @@ test("buildPrePublishGate", async (t) => {
     const adoptionItem = gate.items.find((item) => item.id === "first-three-adoption-loop");
 
     assert.equal(gate.status, "blocked");
+    assert.equal(gate.firstThreeAdoptionClosure.status, "block");
+    assert.equal(gate.firstThreeAdoptionClosure.total, 2);
+    assert.equal(gate.firstThreeAdoptionClosure.pending, 2);
+    assert.equal(gate.firstThreeAdoptionClosure.reviewPending, 1);
+    assert.equal(gate.firstThreeAdoptionClosure.publishPending, 1);
+    assert.equal(gate.firstThreeAdoptionClosure.items[0].href, "/projects/project-ready/chapters/chapter-1#chapter-workflow");
     assert.equal(adoptionItem?.status, "block");
     assert.ok(adoptionItem?.detail.includes("正文变更后不能沿用旧审稿"));
     assert.ok(gate.priorityActions.some((action) => action.id.includes(":review") && action.label === "重新审稿"));
@@ -205,6 +211,9 @@ test("buildPrePublishGate", async (t) => {
     const adoptionItem = gate.items.find((item) => item.id === "first-three-adoption-loop");
 
     assert.equal(gate.status, "ready");
+    assert.equal(gate.firstThreeAdoptionClosure.status, "pass");
+    assert.equal(gate.firstThreeAdoptionClosure.completed, 2);
+    assert.equal(gate.firstThreeAdoptionClosure.items[1].evidence.includes("发布质检已刷新"), true);
     assert.equal(adoptionItem?.status, "pass");
     assert.ok(adoptionItem?.detail.includes("已验收 2 个采纳后续任务"));
     assert.ok(gate.items.every((item) => item.status === "pass"));

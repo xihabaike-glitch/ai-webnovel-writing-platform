@@ -3,6 +3,7 @@ import { AppShell } from "@/components/app-shell/AppShell";
 import { GateClosedLoopTimelinePanel } from "@/components/gate/GateClosedLoopTimelinePanel";
 import { GateActionWorkspace } from "@/components/gate/GateActionWorkspace";
 import { GateExportPackagePanel } from "@/components/gate/GateExportPackagePanel";
+import { GateFirstThreeAdoptionPanel } from "@/components/gate/GateFirstThreeAdoptionPanel";
 import { GatePlatformStrategyReviewPanel } from "@/components/gate/GatePlatformStrategyReviewPanel";
 import { GatePublishEffectReviewPanel } from "@/components/gate/GatePublishEffectReviewPanel";
 import { buildTaskBatchHistory } from "@/lib/ai/taskBatchHistory";
@@ -44,11 +45,20 @@ export default async function GatePage() {
         aiTasks: { orderBy: { createdAt: "desc" } },
         worldEntries: { orderBy: [{ type: "asc" }, { createdAt: "asc" }] },
         gateDispatchTasks: {
-          where: { dispatchKey: { startsWith: "first-day:" } },
+          where: {
+            OR: [
+              { dispatchKey: { startsWith: "first-day:" } },
+              { dispatchKey: { startsWith: "first-three-adoption:" } },
+            ],
+          },
           select: {
             dispatchKey: true,
             state: true,
             completionEvidence: true,
+            title: true,
+            detail: true,
+            actionLabel: true,
+            href: true,
           },
         },
         publishSnapshots: { orderBy: { createdAt: "desc" }, take: 80 },
@@ -193,6 +203,8 @@ export default async function GatePage() {
 
       <GateExportPackagePanel packages={gate.projectStatuses} />
 
+      <GateFirstThreeAdoptionPanel closure={gate.firstThreeAdoptionClosure} />
+
       <GatePublishEffectReviewPanel packages={gate.projectStatuses} />
 
       <GatePlatformStrategyReviewPanel review={gate.strategyReview} />
@@ -201,7 +213,7 @@ export default async function GatePage() {
 
       <section className="mb-6 grid gap-4 lg:grid-cols-[0.9fr_1.1fr]">
         <div className="rounded-md border border-slate-200 bg-white p-4">
-          <div className="mb-3 font-medium text-slate-950">四项总检</div>
+          <div className="mb-3 font-medium text-slate-950">总检卡</div>
           <div className="grid gap-2">
             {gate.items.map((item) => (
               <Link className="block rounded-md bg-slate-50 p-3 text-sm hover:bg-slate-100" href={item.href} key={item.id}>

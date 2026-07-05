@@ -4,6 +4,7 @@ import { buildModelRouteConfirmationReceipt } from "../lib/model-gateway/routeCo
 import { getPlatformProfile } from "../lib/platforms/platformProfiles.ts";
 import { getPlatformWritingStyle } from "../lib/platforms/writingStyleTemplates.ts";
 import {
+  buildGateActionReceipt,
   buildGateDispatchCompletionReceipt,
   buildGatePublishEffectReceipt,
   type GateBatchTacticEffectItem,
@@ -185,6 +186,62 @@ test("buildProjectStartTacticAdvice", async (t) => {
     assert.equal(guide.items[0]?.status, "recommended");
     assert.equal(guide.items[0]?.label, "恢复放量打法");
     assert.ok(guide.items[0]?.detail.includes("新项目仍先跑小样本"));
+  });
+
+  await t.test("carries repeated recovery scale-up into gate experience for first-three starts", () => {
+    const platform = getPlatformProfile("fanqie");
+    const tactic = {
+      title: "首轮平台打法：番茄小说",
+      label: "批量可复用",
+      primaryTactic: "首章先给不可逆危机，三章内连续兑现爽点。",
+      openingMove: "第一段给倒计时和身份暴露风险。",
+      verificationMove: "批量后复检前三章追读。",
+      risk: "解释过多会掉首秀。",
+    };
+    const action = {
+      id: "recommended-batch:standard:draft:project-1",
+      label: "沉淀批量初稿经验",
+      detail: "番茄小说 · 夜雨系统 · 批量初稿 2 个",
+      href: "/projects/project-1#ai-pipeline",
+      tone: "primary" as const,
+      execution: { type: "recommended_batch" as const, strategyId: "standard" as const },
+    };
+    const receipts = [
+      buildGateActionReceipt({
+        action,
+        status: "succeeded",
+        now: "2026-01-01T00:00:00.000Z",
+        payload: {
+          results: [{ status: "succeeded", taskId: "task-1" }],
+          routeEffectSummary: { successRatePercent: 100, knownCostUsd: 0.01, averageQualityScore: 88 },
+          plan: { strategyBases: [tactic], scaleGate: "cleared", actionLabel: "批量初稿 2 个", category: "draft" },
+          batchReceipt: { status: "continue", headline: "准放量批次稳定，下一批仍小步走" },
+        },
+      }),
+      buildGateActionReceipt({
+        action,
+        status: "succeeded",
+        now: "2026-01-02T00:00:00.000Z",
+        payload: {
+          results: [{ status: "succeeded", taskId: "task-2" }],
+          routeEffectSummary: { successRatePercent: 100, knownCostUsd: 0.02, averageQualityScore: 90 },
+          plan: { strategyBases: [tactic], scaleGate: "cleared", actionLabel: "批量初稿 2 个", category: "draft" },
+          batchReceipt: { status: "continue", headline: "准放量批次稳定，下一批仍小步走" },
+        },
+      }),
+    ];
+
+    const result = buildProjectStartGateExperience({
+      platform,
+      template: getDefaultTemplateForPlatform(platform.id),
+      style: getPlatformWritingStyle(platform.id),
+      receipts,
+    });
+
+    assert.equal(result.advice.label, "恢复放量打法");
+    assert.equal(result.selection.batchEffect?.recoveryBatches, 2);
+    assert.ok(result.experiences.some((item) => item.tactic === "恢复放量打法"));
+    assert.ok(result.advice.verificationMove.includes("新项目先小样本复验"));
   });
 
   await t.test("turns platform knowledge feedback receipts into project start experience", () => {

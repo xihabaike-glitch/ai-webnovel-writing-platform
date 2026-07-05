@@ -280,6 +280,12 @@ function isThirdMetricDowngradeExperience(experience: GatePlatformTacticExperien
   return experience.tactic === "三轮降档修复打法";
 }
 
+function isRecoveryScaleExperience(experience: GatePlatformTacticExperienceItem) {
+  return experience.tactic === "恢复放量打法"
+    || experience.tactic === "恢复放量观察"
+    || experience.tactic === "恢复放量避坑";
+}
+
 function isThirdMetricFinalExperience(experience: GatePlatformTacticExperienceItem) {
   return isThirdMetricStableExperience(experience)
     || isThirdMetricArchivePauseExperience(experience)
@@ -466,18 +472,21 @@ export function buildProjectStartPlatformExperienceGuide(input: {
     if (experience?.status === "usable") {
       const firstDayClosedLoop = isFirstDayClosedLoopExperience(experience);
       const thirdStable = isThirdMetricStableExperience(experience);
+      const recoveryScale = isRecoveryScaleExperience(experience);
       return {
         platformId: platform.id,
         platformName: platform.name,
         status: "recommended",
-        label: firstDayClosedLoop ? "开局闭环" : thirdStable ? "三轮稳住" : "历史可复用",
-        headline: firstDayClosedLoop ? `${platform.name} 优先开书` : thirdStable ? `${platform.name} 三轮已站住` : `${platform.name} 优先参考`,
+        label: firstDayClosedLoop ? "开局闭环" : thirdStable ? "三轮稳住" : recoveryScale ? "恢复放量打法" : "历史可复用",
+        headline: firstDayClosedLoop ? `${platform.name} 优先开书` : thirdStable ? `${platform.name} 三轮已站住` : recoveryScale ? `${platform.name} 恢复放量已站住` : `${platform.name} 优先参考`,
         detail: firstDayClosedLoop
           ? `${experience.tactic} 已经被用于新书第一天流程并完成交接，优先作为本次开书默认打法。${experience.reuseHint}`
           : thirdStable
             ? `第三轮最终结论已经稳定加码。${experience.reuseHint} 新项目可优先用它做平台默认打法，但首轮仍要回填真实数据。`
-          : `${experience.tactic} 可作为新项目开书参考。${experience.reuseHint}`,
-        priorityScore: firstDayClosedLoop ? experience.priorityScore + 12 : thirdStable ? experience.priorityScore + 8 : experience.priorityScore,
+            : recoveryScale
+              ? `${experience.tactic} 可作为解除闸门后的谨慎默认打法。${experience.reuseHint}`
+              : `${experience.tactic} 可作为新项目开书参考。${experience.reuseHint}`,
+        priorityScore: firstDayClosedLoop ? experience.priorityScore + 12 : thirdStable ? experience.priorityScore + 8 : recoveryScale ? experience.priorityScore + 6 : experience.priorityScore,
         source: "experience",
         href: experience.href,
         evidence: experience.evidence.slice(0, 3),
@@ -783,10 +792,12 @@ export function selectProjectStartTacticEvidence(input: {
   const guideItem = guide.items[0] ?? null;
 
   if (guideItem?.source === "experience") {
+    const experience = experienceForPlatform(experiences, input.platform);
+    const batchEffect = batchEffectForPlatform(batchEffects, input.platform);
     return {
       guideItem,
-      experience: experienceForPlatform(experiences, input.platform),
-      batchEffect: null,
+      experience,
+      batchEffect: experience && isRecoveryScaleExperience(experience) ? batchEffect : null,
     };
   }
 
@@ -1050,6 +1061,29 @@ export function buildProjectStartTacticAdvice(input: {
       };
     }
 
+    if (isRecoveryScaleExperience(experience)) {
+      return {
+        status: historyStatus(experience),
+        label: experience.tactic,
+        title: `${platform.name}：${experience.tactic}`,
+        primaryTactic: experience.lesson,
+        openingMove: experience.status === "blocked"
+          ? `先避开恢复放量失败样本，重写首屏钩子：${style.openingHook}`
+          : `按恢复放量样本拆首章动作：${experience.reuseHint}`,
+        verificationMove: experience.status === "usable"
+          ? `创建后先跑前三章、平台包装和模型路线小样本复验，确认追读证据后再加码。${modelRouteVerification}`
+          : `创建后只能复用恢复验证清单，不复用成功结论，必须先小样本回填前三章追读证据。${modelRouteVerification}`,
+        risk: experience.risk,
+        evidence: withModelEvidence(experience.evidence),
+        checklist: withModelChecklist([
+          "恢复放量：只作为解除闸门后的谨慎默认打法",
+          "首轮限制：新项目先跑小样本，不直接放量",
+          `模板前三章：${firstThreeTitles}`,
+          `必须具备：${style.mustHave.join("、")}`,
+        ]),
+      };
+    }
+
     return {
       status: historyStatus(experience),
       label: historyLabel(experience),
@@ -1109,11 +1143,11 @@ export function buildProjectStartGateExperience(input: {
     input.knowledgeFeedbackReceipts ?? [],
     input.timelineLimit ?? 20,
   );
+  const batchEffects = buildGateBatchTacticEffectReview(receipts, input.batchLimit ?? 20).items;
   const experiences = [
     ...knowledgeFeedbackExperiences,
-    ...buildGatePlatformTacticExperienceLibrary(timeline, input.timelineLimit ?? 20).items,
+    ...buildGatePlatformTacticExperienceLibrary(timeline, input.timelineLimit ?? 20, batchEffects).items,
   ];
-  const batchEffects = buildGateBatchTacticEffectReview(receipts, input.batchLimit ?? 20).items;
   const modelRoutes = buildProjectStartModelRouteExperienceFromReceipts(receipts);
   const selection = selectProjectStartTacticEvidence({
     platform: input.platform,

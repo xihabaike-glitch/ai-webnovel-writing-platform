@@ -8,6 +8,7 @@ import { BatchReviewPipelinePanel } from "@/components/projects/BatchReviewPipel
 import { ChapterProductionFlowPanel } from "@/components/projects/ChapterProductionFlowPanel";
 import { ChapterProductionPanel } from "@/components/projects/ChapterProductionPanel";
 import { CharacterArcPanel } from "@/components/projects/CharacterArcPanel";
+import { ContinuityAuditPanel } from "@/components/projects/ContinuityAuditPanel";
 import { ExportMarkdownButton } from "@/components/projects/ExportMarkdownButton";
 import { FirstDayWorkflowPanel } from "@/components/projects/FirstDayWorkflowPanel";
 import { FirstThreeRewritePanel } from "@/components/projects/FirstThreeRewritePanel";
@@ -29,6 +30,7 @@ import { buildStoryTreeExperienceApplyDispatchKey, buildStoryTreeExperienceEffec
 import { prisma } from "@/lib/db/prisma";
 import { buildExportPackageReadiness } from "@/lib/export/markdown";
 import { getPlatformProfile, type PlatformId } from "@/lib/platforms/platformProfiles";
+import { buildContinuityAudit } from "@/lib/projects/continuityAudit";
 import { buildGatePlatformDecisionTimeline, buildGatePlatformTacticExperienceLibrary, gateActionReceiptFromAuditRecord } from "@/lib/projects/gateActionReceipts";
 import { gatePlatformDispatchTaskFromRecord } from "@/lib/projects/gateDispatchTaskRecords";
 import { buildPlatformKnowledgeBrief } from "@/lib/projects/platformKnowledgeBrief";
@@ -334,6 +336,51 @@ export default async function ProjectPage({ params }: { params: Promise<{ projec
       status: entry.status,
     })),
   });
+  const continuityAudit = buildContinuityAudit({
+    chapters: project.chapters.map((chapter) => ({
+      id: chapter.id,
+      order: chapter.order,
+      title: chapter.title,
+      content: chapter.content,
+      goal: chapter.goal,
+      hook: chapter.hook,
+      conflict: chapter.conflict,
+      cliffhanger: chapter.cliffhanger,
+      status: chapter.status,
+    })),
+    characters: project.characters.map((character) => ({
+      id: character.id,
+      name: character.name,
+      role: character.role,
+      desire: character.desire,
+      need: character.need,
+      flaw: character.flaw,
+      arcStart: character.arcStart,
+      arcEnd: character.arcEnd,
+    })),
+    worldEntries: project.worldEntries.map((entry) => ({
+      id: entry.id,
+      type: entry.type,
+      title: entry.title,
+      content: entry.content,
+    })),
+    foreshadows: project.foreshadows.map((entry) => ({
+      id: entry.id,
+      title: entry.title,
+      setupChapterId: entry.setupChapterId,
+      payoffChapterId: entry.payoffChapterId,
+      status: entry.status,
+      notes: entry.notes,
+    })),
+    plotThreads: project.plotThreads.map((entry) => ({
+      id: entry.id,
+      type: entry.type,
+      title: entry.title,
+      startChapterId: entry.startChapterId,
+      endChapterId: entry.endChapterId,
+      status: entry.status,
+    })),
+  });
   const outlineNodes = project.outlineNodes.map((node) => ({
     id: node.id,
     parentId: node.parentId,
@@ -599,6 +646,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ projec
         <div id="world-bible">
           <WorldBiblePanel projectId={project.id} />
         </div>
+        <ContinuityAuditPanel audit={continuityAudit} />
         <div id="chapter-production">
           <ChapterProductionPanel projectId={project.id} />
         </div>

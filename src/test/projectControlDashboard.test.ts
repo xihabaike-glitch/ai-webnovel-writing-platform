@@ -95,6 +95,9 @@ test("buildProjectControlDashboard", async (t) => {
     assert.ok(dashboard.storyFoundation.axes.some((axis) => axis.label === "大树骨架"));
     assert.ok(dashboard.storyFoundation.axes.some((axis) => axis.label === "人物弧光"));
     assert.ok(dashboard.storyFoundation.nextAction.length > 0);
+    assert.equal(dashboard.storyFoundation.canExecute, true);
+    assert.ok(["outline", "characters", "story-lines", "world"].includes(dashboard.storyFoundation.actionAreaId ?? ""));
+    assert.equal(dashboard.storyFoundation.actionMode, "seed");
     assert.equal(dashboard.areas.find((area) => area.id === "export")?.status, "blocked");
     assert.ok(dashboard.areas.find((area) => area.id === "export")?.nextAction.includes("先处理"));
     assert.equal(dashboard.priorityActions.length, 4);
@@ -322,6 +325,7 @@ test("buildProjectControlDashboard", async (t) => {
     assert.ok(["good", "watch"].includes(dashboard.storyFoundation.status));
     assert.ok(dashboard.storyFoundation.axes.some((axis) => axis.id === "world" && axis.status === "good"));
     assert.ok(dashboard.storyFoundation.axes.some((axis) => axis.id === "characters" && axis.score > 0));
+    assert.equal(typeof dashboard.storyFoundation.canExecute, "boolean");
     assert.equal(dashboard.areas.find((area) => area.id === "world")?.status, "good");
     assert.equal(dashboard.areas.find((area) => area.id === "export")?.status, "good");
   });

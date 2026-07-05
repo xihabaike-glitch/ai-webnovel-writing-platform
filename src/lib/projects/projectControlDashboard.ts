@@ -174,6 +174,9 @@ export interface StoryFoundationSummary {
   headline: string;
   nextAction: string;
   actionLabel: string;
+  actionAreaId: string | null;
+  actionMode: "seed" | null;
+  canExecute: boolean;
   targetAnchor: string;
   axes: StoryFoundationAxis[];
 }
@@ -400,6 +403,8 @@ function buildStoryFoundationSummary(areas: ControlArea[]): StoryFoundationSumma
   const score = clampScore(average(axes.map((item) => item.score)));
   const status: ControlArea["status"] = score >= 80 ? "good" : score >= 55 ? "watch" : "blocked";
   const weakest = [...axes].sort((left, right) => left.score - right.score || left.label.localeCompare(right.label))[0];
+  const executableAreaIds = new Set(["outline", "characters", "story-lines", "world"]);
+  const actionAreaId = weakest && executableAreaIds.has(weakest.id) ? weakest.id : null;
   const label = status === "good" ? "底座可扩写" : status === "watch" ? "底座待加固" : "先搭底座";
   const headline = status === "good"
     ? "开头、结尾、主干、分支和土壤已能支撑持续连载。"
@@ -413,7 +418,10 @@ function buildStoryFoundationSummary(areas: ControlArea[]): StoryFoundationSumma
     label,
     headline,
     nextAction: weakest?.nextAction ?? "先补大纲、人物、主线和世界观的硬缺口。",
-    actionLabel: weakest?.label ? `补${weakest.label}` : "补写作底座",
+    actionLabel: weakest?.label ? `${actionAreaId ? "一键" : ""}补${weakest.label}` : "补写作底座",
+    actionAreaId,
+    actionMode: actionAreaId ? "seed" : null,
+    canExecute: Boolean(actionAreaId),
     targetAnchor: weakest?.targetAnchor ?? "outline-tree",
     axes,
   };

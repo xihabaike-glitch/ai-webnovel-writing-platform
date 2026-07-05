@@ -35,6 +35,9 @@ interface StoryFoundationSummary {
   headline: string;
   nextAction: string;
   actionLabel: string;
+  actionAreaId: string | null;
+  actionMode: "seed" | null;
+  canExecute: boolean;
   targetAnchor: string;
   axes: StoryFoundationAxis[];
 }
@@ -245,6 +248,7 @@ export function ProjectControlDashboardPanel({ projectId }: { projectId: string 
   const [runningActionId, setRunningActionId] = useState<string | null>(null);
   const [runningVerdictAction, setRunningVerdictAction] = useState(false);
   const [runningStartDecision, setRunningStartDecision] = useState(false);
+  const [runningFoundationAction, setRunningFoundationAction] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
   async function loadDashboard() {
@@ -295,6 +299,39 @@ export function ProjectControlDashboardPanel({ projectId }: { projectId: string 
       setMessage(caught instanceof Error ? caught.message : "执行总控动作失败。");
     } finally {
       setRunningActionId(null);
+    }
+  }
+
+  async function executeStoryFoundationAction() {
+    if (!dashboard?.storyFoundation.canExecute || !dashboard.storyFoundation.actionAreaId || !dashboard.storyFoundation.actionMode) return;
+    setRunningFoundationAction(true);
+    setMessage(null);
+    try {
+      const response = await fetch(`/api/projects/${projectId}/control-actions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          areaId: dashboard.storyFoundation.actionAreaId,
+          mode: dashboard.storyFoundation.actionMode,
+        }),
+      });
+      const payload = await response.json() as {
+        message?: string;
+        error?: string;
+        targetAnchor?: string;
+      };
+      if (!response.ok) {
+        throw new Error(payload.error ?? "补齐写作底座失败。");
+      }
+      await loadDashboard();
+      setMessage(payload.message ?? "写作底座已补齐一轮。");
+      if (payload.targetAnchor && typeof window !== "undefined") {
+        window.location.hash = payload.targetAnchor;
+      }
+    } catch (caught) {
+      setMessage(caught instanceof Error ? caught.message : "补齐写作底座失败。");
+    } finally {
+      setRunningFoundationAction(false);
     }
   }
 
@@ -449,12 +486,23 @@ export function ProjectControlDashboardPanel({ projectId }: { projectId: string 
                   下一步：{dashboard.storyFoundation.nextAction}
                 </div>
               </div>
-              <Link
-                className="inline-flex w-fit items-center justify-center rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white hover:bg-slate-800"
-                href={`/projects/${projectId}#${dashboard.storyFoundation.targetAnchor}`}
-              >
-                {dashboard.storyFoundation.actionLabel}
-              </Link>
+              {dashboard.storyFoundation.canExecute ? (
+                <button
+                  className="inline-flex w-fit items-center justify-center rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white hover:bg-slate-800 disabled:opacity-50"
+                  disabled={runningFoundationAction}
+                  onClick={() => void executeStoryFoundationAction()}
+                  type="button"
+                >
+                  {runningFoundationAction ? "执行中" : dashboard.storyFoundation.actionLabel}
+                </button>
+              ) : (
+                <Link
+                  className="inline-flex w-fit items-center justify-center rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white hover:bg-slate-800"
+                  href={`/projects/${projectId}#${dashboard.storyFoundation.targetAnchor}`}
+                >
+                  {dashboard.storyFoundation.actionLabel}
+                </Link>
+              )}
             </div>
             <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
               {dashboard.storyFoundation.axes.map((axis) => (

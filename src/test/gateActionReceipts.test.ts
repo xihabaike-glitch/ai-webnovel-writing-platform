@@ -26,6 +26,7 @@ import {
   buildGateProjectSecondMetricFollowupDispatchItems,
   buildGateProjectThirdMetricDecision,
   buildGatePlatformDispatchReceipt,
+  buildGateDispatchCompletionReceipt,
   buildGateDispatchEvidenceReview,
   buildGateDispatchCompletionTemplate,
   buildGatePlatformScaleGate,
@@ -3822,6 +3823,59 @@ test("buildGateActionReceipt", async (t) => {
     assert.equal(review.items.find((item) => item.dispatchKey === activeTask.dispatchKey)?.actionLabel, activeTask.actionLabel);
     assert.equal(review.items.find((item) => item.dispatchKey === activeTask.dispatchKey)?.href, activeTask.href);
     assert.ok(review.nextActions.some((actionText) => actionText.includes("后续业务回执")));
+  });
+
+  await t.test("counts dispatch completion receipts as business evidence", () => {
+    const baseDispatch = buildGatePlatformGrowthDispatchItems([buildGatePlatformStrategyReceipt({
+      item: strategyPlatform,
+      status: "succeeded",
+      now: "2026-01-01T00:00:00.000Z",
+      payload: {
+        variants: [{ strategy: "强钩子版" }],
+      },
+    })])[0];
+    const completedTask = {
+      ...baseDispatch,
+      id: "fanqie:publish_finalize",
+      databaseId: "dispatch-db-completion-receipt",
+      dispatchKey: "fanqie:publish_finalize",
+      projectId: "project-1",
+      sourceReceiptId: null,
+      completionEvidence: [
+        "番茄小说 发布包定稿",
+        "标题：重生后我靠毒舌系统爆红",
+        "简介：第一章直接给冲突和反转",
+        "标签：重生、系统、逆袭",
+        "结论：可发布",
+      ].join("\n"),
+      platformId: "fanqie",
+      platformName: "番茄小说",
+      stage: "start_publish_finalize" as const,
+      state: "completed" as const,
+      priorityScore: 80,
+      assignedAt: "2026-01-01T00:30:00.000Z",
+      completedAt: "2026-01-01T01:00:00.000Z",
+      createdAt: "2026-01-01T00:30:00.000Z",
+      updatedAt: "2026-01-01T01:00:00.000Z",
+    };
+    const dispatchReceipt = buildGatePlatformDispatchReceipt({
+      dispatch: completedTask,
+      now: "2026-01-01T01:30:00.000Z",
+    });
+    const completionReceipt = buildGateDispatchCompletionReceipt({
+      dispatch: completedTask,
+      completionEvidence: completedTask.completionEvidence,
+      now: "2026-01-01T01:30:00.001Z",
+    });
+    const metaOnlyReview = buildGateDispatchEvidenceReview([completedTask], [dispatchReceipt]);
+    const completedReview = buildGateDispatchEvidenceReview([completedTask], [dispatchReceipt, completionReceipt]);
+
+    assert.equal(dispatchReceipt.actionId, "gate-platform-dispatch:start_publish_finalize:fanqie");
+    assert.equal(completionReceipt.actionId, "gate-dispatch-completion:start_publish_finalize:fanqie");
+    assert.equal(completionReceipt.taskId, completedTask.dispatchKey);
+    assert.equal(metaOnlyReview.items[0].status, "needs_receipt");
+    assert.equal(completedReview.items[0].status, "verified");
+    assert.equal(completedReview.items[0].latestReceiptAt, completionReceipt.createdAt);
   });
 
   await t.test("builds and validates platform dispatch completion templates", () => {

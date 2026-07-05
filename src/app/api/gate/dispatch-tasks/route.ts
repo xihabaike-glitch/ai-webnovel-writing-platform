@@ -16,7 +16,11 @@ import { buildFirstDayFollowUpDispatch, buildFirstDayWorkflow } from "@/lib/proj
 import { validateFirstDayDispatchCompletionEvidence } from "@/lib/projects/firstDayWorkflowView";
 import { buildChapterProductionRecheckFollowUpTasks } from "@/lib/projects/chapterProductionRecheckFollowUp";
 import { buildProjectControlDashboard } from "@/lib/projects/projectControlDashboard";
-import { buildGatePublishEffectReceipt, reviewGateDispatchCompletionEvidence } from "@/lib/projects/gateActionReceipts";
+import {
+  buildGateDispatchCompletionReceipt,
+  buildGatePublishEffectReceipt,
+  reviewGateDispatchCompletionEvidence,
+} from "@/lib/projects/gateActionReceipts";
 import type {
   GateEvidenceLoopRecheck,
   GateStoryTreeRecheck,
@@ -227,7 +231,7 @@ async function writeSubmissionDecisionCompletionEffect(task: Awaited<ReturnType<
       paidReads: effect.paidReads,
       snapshotDate: effect.snapshotDate,
     },
-    now: task.completedAt ?? new Date(),
+    now: dateAfter(task.completedAt ?? new Date()),
   });
 
   await prisma.gateActionAudit.upsert({
@@ -296,6 +300,92 @@ async function writeSubmissionDecisionCompletionEffect(task: Awaited<ReturnType<
     nextAction: effect.review.nextAction,
     evidence: effect.review.evidence,
   };
+}
+
+function dateAfter(value: Date | string) {
+  return new Date(new Date(value).getTime() + 1);
+}
+
+async function writeDispatchCompletionActionReceipt(task: Awaited<ReturnType<typeof prisma.gateDispatchTask.update>>) {
+  if (!shouldWriteKnowledgeFeedback(task)) return null;
+  const completionEvidence = task.completionEvidence.trim();
+  if (!completionEvidence) return null;
+
+  const receipt = buildGateDispatchCompletionReceipt({
+    dispatch: {
+      id: task.dispatchKey,
+      platformId: task.platformId,
+      platformName: task.platformName,
+      stage: task.stage as GatePlatformGrowthDispatchItem["stage"],
+      state: state(task.state),
+      priorityScore: task.priorityScore,
+      ownerRole: task.ownerRole,
+      title: task.title,
+      detail: task.detail,
+      dueLabel: task.dueLabel,
+      actionLabel: task.actionLabel,
+      href: task.href,
+      acceptanceCriteria: parseJsonList(task.acceptanceCriteria),
+      evidence: parseJsonList(task.evidence),
+      reviewLatestAt: task.reviewLatestAt.toISOString(),
+    },
+    completionEvidence,
+    now: dateAfter(task.completedAt ?? new Date()),
+  });
+
+  const payload = JSON.stringify({
+    dispatchCompletion: {
+      dispatchKey: task.dispatchKey,
+      completionEvidence,
+    },
+  });
+  await prisma.gateActionAudit.upsert({
+    where: { receiptId: receipt.id },
+    create: {
+      receiptId: receipt.id,
+      actionId: receipt.actionId,
+      projectId: task.projectId,
+      platformId: receipt.platformId ?? task.platformId,
+      platformName: receipt.platformName ?? task.platformName,
+      label: receipt.label,
+      detail: receipt.detail,
+      href: receipt.href,
+      status: receipt.status,
+      message: receipt.message,
+      executionType: receipt.executionType,
+      succeededCount: receipt.succeededCount,
+      failedCount: receipt.failedCount,
+      taskId: receipt.taskId,
+      recheckStatus: receipt.recheck.status,
+      recheckLabel: receipt.recheck.label,
+      recheckDetail: receipt.recheck.detail,
+      recheckAction: receipt.recheck.actionLabel,
+      payload,
+      createdAt: new Date(receipt.createdAt),
+    },
+    update: {
+      projectId: task.projectId,
+      platformId: receipt.platformId ?? task.platformId,
+      platformName: receipt.platformName ?? task.platformName,
+      label: receipt.label,
+      detail: receipt.detail,
+      href: receipt.href,
+      status: receipt.status,
+      message: receipt.message,
+      executionType: receipt.executionType,
+      succeededCount: receipt.succeededCount,
+      failedCount: receipt.failedCount,
+      taskId: receipt.taskId,
+      recheckStatus: receipt.recheck.status,
+      recheckLabel: receipt.recheck.label,
+      recheckDetail: receipt.recheck.detail,
+      recheckAction: receipt.recheck.actionLabel,
+      payload,
+      createdAt: new Date(receipt.createdAt),
+    },
+  });
+
+  return receipt;
 }
 
 function baselineEvidenceLoopScore(task: Awaited<ReturnType<typeof prisma.gateDispatchTask.update>>) {
@@ -857,6 +947,9 @@ export async function PATCH(request: Request) {
   const submissionEffectReview = nextState === "completed"
     ? await writeSubmissionDecisionCompletionEffect(task)
     : null;
+  const dispatchCompletionReceipt = nextState === "completed" && !submissionEffectReview
+    ? await writeDispatchCompletionActionReceipt(task)
+    : null;
   const evidenceLoopRecheck = nextState === "completed"
     ? await buildEvidenceLoopRecheck(task)
     : null;
@@ -909,6 +1002,7 @@ export async function PATCH(request: Request) {
       severity: knowledgeFeedbackReceipt.severity,
       createdAt: knowledgeFeedbackReceipt.createdAt.toISOString(),
     } : null,
+    dispatchCompletionReceipt,
     submissionEffectReview,
     evidenceLoopRecheck,
     storyTreeRecheck,

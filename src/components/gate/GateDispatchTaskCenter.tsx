@@ -309,6 +309,9 @@ export function GateDispatchTaskCenter({
         } else if (submissionEffectMessage) {
           setRouteActionMessage(submissionEffectMessage);
           setRouteActionLink(null);
+        } else if (updated.dispatchCompletionReceipt) {
+          setRouteActionMessage(`已生成业务回执：${updated.dispatchCompletionReceipt.label}。证据复盘会用这条回执判断派单真闭环。`);
+          setRouteActionLink({ label: "回总闸门复查", href: "/gate" });
         } else if (updated.knowledgeFeedbackReceipt) {
           setRouteActionMessage(`已回灌到项目反哺证据：${updated.knowledgeFeedbackReceipt.platformName} · ${updated.knowledgeFeedbackReceipt.completedStepLabel}`);
           setRouteActionLink(null);

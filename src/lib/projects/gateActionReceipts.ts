@@ -2822,6 +2822,37 @@ export function buildGatePlatformDispatchReceipt(input: {
   };
 }
 
+export function buildGateDispatchCompletionReceipt(input: {
+  dispatch: GatePlatformGrowthDispatchItem;
+  completionEvidence: string;
+  now?: Date | string;
+}): GateActionReceipt {
+  const createdAt = input.now ? new Date(input.now).toISOString() : new Date().toISOString();
+  const evidence = input.completionEvidence.trim();
+  return {
+    id: `gate-dispatch-completion:${input.dispatch.id}:${createdAt}`,
+    actionId: `gate-dispatch-completion:${input.dispatch.stage}:${input.dispatch.platformId}`,
+    label: `${input.dispatch.actionLabel}完成`,
+    detail: `${input.dispatch.platformName} · ${input.dispatch.title}`,
+    href: input.dispatch.href,
+    status: "succeeded",
+    message: `已验收 ${input.dispatch.platformName} 派单「${input.dispatch.title}」：${evidence}`,
+    executionType: "manual",
+    succeededCount: 1,
+    failedCount: 0,
+    taskId: input.dispatch.id,
+    platformId: input.dispatch.platformId,
+    platformName: input.dispatch.platformName,
+    recheck: {
+      status: "ready",
+      label: "复检派单完成结果",
+      detail: "派单完成依据已经形成业务回执，刷新总闸门后确认平台证据、发布包或修复链路是否闭环。",
+      actionLabel: "刷新总闸门",
+    },
+    createdAt,
+  };
+}
+
 export function buildGateActionReviewAdvice(receipts: GateActionReceipt[], limit = 3): GateActionReviewAdvice[] {
   const sorted = trimGateActionReceipts(receipts, defaultGateActionReceiptLimit);
   if (sorted.length === 0) {
@@ -6631,6 +6662,7 @@ export async function updatePersistedGateDispatchTaskState(
     task?: PersistedGatePlatformDispatchTask;
     followUpTasks?: PersistedGatePlatformDispatchTask[];
     knowledgeFeedbackReceipt?: GateKnowledgeFeedbackReceipt | null;
+    dispatchCompletionReceipt?: GateActionReceipt | null;
     submissionEffectReview?: GateSubmissionCompletionEffectReview | null;
     evidenceLoopRecheck?: GateEvidenceLoopRecheck | null;
     storyTreeRecheck?: GateStoryTreeRecheck | null;
@@ -6641,6 +6673,7 @@ export async function updatePersistedGateDispatchTaskState(
     task: payload.task,
     followUpTasks: payload.followUpTasks ?? [],
     knowledgeFeedbackReceipt: payload.knowledgeFeedbackReceipt ?? null,
+    dispatchCompletionReceipt: payload.dispatchCompletionReceipt ?? null,
     submissionEffectReview: payload.submissionEffectReview ?? null,
     evidenceLoopRecheck: payload.evidenceLoopRecheck ?? null,
     storyTreeRecheck: payload.storyTreeRecheck ?? null,

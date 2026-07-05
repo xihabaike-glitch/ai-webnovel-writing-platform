@@ -8,7 +8,7 @@ import { GatePlatformStrategyReviewPanel } from "@/components/gate/GatePlatformS
 import { GatePublishEffectReviewPanel } from "@/components/gate/GatePublishEffectReviewPanel";
 import { buildTaskBatchHistory } from "@/lib/ai/taskBatchHistory";
 import { prisma } from "@/lib/db/prisma";
-import { buildPrePublishGate, type PrePublishGateItem } from "@/lib/projects/prePublishGate";
+import { buildPrePublishGate, buildPrePublishGateFocusNotice, type PrePublishGateFocusNotice, type PrePublishGateItem } from "@/lib/projects/prePublishGate";
 import { parsePublishSnapshotTags } from "@/lib/projects/platformPublishExport";
 
 export const dynamic = "force-dynamic";
@@ -31,13 +31,25 @@ function checkTone(status: PrePublishGateItem["status"]) {
   return "bg-rose-50 text-rose-700";
 }
 
+function focusNoticeTone(tone: PrePublishGateFocusNotice["tone"]) {
+  if (tone === "ready") return "border-emerald-200 bg-emerald-50 text-emerald-900";
+  if (tone === "blocked") return "border-rose-200 bg-rose-50 text-rose-900";
+  return "border-amber-200 bg-amber-50 text-amber-900";
+}
+
 function repairBatchTone(status: ReturnType<typeof buildPrePublishGate>["failureRepairBatch"]["status"]) {
   if (status === "clear") return "border-emerald-200 bg-emerald-50 text-emerald-800";
   if (status === "retry_sample") return "border-amber-200 bg-amber-50 text-amber-800";
   return "border-rose-200 bg-rose-50 text-rose-800";
 }
 
-export default async function GatePage() {
+export default async function GatePage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ focus?: string | string[] }>;
+}) {
+  const params = await searchParams;
+  const focus = Array.isArray(params?.focus) ? params?.focus[0] : params?.focus ?? null;
   const [projects, recentAiTasks, chapters] = await Promise.all([
     prisma.project.findMany({
       include: {
@@ -144,6 +156,7 @@ export default async function GatePage() {
     failureTasks: recentTasksWithChapter,
     batchHistory: buildTaskBatchHistory(recentTasksWithChapter),
   });
+  const focusNotice = buildPrePublishGateFocusNotice({ focus, gate });
 
   return (
     <AppShell>
@@ -173,6 +186,25 @@ export default async function GatePage() {
           <p className="mt-3 rounded-md bg-white/60 px-3 py-2 text-sm leading-6">{gate.releaseAction.detail}</p>
         ) : null}
       </section>
+
+      {focusNotice.visible ? (
+        <section className={`mb-6 rounded-md border p-4 ${focusNoticeTone(focusNotice.tone)}`} id="first-day-complete-focus">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <div className="text-lg font-semibold">{focusNotice.headline}</div>
+              <p className="mt-1 text-sm leading-6">{focusNotice.detail}</p>
+              <div className="mt-3 flex flex-wrap gap-2 text-xs">
+                {focusNotice.badges.map((badge) => (
+                  <span className="rounded-md bg-white/70 px-2 py-1 font-medium" key={badge}>{badge}</span>
+                ))}
+              </div>
+            </div>
+            <Link className="w-fit shrink-0 rounded-md bg-white px-4 py-2 text-sm font-medium text-slate-950 hover:bg-slate-50" href={focusNotice.primaryHref}>
+              {focusNotice.primaryLabel}
+            </Link>
+          </div>
+        </section>
+      ) : null}
 
       <section className="mb-6 grid gap-3 md:grid-cols-3 lg:grid-cols-6">
         <div className="rounded-md border border-slate-200 bg-white p-3">

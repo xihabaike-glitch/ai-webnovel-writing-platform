@@ -444,6 +444,16 @@ export interface PrePublishGate {
   releaseAction: PrePublishGateAction | null;
 }
 
+export interface PrePublishGateFocusNotice {
+  visible: boolean;
+  tone: "ready" | "blocked" | "review";
+  headline: string;
+  detail: string;
+  primaryLabel: string;
+  primaryHref: string;
+  badges: string[];
+}
+
 export interface PrePublishGateInput {
   projects: PrePublishGateProject[];
   failureTasks?: FailureReviewTask[];
@@ -1398,6 +1408,62 @@ function buildReleaseAction(
     id: `release-blocked:${nextAction.id}`,
     label: `先解除阻塞：${nextAction.label}`,
     tone: "repair" as const,
+  };
+}
+
+export function buildPrePublishGateFocusNotice(input: {
+  focus?: string | null;
+  gate: PrePublishGate;
+}): PrePublishGateFocusNotice {
+  if (input.focus !== "first-day-complete") {
+    return {
+      visible: false,
+      tone: "review",
+      headline: "",
+      detail: "",
+      primaryLabel: "",
+      primaryHref: "",
+      badges: [],
+    };
+  }
+
+  const taskQueueItem = input.gate.items.find((item) => item.id === "task-queue") ?? null;
+  const firstDayStillBlocked = taskQueueItem?.status === "block"
+    && /首日|观察闸门|交接证据/u.test(taskQueueItem.detail);
+  const primary = input.gate.releaseAction ?? input.gate.priorityActions[0] ?? null;
+
+  if (firstDayStillBlocked) {
+    return {
+      visible: true,
+      tone: "blocked",
+      headline: "首日放行仍被阻塞",
+      detail: `${taskQueueItem?.detail ?? "首日链路还没有完全通过总闸门。"} ${primary?.detail ?? "先补齐首日证据，再回到这里复查放行。"}`,
+      primaryLabel: primary?.label ?? taskQueueItem?.actionLabel ?? "查看首日阻塞",
+      primaryHref: primary?.href ?? taskQueueItem?.href ?? "/tasks",
+      badges: ["首日闸门未放行", "先补首日证据", "禁止直接批量"],
+    };
+  }
+
+  if (input.gate.status === "ready") {
+    return {
+      visible: true,
+      tone: "ready",
+      headline: "首日链路已放行",
+      detail: `首日派单已收口，总闸门当前可放行。${primary?.detail ? `下一步：${primary.detail}` : "可以进入平台包导出、批量生产或发布复盘。"}`,
+      primaryLabel: primary?.label ?? "进入发布闭环",
+      primaryHref: primary?.href ?? "#gate-export-package",
+      badges: ["首日链路通过", "总闸门可放行", "进入批量前复查完成"],
+    };
+  }
+
+  return {
+    visible: true,
+    tone: "review",
+    headline: "首日链路已收口，仍需处理总闸门",
+    detail: `首日派单已完成，但总闸门还有发布包、失败任务或批量策略提醒。${primary?.detail ? `优先处理：${primary.detail}` : input.gate.verdict}`,
+    primaryLabel: primary?.label ?? "查看优先动作",
+    primaryHref: primary?.href ?? "/gate",
+    badges: ["首日派单完成", "总闸门仍需复查", "处理后再放量"],
   };
 }
 

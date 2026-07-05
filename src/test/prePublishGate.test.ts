@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { buildPrePublishGate, type PrePublishGateProject } from "../lib/projects/prePublishGate.ts";
+import { buildPrePublishGate, buildPrePublishGateFocusNotice, type PrePublishGateProject } from "../lib/projects/prePublishGate.ts";
 
 const finalChapters = [1, 2, 3].map((order) => ({
   id: `chapter-${order}`,
@@ -154,6 +154,26 @@ test("buildPrePublishGate", async (t) => {
     assert.ok(gate.releaseAction?.detail.includes("采纳一个投稿资产候选"));
   });
 
+  await t.test("focuses first-day completion as a gate release notice", () => {
+    const gate = buildPrePublishGate({
+      projects: [readyProject],
+      failureTasks: [],
+      batchHistory: [],
+    });
+    const notice = buildPrePublishGateFocusNotice({
+      focus: "first-day-complete",
+      gate,
+    });
+
+    assert.equal(notice.visible, true);
+    assert.equal(notice.tone, "ready");
+    assert.equal(notice.headline, "首日链路已放行");
+    assert.ok(notice.detail.includes("总闸门当前可放行"));
+    assert.equal(notice.primaryLabel, "进入发布闭环");
+    assert.equal(notice.primaryHref, "#gate-export-package");
+    assert.ok(notice.badges.includes("首日链路通过"));
+  });
+
   await t.test("blocks launch when first-day handoff evidence is missing", () => {
     const gate = buildPrePublishGate({
       projects: [handoffBlockedProject],
@@ -171,6 +191,26 @@ test("buildPrePublishGate", async (t) => {
     assert.ok(queueAction?.detail.includes("开书交接证据"));
     assert.equal(gate.releaseAction?.label, "先解除阻塞：补交接验收");
     assert.equal(gate.releaseAction?.href, "/dispatch?firstDayProject=project-handoff-blocked&step=publish-precheck#first-day-dispatch");
+  });
+
+  await t.test("focuses first-day completion blockers before release", () => {
+    const gate = buildPrePublishGate({
+      projects: [handoffBlockedProject],
+      failureTasks: [],
+      batchHistory: [],
+    });
+    const notice = buildPrePublishGateFocusNotice({
+      focus: "first-day-complete",
+      gate,
+    });
+
+    assert.equal(notice.visible, true);
+    assert.equal(notice.tone, "blocked");
+    assert.equal(notice.headline, "首日放行仍被阻塞");
+    assert.ok(notice.detail.includes("开书交接证据"));
+    assert.equal(notice.primaryLabel, "先解除阻塞：补交接验收");
+    assert.equal(notice.primaryHref, "/dispatch?firstDayProject=project-handoff-blocked&step=publish-precheck#first-day-dispatch");
+    assert.ok(notice.badges.includes("先补首日证据"));
   });
 
   await t.test("blocks launch when export version center detects baseline regression", () => {

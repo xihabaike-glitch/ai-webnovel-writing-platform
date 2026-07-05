@@ -275,6 +275,9 @@ export interface AiPipelineControlPlanSummary {
   recheckLabel: string;
   recheckStatus: "small_batch_ready" | "sample_required" | null;
   recheckMessage: string | null;
+  recheckOutcomeLabel: string;
+  recheckOutcomeTone: "success" | "warning" | "neutral";
+  recheckOutcomeDetail: string;
   recheckDispatchKey: string | null;
   recheckDispatchTitle: string | null;
   recheckDispatchHref: string | null;
@@ -1178,6 +1181,9 @@ function buildAiPipelineControlPlanSummary(audits: ControlBatchAudit[] = []): Ai
       recheckLabel: "复检批量健康",
       recheckStatus: null,
       recheckMessage: null,
+      recheckOutcomeLabel: "",
+      recheckOutcomeTone: "neutral",
+      recheckOutcomeDetail: "",
       recheckDispatchKey: null,
       recheckDispatchTitle: null,
       recheckDispatchHref: null,
@@ -1210,6 +1216,23 @@ function buildAiPipelineControlPlanSummary(audits: ControlBatchAudit[] = []): Ai
     : recheckStatus === "sample_required"
       ? "运行 1 章复验"
       : null;
+  const recheckOutcomeLabel = recheckStatus === "small_batch_ready"
+    ? "可小样本恢复"
+    : recheckStatus === "sample_required"
+      ? "继续修复"
+      : "";
+  const recheckOutcomeTone = recheckStatus === "small_batch_ready"
+    ? "success"
+    : recheckStatus === "sample_required"
+      ? "warning"
+      : "neutral";
+  const recheckOutcomeDetail = recheckStatus === "small_batch_ready"
+    ? "复检已允许恢复谨慎小批执行，下一轮仍按小样本观察，不直接放大。"
+    : recheckStatus === "sample_required"
+      ? recheckDispatchKey
+        ? "复检要求先跑 1 章小样本复验；完成派单验收后，再回到总控判断能否恢复。"
+        : "复检要求先跑 1 章小样本复验，不能直接恢复批量生产。"
+      : "";
 
   return {
     hasPlan: true,
@@ -1230,6 +1253,9 @@ function buildAiPipelineControlPlanSummary(audits: ControlBatchAudit[] = []): Ai
     recheckLabel: "复检批量健康",
     recheckStatus,
     recheckMessage,
+    recheckOutcomeLabel,
+    recheckOutcomeTone,
+    recheckOutcomeDetail,
     recheckDispatchKey,
     recheckDispatchTitle,
     recheckDispatchHref,

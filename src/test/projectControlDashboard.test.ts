@@ -901,7 +901,59 @@ test("buildProjectControlDashboard", async (t) => {
     assert.equal(dashboard.aiPipelineControlPlan.recheckDispatchTitle, "AI 写审改：跑 1 章小样本复验");
     assert.equal(dashboard.aiPipelineControlPlan.recheckDispatchHref, "/dispatch?queue=ai_pipeline#dispatch-ai-pipeline-recheck:demo-project:ai-plan-dispatched:sample");
     assert.equal(dashboard.aiPipelineControlPlan.recheckActionLabel, "运行 1 章复验");
+    assert.equal(dashboard.aiPipelineControlPlan.recheckOutcomeLabel, "继续修复");
+    assert.equal(dashboard.aiPipelineControlPlan.recheckOutcomeTone, "warning");
+    assert.ok(dashboard.aiPipelineControlPlan.recheckOutcomeDetail.includes("1 章小样本复验"));
+    assert.ok(dashboard.aiPipelineControlPlan.recheckOutcomeDetail.includes("派单验收"));
     assert.equal(dashboard.aiPipelineControlPlan.canRecheck, false);
+  });
+
+  await t.test("surfaces AI pipeline recheck recovery outcome", () => {
+    const dashboard = buildProjectControlDashboard({
+      project,
+      platform: getPlatformProfile("fanqie"),
+      chapters: [chapter],
+      outlineNodes: [],
+      characters: [],
+      worldEntries: [],
+      foreshadows: [],
+      plotThreads: [],
+      aiTasks: [],
+      gateActionAudits: [
+        {
+          receiptId: "ai-plan-ready",
+          actionId: "ai-pipeline-control:demo-project",
+          label: "批量打法修复清单",
+          detail: "三轮稳住打法：成功率 0%，质量 68，失败 2。",
+          href: "/projects/demo-project#ai-pipeline",
+          status: "succeeded",
+          message: "复检完成：可小批恢复。",
+          executionType: "control_action",
+          succeededCount: 3,
+          failedCount: 0,
+          payload: JSON.stringify({
+            aiPipelineControlPlan: {
+              status: "watch",
+              items: [
+                { id: "stop-scale", label: "停用三轮稳住打法继续放量", completed: true },
+              ],
+              recheck: {
+                status: "small_batch_ready",
+                healthLabel: "可小批恢复",
+                detail: "小样本通过，可以恢复谨慎小批。",
+              },
+            },
+          }),
+          createdAt: "2026-01-03T00:00:00.000Z",
+        },
+      ],
+      submissionChecklist: checklist,
+    });
+
+    assert.equal(dashboard.aiPipelineControlPlan.recheckOutcomeLabel, "可小样本恢复");
+    assert.equal(dashboard.aiPipelineControlPlan.recheckOutcomeTone, "success");
+    assert.ok(dashboard.aiPipelineControlPlan.recheckOutcomeDetail.includes("谨慎小批"));
+    assert.equal(dashboard.aiPipelineControlPlan.recheckActionLabel, "恢复小批执行");
   });
 
   await t.test("summarizes model route health for the project control dashboard", () => {

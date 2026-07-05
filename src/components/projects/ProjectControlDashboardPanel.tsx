@@ -130,6 +130,9 @@ interface AiPipelineControlPlanSummary {
   recheckLabel: string;
   recheckStatus: "small_batch_ready" | "sample_required" | null;
   recheckMessage: string | null;
+  recheckOutcomeLabel: string;
+  recheckOutcomeTone: "success" | "warning" | "neutral";
+  recheckOutcomeDetail: string;
   recheckDispatchKey: string | null;
   recheckDispatchTitle: string | null;
   recheckDispatchHref: string | null;
@@ -378,6 +381,12 @@ function aiBatchHealthClass(status: AiPipelineBatchHealthSummary["status"]) {
   if (status === "blocked") return "bg-rose-50 text-rose-700";
   if (status === "watch") return "bg-amber-50 text-amber-700";
   return "bg-slate-100 text-slate-700";
+}
+
+function aiRecheckOutcomeClass(tone: AiPipelineControlPlanSummary["recheckOutcomeTone"]) {
+  if (tone === "success") return "border-emerald-100 bg-emerald-50 text-emerald-700";
+  if (tone === "warning") return "border-amber-100 bg-amber-50 text-amber-700";
+  return "border-slate-200 bg-slate-50 text-slate-600";
 }
 
 function modelRouteHealthClass(status: ModelRouteHealthSummary["status"]) {
@@ -1081,12 +1090,14 @@ export function ProjectControlDashboardPanel({ projectId }: { projectId: string 
                   </div>
                 </div>
                 {dashboard.aiPipelineControlPlan.recheckMessage ? (
-                  <div className={`mt-3 rounded-md px-2 py-1 text-xs leading-5 ${
-                    dashboard.aiPipelineControlPlan.recheckStatus === "small_batch_ready"
-                      ? "bg-emerald-50 text-emerald-700"
-                      : "bg-amber-50 text-amber-700"
-                  }`}>
-                    {dashboard.aiPipelineControlPlan.recheckMessage}
+                  <div className={`mt-3 rounded-md border px-3 py-2 text-xs leading-5 ${aiRecheckOutcomeClass(dashboard.aiPipelineControlPlan.recheckOutcomeTone)}`}>
+                    {dashboard.aiPipelineControlPlan.recheckOutcomeLabel ? (
+                      <div className="font-medium">{dashboard.aiPipelineControlPlan.recheckOutcomeLabel}</div>
+                    ) : null}
+                    <p className="mt-1">{dashboard.aiPipelineControlPlan.recheckMessage}</p>
+                    {dashboard.aiPipelineControlPlan.recheckOutcomeDetail ? (
+                      <p className="mt-1">{dashboard.aiPipelineControlPlan.recheckOutcomeDetail}</p>
+                    ) : null}
                     {dashboard.aiPipelineControlPlan.recheckDispatchTitle ? (
                       <span className="block">已派单：{dashboard.aiPipelineControlPlan.recheckDispatchTitle}</span>
                     ) : null}

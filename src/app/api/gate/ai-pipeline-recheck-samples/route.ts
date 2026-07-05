@@ -6,6 +6,7 @@ import { reviewChapterDraft } from "@/lib/ai/chapterReviewGeneration";
 import { generateChapterSecondPass } from "@/lib/ai/chapterSecondPassGeneration";
 import { prisma } from "@/lib/db/prisma";
 import { buildBatchRouteEffectSummary } from "@/lib/model-gateway/batchRouteEffectSummary";
+import { buildAiPipelineRecheckGateActionReceipt } from "@/lib/projects/aiPipelineRecheckReceipt";
 import { buildTaskQueueBatchReceipt, type TaskQueueBatchRunResult } from "@/lib/projects/taskQueueBatchReceipt";
 import { buildTaskQueueCenter, type TaskQueueProject } from "@/lib/projects/taskQueueCenter";
 import { buildTaskQueueExecutionPlan } from "@/lib/projects/taskQueueExecutionPlan";
@@ -226,28 +227,84 @@ export async function POST(request: Request) {
     qualityScore: result.qualityScore,
   })));
   const batchReceipt = buildTaskQueueBatchReceipt({ plan, results, routeEffectSummary });
-  const completionEvidence = completionEvidenceFor({ receipt: batchReceipt, plan });
   const now = new Date();
-  const task = await prisma.gateDispatchTask.update({
-    where: { dispatchKey },
-    data: {
-      state: "completed",
-      assignedAt: now,
-      completedAt: now,
-      completionEvidence,
-      evidence: JSON.stringify(Array.from(new Set([
-        ...stringList(dispatch.evidence),
-        ...batchReceipt.evidenceItems,
-        routeEffectSummary.verdict,
-      ]))),
-    },
+  const gateReceipt = buildAiPipelineRecheckGateActionReceipt({
+    dispatchKey,
+    projectId,
+    projectTitle: project.title,
+    href: text(dispatch.href) || `/projects/${projectId}#ai-pipeline`,
+    plan,
+    results,
+    routeEffectSummary,
+    batchReceipt,
+    now,
   });
+  const completionEvidence = completionEvidenceFor({ receipt: batchReceipt, plan });
+  const [task] = await prisma.$transaction([
+    prisma.gateDispatchTask.update({
+      where: { dispatchKey },
+      data: {
+        state: "completed",
+        assignedAt: now,
+        completedAt: now,
+        completionEvidence,
+        evidence: JSON.stringify(Array.from(new Set([
+          ...stringList(dispatch.evidence),
+          ...batchReceipt.evidenceItems,
+          routeEffectSummary.verdict,
+          `总闸门回执：${gateReceipt.receipt.id}`,
+        ]))),
+      },
+    }),
+    prisma.gateActionAudit.upsert({
+      where: { receiptId: gateReceipt.receipt.id },
+      create: {
+        receiptId: gateReceipt.receipt.id,
+        actionId: gateReceipt.receipt.actionId,
+        projectId,
+        platformId: gateReceipt.receipt.platformId ?? "ai-pipeline",
+        platformName: gateReceipt.receipt.platformName ?? "AI 写审改",
+        label: gateReceipt.receipt.label,
+        detail: gateReceipt.receipt.detail,
+        href: gateReceipt.receipt.href,
+        status: gateReceipt.receipt.status,
+        message: gateReceipt.receipt.message,
+        executionType: gateReceipt.receipt.executionType,
+        succeededCount: gateReceipt.receipt.succeededCount,
+        failedCount: gateReceipt.receipt.failedCount,
+        taskId: gateReceipt.receipt.taskId,
+        recheckStatus: gateReceipt.receipt.recheck.status,
+        recheckLabel: gateReceipt.receipt.recheck.label,
+        recheckDetail: gateReceipt.receipt.recheck.detail,
+        recheckAction: gateReceipt.receipt.recheck.actionLabel,
+        payload: JSON.stringify(gateReceipt.payload),
+        createdAt: new Date(gateReceipt.receipt.createdAt),
+      },
+      update: {
+        label: gateReceipt.receipt.label,
+        detail: gateReceipt.receipt.detail,
+        href: gateReceipt.receipt.href,
+        status: gateReceipt.receipt.status,
+        message: gateReceipt.receipt.message,
+        executionType: gateReceipt.receipt.executionType,
+        succeededCount: gateReceipt.receipt.succeededCount,
+        failedCount: gateReceipt.receipt.failedCount,
+        taskId: gateReceipt.receipt.taskId,
+        recheckStatus: gateReceipt.receipt.recheck.status,
+        recheckLabel: gateReceipt.receipt.recheck.label,
+        recheckDetail: gateReceipt.receipt.recheck.detail,
+        recheckAction: gateReceipt.receipt.recheck.actionLabel,
+        payload: JSON.stringify(gateReceipt.payload),
+      },
+    }),
+  ]);
 
   return NextResponse.json({
     plan,
     results,
     routeEffectSummary,
     batchReceipt,
+    gateReceipt: gateReceipt.receipt,
     recheckTask: {
       dispatchKey: task.dispatchKey,
       state: task.state,

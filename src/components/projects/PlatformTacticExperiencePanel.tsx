@@ -4,9 +4,11 @@ import Link from "next/link";
 import { useState } from "react";
 import {
   buildGatePlatformTacticExperienceDisplay,
+  buildGatePlatformTacticExperienceFollowupDispatch,
   buildGatePlatformTacticExperienceMarkdown,
   buildGatePlatformTacticExperienceStartHref,
   filterGatePlatformTacticExperienceItems,
+  persistGateDispatchTask,
   type GatePlatformTacticExperienceItem,
   type GatePlatformTacticExperienceLibrary,
   type GatePlatformTacticExperienceStatus,
@@ -38,6 +40,7 @@ function fileName(item: GatePlatformTacticExperienceItem) {
 
 export function PlatformTacticExperiencePanel({ library }: { library: GatePlatformTacticExperienceLibrary }) {
   const [message, setMessage] = useState("");
+  const [assigningDispatchId, setAssigningDispatchId] = useState("");
   const [statusFilter, setStatusFilter] = useState<GatePlatformTacticExperienceStatusFilter>("all");
   const visibleItems = filterGatePlatformTacticExperienceItems(library.items, statusFilter);
   const summaryItems = [
@@ -62,6 +65,20 @@ export function PlatformTacticExperiencePanel({ library }: { library: GatePlatfo
     link.click();
     URL.revokeObjectURL(url);
     setMessage(`${item.platformName} 打法经验已下载。`);
+  }
+
+  async function assignFollowupDispatch(item: GatePlatformTacticExperienceItem) {
+    const dispatch = buildGatePlatformTacticExperienceFollowupDispatch(item);
+    if (!dispatch) return;
+    setAssigningDispatchId(dispatch.id);
+    try {
+      await persistGateDispatchTask({ ...dispatch, state: "assigned" });
+      setMessage(`${item.platformName} 已生成「${dispatch.actionLabel}」任务。`);
+    } catch {
+      setMessage("任务生成失败，请稍后再试。");
+    } finally {
+      setAssigningDispatchId("");
+    }
   }
 
   return (
@@ -114,6 +131,7 @@ export function PlatformTacticExperiencePanel({ library }: { library: GatePlatfo
             <div className={`rounded-md border p-3 text-sm ${experienceClass(item.status)}`} key={item.platformId}>
               {(() => {
                 const display = buildGatePlatformTacticExperienceDisplay(item);
+                const followupDispatch = buildGatePlatformTacticExperienceFollowupDispatch(item);
                 return (
                   <>
                     <div className="flex flex-wrap items-center gap-2">
@@ -157,6 +175,16 @@ export function PlatformTacticExperiencePanel({ library }: { library: GatePlatfo
                         <Link className="rounded-md border border-white/70 bg-slate-950 px-3 py-2 text-xs font-medium text-white hover:bg-slate-800" href={buildGatePlatformTacticExperienceStartHref(item)}>
                           用此打法开项目
                         </Link>
+                      ) : null}
+                      {followupDispatch ? (
+                        <button
+                          className="rounded-md border border-white/70 bg-slate-950 px-3 py-2 text-xs font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+                          disabled={assigningDispatchId === followupDispatch.id}
+                          onClick={() => void assignFollowupDispatch(item)}
+                          type="button"
+                        >
+                          {assigningDispatchId === followupDispatch.id ? "生成中" : followupDispatch.actionLabel}
+                        </button>
                       ) : null}
                       <button
                         className="rounded-md border border-white/70 bg-white/70 px-3 py-2 text-xs font-medium text-slate-950 hover:bg-white"

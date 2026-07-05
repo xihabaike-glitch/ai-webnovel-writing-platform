@@ -975,6 +975,92 @@ export function buildGatePlatformTacticExperienceDisplay(item: GatePlatformTacti
   };
 }
 
+export function buildGatePlatformTacticExperienceFollowupDispatch(
+  item: GatePlatformTacticExperienceItem,
+  persistedTasks: PersistedGatePlatformDispatchTask[] = [],
+): GatePlatformGrowthDispatchItem | null {
+  const sourceText = `${item.tactic} ${item.sourceLabel} ${item.evidence.join(" ")}`;
+  if (!/恢复放量/u.test(sourceText)) return null;
+
+  const display = buildGatePlatformTacticExperienceDisplay(item);
+  const latestDay = item.latestAt.slice(0, 10) || "latest";
+  const keyTactic = safeDispatchKeyPart(`${item.status}-${item.tactic}-${item.sourceLabel}`) || "recovery";
+  const dispatchKey = `${item.platformId}:tactic_experience_followup:${keyTactic}:${safeDispatchKeyPart(latestDay)}`;
+  const persisted = persistedTasks.find((task) => task.dispatchKey === dispatchKey);
+  const commonEvidence = [
+    `经验结论：${display.outcomeLabel}`,
+    `下一步：${display.nextStepLabel}`,
+    `打法：${item.tactic}`,
+    ...item.evidence,
+  ].slice(0, 6);
+
+  const spec: Pick<
+    GatePlatformGrowthDispatchItem,
+    "stage" | "priorityScore" | "ownerRole" | "title" | "detail" | "dueLabel" | "actionLabel" | "acceptanceCriteria"
+  > = item.status === "blocked"
+    ? {
+        stage: "repair_tactic",
+        priorityScore: Math.max(item.priorityScore, 92),
+        ownerRole: "打法修复主编",
+        title: `${item.platformName} 恢复放量重做打法`,
+        detail: "这条恢复放量经验已经进入暂停避坑，先拆失败原因，重做开头钩子、前三章兑现或平台包装，再允许新样本。",
+        dueLabel: "今天",
+        actionLabel: "重做打法",
+        acceptanceCriteria: [
+          "已写明暂停迁移原因",
+          "已重做开头、前三章兑现或平台包装中的关键弱项",
+          "新打法必须重新走小样本，不直接放量",
+        ],
+      }
+    : item.status === "watch"
+      ? {
+          stage: "start_metrics_recovery",
+          priorityScore: Math.max(item.priorityScore, 78),
+          ownerRole: "追读数据运营",
+          title: `${item.platformName} 恢复放量补追读证据`,
+          detail: "这条恢复放量经验还在继续观察，先补一轮曝光、点击、追读、收藏或评论证据，再决定是否继续小样本。",
+          dueLabel: "发布后 24 小时",
+          actionLabel: "补追读证据",
+          acceptanceCriteria: [
+            "已回填至少一轮追读或收藏证据",
+            "已标明继续观察原因",
+            "没有证据前不扩大恢复放量批次",
+          ],
+        }
+      : {
+          stage: "scale_up",
+          priorityScore: Math.max(item.priorityScore, 84),
+          ownerRole: "小样本运营",
+          title: `${item.platformName} 恢复放量继续小样本`,
+          detail: "这条恢复放量经验只允许小步复用，继续跑小样本验证前三章兑现、平台反馈和追读信号，过线后再进入下一轮加码。",
+          dueLabel: "今天",
+          actionLabel: "继续小样本",
+          acceptanceCriteria: [
+            "已建立新的小样本批次",
+            "已记录前三章兑现、平台反馈和追读信号",
+            "小样本未过线前不进入大批量复用",
+          ],
+        };
+
+  return {
+    id: dispatchKey,
+    platformId: item.platformId,
+    platformName: item.platformName,
+    stage: spec.stage,
+    state: persisted?.state ?? "queued",
+    priorityScore: spec.priorityScore,
+    ownerRole: spec.ownerRole,
+    title: spec.title,
+    detail: spec.detail,
+    dueLabel: spec.dueLabel,
+    actionLabel: spec.actionLabel,
+    href: item.href || "/gate#platform-tactic-experience",
+    acceptanceCriteria: spec.acceptanceCriteria,
+    evidence: commonEvidence,
+    reviewLatestAt: item.latestAt,
+  };
+}
+
 export function buildGatePlatformTacticExperienceStartHref(item: Pick<GatePlatformTacticExperienceItem, "platformId" | "tactic" | "status">) {
   const params = new URLSearchParams();
   params.set("startPlatform", item.platformId);

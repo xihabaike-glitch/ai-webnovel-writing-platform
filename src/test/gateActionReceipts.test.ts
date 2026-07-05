@@ -42,6 +42,7 @@ import {
   buildGatePlatformTacticExperienceLibrary,
   buildGatePlatformTacticExperienceMarkdown,
   buildGatePlatformTacticExperienceDisplay,
+  buildGatePlatformTacticExperienceFollowupDispatch,
   buildGatePlatformTacticExperienceStartHref,
   gateActionReceiptFromAuditRecord,
   filterGatePlatformDecisionTimelineItems,
@@ -4154,6 +4155,63 @@ test("buildGateActionReceipt", async (t) => {
     assert.deepEqual(blocked.badges, ["恢复放量", "暂停避坑"]);
     assert.equal(blocked.outcomeLabel, "暂停迁移");
     assert.equal(blocked.nextStepLabel, "重做打法");
+  });
+
+  await t.test("builds follow-up dispatches from recovery scale tactic experience cards", () => {
+    const base = {
+      platformId: "fanqie",
+      platformName: "番茄小说",
+      label: "可复用打法",
+      lesson: "恢复放量首日小样本已跑通。",
+      reuseHint: "新项目仍先跑小样本。",
+      risk: "不能无限复用。",
+      href: "/gate#platform-tactic-experience",
+      sourceStatus: "healthy" as const,
+      priorityScore: 90,
+      latestAt: "2026-01-01T00:00:00.000Z",
+      evidence: ["恢复放量首日闭环：通过"],
+    };
+    const usable = buildGatePlatformTacticExperienceFollowupDispatch({
+      ...base,
+      status: "usable",
+      tactic: "恢复放量打法",
+      sourceLabel: "恢复放量闭环",
+    });
+    const watch = buildGatePlatformTacticExperienceFollowupDispatch({
+      ...base,
+      status: "watch",
+      label: "观察样本",
+      tactic: "恢复放量观察",
+      sourceLabel: "恢复放量观察",
+      evidence: ["恢复放量首日闭环：继续观察"],
+    });
+    const blocked = buildGatePlatformTacticExperienceFollowupDispatch({
+      ...base,
+      status: "blocked",
+      label: "避坑样本",
+      tactic: "恢复放量避坑",
+      sourceLabel: "恢复放量避坑",
+      evidence: ["恢复放量首日闭环：暂停"],
+    });
+    const generic = buildGatePlatformTacticExperienceFollowupDispatch({
+      ...base,
+      status: "usable",
+      tactic: "普通开局打法",
+      sourceLabel: "新书开局闭环",
+      evidence: ["普通打法闭环"],
+    });
+
+    assert.equal(usable?.stage, "scale_up");
+    assert.equal(usable?.actionLabel, "继续小样本");
+    assert.ok(usable?.title.includes("继续小样本"));
+    assert.ok(usable?.acceptanceCriteria.some((line) => line.includes("小样本")));
+    assert.equal(watch?.stage, "start_metrics_recovery");
+    assert.equal(watch?.actionLabel, "补追读证据");
+    assert.ok(watch?.acceptanceCriteria.some((line) => line.includes("追读")));
+    assert.equal(blocked?.stage, "repair_tactic");
+    assert.equal(blocked?.actionLabel, "重做打法");
+    assert.ok(blocked?.acceptanceCriteria.some((line) => line.includes("重做")));
+    assert.equal(generic, null);
   });
 
   await t.test("flags overdue and today dispatch closeout items", () => {

@@ -25,6 +25,7 @@ import {
   buildGateBatchTacticEffectReview,
   buildGatePlatformTacticExperienceLibrary,
   buildGatePlatformTacticExperienceDisplay,
+  buildGatePlatformTacticExperienceFollowupDispatch,
   buildGatePlatformTacticExperienceMarkdown,
   buildGatePlatformTacticExperienceStartHref,
   buildGatePlatformDispatchReceipt,
@@ -1871,6 +1872,7 @@ export function GateActionWorkspace({
                 <div className={`rounded-md border p-3 text-sm ${tacticExperienceClass(item.status)}`} key={item.platformId}>
                   {(() => {
                     const display = buildGatePlatformTacticExperienceDisplay(item);
+                    const followupDispatch = buildGatePlatformTacticExperienceFollowupDispatch(item, persistedDispatchTasks);
                     return (
                       <>
                         <div className="flex flex-wrap items-center gap-2">
@@ -1918,6 +1920,16 @@ export function GateActionWorkspace({
                             <Link className="rounded-md border border-white/70 bg-slate-950 px-3 py-2 text-xs font-medium text-white hover:bg-slate-800" href={buildGatePlatformTacticExperienceStartHref(item)}>
                               用此打法开项目
                             </Link>
+                          ) : null}
+                          {followupDispatch ? (
+                            <button
+                              className="rounded-md border border-white/70 bg-slate-950 px-3 py-2 text-xs font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+                              disabled={followupDispatch.state !== "queued"}
+                              onClick={() => assignDispatch(followupDispatch)}
+                              type="button"
+                            >
+                              {followupDispatch.state === "queued" ? followupDispatch.actionLabel : dispatchStateLabel(followupDispatch.state)}
+                            </button>
                           ) : null}
                           <button
                             className="rounded-md border border-white/70 bg-white/70 px-3 py-2 text-xs font-medium text-slate-950 hover:bg-white"

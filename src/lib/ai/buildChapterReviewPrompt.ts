@@ -1,12 +1,14 @@
 import type { PlatformProfile } from "../platforms/platformProfiles.ts";
 import type { ProjectContextPack } from "../projects/projectContextPack.ts";
 import type { ProjectStartTacticSummary } from "../projects/projectStartTactics.ts";
+import { buildAiRecoveryPromptBlock, type AiRecoveryPromptMemory } from "./aiRecoveryPromptMemory.ts";
 
 interface ChapterReviewPromptInput {
   projectTitle: string;
   platform: PlatformProfile;
   startTactic?: ProjectStartTacticSummary | null;
   projectContext?: ProjectContextPack | null;
+  aiRecoveryMemory?: AiRecoveryPromptMemory | null;
   chapter: {
     title: string;
     content: string;
@@ -38,6 +40,7 @@ export function buildChapterReviewPrompt(input: ChapterReviewPromptInput) {
     `平台审稿重点：${input.platform.reviewFocus.join("、")}`,
     ...startTacticLines,
     input.projectContext?.promptBlock ?? "",
+    buildAiRecoveryPromptBlock(input.aiRecoveryMemory, "review"),
     `章节标题：${input.chapter.title}`,
     `章节目标：${input.chapter.goal}`,
     `开头钩子：${input.chapter.hook}`,

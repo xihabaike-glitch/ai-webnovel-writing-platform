@@ -1,4 +1,5 @@
 import { buildChapterDraftPrompt } from "@/lib/ai/buildChapterDraftPrompt";
+import { buildAiRecoveryPromptMemory } from "@/lib/ai/aiRecoveryPromptMemory";
 import { buildDraftQualityAudit } from "@/lib/ai/draftQualityAudit";
 import { buildStoryTreeRewriteDispatchItems } from "@/lib/ai/storyTreeDispatch";
 import { buildStoryTreeExperienceGuide } from "@/lib/ai/storyTreeExperience";
@@ -35,6 +36,9 @@ export async function generateChapterDraft(options: GenerateChapterDraftOptions)
               OR: [
                 { dispatchKey: { startsWith: "story-tree:" } },
                 { dispatchKey: { startsWith: "story-tree-experience:" } },
+                { platformId: "ai-pipeline" },
+                { dispatchKey: { startsWith: "ai-pipeline-recheck:" } },
+                { dispatchKey: { startsWith: "ai-pipeline:" } },
               ],
             },
             orderBy: { completedAt: "desc" },
@@ -51,9 +55,9 @@ export async function generateChapterDraft(options: GenerateChapterDraftOptions)
 
   const platform = getPlatformProfile(chapter.project.targetPlatform as PlatformId);
   const startTactic = findProjectStartTacticSummary(chapter.project.worldEntries);
-  const storyTreeExperience = buildStoryTreeExperienceGuide(
-    chapter.project.gateDispatchTasks.map(gatePlatformDispatchTaskFromRecord),
-  );
+  const gateDispatchTasks = chapter.project.gateDispatchTasks.map(gatePlatformDispatchTaskFromRecord);
+  const storyTreeExperience = buildStoryTreeExperienceGuide(gateDispatchTasks);
+  const aiRecoveryMemory = buildAiRecoveryPromptMemory(gateDispatchTasks);
   const projectContext = buildProjectContextPack({
     currentChapterId: chapter.id,
     chapters: chapter.project.chapters,
@@ -70,6 +74,7 @@ export async function generateChapterDraft(options: GenerateChapterDraftOptions)
     startTactic,
     projectContext,
     storyTreeExperience,
+    aiRecoveryMemory,
     targetWords: options.targetWords ?? 1200,
     chapter: {
       order: chapter.order,

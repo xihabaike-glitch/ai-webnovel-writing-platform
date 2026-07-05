@@ -2,6 +2,7 @@ import {
   buildChapterSecondPassPrompt,
   type SecondPassMode,
 } from "@/lib/ai/buildChapterSecondPassPrompt";
+import { buildAiRecoveryPromptMemory } from "@/lib/ai/aiRecoveryPromptMemory";
 import { buildDraftQualityAudit } from "@/lib/ai/draftQualityAudit";
 import { buildStoryTreeRewriteDispatchItems } from "@/lib/ai/storyTreeDispatch";
 import {
@@ -65,11 +66,18 @@ export async function generateChapterSecondPass(options: GenerateChapterSecondPa
           gateDispatchTasks: {
             where: {
               state: "completed",
-              dispatchKey: { startsWith: "story-tree-experience:" },
-              href: { contains: `/chapters/${options.chapterId}` },
+              OR: [
+                {
+                  dispatchKey: { startsWith: "story-tree-experience:" },
+                  href: { contains: `/chapters/${options.chapterId}` },
+                },
+                { platformId: "ai-pipeline" },
+                { dispatchKey: { startsWith: "ai-pipeline-recheck:" } },
+                { dispatchKey: { startsWith: "ai-pipeline:" } },
+              ],
             },
             orderBy: { completedAt: "desc" },
-            take: 12,
+            take: 24,
           },
         },
       },
@@ -83,10 +91,12 @@ export async function generateChapterSecondPass(options: GenerateChapterSecondPa
   const mode = normalizeSecondPassMode(options.mode);
   const platform = getPlatformProfile(chapter.project.targetPlatform as PlatformId);
   const startTactic = findProjectStartTacticSummary(chapter.project.worldEntries);
+  const gateDispatchTasks = chapter.project.gateDispatchTasks.map(gatePlatformDispatchTaskFromRecord);
   const storyTreeExperienceAdvice = buildStoryTreeExperienceSecondPassAdvice(
-    chapter.project.gateDispatchTasks.map(gatePlatformDispatchTaskFromRecord),
+    gateDispatchTasks,
     chapter.id,
   );
+  const aiRecoveryMemory = buildAiRecoveryPromptMemory(gateDispatchTasks);
   const usedStoryTreeExperienceAdvice = matchStoryTreeExperienceAdviceForInstruction(storyTreeExperienceAdvice, instruction);
   const prompt = buildChapterSecondPassPrompt({
     projectTitle: chapter.project.title,
@@ -94,6 +104,7 @@ export async function generateChapterSecondPass(options: GenerateChapterSecondPa
     sellingPoint: chapter.project.sellingPoint,
     platform,
     startTactic,
+    aiRecoveryMemory,
     instruction,
     mode,
     targetWords: options.targetWords ?? Math.max(1200, chapter.wordCount),
@@ -112,7 +123,7 @@ export async function generateChapterSecondPass(options: GenerateChapterSecondPa
     projectId: chapter.projectId,
     chapterId: chapter.id,
     taskType: "chapter_second_pass",
-    inputSnapshot: { prompt, instruction, mode, startTactic, storyTreeExperienceAdvice: usedStoryTreeExperienceAdvice },
+    inputSnapshot: { prompt, instruction, mode, startTactic, aiRecoveryMemory, storyTreeExperienceAdvice: usedStoryTreeExperienceAdvice },
     request: {
       systemPrompt: prompt.systemPrompt,
       userPrompt: prompt.userPrompt,

@@ -1,5 +1,6 @@
 import type { PlatformProfile } from "../platforms/platformProfiles.ts";
 import type { ProjectStartTacticSummary } from "../projects/projectStartTactics.ts";
+import { buildAiRecoveryPromptBlock, type AiRecoveryPromptMemory } from "./aiRecoveryPromptMemory.ts";
 
 export type SecondPassMode = "more_hook" | "more_payoff" | "less_exposition" | "more_emotion" | "platform_fit";
 
@@ -9,6 +10,7 @@ export interface ChapterSecondPassPromptInput {
   sellingPoint: string;
   platform: PlatformProfile;
   startTactic?: ProjectStartTacticSummary | null;
+  aiRecoveryMemory?: AiRecoveryPromptMemory | null;
   instruction: string;
   mode: SecondPassMode;
   targetWords: number;
@@ -56,6 +58,7 @@ export function buildChapterSecondPassPrompt(input: ChapterSecondPassPromptInput
     `平台开头规则：${input.platform.openingRules.join("；")}`,
     `平台审稿重点：${input.platform.reviewFocus.join("、")}`,
     ...startTacticLines,
+    buildAiRecoveryPromptBlock(input.aiRecoveryMemory, "second_pass"),
     `二改方向：${modeInstructions[input.mode]}`,
     `作者指令：${input.instruction}`,
     `目标字数：约 ${input.targetWords} 字`,

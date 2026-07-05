@@ -122,4 +122,32 @@ describe("buildChapterReviewPrompt", () => {
     assert.equal(prompt.sourceContext?.sourceCounts.characters, 1);
     assert.ok(prompt.sourceContext?.summary.includes("设定 3"));
   });
+
+  it("feeds AI recovery evidence into review criteria", () => {
+    const prompt = buildChapterReviewPrompt({
+      projectTitle: "夜雨系统",
+      platform: getPlatformProfile("fanqie"),
+      aiRecoveryMemory: {
+        promptBlock: [
+          "AI 写审改恢复证据：",
+          "- 最近恢复证据 · 恢复小批：成功率：100%；平均质量：91。",
+          "- 禁区：不要直接恢复大批量，不要弱化开头钩子和章末追读。",
+        ].join("\n"),
+      },
+      chapter: {
+        title: "第四章",
+        content: "林晚推开门，恢复批次的低分预警亮起。",
+        goal: "验证恢复后的正文质量。",
+        hook: "恢复批次只剩一次机会。",
+        conflict: "继续推进会暴露妹妹。",
+        valueShift: "从冒险推进到谨慎反击。",
+        cliffhanger: "系统要求删除一段关键记忆。",
+      },
+    });
+
+    assert.match(prompt.userPrompt, /AI 写审改恢复证据/);
+    assert.match(prompt.userPrompt, /平均质量：91/);
+    assert.match(prompt.userPrompt, /不要直接恢复大批量/);
+    assert.match(prompt.userPrompt, /ai_recovery/);
+  });
 });

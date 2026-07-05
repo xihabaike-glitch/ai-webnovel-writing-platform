@@ -1,4 +1,5 @@
 import { buildChapterReviewPrompt } from "@/lib/ai/buildChapterReviewPrompt";
+import { buildAiRecoveryPromptMemory } from "@/lib/ai/aiRecoveryPromptMemory";
 import { prisma } from "@/lib/db/prisma";
 import type { ForcedProviderTarget } from "@/lib/model-gateway/providerSelection";
 import { runRoutedGeneration } from "@/lib/model-gateway/routedGeneration";
@@ -6,6 +7,7 @@ import { getPlatformProfile, type PlatformId } from "@/lib/platforms/platformPro
 import { buildProjectContextPack } from "@/lib/projects/projectContextPack";
 import { findProjectStartTacticSummary } from "@/lib/projects/projectStartTactics";
 import { completeFirstThreeReviewFollowup } from "@/lib/chapters/revisionAdoptionFollowupCompletion";
+import { gatePlatformDispatchTaskFromRecord } from "@/lib/projects/gateDispatchTaskRecords";
 
 export interface ReviewIssueResult {
   severity: string;
@@ -35,6 +37,18 @@ export async function reviewChapterDraft(chapterId: string, options: ReviewChapt
           worldEntries: true,
           foreshadows: { orderBy: { createdAt: "asc" } },
           plotThreads: { orderBy: { createdAt: "asc" } },
+          gateDispatchTasks: {
+            where: {
+              state: "completed",
+              OR: [
+                { platformId: "ai-pipeline" },
+                { dispatchKey: { startsWith: "ai-pipeline-recheck:" } },
+                { dispatchKey: { startsWith: "ai-pipeline:" } },
+              ],
+            },
+            orderBy: { completedAt: "desc" },
+            take: 20,
+          },
         },
       },
     },
@@ -46,6 +60,9 @@ export async function reviewChapterDraft(chapterId: string, options: ReviewChapt
 
   const platform = getPlatformProfile(chapter.project.targetPlatform as PlatformId);
   const startTactic = findProjectStartTacticSummary(chapter.project.worldEntries);
+  const aiRecoveryMemory = buildAiRecoveryPromptMemory(
+    chapter.project.gateDispatchTasks.map(gatePlatformDispatchTaskFromRecord),
+  );
   const projectContext = buildProjectContextPack({
     currentChapterId: chapter.id,
     chapters: chapter.project.chapters,
@@ -59,6 +76,7 @@ export async function reviewChapterDraft(chapterId: string, options: ReviewChapt
     platform,
     startTactic,
     projectContext,
+    aiRecoveryMemory,
     chapter: {
       title: chapter.title,
       content: chapter.content,

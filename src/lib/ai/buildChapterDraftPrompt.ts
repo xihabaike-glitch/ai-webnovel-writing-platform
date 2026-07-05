@@ -2,6 +2,7 @@ import type { PlatformProfile } from "../platforms/platformProfiles.ts";
 import { buildPlatformWritingStylePromptBlock } from "../platforms/writingStyleTemplates.ts";
 import type { ProjectContextPack } from "../projects/projectContextPack.ts";
 import type { ProjectStartTacticSummary } from "../projects/projectStartTactics.ts";
+import { buildAiRecoveryPromptBlock, type AiRecoveryPromptMemory } from "./aiRecoveryPromptMemory.ts";
 import type { StoryTreeExperienceGuide } from "./storyTreeExperience.ts";
 import { buildStoryTreeProductionBlock } from "./storyTreeProduction.ts";
 
@@ -13,6 +14,7 @@ interface ChapterDraftPromptInput {
   startTactic?: ProjectStartTacticSummary | null;
   projectContext?: ProjectContextPack | null;
   storyTreeExperience?: StoryTreeExperienceGuide | null;
+  aiRecoveryMemory?: AiRecoveryPromptMemory | null;
   targetWords: number;
   chapter: {
     order?: number;
@@ -63,6 +65,7 @@ export function buildChapterDraftPrompt(input: ChapterDraftPromptInput) {
     startTacticLines,
     storyTreeBlock,
     input.projectContext?.promptBlock ?? "",
+    buildAiRecoveryPromptBlock(input.aiRecoveryMemory, "draft"),
     `目标字数：约 ${input.targetWords} 字`,
     `章节标题：${input.chapter.title}`,
     `章节目标：${input.chapter.goal}`,

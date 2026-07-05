@@ -186,4 +186,35 @@ test("buildChapterDraftPrompt", async (t) => {
     assert.ok(experiencePrompt.userPrompt.includes("可复用｜分支因果｜68 -> 78 分"));
     assert.ok(experiencePrompt.userPrompt.includes("把支线改成主线压力的直接后果"));
   });
+
+  await t.test("feeds AI recovery evidence into draft instructions", () => {
+    const recoveryPrompt = buildChapterDraftPrompt({
+      projectTitle: "夜雨系统",
+      genre: "都市系统",
+      sellingPoint: "雨夜系统翻盘",
+      platform: getPlatformProfile("fanqie"),
+      aiRecoveryMemory: {
+        promptBlock: [
+          "AI 写审改恢复证据：",
+          "- 最近恢复证据 · 恢复小批：平均质量：91；下一步：继续恢复小批。",
+          "- 禁区：不要直接恢复大批量，不要弱化开头钩子和章末追读。",
+        ].join("\n"),
+      },
+      targetWords: 1200,
+      chapter: {
+        title: "第四章",
+        goal: "恢复后继续推进主线危机。",
+        hook: "系统提示恢复批次只剩一次机会。",
+        conflict: "主角必须在暴露路线和保住妹妹之间选择。",
+        valueShift: "从冒险推进到谨慎反击。",
+        cliffhanger: "恢复批次出现低分预警。",
+        content: "",
+      },
+    });
+
+    assert.ok(recoveryPrompt.userPrompt.includes("AI 写审改恢复证据"));
+    assert.ok(recoveryPrompt.userPrompt.includes("平均质量：91"));
+    assert.ok(recoveryPrompt.userPrompt.includes("不要直接恢复大批量"));
+    assert.ok(recoveryPrompt.userPrompt.includes("恢复证据未清除前，初稿必须保留开头钩子、章末追读和小样本节奏"));
+  });
 });

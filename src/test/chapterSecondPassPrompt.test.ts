@@ -78,4 +78,37 @@ test("buildChapterSecondPassPrompt", async (t) => {
     assert.ok(tacticPrompt.userPrompt.includes("先修前三章兑现"));
     assert.ok(tacticPrompt.userPrompt.includes("优先执行首轮平台打法"));
   });
+
+  await t.test("feeds AI recovery evidence into second-pass rewrite constraints", () => {
+    const recoveryPrompt = buildChapterSecondPassPrompt({
+      projectTitle: "夜雨系统",
+      genre: "都市系统",
+      sellingPoint: "雨夜系统翻盘",
+      platform: getPlatformProfile("fanqie"),
+      aiRecoveryMemory: {
+        promptBlock: [
+          "AI 写审改恢复证据：",
+          "- 最近恢复证据 · 恢复小批：失败/成本：无失败，成本 $0.021。",
+          "- 禁区：不要直接恢复大批量，不要弱化开头钩子和章末追读。",
+        ].join("\n"),
+      },
+      instruction: "修掉恢复后可能复发的低分问题。",
+      mode: "platform_fit",
+      targetWords: 1200,
+      chapter: {
+        title: "第四章 恢复批次",
+        content: "林晚推开门，系统提示音在雨夜响起。",
+        goal: "验证恢复后的正文质量。",
+        hook: "恢复批次只剩一次机会。",
+        conflict: "主角必须在危险和逃避之间选择。",
+        valueShift: "普通生活转向失控危机。",
+        cliffhanger: "系统给出第一个选择。",
+      },
+    });
+
+    assert.ok(recoveryPrompt.userPrompt.includes("AI 写审改恢复证据"));
+    assert.ok(recoveryPrompt.userPrompt.includes("无失败，成本 $0.021"));
+    assert.ok(recoveryPrompt.userPrompt.includes("不要直接恢复大批量"));
+    assert.ok(recoveryPrompt.userPrompt.includes("二改必须优先修复恢复证据里暴露的问题"));
+  });
 });

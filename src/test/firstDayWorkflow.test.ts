@@ -179,6 +179,11 @@ test("buildFirstDayWorkflow", async (t) => {
 
     assert.equal(workflow.nextStep.id, "first-draft");
     assert.equal(workflow.executionPackage.tacticFocus?.label, "恢复放量打法");
+    assert.equal(workflow.handoffProgress?.headline, "开书交接执行进度");
+    assert.equal(workflow.handoffProgress?.progressPercent, 0);
+    assert.equal(workflow.handoffProgress?.items[0]?.status, "active");
+    assert.equal(workflow.handoffProgress?.items[0]?.label, "开头打法");
+    assert.ok(workflow.handoffProgress?.nextAction.includes("开头打法"));
     assert.ok(workflow.executionPackage.tacticFocus?.openingMove.includes("倒计时"));
     assert.equal(workflow.executionPackage.tacticFocus?.handoffDetail, "沿用番茄历史高压钩子，但首日必须回填数据证据。");
     assert.ok(workflow.executionPackage.tacticFocus?.firstDayActions.some((action) => action.includes("第一段给倒计时")));
@@ -210,6 +215,67 @@ test("buildFirstDayWorkflow", async (t) => {
     assert.ok(handoffDispatches[2]?.acceptanceCriteria.some((criterion) => criterion.includes("首轮曝光")));
     assert.ok(handoffDispatches.every((item) => item.evidence.some((evidence) => evidence.includes("稳定加码"))));
     assert.equal(launchPackage.handoffDispatches.length, 3);
+  });
+
+  await t.test("tracks closed-loop handoff progress from completed handoff dispatches", () => {
+    const platform = getPlatformProfile("fanqie");
+    const startTactic = {
+      title: "首轮平台打法：番茄小说",
+      label: "开局闭环",
+      primaryTactic: "番茄小说 已经把平台经验落到新书第一天流程。",
+      openingMove: "先锁定第一屏危机和读者承诺。",
+      verificationMove: "写清通过线、不可接受项和复查证据格式。",
+      risk: "仍要回填真实效果，不能直接当成长线加码结论。",
+      handoffStatus: "reuse" as const,
+      handoffLabel: "闭环交接",
+      handoffDetail: "已用于新书开局并闭环：开头、验收、包装三段交接完成。",
+      recommendedPlatformName: "番茄小说",
+      recommendedTemplateId: "fanqie_system_reversal" as const,
+      firstDayActions: [
+        "闭环复用：沿用已完成的新书开局三段交接。",
+        "开头：先锁开头钩子和读者承诺。",
+        "验证：通过线与不可接受项必须写清。",
+      ],
+      avoidRules: ["包装交接：标题、简介、标签、卖点必须回收平台避坑边界。"],
+      handoffEvidence: ["已用于新书开局并闭环：开头、验收、包装三段交接完成"],
+    };
+    const workflow = buildFirstDayWorkflow({
+      project,
+      platform,
+      chapters: [chapter, { ...chapter, id: "chapter-2", order: 2 }, { ...chapter, id: "chapter-3", order: 3 }],
+      outlineNodes,
+      characters,
+      worldEntries,
+      aiTasks: [],
+      startTactic,
+      dispatchTasks: [
+        {
+          dispatchKey: "first-day-handoff:project-1:opening",
+          state: "completed",
+          completionEvidence: "已锁定前三段钩子、读者承诺和第一章冲突升级。",
+        },
+        {
+          dispatchKey: "first-day-handoff:project-1:verification",
+          state: "completed",
+          completionEvidence: "已写清通过线、不可接受项和复查证据格式。",
+        },
+        {
+          dispatchKey: "first-day-handoff:project-1:platform-package",
+          state: "completed",
+          completionEvidence: "已把避坑边界回收到标题、简介、标签和卖点包装。",
+        },
+      ],
+      submissionChecklist: checklist,
+    });
+
+    assert.equal(workflow.handoffProgress?.headline, "闭环打法执行进度");
+    assert.equal(workflow.handoffProgress?.label, "闭环交接");
+    assert.equal(workflow.handoffProgress?.completedCount, 3);
+    assert.equal(workflow.handoffProgress?.progressPercent, 100);
+    assert.equal(workflow.handoffProgress?.items.every((item) => item.status === "done"), true);
+    assert.ok(workflow.handoffProgress?.nextAction.includes("三段交接已闭环"));
+    assert.ok(workflow.handoffProgress?.evidence.some((item) => item.includes("已用于新书开局并闭环")));
+    assert.ok(workflow.handoffProgress?.items[2]?.evidence.includes("标题、简介、标签"));
   });
 
   await t.test("turns the current first-day package into a model execution plan", () => {

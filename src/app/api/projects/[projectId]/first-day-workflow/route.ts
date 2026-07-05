@@ -27,7 +27,10 @@ async function buildWorkflowPayload(projectId: string) {
         aiTasks: { orderBy: { createdAt: "desc" } },
         gateDispatchTasks: {
           where: {
-            dispatchKey: { startsWith: `first-day:${projectId}:` },
+            OR: [
+              { dispatchKey: { startsWith: `first-day:${projectId}:` } },
+              { dispatchKey: { startsWith: `first-day-handoff:${projectId}:` } },
+            ],
           },
           orderBy: { updatedAt: "desc" },
         },

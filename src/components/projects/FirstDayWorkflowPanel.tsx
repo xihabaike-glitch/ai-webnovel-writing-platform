@@ -57,7 +57,32 @@ interface FirstDayWorkflow {
   verdict: string;
   nextStep: FirstDayWorkflowStep;
   executionPackage: FirstDayExecutionPackage;
+  handoffProgress: FirstDayExperienceHandoffProgress | null;
   steps: FirstDayWorkflowStep[];
+}
+
+interface FirstDayExperienceHandoffProgressItem {
+  id: "opening" | "verification" | "platform-package";
+  label: string;
+  ownerRole: string;
+  status: FirstDayWorkflowStep["status"];
+  action: string;
+  target: string;
+  evidence: string;
+  href: string;
+}
+
+interface FirstDayExperienceHandoffProgress {
+  visible: boolean;
+  label: string;
+  headline: string;
+  detail: string;
+  completedCount: number;
+  totalCount: number;
+  progressPercent: number;
+  nextAction: string;
+  evidence: string[];
+  items: FirstDayExperienceHandoffProgressItem[];
 }
 
 interface FirstDayExecutionReceipt {
@@ -179,6 +204,59 @@ function FirstDayStepCard({ step, index }: { step: FirstDayWorkflowStep; index: 
       <Link className="mt-2 inline-block font-medium text-slate-950" href={view.href}>
         {view.actionLabel}
       </Link>
+    </div>
+  );
+}
+
+function FirstDayHandoffProgressPanel({ progress }: { progress: FirstDayExperienceHandoffProgress }) {
+  return (
+    <div className="rounded-md border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-950">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+        <div>
+          <div className="flex flex-wrap items-center gap-2">
+            <h3 className="font-medium">{progress.headline}</h3>
+            <span className="rounded-md bg-white/80 px-2 py-1 text-xs font-medium">{progress.label}</span>
+          </div>
+          <p className="mt-1 leading-6 text-emerald-800">{progress.detail}</p>
+          <p className="mt-2 font-medium text-emerald-900">{progress.nextAction}</p>
+        </div>
+        <div className="shrink-0 rounded-md bg-white/80 px-3 py-2 text-right">
+          <div className="text-xs text-emerald-700">交接进度</div>
+          <div className="mt-1 text-2xl font-semibold">{progress.progressPercent}%</div>
+          <div className="mt-1 text-xs text-emerald-700">{progress.completedCount}/{progress.totalCount} 闭环</div>
+        </div>
+      </div>
+      <div className="mt-3 h-2 overflow-hidden rounded bg-white">
+        <div className="h-full bg-emerald-600" style={{ width: `${progress.progressPercent}%` }} />
+      </div>
+      <div className="mt-3 grid gap-2 lg:grid-cols-3">
+        {progress.items.map((item) => (
+          <div className="rounded-md border border-white/70 bg-white/70 p-3" key={item.id}>
+            <div className="flex items-start justify-between gap-2">
+              <div>
+                <div className="text-xs text-emerald-700">{item.ownerRole}</div>
+                <div className="mt-1 font-medium text-emerald-950">{item.label}</div>
+              </div>
+              <span className={`shrink-0 rounded-md border px-2 py-1 text-xs ${statusClass(item.status)}`}>
+                {statusLabel(item.status)}
+              </span>
+            </div>
+            <p className="mt-2 leading-5 text-emerald-800">{item.action}</p>
+            <p className="mt-2 rounded-md bg-white px-2 py-2 text-xs leading-5 text-emerald-700">{item.target}</p>
+            <p className="mt-2 text-xs leading-5 text-emerald-700">{item.evidence}</p>
+            <Link className="mt-2 inline-block text-xs font-medium text-emerald-950 underline underline-offset-2" href={item.href}>
+              查看处理入口
+            </Link>
+          </div>
+        ))}
+      </div>
+      {progress.evidence.length ? (
+        <div className="mt-3 grid gap-1 text-xs text-emerald-800 sm:grid-cols-2">
+          {progress.evidence.slice(0, 4).map((evidence) => (
+            <div className="rounded-md bg-white/70 px-2 py-1 leading-5" key={evidence}>{evidence}</div>
+          ))}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -494,6 +572,10 @@ export function FirstDayWorkflowPanel({ projectId }: { projectId: string }) {
 
       {workflow ? (
         <div className="mt-4 grid gap-4">
+          {workflow.handoffProgress?.visible ? (
+            <FirstDayHandoffProgressPanel progress={workflow.handoffProgress} />
+          ) : null}
+
           <div className="grid gap-3 lg:grid-cols-[220px_1fr]">
             <div className="rounded-md bg-slate-50 p-4">
               <div className="text-xs text-slate-500">{workflow.platformName}</div>

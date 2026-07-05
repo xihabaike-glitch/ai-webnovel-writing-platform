@@ -126,6 +126,30 @@ export interface FirstDayTacticFocus {
   missingEvidence: string[];
 }
 
+export interface FirstDayExperienceHandoffProgressItem {
+  id: "opening" | "verification" | "platform-package";
+  label: string;
+  ownerRole: string;
+  status: "done" | "active" | "locked";
+  action: string;
+  target: string;
+  evidence: string;
+  href: string;
+}
+
+export interface FirstDayExperienceHandoffProgress {
+  visible: boolean;
+  label: string;
+  headline: string;
+  detail: string;
+  completedCount: number;
+  totalCount: number;
+  progressPercent: number;
+  nextAction: string;
+  evidence: string[];
+  items: FirstDayExperienceHandoffProgressItem[];
+}
+
 export interface FirstDayModelExecutionPlan {
   executable: boolean;
   stepId: string;
@@ -147,6 +171,7 @@ export interface FirstDayWorkflow {
   verdict: string;
   nextStep: FirstDayWorkflowStep;
   executionPackage: FirstDayExecutionPackage;
+  handoffProgress: FirstDayExperienceHandoffProgress | null;
   steps: FirstDayWorkflowStep[];
 }
 
@@ -198,6 +223,19 @@ function hasText(text: string, minLength = 1) {
   return compact(text).length >= minLength;
 }
 
+function uniqueNonEmpty(lines: Array<string | null | undefined>, limit: number) {
+  const seen = new Set<string>();
+  return lines
+    .map((line) => line ? compact(line) : "")
+    .filter(Boolean)
+    .filter((line) => {
+      if (seen.has(line)) return false;
+      seen.add(line);
+      return true;
+    })
+    .slice(0, limit);
+}
+
 function firstChapter(chapters: FirstDayChapter[]) {
   return [...chapters].sort((left, right) => left.order - right.order)[0] ?? null;
 }
@@ -212,6 +250,15 @@ function hasSucceededTask(tasks: FirstDayAiTask[], taskType: string, chapterId?:
 
 function completedDispatchForStep(input: FirstDayWorkflowInput, stepId: string) {
   const dispatchKey = `first-day:${input.project.id}:${stepId}`;
+  return input.dispatchTasks?.find((task) => (
+    task.dispatchKey === dispatchKey
+    && task.state === "completed"
+    && hasText(task.completionEvidence, 8)
+  )) ?? null;
+}
+
+function completedHandoffDispatch(input: FirstDayWorkflowInput, handoffStep: FirstDayExperienceHandoffProgressItem["id"]) {
+  const dispatchKey = `first-day-handoff:${input.project.id}:${handoffStep}`;
   return input.dispatchTasks?.find((task) => (
     task.dispatchKey === dispatchKey
     && task.state === "completed"
@@ -429,6 +476,108 @@ function tacticFocusForStep(startTactic: ProjectStartTacticSummary | null | unde
     handoffEvidence,
     acceptanceCriteria: handoffCriteria,
     missingEvidence: [missingByStep[stepId] ?? "缺少开书打法落地证据。"],
+  };
+}
+
+function firstMatchingLine(lines: string[], pattern: RegExp, fallback: string) {
+  return lines.find((line) => pattern.test(line)) ?? fallback;
+}
+
+function buildFirstDayExperienceHandoffProgress(input: FirstDayWorkflowInput): FirstDayExperienceHandoffProgress | null {
+  const startTactic = input.startTactic;
+  if (!startTactic) return null;
+  const firstDayActions = (startTactic.firstDayActions ?? []).map(compact).filter(Boolean);
+  const avoidRules = (startTactic.avoidRules ?? []).map(compact).filter(Boolean);
+  const handoffEvidence = (startTactic.handoffEvidence ?? []).map(compact).filter(Boolean);
+  const hasHandoffSignal = Boolean(
+    startTactic.handoffLabel
+    || startTactic.handoffDetail
+    || firstDayActions.length
+    || avoidRules.length
+    || handoffEvidence.length,
+  );
+  if (!hasHandoffSignal) return null;
+
+  const projectHref = `/projects/${input.project.id}`;
+  const dispatchByStep: Record<FirstDayExperienceHandoffProgressItem["id"], FirstDayDispatchTask | null> = {
+    opening: completedHandoffDispatch(input, "opening"),
+    verification: completedHandoffDispatch(input, "verification"),
+    "platform-package": completedHandoffDispatch(input, "platform-package"),
+  };
+  const openingAction = firstMatchingLine(
+    firstDayActions,
+    /开头|第一章|首屏|钩子|正文/u,
+    startTactic.openingMove || "把开头钩子、读者承诺、第一章冲突升级写进第一屏。",
+  );
+  const verificationAction = firstMatchingLine(
+    firstDayActions,
+    /验证|通过线|不可接受|复查|审稿/u,
+    startTactic.verificationMove || "写清首轮通过线、不可接受项和复查证据格式。",
+  );
+  const packageAction = firstMatchingLine(
+    [...firstDayActions, ...avoidRules],
+    /平台包|标题|简介|标签|卖点|包装|回填|曝光|点击|收藏|追读|避坑/u,
+    avoidRules[0] || "把标题、简介、标签、卖点和平台避坑边界回收到投稿包装。",
+  );
+  const specs: Array<Omit<FirstDayExperienceHandoffProgressItem, "status" | "evidence"> & { dispatch: FirstDayDispatchTask | null }> = [
+    {
+      id: "opening",
+      label: "开头打法",
+      ownerRole: "开头编辑",
+      action: openingAction,
+      target: "第一章首屏能看出危机、选择、代价和继续读的理由。",
+      href: `${projectHref}#first-day-workflow`,
+      dispatch: dispatchByStep.opening,
+    },
+    {
+      id: "verification",
+      label: "验收口径",
+      ownerRole: "审稿编辑",
+      action: verificationAction,
+      target: "前三章通过线、不可接受项和复查证据格式写清。",
+      href: `${projectHref}#first-day-workflow`,
+      dispatch: dispatchByStep.verification,
+    },
+    {
+      id: "platform-package",
+      label: "平台包装",
+      ownerRole: "平台运营",
+      action: packageAction,
+      target: "标题、简介、标签、卖点和首轮数据回收口径能承接正文打法。",
+      href: `${projectHref}#platform-export`,
+      dispatch: dispatchByStep["platform-package"],
+    },
+  ];
+  const firstIncompleteIndex = specs.findIndex((spec) => !spec.dispatch);
+  const items = specs.map((spec, index): FirstDayExperienceHandoffProgressItem => ({
+    id: spec.id,
+    label: spec.label,
+    ownerRole: spec.ownerRole,
+    status: spec.dispatch ? "done" : index === firstIncompleteIndex ? "active" : "locked",
+    action: spec.action,
+    target: spec.target,
+    evidence: spec.dispatch ? compact(spec.dispatch.completionEvidence) : "等待任务中心回写完成证据。",
+    href: spec.href,
+  }));
+  const completedCount = items.filter((item) => item.status === "done").length;
+  const nextItem = items.find((item) => item.status === "active") ?? items[items.length - 1];
+  const label = startTactic.handoffLabel || startTactic.label;
+  const isClosedLoop = /闭环|开局闭环|已闭环/u.test(`${label} ${startTactic.label} ${startTactic.handoffDetail ?? ""}`);
+
+  return {
+    visible: true,
+    label,
+    headline: isClosedLoop ? "闭环打法执行进度" : "开书交接执行进度",
+    detail: startTactic.handoffDetail || "把首轮平台打法拆成开头、验收、平台包装三段交接，完成后再进入批量生产。",
+    completedCount,
+    totalCount: items.length,
+    progressPercent: Math.round((completedCount / items.length) * 100),
+    nextAction: completedCount === items.length ? "三段交接已闭环，可以继续看首日工作流和平台数据回收。" : `下一步：${nextItem.label} · ${nextItem.action}`,
+    evidence: uniqueNonEmpty([
+      ...handoffEvidence,
+      ...items.filter((item) => item.status === "done").map((item) => `${item.label}：${item.evidence}`),
+    ], 5),
+    items,
   };
 }
 
@@ -1028,6 +1177,7 @@ export function buildFirstDayWorkflow(input: FirstDayWorkflowInput): FirstDayWor
   ];
   const completedCount = steps.filter((item) => item.status === "done").length;
   const nextStep = steps.find((item) => item.status === "active") ?? steps.find((item) => item.status === "locked") ?? steps[steps.length - 1];
+  const handoffProgress = buildFirstDayExperienceHandoffProgress(input);
 
   return {
     title: "首日工作流",
@@ -1044,6 +1194,7 @@ export function buildFirstDayWorkflow(input: FirstDayWorkflowInput): FirstDayWor
       riskProfile,
       startTactic: input.startTactic,
     }),
+    handoffProgress,
     steps,
   };
 }

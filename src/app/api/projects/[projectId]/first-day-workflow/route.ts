@@ -7,6 +7,8 @@ import { buildFirstDayExecutionRouteBlockMessage, buildFirstDayExecutionRouteSta
 import { getPlatformProfile, type PlatformId } from "@/lib/platforms/platformProfiles";
 import { buildFirstDayContinuationAction } from "@/lib/projects/firstDayContinuation";
 import { buildFirstDayDispatchItem, buildFirstDayExecutionReceipt, buildFirstDayModelExecutionPlan, buildFirstDayWorkflow } from "@/lib/projects/firstDayWorkflow";
+import { buildGateProjectStartNextDispatchItems, buildGateProjectStartValidationReview } from "@/lib/projects/gateActionReceipts";
+import { gatePlatformDispatchTaskFromRecord } from "@/lib/projects/gateDispatchTaskRecords";
 import { generateControlAssets, type ControlAssetAreaId } from "@/lib/projects/controlAssetGeneration";
 import { findProjectStartTacticSummary } from "@/lib/projects/projectStartTactics";
 import { buildSubmissionChecklist } from "@/lib/projects/submissionChecklist";
@@ -30,6 +32,7 @@ async function buildWorkflowPayload(projectId: string) {
             OR: [
               { dispatchKey: { startsWith: `first-day:${projectId}:` } },
               { dispatchKey: { startsWith: `first-day-handoff:${projectId}:` } },
+              { stage: { in: ["start_publish_finalize", "start_metrics_recovery"] } },
             ],
           },
           orderBy: { updatedAt: "desc" },
@@ -86,6 +89,10 @@ async function buildWorkflowPayload(projectId: string) {
     submissionChecklist,
   });
   const executionPlan = buildFirstDayModelExecutionPlan(workflow);
+  const persistedDispatchTasks = project.gateDispatchTasks.map(gatePlatformDispatchTaskFromRecord);
+  const startValidationReview = buildGateProjectStartValidationReview(persistedDispatchTasks);
+  const handoffFollowupDispatches = buildGateProjectStartNextDispatchItems(startValidationReview, persistedDispatchTasks)
+    .filter((item) => item.stage === "start_publish_finalize" || item.stage === "start_metrics_recovery");
 
   return {
     workflow,
@@ -120,6 +127,7 @@ async function buildWorkflowPayload(projectId: string) {
       platform,
       workflow,
     }),
+    handoffFollowupDispatches,
   };
 }
 

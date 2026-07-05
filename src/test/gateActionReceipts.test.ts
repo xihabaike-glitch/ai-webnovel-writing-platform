@@ -56,6 +56,7 @@ import {
   mergeGateActionReceipts,
   reviewGateDispatchCompletionEvidence,
   trimGateActionReceipts,
+  type PersistedGatePlatformDispatchTask,
 } from "../lib/projects/gateActionReceipts.ts";
 import { buildProjectStartDecisionActionReceipt } from "../lib/projects/projectStartDecisionActions.ts";
 import type { PrePublishGateAction, PrePublishGateAdoptionFollowupItem, PrePublishGateStrategyPlatform } from "../lib/projects/prePublishGate.ts";
@@ -1803,6 +1804,59 @@ test("buildGateActionReceipt", async (t) => {
 
     assert.equal(refreshed[0].state, "completed");
     assert.equal(refreshed[1].state, "queued");
+  });
+
+  await t.test("promotes completed first-day handoff tasks into metric recovery dispatches", () => {
+    const makeHandoffTask = (
+      suffix: "opening" | "verification" | "platform-package",
+      stage: PersistedGatePlatformDispatchTask["stage"],
+      title: string,
+      completionEvidence: string,
+      index: number,
+    ): PersistedGatePlatformDispatchTask => ({
+      id: `first-day-handoff:project-1:${suffix}`,
+      databaseId: `dispatch-db-handoff-${index}`,
+      dispatchKey: `first-day-handoff:project-1:${suffix}`,
+      projectId: "project-1",
+      sourceReceiptId: null,
+      platformId: "fanqie",
+      platformName: "番茄小说",
+      stage,
+      state: "completed",
+      priorityScore: 80 - index,
+      ownerRole: "首日交接责任人",
+      title,
+      detail: `${title}已经闭环。`,
+      dueLabel: "今天",
+      actionLabel: "查看交接",
+      href: "/projects/project-1#first-day-workflow",
+      acceptanceCriteria: ["交接任务已完成"],
+      evidence: [`${title}待验收`],
+      reviewLatestAt: `2026-01-01T00:00:0${index}.000Z`,
+      completionEvidence,
+      assignedAt: "2026-01-01T00:00:01.000Z",
+      completedAt: `2026-01-01T00:00:0${index + 1}.000Z`,
+      createdAt: "2026-01-01T00:00:01.000Z",
+      updatedAt: `2026-01-01T00:00:0${index + 1}.000Z`,
+    });
+    const handoffTasks = [
+      makeHandoffTask("opening", "start_opening_diagnostic", "开头打法交接", "第一章钩子和冲突已交接。", 1),
+      makeHandoffTask("verification", "start_first_three_review", "验收口径交接", "前三章审稿标准已交接。", 2),
+      makeHandoffTask("platform-package", "start_platform_package", "平台包装回收", "标题简介标签已回收。", 3),
+    ];
+
+    const review = buildGateProjectStartValidationReview(handoffTasks);
+    const nextDispatches = buildGateProjectStartNextDispatchItems(review, handoffTasks);
+
+    assert.equal(review.summary.readyPlans, 1);
+    assert.deepEqual(nextDispatches.map((item) => item.stage), [
+      "start_publish_finalize",
+      "start_metrics_recovery",
+    ]);
+    assert.equal(nextDispatches[1].id, "fanqie:start_next:metrics_recovery:project-1");
+    assert.equal(nextDispatches[1].ownerRole, "首轮数据运营");
+    assert.ok(nextDispatches[1].acceptanceCriteria.includes("首轮曝光、点击、追读或收藏口径已确定"));
+    assert.ok(nextDispatches[1].evidence.some((evidence) => evidence.includes("标题简介标签已回收")));
   });
 
   await t.test("decides the first metric recovery outcome before platform scale-up", () => {

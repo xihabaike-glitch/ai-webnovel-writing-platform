@@ -123,6 +123,24 @@ interface FirstDayContinuationAction {
 type FirstDayModelRouteStatus = FirstDayExecutionRouteStatus;
 type FirstDayMessageAction = "execute_current_step";
 
+function followupDispatchTone(stage: GatePlatformGrowthDispatchItem["stage"]) {
+  if (stage === "start_metrics_recovery") return "border-teal-200 bg-teal-50 text-teal-900";
+  if (stage === "start_publish_finalize") return "border-violet-200 bg-violet-50 text-violet-900";
+  return "border-slate-200 bg-slate-50 text-slate-900";
+}
+
+function followupDispatchLabel(stage: GatePlatformGrowthDispatchItem["stage"]) {
+  if (stage === "start_metrics_recovery") return "首轮数据回收";
+  if (stage === "start_publish_finalize") return "发布包定稿";
+  return "后续派单";
+}
+
+function followupDispatchStateLabel(state: GatePlatformGrowthDispatchItem["state"]) {
+  if (state === "completed") return "已完成";
+  if (state === "assigned") return "已派单";
+  return "待派单";
+}
+
 function statusLabel(status: FirstDayWorkflowStep["status"]) {
   if (status === "done") return "完成";
   if (status === "active") return "当前";
@@ -208,7 +226,17 @@ function FirstDayStepCard({ step, index }: { step: FirstDayWorkflowStep; index: 
   );
 }
 
-function FirstDayHandoffProgressPanel({ progress }: { progress: FirstDayExperienceHandoffProgress }) {
+function FirstDayHandoffProgressPanel({
+  followupDispatches,
+  isAssigning,
+  onAssign,
+  progress,
+}: {
+  followupDispatches: GatePlatformGrowthDispatchItem[];
+  isAssigning: boolean;
+  onAssign: (dispatch: GatePlatformGrowthDispatchItem) => void;
+  progress: FirstDayExperienceHandoffProgress;
+}) {
   return (
     <div className="rounded-md border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-950">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
@@ -257,6 +285,46 @@ function FirstDayHandoffProgressPanel({ progress }: { progress: FirstDayExperien
           ))}
         </div>
       ) : null}
+      {followupDispatches.length ? (
+        <div className="mt-4 grid gap-2 border-t border-white/70 pt-4 lg:grid-cols-2">
+          {followupDispatches.map((dispatch) => (
+            <div className={`rounded-md border p-3 ${followupDispatchTone(dispatch.stage)}`} key={dispatch.id}>
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <div className="text-xs font-medium opacity-75">{followupDispatchLabel(dispatch.stage)}</div>
+                  <div className="mt-1 font-semibold">{dispatch.title}</div>
+                </div>
+                <span className="w-fit rounded-md bg-white/80 px-2 py-1 text-xs font-medium">
+                  {followupDispatchStateLabel(dispatch.state)}
+                </span>
+              </div>
+              <p className="mt-2 leading-6 opacity-90">{dispatch.detail}</p>
+              <div className="mt-2 grid gap-1 text-xs">
+                {dispatch.acceptanceCriteria.slice(0, 2).map((criterion) => (
+                  <div className="rounded-md bg-white/70 px-2 py-1 leading-5" key={criterion}>{criterion}</div>
+                ))}
+              </div>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button
+                  className="w-fit rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white disabled:opacity-50"
+                  disabled={isAssigning || dispatch.state === "completed" || dispatch.state === "assigned"}
+                  onClick={() => onAssign(dispatch)}
+                  type="button"
+                >
+                  {dispatch.state === "queued" ? "派到任务中心" : "已在任务中心"}
+                </button>
+                <Link className="w-fit rounded-md bg-white/80 px-3 py-2 text-xs font-medium text-slate-900 hover:bg-white" href={dispatch.href}>
+                  打开处理入口
+                </Link>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : progress.completedCount === progress.totalCount ? (
+        <div className="mt-4 rounded-md bg-white/70 px-3 py-2 text-xs leading-5 text-emerald-800">
+          交接已经闭环。若还没看到数据回收派单，请刷新工作流或前往总闸门复查派单台。
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -278,6 +346,7 @@ export function FirstDayWorkflowPanel({ projectId }: { projectId: string }) {
   const [messageAction, setMessageAction] = useState<FirstDayMessageAction | null>(null);
   const [executionReceipt, setExecutionReceipt] = useState<FirstDayExecutionReceipt | null>(null);
   const [continuation, setContinuation] = useState<FirstDayContinuationAction | null>(null);
+  const [handoffFollowupDispatches, setHandoffFollowupDispatches] = useState<GatePlatformGrowthDispatchItem[]>([]);
 
   function showMessage(nextMessage: string | null, action?: FirstDayMessageAction) {
     setMessage(nextMessage);
@@ -299,12 +368,14 @@ export function FirstDayWorkflowPanel({ projectId }: { projectId: string }) {
         executionPlan: FirstDayModelExecutionPlan;
         modelRoute: FirstDayModelRouteStatus;
         continuation: FirstDayContinuationAction;
+        handoffFollowupDispatches: GatePlatformGrowthDispatchItem[];
       };
       setWorkflow(payload.workflow);
       setDispatch(payload.dispatch);
       setExecutionPlan(payload.executionPlan);
       setModelRoute(payload.modelRoute);
       setContinuation(payload.continuation);
+      setHandoffFollowupDispatches(payload.handoffFollowupDispatches ?? []);
       if (options?.fromRouteRepair) {
         const notice = refreshedRouteNotice(payload.modelRoute);
         showMessage(notice.message, notice.action);
@@ -362,6 +433,7 @@ export function FirstDayWorkflowPanel({ projectId }: { projectId: string }) {
         executionPlan?: FirstDayModelExecutionPlan;
         modelRoute?: FirstDayModelRouteStatus;
         continuation?: FirstDayContinuationAction;
+        handoffFollowupDispatches?: GatePlatformGrowthDispatchItem[];
         executionReceipt?: FirstDayExecutionReceipt;
         completionEvidence?: string;
         error?: string;
@@ -374,6 +446,7 @@ export function FirstDayWorkflowPanel({ projectId }: { projectId: string }) {
       if (payload.executionPlan) setExecutionPlan(payload.executionPlan);
       if (payload.modelRoute) setModelRoute(payload.modelRoute);
       if (payload.continuation) setContinuation(payload.continuation);
+      if (payload.handoffFollowupDispatches) setHandoffFollowupDispatches(payload.handoffFollowupDispatches);
       if (payload.executionReceipt) setExecutionReceipt(payload.executionReceipt);
       if (payload.completionEvidence) setCompletionEvidence(payload.completionEvidence);
       showMessage(payload.executionReceipt?.summary ?? `AI 已执行当前节点：${workflow.nextStep.label}。请检查结果后完成派单验收。`);
@@ -405,6 +478,21 @@ export function FirstDayWorkflowPanel({ projectId }: { projectId: string }) {
       showMessage(caught instanceof Error ? caught.message : "首日派单验收失败。");
     } finally {
       setIsCompletingDispatch(false);
+    }
+  }
+
+  async function assignHandoffFollowupDispatch(item: GatePlatformGrowthDispatchItem) {
+    setIsDispatching(true);
+    showMessage(null);
+    setExecutionReceipt(null);
+    try {
+      const task = await persistGateDispatchTask(item);
+      showMessage(`已派到任务中心：${task.title}`);
+      await loadWorkflow();
+    } catch (caught) {
+      showMessage(caught instanceof Error ? caught.message : "后续任务派单失败。");
+    } finally {
+      setIsDispatching(false);
     }
   }
 
@@ -573,7 +661,12 @@ export function FirstDayWorkflowPanel({ projectId }: { projectId: string }) {
       {workflow ? (
         <div className="mt-4 grid gap-4">
           {workflow.handoffProgress?.visible ? (
-            <FirstDayHandoffProgressPanel progress={workflow.handoffProgress} />
+            <FirstDayHandoffProgressPanel
+              followupDispatches={handoffFollowupDispatches}
+              isAssigning={isDispatching}
+              onAssign={(item) => void assignHandoffFollowupDispatch(item)}
+              progress={workflow.handoffProgress}
+            />
           ) : null}
 
           <div className="grid gap-3 lg:grid-cols-[220px_1fr]">

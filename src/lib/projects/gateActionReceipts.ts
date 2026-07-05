@@ -4080,6 +4080,15 @@ export type GateDispatchCompletionTemplateTask = Pick<
   "stage" | "title" | "actionLabel" | "platformName"
 > & Partial<Pick<PersistedGatePlatformDispatchTask, "acceptanceCriteria" | "evidence">>;
 
+export type GateAiPipelineRecoveryCompletionKind = "sample_recheck" | "small_batch_resume" | "rollback_repair";
+
+export interface GateAiPipelineRecoveryCompletionOutcome {
+  kind: GateAiPipelineRecoveryCompletionKind;
+  outcome: GatePlatformTacticExperienceStatus;
+  nextAction: string;
+  evidence: string[];
+}
+
 function escapeCompletionLabel(label: string) {
   return label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
@@ -4146,6 +4155,64 @@ function isAiPipelineCompletionTask(task: GateDispatchCompletionTemplateTask) {
   return isAiPipelineSampleCompletionTask(task)
     || isAiPipelineScaleCompletionTask(task)
     || isAiPipelineRollbackCompletionTask(task);
+}
+
+function aiPipelineCompletionKind(task: GateDispatchCompletionTemplateTask): GateAiPipelineRecoveryCompletionKind | null {
+  if (isAiPipelineRollbackCompletionTask(task)) return "rollback_repair";
+  if (isAiPipelineScaleCompletionTask(task)) return "small_batch_resume";
+  if (isAiPipelineSampleCompletionTask(task)) return "sample_recheck";
+  return null;
+}
+
+function aiPipelineCompletionLabels(kind: GateAiPipelineRecoveryCompletionKind) {
+  if (kind === "rollback_repair") {
+    return {
+      evidenceLabels: ["修复对象", "跌线原因", "修复动作", "复验结论"],
+      nextLabel: "下一步",
+    };
+  }
+  if (kind === "small_batch_resume") {
+    return {
+      evidenceLabels: ["小批范围", "成功率", "平均质量", "失败/成本"],
+      nextLabel: "下一步节奏",
+    };
+  }
+  return {
+    evidenceLabels: ["样本范围", "成功率", "质量", "失败/成本"],
+    nextLabel: "放量结论",
+  };
+}
+
+function aiPipelineRecoveryOutcomeFromAction(nextAction: string): GatePlatformTacticExperienceStatus {
+  if (/暂停|回滚|停止|终止|跌线|失败|不允许|不能|不放量/u.test(nextAction)) return "blocked";
+  if (/观察|重新小样本|未通过|不通过|待补|补证据|暂缓/u.test(nextAction)) return "watch";
+  if (/通过|继续恢复小批|可恢复|恢复小批|继续/u.test(nextAction)) return "usable";
+  return "watch";
+}
+
+export function parseAiPipelineRecoveryCompletionEvidence(
+  task: GateDispatchCompletionTemplateTask,
+  completionEvidence: string,
+): GateAiPipelineRecoveryCompletionOutcome | null {
+  const kind = aiPipelineCompletionKind(task);
+  if (!kind) return null;
+  const text = completionEvidence.trim();
+  if (!text) return null;
+  const labels = aiPipelineCompletionLabels(kind);
+  const evidence = labels.evidenceLabels
+    .map((label) => {
+      const value = completionValueAfterLabel(label, text);
+      return value ? `${label}：${value}` : null;
+    })
+    .filter((line): line is string => Boolean(line));
+  const nextAction = completionValueAfterLabel(labels.nextLabel, text) ?? "";
+
+  return {
+    kind,
+    outcome: aiPipelineRecoveryOutcomeFromAction(nextAction || text),
+    nextAction,
+    evidence,
+  };
 }
 
 export function buildGateDispatchCompletionTemplate(task: GateDispatchCompletionTemplateTask) {
@@ -4249,11 +4316,10 @@ export function reviewGateDispatchCompletionEvidence(
   if (!buildGateDispatchCompletionTemplate(task)) return null;
 
   if (isAiPipelineCompletionTask(task)) {
-    const labels = isAiPipelineRollbackCompletionTask(task)
-      ? ["修复对象", "跌线原因", "修复动作", "复验结论", "下一步"]
-      : isAiPipelineScaleCompletionTask(task)
-        ? ["小批范围", "成功率", "平均质量", "失败/成本", "下一步节奏"]
-        : ["样本范围", "成功率", "质量", "失败/成本", "放量结论"];
+    const kind = aiPipelineCompletionKind(task);
+    const labels = kind
+      ? [...aiPipelineCompletionLabels(kind).evidenceLabels, aiPipelineCompletionLabels(kind).nextLabel]
+      : [];
     const filled = completedLabels(text, labels);
     return filled.length >= 4
       ? null

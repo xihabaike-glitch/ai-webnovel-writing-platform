@@ -11,6 +11,7 @@ import {
   buildOutlineActionSeeds,
   buildStoryLineActionSeeds,
   buildWorldActionSeeds,
+  updateAiPipelineControlPlanItem,
 } from "@/lib/projects/controlActionSeeds";
 
 interface Params {
@@ -20,6 +21,9 @@ interface Params {
 interface ControlActionBody {
   areaId?: string;
   mode?: "seed" | "ai";
+  receiptId?: string;
+  itemId?: string;
+  completed?: boolean;
 }
 
 function result(areaId: string, targetAnchor: string, created: string[], skipped?: string) {
@@ -76,6 +80,41 @@ export async function POST(request: Request, { params }: Params) {
   }
 
   const platform = getPlatformProfile(project.targetPlatform as PlatformId);
+
+  if (areaId === "ai-pipeline" && body.receiptId && body.itemId && typeof body.completed === "boolean") {
+    const audit = project.gateActionAudits.find((item) => (
+      item.receiptId === body.receiptId
+      && item.executionType === "control_action"
+      && item.actionId.startsWith("ai-pipeline-control:")
+    ));
+    if (!audit) {
+      return NextResponse.json({ error: "没有找到这张批量修复清单。" }, { status: 404 });
+    }
+    const updated = updateAiPipelineControlPlanItem(audit.payload, body.itemId, body.completed);
+    if (!updated) {
+      return NextResponse.json({ error: "清单项不存在或清单数据已损坏。" }, { status: 400 });
+    }
+    await prisma.gateActionAudit.update({
+      where: { receiptId: audit.receiptId },
+      data: {
+        payload: updated.payload,
+        recheckStatus: updated.completedCount === updated.totalCount ? "ready" : "needs_action",
+        recheckLabel: updated.completedCount === updated.totalCount ? "可以复检" : "继续处理清单",
+        recheckDetail: updated.completedCount === updated.totalCount
+          ? "批量修复清单已全部完成，下一步复检批量健康。"
+          : `批量修复清单完成 ${updated.completedCount}/${updated.totalCount}，还有动作没处理。`,
+        recheckAction: updated.completedCount === updated.totalCount ? "复检批量健康" : "继续修清单",
+      },
+    });
+
+    return NextResponse.json({
+      areaId,
+      targetAnchor: "ai-pipeline",
+      message: `${body.completed ? "已完成" : "已改回待处理"}：${updated.itemLabel}。`,
+      completedCount: updated.completedCount,
+      totalCount: updated.totalCount,
+    });
+  }
 
   if (areaId === "outline") {
     const seeds = buildOutlineActionSeeds(project, platform, project.outlineNodes);

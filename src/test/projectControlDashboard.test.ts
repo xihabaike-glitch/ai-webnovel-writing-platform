@@ -618,6 +618,61 @@ test("buildProjectControlDashboard", async (t) => {
     assert.ok(dashboard.criticalActions.some((action) => action.includes("AI 写审改：")));
   });
 
+  await t.test("surfaces the latest AI pipeline repair checklist progress", () => {
+    const dashboard = buildProjectControlDashboard({
+      project,
+      platform: getPlatformProfile("fanqie"),
+      chapters: [chapter],
+      outlineNodes: [],
+      characters: [],
+      worldEntries: [],
+      foreshadows: [],
+      plotThreads: [],
+      aiTasks: [],
+      gateActionAudits: [
+        {
+          receiptId: "ai-plan-1",
+          actionId: "ai-pipeline-control:demo-project",
+          label: "批量打法修复清单",
+          detail: "三轮稳住打法：成功率 0%，质量 68，失败 2。",
+          href: "/projects/demo-project#ai-pipeline",
+          status: "succeeded",
+          message: "已生成批量打法修复清单。",
+          executionType: "control_action",
+          succeededCount: 3,
+          failedCount: 0,
+          payload: JSON.stringify({
+            aiPipelineControlPlan: {
+              status: "repair",
+              tacticLabel: "三轮稳住打法",
+              tacticTitle: "首轮平台打法：番茄小说",
+              sampleBatches: 1,
+              successRatePercent: 0,
+              averageQualityScore: 68,
+              failedTasks: 2,
+              items: [
+                { id: "stop-scale", label: "停用三轮稳住打法继续放量", completed: true },
+                { id: "review-failures", label: "复盘 2 个失败任务的错误原因", completed: false },
+                { id: "rerun-sample", label: "拆成 1 章小样本复验", completed: false },
+              ],
+              nextActions: ["停用三轮稳住打法继续放量", "复盘 2 个失败任务的错误原因", "拆成 1 章小样本复验"],
+            },
+          }),
+          createdAt: "2026-01-03T00:00:00.000Z",
+        },
+      ],
+      submissionChecklist: checklist,
+    });
+
+    assert.equal(dashboard.aiPipelineControlPlan.hasPlan, true);
+    assert.equal(dashboard.aiPipelineControlPlan.receiptId, "ai-plan-1");
+    assert.equal(dashboard.aiPipelineControlPlan.status, "repair");
+    assert.equal(dashboard.aiPipelineControlPlan.completedCount, 1);
+    assert.equal(dashboard.aiPipelineControlPlan.totalCount, 3);
+    assert.equal(dashboard.aiPipelineControlPlan.items[0].completed, true);
+    assert.ok(dashboard.aiPipelineControlPlan.nextAction.includes("还剩 2 项"));
+  });
+
   await t.test("summarizes model route health for the project control dashboard", () => {
     const dashboard = buildProjectControlDashboard({
       project: {

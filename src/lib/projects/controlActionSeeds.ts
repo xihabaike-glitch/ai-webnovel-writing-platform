@@ -101,6 +101,7 @@ export interface AiPipelineControlActionPlan {
     successRatePercent: number | null;
     averageQualityScore: number | null;
     failedTasks: number;
+    items: Array<{ id: string; label: string; completed: boolean }>;
     nextActions: string[];
   };
 }
@@ -120,6 +121,65 @@ function requiredOutlineCount(type: string) {
 }
 
 const chapterCardNodeTypes = new Set(["opening", "trunk", "branch", "leaf", "ending"]);
+
+function checklistItems(labels: string[]) {
+  return labels.map((label, index) => ({
+    id: `item-${index + 1}`,
+    label,
+    completed: false,
+  }));
+}
+
+function objectRecord(value: unknown): Record<string, unknown> | null {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : null;
+}
+
+export function updateAiPipelineControlPlanItem(payload: string, itemId: string, completed: boolean) {
+  let parsed: Record<string, unknown>;
+  try {
+    const root = JSON.parse(payload) as unknown;
+    const record = objectRecord(root);
+    if (!record) return null;
+    parsed = record;
+  } catch {
+    return null;
+  }
+
+  const plan = objectRecord(parsed.aiPipelineControlPlan);
+  const items = Array.isArray(plan?.items) ? plan.items : [];
+  let itemLabel = "";
+  const updatedItems = items.map((item) => {
+    const record = objectRecord(item);
+    if (!record) return item;
+    if (record.id !== itemId) return item;
+    itemLabel = typeof record.label === "string" ? record.label : "";
+    return {
+      ...record,
+      completed,
+    };
+  });
+  if (!itemLabel || !plan) return null;
+
+  const normalizedItems = updatedItems
+    .map((item) => objectRecord(item))
+    .filter((item): item is Record<string, unknown> => Boolean(item));
+  const completedCount = normalizedItems.filter((item) => item.completed === true).length;
+  const totalCount = normalizedItems.length;
+  parsed.aiPipelineControlPlan = {
+    ...plan,
+    items: updatedItems,
+    completedCount,
+    totalCount,
+    updatedAt: new Date().toISOString(),
+  };
+
+  return {
+    payload: JSON.stringify(parsed),
+    itemLabel,
+    completedCount,
+    totalCount,
+  };
+}
 
 function outlineSortWeight(type: string) {
   if (type === "opening") return 10;
@@ -381,6 +441,7 @@ export function buildAiPipelineControlActionPlan(audits: TaskQueueBatchHealthAud
         successRatePercent: null,
         averageQualityScore: null,
         failedTasks: 0,
+        items: checklistItems(created),
         nextActions: created,
       },
     };
@@ -411,6 +472,7 @@ export function buildAiPipelineControlActionPlan(audits: TaskQueueBatchHealthAud
         successRatePercent: primary.successRatePercent,
         averageQualityScore: primary.averageQualityScore,
         failedTasks: primary.failedTasks,
+        items: checklistItems(created),
         nextActions: created.concat(nextActions).slice(0, 6),
       },
     };
@@ -437,6 +499,7 @@ export function buildAiPipelineControlActionPlan(audits: TaskQueueBatchHealthAud
         successRatePercent: primary.successRatePercent,
         averageQualityScore: primary.averageQualityScore,
         failedTasks: primary.failedTasks,
+        items: checklistItems(created),
         nextActions: created.concat(nextActions).slice(0, 6),
       },
     };
@@ -462,6 +525,7 @@ export function buildAiPipelineControlActionPlan(audits: TaskQueueBatchHealthAud
       successRatePercent: primary.successRatePercent,
       averageQualityScore: primary.averageQualityScore,
       failedTasks: primary.failedTasks,
+      items: checklistItems(created),
       nextActions: created.concat(nextActions).slice(0, 6),
     },
   };

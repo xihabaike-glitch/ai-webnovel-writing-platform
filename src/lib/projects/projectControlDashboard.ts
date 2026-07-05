@@ -254,6 +254,26 @@ export interface ControlAssetQualityReport {
   createdAt: string;
 }
 
+export interface AiPipelineControlPlanItem {
+  id: string;
+  label: string;
+  completed: boolean;
+}
+
+export interface AiPipelineControlPlanSummary {
+  hasPlan: boolean;
+  receiptId: string | null;
+  status: "repair" | "watch" | "continue" | "seed_sample" | "empty";
+  label: string;
+  message: string;
+  nextAction: string;
+  targetAnchor: string;
+  completedCount: number;
+  totalCount: number;
+  items: AiPipelineControlPlanItem[];
+  createdAt: string | null;
+}
+
 export interface ProjectControlDashboard {
   overallScore: number;
   verdict: string;
@@ -266,6 +286,7 @@ export interface ProjectControlDashboard {
   aiPipelineBatch: AiPipelineBatchSummary;
   aiPipelineRecentBatch: AiPipelineRecentBatchSummary;
   aiPipelineBatchHealth: AiPipelineBatchHealthSummary;
+  aiPipelineControlPlan: AiPipelineControlPlanSummary;
   modelRouteHealth: ModelRouteHealthSummary;
   areas: ControlArea[];
   priorityActions: ControlPriorityAction[];
@@ -1065,6 +1086,69 @@ function stringArray(value: unknown) {
   return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
 }
 
+function aiPipelinePlanItem(value: unknown, index: number): AiPipelineControlPlanItem | null {
+  if (!isRecord(value)) return null;
+  const label = typeof value.label === "string" ? value.label.trim() : "";
+  if (!label) return null;
+  return {
+    id: typeof value.id === "string" && value.id.trim() ? value.id.trim() : `item-${index + 1}`,
+    label,
+    completed: value.completed === true,
+  };
+}
+
+function buildAiPipelineControlPlanSummary(audits: ControlBatchAudit[] = []): AiPipelineControlPlanSummary {
+  const latest = [...audits]
+    .filter((audit) => audit.executionType === "control_action" && (audit.actionId ?? "").startsWith("ai-pipeline-control:"))
+    .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime())[0] ?? null;
+
+  if (!latest) {
+    return {
+      hasPlan: false,
+      receiptId: null,
+      status: "empty",
+      label: "暂无修复清单",
+      message: "批量健康一旦进入修复或观察，总控会在这里生成可勾选清单。",
+      nextAction: "先根据本书批量健康生成修复或复验清单。",
+      targetAnchor: "ai-pipeline",
+      completedCount: 0,
+      totalCount: 0,
+      items: [],
+      createdAt: null,
+    };
+  }
+
+  const payload = parseJsonObject(latest.payload);
+  const plan = isRecord(payload?.aiPipelineControlPlan) ? payload.aiPipelineControlPlan : null;
+  const rawItems = Array.isArray(plan?.items) ? plan.items : stringArray(plan?.nextActions).map((label, index) => ({ id: `item-${index + 1}`, label, completed: false }));
+  const items = rawItems
+    .map((item, index) => aiPipelinePlanItem(item, index))
+    .filter((item): item is AiPipelineControlPlanItem => Boolean(item));
+  const completedCount = items.filter((item) => item.completed).length;
+  const totalCount = items.length;
+  const status = plan?.status === "repair" || plan?.status === "watch" || plan?.status === "continue" || plan?.status === "seed_sample"
+    ? plan.status
+    : "repair";
+
+  return {
+    hasPlan: true,
+    receiptId: latest.receiptId,
+    status,
+    label: latest.label,
+    message: latest.message,
+    nextAction: totalCount > 0
+      ? completedCount === totalCount
+        ? "清单已全部完成，下一步复检批量健康，再决定是否恢复小批生产。"
+        : `还剩 ${totalCount - completedCount} 项没处理，别急着继续批量生产。`
+      : "清单缺少可执行项，重新生成一次批量健康动作。",
+    targetAnchor: "ai-pipeline",
+    completedCount,
+    totalCount,
+    items,
+    createdAt: new Date(latest.createdAt).toISOString(),
+  };
+}
+
 function controlAssetAreaLabel(areaId: string) {
   if (areaId === "characters") return "人物弧光";
   if (areaId === "world") return "世界观资料";
@@ -1383,6 +1467,7 @@ export function buildProjectControlDashboard(input: ProjectControlDashboardInput
   const aiPipelineBatch = buildAiPipelineBatchSummary(batchDraft, reviewPipeline);
   const aiPipelineRecentBatch = buildAiPipelineRecentBatchSummary(input.gateActionAudits);
   const aiPipelineBatchHealth = buildAiPipelineBatchHealthSummary(input.gateActionAudits);
+  const aiPipelineControlPlan = buildAiPipelineControlPlanSummary(input.gateActionAudits);
   const modelRouteHealth = buildModelRouteHealthSummary(input);
   const aiPipelineBaseEvidence = `${batchDraft.readyCandidates} 章可初稿，${reviewPipeline.reviewReadyCount} 章待审，${reviewPipeline.secondPassReadyCount} 章可二改。`;
   const aiPipelineArea = aiPipelineAreaDecision({
@@ -1450,6 +1535,7 @@ export function buildProjectControlDashboard(input: ProjectControlDashboardInput
     aiPipelineBatch,
     aiPipelineRecentBatch,
     aiPipelineBatchHealth,
+    aiPipelineControlPlan,
     modelRouteHealth,
     areas,
     priorityActions,

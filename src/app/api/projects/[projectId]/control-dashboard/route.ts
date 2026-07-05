@@ -38,9 +38,9 @@ export async function GET(_request: Request, { params }: Params) {
         platformPublishMetrics: { orderBy: { snapshotDate: "desc" }, take: 80 },
         platformKnowledgeFeedbackReceipts: { orderBy: { createdAt: "desc" }, take: 10 },
         gateActionAudits: {
-          where: { executionType: "recommended_batch" },
+          where: { executionType: { in: ["recommended_batch", "control_action"] } },
           orderBy: { createdAt: "desc" },
-          take: 5,
+          take: 10,
         },
       },
     }),

@@ -9,6 +9,7 @@ import {
   buildOutlineActionSeeds,
   buildStoryLineActionSeeds,
   buildWorldActionSeeds,
+  updateAiPipelineControlPlanItem,
 } from "../lib/projects/controlActionSeeds.ts";
 import { buildControlAssetPrompt, buildControlAssetQualityGate, buildControlAssetRepairPrompt } from "../lib/projects/controlAssetGeneration.ts";
 
@@ -166,6 +167,9 @@ test("control action seeds", async (t) => {
     assert.ok(plan.created.some((item) => item.includes("失败")));
     assert.ok(plan.message.includes("先停用"));
     assert.equal(plan.payload.failedTasks, 2);
+    assert.equal(plan.payload.items.length, 3);
+    assert.equal(plan.payload.items[0].completed, false);
+    assert.ok(plan.payload.items[0].id.length > 0);
   });
 
   await t.test("builds a seed sample plan before batch health has evidence", () => {
@@ -175,6 +179,27 @@ test("control action seeds", async (t) => {
     assert.equal(plan.targetAnchor, "ai-pipeline");
     assert.ok(plan.created.some((item) => item.includes("推荐批次样本")));
     assert.ok(plan.message.includes("还没有样本"));
+  });
+
+  await t.test("updates a single AI pipeline checklist item inside payload", () => {
+    const updated = updateAiPipelineControlPlanItem(JSON.stringify({
+      aiPipelineControlPlan: {
+        status: "repair",
+        items: [
+          { id: "item-1", label: "停用失败打法", completed: false },
+          { id: "item-2", label: "复盘失败原因", completed: false },
+        ],
+      },
+    }), "item-2", true);
+
+    assert.equal(updated?.completedCount, 1);
+    assert.equal(updated?.totalCount, 2);
+    assert.equal(updated?.itemLabel, "复盘失败原因");
+    const parsed = JSON.parse(updated?.payload ?? "{}") as {
+      aiPipelineControlPlan?: { items?: Array<{ id: string; completed: boolean }> };
+    };
+    assert.equal(parsed.aiPipelineControlPlan?.items?.find((item) => item.id === "item-2")?.completed, true);
+    assert.equal(parsed.aiPipelineControlPlan?.items?.find((item) => item.id === "item-1")?.completed, false);
   });
 
   await t.test("builds strict JSON prompts for AI control assets", () => {

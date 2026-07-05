@@ -98,6 +98,26 @@ interface AiPipelineBatchHealthSummary {
   latestAt: string | null;
 }
 
+interface AiPipelineControlPlanItem {
+  id: string;
+  label: string;
+  completed: boolean;
+}
+
+interface AiPipelineControlPlanSummary {
+  hasPlan: boolean;
+  receiptId: string | null;
+  status: "repair" | "watch" | "continue" | "seed_sample" | "empty";
+  label: string;
+  message: string;
+  nextAction: string;
+  targetAnchor: string;
+  completedCount: number;
+  totalCount: number;
+  items: AiPipelineControlPlanItem[];
+  createdAt: string | null;
+}
+
 interface ModelRouteHealthSummary {
   status: "empty" | "healthy" | "watch" | "repair" | "cost_guard";
   score: number;
@@ -160,6 +180,7 @@ interface ProjectControlDashboard {
   aiPipelineBatch: AiPipelineBatchSummary;
   aiPipelineRecentBatch: AiPipelineRecentBatchSummary;
   aiPipelineBatchHealth: AiPipelineBatchHealthSummary;
+  aiPipelineControlPlan: AiPipelineControlPlanSummary;
   modelRouteHealth: ModelRouteHealthSummary;
   areas: ControlArea[];
   priorityActions: ControlPriorityAction[];
@@ -366,6 +387,7 @@ export function ProjectControlDashboardPanel({ projectId }: { projectId: string 
   const [runningStartDecision, setRunningStartDecision] = useState(false);
   const [runningFoundationAction, setRunningFoundationAction] = useState(false);
   const [runningBatchHealthAction, setRunningBatchHealthAction] = useState(false);
+  const [runningChecklistItemId, setRunningChecklistItemId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
   async function loadDashboard() {
@@ -506,6 +528,43 @@ export function ProjectControlDashboardPanel({ projectId }: { projectId: string 
       setMessage(caught instanceof Error ? caught.message : "生成批量健康动作失败。");
     } finally {
       setRunningBatchHealthAction(false);
+    }
+  }
+
+  async function toggleBatchChecklistItem(item: AiPipelineControlPlanItem, completed: boolean) {
+    if (!dashboard?.aiPipelineControlPlan.receiptId) return;
+    setRunningChecklistItemId(item.id);
+    setMessage(null);
+    try {
+      const response = await fetch(`/api/projects/${projectId}/control-actions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          areaId: "ai-pipeline",
+          mode: "seed",
+          receiptId: dashboard.aiPipelineControlPlan.receiptId,
+          itemId: item.id,
+          completed,
+        }),
+      });
+      const payload = await response.json() as {
+        message?: string;
+        error?: string;
+        completedCount?: number;
+        totalCount?: number;
+      };
+      if (!response.ok) {
+        throw new Error(payload.error ?? "更新批量修复清单失败。");
+      }
+      await loadDashboard();
+      const progress = typeof payload.completedCount === "number" && typeof payload.totalCount === "number"
+        ? `进度 ${payload.completedCount}/${payload.totalCount}。`
+        : "";
+      setMessage([payload.message ?? "批量修复清单已更新。", progress].filter(Boolean).join(" "));
+    } catch (caught) {
+      setMessage(caught instanceof Error ? caught.message : "更新批量修复清单失败。");
+    } finally {
+      setRunningChecklistItemId(null);
     }
   }
 
@@ -919,6 +978,36 @@ export function ProjectControlDashboardPanel({ projectId }: { projectId: string 
                 {dashboard.aiPipelineBatchHealth.evidence.map((evidence) => (
                   <p className="rounded-md bg-slate-50 px-2 py-1" key={evidence}>{evidence}</p>
                 ))}
+              </div>
+            ) : null}
+            {dashboard.aiPipelineControlPlan.hasPlan ? (
+              <div className="mt-3 rounded-md border border-slate-200 bg-slate-50 p-3">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <div className="text-sm font-medium text-slate-950">{dashboard.aiPipelineControlPlan.label}</div>
+                    <p className="mt-1 text-xs leading-5 text-slate-600">{dashboard.aiPipelineControlPlan.nextAction}</p>
+                  </div>
+                  <div className="rounded-md bg-white px-2 py-1 text-xs font-medium text-slate-700">
+                    {dashboard.aiPipelineControlPlan.completedCount}/{dashboard.aiPipelineControlPlan.totalCount}
+                  </div>
+                </div>
+                <div className="mt-3 grid gap-2">
+                  {dashboard.aiPipelineControlPlan.items.map((item) => (
+                    <label
+                      className="flex items-start gap-2 rounded-md bg-white p-2 text-sm leading-6 text-slate-700"
+                      key={item.id}
+                    >
+                      <input
+                        checked={item.completed}
+                        className="mt-1 h-4 w-4 rounded border-slate-300"
+                        disabled={runningChecklistItemId === item.id}
+                        onChange={(event) => void toggleBatchChecklistItem(item, event.target.checked)}
+                        type="checkbox"
+                      />
+                      <span className={item.completed ? "text-slate-400 line-through" : ""}>{item.label}</span>
+                    </label>
+                  ))}
+                </div>
               </div>
             ) : null}
           </div>

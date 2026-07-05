@@ -767,6 +767,7 @@ test("buildFirstDayDispatchUpdateSummary promotes executable AI follow-up", () =
   assert.deepEqual(summary.actionExecution, {
     kind: "first_day_ai",
     endpoint: "/api/projects/project-1/first-day-workflow",
+    dispatchKey: "first-day:project-1:first-review",
   });
   assert.ok(summary.detail.includes("下一张首日卡是「第一章审稿」"));
   assert.ok(summary.badges.includes("AI 可继续"));

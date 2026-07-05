@@ -414,6 +414,7 @@ export function GateDispatchTaskCenter({
                 kind: firstDayUpdate.actionExecution.kind,
                 method: "POST",
                 endpoint: firstDayUpdate.actionExecution.endpoint,
+                dispatchKey: firstDayUpdate.actionExecution.dispatchKey,
               }
               : undefined,
             secondary: firstDayPrompt.secondaryActionLabel && firstDayPrompt.secondaryActionHref

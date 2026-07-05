@@ -181,6 +181,7 @@ export interface FirstDayDispatchUpdateExecutionPlan {
 export interface FirstDayDispatchUpdateActionExecution {
   kind: "first_day_ai";
   endpoint: string;
+  dispatchKey: string;
 }
 
 export type FirstDayWorkflowMessageAction = "execute_current_step" | "complete_current_dispatch" | "open_next_step";
@@ -1000,6 +1001,7 @@ export function buildFirstDayDispatchUpdateSummary(input: {
     ? {
       kind: "first_day_ai" as const,
       endpoint: `/api/projects/${encodeURIComponent(firstDayFollowUp.projectId)}/first-day-workflow`,
+      dispatchKey: firstDayFollowUp.dispatchKey,
     }
     : undefined;
 

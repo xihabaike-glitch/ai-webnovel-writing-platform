@@ -1063,6 +1063,117 @@ test("buildProjectStartTacticAdvice", async (t) => {
     assert.ok(fanqieResult.advice.checklist.some((item) => item.includes("不可接受项")));
   });
 
+  await t.test("prioritizes completed first-day handoff experience for new project starts", () => {
+    function handoffTask(input: {
+      suffix: "opening" | "verification" | "platform-package";
+      stage: "start_opening_diagnostic" | "start_first_three_review" | "start_platform_package";
+      completionEvidence: string;
+      completedAt: string;
+    }): PersistedGatePlatformDispatchTask {
+      return {
+        databaseId: `task-fanqie-first-day-${input.suffix}`,
+        dispatchKey: `first-day-handoff:project-1:${input.suffix}`,
+        id: `first-day-handoff:project-1:${input.suffix}`,
+        projectId: "project-1",
+        platformId: "fanqie",
+        platformName: "番茄小说",
+        stage: input.stage,
+        state: "completed",
+        priorityScore: 90,
+        ownerRole: "主编",
+        title: "番茄小说 新书开局交接",
+        detail: "把平台打法库经验交接到新书第一天流程。",
+        dueLabel: "今天",
+        actionLabel: "查看交接",
+        href: "/projects/project-1#first-day-launch",
+        acceptanceCriteria: ["交接证据已写清", "下一步验收口径已明确"],
+        evidence: ["经验来源：番茄强钩子打法", "目标：新书第一天开局"],
+        sourceReceiptId: null,
+        completionEvidence: input.completionEvidence,
+        reviewLatestAt: input.completedAt,
+        assignedAt: "2026-01-01T00:00:00.000Z",
+        completedAt: input.completedAt,
+        createdAt: "2026-01-01T00:00:00.000Z",
+        updatedAt: input.completedAt,
+      };
+    }
+
+    const platform = getPlatformProfile("fanqie");
+    const template = getDefaultTemplateForPlatform(platform.id);
+    const style = getPlatformWritingStyle(platform.id);
+    const result = buildProjectStartGateExperience({
+      platform,
+      template,
+      style,
+      receipts: [],
+      tasks: [
+        handoffTask({
+          suffix: "opening",
+          stage: "start_opening_diagnostic",
+          completionEvidence: "已锁定前三段钩子、读者承诺和第一章冲突升级。",
+          completedAt: "2026-01-01T01:00:00.000Z",
+        }),
+        handoffTask({
+          suffix: "verification",
+          stage: "start_first_three_review",
+          completionEvidence: "已写清通过线、不可接受项和复查证据格式。",
+          completedAt: "2026-01-01T02:00:00.000Z",
+        }),
+        handoffTask({
+          suffix: "platform-package",
+          stage: "start_platform_package",
+          completionEvidence: "已把避坑边界回收到标题、简介、标签和卖点包装。",
+          completedAt: "2026-01-01T03:00:00.000Z",
+        }),
+      ],
+    });
+    const ordinaryUsable: GatePlatformTacticExperienceItem = {
+      platformId: "fanqie",
+      platformName: "番茄小说",
+      status: "usable",
+      label: "可复用打法",
+      tactic: "三轮稳定加码打法",
+      lesson: "三轮真实数据验证后可以进入稳定加码池。",
+      reuseHint: "新项目可复用平台包装和小步加码节奏。",
+      risk: "仍要回填真实效果。",
+      href: "/gate",
+      sourceStatus: "healthy",
+      sourceLabel: "稳定加码",
+      priorityScore: 99,
+      latestAt: "2026-01-05T00:00:00.000Z",
+      evidence: ["最终判定：稳定加码。"],
+    };
+    const selection = selectProjectStartTacticEvidence({
+      platform,
+      experiences: [ordinaryUsable, ...result.experiences],
+    });
+    const guide = buildProjectStartPlatformExperienceGuide({
+      platforms: [platform],
+      experiences: [ordinaryUsable, ...result.experiences],
+    });
+    const riskGate = buildProjectStartRiskGate(guide.items[0] ?? null);
+    const handoff = buildProjectStartExperienceHandoff({
+      platform,
+      template,
+      guide,
+      advice: result.advice,
+      riskGate,
+      recommendedTemplate: template,
+    });
+
+    assert.equal(result.selection.experience?.tactic, "新书开局闭环打法");
+    assert.equal(result.advice.label, "开局闭环");
+    assert.ok(result.advice.verificationMove.includes("开头钩子与读者承诺"));
+    assert.ok(result.advice.checklist.some((item) => item.includes("闭环打法")));
+    assert.equal(selection.experience?.tactic, "新书开局闭环打法");
+    assert.equal(guide.items[0]?.label, "开局闭环");
+    assert.equal(guide.items[0]?.headline, "番茄小说 优先开书");
+    assert.ok(guide.nextActions[0]?.includes("优先参考 番茄小说"));
+    assert.equal(handoff.label, "闭环交接");
+    assert.ok(handoff.firstDayActions.some((action) => action.includes("闭环复用")));
+    assert.ok(handoff.evidence.some((item) => item.includes("已用于新书开局并闭环")));
+  });
+
   await t.test("turns start advice into a reusable platform soil entry", () => {
     const platform = getPlatformProfile("fanqie");
     const template = getDefaultTemplateForPlatform(platform.id);

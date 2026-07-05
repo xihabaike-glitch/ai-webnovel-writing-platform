@@ -260,6 +260,28 @@ function isDispatchCompletionExperience(experience: GatePlatformTacticExperience
   return experience.tactic === "派单验收打法";
 }
 
+function isFirstDayClosedLoopExperience(experience: GatePlatformTacticExperienceItem) {
+  return experience.sourceLabel === "新书开局闭环" || experience.tactic === "新书开局闭环打法";
+}
+
+function experiencePriorityForProjectStart(experience: GatePlatformTacticExperienceItem) {
+  if (experience.status === "blocked") return 4000 + experience.priorityScore;
+  if (isFirstDayClosedLoopExperience(experience)) return 3500 + experience.priorityScore;
+  if (experience.status === "usable") return 3000 + experience.priorityScore;
+  if (experience.status === "watch") return 2000 + experience.priorityScore;
+  return experience.priorityScore;
+}
+
+function experienceForPlatform(experiences: GatePlatformTacticExperienceItem[], platform: PlatformProfile) {
+  return experiences
+    .filter((item) => item.platformId === platform.id)
+    .sort((left, right) => {
+      const priorityDiff = experiencePriorityForProjectStart(right) - experiencePriorityForProjectStart(left);
+      if (priorityDiff !== 0) return priorityDiff;
+      return new Date(right.latestAt).getTime() - new Date(left.latestAt).getTime();
+    })[0] ?? null;
+}
+
 function batchEffectForPlatform(batchEffects: GateBatchTacticEffectItem[], platform: PlatformProfile) {
   return batchEffects.find((item) => item.tacticTitle.includes(platform.name)) ?? null;
 }
@@ -364,7 +386,7 @@ export function buildProjectStartPlatformExperienceGuide(input: {
   const experiences = input.experiences ?? [];
   const batchEffects = input.batchEffects ?? [];
   const items = input.platforms.map((platform): ProjectStartPlatformExperienceItem => {
-    const experience = experiences.find((item) => item.platformId === platform.id) ?? null;
+    const experience = experienceForPlatform(experiences, platform);
     const batchEffect = batchEffectForPlatform(batchEffects, platform);
 
     if (batchEffect?.status === "blocked") {
@@ -408,14 +430,17 @@ export function buildProjectStartPlatformExperienceGuide(input: {
     }
 
     if (experience?.status === "usable") {
+      const firstDayClosedLoop = isFirstDayClosedLoopExperience(experience);
       return {
         platformId: platform.id,
         platformName: platform.name,
         status: "recommended",
-        label: "历史可复用",
-        headline: `${platform.name} 优先参考`,
-        detail: `${experience.tactic} 可作为新项目开书参考。${experience.reuseHint}`,
-        priorityScore: experience.priorityScore,
+        label: firstDayClosedLoop ? "开局闭环" : "历史可复用",
+        headline: firstDayClosedLoop ? `${platform.name} 优先开书` : `${platform.name} 优先参考`,
+        detail: firstDayClosedLoop
+          ? `${experience.tactic} 已经被用于新书第一天流程并完成交接，优先作为本次开书默认打法。${experience.reuseHint}`
+          : `${experience.tactic} 可作为新项目开书参考。${experience.reuseHint}`,
+        priorityScore: firstDayClosedLoop ? experience.priorityScore + 12 : experience.priorityScore,
         source: "experience",
         href: experience.href,
         evidence: experience.evidence.slice(0, 3),
@@ -623,6 +648,7 @@ export function buildProjectStartExperienceHandoff(input: {
   const guideItem = input.guide.items.find((item) => item.platformId === input.platform.id) ?? null;
   const recommendedItem = input.guide.items.find((item) => item.status === "recommended") ?? null;
   const recommendedTemplate = input.recommendedTemplate ?? null;
+  const firstDayClosedLoop = guideItem?.label === "开局闭环";
   const shouldSwitchTemplate = Boolean(
     recommendedTemplate
       && recommendedTemplate.platformId !== input.platform.id
@@ -639,14 +665,18 @@ export function buildProjectStartExperienceHandoff(input: {
     ? `${input.platform.name} 开书前先过恢复条件`
     : status === "small_sample"
       ? `${input.platform.name} 只做小样本开书`
-      : status === "reuse"
+      : status === "reuse" && firstDayClosedLoop
+        ? `${input.platform.name} 已闭环开书打法`
+        : status === "reuse"
         ? `${input.platform.name} 可复用历史打法`
         : `${input.platform.name} 先按模板开书`;
   const label = status === "blocked"
     ? "避坑交接"
     : status === "small_sample"
       ? "观察交接"
-      : status === "reuse"
+      : status === "reuse" && firstDayClosedLoop
+        ? "闭环交接"
+        : status === "reuse"
         ? "复用交接"
         : "模板交接";
   const switchAction = shouldSwitchTemplate && recommendedTemplate && recommendedItem
@@ -665,6 +695,7 @@ export function buildProjectStartExperienceHandoff(input: {
     recommendedTemplateId: recommendedTemplate?.id ?? null,
     shouldSwitchTemplate,
     firstDayActions: uniqueLines([
+      firstDayClosedLoop ? "闭环复用：沿用已完成的新书开局三段交接。" : null,
       `开头：${input.advice.openingMove}`,
       `验证：${input.advice.verificationMove}`,
       input.riskGate.requiresConfirmation ? "创建前写清恢复条件，只允许首轮小样本。" : "创建后回填前三章、平台包装和首轮数据证据。",
@@ -700,7 +731,7 @@ export function selectProjectStartTacticEvidence(input: {
   if (guideItem?.source === "experience") {
     return {
       guideItem,
-      experience: experiences.find((item) => item.platformId === input.platform.id) ?? null,
+      experience: experienceForPlatform(experiences, input.platform),
       batchEffect: null,
     };
   }
@@ -862,6 +893,29 @@ export function buildProjectStartTacticAdvice(input: {
           "首轮效果：必须回填曝光、点击、收藏、追读",
           `模板前三章：${firstThreeTitles}`,
           `必须具备：${style.mustHave.join("、")}`,
+        ]),
+      };
+    }
+
+    if (isFirstDayClosedLoopExperience(experience)) {
+      return {
+        status: "history_usable",
+        label: "开局闭环",
+        title: `${platform.name}：已闭环开书打法`,
+        primaryTactic: experience.lesson,
+        openingMove: `先复用已闭环开头顺序：${experience.reuseHint}`,
+        verificationMove: `创建后直接按三段交接验收：开头钩子与读者承诺、通过线与不可接受项、标题简介标签卖点包装；首轮仍回填曝光、点击、收藏、追读。${modelRouteVerification}`,
+        risk: experience.risk,
+        evidence: withModelEvidence([
+          `开局闭环：${experience.sourceLabel}`,
+          ...experience.evidence,
+        ]),
+        checklist: withModelChecklist([
+          "闭环打法：优先沿用已完成的新书开局交接",
+          "开头交接：第一屏钩子、读者承诺、第一章冲突升级必须落地",
+          "验收交接：通过线、不可接受项、复查证据格式必须写清",
+          "包装交接：标题、简介、标签、卖点必须回收平台避坑边界",
+          `模板前三章：${firstThreeTitles}`,
         ]),
       };
     }

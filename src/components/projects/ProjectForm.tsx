@@ -339,6 +339,9 @@ export function ProjectForm({ experienceLaunch }: { experienceLaunch?: ProjectFo
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="font-medium">{item.platformName}</span>
                   <span className="rounded-md bg-white/70 px-2 py-1 text-xs font-medium">{item.label}</span>
+                  {item.label === "开局闭环" ? (
+                    <span className="rounded-md bg-white/80 px-2 py-1 text-xs font-medium">已闭环</span>
+                  ) : null}
                   {item.platformId === platformId ? (
                     <span className="rounded-md bg-slate-950 px-2 py-1 text-xs font-medium text-white">已选</span>
                   ) : null}
@@ -509,7 +512,12 @@ export function ProjectForm({ experienceLaunch }: { experienceLaunch?: ProjectFo
         <div className="mt-1">审稿：{selectedProfile.reviewFocus.join("、")}</div>
         {selectedPlatformGuide ? (
           <div className={`mt-3 rounded-md border p-3 ${platformExperienceClass(selectedPlatformGuide.status)}`}>
-            <div className="font-medium">{selectedPlatformGuide.headline}</div>
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="font-medium">{selectedPlatformGuide.headline}</div>
+              {selectedPlatformGuide.label === "开局闭环" ? (
+                <span className="rounded-md bg-white/80 px-2 py-1 text-xs font-medium">已用于新书开局并闭环</span>
+              ) : null}
+            </div>
             <p className="mt-1 leading-6">{selectedPlatformGuide.detail}</p>
           </div>
         ) : null}

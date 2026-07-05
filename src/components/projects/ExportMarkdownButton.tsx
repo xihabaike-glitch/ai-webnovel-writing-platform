@@ -19,6 +19,13 @@ function itemClass(status: ExportPackageReadiness["items"][number]["status"]) {
   return "bg-rose-50 text-rose-800";
 }
 
+function comparisonClass(status: NonNullable<ExportPackageSnapshotView["comparison"]>["status"]) {
+  if (status === "improved") return "border-emerald-200 bg-emerald-50 text-emerald-800";
+  if (status === "declined") return "border-rose-200 bg-rose-50 text-rose-800";
+  if (status === "changed") return "border-sky-200 bg-sky-50 text-sky-800";
+  return "border-slate-200 bg-white text-slate-600";
+}
+
 export function ExportMarkdownButton({
   projectId,
   readiness,
@@ -251,6 +258,21 @@ export function ExportMarkdownButton({
                 <div className="mt-1 text-slate-500">
                   章节 {snapshot.chapterCount} · 字数 {snapshot.wordCount} · 摘要 {snapshot.contentHash.slice(0, 10)}
                 </div>
+                {snapshot.comparison ? (
+                  <div className={`mt-2 rounded-md border px-2 py-1.5 ${comparisonClass(snapshot.comparison.status)}`}>
+                    <div>{snapshot.comparison.label}</div>
+                    <div className="mt-1 opacity-80">
+                      准备度 {snapshot.comparison.readinessDelta > 0 ? "+" : ""}{snapshot.comparison.readinessDelta}% ·
+                      章节 {snapshot.comparison.chapterDelta > 0 ? "+" : ""}{snapshot.comparison.chapterDelta} ·
+                      字数 {snapshot.comparison.wordDelta > 0 ? "+" : ""}{snapshot.comparison.wordDelta} ·
+                      文件 {snapshot.comparison.fileSizeDeltaLabel}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="mt-2 rounded-md border border-slate-200 bg-white px-2 py-1.5 text-slate-500">
+                    暂无上一次同类导出可对比。
+                  </div>
+                )}
                 <button
                   className="mt-2 rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
                   disabled={exporting !== null}

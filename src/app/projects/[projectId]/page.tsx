@@ -29,7 +29,7 @@ import { WritingWorkbenchPanel } from "@/components/projects/WritingWorkbenchPan
 import { buildStoryTreeExperienceApplyDispatchKey, buildStoryTreeExperienceEffectDashboard, buildStoryTreeExperienceFlow, buildStoryTreeExperienceGuide, buildStoryTreeExperienceReviewBacklog } from "@/lib/ai/storyTreeExperience";
 import { prisma } from "@/lib/db/prisma";
 import { buildExportPackageReadiness } from "@/lib/export/markdown";
-import { exportSnapshotView } from "@/lib/export/snapshots";
+import { buildExportSnapshotHistory } from "@/lib/export/snapshots";
 import { getPlatformProfile, type PlatformId } from "@/lib/platforms/platformProfiles";
 import { buildContinuityAudit } from "@/lib/projects/continuityAudit";
 import { buildGatePlatformDecisionTimeline, buildGatePlatformTacticExperienceLibrary, gateActionReceiptFromAuditRecord } from "@/lib/projects/gateActionReceipts";
@@ -93,7 +93,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ projec
       },
       exportPackageSnapshots: {
         orderBy: { createdAt: "desc" },
-        take: 8,
+        take: 24,
       },
     },
   });
@@ -341,10 +341,10 @@ export default async function ProjectPage({ params }: { params: Promise<{ projec
       status: entry.status,
     })),
   });
-  const exportSnapshots = project.exportPackageSnapshots.map((snapshot) => exportSnapshotView({
+  const exportSnapshots = buildExportSnapshotHistory(project.exportPackageSnapshots.map((snapshot) => ({
     ...snapshot,
     createdAt: snapshot.createdAt.toISOString(),
-  }));
+  })), 8);
   const continuityAudit = buildContinuityAudit({
     chapters: project.chapters.map((chapter) => ({
       id: chapter.id,

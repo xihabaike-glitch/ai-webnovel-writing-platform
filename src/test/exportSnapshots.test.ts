@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { buildExportPackageSnapshot, exportSnapshotView, fileSizeLabel, formatLabel, packageKindLabel, parseExportSnapshotTarget, readinessLabel, regeneratedSnapshotMessage } from "../lib/export/snapshots.ts";
+import { buildExportPackageSnapshot, buildExportSnapshotHistory, exportSnapshotView, fileSizeLabel, formatLabel, packageKindLabel, parseExportSnapshotTarget, readinessLabel, regeneratedSnapshotMessage } from "../lib/export/snapshots.ts";
 
 describe("export package snapshots", () => {
   const project = {
@@ -95,5 +95,126 @@ describe("export package snapshots", () => {
       regeneratedSnapshotMessage({ packageKind: "characters", format: "docx" }),
       "已按历史快照重新生成：人物伏笔包 · Word。",
     );
+  });
+
+  it("compares snapshots against the previous same package and format", () => {
+    const history = buildExportSnapshotHistory([
+      {
+        id: "new-full",
+        packageKind: "full",
+        format: "markdown",
+        title: "夜雨系统",
+        fileName: "new.md",
+        contentType: "text/markdown",
+        fileSize: 1500,
+        contentHash: "b".repeat(64),
+        readinessStatus: "ready",
+        readinessPercent: 90,
+        chapterCount: 3,
+        wordCount: 9000,
+        notes: "",
+        createdAt: "2026-07-05T02:00:00.000Z",
+      },
+      {
+        id: "other-kind",
+        packageKind: "outline",
+        format: "markdown",
+        title: "夜雨系统",
+        fileName: "outline.md",
+        contentType: "text/markdown",
+        fileSize: 700,
+        contentHash: "c".repeat(64),
+        readinessStatus: "warning",
+        readinessPercent: 80,
+        chapterCount: 0,
+        wordCount: 0,
+        notes: "",
+        createdAt: "2026-07-05T01:30:00.000Z",
+      },
+      {
+        id: "old-full",
+        packageKind: "full",
+        format: "markdown",
+        title: "夜雨系统",
+        fileName: "old.md",
+        contentType: "text/markdown",
+        fileSize: 1000,
+        contentHash: "a".repeat(64),
+        readinessStatus: "warning",
+        readinessPercent: 70,
+        chapterCount: 2,
+        wordCount: 6000,
+        notes: "",
+        createdAt: "2026-07-05T01:00:00.000Z",
+      },
+    ]);
+
+    assert.equal(history[0].comparison?.previousId, "old-full");
+    assert.equal(history[0].comparison?.status, "improved");
+    assert.equal(history[0].comparison?.readinessDelta, 20);
+    assert.equal(history[0].comparison?.chapterDelta, 1);
+    assert.equal(history[0].comparison?.wordDelta, 3000);
+    assert.equal(history[0].comparison?.fileSizeDeltaLabel, "+500 B");
+    assert.match(history[0].comparison?.label ?? "", /更完整/);
+    assert.equal(history[1].comparison, null);
+  });
+
+  it("limits visible history while still comparing against older same-kind records", () => {
+    const records = [
+      {
+        id: "new-outline",
+        packageKind: "outline",
+        format: "docx",
+        title: "夜雨系统",
+        fileName: "new.docx",
+        contentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        fileSize: 2048,
+        contentHash: "d".repeat(64),
+        readinessStatus: "ready",
+        readinessPercent: 100,
+        chapterCount: 0,
+        wordCount: 0,
+        notes: "",
+        createdAt: "2026-07-05T03:00:00.000Z",
+      },
+      ...Array.from({ length: 8 }, (_, index) => ({
+        id: `filler-${index}`,
+        packageKind: "full",
+        format: "markdown",
+        title: "夜雨系统",
+        fileName: `filler-${index}.md`,
+        contentType: "text/markdown",
+        fileSize: 100 + index,
+        contentHash: String(index).repeat(64).slice(0, 64),
+        readinessStatus: "warning",
+        readinessPercent: 60,
+        chapterCount: 1,
+        wordCount: 1000,
+        notes: "",
+        createdAt: `2026-07-05T02:0${index}:00.000Z`,
+      })),
+      {
+        id: "old-outline",
+        packageKind: "outline",
+        format: "docx",
+        title: "夜雨系统",
+        fileName: "old.docx",
+        contentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        fileSize: 2048,
+        contentHash: "d".repeat(64),
+        readinessStatus: "ready",
+        readinessPercent: 100,
+        chapterCount: 0,
+        wordCount: 0,
+        notes: "",
+        createdAt: "2026-07-05T01:00:00.000Z",
+      },
+    ];
+
+    const history = buildExportSnapshotHistory(records, 1);
+    assert.equal(history.length, 1);
+    assert.equal(history[0].comparison?.previousId, "old-outline");
+    assert.equal(history[0].comparison?.status, "same");
+    assert.match(history[0].comparison?.label ?? "", /一致/);
   });
 });

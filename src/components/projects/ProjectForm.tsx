@@ -8,6 +8,7 @@ import {
   buildGateBatchTacticEffectReview,
   buildGatePlatformDecisionTimeline,
   buildGatePlatformTacticExperienceLibrary,
+  fetchGateKnowledgeFeedbackReceipts,
   fetchPersistedGateActionReceipts,
   fetchPersistedGateDispatchTasks,
   type GateBatchTacticEffectItem,
@@ -15,6 +16,7 @@ import {
 } from "@/lib/projects/gateActionReceipts";
 import {
   buildProjectStartExperienceHandoff,
+  buildProjectStartKnowledgeFeedbackExperiences,
   buildProjectStartRiskGate,
   buildProjectStartPlatformExperienceGuide,
   buildProjectStartModelRouteExperienceFromReceipts,
@@ -118,10 +120,11 @@ export function ProjectForm() {
 
     async function loadHistoricalExperience() {
       try {
-        const [receipts, tasks, modelRouteReceipts] = await Promise.all([
+        const [receipts, tasks, modelRouteReceipts, knowledgeFeedbackReceipts] = await Promise.all([
           fetchPersistedGateActionReceipts(),
           fetchPersistedGateDispatchTasks(),
           fetchPersistedGateActionReceipts({ executionType: "model_route", limit: 20 }),
+          fetchGateKnowledgeFeedbackReceipts({ limit: 30 }),
         ]);
         if (ignore) return;
         const timeline = buildGatePlatformDecisionTimeline({
@@ -130,13 +133,15 @@ export function ProjectForm() {
           limit: platformProfiles.length,
         });
         const library = buildGatePlatformTacticExperienceLibrary(timeline, platformProfiles.length);
+        const knowledgeExperiences = buildProjectStartKnowledgeFeedbackExperiences(knowledgeFeedbackReceipts, platformProfiles.length);
         const batchEffectReview = buildGateBatchTacticEffectReview(receipts, platformProfiles.length);
-        setHistoryExperiences(library.items);
+        const mergedExperiences = [...knowledgeExperiences, ...library.items];
+        setHistoryExperiences(mergedExperiences);
         setBatchTacticEffects(batchEffectReview.items);
         setModelRouteExperience(buildProjectStartModelRouteExperienceFromReceipts(modelRouteReceipts));
         const historicalGuide = buildProjectStartPlatformExperienceGuide({
           platforms: platformProfiles,
-          experiences: library.items,
+          experiences: mergedExperiences,
           batchEffects: batchEffectReview.items,
         });
         const recommendedTemplate = selectProjectStartTemplateFromExperienceGuide({

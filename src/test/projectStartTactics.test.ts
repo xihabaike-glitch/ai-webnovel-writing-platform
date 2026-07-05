@@ -8,6 +8,7 @@ import {
   buildProjectStartExperienceHandoff,
   buildProjectStartPlatformExperienceGuide,
   buildProjectStartGateExperience,
+  buildProjectStartKnowledgeFeedbackExperiences,
   buildProjectStartModelRouteExperienceFromConfirmations,
   buildProjectStartModelRouteExperienceFromReceipts,
   buildProjectStartRiskGate,
@@ -177,6 +178,51 @@ test("buildProjectStartTacticAdvice", async (t) => {
     assert.equal(guide.items[0]?.status, "recommended");
     assert.equal(guide.items[0]?.label, "恢复放量打法");
     assert.ok(guide.items[0]?.detail.includes("新项目仍先跑小样本"));
+  });
+
+  await t.test("turns platform knowledge feedback receipts into project start experience", () => {
+    const experiences = buildProjectStartKnowledgeFeedbackExperiences([
+      {
+        id: "platform-knowledge:project-1:fanqie:publish_effect:metric-1",
+        projectId: "project-1",
+        platformId: "fanqie",
+        platformName: "番茄小说",
+        actionLabel: "执行正反馈链",
+        title: "番茄小说 正反馈经验已沉淀",
+        message: "点击和追读变好，正反馈经验已经进入生成链路。",
+        completedStepLabel: "发布效果正反馈",
+        stopReason: "可复用信号：强钩子标题",
+        nextAction: "复盘平台策略排序",
+        href: "#platform-strategy-ranking",
+        severity: "success",
+        createdAt: "2026-07-05T10:00:00.000Z",
+      },
+      {
+        id: "platform-knowledge:project-2:qimao:publish_effect:metric-2",
+        projectId: "project-2",
+        platformId: "qimao",
+        platformName: "七猫",
+        actionLabel: "执行避坑链",
+        title: "七猫 避坑经验待执行",
+        message: "负反馈提示七猫首屏太慢。",
+        completedStepLabel: "发布效果负反馈",
+        stopReason: "避坑信号：慢铺关系",
+        nextAction: "先修标题和前三章钩子",
+        href: "#first-three-rewrite",
+        severity: "needs_action",
+        createdAt: "2026-07-05T11:00:00.000Z",
+      },
+    ]);
+
+    const fanqie = experiences.find((item) => item.platformId === "fanqie");
+    const qimao = experiences.find((item) => item.platformId === "qimao");
+
+    assert.equal(fanqie?.status, "usable");
+    assert.equal(fanqie?.tactic, "发布效果正反馈打法");
+    assert.ok(fanqie?.evidence.some((item) => item.includes("正反馈链")));
+    assert.equal(qimao?.status, "blocked");
+    assert.equal(qimao?.tactic, "发布效果避坑样本");
+    assert.ok(qimao?.risk.includes("慢铺关系"));
   });
 
   await t.test("adds confirmed model routes to new project start advice", () => {
@@ -777,6 +823,38 @@ test("buildProjectStartTacticAdvice", async (t) => {
     assert.ok(result.advice.title.includes("证据闭环提分打法"));
     assert.ok(result.advice.primaryTactic.includes("53 分提升到 71 分"));
     assert.ok(result.advice.evidence.some((item) => item.includes("分数变好")));
+  });
+
+  await t.test("feeds platform knowledge feedback into new project start advice", () => {
+    const platform = getPlatformProfile("fanqie");
+    const result = buildProjectStartGateExperience({
+      platform,
+      template: getDefaultTemplateForPlatform(platform.id),
+      style: getPlatformWritingStyle(platform.id),
+      receipts: [],
+      knowledgeFeedbackReceipts: [{
+        id: "platform-knowledge:project-1:fanqie:publish_effect:metric-1",
+        projectId: "project-1",
+        platformId: "fanqie",
+        platformName: "番茄小说",
+        actionLabel: "执行正反馈链",
+        title: "番茄小说 正反馈经验已沉淀",
+        message: "点击和追读变好，正反馈经验已经进入生成链路。",
+        completedStepLabel: "发布效果正反馈",
+        stopReason: "可复用信号：强钩子标题",
+        nextAction: "复盘平台策略排序",
+        href: "#platform-strategy-ranking",
+        severity: "success",
+        createdAt: "2026-07-05T10:00:00.000Z",
+      }],
+    });
+
+    assert.equal(result.selection.experience?.tactic, "发布效果正反馈打法");
+    assert.equal(result.selection.guideItem?.status, "recommended");
+    assert.equal(result.advice.status, "history_usable");
+    assert.ok(result.advice.primaryTactic.includes("点击和追读变好"));
+    assert.ok(result.advice.openingMove.includes("复盘平台策略排序"));
+    assert.ok(result.advice.evidence.some((item) => item.includes("发布效果正反馈")));
   });
 
   await t.test("feeds completed recheck review dispatches into new project start advice", () => {

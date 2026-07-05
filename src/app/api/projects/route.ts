@@ -108,6 +108,12 @@ export async function POST(request: Request) {
       orderBy: { updatedAt: "desc" },
       take: 100,
     });
+  const knowledgeFeedbackReceipts = input.startTacticAdvice || !template
+    ? []
+    : await prisma.platformKnowledgeFeedbackReceipt.findMany({
+      orderBy: { createdAt: "desc" },
+      take: 100,
+    });
   const gateReceipts = gateAudits.map(gateActionReceiptFromAuditRecord);
   const persistedGateTasks = gateTasks.map(gatePlatformDispatchTaskFromRecord);
 
@@ -123,6 +129,21 @@ export async function POST(request: Request) {
         style,
         receipts: gateReceipts,
         tasks: persistedGateTasks,
+        knowledgeFeedbackReceipts: knowledgeFeedbackReceipts.map((receipt) => ({
+          id: receipt.receiptId,
+          projectId: receipt.projectId,
+          platformId: receipt.platformId,
+          platformName: receipt.platformName,
+          actionLabel: receipt.actionLabel,
+          title: receipt.title,
+          message: receipt.message,
+          completedStepLabel: receipt.completedStepLabel,
+          stopReason: receipt.stopReason,
+          nextAction: receipt.nextAction,
+          href: receipt.href,
+          severity: receipt.severity === "success" ? "success" : "needs_action",
+          createdAt: receipt.createdAt.toISOString(),
+        })),
       });
       const startTacticAdvice = input.startTacticAdvice ?? startExperience.advice;
       const startTacticEntry = buildProjectStartTacticWorldEntry(startTacticAdvice, platform.name, input.startExperienceHandoff ?? null);

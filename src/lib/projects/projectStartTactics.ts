@@ -7,6 +7,7 @@ import {
   buildGatePlatformTacticExperienceLibrary,
   type GateActionReceipt,
   type GateBatchTacticEffectItem,
+  type GateKnowledgeFeedbackReceipt,
   type GatePlatformTacticExperienceItem,
   type PersistedGatePlatformDispatchTask,
 } from "./gateActionReceipts.ts";
@@ -255,6 +256,76 @@ function batchEffectForPlatform(batchEffects: GateBatchTacticEffectItem[], platf
 
 function isRecoveryBatchEffect(batchEffect: GateBatchTacticEffectItem | null | undefined) {
   return (batchEffect?.recoveryBatches ?? 0) > 0;
+}
+
+function isKnowledgeFeedbackAvoidance(receipt: GateKnowledgeFeedbackReceipt) {
+  const text = [
+    receipt.actionLabel,
+    receipt.title,
+    receipt.message,
+    receipt.completedStepLabel,
+    receipt.stopReason,
+    receipt.nextAction,
+  ].join(" ");
+  return /避坑|负反馈|暂停|止损|不要|不支持|降权/u.test(text);
+}
+
+function knowledgeFeedbackExperienceStatus(receipt: GateKnowledgeFeedbackReceipt): GatePlatformTacticExperienceItem["status"] {
+  if (receipt.severity === "success") return "usable";
+  return isKnowledgeFeedbackAvoidance(receipt) ? "blocked" : "watch";
+}
+
+function knowledgeFeedbackExperienceLabel(status: GatePlatformTacticExperienceItem["status"]) {
+  if (status === "usable") return "可复用打法";
+  if (status === "blocked") return "避坑样本";
+  return "观察样本";
+}
+
+function knowledgeFeedbackExperienceTactic(status: GatePlatformTacticExperienceItem["status"]) {
+  if (status === "usable") return "发布效果正反馈打法";
+  if (status === "blocked") return "发布效果避坑样本";
+  return "发布效果补证据样本";
+}
+
+export function buildProjectStartKnowledgeFeedbackExperiences(
+  receipts: GateKnowledgeFeedbackReceipt[],
+  limit = 20,
+): GatePlatformTacticExperienceItem[] {
+  const latestByPlatform = new Map<string, GateKnowledgeFeedbackReceipt>();
+  for (const receipt of receipts
+    .slice()
+    .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime())) {
+    if (!latestByPlatform.has(receipt.platformId)) latestByPlatform.set(receipt.platformId, receipt);
+  }
+
+  return [...latestByPlatform.values()]
+    .slice(0, limit)
+    .map((receipt): GatePlatformTacticExperienceItem => {
+      const status = knowledgeFeedbackExperienceStatus(receipt);
+      const label = knowledgeFeedbackExperienceLabel(status);
+      const latestAt = new Date(receipt.createdAt).toISOString();
+      return {
+        platformId: receipt.platformId,
+        platformName: receipt.platformName,
+        status,
+        label,
+        tactic: knowledgeFeedbackExperienceTactic(status),
+        lesson: receipt.message,
+        reuseHint: receipt.nextAction,
+        risk: receipt.stopReason || (status === "usable" ? "复用前仍要保留首轮数据回收。" : "缺下一轮真实效果前，不要写成成功打法。"),
+        href: receipt.href,
+        sourceStatus: status === "usable" ? "healthy" : status === "blocked" ? "blocked" : "needs_effect",
+        sourceLabel: receipt.completedStepLabel || receipt.actionLabel,
+        priorityScore: status === "usable" ? 92 : status === "blocked" ? 90 : 72,
+        latestAt,
+        evidence: uniqueLines([
+          `平台反哺：${receipt.actionLabel}`,
+          `已推进：${receipt.completedStepLabel}`,
+          receipt.stopReason,
+          receipt.nextAction,
+        ], 4),
+      };
+    });
 }
 
 function batchRecoveryLabel(batchEffect: GateBatchTacticEffectItem) {
@@ -802,6 +873,7 @@ export function buildProjectStartGateExperience(input: {
   template: ProjectTemplate;
   style: PlatformWritingStyleTemplate;
   receipts: GateActionReceipt[];
+  knowledgeFeedbackReceipts?: GateKnowledgeFeedbackReceipt[];
   tasks?: PersistedGatePlatformDispatchTask[];
   timelineLimit?: number;
   batchLimit?: number;
@@ -813,7 +885,14 @@ export function buildProjectStartGateExperience(input: {
     tasks,
     limit: input.timelineLimit ?? 20,
   });
-  const experiences = buildGatePlatformTacticExperienceLibrary(timeline, input.timelineLimit ?? 20).items;
+  const knowledgeFeedbackExperiences = buildProjectStartKnowledgeFeedbackExperiences(
+    input.knowledgeFeedbackReceipts ?? [],
+    input.timelineLimit ?? 20,
+  );
+  const experiences = [
+    ...knowledgeFeedbackExperiences,
+    ...buildGatePlatformTacticExperienceLibrary(timeline, input.timelineLimit ?? 20).items,
+  ];
   const batchEffects = buildGateBatchTacticEffectReview(receipts, input.batchLimit ?? 20).items;
   const modelRoutes = buildProjectStartModelRouteExperienceFromReceipts(receipts);
   const selection = selectProjectStartTacticEvidence({

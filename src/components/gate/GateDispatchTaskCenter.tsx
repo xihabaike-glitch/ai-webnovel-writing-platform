@@ -36,6 +36,12 @@ import {
 } from "@/lib/projects/firstDayWorkflowView";
 import type { WatchSampleCompletionEvidenceSuggestion } from "@/lib/projects/watchSampleCompletionEvidence";
 import {
+  buildTaskQueueBatchReceiptDecisionCard,
+  type TaskQueueBatchReceipt,
+  type TaskQueueBatchReceiptDecisionCard,
+  type TaskQueueBatchReceiptDecisionTone,
+} from "@/lib/projects/taskQueueBatchReceipt";
+import {
   buildRouteDispatchCompletionTemplate,
   buildRouteRecheckExecutionDesk,
   filterRouteConfirmationDispatchTasks,
@@ -123,6 +129,18 @@ function routeDeskStageClass(stageLabel: "复检" | "治理") {
   return "bg-sky-50 text-sky-800";
 }
 
+function batchDecisionClass(tone: TaskQueueBatchReceiptDecisionTone) {
+  if (tone === "blocked") return "border-rose-200 bg-rose-50 text-rose-900";
+  if (tone === "review") return "border-amber-200 bg-amber-50 text-amber-900";
+  return "border-emerald-200 bg-emerald-50 text-emerald-900";
+}
+
+function batchDecisionButtonClass(tone: TaskQueueBatchReceiptDecisionTone) {
+  if (tone === "blocked") return "text-rose-900 hover:bg-rose-100";
+  if (tone === "review") return "text-amber-900 hover:bg-amber-100";
+  return "text-emerald-900 hover:bg-emerald-100";
+}
+
 function routeFlowFilterFromLane(laneId: RouteConfirmationDispatchFlowLaneId): RouteConfirmationDispatchTaskFilter | null {
   if (laneId === "confirmed") return null;
   return laneId;
@@ -202,6 +220,7 @@ export function GateDispatchTaskCenter({
   const [runningRouteActionLink, setRunningRouteActionLink] = useState(false);
   const [routeActionMessage, setRouteActionMessage] = useState("");
   const [routeActionLink, setRouteActionLink] = useState<RouteActionLink | null>(null);
+  const [batchDecisionCard, setBatchDecisionCard] = useState<TaskQueueBatchReceiptDecisionCard | null>(null);
   const [completionDrafts, setCompletionDrafts] = useState<Record<string, string>>({});
   const [focusedCompletionDispatchKey, setFocusedCompletionDispatchKey] = useState("");
   const [focusedCompletionMessage, setFocusedCompletionMessage] = useState("");
@@ -324,6 +343,7 @@ export function GateDispatchTaskCenter({
     }
     setRunningKey(task.dispatchKey);
     setErrorMessage("");
+    setBatchDecisionCard(null);
     try {
       if (task.databaseId) {
         const updated = await updatePersistedGateDispatchTaskState(task.dispatchKey, targetState, { completionEvidence });
@@ -494,6 +514,7 @@ export function GateDispatchTaskCenter({
     setErrorMessage("");
     setRouteActionMessage("");
     setRouteActionLink(null);
+    setBatchDecisionCard(null);
     try {
       const response = await fetch("/api/model-route-confirmation-governance", {
         method: "POST",
@@ -517,6 +538,7 @@ export function GateDispatchTaskCenter({
     setErrorMessage("");
     setRouteActionMessage("");
     setRouteActionLink(null);
+    setBatchDecisionCard(null);
     try {
       const created = await persistGateDispatchTask(chain.reviewAdvice.dispatch);
       setTasks((current) => {
@@ -538,6 +560,7 @@ export function GateDispatchTaskCenter({
     setErrorMessage("");
     setRouteActionMessage("");
     setRouteActionLink(null);
+    setBatchDecisionCard(null);
     try {
       const response = await fetch("/api/model-route-confirmation-recheck-samples", {
         method: "POST",
@@ -601,6 +624,7 @@ export function GateDispatchTaskCenter({
     setErrorMessage("");
     setRouteActionMessage("");
     setRouteActionLink(null);
+    setBatchDecisionCard(null);
     try {
       const response = await fetch("/api/gate/ai-pipeline-recheck-samples", {
         method: "POST",
@@ -615,11 +639,7 @@ export function GateDispatchTaskCenter({
           averageQualityScore: number | null;
           verdict: string;
         };
-        batchReceipt?: {
-          headline: string;
-          primaryLabel: string;
-          primaryHref: string;
-        };
+        batchReceipt?: TaskQueueBatchReceipt;
         nextAction?: {
           label: string;
           detail: string;
@@ -661,6 +681,7 @@ export function GateDispatchTaskCenter({
       const recoveryText = payload?.recoveryDispatch ? ` 已生成恢复派单：${payload.recoveryDispatch.title}。` : "";
       const nextActionText = payload?.nextAction ? ` 下一步：${payload.nextAction.detail}` : "";
       setRouteActionMessage(`已运行「${task.title}」：${succeeded}/${total} 成功，成功率 ${payload?.routeEffectSummary?.successRatePercent ?? 0}%，${qualityText}。${payload?.batchReceipt?.headline ?? payload?.routeEffectSummary?.verdict ?? ""}${nextActionText}${recoveryText}`);
+      setBatchDecisionCard(payload?.batchReceipt ? buildTaskQueueBatchReceiptDecisionCard(payload.batchReceipt) : null);
       setRouteActionLink(payload?.recoveryDispatch ? {
         label: payload.recoveryDispatch.actionLabel,
         href: `/dispatch?queue=ai_pipeline#dispatch-${payload.recoveryDispatch.dispatchKey}`,
@@ -671,6 +692,10 @@ export function GateDispatchTaskCenter({
       } : payload?.batchReceipt?.primaryHref ? {
         label: payload.batchReceipt.primaryLabel,
         href: payload.batchReceipt.primaryHref,
+        secondary: payload.batchReceipt.secondaryHref ? {
+          label: payload.batchReceipt.secondaryLabel,
+          href: payload.batchReceipt.secondaryHref,
+        } : undefined,
       } : null);
       router.refresh();
     } catch (error) {
@@ -684,6 +709,7 @@ export function GateDispatchTaskCenter({
     if (!action.execution) return;
     setRunningRouteActionLink(true);
     setErrorMessage("");
+    setBatchDecisionCard(null);
     try {
       const response = await fetch(action.execution.endpoint, {
         method: action.execution.method,
@@ -1260,13 +1286,37 @@ export function GateDispatchTaskCenter({
             </div>
           ) : null}
           {routeActionMessage ? (
-            <div className="flex flex-col gap-3 rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800 lg:flex-row lg:items-center lg:justify-between">
-              <p className="leading-6">{routeActionMessage}</p>
+            <div className={`flex flex-col gap-3 rounded-md border p-3 text-sm ${batchDecisionCard ? batchDecisionClass(batchDecisionCard.tone) : "border-emerald-200 bg-emerald-50 text-emerald-800"} lg:flex-row lg:items-start lg:justify-between`}>
+              <div>
+                {batchDecisionCard ? (
+                  <div className="mb-2 flex flex-wrap items-center gap-2">
+                    <span className="rounded-md bg-white/75 px-2 py-1 text-xs font-medium">{batchDecisionCard.statusLabel}</span>
+                    <span className="font-semibold">{batchDecisionCard.headline}</span>
+                  </div>
+                ) : null}
+                <p className="leading-6">{batchDecisionCard?.detail ?? routeActionMessage}</p>
+                {batchDecisionCard ? (
+                  <>
+                    <div className="mt-2 flex flex-wrap gap-2 text-xs opacity-85">
+                      {batchDecisionCard.badges.map((badge) => (
+                        <span className="rounded-md bg-white/75 px-2 py-1" key={badge}>{badge}</span>
+                      ))}
+                    </div>
+                    {batchDecisionCard.warnings.length ? (
+                      <div className="mt-2 grid gap-1 text-xs leading-5 opacity-85">
+                        {batchDecisionCard.warnings.slice(0, 2).map((warning) => (
+                          <div key={warning}>{warning}</div>
+                        ))}
+                      </div>
+                    ) : null}
+                  </>
+                ) : null}
+              </div>
               {routeActionLink ? (
                 <div className="flex shrink-0 flex-wrap gap-2">
                   {routeActionLink.execution ? (
                     <button
-                      className="w-fit rounded-md bg-white px-3 py-2 text-xs font-medium text-emerald-900 hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60"
+                      className={`w-fit rounded-md bg-white px-3 py-2 text-xs font-medium disabled:cursor-not-allowed disabled:opacity-60 ${batchDecisionButtonClass(batchDecisionCard?.tone ?? "ready")}`}
                       disabled={runningRouteActionLink}
                       onClick={() => void executeRouteActionLink(routeActionLink)}
                       type="button"
@@ -1274,12 +1324,12 @@ export function GateDispatchTaskCenter({
                       {runningRouteActionLink ? "执行中" : routeActionLink.label}
                     </button>
                   ) : (
-                    <Link className="w-fit rounded-md bg-white px-3 py-2 text-xs font-medium text-emerald-900 hover:bg-emerald-100" href={routeActionLink.href}>
+                    <Link className={`w-fit rounded-md bg-white px-3 py-2 text-xs font-medium ${batchDecisionButtonClass(batchDecisionCard?.tone ?? "ready")}`} href={routeActionLink.href}>
                       {routeActionLink.label}
                     </Link>
                   )}
                   {routeActionLink.secondary ? (
-                    <Link className="w-fit rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-900 hover:bg-emerald-100" href={routeActionLink.secondary.href}>
+                    <Link className={`w-fit rounded-md border bg-white/60 px-3 py-2 text-xs font-medium ${batchDecisionButtonClass(batchDecisionCard?.tone ?? "ready")}`} href={routeActionLink.secondary.href}>
                       {routeActionLink.secondary.label}
                     </Link>
                   ) : null}

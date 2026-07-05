@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   buildTaskQueueBatchGateActionReceipt,
   buildTaskQueueBatchReceipt,
+  buildTaskQueueBatchReceiptDecisionCard,
   type TaskQueueBatchRouteEffect,
 } from "../lib/projects/taskQueueBatchReceipt.ts";
 import type { TaskQueueExecutionPlan } from "../lib/projects/taskQueueExecutionPlan.ts";
@@ -74,6 +75,32 @@ test("buildTaskQueueBatchReceipt blocks scale-up when a batch has failures", () 
   assert.equal(receipt.primaryHref, "/failures");
   assert.ok(receipt.detail.includes("第一章"));
   assert.ok(receipt.warnings.some((warning) => warning.includes("不要继续放大")));
+});
+
+test("buildTaskQueueBatchReceiptDecisionCard turns repair receipts into a blocked task queue card", () => {
+  const receipt = buildTaskQueueBatchReceipt({
+    plan,
+    results: [{ status: "failed", chapterTitle: "第一章", error: "模型超时", qualityScore: null }],
+    routeEffectSummary: {
+      ...routeEffect,
+      succeededTasks: 0,
+      failedTasks: 1,
+      successRatePercent: 0,
+      averageQualityScore: null,
+      verdict: "成功率偏低，先修复。",
+    },
+  });
+
+  const card = buildTaskQueueBatchReceiptDecisionCard(receipt);
+
+  assert.equal(card.tone, "blocked");
+  assert.equal(card.statusLabel, "先修复");
+  assert.equal(card.headline, "批次有失败，先修再放大");
+  assert.equal(card.primaryLabel, "查看失败修复");
+  assert.equal(card.primaryHref, "/failures");
+  assert.ok(card.badges.includes("成功/失败：0/1"));
+  assert.ok(card.badges.includes("质量：缺样本"));
+  assert.ok(card.warnings.some((warning) => warning.includes("不要继续放大")));
 });
 
 test("buildTaskQueueBatchReceipt routes weak quality to review and rewrite", () => {

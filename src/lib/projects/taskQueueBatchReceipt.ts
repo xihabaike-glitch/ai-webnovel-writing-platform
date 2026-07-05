@@ -37,6 +37,21 @@ export interface TaskQueueBatchReceipt {
   completionEvidenceTemplate?: string;
 }
 
+export type TaskQueueBatchReceiptDecisionTone = "ready" | "review" | "blocked";
+
+export interface TaskQueueBatchReceiptDecisionCard {
+  tone: TaskQueueBatchReceiptDecisionTone;
+  statusLabel: string;
+  headline: string;
+  detail: string;
+  primaryLabel: string;
+  primaryHref: string;
+  secondaryLabel: string;
+  secondaryHref: string;
+  badges: string[];
+  warnings: string[];
+}
+
 export interface TaskQueueBatchGateActionReceipt {
   receipt: GateActionReceipt;
   payload: GateActionReceiptPayload & {
@@ -112,6 +127,36 @@ function withAdoptionFollowupReturn(plan: TaskQueueExecutionPlan, receipt: TaskQ
       ...receipt.warnings,
       "采纳闭环任务跑完不等于发布放行，必须回总闸门确认审稿、发布质检和证据都闭合。",
     ],
+  };
+}
+
+function batchReceiptDecisionTone(status: TaskQueueBatchReceipt["status"]): TaskQueueBatchReceiptDecisionTone {
+  if (status === "repair") return "blocked";
+  if (status === "continue") return "ready";
+  return "review";
+}
+
+function batchReceiptDecisionStatusLabel(status: TaskQueueBatchReceipt["status"]) {
+  if (status === "repair") return "先修复";
+  if (status === "review_quality") return "先质检";
+  if (status === "watch_cost") return "看成本";
+  return "继续小批";
+}
+
+export function buildTaskQueueBatchReceiptDecisionCard(
+  receipt: TaskQueueBatchReceipt,
+): TaskQueueBatchReceiptDecisionCard {
+  return {
+    tone: batchReceiptDecisionTone(receipt.status),
+    statusLabel: batchReceiptDecisionStatusLabel(receipt.status),
+    headline: receipt.headline,
+    detail: receipt.detail,
+    primaryLabel: receipt.primaryLabel,
+    primaryHref: receipt.primaryHref,
+    secondaryLabel: receipt.secondaryLabel,
+    secondaryHref: receipt.secondaryHref,
+    badges: receipt.evidenceItems.slice(0, 5),
+    warnings: receipt.warnings,
   };
 }
 

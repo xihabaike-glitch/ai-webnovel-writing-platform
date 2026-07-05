@@ -6548,6 +6548,19 @@ function completedFirstDayHandoffFromTimeline(events: GatePlatformDecisionTimeli
   };
 }
 
+function structuredRecoveryFollowupEvidence(detail: string) {
+  const scope = completionValueAfterLabel("加码范围", detail);
+  const baseline = completionValueAfterLabel("基准版本", detail);
+  const riskBoundary = completionValueAfterLabel("风险边界", detail);
+  const conclusion = completionValueAfterLabel("结论", detail);
+  return [
+    scope ? `加码范围：${scope}` : null,
+    baseline ? `基准版本：${baseline}` : null,
+    riskBoundary ? `适用边界：${riskBoundary}` : null,
+    conclusion ? `复用结论：${conclusion}` : null,
+  ].filter((item): item is string => Boolean(item));
+}
+
 function completedRecoveryFollowupFromTimeline(events: GatePlatformDecisionTimelineEvent[]) {
   const followupEvents = events
     .filter((event) => event.id.includes(":tactic_experience_followup:") && event.label.endsWith("完成"))
@@ -6566,6 +6579,7 @@ function completedRecoveryFollowupFromTimeline(events: GatePlatformDecisionTimel
     outcome,
     conclusion: markdownLine(event.detail),
     evidence: Array.from(new Set([
+      ...structuredRecoveryFollowupEvidence(event.detail),
       `后续任务完成：${markdownLine(event.detail)}`,
       ...event.evidence,
     ])).slice(0, 5),

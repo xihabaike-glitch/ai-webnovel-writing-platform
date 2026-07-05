@@ -4307,6 +4307,56 @@ test("buildGateActionReceipt", async (t) => {
     assert.ok(blockedExperience?.risk.includes("暂停迁移"));
   });
 
+  await t.test("keeps structured recovery follow-up closeout fields visible in tactic experience", () => {
+    const dispatch = buildGatePlatformTacticExperienceFollowupDispatch({
+      platformId: "fanqie",
+      platformName: "番茄小说",
+      status: "usable",
+      label: "可复用打法",
+      tactic: "恢复放量打法",
+      lesson: "恢复放量后续小样本已过线。",
+      reuseHint: "新项目可以参考这套恢复放量节奏，但仍先跑小样本。",
+      risk: "恢复放量不能跨题材无限复用。",
+      href: "/gate#platform-tactic-experience",
+      sourceStatus: "healthy",
+      sourceLabel: "恢复放量闭环",
+      priorityScore: 92,
+      latestAt: "2026-01-02T00:00:00.000Z",
+      evidence: ["恢复放量后续闭环：通过"],
+    });
+    assert.ok(dispatch);
+    const task: PersistedGatePlatformDispatchTask = {
+      ...dispatch,
+      databaseId: "task-recovery-structured",
+      dispatchKey: dispatch.id,
+      projectId: null,
+      sourceReceiptId: null,
+      state: "completed",
+      completionEvidence: [
+        "番茄小说 恢复放量继续小样本",
+        "加码范围：番茄小说 恢复放量继续小样本",
+        "基准版本：最近小样本回执「恢复放量小样本」",
+        "回收时间：按最近小样本批次完成时间回收",
+        "风险边界：只允许小步复用",
+        "结论：继续小样本",
+        "小样本验证已完成：成功率 100%，质量 88，追读率 2.4%。",
+      ].join("\n"),
+      assignedAt: "2026-01-02T00:00:00.000Z",
+      completedAt: "2026-01-02T03:00:00.000Z",
+      createdAt: "2026-01-02T00:00:00.000Z",
+      updatedAt: "2026-01-02T03:00:00.000Z",
+    };
+    const timeline = buildGatePlatformDecisionTimeline({ receipts: [], tasks: [task], limit: 10 });
+    const experience = buildGatePlatformTacticExperienceLibrary(timeline, 10).items[0];
+
+    assert.equal(experience?.status, "usable");
+    assert.ok(experience?.evidence.some((line) => line === "加码范围：番茄小说 恢复放量继续小样本"));
+    assert.ok(experience?.evidence.some((line) => line === "基准版本：最近小样本回执「恢复放量小样本」"));
+    assert.ok(experience?.evidence.some((line) => line === "适用边界：只允许小步复用"));
+    assert.ok(experience?.evidence.some((line) => line === "复用结论：继续小样本"));
+    assert.ok(experience?.reuseHint.includes("新项目"));
+  });
+
   await t.test("flags overdue and today dispatch closeout items", () => {
     const baseDispatch = buildGatePlatformGrowthDispatchItems([buildGatePlatformStrategyReceipt({
       item: strategyPlatform,

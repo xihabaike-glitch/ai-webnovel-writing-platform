@@ -36,6 +36,11 @@ export interface ExportPackageSnapshotView {
   createdAt: string | Date;
 }
 
+export interface ExportSnapshotTarget {
+  packageKind: ExportSnapshotPackageKind;
+  format: ExportSnapshotFormat;
+}
+
 function byteLength(content: string | Buffer) {
   return Buffer.isBuffer(content) ? content.length : Buffer.byteLength(content, "utf8");
 }
@@ -83,6 +88,19 @@ export function fileSizeLabel(size: number) {
   if (size >= 1024 * 1024) return `${(size / 1024 / 1024).toFixed(1)} MB`;
   if (size >= 1024) return `${(size / 1024).toFixed(1)} KB`;
   return `${size} B`;
+}
+
+export function parseExportSnapshotTarget(packageKind: string, format: string): ExportSnapshotTarget | null {
+  if ((packageKind === "full" || packageKind === "outline" || packageKind === "characters") && (format === "markdown" || format === "docx")) {
+    return { packageKind, format };
+  }
+  if (packageKind === "chapters_zip" && format === "zip") return { packageKind, format };
+  if (packageKind === "foreshadows_csv" && format === "csv") return { packageKind, format };
+  return null;
+}
+
+export function regeneratedSnapshotMessage(target: ExportSnapshotTarget) {
+  return `已按历史快照重新生成：${packageKindLabel(target.packageKind)} · ${formatLabel(target.format)}。`;
 }
 
 export function buildExportPackageSnapshot(input: ExportPackageSnapshotInput) {

@@ -107,6 +107,32 @@ export function ExportMarkdownButton({
     }
   }
 
+  async function regenerateSnapshot(snapshot: ExportPackageSnapshotView) {
+    setExporting(`snapshot:${snapshot.id}`);
+    setError(null);
+    setMessage(null);
+    try {
+      const response = await fetch(`/api/export/snapshots/${snapshot.id}/download`);
+
+      if (!response.ok) {
+        throw new Error("重新生成失败，请稍后重试。");
+      }
+
+      const content = await response.blob();
+      const url = URL.createObjectURL(content);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = snapshot.fileName;
+      link.click();
+      URL.revokeObjectURL(url);
+      setMessage(`已按快照重新生成 ${snapshot.packageKindLabel} · ${snapshot.formatLabel}。刷新后可看到新的记录。`);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "重新生成失败。");
+    } finally {
+      setExporting(null);
+    }
+  }
+
   return (
     <div className="grid gap-3">
       <div className={`rounded-md border px-3 py-2 text-sm ${statusClass(readiness.status)}`}>
@@ -225,6 +251,14 @@ export function ExportMarkdownButton({
                 <div className="mt-1 text-slate-500">
                   章节 {snapshot.chapterCount} · 字数 {snapshot.wordCount} · 摘要 {snapshot.contentHash.slice(0, 10)}
                 </div>
+                <button
+                  className="mt-2 rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                  disabled={exporting !== null}
+                  onClick={() => void regenerateSnapshot(snapshot)}
+                  type="button"
+                >
+                  {exporting === `snapshot:${snapshot.id}` ? "生成中" : "重新生成"}
+                </button>
               </div>
             ))}
           </div>

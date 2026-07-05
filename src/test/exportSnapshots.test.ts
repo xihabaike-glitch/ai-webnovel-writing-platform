@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { buildExportPackageSnapshot, exportSnapshotView, fileSizeLabel, formatLabel, packageKindLabel, readinessLabel } from "../lib/export/snapshots.ts";
+import { buildExportPackageSnapshot, exportSnapshotView, fileSizeLabel, formatLabel, packageKindLabel, parseExportSnapshotTarget, readinessLabel, regeneratedSnapshotMessage } from "../lib/export/snapshots.ts";
 
 describe("export package snapshots", () => {
   const project = {
@@ -79,5 +79,21 @@ describe("export package snapshots", () => {
     assert.equal(formatLabel("docx"), "Word");
     assert.equal(readinessLabel("ready"), "可交付");
     assert.equal(fileSizeLabel(900), "900 B");
+  });
+
+  it("parses regeneratable snapshot targets strictly", () => {
+    assert.deepEqual(parseExportSnapshotTarget("full", "markdown"), { packageKind: "full", format: "markdown" });
+    assert.deepEqual(parseExportSnapshotTarget("outline", "docx"), { packageKind: "outline", format: "docx" });
+    assert.deepEqual(parseExportSnapshotTarget("chapters_zip", "zip"), { packageKind: "chapters_zip", format: "zip" });
+    assert.deepEqual(parseExportSnapshotTarget("foreshadows_csv", "csv"), { packageKind: "foreshadows_csv", format: "csv" });
+    assert.equal(parseExportSnapshotTarget("chapters_zip", "docx"), null);
+    assert.equal(parseExportSnapshotTarget("full", "zip"), null);
+  });
+
+  it("describes regenerated snapshot downloads", () => {
+    assert.equal(
+      regeneratedSnapshotMessage({ packageKind: "characters", format: "docx" }),
+      "已按历史快照重新生成：人物伏笔包 · Word。",
+    );
   });
 });

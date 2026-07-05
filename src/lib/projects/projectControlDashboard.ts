@@ -385,6 +385,9 @@ export interface AiPipelineRecentBatchSummary {
   detail: string;
   actionLabel: string;
   targetHref: string;
+  secondaryActionLabel: string;
+  secondaryTargetHref: string;
+  evidenceBadges: string[];
   successRatePercent: number | null;
   averageQualityScore: number | null;
   knownCostUsd: number | null;
@@ -807,6 +810,9 @@ function buildAiPipelineRecentBatchSummary(audits: ControlBatchAudit[] = []): Ai
       detail: "先执行一次推荐批次，项目总控才有成功率、质量和成本证据。",
       actionLabel: "去任务中心",
       targetHref: "/tasks#recommended-batch",
+      secondaryActionLabel: "",
+      secondaryTargetHref: "",
+      evidenceBadges: [],
       successRatePercent: null,
       averageQualityScore: null,
       knownCostUsd: null,
@@ -828,6 +834,19 @@ function buildAiPipelineRecentBatchSummary(audits: ControlBatchAudit[] = []): Ai
   const detail = typeof batchReceipt?.detail === "string" && batchReceipt.detail
     ? batchReceipt.detail
     : latest.message;
+  const primaryLabel = typeof batchReceipt?.primaryLabel === "string" && batchReceipt.primaryLabel
+    ? batchReceipt.primaryLabel
+    : status === "repair"
+      ? "查看失败修复"
+      : status === "watch_cost"
+        ? "看模型审计"
+        : "看推荐批次";
+  const primaryHref = typeof batchReceipt?.primaryHref === "string" && batchReceipt.primaryHref
+    ? batchReceipt.primaryHref
+    : latest.href || "/tasks#recommended-batch";
+  const secondaryLabel = typeof batchReceipt?.secondaryLabel === "string" ? batchReceipt.secondaryLabel : "";
+  const secondaryHref = typeof batchReceipt?.secondaryHref === "string" ? batchReceipt.secondaryHref : "";
+  const evidenceBadges = stringArray(batchReceipt?.evidenceItems).slice(0, 5);
 
   return {
     hasRecent: true,
@@ -835,8 +854,11 @@ function buildAiPipelineRecentBatchSummary(audits: ControlBatchAudit[] = []): Ai
     label: recentBatchLabel(status),
     headline,
     detail,
-    actionLabel: status === "repair" ? "查看失败修复" : status === "watch_cost" ? "看模型审计" : "看推荐批次",
-    targetHref: latest.href || "/tasks#recommended-batch",
+    actionLabel: primaryLabel,
+    targetHref: primaryHref,
+    secondaryActionLabel: secondaryLabel,
+    secondaryTargetHref: secondaryHref,
+    evidenceBadges,
     successRatePercent: numberValue(route?.successRatePercent),
     averageQualityScore: numberValue(route?.averageQualityScore),
     knownCostUsd: numberValue(route?.knownCostUsd),

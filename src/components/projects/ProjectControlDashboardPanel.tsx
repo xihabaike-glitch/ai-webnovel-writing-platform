@@ -62,6 +62,9 @@ interface AiPipelineRecentBatchSummary {
   detail: string;
   actionLabel: string;
   targetHref: string;
+  secondaryActionLabel: string;
+  secondaryTargetHref: string;
+  evidenceBadges: string[];
   successRatePercent: number | null;
   averageQualityScore: number | null;
   knownCostUsd: number | null;
@@ -1219,7 +1222,22 @@ export function ProjectControlDashboardPanel({ projectId }: { projectId: string 
               >
                 {dashboard.aiPipelineRecentBatch.actionLabel}
               </Link>
+              {dashboard.aiPipelineRecentBatch.secondaryActionLabel && dashboard.aiPipelineRecentBatch.secondaryTargetHref ? (
+                <Link
+                  className="inline-flex w-fit items-center justify-center rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-white"
+                  href={dashboard.aiPipelineRecentBatch.secondaryTargetHref}
+                >
+                  {dashboard.aiPipelineRecentBatch.secondaryActionLabel}
+                </Link>
+              ) : null}
             </div>
+            {dashboard.aiPipelineRecentBatch.evidenceBadges.length ? (
+              <div className="mt-3 flex flex-wrap gap-2 text-xs text-slate-600">
+                {dashboard.aiPipelineRecentBatch.evidenceBadges.map((badge) => (
+                  <span className="rounded-md bg-slate-50 px-2 py-1" key={badge}>{badge}</span>
+                ))}
+              </div>
+            ) : null}
             <div className="mt-3 grid gap-2 sm:grid-cols-4">
               <div className="rounded-md bg-slate-50 p-3">
                 <div className="text-xs text-slate-500">成功 / 失败</div>

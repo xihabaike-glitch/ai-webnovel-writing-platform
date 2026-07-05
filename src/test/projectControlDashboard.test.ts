@@ -469,6 +469,11 @@ test("buildProjectControlDashboard", async (t) => {
               status: "repair",
               headline: "批次有失败，先修再放大",
               detail: "第三章执行失败，先处理失败。",
+              primaryLabel: "查看失败修复",
+              primaryHref: "/failures",
+              secondaryLabel: "回任务队列",
+              secondaryHref: "/tasks",
+              evidenceItems: ["成功/失败：3/1", "成功率：75%", "质量：78", "成本：$0.0425"],
               warnings: ["成功率偏低。", "失败批次不要继续放大。"],
             },
           }),
@@ -486,7 +491,11 @@ test("buildProjectControlDashboard", async (t) => {
     assert.equal(dashboard.aiPipelineRecentBatch.knownCostUsd, 0.0425);
     assert.equal(dashboard.aiPipelineRecentBatch.succeededCount, 3);
     assert.equal(dashboard.aiPipelineRecentBatch.failedCount, 1);
-    assert.equal(dashboard.aiPipelineRecentBatch.targetHref, "/projects/demo-project#ai-pipeline");
+    assert.equal(dashboard.aiPipelineRecentBatch.actionLabel, "查看失败修复");
+    assert.equal(dashboard.aiPipelineRecentBatch.targetHref, "/failures");
+    assert.equal(dashboard.aiPipelineRecentBatch.secondaryActionLabel, "回任务队列");
+    assert.equal(dashboard.aiPipelineRecentBatch.secondaryTargetHref, "/tasks");
+    assert.deepEqual(dashboard.aiPipelineRecentBatch.evidenceBadges.slice(0, 3), ["成功/失败：3/1", "成功率：75%", "质量：78"]);
     assert.ok(dashboard.aiPipelineRecentBatch.warnings.some((warning) => warning.includes("不要继续放大")));
     assert.equal(dashboard.aiPipelineBatchHealth.hasSamples, false);
   });

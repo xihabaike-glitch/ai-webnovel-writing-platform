@@ -173,6 +173,8 @@ export interface FirstDayPostDispatchCompletionPrompt {
   action?: FirstDayWorkflowMessageAction;
   actionLabel?: string;
   actionHref?: string;
+  secondaryActionLabel?: string;
+  secondaryActionHref?: string;
 }
 
 export function buildFirstDayReturnToAcceptanceHref(input: {
@@ -647,6 +649,22 @@ function firstDayHref(task: PersistedGatePlatformDispatchTask, stepId: string) {
   return task.href;
 }
 
+export function buildFirstDayDispatchCenterHref(input: {
+  projectId?: string | null;
+  dispatchKey?: string | null;
+  stepId?: string | null;
+}) {
+  const projectId = input.projectId?.trim();
+  if (!projectId) return "/dispatch#first-day-dispatch";
+
+  const stepId = input.stepId?.trim() || (input.dispatchKey?.startsWith("first-day:")
+    ? firstDayStepId(input.dispatchKey)
+    : "");
+  const stepQuery = stepId ? `&step=${encodeURIComponent(stepId)}` : "";
+
+  return `/dispatch?firstDayProject=${encodeURIComponent(projectId)}${stepQuery}#first-day-dispatch`;
+}
+
 export function isFirstDayDispatchTask(task: Pick<PersistedGatePlatformDispatchTask, "dispatchKey">) {
   return task.dispatchKey.startsWith("first-day:");
 }
@@ -973,7 +991,7 @@ export function buildFirstDayDispatchUpdateSummary(input: {
 export function buildFirstDayPostDispatchCompletionPrompt(input: {
   completedTitle: string;
   updateSummary: Pick<FirstDayDispatchUpdateSummary, "visible" | "status" | "title" | "detail"> | null;
-  nextStep: Pick<FirstDayWorkflowStep, "label" | "owner" | "actionLabel" | "href"> | null;
+  nextStep: Pick<FirstDayWorkflowStep, "label" | "owner" | "actionLabel" | "href"> & { dispatchHref?: string } | null;
   executionPlan: { executable: boolean; blockedReason?: string } | null;
 }): FirstDayPostDispatchCompletionPrompt {
   if (input.nextStep?.owner === "AI" && input.executionPlan?.executable) {
@@ -990,6 +1008,8 @@ export function buildFirstDayPostDispatchCompletionPrompt(input: {
       action: "open_next_step",
       actionLabel: input.nextStep.actionLabel,
       actionHref: input.nextStep.href,
+      secondaryActionLabel: input.nextStep.dispatchHref ? "回派单中心看下一张卡" : undefined,
+      secondaryActionHref: input.nextStep.dispatchHref,
     };
   }
 

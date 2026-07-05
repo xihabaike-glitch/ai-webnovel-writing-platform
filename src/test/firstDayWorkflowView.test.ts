@@ -10,6 +10,7 @@ import {
   buildFirstDayExecutionSafetyBanner,
   buildFirstDayHandoffGateCta,
   buildFirstDayPostDispatchCompletionPrompt,
+  buildFirstDayDispatchCenterHref,
   buildFirstDayReturnToAcceptanceHref,
   buildFirstDayReturnedEvidenceAcceptanceState,
   buildFirstDayRouteRepairReturnNotice,
@@ -714,6 +715,16 @@ test("buildFirstDayReturnToAcceptanceHref carries execution evidence back to the
   );
 });
 
+test("buildFirstDayDispatchCenterHref targets the next first-day dispatch card", () => {
+  assert.equal(
+    buildFirstDayDispatchCenterHref({
+      projectId: "project-1",
+      dispatchKey: "first-day:project-1:publish-precheck",
+    }),
+    "/dispatch?firstDayProject=project-1&step=publish-precheck#first-day-dispatch",
+  );
+});
+
 test("buildFirstDayReturnedEvidenceAcceptanceState focuses a completable returned receipt", () => {
   const state = buildFirstDayReturnedEvidenceAcceptanceState({
     completionEvidence: "第一章审稿已完成：钩子、爽点和章末追读点已经复查。",
@@ -844,6 +855,7 @@ test("buildFirstDayPostDispatchCompletionPrompt offers direct AI continuation wh
       owner: "运营",
       actionLabel: "检查平台包",
       href: "/projects/project-1#platform-export",
+      dispatchHref: "/dispatch?firstDayProject=project-1&step=publish-precheck#first-day-dispatch",
     },
     executionPlan: {
       executable: false,
@@ -880,6 +892,8 @@ test("buildFirstDayPostDispatchCompletionPrompt offers direct AI continuation wh
   assert.equal(manualStep.action, "open_next_step");
   assert.equal(manualStep.actionLabel, "检查平台包");
   assert.equal(manualStep.actionHref, "/projects/project-1#platform-export");
+  assert.equal(manualStep.secondaryActionLabel, "回派单中心看下一张卡");
+  assert.equal(manualStep.secondaryActionHref, "/dispatch?firstDayProject=project-1&step=publish-precheck#first-day-dispatch");
   assert.equal(completed.message, "首日工作流已收口：可以进入后续生产。");
   assert.equal(completed.action, undefined);
 });

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { buildFirstDayExecutionRouteBlockMessage, type FirstDayExecutionRouteStatus } from "@/lib/model-gateway/firstDayExecutionRoute";
-import { buildFirstDayDispatchUpdateSummary, buildFirstDayExecutionReceiptFollowupPrompt, buildFirstDayExecutionRiskNotice, buildFirstDayExecutionSafetyBanner, buildFirstDayHandoffGateCta, buildFirstDayPostDispatchCompletionPrompt, buildFirstDayReceiptCompletionAction, buildFirstDayReceiptCompletionEvidence, buildFirstDayReturnedEvidenceAcceptanceState, buildFirstDayRouteRepairReturnNotice, buildFirstDayStepView, completeFirstDayDispatchStep, type FirstDayWorkflowMessageAction } from "@/lib/projects/firstDayWorkflowView";
+import { buildFirstDayDispatchCenterHref, buildFirstDayDispatchUpdateSummary, buildFirstDayExecutionReceiptFollowupPrompt, buildFirstDayExecutionRiskNotice, buildFirstDayExecutionSafetyBanner, buildFirstDayHandoffGateCta, buildFirstDayPostDispatchCompletionPrompt, buildFirstDayReceiptCompletionAction, buildFirstDayReceiptCompletionEvidence, buildFirstDayReturnedEvidenceAcceptanceState, buildFirstDayRouteRepairReturnNotice, buildFirstDayStepView, completeFirstDayDispatchStep, type FirstDayWorkflowMessageAction } from "@/lib/projects/firstDayWorkflowView";
 import { persistGateDispatchTask, type GatePlatformGrowthDispatchItem, type PersistedGatePlatformDispatchTask } from "@/lib/projects/gateActionReceipts";
 
 interface FirstDayWorkflowStep {
@@ -352,17 +352,28 @@ export function FirstDayWorkflowPanel({ projectId }: { projectId: string }) {
   const [messageAction, setMessageAction] = useState<FirstDayMessageAction | null>(null);
   const [messageActionLabel, setMessageActionLabel] = useState<string | null>(null);
   const [messageActionHref, setMessageActionHref] = useState<string | null>(null);
+  const [messageSecondaryActionLabel, setMessageSecondaryActionLabel] = useState<string | null>(null);
+  const [messageSecondaryActionHref, setMessageSecondaryActionHref] = useState<string | null>(null);
   const [executionReceipt, setExecutionReceipt] = useState<FirstDayExecutionReceipt | null>(null);
   const [continuation, setContinuation] = useState<FirstDayContinuationAction | null>(null);
   const [handoffFollowupDispatches, setHandoffFollowupDispatches] = useState<GatePlatformGrowthDispatchItem[]>([]);
   const completionEvidenceRef = useRef<HTMLTextAreaElement | null>(null);
   const hasFocusedReturnedEvidence = useRef(false);
 
-  function showMessage(nextMessage: string | null, action?: FirstDayMessageAction, actionLabel?: string, actionHref?: string) {
+  function showMessage(
+    nextMessage: string | null,
+    action?: FirstDayMessageAction,
+    actionLabel?: string,
+    actionHref?: string,
+    secondaryActionLabel?: string,
+    secondaryActionHref?: string,
+  ) {
     setMessage(nextMessage);
     setMessageAction(action ?? null);
     setMessageActionLabel(actionLabel ?? null);
     setMessageActionHref(actionHref ?? null);
+    setMessageSecondaryActionLabel(secondaryActionLabel ?? null);
+    setMessageSecondaryActionHref(secondaryActionHref ?? null);
   }
 
   async function loadWorkflow(options?: { fromRouteRepair?: boolean }) {
@@ -532,13 +543,30 @@ export function FirstDayWorkflowPanel({ projectId }: { projectId: string }) {
       setCompletionEvidence("");
       const refreshed = await loadWorkflow();
       const updateSummary = buildFirstDayDispatchUpdateSummary(result);
+      const firstDayFollowUp = result.followUpTasks.find((item) => item.dispatchKey.startsWith("first-day:")) ?? null;
+      const nextStep = refreshed?.workflow.nextStep
+        ? {
+          ...refreshed.workflow.nextStep,
+          dispatchHref: firstDayFollowUp ? buildFirstDayDispatchCenterHref({
+            projectId: firstDayFollowUp.projectId,
+            dispatchKey: firstDayFollowUp.dispatchKey,
+          }) : undefined,
+        }
+        : null;
       const nextPrompt = buildFirstDayPostDispatchCompletionPrompt({
         completedTitle: result.task.title,
         updateSummary,
-        nextStep: refreshed?.workflow.nextStep ?? null,
+        nextStep,
         executionPlan: refreshed?.executionPlan ?? null,
       });
-      showMessage(nextPrompt.message, nextPrompt.action, nextPrompt.actionLabel, nextPrompt.actionHref);
+      showMessage(
+        nextPrompt.message,
+        nextPrompt.action,
+        nextPrompt.actionLabel,
+        nextPrompt.actionHref,
+        nextPrompt.secondaryActionLabel,
+        nextPrompt.secondaryActionHref,
+      );
     } catch (caught) {
       showMessage(caught instanceof Error ? caught.message : "首日派单验收失败。");
     } finally {
@@ -706,6 +734,11 @@ export function FirstDayWorkflowPanel({ projectId }: { projectId: string }) {
           ) : messageAction === "open_next_step" && messageActionLabel ? (
             <Link className="w-fit rounded-md bg-slate-950 px-3 py-2 text-sm font-medium text-white" href={messageActionHref ?? workflow?.nextStep.href ?? "#first-day-workflow"}>
               {messageActionLabel}
+            </Link>
+          ) : null}
+          {messageSecondaryActionLabel && messageSecondaryActionHref ? (
+            <Link className="w-fit rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50" href={messageSecondaryActionHref}>
+              {messageSecondaryActionLabel}
             </Link>
           ) : null}
         </div>

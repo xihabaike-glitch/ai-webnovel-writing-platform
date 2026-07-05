@@ -350,14 +350,16 @@ export function FirstDayWorkflowPanel({ projectId }: { projectId: string }) {
   const [message, setMessage] = useState<string | null>(null);
   const [messageAction, setMessageAction] = useState<FirstDayMessageAction | null>(null);
   const [messageActionLabel, setMessageActionLabel] = useState<string | null>(null);
+  const [messageActionHref, setMessageActionHref] = useState<string | null>(null);
   const [executionReceipt, setExecutionReceipt] = useState<FirstDayExecutionReceipt | null>(null);
   const [continuation, setContinuation] = useState<FirstDayContinuationAction | null>(null);
   const [handoffFollowupDispatches, setHandoffFollowupDispatches] = useState<GatePlatformGrowthDispatchItem[]>([]);
 
-  function showMessage(nextMessage: string | null, action?: FirstDayMessageAction, actionLabel?: string) {
+  function showMessage(nextMessage: string | null, action?: FirstDayMessageAction, actionLabel?: string, actionHref?: string) {
     setMessage(nextMessage);
     setMessageAction(action ?? null);
     setMessageActionLabel(actionLabel ?? null);
+    setMessageActionHref(actionHref ?? null);
   }
 
   async function loadWorkflow(options?: { fromRouteRepair?: boolean }) {
@@ -526,7 +528,7 @@ export function FirstDayWorkflowPanel({ projectId }: { projectId: string }) {
         nextStep: refreshed?.workflow.nextStep ?? null,
         executionPlan: refreshed?.executionPlan ?? null,
       });
-      showMessage(nextPrompt.message, nextPrompt.action);
+      showMessage(nextPrompt.message, nextPrompt.action, nextPrompt.actionLabel, nextPrompt.actionHref);
     } catch (caught) {
       showMessage(caught instanceof Error ? caught.message : "首日派单验收失败。");
     } finally {
@@ -679,6 +681,10 @@ export function FirstDayWorkflowPanel({ projectId }: { projectId: string }) {
             >
               {isCompletingDispatch ? "验收中" : messageActionLabel ?? "验收并进入下一步"}
             </button>
+          ) : messageAction === "open_next_step" && messageActionLabel ? (
+            <Link className="w-fit rounded-md bg-slate-950 px-3 py-2 text-sm font-medium text-white" href={messageActionHref ?? workflow?.nextStep.href ?? "#first-day-workflow"}>
+              {messageActionLabel}
+            </Link>
           ) : null}
         </div>
       ) : null}

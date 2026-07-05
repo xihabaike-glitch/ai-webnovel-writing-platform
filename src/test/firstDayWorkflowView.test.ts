@@ -758,12 +758,35 @@ test("buildFirstDayPostDispatchCompletionPrompt offers direct AI continuation wh
       label: "第一章审稿",
       owner: "AI",
       actionLabel: "AI 执行当前节点",
+      href: "#first-day-workflow",
     },
     executionPlan: {
       executable: true,
     },
   });
-  const manual = buildFirstDayPostDispatchCompletionPrompt({
+  const manualStep = buildFirstDayPostDispatchCompletionPrompt({
+    completedTitle: "第一章二改",
+    updateSummary: {
+      visible: true,
+      status: "advanced",
+      title: "首日节点已推进",
+      detail: "「第一章二改」已验收，下一张首日卡是「平台包预检」。",
+      actionLabel: "检查平台包",
+      href: "/projects/project-1#platform-export",
+      badges: [],
+    },
+    nextStep: {
+      label: "平台包预检",
+      owner: "运营",
+      actionLabel: "检查平台包",
+      href: "/projects/project-1#platform-export",
+    },
+    executionPlan: {
+      executable: false,
+      blockedReason: "当前首日节点暂不支持自动执行。",
+    },
+  });
+  const completed = buildFirstDayPostDispatchCompletionPrompt({
     completedTitle: "平台包预检",
     updateSummary: {
       visible: true,
@@ -778,6 +801,7 @@ test("buildFirstDayPostDispatchCompletionPrompt offers direct AI continuation wh
       label: "平台包预检",
       owner: "运营",
       actionLabel: "检查平台包",
+      href: "/projects/project-1#platform-export",
     },
     executionPlan: {
       executable: false,
@@ -787,8 +811,13 @@ test("buildFirstDayPostDispatchCompletionPrompt offers direct AI continuation wh
 
   assert.equal(ready.message, "已完成当前派单：第一章初稿。下一步「第一章审稿」已准备好，可以继续让 AI 执行。");
   assert.equal(ready.action, "execute_current_step");
-  assert.equal(manual.message, "首日工作流已收口：可以进入后续生产。");
-  assert.equal(manual.action, undefined);
+  assert.equal(ready.actionLabel, "继续 AI 执行");
+  assert.equal(manualStep.message, "首日节点已推进：「第一章二改」已验收，下一张首日卡是「平台包预检」。");
+  assert.equal(manualStep.action, "open_next_step");
+  assert.equal(manualStep.actionLabel, "检查平台包");
+  assert.equal(manualStep.actionHref, "/projects/project-1#platform-export");
+  assert.equal(completed.message, "首日工作流已收口：可以进入后续生产。");
+  assert.equal(completed.action, undefined);
 });
 
 test("buildFirstDayRouteRepairReturnNotice only offers AI continuation when route and plan are executable", () => {

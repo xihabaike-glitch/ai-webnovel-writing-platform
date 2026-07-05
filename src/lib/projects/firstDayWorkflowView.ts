@@ -155,12 +155,13 @@ export interface FirstDayDispatchUpdateSummary {
   badges: string[];
 }
 
-export type FirstDayWorkflowMessageAction = "execute_current_step" | "complete_current_dispatch";
+export type FirstDayWorkflowMessageAction = "execute_current_step" | "complete_current_dispatch" | "open_next_step";
 
 export interface FirstDayPostDispatchCompletionPrompt {
   message: string;
   action?: FirstDayWorkflowMessageAction;
   actionLabel?: string;
+  actionHref?: string;
 }
 
 export interface FirstDayDispatchFocusInput {
@@ -903,14 +904,24 @@ export function buildFirstDayDispatchUpdateSummary(input: {
 
 export function buildFirstDayPostDispatchCompletionPrompt(input: {
   completedTitle: string;
-  updateSummary: Pick<FirstDayDispatchUpdateSummary, "visible" | "title" | "detail"> | null;
-  nextStep: Pick<FirstDayWorkflowStep, "label" | "owner" | "actionLabel"> | null;
+  updateSummary: Pick<FirstDayDispatchUpdateSummary, "visible" | "status" | "title" | "detail"> | null;
+  nextStep: Pick<FirstDayWorkflowStep, "label" | "owner" | "actionLabel" | "href"> | null;
   executionPlan: { executable: boolean; blockedReason?: string } | null;
 }): FirstDayPostDispatchCompletionPrompt {
   if (input.nextStep?.owner === "AI" && input.executionPlan?.executable) {
     return {
       message: `已完成当前派单：${input.completedTitle}。下一步「${input.nextStep.label}」已准备好，可以继续让 AI 执行。`,
       action: "execute_current_step",
+      actionLabel: "继续 AI 执行",
+    };
+  }
+
+  if (input.nextStep && input.updateSummary?.visible && input.updateSummary.status !== "completed") {
+    return {
+      message: `${input.updateSummary.title}：${input.updateSummary.detail}`,
+      action: "open_next_step",
+      actionLabel: input.nextStep.actionLabel,
+      actionHref: input.nextStep.href,
     };
   }
 

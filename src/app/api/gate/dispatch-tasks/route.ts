@@ -34,7 +34,12 @@ import { buildProjectContextPack } from "@/lib/projects/projectContextPack";
 import { findProjectStartTacticSummary } from "@/lib/projects/projectStartTactics";
 import { buildSubmissionChecklist } from "@/lib/projects/submissionChecklist";
 import { buildSubmissionDecisionCompletionEffect } from "@/lib/projects/submissionDecisionCompletion";
-import { autoDispatchStartMetricDecision, autoDispatchStartMetricFollowups } from "@/lib/projects/startMetricDecisionAutoDispatch";
+import {
+  autoDispatchSecondMetricDecision,
+  autoDispatchSecondMetricFollowups,
+  autoDispatchStartMetricDecision,
+  autoDispatchStartMetricFollowups,
+} from "@/lib/projects/startMetricDecisionAutoDispatch";
 
 function text(value: unknown, fallback = "") {
   return typeof value === "string" ? value : fallback;
@@ -951,8 +956,14 @@ export async function PATCH(request: Request) {
   const startMetricAutoDispatch = nextState === "completed" && submissionEffectReview && task.projectId
     ? await autoDispatchStartMetricDecision({ projectId: task.projectId, platformId: task.platformId })
     : null;
+  const secondMetricAutoDispatch = nextState === "completed" && submissionEffectReview && task.projectId
+    ? await autoDispatchSecondMetricDecision({ projectId: task.projectId, platformId: task.platformId })
+    : null;
   const startMetricFollowupAutoDispatch = nextState === "completed" && task.projectId
     ? await autoDispatchStartMetricFollowups({ projectId: task.projectId, platformId: task.platformId })
+    : null;
+  const secondMetricFollowupAutoDispatch = nextState === "completed" && task.projectId
+    ? await autoDispatchSecondMetricFollowups({ projectId: task.projectId, platformId: task.platformId })
     : null;
   const dispatchCompletionReceipt = nextState === "completed" && !submissionEffectReview
     ? await writeDispatchCompletionActionReceipt(task)
@@ -1012,7 +1023,9 @@ export async function PATCH(request: Request) {
     dispatchCompletionReceipt,
     submissionEffectReview,
     startMetricAutoDispatch,
+    secondMetricAutoDispatch,
     startMetricFollowupAutoDispatch,
+    secondMetricFollowupAutoDispatch,
     evidenceLoopRecheck,
     storyTreeRecheck,
   });

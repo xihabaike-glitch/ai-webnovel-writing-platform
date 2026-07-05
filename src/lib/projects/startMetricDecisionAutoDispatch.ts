@@ -3,8 +3,12 @@ import {
   buildGateProjectStartMetricDecision,
   buildGateProjectStartMetricDispatchItems,
   buildGateProjectStartMetricFollowupDispatchItems,
+  buildGateProjectSecondMetricDecision,
+  buildGateProjectSecondMetricDispatchItems,
+  buildGateProjectSecondMetricFollowupDispatchItems,
   gateActionReceiptFromAuditRecord,
   type GateProjectStartMetricDecision,
+  type GateProjectSecondMetricDecision,
   type PersistedGatePlatformDispatchTask,
 } from "./gateActionReceipts.ts";
 import { gatePlatformDispatchTaskFromRecord } from "./gateDispatchTaskRecords.ts";
@@ -21,10 +25,18 @@ export interface StartMetricFollowupAutoDispatchResult {
   skippedDispatches: PersistedGatePlatformDispatchTask[];
 }
 
-export async function autoDispatchStartMetricDecision(input: {
-  projectId: string;
-  platformId?: string | null;
-}): Promise<StartMetricAutoDispatchResult> {
+export interface SecondMetricAutoDispatchResult {
+  decision: GateProjectSecondMetricDecision;
+  createdDispatches: PersistedGatePlatformDispatchTask[];
+  skippedDispatches: PersistedGatePlatformDispatchTask[];
+}
+
+export interface SecondMetricFollowupAutoDispatchResult {
+  createdDispatches: PersistedGatePlatformDispatchTask[];
+  skippedDispatches: PersistedGatePlatformDispatchTask[];
+}
+
+async function loadProjectGateContext(input: { projectId: string; platformId?: string | null }) {
   const where = {
     projectId: input.projectId,
     ...(input.platformId ? { platformId: input.platformId } : {}),
@@ -40,12 +52,19 @@ export async function autoDispatchStartMetricDecision(input: {
       take: 100,
     }),
   ]);
-  const persistedTasks = taskRecords.map(gatePlatformDispatchTaskFromRecord);
-  const receipts = auditRecords.map(gateActionReceiptFromAuditRecord);
-  const decision = buildGateProjectStartMetricDecision(persistedTasks, receipts);
+
+  return {
+    persistedTasks: taskRecords.map(gatePlatformDispatchTaskFromRecord),
+    receipts: auditRecords.map(gateActionReceiptFromAuditRecord),
+  };
+}
+
+async function persistNewDispatches(
+  dispatches: ReturnType<typeof buildGateProjectStartMetricDispatchItems>,
+  persistedTasks: PersistedGatePlatformDispatchTask[],
+) {
   const existingKeys = new Set(persistedTasks.map((task) => task.dispatchKey));
   const persistedByKey = new Map(persistedTasks.map((task) => [task.dispatchKey, task]));
-  const dispatches = buildGateProjectStartMetricDispatchItems(decision, persistedTasks);
   const createdDispatches: PersistedGatePlatformDispatchTask[] = [];
   const skippedDispatches: PersistedGatePlatformDispatchTask[] = [];
 
@@ -60,10 +79,21 @@ export async function autoDispatchStartMetricDecision(input: {
     createdDispatches.push(persisted);
   }
 
+  return { createdDispatches, skippedDispatches };
+}
+
+export async function autoDispatchStartMetricDecision(input: {
+  projectId: string;
+  platformId?: string | null;
+}): Promise<StartMetricAutoDispatchResult> {
+  const { persistedTasks, receipts } = await loadProjectGateContext(input);
+  const decision = buildGateProjectStartMetricDecision(persistedTasks, receipts);
+  const dispatches = buildGateProjectStartMetricDispatchItems(decision, persistedTasks);
+  const result = await persistNewDispatches(dispatches, persistedTasks);
+
   return {
     decision,
-    createdDispatches,
-    skippedDispatches,
+    ...result,
   };
 }
 
@@ -71,33 +101,31 @@ export async function autoDispatchStartMetricFollowups(input: {
   projectId: string;
   platformId?: string | null;
 }): Promise<StartMetricFollowupAutoDispatchResult> {
-  const taskRecords = await prisma.gateDispatchTask.findMany({
-    where: {
-      projectId: input.projectId,
-      ...(input.platformId ? { platformId: input.platformId } : {}),
-    },
-    orderBy: { updatedAt: "desc" },
-  });
-  const persistedTasks = taskRecords.map(gatePlatformDispatchTaskFromRecord);
-  const existingKeys = new Set(persistedTasks.map((task) => task.dispatchKey));
-  const persistedByKey = new Map(persistedTasks.map((task) => [task.dispatchKey, task]));
+  const { persistedTasks } = await loadProjectGateContext(input);
   const followups = buildGateProjectStartMetricFollowupDispatchItems(persistedTasks, persistedTasks);
-  const createdDispatches: PersistedGatePlatformDispatchTask[] = [];
-  const skippedDispatches: PersistedGatePlatformDispatchTask[] = [];
+  return persistNewDispatches(followups, persistedTasks);
+}
 
-  for (const dispatch of followups) {
-    if (existingKeys.has(dispatch.id)) {
-      const persisted = persistedByKey.get(dispatch.id);
-      if (persisted) skippedDispatches.push(persisted);
-      continue;
-    }
-    const assignedDispatch = { ...dispatch, state: "assigned" as const };
-    const persisted = await persistServerGateDispatchTask(assignedDispatch);
-    createdDispatches.push(persisted);
-  }
+export async function autoDispatchSecondMetricDecision(input: {
+  projectId: string;
+  platformId?: string | null;
+}): Promise<SecondMetricAutoDispatchResult> {
+  const { persistedTasks, receipts } = await loadProjectGateContext(input);
+  const decision = buildGateProjectSecondMetricDecision(persistedTasks, receipts);
+  const dispatches = buildGateProjectSecondMetricDispatchItems(decision, persistedTasks);
+  const result = await persistNewDispatches(dispatches, persistedTasks);
 
   return {
-    createdDispatches,
-    skippedDispatches,
+    decision,
+    ...result,
   };
+}
+
+export async function autoDispatchSecondMetricFollowups(input: {
+  projectId: string;
+  platformId?: string | null;
+}): Promise<SecondMetricFollowupAutoDispatchResult> {
+  const { persistedTasks } = await loadProjectGateContext(input);
+  const followups = buildGateProjectSecondMetricFollowupDispatchItems(persistedTasks, persistedTasks);
+  return persistNewDispatches(followups, persistedTasks);
 }

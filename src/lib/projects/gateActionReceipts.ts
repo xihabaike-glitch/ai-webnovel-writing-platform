@@ -4293,7 +4293,12 @@ export function buildGateProjectStartMetricDecision(
   }
 
   const metricTasks = tasks
-    .filter((task) => task.stage === "start_metrics_recovery" && task.state === "completed" && task.completionEvidence.trim())
+    .filter((task) => (
+      task.stage === "start_metrics_recovery"
+      && task.dispatchKey.includes(":start_next:metrics_recovery:")
+      && task.state === "completed"
+      && task.completionEvidence.trim()
+    ))
     .sort((left, right) => new Date(right.completedAt ?? right.updatedAt).getTime() - new Date(left.completedAt ?? left.updatedAt).getTime());
   const latestTaskByPlatform = new Map<string, PersistedGatePlatformDispatchTask>();
   for (const task of metricTasks) {
@@ -6853,7 +6858,15 @@ export async function updatePersistedGateDispatchTaskState(
       createdDispatches: PersistedGatePlatformDispatchTask[];
       skippedDispatches: PersistedGatePlatformDispatchTask[];
     } | null;
+    secondMetricAutoDispatch?: {
+      createdDispatches: PersistedGatePlatformDispatchTask[];
+      skippedDispatches: PersistedGatePlatformDispatchTask[];
+    } | null;
     startMetricFollowupAutoDispatch?: {
+      createdDispatches: PersistedGatePlatformDispatchTask[];
+      skippedDispatches: PersistedGatePlatformDispatchTask[];
+    } | null;
+    secondMetricFollowupAutoDispatch?: {
       createdDispatches: PersistedGatePlatformDispatchTask[];
       skippedDispatches: PersistedGatePlatformDispatchTask[];
     } | null;
@@ -6869,7 +6882,9 @@ export async function updatePersistedGateDispatchTaskState(
     task: payload.task,
     followUpTasks: payload.followUpTasks ?? [],
     startMetricAutoDispatch: payload.startMetricAutoDispatch ?? null,
+    secondMetricAutoDispatch: payload.secondMetricAutoDispatch ?? null,
     startMetricFollowupAutoDispatch: payload.startMetricFollowupAutoDispatch ?? null,
+    secondMetricFollowupAutoDispatch: payload.secondMetricFollowupAutoDispatch ?? null,
     knowledgeFeedbackReceipt: payload.knowledgeFeedbackReceipt ?? null,
     dispatchCompletionReceipt: payload.dispatchCompletionReceipt ?? null,
     submissionEffectReview: payload.submissionEffectReview ?? null,

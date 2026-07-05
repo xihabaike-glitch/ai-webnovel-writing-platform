@@ -285,8 +285,14 @@ export function GateDispatchTaskCenter({
           for (const startMetricTask of updated.startMetricAutoDispatch?.createdDispatches ?? []) {
             nextByKey.set(startMetricTask.dispatchKey, startMetricTask);
           }
+          for (const secondMetricTask of updated.secondMetricAutoDispatch?.createdDispatches ?? []) {
+            nextByKey.set(secondMetricTask.dispatchKey, secondMetricTask);
+          }
           for (const startMetricFollowup of updated.startMetricFollowupAutoDispatch?.createdDispatches ?? []) {
             nextByKey.set(startMetricFollowup.dispatchKey, startMetricFollowup);
+          }
+          for (const secondMetricFollowup of updated.secondMetricFollowupAutoDispatch?.createdDispatches ?? []) {
+            nextByKey.set(secondMetricFollowup.dispatchKey, secondMetricFollowup);
           }
           return Array.from(nextByKey.values());
         });
@@ -299,9 +305,17 @@ export function GateDispatchTaskCenter({
         const startMetricMessage = startMetricTasks.length
           ? `已自动生成首轮数据后的二轮任务：${startMetricTasks.map((item) => item.title).join("、")}`
           : "";
+        const secondMetricTasks = updated.secondMetricAutoDispatch?.createdDispatches ?? [];
+        const secondMetricMessage = secondMetricTasks.length
+          ? `已自动生成二轮数据后的三轮动作：${secondMetricTasks.map((item) => item.title).join("、")}`
+          : "";
         const startMetricFollowups = updated.startMetricFollowupAutoDispatch?.createdDispatches ?? [];
         const startMetricFollowupMessage = startMetricFollowups.length
           ? `已自动生成二轮任务后的回流派单：${startMetricFollowups.map((item) => item.title).join("、")}`
+          : "";
+        const secondMetricFollowups = updated.secondMetricFollowupAutoDispatch?.createdDispatches ?? [];
+        const secondMetricFollowupMessage = secondMetricFollowups.length
+          ? `已自动生成三轮动作后的回流派单：${secondMetricFollowups.map((item) => item.title).join("、")}`
           : "";
         const firstDayUpdate = buildFirstDayDispatchUpdateSummary(updated);
         if (firstDayUpdate.visible) {
@@ -311,8 +325,14 @@ export function GateDispatchTaskCenter({
         } else if (startMetricMessage) {
           setRouteActionMessage(`${startMetricMessage}${submissionEffectMessage ? `；${submissionEffectMessage}` : ""}`);
           setRouteActionLink({ label: "回总闸门复查", href: "/gate" });
+        } else if (secondMetricMessage) {
+          setRouteActionMessage(`${secondMetricMessage}${submissionEffectMessage ? `；${submissionEffectMessage}` : ""}`);
+          setRouteActionLink({ label: "回总闸门复查", href: "/gate" });
         } else if (startMetricFollowupMessage) {
           setRouteActionMessage(startMetricFollowupMessage);
+          setRouteActionLink({ label: "回总闸门复查", href: "/gate" });
+        } else if (secondMetricFollowupMessage) {
+          setRouteActionMessage(secondMetricFollowupMessage);
           setRouteActionLink({ label: "回总闸门复查", href: "/gate" });
         } else if (updated.followUpTasks.length) {
           setRouteActionMessage(`已自动生成治理后复检派单：${updated.followUpTasks.map((item) => item.title).join("、")}${recheckMessage ? `；${recheckMessage}` : ""}${storyTreeMessage ? `；${storyTreeMessage}` : ""}${submissionEffectMessage ? `；${submissionEffectMessage}` : ""}`);

@@ -12,7 +12,7 @@ import {
 } from "@/lib/projects/gateActionReceipts";
 import { buildPublishEffectKnowledgeFeedbackReceipt } from "@/lib/projects/platformKnowledgeFeedbackReceipts";
 import { buildPublishEffectDispatchCompletionEvidence } from "@/lib/projects/publishEffectDispatchCompletion";
-import { autoDispatchStartMetricDecision } from "@/lib/projects/startMetricDecisionAutoDispatch";
+import { autoDispatchSecondMetricDecision, autoDispatchStartMetricDecision } from "@/lib/projects/startMetricDecisionAutoDispatch";
 import {
   buildPlatformPublishExportCenter,
   buildPlatformPublishArchive,
@@ -858,7 +858,10 @@ export async function POST(request: Request, { params }: Params) {
       metricId: metric.id,
       platformId: platform.id,
     });
-    const startMetricAutoDispatch = await autoDispatchStartMetricDecision({ projectId, platformId: platform.id });
+    const [startMetricAutoDispatch, secondMetricAutoDispatch] = await Promise.all([
+      autoDispatchStartMetricDecision({ projectId, platformId: platform.id }),
+      autoDispatchSecondMetricDecision({ projectId, platformId: platform.id }),
+    ]);
     const platformKnowledge = refreshedContext?.center.platformKnowledge.find((item) => item.platformId === platform.id) ?? null;
     const knowledgeFeedbackReceipt = platformKnowledge && effectReview
       ? buildPublishEffectKnowledgeFeedbackReceipt({
@@ -913,6 +916,7 @@ export async function POST(request: Request, { params }: Params) {
       gateReceipt,
       completedMetricDispatch,
       startMetricAutoDispatch,
+      secondMetricAutoDispatch,
       knowledgeFeedbackReceipt: savedKnowledgeFeedbackReceipt ? toKnowledgeFeedbackReceipt(savedKnowledgeFeedbackReceipt) : null,
     }, { status: 201 });
   }

@@ -25,6 +25,7 @@ import {
   buildFirstDayDispatchDesk,
   buildFirstDayDispatchCompletionHint,
   buildFirstDayDispatchUpdateSummary,
+  buildFirstDayReturnToAcceptanceHref,
   resolveFirstDayDispatchFocus,
   type FirstDayDispatchFocusInput,
 } from "@/lib/projects/firstDayWorkflowView";
@@ -638,17 +639,23 @@ export function GateDispatchTaskCenter({
           success?: boolean;
           summary?: string;
           nextAction?: string;
+          completionEvidence?: string;
         };
+        completionEvidence?: string;
       } | null;
       if (!response.ok) throw new Error(payload?.error ?? "执行下一步失败。");
       if (action.execution.kind === "first_day_ai") {
         const receipt = payload?.executionReceipt;
         const receiptText = receipt?.summary ? `：${receipt.summary}` : "";
         const nextText = receipt?.nextAction ? ` 下一步：${receipt.nextAction}` : "";
+        const completionEvidence = payload?.completionEvidence || receipt?.completionEvidence || "";
         setRouteActionMessage(`首日 AI 已执行${receiptText}。${nextText}`);
         setRouteActionLink({
           label: "回项目验收",
-          href: action.href,
+          href: buildFirstDayReturnToAcceptanceHref({
+            href: action.href,
+            completionEvidence,
+          }),
         });
         router.refresh();
         return;

@@ -175,6 +175,21 @@ export interface FirstDayPostDispatchCompletionPrompt {
   actionHref?: string;
 }
 
+export function buildFirstDayReturnToAcceptanceHref(input: {
+  href: string;
+  completionEvidence?: string | null;
+}) {
+  const completionEvidence = cleanEvidence(input.completionEvidence ?? "");
+  if (!completionEvidence) return input.href;
+
+  const hashIndex = input.href.indexOf("#");
+  const baseHref = hashIndex >= 0 ? input.href.slice(0, hashIndex) : input.href;
+  const hash = hashIndex >= 0 ? input.href.slice(hashIndex) : "";
+  const separator = baseHref.includes("?") ? "&" : "?";
+
+  return `${baseHref}${separator}firstDayEvidence=${encodeURIComponent(completionEvidence)}${hash}`;
+}
+
 export interface FirstDayDispatchFocusInput {
   dispatchKey?: string | null;
   projectId?: string | null;

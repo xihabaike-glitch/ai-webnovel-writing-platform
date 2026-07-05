@@ -337,6 +337,7 @@ export function FirstDayWorkflowPanel({ projectId }: { projectId: string }) {
   const searchParams = useSearchParams();
   const routeRepairReturn = searchParams.get("firstDayRoute") === "repaired";
   const createdLaunch = searchParams.get("firstDayLaunch") === "1";
+  const returnedCompletionEvidence = searchParams.get("firstDayEvidence")?.trim() ?? "";
   const [workflow, setWorkflow] = useState<FirstDayWorkflow | null>(null);
   const [dispatch, setDispatch] = useState<GatePlatformGrowthDispatchItem | null>(null);
   const [executionPlan, setExecutionPlan] = useState<FirstDayModelExecutionPlan | null>(null);
@@ -378,7 +379,10 @@ export function FirstDayWorkflowPanel({ projectId }: { projectId: string }) {
       setModelRoute(payload.modelRoute);
       setContinuation(payload.continuation);
       setHandoffFollowupDispatches(payload.handoffFollowupDispatches ?? []);
-      if (options?.fromRouteRepair) {
+      if (returnedCompletionEvidence) {
+        setCompletionEvidence(returnedCompletionEvidence);
+        showMessage("已带回首日 AI 执行证据，可以直接验收当前派单。");
+      } else if (options?.fromRouteRepair) {
         const notice = buildFirstDayRouteRepairReturnNotice({
           taskLabel: payload.modelRoute.taskLabel,
           routeBlockMessage: buildFirstDayExecutionRouteBlockMessage(payload.modelRoute),
@@ -553,7 +557,7 @@ export function FirstDayWorkflowPanel({ projectId }: { projectId: string }) {
 
   useEffect(() => {
     void loadWorkflow({ fromRouteRepair: routeRepairReturn });
-  }, [projectId, routeRepairReturn, createdLaunch]);
+  }, [projectId, routeRepairReturn, createdLaunch, returnedCompletionEvidence]);
 
   const routeBlockMessage = modelRoute ? buildFirstDayExecutionRouteBlockMessage(modelRoute) : null;
   const executionBlockMessage = executionPlan && !executionPlan.executable

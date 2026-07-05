@@ -10,6 +10,7 @@ import {
   buildFirstDayExecutionSafetyBanner,
   buildFirstDayHandoffGateCta,
   buildFirstDayPostDispatchCompletionPrompt,
+  buildFirstDayReturnToAcceptanceHref,
   buildFirstDayRouteRepairReturnNotice,
   buildFirstDayReceiptCompletionAction,
   buildFirstDayReceiptCompletionEvidence,
@@ -698,6 +699,18 @@ test("buildFirstDayDispatchUpdateSummary promotes executable AI follow-up", () =
   });
   assert.ok(summary.detail.includes("下一张首日卡是「第一章审稿」"));
   assert.ok(summary.badges.includes("AI 可继续"));
+});
+
+test("buildFirstDayReturnToAcceptanceHref carries execution evidence back to the project", () => {
+  const href = buildFirstDayReturnToAcceptanceHref({
+    href: "/projects/project-1?firstDayLaunch=1&nextStep=first-review#first-day-workflow",
+    completionEvidence: "第一章审稿已完成：钩子、爽点和章末追读点已经复查。",
+  });
+
+  assert.equal(
+    href,
+    "/projects/project-1?firstDayLaunch=1&nextStep=first-review&firstDayEvidence=%E7%AC%AC%E4%B8%80%E7%AB%A0%E5%AE%A1%E7%A8%BF%E5%B7%B2%E5%AE%8C%E6%88%90%EF%BC%9A%E9%92%A9%E5%AD%90%E3%80%81%E7%88%BD%E7%82%B9%E5%92%8C%E7%AB%A0%E6%9C%AB%E8%BF%BD%E8%AF%BB%E7%82%B9%E5%B7%B2%E7%BB%8F%E5%A4%8D%E6%9F%A5%E3%80%82#first-day-workflow",
+  );
 });
 
 test("buildFirstDayDispatchUpdateSummary explains watch sample scale-up status", () => {

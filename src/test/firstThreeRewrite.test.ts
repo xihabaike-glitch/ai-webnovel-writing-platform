@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { getPlatformProfile } from "../lib/platforms/platformProfiles.ts";
-import { buildFirstThreeRewriteEvaluation, buildFirstThreeRewritePackage } from "../lib/projects/firstThreeRewrite.ts";
+import { buildFirstThreeRewriteEvaluation, buildFirstThreeRewritePackage, normalizeFirstThreeRewriteOrders } from "../lib/projects/firstThreeRewrite.ts";
 import type { RetentionChapter } from "../lib/projects/retentionDiagnostic.ts";
 
 const strongChapters: RetentionChapter[] = [
@@ -79,6 +79,19 @@ test("buildFirstThreeRewritePackage", async (t) => {
     assert.ok(result.chapterPlans.some((plan) => plan.chapterId === "missing-2"));
     assert.ok(result.structureMoves.some((move) => move.id === "rebuild-cliffhanger-chain"));
     assert.ok(result.markdown.includes("起点中文网"));
+  });
+
+  await t.test("forces recovered rewrite requests down to a first-chapter sample", () => {
+    const orders = normalizeFirstThreeRewriteOrders([1, 2, 3], {
+      label: "恢复放量打法",
+      primaryTactic: "上一轮恢复放量已过线，但新项目不能复制成功结论。",
+      openingMove: "首章先验证开头承诺。",
+      verificationMove: "恢复放量打法只能作为参考，新项目先小样本复验成功率、质量分和失败样本。",
+      risk: "新项目仍先跑小样本，不直接批量生成前三章。",
+    });
+
+    assert.deepEqual(orders, [1]);
+    assert.deepEqual(normalizeFirstThreeRewriteOrders([3, 2, 2, 1], null), [1, 2, 3]);
   });
 
   await t.test("evaluates before and after platform rewrite gains", () => {

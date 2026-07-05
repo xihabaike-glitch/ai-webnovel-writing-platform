@@ -6,7 +6,7 @@ import { getActiveModelProvider } from "@/lib/model-gateway/activeProvider";
 import type { ModelProviderId } from "@/lib/model-gateway/types";
 import { getPlatformProfile, type PlatformId } from "@/lib/platforms/platformProfiles";
 import { buildProjectContextPack } from "@/lib/projects/projectContextPack";
-import { buildFirstThreeRewriteEvaluation, buildFirstThreeRewritePackage } from "@/lib/projects/firstThreeRewrite";
+import { buildFirstThreeRewriteEvaluation, buildFirstThreeRewritePackage, normalizeFirstThreeRewriteOrders } from "@/lib/projects/firstThreeRewrite";
 import { buildPlatformPublishExportCenter, parsePublishSnapshotTags } from "@/lib/projects/platformPublishExport";
 import { gatePlatformDispatchTaskFromRecord } from "@/lib/projects/gateDispatchTaskRecords";
 import { findProjectStartTacticSummary } from "@/lib/projects/projectStartTactics";
@@ -21,11 +21,6 @@ interface GenerateBody {
   targetWords?: number;
   chapterOrders?: number[];
   platformId?: string;
-}
-
-function normalizeOrders(rawOrders: number[] | undefined) {
-  const orders = rawOrders?.length ? rawOrders : [1, 2, 3];
-  return [...new Set(orders.filter((order) => [1, 2, 3].includes(order)))].sort((left, right) => left - right);
 }
 
 function planToChapterFields(plan: {
@@ -49,9 +44,9 @@ function planToChapterFields(plan: {
 export async function POST(request: Request, { params }: Params) {
   const { projectId } = await params;
   const body = (await request.json().catch(() => ({}))) as GenerateBody;
-  const chapterOrders = normalizeOrders(body.chapterOrders);
+  const requestedChapterOrders = normalizeFirstThreeRewriteOrders(body.chapterOrders, null);
 
-  if (chapterOrders.length === 0) {
+  if (requestedChapterOrders.length === 0) {
     return NextResponse.json({ error: "chapterOrders must include 1, 2, or 3" }, { status: 400 });
   }
 
@@ -88,6 +83,7 @@ export async function POST(request: Request, { params }: Params) {
 
   const platform = getPlatformProfile((body.platformId ?? project.targetPlatform) as PlatformId);
   const startTactic = findProjectStartTacticSummary(project.worldEntries);
+  const chapterOrders = normalizeFirstThreeRewriteOrders(requestedChapterOrders, startTactic);
   const storyTreeExperience = buildStoryTreeExperienceGuide(
     project.gateDispatchTasks.map(gatePlatformDispatchTaskFromRecord),
   );

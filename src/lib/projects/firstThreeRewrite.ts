@@ -101,6 +101,27 @@ export interface FirstThreeRewriteEvaluation {
   storyTreeAudit: StoryTreeQualityAudit;
 }
 
+export function normalizeFirstThreeRewriteOrders(
+  rawOrders: number[] | undefined,
+  startTactic?: Pick<ProjectStartTacticSummary, "label" | "primaryTactic" | "openingMove" | "verificationMove" | "risk"> | null,
+) {
+  const orders = rawOrders?.length ? rawOrders : [1, 2, 3];
+  const normalized = [...new Set(orders.filter((order) => [1, 2, 3].includes(order)))].sort((left, right) => left - right);
+  const tacticText = [
+    startTactic?.label,
+    startTactic?.primaryTactic,
+    startTactic?.openingMove,
+    startTactic?.verificationMove,
+    startTactic?.risk,
+  ].filter(Boolean).join("\n");
+
+  if (normalized.length > 0 && /恢复放量|恢复打法|小样本|不直接批量生成前三章/u.test(tacticText)) {
+    return [1];
+  }
+
+  return normalized;
+}
+
 const fallbackChapters: RetentionChapter[] = [
   {
     id: "missing-1",

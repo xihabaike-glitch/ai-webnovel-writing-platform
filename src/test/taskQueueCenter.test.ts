@@ -643,6 +643,7 @@ test("buildTaskQueueCenter", async (t) => {
     assert.equal(missingEvidence?.href, "/projects/project-1/chapters/chapter-review#chapter-workflow");
     assert.ok(missingEvidence?.evidence.includes("任务已标记完成，但缺少验收证据"));
     assert.equal(queue.recommendedNext?.id, missingEvidence?.id);
+    assert.equal(recommendedQueueActionLabel(queue.recommendedNext), "下一步：采纳闭环 · 补验收证据");
   });
 
   await t.test("blocks risky first drafts behind recovery validation", () => {

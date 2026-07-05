@@ -164,6 +164,7 @@ function blockerPriority(blockerType: QueueItem["blockerType"]) {
 
 export function recommendedQueueActionLabel(entry: QueueItem | null) {
   if (!entry) return null;
+  if (entry.sourceType === "first_three_adoption") return `下一步：采纳闭环 · ${entry.actionLabel}`;
   return `下一步：${entry.actionLabel}`;
 }
 

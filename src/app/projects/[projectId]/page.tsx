@@ -14,6 +14,7 @@ import { FirstThreeRewritePanel } from "@/components/projects/FirstThreeRewriteP
 import { ModelTaskAuditPanel } from "@/components/projects/ModelTaskAuditPanel";
 import { PlatformDecisionTimelinePanel } from "@/components/projects/PlatformDecisionTimelinePanel";
 import { PlatformExportCenterPanel } from "@/components/projects/PlatformExportCenterPanel";
+import { PlatformKnowledgeBriefPanel } from "@/components/projects/PlatformKnowledgeBriefPanel";
 import { PlatformTacticExperiencePanel } from "@/components/projects/PlatformTacticExperiencePanel";
 import { ProjectControlDashboardPanel } from "@/components/projects/ProjectControlDashboardPanel";
 import { RetentionDiagnosticPanel } from "@/components/projects/RetentionDiagnosticPanel";
@@ -29,6 +30,7 @@ import { prisma } from "@/lib/db/prisma";
 import { getPlatformProfile, type PlatformId } from "@/lib/platforms/platformProfiles";
 import { buildGatePlatformDecisionTimeline, buildGatePlatformTacticExperienceLibrary, gateActionReceiptFromAuditRecord } from "@/lib/projects/gateActionReceipts";
 import { gatePlatformDispatchTaskFromRecord } from "@/lib/projects/gateDispatchTaskRecords";
+import { buildPlatformKnowledgeBrief } from "@/lib/projects/platformKnowledgeBrief";
 import { buildProjectDashboard } from "@/lib/projects/projectDashboard";
 import { buildSubmissionChecklist } from "@/lib/projects/submissionChecklist";
 import { buildSubmissionPackage } from "@/lib/projects/submissionPackage";
@@ -214,7 +216,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ projec
     })),
     submissionChecklist,
   });
-  const [projectDecisionAudits, projectDecisionTaskRecords] = await Promise.all([
+  const [projectDecisionAudits, projectDecisionTaskRecords, platformKnowledgeFeedbackReceipts] = await Promise.all([
     prisma.gateActionAudit.findMany({
       where: { projectId: project.id },
       orderBy: { createdAt: "desc" },
@@ -225,6 +227,11 @@ export default async function ProjectPage({ params }: { params: Promise<{ projec
       orderBy: { updatedAt: "desc" },
       take: 100,
     }),
+    prisma.platformKnowledgeFeedbackReceipt.findMany({
+      where: { projectId: project.id },
+      orderBy: { createdAt: "desc" },
+      take: 12,
+    }),
   ]);
   const platformDecisionTimeline = buildGatePlatformDecisionTimeline({
     receipts: projectDecisionAudits.map(gateActionReceiptFromAuditRecord),
@@ -232,6 +239,24 @@ export default async function ProjectPage({ params }: { params: Promise<{ projec
     limit: 8,
   });
   const platformTacticExperienceLibrary = buildGatePlatformTacticExperienceLibrary(platformDecisionTimeline, 8);
+  const platformKnowledgeBrief = buildPlatformKnowledgeBrief({
+    feedbackReceipts: platformKnowledgeFeedbackReceipts.map((receipt) => ({
+      id: receipt.receiptId,
+      platformId: receipt.platformId,
+      platformName: receipt.platformName,
+      actionLabel: receipt.actionLabel,
+      title: receipt.title,
+      message: receipt.message,
+      completedStepLabel: receipt.completedStepLabel,
+      stopReason: receipt.stopReason,
+      nextAction: receipt.nextAction,
+      href: receipt.href,
+      severity: receipt.severity === "success" ? "success" : "needs_action",
+      createdAt: receipt.createdAt,
+    })),
+    tacticLibrary: platformTacticExperienceLibrary,
+    targetPlatformId: platform.id,
+  });
   const submissionPackage = buildSubmissionPackage({
     title: project.title,
     genre: project.genre,
@@ -359,6 +384,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ projec
           </p>
         </div>
         <WritingWorkbenchPanel workbench={writingWorkbench} />
+        <PlatformKnowledgeBriefPanel brief={platformKnowledgeBrief} projectId={project.id} />
         <div id="project-control">
           <ProjectControlDashboardPanel projectId={project.id} />
         </div>

@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import {
   addGateActionReceipt,
   buildGateFirstThreeAdoptionReceipt,
+  updatePersistedGateDispatchTaskState,
   type GateFirstThreeAdoptionReceiptResult,
 } from "@/lib/projects/gateActionReceipts";
 import type {
@@ -17,6 +18,12 @@ import type {
 type LocalFollowupResult = {
   status: "succeeded" | "failed";
   message: string;
+};
+
+type FollowupExecutionResult = {
+  message: string;
+  taskId?: string;
+  score?: number;
 };
 
 type BatchFollowupReview = {
@@ -121,6 +128,15 @@ function runnablePublishItems(items: PrePublishGateAdoptionFollowupItem[]) {
   });
 }
 
+function completionEvidenceForFollowup(item: PrePublishGateAdoptionFollowupItem, result: FollowupExecutionResult) {
+  if (item.execution?.type === "chapter_review") {
+    const taskText = result.taskId ? `，任务 ${result.taskId}` : "";
+    const scoreText = typeof result.score === "number" ? `，审稿分 ${Math.round(result.score)}` : "";
+    return `采纳后重新审稿已完成：${item.title}${taskText}${scoreText}。`;
+  }
+  return `采纳后发布质检已刷新：${item.title}${result.message ? `，${result.message}` : ""}。`;
+}
+
 export function GateFirstThreeAdoptionPanel({ closure }: { closure: PrePublishGateAdoptionClosure }) {
   const router = useRouter();
   const [runningId, setRunningId] = useState<string | null>(null);
@@ -167,9 +183,24 @@ export function GateFirstThreeAdoptionPanel({ closure }: { closure: PrePublishGa
           : { action: "snapshot", platformId: item.execution.platformId }),
       },
     );
-    const payload = (await response.json().catch(() => ({}))) as { message?: string; error?: string };
+    const payload = (await response.json().catch(() => ({}))) as {
+      message?: string;
+      error?: string;
+      task?: { id?: string };
+      result?: { score?: number };
+    };
     if (!response.ok) throw new Error(payload.error ?? "处理采纳后续失败。");
-    return payload.message ?? `${item.title} 已处理。`;
+    return {
+      message: payload.message ?? `${item.title} 已处理。`,
+      taskId: payload.task?.id,
+      score: payload.result?.score,
+    };
+  }
+
+  async function closeFollowupDispatch(item: PrePublishGateAdoptionFollowupItem, result: FollowupExecutionResult) {
+    await updatePersistedGateDispatchTaskState(item.id, "completed", {
+      completionEvidence: completionEvidenceForFollowup(item, result),
+    });
   }
 
   async function runFollowup(item: PrePublishGateAdoptionFollowupItem) {
@@ -178,11 +209,12 @@ export function GateFirstThreeAdoptionPanel({ closure }: { closure: PrePublishGa
     setBatchReview(null);
     try {
       const result = await executeFollowupRequest(item);
+      await closeFollowupDispatch(item, result);
       setFollowupResults((current) => ({
         ...current,
         [item.id]: {
           status: "succeeded",
-          message: `${result} 等待总闸门复检。`,
+          message: `${result.message} 已写回派单证据，等待总闸门复检。`,
         },
       }));
       addGateActionReceipt(buildGateFirstThreeAdoptionReceipt({
@@ -195,10 +227,10 @@ export function GateFirstThreeAdoptionPanel({ closure }: { closure: PrePublishGa
           label: item.label,
           title: item.title,
           status: "succeeded",
-          message: result,
+          message: result.message,
         }],
       }));
-      setMessage(`${result} 正在刷新总闸门。`);
+      setMessage(`${result.message} 已写回派单证据，正在刷新总闸门。`);
       router.refresh();
     } catch (caught) {
       const errorMessage = caught instanceof Error ? caught.message : "处理采纳后续失败。";
@@ -238,6 +270,7 @@ export function GateFirstThreeAdoptionPanel({ closure }: { closure: PrePublishGa
     for (const item of batchItems) {
       try {
         const result = await executeFollowupRequest(item);
+        await closeFollowupDispatch(item, result);
         results.push({
           id: item.id,
           projectId: item.projectId,
@@ -245,7 +278,7 @@ export function GateFirstThreeAdoptionPanel({ closure }: { closure: PrePublishGa
           label: item.label,
           title: item.title,
           status: "succeeded",
-          message: result,
+          message: result.message,
         });
       } catch (caught) {
         results.push({

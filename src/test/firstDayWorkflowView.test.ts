@@ -305,17 +305,47 @@ test("buildFirstDayHandoffGateCta makes handoff gate state actionable", () => {
       href: "/projects/project-1?firstDayLaunch=1&nextStep=first-review#first-day-workflow",
     },
   });
+  const executableClosed = buildFirstDayHandoffGateCta({
+    projectId: "project-1",
+    progress: {
+      visible: true,
+      label: "闭环交接",
+      headline: "闭环打法执行进度",
+      detail: "三段交接都已经完成。",
+      completedCount: 3,
+      totalCount: 3,
+      progressPercent: 100,
+      nextAction: "三段交接已闭环，可以继续看首日工作流和平台数据回收。",
+      evidence: ["平台包装：标题、简介、标签已完成"],
+      items: [
+        { id: "opening", label: "开头打法", ownerRole: "开头编辑", status: "done", action: "开头", target: "首屏", evidence: "已完成", href: "/projects/project-1#first-day-workflow" },
+        { id: "verification", label: "验收口径", ownerRole: "审稿编辑", status: "done", action: "验收", target: "前三章", evidence: "已完成", href: "/projects/project-1#first-day-workflow" },
+        { id: "platform-package", label: "平台包装", ownerRole: "平台运营", status: "done", action: "平台包", target: "回收", evidence: "已完成", href: "/projects/project-1#platform-export" },
+      ],
+    },
+    nextStep: {
+      label: "首轮审稿",
+      actionLabel: "继续审稿",
+      href: "/projects/project-1?firstDayLaunch=1&nextStep=first-review#first-day-workflow",
+    },
+    canExecuteCurrentStep: true,
+  });
 
   assert.equal(pending?.status, "pending");
   assert.equal(pending?.headline, "交接闸门未闭环");
+  assert.equal(pending?.primaryAction, "link");
   assert.equal(pending?.primaryLabel, "去任务中心补交接");
   assert.equal(pending?.primaryHref, "/dispatch?firstDayProject=project-1#first-day-dispatch");
   assert.ok(pending?.badges.includes("等待：验收口径"));
   assert.equal(closed?.status, "closed");
   assert.equal(closed?.headline, "交接闸门已闭环");
+  assert.equal(closed?.primaryAction, "link");
   assert.equal(closed?.primaryLabel, "继续审稿");
   assert.equal(closed?.primaryHref, "/projects/project-1?firstDayLaunch=1&nextStep=first-review#first-day-workflow");
   assert.ok(closed?.badges.includes("可继续生产"));
+  assert.equal(executableClosed?.status, "closed");
+  assert.equal(executableClosed?.primaryAction, "execute_current_step");
+  assert.equal(executableClosed?.primaryLabel, "继续审稿");
 });
 
 test("resolveFirstDayDispatchFocus locates gate handoff targets", () => {

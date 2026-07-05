@@ -561,6 +561,7 @@ export function FirstDayWorkflowPanel({ projectId }: { projectId: string }) {
     projectId,
     progress: workflow.handoffProgress,
     nextStep: workflow.nextStep,
+    canExecuteCurrentStep: Boolean(executionPlan?.executable && !routeBlockMessage),
   }) : null;
   const handoffGateTone = handoffGateCta?.status === "closed"
     ? "border-emerald-200 bg-emerald-50 text-emerald-950"
@@ -623,9 +624,20 @@ export function FirstDayWorkflowPanel({ projectId }: { projectId: string }) {
               </div>
             </div>
             <div className="flex shrink-0 flex-wrap gap-2">
-              <Link className="w-fit rounded-md bg-slate-950 px-3 py-2 text-sm font-medium text-white" href={handoffGateCta.primaryHref}>
-                {handoffGateCta.primaryLabel}
-              </Link>
+              {handoffGateCta.primaryAction === "execute_current_step" ? (
+                <button
+                  className="w-fit rounded-md bg-slate-950 px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
+                  disabled={isExecutingAi}
+                  onClick={executeCurrentStepWithAi}
+                  type="button"
+                >
+                  {isExecutingAi ? "AI 执行中" : handoffGateCta.primaryLabel}
+                </button>
+              ) : (
+                <Link className="w-fit rounded-md bg-slate-950 px-3 py-2 text-sm font-medium text-white" href={handoffGateCta.primaryHref}>
+                  {handoffGateCta.primaryLabel}
+                </Link>
+              )}
               <Link className="w-fit rounded-md bg-white/80 px-3 py-2 text-sm font-medium text-slate-900 hover:bg-white" href={handoffGateCta.secondaryHref}>
                 {handoffGateCta.secondaryLabel}
               </Link>

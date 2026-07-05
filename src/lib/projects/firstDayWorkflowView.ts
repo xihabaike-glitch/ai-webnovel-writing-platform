@@ -120,6 +120,7 @@ export interface FirstDayHandoffGateCta {
   status: "pending" | "closed";
   headline: string;
   detail: string;
+  primaryAction: "link" | "execute_current_step";
   primaryLabel: string;
   primaryHref: string;
   secondaryLabel: string;
@@ -154,6 +155,7 @@ export function buildFirstDayHandoffGateCta(input: {
   projectId: string;
   progress: FirstDayHandoffGateCtaProgress | null;
   nextStep: Pick<FirstDayWorkflowStep, "label" | "actionLabel" | "href">;
+  canExecuteCurrentStep?: boolean;
 }): FirstDayHandoffGateCta | null {
   if (!input.progress?.visible || input.progress.totalCount <= 0) return null;
   const dispatchHref = `/dispatch?firstDayProject=${input.projectId}#first-day-dispatch`;
@@ -167,6 +169,7 @@ export function buildFirstDayHandoffGateCta(input: {
       status: "closed",
       headline: "交接闸门已闭环",
       detail: `开头、验收、平台包装三段交接已完成，当前可以继续：${input.nextStep.label}。`,
+      primaryAction: input.canExecuteCurrentStep ? "execute_current_step" : "link",
       primaryLabel: input.nextStep.actionLabel || "继续当前节点",
       primaryHref: input.nextStep.href,
       secondaryLabel: "查看派单中心",
@@ -180,6 +183,7 @@ export function buildFirstDayHandoffGateCta(input: {
     status: "pending",
     headline: "交接闸门未闭环",
     detail: input.progress.nextAction,
+    primaryAction: "link",
     primaryLabel: "去任务中心补交接",
     primaryHref: dispatchHref,
     secondaryLabel: "查看交接进度",

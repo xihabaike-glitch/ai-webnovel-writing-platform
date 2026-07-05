@@ -181,6 +181,8 @@ export interface FirstDayPostDispatchCompletionPrompt {
   actionHref?: string;
   secondaryActionLabel?: string;
   secondaryActionHref?: string;
+  focusDispatchKey?: string;
+  focusMessage?: string;
 }
 
 export function buildFirstDayReturnToAcceptanceHref(input: {
@@ -1034,9 +1036,11 @@ export function buildFirstDayDispatchUpdateSummary(input: {
 export function buildFirstDayPostDispatchCompletionPrompt(input: {
   completedTitle: string;
   updateSummary: Pick<FirstDayDispatchUpdateSummary, "visible" | "status" | "title" | "detail"> | null;
-  nextStep: Pick<FirstDayWorkflowStep, "label" | "owner" | "actionLabel" | "href"> & { dispatchHref?: string } | null;
+  nextStep: Pick<FirstDayWorkflowStep, "label" | "owner" | "actionLabel" | "href"> & { dispatchHref?: string; dispatchKey?: string } | null;
   executionPlan: { executable: boolean; blockedReason?: string } | null;
 }): FirstDayPostDispatchCompletionPrompt {
+  const focusDispatchKey = cleanEvidence(input.nextStep?.dispatchKey ?? "");
+  const focusMessage = focusDispatchKey ? "下一张首日派单卡已就绪，可以继续推进。" : undefined;
   if (input.nextStep?.owner === "AI" && input.executionPlan?.executable) {
     return {
       message: `已完成当前派单：${input.completedTitle}。下一步「${input.nextStep.label}」已准备好，可以继续让 AI 执行。`,
@@ -1044,6 +1048,8 @@ export function buildFirstDayPostDispatchCompletionPrompt(input: {
       actionLabel: "继续 AI 执行",
       secondaryActionLabel: input.nextStep.dispatchHref ? "看下一张派单卡" : undefined,
       secondaryActionHref: input.nextStep.dispatchHref,
+      focusDispatchKey,
+      focusMessage,
     };
   }
 
@@ -1055,6 +1061,8 @@ export function buildFirstDayPostDispatchCompletionPrompt(input: {
       actionHref: input.nextStep.href,
       secondaryActionLabel: input.nextStep.dispatchHref ? "回派单中心看下一张卡" : undefined,
       secondaryActionHref: input.nextStep.dispatchHref,
+      focusDispatchKey,
+      focusMessage,
     };
   }
 

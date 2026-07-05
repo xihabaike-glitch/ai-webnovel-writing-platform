@@ -856,6 +856,7 @@ test("buildFirstDayPostDispatchCompletionPrompt offers direct AI continuation wh
       actionLabel: "AI 执行当前节点",
       href: "#first-day-workflow",
       dispatchHref: "/dispatch?firstDayProject=project-1&step=first-review#first-day-dispatch",
+      dispatchKey: "first-day:project-1:first-review",
     },
     executionPlan: {
       executable: true,
@@ -878,6 +879,7 @@ test("buildFirstDayPostDispatchCompletionPrompt offers direct AI continuation wh
       actionLabel: "检查平台包",
       href: "/projects/project-1#platform-export",
       dispatchHref: "/dispatch?firstDayProject=project-1&step=publish-precheck#first-day-dispatch",
+      dispatchKey: "first-day:project-1:publish-precheck",
     },
     executionPlan: {
       executable: false,
@@ -912,12 +914,16 @@ test("buildFirstDayPostDispatchCompletionPrompt offers direct AI continuation wh
   assert.equal(ready.actionLabel, "继续 AI 执行");
   assert.equal(ready.secondaryActionLabel, "看下一张派单卡");
   assert.equal(ready.secondaryActionHref, "/dispatch?firstDayProject=project-1&step=first-review#first-day-dispatch");
+  assert.equal(ready.focusDispatchKey, "first-day:project-1:first-review");
+  assert.equal(ready.focusMessage, "下一张首日派单卡已就绪，可以继续推进。");
   assert.equal(manualStep.message, "首日节点已推进：「第一章二改」已验收，下一张首日卡是「平台包预检」。");
   assert.equal(manualStep.action, "open_next_step");
   assert.equal(manualStep.actionLabel, "检查平台包");
   assert.equal(manualStep.actionHref, "/projects/project-1#platform-export");
   assert.equal(manualStep.secondaryActionLabel, "回派单中心看下一张卡");
   assert.equal(manualStep.secondaryActionHref, "/dispatch?firstDayProject=project-1&step=publish-precheck#first-day-dispatch");
+  assert.equal(manualStep.focusDispatchKey, "first-day:project-1:publish-precheck");
+  assert.equal(manualStep.focusMessage, "下一张首日派单卡已就绪，可以继续推进。");
   assert.equal(completed.message, "首日工作流已收口：可以进入后续生产。");
   assert.equal(completed.action, undefined);
 });

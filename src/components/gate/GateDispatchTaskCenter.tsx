@@ -379,6 +379,7 @@ export function GateDispatchTaskCenter({
                     dispatchKey: firstDayFollowUp.dispatchKey,
                   })
                   : undefined,
+                dispatchKey: firstDayFollowUp.dispatchKey,
               }
               : null,
             executionPlan: {
@@ -387,6 +388,19 @@ export function GateDispatchTaskCenter({
             },
           });
           setRouteActionMessage(firstDayPrompt.message);
+          if (firstDayPrompt.focusDispatchKey) {
+            setFocusedCompletionDispatchKey(firstDayPrompt.focusDispatchKey);
+            setFocusedCompletionMessage(firstDayPrompt.focusMessage ?? "");
+            requestAnimationFrame(() => {
+              document.getElementById(`dispatch-${firstDayPrompt.focusDispatchKey}`)?.scrollIntoView({
+                behavior: "smooth",
+                block: "center",
+              });
+            });
+          } else {
+            setFocusedCompletionDispatchKey("");
+            setFocusedCompletionMessage("");
+          }
           setRouteActionLink({
             label: firstDayPrompt.actionLabel ?? firstDayUpdate.actionLabel,
             href: firstDayPrompt.actionHref ?? firstDayUpdate.href,

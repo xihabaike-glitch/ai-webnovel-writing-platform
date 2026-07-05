@@ -54,6 +54,23 @@ interface AiPipelineBatchSummary {
   warnings: string[];
 }
 
+interface AiPipelineRecentBatchSummary {
+  hasRecent: boolean;
+  status: "continue" | "repair" | "review_quality" | "watch_cost" | "empty";
+  label: string;
+  headline: string;
+  detail: string;
+  actionLabel: string;
+  targetHref: string;
+  successRatePercent: number | null;
+  averageQualityScore: number | null;
+  knownCostUsd: number | null;
+  succeededCount: number;
+  failedCount: number;
+  warnings: string[];
+  createdAt: string | null;
+}
+
 interface ControlPriorityAction {
   id: string;
   areaId: string;
@@ -92,6 +109,7 @@ interface ProjectControlDashboard {
   startDecision: ProjectStartDecision;
   storyFoundation: StoryFoundationSummary;
   aiPipelineBatch: AiPipelineBatchSummary;
+  aiPipelineRecentBatch: AiPipelineRecentBatchSummary;
   areas: ControlArea[];
   priorityActions: ControlPriorityAction[];
   criticalActions: string[];
@@ -253,6 +271,14 @@ function aiBatchCategoryClass(category: AiPipelineBatchSummary["category"]) {
   if (category === "review") return "bg-blue-50 text-blue-700";
   if (category === "second_pass") return "bg-amber-50 text-amber-700";
   if (category === "draft") return "bg-emerald-50 text-emerald-700";
+  return "bg-slate-100 text-slate-700";
+}
+
+function aiRecentBatchClass(status: AiPipelineRecentBatchSummary["status"]) {
+  if (status === "continue") return "bg-emerald-50 text-emerald-700";
+  if (status === "repair") return "bg-rose-50 text-rose-700";
+  if (status === "review_quality") return "bg-amber-50 text-amber-700";
+  if (status === "watch_cost") return "bg-blue-50 text-blue-700";
   return "bg-slate-100 text-slate-700";
 }
 
@@ -831,6 +857,63 @@ export function ProjectControlDashboardPanel({ projectId }: { projectId: string 
             {dashboard.aiPipelineBatch.warnings.length ? (
               <div className="mt-2 grid gap-1 text-xs leading-5 text-amber-700">
                 {dashboard.aiPipelineBatch.warnings.map((warning) => (
+                  <p key={warning}>{warning}</p>
+                ))}
+              </div>
+            ) : null}
+          </div>
+
+          <div className="rounded-md border border-slate-200 p-3">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+              <div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="font-medium text-slate-950">最近 AI 批次回流</div>
+                  <span className={`rounded-md px-2 py-1 text-[11px] font-medium ${aiRecentBatchClass(dashboard.aiPipelineRecentBatch.status)}`}>
+                    {dashboard.aiPipelineRecentBatch.label}
+                  </span>
+                  {dashboard.aiPipelineRecentBatch.createdAt ? (
+                    <span className="text-xs text-slate-500">{shortTime(dashboard.aiPipelineRecentBatch.createdAt)}</span>
+                  ) : null}
+                </div>
+                <p className="mt-1 text-sm leading-6 text-slate-600">{dashboard.aiPipelineRecentBatch.headline}</p>
+                <div className="mt-2 rounded-md bg-slate-50 px-2 py-1 text-xs leading-5 text-slate-600">
+                  {dashboard.aiPipelineRecentBatch.detail}
+                </div>
+              </div>
+              <Link
+                className="inline-flex w-fit items-center justify-center rounded-md border border-slate-200 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                href={dashboard.aiPipelineRecentBatch.targetHref}
+              >
+                {dashboard.aiPipelineRecentBatch.actionLabel}
+              </Link>
+            </div>
+            <div className="mt-3 grid gap-2 sm:grid-cols-4">
+              <div className="rounded-md bg-slate-50 p-3">
+                <div className="text-xs text-slate-500">成功 / 失败</div>
+                <div className="mt-1 text-lg font-semibold text-slate-950">
+                  {dashboard.aiPipelineRecentBatch.succeededCount}/{dashboard.aiPipelineRecentBatch.failedCount}
+                </div>
+              </div>
+              <div className="rounded-md bg-slate-50 p-3">
+                <div className="text-xs text-slate-500">成功率</div>
+                <div className="mt-1 text-lg font-semibold text-slate-950">
+                  {dashboard.aiPipelineRecentBatch.successRatePercent ?? "-"}{dashboard.aiPipelineRecentBatch.successRatePercent !== null ? "%" : ""}
+                </div>
+              </div>
+              <div className="rounded-md bg-slate-50 p-3">
+                <div className="text-xs text-slate-500">质量</div>
+                <div className="mt-1 text-lg font-semibold text-slate-950">{dashboard.aiPipelineRecentBatch.averageQualityScore ?? "-"}</div>
+              </div>
+              <div className="rounded-md bg-slate-50 p-3">
+                <div className="text-xs text-slate-500">成本</div>
+                <div className="mt-1 text-lg font-semibold text-slate-950">
+                  {dashboard.aiPipelineRecentBatch.knownCostUsd !== null ? `$${dashboard.aiPipelineRecentBatch.knownCostUsd.toFixed(4)}` : "-"}
+                </div>
+              </div>
+            </div>
+            {dashboard.aiPipelineRecentBatch.warnings.length ? (
+              <div className="mt-2 grid gap-1 text-xs leading-5 text-amber-700">
+                {dashboard.aiPipelineRecentBatch.warnings.map((warning) => (
                   <p key={warning}>{warning}</p>
                 ))}
               </div>

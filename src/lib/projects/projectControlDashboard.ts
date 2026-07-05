@@ -109,6 +109,20 @@ export interface ControlAiTask {
   createdAt: Date | string;
 }
 
+export interface ControlBatchAudit {
+  receiptId: string;
+  label: string;
+  detail: string;
+  href: string;
+  status: string;
+  message: string;
+  executionType: string;
+  succeededCount: number;
+  failedCount: number;
+  payload: string;
+  createdAt: Date | string;
+}
+
 export interface ProjectControlDashboardInput {
   project: ControlProject;
   platform: PlatformProfile;
@@ -124,6 +138,7 @@ export interface ProjectControlDashboardInput {
   submissionAssetVersions?: PlatformSubmissionAssetVersionInput[];
   platformPublishMetrics?: PlatformPublishMetricInput[];
   platformKnowledgeFeedbackReceipts?: ControlPlatformFeedbackReceipt[];
+  gateActionAudits?: ControlBatchAudit[];
   submissionChecklist: SubmissionChecklist;
 }
 
@@ -219,6 +234,7 @@ export interface ProjectControlDashboard {
   startDecision: ProjectStartDecision;
   storyFoundation: StoryFoundationSummary;
   aiPipelineBatch: AiPipelineBatchSummary;
+  aiPipelineRecentBatch: AiPipelineRecentBatchSummary;
   areas: ControlArea[];
   priorityActions: ControlPriorityAction[];
   criticalActions: string[];
@@ -298,6 +314,23 @@ export interface AiPipelineBatchSummary {
   chapterTitles: string[];
   targetHref: string;
   warnings: string[];
+}
+
+export interface AiPipelineRecentBatchSummary {
+  hasRecent: boolean;
+  status: "continue" | "repair" | "review_quality" | "watch_cost" | "empty";
+  label: string;
+  headline: string;
+  detail: string;
+  actionLabel: string;
+  targetHref: string;
+  successRatePercent: number | null;
+  averageQualityScore: number | null;
+  knownCostUsd: number | null;
+  succeededCount: number;
+  failedCount: number;
+  warnings: string[];
+  createdAt: string | null;
 }
 
 function platformVerdictAction(
@@ -629,6 +662,77 @@ function buildAiPipelineBatchSummary(
     chapterTitles: [],
     targetHref: "/tasks#recommended-batch",
     warnings: [...batchDraft.warnings, ...reviewPipeline.warnings].slice(0, 2),
+  };
+}
+
+function numberValue(value: unknown) {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function batchReceiptStatus(value: unknown): AiPipelineRecentBatchSummary["status"] {
+  if (value === "continue" || value === "repair" || value === "review_quality" || value === "watch_cost") return value;
+  return "empty";
+}
+
+function recentBatchLabel(status: AiPipelineRecentBatchSummary["status"]) {
+  if (status === "continue") return "可继续";
+  if (status === "repair") return "先修复";
+  if (status === "review_quality") return "看质量";
+  if (status === "watch_cost") return "看成本";
+  return "暂无回流";
+}
+
+function buildAiPipelineRecentBatchSummary(audits: ControlBatchAudit[] = []): AiPipelineRecentBatchSummary {
+  const latest = audits
+    .filter((audit) => audit.executionType === "recommended_batch")
+    .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime())[0];
+
+  if (!latest) {
+    return {
+      hasRecent: false,
+      status: "empty",
+      label: "暂无回流",
+      headline: "还没有推荐批次执行结果。",
+      detail: "先执行一次推荐批次，项目总控才有成功率、质量和成本证据。",
+      actionLabel: "去任务中心",
+      targetHref: "/tasks#recommended-batch",
+      successRatePercent: null,
+      averageQualityScore: null,
+      knownCostUsd: null,
+      succeededCount: 0,
+      failedCount: 0,
+      warnings: [],
+      createdAt: null,
+    };
+  }
+
+  const payload = parseJsonObject(latest.payload);
+  const route = isRecord(payload?.routeEffectSummary) ? payload.routeEffectSummary : null;
+  const batchReceipt = isRecord(payload?.batchReceipt) ? payload.batchReceipt : null;
+  const status = batchReceiptStatus(batchReceipt?.status);
+  const warnings = stringArray(batchReceipt?.warnings);
+  const headline = typeof batchReceipt?.headline === "string" && batchReceipt.headline
+    ? batchReceipt.headline
+    : latest.label;
+  const detail = typeof batchReceipt?.detail === "string" && batchReceipt.detail
+    ? batchReceipt.detail
+    : latest.message;
+
+  return {
+    hasRecent: true,
+    status,
+    label: recentBatchLabel(status),
+    headline,
+    detail,
+    actionLabel: status === "repair" ? "查看失败修复" : status === "watch_cost" ? "看模型审计" : "看推荐批次",
+    targetHref: latest.href || "/tasks#recommended-batch",
+    successRatePercent: numberValue(route?.successRatePercent),
+    averageQualityScore: numberValue(route?.averageQualityScore),
+    knownCostUsd: numberValue(route?.knownCostUsd),
+    succeededCount: latest.succeededCount,
+    failedCount: latest.failedCount,
+    warnings: warnings.slice(0, 2),
+    createdAt: new Date(latest.createdAt).toISOString(),
   };
 }
 
@@ -966,6 +1070,7 @@ export function buildProjectControlDashboard(input: ProjectControlDashboardInput
     ) * 100
     : 0;
   const aiPipelineBatch = buildAiPipelineBatchSummary(batchDraft, reviewPipeline);
+  const aiPipelineRecentBatch = buildAiPipelineRecentBatchSummary(input.gateActionAudits);
 
   const areas = [
     area("outline", "大纲骨架", outline, `${input.outlineNodes.length} 个大纲节点。`, "补齐开头、结尾、主干、分支、叶片和土壤。", "补大纲骨架", "outline-tree", true, "生成骨架"),
@@ -1023,6 +1128,7 @@ export function buildProjectControlDashboard(input: ProjectControlDashboardInput
     startDecision: buildProjectStartDecision(startTactic),
     storyFoundation,
     aiPipelineBatch,
+    aiPipelineRecentBatch,
     areas,
     priorityActions,
     criticalActions,

@@ -92,6 +92,8 @@ test("buildProjectControlDashboard", async (t) => {
     assert.equal(dashboard.aiPipelineBatch.canRun, true);
     assert.equal(dashboard.aiPipelineBatch.targetHref, "/tasks#recommended-batch");
     assert.ok(dashboard.aiPipelineBatch.actionLabel.includes("批量二改"));
+    assert.equal(dashboard.aiPipelineRecentBatch.hasRecent, false);
+    assert.equal(dashboard.aiPipelineRecentBatch.status, "empty");
     assert.equal(dashboard.storyFoundation.status, "blocked");
     assert.equal(dashboard.storyFoundation.label, "先搭底座");
     assert.equal(dashboard.storyFoundation.axes.length, 5);
@@ -417,6 +419,71 @@ test("buildProjectControlDashboard", async (t) => {
     assert.equal(dashboard.aiPipelineBatch.chapterIds[0], "chapter-ready-draft");
     assert.ok(dashboard.aiPipelineBatch.headline.includes("小批生成正文"));
     assert.ok(dashboard.areas.find((area) => area.id === "ai-pipeline")?.nextAction.includes("章节卡已过线"));
+  });
+
+  await t.test("surfaces the latest recommended batch evidence on the project dashboard", () => {
+    const dashboard = buildProjectControlDashboard({
+      project,
+      platform: getPlatformProfile("fanqie"),
+      chapters: [chapter],
+      outlineNodes: [],
+      characters: [],
+      worldEntries: [],
+      foreshadows: [],
+      plotThreads: [],
+      aiTasks: [],
+      gateActionAudits: [
+        {
+          receiptId: "batch-old",
+          label: "旧批次",
+          detail: "旧批次",
+          href: "/tasks",
+          status: "succeeded",
+          message: "旧批次完成。",
+          executionType: "recommended_batch",
+          succeededCount: 1,
+          failedCount: 0,
+          payload: JSON.stringify({
+            routeEffectSummary: { successRatePercent: 100, knownCostUsd: 0.01, averageQualityScore: 88, verdict: "旧证据。" },
+            batchReceipt: { status: "continue", headline: "旧批次可继续", detail: "旧详情。", warnings: [] },
+          }),
+          createdAt: "2026-01-01T00:00:00.000Z",
+        },
+        {
+          receiptId: "batch-new",
+          label: "推荐批次",
+          detail: "推荐批次",
+          href: "/projects/demo-project#ai-pipeline",
+          status: "succeeded",
+          message: "推荐批次完成。",
+          executionType: "recommended_batch",
+          succeededCount: 3,
+          failedCount: 1,
+          payload: JSON.stringify({
+            routeEffectSummary: { successRatePercent: 75, knownCostUsd: 0.0425, averageQualityScore: 78, verdict: "成功率偏低。" },
+            batchReceipt: {
+              status: "repair",
+              headline: "批次有失败，先修再放大",
+              detail: "第三章执行失败，先处理失败。",
+              warnings: ["成功率偏低。", "失败批次不要继续放大。"],
+            },
+          }),
+          createdAt: "2026-01-02T00:00:00.000Z",
+        },
+      ],
+      submissionChecklist: checklist,
+    });
+
+    assert.equal(dashboard.aiPipelineRecentBatch.hasRecent, true);
+    assert.equal(dashboard.aiPipelineRecentBatch.status, "repair");
+    assert.equal(dashboard.aiPipelineRecentBatch.label, "先修复");
+    assert.equal(dashboard.aiPipelineRecentBatch.successRatePercent, 75);
+    assert.equal(dashboard.aiPipelineRecentBatch.averageQualityScore, 78);
+    assert.equal(dashboard.aiPipelineRecentBatch.knownCostUsd, 0.0425);
+    assert.equal(dashboard.aiPipelineRecentBatch.succeededCount, 3);
+    assert.equal(dashboard.aiPipelineRecentBatch.failedCount, 1);
+    assert.equal(dashboard.aiPipelineRecentBatch.targetHref, "/projects/demo-project#ai-pipeline");
+    assert.ok(dashboard.aiPipelineRecentBatch.warnings.some((warning) => warning.includes("不要继续放大")));
   });
 
   await t.test("pauses project starts when the stored tactic is a historical avoidance signal", () => {

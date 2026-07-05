@@ -26,6 +26,11 @@ export async function GET(_request: Request, { params }: Params) {
       submissionAssetVersions: { orderBy: { createdAt: "desc" }, take: 80 },
       platformPublishMetrics: { orderBy: { snapshotDate: "desc" }, take: 80 },
       platformKnowledgeFeedbackReceipts: { orderBy: { createdAt: "desc" }, take: 10 },
+      gateActionAudits: {
+        where: { executionType: "recommended_batch" },
+        orderBy: { createdAt: "desc" },
+        take: 5,
+      },
     },
   });
 
@@ -129,6 +134,19 @@ export async function GET(_request: Request, { params }: Params) {
       href: receipt.href,
       severity: receipt.severity === "success" ? "success" : "needs_action",
       createdAt: receipt.createdAt,
+    })),
+    gateActionAudits: project.gateActionAudits.map((audit) => ({
+      receiptId: audit.receiptId,
+      label: audit.label,
+      detail: audit.detail,
+      href: audit.href,
+      status: audit.status,
+      message: audit.message,
+      executionType: audit.executionType,
+      succeededCount: audit.succeededCount,
+      failedCount: audit.failedCount,
+      payload: audit.payload,
+      createdAt: audit.createdAt,
     })),
     submissionChecklist,
   });

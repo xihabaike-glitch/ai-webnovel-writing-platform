@@ -417,7 +417,22 @@ export interface GateDispatchTaskCenter {
   nextActions: string[];
   closeoutItems: GateDispatchTaskCloseoutItem[];
   aiPipelineDispatches: PersistedGatePlatformDispatchTask[];
+  aiPipelineGroups: GateDispatchTaskCenterAiPipelineGroup[];
   recheckFollowUpChains: GateDispatchRecheckFollowUpChain[];
+}
+
+export type GateDispatchTaskCenterAiPipelineGroupId = "rollback_repair" | "sample_recheck" | "small_batch_resume";
+
+export interface GateDispatchTaskCenterAiPipelineGroup {
+  id: GateDispatchTaskCenterAiPipelineGroupId;
+  label: string;
+  headline: string;
+  detail: string;
+  total: number;
+  active: number;
+  topPriorityScore: number;
+  topTask: PersistedGatePlatformDispatchTask | null;
+  tasks: PersistedGatePlatformDispatchTask[];
 }
 
 export interface GateDispatchRecheckFollowUpChain {
@@ -3530,6 +3545,62 @@ function isAiPipelineDispatchTask(task: PersistedGatePlatformDispatchTask) {
   return task.platformId === "ai-pipeline" || task.dispatchKey.startsWith("ai-pipeline-recheck:");
 }
 
+function aiPipelineGroupId(task: PersistedGatePlatformDispatchTask): GateDispatchTaskCenterAiPipelineGroupId {
+  const text = `${task.dispatchKey} ${task.title} ${task.actionLabel} ${task.detail}`;
+  if (/:rollback\b/u.test(task.dispatchKey) || /回滚|跌线|修复/u.test(text)) return "rollback_repair";
+  if (task.stage === "ai_pipeline_small_batch" || /:scale\b/u.test(task.dispatchKey) || /恢复小批|回推荐批量/u.test(text)) return "small_batch_resume";
+  return "sample_recheck";
+}
+
+function aiPipelineGroupMeta(id: GateDispatchTaskCenterAiPipelineGroupId) {
+  if (id === "rollback_repair") {
+    return {
+      label: "回滚修复",
+      headline: "恢复小批跌线先修",
+      detail: "恢复小批没站住时，先修低分章节、开头钩子和章末追读，再回到 1 章复验。",
+    };
+  }
+  if (id === "small_batch_resume") {
+    return {
+      label: "恢复小批",
+      headline: "只准小步恢复",
+      detail: "小样本过线后只恢复小批队列，继续看成功率、质量、成本和失败证据。",
+    };
+  }
+  return {
+    label: "小样本复验",
+    headline: "观察期先跑样本",
+    detail: "观察或修复后先跑 1 章样本，证据不闭合前不恢复批量生产。",
+  };
+}
+
+function buildAiPipelineDispatchGroups(
+  aiPipelineDispatches: PersistedGatePlatformDispatchTask[],
+): GateDispatchTaskCenterAiPipelineGroup[] {
+  const order: GateDispatchTaskCenterAiPipelineGroupId[] = ["rollback_repair", "sample_recheck", "small_batch_resume"];
+  const grouped = new Map<GateDispatchTaskCenterAiPipelineGroupId, PersistedGatePlatformDispatchTask[]>();
+  for (const task of aiPipelineDispatches) {
+    const id = aiPipelineGroupId(task);
+    grouped.set(id, [...(grouped.get(id) ?? []), task]);
+  }
+
+  return order.flatMap((id) => {
+    const tasks = grouped.get(id) ?? [];
+    if (tasks.length === 0) return [];
+    const meta = aiPipelineGroupMeta(id);
+    const activeTasks = tasks.filter((task) => task.state !== "completed");
+    return [{
+      id,
+      ...meta,
+      total: tasks.length,
+      active: activeTasks.length,
+      topPriorityScore: tasks.reduce((score, task) => Math.max(score, task.priorityScore), 0),
+      topTask: tasks[0] ?? null,
+      tasks,
+    }];
+  });
+}
+
 function validDate(value: string | null | undefined) {
   if (!value) return null;
   const dateValue = new Date(value);
@@ -3937,6 +4008,7 @@ export function buildGateDispatchTaskCenter(
       return new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime();
     });
   const activeAiPipeline = aiPipelineDispatches.filter((task) => task.state !== "completed").length;
+  const aiPipelineGroups = buildAiPipelineDispatchGroups(aiPipelineDispatches);
   const recheckFollowUpChains = buildGateDispatchRecheckFollowUpChains(tasks);
   const repeatedRecheckFollowUpChains = recheckFollowUpChains.filter((chain) => chain.maxRound > 1).length;
   const highPriorityQueued = tasks.filter((task) => task.state === "queued" && task.priorityScore >= 70).length;
@@ -3998,6 +4070,7 @@ export function buildGateDispatchTaskCenter(
     ].filter((action): action is string => Boolean(action)),
     closeoutItems,
     aiPipelineDispatches,
+    aiPipelineGroups,
     recheckFollowUpChains,
   };
 }

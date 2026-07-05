@@ -3868,6 +3868,80 @@ test("buildGateActionReceipt", async (t) => {
     assert.equal(center.aiPipelineDispatches[0].actionLabel, "跑小样本复验");
   });
 
+  await t.test("groups AI pipeline dispatches by sample, resume, and rollback lanes", () => {
+    const sample: PersistedGatePlatformDispatchTask = {
+      databaseId: "dispatch-db-ai-1",
+      dispatchKey: "ai-pipeline-recheck:project-1:receipt-1:sample",
+      id: "ai-pipeline-recheck:project-1:receipt-1:sample",
+      projectId: "project-1",
+      platformId: "ai-pipeline",
+      platformName: "AI 写审改",
+      stage: "ai_pipeline_sample_recheck",
+      state: "completed",
+      priorityScore: 94,
+      ownerRole: "写作制片 / 审稿负责人",
+      title: "AI 写审改：跑 1 章小样本复验",
+      detail: "观察状态只跑 1 章复验。",
+      dueLabel: "今天先跑 1 章",
+      actionLabel: "跑小样本复验",
+      href: "/projects/project-1#ai-pipeline",
+      acceptanceCriteria: ["复验完成前不能批量放量"],
+      evidence: ["来源清单：receipt-1"],
+      sourceReceiptId: "receipt-1",
+      completionEvidence: "小样本已完成。",
+      reviewLatestAt: "2026-01-01T00:00:00.000Z",
+      assignedAt: null,
+      completedAt: "2026-01-01T00:10:00.000Z",
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:10:00.000Z",
+    };
+    const resume: PersistedGatePlatformDispatchTask = {
+      ...sample,
+      databaseId: "dispatch-db-ai-2",
+      dispatchKey: "ai-pipeline-recheck:project-1:receipt-1:scale",
+      id: "ai-pipeline-recheck:project-1:receipt-1:scale",
+      stage: "ai_pipeline_small_batch",
+      state: "queued",
+      priorityScore: 72,
+      title: "AI 写审改：回推荐批量队列",
+      detail: "恢复小批执行，但不直接放量。",
+      actionLabel: "回推荐批量",
+      completionEvidence: "",
+      completedAt: null,
+      updatedAt: "2026-01-01T00:20:00.000Z",
+    };
+    const rollback: PersistedGatePlatformDispatchTask = {
+      ...sample,
+      databaseId: "dispatch-db-ai-3",
+      dispatchKey: "ai-pipeline-recheck:project-1:receipt-1:rollback",
+      id: "ai-pipeline-recheck:project-1:receipt-1:rollback",
+      stage: "ai_pipeline_sample_recheck",
+      state: "assigned",
+      priorityScore: 96,
+      title: "AI 写审改：恢复小批跌线修复",
+      detail: "恢复小批跌线，先回滚观察修复。",
+      actionLabel: "回滚观察修复",
+      completionEvidence: "",
+      completedAt: null,
+      updatedAt: "2026-01-01T00:30:00.000Z",
+    };
+
+    const center = buildGateDispatchTaskCenter([sample, resume, rollback]);
+
+    assert.deepEqual(center.aiPipelineGroups.map((group) => `${group.id}:${group.total}/${group.active}`), [
+      "rollback_repair:1/1",
+      "sample_recheck:1/0",
+      "small_batch_resume:1/1",
+    ]);
+    assert.equal(center.aiPipelineGroups[0].label, "回滚修复");
+    assert.equal(center.aiPipelineGroups[0].headline, "恢复小批跌线先修");
+    assert.equal(center.aiPipelineGroups[0].topTask?.dispatchKey, rollback.dispatchKey);
+    assert.equal(center.aiPipelineGroups[1].label, "小样本复验");
+    assert.equal(center.aiPipelineGroups[1].topTask?.dispatchKey, sample.dispatchKey);
+    assert.equal(center.aiPipelineGroups[2].label, "恢复小批");
+    assert.equal(center.aiPipelineGroups[2].topTask?.dispatchKey, resume.dispatchKey);
+  });
+
   await t.test("suggests pausing platform direction for repeated submission follow-up chains", () => {
     const baseDispatch = buildGatePlatformGrowthDispatchItems([buildGatePlatformStrategyReceipt({
       item: strategyPlatform,

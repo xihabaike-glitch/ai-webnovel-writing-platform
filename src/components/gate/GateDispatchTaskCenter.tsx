@@ -1057,40 +1057,54 @@ export function GateDispatchTaskCenter({
               只看 AI 复检
             </button>
           </div>
-          <div className="mt-3 grid gap-2 lg:grid-cols-2">
-            {center.aiPipelineDispatches.slice(0, 4).map((task) => (
+          <div className="mt-3 grid gap-2 xl:grid-cols-3">
+            {center.aiPipelineGroups.map((group) => (
               <div
                 className="rounded-md border border-sky-100 bg-white/80 p-3 text-sm text-sky-950 hover:bg-white"
-                key={task.dispatchKey}
+                key={group.id}
               >
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className={`rounded-md px-2 py-1 text-xs font-medium ${stateClass(task.state)}`}>{stateLabel(task.state)}</span>
-                  <span className="font-medium">{task.title}</span>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="font-medium">{group.label}</span>
+                  <span className="rounded-md bg-sky-50 px-2 py-1 text-xs text-sky-700">活跃 {group.active}/{group.total}</span>
                 </div>
-                <p className="mt-2 line-clamp-2 leading-6 text-sky-800">{task.detail}</p>
-                <div className="mt-2 flex flex-wrap gap-2 text-xs text-sky-700">
-                  <span className="rounded-md bg-sky-50 px-2 py-1">{task.ownerRole}</span>
-                  <span className="rounded-md bg-sky-50 px-2 py-1">{task.actionLabel}</span>
-                  <span className="rounded-md bg-sky-50 px-2 py-1">优先级 {task.priorityScore}</span>
-                </div>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  <Link
-                    className="rounded-md bg-white px-3 py-2 text-xs font-medium text-sky-900 hover:bg-sky-100"
-                    href={`#dispatch-${task.dispatchKey}`}
-                  >
-                    查看派单
-                  </Link>
-                  {isAiPipelineExecutableTask(task) ? (
-                    <button
-                      className="rounded-md bg-sky-900 px-3 py-2 text-xs font-medium text-white hover:bg-sky-800 disabled:cursor-not-allowed disabled:opacity-60"
-                      disabled={runningAiPipelineKey !== null}
-                      onClick={() => void runAiPipelineRecheckTask(task)}
-                      type="button"
-                    >
-                      {runningAiPipelineKey === task.dispatchKey ? "运行中" : task.stage === "ai_pipeline_small_batch" ? "恢复小批执行" : "运行 1 章复验"}
-                    </button>
-                  ) : null}
-                </div>
+                <div className="mt-2 text-xs font-medium text-sky-900">{group.headline}</div>
+                <p className="mt-1 line-clamp-2 leading-6 text-sky-800">{group.detail}</p>
+                {group.topTask ? (
+                  <>
+                    <div className="mt-3 rounded-md border border-sky-100 bg-sky-50 px-2 py-2">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className={`rounded-md px-2 py-1 text-xs font-medium ${stateClass(group.topTask.state)}`}>{stateLabel(group.topTask.state)}</span>
+                        <span className="font-medium">{group.topTask.title}</span>
+                      </div>
+                      <div className="mt-2 flex flex-wrap gap-2 text-xs text-sky-700">
+                        <span className="rounded-md bg-white px-2 py-1">{group.topTask.ownerRole}</span>
+                        <span className="rounded-md bg-white px-2 py-1">{group.topTask.actionLabel}</span>
+                        <span className="rounded-md bg-white px-2 py-1">优先级 {group.topTask.priorityScore}</span>
+                      </div>
+                    </div>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <Link
+                        className="rounded-md bg-white px-3 py-2 text-xs font-medium text-sky-900 hover:bg-sky-100"
+                        href={`#dispatch-${group.topTask.dispatchKey}`}
+                      >
+                        查看派单
+                      </Link>
+                      {isAiPipelineExecutableTask(group.topTask) ? (
+                        <button
+                          className="rounded-md bg-sky-900 px-3 py-2 text-xs font-medium text-white hover:bg-sky-800 disabled:cursor-not-allowed disabled:opacity-60"
+                          disabled={runningAiPipelineKey !== null}
+                          onClick={() => void runAiPipelineRecheckTask(group.topTask!)}
+                          type="button"
+                        >
+                          {runningAiPipelineKey === group.topTask.dispatchKey ? "运行中" : group.topTask.stage === "ai_pipeline_small_batch" ? "恢复小批执行" : "运行 1 章复验"}
+                        </button>
+                      ) : null}
+                    </div>
+                  </>
+                ) : null}
+                {group.tasks.length > 1 ? (
+                  <div className="mt-2 text-xs text-sky-700">另有 {group.tasks.length - 1} 个同类派单在下方列表。</div>
+                ) : null}
               </div>
             ))}
           </div>

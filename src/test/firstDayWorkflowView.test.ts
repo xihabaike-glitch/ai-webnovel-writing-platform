@@ -8,6 +8,7 @@ import {
   buildFirstDayExecutionRiskNotice,
   buildFirstDayHandoffGateCta,
   buildFirstDayReceiptCompletionAction,
+  buildFirstDayReceiptCompletionEvidence,
   buildFirstDayStepView,
   completeFirstDayDispatchStep,
   resolveFirstDayDispatchFocus,
@@ -84,6 +85,63 @@ test("buildFirstDayReceiptCompletionAction only allows successful receipts with 
   assert.equal(ready.visible, true);
   assert.equal(ready.canComplete, true);
   assert.equal(ready.label, "验收并进入下一步");
+});
+
+test("buildFirstDayReceiptCompletionEvidence derives an acceptance draft from AI receipts", () => {
+  const direct = buildFirstDayReceiptCompletionEvidence({
+    receipt: {
+      success: true,
+      summary: "第一章初稿已写回。",
+      writeBackTarget: "第一章",
+      nextAction: "检查正文后完成派单验收。",
+      completionEvidence: "第一章正文已生成并写回，钩子和章末追读已按验收线检查。",
+      detailItems: [],
+    },
+    fallbackEvidence: "套用模板。",
+    currentEvidence: "",
+  });
+  const fallback = buildFirstDayReceiptCompletionEvidence({
+    receipt: {
+      success: true,
+      summary: "人物和设定支撑已落库。",
+      writeBackTarget: "作品资料",
+      nextAction: "检查资料卡后完成派单验收。",
+      completionEvidence: "",
+      detailItems: [],
+    },
+    fallbackEvidence: "人物和设定支撑已生成并落库，可以进入第一章初稿。",
+    currentEvidence: "",
+  });
+  const summarized = buildFirstDayReceiptCompletionEvidence({
+    receipt: {
+      success: true,
+      summary: "第一章审稿已完成。",
+      writeBackTarget: "AI 任务审稿记录",
+      nextAction: "按审稿问题做二改。",
+      completionEvidence: "",
+      detailItems: [],
+    },
+    fallbackEvidence: "",
+    currentEvidence: "",
+  });
+  const failed = buildFirstDayReceiptCompletionEvidence({
+    receipt: {
+      success: false,
+      summary: "AI 执行未完成。",
+      writeBackTarget: "未写回",
+      nextAction: "修复模型路线后重试。",
+      completionEvidence: "",
+      detailItems: [],
+    },
+    fallbackEvidence: "不应使用的模板。",
+    currentEvidence: "保留人工正在写的验收依据。",
+  });
+
+  assert.equal(direct, "第一章正文已生成并写回，钩子和章末追读已按验收线检查。");
+  assert.equal(fallback, "人物和设定支撑已生成并落库，可以进入第一章初稿。");
+  assert.ok(summarized.includes("第一章审稿已完成"));
+  assert.ok(summarized.includes("写回：AI 任务审稿记录"));
+  assert.equal(failed, "保留人工正在写的验收依据。");
 });
 
 test("buildFirstDayExecutionRiskNotice surfaces blocked and watch modes", () => {

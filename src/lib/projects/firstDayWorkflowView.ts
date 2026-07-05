@@ -1,4 +1,4 @@
-import type { FirstDayRiskLevel, FirstDayWorkflowStep } from "./firstDayWorkflow.ts";
+import type { FirstDayExecutionReceipt, FirstDayRiskLevel, FirstDayWorkflowStep } from "./firstDayWorkflow.ts";
 import { updatePersistedGateDispatchTaskState, type PersistedGatePlatformDispatchTask } from "./gateActionReceipts.ts";
 
 const ACCEPTANCE_MARKER = "任务中心已验收：";
@@ -32,6 +32,12 @@ export interface FirstDayReceiptCompletionAction {
   canComplete: boolean;
   label: string;
   reason: string;
+}
+
+export interface FirstDayReceiptCompletionEvidenceInput {
+  receipt: Pick<FirstDayExecutionReceipt, "success" | "summary" | "writeBackTarget" | "nextAction" | "completionEvidence"> | null;
+  fallbackEvidence?: string | null;
+  currentEvidence?: string | null;
 }
 
 export interface FirstDayDispatchCompletionValidationInput {
@@ -218,6 +224,23 @@ export function buildFirstDayStepView(step: FirstDayWorkflowStep): FirstDayStepV
     acceptanceEvidence,
     hasTaskAcceptance: acceptanceEvidence.length > 0,
   };
+}
+
+export function buildFirstDayReceiptCompletionEvidence(input: FirstDayReceiptCompletionEvidenceInput): string {
+  const currentEvidence = cleanEvidence(input.currentEvidence ?? "");
+  if (!input.receipt?.success) return currentEvidence;
+
+  const receiptEvidence = cleanEvidence(input.receipt.completionEvidence);
+  if (receiptEvidence.length >= MIN_COMPLETION_EVIDENCE_LENGTH) return receiptEvidence;
+
+  const fallbackEvidence = cleanEvidence(input.fallbackEvidence ?? "");
+  if (fallbackEvidence.length >= MIN_COMPLETION_EVIDENCE_LENGTH) return fallbackEvidence;
+
+  return cleanEvidence([
+    input.receipt.summary,
+    input.receipt.writeBackTarget && input.receipt.writeBackTarget !== "未写回" ? `写回：${input.receipt.writeBackTarget}` : "",
+    input.receipt.nextAction ? `下一步：${input.receipt.nextAction}` : "",
+  ].filter(Boolean).join(" "));
 }
 
 export function buildFirstDayReceiptCompletionAction(input: FirstDayReceiptCompletionInput): FirstDayReceiptCompletionAction {

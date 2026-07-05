@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { buildFirstDayExecutionRouteBlockMessage, type FirstDayExecutionRouteStatus } from "@/lib/model-gateway/firstDayExecutionRoute";
-import { buildFirstDayDispatchUpdateSummary, buildFirstDayExecutionRiskNotice, buildFirstDayHandoffGateCta, buildFirstDayReceiptCompletionAction, buildFirstDayStepView, completeFirstDayDispatchStep } from "@/lib/projects/firstDayWorkflowView";
+import { buildFirstDayDispatchUpdateSummary, buildFirstDayExecutionRiskNotice, buildFirstDayHandoffGateCta, buildFirstDayReceiptCompletionAction, buildFirstDayReceiptCompletionEvidence, buildFirstDayStepView, completeFirstDayDispatchStep } from "@/lib/projects/firstDayWorkflowView";
 import { persistGateDispatchTask, type GatePlatformGrowthDispatchItem, type PersistedGatePlatformDispatchTask } from "@/lib/projects/gateActionReceipts";
 
 interface FirstDayWorkflowStep {
@@ -97,6 +97,7 @@ interface FirstDayExecutionReceipt {
 interface FirstDayModelExecutionPlan {
   executable: boolean;
   taskType?: string;
+  completionEvidence: string;
   blockedReason?: string;
 }
 
@@ -474,7 +475,12 @@ export function FirstDayWorkflowPanel({ projectId }: { projectId: string }) {
       if (payload.continuation) setContinuation(payload.continuation);
       if (payload.handoffFollowupDispatches) setHandoffFollowupDispatches(payload.handoffFollowupDispatches);
       if (payload.executionReceipt) setExecutionReceipt(payload.executionReceipt);
-      if (payload.completionEvidence) setCompletionEvidence(payload.completionEvidence);
+      const nextCompletionEvidence = buildFirstDayReceiptCompletionEvidence({
+        receipt: payload.executionReceipt ?? null,
+        fallbackEvidence: payload.completionEvidence || payload.executionPlan?.completionEvidence || executionPlan?.completionEvidence,
+        currentEvidence: completionEvidence,
+      });
+      if (nextCompletionEvidence) setCompletionEvidence(nextCompletionEvidence);
       showMessage(payload.executionReceipt?.summary ?? `AI 已执行当前节点：${workflow.nextStep.label}。请检查结果后完成派单验收。`);
     } catch (caught) {
       showMessage(caught instanceof Error ? caught.message : "首日 AI 执行失败。");

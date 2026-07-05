@@ -231,6 +231,8 @@ export function buildFirstDayReturnedEvidenceAcceptanceState(input: {
       : input.hasDispatch
         ? "验收依据至少需要 8 个字。"
         : "当前还没有可验收派单，请先刷新首日工作流。",
+    primaryActionLabel: canComplete ? "完成当前派单" : "补足验收依据",
+    primaryActionDisabled: !canComplete,
   };
 }
 

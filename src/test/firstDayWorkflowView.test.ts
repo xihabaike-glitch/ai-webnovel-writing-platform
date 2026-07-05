@@ -821,6 +821,8 @@ test("buildFirstDayReturnedEvidenceAcceptanceState focuses a completable returne
   assert.equal(state.canComplete, true);
   assert.equal(state.message, "已带回首日 AI 执行证据，验收依据已填好。检查后可以点击「完成当前派单」。");
   assert.equal(state.buttonHint, "当前证据已满足验收字数，可以直接验收。");
+  assert.equal(state.primaryActionLabel, "完成当前派单");
+  assert.equal(state.primaryActionDisabled, false);
 });
 
 test("buildFirstDayDispatchUpdateSummary explains watch sample scale-up status", () => {

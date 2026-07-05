@@ -29,6 +29,7 @@ import {
   buildFirstDayDispatchCenterHref,
   buildFirstDayDispatchUpdateSummary,
   buildFirstDayPostDispatchCompletionPrompt,
+  buildFirstDayReturnedEvidenceAcceptanceState,
   buildFirstDayReturnToAcceptanceHref,
   resolveFirstDayDispatchFocus,
   type FirstDayDispatchFocusInput,
@@ -1548,6 +1549,13 @@ export function GateDispatchTaskCenter({
           const firstDayInlineExecution = firstDayInlineAction.execution;
           const isFocusedCompletionTask = task.dispatchKey === focusedCompletionDispatchKey;
           const isFocusedTask = task.dispatchKey === focusedDispatchKey || isFocusedCompletionTask;
+          const completionDraft = completionDrafts[task.dispatchKey] ?? "";
+          const focusedAcceptanceState = isFocusedCompletionTask
+            ? buildFirstDayReturnedEvidenceAcceptanceState({
+                completionEvidence: completionDraft,
+                hasDispatch: task.state === "assigned",
+              })
+            : null;
           return (
           <div
             className={`rounded-md border bg-white p-4 ${isFocusedTask ? "border-amber-300 ring-2 ring-amber-200" : "border-slate-200"}`}
@@ -1602,11 +1610,24 @@ export function GateDispatchTaskCenter({
                     {isFocusedCompletionTask && focusedCompletionMessage ? (
                       <p className="rounded-md bg-emerald-50 px-2 py-1 text-xs leading-5 text-emerald-800">{focusedCompletionMessage}</p>
                     ) : null}
+                    {focusedAcceptanceState?.visible ? (
+                      <div className="flex flex-wrap items-center justify-between gap-2 rounded-md bg-emerald-50 px-2 py-2 text-xs leading-5 text-emerald-800">
+                        <span>{focusedAcceptanceState.buttonHint}</span>
+                        <button
+                          className="rounded-md border border-emerald-200 bg-white px-2 py-1 text-xs font-medium text-emerald-800 hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60"
+                          disabled={focusedAcceptanceState.primaryActionDisabled || runningKey === task.dispatchKey}
+                          onClick={() => void updateTask(task)}
+                          type="button"
+                        >
+                          {runningKey === task.dispatchKey ? "处理中" : focusedAcceptanceState.primaryActionLabel}
+                        </button>
+                      </div>
+                    ) : null}
                     <textarea
                       className="min-h-20 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-normal text-slate-800"
                       onChange={(event) => setCompletionDrafts((current) => ({ ...current, [task.dispatchKey]: event.target.value }))}
                       placeholder="写清楚完成了什么、证据在哪里、是否已回填数据。"
-                      value={completionDrafts[task.dispatchKey] ?? ""}
+                      value={completionDraft}
                     />
                   </div>
                 ) : null}

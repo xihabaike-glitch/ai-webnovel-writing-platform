@@ -62,6 +62,14 @@ export interface TaskQueueProject {
   submissionAssets?: PlatformSubmissionAssetInput[];
   submissionAssetVersions?: PlatformSubmissionAssetVersionInput[];
   platformPublishMetrics?: PlatformPublishMetricInput[];
+  gateActionAudits?: Array<{
+    actionId: string;
+    executionType: string;
+    status: string;
+    succeededCount: number;
+    platformId: string;
+    createdAt: Date | string;
+  }>;
 }
 
 export type QueueScaleGate = "none" | "sample_only" | "cleared";
@@ -122,6 +130,8 @@ export interface TaskQueueCenter {
   items: QueueItem[];
   recommendedNext: QueueItem | null;
 }
+
+type PublishEffectQueueExecution = NonNullable<QueueItem["effectAction"]>["execution"];
 
 const categoryPriority: Record<QueueItem["category"], number> = {
   candidate: 5,
@@ -284,6 +294,64 @@ function effectActionLabel(execution: string) {
   if (execution === "generate_asset_variants") return "生成候选";
   if (execution === "rewrite_first_three") return "重写前三章";
   return "去复盘";
+}
+
+function timestamp(value: Date | string | null | undefined) {
+  if (!value) return null;
+  const time = new Date(value).getTime();
+  return Number.isFinite(time) ? time : null;
+}
+
+function latestCompletedPublishEffectAction(input: {
+  project: TaskQueueProject;
+  platformId: string;
+  execution: PublishEffectQueueExecution;
+  effectSnapshotDate: Date | string | null | undefined;
+}) {
+  if (input.execution === "open_target") return null;
+  const minTime = timestamp(input.effectSnapshotDate);
+  const actionId = `platform-strategy:${input.platformId}:${input.execution}`;
+
+  return (input.project.gateActionAudits ?? [])
+    .filter((audit) => (
+      audit.executionType === "platform_strategy"
+      && audit.actionId === actionId
+      && audit.platformId === input.platformId
+      && audit.status === "succeeded"
+      && audit.succeededCount > 0
+      && (minTime === null || (timestamp(audit.createdAt) ?? 0) >= minTime)
+    ))
+    .sort((left, right) => (timestamp(right.createdAt) ?? 0) - (timestamp(left.createdAt) ?? 0))[0] ?? null;
+}
+
+function completedEffectActionFollowup(input: {
+  execution: PublishEffectQueueExecution;
+  baseActionId: string;
+  effectVerdict: string;
+}) {
+  if (input.execution === "generate_asset_variants") {
+    return {
+      idSuffix: `${input.baseActionId}:adopt-generated-candidate`,
+      chapterTitle: "AI 优化方案",
+      evidence: `${input.effectVerdict} 任务中心已生成候选，别重复开同一炉；下一步先采纳一个候选做实测。`,
+      actionLabel: "采纳候选",
+      href: "#submission-asset-editor",
+      actionId: "adopt-generated-candidate",
+    };
+  }
+
+  if (input.execution === "rewrite_first_three") {
+    return {
+      idSuffix: `${input.baseActionId}:adopt-first-three-rewrite`,
+      chapterTitle: "前三章改写候选",
+      evidence: `${input.effectVerdict} 任务中心已生成前三章改写候选，下一步先采纳候选并回到发布质检。`,
+      actionLabel: "采纳改写",
+      href: "#first-three-rewrite",
+      actionId: "adopt-first-three-rewrite",
+    };
+  }
+
+  return null;
 }
 
 export function buildTaskQueueCenter(projects: TaskQueueProject[]): TaskQueueCenter {
@@ -506,6 +574,21 @@ export function buildTaskQueueCenter(projects: TaskQueueProject[]): TaskQueueCen
 
     const targetPackage = exportCenter.packages.find((pack) => pack.platformId === platform.id) ?? exportCenter.packages[0];
     const primaryEffectAction = targetPackage.effectOptimization.actions[0] ?? null;
+    const completedPrimaryEffectAction = primaryEffectAction
+      ? latestCompletedPublishEffectAction({
+        project,
+        platformId: platform.id,
+        execution: primaryEffectAction.execution,
+        effectSnapshotDate: targetPackage.publishEffect.latest?.snapshotDate ?? null,
+      })
+      : null;
+    const primaryEffectFollowup = primaryEffectAction && completedPrimaryEffectAction
+      ? completedEffectActionFollowup({
+        execution: primaryEffectAction.execution,
+        baseActionId: primaryEffectAction.id,
+        effectVerdict: targetPackage.publishEffect.verdict,
+      })
+      : null;
 
     if (firstDayGateCleared && targetPackage.canExport && targetPackage.publishVersions.length > 0 && targetPackage.publishEffect.records === 0) {
       queueItems.push(item({
@@ -527,6 +610,28 @@ export function buildTaskQueueCenter(projects: TaskQueueProject[]): TaskQueueCen
           platformId: platform.id,
           execution: "open_target",
           actionId: "collect-effect-data",
+        },
+      }));
+    } else if (firstDayGateCleared && targetPackage.canExport && targetPackage.publishEffect.records > 0 && primaryEffectFollowup) {
+      queueItems.push(item({
+        id: `${project.id}:effect:${platform.id}:${primaryEffectFollowup.idSuffix}`,
+        projectId: project.id,
+        projectTitle: project.title,
+        platformName: platform.name,
+        category: "effect",
+        chapterTitle: primaryEffectFollowup.chapterTitle,
+        evidence: primaryEffectFollowup.evidence,
+        strategyBasis: startTactic,
+        riskLevel: riskProfile.level,
+        riskLabel: riskProfile.label,
+        riskNotice,
+        scaleGate,
+        actionLabel: primaryEffectFollowup.actionLabel,
+        href: `${projectHref}${primaryEffectFollowup.href}`,
+        effectAction: {
+          platformId: platform.id,
+          execution: "open_target",
+          actionId: primaryEffectFollowup.actionId,
         },
       }));
     } else if (firstDayGateCleared && targetPackage.canExport && targetPackage.publishEffect.records > 0 && primaryEffectAction) {

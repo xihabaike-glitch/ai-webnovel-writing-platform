@@ -297,6 +297,114 @@ test("buildTaskQueueCenter", async (t) => {
     assert.equal(queue.recommendedNext?.href, "/projects/project-1#submission-asset-editor");
   });
 
+  await t.test("advances completed publish asset optimization into candidate adoption", () => {
+    const queue = buildTaskQueueCenter([publishReadyProject({
+      publishSnapshots: [publishBaseline],
+      platformPublishMetrics: [{
+        id: "metric-weak",
+        platformId: "fanqie",
+        platformName: "番茄小说",
+        views: 1000,
+        clicks: 30,
+        favorites: 5,
+        follows: 2,
+        comments: 0,
+        paidReads: 0,
+        editorFeedback: "",
+        contractStatus: "unknown",
+        publishUrl: "",
+        notes: "",
+        snapshotDate: "2026-07-03T00:00:00.000Z",
+      }],
+      gateActionAudits: [{
+        actionId: "platform-strategy:fanqie:generate_asset_variants",
+        executionType: "platform_strategy",
+        status: "succeeded",
+        succeededCount: 3,
+        platformId: "fanqie",
+        createdAt: "2026-07-04T00:00:00.000Z",
+      }],
+    })]);
+
+    assert.equal(queue.overview.effectReady, 1);
+    assert.equal(queue.recommendedNext?.category, "effect");
+    assert.equal(queue.recommendedNext?.actionLabel, "采纳候选");
+    assert.equal(queue.recommendedNext?.effectAction?.execution, "open_target");
+    assert.equal(queue.recommendedNext?.effectAction?.actionId, "adopt-generated-candidate");
+    assert.ok(queue.recommendedNext?.evidence.includes("已生成候选"));
+    assert.equal(queue.recommendedNext?.href, "/projects/project-1#submission-asset-editor");
+  });
+
+  await t.test("keeps recommending optimization when the action receipt is older than the latest effect", () => {
+    const queue = buildTaskQueueCenter([publishReadyProject({
+      publishSnapshots: [publishBaseline],
+      platformPublishMetrics: [{
+        id: "metric-weak",
+        platformId: "fanqie",
+        platformName: "番茄小说",
+        views: 1000,
+        clicks: 30,
+        favorites: 5,
+        follows: 2,
+        comments: 0,
+        paidReads: 0,
+        editorFeedback: "",
+        contractStatus: "unknown",
+        publishUrl: "",
+        notes: "",
+        snapshotDate: "2026-07-03T00:00:00.000Z",
+      }],
+      gateActionAudits: [{
+        actionId: "platform-strategy:fanqie:generate_asset_variants",
+        executionType: "platform_strategy",
+        status: "succeeded",
+        succeededCount: 3,
+        platformId: "fanqie",
+        createdAt: "2026-07-02T00:00:00.000Z",
+      }],
+    })]);
+
+    assert.equal(queue.recommendedNext?.category, "effect");
+    assert.equal(queue.recommendedNext?.actionLabel, "生成候选");
+    assert.equal(queue.recommendedNext?.effectAction?.execution, "generate_asset_variants");
+  });
+
+  await t.test("advances completed first-three rewrite into adoption review", () => {
+    const queue = buildTaskQueueCenter([publishReadyProject({
+      publishSnapshots: [publishBaseline],
+      platformPublishMetrics: [{
+        id: "metric-retention",
+        platformId: "fanqie",
+        platformName: "番茄小说",
+        views: 1000,
+        clicks: 80,
+        favorites: 30,
+        follows: 2,
+        comments: 0,
+        paidReads: 0,
+        editorFeedback: "",
+        contractStatus: "unknown",
+        publishUrl: "",
+        notes: "",
+        snapshotDate: "2026-07-03T00:00:00.000Z",
+      }],
+      gateActionAudits: [{
+        actionId: "platform-strategy:fanqie:rewrite_first_three",
+        executionType: "platform_strategy",
+        status: "succeeded",
+        succeededCount: 3,
+        platformId: "fanqie",
+        createdAt: "2026-07-04T00:00:00.000Z",
+      }],
+    })]);
+
+    assert.equal(queue.recommendedNext?.category, "effect");
+    assert.equal(queue.recommendedNext?.actionLabel, "采纳改写");
+    assert.equal(queue.recommendedNext?.effectAction?.execution, "open_target");
+    assert.equal(queue.recommendedNext?.effectAction?.actionId, "adopt-first-three-rewrite");
+    assert.equal(queue.recommendedNext?.href, "/projects/project-1#first-three-rewrite");
+  });
+
   await t.test("blocks production behind the first-day completion gate", () => {
     const queue = buildTaskQueueCenter([project]);
     const gate = queue.items.find((item) => item.blockerType === "first_day_gate");

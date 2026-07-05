@@ -89,6 +89,19 @@ export async function POST(request: Request) {
         submissionAssets: { orderBy: { updatedAt: "desc" } },
         submissionAssetVersions: { orderBy: { createdAt: "desc" }, take: 80 },
         platformPublishMetrics: { orderBy: { snapshotDate: "desc" }, take: 80 },
+        gateActionAudits: {
+          where: { executionType: "platform_strategy" },
+          orderBy: { createdAt: "desc" },
+          take: 80,
+          select: {
+            actionId: true,
+            executionType: true,
+            status: true,
+            succeededCount: true,
+            platformId: true,
+            createdAt: true,
+          },
+        },
         gateDispatchTasks: {
           where: { dispatchKey: { startsWith: "first-day:" } },
           select: {

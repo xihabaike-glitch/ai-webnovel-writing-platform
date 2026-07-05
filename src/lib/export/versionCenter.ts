@@ -43,6 +43,18 @@ export interface ExportBaselineComparison {
   targetChanged: boolean;
 }
 
+export interface ExportBaselineTimelineItem {
+  snapshotId: string;
+  label: string;
+  fileName: string;
+  createdAt: string | Date;
+  lockedAt: string | Date;
+  readinessPercent: number;
+  isCurrent: boolean;
+  statusLabel: string;
+  detail: string;
+}
+
 export interface ExportVersionCenterSummary {
   totalSnapshots: number;
   latestCreatedAt: string | Date | null;
@@ -55,6 +67,7 @@ export interface ExportVersionCenterSummary {
   latestSnapshot: ExportPackageSnapshotView | null;
   baselineCandidate: ExportBaselineCandidate | null;
   baselineComparison: ExportBaselineComparison;
+  baselineTimeline: ExportBaselineTimelineItem[];
   targets: ExportVersionTarget[];
   nextAction: {
     label: string;
@@ -222,11 +235,34 @@ function buildBaselineComparison(orderedSnapshots: ExportPackageSnapshotView[], 
   };
 }
 
+function buildBaselineTimeline(orderedSnapshots: ExportPackageSnapshotView[]): ExportBaselineTimelineItem[] {
+  return orderedSnapshots
+    .filter((snapshot) => snapshot.baselineLockedAt)
+    .sort((a, b) => new Date(b.baselineLockedAt ?? 0).getTime() - new Date(a.baselineLockedAt ?? 0).getTime())
+    .map((snapshot) => {
+      const label = `${snapshot.packageKindLabel} · ${snapshot.formatLabel}`;
+      return {
+        snapshotId: snapshot.id,
+        label,
+        fileName: snapshot.fileName,
+        createdAt: snapshot.createdAt,
+        lockedAt: snapshot.baselineLockedAt!,
+        readinessPercent: snapshot.readinessPercent,
+        isCurrent: snapshot.isBaseline,
+        statusLabel: snapshot.isBaseline ? "当前正式基准" : "历史基准",
+        detail: snapshot.isBaseline
+          ? "当前版本对比、发布归档和回滚判断都围绕它展开。"
+          : "这条快照曾经作为正式基准，后续被更新版本替换。",
+      };
+    });
+}
+
 export function buildExportVersionCenter(snapshots: ExportPackageSnapshotView[]): ExportVersionCenterSummary {
   const orderedSnapshots = [...snapshots].sort((a, b) => snapshotTime(b) - snapshotTime(a));
   const latestSnapshot = orderedSnapshots[0] ?? null;
   const baselineCandidate = pickBaselineCandidate(orderedSnapshots);
   const baselineComparison = buildBaselineComparison(orderedSnapshots, latestSnapshot);
+  const baselineTimeline = buildBaselineTimeline(orderedSnapshots);
   const targets = targetMatrix.map((target) => {
     const latest = orderedSnapshots.find((snapshot) => snapshot.packageKind === target.packageKind && snapshot.format === target.format) ?? null;
     const status = latest ? latest.readinessStatus as ExportVersionTarget["status"] : "missing";
@@ -261,6 +297,7 @@ export function buildExportVersionCenter(snapshots: ExportPackageSnapshotView[])
     latestSnapshot,
     baselineCandidate,
     baselineComparison,
+    baselineTimeline,
     targets,
     nextAction: missingTarget ? {
       label: `补齐 ${missingTarget.label}`,

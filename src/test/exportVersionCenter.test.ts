@@ -117,6 +117,36 @@ describe("export version center", () => {
     assert.match(center.nextAction.label, /补齐/);
   });
 
+  it("builds a current and historical baseline timeline", () => {
+    const center = buildExportVersionCenter([
+      snapshot({
+        id: "full-md-current",
+        packageKind: "full",
+        format: "markdown",
+        isBaseline: true,
+        baselineLockedAt: "2026-07-05T06:00:00.000Z",
+        createdAt: "2026-07-05T05:00:00.000Z",
+      }),
+      snapshot({
+        id: "full-md-old",
+        packageKind: "full",
+        format: "markdown",
+        isBaseline: false,
+        baselineLockedAt: "2026-07-05T04:00:00.000Z",
+        createdAt: "2026-07-05T03:00:00.000Z",
+      }),
+      snapshot({ id: "outline-md", packageKind: "outline", format: "markdown", createdAt: "2026-07-05T02:00:00.000Z" }),
+    ]);
+
+    assert.equal(center.baselineTimeline.length, 2);
+    assert.equal(center.baselineTimeline[0].snapshotId, "full-md-current");
+    assert.equal(center.baselineTimeline[0].isCurrent, true);
+    assert.equal(center.baselineTimeline[0].statusLabel, "当前正式基准");
+    assert.equal(center.baselineTimeline[1].snapshotId, "full-md-old");
+    assert.equal(center.baselineTimeline[1].isCurrent, false);
+    assert.equal(center.baselineTimeline[1].statusLabel, "历史基准");
+  });
+
   it("asks for a locked baseline before comparing versions", () => {
     const center = buildExportVersionCenter([
       snapshot({ id: "full-md", packageKind: "full", format: "markdown", createdAt: "2026-07-05T02:00:00.000Z" }),

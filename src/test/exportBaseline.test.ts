@@ -10,7 +10,7 @@ describe("export baseline updates", () => {
     assert.equal(parseExportBaselineAction("delete"), null);
   });
 
-  it("locks one snapshot and clears the previous project baseline", async () => {
+  it("locks one snapshot and preserves the previous baseline history", async () => {
     const rows = [
       { id: "old", projectId: "project-1", packageKind: "full", format: "markdown", isBaseline: true, baselineLockedAt: new Date("2026-07-05T00:00:00.000Z") },
       { id: "next", projectId: "project-1", packageKind: "full", format: "docx", isBaseline: false, baselineLockedAt: null },
@@ -21,11 +21,11 @@ describe("export baseline updates", () => {
         async findUnique({ where }: { where: { id: string } }) {
           return rows.find((row) => row.id === where.id) ?? null;
         },
-        async updateMany({ where, data }: { where: { projectId: string; isBaseline: boolean }; data: { isBaseline: boolean; baselineLockedAt: Date | null } }) {
+        async updateMany({ where, data }: { where: { projectId: string; isBaseline: boolean }; data: { isBaseline: boolean; baselineLockedAt?: Date | null } }) {
           for (const row of rows) {
             if (row.projectId === where.projectId && row.isBaseline === where.isBaseline) {
               row.isBaseline = data.isBaseline;
-              row.baselineLockedAt = data.baselineLockedAt;
+              if ("baselineLockedAt" in data) row.baselineLockedAt = data.baselineLockedAt ?? null;
             }
           }
           return { count: rows.length };
@@ -47,6 +47,7 @@ describe("export baseline updates", () => {
 
     assert.equal(result?.snapshotId, "next");
     assert.equal(rows.find((row) => row.id === "old")?.isBaseline, false);
+    assert.deepEqual(rows.find((row) => row.id === "old")?.baselineLockedAt, new Date("2026-07-05T00:00:00.000Z"));
     assert.equal(rows.find((row) => row.id === "next")?.isBaseline, true);
     assert.equal(rows.find((row) => row.id === "other")?.isBaseline, true);
   });
@@ -76,4 +77,3 @@ describe("export baseline updates", () => {
     assert.equal(rows[0].baselineLockedAt, null);
   });
 });
-

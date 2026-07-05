@@ -65,7 +65,6 @@ export async function updateExportSnapshotBaseline(
       },
       data: {
         isBaseline: false,
-        baselineLockedAt: null,
       },
     });
 
@@ -92,4 +91,3 @@ export async function updateExportSnapshotBaseline(
     message: "已锁定为导出基准。",
   };
 }
-

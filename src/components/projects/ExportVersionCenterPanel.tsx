@@ -166,6 +166,47 @@ export function ExportVersionCenterPanel({
       </section>
 
       <section className="rounded-md border border-slate-200 bg-white p-4">
+        <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <h2 className="font-medium">基准时间线</h2>
+            <p className="mt-1 text-sm text-slate-600">记录正式交付基准的锁定和替换轨迹，避免交付口径说不清。</p>
+          </div>
+          <div className="text-sm text-slate-500">{summary.baselineTimeline.length} 条</div>
+        </div>
+        {summary.baselineTimeline.length ? (
+          <div className="mt-4 grid gap-3">
+            {summary.baselineTimeline.map((item) => (
+              <div className="rounded-md border border-slate-200 bg-slate-50 p-3 text-sm" key={item.snapshotId}>
+                <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <div className="font-medium text-slate-950">{item.label}</div>
+                      <span className={`rounded-md px-2 py-1 text-xs font-medium ${
+                        item.isCurrent ? "bg-slate-950 text-white" : "bg-white text-slate-600"
+                      }`}>
+                        {item.statusLabel}
+                      </span>
+                    </div>
+                    <div className="mt-1 text-slate-600">{item.fileName}</div>
+                    <p className="mt-2 text-slate-600">{item.detail}</p>
+                  </div>
+                  <div className="text-xs leading-5 text-slate-500 md:text-right">
+                    <div>锁定 {timeText(item.lockedAt)}</div>
+                    <div>导出 {timeText(item.createdAt)}</div>
+                    <div>准备度 {item.readinessPercent}%</div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="mt-4 rounded-md border border-dashed border-slate-300 p-4 text-sm leading-6 text-slate-600">
+            还没有正式基准记录。先锁定一个可交付快照，再让后续替换都有据可查。
+          </div>
+        )}
+      </section>
+
+      <section className="rounded-md border border-slate-200 bg-white p-4">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <h2 className="font-medium">推荐基准</h2>

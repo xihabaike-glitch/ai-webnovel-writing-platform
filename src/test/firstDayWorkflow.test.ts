@@ -187,6 +187,8 @@ test("buildFirstDayWorkflow", async (t) => {
     assert.ok(workflow.executionPackage.missingEvidence.some((evidence) => evidence.includes("开头动作")));
     assert.ok(workflow.executionPackage.missingEvidence.some((evidence) => evidence.includes("模型路线复检")));
     assert.ok(workflow.executionPackage.handoffNote.includes("开书打法要落地"));
+    assert.ok(workflow.executionPackage.completionEvidenceTemplate.includes("交接动作已落地"));
+    assert.ok(workflow.executionPackage.completionEvidenceTemplate.includes("避坑边界已确认"));
     assert.ok(workflow.executionPackage.modelPrompt.includes("开书打法约束"));
     assert.ok(workflow.executionPackage.modelPrompt.includes("恢复放量打法"));
     assert.ok(workflow.executionPackage.modelPrompt.includes("交接说明"));

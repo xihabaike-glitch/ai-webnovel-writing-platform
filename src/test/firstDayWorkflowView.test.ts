@@ -334,6 +334,16 @@ test("buildFirstDayDispatchCompletionTemplate covers first-day step types", () =
     dispatchKey: "first-day:project-1:first-draft",
     acceptanceCriteria: [],
   }).includes("第一章正文已生成"));
+  const handoffTemplate = buildFirstDayDispatchCompletionTemplate({
+    dispatchKey: "first-day:project-1:first-draft",
+    acceptanceCriteria: [
+      "第一章正文已生成并写回章节",
+      "执行开书交接动作：开头：第一段给倒计时。",
+      "避开交接边界：不要直接放量，先做小样本。",
+    ],
+  });
+  assert.ok(handoffTemplate.includes("交接动作已落地：开头：第一段给倒计时。"));
+  assert.ok(handoffTemplate.includes("避坑边界已确认：不要直接放量，先做小样本。"));
   assert.ok(buildFirstDayDispatchCompletionTemplate({
     dispatchKey: "first-day:project-1:first-draft",
     dueLabel: "今天止损验证",

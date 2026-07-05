@@ -333,15 +333,28 @@ export function buildFirstDayRiskProfile(startTactic?: ProjectStartTacticSummary
   };
 }
 
+function handoffCompletionLines(acceptanceCriteria: string[]) {
+  return acceptanceCriteria
+    .filter((criterion) => criterion.startsWith("执行开书交接动作：") || criterion.startsWith("避开交接边界："))
+    .map((criterion) => criterion
+      .replace(/^执行开书交接动作：/, "交接动作已落地：")
+      .replace(/^避开交接边界：/, "避坑边界已确认："));
+}
+
+function withHandoffCompletion(base: string, acceptanceCriteria: string[]) {
+  const handoffLines = handoffCompletionLines(acceptanceCriteria);
+  return handoffLines.length ? [base, ...handoffLines].join("\n") : base;
+}
+
 function completionEvidenceTemplate(step: FirstDayWorkflowStep, acceptanceCriteria: string[]) {
-  if (step.id === "first-draft") return "第一章正文已生成并写回章节，已覆盖钩子、冲突和章末追读，可以进入审稿。";
-  if (step.id === "first-review") return "第一章审稿已完成，已输出钩子、爽点、冲突、解释密度和追读问题，可以进入二改。";
-  if (step.id === "first-rewrite") return "二改或前三章改写已完成，审稿问题已逐项处理，并保留了版本对照。";
-  if (step.id === "publish-precheck") return "平台包预检已完成，标题、简介、标签、卖点、样章和风险清单已整理。";
-  if (step.id === "risk-recovery") return "止损恢复条件已写清，入口卖点、前三章兑现或平台匹配度至少改掉一项，并明确只验证一个变量。";
-  if (step.id === "story-support") return "人物弧光和核心设定已补齐，主角欲望、需求、缺陷、规则、禁忌和平台土壤可供后续生成引用。";
-  if (step.id === "opening-hook") return "第一章章节卡已补齐，目标、钩子、冲突、转变和章末悬念已按平台开头规则检查。";
-  return `首日节点已完成：${acceptanceCriteria.join("；")}。`;
+  if (step.id === "first-draft") return withHandoffCompletion("第一章正文已生成并写回章节，已覆盖钩子、冲突和章末追读，可以进入审稿。", acceptanceCriteria);
+  if (step.id === "first-review") return withHandoffCompletion("第一章审稿已完成，已输出钩子、爽点、冲突、解释密度和追读问题，可以进入二改。", acceptanceCriteria);
+  if (step.id === "first-rewrite") return withHandoffCompletion("二改或前三章改写已完成，审稿问题已逐项处理，并保留了版本对照。", acceptanceCriteria);
+  if (step.id === "publish-precheck") return withHandoffCompletion("平台包预检已完成，标题、简介、标签、卖点、样章和风险清单已整理。", acceptanceCriteria);
+  if (step.id === "risk-recovery") return withHandoffCompletion("止损恢复条件已写清，入口卖点、前三章兑现或平台匹配度至少改掉一项，并明确只验证一个变量。", acceptanceCriteria);
+  if (step.id === "story-support") return withHandoffCompletion("人物弧光和核心设定已补齐，主角欲望、需求、缺陷、规则、禁忌和平台土壤可供后续生成引用。", acceptanceCriteria);
+  if (step.id === "opening-hook") return withHandoffCompletion("第一章章节卡已补齐，目标、钩子、冲突、转变和章末悬念已按平台开头规则检查。", acceptanceCriteria);
+  return withHandoffCompletion(`首日节点已完成：${acceptanceCriteria.join("；")}。`, acceptanceCriteria);
 }
 
 function modelRouteRecheckCriteria(stepId: string) {

@@ -302,6 +302,19 @@ function isWatchSampleCompletion(completionEvidence: string) {
   return /小样本|通过线|不可接受|复查证据|放量结论/u.test(completionEvidence);
 }
 
+function handoffCompletionLines(acceptanceCriteria: string[]) {
+  return acceptanceCriteria
+    .filter((criterion) => criterion.startsWith("执行开书交接动作：") || criterion.startsWith("避开交接边界："))
+    .map((criterion) => criterion
+      .replace(/^执行开书交接动作：/, "交接动作已落地：")
+      .replace(/^避开交接边界：/, "避坑边界已确认："));
+}
+
+function withHandoffCompletion(base: string, acceptanceCriteria: string[]) {
+  const handoffLines = handoffCompletionLines(acceptanceCriteria);
+  return handoffLines.length ? [base, ...handoffLines].join("\n") : base;
+}
+
 function firstDayHref(task: PersistedGatePlatformDispatchTask, stepId: string) {
   if (task.projectId) {
     return `/projects/${task.projectId}?firstDayLaunch=1&nextStep=${encodeURIComponent(stepId)}#first-day-workflow`;
@@ -317,23 +330,26 @@ export function buildFirstDayDispatchCompletionTemplate(task: Pick<PersistedGate
   if (!isFirstDayDispatchTask(task)) return "";
   const stepId = firstDayStepId(task.dispatchKey);
   const riskLevel = firstDayCompletionRiskLevel(task);
-  if (stepId === "first-draft" && riskLevel === "blocked") return "止损验证已完成：恢复条件已写清，入口卖点、前三章兑现或平台匹配度已至少改掉一项，暂不批量生成正文。";
-  if (stepId === "first-draft" && riskLevel === "watch") return [
+  if (stepId === "first-draft" && riskLevel === "blocked") return withHandoffCompletion(
+    "止损验证已完成：恢复条件已写清，入口卖点、前三章兑现或平台匹配度已至少改掉一项，暂不批量生成正文。",
+    task.acceptanceCriteria,
+  );
+  if (stepId === "first-draft" && riskLevel === "watch") return withHandoffCompletion([
     "小样本验证已完成：",
     "通过线：第一章钩子、冲突、爽点兑现或平台语气已达到本轮最低要求。",
     "不可接受项：未出现慢热解释、卖点不兑现、平台风格错位或正文空转。",
     "复查证据：已保留第一章正文/审稿分数/人工复核结论，可回到任务中心或章节页复查。",
     "放量结论：通过后才允许恢复后续初稿批次；未过线则继续停留观察。",
-  ].join("\n");
-  if (stepId === "first-draft") return "第一章正文已生成并写回章节，钩子、冲突和章末追读已按首轮平台打法检查，可以进入审稿。";
-  if (stepId === "first-review") return "第一章审稿已完成，钩子、爽点、冲突、解释密度和章末追读问题已列出，可以进入二改。";
-  if (stepId === "first-rewrite") return "第一章二改或前三章改写已完成，审稿问题已逐项处理，并保留版本对照。";
-  if (stepId === "publish-precheck") return "平台包预检已完成，标题、简介、标签、卖点、样章和首轮数据回收口径已整理。";
-  if (stepId === "story-support") return "人物弧光、核心设定和平台土壤已补齐，后续正文生成可以直接引用。";
-  if (stepId === "risk-recovery") return "止损恢复条件已写清：入口卖点、前三章兑现或平台匹配度已至少改掉一项，并明确只验证一个变量。";
-  if (stepId === "opening-hook") return "第一章目标、钩子、冲突、转变和章末悬念已补齐，并按目标平台开头规则检查。";
-  if (stepId === "skeleton") return "作品骨架已完成，开头、结尾、主干、分支、叶片和土壤均已落地。";
-  return task.acceptanceCriteria.length ? `首日派单已完成：${task.acceptanceCriteria.join("；")}。` : "";
+  ].join("\n"), task.acceptanceCriteria);
+  if (stepId === "first-draft") return withHandoffCompletion("第一章正文已生成并写回章节，钩子、冲突和章末追读已按首轮平台打法检查，可以进入审稿。", task.acceptanceCriteria);
+  if (stepId === "first-review") return withHandoffCompletion("第一章审稿已完成，钩子、爽点、冲突、解释密度和章末追读问题已列出，可以进入二改。", task.acceptanceCriteria);
+  if (stepId === "first-rewrite") return withHandoffCompletion("第一章二改或前三章改写已完成，审稿问题已逐项处理，并保留版本对照。", task.acceptanceCriteria);
+  if (stepId === "publish-precheck") return withHandoffCompletion("平台包预检已完成，标题、简介、标签、卖点、样章和首轮数据回收口径已整理。", task.acceptanceCriteria);
+  if (stepId === "story-support") return withHandoffCompletion("人物弧光、核心设定和平台土壤已补齐，后续正文生成可以直接引用。", task.acceptanceCriteria);
+  if (stepId === "risk-recovery") return withHandoffCompletion("止损恢复条件已写清：入口卖点、前三章兑现或平台匹配度已至少改掉一项，并明确只验证一个变量。", task.acceptanceCriteria);
+  if (stepId === "opening-hook") return withHandoffCompletion("第一章目标、钩子、冲突、转变和章末悬念已补齐，并按目标平台开头规则检查。", task.acceptanceCriteria);
+  if (stepId === "skeleton") return withHandoffCompletion("作品骨架已完成，开头、结尾、主干、分支、叶片和土壤均已落地。", task.acceptanceCriteria);
+  return task.acceptanceCriteria.length ? withHandoffCompletion(`首日派单已完成：${task.acceptanceCriteria.join("；")}。`, task.acceptanceCriteria) : "";
 }
 
 export function buildFirstDayDispatchCompletionHint(task: Pick<PersistedGatePlatformDispatchTask, "dispatchKey" | "acceptanceCriteria"> & Partial<Pick<PersistedGatePlatformDispatchTask, "dueLabel" | "title" | "evidence">>) {

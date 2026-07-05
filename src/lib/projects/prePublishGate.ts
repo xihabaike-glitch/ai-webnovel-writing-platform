@@ -243,6 +243,7 @@ export interface PrePublishGate {
   projectStatuses: PrePublishGateProjectStatus[];
   strategyReview: PrePublishGateStrategyReview;
   priorityActions: PrePublishGateAction[];
+  releaseAction: PrePublishGateAction | null;
 }
 
 export interface PrePublishGateInput {
@@ -500,6 +501,50 @@ function uniqueActions(actions: PrePublishGateAction[]) {
     seen.add(key);
     return true;
   }).slice(0, 6);
+}
+
+function buildReleaseAction(
+  status: PrePublishGate["status"],
+  projectStatuses: PrePublishGateProjectStatus[],
+  priorityActions: PrePublishGateAction[],
+) {
+  const readyProject = projectStatuses.find((project) => project.status === "ready" && project.downloadHref)
+    ?? projectStatuses.find((project) => project.status === "ready")
+    ?? null;
+
+  if (status === "ready" && readyProject) {
+    return action(
+      `release:${readyProject.projectId}`,
+      readyProject.downloadHref ? "下载平台发布包" : "打开发布包",
+      `${readyProject.projectTitle} · ${readyProject.platformName} 已通过总闸门。下载后先保存发布包基准，投放后回填平台效果。`,
+      readyProject.downloadHref ?? readyProject.href,
+      "primary",
+    );
+  }
+
+  const nextAction = status === "blocked"
+    ? priorityActions.find((item) => item.id === "queue:next")
+      ?? priorityActions.find((item) => item.id.startsWith("repair:"))
+      ?? priorityActions[0]
+      ?? null
+    : priorityActions[0] ?? null;
+  if (!nextAction) return null;
+
+  if (status === "needs_repair") {
+    return {
+      ...nextAction,
+      id: `release-review:${nextAction.id}`,
+      label: `先处理提醒：${nextAction.label}`,
+      tone: "review" as const,
+    };
+  }
+
+  return {
+    ...nextAction,
+    id: `release-blocked:${nextAction.id}`,
+    label: `先解除阻塞：${nextAction.label}`,
+    tone: "repair" as const,
+  };
 }
 
 function failureTaskToRunInput(task: FailureReviewTask): TaskRunInput {
@@ -850,6 +895,7 @@ export function buildPrePublishGate(input: PrePublishGateInput): PrePublishGate 
       .filter((project) => project.status === "ready")
       .map((project) => action(`export:${project.projectId}`, "导出平台发布包", `${project.projectTitle} · ${project.platformName} 已通过发布质检。`, project.href, "primary")),
   ].filter((item): item is PrePublishGateAction => Boolean(item)));
+  const releaseAction = buildReleaseAction(status, projectStatuses, priorityActions);
 
   return {
     status,
@@ -874,5 +920,6 @@ export function buildPrePublishGate(input: PrePublishGateInput): PrePublishGate 
     projectStatuses,
     strategyReview,
     priorityActions,
+    releaseAction,
   };
 }

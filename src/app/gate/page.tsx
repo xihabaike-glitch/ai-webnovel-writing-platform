@@ -128,8 +128,20 @@ export default async function GatePage() {
       </div>
 
       <section className={`mb-6 rounded-md border p-4 ${statusTone(gate.status)}`}>
-        <div className="text-lg font-semibold">{gate.headline}</div>
-        <p className="mt-1 text-sm">{gate.status === "ready" ? "可以进入导出、保存基准和平台投放。" : "先按下面的优先动作处理，处理完再回到这里复检。"}</p>
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <div className="text-lg font-semibold">{gate.headline}</div>
+            <p className="mt-1 text-sm">{gate.status === "ready" ? "可以进入导出、保存基准和平台投放。" : "先按下面的优先动作处理，处理完再回到这里复检。"}</p>
+          </div>
+          {gate.releaseAction ? (
+            <a className="w-fit shrink-0 rounded-md bg-white px-4 py-2 text-sm font-medium text-slate-950 hover:bg-slate-50" href={gate.releaseAction.href}>
+              {gate.releaseAction.label}
+            </a>
+          ) : null}
+        </div>
+        {gate.releaseAction ? (
+          <p className="mt-3 rounded-md bg-white/60 px-3 py-2 text-sm leading-6">{gate.releaseAction.detail}</p>
+        ) : null}
       </section>
 
       <section className="mb-6 grid gap-3 md:grid-cols-3 lg:grid-cols-6">

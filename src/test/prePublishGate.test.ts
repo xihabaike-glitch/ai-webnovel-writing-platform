@@ -119,6 +119,9 @@ test("buildPrePublishGate", async (t) => {
     assert.ok(gate.projectStatuses[0].downloadHref?.includes("format=markdown"));
     assert.ok(gate.projectStatuses[0].downloadHref?.includes("platformId=fanqie"));
     assert.ok(gate.priorityActions.some((action) => action.label === "导出平台发布包"));
+    assert.equal(gate.releaseAction?.label, "下载平台发布包");
+    assert.ok(gate.releaseAction?.href.includes("/api/projects/project-ready/platform-export"));
+    assert.ok(gate.releaseAction?.detail.includes("保存发布包基准"));
   });
 
   await t.test("blocks launch when first-day handoff evidence is missing", () => {
@@ -136,6 +139,8 @@ test("buildPrePublishGate", async (t) => {
     assert.ok(queueItem?.detail.includes("补交接验收"));
     assert.equal(queueAction?.label, "补交接验收");
     assert.ok(queueAction?.detail.includes("开书交接证据"));
+    assert.equal(gate.releaseAction?.label, "先解除阻塞：补交接验收");
+    assert.equal(gate.releaseAction?.href, "/dispatch?firstDayProject=project-handoff-blocked&step=publish-precheck#first-day-dispatch");
   });
 
   await t.test("blocks launch when publish package and failed tasks are unresolved", () => {

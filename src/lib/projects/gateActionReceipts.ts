@@ -1092,6 +1092,11 @@ function batchTacticEffectExperienceItem(item: GateBatchTacticEffectItem): GateP
   const platform = platformFromBatchTacticTitle(item.tacticTitle);
   if (!platform) return null;
   const recovery = item.recoveryBatches > 0;
+  const recoveryStableGate = recovery
+    ? item.recoveryBatches >= 2
+      ? `恢复放量：已验证 ${item.recoveryBatches} 批，满足连续稳定入库线`
+      : `恢复放量：已验证 ${item.recoveryBatches} 批，还差 ${2 - item.recoveryBatches} 批稳定样本才准入库`
+    : null;
   return {
     platformId: platform.id,
     platformName: platform.name,
@@ -1121,7 +1126,7 @@ function batchTacticEffectExperienceItem(item: GateBatchTacticEffectItem): GateP
     priorityScore: item.status === "usable" ? 88 : item.status === "watch" ? 68 : 95,
     latestAt: item.latestAt,
     evidence: [
-      recovery ? `恢复放量：已验证 ${item.recoveryBatches} 批` : null,
+      recoveryStableGate,
       `批量效果：成功 ${item.succeededTasks}，失败 ${item.failedTasks}，成功率 ${item.successRatePercent}%，质量 ${item.averageQualityScore ?? "缺"}`,
       ...item.evidence,
     ].filter((line): line is string => Boolean(line)).slice(0, 5),

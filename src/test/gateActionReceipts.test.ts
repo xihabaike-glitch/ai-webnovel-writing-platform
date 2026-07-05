@@ -1848,6 +1848,39 @@ test("buildGateActionReceipt", async (t) => {
     assert.ok(library.items[0]?.reuseHint.includes("新项目仍先跑小样本"));
   });
 
+  await t.test("keeps a single recovery batch as watch with explicit missing stable batch evidence", () => {
+    const library = buildGatePlatformTacticExperienceLibrary({
+      summary: { total: 0, healthy: 0, needsEffect: 0, repairing: 0, blocked: 0 },
+      items: [],
+      nextActions: [],
+    }, 6, [{
+      id: "fanqie:recovery-watch",
+      status: "watch",
+      label: "恢复放量观察",
+      tacticTitle: "首轮平台打法：番茄小说",
+      tacticLabel: "恢复放量观察",
+      primaryTactic: "首章先给不可逆危机，三章内连续兑现爽点。",
+      openingMove: "第一段给倒计时和身份暴露风险。",
+      verificationMove: "批量后复检前三章追读。",
+      risk: "解释过多会掉首秀。",
+      sampleBatches: 1,
+      succeededTasks: 2,
+      failedTasks: 0,
+      successRatePercent: 100,
+      averageQualityScore: 88,
+      knownCostUsd: 0.02,
+      recoveryBatches: 1,
+      latestAt: "2026-01-05T00:00:00.000Z",
+      evidence: ["AI 小批恢复完成｜恢复放量：成功 2，失败 0，质量 88"],
+      nextAction: "恢复放量样本还薄，至少再跑一轮稳定批次后，才允许写成新项目可复用打法。",
+    }]);
+
+    assert.equal(library.items[0]?.status, "watch");
+    assert.equal(library.items[0]?.tactic, "恢复放量观察");
+    assert.ok(library.items[0]?.evidence.some((line) => line.includes("还差 1 批")));
+    assert.ok(library.items[0]?.reuseHint.includes("不要直接放量"));
+  });
+
   await t.test("turns project start validation advice into three dispatch cards", () => {
     const startReceipt = buildProjectStartDecisionActionReceipt({
       projectId: "project-1",

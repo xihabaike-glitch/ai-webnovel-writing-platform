@@ -112,6 +112,11 @@ function blockerPriority(blockerType: QueueItem["blockerType"]) {
   return 9;
 }
 
+export function recommendedQueueActionLabel(entry: QueueItem | null) {
+  if (!entry) return null;
+  return `下一步：${entry.actionLabel}`;
+}
+
 function categoryLabel(category: QueueItem["category"]) {
   const labels: Record<QueueItem["category"], string> = {
     draft: "待生成",

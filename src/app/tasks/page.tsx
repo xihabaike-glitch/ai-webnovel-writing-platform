@@ -8,7 +8,7 @@ import { prisma } from "@/lib/db/prisma";
 import { buildBatchExecutionSafety } from "@/lib/projects/batchExecutionSafety";
 import { buildBatchStrategyComparison, buildBatchStrategyDecision } from "@/lib/projects/batchStrategyComparison";
 import { batchExecutionStrategies, getBatchExecutionStrategy } from "@/lib/projects/batchExecutionStrategy";
-import { buildTaskQueueCenter, type QueueItem } from "@/lib/projects/taskQueueCenter";
+import { buildTaskQueueCenter, recommendedQueueActionLabel, type QueueItem } from "@/lib/projects/taskQueueCenter";
 import { buildTaskQueueExecutionPlan } from "@/lib/projects/taskQueueExecutionPlan";
 
 export const dynamic = "force-dynamic";
@@ -160,7 +160,7 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
         </div>
         {queue.recommendedNext ? (
           <Link className="w-fit rounded-md bg-slate-950 px-4 py-2 text-sm font-medium text-white" href={queue.recommendedNext.href}>
-            下一步：{queue.recommendedNext.label}
+            {recommendedQueueActionLabel(queue.recommendedNext)}
           </Link>
         ) : null}
       </div>

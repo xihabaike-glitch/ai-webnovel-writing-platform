@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { buildTaskQueueCenter, type TaskQueueProject } from "../lib/projects/taskQueueCenter.ts";
+import { buildTaskQueueCenter, recommendedQueueActionLabel, type TaskQueueProject } from "../lib/projects/taskQueueCenter.ts";
 
 const baseChapter = {
   id: "chapter-ready-draft",
@@ -162,6 +162,7 @@ test("buildTaskQueueCenter", async (t) => {
     assert.equal(queue.overview.secondPassReady, 0);
     assert.equal(queue.overview.firstDayBlocked, 1);
     assert.equal(gate?.actionLabel, "补交接验收");
+    assert.equal(recommendedQueueActionLabel(queue.recommendedNext), "下一步：补交接验收");
     assert.ok(gate?.evidence.includes("开书交接证据"));
     assert.ok(gate?.evidence.includes("交接动作落地"));
     assert.ok(gate?.evidence.includes("避坑边界确认"));
@@ -186,6 +187,7 @@ test("buildTaskQueueCenter", async (t) => {
     assert.equal(queue.overview.firstDayBlocked, 0);
     assert.equal(queue.overview.reviewReady, 1);
     assert.equal(queue.recommendedNext?.category, "review");
+    assert.equal(recommendedQueueActionLabel(queue.recommendedNext), "下一步：审稿");
     assert.ok(queue.items.every((item) => item.actionLabel !== "补交接验收"));
     assert.ok(queue.recommendedNext?.handoffGuidance?.firstDayActions.some((action) => action.includes("追读承诺")));
     assert.ok(queue.recommendedNext?.handoffGuidance?.avoidRules.some((rule) => rule.includes("不要直接放量")));

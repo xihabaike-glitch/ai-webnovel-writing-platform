@@ -29,6 +29,7 @@ export async function GET(request: Request, { params }: Params) {
   }
 
   const multiPlatformSubmission = buildMultiPlatformSubmission({
+    projectId,
     title: project.title,
     genre: project.genre,
     sellingPoint: project.sellingPoint,

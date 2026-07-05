@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { persistGateDispatchTask, type GatePlatformGrowthDispatchItem } from "@/lib/projects/gateActionReceipts";
 import { buildSubmissionAssetSavePayload } from "@/lib/projects/submissionAssetSavePayload";
 
 interface SubmissionPackageView {
@@ -133,7 +134,7 @@ interface MultiPlatformSubmission {
       detail: string;
       dueLabel: string;
       actionLabel: string;
-      href: "#publish-effect-panel" | "#submission-package" | "#platform-export";
+      href: string;
       acceptanceCriteria: string[];
       evidence: string[];
     }>;
@@ -252,6 +253,7 @@ export function SubmissionPackagePanel({
   const [isLoadingMultiPlatform, setIsLoadingMultiPlatform] = useState(false);
   const [isDownloadingMultiPlatform, setIsDownloadingMultiPlatform] = useState(false);
   const [isDownloadingMultiPlatformArchive, setIsDownloadingMultiPlatformArchive] = useState(false);
+  const [isAssigningDecisionTasks, setIsAssigningDecisionTasks] = useState(false);
   const [multiPlatform, setMultiPlatform] = useState<MultiPlatformSubmission | null>(null);
   const [isLoadingAbTest, setIsLoadingAbTest] = useState(false);
   const [isDownloadingAbTest, setIsDownloadingAbTest] = useState(false);
@@ -447,6 +449,52 @@ export function SubmissionPackagePanel({
       setMessage(caught instanceof Error ? caught.message : "下载平台投稿包失败。");
     } finally {
       setIsDownloadingMultiPlatform(false);
+    }
+  }
+
+  function decisionTaskToDispatch(task: MultiPlatformSubmission["decisionBoard"]["tasks"][number]): GatePlatformGrowthDispatchItem {
+    const stageByKind: Record<typeof task.kind, GatePlatformGrowthDispatchItem["stage"]> = {
+      main: "scale_up",
+      scale: "scale_up",
+      watch: "record_metrics",
+      repair: "start_platform_package",
+      collect_data: "record_metrics",
+      prepare_package: "start_platform_package",
+      pause: "pause_platform",
+    };
+
+    return {
+      id: task.id,
+      platformId: task.platformId,
+      platformName: task.platformName,
+      stage: stageByKind[task.kind],
+      state: "assigned",
+      priorityScore: task.priorityScore,
+      ownerRole: task.ownerRole,
+      title: task.title,
+      detail: task.detail,
+      dueLabel: task.dueLabel,
+      actionLabel: task.actionLabel,
+      href: task.href,
+      acceptanceCriteria: task.acceptanceCriteria,
+      evidence: task.evidence,
+      reviewLatestAt: new Date().toISOString(),
+    };
+  }
+
+  async function assignDecisionTasks() {
+    if (!multiPlatform?.decisionBoard.tasks.length) return;
+    setIsAssigningDecisionTasks(true);
+    setMessage(null);
+    try {
+      const tasks = await Promise.all(
+        multiPlatform.decisionBoard.tasks.map((task) => persistGateDispatchTask(decisionTaskToDispatch(task))),
+      );
+      setMessage(`已派发 ${tasks.length} 个投稿决策执行单到派单中心`);
+    } catch (caught) {
+      setMessage(caught instanceof Error ? caught.message : "投稿决策执行单派发失败。");
+    } finally {
+      setIsAssigningDecisionTasks(false);
     }
   }
 
@@ -667,6 +715,14 @@ export function SubmissionPackagePanel({
                 type="button"
               >
                 {isDownloadingMultiPlatformArchive ? "归档中" : "下载归档包"}
+              </button>
+              <button
+                className="rounded-md border border-slate-200 px-3 py-2 text-xs font-medium hover:bg-slate-50 disabled:opacity-50"
+                disabled={isAssigningDecisionTasks || !multiPlatform.decisionBoard.tasks.length}
+                onClick={() => void assignDecisionTasks()}
+                type="button"
+              >
+                {isAssigningDecisionTasks ? "派发中" : "派发执行单"}
               </button>
             </div>
           </div>

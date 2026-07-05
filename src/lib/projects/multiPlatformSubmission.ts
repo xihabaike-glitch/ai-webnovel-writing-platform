@@ -3,6 +3,7 @@ import { buildSubmissionChecklist, type SubmissionAiTask, type SubmissionChapter
 import { buildSubmissionPackage, type SubmissionPackage, type SubmissionPackageChapter } from "./submissionPackage.ts";
 
 export interface MultiPlatformSubmissionInput {
+  projectId?: string;
   title: string;
   genre: string;
   sellingPoint: string;
@@ -155,7 +156,7 @@ export interface MultiPlatformDecisionTask {
   detail: string;
   dueLabel: string;
   actionLabel: string;
-  href: "#publish-effect-panel" | "#submission-package" | "#platform-export";
+  href: string;
   acceptanceCriteria: string[];
   evidence: string[];
 }
@@ -702,7 +703,11 @@ function decisionAcceptanceCriteria(variant: MultiPlatformSubmissionVariant) {
   ];
 }
 
-function buildDecisionTasks(variants: MultiPlatformSubmissionVariant[]): MultiPlatformDecisionTask[] {
+function projectHref(projectId: string | undefined, anchor: string) {
+  return projectId ? `/projects/${projectId}${anchor}` : anchor;
+}
+
+function buildDecisionTasks(variants: MultiPlatformSubmissionVariant[], projectId?: string): MultiPlatformDecisionTask[] {
   return [...variants]
     .filter((variant) => variant.decision.kind !== "pause")
     .sort((left, right) => (
@@ -722,13 +727,13 @@ function buildDecisionTasks(variants: MultiPlatformSubmissionVariant[]): MultiPl
       detail: variant.decision.reason,
       dueLabel: decisionDueLabel(variant.decision.kind),
       actionLabel: variant.decision.label === "补投稿包" ? "补齐投稿包" : variant.decision.label,
-      href: variant.decision.actionHref,
+      href: projectHref(projectId, variant.decision.actionHref),
       acceptanceCriteria: decisionAcceptanceCriteria(variant),
       evidence: variant.decision.evidence,
     }));
 }
 
-function buildDecisionBoard(variants: MultiPlatformSubmissionVariant[]): MultiPlatformDecisionBoard {
+function buildDecisionBoard(variants: MultiPlatformSubmissionVariant[], projectId?: string): MultiPlatformDecisionBoard {
   const sorted = [...variants].sort((left, right) => (
     right.decision.score - left.decision.score
     || laneOrder(left.decision.kind) - laneOrder(right.decision.kind)
@@ -780,7 +785,7 @@ function buildDecisionBoard(variants: MultiPlatformSubmissionVariant[]): MultiPl
       .slice(0, 2)
       .map((variant) => `${variant.platformName}：${variant.decision.nextAction}`),
   ].filter(Boolean);
-  const tasks = buildDecisionTasks(variants);
+  const tasks = buildDecisionTasks(variants, projectId);
 
   return {
     status,
@@ -963,7 +968,7 @@ export function buildMultiPlatformSubmission(input: MultiPlatformSubmissionInput
     .sort((left, right) => right.fitScore - left.fitScore || left.platformName.localeCompare(right.platformName));
   const readyPlatforms = variants.filter((variant) => variant.packageMatrix.status === "ready").length;
   const effectSummary = buildEffectSummary(variants);
-  const decisionBoard = buildDecisionBoard(variants);
+  const decisionBoard = buildDecisionBoard(variants, input.projectId);
   const submission: MultiPlatformSubmissionArchiveSource = {
     title: input.title,
     targetPlatformId: input.targetPlatformId,

@@ -48,6 +48,7 @@ const chapters = [
 test("buildMultiPlatformSubmission", async (t) => {
   await t.test("builds ranked variants for every MVP platform", () => {
     const result = buildMultiPlatformSubmission({
+      projectId: "project-1",
       title: "夜雨系统",
       genre: "都市系统",
       sellingPoint: "雨夜危机中觉醒系统，主角用一次次选择翻盘。",
@@ -85,6 +86,7 @@ test("buildMultiPlatformSubmission", async (t) => {
 
   await t.test("keeps overseas synopsis visible for overseas platforms", () => {
     const result = buildMultiPlatformSubmission({
+      projectId: "project-1",
       title: "夜雨系统",
       genre: "都市系统",
       sellingPoint: "雨夜危机中觉醒系统，主角用一次次选择翻盘。",
@@ -158,6 +160,7 @@ test("buildMultiPlatformSubmission", async (t) => {
 
   await t.test("summarizes post-submission effect tracking", () => {
     const result = buildMultiPlatformSubmission({
+      projectId: "project-1",
       title: "夜雨系统",
       genre: "都市系统",
       sellingPoint: "雨夜危机中觉醒系统，主角用一次次选择翻盘。",
@@ -240,6 +243,7 @@ test("buildMultiPlatformSubmission", async (t) => {
     assert.ok(result.decisionBoard.tasks.some((task) => task.platformId === "webnovel" && task.kind === "main" && task.ownerRole === "增长运营"));
     assert.ok(result.decisionBoard.tasks.some((task) => task.platformId === "qimao" && task.kind === "repair" && task.ownerRole === "平台编辑"));
     assert.equal(result.decisionBoard.tasks[0].platformId, "webnovel");
+    assert.ok(result.decisionBoard.tasks.every((task) => task.href.startsWith("/projects/project-1#")));
     assert.ok(result.archive.markdown.includes("有苗头"));
   });
 });

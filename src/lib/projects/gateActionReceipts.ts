@@ -6652,10 +6652,36 @@ function batchTacticStatus(input: {
   return "usable";
 }
 
+function batchTacticThirdRoundMode(tactic: GateActionReceiptStartTactic) {
+  const text = `${tactic.label} ${tactic.primaryTactic} ${tactic.risk}`;
+  if (/三轮降档/u.test(text)) return "downgrade";
+  if (/三轮稳住/u.test(text)) return "stable";
+  return null;
+}
+
 function batchTacticLabel(status: GateBatchTacticEffectStatus) {
   if (status === "blocked") return "避坑打法";
   if (status === "watch") return "观察打法";
   return "可复用打法";
+}
+
+function thirdRoundBatchTacticLabel(status: GateBatchTacticEffectStatus, mode: ReturnType<typeof batchTacticThirdRoundMode>) {
+  if (mode === "stable") {
+    if (status === "blocked") return "三轮稳住避坑";
+    if (status === "watch") return "三轮稳住观察";
+    return "三轮稳住打法";
+  }
+  if (mode === "downgrade") {
+    if (status === "blocked") return "三轮降档避坑";
+    return "三轮降档观察";
+  }
+  return batchTacticLabel(status);
+}
+
+function thirdRoundBatchContextText(mode: ReturnType<typeof batchTacticThirdRoundMode>) {
+  if (mode === "stable") return "三轮稳住";
+  if (mode === "downgrade") return "三轮降档";
+  return "";
 }
 
 export function buildGateBatchTacticEffectReview(
@@ -6692,19 +6718,21 @@ export function buildGateBatchTacticEffectReview(
       : null;
     const knownCostUsd = Number(sortedReceipts.reduce((sum, receipt) => sum + (receipt.batchEffectSummary?.knownCostUsd ?? 0), 0).toFixed(4));
     const recoveryBatches = sortedReceipts.filter((receipt) => receipt.batchContext?.scaleGate === "cleared").length;
+    const thirdRoundMode = batchTacticThirdRoundMode(group.tactic);
     const baseStatus = batchTacticStatus({
       sampleBatches: sortedReceipts.length,
       successRatePercent,
       averageQualityScore,
       failedTasks,
     });
-    const status = recoveryBatches > 0 && baseStatus === "usable" && recoveryBatches < 2 ? "watch" : baseStatus;
+    const recoveryAdjustedStatus = recoveryBatches > 0 && baseStatus === "usable" && recoveryBatches < 2 ? "watch" : baseStatus;
+    const status = thirdRoundMode === "downgrade" && recoveryAdjustedStatus === "usable" ? "watch" : recoveryAdjustedStatus;
     const label = recoveryBatches > 0
       ? status === "usable" ? "恢复放量打法" : status === "blocked" ? "恢复放量避坑" : "恢复放量观察"
-      : batchTacticLabel(status);
+      : thirdRoundBatchTacticLabel(status, thirdRoundMode);
     const evidence = sortedReceipts.slice(0, 3).map((receipt) => {
       const quality = receipt.batchEffectSummary?.averageQualityScore ?? "缺";
-      const context = batchContextText(receipt.batchContext);
+      const context = [batchContextText(receipt.batchContext), thirdRoundBatchContextText(thirdRoundMode)].filter(Boolean).join("｜");
       return `${receipt.label}${context ? `｜${context}` : ""}：成功 ${receipt.succeededCount}，失败 ${receipt.failedCount}，质量 ${quality}`;
     });
     const nextAction = status === "blocked"
@@ -6712,9 +6740,15 @@ export function buildGateBatchTacticEffectReview(
       : status === "watch"
         ? recoveryBatches > 0
           ? "恢复放量样本还薄，至少再跑一轮稳定批次后，才允许写成新项目可复用打法。"
+          : thirdRoundMode === "stable"
+            ? "三轮稳住批次还不能直接写成长期打法，至少再跑一轮健康批次并回收曝光、点击、收藏和追读。"
+          : thirdRoundMode === "downgrade"
+            ? "三轮降档只沉淀修复流程，下一轮仍先跑小样本，禁止直接复用加码结论。"
           : "只允许小批继续验证，等至少两批稳定后再写入可复用打法。"
         : recoveryBatches > 0
           ? "恢复放量已经连续稳定，可作为观察平台解除闸门后的参考打法，但新项目仍先跑小样本。"
+          : thirdRoundMode === "stable"
+            ? "三轮稳住批次连续健康，可作为新项目开书参考，但首轮仍要小步验证并回填真实数据。"
           : "可以进入新项目开书参考，但仍保留小步验证和回执追踪。";
 
     return {

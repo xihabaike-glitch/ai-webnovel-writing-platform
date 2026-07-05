@@ -87,6 +87,19 @@ function adoptionFollowupEvidence(plan: TaskQueueExecutionPlan) {
   return plan.adoptionFollowupCount > 0 ? `采纳闭环：${plan.adoptionFollowupCount} 个，执行后必须回总闸门复检。` : null;
 }
 
+function thirdRoundBatchMode(plan: TaskQueueExecutionPlan) {
+  const labels = plan.strategyBases.map((basis) => `${basis.label} ${basis.primaryTactic} ${basis.risk}`).join(" ");
+  if (/三轮降档/u.test(labels)) return "downgrade";
+  if (/三轮稳住/u.test(labels)) return "stable";
+  return null;
+}
+
+function thirdRoundEvidence(mode: ReturnType<typeof thirdRoundBatchMode>) {
+  if (mode === "stable") return "三轮复盘：稳定加码批次仍需回收曝光、点击、收藏和追读。";
+  if (mode === "downgrade") return "三轮复盘：降档修复批次只验证修复流程，不沉淀为放量结论。";
+  return null;
+}
+
 function withAdoptionFollowupReturn(plan: TaskQueueExecutionPlan, receipt: TaskQueueBatchReceipt): TaskQueueBatchReceipt {
   if (plan.adoptionFollowupCount === 0 || receipt.status !== "continue") return receipt;
   return {
@@ -130,6 +143,7 @@ export function buildTaskQueueBatchReceipt(input: {
   const evidenceItems = [
     `执行批次：${input.plan.actionLabel}`,
     adoptionFollowupEvidence(input.plan),
+    thirdRoundEvidence(thirdRoundBatchMode(input.plan)),
     `成功/失败：${input.routeEffectSummary.succeededTasks}/${input.routeEffectSummary.failedTasks}`,
     `成功率：${input.routeEffectSummary.successRatePercent}%`,
     `质量：${quality ?? "缺样本"}`,
@@ -146,6 +160,7 @@ export function buildTaskQueueBatchReceipt(input: {
     ? sampleCompletionEvidenceTemplate({ ...input, passed: samplePassed })
     : undefined;
   const scaleUpRecovery = input.plan.scaleGate === "cleared";
+  const thirdRoundMode = thirdRoundBatchMode(input.plan);
 
   if (failed.length > 0 || input.routeEffectSummary.successRatePercent < 80) {
     return {
@@ -163,6 +178,25 @@ export function buildTaskQueueBatchReceipt(input: {
       warnings: [
         input.routeEffectSummary.verdict,
         "失败批次不要继续放大，先修配置、重试样本或降级模型路线。",
+      ],
+    };
+  }
+
+  if (thirdRoundMode === "stable" && (quality === null || quality < 85)) {
+    return {
+      status: "review_quality",
+      headline: "三轮稳住批次未站住，先停加码",
+      detail: quality === null
+        ? "这批来自三轮稳住打法，但缺少质量复查样本。没有质量证据，就不能把它写成稳定加码。"
+        : `这批来自三轮稳住打法，平均质量 ${quality} 分，没到 85 分健康线。先修正文，再决定是否继续加码。`,
+      primaryLabel: "回到 AI 生产线",
+      primaryHref: `${projectBase}#ai-pipeline`,
+      secondaryLabel: "查看任务队列",
+      secondaryHref: "/tasks",
+      evidenceItems,
+      warnings: [
+        input.routeEffectSummary.verdict,
+        "三轮稳住不是免检牌。批量质量低于 85 时，稳定加码结论必须回撤为观察。",
       ],
     };
   }
@@ -226,8 +260,10 @@ export function buildTaskQueueBatchReceipt(input: {
   if (sampleOnly) {
     return withAdoptionFollowupReturn(input.plan, {
       status: "continue",
-      headline: "小样本已跑完，先回填验收",
-      detail: "这不是放量完成。把下面的验收依据回填到首日小样本派单，系统才会判断是否解除观察闸门。",
+      headline: thirdRoundMode === "downgrade" ? "三轮降档小样本已跑完，先回填验收" : "小样本已跑完，先回填验收",
+      detail: thirdRoundMode === "downgrade"
+        ? "这只证明修复流程可以继续复验，不证明可以放量。把验收依据回填后，再由总闸门判断是否继续观察。"
+        : "这不是放量完成。把下面的验收依据回填到首日小样本派单，系统才会判断是否解除观察闸门。",
       primaryLabel: "回任务中心验收",
       primaryHref: "/dispatch",
       secondaryLabel: "查看任务队列",
@@ -236,7 +272,25 @@ export function buildTaskQueueBatchReceipt(input: {
       completionEvidenceTemplate: sampleTemplate,
       warnings: [
         input.routeEffectSummary.verdict,
+        thirdRoundMode === "downgrade" ? "三轮降档批次只沉淀修复流程，不沉淀加码结论。" : null,
         "别继续点批量。先完成小样本验收，再让系统决定是否恢复后续初稿批次。",
+      ].filter((warning): warning is string => Boolean(warning)),
+    });
+  }
+
+  if (thirdRoundMode === "downgrade") {
+    return withAdoptionFollowupReturn(input.plan, {
+      status: "continue",
+      headline: "三轮降档批次只能回闸门复检",
+      detail: "本批结果可以作为修复样本，但不能直接沉淀为放量打法。先回总闸门看通过线、不可接受项和复查证据是否闭合。",
+      primaryLabel: "回总闸门复检",
+      primaryHref: "/gate",
+      secondaryLabel: next.primaryLabel,
+      secondaryHref: next.primaryHref,
+      evidenceItems,
+      warnings: [
+        input.routeEffectSummary.verdict,
+        "三轮降档通过后也只是修复流程可继续，下一步仍按小样本和平台数据复验。",
       ],
     });
   }
@@ -260,8 +314,10 @@ export function buildTaskQueueBatchReceipt(input: {
 
   return withAdoptionFollowupReturn(input.plan, {
     status: "continue",
-    headline: next.headline,
-    detail: next.detail,
+    headline: thirdRoundMode === "stable" ? "三轮稳住批次健康，继续小步加码" : next.headline,
+    detail: thirdRoundMode === "stable"
+      ? "本批达到稳定加码健康线，但仍然只代表这一轮可继续推进。下一批继续回收曝光、点击、收藏、追读和质量分。"
+      : next.detail,
     primaryLabel: next.primaryLabel,
     primaryHref: next.primaryHref,
     secondaryLabel: "查看任务队列",
@@ -269,8 +325,9 @@ export function buildTaskQueueBatchReceipt(input: {
     evidenceItems,
     warnings: [
       input.routeEffectSummary.verdict,
+      thirdRoundMode === "stable" ? "三轮稳住通过本批健康线，但下一批仍保持小步加码和真实数据回收。" : null,
       input.plan.strategyBases[0] ? `沿用打法：${input.plan.strategyBases[0].label}。` : "执行后继续回填数据，形成可复用打法。",
-    ],
+    ].filter((warning): warning is string => Boolean(warning)),
   });
 }
 

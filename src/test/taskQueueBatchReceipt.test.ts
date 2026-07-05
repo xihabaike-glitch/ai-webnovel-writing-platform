@@ -231,6 +231,93 @@ test("buildTaskQueueBatchReceipt keeps healthy cleared watch scale-up batches sm
   assert.ok(receipt.warnings.some((warning) => warning.includes("下一批仍看成功率")));
 });
 
+test("buildTaskQueueBatchReceipt rolls back weak third-round stable batches to watch", () => {
+  const receipt = buildTaskQueueBatchReceipt({
+    plan: {
+      ...plan,
+      strategyBases: [{
+        ...plan.strategyBases[0],
+        label: "三轮稳住",
+        primaryTactic: "三轮数据已站住，可以小批放大。",
+        risk: "稳定加码不是无限放量。",
+      }],
+      actionLabel: "批量初稿 2 个",
+    },
+    results: [
+      { status: "succeeded", taskId: "task-2", chapterTitle: "第二章", error: null, qualityScore: 84 },
+      { status: "succeeded", taskId: "task-3", chapterTitle: "第三章", error: null, qualityScore: 84 },
+    ],
+    routeEffectSummary: {
+      ...routeEffect,
+      totalTasks: 2,
+      succeededTasks: 2,
+      averageQualityScore: 84,
+      knownCostUsd: 0.02,
+      verdict: "三轮稳住批次质量偏紧。",
+    },
+  });
+
+  assert.equal(receipt.status, "review_quality");
+  assert.equal(receipt.headline, "三轮稳住批次未站住，先停加码");
+  assert.ok(receipt.evidenceItems.some((item) => item.includes("三轮复盘")));
+  assert.ok(receipt.warnings.some((warning) => warning.includes("稳定加码结论必须回撤")));
+});
+
+test("buildTaskQueueBatchReceipt keeps healthy third-round stable batches small-step", () => {
+  const receipt = buildTaskQueueBatchReceipt({
+    plan: {
+      ...plan,
+      strategyBases: [{
+        ...plan.strategyBases[0],
+        label: "三轮稳住",
+        primaryTactic: "三轮数据已站住，可以小批放大。",
+        risk: "稳定加码不是无限放量。",
+      }],
+      actionLabel: "批量初稿 2 个",
+    },
+    results: [
+      { status: "succeeded", taskId: "task-2", chapterTitle: "第二章", error: null, qualityScore: 88 },
+      { status: "succeeded", taskId: "task-3", chapterTitle: "第三章", error: null, qualityScore: 88 },
+    ],
+    routeEffectSummary: {
+      ...routeEffect,
+      totalTasks: 2,
+      succeededTasks: 2,
+      averageQualityScore: 88,
+      knownCostUsd: 0.02,
+      verdict: "三轮稳住批次健康。",
+    },
+  });
+
+  assert.equal(receipt.status, "continue");
+  assert.equal(receipt.headline, "三轮稳住批次健康，继续小步加码");
+  assert.ok(receipt.detail.includes("曝光、点击、收藏、追读"));
+  assert.ok(receipt.warnings.some((warning) => warning.includes("真实数据回收")));
+});
+
+test("buildTaskQueueBatchReceipt keeps third-round downgrade samples out of scale-up", () => {
+  const receipt = buildTaskQueueBatchReceipt({
+    plan: {
+      ...plan,
+      scaleGate: "sample_only",
+      strategyBases: [{
+        ...plan.strategyBases[0],
+        label: "三轮降档",
+        primaryTactic: "只复用修复流程。",
+        risk: "不能直接进入稳定加码。",
+      }],
+      actionLabel: "批量初稿 1 个",
+    },
+    results: [{ status: "succeeded", taskId: "task-1", chapterTitle: "第一章", error: null, qualityScore: 86 }],
+    routeEffectSummary: routeEffect,
+  });
+
+  assert.equal(receipt.status, "continue");
+  assert.equal(receipt.headline, "三轮降档小样本已跑完，先回填验收");
+  assert.ok(receipt.detail.includes("不证明可以放量"));
+  assert.ok(receipt.warnings.some((warning) => warning.includes("不沉淀加码结论")));
+});
+
 test("buildTaskQueueBatchReceipt routes adoption follow-up batches back to the gate", () => {
   const receipt = buildTaskQueueBatchReceipt({
     plan: {

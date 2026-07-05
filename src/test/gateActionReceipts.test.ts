@@ -430,6 +430,110 @@ test("buildGateActionReceipt", async (t) => {
     assert.ok(review.items[0]?.nextAction.includes("新项目仍先跑小样本"));
   });
 
+  await t.test("keeps a single healthy third-round stable batch in watch", () => {
+    const tactic = {
+      title: "首轮平台打法：番茄小说",
+      label: "三轮稳住",
+      primaryTactic: "三轮数据已站住，可以小批放大。",
+      openingMove: "第一段给不可逆危机。",
+      verificationMove: "继续回填曝光、点击、收藏和追读。",
+      risk: "稳定加码不是无限放量。",
+    };
+    const receipt = buildGateActionReceipt({
+      action,
+      status: "succeeded",
+      now: "2026-01-01T00:00:00.000Z",
+      payload: {
+        results: [{ status: "succeeded", taskId: "task-1" }, { status: "succeeded", taskId: "task-2" }],
+        routeEffectSummary: { successRatePercent: 100, knownCostUsd: 0.02, averageQualityScore: 88 },
+        plan: { strategyBases: [tactic], actionLabel: "批量初稿 2 个", category: "draft" },
+        batchReceipt: { status: "continue", headline: "三轮稳住批次健康，继续小步加码" },
+      },
+    });
+    const review = buildGateBatchTacticEffectReview([receipt]);
+
+    assert.equal(review.items[0]?.status, "watch");
+    assert.equal(review.items[0]?.label, "三轮稳住观察");
+    assert.ok(review.items[0]?.evidence[0].includes("三轮稳住"));
+    assert.ok(review.items[0]?.nextAction.includes("曝光、点击、收藏和追读"));
+  });
+
+  await t.test("turns repeated healthy third-round stable batches into cautious reusable tactics", () => {
+    const tactic = {
+      title: "首轮平台打法：番茄小说",
+      label: "三轮稳住",
+      primaryTactic: "三轮数据已站住，可以小批放大。",
+      openingMove: "第一段给不可逆危机。",
+      verificationMove: "继续回填曝光、点击、收藏和追读。",
+      risk: "稳定加码不是无限放量。",
+    };
+    const first = buildGateActionReceipt({
+      action,
+      status: "succeeded",
+      now: "2026-01-01T00:00:00.000Z",
+      payload: {
+        results: [{ status: "succeeded", taskId: "task-1" }, { status: "succeeded", taskId: "task-2" }],
+        routeEffectSummary: { successRatePercent: 100, knownCostUsd: 0.02, averageQualityScore: 88 },
+        plan: { strategyBases: [tactic], actionLabel: "批量初稿 2 个", category: "draft" },
+        batchReceipt: { status: "continue", headline: "三轮稳住批次健康，继续小步加码" },
+      },
+    });
+    const second = buildGateActionReceipt({
+      action,
+      status: "succeeded",
+      now: "2026-01-02T00:00:00.000Z",
+      payload: {
+        results: [{ status: "succeeded", taskId: "task-3" }, { status: "succeeded", taskId: "task-4" }],
+        routeEffectSummary: { successRatePercent: 100, knownCostUsd: 0.02, averageQualityScore: 90 },
+        plan: { strategyBases: [tactic], actionLabel: "批量初稿 2 个", category: "draft" },
+        batchReceipt: { status: "continue", headline: "三轮稳住批次健康，继续小步加码" },
+      },
+    });
+    const review = buildGateBatchTacticEffectReview([second, first]);
+
+    assert.equal(review.items[0]?.status, "usable");
+    assert.equal(review.items[0]?.label, "三轮稳住打法");
+    assert.ok(review.items[0]?.nextAction.includes("小步验证"));
+  });
+
+  await t.test("keeps third-round downgrade batches as repair observation even when repeated", () => {
+    const tactic = {
+      title: "首轮平台打法：七猫",
+      label: "三轮降档",
+      primaryTactic: "只复用修复流程。",
+      openingMove: "重修前三章兑现。",
+      verificationMove: "小样本通过后再放大。",
+      risk: "不能直接进入稳定加码。",
+    };
+    const first = buildGateActionReceipt({
+      action,
+      status: "succeeded",
+      now: "2026-01-01T00:00:00.000Z",
+      payload: {
+        results: [{ status: "succeeded", taskId: "task-1" }],
+        routeEffectSummary: { successRatePercent: 100, knownCostUsd: 0.01, averageQualityScore: 88 },
+        plan: { strategyBases: [tactic], scaleGate: "sample_only", actionLabel: "批量初稿 1 个", category: "draft" },
+        batchReceipt: { status: "continue", headline: "三轮降档小样本已跑完，先回填验收" },
+      },
+    });
+    const second = buildGateActionReceipt({
+      action,
+      status: "succeeded",
+      now: "2026-01-02T00:00:00.000Z",
+      payload: {
+        results: [{ status: "succeeded", taskId: "task-2" }],
+        routeEffectSummary: { successRatePercent: 100, knownCostUsd: 0.01, averageQualityScore: 90 },
+        plan: { strategyBases: [tactic], scaleGate: "sample_only", actionLabel: "批量初稿 1 个", category: "draft" },
+        batchReceipt: { status: "continue", headline: "三轮降档小样本已跑完，先回填验收" },
+      },
+    });
+    const review = buildGateBatchTacticEffectReview([second, first]);
+
+    assert.equal(review.items[0]?.status, "watch");
+    assert.equal(review.items[0]?.label, "三轮降档观察");
+    assert.ok(review.items[0]?.nextAction.includes("禁止直接复用加码结论"));
+  });
+
   await t.test("restores recommended batch receipts from persisted audits", () => {
     const receipt = gateActionReceiptFromAuditRecord({
       receiptId: "recommended-batch:standard:draft:project-1:2026-01-01T00:00:00.000Z",

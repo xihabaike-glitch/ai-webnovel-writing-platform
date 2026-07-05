@@ -4490,6 +4490,48 @@ test("buildGateActionReceipt", async (t) => {
     assert.equal(generic, null);
   });
 
+  await t.test("builds AI pipeline recovery follow-up dispatches as sample or rollback work", () => {
+    const base = {
+      platformId: "ai-pipeline",
+      platformName: "AI 写审改",
+      label: "观察样本",
+      tactic: "恢复放量观察",
+      lesson: "AI 写审改恢复小批已完成，但只能继续观察。",
+      reuseHint: "继续观察恢复小批，不要把一次完成依据误判为可复用放量结论。",
+      risk: "缺少连续稳定样本前，不允许扩大恢复放量批次。",
+      href: "/projects/project-1#ai-pipeline",
+      sourceStatus: "healthy" as const,
+      priorityScore: 94,
+      latestAt: "2026-01-01T00:00:00.000Z",
+      evidence: ["AI 写审改恢复闭环：继续观察", "恢复阶段：恢复小批"],
+    };
+    const watch = buildGatePlatformTacticExperienceFollowupDispatch({
+      ...base,
+      status: "watch",
+      sourceLabel: "AI 恢复观察",
+    });
+    const blocked = buildGatePlatformTacticExperienceFollowupDispatch({
+      ...base,
+      status: "blocked",
+      label: "避坑样本",
+      tactic: "恢复放量避坑",
+      sourceLabel: "AI 恢复避坑",
+      evidence: ["AI 写审改恢复闭环：暂停", "恢复阶段：回滚修复"],
+      risk: "暂停恢复小批",
+    });
+
+    assert.equal(watch?.stage, "ai_pipeline_sample_recheck");
+    assert.equal(watch?.actionLabel, "继续小样本");
+    assert.ok(watch?.title.includes("小样本复验"));
+    assert.ok(watch?.detail.includes("不回推荐批量"));
+    assert.ok(watch?.acceptanceCriteria.some((line) => line.includes("1 章小样本")));
+    assert.ok(watch?.evidence.includes("下一步：继续小样本"));
+    assert.equal(blocked?.stage, "ai_pipeline_sample_recheck");
+    assert.equal(blocked?.actionLabel, "回滚观察修复");
+    assert.ok(blocked?.title.includes("恢复小批跌线修复"));
+    assert.ok(blocked?.acceptanceCriteria.some((line) => line.includes("暂停恢复小批")));
+  });
+
   await t.test("feeds completed recovery follow-up dispatches back into tactic experience", () => {
     const base = {
       platformId: "fanqie",

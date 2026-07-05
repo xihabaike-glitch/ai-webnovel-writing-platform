@@ -1014,9 +1014,15 @@ export function buildGatePlatformTacticExperienceFollowupDispatch(
   const keyTactic = safeDispatchKeyPart(`${item.status}-${item.tactic}-${item.sourceLabel}`) || "recovery";
   const dispatchKey = `${item.platformId}:tactic_experience_followup:${keyTactic}:${safeDispatchKeyPart(latestDay)}`;
   const persisted = persistedTasks.find((task) => task.dispatchKey === dispatchKey);
+  const aiPipelineRecovery = item.platformId === "ai-pipeline" || item.sourceLabel.startsWith("AI 恢复");
+  const displayNextStepLabel = aiPipelineRecovery && item.status === "watch"
+    ? "继续小样本"
+    : aiPipelineRecovery && item.status === "blocked"
+      ? "回滚观察修复"
+      : display.nextStepLabel;
   const commonEvidence = [
     `经验结论：${display.outcomeLabel}`,
-    `下一步：${display.nextStepLabel}`,
+    `下一步：${displayNextStepLabel}`,
     `打法：${item.tactic}`,
     ...item.evidence,
   ].slice(0, 6);
@@ -1024,7 +1030,37 @@ export function buildGatePlatformTacticExperienceFollowupDispatch(
   const spec: Pick<
     GatePlatformGrowthDispatchItem,
     "stage" | "priorityScore" | "ownerRole" | "title" | "detail" | "dueLabel" | "actionLabel" | "acceptanceCriteria"
-  > = item.status === "blocked"
+  > = aiPipelineRecovery && item.status === "blocked"
+    ? {
+        stage: "ai_pipeline_sample_recheck",
+        priorityScore: Math.max(item.priorityScore, 96),
+        ownerRole: "写作制片 / 审稿负责人",
+        title: `${item.platformName}：恢复小批跌线修复`,
+        detail: "AI 写审改恢复小批已经进入暂停避坑，先回滚观察修复，修低分章节、开头钩子和章末追读，再重新跑 1 章小样本。",
+        dueLabel: "今天先修",
+        actionLabel: "回滚观察修复",
+        acceptanceCriteria: [
+          "已写明暂停恢复小批原因",
+          "已修复低分章节、开头钩子或章末追读弱项",
+          "修复后只允许重新跑 1 章小样本，不直接回推荐批量",
+        ],
+      }
+    : aiPipelineRecovery && item.status === "watch"
+      ? {
+          stage: "ai_pipeline_sample_recheck",
+          priorityScore: Math.max(item.priorityScore, 88),
+          ownerRole: "写作制片 / 审稿负责人",
+          title: `${item.platformName}：恢复观察小样本复验`,
+          detail: "AI 写审改恢复依据还在观察期，只准继续 1 章小样本复验，不回推荐批量，过线后再考虑恢复小批。",
+          dueLabel: "今天先跑 1 章",
+          actionLabel: "继续小样本",
+          acceptanceCriteria: [
+            "已跑 1 章小样本复验",
+            "已记录成功率、质量、失败/成本和放量结论",
+            "小样本未过线前不回推荐批量",
+          ],
+        }
+      : item.status === "blocked"
     ? {
         stage: "repair_tactic",
         priorityScore: Math.max(item.priorityScore, 92),

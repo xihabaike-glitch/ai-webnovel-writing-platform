@@ -133,10 +133,9 @@ export function GateFirstThreeAdoptionPanel({ closure }: { closure: PrePublishGa
   const reviewBatchItems = runnableReviewItems(closure.items);
   const publishBatchItems = runnablePublishItems(closure.items);
   const visibleRepairQueue = closure.repairQueue.slice(0, 4);
-  const primaryRepairItem = closure.repairQueue
-    .map((item) => itemsById.get(item.followupItemId) ?? null)
-    .find((item): item is PrePublishGateAdoptionFollowupItem => Boolean(item && executeLabel(item))) ?? null;
-  const primaryRepairLabel = primaryRepairItem ? executeLabel(primaryRepairItem) : null;
+  const topRepairQueueItem = closure.repairQueue[0] ?? null;
+  const topRepairFollowupItem = topRepairQueueItem ? itemsById.get(topRepairQueueItem.followupItemId) ?? null : null;
+  const topRepairExecuteLabel = topRepairFollowupItem ? executeLabel(topRepairFollowupItem) : null;
 
   useEffect(() => {
     setFollowupResults((current) => {
@@ -313,17 +312,25 @@ export function GateFirstThreeAdoptionPanel({ closure }: { closure: PrePublishGa
           </div>
         </div>
       </div>
-      {reviewBatchItems.length || publishBatchItems.length ? (
+      {topRepairQueueItem || reviewBatchItems.length || publishBatchItems.length ? (
         <div className="mt-3 flex flex-wrap items-center gap-2">
-          {primaryRepairItem && primaryRepairLabel ? (
+          {topRepairFollowupItem && topRepairExecuteLabel ? (
             <button
               className="rounded-md bg-rose-700 px-3 py-2 text-xs font-medium text-white disabled:opacity-50"
               disabled={runningId !== null}
-              onClick={() => void runFollowup(primaryRepairItem)}
+              onClick={() => void runFollowup(topRepairFollowupItem)}
               type="button"
             >
-              {runningId === primaryRepairItem.id ? "修复中" : `优先修复：${primaryRepairLabel}`}
+              {runningId === topRepairFollowupItem.id ? "修复中" : `优先修复：${topRepairExecuteLabel}`}
             </button>
+          ) : null}
+          {topRepairQueueItem && (!topRepairFollowupItem || !topRepairExecuteLabel) ? (
+            <Link
+              className="rounded-md bg-rose-700 px-3 py-2 text-xs font-medium text-white hover:bg-rose-800"
+              href={topRepairQueueItem.href}
+            >
+              优先处理：{topRepairQueueItem.actionLabel}
+            </Link>
           ) : null}
           {reviewBatchItems.length ? (
             <button

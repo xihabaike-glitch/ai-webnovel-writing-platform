@@ -284,6 +284,12 @@ export function ProjectControlDashboardPanel({ projectId }: { projectId: string 
       const payload = await response.json() as {
         message?: string;
         error?: string;
+        targetAnchor?: string;
+        draftHandoff?: {
+          readyDraftCount: number;
+          nextAction: string;
+          targetAnchor: string;
+        };
         qualityGate?: { score: number; issues: string[] };
       };
       if (!response.ok) {
@@ -294,7 +300,14 @@ export function ProjectControlDashboardPanel({ projectId }: { projectId: string 
       }
       await loadDashboard();
       const quality = payload.qualityGate ? `质检 ${payload.qualityGate.score} 分。` : "";
-      setMessage([payload.message ?? "动作已完成。", quality].filter(Boolean).join(" "));
+      const handoff = payload.draftHandoff && payload.draftHandoff.readyDraftCount > 0
+        ? `可初稿 ${payload.draftHandoff.readyDraftCount} 章。${payload.draftHandoff.nextAction}`
+        : "";
+      setMessage([payload.message ?? "动作已完成。", handoff, quality].filter(Boolean).join(" "));
+      const targetAnchor = payload.draftHandoff?.targetAnchor ?? payload.targetAnchor;
+      if (targetAnchor && typeof window !== "undefined") {
+        window.location.hash = targetAnchor;
+      }
     } catch (caught) {
       setMessage(caught instanceof Error ? caught.message : "执行总控动作失败。");
     } finally {
@@ -319,14 +332,23 @@ export function ProjectControlDashboardPanel({ projectId }: { projectId: string 
         message?: string;
         error?: string;
         targetAnchor?: string;
+        draftHandoff?: {
+          readyDraftCount: number;
+          nextAction: string;
+          targetAnchor: string;
+        };
       };
       if (!response.ok) {
         throw new Error(payload.error ?? "补齐写作底座失败。");
       }
       await loadDashboard();
-      setMessage(payload.message ?? "写作底座已补齐一轮。");
-      if (payload.targetAnchor && typeof window !== "undefined") {
-        window.location.hash = payload.targetAnchor;
+      const handoff = payload.draftHandoff && payload.draftHandoff.readyDraftCount > 0
+        ? `可初稿 ${payload.draftHandoff.readyDraftCount} 章。${payload.draftHandoff.nextAction}`
+        : "";
+      setMessage([payload.message ?? "写作底座已补齐一轮。", handoff].filter(Boolean).join(" "));
+      const targetAnchor = payload.draftHandoff?.targetAnchor ?? payload.targetAnchor;
+      if (targetAnchor && typeof window !== "undefined") {
+        window.location.hash = targetAnchor;
       }
     } catch (caught) {
       setMessage(caught instanceof Error ? caught.message : "补齐写作底座失败。");

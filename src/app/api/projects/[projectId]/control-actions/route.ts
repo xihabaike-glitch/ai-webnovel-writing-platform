@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
+import { buildBatchDraftQueue } from "@/lib/ai/batchDrafts";
 import { getPlatformProfile, type PlatformId } from "@/lib/platforms/platformProfiles";
 import { generateControlAssets, type ControlAssetAreaId } from "@/lib/projects/controlAssetGeneration";
 import {
   buildChapterCardActionSeeds,
+  buildChapterCardDraftHandoff,
   buildCharacterActionSeeds,
   buildOutlineActionSeeds,
   buildStoryLineActionSeeds,
@@ -210,7 +212,30 @@ export async function POST(request: Request, { params }: Params) {
       }
     });
 
-    return NextResponse.json(result(areaId, "chapter-production", created));
+    const [chapters, draftTasks] = await Promise.all([
+      prisma.chapter.findMany({
+        where: { projectId },
+        orderBy: { order: "asc" },
+      }),
+      prisma.aiTask.findMany({
+        where: {
+          projectId,
+          taskType: "chapter_draft",
+        },
+        select: {
+          chapterId: true,
+          status: true,
+        },
+        orderBy: { createdAt: "desc" },
+      }),
+    ]);
+    const draftHandoff = buildChapterCardDraftHandoff(buildBatchDraftQueue(chapters, draftTasks, platform));
+    const baseResult = result(areaId, "chapter-production", created);
+
+    return NextResponse.json({
+      ...baseResult,
+      draftHandoff,
+    });
   }
 
   return NextResponse.json({

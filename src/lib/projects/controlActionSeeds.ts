@@ -1,5 +1,6 @@
 import { buildDefaultOutlineNodes } from "../outlines/defaultOutline.ts";
 import type { PlatformProfile } from "../platforms/platformProfiles.ts";
+import type { BatchDraftQueue } from "../ai/batchDrafts.ts";
 import { buildChapterCardFromOutline, type ChapterCardDraft } from "../chapters/chapterFromOutline.ts";
 
 export interface SeedProject {
@@ -74,6 +75,14 @@ export interface OutlineNodeCreateSeed {
 
 export interface ChapterCardActionSeed extends ChapterCardDraft {
   outlineNodeId: string;
+}
+
+export interface ChapterCardDraftHandoff {
+  readyDraftCount: number;
+  recommendedChapterIds: string[];
+  headline: string;
+  nextAction: string;
+  targetAnchor: string;
 }
 
 function includesPattern(value: string, pattern: RegExp) {
@@ -300,4 +309,29 @@ export function buildChapterCardActionSeeds(input: {
       },
     }),
   }));
+}
+
+export function buildChapterCardDraftHandoff(queue: BatchDraftQueue): ChapterCardDraftHandoff {
+  const readyDraftCount = queue.readyCandidates;
+  const recommendedChapterIds = queue.recommendedChapterIds;
+  if (readyDraftCount > 0) {
+    return {
+      readyDraftCount,
+      recommendedChapterIds,
+      headline: `已接入批量初稿队列，当前 ${readyDraftCount} 章可生成正文。`,
+      nextAction: recommendedChapterIds.length > 1
+        ? `先跑前 ${recommendedChapterIds.length} 章小批初稿，生成后立刻审稿和二改。`
+        : "先跑 1 章初稿样本，确认平台风格和质量后再放量。",
+      targetAnchor: "ai-pipeline",
+    };
+  }
+
+  const warning = queue.warnings[0] ?? "当前章节卡还不能进入初稿队列。";
+  return {
+    readyDraftCount,
+    recommendedChapterIds,
+    headline: "章节卡已生成，但暂时还不能进入批量初稿。",
+    nextAction: warning,
+    targetAnchor: "ai-pipeline",
+  };
 }

@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { getPlatformProfile } from "../lib/platforms/platformProfiles.ts";
 import {
   buildChapterCardActionSeeds,
+  buildChapterCardDraftHandoff,
   buildCharacterActionSeeds,
   buildOutlineActionSeeds,
   buildStoryLineActionSeeds,
@@ -89,6 +90,36 @@ test("control action seeds", async (t) => {
     assert.equal(seeds[1].title, "第4章 主线：系统主干");
     assert.equal(seeds[2].goal, "落一个爽点。");
     assert.ok(seeds.every((seed) => seed.status === "outline"));
+  });
+
+  await t.test("builds a draft handoff after chapter cards become ready", () => {
+    const handoff = buildChapterCardDraftHandoff({
+      totalCandidates: 3,
+      readyCandidates: 3,
+      recommendedChapterIds: ["chapter-1", "chapter-2", "chapter-3"],
+      warnings: [],
+      candidates: [],
+    });
+
+    assert.equal(handoff.readyDraftCount, 3);
+    assert.equal(handoff.targetAnchor, "ai-pipeline");
+    assert.ok(handoff.headline.includes("批量初稿队列"));
+    assert.ok(handoff.nextAction.includes("小批初稿"));
+  });
+
+  await t.test("keeps draft handoff blocked when generated cards are not ready", () => {
+    const handoff = buildChapterCardDraftHandoff({
+      totalCandidates: 1,
+      readyCandidates: 0,
+      recommendedChapterIds: [],
+      warnings: ["存在平台风格体检未达标章节，先补强钩子、冲突或章末悬念。"],
+      candidates: [],
+    });
+
+    assert.equal(handoff.readyDraftCount, 0);
+    assert.equal(handoff.recommendedChapterIds.length, 0);
+    assert.ok(handoff.headline.includes("暂时还不能"));
+    assert.ok(handoff.nextAction.includes("平台风格"));
   });
 
   await t.test("builds strict JSON prompts for AI control assets", () => {

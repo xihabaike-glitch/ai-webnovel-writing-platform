@@ -140,7 +140,24 @@ export interface MultiPlatformDecisionBoard {
   primaryPlatformId: string | null;
   primaryPlatformName: string | null;
   lanes: MultiPlatformDecisionLane[];
+  tasks: MultiPlatformDecisionTask[];
   nextActions: string[];
+}
+
+export interface MultiPlatformDecisionTask {
+  id: string;
+  platformId: string;
+  platformName: string;
+  kind: MultiPlatformDecisionKind;
+  ownerRole: "增长运营" | "平台编辑" | "数据编辑" | "主编";
+  priorityScore: number;
+  title: string;
+  detail: string;
+  dueLabel: string;
+  actionLabel: string;
+  href: "#publish-effect-panel" | "#submission-package" | "#platform-export";
+  acceptanceCriteria: string[];
+  evidence: string[];
 }
 
 export interface MultiPlatformSubmissionArchivePlatform {
@@ -620,6 +637,97 @@ function laneOrder(kind: MultiPlatformDecisionKind) {
   return order[kind];
 }
 
+function decisionOwnerRole(kind: MultiPlatformDecisionKind): MultiPlatformDecisionTask["ownerRole"] {
+  if (kind === "main" || kind === "scale" || kind === "pause") return "增长运营";
+  if (kind === "repair" || kind === "prepare_package") return "平台编辑";
+  if (kind === "collect_data" || kind === "watch") return "数据编辑";
+  return "主编";
+}
+
+function decisionDueLabel(kind: MultiPlatformDecisionKind) {
+  if (kind === "main" || kind === "scale") return "今天";
+  if (kind === "repair" || kind === "prepare_package") return "24 小时内";
+  if (kind === "collect_data") return "投放后 24 小时";
+  if (kind === "watch") return "下一轮数据后";
+  return "本周复盘";
+}
+
+function decisionAcceptanceCriteria(variant: MultiPlatformSubmissionVariant) {
+  const kind = variant.decision.kind;
+  if (kind === "main") {
+    return [
+      "确认主平台更新节奏和标题简介不乱改。",
+      "记录下一轮曝光、点击、收藏、追读和编辑反馈。",
+      "保留当前有效投稿包作为对照版本。",
+    ];
+  }
+  if (kind === "scale") {
+    return [
+      "只做小步加码，不一次性铺满所有平台。",
+      "下一轮样本继续回填点击率、收藏率和追读率。",
+      "保留本轮标题、简介、标签和前三章作为对照。",
+    ];
+  }
+  if (kind === "repair") {
+    return [
+      "重写标题、简介、标签或前三章钩子中的至少一项。",
+      "修复后生成第二轮小样本投稿包。",
+      "第二轮必须与当前弱数据做前后对照。",
+    ];
+  }
+  if (kind === "prepare_package") {
+    return [
+      "补齐缺失字段并重新生成平台投稿包。",
+      "字段矩阵不得出现缺失项。",
+      "归档包里能看到该平台的单平台 Markdown。",
+    ];
+  }
+  if (kind === "collect_data") {
+    return [
+      "完成 1 个小样本投放或人工模拟投放记录。",
+      "回填曝光、点击、收藏、追读和反馈。",
+      "数据回来后重新打开投放决策板。",
+    ];
+  }
+  if (kind === "watch") {
+    return [
+      "再收一轮样本，不提前放大或放弃。",
+      "观察点击率是否破 10%、收藏率是否破 3%。",
+      "保留对照版本，避免多变量同时修改。",
+    ];
+  }
+  return [
+    "暂停该平台首轮投入。",
+    "等主平台或相邻平台产生稳定数据后再复盘。",
+  ];
+}
+
+function buildDecisionTasks(variants: MultiPlatformSubmissionVariant[]): MultiPlatformDecisionTask[] {
+  return [...variants]
+    .filter((variant) => variant.decision.kind !== "pause")
+    .sort((left, right) => (
+      laneOrder(left.decision.kind) - laneOrder(right.decision.kind)
+      || right.decision.score - left.decision.score
+      || right.fitScore - left.fitScore
+    ))
+    .slice(0, 5)
+    .map((variant) => ({
+      id: `submission-decision:${variant.platformId}:${variant.decision.kind}`,
+      platformId: variant.platformId,
+      platformName: variant.platformName,
+      kind: variant.decision.kind,
+      ownerRole: decisionOwnerRole(variant.decision.kind),
+      priorityScore: variant.decision.score,
+      title: `${variant.platformName}｜${variant.decision.label}`,
+      detail: variant.decision.reason,
+      dueLabel: decisionDueLabel(variant.decision.kind),
+      actionLabel: variant.decision.label === "补投稿包" ? "补齐投稿包" : variant.decision.label,
+      href: variant.decision.actionHref,
+      acceptanceCriteria: decisionAcceptanceCriteria(variant),
+      evidence: variant.decision.evidence,
+    }));
+}
+
 function buildDecisionBoard(variants: MultiPlatformSubmissionVariant[]): MultiPlatformDecisionBoard {
   const sorted = [...variants].sort((left, right) => (
     right.decision.score - left.decision.score
@@ -672,6 +780,7 @@ function buildDecisionBoard(variants: MultiPlatformSubmissionVariant[]): MultiPl
       .slice(0, 2)
       .map((variant) => `${variant.platformName}：${variant.decision.nextAction}`),
   ].filter(Boolean);
+  const tasks = buildDecisionTasks(variants);
 
   return {
     status,
@@ -679,6 +788,7 @@ function buildDecisionBoard(variants: MultiPlatformSubmissionVariant[]): MultiPl
     primaryPlatformId: primary?.platformId ?? null,
     primaryPlatformName: primary?.platformName ?? null,
     lanes,
+    tasks,
     nextActions,
   };
 }
@@ -794,6 +904,14 @@ export function buildMultiPlatformSubmissionArchive(
     `主平台：${submission.decisionBoard.primaryPlatformName ?? "待确认"}`,
     "",
     ...submission.decisionBoard.nextActions.map((action) => `- ${action}`),
+    "",
+    "## 决策执行单",
+    "",
+    "| 任务 | 负责人 | 优先级 | 截止 | 入口 |",
+    "| --- | --- | ---: | --- | --- |",
+    ...submission.decisionBoard.tasks.map((task) => (
+      `| ${markdownTableCell(task.title)} | ${task.ownerRole} | ${task.priorityScore} | ${task.dueLabel} | ${task.href} |`
+    )),
     "",
     "## 平台清单",
     "",

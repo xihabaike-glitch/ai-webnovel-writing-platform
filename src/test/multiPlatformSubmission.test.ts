@@ -75,6 +75,8 @@ test("buildMultiPlatformSubmission", async (t) => {
     assert.equal(result.effectSummary.needsDataPlatforms, 8);
     assert.equal(result.decisionBoard.status, "no_data");
     assert.ok(result.decisionBoard.lanes.some((lane) => lane.kind === "collect_data"));
+    assert.ok(result.decisionBoard.tasks.some((task) => task.kind === "collect_data" && task.ownerRole === "数据编辑"));
+    assert.ok(result.decisionBoard.tasks.every((task) => task.acceptanceCriteria.length >= 2));
     assert.ok(result.markdown.includes("多平台投稿版本"));
     assert.ok(result.markdown.includes("平台包字段"));
     assert.ok(result.markdown.includes("投放追踪"));
@@ -144,6 +146,7 @@ test("buildMultiPlatformSubmission", async (t) => {
     assert.ok(archive.markdown.includes("| 平台 | 状态 | 追踪 | 字段 | 样章 | 摘要字数 | 文件/待补字段 |"));
     assert.ok(archive.markdown.includes("已就绪平台投稿包"));
     assert.ok(archive.markdown.includes("投放决策板"));
+    assert.ok(archive.markdown.includes("决策执行单"));
     assert.ok(archive.platforms.some((platform) => platform.fileName.includes("夜雨-系统-番茄小说-投稿包.md")));
     const singlePackage = buildSinglePlatformSubmissionMarkdown(fanqie);
     assert.ok(singlePackage.includes("# 夜雨|系统 番茄小说 投稿包"));
@@ -234,6 +237,9 @@ test("buildMultiPlatformSubmission", async (t) => {
     assert.equal(result.decisionBoard.primaryPlatformId, "webnovel");
     assert.ok(result.decisionBoard.lanes.some((lane) => lane.kind === "repair" && lane.count === 1));
     assert.ok(result.decisionBoard.nextActions.some((action) => action.includes("WebNovel")));
+    assert.ok(result.decisionBoard.tasks.some((task) => task.platformId === "webnovel" && task.kind === "main" && task.ownerRole === "增长运营"));
+    assert.ok(result.decisionBoard.tasks.some((task) => task.platformId === "qimao" && task.kind === "repair" && task.ownerRole === "平台编辑"));
+    assert.equal(result.decisionBoard.tasks[0].platformId, "webnovel");
     assert.ok(result.archive.markdown.includes("有苗头"));
   });
 });

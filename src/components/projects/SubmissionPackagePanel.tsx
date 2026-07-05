@@ -122,6 +122,21 @@ interface MultiPlatformSubmission {
       count: number;
       platformIds: string[];
     }>;
+    tasks: Array<{
+      id: string;
+      platformId: string;
+      platformName: string;
+      kind: "main" | "scale" | "watch" | "repair" | "collect_data" | "prepare_package" | "pause";
+      ownerRole: "增长运营" | "平台编辑" | "数据编辑" | "主编";
+      priorityScore: number;
+      title: string;
+      detail: string;
+      dueLabel: string;
+      actionLabel: string;
+      href: "#publish-effect-panel" | "#submission-package" | "#platform-export";
+      acceptanceCriteria: string[];
+      evidence: string[];
+    }>;
     nextActions: string[];
   };
   archive: {
@@ -727,6 +742,30 @@ export function SubmissionPackagePanel({
             <div className="mt-3 grid gap-2">
               {multiPlatform.decisionBoard.nextActions.map((action) => (
                 <div className="rounded-md bg-slate-50 p-2 text-xs leading-5 text-slate-700" key={action}>{action}</div>
+              ))}
+            </div>
+            <div className="mt-3 grid gap-2 lg:grid-cols-2">
+              {multiPlatform.decisionBoard.tasks.map((task) => (
+                <div className="rounded-md border border-slate-200 bg-slate-50 p-3" key={task.id}>
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div>
+                      <div className="text-sm font-medium text-slate-900">{task.title}</div>
+                      <div className="mt-1 text-xs text-slate-500">{task.ownerRole} · {task.dueLabel}</div>
+                    </div>
+                    <span className={`rounded-md px-2 py-1 text-xs font-medium ${decisionStatusClass(task.kind)}`}>
+                      {task.priorityScore}
+                    </span>
+                  </div>
+                  <p className="mt-2 text-xs leading-5 text-slate-600">{task.detail}</p>
+                  <div className="mt-2 grid gap-1 text-xs text-slate-600">
+                    {task.acceptanceCriteria.slice(0, 2).map((criterion) => (
+                      <div key={criterion}>{criterion}</div>
+                    ))}
+                  </div>
+                  <a className="mt-3 inline-flex w-fit rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50" href={task.href}>
+                    {task.actionLabel}
+                  </a>
+                </div>
               ))}
             </div>
           </div>

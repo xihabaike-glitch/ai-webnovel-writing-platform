@@ -832,6 +832,7 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
                   action={entry.effectAction}
                   actionLabel={entry.actionLabel}
                   href={entry.href}
+                  platformName={entry.platformName}
                   projectId={entry.projectId}
                 />
               ) : (

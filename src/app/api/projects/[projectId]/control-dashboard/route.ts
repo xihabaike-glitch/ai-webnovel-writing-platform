@@ -11,28 +11,46 @@ interface Params {
 
 export async function GET(_request: Request, { params }: Params) {
   const { projectId } = await params;
-  const project = await prisma.project.findUnique({
-    where: { id: projectId },
-    include: {
-      chapters: { orderBy: { order: "asc" } },
-      outlineNodes: { orderBy: [{ depth: "asc" }, { order: "asc" }, { createdAt: "asc" }] },
-      characters: { orderBy: { createdAt: "asc" } },
-      worldEntries: { orderBy: [{ type: "asc" }, { createdAt: "asc" }] },
-      foreshadows: { orderBy: { createdAt: "asc" } },
-      plotThreads: { orderBy: { createdAt: "asc" } },
-      aiTasks: { orderBy: { createdAt: "desc" } },
-      publishSnapshots: { orderBy: { createdAt: "desc" }, take: 80 },
-      submissionAssets: { orderBy: { updatedAt: "desc" } },
-      submissionAssetVersions: { orderBy: { createdAt: "desc" }, take: 80 },
-      platformPublishMetrics: { orderBy: { snapshotDate: "desc" }, take: 80 },
-      platformKnowledgeFeedbackReceipts: { orderBy: { createdAt: "desc" }, take: 10 },
-      gateActionAudits: {
-        where: { executionType: "recommended_batch" },
-        orderBy: { createdAt: "desc" },
-        take: 5,
+  const [project, modelProviders, modelRoutes] = await Promise.all([
+    prisma.project.findUnique({
+      where: { id: projectId },
+      include: {
+        chapters: { orderBy: { order: "asc" } },
+        outlineNodes: { orderBy: [{ depth: "asc" }, { order: "asc" }, { createdAt: "asc" }] },
+        characters: { orderBy: { createdAt: "asc" } },
+        worldEntries: { orderBy: [{ type: "asc" }, { createdAt: "asc" }] },
+        foreshadows: { orderBy: { createdAt: "asc" } },
+        plotThreads: { orderBy: { createdAt: "asc" } },
+        aiTasks: {
+          orderBy: { createdAt: "desc" },
+          include: {
+            modelProvider: {
+              select: {
+                providerId: true,
+                displayName: true,
+              },
+            },
+          },
+        },
+        publishSnapshots: { orderBy: { createdAt: "desc" }, take: 80 },
+        submissionAssets: { orderBy: { updatedAt: "desc" } },
+        submissionAssetVersions: { orderBy: { createdAt: "desc" }, take: 80 },
+        platformPublishMetrics: { orderBy: { snapshotDate: "desc" }, take: 80 },
+        platformKnowledgeFeedbackReceipts: { orderBy: { createdAt: "desc" }, take: 10 },
+        gateActionAudits: {
+          where: { executionType: "recommended_batch" },
+          orderBy: { createdAt: "desc" },
+          take: 5,
+        },
       },
-    },
-  });
+    }),
+    prisma.modelProvider.findMany({
+      orderBy: { createdAt: "asc" },
+    }),
+    prisma.modelTaskRoute.findMany({
+      orderBy: { taskType: "asc" },
+    }),
+  ]);
 
   if (!project) {
     return NextResponse.json({ error: "Project not found" }, { status: 404 });
@@ -62,6 +80,11 @@ export async function GET(_request: Request, { params }: Params) {
       targetWordCount: project.targetWordCount,
       currentWordCount: project.currentWordCount,
       updateCadence: project.updateCadence,
+      aiMonthlyBudgetUsd: project.aiMonthlyBudgetUsd,
+      aiMaxTaskCostUsd: project.aiMaxTaskCostUsd,
+      aiMaxBatchCostUsd: project.aiMaxBatchCostUsd,
+      aiMaxFailureRatePercent: project.aiMaxFailureRatePercent,
+      aiBudgetEnforcement: project.aiBudgetEnforcement,
     },
     platform,
     chapters: project.chapters,
@@ -148,6 +171,8 @@ export async function GET(_request: Request, { params }: Params) {
       payload: audit.payload,
       createdAt: audit.createdAt,
     })),
+    modelProviders,
+    modelRoutes,
     submissionChecklist,
   });
 

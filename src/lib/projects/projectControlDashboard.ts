@@ -1,6 +1,7 @@
 import type { PlatformProfile } from "../platforms/platformProfiles.ts";
 import { buildBatchDraftQueue, type BatchDraftTask } from "../ai/batchDrafts.ts";
 import { buildReviewPipelineQueue } from "../ai/batchReviewPipeline.ts";
+import { buildModelTaskAuditDashboard, type ModelAuditProvider, type ModelAuditRoute } from "../ai/modelTaskAudit.ts";
 import { buildCharacterArcDashboard } from "./characterArc.ts";
 import { buildChapterProductionSchedule } from "./chapterProductionSchedule.ts";
 import {
@@ -25,6 +26,11 @@ export interface ControlProject {
   targetWordCount: number;
   currentWordCount: number;
   updateCadence: string;
+  aiMonthlyBudgetUsd?: number | null;
+  aiMaxTaskCostUsd?: number | null;
+  aiMaxBatchCostUsd?: number | null;
+  aiMaxFailureRatePercent?: number | null;
+  aiBudgetEnforcement?: string | null;
 }
 
 export interface ControlChapter {
@@ -100,13 +106,26 @@ export interface ControlPlotThread {
 
 export interface ControlAiTask {
   id: string;
+  projectId?: string | null;
   chapterId: string | null;
   taskType: string;
+  providerConfigId?: string;
+  model?: string;
   status: string;
   outputText: string | null;
   inputSnapshot?: string;
+  inputTokens?: number | null;
+  outputTokens?: number | null;
+  costUsd?: number | null;
   errorMessage: string | null;
   createdAt: Date | string;
+  modelProvider?: {
+    providerId: string;
+    displayName: string;
+  } | null;
+  chapter?: {
+    title: string;
+  } | null;
 }
 
 export interface ControlBatchAudit {
@@ -139,6 +158,8 @@ export interface ProjectControlDashboardInput {
   platformPublishMetrics?: PlatformPublishMetricInput[];
   platformKnowledgeFeedbackReceipts?: ControlPlatformFeedbackReceipt[];
   gateActionAudits?: ControlBatchAudit[];
+  modelProviders?: ModelAuditProvider[];
+  modelRoutes?: ModelAuditRoute[];
   submissionChecklist: SubmissionChecklist;
 }
 
@@ -235,6 +256,7 @@ export interface ProjectControlDashboard {
   storyFoundation: StoryFoundationSummary;
   aiPipelineBatch: AiPipelineBatchSummary;
   aiPipelineRecentBatch: AiPipelineRecentBatchSummary;
+  modelRouteHealth: ModelRouteHealthSummary;
   areas: ControlArea[];
   priorityActions: ControlPriorityAction[];
   criticalActions: string[];
@@ -331,6 +353,28 @@ export interface AiPipelineRecentBatchSummary {
   failedCount: number;
   warnings: string[];
   createdAt: string | null;
+}
+
+export interface ModelRouteHealthSummary {
+  status: "empty" | "healthy" | "watch" | "repair" | "cost_guard";
+  score: number;
+  label: string;
+  headline: string;
+  detail: string;
+  actionLabel: string;
+  targetHref: string;
+  totalTasks: number;
+  successRatePercent: number;
+  failureRatePercent: number;
+  knownCostUsd: number;
+  averageCostPerSucceededTaskUsd: number;
+  fallbackAttemptRatePercent: number;
+  configuredProviders: number;
+  enabledProviders: number;
+  preferredRouteLabels: string[];
+  avoidRouteLabels: string[];
+  warnings: string[];
+  nextActions: string[];
 }
 
 function platformVerdictAction(
@@ -736,6 +780,122 @@ function buildAiPipelineRecentBatchSummary(audits: ControlBatchAudit[] = []): Ai
   };
 }
 
+function modelRouteStatusLabel(status: ModelRouteHealthSummary["status"]) {
+  if (status === "healthy") return "可小批放量";
+  if (status === "repair") return "先修路由";
+  if (status === "cost_guard") return "先控成本";
+  if (status === "watch") return "继续观察";
+  return "缺样本";
+}
+
+function modelRouteTaskLabel(taskLabel: string, providerName: string, model: string) {
+  return `${taskLabel} · ${providerName}/${model}`;
+}
+
+function buildModelRouteHealthSummary(input: ProjectControlDashboardInput): ModelRouteHealthSummary {
+  const audit = buildModelTaskAuditDashboard(
+    input.aiTasks.map((task) => ({
+      id: task.id,
+      projectId: task.projectId ?? null,
+      chapterId: task.chapterId,
+      taskType: task.taskType,
+      providerConfigId: task.providerConfigId,
+      model: task.model ?? "unknown",
+      status: task.status,
+      inputSnapshot: task.inputSnapshot ?? "",
+      inputTokens: task.inputTokens ?? null,
+      outputTokens: task.outputTokens ?? null,
+      costUsd: task.costUsd ?? null,
+      outputText: task.outputText,
+      errorMessage: task.errorMessage,
+      createdAt: task.createdAt,
+      modelProvider: task.modelProvider ?? null,
+      chapter: task.chapter ?? null,
+    })),
+    input.modelProviders ?? [],
+    {
+      aiMonthlyBudgetUsd: input.project.aiMonthlyBudgetUsd,
+      aiMaxTaskCostUsd: input.project.aiMaxTaskCostUsd,
+      aiMaxBatchCostUsd: input.project.aiMaxBatchCostUsd,
+      aiMaxFailureRatePercent: input.project.aiMaxFailureRatePercent,
+      aiBudgetEnforcement: input.project.aiBudgetEnforcement,
+    },
+    input.modelRoutes ?? [],
+  );
+  const preferredRouteLabels = audit.modelEffectRows
+    .filter((row) => row.recommendation === "prefer")
+    .slice(0, 3)
+    .map((row) => modelRouteTaskLabel(row.taskLabel, row.providerName, row.model));
+  const avoidRouteLabels = audit.modelEffectRows
+    .filter((row) => row.recommendation === "avoid")
+    .slice(0, 3)
+    .map((row) => modelRouteTaskLabel(row.taskLabel, row.providerName, row.model));
+  const needsRepair = audit.providerReadiness.unconfiguredEnabledProviders > 0
+    || audit.summary.unresolvedFailures > 0
+    || audit.summary.failureRatePercent >= audit.budgetCenter.maxFailureRatePercent
+    || avoidRouteLabels.length > 0;
+  const needsCostGuard = !needsRepair && (
+    audit.budgetCenter.status !== "safe"
+    || audit.budgetCenter.fallbackAttemptRatePercent >= 20
+    || audit.summary.averageCostPerSucceededTaskUsd > audit.budgetCenter.maxTaskCostUsd
+  );
+  const status: ModelRouteHealthSummary["status"] = audit.summary.totalTasks === 0
+    ? "empty"
+    : needsRepair
+      ? "repair"
+      : needsCostGuard
+        ? "cost_guard"
+        : audit.status === "healthy"
+          ? "healthy"
+          : "watch";
+  const headline = status === "empty"
+    ? "模型路线还没有项目样本，别急着判断 Claude、DeepSeek、Kimi、GPT 谁更适合。"
+    : status === "repair"
+      ? "模型路线已经暴露失败或避用信号，先修路由再继续写。"
+      : status === "cost_guard"
+        ? "模型路线能跑，但成本或备用路线触发偏高，先限流。"
+        : status === "healthy"
+          ? "模型路线表现稳定，可以继续小批生产并保留审计。"
+          : "模型路线有样本但还不够硬，继续用小批次验证。";
+  const successRatePercent = audit.summary.totalTasks > 0
+    ? Math.round((audit.summary.succeededTasks / audit.summary.totalTasks) * 100)
+    : 0;
+  const detail = [
+    `成功率 ${successRatePercent}%`,
+    `失败率 ${audit.summary.failureRatePercent}%`,
+    `成本 $${audit.summary.knownCostUsd.toFixed(4)}`,
+    `备用触发 ${audit.budgetCenter.fallbackAttemptRatePercent}%`,
+  ].join(" · ");
+
+  return {
+    status,
+    score: audit.score,
+    label: modelRouteStatusLabel(status),
+    headline,
+    detail,
+    actionLabel: status === "empty"
+      ? "跑首轮模型样本"
+      : status === "repair"
+        ? "修模型路线"
+        : status === "cost_guard"
+          ? "看成本闸门"
+          : "看模型审计",
+    targetHref: status === "repair" ? "/settings/models" : "#model-task-audit",
+    totalTasks: audit.summary.totalTasks,
+    successRatePercent,
+    failureRatePercent: audit.summary.failureRatePercent,
+    knownCostUsd: audit.summary.knownCostUsd,
+    averageCostPerSucceededTaskUsd: audit.summary.averageCostPerSucceededTaskUsd,
+    fallbackAttemptRatePercent: audit.budgetCenter.fallbackAttemptRatePercent,
+    configuredProviders: audit.providerReadiness.configuredProviders,
+    enabledProviders: audit.providerReadiness.enabledProviders,
+    preferredRouteLabels,
+    avoidRouteLabels,
+    warnings: audit.riskFlags.slice(0, 3),
+    nextActions: audit.nextActions.slice(0, 3),
+  };
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
@@ -1071,6 +1231,7 @@ export function buildProjectControlDashboard(input: ProjectControlDashboardInput
     : 0;
   const aiPipelineBatch = buildAiPipelineBatchSummary(batchDraft, reviewPipeline);
   const aiPipelineRecentBatch = buildAiPipelineRecentBatchSummary(input.gateActionAudits);
+  const modelRouteHealth = buildModelRouteHealthSummary(input);
 
   const areas = [
     area("outline", "大纲骨架", outline, `${input.outlineNodes.length} 个大纲节点。`, "补齐开头、结尾、主干、分支、叶片和土壤。", "补大纲骨架", "outline-tree", true, "生成骨架"),
@@ -1129,6 +1290,7 @@ export function buildProjectControlDashboard(input: ProjectControlDashboardInput
     storyFoundation,
     aiPipelineBatch,
     aiPipelineRecentBatch,
+    modelRouteHealth,
     areas,
     priorityActions,
     criticalActions,

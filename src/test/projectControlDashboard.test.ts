@@ -94,6 +94,8 @@ test("buildProjectControlDashboard", async (t) => {
     assert.ok(dashboard.aiPipelineBatch.actionLabel.includes("批量二改"));
     assert.equal(dashboard.aiPipelineRecentBatch.hasRecent, false);
     assert.equal(dashboard.aiPipelineRecentBatch.status, "empty");
+    assert.ok(dashboard.modelRouteHealth.totalTasks >= 1);
+    assert.ok(dashboard.modelRouteHealth.nextActions.length > 0);
     assert.equal(dashboard.storyFoundation.status, "blocked");
     assert.equal(dashboard.storyFoundation.label, "先搭底座");
     assert.equal(dashboard.storyFoundation.axes.length, 5);
@@ -484,6 +486,129 @@ test("buildProjectControlDashboard", async (t) => {
     assert.equal(dashboard.aiPipelineRecentBatch.failedCount, 1);
     assert.equal(dashboard.aiPipelineRecentBatch.targetHref, "/projects/demo-project#ai-pipeline");
     assert.ok(dashboard.aiPipelineRecentBatch.warnings.some((warning) => warning.includes("不要继续放大")));
+  });
+
+  await t.test("summarizes model route health for the project control dashboard", () => {
+    const dashboard = buildProjectControlDashboard({
+      project: {
+        ...project,
+        aiMonthlyBudgetUsd: 5,
+        aiMaxTaskCostUsd: 0.25,
+        aiMaxBatchCostUsd: 1,
+        aiMaxFailureRatePercent: 20,
+        aiBudgetEnforcement: "block",
+      },
+      platform: getPlatformProfile("fanqie"),
+      chapters: [chapter],
+      outlineNodes: [],
+      characters: [],
+      worldEntries: [],
+      foreshadows: [],
+      plotThreads: [],
+      modelProviders: [
+        {
+          id: "deepseek-provider",
+          providerId: "deepseek",
+          displayName: "DeepSeek",
+          defaultModel: "deepseek-chat",
+          enabled: true,
+          encryptedApiKey: "encrypted",
+        },
+        {
+          id: "gpt-provider",
+          providerId: "gpt",
+          displayName: "GPT",
+          defaultModel: "gpt-4.1",
+          enabled: true,
+          encryptedApiKey: "encrypted",
+        },
+      ],
+      modelRoutes: [
+        { taskType: "chapter_draft", primaryProviderConfigId: "deepseek-provider", fallbackProviderConfigId: "gpt-provider" },
+        { taskType: "chapter_review", primaryProviderConfigId: "gpt-provider", fallbackProviderConfigId: "deepseek-provider" },
+      ],
+      aiTasks: [
+        {
+          id: "draft-1",
+          projectId: "project-1",
+          chapterId: "chapter-1",
+          taskType: "chapter_draft",
+          providerConfigId: "deepseek-provider",
+          model: "deepseek-chat",
+          status: "succeeded",
+          outputText: JSON.stringify({ score: 88 }),
+          inputSnapshot: "{}",
+          inputTokens: 1000,
+          outputTokens: 1400,
+          costUsd: 0.01,
+          errorMessage: null,
+          createdAt: "2026-01-01T00:00:00.000Z",
+          modelProvider: { providerId: "deepseek", displayName: "DeepSeek" },
+        },
+        {
+          id: "draft-2",
+          projectId: "project-1",
+          chapterId: "chapter-1",
+          taskType: "chapter_draft",
+          providerConfigId: "deepseek-provider",
+          model: "deepseek-chat",
+          status: "succeeded",
+          outputText: JSON.stringify({ score: 92 }),
+          inputSnapshot: "{}",
+          inputTokens: 900,
+          outputTokens: 1300,
+          costUsd: 0.01,
+          errorMessage: null,
+          createdAt: "2026-01-02T00:00:00.000Z",
+          modelProvider: { providerId: "deepseek", displayName: "DeepSeek" },
+        },
+        {
+          id: "review-1",
+          projectId: "project-1",
+          chapterId: "chapter-1",
+          taskType: "chapter_review",
+          providerConfigId: "gpt-provider",
+          model: "gpt-4.1",
+          status: "failed",
+          outputText: null,
+          inputSnapshot: "{}",
+          inputTokens: 700,
+          outputTokens: 0,
+          costUsd: 0.02,
+          errorMessage: "timeout",
+          createdAt: "2026-01-03T00:00:00.000Z",
+          modelProvider: { providerId: "gpt", displayName: "GPT" },
+        },
+        {
+          id: "review-2",
+          projectId: "project-1",
+          chapterId: "chapter-1",
+          taskType: "chapter_review",
+          providerConfigId: "gpt-provider",
+          model: "gpt-4.1",
+          status: "failed",
+          outputText: null,
+          inputSnapshot: "{}",
+          inputTokens: 700,
+          outputTokens: 0,
+          costUsd: 0.02,
+          errorMessage: "timeout",
+          createdAt: "2026-01-04T00:00:00.000Z",
+          modelProvider: { providerId: "gpt", displayName: "GPT" },
+        },
+      ],
+      submissionChecklist: checklist,
+    });
+
+    assert.equal(dashboard.modelRouteHealth.status, "repair");
+    assert.equal(dashboard.modelRouteHealth.label, "先修路由");
+    assert.equal(dashboard.modelRouteHealth.configuredProviders, 2);
+    assert.equal(dashboard.modelRouteHealth.enabledProviders, 2);
+    assert.equal(dashboard.modelRouteHealth.successRatePercent, 50);
+    assert.equal(dashboard.modelRouteHealth.failureRatePercent, 50);
+    assert.ok(dashboard.modelRouteHealth.preferredRouteLabels.some((label) => label.includes("正文初稿")));
+    assert.ok(dashboard.modelRouteHealth.avoidRouteLabels.some((label) => label.includes("章节审稿")));
+    assert.equal(dashboard.modelRouteHealth.targetHref, "/settings/models");
   });
 
   await t.test("pauses project starts when the stored tactic is a historical avoidance signal", () => {

@@ -14,6 +14,7 @@ import { FirstThreeRewritePanel } from "@/components/projects/FirstThreeRewriteP
 import { ModelTaskAuditPanel } from "@/components/projects/ModelTaskAuditPanel";
 import { PlatformDecisionTimelinePanel } from "@/components/projects/PlatformDecisionTimelinePanel";
 import { PlatformExportCenterPanel } from "@/components/projects/PlatformExportCenterPanel";
+import { PlatformTacticExperiencePanel } from "@/components/projects/PlatformTacticExperiencePanel";
 import { ProjectControlDashboardPanel } from "@/components/projects/ProjectControlDashboardPanel";
 import { RetentionDiagnosticPanel } from "@/components/projects/RetentionDiagnosticPanel";
 import { SerializationOpsPanel } from "@/components/projects/SerializationOpsPanel";
@@ -26,7 +27,7 @@ import { WritingWorkbenchPanel } from "@/components/projects/WritingWorkbenchPan
 import { buildStoryTreeExperienceApplyDispatchKey, buildStoryTreeExperienceEffectDashboard, buildStoryTreeExperienceFlow, buildStoryTreeExperienceGuide, buildStoryTreeExperienceReviewBacklog } from "@/lib/ai/storyTreeExperience";
 import { prisma } from "@/lib/db/prisma";
 import { getPlatformProfile, type PlatformId } from "@/lib/platforms/platformProfiles";
-import { buildGatePlatformDecisionTimeline, gateActionReceiptFromAuditRecord } from "@/lib/projects/gateActionReceipts";
+import { buildGatePlatformDecisionTimeline, buildGatePlatformTacticExperienceLibrary, gateActionReceiptFromAuditRecord } from "@/lib/projects/gateActionReceipts";
 import { gatePlatformDispatchTaskFromRecord } from "@/lib/projects/gateDispatchTaskRecords";
 import { buildProjectDashboard } from "@/lib/projects/projectDashboard";
 import { buildSubmissionChecklist } from "@/lib/projects/submissionChecklist";
@@ -219,6 +220,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ projec
     tasks: projectDecisionTaskRecords.map(gatePlatformDispatchTaskFromRecord),
     limit: 8,
   });
+  const platformTacticExperienceLibrary = buildGatePlatformTacticExperienceLibrary(platformDecisionTimeline, 8);
   const submissionPackage = buildSubmissionPackage({
     title: project.title,
     genre: project.genre,
@@ -479,6 +481,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ projec
           <SerializationOpsPanel projectId={project.id} />
         </div>
         <PlatformDecisionTimelinePanel timeline={platformDecisionTimeline} />
+        <PlatformTacticExperiencePanel library={platformTacticExperienceLibrary} />
         <div id="platform-export">
           <PlatformExportCenterPanel projectId={project.id} />
         </div>

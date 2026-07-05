@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { buildFirstDayExecutionRouteBlockMessage, type FirstDayExecutionRouteStatus } from "@/lib/model-gateway/firstDayExecutionRoute";
-import { buildFirstDayDispatchUpdateSummary, buildFirstDayExecutionRiskNotice, buildFirstDayHandoffGateCta, buildFirstDayPostDispatchCompletionPrompt, buildFirstDayReceiptCompletionAction, buildFirstDayReceiptCompletionEvidence, buildFirstDayStepView, completeFirstDayDispatchStep } from "@/lib/projects/firstDayWorkflowView";
+import { buildFirstDayDispatchUpdateSummary, buildFirstDayExecutionRiskNotice, buildFirstDayExecutionSafetyBanner, buildFirstDayHandoffGateCta, buildFirstDayPostDispatchCompletionPrompt, buildFirstDayReceiptCompletionAction, buildFirstDayReceiptCompletionEvidence, buildFirstDayStepView, completeFirstDayDispatchStep } from "@/lib/projects/firstDayWorkflowView";
 import { persistGateDispatchTask, type GatePlatformGrowthDispatchItem, type PersistedGatePlatformDispatchTask } from "@/lib/projects/gateActionReceipts";
 
 interface FirstDayWorkflowStep {
@@ -204,6 +204,12 @@ function riskNoticeTone(level: "standard" | "watch" | "blocked") {
   if (level === "blocked") return "border-rose-200 bg-rose-50 text-rose-950";
   if (level === "watch") return "border-amber-200 bg-amber-50 text-amber-950";
   return "border-slate-200 bg-slate-50 text-slate-900";
+}
+
+function executionSafetyTone(level: "ready" | "watch" | "blocked") {
+  if (level === "blocked") return "border-rose-200 bg-rose-50 text-rose-950";
+  if (level === "watch") return "border-amber-200 bg-amber-50 text-amber-950";
+  return "border-emerald-200 bg-emerald-50 text-emerald-950";
 }
 
 function FirstDayStepCard({ step, index }: { step: FirstDayWorkflowStep; index: number }) {
@@ -581,6 +587,13 @@ export function FirstDayWorkflowPanel({ projectId }: { projectId: string }) {
   const handoffGateTone = handoffGateCta?.status === "closed"
     ? "border-emerald-200 bg-emerald-50 text-emerald-950"
     : "border-amber-200 bg-amber-50 text-amber-950";
+  const executionSafetyBanner = workflow ? buildFirstDayExecutionSafetyBanner({
+    routeBlockMessage,
+    executionBlockMessage,
+    handoffGateCta,
+    riskNotice,
+    nextStepLabel: workflow.nextStep.label,
+  }) : null;
 
   return (
     <section className="rounded-md border border-slate-200 bg-white p-4">
@@ -608,6 +621,23 @@ export function FirstDayWorkflowPanel({ projectId }: { projectId: string }) {
           </button>
         </div>
       </div>
+
+      {executionSafetyBanner ? (
+        <div className={`mt-3 rounded-md border px-3 py-3 text-sm ${executionSafetyTone(executionSafetyBanner.level)}`}>
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <div className="text-xs font-medium opacity-75">连续执行保护</div>
+              <div className="mt-1 font-medium">{executionSafetyBanner.headline}</div>
+              <p className="mt-1 leading-6 opacity-90">{executionSafetyBanner.detail}</p>
+            </div>
+            <div className="flex shrink-0 flex-wrap gap-2 text-xs">
+              {executionSafetyBanner.badges.map((badge) => (
+                <span className="rounded-md bg-white/70 px-2 py-1" key={badge}>{badge}</span>
+              ))}
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {message ? (
         <div className="mt-3 flex flex-col gap-2 rounded-md bg-slate-50 px-3 py-2 text-sm text-slate-600 sm:flex-row sm:items-center sm:justify-between">

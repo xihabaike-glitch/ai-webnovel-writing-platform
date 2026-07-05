@@ -6,6 +6,7 @@ import {
   buildFirstDayDispatchCompletionHint,
   buildFirstDayDispatchUpdateSummary,
   buildFirstDayExecutionRiskNotice,
+  buildFirstDayExecutionSafetyBanner,
   buildFirstDayHandoffGateCta,
   buildFirstDayPostDispatchCompletionPrompt,
   buildFirstDayReceiptCompletionAction,
@@ -184,6 +185,77 @@ test("buildFirstDayExecutionRiskNotice surfaces blocked and watch modes", () => 
   assert.ok(watch.detail.includes("观察期"));
   assert.ok(watch.badges.includes("今天小样本验证"));
   assert.equal(standard.visible, false);
+});
+
+test("buildFirstDayExecutionSafetyBanner prioritizes route, handoff, and risk warnings", () => {
+  const routeBlocked = buildFirstDayExecutionSafetyBanner({
+    routeBlockMessage: "当前节点还没有可用模型路线。",
+    executionBlockMessage: null,
+    handoffGateCta: null,
+    riskNotice: null,
+    nextStepLabel: "第一章审稿",
+  });
+  const handoffPending = buildFirstDayExecutionSafetyBanner({
+    routeBlockMessage: null,
+    executionBlockMessage: null,
+    handoffGateCta: {
+      visible: true,
+      status: "pending",
+      headline: "交接闸门未闭环",
+      detail: "下一步：验收口径 · 写清首轮通过线。",
+      primaryAction: "link",
+      primaryLabel: "去任务中心补交接",
+      primaryHref: "/dispatch",
+      secondaryLabel: "查看交接进度",
+      secondaryHref: "#first-day-workflow",
+      badges: ["1/3", "等待：验收口径"],
+    },
+    riskNotice: null,
+    nextStepLabel: "第一章审稿",
+  });
+  const watchRisk = buildFirstDayExecutionSafetyBanner({
+    routeBlockMessage: null,
+    executionBlockMessage: null,
+    handoffGateCta: {
+      visible: true,
+      status: "closed",
+      headline: "交接闸门已闭环",
+      detail: "可以继续生产。",
+      primaryAction: "execute_current_step",
+      primaryLabel: "继续审稿",
+      primaryHref: "/projects/project-1",
+      secondaryLabel: "查看派单中心",
+      secondaryHref: "/dispatch",
+      badges: ["3/3", "可继续生产"],
+    },
+    riskNotice: {
+      visible: true,
+      level: "watch",
+      label: "观察",
+      headline: "小样本验证模式",
+      detail: "先跑首轮样本和复查证据，通过后再扩大。",
+      badges: ["今天小样本验证"],
+    },
+    nextStepLabel: "第一章审稿",
+  });
+  const ready = buildFirstDayExecutionSafetyBanner({
+    routeBlockMessage: null,
+    executionBlockMessage: null,
+    handoffGateCta: null,
+    riskNotice: null,
+    nextStepLabel: "第一章审稿",
+  });
+
+  assert.equal(routeBlocked.level, "blocked");
+  assert.equal(routeBlocked.headline, "连续执行已阻断");
+  assert.ok(routeBlocked.detail.includes("当前节点还没有可用模型路线"));
+  assert.equal(handoffPending.level, "blocked");
+  assert.equal(handoffPending.headline, "先补交接闸门");
+  assert.ok(handoffPending.badges.includes("等待：验收口径"));
+  assert.equal(watchRisk.level, "watch");
+  assert.equal(watchRisk.headline, "小样本验证模式");
+  assert.equal(ready.level, "ready");
+  assert.ok(ready.detail.includes("第一章审稿"));
 });
 
 test("buildFirstDayDispatchDesk highlights the next first-day task", () => {

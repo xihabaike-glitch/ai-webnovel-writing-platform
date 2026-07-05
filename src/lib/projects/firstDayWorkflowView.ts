@@ -64,6 +64,13 @@ export interface FirstDayExecutionRiskNotice {
   badges: string[];
 }
 
+export interface FirstDayExecutionSafetyBanner {
+  level: "ready" | "watch" | "blocked";
+  headline: string;
+  detail: string;
+  badges: string[];
+}
+
 export interface FirstDayExecutionRiskNoticeInput {
   riskLevel?: FirstDayRiskLevel;
   riskLabel?: string;
@@ -320,6 +327,62 @@ export function buildFirstDayExecutionRiskNotice(input: FirstDayExecutionRiskNot
     headline: "标准首日验证",
     detail: "当前开书策略按普通首日流程推进。",
     badges: [dueLabel],
+  };
+}
+
+export function buildFirstDayExecutionSafetyBanner(input: {
+  routeBlockMessage: string | null;
+  executionBlockMessage: string | null;
+  handoffGateCta: FirstDayHandoffGateCta | null;
+  riskNotice: FirstDayExecutionRiskNotice | null;
+  nextStepLabel: string;
+}): FirstDayExecutionSafetyBanner {
+  const blockMessage = input.executionBlockMessage ?? input.routeBlockMessage;
+  if (blockMessage) {
+    return {
+      level: "blocked",
+      headline: "连续执行已阻断",
+      detail: blockMessage,
+      badges: ["模型路线", "先修复配置"],
+    };
+  }
+
+  if (input.handoffGateCta?.visible && input.handoffGateCta.status === "pending") {
+    return {
+      level: "blocked",
+      headline: "先补交接闸门",
+      detail: input.handoffGateCta.detail,
+      badges: input.handoffGateCta.badges,
+    };
+  }
+
+  if (input.riskNotice?.visible && input.riskNotice.level === "blocked") {
+    return {
+      level: "blocked",
+      headline: input.riskNotice.headline,
+      detail: input.riskNotice.detail,
+      badges: input.riskNotice.badges,
+    };
+  }
+
+  if (input.riskNotice?.visible && input.riskNotice.level === "watch") {
+    return {
+      level: "watch",
+      headline: input.riskNotice.headline,
+      detail: input.riskNotice.detail,
+      badges: input.riskNotice.badges,
+    };
+  }
+
+  return {
+    level: "ready",
+    headline: "连续执行状态正常",
+    detail: `当前首日节点「${input.nextStepLabel}」可以按工作流继续推进。`,
+    badges: [
+      input.handoffGateCta?.status === "closed" ? "交接已闭环" : "交接无阻断",
+      "模型路线可用",
+      "风险标准",
+    ],
   };
 }
 

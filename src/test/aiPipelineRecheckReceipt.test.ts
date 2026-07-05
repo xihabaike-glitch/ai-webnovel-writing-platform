@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildAiPipelineRecheckGateActionReceipt } from "../lib/projects/aiPipelineRecheckReceipt.ts";
+import {
+  buildAiPipelineRecheckGateActionReceipt,
+  buildAiPipelineRecheckNextAction,
+} from "../lib/projects/aiPipelineRecheckReceipt.ts";
 import { buildTaskQueueBatchHealthReview } from "../lib/projects/taskQueueBatchHealth.ts";
 
 test("buildAiPipelineRecheckGateActionReceipt feeds AI recheck results back into batch health", () => {
@@ -91,4 +94,38 @@ test("buildAiPipelineRecheckGateActionReceipt feeds AI recheck results back into
   assert.equal(health.summary.watch, 1);
   assert.equal(health.items[0]?.label, "三轮稳住观察");
   assert.equal(health.items[0]?.sampleBatches, 1);
+});
+
+test("buildAiPipelineRecheckNextAction points passed samples to small-batch recovery", () => {
+  const action = buildAiPipelineRecheckNextAction({
+    dispatchKey: "ai-pipeline-recheck:project-1:ai-plan-1:sample",
+    projectId: "project-1",
+    mode: "sample_recheck",
+    batchStatus: "continue",
+    primaryHref: "/projects/project-1#ai-pipeline",
+    successRatePercent: 100,
+    averageQualityScore: 88,
+  });
+
+  assert.equal(action.kind, "resume_small_batch");
+  assert.equal(action.label, "恢复小批执行");
+  assert.equal(action.href, "/projects/project-1#ai-pipeline");
+  assert.ok(action.detail.includes("小批"));
+});
+
+test("buildAiPipelineRecheckNextAction points failed samples to repair checklist", () => {
+  const action = buildAiPipelineRecheckNextAction({
+    dispatchKey: "ai-pipeline-recheck:project-1:ai-plan-1:sample",
+    projectId: "project-1",
+    mode: "sample_recheck",
+    batchStatus: "repair",
+    primaryHref: "/failures",
+    successRatePercent: 50,
+    averageQualityScore: 62,
+  });
+
+  assert.equal(action.kind, "repair_checklist");
+  assert.equal(action.label, "生成修复清单");
+  assert.equal(action.href, "/projects/project-1#ai-pipeline");
+  assert.ok(action.detail.includes("不要恢复批量"));
 });

@@ -14,6 +14,15 @@ export interface AiPipelineRecheckGateActionReceipt {
   };
 }
 
+export type AiPipelineRecheckNextActionKind = "resume_small_batch" | "repair_checklist" | "review_quality" | "watch_cost";
+
+export interface AiPipelineRecheckNextAction {
+  kind: AiPipelineRecheckNextActionKind;
+  label: string;
+  detail: string;
+  href: string;
+}
+
 function recheckMode(plan: Pick<TaskQueueExecutionPlan, "scaleGate" | "chapterIds">): AiPipelineRecheckGateActionReceipt["payload"]["aiPipelineRecheck"]["mode"] {
   if (plan.scaleGate === "sample_only" || plan.chapterIds.length <= 1) return "sample_recheck";
   return "small_batch_resume";
@@ -27,6 +36,48 @@ function platformNameFromPlan(plan: Pick<TaskQueueExecutionPlan, "strategyBases"
   const title = plan.strategyBases[0]?.title ?? "";
   const match = title.match(/首轮平台打法[:：](.+)$/u);
   return match?.[1]?.trim() || "AI 写审改";
+}
+
+export function buildAiPipelineRecheckNextAction(input: {
+  dispatchKey: string;
+  projectId: string | null;
+  mode: AiPipelineRecheckGateActionReceipt["payload"]["aiPipelineRecheck"]["mode"];
+  batchStatus: TaskQueueBatchReceipt["status"];
+  primaryHref: string;
+  successRatePercent: number;
+  averageQualityScore: number | null;
+}): AiPipelineRecheckNextAction {
+  const projectHref = input.projectId ? `/projects/${input.projectId}#ai-pipeline` : input.primaryHref || "/tasks#recommended-batch";
+  if (input.batchStatus === "repair") {
+    return {
+      kind: "repair_checklist",
+      label: "生成修复清单",
+      detail: `AI 复检未过线，成功率 ${input.successRatePercent}%，质量 ${input.averageQualityScore ?? "缺样本"}。先生成修复清单，不要恢复批量。`,
+      href: projectHref,
+    };
+  }
+  if (input.batchStatus === "review_quality") {
+    return {
+      kind: "review_quality",
+      label: "回到二改质检",
+      detail: `AI 复检质量 ${input.averageQualityScore ?? "缺样本"}，先回 AI 写审改处理低分章节，再决定是否恢复小批。`,
+      href: projectHref,
+    };
+  }
+  if (input.batchStatus === "watch_cost") {
+    return {
+      kind: "watch_cost",
+      label: "看模型成本",
+      detail: "AI 复检成本偏高，先看模型审计和路线成本，再恢复小批执行。",
+      href: "/settings/models",
+    };
+  }
+  return {
+    kind: "resume_small_batch",
+    label: input.mode === "sample_recheck" ? "恢复小批执行" : "继续小批执行",
+    detail: `AI 复检已过线，成功率 ${input.successRatePercent}%，质量 ${input.averageQualityScore ?? "缺样本"}。下一步只恢复小批，不要直接无限放量。`,
+    href: projectHref,
+  };
 }
 
 export function buildAiPipelineRecheckGateActionReceipt(input: {

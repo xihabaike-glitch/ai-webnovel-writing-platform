@@ -6,7 +6,10 @@ import { reviewChapterDraft } from "@/lib/ai/chapterReviewGeneration";
 import { generateChapterSecondPass } from "@/lib/ai/chapterSecondPassGeneration";
 import { prisma } from "@/lib/db/prisma";
 import { buildBatchRouteEffectSummary } from "@/lib/model-gateway/batchRouteEffectSummary";
-import { buildAiPipelineRecheckGateActionReceipt } from "@/lib/projects/aiPipelineRecheckReceipt";
+import {
+  buildAiPipelineRecheckGateActionReceipt,
+  buildAiPipelineRecheckNextAction,
+} from "@/lib/projects/aiPipelineRecheckReceipt";
 import { buildTaskQueueBatchReceipt, type TaskQueueBatchRunResult } from "@/lib/projects/taskQueueBatchReceipt";
 import { buildTaskQueueCenter, type TaskQueueProject } from "@/lib/projects/taskQueueCenter";
 import { buildTaskQueueExecutionPlan } from "@/lib/projects/taskQueueExecutionPlan";
@@ -239,6 +242,15 @@ export async function POST(request: Request) {
     batchReceipt,
     now,
   });
+  const nextAction = buildAiPipelineRecheckNextAction({
+    dispatchKey,
+    projectId,
+    mode: gateReceipt.payload.aiPipelineRecheck.mode,
+    batchStatus: batchReceipt.status,
+    primaryHref: batchReceipt.primaryHref,
+    successRatePercent: routeEffectSummary.successRatePercent,
+    averageQualityScore: routeEffectSummary.averageQualityScore,
+  });
   const completionEvidence = completionEvidenceFor({ receipt: batchReceipt, plan });
   const [task] = await prisma.$transaction([
     prisma.gateDispatchTask.update({
@@ -305,6 +317,7 @@ export async function POST(request: Request) {
     routeEffectSummary,
     batchReceipt,
     gateReceipt: gateReceipt.receipt,
+    nextAction,
     recheckTask: {
       dispatchKey: task.dispatchKey,
       state: task.state,

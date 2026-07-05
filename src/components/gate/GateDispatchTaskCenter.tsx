@@ -532,6 +532,11 @@ export function GateDispatchTaskCenter({
           primaryLabel: string;
           primaryHref: string;
         };
+        nextAction?: {
+          label: string;
+          detail: string;
+          href: string;
+        };
         recheckTask?: {
           dispatchKey: string;
           state: GatePlatformGrowthDispatchState;
@@ -556,8 +561,12 @@ export function GateDispatchTaskCenter({
       const qualityText = payload?.routeEffectSummary?.averageQualityScore === null || payload?.routeEffectSummary?.averageQualityScore === undefined
         ? "质量缺样本"
         : `质量 ${payload.routeEffectSummary.averageQualityScore}`;
-      setRouteActionMessage(`已运行「${task.title}」：${succeeded}/${total} 成功，成功率 ${payload?.routeEffectSummary?.successRatePercent ?? 0}%，${qualityText}。${payload?.batchReceipt?.headline ?? payload?.routeEffectSummary?.verdict ?? ""}`);
-      setRouteActionLink(payload?.batchReceipt?.primaryHref ? {
+      const nextActionText = payload?.nextAction ? ` 下一步：${payload.nextAction.detail}` : "";
+      setRouteActionMessage(`已运行「${task.title}」：${succeeded}/${total} 成功，成功率 ${payload?.routeEffectSummary?.successRatePercent ?? 0}%，${qualityText}。${payload?.batchReceipt?.headline ?? payload?.routeEffectSummary?.verdict ?? ""}${nextActionText}`);
+      setRouteActionLink(payload?.nextAction?.href ? {
+        label: payload.nextAction.label,
+        href: payload.nextAction.href,
+      } : payload?.batchReceipt?.primaryHref ? {
         label: payload.batchReceipt.primaryLabel,
         href: payload.batchReceipt.primaryHref,
       } : null);

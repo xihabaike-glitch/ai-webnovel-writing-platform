@@ -35,7 +35,7 @@ type RecommendedBatchResult = {
 
 export async function POST(request: Request) {
   const strategy = getBatchExecutionStrategy(new URL(request.url).searchParams.get("strategy"));
-  const [projects, modelProviders, modelRoutes, completedRouteConfirmationRechecks] = await Promise.all([
+  const [projects, modelProviders, modelRoutes, completedRouteConfirmationRechecks, recentRecommendedBatchAudits] = await Promise.all([
     prisma.project.findMany({
       include: {
         chapters: { orderBy: { order: "asc" } },
@@ -80,6 +80,21 @@ export async function POST(request: Request) {
         completedAt: true,
       },
     }),
+    prisma.gateActionAudit.findMany({
+      where: { executionType: "recommended_batch" },
+      orderBy: { createdAt: "desc" },
+      take: 50,
+      select: {
+        receiptId: true,
+        projectId: true,
+        executionType: true,
+        status: true,
+        succeededCount: true,
+        failedCount: true,
+        payload: true,
+        createdAt: true,
+      },
+    }),
   ]);
   const queue = buildTaskQueueCenter(projects);
   const safety = buildBatchExecutionSafety(queue.items, projects, strategy);
@@ -100,6 +115,7 @@ export async function POST(request: Request) {
     providers: modelProviders,
     routes: modelRoutes,
     routeConfirmationRechecks: buildRouteConfirmationRecheckEvidenceFromDispatchTasks(completedRouteConfirmationRechecks),
+    recommendedBatchAudits: recentRecommendedBatchAudits,
   });
   const plan = applyRecommendedBatchModelRouteGate(basePlan, modelRouteGate);
 

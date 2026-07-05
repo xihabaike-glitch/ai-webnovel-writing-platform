@@ -34,6 +34,23 @@ export interface RecommendedBatchModelRouteGate {
   recoveryEvidence: string | null;
 }
 
+export interface RecommendedBatchModelRouteGateAudit {
+  receiptId: string;
+  projectId?: string | null;
+  executionType: string;
+  status: string;
+  succeededCount: number;
+  failedCount: number;
+  payload: string;
+  createdAt: string | Date;
+}
+
+interface RecoveryBatchEvidence {
+  receiptId: string;
+  summary: string;
+  createdAt: string;
+}
+
 function taskTypeForCategory(category: ExecutableQueueCategory | null): RoutedModelTaskType | null {
   if (category === "draft") return "chapter_draft";
   if (category === "review") return "chapter_review";
@@ -48,6 +65,34 @@ function routeLabel(input: { taskLabel: string; providerName: string; model: str
 function successRate(succeeded: number, total: number) {
   if (total <= 0) return 0;
   return Math.round((succeeded / total) * 100);
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function parsePayload(payload: string): Record<string, unknown> {
+  try {
+    const parsed = JSON.parse(payload);
+    return isRecord(parsed) ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function numberFrom(value: unknown) {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function stringFrom(value: unknown) {
+  return typeof value === "string" ? value : null;
+}
+
+function dateMs(value: string | Date | null | undefined) {
+  if (!value) return null;
+  const date = value instanceof Date ? value : new Date(value);
+  const time = date.getTime();
+  return Number.isNaN(time) ? null : time;
 }
 
 function settingsFromProjects(projects: RecommendedBatchModelRouteGateProject[]) {
@@ -69,6 +114,56 @@ function latestRecheckForTask(
   return rechecks
     .filter((item) => item.taskType === taskType)
     .sort((left, right) => (right.completedAt ?? "").localeCompare(left.completedAt ?? ""))[0] ?? null;
+}
+
+function latestPassedRecoveryBatch(input: {
+  plan: TaskQueueExecutionPlan;
+  latestRecheck: RouteConfirmationRecheckEvidence | null;
+  audits?: RecommendedBatchModelRouteGateAudit[];
+}): RecoveryBatchEvidence | null {
+  const recheckTime = dateMs(input.latestRecheck?.completedAt);
+  if (!input.latestRecheck || input.latestRecheck.recommendedAction !== "keep" || recheckTime === null) return null;
+
+  const candidates = (input.audits ?? [])
+    .filter((audit) => audit.executionType === "recommended_batch")
+    .filter((audit) => audit.projectId === input.plan.projectId)
+    .filter((audit) => dateMs(audit.createdAt) !== null && dateMs(audit.createdAt)! > recheckTime)
+    .sort((left, right) => dateMs(right.createdAt)! - dateMs(left.createdAt)!);
+
+  for (const audit of candidates) {
+    const payload = parsePayload(audit.payload);
+    const plan = isRecord(payload.plan) ? payload.plan : {};
+    const route = isRecord(payload.routeEffectSummary) ? payload.routeEffectSummary : {};
+    const batchReceipt = isRecord(payload.batchReceipt) ? payload.batchReceipt : {};
+    const category = stringFrom(plan.category);
+    if (category !== input.plan.category) continue;
+    if (audit.status !== "succeeded" || audit.failedCount > 0 || audit.succeededCount <= 0) continue;
+
+    const successRatePercent = numberFrom(route.successRatePercent);
+    const failedTasks = numberFrom(route.failedTasks) ?? audit.failedCount;
+    const quality = numberFrom(route.averageQualityScore);
+    const fallbackTasks = numberFrom(route.fallbackTasks) ?? 0;
+    const averageCost = numberFrom(route.averageCostPerSucceededTaskUsd) ?? 0;
+    const receiptStatus = stringFrom(batchReceipt.status);
+    const passed = successRatePercent !== null
+      && successRatePercent >= 80
+      && failedTasks === 0
+      && quality !== null
+      && quality >= 80
+      && fallbackTasks === 0
+      && averageCost <= 0.05
+      && receiptStatus !== "repair";
+    if (!passed) continue;
+
+    const createdAt = audit.createdAt instanceof Date ? audit.createdAt.toISOString() : audit.createdAt;
+    return {
+      receiptId: audit.receiptId,
+      createdAt,
+      summary: `恢复样本通过：成功率 ${successRatePercent}%，质量 ${quality}，无失败、无备用命中，成本 $${averageCost.toFixed(4)}/任务。`,
+    };
+  }
+
+  return null;
 }
 
 function buildGateRecheckAdvice(input: {
@@ -124,6 +219,7 @@ export function buildRecommendedBatchModelRouteGate(input: {
   providers: ModelAuditProvider[];
   routes: ModelAuditRoute[];
   routeConfirmationRechecks?: RouteConfirmationRecheckEvidence[];
+  recommendedBatchAudits?: RecommendedBatchModelRouteGateAudit[];
 }): RecommendedBatchModelRouteGate {
   const plannedProjectIds = new Set(input.plan.projectIds);
   const scopedProjects = input.projects.filter((project) => plannedProjectIds.has(project.id));
@@ -140,6 +236,12 @@ export function buildRecommendedBatchModelRouteGate(input: {
     : audit.modelEffectRows;
   const latestRecheck = latestRecheckForTask(taskType, input.routeConfirmationRechecks);
   const recoveredByRecheck = latestRecheck?.recommendedAction === "keep";
+  const passedRecoveryBatch = latestPassedRecoveryBatch({
+    plan: input.plan,
+    latestRecheck,
+    audits: input.recommendedBatchAudits,
+  });
+  const releasedByRecoveryBatch = Boolean(passedRecoveryBatch);
   const avoidedRoutes = scopedEffects
     .filter((row) => row.recommendation === "avoid")
     .slice(0, 3)
@@ -152,13 +254,18 @@ export function buildRecommendedBatchModelRouteGate(input: {
     || audit.summary.unresolvedFailures > 0
     || audit.summary.failureRatePercent >= audit.budgetCenter.maxFailureRatePercent
     || avoidedRoutes.length > 0;
-  const hasCostPressure = audit.budgetCenter.status !== "safe"
-    || audit.budgetCenter.fallbackAttemptRatePercent >= 20
+  const hasActiveCostPressure = audit.budgetCenter.fallbackAttemptRatePercent >= 20
     || audit.summary.averageCostPerSucceededTaskUsd > audit.budgetCenter.maxTaskCostUsd;
+  const hasCostPressure = audit.budgetCenter.status !== "safe"
+    || hasActiveCostPressure;
   const status: RecommendedBatchModelRouteGate["status"] = audit.summary.totalTasks === 0
     ? "sample"
     : hasRouteRepairPressure && !recoveredByRecheck
       ? "block"
+      : hasRouteRepairPressure && recoveredByRecheck && !releasedByRecoveryBatch
+        ? "sample"
+      : releasedByRecoveryBatch
+        ? hasActiveCostPressure ? "sample" : "allow"
       : hasCostPressure || audit.status !== "healthy"
         ? "sample"
         : "allow";
@@ -169,7 +276,9 @@ export function buildRecommendedBatchModelRouteGate(input: {
       : 0;
   const label = status === "allow" ? "模型路线通过" : status === "sample" ? "降级小样本" : "模型路线拦截";
   const headline = status === "allow"
-    ? "模型路线健康，本批可以按当前策略执行。"
+    ? releasedByRecoveryBatch
+      ? "恢复样本已过线，本批可以恢复正常批量。"
+      : "模型路线健康，本批可以按当前策略执行。"
     : status === "sample" && recoveredByRecheck
       ? "模型路线复检已通过，本批先跑 1 个恢复样本。"
       : status === "sample"
@@ -181,6 +290,7 @@ export function buildRecommendedBatchModelRouteGate(input: {
   const warnings = [
     status === "sample" && input.plan.chapterIds.length > 1 ? `原计划 ${input.plan.chapterIds.length} 个任务，模型路线闸门已降级为 1 个样本。` : null,
     recoveredByRecheck && latestRecheck ? `复检通过：${latestRecheck.summary}` : null,
+    passedRecoveryBatch ? passedRecoveryBatch.summary : null,
     ...audit.riskFlags.slice(0, 3),
     ...avoidedRoutes.map((route) => `避用路线：${route}`),
   ].filter((item): item is string => Boolean(item));
@@ -215,7 +325,7 @@ export function buildRecommendedBatchModelRouteGate(input: {
       avoidedRoutes,
       warnings: normalizedWarnings,
     }),
-    recoveryEvidence: recoveredByRecheck && latestRecheck ? latestRecheck.summary : null,
+    recoveryEvidence: passedRecoveryBatch?.summary ?? (recoveredByRecheck && latestRecheck ? latestRecheck.summary : null),
   };
 }
 

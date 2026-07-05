@@ -6,6 +6,7 @@ import {
   previewRevisionContent,
   summarizeChapterRevisions,
 } from "../lib/chapters/revisions.ts";
+import { buildFirstThreeAdoptionFollowupDispatches } from "../lib/chapters/revisionAdoptionFollowup.ts";
 
 test("chapter revision summaries", async (t) => {
   await t.test("labels AI overwrite snapshots and creates readable previews", () => {
@@ -136,5 +137,30 @@ test("chapter revision summaries", async (t) => {
     assert.equal(comparison.wordDelta, 4);
     assert.deepEqual(comparison.changedFields, ["标题", "正文", "章节目标", "开头钩子"]);
     assert.equal(comparison.oldPreview, "旧稿第一段。");
+  });
+
+  await t.test("builds follow-up dispatches after first-three adoption", () => {
+    const dispatches = buildFirstThreeAdoptionFollowupDispatches({
+      projectId: "project-1",
+      projectTitle: "夜雨系统",
+      platformId: "fanqie",
+      platformName: "番茄小说",
+      chapterId: "chapter-1",
+      chapterOrder: 1,
+      chapterTitle: "第一章 雨夜系统",
+      revisionId: "revision-first-three",
+      createdAt: "2026-07-05T12:00:00.000Z",
+    });
+
+    assert.equal(dispatches.length, 2);
+    assert.equal(dispatches[0].id, "first-three-adoption:project-1:chapter-1:revision-first-three:review");
+    assert.equal(dispatches[0].stage, "start_first_three_review");
+    assert.equal(dispatches[0].actionLabel, "重新审稿");
+    assert.equal(dispatches[0].href, "/projects/project-1/chapters/chapter-1#chapter-workflow");
+    assert.ok(dispatches[0].acceptanceCriteria.some((item) => item.includes("新正文")));
+    assert.equal(dispatches[1].stage, "start_publish_finalize");
+    assert.equal(dispatches[1].actionLabel, "回发布质检");
+    assert.equal(dispatches[1].href, "/projects/project-1#platform-export");
+    assert.ok(dispatches[1].evidence.some((item) => item.includes("revision-first-three")));
   });
 });

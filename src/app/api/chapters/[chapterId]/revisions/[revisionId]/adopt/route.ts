@@ -1,8 +1,11 @@
 import { NextResponse } from "next/server";
 import { isChapterRevisionCandidate } from "@/lib/chapters/revisions";
+import { buildFirstThreeAdoptionFollowupDispatches } from "@/lib/chapters/revisionAdoptionFollowup";
 import { countWords } from "@/lib/text/wordCount";
 import { prisma } from "@/lib/db/prisma";
 import { getActiveModelProvider } from "@/lib/model-gateway/activeProvider";
+import { getPlatformProfile, type PlatformId } from "@/lib/platforms/platformProfiles";
+import { persistServerGateDispatchTask } from "@/lib/projects/gateDispatchTaskPersistence";
 
 interface Params {
   params: Promise<{ chapterId: string; revisionId: string }>;
@@ -48,6 +51,11 @@ export async function POST(_request: Request, { params }: Params) {
     providerConfigId = fallbackProvider.provider.id;
     model = fallbackProvider.provider.defaultModel;
   }
+  const project = await prisma.project.findUnique({
+    where: { id: chapter.projectId },
+    select: { id: true, title: true, targetPlatform: true },
+  });
+  const platform = project ? getPlatformProfile(project.targetPlatform as PlatformId) : null;
 
   const adoptedWordCount = countWords(revision.content);
   const updatedChapter = await prisma.$transaction(async (tx) => {
@@ -121,14 +129,29 @@ export async function POST(_request: Request, { params }: Params) {
 
     return savedChapter;
   });
+  const followupDispatches = revision.source === "first_three_rewrite_candidate" && project && platform
+    ? await Promise.all(buildFirstThreeAdoptionFollowupDispatches({
+      projectId: project.id,
+      projectTitle: project.title,
+      platformId: platform.id,
+      platformName: platform.name,
+      chapterId: chapter.id,
+      chapterOrder: chapter.order,
+      chapterTitle: revision.title || chapter.title,
+      revisionId: revision.id,
+    }).map((dispatch) => persistServerGateDispatchTask(dispatch)))
+    : [];
 
   return NextResponse.json({
     chapter: updatedChapter,
+    followupDispatches,
     nextAction: {
       kind: "chapter_review",
       label: "去审稿",
       href: `/projects/${chapter.projectId}/chapters/${chapter.id}#chapter-workflow`,
-      detail: "候选稿已采纳，旧审稿不再代表当前正文。先重新审稿，再决定二改或发布质检。",
+      detail: followupDispatches.length
+        ? "候选稿已采纳，系统已派发重新审稿和发布质检待办。旧审稿不再代表当前正文。"
+        : "候选稿已采纳，旧审稿不再代表当前正文。先重新审稿，再决定二改或发布质检。",
     },
   });
 }

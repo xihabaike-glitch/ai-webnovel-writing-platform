@@ -272,6 +272,17 @@ export function buildAiPipelineRecheckDispatchPlan(input: {
       `复检结论：${input.healthLabel}`,
       input.healthDetail,
     ],
+    execution: sampleRequired
+      ? {
+        mode: "sample_recheck",
+        maxSampleCount: 1,
+        primaryActionLabel: "运行 1 章复验",
+      }
+      : {
+        mode: "small_batch_resume",
+        maxSampleCount: 3,
+        primaryActionLabel: "恢复小批执行",
+      },
     sourceReceiptId: input.receiptId,
     completionEvidence: "",
     reviewLatestAt: new Date().toISOString(),

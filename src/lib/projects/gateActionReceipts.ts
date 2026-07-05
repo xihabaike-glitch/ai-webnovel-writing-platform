@@ -222,6 +222,8 @@ export type GatePlatformGrowthReviewStage =
   | "failure_manual_review"
   | "model_route_confirmation_recheck"
   | "model_route_governance"
+  | "ai_pipeline_sample_recheck"
+  | "ai_pipeline_small_batch"
   | "start_first_three_review"
   | "start_opening_diagnostic"
   | "start_platform_package"

@@ -124,6 +124,12 @@ function routeFlowFilterFromLane(laneId: RouteConfirmationDispatchFlowLaneId): R
 
 type DispatchQueueFilter = "all" | "recheck_followup" | "ai_pipeline";
 
+function isAiPipelineExecutableTask(task: PersistedGatePlatformDispatchTask) {
+  return task.platformId === "ai-pipeline"
+    && (task.stage === "ai_pipeline_sample_recheck" || task.stage === "ai_pipeline_small_batch")
+    && task.state !== "completed";
+}
+
 function routeCompletionRecordChips(record: RouteDispatchCompletionRecord) {
   const chips: string[] = [];
   if (record.sampleCount !== null) chips.push(`样本 ${record.sampleCount}`);
@@ -163,6 +169,7 @@ export function GateDispatchTaskCenter({
   const [runningKey, setRunningKey] = useState<string | null>(null);
   const [runningRouteAdviceId, setRunningRouteAdviceId] = useState<string | null>(null);
   const [runningRouteRecheckKey, setRunningRouteRecheckKey] = useState<string | null>(null);
+  const [runningAiPipelineKey, setRunningAiPipelineKey] = useState<string | null>(null);
   const [runningRecheckAdviceKey, setRunningRecheckAdviceKey] = useState<string | null>(null);
   const [routeActionMessage, setRouteActionMessage] = useState("");
   const [routeActionLink, setRouteActionLink] = useState<{ label: string; href: string } | null>(null);
@@ -501,6 +508,67 @@ export function GateDispatchTaskCenter({
     }
   }
 
+  async function runAiPipelineRecheckTask(task: PersistedGatePlatformDispatchTask) {
+    setRunningAiPipelineKey(task.dispatchKey);
+    setErrorMessage("");
+    setRouteActionMessage("");
+    setRouteActionLink(null);
+    try {
+      const response = await fetch("/api/gate/ai-pipeline-recheck-samples", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ dispatch: task }),
+      });
+      const payload = await response.json().catch(() => null) as {
+        error?: string;
+        results?: Array<{ status: string }>;
+        routeEffectSummary?: {
+          successRatePercent: number;
+          averageQualityScore: number | null;
+          verdict: string;
+        };
+        batchReceipt?: {
+          headline: string;
+          primaryLabel: string;
+          primaryHref: string;
+        };
+        recheckTask?: {
+          dispatchKey: string;
+          state: GatePlatformGrowthDispatchState;
+          completionEvidence: string;
+          completedAt: string | null;
+        };
+      } | null;
+      if (!response.ok) throw new Error(payload?.error ?? "运行 AI 写审改复检失败。");
+      if (payload?.recheckTask) {
+        setTasks((current) => current.map((item) => item.dispatchKey === payload.recheckTask?.dispatchKey
+          ? {
+            ...item,
+            state: payload.recheckTask.state,
+            completionEvidence: payload.recheckTask.completionEvidence,
+            completedAt: payload.recheckTask.completedAt,
+            updatedAt: payload.recheckTask.completedAt ?? item.updatedAt,
+          }
+          : item));
+      }
+      const succeeded = payload?.results?.filter((result) => result.status === "succeeded").length ?? 0;
+      const total = payload?.results?.length ?? 0;
+      const qualityText = payload?.routeEffectSummary?.averageQualityScore === null || payload?.routeEffectSummary?.averageQualityScore === undefined
+        ? "质量缺样本"
+        : `质量 ${payload.routeEffectSummary.averageQualityScore}`;
+      setRouteActionMessage(`已运行「${task.title}」：${succeeded}/${total} 成功，成功率 ${payload?.routeEffectSummary?.successRatePercent ?? 0}%，${qualityText}。${payload?.batchReceipt?.headline ?? payload?.routeEffectSummary?.verdict ?? ""}`);
+      setRouteActionLink(payload?.batchReceipt?.primaryHref ? {
+        label: payload.batchReceipt.primaryLabel,
+        href: payload.batchReceipt.primaryHref,
+      } : null);
+      router.refresh();
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "运行 AI 写审改复检失败。");
+    } finally {
+      setRunningAiPipelineKey(null);
+    }
+  }
+
   return (
     <div className="grid gap-6">
       <section className="grid gap-3 md:grid-cols-3 lg:grid-cols-6">
@@ -710,9 +778,8 @@ export function GateDispatchTaskCenter({
           </div>
           <div className="mt-3 grid gap-2 lg:grid-cols-2">
             {center.aiPipelineDispatches.slice(0, 4).map((task) => (
-              <Link
+              <div
                 className="rounded-md border border-sky-100 bg-white/80 p-3 text-sm text-sky-950 hover:bg-white"
-                href={`#dispatch-${task.dispatchKey}`}
                 key={task.dispatchKey}
               >
                 <div className="flex flex-wrap items-center gap-2">
@@ -725,7 +792,25 @@ export function GateDispatchTaskCenter({
                   <span className="rounded-md bg-sky-50 px-2 py-1">{task.actionLabel}</span>
                   <span className="rounded-md bg-sky-50 px-2 py-1">优先级 {task.priorityScore}</span>
                 </div>
-              </Link>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Link
+                    className="rounded-md bg-white px-3 py-2 text-xs font-medium text-sky-900 hover:bg-sky-100"
+                    href={`#dispatch-${task.dispatchKey}`}
+                  >
+                    查看派单
+                  </Link>
+                  {isAiPipelineExecutableTask(task) ? (
+                    <button
+                      className="rounded-md bg-sky-900 px-3 py-2 text-xs font-medium text-white hover:bg-sky-800 disabled:cursor-not-allowed disabled:opacity-60"
+                      disabled={runningAiPipelineKey !== null}
+                      onClick={() => void runAiPipelineRecheckTask(task)}
+                      type="button"
+                    >
+                      {runningAiPipelineKey === task.dispatchKey ? "运行中" : task.stage === "ai_pipeline_small_batch" ? "恢复小批执行" : "运行 1 章复验"}
+                    </button>
+                  ) : null}
+                </div>
+              </div>
             ))}
           </div>
         </section>
@@ -1318,9 +1403,19 @@ export function GateDispatchTaskCenter({
                     {runningRouteRecheckKey === task.dispatchKey ? "运行中" : "运行复检样本"}
                   </button>
                 ) : null}
+                {isAiPipelineExecutableTask(task) ? (
+                  <button
+                    className="rounded-md border border-sky-200 bg-sky-50 px-3 py-2 text-sm font-medium text-sky-800 hover:bg-sky-100 disabled:cursor-not-allowed disabled:opacity-60"
+                    disabled={runningAiPipelineKey === task.dispatchKey}
+                    onClick={() => void runAiPipelineRecheckTask(task)}
+                    type="button"
+                  >
+                    {runningAiPipelineKey === task.dispatchKey ? "运行中" : task.stage === "ai_pipeline_small_batch" ? "恢复小批执行" : "运行 1 章复验"}
+                  </button>
+                ) : null}
                 <button
                   className="rounded-md border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
-                  disabled={runningKey === task.dispatchKey || runningRouteRecheckKey === task.dispatchKey}
+                  disabled={runningKey === task.dispatchKey || runningRouteRecheckKey === task.dispatchKey || runningAiPipelineKey === task.dispatchKey}
                   onClick={() => void updateTask(task)}
                   type="button"
                 >

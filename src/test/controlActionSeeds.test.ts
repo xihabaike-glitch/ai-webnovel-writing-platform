@@ -266,10 +266,20 @@ test("control action seeds", async (t) => {
 
     assert.equal(sample.dispatchKey, "ai-pipeline-recheck:demo-project:ai-plan-1:sample");
     assert.equal(sample.stage, "ai_pipeline_sample_recheck");
+    assert.deepEqual(sample.execution, {
+      mode: "sample_recheck",
+      maxSampleCount: 1,
+      primaryActionLabel: "运行 1 章复验",
+    });
     assert.ok(sample.title.includes("1 章小样本"));
     assert.ok(sample.acceptanceCriteria.some((item) => item.includes("不能批量放量")));
     assert.equal(scale.dispatchKey, "ai-pipeline-recheck:demo-project:ai-plan-1:scale");
     assert.equal(scale.stage, "ai_pipeline_small_batch");
+    assert.deepEqual(scale.execution, {
+      mode: "small_batch_resume",
+      maxSampleCount: 3,
+      primaryActionLabel: "恢复小批执行",
+    });
     assert.ok(scale.title.includes("推荐批量队列"));
     assert.ok(scale.href.includes("#ai-pipeline"));
   });

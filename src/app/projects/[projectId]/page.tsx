@@ -27,6 +27,7 @@ import { WorldBiblePanel } from "@/components/projects/WorldBiblePanel";
 import { WritingWorkbenchPanel } from "@/components/projects/WritingWorkbenchPanel";
 import { buildStoryTreeExperienceApplyDispatchKey, buildStoryTreeExperienceEffectDashboard, buildStoryTreeExperienceFlow, buildStoryTreeExperienceGuide, buildStoryTreeExperienceReviewBacklog } from "@/lib/ai/storyTreeExperience";
 import { prisma } from "@/lib/db/prisma";
+import { buildExportPackageReadiness } from "@/lib/export/markdown";
 import { getPlatformProfile, type PlatformId } from "@/lib/platforms/platformProfiles";
 import { buildGatePlatformDecisionTimeline, buildGatePlatformTacticExperienceLibrary, gateActionReceiptFromAuditRecord } from "@/lib/projects/gateActionReceipts";
 import { gatePlatformDispatchTaskFromRecord } from "@/lib/projects/gateDispatchTaskRecords";
@@ -268,6 +269,70 @@ export default async function ProjectPage({ params }: { params: Promise<{ projec
     targetWordCount: project.targetWordCount,
     platform,
     chapters: project.chapters,
+  });
+  const exportReadiness = buildExportPackageReadiness({
+    title: project.title,
+    genre: project.genre,
+    targetPlatformName: platform.name,
+    targetLengthType: project.targetLengthType,
+    targetWordCount: project.targetWordCount,
+    currentWordCount: project.currentWordCount,
+    sellingPoint: project.sellingPoint,
+    updateCadence: project.updateCadence,
+    chapters: project.chapters.map((chapter) => ({
+      id: chapter.id,
+      order: chapter.order,
+      title: chapter.title,
+      content: chapter.content,
+      wordCount: chapter.wordCount,
+      goal: chapter.goal,
+      hook: chapter.hook,
+      conflict: chapter.conflict,
+      valueShift: chapter.valueShift,
+      cliffhanger: chapter.cliffhanger,
+      status: chapter.status,
+    })),
+    outlineNodes: project.outlineNodes.map((node) => ({
+      type: node.type,
+      title: node.title,
+      summary: node.summary,
+      goal: node.goal,
+      hook: node.hook,
+      conflict: node.conflict,
+      valueShift: node.valueShift,
+      platformNote: node.platformNote,
+      depth: node.depth,
+      order: node.order,
+      status: node.status,
+    })),
+    characters: project.characters.map((character) => ({
+      name: character.name,
+      role: character.role,
+      desire: character.desire,
+      need: character.need,
+      flaw: character.flaw,
+      arcStart: character.arcStart,
+      arcEnd: character.arcEnd,
+      voice: character.voice,
+      relationshipNotes: character.relationshipNotes,
+    })),
+    worldEntries: project.worldEntries.map((entry) => ({
+      type: entry.type,
+      title: entry.title,
+      content: entry.content,
+    })),
+    foreshadows: project.foreshadows.map((entry) => ({
+      title: entry.title,
+      status: entry.status,
+      notes: entry.notes,
+      setupChapterId: entry.setupChapterId,
+      payoffChapterId: entry.payoffChapterId,
+    })),
+    plotThreads: project.plotThreads.map((entry) => ({
+      type: entry.type,
+      title: entry.title,
+      status: entry.status,
+    })),
   });
   const outlineNodes = project.outlineNodes.map((node) => ({
     id: node.id,
@@ -564,13 +629,16 @@ export default async function ProjectPage({ params }: { params: Promise<{ projec
             <p className="mt-2 text-sm text-slate-600">风险：{platform.risks.join("、")}</p>
           </div>
         </div>
-        <div className="grid gap-4 md:grid-cols-[1fr_auto]">
+        <div className="grid gap-4 md:grid-cols-[1fr_360px]">
           <div id="create-chapter">
             <CreateChapterForm projectId={project.id} />
           </div>
           <div className="rounded-md border border-slate-200 bg-white p-4">
-            <div className="mb-3 font-medium">导出</div>
-            <ExportMarkdownButton projectId={project.id} title={project.title} />
+            <div className="mb-3">
+              <div className="font-medium">资料包导出</div>
+              <p className="mt-1 text-xs leading-5 text-slate-500">正文、大纲、人物、设定和伏笔会一起进入 Markdown 备份包。</p>
+            </div>
+            <ExportMarkdownButton projectId={project.id} readiness={exportReadiness} title={project.title} />
           </div>
         </div>
         <div id="model-task-audit">

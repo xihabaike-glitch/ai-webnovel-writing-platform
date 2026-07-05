@@ -718,6 +718,55 @@ test("buildProjectControlDashboard", async (t) => {
     assert.ok(dashboard.aiPipelineControlPlan.nextAction.includes("清单已全部完成"));
   });
 
+  await t.test("surfaces AI pipeline recheck dispatch handoff", () => {
+    const dashboard = buildProjectControlDashboard({
+      project,
+      platform: getPlatformProfile("fanqie"),
+      chapters: [chapter],
+      outlineNodes: [],
+      characters: [],
+      worldEntries: [],
+      foreshadows: [],
+      plotThreads: [],
+      aiTasks: [],
+      gateActionAudits: [
+        {
+          receiptId: "ai-plan-dispatched",
+          actionId: "ai-pipeline-control:demo-project",
+          label: "批量打法修复清单",
+          detail: "三轮稳住打法：成功率 0%，质量 68，失败 2。",
+          href: "/projects/demo-project#ai-pipeline",
+          status: "succeeded",
+          message: "复检完成：先修打法。只能恢复小样本复验。",
+          executionType: "control_action",
+          succeededCount: 3,
+          failedCount: 0,
+          payload: JSON.stringify({
+            aiPipelineControlPlan: {
+              status: "repair",
+              items: [
+                { id: "stop-scale", label: "停用三轮稳住打法继续放量", completed: true },
+              ],
+              recheck: {
+                status: "sample_required",
+                healthLabel: "先修打法",
+                detail: "还有失败样本。",
+                dispatchKey: "ai-pipeline-recheck:demo-project:ai-plan-dispatched:sample",
+                dispatchTitle: "AI 写审改：跑 1 章小样本复验",
+              },
+            },
+          }),
+          createdAt: "2026-01-03T00:00:00.000Z",
+        },
+      ],
+      submissionChecklist: checklist,
+    });
+
+    assert.equal(dashboard.aiPipelineControlPlan.recheckStatus, "sample_required");
+    assert.equal(dashboard.aiPipelineControlPlan.recheckDispatchKey, "ai-pipeline-recheck:demo-project:ai-plan-dispatched:sample");
+    assert.equal(dashboard.aiPipelineControlPlan.recheckDispatchTitle, "AI 写审改：跑 1 章小样本复验");
+  });
+
   await t.test("summarizes model route health for the project control dashboard", () => {
     const dashboard = buildProjectControlDashboard({
       project: {

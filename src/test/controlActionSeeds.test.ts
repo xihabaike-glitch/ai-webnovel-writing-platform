@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { getPlatformProfile } from "../lib/platforms/platformProfiles.ts";
 import {
   buildAiPipelineControlActionPlan,
+  buildAiPipelineRecheckDispatchPlan,
   buildChapterCardActionSeeds,
   buildChapterCardDraftHandoff,
   buildCharacterActionSeeds,
@@ -232,6 +233,9 @@ test("control action seeds", async (t) => {
       status: "blocked",
       label: "先修打法",
       detail: "还有失败样本。",
+    }, {
+      dispatchKey: "ai-pipeline-recheck:demo-project:ai-plan-1:sample",
+      dispatchTitle: "AI 写审改：跑 1 章小样本复验",
     });
 
     assert.equal(rechecked?.status, "sample_required");
@@ -241,6 +245,33 @@ test("control action seeds", async (t) => {
     };
     assert.equal(parsed.aiPipelineControlPlan?.recheck?.status, "sample_required");
     assert.equal(parsed.aiPipelineControlPlan?.recheck?.healthLabel, "先修打法");
+    assert.equal(parsed.aiPipelineControlPlan?.recheck?.dispatchKey, "ai-pipeline-recheck:demo-project:ai-plan-1:sample");
+  });
+
+  await t.test("builds a dispatch plan from AI pipeline recheck status", () => {
+    const sample = buildAiPipelineRecheckDispatchPlan({
+      projectId: "demo-project",
+      receiptId: "ai-plan-1",
+      recheckStatus: "sample_required",
+      healthLabel: "先修打法",
+      healthDetail: "还有失败样本。",
+    });
+    const scale = buildAiPipelineRecheckDispatchPlan({
+      projectId: "demo-project",
+      receiptId: "ai-plan-1",
+      recheckStatus: "small_batch_ready",
+      healthLabel: "可参考",
+      healthDetail: "可以小步验证。",
+    });
+
+    assert.equal(sample.dispatchKey, "ai-pipeline-recheck:demo-project:ai-plan-1:sample");
+    assert.equal(sample.stage, "ai_pipeline_sample_recheck");
+    assert.ok(sample.title.includes("1 章小样本"));
+    assert.ok(sample.acceptanceCriteria.some((item) => item.includes("不能批量放量")));
+    assert.equal(scale.dispatchKey, "ai-pipeline-recheck:demo-project:ai-plan-1:scale");
+    assert.equal(scale.stage, "ai_pipeline_small_batch");
+    assert.ok(scale.title.includes("推荐批量队列"));
+    assert.ok(scale.href.includes("#ai-pipeline"));
   });
 
   await t.test("builds strict JSON prompts for AI control assets", () => {

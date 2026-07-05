@@ -181,7 +181,11 @@ export function updateAiPipelineControlPlanItem(payload: string, itemId: string,
   };
 }
 
-export function recheckAiPipelineControlPlan(payload: string, health: { status: string; label: string; detail: string }) {
+export function recheckAiPipelineControlPlan(
+  payload: string,
+  health: { status: string; label: string; detail: string },
+  dispatch?: { dispatchKey: string; dispatchTitle: string },
+) {
   let parsed: Record<string, unknown>;
   try {
     const root = JSON.parse(payload) as unknown;
@@ -214,6 +218,8 @@ export function recheckAiPipelineControlPlan(payload: string, health: { status: 
       healthStatus: health.status,
       healthLabel: health.label,
       detail: health.detail,
+      dispatchKey: dispatch?.dispatchKey ?? "",
+      dispatchTitle: dispatch?.dispatchTitle ?? "",
       checkedAt: new Date().toISOString(),
     },
   };
@@ -222,6 +228,53 @@ export function recheckAiPipelineControlPlan(payload: string, health: { status: 
     payload: JSON.stringify(parsed),
     status,
     message,
+  };
+}
+
+export function buildAiPipelineRecheckDispatchPlan(input: {
+  projectId: string;
+  receiptId: string;
+  recheckStatus: "small_batch_ready" | "sample_required";
+  healthLabel: string;
+  healthDetail: string;
+}) {
+  const sampleRequired = input.recheckStatus === "sample_required";
+  const suffix = sampleRequired ? "sample" : "scale";
+  return {
+    dispatchKey: `ai-pipeline-recheck:${input.projectId}:${input.receiptId}:${suffix}`,
+    projectId: input.projectId,
+    platformId: "ai-pipeline",
+    platformName: "AI 写审改",
+    stage: sampleRequired ? "ai_pipeline_sample_recheck" : "ai_pipeline_small_batch",
+    state: "queued",
+    priorityScore: sampleRequired ? 94 : 72,
+    ownerRole: sampleRequired ? "写作制片 / 审稿负责人" : "写作制片",
+    title: sampleRequired ? "AI 写审改：跑 1 章小样本复验" : "AI 写审改：回推荐批量队列",
+    detail: sampleRequired
+      ? `复检结论「${input.healthLabel}」还不支持放量：${input.healthDetail} 先跑 1 章样本，把质量、失败和成本证据补回来。`
+      : `复检结论「${input.healthLabel}」已允许小批：${input.healthDetail} 回到推荐批量队列，但仍按小批生产、审稿、二改留痕。`,
+    dueLabel: sampleRequired ? "今天先跑 1 章" : "下一批前处理",
+    actionLabel: sampleRequired ? "跑小样本复验" : "回推荐批量",
+    href: `/projects/${input.projectId}#ai-pipeline`,
+    acceptanceCriteria: sampleRequired
+      ? [
+        "只选择 1 章进入初稿、审稿或二改复验",
+        "记录成功率、质量分、失败原因和成本",
+        "复验完成前不能批量放量",
+      ]
+      : [
+        "只恢复小批推荐队列，不跳过审稿和二改",
+        "保留本轮批量健康复检结果",
+        "下一批完成后继续回填质量和失败证据",
+      ],
+    evidence: [
+      `来源清单：${input.receiptId}`,
+      `复检结论：${input.healthLabel}`,
+      input.healthDetail,
+    ],
+    sourceReceiptId: input.receiptId,
+    completionEvidence: "",
+    reviewLatestAt: new Date().toISOString(),
   };
 }
 

@@ -5,6 +5,7 @@ import { getPlatformProfile, type PlatformId } from "@/lib/platforms/platformPro
 import { generateControlAssets, type ControlAssetAreaId } from "@/lib/projects/controlAssetGeneration";
 import {
   buildAiPipelineControlActionPlan,
+  buildAiPipelineRecheckDispatchPlan,
   buildChapterCardActionSeeds,
   buildChapterCardDraftHandoff,
   buildCharacterActionSeeds,
@@ -95,14 +96,70 @@ export async function POST(request: Request, { params }: Params) {
     }
     const health = buildTaskQueueBatchHealthReview(project.gateActionAudits, 5);
     const primary = health.items[0] ?? null;
+    const healthStatus = primary?.status ?? "watch";
+    const recheckStatus = healthStatus === "usable" ? "small_batch_ready" : "sample_required";
+    const healthLabel = primary?.label ?? "缺样本";
+    const healthDetail = primary?.nextAction ?? "还没有新的批量样本，先跑 1 章小样本复验。";
+    const dispatchPlan = buildAiPipelineRecheckDispatchPlan({
+      projectId,
+      receiptId: audit.receiptId,
+      recheckStatus,
+      healthLabel,
+      healthDetail,
+    });
     const rechecked = recheckAiPipelineControlPlan(audit.payload, {
-      status: primary?.status ?? "watch",
-      label: primary?.label ?? "缺样本",
-      detail: primary?.nextAction ?? "还没有新的批量样本，先跑 1 章小样本复验。",
+      status: healthStatus,
+      label: healthLabel,
+      detail: healthDetail,
+    }, {
+      dispatchKey: dispatchPlan.dispatchKey,
+      dispatchTitle: dispatchPlan.title,
     });
     if (!rechecked) {
       return NextResponse.json({ error: "清单还没全部完成，先别急着复检。" }, { status: 400 });
     }
+    await prisma.gateDispatchTask.upsert({
+      where: { dispatchKey: dispatchPlan.dispatchKey },
+      create: {
+        dispatchKey: dispatchPlan.dispatchKey,
+        projectId,
+        platformId: dispatchPlan.platformId,
+        platformName: dispatchPlan.platformName,
+        stage: dispatchPlan.stage,
+        state: dispatchPlan.state,
+        priorityScore: dispatchPlan.priorityScore,
+        ownerRole: dispatchPlan.ownerRole,
+        title: dispatchPlan.title,
+        detail: dispatchPlan.detail,
+        dueLabel: dispatchPlan.dueLabel,
+        actionLabel: dispatchPlan.actionLabel,
+        href: dispatchPlan.href,
+        acceptanceCriteria: JSON.stringify(dispatchPlan.acceptanceCriteria),
+        evidence: JSON.stringify(dispatchPlan.evidence),
+        sourceReceiptId: dispatchPlan.sourceReceiptId,
+        completionEvidence: dispatchPlan.completionEvidence,
+        reviewLatestAt: new Date(dispatchPlan.reviewLatestAt),
+      },
+      update: {
+        projectId,
+        platformId: dispatchPlan.platformId,
+        platformName: dispatchPlan.platformName,
+        stage: dispatchPlan.stage,
+        state: dispatchPlan.state,
+        priorityScore: dispatchPlan.priorityScore,
+        ownerRole: dispatchPlan.ownerRole,
+        title: dispatchPlan.title,
+        detail: dispatchPlan.detail,
+        dueLabel: dispatchPlan.dueLabel,
+        actionLabel: dispatchPlan.actionLabel,
+        href: dispatchPlan.href,
+        acceptanceCriteria: JSON.stringify(dispatchPlan.acceptanceCriteria),
+        evidence: JSON.stringify(dispatchPlan.evidence),
+        sourceReceiptId: dispatchPlan.sourceReceiptId,
+        completionEvidence: dispatchPlan.completionEvidence,
+        reviewLatestAt: new Date(dispatchPlan.reviewLatestAt),
+      },
+    });
     await prisma.gateActionAudit.update({
       where: { receiptId: audit.receiptId },
       data: {
@@ -120,6 +177,8 @@ export async function POST(request: Request, { params }: Params) {
       targetAnchor: "ai-pipeline",
       message: rechecked.message,
       recheckStatus: rechecked.status,
+      dispatchKey: dispatchPlan.dispatchKey,
+      dispatchTitle: dispatchPlan.title,
     });
   }
 

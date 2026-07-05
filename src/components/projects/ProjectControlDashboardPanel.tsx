@@ -119,6 +119,8 @@ interface AiPipelineControlPlanSummary {
   recheckLabel: string;
   recheckStatus: "small_batch_ready" | "sample_required" | null;
   recheckMessage: string | null;
+  recheckDispatchKey: string | null;
+  recheckDispatchTitle: string | null;
   createdAt: string | null;
 }
 
@@ -591,12 +593,14 @@ export function ProjectControlDashboardPanel({ projectId }: { projectId: string 
       const payload = await response.json() as {
         message?: string;
         error?: string;
+        dispatchTitle?: string;
       };
       if (!response.ok) {
         throw new Error(payload.error ?? "复检批量健康失败。");
       }
       await loadDashboard();
-      setMessage(payload.message ?? "批量健康已复检。");
+      const dispatch = payload.dispatchTitle ? `已派单：${payload.dispatchTitle}。` : "";
+      setMessage([payload.message ?? "批量健康已复检。", dispatch].filter(Boolean).join(" "));
     } catch (caught) {
       setMessage(caught instanceof Error ? caught.message : "复检批量健康失败。");
     } finally {
@@ -1034,6 +1038,9 @@ export function ProjectControlDashboardPanel({ projectId }: { projectId: string 
                       : "bg-amber-50 text-amber-700"
                   }`}>
                     {dashboard.aiPipelineControlPlan.recheckMessage}
+                    {dashboard.aiPipelineControlPlan.recheckDispatchTitle ? (
+                      <span className="block">已派单：{dashboard.aiPipelineControlPlan.recheckDispatchTitle}</span>
+                    ) : null}
                   </div>
                 ) : null}
                 <div className="mt-3 grid gap-2">

@@ -435,6 +435,39 @@ export interface GateDispatchTaskCenterAiPipelineGroup {
   tasks: PersistedGatePlatformDispatchTask[];
 }
 
+export interface GateAiPipelineRecoveryPanel {
+  anchorId: "ai-pipeline-recovery";
+  visible: boolean;
+  status: "empty" | "ready" | "watch" | "blocked";
+  label: string;
+  headline: string;
+  detail: string;
+  summary: {
+    total: number;
+    active: number;
+    completed: number;
+    rollback: number;
+    sample: number;
+    smallBatch: number;
+  };
+  primaryAction: {
+    label: string;
+    href: string;
+    detail: string;
+  };
+  groups: Array<{
+    id: GateDispatchTaskCenterAiPipelineGroupId;
+    label: string;
+    headline: string;
+    detail: string;
+    total: number;
+    active: number;
+    actionLabel: string;
+    actionHref: string;
+    topTaskTitle: string;
+  }>;
+}
+
 export interface GateDispatchRecheckFollowUpChain {
   rootDispatchKey: string;
   latestDispatchKey: string;
@@ -3635,6 +3668,84 @@ function buildAiPipelineDispatchGroups(
       tasks,
     }];
   });
+}
+
+export function buildGateAiPipelineRecoveryPanel(_tasks: PersistedGatePlatformDispatchTask[]): GateAiPipelineRecoveryPanel {
+  const center = buildGateDispatchTaskCenter(_tasks);
+  const groups = center.aiPipelineGroups;
+  const total = center.summary.aiPipeline;
+  const active = center.summary.activeAiPipeline;
+  const completed = total - active;
+  const rollbackGroup = groups.find((group) => group.id === "rollback_repair") ?? null;
+  const sampleGroup = groups.find((group) => group.id === "sample_recheck") ?? null;
+  const smallBatchGroup = groups.find((group) => group.id === "small_batch_resume") ?? null;
+  const activePrimaryGroup = [rollbackGroup, sampleGroup, smallBatchGroup].find((group) => (group?.active ?? 0) > 0) ?? null;
+  const fallbackPrimaryGroup = activePrimaryGroup ?? groups[0] ?? null;
+  const status: GateAiPipelineRecoveryPanel["status"] = total === 0
+    ? "empty"
+    : (rollbackGroup?.active ?? 0) > 0
+      ? "blocked"
+      : active > 0
+        ? "watch"
+        : "ready";
+  const label = status === "empty"
+    ? "暂无恢复派单"
+    : status === "blocked"
+      ? "先回滚修复"
+      : status === "watch"
+        ? "恢复观察中"
+        : "恢复闭环完成";
+
+  function dispatchHref(task: PersistedGatePlatformDispatchTask | null | undefined) {
+    return task ? `/dispatch?queue=ai_pipeline#dispatch-${task.dispatchKey}` : "/dispatch?queue=ai_pipeline";
+  }
+
+  function primaryLabel(group: GateDispatchTaskCenterAiPipelineGroup | null) {
+    if (!group) return "查看派单中心";
+    if (group.id === "rollback_repair" && group.active > 0) return "先处理回滚修复";
+    if (group.id === "sample_recheck" && group.active > 0) return "运行 1 章复验";
+    if (group.id === "small_batch_resume" && group.active > 0) return "恢复小批执行";
+    return "查看恢复记录";
+  }
+
+  return {
+    anchorId: "ai-pipeline-recovery",
+    visible: total > 0,
+    status,
+    label,
+    headline: "AI 写审改恢复闸门",
+    detail: total === 0
+      ? "还没有 AI 写审改恢复派单。"
+      : status === "blocked"
+        ? "恢复小批已经跌线，先回滚修复低分章节、开头钩子和章末追读，再回 1 章小样本。"
+        : status === "watch"
+          ? "AI 写审改恢复仍在观察期，只允许按样本或小批节奏推进，不直接恢复大批量。"
+          : "AI 写审改恢复派单已闭环，后续只按经验库小步复用，不把一次恢复当成永久通行证。",
+    summary: {
+      total,
+      active,
+      completed,
+      rollback: rollbackGroup?.total ?? 0,
+      sample: sampleGroup?.total ?? 0,
+      smallBatch: smallBatchGroup?.total ?? 0,
+    },
+    primaryAction: {
+      label: primaryLabel(fallbackPrimaryGroup),
+      href: dispatchHref(fallbackPrimaryGroup?.topTask),
+      detail: fallbackPrimaryGroup?.detail ?? "查看 AI 写审改复检派单。",
+    },
+    groups: groups.map((group) => ({
+      id: group.id,
+      label: group.label,
+      headline: group.headline,
+      detail: group.detail,
+      total: group.total,
+      active: group.active,
+      actionLabel: group.topTask?.actionLabel ?? "查看派单",
+      actionHref: dispatchHref(group.topTask),
+      topTaskTitle: group.topTask?.title ?? group.headline,
+    })),
+  };
 }
 
 function validDate(value: string | null | undefined) {

@@ -9,6 +9,8 @@ import { GatePriorityActionCard } from "@/components/gate/GatePriorityActionCard
 import { GatePublishEffectReviewPanel } from "@/components/gate/GatePublishEffectReviewPanel";
 import { buildTaskBatchHistory } from "@/lib/ai/taskBatchHistory";
 import { prisma } from "@/lib/db/prisma";
+import { buildGateAiPipelineRecoveryPanel } from "@/lib/projects/gateActionReceipts";
+import { gatePlatformDispatchTaskFromRecord } from "@/lib/projects/gateDispatchTaskRecords";
 import { buildPrePublishGate, buildPrePublishGateFocusNotice, type PrePublishGateFocusNotice, type PrePublishGateItem } from "@/lib/projects/prePublishGate";
 import { parsePublishSnapshotTags } from "@/lib/projects/platformPublishExport";
 
@@ -44,6 +46,13 @@ function repairBatchTone(status: ReturnType<typeof buildPrePublishGate>["failure
   return "border-rose-200 bg-rose-50 text-rose-800";
 }
 
+function aiRecoveryTone(status: ReturnType<typeof buildGateAiPipelineRecoveryPanel>["status"]) {
+  if (status === "blocked") return "border-rose-200 bg-rose-50 text-rose-900";
+  if (status === "watch") return "border-amber-200 bg-amber-50 text-amber-900";
+  if (status === "ready") return "border-emerald-200 bg-emerald-50 text-emerald-900";
+  return "border-slate-200 bg-white text-slate-700";
+}
+
 export default async function GatePage({
   searchParams,
 }: {
@@ -51,7 +60,7 @@ export default async function GatePage({
 }) {
   const params = await searchParams;
   const focus = Array.isArray(params?.focus) ? params?.focus[0] : params?.focus ?? null;
-  const [projects, recentAiTasks, chapters] = await Promise.all([
+  const [projects, recentAiTasks, chapters, aiRecoveryDispatchRecords] = await Promise.all([
     prisma.project.findMany({
       include: {
         chapters: { orderBy: { order: "asc" } },
@@ -112,6 +121,17 @@ export default async function GatePage({
     prisma.chapter.findMany({
       select: { id: true, title: true },
     }),
+    prisma.gateDispatchTask.findMany({
+      where: {
+        OR: [
+          { platformId: "ai-pipeline" },
+          { dispatchKey: { startsWith: "ai-pipeline-recheck:" } },
+          { dispatchKey: { startsWith: "ai-pipeline:" } },
+        ],
+      },
+      orderBy: [{ state: "asc" }, { priorityScore: "desc" }, { updatedAt: "desc" }],
+      take: 80,
+    }),
   ]);
   const chaptersById = new Map(chapters.map((chapter) => [chapter.id, chapter]));
   const recentTasksWithChapter = recentAiTasks.map((task) => ({
@@ -158,6 +178,7 @@ export default async function GatePage({
     batchHistory: buildTaskBatchHistory(recentTasksWithChapter),
   });
   const focusNotice = buildPrePublishGateFocusNotice({ focus, gate });
+  const aiRecoveryPanel = buildGateAiPipelineRecoveryPanel(aiRecoveryDispatchRecords.map(gatePlatformDispatchTaskFromRecord));
 
   return (
     <AppShell>
@@ -267,6 +288,47 @@ export default async function GatePage({
       <GatePublishEffectReviewPanel packages={gate.projectStatuses} />
 
       <GatePlatformStrategyReviewPanel review={gate.strategyReview} />
+
+      {aiRecoveryPanel.visible ? (
+        <section className={`mb-6 rounded-md border p-4 ${aiRecoveryTone(aiRecoveryPanel.status)}`} id={aiRecoveryPanel.anchorId}>
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <div className="flex flex-wrap items-center gap-2">
+                <h2 className="font-medium">{aiRecoveryPanel.headline}</h2>
+                <span className="rounded-md bg-white/70 px-2 py-1 text-xs font-medium">{aiRecoveryPanel.label}</span>
+              </div>
+              <p className="mt-1 max-w-3xl text-sm leading-6">{aiRecoveryPanel.detail}</p>
+            </div>
+            <Link className="w-fit shrink-0 rounded-md bg-white px-4 py-2 text-sm font-medium text-slate-950 hover:bg-slate-50" href={aiRecoveryPanel.primaryAction.href}>
+              {aiRecoveryPanel.primaryAction.label}
+            </Link>
+          </div>
+          <div className="mt-3 grid gap-2 text-sm md:grid-cols-3 lg:grid-cols-6">
+            <div className="rounded-md bg-white/70 px-3 py-2">总派单 {aiRecoveryPanel.summary.total}</div>
+            <div className="rounded-md bg-white/70 px-3 py-2">未闭环 {aiRecoveryPanel.summary.active}</div>
+            <div className="rounded-md bg-white/70 px-3 py-2">已闭环 {aiRecoveryPanel.summary.completed}</div>
+            <div className="rounded-md bg-white/70 px-3 py-2">回滚 {aiRecoveryPanel.summary.rollback}</div>
+            <div className="rounded-md bg-white/70 px-3 py-2">复验 {aiRecoveryPanel.summary.sample}</div>
+            <div className="rounded-md bg-white/70 px-3 py-2">小批 {aiRecoveryPanel.summary.smallBatch}</div>
+          </div>
+          <div className="mt-3 grid gap-2 lg:grid-cols-3">
+            {aiRecoveryPanel.groups.map((group) => (
+              <Link className="rounded-md border border-white/70 bg-white/70 p-3 text-sm hover:bg-white" href={group.actionHref} key={group.id}>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="font-medium">{group.label}</span>
+                  <span className="rounded-md bg-slate-50 px-2 py-1 text-xs text-slate-700">活跃 {group.active}/{group.total}</span>
+                </div>
+                <div className="mt-2 text-xs font-medium">{group.headline}</div>
+                <p className="mt-1 line-clamp-2 leading-6 opacity-80">{group.detail}</p>
+                <div className="mt-3 rounded-md bg-white px-2 py-2 text-xs">
+                  <div className="font-medium">{group.topTaskTitle}</div>
+                  <div className="mt-1 opacity-75">{group.actionLabel}</div>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </section>
+      ) : null}
 
       <GateClosedLoopTimelinePanel packages={gate.projectStatuses} />
 

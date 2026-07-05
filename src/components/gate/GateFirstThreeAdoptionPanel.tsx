@@ -80,6 +80,18 @@ function followupResultText(result: LocalFollowupResult) {
   return "刚执行失败";
 }
 
+function batchClosureSummary(results: GateFirstThreeAdoptionReceiptResult[]) {
+  const closed = results.filter((result) => result.status === "succeeded");
+  const blocked = results.filter((result) => result.status === "failed");
+  return {
+    closed,
+    blocked,
+    headline: blocked.length > 0
+      ? `已写回 ${closed.length} 条派单，${blocked.length} 条仍需修复。`
+      : `本批 ${closed.length} 条派单已写回，可以刷新总闸门复检。`,
+  };
+}
+
 function stateText(state: string) {
   if (state === "completed") return "完成";
   if (state === "assigned") return "已派单";
@@ -298,7 +310,7 @@ export function GateFirstThreeAdoptionPanel({ closure }: { closure: PrePublishGa
         next[result.id] = {
           status: result.status,
           message: result.status === "succeeded"
-            ? `${result.message ?? result.title} 等待总闸门复检。`
+            ? `${result.message ?? result.title} 已写回派单证据，等待总闸门复检。`
             : result.message ?? "处理采纳后续失败。",
         };
       }
@@ -318,7 +330,7 @@ export function GateFirstThreeAdoptionPanel({ closure }: { closure: PrePublishGa
       items: batchItems,
       results,
     }));
-    setMessage(`${label}完成：成功 ${succeeded} 个，失败 ${failed} 个。`);
+    setMessage(`${label}完成：已闭合 ${succeeded} 个，仍需处理 ${failed} 个。`);
     setRunningId(null);
     router.refresh();
   }
@@ -398,6 +410,27 @@ export function GateFirstThreeAdoptionPanel({ closure }: { closure: PrePublishGa
             <div className="font-medium text-slate-950">{batchReview.label}分项复盘</div>
             <div className="text-xs text-slate-500">成功 {batchReview.succeeded} · 失败 {batchReview.failed}</div>
           </div>
+          {(() => {
+            const summary = batchClosureSummary(batchReview.results);
+            return (
+              <div className="mt-2 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs leading-5 text-slate-700">
+                <div className="font-medium text-slate-950">闭环复检摘要</div>
+                <p className="mt-1">{summary.headline}</p>
+                {summary.closed.length ? (
+                  <p className="mt-1 text-emerald-700">
+                    已闭合：{summary.closed.slice(0, 3).map((result) => result.title).join("、")}
+                    {summary.closed.length > 3 ? ` 等 ${summary.closed.length} 项` : ""}
+                  </p>
+                ) : null}
+                {summary.blocked.length ? (
+                  <p className="mt-1 text-rose-700">
+                    仍需处理：{summary.blocked.slice(0, 3).map((result) => result.title).join("、")}
+                    {summary.blocked.length > 3 ? ` 等 ${summary.blocked.length} 项` : ""}
+                  </p>
+                ) : null}
+              </div>
+            );
+          })()}
           <div className="mt-2 grid gap-2 lg:grid-cols-2">
             {batchReview.results.map((result) => (
               <div

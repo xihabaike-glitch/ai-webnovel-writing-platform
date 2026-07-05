@@ -29,6 +29,7 @@ import { WritingWorkbenchPanel } from "@/components/projects/WritingWorkbenchPan
 import { buildStoryTreeExperienceApplyDispatchKey, buildStoryTreeExperienceEffectDashboard, buildStoryTreeExperienceFlow, buildStoryTreeExperienceGuide, buildStoryTreeExperienceReviewBacklog } from "@/lib/ai/storyTreeExperience";
 import { prisma } from "@/lib/db/prisma";
 import { buildExportPackageReadiness } from "@/lib/export/markdown";
+import { exportSnapshotView } from "@/lib/export/snapshots";
 import { getPlatformProfile, type PlatformId } from "@/lib/platforms/platformProfiles";
 import { buildContinuityAudit } from "@/lib/projects/continuityAudit";
 import { buildGatePlatformDecisionTimeline, buildGatePlatformTacticExperienceLibrary, gateActionReceiptFromAuditRecord } from "@/lib/projects/gateActionReceipts";
@@ -89,6 +90,10 @@ export default async function ProjectPage({ params }: { params: Promise<{ projec
         },
         orderBy: { updatedAt: "desc" },
         take: 30,
+      },
+      exportPackageSnapshots: {
+        orderBy: { createdAt: "desc" },
+        take: 8,
       },
     },
   });
@@ -336,6 +341,10 @@ export default async function ProjectPage({ params }: { params: Promise<{ projec
       status: entry.status,
     })),
   });
+  const exportSnapshots = project.exportPackageSnapshots.map((snapshot) => exportSnapshotView({
+    ...snapshot,
+    createdAt: snapshot.createdAt.toISOString(),
+  }));
   const continuityAudit = buildContinuityAudit({
     chapters: project.chapters.map((chapter) => ({
       id: chapter.id,
@@ -686,7 +695,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ projec
               <div className="font-medium">资料包导出</div>
               <p className="mt-1 text-xs leading-5 text-slate-500">正文、大纲、人物、设定和伏笔会一起进入 Markdown 备份包。</p>
             </div>
-            <ExportMarkdownButton projectId={project.id} readiness={exportReadiness} title={project.title} />
+            <ExportMarkdownButton projectId={project.id} readiness={exportReadiness} snapshots={exportSnapshots} title={project.title} />
           </div>
         </div>
         <div id="model-task-audit">

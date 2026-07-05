@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
-import { exportMarkdownFileSuffix, exportProjectMarkdownByMode, type ExportMarkdownMode } from "@/lib/export/markdown";
+import { buildExportPackageReadiness, exportMarkdownFileSuffix, exportProjectMarkdownByMode, type ExportMarkdownMode } from "@/lib/export/markdown";
+import { buildExportPackageSnapshot } from "@/lib/export/snapshots";
 import { getPlatformProfile, type PlatformId } from "@/lib/platforms/platformProfiles";
 
 export async function POST(request: Request) {
@@ -23,7 +24,7 @@ export async function POST(request: Request) {
   const platform = getPlatformProfile(project.targetPlatform as PlatformId);
 
   const mode: ExportMarkdownMode = body.mode === "outline" || body.mode === "characters" ? body.mode : "full";
-  const markdown = exportProjectMarkdownByMode({
+  const exportProject = {
     title: project.title,
     genre: project.genre,
     targetPlatformName: platform.name,
@@ -86,12 +87,27 @@ export async function POST(request: Request) {
       title: entry.title,
       status: entry.status,
     })),
-  }, mode);
+  };
+  const markdown = exportProjectMarkdownByMode(exportProject, mode);
+  const fileName = `${project.title}-${exportMarkdownFileSuffix(mode)}.md`;
+
+  await prisma.exportPackageSnapshot.create({
+    data: buildExportPackageSnapshot({
+      projectId: project.id,
+      project: exportProject,
+      packageKind: mode,
+      format: "markdown",
+      fileName,
+      contentType: "text/markdown; charset=utf-8",
+      content: markdown,
+      readiness: buildExportPackageReadiness(exportProject),
+    }),
+  });
 
   return new NextResponse(markdown, {
     headers: {
       "Content-Type": "text/markdown; charset=utf-8",
-      "Content-Disposition": `attachment; filename="${encodeURIComponent(`${project.title}-${exportMarkdownFileSuffix(mode)}`)}.md"`,
+      "Content-Disposition": `attachment; filename="${encodeURIComponent(fileName)}"`,
     },
   });
 }

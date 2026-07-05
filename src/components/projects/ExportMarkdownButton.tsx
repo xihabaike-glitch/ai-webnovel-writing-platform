@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { ExportMarkdownMode, ExportPackageReadiness } from "@/lib/export/markdown";
+import type { ExportPackageSnapshotView } from "@/lib/export/snapshots";
 
 type ExportFormat = "markdown" | "docx";
 type ExportSingleFile = "chaptersZip" | "foreshadowsCsv";
@@ -22,13 +23,16 @@ export function ExportMarkdownButton({
   projectId,
   readiness,
   title,
+  snapshots,
 }: {
   projectId: string;
   readiness: ExportPackageReadiness;
   title: string;
+  snapshots: ExportPackageSnapshotView[];
 }) {
   const [exporting, setExporting] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
   const openItems = readiness.items.filter((item) => item.status !== "pass").slice(0, 4);
 
   function modeSuffix(mode: ExportMarkdownMode) {
@@ -42,6 +46,7 @@ export function ExportMarkdownButton({
   async function exportPackage(format: ExportFormat, mode: ExportMarkdownMode) {
     setExporting(`${format}:${mode}`);
     setError(null);
+    setMessage(null);
     try {
       const response = await fetch(`/api/export/${format === "docx" ? "docx" : "markdown"}`, {
         method: "POST",
@@ -61,6 +66,7 @@ export function ExportMarkdownButton({
       link.download = `${title}-${modeSuffix(mode)}.${extension}`;
       link.click();
       URL.revokeObjectURL(url);
+      setMessage("已下载，并保存一条导出快照。刷新后可在历史里查看。");
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "导出失败。");
     } finally {
@@ -71,6 +77,7 @@ export function ExportMarkdownButton({
   async function exportSingleFile(kind: ExportSingleFile) {
     setExporting(kind);
     setError(null);
+    setMessage(null);
     try {
       const endpoint = kind === "chaptersZip" ? "chapters-zip" : "foreshadows-csv";
       const response = await fetch(`/api/export/${endpoint}`, {
@@ -92,6 +99,7 @@ export function ExportMarkdownButton({
       link.download = `${title}-${suffix}.${extension}`;
       link.click();
       URL.revokeObjectURL(url);
+      setMessage("已下载，并保存一条导出快照。刷新后可在历史里查看。");
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "导出失败。");
     } finally {
@@ -198,6 +206,33 @@ export function ExportMarkdownButton({
           {exporting === "foreshadowsCsv" ? "导出中" : "伏笔 CSV"}
         </button>
       </div>
+      {snapshots.length ? (
+        <div className="rounded-md border border-slate-200 bg-white p-3">
+          <div className="flex items-center justify-between gap-3">
+            <div className="text-sm font-medium text-slate-950">最近导出快照</div>
+            <div className="text-xs text-slate-500">{snapshots.length} 条</div>
+          </div>
+          <div className="mt-3 grid gap-2">
+            {snapshots.map((snapshot) => (
+              <div className="rounded-md bg-slate-50 p-2 text-xs leading-5 text-slate-600" key={snapshot.id}>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="font-medium text-slate-950">{snapshot.packageKindLabel} · {snapshot.formatLabel}</span>
+                  <span>{new Date(snapshot.createdAt).toLocaleString("zh-CN")}</span>
+                </div>
+                <div className="mt-1">
+                  {snapshot.fileName} · {snapshot.fileSizeLabel} · 准备度 {snapshot.readinessPercent}% · {snapshot.readinessLabel}
+                </div>
+                <div className="mt-1 text-slate-500">
+                  章节 {snapshot.chapterCount} · 字数 {snapshot.wordCount} · 摘要 {snapshot.contentHash.slice(0, 10)}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : (
+        <p className="rounded-md bg-slate-50 p-3 text-xs text-slate-600">还没有导出快照。下载任一资料包后会自动留下记录。</p>
+      )}
+      {message ? <p className="text-sm text-emerald-700">{message}</p> : null}
       {error ? <p className="text-sm text-red-600">{error}</p> : null}
     </div>
   );

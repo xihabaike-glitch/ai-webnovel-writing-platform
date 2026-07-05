@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { docxContentType, exportDocxFileSuffix, exportProjectDocxByMode } from "@/lib/export/docx";
-import type { ExportMarkdownMode } from "@/lib/export/markdown";
+import { buildExportPackageReadiness, type ExportMarkdownMode } from "@/lib/export/markdown";
+import { buildExportPackageSnapshot } from "@/lib/export/snapshots";
 import { getPlatformProfile, type PlatformId } from "@/lib/platforms/platformProfiles";
 
 export async function POST(request: Request) {
@@ -24,7 +25,7 @@ export async function POST(request: Request) {
 
   const platform = getPlatformProfile(project.targetPlatform as PlatformId);
   const mode: ExportMarkdownMode = body.mode === "outline" || body.mode === "characters" ? body.mode : "full";
-  const docx = exportProjectDocxByMode({
+  const exportProject = {
     title: project.title,
     genre: project.genre,
     targetPlatformName: platform.name,
@@ -87,12 +88,27 @@ export async function POST(request: Request) {
       title: entry.title,
       status: entry.status,
     })),
-  }, mode);
+  };
+  const docx = exportProjectDocxByMode(exportProject, mode);
+  const fileName = `${project.title}-${exportDocxFileSuffix(mode)}.docx`;
+
+  await prisma.exportPackageSnapshot.create({
+    data: buildExportPackageSnapshot({
+      projectId: project.id,
+      project: exportProject,
+      packageKind: mode,
+      format: "docx",
+      fileName,
+      contentType: docxContentType(),
+      content: docx,
+      readiness: buildExportPackageReadiness(exportProject),
+    }),
+  });
 
   return new NextResponse(docx, {
     headers: {
       "Content-Type": docxContentType(),
-      "Content-Disposition": `attachment; filename="${encodeURIComponent(`${project.title}-${exportDocxFileSuffix(mode)}`)}.docx"`,
+      "Content-Disposition": `attachment; filename="${encodeURIComponent(fileName)}"`,
     },
   });
 }

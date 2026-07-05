@@ -1,0 +1,130 @@
+import { createHash } from "node:crypto";
+import type { ExportPackageReadiness, ExportProject } from "./markdown.ts";
+
+export type ExportSnapshotPackageKind = "full" | "outline" | "characters" | "chapters_zip" | "foreshadows_csv";
+export type ExportSnapshotFormat = "markdown" | "docx" | "zip" | "csv";
+
+export interface ExportPackageSnapshotInput {
+  projectId: string;
+  project: ExportProject;
+  packageKind: ExportSnapshotPackageKind;
+  format: ExportSnapshotFormat;
+  fileName: string;
+  contentType: string;
+  content: string | Buffer;
+  readiness: Pick<ExportPackageReadiness, "status" | "readinessPercent">;
+}
+
+export interface ExportPackageSnapshotView {
+  id: string;
+  packageKind: string;
+  packageKindLabel: string;
+  format: string;
+  formatLabel: string;
+  title: string;
+  fileName: string;
+  contentType: string;
+  fileSize: number;
+  fileSizeLabel: string;
+  contentHash: string;
+  readinessStatus: string;
+  readinessLabel: string;
+  readinessPercent: number;
+  chapterCount: number;
+  wordCount: number;
+  notes: string;
+  createdAt: string | Date;
+}
+
+function byteLength(content: string | Buffer) {
+  return Buffer.isBuffer(content) ? content.length : Buffer.byteLength(content, "utf8");
+}
+
+function hashContent(content: string | Buffer) {
+  return createHash("sha256").update(content).digest("hex");
+}
+
+function exportedChapterCount(project: ExportProject, packageKind: ExportSnapshotPackageKind) {
+  if (packageKind === "outline" || packageKind === "characters" || packageKind === "foreshadows_csv") return 0;
+  const manuscriptChapters = project.chapters.filter((chapter) => chapter.content.trim().length > 0);
+  return manuscriptChapters.length || project.chapters.length;
+}
+
+function exportedWordCount(project: ExportProject, packageKind: ExportSnapshotPackageKind) {
+  if (packageKind === "outline" || packageKind === "characters" || packageKind === "foreshadows_csv") return 0;
+  return project.currentWordCount ?? project.chapters.reduce((sum, chapter) => sum + (chapter.wordCount ?? chapter.content.trim().length), 0);
+}
+
+export function packageKindLabel(kind: string) {
+  if (kind === "full") return "完整资料包";
+  if (kind === "outline") return "大纲包";
+  if (kind === "characters") return "人物伏笔包";
+  if (kind === "chapters_zip") return "章节包";
+  if (kind === "foreshadows_csv") return "伏笔表";
+  return kind;
+}
+
+export function formatLabel(format: string) {
+  if (format === "markdown") return "Markdown";
+  if (format === "docx") return "Word";
+  if (format === "zip") return "ZIP";
+  if (format === "csv") return "CSV";
+  return format;
+}
+
+export function readinessLabel(status: string) {
+  if (status === "ready") return "可交付";
+  if (status === "warning") return "需补强";
+  if (status === "blocked") return "不建议交付";
+  return status;
+}
+
+export function fileSizeLabel(size: number) {
+  if (size >= 1024 * 1024) return `${(size / 1024 / 1024).toFixed(1)} MB`;
+  if (size >= 1024) return `${(size / 1024).toFixed(1)} KB`;
+  return `${size} B`;
+}
+
+export function buildExportPackageSnapshot(input: ExportPackageSnapshotInput) {
+  const fileSize = byteLength(input.content);
+  return {
+    projectId: input.projectId,
+    packageKind: input.packageKind,
+    format: input.format,
+    title: input.project.title,
+    fileName: input.fileName,
+    contentType: input.contentType,
+    fileSize,
+    contentHash: hashContent(input.content),
+    readinessStatus: input.readiness.status,
+    readinessPercent: input.readiness.readinessPercent,
+    chapterCount: exportedChapterCount(input.project, input.packageKind),
+    wordCount: exportedWordCount(input.project, input.packageKind),
+    notes: `${packageKindLabel(input.packageKind)} · ${formatLabel(input.format)} · ${readinessLabel(input.readiness.status)}`,
+  };
+}
+
+export function exportSnapshotView(snapshot: {
+  id: string;
+  packageKind: string;
+  format: string;
+  title: string;
+  fileName: string;
+  contentType: string;
+  fileSize: number;
+  contentHash: string;
+  readinessStatus: string;
+  readinessPercent: number;
+  chapterCount: number;
+  wordCount: number;
+  notes: string;
+  createdAt: string | Date;
+}): ExportPackageSnapshotView {
+  return {
+    ...snapshot,
+    packageKindLabel: packageKindLabel(snapshot.packageKind),
+    formatLabel: formatLabel(snapshot.format),
+    fileSizeLabel: fileSizeLabel(snapshot.fileSize),
+    readinessLabel: readinessLabel(snapshot.readinessStatus),
+  };
+}

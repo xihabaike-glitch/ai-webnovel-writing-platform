@@ -207,6 +207,28 @@ CREATE TABLE IF NOT EXISTS "PublishPackageSnapshot" (
   CONSTRAINT "PublishPackageSnapshot_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "Project" ("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
 
+CREATE TABLE IF NOT EXISTS "ExportPackageSnapshot" (
+  "id" TEXT NOT NULL PRIMARY KEY,
+  "projectId" TEXT NOT NULL,
+  "packageKind" TEXT NOT NULL,
+  "format" TEXT NOT NULL,
+  "title" TEXT NOT NULL,
+  "fileName" TEXT NOT NULL,
+  "contentType" TEXT NOT NULL,
+  "fileSize" INTEGER NOT NULL DEFAULT 0,
+  "contentHash" TEXT NOT NULL,
+  "readinessStatus" TEXT NOT NULL,
+  "readinessPercent" INTEGER NOT NULL DEFAULT 0,
+  "chapterCount" INTEGER NOT NULL DEFAULT 0,
+  "wordCount" INTEGER NOT NULL DEFAULT 0,
+  "notes" TEXT NOT NULL DEFAULT '',
+  "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT "ExportPackageSnapshot_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "Project" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS "ExportPackageSnapshot_projectId_createdAt_idx" ON "ExportPackageSnapshot"("projectId", "createdAt");
+CREATE INDEX IF NOT EXISTS "ExportPackageSnapshot_projectId_packageKind_format_createdAt_idx" ON "ExportPackageSnapshot"("projectId", "packageKind", "format", "createdAt");
+
 CREATE TABLE IF NOT EXISTS "PlatformSubmissionAsset" (
   "id" TEXT NOT NULL PRIMARY KEY,
   "projectId" TEXT NOT NULL,

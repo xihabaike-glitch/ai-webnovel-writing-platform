@@ -5,10 +5,12 @@ import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import {
   buildGateDispatchEvidenceReview,
+  buildGateDispatchCompletionTemplate,
   buildGateDispatchTaskCenter,
   filterGateDispatchTasks,
   isChapterProductionRecheckFollowUpTask,
   persistGateDispatchTask,
+  reviewGateDispatchCompletionEvidence,
   updatePersistedGateDispatchTaskState,
   type GateActionReceipt,
   type GateDispatchEvidenceReviewStatus,
@@ -264,6 +266,13 @@ export function GateDispatchTaskCenter({
       setErrorMessage(routeCompletionIssue);
       return;
     }
+    const gateCompletionIssue = targetState === "completed"
+      ? reviewGateDispatchCompletionEvidence(task, completionEvidence)
+      : null;
+    if (gateCompletionIssue) {
+      setErrorMessage(gateCompletionIssue);
+      return;
+    }
     setRunningKey(task.dispatchKey);
     setErrorMessage("");
     try {
@@ -323,6 +332,7 @@ export function GateDispatchTaskCenter({
   function completionTextForTask(task: PersistedGatePlatformDispatchTask) {
     return completionSuggestionByKey.get(task.dispatchKey)?.completionEvidence
       || buildRouteDispatchCompletionTemplate(task)
+      || buildGateDispatchCompletionTemplate(task)
       || buildFirstDayDispatchCompletionTemplate(task);
   }
 

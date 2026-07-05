@@ -16,7 +16,7 @@ import { buildFirstDayFollowUpDispatch, buildFirstDayWorkflow } from "@/lib/proj
 import { validateFirstDayDispatchCompletionEvidence } from "@/lib/projects/firstDayWorkflowView";
 import { buildChapterProductionRecheckFollowUpTasks } from "@/lib/projects/chapterProductionRecheckFollowUp";
 import { buildProjectControlDashboard } from "@/lib/projects/projectControlDashboard";
-import { buildGatePublishEffectReceipt } from "@/lib/projects/gateActionReceipts";
+import { buildGatePublishEffectReceipt, reviewGateDispatchCompletionEvidence } from "@/lib/projects/gateActionReceipts";
 import type {
   GateEvidenceLoopRecheck,
   GateStoryTreeRecheck,
@@ -791,16 +791,29 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: "派单不存在。" }, { status: 404 });
   }
   if (nextState === "completed") {
+    const acceptanceCriteria = parseJsonList(existingTask.acceptanceCriteria);
+    const evidence = parseJsonList(existingTask.evidence);
     const validation = validateFirstDayDispatchCompletionEvidence({
       dispatchKey,
       dueLabel: existingTask.dueLabel,
       title: existingTask.title,
-      acceptanceCriteria: parseJsonList(existingTask.acceptanceCriteria),
-      evidence: parseJsonList(existingTask.evidence),
+      acceptanceCriteria,
+      evidence,
       completionEvidence,
     });
     if (!validation.valid) {
       return NextResponse.json({ error: validation.error ?? "完成派单前，请写清楚完成依据。" }, { status: 400 });
+    }
+    const gateCompletionIssue = reviewGateDispatchCompletionEvidence({
+      stage: existingTask.stage as PersistedGatePlatformDispatchTask["stage"],
+      title: existingTask.title,
+      actionLabel: existingTask.actionLabel,
+      platformName: existingTask.platformName,
+      acceptanceCriteria,
+      evidence,
+    }, completionEvidence);
+    if (gateCompletionIssue) {
+      return NextResponse.json({ error: gateCompletionIssue }, { status: 400 });
     }
   }
   const now = new Date();

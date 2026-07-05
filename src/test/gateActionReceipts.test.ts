@@ -27,6 +27,7 @@ import {
   buildGateProjectThirdMetricDecision,
   buildGatePlatformDispatchReceipt,
   buildGateDispatchEvidenceReview,
+  buildGateDispatchCompletionTemplate,
   buildGatePlatformScaleGate,
   buildGatePlatformScaleFollowup,
   buildGatePlatformScaleCadence,
@@ -50,6 +51,7 @@ import {
   filterGateActionReceipts,
   gateActionReceiptPlatform,
   mergeGateActionReceipts,
+  reviewGateDispatchCompletionEvidence,
   trimGateActionReceipts,
 } from "../lib/projects/gateActionReceipts.ts";
 import { buildProjectStartDecisionActionReceipt } from "../lib/projects/projectStartDecisionActions.ts";
@@ -3820,6 +3822,79 @@ test("buildGateActionReceipt", async (t) => {
     assert.equal(review.items.find((item) => item.dispatchKey === activeTask.dispatchKey)?.actionLabel, activeTask.actionLabel);
     assert.equal(review.items.find((item) => item.dispatchKey === activeTask.dispatchKey)?.href, activeTask.href);
     assert.ok(review.nextActions.some((actionText) => actionText.includes("后续业务回执")));
+  });
+
+  await t.test("builds and validates platform dispatch completion templates", () => {
+    const metricTask = {
+      stage: "start_metrics_recovery" as const,
+      title: "七猫小说 首轮数据回收",
+      actionLabel: "派给数据运营",
+      platformName: "七猫小说",
+    };
+    const packageTask = {
+      stage: "start_publish_finalize" as const,
+      title: "番茄小说 发布包定稿",
+      actionLabel: "派给发布主编",
+      platformName: "番茄小说",
+    };
+    const repairTask = {
+      stage: "repair_tactic" as const,
+      title: "Royal Road 二轮打法修复",
+      actionLabel: "派给增长运营",
+      platformName: "Royal Road",
+    };
+    const openingTask = {
+      stage: "start_rewrite_opening" as const,
+      title: "WebNovel 首轮开头重写",
+      actionLabel: "派给开头编辑",
+      platformName: "WebNovel",
+    };
+
+    assert.ok(buildGateDispatchCompletionTemplate(metricTask).includes("曝光"));
+    assert.ok(buildGateDispatchCompletionTemplate(metricTask).includes("发布链接"));
+    assert.ok(reviewGateDispatchCompletionEvidence(metricTask, buildGateDispatchCompletionTemplate(metricTask)).includes("真实数据"));
+    assert.equal(reviewGateDispatchCompletionEvidence(metricTask, [
+      "七猫小说 首轮数据回收",
+      "日期：2026-07-05",
+      "曝光：12000",
+      "点击：960",
+      "收藏：180",
+      "追读：72",
+      "平台反馈：待反馈",
+      "结论：继续加码",
+    ].join("\n")), null);
+
+    assert.ok(buildGateDispatchCompletionTemplate(packageTask).includes("基准版本"));
+    assert.ok(reviewGateDispatchCompletionEvidence(packageTask, [
+      "番茄小说 发布包定稿",
+      "标题：重生后我靠毒舌系统爆红",
+      "简介：第一章直接给冲突和反转",
+      "标签：重生、系统、逆袭",
+      "结论：可发布",
+    ].join("\n")) === null);
+    assert.ok(reviewGateDispatchCompletionEvidence(packageTask, "标题：已调整\n结论：可发布")?.includes("至少写清 3 项"));
+
+    assert.ok(buildGateDispatchCompletionTemplate(repairTask).includes("修复对象"));
+    assert.equal(reviewGateDispatchCompletionEvidence(repairTask, [
+      "Royal Road 二轮打法修复",
+      "修复对象：简介和前三章承诺",
+      "处理动作：重写英文卖点并收窄 LitRPG 标签",
+      "修复后证据：已保存新版发布包",
+    ].join("\n")), null);
+
+    assert.ok(buildGateDispatchCompletionTemplate(openingTask).includes("钩子/追读点"));
+    assert.equal(reviewGateDispatchCompletionEvidence(openingTask, [
+      "WebNovel 首轮开头重写",
+      "章节范围：1-3 章",
+      "钩子/追读点：第一屏出现系统惩罚和升级目标",
+      "复查证据：已重新跑前三章审稿",
+    ].join("\n")), null);
+    assert.equal(buildGateDispatchCompletionTemplate({
+      stage: "model_route_governance" as const,
+      title: "模型治理",
+      actionLabel: "复检",
+      platformName: "模型路由",
+    }), "");
   });
 
   await t.test("builds platform strategy receipts for the unified gate audit log", () => {

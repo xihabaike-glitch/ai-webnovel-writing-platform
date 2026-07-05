@@ -3626,6 +3626,163 @@ export function buildGateDispatchTaskCenter(
   };
 }
 
+export type GateDispatchCompletionTemplateTask = Pick<
+  PersistedGatePlatformDispatchTask,
+  "stage" | "title" | "actionLabel" | "platformName"
+> & Partial<Pick<PersistedGatePlatformDispatchTask, "acceptanceCriteria" | "evidence">>;
+
+function escapeCompletionLabel(label: string) {
+  return label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function completionValueAfterLabel(label: string, text: string) {
+  const escaped = escapeCompletionLabel(label);
+  const lineMatch = text.match(new RegExp(`^\\s*${escaped}\\s*[:：]\\s*(.+?)\\s*$`, "m"));
+  if (lineMatch?.[1]) return lineMatch[1].trim();
+  const inlineMatch = text.match(new RegExp(`${escaped}\\s*[:：]\\s*([^，,；;。\\n]+)`));
+  return inlineMatch?.[1]?.trim() ?? null;
+}
+
+function hasConcreteDispatchCompletionValue(value: string | null) {
+  if (!value) return false;
+  if (value.includes("/")) return false;
+  return !["待填", "未填", "无", "暂无", "-"].includes(value.trim());
+}
+
+function completedLabels(text: string, labels: string[]) {
+  return labels.filter((label) => hasConcreteDispatchCompletionValue(completionValueAfterLabel(label, text)));
+}
+
+function hasMetricOrBusinessSignal(text: string) {
+  const normalized = text.replace(/\s+/g, "");
+  return /(?:曝光|展示|浏览|阅读|views?|点击|clicks?|收藏|加书架|追读|关注|评论|付费|订阅)\s*[：:=]?\s*(?:[1-9]\d*|0\.\d*[1-9])/iu.test(text)
+    || /https?:\/\//iu.test(text)
+    || /签约|合同|邀约|站短|拒稿|退稿|审核中|待反馈|pending|offer/iu.test(normalized);
+}
+
+const metricCompletionStages = new Set<GatePlatformGrowthReviewStage>(["record_metrics", "start_metrics_recovery"]);
+const packageCompletionStages = new Set<GatePlatformGrowthReviewStage>([
+  "adopt_asset",
+  "start_platform_package",
+  "start_publish_finalize",
+]);
+const repairCompletionStages = new Set<GatePlatformGrowthReviewStage>([
+  "fix_failure",
+  "start_repair_packaging",
+  "repair_tactic",
+  "pivot_platform",
+  "pause_platform",
+]);
+const openingCompletionStages = new Set<GatePlatformGrowthReviewStage>([
+  "start_first_three_review",
+  "start_opening_diagnostic",
+  "start_rewrite_opening",
+]);
+
+export function buildGateDispatchCompletionTemplate(task: GateDispatchCompletionTemplateTask) {
+  if (metricCompletionStages.has(task.stage)) {
+    return [
+      `${task.title}`,
+      "日期：",
+      "曝光：",
+      "点击：",
+      "收藏：",
+      "追读：",
+      "评论：",
+      "付费阅读：",
+      "平台反馈：",
+      "发布链接：",
+      "结论：继续加码 / 修包装 / 换平台 / 暂停",
+    ].join("\n");
+  }
+  if (packageCompletionStages.has(task.stage)) {
+    return [
+      `${task.title}`,
+      "标题：",
+      "简介：",
+      "标签：",
+      "卖点：",
+      "样章/前三章兑现：",
+      "基准版本：",
+      "待回收数据：",
+      "结论：可发布 / 需修包装",
+    ].join("\n");
+  }
+  if (repairCompletionStages.has(task.stage)) {
+    return [
+      `${task.title}`,
+      "修复对象：",
+      "修复前问题：",
+      `处理动作：${task.actionLabel}`,
+      "修复后证据：",
+      "复检结果：",
+      "下一轮口径：",
+    ].join("\n");
+  }
+  if (task.stage === "scale_up") {
+    return [
+      `${task.title}`,
+      "加码范围：",
+      "基准版本：",
+      "回收时间：",
+      "风险边界：",
+      "结论：已小步加码 / 暂缓加码",
+    ].join("\n");
+  }
+  if (openingCompletionStages.has(task.stage)) {
+    return [
+      `${task.title}`,
+      "章节范围：",
+      "钩子/追读点：",
+      "改动或诊断结论：",
+      "复查证据：",
+      "下一步：",
+    ].join("\n");
+  }
+  return "";
+}
+
+export function reviewGateDispatchCompletionEvidence(
+  task: GateDispatchCompletionTemplateTask,
+  completionEvidence: string,
+) {
+  const text = completionEvidence.trim();
+  if (!buildGateDispatchCompletionTemplate(task)) return null;
+  if (text.length < 8) return "完成派单前，请写清楚完成依据，至少 8 个字。";
+
+  if (metricCompletionStages.has(task.stage)) {
+    const missing: string[] = [];
+    if (!hasMetricOrBusinessSignal(text)) missing.push("真实数据或平台反馈");
+    if (!hasConcreteDispatchCompletionValue(completionValueAfterLabel("结论", text))) missing.push("结论");
+    return missing.length ? `请补齐数据回收完成依据：${missing.join("、")}。` : null;
+  }
+
+  if (packageCompletionStages.has(task.stage)) {
+    const filled = completedLabels(text, ["标题", "简介", "标签", "卖点", "样章/前三章兑现", "基准版本"]);
+    if (filled.length < 3) return "请补齐发布包完成依据：标题、简介、标签、卖点、样章兑现或基准版本至少写清 3 项。";
+    return hasConcreteDispatchCompletionValue(completionValueAfterLabel("结论", text))
+      ? null
+      : "请补齐发布包完成依据：结论。";
+  }
+
+  if (repairCompletionStages.has(task.stage)) {
+    const filled = completedLabels(text, ["修复对象", "修复前问题", "处理动作", "修复后证据", "复检结果", "下一轮口径"]);
+    return filled.length >= 3 ? null : "请补齐修复完成依据：修复对象、处理动作、修复后证据、复检结果或下一轮口径至少写清 3 项。";
+  }
+
+  if (task.stage === "scale_up") {
+    const filled = completedLabels(text, ["加码范围", "基准版本", "回收时间", "风险边界", "结论"]);
+    return filled.length >= 3 ? null : "请补齐加码完成依据：加码范围、基准版本、回收时间、风险边界或结论至少写清 3 项。";
+  }
+
+  if (openingCompletionStages.has(task.stage)) {
+    const filled = completedLabels(text, ["章节范围", "钩子/追读点", "改动或诊断结论", "复查证据", "下一步"]);
+    return filled.length >= 3 ? null : "请补齐开头/前三章完成依据：章节范围、钩子追读点、改动结论、复查证据或下一步至少写清 3 项。";
+  }
+
+  return null;
+}
+
 export function buildGateDispatchEvidenceReview(
   tasks: PersistedGatePlatformDispatchTask[],
   receipts: GateActionReceipt[] = [],

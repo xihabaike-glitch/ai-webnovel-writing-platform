@@ -273,8 +273,22 @@ function completedFirstDayDispatch(project: TaskQueueProject, stepId: string) {
   )) ?? null;
 }
 
+function completedFirstDayHandoffEvidence(project: TaskQueueProject) {
+  return (project.gateDispatchTasks ?? [])
+    .filter((task) => (
+      task.dispatchKey.startsWith(`first-day-handoff:${project.id}:`)
+      && task.state === "completed"
+      && task.completionEvidence.trim().length >= 8
+    ))
+    .map((task) => task.completionEvidence.trim())
+    .join("\n");
+}
+
 function handoffEvidenceStatus(project: TaskQueueProject, startTactic: ProjectStartTacticSummary | null, stepId: string) {
-  const evidence = completedFirstDayDispatch(project, stepId)?.completionEvidence ?? "";
+  const evidence = [
+    completedFirstDayDispatch(project, stepId)?.completionEvidence ?? "",
+    completedFirstDayHandoffEvidence(project),
+  ].filter(Boolean).join("\n");
   const requiresAction = (startTactic?.firstDayActions?.length ?? 0) > 0;
   const requiresAvoidRule = (startTactic?.avoidRules?.length ?? 0) > 0;
   const actionCleared = !requiresAction || /交接动作|首日动作|开头|验证|落地/u.test(evidence);

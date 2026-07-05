@@ -715,6 +715,51 @@ test("buildTaskQueueCenter", async (t) => {
     assert.ok(queue.recommendedNext?.handoffGuidance?.avoidRules.some((rule) => rule.includes("不要直接放量")));
   });
 
+  await t.test("allows production when completed handoff dispatches carry closure evidence", () => {
+    const queue = buildTaskQueueCenter([{
+      ...project,
+      worldEntries: handoffWorldEntries(),
+      gateDispatchTasks: [
+        ...firstDayCompleteDispatches(project.id),
+        {
+          dispatchKey: "first-day-handoff:project-1:opening",
+          stage: "start_opening_diagnostic",
+          state: "completed",
+          title: "夜雨系统 · 经验开书交接：开头打法",
+          detail: "把稳定加码拆到第一章首屏。",
+          actionLabel: "锁定开头打法",
+          href: "/projects/project-1/chapters/chapter-ready-draft",
+          completionEvidence: "交接动作已落地：开头第一段倒计时完成，首日动作已写入第一章。",
+        },
+        {
+          dispatchKey: "first-day-handoff:project-1:verification",
+          stage: "start_first_three_review",
+          state: "completed",
+          title: "夜雨系统 · 经验开书交接：首轮验收",
+          detail: "把历史打法转成前三章验收标准。",
+          actionLabel: "设置验收口径",
+          href: "/projects/project-1/chapters/chapter-ready-draft",
+          completionEvidence: "验证动作已落地：前三章追读承诺已列出，复查证据口径已保存。",
+        },
+        {
+          dispatchKey: "first-day-handoff:project-1:platform-package",
+          stage: "start_platform_package",
+          state: "completed",
+          title: "夜雨系统 · 经验开书交接：平台回收",
+          detail: "把可复用经验落到标题、简介、标签、样章和首轮数据回收口径。",
+          actionLabel: "准备平台回收",
+          href: "/projects/project-1#platform-export",
+          completionEvidence: "避坑边界已确认：不要直接放量，先做小样本；平台回收口径已写清。",
+        },
+      ],
+    }]);
+
+    assert.equal(queue.overview.firstDayBlocked, 0);
+    assert.equal(queue.overview.firstDayHandoffs, 0);
+    assert.equal(queue.overview.reviewReady, 1);
+    assert.equal(queue.recommendedNext?.category, "review");
+  });
+
   await t.test("surfaces first-three adoption follow-up dispatches in the queue", () => {
     const queue = buildTaskQueueCenter([{
       ...project,

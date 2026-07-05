@@ -429,6 +429,25 @@ test("buildFirstDayDispatchUpdateSummary routes closed first-day work back to ga
   assert.ok(summary.badges.includes("复查放行"));
 });
 
+test("buildFirstDayDispatchUpdateSummary routes handoff completion back to tasks", () => {
+  const summary = buildFirstDayDispatchUpdateSummary({
+    task: {
+      dispatchKey: "first-day-handoff:project-1:platform-package",
+      state: "completed",
+      title: "夜雨系统 · 经验开书交接：平台回收",
+      completionEvidence: "避坑边界已确认：不要直接放量；平台回收口径已写清标题、简介、标签和追读。",
+      href: "/projects/project-1#platform-export",
+    },
+  });
+
+  assert.equal(summary.visible, true);
+  assert.equal(summary.title, "平台回收交接已回写");
+  assert.equal(summary.actionLabel, "回任务队列复查");
+  assert.equal(summary.href, "/tasks");
+  assert.ok(summary.detail.includes("首日闸门"));
+  assert.ok(summary.badges.includes("证据回写"));
+});
+
 test("buildFirstDayDispatchCompletionTemplate covers first-day step types", () => {
   assert.ok(buildFirstDayDispatchCompletionTemplate({
     dispatchKey: "first-day:project-1:first-draft",
@@ -470,6 +489,18 @@ test("buildFirstDayDispatchCompletionTemplate covers first-day step types", () =
     acceptanceCriteria: [],
   }).includes("平台包预检已完成"));
   assert.ok(buildFirstDayDispatchCompletionTemplate({
+    dispatchKey: "first-day-handoff:project-1:opening",
+    acceptanceCriteria: [],
+  }).includes("第一章首屏"));
+  assert.ok(buildFirstDayDispatchCompletionTemplate({
+    dispatchKey: "first-day-handoff:project-1:verification",
+    acceptanceCriteria: [],
+  }).includes("通过线"));
+  assert.ok(buildFirstDayDispatchCompletionTemplate({
+    dispatchKey: "first-day-handoff:project-1:platform-package",
+    acceptanceCriteria: [],
+  }).includes("平台回收口径"));
+  assert.ok(buildFirstDayDispatchCompletionTemplate({
     dispatchKey: "first-day:project-1:risk-recovery",
     acceptanceCriteria: [],
   }).includes("止损恢复条件已写清"));
@@ -495,6 +526,10 @@ test("buildFirstDayDispatchCompletionHint explains scale gates", () => {
   assert.ok(hint?.includes("放量闸门"));
   assert.ok(hint?.includes("通过线、不可接受项、复查证据和放量结论"));
   assert.ok(recoveryHint?.includes("恢复观察小样本"));
+  assert.ok(buildFirstDayDispatchCompletionHint({
+    dispatchKey: "first-day-handoff:project-1:opening",
+    acceptanceCriteria: [],
+  })?.includes("第一章首屏"));
 });
 
 test("validateFirstDayDispatchCompletionEvidence enforces risky first-day evidence", () => {
@@ -565,6 +600,36 @@ test("validateFirstDayDispatchCompletionEvidence enforces risky first-day eviden
     ],
     completionEvidence: "交接动作已落地：开头第一段给倒计时。避坑边界已确认：不要直接放量，先保留首轮验证。",
   });
+  const openingHandoffThin = validateFirstDayDispatchCompletionEvidence({
+    dispatchKey: "first-day-handoff:project-1:opening",
+    acceptanceCriteria: [],
+    completionEvidence: "已经处理完成，可以继续。",
+  });
+  const openingHandoffReady = validateFirstDayDispatchCompletionEvidence({
+    dispatchKey: "first-day-handoff:project-1:opening",
+    acceptanceCriteria: [],
+    completionEvidence: "交接动作已落地：开头第一段给倒计时，首屏危机和追读问题已写清。",
+  });
+  const verificationHandoffThin = validateFirstDayDispatchCompletionEvidence({
+    dispatchKey: "first-day-handoff:project-1:verification",
+    acceptanceCriteria: [],
+    completionEvidence: "验证动作已经设置完成。",
+  });
+  const verificationHandoffReady = validateFirstDayDispatchCompletionEvidence({
+    dispatchKey: "first-day-handoff:project-1:verification",
+    acceptanceCriteria: [],
+    completionEvidence: "通过线已写清，不可接受项已列出，复查证据入口已保存。",
+  });
+  const packageHandoffThin = validateFirstDayDispatchCompletionEvidence({
+    dispatchKey: "first-day-handoff:project-1:platform-package",
+    acceptanceCriteria: [],
+    completionEvidence: "平台包已经处理完成。",
+  });
+  const packageHandoffReady = validateFirstDayDispatchCompletionEvidence({
+    dispatchKey: "first-day-handoff:project-1:platform-package",
+    acceptanceCriteria: [],
+    completionEvidence: "避坑边界已确认：不要直接放量；平台回收口径已写清标题、简介、标签、样章、曝光、点击、收藏和追读。",
+  });
 
   assert.equal(blockedThin.valid, false);
   assert.equal(blockedThin.level, "blocked");
@@ -581,6 +646,15 @@ test("validateFirstDayDispatchCompletionEvidence enforces risky first-day eviden
   assert.equal(handoffMissingAvoid.valid, false);
   assert.ok(handoffMissingAvoid.error?.includes("避坑边界"));
   assert.equal(handoffReady.valid, true);
+  assert.equal(openingHandoffThin.valid, false);
+  assert.ok(openingHandoffThin.error?.includes("开头打法交接"));
+  assert.equal(openingHandoffReady.valid, true);
+  assert.equal(verificationHandoffThin.valid, false);
+  assert.ok(verificationHandoffThin.error?.includes("通过线"));
+  assert.equal(verificationHandoffReady.valid, true);
+  assert.equal(packageHandoffThin.valid, false);
+  assert.ok(packageHandoffThin.error?.includes("平台回收交接"));
+  assert.equal(packageHandoffReady.valid, true);
 });
 
 test("completeFirstDayDispatchStep completes the matching task center dispatch", async () => {

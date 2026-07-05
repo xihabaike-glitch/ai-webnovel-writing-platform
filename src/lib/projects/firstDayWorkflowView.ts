@@ -115,6 +115,7 @@ export interface FirstDayDispatchDeskCard {
   completionTemplate: string;
   acceptanceCriteria: string[];
   evidence: string[];
+  evidenceChips: string[];
   completionHint: string | null;
   continuation: {
     kind: "first_day_ai" | "open_work";
@@ -122,6 +123,20 @@ export interface FirstDayDispatchDeskCard {
     hint: string;
     endpoint?: string;
   };
+}
+
+function buildWatchSampleEvidenceChips(
+  task: Pick<PersistedGatePlatformDispatchTask, "dispatchKey" | "dueLabel" | "title" | "acceptanceCriteria" | "evidence" | "completionEvidence">
+) {
+  if (firstDayCompletionRiskLevel(task) !== "watch") return [];
+  const gaps = watchSampleEvidenceGaps(task.completionEvidence || "");
+  const allFields = ["成功率", "质量分", "失败样本", "放量结论"];
+  if (gaps.length > 0) {
+    return allFields
+      .filter((field) => gaps.includes(field) || (field === "放量结论" && gaps.includes("正向放量结论")))
+      .map((field) => `缺${field}`);
+  }
+  return allFields.map((field) => `已填${field}`);
 }
 
 export interface FirstDayDispatchDesk {
@@ -842,6 +857,7 @@ function toFirstDayCard(task: PersistedGatePlatformDispatchTask): FirstDayDispat
     completionTemplate: buildFirstDayDispatchCompletionTemplate(task),
     acceptanceCriteria: task.acceptanceCriteria,
     evidence: task.evidence,
+    evidenceChips: buildWatchSampleEvidenceChips(task),
     completionHint: buildFirstDayDispatchCompletionHint(task),
     continuation: aiContinuation
       ? {

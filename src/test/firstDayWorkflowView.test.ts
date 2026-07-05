@@ -601,6 +601,10 @@ test("buildFirstDayDispatchDesk keeps recovered watch state visible", () => {
   assert.ok(desk.nextActions[0].includes("恢复观察小样本"));
   assert.ok(desk.nextActions[0].includes("不要批量放大"));
   assert.ok(desk.nextTask?.completionHint?.includes("放量闸门"));
+  assert.ok(desk.nextTask?.evidenceChips.includes("缺成功率"));
+  assert.ok(desk.nextTask?.evidenceChips.includes("缺质量分"));
+  assert.ok(desk.nextTask?.evidenceChips.includes("缺失败样本"));
+  assert.ok(desk.nextTask?.evidenceChips.includes("缺放量结论"));
 });
 
 test("buildFirstDayHandoffGateCta makes handoff gate state actionable", () => {

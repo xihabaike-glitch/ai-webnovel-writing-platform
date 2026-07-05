@@ -914,6 +914,14 @@ export function GateDispatchTaskCenter({
                     <span className="rounded-md bg-white/10 px-2 py-1">{firstDayDesk.nextTask.ownerRole}</span>
                     <span className="rounded-md bg-white/10 px-2 py-1">{firstDayDesk.nextTask.dueLabel}</span>
                     <span className="rounded-md bg-white/10 px-2 py-1">优先级 {firstDayDesk.nextTask.priorityScore}</span>
+                    {firstDayDesk.nextTask.evidenceChips.map((chip) => (
+                      <span
+                        className={`rounded-md px-2 py-1 ${chip.startsWith("缺") ? "bg-amber-300/20 text-amber-100" : "bg-emerald-300/20 text-emerald-100"}`}
+                        key={chip}
+                      >
+                        {chip}
+                      </span>
+                    ))}
                   </div>
                 </div>
                 <div className="flex shrink-0 flex-wrap gap-2 lg:justify-end">
@@ -1000,6 +1008,14 @@ export function GateDispatchTaskCenter({
                 <div className="mt-2 flex flex-wrap gap-2 text-xs text-slate-500">
                   <span className="rounded-md bg-white px-2 py-1">{card.dueLabel}</span>
                   <span className="rounded-md bg-white px-2 py-1">优先级 {card.priorityScore}</span>
+                  {card.evidenceChips.map((chip) => (
+                    <span
+                      className={`rounded-md px-2 py-1 ${chip.startsWith("缺") ? "bg-amber-100 text-amber-800" : "bg-emerald-100 text-emerald-800"}`}
+                      key={chip}
+                    >
+                      {chip}
+                    </span>
+                  ))}
                 </div>
                 <div className="mt-3 flex flex-wrap gap-2">
                   <Link className="rounded-md bg-slate-950 px-2 py-1 text-xs font-medium text-white hover:bg-slate-800" href={card.firstDayHref}>

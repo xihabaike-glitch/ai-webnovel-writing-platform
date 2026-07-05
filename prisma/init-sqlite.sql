@@ -222,11 +222,14 @@ CREATE TABLE IF NOT EXISTS "ExportPackageSnapshot" (
   "chapterCount" INTEGER NOT NULL DEFAULT 0,
   "wordCount" INTEGER NOT NULL DEFAULT 0,
   "notes" TEXT NOT NULL DEFAULT '',
+  "isBaseline" BOOLEAN NOT NULL DEFAULT false,
+  "baselineLockedAt" DATETIME,
   "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT "ExportPackageSnapshot_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "Project" ("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
 
 CREATE INDEX IF NOT EXISTS "ExportPackageSnapshot_projectId_createdAt_idx" ON "ExportPackageSnapshot"("projectId", "createdAt");
+CREATE INDEX IF NOT EXISTS "ExportPackageSnapshot_projectId_isBaseline_idx" ON "ExportPackageSnapshot"("projectId", "isBaseline");
 CREATE INDEX IF NOT EXISTS "ExportPackageSnapshot_projectId_packageKind_format_createdAt_idx" ON "ExportPackageSnapshot"("projectId", "packageKind", "format", "createdAt");
 
 CREATE TABLE IF NOT EXISTS "PlatformSubmissionAsset" (

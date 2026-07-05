@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { buildExportSnapshotFilterOptions, filterExportSnapshots, type ExportSnapshotFilterId } from "@/lib/export/snapshotFilters";
 import type { ExportPackageSnapshotView } from "@/lib/export/snapshots";
@@ -34,9 +35,11 @@ export function ExportVersionCenterPanel({
   snapshots: ExportPackageSnapshotView[];
   summary: ExportVersionCenterSummary;
 }) {
+  const router = useRouter();
   const [filterId, setFilterId] = useState<ExportSnapshotFilterId>("all");
   const [expandedSnapshotId, setExpandedSnapshotId] = useState<string | null>(summary.latestSnapshot?.id ?? null);
   const [runningId, setRunningId] = useState<string | null>(null);
+  const [baselineRunningId, setBaselineRunningId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const filterOptions = buildExportSnapshotFilterOptions(snapshots);
@@ -62,6 +65,29 @@ export function ExportVersionCenterPanel({
       setError(caught instanceof Error ? caught.message : "重新生成失败。");
     } finally {
       setRunningId(null);
+    }
+  }
+
+  async function updateBaseline(snapshotId: string, action: "lock" | "unlock") {
+    setBaselineRunningId(snapshotId);
+    setError(null);
+    setMessage(null);
+    try {
+      const response = await fetch(`/api/export/snapshots/${snapshotId}/baseline`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action }),
+      });
+
+      if (!response.ok) throw new Error(action === "lock" ? "锁定基准失败，请稍后重试。" : "解除基准失败，请稍后重试。");
+
+      const result = await response.json() as { message?: string };
+      setMessage(result.message ?? (action === "lock" ? "已锁定为导出基准。" : "已解除导出基准。"));
+      router.refresh();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "基准操作失败。");
+    } finally {
+      setBaselineRunningId(null);
     }
   }
 
@@ -116,6 +142,7 @@ export function ExportVersionCenterPanel({
                 <div className="mt-1">{summary.baselineCandidate.fileName}</div>
                 <div className="mt-1">
                   {timeText(summary.baselineCandidate.createdAt)} · 准备度 {summary.baselineCandidate.readinessPercent}%
+                  {summary.baselineCandidate.lockedAt ? ` · 锁定 ${timeText(summary.baselineCandidate.lockedAt)}` : ""}
                 </div>
                 <p className="mt-2 leading-6">{summary.baselineCandidate.reason}</p>
               </div>
@@ -125,9 +152,25 @@ export function ExportVersionCenterPanel({
               </p>
             )}
           </div>
-          <Link className="rounded-md border border-slate-200 px-3 py-2 text-sm font-medium hover:bg-slate-50" href={`${projectHref}#create-chapter`}>
-            回到写作
-          </Link>
+          <div className="flex flex-wrap gap-2">
+            {summary.baselineCandidate ? (
+              <button
+                className="rounded-md bg-slate-950 px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
+                disabled={baselineRunningId !== null}
+                onClick={() => void updateBaseline(summary.baselineCandidate!.snapshotId, summary.baselineCandidate!.source === "locked" ? "unlock" : "lock")}
+                type="button"
+              >
+                {baselineRunningId === summary.baselineCandidate.snapshotId
+                  ? "处理中"
+                  : summary.baselineCandidate.source === "locked"
+                    ? "解除基准"
+                    : "锁定基准"}
+              </button>
+            ) : null}
+            <Link className="rounded-md border border-slate-200 px-3 py-2 text-sm font-medium hover:bg-slate-50" href={`${projectHref}#create-chapter`}>
+              回到写作
+            </Link>
+          </div>
         </div>
       </section>
 
@@ -188,7 +231,9 @@ export function ExportVersionCenterPanel({
                   <div className="flex flex-wrap items-center gap-2">
                     <div className="font-medium text-slate-950">{snapshot.packageKindLabel} · {snapshot.formatLabel}</div>
                     {snapshot.id === summary.baselineCandidate?.snapshotId ? (
-                      <span className="rounded-md bg-slate-950 px-2 py-1 text-xs font-medium text-white">推荐基准</span>
+                      <span className="rounded-md bg-slate-950 px-2 py-1 text-xs font-medium text-white">
+                        {summary.baselineCandidate.source === "locked" ? "已锁定基准" : "推荐基准"}
+                      </span>
                     ) : null}
                   </div>
                   <div className="mt-1">{snapshot.fileName}</div>
@@ -238,6 +283,14 @@ export function ExportVersionCenterPanel({
                   type="button"
                 >
                   {runningId === snapshot.id ? "生成中" : "重新生成"}
+                </button>
+                <button
+                  className="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                  disabled={baselineRunningId !== null}
+                  onClick={() => void updateBaseline(snapshot.id, snapshot.isBaseline ? "unlock" : "lock")}
+                  type="button"
+                >
+                  {baselineRunningId === snapshot.id ? "处理中" : snapshot.isBaseline ? "解除基准" : "锁定基准"}
                 </button>
               </div>
             </div>

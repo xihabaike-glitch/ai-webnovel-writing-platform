@@ -21,6 +21,8 @@ export interface ExportBaselineCandidate {
   fileName: string;
   createdAt: string | Date;
   readinessPercent: number;
+  lockedAt: string | Date | null;
+  source: "locked" | "recommended";
   reason: string;
 }
 
@@ -70,6 +72,21 @@ function buildTargetId(packageKind: string, format: string) {
 }
 
 function pickBaselineCandidate(orderedSnapshots: ExportPackageSnapshotView[]): ExportBaselineCandidate | null {
+  const locked = orderedSnapshots.find((snapshot) => snapshot.isBaseline) ?? null;
+  if (locked) {
+    return {
+      snapshotId: locked.id,
+      targetId: buildTargetId(locked.packageKind, locked.format),
+      label: `${locked.packageKindLabel} · ${locked.formatLabel}`,
+      fileName: locked.fileName,
+      createdAt: locked.createdAt,
+      readinessPercent: locked.readinessPercent,
+      lockedAt: locked.baselineLockedAt,
+      source: "locked",
+      reason: "这条快照已手动锁定为正式交付基准；后续版本对比、发布归档和回滚策略都应围绕它展开。",
+    };
+  }
+
   const readySnapshots = orderedSnapshots.filter((snapshot) => snapshot.readinessStatus === "ready");
   const candidate =
     readySnapshots.find((snapshot) => snapshot.packageKind === "full" && snapshot.format === "docx")
@@ -87,6 +104,8 @@ function pickBaselineCandidate(orderedSnapshots: ExportPackageSnapshotView[]): E
     fileName: candidate.fileName,
     createdAt: candidate.createdAt,
     readinessPercent: candidate.readinessPercent,
+    lockedAt: null,
+    source: "recommended",
     reason: isPreferred
       ? "优先选择完整资料包作为正式交付基准，后续版本对比和发布归档都应围绕它展开。"
       : "暂时没有可交付的完整资料包，先把最新可交付快照作为临时基准候选。",
@@ -139,9 +158,13 @@ export function buildExportVersionCenter(snapshots: ExportPackageSnapshotView[])
       label: `重导 ${weakTarget.label}`,
       detail: "覆盖齐了不等于能交付。先处理准备度偏低的包，再对外发。",
       targetId: weakTarget.id,
-    } : baselineCandidate ? {
+    } : baselineCandidate?.source === "recommended" ? {
       label: "锁定推荐基准",
       detail: `${baselineCandidate.label} 已满足交付口径，可以作为后续版本对比和发布归档的基准。`,
+      targetId: baselineCandidate.targetId,
+    } : baselineCandidate ? {
+      label: "基准已锁定",
+      detail: `${baselineCandidate.label} 是当前正式交付基准，可以继续生成新版本并做对比。`,
       targetId: baselineCandidate.targetId,
     } : {
       label: "先生成可交付版本",

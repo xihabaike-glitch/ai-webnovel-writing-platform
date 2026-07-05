@@ -9,6 +9,8 @@ function snapshot(input: {
   format: string;
   readinessStatus?: string;
   readinessPercent?: number;
+  isBaseline?: boolean;
+  baselineLockedAt?: string;
   createdAt: string;
 }) {
   return exportSnapshotView({
@@ -25,6 +27,8 @@ function snapshot(input: {
     chapterCount: 3,
     wordCount: 9000,
     notes: "",
+    isBaseline: input.isBaseline,
+    baselineLockedAt: input.baselineLockedAt ?? null,
     createdAt: input.createdAt,
   });
 }
@@ -88,5 +92,24 @@ describe("export version center", () => {
 
     assert.equal(center.baselineCandidate, null);
     assert.equal(center.targets.some((target) => target.isBaselineCandidate), false);
+  });
+
+  it("uses a locked baseline before automatic recommendations", () => {
+    const center = buildExportVersionCenter([
+      snapshot({ id: "full-docx", packageKind: "full", format: "docx", createdAt: "2026-07-05T03:00:00.000Z" }),
+      snapshot({
+        id: "full-md-locked",
+        packageKind: "full",
+        format: "markdown",
+        isBaseline: true,
+        baselineLockedAt: "2026-07-05T04:00:00.000Z",
+        createdAt: "2026-07-05T02:00:00.000Z",
+      }),
+    ]);
+
+    assert.equal(center.baselineCandidate?.snapshotId, "full-md-locked");
+    assert.equal(center.baselineCandidate?.source, "locked");
+    assert.equal(center.baselineCandidate?.lockedAt, "2026-07-05T04:00:00.000Z");
+    assert.match(center.nextAction.label, /补齐/);
   });
 });

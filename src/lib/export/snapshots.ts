@@ -33,6 +33,8 @@ export interface ExportPackageSnapshotView {
   chapterCount: number;
   wordCount: number;
   notes: string;
+  isBaseline: boolean;
+  baselineLockedAt: string | Date | null;
   createdAt: string | Date;
   comparison: ExportPackageSnapshotComparison | null;
   detail: ExportPackageSnapshotDetail;
@@ -236,10 +238,14 @@ export function exportSnapshotView(snapshot: {
   chapterCount: number;
   wordCount: number;
   notes: string;
+  isBaseline?: boolean;
+  baselineLockedAt?: string | Date | null;
   createdAt: string | Date;
 }, comparison: ExportPackageSnapshotComparison | null = null): ExportPackageSnapshotView {
   return {
     ...snapshot,
+    isBaseline: snapshot.isBaseline ?? false,
+    baselineLockedAt: snapshot.baselineLockedAt ?? null,
     packageKindLabel: packageKindLabel(snapshot.packageKind),
     formatLabel: formatLabel(snapshot.format),
     fileSizeLabel: fileSizeLabel(snapshot.fileSize),
@@ -263,6 +269,8 @@ export function buildExportSnapshotHistory(snapshots: Array<{
   chapterCount: number;
   wordCount: number;
   notes: string;
+  isBaseline?: boolean;
+  baselineLockedAt?: string | Date | null;
   createdAt: string | Date;
 }>, limit = snapshots.length): ExportPackageSnapshotView[] {
   return snapshots.slice(0, limit).map((snapshot, index) => {

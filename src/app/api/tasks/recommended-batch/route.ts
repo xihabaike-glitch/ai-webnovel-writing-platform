@@ -5,6 +5,7 @@ import { reviewChapterDraft } from "@/lib/ai/chapterReviewGeneration";
 import { generateChapterSecondPass } from "@/lib/ai/chapterSecondPassGeneration";
 import { prisma } from "@/lib/db/prisma";
 import { buildBatchRouteEffectSummary } from "@/lib/model-gateway/batchRouteEffectSummary";
+import { buildRouteConfirmationRecheckEvidenceFromDispatchTasks } from "@/lib/model-gateway/routeConfirmation";
 import { buildBatchExecutionSafety } from "@/lib/projects/batchExecutionSafety";
 import { getBatchExecutionStrategy } from "@/lib/projects/batchExecutionStrategy";
 import { findProjectStartTacticSummary } from "@/lib/projects/projectStartTactics";
@@ -34,7 +35,7 @@ type RecommendedBatchResult = {
 
 export async function POST(request: Request) {
   const strategy = getBatchExecutionStrategy(new URL(request.url).searchParams.get("strategy"));
-  const [projects, modelProviders, modelRoutes] = await Promise.all([
+  const [projects, modelProviders, modelRoutes, completedRouteConfirmationRechecks] = await Promise.all([
     prisma.project.findMany({
       include: {
         chapters: { orderBy: { order: "asc" } },
@@ -63,6 +64,22 @@ export async function POST(request: Request) {
     }),
     prisma.modelProvider.findMany({ orderBy: { createdAt: "asc" } }),
     prisma.modelTaskRoute.findMany({ orderBy: { taskType: "asc" } }),
+    prisma.gateDispatchTask.findMany({
+      where: {
+        stage: "model_route_confirmation_recheck",
+        state: "completed",
+      },
+      orderBy: { completedAt: "desc" },
+      take: 40,
+      select: {
+        dispatchKey: true,
+        stage: true,
+        state: true,
+        completionEvidence: true,
+        evidence: true,
+        completedAt: true,
+      },
+    }),
   ]);
   const queue = buildTaskQueueCenter(projects);
   const safety = buildBatchExecutionSafety(queue.items, projects, strategy);
@@ -82,6 +99,7 @@ export async function POST(request: Request) {
     projects,
     providers: modelProviders,
     routes: modelRoutes,
+    routeConfirmationRechecks: buildRouteConfirmationRecheckEvidenceFromDispatchTasks(completedRouteConfirmationRechecks),
   });
   const plan = applyRecommendedBatchModelRouteGate(basePlan, modelRouteGate);
 

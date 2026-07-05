@@ -46,6 +46,7 @@ interface BatchRunResponse {
     preferredRoutes: string[];
     avoidedRoutes: string[];
     warnings: string[];
+    recoveryEvidence: string | null;
     recheckAdvice: {
       id: string;
       taskType: string;
@@ -165,6 +166,9 @@ export function RunRecommendedBatchButton({ disabled, strategyId }: { disabled: 
               <div className="font-medium">{modelRouteGate.label}</div>
               <p className="mt-1 leading-6 opacity-90">{modelRouteGate.headline}</p>
               <div className="mt-2 rounded-md bg-white/70 px-2 py-1 text-xs leading-5">{modelRouteGate.detail}</div>
+              {modelRouteGate.recoveryEvidence ? (
+                <div className="mt-2 rounded-md bg-white/80 px-2 py-1 text-xs leading-5">恢复依据：{modelRouteGate.recoveryEvidence}</div>
+              ) : null}
             </div>
             <div className="flex shrink-0 flex-wrap gap-2">
               {modelRouteGate.recheckAdvice ? (

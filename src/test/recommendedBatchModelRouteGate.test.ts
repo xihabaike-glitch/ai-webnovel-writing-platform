@@ -138,4 +138,79 @@ test("recommended batch model route gate", async (t) => {
     assert.deepEqual(guardedPlan.chapterIds, ["chapter-1"]);
     assert.ok(guardedPlan.warnings.some((warning) => warning.includes("降级")));
   });
+
+  await t.test("uses a passed route recheck to restore a blocked route as a sample", () => {
+    const gate = buildRecommendedBatchModelRouteGate({
+      plan: plan(),
+      providers,
+      routes: [
+        { taskType: "chapter_review", primaryProviderConfigId: "gpt-provider", fallbackProviderConfigId: "deepseek-provider" },
+      ],
+      routeConfirmationRechecks: [
+        {
+          id: "model-route-confirmation-recheck:chapter_review:governance:2026-01-05T00:00:00.000Z:evidence",
+          taskType: "chapter_review",
+          successRatePercent: 100,
+          qualityScore: 86,
+          sampleCount: 2,
+          cost: "正常",
+          fallbackHit: false,
+          needsGovernance: false,
+          recommendedAction: "keep",
+          summary: "最近路由复检通过：成功率 100%，质量 86，可继续沿用。",
+          completionEvidence: "样本数：2\n成功率：100\n质量：86\n备用命中：未命中备用\n是否需要治理：否",
+          evidence: ["治理后复检通过"],
+          completedAt: "2026-01-05T00:00:00.000Z",
+        },
+      ],
+      projects: [
+        project({
+          aiTasks: [
+            {
+              id: "review-1",
+              projectId: "project-1",
+              chapterId: "chapter-1",
+              taskType: "chapter_review",
+              providerConfigId: "gpt-provider",
+              model: "gpt-4.1",
+              status: "failed",
+              inputSnapshot: "{}",
+              inputTokens: 800,
+              outputTokens: 0,
+              costUsd: 0.02,
+              outputText: null,
+              errorMessage: "timeout",
+              createdAt: "2026-01-01T00:00:00.000Z",
+              modelProvider: { providerId: "gpt", displayName: "GPT" },
+            },
+            {
+              id: "review-2",
+              projectId: "project-1",
+              chapterId: "chapter-2",
+              taskType: "chapter_review",
+              providerConfigId: "gpt-provider",
+              model: "gpt-4.1",
+              status: "failed",
+              inputSnapshot: "{}",
+              inputTokens: 820,
+              outputTokens: 0,
+              costUsd: 0.02,
+              outputText: null,
+              errorMessage: "timeout",
+              createdAt: "2026-01-02T00:00:00.000Z",
+              modelProvider: { providerId: "gpt", displayName: "GPT" },
+            },
+          ],
+        }),
+      ],
+    });
+    const guardedPlan = applyRecommendedBatchModelRouteGate(plan(), gate);
+
+    assert.equal(gate.status, "sample");
+    assert.equal(gate.maxBatchSize, 1);
+    assert.equal(gate.recheckAdvice, null);
+    assert.ok(gate.recoveryEvidence?.includes("复检通过"));
+    assert.equal(guardedPlan.canRun, true);
+    assert.deepEqual(guardedPlan.chapterIds, ["chapter-1"]);
+  });
 });

@@ -1,6 +1,6 @@
 import { buildModelTaskAuditDashboard, type ModelAuditProvider, type ModelAuditRoute, type ModelAuditTask } from "../ai/modelTaskAudit.ts";
 import { labelForRoutedTask, type RoutedModelTaskType } from "../model-gateway/taskRouting.ts";
-import type { RouteConfirmationRecheckAdviceItem } from "../model-gateway/routeConfirmation.ts";
+import type { RouteConfirmationRecheckAdviceItem, RouteConfirmationRecheckEvidence } from "../model-gateway/routeConfirmation.ts";
 import type { ExecutableQueueCategory, TaskQueueExecutionPlan } from "./taskQueueExecutionPlan.ts";
 
 export interface RecommendedBatchModelRouteGateProject {
@@ -31,6 +31,7 @@ export interface RecommendedBatchModelRouteGate {
   avoidedRoutes: string[];
   warnings: string[];
   recheckAdvice: RouteConfirmationRecheckAdviceItem | null;
+  recoveryEvidence: string | null;
 }
 
 function taskTypeForCategory(category: ExecutableQueueCategory | null): RoutedModelTaskType | null {
@@ -60,9 +61,20 @@ function settingsFromProjects(projects: RecommendedBatchModelRouteGateProject[])
   };
 }
 
+function latestRecheckForTask(
+  taskType: RoutedModelTaskType | null,
+  rechecks: RouteConfirmationRecheckEvidence[] = [],
+) {
+  if (!taskType) return null;
+  return rechecks
+    .filter((item) => item.taskType === taskType)
+    .sort((left, right) => (right.completedAt ?? "").localeCompare(left.completedAt ?? ""))[0] ?? null;
+}
+
 function buildGateRecheckAdvice(input: {
   status: RecommendedBatchModelRouteGate["status"];
   taskType: RoutedModelTaskType | null;
+  recoveredByRecheck: boolean;
   headline: string;
   detail: string;
   successRatePercent: number;
@@ -71,7 +83,7 @@ function buildGateRecheckAdvice(input: {
   avoidedRoutes: string[];
   warnings: string[];
 }): RouteConfirmationRecheckAdviceItem | null {
-  if (input.status === "allow" || !input.taskType) return null;
+  if (input.status === "allow" || input.recoveredByRecheck || !input.taskType) return null;
   const label = labelForRoutedTask(input.taskType);
   const fallbackHit = input.fallbackAttemptRatePercent > 0 ? true : input.fallbackAttemptRatePercent === 0 ? false : null;
   const action: RouteConfirmationRecheckAdviceItem["action"] = input.status === "block" && input.avoidedRoutes.length > 0
@@ -111,6 +123,7 @@ export function buildRecommendedBatchModelRouteGate(input: {
   projects: RecommendedBatchModelRouteGateProject[];
   providers: ModelAuditProvider[];
   routes: ModelAuditRoute[];
+  routeConfirmationRechecks?: RouteConfirmationRecheckEvidence[];
 }): RecommendedBatchModelRouteGate {
   const plannedProjectIds = new Set(input.plan.projectIds);
   const scopedProjects = input.projects.filter((project) => plannedProjectIds.has(project.id));
@@ -125,6 +138,8 @@ export function buildRecommendedBatchModelRouteGate(input: {
   const scopedEffects = taskType
     ? audit.modelEffectRows.filter((row) => row.taskType === taskType)
     : audit.modelEffectRows;
+  const latestRecheck = latestRecheckForTask(taskType, input.routeConfirmationRechecks);
+  const recoveredByRecheck = latestRecheck?.recommendedAction === "keep";
   const avoidedRoutes = scopedEffects
     .filter((row) => row.recommendation === "avoid")
     .slice(0, 3)
@@ -142,7 +157,7 @@ export function buildRecommendedBatchModelRouteGate(input: {
     || audit.summary.averageCostPerSucceededTaskUsd > audit.budgetCenter.maxTaskCostUsd;
   const status: RecommendedBatchModelRouteGate["status"] = audit.summary.totalTasks === 0
     ? "sample"
-    : hasRouteRepairPressure
+    : hasRouteRepairPressure && !recoveredByRecheck
       ? "block"
       : hasCostPressure || audit.status !== "healthy"
         ? "sample"
@@ -155,7 +170,9 @@ export function buildRecommendedBatchModelRouteGate(input: {
   const label = status === "allow" ? "模型路线通过" : status === "sample" ? "降级小样本" : "模型路线拦截";
   const headline = status === "allow"
     ? "模型路线健康，本批可以按当前策略执行。"
-    : status === "sample"
+    : status === "sample" && recoveredByRecheck
+      ? "模型路线复检已通过，本批先跑 1 个恢复样本。"
+      : status === "sample"
       ? "模型路线证据还不够硬，本批只允许跑 1 个样本。"
       : "模型路线存在失败、避用或配置风险，本批先别执行。";
   const detail = audit.summary.totalTasks === 0
@@ -163,6 +180,7 @@ export function buildRecommendedBatchModelRouteGate(input: {
     : `成功率 ${successRate(audit.summary.succeededTasks, audit.summary.totalTasks)}%，失败率 ${audit.summary.failureRatePercent}%，成本 $${audit.summary.knownCostUsd.toFixed(4)}，备用触发 ${audit.budgetCenter.fallbackAttemptRatePercent}%。`;
   const warnings = [
     status === "sample" && input.plan.chapterIds.length > 1 ? `原计划 ${input.plan.chapterIds.length} 个任务，模型路线闸门已降级为 1 个样本。` : null,
+    recoveredByRecheck && latestRecheck ? `复检通过：${latestRecheck.summary}` : null,
     ...audit.riskFlags.slice(0, 3),
     ...avoidedRoutes.map((route) => `避用路线：${route}`),
   ].filter((item): item is string => Boolean(item));
@@ -188,6 +206,7 @@ export function buildRecommendedBatchModelRouteGate(input: {
     recheckAdvice: buildGateRecheckAdvice({
       status,
       taskType,
+      recoveredByRecheck,
       headline,
       detail,
       successRatePercent,
@@ -196,6 +215,7 @@ export function buildRecommendedBatchModelRouteGate(input: {
       avoidedRoutes,
       warnings: normalizedWarnings,
     }),
+    recoveryEvidence: recoveredByRecheck && latestRecheck ? latestRecheck.summary : null,
   };
 }
 

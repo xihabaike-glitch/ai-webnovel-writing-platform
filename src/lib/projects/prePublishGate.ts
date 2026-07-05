@@ -485,6 +485,7 @@ function auditBatchReceiptOutcome(input: {
     const batchReceipt = payload?.batchReceipt && typeof payload.batchReceipt === "object"
       ? payload.batchReceipt as Record<string, unknown>
       : null;
+    const receiptStatus = typeof batchReceipt?.status === "string" ? batchReceipt.status : "";
     const headline = typeof batchReceipt?.headline === "string" && batchReceipt.headline
       ? batchReceipt.headline
       : audit.label ?? "推荐批次已完成";
@@ -498,10 +499,14 @@ function auditBatchReceiptOutcome(input: {
       ? (payload.routeEffectSummary as Record<string, unknown>).averageQualityScore
       : null;
     const qualityText = typeof quality === "number" ? `，平均质量 ${Math.round(quality)} 分` : "";
+    const receiptFailed = receiptStatus === "repair" || receiptStatus === "review_quality";
+    const passed = resultSucceeded && !receiptFailed;
     return resultSucceeded
       ? {
-        status: "pass",
-        evidence: `任务中心批量回执已验收：${headline}，成功 ${audit.succeededCount} 个、失败 ${audit.failedCount} 个${qualityText}。`,
+        status: passed ? "pass" : "fail",
+        evidence: passed
+          ? `任务中心批量回执已验收：${headline}，成功 ${audit.succeededCount} 个、失败 ${audit.failedCount} 个${qualityText}。`
+          : `任务中心批量回执未达标：${headline}，成功 ${audit.succeededCount} 个、失败 ${audit.failedCount} 个${chapterTitle}${qualityText}。`,
       }
       : {
         status: "fail",
@@ -637,7 +642,19 @@ function buildFirstThreeAdoptionTimelines(items: PrePublishGateAdoptionFollowupI
 }
 
 function firstThreeAdoptionRepairDetail(item: PrePublishGateAdoptionFollowupItem) {
+  if (item.evidence.includes("任务中心批量回执未达标")) {
+    return `${item.evidence} 这不是模型跑完就算过关：先执行二改或质量修复，再回总闸门复检。`;
+  }
   if (item.evidence.includes("任务中心批量回执失败")) {
+    if (/401|unauthorized|api key|密钥|鉴权|quota|余额|额度/iu.test(item.evidence)) {
+      return `${item.evidence} 先去模型设置修 API Key、额度或供应商配置，再重跑采纳后续任务。`;
+    }
+    if (/timeout|timed out|超时|503|429|rate limit|限流/iu.test(item.evidence)) {
+      return `${item.evidence} 先重试；如果连续超时，切换章节审稿模型路线后再跑采纳闭环。`;
+    }
+    if (item.type === "publish_check") {
+      return `${item.evidence} 先回发布包修复标题、简介、标签或样章一致性，再刷新质检。`;
+    }
     return `${item.evidence} 先处理失败原因，再重跑采纳后续任务；失败项不能当作发布放行证据。`;
   }
   if (item.status === "warn") {
@@ -658,24 +675,52 @@ function firstThreeAdoptionRepairPriority(item: PrePublishGateAdoptionFollowupIt
   return statusWeight + typeWeight;
 }
 
+function firstThreeAdoptionRepairAction(input: PrePublishGateAdoptionFollowupItem): { label: string; href: string } {
+  if (input.evidence.includes("任务中心批量回执未达标")) {
+    return {
+      label: input.type === "review" ? "进入二改" : "修发布包",
+      href: input.type === "review" && input.chapterId ? `/projects/${input.projectId}/chapters/${input.chapterId}#chapter-second-pass` : input.href,
+    };
+  }
+  if (input.evidence.includes("任务中心批量回执失败")) {
+    if (/401|unauthorized|api key|密钥|鉴权|quota|余额|额度/iu.test(input.evidence)) {
+      return { label: "去模型设置", href: "/settings/models" };
+    }
+    if (/timeout|timed out|超时|503|429|rate limit|限流/iu.test(input.evidence)) {
+      return { label: "重试/切模型", href: "/settings/models" };
+    }
+    if (input.type === "publish_check") {
+      return { label: "修发布包", href: `/projects/${input.projectId}#platform-export` };
+    }
+    return { label: input.actionLabel, href: input.href };
+  }
+  return {
+    label: input.status === "warn" ? "补验收证据" : input.actionLabel,
+    href: input.href,
+  };
+}
+
 function buildFirstThreeAdoptionRepairQueue(items: PrePublishGateAdoptionFollowupItem[]): PrePublishGateAdoptionRepairItem[] {
   const statusRank: Record<PrePublishGateItem["status"], number> = { block: 0, warn: 1, pass: 2 };
   return items
     .filter((item) => item.status !== "pass")
-    .map((item): PrePublishGateAdoptionRepairItem => ({
-      id: `adoption-repair:${item.id}`,
-      followupItemId: item.id,
-      projectId: item.projectId,
-      projectTitle: item.projectTitle,
-      type: item.type,
-      status: item.status,
-      priorityScore: firstThreeAdoptionRepairPriority(item),
-      label: item.status === "warn" ? "补证据" : item.label,
-      title: item.title,
-      detail: firstThreeAdoptionRepairDetail(item),
-      actionLabel: item.status === "warn" ? "补验收证据" : item.actionLabel,
-      href: item.href,
-    }))
+    .map((item): PrePublishGateAdoptionRepairItem => {
+      const repairAction = firstThreeAdoptionRepairAction(item);
+      return {
+        id: `adoption-repair:${item.id}`,
+        followupItemId: item.id,
+        projectId: item.projectId,
+        projectTitle: item.projectTitle,
+        type: item.type,
+        status: item.status,
+        priorityScore: firstThreeAdoptionRepairPriority(item),
+        label: item.status === "warn" ? "补证据" : item.label,
+        title: item.title,
+        detail: firstThreeAdoptionRepairDetail(item),
+        actionLabel: repairAction.label,
+        href: repairAction.href,
+      };
+    })
     .sort((left, right) => (
       statusRank[left.status] - statusRank[right.status]
       || right.priorityScore - left.priorityScore

@@ -342,17 +342,42 @@ function recommendedBatchFollowupOutcome(input: {
       (!input.chapterId || result.chapterId === input.chapterId)
       && (result.status === "succeeded" || result.status === "failed")
     ));
+    const batchReceipt = payload?.batchReceipt && typeof payload.batchReceipt === "object"
+      ? payload.batchReceipt as Record<string, unknown>
+      : null;
+    const receiptStatus = typeof batchReceipt?.status === "string" ? batchReceipt.status : "";
     const succeeded = matchingResult
       ? matchingResult.status === "succeeded"
       : audit.succeededCount > 0 && (audit.failedCount ?? 0) === 0;
+    const passed = succeeded && receiptStatus !== "repair" && receiptStatus !== "review_quality";
     const error = typeof matchingResult?.error === "string" && matchingResult.error ? `错误：${matchingResult.error}` : "";
     return {
-      status: succeeded ? "pass" : "fail",
-      evidence: succeeded ? "任务中心批量回执已验收。" : `上一轮任务中心批量回执失败。${error}`,
+      status: passed ? "pass" : "fail",
+      evidence: passed
+        ? "任务中心批量回执已验收。"
+        : succeeded
+          ? "上一轮任务中心批量回执未达标，先质量修复。"
+          : `上一轮任务中心批量回执失败。${error}`,
     };
   }
 
   return null;
+}
+
+function adoptionFollowupRepairActionLabel(input: {
+  isPublishCheck: boolean;
+  missingEvidence: boolean;
+  batchOutcome: { status: "pass" | "fail"; evidence: string } | null;
+  fallbackLabel?: string;
+}) {
+  if (input.batchOutcome?.status === "fail") {
+    if (input.batchOutcome.evidence.includes("未达标")) return input.isPublishCheck ? "修发布包" : "进入二改";
+    if (/401|unauthorized|api key|密钥|鉴权|quota|余额|额度/iu.test(input.batchOutcome.evidence)) return "去模型设置";
+    if (/timeout|timed out|超时|503|429|rate limit|限流/iu.test(input.batchOutcome.evidence)) return "重试/切模型";
+    return input.isPublishCheck ? "回发布质检" : "重新审稿";
+  }
+  if (input.missingEvidence) return "补验收证据";
+  return input.fallbackLabel ?? (input.isPublishCheck ? "回发布质检" : "重新审稿");
 }
 
 function firstThreeAdoptionFollowupQueueItems(input: {
@@ -412,7 +437,12 @@ function firstThreeAdoptionFollowupQueueItems(input: {
         riskLabel: input.riskLabel,
         riskNotice: input.riskNotice,
         scaleGate: input.scaleGate,
-        actionLabel: missingEvidence ? "补验收证据" : task.actionLabel ?? (isPublishCheck ? "回发布质检" : "重新审稿"),
+        actionLabel: adoptionFollowupRepairActionLabel({
+          isPublishCheck,
+          missingEvidence,
+          batchOutcome,
+          fallbackLabel: task.actionLabel,
+        }),
         href: task.href ?? (isPublishCheck ? `${input.projectHref}#platform-export` : input.projectHref),
         executionChapterId: executionChapterId ?? undefined,
       });

@@ -690,8 +690,54 @@ test("buildTaskQueueCenter", async (t) => {
     assert.equal(failedFollowup?.sourceType, "first_three_adoption");
     assert.ok(failedFollowup?.sourceDetail?.includes("批量执行失败"));
     assert.ok(failedFollowup?.evidence.includes("模型超时"));
-    assert.equal(failedFollowup?.actionLabel, "重新审稿");
+    assert.equal(failedFollowup?.actionLabel, "重试/切模型");
     assert.equal(queue.recommendedNext?.id, failedFollowup?.id);
+  });
+
+  await t.test("routes weak adoption batch quality to second pass in the queue", () => {
+    const dispatchKey = "first-three-adoption:project-1:chapter-review:revision-1:review";
+    const queue = buildTaskQueueCenter([{
+      ...project,
+      gateDispatchTasks: [
+        ...firstDayCompleteDispatches(project.id),
+        {
+          dispatchKey,
+          stage: "start_first_three_review",
+          state: "assigned",
+          title: "第 2 章采纳后重新审稿",
+          detail: "采纳后的新正文需要重新审稿。",
+          actionLabel: "重新审稿",
+          href: "/projects/project-1/chapters/chapter-review#chapter-workflow",
+          completionEvidence: "",
+        },
+      ],
+      gateActionAudits: [{
+        actionId: "recommended-batch:standard:review:project-1",
+        executionType: "recommended_batch",
+        status: "succeeded",
+        succeededCount: 1,
+        failedCount: 0,
+        taskId: "review-task-1",
+        platformId: "fanqie",
+        createdAt: "2026-01-09T00:00:00.000Z",
+        payload: JSON.stringify({
+          plan: {
+            actionLabel: "批量审稿 1 个",
+            category: "review",
+            adoptionFollowupCount: 1,
+            adoptionFollowupItemIds: [`project-1:adoption-followup:${dispatchKey}`],
+          },
+          results: [{ status: "succeeded", taskId: "review-task-1", chapterId: "chapter-review" }],
+          batchReceipt: { status: "review_quality", headline: "质量不够，先二改或复审" },
+        }),
+      }],
+    }]);
+    const weakFollowup = queue.items.find((item) => item.id.includes(":revision-1:review"));
+
+    assert.equal(weakFollowup?.sourceType, "first_three_adoption");
+    assert.ok(weakFollowup?.evidence.includes("未达标"));
+    assert.equal(weakFollowup?.actionLabel, "进入二改");
+    assert.equal(queue.recommendedNext?.id, weakFollowup?.id);
   });
 
   await t.test("blocks risky first drafts behind recovery validation", () => {

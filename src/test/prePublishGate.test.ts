@@ -368,7 +368,135 @@ test("buildPrePublishGate", async (t) => {
     assert.equal(reviewItem?.status, "block");
     assert.ok(reviewItem?.evidence.includes("任务中心批量回执失败"));
     assert.ok(repair.detail.includes("模型超时"));
-    assert.equal(gate.releaseAction?.label, "先解除阻塞：重新审稿");
+    assert.equal(repair.actionLabel, "重试/切模型");
+    assert.equal(repair.href, "/settings/models");
+    assert.equal(gate.releaseAction?.label, "先解除阻塞：重试/切模型");
+  });
+
+  await t.test("routes weak adoption batch quality to second pass repair", () => {
+    const reviewDispatchKey = "first-three-adoption:project-ready:chapter-1:revision-1:review";
+    const gate = buildPrePublishGate({
+      projects: [{
+        ...readyProject,
+        gateDispatchTasks: [
+          ...firstDayCompleteDispatches("project-ready"),
+          {
+            dispatchKey: reviewDispatchKey,
+            state: "assigned",
+            completionEvidence: "",
+            title: "第 1 章采纳后重新审稿",
+            detail: "采纳后的新正文需要重新审稿。",
+            actionLabel: "重新审稿",
+            href: "/projects/project-ready/chapters/chapter-1#chapter-workflow",
+          },
+          {
+            dispatchKey: "first-three-adoption:project-ready:chapter-1:revision-1:publish-check",
+            state: "completed",
+            completionEvidence: "采纳后发布质检已刷新：番茄小说 发布包版本 snapshot-1，质检 92 分，可导出。",
+          },
+        ],
+        gateActionAudits: [{
+          actionId: "recommended-batch:standard:review:project-ready",
+          executionType: "recommended_batch",
+          status: "succeeded",
+          succeededCount: 1,
+          failedCount: 0,
+          taskId: "review-task-1",
+          platformId: "fanqie",
+          label: "沉淀批量审稿 1 个经验",
+          message: "推荐批次完成：成功 1，失败 0。",
+          createdAt: "2026-01-09T00:00:00.000Z",
+          payload: JSON.stringify({
+            plan: {
+              actionLabel: "批量审稿 1 个",
+              category: "review",
+              adoptionFollowupCount: 1,
+              adoptionFollowupItemIds: [`project-ready:adoption-followup:${reviewDispatchKey}`],
+            },
+            results: [{
+              status: "succeeded",
+              taskId: "review-task-1",
+              chapterId: "chapter-1",
+              chapterTitle: "第 1 章采纳后重新审稿",
+            }],
+            routeEffectSummary: { successRatePercent: 100, knownCostUsd: 0.01, averageQualityScore: 72 },
+            batchReceipt: { status: "review_quality", headline: "质量不够，先二改或复审" },
+          }),
+        }],
+      }],
+      failureTasks: [],
+      batchHistory: [],
+    });
+    const repair = gate.firstThreeAdoptionClosure.repairQueue[0];
+
+    assert.equal(gate.status, "blocked");
+    assert.equal(repair.actionLabel, "进入二改");
+    assert.equal(repair.href, "/projects/project-ready/chapters/chapter-1#chapter-second-pass");
+    assert.ok(repair.detail.includes("先执行二改"));
+  });
+
+  await t.test("routes failed adoption publish checks to package repair", () => {
+    const publishDispatchKey = "first-three-adoption:project-ready:chapter-1:revision-1:publish-check";
+    const gate = buildPrePublishGate({
+      projects: [{
+        ...readyProject,
+        gateDispatchTasks: [
+          ...firstDayCompleteDispatches("project-ready"),
+          {
+            dispatchKey: "first-three-adoption:project-ready:chapter-1:revision-1:review",
+            state: "completed",
+            completionEvidence: "采纳后重新审稿已完成：审稿分 91，问题 0 个。",
+          },
+          {
+            dispatchKey: publishDispatchKey,
+            platformId: "fanqie",
+            state: "assigned",
+            completionEvidence: "",
+            title: "第 1 章采纳后发布质检",
+            detail: "重新审稿后回发布包刷新质检。",
+            actionLabel: "回发布质检",
+            href: "/projects/project-ready#platform-export",
+          },
+        ],
+        gateActionAudits: [{
+          actionId: "recommended-batch:standard:export:project-ready",
+          executionType: "recommended_batch",
+          status: "failed",
+          succeededCount: 0,
+          failedCount: 1,
+          taskId: "publish-task-1",
+          platformId: "fanqie",
+          label: "沉淀批量发布质检 1 个经验",
+          message: "推荐批次完成：成功 0，失败 1。",
+          createdAt: "2026-01-09T00:00:00.000Z",
+          payload: JSON.stringify({
+            plan: {
+              actionLabel: "批量发布质检 1 个",
+              category: "review",
+              adoptionFollowupCount: 1,
+              adoptionFollowupItemIds: [`project-ready:adoption-followup:${publishDispatchKey}`],
+            },
+            results: [{
+              status: "failed",
+              taskId: "publish-task-1",
+              chapterId: "chapter-1",
+              chapterTitle: "第 1 章采纳后发布质检",
+              error: "发布包标题缺失",
+            }],
+            routeEffectSummary: { successRatePercent: 0, knownCostUsd: 0.01, averageQualityScore: null },
+            batchReceipt: { status: "repair", headline: "批次有失败，先修再放大" },
+          }),
+        }],
+      }],
+      failureTasks: [],
+      batchHistory: [],
+    });
+    const repair = gate.firstThreeAdoptionClosure.repairQueue[0];
+
+    assert.equal(gate.status, "blocked");
+    assert.equal(repair.actionLabel, "修发布包");
+    assert.equal(repair.href, "/projects/project-ready#platform-export");
+    assert.ok(repair.detail.includes("回发布包修复"));
   });
 
   await t.test("surfaces missing adoption evidence as the next gate repair", () => {

@@ -35,6 +35,18 @@ interface BatchRunResponse {
     warnings: string[];
     completionEvidenceTemplate?: string;
   };
+  modelRouteGate?: {
+    status: "allow" | "sample" | "block";
+    label: string;
+    headline: string;
+    detail: string;
+    actionLabel: string;
+    targetHref: string;
+    maxBatchSize: number;
+    preferredRoutes: string[];
+    avoidedRoutes: string[];
+    warnings: string[];
+  };
 }
 
 function receiptTone(status: NonNullable<BatchRunResponse["batchReceipt"]>["status"]) {
@@ -44,23 +56,34 @@ function receiptTone(status: NonNullable<BatchRunResponse["batchReceipt"]>["stat
   return "border-blue-200 bg-blue-50 text-blue-900";
 }
 
+function modelRouteGateTone(status: NonNullable<BatchRunResponse["modelRouteGate"]>["status"]) {
+  if (status === "allow") return "border-emerald-200 bg-emerald-50 text-emerald-900";
+  if (status === "sample") return "border-amber-200 bg-amber-50 text-amber-900";
+  return "border-rose-200 bg-rose-50 text-rose-900";
+}
+
 export function RunRecommendedBatchButton({ disabled, strategyId }: { disabled: boolean; strategyId: string }) {
   const router = useRouter();
   const [isRunning, setIsRunning] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [batchReceipt, setBatchReceipt] = useState<BatchRunResponse["batchReceipt"] | null>(null);
+  const [modelRouteGate, setModelRouteGate] = useState<BatchRunResponse["modelRouteGate"] | null>(null);
 
   async function runBatch() {
     setIsRunning(true);
     setMessage(null);
     setBatchReceipt(null);
+    setModelRouteGate(null);
     try {
       const response = await fetch(`/api/tasks/recommended-batch?strategy=${encodeURIComponent(strategyId)}`, {
         method: "POST",
       });
       const payload = (await response.json()) as BatchRunResponse;
+      setModelRouteGate(payload.modelRouteGate ?? null);
       if (!response.ok) {
-        throw new Error(payload.error ?? "推荐批次执行失败。");
+        setMessage(payload.error ?? "推荐批次执行失败。");
+        router.refresh();
+        return;
       }
       const succeeded = payload.results?.filter((result) => result.status === "succeeded").length ?? 0;
       const failed = payload.results?.filter((result) => result.status === "failed").length ?? 0;
@@ -90,6 +113,37 @@ export function RunRecommendedBatchButton({ disabled, strategyId }: { disabled: 
       {isRunning ? "执行中" : "执行推荐批次"}
       </button>
       {message ? <p className="max-w-xl text-sm text-slate-600">{message}</p> : null}
+      {modelRouteGate ? (
+        <div className={`w-full max-w-2xl rounded-md border p-3 text-left text-sm ${modelRouteGateTone(modelRouteGate.status)}`}>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <div className="font-medium">{modelRouteGate.label}</div>
+              <p className="mt-1 leading-6 opacity-90">{modelRouteGate.headline}</p>
+              <div className="mt-2 rounded-md bg-white/70 px-2 py-1 text-xs leading-5">{modelRouteGate.detail}</div>
+            </div>
+            <a className="w-fit shrink-0 rounded-md bg-white px-3 py-2 text-xs font-medium text-slate-950" href={modelRouteGate.targetHref}>
+              {modelRouteGate.actionLabel}
+            </a>
+          </div>
+          {modelRouteGate.preferredRoutes.length || modelRouteGate.avoidedRoutes.length ? (
+            <div className="mt-3 flex flex-wrap gap-1.5 text-xs">
+              {modelRouteGate.preferredRoutes.map((route) => (
+                <span className="rounded-md bg-white/75 px-2 py-1" key={route}>优先：{route}</span>
+              ))}
+              {modelRouteGate.avoidedRoutes.map((route) => (
+                <span className="rounded-md bg-white/75 px-2 py-1" key={route}>避用：{route}</span>
+              ))}
+            </div>
+          ) : null}
+          {modelRouteGate.warnings.length ? (
+            <div className="mt-2 grid gap-1 text-xs leading-5 opacity-90">
+              {modelRouteGate.warnings.slice(0, 3).map((warning) => (
+                <div key={warning}>· {warning}</div>
+              ))}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
       {batchReceipt ? (
         <div className={`w-full max-w-2xl rounded-md border p-3 text-left text-sm ${receiptTone(batchReceipt.status)}`}>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">

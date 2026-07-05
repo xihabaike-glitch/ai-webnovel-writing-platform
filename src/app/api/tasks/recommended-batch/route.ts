@@ -11,6 +11,7 @@ import { findProjectStartTacticSummary } from "@/lib/projects/projectStartTactic
 import { buildTaskQueueBatchGateActionReceipt, buildTaskQueueBatchReceipt } from "@/lib/projects/taskQueueBatchReceipt";
 import { buildTaskQueueCenter } from "@/lib/projects/taskQueueCenter";
 import { buildTaskQueueExecutionPlan } from "@/lib/projects/taskQueueExecutionPlan";
+import { applyRecommendedBatchModelRouteGate, buildRecommendedBatchModelRouteGate } from "@/lib/projects/recommendedBatchModelRouteGate";
 
 function roleFor(result: { attempts: Array<{ taskId: string; role: "primary" | "fallback" | "auto" | "forced" }> }, taskId: string) {
   return result.attempts.find((attempt) => attempt.taskId === taskId)?.role ?? null;
@@ -33,37 +34,62 @@ type RecommendedBatchResult = {
 
 export async function POST(request: Request) {
   const strategy = getBatchExecutionStrategy(new URL(request.url).searchParams.get("strategy"));
-  const projects = await prisma.project.findMany({
-    include: {
-      chapters: { orderBy: { order: "asc" } },
-      aiTasks: { orderBy: { createdAt: "desc" } },
-      worldEntries: { orderBy: [{ type: "asc" }, { createdAt: "asc" }] },
-      gateDispatchTasks: {
-        where: { dispatchKey: { startsWith: "first-day:" } },
-        select: {
-          dispatchKey: true,
-          state: true,
-          completionEvidence: true,
+  const [projects, modelProviders, modelRoutes] = await Promise.all([
+    prisma.project.findMany({
+      include: {
+        chapters: { orderBy: { order: "asc" } },
+        aiTasks: {
+          orderBy: { createdAt: "desc" },
+          include: {
+            modelProvider: {
+              select: {
+                providerId: true,
+                displayName: true,
+              },
+            },
+          },
+        },
+        worldEntries: { orderBy: [{ type: "asc" }, { createdAt: "asc" }] },
+        gateDispatchTasks: {
+          where: { dispatchKey: { startsWith: "first-day:" } },
+          select: {
+            dispatchKey: true,
+            state: true,
+            completionEvidence: true,
+          },
         },
       },
-    },
-    orderBy: { updatedAt: "desc" },
-  });
+      orderBy: { updatedAt: "desc" },
+    }),
+    prisma.modelProvider.findMany({ orderBy: { createdAt: "asc" } }),
+    prisma.modelTaskRoute.findMany({ orderBy: { taskType: "asc" } }),
+  ]);
   const queue = buildTaskQueueCenter(projects);
   const safety = buildBatchExecutionSafety(queue.items, projects, strategy);
-  const plan = buildTaskQueueExecutionPlan(queue.items, strategy.maxBatchSize, strategy);
+  const basePlan = buildTaskQueueExecutionPlan(queue.items, strategy.maxBatchSize, strategy);
 
-  if (!plan.canRun || !plan.category || !plan.projectId || plan.projectIds.length === 0) {
-    return NextResponse.json({ error: plan.detail, plan, safety }, { status: 400 });
+  if (!basePlan.canRun || !basePlan.category || !basePlan.projectId || basePlan.projectIds.length === 0) {
+    return NextResponse.json({ error: basePlan.detail, plan: basePlan, safety }, { status: 400 });
+  }
+  const projectsById = new Map(projects.map((item) => [item.id, item]));
+  const missingProject = basePlan.projectIds.find((projectId) => !projectsById.has(projectId));
+  if (missingProject) {
+    return NextResponse.json({ error: "Project not found", plan: basePlan, safety }, { status: 404 });
+  }
+
+  const modelRouteGate = buildRecommendedBatchModelRouteGate({
+    plan: basePlan,
+    projects,
+    providers: modelProviders,
+    routes: modelRoutes,
+  });
+  const plan = applyRecommendedBatchModelRouteGate(basePlan, modelRouteGate);
+
+  if (!plan.canRun || modelRouteGate.status === "block") {
+    return NextResponse.json({ error: modelRouteGate.headline, plan, safety, modelRouteGate }, { status: 429 });
   }
   if (!safety.canRunRecommendedBatch) {
-    return NextResponse.json({ error: safety.warnings[0] ?? "批量安全阀未通过。", plan, safety }, { status: 429 });
-  }
-
-  const projectsById = new Map(projects.map((item) => [item.id, item]));
-  const missingProject = plan.projectIds.find((projectId) => !projectsById.has(projectId));
-  if (missingProject) {
-    return NextResponse.json({ error: "Project not found", plan, safety }, { status: 404 });
+    return NextResponse.json({ error: safety.warnings[0] ?? "批量安全阀未通过。", plan, safety, modelRouteGate }, { status: 429 });
   }
 
   const secondPassCandidates = new Map<string, ReturnType<typeof buildReviewPipelineQueue>["candidates"][number]>();
@@ -212,6 +238,7 @@ export async function POST(request: Request) {
   return NextResponse.json({
     plan,
     safety,
+    modelRouteGate,
     results,
     routeEffectSummary,
     batchReceipt,

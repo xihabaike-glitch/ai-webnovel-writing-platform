@@ -7,6 +7,7 @@ import {
   buildFirstDayDispatchUpdateSummary,
   buildFirstDayExecutionRiskNotice,
   buildFirstDayHandoffGateCta,
+  buildFirstDayPostDispatchCompletionPrompt,
   buildFirstDayReceiptCompletionAction,
   buildFirstDayReceiptCompletionEvidence,
   buildFirstDayStepView,
@@ -597,6 +598,47 @@ test("buildFirstDayDispatchUpdateSummary routes handoff completion back to tasks
   assert.equal(summary.href, "/tasks");
   assert.ok(summary.detail.includes("首日闸门"));
   assert.ok(summary.badges.includes("证据回写"));
+});
+
+test("buildFirstDayPostDispatchCompletionPrompt offers direct AI continuation when next step is executable", () => {
+  const ready = buildFirstDayPostDispatchCompletionPrompt({
+    completedTitle: "第一章初稿",
+    updateSummary: null,
+    nextStep: {
+      label: "第一章审稿",
+      owner: "AI",
+      actionLabel: "AI 执行当前节点",
+    },
+    executionPlan: {
+      executable: true,
+    },
+  });
+  const manual = buildFirstDayPostDispatchCompletionPrompt({
+    completedTitle: "平台包预检",
+    updateSummary: {
+      visible: true,
+      status: "completed",
+      title: "首日工作流已收口",
+      detail: "可以进入后续生产。",
+      actionLabel: "看任务队列",
+      href: "/tasks",
+      badges: [],
+    },
+    nextStep: {
+      label: "平台包预检",
+      owner: "运营",
+      actionLabel: "检查平台包",
+    },
+    executionPlan: {
+      executable: false,
+      blockedReason: "当前首日节点暂不支持自动执行。",
+    },
+  });
+
+  assert.equal(ready.message, "已完成当前派单：第一章初稿。下一步「第一章审稿」已准备好，可以继续让 AI 执行。");
+  assert.equal(ready.action, "execute_current_step");
+  assert.equal(manual.message, "首日工作流已收口：可以进入后续生产。");
+  assert.equal(manual.action, undefined);
 });
 
 test("buildFirstDayDispatchCompletionTemplate covers first-day step types", () => {

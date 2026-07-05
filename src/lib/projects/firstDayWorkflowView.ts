@@ -144,6 +144,11 @@ export interface FirstDayDispatchUpdateSummary {
   badges: string[];
 }
 
+export interface FirstDayPostDispatchCompletionPrompt {
+  message: string;
+  action?: "execute_current_step";
+}
+
 export interface FirstDayDispatchFocusInput {
   dispatchKey?: string | null;
   projectId?: string | null;
@@ -805,6 +810,30 @@ export function buildFirstDayDispatchUpdateSummary(input: {
     actionLabel: "回总闸门复查",
     href: "/gate",
     badges: [completedStepLabel, "无新增首日卡", "复查放行"],
+  };
+}
+
+export function buildFirstDayPostDispatchCompletionPrompt(input: {
+  completedTitle: string;
+  updateSummary: Pick<FirstDayDispatchUpdateSummary, "visible" | "title" | "detail"> | null;
+  nextStep: Pick<FirstDayWorkflowStep, "label" | "owner" | "actionLabel"> | null;
+  executionPlan: { executable: boolean; blockedReason?: string } | null;
+}): FirstDayPostDispatchCompletionPrompt {
+  if (input.nextStep?.owner === "AI" && input.executionPlan?.executable) {
+    return {
+      message: `已完成当前派单：${input.completedTitle}。下一步「${input.nextStep.label}」已准备好，可以继续让 AI 执行。`,
+      action: "execute_current_step",
+    };
+  }
+
+  if (input.updateSummary?.visible) {
+    return {
+      message: `${input.updateSummary.title}：${input.updateSummary.detail}`,
+    };
+  }
+
+  return {
+    message: `已完成当前派单：${input.completedTitle}`,
   };
 }
 

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { buildFirstDayExecutionRouteBlockMessage, type FirstDayExecutionRouteStatus } from "@/lib/model-gateway/firstDayExecutionRoute";
-import { buildFirstDayDispatchUpdateSummary, buildFirstDayExecutionRiskNotice, buildFirstDayHandoffGateCta, buildFirstDayReceiptCompletionAction, buildFirstDayReceiptCompletionEvidence, buildFirstDayStepView, completeFirstDayDispatchStep } from "@/lib/projects/firstDayWorkflowView";
+import { buildFirstDayDispatchUpdateSummary, buildFirstDayExecutionRiskNotice, buildFirstDayHandoffGateCta, buildFirstDayPostDispatchCompletionPrompt, buildFirstDayReceiptCompletionAction, buildFirstDayReceiptCompletionEvidence, buildFirstDayStepView, completeFirstDayDispatchStep } from "@/lib/projects/firstDayWorkflowView";
 import { persistGateDispatchTask, type GatePlatformGrowthDispatchItem, type PersistedGatePlatformDispatchTask } from "@/lib/projects/gateActionReceipts";
 
 interface FirstDayWorkflowStep {
@@ -123,6 +123,14 @@ interface FirstDayContinuationAction {
 
 type FirstDayModelRouteStatus = FirstDayExecutionRouteStatus;
 type FirstDayMessageAction = "execute_current_step";
+type FirstDayWorkflowPayload = {
+  workflow: FirstDayWorkflow;
+  dispatch: GatePlatformGrowthDispatchItem;
+  executionPlan: FirstDayModelExecutionPlan;
+  modelRoute: FirstDayModelRouteStatus;
+  continuation: FirstDayContinuationAction;
+  handoffFollowupDispatches: GatePlatformGrowthDispatchItem[];
+};
 
 function followupDispatchTone(stage: GatePlatformGrowthDispatchItem["stage"]) {
   if (stage === "start_metrics_recovery") return "border-teal-200 bg-teal-50 text-teal-900";
@@ -364,14 +372,7 @@ export function FirstDayWorkflowPanel({ projectId }: { projectId: string }) {
       if (!response.ok) {
         throw new Error("读取首日工作流失败。");
       }
-      const payload = (await response.json()) as {
-        workflow: FirstDayWorkflow;
-        dispatch: GatePlatformGrowthDispatchItem;
-        executionPlan: FirstDayModelExecutionPlan;
-        modelRoute: FirstDayModelRouteStatus;
-        continuation: FirstDayContinuationAction;
-        handoffFollowupDispatches: GatePlatformGrowthDispatchItem[];
-      };
+      const payload = (await response.json()) as FirstDayWorkflowPayload;
       setWorkflow(payload.workflow);
       setDispatch(payload.dispatch);
       setExecutionPlan(payload.executionPlan);
@@ -387,8 +388,10 @@ export function FirstDayWorkflowPanel({ projectId }: { projectId: string }) {
           payload.workflow.nextStep.owner === "AI" ? "execute_current_step" : undefined,
         );
       }
+      return payload;
     } catch (caught) {
       showMessage(caught instanceof Error ? caught.message : "读取首日工作流失败。");
+      return null;
     } finally {
       setIsLoading(false);
     }
@@ -503,9 +506,15 @@ export function FirstDayWorkflowPanel({ projectId }: { projectId: string }) {
         evidence: dispatch.evidence,
       });
       setCompletionEvidence("");
-      await loadWorkflow();
+      const refreshed = await loadWorkflow();
       const updateSummary = buildFirstDayDispatchUpdateSummary(result);
-      showMessage(updateSummary.visible ? `${updateSummary.title}：${updateSummary.detail}` : `已完成当前派单：${result.task.title}`);
+      const nextPrompt = buildFirstDayPostDispatchCompletionPrompt({
+        completedTitle: result.task.title,
+        updateSummary,
+        nextStep: refreshed?.workflow.nextStep ?? null,
+        executionPlan: refreshed?.executionPlan ?? null,
+      });
+      showMessage(nextPrompt.message, nextPrompt.action);
     } catch (caught) {
       showMessage(caught instanceof Error ? caught.message : "首日派单验收失败。");
     } finally {

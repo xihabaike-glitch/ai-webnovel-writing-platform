@@ -42,6 +42,15 @@ export default async function GatePage() {
       include: {
         chapters: { orderBy: { order: "asc" } },
         aiTasks: { orderBy: { createdAt: "desc" } },
+        worldEntries: { orderBy: [{ type: "asc" }, { createdAt: "asc" }] },
+        gateDispatchTasks: {
+          where: { dispatchKey: { startsWith: "first-day:" } },
+          select: {
+            dispatchKey: true,
+            state: true,
+            completionEvidence: true,
+          },
+        },
         publishSnapshots: { orderBy: { createdAt: "desc" }, take: 80 },
         submissionAssets: { orderBy: { updatedAt: "desc" } },
         submissionAssetVersions: { orderBy: { createdAt: "desc" }, take: 80 },

@@ -54,6 +54,16 @@ export interface PrePublishGateProject {
     outputTokens?: number | null;
     costUsd?: number | null;
   }>;
+  worldEntries?: Array<{
+    type: string;
+    title: string;
+    content: string;
+  }>;
+  gateDispatchTasks?: Array<{
+    dispatchKey: string;
+    state: string;
+    completionEvidence: string;
+  }>;
   publishSnapshots?: PublishPackageVersionItem[];
   submissionAssets?: PlatformSubmissionAssetInput[];
   submissionAssetVersions?: PlatformSubmissionAssetVersionInput[];
@@ -712,7 +722,11 @@ export function buildPrePublishGate(input: PrePublishGateInput): PrePublishGate 
   const runnableTasks = queue.items.filter((item) => item.category !== "blocked" && item.category !== "export").length;
   const failedTasks = failureRepairBatch.summary.unresolvedFailures;
   const hasPublishableWork = projectStatuses.some((project) => project.publishableChapters > 0);
-  const taskBlockers = queue.overview.publishBlocked + queue.overview.chapterCardBlocked;
+  const taskBlockers = queue.overview.blockedCards;
+  const firstDayBlockers = queue.overview.firstDayBlocked + queue.overview.riskRecoveryBlocked + queue.overview.watchScaleBlocked;
+  const queueBlockerDetail = queue.recommendedNext?.category === "blocked"
+    ? `${queue.recommendedNext.actionLabel}：${queue.recommendedNext.evidence}`
+    : null;
 
   const items: PrePublishGateItem[] = [
     gateItem({
@@ -732,7 +746,7 @@ export function buildPrePublishGate(input: PrePublishGateInput): PrePublishGate 
       label: "任务队列",
       status: taskBlockers > 0 ? "block" : runnableTasks > 0 ? "warn" : "pass",
       detail: taskBlockers > 0
-        ? `${taskBlockers} 个阻塞项挡住生产链路。`
+        ? `${taskBlockers} 个阻塞项挡住生产链路。${firstDayBlockers > 0 ? `其中 ${firstDayBlockers} 个来自首日闸门或观察闸门。` : ""}${queueBlockerDetail ? ` ${queueBlockerDetail}` : ""}`
         : runnableTasks > 0
           ? `${runnableTasks} 个任务可继续处理，发布前建议先跑完关键审稿和二改。`
           : readyPackages > 0
@@ -820,7 +834,7 @@ export function buildPrePublishGate(input: PrePublishGateInput): PrePublishGate 
       )),
     ...failureCenter.nextActions.map((detail, index) => action(`failure:${index}`, "处理失败复盘", detail, "/failures", "review")),
     queue.recommendedNext
-      ? action("queue:next", queue.recommendedNext.actionLabel, `${queue.recommendedNext.projectTitle} · ${queue.recommendedNext.chapterTitle}`, queue.recommendedNext.href)
+      ? action("queue:next", queue.recommendedNext.actionLabel, `${queue.recommendedNext.projectTitle} · ${queue.recommendedNext.chapterTitle} · ${queue.recommendedNext.evidence}`, queue.recommendedNext.href)
       : null,
     runnableTasks > 0
       ? action(

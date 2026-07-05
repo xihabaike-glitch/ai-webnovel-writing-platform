@@ -156,6 +156,28 @@ test("buildAiPipelineRecheckRecoveryDispatchPlan promotes passed samples to smal
   });
 });
 
+test("buildAiPipelineRecheckRecoveryDispatchPlan rolls weak resumed batches back to repair samples", () => {
+  const dispatch = buildAiPipelineRecheckRecoveryDispatchPlan({
+    projectId: "project-1",
+    sourceDispatchKey: "ai-pipeline-recheck:project-1:ai-plan-1:scale",
+    mode: "small_batch_resume",
+    batchStatus: "review_quality",
+    healthLabel: "恢复小批跌线，回滚观察修复",
+    healthDetail: "恢复小批质量 82，没到 85 分复盘线。",
+  });
+
+  assert.equal(dispatch?.dispatchKey, "ai-pipeline-recheck:project-1:ai-plan-1:rollback");
+  assert.equal(dispatch?.stage, "ai_pipeline_sample_recheck");
+  assert.equal(dispatch?.priorityScore, 96);
+  assert.equal(dispatch?.actionLabel, "回滚观察修复");
+  assert.equal(dispatch?.execution.mode, "sample_recheck");
+  assert.equal(dispatch?.execution.maxSampleCount, 1);
+  assert.ok(dispatch?.title.includes("恢复小批跌线"));
+  assert.ok(dispatch?.detail.includes("先修正文质量"));
+  assert.ok(dispatch?.acceptanceCriteria.some((item) => item.includes("修复低分章节")));
+  assert.ok(dispatch?.evidence.some((item) => item.includes("来源小批：ai-pipeline-recheck:project-1:ai-plan-1:scale")));
+});
+
 test("buildAiPipelineRecheckRecoveryDispatchPlan does not promote failed or already scaled rechecks", () => {
   assert.equal(buildAiPipelineRecheckRecoveryDispatchPlan({
     projectId: "project-1",

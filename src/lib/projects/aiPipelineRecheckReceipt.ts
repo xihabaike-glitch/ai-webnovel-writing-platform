@@ -59,6 +59,49 @@ function platformNameFromPlan(plan: Pick<TaskQueueExecutionPlan, "strategyBases"
   return match?.[1]?.trim() || "AI 写审改";
 }
 
+function buildAiPipelineRollbackRepairDispatchPlan(input: {
+  projectId: string;
+  receiptId: string;
+  sourceDispatchKey: string;
+  healthLabel: string;
+  healthDetail: string;
+}) {
+  return {
+    dispatchKey: `ai-pipeline-recheck:${input.projectId}:${input.receiptId}:rollback`,
+    projectId: input.projectId,
+    platformId: "ai-pipeline",
+    platformName: "AI 写审改",
+    stage: "ai_pipeline_sample_recheck",
+    state: "queued",
+    priorityScore: 96,
+    ownerRole: "写作制片 / 审稿负责人",
+    title: "AI 写审改：恢复小批跌线修复",
+    detail: `恢复小批回执「${input.healthLabel}」未过线：${input.healthDetail} 先修正文质量、复查开头钩子和章末追读，再只跑 1 章复验。`,
+    dueLabel: "今天回滚修复",
+    actionLabel: "回滚观察修复",
+    href: `/projects/${input.projectId}#ai-pipeline`,
+    acceptanceCriteria: [
+      "修复低分章节的开头压力、爽点兑现和章末追读",
+      "只选择 1 章重新跑初稿、审稿或二改复验",
+      "回填成功率、质量分、失败原因和成本后再决定是否恢复小批",
+    ],
+    evidence: [
+      `来源小批：${input.sourceDispatchKey}`,
+      `复检结论：${input.healthLabel}`,
+      input.healthDetail,
+      "回滚原因：恢复小批跌破 85 分复盘线或缺少质量证据。",
+    ],
+    execution: {
+      mode: "sample_recheck",
+      maxSampleCount: 1,
+      primaryActionLabel: "运行 1 章复验",
+    },
+    sourceReceiptId: input.receiptId,
+    completionEvidence: "",
+    reviewLatestAt: new Date().toISOString(),
+  };
+}
+
 export function buildAiPipelineRecheckNextAction(input: {
   dispatchKey: string;
   projectId: string | null;
@@ -116,9 +159,18 @@ export function buildAiPipelineRecheckRecoveryDispatchPlan(input: {
   healthLabel: string;
   healthDetail: string;
 }) {
-  if (input.mode !== "sample_recheck" || input.batchStatus !== "continue") return null;
   const receiptId = receiptIdFromRecheckDispatchKey(input.sourceDispatchKey, input.projectId);
   if (!receiptId) return null;
+  if (input.mode === "small_batch_resume" && (input.batchStatus === "review_quality" || input.batchStatus === "repair")) {
+    return buildAiPipelineRollbackRepairDispatchPlan({
+      projectId: input.projectId,
+      receiptId,
+      sourceDispatchKey: input.sourceDispatchKey,
+      healthLabel: input.healthLabel,
+      healthDetail: input.healthDetail,
+    });
+  }
+  if (input.mode !== "sample_recheck" || input.batchStatus !== "continue") return null;
   return buildAiPipelineRecheckDispatchPlan({
     projectId: input.projectId,
     receiptId,

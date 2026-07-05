@@ -6,6 +6,7 @@ import { getPlatformWritingStyle } from "../lib/platforms/writingStyleTemplates.
 import {
   buildGateActionReceipt,
   buildGateDispatchCompletionReceipt,
+  buildGatePlatformTacticExperienceFollowupDispatch,
   buildGatePublishEffectReceipt,
   type GateBatchTacticEffectItem,
   type GatePlatformTacticExperienceItem,
@@ -1303,6 +1304,70 @@ test("buildProjectStartTacticAdvice", async (t) => {
     assert.equal(handoff.label, "闭环交接");
     assert.ok(handoff.firstDayActions.some((action) => action.includes("闭环复用")));
     assert.ok(handoff.evidence.some((item) => item.includes("已用于新书开局并闭环")));
+  });
+
+  await t.test("turns completed recovery follow-up experience into a first-day small-sample handoff", () => {
+    const platform = getPlatformProfile("fanqie");
+    const template = getDefaultTemplateForPlatform(platform.id);
+    const style = getPlatformWritingStyle(platform.id);
+    const recoveryDispatch = buildGatePlatformTacticExperienceFollowupDispatch({
+      platformId: "fanqie",
+      platformName: "番茄小说",
+      status: "usable",
+      label: "可复用打法",
+      tactic: "恢复放量打法",
+      lesson: "恢复放量后续小样本已过线。",
+      reuseHint: "新项目可以参考这套恢复放量节奏，但仍先跑小样本。",
+      risk: "恢复放量不能跨题材无限复用。",
+      href: "/gate#platform-tactic-experience",
+      sourceStatus: "healthy",
+      sourceLabel: "恢复放量闭环",
+      priorityScore: 92,
+      latestAt: "2026-01-02T00:00:00.000Z",
+      evidence: ["恢复放量后续闭环：通过"],
+    });
+    assert.ok(recoveryDispatch);
+    const task: PersistedGatePlatformDispatchTask = {
+      ...recoveryDispatch,
+      databaseId: "task-recovery-followup",
+      dispatchKey: recoveryDispatch.id,
+      projectId: null,
+      sourceReceiptId: null,
+      state: "completed",
+      completionEvidence: "恢复放量继续小样本已通过：曝光 320，点击率 8%，追读率 2.4%，可以继续谨慎复用。",
+      assignedAt: "2026-01-02T00:00:00.000Z",
+      completedAt: "2026-01-02T03:00:00.000Z",
+      createdAt: "2026-01-02T00:00:00.000Z",
+      updatedAt: "2026-01-02T03:00:00.000Z",
+    };
+    const result = buildProjectStartGateExperience({
+      platform,
+      template,
+      style,
+      receipts: [],
+      tasks: [task],
+    });
+    const guide = buildProjectStartPlatformExperienceGuide({
+      platforms: [platform],
+      experiences: result.experiences,
+    });
+    const riskGate = buildProjectStartRiskGate(guide.items[0] ?? null);
+    const handoff = buildProjectStartExperienceHandoff({
+      platform,
+      template,
+      guide,
+      advice: result.advice,
+      riskGate,
+      recommendedTemplate: template,
+    });
+
+    assert.equal(result.selection.experience?.tactic, "恢复放量打法");
+    assert.equal(result.advice.label, "恢复放量打法");
+    assert.equal(guide.items[0]?.label, "恢复放量打法");
+    assert.equal(handoff.label, "恢复放量交接");
+    assert.ok(handoff.title.includes("恢复放量小样本"));
+    assert.ok(handoff.firstDayActions.some((action) => action.includes("恢复放量小样本")));
+    assert.ok(handoff.avoidRules.some((rule) => rule.includes("不直接放量")));
   });
 
   await t.test("turns start advice into a reusable platform soil entry", () => {

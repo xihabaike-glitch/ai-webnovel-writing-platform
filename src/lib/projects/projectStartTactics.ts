@@ -705,6 +705,7 @@ export function buildProjectStartExperienceHandoff(input: {
   const thirdMetricStable = guideItem?.label === "三轮稳住";
   const thirdMetricDowngrade = guideItem?.label === "三轮降档";
   const thirdMetricAvoidance = guideItem?.label === "三轮暂停" || guideItem?.label === "三轮换平台";
+  const recoveryScale = guideItem?.label === "恢复放量打法" || guideItem?.label === "恢复放量观察" || guideItem?.label === "恢复放量避坑";
   const shouldSwitchTemplate = Boolean(
     recommendedTemplate
       && recommendedTemplate.platformId !== input.platform.id
@@ -725,6 +726,8 @@ export function buildProjectStartExperienceHandoff(input: {
         ? `${input.platform.name} 已闭环开书打法`
         : status === "reuse" && thirdMetricStable
           ? `${input.platform.name} 三轮站住，优先复用`
+        : status === "reuse" && recoveryScale
+          ? `${input.platform.name} 恢复放量小样本交接`
         : status === "reuse"
         ? `${input.platform.name} 可复用历史打法`
         : `${input.platform.name} 先按模板开书`;
@@ -736,6 +739,8 @@ export function buildProjectStartExperienceHandoff(input: {
         ? "闭环交接"
         : status === "reuse" && thirdMetricStable
           ? "三轮复用交接"
+        : status === "reuse" && recoveryScale
+          ? "恢复放量交接"
         : status === "reuse"
         ? "复用交接"
         : "模板交接";
@@ -758,6 +763,7 @@ export function buildProjectStartExperienceHandoff(input: {
       firstDayClosedLoop ? "闭环复用：沿用已完成的新书开局三段交接。" : null,
       thirdMetricStable ? "三轮复用：沿用已站住的平台包装、前三章兑现和小步加码节奏。" : null,
       thirdMetricDowngrade ? "三轮降档：只复用修复流程，首轮不放量。" : null,
+      recoveryScale ? "恢复放量小样本：只把历史打法当作解除闸门后的参考，首日先验证开头、前三章兑现和追读信号。" : null,
       `开头：${input.advice.openingMove}`,
       `验证：${input.advice.verificationMove}`,
       input.riskGate.requiresConfirmation ? "创建前写清恢复条件，只允许首轮小样本。" : "创建后回填前三章、平台包装和首轮数据证据。",
@@ -765,6 +771,7 @@ export function buildProjectStartExperienceHandoff(input: {
     avoidRules: uniqueLines([
       status === "blocked" ? "不要直接复用历史失败入口、题材包装或前三章兑现方式。" : null,
       thirdMetricAvoidance ? "三轮最终结论已经避坑，未写清重启条件前不要硬上。" : null,
+      recoveryScale ? "恢复放量经验不等于新书直接放量，未过小样本前不直接放量。" : null,
       guideItem?.status === "watch" ? "不要把观察样本当成成功样本放量。" : null,
       input.advice.risk,
     ], 3),

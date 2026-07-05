@@ -256,6 +256,10 @@ function isWeakExecutionReviewExperience(experience: GatePlatformTacticExperienc
   return experience.tactic === "返工动作收口打法";
 }
 
+function isDispatchCompletionExperience(experience: GatePlatformTacticExperienceItem) {
+  return experience.tactic === "派单验收打法";
+}
+
 function batchEffectForPlatform(batchEffects: GateBatchTacticEffectItem[], platform: PlatformProfile) {
   return batchEffects.find((item) => item.tacticTitle.includes(platform.name)) ?? null;
 }
@@ -444,6 +448,7 @@ export function buildProjectStartPlatformExperienceGuide(input: {
       const source = experience?.status === "watch" ? experience : batchEffect;
       const isAcceptanceReview = experience ? isAcceptanceReviewExperience(experience) : false;
       const isWeakExecutionReview = experience ? isWeakExecutionReviewExperience(experience) : false;
+      const isDispatchCompletion = experience ? isDispatchCompletionExperience(experience) : false;
       return {
         platformId: platform.id,
         platformName: platform.name,
@@ -452,18 +457,24 @@ export function buildProjectStartPlatformExperienceGuide(input: {
           ? "验收观察"
           : isWeakExecutionReview
             ? "动作观察"
-            : experience?.status === "watch" ? "历史观察" : batchEffect ? batchRecoveryLabel(batchEffect) : "批量观察",
+            : isDispatchCompletion
+              ? "验收待效果"
+              : experience?.status === "watch" ? "历史观察" : batchEffect ? batchRecoveryLabel(batchEffect) : "批量观察",
         headline: isAcceptanceReview
           ? `${platform.name} 先补验收线`
           : isWeakExecutionReview
             ? `${platform.name} 先收口动作`
-            : isRecoveryBatchEffect(batchEffect) ? `${platform.name} 恢复放量继续观察` : `${platform.name} 小样本观察`,
+            : isDispatchCompletion
+              ? `${platform.name} 验收已完成，先补效果`
+              : isRecoveryBatchEffect(batchEffect) ? `${platform.name} 恢复放量继续观察` : `${platform.name} 小样本观察`,
         detail: experience?.status === "watch"
           ? isAcceptanceReview
             ? `历史返工复盘暴露验收标准不硬。${experience.reuseHint}`
             : isWeakExecutionReview
               ? `历史返工复盘暴露执行动作太虚。${experience.reuseHint}`
-              : `${experience.tactic} 还不能写成成功打法。${experience.reuseHint}`
+              : isDispatchCompletion
+                ? `历史派单已经完成验收，但还缺真实效果证明。${experience.reuseHint}`
+                : `${experience.tactic} 还不能写成成功打法。${experience.reuseHint}`
           : isRecoveryBatchEffect(batchEffect)
             ? `${batchEffect?.tacticLabel ?? "恢复放量观察"} 样本还薄，解除闸门后也只能小批验证。`
             : `${batchEffect?.tacticLabel ?? "批量样本"} 样本还薄，只能小批验证。`,
@@ -830,6 +841,25 @@ export function buildProjectStartTacticAdvice(input: {
         checklist: withModelChecklist([
           "动作边界：只验证一个核心问题",
           "段落证据：写清改动段落、主线压力和读者追读理由",
+          `模板前三章：${firstThreeTitles}`,
+          `必须具备：${style.mustHave.join("、")}`,
+        ]),
+      };
+    }
+
+    if (isDispatchCompletionExperience(experience)) {
+      return {
+        status: "history_watch",
+        label: "验收待效果",
+        title: `${platform.name}：先复用验收口径，不复用成功结论`,
+        primaryTactic: experience.lesson,
+        openingMove: `开头和投稿包装先按平台模板执行：${style.openingHook}`,
+        verificationMove: `创建后先复用这套完成依据模板和验收标准，但首轮必须回填曝光、点击、收藏、追读或证据闭环复检。${modelRouteVerification}`,
+        risk: experience.risk,
+        evidence: withModelEvidence(experience.evidence),
+        checklist: withModelChecklist([
+          "验收口径：复用完成依据模板，不复用成功结论",
+          "首轮效果：必须回填曝光、点击、收藏、追读",
           `模板前三章：${firstThreeTitles}`,
           `必须具备：${style.mustHave.join("、")}`,
         ]),

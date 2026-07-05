@@ -485,6 +485,46 @@ test("buildProjectStartTacticAdvice", async (t) => {
     assert.ok(guide.items.some((item) => item.status === "template"));
   });
 
+  await t.test("routes dispatch completion experience into effect-gated start advice", () => {
+    const platform = getPlatformProfile("fanqie");
+    const template = getDefaultTemplateForPlatform(platform.id);
+    const style = getPlatformWritingStyle(platform.id);
+    const completionExperience: GatePlatformTacticExperienceItem = {
+      platformId: "fanqie",
+      platformName: "番茄小说",
+      status: "watch",
+      label: "待效果经验",
+      tactic: "派单验收打法",
+      lesson: "番茄小说 已经形成派单完成业务回执，说明验收口径可复用，但还需要发布效果证明业务改善。",
+      reuseHint: "同类项目可以复用这次完成依据模板和验收标准，下一步必须补曝光、点击、收藏、追读。",
+      risk: "派单完成只证明动作做完，不证明平台增长有效；缺效果前不要写成成功打法。",
+      href: "/gate",
+      sourceStatus: "healthy",
+      sourceLabel: "派单完成回执",
+      priorityScore: 82,
+      latestAt: "2026-01-20T00:00:00.000Z",
+      evidence: ["完成回执：已验收发布包定稿。"],
+    };
+    const guide = buildProjectStartPlatformExperienceGuide({
+      platforms: [platform],
+      experiences: [completionExperience],
+    });
+    const advice = buildProjectStartTacticAdvice({
+      platform,
+      template,
+      style,
+      experience: completionExperience,
+    });
+
+    assert.equal(guide.items[0]?.label, "验收待效果");
+    assert.ok(guide.items[0]?.detail.includes("缺真实效果证明"));
+    assert.equal(advice.status, "history_watch");
+    assert.equal(advice.label, "验收待效果");
+    assert.ok(advice.title.includes("不复用成功结论"));
+    assert.ok(advice.verificationMove.includes("曝光、点击、收藏、追读"));
+    assert.ok(advice.checklist.some((item) => item.includes("不复用成功结论")));
+  });
+
   await t.test("requires confirmation before creating from avoidance platforms", () => {
     const avoidGate = buildProjectStartRiskGate({
       platformId: "qimao",

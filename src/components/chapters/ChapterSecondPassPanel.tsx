@@ -17,6 +17,9 @@ interface SecondPassResult {
     wordCount: number;
     status: string;
   };
+  candidateRevision?: {
+    id: string;
+  };
   content: string;
   activeProvider: {
     displayName: string;
@@ -153,8 +156,7 @@ export function ChapterSecondPassPanel({
       const effectText = payload.storyTreeExperienceEffects?.length
         ? `，经验反馈：${payload.storyTreeExperienceEffects.map((effect) => effect.line.replace("经验应用效果：", "")).join("；")}`
         : "";
-      setMessage(`已完成章节二改${fallbackUsed ? "，已自动切换备用模型" : ""}，复检 ${payload.secondPassAudit.score} 分，大树结构 ${payload.secondPassAudit.treeAudit?.score ?? "缺"} 分${dispatchText}${effectText}${payload.secondPassAudit.shouldSecondPass ? "，仍建议继续二改。" : "，可进入发布检查。"}`);
-      router.refresh();
+      setMessage(`已生成二改候选稿${fallbackUsed ? "，已自动切换备用模型" : ""}，复检 ${payload.secondPassAudit.score} 分，大树结构 ${payload.secondPassAudit.treeAudit?.score ?? "缺"} 分${dispatchText}${effectText}${payload.secondPassAudit.shouldSecondPass ? "，采纳前建议继续打磨。" : "，采纳后再进入发布检查。"}`);
     } catch (caught) {
       setMessage(caught instanceof Error ? caught.message : "二改失败。");
     } finally {
@@ -226,7 +228,7 @@ export function ChapterSecondPassPanel({
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h2 className="font-medium">二改指令工作台</h2>
-          <p className="mt-1 text-sm text-slate-600">基于当前稿继续改，不从头生成；覆盖前会自动保存快照。</p>
+          <p className="mt-1 text-sm text-slate-600">基于当前稿继续改，不从头生成；结果先进入候选稿，作者采纳后才覆盖正文。</p>
         </div>
         <button
           className="rounded-md bg-slate-950 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
@@ -432,7 +434,10 @@ export function ChapterSecondPassPanel({
             <div className="text-xs text-slate-500">{result.activeProvider.displayName} · {result.activeProvider.model}</div>
           </div>
           <div className="mt-1 text-slate-500">
-            {result.chapter.wordCount} 字 · 复检 {result.secondPassAudit.score} 分 · {result.secondPassAudit.shouldSecondPass ? "继续二改" : "可发布检查"}
+            候选 {result.content.length} 字符 · 复检 {result.secondPassAudit.score} 分 · {result.secondPassAudit.shouldSecondPass ? "继续二改" : "可采纳后进发布检查"}
+          </div>
+          <div className="mt-2 rounded-md bg-white px-2 py-1 text-xs font-medium text-emerald-700">
+            这份二改尚未覆盖正文；到右侧 AI 工作流或下方版本区采纳后才会写入。
           </div>
           {result.attempts?.length ? (
             <div className="mt-2 flex flex-wrap gap-2 text-xs text-slate-500">

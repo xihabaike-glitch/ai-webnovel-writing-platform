@@ -116,7 +116,7 @@ export async function generateChapterDraft(options: GenerateChapterDraftOptions)
       },
     });
 
-    const [updatedTask, updatedChapter] = await prisma.$transaction(async (tx) => {
+    const [updatedTask, candidateRevision] = await prisma.$transaction(async (tx) => {
       const savedTask = await tx.aiTask.update({
         where: { id: task.id },
         data: {
@@ -127,29 +127,21 @@ export async function generateChapterDraft(options: GenerateChapterDraftOptions)
           costUsd: result.usage?.costUsd,
         },
       });
-      await tx.chapterRevision.create({
+      const savedCandidate = await tx.chapterRevision.create({
         data: {
           chapterId: chapter.id,
-          source: "ai_draft_before_overwrite",
+          source: "ai_draft_candidate",
           sourceTaskId: generation.task.id,
           title: chapter.title,
-          content: chapter.content,
-          wordCount: chapter.wordCount,
+          content: result.text,
+          wordCount,
           goal: chapter.goal,
           hook: chapter.hook,
           conflict: chapter.conflict,
           valueShift: chapter.valueShift,
           cliffhanger: chapter.cliffhanger,
-          status: chapter.status,
-          notes: "AI 生成正文前自动保存。",
-        },
-      });
-      const savedChapter = await tx.chapter.update({
-        where: { id: chapter.id },
-        data: {
-          content: result.text,
-          wordCount,
           status: "draft",
+          notes: `AI 初稿候选。质量 ${draftQuality.score} 分；采纳后才会进入正文。`,
         },
       });
       await tx.aiTask.create({
@@ -172,18 +164,7 @@ export async function generateChapterDraft(options: GenerateChapterDraftOptions)
           costUsd: 0,
         },
       });
-      const chapters = await tx.chapter.findMany({
-        where: { projectId: chapter.projectId },
-        select: { wordCount: true },
-      });
-      await tx.project.update({
-        where: { id: chapter.projectId },
-        data: {
-          currentWordCount: chapters.reduce((sum, item) => sum + item.wordCount, 0),
-        },
-      });
-
-      return [savedTask, savedChapter];
+      return [savedTask, savedCandidate];
     });
     const storyTreeDispatches = await Promise.all(buildStoryTreeRewriteDispatchItems({
       source: "chapter_draft",
@@ -198,7 +179,8 @@ export async function generateChapterDraft(options: GenerateChapterDraftOptions)
 
     return {
       task: updatedTask,
-      chapter: updatedChapter,
+      chapter,
+      candidateRevision,
       content: result.text,
       draftQuality,
       storyTreeDispatches,

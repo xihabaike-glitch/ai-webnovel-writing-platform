@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   buildChapterRevisionComparison,
+  isChapterRevisionCandidate,
   previewRevisionContent,
   summarizeChapterRevisions,
 } from "../lib/chapters/revisions.ts";
@@ -25,6 +26,26 @@ test("chapter revision summaries", async (t) => {
     assert.equal(summaries[0].sourceLabel, "AI 生成前旧稿");
     assert.equal(summaries[0].preview, "旧稿第一段。 旧稿第二段。");
     assert.equal(summaries[0].sourceTaskId, "task-1");
+  });
+
+  await t.test("labels AI candidates without treating them as current prose", () => {
+    const summaries = summarizeChapterRevisions([
+      {
+        id: "revision-candidate",
+        source: "ai_draft_candidate",
+        sourceTaskId: "task-candidate",
+        title: "第一章",
+        content: "AI 候选稿第一段。",
+        wordCount: 9,
+        status: "draft",
+        notes: "AI 初稿候选。采纳后才会进入正文。",
+        createdAt: "2026-07-01T00:00:00.000Z",
+      },
+    ]);
+
+    assert.equal(summaries[0].sourceLabel, "AI 初稿候选");
+    assert.equal(isChapterRevisionCandidate(summaries[0].source), true);
+    assert.equal(isChapterRevisionCandidate("manual_snapshot"), false);
   });
 
   await t.test("labels first-three rewrite snapshots", () => {

@@ -506,7 +506,7 @@ export function BatchReviewPipelinePanel({ projectId }: { projectId: string }) {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h2 className="font-medium">批量审稿与二改生产线</h2>
-          <p className="mt-1 text-sm text-slate-600">把已生成初稿的章节批量送审，再按审稿问题批量二改，覆盖前自动保存版本。</p>
+          <p className="mt-1 text-sm text-slate-600">把已生成初稿的章节批量送审，再按审稿问题批量二改；二改结果先进入候选稿，采纳后才覆盖正文。</p>
         </div>
         <button
           className="rounded-md border border-slate-200 px-3 py-2 text-sm font-medium hover:bg-slate-50 disabled:opacity-50"

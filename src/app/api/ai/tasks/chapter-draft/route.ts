@@ -18,6 +18,7 @@ export async function POST(request: Request) {
     return NextResponse.json({
       task: result.task,
       chapter: result.chapter,
+      candidateRevision: result.candidateRevision,
       content: result.content,
       draftQuality: result.draftQuality,
       storyTreeDispatches: result.storyTreeDispatches,

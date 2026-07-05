@@ -143,7 +143,7 @@ export async function generateChapterSecondPass(options: GenerateChapterSecondPa
       audit: secondPassAudit.treeAudit,
     }));
 
-    const [updatedTask, updatedChapter] = await prisma.$transaction(async (tx) => {
+    const [updatedTask, candidateRevision] = await prisma.$transaction(async (tx) => {
       const savedTask = await tx.aiTask.update({
         where: { id: task.id },
         data: {
@@ -154,29 +154,21 @@ export async function generateChapterSecondPass(options: GenerateChapterSecondPa
           costUsd: result.usage?.costUsd,
         },
       });
-      await tx.chapterRevision.create({
+      const savedCandidate = await tx.chapterRevision.create({
         data: {
           chapterId: chapter.id,
-          source: "chapter_second_pass_before_overwrite",
+          source: "chapter_second_pass_candidate",
           sourceTaskId: generation.task.id,
           title: chapter.title,
-          content: chapter.content,
-          wordCount: chapter.wordCount,
+          content: result.text,
+          wordCount,
           goal: chapter.goal,
           hook: chapter.hook,
           conflict: chapter.conflict,
           valueShift: chapter.valueShift,
           cliffhanger: chapter.cliffhanger,
-          status: chapter.status,
-          notes: `二改前自动保存。指令：${instruction}`,
-        },
-      });
-      const savedChapter = await tx.chapter.update({
-        where: { id: chapter.id },
-        data: {
-          content: result.text,
-          wordCount,
           status: "revising",
+          notes: `二改候选稿。质量 ${secondPassAudit.score} 分；指令：${instruction}`,
         },
       });
       await tx.aiTask.create({
@@ -210,18 +202,7 @@ export async function generateChapterSecondPass(options: GenerateChapterSecondPa
           data: { evidence: JSON.stringify([...evidence, effect.line]) },
         });
       }
-      const chapters = await tx.chapter.findMany({
-        where: { projectId: chapter.projectId },
-        select: { wordCount: true },
-      });
-      await tx.project.update({
-        where: { id: chapter.projectId },
-        data: {
-          currentWordCount: chapters.reduce((sum, item) => sum + item.wordCount, 0),
-        },
-      });
-
-      return [savedTask, savedChapter];
+      return [savedTask, savedCandidate];
     });
     const storyTreeDispatches = await Promise.all(buildStoryTreeRewriteDispatchItems({
       source: "chapter_second_pass",
@@ -236,7 +217,8 @@ export async function generateChapterSecondPass(options: GenerateChapterSecondPa
 
     return {
       task: updatedTask,
-      chapter: updatedChapter,
+      chapter,
+      candidateRevision,
       content: result.text,
       secondPassAudit,
       storyTreeExperienceEffects,

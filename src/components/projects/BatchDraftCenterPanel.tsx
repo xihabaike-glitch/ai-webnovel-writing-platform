@@ -348,7 +348,7 @@ export function BatchDraftCenterPanel({ projectId }: { projectId: string }) {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h2 className="font-medium">AI 批量初稿生产中心</h2>
-          <p className="mt-1 text-sm text-slate-600">从章节卡队列选择 1-5 章，批量调用当前模型生成正文初稿，并自动保存覆盖前版本。</p>
+          <p className="mt-1 text-sm text-slate-600">从章节卡队列选择 1-5 章，批量调用当前模型生成正文初稿候选；作者采纳后才写入正文。</p>
         </div>
         <button
           className="rounded-md border border-slate-200 px-3 py-2 text-sm font-medium hover:bg-slate-50 disabled:opacity-50"

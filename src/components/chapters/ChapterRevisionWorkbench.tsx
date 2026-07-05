@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   buildChapterRevisionComparison,
+  isChapterRevisionCandidate,
   type ChapterRevisionComparable,
   type ChapterRevisionComparison,
 } from "@/lib/chapters/revisions";
@@ -48,6 +49,7 @@ export function ChapterRevisionWorkbench({ chapter }: { chapter: EditableChapter
   const [isLoading, setIsLoading] = useState(false);
   const [isSnapshotting, setIsSnapshotting] = useState(false);
   const [isRestoring, setIsRestoring] = useState(false);
+  const [isAdopting, setIsAdopting] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
   const selectedRevision = useMemo(
@@ -116,6 +118,26 @@ export function ChapterRevisionWorkbench({ chapter }: { chapter: EditableChapter
     }
   }
 
+  async function adoptRevision() {
+    if (!selectedRevision) return;
+    setIsAdopting(true);
+    setMessage(null);
+    try {
+      const response = await fetch(`/api/chapters/${chapter.id}/revisions/${selectedRevision.id}/adopt`, {
+        method: "POST",
+      });
+      if (!response.ok) {
+        throw new Error("采纳候选稿失败。");
+      }
+      setMessage("已采纳候选稿，页面正在刷新");
+      router.refresh();
+    } catch (caught) {
+      setMessage(caught instanceof Error ? caught.message : "采纳候选稿失败。");
+    } finally {
+      setIsAdopting(false);
+    }
+  }
+
   useEffect(() => {
     void loadRevisions();
   }, []);
@@ -147,11 +169,17 @@ export function ChapterRevisionWorkbench({ chapter }: { chapter: EditableChapter
           {selectedRevision ? (
             <button
               className="rounded-md bg-slate-950 px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
-              disabled={isRestoring}
-              onClick={restoreRevision}
+              disabled={isRestoring || isAdopting}
+              onClick={() => {
+                if (isChapterRevisionCandidate(selectedRevision.source)) {
+                  void adoptRevision();
+                } else {
+                  void restoreRevision();
+                }
+              }}
               type="button"
             >
-              {isRestoring ? "恢复中" : "恢复此版本"}
+              {isAdopting ? "采纳中" : isRestoring ? "恢复中" : isChapterRevisionCandidate(selectedRevision.source) ? "采纳候选稿" : "恢复此版本"}
             </button>
           ) : null}
         </div>
@@ -175,6 +203,9 @@ export function ChapterRevisionWorkbench({ chapter }: { chapter: EditableChapter
                   type="button"
                 >
                   <div className="font-medium text-slate-950">{revision.sourceLabel}</div>
+                  {isChapterRevisionCandidate(revision.source) ? (
+                    <div className="mt-1 text-xs font-medium text-emerald-700">AI 候选，未覆盖正文</div>
+                  ) : null}
                   <div className="mt-1 text-xs text-slate-500">{formatDate(revision.createdAt)}</div>
                   <div className="mt-2 line-clamp-2 text-slate-600">{revision.preview}</div>
                 </button>
@@ -187,6 +218,9 @@ export function ChapterRevisionWorkbench({ chapter }: { chapter: EditableChapter
                   <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                     <div>
                       <div className="font-medium text-slate-950">{selectedRevision.sourceLabel}</div>
+                      {isChapterRevisionCandidate(selectedRevision.source) ? (
+                        <div className="mt-1 text-xs font-medium text-emerald-700">采纳后才会写入正文。</div>
+                      ) : null}
                       <div className="mt-1 text-slate-500">
                         {selectedRevision.wordCount} 字 · {selectedRevision.status} · {formatDate(selectedRevision.createdAt)}
                       </div>

@@ -54,12 +54,19 @@ export interface ChapterRevisionComparison {
 }
 
 const sourceLabels: Record<string, string> = {
+  ai_draft_candidate: "AI 初稿候选",
   ai_draft_before_overwrite: "AI 生成前旧稿",
+  chapter_second_pass_candidate: "二改候选稿",
   chapter_second_pass_before_overwrite: "二改前旧稿",
   first_three_rewrite_before_overwrite: "前三章改写前旧稿",
   manual_snapshot: "手动快照",
+  adopt_candidate_before_overwrite: "采纳候选前旧稿",
   restore_before_overwrite: "回滚前旧稿",
 };
+
+export function isChapterRevisionCandidate(source: string) {
+  return source === "ai_draft_candidate" || source === "chapter_second_pass_candidate";
+}
 
 export function previewRevisionContent(content: string) {
   const compact = content.replace(/\s+/g, " ").trim();

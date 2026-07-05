@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { groupReviewIssues, nonEmptyReviewGroups } from "@/lib/ai/reviewGrouping";
 import { latestTaskStatus, type AiTaskWorkflowItem } from "@/lib/ai/taskWorkflow";
 import { buildPlatformStyleScore, type PlatformStyleChapterCard } from "@/lib/chapters/platformStyleScore";
-import type { ChapterRevisionSummary } from "@/lib/chapters/revisions";
+import { isChapterRevisionCandidate, type ChapterRevisionSummary } from "@/lib/chapters/revisions";
 import type { PlatformProfile } from "@/lib/platforms/platformProfiles";
 
 interface ReviewIssue {
@@ -143,6 +143,7 @@ export function ChapterWorkflowPanel({
   const [isDownloadingRewrite, setIsDownloadingRewrite] = useState(false);
   const [isSavingRevision, setIsSavingRevision] = useState(false);
   const [restoringRevisionId, setRestoringRevisionId] = useState<string | null>(null);
+  const [adoptingRevisionId, setAdoptingRevisionId] = useState<string | null>(null);
   const [revisions, setRevisions] = useState<ChapterRevisionSummary[]>([]);
   const [selectedRevision, setSelectedRevision] = useState<ChapterRevisionSummary | null>(null);
   const [openingDiagnostic, setOpeningDiagnostic] = useState<OpeningDiagnostic | null>(null);
@@ -200,6 +201,7 @@ export function ChapterWorkflowPanel({
 
       const payload = (await response.json()) as {
         error?: string;
+        candidateRevision?: { id: string };
         draftQuality?: { score: number; shouldSecondPass: boolean; treeAudit?: { score: number; label: string } };
         storyTreeDispatches?: Array<{ dispatchKey: string }>;
         budgetGuard?: BudgetGuardView;
@@ -212,11 +214,10 @@ export function ChapterWorkflowPanel({
       const fallbackUsed = payload.attempts?.some((attempt) => attempt.status === "failed");
       const dispatchText = payload.storyTreeDispatches?.length ? `，已派发 ${payload.storyTreeDispatches.length} 个结构返工任务` : "";
       setMessage(payload.draftQuality
-        ? `已生成正文初稿${fallbackUsed ? "，已自动切换备用模型" : ""}，自动体检 ${payload.draftQuality.score} 分，大树结构 ${payload.draftQuality.treeAudit?.score ?? "缺"} 分${dispatchText}${payload.draftQuality.shouldSecondPass ? "，建议进入二改。" : "。"}`
-        : "已生成正文初稿");
+        ? `已生成 AI 初稿候选${fallbackUsed ? "，已自动切换备用模型" : ""}，自动体检 ${payload.draftQuality.score} 分，大树结构 ${payload.draftQuality.treeAudit?.score ?? "缺"} 分${dispatchText}${payload.draftQuality.shouldSecondPass ? "，采纳前建议先看候选稿。" : "，采纳后才会进入正文。"}`
+        : "已生成 AI 初稿候选，采纳后才会进入正文。");
       await loadWorkflow();
       await loadRevisions();
-      router.refresh();
     } catch (caught) {
       setMessage(caught instanceof Error ? caught.message : "生成正文失败。");
     } finally {
@@ -267,6 +268,29 @@ export function ChapterWorkflowPanel({
       setMessage(caught instanceof Error ? caught.message : "回滚版本失败。");
     } finally {
       setRestoringRevisionId(null);
+    }
+  }
+
+  async function adoptRevision(revisionId: string) {
+    setAdoptingRevisionId(revisionId);
+    setMessage(null);
+    try {
+      const response = await fetch(`/api/chapters/${chapterId}/revisions/${revisionId}/adopt`, {
+        method: "POST",
+      });
+
+      if (!response.ok) {
+        throw new Error("采纳候选稿失败。");
+      }
+
+      setMessage("已采纳候选稿并写入正文");
+      await loadWorkflow();
+      await loadRevisions();
+      router.refresh();
+    } catch (caught) {
+      setMessage(caught instanceof Error ? caught.message : "采纳候选稿失败。");
+    } finally {
+      setAdoptingRevisionId(null);
     }
   }
 
@@ -721,6 +745,11 @@ export function ChapterWorkflowPanel({
                 <span className="font-medium">{revision.sourceLabel}</span>
                 <span>{revision.wordCount} 字</span>
               </div>
+              {isChapterRevisionCandidate(revision.source) ? (
+                <div className={selectedRevision?.id === revision.id ? "mt-1 text-slate-200" : "mt-1 text-emerald-700"}>
+                  待作者采纳，尚未覆盖正文
+                </div>
+              ) : null}
               <div className="mt-1">{new Date(revision.createdAt).toLocaleString()}</div>
               <div className="mt-2 line-clamp-2">{revision.preview}</div>
             </button>
@@ -738,11 +767,23 @@ export function ChapterWorkflowPanel({
               </div>
               <button
                 className="rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white disabled:opacity-50"
-                disabled={restoringRevisionId === selectedRevision.id}
-                onClick={() => restoreRevision(selectedRevision.id)}
+                disabled={restoringRevisionId === selectedRevision.id || adoptingRevisionId === selectedRevision.id}
+                onClick={() => {
+                  if (isChapterRevisionCandidate(selectedRevision.source)) {
+                    void adoptRevision(selectedRevision.id);
+                  } else {
+                    void restoreRevision(selectedRevision.id);
+                  }
+                }}
                 type="button"
               >
-                {restoringRevisionId === selectedRevision.id ? "回滚中" : "回滚"}
+                {adoptingRevisionId === selectedRevision.id
+                  ? "采纳中"
+                  : restoringRevisionId === selectedRevision.id
+                    ? "回滚中"
+                    : isChapterRevisionCandidate(selectedRevision.source)
+                      ? "采纳候选"
+                      : "回滚"}
               </button>
             </div>
             <pre className="mt-3 max-h-56 overflow-auto whitespace-pre-wrap rounded-md bg-slate-50 p-3 text-xs leading-5 text-slate-700">

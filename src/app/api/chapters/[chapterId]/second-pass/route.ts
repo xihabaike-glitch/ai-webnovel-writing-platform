@@ -39,6 +39,7 @@ export async function POST(request: Request, { params }: Params) {
     return NextResponse.json({
       task: result.task,
       chapter: result.chapter,
+      candidateRevision: result.candidateRevision,
       content: result.content,
       activeProvider: result.activeProvider,
       secondPassAudit: result.secondPassAudit,

@@ -673,6 +673,51 @@ test("buildProjectControlDashboard", async (t) => {
     assert.ok(dashboard.aiPipelineControlPlan.nextAction.includes("还剩 2 项"));
   });
 
+  await t.test("enables AI pipeline recheck after every repair checklist item is complete", () => {
+    const dashboard = buildProjectControlDashboard({
+      project,
+      platform: getPlatformProfile("fanqie"),
+      chapters: [chapter],
+      outlineNodes: [],
+      characters: [],
+      worldEntries: [],
+      foreshadows: [],
+      plotThreads: [],
+      aiTasks: [],
+      gateActionAudits: [
+        {
+          receiptId: "ai-plan-complete",
+          actionId: "ai-pipeline-control:demo-project",
+          label: "批量打法修复清单",
+          detail: "三轮稳住打法：成功率 0%，质量 68，失败 2。",
+          href: "/projects/demo-project#ai-pipeline",
+          status: "succeeded",
+          message: "已生成批量打法修复清单。",
+          executionType: "control_action",
+          succeededCount: 3,
+          failedCount: 0,
+          payload: JSON.stringify({
+            aiPipelineControlPlan: {
+              status: "repair",
+              items: [
+                { id: "stop-scale", label: "停用三轮稳住打法继续放量", completed: true },
+                { id: "review-failures", label: "复盘 2 个失败任务的错误原因", completed: true },
+                { id: "rerun-sample", label: "拆成 1 章小样本复验", completed: true },
+              ],
+            },
+          }),
+          createdAt: "2026-01-03T00:00:00.000Z",
+        },
+      ],
+      submissionChecklist: checklist,
+    });
+
+    assert.equal(dashboard.aiPipelineControlPlan.completedCount, 3);
+    assert.equal(dashboard.aiPipelineControlPlan.canRecheck, true);
+    assert.equal(dashboard.aiPipelineControlPlan.recheckLabel, "复检批量健康");
+    assert.ok(dashboard.aiPipelineControlPlan.nextAction.includes("清单已全部完成"));
+  });
+
   await t.test("summarizes model route health for the project control dashboard", () => {
     const dashboard = buildProjectControlDashboard({
       project: {

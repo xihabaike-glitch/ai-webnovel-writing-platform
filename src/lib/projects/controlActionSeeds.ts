@@ -181,6 +181,50 @@ export function updateAiPipelineControlPlanItem(payload: string, itemId: string,
   };
 }
 
+export function recheckAiPipelineControlPlan(payload: string, health: { status: string; label: string; detail: string }) {
+  let parsed: Record<string, unknown>;
+  try {
+    const root = JSON.parse(payload) as unknown;
+    const record = objectRecord(root);
+    if (!record) return null;
+    parsed = record;
+  } catch {
+    return null;
+  }
+
+  const plan = objectRecord(parsed.aiPipelineControlPlan);
+  const items = Array.isArray(plan?.items)
+    ? plan.items.map((item) => objectRecord(item)).filter((item): item is Record<string, unknown> => Boolean(item))
+    : [];
+  if (!plan || items.length === 0 || items.some((item) => item.completed !== true)) return null;
+
+  const status = health.status === "usable"
+    ? "small_batch_ready"
+    : health.status === "watch"
+      ? "sample_required"
+      : "sample_required";
+  const message = status === "small_batch_ready"
+    ? `复检完成：${health.label}。可以恢复小批生产，但继续审稿和二改留痕。`
+    : `复检完成：${health.label}。清单修完了，但批量健康还没站稳，只能恢复小样本复验。`;
+
+  parsed.aiPipelineControlPlan = {
+    ...plan,
+    recheck: {
+      status,
+      healthStatus: health.status,
+      healthLabel: health.label,
+      detail: health.detail,
+      checkedAt: new Date().toISOString(),
+    },
+  };
+
+  return {
+    payload: JSON.stringify(parsed),
+    status,
+    message,
+  };
+}
+
 function outlineSortWeight(type: string) {
   if (type === "opening") return 10;
   if (type === "trunk") return 20;

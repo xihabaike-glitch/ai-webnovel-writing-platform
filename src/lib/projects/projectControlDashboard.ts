@@ -271,6 +271,10 @@ export interface AiPipelineControlPlanSummary {
   completedCount: number;
   totalCount: number;
   items: AiPipelineControlPlanItem[];
+  canRecheck: boolean;
+  recheckLabel: string;
+  recheckStatus: "small_batch_ready" | "sample_required" | null;
+  recheckMessage: string | null;
   createdAt: string | null;
 }
 
@@ -1114,6 +1118,10 @@ function buildAiPipelineControlPlanSummary(audits: ControlBatchAudit[] = []): Ai
       completedCount: 0,
       totalCount: 0,
       items: [],
+      canRecheck: false,
+      recheckLabel: "复检批量健康",
+      recheckStatus: null,
+      recheckMessage: null,
       createdAt: null,
     };
   }
@@ -1129,6 +1137,11 @@ function buildAiPipelineControlPlanSummary(audits: ControlBatchAudit[] = []): Ai
   const status = plan?.status === "repair" || plan?.status === "watch" || plan?.status === "continue" || plan?.status === "seed_sample"
     ? plan.status
     : "repair";
+  const recheck = isRecord(plan?.recheck) ? plan.recheck : null;
+  const recheckStatus = recheck?.status === "small_batch_ready" || recheck?.status === "sample_required" ? recheck.status : null;
+  const recheckMessage = recheck
+    ? `${typeof recheck.healthLabel === "string" ? recheck.healthLabel : "复检"}：${typeof recheck.detail === "string" ? recheck.detail : latest.recheckDetail ?? latest.message}`
+    : null;
 
   return {
     hasPlan: true,
@@ -1145,6 +1158,10 @@ function buildAiPipelineControlPlanSummary(audits: ControlBatchAudit[] = []): Ai
     completedCount,
     totalCount,
     items,
+    canRecheck: totalCount > 0 && completedCount === totalCount,
+    recheckLabel: "复检批量健康",
+    recheckStatus,
+    recheckMessage,
     createdAt: new Date(latest.createdAt).toISOString(),
   };
 }

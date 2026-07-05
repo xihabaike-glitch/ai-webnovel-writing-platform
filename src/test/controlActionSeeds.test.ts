@@ -9,6 +9,7 @@ import {
   buildOutlineActionSeeds,
   buildStoryLineActionSeeds,
   buildWorldActionSeeds,
+  recheckAiPipelineControlPlan,
   updateAiPipelineControlPlanItem,
 } from "../lib/projects/controlActionSeeds.ts";
 import { buildControlAssetPrompt, buildControlAssetQualityGate, buildControlAssetRepairPrompt } from "../lib/projects/controlAssetGeneration.ts";
@@ -200,6 +201,46 @@ test("control action seeds", async (t) => {
     };
     assert.equal(parsed.aiPipelineControlPlan?.items?.find((item) => item.id === "item-2")?.completed, true);
     assert.equal(parsed.aiPipelineControlPlan?.items?.find((item) => item.id === "item-1")?.completed, false);
+  });
+
+  await t.test("records an AI pipeline recheck only after every checklist item is complete", () => {
+    const incomplete = recheckAiPipelineControlPlan(JSON.stringify({
+      aiPipelineControlPlan: {
+        status: "repair",
+        items: [
+          { id: "item-1", label: "停用失败打法", completed: true },
+          { id: "item-2", label: "复盘失败原因", completed: false },
+        ],
+      },
+    }), {
+      status: "blocked",
+      label: "先修打法",
+      detail: "还有失败样本。",
+    });
+
+    assert.equal(incomplete, null);
+
+    const rechecked = recheckAiPipelineControlPlan(JSON.stringify({
+      aiPipelineControlPlan: {
+        status: "repair",
+        items: [
+          { id: "item-1", label: "停用失败打法", completed: true },
+          { id: "item-2", label: "复盘失败原因", completed: true },
+        ],
+      },
+    }), {
+      status: "blocked",
+      label: "先修打法",
+      detail: "还有失败样本。",
+    });
+
+    assert.equal(rechecked?.status, "sample_required");
+    assert.ok(rechecked?.message.includes("只能恢复小样本复验"));
+    const parsed = JSON.parse(rechecked?.payload ?? "{}") as {
+      aiPipelineControlPlan?: { recheck?: { status?: string; healthLabel?: string } };
+    };
+    assert.equal(parsed.aiPipelineControlPlan?.recheck?.status, "sample_required");
+    assert.equal(parsed.aiPipelineControlPlan?.recheck?.healthLabel, "先修打法");
   });
 
   await t.test("builds strict JSON prompts for AI control assets", () => {

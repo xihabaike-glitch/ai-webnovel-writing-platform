@@ -11,8 +11,10 @@ import {
   buildOutlineActionSeeds,
   buildStoryLineActionSeeds,
   buildWorldActionSeeds,
+  recheckAiPipelineControlPlan,
   updateAiPipelineControlPlanItem,
 } from "@/lib/projects/controlActionSeeds";
+import { buildTaskQueueBatchHealthReview } from "@/lib/projects/taskQueueBatchHealth";
 
 interface Params {
   params: Promise<{ projectId: string }>;
@@ -24,6 +26,7 @@ interface ControlActionBody {
   receiptId?: string;
   itemId?: string;
   completed?: boolean;
+  recheck?: boolean;
 }
 
 function result(areaId: string, targetAnchor: string, created: string[], skipped?: string) {
@@ -80,6 +83,45 @@ export async function POST(request: Request, { params }: Params) {
   }
 
   const platform = getPlatformProfile(project.targetPlatform as PlatformId);
+
+  if (areaId === "ai-pipeline" && body.receiptId && body.recheck === true) {
+    const audit = project.gateActionAudits.find((item) => (
+      item.receiptId === body.receiptId
+      && item.executionType === "control_action"
+      && item.actionId.startsWith("ai-pipeline-control:")
+    ));
+    if (!audit) {
+      return NextResponse.json({ error: "没有找到这张批量修复清单。" }, { status: 404 });
+    }
+    const health = buildTaskQueueBatchHealthReview(project.gateActionAudits, 5);
+    const primary = health.items[0] ?? null;
+    const rechecked = recheckAiPipelineControlPlan(audit.payload, {
+      status: primary?.status ?? "watch",
+      label: primary?.label ?? "缺样本",
+      detail: primary?.nextAction ?? "还没有新的批量样本，先跑 1 章小样本复验。",
+    });
+    if (!rechecked) {
+      return NextResponse.json({ error: "清单还没全部完成，先别急着复检。" }, { status: 400 });
+    }
+    await prisma.gateActionAudit.update({
+      where: { receiptId: audit.receiptId },
+      data: {
+        payload: rechecked.payload,
+        message: rechecked.message,
+        recheckStatus: rechecked.status === "small_batch_ready" ? "ready" : "needs_action",
+        recheckLabel: rechecked.status === "small_batch_ready" ? "可恢复小批" : "先跑小样本",
+        recheckDetail: rechecked.message,
+        recheckAction: rechecked.status === "small_batch_ready" ? "回到批量生产" : "跑小样本复验",
+      },
+    });
+
+    return NextResponse.json({
+      areaId,
+      targetAnchor: "ai-pipeline",
+      message: rechecked.message,
+      recheckStatus: rechecked.status,
+    });
+  }
 
   if (areaId === "ai-pipeline" && body.receiptId && body.itemId && typeof body.completed === "boolean") {
     const audit = project.gateActionAudits.find((item) => (

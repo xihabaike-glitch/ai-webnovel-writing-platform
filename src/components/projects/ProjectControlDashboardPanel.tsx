@@ -115,6 +115,10 @@ interface AiPipelineControlPlanSummary {
   completedCount: number;
   totalCount: number;
   items: AiPipelineControlPlanItem[];
+  canRecheck: boolean;
+  recheckLabel: string;
+  recheckStatus: "small_batch_ready" | "sample_required" | null;
+  recheckMessage: string | null;
   createdAt: string | null;
 }
 
@@ -388,6 +392,7 @@ export function ProjectControlDashboardPanel({ projectId }: { projectId: string 
   const [runningFoundationAction, setRunningFoundationAction] = useState(false);
   const [runningBatchHealthAction, setRunningBatchHealthAction] = useState(false);
   const [runningChecklistItemId, setRunningChecklistItemId] = useState<string | null>(null);
+  const [runningBatchRecheck, setRunningBatchRecheck] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
   async function loadDashboard() {
@@ -565,6 +570,37 @@ export function ProjectControlDashboardPanel({ projectId }: { projectId: string 
       setMessage(caught instanceof Error ? caught.message : "更新批量修复清单失败。");
     } finally {
       setRunningChecklistItemId(null);
+    }
+  }
+
+  async function recheckBatchChecklist() {
+    if (!dashboard?.aiPipelineControlPlan.receiptId || !dashboard.aiPipelineControlPlan.canRecheck) return;
+    setRunningBatchRecheck(true);
+    setMessage(null);
+    try {
+      const response = await fetch(`/api/projects/${projectId}/control-actions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          areaId: "ai-pipeline",
+          mode: "seed",
+          receiptId: dashboard.aiPipelineControlPlan.receiptId,
+          recheck: true,
+        }),
+      });
+      const payload = await response.json() as {
+        message?: string;
+        error?: string;
+      };
+      if (!response.ok) {
+        throw new Error(payload.error ?? "复检批量健康失败。");
+      }
+      await loadDashboard();
+      setMessage(payload.message ?? "批量健康已复检。");
+    } catch (caught) {
+      setMessage(caught instanceof Error ? caught.message : "复检批量健康失败。");
+    } finally {
+      setRunningBatchRecheck(false);
     }
   }
 
@@ -991,6 +1027,15 @@ export function ProjectControlDashboardPanel({ projectId }: { projectId: string 
                     {dashboard.aiPipelineControlPlan.completedCount}/{dashboard.aiPipelineControlPlan.totalCount}
                   </div>
                 </div>
+                {dashboard.aiPipelineControlPlan.recheckMessage ? (
+                  <div className={`mt-3 rounded-md px-2 py-1 text-xs leading-5 ${
+                    dashboard.aiPipelineControlPlan.recheckStatus === "small_batch_ready"
+                      ? "bg-emerald-50 text-emerald-700"
+                      : "bg-amber-50 text-amber-700"
+                  }`}>
+                    {dashboard.aiPipelineControlPlan.recheckMessage}
+                  </div>
+                ) : null}
                 <div className="mt-3 grid gap-2">
                   {dashboard.aiPipelineControlPlan.items.map((item) => (
                     <label
@@ -1008,6 +1053,16 @@ export function ProjectControlDashboardPanel({ projectId }: { projectId: string 
                     </label>
                   ))}
                 </div>
+                {dashboard.aiPipelineControlPlan.canRecheck ? (
+                  <button
+                    className="mt-3 inline-flex w-fit items-center justify-center rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white hover:bg-slate-800 disabled:opacity-50"
+                    disabled={runningBatchRecheck}
+                    onClick={() => void recheckBatchChecklist()}
+                    type="button"
+                  >
+                    {runningBatchRecheck ? "复检中" : dashboard.aiPipelineControlPlan.recheckLabel}
+                  </button>
+                ) : null}
               </div>
             ) : null}
           </div>

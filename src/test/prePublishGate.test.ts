@@ -181,6 +181,8 @@ test("buildPrePublishGate", async (t) => {
     assert.equal(gate.firstThreeAdoptionClosure.pending, 2);
     assert.equal(gate.firstThreeAdoptionClosure.reviewPending, 1);
     assert.equal(gate.firstThreeAdoptionClosure.publishPending, 1);
+    assert.equal(gate.firstThreeAdoptionClosure.executableReviewCount, 1);
+    assert.equal(gate.firstThreeAdoptionClosure.executablePublishCheckCount, 1);
     assert.equal(gate.firstThreeAdoptionClosure.items[0].href, "/projects/project-ready/chapters/chapter-1#chapter-workflow");
     assert.deepEqual(gate.firstThreeAdoptionClosure.items[0].execution, { type: "chapter_review", chapterId: "chapter-1" });
     assert.deepEqual(gate.firstThreeAdoptionClosure.items[1].execution, { type: "publish_check", projectId: "project-ready", platformId: "fanqie" });

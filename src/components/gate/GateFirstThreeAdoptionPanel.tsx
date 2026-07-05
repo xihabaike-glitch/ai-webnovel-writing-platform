@@ -41,38 +41,86 @@ function executeLabel(item: PrePublishGateAdoptionFollowupItem) {
   return "刷新质检";
 }
 
+function runnableReviewItems(items: PrePublishGateAdoptionFollowupItem[]) {
+  const seen = new Set<string>();
+  return items.filter((item) => {
+    if (item.status === "pass" || item.execution?.type !== "chapter_review") return false;
+    if (seen.has(item.execution.chapterId)) return false;
+    seen.add(item.execution.chapterId);
+    return true;
+  });
+}
+
+function runnablePublishItems(items: PrePublishGateAdoptionFollowupItem[]) {
+  const seen = new Set<string>();
+  return items.filter((item) => {
+    if (item.status === "pass" || item.execution?.type !== "publish_check") return false;
+    const key = `${item.execution.projectId}:${item.execution.platformId ?? "default"}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
 export function GateFirstThreeAdoptionPanel({ closure }: { closure: PrePublishGateAdoptionClosure }) {
   const router = useRouter();
   const [runningId, setRunningId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const visibleItems = closure.items.slice(0, 6);
+  const reviewBatchItems = runnableReviewItems(closure.items);
+  const publishBatchItems = runnablePublishItems(closure.items);
+
+  async function executeFollowupRequest(item: PrePublishGateAdoptionFollowupItem) {
+    if (!item.execution) throw new Error("当前任务缺少执行配置。");
+    const response = await fetch(
+      item.execution.type === "chapter_review"
+        ? "/api/ai/tasks/chapter-review"
+        : `/api/projects/${item.execution.projectId}/platform-export`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(item.execution.type === "chapter_review"
+          ? { chapterId: item.execution.chapterId }
+          : { action: "snapshot", platformId: item.execution.platformId }),
+      },
+    );
+    const payload = (await response.json().catch(() => ({}))) as { message?: string; error?: string };
+    if (!response.ok) throw new Error(payload.error ?? "处理采纳后续失败。");
+    return payload.message ?? `${item.title} 已处理。`;
+  }
 
   async function runFollowup(item: PrePublishGateAdoptionFollowupItem) {
-    if (!item.execution) return;
     setRunningId(item.id);
     setMessage(null);
     try {
-      const response = await fetch(
-        item.execution.type === "chapter_review"
-          ? "/api/ai/tasks/chapter-review"
-          : `/api/projects/${item.execution.projectId}/platform-export`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(item.execution.type === "chapter_review"
-            ? { chapterId: item.execution.chapterId }
-            : { action: "snapshot", platformId: item.execution.platformId }),
-        },
-      );
-      const payload = (await response.json().catch(() => ({}))) as { message?: string; error?: string };
-      if (!response.ok) throw new Error(payload.error ?? "处理采纳后续失败。");
-      setMessage(payload.message ?? `${item.title} 已处理，正在刷新总闸门。`);
+      const result = await executeFollowupRequest(item);
+      setMessage(`${result} 正在刷新总闸门。`);
       router.refresh();
     } catch (caught) {
       setMessage(caught instanceof Error ? caught.message : "处理采纳后续失败。");
     } finally {
       setRunningId(null);
     }
+  }
+
+  async function runBatch(kind: "review" | "publish") {
+    const batchItems = kind === "review" ? reviewBatchItems : publishBatchItems;
+    if (!batchItems.length) return;
+    setRunningId(`batch:${kind}`);
+    setMessage(null);
+    let succeeded = 0;
+    let failed = 0;
+    for (const item of batchItems) {
+      try {
+        await executeFollowupRequest(item);
+        succeeded += 1;
+      } catch {
+        failed += 1;
+      }
+    }
+    setMessage(`${kind === "review" ? "批量重新审稿" : "批量刷新质检"}完成：成功 ${succeeded} 个，失败 ${failed} 个。`);
+    setRunningId(null);
+    router.refresh();
   }
 
   return (
@@ -97,6 +145,30 @@ export function GateFirstThreeAdoptionPanel({ closure }: { closure: PrePublishGa
           </div>
         </div>
       </div>
+      {reviewBatchItems.length || publishBatchItems.length ? (
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          {reviewBatchItems.length ? (
+            <button
+              className="rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white disabled:opacity-50"
+              disabled={runningId !== null}
+              onClick={() => void runBatch("review")}
+              type="button"
+            >
+              {runningId === "batch:review" ? "审稿中" : `批量重新审稿 ${reviewBatchItems.length} 章`}
+            </button>
+          ) : null}
+          {publishBatchItems.length ? (
+            <button
+              className="rounded-md border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+              disabled={runningId !== null}
+              onClick={() => void runBatch("publish")}
+              type="button"
+            >
+              {runningId === "batch:publish" ? "刷新中" : `批量刷新质检 ${publishBatchItems.length} 个`}
+            </button>
+          ) : null}
+        </div>
+      ) : null}
       {message ? <div className="mt-3 rounded-md bg-white/80 px-3 py-2 text-sm text-slate-700">{message}</div> : null}
 
       {visibleItems.length ? (
@@ -121,7 +193,7 @@ export function GateFirstThreeAdoptionPanel({ closure }: { closure: PrePublishGa
                   {label ? (
                     <button
                       className="rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white disabled:opacity-50"
-                      disabled={runningId === item.id}
+                      disabled={runningId !== null}
                       onClick={() => void runFollowup(item)}
                       type="button"
                     >

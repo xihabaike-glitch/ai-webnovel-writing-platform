@@ -238,6 +238,8 @@ export interface PrePublishGateAdoptionClosure {
   missingEvidence: number;
   reviewPending: number;
   publishPending: number;
+  executableReviewCount: number;
+  executablePublishCheckCount: number;
   items: PrePublishGateAdoptionFollowupItem[];
 }
 
@@ -409,6 +411,14 @@ function buildFirstThreeAdoptionClosure(projects: PrePublishGateProject[]): PreP
   const missingEvidenceItems = items.filter((item) => item.status === "warn");
   const reviewPending = pendingItems.filter((item) => item.type === "review").length;
   const publishPending = pendingItems.filter((item) => item.type === "publish_check").length;
+  const executableReviewChapterIds = new Set(items.flatMap((item) => (
+    item.status !== "pass" && item.execution?.type === "chapter_review" ? [item.execution.chapterId] : []
+  )));
+  const executablePublishTargets = new Set(items.flatMap((item) => (
+    item.status !== "pass" && item.execution?.type === "publish_check"
+      ? [`${item.execution.projectId}:${item.execution.platformId ?? "default"}`]
+      : []
+  )));
   const affectedProjects = new Set(followups.map(({ project }) => project.id)).size;
   const status: PrePublishGateItem["status"] = pendingItems.length > 0
     ? "block"
@@ -433,6 +443,8 @@ function buildFirstThreeAdoptionClosure(projects: PrePublishGateProject[]): PreP
     missingEvidence: missingEvidenceItems.length,
     reviewPending,
     publishPending,
+    executableReviewCount: executableReviewChapterIds.size,
+    executablePublishCheckCount: executablePublishTargets.size,
     items,
   };
 }

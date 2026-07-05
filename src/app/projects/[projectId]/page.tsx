@@ -78,13 +78,13 @@ export default async function ProjectPage({ params }: { params: Promise<{ projec
       },
       gateDispatchTasks: {
         where: {
-          state: "completed",
           OR: [
             { dispatchKey: { startsWith: "story-tree:" } },
             { dispatchKey: { startsWith: "story-tree-experience:" } },
+            { dispatchKey: { startsWith: "first-three-adoption:" } },
           ],
         },
-        orderBy: { completedAt: "desc" },
+        orderBy: { updatedAt: "desc" },
         take: 30,
       },
     },
@@ -96,7 +96,10 @@ export default async function ProjectPage({ params }: { params: Promise<{ projec
 
   const platform = getPlatformProfile(project.targetPlatform as PlatformId);
   const chaptersById = new Map(project.chapters.map((chapter) => [chapter.id, chapter]));
-  const persistedStoryTreeTasks = project.gateDispatchTasks.map(gatePlatformDispatchTaskFromRecord);
+  const persistedDispatchTasks = project.gateDispatchTasks.map(gatePlatformDispatchTaskFromRecord);
+  const persistedStoryTreeTasks = persistedDispatchTasks.filter((task) => (
+    task.dispatchKey.startsWith("story-tree:") || task.dispatchKey.startsWith("story-tree-experience:")
+  ));
   const storyTreeExperience = buildStoryTreeExperienceGuide(persistedStoryTreeTasks);
   const storyTreeExperienceEffectDashboard = buildStoryTreeExperienceEffectDashboard(storyTreeExperience);
   const storyTreeExperienceReviewBacklog = buildStoryTreeExperienceReviewBacklog(persistedStoryTreeTasks);
@@ -372,6 +375,19 @@ export default async function ProjectPage({ params }: { params: Promise<{ projec
         createdAt: revision.createdAt,
       }))
     )),
+    gateDispatchTasks: persistedDispatchTasks.map((task) => ({
+      dispatchKey: task.dispatchKey,
+      stage: task.stage,
+      state: task.state,
+      title: task.title,
+      detail: task.detail,
+      actionLabel: task.actionLabel,
+      href: task.href,
+      evidence: task.evidence,
+      acceptanceCriteria: task.acceptanceCriteria,
+      completionEvidence: task.completionEvidence,
+      reviewLatestAt: task.reviewLatestAt,
+    })),
   });
 
   return (

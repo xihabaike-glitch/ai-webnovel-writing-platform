@@ -57,6 +57,11 @@ export interface TaskQueueProject {
     dispatchKey: string;
     state: string;
     completionEvidence: string;
+    stage?: string;
+    title?: string;
+    detail?: string;
+    actionLabel?: string;
+    href?: string;
   }>;
   publishSnapshots?: PublishPackageVersionItem[];
   submissionAssets?: PlatformSubmissionAssetInput[];
@@ -287,6 +292,41 @@ function latestPendingCandidates(project: TaskQueueProject) {
     .sort((left, right) => new Date(right.revision.createdAt).getTime() - new Date(left.revision.createdAt).getTime());
 }
 
+function firstThreeAdoptionFollowupQueueItems(input: {
+  project: TaskQueueProject;
+  projectHref: string;
+  platformName: string;
+  startTactic: ProjectStartTacticSummary | null;
+  riskLevel: FirstDayRiskLevel;
+  riskLabel: string;
+  riskNotice: string | null;
+  scaleGate: QueueScaleGate;
+}) {
+  return (input.project.gateDispatchTasks ?? [])
+    .filter((task) => task.dispatchKey.startsWith(`first-three-adoption:${input.project.id}:`) && task.state !== "completed")
+    .map((task): QueueItem => {
+      const isPublishCheck = task.dispatchKey.endsWith(":publish-check");
+      return item({
+        id: `${input.project.id}:adoption-followup:${task.dispatchKey}`,
+        projectId: input.project.id,
+        projectTitle: input.project.title,
+        platformName: input.platformName,
+        category: isPublishCheck ? "export" : "review",
+        chapterTitle: task.title ?? (isPublishCheck ? "采纳后发布质检" : "采纳后重新审稿"),
+        evidence: task.detail ?? (isPublishCheck
+          ? "前三章采纳后需要回发布质检，确认投稿包和新正文一致。"
+          : "前三章采纳后旧审稿已过期，需要重新审稿。"),
+        strategyBasis: input.startTactic,
+        riskLevel: input.riskLevel,
+        riskLabel: input.riskLabel,
+        riskNotice: input.riskNotice,
+        scaleGate: input.scaleGate,
+        actionLabel: task.actionLabel ?? (isPublishCheck ? "回发布质检" : "重新审稿"),
+        href: task.href ?? (isPublishCheck ? `${input.projectHref}#platform-export` : input.projectHref),
+      });
+    });
+}
+
 function isAutomatedQueueItem(entry: QueueItem) {
   return entry.category === "draft" || entry.category === "review" || entry.category === "second_pass";
 }
@@ -478,6 +518,17 @@ export function buildTaskQueueCenter(projects: TaskQueueProject[]): TaskQueueCen
       platformPublishMetrics: project.platformPublishMetrics ?? [],
     });
     const queueItems: QueueItem[] = [];
+
+    queueItems.push(...firstThreeAdoptionFollowupQueueItems({
+      project,
+      projectHref,
+      platformName: platform.name,
+      startTactic,
+      riskLevel: riskProfile.level,
+      riskLabel: riskProfile.label,
+      riskNotice,
+      scaleGate,
+    }));
 
     for (const candidate of latestPendingCandidates(project)) {
       queueItems.push(item({

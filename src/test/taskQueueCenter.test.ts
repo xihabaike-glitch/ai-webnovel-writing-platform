@@ -571,6 +571,46 @@ test("buildTaskQueueCenter", async (t) => {
     assert.ok(queue.recommendedNext?.handoffGuidance?.avoidRules.some((rule) => rule.includes("不要直接放量")));
   });
 
+  await t.test("surfaces first-three adoption follow-up dispatches in the queue", () => {
+    const queue = buildTaskQueueCenter([{
+      ...project,
+      gateDispatchTasks: [
+        ...firstDayCompleteDispatches(project.id),
+        {
+          dispatchKey: "first-three-adoption:project-1:chapter-review:revision-1:review",
+          stage: "start_first_three_review",
+          state: "assigned",
+          title: "第 2 章采纳后重新审稿",
+          detail: "前三章改写候选已经写入正文，旧审稿不能继续当发布通行证。",
+          actionLabel: "重新审稿",
+          href: "/projects/project-1/chapters/chapter-review#chapter-workflow",
+          completionEvidence: "",
+        },
+        {
+          dispatchKey: "first-three-adoption:project-1:chapter-review:revision-1:publish-check",
+          stage: "start_publish_finalize",
+          state: "queued",
+          title: "第 2 章采纳后发布质检",
+          detail: "重新审稿后回发布质检，确认投稿包和新正文一致。",
+          actionLabel: "回发布质检",
+          href: "/projects/project-1#platform-export",
+          completionEvidence: "",
+        },
+      ],
+    }]);
+    const reviewFollowup = queue.items.find((item) => item.id.includes(":revision-1:review"));
+    const publishFollowup = queue.items.find((item) => item.id.includes(":revision-1:publish-check"));
+
+    assert.equal(reviewFollowup?.category, "review");
+    assert.equal(reviewFollowup?.actionLabel, "重新审稿");
+    assert.equal(reviewFollowup?.href, "/projects/project-1/chapters/chapter-review#chapter-workflow");
+    assert.equal(publishFollowup?.category, "export");
+    assert.equal(publishFollowup?.actionLabel, "回发布质检");
+    assert.equal(publishFollowup?.href, "/projects/project-1#platform-export");
+    assert.ok(queue.overview.reviewReady >= 1);
+    assert.ok(queue.overview.exportReady >= 1);
+  });
+
   await t.test("blocks risky first drafts behind recovery validation", () => {
     const blockedProject: TaskQueueProject = {
       ...project,

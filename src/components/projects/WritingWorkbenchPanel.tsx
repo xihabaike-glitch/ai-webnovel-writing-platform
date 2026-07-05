@@ -96,6 +96,35 @@ export function WritingWorkbenchPanel({ workbench }: { workbench: WritingWorkben
         </div>
       ) : null}
 
+      {workbench.firstThreeAdoption.followupChain.length ? (
+        <div className="mt-4 rounded-md border border-emerald-200 bg-emerald-50 p-3">
+          <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <div className="text-sm font-medium text-emerald-950">前三章采纳后续链路</div>
+              <p className="mt-1 text-xs leading-5 text-emerald-800">采纳后的新正文必须重新审稿，再回发布质检，别拿旧判断给新稿放行。</p>
+            </div>
+            <span className="w-fit rounded-md bg-white/80 px-2 py-1 text-xs font-medium text-emerald-800">
+              {workbench.firstThreeAdoption.followupChain.length} 个后续任务
+            </span>
+          </div>
+          <div className="mt-3 grid gap-2 md:grid-cols-2">
+            {workbench.firstThreeAdoption.followupChain.map((step) => (
+              <Link className="rounded-md bg-white/80 p-3 text-sm hover:bg-white" href={step.href} key={step.id}>
+                <div className="flex items-center justify-between gap-2">
+                  <div className="font-medium text-slate-950">{step.label}</div>
+                  <span className={`rounded-md border px-2 py-1 text-xs ${statusClass(step.status)}`}>
+                    {statusLabel(step.status)}
+                  </span>
+                </div>
+                <div className="mt-1 text-xs text-slate-500">{step.title}</div>
+                <p className="mt-2 line-clamp-2 text-xs leading-5 text-slate-600">{step.detail}</p>
+                <div className="mt-2 text-xs font-medium text-emerald-900">{step.actionLabel}</div>
+              </Link>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
       {generalPendingCandidates.length ? (
         <div className="mt-4 rounded-md border border-amber-200 bg-amber-50 p-3">
           <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">

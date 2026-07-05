@@ -104,10 +104,20 @@ export async function POST(request: Request) {
           },
         },
         gateDispatchTasks: {
-          where: { dispatchKey: { startsWith: "first-day:" } },
+          where: {
+            OR: [
+              { dispatchKey: { startsWith: "first-day:" } },
+              { dispatchKey: { startsWith: "first-three-adoption:" } },
+            ],
+          },
           select: {
             dispatchKey: true,
+            stage: true,
             state: true,
+            title: true,
+            detail: true,
+            actionLabel: true,
+            href: true,
             completionEvidence: true,
           },
         },

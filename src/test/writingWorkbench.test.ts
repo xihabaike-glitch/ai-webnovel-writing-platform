@@ -287,6 +287,34 @@ test("buildWritingWorkbench", async (t) => {
       outlineNodes: [],
       characters: [],
       worldEntries: [],
+      gateDispatchTasks: [
+        {
+          dispatchKey: "first-three-adoption:p-candidate:candidate-chapter:latest-candidate:review",
+          stage: "start_first_three_review",
+          state: "assigned",
+          title: "第 1 章采纳后重新审稿",
+          detail: "新正文需要重新审稿。",
+          actionLabel: "重新审稿",
+          href: "/projects/p-candidate/chapters/candidate-chapter#chapter-workflow",
+          evidence: ["采纳版本：latest-candidate"],
+          acceptanceCriteria: ["新正文已完成章节审稿"],
+          completionEvidence: "",
+          reviewLatestAt: "2026-07-03T03:00:00.000Z",
+        },
+        {
+          dispatchKey: "first-three-adoption:p-candidate:candidate-chapter:latest-candidate:publish-check",
+          stage: "start_publish_finalize",
+          state: "queued",
+          title: "第 1 章采纳后发布质检",
+          detail: "审稿后回发布质检。",
+          actionLabel: "回发布质检",
+          href: "/projects/p-candidate#platform-export",
+          evidence: ["采纳版本：latest-candidate"],
+          acceptanceCriteria: ["发布包质检已刷新"],
+          completionEvidence: "",
+          reviewLatestAt: "2026-07-03T03:01:00.000Z",
+        },
+      ],
       aiTasks: [],
     };
     const workbench = buildWritingWorkbench({
@@ -325,6 +353,9 @@ test("buildWritingWorkbench", async (t) => {
     assert.equal(workbench.firstThreeAdoption.pendingCount, 1);
     assert.equal(workbench.firstThreeAdoption.actionLabel, "进入采纳");
     assert.equal(workbench.firstThreeAdoption.href, "/projects/p-candidate/chapters/candidate-chapter#chapter-revisions");
+    assert.deepEqual(workbench.firstThreeAdoption.followupChain.map((step) => step.label), ["重新审稿", "发布质检"]);
+    assert.equal(workbench.firstThreeAdoption.followupChain[0].status, "warn");
+    assert.equal(workbench.firstThreeAdoption.followupChain[1].status, "fail");
     assert.equal(workbench.heroAction.label, "采纳前三章");
     assert.ok(workbench.heroAction.reason.includes("采纳后正文才会真正更新"));
     assert.ok(workbench.chapterFocus.nextAction.includes("待确认"));

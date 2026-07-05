@@ -81,6 +81,20 @@ export interface WritingWorkbenchChapterRevision {
   createdAt: Date | string;
 }
 
+export interface WritingWorkbenchDispatchTask {
+  dispatchKey: string;
+  stage: string;
+  state: string;
+  title: string;
+  detail: string;
+  actionLabel: string;
+  href: string;
+  evidence: string[];
+  acceptanceCriteria: string[];
+  completionEvidence: string;
+  reviewLatestAt: Date | string;
+}
+
 export interface WritingWorkbenchInput {
   project: WritingWorkbenchProject;
   chapters: WritingWorkbenchChapter[];
@@ -91,6 +105,7 @@ export interface WritingWorkbenchInput {
   plotThreads?: ProjectContextPlotThread[];
   aiTasks: WritingWorkbenchAiTask[];
   chapterRevisions?: WritingWorkbenchChapterRevision[];
+  gateDispatchTasks?: WritingWorkbenchDispatchTask[];
 }
 
 export interface WritingWorkbenchTreeBlock {
@@ -192,6 +207,18 @@ export interface WritingWorkbenchFirstThreeAdoption {
   href: string;
   actionLabel: string;
   candidates: WritingWorkbenchPendingCandidate[];
+  followupChain: WritingWorkbenchAdoptionFollowupStep[];
+}
+
+export interface WritingWorkbenchAdoptionFollowupStep {
+  id: string;
+  label: string;
+  title: string;
+  status: WorkbenchStatus;
+  state: string;
+  detail: string;
+  actionLabel: string;
+  href: string;
 }
 
 export interface WritingWorkbenchQuickFix {
@@ -519,6 +546,46 @@ function buildPendingCandidates(input: WritingWorkbenchInput): WritingWorkbenchP
     .slice(0, 5);
 }
 
+function followupStepLabel(task: WritingWorkbenchDispatchTask) {
+  if (task.dispatchKey.endsWith(":review")) return "重新审稿";
+  if (task.dispatchKey.endsWith(":publish-check")) return "发布质检";
+  return task.actionLabel || task.title;
+}
+
+function followupStepStatus(task: WritingWorkbenchDispatchTask): WorkbenchStatus {
+  if (task.state === "completed") return "pass";
+  if (task.state === "assigned") return "warn";
+  return "fail";
+}
+
+function buildFirstThreeAdoptionFollowupChain(input: WritingWorkbenchInput): WritingWorkbenchAdoptionFollowupStep[] {
+  const order = new Map([
+    [":review", 0],
+    [":publish-check", 1],
+  ]);
+  return (input.gateDispatchTasks ?? [])
+    .filter((task) => task.dispatchKey.startsWith(`first-three-adoption:${input.project.id}:`))
+    .sort((left, right) => {
+      const leftOrder = [...order.entries()].find(([suffix]) => left.dispatchKey.endsWith(suffix))?.[1] ?? 99;
+      const rightOrder = [...order.entries()].find(([suffix]) => right.dispatchKey.endsWith(suffix))?.[1] ?? 99;
+      if (leftOrder !== rightOrder) return leftOrder - rightOrder;
+      return new Date(right.reviewLatestAt).getTime() - new Date(left.reviewLatestAt).getTime();
+    })
+    .map((task): WritingWorkbenchAdoptionFollowupStep => ({
+      id: task.dispatchKey,
+      label: followupStepLabel(task),
+      title: task.title,
+      status: followupStepStatus(task),
+      state: task.state,
+      detail: task.state === "completed" && task.completionEvidence
+        ? task.completionEvidence
+        : task.detail,
+      actionLabel: task.actionLabel,
+      href: task.href,
+    }))
+    .slice(0, 4);
+}
+
 function buildFirstThreeAdoption(
   input: WritingWorkbenchInput,
   pendingCandidates: WritingWorkbenchPendingCandidate[],
@@ -527,6 +594,7 @@ function buildFirstThreeAdoption(
     .filter((candidate) => candidate.source === "first_three_rewrite_candidate" && candidate.chapterOrder >= 1 && candidate.chapterOrder <= 3)
     .sort((left, right) => left.chapterOrder - right.chapterOrder);
   const href = candidates[0]?.href ?? `/projects/${input.project.id}#first-three-rewrite`;
+  const followupChain = buildFirstThreeAdoptionFollowupChain(input);
 
   if (candidates.length > 0) {
     return {
@@ -538,6 +606,7 @@ function buildFirstThreeAdoption(
       href,
       actionLabel: "进入采纳",
       candidates,
+      followupChain,
     };
   }
 
@@ -552,6 +621,7 @@ function buildFirstThreeAdoption(
       href: `/projects/${input.project.id}#first-three-rewrite`,
       actionLabel: "查看前三章",
       candidates: [],
+      followupChain,
     };
   }
 
@@ -564,6 +634,7 @@ function buildFirstThreeAdoption(
     href: `/projects/${input.project.id}#first-three-rewrite`,
     actionLabel: "生成前三章",
     candidates: [],
+    followupChain,
   };
 }
 

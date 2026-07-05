@@ -183,6 +183,11 @@ test("buildPrePublishGate", async (t) => {
     assert.equal(gate.firstThreeAdoptionClosure.publishPending, 1);
     assert.equal(gate.firstThreeAdoptionClosure.executableReviewCount, 1);
     assert.equal(gate.firstThreeAdoptionClosure.executablePublishCheckCount, 1);
+    assert.equal(gate.firstThreeAdoptionClosure.repairQueue.length, 2);
+    assert.equal(gate.firstThreeAdoptionClosure.repairQueue[0].followupItemId, "first-three-adoption:project-ready:chapter-1:revision-1:review");
+    assert.equal(gate.firstThreeAdoptionClosure.repairQueue[0].actionLabel, "重新审稿");
+    assert.ok(gate.firstThreeAdoptionClosure.repairQueue[0].detail.includes("旧审稿不能继续当发布通行证"));
+    assert.equal(gate.firstThreeAdoptionClosure.repairQueue[1].actionLabel, "回发布质检");
     assert.equal(gate.firstThreeAdoptionClosure.items[0].href, "/projects/project-ready/chapters/chapter-1#chapter-workflow");
     assert.deepEqual(gate.firstThreeAdoptionClosure.items[0].execution, { type: "chapter_review", chapterId: "chapter-1" });
     assert.deepEqual(gate.firstThreeAdoptionClosure.items[1].execution, { type: "publish_check", projectId: "project-ready", platformId: "fanqie" });
@@ -199,6 +204,7 @@ test("buildPrePublishGate", async (t) => {
     assert.equal(adoptionItem?.status, "block");
     assert.ok(adoptionItem?.detail.includes("正文变更后不能沿用旧审稿"));
     assert.ok(gate.priorityActions.some((action) => action.id.includes(":review") && action.label === "重新审稿"));
+    assert.equal(gate.priorityActions[0].id, "adoption-followup:first-three-adoption:project-ready:chapter-1:revision-1:review");
     assert.equal(gate.releaseAction?.label, "先解除阻塞：重新审稿");
   });
 
@@ -228,6 +234,7 @@ test("buildPrePublishGate", async (t) => {
     assert.equal(gate.status, "ready");
     assert.equal(gate.firstThreeAdoptionClosure.status, "pass");
     assert.equal(gate.firstThreeAdoptionClosure.completed, 2);
+    assert.equal(gate.firstThreeAdoptionClosure.repairQueue.length, 0);
     assert.equal(gate.firstThreeAdoptionClosure.items[1].evidence.includes("发布质检已刷新"), true);
     assert.deepEqual(gate.firstThreeAdoptionClosure.timelines[0].steps.map((step) => step.status), ["pass", "pass", "pass", "pass"]);
     assert.equal(gate.firstThreeAdoptionClosure.timelines[0].completedSteps, 4);

@@ -38,6 +38,11 @@ function statusTone(status: PrePublishGateAdoptionFollowupItem["status"]) {
   return "bg-rose-100 text-rose-800";
 }
 
+function repairTone(status: PrePublishGateAdoptionFollowupItem["status"]) {
+  if (status === "warn") return "border-amber-200 bg-amber-50 text-amber-800";
+  return "border-rose-200 bg-rose-50 text-rose-800";
+}
+
 function statusText(status: PrePublishGateAdoptionFollowupItem["status"]) {
   if (status === "pass") return "已完成";
   if (status === "warn") return "缺证据";
@@ -127,6 +132,7 @@ export function GateFirstThreeAdoptionPanel({ closure }: { closure: PrePublishGa
   const itemsById = new Map(closure.items.map((item) => [item.id, item]));
   const reviewBatchItems = runnableReviewItems(closure.items);
   const publishBatchItems = runnablePublishItems(closure.items);
+  const visibleRepairQueue = closure.repairQueue.slice(0, 4);
 
   useEffect(() => {
     setFollowupResults((current) => {
@@ -347,6 +353,37 @@ export function GateFirstThreeAdoptionPanel({ closure }: { closure: PrePublishGa
                 <div className="font-medium">{result.status === "succeeded" ? "成功" : "失败"} · {result.title}</div>
                 <div className="mt-1 opacity-80">{result.message ?? result.label}</div>
               </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
+      {visibleRepairQueue.length ? (
+        <div className="mt-4 rounded-md border border-white/70 bg-white/80 p-3 text-sm">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <div className="font-medium text-slate-950">采纳失败修复队列</div>
+              <p className="mt-1 text-xs leading-5 text-slate-600">按发布风险排序，先处理旧审稿失效，再补发布包质检和验收证据。</p>
+            </div>
+            <span className="rounded-md bg-slate-100 px-2 py-1 text-xs font-medium text-slate-600">
+              {closure.repairQueue.length} 项
+            </span>
+          </div>
+          <div className="mt-3 grid gap-2 lg:grid-cols-2">
+            {visibleRepairQueue.map((item) => (
+              <Link
+                className={`rounded-md border p-3 transition hover:-translate-y-0.5 hover:shadow-sm ${repairTone(item.status)}`}
+                href={item.href}
+                key={item.id}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-medium">{item.label} · {item.projectTitle}</span>
+                  <span className="text-xs">P{item.priorityScore}</span>
+                </div>
+                <div className="mt-1 text-xs font-medium opacity-90">{item.title}</div>
+                <p className="mt-2 line-clamp-2 text-xs leading-5 opacity-80">{item.detail}</p>
+                <div className="mt-3 text-xs font-medium">{item.actionLabel}</div>
+              </Link>
             ))}
           </div>
         </div>

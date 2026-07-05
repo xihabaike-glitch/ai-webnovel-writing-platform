@@ -217,6 +217,21 @@ export interface PrePublishGateAdoptionFollowupItem {
   execution: PrePublishGateAdoptionFollowupExecution | null;
 }
 
+export interface PrePublishGateAdoptionRepairItem {
+  id: string;
+  followupItemId: string;
+  projectId: string;
+  projectTitle: string;
+  type: PrePublishGateAdoptionFollowupItem["type"];
+  status: PrePublishGateItem["status"];
+  priorityScore: number;
+  label: string;
+  title: string;
+  detail: string;
+  actionLabel: string;
+  href: string;
+}
+
 export type PrePublishGateAdoptionFollowupExecution =
   | {
     type: "chapter_review";
@@ -272,6 +287,7 @@ export interface PrePublishGateAdoptionClosure {
   publishPending: number;
   executableReviewCount: number;
   executablePublishCheckCount: number;
+  repairQueue: PrePublishGateAdoptionRepairItem[];
   items: PrePublishGateAdoptionFollowupItem[];
   timelines: PrePublishGateAdoptionTimeline[];
 }
@@ -534,6 +550,50 @@ function buildFirstThreeAdoptionTimelines(items: PrePublishGateAdoptionFollowupI
   });
 }
 
+function firstThreeAdoptionRepairDetail(item: PrePublishGateAdoptionFollowupItem) {
+  if (item.status === "warn") {
+    return "任务显示已完成，但验收证据不足。补齐审稿分、问题数、发布包版本或质检结果后，再刷新总闸门。";
+  }
+  if (item.type === "review") {
+    return "采纳后的正文还没有重新审稿，旧审稿不能继续当发布通行证。先生成新审稿，再决定是否二改。";
+  }
+  if (item.type === "publish_check") {
+    return "采纳后的前三章会改变标题、简介、标签和兑现判断。重新审稿后刷新发布质检，避免拿旧包装去投平台。";
+  }
+  return item.detail || "采纳后的后续任务没有闭合，发布前需要处理。";
+}
+
+function firstThreeAdoptionRepairPriority(item: PrePublishGateAdoptionFollowupItem) {
+  const statusWeight = item.status === "block" ? 20 : item.status === "warn" ? 10 : 0;
+  const typeWeight = item.type === "review" ? 78 : item.type === "publish_check" ? 70 : 58;
+  return statusWeight + typeWeight;
+}
+
+function buildFirstThreeAdoptionRepairQueue(items: PrePublishGateAdoptionFollowupItem[]): PrePublishGateAdoptionRepairItem[] {
+  const statusRank: Record<PrePublishGateItem["status"], number> = { block: 0, warn: 1, pass: 2 };
+  return items
+    .filter((item) => item.status !== "pass")
+    .map((item): PrePublishGateAdoptionRepairItem => ({
+      id: `adoption-repair:${item.id}`,
+      followupItemId: item.id,
+      projectId: item.projectId,
+      projectTitle: item.projectTitle,
+      type: item.type,
+      status: item.status,
+      priorityScore: firstThreeAdoptionRepairPriority(item),
+      label: item.status === "warn" ? "补证据" : item.label,
+      title: item.title,
+      detail: firstThreeAdoptionRepairDetail(item),
+      actionLabel: item.status === "warn" ? "补验收证据" : item.actionLabel,
+      href: item.href,
+    }))
+    .sort((left, right) => (
+      statusRank[left.status] - statusRank[right.status]
+      || right.priorityScore - left.priorityScore
+      || left.projectTitle.localeCompare(right.projectTitle)
+    ));
+}
+
 function buildFirstThreeAdoptionClosure(projects: PrePublishGateProject[]): PrePublishGateAdoptionClosure {
   const followups = firstThreeAdoptionFollowups(projects);
   const items = followups.map(({ project, task }): PrePublishGateAdoptionFollowupItem => {
@@ -589,6 +649,7 @@ function buildFirstThreeAdoptionClosure(projects: PrePublishGateProject[]): PreP
       : followups.length > 0
         ? `已验收 ${followups.length} 个采纳后续任务，重新审稿和发布质检都已回填。`
         : "当前没有未闭环的前三章采纳后续任务。";
+  const repairQueue = buildFirstThreeAdoptionRepairQueue(items);
 
   return {
     status,
@@ -602,6 +663,7 @@ function buildFirstThreeAdoptionClosure(projects: PrePublishGateProject[]): PreP
     publishPending,
     executableReviewCount: executableReviewChapterIds.size,
     executablePublishCheckCount: executablePublishTargets.size,
+    repairQueue,
     items,
     timelines: buildFirstThreeAdoptionTimelines(items),
   };
@@ -868,15 +930,14 @@ function uniqueActions(actions: PrePublishGateAction[]) {
   }).slice(0, 6);
 }
 
-function firstThreeAdoptionPriorityActions(projects: PrePublishGateProject[]) {
-  return firstThreeAdoptionFollowups(projects)
-    .filter(({ task }) => task.state !== "completed")
+function firstThreeAdoptionPriorityActions(closure: PrePublishGateAdoptionClosure) {
+  return closure.repairQueue
     .slice(0, 4)
-    .map(({ project, task }) => action(
-      `adoption-followup:${task.dispatchKey}`,
-      task.actionLabel ?? (task.dispatchKey.endsWith(":publish-check") ? "回发布质检" : "重新审稿"),
-      `${project.title} · ${task.title ?? "前三章采纳后续"} · ${task.detail ?? "采纳后的正文需要重新审稿并刷新发布质检。"}`,
-      firstThreeFollowupHref(project.id, task),
+    .map((item) => action(
+      `adoption-followup:${item.followupItemId}`,
+      item.actionLabel,
+      `${item.projectTitle} · ${item.title} · ${item.detail}`,
+      item.href,
       "repair",
     ));
 }
@@ -1234,7 +1295,7 @@ export function buildPrePublishGate(input: PrePublishGateInput): PrePublishGate 
       ? "有项目已经能投，但仍存在未处理提醒；先按优先动作走一轮。"
       : "当前发布会把未修复风险带到平台，先完成阻塞项再放行。";
   const priorityActions = uniqueActions([
-    ...firstThreeAdoptionPriorityActions(projects),
+    ...firstThreeAdoptionPriorityActions(firstThreeAdoptionClosure),
     ...projectStatuses
       .filter((project) => project.status !== "ready")
       .map((project) => action(

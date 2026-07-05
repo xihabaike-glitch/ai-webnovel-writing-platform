@@ -8,6 +8,7 @@ import {
   buildRouteConfirmationRecheckSampleDispatch,
   buildRouteConfirmationRecheckSamplePlan,
 } from "@/lib/model-gateway/routeConfirmation";
+import { buildFirstDayRouteFocusNotice } from "@/lib/model-gateway/modelSettingsFocus";
 import type {
   RouteConfirmationGovernanceStatusSummary,
   RouteConfirmationOnboarding,
@@ -894,6 +895,11 @@ export function ModelProviderSettings({
   const focusedFirstDayRoute = isFirstDayRouteFocus
     ? firstDayRouteSummary.items.find((item) => item.taskType === firstDayFocusTaskType) ?? null
     : null;
+  const firstDayRouteFocusNotice = buildFirstDayRouteFocusNotice({
+    isFocused: isFirstDayRouteFocus,
+    projectId: firstDayReturnProjectId,
+    focusedItem: focusedFirstDayRoute,
+  });
 
   useEffect(() => {
     if (!isFirstDayRouteFocus) return;
@@ -1407,12 +1413,15 @@ export function ModelProviderSettings({
               <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-600">
                 首日按钮会依次用到总控资料、第一章初稿、第一章审稿和二改路线。这里先把关键路线露出来，避免执行时才发现模型不对。
               </p>
-              {isFirstDayRouteFocus ? (
+              {firstDayRouteFocusNotice ? (
                 <div className="mt-3 rounded-md bg-amber-50 px-3 py-2 text-sm leading-6 text-amber-800">
-                  {focusedFirstDayRoute
-                    ? `从首日工作流跳转而来：优先修复「${focusedFirstDayRoute.stage}」路线。`
-                    : "从首日工作流跳转而来：先检查下面四条关键路线。"}
-                  {firstDayReturnProjectId ? " 修好后可直接回到原作品继续执行。" : ""}
+                  <div className="font-medium">{firstDayRouteFocusNotice.headline}</div>
+                  <p className="mt-1">{firstDayRouteFocusNotice.detail}</p>
+                  <div className="mt-2 flex flex-wrap gap-2 text-xs">
+                    {firstDayRouteFocusNotice.badges.map((badge) => (
+                      <span className="rounded-md bg-white/80 px-2 py-1" key={badge}>{badge}</span>
+                    ))}
+                  </div>
                 </div>
               ) : null}
             </div>

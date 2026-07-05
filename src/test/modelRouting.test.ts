@@ -6,6 +6,7 @@ import {
   canExecuteFirstDayRouteWithAi,
 } from "../lib/model-gateway/firstDayExecutionRoute.ts";
 import { buildFirstDayRouteSummary } from "../lib/model-gateway/firstDayRouteSummary.ts";
+import { buildFirstDayRouteFocusNotice } from "../lib/model-gateway/modelSettingsFocus.ts";
 import { buildPresetRouteBlueprint } from "../lib/model-gateway/presetRouteBlueprint.ts";
 import {
   selectForcedModelProviderCandidate,
@@ -82,6 +83,38 @@ const disabledClaude = {
   enabled: false,
   encryptedApiKey: "key",
 };
+
+test("model settings first-day route focus notice", () => {
+  const hidden = buildFirstDayRouteFocusNotice({
+    isFocused: false,
+    projectId: "project-1",
+    focusedItem: null,
+  });
+  const targeted = buildFirstDayRouteFocusNotice({
+    isFocused: true,
+    projectId: "project-1",
+    focusedItem: {
+      stage: "第一章初稿",
+      status: "needs_route",
+      canApplyRecommendation: true,
+    },
+  });
+  const overview = buildFirstDayRouteFocusNotice({
+    isFocused: true,
+    projectId: null,
+    focusedItem: null,
+  });
+
+  assert.equal(hidden, null);
+  assert.equal(targeted?.headline, "首日路线修复入口");
+  assert.ok(targeted?.detail.includes("优先修复「第一章初稿」路线"));
+  assert.ok(targeted?.detail.includes("修好后可直接回到原作品继续执行"));
+  assert.deepEqual(targeted?.badges, ["来自首日执行保护", "优先：第一章初稿", "状态：缺路线", "可一键修复"]);
+  assert.equal(targeted?.returnHref, "/projects/project-1?firstDayRoute=repaired#first-day-workflow");
+  assert.ok(overview?.detail.includes("先检查四条关键路线"));
+  assert.deepEqual(overview?.badges, ["来自首日执行保护", "检查四条关键路线"]);
+  assert.equal(overview?.returnHref, null);
+});
 
 test("model task routing", async (t) => {
   await t.test("prefers the configured primary provider when usable", () => {

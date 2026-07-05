@@ -267,6 +267,17 @@ export interface GateKnowledgeFeedbackReceipt {
   createdAt: string;
 }
 
+export interface GateSubmissionCompletionEffectReview {
+  metricId: string;
+  receiptId: string;
+  platformId: string;
+  platformName: string;
+  status: "promising" | "watch" | "weak";
+  headline: string;
+  nextAction: string;
+  evidence: string[];
+}
+
 export interface GatePlatformEvidenceLoop {
   projectId: string;
   projectTitle: string;
@@ -6238,6 +6249,7 @@ export async function updatePersistedGateDispatchTaskState(
     task?: PersistedGatePlatformDispatchTask;
     followUpTasks?: PersistedGatePlatformDispatchTask[];
     knowledgeFeedbackReceipt?: GateKnowledgeFeedbackReceipt | null;
+    submissionEffectReview?: GateSubmissionCompletionEffectReview | null;
     evidenceLoopRecheck?: GateEvidenceLoopRecheck | null;
     storyTreeRecheck?: GateStoryTreeRecheck | null;
     error?: string;
@@ -6247,6 +6259,7 @@ export async function updatePersistedGateDispatchTaskState(
     task: payload.task,
     followUpTasks: payload.followUpTasks ?? [],
     knowledgeFeedbackReceipt: payload.knowledgeFeedbackReceipt ?? null,
+    submissionEffectReview: payload.submissionEffectReview ?? null,
     evidenceLoopRecheck: payload.evidenceLoopRecheck ?? null,
     storyTreeRecheck: payload.storyTreeRecheck ?? null,
   };

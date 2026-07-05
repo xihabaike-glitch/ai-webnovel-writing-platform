@@ -16,6 +16,7 @@ import { buildFirstDayFollowUpDispatch, buildFirstDayWorkflow } from "@/lib/proj
 import { validateFirstDayDispatchCompletionEvidence } from "@/lib/projects/firstDayWorkflowView";
 import { buildChapterProductionRecheckFollowUpTasks } from "@/lib/projects/chapterProductionRecheckFollowUp";
 import { buildProjectControlDashboard } from "@/lib/projects/projectControlDashboard";
+import { buildGatePublishEffectReceipt } from "@/lib/projects/gateActionReceipts";
 import type {
   GateEvidenceLoopRecheck,
   GateStoryTreeRecheck,
@@ -28,6 +29,7 @@ import { parsePublishSnapshotTags } from "@/lib/projects/platformPublishExport";
 import { buildProjectContextPack } from "@/lib/projects/projectContextPack";
 import { findProjectStartTacticSummary } from "@/lib/projects/projectStartTactics";
 import { buildSubmissionChecklist } from "@/lib/projects/submissionChecklist";
+import { buildSubmissionDecisionCompletionEffect } from "@/lib/projects/submissionDecisionCompletion";
 
 function text(value: unknown, fallback = "") {
   return typeof value === "string" ? value : fallback;
@@ -164,6 +166,136 @@ async function writeDispatchCompletionKnowledgeFeedback(task: Awaited<ReturnType
       createdAt: task.completedAt ?? new Date(),
     },
   });
+}
+
+async function writeSubmissionDecisionCompletionEffect(task: Awaited<ReturnType<typeof prisma.gateDispatchTask.update>>) {
+  const effect = buildSubmissionDecisionCompletionEffect({
+    projectId: task.projectId,
+    platformId: task.platformId,
+    platformName: task.platformName,
+    dispatchKey: task.dispatchKey,
+    stage: task.stage,
+    completionEvidence: task.completionEvidence,
+    completedAt: task.completedAt,
+  });
+  if (!effect) return null;
+
+  const existingMetric = await prisma.platformPublishMetric.findFirst({
+    where: {
+      projectId: effect.projectId,
+      platformId: effect.platformId,
+      notes: { contains: effect.dispatchKey },
+    },
+    orderBy: { createdAt: "desc" },
+  });
+  const metricData = {
+    platformName: effect.platformName,
+    views: effect.views,
+    clicks: effect.clicks,
+    favorites: effect.favorites,
+    follows: effect.follows,
+    comments: effect.comments,
+    paidReads: effect.paidReads,
+    editorFeedback: effect.editorFeedback,
+    contractStatus: effect.contractStatus,
+    publishUrl: effect.publishUrl,
+    notes: effect.notes,
+    snapshotDate: effect.snapshotDate,
+  };
+  const metric = existingMetric
+    ? await prisma.platformPublishMetric.update({
+        where: { id: existingMetric.id },
+        data: metricData,
+      })
+    : await prisma.platformPublishMetric.create({
+        data: {
+          projectId: effect.projectId,
+          platformId: effect.platformId,
+          ...metricData,
+        },
+      });
+  const receipt = buildGatePublishEffectReceipt({
+    projectId: effect.projectId,
+    platformId: effect.platformId,
+    platformName: effect.platformName,
+    metric: {
+      views: effect.views,
+      clicks: effect.clicks,
+      favorites: effect.favorites,
+      follows: effect.follows,
+      comments: effect.comments,
+      paidReads: effect.paidReads,
+      snapshotDate: effect.snapshotDate,
+    },
+    now: task.completedAt ?? new Date(),
+  });
+
+  await prisma.gateActionAudit.upsert({
+    where: { receiptId: receipt.id },
+    create: {
+      receiptId: receipt.id,
+      actionId: receipt.actionId,
+      projectId: effect.projectId,
+      platformId: receipt.platformId ?? effect.platformId,
+      platformName: receipt.platformName ?? effect.platformName,
+      label: receipt.label,
+      detail: receipt.detail,
+      href: receipt.href,
+      status: receipt.status,
+      message: `${receipt.message}${existingMetric ? " 已存在同派单效果记录，本次只刷新审计回执。" : ""}`,
+      executionType: receipt.executionType,
+      succeededCount: receipt.succeededCount,
+      failedCount: receipt.failedCount,
+      taskId: task.dispatchKey,
+      recheckStatus: receipt.recheck.status,
+      recheckLabel: receipt.recheck.label,
+      recheckDetail: receipt.recheck.detail,
+      recheckAction: receipt.recheck.actionLabel,
+      payload: JSON.stringify({
+        submissionDecisionCompletion: {
+          dispatchKey: task.dispatchKey,
+          review: effect.review,
+        },
+      }),
+      createdAt: new Date(receipt.createdAt),
+    },
+    update: {
+      projectId: effect.projectId,
+      platformId: receipt.platformId ?? effect.platformId,
+      platformName: receipt.platformName ?? effect.platformName,
+      label: receipt.label,
+      detail: receipt.detail,
+      href: receipt.href,
+      status: receipt.status,
+      message: `${receipt.message}${existingMetric ? " 已存在同派单效果记录，本次只刷新审计回执。" : ""}`,
+      executionType: receipt.executionType,
+      succeededCount: receipt.succeededCount,
+      failedCount: receipt.failedCount,
+      taskId: task.dispatchKey,
+      recheckStatus: receipt.recheck.status,
+      recheckLabel: receipt.recheck.label,
+      recheckDetail: receipt.recheck.detail,
+      recheckAction: receipt.recheck.actionLabel,
+      payload: JSON.stringify({
+        submissionDecisionCompletion: {
+          dispatchKey: task.dispatchKey,
+          review: effect.review,
+        },
+      }),
+      createdAt: new Date(receipt.createdAt),
+    },
+  });
+
+  return {
+    metricId: metric.id,
+    receiptId: receipt.id,
+    platformId: effect.platformId,
+    platformName: effect.platformName,
+    status: effect.review.status,
+    headline: effect.review.headline,
+    nextAction: effect.review.nextAction,
+    evidence: effect.review.evidence,
+  };
 }
 
 function baselineEvidenceLoopScore(task: Awaited<ReturnType<typeof prisma.gateDispatchTask.update>>) {
@@ -709,6 +841,9 @@ export async function PATCH(request: Request) {
   const knowledgeFeedbackReceipt = nextState === "completed"
     ? await writeDispatchCompletionKnowledgeFeedback(task)
     : null;
+  const submissionEffectReview = nextState === "completed"
+    ? await writeSubmissionDecisionCompletionEffect(task)
+    : null;
   const evidenceLoopRecheck = nextState === "completed"
     ? await buildEvidenceLoopRecheck(task)
     : null;
@@ -761,6 +896,7 @@ export async function PATCH(request: Request) {
       severity: knowledgeFeedbackReceipt.severity,
       createdAt: knowledgeFeedbackReceipt.createdAt.toISOString(),
     } : null,
+    submissionEffectReview,
     evidenceLoopRecheck,
     storyTreeRecheck,
   });

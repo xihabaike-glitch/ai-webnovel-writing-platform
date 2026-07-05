@@ -266,18 +266,23 @@ export function GateDispatchTaskCenter({
         });
         const recheckMessage = evidenceLoopRecheckMessage(updated);
         const storyTreeMessage = storyTreeRecheckMessage(updated);
+        const submissionEffectMessage = updated.submissionEffectReview
+          ? `已自动回写投稿效果：${updated.submissionEffectReview.headline}。下一步：${updated.submissionEffectReview.nextAction}`
+          : "";
         const firstDayUpdate = buildFirstDayDispatchUpdateSummary(updated);
         if (firstDayUpdate.visible) {
           setRouteActionMessage(`${firstDayUpdate.title}：${firstDayUpdate.detail} 下一步：${firstDayUpdate.actionLabel}。`);
           router.refresh();
         } else if (updated.followUpTasks.length) {
-          setRouteActionMessage(`已自动生成治理后复检派单：${updated.followUpTasks.map((item) => item.title).join("、")}${recheckMessage ? `；${recheckMessage}` : ""}${storyTreeMessage ? `；${storyTreeMessage}` : ""}`);
+          setRouteActionMessage(`已自动生成治理后复检派单：${updated.followUpTasks.map((item) => item.title).join("、")}${recheckMessage ? `；${recheckMessage}` : ""}${storyTreeMessage ? `；${storyTreeMessage}` : ""}${submissionEffectMessage ? `；${submissionEffectMessage}` : ""}`);
         } else if (storyTreeMessage && recheckMessage) {
-          setRouteActionMessage(`${storyTreeMessage}；${recheckMessage}`);
+          setRouteActionMessage(`${storyTreeMessage}；${recheckMessage}${submissionEffectMessage ? `；${submissionEffectMessage}` : ""}`);
         } else if (storyTreeMessage) {
-          setRouteActionMessage(storyTreeMessage);
+          setRouteActionMessage(`${storyTreeMessage}${submissionEffectMessage ? `；${submissionEffectMessage}` : ""}`);
         } else if (recheckMessage) {
-          setRouteActionMessage(recheckMessage);
+          setRouteActionMessage(`${recheckMessage}${submissionEffectMessage ? `；${submissionEffectMessage}` : ""}`);
+        } else if (submissionEffectMessage) {
+          setRouteActionMessage(submissionEffectMessage);
         } else if (updated.knowledgeFeedbackReceipt) {
           setRouteActionMessage(`已回灌到项目反哺证据：${updated.knowledgeFeedbackReceipt.platformName} · ${updated.knowledgeFeedbackReceipt.completedStepLabel}`);
         }

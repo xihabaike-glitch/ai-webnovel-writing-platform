@@ -695,6 +695,36 @@ test("buildTaskQueueCenter", async (t) => {
     assert.equal(recommendedQueueActionLabel(queue.recommendedNext), "下一步：补交接证据");
   });
 
+  await t.test("surfaces recovery tactic experience follow-up dispatches as queue work", () => {
+    const queue = buildTaskQueueCenter([{
+      ...project,
+      gateDispatchTasks: [
+        ...firstDayCompleteDispatches(project.id),
+        {
+          dispatchKey: "fanqie:tactic_experience_followup:usable-recovery-scale:2026-01-01",
+          stage: "scale_up",
+          state: "queued",
+          title: "番茄小说 恢复放量继续小样本",
+          detail: "这条恢复放量经验只允许小步复用，继续跑小样本验证前三章兑现、平台反馈和追读信号。",
+          actionLabel: "继续小样本",
+          href: "/gate#platform-tactic-experience",
+          completionEvidence: "",
+        },
+      ],
+    }]);
+    const followup = queue.items.find((item) => item.sourceType === "tactic_experience_followup");
+
+    assert.equal(queue.overview.tacticExperienceFollowups, 1);
+    assert.equal(followup?.category, "handoff");
+    assert.equal(followup?.sourceLabel, "打法闭环");
+    assert.ok(followup?.sourceDetail?.includes("恢复放量"));
+    assert.ok(followup?.evidence.includes("继续跑小样本"));
+    assert.equal(followup?.actionLabel, "继续小样本");
+    assert.equal(followup?.href, "/gate#platform-tactic-experience");
+    assert.equal(queue.recommendedNext?.sourceType, "tactic_experience_followup");
+    assert.equal(recommendedQueueActionLabel(queue.recommendedNext), "下一步：打法闭环 · 继续小样本");
+  });
+
   await t.test("allows production when first-day evidence includes handoff closure", () => {
     const queue = buildTaskQueueCenter([{
       ...project,

@@ -120,7 +120,7 @@ export interface QueueItem {
   platformName: string;
   category: "candidate" | "handoff" | "draft" | "review" | "second_pass" | "effect" | "export" | "blocked";
   blockerType: "chapter_card" | "publish_repair" | "export_version" | "risk_recovery" | "watch_scale_gate" | "first_day_gate" | null;
-  sourceType?: "first_day_handoff" | "first_three_adoption" | "export_version_recheck";
+  sourceType?: "first_day_handoff" | "first_three_adoption" | "tactic_experience_followup" | "export_version_recheck";
   sourceLabel?: string;
   sourceDetail?: string;
   label: string;
@@ -164,6 +164,7 @@ export interface TaskQueueCenter {
     watchCleared: number;
     firstDayHandoffs: number;
     firstThreeAdoptionFollowups: number;
+    tacticExperienceFollowups: number;
   };
   items: QueueItem[];
   recommendedNext: QueueItem | null;
@@ -195,6 +196,7 @@ function blockerPriority(blockerType: QueueItem["blockerType"]) {
 export function recommendedQueueActionLabel(entry: QueueItem | null) {
   if (!entry) return null;
   if (entry.sourceType === "first_three_adoption") return `下一步：采纳闭环 · ${entry.actionLabel}`;
+  if (entry.sourceType === "tactic_experience_followup") return `下一步：打法闭环 · ${entry.actionLabel}`;
   return `下一步：${entry.actionLabel}`;
 }
 
@@ -580,6 +582,43 @@ function firstDayExperienceHandoffQueueItems(input: {
     });
 }
 
+function tacticExperienceFollowupQueueItems(input: {
+  project: TaskQueueProject;
+  platformName: string;
+  startTactic: ProjectStartTacticSummary | null;
+  riskLevel: FirstDayRiskLevel;
+  riskLabel: string;
+  riskNotice: string | null;
+  scaleGate: QueueScaleGate;
+}) {
+  return (input.project.gateDispatchTasks ?? [])
+    .filter((task) => (
+      task.dispatchKey.includes(":tactic_experience_followup:")
+      && task.state !== "completed"
+    ))
+    .map((task): QueueItem => item({
+      id: `${input.project.id}:tactic-experience-followup:${task.dispatchKey}`,
+      projectId: input.project.id,
+      projectTitle: input.project.title,
+      platformName: input.platformName,
+      category: "handoff",
+      sourceType: "tactic_experience_followup",
+      sourceLabel: "打法闭环",
+      sourceDetail: task.detail
+        ? `总闸门经验卡派出的恢复放量后续动作：${task.detail}`
+        : "总闸门经验卡派出的恢复放量后续动作，先处理它，再把结论回流到平台打法库。",
+      chapterTitle: task.title ?? "恢复放量打法闭环",
+      evidence: task.detail ?? "恢复放量后续动作未完成，先补小样本、追读证据或打法重做结论。",
+      strategyBasis: input.startTactic,
+      riskLevel: input.riskLevel,
+      riskLabel: input.riskLabel,
+      riskNotice: input.riskNotice,
+      scaleGate: input.scaleGate,
+      actionLabel: task.actionLabel ?? "处理打法闭环",
+      href: task.href ?? "/gate#platform-tactic-experience",
+    }));
+}
+
 function isAutomatedQueueItem(entry: QueueItem) {
   return entry.category === "draft" || entry.category === "review" || entry.category === "second_pass";
 }
@@ -929,6 +968,16 @@ export function buildTaskQueueCenter(projects: TaskQueueProject[]): TaskQueueCen
     queueItems.push(...firstThreeAdoptionFollowupQueueItems({
       project,
       projectHref,
+      platformName: platform.name,
+      startTactic,
+      riskLevel: riskProfile.level,
+      riskLabel: riskProfile.label,
+      riskNotice,
+      scaleGate,
+    }));
+
+    queueItems.push(...tacticExperienceFollowupQueueItems({
+      project,
       platformName: platform.name,
       startTactic,
       riskLevel: riskProfile.level,
@@ -1306,6 +1355,7 @@ export function buildTaskQueueCenter(projects: TaskQueueProject[]): TaskQueueCen
       watchCleared: items.filter((entry) => entry.scaleGate === "cleared" && isAutomatedQueueItem(entry)).length,
       firstDayHandoffs: items.filter((entry) => entry.sourceType === "first_day_handoff").length,
       firstThreeAdoptionFollowups: items.filter((entry) => entry.sourceType === "first_three_adoption").length,
+      tacticExperienceFollowups: items.filter((entry) => entry.sourceType === "tactic_experience_followup").length,
     },
     items,
     recommendedNext: items.find((entry) => entry.category !== "blocked") ?? items[0] ?? null,

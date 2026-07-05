@@ -312,6 +312,7 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
   const batchTacticEffectReview = buildTaskQueueBatchHealthReview(recentRecommendedBatchAudits, 5);
   const unlockedDrafts = queue.items.filter((entry) => entry.category === "draft" && entry.scaleGate === "cleared");
   const firstDayHandoffItems = queue.items.filter((entry) => entry.sourceType === "first_day_handoff");
+  const tacticExperienceFollowupItems = queue.items.filter((entry) => entry.sourceType === "tactic_experience_followup");
   const modelRoutePreflightGate = executionPlan.canRun
     ? buildRecommendedBatchModelRouteGate({
       plan: executionPlan,
@@ -404,10 +405,42 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
           <div className="mt-1 text-2xl font-semibold">{queue.overview.firstDayHandoffs}</div>
         </div>
         <div className="rounded-md border border-slate-200 bg-white p-3">
+          <div className="text-xs text-slate-500">打法闭环</div>
+          <div className="mt-1 text-2xl font-semibold">{queue.overview.tacticExperienceFollowups}</div>
+        </div>
+        <div className="rounded-md border border-slate-200 bg-white p-3">
           <div className="text-xs text-slate-500">采纳闭环</div>
           <div className="mt-1 text-2xl font-semibold">{queue.overview.firstThreeAdoptionFollowups}</div>
         </div>
       </section>
+
+      {tacticExperienceFollowupItems.length > 0 ? (
+        <section className="mb-6 rounded-md border border-teal-200 bg-teal-50 p-4 text-teal-950">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <h2 className="font-medium">恢复放量打法闭环</h2>
+              <p className="mt-1 max-w-3xl text-sm leading-6">
+                这些卡来自总闸门的平台打法经验。先处理继续小样本、补追读证据或重做打法，再让结论回流到平台经验库。
+              </p>
+            </div>
+            <div className="w-fit rounded-md bg-white/80 px-3 py-2 text-sm font-medium">
+              {tacticExperienceFollowupItems.length} 个打法闭环待办
+            </div>
+          </div>
+          <div className="mt-3 grid gap-2 lg:grid-cols-3">
+            {tacticExperienceFollowupItems.slice(0, 6).map((entry) => (
+              <Link className="rounded-md bg-white/80 p-3 text-sm hover:bg-white" href={entry.href} key={entry.id}>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="rounded-md bg-teal-100 px-2 py-1 text-xs font-medium text-teal-800">{entry.actionLabel}</span>
+                  <span className="font-medium text-slate-950">{entry.chapterTitle}</span>
+                </div>
+                <div className="mt-2 text-slate-600">{entry.projectTitle} · {entry.platformName}</div>
+                <p className="mt-2 line-clamp-2 leading-6 text-slate-600">{entry.evidence}</p>
+              </Link>
+            ))}
+          </div>
+        </section>
+      ) : null}
 
       {firstDayHandoffItems.length > 0 ? (
         <section className="mb-6 rounded-md border border-cyan-200 bg-cyan-50 p-4 text-cyan-950">
@@ -938,6 +971,11 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
                       {entry.sourceLabel}
                     </span>
                   ) : null}
+                  {entry.sourceType === "tactic_experience_followup" ? (
+                    <span className="rounded-md bg-teal-50 px-2 py-1 text-xs font-medium text-teal-700">
+                      {entry.sourceLabel}
+                    </span>
+                  ) : null}
                   {entry.sourceType === "first_day_handoff" ? (
                     <span className="rounded-md bg-cyan-50 px-2 py-1 text-xs font-medium text-cyan-700">
                       {entry.sourceLabel}
@@ -963,6 +1001,11 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
                 ) : null}
                 {entry.sourceType === "first_day_handoff" && entry.sourceDetail ? (
                   <div className="mt-3 rounded-md border border-cyan-200 bg-cyan-50 px-3 py-2 text-xs leading-5 text-cyan-950">
+                    <span className="font-medium">{entry.sourceLabel}：</span>{entry.sourceDetail}
+                  </div>
+                ) : null}
+                {entry.sourceType === "tactic_experience_followup" && entry.sourceDetail ? (
+                  <div className="mt-3 rounded-md border border-teal-200 bg-teal-50 px-3 py-2 text-xs leading-5 text-teal-950">
                     <span className="font-medium">{entry.sourceLabel}：</span>{entry.sourceDetail}
                   </div>
                 ) : null}

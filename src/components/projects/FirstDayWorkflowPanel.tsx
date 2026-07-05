@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { buildFirstDayExecutionRouteBlockMessage, type FirstDayExecutionRouteStatus } from "@/lib/model-gateway/firstDayExecutionRoute";
 import { buildFirstDayDispatchUpdateSummary, buildFirstDayExecutionRiskNotice, buildFirstDayReceiptCompletionAction, buildFirstDayStepView, completeFirstDayDispatchStep } from "@/lib/projects/firstDayWorkflowView";
-import { persistGateDispatchTask, type GatePlatformGrowthDispatchItem } from "@/lib/projects/gateActionReceipts";
+import { persistGateDispatchTask, type GatePlatformGrowthDispatchItem, type PersistedGatePlatformDispatchTask } from "@/lib/projects/gateActionReceipts";
 
 interface FirstDayWorkflowStep {
   id: string;
@@ -339,6 +339,7 @@ export function FirstDayWorkflowPanel({ projectId }: { projectId: string }) {
   const [modelRoute, setModelRoute] = useState<FirstDayModelRouteStatus | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isDispatching, setIsDispatching] = useState(false);
+  const [isGeneratingHandoffDispatches, setIsGeneratingHandoffDispatches] = useState(false);
   const [isExecutingAi, setIsExecutingAi] = useState(false);
   const [isCompletingDispatch, setIsCompletingDispatch] = useState(false);
   const [completionEvidence, setCompletionEvidence] = useState("");
@@ -404,6 +405,31 @@ export function FirstDayWorkflowPanel({ projectId }: { projectId: string }) {
       showMessage(caught instanceof Error ? caught.message : "首日任务派单失败。");
     } finally {
       setIsDispatching(false);
+    }
+  }
+
+  async function generateExperienceHandoffDispatches() {
+    setIsGeneratingHandoffDispatches(true);
+    showMessage(null);
+    setExecutionReceipt(null);
+    try {
+      const response = await fetch(`/api/projects/${projectId}/start-handoff-dispatches`, {
+        method: "POST",
+      });
+      const payload = (await response.json().catch(() => null)) as {
+        package?: { label: string; title: string; nextAction: string };
+        tasks?: PersistedGatePlatformDispatchTask[];
+        error?: string;
+      } | null;
+      if (!response.ok || !payload?.package) {
+        throw new Error(payload?.error ?? "生成首日交接派单失败。");
+      }
+      await loadWorkflow();
+      showMessage(`${payload.package.nextAction} 本次已刷新 ${payload.tasks?.length ?? 0} 个派单。`);
+    } catch (caught) {
+      showMessage(caught instanceof Error ? caught.message : "生成首日交接派单失败。");
+    } finally {
+      setIsGeneratingHandoffDispatches(false);
     }
   }
 
@@ -539,14 +565,24 @@ export function FirstDayWorkflowPanel({ projectId }: { projectId: string }) {
           <h2 className="font-medium">首日工作流</h2>
           <p className="mt-1 text-sm text-slate-600">把新书从模板骨架推到第一章可审、可改、可投放的顺序任务板。</p>
         </div>
-        <button
-          className="rounded-md border border-slate-200 px-3 py-2 text-sm font-medium hover:bg-slate-50 disabled:opacity-50"
-          disabled={isLoading}
-          onClick={() => void loadWorkflow()}
-          type="button"
-        >
-          {isLoading ? "读取中" : "刷新工作流"}
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button
+            className="rounded-md border border-slate-200 px-3 py-2 text-sm font-medium hover:bg-slate-50 disabled:opacity-50"
+            disabled={isGeneratingHandoffDispatches || !workflow?.executionPackage.tacticFocus}
+            onClick={() => void generateExperienceHandoffDispatches()}
+            type="button"
+          >
+            {isGeneratingHandoffDispatches ? "生成中" : "生成交接派单"}
+          </button>
+          <button
+            className="rounded-md border border-slate-200 px-3 py-2 text-sm font-medium hover:bg-slate-50 disabled:opacity-50"
+            disabled={isLoading}
+            onClick={() => void loadWorkflow()}
+            type="button"
+          >
+            {isLoading ? "读取中" : "刷新工作流"}
+          </button>
+        </div>
       </div>
 
       {message ? (

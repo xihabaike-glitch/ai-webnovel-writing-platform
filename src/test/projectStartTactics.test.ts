@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { buildModelRouteConfirmationReceipt } from "../lib/model-gateway/routeConfirmation.ts";
 import { getPlatformProfile } from "../lib/platforms/platformProfiles.ts";
 import { getPlatformWritingStyle } from "../lib/platforms/writingStyleTemplates.ts";
+import { parseProjectStartExperienceHandoffDispatchRequest } from "../lib/projects/projectStartHandoffDispatchRequest.ts";
 import {
   buildGateActionReceipt,
   buildGateDispatchCompletionReceipt,
@@ -1445,6 +1446,47 @@ test("buildProjectStartTacticAdvice", async (t) => {
     assert.ok(handoffPackage.dispatches[2]?.acceptanceCriteria.some((item) => item.includes("首轮曝光")));
     assert.ok(handoffPackage.dispatches.every((item) => item.evidence.some((line) => line.includes("恢复放量"))));
     assert.ok(handoffPackage.nextAction.includes("派单中心"));
+  });
+
+  await t.test("parses only complete first-day handoff dispatch requests", () => {
+    const valid = parseProjectStartExperienceHandoffDispatchRequest({
+      handoff: {
+        status: "small_sample",
+        label: "恢复放量交接",
+        title: "番茄小说 恢复放量小样本交接",
+        detail: "历史打法可参考，但首日只跑小样本。",
+        selectedPlatformId: "fanqie",
+        selectedPlatformName: "番茄小说",
+        recommendedPlatformId: "fanqie",
+        recommendedPlatformName: "番茄小说",
+        recommendedTemplateId: "fanqie_system_reversal",
+        shouldSwitchTemplate: false,
+        firstDayActions: ["开头先跑恢复放量小样本。"],
+        avoidRules: ["未过小样本前不直接放量。"],
+        evidence: ["恢复放量：2 批稳定。"],
+      },
+    });
+    const invalid = parseProjectStartExperienceHandoffDispatchRequest({
+      handoff: {
+        status: "small_sample",
+        label: "恢复放量交接",
+        title: "番茄小说 恢复放量小样本交接",
+        detail: "缺少首日动作。",
+        selectedPlatformId: "fanqie",
+        selectedPlatformName: "番茄小说",
+        recommendedPlatformId: "fanqie",
+        recommendedPlatformName: "番茄小说",
+        recommendedTemplateId: null,
+        shouldSwitchTemplate: false,
+        firstDayActions: [],
+        avoidRules: ["未过小样本前不直接放量。"],
+        evidence: ["恢复放量：2 批稳定。"],
+      },
+    });
+
+    assert.equal(valid?.label, "恢复放量交接");
+    assert.equal(valid?.firstDayActions[0], "开头先跑恢复放量小样本。");
+    assert.equal(invalid, null);
   });
 
   await t.test("builds a focused recovery handoff panel only for recovery scale starts", () => {

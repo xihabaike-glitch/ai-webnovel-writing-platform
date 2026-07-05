@@ -88,6 +88,13 @@ test("buildProjectControlDashboard", async (t) => {
     assert.equal(dashboard.platformEvidenceLoop.status, "empty");
     assert.equal(dashboard.platformEvidenceLoop.score, 0);
     assert.equal(dashboard.platformEvidenceLoop.actionLabel, "启动证据闭环");
+    assert.equal(dashboard.storyFoundation.status, "blocked");
+    assert.equal(dashboard.storyFoundation.label, "先搭底座");
+    assert.equal(dashboard.storyFoundation.axes.length, 5);
+    assert.ok(dashboard.storyFoundation.headline.includes("传统写作底座"));
+    assert.ok(dashboard.storyFoundation.axes.some((axis) => axis.label === "大树骨架"));
+    assert.ok(dashboard.storyFoundation.axes.some((axis) => axis.label === "人物弧光"));
+    assert.ok(dashboard.storyFoundation.nextAction.length > 0);
     assert.equal(dashboard.areas.find((area) => area.id === "export")?.status, "blocked");
     assert.ok(dashboard.areas.find((area) => area.id === "export")?.nextAction.includes("先处理"));
     assert.equal(dashboard.priorityActions.length, 4);
@@ -311,6 +318,10 @@ test("buildProjectControlDashboard", async (t) => {
     assert.ok(dashboard.startDecision.evidence.some((item) => item.includes("复用交接")));
     assert.ok(dashboard.startDecision.evidence.some((item) => item.includes("推荐模板")));
     assert.ok(dashboard.startDecision.evidence.some((item) => item.includes("避坑边界")));
+    assert.ok(dashboard.storyFoundation.score >= 60);
+    assert.ok(["good", "watch"].includes(dashboard.storyFoundation.status));
+    assert.ok(dashboard.storyFoundation.axes.some((axis) => axis.id === "world" && axis.status === "good"));
+    assert.ok(dashboard.storyFoundation.axes.some((axis) => axis.id === "characters" && axis.score > 0));
     assert.equal(dashboard.areas.find((area) => area.id === "world")?.status, "good");
     assert.equal(dashboard.areas.find((area) => area.id === "export")?.status, "good");
   });

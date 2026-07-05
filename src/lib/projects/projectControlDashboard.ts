@@ -157,6 +157,27 @@ export interface ControlArea {
   generateLabel: string;
 }
 
+export interface StoryFoundationAxis {
+  id: string;
+  label: string;
+  score: number;
+  status: ControlArea["status"];
+  evidence: string;
+  nextAction: string;
+  targetAnchor: string;
+}
+
+export interface StoryFoundationSummary {
+  score: number;
+  status: ControlArea["status"];
+  label: string;
+  headline: string;
+  nextAction: string;
+  actionLabel: string;
+  targetAnchor: string;
+  axes: StoryFoundationAxis[];
+}
+
 export interface ControlPriorityAction {
   id: string;
   areaId: string;
@@ -193,6 +214,7 @@ export interface ProjectControlDashboard {
   platformEvidenceLoop: PlatformEvidenceLoopSummary;
   startTactic: ProjectStartTacticSummary | null;
   startDecision: ProjectStartDecision;
+  storyFoundation: StoryFoundationSummary;
   areas: ControlArea[];
   priorityActions: ControlPriorityAction[];
   criticalActions: string[];
@@ -348,6 +370,52 @@ function area(
     executeLabel,
     canGenerate,
     generateLabel,
+  };
+}
+
+function buildStoryFoundationSummary(areas: ControlArea[]): StoryFoundationSummary {
+  const axisMap = new Map(areas.map((item) => [item.id, item]));
+  const axisConfigs = [
+    { id: "outline", label: "大树骨架" },
+    { id: "characters", label: "人物弧光" },
+    { id: "story-lines", label: "主线支线" },
+    { id: "world", label: "土壤设定" },
+    { id: "production", label: "章节叶片" },
+  ];
+  const axes = axisConfigs
+    .map((config) => {
+      const source = axisMap.get(config.id);
+      if (!source) return null;
+      return {
+        id: config.id,
+        label: config.label,
+        score: source.score,
+        status: source.status,
+        evidence: source.evidence,
+        nextAction: source.nextAction,
+        targetAnchor: source.targetAnchor,
+      } satisfies StoryFoundationAxis;
+    })
+    .filter((item): item is StoryFoundationAxis => Boolean(item));
+  const score = clampScore(average(axes.map((item) => item.score)));
+  const status: ControlArea["status"] = score >= 80 ? "good" : score >= 55 ? "watch" : "blocked";
+  const weakest = [...axes].sort((left, right) => left.score - right.score || left.label.localeCompare(right.label))[0];
+  const label = status === "good" ? "底座可扩写" : status === "watch" ? "底座待加固" : "先搭底座";
+  const headline = status === "good"
+    ? "开头、结尾、主干、分支和土壤已能支撑持续连载。"
+    : status === "watch"
+      ? "故事大树已经有雏形，但还要先补最弱的一根承重枝。"
+      : "传统写作底座还没立住，先别急着让 AI 批量扩写。";
+
+  return {
+    score,
+    status,
+    label,
+    headline,
+    nextAction: weakest?.nextAction ?? "先补大纲、人物、主线和世界观的硬缺口。",
+    actionLabel: weakest?.label ? `补${weakest.label}` : "补写作底座",
+    targetAnchor: weakest?.targetAnchor ?? "outline-tree",
+    axes,
   };
 }
 
@@ -812,6 +880,7 @@ export function buildProjectControlDashboard(input: ProjectControlDashboardInput
       "platform-export",
     ),
   ];
+  const storyFoundation = buildStoryFoundationSummary(areas);
   const overallScore = clampScore(average(areas.map((item) => item.score)));
   const priorityActions = [...areas]
     .sort((left, right) => left.score - right.score || left.label.localeCompare(right.label))
@@ -847,6 +916,7 @@ export function buildProjectControlDashboard(input: ProjectControlDashboardInput
     platformEvidenceLoop,
     startTactic,
     startDecision: buildProjectStartDecision(startTactic),
+    storyFoundation,
     areas,
     priorityActions,
     criticalActions,

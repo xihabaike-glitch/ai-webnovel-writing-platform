@@ -3698,6 +3698,87 @@ test("buildGateActionReceipt", async (t) => {
     assert.ok(fanqieExperience?.reuseHint.includes("验收收口流程"));
   });
 
+  await t.test("feeds completed first-day handoffs into reusable platform tactic experience", () => {
+    function handoffTask(input: {
+      suffix: "opening" | "verification" | "platform-package";
+      stage: "start_opening_diagnostic" | "start_first_three_review" | "start_platform_package";
+      title: string;
+      completionEvidence: string;
+      completedAt: string;
+    }) {
+      return {
+        id: `first-day-handoff:project-1:${input.suffix}`,
+        databaseId: `dispatch-db-handoff-${input.suffix}`,
+        dispatchKey: `first-day-handoff:project-1:${input.suffix}`,
+        projectId: "project-1",
+        sourceReceiptId: null,
+        platformId: "fanqie",
+        platformName: "番茄小说",
+        stage: input.stage,
+        state: "completed" as const,
+        priorityScore: 90,
+        ownerRole: "主编",
+        title: input.title,
+        detail: "把平台打法库经验交接到新书第一天流程。",
+        dueLabel: "今天",
+        actionLabel: "查看交接",
+        href: "/projects/project-1#first-day-launch",
+        acceptanceCriteria: ["交接证据已写清", "下一步验收口径已明确"],
+        evidence: ["经验来源：番茄强钩子打法", "目标：新书第一天开局"],
+        completionEvidence: input.completionEvidence,
+        reviewLatestAt: input.completedAt,
+        assignedAt: "2026-01-01T00:00:00.000Z",
+        completedAt: input.completedAt,
+        createdAt: "2026-01-01T00:00:00.000Z",
+        updatedAt: input.completedAt,
+      };
+    }
+
+    const timeline = buildGatePlatformDecisionTimeline({
+      receipts: [],
+      tasks: [
+        handoffTask({
+          suffix: "opening",
+          stage: "start_opening_diagnostic",
+          title: "番茄小说 开头打法交接",
+          completionEvidence: "已锁定前三段钩子、读者承诺和第一章冲突升级。",
+          completedAt: "2026-01-01T01:00:00.000Z",
+        }),
+        handoffTask({
+          suffix: "verification",
+          stage: "start_first_three_review",
+          title: "番茄小说 验收口径交接",
+          completionEvidence: "已写清通过线、不可接受项和复查证据格式。",
+          completedAt: "2026-01-01T02:00:00.000Z",
+        }),
+        handoffTask({
+          suffix: "platform-package",
+          stage: "start_platform_package",
+          title: "番茄小说 平台包装回收",
+          completionEvidence: "已把避坑边界回收到标题、简介、标签和卖点包装。",
+          completedAt: "2026-01-01T03:00:00.000Z",
+        }),
+      ],
+      limit: 10,
+    });
+    const fanqieTimeline = timeline.items.find((item) => item.platformId === "fanqie");
+    const tacticLibrary = buildGatePlatformTacticExperienceLibrary(timeline, 10);
+    const fanqieExperience = tacticLibrary.items.find((item) => item.platformId === "fanqie");
+    const fanqieMarkdown = buildGatePlatformTacticExperienceMarkdown(fanqieExperience!);
+
+    assert.equal(fanqieTimeline?.status, "healthy");
+    assert.equal(fanqieTimeline?.label, "新书开局闭环");
+    assert.equal(fanqieTimeline?.events[0].label, "开书交接闭环");
+    assert.ok(fanqieTimeline?.events[0].detail.includes("已用于新书开局并闭环"));
+    assert.equal(fanqieExperience?.status, "usable");
+    assert.equal(fanqieExperience?.sourceLabel, "新书开局闭环");
+    assert.equal(fanqieExperience?.tactic, "新书开局闭环打法");
+    assert.ok(fanqieExperience?.reuseHint.includes("先锁开头钩子"));
+    assert.ok(fanqieExperience?.risk.includes("不能直接当成长线加码结论"));
+    assert.ok(fanqieMarkdown.includes("已用于新书开局并闭环"));
+    assert.ok(fanqieMarkdown.includes("闭环进度：3/3 段交接完成"));
+  });
+
   await t.test("flags overdue and today dispatch closeout items", () => {
     const baseDispatch = buildGatePlatformGrowthDispatchItems([buildGatePlatformStrategyReceipt({
       item: strategyPlatform,

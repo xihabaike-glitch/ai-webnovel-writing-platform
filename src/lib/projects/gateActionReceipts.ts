@@ -2810,6 +2810,24 @@ function isRetreatRecheckDispatchTask(task: Pick<PersistedGatePlatformDispatchTa
   return task.dispatchKey.includes(":scale_up:retreat_recheck:");
 }
 
+function isFirstDayHandoffDispatchTask(task: Pick<PersistedGatePlatformDispatchTask, "dispatchKey">) {
+  return task.dispatchKey.startsWith("first-day-handoff:");
+}
+
+function firstDayHandoffStageFromDispatchKey(dispatchKey: string) {
+  const stage = dispatchKey.split(":").at(-1);
+  if (stage === "opening" || stage === "verification" || stage === "platform-package") return stage;
+  return "handoff";
+}
+
+function firstDayHandoffStageLabel(dispatchKey: string) {
+  const stage = firstDayHandoffStageFromDispatchKey(dispatchKey);
+  if (stage === "opening") return "开头打法交接";
+  if (stage === "verification") return "验收口径交接";
+  if (stage === "platform-package") return "平台包装回收";
+  return "经验开书交接";
+}
+
 export function buildGatePlatformDispatchReceipt(input: {
   dispatch: GatePlatformGrowthDispatchItem;
   now?: Date | string;
@@ -5966,20 +5984,26 @@ export function buildGatePlatformDecisionTimeline(input: {
     const isRecheckReview = isRecheckReviewDispatchTask(task);
     const isRetreatRepair = isRetreatDispatchStage(task.stage);
     const isRetreatRecheck = isRetreatRecheckDispatchTask(task);
+    const isFirstDayHandoff = isFirstDayHandoffDispatchTask(task);
     const recheckReviewType = isRecheckReview ? recheckReviewTypeFromDispatchKey(task.dispatchKey) : null;
     const completedAt = task.completedAt ?? task.updatedAt;
+    const handoffStageLabel = firstDayHandoffStageLabel(task.dispatchKey);
     eventPlatform.events.push({
       id: `task:${task.dispatchKey}`,
       type: isRecheckReview || isRetreatRecheck ? "recheck" : isRetreatRepair ? "repair" : "dispatch",
       label: task.state === "completed"
-        ? isRecheckReview ? "复盘完成" : isRetreatRecheck ? "重验完成" : isRetreatRepair ? "修复完成" : "派单完成"
-        : isRecheckReview ? "复盘派单" : isRetreatRecheck ? "重验派单" : isRetreatRepair ? "修复派单" : "平台派单",
+        ? isFirstDayHandoff ? "开书交接闭环" : isRecheckReview ? "复盘完成" : isRetreatRecheck ? "重验完成" : isRetreatRepair ? "修复完成" : "派单完成"
+        : isFirstDayHandoff ? "开书交接派单" : isRecheckReview ? "复盘派单" : isRetreatRecheck ? "重验派单" : isRetreatRepair ? "修复派单" : "平台派单",
       detail: task.state === "completed" && task.completionEvidence.trim()
-        ? task.completionEvidence.trim()
+        ? isFirstDayHandoff
+          ? `已用于新书开局并闭环：${task.completionEvidence.trim()}`
+          : task.completionEvidence.trim()
         : `${task.ownerRole} · ${task.title}`,
-      href: task.state === "completed" ? "/dispatch" : task.href,
+      href: isFirstDayHandoff ? task.href : task.state === "completed" ? "/dispatch" : task.href,
       createdAt: task.state === "completed" ? completedAt : task.updatedAt,
       evidence: Array.from(new Set([
+        ...(isFirstDayHandoff ? [`新书开局闭环：${handoffStageLabel}`] : []),
+        ...(isFirstDayHandoff && task.state === "completed" && task.completionEvidence.trim() ? [`交接完成证据：${task.completionEvidence.trim()}`] : []),
         ...(recheckReviewType ? [`复盘类型：${recheckReviewTypeLabel(recheckReviewType)}`] : []),
         ...(isRecheckReview && task.state === "completed" && task.completionEvidence.trim() ? [`复盘结论：${task.completionEvidence.trim()}`] : []),
         ...task.evidence,
@@ -6060,6 +6084,7 @@ export function buildGatePlatformDecisionTimeline(input: {
     const recheckFollowup = recheckFollowupByPlatform.get(platform.platformId);
     const completedRecheckReviewEvent = sortedEvents.find((event) => event.id.startsWith("task:recheck-review:") && event.label === "复盘完成");
     const completedRecheckReviewType = completedRecheckReviewEvent ? recheckReviewTypeFromDispatchKey(completedRecheckReviewEvent.id.replace(/^task:/, "")) : null;
+    const completedFirstDayHandoff = completedFirstDayHandoffFromTimeline(sortedEvents);
     let status: GatePlatformDecisionTimelineStatus = "healthy";
     let label = "健康观察";
     let detail = `${platform.platformName} 当前没有撤退修复债，继续按总闸门节奏观察。`;
@@ -6096,6 +6121,12 @@ export function buildGatePlatformDecisionTimeline(input: {
       detail = `${platform.platformName} 已有修复复测证据，继续用重验数据判断是否恢复增长。`;
       actionLabel = "查看重验";
       href = resolution.href;
+    } else if (completedFirstDayHandoff?.allStagesCompleted) {
+      status = "healthy";
+      label = "新书开局闭环";
+      detail = `${platform.platformName} 的平台经验已经完成开头打法、验收口径和平台包装交接，可作为下一本开书的首轮打法样本。`;
+      actionLabel = "查看交接证据";
+      href = completedFirstDayHandoff.latestEvent.href;
     }
 
     return {
@@ -6266,6 +6297,25 @@ function completedRecheckReviewFromTimeline(item: GatePlatformDecisionTimelineIt
   };
 }
 
+function completedFirstDayHandoffFromTimeline(events: GatePlatformDecisionTimelineEvent[]) {
+  const handoffEvents = events
+    .filter((event) => event.id.startsWith("task:first-day-handoff:") && event.label === "开书交接闭环")
+    .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime());
+  if (handoffEvents.length === 0) return null;
+
+  const completedStages = new Set(handoffEvents.map((event) => firstDayHandoffStageFromDispatchKey(event.id.replace(/^task:/, ""))));
+  const allStagesCompleted = ["opening", "verification", "platform-package"].every((stage) => completedStages.has(stage as ReturnType<typeof firstDayHandoffStageFromDispatchKey>));
+  const evidence = Array.from(new Set(handoffEvents.flatMap((event) => event.evidence))).slice(0, 4);
+
+  return {
+    latestEvent: handoffEvents[0],
+    completedStages,
+    completedCount: completedStages.size,
+    allStagesCompleted,
+    evidence,
+  };
+}
+
 export function buildGatePlatformTacticExperienceLibrary(
   timeline: GatePlatformDecisionTimeline,
   limit = 6,
@@ -6273,6 +6323,7 @@ export function buildGatePlatformTacticExperienceLibrary(
   const items = timeline.items.map((item): GatePlatformTacticExperienceItem => {
     const finalEvent = item.events.find((event) => event.type === "final") ?? null;
     const completedRecheckReview = completedRecheckReviewFromTimeline(item);
+    const completedFirstDayHandoff = completedFirstDayHandoffFromTimeline(item.events);
     const evidenceLoopRecheck = evidenceLoopRecheckFromTimeline(item);
     const dispatchCompletionEvent = item.events.find((event) => event.id.startsWith("dispatch-completion-receipt:")) ?? null;
     const reusableEffectEvent = latestReusablePublishEffectEvent(item.events, dispatchCompletionEvent);
@@ -6336,6 +6387,26 @@ export function buildGatePlatformTacticExperienceLibrary(
           `复盘结论：${completedRecheckReview.conclusion}`,
           ...base.evidence,
         ].slice(0, 4),
+      };
+    }
+
+    if (completedFirstDayHandoff?.allStagesCompleted && item.status !== "blocked") {
+      return {
+        ...base,
+        status: "usable",
+        label: "可复用打法",
+        tactic: "新书开局闭环打法",
+        lesson: `${item.platformName} 已经把平台经验落到新书第一天流程，并完成开头打法、验收口径、平台包装三段交接，可作为同类项目开书首轮打法样本。`,
+        reuseHint: "新项目可直接复用这套开书交接顺序：先锁开头钩子和读者承诺，再写通过线与不可接受项，最后回收到标题、简介、标签和卖点包装。",
+        risk: "这条经验证明已被用于新书开局并闭环，但仍要继续回填曝光、点击、收藏和追读，不能直接当成长线加码结论。",
+        sourceLabel: "新书开局闭环",
+        href: completedFirstDayHandoff.latestEvent.href,
+        evidence: [
+          "已用于新书开局并闭环：开头、验收、包装三段交接完成",
+          `闭环进度：${completedFirstDayHandoff.completedCount}/3 段交接完成`,
+          ...completedFirstDayHandoff.evidence,
+          ...base.evidence,
+        ].slice(0, 5),
       };
     }
 

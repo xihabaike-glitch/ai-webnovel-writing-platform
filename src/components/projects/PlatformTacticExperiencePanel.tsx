@@ -114,6 +114,9 @@ export function PlatformTacticExperiencePanel({ library }: { library: GatePlatfo
               <div className="flex flex-wrap items-center gap-2">
                 <span className="font-medium">{item.platformName}</span>
                 <span className="rounded-md bg-white/70 px-2 py-1 text-xs font-medium">{statusLabel(item.status)}</span>
+                {item.sourceLabel === "新书开局闭环" ? (
+                  <span className="rounded-md bg-white/80 px-2 py-1 text-xs font-medium">已用于新书开局并闭环</span>
+                ) : null}
               </div>
               <div className="mt-3 rounded-md bg-white/70 p-3">
                 <div className="text-xs font-medium opacity-70">打法</div>

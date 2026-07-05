@@ -611,6 +611,32 @@ test("buildTaskQueueCenter", async (t) => {
     assert.ok(queue.overview.exportReady >= 1);
   });
 
+  await t.test("keeps completed first-three adoption follow-ups with missing evidence in the queue", () => {
+    const queue = buildTaskQueueCenter([{
+      ...project,
+      gateDispatchTasks: [
+        ...firstDayCompleteDispatches(project.id),
+        {
+          dispatchKey: "first-three-adoption:project-1:chapter-review:revision-1:review",
+          stage: "start_first_three_review",
+          state: "completed",
+          title: "第 2 章采纳后重新审稿",
+          detail: "采纳后的新正文需要重新审稿。",
+          actionLabel: "重新审稿",
+          href: "/projects/project-1/chapters/chapter-review#chapter-workflow",
+          completionEvidence: "",
+        },
+      ],
+    }]);
+    const missingEvidence = queue.items.find((item) => item.id.includes(":revision-1:review"));
+
+    assert.equal(missingEvidence?.category, "review");
+    assert.equal(missingEvidence?.actionLabel, "补验收证据");
+    assert.equal(missingEvidence?.href, "/projects/project-1/chapters/chapter-review#chapter-workflow");
+    assert.ok(missingEvidence?.evidence.includes("任务已标记完成，但缺少验收证据"));
+    assert.equal(queue.recommendedNext?.id, missingEvidence?.id);
+  });
+
   await t.test("blocks risky first drafts behind recovery validation", () => {
     const blockedProject: TaskQueueProject = {
       ...project,

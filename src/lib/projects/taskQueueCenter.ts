@@ -303,9 +303,13 @@ function firstThreeAdoptionFollowupQueueItems(input: {
   scaleGate: QueueScaleGate;
 }) {
   return (input.project.gateDispatchTasks ?? [])
-    .filter((task) => task.dispatchKey.startsWith(`first-three-adoption:${input.project.id}:`) && task.state !== "completed")
+    .filter((task) => (
+      task.dispatchKey.startsWith(`first-three-adoption:${input.project.id}:`)
+      && (task.state !== "completed" || task.completionEvidence.trim().length < 8)
+    ))
     .map((task): QueueItem => {
       const isPublishCheck = task.dispatchKey.endsWith(":publish-check");
+      const missingEvidence = task.state === "completed" && task.completionEvidence.trim().length < 8;
       return item({
         id: `${input.project.id}:adoption-followup:${task.dispatchKey}`,
         projectId: input.project.id,
@@ -313,15 +317,17 @@ function firstThreeAdoptionFollowupQueueItems(input: {
         platformName: input.platformName,
         category: isPublishCheck ? "export" : "review",
         chapterTitle: task.title ?? (isPublishCheck ? "采纳后发布质检" : "采纳后重新审稿"),
-        evidence: task.detail ?? (isPublishCheck
-          ? "前三章采纳后需要回发布质检，确认投稿包和新正文一致。"
-          : "前三章采纳后旧审稿已过期，需要重新审稿。"),
+        evidence: missingEvidence
+          ? `任务已标记完成，但缺少验收证据。${task.detail ?? "补齐审稿分、问题数、发布包版本或质检结果后，再回总闸门复检。"}`
+          : task.detail ?? (isPublishCheck
+            ? "前三章采纳后需要回发布质检，确认投稿包和新正文一致。"
+            : "前三章采纳后旧审稿已过期，需要重新审稿。"),
         strategyBasis: input.startTactic,
         riskLevel: input.riskLevel,
         riskLabel: input.riskLabel,
         riskNotice: input.riskNotice,
         scaleGate: input.scaleGate,
-        actionLabel: task.actionLabel ?? (isPublishCheck ? "回发布质检" : "重新审稿"),
+        actionLabel: missingEvidence ? "补验收证据" : task.actionLabel ?? (isPublishCheck ? "回发布质检" : "重新审稿"),
         href: task.href ?? (isPublishCheck ? `${input.projectHref}#platform-export` : input.projectHref),
       });
     });

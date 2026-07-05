@@ -559,6 +559,60 @@ test("buildProjectControlDashboard", async (t) => {
     assert.ok(dashboard.aiPipelineBatchHealth.detail.includes("小步验证"));
   });
 
+  await t.test("uses blocked batch health to reprioritize AI pipeline repair", () => {
+    const dashboard = buildProjectControlDashboard({
+      project,
+      platform: getPlatformProfile("fanqie"),
+      chapters: [chapter],
+      outlineNodes: [],
+      characters: [],
+      worldEntries: [],
+      foreshadows: [],
+      plotThreads: [],
+      aiTasks: [
+        { id: "review-1", chapterId: "chapter-1", taskType: "chapter_review", status: "succeeded", outputText: JSON.stringify({ score: 86, issues: [] }), errorMessage: null, createdAt: "2026-01-01T00:00:00.000Z" },
+      ],
+      gateActionAudits: [
+        {
+          receiptId: "blocked-batch",
+          label: "失败批次",
+          detail: "番茄小说 · 夜雨系统 · 批量初稿 2 个",
+          href: "/tasks#recommended-batch",
+          status: "failed",
+          message: "推荐批次失败。",
+          executionType: "recommended_batch",
+          succeededCount: 0,
+          failedCount: 2,
+          payload: JSON.stringify({
+            plan: {
+              strategyBases: [{
+                title: "首轮平台打法：番茄小说",
+                label: "三轮稳住",
+                primaryTactic: "三轮数据已站住，可以小批放大。",
+                openingMove: "第一段给不可逆危机。",
+                verificationMove: "继续回填曝光、点击、收藏和追读。",
+                risk: "稳定加码不是无限放量。",
+              }],
+              actionLabel: "批量初稿 2 个",
+              category: "draft",
+            },
+            routeEffectSummary: { successRatePercent: 0, knownCostUsd: 0.02, averageQualityScore: 68 },
+            batchReceipt: { status: "repair", headline: "批次有失败，先修再放大" },
+          }),
+          createdAt: "2026-01-02T00:00:00.000Z",
+        },
+      ],
+      submissionChecklist: checklist,
+    });
+    const aiArea = dashboard.areas.find((area) => area.id === "ai-pipeline");
+
+    assert.equal(dashboard.aiPipelineBatchHealth.status, "blocked");
+    assert.equal(aiArea?.status, "blocked");
+    assert.equal(aiArea?.actionLabel, "修批量打法");
+    assert.ok(aiArea?.nextAction.includes("先别继续复用"));
+    assert.ok(dashboard.criticalActions.some((action) => action.includes("AI 写审改：")));
+  });
+
   await t.test("summarizes model route health for the project control dashboard", () => {
     const dashboard = buildProjectControlDashboard({
       project: {

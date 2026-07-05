@@ -883,6 +883,36 @@ function buildAiPipelineBatchHealthSummary(audits: ControlBatchAudit[] = []): Ai
   };
 }
 
+function aiPipelineAreaDecision(input: {
+  baseScore: number;
+  baseEvidence: string;
+  batch: AiPipelineBatchSummary;
+  health: AiPipelineBatchHealthSummary;
+}) {
+  if (input.health.status === "blocked") {
+    return {
+      score: 0,
+      evidence: input.health.hasSamples ? `${input.baseEvidence} 批量健康：${input.health.tacticLabel}，失败 ${input.health.failedTasks}。` : input.baseEvidence,
+      nextAction: `${input.health.headline} ${input.health.detail}`,
+      actionLabel: "修批量打法",
+    };
+  }
+  if (input.health.status === "watch") {
+    return {
+      score: Math.min(input.baseScore, 64),
+      evidence: input.health.hasSamples ? `${input.baseEvidence} 批量健康：${input.health.tacticLabel}，仍需观察。` : input.baseEvidence,
+      nextAction: `${input.health.headline} ${input.health.detail}`,
+      actionLabel: "小样本复验",
+    };
+  }
+  return {
+    score: input.baseScore,
+    evidence: input.health.hasSamples ? `${input.baseEvidence} 批量健康：${input.health.tacticLabel}。` : input.baseEvidence,
+    nextAction: input.batch.headline,
+    actionLabel: "清写审改队列",
+  };
+}
+
 function modelRouteStatusLabel(status: ModelRouteHealthSummary["status"]) {
   if (status === "healthy") return "可小批放量";
   if (status === "repair") return "先修路由";
@@ -1336,6 +1366,13 @@ export function buildProjectControlDashboard(input: ProjectControlDashboardInput
   const aiPipelineRecentBatch = buildAiPipelineRecentBatchSummary(input.gateActionAudits);
   const aiPipelineBatchHealth = buildAiPipelineBatchHealthSummary(input.gateActionAudits);
   const modelRouteHealth = buildModelRouteHealthSummary(input);
+  const aiPipelineBaseEvidence = `${batchDraft.readyCandidates} 章可初稿，${reviewPipeline.reviewReadyCount} 章待审，${reviewPipeline.secondPassReadyCount} 章可二改。`;
+  const aiPipelineArea = aiPipelineAreaDecision({
+    baseScore: aiPipelineScore,
+    baseEvidence: aiPipelineBaseEvidence,
+    batch: aiPipelineBatch,
+    health: aiPipelineBatchHealth,
+  });
 
   const areas = [
     area("outline", "大纲骨架", outline, `${input.outlineNodes.length} 个大纲节点。`, "补齐开头、结尾、主干、分支、叶片和土壤。", "补大纲骨架", "outline-tree", true, "生成骨架"),
@@ -1343,7 +1380,7 @@ export function buildProjectControlDashboard(input: ProjectControlDashboardInput
     area("world", "世界观资料", ratio(worldDashboard.completeEntries, Math.max(worldDashboard.totalEntries, 3)) * 100, `${worldDashboard.completeEntries}/${worldDashboard.totalEntries} 条设定完整。`, worldDashboard.nextActions[0], "补世界观", "world-bible", true, "补设定卡", true, "AI 生成设定"),
     area("story-lines", "伏笔主线", ratio(storyLineDashboard.foreshadowReady + storyLineDashboard.threadResolved, Math.max(storyLineDashboard.foreshadowTotal + storyLineDashboard.threadTotal, 2)) * 100, `${storyLineDashboard.foreshadowReady} 个伏笔已回收，${storyLineDashboard.threadResolved} 条剧情线有终点。`, storyLineDashboard.nextActions[0], "补主线伏笔", "story-lines", true, "补线索卡", true, "AI 生成线索"),
     area("production", "章节生产", productionScore, `${production.dashboard.totalItems} 张排期卡，${production.dashboard.blockedItems} 张卡住。`, production.dashboard.nextActions[0], "排章节生产", "chapter-production", true, "生成章节卡"),
-    area("ai-pipeline", "AI 写审改", aiPipelineScore, `${batchDraft.readyCandidates} 章可初稿，${reviewPipeline.reviewReadyCount} 章待审，${reviewPipeline.secondPassReadyCount} 章可二改。`, aiPipelineBatch.headline, "清写审改队列", "ai-pipeline"),
+    area("ai-pipeline", "AI 写审改", aiPipelineArea.score, aiPipelineArea.evidence, aiPipelineArea.nextAction, aiPipelineArea.actionLabel, "ai-pipeline"),
     area("ops", "连载运营", average([serialization.submissionReadinessPercent, serialization.publishReadyCount > 0 ? 100 : 40]), `${serialization.publishReadyCount} 章可发布，投稿准备度 ${serialization.submissionReadinessPercent}%。`, serialization.actions[0]?.detail ?? "继续推进运营动作。", "看运营动作", "serialization-ops"),
     area(
       "export",

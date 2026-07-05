@@ -6,6 +6,7 @@ import { platformProfiles } from "../platforms/platformProfiles.ts";
 export interface TaskQueueBatchRunResult {
   status: "succeeded" | "failed";
   taskId?: string;
+  chapterId?: string;
   chapterTitle: string;
   error: string | null;
   qualityScore: number | null;
@@ -291,10 +292,15 @@ export function buildTaskQueueBatchGateActionReceipt(input: {
       scaleGate: input.plan.scaleGate,
       actionLabel: input.plan.actionLabel,
       category: input.plan.category,
+      itemIds: input.plan.itemIds,
+      chapterIds: input.plan.chapterIds,
+      adoptionFollowupCount: input.plan.adoptionFollowupCount,
+      adoptionFollowupItemIds: input.plan.adoptionFollowupItemIds,
     },
     results: input.results.map((result) => ({
       status: result.status,
       taskId: result.taskId,
+      chapterId: result.chapterId,
     })),
     routeEffectSummary: input.routeEffectSummary,
     batchReceipt: input.batchReceipt,

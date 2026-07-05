@@ -297,7 +297,7 @@ export function GateFirstThreeAdoptionPanel({ closure }: { closure: PrePublishGa
           <h2 className="font-medium text-slate-950">前三章采纳闭环</h2>
           <p className="mt-1 text-sm leading-6 text-slate-700">{closure.detail}</p>
         </div>
-        <div className="grid grid-cols-3 gap-2 text-center text-xs text-slate-700">
+        <div className="grid grid-cols-4 gap-2 text-center text-xs text-slate-700">
           <div className="rounded-md bg-white/80 px-3 py-2">
             <div className="text-lg font-semibold text-slate-950">{closure.total}</div>
             <div>任务</div>
@@ -309,6 +309,10 @@ export function GateFirstThreeAdoptionPanel({ closure }: { closure: PrePublishGa
           <div className="rounded-md bg-white/80 px-3 py-2">
             <div className="text-lg font-semibold text-slate-950">{closure.completed}</div>
             <div>完成</div>
+          </div>
+          <div className="rounded-md bg-white/80 px-3 py-2">
+            <div className="text-lg font-semibold text-slate-950">{closure.receiptEvidence}</div>
+            <div>回执</div>
           </div>
         </div>
       </div>

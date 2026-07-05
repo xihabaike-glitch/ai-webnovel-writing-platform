@@ -257,12 +257,12 @@ test("buildTaskQueueBatchReceipt routes adoption follow-up batches back to the g
 test("buildTaskQueueBatchGateActionReceipt turns a recommended batch into gate experience", () => {
   const batchReceipt = buildTaskQueueBatchReceipt({
     plan,
-    results: [{ status: "succeeded", taskId: "task-1", chapterTitle: "第一章", error: null, qualityScore: 86 }],
+    results: [{ status: "succeeded", taskId: "task-1", chapterId: "chapter-1", chapterTitle: "第一章", error: null, qualityScore: 86 }],
     routeEffectSummary: routeEffect,
   });
   const gateReceipt = buildTaskQueueBatchGateActionReceipt({
     plan,
-    results: [{ status: "succeeded", taskId: "task-1", chapterTitle: "第一章", error: null, qualityScore: 86 }],
+    results: [{ status: "succeeded", taskId: "task-1", chapterId: "chapter-1", chapterTitle: "第一章", error: null, qualityScore: 86 }],
     routeEffectSummary: routeEffect,
     batchReceipt,
     strategyId: "standard",
@@ -281,6 +281,9 @@ test("buildTaskQueueBatchGateActionReceipt turns a recommended batch into gate e
   assert.equal(gateReceipt.payload.plan.scaleGate, "none");
   assert.equal(gateReceipt.payload.plan.actionLabel, "批量初稿 1 个");
   assert.equal(gateReceipt.payload.plan.category, "draft");
+  assert.deepEqual(gateReceipt.payload.plan.itemIds, plan.itemIds);
+  assert.deepEqual(gateReceipt.payload.plan.adoptionFollowupItemIds, []);
+  assert.equal(gateReceipt.payload.results[0]?.chapterId, "chapter-1");
   assert.equal(gateReceipt.payload.batchReceipt.status, "continue");
   assert.equal(gateReceipt.payload.strategyId, "standard");
 });

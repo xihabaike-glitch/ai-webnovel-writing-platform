@@ -27,12 +27,17 @@ export interface GateActionReceiptPayload {
     scaleGate?: string;
     actionLabel?: string;
     category?: string | null;
+    itemIds?: string[];
+    chapterIds?: string[];
+    adoptionFollowupCount?: number;
+    adoptionFollowupItemIds?: string[];
   };
   startTactics?: GateActionReceiptStartTactic[];
   variants?: unknown[];
   results?: Array<{
     status?: string;
     taskId?: string;
+    chapterId?: string;
   }>;
   result?: {
     status?: string;

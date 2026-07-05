@@ -72,8 +72,10 @@ export interface TaskQueueProject {
     executionType: string;
     status: string;
     succeededCount: number;
+    failedCount?: number;
     taskId?: string | null;
     platformId: string;
+    payload?: string;
     createdAt: Date | string;
   }>;
 }
@@ -304,6 +306,45 @@ function firstThreeAdoptionChapterId(dispatchKey: string) {
   return parts[2] || null;
 }
 
+function parseTaskQueueAuditPayload(payload: string | null | undefined) {
+  if (!payload) return null;
+  try {
+    const parsed: unknown = JSON.parse(payload);
+    return parsed && typeof parsed === "object" ? parsed as Record<string, unknown> : null;
+  } catch {
+    return null;
+  }
+}
+
+function taskQueueStringArray(value: unknown) {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
+}
+
+function taskQueueRecordArray(value: unknown) {
+  return Array.isArray(value) ? value.filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === "object") : [];
+}
+
+function hasRecommendedBatchFollowupEvidence(input: {
+  project: TaskQueueProject;
+  dispatchKey: string;
+  chapterId: string | null;
+}) {
+  const queueItemId = `${input.project.id}:adoption-followup:${input.dispatchKey}`;
+  return (input.project.gateActionAudits ?? []).some((audit) => {
+    if (audit.executionType !== "recommended_batch" || audit.status !== "succeeded") return false;
+    const payload = parseTaskQueueAuditPayload(audit.payload);
+    const plan = payload?.plan && typeof payload.plan === "object" ? payload.plan as Record<string, unknown> : null;
+    if (!taskQueueStringArray(plan?.adoptionFollowupItemIds).includes(queueItemId)) return false;
+    const matchingResult = taskQueueRecordArray(payload?.results).find((result) => (
+      (!input.chapterId || result.chapterId === input.chapterId)
+      && (result.status === "succeeded" || result.status === "failed")
+    ));
+    return matchingResult
+      ? matchingResult.status === "succeeded"
+      : audit.succeededCount > 0 && (audit.failedCount ?? 0) === 0;
+  });
+}
+
 function firstThreeAdoptionFollowupQueueItems(input: {
   project: TaskQueueProject;
   projectHref: string;
@@ -315,10 +356,15 @@ function firstThreeAdoptionFollowupQueueItems(input: {
   scaleGate: QueueScaleGate;
 }) {
   return (input.project.gateDispatchTasks ?? [])
-    .filter((task) => (
-      task.dispatchKey.startsWith(`first-three-adoption:${input.project.id}:`)
-      && (task.state !== "completed" || task.completionEvidence.trim().length < 8)
-    ))
+    .filter((task) => {
+      if (!task.dispatchKey.startsWith(`first-three-adoption:${input.project.id}:`)) return false;
+      if (task.state === "completed" && task.completionEvidence.trim().length >= 8) return false;
+      return !hasRecommendedBatchFollowupEvidence({
+        project: input.project,
+        dispatchKey: task.dispatchKey,
+        chapterId: firstThreeAdoptionChapterId(task.dispatchKey),
+      });
+    })
     .map((task): QueueItem => {
       const isPublishCheck = task.dispatchKey.endsWith(":publish-check");
       const missingEvidence = task.state === "completed" && task.completionEvidence.trim().length < 8;

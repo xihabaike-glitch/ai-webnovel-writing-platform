@@ -246,6 +246,65 @@ test("buildPrePublishGate", async (t) => {
     assert.ok(gate.items.every((item) => item.status === "pass"));
   });
 
+  await t.test("uses recommended batch receipts as first-three adoption closure evidence", () => {
+    const reviewDispatchKey = "first-three-adoption:project-ready:chapter-1:revision-1:review";
+    const gate = buildPrePublishGate({
+      projects: [{
+        ...readyProject,
+        gateDispatchTasks: [
+          ...firstDayCompleteDispatches("project-ready"),
+          {
+            dispatchKey: reviewDispatchKey,
+            state: "assigned",
+            completionEvidence: "",
+            title: "第 1 章采纳后重新审稿",
+            detail: "采纳后的新正文需要重新审稿。",
+            actionLabel: "重新审稿",
+            href: "/projects/project-ready/chapters/chapter-1#chapter-workflow",
+          },
+          {
+            dispatchKey: "first-three-adoption:project-ready:chapter-1:revision-1:publish-check",
+            state: "completed",
+            completionEvidence: "采纳后发布质检已刷新：番茄小说 发布包版本 snapshot-1，质检 92 分，可导出。",
+          },
+        ],
+        gateActionAudits: [{
+          actionId: "recommended-batch:standard:review:project-ready",
+          executionType: "recommended_batch",
+          status: "succeeded",
+          succeededCount: 1,
+          failedCount: 0,
+          taskId: "review-task-1",
+          platformId: "fanqie",
+          label: "沉淀批量审稿 1 个经验",
+          message: "推荐批次完成：成功 1，失败 0。",
+          createdAt: "2026-01-09T00:00:00.000Z",
+          payload: JSON.stringify({
+            plan: {
+              actionLabel: "批量审稿 1 个",
+              category: "review",
+              adoptionFollowupCount: 1,
+              adoptionFollowupItemIds: [`project-ready:adoption-followup:${reviewDispatchKey}`],
+            },
+            results: [{ status: "succeeded", taskId: "review-task-1", chapterId: "chapter-1" }],
+            routeEffectSummary: { successRatePercent: 100, knownCostUsd: 0.01, averageQualityScore: 91 },
+            batchReceipt: { status: "continue", headline: "采纳闭环批量审稿通过" },
+          }),
+        }],
+      }],
+      failureTasks: [],
+      batchHistory: [],
+    });
+    const reviewItem = gate.firstThreeAdoptionClosure.items.find((item) => item.id === reviewDispatchKey);
+
+    assert.equal(gate.status, "ready");
+    assert.equal(gate.firstThreeAdoptionClosure.status, "pass");
+    assert.equal(gate.firstThreeAdoptionClosure.receiptEvidence, 1);
+    assert.equal(reviewItem?.status, "pass");
+    assert.ok(reviewItem?.evidence.includes("任务中心批量回执已验收"));
+    assert.ok(gate.firstThreeAdoptionClosure.detail.includes("1 个来自任务中心批量回执"));
+  });
+
   await t.test("surfaces missing adoption evidence as the next gate repair", () => {
     const gate = buildPrePublishGate({
       projects: [{

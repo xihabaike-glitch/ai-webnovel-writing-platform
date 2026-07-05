@@ -69,6 +69,19 @@ export interface PrePublishGateProject {
     actionLabel?: string;
     href?: string;
   }>;
+  gateActionAudits?: Array<{
+    actionId: string;
+    executionType: string;
+    status: string;
+    succeededCount: number;
+    failedCount: number;
+    taskId?: string | null;
+    platformId: string;
+    label?: string;
+    message?: string;
+    payload?: string;
+    createdAt: Date | string;
+  }>;
   publishSnapshots?: PublishPackageVersionItem[];
   submissionAssets?: PlatformSubmissionAssetInput[];
   submissionAssetVersions?: PlatformSubmissionAssetVersionInput[];
@@ -283,6 +296,7 @@ export interface PrePublishGateAdoptionClosure {
   completed: number;
   pending: number;
   missingEvidence: number;
+  receiptEvidence: number;
   reviewPending: number;
   publishPending: number;
   executableReviewCount: number;
@@ -423,6 +437,65 @@ function firstThreeFollowupExecution(input: {
       platformId: input.task.platformId ?? null,
     };
   }
+  return null;
+}
+
+function parseGateAuditPayload(payload: string | null | undefined) {
+  if (!payload) return null;
+  try {
+    const parsed: unknown = JSON.parse(payload);
+    return parsed && typeof parsed === "object" ? parsed as Record<string, unknown> : null;
+  } catch {
+    return null;
+  }
+}
+
+function stringArray(value: unknown) {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
+}
+
+function recordArray(value: unknown) {
+  return Array.isArray(value) ? value.filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === "object") : [];
+}
+
+function auditBatchReceiptEvidence(input: {
+  project: PrePublishGateProject;
+  task: PrePublishGateDispatchTask;
+  chapterId: string | null;
+}) {
+  const queueItemId = `${input.project.id}:adoption-followup:${input.task.dispatchKey}`;
+  const audits = (input.project.gateActionAudits ?? [])
+    .filter((audit) => audit.executionType === "recommended_batch" && audit.status === "succeeded")
+    .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime());
+
+  for (const audit of audits) {
+    const payload = parseGateAuditPayload(audit.payload);
+    const plan = payload?.plan && typeof payload.plan === "object" ? payload.plan as Record<string, unknown> : null;
+    const followupIds = stringArray(plan?.adoptionFollowupItemIds);
+    if (!followupIds.includes(queueItemId)) continue;
+
+    const matchingResult = recordArray(payload?.results).find((result) => (
+      (!input.chapterId || result.chapterId === input.chapterId)
+      && (result.status === "succeeded" || result.status === "failed")
+    ));
+    const resultSucceeded = matchingResult
+      ? matchingResult.status === "succeeded"
+      : audit.succeededCount > 0 && audit.failedCount === 0;
+    if (!resultSucceeded) continue;
+
+    const batchReceipt = payload?.batchReceipt && typeof payload.batchReceipt === "object"
+      ? payload.batchReceipt as Record<string, unknown>
+      : null;
+    const headline = typeof batchReceipt?.headline === "string" && batchReceipt.headline
+      ? batchReceipt.headline
+      : audit.label ?? "推荐批次已完成";
+    const quality = payload?.routeEffectSummary && typeof payload.routeEffectSummary === "object"
+      ? (payload.routeEffectSummary as Record<string, unknown>).averageQualityScore
+      : null;
+    const qualityText = typeof quality === "number" ? `，平均质量 ${Math.round(quality)} 分` : "";
+    return `任务中心批量回执已验收：${headline}，成功 ${audit.succeededCount} 个、失败 ${audit.failedCount} 个${qualityText}。`;
+  }
+
   return null;
 }
 
@@ -599,7 +672,19 @@ function buildFirstThreeAdoptionClosure(projects: PrePublishGateProject[]): PreP
   const items = followups.map(({ project, task }): PrePublishGateAdoptionFollowupItem => {
     const type = firstThreeFollowupType(task);
     const keyParts = parseFirstThreeAdoptionDispatchKey(task.dispatchKey);
-    const missingEvidence = task.state === "completed" && task.completionEvidence.trim().length < 8;
+    const batchReceiptEvidence = auditBatchReceiptEvidence({
+      project,
+      task,
+      chapterId: keyParts.chapterId,
+    });
+    const directEvidence = task.completionEvidence.trim();
+    const evidence = directEvidence || batchReceiptEvidence || "";
+    const missingEvidence = task.state === "completed" && evidence.trim().length < 8;
+    const status: PrePublishGateItem["status"] = task.state !== "completed" && !batchReceiptEvidence
+      ? "block"
+      : missingEvidence
+        ? "warn"
+        : "pass";
     return {
       id: task.dispatchKey,
       projectId: project.id,
@@ -610,10 +695,12 @@ function buildFirstThreeAdoptionClosure(projects: PrePublishGateProject[]): PreP
       type,
       label: firstThreeFollowupLabel(type),
       title: task.title ?? firstThreeFollowupLabel(type),
-      status: task.state !== "completed" ? "block" : missingEvidence ? "warn" : "pass",
+      status,
       state: task.state,
-      detail: task.detail ?? "采纳后的正文需要重新审稿并刷新发布质检。",
-      evidence: task.completionEvidence,
+      detail: batchReceiptEvidence && task.state !== "completed"
+        ? "任务中心批量执行已经产出验收回执，回总闸门后可用于复检放行。"
+        : task.detail ?? "采纳后的正文需要重新审稿并刷新发布质检。",
+      evidence,
       actionLabel: task.actionLabel ?? (type === "publish_check" ? "回发布质检" : "重新审稿"),
       href: firstThreeFollowupHref(project.id, task),
       execution: firstThreeFollowupExecution({
@@ -626,6 +713,7 @@ function buildFirstThreeAdoptionClosure(projects: PrePublishGateProject[]): PreP
   });
   const pendingItems = items.filter((item) => item.status === "block");
   const missingEvidenceItems = items.filter((item) => item.status === "warn");
+  const receiptEvidenceItems = items.filter((item) => item.evidence.includes("任务中心批量回执已验收"));
   const reviewPending = pendingItems.filter((item) => item.type === "review").length;
   const publishPending = pendingItems.filter((item) => item.type === "publish_check").length;
   const executableReviewChapterIds = new Set(items.flatMap((item) => (
@@ -643,11 +731,11 @@ function buildFirstThreeAdoptionClosure(projects: PrePublishGateProject[]): PreP
       ? "warn"
       : "pass";
   const detail = pendingItems.length > 0
-    ? `${affectedProjects} 个项目有前三章采纳后续未闭环：${reviewPending} 个待重新审稿，${publishPending} 个待发布质检。正文变更后不能沿用旧审稿。`
+      ? `${affectedProjects} 个项目有前三章采纳后续未闭环：${reviewPending} 个待重新审稿，${publishPending} 个待发布质检。正文变更后不能沿用旧审稿。`
     : missingEvidenceItems.length > 0
       ? `${missingEvidenceItems.length} 个采纳后续任务已完成但缺少验收证据，发布前补齐证据。`
       : followups.length > 0
-        ? `已验收 ${followups.length} 个采纳后续任务，重新审稿和发布质检都已回填。`
+        ? `已验收 ${followups.length} 个采纳后续任务，其中 ${receiptEvidenceItems.length} 个来自任务中心批量回执；重新审稿和发布质检都已回填。`
         : "当前没有未闭环的前三章采纳后续任务。";
   const repairQueue = buildFirstThreeAdoptionRepairQueue(items);
 
@@ -659,6 +747,7 @@ function buildFirstThreeAdoptionClosure(projects: PrePublishGateProject[]): PreP
     completed: items.filter((item) => item.status === "pass").length,
     pending: pendingItems.length,
     missingEvidence: missingEvidenceItems.length,
+    receiptEvidence: receiptEvidenceItems.length,
     reviewPending,
     publishPending,
     executableReviewCount: executableReviewChapterIds.size,

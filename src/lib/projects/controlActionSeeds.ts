@@ -2,6 +2,7 @@ import { buildDefaultOutlineNodes } from "../outlines/defaultOutline.ts";
 import type { PlatformProfile } from "../platforms/platformProfiles.ts";
 import type { BatchDraftQueue } from "../ai/batchDrafts.ts";
 import { buildChapterCardFromOutline, type ChapterCardDraft } from "../chapters/chapterFromOutline.ts";
+import { buildTaskQueueBatchHealthReview, type TaskQueueBatchHealthAudit } from "./taskQueueBatchHealth.ts";
 
 export interface SeedProject {
   id: string;
@@ -83,6 +84,25 @@ export interface ChapterCardDraftHandoff {
   headline: string;
   nextAction: string;
   targetAnchor: string;
+}
+
+export interface AiPipelineControlActionPlan {
+  status: "repair" | "watch" | "continue" | "seed_sample";
+  label: string;
+  detail: string;
+  targetAnchor: string;
+  created: string[];
+  message: string;
+  payload: {
+    status: AiPipelineControlActionPlan["status"];
+    tacticLabel: string;
+    tacticTitle: string;
+    sampleBatches: number;
+    successRatePercent: number | null;
+    averageQualityScore: number | null;
+    failedTasks: number;
+    nextActions: string[];
+  };
 }
 
 function includesPattern(value: string, pattern: RegExp) {
@@ -333,5 +353,116 @@ export function buildChapterCardDraftHandoff(queue: BatchDraftQueue): ChapterCar
     headline: "章节卡已生成，但暂时还不能进入批量初稿。",
     nextAction: warning,
     targetAnchor: "ai-pipeline",
+  };
+}
+
+export function buildAiPipelineControlActionPlan(audits: TaskQueueBatchHealthAudit[]): AiPipelineControlActionPlan {
+  const review = buildTaskQueueBatchHealthReview(audits, 5);
+  const primary = review.items[0] ?? null;
+
+  if (!primary) {
+    const created = [
+      "先跑 1 个推荐批次样本",
+      "记录成功率、质量分和失败原因",
+      "样本过线后再考虑扩大到 2-3 章",
+    ];
+    return {
+      status: "seed_sample",
+      label: "建立批量样本",
+      detail: "本书还没有可复盘的批量打法样本。",
+      targetAnchor: "ai-pipeline",
+      created,
+      message: "还没有样本，别凭感觉放量。先按推荐队列跑一个小样本，再让总控判断能不能继续。",
+      payload: {
+        status: "seed_sample",
+        tacticLabel: "",
+        tacticTitle: "",
+        sampleBatches: 0,
+        successRatePercent: null,
+        averageQualityScore: null,
+        failedTasks: 0,
+        nextActions: created,
+      },
+    };
+  }
+
+  const nextActions = primary.nextAction
+    ? [primary.nextAction, ...primary.evidence]
+    : primary.evidence;
+
+  if (primary.status === "blocked") {
+    const created = [
+      `停用「${primary.label}」继续放量`,
+      `复盘 ${primary.failedTasks || "失败"} 个失败任务的错误原因`,
+      "拆成 1 章小样本，先修提示词、模型路由和章节输入",
+    ];
+    return {
+      status: "repair",
+      label: "批量打法修复清单",
+      detail: `${primary.label}：成功率 ${primary.successRatePercent ?? 0}%，质量 ${primary.averageQualityScore ?? "-"}，失败 ${primary.failedTasks}。`,
+      targetAnchor: "ai-pipeline",
+      created,
+      message: "已生成批量打法修复清单：先停用失败打法，修失败原因和质量缺口，再用 1 章样本复验。",
+      payload: {
+        status: "repair",
+        tacticLabel: primary.label,
+        tacticTitle: primary.tacticTitle,
+        sampleBatches: primary.sampleBatches,
+        successRatePercent: primary.successRatePercent,
+        averageQualityScore: primary.averageQualityScore,
+        failedTasks: primary.failedTasks,
+        nextActions: created.concat(nextActions).slice(0, 6),
+      },
+    };
+  }
+
+  if (primary.status === "watch") {
+    const created = [
+      `限制「${primary.label}」下一批只跑 1-2 章`,
+      "补齐质量分、失败样本和成本记录",
+      "复验通过前不进入连续批量生产",
+    ];
+    return {
+      status: "watch",
+      label: "批量小样本复验清单",
+      detail: `${primary.label}：样本还薄，暂时只能小步验证。`,
+      targetAnchor: "ai-pipeline",
+      created,
+      message: "已生成小样本复验清单：下一批只跑少量章节，回填质量和失败证据后再决定是否放量。",
+      payload: {
+        status: "watch",
+        tacticLabel: primary.label,
+        tacticTitle: primary.tacticTitle,
+        sampleBatches: primary.sampleBatches,
+        successRatePercent: primary.successRatePercent,
+        averageQualityScore: primary.averageQualityScore,
+        failedTasks: primary.failedTasks,
+        nextActions: created.concat(nextActions).slice(0, 6),
+      },
+    };
+  }
+
+  const created = [
+    `保留「${primary.label}」作为参考打法`,
+    "下一批仍按小批执行，不跳过审稿和二改",
+    "继续记录成功率、质量分和成本",
+  ];
+  return {
+    status: "continue",
+    label: "批量放量前检查清单",
+    detail: `${primary.label}：成功率 ${primary.successRatePercent ?? "-"}%，质量 ${primary.averageQualityScore ?? "-"}。`,
+    targetAnchor: "ai-pipeline",
+    created,
+    message: "这套打法可以参考，但仍然别一口气放飞。按小批生产、审稿、二改继续留痕。",
+    payload: {
+      status: "continue",
+      tacticLabel: primary.label,
+      tacticTitle: primary.tacticTitle,
+      sampleBatches: primary.sampleBatches,
+      successRatePercent: primary.successRatePercent,
+      averageQualityScore: primary.averageQualityScore,
+      failedTasks: primary.failedTasks,
+      nextActions: created.concat(nextActions).slice(0, 6),
+    },
   };
 }

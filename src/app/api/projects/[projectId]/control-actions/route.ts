@@ -4,6 +4,7 @@ import { buildBatchDraftQueue } from "@/lib/ai/batchDrafts";
 import { getPlatformProfile, type PlatformId } from "@/lib/platforms/platformProfiles";
 import { generateControlAssets, type ControlAssetAreaId } from "@/lib/projects/controlAssetGeneration";
 import {
+  buildAiPipelineControlActionPlan,
   buildChapterCardActionSeeds,
   buildChapterCardDraftHandoff,
   buildCharacterActionSeeds,
@@ -52,6 +53,7 @@ export async function POST(request: Request, { params }: Params) {
       worldEntries: { orderBy: [{ type: "asc" }, { createdAt: "asc" }] },
       foreshadows: { orderBy: { createdAt: "asc" } },
       plotThreads: { orderBy: { createdAt: "asc" } },
+      gateActionAudits: { orderBy: { createdAt: "desc" }, take: 20 },
     },
   });
 
@@ -235,6 +237,44 @@ export async function POST(request: Request, { params }: Params) {
     return NextResponse.json({
       ...baseResult,
       draftHandoff,
+    });
+  }
+
+  if (areaId === "ai-pipeline") {
+    const plan = buildAiPipelineControlActionPlan(project.gateActionAudits);
+    const receiptId = `ai-pipeline-control:${projectId}:${Date.now()}`;
+
+    await prisma.gateActionAudit.create({
+      data: {
+        receiptId,
+        actionId: `ai-pipeline-control:${projectId}`,
+        projectId,
+        platformId: platform.id,
+        platformName: platform.name,
+        label: plan.label,
+        detail: plan.detail,
+        href: `/projects/${projectId}#ai-pipeline`,
+        status: "succeeded",
+        message: plan.message,
+        executionType: "control_action",
+        succeededCount: plan.created.length,
+        failedCount: 0,
+        taskId: null,
+        recheckStatus: plan.status === "repair" ? "needs_repair" : "ready",
+        recheckLabel: plan.status === "repair" ? "修完再复验" : "复验后再放量",
+        recheckDetail: plan.status === "repair"
+          ? "批量打法已被总控标记为修复优先，先处理失败原因和质量缺口。"
+          : "复验清单已生成，下一批仍按小样本执行并回填质量证据。",
+        recheckAction: plan.status === "repair" ? "回到失败复盘" : "回到 AI 写审改",
+        payload: JSON.stringify({ aiPipelineControlPlan: plan.payload }),
+      },
+    });
+
+    return NextResponse.json({
+      areaId,
+      targetAnchor: plan.targetAnchor,
+      created: plan.created,
+      message: plan.message,
     });
   }
 

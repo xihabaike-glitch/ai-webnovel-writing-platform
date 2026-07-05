@@ -373,6 +373,10 @@ export interface AiPipelineBatchHealthSummary {
   detail: string;
   actionLabel: string;
   targetHref: string;
+  actionExecutable: boolean;
+  actionAreaId: string | null;
+  actionMode: "seed" | null;
+  executeLabel: string;
   total: number;
   usable: number;
   watch: number;
@@ -843,6 +847,10 @@ function buildAiPipelineBatchHealthSummary(audits: ControlBatchAudit[] = []): Ai
       detail: "先从任务中心跑一次带首轮打法的推荐批次，项目总控才会判断这套打法能不能继续。",
       actionLabel: "去任务中心",
       targetHref: "/tasks#recommended-batch",
+      actionExecutable: false,
+      actionAreaId: null,
+      actionMode: null,
+      executeLabel: "建立样本",
       total: 0,
       usable: 0,
       watch: 0,
@@ -867,6 +875,10 @@ function buildAiPipelineBatchHealthSummary(audits: ControlBatchAudit[] = []): Ai
     detail: primary.nextAction,
     actionLabel: primary.status === "blocked" ? "看失败复盘" : "看任务中心",
     targetHref: primary.status === "blocked" ? "/failures" : latestAudit?.href || "/tasks#recommended-batch",
+    actionExecutable: primary.status === "blocked" || primary.status === "watch",
+    actionAreaId: primary.status === "blocked" || primary.status === "watch" ? "ai-pipeline" : null,
+    actionMode: primary.status === "blocked" || primary.status === "watch" ? "seed" : null,
+    executeLabel: primary.status === "blocked" ? "生成修复清单" : primary.status === "watch" ? "生成复验清单" : "继续小批",
     total: review.summary.total,
     usable: review.summary.usable,
     watch: review.summary.watch,
@@ -895,6 +907,8 @@ function aiPipelineAreaDecision(input: {
       evidence: input.health.hasSamples ? `${input.baseEvidence} 批量健康：${input.health.tacticLabel}，失败 ${input.health.failedTasks}。` : input.baseEvidence,
       nextAction: `${input.health.headline} ${input.health.detail}`,
       actionLabel: "修批量打法",
+      canExecute: true,
+      executeLabel: "生成修复清单",
     };
   }
   if (input.health.status === "watch") {
@@ -903,6 +917,8 @@ function aiPipelineAreaDecision(input: {
       evidence: input.health.hasSamples ? `${input.baseEvidence} 批量健康：${input.health.tacticLabel}，仍需观察。` : input.baseEvidence,
       nextAction: `${input.health.headline} ${input.health.detail}`,
       actionLabel: "小样本复验",
+      canExecute: true,
+      executeLabel: "生成复验清单",
     };
   }
   return {
@@ -910,6 +926,8 @@ function aiPipelineAreaDecision(input: {
     evidence: input.health.hasSamples ? `${input.baseEvidence} 批量健康：${input.health.tacticLabel}。` : input.baseEvidence,
     nextAction: input.batch.headline,
     actionLabel: "清写审改队列",
+    canExecute: false,
+    executeLabel: "清写审改队列",
   };
 }
 
@@ -1380,7 +1398,7 @@ export function buildProjectControlDashboard(input: ProjectControlDashboardInput
     area("world", "世界观资料", ratio(worldDashboard.completeEntries, Math.max(worldDashboard.totalEntries, 3)) * 100, `${worldDashboard.completeEntries}/${worldDashboard.totalEntries} 条设定完整。`, worldDashboard.nextActions[0], "补世界观", "world-bible", true, "补设定卡", true, "AI 生成设定"),
     area("story-lines", "伏笔主线", ratio(storyLineDashboard.foreshadowReady + storyLineDashboard.threadResolved, Math.max(storyLineDashboard.foreshadowTotal + storyLineDashboard.threadTotal, 2)) * 100, `${storyLineDashboard.foreshadowReady} 个伏笔已回收，${storyLineDashboard.threadResolved} 条剧情线有终点。`, storyLineDashboard.nextActions[0], "补主线伏笔", "story-lines", true, "补线索卡", true, "AI 生成线索"),
     area("production", "章节生产", productionScore, `${production.dashboard.totalItems} 张排期卡，${production.dashboard.blockedItems} 张卡住。`, production.dashboard.nextActions[0], "排章节生产", "chapter-production", true, "生成章节卡"),
-    area("ai-pipeline", "AI 写审改", aiPipelineArea.score, aiPipelineArea.evidence, aiPipelineArea.nextAction, aiPipelineArea.actionLabel, "ai-pipeline"),
+    area("ai-pipeline", "AI 写审改", aiPipelineArea.score, aiPipelineArea.evidence, aiPipelineArea.nextAction, aiPipelineArea.actionLabel, "ai-pipeline", aiPipelineArea.canExecute, aiPipelineArea.executeLabel),
     area("ops", "连载运营", average([serialization.submissionReadinessPercent, serialization.publishReadyCount > 0 ? 100 : 40]), `${serialization.publishReadyCount} 章可发布，投稿准备度 ${serialization.submissionReadinessPercent}%。`, serialization.actions[0]?.detail ?? "继续推进运营动作。", "看运营动作", "serialization-ops"),
     area(
       "export",

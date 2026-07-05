@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { getPlatformProfile } from "../lib/platforms/platformProfiles.ts";
 import {
+  buildAiPipelineControlActionPlan,
   buildChapterCardActionSeeds,
   buildChapterCardDraftHandoff,
   buildCharacterActionSeeds,
@@ -120,6 +121,60 @@ test("control action seeds", async (t) => {
     assert.equal(handoff.recommendedChapterIds.length, 0);
     assert.ok(handoff.headline.includes("暂时还不能"));
     assert.ok(handoff.nextAction.includes("平台风格"));
+  });
+
+  await t.test("builds a repair plan from blocked AI pipeline batch health", () => {
+    const plan = buildAiPipelineControlActionPlan([
+      {
+        receiptId: "blocked-batch",
+        actionId: "recommended-batch:standard:draft:demo-project",
+        label: "失败批次",
+        detail: "番茄小说 · 夜雨系统 · 批量初稿 2 个",
+        href: "/tasks#recommended-batch",
+        status: "failed",
+        message: "推荐批次失败。",
+        executionType: "recommended_batch",
+        succeededCount: 0,
+        failedCount: 2,
+        platformId: "fanqie",
+        platformName: "番茄小说",
+        recheckStatus: "ready",
+        recheckLabel: "复检",
+        recheckDetail: "复检",
+        recheckAction: "刷新",
+        payload: JSON.stringify({
+          plan: {
+            strategyBases: [{
+              title: "首轮平台打法：番茄小说",
+              label: "三轮稳住",
+              primaryTactic: "三轮数据已站住，可以小批放大。",
+              openingMove: "第一段给不可逆危机。",
+              verificationMove: "继续回填曝光、点击、收藏和追读。",
+              risk: "稳定加码不是无限放量。",
+            }],
+            actionLabel: "批量初稿 2 个",
+            category: "draft",
+          },
+          routeEffectSummary: { successRatePercent: 0, knownCostUsd: 0.02, averageQualityScore: 68 },
+        }),
+        createdAt: "2026-01-02T00:00:00.000Z",
+      },
+    ]);
+
+    assert.equal(plan.status, "repair");
+    assert.ok(plan.created.some((item) => item.includes("停用")));
+    assert.ok(plan.created.some((item) => item.includes("失败")));
+    assert.ok(plan.message.includes("先停用"));
+    assert.equal(plan.payload.failedTasks, 2);
+  });
+
+  await t.test("builds a seed sample plan before batch health has evidence", () => {
+    const plan = buildAiPipelineControlActionPlan([]);
+
+    assert.equal(plan.status, "seed_sample");
+    assert.equal(plan.targetAnchor, "ai-pipeline");
+    assert.ok(plan.created.some((item) => item.includes("推荐批次样本")));
+    assert.ok(plan.message.includes("还没有样本"));
   });
 
   await t.test("builds strict JSON prompts for AI control assets", () => {

@@ -609,6 +609,11 @@ test("buildProjectControlDashboard", async (t) => {
     assert.equal(dashboard.aiPipelineBatchHealth.status, "blocked");
     assert.equal(aiArea?.status, "blocked");
     assert.equal(aiArea?.actionLabel, "修批量打法");
+    assert.equal(aiArea?.canExecute, true);
+    assert.equal(aiArea?.executeLabel, "生成修复清单");
+    assert.equal(dashboard.aiPipelineBatchHealth.actionExecutable, true);
+    assert.equal(dashboard.aiPipelineBatchHealth.actionAreaId, "ai-pipeline");
+    assert.equal(dashboard.aiPipelineBatchHealth.executeLabel, "生成修复清单");
     assert.ok(aiArea?.nextAction.includes("先别继续复用"));
     assert.ok(dashboard.criticalActions.some((action) => action.includes("AI 写审改：")));
   });

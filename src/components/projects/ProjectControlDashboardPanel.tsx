@@ -79,6 +79,10 @@ interface AiPipelineBatchHealthSummary {
   detail: string;
   actionLabel: string;
   targetHref: string;
+  actionExecutable: boolean;
+  actionAreaId: string | null;
+  actionMode: "seed" | null;
+  executeLabel: string;
   total: number;
   usable: number;
   watch: number;
@@ -361,6 +365,7 @@ export function ProjectControlDashboardPanel({ projectId }: { projectId: string 
   const [runningVerdictAction, setRunningVerdictAction] = useState(false);
   const [runningStartDecision, setRunningStartDecision] = useState(false);
   const [runningFoundationAction, setRunningFoundationAction] = useState(false);
+  const [runningBatchHealthAction, setRunningBatchHealthAction] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
   async function loadDashboard() {
@@ -466,6 +471,41 @@ export function ProjectControlDashboardPanel({ projectId }: { projectId: string 
       setMessage(caught instanceof Error ? caught.message : "补齐写作底座失败。");
     } finally {
       setRunningFoundationAction(false);
+    }
+  }
+
+  async function executeBatchHealthAction() {
+    if (!dashboard?.aiPipelineBatchHealth.actionExecutable || !dashboard.aiPipelineBatchHealth.actionAreaId || !dashboard.aiPipelineBatchHealth.actionMode) return;
+    setRunningBatchHealthAction(true);
+    setMessage(null);
+    try {
+      const response = await fetch(`/api/projects/${projectId}/control-actions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          areaId: dashboard.aiPipelineBatchHealth.actionAreaId,
+          mode: dashboard.aiPipelineBatchHealth.actionMode,
+        }),
+      });
+      const payload = await response.json() as {
+        message?: string;
+        error?: string;
+        targetAnchor?: string;
+        created?: string[];
+      };
+      if (!response.ok) {
+        throw new Error(payload.error ?? "生成批量健康动作失败。");
+      }
+      await loadDashboard();
+      const created = payload.created?.length ? `清单：${payload.created.slice(0, 3).join("；")}。` : "";
+      setMessage([payload.message ?? "批量健康动作已生成。", created].filter(Boolean).join(" "));
+      if (payload.targetAnchor && typeof window !== "undefined") {
+        window.location.hash = payload.targetAnchor;
+      }
+    } catch (caught) {
+      setMessage(caught instanceof Error ? caught.message : "生成批量健康动作失败。");
+    } finally {
+      setRunningBatchHealthAction(false);
     }
   }
 
@@ -835,12 +875,24 @@ export function ProjectControlDashboardPanel({ projectId }: { projectId: string 
                   {dashboard.aiPipelineBatchHealth.detail}
                 </div>
               </div>
-              <Link
-                className="inline-flex w-fit items-center justify-center rounded-md border border-slate-200 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
-                href={dashboard.aiPipelineBatchHealth.targetHref}
-              >
-                {dashboard.aiPipelineBatchHealth.actionLabel}
-              </Link>
+              <div className="flex flex-wrap gap-2">
+                {dashboard.aiPipelineBatchHealth.actionExecutable ? (
+                  <button
+                    className="inline-flex w-fit items-center justify-center rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white hover:bg-slate-800 disabled:opacity-50"
+                    disabled={runningBatchHealthAction}
+                    onClick={() => void executeBatchHealthAction()}
+                    type="button"
+                  >
+                    {runningBatchHealthAction ? "生成中" : dashboard.aiPipelineBatchHealth.executeLabel}
+                  </button>
+                ) : null}
+                <Link
+                  className="inline-flex w-fit items-center justify-center rounded-md border border-slate-200 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                  href={dashboard.aiPipelineBatchHealth.targetHref}
+                >
+                  {dashboard.aiPipelineBatchHealth.actionLabel}
+                </Link>
+              </div>
             </div>
             <div className="mt-3 grid gap-2 sm:grid-cols-4">
               <div className="rounded-md bg-slate-50 p-3">

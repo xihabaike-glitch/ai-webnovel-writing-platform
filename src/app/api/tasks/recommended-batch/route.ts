@@ -98,6 +98,7 @@ export async function POST(request: Request) {
             executionType: true,
             status: true,
             succeededCount: true,
+            taskId: true,
             platformId: true,
             createdAt: true,
           },

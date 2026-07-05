@@ -67,6 +67,7 @@ export interface TaskQueueProject {
     executionType: string;
     status: string;
     succeededCount: number;
+    taskId?: string | null;
     platformId: string;
     createdAt: Date | string;
   }>;
@@ -324,12 +325,80 @@ function latestCompletedPublishEffectAction(input: {
     .sort((left, right) => (timestamp(right.createdAt) ?? 0) - (timestamp(left.createdAt) ?? 0))[0] ?? null;
 }
 
+function latestAdoptedAssetAfterAction(input: {
+  project: TaskQueueProject;
+  platformId: string;
+  action: NonNullable<ReturnType<typeof latestCompletedPublishEffectAction>>;
+}) {
+  const actionTime = timestamp(input.action.createdAt) ?? 0;
+  return (input.project.submissionAssetVersions ?? [])
+    .filter((version) => (
+      version.platformId === input.platformId
+      && version.action === "adopt"
+      && (!input.action.taskId || version.sourceTaskId === input.action.taskId)
+      && (timestamp(version.createdAt) ?? 0) >= actionTime
+    ))
+    .sort((left, right) => (timestamp(right.createdAt) ?? 0) - (timestamp(left.createdAt) ?? 0))[0] ?? null;
+}
+
+function latestPublishBaselineAfter(input: {
+  project: TaskQueueProject;
+  platformId: string;
+  after: Date | string;
+}) {
+  const afterTime = timestamp(input.after) ?? 0;
+  return (input.project.publishSnapshots ?? [])
+    .filter((snapshot) => (
+      snapshot.platformId === input.platformId
+      && snapshot.canExport
+      && (snapshot.action === "snapshot" || snapshot.action === "copy" || snapshot.action === "download" || snapshot.action === "archive")
+      && (timestamp(snapshot.createdAt) ?? 0) >= afterTime
+    ))
+    .sort((left, right) => (timestamp(right.createdAt) ?? 0) - (timestamp(left.createdAt) ?? 0))[0] ?? null;
+}
+
 function completedEffectActionFollowup(input: {
   execution: PublishEffectQueueExecution;
   baseActionId: string;
   effectVerdict: string;
+  assetAdopted: boolean;
+  newBaselineSaved: boolean;
+  packageReady: boolean;
 }) {
   if (input.execution === "generate_asset_variants") {
+    if (input.assetAdopted && !input.packageReady) {
+      return {
+        idSuffix: `${input.baseActionId}:recheck-adopted-asset`,
+        chapterTitle: "发布质检",
+        evidence: `${input.effectVerdict} 投稿候选已经采纳，下一步回发布质检确认标题、简介、标签和前三章是否可投。`,
+        actionLabel: "复查质检",
+        href: "#platform-export",
+        actionId: "recheck-adopted-asset",
+      };
+    }
+
+    if (input.assetAdopted && !input.newBaselineSaved) {
+      return {
+        idSuffix: `${input.baseActionId}:save-adopted-baseline`,
+        chapterTitle: "新发布基准",
+        evidence: `${input.effectVerdict} 投稿候选已经采纳，别拿旧基准做新实验；下一步保存新发布基准。`,
+        actionLabel: "保存新基准",
+        href: "#platform-export",
+        actionId: "save-adopted-baseline",
+      };
+    }
+
+    if (input.assetAdopted && input.newBaselineSaved) {
+      return {
+        idSuffix: `${input.baseActionId}:collect-next-effect`,
+        chapterTitle: "下一轮发布效果",
+        evidence: `${input.effectVerdict} 候选已采纳且新基准已保存，下一步录入新一轮曝光、点击、收藏和追读。`,
+        actionLabel: "录入新效果",
+        href: "#publish-effect-panel",
+        actionId: "collect-next-effect",
+      };
+    }
+
     return {
       idSuffix: `${input.baseActionId}:adopt-generated-candidate`,
       chapterTitle: "AI 优化方案",
@@ -582,11 +651,28 @@ export function buildTaskQueueCenter(projects: TaskQueueProject[]): TaskQueueCen
         effectSnapshotDate: targetPackage.publishEffect.latest?.snapshotDate ?? null,
       })
       : null;
+    const adoptedAssetAfterPrimaryEffectAction = completedPrimaryEffectAction && primaryEffectAction?.execution === "generate_asset_variants"
+      ? latestAdoptedAssetAfterAction({
+        project,
+        platformId: platform.id,
+        action: completedPrimaryEffectAction,
+      })
+      : null;
+    const publishBaselineAfterAdoptedAsset = adoptedAssetAfterPrimaryEffectAction
+      ? latestPublishBaselineAfter({
+        project,
+        platformId: platform.id,
+        after: adoptedAssetAfterPrimaryEffectAction.createdAt,
+      })
+      : null;
     const primaryEffectFollowup = primaryEffectAction && completedPrimaryEffectAction
       ? completedEffectActionFollowup({
         execution: primaryEffectAction.execution,
         baseActionId: primaryEffectAction.id,
         effectVerdict: targetPackage.publishEffect.verdict,
+        assetAdopted: Boolean(adoptedAssetAfterPrimaryEffectAction),
+        newBaselineSaved: Boolean(publishBaselineAfterAdoptedAsset),
+        packageReady: targetPackage.canExport,
       })
       : null;
 

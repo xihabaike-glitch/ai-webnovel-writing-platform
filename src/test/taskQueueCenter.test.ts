@@ -120,6 +120,25 @@ const publishBaseline = {
   createdAt: "2026-07-02T00:00:00.000Z",
 };
 
+const adoptedAssetVersion = {
+  id: "asset-version-adopted",
+  platformId: "fanqie",
+  platformName: "番茄小说",
+  title: "夜雨系统：倒计时翻盘",
+  logline: "系统每晚倒计时，主角用选择把危机打成连续翻盘爽点。",
+  synopsis: "主角在雨夜绑定倒计时系统，每一次选择都牵动生死与复仇，必须把系统惩罚反手变成翻盘筹码。",
+  overseasSynopsis: "Night Rain System follows deadly timed choices.",
+  tags: ["系统", "重生", "强爽点"],
+  note: "采纳 AI 候选。",
+  source: "ai_variant",
+  auditScore: 96,
+  auditStatus: "ready" as const,
+  action: "adopt",
+  sourceTaskId: "asset-optimize-1",
+  strategy: "强钩子爽点版",
+  createdAt: "2026-07-05T00:00:00.000Z",
+};
+
 function handoffWorldEntries() {
   return [{
     type: "platform_soil",
@@ -367,6 +386,92 @@ test("buildTaskQueueCenter", async (t) => {
     assert.equal(queue.recommendedNext?.category, "effect");
     assert.equal(queue.recommendedNext?.actionLabel, "生成候选");
     assert.equal(queue.recommendedNext?.effectAction?.execution, "generate_asset_variants");
+  });
+
+  await t.test("advances adopted asset candidates into a new publish baseline", () => {
+    const queue = buildTaskQueueCenter([publishReadyProject({
+      publishSnapshots: [publishBaseline],
+      platformPublishMetrics: [{
+        id: "metric-weak",
+        platformId: "fanqie",
+        platformName: "番茄小说",
+        views: 1000,
+        clicks: 30,
+        favorites: 5,
+        follows: 2,
+        comments: 0,
+        paidReads: 0,
+        editorFeedback: "",
+        contractStatus: "unknown",
+        publishUrl: "",
+        notes: "",
+        snapshotDate: "2026-07-03T00:00:00.000Z",
+      }],
+      submissionAssetVersions: [adoptedAssetVersion],
+      gateActionAudits: [{
+        actionId: "platform-strategy:fanqie:generate_asset_variants",
+        executionType: "platform_strategy",
+        status: "succeeded",
+        succeededCount: 3,
+        taskId: "asset-optimize-1",
+        platformId: "fanqie",
+        createdAt: "2026-07-04T00:00:00.000Z",
+      }],
+    })]);
+
+    assert.equal(queue.recommendedNext?.category, "effect");
+    assert.equal(queue.recommendedNext?.actionLabel, "保存新基准");
+    assert.equal(queue.recommendedNext?.effectAction?.execution, "open_target");
+    assert.equal(queue.recommendedNext?.effectAction?.actionId, "save-adopted-baseline");
+    assert.ok(queue.recommendedNext?.evidence.includes("已经采纳"));
+    assert.equal(queue.recommendedNext?.href, "/projects/project-1#platform-export");
+  });
+
+  await t.test("advances a saved adopted baseline into the next effect record", () => {
+    const queue = buildTaskQueueCenter([publishReadyProject({
+      publishSnapshots: [
+        {
+          ...publishBaseline,
+          id: "snapshot-new-baseline",
+          action: "snapshot",
+          createdAt: "2026-07-06T00:00:00.000Z",
+        },
+        publishBaseline,
+      ],
+      platformPublishMetrics: [{
+        id: "metric-weak",
+        platformId: "fanqie",
+        platformName: "番茄小说",
+        views: 1000,
+        clicks: 30,
+        favorites: 5,
+        follows: 2,
+        comments: 0,
+        paidReads: 0,
+        editorFeedback: "",
+        contractStatus: "unknown",
+        publishUrl: "",
+        notes: "",
+        snapshotDate: "2026-07-03T00:00:00.000Z",
+      }],
+      submissionAssetVersions: [adoptedAssetVersion],
+      gateActionAudits: [{
+        actionId: "platform-strategy:fanqie:generate_asset_variants",
+        executionType: "platform_strategy",
+        status: "succeeded",
+        succeededCount: 3,
+        taskId: "asset-optimize-1",
+        platformId: "fanqie",
+        createdAt: "2026-07-04T00:00:00.000Z",
+      }],
+    })]);
+
+    assert.equal(queue.recommendedNext?.category, "effect");
+    assert.equal(queue.recommendedNext?.actionLabel, "录入新效果");
+    assert.equal(queue.recommendedNext?.effectAction?.execution, "open_target");
+    assert.equal(queue.recommendedNext?.effectAction?.actionId, "collect-next-effect");
+    assert.ok(queue.recommendedNext?.evidence.includes("新基准已保存"));
+    assert.equal(queue.recommendedNext?.href, "/projects/project-1#publish-effect-panel");
   });
 
   await t.test("advances completed first-three rewrite into adoption review", () => {

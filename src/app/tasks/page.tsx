@@ -182,6 +182,7 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
             executionType: true,
             status: true,
             succeededCount: true,
+            taskId: true,
             platformId: true,
             createdAt: true,
           },

@@ -66,6 +66,9 @@ interface AiPipelineRecentBatchSummary {
   actionAreaId: string | null;
   actionMode: "seed" | null;
   executeLabel: string;
+  relayLabel: string;
+  relayDetail: string;
+  relayTargetHref: string;
   secondaryActionLabel: string;
   secondaryTargetHref: string;
   evidenceBadges: string[];
@@ -1319,6 +1322,22 @@ export function ProjectControlDashboardPanel({ projectId }: { projectId: string 
                 {dashboard.aiPipelineRecentBatch.warnings.map((warning) => (
                   <p key={warning}>{warning}</p>
                 ))}
+              </div>
+            ) : null}
+            {dashboard.aiPipelineRecentBatch.relayLabel && dashboard.aiPipelineRecentBatch.relayDetail ? (
+              <div className="mt-3 flex flex-col gap-2 rounded-md border border-amber-100 bg-amber-50 p-3 text-xs leading-5 text-amber-800 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <div className="font-medium">{dashboard.aiPipelineRecentBatch.relayLabel}</div>
+                  <p className="mt-1">{dashboard.aiPipelineRecentBatch.relayDetail}</p>
+                </div>
+                {dashboard.aiPipelineRecentBatch.relayTargetHref ? (
+                  <Link
+                    className="inline-flex w-fit shrink-0 items-center justify-center rounded-md bg-white px-2 py-1 font-medium text-amber-900 hover:bg-amber-100"
+                    href={projectScopedHref(projectId, dashboard.aiPipelineRecentBatch.relayTargetHref)}
+                  >
+                    看清单面板
+                  </Link>
+                ) : null}
               </div>
             ) : null}
           </div>

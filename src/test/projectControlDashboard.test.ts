@@ -500,6 +500,10 @@ test("buildProjectControlDashboard", async (t) => {
     assert.equal(dashboard.aiPipelineRecentBatch.actionAreaId, "ai-pipeline");
     assert.equal(dashboard.aiPipelineRecentBatch.actionMode, "seed");
     assert.equal(dashboard.aiPipelineRecentBatch.executeLabel, "生成修复清单");
+    assert.equal(dashboard.aiPipelineRecentBatch.relayLabel, "修复接力");
+    assert.equal(dashboard.aiPipelineRecentBatch.relayTargetHref, "#ai-pipeline");
+    assert.ok(dashboard.aiPipelineRecentBatch.relayDetail.includes("本书批量健康"));
+    assert.ok(dashboard.aiPipelineRecentBatch.relayDetail.includes("完成清单后再复检"));
     assert.ok(dashboard.aiPipelineRecentBatch.warnings.some((warning) => warning.includes("不要继续放大")));
     assert.equal(dashboard.aiPipelineBatchHealth.hasSamples, false);
   });

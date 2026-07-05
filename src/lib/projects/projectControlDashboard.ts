@@ -389,6 +389,9 @@ export interface AiPipelineRecentBatchSummary {
   actionAreaId: string | null;
   actionMode: "seed" | null;
   executeLabel: string;
+  relayLabel: string;
+  relayDetail: string;
+  relayTargetHref: string;
   secondaryActionLabel: string;
   secondaryTargetHref: string;
   evidenceBadges: string[];
@@ -818,6 +821,9 @@ function buildAiPipelineRecentBatchSummary(audits: ControlBatchAudit[] = []): Ai
       actionAreaId: null,
       actionMode: null,
       executeLabel: "",
+      relayLabel: "",
+      relayDetail: "",
+      relayTargetHref: "",
       secondaryActionLabel: "",
       secondaryTargetHref: "",
       evidenceBadges: [],
@@ -869,6 +875,9 @@ function buildAiPipelineRecentBatchSummary(audits: ControlBatchAudit[] = []): Ai
     actionAreaId: actionExecutable ? "ai-pipeline" : null,
     actionMode: actionExecutable ? "seed" : null,
     executeLabel: actionExecutable ? "生成修复清单" : "",
+    relayLabel: actionExecutable ? "修复接力" : "",
+    relayDetail: actionExecutable ? "生成清单后会进入「本书批量健康」面板；完成清单后再复检批量健康，别把失败样本直接放大。" : "",
+    relayTargetHref: actionExecutable ? "#ai-pipeline" : "",
     secondaryActionLabel: secondaryLabel,
     secondaryTargetHref: secondaryHref,
     evidenceBadges,

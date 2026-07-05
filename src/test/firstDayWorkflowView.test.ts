@@ -6,6 +6,7 @@ import {
   buildFirstDayDispatchCompletionHint,
   buildFirstDayDispatchUpdateSummary,
   buildFirstDayExecutionRiskNotice,
+  buildFirstDayExecutionReceiptFollowupPrompt,
   buildFirstDayExecutionSafetyBanner,
   buildFirstDayHandoffGateCta,
   buildFirstDayPostDispatchCompletionPrompt,
@@ -145,6 +146,68 @@ test("buildFirstDayReceiptCompletionEvidence derives an acceptance draft from AI
   assert.ok(summarized.includes("第一章审稿已完成"));
   assert.ok(summarized.includes("写回：AI 任务审稿记录"));
   assert.equal(failed, "保留人工正在写的验收依据。");
+});
+
+test("buildFirstDayExecutionReceiptFollowupPrompt routes successful AI execution to dispatch acceptance", () => {
+  const ready = buildFirstDayExecutionReceiptFollowupPrompt({
+    receipt: {
+      success: true,
+      summary: "第一章初稿已写回：第一章 雨夜系统，当前 2200 字。",
+      writeBackTarget: "第一章 雨夜系统",
+      nextAction: "检查正文后完成派单验收，再进入第一章审稿。",
+      completionEvidence: "第一章正文已生成并写回，钩子和章末追读已按验收线检查。",
+      detailItems: [],
+    },
+    completionAction: {
+      visible: true,
+      canComplete: true,
+      label: "验收并进入下一步",
+      reason: "AI 回执已生成验收依据，可以直接验收当前首日派单。",
+    },
+    fallbackStepLabel: "第一章初稿",
+  });
+  const thinEvidence = buildFirstDayExecutionReceiptFollowupPrompt({
+    receipt: {
+      success: true,
+      summary: "人物和设定支撑已落库。",
+      writeBackTarget: "作品资料",
+      nextAction: "检查资料卡后完成派单验收。",
+      completionEvidence: "",
+      detailItems: [],
+    },
+    completionAction: {
+      visible: true,
+      canComplete: false,
+      label: "验收并进入下一步",
+      reason: "验收依据至少 8 个字，先补齐证据。",
+    },
+    fallbackStepLabel: "人物设定支撑",
+  });
+  const failed = buildFirstDayExecutionReceiptFollowupPrompt({
+    receipt: {
+      success: false,
+      summary: "AI 执行未完成：模型超时。",
+      writeBackTarget: "未写回",
+      nextAction: "修复模型路线、预算或素材问题后重试当前节点。",
+      completionEvidence: "",
+      detailItems: ["模型超时"],
+    },
+    completionAction: {
+      visible: false,
+      canComplete: false,
+      label: "验收并进入下一步",
+      reason: "",
+    },
+    fallbackStepLabel: "第一章初稿",
+  });
+
+  assert.equal(ready.message, "第一章初稿已写回：第一章 雨夜系统，当前 2200 字。 下一步：检查正文后完成派单验收，再进入第一章审稿。");
+  assert.equal(ready.action, "complete_current_dispatch");
+  assert.equal(ready.actionLabel, "验收并进入下一步");
+  assert.equal(thinEvidence.action, undefined);
+  assert.ok(thinEvidence.message.includes("验收依据至少 8 个字"));
+  assert.equal(failed.action, undefined);
+  assert.ok(failed.message.includes("修复模型路线、预算或素材问题后重试当前节点"));
 });
 
 test("buildFirstDayExecutionRiskNotice surfaces blocked and watch modes", () => {

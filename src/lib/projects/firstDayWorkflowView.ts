@@ -155,9 +155,12 @@ export interface FirstDayDispatchUpdateSummary {
   badges: string[];
 }
 
+export type FirstDayWorkflowMessageAction = "execute_current_step" | "complete_current_dispatch";
+
 export interface FirstDayPostDispatchCompletionPrompt {
   message: string;
-  action?: "execute_current_step";
+  action?: FirstDayWorkflowMessageAction;
+  actionLabel?: string;
 }
 
 export interface FirstDayDispatchFocusInput {
@@ -942,6 +945,42 @@ export function buildFirstDayRouteRepairReturnNotice(input: {
   return {
     message: `已刷新首日模型路线：${input.taskLabel}路线就绪，可以继续执行当前节点。`,
     action: "execute_current_step",
+  };
+}
+
+export function buildFirstDayExecutionReceiptFollowupPrompt(input: {
+  receipt: Pick<FirstDayExecutionReceipt, "success" | "summary" | "nextAction"> | null;
+  completionAction: Pick<FirstDayReceiptCompletionAction, "visible" | "canComplete" | "label" | "reason">;
+  fallbackStepLabel: string;
+}): FirstDayPostDispatchCompletionPrompt {
+  if (!input.receipt) {
+    return {
+      message: `AI 已执行当前节点：${input.fallbackStepLabel}。请检查结果后完成派单验收。`,
+    };
+  }
+
+  if (!input.receipt.success) {
+    return {
+      message: `${input.receipt.summary} 下一步：${input.receipt.nextAction}`,
+    };
+  }
+
+  if (input.completionAction.visible && input.completionAction.canComplete) {
+    return {
+      message: `${input.receipt.summary} 下一步：${input.receipt.nextAction}`,
+      action: "complete_current_dispatch",
+      actionLabel: input.completionAction.label,
+    };
+  }
+
+  if (input.completionAction.visible) {
+    return {
+      message: `${input.receipt.summary} ${input.completionAction.reason}`,
+    };
+  }
+
+  return {
+    message: `${input.receipt.summary} 下一步：${input.receipt.nextAction}`,
   };
 }
 

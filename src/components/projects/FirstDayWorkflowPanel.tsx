@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { buildFirstDayExecutionRouteBlockMessage, type FirstDayExecutionRouteStatus } from "@/lib/model-gateway/firstDayExecutionRoute";
-import { buildFirstDayDispatchUpdateSummary, buildFirstDayExecutionRiskNotice, buildFirstDayExecutionSafetyBanner, buildFirstDayHandoffGateCta, buildFirstDayPostDispatchCompletionPrompt, buildFirstDayReceiptCompletionAction, buildFirstDayReceiptCompletionEvidence, buildFirstDayRouteRepairReturnNotice, buildFirstDayStepView, completeFirstDayDispatchStep } from "@/lib/projects/firstDayWorkflowView";
+import { buildFirstDayDispatchUpdateSummary, buildFirstDayExecutionReceiptFollowupPrompt, buildFirstDayExecutionRiskNotice, buildFirstDayExecutionSafetyBanner, buildFirstDayHandoffGateCta, buildFirstDayPostDispatchCompletionPrompt, buildFirstDayReceiptCompletionAction, buildFirstDayReceiptCompletionEvidence, buildFirstDayRouteRepairReturnNotice, buildFirstDayStepView, completeFirstDayDispatchStep, type FirstDayWorkflowMessageAction } from "@/lib/projects/firstDayWorkflowView";
 import { persistGateDispatchTask, type GatePlatformGrowthDispatchItem, type PersistedGatePlatformDispatchTask } from "@/lib/projects/gateActionReceipts";
 
 interface FirstDayWorkflowStep {
@@ -122,7 +122,7 @@ interface FirstDayContinuationAction {
 }
 
 type FirstDayModelRouteStatus = FirstDayExecutionRouteStatus;
-type FirstDayMessageAction = "execute_current_step";
+type FirstDayMessageAction = FirstDayWorkflowMessageAction;
 type FirstDayWorkflowPayload = {
   workflow: FirstDayWorkflow;
   dispatch: GatePlatformGrowthDispatchItem;
@@ -349,13 +349,15 @@ export function FirstDayWorkflowPanel({ projectId }: { projectId: string }) {
   const [completionEvidence, setCompletionEvidence] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [messageAction, setMessageAction] = useState<FirstDayMessageAction | null>(null);
+  const [messageActionLabel, setMessageActionLabel] = useState<string | null>(null);
   const [executionReceipt, setExecutionReceipt] = useState<FirstDayExecutionReceipt | null>(null);
   const [continuation, setContinuation] = useState<FirstDayContinuationAction | null>(null);
   const [handoffFollowupDispatches, setHandoffFollowupDispatches] = useState<GatePlatformGrowthDispatchItem[]>([]);
 
-  function showMessage(nextMessage: string | null, action?: FirstDayMessageAction) {
+  function showMessage(nextMessage: string | null, action?: FirstDayMessageAction, actionLabel?: string) {
     setMessage(nextMessage);
     setMessageAction(action ?? null);
+    setMessageActionLabel(actionLabel ?? null);
   }
 
   async function loadWorkflow(options?: { fromRouteRepair?: boolean }) {
@@ -483,7 +485,18 @@ export function FirstDayWorkflowPanel({ projectId }: { projectId: string }) {
         currentEvidence: completionEvidence,
       });
       if (nextCompletionEvidence) setCompletionEvidence(nextCompletionEvidence);
-      showMessage(payload.executionReceipt?.summary ?? `AI 已执行当前节点：${workflow.nextStep.label}。请检查结果后完成派单验收。`);
+      const nextReceiptCompletionAction = buildFirstDayReceiptCompletionAction({
+        receipt: payload.executionReceipt ?? null,
+        completionEvidence: nextCompletionEvidence,
+        hasDispatch: Boolean(payload.dispatch ?? dispatch),
+        isCompleting: false,
+      });
+      const followupPrompt = buildFirstDayExecutionReceiptFollowupPrompt({
+        receipt: payload.executionReceipt ?? null,
+        completionAction: nextReceiptCompletionAction,
+        fallbackStepLabel: workflow.nextStep.label,
+      });
+      showMessage(followupPrompt.message, followupPrompt.action, followupPrompt.actionLabel);
     } catch (caught) {
       showMessage(caught instanceof Error ? caught.message : "首日 AI 执行失败。");
     } finally {
@@ -656,6 +669,15 @@ export function FirstDayWorkflowPanel({ projectId }: { projectId: string }) {
               type="button"
             >
               {isExecutingAi ? "执行中" : "继续执行当前节点"}
+            </button>
+          ) : messageAction === "complete_current_dispatch" ? (
+            <button
+              className="w-fit rounded-md bg-emerald-700 px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
+              disabled={isCompletingDispatch || !receiptCompletionAction.canComplete}
+              onClick={() => void completeCurrentDispatch()}
+              type="button"
+            >
+              {isCompletingDispatch ? "验收中" : messageActionLabel ?? "验收并进入下一步"}
             </button>
           ) : null}
         </div>

@@ -4,6 +4,7 @@ import {
   buildFirstDayDispatchCompletionTemplate,
   buildFirstDayDispatchDesk,
   buildFirstDayDispatchCompletionHint,
+  buildFirstDayDispatchCardInlineAction,
   buildFirstDayDispatchUpdateSummary,
   buildFirstDayDispatchAiExecutionNotice,
   buildFirstDayExecutionRiskNotice,
@@ -409,6 +410,69 @@ test("buildFirstDayDispatchDesk highlights the next first-day task", () => {
   assert.ok(desk.nextTask?.continuation.hint.includes("执行后回项目验收"));
   assert.ok(desk.nextTask?.completionTemplate.includes("第一章审稿已完成"));
   assert.ok(desk.nextActions[0].includes("第一章审稿"));
+});
+
+test("buildFirstDayDispatchCardInlineAction exposes AI execution on active first-day cards", () => {
+  const baseTask = {
+    databaseId: "db-1",
+    dispatchKey: "first-day:project-1:first-review",
+    id: "first-day:project-1:first-review",
+    projectId: "project-1",
+    platformId: "fanqie",
+    platformName: "番茄小说",
+    stage: "start_first_three_review",
+    state: "assigned" as const,
+    priorityScore: 70,
+    ownerRole: "AI",
+    title: "夜雨系统 · 第一章审稿",
+    detail: "AI 先当毒舌审稿编辑。",
+    dueLabel: "今天收口",
+    actionLabel: "去审稿",
+    href: "/projects/project-1/chapters/chapter-1",
+    acceptanceCriteria: ["第一章已有结构化审稿结果"],
+    evidence: ["缺少第一章成功审稿任务"],
+    sourceReceiptId: null,
+    completionEvidence: "",
+    reviewLatestAt: "2026-01-01T00:00:00.000Z",
+    assignedAt: "2026-01-01T00:00:00.000Z",
+    completedAt: null,
+    createdAt: "2026-01-01T00:00:00.000Z",
+    updatedAt: "2026-01-01T00:00:00.000Z",
+  };
+  const desk = buildFirstDayDispatchDesk([
+    baseTask,
+    {
+      ...baseTask,
+      databaseId: "db-2",
+      dispatchKey: "first-day:project-1:publish-precheck",
+      id: "first-day:project-1:publish-precheck",
+      ownerRole: "运营",
+      title: "夜雨系统 · 平台包预检",
+    },
+    {
+      ...baseTask,
+      databaseId: "db-3",
+      dispatchKey: "first-day:project-1:first-rewrite",
+      id: "first-day:project-1:first-rewrite",
+      state: "completed",
+      title: "夜雨系统 · 第一章二改",
+    },
+  ]);
+
+  const aiAction = buildFirstDayDispatchCardInlineAction(desk.cards[0]);
+  const manualAction = buildFirstDayDispatchCardInlineAction(desk.cards[1]);
+  const completedAction = buildFirstDayDispatchCardInlineAction(desk.cards[2]);
+
+  assert.equal(aiAction.visible, true);
+  assert.equal(aiAction.label, "直接执行 AI");
+  assert.equal(aiAction.href, "/projects/project-1?firstDayLaunch=1&nextStep=first-review#first-day-workflow");
+  assert.deepEqual(aiAction.execution, {
+    kind: "first_day_ai",
+    endpoint: "/api/projects/project-1/first-day-workflow",
+    dispatchKey: "first-day:project-1:first-review",
+  });
+  assert.equal(manualAction.visible, false);
+  assert.equal(completedAction.visible, false);
 });
 
 test("buildFirstDayDispatchDesk keeps recovered watch state visible", () => {

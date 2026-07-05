@@ -25,6 +25,7 @@ import {
   buildFirstDayDispatchDesk,
   buildFirstDayDispatchCompletionHint,
   buildFirstDayDispatchAiExecutionNotice,
+  buildFirstDayDispatchCardInlineAction,
   buildFirstDayDispatchCenterHref,
   buildFirstDayDispatchUpdateSummary,
   buildFirstDayPostDispatchCompletionPrompt,
@@ -213,6 +214,9 @@ export function GateDispatchTaskCenter({
   const evidenceReview = useMemo(() => buildGateDispatchEvidenceReview(tasks, initialReceipts), [initialReceipts, tasks]);
   const routeExecutionDesk = useMemo(() => buildRouteRecheckExecutionDesk(tasks), [tasks]);
   const routeTaskByKey = useMemo(() => new Map(tasks.map((task) => [task.dispatchKey, task])), [tasks]);
+  const firstDayCardByKey = useMemo(() => (
+    new Map(firstDayDesk.cards.map((card) => [card.dispatchKey, card]))
+  ), [firstDayDesk.cards]);
   const aiPipelineTaskKeys = useMemo(() => (
     new Set(center.aiPipelineDispatches.map((task) => task.dispatchKey))
   ), [center.aiPipelineDispatches]);
@@ -1540,6 +1544,8 @@ export function GateDispatchTaskCenter({
           const completionRecordChips = completionRecord ? routeCompletionRecordChips(completionRecord) : [];
           const isRecheckFollowUp = isChapterProductionRecheckFollowUpTask(task);
           const recheckChain = recheckChainByDispatchKey.get(task.dispatchKey);
+          const firstDayInlineAction = buildFirstDayDispatchCardInlineAction(firstDayCardByKey.get(task.dispatchKey));
+          const firstDayInlineExecution = firstDayInlineAction.execution;
           const isFocusedCompletionTask = task.dispatchKey === focusedCompletionDispatchKey;
           const isFocusedTask = task.dispatchKey === focusedDispatchKey || isFocusedCompletionTask;
           return (
@@ -1618,6 +1624,25 @@ export function GateDispatchTaskCenter({
                 ) : null}
               </div>
               <div className="flex shrink-0 flex-wrap gap-2 lg:justify-end">
+                {firstDayInlineAction.visible && firstDayInlineExecution ? (
+                  <button
+                    className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-800 hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60"
+                    disabled={runningRouteActionLink}
+                    onClick={() => void executeRouteActionLink({
+                      label: firstDayInlineAction.label,
+                      href: firstDayInlineAction.href,
+                      execution: {
+                        kind: firstDayInlineExecution.kind,
+                        method: "POST",
+                        endpoint: firstDayInlineExecution.endpoint,
+                        dispatchKey: firstDayInlineExecution.dispatchKey,
+                      },
+                    })}
+                    type="button"
+                  >
+                    {runningRouteActionLink ? "执行中" : firstDayInlineAction.label}
+                  </button>
+                ) : null}
                 {task.stage === "model_route_confirmation_recheck" && task.state === "assigned" ? (
                   <button
                     className="rounded-md border border-sky-200 bg-sky-50 px-3 py-2 text-sm font-medium text-sky-800 hover:bg-sky-100 disabled:cursor-not-allowed disabled:opacity-60"

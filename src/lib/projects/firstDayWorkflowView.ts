@@ -125,6 +125,17 @@ export interface FirstDayDispatchDesk {
   nextActions: string[];
 }
 
+export interface FirstDayDispatchCardInlineAction {
+  visible: boolean;
+  label: string;
+  href: string;
+  execution?: {
+    kind: "first_day_ai";
+    endpoint: string;
+    dispatchKey: string;
+  };
+}
+
 export interface FirstDayHandoffGateCtaProgress {
   visible: boolean;
   label: string;
@@ -849,6 +860,29 @@ export function buildFirstDayDispatchDesk(tasks: PersistedGatePlatformDispatchTa
       active.length > 1 ? `还有 ${active.length - 1} 张首日卡排队，完成当前节点后再推进下一张。` : null,
       cards.length > 0 && active.length === 0 ? "首日派单已全部完成，可以进入批量生产和平台包复盘。" : null,
     ].filter((action): action is string => Boolean(action)),
+  };
+}
+
+export function buildFirstDayDispatchCardInlineAction(
+  card: Pick<FirstDayDispatchDeskCard, "state" | "dispatchKey" | "firstDayHref" | "continuation"> | null | undefined,
+): FirstDayDispatchCardInlineAction {
+  if (!card || card.state === "completed" || card.continuation.kind !== "first_day_ai" || !card.continuation.endpoint) {
+    return {
+      visible: false,
+      label: "",
+      href: "",
+    };
+  }
+
+  return {
+    visible: true,
+    label: card.continuation.label,
+    href: card.firstDayHref,
+    execution: {
+      kind: "first_day_ai",
+      endpoint: card.continuation.endpoint,
+      dispatchKey: card.dispatchKey,
+    },
   };
 }
 

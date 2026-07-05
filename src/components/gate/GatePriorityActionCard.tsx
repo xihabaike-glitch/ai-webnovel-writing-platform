@@ -17,7 +17,22 @@ function executeLabel(action: PrePublishGateAction) {
   if (!action.execution) return null;
   if (action.execution.type === "publish_repair") return "立即处理";
   if (action.execution.type === "retry_task") return "一键重试";
+  if (action.execution.type === "first_three_adoption") {
+    return action.execution.execution.type === "chapter_review" ? "一键审稿" : "刷新质检";
+  }
   return "执行批次";
+}
+
+function firstThreeAdoptionBody(execution: Extract<NonNullable<PrePublishGateAction["execution"]>, { type: "first_three_adoption" }>) {
+  return execution.execution.type === "chapter_review"
+    ? { chapterId: execution.execution.chapterId }
+    : { action: "snapshot", platformId: execution.execution.platformId };
+}
+
+function firstThreeAdoptionUrl(execution: Extract<NonNullable<PrePublishGateAction["execution"]>, { type: "first_three_adoption" }>) {
+  return execution.execution.type === "chapter_review"
+    ? "/api/ai/tasks/chapter-review"
+    : `/api/projects/${execution.execution.projectId}/platform-export`;
 }
 
 export function GatePriorityActionCard({
@@ -55,10 +70,12 @@ export function GatePriorityActionCard({
           ? `/api/projects/${execution.projectId}/platform-export/repair`
           : execution.type === "retry_task"
             ? `/api/ai/tasks/${execution.taskId}/retry`
-            : `/api/tasks/recommended-batch?strategy=${encodeURIComponent(execution.strategyId)}`,
+            : execution.type === "first_three_adoption"
+              ? firstThreeAdoptionUrl(execution)
+              : `/api/tasks/recommended-batch?strategy=${encodeURIComponent(execution.strategyId)}`,
         {
           method: "POST",
-          headers: execution.type === "publish_repair" ? { "Content-Type": "application/json" } : undefined,
+          headers: execution.type === "publish_repair" || execution.type === "first_three_adoption" ? { "Content-Type": "application/json" } : undefined,
           body: execution.type === "publish_repair"
             ? JSON.stringify({
               kind: execution.kind,
@@ -66,12 +83,24 @@ export function GatePriorityActionCard({
               chapterTitle: execution.chapterTitle,
               detail: execution.detail,
             })
+            : execution.type === "first_three_adoption"
+              ? JSON.stringify(firstThreeAdoptionBody(execution))
             : undefined,
         },
       );
       const payload = (await response.json().catch(() => ({}))) as GateActionReceiptPayload;
       if (!response.ok) throw new Error(payload.error ?? "动作执行失败。");
-      const receipt = buildGateActionReceipt({ action, payload, status: "succeeded" });
+      const receiptPayload: GateActionReceiptPayload = execution.type === "first_three_adoption"
+        ? {
+          ...payload,
+          message: payload.message ?? `${execution.title} 已处理，等待总闸门复检。`,
+          results: [{
+            status: "succeeded",
+            taskId: payload.task?.id ?? payload.result?.taskId,
+          }],
+        }
+        : payload;
+      const receipt = buildGateActionReceipt({ action, payload: receiptPayload, status: "succeeded" });
       setMessage(receipt.message);
       onReceipt?.(receipt);
       router.refresh();

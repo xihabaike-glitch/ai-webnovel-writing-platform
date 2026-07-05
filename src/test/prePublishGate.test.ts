@@ -207,6 +207,12 @@ test("buildPrePublishGate", async (t) => {
     assert.equal(adoptionItem?.href, "/projects/project-ready/chapters/chapter-1#chapter-workflow");
     assert.ok(gate.priorityActions.some((action) => action.id.includes(":review") && action.label === "重新审稿"));
     assert.equal(gate.priorityActions[0].id, "adoption-followup:first-three-adoption:project-ready:chapter-1:revision-1:review");
+    assert.deepEqual(gate.priorityActions[0].execution, {
+      type: "first_three_adoption",
+      itemId: "first-three-adoption:project-ready:chapter-1:revision-1:review",
+      title: "第 1 章采纳后重新审稿",
+      execution: { type: "chapter_review", chapterId: "chapter-1" },
+    });
     assert.equal(gate.releaseAction?.label, "先解除阻塞：重新审稿");
   });
 
@@ -370,6 +376,7 @@ test("buildPrePublishGate", async (t) => {
     assert.ok(repair.detail.includes("模型超时"));
     assert.equal(repair.actionLabel, "重试/切模型");
     assert.equal(repair.href, "/settings/models");
+    assert.equal(gate.priorityActions[0].execution, null);
     assert.equal(gate.releaseAction?.label, "先解除阻塞：重试/切模型");
   });
 
@@ -433,6 +440,7 @@ test("buildPrePublishGate", async (t) => {
     assert.equal(repair.actionLabel, "进入二改");
     assert.equal(repair.href, "/projects/project-ready/chapters/chapter-1#chapter-second-pass");
     assert.ok(repair.detail.includes("先执行二改"));
+    assert.equal(gate.priorityActions[0].execution, null);
   });
 
   await t.test("routes failed adoption publish checks to package repair", () => {

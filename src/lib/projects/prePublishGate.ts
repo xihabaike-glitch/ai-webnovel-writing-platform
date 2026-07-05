@@ -331,6 +331,12 @@ export type PrePublishGateActionExecution =
   | {
     type: "recommended_batch";
     strategyId: BatchExecutionStrategyId;
+  }
+  | {
+    type: "first_three_adoption";
+    itemId: string;
+    title: string;
+    execution: PrePublishGateAdoptionFollowupExecution;
   };
 
 export interface PrePublishGate {
@@ -728,6 +734,20 @@ function buildFirstThreeAdoptionRepairQueue(items: PrePublishGateAdoptionFollowu
     ));
 }
 
+function firstThreeAdoptionRepairExecution(
+  item: PrePublishGateAdoptionRepairItem,
+  followup: PrePublishGateAdoptionFollowupItem | null,
+): PrePublishGateActionExecution | null {
+  if (!followup?.execution) return null;
+  if (item.actionLabel !== followup.actionLabel) return null;
+  return {
+    type: "first_three_adoption",
+    itemId: followup.id,
+    title: followup.title,
+    execution: followup.execution,
+  };
+}
+
 function buildFirstThreeAdoptionClosure(projects: PrePublishGateProject[]): PrePublishGateAdoptionClosure {
   const followups = firstThreeAdoptionFollowups(projects);
   const items = followups.map(({ project, task }): PrePublishGateAdoptionFollowupItem => {
@@ -1082,15 +1102,20 @@ function uniqueActions(actions: PrePublishGateAction[]) {
 }
 
 function firstThreeAdoptionPriorityActions(closure: PrePublishGateAdoptionClosure) {
+  const itemsById = new Map(closure.items.map((item) => [item.id, item]));
   return closure.repairQueue
     .slice(0, 4)
-    .map((item) => action(
-      `adoption-followup:${item.followupItemId}`,
-      item.actionLabel,
-      `${item.projectTitle} · ${item.title} · ${item.detail}`,
-      item.href,
-      "repair",
-    ));
+    .map((item) => {
+      const followup = itemsById.get(item.followupItemId) ?? null;
+      return action(
+        `adoption-followup:${item.followupItemId}`,
+        item.actionLabel,
+        `${item.projectTitle} · ${item.title} · ${item.detail}`,
+        item.href,
+        "repair",
+        firstThreeAdoptionRepairExecution(item, followup),
+      );
+    });
 }
 
 function buildReleaseAction(

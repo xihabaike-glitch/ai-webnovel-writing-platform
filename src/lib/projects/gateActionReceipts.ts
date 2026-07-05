@@ -1,4 +1,9 @@
-import type { PrePublishGateAction, PrePublishGateActionExecution, PrePublishGateStrategyPlatform } from "./prePublishGate.ts";
+import type {
+  PrePublishGateAction,
+  PrePublishGateActionExecution,
+  PrePublishGateAdoptionFollowupItem,
+  PrePublishGateStrategyPlatform,
+} from "./prePublishGate.ts";
 import type { FailureRepairBatch } from "../ai/taskRunConsole.ts";
 
 export const gateActionReceiptStorageKey = "ai-webnovel-gate-action-receipts";
@@ -947,6 +952,16 @@ export interface GatePublishEffectReceiptMetric {
   snapshotDate?: Date | string;
 }
 
+export interface GateFirstThreeAdoptionReceiptResult {
+  id: string;
+  projectId: string;
+  projectTitle: string;
+  label: string;
+  title: string;
+  status: "succeeded" | "failed";
+  message?: string;
+}
+
 function countStatus(payload: GateActionReceiptPayload) {
   const results = payload.results?.length ? payload.results : payload.result ? [payload.result] : [];
   return {
@@ -1839,6 +1854,58 @@ export function buildGatePublishEffectReceipt(input: {
       status: "ready",
       label: "复检发布效果建议",
       detail: "真实投放数据已回填，刷新总闸门后确认平台策略、二轮优化和加码建议是否更新。",
+      actionLabel: "刷新总闸门",
+    },
+    createdAt,
+  };
+}
+
+export function buildGateFirstThreeAdoptionReceipt(input: {
+  mode: "single" | "batch_review" | "batch_publish";
+  items: PrePublishGateAdoptionFollowupItem[];
+  results: GateFirstThreeAdoptionReceiptResult[];
+  now?: Date | string;
+}): GateActionReceipt {
+  const createdAt = input.now ? new Date(input.now).toISOString() : new Date().toISOString();
+  const firstItem = input.items[0] ?? null;
+  const succeededCount = input.results.filter((result) => result.status === "succeeded").length;
+  const failedCount = input.results.filter((result) => result.status === "failed").length;
+  const modeLabel = input.mode === "batch_review"
+    ? "批量重新审稿"
+    : input.mode === "batch_publish"
+      ? "批量刷新质检"
+      : firstItem?.label ?? "采纳后续处理";
+  const platformId = firstItem?.platformId ?? "first-three-adoption";
+  const platformName = "前三章采纳闭环";
+  const projectCount = new Set(input.items.map((item) => item.projectId)).size;
+  const detailTarget = input.items.length > 1
+    ? `${projectCount} 个项目 · ${input.items.length} 个后续任务`
+    : `${firstItem?.projectTitle ?? "项目"} · ${firstItem?.title ?? "采纳后续任务"}`;
+  const failedMessage = input.results.find((result) => result.status === "failed")?.message;
+  const message = failedCount > 0
+    ? `${modeLabel}完成：成功 ${succeededCount} 个，失败 ${failedCount} 个。${failedMessage ? `首个失败：${failedMessage}` : ""}`
+    : `${modeLabel}完成：成功 ${succeededCount} 个，采纳后的审稿和发布质检证据已回到总闸门。`;
+
+  return {
+    id: `first-three-adoption:${input.mode}:${createdAt}`,
+    actionId: `first-three-adoption:${input.mode}`,
+    label: modeLabel,
+    detail: `${detailTarget} · 采纳后正文变更闭环`,
+    href: firstItem?.href ?? "/gate#first-three-adoption-closure",
+    status: failedCount > 0 ? "failed" : "succeeded",
+    message,
+    executionType: "manual",
+    succeededCount,
+    failedCount,
+    taskId: null,
+    platformId,
+    platformName,
+    recheck: {
+      status: failedCount > 0 ? "blocked" : "ready",
+      label: failedCount > 0 ? "处理失败项后复检" : "复检采纳闭环",
+      detail: failedCount > 0
+        ? "有采纳后续动作失败，先处理失败项，再刷新总闸门确认闭环状态。"
+        : "采纳后续已执行，刷新总闸门确认重新审稿、发布质检和发布包状态是否全部闭合。",
       actionLabel: "刷新总闸门",
     },
     createdAt,

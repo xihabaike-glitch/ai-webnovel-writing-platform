@@ -43,6 +43,7 @@ import {
   filterGatePlatformDecisionTimelineItems,
   buildGateDispatchTaskCenter,
   buildGateDispatchTaskCloseoutItem,
+  buildGateFirstThreeAdoptionReceipt,
   buildGatePublishEffectReceipt,
   filterGateDispatchTasks,
   filterGateActionReceipts,
@@ -51,7 +52,7 @@ import {
   trimGateActionReceipts,
 } from "../lib/projects/gateActionReceipts.ts";
 import { buildProjectStartDecisionActionReceipt } from "../lib/projects/projectStartDecisionActions.ts";
-import type { PrePublishGateAction, PrePublishGateStrategyPlatform } from "../lib/projects/prePublishGate.ts";
+import type { PrePublishGateAction, PrePublishGateAdoptionFollowupItem, PrePublishGateStrategyPlatform } from "../lib/projects/prePublishGate.ts";
 import type { FailureRepairBatch } from "../lib/ai/taskRunConsole.ts";
 
 const action: PrePublishGateAction = {
@@ -91,6 +92,28 @@ const strategyPlatform: PrePublishGateStrategyPlatform = {
     loopLabel: "先采纳候选",
     href: "/projects/project-1#submission-asset-editor",
   }],
+};
+
+const firstThreeFollowup: PrePublishGateAdoptionFollowupItem = {
+  id: "first-three-adoption:project-1:chapter-1:revision-1:review",
+  projectId: "project-1",
+  projectTitle: "夜雨系统",
+  chapterId: "chapter-1",
+  revisionId: "revision-1",
+  platformId: "fanqie",
+  type: "review",
+  label: "重新审稿",
+  title: "第 1 章采纳后重新审稿",
+  status: "block",
+  state: "assigned",
+  detail: "采纳后的新正文需要重新审稿。",
+  evidence: "",
+  actionLabel: "重新审稿",
+  href: "/projects/project-1/chapters/chapter-1#chapter-workflow",
+  execution: {
+    type: "chapter_review",
+    chapterId: "chapter-1",
+  },
 };
 
 const failureRepairBatch: FailureRepairBatch = {
@@ -185,6 +208,69 @@ test("buildGateActionReceipt", async (t) => {
     assert.ok(receipt.startTactics?.[0].openingMove.includes("倒计时"));
     assert.equal(receipt.recheck.status, "ready");
     assert.equal(receipt.recheck.label, "复检任务队列");
+  });
+
+  await t.test("records first-three adoption follow-up execution receipts", () => {
+    const receipt = buildGateFirstThreeAdoptionReceipt({
+      mode: "single",
+      items: [firstThreeFollowup],
+      results: [{
+        id: firstThreeFollowup.id,
+        projectId: firstThreeFollowup.projectId,
+        projectTitle: firstThreeFollowup.projectTitle,
+        label: firstThreeFollowup.label,
+        title: firstThreeFollowup.title,
+        status: "succeeded",
+        message: "审稿已完成。",
+      }],
+      now: "2026-01-01T00:00:00.000Z",
+    });
+
+    assert.equal(receipt.actionId, "first-three-adoption:single");
+    assert.equal(receipt.executionType, "manual");
+    assert.equal(receipt.succeededCount, 1);
+    assert.equal(receipt.failedCount, 0);
+    assert.equal(receipt.platformId, "fanqie");
+    assert.equal(receipt.platformName, "前三章采纳闭环");
+    assert.ok(receipt.message.includes("成功 1 个"));
+    assert.equal(receipt.recheck.status, "ready");
+    assert.equal(receipt.recheck.label, "复检采纳闭环");
+  });
+
+  await t.test("records failed first-three adoption batch receipts", () => {
+    const receipt = buildGateFirstThreeAdoptionReceipt({
+      mode: "batch_review",
+      items: [firstThreeFollowup, { ...firstThreeFollowup, id: "first-three-adoption:project-1:chapter-2:revision-2:review", chapterId: "chapter-2" }],
+      results: [
+        {
+          id: firstThreeFollowup.id,
+          projectId: firstThreeFollowup.projectId,
+          projectTitle: firstThreeFollowup.projectTitle,
+          label: firstThreeFollowup.label,
+          title: firstThreeFollowup.title,
+          status: "succeeded",
+        },
+        {
+          id: "first-three-adoption:project-1:chapter-2:revision-2:review",
+          projectId: "project-1",
+          projectTitle: "夜雨系统",
+          label: "重新审稿",
+          title: "第 2 章采纳后重新审稿",
+          status: "failed",
+          message: "预算拦截。",
+        },
+      ],
+      now: "2026-01-01T00:00:00.000Z",
+    });
+
+    assert.equal(receipt.status, "failed");
+    assert.equal(receipt.actionId, "first-three-adoption:batch_review");
+    assert.equal(receipt.succeededCount, 1);
+    assert.equal(receipt.failedCount, 1);
+    assert.ok(receipt.message.includes("失败 1 个"));
+    assert.ok(receipt.message.includes("预算拦截"));
+    assert.equal(receipt.recheck.status, "blocked");
+    assert.equal(receipt.recheck.label, "处理失败项后复检");
   });
 
   await t.test("reviews batch tactic effects from recommended batch receipts", () => {

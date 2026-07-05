@@ -3,6 +3,11 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import {
+  addGateActionReceipt,
+  buildGateFirstThreeAdoptionReceipt,
+  type GateFirstThreeAdoptionReceiptResult,
+} from "@/lib/projects/gateActionReceipts";
 import type { PrePublishGateAdoptionClosure, PrePublishGateAdoptionFollowupItem } from "@/lib/projects/prePublishGate";
 
 function panelTone(status: PrePublishGateAdoptionClosure["status"]) {
@@ -94,10 +99,37 @@ export function GateFirstThreeAdoptionPanel({ closure }: { closure: PrePublishGa
     setMessage(null);
     try {
       const result = await executeFollowupRequest(item);
+      addGateActionReceipt(buildGateFirstThreeAdoptionReceipt({
+        mode: "single",
+        items: [item],
+        results: [{
+          id: item.id,
+          projectId: item.projectId,
+          projectTitle: item.projectTitle,
+          label: item.label,
+          title: item.title,
+          status: "succeeded",
+          message: result,
+        }],
+      }));
       setMessage(`${result} 正在刷新总闸门。`);
       router.refresh();
     } catch (caught) {
-      setMessage(caught instanceof Error ? caught.message : "处理采纳后续失败。");
+      const errorMessage = caught instanceof Error ? caught.message : "处理采纳后续失败。";
+      addGateActionReceipt(buildGateFirstThreeAdoptionReceipt({
+        mode: "single",
+        items: [item],
+        results: [{
+          id: item.id,
+          projectId: item.projectId,
+          projectTitle: item.projectTitle,
+          label: item.label,
+          title: item.title,
+          status: "failed",
+          message: errorMessage,
+        }],
+      }));
+      setMessage(errorMessage);
     } finally {
       setRunningId(null);
     }
@@ -108,16 +140,38 @@ export function GateFirstThreeAdoptionPanel({ closure }: { closure: PrePublishGa
     if (!batchItems.length) return;
     setRunningId(`batch:${kind}`);
     setMessage(null);
-    let succeeded = 0;
-    let failed = 0;
+    const results: GateFirstThreeAdoptionReceiptResult[] = [];
     for (const item of batchItems) {
       try {
-        await executeFollowupRequest(item);
-        succeeded += 1;
-      } catch {
-        failed += 1;
+        const result = await executeFollowupRequest(item);
+        results.push({
+          id: item.id,
+          projectId: item.projectId,
+          projectTitle: item.projectTitle,
+          label: item.label,
+          title: item.title,
+          status: "succeeded",
+          message: result,
+        });
+      } catch (caught) {
+        results.push({
+          id: item.id,
+          projectId: item.projectId,
+          projectTitle: item.projectTitle,
+          label: item.label,
+          title: item.title,
+          status: "failed",
+          message: caught instanceof Error ? caught.message : "处理采纳后续失败。",
+        });
       }
     }
+    const succeeded = results.filter((result) => result.status === "succeeded").length;
+    const failed = results.filter((result) => result.status === "failed").length;
+    addGateActionReceipt(buildGateFirstThreeAdoptionReceipt({
+      mode: kind === "review" ? "batch_review" : "batch_publish",
+      items: batchItems,
+      results,
+    }));
     setMessage(`${kind === "review" ? "批量重新审稿" : "批量刷新质检"}完成：成功 ${succeeded} 个，失败 ${failed} 个。`);
     setRunningId(null);
     router.refresh();

@@ -691,9 +691,14 @@ export default async function ProjectPage({ params }: { params: Promise<{ projec
             <CreateChapterForm projectId={project.id} />
           </div>
           <div className="rounded-md border border-slate-200 bg-white p-4">
-            <div className="mb-3">
-              <div className="font-medium">资料包导出</div>
-              <p className="mt-1 text-xs leading-5 text-slate-500">正文、大纲、人物、设定和伏笔会一起进入 Markdown 备份包。</p>
+            <div className="mb-3 flex items-start justify-between gap-3">
+              <div>
+                <div className="font-medium">资料包导出</div>
+                <p className="mt-1 text-xs leading-5 text-slate-500">正文、大纲、人物、设定和伏笔会一起进入 Markdown 备份包。</p>
+              </div>
+              <Link className="rounded-md border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50" href={`/projects/${project.id}/exports`}>
+                版本中心
+              </Link>
             </div>
             <ExportMarkdownButton projectId={project.id} readiness={exportReadiness} snapshots={exportSnapshots} title={project.title} />
           </div>

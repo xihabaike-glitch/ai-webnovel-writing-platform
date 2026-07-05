@@ -62,6 +62,10 @@ function latestTask(tasks: ReviewPipelineTask[], chapterId: string, taskType: st
   return tasks.find((task) => task.chapterId === chapterId && task.taskType === taskType);
 }
 
+function taskTime(task: ReviewPipelineTask | undefined) {
+  return task ? new Date(task.createdAt).getTime() : 0;
+}
+
 function hasRunning(tasks: ReviewPipelineTask[], chapterId: string, taskType: string) {
   return tasks.some((task) => (
     task.chapterId === chapterId
@@ -113,13 +117,18 @@ function candidateFor(chapter: ReviewPipelineChapter, tasks: ReviewPipelineTask[
   const runningSecondPass = hasRunning(tasks, chapter.id, "chapter_second_pass");
   const reviewTask = latestTask(tasks, chapter.id, "chapter_review");
   const secondPassTask = latestTask(tasks, chapter.id, "chapter_second_pass");
+  const adoptionTask = latestTask(tasks, chapter.id, "chapter_adopt_candidate");
   const review = parseReview(reviewTask?.outputText ?? null);
   const issueCount = review?.issues?.length ?? 0;
   const score = typeof review?.score === "number" ? review.score : null;
   const hasDraft = chapter.wordCount > 0;
-  const reviewed = reviewTask?.status === "succeeded" && Boolean(review);
+  const adoptionTime = taskTime(adoptionTask);
+  const reviewIsFresh = taskTime(reviewTask) > adoptionTime;
+  const secondPassIsFresh = taskTime(secondPassTask) > adoptionTime;
+  const hasStaleReviewAfterAdoption = Boolean(adoptionTask && reviewTask?.status === "succeeded" && !reviewIsFresh);
+  const reviewed = reviewTask?.status === "succeeded" && Boolean(review) && reviewIsFresh;
   const needsSecondPass = reviewed && needsSecondPassFromReview(review);
-  const secondPassDone = secondPassTask?.status === "succeeded";
+  const secondPassDone = secondPassTask?.status === "succeeded" && secondPassIsFresh;
   const reviewStatus = runningReview
     ? "running"
     : !hasDraft
@@ -156,6 +165,8 @@ function candidateFor(chapter: ReviewPipelineChapter, tasks: ReviewPipelineTask[
             : secondPassDone
               ? "二改后复检已达标。"
               : "已审稿，暂不需要批量二改。"
+          : hasStaleReviewAfterAdoption
+            ? "采纳候选稿后正文已变更，需要重新审稿。"
           : "已有正文但未审稿，可以进入批量审稿。",
     recommendedReview: reviewStatus === "ready",
     recommendedSecondPass: secondPassStatus === "ready",

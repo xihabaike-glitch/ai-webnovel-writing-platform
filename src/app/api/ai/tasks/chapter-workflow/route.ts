@@ -32,7 +32,7 @@ export async function GET(request: Request) {
       where: {
         chapterId,
         taskType: {
-          in: ["chapter_draft", "chapter_review", "chapter_second_pass"],
+          in: ["chapter_draft", "chapter_review", "chapter_second_pass", "chapter_adopt_candidate"],
         },
       },
       include: {

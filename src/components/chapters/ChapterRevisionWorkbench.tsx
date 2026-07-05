@@ -32,6 +32,14 @@ interface EditableChapter extends ChapterRevisionComparable {
   id: string;
 }
 
+interface AdoptRevisionResponse {
+  nextAction?: {
+    label: string;
+    detail: string;
+    href: string;
+  };
+}
+
 function formatDate(value: string) {
   return new Date(value).toLocaleString();
 }
@@ -129,7 +137,10 @@ export function ChapterRevisionWorkbench({ chapter }: { chapter: EditableChapter
       if (!response.ok) {
         throw new Error("采纳候选稿失败。");
       }
-      setMessage("已采纳候选稿，页面正在刷新");
+      const payload = await response.json().catch(() => null) as AdoptRevisionResponse | null;
+      setMessage(payload?.nextAction
+        ? `已采纳候选稿。下一步：${payload.nextAction.label}，${payload.nextAction.detail}`
+        : "已采纳候选稿。下一步请重新审稿，确认当前正文能否进入二改或发布质检。");
       router.refresh();
     } catch (caught) {
       setMessage(caught instanceof Error ? caught.message : "采纳候选稿失败。");

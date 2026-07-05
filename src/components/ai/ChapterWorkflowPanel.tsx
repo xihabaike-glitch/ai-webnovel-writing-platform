@@ -96,6 +96,14 @@ interface BudgetGuardView {
   repairActions: BudgetRepairAction[];
 }
 
+interface AdoptRevisionResponse {
+  nextAction?: {
+    label: string;
+    detail: string;
+    href: string;
+  };
+}
+
 function statusText(status: string) {
   const labels: Record<string, string> = {
     queued: "排队中",
@@ -283,7 +291,10 @@ export function ChapterWorkflowPanel({
         throw new Error("采纳候选稿失败。");
       }
 
-      setMessage("已采纳候选稿并写入正文");
+      const payload = await response.json().catch(() => null) as AdoptRevisionResponse | null;
+      setMessage(payload?.nextAction
+        ? `已采纳候选稿并写入正文。下一步：${payload.nextAction.label}，${payload.nextAction.detail}`
+        : "已采纳候选稿并写入正文。下一步请重新审稿。");
       await loadWorkflow();
       await loadRevisions();
       router.refresh();

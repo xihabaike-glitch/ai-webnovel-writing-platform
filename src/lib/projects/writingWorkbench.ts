@@ -727,6 +727,7 @@ function taskLabel(taskType: string) {
     chapter_draft: "正文生成",
     chapter_review: "平台复审",
     chapter_second_pass: "章节二改",
+    chapter_adopt_candidate: "采纳候选稿",
     first_three_rewrite: "前三章改写",
     submission_package_optimize: "投稿资料优化",
     control_asset_generate: "总控资料生成",
@@ -746,6 +747,7 @@ function summarizeTask(task: WritingWorkbenchAiTask) {
 function nextActionForTask(task: WritingWorkbenchAiTask) {
   if (task.status === "failed") return "先复盘模型路由、预算和提示词，再重试。";
   if (task.taskType === "chapter_draft") return "进入平台复审，检查节奏、爽点和人物选择。";
+  if (task.taskType === "chapter_adopt_candidate") return "候选稿已进入正文，马上重新审稿，旧审稿不能继续当通行证。";
   if (task.taskType === "chapter_review") return "按审稿结论补强章节卡或执行二改。";
   if (task.taskType === "chapter_second_pass") return "回到发布检查，确认是否可进入投稿包。";
   return "把结果沉淀到项目土壤或下一轮动作里。";

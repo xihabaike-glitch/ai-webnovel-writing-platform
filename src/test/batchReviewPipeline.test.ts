@@ -163,6 +163,66 @@ test("buildReviewPipelineQueue", async (t) => {
     assert.equal(passedRecheckQueue.candidates[0].reason, "二改后复检已达标。");
   });
 
+  await t.test("requires a fresh review after adopting a candidate revision", () => {
+    const staleReviewQueue = buildReviewPipelineQueue([chapter], [
+      {
+        id: "old-review",
+        chapterId: "chapter-1",
+        taskType: "chapter_review",
+        status: "succeeded",
+        outputText: JSON.stringify({
+          score: 92,
+          shouldSecondPass: false,
+          issues: [],
+        }),
+        errorMessage: null,
+        createdAt: "2026-01-01T00:00:00.000Z",
+      },
+      {
+        id: "adopt-candidate",
+        chapterId: "chapter-1",
+        taskType: "chapter_adopt_candidate",
+        status: "succeeded",
+        outputText: JSON.stringify({ adopted: true }),
+        errorMessage: null,
+        createdAt: "2026-01-02T00:00:00.000Z",
+      },
+    ]);
+
+    assert.equal(staleReviewQueue.reviewReadyCount, 1);
+    assert.equal(staleReviewQueue.secondPassReadyCount, 0);
+    assert.equal(staleReviewQueue.candidates[0].reviewStatus, "ready");
+    assert.ok(staleReviewQueue.candidates[0].reason.includes("重新审稿"));
+
+    const freshReviewQueue = buildReviewPipelineQueue([chapter], [
+      {
+        id: "adopt-candidate",
+        chapterId: "chapter-1",
+        taskType: "chapter_adopt_candidate",
+        status: "succeeded",
+        outputText: JSON.stringify({ adopted: true }),
+        errorMessage: null,
+        createdAt: "2026-01-02T00:00:00.000Z",
+      },
+      {
+        id: "fresh-review",
+        chapterId: "chapter-1",
+        taskType: "chapter_review",
+        status: "succeeded",
+        outputText: JSON.stringify({
+          score: 90,
+          shouldSecondPass: false,
+          issues: [],
+        }),
+        errorMessage: null,
+        createdAt: "2026-01-03T00:00:00.000Z",
+      },
+    ]);
+
+    assert.equal(freshReviewQueue.reviewReadyCount, 0);
+    assert.equal(freshReviewQueue.candidates[0].reviewStatus, "reviewed");
+  });
+
   await t.test("blocks empty chapters and running jobs", () => {
     const queue = buildReviewPipelineQueue([
       { ...chapter, id: "empty", wordCount: 0 },

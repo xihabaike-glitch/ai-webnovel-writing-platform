@@ -327,12 +327,13 @@ function verdict(completedCount: number, totalSteps: number) {
 function startTacticRiskLevel(startTactic: ProjectStartTacticSummary | null | undefined): FirstDayRiskLevel {
   const label = startTactic?.label ?? "";
   if (/三轮暂停|三轮换平台|止损|避坑|blocked/i.test(label)) return "blocked";
-  if (/三轮降档|观察|验收|动作|watch/i.test(label)) return "watch";
+  if (/恢复放量|三轮降档|观察|验收|动作|watch/i.test(label)) return "watch";
   return "standard";
 }
 
 export function buildFirstDayRiskProfile(startTactic?: ProjectStartTacticSummary | null): FirstDayRiskProfile {
   const level = startTacticRiskLevel(startTactic);
+  const recoveryScale = /恢复放量/u.test(startTactic?.label ?? "");
   const avoidCriteria = (startTactic?.avoidRules ?? []).slice(0, 2).map((rule) => `避坑边界已落实：${rule}`);
   const avoidEvidence = (startTactic?.avoidRules ?? []).length ? ["缺少开书交接避坑边界的落地说明。"] : [];
 
@@ -357,14 +358,17 @@ export function buildFirstDayRiskProfile(startTactic?: ProjectStartTacticSummary
     return {
       level,
       label: startTactic?.label ?? "观察",
-      headline: "观察平台首日只跑小样本验证。",
-      instruction: "把通过线、不可接受项、复查证据和放量结论写清楚，先看首轮数据再决定是否扩大。",
+      headline: recoveryScale ? "恢复放量首日只跑小样本验证。" : "观察平台首日只跑小样本验证。",
+      instruction: recoveryScale
+        ? "恢复放量只说明闸门解除过，不说明新书可以直接放量；先写清通过线、不可接受项、复查证据和放量结论。"
+        : "把通过线、不可接受项、复查证据和放量结论写清楚，先看首轮数据再决定是否扩大。",
       acceptanceCriteria: [
+        ...(recoveryScale ? ["恢复放量：新项目仍先跑小样本，不能直接批量生成或平台加码。"] : []),
         "写清首轮小样本通过线、不可接受项和放量结论。",
         "保留第一章或前三章复查证据，后续按数据决定是否扩大。",
         ...avoidCriteria,
       ],
-      missingEvidence: ["缺少观察平台首轮小样本验证口径。", ...avoidEvidence],
+      missingEvidence: [recoveryScale ? "缺少恢复放量首轮小样本验证口径。" : "缺少观察平台首轮小样本验证口径。", ...avoidEvidence],
       priorityBoost: 8,
       dueLabel: "今天小样本验证",
     };
@@ -1232,6 +1236,7 @@ export function buildFirstDayExperienceHandoffDispatchItems(input: FirstDayDispa
   if (!focus) return [];
 
   const projectHref = `/projects/${input.project.id}`;
+  const recoveryScale = /恢复放量/u.test(focus.label);
   const evidence = [
     `来源：${focus.title}（${focus.label}）`,
     focus.handoffDetail ? `交接说明：${focus.handoffDetail}` : null,
@@ -1246,6 +1251,9 @@ export function buildFirstDayExperienceHandoffDispatchItems(input: FirstDayDispa
     focus.verificationMove ? `验证动作已进入首轮复查：${focus.verificationMove}` : "验证动作已进入首轮复查。",
   ];
   const [primaryTacticCriterion, openingMoveCriterion, verificationMoveCriterion] = sharedCriteria;
+  const recoveryOpeningCriterion = recoveryScale ? "恢复放量开头只作为小样本验证，不直接扩到前三章批量。" : null;
+  const recoveryVerificationCriterion = recoveryScale ? "恢复放量验收必须写清小样本通过线、不可接受项和放量结论。" : null;
+  const recoveryPackageCriterion = recoveryScale ? "恢复放量平台包必须先回收小样本曝光、点击、收藏、追读。" : null;
 
   return [
     {
@@ -1264,8 +1272,9 @@ export function buildFirstDayExperienceHandoffDispatchItems(input: FirstDayDispa
       acceptanceCriteria: [
         primaryTacticCriterion,
         openingMoveCriterion,
+        recoveryOpeningCriterion,
         "第一章首屏必须能看出危机、选择、代价和继续读的理由。",
-      ],
+      ].filter((criterion): criterion is string => Boolean(criterion)),
       evidence,
       reviewLatestAt: new Date().toISOString(),
     },
@@ -1284,9 +1293,10 @@ export function buildFirstDayExperienceHandoffDispatchItems(input: FirstDayDispa
       href: input.workflow.executionPackage.href,
       acceptanceCriteria: [
         verificationMoveCriterion,
+        recoveryVerificationCriterion,
         "前三章验收必须写清通过线、不可接受项和复查证据格式。",
         "模型路线复检要记录成功率、质量和成本，不靠默认路线硬跑。",
-      ],
+      ].filter((criterion): criterion is string => Boolean(criterion)),
       evidence,
       reviewLatestAt: new Date().toISOString(),
     },
@@ -1305,9 +1315,10 @@ export function buildFirstDayExperienceHandoffDispatchItems(input: FirstDayDispa
       href: `${projectHref}#platform-export`,
       acceptanceCriteria: [
         "标题、简介、标签和样章能兑现本次开书打法。",
+        recoveryPackageCriterion,
         "首轮曝光、点击、收藏、追读或站内反馈的回收字段已写清。",
         ...focus.avoidRules.slice(0, 1).map((rule) => `避坑边界已进入平台包：${rule}`),
-      ],
+      ].filter((criterion): criterion is string => Boolean(criterion)),
       evidence,
       reviewLatestAt: new Date().toISOString(),
     },

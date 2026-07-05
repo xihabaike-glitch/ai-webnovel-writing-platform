@@ -179,6 +179,8 @@ test("buildFirstDayWorkflow", async (t) => {
 
     assert.equal(workflow.nextStep.id, "first-draft");
     assert.equal(workflow.executionPackage.tacticFocus?.label, "恢复放量打法");
+    assert.equal(workflow.executionPackage.riskLevel, "watch");
+    assert.equal(workflow.executionPackage.riskDueLabel, "今天小样本验证");
     assert.equal(workflow.handoffProgress?.headline, "开书交接执行进度");
     assert.equal(workflow.handoffProgress?.progressPercent, 0);
     assert.equal(workflow.handoffProgress?.items[0]?.status, "active");
@@ -203,6 +205,10 @@ test("buildFirstDayWorkflow", async (t) => {
     assert.ok(workflow.executionPackage.modelPrompt.includes("首日动作"));
     assert.ok(workflow.executionPackage.modelPrompt.includes("避坑边界"));
     assert.ok(workflow.executionPackage.modelPrompt.includes("模型路线复检"));
+    assert.equal(dispatch.dueLabel, "今天小样本验证");
+    assert.ok(dispatch.title.includes("小样本验证"));
+    assert.ok(dispatch.acceptanceCriteria.some((criterion) => criterion.includes("恢复放量")));
+    assert.ok(dispatch.acceptanceCriteria.some((criterion) => criterion.includes("新项目仍先跑小样本")));
     assert.ok(dispatch.acceptanceCriteria.some((criterion) => criterion.includes("模型路线复检")));
     assert.deepEqual(handoffDispatches.map((item) => item.id), [
       "first-day-handoff:project-1:opening",
@@ -211,8 +217,12 @@ test("buildFirstDayWorkflow", async (t) => {
     ]);
     assert.deepEqual(handoffDispatches.map((item) => item.ownerRole), ["开头编辑", "审稿编辑", "平台运营"]);
     assert.ok(handoffDispatches[0]?.acceptanceCriteria.some((criterion) => criterion.includes("倒计时")));
+    assert.ok(handoffDispatches[0]?.acceptanceCriteria.some((criterion) => criterion.includes("恢复放量")));
+    assert.ok(handoffDispatches[0]?.acceptanceCriteria.some((criterion) => criterion.includes("小样本")));
     assert.ok(handoffDispatches[1]?.acceptanceCriteria.some((criterion) => criterion.includes("通过线")));
+    assert.ok(handoffDispatches[1]?.acceptanceCriteria.some((criterion) => criterion.includes("恢复放量")));
     assert.ok(handoffDispatches[2]?.acceptanceCriteria.some((criterion) => criterion.includes("首轮曝光")));
+    assert.ok(handoffDispatches[2]?.acceptanceCriteria.some((criterion) => criterion.includes("小样本")));
     assert.ok(handoffDispatches.every((item) => item.evidence.some((evidence) => evidence.includes("稳定加码"))));
     assert.equal(launchPackage.handoffDispatches.length, 3);
   });

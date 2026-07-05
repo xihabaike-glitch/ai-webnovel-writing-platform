@@ -190,6 +190,29 @@ export function buildFirstDayReturnToAcceptanceHref(input: {
   return `${baseHref}${separator}firstDayEvidence=${encodeURIComponent(completionEvidence)}${hash}`;
 }
 
+export function buildFirstDayReturnedEvidenceAcceptanceState(input: {
+  completionEvidence?: string | null;
+  hasDispatch: boolean;
+}) {
+  const completionEvidence = cleanEvidence(input.completionEvidence ?? "");
+  const visible = completionEvidence.length > 0;
+  const canComplete = input.hasDispatch && completionEvidence.length >= MIN_COMPLETION_EVIDENCE_LENGTH;
+
+  return {
+    visible,
+    shouldFocusAcceptance: visible,
+    canComplete,
+    message: canComplete
+      ? "已带回首日 AI 执行证据，验收依据已填好。检查后可以点击「完成当前派单」。"
+      : "已带回首日 AI 执行证据，请补足验收依据后完成当前派单。",
+    buttonHint: canComplete
+      ? "当前证据已满足验收字数，可以直接验收。"
+      : input.hasDispatch
+        ? "验收依据至少需要 8 个字。"
+        : "当前还没有可验收派单，请先刷新首日工作流。",
+  };
+}
+
 export interface FirstDayDispatchFocusInput {
   dispatchKey?: string | null;
   projectId?: string | null;

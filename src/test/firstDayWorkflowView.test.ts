@@ -11,6 +11,7 @@ import {
   buildFirstDayHandoffGateCta,
   buildFirstDayPostDispatchCompletionPrompt,
   buildFirstDayReturnToAcceptanceHref,
+  buildFirstDayReturnedEvidenceAcceptanceState,
   buildFirstDayRouteRepairReturnNotice,
   buildFirstDayReceiptCompletionAction,
   buildFirstDayReceiptCompletionEvidence,
@@ -711,6 +712,19 @@ test("buildFirstDayReturnToAcceptanceHref carries execution evidence back to the
     href,
     "/projects/project-1?firstDayLaunch=1&nextStep=first-review&firstDayEvidence=%E7%AC%AC%E4%B8%80%E7%AB%A0%E5%AE%A1%E7%A8%BF%E5%B7%B2%E5%AE%8C%E6%88%90%EF%BC%9A%E9%92%A9%E5%AD%90%E3%80%81%E7%88%BD%E7%82%B9%E5%92%8C%E7%AB%A0%E6%9C%AB%E8%BF%BD%E8%AF%BB%E7%82%B9%E5%B7%B2%E7%BB%8F%E5%A4%8D%E6%9F%A5%E3%80%82#first-day-workflow",
   );
+});
+
+test("buildFirstDayReturnedEvidenceAcceptanceState focuses a completable returned receipt", () => {
+  const state = buildFirstDayReturnedEvidenceAcceptanceState({
+    completionEvidence: "第一章审稿已完成：钩子、爽点和章末追读点已经复查。",
+    hasDispatch: true,
+  });
+
+  assert.equal(state.visible, true);
+  assert.equal(state.shouldFocusAcceptance, true);
+  assert.equal(state.canComplete, true);
+  assert.equal(state.message, "已带回首日 AI 执行证据，验收依据已填好。检查后可以点击「完成当前派单」。");
+  assert.equal(state.buttonHint, "当前证据已满足验收字数，可以直接验收。");
 });
 
 test("buildFirstDayDispatchUpdateSummary explains watch sample scale-up status", () => {

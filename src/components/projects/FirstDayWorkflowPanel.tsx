@@ -1,10 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { buildFirstDayExecutionRouteBlockMessage, type FirstDayExecutionRouteStatus } from "@/lib/model-gateway/firstDayExecutionRoute";
-import { buildFirstDayDispatchUpdateSummary, buildFirstDayExecutionReceiptFollowupPrompt, buildFirstDayExecutionRiskNotice, buildFirstDayExecutionSafetyBanner, buildFirstDayHandoffGateCta, buildFirstDayPostDispatchCompletionPrompt, buildFirstDayReceiptCompletionAction, buildFirstDayReceiptCompletionEvidence, buildFirstDayRouteRepairReturnNotice, buildFirstDayStepView, completeFirstDayDispatchStep, type FirstDayWorkflowMessageAction } from "@/lib/projects/firstDayWorkflowView";
+import { buildFirstDayDispatchUpdateSummary, buildFirstDayExecutionReceiptFollowupPrompt, buildFirstDayExecutionRiskNotice, buildFirstDayExecutionSafetyBanner, buildFirstDayHandoffGateCta, buildFirstDayPostDispatchCompletionPrompt, buildFirstDayReceiptCompletionAction, buildFirstDayReceiptCompletionEvidence, buildFirstDayReturnedEvidenceAcceptanceState, buildFirstDayRouteRepairReturnNotice, buildFirstDayStepView, completeFirstDayDispatchStep, type FirstDayWorkflowMessageAction } from "@/lib/projects/firstDayWorkflowView";
 import { persistGateDispatchTask, type GatePlatformGrowthDispatchItem, type PersistedGatePlatformDispatchTask } from "@/lib/projects/gateActionReceipts";
 
 interface FirstDayWorkflowStep {
@@ -355,6 +355,8 @@ export function FirstDayWorkflowPanel({ projectId }: { projectId: string }) {
   const [executionReceipt, setExecutionReceipt] = useState<FirstDayExecutionReceipt | null>(null);
   const [continuation, setContinuation] = useState<FirstDayContinuationAction | null>(null);
   const [handoffFollowupDispatches, setHandoffFollowupDispatches] = useState<GatePlatformGrowthDispatchItem[]>([]);
+  const completionEvidenceRef = useRef<HTMLTextAreaElement | null>(null);
+  const hasFocusedReturnedEvidence = useRef(false);
 
   function showMessage(nextMessage: string | null, action?: FirstDayMessageAction, actionLabel?: string, actionHref?: string) {
     setMessage(nextMessage);
@@ -380,8 +382,12 @@ export function FirstDayWorkflowPanel({ projectId }: { projectId: string }) {
       setContinuation(payload.continuation);
       setHandoffFollowupDispatches(payload.handoffFollowupDispatches ?? []);
       if (returnedCompletionEvidence) {
+        const returnedState = buildFirstDayReturnedEvidenceAcceptanceState({
+          completionEvidence: returnedCompletionEvidence,
+          hasDispatch: Boolean(payload.dispatch),
+        });
         setCompletionEvidence(returnedCompletionEvidence);
-        showMessage("已带回首日 AI 执行证据，可以直接验收当前派单。");
+        showMessage(returnedState.message);
       } else if (options?.fromRouteRepair) {
         const notice = buildFirstDayRouteRepairReturnNotice({
           taskLabel: payload.modelRoute.taskLabel,
@@ -558,6 +564,18 @@ export function FirstDayWorkflowPanel({ projectId }: { projectId: string }) {
   useEffect(() => {
     void loadWorkflow({ fromRouteRepair: routeRepairReturn });
   }, [projectId, routeRepairReturn, createdLaunch, returnedCompletionEvidence]);
+
+  const returnedEvidenceState = buildFirstDayReturnedEvidenceAcceptanceState({
+    completionEvidence: returnedCompletionEvidence,
+    hasDispatch: Boolean(dispatch),
+  });
+
+  useEffect(() => {
+    if (!returnedEvidenceState.shouldFocusAcceptance || hasFocusedReturnedEvidence.current) return;
+    hasFocusedReturnedEvidence.current = true;
+    completionEvidenceRef.current?.scrollIntoView({ block: "center", behavior: "smooth" });
+    completionEvidenceRef.current?.focus();
+  }, [returnedEvidenceState.shouldFocusAcceptance]);
 
   const routeBlockMessage = modelRoute ? buildFirstDayExecutionRouteBlockMessage(modelRoute) : null;
   const executionBlockMessage = executionPlan && !executionPlan.executable
@@ -1024,12 +1042,18 @@ export function FirstDayWorkflowPanel({ projectId }: { projectId: string }) {
               <label className="text-xs font-medium text-slate-500" htmlFor={`first-day-completion-${projectId}`}>
                 当前派单验收依据
               </label>
+              {returnedEvidenceState.visible ? (
+                <p className="mt-2 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs leading-5 text-emerald-800">
+                  {returnedEvidenceState.buttonHint}
+                </p>
+              ) : null}
               <textarea
                 className="mt-2 min-h-24 w-full resize-y rounded-md border border-slate-200 bg-white px-3 py-2 text-sm leading-6 outline-none focus:border-slate-400"
                 disabled={isCompletingDispatch}
                 id={`first-day-completion-${projectId}`}
                 onChange={(event) => setCompletionEvidence(event.target.value)}
                 placeholder="写清楚已经完成了什么，例如：第一章正文已生成并写回章节，钩子、冲突和章末追读已按验收标准检查。"
+                ref={completionEvidenceRef}
                 value={completionEvidence}
               />
               <div className="mt-2 flex flex-wrap items-center gap-3">

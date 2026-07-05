@@ -64,6 +64,15 @@ function executeLabel(item: PrePublishGateAdoptionFollowupItem) {
   return "刷新质检";
 }
 
+function executableTimelineItem(
+  step: PrePublishGateAdoptionTimelineStep,
+  itemsById: Map<string, PrePublishGateAdoptionFollowupItem>,
+) {
+  if (!step.followupItemId) return null;
+  const item = itemsById.get(step.followupItemId) ?? null;
+  return item && executeLabel(item) ? item : null;
+}
+
 function runnableReviewItems(items: PrePublishGateAdoptionFollowupItem[]) {
   const seen = new Set<string>();
   return items.filter((item) => {
@@ -91,6 +100,7 @@ export function GateFirstThreeAdoptionPanel({ closure }: { closure: PrePublishGa
   const [message, setMessage] = useState<string | null>(null);
   const visibleItems = closure.items.slice(0, 6);
   const visibleTimelines = closure.timelines.slice(0, 4);
+  const itemsById = new Map(closure.items.map((item) => [item.id, item]));
   const reviewBatchItems = runnableReviewItems(closure.items);
   const publishBatchItems = runnablePublishItems(closure.items);
 
@@ -263,13 +273,28 @@ export function GateFirstThreeAdoptionPanel({ closure }: { closure: PrePublishGa
               </div>
               <div className="mt-3 grid gap-2 md:grid-cols-4">
                 {timeline.steps.map((step) => (
-                  <div className={`rounded-md border p-3 ${timelineStepTone(step.status)}`} key={step.id}>
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="font-medium">{step.label}</span>
-                      <span className="text-xs">{timelineStepText(step.status)}</span>
-                    </div>
-                    <p className="mt-2 line-clamp-2 text-xs leading-5 opacity-80">{step.evidence || step.detail}</p>
-                  </div>
+                  (() => {
+                    const executableItem = executableTimelineItem(step, itemsById);
+                    return (
+                      <div className={`rounded-md border p-3 ${timelineStepTone(step.status)}`} key={step.id}>
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="font-medium">{step.label}</span>
+                          <span className="text-xs">{timelineStepText(step.status)}</span>
+                        </div>
+                        <p className="mt-2 line-clamp-2 text-xs leading-5 opacity-80">{step.evidence || step.detail}</p>
+                        {executableItem ? (
+                          <button
+                            className="mt-3 rounded-md bg-white px-3 py-2 text-xs font-medium text-slate-950 disabled:opacity-50"
+                            disabled={runningId !== null}
+                            onClick={() => void runFollowup(executableItem)}
+                            type="button"
+                          >
+                            {runningId === executableItem.id ? "处理中" : executeLabel(executableItem)}
+                          </button>
+                        ) : null}
+                      </div>
+                    );
+                  })()
                 ))}
               </div>
               <div className="mt-2 text-xs text-slate-500">进度 {timeline.completedSteps}/{timeline.totalSteps}</div>

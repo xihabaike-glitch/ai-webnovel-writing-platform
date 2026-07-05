@@ -189,6 +189,12 @@ test("buildPrePublishGate", async (t) => {
     assert.equal(gate.firstThreeAdoptionClosure.timelines.length, 1);
     assert.equal(gate.firstThreeAdoptionClosure.timelines[0].status, "block");
     assert.deepEqual(gate.firstThreeAdoptionClosure.timelines[0].steps.map((step) => step.status), ["pass", "block", "block", "waiting"]);
+    assert.deepEqual(gate.firstThreeAdoptionClosure.timelines[0].steps.map((step) => step.followupItemId), [
+      null,
+      "first-three-adoption:project-ready:chapter-1:revision-1:review",
+      "first-three-adoption:project-ready:chapter-1:revision-1:publish-check",
+      null,
+    ]);
     assert.equal(gate.firstThreeAdoptionClosure.timelines[0].nextActionLabel, "重新审稿");
     assert.equal(adoptionItem?.status, "block");
     assert.ok(adoptionItem?.detail.includes("正文变更后不能沿用旧审稿"));

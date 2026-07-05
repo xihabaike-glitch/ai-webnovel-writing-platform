@@ -236,6 +236,7 @@ export interface PrePublishGateAdoptionTimelineStep {
   type: PrePublishGateAdoptionTimelineStepType;
   label: string;
   status: PrePublishGateAdoptionTimelineStepStatus;
+  followupItemId: string | null;
   detail: string;
   evidence: string;
   actionLabel: string;
@@ -430,6 +431,7 @@ function firstThreeAdoptionTimelineStep(input: {
     type: input.type,
     label: input.label,
     status: input.item?.status ?? input.fallbackStatus,
+    followupItemId: input.item?.id ?? null,
     detail: input.item?.detail ?? input.detail,
     evidence: input.item?.evidence ?? "",
     actionLabel: input.item?.actionLabel ?? input.actionLabel,
@@ -465,6 +467,7 @@ function buildFirstThreeAdoptionTimelines(items: PrePublishGateAdoptionFollowupI
         type: "adopted",
         label: "候选已采纳",
         status: "pass",
+        followupItemId: null,
         detail: "前三章候选已经写入正文，旧审稿与旧发布质检自动过期。",
         evidence: "正文已采用候选版本。",
         actionLabel: "查看作品",
@@ -495,6 +498,7 @@ function buildFirstThreeAdoptionTimelines(items: PrePublishGateAdoptionFollowupI
         type: "release",
         label: "发布放行",
         status: releaseStatus,
+        followupItemId: null,
         detail: releaseDetail,
         evidence: releaseStatus === "pass" ? "总闸门可以使用新正文的审稿与发布质检证据。" : "",
         actionLabel: "刷新总闸门",

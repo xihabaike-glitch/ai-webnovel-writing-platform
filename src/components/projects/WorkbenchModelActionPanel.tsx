@@ -55,6 +55,14 @@ export function WorkbenchModelActionPanel({ actions }: { actions: WritingWorkben
             {action.disabledReason ? (
               <p className="mt-2 text-sm text-amber-700">{action.disabledReason}</p>
             ) : null}
+            {action.evidenceGate ? (
+              <div className="mt-2 rounded-md border border-amber-200 bg-amber-50 p-2 text-xs leading-5 text-amber-900">
+                <div className="font-medium">{action.evidenceGate.detail}</div>
+                {action.evidenceGate.missing.length ? (
+                  <div className="mt-1">缺口：{action.evidenceGate.missing.join("、")}</div>
+                ) : null}
+              </div>
+            ) : null}
             <button
               className="mt-3 w-full rounded-md bg-slate-950 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:bg-slate-300 disabled:text-slate-600"
               disabled={Boolean(action.disabledReason) || runningId === action.id}

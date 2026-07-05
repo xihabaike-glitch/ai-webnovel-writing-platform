@@ -484,6 +484,9 @@ test("buildWritingWorkbench", async (t) => {
     assert.ok(firstThreeAction?.description.includes("恢复打法"));
     assert.deepEqual(firstThreeAction?.payload.chapterOrders, [1]);
     assert.equal(firstThreeAction?.disabledReason, null);
+    assert.equal(firstThreeAction?.evidenceGate?.status, "sample_only");
+    assert.deepEqual(firstThreeAction?.evidenceGate?.missing, ["成功率", "质量分", "失败样本", "放量结论"]);
+    assert.ok(firstThreeAction?.evidenceGate?.detail.includes("还差"));
   });
 
   await t.test("explains failed timeline tasks that cannot be retried directly", () => {

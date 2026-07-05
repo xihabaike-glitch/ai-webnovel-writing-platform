@@ -241,6 +241,11 @@ export interface WritingWorkbenchModelAction {
   payload: Record<string, string | number | number[]>;
   refreshHref: string;
   disabledReason: string | null;
+  evidenceGate?: {
+    status: "sample_only" | "cleared";
+    missing: string[];
+    detail: string;
+  } | null;
 }
 
 export interface WritingWorkbenchModelTimeline {
@@ -719,6 +724,16 @@ function requiresFirstChapterSample(input: WritingWorkbenchInput) {
   return /恢复放量|恢复打法|小样本|不直接批量生成前三章/u.test(startTactic.content);
 }
 
+function firstChapterSampleEvidenceGate(firstChapterSample: boolean): WritingWorkbenchModelAction["evidenceGate"] {
+  if (!firstChapterSample) return null;
+  const missing = ["成功率", "质量分", "失败样本", "放量结论"];
+  return {
+    status: "sample_only",
+    missing,
+    detail: `恢复打法当前只允许首章小样本；还差 ${missing.join("、")} 后，才允许恢复前三章生成。`,
+  };
+}
+
 function buildQuickFixes(
   input: WritingWorkbenchInput,
   nextChapter: WritingWorkbenchChapter | null,
@@ -945,6 +960,7 @@ function buildModelActions(input: WritingWorkbenchInput, nextChapter: WritingWor
         : firstThreeNeedsCard
           ? "前三章仍缺钩子、冲突或章末悬念，先补章节卡。"
           : null,
+      evidenceGate: firstChapterSampleEvidenceGate(firstChapterSample),
     },
   ];
 }

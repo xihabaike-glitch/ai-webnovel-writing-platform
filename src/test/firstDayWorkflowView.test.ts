@@ -438,6 +438,33 @@ test("validateFirstDayDispatchCompletionEvidence enforces risky first-day eviden
     evidence: ["缺少观察平台首轮小样本验证口径。"],
     completionEvidence: "小样本首轮通过线已写清，不可接受项和复查证据已补齐。放量结论：通过，可以恢复后续初稿批次。",
   });
+  const handoffMissingAction = validateFirstDayDispatchCompletionEvidence({
+    dispatchKey: "first-day:project-1:first-draft",
+    acceptanceCriteria: [
+      "第一章正文已生成并写回章节",
+      "执行开书交接动作：开头：第一段给倒计时。",
+      "避开交接边界：不要直接放量，先保留首轮验证。",
+    ],
+    completionEvidence: "第一章正文已生成并写回章节，可以进入审稿。",
+  });
+  const handoffMissingAvoid = validateFirstDayDispatchCompletionEvidence({
+    dispatchKey: "first-day:project-1:first-draft",
+    acceptanceCriteria: [
+      "第一章正文已生成并写回章节",
+      "执行开书交接动作：开头：第一段给倒计时。",
+      "避开交接边界：不要直接放量，先保留首轮验证。",
+    ],
+    completionEvidence: "交接动作已落地：开头第一段给倒计时，可以进入审稿。",
+  });
+  const handoffReady = validateFirstDayDispatchCompletionEvidence({
+    dispatchKey: "first-day:project-1:first-draft",
+    acceptanceCriteria: [
+      "第一章正文已生成并写回章节",
+      "执行开书交接动作：开头：第一段给倒计时。",
+      "避开交接边界：不要直接放量，先保留首轮验证。",
+    ],
+    completionEvidence: "交接动作已落地：开头第一段给倒计时。避坑边界已确认：不要直接放量，先保留首轮验证。",
+  });
 
   assert.equal(blockedThin.valid, false);
   assert.equal(blockedThin.level, "blocked");
@@ -449,6 +476,11 @@ test("validateFirstDayDispatchCompletionEvidence enforces risky first-day eviden
   assert.equal(watchMissingEvidence.valid, false);
   assert.ok(watchMissingEvidence.error?.includes("复查证据"));
   assert.equal(watchReady.valid, true);
+  assert.equal(handoffMissingAction.valid, false);
+  assert.ok(handoffMissingAction.error?.includes("交接动作"));
+  assert.equal(handoffMissingAvoid.valid, false);
+  assert.ok(handoffMissingAvoid.error?.includes("避坑边界"));
+  assert.equal(handoffReady.valid, true);
 });
 
 test("completeFirstDayDispatchStep completes the matching task center dispatch", async () => {

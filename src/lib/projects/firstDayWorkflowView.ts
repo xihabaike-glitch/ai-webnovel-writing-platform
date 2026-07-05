@@ -5,6 +5,8 @@ const ACCEPTANCE_MARKER = "任务中心已验收：";
 const MIN_COMPLETION_EVIDENCE_LENGTH = 8;
 const BLOCKED_COMPLETION_KEYWORDS = ["恢复条件", "入口卖点", "前三章兑现", "平台匹配度", "改掉", "重做", "修复"];
 const WATCH_COMPLETION_REQUIRED_KEYWORDS = ["通过线", "不可接受", "复查证据", "放量结论"];
+const HANDOFF_ACTION_KEYWORDS = ["交接动作", "首日动作", "开头", "验证", "落地"];
+const HANDOFF_AVOID_KEYWORDS = ["避坑边界", "避开", "不要", "小样本", "不放量", "暂停"];
 
 function cleanEvidence(value: string) {
   return value.trim().replace(/。{2,}$/u, "。");
@@ -221,6 +223,14 @@ function missingKeywords(value: string, keywords: string[]) {
   return keywords.filter((keyword) => !value.includes(keyword));
 }
 
+function hasHandoffActionCriteria(input: Pick<FirstDayDispatchCompletionValidationInput, "acceptanceCriteria">) {
+  return (input.acceptanceCriteria ?? []).some((criterion) => criterion.startsWith("执行开书交接动作："));
+}
+
+function hasHandoffAvoidCriteria(input: Pick<FirstDayDispatchCompletionValidationInput, "acceptanceCriteria">) {
+  return (input.acceptanceCriteria ?? []).some((criterion) => criterion.startsWith("避开交接边界："));
+}
+
 function firstDayCompletionRiskLevel(input: Pick<FirstDayDispatchCompletionValidationInput, "dispatchKey" | "dueLabel" | "title" | "acceptanceCriteria" | "evidence">): FirstDayRiskLevel {
   if (!isFirstDayDispatchTask({ dispatchKey: input.dispatchKey })) return "standard";
   const joined = [
@@ -260,6 +270,22 @@ export function validateFirstDayDispatchCompletionEvidence(input: FirstDayDispat
       valid: false,
       level,
       error: `小样本验证派单必须同时写清：${missingWatchKeywords.join("、")}。`,
+    };
+  }
+
+  if (hasHandoffActionCriteria(input) && !includesAnyKeyword(trimmedEvidence, HANDOFF_ACTION_KEYWORDS)) {
+    return {
+      valid: false,
+      level,
+      error: "这张首日派单带有开书交接动作，完成依据必须写清交接动作或首日动作如何落地。",
+    };
+  }
+
+  if (hasHandoffAvoidCriteria(input) && !includesAnyKeyword(trimmedEvidence, HANDOFF_AVOID_KEYWORDS)) {
+    return {
+      valid: false,
+      level,
+      error: "这张首日派单带有避坑边界，完成依据必须写清避开了什么、为何仍只做小样本或不放量。",
     };
   }
 

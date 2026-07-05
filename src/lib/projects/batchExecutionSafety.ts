@@ -30,6 +30,7 @@ export interface BatchExecutionSafety {
 }
 
 const estimatedTokensByCategory: Record<QueueItem["category"], number> = {
+  candidate: 0,
   draft: 3200,
   review: 1800,
   second_pass: 4200,
@@ -68,19 +69,24 @@ function projectMix(batch: QueueItem[]) {
   return new Set(batch.map((item) => item.projectId));
 }
 
+function isRunnableBatchItem(item: QueueItem) {
+  return item.category === "draft" || item.category === "review" || item.category === "second_pass";
+}
+
 export function buildBatchExecutionSafety(
   queueItems: QueueItem[],
   projects: SafetyTaskProject[],
   strategy: BatchExecutionStrategy = defaultBatchExecutionStrategy,
 ): BatchExecutionSafety {
-  const runnable = queueItems.filter((item) => item.category !== "blocked");
+  const runnable = queueItems.filter(isRunnableBatchItem);
   const firstRunnable = runnable[0] ?? null;
   const recommended = firstRunnable?.scaleGate === "sample_only"
     ? [firstRunnable]
     : runnable.slice(0, strategy.maxBatchSize);
   const blockedCount = queueItems.filter((item) => item.category === "blocked").length;
-  const sampleOnlyCount = queueItems.filter((item) => item.scaleGate === "sample_only" && item.category !== "blocked").length;
-  const clearedWatchCount = queueItems.filter((item) => item.scaleGate === "cleared" && item.category !== "blocked").length;
+  const candidateCount = queueItems.filter((item) => item.category === "candidate").length;
+  const sampleOnlyCount = queueItems.filter((item) => item.scaleGate === "sample_only" && isRunnableBatchItem(item)).length;
+  const clearedWatchCount = queueItems.filter((item) => item.scaleGate === "cleared" && isRunnableBatchItem(item)).length;
   const estimatedTokens = recommended.reduce((sum, item) => sum + estimatedTokensByCategory[item.category], 0);
   const costPerToken = historicalCostPerToken(projects);
   const estimatedCostUsd = money(estimatedTokens * costPerToken);
@@ -100,6 +106,14 @@ export function buildBatchExecutionSafety(
       recommended.length === 0
         ? "没有可执行任务，先补章节卡或进入项目工作台。"
         : `建议本批执行 ${recommended.length} 个任务，${strategy.label}档上限 ${strategy.maxBatchSize} 个。`,
+    ),
+    safetyItem(
+      "pending-candidates",
+      "候选稿确认",
+      candidateCount === 0 ? "pass" : "block",
+      candidateCount === 0
+        ? "当前没有待采纳 AI 候选稿。"
+        : `${candidateCount} 个 AI 候选稿还没由作者确认；先处理候选，再继续批量生产。`,
     ),
     safetyItem(
       "blocked-items",

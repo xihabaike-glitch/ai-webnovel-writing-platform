@@ -38,7 +38,15 @@ export async function POST(request: Request) {
   const [projects, modelProviders, modelRoutes, completedRouteConfirmationRechecks, recentRecommendedBatchAudits] = await Promise.all([
     prisma.project.findMany({
       include: {
-        chapters: { orderBy: { order: "asc" } },
+        chapters: {
+          orderBy: { order: "asc" },
+          include: {
+            revisions: {
+              orderBy: { createdAt: "desc" },
+              take: 5,
+            },
+          },
+        },
         aiTasks: {
           orderBy: { createdAt: "desc" },
           include: {

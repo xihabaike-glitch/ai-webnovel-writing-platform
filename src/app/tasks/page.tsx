@@ -16,6 +16,7 @@ import { buildTaskQueueExecutionPlan } from "@/lib/projects/taskQueueExecutionPl
 export const dynamic = "force-dynamic";
 
 function categoryClass(category: QueueItem["category"]) {
+  if (category === "candidate") return "bg-violet-50 text-violet-700";
   if (category === "review") return "bg-blue-50 text-blue-700";
   if (category === "second_pass") return "bg-amber-50 text-amber-700";
   if (category === "draft") return "bg-emerald-50 text-emerald-700";
@@ -119,7 +120,15 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
   ] = await Promise.all([
     prisma.project.findMany({
       include: {
-        chapters: { orderBy: { order: "asc" } },
+        chapters: {
+          orderBy: { order: "asc" },
+          include: {
+            revisions: {
+              orderBy: { createdAt: "desc" },
+              take: 5,
+            },
+          },
+        },
         aiTasks: {
           orderBy: { createdAt: "desc" },
           include: {
@@ -233,6 +242,10 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
         <div className="rounded-md border border-slate-200 bg-white p-3">
           <div className="text-xs text-slate-500">总任务</div>
           <div className="mt-1 text-2xl font-semibold">{queue.overview.totalItems}</div>
+        </div>
+        <div className="rounded-md border border-slate-200 bg-white p-3">
+          <div className="text-xs text-slate-500">待采纳</div>
+          <div className="mt-1 text-2xl font-semibold">{queue.overview.candidateReady}</div>
         </div>
         <div className="rounded-md border border-slate-200 bg-white p-3">
           <div className="text-xs text-slate-500">待生成</div>

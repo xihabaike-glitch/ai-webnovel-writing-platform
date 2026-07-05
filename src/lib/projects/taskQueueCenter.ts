@@ -1,5 +1,6 @@
 import { buildBatchDraftQueue } from "../ai/batchDrafts.ts";
 import { buildReviewPipelineQueue } from "../ai/batchReviewPipeline.ts";
+import { getChapterRevisionSourceLabel, isChapterRevisionCandidate, previewRevisionContent } from "../chapters/revisions.ts";
 import { getPlatformProfile, type PlatformId } from "../platforms/platformProfiles.ts";
 import { buildFirstDayRiskProfile, type FirstDayRiskLevel } from "./firstDayWorkflow.ts";
 import { buildPlatformPublishExportCenter } from "./platformPublishExport.ts";
@@ -25,6 +26,16 @@ export interface TaskQueueProject {
     valueShift: string;
     cliffhanger: string;
     status: string;
+    revisions?: Array<{
+      id: string;
+      source: string;
+      sourceTaskId: string | null;
+      title: string;
+      content: string;
+      wordCount: number;
+      notes: string;
+      createdAt: Date | string;
+    }>;
   }>;
   aiTasks: Array<{
     id: string;
@@ -58,7 +69,7 @@ export interface QueueItem {
   projectId: string;
   projectTitle: string;
   platformName: string;
-  category: "draft" | "review" | "second_pass" | "export" | "blocked";
+  category: "candidate" | "draft" | "review" | "second_pass" | "export" | "blocked";
   blockerType: "chapter_card" | "publish_repair" | "risk_recovery" | "watch_scale_gate" | "first_day_gate" | null;
   label: string;
   chapterTitle: string;
@@ -77,6 +88,7 @@ export interface QueueItem {
 export interface TaskQueueCenter {
   overview: {
     totalItems: number;
+    candidateReady: number;
     draftReady: number;
     reviewReady: number;
     secondPassReady: number;
@@ -96,6 +108,7 @@ export interface TaskQueueCenter {
 }
 
 const categoryPriority: Record<QueueItem["category"], number> = {
+  candidate: 5,
   review: 10,
   second_pass: 20,
   draft: 30,
@@ -119,6 +132,7 @@ export function recommendedQueueActionLabel(entry: QueueItem | null) {
 
 function categoryLabel(category: QueueItem["category"]) {
   const labels: Record<QueueItem["category"], string> = {
+    candidate: "待采纳",
     draft: "待生成",
     review: "待审稿",
     second_pass: "待二改",
@@ -216,6 +230,38 @@ function firstDayDispatchHref(projectId: string, stepId?: string) {
   return `/dispatch?${params.toString()}#first-day-dispatch`;
 }
 
+function normalized(text: string | undefined) {
+  return (text ?? "").replace(/\s+/g, " ").trim();
+}
+
+function isCandidateAlreadyCurrent(
+  chapter: TaskQueueProject["chapters"][number],
+  revision: NonNullable<TaskQueueProject["chapters"][number]["revisions"]>[number],
+) {
+  return normalized(chapter.title) === normalized(revision.title)
+    && normalized(chapter.content) === normalized(revision.content)
+    && chapter.wordCount === revision.wordCount;
+}
+
+function latestPendingCandidates(project: TaskQueueProject) {
+  return project.chapters
+    .flatMap((chapter) => {
+      const latest = (chapter.revisions ?? [])
+        .filter((revision) => isChapterRevisionCandidate(revision.source))
+        .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime())[0];
+      if (!latest || isCandidateAlreadyCurrent(chapter, latest)) return [];
+      return {
+        chapter,
+        revision: latest,
+      };
+    })
+    .sort((left, right) => new Date(right.revision.createdAt).getTime() - new Date(left.revision.createdAt).getTime());
+}
+
+function isAutomatedQueueItem(entry: QueueItem) {
+  return entry.category === "draft" || entry.category === "review" || entry.category === "second_pass";
+}
+
 export function buildTaskQueueCenter(projects: TaskQueueProject[]): TaskQueueCenter {
   const items = projects.flatMap((project) => {
     const platform = getPlatformProfile(project.targetPlatform as PlatformId);
@@ -254,6 +300,25 @@ export function buildTaskQueueCenter(projects: TaskQueueProject[]): TaskQueueCen
       aiTasks: project.aiTasks,
     });
     const queueItems: QueueItem[] = [];
+
+    for (const candidate of latestPendingCandidates(project)) {
+      queueItems.push(item({
+        id: `${project.id}:candidate:${candidate.chapter.id}:${candidate.revision.id}`,
+        projectId: project.id,
+        projectTitle: project.title,
+        platformName: platform.name,
+        category: "candidate",
+        chapterTitle: candidate.chapter.title,
+        evidence: `${getChapterRevisionSourceLabel(candidate.revision.source)}还没有写入当前正文：${previewRevisionContent(candidate.revision.content)}`,
+        strategyBasis: startTactic,
+        riskLevel: riskProfile.level,
+        riskLabel: riskProfile.label,
+        riskNotice,
+        scaleGate,
+        actionLabel: "处理候选稿",
+        href: `${projectHref}/chapters/${candidate.chapter.id}#chapter-revisions`,
+      }));
+    }
 
     if (!firstDayGateCleared && riskProfile.level !== "blocked") {
       const missingHandoffEvidence = productionGateCleared && handoffStatus.required && !handoffStatus.cleared;
@@ -467,6 +532,7 @@ export function buildTaskQueueCenter(projects: TaskQueueProject[]): TaskQueueCen
   return {
     overview: {
       totalItems: items.length,
+      candidateReady: items.filter((entry) => entry.category === "candidate").length,
       draftReady: items.filter((entry) => entry.category === "draft").length,
       reviewReady: items.filter((entry) => entry.category === "review").length,
       secondPassReady: items.filter((entry) => entry.category === "second_pass").length,
@@ -478,8 +544,8 @@ export function buildTaskQueueCenter(projects: TaskQueueProject[]): TaskQueueCen
       riskRecoveryBlocked: items.filter((entry) => entry.blockerType === "risk_recovery").length,
       watchScaleBlocked: items.filter((entry) => entry.blockerType === "watch_scale_gate").length,
       watchItems: items.filter((entry) => entry.riskLevel === "watch").length,
-      watchSampleOnly: items.filter((entry) => entry.scaleGate === "sample_only").length,
-      watchCleared: items.filter((entry) => entry.scaleGate === "cleared").length,
+      watchSampleOnly: items.filter((entry) => entry.scaleGate === "sample_only" && isAutomatedQueueItem(entry)).length,
+      watchCleared: items.filter((entry) => entry.scaleGate === "cleared" && isAutomatedQueueItem(entry)).length,
     },
     items,
     recommendedNext: items.find((entry) => entry.category !== "blocked") ?? items[0] ?? null,

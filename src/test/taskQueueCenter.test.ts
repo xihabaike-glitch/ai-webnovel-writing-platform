@@ -105,6 +105,7 @@ test("buildTaskQueueCenter", async (t) => {
     const queue = buildTaskQueueCenter([{ ...project, gateDispatchTasks: firstDayCompleteDispatches(project.id) }]);
 
     assert.equal(queue.overview.draftReady, 1);
+    assert.equal(queue.overview.candidateReady, 0);
     assert.equal(queue.overview.reviewReady, 1);
     assert.equal(queue.overview.secondPassReady, 1);
     assert.equal(queue.overview.exportReady, 0);
@@ -131,6 +132,83 @@ test("buildTaskQueueCenter", async (t) => {
     assert.ok(publishBlocker?.evidence.includes("先处理"));
     assert.equal(queue.recommendedNext?.strategyBasis?.label, "模板推荐");
     assert.ok(queue.items.every((item) => item.strategyBasis?.openingMove.includes("倒计时")));
+  });
+
+  await t.test("surfaces pending candidate revisions before automated production", () => {
+    const queue = buildTaskQueueCenter([{
+      ...project,
+      gateDispatchTasks: firstDayCompleteDispatches(project.id),
+      chapters: project.chapters.map((chapter) => (
+        chapter.id === "chapter-review"
+          ? {
+            ...chapter,
+            revisions: [
+              {
+                id: "candidate-latest",
+                source: "chapter_second_pass_candidate",
+                sourceTaskId: "task-second-pass",
+                title: "第二章 第一次奖励候选",
+                content: "二改候选正文，比当前稿节奏更快。",
+                wordCount: 2300,
+                notes: "二改候选。",
+                createdAt: "2026-07-04T02:00:00.000Z",
+              },
+              {
+                id: "candidate-old",
+                source: "ai_draft_candidate",
+                sourceTaskId: "task-draft",
+                title: "第二章 旧候选",
+                content: "旧候选正文。",
+                wordCount: 2100,
+                notes: "旧候选。",
+                createdAt: "2026-07-04T01:00:00.000Z",
+              },
+            ],
+          }
+          : chapter
+      )),
+    }]);
+
+    assert.equal(queue.overview.candidateReady, 1);
+    assert.equal(queue.overview.totalItems, 6);
+    assert.equal(queue.recommendedNext?.category, "candidate");
+    assert.equal(queue.recommendedNext?.actionLabel, "处理候选稿");
+    assert.equal(queue.recommendedNext?.href, "/projects/project-1/chapters/chapter-review#chapter-revisions");
+    assert.ok(queue.recommendedNext?.evidence.includes("二改候选稿"));
+    assert.deepEqual(
+      queue.items.slice(0, 3).map((item) => item.category),
+      ["candidate", "review", "second_pass"],
+    );
+
+    const adoptedQueue = buildTaskQueueCenter([{
+      ...project,
+      gateDispatchTasks: firstDayCompleteDispatches(project.id),
+      chapters: project.chapters.map((chapter) => (
+        chapter.id === "chapter-review"
+          ? {
+            ...chapter,
+            title: "第二章 第一次奖励候选",
+            content: "二改候选正文，比当前稿节奏更快。",
+            wordCount: 2300,
+            revisions: [
+              {
+                id: "candidate-adopted",
+                source: "chapter_second_pass_candidate",
+                sourceTaskId: "task-second-pass",
+                title: "第二章 第一次奖励候选",
+                content: "二改候选正文，比当前稿节奏更快。",
+                wordCount: 2300,
+                notes: "已采纳候选。",
+                createdAt: "2026-07-04T02:00:00.000Z",
+              },
+            ],
+          }
+          : chapter
+      )),
+    }]);
+
+    assert.equal(adoptedQueue.overview.candidateReady, 0);
+    assert.notEqual(adoptedQueue.recommendedNext?.category, "candidate");
   });
 
   await t.test("blocks production behind the first-day completion gate", () => {
@@ -259,7 +337,7 @@ test("buildTaskQueueCenter", async (t) => {
     assert.equal(drafts.length, 0);
     assert.equal(queue.overview.firstDayBlocked, 1);
     assert.equal(queue.overview.watchScaleBlocked, 1);
-    assert.equal(queue.overview.watchSampleOnly, 2);
+    assert.equal(queue.overview.watchSampleOnly, 0);
     assert.equal(firstDayGate?.riskLevel, "watch");
     assert.equal(firstDayGate?.scaleGate, "sample_only");
     assert.equal(firstDayGate?.actionLabel, "完成小样本验收");

@@ -39,11 +39,25 @@ test("buildBatchExecutionSafety", async (t) => {
       },
     ]);
 
-    assert.equal(safety.recommendedBatchSize, 4);
+    assert.equal(safety.recommendedBatchSize, 3);
     assert.equal(safety.estimatedTokens, 9200);
     assert.equal(safety.estimatedCostUsd, 0.092);
     assert.equal(safety.canRunRecommendedBatch, true);
     assert.ok(safety.warnings.some((warning) => warning.includes("阻塞任务")));
+  });
+
+  await t.test("blocks recommended batches until draft candidates are adopted or dismissed", () => {
+    const safety = buildBatchExecutionSafety([
+      { ...baseItem, id: "candidate-1", category: "candidate", label: "待采纳", priority: 5, actionLabel: "处理候选稿" },
+      baseItem,
+    ], [{ aiTasks: [] }]);
+
+    assert.equal(safety.recommendedBatchSize, 1);
+    assert.deepEqual(safety.recommendedBatchIds, ["item-1"]);
+    assert.equal(safety.canRunRecommendedBatch, false);
+    const candidateGate = safety.items.find((item) => item.id === "pending-candidates");
+    assert.equal(candidateGate?.status, "block");
+    assert.ok(candidateGate?.detail.includes("候选稿"));
   });
 
   await t.test("blocks execution when too many tasks are already running", () => {

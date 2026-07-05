@@ -90,6 +90,7 @@ export function buildTaskQueueExecutionPlan(
   const first = executable[0];
 
   if (!first) {
+    const firstBlocker = queueItems.find((item) => item.category === "blocked") ?? null;
     return {
       canRun: false,
       category: null,
@@ -102,12 +103,16 @@ export function buildTaskQueueExecutionPlan(
       scaleGate: "none",
       adoptionFollowupCount: 0,
       adoptionFollowupItemIds: [],
-      actionLabel: "暂无可执行批次",
-      detail: "当前队列没有可直接运行的初稿、审稿或二改任务。",
+      actionLabel: firstBlocker ? `先处理${firstBlocker.chapterTitle}` : "暂无可执行批次",
+      detail: firstBlocker?.evidence ?? "当前队列没有可直接运行的初稿、审稿或二改任务。",
       batchModeLabel: "暂无批次",
-      batchModeTone: "standard",
-      batchModeDetail: "当前没有可执行的小批次，先补章节卡、处理阻塞或回项目生成任务。",
-      warnings: ["先补章节卡、处理发布阻塞，或进入项目生成新的可执行任务。"],
+      batchModeTone: firstBlocker?.blockerType === "watch_scale_gate" ? "sample" : "standard",
+      batchModeDetail: firstBlocker
+        ? `${firstBlocker.actionLabel}后再回来运行推荐小批次。`
+        : "当前没有可执行的小批次，先补章节卡、处理阻塞或回项目生成任务。",
+      warnings: firstBlocker
+        ? [`${firstBlocker.actionLabel}：${firstBlocker.evidence}`]
+        : ["先补章节卡、处理发布阻塞，或进入项目生成新的可执行任务。"],
     };
   }
 

@@ -93,6 +93,28 @@ test("buildTaskQueueExecutionPlan", async (t) => {
     assert.equal(plan.chapterIds.length, 0);
   });
 
+  await t.test("explains watch evidence blockers when no executable batch is allowed", () => {
+    const plan = buildTaskQueueExecutionPlan([
+      queueItem({
+        id: "project-1:watch-scale-gate:fanqie",
+        category: "blocked",
+        blockerType: "watch_scale_gate",
+        projectId: "project-1",
+        projectTitle: "项目一",
+        chapterTitle: "观察放量闸门",
+        evidence: "需先完成小样本验收：通过线、不可接受项、复查证据、成功率、质量分、失败样本和放量结论齐全后再放量。",
+        actionLabel: "完成小样本验收",
+        href: "/dispatch?firstDayProject=project-1&step=first-draft#first-day-dispatch",
+      }),
+    ]);
+
+    assert.equal(plan.canRun, false);
+    assert.equal(plan.actionLabel, "先处理观察放量闸门");
+    assert.ok(plan.detail.includes("成功率"));
+    assert.ok(plan.detail.includes("质量分"));
+    assert.ok(plan.warnings.some((warning) => warning.includes("完成小样本验收")));
+  });
+
   await t.test("allows aggressive same-action batches to cross projects", () => {
     const plan = buildTaskQueueExecutionPlan([
       queueItem({ id: "project-1:review:chapter-1", category: "review", projectId: "project-1", projectTitle: "项目一", chapterTitle: "第一章" }),

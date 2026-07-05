@@ -1148,7 +1148,7 @@ test("buildTaskQueueCenter", async (t) => {
     assert.equal(downgradeGate?.riskLabel, "三轮降档");
     assert.equal(downgradeGate?.actionLabel, "完成小样本验收");
     assert.equal(downgradeScaleGate?.scaleGate, "sample_only");
-    assert.ok(downgradeScaleGate?.evidence.includes("通过线、不可接受项、复查证据和放量结论"));
+    assert.ok(downgradeScaleGate?.evidence.includes("通过线、不可接受项、复查证据、成功率、质量分、失败样本和放量结论"));
   });
 
   await t.test("keeps watch projects as small-sample draft tasks", () => {
@@ -1194,7 +1194,7 @@ test("buildTaskQueueCenter", async (t) => {
     assert.equal(firstDayGate?.href, "/dispatch?firstDayProject=watch-project&step=first-draft#first-day-dispatch");
     assert.equal(gate?.href, "/dispatch?firstDayProject=watch-project&step=first-draft#first-day-dispatch");
     assert.ok(firstDayGate?.evidence.includes("通过线"));
-    assert.ok(gate?.evidence.includes("通过线、不可接受项、复查证据和放量结论"));
+    assert.ok(gate?.evidence.includes("通过线、不可接受项、复查证据、成功率、质量分、失败样本和放量结论"));
   });
 
   await t.test("allows watch drafts to scale after sample acceptance evidence clears the gate", () => {
@@ -1228,7 +1228,13 @@ test("buildTaskQueueCenter", async (t) => {
         {
           dispatchKey: "first-day:watch-cleared-project:first-draft",
           state: "completed",
-          completionEvidence: "小样本首轮通过线已写清，不可接受项和复查证据已补齐。放量结论：通过，可以恢复后续初稿批次。",
+          completionEvidence: [
+            "小样本首轮通过线已写清，不可接受项和复查证据已补齐。",
+            "成功率：100%",
+            "质量分：86",
+            "失败样本：0",
+            "放量结论：通过，可以恢复后续初稿批次。",
+          ].join("\n"),
         },
       ],
     };
@@ -1243,6 +1249,57 @@ test("buildTaskQueueCenter", async (t) => {
     assert.ok(drafts.every((item) => item.scaleGate === "cleared"));
     assert.ok(drafts.every((item) => item.actionLabel === "生成初稿"));
     assert.ok(drafts.every((item) => item.riskNotice?.includes("小样本验收依据已过线")));
+  });
+
+  await t.test("keeps watch scale gate closed when sample evidence lacks structured metrics", () => {
+    const missingMetricsProject: TaskQueueProject = {
+      ...project,
+      id: "watch-missing-metrics-project",
+      chapters: [
+        baseChapter,
+        {
+          ...baseChapter,
+          id: "chapter-ready-draft-2",
+          order: 2,
+          title: "第二章 第二个样本",
+        },
+      ],
+      aiTasks: [],
+      worldEntries: [
+        {
+          type: "platform_soil",
+          title: "首轮平台打法：番茄小说",
+          content: [
+            "状态：历史观察",
+            "打法：先用第一章小样本验证读者反馈。",
+            "开头动作：第一段给强冲突。",
+            "验证动作：写清通过线和不可接受项。",
+            "风险：观察期不要批量。",
+          ].join("\n"),
+        },
+      ],
+      gateDispatchTasks: [
+        {
+          dispatchKey: "first-day:watch-missing-metrics-project:first-draft",
+          state: "completed",
+          completionEvidence: "小样本首轮通过线已写清，不可接受项和复查证据已补齐。放量结论：通过，可以恢复后续初稿批次。",
+        },
+      ],
+    };
+    const queue = buildTaskQueueCenter([missingMetricsProject]);
+    const drafts = queue.items.filter((item) => item.category === "draft");
+    const gate = queue.items.find((item) => item.blockerType === "watch_scale_gate");
+    const firstDayGate = queue.items.find((item) => item.blockerType === "first_day_gate");
+
+    assert.equal(drafts.length, 0);
+    assert.equal(queue.overview.firstDayBlocked, 1);
+    assert.equal(queue.overview.watchScaleBlocked, 1);
+    assert.equal(firstDayGate?.actionLabel, "完成小样本验收");
+    assert.ok(firstDayGate?.evidence.includes("成功率"));
+    assert.ok(firstDayGate?.evidence.includes("质量分"));
+    assert.ok(firstDayGate?.evidence.includes("失败样本"));
+    assert.ok(gate?.evidence.includes("成功率"));
+    assert.equal(gate?.scaleGate, "sample_only");
   });
 
   await t.test("keeps the watch gate closed when sample evidence says not passed", () => {
@@ -1276,7 +1333,13 @@ test("buildTaskQueueCenter", async (t) => {
         {
           dispatchKey: "first-day:watch-not-passed-project:first-draft",
           state: "completed",
-          completionEvidence: "小样本首轮通过线已写清，不可接受项和复查证据已补齐。放量结论：未通过，继续停留观察。",
+          completionEvidence: [
+            "小样本首轮通过线已写清，不可接受项和复查证据已补齐。",
+            "成功率：100%",
+            "质量分：86",
+            "失败样本：0",
+            "放量结论：未通过，继续停留观察。",
+          ].join("\n"),
         },
       ],
     };

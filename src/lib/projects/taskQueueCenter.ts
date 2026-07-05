@@ -256,20 +256,41 @@ function item(input: Omit<QueueItem, "label" | "priority" | "blockerType" | "ris
   };
 }
 
-function watchDraftScaleCleared(project: TaskQueueProject) {
+const watchScaleEvidenceFields = "通过线、不可接受项、复查证据、成功率、质量分、失败样本和放量结论";
+
+function watchDraftScaleReview(project: TaskQueueProject) {
   const draftDispatch = project.gateDispatchTasks?.find((task) => (
     task.dispatchKey === `first-day:${project.id}:first-draft`
     && task.state === "completed"
-    && task.completionEvidence.trim().length >= 8
   ));
   const evidence = draftDispatch?.completionEvidence ?? "";
+  const validation = validateFirstDayDispatchCompletionEvidence({
+    dispatchKey: `first-day:${project.id}:first-draft`,
+    dueLabel: "今天小样本验证",
+    title: draftDispatch?.title ?? "恢复观察小样本",
+    acceptanceCriteria: [
+      "写清通过线",
+      "写清不可接受项",
+      "写清复查证据",
+      "写清成功率、质量分、失败样本和放量结论",
+    ],
+    evidence: ["观察小样本验收"],
+    completionEvidence: evidence,
+  });
 
-  return /通过线/u.test(evidence)
-    && /不可接受/u.test(evidence)
-    && /复查证据/u.test(evidence)
-    && /放量结论/u.test(evidence)
-    && /(通过|允许|可以恢复|可恢复|恢复后续)/u.test(evidence)
+  if (!validation.valid) {
+    return {
+      cleared: false,
+      error: validation.error ?? `小样本验收必须补齐${watchScaleEvidenceFields}。`,
+    };
+  }
+
+  const positiveConclusion = /(通过|允许|可以恢复|可恢复|恢复后续)/u.test(evidence)
     && !/未通过|暂不放量|继续停留观察/u.test(evidence);
+  return {
+    cleared: positiveConclusion,
+    error: positiveConclusion ? null : "小样本验收必须给出正向放量结论，未通过或继续观察不能解除放量闸门。",
+  };
 }
 
 function completedFirstDayDispatch(project: TaskQueueProject, stepId: string) {
@@ -991,15 +1012,16 @@ export function buildTaskQueueCenter(projects: TaskQueueProject[]): TaskQueueCen
     const projectHref = `/projects/${project.id}`;
     const startTactic = findProjectStartTacticSummary(project.worldEntries ?? []);
     const riskProfile = buildFirstDayRiskProfile(startTactic);
+    const watchScaleReview = riskProfile.level === "watch" ? watchDraftScaleReview(project) : null;
     const riskNotice = riskProfile.level === "blocked"
       ? `${riskProfile.headline}${riskProfile.instruction}`
       : riskProfile.level === "watch"
-        ? watchDraftScaleCleared(project)
-          ? "小样本验收依据已过线：通过线、不可接受项、复查证据和放量结论齐全，可以谨慎进入后续初稿批次。"
-          : `${riskProfile.headline}${riskProfile.instruction}`
+        ? watchScaleReview?.cleared
+          ? `小样本验收依据已过线：${watchScaleEvidenceFields}齐全，可以谨慎进入后续初稿批次。`
+          : `${riskProfile.headline}${riskProfile.instruction}${watchScaleReview?.error ? ` ${watchScaleReview.error}` : ""}`
         : null;
     const scaleGate: QueueScaleGate = riskProfile.level === "watch"
-      ? watchDraftScaleCleared(project) ? "cleared" : "sample_only"
+      ? watchScaleReview?.cleared ? "cleared" : "sample_only"
       : "none";
     const handoffStatus = handoffEvidenceStatus(
       project,
@@ -1111,7 +1133,7 @@ export function buildTaskQueueCenter(projects: TaskQueueProject[]): TaskQueueCen
         evidence: missingHandoffEvidence
           ? `首日链路已完成，但开书交接证据还没闭环：需要补齐${missingParts.join("、")}后，才允许进入批量初稿、批量审稿、批量二改或多平台导出。`
           : riskProfile.level === "watch"
-          ? "观察项目必须先完成首日小样本验收，写清通过线、不可接受项、复查证据和放量结论。"
+          ? `观察项目必须先完成首日小样本验收，写清${watchScaleEvidenceFields}。${watchScaleReview?.error ?? ""}`
           : "首日链路还没完成平台包预检验收，暂不允许进入批量初稿、批量审稿、批量二改或多平台导出。",
         strategyBasis: startTactic,
         riskLevel: riskProfile.level,
@@ -1186,7 +1208,7 @@ export function buildTaskQueueCenter(projects: TaskQueueProject[]): TaskQueueCen
         category: "blocked",
         blockerType: "watch_scale_gate",
         chapterTitle: "观察放量闸门",
-        evidence: `还有 ${readyDraftCandidates.length - draftCandidatesForQueue.length} 个初稿候选，需先完成小样本验收：通过线、不可接受项、复查证据和放量结论齐全后再放量。`,
+        evidence: `还有 ${readyDraftCandidates.length - draftCandidatesForQueue.length} 个初稿候选，需先完成小样本验收：${watchScaleEvidenceFields}齐全后再放量。${watchScaleReview?.error ?? ""}`,
         strategyBasis: startTactic,
         riskLevel: riskProfile.level,
         riskLabel: riskProfile.label,

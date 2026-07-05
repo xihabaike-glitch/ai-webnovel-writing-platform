@@ -821,6 +821,11 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
                 {entry.sourceType === "first_three_adoption" && entry.sourceDetail ? (
                   <div className="mt-3 rounded-md border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs leading-5 text-indigo-950">
                     <span className="font-medium">{entry.sourceLabel}：</span>{entry.sourceDetail}
+                    <div className="mt-2">
+                      <Link className="inline-flex rounded-md bg-white/80 px-2 py-1 font-medium text-indigo-800 hover:bg-white" href="/gate#first-three-adoption-closure">
+                        回总闸门复检
+                      </Link>
+                    </div>
                   </div>
                 ) : null}
                 {entry.riskNotice ? (

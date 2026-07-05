@@ -249,18 +249,18 @@ export function buildTaskQueueBatchReceipt(input: {
   if (scaleUpRecovery && (quality === null || quality < 85)) {
     return {
       status: "review_quality",
-      headline: "准放量质量不够，先停一下",
+      headline: "恢复小批跌线，回滚观察修复",
       detail: quality === null
-        ? "这是小样本解锁后的恢复放量批次，但缺少质量复查样本。没有质量证据，就别继续扩大。"
-        : `这是小样本解锁后的恢复放量批次，平均质量 ${quality} 分，没到 85 分复盘线。先修正文质量，再继续后续初稿。`,
-      primaryLabel: "回到 AI 生产线",
-      primaryHref: `${projectBase}#ai-pipeline`,
+        ? "这是小样本解锁后的恢复放量批次，但缺少质量复查样本。没有质量证据，必须回滚到观察/修复，补证后再跑小样本。"
+        : `这是小样本解锁后的恢复放量批次，平均质量 ${quality} 分，没到 85 分复盘线。先回滚到观察/修复，修正文质量后再重新小样本。`,
+      primaryLabel: "回滚观察修复",
+      primaryHref: "/dispatch",
       secondaryLabel: "查看任务队列",
       secondaryHref: "/tasks",
       evidenceItems,
       warnings: [
         input.routeEffectSummary.verdict,
-        "刚解锁的批次按 85 分看，不是 80 分凑合。质量没稳住，放量就是把问题复制得更快。",
+        "暂停恢复小批。刚解锁的批次按 85 分看，不是 80 分凑合；质量没稳住，放量就是把问题复制得更快。",
       ],
     };
   }
@@ -345,14 +345,14 @@ export function buildTaskQueueBatchReceipt(input: {
       status: "continue",
       headline: "准放量批次稳定，下一批仍小步走",
       detail: "小样本后的第一轮恢复放量已过线，但这只证明可以继续验证，不证明可以一次拉满。下一批继续按同一平台打法和安全阀推进。",
-      primaryLabel: "回任务队列继续",
-      primaryHref: "/tasks",
+      primaryLabel: "继续恢复小批",
+      primaryHref: "/tasks#recommended-batch",
       secondaryLabel: next.primaryLabel,
       secondaryHref: next.primaryHref,
       evidenceItems,
       warnings: [
         input.routeEffectSummary.verdict,
-        input.plan.strategyBases[0] ? `继续沿用打法：${input.plan.strategyBases[0].label}，下一批仍看成功率、质量、成本和备用命中。` : "继续小批次复盘，别把准放量误当成无上限放大。",
+        input.plan.strategyBases[0] ? `继续小批沿用打法：${input.plan.strategyBases[0].label}，下一批仍看成功率、质量、成本和备用命中。` : "继续小批次复盘，别把准放量误当成无上限放大。",
       ],
     });
   }

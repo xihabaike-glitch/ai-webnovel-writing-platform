@@ -223,9 +223,12 @@ test("buildTaskQueueBatchReceipt audits cleared watch scale-up batches with a st
   });
 
   assert.equal(receipt.status, "review_quality");
-  assert.equal(receipt.headline, "准放量质量不够，先停一下");
+  assert.equal(receipt.headline, "恢复小批跌线，回滚观察修复");
+  assert.equal(receipt.primaryLabel, "回滚观察修复");
+  assert.equal(receipt.primaryHref, "/dispatch");
   assert.ok(receipt.detail.includes("85"));
-  assert.ok(receipt.warnings.some((warning) => warning.includes("刚解锁")));
+  assert.ok(receipt.detail.includes("回滚到观察/修复"));
+  assert.ok(receipt.warnings.some((warning) => warning.includes("暂停恢复小批")));
 });
 
 test("buildTaskQueueBatchReceipt keeps healthy cleared watch scale-up batches small-step", () => {
@@ -253,9 +256,10 @@ test("buildTaskQueueBatchReceipt keeps healthy cleared watch scale-up batches sm
 
   assert.equal(receipt.status, "continue");
   assert.equal(receipt.headline, "准放量批次稳定，下一批仍小步走");
-  assert.equal(receipt.primaryHref, "/tasks");
+  assert.equal(receipt.primaryLabel, "继续恢复小批");
+  assert.equal(receipt.primaryHref, "/tasks#recommended-batch");
   assert.ok(receipt.detail.includes("不证明可以一次拉满"));
-  assert.ok(receipt.warnings.some((warning) => warning.includes("下一批仍看成功率")));
+  assert.ok(receipt.warnings.some((warning) => warning.includes("继续小批")));
 });
 
 test("buildTaskQueueBatchReceipt rolls back weak third-round stable batches to watch", () => {

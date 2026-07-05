@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { completeFirstThreePublishFollowups } from "@/lib/chapters/revisionAdoptionFollowupCompletion";
 import { prisma } from "@/lib/db/prisma";
 import { getPlatformProfile, platformProfiles, type PlatformId } from "@/lib/platforms/platformProfiles";
 import { buildGatePublishEffectReceipt, type GateActionReceipt } from "@/lib/projects/gateActionReceipts";
@@ -434,7 +435,14 @@ export async function GET(request: Request, { params }: Params) {
       }, { status: 409 });
     }
 
-    await createPublishSnapshot(projectId, pack, "download");
+    const snapshot = await createPublishSnapshot(projectId, pack, "download");
+    await completeFirstThreePublishFollowups({
+      projectId,
+      platformName: pack.platformName,
+      snapshotId: snapshot.id,
+      preflightScore: snapshot.preflightScore,
+      canExport: snapshot.canExport,
+    });
 
     return new NextResponse(pack.markdown, {
       headers: {
@@ -455,7 +463,7 @@ export async function GET(request: Request, { params }: Params) {
       }, { status: 409 });
     }
 
-    await prisma.$transaction(
+    const snapshots = await prisma.$transaction(
       exportablePacks.map((pack) => prisma.publishPackageSnapshot.create({
         data: {
           projectId,
@@ -474,6 +482,16 @@ export async function GET(request: Request, { params }: Params) {
         },
       })),
     );
+    const weakestSnapshot = snapshots.reduce((weakest, snapshot) => (
+      snapshot.preflightScore < weakest.preflightScore ? snapshot : weakest
+    ), snapshots[0]);
+    await completeFirstThreePublishFollowups({
+      projectId,
+      platformName: "全平台投稿包",
+      snapshotId: `${snapshots.length} 个发布包，最低分版本 ${weakestSnapshot.id}`,
+      preflightScore: weakestSnapshot.preflightScore,
+      canExport: snapshots.every((snapshot) => snapshot.canExport),
+    });
 
     return new NextResponse(archive.markdown, {
       headers: {
@@ -979,9 +997,17 @@ export async function POST(request: Request, { params }: Params) {
   }
 
   const snapshot = await createPublishSnapshot(projectId, pack, snapshotActionLabel(body.action ?? null));
+  const followupCompletion = await completeFirstThreePublishFollowups({
+    projectId,
+    platformName: pack.platformName,
+    snapshotId: snapshot.id,
+    preflightScore: snapshot.preflightScore,
+    canExport: snapshot.canExport,
+  });
 
   return NextResponse.json({
     message: `已保存 ${pack.platformName} 发布包版本。`,
     snapshot,
+    followupCompletion,
   }, { status: 201 });
 }

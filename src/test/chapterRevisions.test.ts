@@ -7,6 +7,10 @@ import {
   summarizeChapterRevisions,
 } from "../lib/chapters/revisions.ts";
 import { buildFirstThreeAdoptionFollowupDispatches } from "../lib/chapters/revisionAdoptionFollowup.ts";
+import {
+  buildFirstThreePublishCompletionEvidence,
+  buildFirstThreeReviewCompletionEvidence,
+} from "../lib/chapters/revisionAdoptionFollowupCompletion.ts";
 
 test("chapter revision summaries", async (t) => {
   await t.test("labels AI overwrite snapshots and creates readable previews", () => {
@@ -162,5 +166,31 @@ test("chapter revision summaries", async (t) => {
     assert.equal(dispatches[1].actionLabel, "回发布质检");
     assert.equal(dispatches[1].href, "/projects/project-1#platform-export");
     assert.ok(dispatches[1].evidence.some((item) => item.includes("revision-first-three")));
+  });
+
+  await t.test("builds automatic completion evidence for adoption follow-ups", () => {
+    const reviewEvidence = buildFirstThreeReviewCompletionEvidence({
+      projectId: "project-1",
+      chapterId: "chapter-1",
+      chapterOrder: 1,
+      chapterTitle: "第一章 雨夜系统",
+      taskId: "review-task-1",
+      score: 91,
+      issueCount: 1,
+    });
+    const publishEvidence = buildFirstThreePublishCompletionEvidence({
+      projectId: "project-1",
+      platformName: "番茄小说",
+      snapshotId: "snapshot-1",
+      preflightScore: 88,
+      canExport: true,
+    });
+
+    assert.ok(reviewEvidence.includes("采纳后重新审稿已完成"));
+    assert.ok(reviewEvidence.includes("review-task-1"));
+    assert.ok(reviewEvidence.includes("审稿分 91"));
+    assert.ok(publishEvidence.includes("采纳后发布质检已刷新"));
+    assert.ok(publishEvidence.includes("snapshot-1"));
+    assert.ok(publishEvidence.includes("可导出"));
   });
 });

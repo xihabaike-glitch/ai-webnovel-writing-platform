@@ -5,6 +5,7 @@ import { runRoutedGeneration } from "@/lib/model-gateway/routedGeneration";
 import { getPlatformProfile, type PlatformId } from "@/lib/platforms/platformProfiles";
 import { buildProjectContextPack } from "@/lib/projects/projectContextPack";
 import { findProjectStartTacticSummary } from "@/lib/projects/projectStartTactics";
+import { completeFirstThreeReviewFollowup } from "@/lib/chapters/revisionAdoptionFollowupCompletion";
 
 export interface ReviewIssueResult {
   severity: string;
@@ -87,6 +88,15 @@ export async function reviewChapterDraft(chapterId: string, options: ReviewChapt
   if (generation.ok) {
     const { result, provider } = generation;
     const parsedResult = JSON.parse(result.text) as ChapterReviewResult;
+    await completeFirstThreeReviewFollowup({
+      projectId: chapter.projectId,
+      chapterId: chapter.id,
+      chapterOrder: chapter.order,
+      chapterTitle: chapter.title,
+      taskId: generation.task.id,
+      score: parsedResult.score,
+      issueCount: Array.isArray(parsedResult.issues) ? parsedResult.issues.length : null,
+    });
 
     return {
       task: generation.task,

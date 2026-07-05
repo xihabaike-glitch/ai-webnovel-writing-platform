@@ -954,6 +954,7 @@ test("buildProjectControlDashboard", async (t) => {
     assert.equal(dashboard.aiPipelineControlPlan.recheckOutcomeTone, "success");
     assert.ok(dashboard.aiPipelineControlPlan.recheckOutcomeDetail.includes("谨慎小批"));
     assert.equal(dashboard.aiPipelineControlPlan.recheckActionLabel, "恢复小批执行");
+    assert.equal(dashboard.aiPipelineControlPlan.recheckActionHref, "/tasks#recommended-batch");
   });
 
   await t.test("summarizes model route health for the project control dashboard", () => {

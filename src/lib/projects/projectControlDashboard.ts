@@ -282,6 +282,7 @@ export interface AiPipelineControlPlanSummary {
   recheckDispatchTitle: string | null;
   recheckDispatchHref: string | null;
   recheckActionLabel: string | null;
+  recheckActionHref: string | null;
   createdAt: string | null;
 }
 
@@ -1188,6 +1189,7 @@ function buildAiPipelineControlPlanSummary(audits: ControlBatchAudit[] = []): Ai
       recheckDispatchTitle: null,
       recheckDispatchHref: null,
       recheckActionLabel: null,
+      recheckActionHref: null,
       createdAt: null,
     };
   }
@@ -1216,6 +1218,9 @@ function buildAiPipelineControlPlanSummary(audits: ControlBatchAudit[] = []): Ai
     : recheckStatus === "sample_required"
       ? "运行 1 章复验"
       : null;
+  const recheckActionHref = recheckStatus === "small_batch_ready"
+    ? "/tasks#recommended-batch"
+    : recheckDispatchHref;
   const recheckOutcomeLabel = recheckStatus === "small_batch_ready"
     ? "可小样本恢复"
     : recheckStatus === "sample_required"
@@ -1260,6 +1265,7 @@ function buildAiPipelineControlPlanSummary(audits: ControlBatchAudit[] = []): Ai
     recheckDispatchTitle,
     recheckDispatchHref,
     recheckActionLabel,
+    recheckActionHref,
     createdAt: new Date(latest.createdAt).toISOString(),
   };
 }

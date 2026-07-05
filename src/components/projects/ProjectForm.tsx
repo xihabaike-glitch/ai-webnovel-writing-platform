@@ -18,6 +18,7 @@ import {
   buildProjectStartExperienceHandoff,
   buildProjectStartKnowledgeFeedbackExperiences,
   buildProjectStartRiskGate,
+  buildProjectStartRecoveryHandoffPanel,
   buildProjectStartPlatformExperienceGuide,
   buildProjectStartModelRouteExperienceFromReceipts,
   buildProjectStartTacticAdvice,
@@ -136,6 +137,7 @@ export function ProjectForm({ experienceLaunch }: { experienceLaunch?: ProjectFo
     riskGate: selectedRiskGate,
     recommendedTemplate: recommendedStartTemplate,
   });
+  const recoveryHandoffPanel = buildProjectStartRecoveryHandoffPanel(startExperienceHandoff);
   const launchRequested = Boolean(launchPlatform && experienceLaunch?.tactic);
   const launchMatched = launchRequested
     && selectedEvidence.experience?.platformId === launchPlatform
@@ -392,6 +394,35 @@ export function ProjectForm({ experienceLaunch }: { experienceLaunch?: ProjectFo
             </button>
           ) : null}
         </div>
+        {recoveryHandoffPanel ? (
+          <div className="rounded-md border border-cyan-200 bg-cyan-50 p-3 text-cyan-950">
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="font-medium">{recoveryHandoffPanel.title}</div>
+              <span className="rounded-md bg-white/80 px-2 py-1 text-xs font-medium">{recoveryHandoffPanel.badge}</span>
+            </div>
+            <div className="mt-3 grid gap-2 md:grid-cols-3">
+              <div className="rounded-md bg-white/75 p-2 text-xs leading-5">
+                <div className="font-medium text-cyan-900">先跑</div>
+                <p className="mt-1">{recoveryHandoffPanel.primaryAction}</p>
+              </div>
+              <div className="rounded-md bg-white/75 p-2 text-xs leading-5">
+                <div className="font-medium text-cyan-900">再看</div>
+                <p className="mt-1">{recoveryHandoffPanel.verificationTarget}</p>
+              </div>
+              <div className="rounded-md bg-white/75 p-2 text-xs leading-5">
+                <div className="font-medium text-cyan-900">别做</div>
+                <p className="mt-1">{recoveryHandoffPanel.blockedRule}</p>
+              </div>
+            </div>
+            {recoveryHandoffPanel.evidence.length ? (
+              <div className="mt-2 grid gap-1">
+                {recoveryHandoffPanel.evidence.map((evidence) => (
+                  <p className="rounded-md bg-white/70 p-2 text-xs leading-5" key={evidence}>{evidence}</p>
+                ))}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
         <div className="grid gap-2 md:grid-cols-2">
           <div className="rounded-md bg-white/70 p-3">
             <div className="text-xs font-medium opacity-70">首日动作</div>

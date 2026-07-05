@@ -141,6 +141,15 @@ export interface ProjectStartExperienceHandoff {
   evidence: string[];
 }
 
+export interface ProjectStartRecoveryHandoffPanel {
+  title: string;
+  badge: string;
+  primaryAction: string;
+  verificationTarget: string;
+  blockedRule: string;
+  evidence: string[];
+}
+
 function routeDetailValue(detail: string, label: string) {
   const match = detail.match(new RegExp(`${label}：([^；;]+)`));
   return match?.[1]?.trim() || null;
@@ -780,6 +789,30 @@ export function buildProjectStartExperienceHandoff(input: {
       ...input.riskGate.evidence,
       ...input.advice.evidence,
     ], 5),
+  };
+}
+
+export function buildProjectStartRecoveryHandoffPanel(handoff: ProjectStartExperienceHandoff): ProjectStartRecoveryHandoffPanel | null {
+  const handoffText = [
+    handoff.label,
+    handoff.title,
+    handoff.detail,
+    ...handoff.firstDayActions,
+    ...handoff.avoidRules,
+  ].join(" ");
+  if (!/恢复放量/u.test(handoffText)) return null;
+  const primaryAction = handoff.firstDayActions.find((action) => /恢复放量|小样本/u.test(action))
+    ?? "首日先跑小样本，验证开头、前三章兑现和追读信号。";
+
+  return {
+    title: "恢复放量首日小样本",
+    badge: handoff.label,
+    primaryAction,
+    verificationTarget: handoff.firstDayActions.find((action) => action !== primaryAction && /验证|回填|追读|前三章/u.test(action))
+      ?? "回填前三章、平台包装和首轮数据证据。",
+    blockedRule: handoff.avoidRules.find((rule) => /不直接放量|小样本|放量/u.test(rule))
+      ?? "未过小样本前不直接放量。",
+    evidence: handoff.evidence.slice(0, 2),
   };
 }
 

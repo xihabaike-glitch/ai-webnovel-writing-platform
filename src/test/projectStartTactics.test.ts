@@ -14,6 +14,7 @@ import {
 } from "../lib/projects/gateActionReceipts.ts";
 import {
   buildProjectStartExperienceHandoff,
+  buildProjectStartRecoveryHandoffPanel,
   buildProjectStartPlatformExperienceGuide,
   buildProjectStartGateExperience,
   buildProjectStartKnowledgeFeedbackExperiences,
@@ -1368,6 +1369,52 @@ test("buildProjectStartTacticAdvice", async (t) => {
     assert.ok(handoff.title.includes("恢复放量小样本"));
     assert.ok(handoff.firstDayActions.some((action) => action.includes("恢复放量小样本")));
     assert.ok(handoff.avoidRules.some((rule) => rule.includes("不直接放量")));
+  });
+
+  await t.test("builds a focused recovery handoff panel only for recovery scale starts", () => {
+    const platform = getPlatformProfile("fanqie");
+    const template = getDefaultTemplateForPlatform(platform.id);
+    const recoveryPanel = buildProjectStartRecoveryHandoffPanel({
+      status: "reuse",
+      label: "恢复放量交接",
+      title: "番茄小说 恢复放量小样本交接",
+      detail: "恢复放量打法可复用，但新书首日不能直接放量。",
+      selectedPlatformId: platform.id,
+      selectedPlatformName: platform.name,
+      recommendedPlatformId: platform.id,
+      recommendedPlatformName: platform.name,
+      recommendedTemplateId: template.id,
+      shouldSwitchTemplate: false,
+      firstDayActions: [
+        "恢复放量小样本：只把历史打法当作解除闸门后的参考，首日先验证开头、前三章兑现和追读信号。",
+        "验证：回填前三章追读、点击和收藏。",
+      ],
+      avoidRules: ["恢复放量经验不等于新书直接放量，未过小样本前不直接放量。"],
+      evidence: ["恢复放量：2 批，仍按小样本节奏复用"],
+    });
+    const regularPanel = buildProjectStartRecoveryHandoffPanel({
+      status: "reuse",
+      label: "复用交接",
+      title: "番茄小说 可复用历史打法",
+      detail: "当前平台可以沿用历史高压钩子。",
+      selectedPlatformId: platform.id,
+      selectedPlatformName: platform.name,
+      recommendedPlatformId: platform.id,
+      recommendedPlatformName: platform.name,
+      recommendedTemplateId: template.id,
+      shouldSwitchTemplate: false,
+      firstDayActions: ["开头：第一段给不可逆危机。"],
+      avoidRules: ["不要直接放量，先做小样本。"],
+      evidence: ["最终判定：稳定加码。"],
+    });
+
+    assert.equal(recoveryPanel?.title, "恢复放量首日小样本");
+    assert.equal(recoveryPanel?.badge, "恢复放量交接");
+    assert.ok(recoveryPanel?.primaryAction.includes("首日先验证"));
+    assert.ok(recoveryPanel?.verificationTarget.includes("回填前三章追读"));
+    assert.ok(recoveryPanel?.blockedRule.includes("未过小样本前不直接放量"));
+    assert.deepEqual(recoveryPanel?.evidence, ["恢复放量：2 批，仍按小样本节奏复用"]);
+    assert.equal(regularPanel, null);
   });
 
   await t.test("turns start advice into a reusable platform soil entry", () => {

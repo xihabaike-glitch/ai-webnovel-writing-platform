@@ -4018,6 +4018,95 @@ test("buildGateActionReceipt", async (t) => {
     assert.ok(fanqieMarkdown.includes("闭环进度：3/3 段交接完成"));
   });
 
+  await t.test("classifies recovery scale first-day handoff conclusions in tactic experience", () => {
+    function recoveryHandoffTask(input: {
+      projectId: string;
+      suffix: "opening" | "verification" | "platform-package";
+      stage: "start_opening_diagnostic" | "start_first_three_review" | "start_platform_package";
+      completionEvidence: string;
+      completedAt: string;
+    }) {
+      return {
+        id: `first-day-handoff:${input.projectId}:${input.suffix}`,
+        databaseId: `dispatch-db-${input.projectId}-${input.suffix}`,
+        dispatchKey: `first-day-handoff:${input.projectId}:${input.suffix}`,
+        projectId: input.projectId,
+        sourceReceiptId: null,
+        platformId: "fanqie",
+        platformName: "番茄小说",
+        stage: input.stage,
+        state: "completed" as const,
+        priorityScore: 92,
+        ownerRole: "主编",
+        title: "番茄小说 恢复放量小样本交接",
+        detail: "把恢复放量打法接到新书首日小样本。",
+        dueLabel: "今天小样本验证",
+        actionLabel: "查看恢复放量",
+        href: "/projects/project-1#first-day-launch",
+        acceptanceCriteria: ["恢复放量：新项目仍先跑小样本", "小样本通过线、不可接受项和放量结论已写清"],
+        evidence: ["来源：恢复放量打法", "首日小样本验证"],
+        completionEvidence: input.completionEvidence,
+        reviewLatestAt: input.completedAt,
+        assignedAt: "2026-01-01T00:00:00.000Z",
+        completedAt: input.completedAt,
+        createdAt: "2026-01-01T00:00:00.000Z",
+        updatedAt: input.completedAt,
+      };
+    }
+    const handoffSet = (projectId: string, conclusion: string) => [
+      recoveryHandoffTask({
+        projectId,
+        suffix: "opening",
+        stage: "start_opening_diagnostic",
+        completionEvidence: "恢复放量开头只做小样本，首屏钩子已落地。",
+        completedAt: "2026-01-01T01:00:00.000Z",
+      }),
+      recoveryHandoffTask({
+        projectId,
+        suffix: "verification",
+        stage: "start_first_three_review",
+        completionEvidence: `恢复放量验收已写清小样本通过线。${conclusion}`,
+        completedAt: "2026-01-01T02:00:00.000Z",
+      }),
+      recoveryHandoffTask({
+        projectId,
+        suffix: "platform-package",
+        stage: "start_platform_package",
+        completionEvidence: "恢复放量平台包已准备曝光、点击、收藏、追读回收字段。",
+        completedAt: "2026-01-01T03:00:00.000Z",
+      }),
+    ];
+
+    const passTimeline = buildGatePlatformDecisionTimeline({
+      receipts: [],
+      tasks: handoffSet("project-pass", "放量结论：通过，可以恢复后续初稿批次。"),
+      limit: 10,
+    });
+    const watchTimeline = buildGatePlatformDecisionTimeline({
+      receipts: [],
+      tasks: handoffSet("project-watch", "放量结论：继续观察，先补一轮追读证据。"),
+      limit: 10,
+    });
+    const blockedTimeline = buildGatePlatformDecisionTimeline({
+      receipts: [],
+      tasks: handoffSet("project-blocked", "放量结论：暂停，未过线，不允许继续放量。"),
+      limit: 10,
+    });
+    const passExperience = buildGatePlatformTacticExperienceLibrary(passTimeline, 10).items[0];
+    const watchExperience = buildGatePlatformTacticExperienceLibrary(watchTimeline, 10).items[0];
+    const blockedExperience = buildGatePlatformTacticExperienceLibrary(blockedTimeline, 10).items[0];
+
+    assert.equal(passExperience?.status, "usable");
+    assert.equal(passExperience?.tactic, "恢复放量打法");
+    assert.ok(passExperience?.reuseHint.includes("新项目仍先跑小样本"));
+    assert.equal(watchExperience?.status, "watch");
+    assert.equal(watchExperience?.tactic, "恢复放量观察");
+    assert.ok(watchExperience?.reuseHint.includes("继续观察"));
+    assert.equal(blockedExperience?.status, "blocked");
+    assert.equal(blockedExperience?.tactic, "恢复放量避坑");
+    assert.ok(blockedExperience?.risk.includes("暂停"));
+  });
+
   await t.test("flags overdue and today dispatch closeout items", () => {
     const baseDispatch = buildGatePlatformGrowthDispatchItems([buildGatePlatformStrategyReceipt({
       item: strategyPlatform,

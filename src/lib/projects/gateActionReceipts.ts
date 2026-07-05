@@ -6391,7 +6391,20 @@ function completedFirstDayHandoffFromTimeline(events: GatePlatformDecisionTimeli
 
   const completedStages = new Set(handoffEvents.map((event) => firstDayHandoffStageFromDispatchKey(event.id.replace(/^task:/, ""))));
   const allStagesCompleted = ["opening", "verification", "platform-package"].every((stage) => completedStages.has(stage as ReturnType<typeof firstDayHandoffStageFromDispatchKey>));
-  const evidence = Array.from(new Set(handoffEvents.flatMap((event) => event.evidence))).slice(0, 4);
+  const allEvidence = Array.from(new Set(handoffEvents.flatMap((event) => event.evidence)));
+  const evidence = allEvidence.slice(0, 4);
+  const evidenceText = allEvidence.join(" ");
+  const recoveryScale = /恢复放量/u.test(evidenceText);
+  const recoveryScaleOutcome = recoveryScale
+    ? /放量结论[:：]\s*(暂停|不通过|未过线|失败)|不允许继续放量/u.test(evidenceText)
+      ? "blocked"
+      : /放量结论[:：]\s*(通过|已通过)|可以恢复|可恢复|小样本已过线/u.test(evidenceText)
+        ? "usable"
+        : "watch"
+    : null;
+  const recoveryScaleConclusion = recoveryScale
+    ? allEvidence.find((line) => /放量结论|继续观察|暂停|未过线|可以恢复|可恢复/u.test(line)) ?? ""
+    : "";
 
   return {
     latestEvent: handoffEvents[0],
@@ -6399,6 +6412,9 @@ function completedFirstDayHandoffFromTimeline(events: GatePlatformDecisionTimeli
     completedCount: completedStages.size,
     allStagesCompleted,
     evidence,
+    recoveryScale,
+    recoveryScaleOutcome,
+    recoveryScaleConclusion,
   };
 }
 
@@ -6474,6 +6490,41 @@ export function buildGatePlatformTacticExperienceLibrary(
           `复盘结论：${completedRecheckReview.conclusion}`,
           ...base.evidence,
         ].slice(0, 4),
+      };
+    }
+
+    if (completedFirstDayHandoff?.allStagesCompleted && completedFirstDayHandoff.recoveryScale) {
+      const outcome = completedFirstDayHandoff.recoveryScaleOutcome;
+      const conclusion = completedFirstDayHandoff.recoveryScaleConclusion || "恢复放量首日小样本已经完成，等待下一轮效果回填。";
+      return {
+        ...base,
+        status: outcome === "blocked" ? "blocked" : outcome === "usable" ? "usable" : "watch",
+        label: outcome === "blocked" ? "避坑样本" : outcome === "usable" ? "可复用打法" : "观察样本",
+        tactic: outcome === "blocked" ? "恢复放量避坑" : outcome === "usable" ? "恢复放量打法" : "恢复放量观察",
+        lesson: outcome === "blocked"
+          ? `${item.platformName} 恢复放量首日小样本没有过线，说明这套恢复节奏不能直接迁移到新书。`
+          : outcome === "usable"
+            ? `${item.platformName} 恢复放量首日小样本已跑通，开头、验收和平台包装都完成闭环，可以沉淀为谨慎复用打法。`
+            : `${item.platformName} 恢复放量首日小样本已完成，但结论仍在观察期，暂时只能复用验证清单。`,
+        reuseHint: outcome === "usable"
+          ? "新项目仍先跑小样本，确认前三章兑现、模型路线和追读证据后再加码。"
+          : outcome === "blocked"
+            ? "同类项目先暂停这套恢复放量节奏，重做开头、前三章兑现或平台包装后再小样本验证。"
+            : "继续观察恢复放量小样本，不要把任务完成误判成可复用成功打法。",
+        risk: outcome === "blocked"
+          ? conclusion
+          : outcome === "usable"
+            ? "恢复放量只证明首日小样本过线，不能跨题材、跨平台无限复用；每次开书仍要重新验前三章追读。"
+            : "缺少明确过线结论前，不允许进入稳定放量。",
+        sourceLabel: outcome === "blocked" ? "恢复放量避坑" : outcome === "usable" ? "恢复放量闭环" : "恢复放量观察",
+        href: completedFirstDayHandoff.latestEvent.href,
+        evidence: [
+          `恢复放量首日闭环：${outcome === "blocked" ? "暂停" : outcome === "usable" ? "通过" : "继续观察"}`,
+          `闭环进度：${completedFirstDayHandoff.completedCount}/3 段交接完成`,
+          conclusion,
+          ...completedFirstDayHandoff.evidence,
+          ...base.evidence,
+        ].slice(0, 5),
       };
     }
 

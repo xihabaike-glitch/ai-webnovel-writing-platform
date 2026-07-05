@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db/prisma";
 import { getPlatformProfile, type PlatformId } from "@/lib/platforms/platformProfiles";
 import { generateControlAssets, type ControlAssetAreaId } from "@/lib/projects/controlAssetGeneration";
 import {
+  buildChapterCardActionSeeds,
   buildCharacterActionSeeds,
   buildOutlineActionSeeds,
   buildStoryLineActionSeeds,
@@ -167,6 +168,49 @@ export async function POST(request: Request, { params }: Params) {
     }
 
     return NextResponse.json(result(areaId, "story-lines", created));
+  }
+
+  if (areaId === "production") {
+    const seeds = buildChapterCardActionSeeds({
+      project,
+      platform,
+      outlineNodes: project.outlineNodes,
+      existingChapterCount: project.chapters.length,
+      limit: 5,
+    });
+
+    if (seeds.length === 0) {
+      return NextResponse.json(result(areaId, "chapter-production", [], "暂无可直接生成章节卡的大纲节点；先补大纲字段或新增分支/叶片。"));
+    }
+
+    const created: string[] = [];
+    await prisma.$transaction(async (tx) => {
+      for (const seed of seeds) {
+        const chapter = await tx.chapter.create({
+          data: {
+            projectId,
+            order: project.chapters.length + created.length + 1,
+            title: seed.title,
+            goal: seed.goal,
+            hook: seed.hook,
+            conflict: seed.conflict,
+            valueShift: seed.valueShift,
+            cliffhanger: seed.cliffhanger,
+            status: seed.status,
+          },
+        });
+        await tx.outlineNode.update({
+          where: { id: seed.outlineNodeId },
+          data: {
+            chapterId: chapter.id,
+            status: "chapter_card",
+          },
+        });
+        created.push(seed.title);
+      }
+    });
+
+    return NextResponse.json(result(areaId, "chapter-production", created));
   }
 
   return NextResponse.json({

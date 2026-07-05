@@ -96,7 +96,7 @@ test("buildProjectControlDashboard", async (t) => {
     assert.ok(dashboard.storyFoundation.axes.some((axis) => axis.label === "人物弧光"));
     assert.ok(dashboard.storyFoundation.nextAction.length > 0);
     assert.equal(dashboard.storyFoundation.canExecute, true);
-    assert.ok(["outline", "characters", "story-lines", "world"].includes(dashboard.storyFoundation.actionAreaId ?? ""));
+    assert.ok(["outline", "characters", "story-lines", "world", "production"].includes(dashboard.storyFoundation.actionAreaId ?? ""));
     assert.equal(dashboard.storyFoundation.actionMode, "seed");
     assert.equal(dashboard.areas.find((area) => area.id === "export")?.status, "blocked");
     assert.ok(dashboard.areas.find((area) => area.id === "export")?.nextAction.includes("先处理"));
@@ -328,6 +328,58 @@ test("buildProjectControlDashboard", async (t) => {
     assert.equal(typeof dashboard.storyFoundation.canExecute, "boolean");
     assert.equal(dashboard.areas.find((area) => area.id === "world")?.status, "good");
     assert.equal(dashboard.areas.find((area) => area.id === "export")?.status, "good");
+  });
+
+  await t.test("routes a complete tree without chapter cards to production execution", () => {
+    const completeCharacters = [
+      { id: "c1", name: "林晚", role: "主角", desire: "查清系统真相", need: "主动承担代价", flaw: "逃避风险", arcStart: "被动求生", arcEnd: "主动破局", voice: "克制直接", relationshipNotes: "和反派形成规则对抗" },
+      { id: "c2", name: "沈砚", role: "反派", desire: "控制系统规则", need: "逼主角暴露弱点", flaw: "过度自信", arcStart: "幕后试探", arcEnd: "亲自下场", voice: "冷静压迫", relationshipNotes: "每次出手都抬高代价" },
+      { id: "c3", name: "周遥", role: "重要关系", desire: "守住主角的人性", need: "承接情绪代价", flaw: "误解主角选择", arcStart: "旁观质疑", arcEnd: "共同承担", voice: "情绪更外放", relationshipNotes: "推动关系线和选择压力" },
+    ];
+    const outlineNodes = ["root", "opening", "ending", "trunk", "branch", "branch", "branch", "leaf", "leaf", "soil"].map((type, index) => ({
+      id: `${type}-${index}`,
+      parentId: index === 0 ? null : "root-0",
+      chapterId: null,
+      type,
+      title: `${type}节点`,
+      summary: `${type}摘要`,
+      goal: `${type}目标`,
+      hook: `${type}钩子`,
+      conflict: `${type}冲突`,
+      valueShift: `${type}转变`,
+      platformNote: `${type}平台提示`,
+      order: index,
+      depth: index === 0 ? 0 : 1,
+      status: "planned",
+    }));
+
+    const dashboard = buildProjectControlDashboard({
+      project: { ...project, currentWordCount: 1200 },
+      platform: getPlatformProfile("fanqie"),
+      chapters: [chapter],
+      outlineNodes,
+      characters: completeCharacters,
+      worldEntries: [
+        { id: "w1", type: "system_rule", title: "系统规则", content: "系统每次奖励都绑定代价、限制和下一轮压力，不能让主角无成本解决问题；每次选择都必须带出新的敌人、债务或身份风险。" },
+        { id: "w2", type: "taboo", title: "禁忌限制", content: "不能无代价复活，不能临时洗白，不能用无铺垫外挂跳过关键选择；任何突破都要交换记忆、关系、资源或安全身份。" },
+        { id: "w3", type: "platform_soil", title: "番茄平台土壤", content: "每章必须快速给钩子、冲突、爽点和章末追读，设定解释只能服务选择压力；前三章必须高密度兑现卖点。" },
+      ],
+      foreshadows: [
+        { id: "f1", title: "系统异常", setupChapterId: "chapter-1", payoffChapterId: "chapter-1", relatedCharacterIds: "[]", status: "paid_off", notes: "已回收" },
+      ],
+      plotThreads: [
+        { id: "p1", type: "main", title: "系统主线", startChapterId: "chapter-1", endChapterId: "chapter-1", status: "resolved" },
+      ],
+      aiTasks: [],
+      submissionChecklist: checklist,
+    });
+
+    assert.equal(dashboard.storyFoundation.status, "blocked");
+    assert.equal(dashboard.storyFoundation.actionAreaId, "production");
+    assert.equal(dashboard.storyFoundation.actionMode, "seed");
+    assert.equal(dashboard.storyFoundation.canExecute, true);
+    assert.ok(dashboard.storyFoundation.actionLabel.includes("章节叶片"));
+    assert.equal(dashboard.priorityActions.find((action) => action.areaId === "production")?.executeLabel, "生成章节卡");
   });
 
   await t.test("pauses project starts when the stored tactic is a historical avoidance signal", () => {

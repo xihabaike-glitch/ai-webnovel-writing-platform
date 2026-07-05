@@ -401,9 +401,18 @@ function buildStoryFoundationSummary(areas: ControlArea[]): StoryFoundationSumma
     })
     .filter((item): item is StoryFoundationAxis => Boolean(item));
   const score = clampScore(average(axes.map((item) => item.score)));
-  const status: ControlArea["status"] = score >= 80 ? "good" : score >= 55 ? "watch" : "blocked";
   const weakest = [...axes].sort((left, right) => left.score - right.score || left.label.localeCompare(right.label))[0];
-  const executableAreaIds = new Set(["outline", "characters", "story-lines", "world"]);
+  const weakestScore = weakest?.score ?? score;
+  const status: ControlArea["status"] = weakestScore < 55
+    ? "blocked"
+    : weakestScore < 80
+      ? "watch"
+      : score >= 80
+        ? "good"
+        : score >= 55
+          ? "watch"
+          : "blocked";
+  const executableAreaIds = new Set(["outline", "characters", "story-lines", "world", "production"]);
   const actionAreaId = weakest && executableAreaIds.has(weakest.id) ? weakest.id : null;
   const label = status === "good" ? "底座可扩写" : status === "watch" ? "底座待加固" : "先搭底座";
   const headline = status === "good"
@@ -857,7 +866,10 @@ export function buildProjectControlDashboard(input: ProjectControlDashboardInput
   const outline = outlineScore(input.outlineNodes);
   const productionScore = production.dashboard.totalItems > 0
     ? ratio(
-      production.dashboard.outlineReadyItems + production.dashboard.chapterCardItems + production.dashboard.draftingItems + production.dashboard.doneItems,
+      production.dashboard.outlineReadyItems * 0.45
+        + production.dashboard.chapterCardItems
+        + production.dashboard.draftingItems
+        + production.dashboard.doneItems,
       production.dashboard.totalItems,
     ) * 100
     : 0;
@@ -875,7 +887,7 @@ export function buildProjectControlDashboard(input: ProjectControlDashboardInput
     area("characters", "人物弧光", characterDashboard.averageCompleteness, `${characterDashboard.completeCharacters}/${characterDashboard.totalCharacters} 个人物完整。`, characterDashboard.nextActions[0], "补人物弧光", "character-arc", true, "补人物卡", true, "AI 生成人物"),
     area("world", "世界观资料", ratio(worldDashboard.completeEntries, Math.max(worldDashboard.totalEntries, 3)) * 100, `${worldDashboard.completeEntries}/${worldDashboard.totalEntries} 条设定完整。`, worldDashboard.nextActions[0], "补世界观", "world-bible", true, "补设定卡", true, "AI 生成设定"),
     area("story-lines", "伏笔主线", ratio(storyLineDashboard.foreshadowReady + storyLineDashboard.threadResolved, Math.max(storyLineDashboard.foreshadowTotal + storyLineDashboard.threadTotal, 2)) * 100, `${storyLineDashboard.foreshadowReady} 个伏笔已回收，${storyLineDashboard.threadResolved} 条剧情线有终点。`, storyLineDashboard.nextActions[0], "补主线伏笔", "story-lines", true, "补线索卡", true, "AI 生成线索"),
-    area("production", "章节生产", productionScore, `${production.dashboard.totalItems} 张排期卡，${production.dashboard.blockedItems} 张卡住。`, production.dashboard.nextActions[0], "排章节生产", "chapter-production"),
+    area("production", "章节生产", productionScore, `${production.dashboard.totalItems} 张排期卡，${production.dashboard.blockedItems} 张卡住。`, production.dashboard.nextActions[0], "排章节生产", "chapter-production", true, "生成章节卡"),
     area("ai-pipeline", "AI 写审改", aiPipelineScore, `${batchDraft.readyCandidates} 章可初稿，${reviewPipeline.reviewReadyCount} 章待审，${reviewPipeline.secondPassReadyCount} 章可二改。`, "按批量初稿、批量审稿、批量二改顺序清队列。", "清写审改队列", "ai-pipeline"),
     area("ops", "连载运营", average([serialization.submissionReadinessPercent, serialization.publishReadyCount > 0 ? 100 : 40]), `${serialization.publishReadyCount} 章可发布，投稿准备度 ${serialization.submissionReadinessPercent}%。`, serialization.actions[0]?.detail ?? "继续推进运营动作。", "看运营动作", "serialization-ops"),
     area(

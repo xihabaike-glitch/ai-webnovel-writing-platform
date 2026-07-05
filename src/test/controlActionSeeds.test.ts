@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { getPlatformProfile } from "../lib/platforms/platformProfiles.ts";
 import {
+  buildChapterCardActionSeeds,
   buildCharacterActionSeeds,
   buildOutlineActionSeeds,
   buildStoryLineActionSeeds,
@@ -65,6 +66,29 @@ test("control action seeds", async (t) => {
     assert.equal(seeds.filter((seed) => seed.type === "branch").length, 3);
     assert.equal(seeds.filter((seed) => seed.type === "leaf").length, 2);
     assert.equal(seeds.find((seed) => seed.type === "opening")?.parentId, "existing-root");
+  });
+
+  await t.test("creates chapter cards from unbound tree leaves in production order", () => {
+    const seeds = buildChapterCardActionSeeds({
+      project,
+      platform: getPlatformProfile("fanqie"),
+      existingChapterCount: 2,
+      limit: 3,
+      outlineNodes: [
+        { id: "soil", type: "soil", title: "平台土壤", order: 1, depth: 1 },
+        { id: "branch-bound", chapterId: "chapter-3", type: "branch", title: "已成卡支线", order: 2, depth: 1 },
+        { id: "leaf", type: "leaf", title: "追读叶片", goal: "落一个爽点。", order: 4, depth: 2 },
+        { id: "opening", type: "opening", title: "雨夜开头", hook: "倒计时出现。", order: 1, depth: 1 },
+        { id: "trunk", type: "trunk", title: "系统主干", conflict: "规则逼迫选择。", order: 3, depth: 1 },
+        { id: "ending", type: "ending", title: "终局兑现", order: 9, depth: 1 },
+      ],
+    });
+
+    assert.deepEqual(seeds.map((seed) => seed.outlineNodeId), ["opening", "trunk", "leaf"]);
+    assert.equal(seeds[0].title, "第3章 开局：雨夜开头");
+    assert.equal(seeds[1].title, "第4章 主线：系统主干");
+    assert.equal(seeds[2].goal, "落一个爽点。");
+    assert.ok(seeds.every((seed) => seed.status === "outline"));
   });
 
   await t.test("builds strict JSON prompts for AI control assets", () => {

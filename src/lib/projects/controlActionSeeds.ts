@@ -1,5 +1,6 @@
 import { buildDefaultOutlineNodes } from "../outlines/defaultOutline.ts";
 import type { PlatformProfile } from "../platforms/platformProfiles.ts";
+import { buildChapterCardFromOutline, type ChapterCardDraft } from "../chapters/chapterFromOutline.ts";
 
 export interface SeedProject {
   id: string;
@@ -42,8 +43,17 @@ export interface SeedPlotThread {
 
 export interface SeedOutlineNode {
   id: string;
+  chapterId?: string | null;
   type: string;
   title: string;
+  summary?: string;
+  goal?: string;
+  hook?: string;
+  conflict?: string;
+  valueShift?: string;
+  platformNote?: string;
+  order?: number;
+  depth?: number;
 }
 
 export interface OutlineNodeCreateSeed {
@@ -62,6 +72,10 @@ export interface OutlineNodeCreateSeed {
   status: string;
 }
 
+export interface ChapterCardActionSeed extends ChapterCardDraft {
+  outlineNodeId: string;
+}
+
 function includesPattern(value: string, pattern: RegExp) {
   return pattern.test(value.trim());
 }
@@ -74,6 +88,17 @@ function requiredOutlineCount(type: string) {
   if (type === "branch") return 3;
   if (type === "leaf") return 2;
   return 1;
+}
+
+const chapterCardNodeTypes = new Set(["opening", "trunk", "branch", "leaf", "ending"]);
+
+function outlineSortWeight(type: string) {
+  if (type === "opening") return 10;
+  if (type === "trunk") return 20;
+  if (type === "branch") return 30;
+  if (type === "leaf") return 40;
+  if (type === "ending") return 90;
+  return 50;
 }
 
 export function buildCharacterActionSeeds(project: SeedProject, characters: SeedCharacter[]): SeedCharacter[] {
@@ -237,4 +262,42 @@ export function buildOutlineActionSeeds(
   }
 
   return seeds;
+}
+
+export function buildChapterCardActionSeeds(input: {
+  project: SeedProject;
+  platform: PlatformProfile;
+  outlineNodes: SeedOutlineNode[];
+  existingChapterCount: number;
+  limit?: number;
+}): ChapterCardActionSeed[] {
+  const limit = Math.max(1, input.limit ?? 5);
+  const candidates = input.outlineNodes
+    .filter((node) => chapterCardNodeTypes.has(node.type) && !node.chapterId)
+    .sort((left, right) => (
+      outlineSortWeight(left.type) - outlineSortWeight(right.type)
+      || (left.depth ?? 0) - (right.depth ?? 0)
+      || (left.order ?? 0) - (right.order ?? 0)
+      || left.title.localeCompare(right.title)
+    ))
+    .slice(0, limit);
+
+  return candidates.map((node, index) => ({
+    outlineNodeId: node.id,
+    ...buildChapterCardFromOutline({
+      projectTitle: input.project.title,
+      platform: input.platform,
+      nextOrder: input.existingChapterCount + index + 1,
+      outlineNode: {
+        type: node.type,
+        title: node.title,
+        summary: node.summary ?? "",
+        goal: node.goal ?? "",
+        hook: node.hook ?? "",
+        conflict: node.conflict ?? "",
+        valueShift: node.valueShift ?? "",
+        platformNote: node.platformNote ?? "",
+      },
+    }),
+  }));
 }

@@ -402,6 +402,10 @@ test("buildFirstDayDispatchDesk highlights the next first-day task", () => {
   assert.equal(desk.nextTask?.stepLabel, "第一章审稿");
   assert.equal(desk.nextTask?.dueLabel, "今天收口");
   assert.equal(desk.nextTask?.firstDayHref, "/projects/project-1?firstDayLaunch=1&nextStep=first-review#first-day-workflow");
+  assert.equal(desk.nextTask?.continuation.kind, "first_day_ai");
+  assert.equal(desk.nextTask?.continuation.label, "直接执行 AI");
+  assert.equal(desk.nextTask?.continuation.endpoint, "/api/projects/project-1/first-day-workflow");
+  assert.ok(desk.nextTask?.continuation.hint.includes("执行后回项目验收"));
   assert.ok(desk.nextTask?.completionTemplate.includes("第一章审稿已完成"));
   assert.ok(desk.nextActions[0].includes("第一章审稿"));
 });

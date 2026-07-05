@@ -104,6 +104,12 @@ export interface FirstDayDispatchDeskCard {
   acceptanceCriteria: string[];
   evidence: string[];
   completionHint: string | null;
+  continuation: {
+    kind: "first_day_ai" | "open_work";
+    label: string;
+    hint: string;
+    endpoint?: string;
+  };
 }
 
 export interface FirstDayDispatchDesk {
@@ -748,6 +754,7 @@ export function buildFirstDayDispatchCompletionHint(task: Pick<PersistedGatePlat
 
 function toFirstDayCard(task: PersistedGatePlatformDispatchTask): FirstDayDispatchDeskCard {
   const stepId = firstDayStepId(task.dispatchKey);
+  const aiContinuation = task.ownerRole === "AI" && task.projectId;
   return {
     dispatchKey: task.dispatchKey,
     projectId: task.projectId,
@@ -767,6 +774,18 @@ function toFirstDayCard(task: PersistedGatePlatformDispatchTask): FirstDayDispat
     acceptanceCriteria: task.acceptanceCriteria,
     evidence: task.evidence,
     completionHint: buildFirstDayDispatchCompletionHint(task),
+    continuation: aiContinuation
+      ? {
+        kind: "first_day_ai",
+        label: "直接执行 AI",
+        hint: "AI 节点可在派单中心直接执行，执行后回项目验收证据。",
+        endpoint: `/api/projects/${encodeURIComponent(task.projectId!)}/first-day-workflow`,
+      }
+      : {
+        kind: "open_work",
+        label: "回作品处理",
+        hint: "人工或运营节点需要先回作品处理材料，再回派单中心填验收依据。",
+      },
   };
 }
 

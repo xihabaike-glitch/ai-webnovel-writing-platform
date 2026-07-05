@@ -801,6 +801,7 @@ export function GateDispatchTaskCenter({
                   {firstDayDesk.nextTask.completionHint ? (
                     <p className="mt-2 max-w-3xl text-xs leading-5 text-amber-100">{firstDayDesk.nextTask.completionHint}</p>
                   ) : null}
+                  <p className="mt-2 max-w-3xl text-xs leading-5 text-slate-300">{firstDayDesk.nextTask.continuation.hint}</p>
                   <div className="mt-3 flex flex-wrap gap-2 text-xs text-slate-200">
                     <span className="rounded-md bg-white/10 px-2 py-1">{firstDayDesk.nextTask.stepLabel}</span>
                     <span className="rounded-md bg-white/10 px-2 py-1">{firstDayDesk.nextTask.ownerRole}</span>
@@ -809,6 +810,24 @@ export function GateDispatchTaskCenter({
                   </div>
                 </div>
                 <div className="flex shrink-0 flex-wrap gap-2 lg:justify-end">
+                  {firstDayDesk.nextTask.continuation.kind === "first_day_ai" && firstDayDesk.nextTask.continuation.endpoint ? (
+                    <button
+                      className="rounded-md bg-white px-3 py-2 text-sm font-medium text-slate-950 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
+                      disabled={runningRouteActionLink}
+                      onClick={() => void executeRouteActionLink({
+                        label: firstDayDesk.nextTask!.continuation.label,
+                        href: firstDayDesk.nextTask!.firstDayHref,
+                        execution: {
+                          kind: "first_day_ai",
+                          method: "POST",
+                          endpoint: firstDayDesk.nextTask!.continuation.endpoint!,
+                        },
+                      })}
+                      type="button"
+                    >
+                      {runningRouteActionLink ? "执行中" : firstDayDesk.nextTask.continuation.label}
+                    </button>
+                  ) : null}
                   <Link className="rounded-md bg-white px-3 py-2 text-sm font-medium text-slate-950 hover:bg-slate-100" href={firstDayDesk.nextTask.firstDayHref}>
                     回作品执行
                   </Link>

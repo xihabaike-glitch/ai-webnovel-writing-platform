@@ -1042,6 +1042,8 @@ export function buildFirstDayPostDispatchCompletionPrompt(input: {
       message: `已完成当前派单：${input.completedTitle}。下一步「${input.nextStep.label}」已准备好，可以继续让 AI 执行。`,
       action: "execute_current_step",
       actionLabel: "继续 AI 执行",
+      secondaryActionLabel: input.nextStep.dispatchHref ? "看下一张派单卡" : undefined,
+      secondaryActionHref: input.nextStep.dispatchHref,
     };
   }
 

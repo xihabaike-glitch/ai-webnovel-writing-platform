@@ -855,6 +855,7 @@ test("buildFirstDayPostDispatchCompletionPrompt offers direct AI continuation wh
       owner: "AI",
       actionLabel: "AI 执行当前节点",
       href: "#first-day-workflow",
+      dispatchHref: "/dispatch?firstDayProject=project-1&step=first-review#first-day-dispatch",
     },
     executionPlan: {
       executable: true,
@@ -909,6 +910,8 @@ test("buildFirstDayPostDispatchCompletionPrompt offers direct AI continuation wh
   assert.equal(ready.message, "已完成当前派单：第一章初稿。下一步「第一章审稿」已准备好，可以继续让 AI 执行。");
   assert.equal(ready.action, "execute_current_step");
   assert.equal(ready.actionLabel, "继续 AI 执行");
+  assert.equal(ready.secondaryActionLabel, "看下一张派单卡");
+  assert.equal(ready.secondaryActionHref, "/dispatch?firstDayProject=project-1&step=first-review#first-day-dispatch");
   assert.equal(manualStep.message, "首日节点已推进：「第一章二改」已验收，下一张首日卡是「平台包预检」。");
   assert.equal(manualStep.action, "open_next_step");
   assert.equal(manualStep.actionLabel, "检查平台包");

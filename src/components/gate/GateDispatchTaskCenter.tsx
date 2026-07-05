@@ -25,7 +25,9 @@ import {
   buildFirstDayDispatchDesk,
   buildFirstDayDispatchCompletionHint,
   buildFirstDayDispatchAiExecutionNotice,
+  buildFirstDayDispatchCenterHref,
   buildFirstDayDispatchUpdateSummary,
+  buildFirstDayPostDispatchCompletionPrompt,
   buildFirstDayReturnToAcceptanceHref,
   resolveFirstDayDispatchFocus,
   type FirstDayDispatchFocusInput,
@@ -140,6 +142,10 @@ interface RouteActionLink {
   label: string;
   href: string;
   execution?: RouteActionExecution;
+  secondary?: {
+    label: string;
+    href: string;
+  };
 }
 
 function isAiPipelineExecutableTask(task: PersistedGatePlatformDispatchTask) {
@@ -357,15 +363,44 @@ export function GateDispatchTaskCenter({
           : "";
         const firstDayUpdate = buildFirstDayDispatchUpdateSummary(updated);
         if (firstDayUpdate.visible) {
-          setRouteActionMessage(`${firstDayUpdate.title}：${firstDayUpdate.detail} 下一步：${firstDayUpdate.actionLabel}。`);
+          const firstDayFollowUp = updated.followUpTasks.find((item) => item.dispatchKey.startsWith("first-day:")) ?? null;
+          const firstDayPrompt = buildFirstDayPostDispatchCompletionPrompt({
+            completedTitle: updated.task.title,
+            updateSummary: firstDayUpdate,
+            nextStep: firstDayFollowUp
+              ? {
+                label: firstDayFollowUp.title,
+                owner: firstDayUpdate.actionExecution ? "AI" : "运营",
+                actionLabel: firstDayUpdate.actionLabel,
+                href: firstDayUpdate.href,
+                dispatchHref: firstDayFollowUp.projectId
+                  ? buildFirstDayDispatchCenterHref({
+                    projectId: firstDayFollowUp.projectId,
+                    dispatchKey: firstDayFollowUp.dispatchKey,
+                  })
+                  : undefined,
+              }
+              : null,
+            executionPlan: {
+              executable: Boolean(firstDayUpdate.actionExecution),
+              blockedReason: firstDayUpdate.actionExecution ? undefined : "当前首日节点暂不支持自动执行。",
+            },
+          });
+          setRouteActionMessage(firstDayPrompt.message);
           setRouteActionLink({
-            label: firstDayUpdate.actionLabel,
-            href: firstDayUpdate.href,
+            label: firstDayPrompt.actionLabel ?? firstDayUpdate.actionLabel,
+            href: firstDayPrompt.actionHref ?? firstDayUpdate.href,
             execution: firstDayUpdate.actionExecution
               ? {
                 kind: firstDayUpdate.actionExecution.kind,
                 method: "POST",
                 endpoint: firstDayUpdate.actionExecution.endpoint,
+              }
+              : undefined,
+            secondary: firstDayPrompt.secondaryActionLabel && firstDayPrompt.secondaryActionHref
+              ? {
+                label: firstDayPrompt.secondaryActionLabel,
+                href: firstDayPrompt.secondaryActionHref,
               }
               : undefined,
           });
@@ -1186,20 +1221,27 @@ export function GateDispatchTaskCenter({
             <div className="flex flex-col gap-3 rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800 lg:flex-row lg:items-center lg:justify-between">
               <p className="leading-6">{routeActionMessage}</p>
               {routeActionLink ? (
-                routeActionLink.execution ? (
-                  <button
-                    className="w-fit shrink-0 rounded-md bg-white px-3 py-2 text-xs font-medium text-emerald-900 hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60"
-                    disabled={runningRouteActionLink}
-                    onClick={() => void executeRouteActionLink(routeActionLink)}
-                    type="button"
-                  >
-                    {runningRouteActionLink ? "执行中" : routeActionLink.label}
-                  </button>
-                ) : (
-                  <Link className="w-fit shrink-0 rounded-md bg-white px-3 py-2 text-xs font-medium text-emerald-900 hover:bg-emerald-100" href={routeActionLink.href}>
-                    {routeActionLink.label}
-                  </Link>
-                )
+                <div className="flex shrink-0 flex-wrap gap-2">
+                  {routeActionLink.execution ? (
+                    <button
+                      className="w-fit rounded-md bg-white px-3 py-2 text-xs font-medium text-emerald-900 hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60"
+                      disabled={runningRouteActionLink}
+                      onClick={() => void executeRouteActionLink(routeActionLink)}
+                      type="button"
+                    >
+                      {runningRouteActionLink ? "执行中" : routeActionLink.label}
+                    </button>
+                  ) : (
+                    <Link className="w-fit rounded-md bg-white px-3 py-2 text-xs font-medium text-emerald-900 hover:bg-emerald-100" href={routeActionLink.href}>
+                      {routeActionLink.label}
+                    </Link>
+                  )}
+                  {routeActionLink.secondary ? (
+                    <Link className="w-fit rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-900 hover:bg-emerald-100" href={routeActionLink.secondary.href}>
+                      {routeActionLink.secondary.label}
+                    </Link>
+                  ) : null}
+                </div>
               ) : null}
             </div>
           ) : null}

@@ -160,6 +160,7 @@ test("buildPrePublishGate", async (t) => {
           },
           {
             dispatchKey: "first-three-adoption:project-ready:chapter-1:revision-1:publish-check",
+            platformId: "fanqie",
             state: "queued",
             completionEvidence: "",
             title: "第 1 章采纳后发布质检",
@@ -181,6 +182,8 @@ test("buildPrePublishGate", async (t) => {
     assert.equal(gate.firstThreeAdoptionClosure.reviewPending, 1);
     assert.equal(gate.firstThreeAdoptionClosure.publishPending, 1);
     assert.equal(gate.firstThreeAdoptionClosure.items[0].href, "/projects/project-ready/chapters/chapter-1#chapter-workflow");
+    assert.deepEqual(gate.firstThreeAdoptionClosure.items[0].execution, { type: "chapter_review", chapterId: "chapter-1" });
+    assert.deepEqual(gate.firstThreeAdoptionClosure.items[1].execution, { type: "publish_check", projectId: "project-ready", platformId: "fanqie" });
     assert.equal(adoptionItem?.status, "block");
     assert.ok(adoptionItem?.detail.includes("正文变更后不能沿用旧审稿"));
     assert.ok(gate.priorityActions.some((action) => action.id.includes(":review") && action.label === "重新审稿"));

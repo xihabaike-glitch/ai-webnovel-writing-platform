@@ -61,6 +61,7 @@ export interface PrePublishGateProject {
   }>;
   gateDispatchTasks?: Array<{
     dispatchKey: string;
+    platformId?: string | null;
     state: string;
     completionEvidence: string;
     title?: string;
@@ -201,6 +202,9 @@ export interface PrePublishGateAdoptionFollowupItem {
   id: string;
   projectId: string;
   projectTitle: string;
+  chapterId: string | null;
+  revisionId: string | null;
+  platformId: string | null;
   type: "review" | "publish_check" | "other";
   label: string;
   title: string;
@@ -210,7 +214,19 @@ export interface PrePublishGateAdoptionFollowupItem {
   evidence: string;
   actionLabel: string;
   href: string;
+  execution: PrePublishGateAdoptionFollowupExecution | null;
 }
+
+export type PrePublishGateAdoptionFollowupExecution =
+  | {
+    type: "chapter_review";
+    chapterId: string;
+  }
+  | {
+    type: "publish_check";
+    projectId: string;
+    platformId: string | null;
+  };
 
 export interface PrePublishGateAdoptionClosure {
   status: PrePublishGateItem["status"];
@@ -326,15 +342,52 @@ function firstThreeFollowupLabel(type: PrePublishGateAdoptionFollowupItem["type"
   return "后续任务";
 }
 
+function parseFirstThreeAdoptionDispatchKey(dispatchKey: string) {
+  const parts = dispatchKey.split(":");
+  if (parts.length < 5 || parts[0] !== "first-three-adoption") {
+    return { chapterId: null, revisionId: null };
+  }
+  return {
+    chapterId: parts[2] || null,
+    revisionId: parts[3] || null,
+  };
+}
+
+function firstThreeFollowupExecution(input: {
+  projectId: string;
+  task: PrePublishGateDispatchTask;
+  type: PrePublishGateAdoptionFollowupItem["type"];
+  chapterId: string | null;
+}): PrePublishGateAdoptionFollowupExecution | null {
+  if (input.type === "review" && input.chapterId) {
+    return {
+      type: "chapter_review",
+      chapterId: input.chapterId,
+    };
+  }
+  if (input.type === "publish_check") {
+    return {
+      type: "publish_check",
+      projectId: input.projectId,
+      platformId: input.task.platformId ?? null,
+    };
+  }
+  return null;
+}
+
 function buildFirstThreeAdoptionClosure(projects: PrePublishGateProject[]): PrePublishGateAdoptionClosure {
   const followups = firstThreeAdoptionFollowups(projects);
   const items = followups.map(({ project, task }): PrePublishGateAdoptionFollowupItem => {
     const type = firstThreeFollowupType(task);
+    const keyParts = parseFirstThreeAdoptionDispatchKey(task.dispatchKey);
     const missingEvidence = task.state === "completed" && task.completionEvidence.trim().length < 8;
     return {
       id: task.dispatchKey,
       projectId: project.id,
       projectTitle: project.title,
+      chapterId: keyParts.chapterId,
+      revisionId: keyParts.revisionId,
+      platformId: task.platformId ?? null,
       type,
       label: firstThreeFollowupLabel(type),
       title: task.title ?? firstThreeFollowupLabel(type),
@@ -344,6 +397,12 @@ function buildFirstThreeAdoptionClosure(projects: PrePublishGateProject[]): PreP
       evidence: task.completionEvidence,
       actionLabel: task.actionLabel ?? (type === "publish_check" ? "回发布质检" : "重新审稿"),
       href: firstThreeFollowupHref(project.id, task),
+      execution: firstThreeFollowupExecution({
+        projectId: project.id,
+        task,
+        type,
+        chapterId: keyParts.chapterId,
+      }),
     };
   });
   const pendingItems = items.filter((item) => item.status === "block");

@@ -53,6 +53,7 @@ export default async function GatePage() {
           },
           select: {
             dispatchKey: true,
+            platformId: true,
             state: true,
             completionEvidence: true,
             title: true,

@@ -80,6 +80,26 @@ function firstDayCompleteDispatches(projectId: string) {
   }];
 }
 
+function handoffWorldEntries() {
+  return [{
+    type: "platform_soil",
+    title: "首轮平台打法：番茄小说",
+    content: [
+      "状态：模板推荐",
+      "打法：首章先给不可逆危机，三章内连续兑现爽点。",
+      "开头动作：第一段给倒计时。",
+      "验证动作：批量前检查前三章追读。",
+      "风险：解释过多会掉节奏。",
+      "交接状态：reuse",
+      "交接标签：稳定加码",
+      "交接说明：沿用番茄首章强钩子打法。",
+      "首日动作：开头必须落地第一段倒计时。",
+      "首日动作：验证前三章追读承诺是否兑现。",
+      "避坑边界：不要直接放量，先做小样本。",
+    ].join("\n"),
+  }];
+}
+
 test("buildTaskQueueCenter", async (t) => {
   await t.test("collects cross-project draft, review, second-pass, export, and blocked tasks", () => {
     const queue = buildTaskQueueCenter([{ ...project, gateDispatchTasks: firstDayCompleteDispatches(project.id) }]);
@@ -127,6 +147,42 @@ test("buildTaskQueueCenter", async (t) => {
     assert.ok(gate?.evidence.includes("平台包预检验收"));
     assert.ok(gate?.href.endsWith("#first-day-workflow"));
     assert.equal(queue.recommendedNext?.blockerType, "first_day_gate");
+  });
+
+  await t.test("keeps the first-day gate closed when handoff evidence is missing", () => {
+    const queue = buildTaskQueueCenter([{
+      ...project,
+      worldEntries: handoffWorldEntries(),
+      gateDispatchTasks: firstDayCompleteDispatches(project.id),
+    }]);
+    const gate = queue.items.find((item) => item.blockerType === "first_day_gate");
+
+    assert.equal(queue.overview.draftReady, 0);
+    assert.equal(queue.overview.reviewReady, 0);
+    assert.equal(queue.overview.secondPassReady, 0);
+    assert.equal(queue.overview.firstDayBlocked, 1);
+    assert.equal(gate?.actionLabel, "补交接验收");
+    assert.ok(gate?.evidence.includes("开书交接证据"));
+    assert.ok(gate?.evidence.includes("交接动作落地"));
+    assert.ok(gate?.evidence.includes("避坑边界确认"));
+    assert.equal(queue.recommendedNext?.blockerType, "first_day_gate");
+  });
+
+  await t.test("allows production when first-day evidence includes handoff closure", () => {
+    const queue = buildTaskQueueCenter([{
+      ...project,
+      worldEntries: handoffWorldEntries(),
+      gateDispatchTasks: [{
+        dispatchKey: `first-day:${project.id}:publish-precheck`,
+        state: "completed",
+        completionEvidence: "首日平台包预检已完成。交接动作已落地：开头第一段倒计时完成，验证前三章追读承诺。避坑边界已确认：不要直接放量，先做小样本。",
+      }],
+    }]);
+
+    assert.equal(queue.overview.firstDayBlocked, 0);
+    assert.equal(queue.overview.reviewReady, 1);
+    assert.equal(queue.recommendedNext?.category, "review");
+    assert.ok(queue.items.every((item) => item.actionLabel !== "补交接验收"));
   });
 
   await t.test("blocks risky first drafts behind recovery validation", () => {

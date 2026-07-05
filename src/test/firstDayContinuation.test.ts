@@ -34,6 +34,26 @@ const worldEntries = [
   { type: "taboo", title: "回档禁忌", content: "回档不能无损使用，主角每次借用未来信息都会失去关系信任，并制造新的证据缺口和敌人。" },
   { type: "platform_soil", title: "番茄土壤", content: "状态：模板推荐\n打法：首章先给不可逆危机，三章内连续兑现爽点。\n开头动作：第一段给倒计时。\n验证动作：批量前检查前三章追读。\n风险：解释过多会掉节奏。" },
 ];
+const handoffWorldEntries = [
+  worldEntries[0],
+  worldEntries[1],
+  {
+    type: "platform_soil",
+    title: "首轮平台打法：番茄小说",
+    content: [
+      "状态：模板推荐",
+      "打法：首章先给不可逆危机，三章内连续兑现爽点。",
+      "开头动作：第一段给倒计时。",
+      "验证动作：批量前检查前三章追读。",
+      "风险：解释过多会掉节奏。",
+      "交接状态：reuse",
+      "交接标签：稳定加码",
+      "交接说明：沿用番茄首章强钩子打法。",
+      "首日动作：开头必须落地第一段倒计时。",
+      "避坑边界：不要直接放量，先做小样本。",
+    ].join("\n"),
+  },
+];
 const checklist = {
   readinessPercent: 30,
   passCount: 3,
@@ -158,6 +178,19 @@ test("buildFirstDayContinuationAction routes completed first-day work into the A
   assert.equal(action.primaryHref, "/projects/project-1#ai-pipeline");
   assert.equal(action.secondaryHref, "/tasks");
   assert.ok(action.warnings.some((warning) => warning.includes("小样本") || warning.includes("同类可执行任务")));
+});
+
+test("buildFirstDayContinuationAction asks for handoff evidence before batch production", () => {
+  const action = buildFirstDayContinuationAction({
+    project: project({ worldEntries: handoffWorldEntries }),
+    workflow: completedWorkflow(),
+  });
+
+  assert.equal(action.status, "blocked");
+  assert.equal(action.primaryLabel, "补交接验收");
+  assert.equal(action.primaryHref, "/projects/project-1#first-day-workflow");
+  assert.equal(action.queueCategory, "blocked");
+  assert.ok(action.detail.includes("开书交接证据"));
 });
 
 test("buildFirstDayContinuationAction gives a fallback when no direct batch item exists", () => {

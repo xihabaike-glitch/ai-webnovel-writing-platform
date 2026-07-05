@@ -157,6 +157,21 @@ function completedFirstDayDispatch(project: TaskQueueProject, stepId: string) {
   )) ?? null;
 }
 
+function handoffEvidenceStatus(project: TaskQueueProject, startTactic: ProjectStartTacticSummary | null, stepId: string) {
+  const evidence = completedFirstDayDispatch(project, stepId)?.completionEvidence ?? "";
+  const requiresAction = (startTactic?.firstDayActions?.length ?? 0) > 0;
+  const requiresAvoidRule = (startTactic?.avoidRules?.length ?? 0) > 0;
+  const actionCleared = !requiresAction || /交接动作|首日动作|开头|验证|落地/u.test(evidence);
+  const avoidRuleCleared = !requiresAvoidRule || /避坑边界|避开|不要|小样本|不放量|暂停/u.test(evidence);
+
+  return {
+    required: requiresAction || requiresAvoidRule,
+    cleared: actionCleared && avoidRuleCleared,
+    missingAction: requiresAction && !actionCleared,
+    missingAvoidRule: requiresAvoidRule && !avoidRuleCleared,
+  };
+}
+
 function firstDayProductionGateCleared(project: TaskQueueProject, riskLevel: FirstDayRiskLevel, scaleGate: QueueScaleGate) {
   if (riskLevel === "watch" && scaleGate === "cleared") return true;
   return Boolean(completedFirstDayDispatch(project, "publish-precheck"));
@@ -178,7 +193,13 @@ export function buildTaskQueueCenter(projects: TaskQueueProject[]): TaskQueueCen
     const scaleGate: QueueScaleGate = riskProfile.level === "watch"
       ? watchDraftScaleCleared(project) ? "cleared" : "sample_only"
       : "none";
-    const firstDayGateCleared = firstDayProductionGateCleared(project, riskProfile.level, scaleGate);
+    const handoffStatus = handoffEvidenceStatus(
+      project,
+      startTactic,
+      riskProfile.level === "watch" && scaleGate === "cleared" ? "first-draft" : "publish-precheck",
+    );
+    const productionGateCleared = firstDayProductionGateCleared(project, riskProfile.level, scaleGate);
+    const firstDayGateCleared = productionGateCleared && (!handoffStatus.required || handoffStatus.cleared);
     const draftQueue = buildBatchDraftQueue(project.chapters, project.aiTasks, platform);
     const reviewQueue = buildReviewPipelineQueue(project.chapters, project.aiTasks, 5, startTactic);
     const exportCenter = buildPlatformPublishExportCenter({
@@ -196,6 +217,11 @@ export function buildTaskQueueCenter(projects: TaskQueueProject[]): TaskQueueCen
     const queueItems: QueueItem[] = [];
 
     if (!firstDayGateCleared && riskProfile.level !== "blocked") {
+      const missingHandoffEvidence = productionGateCleared && handoffStatus.required && !handoffStatus.cleared;
+      const missingParts = [
+        handoffStatus.missingAction ? "交接动作落地" : null,
+        handoffStatus.missingAvoidRule ? "避坑边界确认" : null,
+      ].filter((part): part is string => Boolean(part));
       queueItems.push(item({
         id: `${project.id}:first-day-gate:${platform.id}`,
         projectId: project.id,
@@ -204,7 +230,9 @@ export function buildTaskQueueCenter(projects: TaskQueueProject[]): TaskQueueCen
         category: "blocked",
         blockerType: "first_day_gate",
         chapterTitle: "首日生产闸门",
-        evidence: riskProfile.level === "watch"
+        evidence: missingHandoffEvidence
+          ? `首日链路已完成，但开书交接证据还没闭环：需要补齐${missingParts.join("、")}后，才允许进入批量初稿、批量审稿、批量二改或多平台导出。`
+          : riskProfile.level === "watch"
           ? "观察项目必须先完成首日小样本验收，写清通过线、不可接受项、复查证据和放量结论。"
           : "首日链路还没完成平台包预检验收，暂不允许进入批量初稿、批量审稿、批量二改或多平台导出。",
         strategyBasis: startTactic,
@@ -212,7 +240,9 @@ export function buildTaskQueueCenter(projects: TaskQueueProject[]): TaskQueueCen
         riskLabel: riskProfile.label,
         riskNotice,
         scaleGate,
-        actionLabel: riskProfile.level === "watch" ? "完成小样本验收" : "完成首日链路",
+        actionLabel: missingHandoffEvidence
+          ? "补交接验收"
+          : riskProfile.level === "watch" ? "完成小样本验收" : "完成首日链路",
         href: `${projectHref}#first-day-workflow`,
       }));
     }

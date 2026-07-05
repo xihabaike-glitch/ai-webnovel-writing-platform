@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { getPlatformProfile } from "../lib/platforms/platformProfiles.ts";
-import { buildFirstDayDispatchItem, buildFirstDayExecutionReceipt, buildFirstDayFollowUpDispatch, buildFirstDayLaunchPackage, buildFirstDayLaunchReceipt, buildFirstDayModelExecutionPlan, buildFirstDayRiskProfile, buildFirstDayWorkflow } from "../lib/projects/firstDayWorkflow.ts";
+import { buildFirstDayDispatchItem, buildFirstDayExecutionReceipt, buildFirstDayExperienceHandoffDispatchItems, buildFirstDayFollowUpDispatch, buildFirstDayLaunchPackage, buildFirstDayLaunchReceipt, buildFirstDayModelExecutionPlan, buildFirstDayRiskProfile, buildFirstDayWorkflow } from "../lib/projects/firstDayWorkflow.ts";
 
 const project = {
   id: "project-1",
@@ -113,6 +113,7 @@ test("buildFirstDayWorkflow", async (t) => {
     assert.equal(launchPackage.dispatch.dueLabel, "今天收口");
     assert.equal(launchPackage.dispatch.actionLabel, launchPackage.receipt.actionLabel);
     assert.ok(launchPackage.dispatch.acceptanceCriteria.includes("第一章正文已生成并写回章节"));
+    assert.deepEqual(launchPackage.handoffDispatches, []);
   });
 
   await t.test("builds an execution package for the current first-day step", () => {
@@ -173,6 +174,8 @@ test("buildFirstDayWorkflow", async (t) => {
       submissionChecklist: checklist,
     });
     const dispatch = buildFirstDayDispatchItem({ workflow, project, platform });
+    const handoffDispatches = buildFirstDayExperienceHandoffDispatchItems({ workflow, project, platform });
+    const launchPackage = buildFirstDayLaunchPackage({ workflow, project, platform });
 
     assert.equal(workflow.nextStep.id, "first-draft");
     assert.equal(workflow.executionPackage.tacticFocus?.label, "恢复放量打法");
@@ -196,6 +199,17 @@ test("buildFirstDayWorkflow", async (t) => {
     assert.ok(workflow.executionPackage.modelPrompt.includes("避坑边界"));
     assert.ok(workflow.executionPackage.modelPrompt.includes("模型路线复检"));
     assert.ok(dispatch.acceptanceCriteria.some((criterion) => criterion.includes("模型路线复检")));
+    assert.deepEqual(handoffDispatches.map((item) => item.id), [
+      "first-day-handoff:project-1:opening",
+      "first-day-handoff:project-1:verification",
+      "first-day-handoff:project-1:platform-package",
+    ]);
+    assert.deepEqual(handoffDispatches.map((item) => item.ownerRole), ["开头编辑", "审稿编辑", "平台运营"]);
+    assert.ok(handoffDispatches[0]?.acceptanceCriteria.some((criterion) => criterion.includes("倒计时")));
+    assert.ok(handoffDispatches[1]?.acceptanceCriteria.some((criterion) => criterion.includes("通过线")));
+    assert.ok(handoffDispatches[2]?.acceptanceCriteria.some((criterion) => criterion.includes("首轮曝光")));
+    assert.ok(handoffDispatches.every((item) => item.evidence.some((evidence) => evidence.includes("稳定加码"))));
+    assert.equal(launchPackage.handoffDispatches.length, 3);
   });
 
   await t.test("turns the current first-day package into a model execution plan", () => {

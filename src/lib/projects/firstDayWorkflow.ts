@@ -121,6 +121,7 @@ export interface FirstDayTacticFocus {
   handoffDetail: string;
   firstDayActions: string[];
   avoidRules: string[];
+  handoffEvidence: string[];
   acceptanceCriteria: string[];
   missingEvidence: string[];
 }
@@ -166,6 +167,7 @@ export interface FirstDayLaunchReceipt {
 export interface FirstDayLaunchPackage {
   receipt: FirstDayLaunchReceipt;
   dispatch: GatePlatformGrowthDispatchItem;
+  handoffDispatches: GatePlatformGrowthDispatchItem[];
 }
 
 export interface FirstDayFollowUpDispatchInput extends FirstDayDispatchInput {
@@ -380,6 +382,7 @@ function tacticFocusForStep(startTactic: ProjectStartTacticSummary | null | unde
   const handoffDetail = compact(startTactic.handoffDetail ?? "");
   const firstDayActions = (startTactic.firstDayActions ?? []).map(compact).filter(Boolean);
   const avoidRules = (startTactic.avoidRules ?? []).map(compact).filter(Boolean);
+  const handoffEvidence = (startTactic.handoffEvidence ?? []).map(compact).filter(Boolean);
   const actionByStep = firstDayActions.find((action) => {
     if (["opening-hook", "first-draft"].includes(stepId)) return /开头|第一章|正文/.test(action);
     if (["first-review", "publish-precheck"].includes(stepId)) return /验证|复查|回填|平台包/.test(action);
@@ -423,6 +426,7 @@ function tacticFocusForStep(startTactic: ProjectStartTacticSummary | null | unde
     handoffDetail,
     firstDayActions,
     avoidRules,
+    handoffEvidence,
     acceptanceCriteria: handoffCriteria,
     missingEvidence: [missingByStep[stepId] ?? "缺少开书打法落地证据。"],
   };
@@ -1072,6 +1076,93 @@ export function buildFirstDayDispatchItem(input: FirstDayDispatchInput): GatePla
   };
 }
 
+export function buildFirstDayExperienceHandoffDispatchItems(input: FirstDayDispatchInput): GatePlatformGrowthDispatchItem[] {
+  const focus = input.workflow.executionPackage.tacticFocus;
+  if (!focus) return [];
+
+  const projectHref = `/projects/${input.project.id}`;
+  const evidence = [
+    `来源：${focus.title}（${focus.label}）`,
+    focus.handoffDetail ? `交接说明：${focus.handoffDetail}` : null,
+    focus.risk ? `风险：${focus.risk}` : null,
+    ...focus.firstDayActions.slice(0, 2).map((action) => `首日动作：${action}`),
+    ...focus.avoidRules.slice(0, 2).map((rule) => `避坑边界：${rule}`),
+    ...focus.handoffEvidence.slice(0, 2).map((item) => `交接证据：${item}`),
+  ].filter((item): item is string => Boolean(item));
+  const sharedCriteria = [
+    focus.primaryTactic ? `主打法已写进执行口径：${focus.primaryTactic}` : "主打法已写进执行口径。",
+    focus.openingMove ? `开头动作已分配到第一章：${focus.openingMove}` : "开头动作已分配到第一章。",
+    focus.verificationMove ? `验证动作已进入首轮复查：${focus.verificationMove}` : "验证动作已进入首轮复查。",
+  ];
+  const [primaryTacticCriterion, openingMoveCriterion, verificationMoveCriterion] = sharedCriteria;
+
+  return [
+    {
+      id: `first-day-handoff:${input.project.id}:opening`,
+      platformId: input.platform.id,
+      platformName: input.platform.name,
+      stage: "start_opening_diagnostic",
+      state: "assigned",
+      priorityScore: 88,
+      ownerRole: "开头编辑",
+      title: `${input.project.title} · 经验开书交接：开头打法`,
+      detail: `把「${focus.label}」拆到第一章首屏，先验证钩子、危机和追读问题。`,
+      dueLabel: input.workflow.executionPackage.riskDueLabel,
+      actionLabel: "锁定开头打法",
+      href: input.workflow.executionPackage.href,
+      acceptanceCriteria: [
+        primaryTacticCriterion,
+        openingMoveCriterion,
+        "第一章首屏必须能看出危机、选择、代价和继续读的理由。",
+      ],
+      evidence,
+      reviewLatestAt: new Date().toISOString(),
+    },
+    {
+      id: `first-day-handoff:${input.project.id}:verification`,
+      platformId: input.platform.id,
+      platformName: input.platform.name,
+      stage: "start_first_three_review",
+      state: "assigned",
+      priorityScore: 84,
+      ownerRole: "审稿编辑",
+      title: `${input.project.title} · 经验开书交接：首轮验收`,
+      detail: "把历史打法转成前三章验收标准，防止只复用结论、不复用证据。",
+      dueLabel: input.workflow.executionPackage.riskDueLabel,
+      actionLabel: "设置验收口径",
+      href: input.workflow.executionPackage.href,
+      acceptanceCriteria: [
+        verificationMoveCriterion,
+        "前三章验收必须写清通过线、不可接受项和复查证据格式。",
+        "模型路线复检要记录成功率、质量和成本，不靠默认路线硬跑。",
+      ],
+      evidence,
+      reviewLatestAt: new Date().toISOString(),
+    },
+    {
+      id: `first-day-handoff:${input.project.id}:platform-package`,
+      platformId: input.platform.id,
+      platformName: input.platform.name,
+      stage: "start_platform_package",
+      state: "assigned",
+      priorityScore: 80,
+      ownerRole: "平台运营",
+      title: `${input.project.title} · 经验开书交接：平台回收`,
+      detail: "把可复用经验落到标题、简介、标签、样章和首轮数据回收口径。",
+      dueLabel: "今天准备回收口径",
+      actionLabel: "准备平台回收",
+      href: `${projectHref}#platform-export`,
+      acceptanceCriteria: [
+        "标题、简介、标签和样章能兑现本次开书打法。",
+        "首轮曝光、点击、收藏、追读或站内反馈的回收字段已写清。",
+        ...focus.avoidRules.slice(0, 1).map((rule) => `避坑边界已进入平台包：${rule}`),
+      ],
+      evidence,
+      reviewLatestAt: new Date().toISOString(),
+    },
+  ];
+}
+
 export function buildFirstDayLaunchReceipt(workflow: FirstDayWorkflow): FirstDayLaunchReceipt {
   const readyStepIds = workflow.steps.filter((item) => item.status === "done").map((item) => item.id);
 
@@ -1094,6 +1185,7 @@ export function buildFirstDayLaunchPackage(input: FirstDayDispatchInput): FirstD
   return {
     receipt: buildFirstDayLaunchReceipt(input.workflow),
     dispatch: buildFirstDayDispatchItem(input),
+    handoffDispatches: buildFirstDayExperienceHandoffDispatchItems(input),
   };
 }
 

@@ -3,7 +3,7 @@ import { prisma } from "@/lib/db/prisma";
 import { buildDefaultOutlineNodes } from "@/lib/outlines/defaultOutline";
 import { buildFirstDayLaunchPackage, buildFirstDayWorkflow, type FirstDayLaunchPackage } from "@/lib/projects/firstDayWorkflow";
 import { buildProjectDefaults } from "@/lib/projects/projectDefaults";
-import { gateActionReceiptFromAuditRecord } from "@/lib/projects/gateActionReceipts";
+import { gateActionReceiptFromAuditRecord, type GatePlatformGrowthDispatchItem } from "@/lib/projects/gateActionReceipts";
 import { gatePlatformDispatchTaskFromRecord } from "@/lib/projects/gateDispatchTaskRecords";
 import {
   buildProjectStartGateExperience,
@@ -23,8 +23,7 @@ import type { LengthType, PlatformId } from "@/lib/platforms/platformProfiles";
 import { getPlatformWritingStyle } from "@/lib/platforms/writingStyleTemplates";
 import { createProjectSchema } from "@/lib/validators/project";
 
-async function persistFirstDayLaunchDispatch(projectId: string, launchPackage: FirstDayLaunchPackage) {
-  const dispatch = launchPackage.dispatch;
+async function persistFirstDayDispatch(projectId: string, dispatch: GatePlatformGrowthDispatchItem) {
   const now = new Date();
   return prisma.gateDispatchTask.upsert({
     where: { dispatchKey: dispatch.id },
@@ -69,6 +68,11 @@ async function persistFirstDayLaunchDispatch(projectId: string, launchPackage: F
       assignedAt: now,
     },
   });
+}
+
+async function persistFirstDayLaunchDispatches(projectId: string, launchPackage: FirstDayLaunchPackage) {
+  const dispatches = [launchPackage.dispatch, ...launchPackage.handoffDispatches];
+  return Promise.all(dispatches.map((dispatch) => persistFirstDayDispatch(projectId, dispatch)));
 }
 
 export async function GET() {
@@ -257,12 +261,13 @@ export async function POST(request: Request) {
   })() : null;
 
   if (launchPackage) {
-    await persistFirstDayLaunchDispatch(project.id, launchPackage);
+    await persistFirstDayLaunchDispatches(project.id, launchPackage);
   }
 
   return NextResponse.json({
     project,
     launchReceipt: launchPackage?.receipt ?? null,
     launchDispatch: launchPackage?.dispatch ?? null,
+    launchHandoffDispatches: launchPackage?.handoffDispatches ?? [],
   }, { status: 201 });
 }

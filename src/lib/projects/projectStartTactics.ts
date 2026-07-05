@@ -33,6 +33,12 @@ export interface ProjectStartTacticWorldEntry {
   content: string;
 }
 
+export interface ProjectStartSoilWorldEntry {
+  type: "platform_soil";
+  title: string;
+  content: string;
+}
+
 export interface ProjectStartTacticSummary {
   title: string;
   label: string;
@@ -956,6 +962,155 @@ export function buildProjectStartTacticWorldEntry(
       ...evidence,
     ].join("\n"),
   };
+}
+
+function labeledList(items: Array<string | null | undefined>, fallback: string) {
+  const lines = uniqueLines(items, 5);
+  return (lines.length ? lines : [fallback]).map((line) => `- ${trimLine(line)}`).join("\n");
+}
+
+function platformOpeningAsset(advice: ProjectStartTacticAdvice, platform: PlatformProfile, style: PlatformWritingStyleTemplate): ProjectStartSoilWorldEntry {
+  return {
+    type: "platform_soil",
+    title: `开局钩子土壤：${platform.name}`,
+    content: [
+      `平台：${platform.name}`,
+      `首屏承诺：${style.firstScreen}`,
+      `开头动作：${trimLine(advice.openingMove)}`,
+      `读者问题：主角为什么现在非行动不可，退一步会失去什么。`,
+      `钩子素材：`,
+      labeledList([
+        style.openingHook,
+        advice.primaryTactic,
+        ...platform.openingRules,
+      ], "第一屏给出危机、选择和继续读的理由。"),
+      `验收口径：首段有不可逆变化，章末有明确追读问题。`,
+    ].join("\n"),
+  };
+}
+
+function firstThreeAsset(advice: ProjectStartTacticAdvice, platform: PlatformProfile, template: ProjectTemplate, style: PlatformWritingStyleTemplate): ProjectStartSoilWorldEntry {
+  return {
+    type: "platform_soil",
+    title: `前三章节奏土壤：${platform.name}`,
+    content: [
+      `平台：${platform.name}`,
+      `目标：前三章完成钩子、规则证明、第一次升级或情绪兑现。`,
+      `平台必备：${style.mustHave.join("、")}`,
+      ...template.firstThree.map((chapter, index) => [
+        `第 ${index + 1} 章：${chapter.title}`,
+        `目标：${chapter.goal}`,
+        `钩子：${chapter.hook}`,
+        `冲突：${chapter.conflict}`,
+        `价值转向：${chapter.valueShift}`,
+        `章末：${chapter.cliffhanger}`,
+      ].join("\n")),
+      `验证动作：${trimLine(advice.verificationMove)}`,
+    ].join("\n"),
+  };
+}
+
+function characterArcAsset(platform: PlatformProfile, template: ProjectTemplate): ProjectStartSoilWorldEntry {
+  const protagonist = template.protagonist;
+  return {
+    type: "platform_soil",
+    title: `人物弧光土壤：${platform.name}`,
+    content: [
+      `平台：${platform.name}`,
+      `主角：${protagonist.name}（${protagonist.role}）`,
+      `外在欲望：${protagonist.desire}`,
+      `内在需要：${protagonist.need}`,
+      `缺陷：${protagonist.flaw}`,
+      `弧光起点：${protagonist.arcStart}`,
+      `弧光终点：${protagonist.arcEnd}`,
+      `声音：${protagonist.voice}`,
+      `关系压力：${protagonist.relationshipNotes}`,
+      `写作要求：每个关键选择都同时推进事件和人物变化。`,
+    ].join("\n"),
+  };
+}
+
+function treeStructureAsset(advice: ProjectStartTacticAdvice, platform: PlatformProfile, template: ProjectTemplate): ProjectStartSoilWorldEntry {
+  return {
+    type: "platform_soil",
+    title: `大树结构土壤：${platform.name}`,
+    content: [
+      `平台：${platform.name}`,
+      `开头：${trimLine(advice.openingMove)}`,
+      `结尾：先确定主角最终如何兑现「${template.sellingPoint}」。`,
+      `主干：${trimLine(advice.primaryTactic)}`,
+      `分支：人物弧光线、反派压力线、关系情绪线必须服务主干。`,
+      `叶片：前三章和中段爆点负责验证留存，不能脱离主线。`,
+      `土壤：平台口味、避坑、模型分工和首轮数据反馈持续回填。`,
+      `风险：${trimLine(advice.risk)}`,
+    ].join("\n"),
+  };
+}
+
+function avoidRulesAsset(
+  advice: ProjectStartTacticAdvice,
+  platform: PlatformProfile,
+  handoff?: ProjectStartExperienceHandoff | null,
+): ProjectStartSoilWorldEntry {
+  return {
+    type: "platform_soil",
+    title: `平台避坑清单：${platform.name}`,
+    content: [
+      `平台：${platform.name}`,
+      `当前状态：${advice.label}`,
+      `风险摘要：${trimLine(advice.risk)}`,
+      `平台风险：`,
+      labeledList(platform.risks, "按平台反馈继续校准，不把观察样本当成功样本。"),
+      `历史避坑：`,
+      labeledList([
+        ...(handoff?.avoidRules ?? []),
+        ...advice.checklist.filter((item) => /避坑|不要|不可|风险|恢复条件/u.test(item)),
+      ], "不要直接复制未验证的标题、前三章兑现和平台包装。"),
+      `复盘证据：`,
+      labeledList([
+        ...(handoff?.evidence ?? []),
+        ...advice.evidence,
+      ], "创建后回填首轮数据，再决定是否复用。"),
+    ].join("\n"),
+  };
+}
+
+function modelRouteAsset(platform: PlatformProfile, modelRoutes: ProjectStartModelRouteExperience[]): ProjectStartSoilWorldEntry | null {
+  if (modelRoutes.length === 0) return null;
+  return {
+    type: "platform_soil",
+    title: `模型分工土壤：${platform.name}`,
+    content: [
+      `平台：${platform.name}`,
+      `用途：把 Claude、DeepSeek、Kimi、GPT 等模型路线沉淀为项目首轮分工。`,
+      ...modelRoutes.map((route) => [
+        `任务：${route.taskLabel}`,
+        `首选：${route.primaryProviderName}`,
+        `备用：${route.fallbackProviderName ?? "暂无"}`,
+        route.recommendationSummary ? `依据：${route.recommendationSummary}` : null,
+        ...route.evidence.slice(0, 2).map((item) => `证据：${item}`),
+      ].filter((line): line is string => Boolean(line)).join("\n")),
+      `验收：首批生成后复查质量、成本、失败率，确认是否继续沿用。`,
+    ].join("\n"),
+  };
+}
+
+export function buildProjectStartSoilWorldEntries(input: {
+  advice: ProjectStartTacticAdvice;
+  platform: PlatformProfile;
+  template: ProjectTemplate;
+  style: PlatformWritingStyleTemplate;
+  handoff?: ProjectStartExperienceHandoff | null;
+  modelRoutes?: ProjectStartModelRouteExperience[];
+}): ProjectStartSoilWorldEntry[] {
+  return [
+    platformOpeningAsset(input.advice, input.platform, input.style),
+    firstThreeAsset(input.advice, input.platform, input.template, input.style),
+    characterArcAsset(input.platform, input.template),
+    treeStructureAsset(input.advice, input.platform, input.template),
+    avoidRulesAsset(input.advice, input.platform, input.handoff),
+    modelRouteAsset(input.platform, input.modelRoutes ?? []),
+  ].filter((entry): entry is ProjectStartSoilWorldEntry => Boolean(entry));
 }
 
 function lineValue(lines: string[], prefix: string) {

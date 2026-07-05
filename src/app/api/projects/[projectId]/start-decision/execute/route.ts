@@ -7,7 +7,7 @@ import { buildProjectControlDashboard } from "@/lib/projects/projectControlDashb
 import { buildProjectStartDecisionActionReceipt } from "@/lib/projects/projectStartDecisionActions";
 import { gateActionReceiptFromAuditRecord } from "@/lib/projects/gateActionReceipts";
 import { gatePlatformDispatchTaskFromRecord } from "@/lib/projects/gateDispatchTaskRecords";
-import { buildProjectStartGateExperience, buildProjectStartTacticWorldEntry } from "@/lib/projects/projectStartTactics";
+import { buildProjectStartGateExperience, buildProjectStartSoilWorldEntries, buildProjectStartTacticWorldEntry } from "@/lib/projects/projectStartTactics";
 import { parsePublishSnapshotTags } from "@/lib/projects/platformPublishExport";
 import { buildSubmissionChecklist } from "@/lib/projects/submissionChecklist";
 import { getDefaultTemplateForPlatform } from "@/lib/projects/projectTemplates";
@@ -167,12 +167,20 @@ export async function POST(_request: Request, { params }: Params) {
       startExperience.advice,
       platform.name,
     );
+    const startSoilEntries = buildProjectStartSoilWorldEntries({
+      advice: startExperience.advice,
+      platform,
+      template,
+      style,
+      modelRoutes: startExperience.modelRoutes,
+    });
     const hasStartTactic = project.worldEntries.some((entry) => (
       entry.type === "platform_soil" && entry.title.startsWith("首轮平台打法：")
     ));
     const seeds = [
       ...worldSeeds,
       ...(hasStartTactic ? [] : [startTacticEntry]),
+      ...startSoilEntries,
     ].filter((seed) => !project.worldEntries.some((entry) => entry.type === seed.type && entry.title === seed.title));
 
     if (seeds.length > 0) {

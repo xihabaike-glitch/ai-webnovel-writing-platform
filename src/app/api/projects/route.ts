@@ -7,6 +7,7 @@ import { gateActionReceiptFromAuditRecord } from "@/lib/projects/gateActionRecei
 import { gatePlatformDispatchTaskFromRecord } from "@/lib/projects/gateDispatchTaskRecords";
 import {
   buildProjectStartGateExperience,
+  buildProjectStartSoilWorldEntries,
   buildProjectStartTacticWorldEntry,
   findProjectStartTacticSummary,
 } from "@/lib/projects/projectStartTactics";
@@ -147,6 +148,14 @@ export async function POST(request: Request) {
       });
       const startTacticAdvice = input.startTacticAdvice ?? startExperience.advice;
       const startTacticEntry = buildProjectStartTacticWorldEntry(startTacticAdvice, platform.name, input.startExperienceHandoff ?? null);
+      const startSoilEntries = buildProjectStartSoilWorldEntries({
+        advice: startTacticAdvice,
+        platform,
+        template,
+        style,
+        handoff: input.startExperienceHandoff ?? null,
+        modelRoutes: startExperience.modelRoutes,
+      });
       const outlineNodes = buildDefaultOutlineNodes({
         projectId: created.id,
         title: created.title,
@@ -181,6 +190,7 @@ export async function POST(request: Request) {
         data: [
           ...buildTemplateWorldEntrySeeds(template),
           startTacticEntry,
+          ...startSoilEntries,
         ].map((entry) => ({
           projectId: created.id,
           ...entry,

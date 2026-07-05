@@ -12,6 +12,7 @@ import {
   buildProjectStartModelRouteExperienceFromConfirmations,
   buildProjectStartModelRouteExperienceFromReceipts,
   buildProjectStartRiskGate,
+  buildProjectStartSoilWorldEntries,
   buildProjectStartTacticAdvice,
   buildProjectStartTacticWorldEntry,
   findProjectStartTacticSummary,
@@ -999,5 +1000,56 @@ test("buildProjectStartTacticAdvice", async (t) => {
       { type: "platform_soil", title: "普通平台土壤", content: "每章要有追读。" },
       entry,
     ])?.title, "首轮平台打法：番茄小说");
+  });
+
+  await t.test("turns start advice into editable opening soil assets", () => {
+    const platform = getPlatformProfile("fanqie");
+    const template = getDefaultTemplateForPlatform(platform.id);
+    const style = getPlatformWritingStyle(platform.id);
+    const advice = buildProjectStartTacticAdvice({ platform, template, style });
+    const entries = buildProjectStartSoilWorldEntries({
+      advice,
+      platform,
+      template,
+      style,
+      handoff: {
+        status: "reuse",
+        label: "复用交接",
+        title: "番茄小说 可复用历史打法",
+        detail: "当前平台可以沿用历史高压钩子。",
+        selectedPlatformId: "fanqie",
+        selectedPlatformName: "番茄小说",
+        recommendedPlatformId: "fanqie",
+        recommendedPlatformName: "番茄小说",
+        recommendedTemplateId: template.id,
+        shouldSwitchTemplate: false,
+        firstDayActions: ["开头：第一段给不可逆危机。"],
+        avoidRules: ["不要直接放量，先做小样本。"],
+        evidence: ["最终判定：稳定加码。"],
+      },
+      modelRoutes: [{
+        taskLabel: "正文初稿",
+        primaryProviderName: "DeepSeek · deepseek-chat",
+        fallbackProviderName: "Kimi · kimi-k2.6",
+        recommendationSummary: "历史样本 2 次",
+        evidence: ["正文初稿首选 DeepSeek，备用 Kimi"],
+      }],
+    });
+
+    assert.deepEqual(entries.map((entry) => entry.title), [
+      "开局钩子土壤：番茄小说",
+      "前三章节奏土壤：番茄小说",
+      "人物弧光土壤：番茄小说",
+      "大树结构土壤：番茄小说",
+      "平台避坑清单：番茄小说",
+      "模型分工土壤：番茄小说",
+    ]);
+    assert.ok(entries.every((entry) => entry.type === "platform_soil"));
+    assert.ok(entries.find((entry) => entry.title.startsWith("开局钩子"))?.content.includes("首屏承诺"));
+    assert.ok(entries.find((entry) => entry.title.startsWith("前三章"))?.content.includes(template.firstThree[0].cliffhanger));
+    assert.ok(entries.find((entry) => entry.title.startsWith("人物弧光"))?.content.includes(template.protagonist.arcEnd));
+    assert.ok(entries.find((entry) => entry.title.startsWith("大树结构"))?.content.includes("开头"));
+    assert.ok(entries.find((entry) => entry.title.startsWith("平台避坑"))?.content.includes("不要直接放量"));
+    assert.ok(entries.find((entry) => entry.title.startsWith("模型分工"))?.content.includes("DeepSeek"));
   });
 });

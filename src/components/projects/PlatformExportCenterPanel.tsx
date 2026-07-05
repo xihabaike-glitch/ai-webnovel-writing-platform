@@ -1655,6 +1655,12 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
         message?: string;
         metric?: PlatformPublishMetric;
         effectReview?: PlatformPublishEffectSaveReview | null;
+        completedMetricDispatch?: {
+          dispatchKey: string;
+          title: string;
+          completionEvidence: string;
+          receiptId: string;
+        } | null;
         error?: string;
       } | null;
       if (!response.ok) throw new Error(payload?.error ?? "保存发布效果失败。");
@@ -1672,12 +1678,15 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
       const reviewMessage = payload?.effectReview
         ? saveReviewMessage(payload.effectReview)
         : payload?.message ?? "发布效果已记录。";
-      setMessage(reviewMessage);
+      const dispatchMessage = payload?.completedMetricDispatch
+        ? ` 已自动完成任务中心派单：${payload.completedMetricDispatch.title}。`
+        : "";
+      setMessage(`${reviewMessage}${dispatchMessage}`);
       await loadCenter({ keepMessage: true });
       if (strategySwitchPlan?.platformId === platformId) {
         const refreshedPlan = await refreshStrategyPlan(platformId);
         setStrategyExecutionReceipt(buildStrategyExecutionReceipt(refreshedPlan, "save-publish-effect"));
-        setMessage(`${reviewMessage} 策略链已刷新。`);
+        setMessage(`${reviewMessage}${dispatchMessage} 策略链已刷新。`);
       }
     } catch (caught) {
       setMessage(caught instanceof Error ? caught.message : "保存发布效果失败。");

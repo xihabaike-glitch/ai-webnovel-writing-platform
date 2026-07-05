@@ -2,8 +2,16 @@ import { NextResponse } from "next/server";
 import { completeFirstThreePublishFollowups } from "@/lib/chapters/revisionAdoptionFollowupCompletion";
 import { prisma } from "@/lib/db/prisma";
 import { getPlatformProfile, platformProfiles, type PlatformId } from "@/lib/platforms/platformProfiles";
-import { buildGatePublishEffectReceipt, type GateActionReceipt } from "@/lib/projects/gateActionReceipts";
+import {
+  buildGateDispatchCompletionReceipt,
+  buildGatePublishEffectReceipt,
+  reviewGateDispatchCompletionEvidence,
+  type GateActionReceipt,
+  type GatePlatformGrowthDispatchItem,
+  type PersistedGatePlatformDispatchTask,
+} from "@/lib/projects/gateActionReceipts";
 import { buildPublishEffectKnowledgeFeedbackReceipt } from "@/lib/projects/platformKnowledgeFeedbackReceipts";
+import { buildPublishEffectDispatchCompletionEvidence } from "@/lib/projects/publishEffectDispatchCompletion";
 import {
   buildPlatformPublishExportCenter,
   buildPlatformPublishArchive,
@@ -90,6 +98,15 @@ function normalizeKnowledgeReceiptSeverity(value: unknown) {
   return value === "success" || value === "needs_action" ? value : "needs_action";
 }
 
+function parseJsonList(value: string) {
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
 function toKnowledgeFeedbackReceipt(item: {
   receiptId: string;
   platformId: string;
@@ -167,6 +184,124 @@ async function saveGateActionAuditFromReceipt(projectId: string, receipt: GateAc
       createdAt: new Date(receipt.createdAt),
     },
   });
+}
+
+function gateDispatchTaskToDispatchItem(task: {
+  dispatchKey: string;
+  platformId: string;
+  platformName: string;
+  stage: string;
+  state: string;
+  priorityScore: number;
+  ownerRole: string;
+  title: string;
+  detail: string;
+  dueLabel: string;
+  actionLabel: string;
+  href: string;
+  acceptanceCriteria: string;
+  evidence: string;
+  reviewLatestAt: Date;
+}): GatePlatformGrowthDispatchItem {
+  const state = task.state === "completed" || task.state === "assigned" ? task.state : "queued";
+  return {
+    id: task.dispatchKey,
+    platformId: task.platformId,
+    platformName: task.platformName,
+    stage: task.stage as GatePlatformGrowthDispatchItem["stage"],
+    state,
+    priorityScore: task.priorityScore,
+    ownerRole: task.ownerRole,
+    title: task.title,
+    detail: task.detail,
+    dueLabel: task.dueLabel,
+    actionLabel: task.actionLabel,
+    href: task.href,
+    acceptanceCriteria: parseJsonList(task.acceptanceCriteria),
+    evidence: parseJsonList(task.evidence),
+    reviewLatestAt: task.reviewLatestAt.toISOString(),
+  };
+}
+
+async function completeMetricRecoveryDispatch(input: {
+  projectId: string;
+  platformId: string;
+  metric: {
+    id: string;
+    platformName: string;
+    views: number;
+    clicks: number;
+    favorites: number;
+    follows: number;
+    comments: number;
+    paidReads: number;
+    editorFeedback: string;
+    publishUrl: string;
+    snapshotDate: Date;
+    createdAt: Date;
+  };
+  effectReview: ReturnType<typeof buildPlatformPublishEffectSaveReview> | null;
+}) {
+  const task = await prisma.gateDispatchTask.findFirst({
+    where: {
+      projectId: input.projectId,
+      platformId: input.platformId,
+      stage: "start_metrics_recovery",
+      state: { not: "completed" },
+    },
+    orderBy: [
+      { assignedAt: "desc" },
+      { updatedAt: "desc" },
+    ],
+  });
+  if (!task) return null;
+
+  const dispatch = gateDispatchTaskToDispatchItem(task);
+  const completionEvidence = buildPublishEffectDispatchCompletionEvidence({
+    metric: input.metric,
+    review: input.effectReview,
+  });
+  const completionIssue = reviewGateDispatchCompletionEvidence({
+    stage: task.stage as PersistedGatePlatformDispatchTask["stage"],
+    title: task.title,
+    actionLabel: task.actionLabel,
+    platformName: task.platformName,
+    acceptanceCriteria: dispatch.acceptanceCriteria,
+    evidence: dispatch.evidence,
+  }, completionEvidence);
+  if (completionIssue) return null;
+
+  const completedAt = new Date(Math.max(Date.now(), input.metric.createdAt.getTime() + 1));
+  const completed = await prisma.gateDispatchTask.update({
+    where: { id: task.id },
+    data: {
+      state: "completed",
+      assignedAt: task.assignedAt ?? completedAt,
+      completedAt,
+      completionEvidence,
+    },
+  });
+  const completionReceipt = buildGateDispatchCompletionReceipt({
+    dispatch: {
+      ...dispatch,
+      state: "completed",
+      reviewLatestAt: completed.reviewLatestAt.toISOString(),
+    },
+    completionEvidence,
+    now: new Date(completedAt.getTime() + 1),
+  });
+  await saveGateActionAuditFromReceipt(input.projectId, completionReceipt, {
+    source: "platform_export_auto_complete_metric_dispatch",
+    metricId: input.metric.id,
+    dispatchKey: task.dispatchKey,
+  });
+
+  return {
+    dispatchKey: completed.dispatchKey,
+    title: completed.title,
+    completionEvidence,
+    receiptId: completionReceipt.id,
+  };
 }
 
 async function listKnowledgeFeedbackReceipts(projectId: string) {
@@ -712,6 +847,12 @@ export async function POST(request: Request, { params }: Params) {
       metricId: metric.id,
       platformId: platform.id,
     });
+    const completedMetricDispatch = await completeMetricRecoveryDispatch({
+      projectId,
+      platformId: platform.id,
+      metric,
+      effectReview,
+    });
     const platformKnowledge = refreshedContext?.center.platformKnowledge.find((item) => item.platformId === platform.id) ?? null;
     const knowledgeFeedbackReceipt = platformKnowledge && effectReview
       ? buildPublishEffectKnowledgeFeedbackReceipt({
@@ -764,6 +905,7 @@ export async function POST(request: Request, { params }: Params) {
       metric,
       effectReview,
       gateReceipt,
+      completedMetricDispatch,
       knowledgeFeedbackReceipt: savedKnowledgeFeedbackReceipt ? toKnowledgeFeedbackReceipt(savedKnowledgeFeedbackReceipt) : null,
     }, { status: 201 });
   }

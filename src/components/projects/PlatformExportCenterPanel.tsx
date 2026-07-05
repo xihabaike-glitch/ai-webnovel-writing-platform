@@ -1660,6 +1660,11 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
           title: string;
           completionEvidence: string;
           receiptId: string;
+          completedAt: string;
+        } | null;
+        startMetricAutoDispatch?: {
+          createdDispatches: Array<{ title: string }>;
+          skippedDispatches: Array<{ title: string }>;
         } | null;
         error?: string;
       } | null;
@@ -1681,12 +1686,15 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
       const dispatchMessage = payload?.completedMetricDispatch
         ? ` 已自动完成任务中心派单：${payload.completedMetricDispatch.title}。`
         : "";
-      setMessage(`${reviewMessage}${dispatchMessage}`);
+      const startMetricMessage = payload?.startMetricAutoDispatch?.createdDispatches.length
+        ? ` 已自动生成二轮任务：${payload.startMetricAutoDispatch.createdDispatches.map((item) => item.title).join("、")}。`
+        : "";
+      setMessage(`${reviewMessage}${dispatchMessage}${startMetricMessage}`);
       await loadCenter({ keepMessage: true });
       if (strategySwitchPlan?.platformId === platformId) {
         const refreshedPlan = await refreshStrategyPlan(platformId);
         setStrategyExecutionReceipt(buildStrategyExecutionReceipt(refreshedPlan, "save-publish-effect"));
-        setMessage(`${reviewMessage}${dispatchMessage} 策略链已刷新。`);
+        setMessage(`${reviewMessage}${dispatchMessage}${startMetricMessage} 策略链已刷新。`);
       }
     } catch (caught) {
       setMessage(caught instanceof Error ? caught.message : "保存发布效果失败。");

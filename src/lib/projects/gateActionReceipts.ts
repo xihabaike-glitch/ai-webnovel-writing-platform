@@ -6849,6 +6849,10 @@ export async function updatePersistedGateDispatchTaskState(
   const payload = (await response.json().catch(() => null)) as {
     task?: PersistedGatePlatformDispatchTask;
     followUpTasks?: PersistedGatePlatformDispatchTask[];
+    startMetricAutoDispatch?: {
+      createdDispatches: PersistedGatePlatformDispatchTask[];
+      skippedDispatches: PersistedGatePlatformDispatchTask[];
+    } | null;
     knowledgeFeedbackReceipt?: GateKnowledgeFeedbackReceipt | null;
     dispatchCompletionReceipt?: GateActionReceipt | null;
     submissionEffectReview?: GateSubmissionCompletionEffectReview | null;
@@ -6860,6 +6864,7 @@ export async function updatePersistedGateDispatchTaskState(
   return {
     task: payload.task,
     followUpTasks: payload.followUpTasks ?? [],
+    startMetricAutoDispatch: payload.startMetricAutoDispatch ?? null,
     knowledgeFeedbackReceipt: payload.knowledgeFeedbackReceipt ?? null,
     dispatchCompletionReceipt: payload.dispatchCompletionReceipt ?? null,
     submissionEffectReview: payload.submissionEffectReview ?? null,

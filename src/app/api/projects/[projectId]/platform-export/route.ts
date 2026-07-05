@@ -12,6 +12,7 @@ import {
 } from "@/lib/projects/gateActionReceipts";
 import { buildPublishEffectKnowledgeFeedbackReceipt } from "@/lib/projects/platformKnowledgeFeedbackReceipts";
 import { buildPublishEffectDispatchCompletionEvidence } from "@/lib/projects/publishEffectDispatchCompletion";
+import { autoDispatchStartMetricDecision } from "@/lib/projects/startMetricDecisionAutoDispatch";
 import {
   buildPlatformPublishExportCenter,
   buildPlatformPublishArchive,
@@ -301,6 +302,7 @@ async function completeMetricRecoveryDispatch(input: {
     title: completed.title,
     completionEvidence,
     receiptId: completionReceipt.id,
+    completedAt: completedAt.toISOString(),
   };
 }
 
@@ -829,6 +831,15 @@ export async function POST(request: Request, { params }: Params) {
     const refreshedContext = await buildCenter(projectId);
     const refreshedPack = refreshedContext?.center.packages.find((item) => item.platformId === platform.id) ?? null;
     const effectReview = refreshedPack ? buildPlatformPublishEffectSaveReview(refreshedPack) : null;
+    const completedMetricDispatch = await completeMetricRecoveryDispatch({
+      projectId,
+      platformId: platform.id,
+      metric,
+      effectReview,
+    });
+    const gateReceiptNow = completedMetricDispatch?.completedAt
+      ? new Date(new Date(completedMetricDispatch.completedAt).getTime() + 1)
+      : metric.createdAt;
     const gateReceipt = buildGatePublishEffectReceipt({
       projectId,
       platformId: platform.id,
@@ -840,19 +851,14 @@ export async function POST(request: Request, { params }: Params) {
         follows: metric.follows,
         snapshotDate: metric.snapshotDate,
       },
-      now: metric.createdAt,
+      now: gateReceiptNow,
     });
     await saveGateActionAuditFromReceipt(projectId, gateReceipt, {
       source: "platform_export_save_effect",
       metricId: metric.id,
       platformId: platform.id,
     });
-    const completedMetricDispatch = await completeMetricRecoveryDispatch({
-      projectId,
-      platformId: platform.id,
-      metric,
-      effectReview,
-    });
+    const startMetricAutoDispatch = await autoDispatchStartMetricDecision({ projectId, platformId: platform.id });
     const platformKnowledge = refreshedContext?.center.platformKnowledge.find((item) => item.platformId === platform.id) ?? null;
     const knowledgeFeedbackReceipt = platformKnowledge && effectReview
       ? buildPublishEffectKnowledgeFeedbackReceipt({
@@ -906,6 +912,7 @@ export async function POST(request: Request, { params }: Params) {
       effectReview,
       gateReceipt,
       completedMetricDispatch,
+      startMetricAutoDispatch,
       knowledgeFeedbackReceipt: savedKnowledgeFeedbackReceipt ? toKnowledgeFeedbackReceipt(savedKnowledgeFeedbackReceipt) : null,
     }, { status: 201 });
   }

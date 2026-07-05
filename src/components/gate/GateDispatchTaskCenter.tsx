@@ -282,6 +282,9 @@ export function GateDispatchTaskCenter({
           const nextByKey = new Map(current.map((item) => [item.dispatchKey, item]));
           nextByKey.set(updated.task.dispatchKey, updated.task);
           for (const followUp of updated.followUpTasks) nextByKey.set(followUp.dispatchKey, followUp);
+          for (const startMetricTask of updated.startMetricAutoDispatch?.createdDispatches ?? []) {
+            nextByKey.set(startMetricTask.dispatchKey, startMetricTask);
+          }
           return Array.from(nextByKey.values());
         });
         const recheckMessage = evidenceLoopRecheckMessage(updated);
@@ -289,11 +292,18 @@ export function GateDispatchTaskCenter({
         const submissionEffectMessage = updated.submissionEffectReview
           ? `已自动回写投稿效果：${updated.submissionEffectReview.headline}。下一步：${updated.submissionEffectReview.nextAction}`
           : "";
+        const startMetricTasks = updated.startMetricAutoDispatch?.createdDispatches ?? [];
+        const startMetricMessage = startMetricTasks.length
+          ? `已自动生成首轮数据后的二轮任务：${startMetricTasks.map((item) => item.title).join("、")}`
+          : "";
         const firstDayUpdate = buildFirstDayDispatchUpdateSummary(updated);
         if (firstDayUpdate.visible) {
           setRouteActionMessage(`${firstDayUpdate.title}：${firstDayUpdate.detail} 下一步：${firstDayUpdate.actionLabel}。`);
           setRouteActionLink({ label: firstDayUpdate.actionLabel, href: firstDayUpdate.href });
           router.refresh();
+        } else if (startMetricMessage) {
+          setRouteActionMessage(`${startMetricMessage}${submissionEffectMessage ? `；${submissionEffectMessage}` : ""}`);
+          setRouteActionLink({ label: "回总闸门复查", href: "/gate" });
         } else if (updated.followUpTasks.length) {
           setRouteActionMessage(`已自动生成治理后复检派单：${updated.followUpTasks.map((item) => item.title).join("、")}${recheckMessage ? `；${recheckMessage}` : ""}${storyTreeMessage ? `；${storyTreeMessage}` : ""}${submissionEffectMessage ? `；${submissionEffectMessage}` : ""}`);
           setRouteActionLink(null);

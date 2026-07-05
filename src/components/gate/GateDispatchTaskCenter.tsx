@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   buildGateDispatchEvidenceReview,
   buildGateDispatchCompletionTemplate,
@@ -34,6 +34,7 @@ import {
   resolveFirstDayDispatchFocus,
   type FirstDayDispatchFocusInput,
 } from "@/lib/projects/firstDayWorkflowView";
+import { buildWatchSampleAutoCompletionDrafts } from "@/lib/projects/watchSampleCompletionEvidence";
 import type { WatchSampleCompletionEvidenceSuggestion } from "@/lib/projects/watchSampleCompletionEvidence";
 import {
   buildTaskQueueBatchReceiptDecisionCard,
@@ -287,6 +288,14 @@ export function GateDispatchTaskCenter({
       : baseTasks;
     return filterRouteConfirmationDispatchTasks(queueFilteredTasks, routeFlowFilter);
   }, [aiPipelineTaskKeys, platformFilter, queueFilter, roleFilter, routeFlowFilter, stateFilter, tasks]);
+
+  useEffect(() => {
+    setCompletionDrafts((current) => buildWatchSampleAutoCompletionDrafts({
+      currentDrafts: current,
+      suggestions: initialCompletionSuggestions,
+      tasks,
+    }));
+  }, [initialCompletionSuggestions, tasks]);
 
   function evidenceLoopRecheckMessage(updated: Awaited<ReturnType<typeof updatePersistedGateDispatchTaskState>>) {
     const recheck = updated.evidenceLoopRecheck;

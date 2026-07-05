@@ -14,6 +14,16 @@ export interface WatchSampleCompletionEvidenceSuggestion {
   createdAt: string;
 }
 
+export interface WatchSampleAutoCompletionDraftInput {
+  currentDrafts: Record<string, string>;
+  suggestions: WatchSampleCompletionEvidenceSuggestion[];
+  tasks: Array<{
+    dispatchKey: string;
+    state: string;
+    completionEvidence?: string | null;
+  }>;
+}
+
 function parsePayload(payload: string): Record<string, unknown> | null {
   try {
     const parsed = JSON.parse(payload) as unknown;
@@ -69,4 +79,20 @@ export function buildWatchSampleCompletionEvidenceSuggestions(
   return Array.from(suggestionsByKey.values()).sort((left, right) => (
     new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime()
   ));
+}
+
+export function buildWatchSampleAutoCompletionDrafts(input: WatchSampleAutoCompletionDraftInput) {
+  let nextDrafts = input.currentDrafts;
+  const taskByKey = new Map(input.tasks.map((task) => [task.dispatchKey, task]));
+
+  for (const suggestion of input.suggestions) {
+    const task = taskByKey.get(suggestion.dispatchKey);
+    if (!task || task.state !== "assigned") continue;
+    if ((task.completionEvidence ?? "").trim()) continue;
+    if ((nextDrafts[suggestion.dispatchKey] ?? "").trim()) continue;
+    if (nextDrafts === input.currentDrafts) nextDrafts = { ...input.currentDrafts };
+    nextDrafts[suggestion.dispatchKey] = suggestion.completionEvidence;
+  }
+
+  return nextDrafts;
 }

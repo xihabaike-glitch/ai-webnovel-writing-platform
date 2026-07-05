@@ -439,6 +439,53 @@ test("buildWritingWorkbench", async (t) => {
     assert.equal(firstThreeAction?.refreshHref, "/projects/p-soil#first-three-rewrite");
   });
 
+  await t.test("keeps recovered project starts in first-chapter sample mode", () => {
+    const workbench = buildWritingWorkbench({
+      project: {
+        id: "p-recovery-soil",
+        title: "夜雨系统",
+        genre: "都市系统",
+        sellingPoint: "雨夜危机中觉醒系统。",
+        targetPlatformName: "番茄小说",
+        targetWordCount: 300000,
+        currentWordCount: 5400,
+      },
+      chapters: [1, 2, 3].map((order) => ({
+        id: `recovery-c${order}`,
+        title: `第 ${order} 章`,
+        order,
+        status: "draft",
+        wordCount: 1800,
+        hook: `第 ${order} 章开头危机`,
+        conflict: `第 ${order} 章选择冲突`,
+        cliffhanger: `第 ${order} 章章末追读`,
+      })),
+      outlineNodes: [],
+      characters: [],
+      worldEntries: [
+        {
+          id: "w-recovery-tactic",
+          type: "platform_soil",
+          title: "首轮平台打法：番茄小说",
+          content: [
+            "状态：恢复放量打法",
+            "打法：上一轮恢复放量已过线，但新项目不能复制成功结论。",
+            "验证动作：恢复放量打法只能作为参考，新项目先小样本复验成功率、质量分和失败样本。",
+            "风险：新项目仍先跑小样本，不直接批量生成前三章。",
+          ].join("\n"),
+        },
+      ],
+      aiTasks: [],
+    });
+
+    const firstThreeAction = workbench.modelActions.find((action) => action.kind === "first_three_rewrite");
+
+    assert.equal(firstThreeAction?.label, "生成首章小样本");
+    assert.ok(firstThreeAction?.description.includes("恢复打法"));
+    assert.deepEqual(firstThreeAction?.payload.chapterOrders, [1]);
+    assert.equal(firstThreeAction?.disabledReason, null);
+  });
+
   await t.test("explains failed timeline tasks that cannot be retried directly", () => {
     const workbench = buildWritingWorkbench({
       project: {

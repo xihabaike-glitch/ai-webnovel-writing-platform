@@ -711,6 +711,14 @@ function buildModelRoutes(input: WritingWorkbenchInput, nextChapter: WritingWork
     : routes;
 }
 
+function requiresFirstChapterSample(input: WritingWorkbenchInput) {
+  const startTactic = input.worldEntries.find((item) => (
+    item.type === "platform_soil" && item.title.startsWith("首轮平台打法：")
+  ));
+  if (!startTactic) return false;
+  return /恢复放量|恢复打法|小样本|不直接批量生成前三章/u.test(startTactic.content);
+}
+
 function buildQuickFixes(
   input: WritingWorkbenchInput,
   nextChapter: WritingWorkbenchChapter | null,
@@ -879,6 +887,7 @@ function buildModelActions(input: WritingWorkbenchInput, nextChapter: WritingWor
   const firstThreeNeedsCard = firstThreeChapters.some((chapter) => (
     !hasText(chapter.hook) || !hasText(chapter.conflict) || !hasText(chapter.cliffhanger)
   ));
+  const firstChapterSample = requiresFirstChapterSample(input);
 
   return [
     {
@@ -920,13 +929,15 @@ function buildModelActions(input: WritingWorkbenchInput, nextChapter: WritingWor
     {
       id: "first-three-rewrite",
       kind: "first_three_rewrite",
-      label: "生成前三章",
-      description: "按开局土壤和平台经验重写前三章，产出可采纳候选稿。",
+      label: firstChapterSample ? "生成首章小样本" : "生成前三章",
+      description: firstChapterSample
+        ? "恢复打法只作为参考，先生成第一章小样本，验收通过后再扩大到前三章。"
+        : "按开局土壤和平台经验重写前三章，产出可采纳候选稿。",
       method: "POST",
       endpoint: `/api/projects/${input.project.id}/first-three-rewrite/generate`,
       payload: {
         targetWords: input.project.targetPlatformName.includes("起点") ? 2600 : 1800,
-        chapterOrders: [1, 2, 3],
+        chapterOrders: firstChapterSample ? [1] : [1, 2, 3],
       },
       refreshHref: `/projects/${input.project.id}#first-three-rewrite`,
       disabledReason: !firstThreeReady

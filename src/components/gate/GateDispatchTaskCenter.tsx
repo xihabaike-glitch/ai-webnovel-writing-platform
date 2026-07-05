@@ -24,6 +24,7 @@ import {
   buildFirstDayDispatchCompletionTemplate,
   buildFirstDayDispatchDesk,
   buildFirstDayDispatchCompletionHint,
+  buildFirstDayDispatchAiExecutionNotice,
   buildFirstDayDispatchUpdateSummary,
   buildFirstDayReturnToAcceptanceHref,
   resolveFirstDayDispatchFocus,
@@ -129,6 +130,7 @@ interface RouteActionExecution {
   kind?: "route_action" | "first_day_ai";
   method: "POST";
   endpoint: string;
+  dispatchKey?: string;
   body?: {
     areaId: string;
   };
@@ -646,12 +648,23 @@ export function GateDispatchTaskCenter({
       if (!response.ok) throw new Error(payload?.error ?? "执行下一步失败。");
       if (action.execution.kind === "first_day_ai") {
         const receipt = payload?.executionReceipt;
-        const receiptText = receipt?.summary ? `：${receipt.summary}` : "";
-        const nextText = receipt?.nextAction ? ` 下一步：${receipt.nextAction}` : "";
         const completionEvidence = payload?.completionEvidence || receipt?.completionEvidence || "";
-        setRouteActionMessage(`首日 AI 已执行${receiptText}。${nextText}`);
+        const dispatchKey = action.execution.dispatchKey;
+        const notice = buildFirstDayDispatchAiExecutionNotice({
+          summary: receipt?.summary,
+          nextAction: receipt?.nextAction,
+          completionEvidence,
+          canCompleteInDispatch: Boolean(dispatchKey),
+        });
+        if (notice.canCompleteInDispatch && dispatchKey) {
+          setCompletionDrafts((current) => ({
+            ...current,
+            [dispatchKey]: completionEvidence,
+          }));
+        }
+        setRouteActionMessage(notice.message);
         setRouteActionLink({
-          label: "回项目验收",
+          label: notice.actionLabel === "当前页验收" ? "回项目复查" : notice.actionLabel,
           href: buildFirstDayReturnToAcceptanceHref({
             href: action.href,
             completionEvidence,
@@ -821,6 +834,7 @@ export function GateDispatchTaskCenter({
                           kind: "first_day_ai",
                           method: "POST",
                           endpoint: firstDayDesk.nextTask!.continuation.endpoint!,
+                          dispatchKey: firstDayDesk.nextTask!.dispatchKey,
                         },
                       })}
                       type="button"

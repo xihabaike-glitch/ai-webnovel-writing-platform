@@ -5,6 +5,7 @@ import {
   buildFirstDayDispatchDesk,
   buildFirstDayDispatchCompletionHint,
   buildFirstDayDispatchUpdateSummary,
+  buildFirstDayDispatchAiExecutionNotice,
   buildFirstDayExecutionRiskNotice,
   buildFirstDayExecutionReceiptFollowupPrompt,
   buildFirstDayExecutionSafetyBanner,
@@ -727,6 +728,19 @@ test("buildFirstDayDispatchCenterHref targets the next first-day dispatch card",
     }),
     "/dispatch?firstDayProject=project-1&step=publish-precheck#first-day-dispatch",
   );
+});
+
+test("buildFirstDayDispatchAiExecutionNotice explains current-page acceptance", () => {
+  const notice = buildFirstDayDispatchAiExecutionNotice({
+    summary: "第一章审稿已完成",
+    nextAction: "回写验收依据",
+    completionEvidence: "第一章审稿已完成：钩子、爽点和章末追读点已经复查。",
+    canCompleteInDispatch: true,
+  });
+
+  assert.equal(notice.message, "首日 AI 已执行：第一章审稿已完成。下一步：回写验收依据。验收依据已填入当前派单卡，可以直接在派单中心标记完成。");
+  assert.equal(notice.actionLabel, "当前页验收");
+  assert.equal(notice.canCompleteInDispatch, true);
 });
 
 test("buildFirstDayReturnedEvidenceAcceptanceState focuses a completable returned receipt", () => {

@@ -221,6 +221,26 @@ export function buildFirstDayReturnedEvidenceAcceptanceState(input: {
   };
 }
 
+export function buildFirstDayDispatchAiExecutionNotice(input: {
+  summary?: string | null;
+  nextAction?: string | null;
+  completionEvidence?: string | null;
+  canCompleteInDispatch: boolean;
+}) {
+  const summary = cleanEvidence(input.summary ?? "") || "当前首日节点已执行";
+  const nextAction = cleanEvidence(input.nextAction ?? "") || "检查结果并完成派单验收";
+  const hasEvidence = cleanEvidence(input.completionEvidence ?? "").length >= MIN_COMPLETION_EVIDENCE_LENGTH;
+  const canCompleteInDispatch = input.canCompleteInDispatch && hasEvidence;
+
+  return {
+    message: canCompleteInDispatch
+      ? `首日 AI 已执行：${summary}。下一步：${nextAction}。验收依据已填入当前派单卡，可以直接在派单中心标记完成。`
+      : `首日 AI 已执行：${summary}。下一步：${nextAction}。请回项目检查结果并补足验收依据。`,
+    actionLabel: canCompleteInDispatch ? "当前页验收" : "回项目验收",
+    canCompleteInDispatch,
+  };
+}
+
 export interface FirstDayDispatchFocusInput {
   dispatchKey?: string | null;
   projectId?: string | null;

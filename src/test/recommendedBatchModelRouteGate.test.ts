@@ -244,6 +244,40 @@ test("recommended batch model route gate", async (t) => {
     assert.deepEqual(guardedPlan.chapterIds, ["chapter-1"]);
   });
 
+  await t.test("blocks a batch while the matching route recheck is still pending", () => {
+    const gate = buildRecommendedBatchModelRouteGate({
+      plan: plan(),
+      providers,
+      routes: [
+        { taskType: "chapter_review", primaryProviderConfigId: "gpt-provider", fallbackProviderConfigId: "deepseek-provider" },
+      ],
+      routeConfirmationRecheckDispatches: [{
+        dispatchKey: "model-route-confirmation-recheck:chapter_review:governance:2026-01-07T00:00:00.000Z",
+        stage: "model_route_confirmation_recheck",
+        state: "assigned",
+        title: "复检章节审稿模型路由小样本",
+        detail: "刚保存章节审稿模型路线，需要先复检小样本。",
+        actionLabel: "复检小样本",
+        href: "/settings/models",
+        priorityScore: 88,
+        reviewLatestAt: "2026-01-07T00:00:00.000Z",
+        evidence: ["批量保存后自动派发复检。"],
+      }],
+      projects: [project()],
+    });
+    const guardedPlan = applyRecommendedBatchModelRouteGate(plan(), gate);
+
+    assert.equal(gate.status, "block");
+    assert.equal(gate.maxBatchSize, 0);
+    assert.equal(gate.targetHref, "/dispatch?filter=waiting_recheck");
+    assert.equal(gate.actionLabel, "去复检模型路线");
+    assert.equal(gate.recheckAdvice?.taskType, "chapter_review");
+    assert.equal(gate.recheckAdvice?.severity, "blocked");
+    assert.ok(gate.headline.includes("复检"));
+    assert.ok(gate.warnings.some((warning) => warning.includes("批量保存后自动派发复检")));
+    assert.equal(guardedPlan.canRun, false);
+  });
+
   await t.test("restores the full batch after a passed route recheck and recovery sample", () => {
     const gate = buildRecommendedBatchModelRouteGate({
       plan: plan(),

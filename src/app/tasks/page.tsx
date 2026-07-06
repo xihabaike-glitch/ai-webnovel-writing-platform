@@ -178,6 +178,7 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
     modelProviders,
     modelRoutes,
     completedRouteConfirmationRechecks,
+    activeRouteConfirmationRechecks,
     recentRecommendedBatchAudits,
   ] = await Promise.all([
     prisma.project.findMany({
@@ -276,6 +277,26 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
         completedAt: true,
       },
     }),
+    prisma.gateDispatchTask.findMany({
+      where: {
+        stage: "model_route_confirmation_recheck",
+        state: { not: "completed" },
+      },
+      orderBy: { reviewLatestAt: "desc" },
+      take: 40,
+      select: {
+        dispatchKey: true,
+        stage: true,
+        state: true,
+        title: true,
+        detail: true,
+        actionLabel: true,
+        href: true,
+        priorityScore: true,
+        reviewLatestAt: true,
+        evidence: true,
+      },
+    }),
     prisma.gateActionAudit.findMany({
       where: { executionType: "recommended_batch" },
       orderBy: { createdAt: "desc" },
@@ -349,6 +370,10 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
       providers: modelProviders,
       routes: modelRoutes,
       routeConfirmationRechecks: buildRouteConfirmationRecheckEvidenceFromDispatchTasks(completedRouteConfirmationRechecks),
+      routeConfirmationRecheckDispatches: activeRouteConfirmationRechecks.map((task) => ({
+        ...task,
+        reviewLatestAt: task.reviewLatestAt.toISOString(),
+      })),
       recommendedBatchAudits: recentRecommendedBatchAudits,
     })
     : null;

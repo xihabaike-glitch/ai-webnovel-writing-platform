@@ -61,7 +61,14 @@ function normalizeTaskQueueProjects<T extends {
 
 export async function POST(request: Request) {
   const strategy = getBatchExecutionStrategy(new URL(request.url).searchParams.get("strategy"));
-  const [projects, modelProviders, modelRoutes, completedRouteConfirmationRechecks, recentRecommendedBatchAudits] = await Promise.all([
+  const [
+    projects,
+    modelProviders,
+    modelRoutes,
+    completedRouteConfirmationRechecks,
+    activeRouteConfirmationRechecks,
+    recentRecommendedBatchAudits,
+  ] = await Promise.all([
     prisma.project.findMany({
       include: {
         chapters: {
@@ -146,6 +153,26 @@ export async function POST(request: Request) {
         completedAt: true,
       },
     }),
+    prisma.gateDispatchTask.findMany({
+      where: {
+        stage: "model_route_confirmation_recheck",
+        state: { not: "completed" },
+      },
+      orderBy: { reviewLatestAt: "desc" },
+      take: 40,
+      select: {
+        dispatchKey: true,
+        stage: true,
+        state: true,
+        title: true,
+        detail: true,
+        actionLabel: true,
+        href: true,
+        priorityScore: true,
+        reviewLatestAt: true,
+        evidence: true,
+      },
+    }),
     prisma.gateActionAudit.findMany({
       where: { executionType: "recommended_batch" },
       orderBy: { createdAt: "desc" },
@@ -190,6 +217,10 @@ export async function POST(request: Request) {
     providers: modelProviders,
     routes: modelRoutes,
     routeConfirmationRechecks: buildRouteConfirmationRecheckEvidenceFromDispatchTasks(completedRouteConfirmationRechecks),
+    routeConfirmationRecheckDispatches: activeRouteConfirmationRechecks.map((task) => ({
+      ...task,
+      reviewLatestAt: task.reviewLatestAt.toISOString(),
+    })),
     recommendedBatchAudits: recentRecommendedBatchAudits,
   });
   const plan = applyRecommendedBatchModelRouteGate(basePlan, modelRouteGate);

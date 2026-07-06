@@ -1,6 +1,11 @@
 import { buildModelTaskAuditDashboard, type ModelAuditProvider, type ModelAuditRoute, type ModelAuditTask } from "../ai/modelTaskAudit.ts";
 import { labelForRoutedTask, type RoutedModelTaskType } from "../model-gateway/taskRouting.ts";
-import type { RouteConfirmationRecheckAdviceItem, RouteConfirmationRecheckEvidence } from "../model-gateway/routeConfirmation.ts";
+import {
+  buildRouteConfirmationRecheckAdviceFromDispatchTask,
+  type RouteConfirmationRecheckAdviceDispatchTask,
+  type RouteConfirmationRecheckAdviceItem,
+  type RouteConfirmationRecheckEvidence,
+} from "../model-gateway/routeConfirmation.ts";
 import { adoptionFollowupBatchWarning, type ExecutableQueueCategory, type TaskQueueExecutionPlan } from "./taskQueueExecutionPlan.ts";
 
 export interface RecommendedBatchModelRouteGateProject {
@@ -116,6 +121,26 @@ function latestRecheckForTask(
     .sort((left, right) => (right.completedAt ?? "").localeCompare(left.completedAt ?? ""))[0] ?? null;
 }
 
+function latestPendingRecheckAdviceForTask(input: {
+  taskType: RoutedModelTaskType | null;
+  latestRecheck: RouteConfirmationRecheckEvidence | null;
+  dispatches?: RouteConfirmationRecheckAdviceDispatchTask[];
+}) {
+  if (!input.taskType) return null;
+  const latestPassedAt = dateMs(input.latestRecheck?.completedAt);
+  const candidates = (input.dispatches ?? [])
+    .filter((dispatch) => dispatch.stage === "model_route_confirmation_recheck" && dispatch.state !== "completed")
+    .flatMap((dispatch) => {
+      const advice = buildRouteConfirmationRecheckAdviceFromDispatchTask(dispatch);
+      if (!advice || advice.taskType !== input.taskType) return [];
+      const reviewLatestAt = dateMs(dispatch.reviewLatestAt);
+      if (latestPassedAt !== null && reviewLatestAt !== null && latestPassedAt >= reviewLatestAt) return [];
+      return [{ advice, reviewLatestAt: reviewLatestAt ?? 0 }];
+    })
+    .sort((left, right) => right.reviewLatestAt - left.reviewLatestAt);
+  return candidates[0]?.advice ?? null;
+}
+
 function latestPassedRecoveryBatch(input: {
   plan: TaskQueueExecutionPlan;
   latestRecheck: RouteConfirmationRecheckEvidence | null;
@@ -219,6 +244,7 @@ export function buildRecommendedBatchModelRouteGate(input: {
   providers: ModelAuditProvider[];
   routes: ModelAuditRoute[];
   routeConfirmationRechecks?: RouteConfirmationRecheckEvidence[];
+  routeConfirmationRecheckDispatches?: RouteConfirmationRecheckAdviceDispatchTask[];
   recommendedBatchAudits?: RecommendedBatchModelRouteGateAudit[];
 }): RecommendedBatchModelRouteGate {
   const plannedProjectIds = new Set(input.plan.projectIds);
@@ -236,6 +262,12 @@ export function buildRecommendedBatchModelRouteGate(input: {
     : audit.modelEffectRows;
   const latestRecheck = latestRecheckForTask(taskType, input.routeConfirmationRechecks);
   const recoveredByRecheck = latestRecheck?.recommendedAction === "keep";
+  const pendingRecheckAdvice = latestPendingRecheckAdviceForTask({
+    taskType,
+    latestRecheck,
+    dispatches: input.routeConfirmationRecheckDispatches,
+  });
+  const hasPendingRouteRecheck = Boolean(pendingRecheckAdvice);
   const passedRecoveryBatch = latestPassedRecoveryBatch({
     plan: input.plan,
     latestRecheck,
@@ -259,8 +291,10 @@ export function buildRecommendedBatchModelRouteGate(input: {
   const hasCostPressure = audit.budgetCenter.status !== "safe"
     || hasActiveCostPressure;
   const status: RecommendedBatchModelRouteGate["status"] = audit.summary.totalTasks === 0
-    ? "sample"
-    : hasRouteRepairPressure && !recoveredByRecheck
+    ? hasPendingRouteRecheck ? "block" : "sample"
+    : hasPendingRouteRecheck
+      ? "block"
+      : hasRouteRepairPressure && !recoveredByRecheck
       ? "block"
       : hasRouteRepairPressure && recoveredByRecheck && !releasedByRecoveryBatch
         ? "sample"
@@ -279,6 +313,8 @@ export function buildRecommendedBatchModelRouteGate(input: {
     ? releasedByRecoveryBatch
       ? "恢复样本已过线，本批可以恢复正常批量。"
       : "模型路线健康，本批可以按当前策略执行。"
+    : hasPendingRouteRecheck
+      ? "模型路线复检还没完成，本批先别执行。"
     : status === "sample" && recoveredByRecheck
       ? "模型路线复检已通过，本批先跑 1 个恢复样本。"
       : status === "sample"
@@ -288,6 +324,8 @@ export function buildRecommendedBatchModelRouteGate(input: {
     ? "还没有模型任务样本，先跑单章样本建立成功率、质量和成本证据。"
     : `成功率 ${successRate(audit.summary.succeededTasks, audit.summary.totalTasks)}%，失败率 ${audit.summary.failureRatePercent}%，成本 $${audit.summary.knownCostUsd.toFixed(4)}，备用触发 ${audit.budgetCenter.fallbackAttemptRatePercent}%。`;
   const warnings = [
+    pendingRecheckAdvice ? `等待复检：${pendingRecheckAdvice.recommendation}` : null,
+    ...(pendingRecheckAdvice?.evidence ?? []),
     status === "sample" && input.plan.chapterIds.length > 1 ? `原计划 ${input.plan.chapterIds.length} 个任务，模型路线闸门已降级为 1 个样本。` : null,
     recoveredByRecheck && latestRecheck ? `复检通过：${latestRecheck.summary}` : null,
     passedRecoveryBatch ? passedRecoveryBatch.summary : null,
@@ -302,8 +340,8 @@ export function buildRecommendedBatchModelRouteGate(input: {
     label,
     headline,
     detail,
-    actionLabel: status === "block" ? "去修模型路线" : status === "sample" ? "跑单章样本" : "继续执行",
-    targetHref: status === "block" ? "/settings/models" : "/tasks#recommended-batch",
+    actionLabel: hasPendingRouteRecheck ? "去复检模型路线" : status === "block" ? "去修模型路线" : status === "sample" ? "跑单章样本" : "继续执行",
+    targetHref: hasPendingRouteRecheck ? "/dispatch?filter=waiting_recheck" : status === "block" ? "/settings/models" : "/tasks#recommended-batch",
     maxBatchSize,
     totalTasks: audit.summary.totalTasks,
     successRatePercent,
@@ -313,7 +351,7 @@ export function buildRecommendedBatchModelRouteGate(input: {
     preferredRoutes,
     avoidedRoutes,
     warnings: normalizedWarnings,
-    recheckAdvice: buildGateRecheckAdvice({
+    recheckAdvice: pendingRecheckAdvice ?? buildGateRecheckAdvice({
       status,
       taskType,
       recoveredByRecheck,

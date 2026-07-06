@@ -5,6 +5,8 @@ import { FailureRepairRecheckCard } from "@/components/failures/FailureRepairRec
 import { buildTaskRunConsole } from "@/lib/ai/taskRunConsole";
 import { prisma } from "@/lib/db/prisma";
 import { buildFailureReviewCenter } from "@/lib/ai/failureReviewCenter";
+import { buildBatchExecutionSafety, buildFailureRepairResumeRecommendation } from "@/lib/projects/batchExecutionSafety";
+import { defaultBatchExecutionStrategy } from "@/lib/projects/batchExecutionStrategy";
 import {
   buildGateFailureRepairFollowupNotice,
   buildGateFailureRepairRecheckCard,
@@ -15,6 +17,7 @@ import {
   type GatePlatformGrowthDispatchState,
   type PersistedGatePlatformDispatchTask,
 } from "@/lib/projects/gateActionReceipts";
+import { buildTaskQueueCenter, type TaskQueueProject } from "@/lib/projects/taskQueueCenter";
 
 export const dynamic = "force-dynamic";
 
@@ -38,6 +41,38 @@ function parseStringList(value: string) {
   } catch {
     return [];
   }
+}
+
+function parseTaskQueueTags(value: string | string[] | null | undefined) {
+  if (Array.isArray(value)) return value;
+  return (value ?? "")
+    .split(/[、,，\s]+/u)
+    .map((tag) => tag.trim())
+    .filter(Boolean);
+}
+
+function normalizeTaskQueueProjects<T extends {
+  submissionAssets?: Array<{ tags: string | string[] | null }>;
+  submissionAssetVersions?: Array<{ tags: string | string[] | null; auditStatus: string }>;
+}>(projects: T[]): TaskQueueProject[] {
+  return projects.map((project) => ({
+    ...project,
+    submissionAssets: project.submissionAssets?.map((asset) => ({
+      ...asset,
+      tags: parseTaskQueueTags(asset.tags),
+    })) ?? [],
+    submissionAssetVersions: project.submissionAssetVersions?.map((version) => ({
+      ...version,
+      tags: parseTaskQueueTags(version.tags),
+      auditStatus: version.auditStatus === "ready" || version.auditStatus === "blocked" ? version.auditStatus : "needs_work",
+    })) ?? [],
+  })) as unknown as TaskQueueProject[];
+}
+
+function resumeRecommendationClass(status: "ready" | "blocked" | "empty") {
+  if (status === "ready") return "border-emerald-200 bg-emerald-50 text-emerald-900";
+  if (status === "blocked") return "border-amber-200 bg-amber-50 text-amber-900";
+  return "border-slate-200 bg-white text-slate-900";
 }
 
 function toPersistedDispatch(task: {
@@ -112,7 +147,74 @@ function groupList(groups: Array<{ id: string; label: string; count: number; per
 }
 
 export default async function FailuresPage() {
-  const [tasks, chapters, receiptAudits, recheckDispatchRecords] = await Promise.all([
+  const [projects, tasks, chapters, receiptAudits, recheckDispatchRecords] = await Promise.all([
+    prisma.project.findMany({
+      include: {
+        chapters: {
+          orderBy: { order: "asc" },
+          include: {
+            revisions: {
+              orderBy: { createdAt: "desc" },
+              take: 5,
+            },
+          },
+        },
+        aiTasks: {
+          orderBy: { createdAt: "desc" },
+          include: {
+            modelProvider: {
+              select: {
+                providerId: true,
+                displayName: true,
+              },
+            },
+          },
+        },
+        worldEntries: { orderBy: [{ type: "asc" }, { createdAt: "asc" }] },
+        publishSnapshots: { orderBy: { createdAt: "desc" }, take: 80 },
+        exportPackageSnapshots: { orderBy: { createdAt: "desc" }, take: 120 },
+        submissionAssets: { orderBy: { updatedAt: "desc" } },
+        submissionAssetVersions: { orderBy: { createdAt: "desc" }, take: 80 },
+        platformPublishMetrics: { orderBy: { snapshotDate: "desc" }, take: 80 },
+        gateActionAudits: {
+          where: { executionType: { in: ["platform_strategy", "export_version"] } },
+          orderBy: { createdAt: "desc" },
+          take: 80,
+          select: {
+            actionId: true,
+            executionType: true,
+            status: true,
+            succeededCount: true,
+            failedCount: true,
+            taskId: true,
+            platformId: true,
+            label: true,
+            message: true,
+            createdAt: true,
+          },
+        },
+        gateDispatchTasks: {
+          where: {
+            OR: [
+              { dispatchKey: { startsWith: "first-day:" } },
+              { dispatchKey: { startsWith: "first-day-handoff:" } },
+              { dispatchKey: { startsWith: "first-three-adoption:" } },
+            ],
+          },
+          select: {
+            dispatchKey: true,
+            stage: true,
+            state: true,
+            title: true,
+            detail: true,
+            actionLabel: true,
+            href: true,
+            completionEvidence: true,
+          },
+        },
+      },
+      orderBy: { updatedAt: "desc" },
+    }),
     prisma.aiTask.findMany({
       where: { status: { in: ["failed", "succeeded"] } },
       include: {
@@ -167,11 +269,12 @@ export default async function FailuresPage() {
   })));
   const repairReceipts = receiptAudits.map(gateActionReceiptFromAuditRecord);
   const failureRepairReview = buildGateFailureRepairReceiptReview(runConsole.failureRepairBatch, repairReceipts);
+  const persistedRecheckDispatches = recheckDispatchRecords.map(toPersistedDispatch);
+  const failureRepairResolution = buildGateFailureRepairRecheckResolution(runConsole.failureRepairBatch, persistedRecheckDispatches);
   const failureRepairFollowup = buildGateFailureRepairFollowupNotice(
     failureRepairReview,
-    buildGateFailureRepairRecheckResolution(runConsole.failureRepairBatch, []),
+    failureRepairResolution,
   );
-  const persistedRecheckDispatches = recheckDispatchRecords.map(toPersistedDispatch);
   const [failureRepairRecheckDispatch] = buildGateFailureRepairRecheckDispatchItems(
     failureRepairReview,
     runConsole.failureRepairBatch,
@@ -182,6 +285,22 @@ export default async function FailuresPage() {
     runConsole.failureRepairBatch,
     persistedRecheckDispatches,
   );
+  const taskQueueProjects = normalizeTaskQueueProjects(projects);
+  const queue = buildTaskQueueCenter(taskQueueProjects);
+  const safetyProjects = projects.map((project) => ({
+    aiTasks: project.aiTasks.map((task) => ({
+      status: task.status,
+      inputTokens: task.inputTokens ?? null,
+      outputTokens: task.outputTokens ?? null,
+      costUsd: task.costUsd ?? null,
+    })),
+  }));
+  const safety = buildBatchExecutionSafety(queue.items, safetyProjects, defaultBatchExecutionStrategy);
+  const failureRepairResumeRecommendation = buildFailureRepairResumeRecommendation({
+    resolved: failureRepairResolution.status === "resolved",
+    safety,
+    queueItems: queue.items,
+  });
 
   return (
     <AppShell>
@@ -249,6 +368,27 @@ export default async function FailuresPage() {
 
       {failureRepairRecheckCard && failureRepairRecheckDispatch ? (
         <FailureRepairRecheckCard card={failureRepairRecheckCard} dispatch={failureRepairRecheckDispatch} />
+      ) : null}
+
+      {failureRepairResumeRecommendation ? (
+        <section className={`mb-6 rounded-md border p-4 ${resumeRecommendationClass(failureRepairResumeRecommendation.status)}`}>
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <h2 className="font-medium">{failureRepairResumeRecommendation.label}</h2>
+              <p className="mt-1 text-sm leading-6">{failureRepairResumeRecommendation.detail}</p>
+              {failureRepairResumeRecommendation.taskLabels.length > 0 ? (
+                <div className="mt-3 flex flex-wrap gap-1.5">
+                  {failureRepairResumeRecommendation.taskLabels.map((label) => (
+                    <span className="rounded-md bg-white/70 px-2 py-1 text-xs font-medium" key={label}>{label}</span>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+            <Link className="w-fit rounded-md bg-slate-950 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800" href={failureRepairResumeRecommendation.href}>
+              {failureRepairResumeRecommendation.actionLabel}
+            </Link>
+          </div>
+        </section>
       ) : null}
 
       <section className="mb-6 rounded-md border border-slate-200 bg-white p-4">

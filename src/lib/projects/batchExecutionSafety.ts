@@ -40,6 +40,16 @@ export interface BatchSafetyPriorityBlocker {
   actionHref: string;
 }
 
+export interface FailureRepairResumeRecommendation {
+  status: "ready" | "blocked" | "empty";
+  label: string;
+  detail: string;
+  actionLabel: string;
+  href: string;
+  batchSize: number;
+  taskLabels: string[];
+}
+
 const estimatedTokensByCategory: Record<QueueItem["category"], number> = {
   candidate: 0,
   handoff: 0,
@@ -125,6 +135,59 @@ export function buildBatchSafetyPriorityBlocker(safety: Pick<BatchExecutionSafet
     status: item.status,
     actionLabel: item.actionLabel ?? "查看安全阀",
     actionHref: item.actionHref ?? "/tasks#recommended-batch",
+  };
+}
+
+function resumeTaskLabel(item: QueueItem) {
+  return `${item.projectTitle} · ${item.chapterTitle} · ${item.actionLabel}`;
+}
+
+export function buildFailureRepairResumeRecommendation(input: {
+  resolved: boolean;
+  safety: BatchExecutionSafety;
+  queueItems: QueueItem[];
+}): FailureRepairResumeRecommendation | null {
+  if (!input.resolved) return null;
+
+  const queueItemsById = new Map(input.queueItems.map((item) => [item.id, item]));
+  const batchItems = input.safety.recommendedBatchIds
+    .map((id) => queueItemsById.get(id))
+    .filter((item): item is QueueItem => Boolean(item));
+  const taskLabels = batchItems.slice(0, 3).map(resumeTaskLabel);
+
+  if (!input.safety.canRunRecommendedBatch) {
+    const blocker = buildBatchSafetyPriorityBlocker(input.safety);
+    return {
+      status: "blocked",
+      label: "恢复前仍有安全阀拦截",
+      detail: blocker?.detail ?? "失败修复已复检，但推荐批次仍未通过安全阀；先处理阻塞项，再恢复生产。",
+      actionLabel: blocker?.actionLabel ?? "查看安全阀",
+      href: blocker?.actionHref ?? "/tasks#recommended-batch",
+      batchSize: batchItems.length,
+      taskLabels,
+    };
+  }
+
+  if (batchItems.length === 0) {
+    return {
+      status: "empty",
+      label: "暂无可恢复小批",
+      detail: "失败修复已复检，但当前没有可执行的初稿、审稿或二改任务；先补章节卡或进入项目工作台。",
+      actionLabel: "去任务中心",
+      href: "/tasks",
+      batchSize: 0,
+      taskLabels: [],
+    };
+  }
+
+  return {
+    status: "ready",
+    label: "恢复安全小批",
+    detail: `失败修复已复检，可以恢复 ${batchItems.length} 个任务的小批量生产：${taskLabels.join("；")}。`,
+    actionLabel: "执行恢复小批",
+    href: "/tasks#recommended-batch",
+    batchSize: batchItems.length,
+    taskLabels,
   };
 }
 

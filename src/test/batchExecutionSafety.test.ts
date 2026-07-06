@@ -1,6 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { buildBatchExecutionSafety, buildBatchSafetyPriorityBlocker } from "../lib/projects/batchExecutionSafety.ts";
+import {
+  buildBatchExecutionSafety,
+  buildBatchSafetyPriorityBlocker,
+  buildFailureRepairResumeRecommendation,
+} from "../lib/projects/batchExecutionSafety.ts";
 import { getBatchExecutionStrategy } from "../lib/projects/batchExecutionStrategy.ts";
 import type { QueueItem } from "../lib/projects/taskQueueCenter.ts";
 
@@ -205,5 +209,66 @@ test("buildBatchExecutionSafety", async (t) => {
     const gate = safety.items.find((item) => item.id === "watch-scale-gate");
     assert.equal(gate?.status, "warn");
     assert.ok(gate?.detail.includes("单章小样本"));
+  });
+
+  await t.test("does not recommend resumed production before failure repair recheck is resolved", () => {
+    const safety = buildBatchExecutionSafety([baseItem], [{ aiTasks: [] }], getBatchExecutionStrategy("conservative"));
+    const recommendation = buildFailureRepairResumeRecommendation({
+      resolved: false,
+      safety,
+      queueItems: [baseItem],
+    });
+
+    assert.equal(recommendation, null);
+  });
+
+  await t.test("recommends a safe small batch after failure repair recheck is resolved", () => {
+    const secondItem: QueueItem = {
+      ...baseItem,
+      id: "item-2",
+      category: "draft",
+      label: "待生成",
+      chapterTitle: "第二章",
+      actionLabel: "生成初稿",
+      priority: 20,
+    };
+    const safety = buildBatchExecutionSafety([baseItem, secondItem], [{ aiTasks: [] }], getBatchExecutionStrategy("conservative"));
+    const recommendation = buildFailureRepairResumeRecommendation({
+      resolved: true,
+      safety,
+      queueItems: [baseItem, secondItem],
+    });
+
+    assert.equal(recommendation?.status, "ready");
+    assert.equal(recommendation?.label, "恢复安全小批");
+    assert.equal(recommendation?.actionLabel, "执行恢复小批");
+    assert.equal(recommendation?.href, "/tasks#recommended-batch");
+    assert.ok(recommendation?.detail.includes("2 个"));
+    assert.ok(recommendation?.detail.includes("第一章"));
+    assert.ok(recommendation?.detail.includes("第二章"));
+  });
+
+  await t.test("points resolved failure repair rechecks at the top safety blocker before resuming production", () => {
+    const candidate: QueueItem = {
+      ...baseItem,
+      id: "candidate-1",
+      category: "candidate",
+      label: "待采纳",
+      actionLabel: "处理候选稿",
+      href: "/projects/project-1/chapters/chapter-1#chapter-revisions",
+      priority: 5,
+    };
+    const safety = buildBatchExecutionSafety([candidate, baseItem], [{ aiTasks: [] }], getBatchExecutionStrategy("conservative"));
+    const recommendation = buildFailureRepairResumeRecommendation({
+      resolved: true,
+      safety,
+      queueItems: [candidate, baseItem],
+    });
+
+    assert.equal(recommendation?.status, "blocked");
+    assert.equal(recommendation?.label, "恢复前仍有安全阀拦截");
+    assert.equal(recommendation?.actionLabel, "处理候选稿");
+    assert.equal(recommendation?.href, "/projects/project-1/chapters/chapter-1#chapter-revisions");
+    assert.ok(recommendation?.detail.includes("候选稿"));
   });
 });

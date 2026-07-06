@@ -148,6 +148,11 @@ test("buildPlatformPublishExportCenter", async (t) => {
     assert.equal(center.executionHandoffs[0].actionLabel, center.packages[0].repairPath.nextStep?.label);
     assert.equal(center.executionHandoffs[0].actionKind, center.packages[0].repairPath.nextStep?.kind);
     assert.equal(center.executionHandoffs[0].actionHref.includes("#"), true);
+    assert.equal(center.executionHandoffSummary.readyCount, 0);
+    assert.equal(center.executionHandoffSummary.blockedCount, platformProfiles.length);
+    assert.equal(center.executionHandoffSummary.primaryAction?.actionLabel, center.executionHandoffs[0].actionLabel);
+    assert.ok(center.executionHandoffSummary.headline.includes("优先处理"));
+    assert.ok(center.executionHandoffSummary.nextAction.includes(center.executionHandoffSummary.primaryAction?.platformName ?? ""));
     assert.ok(center.executionHandoffs.find((item) => item.platformId === "fanqie")?.submissionFocus.some((item) => item.includes("首秀")));
     assert.ok(center.executionHandoffs.find((item) => item.platformId === "qidian")?.writingFocus.some((item) => item.includes("卷结构")));
     assert.equal(center.packages[0].publishEffect.status, "empty");
@@ -272,6 +277,10 @@ test("buildPlatformPublishExportCenter", async (t) => {
     assert.equal(center.executionHandoffs[0].actionKind, "record_publish_effect");
     assert.equal(center.executionHandoffs[0].actionLabel, "记录发布效果");
     assert.equal(center.executionHandoffs[0].actionHref, "#publish-effect-panel");
+    assert.equal(center.executionHandoffSummary.readyCount, 1);
+    assert.equal(center.executionHandoffSummary.blockedCount, 0);
+    assert.equal(center.executionHandoffSummary.primaryAction?.actionKind, "record_publish_effect");
+    assert.ok(center.executionHandoffSummary.headline.includes("可以进入复盘"));
   });
 
   await t.test("blocks export when candidate adoption makes old reviews stale", () => {

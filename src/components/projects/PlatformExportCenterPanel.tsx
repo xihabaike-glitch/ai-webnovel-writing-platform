@@ -706,12 +706,21 @@ interface PlatformPublishExecutionHandoff {
   warningCount: number;
 }
 
+interface PlatformPublishExecutionHandoffSummary {
+  readyCount: number;
+  blockedCount: number;
+  primaryAction: PlatformPublishExecutionHandoff | null;
+  headline: string;
+  nextAction: string;
+}
+
 interface PlatformPublishExportCenter {
   packages: PlatformPublishPackage[];
   recommendedPlatformId: string;
   totalPublishableChapters: number;
   workspace: PlatformPublishWorkspace;
   executionHandoffs: PlatformPublishExecutionHandoff[];
+  executionHandoffSummary: PlatformPublishExecutionHandoffSummary;
   platformStrategy: PlatformStrategyRankItem[];
   strategyVerdict: PlatformStrategyAutoVerdict;
   platformKnowledge: PlatformKnowledgeInsight[];
@@ -2603,6 +2612,27 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
                   <p className="mt-1 text-sm leading-6 text-slate-600">把参考库的平台抓手接到当前作品包：每个平台都显示写作、投稿、复盘和当前要处理的动作。</p>
                 </div>
                 <div className="text-xs text-slate-500">平台还差 0 个</div>
+              </div>
+              <div className="mt-3 rounded-md bg-slate-50 p-3 text-sm">
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                  <div>
+                    <div className="font-medium text-slate-950">{center.executionHandoffSummary.headline}</div>
+                    <p className="mt-1 leading-6 text-slate-600">{center.executionHandoffSummary.nextAction}</p>
+                  </div>
+                  {center.executionHandoffSummary.primaryAction ? (
+                    <Link
+                      className="w-fit rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white"
+                      href={handoffActionHref(projectId, center.executionHandoffSummary.primaryAction)}
+                    >
+                      {center.executionHandoffSummary.primaryAction.actionLabel}
+                    </Link>
+                  ) : null}
+                </div>
+                <div className="mt-3 grid gap-2 text-xs text-slate-500 sm:grid-cols-3">
+                  <div>可导出 <span className="font-medium text-slate-950">{center.executionHandoffSummary.readyCount}</span></div>
+                  <div>待处理 <span className="font-medium text-slate-950">{center.executionHandoffSummary.blockedCount}</span></div>
+                  <div>总平台 <span className="font-medium text-slate-950">{center.executionHandoffs.length}</span></div>
+                </div>
               </div>
               <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-4">
                 {center.executionHandoffs.map((item) => (

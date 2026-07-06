@@ -778,6 +778,7 @@ export interface PlatformPublishExportCenter {
   totalPublishableChapters: number;
   workspace: PlatformPublishWorkspace;
   executionHandoffs: PlatformPublishExecutionHandoff[];
+  executionHandoffSummary: PlatformPublishExecutionHandoffSummary;
   platformStrategy: PlatformStrategyRankItem[];
   strategyVerdict: PlatformStrategyAutoVerdict;
   platformKnowledge: PlatformKnowledgeInsight[];
@@ -802,6 +803,14 @@ export interface PlatformPublishExecutionHandoff {
   canExport: boolean;
   blockedCount: number;
   warningCount: number;
+}
+
+export interface PlatformPublishExecutionHandoffSummary {
+  readyCount: number;
+  blockedCount: number;
+  primaryAction: PlatformPublishExecutionHandoff | null;
+  headline: string;
+  nextAction: string;
 }
 
 export interface PlatformPublishArchivePlatform {
@@ -4070,9 +4079,65 @@ function publishExecutionHandoffActionHref(
   return "#platform-export";
 }
 
+function handoffActionRank(item: PlatformPublishExecutionHandoff) {
+  const kindRank: Record<PlatformPublishExecutionHandoff["actionKind"], number> = {
+    add_publish_chapters: 0,
+    edit_chapter: 1,
+    adopt_candidate: 2,
+    run_second_pass: 3,
+    run_chapter_review: 4,
+    open_submission_package: 5,
+    record_publish_effect: 6,
+  };
+  return (item.canExport ? 100 : 0) + kindRank[item.actionKind];
+}
+
+function buildPlatformPublishExecutionHandoffSummary(
+  handoffs: PlatformPublishExecutionHandoff[],
+): PlatformPublishExecutionHandoffSummary {
+  const readyCount = handoffs.filter((item) => item.canExport).length;
+  const blockedCount = handoffs.length - readyCount;
+  const primaryAction = [...handoffs]
+    .sort((left, right) => (
+      handoffActionRank(left) - handoffActionRank(right)
+      || right.blockedCount - left.blockedCount
+      || left.preflightScore - right.preflightScore
+      || left.platformName.localeCompare(right.platformName)
+    ))[0] ?? null;
+
+  if (!primaryAction) {
+    return {
+      readyCount,
+      blockedCount,
+      primaryAction: null,
+      headline: "还没有平台交接卡。",
+      nextAction: "先生成平台投稿包，再进入全平台执行交接。",
+    };
+  }
+
+  if (blockedCount === 0) {
+    return {
+      readyCount,
+      blockedCount,
+      primaryAction,
+      headline: `${readyCount}/${handoffs.length} 平台可导出，可以进入复盘。`,
+      nextAction: `先处理 ${primaryAction.platformName}：${primaryAction.actionLabel}。`,
+    };
+  }
+
+  return {
+    readyCount,
+    blockedCount,
+    primaryAction,
+    headline: `${blockedCount} 个平台未就绪，优先处理 ${primaryAction.platformName}。`,
+    nextAction: `先处理 ${primaryAction.platformName}：${primaryAction.actionLabel}，别同时开八条线。`,
+  };
+}
+
 export function buildPlatformPublishExportCenter(input: PlatformPublishExportInput): PlatformPublishExportCenter {
   const platforms = input.platforms ?? platformProfiles;
   const packages = platforms.map((platform) => buildPlatformPackage(input, platform));
+  const executionHandoffs = packages.map(buildPlatformPublishExecutionHandoff);
   const platformStrategy = buildPlatformStrategy(packages);
   const strategyVerdict = buildPlatformStrategyAutoVerdict(platformStrategy);
   const platformKnowledge = buildPlatformKnowledge(packages);
@@ -4084,7 +4149,8 @@ export function buildPlatformPublishExportCenter(input: PlatformPublishExportInp
     recommendedPlatformId: input.targetPlatform.id,
     totalPublishableChapters: publishableChapters(input.chapters).length,
     workspace: buildPublishWorkspace(packages),
-    executionHandoffs: packages.map(buildPlatformPublishExecutionHandoff),
+    executionHandoffs,
+    executionHandoffSummary: buildPlatformPublishExecutionHandoffSummary(executionHandoffs),
     platformStrategy,
     strategyVerdict,
     platformKnowledge,

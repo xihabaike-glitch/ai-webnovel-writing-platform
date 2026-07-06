@@ -547,6 +547,16 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
               </div>
             ) : null}
           </div>
+          {debtView.focusAcceptanceCriteria.length > 0 ? (
+            <div className="mt-4 rounded-md bg-white/80 p-3 text-sm">
+              <div className="font-medium">{debtView.focusLabel}清债验收</div>
+              <div className="mt-2 grid gap-1 leading-6">
+                {debtView.focusAcceptanceCriteria.map((criterion) => (
+                  <div key={criterion}>- {criterion}</div>
+                ))}
+              </div>
+            </div>
+          ) : null}
         </section>
       ) : null}
 

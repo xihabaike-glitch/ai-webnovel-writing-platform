@@ -199,6 +199,7 @@ export interface TaskQueueDebtView {
   nextAction: QueueItem | null;
   focusedBlockerType: QueueItem["blockerType"] | null;
   focusLabel: string | null;
+  focusAcceptanceCriteria: string[];
   resumeAction: QueueItem | null;
   resumeActionLabel: string | null;
   resumeActionHref: string | null;
@@ -306,6 +307,40 @@ function blockerDebtActionLabel(blockerType: QueueItem["blockerType"]) {
   return "处理阻塞";
 }
 
+function blockerDebtAcceptanceCriteria(blockerType: QueueItem["blockerType"]) {
+  if (blockerType === "first_day_gate") return [
+    "首日链路派单完成并写入可验收证据。",
+    "平台包预检、首轮验证口径和避坑边界已闭环。",
+    "回到任务队列确认批量初稿、审稿、二改或导出恢复出现。",
+  ];
+  if (blockerType === "risk_recovery") return [
+    "止损原因、恢复条件和不再放大的边界已写清。",
+    "恢复动作必须能回流到首日链路或小样本验证。",
+    "处理后风险不再阻断推荐批次。",
+  ];
+  if (blockerType === "watch_scale_gate") return [
+    "小样本验收写清通过线、不可接受项和复查证据。",
+    "成功率、质量分、失败样本和放量结论齐全。",
+    "结论明确允许恢复后续初稿批次。",
+  ];
+  if (blockerType === "publish_repair") return [
+    "发布质检阻塞项已经修复或有明确暂缓理由。",
+    "标题、简介、标签、样章和平台卖点重新通过预检。",
+    "处理后导出或发布效果任务恢复出现。",
+  ];
+  if (blockerType === "export_version") return [
+    "导出版本重新生成或恢复到可信基线。",
+    "章节数、字数、格式和内容哈希与当前项目一致。",
+    "处理后导出版本阻塞数量下降。",
+  ];
+  if (blockerType === "chapter_card") return [
+    "章节目标、钩子、冲突、价值转折和章末追读都不为空。",
+    "章节卡能直接进入初稿、审稿或二改，不再返回 needs_card。",
+    "处理后回到阻塞清债页确认该类型数量下降。",
+  ];
+  return ["处理后该阻塞类型数量下降。"];
+}
+
 export function buildTaskQueueDebtView(
   items: QueueItem[],
   focusedBlockerType: QueueItem["blockerType"] | null = null,
@@ -351,6 +386,7 @@ export function buildTaskQueueDebtView(
     nextAction,
     focusedBlockerType: activeBlockerType,
     focusLabel,
+    focusAcceptanceCriteria: activeBlockerType ? blockerDebtAcceptanceCriteria(activeBlockerType) : [],
     resumeAction,
     resumeActionLabel: resumeAction ? `恢复生产：${resumeAction.actionLabel}` : null,
     resumeActionHref: resumeAction?.href ?? null,

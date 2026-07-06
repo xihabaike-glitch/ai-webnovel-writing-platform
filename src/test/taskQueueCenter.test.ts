@@ -250,6 +250,11 @@ test("buildTaskQueueCenter", async (t) => {
     assert.equal(debt.items[0].blockerType, "chapter_card");
     assert.equal(debt.nextAction?.blockerType, "chapter_card");
     assert.ok(debt.headline.includes("正在清理章节卡"));
+    assert.deepEqual(debt.focusAcceptanceCriteria, [
+      "章节目标、钩子、冲突、价值转折和章末追读都不为空。",
+      "章节卡能直接进入初稿、审稿或二改，不再返回 needs_card。",
+      "处理后回到阻塞清债页确认该类型数量下降。",
+    ]);
   });
 
   await t.test("returns a resume production action after blocked debt is cleared", () => {

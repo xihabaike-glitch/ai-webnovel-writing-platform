@@ -486,7 +486,10 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
       </section>
 
       {activeView === "blocked" ? (
-        <section className="mb-6 rounded-md border border-rose-200 bg-rose-50 p-4 text-rose-950" id="task-debt">
+        <section
+          className={`mb-6 rounded-md border p-4 ${debtView.totalBlocked > 0 ? "border-rose-200 bg-rose-50 text-rose-950" : "border-emerald-200 bg-emerald-50 text-emerald-950"}`}
+          id="task-debt"
+        >
           <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
             <div>
               <h2 className="font-medium">阻塞清债</h2>
@@ -501,6 +504,11 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
                   先处理：{debtView.nextAction.actionLabel}
                 </Link>
               ) : null}
+              {!debtView.nextAction && debtView.resumeActionHref && debtView.resumeActionLabel ? (
+                <Link className="rounded-md bg-emerald-950 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-900" href={debtView.resumeActionHref}>
+                  {debtView.resumeActionLabel}
+                </Link>
+              ) : null}
             </div>
           </div>
           <div className="mt-4 grid gap-2 md:grid-cols-3 lg:grid-cols-6">
@@ -513,7 +521,7 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
             ))}
             {debtView.groups.length === 0 ? (
               <div className="rounded-md bg-white/80 p-3 text-sm text-emerald-800">
-                没有阻塞项，可以继续批量推进。
+                清债完成，可以继续批量推进。
               </div>
             ) : null}
           </div>

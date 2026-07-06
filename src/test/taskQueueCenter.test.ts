@@ -239,6 +239,21 @@ test("buildTaskQueueCenter", async (t) => {
     assert.ok(debt.items.every((item) => item.category === "blocked"));
   });
 
+  await t.test("returns a resume production action after blocked debt is cleared", () => {
+    const queue = buildTaskQueueCenter([{
+      ...project,
+      chapters: [baseChapter],
+      gateDispatchTasks: firstDayCompleteDispatches(project.id),
+    }]);
+    const debt = buildTaskQueueDebtView(queue.items);
+
+    assert.equal(debt.totalBlocked, 0);
+    assert.equal(debt.resumeAction?.category, "draft");
+    assert.equal(debt.resumeActionLabel, "恢复生产：生成初稿");
+    assert.equal(debt.resumeActionHref, debt.resumeAction?.href);
+    assert.ok(debt.detail.includes("恢复"));
+  });
+
   await t.test("surfaces pending candidate revisions before automated production", () => {
     const queue = buildTaskQueueCenter([{
       ...project,

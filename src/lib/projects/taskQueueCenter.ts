@@ -196,6 +196,9 @@ export interface TaskQueueDebtView {
   groups: TaskQueueDebtGroup[];
   items: QueueItem[];
   nextAction: QueueItem | null;
+  resumeAction: QueueItem | null;
+  resumeActionLabel: string | null;
+  resumeActionHref: string | null;
 }
 
 type PublishEffectQueueExecution = NonNullable<QueueItem["effectAction"]>["execution"];
@@ -301,6 +304,7 @@ function blockerDebtActionLabel(blockerType: QueueItem["blockerType"]) {
 }
 
 export function buildTaskQueueDebtView(items: QueueItem[]): TaskQueueDebtView {
+  const resumeAction = items.find((entry) => entry.category !== "blocked") ?? null;
   const blockedItems = items
     .filter((entry) => entry.category === "blocked")
     .sort((left, right) => (
@@ -323,10 +327,15 @@ export function buildTaskQueueDebtView(items: QueueItem[]): TaskQueueDebtView {
     headline: totalBlocked > 0 ? `还有 ${totalBlocked} 个阻塞债，先清最高风险项。` : "当前没有阻塞债。",
     detail: nextAction
       ? `优先处理「${nextAction.projectTitle} · ${nextAction.chapterTitle}」：${nextAction.actionLabel}。`
-      : "可以回到全部任务，继续推进写、审、改、导出。",
+      : resumeAction
+        ? `阻塞已经清空，可以恢复「${resumeAction.projectTitle} · ${resumeAction.chapterTitle}」的${resumeAction.actionLabel}。`
+        : "可以回到全部任务，继续推进写、审、改、导出。",
     groups,
     items: blockedItems,
     nextAction,
+    resumeAction,
+    resumeActionLabel: resumeAction ? `恢复生产：${resumeAction.actionLabel}` : null,
+    resumeActionHref: resumeAction?.href ?? null,
   };
 }
 

@@ -207,6 +207,14 @@ export interface PlatformSubmissionAssetAudit {
   issues: PlatformSubmissionAssetIssue[];
 }
 
+export interface PlatformSubmissionAssetEditorReview {
+  tone: "success" | "warning" | "danger";
+  headline: string;
+  primaryAction: string;
+  focusIssues: PlatformSubmissionAssetIssue[];
+  evidence: string[];
+}
+
 export interface PlatformSubmissionAssetAdoptionSummary {
   generatedTasks: number;
   generatedVariants: number;
@@ -2941,6 +2949,45 @@ export function buildSubmissionAssetAudit(
     status: blockerCount ? "blocked" : warningCount ? "needs_work" : "ready",
     passed,
     issues,
+  };
+}
+
+export function buildSubmissionAssetEditorReview(
+  platformName: string,
+  audit: PlatformSubmissionAssetAudit,
+): PlatformSubmissionAssetEditorReview {
+  const focusIssues = [...audit.issues]
+    .sort((left, right) => {
+      if (left.severity === right.severity) return 0;
+      return left.severity === "blocker" ? -1 : 1;
+    })
+    .slice(0, 3);
+  const tone = audit.status === "ready" ? "success" : audit.status === "blocked" ? "danger" : "warning";
+  const headline = audit.status === "ready"
+    ? `${platformName}入口变量可以进入投放验证。`
+    : audit.status === "blocked"
+      ? `${platformName}入口变量不够投稿，先重写。`
+      : `${platformName}入口变量还需要编辑返工。`;
+  const primaryAction = focusIssues[0]
+    ? `先修：${focusIssues[0].label}`
+    : audit.status === "ready"
+      ? "可以保存版本，并进入前三章兑现检查"
+      : "先补标题、卖点、简介或标签";
+  const evidence = [...audit.passed]
+    .sort((left, right) => {
+      const leftPlatformSpecific = left.includes(platformName);
+      const rightPlatformSpecific = right.includes(platformName);
+      if (leftPlatformSpecific === rightPlatformSpecific) return 0;
+      return leftPlatformSpecific ? -1 : 1;
+    })
+    .slice(0, 4);
+
+  return {
+    tone,
+    headline,
+    primaryAction,
+    focusIssues,
+    evidence,
   };
 }
 

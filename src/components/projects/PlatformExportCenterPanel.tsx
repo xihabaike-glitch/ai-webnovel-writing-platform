@@ -14,6 +14,7 @@ import {
   type RawPublishRepairRunResult,
 } from "@/lib/projects/publishRepairRunResults";
 import { addGateActionReceipt, buildGatePublishEffectReceipt } from "@/lib/projects/gateActionReceipts";
+import { buildSubmissionAssetEditorReview } from "@/lib/projects/platformPublishExport";
 
 type PublishRepairActionKind =
   | "edit_chapter"
@@ -824,6 +825,26 @@ function assetAuditStatusClass(status: PlatformSubmissionAssetAudit["status"]) {
   return "bg-amber-50 text-amber-700";
 }
 
+function assetEditorReviewToneClass(tone: "success" | "warning" | "danger") {
+  if (tone === "success") return "border-emerald-100 bg-emerald-50";
+  if (tone === "danger") return "border-rose-100 bg-rose-50";
+  return "border-amber-100 bg-amber-50";
+}
+
+function assetEditorReviewTextClass(tone: "success" | "warning" | "danger") {
+  if (tone === "success") return "text-emerald-800";
+  if (tone === "danger") return "text-rose-800";
+  return "text-amber-800";
+}
+
+function assetIssueFieldLabel(field: PlatformSubmissionAssetIssue["field"]) {
+  if (field === "title") return "标题";
+  if (field === "logline") return "一句话卖点";
+  if (field === "synopsis") return "中文简介";
+  if (field === "overseasSynopsis") return "海外简介";
+  return "标签";
+}
+
 function assetVersionActionLabel(action: string) {
   if (action === "adopt") return "采纳";
   if (action === "restore") return "恢复";
@@ -1424,6 +1445,12 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
   const selectedPackage = useMemo(
     () => center?.packages.find((pack) => pack.platformId === selectedPlatformId) ?? center?.packages[0] ?? null,
     [center, selectedPlatformId],
+  );
+  const selectedAssetEditorReview = useMemo(
+    () => selectedPackage
+      ? buildSubmissionAssetEditorReview(selectedPackage.platformName, selectedPackage.submissionAssetAudit)
+      : null,
+    [selectedPackage],
   );
   const executableActions = useMemo(
     () => selectedPackage?.repairActions.filter(canRunAction).slice(0, 5) ?? [],
@@ -3910,30 +3937,49 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
                   {assetAuditStatusLabel(selectedPackage.submissionAssetAudit.status)}
                 </span>
               </div>
-              <div className="rounded-md bg-slate-50 p-3 text-sm">
-                <div className="font-medium text-slate-900">字段问题</div>
-                <div className="mt-2 grid gap-2">
-                  {(selectedPackage.submissionAssetAudit.issues.length ? selectedPackage.submissionAssetAudit.issues : []).slice(0, 4).map((issue) => (
-                    <div className="rounded-md border border-slate-200 bg-white p-2" key={`${issue.field}-${issue.label}`}>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className={`rounded-md px-2 py-1 text-xs font-medium ${
-                          issue.severity === "blocker" ? "bg-rose-50 text-rose-700" : "bg-amber-50 text-amber-700"
-                        }`}>
-                          {issue.severity === "blocker" ? "阻塞" : "提醒"}
-                        </span>
-                        <span className="font-medium text-slate-950">{issue.label}</span>
-                      </div>
-                      <div className="mt-1 leading-5 text-slate-600">{issue.detail}</div>
+              {selectedAssetEditorReview ? (
+                <div className="rounded-md bg-slate-50 p-3 text-sm">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                      <div className="font-medium text-slate-900">编辑审稿意见</div>
+                      <p className="mt-1 leading-5 text-slate-600">{selectedAssetEditorReview.headline}</p>
                     </div>
-                  ))}
-                  {!selectedPackage.submissionAssetAudit.issues.length ? (
-                    <div className="rounded-md border border-emerald-100 bg-white p-2 text-emerald-700">当前平台投稿字段暂无明显问题。</div>
+                    <span className={`w-fit rounded-md px-2 py-1 text-xs font-medium ${assetAuditStatusClass(selectedPackage.submissionAssetAudit.status)}`}>
+                      {assetAuditStatusLabel(selectedPackage.submissionAssetAudit.status)}
+                    </span>
+                  </div>
+                  <div className={`mt-3 rounded-md border p-3 ${assetEditorReviewToneClass(selectedAssetEditorReview.tone)}`}>
+                    <div className={`text-xs font-medium ${assetEditorReviewTextClass(selectedAssetEditorReview.tone)}`}>
+                      {selectedAssetEditorReview.primaryAction}
+                    </div>
+                  </div>
+                  <div className="mt-3 grid gap-2">
+                    {selectedAssetEditorReview.focusIssues.map((issue) => (
+                      <div className="rounded-md border border-slate-200 bg-white p-2" key={`${issue.field}-${issue.label}`}>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className={`rounded-md px-2 py-1 text-xs font-medium ${
+                            issue.severity === "blocker" ? "bg-rose-50 text-rose-700" : "bg-amber-50 text-amber-700"
+                          }`}>
+                            {issue.severity === "blocker" ? "阻塞" : "提醒"}
+                          </span>
+                          <span className="font-medium text-slate-950">{issue.label}</span>
+                          <span className="text-xs text-slate-500">{assetIssueFieldLabel(issue.field)}</span>
+                        </div>
+                        <div className="mt-1 leading-5 text-slate-600">{issue.detail}</div>
+                      </div>
+                    ))}
+                    {!selectedAssetEditorReview.focusIssues.length ? (
+                      <div className="rounded-md border border-emerald-100 bg-white p-2 text-emerald-700">当前平台投稿字段暂无明显问题。</div>
+                    ) : null}
+                  </div>
+                  {selectedAssetEditorReview.evidence.length ? (
+                    <div className="mt-3 rounded-md bg-white p-2 text-xs leading-5 text-slate-500">
+                      <div className="font-medium text-slate-800">已通过证据</div>
+                      <div className="mt-1">{selectedAssetEditorReview.evidence.join("、")}</div>
+                    </div>
                   ) : null}
                 </div>
-                {selectedPackage.submissionAssetAudit.passed.length ? (
-                  <div className="mt-3 text-xs text-slate-500">已通过：{selectedPackage.submissionAssetAudit.passed.slice(0, 3).join("、")}</div>
-                ) : null}
-              </div>
+              ) : null}
             </div>
             <div className="mt-3 grid gap-2 rounded-md bg-slate-50 p-3 text-sm sm:grid-cols-4">
               <div>

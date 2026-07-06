@@ -9,6 +9,7 @@ import {
   buildPlatformStrategySwitchPlan,
   buildPublishPackageRestorePatch,
   buildPublishPackageVersionComparison,
+  buildSubmissionAssetEditorReview,
   buildSubmissionAssetAudit,
   countPublishPackageVersionActions,
   filterPublishPackageVersions,
@@ -1067,6 +1068,24 @@ test("buildPlatformPublishExportCenter", async (t) => {
     assert.ok(weakJinjiangAudit.issues.some((issue) => issue.label.includes("晋江人物弧光")));
     assert.equal(weakZhihuAudit.status, "needs_work");
     assert.ok(weakZhihuAudit.issues.some((issue) => issue.label.includes("盐选付费节点")));
+  });
+
+  await t.test("summarizes submission asset audit as editor review guidance", () => {
+    const weakZhihuAudit = buildSubmissionAssetAudit(getPlatformProfile("zhihu_yanxuan"), {
+      title: "她替我活着",
+      logline: "我参加自己的葬礼，发现最亲近的人都藏着反转真相。",
+      synopsis: "我站在自己的遗像前，看见另一个女人用我的名字接受所有人的悼念。为了查清真相，我开始跟踪她、接近未婚夫，也发现母亲和好友都在撒谎。故事会持续推进悬疑、复仇和身份反转，让读者不断怀疑谁才是真正的受害者。",
+      overseasSynopsis: "",
+      tags: ["悬疑", "复仇", "第一人称反转"],
+    });
+
+    const review = buildSubmissionAssetEditorReview("知乎盐选", weakZhihuAudit);
+
+    assert.equal(review.tone, "warning");
+    assert.equal(review.headline, "知乎盐选入口变量还需要编辑返工。");
+    assert.equal(review.primaryAction, "先修：盐选付费节点不够明确");
+    assert.ok(review.focusIssues.some((issue) => issue.label === "盐选付费节点不够明确"));
+    assert.ok(review.evidence.some((item) => item.includes("知乎盐选反转/付费期待明确")));
   });
 
   await t.test("blocks export when latest review still asks for a second pass", () => {

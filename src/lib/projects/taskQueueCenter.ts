@@ -15,6 +15,7 @@ import {
   type PublishPackageVersionItem,
 } from "./platformPublishExport.ts";
 import { findProjectStartTacticSummary, type ProjectStartTacticEntryLike, type ProjectStartTacticSummary } from "./projectStartTactics.ts";
+import type { SubmissionChecklist } from "./submissionChecklist.ts";
 
 export interface TaskQueueProject {
   id: string;
@@ -70,6 +71,7 @@ export interface TaskQueueProject {
   publishSnapshots?: PublishPackageVersionItem[];
   submissionAssets?: PlatformSubmissionAssetInput[];
   submissionAssetVersions?: PlatformSubmissionAssetVersionInput[];
+  submissionChecklist?: SubmissionChecklist;
   platformPublishMetrics?: PlatformPublishMetricInput[];
   exportPackageSnapshots?: Array<{
     id: string;
@@ -1301,6 +1303,7 @@ export function buildTaskQueueCenter(projects: TaskQueueProject[]): TaskQueueCen
       publishSnapshots: project.publishSnapshots ?? [],
       submissionAssets: project.submissionAssets ?? [],
       submissionAssetVersions: project.submissionAssetVersions ?? [],
+      submissionChecklist: project.submissionChecklist,
       platformPublishMetrics: project.platformPublishMetrics ?? [],
     });
     const queueItems: QueueItem[] = [];
@@ -1653,46 +1656,54 @@ export function buildTaskQueueCenter(projects: TaskQueueProject[]): TaskQueueCen
       targetPackage,
       ...exportCenter.packages.filter((pack) => pack.platformId !== targetPackage.platformId),
     ].filter((pack) => pack.canExport);
+    const repairQueuePackages = [
+      targetPackage,
+      ...exportCenter.packages.filter((pack) => pack.platformId !== targetPackage.platformId),
+    ].filter((pack) => pack.repairPath.status === "needs_repair");
 
     if (versionQueueItem) {
       queueItems.push(versionQueueItem);
-    } else if (firstDayGateCleared && exportCenter.totalPublishableChapters > 0 && exportQueuePackages.length > 0) {
-      for (const exportPackage of exportQueuePackages) {
+    } else if (firstDayGateCleared && exportCenter.totalPublishableChapters > 0) {
+      if (exportQueuePackages.length > 0) {
+        for (const exportPackage of exportQueuePackages) {
+          queueItems.push(item({
+            id: `${project.id}:export:${exportPackage.platformId}`,
+            projectId: project.id,
+            projectTitle: project.title,
+            platformName: exportPackage.platformName,
+            category: "export",
+            chapterTitle: `${exportPackage.platformName} 发布包`,
+            evidence: `${exportCenter.totalPublishableChapters} 章有正文可导出，${exportPackage.warnings.length} 条发布提醒。`,
+            strategyBasis: startTactic,
+            riskLevel: riskProfile.level,
+            riskLabel: riskProfile.label,
+            riskNotice,
+            scaleGate,
+            actionLabel: "导出平台包",
+            href: `${projectHref}#platform-export`,
+          }));
+        }
+      }
+
+      for (const repairPackage of repairQueuePackages) {
         queueItems.push(item({
-          id: `${project.id}:export:${exportPackage.platformId}`,
+          id: `${project.id}:publish-repair:${repairPackage.platformId}`,
           projectId: project.id,
           projectTitle: project.title,
-          platformName: exportPackage.platformName,
-          category: "export",
-          chapterTitle: `${exportPackage.platformName} 发布包`,
-          evidence: `${exportCenter.totalPublishableChapters} 章有正文可导出，${exportPackage.warnings.length} 条发布提醒。`,
+          platformName: repairPackage.platformName,
+          category: "blocked",
+          blockerType: "publish_repair",
+          chapterTitle: `${repairPackage.platformName} 发布质检`,
+          evidence: repairPackage.repairPath.headline,
           strategyBasis: startTactic,
           riskLevel: riskProfile.level,
           riskLabel: riskProfile.label,
           riskNotice,
           scaleGate,
-          actionLabel: "导出平台包",
+          actionLabel: repairPackage.repairPath.nextStep?.label ?? "处理发布阻塞",
           href: `${projectHref}#platform-export`,
         }));
       }
-    } else if (firstDayGateCleared && exportCenter.totalPublishableChapters > 0 && targetPackage.repairPath.status === "needs_repair") {
-      queueItems.push(item({
-        id: `${project.id}:publish-repair:${platform.id}`,
-        projectId: project.id,
-        projectTitle: project.title,
-        platformName: platform.name,
-        category: "blocked",
-        blockerType: "publish_repair",
-        chapterTitle: `${targetPackage.platformName} 发布质检`,
-        evidence: targetPackage.repairPath.headline,
-        strategyBasis: startTactic,
-        riskLevel: riskProfile.level,
-        riskLabel: riskProfile.label,
-        riskNotice,
-        scaleGate,
-        actionLabel: targetPackage.repairPath.nextStep?.label ?? "处理发布阻塞",
-        href: `${projectHref}#platform-export`,
-      }));
     }
 
     for (const candidate of draftQueue.candidates.filter((candidate) => candidate.status === "needs_card").slice(0, 3)) {

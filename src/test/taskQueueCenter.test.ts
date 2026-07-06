@@ -196,21 +196,22 @@ test("buildTaskQueueCenter", async (t) => {
     assert.equal(queue.overview.reviewReady, 1);
     assert.equal(queue.overview.secondPassReady, 1);
     assert.equal(queue.overview.exportReady, 0);
-    assert.equal(queue.overview.blockedCards, 2);
+    assert.equal(queue.overview.blockedCards, 9);
     assert.equal(queue.overview.firstDayBlocked, 0);
-    assert.equal(queue.overview.publishBlocked, 1);
+    assert.equal(queue.overview.publishBlocked, 8);
     assert.equal(queue.overview.chapterCardBlocked, 1);
     assert.equal(queue.overview.riskRecoveryBlocked, 0);
     assert.equal(queue.overview.watchScaleBlocked, 0);
     assert.equal(queue.overview.watchItems, 0);
     assert.equal(queue.overview.watchSampleOnly, 0);
     assert.equal(queue.overview.watchCleared, 0);
-    assert.equal(queue.overview.totalItems, 5);
+    assert.equal(queue.overview.totalItems, 12);
     assert.equal(queue.recommendedNext?.category, "review");
     assert.deepEqual(
-      queue.items.map((item) => item.category),
-      ["review", "second_pass", "draft", "blocked", "blocked"],
+      queue.items.slice(0, 3).map((item) => item.category),
+      ["review", "second_pass", "draft"],
     );
+    assert.equal(queue.items.filter((item) => item.category === "blocked").length, 9);
     const publishBlocker = queue.items.find((item) => item.id.includes(":publish-repair:"));
     const cardBlocker = queue.items.find((item) => item.id.includes(":blocked:"));
     assert.ok(publishBlocker?.href.endsWith("#platform-export"));
@@ -225,14 +226,14 @@ test("buildTaskQueueCenter", async (t) => {
     const queue = buildTaskQueueCenter([{ ...project, gateDispatchTasks: firstDayCompleteDispatches(project.id) }]);
     const debt = buildTaskQueueDebtView(queue.items);
 
-    assert.equal(debt.totalBlocked, 2);
-    assert.equal(debt.items.length, 2);
-    assert.ok(debt.headline.includes("2 个阻塞债"));
+    assert.equal(debt.totalBlocked, 9);
+    assert.equal(debt.items.length, 9);
+    assert.ok(debt.headline.includes("9 个阻塞债"));
     assert.equal(debt.nextAction?.blockerType, "publish_repair");
     assert.deepEqual(
       debt.groups.map((group) => [group.blockerType, group.count, group.actionLabel]),
       [
-        ["publish_repair", 1, "先修发布质检"],
+        ["publish_repair", 8, "先修发布质检"],
         ["chapter_card", 1, "补章节卡"],
       ],
     );
@@ -243,7 +244,7 @@ test("buildTaskQueueCenter", async (t) => {
     const queue = buildTaskQueueCenter([{ ...project, gateDispatchTasks: firstDayCompleteDispatches(project.id) }]);
     const debt = buildTaskQueueDebtView(queue.items, "chapter_card");
 
-    assert.equal(debt.totalBlocked, 2);
+    assert.equal(debt.totalBlocked, 9);
     assert.equal(debt.focusedBlockerType, "chapter_card");
     assert.equal(debt.focusLabel, "章节卡");
     assert.equal(debt.items.length, 1);
@@ -332,7 +333,7 @@ test("buildTaskQueueCenter", async (t) => {
     }]);
 
     assert.equal(queue.overview.candidateReady, 1);
-    assert.equal(queue.overview.totalItems, 6);
+    assert.equal(queue.overview.totalItems, 13);
     assert.equal(queue.recommendedNext?.category, "candidate");
     assert.equal(queue.recommendedNext?.actionLabel, "处理候选稿");
     assert.equal(queue.recommendedNext?.href, "/projects/project-1/chapters/chapter-review#chapter-revisions");
@@ -432,6 +433,24 @@ test("buildTaskQueueCenter", async (t) => {
     );
     assert.ok(exportItems.every((item) => item.actionLabel === "导出平台包"));
     assert.ok(exportItems.every((item) => item.href === "/projects/project-1#platform-export"));
+  });
+
+  await t.test("promotes every blocked platform into publish repair debt", () => {
+    const queue = buildTaskQueueCenter([publishReadyProject({
+      publishSnapshots: [],
+      platformPublishMetrics: [],
+      submissionChecklist: { readinessPercent: 70, todoCount: 1, passedCount: 5, warningCount: 0, items: [] },
+    })]);
+
+    const repairItems = queue.items.filter((item) => item.blockerType === "publish_repair");
+
+    assert.equal(queue.overview.exportReady, 0);
+    assert.equal(queue.overview.publishBlocked, 8);
+    assert.deepEqual(
+      repairItems.map((item) => item.platformName).sort((left, right) => left.localeCompare(right)),
+      ["番茄小说", "起点中文网", "七猫", "晋江文学城", "知乎盐选", "WebNovel", "Royal Road", "Wattpad"].sort((left, right) => left.localeCompare(right)),
+    );
+    assert.ok(repairItems.every((item) => item.href === "/projects/project-1#platform-export"));
   });
 
   await t.test("blocks export when the export version center reports regression risk", () => {

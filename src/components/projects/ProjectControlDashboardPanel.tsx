@@ -148,6 +148,9 @@ interface AiPipelinePromptMemorySummary {
   gateTone: "ready" | "watch" | "blocked" | "empty";
   gateStatusLabel: string;
   gateStatusDetail: string;
+  gateActionMode: "link" | "rollback" | null;
+  gateActionLabel: string | null;
+  gateActionHref: string | null;
   label: string;
   headline: string;
   detail: string;
@@ -1178,8 +1181,30 @@ export function ProjectControlDashboardPanel({ projectId }: { projectId: string 
                   ))}
                 </div>
                 <div className={`mt-3 rounded-md border px-3 py-2 text-xs leading-5 ${aiPromptMemoryGateClass(dashboard.aiPipelinePromptMemory.gateTone)}`}>
-                  <div className="font-medium">{dashboard.aiPipelinePromptMemory.gateStatusLabel}</div>
-                  <p className="mt-1">{dashboard.aiPipelinePromptMemory.gateStatusDetail}</p>
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                      <div className="font-medium">{dashboard.aiPipelinePromptMemory.gateStatusLabel}</div>
+                      <p className="mt-1">{dashboard.aiPipelinePromptMemory.gateStatusDetail}</p>
+                    </div>
+                    {dashboard.aiPipelinePromptMemory.gateActionMode === "link" && dashboard.aiPipelinePromptMemory.gateActionHref && dashboard.aiPipelinePromptMemory.gateActionLabel ? (
+                      <Link
+                        className="inline-flex w-fit rounded-md bg-white px-2 py-1 text-xs font-medium text-emerald-900 hover:bg-emerald-50"
+                        href={dashboard.aiPipelinePromptMemory.gateActionHref}
+                      >
+                        {dashboard.aiPipelinePromptMemory.gateActionLabel}
+                      </Link>
+                    ) : null}
+                    {dashboard.aiPipelinePromptMemory.gateActionMode === "rollback" && dashboard.aiPipelinePromptMemory.gateActionLabel ? (
+                      <button
+                        className="inline-flex w-fit rounded-md bg-white px-2 py-1 text-xs font-medium text-rose-800 hover:bg-rose-50 disabled:opacity-50"
+                        disabled={Boolean(runningMemoryAction)}
+                        onClick={() => void controlPromptMemory("rollback")}
+                        type="button"
+                      >
+                        {runningMemoryAction === "rollback" ? "派单中" : dashboard.aiPipelinePromptMemory.gateActionLabel}
+                      </button>
+                    ) : null}
+                  </div>
                 </div>
                 <p className="mt-2 rounded-md bg-white/70 px-2 py-1 text-xs leading-5 text-emerald-900">
                   下一步：{dashboard.aiPipelinePromptMemory.nextAction}

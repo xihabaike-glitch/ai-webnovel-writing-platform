@@ -293,6 +293,9 @@ export interface AiPipelinePromptMemorySummary {
   gateTone: "ready" | "watch" | "blocked" | "empty";
   gateStatusLabel: string;
   gateStatusDetail: string;
+  gateActionMode: "link" | "rollback" | null;
+  gateActionLabel: string | null;
+  gateActionHref: string | null;
   label: string;
   headline: string;
   detail: string;
@@ -1318,13 +1321,16 @@ function compactEvidence(items: Array<string | null | undefined>) {
 function buildAiPipelinePromptMemoryGate(
   status: AiPipelinePromptMemorySummary["lifecycleStatus"],
   options: { hasMemory: boolean; sourceLabel?: string | null } = { hasMemory: false },
-): Pick<AiPipelinePromptMemorySummary, "gateTone" | "gateStatusLabel" | "gateStatusDetail"> {
+): Pick<AiPipelinePromptMemorySummary, "gateTone" | "gateStatusLabel" | "gateStatusDetail" | "gateActionMode" | "gateActionLabel" | "gateActionHref"> {
   if (status === "rollback") {
     const sourcePrefix = options.sourceLabel ? `${options.sourceLabel}：` : "";
     return {
       gateTone: "blocked",
       gateStatusLabel: "禁止放量",
       gateStatusDetail: `${sourcePrefix}先停用批量恢复，只能回滚到 1 章复验；开头钩子、章末追读和质量线通过后再重新观察。`,
+      gateActionMode: "rollback",
+      gateActionLabel: "派 1 章复验",
+      gateActionHref: null,
     };
   }
   if (status === "sample_required") {
@@ -1332,6 +1338,9 @@ function buildAiPipelinePromptMemoryGate(
       gateTone: "watch",
       gateStatusLabel: "等待样本",
       gateStatusDetail: "只允许 1 章小样本复验；补齐失败原因、正文质量和模型路线证据后再考虑小批。",
+      gateActionMode: "rollback",
+      gateActionLabel: "派 1 章复验",
+      gateActionHref: null,
     };
   }
   if (status === "active") {
@@ -1339,6 +1348,9 @@ function buildAiPipelinePromptMemoryGate(
       gateTone: "ready",
       gateStatusLabel: "小批观察",
       gateStatusDetail: "只允许小批观察，持续盯成功率、平均质量和连续失败；任何跌线都回滚到小样本。",
+      gateActionMode: "link",
+      gateActionLabel: "去小批执行",
+      gateActionHref: "/tasks#recommended-batch",
     };
   }
   return {
@@ -1347,6 +1359,9 @@ function buildAiPipelinePromptMemoryGate(
     gateStatusDetail: options.hasMemory
       ? "恢复证据不可用，等待新复检后再写入提示词。"
       : "没有可用恢复证据，等待新复检或小批恢复产生真实回执。",
+    gateActionMode: null,
+    gateActionLabel: null,
+    gateActionHref: null,
   };
 }
 

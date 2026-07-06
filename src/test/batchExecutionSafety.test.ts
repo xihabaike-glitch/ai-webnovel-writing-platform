@@ -48,7 +48,7 @@ test("buildBatchExecutionSafety", async (t) => {
 
   await t.test("blocks recommended batches until draft candidates are adopted or dismissed", () => {
     const safety = buildBatchExecutionSafety([
-      { ...baseItem, id: "candidate-1", category: "candidate", label: "待采纳", priority: 5, actionLabel: "处理候选稿" },
+      { ...baseItem, id: "candidate-1", category: "candidate", label: "待采纳", priority: 5, actionLabel: "处理候选稿", href: "/projects/project-1/chapters/chapter-1#chapter-revisions" },
       baseItem,
     ], [{ aiTasks: [] }]);
 
@@ -58,6 +58,8 @@ test("buildBatchExecutionSafety", async (t) => {
     const candidateGate = safety.items.find((item) => item.id === "pending-candidates");
     assert.equal(candidateGate?.status, "block");
     assert.ok(candidateGate?.detail.includes("候选稿"));
+    assert.equal(candidateGate?.actionLabel, "处理候选稿");
+    assert.equal(candidateGate?.actionHref, "/projects/project-1/chapters/chapter-1#chapter-revisions");
   });
 
   await t.test("blocks recommended batches while AI pipeline recovery follow-ups are open", () => {

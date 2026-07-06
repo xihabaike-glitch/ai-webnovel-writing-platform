@@ -140,6 +140,7 @@ export function buildBatchExecutionSafety(
     : runnable.slice(0, strategy.maxBatchSize);
   const blockedCount = queueItems.filter((item) => item.category === "blocked").length;
   const candidateCount = queueItems.filter((item) => item.category === "candidate").length;
+  const firstCandidate = queueItems.find((item) => item.category === "candidate") ?? null;
   const aiPipelineRecoveryFollowupCount = queueItems.filter(isOpenAiPipelineRecoveryFollowup).length;
   const sampleOnlyCount = queueItems.filter((item) => item.scaleGate === "sample_only" && isRunnableBatchItem(item)).length;
   const clearedWatchCount = queueItems.filter((item) => item.scaleGate === "cleared" && isRunnableBatchItem(item)).length;
@@ -170,6 +171,10 @@ export function buildBatchExecutionSafety(
       candidateCount === 0
         ? "当前没有待采纳 AI 候选稿。"
         : `${candidateCount} 个 AI 候选稿还没由作者确认；先处理候选，再继续批量生产。`,
+      candidateCount === 0 ? undefined : {
+        actionLabel: firstCandidate?.actionLabel ?? "处理候选稿",
+        actionHref: firstCandidate?.href ?? "/tasks",
+      },
     ),
     safetyItem(
       "ai-pipeline-recovery",

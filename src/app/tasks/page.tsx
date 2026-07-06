@@ -376,15 +376,6 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
   }));
   const queue = buildTaskQueueCenter(taskQueueProjects);
   const debtView = buildTaskQueueDebtView(queue.items, activeDebtBlockerType);
-  const debtFocusChangeNotice = clearedDebtBlockerType
-    ? buildTaskDebtFocusChangeNotice({
-        label: debtBlockerTypeName(clearedDebtBlockerType),
-        previousDebtCount: previousDebtCount(resolvedSearchParams.previousDebt),
-        currentDebtCount: debtView.groups.find((group) => group.blockerType === clearedDebtBlockerType)?.count ?? 0,
-        resumeActionLabel: debtView.resumeActionLabel,
-        resumeActionHref: debtView.resumeActionHref,
-      })
-    : null;
   const visibleQueueItems = activeView === "blocked" ? debtView.items : queue.items;
   const safety = buildBatchExecutionSafety(queue.items, safetyProjects, activeStrategy);
   const safetyPriorityBlocker = buildBatchSafetyPriorityBlocker(safety);
@@ -428,6 +419,21 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
     })
     : null;
   const modelRouteBlocksRecommendedBatch = modelRoutePreflightGate?.status === "block";
+  const debtFocusChangeNotice = clearedDebtBlockerType
+    ? buildTaskDebtFocusChangeNotice({
+        label: debtBlockerTypeName(clearedDebtBlockerType),
+        previousDebtCount: previousDebtCount(resolvedSearchParams.previousDebt),
+        currentDebtCount: debtView.groups.find((group) => group.blockerType === clearedDebtBlockerType)?.count ?? 0,
+        resumeActionLabel: debtView.resumeActionLabel,
+        resumeActionHref: debtView.resumeActionHref,
+        resumeBatch: {
+          canRun: safety.canRunRecommendedBatch && executionPlan.canRun && !modelRouteBlocksRecommendedBatch,
+          actionLabel: executionPlan.actionLabel,
+          detail: executionPlan.detail,
+          href: "/tasks#recommended-batch",
+        },
+      })
+    : null;
 
   return (
     <AppShell>
@@ -594,6 +600,11 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
           {debtFocusChangeNotice ? (
             <div className={`mt-4 rounded-md border px-3 py-2 text-sm leading-6 ${debtFocusNoticeClass(debtFocusChangeNotice.tone)}`}>
               <div>{debtFocusChangeNotice.message}</div>
+              {debtFocusChangeNotice.resumeBatchDetail ? (
+                <div className="mt-2 rounded-md bg-white/70 px-2 py-1 text-xs">
+                  恢复小批：{debtFocusChangeNotice.resumeBatchDetail}
+                </div>
+              ) : null}
               {debtFocusChangeNotice.actionLabel && debtFocusChangeNotice.actionHref ? (
                 <Link className="mt-2 inline-flex rounded-md bg-white/80 px-3 py-1 font-medium hover:bg-white" href={debtFocusChangeNotice.actionHref}>
                   {debtFocusChangeNotice.actionLabel}

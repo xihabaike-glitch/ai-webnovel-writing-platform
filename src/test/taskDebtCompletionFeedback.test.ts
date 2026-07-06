@@ -63,6 +63,46 @@ test("buildTaskDebtFocusChangeNotice recommends resumed production after a debt 
   assert.equal(notice?.actionHref, "/projects/project-1/chapters/chapter-ready-draft");
 });
 
+test("buildTaskDebtFocusChangeNotice recommends a safe resume batch when execution gates allow it", () => {
+  const notice = buildTaskDebtFocusChangeNotice({
+    label: "首日闸门",
+    previousDebtCount: 2,
+    currentDebtCount: 0,
+    resumeActionLabel: "恢复生产：生成初稿",
+    resumeActionHref: "/projects/project-1/chapters/chapter-ready-draft",
+    resumeBatch: {
+      canRun: true,
+      actionLabel: "批量初稿 2 个",
+      detail: "夜雨系统 · 待生成 · 第一章、第二章",
+      href: "/tasks#recommended-batch",
+    },
+  });
+
+  assert.equal(notice?.actionLabel, "执行恢复小批：批量初稿 2 个");
+  assert.equal(notice?.actionHref, "/tasks#recommended-batch");
+  assert.equal(notice?.resumeBatchDetail, "夜雨系统 · 待生成 · 第一章、第二章");
+});
+
+test("buildTaskDebtFocusChangeNotice keeps the single resume action when the safe batch is blocked", () => {
+  const notice = buildTaskDebtFocusChangeNotice({
+    label: "首日闸门",
+    previousDebtCount: 2,
+    currentDebtCount: 0,
+    resumeActionLabel: "恢复生产：生成初稿",
+    resumeActionHref: "/projects/project-1/chapters/chapter-ready-draft",
+    resumeBatch: {
+      canRun: false,
+      actionLabel: "批量初稿 2 个",
+      detail: "候选稿未确认，先别跑批量。",
+      href: "/tasks#recommended-batch",
+    },
+  });
+
+  assert.equal(notice?.actionLabel, "恢复生产：生成初稿");
+  assert.equal(notice?.actionHref, "/projects/project-1/chapters/chapter-ready-draft");
+  assert.equal(notice?.resumeBatchDetail, null);
+});
+
 test("buildTaskDebtFocusChangeNotice explains when debt count does not fall", () => {
   const notice = buildTaskDebtFocusChangeNotice({
     label: "观察闸门",

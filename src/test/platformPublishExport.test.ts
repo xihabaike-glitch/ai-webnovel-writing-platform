@@ -194,6 +194,11 @@ test("buildPlatformPublishExportCenter", async (t) => {
     assert.equal(center.platformReadinessSummary.needsEffectRecordCount, 0);
     assert.equal(center.platformReadinessSummary.notGeneratedCount, 0);
     assert.ok(center.platformReadinessSummary.headline.includes("投稿材料没过线"));
+    assert.equal(center.packages[0].preview.status, "blocked");
+    assert.ok(center.packages[0].preview.headline.includes("还不能交付"));
+    assert.ok(center.packages[0].preview.chapterLine.includes("1 章"));
+    assert.ok(center.packages[0].preview.riskLine.includes("阻塞"));
+    assert.ok(center.packages[0].preview.nextAction.includes("补"));
   });
 
   await t.test("dedupes workspace repair actions across platforms", () => {
@@ -327,6 +332,13 @@ test("buildPlatformPublishExportCenter", async (t) => {
     assert.equal(center.platformReadinessSummary.items[0]?.actionHref, "#platform-export");
     assert.ok(center.platformReadinessSummary.headline.includes("1 个平台发布包已过线"));
     assert.ok(center.platformReadinessSummary.nextAction.includes("保存发布基准"));
+    assert.equal(pack.preview.status, "needs_baseline");
+    assert.ok(pack.preview.headline.includes("缺发布基准"));
+    assert.equal(pack.preview.actionHref, "#platform-export");
+    assert.ok(pack.preview.chapterLine.includes("3 章"));
+    assert.ok(pack.preview.chapterLine.includes("7800 字"));
+    assert.ok(pack.preview.assetLine.includes("标签"));
+    assert.ok(pack.preview.assetLine.includes("个"));
   });
 
   await t.test("blocks export when candidate adoption makes old reviews stale", () => {

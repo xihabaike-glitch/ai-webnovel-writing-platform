@@ -401,6 +401,18 @@ interface PlatformPublishEffectSaveReview {
   recommendedAction: PlatformPublishOptimizationAction | null;
 }
 
+interface PlatformPublishPackagePreview {
+  status: "blocked" | "needs_baseline" | "needs_effect" | "ready";
+  headline: string;
+  titleLine: string;
+  assetLine: string;
+  chapterLine: string;
+  riskLine: string;
+  nextAction: string;
+  actionHref: string;
+  highlights: string[];
+}
+
 interface PlatformDispatchCompletionEffectValidation {
   status: "needs_effect" | "watch" | "rework" | "reusable_success";
   label: string;
@@ -437,6 +449,7 @@ interface PlatformPublishPackage {
   repairPath: PublishRepairPath;
   repairHistory: PublishRepairHistoryItem[];
   publishVersions: PublishPackageVersionItem[];
+  preview: PlatformPublishPackagePreview;
   warnings: string[];
   markdown: string;
 }
@@ -1011,6 +1024,20 @@ function platformReadinessStatusClass(status: PlatformReadinessItem["status"]) {
   if (status === "needs_package_export") return "bg-blue-50 text-blue-700";
   if (status === "needs_submission_repair") return "bg-rose-50 text-rose-700";
   return "bg-slate-100 text-slate-600";
+}
+
+function packagePreviewStatusLabel(status: PlatformPublishPackagePreview["status"]) {
+  if (status === "ready") return "可复盘";
+  if (status === "needs_effect") return "补效果";
+  if (status === "needs_baseline") return "存基准";
+  return "先修稿";
+}
+
+function packagePreviewStatusClass(status: PlatformPublishPackagePreview["status"]) {
+  if (status === "ready") return "bg-emerald-50 text-emerald-700";
+  if (status === "needs_effect") return "bg-cyan-50 text-cyan-700";
+  if (status === "needs_baseline") return "bg-blue-50 text-blue-700";
+  return "bg-rose-50 text-rose-700";
 }
 
 function dispatchValidationClass(status: PlatformDispatchCompletionEffectValidation["status"]) {
@@ -4955,6 +4982,42 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
                 ))}
               </div>
             ) : null}
+          </div>
+
+          <div className="rounded-md border border-slate-200 bg-slate-50 p-3" data-testid="platform-package-preview">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+              <div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className={`rounded-md px-2 py-1 text-xs font-medium ${packagePreviewStatusClass(selectedPackage.preview.status)}`}>
+                    {packagePreviewStatusLabel(selectedPackage.preview.status)}
+                  </span>
+                  <div className="font-medium text-slate-950">{selectedPackage.preview.headline}</div>
+                </div>
+                <p className="mt-2 text-sm leading-6 text-slate-600">{selectedPackage.preview.nextAction}</p>
+              </div>
+              <a
+                className="w-fit rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                href={selectedPackage.preview.actionHref}
+              >
+                跳到动作
+              </a>
+            </div>
+
+            <div className="mt-3 grid gap-2 text-sm md:grid-cols-2 xl:grid-cols-4">
+              {[selectedPackage.preview.titleLine, selectedPackage.preview.assetLine, selectedPackage.preview.chapterLine, selectedPackage.preview.riskLine].map((line) => (
+                <div className="rounded-md bg-white p-2 leading-5 text-slate-700" key={line}>
+                  {line}
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-3 grid gap-2 text-sm lg:grid-cols-3">
+              {selectedPackage.preview.highlights.map((item) => (
+                <div className="rounded-md bg-white p-2 leading-5 text-slate-600" key={item}>
+                  {item}
+                </div>
+              ))}
+            </div>
           </div>
 
           <div className="rounded-md border border-slate-200 p-3">

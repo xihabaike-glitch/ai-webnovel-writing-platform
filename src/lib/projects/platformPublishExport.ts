@@ -491,8 +491,21 @@ export interface PlatformPublishPackage {
   repairPath: PublishRepairPath;
   repairHistory: PublishRepairHistoryItem[];
   publishVersions: PublishPackageVersionItem[];
+  preview: PlatformPublishPackagePreview;
   warnings: string[];
   markdown: string;
+}
+
+export interface PlatformPublishPackagePreview {
+  status: "blocked" | "needs_baseline" | "needs_effect" | "ready";
+  headline: string;
+  titleLine: string;
+  assetLine: string;
+  chapterLine: string;
+  riskLine: string;
+  nextAction: string;
+  actionHref: string;
+  highlights: string[];
 }
 
 export function buildSubmissionAssetPostSaveReview(input: {
@@ -2802,7 +2815,7 @@ function buildRepairHistory(tasks: PublishExportAiTask[], chapters: PublishExpor
     .slice(0, 6);
 }
 
-function buildMarkdown(pack: Omit<PlatformPublishPackage, "markdown">) {
+function buildMarkdown(pack: Omit<PlatformPublishPackage, "markdown" | "preview">) {
   return [
     `# ${pack.platformName} 发布包`,
     "",
@@ -2916,6 +2929,88 @@ function buildMarkdown(pack: Omit<PlatformPublishPackage, "markdown">) {
       "",
     ]),
   ].join("\n");
+}
+
+function shortText(value: string, maxLength = 72) {
+  const normalized = value.replace(/\s+/g, " ").trim();
+  if (normalized.length <= maxLength) return normalized;
+  return `${normalized.slice(0, maxLength - 1)}…`;
+}
+
+function buildPackagePreview(pack: Omit<PlatformPublishPackage, "markdown" | "preview">): PlatformPublishPackagePreview {
+  const chapterCount = pack.chapters.length;
+  const readyChapterCount = pack.chapters.filter((chapter) => chapter.ready).length;
+  const wordCount = pack.chapters.reduce((sum, chapter) => sum + chapter.wordCount, 0);
+  const firstFailedGateItem = pack.finalGate.items.find((item) => item.status !== "pass");
+  const firstBlocker = pack.finalGate.blockers[0] ?? pack.preflight.blocked[0] ?? "";
+  const firstWarning = pack.warnings[0] ?? pack.preflight.warnings[0] ?? "";
+  const titleLine = `${pack.platformName}｜${pack.title}`;
+  const assetLine = `标题 ${pack.submissionAssetAudit.score} 分 · 标签 ${pack.tags.length} 个 · ${pack.submissionAsset ? "已保存投稿资产" : "使用默认投稿资产"}`;
+  const chapterLine = `${chapterCount} 章 · ${wordCount} 字 · ${readyChapterCount}/${chapterCount || 0} 章可发布`;
+  const riskLine = firstBlocker
+    ? `阻塞：${firstBlocker}`
+    : firstWarning
+      ? `提醒：${firstWarning}`
+      : "风险：暂无明显风险。";
+  const highlights = [
+    `卖点：${shortText(pack.logline, 64)}`,
+    `简介：${shortText(pack.synopsis, 96)}`,
+    `说明：${shortText(pack.publishNote, 72)}`,
+  ];
+
+  if (!pack.canExport || pack.finalGate.status !== "ready_to_submit") {
+    return {
+      status: "blocked",
+      headline: `${pack.platformName} 发布包还不能交付，先处理终检阻塞。`,
+      titleLine,
+      assetLine,
+      chapterLine,
+      riskLine,
+      nextAction: pack.finalGate.nextAction || pack.repairPath.nextStep?.detail || "补齐发布前质检后再导出。",
+      actionHref: firstFailedGateItem?.href ?? "#platform-export",
+      highlights,
+    };
+  }
+
+  if (pack.publishVersions.length === 0) {
+    return {
+      status: "needs_baseline",
+      headline: `${pack.platformName} 发布包已过线，但缺发布基准。`,
+      titleLine,
+      assetLine,
+      chapterLine,
+      riskLine,
+      nextAction: "保存发布基准，再复制或下载发布包。",
+      actionHref: "#platform-export",
+      highlights,
+    };
+  }
+
+  if (pack.effectCapturePlan.status !== "ready_to_review") {
+    return {
+      status: "needs_effect",
+      headline: `${pack.platformName} 发布包已归档，下一步补真实发布效果。`,
+      titleLine,
+      assetLine,
+      chapterLine,
+      riskLine,
+      nextAction: pack.effectCapturePlan.nextAction,
+      actionHref: "#publish-effect-panel",
+      highlights,
+    };
+  }
+
+  return {
+    status: "ready",
+    headline: `${pack.platformName} 发布包、基准和效果数据已齐，可以进入平台复盘。`,
+    titleLine,
+    assetLine,
+    chapterLine,
+    riskLine,
+    nextAction: "查看平台排序，决定放大、迭代还是换平台。",
+    actionHref: "#platform-strategy-ranking",
+    highlights,
+  };
 }
 
 function textOrFallback(value: string | undefined, fallback: string) {
@@ -4146,9 +4241,11 @@ function buildPlatformPackage(
     publishVersions,
     warnings,
   };
+  const preview = buildPackagePreview(packWithoutMarkdown);
 
   return {
     ...packWithoutMarkdown,
+    preview,
     markdown: buildMarkdown(packWithoutMarkdown),
   };
 }

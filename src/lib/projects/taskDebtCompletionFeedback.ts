@@ -151,10 +151,14 @@ function buildTaskDebtRecoveryDecision(input: {
   };
 }
 
-export function buildTaskDebtRecoveryBatchRecord(audits: TaskDebtRecoveryBatchAudit[]): TaskDebtRecoveryBatchRecord | null {
-  const latest = audits
+function buildRecoveryBatchRecord(input: {
+  audits: TaskDebtRecoveryBatchAudit[];
+  predicate: (payload: Record<string, unknown>) => boolean;
+  headlinePrefix: string;
+}): TaskDebtRecoveryBatchRecord | null {
+  const latest = input.audits
     .map((audit) => ({ audit, payload: parseTaskDebtPayload(audit.payload) }))
-    .filter((item) => taskDebtRecord(item.payload?.plan)?.scaleGate === "cleared")
+    .filter((item) => item.payload ? input.predicate(item.payload) : false)
     .sort((left, right) => taskDebtTimestamp(right.audit.createdAt) - taskDebtTimestamp(left.audit.createdAt))[0] ?? null;
   if (!latest) return null;
 
@@ -177,7 +181,7 @@ export function buildTaskDebtRecoveryBatchRecord(audits: TaskDebtRecoveryBatchAu
     : latest.audit.href || "/tasks#recommended-batch";
 
   return {
-    headline: `恢复小批已回流：${headline}`,
+    headline: `${input.headlinePrefix}：${headline}`,
     detail,
     metrics: [
       successRate === null ? null : `成功率 ${Math.round(successRate)}%`,
@@ -196,6 +200,25 @@ export function buildTaskDebtRecoveryBatchRecord(audits: TaskDebtRecoveryBatchAu
       actionHref,
     }),
   };
+}
+
+export function buildTaskDebtRecoveryBatchRecord(audits: TaskDebtRecoveryBatchAudit[]): TaskDebtRecoveryBatchRecord | null {
+  return buildRecoveryBatchRecord({
+    audits,
+    headlinePrefix: "恢复小批已回流",
+    predicate: (payload) => taskDebtRecord(payload.plan)?.scaleGate === "cleared",
+  });
+}
+
+export function buildFailureRepairResumeBatchRecord(audits: TaskDebtRecoveryBatchAudit[]): TaskDebtRecoveryBatchRecord | null {
+  return buildRecoveryBatchRecord({
+    audits,
+    headlinePrefix: "失败修复恢复小批已回流",
+    predicate: (payload) => {
+      const plan = taskDebtRecord(payload.plan);
+      return payload.executionContext === "repair_resume" || plan?.executionContext === "repair_resume";
+    },
+  });
 }
 
 export function buildTaskDebtFocusChangeNotice(input: TaskDebtFocusChangeNoticeInput): TaskDebtFocusChangeNotice | null {

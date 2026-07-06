@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   buildTaskDebtCompletionFeedback,
   buildTaskDebtFocusChangeNotice,
+  buildFailureRepairResumeBatchRecord,
   buildTaskDebtRecoveryBatchRecord,
 } from "../lib/projects/taskDebtCompletionFeedback.ts";
 
@@ -249,4 +250,66 @@ test("buildTaskDebtRecoveryBatchRecord pauses scale-up when the cost line is too
   assert.equal(record?.decisionActionLabel, "查看推荐批次");
   assert.equal(record?.decisionActionHref, "/tasks#recommended-batch");
   assert.match(record?.decisionDetail ?? "", /\$0.0700/);
+});
+
+test("buildFailureRepairResumeBatchRecord summarizes repair resume batches even without a cleared scale gate", () => {
+  const record = buildFailureRepairResumeBatchRecord([{
+    label: "沉淀修复后恢复小批经验",
+    href: "/tasks?batchContext=repair_resume#recommended-batch",
+    payload: JSON.stringify({
+      executionContext: "repair_resume",
+      plan: {
+        executionContext: "repair_resume",
+        scaleGate: "none",
+        actionLabel: "批量初稿 2 个",
+      },
+      routeEffectSummary: {
+        successRatePercent: 100,
+        failedTasks: 0,
+        knownCostUsd: 0.02,
+        averageQualityScore: 88,
+      },
+      batchReceipt: {
+        headline: "修复后恢复小批通过，继续小步观察",
+        detail: "失败修复后的第一轮恢复小批已过线。",
+        primaryLabel: "继续恢复小批",
+        primaryHref: "/tasks?batchContext=repair_resume#recommended-batch",
+      },
+    }),
+    createdAt: "2026-07-06T07:00:00.000Z",
+  }]);
+
+  assert.equal(record?.headline, "失败修复恢复小批已回流：修复后恢复小批通过，继续小步观察");
+  assert.equal(record?.detail, "失败修复后的第一轮恢复小批已过线。");
+  assert.deepEqual(record?.metrics, ["成功率 100%", "失败 0", "成本 $0.0200", "质量 88"]);
+  assert.equal(record?.decisionTone, "continue");
+  assert.equal(record?.decisionLabel, "继续小批");
+  assert.equal(record?.decisionActionHref, "/tasks?batchContext=repair_resume#recommended-batch");
+});
+
+test("buildFailureRepairResumeBatchRecord ignores normal recovery batches", () => {
+  const record = buildFailureRepairResumeBatchRecord([{
+    label: "沉淀批量初稿 2 个经验",
+    href: "/tasks#recommended-batch",
+    payload: JSON.stringify({
+      plan: {
+        scaleGate: "cleared",
+        actionLabel: "批量初稿 2 个",
+      },
+      routeEffectSummary: {
+        successRatePercent: 100,
+        failedTasks: 0,
+        knownCostUsd: 0.02,
+        averageQualityScore: 88,
+      },
+      batchReceipt: {
+        headline: "准放量批次稳定，下一批仍小步走",
+        primaryLabel: "继续恢复小批",
+        primaryHref: "/tasks#recommended-batch",
+      },
+    }),
+    createdAt: "2026-07-06T07:00:00.000Z",
+  }]);
+
+  assert.equal(record, null);
 });

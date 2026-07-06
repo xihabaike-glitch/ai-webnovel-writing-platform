@@ -7,6 +7,7 @@ import { prisma } from "@/lib/db/prisma";
 import { buildFailureReviewCenter } from "@/lib/ai/failureReviewCenter";
 import { buildBatchExecutionSafety, buildFailureRepairResumeRecommendation } from "@/lib/projects/batchExecutionSafety";
 import { defaultBatchExecutionStrategy } from "@/lib/projects/batchExecutionStrategy";
+import { buildFailureRepairResumeBatchRecord } from "@/lib/projects/taskDebtCompletionFeedback";
 import {
   buildGateFailureRepairFollowupNotice,
   buildGateFailureRepairRecheckCard,
@@ -73,6 +74,13 @@ function resumeRecommendationClass(status: "ready" | "blocked" | "empty") {
   if (status === "ready") return "border-emerald-200 bg-emerald-50 text-emerald-900";
   if (status === "blocked") return "border-amber-200 bg-amber-50 text-amber-900";
   return "border-slate-200 bg-white text-slate-900";
+}
+
+function resumeBatchDecisionClass(tone: "continue" | "repair" | "rollback" | "watch") {
+  if (tone === "continue") return "border-emerald-200 bg-emerald-50 text-emerald-900";
+  if (tone === "repair") return "border-rose-200 bg-rose-50 text-rose-900";
+  if (tone === "rollback") return "border-blue-200 bg-blue-50 text-blue-900";
+  return "border-amber-200 bg-amber-50 text-amber-900";
 }
 
 function toPersistedDispatch(task: {
@@ -147,7 +155,7 @@ function groupList(groups: Array<{ id: string; label: string; count: number; per
 }
 
 export default async function FailuresPage() {
-  const [projects, tasks, chapters, receiptAudits, recheckDispatchRecords] = await Promise.all([
+  const [projects, tasks, chapters, receiptAudits, recheckDispatchRecords, recentRecommendedBatchAudits] = await Promise.all([
     prisma.project.findMany({
       include: {
         chapters: {
@@ -242,6 +250,17 @@ export default async function FailuresPage() {
       orderBy: { updatedAt: "desc" },
       take: 20,
     }),
+    prisma.gateActionAudit.findMany({
+      where: { executionType: "recommended_batch" },
+      orderBy: { createdAt: "desc" },
+      take: 50,
+      select: {
+        label: true,
+        href: true,
+        payload: true,
+        createdAt: true,
+      },
+    }),
   ]);
   const chaptersById = new Map(chapters.map((chapter) => [chapter.id, chapter]));
   const failureTasks = tasks.map((task) => ({
@@ -301,6 +320,7 @@ export default async function FailuresPage() {
     safety,
     queueItems: queue.items,
   });
+  const failureRepairResumeBatchRecord = buildFailureRepairResumeBatchRecord(recentRecommendedBatchAudits);
 
   return (
     <AppShell>
@@ -386,6 +406,29 @@ export default async function FailuresPage() {
             </div>
             <Link className="w-fit rounded-md bg-slate-950 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800" href={failureRepairResumeRecommendation.href}>
               {failureRepairResumeRecommendation.actionLabel}
+            </Link>
+          </div>
+        </section>
+      ) : null}
+
+      {failureRepairResumeBatchRecord ? (
+        <section className={`mb-6 rounded-md border p-4 ${resumeBatchDecisionClass(failureRepairResumeBatchRecord.decisionTone)}`}>
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <h2 className="font-medium">{failureRepairResumeBatchRecord.headline}</h2>
+              <p className="mt-1 text-sm leading-6">{failureRepairResumeBatchRecord.detail}</p>
+              <div className="mt-3 flex flex-wrap gap-1.5">
+                {failureRepairResumeBatchRecord.metrics.map((metric) => (
+                  <span className="rounded-md bg-white/70 px-2 py-1 text-xs font-medium" key={metric}>{metric}</span>
+                ))}
+              </div>
+              <div className="mt-3 rounded-md bg-white/75 px-3 py-2 text-sm">
+                <span className="font-medium">{failureRepairResumeBatchRecord.decisionLabel}</span>
+                <span className="ml-1 opacity-85">{failureRepairResumeBatchRecord.decisionDetail}</span>
+              </div>
+            </div>
+            <Link className="w-fit rounded-md bg-slate-950 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800" href={failureRepairResumeBatchRecord.decisionActionHref}>
+              {failureRepairResumeBatchRecord.decisionActionLabel}
             </Link>
           </div>
         </section>

@@ -15,7 +15,7 @@ import { buildBatchStrategyComparison, buildBatchStrategyDecision } from "@/lib/
 import { batchExecutionStrategies, getBatchExecutionStrategy } from "@/lib/projects/batchExecutionStrategy";
 import type { GateBatchTacticEffectStatus } from "@/lib/projects/gateActionReceipts";
 import { buildRecommendedBatchModelRouteGate } from "@/lib/projects/recommendedBatchModelRouteGate";
-import { buildTaskDebtFocusChangeNotice, buildTaskDebtRecoveryBatchRecord } from "@/lib/projects/taskDebtCompletionFeedback";
+import { buildFailureRepairResumeBatchRecord, buildTaskDebtFocusChangeNotice, buildTaskDebtRecoveryBatchRecord } from "@/lib/projects/taskDebtCompletionFeedback";
 import { buildTaskQueueBatchHealthReview } from "@/lib/projects/taskQueueBatchHealth";
 import { taskQueueBatchExecutionContext } from "@/lib/projects/taskQueueBatchReceipt";
 import { buildTaskQueueCenter, buildTaskQueueDebtView, recommendedQueueActionLabel, taskQueueSourcePresentation, type QueueItem, type TaskQueueProject } from "@/lib/projects/taskQueueCenter";
@@ -202,6 +202,13 @@ function previousDebtCount(value: string | undefined) {
 function debtFocusNoticeClass(tone: "reduced" | "cleared" | "unchanged") {
   if (tone === "cleared") return "border-emerald-200 bg-emerald-50 text-emerald-900";
   if (tone === "reduced") return "border-cyan-200 bg-cyan-50 text-cyan-900";
+  return "border-amber-200 bg-amber-50 text-amber-900";
+}
+
+function resumeBatchDecisionClass(tone: "continue" | "repair" | "rollback" | "watch") {
+  if (tone === "continue") return "border-emerald-200 bg-emerald-50 text-emerald-900";
+  if (tone === "repair") return "border-rose-200 bg-rose-50 text-rose-900";
+  if (tone === "rollback") return "border-blue-200 bg-blue-50 text-blue-900";
   return "border-amber-200 bg-amber-50 text-amber-900";
 }
 
@@ -404,6 +411,7 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
   const strategyDecision = buildBatchStrategyDecision(strategyComparison, activeStrategy.id);
   const batchTacticEffectReview = buildTaskQueueBatchHealthReview(recentRecommendedBatchAudits, 5);
   const debtRecoveryBatchRecord = buildTaskDebtRecoveryBatchRecord(recentRecommendedBatchAudits);
+  const failureRepairResumeBatchRecord = buildFailureRepairResumeBatchRecord(recentRecommendedBatchAudits);
   const unlockedDrafts = queue.items.filter((entry) => entry.category === "draft" && entry.scaleGate === "cleared");
   const firstDayHandoffItems = queue.items.filter((entry) => entry.sourceType === "first_day_handoff");
   const tacticExperienceFollowupItems = queue.items.filter((entry) => entry.sourceType === "tactic_experience_followup");
@@ -985,6 +993,28 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
           <div className="mt-4 rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900">
             <div className="font-medium">修复后恢复模式</div>
             <p className="mt-1 leading-6">这一批来自失败修复复检后的恢复入口。执行回执会按恢复小批记录，不会被当作普通放量批次。</p>
+          </div>
+        ) : null}
+        {activeBatchContext === "repair_resume" && failureRepairResumeBatchRecord ? (
+          <div className={`mt-4 rounded-md border p-3 text-sm ${resumeBatchDecisionClass(failureRepairResumeBatchRecord.decisionTone)}`}>
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+              <div>
+                <div className="font-medium">{failureRepairResumeBatchRecord.headline}</div>
+                <p className="mt-1 leading-6">{failureRepairResumeBatchRecord.detail}</p>
+                <div className="mt-2 flex flex-wrap gap-1.5 text-xs">
+                  {failureRepairResumeBatchRecord.metrics.map((metric) => (
+                    <span className="rounded-md bg-white/75 px-2 py-1 font-medium" key={metric}>{metric}</span>
+                  ))}
+                </div>
+                <div className="mt-2 rounded-md bg-white/75 px-2 py-1 text-xs leading-5">
+                  <span className="font-medium">{failureRepairResumeBatchRecord.decisionLabel}</span>
+                  <span className="ml-1 opacity-85">{failureRepairResumeBatchRecord.decisionDetail}</span>
+                </div>
+              </div>
+              <Link className="w-fit rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white hover:bg-slate-800" href={failureRepairResumeBatchRecord.decisionActionHref}>
+                {failureRepairResumeBatchRecord.decisionActionLabel}
+              </Link>
+            </div>
           </div>
         ) : null}
         {safetyPriorityBlocker ? (

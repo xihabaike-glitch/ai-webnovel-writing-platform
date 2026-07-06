@@ -2,6 +2,10 @@ import { buildGateAiPipelineRecoveryPanel, type PersistedGatePlatformDispatchTas
 
 export interface AiRecoveryPromptMemory {
   promptBlock: string;
+  sourceLabel: string;
+  lifecycleStatus: "active" | "sample_required" | "rollback";
+  lifecycleLabel: string;
+  latestAt: string | null;
 }
 
 export type AiRecoveryPromptPhase = "draft" | "review" | "second_pass";
@@ -9,8 +13,17 @@ export type AiRecoveryPromptPhase = "draft" | "review" | "second_pass";
 export function buildAiRecoveryPromptMemory(tasks: PersistedGatePlatformDispatchTask[]): AiRecoveryPromptMemory | null {
   const latestEvidence = buildGateAiPipelineRecoveryPanel(tasks).latestEvidence;
   if (!latestEvidence) return null;
+  const lifecycleStatus = latestEvidence.kind === "rollback_repair"
+    ? "rollback"
+    : latestEvidence.kind === "sample_recheck"
+      ? "sample_required"
+      : "active";
 
   return {
+    sourceLabel: latestEvidence.label,
+    lifecycleStatus,
+    lifecycleLabel: lifecycleStatus === "rollback" ? "回滚小样本" : lifecycleStatus === "sample_required" ? "等待小样本" : "继续生效",
+    latestAt: latestEvidence.completedAt,
     promptBlock: [
       "AI 写审改恢复证据：",
       `- ${latestEvidence.label}：${latestEvidence.evidence.slice(0, 3).join("；")}。`,

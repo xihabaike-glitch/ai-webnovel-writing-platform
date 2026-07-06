@@ -92,7 +92,7 @@ export async function generateChapterDraft(options: GenerateChapterDraftOptions)
     projectId: chapter.projectId,
     chapterId: chapter.id,
     taskType: "chapter_draft",
-    inputSnapshot: prompt,
+    inputSnapshot: { prompt, aiRecoveryMemory },
     request: {
       systemPrompt: prompt.systemPrompt,
       userPrompt: prompt.userPrompt,

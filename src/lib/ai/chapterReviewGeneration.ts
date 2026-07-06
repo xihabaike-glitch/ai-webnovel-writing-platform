@@ -92,7 +92,7 @@ export async function reviewChapterDraft(chapterId: string, options: ReviewChapt
     projectId: chapter.projectId,
     chapterId: chapter.id,
     taskType: "chapter_review",
-    inputSnapshot: prompt,
+    inputSnapshot: { prompt, aiRecoveryMemory },
     request: {
       systemPrompt: prompt.systemPrompt,
       userPrompt: prompt.userPrompt,

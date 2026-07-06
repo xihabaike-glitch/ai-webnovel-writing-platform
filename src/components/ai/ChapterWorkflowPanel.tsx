@@ -722,6 +722,12 @@ export function ChapterWorkflowPanel({
               <div className="mt-1">
                 {task.providerName} · {task.model}
               </div>
+              {task.recoveryMemoryAudit ? (
+                <div className="mt-2 rounded-md bg-emerald-50 px-2 py-1 text-emerald-800">
+                  <div className="font-medium">恢复记忆 · {task.recoveryMemoryAudit.lifecycleLabel}</div>
+                  <div className="mt-1 line-clamp-2">{task.recoveryMemoryAudit.sourceLabel}：{task.recoveryMemoryAudit.summary}</div>
+                </div>
+              ) : null}
               <div className="mt-1">{new Date(task.createdAt).toLocaleString()}</div>
               {task.outputPreview ? <div className="mt-2 line-clamp-2">{task.outputPreview}</div> : null}
               {task.errorMessage ? <div className="mt-2 text-red-600">{task.errorMessage}</div> : null}

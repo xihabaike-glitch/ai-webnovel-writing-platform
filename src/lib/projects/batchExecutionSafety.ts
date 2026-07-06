@@ -195,7 +195,7 @@ export function buildBatchExecutionSafety(
       blockedCount === 0 ? "本批没有阻塞项。" : `${blockedCount} 个任务卡住；不拦本批，但别把阻塞债滚到下一轮。`,
       blockedCount === 0 ? undefined : {
         actionLabel: "查看阻塞任务",
-        actionHref: "/tasks",
+        actionHref: "/tasks?view=blocked#task-debt",
       },
     ),
     safetyItem(

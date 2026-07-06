@@ -15,7 +15,7 @@ import { batchExecutionStrategies, getBatchExecutionStrategy } from "@/lib/proje
 import type { GateBatchTacticEffectStatus } from "@/lib/projects/gateActionReceipts";
 import { buildRecommendedBatchModelRouteGate } from "@/lib/projects/recommendedBatchModelRouteGate";
 import { buildTaskQueueBatchHealthReview } from "@/lib/projects/taskQueueBatchHealth";
-import { buildTaskQueueCenter, recommendedQueueActionLabel, taskQueueSourcePresentation, type QueueItem, type TaskQueueProject } from "@/lib/projects/taskQueueCenter";
+import { buildTaskQueueCenter, buildTaskQueueDebtView, recommendedQueueActionLabel, taskQueueSourcePresentation, type QueueItem, type TaskQueueProject } from "@/lib/projects/taskQueueCenter";
 import { buildTaskQueueExecutionPlan } from "@/lib/projects/taskQueueExecutionPlan";
 
 export const dynamic = "force-dynamic";
@@ -168,9 +168,10 @@ function modelRoleBlockerButtonClass(tone: "blocked" | "watch") {
   return "bg-amber-950 text-white hover:bg-amber-900";
 }
 
-export default async function TasksPage({ searchParams }: { searchParams?: Promise<{ batchStrategy?: string }> }) {
+export default async function TasksPage({ searchParams }: { searchParams?: Promise<{ batchStrategy?: string; view?: string }> }) {
   const resolvedSearchParams = searchParams ? await searchParams : {};
   const activeStrategy = getBatchExecutionStrategy(resolvedSearchParams.batchStrategy);
+  const activeView = resolvedSearchParams.view === "blocked" ? "blocked" : "all";
   const [
     projects,
     recentAiTasks,
@@ -336,6 +337,8 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
     })),
   }));
   const queue = buildTaskQueueCenter(taskQueueProjects);
+  const debtView = buildTaskQueueDebtView(queue.items);
+  const visibleQueueItems = activeView === "blocked" ? debtView.items : queue.items;
   const safety = buildBatchExecutionSafety(queue.items, safetyProjects, activeStrategy);
   const safetyPriorityBlocker = buildBatchSafetyPriorityBlocker(safety);
   const modelRoleMatrix = buildModelRoleMatrix(modelProviders.map((provider) => ({
@@ -386,11 +389,25 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
           <h1 className="text-2xl font-semibold">任务队列</h1>
           <p className="mt-1 text-sm text-slate-600">跨项目集中处理待生成、待审稿、待二改和待导出的任务。</p>
         </div>
-        {queue.recommendedNext ? (
-          <Link className="w-fit rounded-md bg-slate-950 px-4 py-2 text-sm font-medium text-white" href={queue.recommendedNext.href}>
-            {recommendedQueueActionLabel(queue.recommendedNext)}
+        <div className="flex flex-wrap items-center gap-2">
+          <Link
+            className={`rounded-md border px-3 py-2 text-sm font-medium ${activeView === "all" ? "border-slate-950 bg-slate-950 text-white" : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"}`}
+            href="/tasks"
+          >
+            全部任务
           </Link>
-        ) : null}
+          <Link
+            className={`rounded-md border px-3 py-2 text-sm font-medium ${activeView === "blocked" ? "border-rose-950 bg-rose-950 text-white" : "border-rose-200 bg-white text-rose-700 hover:bg-rose-50"}`}
+            href="/tasks?view=blocked#task-debt"
+          >
+            阻塞清债 {debtView.totalBlocked}
+          </Link>
+          {queue.recommendedNext ? (
+            <Link className="w-fit rounded-md bg-slate-950 px-4 py-2 text-sm font-medium text-white" href={queue.recommendedNext.href}>
+              {recommendedQueueActionLabel(queue.recommendedNext)}
+            </Link>
+          ) : null}
+        </div>
       </div>
 
       <section className="mb-6 grid gap-3 md:grid-cols-3 lg:grid-cols-6">
@@ -467,6 +484,41 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
           <div className="mt-1 text-2xl font-semibold">{queue.overview.firstThreeAdoptionFollowups}</div>
         </div>
       </section>
+
+      {activeView === "blocked" ? (
+        <section className="mb-6 rounded-md border border-rose-200 bg-rose-50 p-4 text-rose-950" id="task-debt">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <h2 className="font-medium">阻塞清债</h2>
+              <p className="mt-1 max-w-3xl text-sm leading-6">{debtView.headline} {debtView.detail}</p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Link className="rounded-md bg-white/80 px-3 py-2 text-sm font-medium text-rose-900 hover:bg-white" href="/tasks">
+                返回全部任务
+              </Link>
+              {debtView.nextAction ? (
+                <Link className="rounded-md bg-rose-950 px-3 py-2 text-sm font-medium text-white hover:bg-rose-900" href={debtView.nextAction.href}>
+                  先处理：{debtView.nextAction.actionLabel}
+                </Link>
+              ) : null}
+            </div>
+          </div>
+          <div className="mt-4 grid gap-2 md:grid-cols-3 lg:grid-cols-6">
+            {debtView.groups.map((group) => (
+              <div className="rounded-md bg-white/80 p-3" key={group.blockerType ?? "unknown"}>
+                <div className="text-xs text-rose-700">{group.label}</div>
+                <div className="mt-1 text-2xl font-semibold">{group.count}</div>
+                <div className="mt-1 text-xs font-medium text-rose-800">{group.actionLabel}</div>
+              </div>
+            ))}
+            {debtView.groups.length === 0 ? (
+              <div className="rounded-md bg-white/80 p-3 text-sm text-emerald-800">
+                没有阻塞项，可以继续批量推进。
+              </div>
+            ) : null}
+          </div>
+        </section>
+      ) : null}
 
       {tacticExperienceFollowupItems.length > 0 ? (
         <section className="mb-6 rounded-md border border-teal-200 bg-teal-50 p-4 text-teal-950">
@@ -1047,7 +1099,7 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
       </section>
 
       <section className="grid gap-3">
-        {queue.items.map((entry) => (
+        {visibleQueueItems.map((entry) => (
           <div className="rounded-md border border-slate-200 bg-white p-4" key={entry.id}>
             <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
               <div>
@@ -1169,9 +1221,9 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
             </div>
           </div>
         ))}
-        {queue.items.length === 0 ? (
+        {visibleQueueItems.length === 0 ? (
           <p className="rounded-md border border-dashed border-slate-300 bg-white p-4 text-sm text-slate-600">
-            当前没有可调度任务。先创建项目、补章节卡或生成正文。
+            {activeView === "blocked" ? "当前没有阻塞债，可以回到全部任务继续推进。" : "当前没有可调度任务。先创建项目、补章节卡或生成正文。"}
           </p>
         ) : null}
       </section>

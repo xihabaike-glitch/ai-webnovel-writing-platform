@@ -1,6 +1,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { buildTaskQueueCenter, recommendedQueueActionLabel, taskQueueSourcePresentation, type TaskQueueProject } from "../lib/projects/taskQueueCenter.ts";
+import {
+  buildTaskQueueCenter,
+  buildTaskQueueDebtView,
+  recommendedQueueActionLabel,
+  taskQueueSourcePresentation,
+  type TaskQueueProject,
+} from "../lib/projects/taskQueueCenter.ts";
 
 const baseChapter = {
   id: "chapter-ready-draft",
@@ -213,6 +219,24 @@ test("buildTaskQueueCenter", async (t) => {
     assert.ok(publishBlocker?.evidence.includes("先处理"));
     assert.equal(queue.recommendedNext?.strategyBasis?.label, "模板推荐");
     assert.ok(queue.items.every((item) => item.strategyBasis?.openingMove.includes("倒计时")));
+  });
+
+  await t.test("builds a focused blocked debt view for clearing batch risks", () => {
+    const queue = buildTaskQueueCenter([{ ...project, gateDispatchTasks: firstDayCompleteDispatches(project.id) }]);
+    const debt = buildTaskQueueDebtView(queue.items);
+
+    assert.equal(debt.totalBlocked, 2);
+    assert.equal(debt.items.length, 2);
+    assert.ok(debt.headline.includes("2 个阻塞债"));
+    assert.equal(debt.nextAction?.blockerType, "publish_repair");
+    assert.deepEqual(
+      debt.groups.map((group) => [group.blockerType, group.count, group.actionLabel]),
+      [
+        ["publish_repair", 1, "先修发布质检"],
+        ["chapter_card", 1, "补章节卡"],
+      ],
+    );
+    assert.ok(debt.items.every((item) => item.category === "blocked"));
   });
 
   await t.test("surfaces pending candidate revisions before automated production", () => {

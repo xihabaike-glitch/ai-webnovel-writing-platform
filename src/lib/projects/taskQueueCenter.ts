@@ -182,6 +182,22 @@ export interface TaskQueueSourcePresentation {
   returnLabel: string | null;
 }
 
+export interface TaskQueueDebtGroup {
+  blockerType: QueueItem["blockerType"];
+  label: string;
+  count: number;
+  actionLabel: string;
+}
+
+export interface TaskQueueDebtView {
+  totalBlocked: number;
+  headline: string;
+  detail: string;
+  groups: TaskQueueDebtGroup[];
+  items: QueueItem[];
+  nextAction: QueueItem | null;
+}
+
 type PublishEffectQueueExecution = NonNullable<QueueItem["effectAction"]>["execution"];
 
 const categoryPriority: Record<QueueItem["category"], number> = {
@@ -262,6 +278,56 @@ export function taskQueueSourcePresentation(entry: QueueItem | null): TaskQueueS
   }
 
   return null;
+}
+
+function blockerDebtLabel(blockerType: QueueItem["blockerType"]) {
+  if (blockerType === "first_day_gate") return "首日闸门";
+  if (blockerType === "risk_recovery") return "开书止损";
+  if (blockerType === "watch_scale_gate") return "观察闸门";
+  if (blockerType === "publish_repair") return "发布质检";
+  if (blockerType === "export_version") return "导出版本";
+  if (blockerType === "chapter_card") return "章节卡";
+  return "其他阻塞";
+}
+
+function blockerDebtActionLabel(blockerType: QueueItem["blockerType"]) {
+  if (blockerType === "first_day_gate") return "补首日链路";
+  if (blockerType === "risk_recovery") return "写恢复条件";
+  if (blockerType === "watch_scale_gate") return "补小样本验收";
+  if (blockerType === "publish_repair") return "先修发布质检";
+  if (blockerType === "export_version") return "修导出版本";
+  if (blockerType === "chapter_card") return "补章节卡";
+  return "处理阻塞";
+}
+
+export function buildTaskQueueDebtView(items: QueueItem[]): TaskQueueDebtView {
+  const blockedItems = items
+    .filter((entry) => entry.category === "blocked")
+    .sort((left, right) => (
+      blockerPriority(left.blockerType) - blockerPriority(right.blockerType)
+      || left.projectTitle.localeCompare(right.projectTitle)
+      || left.chapterTitle.localeCompare(right.chapterTitle)
+    ));
+  const blockerTypes = [...new Set(blockedItems.map((entry) => entry.blockerType))];
+  const groups = blockerTypes.map((blockerType) => ({
+    blockerType,
+    label: blockerDebtLabel(blockerType),
+    count: blockedItems.filter((entry) => entry.blockerType === blockerType).length,
+    actionLabel: blockerDebtActionLabel(blockerType),
+  }));
+  const totalBlocked = blockedItems.length;
+  const nextAction = blockedItems[0] ?? null;
+
+  return {
+    totalBlocked,
+    headline: totalBlocked > 0 ? `还有 ${totalBlocked} 个阻塞债，先清最高风险项。` : "当前没有阻塞债。",
+    detail: nextAction
+      ? `优先处理「${nextAction.projectTitle} · ${nextAction.chapterTitle}」：${nextAction.actionLabel}。`
+      : "可以回到全部任务，继续推进写、审、改、导出。",
+    groups,
+    items: blockedItems,
+    nextAction,
+  };
 }
 
 function categoryLabel(category: QueueItem["category"]) {

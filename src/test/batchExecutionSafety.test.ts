@@ -48,7 +48,7 @@ test("buildBatchExecutionSafety", async (t) => {
     assert.equal(blockedGate?.status, "warn");
     assert.ok(blockedGate?.detail.includes("不拦本批"));
     assert.equal(blockedGate?.actionLabel, "查看阻塞任务");
-    assert.equal(blockedGate?.actionHref, "/tasks");
+    assert.equal(blockedGate?.actionHref, "/tasks?view=blocked#task-debt");
   });
 
   await t.test("blocks recommended batches until draft candidates are adopted or dismissed", () => {

@@ -4116,6 +4116,46 @@ test("buildGateActionReceipt", async (t) => {
     assert.equal(panel.promptMemory.history[0].primaryActionLabel, "继续小批，不放大批");
   });
 
+  await t.test("builds a gate quick action for prompt memory rollback recheck dispatch", () => {
+    const panel = buildGateAiPipelineRecoveryPanel([], [{
+      receiptId: "ai-memory-rollback",
+      actionId: "ai-pipeline-memory",
+      projectId: "project-rollback",
+      label: "AI 恢复记忆回滚小样本",
+      detail: "读感不稳，先回滚到 1 章复验。",
+      href: "/projects/project-rollback#ai-pipeline",
+      status: "succeeded",
+      message: "已把恢复记忆回滚到 1 章复验。",
+      executionType: "control_action",
+      succeededCount: 1,
+      failedCount: 0,
+      taskId: null,
+      platformId: "ai-pipeline",
+      platformName: "AI 写审改",
+      recheckStatus: "needs_action",
+      recheckLabel: "回滚小样本",
+      recheckDetail: "读感不稳，先回滚到 1 章复验。",
+      recheckAction: "跑 1 章复验",
+      payload: JSON.stringify({
+        aiPipelinePromptMemoryControl: {
+          action: "rollback",
+          label: "人工回滚",
+          detail: "读感不稳，先回滚到 1 章复验。",
+        },
+      }),
+      createdAt: "2026-01-04T00:00:00.000Z",
+    }]);
+
+    assert.equal(panel.status, "blocked");
+    assert.equal(panel.promptMemory.quickAction?.label, "生成 1 章复验派单");
+    assert.equal(panel.promptMemory.quickAction?.endpoint, "/api/projects/project-rollback/control-actions");
+    assert.deepEqual(panel.promptMemory.quickAction?.body, {
+      areaId: "ai-pipeline",
+      memoryAction: "rollback",
+    });
+    assert.equal(panel.promptMemory.quickAction?.successHref, "/dispatch?queue=ai_pipeline");
+  });
+
   await t.test("suggests pausing platform direction for repeated submission follow-up chains", () => {
     const baseDispatch = buildGatePlatformGrowthDispatchItems([buildGatePlatformStrategyReceipt({
       item: strategyPlatform,

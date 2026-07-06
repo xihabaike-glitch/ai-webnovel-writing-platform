@@ -483,6 +483,15 @@ export interface GateAiPipelineRecoveryPanel {
     actionLabel: string | null;
     actionHref: string | null;
     latestAt: string | null;
+    quickAction: {
+      label: string;
+      endpoint: string;
+      body: {
+        areaId: "ai-pipeline";
+        memoryAction: "rollback";
+      };
+      successHref: string;
+    } | null;
     history: AiPipelinePromptMemorySummary["history"];
   };
   groups: Array<{
@@ -3728,6 +3737,13 @@ function buildAiPipelineDispatchGroups(
   });
 }
 
+function latestPromptMemoryAudit(audits: ControlBatchAudit[], latestAt: string | null) {
+  if (!latestAt) return null;
+  return audits
+    .filter((audit) => new Date(audit.createdAt).toISOString() === latestAt)
+    .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime())[0] ?? null;
+}
+
 export function buildGateAiPipelineRecoveryPanel(
   _tasks: PersistedGatePlatformDispatchTask[],
   audits: ControlBatchAudit[] = [],
@@ -3737,6 +3753,18 @@ export function buildGateAiPipelineRecoveryPanel(
   const total = center.summary.aiPipeline;
   const active = center.summary.activeAiPipeline;
   const promptMemory = buildAiPipelinePromptMemorySummary(audits);
+  const promptMemoryAudit = latestPromptMemoryAudit(audits, promptMemory.latestAt);
+  const promptMemoryQuickAction = promptMemory.gateActionMode === "rollback" && promptMemoryAudit?.projectId
+    ? {
+      label: "生成 1 章复验派单",
+      endpoint: `/api/projects/${promptMemoryAudit.projectId}/control-actions`,
+      body: {
+        areaId: "ai-pipeline" as const,
+        memoryAction: "rollback" as const,
+      },
+      successHref: "/dispatch?queue=ai_pipeline",
+    }
+    : null;
   const completed = total - active;
   const rollbackGroup = groups.find((group) => group.id === "rollback_repair") ?? null;
   const sampleGroup = groups.find((group) => group.id === "sample_recheck") ?? null;
@@ -3853,6 +3881,7 @@ export function buildGateAiPipelineRecoveryPanel(
       actionLabel: promptMemory.gateActionLabel,
       actionHref: promptMemory.gateActionHref,
       latestAt: promptMemory.latestAt,
+      quickAction: promptMemoryQuickAction,
       history: promptMemory.history,
     },
     groups: groups.map((group) => ({

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { AppShell } from "@/components/app-shell/AppShell";
+import { GateAiPromptMemoryQuickActionButton } from "@/components/gate/GateAiPromptMemoryQuickActionButton";
 import { GateClosedLoopTimelinePanel } from "@/components/gate/GateClosedLoopTimelinePanel";
 import { GateActionWorkspace } from "@/components/gate/GateActionWorkspace";
 import { GateExportPackagePanel } from "@/components/gate/GateExportPackagePanel";
@@ -205,6 +206,7 @@ export default async function GatePage({
     aiPromptMemoryAuditRecords.map((audit) => ({
       receiptId: audit.receiptId,
       actionId: audit.actionId,
+      projectId: audit.projectId,
       label: audit.label,
       detail: audit.detail,
       href: audit.href,
@@ -397,7 +399,9 @@ export default async function GatePage({
                   <div className="mt-2 text-xs font-medium">{aiRecoveryPanel.promptMemory.headline}</div>
                   <p className="mt-1 text-xs leading-5 opacity-75">{aiRecoveryPanel.promptMemory.detail}</p>
                 </div>
-                {aiRecoveryPanel.promptMemory.actionHref && aiRecoveryPanel.promptMemory.actionLabel ? (
+                {aiRecoveryPanel.promptMemory.quickAction ? (
+                  <GateAiPromptMemoryQuickActionButton action={aiRecoveryPanel.promptMemory.quickAction} />
+                ) : aiRecoveryPanel.promptMemory.actionHref && aiRecoveryPanel.promptMemory.actionLabel ? (
                   <Link className="w-fit shrink-0 rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white" href={aiRecoveryPanel.promptMemory.actionHref}>
                     {aiRecoveryPanel.promptMemory.actionLabel}
                   </Link>

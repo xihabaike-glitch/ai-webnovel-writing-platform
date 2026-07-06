@@ -132,6 +132,7 @@ export interface ControlAiTask {
 export interface ControlBatchAudit {
   receiptId: string;
   actionId?: string;
+  projectId?: string | null;
   label: string;
   detail: string;
   href: string;

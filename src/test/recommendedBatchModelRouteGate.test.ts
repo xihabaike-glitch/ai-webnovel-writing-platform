@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   applyRecommendedBatchModelRouteGate,
+  buildRecommendedBatchModelRouteGateAfterAudit,
   buildRecommendedBatchModelRouteGate,
   type RecommendedBatchModelRouteGateProject,
 } from "../lib/projects/recommendedBatchModelRouteGate.ts";
@@ -322,6 +323,45 @@ test("recommended batch model route gate", async (t) => {
     assert.equal(gate.recheckAdvice, null);
     assert.ok(gate.recoveryEvidence?.includes("恢复样本通过"));
     assert.deepEqual(guardedPlan.chapterIds, ["chapter-1", "chapter-2", "chapter-3"]);
+  });
+
+  await t.test("rebuilds the post-run gate after a recovery sample audit", () => {
+    const gate = buildRecommendedBatchModelRouteGateAfterAudit({
+      plan: plan(),
+      providers,
+      routes: [
+        { taskType: "chapter_review", primaryProviderConfigId: "gpt-provider", fallbackProviderConfigId: "deepseek-provider" },
+      ],
+      routeConfirmationRechecks: [passedRouteRecheck],
+      completedAudit: {
+        receiptId: "recommended-batch:standard:review:project-1:2026-01-06T00:00:00.000Z",
+        projectId: "project-1",
+        executionType: "recommended_batch",
+        status: "succeeded",
+        succeededCount: 1,
+        failedCount: 0,
+        createdAt: "2026-01-06T00:00:00.000Z",
+        payload: JSON.stringify({
+          plan: { category: "review", scaleGate: "none", actionLabel: "批量审稿 1 个" },
+          routeEffectSummary: {
+            totalTasks: 1,
+            succeededTasks: 1,
+            failedTasks: 0,
+            successRatePercent: 100,
+            knownCostUsd: 0.01,
+            averageCostPerSucceededTaskUsd: 0.01,
+            averageQualityScore: 88,
+            fallbackTasks: 0,
+          },
+          batchReceipt: { status: "continue", headline: "恢复样本通过" },
+        }),
+      },
+      projects: [project({ aiTasks: failedReviewTasks() })],
+    });
+
+    assert.equal(gate.status, "allow");
+    assert.equal(gate.maxBatchSize, 3);
+    assert.ok(gate.recoveryEvidence?.includes("恢复样本通过"));
   });
 
   await t.test("keeps the batch sampled when recovery evidence is weak", () => {

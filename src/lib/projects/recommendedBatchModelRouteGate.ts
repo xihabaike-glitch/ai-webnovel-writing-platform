@@ -50,6 +50,16 @@ export interface RecommendedBatchModelRouteGateAudit {
   createdAt: string | Date;
 }
 
+export interface RecommendedBatchModelRouteGateInput {
+  plan: TaskQueueExecutionPlan;
+  projects: RecommendedBatchModelRouteGateProject[];
+  providers: ModelAuditProvider[];
+  routes: ModelAuditRoute[];
+  routeConfirmationRechecks?: RouteConfirmationRecheckEvidence[];
+  routeConfirmationRecheckDispatches?: RouteConfirmationRecheckAdviceDispatchTask[];
+  recommendedBatchAudits?: RecommendedBatchModelRouteGateAudit[];
+}
+
 interface RecoveryBatchEvidence {
   receiptId: string;
   summary: string;
@@ -238,15 +248,7 @@ function buildGateRecheckAdvice(input: {
   };
 }
 
-export function buildRecommendedBatchModelRouteGate(input: {
-  plan: TaskQueueExecutionPlan;
-  projects: RecommendedBatchModelRouteGateProject[];
-  providers: ModelAuditProvider[];
-  routes: ModelAuditRoute[];
-  routeConfirmationRechecks?: RouteConfirmationRecheckEvidence[];
-  routeConfirmationRecheckDispatches?: RouteConfirmationRecheckAdviceDispatchTask[];
-  recommendedBatchAudits?: RecommendedBatchModelRouteGateAudit[];
-}): RecommendedBatchModelRouteGate {
+export function buildRecommendedBatchModelRouteGate(input: RecommendedBatchModelRouteGateInput): RecommendedBatchModelRouteGate {
   const plannedProjectIds = new Set(input.plan.projectIds);
   const scopedProjects = input.projects.filter((project) => plannedProjectIds.has(project.id));
   const tasks = scopedProjects.flatMap((project) => project.aiTasks);
@@ -365,6 +367,15 @@ export function buildRecommendedBatchModelRouteGate(input: {
     }),
     recoveryEvidence: passedRecoveryBatch?.summary ?? (recoveredByRecheck && latestRecheck ? latestRecheck.summary : null),
   };
+}
+
+export function buildRecommendedBatchModelRouteGateAfterAudit(
+  input: RecommendedBatchModelRouteGateInput & { completedAudit: RecommendedBatchModelRouteGateAudit },
+): RecommendedBatchModelRouteGate {
+  return buildRecommendedBatchModelRouteGate({
+    ...input,
+    recommendedBatchAudits: [input.completedAudit, ...(input.recommendedBatchAudits ?? [])],
+  });
 }
 
 export function applyRecommendedBatchModelRouteGate(

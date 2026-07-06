@@ -12,7 +12,11 @@ import { findProjectStartTacticSummary } from "@/lib/projects/projectStartTactic
 import { buildTaskQueueBatchGateActionReceipt, buildTaskQueueBatchReceipt } from "@/lib/projects/taskQueueBatchReceipt";
 import { buildTaskQueueCenter, type TaskQueueProject } from "@/lib/projects/taskQueueCenter";
 import { buildTaskQueueExecutionPlan } from "@/lib/projects/taskQueueExecutionPlan";
-import { applyRecommendedBatchModelRouteGate, buildRecommendedBatchModelRouteGate } from "@/lib/projects/recommendedBatchModelRouteGate";
+import {
+  applyRecommendedBatchModelRouteGate,
+  buildRecommendedBatchModelRouteGate,
+  buildRecommendedBatchModelRouteGateAfterAudit,
+} from "@/lib/projects/recommendedBatchModelRouteGate";
 
 function roleFor(result: { attempts: Array<{ taskId: string; role: "primary" | "fallback" | "auto" | "forced" }> }, taskId: string) {
   return result.attempts.find((attempt) => attempt.taskId === taskId)?.role ?? null;
@@ -329,56 +333,79 @@ export async function POST(request: Request) {
     batchReceipt,
     strategyId: strategy.id,
   });
+  const completedRecommendedBatchAudit = {
+    receiptId: gateReceipt.receipt.id,
+    projectId: plan.projectIds.length === 1 ? plan.projectId : null,
+    executionType: gateReceipt.receipt.executionType,
+    status: gateReceipt.receipt.status,
+    succeededCount: gateReceipt.receipt.succeededCount,
+    failedCount: gateReceipt.receipt.failedCount,
+    payload: JSON.stringify(gateReceipt.payload),
+    createdAt: new Date(gateReceipt.receipt.createdAt),
+  };
   await prisma.gateActionAudit.upsert({
     where: { receiptId: gateReceipt.receipt.id },
     create: {
-      receiptId: gateReceipt.receipt.id,
+      receiptId: completedRecommendedBatchAudit.receiptId,
       actionId: gateReceipt.receipt.actionId,
-      projectId: plan.projectIds.length === 1 ? plan.projectId : null,
+      projectId: completedRecommendedBatchAudit.projectId,
       platformId: gateReceipt.receipt.platformId ?? "",
       platformName: gateReceipt.receipt.platformName ?? "",
       label: gateReceipt.receipt.label,
       detail: gateReceipt.receipt.detail,
       href: gateReceipt.receipt.href,
-      status: gateReceipt.receipt.status,
+      status: completedRecommendedBatchAudit.status,
       message: gateReceipt.receipt.message,
-      executionType: gateReceipt.receipt.executionType,
-      succeededCount: gateReceipt.receipt.succeededCount,
-      failedCount: gateReceipt.receipt.failedCount,
+      executionType: completedRecommendedBatchAudit.executionType,
+      succeededCount: completedRecommendedBatchAudit.succeededCount,
+      failedCount: completedRecommendedBatchAudit.failedCount,
       taskId: gateReceipt.receipt.taskId,
       recheckStatus: gateReceipt.receipt.recheck.status,
       recheckLabel: gateReceipt.receipt.recheck.label,
       recheckDetail: gateReceipt.receipt.recheck.detail,
       recheckAction: gateReceipt.receipt.recheck.actionLabel,
-      payload: JSON.stringify(gateReceipt.payload),
-      createdAt: new Date(gateReceipt.receipt.createdAt),
+      payload: completedRecommendedBatchAudit.payload,
+      createdAt: completedRecommendedBatchAudit.createdAt,
     },
     update: {
       actionId: gateReceipt.receipt.actionId,
-      projectId: plan.projectIds.length === 1 ? plan.projectId : null,
+      projectId: completedRecommendedBatchAudit.projectId,
       platformId: gateReceipt.receipt.platformId ?? "",
       platformName: gateReceipt.receipt.platformName ?? "",
       label: gateReceipt.receipt.label,
       detail: gateReceipt.receipt.detail,
       href: gateReceipt.receipt.href,
-      status: gateReceipt.receipt.status,
+      status: completedRecommendedBatchAudit.status,
       message: gateReceipt.receipt.message,
-      executionType: gateReceipt.receipt.executionType,
-      succeededCount: gateReceipt.receipt.succeededCount,
-      failedCount: gateReceipt.receipt.failedCount,
+      executionType: completedRecommendedBatchAudit.executionType,
+      succeededCount: completedRecommendedBatchAudit.succeededCount,
+      failedCount: completedRecommendedBatchAudit.failedCount,
       taskId: gateReceipt.receipt.taskId,
       recheckStatus: gateReceipt.receipt.recheck.status,
       recheckLabel: gateReceipt.receipt.recheck.label,
       recheckDetail: gateReceipt.receipt.recheck.detail,
       recheckAction: gateReceipt.receipt.recheck.actionLabel,
-      payload: JSON.stringify(gateReceipt.payload),
+      payload: completedRecommendedBatchAudit.payload,
     },
+  });
+  const postRunModelRouteGate = buildRecommendedBatchModelRouteGateAfterAudit({
+    plan: basePlan,
+    projects,
+    providers: modelProviders,
+    routes: modelRoutes,
+    routeConfirmationRechecks: buildRouteConfirmationRecheckEvidenceFromDispatchTasks(completedRouteConfirmationRechecks),
+    routeConfirmationRecheckDispatches: activeRouteConfirmationRechecks.map((task) => ({
+      ...task,
+      reviewLatestAt: task.reviewLatestAt.toISOString(),
+    })),
+    recommendedBatchAudits: recentRecommendedBatchAudits,
+    completedAudit: completedRecommendedBatchAudit,
   });
 
   return NextResponse.json({
     plan,
     safety,
-    modelRouteGate,
+    modelRouteGate: postRunModelRouteGate,
     results,
     routeEffectSummary,
     batchReceipt,

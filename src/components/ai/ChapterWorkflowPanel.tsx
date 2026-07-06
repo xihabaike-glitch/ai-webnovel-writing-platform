@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { groupReviewIssues, nonEmptyReviewGroups } from "@/lib/ai/reviewGrouping";
-import { buildAiRecoveryMemoryDiagnostic, latestTaskStatus, type AiTaskWorkflowItem } from "@/lib/ai/taskWorkflow";
+import { buildAiRecoveryMemoryControlRequest, buildAiRecoveryMemoryDiagnostic, latestTaskStatus, type AiTaskWorkflowItem } from "@/lib/ai/taskWorkflow";
 import { buildPlatformStyleScore, type PlatformStyleChapterCard } from "@/lib/chapters/platformStyleScore";
 import { isChapterRevisionCandidate, type ChapterRevisionSummary } from "@/lib/chapters/revisions";
 import type { PlatformProfile } from "@/lib/platforms/platformProfiles";
@@ -132,10 +132,12 @@ function modelRouteRoleLabel(role: "primary" | "fallback" | "auto" | "forced") {
 }
 
 export function ChapterWorkflowPanel({
+  projectId,
   chapterId,
   platform,
   chapterCard,
 }: {
+  projectId: string;
   chapterId: string;
   platform: PlatformProfile;
   chapterCard: PlatformStyleChapterCard;
@@ -152,6 +154,7 @@ export function ChapterWorkflowPanel({
   const [isSavingRevision, setIsSavingRevision] = useState(false);
   const [restoringRevisionId, setRestoringRevisionId] = useState<string | null>(null);
   const [adoptingRevisionId, setAdoptingRevisionId] = useState<string | null>(null);
+  const [isControllingRecoveryMemory, setIsControllingRecoveryMemory] = useState(false);
   const [revisions, setRevisions] = useState<ChapterRevisionSummary[]>([]);
   const [selectedRevision, setSelectedRevision] = useState<ChapterRevisionSummary | null>(null);
   const [openingDiagnostic, setOpeningDiagnostic] = useState<OpeningDiagnostic | null>(null);
@@ -306,6 +309,37 @@ export function ChapterWorkflowPanel({
       setMessage(caught instanceof Error ? caught.message : "采纳候选稿失败。");
     } finally {
       setAdoptingRevisionId(null);
+    }
+  }
+
+  async function rollbackRecoveryMemoryFromDiagnostic() {
+    const request = buildAiRecoveryMemoryControlRequest({
+      projectId,
+      chapterId,
+      chapterTitle: workflow?.chapter.title ?? chapterCard.title,
+      diagnostic: recoveryMemoryDiagnostic,
+    });
+    if (!request) return;
+
+    setIsControllingRecoveryMemory(true);
+    setMessage(null);
+    try {
+      const response = await fetch(request.endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(request.body),
+      });
+      const payload = await response.json() as { message?: string; error?: string };
+      if (!response.ok) {
+        throw new Error(payload.error ?? "写入恢复记忆回滚失败。");
+      }
+      setMessage(payload.message ?? "已写入恢复记忆回滚。");
+      await loadWorkflow();
+      router.refresh();
+    } catch (caught) {
+      setMessage(caught instanceof Error ? caught.message : "写入恢复记忆回滚失败。");
+    } finally {
+      setIsControllingRecoveryMemory(false);
     }
   }
 
@@ -717,7 +751,18 @@ export function ChapterWorkflowPanel({
             }`}>
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <span className="font-medium">{recoveryMemoryDiagnostic.label}</span>
-                <span>{recoveryMemoryDiagnostic.actionLabel}</span>
+                {recoveryMemoryDiagnostic.status === "rollback" ? (
+                  <button
+                    className="rounded-md bg-rose-700 px-2 py-1 text-white hover:bg-rose-800 disabled:cursor-not-allowed disabled:opacity-60"
+                    disabled={isControllingRecoveryMemory}
+                    onClick={() => void rollbackRecoveryMemoryFromDiagnostic()}
+                    type="button"
+                  >
+                    {isControllingRecoveryMemory ? "写入中" : recoveryMemoryDiagnostic.actionLabel}
+                  </button>
+                ) : (
+                  <span>{recoveryMemoryDiagnostic.actionLabel}</span>
+                )}
               </div>
               <p className="mt-1">{recoveryMemoryDiagnostic.detail}</p>
               {recoveryMemoryDiagnostic.sourceLabel ? <p className="mt-1">来源：{recoveryMemoryDiagnostic.sourceLabel}</p> : null}

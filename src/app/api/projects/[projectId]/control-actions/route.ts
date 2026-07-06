@@ -29,6 +29,15 @@ interface ControlActionBody {
   completed?: boolean;
   recheck?: boolean;
   memoryAction?: "confirm" | "rollback" | "clear";
+  memorySource?: {
+    kind?: string;
+    chapterId?: string;
+    chapterTitle?: string;
+    label?: string;
+    detail?: string;
+    sourceLabel?: string | null;
+    evidence?: string[];
+  };
 }
 
 function result(areaId: string, targetAnchor: string, created: string[], skipped?: string) {
@@ -41,6 +50,22 @@ function result(areaId: string, targetAnchor: string, created: string[], skipped
       ? `已创建 ${created.length} 项：${created.join("、")}。`
       : skipped ?? "没有需要自动创建的基础项。",
   };
+}
+
+function memorySourceDetail(source: ControlActionBody["memorySource"]) {
+  if (source?.kind !== "chapter_workflow_diagnostic") return null;
+  const chapterTitle = typeof source.chapterTitle === "string" && source.chapterTitle.trim()
+    ? source.chapterTitle.trim()
+    : "当前章节";
+  const detail = typeof source.detail === "string" && source.detail.trim() ? source.detail.trim() : null;
+  const evidence = Array.isArray(source.evidence)
+    ? source.evidence.filter((item): item is string => typeof item === "string" && item.trim().length > 0).map((item) => item.trim())
+    : [];
+  return [
+    `章节诊断触发：${chapterTitle}`,
+    detail,
+    evidence.length ? `证据：${evidence.slice(0, 3).join(" / ")}` : null,
+  ].filter(Boolean).join("；");
 }
 
 export async function POST(request: Request, { params }: Params) {
@@ -91,17 +116,19 @@ export async function POST(request: Request, { params }: Params) {
     : null;
   if (areaId === "ai-pipeline" && memoryAction) {
     const action = memoryAction;
+    const sourceDetail = memorySourceDetail(body.memorySource);
     const receiptId = `ai-pipeline-memory:${action}:${projectId}:${Date.now()}`;
     const label = action === "clear"
       ? "AI 恢复记忆已清除"
       : action === "rollback"
         ? "AI 恢复记忆回滚小样本"
         : "AI 恢复记忆已确认";
-    const detail = action === "clear"
+    const baseDetail = action === "clear"
       ? "旧恢复证据已过期，停止带入提示词。"
       : action === "rollback"
         ? "读感或数据不稳，先回滚到 1 章复验。"
         : "人工确认继续使用恢复记忆，并保持小批观察。";
+    const detail = sourceDetail ? `${baseDetail} ${sourceDetail}` : baseDetail;
     const message = action === "clear"
       ? "旧恢复记忆已清除，后续提示词不再携带这条证据。"
       : action === "rollback"
@@ -131,8 +158,17 @@ export async function POST(request: Request, { params }: Params) {
         payload: JSON.stringify({
           aiPipelinePromptMemoryControl: {
             action,
-            label: action === "rollback" ? "人工回滚" : action === "clear" ? "清除旧记忆" : "人工确认",
+            label: sourceDetail && action === "rollback" ? "章节诊断回滚" : action === "rollback" ? "人工回滚" : action === "clear" ? "清除旧记忆" : "人工确认",
             detail,
+            source: body.memorySource?.kind === "chapter_workflow_diagnostic" ? {
+              kind: "chapter_workflow_diagnostic",
+              chapterId: body.memorySource.chapterId,
+              chapterTitle: body.memorySource.chapterTitle,
+              label: body.memorySource.label,
+              detail: body.memorySource.detail,
+              sourceLabel: body.memorySource.sourceLabel ?? null,
+              evidence: Array.isArray(body.memorySource.evidence) ? body.memorySource.evidence : [],
+            } : undefined,
           },
         }),
       },

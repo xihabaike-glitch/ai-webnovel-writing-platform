@@ -15,7 +15,7 @@ export default async function ChapterPage({
 }: {
   params: Promise<{ projectId: string; chapterId: string }>;
 }) {
-  const { chapterId } = await params;
+  const { projectId, chapterId } = await params;
   const chapter = await prisma.chapter.findUnique({
     where: { id: chapterId },
     include: {
@@ -104,7 +104,7 @@ export default async function ChapterPage({
           </div>
         </div>
         <div id="chapter-workflow">
-          <ChapterWorkflowPanel chapterCard={editableChapter} chapterId={chapterId} platform={platform} />
+          <ChapterWorkflowPanel chapterCard={editableChapter} chapterId={chapterId} platform={platform} projectId={projectId} />
         </div>
       </div>
     </AppShell>

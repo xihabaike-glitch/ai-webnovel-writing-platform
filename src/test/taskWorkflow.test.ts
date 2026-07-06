@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { buildAiRecoveryMemoryDiagnostic, latestTaskStatus, summarizeAiTasks } from "../lib/ai/taskWorkflow.ts";
+import { buildAiRecoveryMemoryControlRequest, buildAiRecoveryMemoryDiagnostic, latestTaskStatus, summarizeAiTasks } from "../lib/ai/taskWorkflow.ts";
 
 test("summarizeAiTasks", async (t) => {
   await t.test("normalizes draft and review tasks into a workflow timeline", () => {
@@ -134,5 +134,49 @@ test("summarizeAiTasks", async (t) => {
     assert.ok(diagnostic.detail.includes("连续 2 次"));
     assert.ok(diagnostic.evidence.some((item) => item.includes("72")));
     assert.equal(diagnostic.sourceLabel, "AI 写审改小批恢复");
+  });
+
+  await t.test("builds a project control request for rollback diagnostics only", () => {
+    const rollbackRequest = buildAiRecoveryMemoryControlRequest({
+      projectId: "project-1",
+      chapterId: "chapter-2",
+      chapterTitle: "第二章 失控的小批恢复",
+      diagnostic: {
+        status: "rollback",
+        label: "恢复记忆疑似失效",
+        detail: "连续 2 次带恢复记忆的审稿仍低于 85 分。",
+        actionLabel: "回滚小样本",
+        sourceLabel: "AI 写审改小批恢复",
+        evidence: ["正文审稿 72 分；问题：ai_recovery", "正文审稿 80 分；问题：hook"],
+      },
+    });
+
+    assert.equal(rollbackRequest?.endpoint, "/api/projects/project-1/control-actions");
+    assert.equal(rollbackRequest?.body.areaId, "ai-pipeline");
+    assert.equal(rollbackRequest?.body.memoryAction, "rollback");
+    assert.equal(rollbackRequest?.body.memorySource?.kind, "chapter_workflow_diagnostic");
+    assert.equal(rollbackRequest?.body.memorySource?.chapterId, "chapter-2");
+    assert.equal(rollbackRequest?.body.memorySource?.chapterTitle, "第二章 失控的小批恢复");
+    assert.ok(rollbackRequest?.body.memorySource?.detail.includes("连续 2 次"));
+    assert.deepEqual(rollbackRequest?.body.memorySource?.evidence, [
+      "正文审稿 72 分；问题：ai_recovery",
+      "正文审稿 80 分；问题：hook",
+    ]);
+
+    const watchRequest = buildAiRecoveryMemoryControlRequest({
+      projectId: "project-1",
+      chapterId: "chapter-2",
+      chapterTitle: "第二章",
+      diagnostic: {
+        status: "watch",
+        label: "恢复记忆观察中",
+        detail: "最近一次低分。",
+        actionLabel: "再看 1 次",
+        sourceLabel: "AI 写审改小批恢复",
+        evidence: ["正文审稿 80 分"],
+      },
+    });
+
+    assert.equal(watchRequest, null);
   });
 });

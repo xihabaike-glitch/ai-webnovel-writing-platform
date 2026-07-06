@@ -52,6 +52,24 @@ export interface AiRecoveryMemoryDiagnostic {
   evidence: string[];
 }
 
+export interface AiRecoveryMemoryControlRequest {
+  endpoint: string;
+  body: {
+    areaId: "ai-pipeline";
+    mode: "seed";
+    memoryAction: "rollback";
+    memorySource: {
+      kind: "chapter_workflow_diagnostic";
+      chapterId: string;
+      chapterTitle: string;
+      label: string;
+      detail: string;
+      sourceLabel: string | null;
+      evidence: string[];
+    };
+  };
+}
+
 const taskLabels: Record<string, string> = {
   chapter_draft: "正文初稿",
   chapter_review: "章节审稿",
@@ -222,5 +240,32 @@ export function buildAiRecoveryMemoryDiagnostic(items: AiTaskWorkflowItem[]): Ai
     actionLabel: "继续观察",
     sourceLabel: latest.item.recoveryMemoryAudit?.sourceLabel ?? null,
     evidence,
+  };
+}
+
+export function buildAiRecoveryMemoryControlRequest(input: {
+  projectId: string;
+  chapterId: string;
+  chapterTitle: string;
+  diagnostic: AiRecoveryMemoryDiagnostic | null;
+}): AiRecoveryMemoryControlRequest | null {
+  if (!input.diagnostic || input.diagnostic.status !== "rollback") return null;
+
+  return {
+    endpoint: `/api/projects/${input.projectId}/control-actions`,
+    body: {
+      areaId: "ai-pipeline",
+      mode: "seed",
+      memoryAction: "rollback",
+      memorySource: {
+        kind: "chapter_workflow_diagnostic",
+        chapterId: input.chapterId,
+        chapterTitle: input.chapterTitle,
+        label: input.diagnostic.label,
+        detail: input.diagnostic.detail,
+        sourceLabel: input.diagnostic.sourceLabel,
+        evidence: input.diagnostic.evidence,
+      },
+    },
   };
 }

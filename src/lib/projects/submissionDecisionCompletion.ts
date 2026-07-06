@@ -46,6 +46,13 @@ const effectStages = new Set([
   "pause_platform",
 ]);
 
+const repairEvidenceStages = new Set([
+  "start_repair_packaging",
+  "repair_tactic",
+  "pivot_platform",
+  "pause_platform",
+]);
+
 function parseMetricValue(value: string) {
   const compact = value.replace(/,/g, "").replace(/\s+/g, "");
   const match = compact.match(/(\d+(?:\.\d+)?)(万|k|K)?/u);
@@ -89,6 +96,11 @@ function editorFeedback(text: string) {
 function rate(numerator: number, denominator: number) {
   if (!denominator) return 0;
   return Math.round((numerator / denominator) * 1000) / 10;
+}
+
+function hasRepairCompletionSignal(stage: string, text: string) {
+  if (!repairEvidenceStages.has(stage)) return false;
+  return /(?:修复对象|修复前问题|处理动作|修复后证据|复检结果|下一轮口径)\s*[：:=]\s*\S+/u.test(text);
 }
 
 function review(input: {
@@ -154,7 +166,8 @@ export function buildSubmissionDecisionCompletionEffect(
   const feedback = editorFeedback(text);
   const hasMetricSignal = Object.values(effect).some((value) => value > 0);
   const hasBusinessSignal = contractStatus !== "unknown" || publishUrl.length > 0;
-  if (!hasMetricSignal && !hasBusinessSignal) return null;
+  const hasRepairSignal = hasRepairCompletionSignal(input.stage, text);
+  if (!hasMetricSignal && !hasBusinessSignal && !hasRepairSignal) return null;
 
   return {
     projectId: input.projectId,

@@ -52,6 +52,32 @@ test("submission decision completion effect", async (t) => {
     assert.equal(effect.views, 0);
   });
 
+  await t.test("records repair completion evidence before traffic metrics return", () => {
+    const effect = buildSubmissionDecisionCompletionEffect({
+      projectId: "project-1",
+      platformId: "qimao",
+      platformName: "七猫小说",
+      dispatchKey: "submission-decision:project-1:qimao:repair",
+      stage: "start_repair_packaging",
+      completionEvidence: [
+        "七猫小说｜修复平台包",
+        "修复对象：标题、简介、前三章兑现",
+        "修复前问题：点击低，收藏低，追读断",
+        "修复后证据：已保存第二轮小样本投稿包",
+        "复检结果：标题简介标签同向表达一个卖点",
+        "下一轮口径：只验证新标题和前三章兑现，不扩大投放",
+      ].join("\n"),
+    });
+
+    assert.ok(effect);
+    assert.equal(effect.dispatchKey, "submission-decision:project-1:qimao:repair");
+    assert.equal(effect.views, 0);
+    assert.equal(effect.contractStatus, "unknown");
+    assert.equal(effect.review.status, "watch");
+    assert.ok(effect.editorFeedback.includes("修复对象"));
+    assert.ok(effect.notes.includes("submission-decision:project-1:qimao:repair"));
+  });
+
   await t.test("ignores ordinary completion text without effect signals", () => {
     const effect = buildSubmissionDecisionCompletionEffect({
       projectId: "project-1",

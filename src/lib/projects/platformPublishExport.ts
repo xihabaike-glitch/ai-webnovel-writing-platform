@@ -809,6 +809,8 @@ export interface PlatformPublishExecutionHandoffSummary {
   readyCount: number;
   blockedCount: number;
   primaryAction: PlatformPublishExecutionHandoff | null;
+  primaryActionCount: number;
+  primaryActionPlatformNames: string[];
   headline: string;
   nextAction: string;
 }
@@ -4092,6 +4094,15 @@ function handoffActionRank(item: PlatformPublishExecutionHandoff) {
   return (item.canExport ? 100 : 0) + kindRank[item.actionKind];
 }
 
+function handoffActionKey(item: PlatformPublishExecutionHandoff) {
+  return [
+    item.actionKind,
+    item.actionHref,
+    item.chapterId ?? "",
+    item.candidateRevisionId ?? "",
+  ].join(":");
+}
+
 function buildPlatformPublishExecutionHandoffSummary(
   handoffs: PlatformPublishExecutionHandoff[],
 ): PlatformPublishExecutionHandoffSummary {
@@ -4110,17 +4121,25 @@ function buildPlatformPublishExecutionHandoffSummary(
       readyCount,
       blockedCount,
       primaryAction: null,
+      primaryActionCount: 0,
+      primaryActionPlatformNames: [],
       headline: "还没有平台交接卡。",
       nextAction: "先生成平台投稿包，再进入全平台执行交接。",
     };
   }
+  const primaryActionKey = handoffActionKey(primaryAction);
+  const primaryActionPlatformNames = handoffs
+    .filter((item) => handoffActionKey(item) === primaryActionKey)
+    .map((item) => item.platformName);
 
   if (blockedCount === 0) {
     return {
       readyCount,
       blockedCount,
       primaryAction,
-      headline: `${readyCount}/${handoffs.length} 平台可导出，可以进入复盘。`,
+      primaryActionCount: primaryActionPlatformNames.length,
+      primaryActionPlatformNames,
+      headline: `${readyCount}/${handoffs.length} 平台可导出，可以进入复盘，影响 ${primaryActionPlatformNames.length} 个平台。`,
       nextAction: `先处理 ${primaryAction.platformName}：${primaryAction.actionLabel}。`,
     };
   }
@@ -4129,7 +4148,9 @@ function buildPlatformPublishExecutionHandoffSummary(
     readyCount,
     blockedCount,
     primaryAction,
-    headline: `${blockedCount} 个平台未就绪，优先处理 ${primaryAction.platformName}。`,
+    primaryActionCount: primaryActionPlatformNames.length,
+    primaryActionPlatformNames,
+    headline: `${blockedCount} 个平台未就绪，优先处理 ${primaryAction.platformName}，影响 ${primaryActionPlatformNames.length} 个平台。`,
     nextAction: `先处理 ${primaryAction.platformName}：${primaryAction.actionLabel}，别同时开八条线。`,
   };
 }

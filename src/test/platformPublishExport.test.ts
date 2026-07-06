@@ -151,7 +151,10 @@ test("buildPlatformPublishExportCenter", async (t) => {
     assert.equal(center.executionHandoffSummary.readyCount, 0);
     assert.equal(center.executionHandoffSummary.blockedCount, platformProfiles.length);
     assert.equal(center.executionHandoffSummary.primaryAction?.actionLabel, center.executionHandoffs[0].actionLabel);
+    assert.ok(center.executionHandoffSummary.primaryActionCount >= 1);
+    assert.ok(center.executionHandoffSummary.primaryActionPlatformNames.includes(center.executionHandoffSummary.primaryAction?.platformName ?? ""));
     assert.ok(center.executionHandoffSummary.headline.includes("优先处理"));
+    assert.ok(center.executionHandoffSummary.headline.includes("影响"));
     assert.ok(center.executionHandoffSummary.nextAction.includes(center.executionHandoffSummary.primaryAction?.platformName ?? ""));
     assert.ok(center.executionHandoffs.find((item) => item.platformId === "fanqie")?.submissionFocus.some((item) => item.includes("首秀")));
     assert.ok(center.executionHandoffs.find((item) => item.platformId === "qidian")?.writingFocus.some((item) => item.includes("卷结构")));
@@ -280,6 +283,8 @@ test("buildPlatformPublishExportCenter", async (t) => {
     assert.equal(center.executionHandoffSummary.readyCount, 1);
     assert.equal(center.executionHandoffSummary.blockedCount, 0);
     assert.equal(center.executionHandoffSummary.primaryAction?.actionKind, "record_publish_effect");
+    assert.equal(center.executionHandoffSummary.primaryActionCount, 1);
+    assert.deepEqual(center.executionHandoffSummary.primaryActionPlatformNames, ["番茄小说"]);
     assert.ok(center.executionHandoffSummary.headline.includes("可以进入复盘"));
   });
 

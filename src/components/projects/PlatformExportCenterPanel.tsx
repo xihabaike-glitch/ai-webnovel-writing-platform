@@ -710,6 +710,8 @@ interface PlatformPublishExecutionHandoffSummary {
   readyCount: number;
   blockedCount: number;
   primaryAction: PlatformPublishExecutionHandoff | null;
+  primaryActionCount: number;
+  primaryActionPlatformNames: string[];
   headline: string;
   nextAction: string;
 }
@@ -2631,8 +2633,13 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
                 <div className="mt-3 grid gap-2 text-xs text-slate-500 sm:grid-cols-3">
                   <div>可导出 <span className="font-medium text-slate-950">{center.executionHandoffSummary.readyCount}</span></div>
                   <div>待处理 <span className="font-medium text-slate-950">{center.executionHandoffSummary.blockedCount}</span></div>
-                  <div>总平台 <span className="font-medium text-slate-950">{center.executionHandoffs.length}</span></div>
+                  <div>影响平台 <span className="font-medium text-slate-950">{center.executionHandoffSummary.primaryActionCount}</span></div>
                 </div>
+                {center.executionHandoffSummary.primaryActionPlatformNames.length ? (
+                  <div className="mt-2 line-clamp-2 text-xs leading-5 text-slate-500">
+                    {center.executionHandoffSummary.primaryActionPlatformNames.join("、")}
+                  </div>
+                ) : null}
               </div>
               <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-4">
                 {center.executionHandoffs.map((item) => (

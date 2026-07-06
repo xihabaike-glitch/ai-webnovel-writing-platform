@@ -10,14 +10,19 @@ export interface AiRecoveryPromptMemory {
 
 export type AiRecoveryPromptPhase = "draft" | "review" | "second_pass";
 
+function lifecycleStatusFromEvidence(latestEvidence: NonNullable<ReturnType<typeof buildGateAiPipelineRecoveryPanel>["latestEvidence"]>): AiRecoveryPromptMemory["lifecycleStatus"] {
+  if (latestEvidence.outcome === "blocked") return "rollback";
+  if (latestEvidence.outcome === "watch") return "sample_required";
+  if (latestEvidence.outcome === "usable") return "active";
+  if (latestEvidence.kind === "rollback_repair") return "rollback";
+  if (latestEvidence.kind === "sample_recheck") return "sample_required";
+  return "active";
+}
+
 export function buildAiRecoveryPromptMemory(tasks: PersistedGatePlatformDispatchTask[]): AiRecoveryPromptMemory | null {
   const latestEvidence = buildGateAiPipelineRecoveryPanel(tasks).latestEvidence;
   if (!latestEvidence) return null;
-  const lifecycleStatus = latestEvidence.kind === "rollback_repair"
-    ? "rollback"
-    : latestEvidence.kind === "sample_recheck"
-      ? "sample_required"
-      : "active";
+  const lifecycleStatus = lifecycleStatusFromEvidence(latestEvidence);
 
   return {
     sourceLabel: latestEvidence.label,
@@ -26,7 +31,7 @@ export function buildAiRecoveryPromptMemory(tasks: PersistedGatePlatformDispatch
     latestAt: latestEvidence.completedAt,
     promptBlock: [
       "AI 写审改恢复证据：",
-      `- ${latestEvidence.label}：${latestEvidence.evidence.slice(0, 3).join("；")}。`,
+      `- ${latestEvidence.label}：${latestEvidence.evidence.slice(0, 4).join("；")}。`,
       `- 下一步：${latestEvidence.nextAction || "继续小样本观察"}。`,
       "- 禁区：不要直接恢复大批量，不要弱化开头钩子和章末追读。",
     ].join("\n"),

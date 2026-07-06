@@ -173,6 +173,10 @@ test("buildPlatformPublishExportCenter", async (t) => {
     assert.equal(center.effectCaptureSummary.primaryPlatformId, center.packages[0].platformId);
     assert.equal(center.effectCaptureSummary.actionHref, "#publish-effect-panel");
     assert.ok(center.effectCaptureSummary.actionLabel.includes(center.packages[0].platformName));
+    assert.equal(center.effectCaptureSummary.tasks.length, platformProfiles.length);
+    assert.equal(center.effectCaptureSummary.tasks[0].platformId, center.effectCaptureSummary.primaryPlatformId);
+    assert.equal(center.effectCaptureSummary.tasks[0].actionHref, "#publish-effect-panel");
+    assert.ok(center.effectCaptureSummary.tasks[0].missingFields.includes("曝光"));
     assert.ok(center.effectCaptureSummary.headline.includes("真实效果"));
     assert.ok(center.effectCaptureSummary.nextAction.includes("先回填"));
     assert.equal(center.packages[0].dispatchEffectValidation.status, "needs_effect");
@@ -305,6 +309,8 @@ test("buildPlatformPublishExportCenter", async (t) => {
     assert.equal(center.effectCaptureSummary.needsRecordCount, 1);
     assert.equal(center.effectCaptureSummary.primaryPlatformId, "fanqie");
     assert.equal(center.effectCaptureSummary.actionHref, "#publish-effect-panel");
+    assert.equal(center.effectCaptureSummary.tasks.length, 1);
+    assert.equal(center.effectCaptureSummary.tasks[0].platformName, "番茄小说");
   });
 
   await t.test("blocks export when candidate adoption makes old reviews stale", () => {
@@ -564,6 +570,7 @@ test("buildPlatformPublishExportCenter", async (t) => {
     assert.equal(center.effectCaptureSummary.missingFieldPlatformCount, 0);
     assert.equal(center.effectCaptureSummary.actionHref, "#platform-strategy-ranking");
     assert.ok(center.effectCaptureSummary.actionLabel.includes("平台排序"));
+    assert.deepEqual(center.effectCaptureSummary.tasks, []);
     assert.ok(center.effectCaptureSummary.nextAction.includes("进入平台排序"));
     assert.equal(pack.publishEffect.comparison.status, "none");
     assert.equal(pack.dispatchEffectValidation.status, "reusable_success");

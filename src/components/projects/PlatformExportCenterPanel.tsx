@@ -448,6 +448,7 @@ interface PlatformEffectCaptureSummary {
   missingFieldPlatformCount: number;
   missingFieldCount: number;
   platformNamesNeedingInput: string[];
+  tasks: PlatformEffectCaptureTask[];
   primaryPlatformId: string | null;
   primaryPlatformName: string | null;
   primaryMissingFields: string[];
@@ -455,6 +456,15 @@ interface PlatformEffectCaptureSummary {
   actionHref: string;
   headline: string;
   nextAction: string;
+}
+
+interface PlatformEffectCaptureTask {
+  platformId: string;
+  platformName: string;
+  status: PlatformEffectCapturePlan["status"];
+  missingFields: string[];
+  actionLabel: string;
+  actionHref: string;
 }
 
 interface PlatformPublishWorkspaceAction extends PublishRepairAction {
@@ -1776,6 +1786,14 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
     }
   }
 
+  function openEffectCaptureTask(task: PlatformEffectCaptureTask) {
+    setSelectedPlatformId(task.platformId);
+    setSelectedVersionId(null);
+    if (typeof window !== "undefined") {
+      window.location.hash = task.actionHref;
+    }
+  }
+
   async function savePublishEffect() {
     if (!selectedPackage) return;
     const platformId = selectedPackage.platformId;
@@ -2696,6 +2714,30 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
             <div className="mt-2 rounded-md bg-slate-50 p-2 text-sm text-slate-700">
               <span className="font-medium text-slate-950">下一步：</span>{center.effectCaptureSummary.nextAction}
             </div>
+            {center.effectCaptureSummary.tasks.length ? (
+              <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-4">
+                {center.effectCaptureSummary.tasks.slice(0, 4).map((task) => (
+                  <div className="rounded-md bg-slate-50 p-3 text-sm" key={task.platformId}>
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <div className="font-medium text-slate-950">{task.platformName}</div>
+                      <span className={`rounded-md px-2 py-1 text-[11px] font-medium ${effectCaptureStatusClass(task.status)}`}>
+                        {effectCaptureStatusLabel(task.status)}
+                      </span>
+                    </div>
+                    <div className="mt-2 line-clamp-2 text-xs leading-5 text-slate-500">
+                      缺：{task.missingFields.join("、") || "无"}
+                    </div>
+                    <button
+                      className="mt-3 rounded-md border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                      onClick={() => openEffectCaptureTask(task)}
+                      type="button"
+                    >
+                      {task.actionLabel}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : null}
           </div>
           {center.executionHandoffs.length ? (
             <div className="mt-3 rounded-md border border-slate-200 p-3">

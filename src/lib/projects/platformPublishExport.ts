@@ -809,6 +809,7 @@ export interface PlatformEffectCaptureSummary {
   missingFieldPlatformCount: number;
   missingFieldCount: number;
   platformNamesNeedingInput: string[];
+  tasks: PlatformEffectCaptureTask[];
   primaryPlatformId: PlatformId | null;
   primaryPlatformName: string | null;
   primaryMissingFields: string[];
@@ -816,6 +817,15 @@ export interface PlatformEffectCaptureSummary {
   actionHref: string;
   headline: string;
   nextAction: string;
+}
+
+export interface PlatformEffectCaptureTask {
+  platformId: PlatformId;
+  platformName: string;
+  status: PlatformEffectCapturePlan["status"];
+  missingFields: string[];
+  actionLabel: string;
+  actionHref: string;
 }
 
 export interface PlatformPublishExecutionHandoff {
@@ -4243,6 +4253,19 @@ function buildPlatformEffectCaptureSummary(packages: PlatformPublishPackage[]): 
   const needsRecord = packages.filter((pack) => pack.effectCapturePlan.status === "needs_record");
   const missingFields = packages.filter((pack) => pack.effectCapturePlan.status === "missing_fields");
   const platformNamesNeedingInput = [...needsRecord, ...missingFields].map((pack) => pack.platformName);
+  const tasks = [...needsRecord, ...missingFields].map((pack): PlatformEffectCaptureTask => {
+    const missingFieldLabels = pack.effectCapturePlan.missingFields.map((field) => field.label);
+    return {
+      platformId: pack.platformId,
+      platformName: pack.platformName,
+      status: pack.effectCapturePlan.status,
+      missingFields: missingFieldLabels,
+      actionLabel: pack.effectCapturePlan.status === "needs_record"
+        ? `回填${pack.platformName}效果`
+        : `补齐${pack.platformName}数据`,
+      actionHref: "#publish-effect-panel",
+    };
+  });
   const primaryPack = needsRecord[0] ?? missingFields[0] ?? null;
   const primaryMissingFields = primaryPack
     ? primaryPack.effectCapturePlan.missingFields.map((field) => field.label)
@@ -4265,6 +4288,7 @@ function buildPlatformEffectCaptureSummary(packages: PlatformPublishPackage[]): 
       missingFieldPlatformCount: 0,
       missingFieldCount: 0,
       platformNamesNeedingInput: [],
+      tasks: [],
       primaryPlatformId: null,
       primaryPlatformName: null,
       primaryMissingFields: [],
@@ -4283,6 +4307,7 @@ function buildPlatformEffectCaptureSummary(packages: PlatformPublishPackage[]): 
       missingFieldPlatformCount: 0,
       missingFieldCount: 0,
       platformNamesNeedingInput: [],
+      tasks: [],
       primaryPlatformId: readyToReview[0]?.platformId ?? null,
       primaryPlatformName: readyToReview[0]?.platformName ?? null,
       primaryMissingFields: [],
@@ -4301,6 +4326,7 @@ function buildPlatformEffectCaptureSummary(packages: PlatformPublishPackage[]): 
       missingFieldPlatformCount: missingFields.length,
       missingFieldCount,
       platformNamesNeedingInput,
+      tasks,
       primaryPlatformId: primaryPack?.platformId ?? null,
       primaryPlatformName: primaryPack?.platformName ?? null,
       primaryMissingFields,
@@ -4320,6 +4346,7 @@ function buildPlatformEffectCaptureSummary(packages: PlatformPublishPackage[]): 
     missingFieldPlatformCount: missingFields.length,
     missingFieldCount,
     platformNamesNeedingInput,
+    tasks,
     primaryPlatformId: primaryPack?.platformId ?? null,
     primaryPlatformName: primaryPack?.platformName ?? null,
     primaryMissingFields,

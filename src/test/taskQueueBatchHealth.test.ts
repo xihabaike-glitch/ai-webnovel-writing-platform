@@ -1,11 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  autoDispatchTaskQueueBatchRhythm,
   buildTaskQueueBatchHealthReview,
   buildTaskQueueBatchRhythmDecision,
   buildTaskQueueBatchRhythmDispatch,
 } from "../lib/projects/taskQueueBatchHealth.ts";
-import type { GateActionAuditRecord } from "../lib/projects/gateActionReceipts.ts";
+import type { GateActionAuditRecord, GatePlatformGrowthDispatchItem, PersistedGatePlatformDispatchTask } from "../lib/projects/gateActionReceipts.ts";
 
 function audit(input: {
   receiptId: string;
@@ -68,6 +69,21 @@ function audit(input: {
       },
     }),
     createdAt: input.createdAt,
+  };
+}
+
+function persistedTask(dispatch: GatePlatformGrowthDispatchItem): PersistedGatePlatformDispatchTask {
+  return {
+    ...dispatch,
+    databaseId: `db-${dispatch.id}`,
+    dispatchKey: dispatch.id,
+    projectId: null,
+    sourceReceiptId: null,
+    completionEvidence: "",
+    assignedAt: null,
+    completedAt: null,
+    createdAt: dispatch.reviewLatestAt,
+    updatedAt: dispatch.reviewLatestAt,
   };
 }
 
@@ -291,4 +307,90 @@ test("buildTaskQueueBatchRhythmDispatch skips dispatches when rhythm can continu
 
   assert.equal(decision.tone, "scale");
   assert.equal(dispatch, null);
+});
+
+test("autoDispatchTaskQueueBatchRhythm persists a new repair dispatch", async () => {
+  const audits = [
+    audit({
+      receiptId: "weak-1",
+      label: "普通批次质量跌线",
+      tacticLabel: "三轮稳住",
+      quality: 70,
+      failedCount: 1,
+      successRatePercent: 50,
+      createdAt: "2026-01-03T00:00:00.000Z",
+    }),
+  ];
+  const created: GatePlatformGrowthDispatchItem[] = [];
+  const result = await autoDispatchTaskQueueBatchRhythm({
+    audits,
+    existingTasks: [],
+    persist: async (dispatch) => {
+      created.push(dispatch);
+      return persistedTask(dispatch);
+    },
+  });
+
+  assert.equal(result.status, "created");
+  assert.equal(result.createdTask?.dispatchKey, "batch-rhythm:repair:2026-01-03T00:00:00.000Z");
+  assert.equal(result.createdTask?.state, "assigned");
+  assert.equal(created[0]?.state, "assigned");
+  assert.equal(result.decision.tone, "repair");
+});
+
+test("autoDispatchTaskQueueBatchRhythm skips an existing rhythm dispatch", async () => {
+  const audits = [
+    audit({
+      receiptId: "stable-1",
+      label: "三轮稳住批次健康，继续小步加码",
+      tacticLabel: "三轮稳住",
+      quality: 88,
+      createdAt: "2026-01-01T00:00:00.000Z",
+    }),
+  ];
+  const review = buildTaskQueueBatchHealthReview(audits);
+  const decision = buildTaskQueueBatchRhythmDecision(review);
+  const dispatch = buildTaskQueueBatchRhythmDispatch(decision, review);
+  assert.ok(dispatch);
+
+  const result = await autoDispatchTaskQueueBatchRhythm({
+    audits,
+    existingTasks: [persistedTask(dispatch)],
+    persist: async () => {
+      throw new Error("should not persist duplicates");
+    },
+  });
+
+  assert.equal(result.status, "skipped");
+  assert.equal(result.skippedTask?.dispatchKey, dispatch.id);
+});
+
+test("autoDispatchTaskQueueBatchRhythm does not persist when rhythm can continue", async () => {
+  const audits = [
+    audit({
+      receiptId: "stable-2",
+      label: "三轮稳住批次健康，继续小步加码",
+      tacticLabel: "三轮稳住",
+      quality: 90,
+      createdAt: "2026-01-02T00:00:00.000Z",
+    }),
+    audit({
+      receiptId: "stable-1",
+      label: "三轮稳住批次健康，继续小步加码",
+      tacticLabel: "三轮稳住",
+      quality: 88,
+      createdAt: "2026-01-01T00:00:00.000Z",
+    }),
+  ];
+  const result = await autoDispatchTaskQueueBatchRhythm({
+    audits,
+    existingTasks: [],
+    persist: async () => {
+      throw new Error("should not persist healthy rhythm");
+    },
+  });
+
+  assert.equal(result.status, "empty");
+  assert.equal(result.dispatch, null);
+  assert.equal(result.decision.tone, "scale");
 });

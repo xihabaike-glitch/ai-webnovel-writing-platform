@@ -4,6 +4,7 @@ import {
   type GateActionAuditRecord,
   type GateBatchTacticEffectReview,
   type GatePlatformGrowthDispatchItem,
+  type PersistedGatePlatformDispatchTask,
 } from "./gateActionReceipts.ts";
 
 export interface TaskQueueBatchRhythmDecision {
@@ -13,6 +14,14 @@ export interface TaskQueueBatchRhythmDecision {
   actionLabel: string;
   href: string;
   evidence: string[];
+}
+
+export interface TaskQueueBatchRhythmAutoDispatchResult {
+  status: "created" | "skipped" | "empty";
+  decision: TaskQueueBatchRhythmDecision;
+  dispatch: GatePlatformGrowthDispatchItem | null;
+  createdTask: PersistedGatePlatformDispatchTask | null;
+  skippedTask: PersistedGatePlatformDispatchTask | null;
 }
 
 export type TaskQueueBatchHealthAudit = Pick<GateActionAuditRecord,
@@ -123,11 +132,11 @@ export function buildTaskQueueBatchRhythmDispatch(
 ): GatePlatformGrowthDispatchItem | null {
   if (decision.tone !== "repair" && decision.tone !== "watch") return null;
 
-  const createdAt = new Date(options.createdAt ?? new Date()).toISOString();
   const target = review.items.find((item) => decision.evidence.some((line) => item.evidence.includes(line)))
     ?? review.items.find((item) => decision.tone === "repair" ? item.status === "blocked" : item.status === "watch")
     ?? review.items[0]
     ?? null;
+  const createdAt = new Date(options.createdAt ?? target?.latestAt ?? new Date()).toISOString();
   const platformName = target?.tacticTitle.replace(/^首轮平台打法：/u, "") || "全平台";
   const platformId = platformName === "全平台" ? "batch-rhythm" : platformName.toLowerCase().replace(/[^a-z0-9]+/gu, "-") || "batch-rhythm";
   const repair = decision.tone === "repair";
@@ -163,5 +172,44 @@ export function buildTaskQueueBatchRhythmDispatch(
       ...(target?.nextAction ? [target.nextAction] : []),
     ].slice(0, 6),
     reviewLatestAt: target?.latestAt ?? createdAt,
+  };
+}
+
+export async function autoDispatchTaskQueueBatchRhythm(input: {
+  audits: TaskQueueBatchHealthAudit[];
+  existingTasks: PersistedGatePlatformDispatchTask[];
+  persist: (dispatch: GatePlatformGrowthDispatchItem) => Promise<PersistedGatePlatformDispatchTask>;
+}): Promise<TaskQueueBatchRhythmAutoDispatchResult> {
+  const review = buildTaskQueueBatchHealthReview(input.audits, 5);
+  const decision = buildTaskQueueBatchRhythmDecision(review);
+  const dispatch = buildTaskQueueBatchRhythmDispatch(decision, review);
+  if (!dispatch) {
+    return {
+      status: "empty",
+      decision,
+      dispatch: null,
+      createdTask: null,
+      skippedTask: null,
+    };
+  }
+
+  const existing = input.existingTasks.find((task) => task.dispatchKey === dispatch.id) ?? null;
+  if (existing) {
+    return {
+      status: "skipped",
+      decision,
+      dispatch,
+      createdTask: null,
+      skippedTask: existing,
+    };
+  }
+
+  const createdTask = await input.persist({ ...dispatch, state: "assigned" });
+  return {
+    status: "created",
+    decision,
+    dispatch,
+    createdTask,
+    skippedTask: null,
   };
 }

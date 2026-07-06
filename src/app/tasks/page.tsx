@@ -2,6 +2,7 @@ import Link from "next/link";
 import { AppShell } from "@/components/app-shell/AppShell";
 import { CompleteTaskDebtEvidenceForm } from "@/components/tasks/CompleteTaskDebtEvidenceForm";
 import { CompleteTacticExperienceFollowupForm } from "@/components/tasks/CompleteTacticExperienceFollowupForm";
+import { CreateBatchRhythmDispatchButton } from "@/components/tasks/CreateBatchRhythmDispatchButton";
 import { RetryTaskButton } from "@/components/tasks/RetryTaskButton";
 import { RunRecommendedBatchButton } from "@/components/tasks/RunRecommendedBatchButton";
 import { RunPublishEffectQueueActionButton } from "@/components/tasks/RunPublishEffectQueueActionButton";
@@ -973,9 +974,13 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
                 </div>
               ) : null}
             </div>
-            <Link className="w-fit shrink-0 rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white hover:bg-slate-800" href={batchRhythmDecision.href}>
-              {batchRhythmDecision.actionLabel}
-            </Link>
+            {batchRhythmDispatch ? (
+              <CreateBatchRhythmDispatchButton label="生成节奏派单" />
+            ) : (
+              <Link className="w-fit shrink-0 rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white hover:bg-slate-800" href={batchRhythmDecision.href}>
+                {batchRhythmDecision.actionLabel}
+              </Link>
+            )}
           </div>
         </div>
         {batchTacticEffectReview.nextActions.length ? (

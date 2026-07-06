@@ -91,6 +91,43 @@ export default async function FailuresPage() {
         </div>
       </section>
 
+      <section className="mb-6 rounded-md border border-slate-200 bg-white p-4">
+        <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <h2 className="font-medium text-slate-950">修复决策台</h2>
+            <p className="mt-1 text-sm text-slate-600">按失败原因自动排优先级，先清会拖垮批量生产的断点。</p>
+          </div>
+          <div className="w-fit rounded-md bg-slate-50 px-3 py-2 text-sm font-medium text-slate-700">
+            {center.repairLanes.length} 条修复泳道
+          </div>
+        </div>
+        <div className="mt-4 grid gap-3 lg:grid-cols-4">
+          {center.repairLanes.map((lane) => (
+            <div className="rounded-md border border-slate-200 p-3 text-sm" key={lane.id}>
+              <div className="flex items-center justify-between gap-2">
+                <span className="rounded-md bg-rose-50 px-2 py-1 text-xs font-medium text-rose-700">{lane.priorityLabel}</span>
+                <span className="text-xs text-slate-500">{lane.count} 个</span>
+              </div>
+              <div className="mt-3 font-medium text-slate-950">{lane.label}</div>
+              <p className="mt-2 leading-6 text-slate-600">{lane.detail}</p>
+              <div className="mt-3 flex flex-wrap gap-1.5">
+                {lane.evidence.slice(0, 3).map((item) => (
+                  <span className="rounded-md bg-slate-50 px-2 py-1 text-xs text-slate-600" key={item}>{item}</span>
+                ))}
+              </div>
+              <Link className="mt-3 inline-flex rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white hover:bg-slate-800" href={lane.href}>
+                {lane.actionLabel}
+              </Link>
+            </div>
+          ))}
+          {center.repairLanes.length === 0 ? (
+            <div className="rounded-md border border-dashed border-slate-300 p-3 text-sm text-slate-600">
+              没有未恢复失败，继续观察后续失败率和模型成本。
+            </div>
+          ) : null}
+        </div>
+      </section>
+
       <section className="mb-6 grid gap-4 lg:grid-cols-2">
         <div className="rounded-md border border-slate-200 bg-white p-4">
           <div className="mb-3 font-medium text-slate-950">错误原因</div>

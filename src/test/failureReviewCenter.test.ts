@@ -102,4 +102,64 @@ test("buildFailureReviewCenter", async (t) => {
     assert.equal(center.recentFailures.find((item) => item.id === "failed-draft")?.recoveredByTaskId, "recovered-draft");
     assert.equal(center.recentFailures.find((item) => item.id === "unresolved-review")?.recoveryStatus, "unresolved");
   });
+
+  await t.test("builds prioritized repair lanes for mixed unresolved failures", () => {
+    const center = buildFailureReviewCenter([
+      {
+        ...baseTask,
+        id: "config-failure",
+        chapterId: "chapter-config",
+        errorMessage: "401 unauthorized api key",
+        createdAt: "2026-01-01T00:01:00.000Z",
+        chapter: { title: "配置章" },
+      },
+      {
+        ...baseTask,
+        id: "context-failure",
+        chapterId: "chapter-context",
+        errorMessage: "context length too long",
+        createdAt: "2026-01-01T00:02:00.000Z",
+        chapter: { title: "上下文章" },
+      },
+      {
+        ...baseTask,
+        id: "timeout-failure",
+        chapterId: "chapter-timeout",
+        errorMessage: "503 provider timeout",
+        createdAt: "2026-01-01T00:03:00.000Z",
+        chapter: { title: "超时章" },
+      },
+      {
+        ...baseTask,
+        id: "manual-failure",
+        chapterId: null,
+        errorMessage: "writer output refused without clear reason",
+        createdAt: "2026-01-01T00:04:00.000Z",
+        chapter: null,
+      },
+    ]);
+
+    assert.deepEqual(center.repairLanes.map((lane) => lane.id), ["config", "prompt_context", "retry_sample", "manual_review"]);
+    assert.equal(center.repairLanes[0].priorityLabel, "P0");
+    assert.equal(center.repairLanes[0].label, "先修模型配置");
+    assert.equal(center.repairLanes[0].actionLabel, "去模型设置");
+    assert.equal(center.repairLanes[0].href, "/settings/models");
+    assert.deepEqual(center.repairLanes[0].sampleTaskIds, ["config-failure"]);
+    assert.ok(center.repairLanes[0].evidence.some((line) => line.includes("密钥/权限 1")));
+
+    const promptLane = center.repairLanes.find((lane) => lane.id === "prompt_context");
+    assert.equal(promptLane?.priorityLabel, "P1");
+    assert.equal(promptLane?.actionLabel, "回章节修上下文");
+    assert.equal(promptLane?.href, "/projects/project-1/chapters/chapter-context");
+
+    const retryLane = center.repairLanes.find((lane) => lane.id === "retry_sample");
+    assert.equal(retryLane?.priorityLabel, "P2");
+    assert.equal(retryLane?.actionLabel, "单章重试样本");
+    assert.equal(retryLane?.href, "/projects/project-1/chapters/chapter-timeout");
+
+    const manualLane = center.repairLanes.find((lane) => lane.id === "manual_review");
+    assert.equal(manualLane?.priorityLabel, "P3");
+    assert.equal(manualLane?.actionLabel, "人工复盘输入");
+    assert.equal(manualLane?.href, "/projects/project-1");
+  });
 });

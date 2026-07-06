@@ -48,6 +48,20 @@ export interface FailureReviewItem {
   href: string;
 }
 
+export type FailureRepairLaneId = "config" | "prompt_context" | "retry_sample" | "manual_review";
+
+export interface FailureRepairLane {
+  id: FailureRepairLaneId;
+  priorityLabel: "P0" | "P1" | "P2" | "P3";
+  label: string;
+  count: number;
+  detail: string;
+  actionLabel: string;
+  href: string;
+  evidence: string[];
+  sampleTaskIds: string[];
+}
+
 export interface FailureReviewCenter {
   summary: {
     totalFailures: number;
@@ -62,6 +76,7 @@ export interface FailureReviewCenter {
   providerGroups: FailureGroup[];
   taskTypeGroups: FailureGroup[];
   projectGroups: FailureGroup[];
+  repairLanes: FailureRepairLane[];
   recentFailures: FailureReviewItem[];
   nextActions: string[];
 }
@@ -126,6 +141,10 @@ function dateIso(value: Date | string) {
   return new Date(value).toISOString();
 }
 
+function failureHref(task: FailureReviewTask) {
+  return task.chapterId ? `/projects/${task.projectId}/chapters/${task.chapterId}` : `/projects/${task.projectId}`;
+}
+
 function groupBy(
   items: FailureReviewItem[],
   getKey: (item: FailureReviewItem) => string,
@@ -148,6 +167,83 @@ function groupBy(
       suggestion: getSuggestion(values[0]),
     }))
     .sort((left, right) => right.count - left.count || left.label.localeCompare(right.label));
+}
+
+function repairLaneId(item: FailureReviewItem): FailureRepairLaneId {
+  if (item.category === "api_key") return "config";
+  if (item.category === "context" || item.category === "json_parse") return "prompt_context";
+  if (item.retryable) return "retry_sample";
+  return "manual_review";
+}
+
+function buildRepairLanes(items: FailureReviewItem[]): FailureRepairLane[] {
+  const laneOrder: FailureRepairLaneId[] = ["config", "prompt_context", "retry_sample", "manual_review"];
+  const laneMeta: Record<FailureRepairLaneId, {
+    priorityLabel: FailureRepairLane["priorityLabel"];
+    label: string;
+    detail: (count: number) => string;
+    actionLabel: string;
+    href?: string;
+  }> = {
+    config: {
+      priorityLabel: "P0",
+      label: "先修模型配置",
+      detail: (count) => `${count} 个失败指向密钥、权限或模型配置。先修配置，否则重试只会重复失败。`,
+      actionLabel: "去模型设置",
+      href: "/settings/models",
+    },
+    prompt_context: {
+      priorityLabel: "P1",
+      label: "先改提示词/上下文",
+      detail: (count) => `${count} 个失败来自上下文过长或结构化输出不稳。先裁剪输入、收紧格式，再重试样本。`,
+      actionLabel: "回章节修上下文",
+    },
+    retry_sample: {
+      priorityLabel: "P2",
+      label: "单章重试验证",
+      detail: (count) => `${count} 个失败具备重试价值。先挑最近 1 个样本跑通，再恢复同类任务。`,
+      actionLabel: "单章重试样本",
+    },
+    manual_review: {
+      priorityLabel: "P3",
+      label: "人工复盘输入",
+      detail: (count) => `${count} 个失败缺少稳定自动修复路径。先回项目核对输入、任务类型和上下文。`,
+      actionLabel: "人工复盘输入",
+    },
+  };
+
+  return laneOrder
+    .map((laneId) => {
+      const values = items.filter((item) => repairLaneId(item) === laneId);
+      if (values.length === 0) return null;
+      const categoryCounts = new Map<string, number>();
+      const providerCounts = new Map<string, number>();
+      for (const item of values) {
+        categoryCounts.set(item.categoryLabel, (categoryCounts.get(item.categoryLabel) ?? 0) + 1);
+        providerCounts.set(`${item.providerName} · ${item.model}`, (providerCounts.get(`${item.providerName} · ${item.model}`) ?? 0) + 1);
+      }
+      const categoryEvidence = [...categoryCounts.entries()]
+        .sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]))
+        .map(([label, count]) => `${label} ${count}`);
+      const providerEvidence = [...providerCounts.entries()]
+        .sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]))
+        .slice(0, 2)
+        .map(([label, count]) => `${label} ${count}`);
+      const meta = laneMeta[laneId];
+
+      return {
+        id: laneId,
+        priorityLabel: meta.priorityLabel,
+        label: meta.label,
+        count: values.length,
+        detail: meta.detail(values.length),
+        actionLabel: meta.actionLabel,
+        href: meta.href ?? values[0].href,
+        evidence: [...categoryEvidence, ...providerEvidence],
+        sampleTaskIds: values.slice(0, 3).map((item) => item.id),
+      };
+    })
+    .filter((lane): lane is FailureRepairLane => Boolean(lane));
 }
 
 function recoveryFor(task: FailureReviewTask, tasks: FailureReviewTask[]) {
@@ -217,7 +313,7 @@ export function buildFailureReviewCenter(tasks: FailureReviewTask[]): FailureRev
         errorMessage: compact(task.errorMessage),
         suggestion: categorySuggestions[category],
         createdAt: dateIso(task.createdAt),
-        href: `/projects/${task.projectId}`,
+        href: failureHref(task),
       };
     });
   const unresolvedFailures = failures.filter((item) => item.recoveryStatus === "unresolved");
@@ -261,6 +357,7 @@ export function buildFailureReviewCenter(tasks: FailureReviewTask[]): FailureRev
     providerGroups,
     taskTypeGroups,
     projectGroups,
+    repairLanes: buildRepairLanes(unresolvedFailures),
     recentFailures: failures.slice(0, 12),
     nextActions: nextActions(unresolvedFailures, categoryGroups, providerGroups, recoveredFailures),
   };

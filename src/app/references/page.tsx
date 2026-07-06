@@ -199,9 +199,9 @@ export default async function ReferencesPage({ searchParams }: ReferencesPagePro
                 <p className="text-xs leading-5 text-slate-500">验收：{item.acceptance}</p>
               </div>
               <div className="mt-3 flex flex-wrap gap-1">
-                {item.roleIds.map((roleId) => (
-                  <span className="rounded-md bg-white px-2 py-1 text-[11px] text-slate-500" key={`${item.id}-${roleId}`}>
-                    {roleId}
+                {item.roleSummaries.map((role) => (
+                  <span className="rounded-md bg-white px-2 py-1 text-[11px] text-slate-500" key={`${item.id}-${role.id}`}>
+                    {role.roleName} · {role.modelOwner}
                   </span>
                 ))}
               </div>

@@ -63,6 +63,11 @@ export interface ReferenceCaseDevelopmentPathItem {
   status: "已落地" | "继续打磨";
   ownerRole: string;
   roleIds: string[];
+  roleSummaries: Array<{
+    id: string;
+    roleName: string;
+    modelOwner: string;
+  }>;
   currentEvidence: string;
   nextAction: string;
   acceptance: string;
@@ -579,7 +584,24 @@ export function buildReferenceCaseDevelopmentPlan(
 }
 
 export function buildReferenceCaseDevelopmentPath(): ReferenceCaseDevelopmentPathItem[] {
-  return [
+  const roles = buildReferenceCaseRolePlaybook();
+  const roleById = new Map(roles.map((role) => [role.id, role]));
+  const withRoleSummaries = (
+    item: Omit<ReferenceCaseDevelopmentPathItem, "roleSummaries">,
+  ): ReferenceCaseDevelopmentPathItem => ({
+    ...item,
+    roleSummaries: item.roleIds.flatMap((roleId) => {
+      const role = roleById.get(roleId);
+      if (!role) return [];
+      return {
+        id: role.id,
+        roleName: role.roleName,
+        modelOwner: role.modelOwner,
+      };
+    }),
+  });
+
+  const pathItems: Array<Omit<ReferenceCaseDevelopmentPathItem, "roleSummaries">> = [
     {
       id: "writing_workbench",
       title: "传统写作工作台",
@@ -625,6 +647,8 @@ export function buildReferenceCaseDevelopmentPath(): ReferenceCaseDevelopmentPat
       href: "/projects#platform-export",
     },
   ];
+
+  return pathItems.map(withRoleSummaries);
 }
 
 export function buildReferenceCaseLibraryView(input?: {

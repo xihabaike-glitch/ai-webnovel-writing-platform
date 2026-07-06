@@ -79,6 +79,12 @@ test("open source reference cases", async (t) => {
       assert.ok(item.ownerRole.length >= 4);
       assert.ok(item.roleIds.length >= 1);
       assert.ok(item.roleIds.every((roleId) => roleIds.has(roleId)));
+      assert.equal(item.roleSummaries.length, item.roleIds.length);
+      for (const role of item.roleSummaries) {
+        assert.ok(item.roleIds.includes(role.id));
+        assert.ok(role.roleName.length >= 4);
+        assert.ok(role.modelOwner.length >= 3);
+      }
       assert.ok(item.currentEvidence.length >= 10);
       assert.ok(item.nextAction.length >= 10);
       assert.ok(item.acceptance.length >= 10);

@@ -16,6 +16,7 @@ import type {
 } from "@/lib/model-gateway/routeConfirmation";
 import {
   buildModelRoleRouteBatchSavePlan,
+  buildModelRoleRouteRecheckAdviceFromBatchPlan,
   type ModelRoleMatrix,
   type ModelRoleRouteDraft,
   type ModelRoleRouteDraftItem,
@@ -1216,6 +1217,16 @@ export function ModelProviderSettings({
         });
         if (!response.ok) throw new Error(`保存「${item.label}」职责路线失败。`);
       }
+      const recheckAdvice = buildModelRoleRouteRecheckAdviceFromBatchPlan(plan);
+      let dispatchedRechecks = 0;
+      for (const advice of recheckAdvice) {
+        const response = await fetch("/api/model-route-confirmation-recheck-dispatch", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ advice }),
+        });
+        if (response.ok) dispatchedRechecks += 1;
+      }
       setRouteDrafts((current) => ({
         ...current,
         ...Object.fromEntries(plan.items.map((item) => [
@@ -1227,9 +1238,9 @@ export function ModelProviderSettings({
         ])),
       }));
       setRouteNotice({
-        message: `已批量保存 ${plan.items.length} 条职责路线；已匹配 ${plan.summary.alreadyCurrent} 条，缺岗位 ${plan.summary.missing} 条已跳过。`,
-        href: "/tasks#recommended-batch",
-        actionLabel: "回任务队列",
+        message: `已批量保存 ${plan.items.length} 条职责路线，并生成 ${dispatchedRechecks} 条小样本复检派单；已匹配 ${plan.summary.alreadyCurrent} 条，缺岗位 ${plan.summary.missing} 条已跳过。`,
+        href: "/dispatch?filter=waiting_recheck",
+        actionLabel: "去复检派单",
       });
       router.refresh();
     } catch (caught) {

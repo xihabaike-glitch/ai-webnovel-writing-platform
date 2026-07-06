@@ -5,6 +5,7 @@ import {
   buildModelRoleMatrixPriorityBlocker,
   buildModelRoleRouteDraft,
   buildModelRoleRouteBatchSavePlan,
+  buildModelRoleRouteRecheckAdviceFromBatchPlan,
 } from "../lib/model-gateway/modelRoleMatrix.ts";
 
 test("buildModelRoleMatrix", async (t) => {
@@ -347,5 +348,60 @@ test("buildModelRoleMatrix", async (t) => {
     assert.ok(firstItem.confirmation.reason.includes(firstItem.label));
     assert.ok(firstItem.confirmation.reason.includes(firstItem.ownerRoleTitle));
     assert.ok(firstItem.confirmation.reason.includes(firstItem.manualGate));
+  });
+
+  await t.test("turns saved role routes into route recheck advice", () => {
+    const draft = buildModelRoleRouteDraft([
+      {
+        id: "claude-config",
+        providerId: "claude",
+        displayName: "Claude",
+        hasApiKey: true,
+        defaultModel: "claude-sonnet-4-5",
+        enabled: true,
+        maxContextTokens: 200000,
+      },
+      {
+        id: "deepseek-config",
+        providerId: "deepseek",
+        displayName: "DeepSeek",
+        hasApiKey: true,
+        defaultModel: "deepseek-chat",
+        enabled: true,
+        maxContextTokens: 64000,
+      },
+      {
+        id: "kimi-config",
+        providerId: "kimi",
+        displayName: "Kimi",
+        hasApiKey: true,
+        defaultModel: "kimi-k2.6",
+        enabled: true,
+        maxContextTokens: 128000,
+      },
+      {
+        id: "gpt-config",
+        providerId: "gpt",
+        displayName: "GPT / OpenAI",
+        hasApiKey: true,
+        defaultModel: "gpt-5-mini",
+        enabled: true,
+        maxContextTokens: 128000,
+      },
+    ], []);
+    const plan = buildModelRoleRouteBatchSavePlan(draft);
+
+    const advice = buildModelRoleRouteRecheckAdviceFromBatchPlan(plan, "2026-07-06T08:00:00.000Z");
+    const draftAdvice = advice.find((item) => item.taskType === "chapter_draft");
+
+    assert.equal(advice.length, 6);
+    assert.equal(draftAdvice?.id, "role-route-recheck:chapter_draft:2026-07-06T08:00:00.000Z");
+    assert.equal(draftAdvice?.severity, "warning");
+    assert.equal(draftAdvice?.action, "manual_review");
+    assert.equal(draftAdvice?.actionLabel, "跑小样本复检");
+    assert.ok(draftAdvice?.recommendation.includes("中文网文写手"));
+    assert.ok(draftAdvice?.evidence.some((item) => item.includes("DeepSeek · deepseek-chat")));
+    assert.equal(draftAdvice?.sampleCount, null);
+    assert.equal(draftAdvice?.successRatePercent, null);
   });
 });

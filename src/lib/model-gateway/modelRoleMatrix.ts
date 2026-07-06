@@ -1,4 +1,5 @@
 import { getProviderOption, getProviderModelPresets } from "./providerDefaults.ts";
+import type { RouteConfirmationRecheckAdviceItem } from "./routeConfirmation.ts";
 import { labelForRoutedTask, type RoutedModelTaskType } from "./taskRouting.ts";
 import type { ModelProviderId } from "./types.ts";
 
@@ -452,4 +453,34 @@ export function buildModelRoleRouteBatchSavePlan(draft: ModelRoleRouteDraft): Mo
     },
     items,
   };
+}
+
+export function buildModelRoleRouteRecheckAdviceFromBatchPlan(
+  plan: ModelRoleRouteBatchSavePlan,
+  createdAt: string | Date = new Date(),
+): RouteConfirmationRecheckAdviceItem[] {
+  const createdAtIso = typeof createdAt === "string" ? new Date(createdAt).toISOString() : createdAt.toISOString();
+
+  return plan.items.map((item): RouteConfirmationRecheckAdviceItem => ({
+    id: `role-route-recheck:${item.taskType}:${createdAtIso}`,
+    taskType: item.taskType,
+    label: item.label,
+    severity: "warning",
+    action: "manual_review",
+    actionLabel: "跑小样本复检",
+    recommendation: `${item.label}已按${item.ownerRoleTitle}职责路线保存，先跑 1 个小样本复检质量、成本和备用命中，再开放批量生产。`,
+    sampleCount: null,
+    successRatePercent: null,
+    qualityScore: null,
+    cost: null,
+    fallbackHit: null,
+    needsGovernance: null,
+    evidence: [
+      `首选：${item.primaryProviderName}`,
+      item.fallbackProviderName ? `备用：${item.fallbackProviderName}` : "备用：无",
+      `人工闸门：${item.manualGate}`,
+      `保存原因：${item.confirmation.reason}`,
+    ],
+    completedAt: null,
+  }));
 }

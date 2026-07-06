@@ -444,6 +444,7 @@ export function ProjectControlDashboardPanel({ projectId }: { projectId: string 
   const [runningRecentBatchAction, setRunningRecentBatchAction] = useState(false);
   const [runningChecklistItemId, setRunningChecklistItemId] = useState<string | null>(null);
   const [runningBatchRecheck, setRunningBatchRecheck] = useState(false);
+  const [runningMemoryAction, setRunningMemoryAction] = useState<"confirm" | "rollback" | "clear" | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
   async function loadDashboard() {
@@ -689,6 +690,40 @@ export function ProjectControlDashboardPanel({ projectId }: { projectId: string 
       setMessage(caught instanceof Error ? caught.message : "复检批量健康失败。");
     } finally {
       setRunningBatchRecheck(false);
+    }
+  }
+
+  async function controlPromptMemory(memoryAction: "confirm" | "rollback" | "clear") {
+    if (!dashboard?.aiPipelinePromptMemory.hasMemory) return;
+    setRunningMemoryAction(memoryAction);
+    setMessage(null);
+    try {
+      const response = await fetch(`/api/projects/${projectId}/control-actions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          areaId: "ai-pipeline",
+          mode: "seed",
+          memoryAction,
+        }),
+      });
+      const payload = await response.json() as {
+        message?: string;
+        error?: string;
+        targetAnchor?: string;
+      };
+      if (!response.ok) {
+        throw new Error(payload.error ?? "更新恢复记忆失败。");
+      }
+      await loadDashboard();
+      setMessage(payload.message ?? "恢复记忆控制动作已写入。");
+      if (payload.targetAnchor && typeof window !== "undefined") {
+        window.location.hash = payload.targetAnchor;
+      }
+    } catch (caught) {
+      setMessage(caught instanceof Error ? caught.message : "更新恢复记忆失败。");
+    } finally {
+      setRunningMemoryAction(null);
     }
   }
 
@@ -1104,7 +1139,7 @@ export function ProjectControlDashboardPanel({ projectId }: { projectId: string 
                 ))}
               </div>
             ) : null}
-            {dashboard.aiPipelinePromptMemory.hasMemory ? (
+            {dashboard.aiPipelinePromptMemory.hasMemory || dashboard.aiPipelinePromptMemory.latestAt ? (
               <div className="mt-3 rounded-md border border-emerald-200 bg-emerald-50 p-3">
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                   <div>
@@ -1138,6 +1173,34 @@ export function ProjectControlDashboardPanel({ projectId }: { projectId: string 
                 <p className="mt-2 rounded-md bg-white/70 px-2 py-1 text-xs leading-5 text-emerald-900">
                   {dashboard.aiPipelinePromptMemory.actionLabel}：{dashboard.aiPipelinePromptMemory.controlDetail}
                 </p>
+                {dashboard.aiPipelinePromptMemory.hasMemory ? (
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <button
+                      className="inline-flex w-fit rounded-md bg-white px-2 py-1 text-xs font-medium text-emerald-900 hover:bg-emerald-100 disabled:opacity-50"
+                      disabled={Boolean(runningMemoryAction)}
+                      onClick={() => void controlPromptMemory("confirm")}
+                      type="button"
+                    >
+                      {runningMemoryAction === "confirm" ? "写入中" : "确认继续使用"}
+                    </button>
+                    <button
+                      className="inline-flex w-fit rounded-md bg-white px-2 py-1 text-xs font-medium text-rose-800 hover:bg-rose-50 disabled:opacity-50"
+                      disabled={Boolean(runningMemoryAction)}
+                      onClick={() => void controlPromptMemory("rollback")}
+                      type="button"
+                    >
+                      {runningMemoryAction === "rollback" ? "写入中" : "回滚小样本"}
+                    </button>
+                    <button
+                      className="inline-flex w-fit rounded-md bg-white px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                      disabled={Boolean(runningMemoryAction)}
+                      onClick={() => void controlPromptMemory("clear")}
+                      type="button"
+                    >
+                      {runningMemoryAction === "clear" ? "写入中" : "清除旧记忆"}
+                    </button>
+                  </div>
+                ) : null}
               </div>
             ) : null}
             {dashboard.aiPipelineControlPlan.hasPlan ? (

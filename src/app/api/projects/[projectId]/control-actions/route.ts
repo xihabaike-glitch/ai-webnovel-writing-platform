@@ -28,6 +28,7 @@ interface ControlActionBody {
   itemId?: string;
   completed?: boolean;
   recheck?: boolean;
+  memoryAction?: "confirm" | "rollback" | "clear";
 }
 
 function result(areaId: string, targetAnchor: string, created: string[], skipped?: string) {
@@ -84,6 +85,66 @@ export async function POST(request: Request, { params }: Params) {
   }
 
   const platform = getPlatformProfile(project.targetPlatform as PlatformId);
+
+  const memoryAction = body.memoryAction === "confirm" || body.memoryAction === "rollback" || body.memoryAction === "clear"
+    ? body.memoryAction
+    : null;
+  if (areaId === "ai-pipeline" && memoryAction) {
+    const action = memoryAction;
+    const receiptId = `ai-pipeline-memory:${action}:${projectId}:${Date.now()}`;
+    const label = action === "clear"
+      ? "AI 恢复记忆已清除"
+      : action === "rollback"
+        ? "AI 恢复记忆回滚小样本"
+        : "AI 恢复记忆已确认";
+    const detail = action === "clear"
+      ? "旧恢复证据已过期，停止带入提示词。"
+      : action === "rollback"
+        ? "读感或数据不稳，先回滚到 1 章复验。"
+        : "人工确认继续使用恢复记忆，并保持小批观察。";
+    const message = action === "clear"
+      ? "旧恢复记忆已清除，后续提示词不再携带这条证据。"
+      : action === "rollback"
+        ? "已把恢复记忆回滚到 1 章复验。"
+        : "已确认继续使用恢复记忆，后续仍按小批观察。";
+
+    await prisma.gateActionAudit.create({
+      data: {
+        receiptId,
+        actionId: `ai-pipeline-memory:${projectId}`,
+        projectId,
+        platformId: platform.id,
+        platformName: platform.name,
+        label,
+        detail,
+        href: `/projects/${projectId}#ai-pipeline`,
+        status: "succeeded",
+        message,
+        executionType: "control_action",
+        succeededCount: 1,
+        failedCount: 0,
+        taskId: null,
+        recheckStatus: action === "rollback" ? "needs_action" : action === "clear" ? "cleared" : "ready",
+        recheckLabel: action === "rollback" ? "回滚小样本" : action === "clear" ? "已清除" : "继续生效",
+        recheckDetail: detail,
+        recheckAction: action === "rollback" ? "跑 1 章复验" : action === "clear" ? "等待新复检" : "继续小批观察",
+        payload: JSON.stringify({
+          aiPipelinePromptMemoryControl: {
+            action,
+            label: action === "rollback" ? "人工回滚" : action === "clear" ? "清除旧记忆" : "人工确认",
+            detail,
+          },
+        }),
+      },
+    });
+
+    return NextResponse.json({
+      areaId,
+      targetAnchor: "ai-pipeline",
+      memoryAction: action,
+      message,
+    });
+  }
 
   if (areaId === "ai-pipeline" && body.receiptId && body.recheck === true) {
     const audit = project.gateActionAudits.find((item) => (

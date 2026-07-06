@@ -1293,6 +1293,7 @@ function buildAiPipelineControlPlanSummary(audits: ControlBatchAudit[] = []): Ai
 }
 
 interface AiPipelinePromptMemoryCandidate {
+  hasMemory: boolean;
   lifecycleStatus: "active" | "sample_required" | "rollback";
   lifecycleLabel: string;
   healthLabel: string;
@@ -1313,6 +1314,43 @@ function compactEvidence(items: Array<string | null | undefined>) {
 
 function buildAiPipelinePromptMemoryCandidate(audit: ControlBatchAudit): AiPipelinePromptMemoryCandidate | null {
   const payload = parseJsonObject(audit.payload);
+  const memoryControl = isRecord(payload?.aiPipelinePromptMemoryControl) ? payload.aiPipelinePromptMemoryControl : null;
+  const memoryAction = memoryControl?.action === "confirm" || memoryControl?.action === "rollback" || memoryControl?.action === "clear"
+    ? memoryControl.action
+    : null;
+  if (memoryAction) {
+    const label = textValue(memoryControl?.label) ?? (memoryAction === "clear" ? "清除旧记忆" : memoryAction === "rollback" ? "人工回滚" : "人工确认");
+    const detail = textValue(memoryControl?.detail) ?? audit.message;
+    if (memoryAction === "clear") {
+      return {
+        hasMemory: false,
+        lifecycleStatus: "active",
+        lifecycleLabel: "已清除",
+        healthLabel: label,
+        sourceLabel: audit.label,
+        nextAction: "旧恢复记忆已清除，后续提示词不再携带这条证据。",
+        actionLabel: "等待新复检",
+        controlDetail: detail,
+        evidence: compactEvidence([label, detail, audit.message]),
+        latestAt: new Date(audit.createdAt).toISOString(),
+      };
+    }
+    return {
+      hasMemory: true,
+      lifecycleStatus: memoryAction === "rollback" ? "rollback" : "active",
+      lifecycleLabel: memoryAction === "rollback" ? "回滚小样本" : "继续生效",
+      healthLabel: label,
+      sourceLabel: audit.label,
+      nextAction: memoryAction === "rollback"
+        ? "回滚到小样本修复，不要继续扩大批量。"
+        : "继续小批观察，禁止直接恢复大批量。",
+      actionLabel: memoryAction === "rollback" ? "回滚到 1 章复验" : "继续使用恢复记忆",
+      controlDetail: detail,
+      evidence: compactEvidence([label, detail, audit.message]),
+      latestAt: new Date(audit.createdAt).toISOString(),
+    };
+  }
+
   const controlPlan = isRecord(payload?.aiPipelineControlPlan) ? payload.aiPipelineControlPlan : null;
   const controlRecheck = isRecord(controlPlan?.recheck) ? controlPlan.recheck : null;
   const recheckStatus = controlRecheck?.status === "small_batch_ready" || controlRecheck?.status === "sample_required"
@@ -1323,6 +1361,7 @@ function buildAiPipelinePromptMemoryCandidate(audit: ControlBatchAudit): AiPipel
     const healthLabel = textValue(controlRecheck?.healthLabel) ?? (recheckStatus === "small_batch_ready" ? "可小批恢复" : "继续小样本复验");
     const detail = textValue(controlRecheck?.detail) ?? textValue(audit.recheckDetail) ?? audit.message;
     return {
+      hasMemory: true,
       lifecycleStatus: recheckStatus === "small_batch_ready" ? "active" : "sample_required",
       lifecycleLabel: recheckStatus === "small_batch_ready" ? "继续生效" : "等待小样本",
       healthLabel,
@@ -1359,6 +1398,7 @@ function buildAiPipelinePromptMemoryCandidate(audit: ControlBatchAudit): AiPipel
     : "继续小批观察，禁止直接恢复大批量。";
 
   return {
+    hasMemory: true,
     lifecycleStatus: shouldRollback ? "rollback" : batchStatus === "watch_cost" ? "sample_required" : "active",
     lifecycleLabel: shouldRollback ? "回滚小样本" : batchStatus === "watch_cost" ? "等待复验" : "继续生效",
     healthLabel,
@@ -1401,6 +1441,25 @@ function buildAiPipelinePromptMemorySummary(audits: ControlBatchAudit[] = []): A
       evidence: [],
       sourceLabel: null,
       latestAt: null,
+      targetHref: "#ai-pipeline",
+    };
+  }
+
+  if (!candidate.hasMemory) {
+    return {
+      hasMemory: false,
+      lifecycleStatus: "empty",
+      lifecycleLabel: candidate.lifecycleLabel,
+      label: "提示词记忆已清除",
+      headline: "旧恢复记忆已经被清除，后续 AI 写审改不会继续携带这条证据。",
+      detail: "等下一次复检或小批恢复产生新回执后，再写入新的提示词约束。",
+      promptBlock: "",
+      nextAction: candidate.nextAction,
+      actionLabel: candidate.actionLabel,
+      controlDetail: candidate.controlDetail,
+      evidence: candidate.evidence,
+      sourceLabel: candidate.sourceLabel,
+      latestAt: candidate.latestAt,
       targetHref: "#ai-pipeline",
     };
   }

@@ -87,6 +87,8 @@ test("buildBatchExecutionSafety", async (t) => {
     assert.equal(recoveryGate?.status, "block");
     assert.ok(recoveryGate?.detail.includes("AI 写审改恢复"));
     assert.ok(recoveryGate?.detail.includes("不回推荐批量"));
+    assert.equal(recoveryGate?.actionLabel, "回恢复闸门");
+    assert.equal(recoveryGate?.actionHref, "/gate#ai-pipeline-recovery");
   });
 
   await t.test("blocks execution when too many tasks are already running", () => {

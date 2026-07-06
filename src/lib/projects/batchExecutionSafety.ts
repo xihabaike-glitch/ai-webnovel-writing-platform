@@ -15,6 +15,8 @@ export interface ExecutionSafetyItem {
   label: string;
   status: "pass" | "warn" | "block";
   detail: string;
+  actionLabel?: string;
+  actionHref?: string;
 }
 
 export interface BatchExecutionSafety {
@@ -49,8 +51,9 @@ function safetyItem(
   label: string,
   status: ExecutionSafetyItem["status"],
   detail: string,
+  action?: Pick<ExecutionSafetyItem, "actionLabel" | "actionHref">,
 ): ExecutionSafetyItem {
-  return { id, label, status, detail };
+  return { id, label, status, detail, ...action };
 }
 
 function historicalCostPerToken(projects: SafetyTaskProject[]) {
@@ -134,6 +137,10 @@ export function buildBatchExecutionSafety(
       aiPipelineRecoveryFollowupCount === 0
         ? "当前没有待处理的 AI 写审改恢复派单。"
         : `${aiPipelineRecoveryFollowupCount} 个 AI 写审改恢复派单未闭环；先回恢复闸门跑小样本或回滚修复，不回推荐批量。`,
+      aiPipelineRecoveryFollowupCount === 0 ? undefined : {
+        actionLabel: "回恢复闸门",
+        actionHref: "/gate#ai-pipeline-recovery",
+      },
     ),
     safetyItem(
       "blocked-items",

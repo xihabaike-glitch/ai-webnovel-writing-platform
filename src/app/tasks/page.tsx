@@ -897,6 +897,11 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
                 <div className="text-xs text-slate-500">{item.status === "pass" ? "通过" : item.status === "warn" ? "提醒" : "阻止"}</div>
               </div>
               <p className="mt-1 leading-6 text-slate-600">{item.detail}</p>
+              {item.actionHref && item.actionLabel ? (
+                <Link className="mt-3 inline-flex w-fit rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white hover:bg-slate-800" href={item.actionHref}>
+                  {item.actionLabel}
+                </Link>
+              ) : null}
             </div>
           ))}
         </div>

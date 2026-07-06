@@ -167,6 +167,51 @@ export default async function ReferencesPage({ searchParams }: ReferencesPagePro
       </section>
 
       <section className="mb-6 rounded-md border border-slate-200 bg-white p-4">
+        <div className="mb-3 flex flex-col gap-2 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <h2 className="font-medium text-slate-950">AI 编辑部角色分工</h2>
+            <p className="mt-1 text-sm text-slate-500">把开源案例沉淀成可执行岗位，分别接到模型、Skill、输入和产物。</p>
+          </div>
+          <Link className="w-fit rounded-md border border-slate-200 px-3 py-2 text-sm font-medium hover:bg-slate-50" href="/settings/models#model-role-matrix">
+            配置模型岗位
+          </Link>
+        </div>
+        <div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-3">
+          {view.rolePlaybook.map((role) => (
+            <article className="rounded-md border border-slate-200 bg-slate-50 p-4" key={role.id}>
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <div className="text-xs text-slate-500">{role.modelOwner} · {role.skillOwner}</div>
+                  <h3 className="mt-1 font-medium text-slate-950">{role.roleName}</h3>
+                </div>
+                <span className="w-fit rounded-md bg-white px-2 py-1 text-xs font-medium text-slate-700">
+                  {role.referenceCaseIds.length} 案例
+                </span>
+              </div>
+              <p className="mt-3 text-sm leading-6 text-slate-600">{role.whenToUse}</p>
+              <div className="mt-3 grid gap-3 text-sm">
+                <div>
+                  <div className="text-xs font-medium text-slate-500">输入</div>
+                  <p className="mt-1 leading-6 text-slate-700">{role.inputs.join("、")}</p>
+                </div>
+                <div>
+                  <div className="text-xs font-medium text-slate-500">产物</div>
+                  <p className="mt-1 leading-6 text-slate-700">{role.outputs.join("、")}</p>
+                </div>
+                <div>
+                  <div className="text-xs font-medium text-slate-500">参考案例</div>
+                  <p className="mt-1 leading-6 text-slate-700">{role.referenceCaseIds.join("、")}</p>
+                </div>
+              </div>
+              <div className="mt-3 rounded-md bg-white p-3 text-sm font-medium leading-6 text-slate-800">
+                {role.nextAction}
+              </div>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <section className="mb-6 rounded-md border border-slate-200 bg-white p-4">
         <div className="mb-3 flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <h2 className="font-medium text-slate-950">高频参考标签</h2>

@@ -78,6 +78,34 @@ test("open source reference cases", async (t) => {
     assert.equal(fallbackView.selectedCategory, "all");
   });
 
+  await t.test("builds a role playbook from the reference library", () => {
+    const view = buildReferenceCaseLibraryView();
+
+    assert.ok(Array.isArray(view.rolePlaybook), "role playbook is required");
+    assert.equal(view.rolePlaybook.length, 6);
+    for (const role of view.rolePlaybook) {
+      assert.ok(role.roleName.length >= 4);
+      assert.ok(role.modelOwner.length >= 3);
+      assert.ok(role.skillOwner.length >= 3);
+      assert.ok(role.whenToUse.length >= 10);
+      assert.ok(role.inputs.length >= 2);
+      assert.ok(role.outputs.length >= 2);
+      assert.ok(role.referenceCaseIds.length >= 2);
+      assert.ok(role.referenceCaseIds.every((id) => openSourceReferenceCases.some((item) => item.id === id)));
+      assert.ok(role.nextAction.length >= 10);
+    }
+
+    const productManager = view.rolePlaybook.find((role) => role.id === "toxic_pm");
+    const draftWriter = view.rolePlaybook.find((role) => role.id === "draft_writer");
+    const overseasPackager = view.rolePlaybook.find((role) => role.id === "overseas_packager");
+    const feedbackOperator = view.rolePlaybook.find((role) => role.id === "feedback_operator");
+
+    assert.ok(productManager?.referenceCaseIds.includes("autogen"));
+    assert.ok(draftWriter?.modelOwner.includes("DeepSeek"));
+    assert.ok(overseasPackager?.outputs.some((output) => output.includes("WebNovel")));
+    assert.ok(feedbackOperator?.referenceCaseIds.includes("n8n"));
+  });
+
   await t.test("surfaces the locked eight-platform delivery scope", () => {
     const view = buildReferenceCaseLibraryView();
 

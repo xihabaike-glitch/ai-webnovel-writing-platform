@@ -38,6 +38,7 @@ export interface ReferenceCaseDevelopmentPlan {
 export interface ReferenceCaseLibraryView {
   totalCases: number;
   platformScope: ReferenceCasePlatformScope;
+  rolePlaybook: ReferenceCaseRolePlaybookItem[];
   selectedCategory: ReferenceCaseCategory | "all";
   categoryTabs: Array<{
     id: ReferenceCaseCategory | "all";
@@ -66,6 +67,18 @@ export interface ReferenceCasePlatformScope {
 }
 
 export type ReferenceCasePlatformCard = PlatformExecutionCard;
+
+export interface ReferenceCaseRolePlaybookItem {
+  id: string;
+  roleName: string;
+  modelOwner: string;
+  skillOwner: string;
+  whenToUse: string;
+  inputs: string[];
+  outputs: string[];
+  referenceCaseIds: string[];
+  nextAction: string;
+}
 
 export const referenceCaseCategories: ReferenceCaseCategoryMeta[] = [
   {
@@ -435,6 +448,77 @@ export function buildReferenceCasePlatformScope(): ReferenceCasePlatformScope {
   };
 }
 
+export function buildReferenceCaseRolePlaybook(): ReferenceCaseRolePlaybookItem[] {
+  return [
+    {
+      id: "toxic_pm",
+      roleName: "毒舌产品经理",
+      modelOwner: "GPT / Claude",
+      skillOwner: "产品梳理 Skill",
+      whenToUse: "开书前、阶段复盘和功能取舍时使用，负责把炫技想法压回可交付闭环。",
+      inputs: ["用户目标", "平台范围", "30 个参考案例", "当前项目指标"],
+      outputs: ["优先级判断", "下一步开发动作", "风险提醒", "验收口径"],
+      referenceCaseIds: ["autogen", "crewai", "dify"],
+      nextAction: "把每个页面的下一步动作都绑定到真实写作、投稿或复盘产物。",
+    },
+    {
+      id: "structure_editor",
+      roleName: "长篇结构主编",
+      modelOwner: "Claude 优先",
+      skillOwner: "结构审稿 Skill",
+      whenToUse: "设计开头结尾、主干支线、人物弧光和伏笔回收时使用。",
+      inputs: ["大纲树", "人物卡", "伏笔线", "历史章节"],
+      outputs: ["人物弧光审校", "主线支线诊断", "前三章结构复审", "结尾回收清单"],
+      referenceCaseIds: ["novelwriter", "bibisco", "manuskript", "langchain"],
+      nextAction: "把结构诊断结果直接回写到大纲树和前三章改写任务。",
+    },
+    {
+      id: "draft_writer",
+      roleName: "中文网文写手",
+      modelOwner: "DeepSeek 优先",
+      skillOwner: "正文生产 Skill",
+      whenToUse: "章节初稿、小样本试写、爽点补强和中文节奏改写时使用。",
+      inputs: ["章节卡", "平台土壤", "人物当前状态", "上一章悬念"],
+      outputs: ["章节初稿", "开头钩子候选", "爽点补强段落", "二改候选稿"],
+      referenceCaseIds: ["wavemaker", "writer", "flowise"],
+      nextAction: "先跑 1 章小样本，审稿通过后再进入批量章节生产。",
+    },
+    {
+      id: "context_librarian",
+      roleName: "长上下文资料官",
+      modelOwner: "Kimi 优先",
+      skillOwner: "资料召回 Skill",
+      whenToUse: "整理世界观、压缩长资料、召回历史章节和连续性检查时使用。",
+      inputs: ["世界观条目", "人物关系", "历史章节", "素材来源"],
+      outputs: ["项目土壤摘要", "上下文召回包", "连续性风险", "资料引用说明"],
+      referenceCaseIds: ["llama-index", "logseq", "joplin", "outline"],
+      nextAction: "把每次模型调用需要的资料包变成可审计的上下文来源。",
+    },
+    {
+      id: "overseas_packager",
+      roleName: "海外投稿包装编辑",
+      modelOwner: "GPT 优先",
+      skillOwner: "海外平台包装 Skill",
+      whenToUse: "适配 WebNovel、Royal Road、Wattpad 的英文简介、标签和章节标题时使用。",
+      inputs: ["中文卖点", "目标海外平台", "样章", "平台反馈"],
+      outputs: ["WebNovel synopsis", "Royal Road progression pitch", "Wattpad tags", "英文章节标题包"],
+      referenceCaseIds: ["lobe-chat", "librechat", "pandoc"],
+      nextAction: "把海外包装产物接到发布包版本，而不是停留在翻译文本。",
+    },
+    {
+      id: "feedback_operator",
+      roleName: "数据复盘运营",
+      modelOwner: "Kimi / GPT",
+      skillOwner: "发布复盘 Skill",
+      whenToUse: "发布后回填点击、收藏、读完、评论和签约反馈时使用。",
+      inputs: ["发布包版本", "平台效果数据", "A/B 候选", "历史复盘"],
+      outputs: ["下一轮优化建议", "标题简介 A/B 判断", "平台知识反馈", "是否放量结论"],
+      referenceCaseIds: ["n8n", "zola", "mdbook", "honkit"],
+      nextAction: "把真实平台效果回写到平台知识库，驱动下一轮包装或前三章修订。",
+    },
+  ];
+}
+
 function isReferenceCaseCategory(value: string | null | undefined): value is ReferenceCaseCategory {
   return referenceCaseCategories.some((category) => category.id === value);
 }
@@ -506,6 +590,7 @@ export function buildReferenceCaseLibraryView(input?: {
   return {
     totalCases: plan.totalCases,
     platformScope: buildReferenceCasePlatformScope(),
+    rolePlaybook: buildReferenceCaseRolePlaybook(),
     selectedCategory,
     categoryTabs,
     visibleCases,

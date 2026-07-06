@@ -142,6 +142,13 @@ interface MultiPlatformSubmission {
   };
   archive: {
     archiveFileName: string;
+    deliveryScope: {
+      corePlatformCount: number;
+      completedPlatformCount: number;
+      pausedExpansionCount: number;
+      statusLabel: string;
+      scopeDecision: string;
+    };
     readyCount: number;
     blockedCount: number;
     totalPlatforms: number;
@@ -691,6 +698,9 @@ export function SubmissionPackagePanel({
                 {" · "}
                 {multiPlatform.archive.archiveFileName}
               </p>
+              <p className="mt-1 text-xs text-emerald-700">
+                {multiPlatform.archive.deliveryScope.statusLabel}；扩展平台暂停 {multiPlatform.archive.deliveryScope.pausedExpansionCount} 个
+              </p>
             </div>
             <div className="flex flex-wrap gap-2">
               <button
@@ -734,7 +744,7 @@ export function SubmissionPackagePanel({
               </div>
             </div>
             <div className="rounded-md bg-slate-50 p-3">
-              <div className="text-xs text-slate-500">待补平台</div>
+              <div className="text-xs text-slate-500">待补字段平台</div>
               <div className="mt-1 text-lg font-semibold text-amber-700">{multiPlatform.archive.blockedCount}</div>
             </div>
             <div className="rounded-md bg-slate-50 p-3">

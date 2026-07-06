@@ -70,8 +70,14 @@ test("buildMultiPlatformSubmission", async (t) => {
     assert.ok(result.variants.every((variant) => variant.packageMatrix.packageFileName.endsWith("-投稿包.md")));
     assert.equal(result.archive.totalPlatforms, 8);
     assert.equal(result.archive.readyCount, result.packageSummary.readyPlatforms);
+    assert.equal(result.archive.deliveryScope.corePlatformCount, 8);
+    assert.equal(result.archive.deliveryScope.pausedExpansionCount, 10);
+    assert.equal(result.archive.deliveryScope.statusLabel, "8/8 核心平台已纳入发布闭环");
     assert.ok(result.archive.archiveFileName.endsWith(".md"));
     assert.ok(result.archive.markdown.includes("多平台投稿包归档"));
+    assert.ok(result.archive.markdown.includes("平台范围：8/8 核心平台已纳入发布闭环"));
+    assert.ok(result.archive.markdown.includes("扩展平台：剩余 10 个暂停，不进入当前投稿包"));
+    assert.equal(result.archive.markdown.includes("## 待补齐平台"), false);
     assert.equal(result.effectSummary.trackedPlatforms, 0);
     assert.equal(result.effectSummary.needsDataPlatforms, 8);
     assert.equal(result.decisionBoard.status, "no_data");

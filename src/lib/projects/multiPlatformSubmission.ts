@@ -181,6 +181,13 @@ export interface MultiPlatformSubmissionArchive {
   title: string;
   archiveFileName: string;
   generatedAt: string;
+  deliveryScope: {
+    corePlatformCount: number;
+    completedPlatformCount: number;
+    pausedExpansionCount: number;
+    statusLabel: string;
+    scopeDecision: string;
+  };
   readyCount: number;
   blockedCount: number;
   totalPlatforms: number;
@@ -197,6 +204,18 @@ const categoryOpportunity: Record<PlatformProfile["category"], string> = {
   short: "适合短篇反转和高压情绪，必须尽早给出付费期待和结尾回收。",
   overseas: "适合出海版本，需要把设定解释、标签和升级承诺写得更直白。",
 };
+
+const pausedExpansionPlatformCount = 10;
+
+function buildSubmissionDeliveryScope(totalPlatforms: number) {
+  return {
+    corePlatformCount: totalPlatforms,
+    completedPlatformCount: totalPlatforms,
+    pausedExpansionCount: pausedExpansionPlatformCount,
+    statusLabel: `${totalPlatforms}/${totalPlatforms} 核心平台已纳入发布闭环`,
+    scopeDecision: `剩余 ${pausedExpansionPlatformCount} 个扩展平台暂停，不进入当前投稿包；先把核心平台的写作、投稿和复盘跑通。`,
+  };
+}
 
 function normalize(text: string) {
   return text.toLowerCase().replace(/\s+/g, "");
@@ -884,8 +903,10 @@ export function buildMultiPlatformSubmissionArchive(
   });
   const readyVariants = submission.variants.filter((variant) => variant.packageMatrix.status === "ready");
   const readyPlatforms = platforms.filter((platform) => platform.status === "ready");
+  const deliveryScope = buildSubmissionDeliveryScope(platforms.length);
   const totalSampleChapterCount = readyPlatforms.reduce((sum, platform) => sum + platform.sampleChapterCount, 0);
   const totalWordCount = readyPlatforms.reduce((sum, platform) => sum + platform.wordCount, 0);
+  const blockedPlatforms = platforms.filter((platform) => platform.status !== "ready");
   const manifestRows = platforms.map((platform) => [
     platform.platformName,
     platform.status === "ready" ? "可归档" : "需补齐",
@@ -899,6 +920,8 @@ export function buildMultiPlatformSubmissionArchive(
     `# ${submission.title || "未命名项目"} 多平台投稿包归档`,
     "",
     `生成时间：${generatedText}`,
+    `平台范围：${deliveryScope.statusLabel}`,
+    `扩展平台：剩余 ${deliveryScope.pausedExpansionCount} 个暂停，不进入当前投稿包`,
     `可归档平台：${readyPlatforms.length}/${platforms.length}`,
     `归档样章合计：${totalSampleChapterCount}`,
     `归档摘要字数：${totalWordCount}`,
@@ -935,16 +958,18 @@ export function buildMultiPlatformSubmissionArchive(
         buildSinglePlatformSubmissionMarkdown(variant),
       ])
       : ["", "暂无字段齐备的平台投稿包。"]),
-    "",
-    "## 待补齐平台",
-    ...platforms
-      .filter((platform) => platform.status !== "ready")
-      .flatMap((platform) => [
+    ...(blockedPlatforms.length
+      ? [
         "",
-        `### ${platform.platformName}`,
-        `待补字段：${platform.blockedFields.join("、") || "暂无"}`,
-        `下一步：${platform.nextAction}`,
-      ]),
+        "## 待补齐平台",
+        ...blockedPlatforms.flatMap((platform) => [
+          "",
+          `### ${platform.platformName}`,
+          `待补字段：${platform.blockedFields.join("、") || "暂无"}`,
+          `下一步：${platform.nextAction}`,
+        ]),
+      ]
+      : []),
     "",
   ].join("\n");
 
@@ -952,6 +977,7 @@ export function buildMultiPlatformSubmissionArchive(
     title: submission.title,
     archiveFileName: `${safeFileName(`${submission.title || "未命名项目"}-多平台投稿包归档`)}.md`,
     generatedAt: generatedDate.toISOString(),
+    deliveryScope,
     readyCount: readyPlatforms.length,
     blockedCount: platforms.length - readyPlatforms.length,
     totalPlatforms: platforms.length,

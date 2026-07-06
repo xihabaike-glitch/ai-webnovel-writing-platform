@@ -75,6 +75,15 @@ function isRunnableBatchItem(item: QueueItem) {
   return item.category === "draft" || item.category === "review" || item.category === "second_pass";
 }
 
+function isOpenAiPipelineRecoveryFollowup(item: QueueItem) {
+  return item.sourceType === "tactic_experience_followup"
+    && (
+      item.sourceLabel === "AI 写审改恢复"
+      || item.platformName === "AI 写审改"
+      || item.sourceDispatchKey?.startsWith("ai-pipeline:") === true
+    );
+}
+
 export function buildBatchExecutionSafety(
   queueItems: QueueItem[],
   projects: SafetyTaskProject[],
@@ -87,6 +96,7 @@ export function buildBatchExecutionSafety(
     : runnable.slice(0, strategy.maxBatchSize);
   const blockedCount = queueItems.filter((item) => item.category === "blocked").length;
   const candidateCount = queueItems.filter((item) => item.category === "candidate").length;
+  const aiPipelineRecoveryFollowupCount = queueItems.filter(isOpenAiPipelineRecoveryFollowup).length;
   const sampleOnlyCount = queueItems.filter((item) => item.scaleGate === "sample_only" && isRunnableBatchItem(item)).length;
   const clearedWatchCount = queueItems.filter((item) => item.scaleGate === "cleared" && isRunnableBatchItem(item)).length;
   const estimatedTokens = recommended.reduce((sum, item) => sum + estimatedTokensByCategory[item.category], 0);
@@ -116,6 +126,14 @@ export function buildBatchExecutionSafety(
       candidateCount === 0
         ? "当前没有待采纳 AI 候选稿。"
         : `${candidateCount} 个 AI 候选稿还没由作者确认；先处理候选，再继续批量生产。`,
+    ),
+    safetyItem(
+      "ai-pipeline-recovery",
+      "AI 写审改恢复",
+      aiPipelineRecoveryFollowupCount === 0 ? "pass" : "block",
+      aiPipelineRecoveryFollowupCount === 0
+        ? "当前没有待处理的 AI 写审改恢复派单。"
+        : `${aiPipelineRecoveryFollowupCount} 个 AI 写审改恢复派单未闭环；先回恢复闸门跑小样本或回滚修复，不回推荐批量。`,
     ),
     safetyItem(
       "blocked-items",

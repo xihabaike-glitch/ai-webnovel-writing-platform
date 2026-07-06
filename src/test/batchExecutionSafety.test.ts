@@ -60,6 +60,35 @@ test("buildBatchExecutionSafety", async (t) => {
     assert.ok(candidateGate?.detail.includes("候选稿"));
   });
 
+  await t.test("blocks recommended batches while AI pipeline recovery follow-ups are open", () => {
+    const safety = buildBatchExecutionSafety([
+      {
+        ...baseItem,
+        id: "project-1:tactic-experience-followup:ai-pipeline:watch",
+        category: "handoff",
+        sourceType: "tactic_experience_followup",
+        sourceLabel: "AI 写审改恢复",
+        sourceDispatchKey: "ai-pipeline:tactic_experience_followup:watch-ai-recovery:2026-01-01",
+        platformName: "AI 写审改",
+        label: "AI 写审改恢复",
+        chapterTitle: "恢复观察小样本复验",
+        evidence: "AI 写审改恢复依据还在观察期，只准继续 1 章小样本复验，不回推荐批量。",
+        actionLabel: "继续小样本",
+        href: "/gate#ai-pipeline-recovery",
+        priority: 6,
+      },
+      baseItem,
+    ], [{ aiTasks: [] }]);
+
+    assert.equal(safety.recommendedBatchSize, 1);
+    assert.deepEqual(safety.recommendedBatchIds, ["item-1"]);
+    assert.equal(safety.canRunRecommendedBatch, false);
+    const recoveryGate = safety.items.find((item) => item.id === "ai-pipeline-recovery");
+    assert.equal(recoveryGate?.status, "block");
+    assert.ok(recoveryGate?.detail.includes("AI 写审改恢复"));
+    assert.ok(recoveryGate?.detail.includes("不回推荐批量"));
+  });
+
   await t.test("blocks execution when too many tasks are already running", () => {
     const safety = buildBatchExecutionSafety([baseItem], [
       {

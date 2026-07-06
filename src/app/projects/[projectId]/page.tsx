@@ -36,6 +36,7 @@ import { buildGateBatchTacticEffectReview, buildGatePlatformDecisionTimeline, bu
 import { gatePlatformDispatchTaskFromRecord } from "@/lib/projects/gateDispatchTaskRecords";
 import { buildPlatformKnowledgeBrief } from "@/lib/projects/platformKnowledgeBrief";
 import { buildProjectDashboard } from "@/lib/projects/projectDashboard";
+import { buildProjectRoleWorkflowEntrypoints } from "@/lib/projects/projectListDashboard";
 import { buildSubmissionChecklist } from "@/lib/projects/submissionChecklist";
 import { buildSubmissionPackage } from "@/lib/projects/submissionPackage";
 import { buildWritingWorkbench } from "@/lib/projects/writingWorkbench";
@@ -512,6 +513,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ projec
       reviewLatestAt: task.reviewLatestAt,
     })),
   });
+  const roleEntrypoints = buildProjectRoleWorkflowEntrypoints();
 
   return (
     <AppShell>
@@ -522,6 +524,36 @@ export default async function ProjectPage({ params }: { params: Promise<{ projec
             {platform.name} · {project.currentWordCount}/{project.targetWordCount} 字 · {project.genre}
           </p>
         </div>
+        <section className="rounded-md border border-slate-200 bg-white p-4">
+          <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <h2 className="font-medium text-slate-950">当前作品角色导航</h2>
+              <p className="mt-1 text-sm text-slate-500">从角色入口进来后，先按岗位找到对应工作区，再处理具体产物。</p>
+            </div>
+            <Link className="w-fit rounded-md border border-slate-200 px-3 py-2 text-sm font-medium hover:bg-slate-50" href="/references">
+              回到参考库
+            </Link>
+          </div>
+          <div className="grid gap-3 md:grid-cols-3">
+            {roleEntrypoints.map((entry) => (
+              <Link
+                className="rounded-md border border-slate-200 bg-slate-50 p-3 text-sm hover:border-slate-400 hover:bg-white"
+                href={`/projects/${project.id}${entry.projectAnchor}`}
+                key={entry.id}
+              >
+                <div className="font-medium text-slate-950">{entry.title}</div>
+                <p className="mt-1 line-clamp-2 leading-5 text-slate-600">{entry.detail}</p>
+                <div className="mt-2 flex flex-wrap gap-1">
+                  {entry.workflowSteps.map((step) => (
+                    <span className="rounded-md bg-white px-2 py-1 text-xs text-slate-600" key={`${entry.id}-${step.stage}`}>
+                      {step.stage}：{step.output}
+                    </span>
+                  ))}
+                </div>
+              </Link>
+            ))}
+          </div>
+        </section>
         <WritingWorkbenchPanel workbench={writingWorkbench} />
         <PlatformKnowledgeBriefPanel brief={platformKnowledgeBrief} projectId={project.id} />
         <div id="project-control">
@@ -677,7 +709,9 @@ export default async function ProjectPage({ params }: { params: Promise<{ projec
         <div id="platform-export">
           <PlatformExportCenterPanel projectId={project.id} />
         </div>
-        <StoryStructureDiagnosticPanel projectId={project.id} />
+        <div id="story-structure">
+          <StoryStructureDiagnosticPanel projectId={project.id} />
+        </div>
         <div id="submission-package">
           <SubmissionPackagePanel projectId={project.id} submissionPackage={submissionPackage} />
         </div>

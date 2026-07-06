@@ -29,11 +29,15 @@ export interface TaskDebtFocusChangeNoticeInput {
   label: string;
   previousDebtCount: number | null;
   currentDebtCount: number;
+  resumeActionLabel?: string | null;
+  resumeActionHref?: string | null;
 }
 
 export interface TaskDebtFocusChangeNotice {
   tone: "reduced" | "cleared" | "unchanged";
   message: string;
+  actionLabel: string | null;
+  actionHref: string | null;
 }
 
 function taskDebtAutoFocusHref(input: Pick<TaskDebtCompletionFeedbackInput, "blockerType" | "previousDebtCount">) {
@@ -59,6 +63,8 @@ export function buildTaskDebtFocusChangeNotice(input: TaskDebtFocusChangeNoticeI
     return {
       tone: "cleared",
       message: `刚回写${input.label}清债证据：提交前 ${previous} 个，现在已经清空。可以恢复后续生产。`,
+      actionLabel: input.resumeActionLabel ?? null,
+      actionHref: input.resumeActionHref ?? null,
     };
   }
 
@@ -66,12 +72,16 @@ export function buildTaskDebtFocusChangeNotice(input: TaskDebtFocusChangeNoticeI
     return {
       tone: "reduced",
       message: `刚回写${input.label}清债证据：提交前 ${previous} 个，现在 ${current} 个，已减少 ${delta} 个。继续处理剩余阻塞。`,
+      actionLabel: null,
+      actionHref: null,
     };
   }
 
   return {
     tone: "unchanged",
     message: `刚回写${input.label}清债证据：提交前 ${previous} 个，现在仍是 ${current} 个。证据可能生成了后续动作，或仍缺验收项。`,
+    actionLabel: null,
+    actionHref: null,
   };
 }
 

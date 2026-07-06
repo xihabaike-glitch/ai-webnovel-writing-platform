@@ -381,6 +381,8 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
         label: debtBlockerTypeName(clearedDebtBlockerType),
         previousDebtCount: previousDebtCount(resolvedSearchParams.previousDebt),
         currentDebtCount: debtView.groups.find((group) => group.blockerType === clearedDebtBlockerType)?.count ?? 0,
+        resumeActionLabel: debtView.resumeActionLabel,
+        resumeActionHref: debtView.resumeActionHref,
       })
     : null;
   const visibleQueueItems = activeView === "blocked" ? debtView.items : queue.items;
@@ -591,7 +593,12 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
           ) : null}
           {debtFocusChangeNotice ? (
             <div className={`mt-4 rounded-md border px-3 py-2 text-sm leading-6 ${debtFocusNoticeClass(debtFocusChangeNotice.tone)}`}>
-              {debtFocusChangeNotice.message}
+              <div>{debtFocusChangeNotice.message}</div>
+              {debtFocusChangeNotice.actionLabel && debtFocusChangeNotice.actionHref ? (
+                <Link className="mt-2 inline-flex rounded-md bg-white/80 px-3 py-1 font-medium hover:bg-white" href={debtFocusChangeNotice.actionHref}>
+                  {debtFocusChangeNotice.actionLabel}
+                </Link>
+              ) : null}
             </div>
           ) : null}
         </section>

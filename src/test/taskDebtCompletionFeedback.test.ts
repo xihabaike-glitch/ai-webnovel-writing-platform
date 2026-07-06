@@ -48,6 +48,21 @@ test("buildTaskDebtFocusChangeNotice highlights reduced debt after refresh", () 
   assert.equal(notice?.message, "刚回写首日闸门清债证据：提交前 4 个，现在 3 个，已减少 1 个。继续处理剩余阻塞。");
 });
 
+test("buildTaskDebtFocusChangeNotice recommends resumed production after a debt type is cleared", () => {
+  const notice = buildTaskDebtFocusChangeNotice({
+    label: "首日闸门",
+    previousDebtCount: 2,
+    currentDebtCount: 0,
+    resumeActionLabel: "恢复生产：生成初稿",
+    resumeActionHref: "/projects/project-1/chapters/chapter-ready-draft",
+  });
+
+  assert.equal(notice?.tone, "cleared");
+  assert.equal(notice?.message, "刚回写首日闸门清债证据：提交前 2 个，现在已经清空。可以恢复后续生产。");
+  assert.equal(notice?.actionLabel, "恢复生产：生成初稿");
+  assert.equal(notice?.actionHref, "/projects/project-1/chapters/chapter-ready-draft");
+});
+
 test("buildTaskDebtFocusChangeNotice explains when debt count does not fall", () => {
   const notice = buildTaskDebtFocusChangeNotice({
     label: "观察闸门",

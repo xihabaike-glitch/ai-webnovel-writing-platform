@@ -185,6 +185,15 @@ export interface GateFailureRepairRecheckResolution {
   evidence: string[];
 }
 
+export interface GateFailureRepairFollowupNotice {
+  tone: "open" | "recheck" | "active" | "failed" | "resolved";
+  label: string;
+  detail: string;
+  actionLabel: string;
+  href: string;
+  badges: string[];
+}
+
 export interface GateFailureRepairThirdRoundResolution {
   status: "none" | "active" | "failed" | "resolved";
   label: string;
@@ -1993,6 +2002,64 @@ export function buildGateFailureRepairRecheckResolution(
     unresolvedFailures: 0,
     latestDispatchKey: latestCompleted.dispatchKey,
     evidence,
+  };
+}
+
+export function buildGateFailureRepairFollowupNotice(
+  review: GateFailureRepairReceiptReview,
+  resolution: GateFailureRepairRecheckResolution,
+): GateFailureRepairFollowupNotice {
+  if (resolution.status === "resolved" || review.status === "cleared") {
+    return {
+      tone: "resolved",
+      label: "失败修复已闭环",
+      detail: resolution.status === "resolved" ? resolution.detail : review.detail,
+      actionLabel: "恢复任务中心",
+      href: "/tasks",
+      badges: ["未恢复 0", `回执 ${review.receipts}`, "可恢复小批前复查"],
+    };
+  }
+
+  if (resolution.status === "failed") {
+    return {
+      tone: "failed",
+      label: "复检未通过，进入第三轮",
+      detail: resolution.detail,
+      actionLabel: "生成第三轮处理建议",
+      href: resolution.href,
+      badges: [`未恢复 ${resolution.unresolvedFailures}`, `复检 ${resolution.completedRechecks}`, "继续拆失败"],
+    };
+  }
+
+  if (resolution.status === "active") {
+    return {
+      tone: "active",
+      label: "等待复检完成",
+      detail: resolution.detail,
+      actionLabel: "查看复检派单",
+      href: resolution.href,
+      badges: [`未恢复 ${resolution.unresolvedFailures}`, "已派单", "等完成依据"],
+    };
+  }
+
+  if (review.status === "recheck" || review.status === "blocked") {
+    return {
+      tone: "recheck",
+      label: review.status === "blocked" ? "修复失败，先派复检" : "已记录修复，去复检",
+      detail: `${review.detail} 下一步去派单中心接住失败修复后复检。`,
+      actionLabel: "去派单复检",
+      href: "/dispatch",
+      badges: [`回执 ${review.receipts}`, "复检未派", review.status === "blocked" ? "先查失败动作" : "别直接放量"],
+    };
+  }
+
+  return {
+    tone: "open",
+    label: review.label,
+    detail: review.detail,
+    actionLabel: "记录修复回执",
+    href: "/failures",
+    badges: [`回执 ${review.receipts}`, "先修再验", "未进入复检"],
   };
 }
 

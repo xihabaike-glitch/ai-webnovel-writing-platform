@@ -8,6 +8,7 @@ import {
   buildGatePlatformStrategyReceipt,
   buildGateActionReviewAdvice,
   buildGateFailureRepairReceiptReview,
+  buildGateFailureRepairFollowupNotice,
   buildGateFailureRepairRecheckDispatchItems,
   buildGateFailureRepairRecheckResolution,
   buildGateFailureRepairThirdRoundDispatchItems,
@@ -952,6 +953,68 @@ test("buildGateActionReceipt", async (t) => {
     assert.ok(dispatches[0].acceptanceCriteria.includes("总闸门未恢复失败数降为 0"));
     assert.ok(dispatches[0].evidence.some((line) => line.includes("已记录模型配置修复")));
     assert.equal(clearedDispatches.length, 0);
+  });
+
+  await t.test("builds a failure repair follow-up notice from receipts and recheck state", () => {
+    const open = buildGateFailureRepairFollowupNotice(
+      buildGateFailureRepairReceiptReview(failureRepairBatch, []),
+      buildGateFailureRepairRecheckResolution(failureRepairBatch, []),
+    );
+    const manualRepair = buildGateActionReceipt({
+      action: {
+        id: "failure-repair-batch",
+        label: "记录配置修复",
+        detail: "先修配置，再谈重试：1 个未恢复失败指向 API Key、权限或模型配置。",
+        href: "/settings/models",
+        tone: "repair",
+        execution: null,
+      },
+      status: "succeeded",
+      now: "2026-01-01T00:00:00.000Z",
+      payload: { message: "已记录模型配置修复。" },
+    });
+    const review = buildGateFailureRepairReceiptReview(failureRepairBatch, [manualRepair]);
+    const pendingRecheck = buildGateFailureRepairFollowupNotice(
+      review,
+      buildGateFailureRepairRecheckResolution(failureRepairBatch, []),
+    );
+    const resolved = buildGateFailureRepairFollowupNotice(
+      buildGateFailureRepairReceiptReview({
+        ...failureRepairBatch,
+        status: "clear",
+        summary: {
+          unresolvedFailures: 0,
+          configFailures: 0,
+          retryableFailures: 0,
+          manualFailures: 0,
+          affectedProjects: 0,
+          affectedProviders: 0,
+        },
+        items: [],
+      }, [manualRepair]),
+      {
+        status: "resolved",
+        label: "复检闭环",
+        detail: "复检完成后未恢复失败已归零。",
+        actionLabel: "查看任务中心",
+        href: "/tasks",
+        completedRechecks: 1,
+        unresolvedFailures: 0,
+        latestDispatchKey: "global:failure_repair_recheck:failure-repair-batch",
+        evidence: ["完成依据：失败已清空"],
+      },
+    );
+
+    assert.equal(open.tone, "open");
+    assert.equal(open.actionLabel, "记录修复回执");
+    assert.equal(open.href, "/failures");
+    assert.equal(pendingRecheck.tone, "recheck");
+    assert.equal(pendingRecheck.actionLabel, "去派单复检");
+    assert.equal(pendingRecheck.href, "/dispatch");
+    assert.match(pendingRecheck.detail, /已有 1 条失败修复回执/);
+    assert.equal(resolved.tone, "resolved");
+    assert.equal(resolved.actionLabel, "恢复任务中心");
+    assert.equal(resolved.href, "/tasks");
   });
 
   await t.test("reviews completed failure repair recheck dispatch against unresolved failures", () => {

@@ -1,10 +1,24 @@
 import Link from "next/link";
 import { AppShell } from "@/components/app-shell/AppShell";
 import { FailureRepairLaneReceiptButton } from "@/components/failures/FailureRepairLaneReceiptButton";
+import { buildTaskRunConsole } from "@/lib/ai/taskRunConsole";
 import { prisma } from "@/lib/db/prisma";
 import { buildFailureReviewCenter } from "@/lib/ai/failureReviewCenter";
+import {
+  buildGateFailureRepairFollowupNotice,
+  buildGateFailureRepairReceiptReview,
+  buildGateFailureRepairRecheckResolution,
+  gateActionReceiptFromAuditRecord,
+} from "@/lib/projects/gateActionReceipts";
 
 export const dynamic = "force-dynamic";
+
+function followupToneClass(tone: ReturnType<typeof buildGateFailureRepairFollowupNotice>["tone"]) {
+  if (tone === "resolved") return "border-emerald-200 bg-emerald-50 text-emerald-900";
+  if (tone === "failed" || tone === "active") return "border-amber-200 bg-amber-50 text-amber-900";
+  if (tone === "recheck") return "border-blue-200 bg-blue-50 text-blue-900";
+  return "border-slate-200 bg-white text-slate-900";
+}
 
 function groupList(groups: Array<{ id: string; label: string; count: number; percent: number; sample: string; suggestion: string }>) {
   return (
@@ -25,7 +39,7 @@ function groupList(groups: Array<{ id: string; label: string; count: number; per
 }
 
 export default async function FailuresPage() {
-  const [tasks, chapters] = await Promise.all([
+  const [tasks, chapters, receiptAudits] = await Promise.all([
     prisma.aiTask.findMany({
       where: { status: { in: ["failed", "succeeded"] } },
       include: {
@@ -38,12 +52,47 @@ export default async function FailuresPage() {
     prisma.chapter.findMany({
       select: { id: true, title: true },
     }),
+    prisma.gateActionAudit.findMany({
+      where: {
+        OR: [
+          { actionId: "failure-repair-batch" },
+          { actionId: { startsWith: "repair-batch-retry:" } },
+        ],
+      },
+      orderBy: { createdAt: "desc" },
+      take: 80,
+    }),
   ]);
   const chaptersById = new Map(chapters.map((chapter) => [chapter.id, chapter]));
-  const center = buildFailureReviewCenter(tasks.map((task) => ({
+  const failureTasks = tasks.map((task) => ({
     ...task,
     chapter: task.chapterId ? chaptersById.get(task.chapterId) ?? null : null,
+  }));
+  const center = buildFailureReviewCenter(failureTasks);
+  const runConsole = buildTaskRunConsole(failureTasks.map((task) => ({
+    id: task.id,
+    projectId: task.projectId,
+    chapterId: task.chapterId,
+    taskType: task.taskType,
+    model: task.model,
+    status: task.status,
+    inputTokens: task.inputTokens,
+    outputTokens: task.outputTokens,
+    costUsd: task.costUsd,
+    errorMessage: task.errorMessage,
+    inputSnapshot: task.inputSnapshot,
+    createdAt: task.createdAt,
+    updatedAt: task.updatedAt,
+    project: task.project,
+    chapter: task.chapter,
+    modelProvider: task.modelProvider,
   })));
+  const repairReceipts = receiptAudits.map(gateActionReceiptFromAuditRecord);
+  const failureRepairReview = buildGateFailureRepairReceiptReview(runConsole.failureRepairBatch, repairReceipts);
+  const failureRepairFollowup = buildGateFailureRepairFollowupNotice(
+    failureRepairReview,
+    buildGateFailureRepairRecheckResolution(runConsole.failureRepairBatch, []),
+  );
 
   return (
     <AppShell>
@@ -89,6 +138,23 @@ export default async function FailuresPage() {
           {center.nextActions.map((action, index) => (
             <div className="rounded-md bg-slate-50 p-2" key={action}>{index + 1}. {action}</div>
           ))}
+        </div>
+      </section>
+
+      <section className={`mb-6 rounded-md border p-4 ${followupToneClass(failureRepairFollowup.tone)}`}>
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <h2 className="font-medium">{failureRepairFollowup.label}</h2>
+            <p className="mt-1 text-sm leading-6">{failureRepairFollowup.detail}</p>
+            <div className="mt-3 flex flex-wrap gap-1.5">
+              {failureRepairFollowup.badges.map((badge) => (
+                <span className="rounded-md bg-white/70 px-2 py-1 text-xs font-medium" key={badge}>{badge}</span>
+              ))}
+            </div>
+          </div>
+          <Link className="w-fit rounded-md bg-slate-950 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800" href={failureRepairFollowup.href}>
+            {failureRepairFollowup.actionLabel}
+          </Link>
         </div>
       </section>
 

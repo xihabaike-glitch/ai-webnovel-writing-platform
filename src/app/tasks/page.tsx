@@ -168,10 +168,23 @@ function modelRoleBlockerButtonClass(tone: "blocked" | "watch") {
   return "bg-amber-950 text-white hover:bg-amber-900";
 }
 
-export default async function TasksPage({ searchParams }: { searchParams?: Promise<{ batchStrategy?: string; view?: string }> }) {
+function debtBlockerType(value: string | undefined): QueueItem["blockerType"] | null {
+  if (
+    value === "chapter_card"
+    || value === "publish_repair"
+    || value === "export_version"
+    || value === "risk_recovery"
+    || value === "watch_scale_gate"
+    || value === "first_day_gate"
+  ) return value;
+  return null;
+}
+
+export default async function TasksPage({ searchParams }: { searchParams?: Promise<{ batchStrategy?: string; view?: string; debt?: string }> }) {
   const resolvedSearchParams = searchParams ? await searchParams : {};
   const activeStrategy = getBatchExecutionStrategy(resolvedSearchParams.batchStrategy);
   const activeView = resolvedSearchParams.view === "blocked" ? "blocked" : "all";
+  const activeDebtBlockerType = activeView === "blocked" ? debtBlockerType(resolvedSearchParams.debt) : null;
   const [
     projects,
     recentAiTasks,
@@ -337,7 +350,7 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
     })),
   }));
   const queue = buildTaskQueueCenter(taskQueueProjects);
-  const debtView = buildTaskQueueDebtView(queue.items);
+  const debtView = buildTaskQueueDebtView(queue.items, activeDebtBlockerType);
   const visibleQueueItems = activeView === "blocked" ? debtView.items : queue.items;
   const safety = buildBatchExecutionSafety(queue.items, safetyProjects, activeStrategy);
   const safetyPriorityBlocker = buildBatchSafetyPriorityBlocker(safety);
@@ -499,6 +512,11 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
               <Link className="rounded-md bg-white/80 px-3 py-2 text-sm font-medium text-rose-900 hover:bg-white" href="/tasks">
                 返回全部任务
               </Link>
+              {debtView.totalBlocked > 0 && debtView.focusedBlockerType ? (
+                <Link className="rounded-md bg-white/80 px-3 py-2 text-sm font-medium text-rose-900 hover:bg-white" href="/tasks?view=blocked#task-debt">
+                  全部阻塞
+                </Link>
+              ) : null}
               {debtView.nextAction ? (
                 <Link className="rounded-md bg-rose-950 px-3 py-2 text-sm font-medium text-white hover:bg-rose-900" href={debtView.nextAction.href}>
                   先处理：{debtView.nextAction.actionLabel}
@@ -513,11 +531,15 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
           </div>
           <div className="mt-4 grid gap-2 md:grid-cols-3 lg:grid-cols-6">
             {debtView.groups.map((group) => (
-              <div className="rounded-md bg-white/80 p-3" key={group.blockerType ?? "unknown"}>
-                <div className="text-xs text-rose-700">{group.label}</div>
+              <Link
+                className={`rounded-md p-3 ${debtView.focusedBlockerType === group.blockerType ? "bg-rose-950 text-white" : "bg-white/80 hover:bg-white"}`}
+                href={group.href}
+                key={group.blockerType ?? "unknown"}
+              >
+                <div className={`text-xs ${debtView.focusedBlockerType === group.blockerType ? "text-white/80" : "text-rose-700"}`}>{group.label}</div>
                 <div className="mt-1 text-2xl font-semibold">{group.count}</div>
-                <div className="mt-1 text-xs font-medium text-rose-800">{group.actionLabel}</div>
-              </div>
+                <div className={`mt-1 text-xs font-medium ${debtView.focusedBlockerType === group.blockerType ? "text-white/90" : "text-rose-800"}`}>{group.actionLabel}</div>
+              </Link>
             ))}
             {debtView.groups.length === 0 ? (
               <div className="rounded-md bg-white/80 p-3 text-sm text-emerald-800">

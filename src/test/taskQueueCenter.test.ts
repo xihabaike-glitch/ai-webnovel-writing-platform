@@ -239,6 +239,19 @@ test("buildTaskQueueCenter", async (t) => {
     assert.ok(debt.items.every((item) => item.category === "blocked"));
   });
 
+  await t.test("filters blocked debt view by blocker type while preserving total debt", () => {
+    const queue = buildTaskQueueCenter([{ ...project, gateDispatchTasks: firstDayCompleteDispatches(project.id) }]);
+    const debt = buildTaskQueueDebtView(queue.items, "chapter_card");
+
+    assert.equal(debt.totalBlocked, 2);
+    assert.equal(debt.focusedBlockerType, "chapter_card");
+    assert.equal(debt.focusLabel, "章节卡");
+    assert.equal(debt.items.length, 1);
+    assert.equal(debt.items[0].blockerType, "chapter_card");
+    assert.equal(debt.nextAction?.blockerType, "chapter_card");
+    assert.ok(debt.headline.includes("正在清理章节卡"));
+  });
+
   await t.test("returns a resume production action after blocked debt is cleared", () => {
     const queue = buildTaskQueueCenter([{
       ...project,

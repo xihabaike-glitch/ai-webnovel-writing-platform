@@ -187,6 +187,7 @@ export interface TaskQueueDebtGroup {
   label: string;
   count: number;
   actionLabel: string;
+  href: string;
 }
 
 export interface TaskQueueDebtView {
@@ -196,6 +197,8 @@ export interface TaskQueueDebtView {
   groups: TaskQueueDebtGroup[];
   items: QueueItem[];
   nextAction: QueueItem | null;
+  focusedBlockerType: QueueItem["blockerType"] | null;
+  focusLabel: string | null;
   resumeAction: QueueItem | null;
   resumeActionLabel: string | null;
   resumeActionHref: string | null;
@@ -303,7 +306,10 @@ function blockerDebtActionLabel(blockerType: QueueItem["blockerType"]) {
   return "处理阻塞";
 }
 
-export function buildTaskQueueDebtView(items: QueueItem[]): TaskQueueDebtView {
+export function buildTaskQueueDebtView(
+  items: QueueItem[],
+  focusedBlockerType: QueueItem["blockerType"] | null = null,
+): TaskQueueDebtView {
   const resumeAction = items.find((entry) => entry.category !== "blocked") ?? null;
   const blockedItems = items
     .filter((entry) => entry.category === "blocked")
@@ -318,21 +324,33 @@ export function buildTaskQueueDebtView(items: QueueItem[]): TaskQueueDebtView {
     label: blockerDebtLabel(blockerType),
     count: blockedItems.filter((entry) => entry.blockerType === blockerType).length,
     actionLabel: blockerDebtActionLabel(blockerType),
+    href: blockerType ? `/tasks?view=blocked&debt=${blockerType}#task-debt` : "/tasks?view=blocked#task-debt",
   }));
   const totalBlocked = blockedItems.length;
-  const nextAction = blockedItems[0] ?? null;
+  const activeBlockerType = groups.some((group) => group.blockerType === focusedBlockerType) ? focusedBlockerType : null;
+  const visibleBlockedItems = activeBlockerType
+    ? blockedItems.filter((entry) => entry.blockerType === activeBlockerType)
+    : blockedItems;
+  const nextAction = visibleBlockedItems[0] ?? null;
+  const focusLabel = activeBlockerType ? blockerDebtLabel(activeBlockerType) : null;
 
   return {
     totalBlocked,
-    headline: totalBlocked > 0 ? `还有 ${totalBlocked} 个阻塞债，先清最高风险项。` : "当前没有阻塞债。",
+    headline: totalBlocked > 0
+      ? activeBlockerType
+        ? `还有 ${totalBlocked} 个阻塞债，正在清理${focusLabel}。`
+        : `还有 ${totalBlocked} 个阻塞债，先清最高风险项。`
+      : "当前没有阻塞债。",
     detail: nextAction
       ? `优先处理「${nextAction.projectTitle} · ${nextAction.chapterTitle}」：${nextAction.actionLabel}。`
       : resumeAction
         ? `阻塞已经清空，可以恢复「${resumeAction.projectTitle} · ${resumeAction.chapterTitle}」的${resumeAction.actionLabel}。`
         : "可以回到全部任务，继续推进写、审、改、导出。",
     groups,
-    items: blockedItems,
+    items: visibleBlockedItems,
     nextAction,
+    focusedBlockerType: activeBlockerType,
+    focusLabel,
     resumeAction,
     resumeActionLabel: resumeAction ? `恢复生产：${resumeAction.actionLabel}` : null,
     resumeActionHref: resumeAction?.href ?? null,

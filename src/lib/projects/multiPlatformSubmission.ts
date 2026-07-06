@@ -724,8 +724,9 @@ function decisionAcceptanceCriteria(variant: MultiPlatformSubmissionVariant) {
     ];
   }
   if (kind === "repair") {
+    const repairFocusCriteria = variant.effectTracking.repairFocus.map((focus) => `按复盘修复焦点处理：${focus}`);
     return [
-      "重写标题、简介、标签或前三章钩子中的至少一项。",
+      ...(repairFocusCriteria.length ? repairFocusCriteria : ["重写标题、简介、标签或前三章钩子中的至少一项。"]),
       "修复后生成第二轮小样本投稿包。",
       "第二轮必须与当前弱数据做前后对照。",
     ];
@@ -757,6 +758,14 @@ function decisionAcceptanceCriteria(variant: MultiPlatformSubmissionVariant) {
   ];
 }
 
+function decisionTaskDetail(variant: MultiPlatformSubmissionVariant) {
+  if (variant.decision.kind !== "repair" || !variant.effectTracking.repairFocus.length) {
+    return variant.decision.reason;
+  }
+
+  return `${variant.decision.reason} 复盘修复焦点：${variant.effectTracking.repairFocus.join("；")}`;
+}
+
 function projectHref(projectId: string | undefined, anchor: string) {
   return projectId ? `/projects/${projectId}${anchor}` : anchor;
 }
@@ -778,7 +787,7 @@ function buildDecisionTasks(variants: MultiPlatformSubmissionVariant[], projectI
       ownerRole: decisionOwnerRole(variant.decision.kind),
       priorityScore: variant.decision.score,
       title: `${variant.platformName}｜${variant.decision.label}`,
-      detail: variant.decision.reason,
+      detail: decisionTaskDetail(variant),
       dueLabel: decisionDueLabel(variant.decision.kind),
       actionLabel: variant.decision.label === "补投稿包" ? "补齐投稿包" : variant.decision.label,
       href: projectHref(projectId, variant.decision.actionHref),

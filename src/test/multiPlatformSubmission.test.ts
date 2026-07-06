@@ -254,6 +254,12 @@ test("buildMultiPlatformSubmission", async (t) => {
     assert.ok(result.decisionBoard.nextActions.some((action) => action.includes("WebNovel")));
     assert.ok(result.decisionBoard.tasks.some((task) => task.platformId === "webnovel" && task.kind === "main" && task.ownerRole === "增长运营"));
     assert.ok(result.decisionBoard.tasks.some((task) => task.platformId === "qimao" && task.kind === "repair" && task.ownerRole === "平台编辑"));
+    const qimaoRepairTask = result.decisionBoard.tasks.find((task) => task.platformId === "qimao" && task.kind === "repair");
+    assert.ok(qimaoRepairTask);
+    assert.ok(qimaoRepairTask.detail.includes("复盘修复焦点"));
+    assert.ok(qimaoRepairTask.acceptanceCriteria.some((item) => item.includes("标题") && item.includes("简介")));
+    assert.ok(qimaoRepairTask.acceptanceCriteria.some((item) => item.includes("标签") && item.includes("卖点")));
+    assert.ok(qimaoRepairTask.acceptanceCriteria.some((item) => item.includes("前三章") && item.includes("兑现")));
     assert.equal(result.decisionBoard.tasks[0].platformId, "webnovel");
     assert.ok(result.decisionBoard.tasks.every((task) => task.href.startsWith("/projects/project-1#")));
     assert.ok(result.archive.markdown.includes("有苗头"));

@@ -825,7 +825,7 @@ export function SubmissionPackagePanel({
                   </div>
                   <p className="mt-2 text-xs leading-5 text-slate-600">{task.detail}</p>
                   <div className="mt-2 grid gap-1 text-xs text-slate-600">
-                    {task.acceptanceCriteria.slice(0, 2).map((criterion) => (
+                    {task.acceptanceCriteria.map((criterion) => (
                       <div key={criterion}>{criterion}</div>
                     ))}
                   </div>

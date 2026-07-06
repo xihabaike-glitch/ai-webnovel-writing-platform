@@ -441,6 +441,19 @@ interface PlatformPublishPackage {
   markdown: string;
 }
 
+interface PlatformEffectCaptureSummary {
+  status: "needs_record" | "missing_fields" | "ready_to_review";
+  readyToReviewCount: number;
+  needsRecordCount: number;
+  missingFieldPlatformCount: number;
+  missingFieldCount: number;
+  platformNamesNeedingInput: string[];
+  primaryPlatformName: string | null;
+  primaryMissingFields: string[];
+  headline: string;
+  nextAction: string;
+}
+
 interface PlatformPublishWorkspaceAction extends PublishRepairAction {
   platformIds: string[];
   platformNames: string[];
@@ -737,6 +750,7 @@ interface PlatformPublishExportCenter {
   recommendedPlatformId: string;
   totalPublishableChapters: number;
   workspace: PlatformPublishWorkspace;
+  effectCaptureSummary: PlatformEffectCaptureSummary;
   executionHandoffs: PlatformPublishExecutionHandoff[];
   executionHandoffSummary: PlatformPublishExecutionHandoffSummary;
   platformStrategy: PlatformStrategyRankItem[];
@@ -2632,6 +2646,31 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
             <div className="rounded-md bg-slate-50 p-2">
               <div className="text-xs text-slate-500">需手动</div>
               <div className="mt-1 font-medium text-slate-950">{center.workspace.manualActions}</div>
+            </div>
+          </div>
+          <div className="mt-3 rounded-md border border-slate-200 bg-white p-3">
+            <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
+              <div>
+                <div className="font-medium text-slate-950">全平台效果回填总览</div>
+                <p className="mt-1 text-sm leading-6 text-slate-600">{center.effectCaptureSummary.headline}</p>
+              </div>
+              <span className={`w-fit rounded-md px-2 py-1 text-xs font-medium ${effectCaptureStatusClass(center.effectCaptureSummary.status)}`}>
+                {effectCaptureStatusLabel(center.effectCaptureSummary.status)}
+              </span>
+            </div>
+            <div className="mt-3 grid gap-2 text-xs text-slate-500 sm:grid-cols-4">
+              <div>可复盘 <span className="font-medium text-slate-950">{center.effectCaptureSummary.readyToReviewCount}</span></div>
+              <div>待回填 <span className="font-medium text-slate-950">{center.effectCaptureSummary.needsRecordCount}</span></div>
+              <div>缺字段平台 <span className="font-medium text-slate-950">{center.effectCaptureSummary.missingFieldPlatformCount}</span></div>
+              <div>缺字段 <span className="font-medium text-slate-950">{center.effectCaptureSummary.missingFieldCount}</span></div>
+            </div>
+            {center.effectCaptureSummary.platformNamesNeedingInput.length ? (
+              <div className="mt-2 line-clamp-2 text-xs leading-5 text-slate-500">
+                {center.effectCaptureSummary.platformNamesNeedingInput.join("、")}
+              </div>
+            ) : null}
+            <div className="mt-2 rounded-md bg-slate-50 p-2 text-sm text-slate-700">
+              <span className="font-medium text-slate-950">下一步：</span>{center.effectCaptureSummary.nextAction}
             </div>
           </div>
           {center.executionHandoffs.length ? (

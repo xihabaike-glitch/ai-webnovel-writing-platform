@@ -793,12 +793,26 @@ export interface PlatformPublishExportCenter {
   recommendedPlatformId: PlatformId;
   totalPublishableChapters: number;
   workspace: PlatformPublishWorkspace;
+  effectCaptureSummary: PlatformEffectCaptureSummary;
   executionHandoffs: PlatformPublishExecutionHandoff[];
   executionHandoffSummary: PlatformPublishExecutionHandoffSummary;
   platformStrategy: PlatformStrategyRankItem[];
   strategyVerdict: PlatformStrategyAutoVerdict;
   platformKnowledge: PlatformKnowledgeInsight[];
   activeStrategyPlan: PlatformStrategySwitchPlan | null;
+}
+
+export interface PlatformEffectCaptureSummary {
+  status: "needs_record" | "missing_fields" | "ready_to_review";
+  readyToReviewCount: number;
+  needsRecordCount: number;
+  missingFieldPlatformCount: number;
+  missingFieldCount: number;
+  platformNamesNeedingInput: string[];
+  primaryPlatformName: string | null;
+  primaryMissingFields: string[];
+  headline: string;
+  nextAction: string;
 }
 
 export interface PlatformPublishExecutionHandoff {
@@ -4221,6 +4235,88 @@ function buildPlatformPublishExecutionHandoffSummary(
   };
 }
 
+function buildPlatformEffectCaptureSummary(packages: PlatformPublishPackage[]): PlatformEffectCaptureSummary {
+  const readyToReview = packages.filter((pack) => pack.effectCapturePlan.status === "ready_to_review");
+  const needsRecord = packages.filter((pack) => pack.effectCapturePlan.status === "needs_record");
+  const missingFields = packages.filter((pack) => pack.effectCapturePlan.status === "missing_fields");
+  const platformNamesNeedingInput = [...needsRecord, ...missingFields].map((pack) => pack.platformName);
+  const primaryPack = needsRecord[0] ?? missingFields[0] ?? null;
+  const primaryMissingFields = primaryPack
+    ? primaryPack.effectCapturePlan.missingFields.map((field) => field.label)
+    : [];
+  const status: PlatformEffectCaptureSummary["status"] = needsRecord.length
+    ? "needs_record"
+    : missingFields.length
+      ? "missing_fields"
+      : "ready_to_review";
+  const missingFieldCount = missingFields.reduce(
+    (sum, pack) => sum + pack.effectCapturePlan.missingFields.length,
+    0,
+  );
+
+  if (!packages.length) {
+    return {
+      status: "needs_record",
+      readyToReviewCount: 0,
+      needsRecordCount: 0,
+      missingFieldPlatformCount: 0,
+      missingFieldCount: 0,
+      platformNamesNeedingInput: [],
+      primaryPlatformName: null,
+      primaryMissingFields: [],
+      headline: "还没有平台可复盘。",
+      nextAction: "先生成平台发布包，再回填真实效果。",
+    };
+  }
+
+  if (status === "ready_to_review") {
+    return {
+      status,
+      readyToReviewCount: readyToReview.length,
+      needsRecordCount: 0,
+      missingFieldPlatformCount: 0,
+      missingFieldCount: 0,
+      platformNamesNeedingInput: [],
+      primaryPlatformName: readyToReview[0]?.platformName ?? null,
+      primaryMissingFields: [],
+      headline: `${readyToReview.length}/${packages.length} 平台效果可以复盘。`,
+      nextAction: "进入平台排序、A/B 归因和下一轮动作，让真实数据决定主战场。",
+    };
+  }
+
+  if (status === "needs_record") {
+    return {
+      status,
+      readyToReviewCount: readyToReview.length,
+      needsRecordCount: needsRecord.length,
+      missingFieldPlatformCount: missingFields.length,
+      missingFieldCount,
+      platformNamesNeedingInput,
+      primaryPlatformName: primaryPack?.platformName ?? null,
+      primaryMissingFields,
+      headline: `${needsRecord.length} 个平台缺真实效果，${readyToReview.length}/${packages.length} 平台可复盘。`,
+      nextAction: primaryPack
+        ? `先回填 ${primaryPack.platformName} 的${primaryMissingFields.join("、") || "曝光、点击、收藏、追读"}。`
+        : "先回填一个平台的真实效果。",
+    };
+  }
+
+  return {
+    status,
+    readyToReviewCount: readyToReview.length,
+    needsRecordCount: 0,
+    missingFieldPlatformCount: missingFields.length,
+    missingFieldCount,
+    platformNamesNeedingInput,
+    primaryPlatformName: primaryPack?.platformName ?? null,
+    primaryMissingFields,
+    headline: `${missingFields.length} 个平台还有 ${missingFieldCount} 项关键数据缺失。`,
+    nextAction: primaryPack
+      ? `补齐 ${primaryPack.platformName} 的${primaryMissingFields.join("、")} 后再做全平台复盘。`
+      : "补齐缺失指标后再做全平台复盘。",
+  };
+}
+
 export function buildPlatformPublishExportCenter(input: PlatformPublishExportInput): PlatformPublishExportCenter {
   const platforms = input.platforms ?? platformProfiles;
   const packages = platforms.map((platform) => buildPlatformPackage(input, platform));
@@ -4236,6 +4332,7 @@ export function buildPlatformPublishExportCenter(input: PlatformPublishExportInp
     recommendedPlatformId: input.targetPlatform.id,
     totalPublishableChapters: publishableChapters(input.chapters).length,
     workspace: buildPublishWorkspace(packages),
+    effectCaptureSummary: buildPlatformEffectCaptureSummary(packages),
     executionHandoffs,
     executionHandoffSummary: buildPlatformPublishExecutionHandoffSummary(executionHandoffs),
     platformStrategy,

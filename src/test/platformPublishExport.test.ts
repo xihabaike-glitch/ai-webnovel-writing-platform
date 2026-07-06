@@ -166,6 +166,12 @@ test("buildPlatformPublishExportCenter", async (t) => {
     assert.ok(fanqiePack?.effectCapturePlan.requiredFields.some((item) => item.label === "曝光"));
     assert.ok(fanqiePack?.effectCapturePlan.missingFields.some((item) => item.label === "曝光"));
     assert.ok(fanqiePack?.effectCapturePlan.nextAction.includes("先回填"));
+    assert.equal(center.effectCaptureSummary.status, "needs_record");
+    assert.equal(center.effectCaptureSummary.readyToReviewCount, 0);
+    assert.equal(center.effectCaptureSummary.needsRecordCount, platformProfiles.length);
+    assert.equal(center.effectCaptureSummary.platformNamesNeedingInput.length, platformProfiles.length);
+    assert.ok(center.effectCaptureSummary.headline.includes("真实效果"));
+    assert.ok(center.effectCaptureSummary.nextAction.includes("先回填"));
     assert.equal(center.packages[0].dispatchEffectValidation.status, "needs_effect");
     assert.ok(center.packages[0].dispatchEffectValidation.verdict.includes("不能证明平台增长有效"));
     assert.ok(center.packages[0].dispatchEffectValidation.nextAction.includes("曝光、点击、收藏、追读"));
@@ -292,6 +298,8 @@ test("buildPlatformPublishExportCenter", async (t) => {
     assert.equal(center.executionHandoffSummary.primaryActionCount, 1);
     assert.deepEqual(center.executionHandoffSummary.primaryActionPlatformNames, ["番茄小说"]);
     assert.ok(center.executionHandoffSummary.headline.includes("可以进入复盘"));
+    assert.equal(center.effectCaptureSummary.status, "needs_record");
+    assert.equal(center.effectCaptureSummary.needsRecordCount, 1);
   });
 
   await t.test("blocks export when candidate adoption makes old reviews stale", () => {
@@ -545,6 +553,11 @@ test("buildPlatformPublishExportCenter", async (t) => {
     assert.deepEqual(pack.effectCapturePlan.missingFields, []);
     assert.ok(pack.effectCapturePlan.primaryMetrics.includes("读完率"));
     assert.ok(pack.effectCapturePlan.nextAction.includes("可以复盘"));
+    assert.equal(center.effectCaptureSummary.status, "ready_to_review");
+    assert.equal(center.effectCaptureSummary.readyToReviewCount, 1);
+    assert.equal(center.effectCaptureSummary.needsRecordCount, 0);
+    assert.equal(center.effectCaptureSummary.missingFieldPlatformCount, 0);
+    assert.ok(center.effectCaptureSummary.nextAction.includes("进入平台排序"));
     assert.equal(pack.publishEffect.comparison.status, "none");
     assert.equal(pack.dispatchEffectValidation.status, "reusable_success");
     assert.equal(pack.dispatchEffectValidation.label, "可沉淀");

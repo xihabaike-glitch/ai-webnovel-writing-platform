@@ -242,7 +242,7 @@ test("buildBatchExecutionSafety", async (t) => {
     assert.equal(recommendation?.status, "ready");
     assert.equal(recommendation?.label, "恢复安全小批");
     assert.equal(recommendation?.actionLabel, "执行恢复小批");
-    assert.equal(recommendation?.href, "/tasks#recommended-batch");
+    assert.equal(recommendation?.href, "/tasks?batchContext=repair_resume#recommended-batch");
     assert.ok(recommendation?.detail.includes("2 个"));
     assert.ok(recommendation?.detail.includes("第一章"));
     assert.ok(recommendation?.detail.includes("第二章"));

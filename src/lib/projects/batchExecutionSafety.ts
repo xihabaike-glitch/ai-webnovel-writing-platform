@@ -185,7 +185,7 @@ export function buildFailureRepairResumeRecommendation(input: {
     label: "恢复安全小批",
     detail: `失败修复已复检，可以恢复 ${batchItems.length} 个任务的小批量生产：${taskLabels.join("；")}。`,
     actionLabel: "执行恢复小批",
-    href: "/tasks#recommended-batch",
+    href: "/tasks?batchContext=repair_resume#recommended-batch",
     batchSize: batchItems.length,
     taskLabels,
   };

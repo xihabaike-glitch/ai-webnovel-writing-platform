@@ -39,6 +39,7 @@ export interface BatchRunResponse {
     warnings: string[];
     completionEvidenceTemplate?: string;
   };
+  executionContext?: "standard" | "repair_resume";
   modelRouteGate?: {
     status: "allow" | "sample" | "block";
     label: string;
@@ -99,10 +100,12 @@ function timelineItemClass(status: ReturnType<typeof buildRecommendedBatchRouteG
 export function RunRecommendedBatchButton({
   disabled,
   strategyId,
+  executionContext = "standard",
   initialModelRouteGate = null,
 }: {
   disabled: boolean;
   strategyId: string;
+  executionContext?: "standard" | "repair_resume";
   initialModelRouteGate?: BatchRunResponse["modelRouteGate"] | null;
 }) {
   const router = useRouter();
@@ -117,6 +120,8 @@ export function RunRecommendedBatchButton({
     ? routeGateActions.runButtonLabel
     : routeGateTimeline && modelRouteGate?.status !== "block"
     ? routeGateTimeline.primaryActionLabel
+    : executionContext === "repair_resume"
+    ? "执行恢复小批"
     : "执行推荐批次";
 
   useEffect(() => {
@@ -129,7 +134,7 @@ export function RunRecommendedBatchButton({
     setBatchReceipt(null);
     setModelRouteGate(initialModelRouteGate);
     try {
-      const response = await fetch(`/api/tasks/recommended-batch?strategy=${encodeURIComponent(strategyId)}`, {
+      const response = await fetch(`/api/tasks/recommended-batch?strategy=${encodeURIComponent(strategyId)}&context=${encodeURIComponent(executionContext)}`, {
         method: "POST",
       });
       const payload = (await response.json()) as BatchRunResponse;
@@ -146,7 +151,8 @@ export function RunRecommendedBatchButton({
         : "";
       const tactic = payload.plan?.strategyBases?.[0];
       const tacticText = tactic ? `打法依据：${tactic.label}｜${tactic.openingMove || tactic.primaryTactic}。` : "";
-      setMessage(`${payload.plan?.actionLabel ?? "推荐批次"}完成：成功 ${succeeded}，失败 ${failed}。${summary}${tacticText}`);
+      const contextLabel = payload.executionContext === "repair_resume" || executionContext === "repair_resume" ? "恢复小批" : payload.plan?.actionLabel ?? "推荐批次";
+      setMessage(`${contextLabel}完成：成功 ${succeeded}，失败 ${failed}。${summary}${tacticText}`);
       setBatchReceipt(payload.batchReceipt ?? null);
       router.refresh();
     } catch (caught) {

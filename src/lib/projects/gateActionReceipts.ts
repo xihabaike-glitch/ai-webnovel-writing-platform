@@ -26,6 +26,7 @@ export type GateActionReceiptExecutionFilter = "all" | GateActionReceiptExecutio
 export interface GateActionReceiptPayload {
   message?: string;
   error?: string;
+  executionContext?: "standard" | "repair_resume";
   firstThreeAdoptionClosure?: GateFirstThreeAdoptionClosureSummary;
   aiPipelineRecheck?: {
     dispatchKey?: string;
@@ -40,6 +41,7 @@ export interface GateActionReceiptPayload {
     chapterIds?: string[];
     adoptionFollowupCount?: number;
     adoptionFollowupItemIds?: string[];
+    executionContext?: "standard" | "repair_resume";
   };
   startTactics?: GateActionReceiptStartTactic[];
   variants?: unknown[];

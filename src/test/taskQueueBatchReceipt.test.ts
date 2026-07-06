@@ -372,6 +372,28 @@ test("buildTaskQueueBatchReceipt routes adoption follow-up batches back to the g
   assert.ok(receipt.warnings.some((warning) => warning.includes("采纳闭环任务跑完不等于发布放行")));
 });
 
+test("buildTaskQueueBatchReceipt labels repair resume batches as a tracked recovery run", () => {
+  const receipt = buildTaskQueueBatchReceipt({
+    plan,
+    results: [{ status: "succeeded", taskId: "task-1", chapterTitle: "第一章", error: null, qualityScore: 88 }],
+    routeEffectSummary: {
+      ...routeEffect,
+      averageQualityScore: 88,
+      verdict: "修复后恢复小批稳定。",
+    },
+    executionContext: "repair_resume",
+  });
+
+  assert.equal(receipt.status, "continue");
+  assert.equal(receipt.headline, "修复后恢复小批通过，继续小步观察");
+  assert.equal(receipt.primaryLabel, "继续恢复小批");
+  assert.equal(receipt.primaryHref, "/tasks?batchContext=repair_resume#recommended-batch");
+  assert.equal(receipt.secondaryLabel, "回失败复盘");
+  assert.equal(receipt.secondaryHref, "/failures");
+  assert.ok(receipt.evidenceItems.some((item) => item.includes("执行上下文：失败修复后恢复小批")));
+  assert.ok(receipt.warnings.some((warning) => warning.includes("恢复小批不是普通放量")));
+});
+
 test("buildTaskQueueBatchGateActionReceipt turns a recommended batch into gate experience", () => {
   const batchReceipt = buildTaskQueueBatchReceipt({
     plan,
@@ -406,4 +428,36 @@ test("buildTaskQueueBatchGateActionReceipt turns a recommended batch into gate e
   assert.equal(gateReceipt.payload.results[0]?.error, null);
   assert.equal(gateReceipt.payload.batchReceipt.status, "continue");
   assert.equal(gateReceipt.payload.strategyId, "standard");
+});
+
+test("buildTaskQueueBatchGateActionReceipt persists repair resume context for later audits", () => {
+  const batchReceipt = buildTaskQueueBatchReceipt({
+    plan,
+    results: [{ status: "succeeded", taskId: "task-1", chapterId: "chapter-1", chapterTitle: "第一章", error: null, qualityScore: 88 }],
+    routeEffectSummary: {
+      ...routeEffect,
+      averageQualityScore: 88,
+      verdict: "修复后恢复小批稳定。",
+    },
+    executionContext: "repair_resume",
+  });
+  const gateReceipt = buildTaskQueueBatchGateActionReceipt({
+    plan,
+    results: [{ status: "succeeded", taskId: "task-1", chapterId: "chapter-1", chapterTitle: "第一章", error: null, qualityScore: 88 }],
+    routeEffectSummary: {
+      ...routeEffect,
+      averageQualityScore: 88,
+      verdict: "修复后恢复小批稳定。",
+    },
+    batchReceipt,
+    strategyId: "standard",
+    executionContext: "repair_resume",
+    now: "2026-01-01T00:00:00.000Z",
+  });
+
+  assert.equal(gateReceipt.receipt.actionId, "recommended-batch:repair_resume:standard:draft:project-1");
+  assert.equal(gateReceipt.receipt.label, "沉淀修复后恢复小批经验");
+  assert.equal(gateReceipt.payload.executionContext, "repair_resume");
+  assert.equal(gateReceipt.payload.plan.executionContext, "repair_resume");
+  assert.equal(gateReceipt.payload.batchReceipt.headline, "修复后恢复小批通过，继续小步观察");
 });

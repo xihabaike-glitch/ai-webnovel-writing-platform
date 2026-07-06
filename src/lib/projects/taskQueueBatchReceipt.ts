@@ -24,6 +24,12 @@ export interface TaskQueueBatchRouteEffect {
   verdict: string;
 }
 
+export type TaskQueueBatchExecutionContext = "standard" | "repair_resume";
+
+export function taskQueueBatchExecutionContext(value: string | null | undefined): TaskQueueBatchExecutionContext {
+  return value === "repair_resume" ? "repair_resume" : "standard";
+}
+
 export interface TaskQueueBatchReceipt {
   status: "continue" | "repair" | "review_quality" | "watch_cost";
   headline: string;
@@ -56,6 +62,7 @@ export interface TaskQueueBatchGateActionReceipt {
   receipt: GateActionReceipt;
   payload: GateActionReceiptPayload & {
     strategyId: BatchExecutionStrategyId;
+    executionContext: TaskQueueBatchExecutionContext;
     batchReceipt: TaskQueueBatchReceipt;
   };
 }
@@ -112,6 +119,11 @@ function thirdRoundBatchMode(plan: TaskQueueExecutionPlan) {
 function thirdRoundEvidence(mode: ReturnType<typeof thirdRoundBatchMode>) {
   if (mode === "stable") return "三轮复盘：稳定加码批次仍需回收曝光、点击、收藏和追读。";
   if (mode === "downgrade") return "三轮复盘：降档修复批次只验证修复流程，不沉淀为放量结论。";
+  return null;
+}
+
+function executionContextEvidence(context: TaskQueueBatchExecutionContext) {
+  if (context === "repair_resume") return "执行上下文：失败修复后恢复小批";
   return null;
 }
 
@@ -181,11 +193,14 @@ export function buildTaskQueueBatchReceipt(input: {
   plan: TaskQueueExecutionPlan;
   results: TaskQueueBatchRunResult[];
   routeEffectSummary: TaskQueueBatchRouteEffect;
+  executionContext?: TaskQueueBatchExecutionContext;
 }): TaskQueueBatchReceipt {
+  const executionContext = input.executionContext ?? "standard";
   const failed = input.results.filter((result) => result.status === "failed");
   const quality = input.routeEffectSummary.averageQualityScore;
   const projectBase = projectHref(input.plan);
   const evidenceItems = [
+    executionContextEvidence(executionContext),
     `执行批次：${input.plan.actionLabel}`,
     adoptionFollowupEvidence(input.plan),
     thirdRoundEvidence(thirdRoundBatchMode(input.plan)),
@@ -357,6 +372,24 @@ export function buildTaskQueueBatchReceipt(input: {
     });
   }
 
+  if (executionContext === "repair_resume") {
+    return withAdoptionFollowupReturn(input.plan, {
+      status: "continue",
+      headline: "修复后恢复小批通过，继续小步观察",
+      detail: "失败修复后的第一轮恢复小批已过线，但这只证明修复链路可以继续验证，不证明可以回到普通放量。下一批仍按恢复模式、同一安全阀和真实质量线推进。",
+      primaryLabel: "继续恢复小批",
+      primaryHref: "/tasks?batchContext=repair_resume#recommended-batch",
+      secondaryLabel: "回失败复盘",
+      secondaryHref: "/failures",
+      evidenceItems,
+      warnings: [
+        input.routeEffectSummary.verdict,
+        input.plan.strategyBases[0] ? `恢复小批沿用打法：${input.plan.strategyBases[0].label}。` : "恢复小批继续保留批次、质量、失败率和成本证据。",
+        "恢复小批不是普通放量；连续稳定前不要扩大批次，也不要跳过失败复盘。",
+      ],
+    });
+  }
+
   return withAdoptionFollowupReturn(input.plan, {
     status: "continue",
     headline: thirdRoundMode === "stable" ? "三轮稳住批次健康，继续小步加码" : next.headline,
@@ -382,13 +415,16 @@ export function buildTaskQueueBatchGateActionReceipt(input: {
   routeEffectSummary: TaskQueueBatchRouteEffect;
   batchReceipt: TaskQueueBatchReceipt;
   strategyId: BatchExecutionStrategyId;
+  executionContext?: TaskQueueBatchExecutionContext;
   now?: Date | string;
 }): TaskQueueBatchGateActionReceipt {
+  const executionContext = input.executionContext ?? "standard";
   const platform = platformFromStrategyTitle(input.plan.strategyBases[0]?.title);
   const platformName = platform?.name ?? "任务中心";
   const projectTitle = input.plan.projectTitle ?? "多项目批次";
   const payload: TaskQueueBatchGateActionReceipt["payload"] = {
     strategyId: input.strategyId,
+    executionContext,
     plan: {
       strategyBases: input.plan.strategyBases,
       scaleGate: input.plan.scaleGate,
@@ -398,6 +434,7 @@ export function buildTaskQueueBatchGateActionReceipt(input: {
       chapterIds: input.plan.chapterIds,
       adoptionFollowupCount: input.plan.adoptionFollowupCount,
       adoptionFollowupItemIds: input.plan.adoptionFollowupItemIds,
+      executionContext,
     },
     results: input.results.map((result) => ({
       status: result.status,
@@ -409,10 +446,14 @@ export function buildTaskQueueBatchGateActionReceipt(input: {
     routeEffectSummary: input.routeEffectSummary,
     batchReceipt: input.batchReceipt,
   };
+  const actionContext = executionContext === "repair_resume" ? "repair_resume:" : "";
+  const actionLabel = executionContext === "repair_resume"
+    ? "沉淀修复后恢复小批经验"
+    : `沉淀${input.plan.actionLabel}经验`;
   const receipt = buildGateActionReceipt({
     action: {
-      id: `recommended-batch:${input.strategyId}:${input.plan.category ?? "none"}:${input.plan.projectId ?? "multi"}`,
-      label: `沉淀${input.plan.actionLabel}经验`,
+      id: `recommended-batch:${actionContext}${input.strategyId}:${input.plan.category ?? "none"}:${input.plan.projectId ?? "multi"}`,
+      label: actionLabel,
       detail: `${platformName} · ${projectTitle} · ${input.plan.actionLabel}`,
       href: "/gate",
       tone: receiptStatusFromBatchReceipt(input.batchReceipt) === "failed" ? "repair" : "primary",

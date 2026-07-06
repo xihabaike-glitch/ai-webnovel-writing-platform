@@ -9,7 +9,11 @@ import { buildRouteConfirmationRecheckEvidenceFromDispatchTasks } from "@/lib/mo
 import { buildBatchExecutionSafety } from "@/lib/projects/batchExecutionSafety";
 import { getBatchExecutionStrategy } from "@/lib/projects/batchExecutionStrategy";
 import { findProjectStartTacticSummary } from "@/lib/projects/projectStartTactics";
-import { buildTaskQueueBatchGateActionReceipt, buildTaskQueueBatchReceipt } from "@/lib/projects/taskQueueBatchReceipt";
+import {
+  buildTaskQueueBatchGateActionReceipt,
+  buildTaskQueueBatchReceipt,
+  taskQueueBatchExecutionContext,
+} from "@/lib/projects/taskQueueBatchReceipt";
 import { buildTaskQueueCenter, type TaskQueueProject } from "@/lib/projects/taskQueueCenter";
 import { buildTaskQueueExecutionPlan } from "@/lib/projects/taskQueueExecutionPlan";
 import {
@@ -64,7 +68,9 @@ function normalizeTaskQueueProjects<T extends {
 }
 
 export async function POST(request: Request) {
-  const strategy = getBatchExecutionStrategy(new URL(request.url).searchParams.get("strategy"));
+  const requestUrl = new URL(request.url);
+  const strategy = getBatchExecutionStrategy(requestUrl.searchParams.get("strategy"));
+  const executionContext = taskQueueBatchExecutionContext(requestUrl.searchParams.get("context"));
   const [
     projects,
     modelProviders,
@@ -325,6 +331,7 @@ export async function POST(request: Request) {
     plan,
     results,
     routeEffectSummary,
+    executionContext,
   });
   const gateReceipt = buildTaskQueueBatchGateActionReceipt({
     plan,
@@ -332,6 +339,7 @@ export async function POST(request: Request) {
     routeEffectSummary,
     batchReceipt,
     strategyId: strategy.id,
+    executionContext,
   });
   const completedRecommendedBatchAudit = {
     receiptId: gateReceipt.receipt.id,
@@ -410,5 +418,6 @@ export async function POST(request: Request) {
     routeEffectSummary,
     batchReceipt,
     gateReceipt: gateReceipt.receipt,
+    executionContext,
   });
 }

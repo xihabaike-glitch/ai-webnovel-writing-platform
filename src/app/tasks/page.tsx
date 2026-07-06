@@ -17,6 +17,7 @@ import type { GateBatchTacticEffectStatus } from "@/lib/projects/gateActionRecei
 import { buildRecommendedBatchModelRouteGate } from "@/lib/projects/recommendedBatchModelRouteGate";
 import { buildTaskDebtFocusChangeNotice, buildTaskDebtRecoveryBatchRecord } from "@/lib/projects/taskDebtCompletionFeedback";
 import { buildTaskQueueBatchHealthReview } from "@/lib/projects/taskQueueBatchHealth";
+import { taskQueueBatchExecutionContext } from "@/lib/projects/taskQueueBatchReceipt";
 import { buildTaskQueueCenter, buildTaskQueueDebtView, recommendedQueueActionLabel, taskQueueSourcePresentation, type QueueItem, type TaskQueueProject } from "@/lib/projects/taskQueueCenter";
 import { buildTaskQueueExecutionPlan } from "@/lib/projects/taskQueueExecutionPlan";
 
@@ -204,9 +205,10 @@ function debtFocusNoticeClass(tone: "reduced" | "cleared" | "unchanged") {
   return "border-amber-200 bg-amber-50 text-amber-900";
 }
 
-export default async function TasksPage({ searchParams }: { searchParams?: Promise<{ batchStrategy?: string; view?: string; debt?: string; cleared?: string; previousDebt?: string }> }) {
+export default async function TasksPage({ searchParams }: { searchParams?: Promise<{ batchStrategy?: string; batchContext?: string; view?: string; debt?: string; cleared?: string; previousDebt?: string }> }) {
   const resolvedSearchParams = searchParams ? await searchParams : {};
   const activeStrategy = getBatchExecutionStrategy(resolvedSearchParams.batchStrategy);
+  const activeBatchContext = taskQueueBatchExecutionContext(resolvedSearchParams.batchContext);
   const activeView = resolvedSearchParams.view === "blocked" ? "blocked" : "all";
   const activeDebtBlockerType = activeView === "blocked" ? debtBlockerType(resolvedSearchParams.debt) : null;
   const clearedDebtBlockerType = activeView === "blocked" ? debtBlockerType(resolvedSearchParams.cleared) : null;
@@ -973,11 +975,18 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
             </div>
             <RunRecommendedBatchButton
               disabled={!safety.canRunRecommendedBatch || !executionPlan.canRun || modelRouteBlocksRecommendedBatch}
+              executionContext={activeBatchContext}
               initialModelRouteGate={modelRoutePreflightGate}
               strategyId={activeStrategy.id}
             />
           </div>
         </div>
+        {activeBatchContext === "repair_resume" ? (
+          <div className="mt-4 rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900">
+            <div className="font-medium">修复后恢复模式</div>
+            <p className="mt-1 leading-6">这一批来自失败修复复检后的恢复入口。执行回执会按恢复小批记录，不会被当作普通放量批次。</p>
+          </div>
+        ) : null}
         {safetyPriorityBlocker ? (
           <div className="mt-4 rounded-md border border-rose-200 bg-rose-50 p-3 text-sm text-rose-900">
             <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
@@ -1034,6 +1043,7 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
             {strategyDecision.status === "ready" ? (
               <RunRecommendedBatchButton
                 disabled={!strategyDecision.canRun || modelRouteBlocksRecommendedBatch}
+                executionContext={activeBatchContext}
                 initialModelRouteGate={modelRoutePreflightGate}
                 strategyId={strategyDecision.strategyId}
               />

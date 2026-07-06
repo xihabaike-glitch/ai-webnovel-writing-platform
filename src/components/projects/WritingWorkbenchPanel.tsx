@@ -155,7 +155,7 @@ export function WritingWorkbenchPanel({ workbench }: { workbench: WritingWorkben
         </div>
       ) : null}
 
-      <div className="mt-4 rounded-md border border-slate-200 bg-white p-3">
+      <div className="mt-4 rounded-md border border-slate-200 bg-white p-3" id="start-soil">
         <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <div className="text-sm font-medium text-slate-950">开局土壤资产</div>
@@ -269,7 +269,7 @@ export function WritingWorkbenchPanel({ workbench }: { workbench: WritingWorkben
         </div>
       </div>
 
-      <div className="mt-4 rounded-md border border-slate-200 bg-white p-3">
+      <div className="mt-4 rounded-md border border-slate-200 bg-white p-3" id="context-recall">
         <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <div className="text-sm font-medium text-slate-950">项目土壤召回</div>

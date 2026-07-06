@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { buildModelRouteConfirmationReceipt } from "../lib/model-gateway/routeConfirmation.ts";
-import { getPlatformProfile } from "../lib/platforms/platformProfiles.ts";
+import { getPlatformProfile, platformProfiles } from "../lib/platforms/platformProfiles.ts";
 import { getPlatformWritingStyle } from "../lib/platforms/writingStyleTemplates.ts";
 import { parseProjectStartExperienceHandoffDispatchRequest } from "../lib/projects/projectStartHandoffDispatchRequest.ts";
 import {
@@ -34,6 +34,18 @@ import {
 import { getDefaultTemplateForPlatform, projectTemplates } from "../lib/projects/projectTemplates.ts";
 
 test("buildProjectStartTacticAdvice", async (t) => {
+  await t.test("keeps template-only platform guide in configured platform order", () => {
+    const guide = buildProjectStartPlatformExperienceGuide({
+      platforms: platformProfiles,
+      limit: platformProfiles.length,
+    });
+
+    assert.deepEqual(
+      guide.items.map((item) => item.platformId),
+      platformProfiles.map((platform) => platform.id),
+    );
+  });
+
   await t.test("uses template advice when no historical platform experience exists", () => {
     const platform = getPlatformProfile("qidian");
     const template = getDefaultTemplateForPlatform(platform.id);

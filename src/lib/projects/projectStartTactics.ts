@@ -432,6 +432,7 @@ export function buildProjectStartPlatformExperienceGuide(input: {
 }): ProjectStartPlatformExperienceGuide {
   const experiences = input.experiences ?? [];
   const batchEffects = input.batchEffects ?? [];
+  const platformOrder = new Map(input.platforms.map((platform, index) => [platform.id, index]));
   const items = input.platforms.map((platform): ProjectStartPlatformExperienceItem => {
     const experience = experienceForPlatform(experiences, platform);
     const batchEffect = batchEffectForPlatform(batchEffects, platform);
@@ -609,7 +610,9 @@ export function buildProjectStartPlatformExperienceGuide(input: {
       if (statusDiff !== 0) return statusDiff;
       const priorityDiff = right.priorityScore - left.priorityScore;
       if (priorityDiff !== 0) return priorityDiff;
-      return left.platformName.localeCompare(right.platformName);
+      const orderDiff = (platformOrder.get(left.platformId) ?? 999) - (platformOrder.get(right.platformId) ?? 999);
+      if (orderDiff !== 0) return orderDiff;
+      return left.platformId.localeCompare(right.platformId);
     })
     .slice(0, input.limit ?? items.length);
   const recommended = sortedItems.filter((item) => item.status === "recommended").length;

@@ -1198,11 +1198,11 @@ export function buildWritingWorkbench(input: WritingWorkbenchInput): WritingWork
     startSoil,
     quickLinks: [
       ...(pendingCandidates[0] ? [{ label: "待采纳", href: pendingCandidates[0].href }] : []),
-      { label: "开局土壤", href: `/projects/${input.project.id}#world-bible` },
+      { label: "开局土壤", href: `/projects/${input.project.id}#start-soil` },
       { label: "前三章", href: `/projects/${input.project.id}#first-three-rewrite` },
       { label: "大树结构", href: `/projects/${input.project.id}#outline-tree` },
       { label: "人物弧光", href: `/projects/${input.project.id}#character-arc` },
-      { label: "项目土壤", href: `/projects/${input.project.id}#world-bible` },
+      { label: "项目土壤", href: `/projects/${input.project.id}#context-recall` },
       { label: "模型任务", href: `/projects/${input.project.id}#ai-pipeline` },
       { label: "发布包", href: `/projects/${input.project.id}#platform-export` },
     ],

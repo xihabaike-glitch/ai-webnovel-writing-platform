@@ -153,6 +153,7 @@ test("buildWritingWorkbench", async (t) => {
     )));
     assert.ok(workbench.modelFocus.nextRoutes.some((route) => route.task.includes("开头钩子")));
     assert.ok(workbench.quickLinks.some((link) => link.href === "/projects/p1#outline-tree"));
+    assert.equal(new Set(workbench.quickLinks.map((link) => link.href)).size, workbench.quickLinks.length);
     assert.ok(workbench.quickFixes.some((fix) => fix.kind === "chapter_hook" && fix.endpoint === "/api/chapters/c1"));
     assert.ok(workbench.quickFixes.some((fix) => fix.kind === "character_seed" && fix.endpoint === "/api/projects/p1/characters"));
     assert.ok(workbench.quickFixes.some((fix) => (

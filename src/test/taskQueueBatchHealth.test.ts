@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   autoDispatchTaskQueueBatchRhythm,
   buildTaskQueueBatchHealthReview,
+  buildTaskQueueBatchRhythmClosure,
   buildTaskQueueBatchRhythmDecision,
   buildTaskQueueBatchRhythmDispatch,
 } from "../lib/projects/taskQueueBatchHealth.ts";
@@ -84,6 +85,15 @@ function persistedTask(dispatch: GatePlatformGrowthDispatchItem): PersistedGateP
     completedAt: null,
     createdAt: dispatch.reviewLatestAt,
     updatedAt: dispatch.reviewLatestAt,
+  };
+}
+
+function completedTask(dispatch: GatePlatformGrowthDispatchItem, completionEvidence: string): PersistedGatePlatformDispatchTask {
+  return {
+    ...persistedTask(dispatch),
+    state: "completed",
+    completionEvidence,
+    completedAt: dispatch.reviewLatestAt,
   };
 }
 
@@ -393,4 +403,54 @@ test("autoDispatchTaskQueueBatchRhythm does not persist when rhythm can continue
   assert.equal(result.status, "empty");
   assert.equal(result.dispatch, null);
   assert.equal(result.decision.tone, "scale");
+});
+
+test("buildTaskQueueBatchRhythmClosure points active rhythm dispatches back to dispatch center", () => {
+  const audits = [
+    audit({
+      receiptId: "stable-1",
+      label: "三轮稳住批次健康，继续小步加码",
+      tacticLabel: "三轮稳住",
+      quality: 88,
+      createdAt: "2026-01-01T00:00:00.000Z",
+    }),
+  ];
+  const review = buildTaskQueueBatchHealthReview(audits);
+  const decision = buildTaskQueueBatchRhythmDecision(review);
+  const dispatch = buildTaskQueueBatchRhythmDispatch(decision, review);
+  assert.ok(dispatch);
+  const closure = buildTaskQueueBatchRhythmClosure(decision, review, [persistedTask(dispatch)]);
+
+  assert.equal(closure?.status, "active");
+  assert.equal(closure?.label, "节奏派单处理中");
+  assert.equal(closure?.actionLabel, "去派单中心");
+  assert.equal(closure?.href, `/dispatch#dispatch-${dispatch.id}`);
+});
+
+test("buildTaskQueueBatchRhythmClosure sends completed rhythm dispatches back to recheck batches", () => {
+  const audits = [
+    audit({
+      receiptId: "weak-1",
+      label: "普通批次质量跌线",
+      tacticLabel: "三轮稳住",
+      quality: 70,
+      failedCount: 1,
+      successRatePercent: 50,
+      createdAt: "2026-01-03T00:00:00.000Z",
+    }),
+  ];
+  const review = buildTaskQueueBatchHealthReview(audits);
+  const decision = buildTaskQueueBatchRhythmDecision(review);
+  const dispatch = buildTaskQueueBatchRhythmDispatch(decision, review);
+  assert.ok(dispatch);
+  const closure = buildTaskQueueBatchRhythmClosure(decision, review, [
+    completedTask(dispatch, "已拆失败样本，修复模型路线和提示词，复验范围 1 章，成功率目标 100%，质量目标 85。"),
+  ]);
+
+  assert.equal(closure?.status, "completed");
+  assert.equal(closure?.label, "节奏派单已回流");
+  assert.equal(closure?.actionLabel, "跑复验小批");
+  assert.equal(closure?.href, "/tasks#recommended-batch");
+  assert.ok(closure?.detail.includes("复验范围"));
+  assert.ok(closure?.evidence.some((item) => item.includes("质量目标 85")));
 });

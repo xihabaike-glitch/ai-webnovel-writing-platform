@@ -24,6 +24,16 @@ export interface TaskQueueBatchRhythmAutoDispatchResult {
   skippedTask: PersistedGatePlatformDispatchTask | null;
 }
 
+export interface TaskQueueBatchRhythmClosure {
+  status: "active" | "completed";
+  label: string;
+  detail: string;
+  actionLabel: string;
+  href: string;
+  evidence: string[];
+  task: PersistedGatePlatformDispatchTask;
+}
+
 export type TaskQueueBatchHealthAudit = Pick<GateActionAuditRecord,
   "receiptId"
   | "label"
@@ -172,6 +182,41 @@ export function buildTaskQueueBatchRhythmDispatch(
       ...(target?.nextAction ? [target.nextAction] : []),
     ].slice(0, 6),
     reviewLatestAt: target?.latestAt ?? createdAt,
+  };
+}
+
+export function buildTaskQueueBatchRhythmClosure(
+  decision: TaskQueueBatchRhythmDecision,
+  review: GateBatchTacticEffectReview,
+  tasks: PersistedGatePlatformDispatchTask[],
+): TaskQueueBatchRhythmClosure | null {
+  const dispatch = buildTaskQueueBatchRhythmDispatch(decision, review);
+  if (!dispatch) return null;
+
+  const task = tasks.find((item) => item.dispatchKey === dispatch.id) ?? null;
+  if (!task) return null;
+
+  const completionEvidence = task.completionEvidence.trim();
+  if (task.state === "completed" && completionEvidence) {
+    return {
+      status: "completed",
+      label: "节奏派单已回流",
+      detail: `已完成「${task.title}」：${completionEvidence} 下一步回任务页跑复验小批，用真实成功率、质量和成本更新节奏判断。`,
+      actionLabel: "跑复验小批",
+      href: "/tasks#recommended-batch",
+      evidence: [`完成依据：${completionEvidence}`, ...task.evidence].slice(0, 4),
+      task,
+    };
+  }
+
+  return {
+    status: "active",
+    label: "节奏派单处理中",
+    detail: `「${task.title}」还未完成。先去派单中心补齐验收依据，再回任务页跑复验小批。`,
+    actionLabel: "去派单中心",
+    href: `/dispatch#dispatch-${task.dispatchKey}`,
+    evidence: task.evidence.slice(0, 4),
+    task,
   };
 }
 

@@ -15,9 +15,10 @@ import { buildBatchExecutionSafety, buildBatchSafetyPriorityBlocker } from "@/li
 import { buildBatchStrategyComparison, buildBatchStrategyDecision } from "@/lib/projects/batchStrategyComparison";
 import { batchExecutionStrategies, getBatchExecutionStrategy } from "@/lib/projects/batchExecutionStrategy";
 import type { GateBatchTacticEffectStatus } from "@/lib/projects/gateActionReceipts";
+import { gatePlatformDispatchTaskFromRecord } from "@/lib/projects/gateDispatchTaskRecords";
 import { buildRecommendedBatchModelRouteGate } from "@/lib/projects/recommendedBatchModelRouteGate";
 import { buildFailureRepairResumeBatchRecord, buildTaskDebtFocusChangeNotice, buildTaskDebtRecoveryBatchRecord } from "@/lib/projects/taskDebtCompletionFeedback";
-import { buildTaskQueueBatchHealthReview, buildTaskQueueBatchRhythmDecision, buildTaskQueueBatchRhythmDispatch } from "@/lib/projects/taskQueueBatchHealth";
+import { buildTaskQueueBatchHealthReview, buildTaskQueueBatchRhythmClosure, buildTaskQueueBatchRhythmDecision, buildTaskQueueBatchRhythmDispatch } from "@/lib/projects/taskQueueBatchHealth";
 import { taskQueueBatchExecutionContext } from "@/lib/projects/taskQueueBatchReceipt";
 import { buildTaskQueueCenter, buildTaskQueueDebtView, recommendedQueueActionLabel, taskQueueSourcePresentation, type QueueItem, type TaskQueueProject } from "@/lib/projects/taskQueueCenter";
 import { buildTaskQueueExecutionPlan } from "@/lib/projects/taskQueueExecutionPlan";
@@ -242,6 +243,7 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
     completedRouteConfirmationRechecks,
     activeRouteConfirmationRechecks,
     recentRecommendedBatchAudits,
+    batchRhythmTaskRecords,
   ] = await Promise.all([
     prisma.project.findMany({
       include: {
@@ -386,6 +388,11 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
         createdAt: true,
       },
     }),
+    prisma.gateDispatchTask.findMany({
+      where: { dispatchKey: { startsWith: "batch-rhythm:" } },
+      orderBy: { updatedAt: "desc" },
+      take: 20,
+    }),
   ]);
   const chaptersById = new Map(chapters.map((chapter) => [chapter.id, chapter]));
   const taskQueueProjects = normalizeTaskQueueProjects(projects);
@@ -426,6 +433,8 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
   const batchTacticEffectReview = buildTaskQueueBatchHealthReview(recentRecommendedBatchAudits, 5);
   const batchRhythmDecision = buildTaskQueueBatchRhythmDecision(batchTacticEffectReview);
   const batchRhythmDispatch = buildTaskQueueBatchRhythmDispatch(batchRhythmDecision, batchTacticEffectReview);
+  const batchRhythmTasks = batchRhythmTaskRecords.map(gatePlatformDispatchTaskFromRecord);
+  const batchRhythmClosure = buildTaskQueueBatchRhythmClosure(batchRhythmDecision, batchTacticEffectReview, batchRhythmTasks);
   const debtRecoveryBatchRecord = buildTaskDebtRecoveryBatchRecord(recentRecommendedBatchAudits);
   const failureRepairResumeBatchRecord = buildFailureRepairResumeBatchRecord(recentRecommendedBatchAudits);
   const effectiveBatchContext = activeBatchContext === "repair_resume" && failureRepairResumeBatchRecord?.stabilityTone === "ready"
@@ -967,14 +976,33 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
                   ))}
                 </div>
               ) : null}
-              {batchRhythmDispatch ? (
+              {batchRhythmClosure ? (
+                <div className="mt-3 rounded-md bg-white/75 px-3 py-2 text-xs leading-5">
+                  <div className="font-medium">{batchRhythmClosure.label}</div>
+                  <div className="mt-1 opacity-85">{batchRhythmClosure.detail}</div>
+                  {batchRhythmClosure.evidence.length > 0 ? (
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {batchRhythmClosure.evidence.map((line) => (
+                        <span className="rounded-md bg-white px-2 py-1 font-medium" key={line}>{line}</span>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+              ) : batchRhythmDispatch ? (
                 <div className="mt-3 rounded-md bg-white/75 px-3 py-2 text-xs leading-5">
                   <div className="font-medium">派单预案：{batchRhythmDispatch.title} · {batchRhythmDispatch.ownerRole}</div>
                   <div className="mt-1 opacity-85">{batchRhythmDispatch.acceptanceCriteria[0]}</div>
                 </div>
               ) : null}
             </div>
-            {batchRhythmDispatch ? (
+            {batchRhythmClosure ? (
+              <Link
+                className={`w-fit shrink-0 rounded-md px-3 py-2 text-xs font-medium text-white ${batchRhythmClosure.status === "completed" ? "bg-emerald-950 hover:bg-emerald-900" : "bg-slate-950 hover:bg-slate-800"}`}
+                href={batchRhythmClosure.href}
+              >
+                {batchRhythmClosure.actionLabel}
+              </Link>
+            ) : batchRhythmDispatch ? (
               <CreateBatchRhythmDispatchButton label="生成节奏派单" />
             ) : (
               <Link className="w-fit shrink-0 rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white hover:bg-slate-800" href={batchRhythmDecision.href}>

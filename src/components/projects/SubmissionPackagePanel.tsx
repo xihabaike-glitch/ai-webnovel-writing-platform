@@ -78,6 +78,7 @@ interface MultiPlatformSubmissionVariant {
     favoriteRatePercent: number;
     followRatePercent: number;
     nextAction: string;
+    repairFocus: string[];
     evidence: string[];
   };
   decision: {
@@ -943,6 +944,13 @@ export function SubmissionPackagePanel({
                     </div>
                   </div>
                   <p className="mt-2 text-xs leading-5 text-slate-600">{variant.effectTracking.nextAction}</p>
+                  {variant.effectTracking.repairFocus.length ? (
+                    <div className="mt-2 grid gap-1 text-xs leading-5 text-rose-700">
+                      {variant.effectTracking.repairFocus.map((focus) => (
+                        <div className="rounded-md bg-rose-50 px-2 py-1" key={focus}>{focus}</div>
+                      ))}
+                    </div>
+                  ) : null}
                   <a className="mt-2 inline-flex w-fit rounded-md border border-slate-200 px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50" href="#publish-effect-panel">
                     回填这轮数据
                   </a>

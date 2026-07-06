@@ -234,7 +234,11 @@ test("buildMultiPlatformSubmission", async (t) => {
     assert.equal(fanqie.effectTracking.favoriteRatePercent, 6);
     assert.ok(qimao);
     assert.equal(qimao.effectTracking.status, "weak");
+    assert.ok(qimao.effectTracking.repairFocus.some((item) => item.includes("标题") && item.includes("简介")));
+    assert.ok(qimao.effectTracking.repairFocus.some((item) => item.includes("标签") && item.includes("卖点")));
+    assert.ok(qimao.effectTracking.repairFocus.some((item) => item.includes("前三章") && item.includes("兑现")));
     assert.equal(qimao.decision.kind, "repair");
+    assert.ok(qimao.decision.evidence.some((item) => item.includes("前三章")));
     assert.ok(webnovel);
     assert.equal(webnovel.effectTracking.status, "signed");
     assert.equal(webnovel.decision.kind, "main");
@@ -251,5 +255,7 @@ test("buildMultiPlatformSubmission", async (t) => {
     assert.equal(result.decisionBoard.tasks[0].platformId, "webnovel");
     assert.ok(result.decisionBoard.tasks.every((task) => task.href.startsWith("/projects/project-1#")));
     assert.ok(result.archive.markdown.includes("有苗头"));
+    assert.ok(result.archive.markdown.includes("复盘修复焦点"));
+    assert.ok(result.archive.markdown.includes("先修前三章兑现"));
   });
 });

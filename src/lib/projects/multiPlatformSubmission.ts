@@ -102,6 +102,7 @@ export interface MultiPlatformEffectTracking {
   favoriteRatePercent: number;
   followRatePercent: number;
   nextAction: string;
+  repairFocus: string[];
   evidence: string[];
 }
 
@@ -326,6 +327,31 @@ function contractStatusLabel(status: string) {
   return "未确认";
 }
 
+function buildEffectRepairFocus(input: {
+  clickRatePercent: number;
+  favoriteRatePercent: number;
+  followRatePercent: number;
+  editorFeedback: string;
+}) {
+  const focus: string[] = [];
+  if (input.clickRatePercent < 5) {
+    focus.push("先修标题和简介：点击率低，入口承诺不够直。");
+  }
+  if (input.favoriteRatePercent < 1.5) {
+    focus.push("先修标签和卖点：收藏率低，题材利益点没有被读者记住。");
+  }
+  if (input.followRatePercent < 0.8) {
+    focus.push("先修前三章兑现：追读率低，开头钩子没有转成连续期待。");
+  }
+  if (/开头|前三章|慢|拖|兑现|钩子/u.test(input.editorFeedback)) {
+    focus.push("按编辑反馈复查前三章：把慢热铺垫改成选择、冲突和兑现。");
+  }
+  if (/标题|简介|卖点|包装|标签/u.test(input.editorFeedback)) {
+    focus.push("按编辑反馈重做投稿包装：标题、简介、标签必须同向表达一个卖点。");
+  }
+  return [...new Set(focus)].slice(0, 4);
+}
+
 function buildEffectTracking(platform: PlatformProfile, metrics: MultiPlatformPublishMetricInput[]): MultiPlatformEffectTracking {
   const history = metrics
     .filter((metric) => metric.platformId === platform.id)
@@ -347,6 +373,7 @@ function buildEffectTracking(platform: PlatformProfile, metrics: MultiPlatformPu
       favoriteRatePercent: 0,
       followRatePercent: 0,
       nextAction: "下载或复制投稿包后，回填曝光、点击、收藏、追读和编辑反馈。",
+      repairFocus: [],
       evidence: ["暂无真实投放数据"],
     };
   }
@@ -361,6 +388,12 @@ function buildEffectTracking(platform: PlatformProfile, metrics: MultiPlatformPu
     `追读率 ${followRatePercent}%`,
     latest.editorFeedback ? `编辑反馈：${latest.editorFeedback}` : "",
   ].filter(Boolean);
+  const repairFocus = buildEffectRepairFocus({
+    clickRatePercent,
+    favoriteRatePercent,
+    followRatePercent,
+    editorFeedback: latest.editorFeedback,
+  });
 
   if (latest.contractStatus === "signed" || latest.contractStatus === "invited") {
     return {
@@ -378,6 +411,7 @@ function buildEffectTracking(platform: PlatformProfile, metrics: MultiPlatformPu
       favoriteRatePercent,
       followRatePercent,
       nextAction: "保留当前投稿入口承诺，围绕有效卖点稳定更新，不要乱换题眼。",
+      repairFocus: [],
       evidence,
     };
   }
@@ -408,6 +442,7 @@ function buildEffectTracking(platform: PlatformProfile, metrics: MultiPlatformPu
     favoriteRatePercent,
     followRatePercent,
     nextAction,
+    repairFocus: status === "weak" ? repairFocus : [],
     evidence,
   };
 }
@@ -476,7 +511,7 @@ function buildDecision(
       reason: `${platform.name} 入口数据偏弱，继续铺量只会把问题放大。`,
       nextAction: "先修标题、简介、标签和前三章钩子，再投第二轮小样本。",
       actionHref: "#platform-export",
-      evidence: effectTracking.evidence,
+      evidence: [...effectTracking.evidence, ...effectTracking.repairFocus],
     };
   }
 
@@ -862,6 +897,13 @@ export function buildSinglePlatformSubmissionMarkdown(variant: MultiPlatformSubm
     "",
     "## 投放追踪证据",
     ...variant.effectTracking.evidence.map((item) => `- ${item}`),
+    ...(variant.effectTracking.repairFocus.length
+      ? [
+        "",
+        "## 复盘修复焦点",
+        ...variant.effectTracking.repairFocus.map((item) => `- ${item}`),
+      ]
+      : []),
     "",
     "## 投放决策证据",
     ...variant.decision.evidence.map((item) => `- ${item}`),

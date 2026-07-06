@@ -77,6 +77,8 @@ export interface ReferenceCaseRolePlaybookItem {
   inputs: string[];
   outputs: string[];
   referenceCaseIds: string[];
+  workflowHref: string;
+  workflowActionLabel: string;
   nextAction: string;
 }
 
@@ -459,6 +461,8 @@ export function buildReferenceCaseRolePlaybook(): ReferenceCaseRolePlaybookItem[
       inputs: ["用户目标", "平台范围", "30 个参考案例", "当前项目指标"],
       outputs: ["优先级判断", "下一步开发动作", "风险提醒", "验收口径"],
       referenceCaseIds: ["autogen", "crewai", "dify"],
+      workflowHref: "/references",
+      workflowActionLabel: "回看参考库",
       nextAction: "把每个页面的下一步动作都绑定到真实写作、投稿或复盘产物。",
     },
     {
@@ -470,6 +474,8 @@ export function buildReferenceCaseRolePlaybook(): ReferenceCaseRolePlaybookItem[
       inputs: ["大纲树", "人物卡", "伏笔线", "历史章节"],
       outputs: ["人物弧光审校", "主线支线诊断", "前三章结构复审", "结尾回收清单"],
       referenceCaseIds: ["novelwriter", "bibisco", "manuskript", "langchain"],
+      workflowHref: "/projects#story-structure",
+      workflowActionLabel: "进入结构诊断",
       nextAction: "把结构诊断结果直接回写到大纲树和前三章改写任务。",
     },
     {
@@ -481,6 +487,8 @@ export function buildReferenceCaseRolePlaybook(): ReferenceCaseRolePlaybookItem[
       inputs: ["章节卡", "平台土壤", "人物当前状态", "上一章悬念"],
       outputs: ["章节初稿", "开头钩子候选", "爽点补强段落", "二改候选稿"],
       referenceCaseIds: ["wavemaker", "writer", "flowise"],
+      workflowHref: "/projects",
+      workflowActionLabel: "进入写作工作台",
       nextAction: "先跑 1 章小样本，审稿通过后再进入批量章节生产。",
     },
     {
@@ -492,6 +500,8 @@ export function buildReferenceCaseRolePlaybook(): ReferenceCaseRolePlaybookItem[
       inputs: ["世界观条目", "人物关系", "历史章节", "素材来源"],
       outputs: ["项目土壤摘要", "上下文召回包", "连续性风险", "资料引用说明"],
       referenceCaseIds: ["llama-index", "logseq", "joplin", "outline"],
+      workflowHref: "/projects#context-recall",
+      workflowActionLabel: "查看项目土壤",
       nextAction: "把每次模型调用需要的资料包变成可审计的上下文来源。",
     },
     {
@@ -503,6 +513,8 @@ export function buildReferenceCaseRolePlaybook(): ReferenceCaseRolePlaybookItem[
       inputs: ["中文卖点", "目标海外平台", "样章", "平台反馈"],
       outputs: ["WebNovel synopsis", "Royal Road progression pitch", "Wattpad tags", "英文章节标题包"],
       referenceCaseIds: ["lobe-chat", "librechat", "pandoc"],
+      workflowHref: "/projects#platform-export",
+      workflowActionLabel: "进入平台发布",
       nextAction: "把海外包装产物接到发布包版本，而不是停留在翻译文本。",
     },
     {
@@ -514,6 +526,8 @@ export function buildReferenceCaseRolePlaybook(): ReferenceCaseRolePlaybookItem[
       inputs: ["发布包版本", "平台效果数据", "A/B 候选", "历史复盘"],
       outputs: ["下一轮优化建议", "标题简介 A/B 判断", "平台知识反馈", "是否放量结论"],
       referenceCaseIds: ["n8n", "zola", "mdbook", "honkit"],
+      workflowHref: "/gate",
+      workflowActionLabel: "进入复盘闸门",
       nextAction: "把真实平台效果回写到平台知识库，驱动下一轮包装或前三章修订。",
     },
   ];

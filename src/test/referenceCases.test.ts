@@ -92,6 +92,9 @@ test("open source reference cases", async (t) => {
       assert.ok(role.outputs.length >= 2);
       assert.ok(role.referenceCaseIds.length >= 2);
       assert.ok(role.referenceCaseIds.every((id) => openSourceReferenceCases.some((item) => item.id === id)));
+      assert.equal(typeof role.workflowHref, "string", `${role.id} should expose a workflow href`);
+      assert.ok(role.workflowHref.startsWith("/") && !role.workflowHref.includes("undefined"));
+      assert.ok(role.workflowActionLabel.length >= 4);
       assert.ok(role.nextAction.length >= 10);
     }
 
@@ -104,6 +107,10 @@ test("open source reference cases", async (t) => {
     assert.ok(draftWriter?.modelOwner.includes("DeepSeek"));
     assert.ok(overseasPackager?.outputs.some((output) => output.includes("WebNovel")));
     assert.ok(feedbackOperator?.referenceCaseIds.includes("n8n"));
+    assert.equal(productManager?.workflowHref, "/references");
+    assert.equal(draftWriter?.workflowHref, "/projects");
+    assert.equal(overseasPackager?.workflowHref, "/projects#platform-export");
+    assert.equal(feedbackOperator?.workflowHref, "/gate");
   });
 
   await t.test("surfaces the locked eight-platform delivery scope", () => {

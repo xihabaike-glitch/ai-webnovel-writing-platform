@@ -203,8 +203,14 @@ export default async function ReferencesPage({ searchParams }: ReferencesPagePro
                   <p className="mt-1 leading-6 text-slate-700">{role.referenceCaseIds.join("、")}</p>
                 </div>
               </div>
-              <div className="mt-3 rounded-md bg-white p-3 text-sm font-medium leading-6 text-slate-800">
-                {role.nextAction}
+              <div className="mt-3 rounded-md bg-white p-3">
+                <div className="text-sm font-medium leading-6 text-slate-800">{role.nextAction}</div>
+                <Link
+                  className="mt-3 inline-flex w-fit rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white hover:bg-slate-800"
+                  href={role.workflowHref}
+                >
+                  {role.workflowActionLabel}
+                </Link>
               </div>
             </article>
           ))}

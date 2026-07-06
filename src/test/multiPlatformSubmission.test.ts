@@ -325,6 +325,9 @@ test("buildMultiPlatformSubmission", async (t) => {
       reviewLatestAt: "2026-01-07T08:00:00.000Z",
     });
     assert.equal(qimaoRetestDispatch.stage, "record_metrics");
-    assert.ok(buildGateDispatchCompletionTemplate(qimaoRetestDispatch).includes("曝光"));
+    const retestTemplate = buildGateDispatchCompletionTemplate(qimaoRetestDispatch);
+    assert.ok(retestTemplate.includes("样本轮次：第二轮小样本"));
+    assert.ok(retestTemplate.includes("验证变量：标题、简介、标签、前三章兑现"));
+    assert.ok(retestTemplate.includes("曝光"));
   });
 });

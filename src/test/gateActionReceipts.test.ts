@@ -5266,6 +5266,39 @@ test("buildGateActionReceipt", async (t) => {
       "结论：继续加码",
     ].join("\n")), null);
 
+    const repairRetestMetricTask = {
+      ...metricTask,
+      stage: "record_metrics" as const,
+      title: "七猫小说 修复包二轮小样本复检",
+      evidence: ["修复包已完成：等待第二轮小样本重验标题、简介、标签和前三章兑现。"],
+    };
+    const repairRetestTemplate = buildGateDispatchCompletionTemplate(repairRetestMetricTask);
+    assert.ok(repairRetestTemplate.includes("样本轮次：第二轮小样本"));
+    assert.ok(repairRetestTemplate.includes("验证变量：标题、简介、标签、前三章兑现"));
+    assert.ok(repairRetestTemplate.includes("放量限制：不提前放大，不同时改多个变量"));
+    assert.equal(reviewGateDispatchCompletionEvidence(repairRetestMetricTask, [
+      "七猫小说 修复包二轮小样本复检",
+      "样本轮次：第二轮小样本",
+      "验证变量：标题、简介、标签、前三章兑现",
+      "日期：2026-07-06",
+      "曝光：3000",
+      "点击：270",
+      "收藏：66",
+      "追读：31",
+      "平台反馈：暂无编辑反馈",
+      "发布链接：https://example.com/retest",
+      "结论：继续观察",
+    ].join("\n")), null);
+    assert.ok(reviewGateDispatchCompletionEvidence(repairRetestMetricTask, [
+      "七猫小说 修复包二轮小样本复检",
+      "日期：2026-07-06",
+      "曝光：3000",
+      "点击：270",
+      "收藏：66",
+      "追读：31",
+      "结论：继续观察",
+    ].join("\n"))?.includes("样本轮次"));
+
     assert.ok(buildGateDispatchCompletionTemplate(packageTask).includes("基准版本"));
     assert.ok(reviewGateDispatchCompletionEvidence(packageTask, [
       "番茄小说 发布包定稿",

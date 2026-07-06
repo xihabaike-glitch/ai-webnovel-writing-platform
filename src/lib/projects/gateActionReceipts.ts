@@ -4610,6 +4610,12 @@ function isAiPipelineSampleCompletionTask(task: GateDispatchCompletionTemplateTa
   return task.stage === "ai_pipeline_sample_recheck" && !/回滚|跌线|修复/u.test(text);
 }
 
+function isRepairRetestMetricCompletionTask(task: GateDispatchCompletionTemplateTask) {
+  if (!metricCompletionStages.has(task.stage)) return false;
+  const text = `${task.title} ${task.actionLabel} ${(task.evidence ?? []).join(" ")}`;
+  return /修复包已完成|二轮小样本|第二轮小样本|重验标题、简介、标签和前三章/u.test(text);
+}
+
 function isAiPipelineScaleCompletionTask(task: GateDispatchCompletionTemplateTask) {
   return task.stage === "ai_pipeline_small_batch";
 }
@@ -4742,6 +4748,24 @@ export function buildGateDispatchCompletionTemplate(task: GateDispatchCompletion
       "放量结论：通过恢复小批 / 未通过继续观察",
     ].join("\n");
   }
+  if (isRepairRetestMetricCompletionTask(task)) {
+    return [
+      `${task.title}`,
+      "样本轮次：第二轮小样本",
+      "验证变量：标题、简介、标签、前三章兑现",
+      "放量限制：不提前放大，不同时改多个变量",
+      "日期：",
+      "曝光：",
+      "点击：",
+      "收藏：",
+      "追读：",
+      "评论：",
+      "付费阅读：",
+      "平台反馈：",
+      "发布链接：",
+      "结论：继续观察 / 回到修包装 / 暂停",
+    ].join("\n");
+  }
   if (metricCompletionStages.has(task.stage)) {
     return [
       `${task.title}`,
@@ -4823,6 +4847,14 @@ export function reviewGateDispatchCompletionEvidence(
   }
 
   if (text.length < 8) return "完成派单前，请写清楚完成依据，至少 8 个字。";
+
+  if (isRepairRetestMetricCompletionTask(task)) {
+    const missing: string[] = [];
+    if (completedLabels(text, ["样本轮次", "验证变量"]).length < 2) missing.push("样本轮次、验证变量");
+    if (!hasMetricOrBusinessSignal(text)) missing.push("真实数据或平台反馈");
+    if (!hasConcreteDispatchCompletionValue(completionValueAfterLabel("结论", text))) missing.push("结论");
+    return missing.length ? `请补齐二轮小样本复检依据：${missing.join("、")}。` : null;
+  }
 
   if (metricCompletionStages.has(task.stage)) {
     const missing: string[] = [];

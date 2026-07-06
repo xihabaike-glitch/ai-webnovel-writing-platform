@@ -152,6 +152,15 @@ interface AiPipelinePromptMemorySummary {
     detail: string;
     primaryActionLabel: string;
   };
+  history: Array<{
+    statusLabel: string;
+    headline: string;
+    detail: string;
+    primaryActionLabel: string;
+    sourceLabel: string;
+    latestAt: string;
+    transitionLabel: string;
+  }>;
   gateTone: "ready" | "watch" | "blocked" | "empty";
   gateStatusLabel: string;
   gateStatusDetail: string;
@@ -1248,6 +1257,24 @@ export function ProjectControlDashboardPanel({ projectId }: { projectId: string 
                     {dashboard.aiPipelinePromptMemory.promptFeedback.primaryActionLabel}
                   </div>
                 </div>
+                {dashboard.aiPipelinePromptMemory.history.length > 0 ? (
+                  <div className="mt-2 rounded-md border border-emerald-100 bg-white/70 px-2 py-2">
+                    <div className="text-xs font-medium text-emerald-950">反馈历史</div>
+                    <div className="mt-2 grid gap-1">
+                      {dashboard.aiPipelinePromptMemory.history.slice(0, 3).map((item) => (
+                        <div className="rounded-md bg-white px-2 py-1 text-xs leading-5 text-emerald-900" key={`${item.latestAt}-${item.sourceLabel}`}>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="rounded-md bg-emerald-50 px-2 py-0.5 font-medium text-emerald-800">{item.statusLabel}</span>
+                            <span className="text-emerald-700">{item.transitionLabel}</span>
+                            <span className="text-emerald-600">{shortTime(item.latestAt)}</span>
+                          </div>
+                          <div className="mt-1 font-medium text-emerald-950">{item.headline}</div>
+                          <p className="mt-1 text-emerald-800">{item.detail}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
                 <p className="mt-2 rounded-md bg-white/70 px-2 py-1 text-xs leading-5 text-emerald-900">
                   {dashboard.aiPipelinePromptMemory.actionLabel}：{dashboard.aiPipelinePromptMemory.controlDetail}
                 </p>

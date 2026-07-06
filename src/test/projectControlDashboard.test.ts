@@ -995,6 +995,30 @@ test("buildProjectControlDashboard", async (t) => {
           }),
           createdAt: "2026-01-03T00:00:00.000Z",
         },
+        {
+          receiptId: "ai-plan-sample",
+          actionId: "ai-pipeline-control:demo-project",
+          label: "批量打法小样本复验",
+          detail: "三轮稳住打法：先回 1 章小样本。",
+          href: "/projects/demo-project#ai-pipeline",
+          status: "succeeded",
+          message: "复检完成：继续观察。",
+          executionType: "control_action",
+          succeededCount: 1,
+          failedCount: 0,
+          payload: JSON.stringify({
+            aiPipelineControlPlan: {
+              status: "watch",
+              items: [{ id: "sample", label: "回到 1 章样本", completed: true }],
+              recheck: {
+                status: "sample_required",
+                healthLabel: "继续小样本复验",
+                detail: "质量证据不足，先继续观察。",
+              },
+            },
+          }),
+          createdAt: "2026-01-02T00:00:00.000Z",
+        },
       ],
       submissionChecklist: checklist,
     });
@@ -1019,6 +1043,13 @@ test("buildProjectControlDashboard", async (t) => {
     assert.equal(dashboard.aiPipelinePromptMemory.promptFeedback.headline, "可小批恢复，提示词正在携带恢复约束");
     assert.ok(dashboard.aiPipelinePromptMemory.promptFeedback.detail.includes("小样本通过"));
     assert.equal(dashboard.aiPipelinePromptMemory.promptFeedback.primaryActionLabel, "继续小批，不放大批");
+    assert.deepEqual(dashboard.aiPipelinePromptMemory.history.map((item) => `${item.statusLabel}:${item.transitionLabel}`), [
+      "可恢复:继续观察 -> 可恢复",
+      "继续观察:初始：继续观察",
+    ]);
+    assert.equal(dashboard.aiPipelinePromptMemory.history[0].sourceLabel, "批量打法修复清单");
+    assert.equal(dashboard.aiPipelinePromptMemory.history[0].primaryActionLabel, "继续小批，不放大批");
+    assert.ok(dashboard.aiPipelinePromptMemory.history[1].detail.includes("质量证据不足"));
     assert.ok(dashboard.aiPipelinePromptMemory.evidence.some((item) => item.includes("小样本通过")));
     assert.equal(dashboard.aiPipelinePromptMemory.targetHref, "#ai-pipeline");
     assert.equal(dashboard.aiPipelinePromptMemory.latestAt, "2026-01-03T00:00:00.000Z");

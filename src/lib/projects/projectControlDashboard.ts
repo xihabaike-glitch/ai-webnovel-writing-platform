@@ -296,6 +296,15 @@ export interface AiPipelinePromptMemorySummary {
     detail: string;
     primaryActionLabel: string;
   };
+  history: Array<{
+    statusLabel: string;
+    headline: string;
+    detail: string;
+    primaryActionLabel: string;
+    sourceLabel: string;
+    latestAt: string;
+    transitionLabel: string;
+  }>;
   gateTone: "ready" | "watch" | "blocked" | "empty";
   gateStatusLabel: string;
   gateStatusDetail: string;
@@ -1355,6 +1364,47 @@ function buildAiPipelinePromptFeedback(input: {
   };
 }
 
+function promptHistoryStatus(candidate: AiPipelinePromptMemoryCandidate): AiPipelinePromptMemorySummary["lifecycleStatus"] {
+  return candidate.hasMemory ? candidate.lifecycleStatus : "empty";
+}
+
+function buildAiPipelinePromptHistory(
+  candidates: AiPipelinePromptMemoryCandidate[],
+): AiPipelinePromptMemorySummary["history"] {
+  const chronological = candidates
+    .slice()
+    .sort((left, right) => new Date(left.latestAt).getTime() - new Date(right.latestAt).getTime());
+  return chronological
+    .map((candidate, index) => {
+      const status = promptHistoryStatus(candidate);
+      const feedback = buildAiPipelinePromptFeedback({
+        lifecycleStatus: status,
+        healthLabel: candidate.healthLabel,
+        evidence: candidate.evidence,
+      });
+      const previous = index > 0 ? chronological[index - 1] : null;
+      const previousFeedback = previous
+        ? buildAiPipelinePromptFeedback({
+          lifecycleStatus: promptHistoryStatus(previous),
+          healthLabel: previous.healthLabel,
+          evidence: previous.evidence,
+        })
+        : null;
+      return {
+        ...feedback,
+        sourceLabel: candidate.sourceLabel,
+        latestAt: candidate.latestAt,
+        transitionLabel: previousFeedback
+          ? previousFeedback.statusLabel === feedback.statusLabel
+            ? `保持：${feedback.statusLabel}`
+            : `${previousFeedback.statusLabel} -> ${feedback.statusLabel}`
+          : `初始：${feedback.statusLabel}`,
+      };
+    })
+    .reverse()
+    .slice(0, 5);
+}
+
 function compactEvidence(items: Array<string | null | undefined>) {
   return items
     .map((item) => item?.trim() ?? "")
@@ -1518,10 +1568,12 @@ function buildAiPipelinePromptMemoryCandidate(audit: ControlBatchAudit): AiPipel
 }
 
 function buildAiPipelinePromptMemorySummary(audits: ControlBatchAudit[] = []): AiPipelinePromptMemorySummary {
-  const candidate = audits
+  const candidates = audits
     .map(buildAiPipelinePromptMemoryCandidate)
     .filter((item): item is AiPipelinePromptMemoryCandidate => Boolean(item))
-    .sort((left, right) => new Date(right.latestAt).getTime() - new Date(left.latestAt).getTime())[0] ?? null;
+    .sort((left, right) => new Date(right.latestAt).getTime() - new Date(left.latestAt).getTime());
+  const candidate = candidates[0] ?? null;
+  const history = buildAiPipelinePromptHistory(candidates);
 
   if (!candidate) {
     const gate = buildAiPipelinePromptMemoryGate("empty", { hasMemory: false });
@@ -1534,6 +1586,7 @@ function buildAiPipelinePromptMemorySummary(audits: ControlBatchAudit[] = []): A
         healthLabel: "无恢复证据",
         evidence: [],
       }),
+      history,
       ...gate,
       label: "暂无提示词记忆",
       headline: "AI 写审改还没有恢复证据可带入提示词。",
@@ -1560,6 +1613,7 @@ function buildAiPipelinePromptMemorySummary(audits: ControlBatchAudit[] = []): A
         healthLabel: candidate.healthLabel,
         evidence: candidate.evidence,
       }),
+      history,
       ...gate,
       label: "提示词记忆已清除",
       headline: "旧恢复记忆已经被清除，后续 AI 写审改不会继续携带这条证据。",
@@ -1595,6 +1649,7 @@ function buildAiPipelinePromptMemorySummary(audits: ControlBatchAudit[] = []): A
       healthLabel: candidate.healthLabel,
       evidence: candidate.evidence,
     }),
+    history,
     ...gate,
     label: "提示词已携带恢复记忆",
     headline: `${candidate.healthLabel}，后续 AI 写审改会带上这条恢复证据。`,

@@ -31,6 +31,15 @@ export interface BatchExecutionSafety {
   warnings: string[];
 }
 
+export interface BatchSafetyPriorityBlocker {
+  id: string;
+  title: string;
+  detail: string;
+  status: ExecutionSafetyItem["status"];
+  actionLabel: string;
+  actionHref: string;
+}
+
 const estimatedTokensByCategory: Record<QueueItem["category"], number> = {
   candidate: 0,
   handoff: 0,
@@ -85,6 +94,38 @@ function isOpenAiPipelineRecoveryFollowup(item: QueueItem) {
       || item.platformName === "AI 写审改"
       || item.sourceDispatchKey?.startsWith("ai-pipeline:") === true
     );
+}
+
+const priorityBlockerOrder = [
+  "ai-pipeline-recovery",
+  "pending-candidates",
+  "running-tasks",
+  "failure-rate",
+  "watch-scale-gate",
+  "blocked-items",
+  "budget",
+  "mixed-actions",
+  "mixed-projects",
+  "batch-size",
+] as const;
+
+export function buildBatchSafetyPriorityBlocker(safety: Pick<BatchExecutionSafety, "items">): BatchSafetyPriorityBlocker | null {
+  const actionable = safety.items.filter((item) => item.status !== "pass");
+  const item = actionable.sort((left, right) => {
+    const leftIndex = priorityBlockerOrder.indexOf(left.id as (typeof priorityBlockerOrder)[number]);
+    const rightIndex = priorityBlockerOrder.indexOf(right.id as (typeof priorityBlockerOrder)[number]);
+    return (leftIndex === -1 ? 99 : leftIndex) - (rightIndex === -1 ? 99 : rightIndex);
+  })[0] ?? null;
+  if (!item) return null;
+
+  return {
+    id: item.id,
+    title: `先处理 ${item.label}`,
+    detail: item.detail,
+    status: item.status,
+    actionLabel: item.actionLabel ?? "查看安全阀",
+    actionHref: item.actionHref ?? "/tasks#recommended-batch",
+  };
 }
 
 export function buildBatchExecutionSafety(

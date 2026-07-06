@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { buildBatchExecutionSafety } from "../lib/projects/batchExecutionSafety.ts";
+import { buildBatchExecutionSafety, buildBatchSafetyPriorityBlocker } from "../lib/projects/batchExecutionSafety.ts";
 import { getBatchExecutionStrategy } from "../lib/projects/batchExecutionStrategy.ts";
 import type { QueueItem } from "../lib/projects/taskQueueCenter.ts";
 
@@ -89,6 +89,44 @@ test("buildBatchExecutionSafety", async (t) => {
     assert.ok(recoveryGate?.detail.includes("不回推荐批量"));
     assert.equal(recoveryGate?.actionLabel, "回恢复闸门");
     assert.equal(recoveryGate?.actionHref, "/gate#ai-pipeline-recovery");
+  });
+
+  await t.test("prioritizes the PM blocker that should be handled before running batches", () => {
+    const safety = buildBatchExecutionSafety([
+      { ...baseItem, id: "candidate-1", category: "candidate", label: "待采纳", priority: 5, actionLabel: "处理候选稿" },
+      {
+        ...baseItem,
+        id: "project-1:tactic-experience-followup:ai-pipeline:watch",
+        category: "handoff",
+        sourceType: "tactic_experience_followup",
+        sourceLabel: "AI 写审改恢复",
+        sourceDispatchKey: "ai-pipeline:tactic_experience_followup:watch-ai-recovery:2026-01-01",
+        platformName: "AI 写审改",
+        label: "AI 写审改恢复",
+        chapterTitle: "恢复观察小样本复验",
+        evidence: "AI 写审改恢复依据还在观察期，只准继续 1 章小样本复验，不回推荐批量。",
+        actionLabel: "继续小样本",
+        href: "/gate#ai-pipeline-recovery",
+        priority: 6,
+      },
+      baseItem,
+    ], [
+      {
+        aiTasks: [
+          { status: "running", inputTokens: null, outputTokens: null, costUsd: null },
+          { status: "running", inputTokens: null, outputTokens: null, costUsd: null },
+          { status: "queued", inputTokens: null, outputTokens: null, costUsd: null },
+          { status: "queued", inputTokens: null, outputTokens: null, costUsd: null },
+        ],
+      },
+    ]);
+    const blocker = buildBatchSafetyPriorityBlocker(safety);
+
+    assert.equal(blocker?.id, "ai-pipeline-recovery");
+    assert.equal(blocker?.title, "先处理 AI 写审改恢复");
+    assert.equal(blocker?.actionLabel, "回恢复闸门");
+    assert.equal(blocker?.actionHref, "/gate#ai-pipeline-recovery");
+    assert.ok(blocker?.detail.includes("不回推荐批量"));
   });
 
   await t.test("blocks execution when too many tasks are already running", () => {

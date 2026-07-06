@@ -8,7 +8,7 @@ import { buildTaskBatchHistory } from "@/lib/ai/taskBatchHistory";
 import { buildTaskRunConsole, type TaskRunLog } from "@/lib/ai/taskRunConsole";
 import { prisma } from "@/lib/db/prisma";
 import { buildRouteConfirmationRecheckEvidenceFromDispatchTasks } from "@/lib/model-gateway/routeConfirmation";
-import { buildBatchExecutionSafety } from "@/lib/projects/batchExecutionSafety";
+import { buildBatchExecutionSafety, buildBatchSafetyPriorityBlocker } from "@/lib/projects/batchExecutionSafety";
 import { buildBatchStrategyComparison, buildBatchStrategyDecision } from "@/lib/projects/batchStrategyComparison";
 import { batchExecutionStrategies, getBatchExecutionStrategy } from "@/lib/projects/batchExecutionStrategy";
 import type { GateBatchTacticEffectStatus } from "@/lib/projects/gateActionReceipts";
@@ -305,6 +305,7 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
   }));
   const queue = buildTaskQueueCenter(taskQueueProjects);
   const safety = buildBatchExecutionSafety(queue.items, safetyProjects, activeStrategy);
+  const safetyPriorityBlocker = buildBatchSafetyPriorityBlocker(safety);
   const executionPlan = buildTaskQueueExecutionPlan(queue.items, activeStrategy.maxBatchSize, activeStrategy);
   const runConsole = buildTaskRunConsole(recentAiTasks.map((task) => ({
     ...task,
@@ -765,6 +766,20 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
             />
           </div>
         </div>
+        {safetyPriorityBlocker ? (
+          <div className="mt-4 rounded-md border border-rose-200 bg-rose-50 p-3 text-sm text-rose-900">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+              <div>
+                <div className="text-xs font-medium uppercase text-rose-700">PM 优先处理</div>
+                <div className="mt-1 font-medium">{safetyPriorityBlocker.title}</div>
+                <p className="mt-1 leading-6">{safetyPriorityBlocker.detail}</p>
+              </div>
+              <Link className="w-fit shrink-0 rounded-md bg-rose-950 px-3 py-2 text-xs font-medium text-white hover:bg-rose-900" href={safetyPriorityBlocker.actionHref}>
+                {safetyPriorityBlocker.actionLabel}
+              </Link>
+            </div>
+          </div>
+        ) : null}
         <div className="mt-4 grid gap-2 md:grid-cols-3">
           {batchExecutionStrategies.map((strategy) => (
             <Link

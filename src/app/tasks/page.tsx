@@ -584,6 +584,46 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
         </div>
       </section>
 
+      <section className="mb-6 rounded-md border border-slate-200 bg-white p-4">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <h2 className="font-medium text-slate-950">平台闭环总览</h2>
+            <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-600">
+              {queue.overview.platformReadiness.headline} {queue.overview.platformReadiness.nextAction}
+            </p>
+          </div>
+          <Link className="w-fit rounded-md bg-slate-950 px-3 py-2 text-sm font-medium text-white" href="/tasks?view=blocked&debt=publish_repair#task-debt">
+            查看发布阻塞
+          </Link>
+        </div>
+        <div className="mt-4 grid gap-2 text-sm text-slate-600 sm:grid-cols-2 lg:grid-cols-6">
+          <div className="rounded-md bg-slate-50 p-3">
+            <div className="text-xs text-slate-500">平台样本</div>
+            <div className="mt-1 font-medium text-slate-950">{queue.overview.platformReadiness.totalPlatforms}</div>
+          </div>
+          <div className="rounded-md bg-slate-50 p-3">
+            <div className="text-xs text-slate-500">已可投</div>
+            <div className="mt-1 font-medium text-slate-950">{queue.overview.platformReadiness.readyToSubmitCount}</div>
+          </div>
+          <div className="rounded-md bg-slate-50 p-3">
+            <div className="text-xs text-slate-500">需导出包</div>
+            <div className="mt-1 font-medium text-slate-950">{queue.overview.platformReadiness.needsPackageExportCount}</div>
+          </div>
+          <div className="rounded-md bg-slate-50 p-3">
+            <div className="text-xs text-slate-500">需补效果</div>
+            <div className="mt-1 font-medium text-slate-950">{queue.overview.platformReadiness.needsEffectRecordCount}</div>
+          </div>
+          <div className="rounded-md bg-slate-50 p-3">
+            <div className="text-xs text-slate-500">需修投稿</div>
+            <div className="mt-1 font-medium text-slate-950">{queue.overview.platformReadiness.needsSubmissionRepairCount}</div>
+          </div>
+          <div className="rounded-md bg-slate-50 p-3">
+            <div className="text-xs text-slate-500">未生成包</div>
+            <div className="mt-1 font-medium text-slate-950">{queue.overview.platformReadiness.notGeneratedCount}</div>
+          </div>
+        </div>
+      </section>
+
       {activeView === "blocked" ? (
         <section
           className={`mb-6 rounded-md border p-4 ${debtView.totalBlocked > 0 ? "border-rose-200 bg-rose-50 text-rose-950" : "border-emerald-200 bg-emerald-50 text-emerald-950"}`}

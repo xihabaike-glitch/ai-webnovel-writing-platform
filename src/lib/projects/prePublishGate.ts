@@ -1705,15 +1705,26 @@ export function buildPrePublishGate(input: PrePublishGateInput): PrePublishGate 
   const emptyProjects = projectStatuses.filter((project) => project.status === "empty").length;
   const exportVersionBlockers = projectStatuses.filter((project) => project.exportVersionGate.status === "block");
   const exportVersionWarnings = projectStatuses.filter((project) => project.exportVersionGate.status === "warn");
+  const targetPlatformByProjectId = new Map(
+    projects.map((project) => [
+      project.id,
+      getPlatformProfile(project.targetPlatform as PlatformId).name,
+    ]),
+  );
+  const gateBlockingQueueItems = queue.items.filter((item) => {
+    if (item.category !== "blocked") return false;
+    if (item.blockerType !== "publish_repair") return true;
+    return targetPlatformByProjectId.get(item.projectId) === item.platformName;
+  });
   const runnableTasks = queue.items.filter((item) => (
     item.category === "draft" || item.category === "review" || item.category === "second_pass"
   )).length;
   const failedTasks = failureRepairBatch.summary.unresolvedFailures;
   const hasPublishableWork = projectStatuses.some((project) => project.publishableChapters > 0);
-  const taskBlockers = queue.overview.blockedCards;
+  const taskBlockers = gateBlockingQueueItems.length;
   const firstDayBlockers = queue.overview.firstDayBlocked + queue.overview.riskRecoveryBlocked + queue.overview.watchScaleBlocked;
-  const queueBlockerDetail = queue.recommendedNext?.category === "blocked"
-    ? `${queue.recommendedNext.actionLabel}：${queue.recommendedNext.evidence}`
+  const queueBlockerDetail = gateBlockingQueueItems[0]
+    ? `${gateBlockingQueueItems[0].actionLabel}：${gateBlockingQueueItems[0].evidence}`
     : null;
   const firstThreeAdoptionClosure = buildFirstThreeAdoptionClosure(projects);
 
@@ -1842,8 +1853,13 @@ export function buildPrePublishGate(input: PrePublishGateInput): PrePublishGate 
         { type: "retry_task", taskId: failure.id },
       )),
     ...failureCenter.nextActions.map((detail, index) => action(`failure:${index}`, "处理失败复盘", detail, "/failures", "review")),
-    queue.recommendedNext
-      ? action("queue:next", queue.recommendedNext.actionLabel, `${queue.recommendedNext.projectTitle} · ${queue.recommendedNext.chapterTitle} · ${queue.recommendedNext.evidence}`, queue.recommendedNext.href)
+    (gateBlockingQueueItems[0] ?? queue.recommendedNext)
+      ? action(
+        "queue:next",
+        (gateBlockingQueueItems[0] ?? queue.recommendedNext)?.actionLabel ?? "打开任务队列",
+        `${(gateBlockingQueueItems[0] ?? queue.recommendedNext)?.projectTitle ?? "任务队列"} · ${(gateBlockingQueueItems[0] ?? queue.recommendedNext)?.chapterTitle ?? "下一步"} · ${(gateBlockingQueueItems[0] ?? queue.recommendedNext)?.evidence ?? "继续处理队列任务。"}`,
+        (gateBlockingQueueItems[0] ?? queue.recommendedNext)?.href ?? "/tasks",
+      )
       : null,
     runnableTasks > 0
       ? action(
@@ -1873,8 +1889,8 @@ export function buildPrePublishGate(input: PrePublishGateInput): PrePublishGate 
       repairPackages,
       emptyProjects,
       runnableTasks,
-      blockedTasks: queue.overview.blockedCards,
-      publishBlocked: queue.overview.publishBlocked,
+      blockedTasks: taskBlockers,
+      publishBlocked: gateBlockingQueueItems.filter((item) => item.blockerType === "publish_repair").length,
       failureTasks: failedTasks,
       retryableFailures: failureRepairBatch.summary.retryableFailures,
       canRunBatch: safety.canRunRecommendedBatch,

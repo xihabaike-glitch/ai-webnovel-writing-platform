@@ -29,6 +29,20 @@ const passedReviews = finalChapters.map((chapter, index) => ({
   costUsd: 0.01,
 }));
 
+const readySubmissionAsset = {
+  id: "asset-ready-fanqie",
+  platformId: "fanqie",
+  platformName: "番茄小说",
+  title: "夜雨系统：倒计时翻盘",
+  logline: "林晚在雨夜绑定倒计时系统，每一次选择都把绝境打成反杀爽点，并逼近旧案真相。",
+  synopsis: "林晚在雨夜绑定倒计时系统，每一次选择都牵动生死、复仇和旧案真相。她必须把系统惩罚反手变成翻盘筹码，在连续任务里救人、反杀、追查背叛者，并把所有敌人拖回雨夜审判。前三章用倒计时危机、隐藏任务和旧案线索连续推进，适合快节奏平台测试首轮留存。",
+  overseasSynopsis: "Night Rain System follows Lin Wan through deadly timed choices and revenge.",
+  tags: ["系统", "重生", "强爽点"],
+  note: "总闸门 ready 样本。",
+  source: "manual",
+  updatedAt: "2026-01-07T08:00:00.000Z",
+};
+
 function firstDayCompleteDispatches(projectId: string) {
   return [{
     dispatchKey: `first-day:${projectId}:publish-precheck`,
@@ -72,7 +86,7 @@ const readyProject: PrePublishGateProject = {
   title: "夜雨系统",
   targetPlatform: "fanqie",
   targetWordCount: 300000,
-  currentWordCount: 9000,
+  currentWordCount: 30000,
   genre: "都市系统",
   sellingPoint: "雨夜危机中觉醒系统，主角用一次次选择翻盘。",
   chapters: finalChapters,
@@ -93,6 +107,7 @@ const readyProject: PrePublishGateProject = {
     },
   ],
   gateDispatchTasks: firstDayCompleteDispatches("project-ready"),
+  submissionAssets: [readySubmissionAsset],
 };
 
 const blockedProject: PrePublishGateProject = {

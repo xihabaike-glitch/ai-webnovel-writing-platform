@@ -319,13 +319,14 @@ test("buildPlatformPublishExportCenter", async (t) => {
     assert.equal(center.effectCaptureSummary.tasks[0].platformName, "番茄小说");
     assert.equal(center.platformReadinessSummary.totalPlatforms, 1);
     assert.equal(center.platformReadinessSummary.readyToSubmitCount, 0);
-    assert.equal(center.platformReadinessSummary.needsEffectRecordCount, 1);
+    assert.equal(center.platformReadinessSummary.needsPackageExportCount, 1);
+    assert.equal(center.platformReadinessSummary.needsEffectRecordCount, 0);
     assert.equal(center.platformReadinessSummary.needsSubmissionRepairCount, 0);
     assert.equal(center.platformReadinessSummary.notGeneratedCount, 0);
-    assert.equal(center.platformReadinessSummary.items[0]?.status, "needs_effect_record");
-    assert.equal(center.platformReadinessSummary.items[0]?.actionHref, "#publish-effect-panel");
+    assert.equal(center.platformReadinessSummary.items[0]?.status, "needs_package_export");
+    assert.equal(center.platformReadinessSummary.items[0]?.actionHref, "#platform-export");
     assert.ok(center.platformReadinessSummary.headline.includes("1 个平台发布包已过线"));
-    assert.ok(center.platformReadinessSummary.nextAction.includes("补发布效果"));
+    assert.ok(center.platformReadinessSummary.nextAction.includes("保存发布基准"));
   });
 
   await t.test("blocks export when candidate adoption makes old reviews stale", () => {

@@ -9,6 +9,7 @@ import { validateFirstDayDispatchCompletionEvidence } from "./firstDayWorkflowVi
 import { buildGateDispatchCompletionTemplate, type GateDispatchCompletionTemplateTask } from "./gateActionReceipts.ts";
 import {
   buildPlatformPublishExportCenter,
+  type PlatformReadinessSummary,
   type PlatformPublishMetricInput,
   type PlatformSubmissionAssetInput,
   type PlatformSubmissionAssetVersionInput,
@@ -171,9 +172,22 @@ export interface TaskQueueCenter {
     firstDayHandoffs: number;
     firstThreeAdoptionFollowups: number;
     tacticExperienceFollowups: number;
+    platformReadiness: TaskQueuePlatformReadinessSummary;
   };
   items: QueueItem[];
   recommendedNext: QueueItem | null;
+}
+
+export interface TaskQueuePlatformReadinessSummary {
+  totalProjects: number;
+  totalPlatforms: number;
+  readyToSubmitCount: number;
+  needsPackageExportCount: number;
+  needsEffectRecordCount: number;
+  needsSubmissionRepairCount: number;
+  notGeneratedCount: number;
+  headline: string;
+  nextAction: string;
 }
 
 export interface TaskQueueSourcePresentation {
@@ -234,6 +248,47 @@ export function buildTaskQueueProjectSubmissionChecklist(project: TaskQueueProje
       createdAt: task.createdAt,
     })),
   });
+}
+
+function buildTaskQueuePlatformReadinessSummary(
+  summaries: PlatformReadinessSummary[],
+): TaskQueuePlatformReadinessSummary {
+  const totalProjects = summaries.length;
+  const totalPlatforms = summaries.reduce((sum, summary) => sum + summary.totalPlatforms, 0);
+  const readyToSubmitCount = summaries.reduce((sum, summary) => sum + summary.readyToSubmitCount, 0);
+  const needsPackageExportCount = summaries.reduce((sum, summary) => sum + summary.needsPackageExportCount, 0);
+  const needsEffectRecordCount = summaries.reduce((sum, summary) => sum + summary.needsEffectRecordCount, 0);
+  const needsSubmissionRepairCount = summaries.reduce((sum, summary) => sum + summary.needsSubmissionRepairCount, 0);
+  const notGeneratedCount = summaries.reduce((sum, summary) => sum + summary.notGeneratedCount, 0);
+  const primary = summaries.find((summary) => summary.needsSubmissionRepairCount > 0)
+    ?? summaries.find((summary) => summary.notGeneratedCount > 0)
+    ?? summaries.find((summary) => summary.needsPackageExportCount > 0)
+    ?? summaries.find((summary) => summary.needsEffectRecordCount > 0)
+    ?? summaries[0]
+    ?? null;
+  const headline = needsSubmissionRepairCount > 0
+    ? `${needsSubmissionRepairCount}/${totalPlatforms} 平台需修投稿。`
+    : notGeneratedCount > 0
+      ? `${notGeneratedCount}/${totalPlatforms} 平台未生成包。`
+      : needsPackageExportCount > 0
+        ? `${needsPackageExportCount}/${totalPlatforms} 平台需导出包。`
+        : needsEffectRecordCount > 0
+          ? `${needsEffectRecordCount}/${totalPlatforms} 平台需补效果。`
+          : totalPlatforms > 0
+            ? `${readyToSubmitCount}/${totalPlatforms} 平台已完成闭环。`
+            : "还没有平台发布闭环数据。";
+
+  return {
+    totalProjects,
+    totalPlatforms,
+    readyToSubmitCount,
+    needsPackageExportCount,
+    needsEffectRecordCount,
+    needsSubmissionRepairCount,
+    notGeneratedCount,
+    headline,
+    nextAction: primary?.nextAction ?? "先创建作品和章节，再生成平台发布包。",
+  };
 }
 
 const categoryPriority: Record<QueueItem["category"], number> = {
@@ -1278,6 +1333,7 @@ function completedEffectActionFollowup(input: {
 }
 
 export function buildTaskQueueCenter(projects: TaskQueueProject[]): TaskQueueCenter {
+  const platformReadinessSummaries: PlatformReadinessSummary[] = [];
   const items = projects.flatMap((project) => {
     const platform = getPlatformProfile(project.targetPlatform as PlatformId);
     const projectHref = `/projects/${project.id}`;
@@ -1333,6 +1389,7 @@ export function buildTaskQueueCenter(projects: TaskQueueProject[]): TaskQueueCen
       submissionChecklist: project.submissionChecklist,
       platformPublishMetrics: project.platformPublishMetrics ?? [],
     });
+    platformReadinessSummaries.push(exportCenter.platformReadinessSummary);
     const queueItems: QueueItem[] = [];
 
     queueItems.push(...firstDayExperienceHandoffQueueItems({
@@ -1679,14 +1736,20 @@ export function buildTaskQueueCenter(projects: TaskQueueProject[]): TaskQueueCen
       })
       : null;
 
-    const exportQueuePackages = [
+    const readinessByPlatform = new Map(
+      exportCenter.platformReadinessSummary.items.map((entry) => [entry.platformId, entry]),
+    );
+    const orderedPackages = [
       targetPackage,
       ...exportCenter.packages.filter((pack) => pack.platformId !== targetPackage.platformId),
-    ].filter((pack) => pack.canExport);
-    const repairQueuePackages = [
-      targetPackage,
-      ...exportCenter.packages.filter((pack) => pack.platformId !== targetPackage.platformId),
-    ].filter((pack) => pack.repairPath.status === "needs_repair");
+    ];
+    const exportQueuePackages = orderedPackages.filter((pack) => (
+      readinessByPlatform.get(pack.platformId)?.status === "needs_package_export"
+    ));
+    const repairQueuePackages = orderedPackages.filter((pack) => (
+      pack.repairPath.status === "needs_repair"
+      || readinessByPlatform.get(pack.platformId)?.status === "needs_submission_repair"
+    ));
 
     if (versionQueueItem) {
       queueItems.push(versionQueueItem);
@@ -1721,13 +1784,13 @@ export function buildTaskQueueCenter(projects: TaskQueueProject[]): TaskQueueCen
           category: "blocked",
           blockerType: "publish_repair",
           chapterTitle: `${repairPackage.platformName} 发布质检`,
-          evidence: repairPackage.repairPath.headline,
+          evidence: readinessByPlatform.get(repairPackage.platformId)?.detail ?? repairPackage.repairPath.headline,
           strategyBasis: startTactic,
           riskLevel: riskProfile.level,
           riskLabel: riskProfile.label,
           riskNotice,
           scaleGate,
-          actionLabel: repairPackage.repairPath.nextStep?.label ?? "处理发布阻塞",
+          actionLabel: readinessByPlatform.get(repairPackage.platformId)?.actionLabel ?? repairPackage.repairPath.nextStep?.label ?? "处理发布阻塞",
           href: `${projectHref}#platform-export`,
         }));
       }
@@ -1783,6 +1846,7 @@ export function buildTaskQueueCenter(projects: TaskQueueProject[]): TaskQueueCen
       firstDayHandoffs: items.filter((entry) => entry.sourceType === "first_day_handoff").length,
       firstThreeAdoptionFollowups: items.filter((entry) => entry.sourceType === "first_three_adoption").length,
       tacticExperienceFollowups: items.filter((entry) => entry.sourceType === "tactic_experience_followup").length,
+      platformReadiness: buildTaskQueuePlatformReadinessSummary(platformReadinessSummaries),
     },
     items,
     recommendedNext: items.find((entry) => entry.category !== "blocked") ?? items[0] ?? null,

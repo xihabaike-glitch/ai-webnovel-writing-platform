@@ -218,7 +218,11 @@ test("buildTaskQueueCenter", async (t) => {
     assert.ok(publishBlocker?.href.endsWith("#platform-export"));
     assert.equal(publishBlocker?.blockerType, "publish_repair");
     assert.equal(cardBlocker?.blockerType, "chapter_card");
-    assert.ok(publishBlocker?.evidence.includes("先处理"));
+    assert.ok(
+      publishBlocker?.evidence.includes("补")
+      || publishBlocker?.evidence.includes("优化")
+      || publishBlocker?.evidence.includes("修"),
+    );
     assert.equal(queue.recommendedNext?.strategyBasis?.label, "模板推荐");
     assert.ok(queue.items.every((item) => item.strategyBasis?.openingMove.includes("倒计时")));
   });
@@ -382,7 +386,7 @@ test("buildTaskQueueCenter", async (t) => {
     })]);
 
     assert.equal(queue.overview.effectReady, 1);
-    assert.equal(queue.overview.exportReady, 8);
+    assert.equal(queue.overview.exportReady, 1);
     assert.equal(queue.recommendedNext?.category, "effect");
     assert.equal(queue.recommendedNext?.actionLabel, "录入发布效果");
     assert.equal(queue.recommendedNext?.href, "/projects/project-1#publish-effect-panel");
@@ -419,21 +423,30 @@ test("buildTaskQueueCenter", async (t) => {
     assert.ok(effectItems.every((item) => item.href === "/projects/project-1#publish-effect-panel"));
   });
 
-  await t.test("promotes every export-ready platform into package export tasks", () => {
+  await t.test("promotes only final-gate-cleared platforms into package export tasks", () => {
     const queue = buildTaskQueueCenter([publishReadyProject({
       publishSnapshots: [],
       platformPublishMetrics: [],
     })]);
 
     const exportItems = queue.items.filter((item) => item.category === "export" && item.id.includes(":export:"));
+    const repairItems = queue.items.filter((item) => item.blockerType === "publish_repair");
 
-    assert.equal(queue.overview.exportReady, 8);
+    assert.equal(queue.overview.exportReady, 1);
+    assert.equal(queue.overview.publishBlocked, 7);
     assert.deepEqual(
       exportItems.map((item) => item.platformName).sort((left, right) => left.localeCompare(right)),
-      ["番茄小说", "起点中文网", "七猫", "晋江文学城", "知乎盐选", "WebNovel", "Royal Road", "Wattpad"].sort((left, right) => left.localeCompare(right)),
+      ["知乎盐选"],
     );
     assert.ok(exportItems.every((item) => item.actionLabel === "导出平台包"));
     assert.ok(exportItems.every((item) => item.href === "/projects/project-1#platform-export"));
+    assert.ok(repairItems.some((item) => item.platformName === "起点中文网"));
+    assert.equal(queue.overview.platformReadiness.totalPlatforms, 8);
+    assert.equal(queue.overview.platformReadiness.needsPackageExportCount, 1);
+    assert.equal(queue.overview.platformReadiness.needsEffectRecordCount, 0);
+    assert.equal(queue.overview.platformReadiness.needsSubmissionRepairCount, 7);
+    assert.equal(queue.overview.platformReadiness.readyToSubmitCount, 0);
+    assert.ok(queue.overview.platformReadiness.headline.includes("需修投稿"));
   });
 
   await t.test("promotes every blocked platform into publish repair debt", () => {
@@ -452,6 +465,10 @@ test("buildTaskQueueCenter", async (t) => {
       ["番茄小说", "起点中文网", "七猫", "晋江文学城", "知乎盐选", "WebNovel", "Royal Road", "Wattpad"].sort((left, right) => left.localeCompare(right)),
     );
     assert.ok(repairItems.every((item) => item.href === "/projects/project-1#platform-export"));
+    assert.equal(queue.overview.platformReadiness.totalPlatforms, 8);
+    assert.equal(queue.overview.platformReadiness.needsSubmissionRepairCount, 8);
+    assert.equal(queue.overview.platformReadiness.needsEffectRecordCount, 0);
+    assert.ok(queue.overview.platformReadiness.headline.includes("需修投稿"));
   });
 
   await t.test("derives submission checklist before queuing platform package work", () => {
@@ -466,7 +483,7 @@ test("buildTaskQueueCenter", async (t) => {
       submissionChecklist: buildTaskQueueProjectSubmissionChecklist(readyButTooShort),
     }]);
 
-    assert.equal(looseQueue.overview.exportReady, 8);
+    assert.equal(looseQueue.overview.exportReady, 1);
     assert.equal(strictQueue.overview.exportReady, 0);
     assert.equal(strictQueue.overview.publishBlocked, 8);
     assert.ok(strictQueue.items.every((item) => item.blockerType === "publish_repair"));

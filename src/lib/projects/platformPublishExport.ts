@@ -806,7 +806,7 @@ export interface PlatformPublishExportCenter {
 export interface PlatformReadinessItem {
   platformId: PlatformId;
   platformName: string;
-  status: "ready_to_submit" | "needs_effect_record" | "needs_submission_repair" | "not_generated";
+  status: "ready_to_submit" | "needs_effect_record" | "needs_package_export" | "needs_submission_repair" | "not_generated";
   label: string;
   detail: string;
   actionLabel: string;
@@ -819,6 +819,7 @@ export interface PlatformReadinessItem {
 export interface PlatformReadinessSummary {
   totalPlatforms: number;
   readyToSubmitCount: number;
+  needsPackageExportCount: number;
   needsEffectRecordCount: number;
   needsSubmissionRepairCount: number;
   notGeneratedCount: number;
@@ -4423,6 +4424,21 @@ function buildPlatformReadinessSummary(packages: PlatformPublishPackage[]): Plat
       };
     }
 
+    if (pack.publishVersions.length === 0) {
+      return {
+        platformId: pack.platformId,
+        platformName: pack.platformName,
+        status: "needs_package_export",
+        label: "需导出包",
+        detail: "发布包已过线，但还没有保存发布基准。",
+        actionLabel: "保存发布基准",
+        actionHref: "#platform-export",
+        preflightScore: pack.preflight.score,
+        finalGateScore: pack.finalGate.score,
+        blockers,
+      };
+    }
+
     if (pack.effectCapturePlan.status !== "ready_to_review") {
       return {
         platformId: pack.platformId,
@@ -4453,11 +4469,13 @@ function buildPlatformReadinessSummary(packages: PlatformPublishPackage[]): Plat
   });
 
   const readyToSubmitCount = items.filter((item) => item.status === "ready_to_submit").length;
+  const needsPackageExportCount = items.filter((item) => item.status === "needs_package_export").length;
   const needsEffectRecordCount = items.filter((item) => item.status === "needs_effect_record").length;
   const needsSubmissionRepairCount = items.filter((item) => item.status === "needs_submission_repair").length;
   const notGeneratedCount = items.filter((item) => item.status === "not_generated").length;
   const primaryAction = items.find((item) => item.status === "needs_submission_repair")
     ?? items.find((item) => item.status === "not_generated")
+    ?? items.find((item) => item.status === "needs_package_export")
     ?? items.find((item) => item.status === "needs_effect_record")
     ?? items[0]
     ?? null;
@@ -4465,9 +4483,11 @@ function buildPlatformReadinessSummary(packages: PlatformPublishPackage[]): Plat
     ? `${needsSubmissionRepairCount} 个平台投稿材料没过线，先修终检阻塞。`
     : notGeneratedCount > 0
       ? `${notGeneratedCount} 个平台还没有生成发布包，先补正文。`
-      : needsEffectRecordCount > 0
-        ? `${needsEffectRecordCount} 个平台发布包已过线，下一步补发布效果。`
-        : `${readyToSubmitCount} 个平台已完成投稿闭环，可以进入平台排序。`;
+      : needsPackageExportCount > 0
+        ? `${needsPackageExportCount} 个平台发布包已过线，下一步保存发布基准。`
+        : needsEffectRecordCount > 0
+          ? `${needsEffectRecordCount} 个平台发布包已归档，下一步补发布效果。`
+          : `${readyToSubmitCount} 个平台已完成投稿闭环，可以进入平台排序。`;
   const nextAction = primaryAction
     ? `${primaryAction.platformName}：${primaryAction.actionLabel}。${primaryAction.detail}`
     : "先创建作品和章节，再生成平台发布包。";
@@ -4475,6 +4495,7 @@ function buildPlatformReadinessSummary(packages: PlatformPublishPackage[]): Plat
   return {
     totalPlatforms: items.length,
     readyToSubmitCount,
+    needsPackageExportCount,
     needsEffectRecordCount,
     needsSubmissionRepairCount,
     notGeneratedCount,

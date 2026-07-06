@@ -489,7 +489,7 @@ interface PlatformPublishWorkspace {
 interface PlatformReadinessItem {
   platformId: string;
   platformName: string;
-  status: "ready_to_submit" | "needs_effect_record" | "needs_submission_repair" | "not_generated";
+  status: "ready_to_submit" | "needs_effect_record" | "needs_package_export" | "needs_submission_repair" | "not_generated";
   label: string;
   detail: string;
   actionLabel: string;
@@ -502,6 +502,7 @@ interface PlatformReadinessItem {
 interface PlatformReadinessSummary {
   totalPlatforms: number;
   readyToSubmitCount: number;
+  needsPackageExportCount: number;
   needsEffectRecordCount: number;
   needsSubmissionRepairCount: number;
   notGeneratedCount: number;
@@ -1007,6 +1008,7 @@ function effectCaptureStatusClass(status: PlatformEffectCapturePlan["status"]) {
 function platformReadinessStatusClass(status: PlatformReadinessItem["status"]) {
   if (status === "ready_to_submit") return "bg-emerald-50 text-emerald-700";
   if (status === "needs_effect_record") return "bg-cyan-50 text-cyan-700";
+  if (status === "needs_package_export") return "bg-blue-50 text-blue-700";
   if (status === "needs_submission_repair") return "bg-rose-50 text-rose-700";
   return "bg-slate-100 text-slate-600";
 }
@@ -2738,8 +2740,9 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
                 </button>
               ) : null}
             </div>
-            <div className="mt-3 grid gap-2 text-xs text-slate-500 sm:grid-cols-4">
+            <div className="mt-3 grid gap-2 text-xs text-slate-500 sm:grid-cols-5">
               <div>已可投 <span className="font-medium text-slate-950">{center.platformReadinessSummary.readyToSubmitCount}</span></div>
+              <div>需导出包 <span className="font-medium text-slate-950">{center.platformReadinessSummary.needsPackageExportCount}</span></div>
               <div>需补效果 <span className="font-medium text-slate-950">{center.platformReadinessSummary.needsEffectRecordCount}</span></div>
               <div>需修投稿 <span className="font-medium text-slate-950">{center.platformReadinessSummary.needsSubmissionRepairCount}</span></div>
               <div>未生成包 <span className="font-medium text-slate-950">{center.platformReadinessSummary.notGeneratedCount}</span></div>

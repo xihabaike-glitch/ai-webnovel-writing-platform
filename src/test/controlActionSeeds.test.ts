@@ -12,6 +12,7 @@ import {
   buildStoryLineActionSeeds,
   buildWorldActionSeeds,
   recheckAiPipelineControlPlan,
+  resolveAiPipelinePromptMemoryRollbackSource,
   updateAiPipelineControlPlanItem,
 } from "../lib/projects/controlActionSeeds.ts";
 import { buildControlAssetPrompt, buildControlAssetQualityGate, buildControlAssetRepairPrompt } from "../lib/projects/controlAssetGeneration.ts";
@@ -359,6 +360,19 @@ test("control action seeds", async (t) => {
     assert.ok(dispatch.acceptanceCriteria.some((item) => item.includes("只选择这 1 章")));
     assert.ok(dispatch.evidence.some((item) => item.includes("恢复记忆疑似失效")));
     assert.ok(dispatch.evidence.some((item) => item.includes("正文审稿 72 分")));
+  });
+
+  await t.test("selects a fallback chapter for prompt memory rollback from project control", () => {
+    const source = resolveAiPipelinePromptMemoryRollbackSource([
+      { id: "chapter-1", order: 1, title: "第一章 空卡", content: "", wordCount: 0, hook: "系统倒计时" },
+      { id: "chapter-2", order: 2, title: "第二章 有正文", content: "雨夜里，系统再次响起。", wordCount: 1600, hook: "新任务砸下来" },
+    ]);
+
+    assert.equal(source?.chapterId, "chapter-2");
+    assert.equal(source?.chapterTitle, "第二章 有正文");
+    assert.equal(source?.label, "总控闸口回滚");
+    assert.ok(source?.detail.includes("AI 写审改恢复记忆"));
+    assert.ok(source?.evidence.some((item) => item.includes("新任务砸下来")));
   });
 
   await t.test("builds strict JSON prompts for AI control assets", () => {

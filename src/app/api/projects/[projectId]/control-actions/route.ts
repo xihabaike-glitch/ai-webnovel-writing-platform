@@ -14,8 +14,10 @@ import {
   buildStoryLineActionSeeds,
   buildWorldActionSeeds,
   recheckAiPipelineControlPlan,
+  resolveAiPipelinePromptMemoryRollbackSource,
   updateAiPipelineControlPlanItem,
 } from "@/lib/projects/controlActionSeeds";
+import { aiPipelineDispatchHref } from "@/lib/projects/projectControlDashboardFeedback";
 import { buildTaskQueueBatchHealthReview } from "@/lib/projects/taskQueueBatchHealth";
 
 interface Params {
@@ -132,7 +134,8 @@ export async function POST(request: Request, { params }: Params) {
   if (areaId === "ai-pipeline" && memoryAction) {
     const action = memoryAction;
     const sourceDetail = memorySourceDetail(body.memorySource);
-    const chapterSource = chapterWorkflowMemorySource(body.memorySource);
+    const chapterSource = chapterWorkflowMemorySource(body.memorySource)
+      ?? (action === "rollback" ? resolveAiPipelinePromptMemoryRollbackSource(project.chapters) : null);
     const receiptId = `ai-pipeline-memory:${action}:${projectId}:${Date.now()}`;
     const label = action === "clear"
       ? "AI 恢复记忆已清除"
@@ -255,6 +258,7 @@ export async function POST(request: Request, { params }: Params) {
       message,
       dispatchKey: rollbackDispatch?.dispatchKey,
       dispatchTitle: rollbackDispatch?.title,
+      dispatchHref: rollbackDispatch ? aiPipelineDispatchHref(rollbackDispatch.dispatchKey) : null,
     });
   }
 

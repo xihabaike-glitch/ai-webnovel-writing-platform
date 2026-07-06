@@ -293,6 +293,35 @@ function dispatchSafeReceiptId(receiptId: string) {
   return receiptId.replace(/[^a-zA-Z0-9_-]+/g, "-").replace(/^-+|-+$/g, "");
 }
 
+export interface AiPipelinePromptMemoryRollbackSourceChapter {
+  id: string;
+  order?: number | null;
+  title: string;
+  content?: string | null;
+  wordCount?: number | null;
+  hook?: string | null;
+  goal?: string | null;
+}
+
+export function resolveAiPipelinePromptMemoryRollbackSource(chapters: AiPipelinePromptMemoryRollbackSourceChapter[]) {
+  const ordered = [...chapters].sort((left, right) => (left.order ?? 0) - (right.order ?? 0));
+  const target = ordered.find((chapter) => (chapter.wordCount ?? 0) > 0 || Boolean(chapter.content?.trim())) ?? ordered[0] ?? null;
+  if (!target) return null;
+  const hook = target.hook?.trim();
+  const goal = target.goal?.trim();
+  return {
+    chapterId: target.id,
+    chapterTitle: target.title,
+    label: "总控闸口回滚",
+    detail: "总控闸口触发 AI 写审改恢复记忆回滚，先用这一章验证恢复证据是否还可靠。",
+    evidence: [
+      `目标章节：${target.title}`,
+      hook ? `章节钩子：${hook}` : null,
+      goal ? `章节目标：${goal}` : null,
+    ].filter((item): item is string => Boolean(item)),
+  };
+}
+
 export function buildAiPipelinePromptMemoryRollbackDispatchPlan(input: {
   projectId: string;
   receiptId: string;

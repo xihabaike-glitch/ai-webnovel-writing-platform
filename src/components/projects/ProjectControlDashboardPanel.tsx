@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { buildAiPipelineDispatchFeedback, type ProjectControlDashboardActionFeedback } from "@/lib/projects/projectControlDashboardFeedback";
 
 interface ControlArea {
   id: string;
@@ -458,7 +459,7 @@ export function ProjectControlDashboardPanel({ projectId }: { projectId: string 
   const [runningChecklistItemId, setRunningChecklistItemId] = useState<string | null>(null);
   const [runningBatchRecheck, setRunningBatchRecheck] = useState(false);
   const [runningMemoryAction, setRunningMemoryAction] = useState<"confirm" | "rollback" | "clear" | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | ProjectControlDashboardActionFeedback | null>(null);
 
   async function loadDashboard() {
     setIsLoading(true);
@@ -691,14 +692,15 @@ export function ProjectControlDashboardPanel({ projectId }: { projectId: string 
       const payload = await response.json() as {
         message?: string;
         error?: string;
+        dispatchKey?: string;
         dispatchTitle?: string;
+        dispatchHref?: string;
       };
       if (!response.ok) {
         throw new Error(payload.error ?? "复检批量健康失败。");
       }
       await loadDashboard();
-      const dispatch = payload.dispatchTitle ? `已派单：${payload.dispatchTitle}。` : "";
-      setMessage([payload.message ?? "批量健康已复检。", dispatch].filter(Boolean).join(" "));
+      setMessage(buildAiPipelineDispatchFeedback(payload, "批量健康已复检。"));
     } catch (caught) {
       setMessage(caught instanceof Error ? caught.message : "复检批量健康失败。");
     } finally {
@@ -724,12 +726,15 @@ export function ProjectControlDashboardPanel({ projectId }: { projectId: string 
         message?: string;
         error?: string;
         targetAnchor?: string;
+        dispatchKey?: string;
+        dispatchTitle?: string;
+        dispatchHref?: string;
       };
       if (!response.ok) {
         throw new Error(payload.error ?? "更新恢复记忆失败。");
       }
       await loadDashboard();
-      setMessage(payload.message ?? "恢复记忆控制动作已写入。");
+      setMessage(buildAiPipelineDispatchFeedback(payload, "恢复记忆控制动作已写入。"));
       if (payload.targetAnchor && typeof window !== "undefined") {
         window.location.hash = payload.targetAnchor;
       }
@@ -839,7 +844,23 @@ export function ProjectControlDashboardPanel({ projectId }: { projectId: string 
         </button>
       </div>
 
-      {message ? <p className="mt-3 text-sm text-slate-600">{message}</p> : null}
+      {message ? (
+        typeof message === "string" ? (
+          <p className="mt-3 text-sm text-slate-600">{message}</p>
+        ) : (
+          <div className="mt-3 flex flex-col gap-2 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 sm:flex-row sm:items-center sm:justify-between">
+            <p>{message.text}</p>
+            {message.actionHref && message.actionLabel ? (
+              <Link
+                className="inline-flex w-fit rounded-md bg-white px-2 py-1 text-xs font-medium text-slate-900 hover:bg-slate-100"
+                href={message.actionHref}
+              >
+                {message.actionLabel}
+              </Link>
+            ) : null}
+          </div>
+        )
+      ) : null}
 
       {dashboard ? (
         <div className="mt-4 grid gap-4">

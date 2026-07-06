@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { persistGateDispatchTask, type GatePlatformGrowthDispatchItem } from "@/lib/projects/gateActionReceipts";
+import { persistGateDispatchTask } from "@/lib/projects/gateActionReceipts";
+import { buildMultiPlatformDecisionDispatch } from "@/lib/projects/multiPlatformSubmission";
 import { buildSubmissionAssetSavePayload } from "@/lib/projects/submissionAssetSavePayload";
 
 interface SubmissionPackageView {
@@ -460,43 +461,13 @@ export function SubmissionPackagePanel({
     }
   }
 
-  function decisionTaskToDispatch(task: MultiPlatformSubmission["decisionBoard"]["tasks"][number]): GatePlatformGrowthDispatchItem {
-    const stageByKind: Record<typeof task.kind, GatePlatformGrowthDispatchItem["stage"]> = {
-      main: "scale_up",
-      scale: "scale_up",
-      watch: "record_metrics",
-      repair: "start_platform_package",
-      collect_data: "record_metrics",
-      prepare_package: "start_platform_package",
-      pause: "pause_platform",
-    };
-
-    return {
-      id: task.id,
-      platformId: task.platformId,
-      platformName: task.platformName,
-      stage: stageByKind[task.kind],
-      state: "assigned",
-      priorityScore: task.priorityScore,
-      ownerRole: task.ownerRole,
-      title: task.title,
-      detail: task.detail,
-      dueLabel: task.dueLabel,
-      actionLabel: task.actionLabel,
-      href: task.href,
-      acceptanceCriteria: task.acceptanceCriteria,
-      evidence: task.evidence,
-      reviewLatestAt: new Date().toISOString(),
-    };
-  }
-
   async function assignDecisionTasks() {
     if (!multiPlatform?.decisionBoard.tasks.length) return;
     setIsAssigningDecisionTasks(true);
     setMessage(null);
     try {
       const tasks = await Promise.all(
-        multiPlatform.decisionBoard.tasks.map((task) => persistGateDispatchTask(decisionTaskToDispatch(task))),
+        multiPlatform.decisionBoard.tasks.map((task) => persistGateDispatchTask(buildMultiPlatformDecisionDispatch(task, { projectId }))),
       );
       setMessage(`已派发 ${tasks.length} 个投稿决策执行单到派单中心`);
     } catch (caught) {

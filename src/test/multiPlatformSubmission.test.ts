@@ -2,9 +2,11 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   buildMultiPlatformSubmission,
+  buildMultiPlatformDecisionDispatch,
   buildMultiPlatformSubmissionArchive,
   buildSinglePlatformSubmissionMarkdown,
 } from "../lib/projects/multiPlatformSubmission.ts";
+import { buildGateDispatchCompletionTemplate } from "../lib/projects/gateActionReceipts.ts";
 
 const chapters = [
   {
@@ -260,6 +262,15 @@ test("buildMultiPlatformSubmission", async (t) => {
     assert.ok(qimaoRepairTask.acceptanceCriteria.some((item) => item.includes("标题") && item.includes("简介")));
     assert.ok(qimaoRepairTask.acceptanceCriteria.some((item) => item.includes("标签") && item.includes("卖点")));
     assert.ok(qimaoRepairTask.acceptanceCriteria.some((item) => item.includes("前三章") && item.includes("兑现")));
+    const qimaoRepairDispatch = buildMultiPlatformDecisionDispatch(qimaoRepairTask, {
+      projectId: "project-1",
+      reviewLatestAt: "2026-01-06T08:00:00.000Z",
+    });
+    assert.equal(qimaoRepairDispatch.id, "submission-decision:project-1:qimao:repair");
+    assert.equal(qimaoRepairDispatch.stage, "start_repair_packaging");
+    assert.equal(qimaoRepairDispatch.href, "/projects/project-1#platform-export");
+    assert.ok(qimaoRepairDispatch.acceptanceCriteria.some((item) => item.includes("前三章")));
+    assert.ok(buildGateDispatchCompletionTemplate(qimaoRepairDispatch).includes("修复对象"));
     assert.equal(result.decisionBoard.tasks[0].platformId, "webnovel");
     assert.ok(result.decisionBoard.tasks.every((task) => task.href.startsWith("/projects/project-1#")));
     assert.ok(result.archive.markdown.includes("有苗头"));

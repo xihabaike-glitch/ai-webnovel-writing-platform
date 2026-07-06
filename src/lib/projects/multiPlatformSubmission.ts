@@ -1,4 +1,5 @@
 import { platformProfiles, type PlatformProfile } from "../platforms/platformProfiles.ts";
+import type { GatePlatformGrowthDispatchItem } from "./gateActionReceipts.ts";
 import { buildSubmissionChecklist, type SubmissionAiTask, type SubmissionChapter } from "./submissionChecklist.ts";
 import { buildSubmissionPackage, type SubmissionPackage, type SubmissionPackageChapter } from "./submissionPackage.ts";
 
@@ -160,6 +161,11 @@ export interface MultiPlatformDecisionTask {
   href: string;
   acceptanceCriteria: string[];
   evidence: string[];
+}
+
+export interface MultiPlatformDecisionDispatchOptions {
+  projectId?: string;
+  reviewLatestAt?: string;
 }
 
 export interface MultiPlatformSubmissionArchivePlatform {
@@ -764,6 +770,50 @@ function decisionTaskDetail(variant: MultiPlatformSubmissionVariant) {
   }
 
   return `${variant.decision.reason} 复盘修复焦点：${variant.effectTracking.repairFocus.join("；")}`;
+}
+
+function decisionDispatchStage(kind: MultiPlatformDecisionKind): GatePlatformGrowthDispatchItem["stage"] {
+  if (kind === "main" || kind === "scale") return "scale_up";
+  if (kind === "watch" || kind === "collect_data") return "record_metrics";
+  if (kind === "repair") return "start_repair_packaging";
+  if (kind === "prepare_package") return "start_platform_package";
+  return "pause_platform";
+}
+
+function projectIdFromTaskHref(href: string) {
+  const match = href.match(/\/projects\/([^/#?]+)/);
+  return match?.[1] ?? null;
+}
+
+function decisionDispatchKey(task: MultiPlatformDecisionTask, projectId: string | null) {
+  return projectId
+    ? `submission-decision:${projectId}:${task.platformId}:${task.kind}`
+    : task.id;
+}
+
+export function buildMultiPlatformDecisionDispatch(
+  task: MultiPlatformDecisionTask,
+  options: MultiPlatformDecisionDispatchOptions = {},
+): GatePlatformGrowthDispatchItem {
+  const projectId = options.projectId ?? projectIdFromTaskHref(task.href);
+  const dispatchKey = decisionDispatchKey(task, projectId);
+  return {
+    id: dispatchKey,
+    platformId: task.platformId,
+    platformName: task.platformName,
+    stage: decisionDispatchStage(task.kind),
+    state: "assigned",
+    priorityScore: task.priorityScore,
+    ownerRole: task.ownerRole,
+    title: task.title,
+    detail: task.detail,
+    dueLabel: task.dueLabel,
+    actionLabel: task.actionLabel,
+    href: task.href,
+    acceptanceCriteria: task.acceptanceCriteria,
+    evidence: task.evidence,
+    reviewLatestAt: options.reviewLatestAt ?? new Date().toISOString(),
+  };
 }
 
 function projectHref(projectId: string | undefined, anchor: string) {

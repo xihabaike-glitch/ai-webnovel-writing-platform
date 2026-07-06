@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildTaskQueueBatchHealthReview } from "../lib/projects/taskQueueBatchHealth.ts";
+import { buildTaskQueueBatchHealthReview, buildTaskQueueBatchRhythmDecision } from "../lib/projects/taskQueueBatchHealth.ts";
 import type { GateActionAuditRecord } from "../lib/projects/gateActionReceipts.ts";
 
 function audit(input: {
@@ -10,6 +10,9 @@ function audit(input: {
   tacticLabel: string;
   quality: number;
   createdAt: string;
+  succeededCount?: number;
+  failedCount?: number;
+  successRatePercent?: number;
   scaleGate?: "none" | "sample_only" | "cleared";
   aiPipelineRecheckMode?: "sample_recheck" | "small_batch_resume";
 }): GateActionAuditRecord {
@@ -23,8 +26,8 @@ function audit(input: {
     status: "succeeded",
     message: "推荐批次完成。",
     executionType: "recommended_batch",
-    succeededCount: 2,
-    failedCount: 0,
+    succeededCount: input.succeededCount ?? 2,
+    failedCount: input.failedCount ?? 0,
     taskId: null,
     platformId: platformName === "七猫" ? "qimao" : "fanqie",
     platformName,
@@ -51,7 +54,7 @@ function audit(input: {
         mode: input.aiPipelineRecheckMode,
       } : undefined,
       routeEffectSummary: {
-        successRatePercent: 100,
+        successRatePercent: input.successRatePercent ?? 100,
         knownCostUsd: 0.02,
         averageQualityScore: input.quality,
       },
@@ -141,4 +144,72 @@ test("buildTaskQueueBatchHealthReview treats AI small-batch recheck as recovery 
   assert.equal(review.items[0]?.label, "恢复放量观察");
   assert.ok(review.items[0]?.evidence[0]?.includes("恢复放量"));
   assert.ok(review.items[0]?.nextAction.includes("恢复放量样本还薄"));
+});
+
+test("buildTaskQueueBatchRhythmDecision continues standard batches after repeated healthy tactics", () => {
+  const review = buildTaskQueueBatchHealthReview([
+    audit({
+      receiptId: "stable-2",
+      label: "三轮稳住批次健康，继续小步加码",
+      tacticLabel: "三轮稳住",
+      quality: 90,
+      createdAt: "2026-01-02T00:00:00.000Z",
+    }),
+    audit({
+      receiptId: "stable-1",
+      label: "三轮稳住批次健康，继续小步加码",
+      tacticLabel: "三轮稳住",
+      quality: 88,
+      createdAt: "2026-01-01T00:00:00.000Z",
+    }),
+  ]);
+  const decision = buildTaskQueueBatchRhythmDecision(review);
+
+  assert.equal(decision.tone, "scale");
+  assert.equal(decision.label, "继续普通推荐批次");
+  assert.equal(decision.actionLabel, "执行下一批");
+  assert.equal(decision.href, "/tasks#recommended-batch");
+  assert.ok(decision.detail.includes("连续健康"));
+  assert.ok(decision.detail.includes("三轮稳住"));
+});
+
+test("buildTaskQueueBatchRhythmDecision keeps one healthy standard batch in observation", () => {
+  const review = buildTaskQueueBatchHealthReview([
+    audit({
+      receiptId: "stable-1",
+      label: "三轮稳住批次健康，继续小步加码",
+      tacticLabel: "三轮稳住",
+      quality: 88,
+      createdAt: "2026-01-01T00:00:00.000Z",
+    }),
+  ]);
+  const decision = buildTaskQueueBatchRhythmDecision(review);
+
+  assert.equal(decision.tone, "watch");
+  assert.equal(decision.label, "继续小批观察");
+  assert.equal(decision.actionLabel, "跑观察小批");
+  assert.equal(decision.href, "/tasks#recommended-batch");
+  assert.ok(decision.detail.includes("样本还薄"));
+  assert.ok(decision.detail.includes("别扩大批量"));
+});
+
+test("buildTaskQueueBatchRhythmDecision sends weak standard batches to failure repair", () => {
+  const review = buildTaskQueueBatchHealthReview([
+    audit({
+      receiptId: "weak-1",
+      label: "普通批次质量跌线",
+      tacticLabel: "三轮稳住",
+      quality: 70,
+      failedCount: 1,
+      successRatePercent: 50,
+      createdAt: "2026-01-03T00:00:00.000Z",
+    }),
+  ]);
+  const decision = buildTaskQueueBatchRhythmDecision(review);
+
+  assert.equal(decision.tone, "repair");
+  assert.equal(decision.label, "先修批次问题");
+  assert.equal(decision.actionLabel, "去失败修复");
+  assert.equal(decision.href, "/failures");
+  assert.ok(decision.detail.includes("失败或低分"));
 });

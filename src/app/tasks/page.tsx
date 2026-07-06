@@ -16,7 +16,7 @@ import { batchExecutionStrategies, getBatchExecutionStrategy } from "@/lib/proje
 import type { GateBatchTacticEffectStatus } from "@/lib/projects/gateActionReceipts";
 import { buildRecommendedBatchModelRouteGate } from "@/lib/projects/recommendedBatchModelRouteGate";
 import { buildFailureRepairResumeBatchRecord, buildTaskDebtFocusChangeNotice, buildTaskDebtRecoveryBatchRecord } from "@/lib/projects/taskDebtCompletionFeedback";
-import { buildTaskQueueBatchHealthReview } from "@/lib/projects/taskQueueBatchHealth";
+import { buildTaskQueueBatchHealthReview, buildTaskQueueBatchRhythmDecision } from "@/lib/projects/taskQueueBatchHealth";
 import { taskQueueBatchExecutionContext } from "@/lib/projects/taskQueueBatchReceipt";
 import { buildTaskQueueCenter, buildTaskQueueDebtView, recommendedQueueActionLabel, taskQueueSourcePresentation, type QueueItem, type TaskQueueProject } from "@/lib/projects/taskQueueCenter";
 import { buildTaskQueueExecutionPlan } from "@/lib/projects/taskQueueExecutionPlan";
@@ -146,6 +146,13 @@ function batchTacticStatusText(status: GateBatchTacticEffectStatus) {
   if (status === "blocked") return "先停用";
   if (status === "watch") return "继续观察";
   return "可参考";
+}
+
+function batchRhythmDecisionClass(tone: "scale" | "watch" | "repair" | "empty") {
+  if (tone === "scale") return "border-emerald-200 bg-emerald-50 text-emerald-900";
+  if (tone === "repair") return "border-rose-200 bg-rose-50 text-rose-900";
+  if (tone === "watch") return "border-amber-200 bg-amber-50 text-amber-900";
+  return "border-slate-200 bg-slate-50 text-slate-900";
 }
 
 function repairBatchTone(status: ReturnType<typeof buildTaskRunConsole>["failureRepairBatch"]["status"]) {
@@ -416,6 +423,7 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
   const strategyComparison = buildBatchStrategyComparison(queue.items, safetyProjects, batchHistory);
   const strategyDecision = buildBatchStrategyDecision(strategyComparison, activeStrategy.id);
   const batchTacticEffectReview = buildTaskQueueBatchHealthReview(recentRecommendedBatchAudits, 5);
+  const batchRhythmDecision = buildTaskQueueBatchRhythmDecision(batchTacticEffectReview);
   const debtRecoveryBatchRecord = buildTaskDebtRecoveryBatchRecord(recentRecommendedBatchAudits);
   const failureRepairResumeBatchRecord = buildFailureRepairResumeBatchRecord(recentRecommendedBatchAudits);
   const effectiveBatchContext = activeBatchContext === "repair_resume" && failureRepairResumeBatchRecord?.stabilityTone === "ready"
@@ -942,6 +950,25 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
             <span className="rounded-md border border-rose-200 bg-rose-50 px-2 py-1 font-medium text-rose-800">
               先停 {batchTacticEffectReview.summary.blocked}
             </span>
+          </div>
+        </div>
+        <div className={`mt-4 rounded-md border p-3 text-sm ${batchRhythmDecisionClass(batchRhythmDecision.tone)}`}>
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <div className="text-xs font-medium uppercase opacity-75">生产节奏决策</div>
+              <div className="mt-1 font-medium">{batchRhythmDecision.label}</div>
+              <p className="mt-1 leading-6">{batchRhythmDecision.detail}</p>
+              {batchRhythmDecision.evidence.length > 0 ? (
+                <div className="mt-2 flex flex-wrap gap-1.5 text-xs">
+                  {batchRhythmDecision.evidence.map((line) => (
+                    <span className="rounded-md bg-white/70 px-2 py-1 font-medium" key={line}>{line}</span>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+            <Link className="w-fit shrink-0 rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white hover:bg-slate-800" href={batchRhythmDecision.href}>
+              {batchRhythmDecision.actionLabel}
+            </Link>
           </div>
         </div>
         {batchTacticEffectReview.nextActions.length ? (

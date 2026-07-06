@@ -262,12 +262,18 @@ test("buildModelRoleMatrix", async (t) => {
     assert.equal(chapterDraft?.primaryProviderConfigId, "deepseek-config");
     assert.equal(chapterDraft?.fallbackProviderConfigId, "kimi-config");
     assert.equal(chapterDraft?.ownerRoleTitle, "中文网文写手");
+    assert.equal(chapterDraft?.costWatchLabel, "成本观察：低成本批量");
+    assert.ok(chapterDraft?.recheckAction.includes("质量、成本和备用命中"));
     assert.equal(chapterReview?.status, "current");
     assert.equal(chapterReview?.primaryProviderName, "Claude · claude-sonnet-4-5");
     assert.equal(chapterReview?.fallbackProviderName, "Kimi · kimi-k2.6");
+    assert.equal(chapterReview?.costWatchLabel, "成本观察：高成本结构审稿");
+    assert.ok(chapterReview?.recheckAction.includes("同章复检"));
     assert.equal(packageOptimize?.primaryProviderConfigId, "gpt-config");
     assert.equal(packageOptimize?.ownerRoleTitle, "海外投稿包装编辑");
+    assert.equal(packageOptimize?.costWatchLabel, "成本观察：中成本包装");
     assert.equal(controlAsset?.primaryProviderConfigId, "kimi-config");
+    assert.equal(controlAsset?.costWatchLabel, "成本观察：长上下文消耗");
     assert.ok(draft.nextActions.some((action) => action.includes("5 条")));
   });
 

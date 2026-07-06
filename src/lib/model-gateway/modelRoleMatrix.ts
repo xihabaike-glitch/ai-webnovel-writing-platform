@@ -75,6 +75,8 @@ export interface ModelRoleRouteDraftItem {
   fallbackProviderName: string | null;
   reason: string;
   manualGate: string;
+  costWatchLabel: string;
+  recheckAction: string;
 }
 
 export interface ModelRoleRouteDraft {
@@ -175,6 +177,8 @@ const roleRouteDraftDefinitions: Array<{
   fallbackRoleId: ModelWritingRoleId;
   reason: string;
   manualGate: string;
+  costWatchLabel: string;
+  recheckAction: string;
 }> = [
   {
     taskType: "chapter_draft",
@@ -182,6 +186,8 @@ const roleRouteDraftDefinitions: Array<{
     fallbackRoleId: "context_librarian",
     reason: "正文初稿先交给中文网文写手，备用用长上下文资料官兜底，避免章节跑偏。",
     manualGate: "首轮只跑 1 章样本，质量分和人工读感过线后再批量。",
+    costWatchLabel: "成本观察：低成本批量",
+    recheckAction: "跑 1 章样本，复看质量、成本和备用命中。",
   },
   {
     taskType: "chapter_review",
@@ -189,6 +195,8 @@ const roleRouteDraftDefinitions: Array<{
     fallbackRoleId: "context_librarian",
     reason: "章节审稿交给长篇结构主编，备用用资料官复核连续性和伏笔。",
     manualGate: "审稿问题必须落到钩子、爽点、人物弧光或伏笔，不接受泛泛建议。",
+    costWatchLabel: "成本观察：高成本结构审稿",
+    recheckAction: "同章复检问题清单，复看质量、成本和备用命中。",
   },
   {
     taskType: "chapter_second_pass",
@@ -196,6 +204,8 @@ const roleRouteDraftDefinitions: Array<{
     fallbackRoleId: "draft_writer",
     reason: "二改由结构主编守住问题清单，备用写手负责把修改落成正文。",
     manualGate: "二改候选必须人工确认后才能覆盖正文。",
+    costWatchLabel: "成本观察：高成本二改",
+    recheckAction: "同章二改复检，复看改稿收益、成本和备用命中。",
   },
   {
     taskType: "submission_package_optimize",
@@ -203,6 +213,8 @@ const roleRouteDraftDefinitions: Array<{
     fallbackRoleId: "structure_editor",
     reason: "投稿包装交给海外投稿包装编辑，备用结构主编检查卖点是否真实。",
     manualGate: "标题、简介、标签和卖点必须人工采用后才能进入发布包版本。",
+    costWatchLabel: "成本观察：中成本包装",
+    recheckAction: "跑 1 个发布包样本，复看采用率、成本和备用命中。",
   },
   {
     taskType: "first_three_rewrite",
@@ -210,6 +222,8 @@ const roleRouteDraftDefinitions: Array<{
     fallbackRoleId: "draft_writer",
     reason: "前三章改写先由结构主编抓钩子和追读，备用写手只做小样本改写。",
     manualGate: "前三章改写必须逐章对比，确认追读问题更强后再保存。",
+    costWatchLabel: "成本观察：高成本开局改写",
+    recheckAction: "先改第 1 章样本，复看追读增益、成本和备用命中。",
   },
   {
     taskType: "control_asset_generate",
@@ -217,6 +231,8 @@ const roleRouteDraftDefinitions: Array<{
     fallbackRoleId: "structure_editor",
     reason: "总控资料交给长上下文资料官，备用结构主编校验人物弧光和主线支线。",
     manualGate: "总控资料只作为项目土壤候选，人物和世界观不得自动覆盖。",
+    costWatchLabel: "成本观察：长上下文消耗",
+    recheckAction: "跑 1 份项目土壤样本，复看资料引用、成本和备用命中。",
   },
 ];
 
@@ -402,6 +418,8 @@ export function buildModelRoleRouteDraft(
       fallbackProviderName: fallbackProvider ? providerDisplay(fallbackProvider) : null,
       reason: status === "missing" ? `${labelForRoutedTask(definition.taskType)}缺少${ownerRole?.title ?? "负责岗位"}，先补模型岗位再谈路线。` : definition.reason,
       manualGate: definition.manualGate,
+      costWatchLabel: definition.costWatchLabel,
+      recheckAction: definition.recheckAction,
     };
   });
   const ready = items.filter((item) => item.status === "ready").length;

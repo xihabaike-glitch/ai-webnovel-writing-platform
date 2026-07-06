@@ -34,6 +34,12 @@ export interface TaskQueueBatchRhythmClosure {
   task: PersistedGatePlatformDispatchTask;
 }
 
+export interface TaskQueueBatchRhythmRecheckGate {
+  canRun: boolean;
+  reason: "ready" | "restored";
+  message: string;
+}
+
 export type TaskQueueBatchHealthAudit = Pick<GateActionAuditRecord,
   "receiptId"
   | "label"
@@ -192,6 +198,23 @@ export function buildTaskQueueBatchRhythmDispatch(
       ...(target?.nextAction ? [target.nextAction] : []),
     ].slice(0, 6),
     reviewLatestAt: target?.latestAt ?? createdAt,
+  };
+}
+
+export function buildTaskQueueBatchRhythmRecheckGate(review: GateBatchTacticEffectReview): TaskQueueBatchRhythmRecheckGate {
+  const decision = buildTaskQueueBatchRhythmDecision(review);
+  if (decision.label === "恢复普通推荐批次") {
+    return {
+      canRun: false,
+      reason: "restored",
+      message: "节奏复验已经连续稳定并恢复普通推荐批次，旧节奏派单不能继续触发复验；请执行普通推荐批次并保留新回执。",
+    };
+  }
+
+  return {
+    canRun: true,
+    reason: "ready",
+    message: "节奏复验可以执行。",
   };
 }
 

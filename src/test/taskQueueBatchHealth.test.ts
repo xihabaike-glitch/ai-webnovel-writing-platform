@@ -6,6 +6,7 @@ import {
   buildTaskQueueBatchRhythmClosure,
   buildTaskQueueBatchRhythmDecision,
   buildTaskQueueBatchRhythmDispatch,
+  buildTaskQueueBatchRhythmRecheckGate,
 } from "../lib/projects/taskQueueBatchHealth.ts";
 import type { GateActionAuditRecord, GatePlatformGrowthDispatchItem, PersistedGatePlatformDispatchTask } from "../lib/projects/gateActionReceipts.ts";
 
@@ -270,6 +271,41 @@ test("buildTaskQueueBatchRhythmDecision restores standard batches after repeated
   assert.equal(decision.actionLabel, "恢复普通批次");
   assert.ok(decision.detail.includes("节奏复验连续稳定"));
   assert.equal(dispatch, null);
+});
+
+test("buildTaskQueueBatchRhythmRecheckGate blocks stale rechecks after standard batches are restored", () => {
+  const review = buildTaskQueueBatchHealthReview([
+    audit({
+      receiptId: "rhythm-recheck-2",
+      label: "节奏复验小批通过，回到批量健康复盘",
+      tacticLabel: "三轮稳住",
+      quality: 90,
+      succeededCount: 1,
+      createdAt: "2026-01-05T00:00:00.000Z",
+      batchRhythmRecheck: {
+        dispatchKey: "batch-rhythm:watch:2026-01-04T00:00:00.000Z",
+        completionEvidence: "第二轮复验范围 1 章，成功率 100%，质量 90。",
+      },
+    }),
+    audit({
+      receiptId: "rhythm-recheck-1",
+      label: "节奏复验小批通过，回到批量健康复盘",
+      tacticLabel: "三轮稳住",
+      quality: 88,
+      succeededCount: 1,
+      createdAt: "2026-01-04T00:00:00.000Z",
+      batchRhythmRecheck: {
+        dispatchKey: "batch-rhythm:watch:2026-01-03T00:00:00.000Z",
+        completionEvidence: "已拆失败样本，复验范围 1 章，质量目标 85。",
+      },
+    }),
+  ]);
+  const gate = buildTaskQueueBatchRhythmRecheckGate(review);
+
+  assert.equal(gate.canRun, false);
+  assert.equal(gate.reason, "restored");
+  assert.ok(gate.message.includes("恢复普通推荐批次"));
+  assert.ok(gate.message.includes("旧节奏派单"));
 });
 
 test("buildTaskQueueBatchRhythmDecision continues standard batches after repeated healthy tactics", () => {

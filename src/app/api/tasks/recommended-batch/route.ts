@@ -15,6 +15,11 @@ import {
   taskQueueBatchMaxSizeForContext,
   taskQueueBatchExecutionContext,
 } from "@/lib/projects/taskQueueBatchReceipt";
+import {
+  buildTaskQueueBatchHealthReview,
+  buildTaskQueueBatchRhythmDecision,
+  buildTaskQueueBatchRhythmRecheckGate,
+} from "@/lib/projects/taskQueueBatchHealth";
 import { buildTaskQueueCenter, type TaskQueueProject } from "@/lib/projects/taskQueueCenter";
 import { buildTaskQueueExecutionPlan } from "@/lib/projects/taskQueueExecutionPlan";
 import {
@@ -191,11 +196,23 @@ export async function POST(request: Request) {
       take: 50,
       select: {
         receiptId: true,
+        actionId: true,
         projectId: true,
+        label: true,
+        detail: true,
+        href: true,
         executionType: true,
         status: true,
+        message: true,
         succeededCount: true,
         failedCount: true,
+        taskId: true,
+        platformId: true,
+        platformName: true,
+        recheckStatus: true,
+        recheckLabel: true,
+        recheckDetail: true,
+        recheckAction: true,
         payload: true,
         createdAt: true,
       },
@@ -229,6 +246,15 @@ export async function POST(request: Request) {
     }
     if (!batchRhythmSourceTask || batchRhythmSourceTask.state !== "completed" || !batchRhythmSourceTask.completionEvidence.trim()) {
       return NextResponse.json({ error: "节奏派单还没有完成验收依据，先回派单中心补齐后再复验。" }, { status: 409 });
+    }
+    const batchRhythmReview = buildTaskQueueBatchHealthReview(recentRecommendedBatchAudits, 5);
+    const recheckGate = buildTaskQueueBatchRhythmRecheckGate(batchRhythmReview);
+    if (!recheckGate.canRun) {
+      return NextResponse.json({
+        error: recheckGate.message,
+        rhythmDecision: buildTaskQueueBatchRhythmDecision(batchRhythmReview),
+        recheckGate,
+      }, { status: 409 });
     }
   }
   const batchRhythmSource = batchRhythmSourceTask

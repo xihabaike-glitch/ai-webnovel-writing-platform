@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { updatePersistedGateDispatchTaskState } from "@/lib/projects/gateActionReceipts";
+import { buildTaskDebtCompletionFeedback, type TaskDebtCompletionFeedback } from "@/lib/projects/taskDebtCompletionFeedback";
 
 export function CompleteTaskDebtEvidenceForm({
   actionLabel,
@@ -18,7 +19,7 @@ export function CompleteTaskDebtEvidenceForm({
   const router = useRouter();
   const [completionEvidence, setCompletionEvidence] = useState(completionEvidenceTemplate ?? "");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<TaskDebtCompletionFeedback | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   async function completeDebtEvidence() {
@@ -29,12 +30,18 @@ export function CompleteTaskDebtEvidenceForm({
     }
     setIsSubmitting(true);
     setErrorMessage(null);
-    setMessage(null);
+    setFeedback(null);
     try {
-      await updatePersistedGateDispatchTaskState(dispatchKey, "completed", {
+      const updated = await updatePersistedGateDispatchTaskState(dispatchKey, "completed", {
         completionEvidence: evidence,
       });
-      setMessage("清债证据已回写，阻塞状态会按最新证据重新计算。");
+      setFeedback(buildTaskDebtCompletionFeedback({
+        actionLabel,
+        followUpTasks: updated.followUpTasks,
+        knowledgeFeedbackWritten: Boolean(updated.knowledgeFeedbackReceipt),
+        dispatchCompletionReceiptLabel: updated.dispatchCompletionReceipt?.label ?? null,
+        submissionEffectHeadline: updated.submissionEffectReview?.headline ?? null,
+      }));
       router.refresh();
     } catch (caught) {
       setErrorMessage(caught instanceof Error ? caught.message : "清债证据回写失败。");
@@ -77,9 +84,16 @@ export function CompleteTaskDebtEvidenceForm({
         >
           {isSubmitting ? "回写中" : `${actionLabel}并回写`}
         </button>
-        {message ? <span className="text-xs leading-5 text-emerald-700">{message}</span> : null}
         {errorMessage ? <span className="text-xs leading-5 text-rose-700">{errorMessage}</span> : null}
       </div>
+      {feedback ? (
+        <div className={`mt-3 rounded-md border px-3 py-2 text-xs leading-5 ${feedback.status === "needs_follow_up" ? "border-amber-200 bg-amber-50 text-amber-900" : "border-emerald-200 bg-emerald-50 text-emerald-900"}`}>
+          <div>{feedback.message}</div>
+          <a className="mt-2 inline-flex rounded-md bg-white/80 px-2 py-1 font-medium hover:bg-white" href={feedback.href}>
+            {feedback.actionLabel}
+          </a>
+        </div>
+      ) : null}
     </div>
   );
 }

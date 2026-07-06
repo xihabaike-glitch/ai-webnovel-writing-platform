@@ -1047,6 +1047,28 @@ test("buildPlatformPublishExportCenter", async (t) => {
     assert.ok(weakQimaoAudit.issues.some((issue) => issue.label.includes("七猫稳定更新")));
   });
 
+  await t.test("scores female and short platforms with arc and paywall checks", () => {
+    const weakJinjiangAudit = buildSubmissionAssetAudit(getPlatformProfile("jjwxc"), {
+      title: "旧雨来信",
+      logline: "女主和旧友重逢，在现言悬疑里重新面对关系裂痕与情感误会。",
+      synopsis: "女主收到一封旧友来信后回到故乡，与多年未见的搭档重新调查当年的误会。故事会围绕关系压力、情感拉扯和旧案线索推进，让两个人在现言悬疑氛围中面对过去，也让读者看到他们从回避到合作的变化。后续会继续处理家庭压力、旧友秘密和彼此试探，让情绪线持续推进。",
+      overseasSynopsis: "",
+      tags: ["现言", "悬疑言情", "情感"],
+    });
+    const weakZhihuAudit = buildSubmissionAssetAudit(getPlatformProfile("zhihu_yanxuan"), {
+      title: "她替我活着",
+      logline: "我参加自己的葬礼，发现最亲近的人都藏着反转真相。",
+      synopsis: "我站在自己的遗像前，看见另一个女人用我的名字接受所有人的悼念。为了查清真相，我开始跟踪她、接近未婚夫，也发现母亲和好友都在撒谎。故事会持续推进悬疑、复仇和身份反转，让读者不断怀疑谁才是真正的受害者。",
+      overseasSynopsis: "",
+      tags: ["悬疑", "复仇", "第一人称反转"],
+    });
+
+    assert.equal(weakJinjiangAudit.status, "needs_work");
+    assert.ok(weakJinjiangAudit.issues.some((issue) => issue.label.includes("晋江人物弧光")));
+    assert.equal(weakZhihuAudit.status, "needs_work");
+    assert.ok(weakZhihuAudit.issues.some((issue) => issue.label.includes("盐选付费节点")));
+  });
+
   await t.test("blocks export when latest review still asks for a second pass", () => {
     const center = buildPlatformPublishExportCenter({
       project: {

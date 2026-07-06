@@ -34,6 +34,103 @@ const checklist = {
   items: [{ id: "word-count", label: "投稿字数", status: "todo" as const, detail: "字数不足。" }],
 };
 
+function readySubmissionAssetForDashboard(platform: (typeof platformProfiles)[number]) {
+  const base = {
+    id: `asset-ready-${platform.id}`,
+    platformId: platform.id,
+    platformName: platform.name,
+    note: "主战场资产已就绪。",
+    source: "manual" as const,
+    updatedAt: "2026-01-05T01:00:00.000Z",
+  };
+
+  if (platform.id === "qidian") {
+    return {
+      ...base,
+      title: "万界长夜体系",
+      logline: "少年在万界规则崩塌后重建升级体系，沿着主线追查旧神伏笔。",
+      synopsis: "少年在长夜世界醒来，发现每个境界都对应一段被抹去的历史。他必须重建升级体系，推进长期主线，收束隐藏伏笔，逐步揭开宗门、王朝和旧神之间的利益链，并在每个阶段 Boss 身上拿回失落规则，最终挑战操纵万界的旧神。",
+      overseasSynopsis: "",
+      tags: ["玄幻", "升级", "世界观"],
+    };
+  }
+
+  if (platform.id === "qimao") {
+    return {
+      ...base,
+      title: "春风有信",
+      logline: "女主回到小镇靠手艺翻身，面对债务、旧爱和家庭误会，慢慢找回生活主动权。",
+      synopsis: "女主回到小镇后重新经营点心摊，面对债务、流言、旧爱误会和家庭压力。她靠手艺打开局面，查清旧账本背后的真相，也逐步修复自己和家人、旧恋人之间的关系。后续会保持日更和稳定更新，按七猫平台连载节奏推进生意成长、亲情修复和旧案证据。",
+      overseasSynopsis: "",
+      tags: ["言情", "种田", "年代"],
+    };
+  }
+
+  if (platform.id === "jjwxc") {
+    return {
+      ...base,
+      title: "雾中来信",
+      logline: "女主收到已故好友来信，与昔日搭档重查旧案并修复彼此信任。",
+      synopsis: "女主收到一封旧友来信后回到故乡，与多年未见的搭档重新调查当年的误会。故事会围绕人物动机、关系状态、情感推进和人物弧光展开，让两个人从互相指责到信任修复，也让悬疑旧案服务情感成长终点。",
+      overseasSynopsis: "",
+      tags: ["现言", "悬疑言情", "情感"],
+    };
+  }
+
+  if (platform.id === "zhihu_yanxuan") {
+    return {
+      ...base,
+      title: "她替我活着",
+      logline: "我参加自己的葬礼，发现最亲近的人都藏着反转真相。",
+      synopsis: "我站在自己的遗像前，看见另一个女人用我的名字接受所有人的悼念。前 1000 字直接抛出身份谜团、未婚夫谎言和母亲短信，三段内形成付费期待；后续用复仇、悬疑证据和身份反转推进，结尾回收谁才是真正受害者的答案。",
+      overseasSynopsis: "",
+      tags: ["悬疑", "复仇", "第一人称反转"],
+    };
+  }
+
+  if (platform.id === "webnovel") {
+    return {
+      ...base,
+      title: "Night Rain System",
+      logline: "A betrayed trainee survives a countdown system, gains power through choices, and turns punishment into progression.",
+      synopsis: "",
+      overseasSynopsis: "Lin Wan is bound to a countdown system during a night rain disaster. Each timed choice grants power, unlocks new abilities, and exposes a conspiracy around her family. The story promises system progression, revenge, skill growth, and a clear power fantasy as she turns every punishment into a stronger build.",
+      tags: ["Fantasy", "System", "Progression"],
+    };
+  }
+
+  if (platform.id === "royal_road") {
+    return {
+      ...base,
+      title: "Dungeon Rulebook",
+      logline: "A clever survivor enters a LitRPG dungeon where every level, skill, and build choice rewrites the rules.",
+      synopsis: "",
+      overseasSynopsis: "A clever survivor enters a LitRPG dungeon where every room tests his build, stats, and skill choices. Progression comes from learning the rules, exploiting level mechanics, and paying the cost of each upgrade. The story focuses on visible mechanics, tactical survival, and a growing rule system.",
+      tags: ["LitRPG", "Progression", "Dungeon"],
+    };
+  }
+
+  if (platform.id === "wattpad") {
+    return {
+      ...base,
+      title: "Midnight Contract",
+      logline: "A young woman signs a forbidden billionaire contract and falls into a romance built on secrets, family shame, and desire.",
+      synopsis: "",
+      overseasSynopsis: "A young woman signs a midnight contract with a billionaire heir to save her family from ruin. Their romance grows through forbidden attraction, public secrets, and emotional betrayal, while every chapter pushes the relationship from fake alliance toward dangerous love.",
+      tags: ["Romance", "Billionaire", "Forbidden Love"],
+    };
+  }
+
+  return {
+    ...base,
+    title: "夜雨系统：雨夜倒计时",
+    logline: "雨夜倒计时逼她救人，系统惩罚反成翻盘筹码。",
+    synopsis: "林晚在雨夜绑定倒计时系统，每一次选择都牵动生死、复仇和悬疑真相。她从被迫救人开始，一步步摸清系统规则，把惩罚变成筹码，把背叛者拖回真相现场，并在连续任务中建立稳定目标：查清当年事故、保护真正重要的人、夺回属于自己的命运。故事保持强钩子、强情绪和连续爽点，适合平台长篇连载。",
+    overseasSynopsis: "Night Rain System follows Lin Wan through timed choices and revenge.",
+    tags: ["系统", "逆袭", "悬疑"],
+  };
+}
+
 test("buildProjectControlDashboard", async (t) => {
   await t.test("aggregates project health areas and critical actions", () => {
     const dashboard = buildProjectControlDashboard({
@@ -1501,19 +1598,7 @@ test("buildProjectControlDashboard", async (t) => {
         canExport: false,
         createdAt: "2026-01-05T00:00:00.000Z",
       })),
-      submissionAssets: platformProfiles.map((platform) => ({
-        id: `asset-ready-${platform.id}`,
-        platformId: platform.id,
-        platformName: platform.name,
-        title: "夜雨系统：雨夜倒计时",
-        logline: "雨夜倒计时逼她救人，系统惩罚反成翻盘筹码。",
-        synopsis: "林晚在雨夜绑定倒计时系统，每一次选择都牵动生死、复仇和悬疑真相。她从被迫救人开始，一步步摸清系统规则，把惩罚变成筹码，把背叛者拖回真相现场，并在连续任务中建立稳定目标：查清当年事故、保护真正重要的人、夺回属于自己的命运。故事保持强钩子、强情绪和连续爽点，适合平台长篇连载。",
-        overseasSynopsis: "Night Rain System follows Lin Wan through timed choices and revenge.",
-        tags: ["系统", "逆袭", "悬疑"],
-        note: "主战场资产已就绪。",
-        source: "manual",
-        updatedAt: "2026-01-05T01:00:00.000Z",
-      })),
+      submissionAssets: platformProfiles.map(readySubmissionAssetForDashboard),
       submissionChecklist: { ...checklist, readinessPercent: 90, items: [] },
     });
 

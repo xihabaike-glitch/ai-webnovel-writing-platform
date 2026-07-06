@@ -2890,6 +2890,17 @@ export function buildSubmissionAssetAudit(
   } else if (platform.id === "zhihu_yanxuan") {
     addIssue({ field: "synopsis", severity: "warning", label: "盐选付费钩子不够尖", detail: "知乎盐选需要更强的第一人称矛盾、反转链、复仇或真相期待。" });
   }
+  if (platform.id === "zhihu_yanxuan" && hasAny(searchableText, ["前 1000", "前1000", "千字", "付费节点", "付费点", "付费期待", "付费前", "卡点", "三段内", "结尾回收", "回收"])) {
+    passed.push("知乎盐选付费节点和结尾回收可见。");
+  } else if (platform.id === "zhihu_yanxuan") {
+    addIssue({ field: "synopsis", severity: "warning", label: "盐选付费节点不够明确", detail: "知乎盐选投稿包要写清前 1000 字或三段内如何形成付费期待，以及结尾如何回收反转。" });
+  }
+
+  if (platform.id === "jjwxc" && hasAny(searchableText, ["人物弧光", "人物成长", "成长终点", "动机", "关系状态", "情感推进", "内心转变", "信任修复", "修复", "救赎路径"])) {
+    passed.push("晋江人物弧光和关系推进可见。");
+  } else if (platform.id === "jjwxc") {
+    addIssue({ field: "synopsis", severity: "warning", label: "晋江人物弧光不够明确", detail: "晋江投稿包要写清人物动机、关系状态变化、情感推进或成长终点，不能只说有误会和关系。" });
+  }
 
   if (platform.category === "female" && hasAny(searchableText, ["关系", "情感", "拉扯", "暗恋", "婚", "救赎", "成长"])) {
     passed.push("女频情绪关系信号明确。");

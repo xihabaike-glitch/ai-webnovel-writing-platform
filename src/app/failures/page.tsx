@@ -321,12 +321,13 @@ export default async function FailuresPage() {
     })),
   }));
   const safety = buildBatchExecutionSafety(queue.items, safetyProjects, defaultBatchExecutionStrategy);
+  const failureRepairResumeBatchRecord = buildFailureRepairResumeBatchRecord(recentRecommendedBatchAudits);
   const failureRepairResumeRecommendation = buildFailureRepairResumeRecommendation({
     resolved: failureRepairResolution.status === "resolved",
     safety,
     queueItems: queue.items,
+    resumeStabilityTone: failureRepairResumeBatchRecord?.stabilityTone ?? null,
   });
-  const failureRepairResumeBatchRecord = buildFailureRepairResumeBatchRecord(recentRecommendedBatchAudits);
 
   return (
     <AppShell>

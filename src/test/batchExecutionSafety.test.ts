@@ -248,6 +248,32 @@ test("buildBatchExecutionSafety", async (t) => {
     assert.ok(recommendation?.detail.includes("第二章"));
   });
 
+  await t.test("returns to standard recommended batches after repair resume stability is ready", () => {
+    const secondItem: QueueItem = {
+      ...baseItem,
+      id: "item-2",
+      category: "draft",
+      label: "待生成",
+      chapterTitle: "第二章",
+      actionLabel: "生成初稿",
+      priority: 20,
+    };
+    const safety = buildBatchExecutionSafety([baseItem, secondItem], [{ aiTasks: [] }], getBatchExecutionStrategy("conservative"));
+    const recommendation = buildFailureRepairResumeRecommendation({
+      resolved: true,
+      safety,
+      queueItems: [baseItem, secondItem],
+      resumeStabilityTone: "ready",
+    });
+
+    assert.equal(recommendation?.status, "ready");
+    assert.equal(recommendation?.label, "回普通推荐批次");
+    assert.equal(recommendation?.actionLabel, "执行普通推荐批次");
+    assert.equal(recommendation?.href, "/tasks#recommended-batch");
+    assert.ok(recommendation?.detail.includes("连续稳定"));
+    assert.ok(recommendation?.detail.includes("2 个"));
+  });
+
   await t.test("points resolved failure repair rechecks at the top safety blocker before resuming production", () => {
     const candidate: QueueItem = {
       ...baseItem,

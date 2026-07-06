@@ -146,6 +146,7 @@ export function buildFailureRepairResumeRecommendation(input: {
   resolved: boolean;
   safety: BatchExecutionSafety;
   queueItems: QueueItem[];
+  resumeStabilityTone?: "ready" | "watch" | "blocked" | null;
 }): FailureRepairResumeRecommendation | null {
   if (!input.resolved) return null;
 
@@ -177,6 +178,18 @@ export function buildFailureRepairResumeRecommendation(input: {
       href: "/tasks",
       batchSize: 0,
       taskLabels: [],
+    };
+  }
+
+  if (input.resumeStabilityTone === "ready") {
+    return {
+      status: "ready",
+      label: "回普通推荐批次",
+      detail: `恢复小批已连续稳定，可以回到普通推荐批次继续 ${batchItems.length} 个任务：${taskLabels.join("；")}。`,
+      actionLabel: "执行普通推荐批次",
+      href: "/tasks#recommended-batch",
+      batchSize: batchItems.length,
+      taskLabels,
     };
   }
 

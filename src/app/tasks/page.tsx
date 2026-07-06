@@ -418,6 +418,9 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
   const batchTacticEffectReview = buildTaskQueueBatchHealthReview(recentRecommendedBatchAudits, 5);
   const debtRecoveryBatchRecord = buildTaskDebtRecoveryBatchRecord(recentRecommendedBatchAudits);
   const failureRepairResumeBatchRecord = buildFailureRepairResumeBatchRecord(recentRecommendedBatchAudits);
+  const effectiveBatchContext = activeBatchContext === "repair_resume" && failureRepairResumeBatchRecord?.stabilityTone === "ready"
+    ? "standard"
+    : activeBatchContext;
   const unlockedDrafts = queue.items.filter((entry) => entry.category === "draft" && entry.scaleGate === "cleared");
   const firstDayHandoffItems = queue.items.filter((entry) => entry.sourceType === "first_day_handoff");
   const tacticExperienceFollowupItems = queue.items.filter((entry) => entry.sourceType === "tactic_experience_followup");
@@ -989,16 +992,20 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
             </div>
             <RunRecommendedBatchButton
               disabled={!safety.canRunRecommendedBatch || !executionPlan.canRun || modelRouteBlocksRecommendedBatch}
-              executionContext={activeBatchContext}
+              executionContext={effectiveBatchContext}
               initialModelRouteGate={modelRoutePreflightGate}
               strategyId={activeStrategy.id}
             />
           </div>
         </div>
         {activeBatchContext === "repair_resume" ? (
-          <div className="mt-4 rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900">
-            <div className="font-medium">修复后恢复模式</div>
-            <p className="mt-1 leading-6">这一批来自失败修复复检后的恢复入口。执行回执会按恢复小批记录，不会被当作普通放量批次。</p>
+          <div className={`mt-4 rounded-md border p-3 text-sm ${effectiveBatchContext === "standard" ? "border-sky-200 bg-sky-50 text-sky-900" : "border-emerald-200 bg-emerald-50 text-emerald-900"}`}>
+            <div className="font-medium">{effectiveBatchContext === "standard" ? "已承接普通推荐批次" : "修复后恢复模式"}</div>
+            <p className="mt-1 leading-6">
+              {effectiveBatchContext === "standard"
+                ? "恢复小批已连续稳定，这次执行会按普通推荐批次记录，继续保留安全阀。"
+                : "这一批来自失败修复复检后的恢复入口。执行回执会按恢复小批记录，不会被当作普通放量批次。"}
+            </p>
           </div>
         ) : null}
         {activeBatchContext === "repair_resume" && failureRepairResumeBatchRecord ? (
@@ -1085,7 +1092,7 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
             {strategyDecision.status === "ready" ? (
               <RunRecommendedBatchButton
                 disabled={!strategyDecision.canRun || modelRouteBlocksRecommendedBatch}
-                executionContext={activeBatchContext}
+                executionContext={effectiveBatchContext}
                 initialModelRouteGate={modelRoutePreflightGate}
                 strategyId={strategyDecision.strategyId}
               />

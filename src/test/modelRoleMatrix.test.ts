@@ -4,6 +4,7 @@ import {
   buildModelRoleMatrix,
   buildModelRoleMatrixPriorityBlocker,
   buildModelRoleRouteDraft,
+  buildModelRoleRouteBatchSavePlan,
 } from "../lib/model-gateway/modelRoleMatrix.ts";
 
 test("buildModelRoleMatrix", async (t) => {
@@ -286,5 +287,65 @@ test("buildModelRoleMatrix", async (t) => {
     assert.equal(draft.items.every((item) => item.status === "missing"), true);
     assert.equal(draft.items.every((item) => item.primaryProviderConfigId === null), true);
     assert.ok(draft.nextActions.some((action) => action.includes("先补模型岗位")));
+  });
+
+  await t.test("builds a batch save plan only for ready role routes", () => {
+    const draft = buildModelRoleRouteDraft([
+      {
+        id: "claude-config",
+        providerId: "claude",
+        displayName: "Claude",
+        hasApiKey: true,
+        defaultModel: "claude-sonnet-4-5",
+        enabled: true,
+        maxContextTokens: 200000,
+      },
+      {
+        id: "deepseek-config",
+        providerId: "deepseek",
+        displayName: "DeepSeek",
+        hasApiKey: true,
+        defaultModel: "deepseek-chat",
+        enabled: true,
+        maxContextTokens: 64000,
+      },
+      {
+        id: "kimi-config",
+        providerId: "kimi",
+        displayName: "Kimi",
+        hasApiKey: true,
+        defaultModel: "kimi-k2.6",
+        enabled: true,
+        maxContextTokens: 128000,
+      },
+      {
+        id: "gpt-config",
+        providerId: "gpt",
+        displayName: "GPT / OpenAI",
+        hasApiKey: true,
+        defaultModel: "gpt-5-mini",
+        enabled: true,
+        maxContextTokens: 128000,
+      },
+    ], [
+      {
+        taskType: "chapter_review",
+        primaryProviderConfigId: "claude-config",
+        fallbackProviderConfigId: "kimi-config",
+      },
+    ]);
+
+    const plan = buildModelRoleRouteBatchSavePlan(draft);
+    const firstItem = plan.items[0];
+
+    assert.equal(plan.summary.readyToSave, 5);
+    assert.equal(plan.summary.alreadyCurrent, 1);
+    assert.equal(plan.summary.missing, 0);
+    assert.equal(plan.items.some((item) => item.taskType === "chapter_review"), false);
+    assert.equal(firstItem.confirmation.source, "manual");
+    assert.equal(firstItem.confirmation.routeStatus, "ready");
+    assert.ok(firstItem.confirmation.reason.includes(firstItem.label));
+    assert.ok(firstItem.confirmation.reason.includes(firstItem.ownerRoleTitle));
+    assert.ok(firstItem.confirmation.reason.includes(firstItem.manualGate));
   });
 });

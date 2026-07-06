@@ -87,6 +87,33 @@ export interface ModelRoleRouteDraft {
   items: ModelRoleRouteDraftItem[];
 }
 
+export interface ModelRoleRouteBatchSavePlanItem {
+  taskType: RoutedModelTaskType;
+  label: string;
+  ownerRoleTitle: string;
+  manualGate: string;
+  primaryProviderConfigId: string;
+  fallbackProviderConfigId: string | null;
+  primaryProviderName: string;
+  fallbackProviderName: string | null;
+  confirmation: {
+    source: "manual";
+    reason: string;
+    primaryProviderName: string;
+    fallbackProviderName: string | null;
+    routeStatus: "ready";
+  };
+}
+
+export interface ModelRoleRouteBatchSavePlan {
+  summary: {
+    readyToSave: number;
+    alreadyCurrent: number;
+    missing: number;
+  };
+  items: ModelRoleRouteBatchSavePlanItem[];
+}
+
 interface RoleDefinition {
   id: ModelWritingRoleId;
   title: string;
@@ -392,6 +419,37 @@ export function buildModelRoleRouteDraft(
       current > 0 ? `${current} 条职责路线已经匹配当前配置。` : null,
       missing > 0 ? `${missing} 条路线缺少首选岗位，先补模型岗位。` : null,
     ].filter((item): item is string => Boolean(item)),
+    items,
+  };
+}
+
+export function buildModelRoleRouteBatchSavePlan(draft: ModelRoleRouteDraft): ModelRoleRouteBatchSavePlan {
+  const items = draft.items
+    .filter((item) => item.status === "ready" && Boolean(item.primaryProviderConfigId))
+    .map((item): ModelRoleRouteBatchSavePlanItem => ({
+      taskType: item.taskType,
+      label: item.label,
+      ownerRoleTitle: item.ownerRoleTitle,
+      manualGate: item.manualGate,
+      primaryProviderConfigId: item.primaryProviderConfigId as string,
+      fallbackProviderConfigId: item.fallbackProviderConfigId,
+      primaryProviderName: item.primaryProviderName,
+      fallbackProviderName: item.fallbackProviderName,
+      confirmation: {
+        source: "manual",
+        reason: `职责路由批量保存：${item.label} 交给 ${item.ownerRoleTitle}。${item.reason} 人工闸门：${item.manualGate}`,
+        primaryProviderName: item.primaryProviderName,
+        fallbackProviderName: item.fallbackProviderName,
+        routeStatus: "ready",
+      },
+    }));
+
+  return {
+    summary: {
+      readyToSave: items.length,
+      alreadyCurrent: draft.items.filter((item) => item.status === "current").length,
+      missing: draft.items.filter((item) => item.status === "missing").length,
+    },
     items,
   };
 }

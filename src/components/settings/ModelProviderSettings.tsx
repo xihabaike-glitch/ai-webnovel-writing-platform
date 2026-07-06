@@ -14,7 +14,13 @@ import type {
   RouteConfirmationOnboarding,
   RouteConfirmationRecheckResultSummary,
 } from "@/lib/model-gateway/routeConfirmation";
-import type { ModelRoleMatrix, ModelWritingRoleStatus } from "@/lib/model-gateway/modelRoleMatrix";
+import {
+  buildModelRoleRouteBatchSavePlan,
+  type ModelRoleMatrix,
+  type ModelRoleRouteDraft,
+  type ModelRoleRouteDraftItem,
+  type ModelWritingRoleStatus,
+} from "@/lib/model-gateway/modelRoleMatrix";
 import type { ProviderHealthDashboard, ProviderHealthStatus } from "@/lib/model-gateway/providerHealth";
 import type { RoutedModelTaskType } from "@/lib/model-gateway/taskRouting";
 import type { ModelProviderId } from "@/lib/model-gateway/types";
@@ -380,33 +386,7 @@ interface PresetRouteBlueprintView {
   }>;
 }
 
-interface ModelRoleRouteDraftView {
-  summary: {
-    total: number;
-    ready: number;
-    current: number;
-    missing: number;
-  };
-  nextActions: string[];
-  items: Array<{
-    taskType: string;
-    label: string;
-    status: "ready" | "current" | "missing";
-    ownerRoleId: string;
-    ownerRoleTitle: string;
-    fallbackRoleTitle: string | null;
-    primaryProviderConfigId: string | null;
-    fallbackProviderConfigId: string | null;
-    currentPrimaryProviderConfigId: string | null;
-    currentFallbackProviderConfigId: string | null;
-    primaryProviderName: string;
-    fallbackProviderName: string | null;
-    reason: string;
-    manualGate: string;
-  }>;
-}
-
-const roleRouteDraftStatusCopy: Record<ModelRoleRouteDraftView["items"][number]["status"], { label: string; className: string }> = {
+const roleRouteDraftStatusCopy: Record<ModelRoleRouteDraftItem["status"], { label: string; className: string }> = {
   ready: { label: "可填入", className: "bg-sky-50 text-sky-700" },
   current: { label: "已匹配", className: "bg-emerald-50 text-emerald-700" },
   missing: { label: "缺岗位", className: "bg-rose-50 text-rose-700" },
@@ -599,7 +579,7 @@ export function ModelProviderSettings({
   providerSetupWizard: ProviderSetupWizardView;
   modelSetupOnboarding: ModelSetupOnboardingView;
   modelRoleMatrix: ModelRoleMatrix;
-  modelRoleRouteDraft: ModelRoleRouteDraftView;
+  modelRoleRouteDraft: ModelRoleRouteDraft;
   firstDayRouteSummary: FirstDayRouteSummaryView;
   presetRouteBlueprint: PresetRouteBlueprintView;
   providers: ProviderView[];
@@ -649,6 +629,7 @@ export function ModelProviderSettings({
   ));
   const [savingRouteType, setSavingRouteType] = useState<string | null>(null);
   const [applyingRecommendationType, setApplyingRecommendationType] = useState<string | null>(null);
+  const [savingRoleRouteBatch, setSavingRoleRouteBatch] = useState(false);
   const [applyingFirstDayRouteType, setApplyingFirstDayRouteType] = useState<string | "all" | null>(null);
   const [governingRuleKey, setGoverningRuleKey] = useState<string | null>(null);
   const [creatingRetestRuleKey, setCreatingRetestRuleKey] = useState<string | null>(null);
@@ -664,6 +645,10 @@ export function ModelProviderSettings({
   ));
   const [routeNotice, setRouteNotice] = useState<RouteNotice | null>(null);
   const currentTestResult = testResults[selectedProviderId];
+  const roleRouteBatchSavePlan = useMemo(
+    () => buildModelRoleRouteBatchSavePlan(modelRoleRouteDraft),
+    [modelRoleRouteDraft],
+  );
   const latestRetestReviewByRuleKey = useMemo(() => {
     const reviewsByRuleKey = new Map<string, RouteAvoidanceGovernanceView["retestReview"]["items"][number]>();
     [...routeAvoidanceGovernance.retestReview.items]
@@ -1190,7 +1175,7 @@ export function ModelProviderSettings({
     }
   }
 
-  function fillRoleRouteDraft(item: ModelRoleRouteDraftView["items"][number]) {
+  function fillRoleRouteDraft(item: ModelRoleRouteDraftItem) {
     if (!item.primaryProviderConfigId) {
       setRouteNotice({ message: `${item.label}还缺首选模型岗位，先补模型配置。` });
       return;
@@ -1205,6 +1190,53 @@ export function ModelProviderSettings({
     }));
     setRouteNotice({ message: `已把「${item.label}」职责草案填入手动路由表，确认后点击保存路由。` });
     document.getElementById("manual-model-routes")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  async function saveRoleRouteBatch() {
+    const plan = roleRouteBatchSavePlan;
+    if (!plan.items.length) {
+      setRouteNotice({ message: "当前没有可批量保存的职责路线；已匹配或缺岗位的路线会被跳过。" });
+      document.getElementById("model-role-matrix")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      return;
+    }
+
+    setSavingRoleRouteBatch(true);
+    setRouteNotice(null);
+    try {
+      for (const item of plan.items) {
+        const response = await fetch("/api/model-task-routes", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            taskType: item.taskType,
+            primaryProviderConfigId: item.primaryProviderConfigId,
+            fallbackProviderConfigId: item.fallbackProviderConfigId,
+            confirmation: item.confirmation,
+          }),
+        });
+        if (!response.ok) throw new Error(`保存「${item.label}」职责路线失败。`);
+      }
+      setRouteDrafts((current) => ({
+        ...current,
+        ...Object.fromEntries(plan.items.map((item) => [
+          item.taskType,
+          {
+            primaryProviderConfigId: item.primaryProviderConfigId,
+            fallbackProviderConfigId: item.fallbackProviderConfigId ?? "",
+          },
+        ])),
+      }));
+      setRouteNotice({
+        message: `已批量保存 ${plan.items.length} 条职责路线；已匹配 ${plan.summary.alreadyCurrent} 条，缺岗位 ${plan.summary.missing} 条已跳过。`,
+        href: "/tasks#recommended-batch",
+        actionLabel: "回任务队列",
+      });
+      router.refresh();
+    } catch (caught) {
+      setRouteNotice({ message: caught instanceof Error ? caught.message : "批量保存职责路线失败。" });
+    } finally {
+      setSavingRoleRouteBatch(false);
+    }
   }
 
   return (
@@ -1325,10 +1357,20 @@ export function ModelProviderSettings({
                 <div className="text-sm font-medium text-slate-950">职责路由草案</div>
                 <p className="mt-1 text-sm leading-6 text-slate-600">按四个模型岗位给六类写作任务分配首选和备用模型，先填入表单，再人工保存。</p>
               </div>
-              <div className="flex flex-wrap gap-2 text-xs text-slate-600">
-                <span className="rounded-md bg-sky-50 px-2 py-1 text-sky-700">可填入 {modelRoleRouteDraft.summary.ready}</span>
-                <span className="rounded-md bg-emerald-50 px-2 py-1 text-emerald-700">已匹配 {modelRoleRouteDraft.summary.current}</span>
-                <span className="rounded-md bg-rose-50 px-2 py-1 text-rose-700">缺岗位 {modelRoleRouteDraft.summary.missing}</span>
+              <div className="flex flex-col gap-2 lg:items-end">
+                <div className="flex flex-wrap gap-2 text-xs text-slate-600">
+                  <span className="rounded-md bg-sky-50 px-2 py-1 text-sky-700">可保存 {roleRouteBatchSavePlan.summary.readyToSave}</span>
+                  <span className="rounded-md bg-emerald-50 px-2 py-1 text-emerald-700">已匹配 {roleRouteBatchSavePlan.summary.alreadyCurrent}</span>
+                  <span className="rounded-md bg-rose-50 px-2 py-1 text-rose-700">缺岗位 {roleRouteBatchSavePlan.summary.missing}</span>
+                </div>
+                <button
+                  className="w-fit rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
+                  disabled={savingRoleRouteBatch || roleRouteBatchSavePlan.items.length === 0}
+                  onClick={() => void saveRoleRouteBatch()}
+                  type="button"
+                >
+                  {savingRoleRouteBatch ? "保存中" : `保存 ${roleRouteBatchSavePlan.items.length} 条职责路线`}
+                </button>
               </div>
             </div>
             {modelRoleRouteDraft.nextActions.length ? (

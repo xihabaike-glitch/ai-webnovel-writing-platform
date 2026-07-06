@@ -21,6 +21,10 @@ function audit(input: {
   successRatePercent?: number;
   scaleGate?: "none" | "sample_only" | "cleared";
   aiPipelineRecheckMode?: "sample_recheck" | "small_batch_resume";
+  batchRhythmRecheck?: {
+    dispatchKey: string;
+    completionEvidence: string;
+  };
 }): GateActionAuditRecord {
   const platformName = input.platformName ?? "番茄小说";
   return {
@@ -58,6 +62,10 @@ function audit(input: {
       aiPipelineRecheck: input.aiPipelineRecheckMode ? {
         dispatchKey: `ai-pipeline-recheck:project-1:${input.receiptId}:scale`,
         mode: input.aiPipelineRecheckMode,
+      } : undefined,
+      batchRhythmRecheck: input.batchRhythmRecheck ? {
+        title: "批次节奏观察小批",
+        ...input.batchRhythmRecheck,
       } : undefined,
       routeEffectSummary: {
         successRatePercent: input.successRatePercent ?? 100,
@@ -174,6 +182,54 @@ test("buildTaskQueueBatchHealthReview treats AI small-batch recheck as recovery 
   assert.equal(review.items[0]?.label, "恢复放量观察");
   assert.ok(review.items[0]?.evidence[0]?.includes("恢复放量"));
   assert.ok(review.items[0]?.nextAction.includes("恢复放量样本还薄"));
+});
+
+test("buildTaskQueueBatchHealthReview treats batch rhythm rechecks as rhythm evidence", () => {
+  const review = buildTaskQueueBatchHealthReview([
+    audit({
+      receiptId: "rhythm-recheck-1",
+      label: "节奏复验小批通过，回到批量健康复盘",
+      tacticLabel: "三轮稳住",
+      quality: 88,
+      succeededCount: 1,
+      createdAt: "2026-01-04T00:00:00.000Z",
+      batchRhythmRecheck: {
+        dispatchKey: "batch-rhythm:watch:2026-01-03T00:00:00.000Z",
+        completionEvidence: "已拆失败样本，复验范围 1 章，质量目标 85。",
+      },
+    }),
+  ]);
+
+  assert.equal(review.items[0]?.status, "watch");
+  assert.equal(review.items[0]?.label, "节奏复验观察");
+  assert.equal(review.items[0]?.recoveryBatches, 0);
+  assert.equal(review.items[0]?.rhythmRecheckBatches, 1);
+  assert.ok(review.items[0]?.evidence[0]?.includes("节奏复验"));
+  assert.ok(review.items[0]?.evidence[0]?.includes("质量目标 85"));
+  assert.ok(review.items[0]?.nextAction.includes("再跑一轮"));
+});
+
+test("buildTaskQueueBatchRhythmDecision keeps one passed rhythm recheck in observation", () => {
+  const review = buildTaskQueueBatchHealthReview([
+    audit({
+      receiptId: "rhythm-recheck-1",
+      label: "节奏复验小批通过，回到批量健康复盘",
+      tacticLabel: "三轮稳住",
+      quality: 88,
+      succeededCount: 1,
+      createdAt: "2026-01-04T00:00:00.000Z",
+      batchRhythmRecheck: {
+        dispatchKey: "batch-rhythm:watch:2026-01-03T00:00:00.000Z",
+        completionEvidence: "已拆失败样本，复验范围 1 章，质量目标 85。",
+      },
+    }),
+  ]);
+  const decision = buildTaskQueueBatchRhythmDecision(review);
+
+  assert.equal(decision.tone, "watch");
+  assert.equal(decision.label, "继续小批观察");
+  assert.equal(decision.actionLabel, "跑观察小批");
+  assert.ok(decision.detail.includes("三轮稳住"));
 });
 
 test("buildTaskQueueBatchRhythmDecision continues standard batches after repeated healthy tactics", () => {

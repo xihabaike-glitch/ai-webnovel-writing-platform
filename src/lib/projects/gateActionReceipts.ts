@@ -101,6 +101,11 @@ export interface GateActionReceiptBatchContext {
   category: string | null;
   receiptHeadline: string;
   receiptStatus: string;
+  rhythmRecheck?: {
+    dispatchKey: string;
+    title: string;
+    completionEvidence: string;
+  } | null;
 }
 
 export interface GateActionReceipt {
@@ -1318,6 +1323,7 @@ export interface GateBatchTacticEffectItem {
   averageQualityScore: number | null;
   knownCostUsd: number;
   recoveryBatches: number;
+  rhythmRecheckBatches?: number;
   latestAt: string;
   evidence: string[];
   nextAction: string;
@@ -1440,7 +1446,8 @@ function batchContextFromPayload(payload: GateActionReceiptPayload): GateActionR
   const category = typeof payload.plan?.category === "string" ? payload.plan.category : null;
   const receiptHeadline = payload.batchReceipt?.headline ?? "";
   const receiptStatus = payload.batchReceipt?.status ?? "";
-  if (scaleGate === "none" && !actionLabel && !receiptHeadline) return null;
+  const rhythmRecheck = payload.batchRhythmRecheck ?? null;
+  if (scaleGate === "none" && !actionLabel && !receiptHeadline && !rhythmRecheck) return null;
 
   return {
     scaleGate,
@@ -1448,11 +1455,13 @@ function batchContextFromPayload(payload: GateActionReceiptPayload): GateActionR
     category,
     receiptHeadline,
     receiptStatus,
+    rhythmRecheck,
   };
 }
 
 function batchContextText(context?: GateActionReceiptBatchContext | null) {
   if (!context) return "";
+  if (context.rhythmRecheck) return "节奏复验";
   if (context.scaleGate === "cleared") return "恢复放量";
   if (context.scaleGate === "sample_only") return "小样本";
   return "";
@@ -7907,6 +7916,7 @@ export function buildGateBatchTacticEffectReview(
       : null;
     const knownCostUsd = Number(sortedReceipts.reduce((sum, receipt) => sum + (receipt.batchEffectSummary?.knownCostUsd ?? 0), 0).toFixed(4));
     const recoveryBatches = sortedReceipts.filter((receipt) => receipt.batchContext?.scaleGate === "cleared").length;
+    const rhythmRecheckBatches = sortedReceipts.filter((receipt) => receipt.batchContext?.rhythmRecheck).length;
     const thirdRoundMode = batchTacticThirdRoundMode(group.tactic);
     const baseStatus = batchTacticStatus({
       sampleBatches: sortedReceipts.length,
@@ -7915,26 +7925,34 @@ export function buildGateBatchTacticEffectReview(
       failedTasks,
     });
     const recoveryAdjustedStatus = recoveryBatches > 0 && baseStatus === "usable" && recoveryBatches < 2 ? "watch" : baseStatus;
-    const status = thirdRoundMode === "downgrade" && recoveryAdjustedStatus === "usable" ? "watch" : recoveryAdjustedStatus;
-    const label = recoveryBatches > 0
+    const rhythmAdjustedStatus = rhythmRecheckBatches > 0 && recoveryAdjustedStatus === "usable" && rhythmRecheckBatches < 2 ? "watch" : recoveryAdjustedStatus;
+    const status = thirdRoundMode === "downgrade" && rhythmAdjustedStatus === "usable" ? "watch" : rhythmAdjustedStatus;
+    const label = rhythmRecheckBatches > 0
+      ? status === "usable" ? "节奏复验打法" : status === "blocked" ? "节奏复验避坑" : "节奏复验观察"
+      : recoveryBatches > 0
       ? status === "usable" ? "恢复放量打法" : status === "blocked" ? "恢复放量避坑" : "恢复放量观察"
       : thirdRoundBatchTacticLabel(status, thirdRoundMode);
     const evidence = sortedReceipts.slice(0, 3).map((receipt) => {
       const quality = receipt.batchEffectSummary?.averageQualityScore ?? "缺";
       const context = [batchContextText(receipt.batchContext), thirdRoundBatchContextText(thirdRoundMode)].filter(Boolean).join("｜");
-      return `${receipt.label}${context ? `｜${context}` : ""}：成功 ${receipt.succeededCount}，失败 ${receipt.failedCount}，质量 ${quality}`;
+      const rhythmEvidence = receipt.batchContext?.rhythmRecheck?.completionEvidence ?? "";
+      return `${receipt.label}${context ? `｜${context}` : ""}${rhythmEvidence ? `｜${rhythmEvidence}` : ""}：成功 ${receipt.succeededCount}，失败 ${receipt.failedCount}，质量 ${quality}`;
     });
     const nextAction = status === "blocked"
       ? "先拆失败样本和低分原因，暂停把这套打法继续放进新批次。"
       : status === "watch"
-        ? recoveryBatches > 0
+        ? rhythmRecheckBatches > 0
+          ? "节奏复验已经回流，但样本仍薄；再跑一轮稳定小批后，才允许恢复普通推荐节奏。"
+          : recoveryBatches > 0
           ? "恢复放量样本还薄，至少再跑一轮稳定批次后，才允许写成新项目可复用打法。"
           : thirdRoundMode === "stable"
             ? "三轮稳住批次还不能直接写成长期打法，至少再跑一轮健康批次并回收曝光、点击、收藏和追读。"
           : thirdRoundMode === "downgrade"
             ? "三轮降档只沉淀修复流程，下一轮仍先跑小样本，禁止直接复用加码结论。"
           : "只允许小批继续验证，等至少两批稳定后再写入可复用打法。"
-        : recoveryBatches > 0
+        : rhythmRecheckBatches > 0
+          ? "节奏复验连续稳定，可恢复普通推荐节奏；仍要保留下一批真实成功率、质量和成本回执。"
+          : recoveryBatches > 0
           ? "恢复放量已经连续稳定，可作为观察平台解除闸门后的参考打法，但新项目仍先跑小样本。"
           : thirdRoundMode === "stable"
             ? "三轮稳住批次连续健康，可作为新项目开书参考，但首轮仍要小步验证并回填真实数据。"
@@ -7957,6 +7975,7 @@ export function buildGateBatchTacticEffectReview(
       averageQualityScore,
       knownCostUsd,
       recoveryBatches,
+      rhythmRecheckBatches,
       latestAt: sortedReceipts[0]?.createdAt ?? new Date(0).toISOString(),
       evidence,
       nextAction,

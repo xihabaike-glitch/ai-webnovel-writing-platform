@@ -1040,6 +1040,9 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
                 <div className="rounded-md bg-white/70 p-2">成功率 {item.successRatePercent}%</div>
                 <div className="rounded-md bg-white/70 p-2">质量 {item.averageQualityScore ?? "缺"}</div>
                 <div className="rounded-md bg-white/70 p-2">失败 {item.failedTasks}</div>
+                {item.rhythmRecheckBatches ? (
+                  <div className="rounded-md bg-white/70 p-2">节奏复验 {item.rhythmRecheckBatches}</div>
+                ) : null}
               </div>
               <p className="mt-3 leading-6 opacity-85">{item.nextAction}</p>
               {item.evidence[0] ? (

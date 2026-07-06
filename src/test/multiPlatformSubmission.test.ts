@@ -277,4 +277,43 @@ test("buildMultiPlatformSubmission", async (t) => {
     assert.ok(result.archive.markdown.includes("复盘修复焦点"));
     assert.ok(result.archive.markdown.includes("先修前三章兑现"));
   });
+
+  await t.test("treats completed repair packages as watch-and-retest evidence", () => {
+    const result = buildMultiPlatformSubmission({
+      projectId: "project-1",
+      title: "夜雨系统",
+      genre: "都市系统",
+      sellingPoint: "雨夜危机中觉醒系统，主角用一次次选择翻盘。",
+      currentWordCount: 9000,
+      targetWordCount: 300000,
+      targetPlatformId: "fanqie",
+      chapters,
+      aiTasks: [],
+      platformPublishMetrics: [
+        {
+          platformId: "qimao",
+          platformName: "七猫",
+          views: 0,
+          clicks: 0,
+          favorites: 0,
+          follows: 0,
+          comments: 0,
+          paidReads: 0,
+          editorFeedback: "修复对象：标题、简介、前三章兑现；修复后证据：已保存第二轮小样本投稿包；下一轮口径：只验证新标题和前三章兑现。",
+          contractStatus: "unknown",
+          publishUrl: "",
+          notes: "由派单完成依据自动回写；派单编号：submission-decision:project-1:qimao:repair",
+          snapshotDate: "2026-01-07T08:00:00.000Z",
+        },
+      ],
+    });
+    const qimao = result.variants.find((variant) => variant.platformId === "qimao");
+    assert.ok(qimao);
+    assert.equal(qimao.effectTracking.status, "watch");
+    assert.equal(qimao.decision.kind, "watch");
+    assert.equal(qimao.effectTracking.repairFocus.length, 0);
+    assert.ok(qimao.effectTracking.nextAction.includes("修复包已完成"));
+    assert.ok(qimao.effectTracking.nextAction.includes("第二轮小样本"));
+    assert.ok(qimao.effectTracking.evidence.some((item) => item.includes("修复包已完成")));
+  });
 });

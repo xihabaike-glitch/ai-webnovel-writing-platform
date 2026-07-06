@@ -358,6 +358,12 @@ function buildEffectRepairFocus(input: {
   return [...new Set(focus)].slice(0, 4);
 }
 
+function hasCompletedRepairPackageEvidence(metric: MultiPlatformPublishMetricInput) {
+  const text = `${metric.editorFeedback} ${metric.notes}`;
+  return /(?:修复对象|修复后证据|复检结果|下一轮口径)\s*[：:=]\s*\S+/u.test(text)
+    || /submission-decision:[^：\s]+:[^：\s]+:repair/u.test(text);
+}
+
 function buildEffectTracking(platform: PlatformProfile, metrics: MultiPlatformPublishMetricInput[]): MultiPlatformEffectTracking {
   const history = metrics
     .filter((metric) => metric.platformId === platform.id)
@@ -394,6 +400,10 @@ function buildEffectTracking(platform: PlatformProfile, metrics: MultiPlatformPu
     `追读率 ${followRatePercent}%`,
     latest.editorFeedback ? `编辑反馈：${latest.editorFeedback}` : "",
   ].filter(Boolean);
+  const completedRepairPackage = hasCompletedRepairPackageEvidence(latest);
+  const trackingEvidence = completedRepairPackage
+    ? [...evidence, "修复包已完成：等待第二轮小样本重验标题、简介、标签和前三章兑现。"]
+    : evidence;
   const repairFocus = buildEffectRepairFocus({
     clickRatePercent,
     favoriteRatePercent,
@@ -418,7 +428,7 @@ function buildEffectTracking(platform: PlatformProfile, metrics: MultiPlatformPu
       followRatePercent,
       nextAction: "保留当前投稿入口承诺，围绕有效卖点稳定更新，不要乱换题眼。",
       repairFocus: [],
-      evidence,
+      evidence: trackingEvidence,
     };
   }
 
@@ -431,7 +441,9 @@ function buildEffectTracking(platform: PlatformProfile, metrics: MultiPlatformPu
     ? "入口数据偏弱，优先重写标题、简介和前三章钩子，再做第二轮小样本。"
     : status === "promising"
       ? "数据有苗头，可以小步加码，但下一轮仍要继续回填对照。"
-      : "样本还没站稳，继续观察一轮，不要过早判死或放大。";
+      : completedRepairPackage
+        ? "修复包已完成，下一步只做第二轮小样本重验；不要放大投放，也不要同时改多个变量。"
+        : "样本还没站稳，继续观察一轮，不要过早判死或放大。";
 
   return {
     status,
@@ -449,7 +461,7 @@ function buildEffectTracking(platform: PlatformProfile, metrics: MultiPlatformPu
     followRatePercent,
     nextAction,
     repairFocus: status === "weak" ? repairFocus : [],
-    evidence,
+    evidence: trackingEvidence,
   };
 }
 

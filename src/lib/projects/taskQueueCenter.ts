@@ -490,6 +490,35 @@ function completedFirstDayDispatch(project: TaskQueueProject, stepId: string) {
   )) ?? null;
 }
 
+function activeFirstDayDispatch(project: TaskQueueProject, stepId: string) {
+  return project.gateDispatchTasks?.find((task) => (
+    task.dispatchKey === `first-day:${project.id}:${stepId}`
+    && task.state !== "completed"
+  )) ?? null;
+}
+
+function dispatchEvidenceDraft(input: {
+  task: NonNullable<TaskQueueProject["gateDispatchTasks"]>[number] | null;
+  fallbackStage: GateDispatchCompletionTemplateTask["stage"];
+  fallbackTitle: string;
+  fallbackActionLabel: string;
+  platformName: string;
+  source: string;
+}) {
+  if (!input.task) return {};
+  return {
+    sourceDispatchKey: input.task.dispatchKey,
+    completionEvidenceTemplate: buildGateDispatchCompletionTemplate({
+      stage: (input.task.stage ?? input.fallbackStage) as GateDispatchCompletionTemplateTask["stage"],
+      title: input.task.title ?? input.fallbackTitle,
+      actionLabel: input.task.actionLabel ?? input.fallbackActionLabel,
+      platformName: input.platformName,
+      evidence: input.task.detail ? [input.task.detail] : [],
+    }),
+    completionEvidenceTemplateSource: input.source,
+  };
+}
+
 function completedFirstDayHandoffEvidence(project: TaskQueueProject) {
   return (project.gateDispatchTasks ?? [])
     .filter((task) => (
@@ -1328,6 +1357,15 @@ export function buildTaskQueueCenter(projects: TaskQueueProject[]): TaskQueueCen
 
     if (!firstDayGateCleared && riskProfile.level !== "blocked") {
       const missingHandoffEvidence = productionGateCleared && handoffStatus.required && !handoffStatus.cleared;
+      const firstDayStepId = missingHandoffEvidence || riskProfile.level !== "watch" ? "publish-precheck" : "first-draft";
+      const firstDayEvidenceDraft = dispatchEvidenceDraft({
+        task: activeFirstDayDispatch(project, firstDayStepId),
+        fallbackStage: riskProfile.level === "watch" ? "start_first_three_review" : "start_platform_package",
+        fallbackTitle: riskProfile.level === "watch" ? "观察小样本验收" : "首日生产闸门",
+        fallbackActionLabel: riskProfile.level === "watch" ? "完成小样本验收" : "完成首日链路",
+        platformName: platform.name,
+        source: riskProfile.level === "watch" ? "观察闸门清债模板" : "首日闸门清债模板",
+      });
       const missingParts = [
         handoffStatus.missingAction ? "交接动作落地" : null,
         handoffStatus.missingVerification ? "首轮验收口径" : null,
@@ -1356,14 +1394,20 @@ export function buildTaskQueueCenter(projects: TaskQueueProject[]): TaskQueueCen
         actionLabel: missingHandoffEvidence
           ? "补交接验收"
           : riskProfile.level === "watch" ? "完成小样本验收" : "完成首日链路",
-        href: firstDayDispatchHref(
-          project.id,
-          missingHandoffEvidence || riskProfile.level !== "watch" ? "publish-precheck" : "first-draft",
-        ),
+        href: firstDayDispatchHref(project.id, firstDayStepId),
+        ...firstDayEvidenceDraft,
       }));
     }
 
     if (riskProfile.level === "blocked" && draftQueue.candidates.some((candidate) => candidate.status === "ready")) {
+      const recoveryEvidenceDraft = dispatchEvidenceDraft({
+        task: activeFirstDayDispatch(project, "risk-recovery"),
+        fallbackStage: "repair_tactic",
+        fallbackTitle: "首日止损恢复",
+        fallbackActionLabel: "做恢复验证",
+        platformName: platform.name,
+        source: "开书止损清债模板",
+      });
       queueItems.push(item({
         id: `${project.id}:risk-recovery:${platform.id}`,
         projectId: project.id,
@@ -1379,6 +1423,7 @@ export function buildTaskQueueCenter(projects: TaskQueueProject[]): TaskQueueCen
         riskNotice,
         actionLabel: "做恢复验证",
         href: firstDayDispatchHref(project.id, "risk-recovery"),
+        ...recoveryEvidenceDraft,
       }));
     }
 
@@ -1413,6 +1458,14 @@ export function buildTaskQueueCenter(projects: TaskQueueProject[]): TaskQueueCen
     }
 
     if (riskProfile.level === "watch" && scaleGate === "sample_only" && readyDraftCandidates.length > draftCandidatesForQueue.length) {
+      const watchEvidenceDraft = dispatchEvidenceDraft({
+        task: activeFirstDayDispatch(project, "first-draft"),
+        fallbackStage: "start_first_three_review",
+        fallbackTitle: "观察放量闸门",
+        fallbackActionLabel: "完成小样本验收",
+        platformName: platform.name,
+        source: "观察闸门清债模板",
+      });
       queueItems.push(item({
         id: `${project.id}:watch-scale-gate:${platform.id}`,
         projectId: project.id,
@@ -1429,6 +1482,7 @@ export function buildTaskQueueCenter(projects: TaskQueueProject[]): TaskQueueCen
         scaleGate,
         actionLabel: "完成小样本验收",
         href: firstDayDispatchHref(project.id, "first-draft"),
+        ...watchEvidenceDraft,
       }));
     }
 

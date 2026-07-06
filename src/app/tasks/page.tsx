@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { AppShell } from "@/components/app-shell/AppShell";
+import { CompleteTaskDebtEvidenceForm } from "@/components/tasks/CompleteTaskDebtEvidenceForm";
 import { CompleteTacticExperienceFollowupForm } from "@/components/tasks/CompleteTacticExperienceFollowupForm";
 import { RetryTaskButton } from "@/components/tasks/RetryTaskButton";
 import { RunRecommendedBatchButton } from "@/components/tasks/RunRecommendedBatchButton";
@@ -1197,6 +1198,14 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
                 ) : null}
                 {entry.sourceType === "tactic_experience_followup" && entry.sourceDispatchKey ? (
                   <CompleteTacticExperienceFollowupForm
+                    actionLabel={entry.actionLabel}
+                    completionEvidenceTemplate={entry.completionEvidenceTemplate}
+                    completionEvidenceTemplateSource={entry.completionEvidenceTemplateSource}
+                    dispatchKey={entry.sourceDispatchKey}
+                  />
+                ) : null}
+                {entry.category === "blocked" && entry.sourceDispatchKey ? (
+                  <CompleteTaskDebtEvidenceForm
                     actionLabel={entry.actionLabel}
                     completionEvidenceTemplate={entry.completionEvidenceTemplate}
                     completionEvidenceTemplateSource={entry.completionEvidenceTemplateSource}

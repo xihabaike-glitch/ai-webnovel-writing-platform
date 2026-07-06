@@ -257,6 +257,30 @@ test("buildTaskQueueCenter", async (t) => {
     ]);
   });
 
+  await t.test("exposes a dispatch evidence draft for focused first-day debt", () => {
+    const queue = buildTaskQueueCenter([{
+      ...project,
+      gateDispatchTasks: [{
+        dispatchKey: "first-day:project-1:publish-precheck",
+        state: "assigned",
+        completionEvidence: "",
+        stage: "start_platform_package",
+        title: "首日生产闸门",
+        detail: "完成平台包预检、首轮验证口径和避坑边界。",
+        actionLabel: "完成首日链路",
+        href: "/dispatch?firstDayProject=project-1&step=publish-precheck#first-day-dispatch",
+      }],
+    }]);
+    const debt = buildTaskQueueDebtView(queue.items, "first_day_gate");
+
+    assert.equal(debt.nextAction?.blockerType, "first_day_gate");
+    assert.equal(debt.nextAction?.sourceDispatchKey, "first-day:project-1:publish-precheck");
+    assert.equal(debt.nextAction?.completionEvidenceTemplateSource, "首日闸门清债模板");
+    assert.ok(debt.nextAction?.completionEvidenceTemplate?.includes("首日生产闸门"));
+    assert.ok(debt.nextAction?.completionEvidenceTemplate?.includes("标题："));
+    assert.ok(debt.nextAction?.completionEvidenceTemplate?.includes("结论：可发布 / 需修包装"));
+  });
+
   await t.test("returns a resume production action after blocked debt is cleared", () => {
     const queue = buildTaskQueueCenter([{
       ...project,

@@ -1649,25 +1649,32 @@ export function buildTaskQueueCenter(projects: TaskQueueProject[]): TaskQueueCen
       })
       : null;
 
+    const exportQueuePackages = [
+      targetPackage,
+      ...exportCenter.packages.filter((pack) => pack.platformId !== targetPackage.platformId),
+    ].filter((pack) => pack.canExport);
+
     if (versionQueueItem) {
       queueItems.push(versionQueueItem);
-    } else if (firstDayGateCleared && exportCenter.totalPublishableChapters > 0 && targetPackage.canExport) {
-      queueItems.push(item({
-        id: `${project.id}:export:${platform.id}`,
-        projectId: project.id,
-        projectTitle: project.title,
-        platformName: platform.name,
-        category: "export",
-        chapterTitle: `${targetPackage.platformName} 发布包`,
-        evidence: `${exportCenter.totalPublishableChapters} 章有正文可导出，${targetPackage.warnings.length} 条发布提醒。`,
-        strategyBasis: startTactic,
-        riskLevel: riskProfile.level,
-        riskLabel: riskProfile.label,
-        riskNotice,
-        scaleGate,
-        actionLabel: "导出平台包",
-        href: `${projectHref}#platform-export`,
-      }));
+    } else if (firstDayGateCleared && exportCenter.totalPublishableChapters > 0 && exportQueuePackages.length > 0) {
+      for (const exportPackage of exportQueuePackages) {
+        queueItems.push(item({
+          id: `${project.id}:export:${exportPackage.platformId}`,
+          projectId: project.id,
+          projectTitle: project.title,
+          platformName: exportPackage.platformName,
+          category: "export",
+          chapterTitle: `${exportPackage.platformName} 发布包`,
+          evidence: `${exportCenter.totalPublishableChapters} 章有正文可导出，${exportPackage.warnings.length} 条发布提醒。`,
+          strategyBasis: startTactic,
+          riskLevel: riskProfile.level,
+          riskLabel: riskProfile.label,
+          riskNotice,
+          scaleGate,
+          actionLabel: "导出平台包",
+          href: `${projectHref}#platform-export`,
+        }));
+      }
     } else if (firstDayGateCleared && exportCenter.totalPublishableChapters > 0 && targetPackage.repairPath.status === "needs_repair") {
       queueItems.push(item({
         id: `${project.id}:publish-repair:${platform.id}`,

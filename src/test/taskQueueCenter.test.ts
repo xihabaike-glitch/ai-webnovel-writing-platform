@@ -380,7 +380,7 @@ test("buildTaskQueueCenter", async (t) => {
     })]);
 
     assert.equal(queue.overview.effectReady, 1);
-    assert.equal(queue.overview.exportReady, 1);
+    assert.equal(queue.overview.exportReady, 8);
     assert.equal(queue.recommendedNext?.category, "effect");
     assert.equal(queue.recommendedNext?.actionLabel, "录入发布效果");
     assert.equal(queue.recommendedNext?.href, "/projects/project-1#publish-effect-panel");
@@ -415,6 +415,23 @@ test("buildTaskQueueCenter", async (t) => {
       ["fanqie", "qidian"],
     );
     assert.ok(effectItems.every((item) => item.href === "/projects/project-1#publish-effect-panel"));
+  });
+
+  await t.test("promotes every export-ready platform into package export tasks", () => {
+    const queue = buildTaskQueueCenter([publishReadyProject({
+      publishSnapshots: [],
+      platformPublishMetrics: [],
+    })]);
+
+    const exportItems = queue.items.filter((item) => item.category === "export" && item.id.includes(":export:"));
+
+    assert.equal(queue.overview.exportReady, 8);
+    assert.deepEqual(
+      exportItems.map((item) => item.platformName).sort((left, right) => left.localeCompare(right)),
+      ["番茄小说", "起点中文网", "七猫", "晋江文学城", "知乎盐选", "WebNovel", "Royal Road", "Wattpad"].sort((left, right) => left.localeCompare(right)),
+    );
+    assert.ok(exportItems.every((item) => item.actionLabel === "导出平台包"));
+    assert.ok(exportItems.every((item) => item.href === "/projects/project-1#platform-export"));
   });
 
   await t.test("blocks export when the export version center reports regression risk", () => {

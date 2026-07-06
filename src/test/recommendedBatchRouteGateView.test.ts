@@ -74,4 +74,23 @@ test("buildRecommendedBatchRouteGateTimeline", async (t) => {
     assert.equal(actions.primaryLinkLabel, "查看待复检");
     assert.equal(actions.primaryLinkHref, "/dispatch?filter=waiting_recheck");
   });
+
+  await t.test("points blocked batches to create a recheck dispatch before route repair links", () => {
+    const actions = buildRecommendedBatchRouteGateActions({
+      status: "block",
+      label: "模型路线拦截",
+      headline: "模型路线存在失败。",
+      detail: "需要治理。",
+      maxBatchSize: 0,
+      recoveryEvidence: null,
+      recheckAdvice: { id: "new-recheck" },
+      actionLabel: "去修模型路线",
+      targetHref: "/settings/models",
+    });
+
+    assert.equal(actions.canCreateRecheckDispatch, true);
+    assert.equal(actions.runButtonLabel, "先生成复检派单");
+    assert.equal(actions.primaryLinkLabel, "去修模型路线");
+    assert.equal(actions.primaryLinkHref, "/settings/models");
+  });
 });

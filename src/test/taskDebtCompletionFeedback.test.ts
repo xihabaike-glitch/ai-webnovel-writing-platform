@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildTaskDebtCompletionFeedback, buildTaskDebtFocusChangeNotice } from "../lib/projects/taskDebtCompletionFeedback.ts";
+import {
+  buildTaskDebtCompletionFeedback,
+  buildTaskDebtFocusChangeNotice,
+  buildTaskDebtRecoveryBatchRecord,
+} from "../lib/projects/taskDebtCompletionFeedback.ts";
 
 test("buildTaskDebtCompletionFeedback explains first-day follow-up debt", () => {
   const feedback = buildTaskDebtCompletionFeedback({
@@ -112,4 +116,36 @@ test("buildTaskDebtFocusChangeNotice explains when debt count does not fall", ()
 
   assert.equal(notice?.tone, "unchanged");
   assert.equal(notice?.message, "刚回写观察闸门清债证据：提交前 2 个，现在仍是 2 个。证据可能生成了后续动作，或仍缺验收项。");
+});
+
+test("buildTaskDebtRecoveryBatchRecord summarizes the latest cleared resume batch", () => {
+  const record = buildTaskDebtRecoveryBatchRecord([{
+    label: "沉淀批量初稿 2 个经验",
+    href: "/tasks#recommended-batch",
+    payload: JSON.stringify({
+      plan: {
+        scaleGate: "cleared",
+        actionLabel: "批量初稿 2 个",
+      },
+      routeEffectSummary: {
+        successRatePercent: 100,
+        failedTasks: 0,
+        knownCostUsd: 0.02,
+        averageQualityScore: 88,
+      },
+      batchReceipt: {
+        headline: "准放量批次稳定，下一批仍小步走",
+        detail: "小样本后的第一轮恢复放量已过线。",
+        primaryLabel: "继续恢复小批",
+        primaryHref: "/tasks#recommended-batch",
+      },
+    }),
+    createdAt: "2026-07-06T06:00:00.000Z",
+  }]);
+
+  assert.equal(record?.headline, "恢复小批已回流：准放量批次稳定，下一批仍小步走");
+  assert.equal(record?.detail, "小样本后的第一轮恢复放量已过线。");
+  assert.deepEqual(record?.metrics, ["成功率 100%", "失败 0", "成本 $0.0200", "质量 88"]);
+  assert.equal(record?.actionLabel, "继续恢复小批");
+  assert.equal(record?.actionHref, "/tasks#recommended-batch");
 });

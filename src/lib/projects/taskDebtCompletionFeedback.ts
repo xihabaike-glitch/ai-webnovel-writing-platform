@@ -47,6 +47,21 @@ export interface TaskDebtFocusChangeNotice {
   resumeBatchDetail: string | null;
 }
 
+export interface TaskDebtRecoveryBatchAudit {
+  label: string;
+  href: string;
+  payload: string | null;
+  createdAt: Date | string;
+}
+
+export interface TaskDebtRecoveryBatchRecord {
+  headline: string;
+  detail: string;
+  metrics: string[];
+  actionLabel: string;
+  actionHref: string;
+}
+
 function taskDebtAutoFocusHref(input: Pick<TaskDebtCompletionFeedbackInput, "blockerType" | "previousDebtCount">) {
   const blockerType = input.blockerType?.trim();
   const params = new URLSearchParams({ view: "blocked" });
@@ -58,6 +73,67 @@ function taskDebtAutoFocusHref(input: Pick<TaskDebtCompletionFeedbackInput, "blo
     params.set("previousDebt", String(Math.max(0, Math.round(input.previousDebtCount))));
   }
   return `/tasks?${params.toString()}#task-debt`;
+}
+
+function taskDebtRecord(value: unknown) {
+  return value && typeof value === "object" ? value as Record<string, unknown> : null;
+}
+
+function taskDebtNumber(value: unknown) {
+  const parsed = typeof value === "number" ? value : typeof value === "string" ? Number(value) : Number.NaN;
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function parseTaskDebtPayload(payload: string | null) {
+  if (!payload) return null;
+  try {
+    return taskDebtRecord(JSON.parse(payload));
+  } catch {
+    return null;
+  }
+}
+
+function taskDebtTimestamp(value: Date | string) {
+  const time = new Date(value).getTime();
+  return Number.isFinite(time) ? time : 0;
+}
+
+export function buildTaskDebtRecoveryBatchRecord(audits: TaskDebtRecoveryBatchAudit[]): TaskDebtRecoveryBatchRecord | null {
+  const latest = audits
+    .map((audit) => ({ audit, payload: parseTaskDebtPayload(audit.payload) }))
+    .filter((item) => taskDebtRecord(item.payload?.plan)?.scaleGate === "cleared")
+    .sort((left, right) => taskDebtTimestamp(right.audit.createdAt) - taskDebtTimestamp(left.audit.createdAt))[0] ?? null;
+  if (!latest) return null;
+
+  const routeEffectSummary = taskDebtRecord(latest.payload?.routeEffectSummary);
+  const batchReceipt = taskDebtRecord(latest.payload?.batchReceipt);
+  const successRate = taskDebtNumber(routeEffectSummary?.successRatePercent);
+  const failedTasks = taskDebtNumber(routeEffectSummary?.failedTasks);
+  const knownCostUsd = taskDebtNumber(routeEffectSummary?.knownCostUsd);
+  const averageQualityScore = taskDebtNumber(routeEffectSummary?.averageQualityScore);
+  const headline = typeof batchReceipt?.headline === "string" && batchReceipt.headline
+    ? batchReceipt.headline
+    : latest.audit.label;
+  const detail = typeof batchReceipt?.detail === "string" ? batchReceipt.detail : "";
+  const actionLabel = typeof batchReceipt?.primaryLabel === "string" && batchReceipt.primaryLabel
+    ? batchReceipt.primaryLabel
+    : "查看推荐批次";
+  const actionHref = typeof batchReceipt?.primaryHref === "string" && batchReceipt.primaryHref
+    ? batchReceipt.primaryHref
+    : latest.audit.href || "/tasks#recommended-batch";
+
+  return {
+    headline: `恢复小批已回流：${headline}`,
+    detail,
+    metrics: [
+      successRate === null ? null : `成功率 ${Math.round(successRate)}%`,
+      failedTasks === null ? null : `失败 ${Math.round(failedTasks)}`,
+      knownCostUsd === null ? null : `成本 $${knownCostUsd.toFixed(4)}`,
+      averageQualityScore === null ? null : `质量 ${Math.round(averageQualityScore)}`,
+    ].filter((metric): metric is string => Boolean(metric)),
+    actionLabel,
+    actionHref,
+  };
 }
 
 export function buildTaskDebtFocusChangeNotice(input: TaskDebtFocusChangeNoticeInput): TaskDebtFocusChangeNotice | null {

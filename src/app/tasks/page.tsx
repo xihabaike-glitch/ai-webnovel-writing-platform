@@ -15,7 +15,7 @@ import { buildBatchStrategyComparison, buildBatchStrategyDecision } from "@/lib/
 import { batchExecutionStrategies, getBatchExecutionStrategy } from "@/lib/projects/batchExecutionStrategy";
 import type { GateBatchTacticEffectStatus } from "@/lib/projects/gateActionReceipts";
 import { buildRecommendedBatchModelRouteGate } from "@/lib/projects/recommendedBatchModelRouteGate";
-import { buildTaskDebtFocusChangeNotice } from "@/lib/projects/taskDebtCompletionFeedback";
+import { buildTaskDebtFocusChangeNotice, buildTaskDebtRecoveryBatchRecord } from "@/lib/projects/taskDebtCompletionFeedback";
 import { buildTaskQueueBatchHealthReview } from "@/lib/projects/taskQueueBatchHealth";
 import { buildTaskQueueCenter, buildTaskQueueDebtView, recommendedQueueActionLabel, taskQueueSourcePresentation, type QueueItem, type TaskQueueProject } from "@/lib/projects/taskQueueCenter";
 import { buildTaskQueueExecutionPlan } from "@/lib/projects/taskQueueExecutionPlan";
@@ -401,6 +401,7 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
   const strategyComparison = buildBatchStrategyComparison(queue.items, safetyProjects, batchHistory);
   const strategyDecision = buildBatchStrategyDecision(strategyComparison, activeStrategy.id);
   const batchTacticEffectReview = buildTaskQueueBatchHealthReview(recentRecommendedBatchAudits, 5);
+  const debtRecoveryBatchRecord = buildTaskDebtRecoveryBatchRecord(recentRecommendedBatchAudits);
   const unlockedDrafts = queue.items.filter((entry) => entry.category === "draft" && entry.scaleGate === "cleared");
   const firstDayHandoffItems = queue.items.filter((entry) => entry.sourceType === "first_day_handoff");
   const tacticExperienceFollowupItems = queue.items.filter((entry) => entry.sourceType === "tactic_experience_followup");
@@ -609,6 +610,20 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
                 <Link className="mt-2 inline-flex rounded-md bg-white/80 px-3 py-1 font-medium hover:bg-white" href={debtFocusChangeNotice.actionHref}>
                   {debtFocusChangeNotice.actionLabel}
                 </Link>
+              ) : null}
+              {debtRecoveryBatchRecord ? (
+                <div className="mt-3 rounded-md bg-white/75 px-3 py-2 text-xs leading-5">
+                  <div className="font-medium">{debtRecoveryBatchRecord.headline}</div>
+                  <div className="mt-1">{debtRecoveryBatchRecord.detail}</div>
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {debtRecoveryBatchRecord.metrics.map((metric) => (
+                      <span className="rounded-md bg-slate-50 px-2 py-1 font-medium" key={metric}>{metric}</span>
+                    ))}
+                  </div>
+                  <Link className="mt-2 inline-flex rounded-md bg-white px-2 py-1 font-medium hover:bg-slate-50" href={debtRecoveryBatchRecord.actionHref}>
+                    {debtRecoveryBatchRecord.actionLabel}
+                  </Link>
+                </div>
               ) : null}
             </div>
           ) : null}

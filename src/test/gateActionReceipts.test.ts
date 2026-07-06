@@ -9,6 +9,7 @@ import {
   buildGateActionReviewAdvice,
   buildGateFailureRepairReceiptReview,
   buildGateFailureRepairFollowupNotice,
+  buildGateFailureRepairRecheckCard,
   buildGateFailureRepairRecheckDispatchItems,
   buildGateFailureRepairRecheckResolution,
   buildGateFailureRepairThirdRoundDispatchItems,
@@ -953,6 +954,45 @@ test("buildGateActionReceipt", async (t) => {
     assert.ok(dispatches[0].acceptanceCriteria.includes("总闸门未恢复失败数降为 0"));
     assert.ok(dispatches[0].evidence.some((line) => line.includes("已记录模型配置修复")));
     assert.equal(clearedDispatches.length, 0);
+  });
+
+  await t.test("builds a compact failure repair recheck card for the failures page", () => {
+    const repairReceipt = buildGateActionReceipt({
+      action: {
+        id: "failure-repair-batch",
+        label: "记录配置修复",
+        detail: "先修配置，再谈重试：1 个未恢复失败指向 API Key、权限或模型配置。",
+        href: "/settings/models",
+        tone: "repair",
+        execution: null,
+      },
+      status: "succeeded",
+      now: "2026-01-01T00:00:00.000Z",
+      payload: { message: "已记录模型配置修复。" },
+    });
+    const review = buildGateFailureRepairReceiptReview(failureRepairBatch, [repairReceipt]);
+    const queued = buildGateFailureRepairRecheckCard(review, failureRepairBatch, []);
+    const [virtualDispatch] = buildGateFailureRepairRecheckDispatchItems(review, failureRepairBatch);
+    const assigned = buildGateFailureRepairRecheckCard(review, failureRepairBatch, [{
+      ...virtualDispatch,
+      databaseId: "dispatch-db",
+      dispatchKey: virtualDispatch.id,
+      state: "assigned",
+      sourceReceiptId: null,
+      completionEvidence: "",
+      assignedAt: "2026-01-01T00:02:00.000Z",
+      completedAt: null,
+      createdAt: "2026-01-01T00:02:00.000Z",
+      updatedAt: "2026-01-01T00:02:00.000Z",
+    }]);
+
+    assert.equal(queued?.dispatchKey, "global:failure_repair_recheck:failure-repair-batch");
+    assert.equal(queued?.state, "queued");
+    assert.equal(queued?.primaryActionLabel, "接单复检");
+    assert.match(queued?.detail ?? "", /已有失败修复回执/);
+    assert.ok(queued?.completionEvidencePlaceholder.includes("复检配置"));
+    assert.equal(assigned?.state, "assigned");
+    assert.equal(assigned?.primaryActionLabel, "提交复检依据");
   });
 
   await t.test("builds a failure repair follow-up notice from receipts and recheck state", () => {

@@ -1,14 +1,19 @@
 import Link from "next/link";
 import { AppShell } from "@/components/app-shell/AppShell";
 import { FailureRepairLaneReceiptButton } from "@/components/failures/FailureRepairLaneReceiptButton";
+import { FailureRepairRecheckCard } from "@/components/failures/FailureRepairRecheckCard";
 import { buildTaskRunConsole } from "@/lib/ai/taskRunConsole";
 import { prisma } from "@/lib/db/prisma";
 import { buildFailureReviewCenter } from "@/lib/ai/failureReviewCenter";
 import {
   buildGateFailureRepairFollowupNotice,
+  buildGateFailureRepairRecheckCard,
+  buildGateFailureRepairRecheckDispatchItems,
   buildGateFailureRepairReceiptReview,
   buildGateFailureRepairRecheckResolution,
   gateActionReceiptFromAuditRecord,
+  type GatePlatformGrowthDispatchState,
+  type PersistedGatePlatformDispatchTask,
 } from "@/lib/projects/gateActionReceipts";
 
 export const dynamic = "force-dynamic";
@@ -18,6 +23,74 @@ function followupToneClass(tone: ReturnType<typeof buildGateFailureRepairFollowu
   if (tone === "failed" || tone === "active") return "border-amber-200 bg-amber-50 text-amber-900";
   if (tone === "recheck") return "border-blue-200 bg-blue-50 text-blue-900";
   return "border-slate-200 bg-white text-slate-900";
+}
+
+function dispatchState(value: string): GatePlatformGrowthDispatchState {
+  if (value === "completed") return "completed";
+  if (value === "assigned") return "assigned";
+  return "queued";
+}
+
+function parseStringList(value: string) {
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+function toPersistedDispatch(task: {
+  id: string;
+  dispatchKey: string;
+  projectId: string | null;
+  platformId: string;
+  platformName: string;
+  stage: string;
+  state: string;
+  priorityScore: number;
+  ownerRole: string;
+  title: string;
+  detail: string;
+  dueLabel: string;
+  actionLabel: string;
+  href: string;
+  acceptanceCriteria: string;
+  evidence: string;
+  sourceReceiptId: string | null;
+  completionEvidence: string;
+  reviewLatestAt: Date;
+  assignedAt: Date | null;
+  completedAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+}): PersistedGatePlatformDispatchTask {
+  return {
+    databaseId: task.id,
+    dispatchKey: task.dispatchKey,
+    id: task.dispatchKey,
+    projectId: task.projectId,
+    platformId: task.platformId,
+    platformName: task.platformName,
+    stage: task.stage as PersistedGatePlatformDispatchTask["stage"],
+    state: dispatchState(task.state),
+    priorityScore: task.priorityScore,
+    ownerRole: task.ownerRole,
+    title: task.title,
+    detail: task.detail,
+    dueLabel: task.dueLabel,
+    actionLabel: task.actionLabel,
+    href: task.href,
+    acceptanceCriteria: parseStringList(task.acceptanceCriteria),
+    evidence: parseStringList(task.evidence),
+    sourceReceiptId: task.sourceReceiptId,
+    completionEvidence: task.completionEvidence,
+    reviewLatestAt: task.reviewLatestAt.toISOString(),
+    assignedAt: task.assignedAt?.toISOString() ?? null,
+    completedAt: task.completedAt?.toISOString() ?? null,
+    createdAt: task.createdAt.toISOString(),
+    updatedAt: task.updatedAt.toISOString(),
+  };
 }
 
 function groupList(groups: Array<{ id: string; label: string; count: number; percent: number; sample: string; suggestion: string }>) {
@@ -39,7 +112,7 @@ function groupList(groups: Array<{ id: string; label: string; count: number; per
 }
 
 export default async function FailuresPage() {
-  const [tasks, chapters, receiptAudits] = await Promise.all([
+  const [tasks, chapters, receiptAudits, recheckDispatchRecords] = await Promise.all([
     prisma.aiTask.findMany({
       where: { status: { in: ["failed", "succeeded"] } },
       include: {
@@ -61,6 +134,11 @@ export default async function FailuresPage() {
       },
       orderBy: { createdAt: "desc" },
       take: 80,
+    }),
+    prisma.gateDispatchTask.findMany({
+      where: { stage: "failure_repair_recheck" },
+      orderBy: { updatedAt: "desc" },
+      take: 20,
     }),
   ]);
   const chaptersById = new Map(chapters.map((chapter) => [chapter.id, chapter]));
@@ -92,6 +170,17 @@ export default async function FailuresPage() {
   const failureRepairFollowup = buildGateFailureRepairFollowupNotice(
     failureRepairReview,
     buildGateFailureRepairRecheckResolution(runConsole.failureRepairBatch, []),
+  );
+  const persistedRecheckDispatches = recheckDispatchRecords.map(toPersistedDispatch);
+  const [failureRepairRecheckDispatch] = buildGateFailureRepairRecheckDispatchItems(
+    failureRepairReview,
+    runConsole.failureRepairBatch,
+    persistedRecheckDispatches,
+  );
+  const failureRepairRecheckCard = buildGateFailureRepairRecheckCard(
+    failureRepairReview,
+    runConsole.failureRepairBatch,
+    persistedRecheckDispatches,
   );
 
   return (
@@ -157,6 +246,10 @@ export default async function FailuresPage() {
           </Link>
         </div>
       </section>
+
+      {failureRepairRecheckCard && failureRepairRecheckDispatch ? (
+        <FailureRepairRecheckCard card={failureRepairRecheckCard} dispatch={failureRepairRecheckDispatch} />
+      ) : null}
 
       <section className="mb-6 rounded-md border border-slate-200 bg-white p-4">
         <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">

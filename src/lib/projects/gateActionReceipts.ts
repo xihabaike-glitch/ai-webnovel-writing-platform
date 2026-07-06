@@ -194,6 +194,20 @@ export interface GateFailureRepairFollowupNotice {
   badges: string[];
 }
 
+export interface GateFailureRepairRecheckCard {
+  dispatchKey: string;
+  state: GatePlatformGrowthDispatchState;
+  title: string;
+  detail: string;
+  ownerRole: string;
+  dueLabel: string;
+  href: string;
+  primaryActionLabel: string;
+  completionEvidencePlaceholder: string;
+  acceptanceCriteria: string[];
+  evidence: string[];
+}
+
 export interface GateFailureRepairThirdRoundResolution {
   status: "none" | "active" | "failed" | "resolved";
   label: string;
@@ -1928,6 +1942,35 @@ export function buildGateFailureRepairRecheckDispatchItems(
     ].slice(0, 5),
     reviewLatestAt: new Date().toISOString(),
   }];
+}
+
+export function buildGateFailureRepairRecheckCard(
+  review: GateFailureRepairReceiptReview,
+  batch: FailureRepairBatch,
+  persistedTasks: PersistedGatePlatformDispatchTask[] = [],
+): GateFailureRepairRecheckCard | null {
+  const [dispatch] = buildGateFailureRepairRecheckDispatchItems(review, batch, persistedTasks);
+  if (!dispatch) return null;
+
+  const primaryActionLabel = dispatch.state === "completed"
+    ? "查看复检结果"
+    : dispatch.state === "assigned"
+      ? "提交复检依据"
+      : "接单复检";
+
+  return {
+    dispatchKey: dispatch.id,
+    state: dispatch.state,
+    title: dispatch.title,
+    detail: dispatch.detail,
+    ownerRole: dispatch.ownerRole,
+    dueLabel: dispatch.dueLabel,
+    href: dispatch.href,
+    primaryActionLabel,
+    completionEvidencePlaceholder: "复检配置、重试结果和失败列表：未恢复失败 __ 个；已确认配置/上下文/样本重试；下一步 __。",
+    acceptanceCriteria: dispatch.acceptanceCriteria,
+    evidence: dispatch.evidence,
+  };
 }
 
 function failureRepairRecheckTasks(tasks: PersistedGatePlatformDispatchTask[]) {

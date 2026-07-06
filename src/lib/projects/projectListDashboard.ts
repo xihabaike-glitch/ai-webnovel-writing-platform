@@ -69,7 +69,16 @@ export interface ProjectListDashboard {
     watchProjects: number;
     blockedProjects: number;
   };
+  roleEntrypoints: ProjectRoleWorkflowEntrypoint[];
   items: ProjectListItem[];
+}
+
+export interface ProjectRoleWorkflowEntrypoint {
+  id: "story-structure" | "context-recall" | "platform-export";
+  title: string;
+  detail: string;
+  actionLabel: string;
+  projectAnchor: "#story-structure" | "#context-recall" | "#platform-export";
 }
 
 function clampPercent(value: number) {
@@ -135,6 +144,32 @@ function riskFlags(input: {
   if (input.wordProgressPercent < 1 && input.chapterCount > 0) flags.push("还没进入有效字数生产");
   if (flags.length === 0) flags.push("暂无明显阻塞");
   return flags;
+}
+
+export function buildProjectRoleWorkflowEntrypoints(): ProjectRoleWorkflowEntrypoint[] {
+  return [
+    {
+      id: "story-structure",
+      title: "结构主编入口",
+      detail: "选择作品后进入结构诊断，检查开头、结尾、主干、支线、人物弧光和伏笔回收。",
+      actionLabel: "选作品做结构诊断",
+      projectAnchor: "#story-structure",
+    },
+    {
+      id: "context-recall",
+      title: "资料官入口",
+      detail: "选择作品后查看项目土壤与上下文召回，确认人物、设定、线索和历史章节来源。",
+      actionLabel: "选作品看项目土壤",
+      projectAnchor: "#context-recall",
+    },
+    {
+      id: "platform-export",
+      title: "平台包装入口",
+      detail: "选择作品后进入平台发布包，处理标题、简介、标签、样章、版本和发布效果。",
+      actionLabel: "选作品做平台包",
+      projectAnchor: "#platform-export",
+    },
+  ];
 }
 
 export function buildProjectListDashboard(
@@ -273,6 +308,7 @@ export function buildProjectListDashboard(
       watchProjects: items.filter((item) => item.riskLevel === "watch").length,
       blockedProjects: items.filter((item) => item.riskLevel === "blocked").length,
     },
+    roleEntrypoints: buildProjectRoleWorkflowEntrypoints(),
     items,
   };
 }

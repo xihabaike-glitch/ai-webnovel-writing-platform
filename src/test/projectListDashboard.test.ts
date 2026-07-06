@@ -186,6 +186,35 @@ test("buildProjectListDashboard", async (t) => {
     assert.equal(dashboard.items[1].nextAction, "启动二改");
   });
 
+  await t.test("exposes role workflow anchors for reference role entry links", () => {
+    const dashboard = buildProjectListDashboard([completeProject], [
+      {
+        id: "provider-1",
+        providerId: "mock",
+        displayName: "Mock",
+        defaultModel: "mock-novel",
+        enabled: true,
+        encryptedApiKey: "secret",
+      },
+    ]);
+
+    assert.ok(Array.isArray(dashboard.roleEntrypoints), "project list dashboard needs role entrypoints");
+    assert.deepEqual(
+      dashboard.roleEntrypoints.map((entry) => entry.id),
+      ["story-structure", "context-recall", "platform-export"],
+    );
+    for (const entry of dashboard.roleEntrypoints) {
+      assert.ok(entry.title.length >= 4);
+      assert.ok(entry.detail.includes("选择作品"));
+      assert.ok(entry.actionLabel.length >= 4);
+      assert.ok(entry.projectAnchor.startsWith("#"));
+    }
+    assert.equal(
+      dashboard.roleEntrypoints.find((entry) => entry.id === "platform-export")?.projectAnchor,
+      "#platform-export",
+    );
+  });
+
   await t.test("surfaces first-day risk lanes in portfolio cards", () => {
     const dashboard = buildProjectListDashboard([completeProject, blockedProject, watchProject], [
       {

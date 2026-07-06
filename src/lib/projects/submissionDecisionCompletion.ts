@@ -87,7 +87,23 @@ export function inferSubmissionDecisionContractStatus(text: string): SubmissionD
   return "unknown";
 }
 
+function valueAfterLabel(label: string, text: string) {
+  return text.match(new RegExp(`${label}\\s*[：:=]\\s*([^\\n；;]+)`, "u"))?.[1]?.trim() ?? "";
+}
+
 function editorFeedback(text: string) {
+  if (/样本轮次\s*[：:=]?\s*第二轮小样本|第二轮小样本|二轮小样本|验证变量\s*[：:=]?.*前三章/u.test(text)) {
+    const summary = [
+      ["样本轮次", valueAfterLabel("样本轮次", text)],
+      ["验证变量", valueAfterLabel("验证变量", text)],
+      ["平台反馈", valueAfterLabel("平台反馈", text)],
+      ["结论", valueAfterLabel("结论", text)],
+    ]
+      .filter(([, value]) => value)
+      .map(([label, value]) => `${label}：${value}`)
+      .join("；");
+    if (summary) return summary.slice(0, 240);
+  }
   const explicit = text.match(/(?:编辑反馈|反馈|编辑意见|平台反馈)\s*[：:=]\s*([^\n。；;]+)/u)?.[1]?.trim();
   if (explicit) return explicit.slice(0, 240);
   return text.replace(/\s+/g, " ").trim().slice(0, 240);

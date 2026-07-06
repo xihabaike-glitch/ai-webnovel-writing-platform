@@ -330,4 +330,81 @@ test("buildMultiPlatformSubmission", async (t) => {
     assert.ok(retestTemplate.includes("验证变量：标题、简介、标签、前三章兑现"));
     assert.ok(retestTemplate.includes("曝光"));
   });
+
+  await t.test("routes second-round retest conclusions into platform decisions", () => {
+    const result = buildMultiPlatformSubmission({
+      projectId: "project-1",
+      title: "夜雨系统",
+      genre: "都市系统",
+      sellingPoint: "雨夜危机中觉醒系统，主角用一次次选择翻盘。",
+      currentWordCount: 9000,
+      targetWordCount: 300000,
+      targetPlatformId: "fanqie",
+      chapters,
+      aiTasks: [],
+      platformPublishMetrics: [
+        {
+          platformId: "fanqie",
+          platformName: "番茄小说",
+          views: 3000,
+          clicks: 240,
+          favorites: 75,
+          follows: 30,
+          comments: 4,
+          paidReads: 0,
+          editorFeedback: "样本轮次：第二轮小样本；验证变量：标题、简介、标签、前三章兑现；结论：继续观察。",
+          contractStatus: "unknown",
+          publishUrl: "",
+          notes: "由派单完成依据自动回写；派单编号：submission-decision:project-1:fanqie:watch",
+          snapshotDate: "2026-01-08T08:00:00.000Z",
+        },
+        {
+          platformId: "qimao",
+          platformName: "七猫",
+          views: 3000,
+          clicks: 240,
+          favorites: 75,
+          follows: 30,
+          comments: 2,
+          paidReads: 0,
+          editorFeedback: "样本轮次：第二轮小样本；验证变量：标题、简介、标签、前三章兑现；结论：回到修包装。",
+          contractStatus: "unknown",
+          publishUrl: "",
+          notes: "由派单完成依据自动回写；派单编号：submission-decision:project-1:qimao:watch",
+          snapshotDate: "2026-01-08T08:00:00.000Z",
+        },
+        {
+          platformId: "wattpad",
+          platformName: "Wattpad",
+          views: 3000,
+          clicks: 240,
+          favorites: 75,
+          follows: 30,
+          comments: 1,
+          paidReads: 0,
+          editorFeedback: "样本轮次：第二轮小样本；验证变量：标题、简介、标签、前三章兑现；结论：暂停。",
+          contractStatus: "unknown",
+          publishUrl: "",
+          notes: "由派单完成依据自动回写；派单编号：submission-decision:project-1:wattpad:watch",
+          snapshotDate: "2026-01-08T08:00:00.000Z",
+        },
+      ],
+    });
+
+    const fanqie = result.variants.find((variant) => variant.platformId === "fanqie");
+    const qimao = result.variants.find((variant) => variant.platformId === "qimao");
+    const wattpad = result.variants.find((variant) => variant.platformId === "wattpad");
+    assert.ok(fanqie);
+    assert.ok(qimao);
+    assert.ok(wattpad);
+    assert.equal(fanqie.effectTracking.status, "watch");
+    assert.equal(fanqie.decision.kind, "watch");
+    assert.ok(fanqie.effectTracking.nextAction.includes("复检通过"));
+    assert.equal(qimao.effectTracking.status, "weak");
+    assert.equal(qimao.decision.kind, "repair");
+    assert.ok(qimao.effectTracking.repairFocus.some((focus) => focus.includes("二轮小样本")));
+    assert.equal(wattpad.effectTracking.status, "paused");
+    assert.equal(wattpad.decision.kind, "pause");
+    assert.ok(wattpad.decision.nextAction.includes("暂停"));
+  });
 });

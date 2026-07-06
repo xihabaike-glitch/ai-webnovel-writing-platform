@@ -78,6 +78,38 @@ test("submission decision completion effect", async (t) => {
     assert.ok(effect.notes.includes("submission-decision:project-1:qimao:repair"));
   });
 
+  await t.test("preserves second-round retest conclusion for platform decisions", () => {
+    const effect = buildSubmissionDecisionCompletionEffect({
+      projectId: "project-1",
+      platformId: "wattpad",
+      platformName: "Wattpad",
+      dispatchKey: "submission-decision:project-1:wattpad:watch",
+      stage: "record_metrics",
+      completedAt: "2026-01-09T10:00:00.000Z",
+      completionEvidence: [
+        "Wattpad 修复包二轮小样本复检",
+        "样本轮次：第二轮小样本",
+        "验证变量：标题、简介、标签、前三章兑现",
+        "放量限制：不提前放大，不同时改多个变量",
+        "日期：2026-01-09",
+        "曝光：3000",
+        "点击：240",
+        "收藏：75",
+        "追读：30",
+        "评论：1",
+        "付费阅读：0",
+        "平台反馈：暂无编辑反馈",
+        "发布链接：https://wattpad.example/story/1",
+        "结论：暂停",
+      ].join("\n"),
+    });
+
+    assert.ok(effect);
+    assert.ok(effect.editorFeedback.includes("样本轮次：第二轮小样本"));
+    assert.ok(effect.editorFeedback.includes("验证变量：标题、简介、标签、前三章兑现"));
+    assert.ok(effect.editorFeedback.includes("结论：暂停"));
+  });
+
   await t.test("ignores ordinary completion text without effect signals", () => {
     const effect = buildSubmissionDecisionCompletionEffect({
       projectId: "project-1",

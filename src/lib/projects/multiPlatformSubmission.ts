@@ -89,7 +89,7 @@ export interface MultiPlatformPackageMatrix {
 }
 
 export interface MultiPlatformEffectTracking {
-  status: "needs_data" | "weak" | "watch" | "promising" | "signed";
+  status: "needs_data" | "weak" | "watch" | "promising" | "signed" | "paused";
   label: string;
   records: number;
   latestSnapshotDate: string | null;
@@ -368,6 +368,16 @@ function hasCompletedRepairPackageTracking(effectTracking: MultiPlatformEffectTr
   return effectTracking.evidence.some((item) => item.includes("修复包已完成"));
 }
 
+function secondRoundRetestConclusion(metric: MultiPlatformPublishMetricInput): "watch" | "repair" | "pause" | null {
+  const text = `${metric.editorFeedback} ${metric.notes}`;
+  const isRetest = /样本轮次\s*[：:=]?\s*第二轮小样本|第二轮小样本|二轮小样本|验证变量\s*[：:=]?.*前三章/u.test(text);
+  if (!isRetest) return null;
+  if (/结论\s*[：:=]?\s*(?:暂停|停止|放弃)|暂停该平台|不再继续/u.test(text)) return "pause";
+  if (/结论\s*[：:=]?\s*(?:回到修包装|修包装|返修|重修)|回到修包装/u.test(text)) return "repair";
+  if (/结论\s*[：:=]?\s*(?:继续观察|通过|可继续)|复检通过/u.test(text)) return "watch";
+  return null;
+}
+
 function buildEffectTracking(platform: PlatformProfile, metrics: MultiPlatformPublishMetricInput[]): MultiPlatformEffectTracking {
   const history = metrics
     .filter((metric) => metric.platformId === platform.id)
@@ -405,6 +415,7 @@ function buildEffectTracking(platform: PlatformProfile, metrics: MultiPlatformPu
     latest.editorFeedback ? `编辑反馈：${latest.editorFeedback}` : "",
   ].filter(Boolean);
   const completedRepairPackage = hasCompletedRepairPackageEvidence(latest);
+  const retestConclusion = secondRoundRetestConclusion(latest);
   const trackingEvidence = completedRepairPackage
     ? [...evidence, "修复包已完成：等待第二轮小样本重验标题、简介、标签和前三章兑现。"]
     : evidence;
@@ -433,6 +444,70 @@ function buildEffectTracking(platform: PlatformProfile, metrics: MultiPlatformPu
       nextAction: "保留当前投稿入口承诺，围绕有效卖点稳定更新，不要乱换题眼。",
       repairFocus: [],
       evidence: trackingEvidence,
+    };
+  }
+
+  if (retestConclusion === "pause") {
+    return {
+      status: "paused",
+      label: "暂停",
+      records: history.length,
+      latestSnapshotDate: new Date(latest.snapshotDate).toISOString(),
+      views: latest.views,
+      clicks: latest.clicks,
+      favorites: latest.favorites,
+      follows: latest.follows,
+      comments: latest.comments,
+      paidReads: latest.paidReads,
+      clickRatePercent,
+      favoriteRatePercent,
+      followRatePercent,
+      nextAction: "二轮小样本复检结论要求暂停该平台，不再继续消耗投稿包和更新节奏。",
+      repairFocus: [],
+      evidence: [...trackingEvidence, "二轮复检结论：暂停"],
+    };
+  }
+
+  if (retestConclusion === "repair") {
+    const retestRepairFocus = "二轮小样本未通过：回到标题、简介、标签和前三章兑现修包装。";
+    return {
+      status: "weak",
+      label: "偏弱",
+      records: history.length,
+      latestSnapshotDate: new Date(latest.snapshotDate).toISOString(),
+      views: latest.views,
+      clicks: latest.clicks,
+      favorites: latest.favorites,
+      follows: latest.follows,
+      comments: latest.comments,
+      paidReads: latest.paidReads,
+      clickRatePercent,
+      favoriteRatePercent,
+      followRatePercent,
+      nextAction: "二轮小样本未过线，回到修包装；先改入口承诺，再做下一轮对照。",
+      repairFocus: [...new Set([retestRepairFocus, ...repairFocus])],
+      evidence: [...trackingEvidence, "二轮复检结论：回到修包装"],
+    };
+  }
+
+  if (retestConclusion === "watch") {
+    return {
+      status: "watch",
+      label: "观察中",
+      records: history.length,
+      latestSnapshotDate: new Date(latest.snapshotDate).toISOString(),
+      views: latest.views,
+      clicks: latest.clicks,
+      favorites: latest.favorites,
+      follows: latest.follows,
+      comments: latest.comments,
+      paidReads: latest.paidReads,
+      clickRatePercent,
+      favoriteRatePercent,
+      followRatePercent,
+      nextAction: "二轮小样本复检通过，继续观察一轮；先不放大，也不再改多个变量。",
+      repairFocus: [],
+      evidence: [...trackingEvidence, "二轮复检结论：继续观察"],
     };
   }
 
@@ -534,6 +609,19 @@ function buildDecision(
       nextAction: "先修标题、简介、标签和前三章钩子，再投第二轮小样本。",
       actionHref: "#platform-export",
       evidence: [...effectTracking.evidence, ...effectTracking.repairFocus],
+    };
+  }
+
+  if (effectTracking.status === "paused") {
+    return {
+      kind: "pause",
+      label: decisionLabel("pause"),
+      priority: "low",
+      score: clampScore(fitScore - 30),
+      reason: `${platform.name} 二轮小样本复检已给出暂停结论，继续投入会消耗注意力。`,
+      nextAction: "暂停该平台，不再投第三轮；等主平台或相邻平台跑出稳定数据后再复盘。",
+      actionHref: "#publish-effect-panel",
+      evidence: effectTracking.evidence,
     };
   }
 

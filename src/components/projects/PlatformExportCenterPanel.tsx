@@ -448,8 +448,11 @@ interface PlatformEffectCaptureSummary {
   missingFieldPlatformCount: number;
   missingFieldCount: number;
   platformNamesNeedingInput: string[];
+  primaryPlatformId: string | null;
   primaryPlatformName: string | null;
   primaryMissingFields: string[];
+  actionLabel: string;
+  actionHref: string;
   headline: string;
   nextAction: string;
 }
@@ -1761,6 +1764,18 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
     return payload.switchPlan;
   }
 
+  function openEffectCaptureSummaryAction() {
+    if (!center) return;
+    const summary = center.effectCaptureSummary;
+    if (summary.primaryPlatformId) {
+      setSelectedPlatformId(summary.primaryPlatformId);
+      setSelectedVersionId(null);
+    }
+    if (typeof window !== "undefined") {
+      window.location.hash = summary.actionHref;
+    }
+  }
+
   async function savePublishEffect() {
     if (!selectedPackage) return;
     const platformId = selectedPackage.platformId;
@@ -2654,9 +2669,18 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
                 <div className="font-medium text-slate-950">全平台效果回填总览</div>
                 <p className="mt-1 text-sm leading-6 text-slate-600">{center.effectCaptureSummary.headline}</p>
               </div>
-              <span className={`w-fit rounded-md px-2 py-1 text-xs font-medium ${effectCaptureStatusClass(center.effectCaptureSummary.status)}`}>
-                {effectCaptureStatusLabel(center.effectCaptureSummary.status)}
-              </span>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className={`w-fit rounded-md px-2 py-1 text-xs font-medium ${effectCaptureStatusClass(center.effectCaptureSummary.status)}`}>
+                  {effectCaptureStatusLabel(center.effectCaptureSummary.status)}
+                </span>
+                <button
+                  className="w-fit rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white"
+                  onClick={openEffectCaptureSummaryAction}
+                  type="button"
+                >
+                  {center.effectCaptureSummary.actionLabel}
+                </button>
+              </div>
             </div>
             <div className="mt-3 grid gap-2 text-xs text-slate-500 sm:grid-cols-4">
               <div>可复盘 <span className="font-medium text-slate-950">{center.effectCaptureSummary.readyToReviewCount}</span></div>

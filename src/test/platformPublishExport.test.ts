@@ -170,6 +170,9 @@ test("buildPlatformPublishExportCenter", async (t) => {
     assert.equal(center.effectCaptureSummary.readyToReviewCount, 0);
     assert.equal(center.effectCaptureSummary.needsRecordCount, platformProfiles.length);
     assert.equal(center.effectCaptureSummary.platformNamesNeedingInput.length, platformProfiles.length);
+    assert.equal(center.effectCaptureSummary.primaryPlatformId, center.packages[0].platformId);
+    assert.equal(center.effectCaptureSummary.actionHref, "#publish-effect-panel");
+    assert.ok(center.effectCaptureSummary.actionLabel.includes(center.packages[0].platformName));
     assert.ok(center.effectCaptureSummary.headline.includes("真实效果"));
     assert.ok(center.effectCaptureSummary.nextAction.includes("先回填"));
     assert.equal(center.packages[0].dispatchEffectValidation.status, "needs_effect");
@@ -300,6 +303,8 @@ test("buildPlatformPublishExportCenter", async (t) => {
     assert.ok(center.executionHandoffSummary.headline.includes("可以进入复盘"));
     assert.equal(center.effectCaptureSummary.status, "needs_record");
     assert.equal(center.effectCaptureSummary.needsRecordCount, 1);
+    assert.equal(center.effectCaptureSummary.primaryPlatformId, "fanqie");
+    assert.equal(center.effectCaptureSummary.actionHref, "#publish-effect-panel");
   });
 
   await t.test("blocks export when candidate adoption makes old reviews stale", () => {
@@ -557,6 +562,8 @@ test("buildPlatformPublishExportCenter", async (t) => {
     assert.equal(center.effectCaptureSummary.readyToReviewCount, 1);
     assert.equal(center.effectCaptureSummary.needsRecordCount, 0);
     assert.equal(center.effectCaptureSummary.missingFieldPlatformCount, 0);
+    assert.equal(center.effectCaptureSummary.actionHref, "#platform-strategy-ranking");
+    assert.ok(center.effectCaptureSummary.actionLabel.includes("平台排序"));
     assert.ok(center.effectCaptureSummary.nextAction.includes("进入平台排序"));
     assert.equal(pack.publishEffect.comparison.status, "none");
     assert.equal(pack.dispatchEffectValidation.status, "reusable_success");

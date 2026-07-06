@@ -809,8 +809,11 @@ export interface PlatformEffectCaptureSummary {
   missingFieldPlatformCount: number;
   missingFieldCount: number;
   platformNamesNeedingInput: string[];
+  primaryPlatformId: PlatformId | null;
   primaryPlatformName: string | null;
   primaryMissingFields: string[];
+  actionLabel: string;
+  actionHref: string;
   headline: string;
   nextAction: string;
 }
@@ -4262,8 +4265,11 @@ function buildPlatformEffectCaptureSummary(packages: PlatformPublishPackage[]): 
       missingFieldPlatformCount: 0,
       missingFieldCount: 0,
       platformNamesNeedingInput: [],
+      primaryPlatformId: null,
       primaryPlatformName: null,
       primaryMissingFields: [],
+      actionLabel: "生成平台发布包",
+      actionHref: "#platform-export",
       headline: "还没有平台可复盘。",
       nextAction: "先生成平台发布包，再回填真实效果。",
     };
@@ -4277,8 +4283,11 @@ function buildPlatformEffectCaptureSummary(packages: PlatformPublishPackage[]): 
       missingFieldPlatformCount: 0,
       missingFieldCount: 0,
       platformNamesNeedingInput: [],
+      primaryPlatformId: readyToReview[0]?.platformId ?? null,
       primaryPlatformName: readyToReview[0]?.platformName ?? null,
       primaryMissingFields: [],
+      actionLabel: "进入平台排序",
+      actionHref: "#platform-strategy-ranking",
       headline: `${readyToReview.length}/${packages.length} 平台效果可以复盘。`,
       nextAction: "进入平台排序、A/B 归因和下一轮动作，让真实数据决定主战场。",
     };
@@ -4292,8 +4301,11 @@ function buildPlatformEffectCaptureSummary(packages: PlatformPublishPackage[]): 
       missingFieldPlatformCount: missingFields.length,
       missingFieldCount,
       platformNamesNeedingInput,
+      primaryPlatformId: primaryPack?.platformId ?? null,
       primaryPlatformName: primaryPack?.platformName ?? null,
       primaryMissingFields,
+      actionLabel: primaryPack ? `回填${primaryPack.platformName}效果` : "回填平台效果",
+      actionHref: "#publish-effect-panel",
       headline: `${needsRecord.length} 个平台缺真实效果，${readyToReview.length}/${packages.length} 平台可复盘。`,
       nextAction: primaryPack
         ? `先回填 ${primaryPack.platformName} 的${primaryMissingFields.join("、") || "曝光、点击、收藏、追读"}。`
@@ -4308,8 +4320,11 @@ function buildPlatformEffectCaptureSummary(packages: PlatformPublishPackage[]): 
     missingFieldPlatformCount: missingFields.length,
     missingFieldCount,
     platformNamesNeedingInput,
+    primaryPlatformId: primaryPack?.platformId ?? null,
     primaryPlatformName: primaryPack?.platformName ?? null,
     primaryMissingFields,
+    actionLabel: primaryPack ? `补齐${primaryPack.platformName}数据` : "补齐缺失数据",
+    actionHref: "#publish-effect-panel",
     headline: `${missingFields.length} 个平台还有 ${missingFieldCount} 项关键数据缺失。`,
     nextAction: primaryPack
       ? `补齐 ${primaryPack.platformName} 的${primaryMissingFields.join("、")} 后再做全平台复盘。`

@@ -423,6 +423,12 @@ export interface GateDispatchTaskCenter {
 
 export type GateDispatchTaskCenterAiPipelineGroupId = "rollback_repair" | "sample_recheck" | "small_batch_resume";
 
+export interface GateDispatchTaskCenterAiPipelineExecutionGuide {
+  primaryActionLabel: string;
+  primaryHref: string;
+  hint: string;
+}
+
 export interface GateDispatchTaskCenterAiPipelineGroup {
   id: GateDispatchTaskCenterAiPipelineGroupId;
   label: string;
@@ -432,6 +438,7 @@ export interface GateDispatchTaskCenterAiPipelineGroup {
   active: number;
   topPriorityScore: number;
   topTask: PersistedGatePlatformDispatchTask | null;
+  executionGuide: GateDispatchTaskCenterAiPipelineExecutionGuide;
   tasks: PersistedGatePlatformDispatchTask[];
 }
 
@@ -3653,6 +3660,32 @@ function aiPipelineGroupMeta(id: GateDispatchTaskCenterAiPipelineGroupId) {
   };
 }
 
+function buildAiPipelineExecutionGuide(
+  id: GateDispatchTaskCenterAiPipelineGroupId,
+  topTask: PersistedGatePlatformDispatchTask | null,
+): GateDispatchTaskCenterAiPipelineExecutionGuide {
+  const primaryHref = topTask?.href ?? "/dispatch?queue=ai_pipeline";
+  if (id === "rollback_repair") {
+    return {
+      primaryActionLabel: "运行 1 章复验",
+      primaryHref,
+      hint: "先在目标章节运行初稿、审稿或二改复验，把跌线原因修清楚后再考虑恢复小批。",
+    };
+  }
+  if (id === "small_batch_resume") {
+    return {
+      primaryActionLabel: "恢复小批执行",
+      primaryHref,
+      hint: "回到推荐批量队列，但只按小批执行，继续记录成功率、质量、失败原因和成本。",
+    };
+  }
+  return {
+    primaryActionLabel: "运行 1 章复验",
+    primaryHref,
+    hint: "只跑 1 章样本，补齐质量、失败原因和成本证据；证据不闭合前不放量。",
+  };
+}
+
 function buildAiPipelineDispatchGroups(
   aiPipelineDispatches: PersistedGatePlatformDispatchTask[],
 ): GateDispatchTaskCenterAiPipelineGroup[] {
@@ -3668,13 +3701,15 @@ function buildAiPipelineDispatchGroups(
     if (tasks.length === 0) return [];
     const meta = aiPipelineGroupMeta(id);
     const activeTasks = tasks.filter((task) => task.state !== "completed");
+    const topTask = tasks[0] ?? null;
     return [{
       id,
       ...meta,
       total: tasks.length,
       active: activeTasks.length,
       topPriorityScore: tasks.reduce((score, task) => Math.max(score, task.priorityScore), 0),
-      topTask: tasks[0] ?? null,
+      topTask,
+      executionGuide: buildAiPipelineExecutionGuide(id, topTask),
       tasks,
     }];
   });

@@ -3938,10 +3938,17 @@ test("buildGateActionReceipt", async (t) => {
     assert.equal(center.aiPipelineGroups[0].label, "回滚修复");
     assert.equal(center.aiPipelineGroups[0].headline, "恢复小批跌线先修");
     assert.equal(center.aiPipelineGroups[0].topTask?.dispatchKey, rollback.dispatchKey);
+    assert.equal(center.aiPipelineGroups[0].executionGuide.primaryActionLabel, "运行 1 章复验");
+    assert.equal(center.aiPipelineGroups[0].executionGuide.primaryHref, rollback.href);
+    assert.ok(center.aiPipelineGroups[0].executionGuide.hint.includes("初稿、审稿或二改"));
     assert.equal(center.aiPipelineGroups[1].label, "小样本复验");
     assert.equal(center.aiPipelineGroups[1].topTask?.dispatchKey, sample.dispatchKey);
+    assert.equal(center.aiPipelineGroups[1].executionGuide.primaryActionLabel, "运行 1 章复验");
+    assert.ok(center.aiPipelineGroups[1].executionGuide.hint.includes("只跑 1 章"));
     assert.equal(center.aiPipelineGroups[2].label, "恢复小批");
     assert.equal(center.aiPipelineGroups[2].topTask?.dispatchKey, resume.dispatchKey);
+    assert.equal(center.aiPipelineGroups[2].executionGuide.primaryActionLabel, "恢复小批执行");
+    assert.ok(center.aiPipelineGroups[2].executionGuide.hint.includes("推荐批量队列"));
   });
 
   await t.test("builds a gate AI pipeline recovery panel from active dispatch lanes", () => {

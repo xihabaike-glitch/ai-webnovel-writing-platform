@@ -1071,6 +1071,9 @@ export function GateDispatchTaskCenter({
                 <p className="mt-1 line-clamp-2 leading-6 text-sky-800">{group.detail}</p>
                 {group.topTask ? (
                   <>
+                    <div className="mt-3 rounded-md border border-sky-100 bg-white px-2 py-2 text-xs leading-5 text-sky-800">
+                      {group.executionGuide.hint}
+                    </div>
                     <div className="mt-3 rounded-md border border-sky-100 bg-sky-50 px-2 py-2">
                       <div className="flex flex-wrap items-center gap-2">
                         <span className={`rounded-md px-2 py-1 text-xs font-medium ${stateClass(group.topTask.state)}`}>{stateLabel(group.topTask.state)}</span>
@@ -1085,7 +1088,7 @@ export function GateDispatchTaskCenter({
                     <div className="mt-3 flex flex-wrap gap-2">
                       <Link
                         className="rounded-md bg-white px-3 py-2 text-xs font-medium text-sky-900 hover:bg-sky-100"
-                        href={`#dispatch-${group.topTask.dispatchKey}`}
+                        href={group.executionGuide.primaryHref}
                       >
                         查看派单
                       </Link>
@@ -1096,7 +1099,7 @@ export function GateDispatchTaskCenter({
                           onClick={() => void runAiPipelineRecheckTask(group.topTask!)}
                           type="button"
                         >
-                          {runningAiPipelineKey === group.topTask.dispatchKey ? "运行中" : group.topTask.stage === "ai_pipeline_small_batch" ? "恢复小批执行" : "运行 1 章复验"}
+                          {runningAiPipelineKey === group.topTask.dispatchKey ? "运行中" : group.executionGuide.primaryActionLabel}
                         </button>
                       ) : null}
                     </div>

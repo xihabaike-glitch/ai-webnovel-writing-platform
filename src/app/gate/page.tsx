@@ -70,7 +70,7 @@ export default async function GatePage({
 }) {
   const params = await searchParams;
   const focus = Array.isArray(params?.focus) ? params?.focus[0] : params?.focus ?? null;
-  const [projects, recentAiTasks, chapters, aiRecoveryDispatchRecords] = await Promise.all([
+  const [projects, recentAiTasks, chapters, aiRecoveryDispatchRecords, aiPromptMemoryAuditRecords] = await Promise.all([
     prisma.project.findMany({
       include: {
         chapters: { orderBy: { order: "asc" } },
@@ -142,6 +142,18 @@ export default async function GatePage({
       orderBy: [{ state: "asc" }, { priorityScore: "desc" }, { updatedAt: "desc" }],
       take: 80,
     }),
+    prisma.gateActionAudit.findMany({
+      where: {
+        OR: [
+          { platformId: "ai-pipeline" },
+          { payload: { contains: "aiPipelineControlPlan" } },
+          { payload: { contains: "aiPipelinePromptMemoryControl" } },
+          { payload: { contains: "aiPipelineRecheck" } },
+        ],
+      },
+      orderBy: { createdAt: "desc" },
+      take: 40,
+    }),
   ]);
   const chaptersById = new Map(chapters.map((chapter) => [chapter.id, chapter]));
   const recentTasksWithChapter = recentAiTasks.map((task) => ({
@@ -188,7 +200,30 @@ export default async function GatePage({
     batchHistory: buildTaskBatchHistory(recentTasksWithChapter),
   });
   const focusNotice = buildPrePublishGateFocusNotice({ focus, gate });
-  const aiRecoveryPanel = buildGateAiPipelineRecoveryPanel(aiRecoveryDispatchRecords.map(gatePlatformDispatchTaskFromRecord));
+  const aiRecoveryPanel = buildGateAiPipelineRecoveryPanel(
+    aiRecoveryDispatchRecords.map(gatePlatformDispatchTaskFromRecord),
+    aiPromptMemoryAuditRecords.map((audit) => ({
+      receiptId: audit.receiptId,
+      actionId: audit.actionId,
+      label: audit.label,
+      detail: audit.detail,
+      href: audit.href,
+      status: audit.status,
+      message: audit.message,
+      executionType: audit.executionType,
+      succeededCount: audit.succeededCount,
+      failedCount: audit.failedCount,
+      taskId: audit.taskId,
+      platformId: audit.platformId,
+      platformName: audit.platformName,
+      recheckStatus: audit.recheckStatus,
+      recheckLabel: audit.recheckLabel,
+      recheckDetail: audit.recheckDetail,
+      recheckAction: audit.recheckAction,
+      payload: audit.payload,
+      createdAt: audit.createdAt,
+    })),
+  );
 
   return (
     <AppShell>
@@ -345,6 +380,46 @@ export default async function GatePage({
                 ))}
               </div>
             </Link>
+          ) : null}
+          {aiRecoveryPanel.promptMemory.visible ? (
+            <div className="mt-3 rounded-md border border-white/70 bg-white/80 p-3 text-sm">
+              <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
+                <div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-medium">提示词反馈历史</span>
+                    <span className="rounded-md bg-slate-50 px-2 py-1 text-xs font-medium text-slate-700">
+                      {aiRecoveryPanel.promptMemory.statusLabel}
+                    </span>
+                    <span className="rounded-md bg-slate-50 px-2 py-1 text-xs text-slate-700">
+                      {shortDateTime(aiRecoveryPanel.promptMemory.latestAt)}
+                    </span>
+                  </div>
+                  <div className="mt-2 text-xs font-medium">{aiRecoveryPanel.promptMemory.headline}</div>
+                  <p className="mt-1 text-xs leading-5 opacity-75">{aiRecoveryPanel.promptMemory.detail}</p>
+                </div>
+                {aiRecoveryPanel.promptMemory.actionHref && aiRecoveryPanel.promptMemory.actionLabel ? (
+                  <Link className="w-fit shrink-0 rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white" href={aiRecoveryPanel.promptMemory.actionHref}>
+                    {aiRecoveryPanel.promptMemory.actionLabel}
+                  </Link>
+                ) : aiRecoveryPanel.promptMemory.actionLabel ? (
+                  <span className="w-fit shrink-0 rounded-md bg-slate-100 px-3 py-2 text-xs font-medium text-slate-700">
+                    {aiRecoveryPanel.promptMemory.actionLabel}
+                  </span>
+                ) : null}
+              </div>
+              <div className="mt-3 grid gap-2 lg:grid-cols-3">
+                {aiRecoveryPanel.promptMemory.history.slice(0, 3).map((item) => (
+                  <div className="rounded-md bg-white px-2 py-2 text-xs leading-5" key={`${item.latestAt}-${item.sourceLabel}`}>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="rounded-md bg-slate-50 px-2 py-1 font-medium text-slate-700">{item.statusLabel}</span>
+                      <span className="text-slate-600">{item.transitionLabel}</span>
+                    </div>
+                    <div className="mt-2 font-medium">{item.sourceLabel}</div>
+                    <p className="mt-1 line-clamp-2 opacity-75">{item.detail}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
           ) : null}
           <div className="mt-3 grid gap-2 lg:grid-cols-3">
             {aiRecoveryPanel.groups.map((group) => (

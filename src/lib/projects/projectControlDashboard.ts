@@ -1567,7 +1567,7 @@ function buildAiPipelinePromptMemoryCandidate(audit: ControlBatchAudit): AiPipel
   };
 }
 
-function buildAiPipelinePromptMemorySummary(audits: ControlBatchAudit[] = []): AiPipelinePromptMemorySummary {
+export function buildAiPipelinePromptMemorySummary(audits: ControlBatchAudit[] = []): AiPipelinePromptMemorySummary {
   const candidates = audits
     .map(buildAiPipelinePromptMemoryCandidate)
     .filter((item): item is AiPipelinePromptMemoryCandidate => Boolean(item))

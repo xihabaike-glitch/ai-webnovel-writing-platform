@@ -4043,6 +4043,79 @@ test("buildGateActionReceipt", async (t) => {
     ]);
   });
 
+  await t.test("feeds AI prompt memory history into the gate recovery panel", () => {
+    const audits = [{
+      receiptId: "ai-plan-watch",
+      actionId: "recommended-batch",
+      label: "批量打法小样本复验",
+      detail: "质量证据不足，先继续观察。",
+      href: "/projects/project-1#ai-pipeline",
+      status: "succeeded",
+      message: "小样本仍需观察。",
+      executionType: "recommended_batch",
+      succeededCount: 1,
+      failedCount: 0,
+      taskId: null,
+      platformId: "ai-pipeline",
+      platformName: "AI 写审改",
+      recheckStatus: "sample_required",
+      recheckLabel: "继续小样本复验",
+      recheckDetail: "质量证据不足，先继续观察。",
+      recheckAction: "运行 1 章复验",
+      payload: JSON.stringify({
+        aiPipelineControlPlan: {
+          recheck: {
+            status: "sample_required",
+            healthLabel: "继续小样本复验",
+            detail: "质量证据不足，先继续观察。",
+          },
+        },
+      }),
+      createdAt: "2026-01-02T00:00:00.000Z",
+    }, {
+      receiptId: "ai-plan-ready",
+      actionId: "recommended-batch",
+      label: "批量打法修复清单",
+      detail: "小样本通过，可以谨慎恢复小批。",
+      href: "/projects/project-1#ai-pipeline",
+      status: "succeeded",
+      message: "恢复证据已写入提示词。",
+      executionType: "recommended_batch",
+      succeededCount: 1,
+      failedCount: 0,
+      taskId: null,
+      platformId: "ai-pipeline",
+      platformName: "AI 写审改",
+      recheckStatus: "small_batch_ready",
+      recheckLabel: "可小批恢复",
+      recheckDetail: "小样本通过，可以谨慎恢复小批。",
+      recheckAction: "恢复小批执行",
+      payload: JSON.stringify({
+        aiPipelineControlPlan: {
+          recheck: {
+            status: "small_batch_ready",
+            healthLabel: "可小批恢复",
+            detail: "小样本通过，可以谨慎恢复小批。",
+          },
+        },
+      }),
+      createdAt: "2026-01-03T00:00:00.000Z",
+    }];
+
+    const panel = buildGateAiPipelineRecoveryPanel([], audits);
+
+    assert.equal(panel.visible, true);
+    assert.equal(panel.promptMemory.hasMemory, true);
+    assert.equal(panel.promptMemory.statusLabel, "小批观察");
+    assert.equal(panel.promptMemory.actionLabel, "去小批执行");
+    assert.deepEqual(panel.promptMemory.history.map((item) => `${item.statusLabel}:${item.transitionLabel}`), [
+      "可恢复:继续观察 -> 可恢复",
+      "继续观察:初始：继续观察",
+    ]);
+    assert.equal(panel.promptMemory.history[0].sourceLabel, "批量打法修复清单");
+    assert.equal(panel.promptMemory.history[0].primaryActionLabel, "继续小批，不放大批");
+  });
+
   await t.test("suggests pausing platform direction for repeated submission follow-up chains", () => {
     const baseDispatch = buildGatePlatformGrowthDispatchItems([buildGatePlatformStrategyReceipt({
       item: strategyPlatform,

@@ -7,6 +7,7 @@ import type {
 } from "./prePublishGate.ts";
 import type { FailureRepairBatch } from "../ai/taskRunConsole.ts";
 import { platformProfiles } from "../platforms/platformProfiles.ts";
+import { buildAiPipelinePromptMemorySummary, type AiPipelinePromptMemorySummary, type ControlBatchAudit } from "./projectControlDashboard.ts";
 
 export const gateActionReceiptStorageKey = "ai-webnovel-gate-action-receipts";
 export const gateActionReceiptUpdatedEvent = "ai-webnovel-gate-action-receipts-updated";
@@ -473,6 +474,17 @@ export interface GateAiPipelineRecoveryPanel {
     completedAt: string | null;
     href: string;
   } | null;
+  promptMemory: {
+    visible: boolean;
+    hasMemory: boolean;
+    statusLabel: string;
+    headline: string;
+    detail: string;
+    actionLabel: string | null;
+    actionHref: string | null;
+    latestAt: string | null;
+    history: AiPipelinePromptMemorySummary["history"];
+  };
   groups: Array<{
     id: GateDispatchTaskCenterAiPipelineGroupId;
     label: string;
@@ -3716,11 +3728,15 @@ function buildAiPipelineDispatchGroups(
   });
 }
 
-export function buildGateAiPipelineRecoveryPanel(_tasks: PersistedGatePlatformDispatchTask[]): GateAiPipelineRecoveryPanel {
+export function buildGateAiPipelineRecoveryPanel(
+  _tasks: PersistedGatePlatformDispatchTask[],
+  audits: ControlBatchAudit[] = [],
+): GateAiPipelineRecoveryPanel {
   const center = buildGateDispatchTaskCenter(_tasks);
   const groups = center.aiPipelineGroups;
   const total = center.summary.aiPipeline;
   const active = center.summary.activeAiPipeline;
+  const promptMemory = buildAiPipelinePromptMemorySummary(audits);
   const completed = total - active;
   const rollbackGroup = groups.find((group) => group.id === "rollback_repair") ?? null;
   const sampleGroup = groups.find((group) => group.id === "sample_recheck") ?? null;
@@ -3728,14 +3744,22 @@ export function buildGateAiPipelineRecoveryPanel(_tasks: PersistedGatePlatformDi
   const activePrimaryGroup = [rollbackGroup, sampleGroup, smallBatchGroup].find((group) => (group?.active ?? 0) > 0) ?? null;
   const fallbackPrimaryGroup = activePrimaryGroup ?? groups[0] ?? null;
   const status: GateAiPipelineRecoveryPanel["status"] = total === 0
-    ? "empty"
+    ? promptMemory.gateTone === "blocked"
+      ? "blocked"
+      : promptMemory.gateTone === "watch"
+        ? "watch"
+        : promptMemory.gateTone === "ready"
+          ? "ready"
+          : "empty"
     : (rollbackGroup?.active ?? 0) > 0
       ? "blocked"
       : active > 0
         ? "watch"
         : "ready";
   const label = status === "empty"
-    ? "暂无恢复派单"
+    ? promptMemory.hasMemory
+      ? promptMemory.gateStatusLabel
+      : "暂无恢复派单"
     : status === "blocked"
       ? "先回滚修复"
       : status === "watch"
@@ -3785,7 +3809,7 @@ export function buildGateAiPipelineRecoveryPanel(_tasks: PersistedGatePlatformDi
 
   return {
     anchorId: "ai-pipeline-recovery",
-    visible: total > 0,
+    visible: total > 0 || promptMemory.history.length > 0 || promptMemory.hasMemory,
     status,
     label,
     headline: "AI 写审改恢复闸门",
@@ -3805,9 +3829,9 @@ export function buildGateAiPipelineRecoveryPanel(_tasks: PersistedGatePlatformDi
       smallBatch: smallBatchGroup?.total ?? 0,
     },
     primaryAction: {
-      label: primaryLabel(fallbackPrimaryGroup),
-      href: dispatchHref(fallbackPrimaryGroup?.topTask),
-      detail: fallbackPrimaryGroup?.detail ?? "查看 AI 写审改复检派单。",
+      label: fallbackPrimaryGroup ? primaryLabel(fallbackPrimaryGroup) : promptMemory.gateActionLabel ?? "查看派单中心",
+      href: fallbackPrimaryGroup ? dispatchHref(fallbackPrimaryGroup.topTask) : promptMemory.gateActionHref ?? "/dispatch?queue=ai_pipeline",
+      detail: fallbackPrimaryGroup?.detail ?? promptMemory.gateStatusDetail,
     },
     latestEvidence: latestEvidence ? {
       dispatchKey: latestEvidence.dispatchKey,
@@ -3820,6 +3844,17 @@ export function buildGateAiPipelineRecoveryPanel(_tasks: PersistedGatePlatformDi
       completedAt: latestEvidence.completedAt,
       href: latestEvidence.href,
     } : null,
+    promptMemory: {
+      visible: promptMemory.history.length > 0 || promptMemory.hasMemory,
+      hasMemory: promptMemory.hasMemory,
+      statusLabel: promptMemory.gateStatusLabel,
+      headline: promptMemory.promptFeedback.headline,
+      detail: promptMemory.promptFeedback.detail,
+      actionLabel: promptMemory.gateActionLabel,
+      actionHref: promptMemory.gateActionHref,
+      latestAt: promptMemory.latestAt,
+      history: promptMemory.history,
+    },
     groups: groups.map((group) => ({
       id: group.id,
       label: group.label,

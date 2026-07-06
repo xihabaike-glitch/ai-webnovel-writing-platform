@@ -700,7 +700,7 @@ export function SubmissionPackagePanel({
                 {multiPlatform.archive.archiveFileName}
               </p>
               <p className="mt-1 text-xs text-emerald-700">
-                {multiPlatform.archive.deliveryScope.statusLabel}；扩展平台暂停 {multiPlatform.archive.deliveryScope.pausedExpansionCount} 个
+                {multiPlatform.archive.deliveryScope.statusLabel}；扩展平台不纳入本期
               </p>
             </div>
             <div className="flex flex-wrap gap-2">

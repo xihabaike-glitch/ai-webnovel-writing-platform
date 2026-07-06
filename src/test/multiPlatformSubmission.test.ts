@@ -71,12 +71,14 @@ test("buildMultiPlatformSubmission", async (t) => {
     assert.equal(result.archive.totalPlatforms, 8);
     assert.equal(result.archive.readyCount, result.packageSummary.readyPlatforms);
     assert.equal(result.archive.deliveryScope.corePlatformCount, 8);
-    assert.equal(result.archive.deliveryScope.pausedExpansionCount, 10);
+    assert.equal(result.archive.deliveryScope.pausedExpansionCount, 0);
     assert.equal(result.archive.deliveryScope.statusLabel, "8/8 核心平台已纳入发布闭环");
+    assert.ok(result.archive.deliveryScope.scopeDecision.includes("扩展平台不再作为待补缺口"));
     assert.ok(result.archive.archiveFileName.endsWith(".md"));
     assert.ok(result.archive.markdown.includes("多平台投稿包归档"));
     assert.ok(result.archive.markdown.includes("平台范围：8/8 核心平台已纳入发布闭环"));
-    assert.ok(result.archive.markdown.includes("扩展平台：剩余 10 个暂停，不进入当前投稿包"));
+    assert.ok(result.archive.markdown.includes("扩展平台：不纳入本期投稿包，不再作为待补缺口"));
+    assert.equal(result.archive.markdown.includes("剩余 10"), false);
     assert.equal(result.archive.markdown.includes("## 待补齐平台"), false);
     assert.equal(result.effectSummary.trackedPlatforms, 0);
     assert.equal(result.effectSummary.needsDataPlatforms, 8);

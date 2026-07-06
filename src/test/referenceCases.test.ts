@@ -142,9 +142,10 @@ test("open source reference cases", async (t) => {
 
     assert.equal(view.platformScope.corePlatformCount, 8);
     assert.equal(view.platformScope.completedPlatformCount, 8);
-    assert.equal(view.platformScope.pausedExpansionCount, 10);
+    assert.equal(view.platformScope.pausedExpansionCount, 0);
     assert.equal(view.platformScope.statusLabel, "8/8 核心平台已完成");
-    assert.ok(view.platformScope.scopeDecision.includes("剩余 10 个扩展平台暂停"));
+    assert.ok(view.platformScope.scopeDecision.includes("扩展平台不再作为待补缺口"));
+    assert.equal(view.platformScope.scopeDecision.includes("剩余 10"), false);
     assert.deepEqual(view.platformScope.platformNames, [
       "番茄小说",
       "起点中文网",

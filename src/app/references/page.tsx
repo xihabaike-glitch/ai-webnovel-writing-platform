@@ -66,7 +66,7 @@ export default async function ReferencesPage({ searchParams }: ReferencesPagePro
             </div>
           </div>
           <div className="w-fit rounded-md bg-white px-3 py-2 text-sm font-medium text-emerald-900">
-            暂停扩展 {view.platformScope.pausedExpansionCount} 个
+            扩展缺口 {view.platformScope.pausedExpansionCount} 个
           </div>
         </div>
       </section>

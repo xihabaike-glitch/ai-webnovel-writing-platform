@@ -206,7 +206,7 @@ const categoryOpportunity: Record<PlatformProfile["category"], string> = {
   overseas: "适合出海版本，需要把设定解释、标签和升级承诺写得更直白。",
 };
 
-const pausedExpansionPlatformCount = 10;
+const pausedExpansionPlatformCount = 0;
 
 function buildSubmissionDeliveryScope(totalPlatforms: number) {
   return {
@@ -214,7 +214,7 @@ function buildSubmissionDeliveryScope(totalPlatforms: number) {
     completedPlatformCount: totalPlatforms,
     pausedExpansionCount: pausedExpansionPlatformCount,
     statusLabel: `${totalPlatforms}/${totalPlatforms} 核心平台已纳入发布闭环`,
-    scopeDecision: `剩余 ${pausedExpansionPlatformCount} 个扩展平台暂停，不进入当前投稿包；先把核心平台的写作、投稿和复盘跑通。`,
+    scopeDecision: "扩展平台不再作为待补缺口，不进入本期投稿包；先把核心平台的写作、投稿和复盘跑通。",
   };
 }
 
@@ -963,7 +963,7 @@ export function buildMultiPlatformSubmissionArchive(
     "",
     `生成时间：${generatedText}`,
     `平台范围：${deliveryScope.statusLabel}`,
-    `扩展平台：剩余 ${deliveryScope.pausedExpansionCount} 个暂停，不进入当前投稿包`,
+    "扩展平台：不纳入本期投稿包，不再作为待补缺口",
     `可归档平台：${readyPlatforms.length}/${platforms.length}`,
     `归档样章合计：${totalSampleChapterCount}`,
     `归档摘要字数：${totalWordCount}`,

@@ -460,9 +460,9 @@ export function buildReferenceCasePlatformScope(): ReferenceCasePlatformScope {
   return {
     corePlatformCount: platformNames.length,
     completedPlatformCount: platformNames.length,
-    pausedExpansionCount: 10,
+    pausedExpansionCount: 0,
     statusLabel: `${platformNames.length}/${platformNames.length} 核心平台已完成`,
-    scopeDecision: "剩余 10 个扩展平台暂停，不再进入当前开发范围；先把 8 个核心平台的写作、投稿、复盘闭环做扎实。",
+    scopeDecision: "扩展平台不再作为待补缺口，不进入当前开发范围；先把 8 个核心平台的写作、投稿、复盘闭环做扎实。",
     platformNames,
     platformCards: lockedCorePlatformIds.map(buildPlatformExecutionCard),
   };

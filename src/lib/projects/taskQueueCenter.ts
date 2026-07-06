@@ -1527,106 +1527,113 @@ export function buildTaskQueueCenter(projects: TaskQueueProject[]): TaskQueueCen
     }
 
     const targetPackage = exportCenter.packages.find((pack) => pack.platformId === platform.id) ?? exportCenter.packages[0];
-    const primaryEffectAction = targetPackage.effectOptimization.actions[0] ?? null;
-    const completedPrimaryEffectAction = primaryEffectAction
-      ? latestCompletedPublishEffectAction({
-        project,
-        platformId: platform.id,
-        execution: primaryEffectAction.execution,
-        effectSnapshotDate: targetPackage.publishEffect.latest?.snapshotDate ?? null,
-      })
-      : null;
-    const adoptedAssetAfterPrimaryEffectAction = completedPrimaryEffectAction && primaryEffectAction?.execution === "generate_asset_variants"
-      ? latestAdoptedAssetAfterAction({
-        project,
-        platformId: platform.id,
-        action: completedPrimaryEffectAction,
-      })
-      : null;
-    const publishBaselineAfterAdoptedAsset = adoptedAssetAfterPrimaryEffectAction
-      ? latestPublishBaselineAfter({
-        project,
-        platformId: platform.id,
-        after: adoptedAssetAfterPrimaryEffectAction.createdAt,
-      })
-      : null;
-    const primaryEffectFollowup = primaryEffectAction && completedPrimaryEffectAction
-      ? completedEffectActionFollowup({
-        execution: primaryEffectAction.execution,
-        baseActionId: primaryEffectAction.id,
-        effectVerdict: targetPackage.publishEffect.verdict,
-        assetAdopted: Boolean(adoptedAssetAfterPrimaryEffectAction),
-        newBaselineSaved: Boolean(publishBaselineAfterAdoptedAsset),
-        packageReady: targetPackage.canExport,
-      })
-      : null;
+    const effectQueuePackages = [
+      targetPackage,
+      ...exportCenter.packages.filter((pack) => pack.platformId !== targetPackage.platformId),
+    ].filter((pack) => pack.canExport && (pack.publishVersions.length > 0 || pack.publishEffect.records > 0));
 
-    if (firstDayGateCleared && targetPackage.canExport && targetPackage.publishVersions.length > 0 && targetPackage.publishEffect.records === 0) {
-      queueItems.push(item({
-        id: `${project.id}:effect:${platform.id}:collect`,
-        projectId: project.id,
-        projectTitle: project.title,
-        platformName: platform.name,
-        category: "effect",
-        chapterTitle: `${targetPackage.platformName} 发布效果`,
-        evidence: "发布包已经保存过基准，但还没有录入曝光、点击、收藏、追读、评论、付费阅读或编辑反馈。",
-        strategyBasis: startTactic,
-        riskLevel: riskProfile.level,
-        riskLabel: riskProfile.label,
-        riskNotice,
-        scaleGate,
-        actionLabel: "录入发布效果",
-        href: `${projectHref}#publish-effect-panel`,
-        effectAction: {
-          platformId: platform.id,
-          execution: "open_target",
-          actionId: "collect-effect-data",
-        },
-      }));
-    } else if (firstDayGateCleared && targetPackage.canExport && targetPackage.publishEffect.records > 0 && primaryEffectFollowup) {
-      queueItems.push(item({
-        id: `${project.id}:effect:${platform.id}:${primaryEffectFollowup.idSuffix}`,
-        projectId: project.id,
-        projectTitle: project.title,
-        platformName: platform.name,
-        category: "effect",
-        chapterTitle: primaryEffectFollowup.chapterTitle,
-        evidence: primaryEffectFollowup.evidence,
-        strategyBasis: startTactic,
-        riskLevel: riskProfile.level,
-        riskLabel: riskProfile.label,
-        riskNotice,
-        scaleGate,
-        actionLabel: primaryEffectFollowup.actionLabel,
-        href: `${projectHref}${primaryEffectFollowup.href}`,
-        effectAction: {
-          platformId: platform.id,
-          execution: "open_target",
-          actionId: primaryEffectFollowup.actionId,
-        },
-      }));
-    } else if (firstDayGateCleared && targetPackage.canExport && targetPackage.publishEffect.records > 0 && primaryEffectAction) {
-      queueItems.push(item({
-        id: `${project.id}:effect:${platform.id}:${primaryEffectAction.id}`,
-        projectId: project.id,
-        projectTitle: project.title,
-        platformName: platform.name,
-        category: "effect",
-        chapterTitle: primaryEffectAction.target,
-        evidence: `${targetPackage.publishEffect.verdict} ${primaryEffectAction.evidence}`,
-        strategyBasis: startTactic,
-        riskLevel: riskProfile.level,
-        riskLabel: riskProfile.label,
-        riskNotice,
-        scaleGate,
-        actionLabel: effectActionLabel(primaryEffectAction.execution),
-        href: `${projectHref}${primaryEffectAction.href}`,
-        effectAction: {
-          platformId: platform.id,
+    for (const effectPackage of effectQueuePackages) {
+      const primaryEffectAction = effectPackage.effectOptimization.actions[0] ?? null;
+      const completedPrimaryEffectAction = primaryEffectAction
+        ? latestCompletedPublishEffectAction({
+          project,
+          platformId: effectPackage.platformId,
           execution: primaryEffectAction.execution,
-          actionId: primaryEffectAction.id,
-        },
-      }));
+          effectSnapshotDate: effectPackage.publishEffect.latest?.snapshotDate ?? null,
+        })
+        : null;
+      const adoptedAssetAfterPrimaryEffectAction = completedPrimaryEffectAction && primaryEffectAction?.execution === "generate_asset_variants"
+        ? latestAdoptedAssetAfterAction({
+          project,
+          platformId: effectPackage.platformId,
+          action: completedPrimaryEffectAction,
+        })
+        : null;
+      const publishBaselineAfterAdoptedAsset = adoptedAssetAfterPrimaryEffectAction
+        ? latestPublishBaselineAfter({
+          project,
+          platformId: effectPackage.platformId,
+          after: adoptedAssetAfterPrimaryEffectAction.createdAt,
+        })
+        : null;
+      const primaryEffectFollowup = primaryEffectAction && completedPrimaryEffectAction
+        ? completedEffectActionFollowup({
+          execution: primaryEffectAction.execution,
+          baseActionId: primaryEffectAction.id,
+          effectVerdict: effectPackage.publishEffect.verdict,
+          assetAdopted: Boolean(adoptedAssetAfterPrimaryEffectAction),
+          newBaselineSaved: Boolean(publishBaselineAfterAdoptedAsset),
+          packageReady: effectPackage.canExport,
+        })
+        : null;
+
+      if (firstDayGateCleared && effectPackage.publishVersions.length > 0 && effectPackage.publishEffect.records === 0) {
+        queueItems.push(item({
+          id: `${project.id}:effect:${effectPackage.platformId}:collect`,
+          projectId: project.id,
+          projectTitle: project.title,
+          platformName: effectPackage.platformName,
+          category: "effect",
+          chapterTitle: `${effectPackage.platformName} 发布效果`,
+          evidence: "发布包已经保存过基准，但还没有录入曝光、点击、收藏、追读、评论、付费阅读或编辑反馈。",
+          strategyBasis: startTactic,
+          riskLevel: riskProfile.level,
+          riskLabel: riskProfile.label,
+          riskNotice,
+          scaleGate,
+          actionLabel: "录入发布效果",
+          href: `${projectHref}#publish-effect-panel`,
+          effectAction: {
+            platformId: effectPackage.platformId,
+            execution: "open_target",
+            actionId: "collect-effect-data",
+          },
+        }));
+      } else if (firstDayGateCleared && effectPackage.publishEffect.records > 0 && primaryEffectFollowup) {
+        queueItems.push(item({
+          id: `${project.id}:effect:${effectPackage.platformId}:${primaryEffectFollowup.idSuffix}`,
+          projectId: project.id,
+          projectTitle: project.title,
+          platformName: effectPackage.platformName,
+          category: "effect",
+          chapterTitle: primaryEffectFollowup.chapterTitle,
+          evidence: primaryEffectFollowup.evidence,
+          strategyBasis: startTactic,
+          riskLevel: riskProfile.level,
+          riskLabel: riskProfile.label,
+          riskNotice,
+          scaleGate,
+          actionLabel: primaryEffectFollowup.actionLabel,
+          href: `${projectHref}${primaryEffectFollowup.href}`,
+          effectAction: {
+            platformId: effectPackage.platformId,
+            execution: "open_target",
+            actionId: primaryEffectFollowup.actionId,
+          },
+        }));
+      } else if (firstDayGateCleared && effectPackage.publishEffect.records > 0 && primaryEffectAction) {
+        queueItems.push(item({
+          id: `${project.id}:effect:${effectPackage.platformId}:${primaryEffectAction.id}`,
+          projectId: project.id,
+          projectTitle: project.title,
+          platformName: effectPackage.platformName,
+          category: "effect",
+          chapterTitle: primaryEffectAction.target,
+          evidence: `${effectPackage.publishEffect.verdict} ${primaryEffectAction.evidence}`,
+          strategyBasis: startTactic,
+          riskLevel: riskProfile.level,
+          riskLabel: riskProfile.label,
+          riskNotice,
+          scaleGate,
+          actionLabel: effectActionLabel(primaryEffectAction.execution),
+          href: `${projectHref}${primaryEffectAction.href}`,
+          effectAction: {
+            platformId: effectPackage.platformId,
+            execution: primaryEffectAction.execution,
+            actionId: primaryEffectAction.id,
+          },
+        }));
+      }
     }
 
     const versionQueueItem = firstDayGateCleared && exportCenter.totalPublishableChapters > 0 && targetPackage.canExport

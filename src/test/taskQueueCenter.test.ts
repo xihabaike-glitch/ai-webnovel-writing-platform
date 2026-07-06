@@ -389,6 +389,34 @@ test("buildTaskQueueCenter", async (t) => {
     assert.ok(queue.recommendedNext?.evidence.includes("发布包已经保存过基准"));
   });
 
+  await t.test("promotes every platform with a saved baseline into effect recovery tasks", () => {
+    const queue = buildTaskQueueCenter([publishReadyProject({
+      publishSnapshots: [
+        publishBaseline,
+        {
+          ...publishBaseline,
+          id: "snapshot-qidian",
+          platformId: "qidian",
+          platformName: "起点中文网",
+        },
+      ],
+      platformPublishMetrics: [],
+    })]);
+
+    const effectItems = queue.items.filter((item) => item.category === "effect");
+
+    assert.equal(queue.overview.effectReady, 2);
+    assert.deepEqual(
+      effectItems.map((item) => item.platformName),
+      ["番茄小说", "起点中文网"],
+    );
+    assert.deepEqual(
+      effectItems.map((item) => item.effectAction?.platformId),
+      ["fanqie", "qidian"],
+    );
+    assert.ok(effectItems.every((item) => item.href === "/projects/project-1#publish-effect-panel"));
+  });
+
   await t.test("blocks export when the export version center reports regression risk", () => {
     const queue = buildTaskQueueCenter([publishReadyProject({
       exportPackageSnapshots: [

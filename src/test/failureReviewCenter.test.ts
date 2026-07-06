@@ -146,20 +146,32 @@ test("buildFailureReviewCenter", async (t) => {
     assert.equal(center.repairLanes[0].href, "/settings/models");
     assert.deepEqual(center.repairLanes[0].sampleTaskIds, ["config-failure"]);
     assert.ok(center.repairLanes[0].evidence.some((line) => line.includes("密钥/权限 1")));
+    assert.equal(center.repairLanes[0].receiptAction.id, "failure-repair-batch");
+    assert.equal(center.repairLanes[0].receiptAction.label, "记录配置修复");
+    assert.match(center.repairLanes[0].receiptAction.message, /模型配置修复/);
+    assert.equal(center.repairLanes[0].receiptAction.payload.laneId, "config");
+    assert.deepEqual(center.repairLanes[0].receiptAction.payload.sampleTaskIds, ["config-failure"]);
 
     const promptLane = center.repairLanes.find((lane) => lane.id === "prompt_context");
     assert.equal(promptLane?.priorityLabel, "P1");
     assert.equal(promptLane?.actionLabel, "回章节修上下文");
     assert.equal(promptLane?.href, "/projects/project-1/chapters/chapter-context");
+    assert.equal(promptLane?.receiptAction.id, "failure-repair-batch");
+    assert.equal(promptLane?.receiptAction.label, "记录上下文修复");
 
     const retryLane = center.repairLanes.find((lane) => lane.id === "retry_sample");
     assert.equal(retryLane?.priorityLabel, "P2");
     assert.equal(retryLane?.actionLabel, "单章重试样本");
     assert.equal(retryLane?.href, "/projects/project-1/chapters/chapter-timeout");
+    assert.equal(retryLane?.receiptAction.id, "repair-batch-retry:timeout-failure");
+    assert.equal(retryLane?.receiptAction.label, "记录样本重试");
+    assert.match(retryLane?.receiptAction.message ?? "", /单章重试样本/);
 
     const manualLane = center.repairLanes.find((lane) => lane.id === "manual_review");
     assert.equal(manualLane?.priorityLabel, "P3");
     assert.equal(manualLane?.actionLabel, "人工复盘输入");
     assert.equal(manualLane?.href, "/projects/project-1");
+    assert.equal(manualLane?.receiptAction.id, "failure-repair-batch");
+    assert.equal(manualLane?.receiptAction.label, "记录人工复盘");
   });
 });

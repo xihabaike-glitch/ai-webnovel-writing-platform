@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { AppShell } from "@/components/app-shell/AppShell";
+import { FailureRepairLaneReceiptButton } from "@/components/failures/FailureRepairLaneReceiptButton";
 import { prisma } from "@/lib/db/prisma";
 import { buildFailureReviewCenter } from "@/lib/ai/failureReviewCenter";
 
@@ -118,6 +119,7 @@ export default async function FailuresPage() {
               <Link className="mt-3 inline-flex rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white hover:bg-slate-800" href={lane.href}>
                 {lane.actionLabel}
               </Link>
+              <FailureRepairLaneReceiptButton action={lane.receiptAction} />
             </div>
           ))}
           {center.repairLanes.length === 0 ? (

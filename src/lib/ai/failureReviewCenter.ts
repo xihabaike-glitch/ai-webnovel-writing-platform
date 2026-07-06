@@ -60,6 +60,19 @@ export interface FailureRepairLane {
   href: string;
   evidence: string[];
   sampleTaskIds: string[];
+  receiptAction: {
+    id: string;
+    label: string;
+    detail: string;
+    href: string;
+    message: string;
+    payload: {
+      source: "failure_repair_lane";
+      laneId: FailureRepairLaneId;
+      sampleTaskIds: string[];
+      evidence: string[];
+    };
+  };
 }
 
 export interface FailureReviewCenter {
@@ -184,6 +197,8 @@ function buildRepairLanes(items: FailureReviewItem[]): FailureRepairLane[] {
     detail: (count: number) => string;
     actionLabel: string;
     href?: string;
+    receiptLabel: string;
+    receiptMessage: string;
   }> = {
     config: {
       priorityLabel: "P0",
@@ -191,24 +206,32 @@ function buildRepairLanes(items: FailureReviewItem[]): FailureRepairLane[] {
       detail: (count) => `${count} 个失败指向密钥、权限或模型配置。先修配置，否则重试只会重复失败。`,
       actionLabel: "去模型设置",
       href: "/settings/models",
+      receiptLabel: "记录配置修复",
+      receiptMessage: "已记录模型配置修复，刷新后确认未恢复失败是否清空。",
     },
     prompt_context: {
       priorityLabel: "P1",
       label: "先改提示词/上下文",
       detail: (count) => `${count} 个失败来自上下文过长或结构化输出不稳。先裁剪输入、收紧格式，再重试样本。`,
       actionLabel: "回章节修上下文",
+      receiptLabel: "记录上下文修复",
+      receiptMessage: "已记录提示词/上下文修复，下一步只跑单章样本复检。",
     },
     retry_sample: {
       priorityLabel: "P2",
       label: "单章重试验证",
       detail: (count) => `${count} 个失败具备重试价值。先挑最近 1 个样本跑通，再恢复同类任务。`,
       actionLabel: "单章重试样本",
+      receiptLabel: "记录样本重试",
+      receiptMessage: "已记录单章重试样本，刷新后检查失败数量和同类任务是否恢复。",
     },
     manual_review: {
       priorityLabel: "P3",
       label: "人工复盘输入",
       detail: (count) => `${count} 个失败缺少稳定自动修复路径。先回项目核对输入、任务类型和上下文。`,
       actionLabel: "人工复盘输入",
+      receiptLabel: "记录人工复盘",
+      receiptMessage: "已记录人工复盘处理，下一步回总闸门复检是否仍有失败阻塞。",
     },
   };
 
@@ -230,17 +253,34 @@ function buildRepairLanes(items: FailureReviewItem[]): FailureRepairLane[] {
         .slice(0, 2)
         .map(([label, count]) => `${label} ${count}`);
       const meta = laneMeta[laneId];
+      const sampleTaskIds = values.slice(0, 3).map((item) => item.id);
+      const href = meta.href ?? values[0].href;
+      const detail = meta.detail(values.length);
+      const receiptActionId = laneId === "retry_sample" ? `repair-batch-retry:${sampleTaskIds[0]}` : "failure-repair-batch";
 
       return {
         id: laneId,
         priorityLabel: meta.priorityLabel,
         label: meta.label,
         count: values.length,
-        detail: meta.detail(values.length),
+        detail,
         actionLabel: meta.actionLabel,
-        href: meta.href ?? values[0].href,
+        href,
         evidence: [...categoryEvidence, ...providerEvidence],
-        sampleTaskIds: values.slice(0, 3).map((item) => item.id),
+        sampleTaskIds,
+        receiptAction: {
+          id: receiptActionId,
+          label: meta.receiptLabel,
+          detail: `${meta.label}：${detail}`,
+          href,
+          message: meta.receiptMessage,
+          payload: {
+            source: "failure_repair_lane",
+            laneId,
+            sampleTaskIds,
+            evidence: [...categoryEvidence, ...providerEvidence],
+          },
+        },
       };
     })
     .filter((lane): lane is FailureRepairLane => Boolean(lane));

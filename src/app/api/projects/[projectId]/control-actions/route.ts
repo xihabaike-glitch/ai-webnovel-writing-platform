@@ -5,6 +5,7 @@ import { getPlatformProfile, type PlatformId } from "@/lib/platforms/platformPro
 import { generateControlAssets, type ControlAssetAreaId } from "@/lib/projects/controlAssetGeneration";
 import {
   buildAiPipelineControlActionPlan,
+  buildAiPipelinePromptMemoryRollbackDispatchPlan,
   buildAiPipelineRecheckDispatchPlan,
   buildChapterCardActionSeeds,
   buildChapterCardDraftHandoff,
@@ -68,6 +69,20 @@ function memorySourceDetail(source: ControlActionBody["memorySource"]) {
   ].filter(Boolean).join("；");
 }
 
+function chapterWorkflowMemorySource(source: ControlActionBody["memorySource"]) {
+  if (source?.kind !== "chapter_workflow_diagnostic") return null;
+  if (!source.chapterId || !source.chapterTitle) return null;
+  return {
+    chapterId: source.chapterId,
+    chapterTitle: source.chapterTitle,
+    label: typeof source.label === "string" && source.label.trim() ? source.label.trim() : "恢复记忆疑似失效",
+    detail: typeof source.detail === "string" && source.detail.trim() ? source.detail.trim() : "章节诊断要求回滚恢复记忆。",
+    evidence: Array.isArray(source.evidence)
+      ? source.evidence.filter((item): item is string => typeof item === "string" && item.trim().length > 0).map((item) => item.trim())
+      : [],
+  };
+}
+
 export async function POST(request: Request, { params }: Params) {
   const { projectId } = await params;
   const body = (await request.json().catch(() => ({}))) as ControlActionBody;
@@ -117,6 +132,7 @@ export async function POST(request: Request, { params }: Params) {
   if (areaId === "ai-pipeline" && memoryAction) {
     const action = memoryAction;
     const sourceDetail = memorySourceDetail(body.memorySource);
+    const chapterSource = chapterWorkflowMemorySource(body.memorySource);
     const receiptId = `ai-pipeline-memory:${action}:${projectId}:${Date.now()}`;
     const label = action === "clear"
       ? "AI 恢复记忆已清除"
@@ -135,50 +151,110 @@ export async function POST(request: Request, { params }: Params) {
         ? "已把恢复记忆回滚到 1 章复验。"
         : "已确认继续使用恢复记忆，后续仍按小批观察。";
 
-    await prisma.gateActionAudit.create({
-      data: {
-        receiptId,
-        actionId: `ai-pipeline-memory:${projectId}`,
+    const rollbackDispatch = action === "rollback" && chapterSource
+      ? buildAiPipelinePromptMemoryRollbackDispatchPlan({
         projectId,
-        platformId: platform.id,
-        platformName: platform.name,
-        label,
-        detail,
-        href: `/projects/${projectId}#ai-pipeline`,
-        status: "succeeded",
-        message,
-        executionType: "control_action",
-        succeededCount: 1,
-        failedCount: 0,
-        taskId: null,
-        recheckStatus: action === "rollback" ? "needs_action" : action === "clear" ? "cleared" : "ready",
-        recheckLabel: action === "rollback" ? "回滚小样本" : action === "clear" ? "已清除" : "继续生效",
-        recheckDetail: detail,
-        recheckAction: action === "rollback" ? "跑 1 章复验" : action === "clear" ? "等待新复检" : "继续小批观察",
-        payload: JSON.stringify({
-          aiPipelinePromptMemoryControl: {
-            action,
-            label: sourceDetail && action === "rollback" ? "章节诊断回滚" : action === "rollback" ? "人工回滚" : action === "clear" ? "清除旧记忆" : "人工确认",
-            detail,
-            source: body.memorySource?.kind === "chapter_workflow_diagnostic" ? {
-              kind: "chapter_workflow_diagnostic",
-              chapterId: body.memorySource.chapterId,
-              chapterTitle: body.memorySource.chapterTitle,
-              label: body.memorySource.label,
-              detail: body.memorySource.detail,
-              sourceLabel: body.memorySource.sourceLabel ?? null,
-              evidence: Array.isArray(body.memorySource.evidence) ? body.memorySource.evidence : [],
-            } : undefined,
+        receiptId,
+        chapterId: chapterSource.chapterId,
+        chapterTitle: chapterSource.chapterTitle,
+        diagnosticLabel: chapterSource.label,
+        diagnosticDetail: chapterSource.detail,
+        evidence: chapterSource.evidence,
+      })
+      : null;
+
+    await prisma.$transaction([
+      prisma.gateActionAudit.create({
+        data: {
+          receiptId,
+          actionId: `ai-pipeline-memory:${projectId}`,
+          projectId,
+          platformId: platform.id,
+          platformName: platform.name,
+          label,
+          detail,
+          href: `/projects/${projectId}#ai-pipeline`,
+          status: "succeeded",
+          message,
+          executionType: "control_action",
+          succeededCount: 1,
+          failedCount: 0,
+          taskId: null,
+          recheckStatus: action === "rollback" ? "needs_action" : action === "clear" ? "cleared" : "ready",
+          recheckLabel: action === "rollback" ? "回滚小样本" : action === "clear" ? "已清除" : "继续生效",
+          recheckDetail: detail,
+          recheckAction: action === "rollback" ? "跑 1 章复验" : action === "clear" ? "等待新复检" : "继续小批观察",
+          payload: JSON.stringify({
+            aiPipelinePromptMemoryControl: {
+              action,
+              label: sourceDetail && action === "rollback" ? "章节诊断回滚" : action === "rollback" ? "人工回滚" : action === "clear" ? "清除旧记忆" : "人工确认",
+              detail,
+              source: body.memorySource?.kind === "chapter_workflow_diagnostic" ? {
+                kind: "chapter_workflow_diagnostic",
+                chapterId: body.memorySource.chapterId,
+                chapterTitle: body.memorySource.chapterTitle,
+                label: body.memorySource.label,
+                detail: body.memorySource.detail,
+                sourceLabel: body.memorySource.sourceLabel ?? null,
+                evidence: Array.isArray(body.memorySource.evidence) ? body.memorySource.evidence : [],
+              } : undefined,
+            },
+          }),
+        },
+      }),
+      ...(rollbackDispatch ? [
+        prisma.gateDispatchTask.upsert({
+          where: { dispatchKey: rollbackDispatch.dispatchKey },
+          create: {
+            dispatchKey: rollbackDispatch.dispatchKey,
+            projectId,
+            platformId: rollbackDispatch.platformId,
+            platformName: rollbackDispatch.platformName,
+            stage: rollbackDispatch.stage,
+            state: rollbackDispatch.state,
+            priorityScore: rollbackDispatch.priorityScore,
+            ownerRole: rollbackDispatch.ownerRole,
+            title: rollbackDispatch.title,
+            detail: rollbackDispatch.detail,
+            dueLabel: rollbackDispatch.dueLabel,
+            actionLabel: rollbackDispatch.actionLabel,
+            href: rollbackDispatch.href,
+            acceptanceCriteria: JSON.stringify(rollbackDispatch.acceptanceCriteria),
+            evidence: JSON.stringify(rollbackDispatch.evidence),
+            sourceReceiptId: rollbackDispatch.sourceReceiptId,
+            completionEvidence: rollbackDispatch.completionEvidence,
+            reviewLatestAt: new Date(rollbackDispatch.reviewLatestAt),
+          },
+          update: {
+            projectId,
+            platformId: rollbackDispatch.platformId,
+            platformName: rollbackDispatch.platformName,
+            stage: rollbackDispatch.stage,
+            state: rollbackDispatch.state,
+            priorityScore: rollbackDispatch.priorityScore,
+            ownerRole: rollbackDispatch.ownerRole,
+            title: rollbackDispatch.title,
+            detail: rollbackDispatch.detail,
+            dueLabel: rollbackDispatch.dueLabel,
+            actionLabel: rollbackDispatch.actionLabel,
+            href: rollbackDispatch.href,
+            acceptanceCriteria: JSON.stringify(rollbackDispatch.acceptanceCriteria),
+            evidence: JSON.stringify(rollbackDispatch.evidence),
+            sourceReceiptId: rollbackDispatch.sourceReceiptId,
+            completionEvidence: rollbackDispatch.completionEvidence,
+            reviewLatestAt: new Date(rollbackDispatch.reviewLatestAt),
           },
         }),
-      },
-    });
+      ] : []),
+    ]);
 
     return NextResponse.json({
       areaId,
       targetAnchor: "ai-pipeline",
       memoryAction: action,
       message,
+      dispatchKey: rollbackDispatch?.dispatchKey,
+      dispatchTitle: rollbackDispatch?.title,
     });
   }
 

@@ -289,6 +289,57 @@ export function buildAiPipelineRecheckDispatchPlan(input: {
   };
 }
 
+function dispatchSafeReceiptId(receiptId: string) {
+  return receiptId.replace(/[^a-zA-Z0-9_-]+/g, "-").replace(/^-+|-+$/g, "");
+}
+
+export function buildAiPipelinePromptMemoryRollbackDispatchPlan(input: {
+  projectId: string;
+  receiptId: string;
+  chapterId: string;
+  chapterTitle: string;
+  diagnosticLabel: string;
+  diagnosticDetail: string;
+  evidence: string[];
+}) {
+  const safeReceiptId = dispatchSafeReceiptId(input.receiptId);
+  return {
+    dispatchKey: `ai-pipeline-recheck:${input.projectId}:${safeReceiptId}:sample`,
+    projectId: input.projectId,
+    platformId: "ai-pipeline",
+    platformName: "AI 写审改",
+    stage: "ai_pipeline_sample_recheck",
+    state: "queued",
+    priorityScore: 96,
+    ownerRole: "写作制片 / 审稿负责人",
+    title: "AI 写审改：恢复记忆回滚 1 章复验",
+    detail: `章节「${input.chapterTitle}」触发恢复记忆回滚：${input.diagnosticDetail} 只用这 1 章重跑初稿、审稿或二改复验，补回质量、失败原因和成本证据。`,
+    dueLabel: "今天跑 1 章",
+    actionLabel: "运行 1 章复验",
+    href: `/projects/${input.projectId}/chapters/${input.chapterId}#chapter-workflow`,
+    acceptanceCriteria: [
+      "只选择这 1 章进入初稿、审稿或二改复验",
+      "记录新审稿分、ai_recovery 问题是否消失、失败原因和成本",
+      "复验完成前不要恢复小批放量",
+    ],
+    evidence: [
+      `来源回执：${input.receiptId}`,
+      `诊断结论：${input.diagnosticLabel}`,
+      input.diagnosticDetail,
+      `目标章节：${input.chapterTitle}`,
+      ...input.evidence,
+    ],
+    execution: {
+      mode: "sample_recheck",
+      maxSampleCount: 1,
+      primaryActionLabel: "运行 1 章复验",
+    },
+    sourceReceiptId: input.receiptId,
+    completionEvidence: "",
+    reviewLatestAt: new Date().toISOString(),
+  };
+}
+
 function outlineSortWeight(type: string) {
   if (type === "opening") return 10;
   if (type === "trunk") return 20;

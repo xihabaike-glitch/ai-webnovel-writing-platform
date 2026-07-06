@@ -329,11 +329,12 @@ export function ChapterWorkflowPanel({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(request.body),
       });
-      const payload = await response.json() as { message?: string; error?: string };
+      const payload = await response.json() as { message?: string; error?: string; dispatchTitle?: string };
       if (!response.ok) {
         throw new Error(payload.error ?? "写入恢复记忆回滚失败。");
       }
-      setMessage(payload.message ?? "已写入恢复记忆回滚。");
+      const dispatchText = payload.dispatchTitle ? ` 已派单：${payload.dispatchTitle}。` : "";
+      setMessage(`${payload.message ?? "已写入恢复记忆回滚。"}${dispatchText}`);
       await loadWorkflow();
       router.refresh();
     } catch (caught) {

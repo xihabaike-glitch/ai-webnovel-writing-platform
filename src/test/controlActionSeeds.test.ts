@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { getPlatformProfile } from "../lib/platforms/platformProfiles.ts";
 import {
   buildAiPipelineControlActionPlan,
+  buildAiPipelinePromptMemoryRollbackDispatchPlan,
   buildAiPipelineRecheckDispatchPlan,
   buildChapterCardActionSeeds,
   buildChapterCardDraftHandoff,
@@ -332,6 +333,32 @@ test("control action seeds", async (t) => {
     });
     assert.ok(scale.title.includes("推荐批量队列"));
     assert.ok(scale.href.includes("#ai-pipeline"));
+  });
+
+  await t.test("builds a one-chapter recheck dispatch from prompt memory rollback diagnostics", () => {
+    const dispatch = buildAiPipelinePromptMemoryRollbackDispatchPlan({
+      projectId: "demo-project",
+      receiptId: "ai-pipeline-memory:rollback:demo-project:1700000000000",
+      chapterId: "chapter-2",
+      chapterTitle: "第二章 失控的小批恢复",
+      diagnosticLabel: "恢复记忆疑似失效",
+      diagnosticDetail: "连续 2 次带恢复记忆的审稿仍低于 85 分。",
+      evidence: ["正文审稿 72 分；问题：ai_recovery", "正文审稿 80 分；问题：hook"],
+    });
+
+    assert.equal(dispatch.dispatchKey, "ai-pipeline-recheck:demo-project:ai-pipeline-memory-rollback-demo-project-1700000000000:sample");
+    assert.equal(dispatch.stage, "ai_pipeline_sample_recheck");
+    assert.equal(dispatch.priorityScore, 96);
+    assert.equal(dispatch.sourceReceiptId, "ai-pipeline-memory:rollback:demo-project:1700000000000");
+    assert.equal(dispatch.execution.mode, "sample_recheck");
+    assert.equal(dispatch.execution.maxSampleCount, 1);
+    assert.equal(dispatch.execution.primaryActionLabel, "运行 1 章复验");
+    assert.ok(dispatch.title.includes("恢复记忆回滚"));
+    assert.ok(dispatch.detail.includes("第二章 失控的小批恢复"));
+    assert.ok(dispatch.href.includes("#chapter-workflow"));
+    assert.ok(dispatch.acceptanceCriteria.some((item) => item.includes("只选择这 1 章")));
+    assert.ok(dispatch.evidence.some((item) => item.includes("恢复记忆疑似失效")));
+    assert.ok(dispatch.evidence.some((item) => item.includes("正文审稿 72 分")));
   });
 
   await t.test("builds strict JSON prompts for AI control assets", () => {

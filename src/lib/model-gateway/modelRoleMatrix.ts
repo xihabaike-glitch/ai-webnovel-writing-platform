@@ -43,6 +43,14 @@ export interface ModelRoleMatrix {
   roles: ModelWritingRole[];
 }
 
+export interface ModelRoleMatrixPriorityBlocker {
+  tone: "blocked" | "watch";
+  title: string;
+  detail: string;
+  actionLabel: string;
+  actionHref: string;
+}
+
 interface RoleDefinition {
   id: ModelWritingRoleId;
   title: string;
@@ -200,5 +208,27 @@ export function buildModelRoleMatrix(providers: ModelRoleProviderInput[]): Model
         : "模型编辑部缺岗位，正式写作会继续依赖 Mock 或人工补位。",
     nextAction: firstOpen?.nextAction ?? "进入作品页，跑首日工作流和小批量写审改。",
     roles,
+  };
+}
+
+export function buildModelRoleMatrixPriorityBlocker(matrix: ModelRoleMatrix): ModelRoleMatrixPriorityBlocker | null {
+  if (matrix.status === "ready") return null;
+
+  if (matrix.summary.missingRoles > 0) {
+    return {
+      tone: "blocked",
+      title: "模型编辑部缺岗",
+      detail: `${matrix.summary.missingRoles} 个岗位还没可用模型。继续跑真实写作会变成 Mock 或人工救火，先补 Claude / DeepSeek / Kimi / GPT 的职责分工。${matrix.nextAction}`,
+      actionLabel: "去配置模型岗位",
+      actionHref: "/settings/models#model-role-matrix",
+    };
+  }
+
+  return {
+    tone: "watch",
+    title: "模型岗位上下文不够",
+    detail: `${matrix.summary.partialRoles} 个岗位只能顶岗，长篇结构、整卷资料和海外包装容易被迫拆碎。${matrix.nextAction}`,
+    actionLabel: "去调整模型岗位",
+    actionHref: "/settings/models#model-role-matrix",
   };
 }

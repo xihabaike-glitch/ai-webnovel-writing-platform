@@ -7,6 +7,7 @@ import { RunPublishEffectQueueActionButton } from "@/components/tasks/RunPublish
 import { buildTaskBatchHistory } from "@/lib/ai/taskBatchHistory";
 import { buildTaskRunConsole, type TaskRunLog } from "@/lib/ai/taskRunConsole";
 import { prisma } from "@/lib/db/prisma";
+import { buildModelRoleMatrix, buildModelRoleMatrixPriorityBlocker } from "@/lib/model-gateway/modelRoleMatrix";
 import { buildRouteConfirmationRecheckEvidenceFromDispatchTasks } from "@/lib/model-gateway/routeConfirmation";
 import { buildBatchExecutionSafety, buildBatchSafetyPriorityBlocker } from "@/lib/projects/batchExecutionSafety";
 import { buildBatchStrategyComparison, buildBatchStrategyDecision } from "@/lib/projects/batchStrategyComparison";
@@ -155,6 +156,16 @@ function repairKindLabel(kind: ReturnType<typeof buildTaskRunConsole>["failureRe
   if (kind === "config") return "修配置";
   if (kind === "retry") return "可重试";
   return "人工复盘";
+}
+
+function modelRoleBlockerClass(tone: "blocked" | "watch") {
+  if (tone === "blocked") return "border-rose-200 bg-rose-50 text-rose-900";
+  return "border-amber-200 bg-amber-50 text-amber-900";
+}
+
+function modelRoleBlockerButtonClass(tone: "blocked" | "watch") {
+  if (tone === "blocked") return "bg-rose-950 text-white hover:bg-rose-900";
+  return "bg-amber-950 text-white hover:bg-amber-900";
 }
 
 export default async function TasksPage({ searchParams }: { searchParams?: Promise<{ batchStrategy?: string }> }) {
@@ -306,6 +317,16 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
   const queue = buildTaskQueueCenter(taskQueueProjects);
   const safety = buildBatchExecutionSafety(queue.items, safetyProjects, activeStrategy);
   const safetyPriorityBlocker = buildBatchSafetyPriorityBlocker(safety);
+  const modelRoleMatrix = buildModelRoleMatrix(modelProviders.map((provider) => ({
+    id: provider.id,
+    providerId: provider.providerId,
+    displayName: provider.displayName,
+    encryptedApiKey: provider.encryptedApiKey,
+    defaultModel: provider.defaultModel,
+    enabled: provider.enabled,
+    maxContextTokens: provider.maxContextTokens,
+  })));
+  const modelRolePriorityBlocker = buildModelRoleMatrixPriorityBlocker(modelRoleMatrix);
   const executionPlan = buildTaskQueueExecutionPlan(queue.items, activeStrategy.maxBatchSize, activeStrategy);
   const runConsole = buildTaskRunConsole(recentAiTasks.map((task) => ({
     ...task,
@@ -776,6 +797,20 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
               </div>
               <Link className="w-fit shrink-0 rounded-md bg-rose-950 px-3 py-2 text-xs font-medium text-white hover:bg-rose-900" href={safetyPriorityBlocker.actionHref}>
                 {safetyPriorityBlocker.actionLabel}
+              </Link>
+            </div>
+          </div>
+        ) : null}
+        {modelRolePriorityBlocker ? (
+          <div className={`mt-3 rounded-md border p-3 text-sm ${modelRoleBlockerClass(modelRolePriorityBlocker.tone)}`}>
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+              <div>
+                <div className="text-xs font-medium uppercase opacity-80">模型路线优先处理</div>
+                <div className="mt-1 font-medium">{modelRolePriorityBlocker.title}</div>
+                <p className="mt-1 leading-6">{modelRolePriorityBlocker.detail}</p>
+              </div>
+              <Link className={`w-fit shrink-0 rounded-md px-3 py-2 text-xs font-medium ${modelRoleBlockerButtonClass(modelRolePriorityBlocker.tone)}`} href={modelRolePriorityBlocker.actionHref}>
+                {modelRolePriorityBlocker.actionLabel}
               </Link>
             </div>
           </div>

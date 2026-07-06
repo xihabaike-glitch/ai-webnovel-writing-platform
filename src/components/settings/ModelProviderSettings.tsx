@@ -1219,7 +1219,7 @@ export function ModelProviderSettings({
             ))}
           </div>
         </div>
-        <div className="rounded-md border border-slate-200 bg-white p-4">
+        <div className="rounded-md border border-slate-200 bg-white p-4" id="model-role-matrix">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
             <div>
               <h2 className="font-medium text-slate-950">模型编辑部职责矩阵</h2>

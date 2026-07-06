@@ -188,6 +188,12 @@ test("buildPlatformPublishExportCenter", async (t) => {
     assert.equal(center.packages[0].finalGate.status, "do_not_submit");
     assert.ok(center.packages[0].finalGate.blockers.some((item) => item.includes("前三章")));
     assert.ok(center.packages[0].finalGate.items.some((item) => item.id === "review-records" && item.status === "block"));
+    assert.equal(center.platformReadinessSummary.totalPlatforms, platformProfiles.length);
+    assert.equal(center.platformReadinessSummary.needsSubmissionRepairCount, platformProfiles.length);
+    assert.equal(center.platformReadinessSummary.readyToSubmitCount, 0);
+    assert.equal(center.platformReadinessSummary.needsEffectRecordCount, 0);
+    assert.equal(center.platformReadinessSummary.notGeneratedCount, 0);
+    assert.ok(center.platformReadinessSummary.headline.includes("投稿材料没过线"));
   });
 
   await t.test("dedupes workspace repair actions across platforms", () => {
@@ -311,6 +317,15 @@ test("buildPlatformPublishExportCenter", async (t) => {
     assert.equal(center.effectCaptureSummary.actionHref, "#publish-effect-panel");
     assert.equal(center.effectCaptureSummary.tasks.length, 1);
     assert.equal(center.effectCaptureSummary.tasks[0].platformName, "番茄小说");
+    assert.equal(center.platformReadinessSummary.totalPlatforms, 1);
+    assert.equal(center.platformReadinessSummary.readyToSubmitCount, 0);
+    assert.equal(center.platformReadinessSummary.needsEffectRecordCount, 1);
+    assert.equal(center.platformReadinessSummary.needsSubmissionRepairCount, 0);
+    assert.equal(center.platformReadinessSummary.notGeneratedCount, 0);
+    assert.equal(center.platformReadinessSummary.items[0]?.status, "needs_effect_record");
+    assert.equal(center.platformReadinessSummary.items[0]?.actionHref, "#publish-effect-panel");
+    assert.ok(center.platformReadinessSummary.headline.includes("1 个平台发布包已过线"));
+    assert.ok(center.platformReadinessSummary.nextAction.includes("补发布效果"));
   });
 
   await t.test("blocks export when candidate adoption makes old reviews stale", () => {

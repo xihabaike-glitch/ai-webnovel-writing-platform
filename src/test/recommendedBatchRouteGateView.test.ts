@@ -32,6 +32,8 @@ test("buildRecommendedBatchRouteGateTimeline", async (t) => {
 
     assert.equal(timeline.tone, "watch");
     assert.equal(timeline.label, "复检通过，等待恢复样本");
+    assert.equal(timeline.primaryActionLabel, "跑 1 个恢复样本");
+    assert.ok(timeline.primaryActionDetail.includes("不是恢复正常批量"));
     assert.deepEqual(timeline.items.map((item) => item.status), ["done", "active", "pending"]);
   });
 

@@ -109,6 +109,9 @@ export function RunRecommendedBatchButton({
   const [modelRouteGate, setModelRouteGate] = useState<BatchRunResponse["modelRouteGate"] | null>(initialModelRouteGate);
   const [isCreatingRecheck, setIsCreatingRecheck] = useState(false);
   const routeGateTimeline = modelRouteGate ? buildRecommendedBatchRouteGateTimeline(modelRouteGate) : null;
+  const runActionLabel = routeGateTimeline && modelRouteGate?.status !== "block"
+    ? routeGateTimeline.primaryActionLabel
+    : "执行推荐批次";
 
   useEffect(() => {
     setModelRouteGate(initialModelRouteGate);
@@ -182,7 +185,7 @@ export function RunRecommendedBatchButton({
         onClick={runBatch}
         type="button"
       >
-      {isRunning ? "执行中" : "执行推荐批次"}
+      {isRunning ? "执行中" : runActionLabel}
       </button>
       {message ? <p className="max-w-xl text-sm text-slate-600">{message}</p> : null}
       {modelRouteGate ? (
@@ -197,6 +200,10 @@ export function RunRecommendedBatchButton({
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <span className="font-medium">{routeGateTimeline.label}</span>
                     <span>{routeGateTimeline.summary}</span>
+                  </div>
+                  <div className="mt-2 rounded-md bg-white/75 px-2 py-1">
+                    <span className="font-medium">下一步：{routeGateTimeline.primaryActionLabel}</span>
+                    <span className="ml-1">{routeGateTimeline.primaryActionDetail}</span>
                   </div>
                   <div className="mt-2 flex flex-wrap gap-1.5">
                     {routeGateTimeline.items.map((item) => (

@@ -285,6 +285,21 @@ export interface PlatformPublishEffectSummary {
   history: PlatformPublishMetricInput[];
 }
 
+export interface PlatformEffectCaptureField {
+  id: "views" | "clicks" | "favorites" | "follows" | "comments" | "paidReads";
+  label: string;
+  helper: string;
+}
+
+export interface PlatformEffectCapturePlan {
+  status: "needs_record" | "missing_fields" | "ready_to_review";
+  primaryMetrics: string[];
+  requiredFields: PlatformEffectCaptureField[];
+  missingFields: PlatformEffectCaptureField[];
+  prompt: string;
+  nextAction: string;
+}
+
 export interface PlatformPublishEffectComparison {
   status: "none" | "improved" | "declined" | "mixed" | "flat";
   previous: PlatformPublishMetricInput | null;
@@ -459,6 +474,7 @@ export interface PlatformPublishPackage {
   submissionAssetVersions: PlatformSubmissionAssetVersionInput[];
   submissionAssetAdoption: PlatformSubmissionAssetAdoptionSummary;
   publishEffect: PlatformPublishEffectSummary;
+  effectCapturePlan: PlatformEffectCapturePlan;
   dispatchEffectValidation: PlatformDispatchCompletionEffectValidation;
   effectOptimization: PlatformPublishEffectOptimization;
   experimentPlan: PlatformABExperimentPlan;
@@ -2784,6 +2800,11 @@ function buildMarkdown(pack: Omit<PlatformPublishPackage, "markdown">) {
     ...(pack.repairHistory.length ? ["", "## 最近修复记录", ...pack.repairHistory.map((item) => `- ${item.label}｜${item.chapterTitle}｜${item.status}｜${item.message}`)] : []),
     "",
     "## 发布效果复盘",
+    `回填状态：${pack.effectCapturePlan.status}`,
+    `平台关注：${pack.effectCapturePlan.primaryMetrics.join("、")}`,
+    `必填数据：${pack.effectCapturePlan.requiredFields.map((field) => field.label).join("、")}`,
+    `缺失数据：${pack.effectCapturePlan.missingFields.map((field) => field.label).join("、") || "无"}`,
+    `回填提示：${pack.effectCapturePlan.prompt}`,
     `记录数：${pack.publishEffect.records}`,
     `曝光/点击/收藏/追读：${pack.publishEffect.totalViews}/${pack.publishEffect.totalClicks}/${pack.publishEffect.totalFavorites}/${pack.publishEffect.totalFollows}`,
     `点击率：${pack.publishEffect.clickRatePercent}%｜收藏率：${pack.publishEffect.favoriteRatePercent}%｜追读率：${pack.publishEffect.followRatePercent}%`,
@@ -3492,6 +3513,49 @@ function buildPublishEffectComparison(history: PlatformPublishMetricInput[]): Pl
   };
 }
 
+const baseEffectCaptureFields: PlatformEffectCaptureField[] = [
+  { id: "views", label: "曝光", helper: "平台给到的曝光、展示或阅读入口触达。" },
+  { id: "clicks", label: "点击", helper: "读者点进作品详情或章节的次数。" },
+  { id: "favorites", label: "收藏", helper: "加入书架、library add、favorite 或 vote 类留存信号。" },
+  { id: "follows", label: "追读", helper: "继续阅读、followers、chapter retention 或后续章节追更。" },
+];
+
+function buildPlatformEffectCapturePlan(
+  platform: PlatformProfile,
+  effect: PlatformPublishEffectSummary,
+): PlatformEffectCapturePlan {
+  const executionCard = buildPlatformExecutionCard(platform.id);
+  const latest = effect.latest;
+  const missingFields = !latest
+    ? baseEffectCaptureFields
+    : baseEffectCaptureFields.filter((field) => Math.max(0, latest[field.id]) === 0);
+  const status: PlatformEffectCapturePlan["status"] = !latest
+    ? "needs_record"
+    : missingFields.length
+      ? "missing_fields"
+      : "ready_to_review";
+  const prompt = [
+    `${platform.name} 这轮重点看：${executionCard.feedbackMetric.join("、")}。`,
+    platform.category === "overseas"
+      ? "海外平台请把 views、library adds/followers、chapter comments 和 retention 对应回填，别只贴中文后台截图。"
+      : "国内平台请至少回填曝光、点击、收藏、追读；编辑反馈或签约状态有变化也要写清。",
+  ].join("");
+  const nextAction = status === "needs_record"
+    ? `先回填 ${baseEffectCaptureFields.map((field) => field.label).join("、")}，再让系统判断 ${platform.name} 是否值得继续投放。`
+    : status === "missing_fields"
+      ? `补齐 ${missingFields.map((field) => field.label).join("、")} 后再复盘，别拿半截数据做平台判断。`
+      : `${platform.name} 的关键效果可以复盘，可以进入平台排序、A/B 归因和下一轮动作。`;
+
+  return {
+    status,
+    primaryMetrics: executionCard.feedbackMetric,
+    requiredFields: baseEffectCaptureFields,
+    missingFields,
+    prompt,
+    nextAction,
+  };
+}
+
 function buildPlatformPublishEffect(
   platform: PlatformProfile,
   metrics: PlatformPublishMetricInput[],
@@ -3979,6 +4043,7 @@ function buildPlatformPackage(
     input.submissionAssetVersions ?? [],
   );
   const publishEffect = buildPlatformPublishEffect(platform, input.platformPublishMetrics ?? []);
+  const effectCapturePlan = buildPlatformEffectCapturePlan(platform, publishEffect);
   const dispatchEffectValidation = buildDispatchCompletionEffectValidation(platform, publishEffect);
   const effectOptimization = buildPlatformEffectOptimization(
     platform,
@@ -4008,6 +4073,7 @@ function buildPlatformPackage(
     submissionAssetVersions,
     submissionAssetAdoption,
     publishEffect,
+    effectCapturePlan,
     dispatchEffectValidation,
     effectOptimization,
     experimentPlan,

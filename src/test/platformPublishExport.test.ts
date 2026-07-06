@@ -158,8 +158,14 @@ test("buildPlatformPublishExportCenter", async (t) => {
     assert.ok(center.executionHandoffSummary.nextAction.includes(center.executionHandoffSummary.primaryAction?.platformName ?? ""));
     assert.ok(center.executionHandoffs.find((item) => item.platformId === "fanqie")?.submissionFocus.some((item) => item.includes("首秀")));
     assert.ok(center.executionHandoffs.find((item) => item.platformId === "qidian")?.writingFocus.some((item) => item.includes("卷结构")));
-    assert.equal(center.packages[0].publishEffect.status, "empty");
-    assert.ok(center.packages[0].publishEffect.nextAction.includes("录入"));
+    const fanqiePack = center.packages.find((pack) => pack.platformId === "fanqie");
+    assert.equal(fanqiePack?.publishEffect.status, "empty");
+    assert.ok(fanqiePack?.publishEffect.nextAction.includes("录入"));
+    assert.equal(fanqiePack?.effectCapturePlan.status, "needs_record");
+    assert.ok(fanqiePack?.effectCapturePlan.primaryMetrics.some((item) => item.includes("首秀曝光")));
+    assert.ok(fanqiePack?.effectCapturePlan.requiredFields.some((item) => item.label === "曝光"));
+    assert.ok(fanqiePack?.effectCapturePlan.missingFields.some((item) => item.label === "曝光"));
+    assert.ok(fanqiePack?.effectCapturePlan.nextAction.includes("先回填"));
     assert.equal(center.packages[0].dispatchEffectValidation.status, "needs_effect");
     assert.ok(center.packages[0].dispatchEffectValidation.verdict.includes("不能证明平台增长有效"));
     assert.ok(center.packages[0].dispatchEffectValidation.nextAction.includes("曝光、点击、收藏、追读"));
@@ -535,6 +541,10 @@ test("buildPlatformPublishExportCenter", async (t) => {
     assert.equal(pack.publishEffect.favoriteRatePercent, 6);
     assert.equal(pack.publishEffect.followRatePercent, 3);
     assert.ok(pack.publishEffect.verdict.includes("有可追的苗头"));
+    assert.equal(pack.effectCapturePlan.status, "ready_to_review");
+    assert.deepEqual(pack.effectCapturePlan.missingFields, []);
+    assert.ok(pack.effectCapturePlan.primaryMetrics.includes("读完率"));
+    assert.ok(pack.effectCapturePlan.nextAction.includes("可以复盘"));
     assert.equal(pack.publishEffect.comparison.status, "none");
     assert.equal(pack.dispatchEffectValidation.status, "reusable_success");
     assert.equal(pack.dispatchEffectValidation.label, "可沉淀");

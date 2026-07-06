@@ -336,6 +336,21 @@ interface PlatformPublishEffectOptimization {
   actions: PlatformPublishOptimizationAction[];
 }
 
+interface PlatformEffectCaptureField {
+  id: "views" | "clicks" | "favorites" | "follows" | "comments" | "paidReads";
+  label: string;
+  helper: string;
+}
+
+interface PlatformEffectCapturePlan {
+  status: "needs_record" | "missing_fields" | "ready_to_review";
+  primaryMetrics: string[];
+  requiredFields: PlatformEffectCaptureField[];
+  missingFields: PlatformEffectCaptureField[];
+  prompt: string;
+  nextAction: string;
+}
+
 interface PlatformABExperimentCandidate {
   id: string;
   sourceTaskId: string;
@@ -405,6 +420,7 @@ interface PlatformPublishPackage {
   submissionAssetVersions: PlatformSubmissionAssetVersion[];
   submissionAssetAdoption: PlatformSubmissionAssetAdoption;
   publishEffect: PlatformPublishEffect;
+  effectCapturePlan: PlatformEffectCapturePlan;
   dispatchEffectValidation: PlatformDispatchCompletionEffectValidation;
   effectOptimization: PlatformPublishEffectOptimization;
   experimentPlan: PlatformABExperimentPlan;
@@ -920,6 +936,18 @@ function effectStatusClass(status: PlatformPublishEffect["status"]) {
   if (status === "promising") return "bg-cyan-50 text-cyan-700";
   if (status === "weak") return "bg-rose-50 text-rose-700";
   if (status === "watch") return "bg-amber-50 text-amber-700";
+  return "bg-slate-100 text-slate-600";
+}
+
+function effectCaptureStatusLabel(status: PlatformEffectCapturePlan["status"]) {
+  if (status === "ready_to_review") return "可复盘";
+  if (status === "missing_fields") return "缺数据";
+  return "待回填";
+}
+
+function effectCaptureStatusClass(status: PlatformEffectCapturePlan["status"]) {
+  if (status === "ready_to_review") return "bg-emerald-50 text-emerald-700";
+  if (status === "missing_fields") return "bg-amber-50 text-amber-700";
   return "bg-slate-100 text-slate-600";
 }
 
@@ -4376,6 +4404,34 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
             </div>
             <div className="mt-3 rounded-md bg-slate-50 p-3 text-sm text-slate-700">
               <span className="font-medium text-slate-950">下一步：</span>{selectedPackage.publishEffect.nextAction}
+            </div>
+            <div className="mt-3 rounded-md border border-slate-200 bg-white p-3 text-sm">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <div className="font-medium text-slate-950">效果回填口径</div>
+                  <p className="mt-1 leading-6 text-slate-600">{selectedPackage.effectCapturePlan.prompt}</p>
+                </div>
+                <span className={`w-fit rounded-md px-2 py-1 text-xs font-medium ${effectCaptureStatusClass(selectedPackage.effectCapturePlan.status)}`}>
+                  {effectCaptureStatusLabel(selectedPackage.effectCapturePlan.status)}
+                </span>
+              </div>
+              <div className="mt-3 grid gap-2 text-xs text-slate-500 lg:grid-cols-3">
+                <div className="rounded-md bg-slate-50 p-2">
+                  <div className="font-medium text-slate-700">平台重点</div>
+                  <div className="mt-1 leading-5">{selectedPackage.effectCapturePlan.primaryMetrics.join("、")}</div>
+                </div>
+                <div className="rounded-md bg-slate-50 p-2">
+                  <div className="font-medium text-slate-700">必填数据</div>
+                  <div className="mt-1 leading-5">{selectedPackage.effectCapturePlan.requiredFields.map((field) => field.label).join("、")}</div>
+                </div>
+                <div className="rounded-md bg-slate-50 p-2">
+                  <div className="font-medium text-slate-700">当前缺失</div>
+                  <div className="mt-1 leading-5">{selectedPackage.effectCapturePlan.missingFields.map((field) => field.label).join("、") || "无"}</div>
+                </div>
+              </div>
+              <div className="mt-2 rounded-md bg-slate-50 p-2 text-slate-700">
+                <span className="font-medium text-slate-950">回填动作：</span>{selectedPackage.effectCapturePlan.nextAction}
+              </div>
             </div>
             <div className="mt-3 rounded-md border border-slate-200 bg-white p-3 text-sm">
               <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">

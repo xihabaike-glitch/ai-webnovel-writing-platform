@@ -1016,6 +1016,37 @@ test("buildPlatformPublishExportCenter", async (t) => {
     assert.ok(weakWattpadAudit.issues.some((issue) => issue.label.includes("Wattpad")));
   });
 
+  await t.test("scores domestic core platforms with platform-specific publishing checks", () => {
+    const weakFanqieAudit = buildSubmissionAssetAudit(getPlatformProfile("fanqie"), {
+      title: "雨夜系统",
+      logline: "主角在危机中觉醒系统，靠选择逆袭翻盘，连续面对追杀、背叛和新任务。",
+      synopsis: "主角在雨夜危机中觉醒系统，被迫在救人和自保之间做出选择。故事会持续推进系统任务、背叛真相和一次次翻盘，主角不断用新能力解决眼前危机，并追查系统背后的隐藏操盘者。后续会围绕任务代价、反派压迫和关系背叛不断加码，让读者持续看到危机、选择和逆袭结果。",
+      overseasSynopsis: "",
+      tags: ["系统", "逆袭", "爽文"],
+    });
+    const weakQidianAudit = buildSubmissionAssetAudit(getPlatformProfile("qidian"), {
+      title: "万界长夜",
+      logline: "少年在世界规则崩塌后重建升级体系，沿着主线追查旧神伏笔和境界真相。",
+      synopsis: "少年在长夜世界醒来，发现每个境界都对应一段被抹去的历史。他必须重建升级体系，推进长期主线，收束隐藏伏笔，并在每个阶段敌人身上拿回失落规则，最终挑战操纵万界的旧神。故事会持续围绕修行体系、旧神真相和主角成长推进，让读者看到长篇目标和升级期待。",
+      overseasSynopsis: "",
+      tags: ["玄幻", "升级", "世界观"],
+    });
+    const weakQimaoAudit = buildSubmissionAssetAudit(getPlatformProfile("qimao"), {
+      title: "春风有信",
+      logline: "女主回到小镇靠手艺翻身，面对债务、旧爱和家庭误会，慢慢找回生活主动权。",
+      synopsis: "女主回到小镇后重新经营点心摊，面对债务、流言、旧爱误会和家庭压力。她靠手艺打开局面，查清旧账本背后的真相，也逐步修复自己和家人、旧恋人之间的关系。后续会继续推进生意成长、亲情修复和旧案证据，让读者看到生活目标、关系变化和情绪回报。",
+      overseasSynopsis: "",
+      tags: ["言情", "种田", "年代"],
+    });
+
+    assert.equal(weakFanqieAudit.status, "needs_work");
+    assert.ok(weakFanqieAudit.issues.some((issue) => issue.label.includes("番茄开头钩子")));
+    assert.equal(weakQidianAudit.status, "needs_work");
+    assert.ok(weakQidianAudit.issues.some((issue) => issue.label.includes("起点长线结构")));
+    assert.equal(weakQimaoAudit.status, "needs_work");
+    assert.ok(weakQimaoAudit.issues.some((issue) => issue.label.includes("七猫稳定更新")));
+  });
+
   await t.test("blocks export when latest review still asks for a second pass", () => {
     const center = buildPlatformPublishExportCenter({
       project: {

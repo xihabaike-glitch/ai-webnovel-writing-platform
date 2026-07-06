@@ -2862,11 +2862,27 @@ export function buildSubmissionAssetAudit(
   } else if (platform.id === "fanqie") {
     addIssue({ field: "logline", severity: "warning", label: "番茄爽点不够直给", detail: "番茄标题/卖点要更直接打出系统、逆袭、翻盘、危机或连续选择。" });
   }
+  if (platform.id === "fanqie" && hasAny(searchableText, ["第一章", "首章", "前三章", "章末", "首秀", "读完率", "追读", "倒计时", "强爽点", "连续爽点"])) {
+    passed.push("番茄开头钩子和追读信号明确。");
+  } else if (platform.id === "fanqie") {
+    addIssue({ field: "synopsis", severity: "warning", label: "番茄开头钩子不够可测", detail: "番茄投稿包要写清第一章/前三章如何抓人、章末如何追读，别只说有爽点。" });
+  }
 
   if (platform.id === "qidian" && hasAny(searchableText, ["世界", "体系", "升级", "主线", "长期", "伏笔", "境界"])) {
     passed.push("起点长线结构信号明确。");
   } else if (platform.id === "qidian") {
     addIssue({ field: "synopsis", severity: "warning", label: "起点长线期待不足", detail: "起点简介要补世界观、升级体系、长期主线或阶段目标。" });
+  }
+  if (platform.id === "qidian" && hasAny(searchableText, ["卷", "地图", "宗门", "王朝", "阶段 Boss", "阶段Boss", "势力", "资源体系"])) {
+    passed.push("起点长线结构层级可见。");
+  } else if (platform.id === "qidian") {
+    addIssue({ field: "synopsis", severity: "warning", label: "起点长线结构层级不足", detail: "起点投稿包要补卷、地图、势力、资源体系或阶段 Boss，让长篇主干不是一句空承诺。" });
+  }
+
+  if (platform.id === "qimao" && hasAny(searchableText, ["稳定更新", "日更", "追更", "保底", "持续更新", "不断更", "平台连载", "七猫"])) {
+    passed.push("七猫稳定更新承诺明确。");
+  } else if (platform.id === "qimao") {
+    addIssue({ field: "synopsis", severity: "warning", label: "七猫稳定更新承诺不足", detail: "七猫投稿包要写清稳定更新、追更或保底节奏，别只讲情绪和关系。" });
   }
 
   if (platform.id === "zhihu_yanxuan" && hasAny(searchableText, ["反转", "真相", "复仇", "第一人称", "悬疑", "付费"])) {

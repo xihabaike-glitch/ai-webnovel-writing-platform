@@ -985,6 +985,37 @@ test("buildPlatformPublishExportCenter", async (t) => {
     assert.ok(strongQidianAudit.score >= 90);
   });
 
+  await t.test("scores overseas platforms with platform-specific packaging signals", () => {
+    const weakWebNovelAudit = buildSubmissionAssetAudit(getPlatformProfile("webnovel"), {
+      title: "Rain Choice",
+      logline: "A betrayed trainee must survive a rain-soaked academy conspiracy while enemies close in from every side.",
+      synopsis: "A betrayed trainee enters a dangerous academy and faces enemies, secrets, and a growing conspiracy around his missing family.",
+      overseasSynopsis: "A betrayed trainee enters a dangerous academy and faces enemies, secrets, and a growing conspiracy around his missing family. Every chapter pushes him into a harder choice while old allies become threats and the truth behind the rain slowly becomes impossible to ignore.",
+      tags: ["academy", "mystery", "revenge"],
+    });
+    const weakRoyalRoadAudit = buildSubmissionAssetAudit(getPlatformProfile("royal_road"), {
+      title: "Dungeon Rain",
+      logline: "A clever survivor enters a deadly dungeon and fights monsters while trying to return home alive.",
+      synopsis: "A clever survivor enters a dungeon where every room tests courage, trust, and the will to keep moving forward.",
+      overseasSynopsis: "A clever survivor enters a dungeon where every room tests courage, trust, and the will to keep moving forward. The story follows dangerous battles, uncertain alliances, and the slow discovery that the dungeon is connected to a world-changing secret.",
+      tags: ["dungeon", "fantasy", "survival"],
+    });
+    const weakWattpadAudit = buildSubmissionAssetAudit(getPlatformProfile("wattpad"), {
+      title: "Midnight Contract",
+      logline: "A young woman signs a risky midnight contract to save her family from ruin and public shame.",
+      synopsis: "A young woman signs a contract that changes her public image and forces her into a house full of secrets.",
+      overseasSynopsis: "A young woman signs a contract that changes her public image and forces her into a house full of secrets. She must protect her family, navigate public pressure, and decide how much of herself she is willing to sacrifice for a polished life.",
+      tags: ["family", "drama", "secrets"],
+    });
+
+    assert.equal(weakWebNovelAudit.status, "needs_work");
+    assert.ok(weakWebNovelAudit.issues.some((issue) => issue.label.includes("WebNovel")));
+    assert.equal(weakRoyalRoadAudit.status, "needs_work");
+    assert.ok(weakRoyalRoadAudit.issues.some((issue) => issue.label.includes("Royal Road")));
+    assert.equal(weakWattpadAudit.status, "needs_work");
+    assert.ok(weakWattpadAudit.issues.some((issue) => issue.label.includes("Wattpad")));
+  });
+
   await t.test("blocks export when latest review still asks for a second pass", () => {
     const center = buildPlatformPublishExportCenter({
       project: {

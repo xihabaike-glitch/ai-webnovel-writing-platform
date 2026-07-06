@@ -2887,6 +2887,24 @@ export function buildSubmissionAssetAudit(
     addIssue({ field: "overseasSynopsis", severity: "blocker", label: "海外简介不够英文平台化", detail: "海外平台需要英文简介，避免直接中文投递或机器直译感过强。" });
   }
 
+  if (platform.id === "webnovel" && hasAny(searchableText, ["system", "power", "progression", "cultivation", "fantasy", "skill", "ability"])) {
+    passed.push("WebNovel 力量幻想/系统卖点明确。");
+  } else if (platform.id === "webnovel") {
+    addIssue({ field: "overseasSynopsis", severity: "warning", label: "WebNovel力量幻想不够直给", detail: "WebNovel 包装要更早打出 system、power fantasy、progression 或 cultivation 承诺。" });
+  }
+
+  if (platform.id === "royal_road" && hasAny(searchableText, ["litrpg", "progression", "skill", "level", "system", "rule", "build", "stat", "mechanic"])) {
+    passed.push("Royal Road 进阶机制和规则信号明确。");
+  } else if (platform.id === "royal_road") {
+    addIssue({ field: "overseasSynopsis", severity: "warning", label: "Royal Road机制承诺不足", detail: "Royal Road 包装要看见 progression、skill、level、build、rules 或系统限制，别只写泛奇幻冒险。" });
+  }
+
+  if (platform.id === "wattpad" && hasAny(searchableText, ["romance", "love", "relationship", "chemistry", "werewolf", "billionaire", "forbidden", "kiss"])) {
+    passed.push("Wattpad 情感关系和标签承诺明确。");
+  } else if (platform.id === "wattpad") {
+    addIssue({ field: "tags", severity: "warning", label: "Wattpad关系标签不够明确", detail: "Wattpad 包装要更早出现 romance、relationship、chemistry、werewolf、billionaire 或 forbidden love 等可点击标签。" });
+  }
+
   const blockerCount = issues.filter((issue) => issue.severity === "blocker").length;
   const warningCount = issues.length - blockerCount;
   const score = Math.max(0, 100 - blockerCount * 24 - warningCount * 10);

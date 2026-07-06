@@ -1,5 +1,6 @@
 import type { PlatformProfile } from "../platforms/platformProfiles.ts";
 import { platformProfiles, type PlatformId } from "../platforms/platformProfiles.ts";
+import { buildPlatformExecutionCard } from "../platforms/platformExecutionCards.ts";
 import { getChapterRevisionSourceLabel, isChapterRevisionCandidate } from "../chapters/revisions.ts";
 import { publishRepairTaskSource } from "./publishRepairActionExecution.ts";
 import { chapterTaskFreshness } from "./chapterPublishReadiness.ts";
@@ -776,10 +777,26 @@ export interface PlatformPublishExportCenter {
   recommendedPlatformId: PlatformId;
   totalPublishableChapters: number;
   workspace: PlatformPublishWorkspace;
+  executionHandoffs: PlatformPublishExecutionHandoff[];
   platformStrategy: PlatformStrategyRankItem[];
   strategyVerdict: PlatformStrategyAutoVerdict;
   platformKnowledge: PlatformKnowledgeInsight[];
   activeStrategyPlan: PlatformStrategySwitchPlan | null;
+}
+
+export interface PlatformPublishExecutionHandoff {
+  platformId: PlatformId;
+  platformName: string;
+  pipelineStages: string[];
+  writingFocus: string[];
+  submissionFocus: string[];
+  feedbackMetric: string[];
+  referenceAction: string;
+  currentAction: string;
+  preflightScore: number;
+  canExport: boolean;
+  blockedCount: number;
+  warningCount: number;
 }
 
 export interface PlatformPublishArchivePlatform {
@@ -4000,6 +4017,29 @@ function buildPlatformPackage(
   };
 }
 
+function buildPlatformPublishExecutionHandoff(pack: PlatformPublishPackage): PlatformPublishExecutionHandoff {
+  const executionCard = buildPlatformExecutionCard(pack.platformId);
+  const firstBlocker = pack.preflight.blocked[0] ?? pack.finalGate.blockers[0] ?? "";
+  const currentAction = pack.canExport
+    ? `可导出：按${pack.platformName}投稿包进入小范围发布和数据复盘。`
+    : `先修：${firstBlocker || pack.repairPath.nextStep?.label || executionCard.nextAction}`;
+
+  return {
+    platformId: pack.platformId,
+    platformName: pack.platformName,
+    pipelineStages: executionCard.pipelineStages,
+    writingFocus: executionCard.writingFocus,
+    submissionFocus: executionCard.submissionFocus,
+    feedbackMetric: executionCard.feedbackMetric,
+    referenceAction: executionCard.nextAction,
+    currentAction,
+    preflightScore: pack.preflight.score,
+    canExport: pack.canExport,
+    blockedCount: pack.preflight.blocked.length + pack.finalGate.blockers.length,
+    warningCount: pack.warnings.length,
+  };
+}
+
 export function buildPlatformPublishExportCenter(input: PlatformPublishExportInput): PlatformPublishExportCenter {
   const platforms = input.platforms ?? platformProfiles;
   const packages = platforms.map((platform) => buildPlatformPackage(input, platform));
@@ -4014,6 +4054,7 @@ export function buildPlatformPublishExportCenter(input: PlatformPublishExportInp
     recommendedPlatformId: input.targetPlatform.id,
     totalPublishableChapters: publishableChapters(input.chapters).length,
     workspace: buildPublishWorkspace(packages),
+    executionHandoffs: packages.map(buildPlatformPublishExecutionHandoff),
     platformStrategy,
     strategyVerdict,
     platformKnowledge,

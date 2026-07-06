@@ -686,11 +686,27 @@ interface PlatformKnowledgeInsight {
   feedbackLoop: PlatformKnowledgeFeedbackLoop;
 }
 
+interface PlatformPublishExecutionHandoff {
+  platformId: string;
+  platformName: string;
+  pipelineStages: string[];
+  writingFocus: string[];
+  submissionFocus: string[];
+  feedbackMetric: string[];
+  referenceAction: string;
+  currentAction: string;
+  preflightScore: number;
+  canExport: boolean;
+  blockedCount: number;
+  warningCount: number;
+}
+
 interface PlatformPublishExportCenter {
   packages: PlatformPublishPackage[];
   recommendedPlatformId: string;
   totalPublishableChapters: number;
   workspace: PlatformPublishWorkspace;
+  executionHandoffs: PlatformPublishExecutionHandoff[];
   platformStrategy: PlatformStrategyRankItem[];
   strategyVerdict: PlatformStrategyAutoVerdict;
   platformKnowledge: PlatformKnowledgeInsight[];
@@ -2557,6 +2573,51 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
               <div className="mt-1 font-medium text-slate-950">{center.workspace.manualActions}</div>
             </div>
           </div>
+          {center.executionHandoffs.length ? (
+            <div className="mt-3 rounded-md border border-slate-200 p-3">
+              <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <div className="font-medium text-slate-950">8 平台执行交接卡</div>
+                  <p className="mt-1 text-sm leading-6 text-slate-600">把参考库的平台抓手接到当前作品包：每个平台都显示写作、投稿、复盘和当前要处理的动作。</p>
+                </div>
+                <div className="text-xs text-slate-500">平台还差 0 个</div>
+              </div>
+              <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-4">
+                {center.executionHandoffs.map((item) => (
+                  <div className="rounded-md bg-slate-50 p-3 text-sm" key={item.platformId}>
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <div>
+                        <div className="font-medium text-slate-950">{item.platformName}</div>
+                        <div className="mt-1 flex flex-wrap gap-1">
+                          {item.pipelineStages.map((stage) => (
+                            <span className="rounded-md bg-white px-1.5 py-0.5 text-[11px] text-slate-500" key={stage}>
+                              {stage}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                      <span className={`rounded-md px-2 py-1 text-[11px] font-medium ${item.canExport ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}>
+                        {item.canExport ? "可导出" : "待修"}
+                      </span>
+                    </div>
+                    <div className="mt-3 grid grid-cols-3 gap-2 text-xs text-slate-500">
+                      <div>质检 <span className="font-medium text-slate-950">{item.preflightScore}</span></div>
+                      <div>阻塞 <span className="font-medium text-slate-950">{item.blockedCount}</span></div>
+                      <div>提醒 <span className="font-medium text-slate-950">{item.warningCount}</span></div>
+                    </div>
+                    <div className="mt-3 grid gap-2 text-xs leading-5 text-slate-600">
+                      <div>写作：{item.writingFocus.join("、")}</div>
+                      <div>投稿：{item.submissionFocus.join("、")}</div>
+                      <div>复盘：{item.feedbackMetric.join("、")}</div>
+                    </div>
+                    <div className="mt-3 rounded-md bg-white px-2 py-1.5 text-xs leading-5 text-slate-600">
+                      {item.currentAction}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
           {center.workspace.nextActions.length ? (
             <div className="mt-3 grid gap-2 lg:grid-cols-2">
               {center.workspace.nextActions.slice(0, 4).map((action) => (

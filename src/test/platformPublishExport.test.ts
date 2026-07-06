@@ -140,6 +140,13 @@ test("buildPlatformPublishExportCenter", async (t) => {
       center.platformStrategy.find((item) => item.platformId === "fanqie")?.reviewDecision.tasks.find((task) => task.id === "archive-current-submission")?.execution,
       "save_snapshot",
     );
+    assert.equal(center.executionHandoffs.length, platformProfiles.length);
+    assert.equal(center.executionHandoffs[0].pipelineStages.join("、"), "写作、投稿、复盘");
+    assert.equal(center.executionHandoffs[0].preflightScore, center.packages[0].preflight.score);
+    assert.equal(center.executionHandoffs[0].canExport, center.packages[0].canExport);
+    assert.ok(center.executionHandoffs[0].currentAction.includes("先修"));
+    assert.ok(center.executionHandoffs.find((item) => item.platformId === "fanqie")?.submissionFocus.some((item) => item.includes("首秀")));
+    assert.ok(center.executionHandoffs.find((item) => item.platformId === "qidian")?.writingFocus.some((item) => item.includes("卷结构")));
     assert.equal(center.packages[0].publishEffect.status, "empty");
     assert.ok(center.packages[0].publishEffect.nextAction.includes("录入"));
     assert.equal(center.packages[0].dispatchEffectValidation.status, "needs_effect");

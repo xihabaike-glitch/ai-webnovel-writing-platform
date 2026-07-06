@@ -215,6 +215,14 @@ export interface PlatformSubmissionAssetEditorReview {
   evidence: string[];
 }
 
+export interface PlatformSubmissionAssetIssueResolution {
+  field: PlatformSubmissionAssetIssue["field"];
+  severity: PlatformSubmissionAssetIssue["severity"];
+  label: string;
+  detail: string;
+  status: "resolved";
+}
+
 export interface PlatformSubmissionAssetAdoptionSummary {
   generatedTasks: number;
   generatedVariants: number;
@@ -2989,6 +2997,23 @@ export function buildSubmissionAssetEditorReview(
     focusIssues,
     evidence,
   };
+}
+
+export function buildSubmissionAssetIssueResolutions(
+  sourceAudit: PlatformSubmissionAssetAudit,
+  variantAudit: PlatformSubmissionAssetAudit,
+): PlatformSubmissionAssetIssueResolution[] {
+  return sourceAudit.issues
+    .filter((sourceIssue) => !variantAudit.issues.some((variantIssue) => (
+      variantIssue.field === sourceIssue.field && variantIssue.label === sourceIssue.label
+    )))
+    .map((issue) => ({
+      field: issue.field,
+      severity: issue.severity,
+      label: issue.label,
+      detail: issue.detail,
+      status: "resolved",
+    }));
 }
 
 function taskPlatformId(task: PublishExportAiTask) {

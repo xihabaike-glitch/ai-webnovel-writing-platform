@@ -6,7 +6,7 @@ import {
 import { prisma } from "@/lib/db/prisma";
 import { getActiveModelProvider } from "@/lib/model-gateway/activeProvider";
 import { getPlatformProfile, platformProfiles, type PlatformId } from "@/lib/platforms/platformProfiles";
-import { buildPlatformPublishExportCenter, buildSubmissionAssetAudit, buildSubmissionAssetEditorReview, parsePublishSnapshotTags } from "@/lib/projects/platformPublishExport";
+import { buildPlatformPublishExportCenter, buildSubmissionAssetAudit, buildSubmissionAssetEditorReview, buildSubmissionAssetIssueResolutions, parsePublishSnapshotTags } from "@/lib/projects/platformPublishExport";
 import { buildSubmissionChecklist } from "@/lib/projects/submissionChecklist";
 
 interface Params {
@@ -183,16 +183,20 @@ export async function POST(request: Request, { params }: Params) {
       maxTokens: 2400,
     });
     const parsed = platformSubmissionAssetOptimizationResultSchema.parse(JSON.parse(result.text));
-    const variants = parsed.variants.map((variant) => ({
-      ...variant,
-      audit: buildSubmissionAssetAudit(platform, {
+    const variants = parsed.variants.map((variant) => {
+      const variantAudit = buildSubmissionAssetAudit(platform, {
         title: variant.title,
         logline: variant.logline,
         synopsis: variant.synopsis,
         overseasSynopsis: variant.overseasSynopsis,
         tags: variant.tags,
-      }),
-    }));
+      });
+      return {
+        ...variant,
+        audit: variantAudit,
+        addressedIssues: buildSubmissionAssetIssueResolutions(audit, variantAudit),
+      };
+    });
     const updatedTask = await prisma.aiTask.update({
       where: { id: task.id },
       data: {

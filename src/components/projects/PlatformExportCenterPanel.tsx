@@ -242,6 +242,13 @@ interface PlatformSubmissionAssetOptimizationVariant {
   tags: string[];
   rationale: string[];
   audit: PlatformSubmissionAssetAudit;
+  addressedIssues?: Array<{
+    field: PlatformSubmissionAssetIssue["field"];
+    severity: PlatformSubmissionAssetIssue["severity"];
+    label: string;
+    detail: string;
+    status: "resolved";
+  }>;
   sourceTaskId?: string;
 }
 
@@ -4101,6 +4108,18 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
                       <div className="mt-2 leading-6 text-slate-700">{variant.logline}</div>
                       <div className="mt-2 line-clamp-4 leading-6 text-slate-600">{variant.synopsis}</div>
                       <div className="mt-2 text-xs text-slate-500">标签：{variant.tags.join("、")}</div>
+                      {variant.addressedIssues?.length ? (
+                        <div className="mt-2 rounded-md border border-emerald-100 bg-emerald-50 p-2 text-xs leading-5 text-emerald-800">
+                          <div className="font-medium text-emerald-950">解决审稿意见</div>
+                          <div className="mt-1">
+                            {variant.addressedIssues.slice(0, 2).map((issue) => `${assetIssueFieldLabel(issue.field)}：${issue.label}`).join("；")}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="mt-2 rounded-md border border-slate-100 bg-slate-50 p-2 text-xs leading-5 text-slate-500">
+                          暂未命中明确审稿意见，重点看分数和改动字段。
+                        </div>
+                      )}
                       <div className="mt-2 grid gap-1 text-xs text-slate-500">
                         {variant.rationale.slice(0, 3).map((item) => (
                           <div key={item}>{item}</div>

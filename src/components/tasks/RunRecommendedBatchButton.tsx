@@ -2,7 +2,10 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { buildRecommendedBatchRouteGateTimeline } from "@/lib/projects/recommendedBatchRouteGateView";
+import {
+  buildRecommendedBatchRouteGateActions,
+  buildRecommendedBatchRouteGateTimeline,
+} from "@/lib/projects/recommendedBatchRouteGateView";
 
 export interface BatchRunResponse {
   error?: string;
@@ -109,6 +112,7 @@ export function RunRecommendedBatchButton({
   const [modelRouteGate, setModelRouteGate] = useState<BatchRunResponse["modelRouteGate"] | null>(initialModelRouteGate);
   const [isCreatingRecheck, setIsCreatingRecheck] = useState(false);
   const routeGateTimeline = modelRouteGate ? buildRecommendedBatchRouteGateTimeline(modelRouteGate) : null;
+  const routeGateActions = modelRouteGate ? buildRecommendedBatchRouteGateActions(modelRouteGate) : null;
   const runActionLabel = routeGateTimeline && modelRouteGate?.status !== "block"
     ? routeGateTimeline.primaryActionLabel
     : "执行推荐批次";
@@ -219,7 +223,7 @@ export function RunRecommendedBatchButton({
               ) : null}
             </div>
             <div className="flex shrink-0 flex-wrap gap-2">
-              {modelRouteGate.recheckAdvice ? (
+              {modelRouteGate.recheckAdvice && routeGateActions?.canCreateRecheckDispatch ? (
                 <button
                   className="w-fit rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white disabled:opacity-50"
                   disabled={isCreatingRecheck}
@@ -229,8 +233,8 @@ export function RunRecommendedBatchButton({
                   {isCreatingRecheck ? "生成中" : "生成复检派单"}
                 </button>
               ) : null}
-              <a className="w-fit rounded-md bg-white px-3 py-2 text-xs font-medium text-slate-950" href={modelRouteGate.targetHref}>
-                {modelRouteGate.actionLabel}
+              <a className="w-fit rounded-md bg-white px-3 py-2 text-xs font-medium text-slate-950" href={routeGateActions?.primaryLinkHref ?? modelRouteGate.targetHref}>
+                {routeGateActions?.primaryLinkLabel ?? modelRouteGate.actionLabel}
               </a>
             </div>
           </div>

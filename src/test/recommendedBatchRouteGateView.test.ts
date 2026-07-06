@@ -1,6 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { buildRecommendedBatchRouteGateTimeline } from "../lib/projects/recommendedBatchRouteGateView.ts";
+import {
+  buildRecommendedBatchRouteGateActions,
+  buildRecommendedBatchRouteGateTimeline,
+} from "../lib/projects/recommendedBatchRouteGateView.ts";
 
 test("buildRecommendedBatchRouteGateTimeline", async (t) => {
   await t.test("shows a blocked route before recheck", () => {
@@ -51,5 +54,23 @@ test("buildRecommendedBatchRouteGateTimeline", async (t) => {
     assert.equal(timeline.tone, "ok");
     assert.equal(timeline.label, "正常批量已恢复");
     assert.deepEqual(timeline.items.map((item) => item.label), ["路线复检通过", "恢复样本通过", "标准批量已开启"]);
+  });
+
+  await t.test("does not offer duplicate recheck dispatch creation while a recheck is already waiting", () => {
+    const actions = buildRecommendedBatchRouteGateActions({
+      status: "block",
+      label: "模型路线拦截",
+      headline: "模型路线复检还没完成，本批先别执行。",
+      detail: "等待复检。",
+      maxBatchSize: 0,
+      recoveryEvidence: null,
+      recheckAdvice: { id: "pending-recheck" },
+      actionLabel: "去复检模型路线",
+      targetHref: "/dispatch?filter=waiting_recheck",
+    });
+
+    assert.equal(actions.canCreateRecheckDispatch, false);
+    assert.equal(actions.primaryLinkLabel, "查看待复检");
+    assert.equal(actions.primaryLinkHref, "/dispatch?filter=waiting_recheck");
   });
 });

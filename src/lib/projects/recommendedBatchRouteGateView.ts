@@ -3,6 +3,8 @@ export interface RecommendedBatchRouteGateViewInput {
   label: string;
   headline: string;
   detail: string;
+  actionLabel?: string;
+  targetHref?: string;
   maxBatchSize: number;
   totalTasks?: number;
   recoveryEvidence: string | null;
@@ -21,6 +23,12 @@ export interface RecommendedBatchRouteGateTimeline {
   primaryActionLabel: string;
   primaryActionDetail: string;
   items: RecommendedBatchRouteGateTimelineItem[];
+}
+
+export interface RecommendedBatchRouteGateActions {
+  canCreateRecheckDispatch: boolean;
+  primaryLinkLabel: string;
+  primaryLinkHref: string;
 }
 
 function hasRecoverySamplePass(evidence: string | null) {
@@ -97,5 +105,18 @@ export function buildRecommendedBatchRouteGateTimeline(
       { label: "无需恢复样本", status: "done" },
       { label: "标准批量可执行", status: "active" },
     ],
+  };
+}
+
+export function buildRecommendedBatchRouteGateActions(
+  gate: RecommendedBatchRouteGateViewInput,
+): RecommendedBatchRouteGateActions {
+  const primaryLinkHref = gate.targetHref ?? "/tasks#recommended-batch";
+  const waitingForExistingRecheck = gate.status === "block" && primaryLinkHref.includes("filter=waiting_recheck");
+
+  return {
+    canCreateRecheckDispatch: Boolean(gate.recheckAdvice) && !waitingForExistingRecheck,
+    primaryLinkLabel: waitingForExistingRecheck ? "查看待复检" : gate.actionLabel ?? "继续执行",
+    primaryLinkHref,
   };
 }

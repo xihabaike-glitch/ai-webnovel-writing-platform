@@ -511,7 +511,7 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
         </section>
       ) : null}
 
-      <section className="mb-6 rounded-md border border-slate-200 bg-white p-4">
+      <section className="mb-6 rounded-md border border-slate-200 bg-white p-4" id="task-run-console">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <h2 className="font-medium">真实运行控制台</h2>
@@ -576,7 +576,7 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
         </div>
       </section>
 
-      <section className={`mb-6 rounded-md border p-4 ${repairBatchTone(runConsole.failureRepairBatch.status)}`}>
+      <section className={`mb-6 rounded-md border p-4 ${repairBatchTone(runConsole.failureRepairBatch.status)}`} id="failure-repair-batch">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <h2 className="font-medium">失败修复批次</h2>

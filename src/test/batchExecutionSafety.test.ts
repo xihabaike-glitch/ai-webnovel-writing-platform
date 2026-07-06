@@ -144,7 +144,29 @@ test("buildBatchExecutionSafety", async (t) => {
     ]);
 
     assert.equal(safety.canRunRecommendedBatch, false);
-    assert.equal(safety.items.find((item) => item.id === "running-tasks")?.status, "block");
+    const runningGate = safety.items.find((item) => item.id === "running-tasks");
+    assert.equal(runningGate?.status, "block");
+    assert.equal(runningGate?.actionLabel, "看任务运行台");
+    assert.equal(runningGate?.actionHref, "/tasks#task-run-console");
+  });
+
+  await t.test("links high failure rate blockers to the failure review center", () => {
+    const safety = buildBatchExecutionSafety([baseItem], [
+      {
+        aiTasks: [
+          { status: "failed", inputTokens: null, outputTokens: null, costUsd: null },
+          { status: "failed", inputTokens: null, outputTokens: null, costUsd: null },
+          { status: "failed", inputTokens: null, outputTokens: null, costUsd: null },
+          { status: "succeeded", inputTokens: 1000, outputTokens: 1000, costUsd: 0.02 },
+        ],
+      },
+    ]);
+
+    assert.equal(safety.canRunRecommendedBatch, false);
+    const failureGate = safety.items.find((item) => item.id === "failure-rate");
+    assert.equal(failureGate?.status, "block");
+    assert.equal(failureGate?.actionLabel, "去失败复盘");
+    assert.equal(failureGate?.actionHref, "/failures");
   });
 
   await t.test("applies conservative and aggressive strategy thresholds", () => {

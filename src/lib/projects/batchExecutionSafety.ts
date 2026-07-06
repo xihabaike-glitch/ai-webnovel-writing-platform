@@ -225,12 +225,20 @@ export function buildBatchExecutionSafety(
       "并发占用",
       runningTasks === 0 ? "pass" : runningTasks <= strategy.runningWarnThreshold ? "warn" : runningTasks < strategy.runningBlockThreshold ? "warn" : "block",
       runningTasks === 0 ? "当前没有排队或运行中的 AI 任务。" : `当前已有 ${runningTasks} 个任务排队或运行。`,
+      runningTasks === 0 ? undefined : {
+        actionLabel: "看任务运行台",
+        actionHref: "/tasks#task-run-console",
+      },
     ),
     safetyItem(
       "failure-rate",
       "失败率",
       failureRate < strategy.failureWarnPercent ? "pass" : failureRate < strategy.failureBlockPercent ? "warn" : "block",
       totalTasks === 0 ? "还没有历史任务样本。" : `历史 AI 失败率 ${failureRate}%。`,
+      failureRate < strategy.failureWarnPercent ? undefined : {
+        actionLabel: "去失败复盘",
+        actionHref: "/failures",
+      },
     ),
     safetyItem(
       "budget",

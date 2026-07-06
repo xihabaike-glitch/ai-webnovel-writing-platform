@@ -491,6 +491,10 @@ export interface GateAiPipelineRecoveryPanel {
         memoryAction: "rollback";
       };
       successHref: string;
+      runAfterCreate: {
+        lookupEndpoint: string;
+        runEndpoint: string;
+      };
     } | null;
     history: AiPipelinePromptMemorySummary["history"];
   };
@@ -3763,6 +3767,10 @@ export function buildGateAiPipelineRecoveryPanel(
         memoryAction: "rollback" as const,
       },
       successHref: "/dispatch?queue=ai_pipeline",
+      runAfterCreate: {
+        lookupEndpoint: "/api/gate/dispatch-tasks?platformId=ai-pipeline&limit=80",
+        runEndpoint: "/api/gate/ai-pipeline-recheck-samples",
+      },
     }
     : null;
   const completed = total - active;

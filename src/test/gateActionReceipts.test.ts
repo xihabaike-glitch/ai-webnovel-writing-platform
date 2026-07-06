@@ -4154,6 +4154,10 @@ test("buildGateActionReceipt", async (t) => {
       memoryAction: "rollback",
     });
     assert.equal(panel.promptMemory.quickAction?.successHref, "/dispatch?queue=ai_pipeline");
+    assert.deepEqual(panel.promptMemory.quickAction?.runAfterCreate, {
+      lookupEndpoint: "/api/gate/dispatch-tasks?platformId=ai-pipeline&limit=80",
+      runEndpoint: "/api/gate/ai-pipeline-recheck-samples",
+    });
   });
 
   await t.test("suggests pausing platform direction for repeated submission follow-up chains", () => {

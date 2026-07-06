@@ -15,7 +15,7 @@ import {
   type PublishPackageVersionItem,
 } from "./platformPublishExport.ts";
 import { findProjectStartTacticSummary, type ProjectStartTacticEntryLike, type ProjectStartTacticSummary } from "./projectStartTactics.ts";
-import type { SubmissionChecklist } from "./submissionChecklist.ts";
+import { buildSubmissionChecklist, type SubmissionChecklist } from "./submissionChecklist.ts";
 
 export interface TaskQueueProject {
   id: string;
@@ -208,6 +208,33 @@ export interface TaskQueueDebtView {
 }
 
 type PublishEffectQueueExecution = NonNullable<QueueItem["effectAction"]>["execution"];
+
+export function buildTaskQueueProjectSubmissionChecklist(project: TaskQueueProject): SubmissionChecklist {
+  const platform = getPlatformProfile(project.targetPlatform as PlatformId);
+  return buildSubmissionChecklist({
+    title: project.title,
+    genre: project.genre,
+    sellingPoint: project.sellingPoint,
+    currentWordCount: project.currentWordCount,
+    targetWordCount: project.targetWordCount,
+    platform,
+    chapters: project.chapters.map((chapter) => ({
+      id: chapter.id,
+      title: chapter.title,
+      order: chapter.order,
+      status: chapter.status,
+      wordCount: chapter.wordCount,
+      hook: chapter.hook,
+      cliffhanger: chapter.cliffhanger,
+    })),
+    aiTasks: project.aiTasks.map((task) => ({
+      chapterId: task.chapterId,
+      taskType: task.taskType,
+      status: task.status,
+      createdAt: task.createdAt,
+    })),
+  });
+}
 
 const categoryPriority: Record<QueueItem["category"], number> = {
   candidate: 5,

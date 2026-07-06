@@ -20,7 +20,7 @@ import { buildRecommendedBatchModelRouteGate } from "@/lib/projects/recommendedB
 import { buildFailureRepairResumeBatchRecord, buildTaskDebtFocusChangeNotice, buildTaskDebtRecoveryBatchRecord } from "@/lib/projects/taskDebtCompletionFeedback";
 import { buildTaskQueueBatchHealthReview, buildTaskQueueBatchRhythmClosure, buildTaskQueueBatchRhythmDecision, buildTaskQueueBatchRhythmDispatch } from "@/lib/projects/taskQueueBatchHealth";
 import { taskQueueBatchExecutionContext } from "@/lib/projects/taskQueueBatchReceipt";
-import { buildTaskQueueCenter, buildTaskQueueDebtView, recommendedQueueActionLabel, taskQueueSourcePresentation, type QueueItem, type TaskQueueProject } from "@/lib/projects/taskQueueCenter";
+import { buildTaskQueueCenter, buildTaskQueueDebtView, buildTaskQueueProjectSubmissionChecklist, recommendedQueueActionLabel, taskQueueSourcePresentation, type QueueItem, type TaskQueueProject } from "@/lib/projects/taskQueueCenter";
 import { buildTaskQueueExecutionPlan } from "@/lib/projects/taskQueueExecutionPlan";
 
 export const dynamic = "force-dynamic";
@@ -103,18 +103,25 @@ function normalizeTaskQueueProjects<T extends {
   submissionAssets?: Array<{ tags: string | string[] | null }>;
   submissionAssetVersions?: Array<{ tags: string | string[] | null; auditStatus: string }>;
 }>(projects: T[]): TaskQueueProject[] {
-  return projects.map((project) => ({
-    ...project,
-    submissionAssets: project.submissionAssets?.map((asset) => ({
-      ...asset,
-      tags: parseTaskQueueTags(asset.tags),
-    })) ?? [],
-    submissionAssetVersions: project.submissionAssetVersions?.map((version) => ({
-      ...version,
-      tags: parseTaskQueueTags(version.tags),
-      auditStatus: version.auditStatus === "ready" || version.auditStatus === "blocked" ? version.auditStatus : "needs_work",
-    })) ?? [],
-  })) as unknown as TaskQueueProject[];
+  return projects.map((project) => {
+    const normalizedProject = {
+      ...project,
+      submissionAssets: project.submissionAssets?.map((asset) => ({
+        ...asset,
+        tags: parseTaskQueueTags(asset.tags),
+      })) ?? [],
+      submissionAssetVersions: project.submissionAssetVersions?.map((version) => ({
+        ...version,
+        tags: parseTaskQueueTags(version.tags),
+        auditStatus: version.auditStatus === "ready" || version.auditStatus === "blocked" ? version.auditStatus : "needs_work",
+      })) ?? [],
+    } as unknown as TaskQueueProject;
+
+    return {
+      ...normalizedProject,
+      submissionChecklist: normalizedProject.submissionChecklist ?? buildTaskQueueProjectSubmissionChecklist(normalizedProject),
+    };
+  });
 }
 
 function logMeta(log: TaskRunLog) {

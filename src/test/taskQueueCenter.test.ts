@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  buildTaskQueueProjectSubmissionChecklist,
   buildTaskQueueCenter,
   buildTaskQueueDebtView,
   recommendedQueueActionLabel,
@@ -451,6 +452,25 @@ test("buildTaskQueueCenter", async (t) => {
       ["番茄小说", "起点中文网", "七猫", "晋江文学城", "知乎盐选", "WebNovel", "Royal Road", "Wattpad"].sort((left, right) => left.localeCompare(right)),
     );
     assert.ok(repairItems.every((item) => item.href === "/projects/project-1#platform-export"));
+  });
+
+  await t.test("derives submission checklist before queuing platform package work", () => {
+    const readyButTooShort = publishReadyProject({
+      publishSnapshots: [],
+      platformPublishMetrics: [],
+      currentWordCount: 5000,
+    });
+    const looseQueue = buildTaskQueueCenter([readyButTooShort]);
+    const strictQueue = buildTaskQueueCenter([{
+      ...readyButTooShort,
+      submissionChecklist: buildTaskQueueProjectSubmissionChecklist(readyButTooShort),
+    }]);
+
+    assert.equal(looseQueue.overview.exportReady, 8);
+    assert.equal(strictQueue.overview.exportReady, 0);
+    assert.equal(strictQueue.overview.publishBlocked, 8);
+    assert.ok(strictQueue.items.every((item) => item.blockerType === "publish_repair"));
+    assert.ok(strictQueue.items.some((item) => item.actionLabel.includes("投稿")));
   });
 
   await t.test("blocks export when the export version center reports regression risk", () => {

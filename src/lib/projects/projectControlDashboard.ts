@@ -288,11 +288,15 @@ export interface AiPipelineControlPlanSummary {
 
 export interface AiPipelinePromptMemorySummary {
   hasMemory: boolean;
+  lifecycleStatus: "active" | "sample_required" | "rollback" | "empty";
+  lifecycleLabel: string;
   label: string;
   headline: string;
   detail: string;
   promptBlock: string;
   nextAction: string;
+  actionLabel: string;
+  controlDetail: string;
   evidence: string[];
   sourceLabel: string | null;
   latestAt: string | null;
@@ -1289,9 +1293,13 @@ function buildAiPipelineControlPlanSummary(audits: ControlBatchAudit[] = []): Ai
 }
 
 interface AiPipelinePromptMemoryCandidate {
+  lifecycleStatus: "active" | "sample_required" | "rollback";
+  lifecycleLabel: string;
   healthLabel: string;
   sourceLabel: string;
   nextAction: string;
+  actionLabel: string;
+  controlDetail: string;
   evidence: string[];
   latestAt: string;
 }
@@ -1315,11 +1323,17 @@ function buildAiPipelinePromptMemoryCandidate(audit: ControlBatchAudit): AiPipel
     const healthLabel = textValue(controlRecheck?.healthLabel) ?? (recheckStatus === "small_batch_ready" ? "可小批恢复" : "继续小样本复验");
     const detail = textValue(controlRecheck?.detail) ?? textValue(audit.recheckDetail) ?? audit.message;
     return {
+      lifecycleStatus: recheckStatus === "small_batch_ready" ? "active" : "sample_required",
+      lifecycleLabel: recheckStatus === "small_batch_ready" ? "继续生效" : "等待小样本",
       healthLabel,
       sourceLabel: audit.label,
       nextAction: recheckStatus === "small_batch_ready"
         ? "只恢复小批执行，继续观察开头钩子、章末追读、质量分和失败率。"
         : "先修复正文质量，再只跑 1 章小样本复验。",
+      actionLabel: recheckStatus === "small_batch_ready" ? "继续小批观察" : "运行 1 章复验",
+      controlDetail: recheckStatus === "small_batch_ready"
+        ? "失效条件：后续小批成功率跌破 80%、平均质量低于 85，或出现连续失败，就回滚到小样本。"
+        : "恢复记忆还不能放大；先补失败原因和正文质量，再用 1 章小样本验收。",
       evidence: compactEvidence([
         `复检结论：${healthLabel}`,
         detail,
@@ -1339,14 +1353,23 @@ function buildAiPipelinePromptMemoryCandidate(audit: ControlBatchAudit): AiPipel
   const qualityScore = numberValue(route?.averageQualityScore);
   const healthLabel = mode === "small_batch_resume" ? "恢复小批回流" : "小样本复验回流";
   const batchStatus = batchReceiptStatus(batchReceipt?.status);
+  const shouldRollback = batchStatus === "repair" || batchStatus === "review_quality";
   const nextAction = batchStatus === "repair" || batchStatus === "review_quality"
     ? "回滚到小样本修复，不要继续扩大批量。"
     : "继续小批观察，禁止直接恢复大批量。";
 
   return {
+    lifecycleStatus: shouldRollback ? "rollback" : batchStatus === "watch_cost" ? "sample_required" : "active",
+    lifecycleLabel: shouldRollback ? "回滚小样本" : batchStatus === "watch_cost" ? "等待复验" : "继续生效",
     healthLabel,
     sourceLabel: audit.label,
     nextAction,
+    actionLabel: shouldRollback ? "回滚到 1 章复验" : batchStatus === "watch_cost" ? "先看模型成本" : "继续小批观察",
+    controlDetail: shouldRollback
+      ? "暂停小批，把低分章节回滚到 1 章复验；确认开头钩子、章末追读和质量线恢复后再放量。"
+      : batchStatus === "watch_cost"
+        ? "成本或备用路线触发异常，先看模型路线，再决定是否保留恢复记忆。"
+        : "失效条件：后续小批成功率跌破 80%、平均质量低于 85，或出现连续失败，就回滚到小样本。",
     evidence: compactEvidence([
       textValue(batchReceipt?.headline) ?? audit.label,
       textValue(batchReceipt?.detail) ?? audit.message,
@@ -1366,11 +1389,15 @@ function buildAiPipelinePromptMemorySummary(audits: ControlBatchAudit[] = []): A
   if (!candidate) {
     return {
       hasMemory: false,
+      lifecycleStatus: "empty",
+      lifecycleLabel: "无记忆",
       label: "暂无提示词记忆",
       headline: "AI 写审改还没有恢复证据可带入提示词。",
       detail: "先完成一次复检或小批恢复，总控会把结论变成后续初稿、审稿、二改的约束。",
       promptBlock: "",
       nextAction: "先跑复检或小批恢复，拿到真实回执后再写入提示词记忆。",
+      actionLabel: "先跑复检",
+      controlDetail: "没有恢复证据时不写入额外约束，避免模型被旧判断误导。",
       evidence: [],
       sourceLabel: null,
       latestAt: null,
@@ -1387,11 +1414,15 @@ function buildAiPipelinePromptMemorySummary(audits: ControlBatchAudit[] = []): A
 
   return {
     hasMemory: true,
+    lifecycleStatus: candidate.lifecycleStatus,
+    lifecycleLabel: candidate.lifecycleLabel,
     label: "提示词已携带恢复记忆",
     headline: `${candidate.healthLabel}，后续 AI 写审改会带上这条恢复证据。`,
     detail: "初稿、审稿、二改都会先按恢复证据守住开头钩子、章末追读和小样本节奏。",
     promptBlock,
     nextAction: candidate.nextAction,
+    actionLabel: candidate.actionLabel,
+    controlDetail: candidate.controlDetail,
     evidence: candidate.evidence,
     sourceLabel: candidate.sourceLabel,
     latestAt: candidate.latestAt,

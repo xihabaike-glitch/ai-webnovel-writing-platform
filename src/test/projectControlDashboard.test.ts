@@ -1001,6 +1001,10 @@ test("buildProjectControlDashboard", async (t) => {
 
     assert.equal(dashboard.aiPipelinePromptMemory.hasMemory, true);
     assert.equal(dashboard.aiPipelinePromptMemory.label, "提示词已携带恢复记忆");
+    assert.equal(dashboard.aiPipelinePromptMemory.lifecycleStatus, "active");
+    assert.equal(dashboard.aiPipelinePromptMemory.lifecycleLabel, "继续生效");
+    assert.equal(dashboard.aiPipelinePromptMemory.actionLabel, "继续小批观察");
+    assert.ok(dashboard.aiPipelinePromptMemory.controlDetail.includes("失效条件"));
     assert.ok(dashboard.aiPipelinePromptMemory.headline.includes("可小批恢复"));
     assert.ok(dashboard.aiPipelinePromptMemory.detail.includes("初稿、审稿、二改"));
     assert.ok(dashboard.aiPipelinePromptMemory.promptBlock.includes("AI 写审改恢复证据"));
@@ -1008,6 +1012,56 @@ test("buildProjectControlDashboard", async (t) => {
     assert.ok(dashboard.aiPipelinePromptMemory.evidence.some((item) => item.includes("小样本通过")));
     assert.equal(dashboard.aiPipelinePromptMemory.targetHref, "#ai-pipeline");
     assert.equal(dashboard.aiPipelinePromptMemory.latestAt, "2026-01-03T00:00:00.000Z");
+  });
+
+  await t.test("marks AI recovery prompt memory for rollback when resumed batch falls below quality", () => {
+    const dashboard = buildProjectControlDashboard({
+      project,
+      platform: getPlatformProfile("fanqie"),
+      chapters: [chapter],
+      outlineNodes: [],
+      characters: [],
+      worldEntries: [],
+      foreshadows: [],
+      plotThreads: [],
+      aiTasks: [],
+      gateActionAudits: [
+        {
+          receiptId: "ai-scale-weak",
+          label: "AI 写审改小批恢复跌线",
+          detail: "番茄小说 · 夜雨系统 · 批量初稿 3 个",
+          href: "/projects/demo-project#ai-pipeline",
+          status: "failed",
+          message: "恢复小批质量跌线，暂停继续放量。",
+          executionType: "recommended_batch",
+          succeededCount: 2,
+          failedCount: 1,
+          payload: JSON.stringify({
+            aiPipelineRecheck: {
+              dispatchKey: "ai-pipeline-recheck:demo-project:ai-plan-1:scale",
+              mode: "small_batch_resume",
+            },
+            routeEffectSummary: { successRatePercent: 67, knownCostUsd: 0.04, averageQualityScore: 72 },
+            batchReceipt: {
+              status: "review_quality",
+              headline: "恢复小批质量跌线",
+              detail: "质量低于 85，先回滚到 1 章复验。",
+            },
+          }),
+          createdAt: "2026-01-04T00:00:00.000Z",
+        },
+      ],
+      submissionChecklist: checklist,
+    });
+
+    assert.equal(dashboard.aiPipelinePromptMemory.hasMemory, true);
+    assert.equal(dashboard.aiPipelinePromptMemory.lifecycleStatus, "rollback");
+    assert.equal(dashboard.aiPipelinePromptMemory.lifecycleLabel, "回滚小样本");
+    assert.equal(dashboard.aiPipelinePromptMemory.actionLabel, "回滚到 1 章复验");
+    assert.ok(dashboard.aiPipelinePromptMemory.controlDetail.includes("暂停小批"));
+    assert.ok(dashboard.aiPipelinePromptMemory.nextAction.includes("不要继续扩大批量"));
+    assert.ok(dashboard.aiPipelinePromptMemory.promptBlock.includes("回滚到小样本修复"));
+    assert.equal(dashboard.aiPipelinePromptMemory.targetHref, "#ai-pipeline");
   });
 
   await t.test("summarizes model route health for the project control dashboard", () => {

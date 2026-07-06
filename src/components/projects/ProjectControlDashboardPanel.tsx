@@ -143,11 +143,15 @@ interface AiPipelineControlPlanSummary {
 
 interface AiPipelinePromptMemorySummary {
   hasMemory: boolean;
+  lifecycleStatus: "active" | "sample_required" | "rollback" | "empty";
+  lifecycleLabel: string;
   label: string;
   headline: string;
   detail: string;
   promptBlock: string;
   nextAction: string;
+  actionLabel: string;
+  controlDetail: string;
   evidence: string[];
   sourceLabel: string | null;
   latestAt: string | null;
@@ -402,6 +406,13 @@ function aiRecheckOutcomeClass(tone: AiPipelineControlPlanSummary["recheckOutcom
   if (tone === "success") return "border-emerald-100 bg-emerald-50 text-emerald-700";
   if (tone === "warning") return "border-amber-100 bg-amber-50 text-amber-700";
   return "border-slate-200 bg-slate-50 text-slate-600";
+}
+
+function aiPromptMemoryLifecycleClass(status: AiPipelinePromptMemorySummary["lifecycleStatus"]) {
+  if (status === "active") return "bg-emerald-100 text-emerald-800";
+  if (status === "rollback") return "bg-rose-100 text-rose-800";
+  if (status === "sample_required") return "bg-amber-100 text-amber-800";
+  return "bg-slate-100 text-slate-700";
 }
 
 function modelRouteHealthClass(status: ModelRouteHealthSummary["status"]) {
@@ -1099,6 +1110,9 @@ export function ProjectControlDashboardPanel({ projectId }: { projectId: string 
                   <div>
                     <div className="flex flex-wrap items-center gap-2">
                       <div className="text-sm font-medium text-emerald-950">{dashboard.aiPipelinePromptMemory.label}</div>
+                      <span className={`rounded-md px-2 py-1 text-[11px] font-medium ${aiPromptMemoryLifecycleClass(dashboard.aiPipelinePromptMemory.lifecycleStatus)}`}>
+                        {dashboard.aiPipelinePromptMemory.lifecycleLabel}
+                      </span>
                       {dashboard.aiPipelinePromptMemory.latestAt ? (
                         <span className="text-xs text-emerald-700">{shortTime(dashboard.aiPipelinePromptMemory.latestAt)}</span>
                       ) : null}
@@ -1120,6 +1134,9 @@ export function ProjectControlDashboardPanel({ projectId }: { projectId: string 
                 </div>
                 <p className="mt-2 rounded-md bg-white/70 px-2 py-1 text-xs leading-5 text-emerald-900">
                   下一步：{dashboard.aiPipelinePromptMemory.nextAction}
+                </p>
+                <p className="mt-2 rounded-md bg-white/70 px-2 py-1 text-xs leading-5 text-emerald-900">
+                  {dashboard.aiPipelinePromptMemory.actionLabel}：{dashboard.aiPipelinePromptMemory.controlDetail}
                 </p>
               </div>
             ) : null}

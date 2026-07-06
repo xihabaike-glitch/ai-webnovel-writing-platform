@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildTaskQueueBatchHealthReview, buildTaskQueueBatchRhythmDecision } from "../lib/projects/taskQueueBatchHealth.ts";
+import {
+  buildTaskQueueBatchHealthReview,
+  buildTaskQueueBatchRhythmDecision,
+  buildTaskQueueBatchRhythmDispatch,
+} from "../lib/projects/taskQueueBatchHealth.ts";
 import type { GateActionAuditRecord } from "../lib/projects/gateActionReceipts.ts";
 
 function audit(input: {
@@ -212,4 +216,79 @@ test("buildTaskQueueBatchRhythmDecision sends weak standard batches to failure r
   assert.equal(decision.actionLabel, "去失败修复");
   assert.equal(decision.href, "/failures");
   assert.ok(decision.detail.includes("失败或低分"));
+});
+
+test("buildTaskQueueBatchRhythmDispatch creates a repair dispatch for weak batch rhythm", () => {
+  const review = buildTaskQueueBatchHealthReview([
+    audit({
+      receiptId: "weak-1",
+      label: "普通批次质量跌线",
+      tacticLabel: "三轮稳住",
+      quality: 70,
+      failedCount: 1,
+      successRatePercent: 50,
+      createdAt: "2026-01-03T00:00:00.000Z",
+    }),
+  ]);
+  const decision = buildTaskQueueBatchRhythmDecision(review);
+  const dispatch = buildTaskQueueBatchRhythmDispatch(decision, review, {
+    createdAt: "2026-01-03T00:00:00.000Z",
+  });
+
+  assert.equal(dispatch?.id, "batch-rhythm:repair:2026-01-03T00:00:00.000Z");
+  assert.equal(dispatch?.stage, "repair_tactic");
+  assert.equal(dispatch?.ownerRole, "毒舌产品经理");
+  assert.equal(dispatch?.actionLabel, "处理批次修复");
+  assert.equal(dispatch?.href, "/failures");
+  assert.ok(dispatch?.acceptanceCriteria.some((item) => item.includes("失败样本")));
+  assert.ok(dispatch?.evidence.some((item) => item.includes("质量")));
+});
+
+test("buildTaskQueueBatchRhythmDispatch creates an observation dispatch for thin healthy samples", () => {
+  const review = buildTaskQueueBatchHealthReview([
+    audit({
+      receiptId: "stable-1",
+      label: "三轮稳住批次健康，继续小步加码",
+      tacticLabel: "三轮稳住",
+      quality: 88,
+      createdAt: "2026-01-01T00:00:00.000Z",
+    }),
+  ]);
+  const decision = buildTaskQueueBatchRhythmDecision(review);
+  const dispatch = buildTaskQueueBatchRhythmDispatch(decision, review, {
+    createdAt: "2026-01-01T00:00:00.000Z",
+  });
+
+  assert.equal(dispatch?.id, "batch-rhythm:watch:2026-01-01T00:00:00.000Z");
+  assert.equal(dispatch?.stage, "watch");
+  assert.equal(dispatch?.ownerRole, "增长运营");
+  assert.equal(dispatch?.actionLabel, "执行观察小批");
+  assert.equal(dispatch?.href, "/tasks#recommended-batch");
+  assert.ok(dispatch?.acceptanceCriteria.some((item) => item.includes("至少再跑一轮")));
+});
+
+test("buildTaskQueueBatchRhythmDispatch skips dispatches when rhythm can continue normally", () => {
+  const review = buildTaskQueueBatchHealthReview([
+    audit({
+      receiptId: "stable-2",
+      label: "三轮稳住批次健康，继续小步加码",
+      tacticLabel: "三轮稳住",
+      quality: 90,
+      createdAt: "2026-01-02T00:00:00.000Z",
+    }),
+    audit({
+      receiptId: "stable-1",
+      label: "三轮稳住批次健康，继续小步加码",
+      tacticLabel: "三轮稳住",
+      quality: 88,
+      createdAt: "2026-01-01T00:00:00.000Z",
+    }),
+  ]);
+  const decision = buildTaskQueueBatchRhythmDecision(review);
+  const dispatch = buildTaskQueueBatchRhythmDispatch(decision, review, {
+    createdAt: "2026-01-02T00:00:00.000Z",
+  });
+
+  assert.equal(decision.tone, "scale");
+  assert.equal(dispatch, null);
 });

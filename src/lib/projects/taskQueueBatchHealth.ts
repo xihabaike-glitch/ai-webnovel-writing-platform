@@ -3,6 +3,7 @@ import {
   gateActionReceiptFromAuditRecord,
   type GateActionAuditRecord,
   type GateBatchTacticEffectReview,
+  type GatePlatformGrowthDispatchItem,
 } from "./gateActionReceipts.ts";
 
 export interface TaskQueueBatchRhythmDecision {
@@ -112,5 +113,55 @@ export function buildTaskQueueBatchRhythmDecision(review: GateBatchTacticEffectR
     actionLabel: "查看推荐批次",
     href: "/tasks#recommended-batch",
     evidence: [],
+  };
+}
+
+export function buildTaskQueueBatchRhythmDispatch(
+  decision: TaskQueueBatchRhythmDecision,
+  review: GateBatchTacticEffectReview,
+  options: { createdAt?: Date | string } = {},
+): GatePlatformGrowthDispatchItem | null {
+  if (decision.tone !== "repair" && decision.tone !== "watch") return null;
+
+  const createdAt = new Date(options.createdAt ?? new Date()).toISOString();
+  const target = review.items.find((item) => decision.evidence.some((line) => item.evidence.includes(line)))
+    ?? review.items.find((item) => decision.tone === "repair" ? item.status === "blocked" : item.status === "watch")
+    ?? review.items[0]
+    ?? null;
+  const platformName = target?.tacticTitle.replace(/^首轮平台打法：/u, "") || "全平台";
+  const platformId = platformName === "全平台" ? "batch-rhythm" : platformName.toLowerCase().replace(/[^a-z0-9]+/gu, "-") || "batch-rhythm";
+  const repair = decision.tone === "repair";
+
+  return {
+    id: `batch-rhythm:${decision.tone}:${createdAt}`,
+    platformId,
+    platformName,
+    stage: repair ? "repair_tactic" : "watch",
+    state: "queued",
+    priorityScore: repair ? 92 : 68,
+    ownerRole: repair ? "毒舌产品经理" : "增长运营",
+    title: repair ? "批次节奏跌线修复" : "批次节奏观察小批",
+    detail: decision.detail,
+    dueLabel: repair ? "今天" : "下一批前",
+    actionLabel: repair ? "处理批次修复" : "执行观察小批",
+    href: decision.href,
+    acceptanceCriteria: repair
+      ? [
+        "拆出失败样本、低分章节和模型路线问题。",
+        "给出不可继续放量的原因和修复后复检方式。",
+        "修复完成后再跑一轮小批，并回填成功率、质量和成本证据。",
+      ]
+      : [
+        "至少再跑一轮同类小批，不扩大批量。",
+        "回填成功率、质量、成本，以及曝光、点击、收藏和追读证据。",
+        "连续健康后再允许回普通推荐批次。",
+      ],
+    evidence: [
+      decision.label,
+      decision.detail,
+      ...decision.evidence,
+      ...(target?.nextAction ? [target.nextAction] : []),
+    ].slice(0, 6),
+    reviewLatestAt: target?.latestAt ?? createdAt,
   };
 }

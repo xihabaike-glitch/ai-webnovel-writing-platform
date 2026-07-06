@@ -16,7 +16,7 @@ import { batchExecutionStrategies, getBatchExecutionStrategy } from "@/lib/proje
 import type { GateBatchTacticEffectStatus } from "@/lib/projects/gateActionReceipts";
 import { buildRecommendedBatchModelRouteGate } from "@/lib/projects/recommendedBatchModelRouteGate";
 import { buildFailureRepairResumeBatchRecord, buildTaskDebtFocusChangeNotice, buildTaskDebtRecoveryBatchRecord } from "@/lib/projects/taskDebtCompletionFeedback";
-import { buildTaskQueueBatchHealthReview, buildTaskQueueBatchRhythmDecision } from "@/lib/projects/taskQueueBatchHealth";
+import { buildTaskQueueBatchHealthReview, buildTaskQueueBatchRhythmDecision, buildTaskQueueBatchRhythmDispatch } from "@/lib/projects/taskQueueBatchHealth";
 import { taskQueueBatchExecutionContext } from "@/lib/projects/taskQueueBatchReceipt";
 import { buildTaskQueueCenter, buildTaskQueueDebtView, recommendedQueueActionLabel, taskQueueSourcePresentation, type QueueItem, type TaskQueueProject } from "@/lib/projects/taskQueueCenter";
 import { buildTaskQueueExecutionPlan } from "@/lib/projects/taskQueueExecutionPlan";
@@ -424,6 +424,7 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
   const strategyDecision = buildBatchStrategyDecision(strategyComparison, activeStrategy.id);
   const batchTacticEffectReview = buildTaskQueueBatchHealthReview(recentRecommendedBatchAudits, 5);
   const batchRhythmDecision = buildTaskQueueBatchRhythmDecision(batchTacticEffectReview);
+  const batchRhythmDispatch = buildTaskQueueBatchRhythmDispatch(batchRhythmDecision, batchTacticEffectReview);
   const debtRecoveryBatchRecord = buildTaskDebtRecoveryBatchRecord(recentRecommendedBatchAudits);
   const failureRepairResumeBatchRecord = buildFailureRepairResumeBatchRecord(recentRecommendedBatchAudits);
   const effectiveBatchContext = activeBatchContext === "repair_resume" && failureRepairResumeBatchRecord?.stabilityTone === "ready"
@@ -963,6 +964,12 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
                   {batchRhythmDecision.evidence.map((line) => (
                     <span className="rounded-md bg-white/70 px-2 py-1 font-medium" key={line}>{line}</span>
                   ))}
+                </div>
+              ) : null}
+              {batchRhythmDispatch ? (
+                <div className="mt-3 rounded-md bg-white/75 px-3 py-2 text-xs leading-5">
+                  <div className="font-medium">派单预案：{batchRhythmDispatch.title} · {batchRhythmDispatch.ownerRole}</div>
+                  <div className="mt-1 opacity-85">{batchRhythmDispatch.acceptanceCriteria[0]}</div>
                 </div>
               ) : null}
             </div>

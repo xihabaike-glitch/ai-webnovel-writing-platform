@@ -44,6 +44,11 @@ test("buildBatchExecutionSafety", async (t) => {
     assert.equal(safety.estimatedCostUsd, 0.092);
     assert.equal(safety.canRunRecommendedBatch, true);
     assert.ok(safety.warnings.some((warning) => warning.includes("阻塞任务")));
+    const blockedGate = safety.items.find((item) => item.id === "blocked-items");
+    assert.equal(blockedGate?.status, "warn");
+    assert.ok(blockedGate?.detail.includes("不拦本批"));
+    assert.equal(blockedGate?.actionLabel, "查看阻塞任务");
+    assert.equal(blockedGate?.actionHref, "/tasks");
   });
 
   await t.test("blocks recommended batches until draft candidates are adopted or dismissed", () => {

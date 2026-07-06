@@ -192,7 +192,11 @@ export function buildBatchExecutionSafety(
       "blocked-items",
       "阻塞任务",
       blockedCount === 0 ? "pass" : "warn",
-      blockedCount === 0 ? "本批没有阻塞项。" : `${blockedCount} 个任务卡住，不能进入批量执行。`,
+      blockedCount === 0 ? "本批没有阻塞项。" : `${blockedCount} 个任务卡住；不拦本批，但别把阻塞债滚到下一轮。`,
+      blockedCount === 0 ? undefined : {
+        actionLabel: "查看阻塞任务",
+        actionHref: "/tasks",
+      },
     ),
     safetyItem(
       "watch-scale-gate",

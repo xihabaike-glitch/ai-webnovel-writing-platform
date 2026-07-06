@@ -1015,6 +1015,10 @@ test("buildProjectControlDashboard", async (t) => {
     assert.ok(dashboard.aiPipelinePromptMemory.detail.includes("初稿、审稿、二改"));
     assert.ok(dashboard.aiPipelinePromptMemory.promptBlock.includes("AI 写审改恢复证据"));
     assert.ok(dashboard.aiPipelinePromptMemory.promptBlock.includes("谨慎小批"));
+    assert.equal(dashboard.aiPipelinePromptMemory.promptFeedback.statusLabel, "可恢复");
+    assert.equal(dashboard.aiPipelinePromptMemory.promptFeedback.headline, "可小批恢复，提示词正在携带恢复约束");
+    assert.ok(dashboard.aiPipelinePromptMemory.promptFeedback.detail.includes("小样本通过"));
+    assert.equal(dashboard.aiPipelinePromptMemory.promptFeedback.primaryActionLabel, "继续小批，不放大批");
     assert.ok(dashboard.aiPipelinePromptMemory.evidence.some((item) => item.includes("小样本通过")));
     assert.equal(dashboard.aiPipelinePromptMemory.targetHref, "#ai-pipeline");
     assert.equal(dashboard.aiPipelinePromptMemory.latestAt, "2026-01-03T00:00:00.000Z");

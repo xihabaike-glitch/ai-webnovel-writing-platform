@@ -290,6 +290,12 @@ export interface AiPipelinePromptMemorySummary {
   hasMemory: boolean;
   lifecycleStatus: "active" | "sample_required" | "rollback" | "empty";
   lifecycleLabel: string;
+  promptFeedback: {
+    statusLabel: string;
+    headline: string;
+    detail: string;
+    primaryActionLabel: string;
+  };
   gateTone: "ready" | "watch" | "blocked" | "empty";
   gateStatusLabel: string;
   gateStatusDetail: string;
@@ -1311,6 +1317,44 @@ interface AiPipelinePromptMemoryCandidate {
   latestAt: string;
 }
 
+function buildAiPipelinePromptFeedback(input: {
+  lifecycleStatus: AiPipelinePromptMemorySummary["lifecycleStatus"];
+  healthLabel: string;
+  evidence: string[];
+}): AiPipelinePromptMemorySummary["promptFeedback"] {
+  const evidenceText = input.evidence.length > 0 ? input.evidence.join("；") : "暂无恢复证据。";
+  if (input.lifecycleStatus === "rollback") {
+    return {
+      statusLabel: "暂停恢复",
+      headline: `${input.healthLabel}，提示词正在强制回滚约束`,
+      detail: evidenceText,
+      primaryActionLabel: "回滚修复",
+    };
+  }
+  if (input.lifecycleStatus === "sample_required") {
+    return {
+      statusLabel: "继续观察",
+      headline: `${input.healthLabel}，提示词正在限制为小样本`,
+      detail: evidenceText,
+      primaryActionLabel: "继续复验",
+    };
+  }
+  if (input.lifecycleStatus === "active") {
+    return {
+      statusLabel: "可恢复",
+      headline: `${input.healthLabel}，提示词正在携带恢复约束`,
+      detail: evidenceText,
+      primaryActionLabel: "继续小批，不放大批",
+    };
+  }
+  return {
+    statusLabel: "无反馈",
+    headline: "暂无提示词恢复反馈",
+    detail: evidenceText,
+    primaryActionLabel: "等待复检",
+  };
+}
+
 function compactEvidence(items: Array<string | null | undefined>) {
   return items
     .map((item) => item?.trim() ?? "")
@@ -1485,6 +1529,11 @@ function buildAiPipelinePromptMemorySummary(audits: ControlBatchAudit[] = []): A
       hasMemory: false,
       lifecycleStatus: "empty",
       lifecycleLabel: "无记忆",
+      promptFeedback: buildAiPipelinePromptFeedback({
+        lifecycleStatus: "empty",
+        healthLabel: "无恢复证据",
+        evidence: [],
+      }),
       ...gate,
       label: "暂无提示词记忆",
       headline: "AI 写审改还没有恢复证据可带入提示词。",
@@ -1506,6 +1555,11 @@ function buildAiPipelinePromptMemorySummary(audits: ControlBatchAudit[] = []): A
       hasMemory: false,
       lifecycleStatus: "empty",
       lifecycleLabel: candidate.lifecycleLabel,
+      promptFeedback: buildAiPipelinePromptFeedback({
+        lifecycleStatus: "empty",
+        healthLabel: candidate.healthLabel,
+        evidence: candidate.evidence,
+      }),
       ...gate,
       label: "提示词记忆已清除",
       headline: "旧恢复记忆已经被清除，后续 AI 写审改不会继续携带这条证据。",
@@ -1536,6 +1590,11 @@ function buildAiPipelinePromptMemorySummary(audits: ControlBatchAudit[] = []): A
     hasMemory: true,
     lifecycleStatus: candidate.lifecycleStatus,
     lifecycleLabel: candidate.lifecycleLabel,
+    promptFeedback: buildAiPipelinePromptFeedback({
+      lifecycleStatus: candidate.lifecycleStatus,
+      healthLabel: candidate.healthLabel,
+      evidence: candidate.evidence,
+    }),
     ...gate,
     label: "提示词已携带恢复记忆",
     headline: `${candidate.healthLabel}，后续 AI 写审改会带上这条恢复证据。`,

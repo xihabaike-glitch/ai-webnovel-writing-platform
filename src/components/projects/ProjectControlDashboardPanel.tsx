@@ -146,6 +146,12 @@ interface AiPipelinePromptMemorySummary {
   hasMemory: boolean;
   lifecycleStatus: "active" | "sample_required" | "rollback" | "empty";
   lifecycleLabel: string;
+  promptFeedback: {
+    statusLabel: string;
+    headline: string;
+    detail: string;
+    primaryActionLabel: string;
+  };
   gateTone: "ready" | "watch" | "blocked" | "empty";
   gateStatusLabel: string;
   gateStatusDetail: string;
@@ -1230,6 +1236,18 @@ export function ProjectControlDashboardPanel({ projectId }: { projectId: string 
                 <p className="mt-2 rounded-md bg-white/70 px-2 py-1 text-xs leading-5 text-emerald-900">
                   下一步：{dashboard.aiPipelinePromptMemory.nextAction}
                 </p>
+                <div className="mt-2 rounded-md border border-emerald-100 bg-white/80 px-2 py-2 text-xs leading-5 text-emerald-950">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="rounded-md bg-emerald-50 px-2 py-1 font-medium text-emerald-800">
+                      {dashboard.aiPipelinePromptMemory.promptFeedback.statusLabel}
+                    </span>
+                    <span className="font-medium">{dashboard.aiPipelinePromptMemory.promptFeedback.headline}</span>
+                  </div>
+                  <p className="mt-1 text-emerald-800">{dashboard.aiPipelinePromptMemory.promptFeedback.detail}</p>
+                  <div className="mt-2 w-fit rounded-md bg-emerald-950 px-2 py-1 font-medium text-white">
+                    {dashboard.aiPipelinePromptMemory.promptFeedback.primaryActionLabel}
+                  </div>
+                </div>
                 <p className="mt-2 rounded-md bg-white/70 px-2 py-1 text-xs leading-5 text-emerald-900">
                   {dashboard.aiPipelinePromptMemory.actionLabel}：{dashboard.aiPipelinePromptMemory.controlDetail}
                 </p>

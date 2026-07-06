@@ -474,6 +474,15 @@ export interface GateAiPipelineRecoveryPanel {
     completedAt: string | null;
     href: string;
   } | null;
+  currentConclusion: {
+    status: "resume" | "watch" | "rollback";
+    label: string;
+    headline: string;
+    detail: string;
+    primaryActionLabel: string;
+    href: string;
+    latestAt: string | null;
+  } | null;
   promptMemory: {
     visible: boolean;
     hasMemory: boolean;
@@ -3843,6 +3852,26 @@ export function buildGateAiPipelineRecoveryPanel(
       new Date(right.completedAt ?? right.updatedAt).getTime() - new Date(left.completedAt ?? left.updatedAt).getTime()
     ))[0] ?? null;
 
+  const currentConclusion: GateAiPipelineRecoveryPanel["currentConclusion"] = latestEvidence
+    ? {
+      status: latestEvidence.outcome === "usable"
+        ? "resume"
+        : latestEvidence.outcome === "blocked"
+          ? "rollback"
+          : "watch",
+      label: latestEvidence.outcome === "usable"
+        ? "可恢复小批"
+        : latestEvidence.outcome === "blocked"
+          ? "回滚修复"
+          : "继续观察",
+      headline: latestEvidence.feedback.headline,
+      detail: latestEvidence.feedback.detail,
+      primaryActionLabel: latestEvidence.feedback.primaryActionLabel,
+      href: latestEvidence.href,
+      latestAt: latestEvidence.completedAt,
+    }
+    : null;
+
   return {
     anchorId: "ai-pipeline-recovery",
     visible: total > 0 || promptMemory.history.length > 0 || promptMemory.hasMemory,
@@ -3880,6 +3909,7 @@ export function buildGateAiPipelineRecoveryPanel(
       completedAt: latestEvidence.completedAt,
       href: latestEvidence.href,
     } : null,
+    currentConclusion,
     promptMemory: {
       visible: promptMemory.history.length > 0 || promptMemory.hasMemory,
       hasMemory: promptMemory.hasMemory,

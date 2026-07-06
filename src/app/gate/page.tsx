@@ -54,6 +54,12 @@ function aiRecoveryTone(status: ReturnType<typeof buildGateAiPipelineRecoveryPan
   return "border-slate-200 bg-white text-slate-700";
 }
 
+function aiRecoveryConclusionTone(status: NonNullable<ReturnType<typeof buildGateAiPipelineRecoveryPanel>["currentConclusion"]>["status"]) {
+  if (status === "rollback") return "border-rose-200 bg-rose-50 text-rose-900";
+  if (status === "watch") return "border-amber-200 bg-amber-50 text-amber-900";
+  return "border-emerald-200 bg-emerald-50 text-emerald-900";
+}
+
 function shortDateTime(value: string | null) {
   if (!value) return "未记录时间";
   return new Intl.DateTimeFormat("zh-CN", {
@@ -358,6 +364,31 @@ export default async function GatePage({
             <div className="rounded-md bg-white/70 px-3 py-2">复验 {aiRecoveryPanel.summary.sample}</div>
             <div className="rounded-md bg-white/70 px-3 py-2">小批 {aiRecoveryPanel.summary.smallBatch}</div>
           </div>
+          {aiRecoveryPanel.currentConclusion ? (
+            <Link
+              className={`mt-3 block rounded-md border p-3 text-sm hover:bg-white ${aiRecoveryConclusionTone(aiRecoveryPanel.currentConclusion.status)}`}
+              href={aiRecoveryPanel.currentConclusion.href}
+            >
+              <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
+                <div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-medium">本轮结论</span>
+                    <span className="rounded-md bg-white/70 px-2 py-1 text-xs font-medium">
+                      {aiRecoveryPanel.currentConclusion.label}
+                    </span>
+                    <span className="rounded-md bg-white/70 px-2 py-1 text-xs">
+                      {shortDateTime(aiRecoveryPanel.currentConclusion.latestAt)}
+                    </span>
+                  </div>
+                  <div className="mt-2 text-xs font-medium">{aiRecoveryPanel.currentConclusion.headline}</div>
+                  <p className="mt-1 text-xs leading-5 opacity-80">{aiRecoveryPanel.currentConclusion.detail}</p>
+                </div>
+                <span className="w-fit shrink-0 rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white">
+                  {aiRecoveryPanel.currentConclusion.primaryActionLabel}
+                </span>
+              </div>
+            </Link>
+          ) : null}
           {aiRecoveryPanel.latestEvidence ? (
             <Link className="mt-3 block rounded-md border border-white/70 bg-white/80 p-3 text-sm hover:bg-white" href={aiRecoveryPanel.latestEvidence.href}>
               <div className="flex flex-wrap items-center justify-between gap-2">

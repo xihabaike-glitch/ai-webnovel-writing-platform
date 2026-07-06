@@ -1,6 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { buildModelRoleMatrix, buildModelRoleMatrixPriorityBlocker } from "../lib/model-gateway/modelRoleMatrix.ts";
+import {
+  buildModelRoleMatrix,
+  buildModelRoleMatrixPriorityBlocker,
+  buildModelRoleRouteDraft,
+} from "../lib/model-gateway/modelRoleMatrix.ts";
 
 test("buildModelRoleMatrix", async (t) => {
   await t.test("marks the four writing roles ready with Claude, DeepSeek, Kimi and GPT", () => {
@@ -195,5 +199,92 @@ test("buildModelRoleMatrix", async (t) => {
     ]);
 
     assert.equal(buildModelRoleMatrixPriorityBlocker(matrix), null);
+  });
+
+  await t.test("builds task route drafts from the editorial role matrix", () => {
+    const providers = [
+      {
+        id: "claude-config",
+        providerId: "claude",
+        displayName: "Claude",
+        hasApiKey: true,
+        defaultModel: "claude-sonnet-4-5",
+        enabled: true,
+        maxContextTokens: 200000,
+      },
+      {
+        id: "deepseek-config",
+        providerId: "deepseek",
+        displayName: "DeepSeek",
+        hasApiKey: true,
+        defaultModel: "deepseek-chat",
+        enabled: true,
+        maxContextTokens: 64000,
+      },
+      {
+        id: "kimi-config",
+        providerId: "kimi",
+        displayName: "Kimi",
+        hasApiKey: true,
+        defaultModel: "kimi-k2.6",
+        enabled: true,
+        maxContextTokens: 128000,
+      },
+      {
+        id: "gpt-config",
+        providerId: "gpt",
+        displayName: "GPT / OpenAI",
+        hasApiKey: true,
+        defaultModel: "gpt-5-mini",
+        enabled: true,
+        maxContextTokens: 128000,
+      },
+    ];
+
+    const draft = buildModelRoleRouteDraft(providers, [
+      {
+        taskType: "chapter_review",
+        primaryProviderConfigId: "claude-config",
+        fallbackProviderConfigId: "kimi-config",
+      },
+    ]);
+    const chapterDraft = draft.items.find((item) => item.taskType === "chapter_draft");
+    const chapterReview = draft.items.find((item) => item.taskType === "chapter_review");
+    const packageOptimize = draft.items.find((item) => item.taskType === "submission_package_optimize");
+    const controlAsset = draft.items.find((item) => item.taskType === "control_asset_generate");
+
+    assert.equal(draft.summary.total, 6);
+    assert.equal(draft.summary.ready, 5);
+    assert.equal(draft.summary.current, 1);
+    assert.equal(draft.summary.missing, 0);
+    assert.equal(chapterDraft?.primaryProviderConfigId, "deepseek-config");
+    assert.equal(chapterDraft?.fallbackProviderConfigId, "kimi-config");
+    assert.equal(chapterDraft?.ownerRoleTitle, "中文网文写手");
+    assert.equal(chapterReview?.status, "current");
+    assert.equal(chapterReview?.primaryProviderName, "Claude · claude-sonnet-4-5");
+    assert.equal(chapterReview?.fallbackProviderName, "Kimi · kimi-k2.6");
+    assert.equal(packageOptimize?.primaryProviderConfigId, "gpt-config");
+    assert.equal(packageOptimize?.ownerRoleTitle, "海外投稿包装编辑");
+    assert.equal(controlAsset?.primaryProviderConfigId, "kimi-config");
+    assert.ok(draft.nextActions.some((action) => action.includes("5 条")));
+  });
+
+  await t.test("keeps route drafts missing when required model roles are absent", () => {
+    const draft = buildModelRoleRouteDraft([
+      {
+        id: "mock",
+        providerId: "mock",
+        displayName: "Mock",
+        hasApiKey: false,
+        defaultModel: "mock-writer",
+        enabled: true,
+        maxContextTokens: 16000,
+      },
+    ], []);
+
+    assert.equal(draft.summary.missing, 6);
+    assert.equal(draft.items.every((item) => item.status === "missing"), true);
+    assert.equal(draft.items.every((item) => item.primaryProviderConfigId === null), true);
+    assert.ok(draft.nextActions.some((action) => action.includes("先补模型岗位")));
   });
 });

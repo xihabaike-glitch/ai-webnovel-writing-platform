@@ -3,7 +3,7 @@ import { ModelProviderSettings } from "@/components/settings/ModelProviderSettin
 import { prisma } from "@/lib/db/prisma";
 import { buildFirstDayRouteSummary } from "@/lib/model-gateway/firstDayRouteSummary";
 import { buildModelSetupOnboarding } from "@/lib/model-gateway/modelSetupOnboarding";
-import { buildModelRoleMatrix } from "@/lib/model-gateway/modelRoleMatrix";
+import { buildModelRoleMatrix, buildModelRoleRouteDraft } from "@/lib/model-gateway/modelRoleMatrix";
 import { buildPresetRouteBlueprint } from "@/lib/model-gateway/presetRouteBlueprint";
 import { providerModelPresets, providerOptions } from "@/lib/model-gateway/providerDefaults";
 import { buildProviderHealthDashboard } from "@/lib/model-gateway/providerHealth";
@@ -255,6 +255,7 @@ export default async function ModelSettingsPage() {
     firstDayRouteSummary: firstDayRouteSummary.summary,
   });
   const modelRoleMatrix = buildModelRoleMatrix(maskedProviders);
+  const modelRoleRouteDraft = buildModelRoleRouteDraft(maskedProviders, routes);
   const routeConfirmationOnboarding = buildRouteConfirmationOnboarding({
     routeOptions: modelTaskRouteOptions,
     routes,
@@ -273,6 +274,7 @@ export default async function ModelSettingsPage() {
         providerSetupWizard={providerSetupWizard}
         modelSetupOnboarding={modelSetupOnboarding}
         modelRoleMatrix={modelRoleMatrix}
+        modelRoleRouteDraft={modelRoleRouteDraft}
         firstDayRouteSummary={firstDayRouteSummary}
         presetRouteBlueprint={presetRouteBlueprint}
         providers={maskedProviders}

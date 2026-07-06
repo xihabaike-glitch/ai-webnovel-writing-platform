@@ -380,6 +380,38 @@ interface PresetRouteBlueprintView {
   }>;
 }
 
+interface ModelRoleRouteDraftView {
+  summary: {
+    total: number;
+    ready: number;
+    current: number;
+    missing: number;
+  };
+  nextActions: string[];
+  items: Array<{
+    taskType: string;
+    label: string;
+    status: "ready" | "current" | "missing";
+    ownerRoleId: string;
+    ownerRoleTitle: string;
+    fallbackRoleTitle: string | null;
+    primaryProviderConfigId: string | null;
+    fallbackProviderConfigId: string | null;
+    currentPrimaryProviderConfigId: string | null;
+    currentFallbackProviderConfigId: string | null;
+    primaryProviderName: string;
+    fallbackProviderName: string | null;
+    reason: string;
+    manualGate: string;
+  }>;
+}
+
+const roleRouteDraftStatusCopy: Record<ModelRoleRouteDraftView["items"][number]["status"], { label: string; className: string }> = {
+  ready: { label: "可填入", className: "bg-sky-50 text-sky-700" },
+  current: { label: "已匹配", className: "bg-emerald-50 text-emerald-700" },
+  missing: { label: "缺岗位", className: "bg-rose-50 text-rose-700" },
+};
+
 interface FirstDayRouteSummaryView {
   summary: {
     total: number;
@@ -544,6 +576,7 @@ export function ModelProviderSettings({
   providerSetupWizard,
   modelSetupOnboarding,
   modelRoleMatrix,
+  modelRoleRouteDraft,
   firstDayRouteSummary,
   presetRouteBlueprint,
   providers,
@@ -566,6 +599,7 @@ export function ModelProviderSettings({
   providerSetupWizard: ProviderSetupWizardView;
   modelSetupOnboarding: ModelSetupOnboardingView;
   modelRoleMatrix: ModelRoleMatrix;
+  modelRoleRouteDraft: ModelRoleRouteDraftView;
   firstDayRouteSummary: FirstDayRouteSummaryView;
   presetRouteBlueprint: PresetRouteBlueprintView;
   providers: ProviderView[];
@@ -1156,6 +1190,23 @@ export function ModelProviderSettings({
     }
   }
 
+  function fillRoleRouteDraft(item: ModelRoleRouteDraftView["items"][number]) {
+    if (!item.primaryProviderConfigId) {
+      setRouteNotice({ message: `${item.label}还缺首选模型岗位，先补模型配置。` });
+      return;
+    }
+
+    setRouteDrafts((current) => ({
+      ...current,
+      [item.taskType]: {
+        primaryProviderConfigId: item.primaryProviderConfigId ?? "",
+        fallbackProviderConfigId: item.fallbackProviderConfigId ?? "",
+      },
+    }));
+    setRouteNotice({ message: `已把「${item.label}」职责草案填入手动路由表，确认后点击保存路由。` });
+    document.getElementById("manual-model-routes")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
   return (
     <div className="mt-6 grid gap-5">
       <section className="grid gap-3">
@@ -1267,6 +1318,57 @@ export function ModelProviderSettings({
                 </article>
               );
             })}
+          </div>
+          <div className="mt-4 rounded-md border border-slate-200 bg-white p-3">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+              <div>
+                <div className="text-sm font-medium text-slate-950">职责路由草案</div>
+                <p className="mt-1 text-sm leading-6 text-slate-600">按四个模型岗位给六类写作任务分配首选和备用模型，先填入表单，再人工保存。</p>
+              </div>
+              <div className="flex flex-wrap gap-2 text-xs text-slate-600">
+                <span className="rounded-md bg-sky-50 px-2 py-1 text-sky-700">可填入 {modelRoleRouteDraft.summary.ready}</span>
+                <span className="rounded-md bg-emerald-50 px-2 py-1 text-emerald-700">已匹配 {modelRoleRouteDraft.summary.current}</span>
+                <span className="rounded-md bg-rose-50 px-2 py-1 text-rose-700">缺岗位 {modelRoleRouteDraft.summary.missing}</span>
+              </div>
+            </div>
+            {modelRoleRouteDraft.nextActions.length ? (
+              <div className="mt-3 grid gap-2 md:grid-cols-3">
+                {modelRoleRouteDraft.nextActions.map((action) => (
+                  <div className="rounded-md bg-slate-50 p-2 text-xs leading-5 text-slate-600" key={action}>{action}</div>
+                ))}
+              </div>
+            ) : null}
+            <div className="mt-3 grid gap-2 lg:grid-cols-2">
+              {modelRoleRouteDraft.items.map((item) => {
+                const status = roleRouteDraftStatusCopy[item.status];
+                return (
+                  <article className="rounded-md bg-slate-50 p-3 text-sm" key={item.taskType}>
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <div>
+                        <div className="font-medium text-slate-950">{item.label}</div>
+                        <div className="mt-1 text-xs text-slate-500">{item.ownerRoleTitle}</div>
+                      </div>
+                      <span className={`rounded-md px-2 py-1 text-xs font-medium ${status.className}`}>{status.label}</span>
+                    </div>
+                    <div className="mt-2 grid gap-1 text-xs leading-5 text-slate-600 md:grid-cols-2">
+                      <div>首选：{item.primaryProviderName}</div>
+                      <div>备用：{item.fallbackProviderName ?? "无"}</div>
+                    </div>
+                    <p className="mt-2 text-xs leading-5 text-slate-600">{item.reason}</p>
+                    <p className="mt-1 text-xs leading-5 text-amber-700">{item.manualGate}</p>
+                    {item.status === "ready" ? (
+                      <button
+                        className="mt-3 rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white hover:bg-slate-800"
+                        onClick={() => fillRoleRouteDraft(item)}
+                        type="button"
+                      >
+                        填入路由表单
+                      </button>
+                    ) : null}
+                  </article>
+                );
+              })}
+            </div>
           </div>
         </div>
         <div className="grid gap-3 md:grid-cols-4">
@@ -2196,7 +2298,7 @@ export function ModelProviderSettings({
             </div>
           </div>
         </div>
-        <div className="mt-4 grid gap-3">
+        <div className="mt-4 grid gap-3" id="manual-model-routes">
           {routeOptions.map((option) => {
             const draftRoute = routeDrafts[option.taskType] ?? { primaryProviderConfigId: "", fallbackProviderConfigId: "" };
             return (

@@ -1,4 +1,5 @@
 import { getProviderOption, getProviderModelPresets } from "./providerDefaults.ts";
+import { labelForRoutedTask, type RoutedModelTaskType } from "./taskRouting.ts";
 import type { ModelProviderId } from "./types.ts";
 
 export type ModelWritingRoleId = "structure_editor" | "draft_writer" | "context_librarian" | "overseas_packager";
@@ -21,6 +22,7 @@ export interface ModelWritingRole {
   ownerLabel: string;
   status: ModelWritingRoleStatus;
   preferredProviderIds: string[];
+  providerConfigId: string | null;
   providerName: string | null;
   model: string | null;
   minContextTokens: number;
@@ -49,6 +51,40 @@ export interface ModelRoleMatrixPriorityBlocker {
   detail: string;
   actionLabel: string;
   actionHref: string;
+}
+
+export interface ModelRoleRouteDraftRoute {
+  taskType: string;
+  primaryProviderConfigId: string | null;
+  fallbackProviderConfigId: string | null;
+}
+
+export interface ModelRoleRouteDraftItem {
+  taskType: RoutedModelTaskType;
+  label: string;
+  status: "ready" | "current" | "missing";
+  ownerRoleId: ModelWritingRoleId;
+  ownerRoleTitle: string;
+  fallbackRoleTitle: string | null;
+  primaryProviderConfigId: string | null;
+  fallbackProviderConfigId: string | null;
+  currentPrimaryProviderConfigId: string | null;
+  currentFallbackProviderConfigId: string | null;
+  primaryProviderName: string;
+  fallbackProviderName: string | null;
+  reason: string;
+  manualGate: string;
+}
+
+export interface ModelRoleRouteDraft {
+  summary: {
+    total: number;
+    ready: number;
+    current: number;
+    missing: number;
+  };
+  nextActions: string[];
+  items: ModelRoleRouteDraftItem[];
 }
 
 interface RoleDefinition {
@@ -102,6 +138,57 @@ const roleDefinitions: RoleDefinition[] = [
     minContextTokens: 32000,
     taskTypes: ["submission_package_optimize", "multi_platform_submission"],
     deliverables: ["英文 synopsis", "WebNovel/Royal Road/Wattpad 包装", "标签与简介", "多语言改写"],
+  },
+];
+
+const roleRouteDraftDefinitions: Array<{
+  taskType: RoutedModelTaskType;
+  ownerRoleId: ModelWritingRoleId;
+  fallbackRoleId: ModelWritingRoleId;
+  reason: string;
+  manualGate: string;
+}> = [
+  {
+    taskType: "chapter_draft",
+    ownerRoleId: "draft_writer",
+    fallbackRoleId: "context_librarian",
+    reason: "正文初稿先交给中文网文写手，备用用长上下文资料官兜底，避免章节跑偏。",
+    manualGate: "首轮只跑 1 章样本，质量分和人工读感过线后再批量。",
+  },
+  {
+    taskType: "chapter_review",
+    ownerRoleId: "structure_editor",
+    fallbackRoleId: "context_librarian",
+    reason: "章节审稿交给长篇结构主编，备用用资料官复核连续性和伏笔。",
+    manualGate: "审稿问题必须落到钩子、爽点、人物弧光或伏笔，不接受泛泛建议。",
+  },
+  {
+    taskType: "chapter_second_pass",
+    ownerRoleId: "structure_editor",
+    fallbackRoleId: "draft_writer",
+    reason: "二改由结构主编守住问题清单，备用写手负责把修改落成正文。",
+    manualGate: "二改候选必须人工确认后才能覆盖正文。",
+  },
+  {
+    taskType: "submission_package_optimize",
+    ownerRoleId: "overseas_packager",
+    fallbackRoleId: "structure_editor",
+    reason: "投稿包装交给海外投稿包装编辑，备用结构主编检查卖点是否真实。",
+    manualGate: "标题、简介、标签和卖点必须人工采用后才能进入发布包版本。",
+  },
+  {
+    taskType: "first_three_rewrite",
+    ownerRoleId: "structure_editor",
+    fallbackRoleId: "draft_writer",
+    reason: "前三章改写先由结构主编抓钩子和追读，备用写手只做小样本改写。",
+    manualGate: "前三章改写必须逐章对比，确认追读问题更强后再保存。",
+  },
+  {
+    taskType: "control_asset_generate",
+    ownerRoleId: "context_librarian",
+    fallbackRoleId: "structure_editor",
+    reason: "总控资料交给长上下文资料官，备用结构主编校验人物弧光和主线支线。",
+    manualGate: "总控资料只作为项目土壤候选，人物和世界观不得自动覆盖。",
   },
 ];
 
@@ -162,6 +249,19 @@ function bestProvider(definition: RoleDefinition, providers: ModelRoleProviderIn
     })[0] ?? null;
 }
 
+function providerDisplay(provider: ModelRoleProviderInput | null) {
+  return provider ? `${provider.displayName} · ${provider.defaultModel}` : "暂无可用模型";
+}
+
+function sameRoute(
+  route: ModelRoleRouteDraftRoute | undefined,
+  primaryProviderConfigId: string | null,
+  fallbackProviderConfigId: string | null,
+) {
+  return (route?.primaryProviderConfigId ?? null) === primaryProviderConfigId
+    && (route?.fallbackProviderConfigId ?? null) === fallbackProviderConfigId;
+}
+
 export function buildModelRoleMatrix(providers: ModelRoleProviderInput[]): ModelRoleMatrix {
   const roles = roleDefinitions.map((definition): ModelWritingRole => {
     const provider = bestProvider(definition, providers);
@@ -178,6 +278,7 @@ export function buildModelRoleMatrix(providers: ModelRoleProviderInput[]): Model
       ownerLabel: definition.ownerLabel,
       status,
       preferredProviderIds: definition.preferredProviderIds,
+      providerConfigId: provider?.id ?? null,
       providerName: provider?.displayName ?? null,
       model: preset?.label ? `${preset.label} · ${provider?.defaultModel}` : provider?.defaultModel ?? null,
       minContextTokens: definition.minContextTokens,
@@ -230,5 +331,67 @@ export function buildModelRoleMatrixPriorityBlocker(matrix: ModelRoleMatrix): Mo
     detail: `${matrix.summary.partialRoles} 个岗位只能顶岗，长篇结构、整卷资料和海外包装容易被迫拆碎。${matrix.nextAction}`,
     actionLabel: "去调整模型岗位",
     actionHref: "/settings/models#model-role-matrix",
+  };
+}
+
+export function buildModelRoleRouteDraft(
+  providers: ModelRoleProviderInput[],
+  routes: ModelRoleRouteDraftRoute[],
+): ModelRoleRouteDraft {
+  const matrix = buildModelRoleMatrix(providers);
+  const roleById = new Map(matrix.roles.map((role) => [role.id, role]));
+  const providerById = new Map(providers.map((provider) => [provider.id, provider]));
+  const routesByTaskType = new Map(routes.map((route) => [route.taskType, route]));
+
+  const items = roleRouteDraftDefinitions.map((definition): ModelRoleRouteDraftItem => {
+    const ownerRole = roleById.get(definition.ownerRoleId);
+    const fallbackRole = roleById.get(definition.fallbackRoleId);
+    const primaryProviderConfigId = ownerRole?.status === "missing" ? null : ownerRole?.providerConfigId ?? null;
+    const fallbackProviderConfigId = fallbackRole?.status === "missing" || fallbackRole?.providerConfigId === primaryProviderConfigId
+      ? null
+      : fallbackRole?.providerConfigId ?? null;
+    const route = routesByTaskType.get(definition.taskType);
+    const status: ModelRoleRouteDraftItem["status"] = !primaryProviderConfigId
+      ? "missing"
+      : sameRoute(route, primaryProviderConfigId, fallbackProviderConfigId)
+        ? "current"
+        : "ready";
+    const primaryProvider = primaryProviderConfigId ? providerById.get(primaryProviderConfigId) ?? null : null;
+    const fallbackProvider = fallbackProviderConfigId ? providerById.get(fallbackProviderConfigId) ?? null : null;
+
+    return {
+      taskType: definition.taskType,
+      label: labelForRoutedTask(definition.taskType),
+      status,
+      ownerRoleId: definition.ownerRoleId,
+      ownerRoleTitle: ownerRole?.title ?? definition.ownerRoleId,
+      fallbackRoleTitle: fallbackProviderConfigId ? fallbackRole?.title ?? null : null,
+      primaryProviderConfigId,
+      fallbackProviderConfigId,
+      currentPrimaryProviderConfigId: route?.primaryProviderConfigId ?? null,
+      currentFallbackProviderConfigId: route?.fallbackProviderConfigId ?? null,
+      primaryProviderName: providerDisplay(primaryProvider),
+      fallbackProviderName: fallbackProvider ? providerDisplay(fallbackProvider) : null,
+      reason: status === "missing" ? `${labelForRoutedTask(definition.taskType)}缺少${ownerRole?.title ?? "负责岗位"}，先补模型岗位再谈路线。` : definition.reason,
+      manualGate: definition.manualGate,
+    };
+  });
+  const ready = items.filter((item) => item.status === "ready").length;
+  const current = items.filter((item) => item.status === "current").length;
+  const missing = items.filter((item) => item.status === "missing").length;
+
+  return {
+    summary: {
+      total: items.length,
+      ready,
+      current,
+      missing,
+    },
+    nextActions: [
+      ready > 0 ? `${ready} 条职责路线可应用到模型任务路由。` : null,
+      current > 0 ? `${current} 条职责路线已经匹配当前配置。` : null,
+      missing > 0 ? `${missing} 条路线缺少首选岗位，先补模型岗位。` : null,
+    ].filter((item): item is string => Boolean(item)),
+    items,
   };
 }

@@ -62,6 +62,7 @@ export interface ReferenceCaseDevelopmentPathItem {
   title: string;
   status: "已落地" | "继续打磨";
   ownerRole: string;
+  roleIds: string[];
   currentEvidence: string;
   nextAction: string;
   acceptance: string;
@@ -584,6 +585,7 @@ export function buildReferenceCaseDevelopmentPath(): ReferenceCaseDevelopmentPat
       title: "传统写作工作台",
       status: "已落地",
       ownerRole: "长篇结构主编",
+      roleIds: ["structure_editor", "draft_writer", "context_librarian"],
       currentEvidence: "作品页已有大纲树、人物弧光、世界观、伏笔、章节生产和结构诊断入口。",
       nextAction: "继续把结构诊断结果回写到大纲树、前三章改写和章节卡。",
       acceptance: "作者不调用 AI 也能管理一部长篇；调用 AI 后只是在关键节点提速。",
@@ -594,6 +596,7 @@ export function buildReferenceCaseDevelopmentPath(): ReferenceCaseDevelopmentPat
       title: "多模型任务路由",
       status: "继续打磨",
       ownerRole: "毒舌产品经理",
+      roleIds: ["toxic_pm", "structure_editor", "draft_writer", "context_librarian", "overseas_packager"],
       currentEvidence: "模型设置已覆盖 Claude、DeepSeek、Kimi、GPT 等岗位矩阵和任务路由。",
       nextAction: "把每个角色入口都绑定到可复核的模型岗位、失败替代路线和成本记录。",
       acceptance: "用户能看懂每次 AI 任务由哪个模型执行、为什么选它、失败后去哪补救。",
@@ -604,6 +607,7 @@ export function buildReferenceCaseDevelopmentPath(): ReferenceCaseDevelopmentPat
       title: "项目土壤召回",
       status: "已落地",
       ownerRole: "长上下文资料官",
+      roleIds: ["context_librarian", "structure_editor", "draft_writer"],
       currentEvidence: "具体作品页已有项目土壤召回，汇总人物、设定、线索和历史章节来源。",
       nextAction: "把每次草稿、审稿、二改使用的上下文来源继续沉淀到任务时间线。",
       acceptance: "长篇续写不会凭空改设定，用户能追到模型参考了哪些资料。",
@@ -614,6 +618,7 @@ export function buildReferenceCaseDevelopmentPath(): ReferenceCaseDevelopmentPat
       title: "8 平台发布闭环",
       status: "继续打磨",
       ownerRole: "平台包装官",
+      roleIds: ["overseas_packager", "feedback_operator", "toxic_pm"],
       currentEvidence: "参考库和发布中心已锁定 8 个核心平台，覆盖写作、投稿、复盘三段动作。",
       nextAction: "继续把标题、简介、标签、样章、版本和发布效果变成可回滚的发布包记录。",
       acceptance: "平台还差 0 个；每个平台都有可导出的发布包和可回填的效果复盘。",

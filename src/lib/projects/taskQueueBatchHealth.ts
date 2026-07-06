@@ -103,6 +103,16 @@ export function buildTaskQueueBatchRhythmDecision(review: GateBatchTacticEffectR
 
   const usable = review.items.find((item) => item.status === "usable") ?? null;
   if (usable) {
+    if ((usable.rhythmRecheckBatches ?? 0) >= 2) {
+      return {
+        tone: "scale",
+        label: "恢复普通推荐批次",
+        detail: `${usable.tacticLabel} 节奏复验连续稳定，可恢复普通推荐批次；下一批仍保留成功率、质量、成本和失败项回执，别把恢复当成无限放量。`,
+        actionLabel: "恢复普通批次",
+        href: "/tasks#recommended-batch",
+        evidence: usable.evidence.slice(0, 2),
+      };
+    }
     return {
       tone: "scale",
       label: "继续普通推荐批次",

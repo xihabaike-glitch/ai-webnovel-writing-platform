@@ -232,6 +232,46 @@ test("buildTaskQueueBatchRhythmDecision keeps one passed rhythm recheck in obser
   assert.ok(decision.detail.includes("三轮稳住"));
 });
 
+test("buildTaskQueueBatchRhythmDecision restores standard batches after repeated rhythm rechecks", () => {
+  const review = buildTaskQueueBatchHealthReview([
+    audit({
+      receiptId: "rhythm-recheck-2",
+      label: "节奏复验小批通过，回到批量健康复盘",
+      tacticLabel: "三轮稳住",
+      quality: 90,
+      succeededCount: 1,
+      createdAt: "2026-01-05T00:00:00.000Z",
+      batchRhythmRecheck: {
+        dispatchKey: "batch-rhythm:watch:2026-01-04T00:00:00.000Z",
+        completionEvidence: "第二轮复验范围 1 章，成功率 100%，质量 90。",
+      },
+    }),
+    audit({
+      receiptId: "rhythm-recheck-1",
+      label: "节奏复验小批通过，回到批量健康复盘",
+      tacticLabel: "三轮稳住",
+      quality: 88,
+      succeededCount: 1,
+      createdAt: "2026-01-04T00:00:00.000Z",
+      batchRhythmRecheck: {
+        dispatchKey: "batch-rhythm:watch:2026-01-03T00:00:00.000Z",
+        completionEvidence: "已拆失败样本，复验范围 1 章，质量目标 85。",
+      },
+    }),
+  ]);
+  const decision = buildTaskQueueBatchRhythmDecision(review);
+  const dispatch = buildTaskQueueBatchRhythmDispatch(decision, review);
+
+  assert.equal(review.items[0]?.status, "usable");
+  assert.equal(review.items[0]?.label, "节奏复验打法");
+  assert.equal(review.items[0]?.rhythmRecheckBatches, 2);
+  assert.equal(decision.tone, "scale");
+  assert.equal(decision.label, "恢复普通推荐批次");
+  assert.equal(decision.actionLabel, "恢复普通批次");
+  assert.ok(decision.detail.includes("节奏复验连续稳定"));
+  assert.equal(dispatch, null);
+});
+
 test("buildTaskQueueBatchRhythmDecision continues standard batches after repeated healthy tactics", () => {
   const review = buildTaskQueueBatchHealthReview([
     audit({

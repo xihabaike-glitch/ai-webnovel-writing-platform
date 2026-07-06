@@ -1003,6 +1003,9 @@ test("buildProjectControlDashboard", async (t) => {
     assert.equal(dashboard.aiPipelinePromptMemory.label, "提示词已携带恢复记忆");
     assert.equal(dashboard.aiPipelinePromptMemory.lifecycleStatus, "active");
     assert.equal(dashboard.aiPipelinePromptMemory.lifecycleLabel, "继续生效");
+    assert.equal(dashboard.aiPipelinePromptMemory.gateTone, "ready");
+    assert.equal(dashboard.aiPipelinePromptMemory.gateStatusLabel, "小批观察");
+    assert.ok(dashboard.aiPipelinePromptMemory.gateStatusDetail.includes("只允许小批"));
     assert.equal(dashboard.aiPipelinePromptMemory.actionLabel, "继续小批观察");
     assert.ok(dashboard.aiPipelinePromptMemory.controlDetail.includes("失效条件"));
     assert.ok(dashboard.aiPipelinePromptMemory.headline.includes("可小批恢复"));
@@ -1057,6 +1060,9 @@ test("buildProjectControlDashboard", async (t) => {
     assert.equal(dashboard.aiPipelinePromptMemory.hasMemory, true);
     assert.equal(dashboard.aiPipelinePromptMemory.lifecycleStatus, "rollback");
     assert.equal(dashboard.aiPipelinePromptMemory.lifecycleLabel, "回滚小样本");
+    assert.equal(dashboard.aiPipelinePromptMemory.gateTone, "blocked");
+    assert.equal(dashboard.aiPipelinePromptMemory.gateStatusLabel, "禁止放量");
+    assert.ok(dashboard.aiPipelinePromptMemory.gateStatusDetail.includes("1 章复验"));
     assert.equal(dashboard.aiPipelinePromptMemory.actionLabel, "回滚到 1 章复验");
     assert.ok(dashboard.aiPipelinePromptMemory.controlDetail.includes("暂停小批"));
     assert.ok(dashboard.aiPipelinePromptMemory.nextAction.includes("不要继续扩大批量"));
@@ -1127,6 +1133,9 @@ test("buildProjectControlDashboard", async (t) => {
     assert.equal(dashboard.aiPipelinePromptMemory.hasMemory, false);
     assert.equal(dashboard.aiPipelinePromptMemory.lifecycleStatus, "empty");
     assert.equal(dashboard.aiPipelinePromptMemory.lifecycleLabel, "已清除");
+    assert.equal(dashboard.aiPipelinePromptMemory.gateTone, "empty");
+    assert.equal(dashboard.aiPipelinePromptMemory.gateStatusLabel, "无恢复证据");
+    assert.ok(dashboard.aiPipelinePromptMemory.gateStatusDetail.includes("等待新复检"));
     assert.equal(dashboard.aiPipelinePromptMemory.label, "提示词记忆已清除");
     assert.equal(dashboard.aiPipelinePromptMemory.promptBlock, "");
     assert.ok(dashboard.aiPipelinePromptMemory.controlDetail.includes("旧恢复证据已过期"));
@@ -1196,6 +1205,9 @@ test("buildProjectControlDashboard", async (t) => {
     assert.equal(dashboard.aiPipelinePromptMemory.hasMemory, true);
     assert.equal(dashboard.aiPipelinePromptMemory.lifecycleStatus, "rollback");
     assert.equal(dashboard.aiPipelinePromptMemory.lifecycleLabel, "回滚小样本");
+    assert.equal(dashboard.aiPipelinePromptMemory.gateTone, "blocked");
+    assert.equal(dashboard.aiPipelinePromptMemory.gateStatusLabel, "禁止放量");
+    assert.ok(dashboard.aiPipelinePromptMemory.gateStatusDetail.includes("人工回滚"));
     assert.equal(dashboard.aiPipelinePromptMemory.actionLabel, "回滚到 1 章复验");
     assert.ok(dashboard.aiPipelinePromptMemory.promptBlock.includes("人工回滚"));
     assert.ok(dashboard.aiPipelinePromptMemory.controlDetail.includes("读感不稳"));

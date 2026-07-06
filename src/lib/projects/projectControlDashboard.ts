@@ -290,6 +290,9 @@ export interface AiPipelinePromptMemorySummary {
   hasMemory: boolean;
   lifecycleStatus: "active" | "sample_required" | "rollback" | "empty";
   lifecycleLabel: string;
+  gateTone: "ready" | "watch" | "blocked" | "empty";
+  gateStatusLabel: string;
+  gateStatusDetail: string;
   label: string;
   headline: string;
   detail: string;
@@ -1312,6 +1315,41 @@ function compactEvidence(items: Array<string | null | undefined>) {
     .slice(0, 4);
 }
 
+function buildAiPipelinePromptMemoryGate(
+  status: AiPipelinePromptMemorySummary["lifecycleStatus"],
+  options: { hasMemory: boolean; sourceLabel?: string | null } = { hasMemory: false },
+): Pick<AiPipelinePromptMemorySummary, "gateTone" | "gateStatusLabel" | "gateStatusDetail"> {
+  if (status === "rollback") {
+    const sourcePrefix = options.sourceLabel ? `${options.sourceLabel}：` : "";
+    return {
+      gateTone: "blocked",
+      gateStatusLabel: "禁止放量",
+      gateStatusDetail: `${sourcePrefix}先停用批量恢复，只能回滚到 1 章复验；开头钩子、章末追读和质量线通过后再重新观察。`,
+    };
+  }
+  if (status === "sample_required") {
+    return {
+      gateTone: "watch",
+      gateStatusLabel: "等待样本",
+      gateStatusDetail: "只允许 1 章小样本复验；补齐失败原因、正文质量和模型路线证据后再考虑小批。",
+    };
+  }
+  if (status === "active") {
+    return {
+      gateTone: "ready",
+      gateStatusLabel: "小批观察",
+      gateStatusDetail: "只允许小批观察，持续盯成功率、平均质量和连续失败；任何跌线都回滚到小样本。",
+    };
+  }
+  return {
+    gateTone: "empty",
+    gateStatusLabel: "无恢复证据",
+    gateStatusDetail: options.hasMemory
+      ? "恢复证据不可用，等待新复检后再写入提示词。"
+      : "没有可用恢复证据，等待新复检或小批恢复产生真实回执。",
+  };
+}
+
 function buildAiPipelinePromptMemoryCandidate(audit: ControlBatchAudit): AiPipelinePromptMemoryCandidate | null {
   const payload = parseJsonObject(audit.payload);
   const memoryControl = isRecord(payload?.aiPipelinePromptMemoryControl) ? payload.aiPipelinePromptMemoryControl : null;
@@ -1427,10 +1465,12 @@ function buildAiPipelinePromptMemorySummary(audits: ControlBatchAudit[] = []): A
     .sort((left, right) => new Date(right.latestAt).getTime() - new Date(left.latestAt).getTime())[0] ?? null;
 
   if (!candidate) {
+    const gate = buildAiPipelinePromptMemoryGate("empty", { hasMemory: false });
     return {
       hasMemory: false,
       lifecycleStatus: "empty",
       lifecycleLabel: "无记忆",
+      ...gate,
       label: "暂无提示词记忆",
       headline: "AI 写审改还没有恢复证据可带入提示词。",
       detail: "先完成一次复检或小批恢复，总控会把结论变成后续初稿、审稿、二改的约束。",
@@ -1446,10 +1486,12 @@ function buildAiPipelinePromptMemorySummary(audits: ControlBatchAudit[] = []): A
   }
 
   if (!candidate.hasMemory) {
+    const gate = buildAiPipelinePromptMemoryGate("empty", { hasMemory: true, sourceLabel: candidate.healthLabel });
     return {
       hasMemory: false,
       lifecycleStatus: "empty",
       lifecycleLabel: candidate.lifecycleLabel,
+      ...gate,
       label: "提示词记忆已清除",
       headline: "旧恢复记忆已经被清除，后续 AI 写审改不会继续携带这条证据。",
       detail: "等下一次复检或小批恢复产生新回执后，再写入新的提示词约束。",
@@ -1470,11 +1512,16 @@ function buildAiPipelinePromptMemorySummary(audits: ControlBatchAudit[] = []): A
     `- 下一步：${candidate.nextAction}。`,
     "- 禁区：不要直接恢复大批量，不要弱化开头钩子和章末追读。",
   ].join("\n");
+  const gate = buildAiPipelinePromptMemoryGate(candidate.lifecycleStatus, {
+    hasMemory: candidate.hasMemory,
+    sourceLabel: candidate.healthLabel,
+  });
 
   return {
     hasMemory: true,
     lifecycleStatus: candidate.lifecycleStatus,
     lifecycleLabel: candidate.lifecycleLabel,
+    ...gate,
     label: "提示词已携带恢复记忆",
     headline: `${candidate.healthLabel}，后续 AI 写审改会带上这条恢复证据。`,
     detail: "初稿、审稿、二改都会先按恢复证据守住开头钩子、章末追读和小样本节奏。",

@@ -145,6 +145,9 @@ interface AiPipelinePromptMemorySummary {
   hasMemory: boolean;
   lifecycleStatus: "active" | "sample_required" | "rollback" | "empty";
   lifecycleLabel: string;
+  gateTone: "ready" | "watch" | "blocked" | "empty";
+  gateStatusLabel: string;
+  gateStatusDetail: string;
   label: string;
   headline: string;
   detail: string;
@@ -413,6 +416,13 @@ function aiPromptMemoryLifecycleClass(status: AiPipelinePromptMemorySummary["lif
   if (status === "rollback") return "bg-rose-100 text-rose-800";
   if (status === "sample_required") return "bg-amber-100 text-amber-800";
   return "bg-slate-100 text-slate-700";
+}
+
+function aiPromptMemoryGateClass(tone: AiPipelinePromptMemorySummary["gateTone"]) {
+  if (tone === "ready") return "border-emerald-200 bg-emerald-100/70 text-emerald-950";
+  if (tone === "blocked") return "border-rose-200 bg-rose-50 text-rose-900";
+  if (tone === "watch") return "border-amber-200 bg-amber-50 text-amber-900";
+  return "border-slate-200 bg-white text-slate-700";
 }
 
 function modelRouteHealthClass(status: ModelRouteHealthSummary["status"]) {
@@ -1166,6 +1176,10 @@ export function ProjectControlDashboardPanel({ projectId }: { projectId: string 
                   {dashboard.aiPipelinePromptMemory.evidence.slice(0, 3).map((evidence) => (
                     <p className="rounded-md bg-white/70 px-2 py-1" key={evidence}>{evidence}</p>
                   ))}
+                </div>
+                <div className={`mt-3 rounded-md border px-3 py-2 text-xs leading-5 ${aiPromptMemoryGateClass(dashboard.aiPipelinePromptMemory.gateTone)}`}>
+                  <div className="font-medium">{dashboard.aiPipelinePromptMemory.gateStatusLabel}</div>
+                  <p className="mt-1">{dashboard.aiPipelinePromptMemory.gateStatusDetail}</p>
                 </div>
                 <p className="mt-2 rounded-md bg-white/70 px-2 py-1 text-xs leading-5 text-emerald-900">
                   下一步：{dashboard.aiPipelinePromptMemory.nextAction}

@@ -208,10 +208,36 @@ test("buildProjectListDashboard", async (t) => {
       assert.ok(entry.detail.includes("选择作品"));
       assert.ok(entry.actionLabel.length >= 4);
       assert.ok(entry.projectAnchor.startsWith("#"));
+      assert.ok(entry.roleIds.length >= 1);
+      assert.ok(entry.workflowSteps.length >= 3);
+      assert.deepEqual(
+        entry.workflowSteps.map((step) => step.stage),
+        ["先判断", "再生产", "最后验收"],
+      );
+      for (const step of entry.workflowSteps) {
+        assert.ok(step.ownerRole.length >= 4);
+        assert.ok(step.action.length >= 8);
+        assert.ok(step.output.length >= 6);
+      }
     }
     assert.equal(
       dashboard.roleEntrypoints.find((entry) => entry.id === "platform-export")?.projectAnchor,
       "#platform-export",
+    );
+    assert.ok(
+      dashboard.roleEntrypoints
+        .find((entry) => entry.id === "story-structure")
+        ?.roleIds.includes("structure_editor"),
+    );
+    assert.ok(
+      dashboard.roleEntrypoints
+        .find((entry) => entry.id === "context-recall")
+        ?.roleIds.includes("context_librarian"),
+    );
+    assert.ok(
+      dashboard.roleEntrypoints
+        .find((entry) => entry.id === "platform-export")
+        ?.roleIds.includes("overseas_packager"),
     );
   });
 

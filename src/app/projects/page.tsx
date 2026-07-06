@@ -140,6 +140,25 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps) 
               <div className="text-sm font-medium text-slate-950">{entry.title}</div>
               <p className="mt-1 text-sm leading-6 text-slate-600">{entry.detail}</p>
               <div className="mt-3 grid gap-2">
+                {entry.workflowSteps.map((step) => (
+                  <div className="rounded-md bg-white p-2 text-xs leading-5 text-slate-700" key={`${entry.id}-${step.stage}`}>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-medium text-slate-950">{step.stage}</span>
+                      <span className="text-slate-500">{step.ownerRole}</span>
+                    </div>
+                    <p className="mt-1">{step.action}</p>
+                    <div className="mt-1 font-medium text-slate-900">产物：{step.output}</div>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-3 flex flex-wrap gap-1">
+                {entry.roleIds.map((roleId) => (
+                  <span className="rounded-md bg-white px-2 py-1 text-[11px] text-slate-500" key={`${entry.id}-${roleId}`}>
+                    {roleId}
+                  </span>
+                ))}
+              </div>
+              <div className="mt-3 grid gap-2">
                 {dashboard.items.slice(0, 3).map((item) => (
                   <Link
                     className="rounded-md bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-100"

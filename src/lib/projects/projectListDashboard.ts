@@ -79,6 +79,13 @@ export interface ProjectRoleWorkflowEntrypoint {
   detail: string;
   actionLabel: string;
   projectAnchor: "#story-structure" | "#context-recall" | "#platform-export";
+  roleIds: string[];
+  workflowSteps: Array<{
+    stage: "先判断" | "再生产" | "最后验收";
+    ownerRole: string;
+    action: string;
+    output: string;
+  }>;
 }
 
 function clampPercent(value: number) {
@@ -154,6 +161,27 @@ export function buildProjectRoleWorkflowEntrypoints(): ProjectRoleWorkflowEntryp
       detail: "选择作品后进入结构诊断，检查开头、结尾、主干、支线、人物弧光和伏笔回收。",
       actionLabel: "选作品做结构诊断",
       projectAnchor: "#story-structure",
+      roleIds: ["toxic_pm", "structure_editor", "draft_writer"],
+      workflowSteps: [
+        {
+          stage: "先判断",
+          ownerRole: "毒舌产品经理",
+          action: "先判定题材、平台和开篇钩子是不是值得继续投入。",
+          output: "开书判断报告",
+        },
+        {
+          stage: "再生产",
+          ownerRole: "结构主编",
+          action: "把开头、结尾、主干、支线、人物弧光和伏笔拆成树状骨架。",
+          output: "故事大树结构图",
+        },
+        {
+          stage: "最后验收",
+          ownerRole: "正文写手",
+          action: "按结构骨架写首章和前三章样稿，检查钩子、冲突和章末追读。",
+          output: "首章样稿包验收",
+        },
+      ],
     },
     {
       id: "context-recall",
@@ -161,6 +189,27 @@ export function buildProjectRoleWorkflowEntrypoints(): ProjectRoleWorkflowEntryp
       detail: "选择作品后查看项目土壤与上下文召回，确认人物、设定、线索和历史章节来源。",
       actionLabel: "选作品看项目土壤",
       projectAnchor: "#context-recall",
+      roleIds: ["context_librarian", "structure_editor", "draft_writer"],
+      workflowSteps: [
+        {
+          stage: "先判断",
+          ownerRole: "上下文资料官",
+          action: "先找人物、设定、禁忌、伏笔和历史章节里最容易被模型写错的地方。",
+          output: "设定风险清单",
+        },
+        {
+          stage: "再生产",
+          ownerRole: "结构主编",
+          action: "把土壤资料绑定到主线、支线和章节节点，标出每章必须继承的信息。",
+          output: "章节上下文包",
+        },
+        {
+          stage: "最后验收",
+          ownerRole: "正文写手",
+          action: "用上下文包重写或续写章节，核对人物口吻、设定边界和伏笔连续性。",
+          output: "一致性修订稿件",
+        },
+      ],
     },
     {
       id: "platform-export",
@@ -168,6 +217,27 @@ export function buildProjectRoleWorkflowEntrypoints(): ProjectRoleWorkflowEntryp
       detail: "选择作品后进入平台发布包，处理标题、简介、标签、样章、版本和发布效果。",
       actionLabel: "选作品做平台包",
       projectAnchor: "#platform-export",
+      roleIds: ["overseas_packager", "feedback_operator", "toxic_pm"],
+      workflowSteps: [
+        {
+          stage: "先判断",
+          ownerRole: "平台包装官",
+          action: "先按 8 个核心平台检查标题、简介、标签、样章和长度是否匹配。",
+          output: "平台适配结论",
+        },
+        {
+          stage: "再生产",
+          ownerRole: "海外包装官",
+          action: "为 WebNovel、Royal Road、Wattpad 生成英文卖点、简介和标签版本。",
+          output: "出海平台发布包",
+        },
+        {
+          stage: "最后验收",
+          ownerRole: "数据复盘官",
+          action: "记录发布效果、读者反馈和下一轮改稿动作，决定继续、观察或止损。",
+          output: "复盘动作执行单",
+        },
+      ],
     },
   ];
 }

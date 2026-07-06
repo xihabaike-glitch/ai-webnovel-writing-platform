@@ -7,14 +7,18 @@ import { buildTaskDebtCompletionFeedback, type TaskDebtCompletionFeedback } from
 
 export function CompleteTaskDebtEvidenceForm({
   actionLabel,
+  blockerType,
   completionEvidenceTemplate,
   completionEvidenceTemplateSource,
   dispatchKey,
+  previousDebtCount,
 }: {
   actionLabel: string;
+  blockerType?: string | null;
   completionEvidenceTemplate?: string;
   completionEvidenceTemplateSource?: string;
   dispatchKey: string;
+  previousDebtCount?: number;
 }) {
   const router = useRouter();
   const [completionEvidence, setCompletionEvidence] = useState(completionEvidenceTemplate ?? "");
@@ -35,13 +39,17 @@ export function CompleteTaskDebtEvidenceForm({
       const updated = await updatePersistedGateDispatchTaskState(dispatchKey, "completed", {
         completionEvidence: evidence,
       });
-      setFeedback(buildTaskDebtCompletionFeedback({
+      const nextFeedback = buildTaskDebtCompletionFeedback({
         actionLabel,
+        blockerType,
+        previousDebtCount,
         followUpTasks: updated.followUpTasks,
         knowledgeFeedbackWritten: Boolean(updated.knowledgeFeedbackReceipt),
         dispatchCompletionReceiptLabel: updated.dispatchCompletionReceipt?.label ?? null,
         submissionEffectHeadline: updated.submissionEffectReview?.headline ?? null,
-      }));
+      });
+      setFeedback(nextFeedback);
+      router.push(nextFeedback.autoFocusHref);
       router.refresh();
     } catch (caught) {
       setErrorMessage(caught instanceof Error ? caught.message : "清债证据回写失败。");

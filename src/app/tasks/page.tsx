@@ -15,6 +15,7 @@ import { buildBatchStrategyComparison, buildBatchStrategyDecision } from "@/lib/
 import { batchExecutionStrategies, getBatchExecutionStrategy } from "@/lib/projects/batchExecutionStrategy";
 import type { GateBatchTacticEffectStatus } from "@/lib/projects/gateActionReceipts";
 import { buildRecommendedBatchModelRouteGate } from "@/lib/projects/recommendedBatchModelRouteGate";
+import { buildTaskDebtFocusChangeNotice } from "@/lib/projects/taskDebtCompletionFeedback";
 import { buildTaskQueueBatchHealthReview } from "@/lib/projects/taskQueueBatchHealth";
 import { buildTaskQueueCenter, buildTaskQueueDebtView, recommendedQueueActionLabel, taskQueueSourcePresentation, type QueueItem, type TaskQueueProject } from "@/lib/projects/taskQueueCenter";
 import { buildTaskQueueExecutionPlan } from "@/lib/projects/taskQueueExecutionPlan";
@@ -181,11 +182,34 @@ function debtBlockerType(value: string | undefined): QueueItem["blockerType"] | 
   return null;
 }
 
-export default async function TasksPage({ searchParams }: { searchParams?: Promise<{ batchStrategy?: string; view?: string; debt?: string }> }) {
+function debtBlockerTypeName(blockerType: QueueItem["blockerType"]) {
+  if (blockerType === "first_day_gate") return "首日闸门";
+  if (blockerType === "risk_recovery") return "开书止损";
+  if (blockerType === "watch_scale_gate") return "观察闸门";
+  if (blockerType === "publish_repair") return "发布质检";
+  if (blockerType === "export_version") return "导出版本";
+  if (blockerType === "chapter_card") return "章节卡";
+  return "阻塞";
+}
+
+function previousDebtCount(value: string | undefined) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return null;
+  return Math.max(0, Math.round(parsed));
+}
+
+function debtFocusNoticeClass(tone: "reduced" | "cleared" | "unchanged") {
+  if (tone === "cleared") return "border-emerald-200 bg-emerald-50 text-emerald-900";
+  if (tone === "reduced") return "border-cyan-200 bg-cyan-50 text-cyan-900";
+  return "border-amber-200 bg-amber-50 text-amber-900";
+}
+
+export default async function TasksPage({ searchParams }: { searchParams?: Promise<{ batchStrategy?: string; view?: string; debt?: string; cleared?: string; previousDebt?: string }> }) {
   const resolvedSearchParams = searchParams ? await searchParams : {};
   const activeStrategy = getBatchExecutionStrategy(resolvedSearchParams.batchStrategy);
   const activeView = resolvedSearchParams.view === "blocked" ? "blocked" : "all";
   const activeDebtBlockerType = activeView === "blocked" ? debtBlockerType(resolvedSearchParams.debt) : null;
+  const clearedDebtBlockerType = activeView === "blocked" ? debtBlockerType(resolvedSearchParams.cleared) : null;
   const [
     projects,
     recentAiTasks,
@@ -352,6 +376,13 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
   }));
   const queue = buildTaskQueueCenter(taskQueueProjects);
   const debtView = buildTaskQueueDebtView(queue.items, activeDebtBlockerType);
+  const debtFocusChangeNotice = clearedDebtBlockerType
+    ? buildTaskDebtFocusChangeNotice({
+        label: debtBlockerTypeName(clearedDebtBlockerType),
+        previousDebtCount: previousDebtCount(resolvedSearchParams.previousDebt),
+        currentDebtCount: debtView.groups.find((group) => group.blockerType === clearedDebtBlockerType)?.count ?? 0,
+      })
+    : null;
   const visibleQueueItems = activeView === "blocked" ? debtView.items : queue.items;
   const safety = buildBatchExecutionSafety(queue.items, safetyProjects, activeStrategy);
   const safetyPriorityBlocker = buildBatchSafetyPriorityBlocker(safety);
@@ -556,6 +587,11 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
                   <div key={criterion}>- {criterion}</div>
                 ))}
               </div>
+            </div>
+          ) : null}
+          {debtFocusChangeNotice ? (
+            <div className={`mt-4 rounded-md border px-3 py-2 text-sm leading-6 ${debtFocusNoticeClass(debtFocusChangeNotice.tone)}`}>
+              {debtFocusChangeNotice.message}
             </div>
           ) : null}
         </section>
@@ -1207,9 +1243,11 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
                 {entry.category === "blocked" && entry.sourceDispatchKey ? (
                   <CompleteTaskDebtEvidenceForm
                     actionLabel={entry.actionLabel}
+                    blockerType={entry.blockerType}
                     completionEvidenceTemplate={entry.completionEvidenceTemplate}
                     completionEvidenceTemplateSource={entry.completionEvidenceTemplateSource}
                     dispatchKey={entry.sourceDispatchKey}
+                    previousDebtCount={entry.blockerType ? debtView.groups.find((group) => group.blockerType === entry.blockerType)?.count ?? 0 : 0}
                   />
                 ) : null}
                 {entry.riskNotice ? (

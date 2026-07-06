@@ -113,7 +113,9 @@ export function RunRecommendedBatchButton({
   const [isCreatingRecheck, setIsCreatingRecheck] = useState(false);
   const routeGateTimeline = modelRouteGate ? buildRecommendedBatchRouteGateTimeline(modelRouteGate) : null;
   const routeGateActions = modelRouteGate ? buildRecommendedBatchRouteGateActions(modelRouteGate) : null;
-  const runActionLabel = routeGateTimeline && modelRouteGate?.status !== "block"
+  const runActionLabel = routeGateActions && modelRouteGate?.status === "block"
+    ? routeGateActions.runButtonLabel
+    : routeGateTimeline && modelRouteGate?.status !== "block"
     ? routeGateTimeline.primaryActionLabel
     : "执行推荐批次";
 

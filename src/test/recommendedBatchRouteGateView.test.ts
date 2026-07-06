@@ -70,6 +70,7 @@ test("buildRecommendedBatchRouteGateTimeline", async (t) => {
     });
 
     assert.equal(actions.canCreateRecheckDispatch, false);
+    assert.equal(actions.runButtonLabel, "先查看待复检");
     assert.equal(actions.primaryLinkLabel, "查看待复检");
     assert.equal(actions.primaryLinkHref, "/dispatch?filter=waiting_recheck");
   });

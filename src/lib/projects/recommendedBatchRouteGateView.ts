@@ -27,6 +27,7 @@ export interface RecommendedBatchRouteGateTimeline {
 
 export interface RecommendedBatchRouteGateActions {
   canCreateRecheckDispatch: boolean;
+  runButtonLabel: string;
   primaryLinkLabel: string;
   primaryLinkHref: string;
 }
@@ -113,9 +114,11 @@ export function buildRecommendedBatchRouteGateActions(
 ): RecommendedBatchRouteGateActions {
   const primaryLinkHref = gate.targetHref ?? "/tasks#recommended-batch";
   const waitingForExistingRecheck = gate.status === "block" && primaryLinkHref.includes("filter=waiting_recheck");
+  const blockedRunButtonLabel = waitingForExistingRecheck ? "先查看待复检" : gate.actionLabel ?? "先处理阻塞";
 
   return {
     canCreateRecheckDispatch: Boolean(gate.recheckAdvice) && !waitingForExistingRecheck,
+    runButtonLabel: gate.status === "block" ? blockedRunButtonLabel : gate.actionLabel ?? "执行推荐批次",
     primaryLinkLabel: waitingForExistingRecheck ? "查看待复检" : gate.actionLabel ?? "继续执行",
     primaryLinkHref,
   };

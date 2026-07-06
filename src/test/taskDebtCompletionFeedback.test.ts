@@ -148,4 +148,105 @@ test("buildTaskDebtRecoveryBatchRecord summarizes the latest cleared resume batc
   assert.deepEqual(record?.metrics, ["成功率 100%", "失败 0", "成本 $0.0200", "质量 88"]);
   assert.equal(record?.actionLabel, "继续恢复小批");
   assert.equal(record?.actionHref, "/tasks#recommended-batch");
+  assert.equal(record?.decisionTone, "continue");
+  assert.equal(record?.decisionLabel, "继续小批");
+  assert.equal(record?.decisionActionHref, "/tasks#recommended-batch");
+  assert.match(record?.decisionDetail ?? "", /已过线/);
+});
+
+test("buildTaskDebtRecoveryBatchRecord sends failed resume batches to repair", () => {
+  const record = buildTaskDebtRecoveryBatchRecord([{
+    label: "沉淀批量初稿 2 个经验",
+    href: "/tasks#recommended-batch",
+    payload: JSON.stringify({
+      plan: {
+        scaleGate: "cleared",
+        actionLabel: "批量初稿 2 个",
+      },
+      routeEffectSummary: {
+        successRatePercent: 50,
+        failedTasks: 1,
+        knownCostUsd: 0.02,
+        averageQualityScore: 90,
+      },
+      batchReceipt: {
+        headline: "批次有失败，先修再放大",
+        detail: "第二章执行失败。",
+        primaryLabel: "继续恢复小批",
+        primaryHref: "/tasks#recommended-batch",
+      },
+    }),
+    createdAt: "2026-07-06T06:00:00.000Z",
+  }]);
+
+  assert.equal(record?.decisionTone, "repair");
+  assert.equal(record?.decisionLabel, "进入失败修复");
+  assert.equal(record?.decisionActionLabel, "查看失败修复");
+  assert.equal(record?.decisionActionHref, "/failures");
+  assert.match(record?.decisionDetail ?? "", /成功率低于 80/);
+});
+
+test("buildTaskDebtRecoveryBatchRecord rolls back when quality drops below the resume line", () => {
+  const record = buildTaskDebtRecoveryBatchRecord([{
+    label: "沉淀批量初稿 2 个经验",
+    href: "/tasks#recommended-batch",
+    payload: JSON.stringify({
+      plan: {
+        scaleGate: "cleared",
+        actionLabel: "批量初稿 2 个",
+      },
+      routeEffectSummary: {
+        successRatePercent: 100,
+        failedTasks: 0,
+        knownCostUsd: 0.02,
+        averageQualityScore: 82,
+      },
+      batchReceipt: {
+        headline: "恢复小批质量跌线",
+        detail: "小批可以跑完，但质量不够稳。",
+        primaryLabel: "继续恢复小批",
+        primaryHref: "/tasks#recommended-batch",
+      },
+    }),
+    createdAt: "2026-07-06T06:00:00.000Z",
+  }]);
+
+  assert.equal(record?.decisionTone, "rollback");
+  assert.equal(record?.decisionLabel, "回滚观察修复");
+  assert.equal(record?.decisionActionLabel, "回滚观察修复");
+  assert.equal(record?.decisionActionHref, "/dispatch");
+  assert.match(record?.decisionDetail ?? "", /85 分/);
+});
+
+test("buildTaskDebtRecoveryBatchRecord pauses scale-up when the cost line is too high", () => {
+  const record = buildTaskDebtRecoveryBatchRecord([{
+    label: "沉淀批量初稿 2 个经验",
+    href: "/tasks#recommended-batch",
+    payload: JSON.stringify({
+      plan: {
+        scaleGate: "cleared",
+        actionLabel: "批量初稿 2 个",
+      },
+      routeEffectSummary: {
+        successRatePercent: 100,
+        failedTasks: 0,
+        knownCostUsd: 0.14,
+        averageQualityScore: 90,
+        averageCostPerSucceededTaskUsd: 0.07,
+      },
+      batchReceipt: {
+        headline: "恢复小批成本偏高",
+        detail: "质量能过，但模型消耗超线。",
+        primaryLabel: "继续恢复小批",
+        primaryHref: "/tasks#recommended-batch",
+      },
+    }),
+    createdAt: "2026-07-06T06:00:00.000Z",
+  }]);
+
+  assert.equal(record?.decisionTone, "watch");
+  assert.equal(record?.decisionLabel, "暂停加码看成本");
+  assert.equal(record?.decisionActionLabel, "查看推荐批次");
+  assert.equal(record?.decisionActionHref, "/tasks#recommended-batch");
+  assert.match(record?.decisionDetail ?? "", /\$0.0700/);
 });

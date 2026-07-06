@@ -620,8 +620,12 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
                       <span className="rounded-md bg-slate-50 px-2 py-1 font-medium" key={metric}>{metric}</span>
                     ))}
                   </div>
-                  <Link className="mt-2 inline-flex rounded-md bg-white px-2 py-1 font-medium hover:bg-slate-50" href={debtRecoveryBatchRecord.actionHref}>
-                    {debtRecoveryBatchRecord.actionLabel}
+                  <div className="mt-2 rounded-md bg-white px-2 py-1">
+                    <span className="font-medium">{debtRecoveryBatchRecord.decisionLabel}</span>
+                    <span className="ml-1 text-slate-600">{debtRecoveryBatchRecord.decisionDetail}</span>
+                  </div>
+                  <Link className="mt-2 inline-flex rounded-md bg-white px-2 py-1 font-medium hover:bg-slate-50" href={debtRecoveryBatchRecord.decisionActionHref}>
+                    {debtRecoveryBatchRecord.decisionActionLabel}
                   </Link>
                 </div>
               ) : null}

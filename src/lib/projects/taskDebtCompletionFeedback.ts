@@ -60,6 +60,11 @@ export interface TaskDebtRecoveryBatchRecord {
   metrics: string[];
   actionLabel: string;
   actionHref: string;
+  decisionTone: "continue" | "repair" | "rollback" | "watch";
+  decisionLabel: string;
+  decisionDetail: string;
+  decisionActionLabel: string;
+  decisionActionHref: string;
 }
 
 function taskDebtAutoFocusHref(input: Pick<TaskDebtCompletionFeedbackInput, "blockerType" | "previousDebtCount">) {
@@ -98,6 +103,54 @@ function taskDebtTimestamp(value: Date | string) {
   return Number.isFinite(time) ? time : 0;
 }
 
+function buildTaskDebtRecoveryDecision(input: {
+  successRate: number | null;
+  failedTasks: number | null;
+  averageQualityScore: number | null;
+  averageCostPerSucceededTaskUsd: number | null;
+  actionLabel: string;
+  actionHref: string;
+}): Pick<TaskDebtRecoveryBatchRecord, "decisionTone" | "decisionLabel" | "decisionDetail" | "decisionActionLabel" | "decisionActionHref"> {
+  const failedTasks = input.failedTasks ?? 0;
+  if (failedTasks > 0 || (input.successRate !== null && input.successRate < 80)) {
+    return {
+      decisionTone: "repair",
+      decisionLabel: "进入失败修复",
+      decisionDetail: "恢复小批出现失败，或成功率低于 80%。先修失败项，不继续放量。",
+      decisionActionLabel: "查看失败修复",
+      decisionActionHref: "/failures",
+    };
+  }
+
+  if (input.averageQualityScore === null || input.averageQualityScore < 85) {
+    return {
+      decisionTone: "rollback",
+      decisionLabel: "回滚观察修复",
+      decisionDetail: "恢复小批质量未过 85 分，先回滚观察修复，再重新跑小批。",
+      decisionActionLabel: "回滚观察修复",
+      decisionActionHref: "/dispatch",
+    };
+  }
+
+  if (input.averageCostPerSucceededTaskUsd !== null && input.averageCostPerSucceededTaskUsd > 0.05) {
+    return {
+      decisionTone: "watch",
+      decisionLabel: "暂停加码看成本",
+      decisionDetail: `单个成功任务平均成本 $${input.averageCostPerSucceededTaskUsd.toFixed(4)}，先观察模型消耗，不扩大批次。`,
+      decisionActionLabel: "查看推荐批次",
+      decisionActionHref: input.actionHref,
+    };
+  }
+
+  return {
+    decisionTone: "continue",
+    decisionLabel: "继续小批",
+    decisionDetail: "恢复小批已过线，下一批仍按安全阀小步推进。",
+    decisionActionLabel: input.actionLabel,
+    decisionActionHref: input.actionHref,
+  };
+}
+
 export function buildTaskDebtRecoveryBatchRecord(audits: TaskDebtRecoveryBatchAudit[]): TaskDebtRecoveryBatchRecord | null {
   const latest = audits
     .map((audit) => ({ audit, payload: parseTaskDebtPayload(audit.payload) }))
@@ -111,6 +164,7 @@ export function buildTaskDebtRecoveryBatchRecord(audits: TaskDebtRecoveryBatchAu
   const failedTasks = taskDebtNumber(routeEffectSummary?.failedTasks);
   const knownCostUsd = taskDebtNumber(routeEffectSummary?.knownCostUsd);
   const averageQualityScore = taskDebtNumber(routeEffectSummary?.averageQualityScore);
+  const averageCostPerSucceededTaskUsd = taskDebtNumber(routeEffectSummary?.averageCostPerSucceededTaskUsd);
   const headline = typeof batchReceipt?.headline === "string" && batchReceipt.headline
     ? batchReceipt.headline
     : latest.audit.label;
@@ -133,6 +187,14 @@ export function buildTaskDebtRecoveryBatchRecord(audits: TaskDebtRecoveryBatchAu
     ].filter((metric): metric is string => Boolean(metric)),
     actionLabel,
     actionHref,
+    ...buildTaskDebtRecoveryDecision({
+      successRate,
+      failedTasks,
+      averageQualityScore,
+      averageCostPerSucceededTaskUsd,
+      actionLabel,
+      actionHref,
+    }),
   };
 }
 

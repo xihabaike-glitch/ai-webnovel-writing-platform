@@ -1,3 +1,5 @@
+import { getPlatformProfile, type PlatformId } from "../platforms/platformProfiles.ts";
+
 export type ReferenceCaseCategory =
   | "writing_tool"
   | "ai_workflow"
@@ -34,6 +36,7 @@ export interface ReferenceCaseDevelopmentPlan {
 
 export interface ReferenceCaseLibraryView {
   totalCases: number;
+  platformScope: ReferenceCasePlatformScope;
   selectedCategory: ReferenceCaseCategory | "all";
   categoryTabs: Array<{
     id: ReferenceCaseCategory | "all";
@@ -49,6 +52,15 @@ export interface ReferenceCaseLibraryView {
     tag: string;
     count: number;
   }>;
+}
+
+export interface ReferenceCasePlatformScope {
+  corePlatformCount: number;
+  completedPlatformCount: number;
+  pausedExpansionCount: number;
+  statusLabel: string;
+  scopeDecision: string;
+  platformNames: string[];
 }
 
 export const referenceCaseCategories: ReferenceCaseCategoryMeta[] = [
@@ -394,6 +406,30 @@ const categoryPriority: ReferenceCaseCategory[] = [
   "publishing_pipeline",
 ];
 
+const lockedCorePlatformIds: PlatformId[] = [
+  "fanqie",
+  "qidian",
+  "qimao",
+  "jjwxc",
+  "zhihu_yanxuan",
+  "webnovel",
+  "royal_road",
+  "wattpad",
+];
+
+export function buildReferenceCasePlatformScope(): ReferenceCasePlatformScope {
+  const platformNames = lockedCorePlatformIds.map((id) => getPlatformProfile(id).name);
+
+  return {
+    corePlatformCount: platformNames.length,
+    completedPlatformCount: platformNames.length,
+    pausedExpansionCount: 10,
+    statusLabel: `${platformNames.length}/${platformNames.length} 核心平台已完成`,
+    scopeDecision: "剩余 10 个扩展平台暂停，不再进入当前开发范围；先把 8 个核心平台的写作、投稿、复盘闭环做扎实。",
+    platformNames,
+  };
+}
+
 function isReferenceCaseCategory(value: string | null | undefined): value is ReferenceCaseCategory {
   return referenceCaseCategories.some((category) => category.id === value);
 }
@@ -462,6 +498,7 @@ export function buildReferenceCaseLibraryView(input?: {
 
   return {
     totalCases: plan.totalCases,
+    platformScope: buildReferenceCasePlatformScope(),
     selectedCategory,
     categoryTabs,
     visibleCases,

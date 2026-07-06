@@ -36,11 +36,35 @@ export default async function ReferencesPage({ searchParams }: ReferencesPagePro
             30 个以上 GitHub 案例，按传统写作、AI 工作流、知识库和发布流水线拆开看，只取能帮助网文生产平台落地的部分。
           </p>
         </div>
-        <div className="rounded-md border border-slate-200 bg-white px-4 py-3">
-          <div className="text-xs text-slate-500">当前案例</div>
-          <div className="mt-1 text-2xl font-semibold">{view.visibleCases.length} / {view.totalCases}</div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="rounded-md border border-slate-200 bg-white px-4 py-3">
+            <div className="text-xs text-slate-500">平台范围</div>
+            <div className="mt-1 text-2xl font-semibold">{view.platformScope.statusLabel}</div>
+          </div>
+          <div className="rounded-md border border-slate-200 bg-white px-4 py-3">
+            <div className="text-xs text-slate-500">当前案例</div>
+            <div className="mt-1 text-2xl font-semibold">{view.visibleCases.length} / {view.totalCases}</div>
+          </div>
         </div>
       </div>
+
+      <section className="mb-6 rounded-md border border-emerald-200 bg-emerald-50 p-4">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <div className="text-sm font-medium text-emerald-900">{view.platformScope.scopeDecision}</div>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {view.platformScope.platformNames.map((name) => (
+                <span className="rounded-md bg-white px-2 py-1 text-xs text-emerald-800" key={name}>
+                  {name}
+                </span>
+              ))}
+            </div>
+          </div>
+          <div className="w-fit rounded-md bg-white px-3 py-2 text-sm font-medium text-emerald-900">
+            暂停扩展 {view.platformScope.pausedExpansionCount} 个
+          </div>
+        </div>
+      </section>
 
       <section className="mb-6 grid gap-3 md:grid-cols-2 lg:grid-cols-5">
         {view.categoryTabs.map((tab) => {

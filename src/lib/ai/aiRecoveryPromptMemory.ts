@@ -1,8 +1,9 @@
-import { buildGateAiPipelineRecoveryPanel, type PersistedGatePlatformDispatchTask } from "../projects/gateActionReceipts.ts";
+import { buildGateAiPipelineRecoveryPanel, type GateAiPipelineRecoveryCompletionFeedback, type PersistedGatePlatformDispatchTask } from "../projects/gateActionReceipts.ts";
 
 export interface AiRecoveryPromptMemory {
   promptBlock: string;
   sourceLabel: string;
+  recoveryFeedback: GateAiPipelineRecoveryCompletionFeedback;
   lifecycleStatus: "active" | "sample_required" | "rollback";
   lifecycleLabel: string;
   latestAt: string | null;
@@ -26,11 +27,13 @@ export function buildAiRecoveryPromptMemory(tasks: PersistedGatePlatformDispatch
 
   return {
     sourceLabel: latestEvidence.label,
+    recoveryFeedback: latestEvidence.feedback,
     lifecycleStatus,
     lifecycleLabel: lifecycleStatus === "rollback" ? "回滚小样本" : lifecycleStatus === "sample_required" ? "等待小样本" : "继续生效",
     latestAt: latestEvidence.completedAt,
     promptBlock: [
       "AI 写审改恢复证据：",
+      `- 恢复反馈：${latestEvidence.feedback.statusLabel}｜${latestEvidence.feedback.headline}｜${latestEvidence.feedback.primaryActionLabel}。`,
       `- ${latestEvidence.label}：${latestEvidence.evidence.slice(0, 4).join("；")}。`,
       `- 下一步：${latestEvidence.nextAction || "继续小样本观察"}。`,
       "- 禁区：不要直接恢复大批量，不要弱化开头钩子和章末追读。",

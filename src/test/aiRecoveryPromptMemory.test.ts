@@ -53,8 +53,11 @@ test("buildAiRecoveryPromptMemory", async (t) => {
 
     assert.equal(memory?.lifecycleStatus, "active");
     assert.equal(memory?.lifecycleLabel, "继续生效");
+    assert.equal(memory?.recoveryFeedback.statusLabel, "可恢复");
+    assert.equal(memory?.recoveryFeedback.primaryActionLabel, "继续小批，不放大批");
     assert.ok(memory?.promptBlock.includes("继续恢复小批"));
     assert.ok(memory?.promptBlock.includes("质量 88"));
+    assert.ok(memory?.promptBlock.includes("恢复反馈：可恢复｜小样本复验已过线｜继续小批，不放大批"));
   });
 
   await t.test("keeps rollback recheck in sample mode when completion asks for another sample", () => {
@@ -73,6 +76,8 @@ test("buildAiRecoveryPromptMemory", async (t) => {
 
     assert.equal(memory?.lifecycleStatus, "sample_required");
     assert.equal(memory?.lifecycleLabel, "等待小样本");
+    assert.equal(memory?.recoveryFeedback.statusLabel, "继续观察");
     assert.ok(memory?.promptBlock.includes("重新小样本"));
+    assert.ok(memory?.promptBlock.includes("恢复反馈：继续观察"));
   });
 });

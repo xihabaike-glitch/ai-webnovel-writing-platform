@@ -223,6 +223,17 @@ export interface PlatformSubmissionAssetIssueResolution {
   status: "resolved";
 }
 
+export interface PlatformSubmissionAssetAdoptionReviewReceipt {
+  tone: "success" | "warning" | "danger";
+  title: string;
+  message: string;
+  score: number;
+  status: PlatformSubmissionAssetAudit["status"];
+  resolvedLabels: string;
+  remainingLabels: string;
+  nextAction: string;
+}
+
 export interface PlatformSubmissionAssetAdoptionSummary {
   generatedTasks: number;
   generatedVariants: number;
@@ -3014,6 +3025,35 @@ export function buildSubmissionAssetIssueResolutions(
       detail: issue.detail,
       status: "resolved",
     }));
+}
+
+export function buildSubmissionAssetAdoptionReviewReceipt(input: {
+  platformName: string;
+  strategy: string;
+  audit: PlatformSubmissionAssetAudit;
+  addressedIssues?: PlatformSubmissionAssetIssueResolution[];
+}): PlatformSubmissionAssetAdoptionReviewReceipt {
+  const resolvedLabels = input.addressedIssues?.length
+    ? input.addressedIssues.map((issue) => issue.label).join("、")
+    : "暂无";
+  const remainingLabels = input.audit.issues.length
+    ? input.audit.issues.slice(0, 3).map((issue) => issue.label).join("、")
+    : "暂无";
+  const tone = input.audit.status === "ready" ? "success" : input.audit.status === "blocked" ? "danger" : "warning";
+  const nextAction = input.audit.status === "ready"
+    ? "保存发布基准，并进入前三章兑现检查。"
+    : "继续按剩余问题生成候选或手动改稿。";
+
+  return {
+    tone,
+    title: `${input.platformName} 投稿资产复检`,
+    message: `已采纳「${input.strategy}」，质检 ${input.audit.score} 分，已解决：${resolvedLabels}。`,
+    score: input.audit.score,
+    status: input.audit.status,
+    resolvedLabels,
+    remainingLabels,
+    nextAction,
+  };
 }
 
 function taskPlatformId(task: PublishExportAiTask) {

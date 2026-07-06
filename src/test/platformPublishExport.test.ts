@@ -9,6 +9,7 @@ import {
   buildPlatformStrategySwitchPlan,
   buildPublishPackageRestorePatch,
   buildPublishPackageVersionComparison,
+  buildSubmissionAssetAdoptionReviewReceipt,
   buildSubmissionAssetIssueResolutions,
   buildSubmissionAssetEditorReview,
   buildSubmissionAssetAudit,
@@ -1110,6 +1111,38 @@ test("buildPlatformPublishExportCenter", async (t) => {
 
     assert.ok(resolutions.some((item) => item.label === "盐选付费节点不够明确"));
     assert.ok(resolutions.every((item) => item.status === "resolved"));
+  });
+
+  await t.test("builds post-adoption review receipt for saved asset variants", () => {
+    const platform = getPlatformProfile("zhihu_yanxuan");
+    const sourceAudit = buildSubmissionAssetAudit(platform, {
+      title: "她替我活着",
+      logline: "我参加自己的葬礼，发现最亲近的人都藏着反转真相。",
+      synopsis: "我站在自己的遗像前，看见另一个女人用我的名字接受所有人的悼念。为了查清真相，我开始跟踪她、接近未婚夫，也发现母亲和好友都在撒谎。故事会持续推进悬疑、复仇和身份反转，让读者不断怀疑谁才是真正的受害者。",
+      overseasSynopsis: "",
+      tags: ["悬疑", "复仇", "第一人称反转"],
+    });
+    const variantAudit = buildSubmissionAssetAudit(platform, {
+      title: "她替我活着",
+      logline: "我参加自己的葬礼，发现最亲近的人都藏着反转真相。",
+      synopsis: "我站在自己的遗像前，看见另一个女人用我的名字接受所有人的悼念。前 1000 字直接抛出身份谜团、未婚夫谎言和母亲短信，三段内形成付费期待；后续用复仇、悬疑证据和身份反转推进，结尾回收谁才是真正受害者的答案。",
+      overseasSynopsis: "",
+      tags: ["悬疑", "复仇", "第一人称反转"],
+    });
+    const addressedIssues = buildSubmissionAssetIssueResolutions(sourceAudit, variantAudit);
+
+    const receipt = buildSubmissionAssetAdoptionReviewReceipt({
+      platformName: platform.name,
+      strategy: "盐选付费节点补强",
+      audit: variantAudit,
+      addressedIssues,
+    });
+
+    assert.equal(receipt.score, variantAudit.score);
+    assert.equal(receipt.resolvedLabels, "盐选付费节点不够明确");
+    assert.equal(receipt.remainingLabels, "暂无");
+    assert.ok(receipt.message.includes("质检"));
+    assert.ok(receipt.nextAction.includes("保存发布基准"));
   });
 
   await t.test("blocks export when latest review still asks for a second pass", () => {

@@ -14,7 +14,7 @@ import {
   type RawPublishRepairRunResult,
 } from "@/lib/projects/publishRepairRunResults";
 import { addGateActionReceipt, buildGatePublishEffectReceipt } from "@/lib/projects/gateActionReceipts";
-import { buildSubmissionAssetEditorReview } from "@/lib/projects/platformPublishExport";
+import { buildSubmissionAssetAdoptionReviewReceipt, buildSubmissionAssetEditorReview } from "@/lib/projects/platformPublishExport";
 
 type PublishRepairActionKind =
   | "edit_chapter"
@@ -1423,6 +1423,7 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
   const [strategySwitchPlan, setStrategySwitchPlan] = useState<PlatformStrategySwitchPlan | null>(null);
   const [strategyExecutionReceipt, setStrategyExecutionReceipt] = useState<PlatformStrategyExecutionReceipt | null>(null);
   const [strategyReviewTaskReceipt, setStrategyReviewTaskReceipt] = useState<PlatformStrategyReviewTaskReceipt | null>(null);
+  const [assetAdoptionReceipt, setAssetAdoptionReceipt] = useState<ReturnType<typeof buildSubmissionAssetAdoptionReviewReceipt> | null>(null);
   const [knowledgeFeedbackReceipt, setKnowledgeFeedbackReceipt] = useState<PlatformKnowledgeFeedbackReceipt | null>(null);
   const [knowledgeFeedbackHistory, setKnowledgeFeedbackHistory] = useState<PlatformKnowledgeFeedbackReceipt[]>([]);
   const [latestEffectReview, setLatestEffectReview] = useState<PlatformPublishEffectSaveReview | null>(null);
@@ -2119,11 +2120,21 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
       sourceTaskId: variant.sourceTaskId,
       strategy: variant.strategy,
     });
+    if (saved && selectedPackage) {
+      const receipt = buildSubmissionAssetAdoptionReviewReceipt({
+        platformName: selectedPackage.platformName,
+        strategy: variant.strategy,
+        audit: variant.audit,
+        addressedIssues: variant.addressedIssues,
+      });
+      setAssetAdoptionReceipt(receipt);
+      setMessage(receipt.message);
+    }
     if (!saved || !platformId || strategySwitchPlan?.platformId !== platformId) return;
     try {
       const refreshedPlan = await refreshStrategyPlan(platformId);
       setStrategyExecutionReceipt(buildStrategyExecutionReceipt(refreshedPlan, "adopt-submission-asset"));
-      setMessage(`已采纳并保存「${variant.strategy}」，策略链已刷新。`);
+      setMessage(`已采纳并保存「${variant.strategy}」，策略链已刷新。${variant.audit.status === "ready" ? " 投稿资产已通过复检。" : " 投稿资产仍需继续修。"}`);
     } catch (caught) {
       setStrategyExecutionReceipt(buildStrategyExecutionReceipt(strategySwitchPlan, "adopt-submission-asset"));
       setMessage(caught instanceof Error ? caught.message : "投稿资产已保存，但策略链刷新失败。");
@@ -2436,6 +2447,7 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
               setSelectedVersionId(null);
               setVersionDetail(null);
               setVersionActionFilter("all");
+              setAssetAdoptionReceipt(null);
             }}
             value={selectedPlatformId}
           >
@@ -3272,6 +3284,34 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
       ) : null}
 
       {message ? <p className="mt-3 text-sm text-slate-600">{message}</p> : null}
+
+      {assetAdoptionReceipt ? (
+        <div className={`mt-3 rounded-md border p-3 text-sm ${assetEditorReviewToneClass(assetAdoptionReceipt.tone)}`}>
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <div className={`font-medium ${assetEditorReviewTextClass(assetAdoptionReceipt.tone)}`}>
+                {assetAdoptionReceipt.title}
+              </div>
+              <p className="mt-1 leading-6 text-slate-700">{assetAdoptionReceipt.message}</p>
+              <div className="mt-2 grid gap-2 text-xs sm:grid-cols-3">
+                <div className="rounded-md bg-white px-2 py-1 text-slate-600">
+                  复检分 <span className="font-medium text-slate-950">{assetAdoptionReceipt.score}</span>
+                </div>
+                <div className="rounded-md bg-white px-2 py-1 text-slate-600">
+                  已解决 <span className="font-medium text-slate-950">{assetAdoptionReceipt.resolvedLabels}</span>
+                </div>
+                <div className="rounded-md bg-white px-2 py-1 text-slate-600">
+                  剩余 <span className="font-medium text-slate-950">{assetAdoptionReceipt.remainingLabels}</span>
+                </div>
+              </div>
+              <p className="mt-2 text-xs leading-5 text-slate-600">下一步：{assetAdoptionReceipt.nextAction}</p>
+            </div>
+            <span className={`w-fit rounded-md px-2 py-1 text-xs font-medium ${assetAuditStatusClass(assetAdoptionReceipt.status)}`}>
+              {assetAuditStatusLabel(assetAdoptionReceipt.status)}
+            </span>
+          </div>
+        </div>
+      ) : null}
 
       {selectedPackage ? (
         <div className="mt-4 grid gap-4">

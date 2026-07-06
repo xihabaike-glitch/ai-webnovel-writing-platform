@@ -46,11 +46,15 @@ test("open source reference cases", async (t) => {
 
   await t.test("builds a development plan from the reference library", () => {
     const plan = buildReferenceCaseDevelopmentPlan(openSourceReferenceCases);
+    const publishingMove = plan.nextBuildMoves.find((move) => move.includes("发布流水线")) ?? "";
 
     assert.equal(plan.totalCases, openSourceReferenceCases.length);
     assert.ok(plan.categoryBlocks.every((block) => block.cases.length >= 4));
     assert.ok(plan.nextBuildMoves.some((move) => move.includes("写作工作台")));
     assert.ok(plan.nextBuildMoves.some((move) => move.includes("模型")));
+    for (const platformName of ["起点", "番茄", "七猫", "晋江", "知乎盐选", "WebNovel", "Royal Road", "Wattpad"]) {
+      assert.ok(publishingMove.includes(platformName), `${platformName} should be included in the publishing pipeline move`);
+    }
   });
 
   await t.test("builds a filterable product reference library view", () => {

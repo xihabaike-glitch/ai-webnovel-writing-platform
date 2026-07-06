@@ -442,6 +442,8 @@ function isReferenceCaseCategory(value: string | null | undefined): value is Ref
 export function buildReferenceCaseDevelopmentPlan(
   cases: OpenSourceReferenceCase[] = openSourceReferenceCases,
 ): ReferenceCaseDevelopmentPlan {
+  const platformScope = buildReferenceCasePlatformScope();
+  const platformList = platformScope.platformNames.join("、");
   const categoryBlocks = categoryPriority.map((category) => {
     const meta = referenceCaseCategories.find((item) => item.id === category);
 
@@ -460,7 +462,7 @@ export function buildReferenceCaseDevelopmentPlan(
       "写作工作台：参考 novelWriter、bibisco、Manuskript，把开书、人物弧光、大纲树、章节卡和正文编辑放进同一个工作区。",
       "模型路由：参考 Dify、Flowise、LangChain，把 Claude、DeepSeek、Kimi、GPT 的任务分工接到开头钩子、正文生成、复审和二改。",
       "知识库：参考 Logseq、Joplin、Outline，把世界观、伏笔、人物关系和历史章节做成可召回的项目土壤。",
-      "发布流水线：参考 mdBook、HonKit、Pandoc，把起点、番茄、七猫、知乎盐选、WebNovel、Royal Road、Wattpad 的投稿包做成可导出版本。",
+      `发布流水线：参考 mdBook、HonKit、Pandoc，只覆盖当前锁定的 ${platformScope.corePlatformCount} 个核心平台：${platformList}，把投稿包做成可导出版本。`,
     ],
   };
 }

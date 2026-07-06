@@ -4032,6 +4032,10 @@ test("buildGateActionReceipt", async (t) => {
     assert.equal(panel.latestEvidence?.nextAction, "继续恢复小批");
     assert.equal(panel.latestEvidence?.completedAt, "2026-01-01T00:22:00.000Z");
     assert.ok(panel.latestEvidence?.evidence.some((line) => line.includes("平均质量：91")));
+    assert.equal(panel.latestEvidence?.feedback.statusLabel, "可恢复");
+    assert.equal(panel.latestEvidence?.feedback.headline, "恢复小批证据已过线");
+    assert.ok(panel.latestEvidence?.feedback.detail.includes("成功率：100%"));
+    assert.equal(panel.latestEvidence?.feedback.primaryActionLabel, "继续小批，不放大批");
     assert.deepEqual(panel.groups.map((group) => `${group.id}:${group.total}/${group.active}:${group.actionHref}`), [
       "rollback_repair:1/1:/dispatch?queue=ai_pipeline#dispatch-ai-pipeline-recheck:project-1:receipt-1:rollback",
       "sample_recheck:1/0:/dispatch?queue=ai_pipeline#dispatch-ai-pipeline-recheck:project-1:receipt-1:sample",

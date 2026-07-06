@@ -325,11 +325,20 @@ export default async function GatePage({
             <Link className="mt-3 block rounded-md border border-white/70 bg-white/80 p-3 text-sm hover:bg-white" href={aiRecoveryPanel.latestEvidence.href}>
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="font-medium">{aiRecoveryPanel.latestEvidence.label}</div>
-                <span className="rounded-md bg-slate-50 px-2 py-1 text-xs text-slate-700">
-                  {shortDateTime(aiRecoveryPanel.latestEvidence.completedAt)}
-                </span>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="rounded-md bg-slate-50 px-2 py-1 text-xs font-medium text-slate-700">
+                    {aiRecoveryPanel.latestEvidence.feedback.statusLabel}
+                  </span>
+                  <span className="rounded-md bg-slate-50 px-2 py-1 text-xs text-slate-700">
+                    {shortDateTime(aiRecoveryPanel.latestEvidence.completedAt)}
+                  </span>
+                </div>
               </div>
-              <p className="mt-1 text-xs leading-5 opacity-75">下一步：{aiRecoveryPanel.latestEvidence.nextAction || "待补恢复结论"}</p>
+              <div className="mt-2 text-xs font-medium">{aiRecoveryPanel.latestEvidence.feedback.headline}</div>
+              <p className="mt-1 text-xs leading-5 opacity-75">{aiRecoveryPanel.latestEvidence.feedback.detail}</p>
+              <div className="mt-2 w-fit rounded-md bg-slate-950 px-2 py-1 text-xs font-medium text-white">
+                {aiRecoveryPanel.latestEvidence.feedback.primaryActionLabel}
+              </div>
               <div className="mt-2 grid gap-1 text-xs leading-5">
                 {aiRecoveryPanel.latestEvidence.evidence.slice(0, 3).map((line) => (
                   <div className="rounded-md bg-white px-2 py-1" key={line}>{line}</div>

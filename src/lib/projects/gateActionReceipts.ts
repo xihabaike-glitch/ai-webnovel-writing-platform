@@ -468,6 +468,7 @@ export interface GateAiPipelineRecoveryPanel {
     kind: GateAiPipelineRecoveryCompletionKind;
     outcome: GatePlatformTacticExperienceStatus;
     nextAction: string;
+    feedback: GateAiPipelineRecoveryCompletionFeedback;
     evidence: string[];
     completedAt: string | null;
     href: string;
@@ -3770,6 +3771,7 @@ export function buildGateAiPipelineRecoveryPanel(_tasks: PersistedGatePlatformDi
         kind: completion.kind,
         outcome: completion.outcome,
         nextAction: completion.nextAction,
+        feedback: buildAiPipelineRecoveryCompletionFeedback(completion),
         evidence: completion.evidence,
         completedAt: task.completedAt,
         updatedAt: task.updatedAt,
@@ -3813,6 +3815,7 @@ export function buildGateAiPipelineRecoveryPanel(_tasks: PersistedGatePlatformDi
       kind: latestEvidence.kind,
       outcome: latestEvidence.outcome,
       nextAction: latestEvidence.nextAction,
+      feedback: latestEvidence.feedback,
       evidence: latestEvidence.evidence,
       completedAt: latestEvidence.completedAt,
       href: latestEvidence.href,
@@ -4312,6 +4315,13 @@ export type GateDispatchCompletionTemplateTask = Pick<
 
 export type GateAiPipelineRecoveryCompletionKind = "sample_recheck" | "small_batch_resume" | "rollback_repair";
 
+export interface GateAiPipelineRecoveryCompletionFeedback {
+  statusLabel: string;
+  headline: string;
+  detail: string;
+  primaryActionLabel: string;
+}
+
 export interface GateAiPipelineRecoveryCompletionOutcome {
   kind: GateAiPipelineRecoveryCompletionKind;
   outcome: GatePlatformTacticExperienceStatus;
@@ -4418,6 +4428,34 @@ function aiPipelineRecoveryOutcomeFromAction(nextAction: string): GatePlatformTa
   if (/观察|重新小样本|未通过|不通过|待补|补证据|暂缓/u.test(nextAction)) return "watch";
   if (/通过|继续恢复小批|可恢复|恢复小批|继续/u.test(nextAction)) return "usable";
   return "watch";
+}
+
+function buildAiPipelineRecoveryCompletionFeedback(
+  completion: GateAiPipelineRecoveryCompletionOutcome,
+): GateAiPipelineRecoveryCompletionFeedback {
+  const evidenceText = completion.evidence.length > 0 ? completion.evidence.join("；") : "完成证据不足，需补成功率、质量、失败原因和成本。";
+  if (completion.outcome === "blocked") {
+    return {
+      statusLabel: "暂停恢复",
+      headline: completion.kind === "small_batch_resume" ? "恢复小批证据跌线" : "复验未过线",
+      detail: `${evidenceText} 下一步：${completion.nextAction || "暂停恢复小批，先回滚修复。"}`,
+      primaryActionLabel: "回滚修复",
+    };
+  }
+  if (completion.outcome === "usable") {
+    return {
+      statusLabel: "可恢复",
+      headline: completion.kind === "small_batch_resume" ? "恢复小批证据已过线" : "小样本复验已过线",
+      detail: `${evidenceText} 下一步：${completion.nextAction || "继续恢复小批"}。`,
+      primaryActionLabel: "继续小批，不放大批",
+    };
+  }
+  return {
+    statusLabel: "继续观察",
+    headline: completion.kind === "rollback_repair" ? "回滚修复仍需复验" : "恢复证据仍需补齐",
+    detail: `${evidenceText} 下一步：${completion.nextAction || "继续 1 章复验，不恢复批量。"}`,
+    primaryActionLabel: "继续复验",
+  };
 }
 
 export function parseAiPipelineRecoveryCompletionEvidence(

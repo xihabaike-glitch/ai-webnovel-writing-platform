@@ -6,7 +6,7 @@ import {
 import { prisma } from "@/lib/db/prisma";
 import { getActiveModelProvider } from "@/lib/model-gateway/activeProvider";
 import { getPlatformProfile, platformProfiles, type PlatformId } from "@/lib/platforms/platformProfiles";
-import { buildPlatformPublishExportCenter, buildSubmissionAssetAudit, parsePublishSnapshotTags } from "@/lib/projects/platformPublishExport";
+import { buildPlatformPublishExportCenter, buildSubmissionAssetAudit, buildSubmissionAssetEditorReview, parsePublishSnapshotTags } from "@/lib/projects/platformPublishExport";
 import { buildSubmissionChecklist } from "@/lib/projects/submissionChecklist";
 
 interface Params {
@@ -145,10 +145,12 @@ export async function POST(request: Request, { params }: Params) {
     note: trimText(body.note, pack.submissionAsset?.note ?? ""),
   };
   const audit = buildSubmissionAssetAudit(platform, asset);
+  const editorReview = buildSubmissionAssetEditorReview(platform.name, audit);
   const prompt = buildPlatformSubmissionAssetOptimizationPrompt({
     platform,
     asset,
     audit,
+    editorReview,
     chapters: project.chapters.map((chapter) => ({
       order: chapter.order,
       title: chapter.title,

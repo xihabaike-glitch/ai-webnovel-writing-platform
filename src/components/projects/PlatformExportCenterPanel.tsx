@@ -3916,7 +3916,7 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
                   onClick={() => void optimizeSubmissionAsset()}
                   type="button"
                 >
-                  {isOptimizingAsset ? "优化中" : "AI 优化投稿资产"}
+                  {isOptimizingAsset ? "优化中" : "按审稿意见优化"}
                 </button>
                 <button
                   className="w-fit rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white disabled:opacity-50"

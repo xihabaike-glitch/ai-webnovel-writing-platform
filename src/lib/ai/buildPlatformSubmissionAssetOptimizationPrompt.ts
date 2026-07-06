@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { PlatformProfile } from "@/lib/platforms/platformProfiles";
-import type { PlatformKnowledgeInsight, PlatformSubmissionAssetAudit } from "@/lib/projects/platformPublishExport";
+import type { PlatformKnowledgeInsight, PlatformSubmissionAssetAudit, PlatformSubmissionAssetEditorReview } from "@/lib/projects/platformPublishExport";
 
 export interface PlatformSubmissionAssetOptimizationInput {
   platform: PlatformProfile;
@@ -13,6 +13,7 @@ export interface PlatformSubmissionAssetOptimizationInput {
     note: string;
   };
   audit: PlatformSubmissionAssetAudit;
+  editorReview?: PlatformSubmissionAssetEditorReview | null;
   chapters: {
     order: number;
     title: string;
@@ -67,6 +68,19 @@ export function buildPlatformSubmissionAssetOptimizationPrompt(input: PlatformSu
         `下一步建议：${input.platformKnowledge.nextAction}`,
       ]
     : ["平台知识库反哺：暂无可用经验，按平台基础规则生成。"];
+  const editorReviewLines = input.editorReview
+    ? [
+        "编辑审稿意见：",
+        input.editorReview.headline,
+        input.editorReview.primaryAction,
+        "生成候选时必须优先解决首要修复项，再处理其它字段。",
+        `重点问题：${input.editorReview.focusIssues.map((issue) => `${issue.label}：${issue.detail}`).join("；") || "暂无"}`,
+        `已通过证据：${input.editorReview.evidence.join("；") || "暂无"}`,
+      ]
+    : [
+        "编辑审稿意见：暂无独立摘要，按当前质检问题排序优化。",
+        "生成候选时必须优先解决首要修复项，再处理其它字段。",
+      ];
 
   const userPrompt = [
     `目标平台：${input.platform.name}`,
@@ -77,6 +91,7 @@ export function buildPlatformSubmissionAssetOptimizationPrompt(input: PlatformSu
     `平台风险：${input.platform.risks.join("、")}`,
     `当前质检分：${input.audit.score}`,
     `当前质检状态：${input.audit.status}`,
+    ...editorReviewLines,
     ...knowledgeLines,
     "当前质检问题：",
     issueText,

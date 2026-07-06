@@ -11,7 +11,7 @@ import {
 } from "../lib/ai/buildPlatformSubmissionAssetOptimizationPrompt.ts";
 import { MockAdapter } from "../lib/model-gateway/mockAdapter.ts";
 import { getPlatformProfile } from "../lib/platforms/platformProfiles.ts";
-import { buildSubmissionAssetAudit } from "../lib/projects/platformPublishExport.ts";
+import { buildSubmissionAssetAudit, buildSubmissionAssetEditorReview } from "../lib/projects/platformPublishExport.ts";
 import { buildSubmissionPackage } from "../lib/projects/submissionPackage.ts";
 
 const submissionPackage = buildSubmissionPackage({
@@ -125,6 +125,32 @@ test("buildPlatformSubmissionAssetOptimizationPrompt", async (t) => {
     assert.ok(prompt.userPrompt.includes("平台知识库反哺"));
     assert.ok(prompt.userPrompt.includes("胜出标题：夜雨系统：倒计时重生"));
     assert.ok(prompt.userPrompt.includes("不要把系统卖点写得太泛"));
+  });
+
+  await t.test("prioritizes editor review guidance before generic optimization", () => {
+    const zhihu = getPlatformProfile("zhihu_yanxuan");
+    const weakAsset = {
+      title: "她替我活着",
+      logline: "我参加自己的葬礼，发现最亲近的人都藏着反转真相。",
+      synopsis: "我站在自己的遗像前，看见另一个女人用我的名字接受所有人的悼念。为了查清真相，我开始跟踪她、接近未婚夫，也发现母亲和好友都在撒谎。故事会持续推进悬疑、复仇和身份反转，让读者不断怀疑谁才是真正的受害者。",
+      overseasSynopsis: "",
+      tags: ["悬疑", "复仇", "第一人称反转"],
+      note: "",
+    };
+    const weakAudit = buildSubmissionAssetAudit(zhihu, weakAsset);
+    const editorReview = buildSubmissionAssetEditorReview(zhihu.name, weakAudit);
+
+    const prompt = buildPlatformSubmissionAssetOptimizationPrompt({
+      platform: zhihu,
+      asset: weakAsset,
+      audit: weakAudit,
+      editorReview,
+      chapters: [],
+    });
+
+    assert.ok(prompt.userPrompt.includes("编辑审稿意见"));
+    assert.ok(prompt.userPrompt.includes("先修：盐选付费节点不够明确"));
+    assert.ok(prompt.userPrompt.includes("生成候选时必须优先解决首要修复项"));
   });
 
   await t.test("mock adapter returns parseable platform asset variants", async () => {

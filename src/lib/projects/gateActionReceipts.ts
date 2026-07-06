@@ -26,7 +26,12 @@ export type GateActionReceiptExecutionFilter = "all" | GateActionReceiptExecutio
 export interface GateActionReceiptPayload {
   message?: string;
   error?: string;
-  executionContext?: "standard" | "repair_resume";
+  executionContext?: "standard" | "repair_resume" | "batch_rhythm_recheck";
+  batchRhythmRecheck?: {
+    dispatchKey: string;
+    title: string;
+    completionEvidence: string;
+  };
   firstThreeAdoptionClosure?: GateFirstThreeAdoptionClosureSummary;
   aiPipelineRecheck?: {
     dispatchKey?: string;
@@ -41,7 +46,7 @@ export interface GateActionReceiptPayload {
     chapterIds?: string[];
     adoptionFollowupCount?: number;
     adoptionFollowupItemIds?: string[];
-    executionContext?: "standard" | "repair_resume";
+    executionContext?: "standard" | "repair_resume" | "batch_rhythm_recheck";
   };
   startTactics?: GateActionReceiptStartTactic[];
   variants?: unknown[];

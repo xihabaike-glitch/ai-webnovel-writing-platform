@@ -943,7 +943,7 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
         </div>
       </section>
 
-      <section className="mb-6 rounded-md border border-slate-200 bg-white p-4">
+      <section className="mb-6 rounded-md border border-slate-200 bg-white p-4" id="batch-health-review">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <h2 className="font-medium">批量健康复盘</h2>
@@ -995,9 +995,17 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
                 </div>
               ) : null}
             </div>
-            {batchRhythmClosure ? (
+            {batchRhythmClosure?.status === "completed" ? (
+              <RunRecommendedBatchButton
+                disabled={!safety.canRunRecommendedBatch || !executionPlan.canRun || modelRouteBlocksRecommendedBatch}
+                executionContext="batch_rhythm_recheck"
+                initialModelRouteGate={modelRoutePreflightGate}
+                sourceDispatchKey={batchRhythmClosure.task.dispatchKey}
+                strategyId={activeStrategy.id}
+              />
+            ) : batchRhythmClosure ? (
               <Link
-                className={`w-fit shrink-0 rounded-md px-3 py-2 text-xs font-medium text-white ${batchRhythmClosure.status === "completed" ? "bg-emerald-950 hover:bg-emerald-900" : "bg-slate-950 hover:bg-slate-800"}`}
+                className="w-fit shrink-0 rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white hover:bg-slate-800"
                 href={batchRhythmClosure.href}
               >
                 {batchRhythmClosure.actionLabel}

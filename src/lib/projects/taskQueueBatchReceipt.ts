@@ -24,10 +24,21 @@ export interface TaskQueueBatchRouteEffect {
   verdict: string;
 }
 
-export type TaskQueueBatchExecutionContext = "standard" | "repair_resume";
+export type TaskQueueBatchExecutionContext = "standard" | "repair_resume" | "batch_rhythm_recheck";
+
+export interface TaskQueueBatchRhythmRecheckSource {
+  dispatchKey: string;
+  title: string;
+  completionEvidence: string;
+}
 
 export function taskQueueBatchExecutionContext(value: string | null | undefined): TaskQueueBatchExecutionContext {
+  if (value === "batch_rhythm_recheck") return "batch_rhythm_recheck";
   return value === "repair_resume" ? "repair_resume" : "standard";
+}
+
+export function taskQueueBatchMaxSizeForContext(context: TaskQueueBatchExecutionContext, strategyMaxBatchSize: number) {
+  return context === "batch_rhythm_recheck" ? 1 : strategyMaxBatchSize;
 }
 
 export interface TaskQueueBatchReceipt {
@@ -123,8 +134,14 @@ function thirdRoundEvidence(mode: ReturnType<typeof thirdRoundBatchMode>) {
 }
 
 function executionContextEvidence(context: TaskQueueBatchExecutionContext) {
+  if (context === "batch_rhythm_recheck") return "执行上下文：节奏派单回流复验小批";
   if (context === "repair_resume") return "执行上下文：失败修复后恢复小批";
   return null;
+}
+
+function batchRhythmSourceEvidence(source: TaskQueueBatchRhythmRecheckSource | null | undefined) {
+  if (!source) return null;
+  return `节奏派单回流：${source.title}；${source.completionEvidence}`;
 }
 
 function withAdoptionFollowupReturn(plan: TaskQueueExecutionPlan, receipt: TaskQueueBatchReceipt): TaskQueueBatchReceipt {
@@ -194,6 +211,7 @@ export function buildTaskQueueBatchReceipt(input: {
   results: TaskQueueBatchRunResult[];
   routeEffectSummary: TaskQueueBatchRouteEffect;
   executionContext?: TaskQueueBatchExecutionContext;
+  batchRhythmSource?: TaskQueueBatchRhythmRecheckSource | null;
 }): TaskQueueBatchReceipt {
   const executionContext = input.executionContext ?? "standard";
   const failed = input.results.filter((result) => result.status === "failed");
@@ -201,6 +219,7 @@ export function buildTaskQueueBatchReceipt(input: {
   const projectBase = projectHref(input.plan);
   const evidenceItems = [
     executionContextEvidence(executionContext),
+    batchRhythmSourceEvidence(input.batchRhythmSource),
     `执行批次：${input.plan.actionLabel}`,
     adoptionFollowupEvidence(input.plan),
     thirdRoundEvidence(thirdRoundBatchMode(input.plan)),
@@ -390,6 +409,24 @@ export function buildTaskQueueBatchReceipt(input: {
     });
   }
 
+  if (executionContext === "batch_rhythm_recheck") {
+    return withAdoptionFollowupReturn(input.plan, {
+      status: "continue",
+      headline: "节奏复验小批通过，回到批量健康复盘",
+      detail: "这轮复验来自节奏派单完成依据，只证明当前修复或观察动作可以继续验证，不证明可以直接回普通放量。下一步回批量健康复盘，看成功率、质量、成本和失败项是否连续站住。",
+      primaryLabel: "查看批量健康复盘",
+      primaryHref: "/tasks#batch-health-review",
+      secondaryLabel: "继续任务队列",
+      secondaryHref: "/tasks#recommended-batch",
+      evidenceItems,
+      warnings: [
+        input.routeEffectSummary.verdict,
+        input.batchRhythmSource ? `来源派单：${input.batchRhythmSource.dispatchKey}` : "来源派单缺失，复验结论只能作为普通观察证据。",
+        "节奏复验只证明这一轮复验过线；至少再看一轮真实批次回执，才允许恢复普通推荐节奏。",
+      ],
+    });
+  }
+
   return withAdoptionFollowupReturn(input.plan, {
     status: "continue",
     headline: thirdRoundMode === "stable" ? "三轮稳住批次健康，继续小步加码" : next.headline,
@@ -416,6 +453,7 @@ export function buildTaskQueueBatchGateActionReceipt(input: {
   batchReceipt: TaskQueueBatchReceipt;
   strategyId: BatchExecutionStrategyId;
   executionContext?: TaskQueueBatchExecutionContext;
+  batchRhythmSource?: TaskQueueBatchRhythmRecheckSource | null;
   now?: Date | string;
 }): TaskQueueBatchGateActionReceipt {
   const executionContext = input.executionContext ?? "standard";
@@ -445,11 +483,18 @@ export function buildTaskQueueBatchGateActionReceipt(input: {
     })),
     routeEffectSummary: input.routeEffectSummary,
     batchReceipt: input.batchReceipt,
+    batchRhythmRecheck: input.batchRhythmSource ?? undefined,
   };
-  const actionContext = executionContext === "repair_resume" ? "repair_resume:" : "";
+  const actionContext = executionContext === "repair_resume"
+    ? "repair_resume:"
+    : executionContext === "batch_rhythm_recheck"
+      ? "batch_rhythm_recheck:"
+      : "";
   const actionLabel = executionContext === "repair_resume"
     ? "沉淀修复后恢复小批经验"
-    : `沉淀${input.plan.actionLabel}经验`;
+    : executionContext === "batch_rhythm_recheck"
+      ? "沉淀节奏复验小批经验"
+      : `沉淀${input.plan.actionLabel}经验`;
   const receipt = buildGateActionReceipt({
     action: {
       id: `recommended-batch:${actionContext}${input.strategyId}:${input.plan.category ?? "none"}:${input.plan.projectId ?? "multi"}`,

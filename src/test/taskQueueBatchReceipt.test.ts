@@ -4,6 +4,7 @@ import {
   buildTaskQueueBatchGateActionReceipt,
   buildTaskQueueBatchReceipt,
   buildTaskQueueBatchReceiptDecisionCard,
+  taskQueueBatchMaxSizeForContext,
   type TaskQueueBatchRouteEffect,
 } from "../lib/projects/taskQueueBatchReceipt.ts";
 import type { TaskQueueExecutionPlan } from "../lib/projects/taskQueueExecutionPlan.ts";
@@ -392,6 +393,78 @@ test("buildTaskQueueBatchReceipt labels repair resume batches as a tracked recov
   assert.equal(receipt.secondaryHref, "/failures");
   assert.ok(receipt.evidenceItems.some((item) => item.includes("执行上下文：失败修复后恢复小批")));
   assert.ok(receipt.warnings.some((warning) => warning.includes("恢复小批不是普通放量")));
+});
+
+test("buildTaskQueueBatchReceipt labels batch rhythm rechecks with source dispatch evidence", () => {
+  const receipt = buildTaskQueueBatchReceipt({
+    plan,
+    results: [{ status: "succeeded", taskId: "task-1", chapterTitle: "第一章", error: null, qualityScore: 88 }],
+    routeEffectSummary: {
+      ...routeEffect,
+      averageQualityScore: 88,
+      verdict: "节奏复验小批稳定。",
+    },
+    executionContext: "batch_rhythm_recheck",
+    batchRhythmSource: {
+      dispatchKey: "batch-rhythm:watch:2026-01-01T00:00:00.000Z",
+      title: "批次节奏观察小批",
+      completionEvidence: "已拆失败样本，复验范围 1 章，质量目标 85。",
+    },
+  });
+
+  assert.equal(receipt.status, "continue");
+  assert.equal(receipt.headline, "节奏复验小批通过，回到批量健康复盘");
+  assert.equal(receipt.primaryLabel, "查看批量健康复盘");
+  assert.equal(receipt.primaryHref, "/tasks#batch-health-review");
+  assert.ok(receipt.evidenceItems.some((item) => item.includes("节奏派单回流")));
+  assert.ok(receipt.evidenceItems.some((item) => item.includes("质量目标 85")));
+  assert.ok(receipt.warnings.some((warning) => warning.includes("只证明这一轮复验过线")));
+});
+
+test("taskQueueBatchMaxSizeForContext limits batch rhythm rechecks to one sample", () => {
+  assert.equal(taskQueueBatchMaxSizeForContext("standard", 6), 6);
+  assert.equal(taskQueueBatchMaxSizeForContext("repair_resume", 4), 4);
+  assert.equal(taskQueueBatchMaxSizeForContext("batch_rhythm_recheck", 6), 1);
+});
+
+test("buildTaskQueueBatchGateActionReceipt persists batch rhythm recheck source", () => {
+  const source = {
+    dispatchKey: "batch-rhythm:repair:2026-01-01T00:00:00.000Z",
+    title: "批次节奏跌线修复",
+    completionEvidence: "修复模型路线，复验范围 1 章，成功率目标 100%。",
+  };
+  const batchReceipt = buildTaskQueueBatchReceipt({
+    plan,
+    results: [{ status: "succeeded", taskId: "task-1", chapterId: "chapter-1", chapterTitle: "第一章", error: null, qualityScore: 88 }],
+    routeEffectSummary: {
+      ...routeEffect,
+      averageQualityScore: 88,
+      verdict: "节奏复验小批稳定。",
+    },
+    executionContext: "batch_rhythm_recheck",
+    batchRhythmSource: source,
+  });
+  const gateReceipt = buildTaskQueueBatchGateActionReceipt({
+    plan,
+    results: [{ status: "succeeded", taskId: "task-1", chapterId: "chapter-1", chapterTitle: "第一章", error: null, qualityScore: 88 }],
+    routeEffectSummary: {
+      ...routeEffect,
+      averageQualityScore: 88,
+      verdict: "节奏复验小批稳定。",
+    },
+    batchReceipt,
+    strategyId: "standard",
+    executionContext: "batch_rhythm_recheck",
+    batchRhythmSource: source,
+    now: "2026-01-01T00:00:00.000Z",
+  });
+
+  assert.equal(gateReceipt.receipt.actionId, "recommended-batch:batch_rhythm_recheck:standard:draft:project-1");
+  assert.equal(gateReceipt.receipt.label, "沉淀节奏复验小批经验");
+  assert.equal(gateReceipt.payload.executionContext, "batch_rhythm_recheck");
+  assert.equal(gateReceipt.payload.plan.executionContext, "batch_rhythm_recheck");
+  assert.equal(gateReceipt.payload.batchRhythmRecheck?.dispatchKey, source.dispatchKey);
+  assert.equal(gateReceipt.payload.batchRhythmRecheck?.completionEvidence, source.completionEvidence);
 });
 
 test("buildTaskQueueBatchGateActionReceipt turns a recommended batch into gate experience", () => {

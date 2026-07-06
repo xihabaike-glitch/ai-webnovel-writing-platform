@@ -39,7 +39,7 @@ export interface BatchRunResponse {
     warnings: string[];
     completionEvidenceTemplate?: string;
   };
-  executionContext?: "standard" | "repair_resume";
+  executionContext?: BatchExecutionContext;
   modelRouteGate?: {
     status: "allow" | "sample" | "block";
     label: string;
@@ -72,6 +72,8 @@ export interface BatchRunResponse {
   };
 }
 
+type BatchExecutionContext = "standard" | "repair_resume" | "batch_rhythm_recheck";
+
 function receiptTone(status: NonNullable<BatchRunResponse["batchReceipt"]>["status"]) {
   if (status === "continue") return "border-emerald-200 bg-emerald-50 text-emerald-900";
   if (status === "repair") return "border-rose-200 bg-rose-50 text-rose-900";
@@ -102,11 +104,13 @@ export function RunRecommendedBatchButton({
   strategyId,
   executionContext = "standard",
   initialModelRouteGate = null,
+  sourceDispatchKey,
 }: {
   disabled: boolean;
   strategyId: string;
-  executionContext?: "standard" | "repair_resume";
+  executionContext?: BatchExecutionContext;
   initialModelRouteGate?: BatchRunResponse["modelRouteGate"] | null;
+  sourceDispatchKey?: string;
 }) {
   const router = useRouter();
   const [isRunning, setIsRunning] = useState(false);
@@ -120,6 +124,8 @@ export function RunRecommendedBatchButton({
     ? routeGateActions.runButtonLabel
     : routeGateTimeline && modelRouteGate?.status !== "block"
     ? routeGateTimeline.primaryActionLabel
+    : executionContext === "batch_rhythm_recheck"
+    ? "运行节奏复验"
     : executionContext === "repair_resume"
     ? "执行恢复小批"
     : "执行推荐批次";
@@ -134,7 +140,12 @@ export function RunRecommendedBatchButton({
     setBatchReceipt(null);
     setModelRouteGate(initialModelRouteGate);
     try {
-      const response = await fetch(`/api/tasks/recommended-batch?strategy=${encodeURIComponent(strategyId)}&context=${encodeURIComponent(executionContext)}`, {
+      const params = new URLSearchParams({
+        strategy: strategyId,
+        context: executionContext,
+      });
+      if (sourceDispatchKey) params.set("sourceDispatchKey", sourceDispatchKey);
+      const response = await fetch(`/api/tasks/recommended-batch?${params.toString()}`, {
         method: "POST",
       });
       const payload = (await response.json()) as BatchRunResponse;
@@ -151,7 +162,11 @@ export function RunRecommendedBatchButton({
         : "";
       const tactic = payload.plan?.strategyBases?.[0];
       const tacticText = tactic ? `打法依据：${tactic.label}｜${tactic.openingMove || tactic.primaryTactic}。` : "";
-      const contextLabel = payload.executionContext === "repair_resume" || executionContext === "repair_resume" ? "恢复小批" : payload.plan?.actionLabel ?? "推荐批次";
+      const contextLabel = payload.executionContext === "batch_rhythm_recheck" || executionContext === "batch_rhythm_recheck"
+        ? "节奏复验小批"
+        : payload.executionContext === "repair_resume" || executionContext === "repair_resume"
+          ? "恢复小批"
+          : payload.plan?.actionLabel ?? "推荐批次";
       setMessage(`${contextLabel}完成：成功 ${succeeded}，失败 ${failed}。${summary}${tacticText}`);
       setBatchReceipt(payload.batchReceipt ?? null);
       router.refresh();

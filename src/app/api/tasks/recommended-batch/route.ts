@@ -12,6 +12,7 @@ import { findProjectStartTacticSummary } from "@/lib/projects/projectStartTactic
 import {
   buildTaskQueueBatchGateActionReceipt,
   buildTaskQueueBatchReceipt,
+  taskQueueBatchMaxSizeForContext,
   taskQueueBatchExecutionContext,
 } from "@/lib/projects/taskQueueBatchReceipt";
 import { buildTaskQueueCenter, type TaskQueueProject } from "@/lib/projects/taskQueueCenter";
@@ -71,6 +72,7 @@ export async function POST(request: Request) {
   const requestUrl = new URL(request.url);
   const strategy = getBatchExecutionStrategy(requestUrl.searchParams.get("strategy"));
   const executionContext = taskQueueBatchExecutionContext(requestUrl.searchParams.get("context"));
+  const sourceDispatchKey = requestUrl.searchParams.get("sourceDispatchKey")?.trim() ?? "";
   const [
     projects,
     modelProviders,
@@ -210,7 +212,37 @@ export async function POST(request: Request) {
   }));
   const queue = buildTaskQueueCenter(taskQueueProjects);
   const safety = buildBatchExecutionSafety(queue.items, safetyProjects, strategy);
-  const basePlan = buildTaskQueueExecutionPlan(queue.items, strategy.maxBatchSize, strategy);
+  const batchRhythmSourceTask = executionContext === "batch_rhythm_recheck"
+    ? await prisma.gateDispatchTask.findUnique({
+      where: { dispatchKey: sourceDispatchKey },
+      select: {
+        dispatchKey: true,
+        title: true,
+        state: true,
+        completionEvidence: true,
+      },
+    })
+    : null;
+  if (executionContext === "batch_rhythm_recheck") {
+    if (!sourceDispatchKey || !sourceDispatchKey.startsWith("batch-rhythm:")) {
+      return NextResponse.json({ error: "缺少有效的节奏派单来源，不能执行节奏复验小批。" }, { status: 400 });
+    }
+    if (!batchRhythmSourceTask || batchRhythmSourceTask.state !== "completed" || !batchRhythmSourceTask.completionEvidence.trim()) {
+      return NextResponse.json({ error: "节奏派单还没有完成验收依据，先回派单中心补齐后再复验。" }, { status: 409 });
+    }
+  }
+  const batchRhythmSource = batchRhythmSourceTask
+    ? {
+      dispatchKey: batchRhythmSourceTask.dispatchKey,
+      title: batchRhythmSourceTask.title,
+      completionEvidence: batchRhythmSourceTask.completionEvidence.trim(),
+    }
+    : null;
+  const basePlan = buildTaskQueueExecutionPlan(
+    queue.items,
+    taskQueueBatchMaxSizeForContext(executionContext, strategy.maxBatchSize),
+    strategy,
+  );
 
   if (!basePlan.canRun || !basePlan.category || !basePlan.projectId || basePlan.projectIds.length === 0) {
     return NextResponse.json({ error: basePlan.detail, plan: basePlan, safety }, { status: 400 });
@@ -332,6 +364,7 @@ export async function POST(request: Request) {
     results,
     routeEffectSummary,
     executionContext,
+    batchRhythmSource,
   });
   const gateReceipt = buildTaskQueueBatchGateActionReceipt({
     plan,
@@ -340,6 +373,7 @@ export async function POST(request: Request) {
     batchReceipt,
     strategyId: strategy.id,
     executionContext,
+    batchRhythmSource,
   });
   const completedRecommendedBatchAudit = {
     receiptId: gateReceipt.receipt.id,
@@ -419,5 +453,6 @@ export async function POST(request: Request) {
     batchReceipt,
     gateReceipt: gateReceipt.receipt,
     executionContext,
+    batchRhythmSource,
   });
 }

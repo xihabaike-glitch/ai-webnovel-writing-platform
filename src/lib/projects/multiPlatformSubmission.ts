@@ -364,6 +364,10 @@ function hasCompletedRepairPackageEvidence(metric: MultiPlatformPublishMetricInp
     || /submission-decision:[^：\s]+:[^：\s]+:repair/u.test(text);
 }
 
+function hasCompletedRepairPackageTracking(effectTracking: MultiPlatformEffectTracking) {
+  return effectTracking.evidence.some((item) => item.includes("修复包已完成"));
+}
+
 function buildEffectTracking(platform: PlatformProfile, metrics: MultiPlatformPublishMetricInput[]): MultiPlatformEffectTracking {
   const history = metrics
     .filter((metric) => metric.platformId === platform.id)
@@ -534,13 +538,18 @@ function buildDecision(
   }
 
   if (effectTracking.status === "watch") {
+    const repairedWatch = hasCompletedRepairPackageTracking(effectTracking);
     return {
       kind: "watch",
       label: decisionLabel("watch"),
       priority: "medium",
-      score: clampScore(fitScore + 4),
-      reason: `${platform.name} 有数据但不够硬，不能判死，也不能加码。`,
-      nextAction: "再收一轮样本，优先观察点击率是否破 10%、收藏率是否破 3%。",
+      score: clampScore(fitScore + (repairedWatch ? 14 : 4)),
+      reason: repairedWatch
+        ? `${platform.name} 修复包已完成，下一步必须二轮小样本重验。`
+        : `${platform.name} 有数据但不够硬，不能判死，也不能加码。`,
+      nextAction: repairedWatch
+        ? "只投第二轮小样本，回填曝光、点击、收藏、追读和编辑反馈，验证修复是否真的起效。"
+        : "再收一轮样本，优先观察点击率是否破 10%、收藏率是否破 3%。",
       actionHref: "#publish-effect-panel",
       evidence: effectTracking.evidence,
     };
@@ -710,6 +719,11 @@ function laneOrder(kind: MultiPlatformDecisionKind) {
   return order[kind];
 }
 
+function decisionTaskLaneOrder(variant: MultiPlatformSubmissionVariant) {
+  if (variant.decision.kind === "watch" && hasCompletedRepairPackageTracking(variant.effectTracking)) return 2.5;
+  return laneOrder(variant.decision.kind);
+}
+
 function decisionOwnerRole(kind: MultiPlatformDecisionKind): MultiPlatformDecisionTask["ownerRole"] {
   if (kind === "main" || kind === "scale" || kind === "pause") return "增长运营";
   if (kind === "repair" || kind === "prepare_package") return "平台编辑";
@@ -764,6 +778,13 @@ function decisionAcceptanceCriteria(variant: MultiPlatformSubmissionVariant) {
     ];
   }
   if (kind === "watch") {
+    if (hasCompletedRepairPackageTracking(variant.effectTracking)) {
+      return [
+        "只投第二轮小样本，不提前放大或放弃。",
+        "回填曝光、点击、收藏、追读和编辑反馈。",
+        "只验证标题、简介、标签和前三章兑现，不同时改多个变量。",
+      ];
+    }
     return [
       "再收一轮样本，不提前放大或放弃。",
       "观察点击率是否破 10%、收藏率是否破 3%。",
@@ -836,7 +857,7 @@ function buildDecisionTasks(variants: MultiPlatformSubmissionVariant[], projectI
   return [...variants]
     .filter((variant) => variant.decision.kind !== "pause")
     .sort((left, right) => (
-      laneOrder(left.decision.kind) - laneOrder(right.decision.kind)
+      decisionTaskLaneOrder(left) - decisionTaskLaneOrder(right)
       || right.decision.score - left.decision.score
       || right.fitScore - left.fitScore
     ))

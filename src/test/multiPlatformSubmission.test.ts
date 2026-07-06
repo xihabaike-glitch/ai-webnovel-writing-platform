@@ -315,5 +315,16 @@ test("buildMultiPlatformSubmission", async (t) => {
     assert.ok(qimao.effectTracking.nextAction.includes("修复包已完成"));
     assert.ok(qimao.effectTracking.nextAction.includes("第二轮小样本"));
     assert.ok(qimao.effectTracking.evidence.some((item) => item.includes("修复包已完成")));
+    const qimaoRetestTask = result.decisionBoard.tasks.find((task) => task.platformId === "qimao" && task.kind === "watch");
+    assert.ok(qimaoRetestTask);
+    assert.ok(qimaoRetestTask.detail.includes("修复包已完成"));
+    assert.ok(qimaoRetestTask.acceptanceCriteria.some((item) => item.includes("第二轮小样本")));
+    assert.ok(qimaoRetestTask.acceptanceCriteria.some((item) => item.includes("标题、简介、标签和前三章")));
+    const qimaoRetestDispatch = buildMultiPlatformDecisionDispatch(qimaoRetestTask, {
+      projectId: "project-1",
+      reviewLatestAt: "2026-01-07T08:00:00.000Z",
+    });
+    assert.equal(qimaoRetestDispatch.stage, "record_metrics");
+    assert.ok(buildGateDispatchCompletionTemplate(qimaoRetestDispatch).includes("曝光"));
   });
 });

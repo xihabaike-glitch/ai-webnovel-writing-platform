@@ -93,4 +93,28 @@ test("open source reference cases", async (t) => {
       "Wattpad",
     ]);
   });
+
+  await t.test("builds execution cards for every locked platform", () => {
+    const view = buildReferenceCaseLibraryView();
+
+    assert.equal(view.platformScope.platformCards.length, 8);
+    for (const card of view.platformScope.platformCards) {
+      assert.ok(card.platformId.length > 0);
+      assert.ok(card.platformName.length > 0);
+      assert.ok(card.writingFocus.length >= 2);
+      assert.ok(card.submissionFocus.length >= 2);
+      assert.ok(card.feedbackMetric.length >= 2);
+      assert.ok(card.nextAction.length >= 10);
+      assert.ok(["写作", "投稿", "复盘"].every((stage) => card.pipelineStages.includes(stage)));
+    }
+
+    const fanqie = view.platformScope.platformCards.find((card) => card.platformId === "fanqie");
+    const qidian = view.platformScope.platformCards.find((card) => card.platformId === "qidian");
+    const webnovel = view.platformScope.platformCards.find((card) => card.platformId === "webnovel");
+
+    assert.ok(fanqie?.submissionFocus.some((item) => item.includes("首秀")));
+    assert.ok(qidian?.writingFocus.some((item) => item.includes("卷结构")));
+    assert.ok(webnovel?.submissionFocus.some((item) => item.includes("English synopsis")));
+    assert.notDeepEqual(fanqie?.feedbackMetric, qidian?.feedbackMetric);
+  });
 });

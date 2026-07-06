@@ -66,6 +66,56 @@ export default async function ReferencesPage({ searchParams }: ReferencesPagePro
         </div>
       </section>
 
+      <section className="mb-6">
+        <div className="mb-3 flex flex-col gap-2 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <h2 className="font-medium text-slate-950">8 平台执行状态卡</h2>
+            <p className="mt-1 text-sm text-slate-500">每个平台都要落到写作、投稿、复盘三段动作，别只停在资料收集。</p>
+          </div>
+          <div className="w-fit rounded-md bg-slate-950 px-3 py-2 text-sm font-medium text-white">
+            平台还差 0 个
+          </div>
+        </div>
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          {view.platformScope.platformCards.map((card) => (
+            <article className="rounded-md border border-slate-200 bg-white p-4" key={card.platformId}>
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <h3 className="font-medium text-slate-950">{card.platformName}</h3>
+                  <div className="mt-2 flex flex-wrap gap-1">
+                    {card.pipelineStages.map((stage) => (
+                      <span className="rounded-md bg-slate-100 px-2 py-1 text-xs text-slate-600" key={stage}>
+                        {stage}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+                <span className="rounded-md bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-700">已覆盖</span>
+              </div>
+
+              <div className="mt-4 grid gap-3 text-sm">
+                <div>
+                  <div className="text-xs font-medium text-slate-500">写作抓手</div>
+                  <p className="mt-1 leading-6 text-slate-700">{card.writingFocus.join("、")}</p>
+                </div>
+                <div>
+                  <div className="text-xs font-medium text-slate-500">投稿抓手</div>
+                  <p className="mt-1 leading-6 text-slate-700">{card.submissionFocus.join("、")}</p>
+                </div>
+                <div>
+                  <div className="text-xs font-medium text-slate-500">复盘指标</div>
+                  <p className="mt-1 leading-6 text-slate-700">{card.feedbackMetric.join("、")}</p>
+                </div>
+              </div>
+
+              <div className="mt-4 rounded-md bg-slate-50 p-3 text-sm leading-6 text-slate-700">
+                {card.nextAction}
+              </div>
+            </article>
+          ))}
+        </div>
+      </section>
+
       <section className="mb-6 grid gap-3 md:grid-cols-2 lg:grid-cols-5">
         {view.categoryTabs.map((tab) => {
           const active = tab.id === view.selectedCategory;

@@ -65,6 +65,13 @@ export interface TaskDebtRecoveryBatchRecord {
   decisionDetail: string;
   decisionActionLabel: string;
   decisionActionHref: string;
+  stabilityTone?: "ready" | "watch" | "blocked";
+  stableRuns?: number;
+  requiredStableRuns?: number;
+  stabilityLabel?: string;
+  stabilityDetail?: string;
+  stabilityActionLabel?: string;
+  stabilityActionHref?: string;
 }
 
 function taskDebtAutoFocusHref(input: Pick<TaskDebtCompletionFeedbackInput, "blockerType" | "previousDebtCount">) {
@@ -151,15 +158,71 @@ function buildTaskDebtRecoveryDecision(input: {
   };
 }
 
+function repairResumeBatchPassed(payload: Record<string, unknown>) {
+  const routeEffectSummary = taskDebtRecord(payload.routeEffectSummary);
+  const successRate = taskDebtNumber(routeEffectSummary?.successRatePercent);
+  const failedTasks = taskDebtNumber(routeEffectSummary?.failedTasks) ?? 0;
+  const averageQualityScore = taskDebtNumber(routeEffectSummary?.averageQualityScore);
+  const averageCostPerSucceededTaskUsd = taskDebtNumber(routeEffectSummary?.averageCostPerSucceededTaskUsd);
+  return failedTasks === 0
+    && successRate !== null
+    && successRate >= 80
+    && averageQualityScore !== null
+    && averageQualityScore >= 85
+    && (averageCostPerSucceededTaskUsd === null || averageCostPerSucceededTaskUsd <= 0.05);
+}
+
+function buildFailureRepairResumeStability(records: Array<{ payload: Record<string, unknown>; audit: TaskDebtRecoveryBatchAudit }>) {
+  const requiredStableRuns = 2;
+  const latest = records[0] ?? null;
+  if (!latest || !repairResumeBatchPassed(latest.payload)) {
+    return {
+      stabilityTone: "blocked" as const,
+      stableRuns: 0,
+      requiredStableRuns,
+      stabilityLabel: "恢复稳定性中断",
+      stabilityDetail: "最近恢复小批未过线，不能退出恢复模式。先修失败、质量或成本问题，再重新跑恢复小批。",
+      stabilityActionLabel: "查看失败修复",
+      stabilityActionHref: "/failures",
+    };
+  }
+
+  const stableRuns = records.slice(0, requiredStableRuns)
+    .filter((record) => repairResumeBatchPassed(record.payload)).length;
+  if (stableRuns >= requiredStableRuns) {
+    return {
+      stabilityTone: "ready" as const,
+      stableRuns,
+      requiredStableRuns,
+      stabilityLabel: "连续稳定，可回普通批次",
+      stabilityDetail: `恢复小批已连续 ${stableRuns} 次过线，可以从恢复模式回到普通推荐批次，但仍保留安全阀。`,
+      stabilityActionLabel: "回普通推荐批次",
+      stabilityActionHref: "/tasks#recommended-batch",
+    };
+  }
+
+  return {
+    stabilityTone: "watch" as const,
+    stableRuns,
+    requiredStableRuns,
+    stabilityLabel: "继续恢复观察",
+    stabilityDetail: `恢复小批已有 ${stableRuns} 次过线，还差 ${requiredStableRuns - stableRuns} 次连续稳定，先别退出恢复模式。`,
+    stabilityActionLabel: "继续恢复小批",
+    stabilityActionHref: "/tasks?batchContext=repair_resume#recommended-batch",
+  };
+}
+
 function buildRecoveryBatchRecord(input: {
   audits: TaskDebtRecoveryBatchAudit[];
   predicate: (payload: Record<string, unknown>) => boolean;
   headlinePrefix: string;
+  stability?: (records: Array<{ payload: Record<string, unknown>; audit: TaskDebtRecoveryBatchAudit }>) => Partial<TaskDebtRecoveryBatchRecord>;
 }): TaskDebtRecoveryBatchRecord | null {
-  const latest = input.audits
+  const records = input.audits
     .map((audit) => ({ audit, payload: parseTaskDebtPayload(audit.payload) }))
     .filter((item) => item.payload ? input.predicate(item.payload) : false)
-    .sort((left, right) => taskDebtTimestamp(right.audit.createdAt) - taskDebtTimestamp(left.audit.createdAt))[0] ?? null;
+    .sort((left, right) => taskDebtTimestamp(right.audit.createdAt) - taskDebtTimestamp(left.audit.createdAt)) as Array<{ payload: Record<string, unknown>; audit: TaskDebtRecoveryBatchAudit }>;
+  const latest = records[0] ?? null;
   if (!latest) return null;
 
   const routeEffectSummary = taskDebtRecord(latest.payload?.routeEffectSummary);
@@ -199,6 +262,7 @@ function buildRecoveryBatchRecord(input: {
       actionLabel,
       actionHref,
     }),
+    ...input.stability?.(records),
   };
 }
 
@@ -214,6 +278,7 @@ export function buildFailureRepairResumeBatchRecord(audits: TaskDebtRecoveryBatc
   return buildRecoveryBatchRecord({
     audits,
     headlinePrefix: "失败修复恢复小批已回流",
+    stability: buildFailureRepairResumeStability,
     predicate: (payload) => {
       const plan = taskDebtRecord(payload.plan);
       return payload.executionContext === "repair_resume" || plan?.executionContext === "repair_resume";

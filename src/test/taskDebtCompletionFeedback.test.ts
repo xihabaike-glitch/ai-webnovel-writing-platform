@@ -313,3 +313,131 @@ test("buildFailureRepairResumeBatchRecord ignores normal recovery batches", () =
 
   assert.equal(record, null);
 });
+
+test("buildFailureRepairResumeBatchRecord allows leaving recovery mode after two stable repair resume batches", () => {
+  const record = buildFailureRepairResumeBatchRecord([
+    {
+      label: "沉淀修复后恢复小批经验",
+      href: "/tasks?batchContext=repair_resume#recommended-batch",
+      payload: JSON.stringify({
+        executionContext: "repair_resume",
+        routeEffectSummary: {
+          successRatePercent: 100,
+          failedTasks: 0,
+          knownCostUsd: 0.02,
+          averageQualityScore: 88,
+          averageCostPerSucceededTaskUsd: 0.01,
+        },
+        batchReceipt: {
+          headline: "第二轮恢复小批通过",
+          primaryLabel: "继续恢复小批",
+          primaryHref: "/tasks?batchContext=repair_resume#recommended-batch",
+        },
+      }),
+      createdAt: "2026-07-06T08:00:00.000Z",
+    },
+    {
+      label: "沉淀修复后恢复小批经验",
+      href: "/tasks?batchContext=repair_resume#recommended-batch",
+      payload: JSON.stringify({
+        executionContext: "repair_resume",
+        routeEffectSummary: {
+          successRatePercent: 100,
+          failedTasks: 0,
+          knownCostUsd: 0.02,
+          averageQualityScore: 87,
+          averageCostPerSucceededTaskUsd: 0.01,
+        },
+        batchReceipt: {
+          headline: "第一轮恢复小批通过",
+          primaryLabel: "继续恢复小批",
+          primaryHref: "/tasks?batchContext=repair_resume#recommended-batch",
+        },
+      }),
+      createdAt: "2026-07-06T07:00:00.000Z",
+    },
+  ]);
+
+  assert.equal(record?.stabilityTone, "ready");
+  assert.equal(record?.stableRuns, 2);
+  assert.equal(record?.stabilityLabel, "连续稳定，可回普通批次");
+  assert.equal(record?.stabilityActionLabel, "回普通推荐批次");
+  assert.equal(record?.stabilityActionHref, "/tasks#recommended-batch");
+  assert.match(record?.stabilityDetail ?? "", /连续 2 次/);
+});
+
+test("buildFailureRepairResumeBatchRecord keeps one healthy repair resume batch in watch mode", () => {
+  const record = buildFailureRepairResumeBatchRecord([{
+    label: "沉淀修复后恢复小批经验",
+    href: "/tasks?batchContext=repair_resume#recommended-batch",
+    payload: JSON.stringify({
+      executionContext: "repair_resume",
+      routeEffectSummary: {
+        successRatePercent: 100,
+        failedTasks: 0,
+        knownCostUsd: 0.02,
+        averageQualityScore: 88,
+        averageCostPerSucceededTaskUsd: 0.01,
+      },
+      batchReceipt: {
+        headline: "第一轮恢复小批通过",
+        primaryLabel: "继续恢复小批",
+        primaryHref: "/tasks?batchContext=repair_resume#recommended-batch",
+      },
+    }),
+    createdAt: "2026-07-06T07:00:00.000Z",
+  }]);
+
+  assert.equal(record?.stabilityTone, "watch");
+  assert.equal(record?.stableRuns, 1);
+  assert.equal(record?.stabilityLabel, "继续恢复观察");
+  assert.equal(record?.stabilityActionHref, "/tasks?batchContext=repair_resume#recommended-batch");
+  assert.match(record?.stabilityDetail ?? "", /还差 1 次/);
+});
+
+test("buildFailureRepairResumeBatchRecord blocks leaving recovery mode after the latest repair resume batch fails", () => {
+  const record = buildFailureRepairResumeBatchRecord([
+    {
+      label: "沉淀修复后恢复小批经验",
+      href: "/tasks?batchContext=repair_resume#recommended-batch",
+      payload: JSON.stringify({
+        executionContext: "repair_resume",
+        routeEffectSummary: {
+          successRatePercent: 50,
+          failedTasks: 1,
+          knownCostUsd: 0.02,
+          averageQualityScore: 90,
+          averageCostPerSucceededTaskUsd: 0.01,
+        },
+        batchReceipt: {
+          headline: "恢复小批失败",
+          primaryLabel: "查看失败修复",
+          primaryHref: "/failures",
+        },
+      }),
+      createdAt: "2026-07-06T08:00:00.000Z",
+    },
+    {
+      label: "沉淀修复后恢复小批经验",
+      href: "/tasks?batchContext=repair_resume#recommended-batch",
+      payload: JSON.stringify({
+        executionContext: "repair_resume",
+        routeEffectSummary: {
+          successRatePercent: 100,
+          failedTasks: 0,
+          knownCostUsd: 0.02,
+          averageQualityScore: 88,
+          averageCostPerSucceededTaskUsd: 0.01,
+        },
+      }),
+      createdAt: "2026-07-06T07:00:00.000Z",
+    },
+  ]);
+
+  assert.equal(record?.stabilityTone, "blocked");
+  assert.equal(record?.stableRuns, 0);
+  assert.equal(record?.stabilityLabel, "恢复稳定性中断");
+  assert.equal(record?.stabilityActionLabel, "查看失败修复");
+  assert.equal(record?.stabilityActionHref, "/failures");
+  assert.match(record?.stabilityDetail ?? "", /最近恢复小批未过线/);
+});

@@ -83,6 +83,12 @@ function resumeBatchDecisionClass(tone: "continue" | "repair" | "rollback" | "wa
   return "border-amber-200 bg-amber-50 text-amber-900";
 }
 
+function resumeStabilityClass(tone: "ready" | "watch" | "blocked") {
+  if (tone === "ready") return "bg-emerald-100 text-emerald-950";
+  if (tone === "blocked") return "bg-rose-100 text-rose-950";
+  return "bg-amber-100 text-amber-950";
+}
+
 function toPersistedDispatch(task: {
   id: string;
   dispatchKey: string;
@@ -426,9 +432,15 @@ export default async function FailuresPage() {
                 <span className="font-medium">{failureRepairResumeBatchRecord.decisionLabel}</span>
                 <span className="ml-1 opacity-85">{failureRepairResumeBatchRecord.decisionDetail}</span>
               </div>
+              {failureRepairResumeBatchRecord.stabilityTone && failureRepairResumeBatchRecord.stabilityLabel ? (
+                <div className={`mt-3 rounded-md px-3 py-2 text-sm ${resumeStabilityClass(failureRepairResumeBatchRecord.stabilityTone)}`}>
+                  <div className="font-medium">{failureRepairResumeBatchRecord.stabilityLabel}</div>
+                  <p className="mt-1 leading-6">{failureRepairResumeBatchRecord.stabilityDetail}</p>
+                </div>
+              ) : null}
             </div>
-            <Link className="w-fit rounded-md bg-slate-950 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800" href={failureRepairResumeBatchRecord.decisionActionHref}>
-              {failureRepairResumeBatchRecord.decisionActionLabel}
+            <Link className="w-fit rounded-md bg-slate-950 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800" href={failureRepairResumeBatchRecord.stabilityActionHref ?? failureRepairResumeBatchRecord.decisionActionHref}>
+              {failureRepairResumeBatchRecord.stabilityActionLabel ?? failureRepairResumeBatchRecord.decisionActionLabel}
             </Link>
           </div>
         </section>

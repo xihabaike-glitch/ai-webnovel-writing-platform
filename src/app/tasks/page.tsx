@@ -212,6 +212,12 @@ function resumeBatchDecisionClass(tone: "continue" | "repair" | "rollback" | "wa
   return "border-amber-200 bg-amber-50 text-amber-900";
 }
 
+function resumeStabilityClass(tone: "ready" | "watch" | "blocked") {
+  if (tone === "ready") return "bg-emerald-100 text-emerald-950";
+  if (tone === "blocked") return "bg-rose-100 text-rose-950";
+  return "bg-amber-100 text-amber-950";
+}
+
 export default async function TasksPage({ searchParams }: { searchParams?: Promise<{ batchStrategy?: string; batchContext?: string; view?: string; debt?: string; cleared?: string; previousDebt?: string }> }) {
   const resolvedSearchParams = searchParams ? await searchParams : {};
   const activeStrategy = getBatchExecutionStrategy(resolvedSearchParams.batchStrategy);
@@ -1010,9 +1016,15 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
                   <span className="font-medium">{failureRepairResumeBatchRecord.decisionLabel}</span>
                   <span className="ml-1 opacity-85">{failureRepairResumeBatchRecord.decisionDetail}</span>
                 </div>
+                {failureRepairResumeBatchRecord.stabilityTone && failureRepairResumeBatchRecord.stabilityLabel ? (
+                  <div className={`mt-2 rounded-md px-2 py-1 text-xs leading-5 ${resumeStabilityClass(failureRepairResumeBatchRecord.stabilityTone)}`}>
+                    <span className="font-medium">{failureRepairResumeBatchRecord.stabilityLabel}</span>
+                    <span className="ml-1 opacity-85">{failureRepairResumeBatchRecord.stabilityDetail}</span>
+                  </div>
+                ) : null}
               </div>
-              <Link className="w-fit rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white hover:bg-slate-800" href={failureRepairResumeBatchRecord.decisionActionHref}>
-                {failureRepairResumeBatchRecord.decisionActionLabel}
+              <Link className="w-fit rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white hover:bg-slate-800" href={failureRepairResumeBatchRecord.stabilityActionHref ?? failureRepairResumeBatchRecord.decisionActionHref}>
+                {failureRepairResumeBatchRecord.stabilityActionLabel ?? failureRepairResumeBatchRecord.decisionActionLabel}
               </Link>
             </div>
           </div>

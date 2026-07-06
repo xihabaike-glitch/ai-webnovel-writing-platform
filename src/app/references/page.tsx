@@ -21,6 +21,11 @@ function selectedCategoryParam(value: string | string[] | undefined) {
   return value ?? null;
 }
 
+function pathStatusClass(status: string) {
+  if (status === "已落地") return "border-emerald-200 bg-emerald-50 text-emerald-800";
+  return "border-amber-200 bg-amber-50 text-amber-800";
+}
+
 export default async function ReferencesPage({ searchParams }: ReferencesPageProps) {
   const params = await searchParams;
   const view = buildReferenceCaseLibraryView({
@@ -163,6 +168,44 @@ export default async function ReferencesPage({ searchParams }: ReferencesPagePro
               </div>
             ))}
           </div>
+        </div>
+      </section>
+
+      <section className="mb-6 rounded-md border border-slate-200 bg-white p-4">
+        <div className="mb-3 flex flex-col gap-2 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <h2 className="font-medium text-slate-950">毒舌 PM 开发路径</h2>
+            <p className="mt-1 text-sm text-slate-500">把参考案例、8 平台和 AI 编辑部收束成当前可交付路线，逐条看证据和验收口径。</p>
+          </div>
+          <Link className="w-fit rounded-md border border-slate-200 px-3 py-2 text-sm font-medium hover:bg-slate-50" href="/projects">
+            进入作品工作台
+          </Link>
+        </div>
+        <div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-4">
+          {view.developmentPath.map((item) => (
+            <article className="rounded-md border border-slate-200 bg-slate-50 p-4" key={item.id}>
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className="text-xs text-slate-500">{item.ownerRole}</div>
+                  <h3 className="mt-1 font-medium text-slate-950">{item.title}</h3>
+                </div>
+                <span className={`w-fit rounded-md border px-2 py-1 text-xs font-medium ${pathStatusClass(item.status)}`}>
+                  {item.status}
+                </span>
+              </div>
+              <div className="mt-3 grid gap-2 text-sm leading-6 text-slate-700">
+                <p>{item.currentEvidence}</p>
+                <p className="font-medium text-slate-900">{item.nextAction}</p>
+                <p className="text-xs leading-5 text-slate-500">验收：{item.acceptance}</p>
+              </div>
+              <Link
+                className="mt-3 inline-flex w-fit rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white hover:bg-slate-800"
+                href={item.href}
+              >
+                查看落点
+              </Link>
+            </article>
+          ))}
         </div>
       </section>
 

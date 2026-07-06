@@ -68,6 +68,19 @@ test("open source reference cases", async (t) => {
     assert.ok(allView.categoryTabs.some((tab) => tab.href === "/references?category=ai_workflow"));
     assert.ok(allView.productManagerNotes.some((note) => note.includes("聊天")));
     assert.ok(allView.nextBuildMoves.some((move) => move.includes("发布流水线")));
+    assert.equal(allView.developmentPath.length, 4);
+    assert.deepEqual(
+      allView.developmentPath.map((item) => item.id),
+      ["writing_workbench", "model_routing", "knowledge_recall", "publishing_pipeline"],
+    );
+    for (const item of allView.developmentPath) {
+      assert.ok(["已落地", "继续打磨"].includes(item.status));
+      assert.ok(item.ownerRole.length >= 4);
+      assert.ok(item.currentEvidence.length >= 10);
+      assert.ok(item.nextAction.length >= 10);
+      assert.ok(item.acceptance.length >= 10);
+      assert.ok(item.href.startsWith("/"));
+    }
     assert.ok(allView.topTags.length > 0);
 
     assert.equal(aiView.selectedCategory, "ai_workflow");

@@ -39,6 +39,7 @@ export interface ReferenceCaseLibraryView {
   totalCases: number;
   platformScope: ReferenceCasePlatformScope;
   rolePlaybook: ReferenceCaseRolePlaybookItem[];
+  developmentPath: ReferenceCaseDevelopmentPathItem[];
   selectedCategory: ReferenceCaseCategory | "all";
   categoryTabs: Array<{
     id: ReferenceCaseCategory | "all";
@@ -54,6 +55,17 @@ export interface ReferenceCaseLibraryView {
     tag: string;
     count: number;
   }>;
+}
+
+export interface ReferenceCaseDevelopmentPathItem {
+  id: "writing_workbench" | "model_routing" | "knowledge_recall" | "publishing_pipeline";
+  title: string;
+  status: "已落地" | "继续打磨";
+  ownerRole: string;
+  currentEvidence: string;
+  nextAction: string;
+  acceptance: string;
+  href: string;
 }
 
 export interface ReferenceCasePlatformScope {
@@ -565,6 +577,51 @@ export function buildReferenceCaseDevelopmentPlan(
   };
 }
 
+export function buildReferenceCaseDevelopmentPath(): ReferenceCaseDevelopmentPathItem[] {
+  return [
+    {
+      id: "writing_workbench",
+      title: "传统写作工作台",
+      status: "已落地",
+      ownerRole: "长篇结构主编",
+      currentEvidence: "作品页已有大纲树、人物弧光、世界观、伏笔、章节生产和结构诊断入口。",
+      nextAction: "继续把结构诊断结果回写到大纲树、前三章改写和章节卡。",
+      acceptance: "作者不调用 AI 也能管理一部长篇；调用 AI 后只是在关键节点提速。",
+      href: "/projects#story-structure",
+    },
+    {
+      id: "model_routing",
+      title: "多模型任务路由",
+      status: "继续打磨",
+      ownerRole: "毒舌产品经理",
+      currentEvidence: "模型设置已覆盖 Claude、DeepSeek、Kimi、GPT 等岗位矩阵和任务路由。",
+      nextAction: "把每个角色入口都绑定到可复核的模型岗位、失败替代路线和成本记录。",
+      acceptance: "用户能看懂每次 AI 任务由哪个模型执行、为什么选它、失败后去哪补救。",
+      href: "/settings/models#model-role-matrix",
+    },
+    {
+      id: "knowledge_recall",
+      title: "项目土壤召回",
+      status: "已落地",
+      ownerRole: "长上下文资料官",
+      currentEvidence: "具体作品页已有项目土壤召回，汇总人物、设定、线索和历史章节来源。",
+      nextAction: "把每次草稿、审稿、二改使用的上下文来源继续沉淀到任务时间线。",
+      acceptance: "长篇续写不会凭空改设定，用户能追到模型参考了哪些资料。",
+      href: "/projects#context-recall",
+    },
+    {
+      id: "publishing_pipeline",
+      title: "8 平台发布闭环",
+      status: "继续打磨",
+      ownerRole: "平台包装官",
+      currentEvidence: "参考库和发布中心已锁定 8 个核心平台，覆盖写作、投稿、复盘三段动作。",
+      nextAction: "继续把标题、简介、标签、样章、版本和发布效果变成可回滚的发布包记录。",
+      acceptance: "平台还差 0 个；每个平台都有可导出的发布包和可回填的效果复盘。",
+      href: "/projects#platform-export",
+    },
+  ];
+}
+
 export function buildReferenceCaseLibraryView(input?: {
   selectedCategory?: string | null;
   cases?: OpenSourceReferenceCase[];
@@ -605,6 +662,7 @@ export function buildReferenceCaseLibraryView(input?: {
     totalCases: plan.totalCases,
     platformScope: buildReferenceCasePlatformScope(),
     rolePlaybook: buildReferenceCaseRolePlaybook(),
+    developmentPath: buildReferenceCaseDevelopmentPath(),
     selectedCategory,
     categoryTabs,
     visibleCases,

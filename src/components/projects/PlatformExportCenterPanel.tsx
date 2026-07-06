@@ -695,6 +695,11 @@ interface PlatformPublishExecutionHandoff {
   feedbackMetric: string[];
   referenceAction: string;
   currentAction: string;
+  actionKind: PublishRepairAction["kind"] | "record_publish_effect";
+  actionLabel: string;
+  actionHref: string;
+  chapterId?: string;
+  candidateRevisionId?: string;
   preflightScore: number;
   canExport: boolean;
   blockedCount: number;
@@ -758,6 +763,23 @@ function actionHref(projectId: string, action: PublishRepairAction) {
   }
   if (action.chapterId) return `/projects/${projectId}/chapters/${action.chapterId}#chapter-editor`;
   return `/projects/${projectId}`;
+}
+
+function handoffActionHref(projectId: string, handoff: PlatformPublishExecutionHandoff) {
+  if (handoff.actionKind === "record_publish_effect") return handoff.actionHref;
+  if (handoff.actionKind === "adopt_candidate" && handoff.chapterId) {
+    return `/projects/${projectId}/chapters/${handoff.chapterId}#chapter-revisions`;
+  }
+  if (handoff.actionKind === "open_submission_package") return `/projects/${projectId}#submission-package`;
+  if (handoff.actionKind === "add_publish_chapters") return `/projects/${projectId}#create-chapter`;
+  if (handoff.actionKind === "run_second_pass" && handoff.chapterId) {
+    return `/projects/${projectId}/chapters/${handoff.chapterId}#chapter-second-pass`;
+  }
+  if (handoff.actionKind === "run_chapter_review" && handoff.chapterId) {
+    return `/projects/${projectId}/chapters/${handoff.chapterId}#chapter-workflow`;
+  }
+  if (handoff.chapterId) return `/projects/${projectId}/chapters/${handoff.chapterId}#chapter-editor`;
+  return handoff.actionHref || `/projects/${projectId}`;
 }
 
 function canRunAction(action: PublishRepairAction) {
@@ -2611,7 +2633,13 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
                       <div>复盘：{item.feedbackMetric.join("、")}</div>
                     </div>
                     <div className="mt-3 rounded-md bg-white px-2 py-1.5 text-xs leading-5 text-slate-600">
-                      {item.currentAction}
+                      <div>{item.currentAction}</div>
+                      <Link
+                        className="mt-2 inline-flex w-fit rounded-md bg-slate-950 px-2 py-1 text-[11px] font-medium text-white"
+                        href={handoffActionHref(projectId, item)}
+                      >
+                        {item.actionLabel}
+                      </Link>
                     </div>
                   </div>
                 ))}

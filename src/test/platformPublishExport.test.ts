@@ -145,6 +145,9 @@ test("buildPlatformPublishExportCenter", async (t) => {
     assert.equal(center.executionHandoffs[0].preflightScore, center.packages[0].preflight.score);
     assert.equal(center.executionHandoffs[0].canExport, center.packages[0].canExport);
     assert.ok(center.executionHandoffs[0].currentAction.includes("先修"));
+    assert.equal(center.executionHandoffs[0].actionLabel, center.packages[0].repairPath.nextStep?.label);
+    assert.equal(center.executionHandoffs[0].actionKind, center.packages[0].repairPath.nextStep?.kind);
+    assert.equal(center.executionHandoffs[0].actionHref.includes("#"), true);
     assert.ok(center.executionHandoffs.find((item) => item.platformId === "fanqie")?.submissionFocus.some((item) => item.includes("首秀")));
     assert.ok(center.executionHandoffs.find((item) => item.platformId === "qidian")?.writingFocus.some((item) => item.includes("卷结构")));
     assert.equal(center.packages[0].publishEffect.status, "empty");
@@ -266,6 +269,9 @@ test("buildPlatformPublishExportCenter", async (t) => {
     assert.ok(pack.finalGate.verdict.includes("标题、简介、前三章"));
     assert.ok(pack.markdown.includes("导出状态：允许导出"));
     assert.ok(pack.markdown.includes("最终裁决：可投"));
+    assert.equal(center.executionHandoffs[0].actionKind, "record_publish_effect");
+    assert.equal(center.executionHandoffs[0].actionLabel, "记录发布效果");
+    assert.equal(center.executionHandoffs[0].actionHref, "#publish-effect-panel");
   });
 
   await t.test("blocks export when candidate adoption makes old reviews stale", () => {

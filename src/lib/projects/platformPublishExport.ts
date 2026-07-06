@@ -793,6 +793,11 @@ export interface PlatformPublishExecutionHandoff {
   feedbackMetric: string[];
   referenceAction: string;
   currentAction: string;
+  actionKind: PublishRepairActionKind | "record_publish_effect";
+  actionLabel: string;
+  actionHref: string;
+  chapterId?: string;
+  candidateRevisionId?: string;
   preflightScore: number;
   canExport: boolean;
   blockedCount: number;
@@ -4020,9 +4025,15 @@ function buildPlatformPackage(
 function buildPlatformPublishExecutionHandoff(pack: PlatformPublishPackage): PlatformPublishExecutionHandoff {
   const executionCard = buildPlatformExecutionCard(pack.platformId);
   const firstBlocker = pack.preflight.blocked[0] ?? pack.finalGate.blockers[0] ?? "";
+  const nextStep = pack.repairPath.nextStep;
   const currentAction = pack.canExport
     ? `可导出：按${pack.platformName}投稿包进入小范围发布和数据复盘。`
-    : `先修：${firstBlocker || pack.repairPath.nextStep?.label || executionCard.nextAction}`;
+    : `先修：${firstBlocker || nextStep?.label || executionCard.nextAction}`;
+  const actionKind = pack.canExport ? "record_publish_effect" : nextStep?.kind ?? "open_submission_package";
+  const actionLabel = pack.canExport ? "记录发布效果" : nextStep?.label ?? "处理阻塞";
+  const actionHref = pack.canExport
+    ? "#publish-effect-panel"
+    : publishExecutionHandoffActionHref(actionKind, nextStep?.chapterId);
 
   return {
     platformId: pack.platformId,
@@ -4033,11 +4044,30 @@ function buildPlatformPublishExecutionHandoff(pack: PlatformPublishPackage): Pla
     feedbackMetric: executionCard.feedbackMetric,
     referenceAction: executionCard.nextAction,
     currentAction,
+    actionKind,
+    actionLabel,
+    actionHref,
+    chapterId: nextStep?.chapterId,
+    candidateRevisionId: nextStep?.candidateRevisionId,
     preflightScore: pack.preflight.score,
     canExport: pack.canExport,
     blockedCount: pack.preflight.blocked.length + pack.finalGate.blockers.length,
     warningCount: pack.warnings.length,
   };
+}
+
+function publishExecutionHandoffActionHref(
+  actionKind: PlatformPublishExecutionHandoff["actionKind"],
+  chapterId?: string,
+) {
+  if (actionKind === "record_publish_effect") return "#publish-effect-panel";
+  if (actionKind === "open_submission_package") return "#submission-assets";
+  if (actionKind === "add_publish_chapters") return "#create-chapter";
+  if (actionKind === "run_second_pass" && chapterId) return "#chapter-second-pass";
+  if (actionKind === "run_chapter_review" && chapterId) return "#chapter-workflow";
+  if (actionKind === "adopt_candidate" && chapterId) return "#chapter-revisions";
+  if (chapterId) return "#chapter-editor";
+  return "#platform-export";
 }
 
 export function buildPlatformPublishExportCenter(input: PlatformPublishExportInput): PlatformPublishExportCenter {

@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { groupReviewIssues, nonEmptyReviewGroups } from "@/lib/ai/reviewGrouping";
-import { latestTaskStatus, type AiTaskWorkflowItem } from "@/lib/ai/taskWorkflow";
+import { buildAiRecoveryMemoryDiagnostic, latestTaskStatus, type AiTaskWorkflowItem } from "@/lib/ai/taskWorkflow";
 import { buildPlatformStyleScore, type PlatformStyleChapterCard } from "@/lib/chapters/platformStyleScore";
 import { isChapterRevisionCandidate, type ChapterRevisionSummary } from "@/lib/chapters/revisions";
 import type { PlatformProfile } from "@/lib/platforms/platformProfiles";
@@ -165,6 +165,10 @@ export function ChapterWorkflowPanel({
   const styleScore = useMemo(() => buildPlatformStyleScore({ platform, chapter: chapterCard }), [platform, chapterCard]);
   const latestDraftStatus = workflow ? latestTaskStatus(workflow.tasks, "chapter_draft") : "not_started";
   const latestReviewStatus = workflow ? latestTaskStatus(workflow.tasks, "chapter_review") : "not_started";
+  const recoveryMemoryDiagnostic = useMemo(
+    () => (workflow ? buildAiRecoveryMemoryDiagnostic(workflow.tasks) : null),
+    [workflow],
+  );
 
   async function loadWorkflow() {
     const response = await fetch(`/api/ai/tasks/chapter-workflow?chapterId=${chapterId}`);
@@ -703,6 +707,29 @@ export function ChapterWorkflowPanel({
           </button>
         </div>
         <div className="grid gap-2">
+          {recoveryMemoryDiagnostic && recoveryMemoryDiagnostic.status !== "empty" ? (
+            <div className={`rounded-md border p-3 text-xs leading-5 ${
+              recoveryMemoryDiagnostic.status === "rollback"
+                ? "border-rose-200 bg-rose-50 text-rose-800"
+                : recoveryMemoryDiagnostic.status === "watch"
+                  ? "border-amber-200 bg-amber-50 text-amber-800"
+                  : "border-emerald-200 bg-emerald-50 text-emerald-800"
+            }`}>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="font-medium">{recoveryMemoryDiagnostic.label}</span>
+                <span>{recoveryMemoryDiagnostic.actionLabel}</span>
+              </div>
+              <p className="mt-1">{recoveryMemoryDiagnostic.detail}</p>
+              {recoveryMemoryDiagnostic.sourceLabel ? <p className="mt-1">来源：{recoveryMemoryDiagnostic.sourceLabel}</p> : null}
+              {recoveryMemoryDiagnostic.evidence.length ? (
+                <div className="mt-2 grid gap-1">
+                  {recoveryMemoryDiagnostic.evidence.map((evidence) => (
+                    <p className="rounded-md bg-white/70 px-2 py-1" key={evidence}>{evidence}</p>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
           {workflow?.tasks.map((task) => (
             <button
               className="rounded-md bg-slate-50 p-3 text-left text-xs text-slate-600 hover:bg-slate-100"

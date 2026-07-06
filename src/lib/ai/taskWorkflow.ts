@@ -43,6 +43,15 @@ export interface AiRecoveryMemoryAudit {
   latestAt: string | null;
 }
 
+export interface AiRecoveryMemoryDiagnostic {
+  status: "empty" | "healthy" | "watch" | "rollback";
+  label: string;
+  detail: string;
+  actionLabel: string;
+  sourceLabel: string | null;
+  evidence: string[];
+}
+
 const taskLabels: Record<string, string> = {
   chapter_draft: "正文初稿",
   chapter_review: "章节审稿",
@@ -108,6 +117,23 @@ function parseRecoveryMemoryAudit(inputSnapshot: string | null | undefined): AiR
   };
 }
 
+function numericValue(value: unknown) {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function reviewIssueTypes(outputText: string | null) {
+  const parsed = parseJsonObject(outputText);
+  const issues = Array.isArray(parsed?.issues) ? parsed.issues : [];
+  return issues
+    .filter(isRecord)
+    .map((issue) => textValue(issue.type))
+    .filter((type): type is string => Boolean(type));
+}
+
+function reviewScore(outputText: string | null) {
+  return numericValue(parseJsonObject(outputText)?.score);
+}
+
 export function summarizeAiTasks(tasks: AiTaskWorkflowInput[]): AiTaskWorkflowItem[] {
   return tasks.map((task) => ({
     id: task.id,
@@ -130,4 +156,71 @@ export function summarizeAiTasks(tasks: AiTaskWorkflowInput[]): AiTaskWorkflowIt
 
 export function latestTaskStatus(items: AiTaskWorkflowItem[], taskType: string) {
   return items.find((item) => item.taskType === taskType)?.status ?? "not_started";
+}
+
+export function buildAiRecoveryMemoryDiagnostic(items: AiTaskWorkflowItem[]): AiRecoveryMemoryDiagnostic {
+  const recoveryReviews = items
+    .filter((item) => item.taskType === "chapter_review" && item.status === "succeeded" && item.recoveryMemoryAudit)
+    .map((item) => {
+      const score = reviewScore(item.outputText);
+      const issueTypes = reviewIssueTypes(item.outputText);
+      const weak = (score !== null && score < 85) || issueTypes.includes("ai_recovery");
+      return {
+        item,
+        score,
+        issueTypes,
+        weak,
+      };
+    })
+    .sort((left, right) => new Date(right.item.createdAt).getTime() - new Date(left.item.createdAt).getTime());
+
+  if (recoveryReviews.length === 0) {
+    return {
+      status: "empty",
+      label: "暂无恢复记忆审计",
+      detail: "还没有带恢复记忆的审稿样本。",
+      actionLabel: "等待样本",
+      sourceLabel: null,
+      evidence: [],
+    };
+  }
+
+  const latest = recoveryReviews[0];
+  const weakStreak = recoveryReviews.slice(0, 2).filter((item) => item.weak).length;
+  const evidence = recoveryReviews.slice(0, 2).map(({ item, score, issueTypes }) => [
+    `${item.label} ${score ?? "无分数"} 分`,
+    issueTypes.length ? `问题：${issueTypes.join("、")}` : "",
+    item.recoveryMemoryAudit?.lifecycleLabel ?? "",
+  ].filter(Boolean).join("；"));
+
+  if (weakStreak >= 2) {
+    return {
+      status: "rollback",
+      label: "恢复记忆疑似失效",
+      detail: "连续 2 次带恢复记忆的审稿仍低于 85 分或命中 ai_recovery 问题，别继续放大。",
+      actionLabel: "回滚小样本",
+      sourceLabel: latest.item.recoveryMemoryAudit?.sourceLabel ?? null,
+      evidence,
+    };
+  }
+
+  if (latest.weak) {
+    return {
+      status: "watch",
+      label: "恢复记忆观察中",
+      detail: "最近一次带恢复记忆的审稿仍有低分或恢复相关问题；下一次仍弱就回滚小样本。",
+      actionLabel: "再看 1 次",
+      sourceLabel: latest.item.recoveryMemoryAudit?.sourceLabel ?? null,
+      evidence,
+    };
+  }
+
+  return {
+    status: "healthy",
+    label: "恢复记忆未触发失效",
+    detail: "最近带恢复记忆的审稿过线，继续小批观察。",
+    actionLabel: "继续观察",
+    sourceLabel: latest.item.recoveryMemoryAudit?.sourceLabel ?? null,
+    evidence,
+  };
 }

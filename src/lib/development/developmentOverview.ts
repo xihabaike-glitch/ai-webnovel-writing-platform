@@ -290,7 +290,7 @@ const deliveryAuditItems: DevelopmentOverviewAuditItem[] = [
     requirement: "筛选最少 30 个 GitHub 写作、AI 工作流、知识库和发布流水线项目作为参考。",
     evidence: `${openSourceReferenceCases.length} 个参考案例已进入参考库，并按传统写作、AI 工作流、知识库、发布流水线分类。`,
     nextStep: "继续只抽取能服务网文生产的产品动作，不为了资料数量继续堆项目。",
-    href: "/references",
+    href: "/references#development-path",
   },
   {
     id: "platform_scope",
@@ -299,7 +299,7 @@ const deliveryAuditItems: DevelopmentOverviewAuditItem[] = [
     requirement: "覆盖起点、番茄、七猫、晋江、知乎盐选、WebNovel、Royal Road、Wattpad，并停止扩展剩余平台。",
     evidence: `${platformDeliveryScope.statusLabel}；${platformDeliveryScope.expansionLabel}；扩展平台不再作为待补缺口。`,
     nextStep: "把 8 个平台的写作、投稿、复盘闭环继续打磨，不扩范围。",
-    href: "/references",
+    href: "/projects#platform-export",
   },
   {
     id: "length_modes",
@@ -308,7 +308,7 @@ const deliveryAuditItems: DevelopmentOverviewAuditItem[] = [
     requirement: "支持一万字左右短篇、5-6 万字中篇、30 万字以上长篇和百万字级超长篇规划。",
     evidence: "篇幅模板已覆盖 short_10k、mid_50k、long_300k_plus、mega_1m_plus，并绑定平台默认篇幅。",
     nextStep: "继续把篇幅选择落到章节数量、首章钩子和发布包验收。",
-    href: "/projects",
+    href: "/projects#create-project",
   },
   {
     id: "tree_workflow",
@@ -317,7 +317,7 @@ const deliveryAuditItems: DevelopmentOverviewAuditItem[] = [
     requirement: "先写开头和结尾，再写主干，最后做分支，叶片和土壤用于章节内容与设定填充。",
     evidence: "开发总览已展示开头、结尾、主干、分支、叶片、土壤六步，并把钩子和土壤作为 PM 规则。",
     nextStep: "从作品工作台继续验证每本书是否按这棵树补齐材料。",
-    href: "/docs",
+    href: "/projects#story-structure",
   },
   {
     id: "model_interfaces",
@@ -326,7 +326,7 @@ const deliveryAuditItems: DevelopmentOverviewAuditItem[] = [
     requirement: "对接 Claude、DeepSeek、Kimi、GPT 等模型，并预留对应接口。",
     evidence: "Claude、DeepSeek、Kimi、GPT 已在模型岗位中分别承担结构、正文、长上下文和海外包装。",
     nextStep: "进入模型设置检查接口、备用模型、任务路由和失败替代。",
-    href: "/settings/models",
+    href: "/settings/models#model-provider-interfaces",
   },
   {
     id: "ai_roles",
@@ -335,7 +335,7 @@ const deliveryAuditItems: DevelopmentOverviewAuditItem[] = [
     requirement: "把不同角色分配到不同 Skill 或模型岗位，服务策划、结构、正文、资料、海外包装和复盘。",
     evidence: "参考库已沉淀毒舌产品经理、长篇结构主编、中文网文写手、长上下文资料官、海外投稿包装编辑、反馈运营等角色。",
     nextStep: "继续把角色产物绑定到任务回执，避免只停留在角色名。",
-    href: "/references",
+    href: "/dispatch#dispatch-task-center",
   },
   {
     id: "writing_pipeline",
@@ -344,7 +344,7 @@ const deliveryAuditItems: DevelopmentOverviewAuditItem[] = [
     requirement: "形成从开书、章节生产、审稿二改、导出投稿到平台反馈复盘的完整路径。",
     evidence: "作品、任务、派单、总闸门、失败修复、发布包和导出页面已串联，仍需用真实作品持续验收流转体验。",
     nextStep: "从作品工作台跑一条首章样本到发布包的完整验收，不跳过人工采用。",
-    href: "/projects",
+    href: "/projects#pipeline-projects",
   },
   {
     id: "pm_gates",
@@ -353,7 +353,7 @@ const deliveryAuditItems: DevelopmentOverviewAuditItem[] = [
     requirement: "按照毒舌产品经理路径，所有批量生产前必须有样本、复查、失败修复和可点击下一步。",
     evidence: "总闸门、任务中心、失败修复中心、模型设置和参考库均有 PM 焦点；失败中心会在高风险时暂停批量。",
     nextStep: "继续让每个新功能先写清阻塞原因和验收证据，再允许批量扩大。",
-    href: "/gate",
+    href: "/gate?focus=action-recheck#gate-focus-notice",
   },
 ];
 

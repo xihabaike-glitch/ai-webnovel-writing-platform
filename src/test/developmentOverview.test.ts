@@ -101,6 +101,7 @@ test("buildDevelopmentOverview", async (t) => {
     const platformScope = overview.deliveryAudit.items.find((item) => item.id === "platform_scope");
     const modelInterfaces = overview.deliveryAudit.items.find((item) => item.id === "model_interfaces");
     const treeWorkflow = overview.deliveryAudit.items.find((item) => item.id === "tree_workflow");
+    const auditHrefs = Object.fromEntries(overview.deliveryAudit.items.map((item) => [item.id, item.href]));
 
     assert.equal(platformScope?.status, "ready");
     assert.ok(platformScope?.evidence.includes("8/8 核心平台已完成"));
@@ -113,6 +114,16 @@ test("buildDevelopmentOverview", async (t) => {
     assert.equal(treeWorkflow?.status, "ready");
     assert.ok(treeWorkflow?.evidence.includes("开头"));
     assert.ok(treeWorkflow?.evidence.includes("土壤"));
+    assert.deepEqual(auditHrefs, {
+      reference_cases: "/references#development-path",
+      platform_scope: "/projects#platform-export",
+      length_modes: "/projects#create-project",
+      tree_workflow: "/projects#story-structure",
+      model_interfaces: "/settings/models#model-provider-interfaces",
+      ai_roles: "/dispatch#dispatch-task-center",
+      writing_pipeline: "/projects#pipeline-projects",
+      pm_gates: "/gate?focus=action-recheck#gate-focus-notice",
+    });
   });
 
   await t.test("builds an executable writing-to-submission proof route", () => {

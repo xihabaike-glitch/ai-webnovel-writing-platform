@@ -151,6 +151,9 @@ test("buildWritingWorkbench", async (t) => {
       && card.status === "fail"
       && card.nextAction.includes("模型凭感觉")
     )));
+    assert.equal(workbench.contextFocus.recallPlan.status, "partial");
+    assert.ok(workbench.contextFocus.recallPlan.items.some((item) => item.sourceType === "character"));
+    assert.ok(workbench.contextFocus.recallPlan.promptBlock.includes("下一章召回计划"));
     assert.ok(workbench.modelFocus.nextRoutes.some((route) => route.task.includes("开头钩子")));
     assert.ok(workbench.quickLinks.some((link) => link.href === "/projects/p1#outline-tree"));
     assert.equal(new Set(workbench.quickLinks.map((link) => link.href)).size, workbench.quickLinks.length);

@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { buildChapterSecondPassPrompt } from "../lib/ai/buildChapterSecondPassPrompt.ts";
 import { MockAdapter } from "../lib/model-gateway/mockAdapter.ts";
 import { getPlatformProfile } from "../lib/platforms/platformProfiles.ts";
+import { buildProjectContextPack } from "../lib/projects/projectContextPack.ts";
 
 const prompt = buildChapterSecondPassPrompt({
   projectTitle: "夜雨系统",
@@ -77,6 +78,92 @@ test("buildChapterSecondPassPrompt", async (t) => {
     assert.ok(tacticPrompt.userPrompt.includes("历史观察"));
     assert.ok(tacticPrompt.userPrompt.includes("先修前三章兑现"));
     assert.ok(tacticPrompt.userPrompt.includes("优先执行首轮平台打法"));
+  });
+
+  await t.test("includes project context recall plan when available", () => {
+    const projectContext = buildProjectContextPack({
+      currentChapterId: "chapter-2",
+      chapters: [
+        {
+          id: "chapter-1",
+          order: 1,
+          title: "雨夜系统",
+          content: "林晚在雨夜救人，系统要求她支付记忆代价。",
+          hook: "系统倒计时只剩十秒。",
+          conflict: "救人会暴露异常。",
+          cliffhanger: "黑伞人说出了系统编号。",
+          status: "draft",
+        },
+        {
+          id: "chapter-2",
+          order: 2,
+          title: "记忆代价",
+          content: "待二改正文。",
+          hook: "手机里少了一段通话记录。",
+          conflict: "追查系统会牵连妹妹。",
+          cliffhanger: "黑伞人再次出现。",
+          status: "draft",
+        },
+      ],
+      characters: [
+        {
+          id: "character-1",
+          name: "林晚",
+          role: "主角",
+          desire: "查清系统来源并保护妹妹",
+          need: "学会主动选择并承担代价",
+          flaw: "总想一个人扛下所有风险",
+          arcStart: "被系统推着走",
+          arcEnd: "反过来定义系统规则",
+          relationshipNotes: "妹妹是软肋，黑伞人是压力源。",
+        },
+      ],
+      worldEntries: [
+        {
+          id: "world-1",
+          type: "system_rule",
+          title: "系统任务规则",
+          content: "系统只在高压选择时发布任务，每次奖励都必须支付记忆或关系代价。",
+        },
+      ],
+      foreshadows: [
+        {
+          id: "foreshadow-1",
+          title: "黑伞人知道系统编号",
+          setupChapterId: "chapter-1",
+          payoffChapterId: null,
+          relatedCharacterIds: JSON.stringify(["character-1"]),
+          status: "setup",
+          notes: "二改时保留黑伞人的压迫感，不提前解释身份。",
+        },
+      ],
+      plotThreads: [],
+    });
+    const contextPrompt = buildChapterSecondPassPrompt({
+      projectTitle: "夜雨系统",
+      genre: "都市系统",
+      sellingPoint: "雨夜系统翻盘",
+      platform: getPlatformProfile("fanqie"),
+      projectContext,
+      instruction: "二改时强化人物选择。",
+      mode: "more_emotion",
+      targetWords: 1200,
+      chapter: {
+        title: "第二章 记忆代价",
+        content: "林晚发现手机里少了一段通话记录。",
+        goal: "让主角意识到系统代价。",
+        hook: "手机里少了一段通话记录。",
+        conflict: "追查系统会牵连妹妹。",
+        valueShift: "从怀疑转向主动追查。",
+        cliffhanger: "黑伞人再次出现。",
+      },
+    });
+
+    assert.ok(contextPrompt.userPrompt.includes("项目上下文召回包"));
+    assert.ok(contextPrompt.userPrompt.includes("下一章召回计划"));
+    assert.ok(contextPrompt.userPrompt.includes("林晚"));
+    assert.ok(contextPrompt.userPrompt.includes("系统任务规则"));
+    assert.ok(contextPrompt.userPrompt.includes("二改必须遵守项目上下文召回计划"));
   });
 
   await t.test("feeds AI recovery evidence into second-pass rewrite constraints", () => {

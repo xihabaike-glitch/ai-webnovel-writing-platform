@@ -113,6 +113,72 @@ test("buildProjectContextPack", async (t) => {
     assert.equal(pack.warnings.length, 0);
   });
 
+  await t.test("builds an executable recall plan for the next chapter", () => {
+    const pack = buildProjectContextPack({
+      currentChapterId: "chapter-2",
+      chapters,
+      characters: [
+        {
+          id: "character-1",
+          name: "林晚",
+          role: "主角",
+          desire: "查清系统来源并保护妹妹",
+          need: "学会主动选择并承担代价",
+          flaw: "总想一个人扛下所有风险",
+          arcStart: "被系统推着走",
+          arcEnd: "反过来定义系统规则",
+          relationshipNotes: "妹妹是软肋，黑伞人是压力源。",
+        },
+      ],
+      worldEntries: [
+        {
+          id: "world-1",
+          type: "system_rule",
+          title: "系统任务规则",
+          content: "系统只在高压选择时发布任务，每次奖励都必须支付记忆或关系代价。",
+        },
+        {
+          id: "world-2",
+          type: "platform_soil",
+          title: "番茄土壤",
+          content: "每章前半段给危机，后半段给反击或新问题，章末留下追读钩子。",
+        },
+      ],
+      foreshadows: [
+        {
+          id: "foreshadow-1",
+          title: "黑伞人知道系统编号",
+          setupChapterId: "chapter-1",
+          payoffChapterId: null,
+          relatedCharacterIds: JSON.stringify(["character-1"]),
+          status: "setup",
+          notes: "下一章让黑伞人用编号施压，但不解释全部真相。",
+        },
+      ],
+      plotThreads: [
+        {
+          id: "thread-1",
+          type: "main",
+          title: "系统来源追查",
+          startChapterId: "chapter-1",
+          endChapterId: null,
+          status: "active",
+        },
+      ],
+    });
+
+    assert.equal(pack.recallPlan.status, "ready");
+    assert.equal(pack.recallPlan.items.length, 4);
+    assert.equal(pack.recallPlan.items[0].sourceType, "character");
+    assert.equal(pack.recallPlan.items[0].priority, "must_use");
+    assert.ok(pack.recallPlan.items[0].usage.includes("人物选择"));
+    assert.ok(pack.recallPlan.items.some((item) => item.sourceType === "world" && item.usage.includes("规则边界")));
+    assert.ok(pack.recallPlan.items.some((item) => item.sourceType === "foreshadow" && item.usage.includes("章末")));
+    assert.ok(pack.recallPlan.items.some((item) => item.sourceType === "history" && item.promptLine.includes("第 1 章")));
+    assert.ok(pack.recallPlan.promptBlock.includes("下一章召回计划"));
+    assert.ok(pack.promptBlock.includes("下一章召回计划"));
+  });
+
   await t.test("marks missing soil as actionable warnings", () => {
     const pack = buildProjectContextPack({
       currentChapterId: "chapter-2",

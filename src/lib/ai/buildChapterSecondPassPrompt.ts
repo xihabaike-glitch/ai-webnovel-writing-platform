@@ -1,4 +1,5 @@
 import type { PlatformProfile } from "../platforms/platformProfiles.ts";
+import type { ProjectContextPack } from "../projects/projectContextPack.ts";
 import type { ProjectStartTacticSummary } from "../projects/projectStartTactics.ts";
 import { buildAiRecoveryPromptBlock, type AiRecoveryPromptMemory } from "./aiRecoveryPromptMemory.ts";
 
@@ -10,6 +11,7 @@ export interface ChapterSecondPassPromptInput {
   sellingPoint: string;
   platform: PlatformProfile;
   startTactic?: ProjectStartTacticSummary | null;
+  projectContext?: ProjectContextPack | null;
   aiRecoveryMemory?: AiRecoveryPromptMemory | null;
   instruction: string;
   mode: SecondPassMode;
@@ -58,6 +60,7 @@ export function buildChapterSecondPassPrompt(input: ChapterSecondPassPromptInput
     `平台开头规则：${input.platform.openingRules.join("；")}`,
     `平台审稿重点：${input.platform.reviewFocus.join("、")}`,
     ...startTacticLines,
+    input.projectContext?.promptBlock ?? "",
     buildAiRecoveryPromptBlock(input.aiRecoveryMemory, "second_pass"),
     `二改方向：${modeInstructions[input.mode]}`,
     `作者指令：${input.instruction}`,
@@ -80,6 +83,7 @@ export function buildChapterSecondPassPrompt(input: ChapterSecondPassPromptInput
     "4. 开头必须比当前稿更快进入冲突。",
     "5. 结尾必须扣住章末悬念，不能平收。",
     input.startTactic ? "6. 优先执行首轮平台打法，尤其是开头动作和验证动作，不要把它写成注释。" : "",
+    input.projectContext ? "7. 二改必须遵守项目上下文召回计划；不要改断人物弧光、世界规则、伏笔状态和历史章节承接。" : "",
   ].join("\n");
 
   return { systemPrompt, userPrompt };

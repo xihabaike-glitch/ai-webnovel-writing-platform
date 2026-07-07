@@ -16,6 +16,26 @@ function statusClass(status: WorkbenchStatus) {
   return "border-rose-200 bg-rose-50 text-rose-800";
 }
 
+type RecallPlanStatus = WritingWorkbench["contextFocus"]["recallPlan"]["status"];
+
+function recallPlanStatusClass(status: RecallPlanStatus) {
+  if (status === "ready") return "border-emerald-200 bg-emerald-50 text-emerald-800";
+  if (status === "partial") return "border-amber-200 bg-amber-50 text-amber-800";
+  return "border-rose-200 bg-rose-50 text-rose-800";
+}
+
+function recallPlanStatusLabel(status: RecallPlanStatus) {
+  if (status === "ready") return "可执行";
+  if (status === "partial") return "需补强";
+  return "阻塞";
+}
+
+function recallPriorityLabel(priority: WritingWorkbench["contextFocus"]["recallPlan"]["items"][number]["priority"]) {
+  if (priority === "must_use") return "必用";
+  if (priority === "should_use") return "建议";
+  return "可选";
+}
+
 export function WritingWorkbenchPanel({ workbench }: { workbench: WritingWorkbench }) {
   const generalPendingCandidates = workbench.pendingCandidates.filter((candidate) => candidate.source !== "first_three_rewrite_candidate");
 
@@ -294,6 +314,32 @@ export function WritingWorkbenchPanel({ workbench }: { workbench: WritingWorkben
               <p className="mt-2 text-xs leading-5 text-slate-600">{card.nextAction}</p>
             </div>
           ))}
+        </div>
+        <div className="mt-3 border-t border-slate-200 pt-3">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <div className="text-sm font-medium text-slate-950">{workbench.contextFocus.recallPlan.headline}</div>
+              <p className="mt-1 text-xs leading-5 text-slate-500">{workbench.contextFocus.recallPlan.nextAction}</p>
+            </div>
+            <span className={`w-fit rounded-md border px-2 py-1 text-xs ${recallPlanStatusClass(workbench.contextFocus.recallPlan.status)}`}>
+              {recallPlanStatusLabel(workbench.contextFocus.recallPlan.status)}
+            </span>
+          </div>
+          <div className="mt-3 grid gap-2 md:grid-cols-2">
+            {workbench.contextFocus.recallPlan.items.slice(0, 4).map((item) => (
+              <div className="rounded-md bg-slate-50 p-3 text-sm" key={item.id}>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="font-medium text-slate-950">{item.sourceLabel}</div>
+                  <span className="rounded-md bg-white px-2 py-1 text-xs text-slate-600">{recallPriorityLabel(item.priority)}</span>
+                </div>
+                <p className="mt-2 text-xs leading-5 text-slate-600">{item.usage}</p>
+                <p className="mt-1 line-clamp-2 text-xs leading-5 text-slate-500">{item.promptLine}</p>
+              </div>
+            ))}
+            {workbench.contextFocus.recallPlan.items.length === 0 ? (
+              <p className="text-sm text-slate-600">还没有可执行召回项。</p>
+            ) : null}
+          </div>
         </div>
       </div>
     </section>

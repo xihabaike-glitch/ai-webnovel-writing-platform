@@ -605,8 +605,8 @@ function buildPipelineProofSummary(items: ProjectListItem[]): ProjectListPipelin
       validationReceipt: buildPipelineValidationReceipt(step),
       recommendedProjectId: stepProject?.id ?? null,
       recommendedProjectTitle: stepProject?.title ?? null,
-      recommendedActionLabel: stepProject?.pipelineProof.nextActionLabel ?? step.label,
-      recommendedActionHref: stepProject?.pipelineProof.nextActionHref ?? `/projects?pipelineStep=${step.id}#pipeline-projects`,
+      recommendedActionLabel: stepProject?.pipelineProof.nextActionLabel ?? (items.length > 0 ? "查看全部作品" : "创建作品"),
+      recommendedActionHref: stepProject?.pipelineProof.nextActionHref ?? (items.length > 0 ? "/projects#pipeline-projects" : "#create-project"),
     };
   });
   const bottleneckSeed = stepCounts[0] ?? {

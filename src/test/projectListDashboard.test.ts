@@ -519,4 +519,23 @@ test("buildProjectListDashboard", async (t) => {
     assert.ok(taskDispatchFilter?.recommendedActionLabel.includes("任务与派单回执"));
     assert.ok(taskDispatchFilter?.recommendedActionHref.includes("/dispatch?firstDayProject=ready-project"));
   });
+
+  await t.test("routes empty pipeline filters back to the full portfolio instead of looping", () => {
+    const dashboard = buildProjectListDashboard([emptyProject, completeProject, handoffBlockedProject], [
+      {
+        id: "provider-1",
+        providerId: "mock",
+        displayName: "Mock",
+        defaultModel: "mock-novel",
+        enabled: true,
+        encryptedApiKey: "secret",
+      },
+    ]);
+    const failureRepairFilter = dashboard.pipelineProofSummary.stepCounts.find((step) => step.id === "failure_repair");
+
+    assert.equal(failureRepairFilter?.count, 0);
+    assert.equal(failureRepairFilter?.recommendedActionLabel, "查看全部作品");
+    assert.equal(failureRepairFilter?.recommendedActionHref, "/projects#pipeline-projects");
+    assert.equal(failureRepairFilter?.recommendedProjectTitle, null);
+  });
 });

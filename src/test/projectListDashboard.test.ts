@@ -162,6 +162,25 @@ const handoffBlockedProject: ProjectListProject = {
   }],
 };
 
+const pendingDispatchProject: ProjectListProject = {
+  ...completeProject,
+  id: "pending-dispatch-project",
+  title: "派单待验收",
+  aiTasks: [
+    completeProject.aiTasks[0],
+    {
+      ...completeProject.aiTasks[0],
+      id: "second-pass-task",
+      taskType: "chapter_second_pass",
+    },
+  ],
+  gateDispatchTasks: [{
+    dispatchKey: "first-day:pending-dispatch-project:publish-precheck",
+    state: "assigned",
+    completionEvidence: "",
+  }],
+};
+
 test("buildProjectListDashboard", async (t) => {
   await t.test("sorts projects by operational urgency and summarizes portfolio metrics", () => {
     const dashboard = buildProjectListDashboard([completeProject, emptyProject], [
@@ -379,6 +398,30 @@ test("buildProjectListDashboard", async (t) => {
     assert.ok(handoff?.realSampleValidation.headline.includes("总闸门"));
     assert.ok(handoff?.realSampleValidation.completedEvidence.some((item) => item.includes("派单验收")));
     assert.equal(handoff?.realSampleValidation.nextActionHref, "/gate");
+  });
+
+  await t.test("recognizes generated first-day dispatches that still need acceptance evidence", () => {
+    const dashboard = buildProjectListDashboard([pendingDispatchProject], [
+      {
+        id: "provider-1",
+        providerId: "mock",
+        displayName: "Mock",
+        defaultModel: "mock-novel",
+        enabled: true,
+        encryptedApiKey: "secret",
+      },
+    ]);
+    const item = dashboard.items[0];
+
+    assert.equal(item.realSampleValidation.status, "needs_acceptance");
+    assert.ok(item.realSampleValidation.headline.includes("派单已生成"));
+    assert.ok(item.realSampleValidation.completedEvidence.some((entry) => entry.includes("派单已生成")));
+    assert.ok(item.realSampleValidation.missingEvidence.some((entry) => entry.includes("完成依据")));
+    assert.equal(item.realSampleValidation.nextActionLabel, "填写派单验收");
+    assert.equal(
+      item.realSampleValidation.nextActionHref,
+      "/dispatch?firstDayProject=pending-dispatch-project&step=publish-precheck&source=real-sample&gap=%E6%B4%BE%E5%8D%95%E5%B7%B2%E7%94%9F%E6%88%90%EF%BC%8C%E4%BD%86%E8%BF%98%E7%BC%BA%E5%AE%8C%E6%88%90%E4%BE%9D%E6%8D%AE%E5%92%8C%E4%BA%BA%E5%B7%A5%E9%AA%8C%E6%94%B6%E3%80%82#first-day-dispatch",
+    );
   });
 
   await t.test("summarizes portfolio bottlenecks across pipeline proof steps", () => {

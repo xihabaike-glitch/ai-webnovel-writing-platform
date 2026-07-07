@@ -381,6 +381,13 @@ function hasAcceptedDispatch(project: ProjectListProject) {
   ));
 }
 
+function pendingFirstDayDispatch(project: ProjectListProject, stepId: string) {
+  return (project.gateDispatchTasks ?? []).find((task) => (
+    task.dispatchKey === `first-day:${project.id}:${stepId}`
+    && task.state !== "completed"
+  )) ?? null;
+}
+
 function buildRealSampleValidation(input: {
   project: ProjectListProject;
   outlinePercent: number;
@@ -442,6 +449,28 @@ function buildRealSampleValidation(input: {
 
   if (!reviewReady || !secondPassReady || !dispatchAccepted) {
     const stepId = !reviewReady ? "first-review" : !secondPassReady ? "first-rewrite" : "publish-precheck";
+    const pendingDispatch = pendingFirstDayDispatch(input.project, stepId);
+    if (pendingDispatch) {
+      const pendingGap = "派单已生成，但还缺完成依据和人工验收。";
+      return {
+        status: "needs_acceptance",
+        label: "待验收",
+        headline: "真实样本验收卡：派单已生成，先填写验收依据。",
+        detail: "这一步不用再生成派单。直接去派单中心填完成依据，让人工验收把缺口闭上。",
+        completedEvidence: [
+          ...completedEvidence,
+          `派单已生成：${pendingDispatch.dispatchKey}`,
+        ],
+        missingEvidence: [pendingGap],
+        nextActionLabel: "填写派单验收",
+        nextActionHref: buildFirstDayDispatchCenterHref({
+          projectId: input.project.id,
+          stepId,
+          source: "real-sample",
+          gaps: [pendingGap],
+        }),
+      };
+    }
     return {
       status: "needs_acceptance",
       label: "待验收",

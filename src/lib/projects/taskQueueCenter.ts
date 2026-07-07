@@ -3,7 +3,7 @@ import { buildReviewPipelineQueue } from "../ai/batchReviewPipeline.ts";
 import { getChapterRevisionSourceLabel, isChapterRevisionCandidate, previewRevisionContent } from "../chapters/revisions.ts";
 import { buildExportSnapshotHistory } from "../export/snapshots.ts";
 import { buildExportVersionCenter } from "../export/versionCenter.ts";
-import { getPlatformProfile, type PlatformId } from "../platforms/platformProfiles.ts";
+import { getPlatformProfile, platformDeliveryScope, type PlatformId } from "../platforms/platformProfiles.ts";
 import { buildFirstDayRiskProfile, type FirstDayRiskLevel } from "./firstDayWorkflow.ts";
 import { validateFirstDayDispatchCompletionEvidence } from "./firstDayWorkflowView.ts";
 import { buildGateDispatchCompletionTemplate, type GateDispatchCompletionTemplateTask } from "./gateActionReceipts.ts";
@@ -174,8 +174,20 @@ export interface TaskQueueCenter {
     tacticExperienceFollowups: number;
     platformReadiness: TaskQueuePlatformReadinessSummary;
   };
+  pmFocus: TaskQueuePmFocus;
   items: QueueItem[];
   recommendedNext: QueueItem | null;
+}
+
+export interface TaskQueuePmFocus {
+  status: "empty" | "blocked" | "ready";
+  headline: string;
+  detail: string;
+  scopeLabel: string;
+  queueItemId: string | null;
+  projectId: string | null;
+  actionLabel: string;
+  actionHref: string;
 }
 
 export interface TaskQueuePlatformReadinessSummary {
@@ -288,6 +300,34 @@ function buildTaskQueuePlatformReadinessSummary(
     notGeneratedCount,
     headline,
     nextAction: primary?.nextAction ?? "先创建作品和章节，再生成平台发布包。",
+  };
+}
+
+function buildTaskQueuePmFocus(recommendedNext: QueueItem | null): TaskQueuePmFocus {
+  const scopeLabel = `${platformDeliveryScope.statusLabel} · ${platformDeliveryScope.expansionLabel}`;
+  if (!recommendedNext) {
+    return {
+      status: "empty",
+      headline: "当前没有可执行任务，先回作品页补开书资料。",
+      detail: "任务中心暂时没有可派发、可审稿或可清债的条目。下一步先创建作品、章节卡或平台包，再回到这里统一排队。",
+      scopeLabel,
+      queueItemId: null,
+      projectId: null,
+      actionLabel: "回作品页",
+      actionHref: "/projects",
+    };
+  }
+
+  const status = recommendedNext.category === "blocked" ? "blocked" : "ready";
+  return {
+    status,
+    headline: `${recommendedNext.projectTitle} 先做：${recommendedNext.actionLabel}`,
+    detail: `${recommendedNext.platformName} · ${recommendedNext.label}：${recommendedNext.evidence}`,
+    scopeLabel,
+    queueItemId: recommendedNext.id,
+    projectId: recommendedNext.projectId,
+    actionLabel: recommendedNext.actionLabel,
+    actionHref: recommendedNext.href,
   };
 }
 
@@ -1824,6 +1864,8 @@ export function buildTaskQueueCenter(projects: TaskQueueProject[]): TaskQueueCen
     || left.chapterTitle.localeCompare(right.chapterTitle)
   ));
 
+  const recommendedNext = items.find((entry) => entry.category !== "blocked") ?? items[0] ?? null;
+
   return {
     overview: {
       totalItems: items.length,
@@ -1848,7 +1890,8 @@ export function buildTaskQueueCenter(projects: TaskQueueProject[]): TaskQueueCen
       tacticExperienceFollowups: items.filter((entry) => entry.sourceType === "tactic_experience_followup").length,
       platformReadiness: buildTaskQueuePlatformReadinessSummary(platformReadinessSummaries),
     },
+    pmFocus: buildTaskQueuePmFocus(recommendedNext),
     items,
-    recommendedNext: items.find((entry) => entry.category !== "blocked") ?? items[0] ?? null,
+    recommendedNext,
   };
 }

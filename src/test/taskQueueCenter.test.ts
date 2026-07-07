@@ -225,6 +225,14 @@ test("buildTaskQueueCenter", async (t) => {
     );
     assert.equal(queue.recommendedNext?.strategyBasis?.label, "模板推荐");
     assert.ok(queue.items.every((item) => item.strategyBasis?.openingMove.includes("倒计时")));
+    assert.equal(queue.pmFocus.status, "ready");
+    assert.equal(queue.pmFocus.queueItemId, queue.recommendedNext?.id);
+    assert.ok(queue.pmFocus.headline.includes(queue.recommendedNext?.projectTitle ?? ""));
+    assert.ok(queue.pmFocus.detail.includes(queue.recommendedNext?.evidence ?? ""));
+    assert.equal(queue.pmFocus.actionLabel, queue.recommendedNext?.actionLabel);
+    assert.equal(queue.pmFocus.actionHref, queue.recommendedNext?.href);
+    assert.ok(queue.pmFocus.scopeLabel.includes("8/8 核心平台已完成"));
+    assert.ok(queue.pmFocus.scopeLabel.includes("剩余 10 个平台不再添加"));
   });
 
   await t.test("builds a focused blocked debt view for clearing batch risks", () => {

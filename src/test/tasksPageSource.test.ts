@@ -19,3 +19,11 @@ test("tasks page shows invalid debt feedback", () => {
   assert.ok(source.includes("查看全部阻塞"));
   assert.ok(source.includes("href=\"/tasks?view=blocked#task-debt\""));
 });
+
+test("tasks page shows invalid cleared debt feedback", () => {
+  assert.ok(source.includes("invalidClearedDebtNotice"));
+  assert.ok(source.includes("clearedDebtParam ? `清债完成类型「${clearedDebtParam}」不存在，已忽略这次完成反馈。` : null"));
+  assert.ok(source.includes("清债完成反馈已忽略"));
+  assert.ok(source.includes("查看阻塞清债"));
+  assert.ok(source.includes("href=\"/tasks?view=blocked#task-debt\""));
+});

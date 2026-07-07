@@ -256,7 +256,11 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
   const invalidDebtNotice = activeView === "blocked" && !isDebtBlockerType(debtParam)
     ? debtParam ? `清债类型「${debtParam}」不存在，已显示全部阻塞债务。` : null
     : null;
-  const clearedDebtBlockerType = activeView === "blocked" ? debtBlockerType(resolvedSearchParams.cleared) : null;
+  const clearedDebtParam = resolvedSearchParams.cleared;
+  const clearedDebtBlockerType = activeView === "blocked" ? debtBlockerType(clearedDebtParam) : null;
+  const invalidClearedDebtNotice = activeView === "blocked" && !isDebtBlockerType(clearedDebtParam)
+    ? clearedDebtParam ? `清债完成类型「${clearedDebtParam}」不存在，已忽略这次完成反馈。` : null
+    : null;
   const [
     projects,
     recentAiTasks,
@@ -548,6 +552,20 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
             </div>
             <Link className="w-fit rounded-md bg-white px-3 py-2 text-sm font-medium text-amber-950 hover:bg-amber-100" href="/tasks?view=blocked#task-debt">
               查看全部阻塞
+            </Link>
+          </div>
+        </section>
+      ) : null}
+
+      {invalidClearedDebtNotice ? (
+        <section className="mb-6 rounded-md border border-amber-200 bg-amber-50 p-4 text-amber-900">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <div className="font-medium">清债完成反馈已忽略</div>
+              <p className="mt-1 text-sm leading-6">{invalidClearedDebtNotice}</p>
+            </div>
+            <Link className="w-fit rounded-md bg-white px-3 py-2 text-sm font-medium text-amber-950 hover:bg-amber-100" href="/tasks?view=blocked#task-debt">
+              查看阻塞清债
             </Link>
           </div>
         </section>

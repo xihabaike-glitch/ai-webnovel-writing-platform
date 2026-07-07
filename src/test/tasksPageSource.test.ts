@@ -103,3 +103,10 @@ test("tasks page shows platform strategy task source detail", () => {
   assert.ok(source.includes("entry.sourceType === \"platform_strategy\" && entry.sourceDetail"));
   assert.ok(source.includes("border-violet-200 bg-violet-50 text-violet-950"));
 });
+
+test("tasks page surfaces platform strategy work in the overview", () => {
+  assert.ok(source.includes("queue.overview.platformStrategyTasks"));
+  assert.ok(source.includes("平台策略"));
+  assert.ok(source.includes("href={hrefWithGateReturn(\"/tasks#platform-strategy-tasks\", gateReturn)}"));
+  assert.ok(source.includes("id=\"platform-strategy-tasks\""));
+});

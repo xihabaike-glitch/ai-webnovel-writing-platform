@@ -622,6 +622,7 @@ test("buildTaskQueueCenter", async (t) => {
     const queue = buildTaskQueueCenter([publishReadyProject()]);
     const strategyItem = queue.items.find((entry) => entry.id === "project-1:platform-strategy:fanqie:save-evidence-baseline");
 
+    assert.equal(queue.overview.platformStrategyTasks, 1);
     assert.equal(strategyItem?.sourceType, "platform_strategy");
     assert.equal(strategyItem?.category, "effect");
     assert.equal(strategyItem?.chapterTitle, "主平台策略执行链");
@@ -679,6 +680,7 @@ test("buildTaskQueueCenter", async (t) => {
       platformPublishMetrics: [],
     })]);
 
+    assert.equal(queue.overview.platformStrategyTasks, 1);
     assert.equal(queue.recommendedNext?.sourceType, "platform_strategy");
     assert.equal(queue.recommendedNext?.actionLabel, "录入发布效果");
     assert.equal(queue.recommendedNext?.href, "/projects/project-1#publish-effect-panel");

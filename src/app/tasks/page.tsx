@@ -750,6 +750,10 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
           <div className="text-xs text-slate-500">采纳闭环</div>
           <div className="mt-1 text-2xl font-semibold">{queue.overview.firstThreeAdoptionFollowups}</div>
         </div>
+        <Link className="rounded-md border border-violet-200 bg-violet-50 p-3 text-violet-950 hover:bg-violet-100" href={hrefWithGateReturn("/tasks#platform-strategy-tasks", gateReturn)}>
+          <div className="text-xs text-violet-700">平台策略</div>
+          <div className="mt-1 text-2xl font-semibold">{queue.overview.platformStrategyTasks}</div>
+        </Link>
       </section>
 
       <section className="mb-6 rounded-md border border-slate-200 bg-white p-4">
@@ -1567,7 +1571,7 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
         </div>
       </section>
 
-      <section className="grid gap-3">
+      <section className="grid gap-3" id="platform-strategy-tasks">
         {visibleQueueItems.map((entry) => (
           <div className="rounded-md border border-slate-200 bg-white p-4" key={entry.id}>
             <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">

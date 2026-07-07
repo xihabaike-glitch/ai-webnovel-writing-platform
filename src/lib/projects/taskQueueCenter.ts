@@ -173,6 +173,7 @@ export interface TaskQueueCenter {
     firstDayHandoffs: number;
     firstThreeAdoptionFollowups: number;
     tacticExperienceFollowups: number;
+    platformStrategyTasks: number;
     platformReadiness: TaskQueuePlatformReadinessSummary;
   };
   pmFocus: TaskQueuePmFocus;
@@ -1988,6 +1989,7 @@ export function buildTaskQueueCenter(projects: TaskQueueProject[]): TaskQueueCen
       firstDayHandoffs: items.filter((entry) => entry.sourceType === "first_day_handoff").length,
       firstThreeAdoptionFollowups: items.filter((entry) => entry.sourceType === "first_three_adoption").length,
       tacticExperienceFollowups: items.filter((entry) => entry.sourceType === "tactic_experience_followup").length,
+      platformStrategyTasks: items.filter((entry) => entry.sourceType === "platform_strategy").length,
       platformReadiness: buildTaskQueuePlatformReadinessSummary(platformReadinessSummaries),
     },
     pmFocus: buildTaskQueuePmFocus(recommendedNext),

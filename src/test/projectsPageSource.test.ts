@@ -51,3 +51,20 @@ test("projects page keeps a gate recheck return path visible", () => {
   assert.ok(source.includes("来自总闸门复检"));
   assert.ok(source.includes("回总闸门复检"));
 });
+
+test("projects page carries gate return through project action links", () => {
+  assert.ok(source.includes("function hrefWithGateReturn"));
+  assert.ok(source.includes("href={hrefWithGateReturn(dashboard.pmFocus.actionHref, gateReturn)}"));
+  assert.ok(source.includes("href={hrefWithGateReturn(dashboard.pipelineAcceptanceSummary.primaryActionHref, gateReturn)}"));
+  assert.ok(source.includes("href={hrefWithGateReturn(sample.actionHref, gateReturn)}"));
+  assert.ok(source.includes("href={hrefWithGateReturn(activePipelineAction.recommendedActionHref, gateReturn)}"));
+  assert.ok(source.includes("href={hrefWithGateReturn(step.filterHref, gateReturn)}"));
+  assert.ok(source.includes("href={hrefWithGateReturn(\"/projects#pipeline-projects\", gateReturn)}"));
+  assert.ok(source.includes("href={hrefWithGateReturn(`/projects/${item.id}${entry.projectAnchor}`, gateReturn)}"));
+  assert.ok(source.includes("href={hrefWithGateReturn(\"#create-project\", gateReturn, \"/projects\")}"));
+  assert.ok(source.includes("href={hrefWithGateReturn(`/projects/${item.id}`, gateReturn)}"));
+  assert.ok(source.includes("href={hrefWithGateReturn(item.nextActionHref, gateReturn)}"));
+  assert.ok(source.includes("href={hrefWithGateReturn(item.realSampleValidation.nextActionHref, gateReturn)}"));
+  assert.ok(source.includes("href={hrefWithGateReturn(item.pipelineProof.nextActionHref, gateReturn)}"));
+  assert.ok(source.includes("href={hrefWithGateReturn(step.href, gateReturn)}"));
+});

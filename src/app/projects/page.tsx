@@ -37,6 +37,19 @@ function gateReturnFromParam(value: string | string[] | undefined) {
   return raw;
 }
 
+function hrefWithGateReturn(href: string, gateReturnHref?: string | null, currentPath = "") {
+  const normalizedHref = gateReturnHref && href.startsWith("#") && currentPath ? `${currentPath}${href}` : href;
+  if (!gateReturnHref || !normalizedHref.startsWith("/") || normalizedHref.startsWith("/gate")) return normalizedHref;
+
+  const hashIndex = normalizedHref.indexOf("#");
+  const base = hashIndex >= 0 ? normalizedHref.slice(0, hashIndex) : normalizedHref;
+  const hash = hashIndex >= 0 ? normalizedHref.slice(hashIndex) : "";
+  if (base.includes("gateReturn=")) return normalizedHref;
+  const separator = base.includes("?") ? "&" : "?";
+
+  return `${base}${separator}gateReturn=${encodeURIComponent(gateReturnHref)}${hash}`;
+}
+
 function riskLevelLabel(level: FirstDayRiskLevel) {
   if (level === "blocked") return "止损";
   if (level === "watch") return "观察";
@@ -200,7 +213,7 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps) 
             <p className="mt-2 max-w-4xl text-sm leading-6 text-slate-200">{dashboard.pmFocus.detail}</p>
             <div className="mt-2 text-xs text-slate-400">{dashboard.pmFocus.scopeLabel}</div>
           </div>
-          <Link className="w-fit rounded-md bg-white px-3 py-2 text-sm font-medium text-slate-950 hover:bg-slate-100" href={dashboard.pmFocus.actionHref}>
+          <Link className="w-fit rounded-md bg-white px-3 py-2 text-sm font-medium text-slate-950 hover:bg-slate-100" href={hrefWithGateReturn(dashboard.pmFocus.actionHref, gateReturn)}>
             {dashboard.pmFocus.actionLabel}
           </Link>
         </div>
@@ -213,7 +226,7 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps) 
               <h2 className="mt-1 font-medium text-slate-950">{dashboard.pipelineAcceptanceSummary.headline}</h2>
               <p className="mt-1 text-sm leading-6 text-slate-600">{dashboard.pipelineAcceptanceSummary.verdict}</p>
             </div>
-            <Link className="w-fit rounded-md bg-slate-950 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800" href={dashboard.pipelineAcceptanceSummary.primaryActionHref}>
+            <Link className="w-fit rounded-md bg-slate-950 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800" href={hrefWithGateReturn(dashboard.pipelineAcceptanceSummary.primaryActionHref, gateReturn)}>
               {dashboard.pipelineAcceptanceSummary.primaryActionLabel}
             </Link>
           </div>
@@ -254,7 +267,7 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps) 
                     </div>
                     <p className="mt-1 text-xs leading-5 text-slate-600">{sample.reason}</p>
                   </div>
-                  <Link className="w-fit rounded-md bg-white px-3 py-2 text-xs font-medium text-slate-950 hover:bg-slate-100" href={sample.actionHref}>
+                  <Link className="w-fit rounded-md bg-white px-3 py-2 text-xs font-medium text-slate-950 hover:bg-slate-100" href={hrefWithGateReturn(sample.actionHref, gateReturn)}>
                     {sample.actionLabel}
                   </Link>
                 </div>
@@ -279,7 +292,7 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps) 
             <div className="rounded-md bg-slate-100 px-3 py-2 text-sm text-slate-700">
               {activePipelineSummary.countLabel}
             </div>
-            <Link className="rounded-md bg-slate-950 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800" href={activePipelineAction.recommendedActionHref}>
+            <Link className="rounded-md bg-slate-950 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800" href={hrefWithGateReturn(activePipelineAction.recommendedActionHref, gateReturn)}>
               {activePipelineAction.recommendedProjectTitle ? `${activePipelineAction.recommendedActionLabel} · ${activePipelineAction.recommendedProjectTitle}` : activePipelineAction.recommendedActionLabel}
             </Link>
           </div>
@@ -288,7 +301,7 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps) 
           {dashboard.pipelineProofSummary.stepCounts.map((step, index) => (
             <Link
               className={`rounded-md border p-3 text-sm ${activePipelineStep?.id === step.id ? "border-slate-900 bg-slate-950 text-white" : "border-slate-200 bg-slate-50 hover:bg-slate-100"}`}
-              href={step.filterHref}
+              href={hrefWithGateReturn(step.filterHref, gateReturn)}
               key={step.id}
             >
               <div className={`text-xs ${activePipelineStep?.id === step.id ? "text-slate-300" : "text-slate-500"}`}>第 {index + 1} 步</div>
@@ -300,7 +313,7 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps) 
         {invalidPipelineStep ? (
           <div className="mt-3 flex flex-col gap-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 sm:flex-row sm:items-center sm:justify-between">
             <span>{invalidPipelineStep}</span>
-            <Link className="w-fit rounded-md bg-white px-3 py-2 text-xs font-medium text-amber-900 hover:bg-amber-100" href="/projects#pipeline-projects">
+            <Link className="w-fit rounded-md bg-white px-3 py-2 text-xs font-medium text-amber-900 hover:bg-amber-100" href={hrefWithGateReturn("/projects#pipeline-projects", gateReturn)}>
               查看全部作品
             </Link>
           </div>
@@ -328,7 +341,7 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps) 
         {activePipelineStep ? (
           <div className="mt-3 flex flex-col gap-2 rounded-md bg-slate-50 p-3 text-sm text-slate-600 sm:flex-row sm:items-center sm:justify-between">
             <span>当前只看卡在「{activePipelineStep.label}」的作品。</span>
-            <Link className="w-fit rounded-md border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-100" href="/projects#pipeline-projects">
+            <Link className="w-fit rounded-md border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-100" href={hrefWithGateReturn("/projects#pipeline-projects", gateReturn)}>
               查看全部作品
             </Link>
           </div>
@@ -367,7 +380,7 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps) 
                 {dashboard.items.slice(0, 3).map((item) => (
                   <Link
                     className="rounded-md bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-100"
-                    href={`/projects/${item.id}${entry.projectAnchor}`}
+                    href={hrefWithGateReturn(`/projects/${item.id}${entry.projectAnchor}`, gateReturn)}
                     key={`${entry.id}-${item.id}`}
                   >
                     {entry.actionLabel} · {item.title}
@@ -376,7 +389,7 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps) 
                 {dashboard.items.length === 0 ? (
                   <Link
                     className="rounded-md bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-100"
-                    href="#create-project"
+                    href={hrefWithGateReturn("#create-project", gateReturn, "/projects")}
                   >
                     先创建作品
                   </Link>
@@ -395,7 +408,7 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps) 
             <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
               <div>
                 <div className="flex flex-wrap items-center gap-2">
-                  <Link className="text-lg font-semibold text-slate-950 hover:underline" href={`/projects/${item.id}`}>
+                  <Link className="text-lg font-semibold text-slate-950 hover:underline" href={hrefWithGateReturn(`/projects/${item.id}`, gateReturn)}>
                     {item.title}
                   </Link>
                   <span className="rounded-md bg-slate-100 px-2 py-1 text-xs text-slate-600">{item.healthLabel}</span>
@@ -413,10 +426,10 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps) 
                 ) : null}
               </div>
               <div className="flex flex-wrap gap-2 text-sm">
-                <Link className="rounded-md bg-slate-950 px-3 py-2 font-medium text-white" href={item.nextActionHref}>
+                <Link className="rounded-md bg-slate-950 px-3 py-2 font-medium text-white" href={hrefWithGateReturn(item.nextActionHref, gateReturn)}>
                   {item.nextAction}
                 </Link>
-                <Link className="rounded-md border border-slate-200 px-3 py-2 font-medium hover:bg-slate-50" href={`/projects/${item.id}`}>
+                <Link className="rounded-md border border-slate-200 px-3 py-2 font-medium hover:bg-slate-50" href={hrefWithGateReturn(`/projects/${item.id}`, gateReturn)}>
                   进入工作台
                 </Link>
               </div>
@@ -456,7 +469,7 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps) 
                   <div className="mt-1 font-medium">{item.realSampleValidation.headline}</div>
                   <p className="mt-1 text-xs leading-5 opacity-80">{item.realSampleValidation.detail}</p>
                 </div>
-                <Link className="w-fit rounded-md bg-white px-3 py-2 text-xs font-medium text-slate-950 hover:bg-slate-100" href={item.realSampleValidation.nextActionHref}>
+                <Link className="w-fit rounded-md bg-white px-3 py-2 text-xs font-medium text-slate-950 hover:bg-slate-100" href={hrefWithGateReturn(item.realSampleValidation.nextActionHref, gateReturn)}>
                   {item.realSampleValidation.nextActionLabel}
                 </Link>
               </div>
@@ -507,13 +520,13 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps) 
                     </div>
                   </div>
                 </div>
-                <Link className="w-fit rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white hover:bg-slate-800" href={item.pipelineProof.nextActionHref}>
+                <Link className="w-fit rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white hover:bg-slate-800" href={hrefWithGateReturn(item.pipelineProof.nextActionHref, gateReturn)}>
                   {item.pipelineProof.nextActionLabel}
                 </Link>
               </div>
               <div className="mt-3 grid gap-2 md:grid-cols-3 xl:grid-cols-6">
                 {item.pipelineProof.steps.map((step, index) => (
-                  <Link className={`rounded-md border p-2 text-xs leading-5 ${pipelineStepClass(step.status)}`} href={step.href} key={`${item.id}-${step.id}`}>
+                  <Link className={`rounded-md border p-2 text-xs leading-5 ${pipelineStepClass(step.status)}`} href={hrefWithGateReturn(step.href, gateReturn)} key={`${item.id}-${step.id}`}>
                     <div className="flex items-center justify-between gap-2">
                       <span>{index + 1}. {step.label}</span>
                       <span className="shrink-0 opacity-75">{pipelineStepLabel(step.status)}</span>

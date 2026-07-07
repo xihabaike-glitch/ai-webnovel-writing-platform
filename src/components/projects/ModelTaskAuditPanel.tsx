@@ -223,7 +223,25 @@ function budgetStatusClass(status: ModelTaskAuditDashboard["budgetCenter"]["stat
   return "border-amber-200 bg-amber-50 text-amber-800";
 }
 
-export function ModelTaskAuditPanel({ projectId }: { projectId: string }) {
+function hrefWithGateReturn(href: string, gateReturnHref?: string | null) {
+  if (!gateReturnHref || !href.startsWith("/") || href.startsWith("/gate")) return href;
+
+  const hashIndex = href.indexOf("#");
+  const base = hashIndex >= 0 ? href.slice(0, hashIndex) : href;
+  const hash = hashIndex >= 0 ? href.slice(hashIndex) : "";
+  if (base.includes("gateReturn=")) return href;
+  const separator = base.includes("?") ? "&" : "?";
+
+  return `${base}${separator}gateReturn=${encodeURIComponent(gateReturnHref)}${hash}`;
+}
+
+export function ModelTaskAuditPanel({
+  projectId,
+  gateReturnHref,
+}: {
+  projectId: string;
+  gateReturnHref?: string | null;
+}) {
   const [dashboard, setDashboard] = useState<ModelTaskAuditDashboard | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isSavingBudget, setIsSavingBudget] = useState(false);
@@ -506,7 +524,7 @@ export function ModelTaskAuditPanel({ projectId }: { projectId: string }) {
           <div className="rounded-md border border-slate-200 p-3">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <div className="font-medium text-slate-950">推荐模型路线</div>
-              <a className="text-sm font-medium text-slate-600 hover:text-slate-950" href="/settings/models">
+              <a className="text-sm font-medium text-slate-600 hover:text-slate-950" href={hrefWithGateReturn("/settings/models", gateReturnHref)}>
                 去模型设置应用
               </a>
             </div>

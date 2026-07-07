@@ -130,6 +130,20 @@ export interface DevelopmentOverviewRequirementTraceability {
   items: DevelopmentOverviewRequirementTraceItem[];
 }
 
+export interface DevelopmentOverviewFinalAcceptanceGate {
+  title: string;
+  verdict: string;
+  metrics: {
+    total: number;
+    ready: number;
+    watch: number;
+    blocked: number;
+  };
+  stopRule: string;
+  actionHref: string;
+  actionLabel: string;
+}
+
 export interface DevelopmentOverview {
   referenceCount: number;
   platformScope: typeof platformDeliveryScope;
@@ -151,6 +165,7 @@ export interface DevelopmentOverview {
   pipelineProofRoute: DevelopmentOverviewPipelineProofRoute;
   currentPipelineValidation: DevelopmentOverviewCurrentPipelineValidation;
   requirementTraceability: DevelopmentOverviewRequirementTraceability;
+  finalAcceptanceGate: DevelopmentOverviewFinalAcceptanceGate;
   nextActions: DevelopmentOverviewAction[];
 }
 
@@ -570,7 +585,30 @@ function buildRequirementTraceability(): DevelopmentOverviewRequirementTraceabil
   };
 }
 
+function buildFinalAcceptanceGate(
+  deliveryAudit: DevelopmentOverviewDeliveryAudit,
+  currentPipelineValidation: DevelopmentOverviewCurrentPipelineValidation,
+): DevelopmentOverviewFinalAcceptanceGate {
+  const { summary } = deliveryAudit;
+
+  return {
+    title: "产品最终验收闸门",
+    verdict: summary.blocked > 0
+      ? `还有 ${summary.blocked} 项阻塞，先修复阻塞项，再验真实流水线。`
+      : summary.watch > 0
+        ? `${summary.ready}/${summary.total} 项已覆盖，${summary.watch} 项观察中；最终验收要先跑通真实流水线。`
+        : `${summary.ready}/${summary.total} 项已覆盖，可以进入真实流水线复盘验收。`,
+    metrics: summary,
+    stopRule: "不要新增平台、不要堆演示页；没有真实作品流水线证据，就不能宣称产品完成。",
+    actionHref: currentPipelineValidation.actionHref,
+    actionLabel: currentPipelineValidation.actionLabel,
+  };
+}
+
 export function buildDevelopmentOverview(): DevelopmentOverview {
+  const deliveryAudit = buildDeliveryAudit();
+  const currentPipelineValidation = buildCurrentPipelineValidation();
+
   return {
     referenceCount: openSourceReferenceCases.length,
     platformScope: platformDeliveryScope,
@@ -588,10 +626,11 @@ export function buildDevelopmentOverview(): DevelopmentOverview {
     },
     docSections,
     treeWorkflow,
-    deliveryAudit: buildDeliveryAudit(),
+    deliveryAudit,
     pipelineProofRoute: buildPipelineProofRoute(),
-    currentPipelineValidation: buildCurrentPipelineValidation(),
+    currentPipelineValidation,
     requirementTraceability: buildRequirementTraceability(),
+    finalAcceptanceGate: buildFinalAcceptanceGate(deliveryAudit, currentPipelineValidation),
     nextActions: [
       {
         label: "从作品工作台验收真实写作流程",

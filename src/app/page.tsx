@@ -30,6 +30,41 @@ export default function HomePage() {
           </div>
         </div>
 
+        <section className="rounded-md border border-slate-200 bg-white p-4">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <div className="text-xs font-medium text-slate-500">毒舌 PM 总闸门</div>
+              <h2 className="mt-1 font-medium text-slate-950">{overview.finalAcceptanceGate.title}</h2>
+              <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">{overview.finalAcceptanceGate.verdict}</p>
+              <p className="mt-2 text-xs leading-5 text-rose-700">{overview.finalAcceptanceGate.stopRule}</p>
+            </div>
+            <Link
+              className="inline-flex w-fit shrink-0 rounded-md bg-slate-950 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
+              href={overview.finalAcceptanceGate.actionHref}
+            >
+              {overview.finalAcceptanceGate.actionLabel}
+            </Link>
+          </div>
+          <div className="mt-4 grid gap-2 sm:grid-cols-4">
+            <div className="rounded-md bg-slate-100 p-3 text-sm">
+              <div className="text-xs text-slate-500">验收项</div>
+              <div className="mt-1 font-semibold text-slate-950">{overview.finalAcceptanceGate.metrics.total}</div>
+            </div>
+            <div className="rounded-md bg-emerald-50 p-3 text-sm text-emerald-900">
+              <div className="text-xs opacity-75">已覆盖</div>
+              <div className="mt-1 font-semibold">{overview.finalAcceptanceGate.metrics.ready}</div>
+            </div>
+            <div className="rounded-md bg-amber-50 p-3 text-sm text-amber-900">
+              <div className="text-xs opacity-75">观察中</div>
+              <div className="mt-1 font-semibold">{overview.finalAcceptanceGate.metrics.watch}</div>
+            </div>
+            <div className="rounded-md bg-rose-50 p-3 text-sm text-rose-900">
+              <div className="text-xs opacity-75">阻塞</div>
+              <div className="mt-1 font-semibold">{overview.finalAcceptanceGate.metrics.blocked}</div>
+            </div>
+          </div>
+        </section>
+
         <section className="grid gap-3 md:grid-cols-3">
           <div className="rounded-md border border-slate-200 bg-white p-4">
             <div className="text-xs text-slate-500">平台范围</div>

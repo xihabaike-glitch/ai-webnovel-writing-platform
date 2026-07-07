@@ -231,4 +231,17 @@ test("buildDevelopmentOverview", async (t) => {
     assert.ok(treeMethod?.acceptanceSignal.includes("开头"));
     assert.ok(treeMethod?.acceptanceSignal.includes("土壤"));
   });
+
+  await t.test("builds a final product acceptance gate for the home page", () => {
+    const overview = buildDevelopmentOverview();
+
+    assert.equal(overview.finalAcceptanceGate.title, "产品最终验收闸门");
+    assert.ok(overview.finalAcceptanceGate.verdict.includes("真实流水线"));
+    assert.equal(overview.finalAcceptanceGate.metrics.ready, overview.deliveryAudit.summary.ready);
+    assert.equal(overview.finalAcceptanceGate.metrics.watch, overview.deliveryAudit.summary.watch);
+    assert.equal(overview.finalAcceptanceGate.metrics.blocked, overview.deliveryAudit.summary.blocked);
+    assert.equal(overview.finalAcceptanceGate.actionHref, overview.currentPipelineValidation.actionHref);
+    assert.equal(overview.finalAcceptanceGate.actionLabel, overview.currentPipelineValidation.actionLabel);
+    assert.ok(overview.finalAcceptanceGate.stopRule.includes("不要新增平台"));
+  });
 });

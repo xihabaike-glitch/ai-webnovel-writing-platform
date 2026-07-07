@@ -105,6 +105,17 @@ function nextState(state: GatePlatformGrowthDispatchState): GatePlatformGrowthDi
   return "assigned";
 }
 
+function projectIdFromFirstDayDispatchKey(dispatchKey: string) {
+  const match = dispatchKey.match(/^first-day:([^:]+):/);
+  return match?.[1] ?? null;
+}
+
+function dispatchGateRecheckHref(task: PersistedGatePlatformDispatchTask) {
+  const projectId = projectIdFromFirstDayDispatchKey(task.dispatchKey);
+  if (!projectId) return "/gate#gate-focus-notice";
+  return `/gate?focus=action-recheck&actionId=project-acceptance:${encodeURIComponent(projectId)}#gate-focus-notice`;
+}
+
 function routeFlowLaneClass(laneId: RouteConfirmationDispatchFlowLaneId) {
   if (laneId === "needs_governance") return "border-amber-200 bg-amber-50 text-amber-900";
   if (laneId === "waiting_recheck") return "border-sky-200 bg-sky-50 text-sky-900";
@@ -1814,6 +1825,11 @@ export function GateDispatchTaskCenter({
                           <span className="rounded-md bg-white px-2 py-1 font-medium text-emerald-900" key={chip}>{chip}</span>
                         ))}
                       </div>
+                    ) : null}
+                    {task.state === "completed" ? (
+                      <Link className="mt-2 inline-flex rounded-md bg-white px-3 py-2 text-xs font-medium text-emerald-900 hover:bg-emerald-100" href={dispatchGateRecheckHref(task)}>
+                        回总闸门复检
+                      </Link>
                     ) : null}
                   </div>
                 ) : null}

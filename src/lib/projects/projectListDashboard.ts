@@ -121,6 +121,7 @@ export interface ProjectListPipelineProofSummary {
     count: number;
     href: string;
     filterHref: string;
+    validationReceipt: ProjectListPipelineValidationReceipt;
   }>;
 }
 
@@ -593,6 +594,7 @@ function buildPipelineProofSummary(items: ProjectListItem[]): ProjectListPipelin
     href: step.href,
     filterHref: `/projects?pipelineStep=${step.id}#pipeline-projects`,
     count: items.filter((item) => item.pipelineProof.currentStepId === step.id).length,
+    validationReceipt: buildPipelineValidationReceipt(step),
   }));
   const bottleneckSeed = stepCounts[0] ?? {
     id: "project_start",

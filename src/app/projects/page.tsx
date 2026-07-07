@@ -95,6 +95,7 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps) 
   const dashboard = buildProjectListDashboard(projects, providers);
   const pipelineStepParam = firstValue(params?.pipelineStep);
   const activePipelineStep = dashboard.pipelineProofSummary.stepCounts.find((step) => step.id === pipelineStepParam) ?? null;
+  const activePipelineValidationReceipt = activePipelineStep?.validationReceipt ?? dashboard.pipelineProofSummary.validationReceipt;
   const visibleItems = activePipelineStep
     ? dashboard.items.filter((item) => item.pipelineProof.currentStepId === activePipelineStep.id)
     : dashboard.items;
@@ -200,10 +201,10 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps) 
         <div className="mt-3 grid gap-3 lg:grid-cols-[1.1fr_0.9fr]">
           <div className="rounded-md border border-slate-200 bg-slate-50 p-3 text-sm leading-6 text-slate-700">
             <div className="text-xs font-medium text-slate-500">组合级验收回执</div>
-            <div className="mt-1 font-medium text-slate-950">{dashboard.pipelineProofSummary.validationReceipt.headline}</div>
-            <p className="mt-1 text-xs leading-5 text-slate-600">{dashboard.pipelineProofSummary.validationReceipt.proofPrompt}</p>
+            <div className="mt-1 font-medium text-slate-950">{activePipelineValidationReceipt.headline}</div>
+            <p className="mt-1 text-xs leading-5 text-slate-600">{activePipelineValidationReceipt.proofPrompt}</p>
             <div className="mt-2 grid gap-1 text-xs">
-              {dashboard.pipelineProofSummary.validationReceipt.requiredEvidence.map((evidence) => (
+              {activePipelineValidationReceipt.requiredEvidence.map((evidence) => (
                 <span key={evidence}>必须看到：{evidence}</span>
               ))}
             </div>
@@ -211,7 +212,7 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps) 
           <div className="rounded-md border border-rose-100 bg-rose-50 p-3 text-xs leading-5 text-rose-800">
             <div className="font-medium">缺失就停手</div>
             <div className="mt-2 grid gap-1">
-              {dashboard.pipelineProofSummary.validationReceipt.stopIfMissing.map((rule) => (
+              {activePipelineValidationReceipt.stopIfMissing.map((rule) => (
                 <span key={rule}>{rule}</span>
               ))}
             </div>

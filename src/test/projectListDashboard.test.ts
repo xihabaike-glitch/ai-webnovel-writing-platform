@@ -481,4 +481,23 @@ test("buildProjectListDashboard", async (t) => {
     assert.ok(dashboard.pipelineProofSummary.validationReceipt.requiredEvidence.some((item) => item.includes("目标平台")));
     assert.ok(dashboard.pipelineProofSummary.validationReceipt.stopIfMissing.some((item) => item.includes("停在作品工作台")));
   });
+
+  await t.test("keeps a validation receipt on each portfolio pipeline filter", () => {
+    const dashboard = buildProjectListDashboard([emptyProject, completeProject, handoffBlockedProject], [
+      {
+        id: "provider-1",
+        providerId: "mock",
+        displayName: "Mock",
+        defaultModel: "mock-novel",
+        enabled: true,
+        encryptedApiKey: "secret",
+      },
+    ]);
+    const taskDispatchFilter = dashboard.pipelineProofSummary.stepCounts.find((step) => step.id === "task_dispatch");
+
+    assert.equal(taskDispatchFilter?.validationReceipt.stepId, "task_dispatch");
+    assert.ok(taskDispatchFilter?.validationReceipt.headline.includes("任务与派单回执"));
+    assert.ok(taskDispatchFilter?.validationReceipt.proofPrompt.includes("完成依据"));
+    assert.ok(taskDispatchFilter?.validationReceipt.stopIfMissing.some((item) => item.includes("派单中心")));
+  });
 });

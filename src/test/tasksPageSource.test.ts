@@ -27,3 +27,11 @@ test("tasks page shows invalid cleared debt feedback", () => {
   assert.ok(source.includes("查看阻塞清债"));
   assert.ok(source.includes("href=\"/tasks?view=blocked#task-debt\""));
 });
+
+test("tasks page shows invalid batch strategy feedback", () => {
+  assert.ok(source.includes("invalidBatchStrategyNotice"));
+  assert.ok(source.includes("batchStrategyParam ? `批量策略「${batchStrategyParam}」不存在，已回退到标准档。` : null"));
+  assert.ok(source.includes("批量策略已回退"));
+  assert.ok(source.includes("查看标准档"));
+  assert.ok(source.includes("href=\"/tasks?batchStrategy=standard\""));
+});

@@ -223,6 +223,10 @@ function isDebtBlockerType(value: string | undefined) {
   return value === undefined || debtBlockerType(value) !== null;
 }
 
+function isBatchExecutionStrategy(value: string | undefined) {
+  return value === undefined || batchExecutionStrategies.some((strategy) => strategy.id === value);
+}
+
 function debtFocusNoticeClass(tone: "reduced" | "cleared" | "unchanged") {
   if (tone === "cleared") return "border-emerald-200 bg-emerald-50 text-emerald-900";
   if (tone === "reduced") return "border-cyan-200 bg-cyan-50 text-cyan-900";
@@ -244,7 +248,11 @@ function resumeStabilityClass(tone: "ready" | "watch" | "blocked") {
 
 export default async function TasksPage({ searchParams }: { searchParams?: Promise<{ batchStrategy?: string; batchContext?: string; view?: string; debt?: string; cleared?: string; previousDebt?: string }> }) {
   const resolvedSearchParams = searchParams ? await searchParams : {};
-  const activeStrategy = getBatchExecutionStrategy(resolvedSearchParams.batchStrategy);
+  const batchStrategyParam = resolvedSearchParams.batchStrategy;
+  const activeStrategy = getBatchExecutionStrategy(batchStrategyParam);
+  const invalidBatchStrategyNotice = isBatchExecutionStrategy(batchStrategyParam)
+    ? null
+    : batchStrategyParam ? `批量策略「${batchStrategyParam}」不存在，已回退到标准档。` : null;
   const activeBatchContext = taskQueueBatchExecutionContext(resolvedSearchParams.batchContext);
   const viewParam = resolvedSearchParams.view;
   const activeView = viewParam === "blocked" ? "blocked" : "all";
@@ -566,6 +574,20 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
             </div>
             <Link className="w-fit rounded-md bg-white px-3 py-2 text-sm font-medium text-amber-950 hover:bg-amber-100" href="/tasks?view=blocked#task-debt">
               查看阻塞清债
+            </Link>
+          </div>
+        </section>
+      ) : null}
+
+      {invalidBatchStrategyNotice ? (
+        <section className="mb-6 rounded-md border border-amber-200 bg-amber-50 p-4 text-amber-900">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <div className="font-medium">批量策略已回退</div>
+              <p className="mt-1 text-sm leading-6">{invalidBatchStrategyNotice}</p>
+            </div>
+            <Link className="w-fit rounded-md bg-white px-3 py-2 text-sm font-medium text-amber-950 hover:bg-amber-100" href="/tasks?batchStrategy=standard">
+              查看标准档
             </Link>
           </div>
         </section>

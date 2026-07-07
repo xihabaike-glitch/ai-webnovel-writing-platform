@@ -66,10 +66,24 @@ function flowToneClass(tone: StoryTreeExperienceFlowTone) {
   return "bg-slate-100 text-slate-700";
 }
 
+function hrefWithGateReturn(href: string, gateReturnHref?: string | null, projectId?: string) {
+  const normalizedHref = gateReturnHref && href.startsWith("#") && projectId ? `/projects/${projectId}${href}` : href;
+  if (!gateReturnHref || !normalizedHref.startsWith("/") || normalizedHref.startsWith("/gate")) return normalizedHref;
+
+  const hashIndex = normalizedHref.indexOf("#");
+  const base = hashIndex >= 0 ? normalizedHref.slice(0, hashIndex) : normalizedHref;
+  const hash = hashIndex >= 0 ? normalizedHref.slice(hashIndex) : "";
+  if (base.includes("gateReturn=")) return normalizedHref;
+  const separator = base.includes("?") ? "&" : "?";
+
+  return `${base}${separator}gateReturn=${encodeURIComponent(gateReturnHref)}${hash}`;
+}
+
 export function StoryTreeExperiencePanel({
   appliedDispatches = [],
   effectDashboard,
   flow,
+  gateReturnHref,
   guide,
   projectId,
   reviewBacklog,
@@ -77,6 +91,7 @@ export function StoryTreeExperiencePanel({
   appliedDispatches?: AppliedStoryTreeExperienceDispatch[];
   effectDashboard: StoryTreeExperienceEffectDashboard;
   flow: StoryTreeExperienceFlow;
+  gateReturnHref?: string | null;
   guide: StoryTreeExperienceGuide;
   projectId: string;
   reviewBacklog: StoryTreeExperienceReviewBacklog;
@@ -180,7 +195,7 @@ export function StoryTreeExperiencePanel({
         </div>
         <Link
           className="w-fit rounded-md border border-slate-200 px-3 py-2 text-sm font-medium hover:bg-slate-50"
-          href="/dispatch"
+          href={hrefWithGateReturn("/dispatch", gateReturnHref, projectId)}
         >
           查看派单
         </Link>
@@ -196,7 +211,7 @@ export function StoryTreeExperiencePanel({
           {flow.nextHref ? (
             <Link
               className="w-fit rounded-md bg-slate-950 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800"
-              href={flow.nextHref}
+              href={hrefWithGateReturn(flow.nextHref, gateReturnHref, projectId)}
             >
               处理卡点
             </Link>
@@ -259,7 +274,7 @@ export function StoryTreeExperiencePanel({
               {reviewBacklog.nextItem ? (
                 <Link
                   className="w-fit rounded-md bg-slate-950 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800"
-                  href={reviewBacklog.nextItem.href}
+                  href={hrefWithGateReturn(reviewBacklog.nextItem.href, gateReturnHref, projectId)}
                 >
                   去复盘
                 </Link>
@@ -271,7 +286,7 @@ export function StoryTreeExperiencePanel({
                   <span className={`rounded-md px-2 py-1 text-xs font-medium ${statusClass(item.status)}`}>
                     {statusLabel(item.status)}
                   </span>
-                  <Link className="font-medium text-slate-950 hover:underline" href={item.href}>
+                  <Link className="font-medium text-slate-950 hover:underline" href={hrefWithGateReturn(item.href, gateReturnHref, projectId)}>
                     {item.axisLabel}｜{item.title}
                   </Link>
                   {item.sourceScore !== null ? <span className="text-xs text-slate-500">原分 {item.sourceScore}</span> : null}
@@ -296,7 +311,7 @@ export function StoryTreeExperiencePanel({
             <div className="mt-2 grid gap-2 text-sm text-slate-600">
               {effectDashboard.reusableItems.map((item) => (
                 <div className="flex flex-wrap items-center gap-2" key={item.id}>
-                  <Link className="hover:text-slate-950 hover:underline" href={item.href}>
+                  <Link className="hover:text-slate-950 hover:underline" href={hrefWithGateReturn(item.href, gateReturnHref, projectId)}>
                     {decisionItemLine(item)}
                   </Link>
                   <AppliedDispatchBadge dispatch={appliedDispatch(item)} />
@@ -320,7 +335,7 @@ export function StoryTreeExperiencePanel({
             <div className="mt-2 grid gap-2 text-sm text-slate-600">
               {effectDashboard.avoidItems.map((item) => (
                 <div className="flex flex-wrap items-center gap-2" key={item.id}>
-                  <Link className="hover:text-slate-950 hover:underline" href={item.href}>
+                  <Link className="hover:text-slate-950 hover:underline" href={hrefWithGateReturn(item.href, gateReturnHref, projectId)}>
                     {decisionItemLine(item)}
                   </Link>
                   <AppliedDispatchBadge dispatch={appliedDispatch(item)} />
@@ -344,7 +359,7 @@ export function StoryTreeExperiencePanel({
             <div className="mt-2 grid gap-2 text-sm text-slate-600">
               {effectDashboard.watchItems.map((item) => (
                 <div className="flex flex-wrap items-center gap-2" key={item.id}>
-                  <Link className="hover:text-slate-950 hover:underline" href={item.href}>
+                  <Link className="hover:text-slate-950 hover:underline" href={hrefWithGateReturn(item.href, gateReturnHref, projectId)}>
                     {decisionItemLine(item)}
                   </Link>
                   <AppliedDispatchBadge dispatch={appliedDispatch(item)} />
@@ -397,7 +412,7 @@ export function StoryTreeExperiencePanel({
                 >
                   {runningKey === item.dispatchKey ? "生成中" : appliedDispatch(item) ? appliedStateLabel(appliedDispatch(item)!) : actionLabel(item.status)}
                 </button>
-                <Link className="font-medium text-slate-950 hover:underline" href={item.href}>
+                <Link className="font-medium text-slate-950 hover:underline" href={hrefWithGateReturn(item.href, gateReturnHref, projectId)}>
                   回到章节
                 </Link>
               </div>

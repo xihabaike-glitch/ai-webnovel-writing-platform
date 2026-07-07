@@ -702,6 +702,7 @@ export default async function ProjectPage({
           appliedDispatches={appliedStoryTreeExperienceItems}
           effectDashboard={storyTreeExperienceEffectDashboard}
           flow={storyTreeExperienceFlow}
+          gateReturnHref={gateReturn}
           guide={storyTreeExperience}
           projectId={project.id}
           reviewBacklog={storyTreeExperienceReviewBacklog}
@@ -775,7 +776,7 @@ export default async function ProjectPage({
           </div>
         </div>
         <div id="serialization-ops">
-          <SerializationOpsPanel projectId={project.id} />
+          <SerializationOpsPanel gateReturnHref={gateReturn} projectId={project.id} />
         </div>
         <PlatformDecisionTimelinePanel gateReturnHref={gateReturn} timeline={platformDecisionTimeline} />
         <div id="platform-tactic-experience">

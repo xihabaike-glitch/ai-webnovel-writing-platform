@@ -247,6 +247,19 @@ function projectHref(projectId: string, href: string) {
   return href.startsWith("#") ? `/projects/${projectId}${href}` : href;
 }
 
+function hrefWithGateReturn(href: string, gateReturnHref?: string | null, projectId?: string) {
+  const normalizedHref = gateReturnHref && href.startsWith("#") && projectId ? `/projects/${projectId}${href}` : href;
+  if (!gateReturnHref || !normalizedHref.startsWith("/") || normalizedHref.startsWith("/gate") || normalizedHref.startsWith("/api/")) return normalizedHref;
+
+  const hashIndex = normalizedHref.indexOf("#");
+  const base = hashIndex >= 0 ? normalizedHref.slice(0, hashIndex) : normalizedHref;
+  const hash = hashIndex >= 0 ? normalizedHref.slice(hashIndex) : "";
+  if (base.includes("gateReturn=")) return normalizedHref;
+  const separator = base.includes("?") ? "&" : "?";
+
+  return `${base}${separator}gateReturn=${encodeURIComponent(gateReturnHref)}${hash}`;
+}
+
 function triggerDownload(href: string) {
   const link = document.createElement("a");
   link.href = href;
@@ -279,7 +292,13 @@ function checklistRepairTarget(itemId: string) {
   return targets[itemId] ?? { href: "#submission-package", label: "查看投稿包" };
 }
 
-export function SerializationOpsPanel({ projectId }: { projectId: string }) {
+export function SerializationOpsPanel({
+  gateReturnHref,
+  projectId,
+}: {
+  gateReturnHref?: string | null;
+  projectId: string;
+}) {
   const [dashboard, setDashboard] = useState<SerializationOpsDashboard | null>(null);
   const [checklist, setChecklist] = useState<SubmissionChecklist | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -338,7 +357,7 @@ export function SerializationOpsPanel({ projectId }: { projectId: string }) {
       if (action.afterSuccess?.behavior === "download") {
         triggerDownload(action.afterSuccess.href);
       } else if (action.afterSuccess?.behavior === "navigate") {
-        window.location.href = projectHref(projectId, action.afterSuccess.href);
+        window.location.href = hrefWithGateReturn(projectHref(projectId, action.afterSuccess.href), gateReturnHref, projectId);
       }
       setMessage(action.afterSuccess
         ? afterSuccessMessage(action.afterSuccess)
@@ -535,7 +554,7 @@ export function SerializationOpsPanel({ projectId }: { projectId: string }) {
               {message.hrefLabel ?? "下载"}
             </a>
           ) : message.href ? (
-            <Link className="rounded-md border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50" href={projectHref(projectId, message.href)}>
+            <Link className="rounded-md border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50" href={hrefWithGateReturn(projectHref(projectId, message.href), gateReturnHref, projectId)}>
               {message.hrefLabel ?? "去处理"}
             </Link>
           ) : null}
@@ -576,14 +595,14 @@ export function SerializationOpsPanel({ projectId }: { projectId: string }) {
                     ) : action.href ? (
                       <Link
                         className="rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white hover:bg-slate-800"
-                        href={projectHref(projectId, action.href)}
+                        href={hrefWithGateReturn(projectHref(projectId, action.href), gateReturnHref, projectId)}
                         onClick={() => markActionHrefClick(action)}
                       >
                         {action.hrefLabel ?? "去处理"}
                       </Link>
                     ) : null}
                     {action.chapterId ? (
-                      <Link className="rounded-md border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50" href={`/projects/${projectId}/chapters/${action.chapterId}`}>
+                      <Link className="rounded-md border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50" href={hrefWithGateReturn(`/projects/${projectId}/chapters/${action.chapterId}`, gateReturnHref, projectId)}>
                         打开章节
                       </Link>
                     ) : null}
@@ -615,7 +634,7 @@ export function SerializationOpsPanel({ projectId }: { projectId: string }) {
                   <div className="text-xs text-slate-500">投稿资产状态</div>
                   <div className="mt-1 font-medium text-slate-950">{assetStatusLabel(dashboard.submissionAssetStatus.status)}</div>
                 </div>
-                <Link className="rounded-md border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50" href={projectHref(projectId, dashboard.submissionAssetStatus.href)}>
+                <Link className="rounded-md border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50" href={hrefWithGateReturn(projectHref(projectId, dashboard.submissionAssetStatus.href), gateReturnHref, projectId)}>
                   {dashboard.submissionAssetStatus.actionLabel}
                 </Link>
               </div>
@@ -636,7 +655,7 @@ export function SerializationOpsPanel({ projectId }: { projectId: string }) {
                   </div>
                   <Link
                     className="rounded-md border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
-                    href={projectHref(projectId, dashboard.submissionAssetCandidates.href)}
+                    href={hrefWithGateReturn(projectHref(projectId, dashboard.submissionAssetCandidates.href), gateReturnHref, projectId)}
                   >
                     候选工作区
                   </Link>
@@ -709,7 +728,7 @@ export function SerializationOpsPanel({ projectId }: { projectId: string }) {
                 ) : (
                   <Link
                     className="rounded-md border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
-                    href={projectHref(projectId, dashboard.publishBaselineStatus.href)}
+                    href={hrefWithGateReturn(projectHref(projectId, dashboard.publishBaselineStatus.href), gateReturnHref, projectId)}
                   >
                     {dashboard.publishBaselineStatus.actionLabel}
                   </Link>
@@ -753,13 +772,13 @@ export function SerializationOpsPanel({ projectId }: { projectId: string }) {
               <div className="mt-3 flex flex-wrap gap-2">
                 <Link
                   className="rounded-md border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
-                  href={projectHref(projectId, dashboard.publishEffectStatus.href)}
+                  href={hrefWithGateReturn(projectHref(projectId, dashboard.publishEffectStatus.href), gateReturnHref, projectId)}
                 >
                   {dashboard.publishEffectStatus.actionLabel}
                 </Link>
                 <Link
                   className="rounded-md border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
-                  href={`/projects/${projectId}#publish-effect-panel`}
+                  href={hrefWithGateReturn(`/projects/${projectId}#publish-effect-panel`, gateReturnHref, projectId)}
                 >
                   效果面板
                 </Link>
@@ -788,7 +807,7 @@ export function SerializationOpsPanel({ projectId }: { projectId: string }) {
                         ) : null}
                         <Link
                           className="inline-flex rounded-md border border-slate-200 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
-                          href={projectHref(projectId, action.href)}
+                          href={hrefWithGateReturn(projectHref(projectId, action.href), gateReturnHref, projectId)}
                         >
                           {action.execution ? "打开工作区" : action.actionLabel}
                         </Link>
@@ -808,7 +827,7 @@ export function SerializationOpsPanel({ projectId }: { projectId: string }) {
                 </div>
                 <Link
                   className="rounded-md border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
-                  href={`/projects/${projectId}#package-version-history`}
+                  href={hrefWithGateReturn(`/projects/${projectId}#package-version-history`, gateReturnHref, projectId)}
                 >
                   全部版本
                 </Link>
@@ -876,7 +895,7 @@ export function SerializationOpsPanel({ projectId }: { projectId: string }) {
                   <div className="font-medium text-slate-950">{item.label}</div>
                   <Link
                     className="rounded-md border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
-                    href={projectHref(projectId, checklistRepairTarget(item.id).href)}
+                    href={hrefWithGateReturn(projectHref(projectId, checklistRepairTarget(item.id).href), gateReturnHref, projectId)}
                   >
                     {checklistRepairTarget(item.id).label}
                   </Link>

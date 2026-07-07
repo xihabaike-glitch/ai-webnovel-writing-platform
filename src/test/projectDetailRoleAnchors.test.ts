@@ -169,6 +169,37 @@ test("project detail page carries gate return through chapter production links",
   assert.ok(chapterProductionPanel.includes("href={hrefWithGateReturn(`/projects/${projectId}/chapters/${item.chapterId}`, gateReturnHref)}"));
 });
 
+test("project detail page carries gate return through story experience and serialization links", () => {
+  const projectPage = readFileSync("src/app/projects/[projectId]/page.tsx", "utf8");
+  const storyTreeExperiencePanel = readFileSync("src/components/projects/StoryTreeExperiencePanel.tsx", "utf8");
+  const serializationOpsPanel = readFileSync("src/components/projects/SerializationOpsPanel.tsx", "utf8");
+
+  assert.ok(projectPage.includes("gateReturnHref={gateReturn}\n          guide={storyTreeExperience}"));
+  assert.ok(projectPage.includes("<SerializationOpsPanel gateReturnHref={gateReturn} projectId={project.id} />"));
+
+  assert.ok(storyTreeExperiencePanel.includes("gateReturnHref?: string | null"));
+  assert.ok(storyTreeExperiencePanel.includes("function hrefWithGateReturn"));
+  assert.ok(storyTreeExperiencePanel.includes("href={hrefWithGateReturn(\"/dispatch\", gateReturnHref, projectId)}"));
+  assert.ok(storyTreeExperiencePanel.includes("href={hrefWithGateReturn(flow.nextHref, gateReturnHref, projectId)}"));
+  assert.ok(storyTreeExperiencePanel.includes("href={hrefWithGateReturn(reviewBacklog.nextItem.href, gateReturnHref, projectId)}"));
+  assert.ok(storyTreeExperiencePanel.includes("href={hrefWithGateReturn(item.href, gateReturnHref, projectId)}"));
+
+  assert.ok(serializationOpsPanel.includes("gateReturnHref?: string | null"));
+  assert.ok(serializationOpsPanel.includes("function hrefWithGateReturn"));
+  assert.ok(serializationOpsPanel.includes("window.location.href = hrefWithGateReturn(projectHref(projectId, action.afterSuccess.href), gateReturnHref, projectId);"));
+  assert.ok(serializationOpsPanel.includes("href={hrefWithGateReturn(projectHref(projectId, message.href), gateReturnHref, projectId)}"));
+  assert.ok(serializationOpsPanel.includes("href={hrefWithGateReturn(projectHref(projectId, action.href), gateReturnHref, projectId)}"));
+  assert.ok(serializationOpsPanel.includes("href={hrefWithGateReturn(`/projects/${projectId}/chapters/${action.chapterId}`, gateReturnHref, projectId)}"));
+  assert.ok(serializationOpsPanel.includes("href={hrefWithGateReturn(projectHref(projectId, dashboard.submissionAssetStatus.href), gateReturnHref, projectId)}"));
+  assert.ok(serializationOpsPanel.includes("href={hrefWithGateReturn(projectHref(projectId, dashboard.submissionAssetCandidates.href), gateReturnHref, projectId)}"));
+  assert.ok(serializationOpsPanel.includes("href={hrefWithGateReturn(projectHref(projectId, dashboard.publishBaselineStatus.href), gateReturnHref, projectId)}"));
+  assert.ok(serializationOpsPanel.includes("href={hrefWithGateReturn(projectHref(projectId, dashboard.publishEffectStatus.href), gateReturnHref, projectId)}"));
+  assert.ok(serializationOpsPanel.includes("href={hrefWithGateReturn(`/projects/${projectId}#publish-effect-panel`, gateReturnHref, projectId)}"));
+  assert.ok(serializationOpsPanel.includes("href={hrefWithGateReturn(projectHref(projectId, action.href), gateReturnHref, projectId)}"));
+  assert.ok(serializationOpsPanel.includes("href={hrefWithGateReturn(`/projects/${projectId}#package-version-history`, gateReturnHref, projectId)}"));
+  assert.ok(serializationOpsPanel.includes("href={hrefWithGateReturn(projectHref(projectId, checklistRepairTarget(item.id).href), gateReturnHref, projectId)}"));
+});
+
 test("chapter detail page keeps a gate recheck return path visible", () => {
   const chapterPage = readFileSync("src/app/projects/[projectId]/chapters/[chapterId]/page.tsx", "utf8");
 

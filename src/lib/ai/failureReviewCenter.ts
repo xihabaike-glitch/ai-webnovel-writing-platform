@@ -75,6 +75,16 @@ export interface FailureRepairLane {
   };
 }
 
+export interface FailureReviewPmFocus {
+  tone: "blocked" | "watch" | "ready";
+  resumePolicy: "hold_batch" | "sample_only" | "watch_resume";
+  headline: string;
+  detail: string;
+  proof: string;
+  actionLabel: string;
+  actionHref: string;
+}
+
 export interface FailureReviewCenter {
   summary: {
     totalFailures: number;
@@ -90,6 +100,7 @@ export interface FailureReviewCenter {
   taskTypeGroups: FailureGroup[];
   projectGroups: FailureGroup[];
   repairLanes: FailureRepairLane[];
+  pmFocus: FailureReviewPmFocus;
   recentFailures: FailureReviewItem[];
   nextActions: string[];
 }
@@ -326,6 +337,49 @@ function nextActions(items: FailureReviewItem[], categoryGroups: FailureGroup[],
   return actions.slice(0, 5);
 }
 
+function buildFailureReviewPmFocus(
+  unresolvedFailures: FailureReviewItem[],
+  recoveredFailures: number,
+  repairLanes: FailureRepairLane[],
+): FailureReviewPmFocus {
+  const topLane = repairLanes[0];
+  if (topLane) {
+    const retryOnly = topLane.id === "retry_sample";
+
+    return {
+      tone: retryOnly ? "watch" : "blocked",
+      resumePolicy: retryOnly ? "sample_only" : "hold_batch",
+      headline: `当前先处理：${topLane.label}`,
+      detail: `${topLane.detail} 修完前不恢复批量；只允许按这条泳道处理样本和复检证据。`,
+      proof: `${topLane.priorityLabel} · ${topLane.count} 个未恢复失败 · ${topLane.evidence.join("、") || "等待修复证据"}`,
+      actionLabel: topLane.actionLabel,
+      actionHref: topLane.href,
+    };
+  }
+
+  if (recoveredFailures > 0) {
+    return {
+      tone: "ready",
+      resumePolicy: "watch_resume",
+      headline: "未恢复失败已清空，恢复生产先看样本。",
+      detail: `${recoveredFailures} 个历史失败已有恢复证据；恢复批量前先跑单章样本和小批量观察，不要直接放大。`,
+      proof: "未恢复失败 0 个；恢复节奏仍需观察失败率、成本和质量分。",
+      actionLabel: "去任务中心",
+      actionHref: "/tasks",
+    };
+  }
+
+  return {
+    tone: "ready",
+    resumePolicy: "watch_resume",
+    headline: "当前没有失败阻塞，继续观察生产节奏。",
+    detail: "暂无失败任务；继续保留错误原因、成本和恢复证据，后续批量生产仍按小样本放大。",
+    proof: "未恢复失败 0 个；失败中心暂无待修复泳道。",
+    actionLabel: "去任务中心",
+    actionHref: "/tasks",
+  };
+}
+
 export function buildFailureReviewCenter(tasks: FailureReviewTask[]): FailureReviewCenter {
   const failures = tasks
     .filter((task) => task.status === "failed")
@@ -382,6 +436,7 @@ export function buildFailureReviewCenter(tasks: FailureReviewTask[]): FailureRev
     (item) => item.projectTitle,
     () => "回到项目工作台，先单章重试失败任务，不要直接批量扩大。",
   );
+  const repairLanes = buildRepairLanes(unresolvedFailures);
 
   return {
     summary: {
@@ -397,7 +452,8 @@ export function buildFailureReviewCenter(tasks: FailureReviewTask[]): FailureRev
     providerGroups,
     taskTypeGroups,
     projectGroups,
-    repairLanes: buildRepairLanes(unresolvedFailures),
+    repairLanes,
+    pmFocus: buildFailureReviewPmFocus(unresolvedFailures, recoveredFailures, repairLanes),
     recentFailures: failures.slice(0, 12),
     nextActions: nextActions(unresolvedFailures, categoryGroups, providerGroups, recoveredFailures),
   };

@@ -140,6 +140,13 @@ test("buildFailureReviewCenter", async (t) => {
     ]);
 
     assert.deepEqual(center.repairLanes.map((lane) => lane.id), ["config", "prompt_context", "retry_sample", "manual_review"]);
+    assert.equal(center.pmFocus.tone, "blocked");
+    assert.equal(center.pmFocus.resumePolicy, "hold_batch");
+    assert.ok(center.pmFocus.headline.includes("先修模型配置"));
+    assert.ok(center.pmFocus.detail.includes("修完前不恢复批量"));
+    assert.equal(center.pmFocus.actionLabel, "去模型设置");
+    assert.equal(center.pmFocus.actionHref, "/settings/models");
+    assert.ok(center.pmFocus.proof.includes("P0"));
     assert.equal(center.repairLanes[0].priorityLabel, "P0");
     assert.equal(center.repairLanes[0].label, "先修模型配置");
     assert.equal(center.repairLanes[0].actionLabel, "去模型设置");
@@ -173,5 +180,31 @@ test("buildFailureReviewCenter", async (t) => {
     assert.equal(manualLane?.href, "/projects/project-1");
     assert.equal(manualLane?.receiptAction.id, "failure-repair-batch");
     assert.equal(manualLane?.receiptAction.label, "记录人工复盘");
+  });
+
+  await t.test("allows resume watch only when unresolved failures are clear", () => {
+    const center = buildFailureReviewCenter([
+      {
+        ...baseTask,
+        id: "failed-draft",
+        taskType: "chapter_draft",
+        errorMessage: "503 provider timeout",
+        createdAt: "2026-01-01T00:00:00.000Z",
+      },
+      {
+        ...baseTask,
+        id: "recovered-draft",
+        taskType: "chapter_draft",
+        status: "succeeded",
+        errorMessage: null,
+        createdAt: "2026-01-01T00:04:00.000Z",
+      },
+    ]);
+
+    assert.equal(center.pmFocus.tone, "ready");
+    assert.equal(center.pmFocus.resumePolicy, "watch_resume");
+    assert.ok(center.pmFocus.headline.includes("未恢复失败已清空"));
+    assert.ok(center.pmFocus.detail.includes("单章样本"));
+    assert.equal(center.pmFocus.actionHref, "/tasks");
   });
 });

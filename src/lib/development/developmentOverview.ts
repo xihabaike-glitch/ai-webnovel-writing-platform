@@ -117,6 +117,7 @@ export interface DevelopmentOverviewRequirementTraceItem {
     | "model_interfaces"
     | "role_dispatch"
     | "tomato_style"
+    | "traditional_tooling"
     | "pipeline_validation";
   originalRequest: string;
   currentEvidence: string;
@@ -573,6 +574,13 @@ function buildRequirementTraceability(): DevelopmentOverviewRequirementTraceabil
         currentEvidence: "平台写作模板已覆盖国内快读、付费长线、知乎短篇、海外英文连载和平台包装规则。",
         acceptanceSignal: "章节卡、审稿、二改和发布包能按目标平台调整钩子、爽点、节奏、标签和简介。",
         href: "/projects#platform-export",
+      },
+      {
+        id: "traditional_tooling",
+        originalRequest: "具体还是传统的写作工具，AI 只作为写作、审稿、改写、投稿和复盘的执行层。",
+        currentEvidence: "作品、章节、大纲、人物、世界观、伏笔、任务回执和发布包都在作品工作台与流水线中保留。",
+        acceptanceSignal: "作者能按大纲、人物、世界观、伏笔、章节、发布包推进作品，模型只能沿这些传统写作资产执行。",
+        href: "/projects#pipeline-projects",
       },
       {
         id: "pipeline_validation",

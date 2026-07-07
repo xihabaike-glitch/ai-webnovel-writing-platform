@@ -218,6 +218,7 @@ test("buildDevelopmentOverview", async (t) => {
         "model_interfaces",
         "role_dispatch",
         "tomato_style",
+        "traditional_tooling",
         "pipeline_validation",
       ],
     );
@@ -236,6 +237,7 @@ test("buildDevelopmentOverview", async (t) => {
     const lengthModes = overview.requirementTraceability.items.find((item) => item.id === "length_modes");
     const roleDispatch = overview.requirementTraceability.items.find((item) => item.id === "role_dispatch");
     const tomatoStyle = overview.requirementTraceability.items.find((item) => item.id === "tomato_style");
+    const traditionalTooling = overview.requirementTraceability.items.find((item) => item.id === "traditional_tooling");
     const treeMethod = overview.requirementTraceability.items.find((item) => item.id === "tree_method");
     const pipelineValidation = overview.requirementTraceability.items.find((item) => item.id === "pipeline_validation");
 
@@ -250,6 +252,14 @@ test("buildDevelopmentOverview", async (t) => {
     assert.equal(lengthModes?.href, "/projects#create-project");
     assert.equal(roleDispatch?.href, "/dispatch#dispatch-task-center");
     assert.equal(tomatoStyle?.href, "/projects#platform-export");
+    assert.ok(traditionalTooling?.currentEvidence.includes("作品"));
+    assert.ok(traditionalTooling?.currentEvidence.includes("章节"));
+    assert.ok(traditionalTooling?.acceptanceSignal.includes("大纲"));
+    assert.ok(traditionalTooling?.acceptanceSignal.includes("人物"));
+    assert.ok(traditionalTooling?.acceptanceSignal.includes("世界观"));
+    assert.ok(traditionalTooling?.acceptanceSignal.includes("伏笔"));
+    assert.ok(traditionalTooling?.acceptanceSignal.includes("发布包"));
+    assert.equal(traditionalTooling?.href, "/projects#pipeline-projects");
     assert.ok(treeMethod?.acceptanceSignal.includes("开头"));
     assert.ok(treeMethod?.acceptanceSignal.includes("土壤"));
     assert.equal(treeMethod?.href, "/projects#story-structure");

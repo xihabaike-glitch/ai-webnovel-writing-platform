@@ -75,7 +75,25 @@ function fieldLabel(field: string) {
   return labels[field] ?? field;
 }
 
-export function ChapterProductionPanel({ projectId }: { projectId: string }) {
+function hrefWithGateReturn(href: string, gateReturnHref?: string | null) {
+  if (!gateReturnHref || !href.startsWith("/") || href.startsWith("/gate")) return href;
+
+  const hashIndex = href.indexOf("#");
+  const base = hashIndex >= 0 ? href.slice(0, hashIndex) : href;
+  const hash = hashIndex >= 0 ? href.slice(hashIndex) : "";
+  if (base.includes("gateReturn=")) return href;
+  const separator = base.includes("?") ? "&" : "?";
+
+  return `${base}${separator}gateReturn=${encodeURIComponent(gateReturnHref)}${hash}`;
+}
+
+export function ChapterProductionPanel({
+  gateReturnHref,
+  projectId,
+}: {
+  gateReturnHref?: string | null;
+  projectId: string;
+}) {
   const [schedule, setSchedule] = useState<ChapterProductionSchedule | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [creatingNodeId, setCreatingNodeId] = useState<string | null>(null);
@@ -250,7 +268,7 @@ export function ChapterProductionPanel({ projectId }: { projectId: string }) {
                 {item.chapterId ? (
                   <Link
                     className="rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white"
-                    href={`/projects/${projectId}/chapters/${item.chapterId}`}
+                    href={hrefWithGateReturn(`/projects/${projectId}/chapters/${item.chapterId}`, gateReturnHref)}
                   >
                     打开章节
                   </Link>

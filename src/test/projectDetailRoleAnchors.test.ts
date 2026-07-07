@@ -147,6 +147,28 @@ test("project detail page carries gate return through export and submission link
   assert.ok(submissionPackagePanel.includes("href={hrefWithGateReturn(\"#publish-effect-panel\", gateReturnHref, projectId)}"));
 });
 
+test("project detail page carries gate return through chapter production links", () => {
+  const projectPage = readFileSync("src/app/projects/[projectId]/page.tsx", "utf8");
+  const chapterProductionFlowPanel = readFileSync("src/components/projects/ChapterProductionFlowPanel.tsx", "utf8");
+  const chapterProductionPanel = readFileSync("src/components/projects/ChapterProductionPanel.tsx", "utf8");
+
+  assert.ok(projectPage.includes("<ChapterProductionFlowPanel flow={chapterProductionFlow} gateReturnHref={gateReturn} />"));
+  assert.ok(projectPage.includes("<ChapterProductionPanel gateReturnHref={gateReturn} projectId={project.id} />"));
+
+  assert.ok(chapterProductionFlowPanel.includes("gateReturnHref?: string | null"));
+  assert.ok(chapterProductionFlowPanel.includes("function hrefWithGateReturn"));
+  assert.ok(chapterProductionFlowPanel.includes("href={hrefWithGateReturn(primary ? flow.nextHref : stage.href, gateReturnHref)}"));
+  assert.ok(chapterProductionFlowPanel.includes("href={hrefWithGateReturn(followUp.href, gateReturnHref)}"));
+  assert.ok(chapterProductionFlowPanel.includes("href={hrefWithGateReturn(flow.followUpNotice.href, gateReturnHref)}"));
+  assert.ok(chapterProductionFlowPanel.includes("href={hrefWithGateReturn(flow.followUpResultNotice.href, gateReturnHref)}"));
+  assert.ok(chapterProductionFlowPanel.includes("href={hrefWithGateReturn(flow.recheckNotice.href, gateReturnHref)}"));
+  assert.ok(chapterProductionFlowPanel.includes("href={hrefWithGateReturn(stage.dispatchSummary.href, gateReturnHref)}"));
+
+  assert.ok(chapterProductionPanel.includes("gateReturnHref?: string | null"));
+  assert.ok(chapterProductionPanel.includes("function hrefWithGateReturn"));
+  assert.ok(chapterProductionPanel.includes("href={hrefWithGateReturn(`/projects/${projectId}/chapters/${item.chapterId}`, gateReturnHref)}"));
+});
+
 test("chapter detail page keeps a gate recheck return path visible", () => {
   const chapterPage = readFileSync("src/app/projects/[projectId]/chapters/[chapterId]/page.tsx", "utf8");
 

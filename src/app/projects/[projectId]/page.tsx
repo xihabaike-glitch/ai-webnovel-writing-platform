@@ -637,7 +637,7 @@ export default async function ProjectPage({
         <div id="first-day-workflow">
           <FirstDayWorkflowPanel gateReturnHref={gateReturn} projectId={project.id} />
         </div>
-        <ChapterProductionFlowPanel flow={chapterProductionFlow} />
+        <ChapterProductionFlowPanel flow={chapterProductionFlow} gateReturnHref={gateReturn} />
         <section className="grid gap-4 md:grid-cols-[1.4fr_1fr]">
           <div className="rounded-md border border-slate-200 bg-white p-4">
             <div className="flex items-start justify-between gap-4">
@@ -766,7 +766,7 @@ export default async function ProjectPage({
         </div>
         <ContinuityAuditPanel audit={continuityAudit} />
         <div id="chapter-production">
-          <ChapterProductionPanel projectId={project.id} />
+          <ChapterProductionPanel gateReturnHref={gateReturn} projectId={project.id} />
         </div>
         <div id="ai-pipeline">
           <BatchDraftCenterPanel projectId={project.id} />

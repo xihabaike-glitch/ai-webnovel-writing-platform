@@ -59,7 +59,25 @@ function doneLabel(action: ChapterProductionFlowRunAction) {
   return action.action === "review" ? "批量审稿" : "批量二改";
 }
 
-export function ChapterProductionFlowPanel({ flow }: { flow: ChapterProductionFlow }) {
+function hrefWithGateReturn(href: string, gateReturnHref?: string | null) {
+  if (!gateReturnHref || !href.startsWith("/") || href.startsWith("/gate")) return href;
+
+  const hashIndex = href.indexOf("#");
+  const base = hashIndex >= 0 ? href.slice(0, hashIndex) : href;
+  const hash = hashIndex >= 0 ? href.slice(hashIndex) : "";
+  if (base.includes("gateReturn=")) return href;
+  const separator = base.includes("?") ? "&" : "?";
+
+  return `${base}${separator}gateReturn=${encodeURIComponent(gateReturnHref)}${hash}`;
+}
+
+export function ChapterProductionFlowPanel({
+  flow,
+  gateReturnHref,
+}: {
+  flow: ChapterProductionFlow;
+  gateReturnHref?: string | null;
+}) {
   const router = useRouter();
   const [runningStageId, setRunningStageId] = useState<string | null>(null);
   const [runningRecheck, setRunningRecheck] = useState(false);
@@ -252,7 +270,7 @@ export function ChapterProductionFlowPanel({ flow }: { flow: ChapterProductionFl
     }
 
     return (
-      <Link className={linkClass} href={primary ? flow.nextHref : stage.href}>
+      <Link className={linkClass} href={hrefWithGateReturn(primary ? flow.nextHref : stage.href, gateReturnHref)}>
         {primary ? flow.nextActionLabel : stage.actionLabel}
       </Link>
     );
@@ -282,7 +300,7 @@ export function ChapterProductionFlowPanel({ flow }: { flow: ChapterProductionFl
           {followUp ? (
             <Link
               className="w-fit rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
-              href={followUp.href}
+              href={hrefWithGateReturn(followUp.href, gateReturnHref)}
             >
               {followUp.label}
             </Link>
@@ -297,7 +315,7 @@ export function ChapterProductionFlowPanel({ flow }: { flow: ChapterProductionFl
           </div>
           <Link
             className="w-fit rounded-md bg-rose-950 px-3 py-1.5 text-xs font-medium text-white hover:bg-rose-900"
-            href={flow.followUpNotice.href}
+            href={hrefWithGateReturn(flow.followUpNotice.href, gateReturnHref)}
           >
             {flow.followUpNotice.actionLabel}
           </Link>
@@ -322,7 +340,7 @@ export function ChapterProductionFlowPanel({ flow }: { flow: ChapterProductionFl
             ) : null}
             <Link
               className={`w-fit rounded-md px-3 py-1.5 text-xs font-medium ${followUpResultTone.action}`}
-              href={flow.followUpResultNotice.href}
+              href={hrefWithGateReturn(flow.followUpResultNotice.href, gateReturnHref)}
             >
               {flow.followUpResultNotice.actionLabel}
             </Link>
@@ -348,7 +366,7 @@ export function ChapterProductionFlowPanel({ flow }: { flow: ChapterProductionFl
             ) : null}
             <Link
               className="w-fit rounded-md border border-amber-300 bg-white px-3 py-1.5 text-xs font-medium text-amber-950 hover:bg-amber-100"
-              href={flow.recheckNotice.href}
+              href={hrefWithGateReturn(flow.recheckNotice.href, gateReturnHref)}
             >
               {flow.recheckNotice.actionLabel}
             </Link>
@@ -372,7 +390,7 @@ export function ChapterProductionFlowPanel({ flow }: { flow: ChapterProductionFl
               <div className="mt-2 rounded-md border border-slate-200 bg-white p-2 text-xs leading-5 text-slate-600">
                 <div className="flex items-center justify-between gap-2">
                   <span className="font-medium text-slate-800">{stage.dispatchSummary.label}</span>
-                  <Link className="font-medium text-slate-950" href={stage.dispatchSummary.href}>
+                  <Link className="font-medium text-slate-950" href={hrefWithGateReturn(stage.dispatchSummary.href, gateReturnHref)}>
                     {stage.dispatchSummary.actionLabel}
                   </Link>
                 </div>

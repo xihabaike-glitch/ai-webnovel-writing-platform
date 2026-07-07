@@ -50,4 +50,15 @@ test("ai writing platform development document", async (t) => {
       assert.ok(doc.includes(outcome), `${outcome} should be documented`);
     }
   });
+
+  await t.test("uses the current delivery route instead of old kickoff instructions", () => {
+    assert.equal(doc.includes("建议下一步不要直接开写代码"), false);
+    assert.equal(doc.includes("`PRD.md`：产品需求文档，锁定页面、字段、MVP 范围。"), false);
+    assert.equal(doc.includes("`TECHNICAL_DESIGN.md`：技术方案，锁定数据库、模型网关、编辑器选型、API。"), false);
+
+    assert.ok(doc.includes("当前下一步"));
+    assert.ok(doc.includes("从 `/projects` 跑一条真实作品样本"));
+    assert.ok(doc.includes("从 `/gate` 判断是否允许小批量"));
+    assert.ok(doc.includes("不再把新增平台当作进度"));
+  });
 });

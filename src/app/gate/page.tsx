@@ -80,6 +80,29 @@ function isGateFocus(value: string | null) {
   return value === null || value === "first-day-complete" || value === "action-recheck";
 }
 
+function buildGateRecheckReturnHref(focus: string | null, projectId: string | null, actionId: string | null) {
+  if (focus === "action-recheck") {
+    const params = new URLSearchParams({ focus: "action-recheck" });
+    if (projectId) params.set("projectId", projectId);
+    if (actionId) params.set("actionId", actionId);
+
+    return `/gate?${params.toString()}#gate-focus-notice`;
+  }
+
+  return null;
+}
+
+function hrefWithGateReturn(href: string, gateReturn: string | null) {
+  if (!gateReturn || !href.startsWith("/") || href.startsWith("/gate")) return href;
+
+  const hashIndex = href.indexOf("#");
+  const base = hashIndex >= 0 ? href.slice(0, hashIndex) : href;
+  const hash = hashIndex >= 0 ? href.slice(hashIndex) : "";
+  const separator = base.includes("?") ? "&" : "?";
+
+  return `${base}${separator}gateReturn=${encodeURIComponent(gateReturn)}${hash}`;
+}
+
 export default async function GatePage({
   searchParams,
 }: {
@@ -89,6 +112,7 @@ export default async function GatePage({
   const focus = Array.isArray(params?.focus) ? params?.focus[0] : params?.focus ?? null;
   const projectId = Array.isArray(params?.projectId) ? params?.projectId[0] : params?.projectId ?? null;
   const actionId = Array.isArray(params?.actionId) ? params?.actionId[0] : params?.actionId ?? null;
+  const gateRecheckReturnHref = buildGateRecheckReturnHref(focus, projectId, actionId);
   const invalidFocusNotice = isGateFocus(focus)
     ? null
     : focus ? `总闸门焦点「${focus}」不存在，已显示总闸门全局验收。` : null;
@@ -617,7 +641,7 @@ export default async function GatePage({
           <div className="mb-3 font-medium text-slate-950">总检卡</div>
           <div className="grid gap-2">
             {gate.items.map((item) => (
-              <Link className="block rounded-md bg-slate-50 p-3 text-sm hover:bg-slate-100" href={item.href} key={item.id}>
+              <Link className="block rounded-md bg-slate-50 p-3 text-sm hover:bg-slate-100" href={hrefWithGateReturn(item.href, gateRecheckReturnHref)} key={item.id}>
                 <div className="flex items-center justify-between gap-3">
                   <div className="font-medium text-slate-950">{item.label}</div>
                   <span className={`rounded-md px-2 py-1 text-xs font-medium ${checkTone(item.status)}`}>

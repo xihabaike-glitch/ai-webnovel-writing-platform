@@ -467,6 +467,47 @@ test("buildMultiPlatformSubmission", async (t) => {
     assert.ok(pausedDispatch.acceptanceCriteria.some((item) => item.includes("恢复一轮小样本")));
   });
 
+  await t.test("summarizes paused-only tracked platforms as pause review work", () => {
+    const result = buildMultiPlatformSubmission({
+      projectId: "project-1",
+      title: "夜雨系统",
+      genre: "都市系统",
+      sellingPoint: "雨夜危机中觉醒系统，主角用一次次选择翻盘。",
+      currentWordCount: 9000,
+      targetWordCount: 300000,
+      targetPlatformId: "fanqie",
+      chapters,
+      aiTasks: [],
+      platformPublishMetrics: [
+        {
+          platformId: "wattpad",
+          platformName: "Wattpad",
+          views: 3000,
+          clicks: 240,
+          favorites: 75,
+          follows: 30,
+          comments: 1,
+          paidReads: 0,
+          editorFeedback: "样本轮次：第二轮小样本；验证变量：标题、简介、标签、前三章兑现；结论：暂停。",
+          contractStatus: "unknown",
+          publishUrl: "",
+          notes: "由派单完成依据自动回写；派单编号：submission-decision:project-1:wattpad:watch",
+          snapshotDate: "2026-01-08T08:00:00.000Z",
+        },
+      ],
+    });
+
+    assert.equal(result.effectSummary.trackedPlatforms, 1);
+    assert.equal(result.effectSummary.pausedPlatforms, 1);
+    assert.ok(result.effectSummary.nextAction.includes("暂停复盘"));
+    assert.equal(result.decisionBoard.status, "paused_review");
+    assert.equal(result.decisionBoard.primaryPlatformId, "wattpad");
+    assert.ok(result.decisionBoard.headline.includes("暂停复盘"));
+    assert.ok(result.decisionBoard.nextActions[0].includes("Wattpad"));
+    assert.ok(result.decisionBoard.tasks[0].platformId === "wattpad");
+    assert.equal(result.decisionBoard.tasks[0].actionLabel, "暂停复盘");
+  });
+
   await t.test("turns completed pause recovery review into a resumed sample metric task", () => {
     const result = buildMultiPlatformSubmission({
       projectId: "project-1",

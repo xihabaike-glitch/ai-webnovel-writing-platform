@@ -109,13 +109,14 @@ interface MultiPlatformSubmission {
     trackedPlatforms: number;
     needsDataPlatforms: number;
     weakPlatforms: number;
+    pausedPlatforms: number;
     promisingPlatforms: number;
     signedPlatforms: number;
     bestPlatformId: string | null;
     nextAction: string;
   };
   decisionBoard: {
-    status: "no_data" | "needs_repair" | "watch" | "ready_to_scale" | "main_locked";
+    status: "no_data" | "needs_repair" | "paused_review" | "watch" | "ready_to_scale" | "main_locked";
     headline: string;
     primaryPlatformId: string | null;
     primaryPlatformName: string | null;
@@ -160,7 +161,7 @@ interface MultiPlatformSubmission {
       platformId: string;
       platformName: string;
       status: "ready" | "needs_work";
-      effectStatus: "needs_data" | "weak" | "watch" | "promising" | "signed";
+      effectStatus: "needs_data" | "weak" | "watch" | "promising" | "signed" | "paused";
       effectLabel: string;
       fileName: string;
       readyFields: number;
@@ -737,7 +738,7 @@ export function SubmissionPackagePanel({
                 进入效果回填
               </a>
             </div>
-            <div className="mt-3 grid gap-2 text-xs sm:grid-cols-5">
+            <div className="mt-3 grid gap-2 text-xs sm:grid-cols-2 lg:grid-cols-6">
               <div className="rounded-md bg-white p-2">
                 <div className="text-slate-500">已追踪</div>
                 <div className="mt-1 font-semibold text-slate-900">{multiPlatform.effectSummary.trackedPlatforms}</div>
@@ -749,6 +750,10 @@ export function SubmissionPackagePanel({
               <div className="rounded-md bg-white p-2">
                 <div className="text-slate-500">偏弱</div>
                 <div className="mt-1 font-semibold text-rose-700">{multiPlatform.effectSummary.weakPlatforms}</div>
+              </div>
+              <div className="rounded-md bg-white p-2">
+                <div className="text-slate-500">暂停复盘</div>
+                <div className="mt-1 font-semibold text-rose-700">{multiPlatform.effectSummary.pausedPlatforms}</div>
               </div>
               <div className="rounded-md bg-white p-2">
                 <div className="text-slate-500">有苗头</div>

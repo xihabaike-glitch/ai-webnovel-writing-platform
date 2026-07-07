@@ -111,6 +111,7 @@ export interface MultiPlatformEffectSummary {
   trackedPlatforms: number;
   needsDataPlatforms: number;
   weakPlatforms: number;
+  pausedPlatforms: number;
   promisingPlatforms: number;
   signedPlatforms: number;
   bestPlatformId: string | null;
@@ -138,7 +139,7 @@ export interface MultiPlatformDecisionLane {
 }
 
 export interface MultiPlatformDecisionBoard {
-  status: "no_data" | "needs_repair" | "watch" | "ready_to_scale" | "main_locked";
+  status: "no_data" | "needs_repair" | "paused_review" | "watch" | "ready_to_scale" | "main_locked";
   headline: string;
   primaryPlatformId: string | null;
   primaryPlatformName: string | null;
@@ -877,6 +878,7 @@ function buildEffectSummary(variants: MultiPlatformSubmissionVariant[]): MultiPl
   const trackedPlatforms = variants.filter((variant) => variant.effectTracking.records > 0).length;
   const needsDataPlatforms = variants.filter((variant) => variant.effectTracking.status === "needs_data").length;
   const weakPlatforms = variants.filter((variant) => variant.effectTracking.status === "weak").length;
+  const pausedPlatforms = variants.filter((variant) => variant.effectTracking.status === "paused").length;
   const promisingPlatforms = variants.filter((variant) => variant.effectTracking.status === "promising").length;
   const signedPlatforms = variants.filter((variant) => variant.effectTracking.status === "signed").length;
   const best = variants
@@ -892,12 +894,17 @@ function buildEffectSummary(variants: MultiPlatformSubmissionVariant[]): MultiPl
       ? "优先处理偏弱平台的标题、简介和前三章入口，不要继续盲目铺量。"
       : promisingPlatforms + signedPlatforms > 0
         ? "保留有反馈的平台打法，小步加码并继续做下一轮数据对照。"
-        : "已有数据但还不够硬，继续收一轮样本再定主战场。";
+        : pausedPlatforms > 0 && trackedPlatforms === pausedPlatforms
+          ? "已暂停的平台先做暂停复盘；不要继续投放，等复盘给出恢复小样本或继续暂停。"
+          : pausedPlatforms > 0
+            ? "暂停平台先做暂停复盘，其余平台继续收一轮样本再定主战场。"
+            : "已有数据但还不够硬，继续收一轮样本再定主战场。";
 
   return {
     trackedPlatforms,
     needsDataPlatforms,
     weakPlatforms,
+    pausedPlatforms,
     promisingPlatforms,
     signedPlatforms,
     bestPlatformId: best?.platformId ?? null,
@@ -1122,9 +1129,11 @@ function buildDecisionBoard(variants: MultiPlatformSubmissionVariant[], projectI
     || laneOrder(left.decision.kind) - laneOrder(right.decision.kind)
     || right.fitScore - left.fitScore
   ));
+  const pausedReview = sorted.find((variant) => variant.decision.kind === "pause" && variant.effectTracking.status === "paused");
   const primary = sorted.find((variant) => variant.decision.kind === "main")
     ?? sorted.find((variant) => variant.decision.kind === "scale")
     ?? sorted.find((variant) => variant.decision.kind === "watch")
+    ?? pausedReview
     ?? sorted.find((variant) => variant.decision.kind === "collect_data")
     ?? sorted[0]
     ?? null;
@@ -1142,6 +1151,7 @@ function buildDecisionBoard(variants: MultiPlatformSubmissionVariant[], projectI
   const hasMain = variants.some((variant) => variant.decision.kind === "main");
   const hasScale = variants.some((variant) => variant.decision.kind === "scale");
   const hasRepair = variants.some((variant) => variant.decision.kind === "repair" || variant.decision.kind === "prepare_package");
+  const hasPausedReview = variants.some((variant) => variant.decision.kind === "pause" && variant.effectTracking.status === "paused");
   const tracked = variants.some((variant) => variant.effectTracking.records > 0);
   const status: MultiPlatformDecisionBoard["status"] = hasMain
     ? "main_locked"
@@ -1149,15 +1159,19 @@ function buildDecisionBoard(variants: MultiPlatformSubmissionVariant[], projectI
       ? "ready_to_scale"
       : hasRepair
         ? "needs_repair"
-        : tracked
-          ? "watch"
-          : "no_data";
+        : hasPausedReview
+          ? "paused_review"
+          : tracked
+            ? "watch"
+            : "no_data";
   const headline = status === "main_locked"
     ? `主战场锁定：${primary?.platformName ?? "待确认"}。`
     : status === "ready_to_scale"
       ? `优先加码：${primary?.platformName ?? "待确认"}，但保持小步复测。`
       : status === "needs_repair"
         ? "先修入口或补包，别急着继续铺平台。"
+        : status === "paused_review"
+          ? "有平台进入暂停复盘，先别继续投放。"
         : status === "watch"
           ? "已有数据但还不够硬，继续观察一轮。"
           : "还没真实数据，先做 1-2 个平台小样本。";

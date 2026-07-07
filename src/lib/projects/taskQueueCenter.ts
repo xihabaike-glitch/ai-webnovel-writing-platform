@@ -188,6 +188,8 @@ export interface TaskQueuePmFocus {
   projectId: string | null;
   actionLabel: string;
   actionHref: string;
+  pipelineActionLabel: string;
+  pipelineActionHref: string;
 }
 
 export interface TaskQueuePlatformReadinessSummary {
@@ -315,6 +317,8 @@ function buildTaskQueuePmFocus(recommendedNext: QueueItem | null): TaskQueuePmFo
       projectId: null,
       actionLabel: "回作品页",
       actionHref: "/projects",
+      pipelineActionLabel: "查看项目流水线",
+      pipelineActionHref: "/projects#pipeline-projects",
     };
   }
 
@@ -328,6 +332,8 @@ function buildTaskQueuePmFocus(recommendedNext: QueueItem | null): TaskQueuePmFo
     projectId: recommendedNext.projectId,
     actionLabel: recommendedNext.actionLabel,
     actionHref: recommendedNext.href,
+    pipelineActionLabel: "查看项目流水线",
+    pipelineActionHref: "/projects#pipeline-projects",
   };
 }
 

@@ -233,6 +233,8 @@ test("buildTaskQueueCenter", async (t) => {
     assert.equal(queue.pmFocus.actionHref, queue.recommendedNext?.href);
     assert.ok(queue.pmFocus.scopeLabel.includes("8/8 核心平台已完成"));
     assert.ok(queue.pmFocus.scopeLabel.includes("剩余 10 个平台不再添加"));
+    assert.equal(queue.pmFocus.pipelineActionLabel, "查看项目流水线");
+    assert.equal(queue.pmFocus.pipelineActionHref, "/projects#pipeline-projects");
   });
 
   await t.test("builds a focused blocked debt view for clearing batch risks", () => {

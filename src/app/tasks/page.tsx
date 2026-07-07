@@ -517,9 +517,14 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
             <p className="mt-2 max-w-4xl text-sm leading-6 text-slate-200">{queue.pmFocus.detail}</p>
             <div className="mt-2 text-xs text-slate-400">{queue.pmFocus.scopeLabel}</div>
           </div>
-          <Link className="w-fit rounded-md bg-white px-3 py-2 text-sm font-medium text-slate-950 hover:bg-slate-100" href={queue.pmFocus.actionHref}>
-            {queue.pmFocus.actionLabel}
-          </Link>
+          <div className="flex flex-wrap gap-2">
+            <Link className="w-fit rounded-md bg-white px-3 py-2 text-sm font-medium text-slate-950 hover:bg-slate-100" href={queue.pmFocus.actionHref}>
+              {queue.pmFocus.actionLabel}
+            </Link>
+            <Link className="w-fit rounded-md border border-white/25 px-3 py-2 text-sm font-medium text-white hover:bg-white/10" href={queue.pmFocus.pipelineActionHref}>
+              {queue.pmFocus.pipelineActionLabel}
+            </Link>
+          </div>
         </div>
       </section>
 

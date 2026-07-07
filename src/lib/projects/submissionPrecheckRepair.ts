@@ -1,6 +1,6 @@
 import type { PlatformProfile } from "@/lib/platforms/platformProfiles";
 import type { GatePlatformGrowthDispatchItem, GatePlatformGrowthReviewStage } from "./gateActionReceipts.ts";
-import type { SubmissionChecklistItem } from "./submissionChecklist.ts";
+import type { SubmissionChecklistItem, SubmissionStructureDiagnostic } from "./submissionChecklist.ts";
 
 export interface SubmissionPrecheckRepairTarget {
   stage: GatePlatformGrowthReviewStage;
@@ -16,6 +16,7 @@ export interface SubmissionPrecheckRepairInput {
   projectTitle: string;
   platform: PlatformProfile;
   items: SubmissionChecklistItem[];
+  structureDiagnostic?: SubmissionStructureDiagnostic;
   existingDispatchKeys?: string[];
   limit?: number;
   now?: string;
@@ -104,6 +105,49 @@ const targetByItemId: Record<string, SubmissionPrecheckRepairTarget> = {
   },
 };
 
+const structureTargetByItemId: Record<string, SubmissionPrecheckRepairTarget> = {
+  "tree-skeleton": {
+    stage: "start_repair_packaging",
+    ownerRole: "结构主编",
+    href: "#story-structure",
+    actionLabel: "补大树",
+    dueLabel: "投稿前",
+    instruction: "补齐开头、结尾、主干、分支、叶片和土壤节点，让长篇结构先成型。",
+  },
+  "trunk-pressure": {
+    stage: "start_repair_packaging",
+    ownerRole: "结构主编",
+    href: "#story-lines",
+    actionLabel: "补主干",
+    dueLabel: "投稿前",
+    instruction: "补主干目标、阻碍、反转和阶段结果，保证长篇不是散点推进。",
+  },
+  "branch-coverage": {
+    stage: "start_repair_packaging",
+    ownerRole: "支线编辑",
+    href: "#story-lines",
+    actionLabel: "补支线",
+    dueLabel: "投稿前",
+    instruction: "补人物线、反派压力线和关系情绪线，并绑定回主线压力。",
+  },
+  "character-arc": {
+    stage: "start_repair_packaging",
+    ownerRole: "角色主编",
+    href: "#character-arc",
+    actionLabel: "补弧光",
+    dueLabel: "投稿前",
+    instruction: "补主角欲望、需求、缺陷、起点和终点，避免人物只是剧情工具。",
+  },
+  "foreshadow-payoff": {
+    stage: "start_repair_packaging",
+    ownerRole: "伏笔编辑",
+    href: "#story-lines",
+    actionLabel: "补回收",
+    dueLabel: "投稿前",
+    instruction: "给关键伏笔绑定埋点章和回收章，不要靠临时解释救场。",
+  },
+};
+
 function targetFor(itemId: string) {
   return targetByItemId[itemId] ?? {
     stage: "start_platform_package" as const,
@@ -122,13 +166,57 @@ function priorityScore(item: SubmissionChecklistItem) {
   return base;
 }
 
+function buildStructureRepairDispatches(input: SubmissionPrecheckRepairInput, now: string, existingDispatchKeys: Set<string>) {
+  const lengthItem = input.items.find((item) => item.id === "length-structure" && (item.status === "todo" || item.status === "risk"));
+  if (!lengthItem || !input.structureDiagnostic) return [];
+
+  const dispatches: GatePlatformGrowthDispatchItem[] = [];
+  for (const diagnosticItem of input.structureDiagnostic.items) {
+    if (diagnosticItem.status === "pass") continue;
+    const target = structureTargetByItemId[diagnosticItem.id];
+    if (!target) continue;
+    const dispatchKey = `submission-precheck:${input.projectId}:length-structure:${diagnosticItem.id}`;
+    if (existingDispatchKeys.has(dispatchKey)) continue;
+
+    dispatches.push({
+      id: dispatchKey,
+      platformId: input.platform.id,
+      platformName: input.platform.name,
+      stage: target.stage,
+      state: "assigned",
+      priorityScore: 94,
+      ownerRole: target.ownerRole,
+      title: `${input.projectTitle} · ${lengthItem.label} · ${diagnosticItem.label}`,
+      detail: `${lengthItem.detail} 诊断证据：${diagnosticItem.evidence} 修复要求：${target.instruction}`,
+      dueLabel: target.dueLabel,
+      actionLabel: target.actionLabel,
+      href: `/projects/${input.projectId}${target.href}`,
+      acceptanceCriteria: [
+        `让「${diagnosticItem.label}」在整书结构诊断里变成通过项，或写清暂时不能通过的原因。`,
+        "保存对应角色卡、大纲节点、伏笔、剧情线或土壤设定修改。",
+        "完成证据必须说明改了哪里，以及如何支撑长篇投稿前验收。",
+      ],
+      evidence: [
+        `投稿预检：${lengthItem.label} · ${lengthItem.status === "todo" ? "待处理" : "风险"}`,
+        `结构诊断：${diagnosticItem.label} · ${diagnosticItem.status}`,
+        diagnosticItem.evidence,
+        `修复动作：${target.instruction}`,
+      ],
+      reviewLatestAt: now,
+    });
+  }
+
+  return dispatches;
+}
+
 export function buildSubmissionPrecheckRepairDispatches(input: SubmissionPrecheckRepairInput): GatePlatformGrowthDispatchItem[] {
   const now = input.now ?? new Date().toISOString();
   const existingDispatchKeys = new Set(input.existingDispatchKeys ?? []);
-  const dispatches: GatePlatformGrowthDispatchItem[] = [];
+  const dispatches: GatePlatformGrowthDispatchItem[] = buildStructureRepairDispatches(input, now, existingDispatchKeys);
 
   for (const item of input.items) {
     if (item.status !== "todo" && item.status !== "risk") continue;
+    if (item.id === "length-structure" && input.structureDiagnostic && dispatches.length > 0) continue;
     const target = targetFor(item.id);
     const dispatchKey = `submission-precheck:${input.projectId}:${item.id}`;
     if (existingDispatchKeys.has(dispatchKey)) continue;

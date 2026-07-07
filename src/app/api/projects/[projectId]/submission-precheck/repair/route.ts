@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { getPlatformProfile, type PlatformId } from "@/lib/platforms/platformProfiles";
 import { persistServerGateDispatchTask } from "@/lib/projects/gateDispatchTaskPersistence";
+import { buildStoryStructureDiagnostic } from "@/lib/projects/storyStructureDiagnostic";
 import { buildSubmissionChecklist } from "@/lib/projects/submissionChecklist";
 import { buildSubmissionPrecheckRepairDispatches } from "@/lib/projects/submissionPrecheckRepair";
 
@@ -15,6 +16,10 @@ export async function POST(_request: Request, { params }: Params) {
     where: { id: projectId },
     include: {
       chapters: { orderBy: { order: "asc" } },
+      characters: { orderBy: { createdAt: "asc" } },
+      foreshadows: { orderBy: { createdAt: "asc" } },
+      outlineNodes: { orderBy: [{ depth: "asc" }, { order: "asc" }, { createdAt: "asc" }] },
+      plotThreads: { orderBy: { createdAt: "asc" } },
       aiTasks: {
         where: { taskType: { in: ["chapter_review", "chapter_second_pass"] } },
         orderBy: { createdAt: "desc" },
@@ -31,11 +36,29 @@ export async function POST(_request: Request, { params }: Params) {
   }
 
   const platform = getPlatformProfile(project.targetPlatform as PlatformId);
+  const structureDiagnostic = buildStoryStructureDiagnostic({
+    project: {
+      id: project.id,
+      title: project.title,
+      genre: project.genre,
+      sellingPoint: project.sellingPoint,
+      targetLengthType: project.targetLengthType,
+      targetWordCount: project.targetWordCount,
+      currentWordCount: project.currentWordCount,
+    },
+    platform,
+    chapters: project.chapters,
+    outlineNodes: project.outlineNodes,
+    characters: project.characters,
+    foreshadows: project.foreshadows,
+    plotThreads: project.plotThreads,
+  });
   const checklist = buildSubmissionChecklist({
     title: project.title,
     genre: project.genre,
     sellingPoint: project.sellingPoint,
     currentWordCount: project.currentWordCount,
+    targetLengthType: project.targetLengthType,
     targetWordCount: project.targetWordCount,
     platform,
     chapters: project.chapters,
@@ -44,12 +67,14 @@ export async function POST(_request: Request, { params }: Params) {
       status: task.status,
       chapter: task.chapterId ? { id: task.chapterId } : null,
     })),
+    structureDiagnostic,
   });
   const dispatches = buildSubmissionPrecheckRepairDispatches({
     projectId: project.id,
     projectTitle: project.title,
     platform,
     items: checklist.items,
+    structureDiagnostic,
     existingDispatchKeys: project.gateDispatchTasks
       .filter((task) => task.state !== "completed")
       .map((task) => task.dispatchKey),

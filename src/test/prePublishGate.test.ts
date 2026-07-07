@@ -456,6 +456,7 @@ test("buildPrePublishGate", async (t) => {
     assert.ok(decodeURIComponent(notice.recheckSummary?.remainingBlockers[0]?.href ?? "").includes("/gate?focus=action-recheck&actionId=project-acceptance:project-recheck-blockers#gate-focus-notice"));
     assert.ok(notice.recheckSummary?.remainingBlockers[0]?.evidence.includes("首章还缺审稿成功记录"));
     assert.ok(notice.recheckSummary?.remainingBlockers.find((item) => item.label === "二改")?.href.includes("gateReturn="));
+    assert.ok(notice.recheckSummary?.remainingBlockers.find((item) => item.label === "派单回执")?.href.startsWith("/dispatch?firstDayProject=project-recheck-blockers"));
     assert.ok(notice.recheckSummary?.remainingBlockers.find((item) => item.label === "派单回执")?.href.includes("gateReturn="));
     assert.ok(notice.recheckSummary?.remainingBlockers.find((item) => item.label === "发布包")?.href.includes("gateReturn="));
     assert.deepEqual(

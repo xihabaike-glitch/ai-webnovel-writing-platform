@@ -50,6 +50,12 @@ function isDispatchQueueFilter(value: string) {
   return value === "all" || value === "ai_pipeline" || value === "recheck_followup";
 }
 
+function gateReturnFromParam(value: string | string[] | undefined) {
+  const raw = Array.isArray(value) ? value[0] : value;
+  if (!raw?.startsWith("/gate?focus=action-recheck")) return null;
+  return raw;
+}
+
 function normalizeAssetAuditStatus(status: string): "ready" | "blocked" | "needs_work" {
   if (status === "ready" || status === "blocked") return status;
   return "needs_work";
@@ -206,13 +212,14 @@ export default async function DispatchPage({
 }: {
   searchParams?: Promise<DispatchSearchParams>;
 }) {
-  const resolvedSearchParams = await Promise.resolve(searchParams ?? {});
+  const resolvedSearchParams: DispatchSearchParams = await Promise.resolve(searchParams ?? {});
   const firstDayProjectId = searchValue(resolvedSearchParams, "firstDayProject");
   const firstDayStepId = searchValue(resolvedSearchParams, "step");
   const firstDaySource = searchValue(resolvedSearchParams, "source");
   const firstDayGaps = searchValues(resolvedSearchParams, "gap");
   const focusDispatchKey = searchValue(resolvedSearchParams, "focus");
   const queueParam = searchValue(resolvedSearchParams, "queue");
+  const gateReturn = gateReturnFromParam(resolvedSearchParams.gateReturn);
   const initialQueueFilter = dispatchQueueFilter(queueParam);
   const invalidQueueNotice = isDispatchQueueFilter(queueParam)
     ? null
@@ -374,6 +381,19 @@ export default async function DispatchPage({
             </div>
             <Link className="w-fit rounded-md bg-white px-3 py-2 text-sm font-medium text-amber-950 hover:bg-amber-100" href="/dispatch">
               查看全部派单
+            </Link>
+          </div>
+        </section>
+      ) : null}
+      {gateReturn ? (
+        <section className="mb-6 rounded-md border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <div className="font-medium">来自总闸门复检</div>
+              <p className="mt-1 leading-5">先补齐派单完成依据和人工验收，处理后回总闸门确认剩余卡点是否减少。</p>
+            </div>
+            <Link className="w-fit rounded-md bg-white px-3 py-2 text-sm font-medium text-amber-950 hover:bg-amber-100" href={gateReturn}>
+              回总闸门复检
             </Link>
           </div>
         </section>

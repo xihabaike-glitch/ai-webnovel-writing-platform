@@ -71,6 +71,22 @@ export default async function ReferencesPage({ searchParams }: ReferencesPagePro
         </div>
       </section>
 
+      <section className="mb-6 rounded-md border border-slate-900 bg-slate-950 p-4 text-white">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <div className="text-xs font-medium text-slate-300">毒舌 PM 平台范围回答</div>
+            <h2 className="mt-1 text-lg font-semibold">{view.platformScope.pmFocus.headline}</h2>
+            <p className="mt-2 max-w-4xl text-sm leading-6 text-slate-200">{view.platformScope.pmFocus.detail}</p>
+          </div>
+          <Link
+            className="inline-flex w-fit shrink-0 rounded-md bg-white px-4 py-2 text-sm font-medium text-slate-950 hover:bg-slate-100"
+            href={view.platformScope.pmFocus.actionHref}
+          >
+            {view.platformScope.pmFocus.actionLabel}
+          </Link>
+        </div>
+      </section>
+
       <section className="mb-6">
         <div className="mb-3 flex flex-col gap-2 lg:flex-row lg:items-end lg:justify-between">
           <div>

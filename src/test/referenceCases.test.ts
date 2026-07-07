@@ -173,6 +173,12 @@ test("open source reference cases", async (t) => {
       "Royal Road",
       "Wattpad",
     ]);
+    assert.equal(view.platformScope.pmFocus.remainingPlatformCount, 0);
+    assert.ok(view.platformScope.pmFocus.headline.includes("平台还差 0 个"));
+    assert.ok(view.platformScope.pmFocus.detail.includes("剩余 10 个平台不再添加"));
+    assert.ok(view.platformScope.pmFocus.detail.includes("8 个核心平台"));
+    assert.equal(view.platformScope.pmFocus.actionHref, "/projects#platform-export");
+    assert.equal(view.platformScope.pmFocus.actionLabel, "推进发布闭环");
   });
 
   await t.test("builds execution cards for every locked platform", () => {

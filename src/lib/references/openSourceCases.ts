@@ -97,11 +97,20 @@ export interface ReferenceCasePlatformScope {
   statusLabel: string;
   expansionLabel: string;
   scopeDecision: string;
+  pmFocus: ReferenceCasePlatformScopePmFocus;
   platformNames: string[];
   platformCards: ReferenceCasePlatformCard[];
 }
 
 export type ReferenceCasePlatformCard = PlatformExecutionCard;
+
+export interface ReferenceCasePlatformScopePmFocus {
+  remainingPlatformCount: number;
+  headline: string;
+  detail: string;
+  actionHref: string;
+  actionLabel: string;
+}
 
 export interface ReferenceCaseRolePlaybookItem {
   id: string;
@@ -462,6 +471,7 @@ const categoryPriority: ReferenceCaseCategory[] = [
 
 export function buildReferenceCasePlatformScope(): ReferenceCasePlatformScope {
   const platformNames = platformDeliveryScope.corePlatformIds.map((id) => getPlatformProfile(id).name);
+  const remainingPlatformCount = Math.max(0, platformDeliveryScope.corePlatformCount - platformDeliveryScope.completedPlatformCount);
 
   return {
     corePlatformCount: platformDeliveryScope.corePlatformCount,
@@ -470,6 +480,13 @@ export function buildReferenceCasePlatformScope(): ReferenceCasePlatformScope {
     statusLabel: platformDeliveryScope.statusLabel,
     expansionLabel: platformDeliveryScope.expansionLabel,
     scopeDecision: platformDeliveryScope.scopeDecision,
+    pmFocus: {
+      remainingPlatformCount,
+      headline: `平台还差 ${remainingPlatformCount} 个，别再扩范围。`,
+      detail: `${platformDeliveryScope.statusLabel}，剩余 10 个平台不再添加；现在只把 ${platformDeliveryScope.corePlatformCount} 个核心平台的写作、投稿、复盘闭环做扎实。`,
+      actionHref: "/projects#platform-export",
+      actionLabel: "推进发布闭环",
+    },
     platformNames,
     platformCards: platformDeliveryScope.corePlatformIds.map(buildPlatformExecutionCard),
   };

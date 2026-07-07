@@ -23,7 +23,16 @@ function metricLabel(value: number) {
   return value > 0 ? `${value}%` : "缺";
 }
 
-export function ContinuityAuditPanel({ audit }: { audit: ContinuityAudit }) {
+function hrefWithGateReturn(href: string, gateReturnHref?: string | null) {
+  if (!gateReturnHref || !href.startsWith("/") || href.startsWith("/gate")) return href;
+  const [withoutHash, hash = ""] = href.split("#", 2);
+  const separator = withoutHash.includes("?") ? "&" : "?";
+  const base = withoutHash || href;
+  if (base.includes("gateReturn=")) return href;
+  return `${base}${separator}gateReturn=${encodeURIComponent(gateReturnHref)}${hash ? `#${hash}` : ""}`;
+}
+
+export function ContinuityAuditPanel({ audit, gateReturnHref }: { audit: ContinuityAudit; gateReturnHref?: string | null }) {
   const visibleItems = audit.items.slice(0, 6);
 
   return (
@@ -90,7 +99,7 @@ export function ContinuityAuditPanel({ audit }: { audit: ContinuityAudit }) {
                 ))}
               </div>
               <div className="mt-3 flex flex-wrap items-center gap-2">
-                <Link className="rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white hover:bg-slate-800" href={item.href}>
+                <Link className="rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white hover:bg-slate-800" href={hrefWithGateReturn(item.href, gateReturnHref)}>
                   处理
                 </Link>
                 <span className="text-xs text-slate-500">{item.action}</span>

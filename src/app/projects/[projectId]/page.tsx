@@ -765,7 +765,7 @@ export default async function ProjectPage({
         <div id="world-bible">
           <WorldBiblePanel projectId={project.id} />
         </div>
-        <ContinuityAuditPanel audit={continuityAudit} />
+        <ContinuityAuditPanel audit={continuityAudit} gateReturnHref={gateReturn} />
         <div id="chapter-production">
           <ChapterProductionPanel gateReturnHref={gateReturn} projectId={project.id} />
         </div>

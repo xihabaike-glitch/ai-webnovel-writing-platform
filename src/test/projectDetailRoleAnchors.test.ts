@@ -207,6 +207,17 @@ test("project detail page carries gate return through chapter production links",
   assert.ok(chapterProductionPanel.includes("href={hrefWithGateReturn(`/projects/${projectId}/chapters/${item.chapterId}`, gateReturnHref)}"));
 });
 
+test("project detail page carries gate return through continuity audit repairs", () => {
+  const projectPage = readFileSync("src/app/projects/[projectId]/page.tsx", "utf8");
+  const continuityAuditPanel = readFileSync("src/components/projects/ContinuityAuditPanel.tsx", "utf8");
+
+  assert.ok(projectPage.includes("<ContinuityAuditPanel audit={continuityAudit} gateReturnHref={gateReturn} />"));
+
+  assert.ok(continuityAuditPanel.includes("gateReturnHref?: string | null"));
+  assert.ok(continuityAuditPanel.includes("function hrefWithGateReturn"));
+  assert.ok(continuityAuditPanel.includes("href={hrefWithGateReturn(item.href, gateReturnHref)}"));
+});
+
 test("project detail page carries gate return through chapter creation jumps", () => {
   const projectPage = readFileSync("src/app/projects/[projectId]/page.tsx", "utf8");
   const outlineTreePanel = readFileSync("src/components/outlines/OutlineTreePanel.tsx", "utf8");

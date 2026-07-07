@@ -129,6 +129,17 @@ export interface ProjectListPipelineProofSummary {
   }>;
 }
 
+export interface ProjectListPipelineAcceptanceSummary {
+  headline: string;
+  verdict: string;
+  totalProjects: number;
+  passCount: number;
+  repairCount: number;
+  holdBatchCount: number;
+  primaryActionLabel: string;
+  primaryActionHref: string;
+}
+
 export interface ProjectListDashboard {
   overview: {
     totalProjects: number;
@@ -143,6 +154,7 @@ export interface ProjectListDashboard {
   };
   pmFocus: ProjectListPmFocus;
   pipelineProofSummary: ProjectListPipelineProofSummary;
+  pipelineAcceptanceSummary: ProjectListPipelineAcceptanceSummary;
   roleEntrypoints: ProjectRoleWorkflowEntrypoint[];
   items: ProjectListItem[];
 }
@@ -640,6 +652,32 @@ function buildPipelineProofSummary(items: ProjectListItem[]): ProjectListPipelin
   };
 }
 
+function buildPipelineAcceptanceSummary(items: ProjectListItem[]): ProjectListPipelineAcceptanceSummary {
+  const passItems = items.filter((item) => item.realSampleValidation.status === "ready_for_publish_review");
+  const holdItems = items.filter((item) => item.realSampleValidation.status === "ready_for_gate");
+  const repairItems = items.filter((item) => item.realSampleValidation.status === "blocked" || item.realSampleValidation.status === "needs_acceptance");
+  const primaryItem = repairItems[0] ?? holdItems[0] ?? passItems[0] ?? null;
+
+  return {
+    headline: items.length === 0
+      ? "真实流水线验收：还没有作品样本。"
+      : `真实流水线验收：${passItems.length}/${items.length} 本可进入发布复盘。`,
+    verdict: items.length === 0
+      ? "先创建作品，再开始开书、首章样本、审稿二改、发布包和复盘验收。"
+      : repairItems.length > 0
+        ? `先修复 ${repairItems.length} 本作品的真实样本证据，补齐后再考虑批量。`
+        : holdItems.length > 0
+          ? `${holdItems.length} 本作品证据已到总闸门，先暂停批量，等总闸门确认放大。`
+          : "所有作品都已到发布复盘口径，可以开始检查平台包和反馈记录。",
+    totalProjects: items.length,
+    passCount: passItems.length,
+    repairCount: repairItems.length,
+    holdBatchCount: holdItems.length,
+    primaryActionLabel: primaryItem?.realSampleValidation.nextActionLabel ?? "创建作品",
+    primaryActionHref: primaryItem?.realSampleValidation.nextActionHref ?? "#create-project",
+  };
+}
+
 export function buildProjectRoleWorkflowEntrypoints(): ProjectRoleWorkflowEntrypoint[] {
   return [
     {
@@ -885,6 +923,7 @@ export function buildProjectListDashboard(
     },
     pmFocus: buildProjectListPmFocus(items),
     pipelineProofSummary: buildPipelineProofSummary(items),
+    pipelineAcceptanceSummary: buildPipelineAcceptanceSummary(items),
     roleEntrypoints: buildProjectRoleWorkflowEntrypoints(),
     items,
   };

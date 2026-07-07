@@ -24,3 +24,13 @@ test("projects page shows the portfolio pipeline bottleneck receipt", () => {
   assert.ok(source.includes("activePipelineValidationReceipt.requiredEvidence.map"));
   assert.ok(source.includes("activePipelineValidationReceipt.stopIfMissing.map"));
 });
+
+test("projects page shows portfolio pipeline acceptance outcomes", () => {
+  assert.ok(source.includes("dashboard.pipelineAcceptanceSummary"));
+  assert.ok(source.includes("真实流水线验收判定"));
+  assert.ok(source.includes("dashboard.pipelineAcceptanceSummary.passCount"));
+  assert.ok(source.includes("dashboard.pipelineAcceptanceSummary.repairCount"));
+  assert.ok(source.includes("dashboard.pipelineAcceptanceSummary.holdBatchCount"));
+  assert.ok(source.includes("dashboard.pipelineAcceptanceSummary.primaryActionHref"));
+  assert.ok(source.includes("dashboard.pipelineAcceptanceSummary.primaryActionLabel"));
+});

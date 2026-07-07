@@ -482,6 +482,28 @@ test("buildProjectListDashboard", async (t) => {
     assert.ok(dashboard.pipelineProofSummary.validationReceipt.stopIfMissing.some((item) => item.includes("停在作品工作台")));
   });
 
+  await t.test("summarizes portfolio pipeline acceptance outcomes", () => {
+    const dashboard = buildProjectListDashboard([emptyProject, completeProject, handoffBlockedProject], [
+      {
+        id: "provider-1",
+        providerId: "mock",
+        displayName: "Mock",
+        defaultModel: "mock-novel",
+        enabled: true,
+        encryptedApiKey: "secret",
+      },
+    ]);
+
+    assert.equal(dashboard.pipelineAcceptanceSummary.totalProjects, 3);
+    assert.equal(dashboard.pipelineAcceptanceSummary.passCount, 0);
+    assert.equal(dashboard.pipelineAcceptanceSummary.repairCount, 2);
+    assert.equal(dashboard.pipelineAcceptanceSummary.holdBatchCount, 1);
+    assert.ok(dashboard.pipelineAcceptanceSummary.headline.includes("真实流水线验收"));
+    assert.ok(dashboard.pipelineAcceptanceSummary.verdict.includes("先修复"));
+    assert.equal(dashboard.pipelineAcceptanceSummary.primaryActionLabel, "补开书骨架");
+    assert.equal(dashboard.pipelineAcceptanceSummary.primaryActionHref, "/projects/empty-project");
+  });
+
   await t.test("keeps a validation receipt on each portfolio pipeline filter", () => {
     const dashboard = buildProjectListDashboard([emptyProject, completeProject, handoffBlockedProject], [
       {

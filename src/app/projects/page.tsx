@@ -182,6 +182,36 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps) 
         </div>
       </section>
       <section className="mb-6 rounded-md border border-slate-200 bg-white p-4">
+        <div className="mb-4 rounded-md border border-slate-200 bg-slate-50 p-3">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <div className="text-xs font-medium text-slate-500">真实流水线验收判定</div>
+              <h2 className="mt-1 font-medium text-slate-950">{dashboard.pipelineAcceptanceSummary.headline}</h2>
+              <p className="mt-1 text-sm leading-6 text-slate-600">{dashboard.pipelineAcceptanceSummary.verdict}</p>
+            </div>
+            <Link className="w-fit rounded-md bg-slate-950 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800" href={dashboard.pipelineAcceptanceSummary.primaryActionHref}>
+              {dashboard.pipelineAcceptanceSummary.primaryActionLabel}
+            </Link>
+          </div>
+          <div className="mt-3 grid gap-2 sm:grid-cols-4">
+            <div className="rounded-md bg-white p-3 text-sm">
+              <div className="text-xs text-slate-500">作品样本</div>
+              <div className="mt-1 font-semibold text-slate-950">{dashboard.pipelineAcceptanceSummary.totalProjects}</div>
+            </div>
+            <div className="rounded-md bg-emerald-50 p-3 text-sm text-emerald-900">
+              <div className="text-xs opacity-75">通过</div>
+              <div className="mt-1 font-semibold">{dashboard.pipelineAcceptanceSummary.passCount}</div>
+            </div>
+            <div className="rounded-md bg-amber-50 p-3 text-sm text-amber-900">
+              <div className="text-xs opacity-75">暂停批量</div>
+              <div className="mt-1 font-semibold">{dashboard.pipelineAcceptanceSummary.holdBatchCount}</div>
+            </div>
+            <div className="rounded-md bg-rose-50 p-3 text-sm text-rose-900">
+              <div className="text-xs opacity-75">需修复</div>
+              <div className="mt-1 font-semibold">{dashboard.pipelineAcceptanceSummary.repairCount}</div>
+            </div>
+          </div>
+        </div>
         <div className="flex flex-col gap-2 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <div className="text-xs font-medium text-slate-500">组合流水线瓶颈</div>

@@ -1,5 +1,5 @@
 import { buildModelTaskAuditDashboard, type ModelAuditProvider, type ModelAuditTask } from "../ai/modelTaskAudit.ts";
-import { getPlatformProfile, type PlatformId } from "../platforms/platformProfiles.ts";
+import { getPlatformProfile, platformDeliveryScope, type PlatformId } from "../platforms/platformProfiles.ts";
 import { buildFirstDayContinuationAction } from "./firstDayContinuation.ts";
 import { buildFirstDayRiskProfile, buildFirstDayWorkflow, type FirstDayAiTask, type FirstDayChapter, type FirstDayCharacter, type FirstDayOutlineNode, type FirstDayRiskLevel, type FirstDayWorldEntry } from "./firstDayWorkflow.ts";
 import { findProjectStartTacticSummary } from "./projectStartTactics.ts";
@@ -69,8 +69,20 @@ export interface ProjectListDashboard {
     watchProjects: number;
     blockedProjects: number;
   };
+  pmFocus: ProjectListPmFocus;
   roleEntrypoints: ProjectRoleWorkflowEntrypoint[];
   items: ProjectListItem[];
+}
+
+export interface ProjectListPmFocus {
+  status: "empty" | "blocked" | "needs_action" | "ready";
+  headline: string;
+  detail: string;
+  scopeLabel: string;
+  projectId: string | null;
+  projectTitle: string | null;
+  actionLabel: string;
+  actionHref: string;
 }
 
 export interface ProjectRoleWorkflowEntrypoint {
@@ -151,6 +163,47 @@ function riskFlags(input: {
   if (input.wordProgressPercent < 1 && input.chapterCount > 0) flags.push("还没进入有效字数生产");
   if (flags.length === 0) flags.push("暂无明显阻塞");
   return flags;
+}
+
+function buildProjectListPmFocus(items: ProjectListItem[]): ProjectListPmFocus {
+  const scopeLabel = `${platformDeliveryScope.statusLabel} · ${platformDeliveryScope.expansionLabel}`;
+  if (items.length === 0) {
+    return {
+      status: "empty",
+      headline: "先开一本书，别在空工作台里谈平台战略。",
+      detail: "当前没有作品。先创建项目、选定 8 个核心平台之一，再让大纲、人物、章节和平台包进入同一条生产线。",
+      scopeLabel,
+      projectId: null,
+      projectTitle: null,
+      actionLabel: "创建作品",
+      actionHref: "#create-project",
+    };
+  }
+
+  const target = items[0];
+  const status = target.healthScore < 50
+    ? "blocked"
+    : target.healthScore < 75
+      ? "needs_action"
+      : "ready";
+  const leadingRisk = target.riskFlags.find((flag) => flag !== "暂无明显阻塞") ?? target.riskFlags[0] ?? "暂无明显阻塞";
+  const headline = status === "ready"
+    ? `${target.title} 可以继续推进，但别跳过验收。`
+    : `${target.title} 先处理：${target.nextAction}`;
+  const detail = status === "ready"
+    ? `当前最健康的作品是 ${target.platformName} · ${target.genre}，下一步仍要按写作、审稿、发布预检逐段留痕。`
+    : `当前最该盯的是 ${target.platformName} · ${target.genre}：${leadingRisk}。先完成这个动作，再谈批量生成或新增入口。`;
+
+  return {
+    status,
+    headline,
+    detail,
+    scopeLabel,
+    projectId: target.id,
+    projectTitle: target.title,
+    actionLabel: target.nextAction,
+    actionHref: target.nextActionHref,
+  };
 }
 
 export function buildProjectRoleWorkflowEntrypoints(): ProjectRoleWorkflowEntrypoint[] {
@@ -378,6 +431,7 @@ export function buildProjectListDashboard(
       watchProjects: items.filter((item) => item.riskLevel === "watch").length,
       blockedProjects: items.filter((item) => item.riskLevel === "blocked").length,
     },
+    pmFocus: buildProjectListPmFocus(items),
     roleEntrypoints: buildProjectRoleWorkflowEntrypoints(),
     items,
   };

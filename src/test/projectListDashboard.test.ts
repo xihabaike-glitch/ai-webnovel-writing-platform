@@ -186,6 +186,28 @@ test("buildProjectListDashboard", async (t) => {
     assert.equal(dashboard.items[1].nextAction, "启动二改");
   });
 
+  await t.test("surfaces a toxic PM portfolio focus before project cards", () => {
+    const dashboard = buildProjectListDashboard([completeProject, emptyProject], [
+      {
+        id: "provider-1",
+        providerId: "mock",
+        displayName: "Mock",
+        defaultModel: "mock-novel",
+        enabled: true,
+        encryptedApiKey: "secret",
+      },
+    ]);
+
+    assert.equal(dashboard.pmFocus.status, "blocked");
+    assert.equal(dashboard.pmFocus.projectId, "empty-project");
+    assert.ok(dashboard.pmFocus.headline.includes("空白新坑"));
+    assert.ok(dashboard.pmFocus.detail.includes("没有章节卡"));
+    assert.ok(dashboard.pmFocus.scopeLabel.includes("8/8 核心平台已完成"));
+    assert.ok(dashboard.pmFocus.scopeLabel.includes("剩余 10 个平台不再添加"));
+    assert.equal(dashboard.pmFocus.actionLabel, dashboard.items[0].nextAction);
+    assert.equal(dashboard.pmFocus.actionHref, dashboard.items[0].nextActionHref);
+  });
+
   await t.test("exposes role workflow anchors for reference role entry links", () => {
     const dashboard = buildProjectListDashboard([completeProject], [
       {

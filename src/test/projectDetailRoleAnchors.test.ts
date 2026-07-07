@@ -117,6 +117,7 @@ test("project detail page carries gate return through first day workflow links",
   assert.ok(firstDayWorkflowPanel.includes("href={hrefWithGateReturn(workflow.nextStep.href, gateReturnHref)}"));
   assert.ok(firstDayWorkflowPanel.includes("href={hrefWithGateReturn(workflow.executionPackage.href, gateReturnHref)}"));
   assert.ok(firstDayWorkflowPanel.includes("href={hrefWithGateReturn(\"/dispatch\", gateReturnHref)}"));
+  assert.ok(firstDayWorkflowPanel.includes("gateReviewHref: gateReturnHref ?? \"/gate?focus=first-day-risk\""));
   assert.ok(firstDayWorkflowPanel.includes("href={hrefWithGateReturn(modelSettingsRepairHref(modelRoute, projectId), gateReturnHref)}"));
   assert.ok(firstDayWorkflowPanel.includes("<FirstDayStepCard gateReturnHref={gateReturnHref} index={index} key={step.id} step={step} />"));
 });

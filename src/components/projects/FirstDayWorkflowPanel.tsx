@@ -680,7 +680,7 @@ export function FirstDayWorkflowPanel({
     riskNotice,
     nextStepLabel: workflow.nextStep.label,
     routeRepairHref: modelRoute ? modelSettingsRepairHref(modelRoute, projectId) : "/settings/models",
-    gateReviewHref: "/gate?focus=first-day-risk",
+    gateReviewHref: gateReturnHref ?? "/gate?focus=first-day-risk",
     workflowHref: "#first-day-workflow",
   }) : null;
 

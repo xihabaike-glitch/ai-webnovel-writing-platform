@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
 const source = readFileSync("src/components/gate/GateDispatchTaskCenter.tsx", "utf8");
+const dispatchPageSource = readFileSync("src/app/dispatch/page.tsx", "utf8");
 
 test("dispatch task center sends completed acceptance dispatches back to gate recheck", () => {
   assert.ok(source.includes("dispatchGateRecheckHref"));
@@ -24,4 +25,14 @@ test("dispatch task center points completed dispatches back to remaining gate bl
   assert.ok(source.includes("回总闸门复检并查看剩余卡点"));
   assert.ok(source.includes("查看剩余卡点"));
   assert.ok(source.includes("buildGateRecheckActionLink(updated.task)"));
+});
+
+test("dispatch task center carries gate return into internal work links", () => {
+  assert.ok(dispatchPageSource.includes("gateReturnHref={gateReturn}"));
+  assert.ok(source.includes("gateReturnHref?: string | null"));
+  assert.ok(source.includes("function hrefWithGateReturn"));
+  assert.ok(source.includes("href={hrefWithGateReturn(firstDayDesk.nextTask.firstDayHref, gateReturnHref)}"));
+  assert.ok(source.includes("href={hrefWithGateReturn(card.firstDayHref, gateReturnHref)}"));
+  assert.ok(source.includes("href={hrefWithGateReturn(card.href, gateReturnHref)}"));
+  assert.ok(source.includes("href={hrefWithGateReturn(task.href, gateReturnHref)}"));
 });

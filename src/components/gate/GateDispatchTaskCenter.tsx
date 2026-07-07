@@ -55,6 +55,18 @@ import {
   type RouteDispatchCompletionRecord,
 } from "@/lib/model-gateway/routeConfirmation";
 
+function hrefWithGateReturn(href: string, gateReturnHref?: string | null) {
+  if (!gateReturnHref || !href.startsWith("/") || href.startsWith("/gate")) return href;
+
+  const hashIndex = href.indexOf("#");
+  const base = hashIndex >= 0 ? href.slice(0, hashIndex) : href;
+  const hash = hashIndex >= 0 ? href.slice(hashIndex) : "";
+  if (base.includes("gateReturn=")) return href;
+  const separator = base.includes("?") ? "&" : "?";
+
+  return `${base}${separator}gateReturn=${encodeURIComponent(gateReturnHref)}${hash}`;
+}
+
 function stateClass(state: GatePlatformGrowthDispatchState) {
   if (state === "queued") return "bg-amber-50 text-amber-700";
   if (state === "assigned") return "bg-emerald-50 text-emerald-700";
@@ -224,6 +236,7 @@ export function GateDispatchTaskCenter({
   initialRealSampleMissingDispatch,
   routeConfirmationDispatchFlow,
   initialQueueFilter = "all",
+  gateReturnHref,
 }: {
   initialFirstDayFocus?: FirstDayDispatchFocusInput;
   initialReceipts: GateActionReceipt[];
@@ -232,6 +245,7 @@ export function GateDispatchTaskCenter({
   initialRealSampleMissingDispatch?: GatePlatformGrowthDispatchItem | null;
   routeConfirmationDispatchFlow: RouteConfirmationDispatchFlow;
   initialQueueFilter?: DispatchQueueFilter;
+  gateReturnHref?: string | null;
 }) {
   const router = useRouter();
   const [tasks, setTasks] = useState(initialTasks);
@@ -1039,7 +1053,7 @@ export function GateDispatchTaskCenter({
                       {runningRouteActionLink ? "执行中" : firstDayDesk.nextTask.continuation.label}
                     </button>
                   ) : null}
-                  <Link className="rounded-md bg-white px-3 py-2 text-sm font-medium text-slate-950 hover:bg-slate-100" href={firstDayDesk.nextTask.firstDayHref}>
+                  <Link className="rounded-md bg-white px-3 py-2 text-sm font-medium text-slate-950 hover:bg-slate-100" href={hrefWithGateReturn(firstDayDesk.nextTask.firstDayHref, gateReturnHref)}>
                     回作品执行
                   </Link>
                   <button
@@ -1113,10 +1127,10 @@ export function GateDispatchTaskCenter({
                   ))}
                 </div>
                 <div className="mt-3 flex flex-wrap gap-2">
-                  <Link className="rounded-md bg-slate-950 px-2 py-1 text-xs font-medium text-white hover:bg-slate-800" href={card.firstDayHref}>
+                  <Link className="rounded-md bg-slate-950 px-2 py-1 text-xs font-medium text-white hover:bg-slate-800" href={hrefWithGateReturn(card.firstDayHref, gateReturnHref)}>
                     回作品
                   </Link>
-                  <Link className="rounded-md bg-white px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50" href={card.href}>
+                  <Link className="rounded-md bg-white px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50" href={hrefWithGateReturn(card.href, gateReturnHref)}>
                     {card.actionLabel}
                   </Link>
                 </div>
@@ -1911,7 +1925,7 @@ export function GateDispatchTaskCenter({
                 >
                   {runningKey === task.dispatchKey ? "处理中" : actionLabel(task.state)}
                 </button>
-                <Link className="rounded-md bg-slate-950 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800" href={task.href}>
+                <Link className="rounded-md bg-slate-950 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800" href={hrefWithGateReturn(task.href, gateReturnHref)}>
                   打开入口
                 </Link>
               </div>

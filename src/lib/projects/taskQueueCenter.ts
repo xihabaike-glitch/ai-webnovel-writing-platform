@@ -125,7 +125,7 @@ export interface QueueItem {
   platformName: string;
   category: "candidate" | "handoff" | "draft" | "review" | "second_pass" | "effect" | "export" | "blocked";
   blockerType: "chapter_card" | "publish_repair" | "export_version" | "risk_recovery" | "watch_scale_gate" | "first_day_gate" | null;
-  sourceType?: "first_day_handoff" | "first_three_adoption" | "tactic_experience_followup" | "export_version_recheck";
+  sourceType?: "first_day_handoff" | "first_three_adoption" | "tactic_experience_followup" | "export_version_recheck" | "platform_strategy";
   sourceLabel?: string;
   sourceDetail?: string;
   sourceDispatchKey?: string;
@@ -368,6 +368,7 @@ export function recommendedQueueActionLabel(entry: QueueItem | null) {
   if (entry.sourceType === "first_three_adoption") return `下一步：采纳闭环 · ${entry.actionLabel}`;
   if (isAiPipelineRecoveryFollowupItem(entry)) return `下一步：AI 写审改恢复 · ${entry.actionLabel}`;
   if (entry.sourceType === "tactic_experience_followup") return `下一步：打法闭环 · ${entry.actionLabel}`;
+  if (entry.sourceType === "platform_strategy") return `下一步：平台策略 · ${entry.actionLabel}`;
   return `下一步：${entry.actionLabel}`;
 }
 
@@ -414,6 +415,16 @@ export function taskQueueSourcePresentation(entry: QueueItem | null): TaskQueueS
       tone: "standard",
       badgeClass: "bg-cyan-50 text-cyan-700",
       detailClass: "border-cyan-200 bg-cyan-50 text-cyan-950",
+      returnHref: null,
+      returnLabel: null,
+    };
+  }
+
+  if (entry?.sourceType === "platform_strategy") {
+    return {
+      tone: "standard",
+      badgeClass: "bg-violet-50 text-violet-700",
+      detailClass: "border-violet-200 bg-violet-50 text-violet-950",
       returnHref: null,
       returnLabel: null,
     };
@@ -1383,6 +1394,49 @@ function completedEffectActionFollowup(input: {
   return null;
 }
 
+function platformStrategyQueueItem(input: {
+  project: TaskQueueProject;
+  projectHref: string;
+  platformName: string;
+  startTactic: ProjectStartTacticSummary | null;
+  riskLevel: FirstDayRiskLevel;
+  riskLabel: string;
+  riskNotice: string | null;
+  scaleGate: QueueScaleGate;
+  packageReady: boolean;
+  plan: NonNullable<ReturnType<typeof buildPlatformPublishExportCenter>["activeStrategyPlan"]>;
+}) {
+  const step = input.plan.steps.find((candidate) => candidate.status === "next") ?? null;
+  if (!step || input.plan.progress.status === "complete") return null;
+  if (!input.packageReady || step.id !== "save-evidence-baseline") return null;
+  const execution: PublishEffectQueueExecution = "open_target";
+
+  return item({
+    id: `${input.project.id}:platform-strategy:${input.plan.platformId}:${step.id}`,
+    projectId: input.project.id,
+    projectTitle: input.project.title,
+    platformName: input.plan.platformName || input.platformName,
+    category: "effect",
+    sourceType: "platform_strategy",
+    sourceLabel: "平台策略",
+    sourceDetail: input.plan.decisionBasis,
+    chapterTitle: "主平台策略执行链",
+    evidence: input.plan.progress.verdict,
+    strategyBasis: input.startTactic,
+    riskLevel: input.riskLevel,
+    riskLabel: input.riskLabel,
+    riskNotice: input.riskNotice,
+    scaleGate: input.scaleGate,
+    actionLabel: step.label,
+    href: `${input.projectHref}${step.href}`,
+    effectAction: {
+      platformId: input.plan.platformId,
+      execution,
+      actionId: `platform-strategy:${input.plan.platformId}:${execution}`,
+    },
+  });
+}
+
 export function buildTaskQueueCenter(projects: TaskQueueProject[]): TaskQueueCenter {
   const platformReadinessSummaries: PlatformReadinessSummary[] = [];
   const items = projects.flatMap((project) => {
@@ -1665,6 +1719,22 @@ export function buildTaskQueueCenter(projects: TaskQueueProject[]): TaskQueueCen
     }
 
     const targetPackage = exportCenter.packages.find((pack) => pack.platformId === platform.id) ?? exportCenter.packages[0];
+    const activePlatformStrategyItem = firstDayGateCleared && exportCenter.activeStrategyPlan
+      ? platformStrategyQueueItem({
+        project,
+        projectHref,
+        platformName: platform.name,
+        startTactic,
+        riskLevel: riskProfile.level,
+        riskLabel: riskProfile.label,
+        riskNotice,
+        scaleGate,
+        packageReady: targetPackage.canExport,
+        plan: exportCenter.activeStrategyPlan,
+      })
+      : null;
+    if (activePlatformStrategyItem) queueItems.push(activePlatformStrategyItem);
+
     const effectQueuePackages = [
       targetPackage,
       ...exportCenter.packages.filter((pack) => pack.platformId !== targetPackage.platformId),

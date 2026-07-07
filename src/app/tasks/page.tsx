@@ -1624,6 +1624,11 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
                     ) : null}
                   </div>
                 ) : null}
+                {entry.sourceType === "platform_strategy" && entry.sourceDetail ? (
+                  <div className={`mt-3 rounded-md border px-3 py-2 text-xs leading-5 ${taskQueueSourcePresentation(entry)?.detailClass ?? "border-violet-200 bg-violet-50 text-violet-950"}`}>
+                    <span className="font-medium">{entry.sourceLabel}：</span>{entry.sourceDetail}
+                  </div>
+                ) : null}
                 {entry.sourceType === "tactic_experience_followup" && entry.sourceDispatchKey ? (
                   <CompleteTacticExperienceFollowupForm
                     actionLabel={entry.actionLabel}

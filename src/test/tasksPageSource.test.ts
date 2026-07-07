@@ -98,3 +98,8 @@ test("tasks page carries gate return through task work links", () => {
   assert.ok(batchRhythmDispatchButton.includes("function hrefWithGateReturn"));
   assert.ok(batchRhythmDispatchButton.includes("router.push(hrefWithGateReturn(`/dispatch#dispatch-${payload.task.dispatchKey}`, gateReturnHref));"));
 });
+
+test("tasks page shows platform strategy task source detail", () => {
+  assert.ok(source.includes("entry.sourceType === \"platform_strategy\" && entry.sourceDetail"));
+  assert.ok(source.includes("border-violet-200 bg-violet-50 text-violet-950"));
+});

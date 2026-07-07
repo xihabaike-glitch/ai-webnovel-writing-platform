@@ -604,6 +604,20 @@ test("buildTaskQueueCenter", async (t) => {
     assert.equal(queue.recommendedNext?.href, "/projects/project-1#submission-asset-editor");
   });
 
+  await t.test("surfaces active platform strategy chain in the task center", () => {
+    const queue = buildTaskQueueCenter([publishReadyProject()]);
+    const strategyItem = queue.items.find((entry) => entry.id === "project-1:platform-strategy:fanqie:save-evidence-baseline");
+
+    assert.equal(strategyItem?.sourceType, "platform_strategy");
+    assert.equal(strategyItem?.category, "effect");
+    assert.equal(strategyItem?.chapterTitle, "主平台策略执行链");
+    assert.equal(strategyItem?.actionLabel, "保存证据基准");
+    assert.ok(strategyItem?.evidence.includes("先处理「保存证据基准」"));
+    assert.equal(strategyItem?.href, "/projects/project-1#package-version-history");
+    assert.equal(queue.recommendedNext?.id, strategyItem?.id);
+    assert.equal(recommendedQueueActionLabel(queue.recommendedNext), "下一步：平台策略 · 保存证据基准");
+  });
+
   await t.test("advances completed publish asset optimization into candidate adoption", () => {
     const queue = buildTaskQueueCenter([publishReadyProject({
       publishSnapshots: [publishBaseline],

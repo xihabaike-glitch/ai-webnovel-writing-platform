@@ -64,12 +64,26 @@ function actionRecheckHref(action: PrePublishGateAction) {
   return `/gate?focus=action-recheck&actionId=${encodeURIComponent(action.id)}#gate-focus-notice`;
 }
 
+function hrefWithGateReturn(href: string, gateReturnHref?: string | null) {
+  if (!gateReturnHref || !href.startsWith("/") || href.startsWith("/gate")) return href;
+
+  const hashIndex = href.indexOf("#");
+  const base = hashIndex >= 0 ? href.slice(0, hashIndex) : href;
+  const hash = hashIndex >= 0 ? href.slice(hashIndex) : "";
+  if (base.includes("gateReturn=")) return href;
+  const separator = base.includes("?") ? "&" : "?";
+
+  return `${base}${separator}gateReturn=${encodeURIComponent(gateReturnHref)}${hash}`;
+}
+
 export function GatePriorityActionCard({
   action,
+  gateReturnHref,
   index,
   onReceipt,
 }: {
   action: PrePublishGateAction;
+  gateReturnHref?: string | null;
   index: number;
   onReceipt?: (receipt: GateActionReceipt) => void;
 }) {
@@ -170,7 +184,7 @@ export function GatePriorityActionCard({
             {isRunning ? "处理中" : label}
           </button>
         ) : null}
-        <Link className="rounded-md border border-current px-3 py-2 text-xs font-medium opacity-80 hover:opacity-100" href={action.href}>
+        <Link className="rounded-md border border-current px-3 py-2 text-xs font-medium opacity-80 hover:opacity-100" href={hrefWithGateReturn(action.href, gateReturnHref)}>
           打开位置
         </Link>
       </div>

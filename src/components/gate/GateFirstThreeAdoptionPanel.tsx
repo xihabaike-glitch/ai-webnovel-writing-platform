@@ -129,6 +129,18 @@ function runnableReviewItems(items: PrePublishGateAdoptionFollowupItem[]) {
   });
 }
 
+function hrefWithGateReturn(href: string, gateReturnHref?: string | null) {
+  if (!gateReturnHref || !href.startsWith("/") || href.startsWith("/gate")) return href;
+
+  const hashIndex = href.indexOf("#");
+  const base = hashIndex >= 0 ? href.slice(0, hashIndex) : href;
+  const hash = hashIndex >= 0 ? href.slice(hashIndex) : "";
+  if (base.includes("gateReturn=")) return href;
+  const separator = base.includes("?") ? "&" : "?";
+
+  return `${base}${separator}gateReturn=${encodeURIComponent(gateReturnHref)}${hash}`;
+}
+
 function runnablePublishItems(items: PrePublishGateAdoptionFollowupItem[]) {
   const seen = new Set<string>();
   return items.filter((item) => {
@@ -149,7 +161,7 @@ function completionEvidenceForFollowup(item: PrePublishGateAdoptionFollowupItem,
   return `采纳后发布质检已刷新：${item.title}${result.message ? `，${result.message}` : ""}。`;
 }
 
-export function GateFirstThreeAdoptionPanel({ closure }: { closure: PrePublishGateAdoptionClosure }) {
+export function GateFirstThreeAdoptionPanel({ closure, gateReturnHref }: { closure: PrePublishGateAdoptionClosure; gateReturnHref?: string | null }) {
   const router = useRouter();
   const [runningId, setRunningId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -376,7 +388,7 @@ export function GateFirstThreeAdoptionPanel({ closure }: { closure: PrePublishGa
           {topRepairQueueItem && (!topRepairFollowupItem || !topRepairExecuteLabel) ? (
             <Link
               className="rounded-md bg-rose-700 px-3 py-2 text-xs font-medium text-white hover:bg-rose-800"
-              href={topRepairQueueItem.href}
+              href={hrefWithGateReturn(topRepairQueueItem.href, gateReturnHref)}
             >
               优先处理：{topRepairQueueItem.actionLabel}
             </Link>
@@ -489,7 +501,7 @@ export function GateFirstThreeAdoptionPanel({ closure }: { closure: PrePublishGa
                         {runningId === followupItem.id ? "处理中" : label}
                       </button>
                     ) : null}
-                    <Link className="rounded-md border border-white/80 bg-white/70 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-white" href={item.href}>
+                    <Link className="rounded-md border border-white/80 bg-white/70 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-white" href={hrefWithGateReturn(item.href, gateReturnHref)}>
                       打开位置
                     </Link>
                     <span className="text-xs font-medium opacity-80">{itemResult ? followupResultText(itemResult) : item.actionLabel}</span>
@@ -514,7 +526,7 @@ export function GateFirstThreeAdoptionPanel({ closure }: { closure: PrePublishGa
                   <div className="font-medium text-slate-950">{timeline.label}</div>
                   <p className="mt-1 text-xs leading-5 text-slate-600">{timeline.detail}</p>
                 </div>
-                <Link className="w-fit rounded-md border border-slate-200 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50" href={timeline.href}>
+                <Link className="w-fit rounded-md border border-slate-200 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50" href={hrefWithGateReturn(timeline.href, gateReturnHref)}>
                   {timeline.nextActionLabel}
                 </Link>
               </div>
@@ -586,7 +598,7 @@ export function GateFirstThreeAdoptionPanel({ closure }: { closure: PrePublishGa
                       {runningId === item.id ? "处理中" : label}
                     </button>
                   ) : null}
-                  <Link className="rounded-md border border-slate-200 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50" href={item.href}>
+                  <Link className="rounded-md border border-slate-200 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50" href={hrefWithGateReturn(item.href, gateReturnHref)}>
                     打开位置
                   </Link>
                   <span className="text-xs font-medium text-slate-500">{item.actionLabel}</span>

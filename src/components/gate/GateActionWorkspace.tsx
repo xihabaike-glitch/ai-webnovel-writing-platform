@@ -110,6 +110,18 @@ function recommendedBatchFocusClass(tone: GateRecommendedBatchReceiptFocusTone) 
   return "border-amber-200 bg-amber-50 text-amber-900";
 }
 
+function hrefWithGateReturn(href: string, gateReturnHref?: string | null) {
+  if (!gateReturnHref || !href.startsWith("/") || href.startsWith("/gate")) return href;
+
+  const hashIndex = href.indexOf("#");
+  const base = hashIndex >= 0 ? href.slice(0, hashIndex) : href;
+  const hash = hashIndex >= 0 ? href.slice(hashIndex) : "";
+  if (base.includes("gateReturn=")) return href;
+  const separator = base.includes("?") ? "&" : "?";
+
+  return `${base}${separator}gateReturn=${encodeURIComponent(gateReturnHref)}${hash}`;
+}
+
 function failureRepairReviewClass(status: ReturnType<typeof buildGateFailureRepairReceiptReview>["status"]) {
   if (status === "cleared" || status === "clear") return "border-emerald-200 bg-emerald-50 text-emerald-900";
   if (status === "recheck") return "border-blue-200 bg-blue-50 text-blue-900";
@@ -355,9 +367,11 @@ function batchTacticEffectLabel(status: GateBatchTacticEffectStatus) {
 export function GateActionWorkspace({
   actions,
   failureRepairBatch,
+  gateReturnHref,
 }: {
   actions: PrePublishGateAction[];
   failureRepairBatch: FailureRepairBatch;
+  gateReturnHref?: string | null;
 }) {
   const router = useRouter();
   const [receipts, setReceipts] = useState<GateActionReceipt[]>([]);
@@ -544,7 +558,7 @@ export function GateActionWorkspace({
     <div className="grid gap-4">
       <div className="grid gap-2">
         {actions.map((action, index) => (
-          <GatePriorityActionCard action={action} index={index} key={action.id} onReceipt={addReceipt} />
+          <GatePriorityActionCard action={action} gateReturnHref={gateReturnHref} index={index} key={action.id} onReceipt={addReceipt} />
         ))}
         {actions.length === 0 ? (
           <p className="rounded-md bg-slate-50 p-3 text-sm text-slate-600">暂无需要处理的动作。</p>
@@ -565,7 +579,7 @@ export function GateActionWorkspace({
             </div>
             <Link
               className="w-fit shrink-0 rounded-md bg-white px-3 py-2 text-xs font-medium text-slate-950"
-              href={recommendedBatchFocus.primaryHref}
+              href={hrefWithGateReturn(recommendedBatchFocus.primaryHref, gateReturnHref)}
             >
               {recommendedBatchFocus.primaryLabel}
             </Link>
@@ -660,7 +674,7 @@ export function GateActionWorkspace({
               </div>
               <Link
                 className="w-fit rounded-md bg-white px-3 py-2 text-xs font-medium text-slate-950"
-                href={failureRepairReview.href}
+                href={hrefWithGateReturn(failureRepairReview.href, gateReturnHref)}
               >
                 {failureRepairReview.actionLabel}
               </Link>
@@ -684,7 +698,7 @@ export function GateActionWorkspace({
               </div>
               <Link
                 className="w-fit rounded-md bg-white px-3 py-2 text-xs font-medium text-slate-950"
-                href={failureRepairResolution.href}
+                href={hrefWithGateReturn(failureRepairResolution.href, gateReturnHref)}
               >
                 {failureRepairResolution.actionLabel}
               </Link>
@@ -710,7 +724,7 @@ export function GateActionWorkspace({
               </div>
               <Link
                 className="w-fit rounded-md bg-white px-3 py-2 text-xs font-medium text-slate-950"
-                href={failureRepairThirdRound.href}
+                href={hrefWithGateReturn(failureRepairThirdRound.href, gateReturnHref)}
               >
                 {failureRepairThirdRound.actionLabel}
               </Link>
@@ -739,7 +753,7 @@ export function GateActionWorkspace({
             </div>
             <Link
               className="w-fit rounded-md border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
-              href="/dispatch"
+              href={hrefWithGateReturn("/dispatch", gateReturnHref)}
             >
               打开派单中心
             </Link>
@@ -789,7 +803,7 @@ export function GateActionWorkspace({
                   <div className="mt-3 flex flex-wrap items-center gap-2">
                     <Link
                       className="rounded-md bg-white px-3 py-2 text-xs font-medium text-slate-950"
-                      href={item.href}
+                      href={hrefWithGateReturn(item.href, gateReturnHref)}
                     >
                       {item.actionLabel}
                     </Link>
@@ -827,7 +841,7 @@ export function GateActionWorkspace({
             </div>
             <Link
               className="w-fit rounded-md border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
-              href="/dispatch"
+              href={hrefWithGateReturn("/dispatch", gateReturnHref)}
             >
               去收验证任务
             </Link>
@@ -884,7 +898,7 @@ export function GateActionWorkspace({
                   <div className="mt-3 flex flex-wrap items-center gap-2">
                     <Link
                       className="rounded-md bg-white px-3 py-2 text-xs font-medium text-slate-950"
-                      href={plan.status === "ready" ? plan.href : "/dispatch"}
+                      href={hrefWithGateReturn(plan.status === "ready" ? plan.href : "/dispatch", gateReturnHref)}
                     >
                       {plan.status === "ready" ? "打开项目" : "补齐验证"}
                     </Link>
@@ -913,7 +927,7 @@ export function GateActionWorkspace({
             </div>
             <Link
               className="w-fit rounded-md border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
-              href="/dispatch"
+              href={hrefWithGateReturn("/dispatch", gateReturnHref)}
             >
               查看数据回收
             </Link>
@@ -968,7 +982,7 @@ export function GateActionWorkspace({
                   <div className="mt-3 flex flex-wrap items-center gap-2">
                     <Link
                       className="rounded-md bg-white px-3 py-2 text-xs font-medium text-slate-950"
-                      href={item.href}
+                      href={hrefWithGateReturn(item.href, gateReturnHref)}
                     >
                       {item.actionLabel}
                     </Link>
@@ -997,7 +1011,7 @@ export function GateActionWorkspace({
             </div>
             <Link
               className="w-fit rounded-md border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
-              href="/dispatch"
+              href={hrefWithGateReturn("/dispatch", gateReturnHref)}
             >
               查看二轮回收
             </Link>
@@ -1056,7 +1070,7 @@ export function GateActionWorkspace({
                   <div className="mt-3 flex flex-wrap items-center gap-2">
                     <Link
                       className="rounded-md bg-white px-3 py-2 text-xs font-medium text-slate-950"
-                      href={item.href}
+                      href={hrefWithGateReturn(item.href, gateReturnHref)}
                     >
                       {item.actionLabel}
                     </Link>
@@ -1085,7 +1099,7 @@ export function GateActionWorkspace({
             </div>
             <Link
               className="w-fit rounded-md border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
-              href="/dispatch"
+              href={hrefWithGateReturn("/dispatch", gateReturnHref)}
             >
               查看第三轮回收
             </Link>
@@ -1144,7 +1158,7 @@ export function GateActionWorkspace({
                   <div className="mt-3 flex flex-wrap items-center gap-2">
                     <Link
                       className="rounded-md bg-white px-3 py-2 text-xs font-medium text-slate-950"
-                      href={item.href}
+                      href={hrefWithGateReturn(item.href, gateReturnHref)}
                     >
                       {item.actionLabel}
                     </Link>
@@ -1217,7 +1231,7 @@ export function GateActionWorkspace({
                   <div className="mt-3 flex flex-wrap items-center gap-2">
                     <Link
                       className="rounded-md bg-white px-3 py-2 text-xs font-medium text-slate-950"
-                      href={item.href}
+                      href={hrefWithGateReturn(item.href, gateReturnHref)}
                     >
                       {item.actionLabel}
                     </Link>
@@ -1294,7 +1308,7 @@ export function GateActionWorkspace({
                   <div className="mt-3 flex flex-wrap items-center gap-2">
                     <Link
                       className="rounded-md bg-white px-3 py-2 text-xs font-medium text-slate-950"
-                      href={item.href}
+                      href={hrefWithGateReturn(item.href, gateReturnHref)}
                     >
                       {item.actionLabel}
                     </Link>
@@ -1380,7 +1394,7 @@ export function GateActionWorkspace({
                   <div className="mt-3 flex flex-wrap items-center gap-2">
                     <Link
                       className="rounded-md bg-white px-3 py-2 text-xs font-medium text-slate-950"
-                      href={item.href}
+                      href={hrefWithGateReturn(item.href, gateReturnHref)}
                     >
                       {item.actionLabel}
                     </Link>
@@ -1410,7 +1424,7 @@ export function GateActionWorkspace({
             {retreatDispatchItems.length ? (
               <Link
                 className="w-fit rounded-md border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
-                href="/dispatch"
+                href={hrefWithGateReturn("/dispatch", gateReturnHref)}
               >
                 打开派单中心
               </Link>
@@ -1450,14 +1464,14 @@ export function GateActionWorkspace({
                     {item.state === "assigned" ? (
                       <Link
                         className="rounded-md border border-emerald-200 px-3 py-2 text-xs font-medium text-emerald-700 hover:bg-emerald-50"
-                        href="/dispatch"
+                        href={hrefWithGateReturn("/dispatch", gateReturnHref)}
                       >
                         去派单中心收口
                       </Link>
                     ) : null}
                     <Link
                       className="rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white hover:bg-slate-800"
-                      href={item.href}
+                      href={hrefWithGateReturn(item.href, gateReturnHref)}
                     >
                       打开处理入口
                     </Link>
@@ -1515,7 +1529,7 @@ export function GateActionWorkspace({
                   <div className="mt-3 flex flex-wrap items-center gap-2">
                     <Link
                       className="rounded-md bg-white px-3 py-2 text-xs font-medium text-slate-950"
-                      href={item.href}
+                      href={hrefWithGateReturn(item.href, gateReturnHref)}
                     >
                       {item.actionLabel}
                     </Link>
@@ -1597,7 +1611,7 @@ export function GateActionWorkspace({
                   <div className="mt-3 flex flex-wrap items-center gap-2">
                     <Link
                       className="rounded-md bg-white px-3 py-2 text-xs font-medium text-slate-950"
-                      href={item.href}
+                      href={hrefWithGateReturn(item.href, gateReturnHref)}
                     >
                       {item.actionLabel}
                     </Link>
@@ -1633,7 +1647,7 @@ export function GateActionWorkspace({
               </div>
               <Link
                 className="w-fit rounded-md border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
-                href="/dispatch"
+                href={hrefWithGateReturn("/dispatch", gateReturnHref)}
               >
                 打开派单中心
               </Link>
@@ -1671,14 +1685,14 @@ export function GateActionWorkspace({
                     {item.state === "assigned" ? (
                       <Link
                         className="rounded-md border border-white/70 bg-white/80 px-3 py-2 text-xs font-medium text-emerald-800 hover:bg-white"
-                        href="/dispatch"
+                        href={hrefWithGateReturn("/dispatch", gateReturnHref)}
                       >
                         去派单中心收口
                       </Link>
                     ) : null}
                     <Link
                       className="rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white hover:bg-slate-800"
-                      href={item.href}
+                      href={hrefWithGateReturn(item.href, gateReturnHref)}
                     >
                       打开处理入口
                     </Link>
@@ -1752,14 +1766,14 @@ export function GateActionWorkspace({
                     </div>
                     <Link
                       className="w-fit rounded-md bg-white px-3 py-2 text-xs font-medium text-slate-950"
-                      href={item.href}
+                      href={hrefWithGateReturn(item.href, gateReturnHref)}
                     >
                       {item.actionLabel}
                     </Link>
                   </div>
                   <div className="mt-3 grid gap-2">
                     {item.events.slice(0, 4).map((event) => (
-                      <Link className="rounded-md border border-white/70 bg-white/70 p-3 hover:bg-white" href={event.href} key={event.id}>
+                      <Link className="rounded-md border border-white/70 bg-white/70 p-3 hover:bg-white" href={hrefWithGateReturn(event.href, gateReturnHref)} key={event.id}>
                         <div className="flex flex-wrap items-center gap-2">
                           <span className={`rounded-md px-2 py-1 text-xs font-medium ${decisionEventClass(event.type)}`}>{event.label}</span>
                           <span className="text-xs opacity-70">{new Date(event.createdAt).toLocaleString()}</span>
@@ -1949,7 +1963,7 @@ export function GateActionWorkspace({
                             只看该平台
                           </button>
                           {item.status === "usable" ? (
-                            <Link className="rounded-md border border-white/70 bg-slate-950 px-3 py-2 text-xs font-medium text-white hover:bg-slate-800" href={buildGatePlatformTacticExperienceStartHref(item)}>
+                            <Link className="rounded-md border border-white/70 bg-slate-950 px-3 py-2 text-xs font-medium text-white hover:bg-slate-800" href={hrefWithGateReturn(buildGatePlatformTacticExperienceStartHref(item), gateReturnHref)}>
                               用此打法开项目
                             </Link>
                           ) : null}
@@ -2035,7 +2049,7 @@ export function GateActionWorkspace({
                     </button>
                     <Link
                       className="rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white hover:bg-slate-800"
-                      href={item.href}
+                      href={hrefWithGateReturn(item.href, gateReturnHref)}
                     >
                       处理下一步
                     </Link>
@@ -2088,14 +2102,14 @@ export function GateActionWorkspace({
                     {item.state === "assigned" ? (
                       <Link
                         className="rounded-md border border-emerald-200 px-3 py-2 text-xs font-medium text-emerald-700 hover:bg-emerald-50"
-                        href="/dispatch"
+                        href={hrefWithGateReturn("/dispatch", gateReturnHref)}
                       >
                         去派单中心收口
                       </Link>
                     ) : null}
                     <Link
                       className="rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white hover:bg-slate-800"
-                      href={item.href}
+                      href={hrefWithGateReturn(item.href, gateReturnHref)}
                     >
                       打开处理入口
                     </Link>
@@ -2143,7 +2157,7 @@ export function GateActionWorkspace({
                 ) : (
                   <Link
                     className="w-fit shrink-0 rounded-md bg-white px-3 py-2 text-xs font-medium text-slate-950"
-                    href={item.action.href}
+                    href={hrefWithGateReturn(item.action.href, gateReturnHref)}
                     onClick={() => recordAdviceAction(item)}
                     title={adviceActionTitle(item.action.kind)}
                   >
@@ -2178,7 +2192,7 @@ export function GateActionWorkspace({
               ) : (
                 <Link
                   className="w-fit shrink-0 rounded-md bg-white px-3 py-2 text-xs font-medium text-slate-950"
-                  href={latestReceipt.href}
+                  href={hrefWithGateReturn(latestReceipt.href, gateReturnHref)}
                 >
                   {latestReceipt.recheck.actionLabel}
                 </Link>
@@ -2239,7 +2253,7 @@ export function GateActionWorkspace({
                 <span className={`rounded-md border px-2 py-1 text-xs font-medium ${recheckClass(receipt.recheck.status)}`}>
                   {receipt.recheck.label}
                 </span>
-                <Link className="inline-flex text-xs font-medium text-slate-700 hover:underline" href={receipt.href}>
+                <Link className="inline-flex text-xs font-medium text-slate-700 hover:underline" href={hrefWithGateReturn(receipt.href, gateReturnHref)}>
                   打开相关位置
                 </Link>
                 <Link className="inline-flex text-xs font-medium text-slate-700 hover:underline" href="/gate">

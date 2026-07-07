@@ -183,4 +183,42 @@ test("buildChapterProductionSchedule", async (t) => {
     assert.deepEqual(schedule.items[0].missingFields, []);
     assert.deepEqual(Object.keys(schedule.items[0].quickFix?.payload ?? {}).sort(), ["platformNote", "summary"]);
   });
+
+  await t.test("turns length presets into production card targets and structure advice", () => {
+    const shortSchedule = buildChapterProductionSchedule({
+      project: {
+        ...project,
+        targetLengthType: "short_10k",
+        targetWordCount: 10000,
+        currentWordCount: 0,
+      },
+      platform,
+      chapters: [],
+      outlineNodes: [],
+      characters: [],
+      worldEntries: [],
+      foreshadows: [],
+      plotThreads: [],
+    });
+    const longSchedule = buildChapterProductionSchedule({
+      project,
+      platform,
+      chapters: [],
+      outlineNodes: [],
+      characters: [],
+      worldEntries: [],
+      foreshadows: [],
+      plotThreads: [],
+    });
+
+    assert.equal(shortSchedule.dashboard.lengthPlan.minimumProductionCards, 4);
+    assert.equal(shortSchedule.dashboard.lengthPlan.targetWordCount, 10000);
+    assert.ok(shortSchedule.dashboard.lengthPlan.structureFocus.includes("闭环结尾"));
+    assert.ok(shortSchedule.dashboard.warnings.some((warning) => warning.includes("1 万字短篇")));
+    assert.equal(longSchedule.dashboard.lengthPlan.minimumProductionCards, 30);
+    assert.equal(longSchedule.dashboard.lengthPlan.targetWordCount, 300000);
+    assert.ok(longSchedule.dashboard.lengthPlan.structureFocus.includes("主干"));
+    assert.ok(longSchedule.dashboard.warnings.some((warning) => warning.includes("30 万字以上长篇")));
+    assert.ok(longSchedule.dashboard.nextActions.some((action) => action.includes("篇幅打法")));
+  });
 });

@@ -41,9 +41,18 @@ interface ChapterProductionDashboard {
   doneItems: number;
   estimatedRemainingWords: number;
   suggestedDailyWords: number;
+  lengthPlan: ChapterProductionLengthPlan;
   platformName: string;
   warnings: string[];
   nextActions: string[];
+}
+
+interface ChapterProductionLengthPlan {
+  label: string;
+  targetWordCount: number;
+  minimumProductionCards: number;
+  structureFocus: string;
+  acceptanceRule: string;
 }
 
 interface ChapterProductionSchedule {
@@ -225,6 +234,19 @@ export function ChapterProductionPanel({
             <div className="text-xs text-slate-500">日更建议</div>
             <div className="mt-1 text-2xl font-semibold text-slate-950">{dashboard.suggestedDailyWords}</div>
           </div>
+        </div>
+      ) : null}
+
+      {dashboard ? (
+        <div className="mt-3 rounded-md border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="font-medium text-slate-950">篇幅计划</div>
+            <span className="rounded-md bg-white px-2 py-1 text-xs text-slate-600">{dashboard.lengthPlan.label}</span>
+            <span className="rounded-md bg-white px-2 py-1 text-xs text-slate-600">至少 {dashboard.lengthPlan.minimumProductionCards} 张排期卡</span>
+            <span className="rounded-md bg-white px-2 py-1 text-xs text-slate-600">目标 {dashboard.lengthPlan.targetWordCount.toLocaleString("zh-CN")} 字</span>
+          </div>
+          <p className="mt-2 leading-6">{dashboard.lengthPlan.structureFocus}</p>
+          <p className="mt-1 leading-6">验收：{dashboard.lengthPlan.acceptanceRule}</p>
         </div>
       ) : null}
 

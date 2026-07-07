@@ -121,9 +121,18 @@ export interface ChapterProductionDashboard {
   doneItems: number;
   estimatedRemainingWords: number;
   suggestedDailyWords: number;
+  lengthPlan: ChapterProductionLengthPlan;
   platformName: string;
   warnings: string[];
   nextActions: string[];
+}
+
+export interface ChapterProductionLengthPlan {
+  label: string;
+  targetWordCount: number;
+  minimumProductionCards: number;
+  structureFocus: string;
+  acceptanceRule: string;
 }
 
 export interface ChapterProductionSchedule {
@@ -296,9 +305,47 @@ function suggestedDailyWords(project: ProductionProject, platform: PlatformProfi
   return 2500;
 }
 
-function buildWarnings(input: ChapterProductionInput, items: ChapterProductionItem[]) {
+function buildLengthPlan(project: ProductionProject): ChapterProductionLengthPlan {
+  if (project.targetLengthType === "short_10k" || project.targetWordCount <= 20_000) {
+    return {
+      label: "1 万字短篇",
+      targetWordCount: project.targetWordCount,
+      minimumProductionCards: 4,
+      structureFocus: "一个首章强钩子、一个主干反转、一个情绪峰值和一个闭环结尾。",
+      acceptanceRule: "每张排期卡都必须服务同一个核心反转，不能开新大支线。",
+    };
+  }
+  if (project.targetLengthType === "mid_50k" || project.targetWordCount <= 80_000) {
+    return {
+      label: "5-6 万字中篇",
+      targetWordCount: project.targetWordCount,
+      minimumProductionCards: 12,
+      structureFocus: "开头、三段主干、两条可控支线和明确人物弧光收束。",
+      acceptanceRule: "支线只能强化主角变化，不能挤掉主线兑现。",
+    };
+  }
+  if (project.targetLengthType === "mega_1m_plus" || project.targetWordCount >= 800_000) {
+    return {
+      label: "100 万字以上超长篇",
+      targetWordCount: project.targetWordCount,
+      minimumProductionCards: 80,
+      structureFocus: "大树结构要覆盖长期主线、阶段地图、势力分支、伏笔回收和世界规则升级。",
+      acceptanceRule: "每个阶段都要有独立目标、阶段反派和下一阶段引线。",
+    };
+  }
+  return {
+    label: "30 万字以上长篇",
+    targetWordCount: project.targetWordCount,
+    minimumProductionCards: 30,
+    structureFocus: "先定开头和结尾，再铺主干、分支、叶片与土壤，保证长期追读。",
+    acceptanceRule: "主干必须承接人物弧光，分支必须回到主线压力。",
+  };
+}
+
+function buildWarnings(input: ChapterProductionInput, items: ChapterProductionItem[], lengthPlan: ChapterProductionLengthPlan) {
   const warnings: string[] = [];
   if (items.length === 0) warnings.push("还没有可排期的大纲节点，先补开头、主干、分支、叶片和结尾。");
+  if (items.length < lengthPlan.minimumProductionCards) warnings.push(`${lengthPlan.label} 当前只有 ${items.length} 张排期卡，至少先补到 ${lengthPlan.minimumProductionCards} 张，才能支撑目标 ${lengthPlan.targetWordCount} 字。`);
   if (!items.some((item) => item.stage === "开头")) warnings.push("缺少开头排期，平台首章钩子无法落地。");
   if (!items.some((item) => item.stage === "结尾")) warnings.push("缺少结尾排期，长篇会只会往前铺、不知道如何回收。");
   if (items.some((item) => item.status === "blocked")) warnings.push("存在缺目标/钩子/冲突/转变的排期卡，直接生成正文会变成流水账。");
@@ -350,7 +397,8 @@ export function buildChapterProductionSchedule(input: ChapterProductionInput): C
 
   const estimatedRemainingWords = Math.max(input.project.targetWordCount - input.project.currentWordCount, 0);
   const dailyWords = suggestedDailyWords(input.project, input.platform);
-  const warnings = buildWarnings(input, items);
+  const lengthPlan = buildLengthPlan(input.project);
+  const warnings = buildWarnings(input, items, lengthPlan);
   const firstBlocked = items.find((item) => item.status === "blocked");
   const firstOutlineReady = items.find((item) => item.status === "outline_ready");
   const firstCardReady = items.find((item) => item.status === "card_ready");
@@ -365,6 +413,7 @@ export function buildChapterProductionSchedule(input: ChapterProductionInput): C
       doneItems: items.filter((item) => item.status === "done").length,
       estimatedRemainingWords,
       suggestedDailyWords: dailyWords,
+      lengthPlan,
       platformName: input.platform.name,
       warnings,
       nextActions: [
@@ -376,6 +425,7 @@ export function buildChapterProductionSchedule(input: ChapterProductionInput): C
               ? `先写「${firstCardReady.title}」正文初稿。`
               : "先补新的主干/分支节点，继续扩展生产队列。",
         `按 ${dailyWords} 字/日估算，剩余 ${estimatedRemainingWords} 字需要约 ${Math.ceil(estimatedRemainingWords / Math.max(dailyWords, 1))} 个写作日。`,
+        `篇幅打法：${lengthPlan.structureFocus}`,
         "每张排期卡都要同时检查人物推动、设定限制、伏笔/支线承接和章末追读问题。",
       ],
     },

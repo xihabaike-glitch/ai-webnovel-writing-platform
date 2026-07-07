@@ -357,6 +357,10 @@ test("buildProjectListDashboard", async (t) => {
     assert.equal(dashboard.pipelineProofSummary.totalProjects, 3);
     assert.equal(dashboard.pipelineProofSummary.bottleneckStepId, "project_start");
     assert.ok(dashboard.pipelineProofSummary.bottleneckLabel.includes("开书与大树骨架"));
+    assert.equal(dashboard.pipelineProofSummary.recommendedProjectId, "empty-project");
+    assert.equal(dashboard.pipelineProofSummary.recommendedProjectTitle, "空白新坑");
+    assert.ok(dashboard.pipelineProofSummary.recommendedActionHref.includes("/projects/empty-project"));
+    assert.ok(dashboard.pipelineProofSummary.recommendedActionLabel.includes("开书与大树骨架"));
     assert.equal(dashboard.pipelineProofSummary.stepCounts.find((step) => step.id === "project_start")?.count, 1);
     assert.equal(dashboard.pipelineProofSummary.stepCounts.find((step) => step.id === "task_dispatch")?.count, 1);
     assert.equal(dashboard.pipelineProofSummary.stepCounts.find((step) => step.id === "gate_check")?.count, 1);

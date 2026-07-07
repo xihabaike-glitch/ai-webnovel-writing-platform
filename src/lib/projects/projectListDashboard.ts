@@ -82,6 +82,10 @@ export interface ProjectListPipelineProofSummary {
   bottleneckStepId: ProjectListPipelineStep["id"] | null;
   bottleneckLabel: string;
   bottleneckCount: number;
+  recommendedProjectId: string | null;
+  recommendedProjectTitle: string | null;
+  recommendedActionLabel: string;
+  recommendedActionHref: string;
   stepCounts: Array<{
     id: ProjectListPipelineStep["id"];
     label: string;
@@ -345,6 +349,7 @@ function buildPipelineProofSummary(items: ProjectListItem[]): ProjectListPipelin
     if (next.count > current.count) return next;
     return current;
   }, bottleneckSeed);
+  const recommendedProject = items.find((item) => item.pipelineProof.currentStepId === bottleneck.id) ?? null;
 
   return {
     headline: items.length === 0
@@ -354,6 +359,10 @@ function buildPipelineProofSummary(items: ProjectListItem[]): ProjectListPipelin
     bottleneckStepId: items.length === 0 ? null : bottleneck.id,
     bottleneckLabel: items.length === 0 ? "暂无作品" : bottleneck.label,
     bottleneckCount: items.length === 0 ? 0 : bottleneck.count,
+    recommendedProjectId: recommendedProject?.id ?? null,
+    recommendedProjectTitle: recommendedProject?.title ?? null,
+    recommendedActionLabel: recommendedProject?.pipelineProof.nextActionLabel ?? "创建作品",
+    recommendedActionHref: recommendedProject?.pipelineProof.nextActionHref ?? "#create-project",
     stepCounts,
   };
 }

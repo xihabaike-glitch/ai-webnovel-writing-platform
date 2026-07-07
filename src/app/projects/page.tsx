@@ -163,8 +163,13 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps) 
               当前只统计 8 个核心平台作品，不把新增平台当作进度。
             </p>
           </div>
-          <div className="rounded-md bg-slate-100 px-3 py-2 text-sm text-slate-700">
-            {dashboard.pipelineProofSummary.bottleneckCount}/{dashboard.pipelineProofSummary.totalProjects} 本卡在 {dashboard.pipelineProofSummary.bottleneckLabel}
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <div className="rounded-md bg-slate-100 px-3 py-2 text-sm text-slate-700">
+              {dashboard.pipelineProofSummary.bottleneckCount}/{dashboard.pipelineProofSummary.totalProjects} 本卡在 {dashboard.pipelineProofSummary.bottleneckLabel}
+            </div>
+            <Link className="rounded-md bg-slate-950 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800" href={dashboard.pipelineProofSummary.recommendedActionHref}>
+              {dashboard.pipelineProofSummary.recommendedProjectTitle ? `${dashboard.pipelineProofSummary.recommendedActionLabel} · ${dashboard.pipelineProofSummary.recommendedProjectTitle}` : dashboard.pipelineProofSummary.recommendedActionLabel}
+            </Link>
           </div>
         </div>
         <div className="mt-3 grid gap-2 md:grid-cols-3 xl:grid-cols-6">

@@ -66,7 +66,18 @@ function exportVersionActionTone(priority: PrePublishGateProjectStatus["exportVe
   return "border-slate-200 bg-white text-slate-700";
 }
 
-export function GateExportPackagePanel({ packages }: { packages: PrePublishGateProjectStatus[] }) {
+function hrefWithGateReturn(href: string, gateReturnHref?: string | null) {
+  if (!gateReturnHref || !href.startsWith("/") || href.startsWith("/gate")) return href;
+
+  const hashIndex = href.indexOf("#");
+  const base = hashIndex >= 0 ? href.slice(0, hashIndex) : href;
+  const hash = hashIndex >= 0 ? href.slice(hashIndex) : "";
+  const separator = base.includes("?") ? "&" : "?";
+
+  return `${base}${separator}gateReturn=${encodeURIComponent(gateReturnHref)}${hash}`;
+}
+
+export function GateExportPackagePanel({ packages, gateReturnHref }: { packages: PrePublishGateProjectStatus[]; gateReturnHref?: string | null }) {
   const router = useRouter();
   const [runningId, setRunningId] = useState<string | null>(null);
   const [exportActionRunningId, setExportActionRunningId] = useState<string | null>(null);
@@ -245,7 +256,7 @@ export function GateExportPackagePanel({ packages }: { packages: PrePublishGateP
                     </button>
                   </>
                 ) : null}
-                <Link className="rounded-md border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50" href={item.href}>
+                <Link className="rounded-md border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50" href={hrefWithGateReturn(item.href, gateReturnHref)}>
                   打开项目
                 </Link>
               </div>
@@ -281,7 +292,7 @@ export function GateExportPackagePanel({ packages }: { packages: PrePublishGateP
                       </button>
                     ) : null}
                     {item.loopTimeline.status === "needs_iteration" || item.loopTimeline.status === "scaling" || item.loopTimeline.status === "needs_asset" ? (
-                      <Link className="rounded-md bg-white px-3 py-2 text-xs font-medium text-slate-950 hover:bg-slate-50" href={item.loopTimeline.actionHref}>
+                      <Link className="rounded-md bg-white px-3 py-2 text-xs font-medium text-slate-950 hover:bg-slate-50" href={hrefWithGateReturn(item.loopTimeline.actionHref, gateReturnHref)}>
                         打开下一步
                       </Link>
                     ) : null}
@@ -301,7 +312,7 @@ export function GateExportPackagePanel({ packages }: { packages: PrePublishGateP
                     <div className="font-medium">导出版本门禁：{item.exportVersionGate.label}</div>
                     <p className="mt-1 leading-6">{item.exportVersionGate.detail}</p>
                   </div>
-                  <Link className="w-fit rounded-md bg-white px-3 py-2 text-xs font-medium text-slate-950 hover:bg-slate-50" href={item.exportVersionGate.href}>
+                  <Link className="w-fit rounded-md bg-white px-3 py-2 text-xs font-medium text-slate-950 hover:bg-slate-50" href={hrefWithGateReturn(item.exportVersionGate.href, gateReturnHref)}>
                     {item.exportVersionGate.actionLabel}
                   </Link>
                 </div>
@@ -322,7 +333,7 @@ export function GateExportPackagePanel({ packages }: { packages: PrePublishGateP
                       ) : (
                         <Link
                           className={`rounded-md border px-3 py-2 text-xs font-medium ${exportVersionActionTone(action.priority)}`}
-                          href={action.href}
+                          href={hrefWithGateReturn(action.href, gateReturnHref)}
                           key={action.id}
                         >
                           <div>{action.label}</div>
@@ -338,7 +349,7 @@ export function GateExportPackagePanel({ packages }: { packages: PrePublishGateP
                       <div className="font-medium text-slate-950">{item.exportVersionGate.receiptReview.label}</div>
                       <p className="mt-1 leading-5 opacity-80">{item.exportVersionGate.receiptReview.detail}</p>
                     </div>
-                    <Link className="w-fit rounded-md border border-slate-200 bg-white px-3 py-2 font-medium text-slate-700 hover:bg-slate-50" href={item.exportVersionGate.receiptReview.href}>
+                    <Link className="w-fit rounded-md border border-slate-200 bg-white px-3 py-2 font-medium text-slate-700 hover:bg-slate-50" href={hrefWithGateReturn(item.exportVersionGate.receiptReview.href, gateReturnHref)}>
                       {item.exportVersionGate.receiptReview.actionLabel}
                     </Link>
                   </div>

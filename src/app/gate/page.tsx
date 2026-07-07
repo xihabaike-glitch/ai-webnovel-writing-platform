@@ -458,7 +458,7 @@ export default async function GatePage({
         </div>
       </section>
 
-      <GateExportPackagePanel packages={gate.projectStatuses} />
+      <GateExportPackagePanel gateReturnHref={gateRecheckReturnHref} packages={gate.projectStatuses} />
 
       <section className="mb-6 rounded-md border border-slate-200 bg-white p-4">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">

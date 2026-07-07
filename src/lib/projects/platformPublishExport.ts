@@ -808,12 +808,36 @@ export interface PlatformPublishExportCenter {
   workspace: PlatformPublishWorkspace;
   platformReadinessSummary: PlatformReadinessSummary;
   effectCaptureSummary: PlatformEffectCaptureSummary;
+  platformLaunchQueue: PlatformLaunchQueue;
   executionHandoffs: PlatformPublishExecutionHandoff[];
   executionHandoffSummary: PlatformPublishExecutionHandoffSummary;
   platformStrategy: PlatformStrategyRankItem[];
   strategyVerdict: PlatformStrategyAutoVerdict;
   platformKnowledge: PlatformKnowledgeInsight[];
   activeStrategyPlan: PlatformStrategySwitchPlan | null;
+}
+
+export type PlatformLaunchQueueActionKind = "repair_submission" | "save_baseline" | "record_effect" | "review_strategy";
+
+export interface PlatformLaunchQueueItem {
+  platformId: PlatformId;
+  platformName: string;
+  actionKind: PlatformLaunchQueueActionKind;
+  actionLabel: string;
+  actionHref: string;
+  priority: "high" | "medium" | "low";
+  whyNow: string;
+  acceptance: string;
+  readinessStatus: PlatformReadinessItem["status"];
+  preflightScore: number;
+  finalGateScore: number;
+}
+
+export interface PlatformLaunchQueue {
+  status: "blocked" | "needs_action" | "ready";
+  headline: string;
+  nextAction: string;
+  items: PlatformLaunchQueueItem[];
 }
 
 export interface PlatformReadinessItem {
@@ -4603,6 +4627,83 @@ function buildPlatformReadinessSummary(packages: PlatformPublishPackage[]): Plat
   };
 }
 
+function launchActionKind(status: PlatformReadinessItem["status"]): PlatformLaunchQueueActionKind {
+  if (status === "needs_submission_repair" || status === "not_generated") return "repair_submission";
+  if (status === "needs_package_export") return "save_baseline";
+  if (status === "needs_effect_record") return "record_effect";
+  return "review_strategy";
+}
+
+function launchPriority(status: PlatformReadinessItem["status"]): PlatformLaunchQueueItem["priority"] {
+  if (status === "needs_submission_repair" || status === "not_generated") return "high";
+  if (status === "needs_package_export" || status === "needs_effect_record") return "medium";
+  return "low";
+}
+
+function launchWhyNow(item: PlatformReadinessItem) {
+  if (item.status === "needs_submission_repair") return `${item.platformName} 终检还没过线，继续投放会把坏入口放大。`;
+  if (item.status === "not_generated") return `${item.platformName} 还没有可投发布包，先补正文和平台包。`;
+  if (item.status === "needs_package_export") return `${item.platformName} 发布包已过线，但没有基准就无法复盘版本效果。`;
+  if (item.status === "needs_effect_record") return `${item.platformName} 已有发布基准，缺真实效果就无法判断是否加码。`;
+  return `${item.platformName} 已具备复盘条件，可以进入平台排序和小步加码判断。`;
+}
+
+function launchAcceptance(item: PlatformReadinessItem) {
+  if (item.status === "needs_submission_repair") return "验收：终检阻塞项清零，发布包状态进入可导出或可投。";
+  if (item.status === "not_generated") return "验收：至少生成一份平台发布包，并完成前三章或样章质检。";
+  if (item.status === "needs_package_export") return "验收：保存发布基准，版本历史能看到当前平台包。";
+  if (item.status === "needs_effect_record") return "验收：回填曝光、点击、收藏、追读和编辑反馈中的关键字段。";
+  return "验收：完成平台排序复盘，明确继续加码、观察还是换打法。";
+}
+
+function buildPlatformLaunchQueue(readiness: PlatformReadinessSummary): PlatformLaunchQueue {
+  const order: Record<PlatformReadinessItem["status"], number> = {
+    needs_submission_repair: 0,
+    not_generated: 1,
+    needs_package_export: 2,
+    needs_effect_record: 3,
+    ready_to_submit: 4,
+  };
+  const items = [...readiness.items]
+    .sort((left, right) => {
+      if (left.platformId === readiness.primaryAction?.platformId) return -1;
+      if (right.platformId === readiness.primaryAction?.platformId) return 1;
+      return order[left.status] - order[right.status] || right.finalGateScore - left.finalGateScore || right.preflightScore - left.preflightScore;
+    })
+    .map((item) => ({
+      platformId: item.platformId,
+      platformName: item.platformName,
+      actionKind: launchActionKind(item.status),
+      actionLabel: item.actionLabel,
+      actionHref: item.actionHref,
+      priority: launchPriority(item.status),
+      whyNow: launchWhyNow(item),
+      acceptance: launchAcceptance(item),
+      readinessStatus: item.status,
+      preflightScore: item.preflightScore,
+      finalGateScore: item.finalGateScore,
+    }));
+  const primary = items[0] ?? null;
+  const status: PlatformLaunchQueue["status"] = readiness.needsSubmissionRepairCount > 0 || readiness.notGeneratedCount > 0
+    ? "blocked"
+    : readiness.needsPackageExportCount > 0 || readiness.needsEffectRecordCount > 0
+      ? "needs_action"
+      : "ready";
+
+  return {
+    status,
+    headline: status === "blocked"
+      ? "投放队列有硬阻塞，先别同时铺平台。"
+      : status === "needs_action"
+        ? "投放队列需要补基准或真实效果。"
+        : "投放队列已进入复盘和加码判断。",
+    nextAction: primary
+      ? `先处理 ${primary.platformName}：${primary.actionLabel}。${primary.whyNow}`
+      : "先生成平台发布包，再进入投放队列。",
+    items,
+  };
+}
+
 export function buildPlatformPublishExportCenter(input: PlatformPublishExportInput): PlatformPublishExportCenter {
   const platforms = input.platforms ?? platformProfiles;
   const packages = platforms.map((platform) => buildPlatformPackage(input, platform));
@@ -4610,6 +4711,8 @@ export function buildPlatformPublishExportCenter(input: PlatformPublishExportInp
   const platformStrategy = buildPlatformStrategy(packages);
   const strategyVerdict = buildPlatformStrategyAutoVerdict(platformStrategy);
   const platformKnowledge = buildPlatformKnowledge(packages);
+  const platformReadinessSummary = buildPlatformReadinessSummary(packages);
+  const effectCaptureSummary = buildPlatformEffectCaptureSummary(packages);
   const activeStrategy = platformStrategy.find((strategy) => strategy.platformId === input.targetPlatform.id) ?? null;
   const activePackage = packages.find((pack) => pack.platformId === input.targetPlatform.id);
 
@@ -4618,8 +4721,9 @@ export function buildPlatformPublishExportCenter(input: PlatformPublishExportInp
     recommendedPlatformId: input.targetPlatform.id,
     totalPublishableChapters: publishableChapters(input.chapters).length,
     workspace: buildPublishWorkspace(packages),
-    platformReadinessSummary: buildPlatformReadinessSummary(packages),
-    effectCaptureSummary: buildPlatformEffectCaptureSummary(packages),
+    platformReadinessSummary,
+    effectCaptureSummary,
+    platformLaunchQueue: buildPlatformLaunchQueue(platformReadinessSummary),
     executionHandoffs,
     executionHandoffSummary: buildPlatformPublishExecutionHandoffSummary(executionHandoffs),
     platformStrategy,

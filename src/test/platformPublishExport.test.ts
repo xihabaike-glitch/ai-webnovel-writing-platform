@@ -194,6 +194,13 @@ test("buildPlatformPublishExportCenter", async (t) => {
     assert.equal(center.platformReadinessSummary.needsEffectRecordCount, 0);
     assert.equal(center.platformReadinessSummary.notGeneratedCount, 0);
     assert.ok(center.platformReadinessSummary.headline.includes("投稿材料没过线"));
+    assert.equal(center.platformLaunchQueue.status, "blocked");
+    assert.equal(center.platformLaunchQueue.items.length, platformProfiles.length);
+    assert.equal(center.platformLaunchQueue.items[0].platformId, center.platformReadinessSummary.primaryAction?.platformId);
+    assert.equal(center.platformLaunchQueue.items[0].actionKind, "repair_submission");
+    assert.ok(center.platformLaunchQueue.items[0].whyNow.includes("终检"));
+    assert.ok(center.platformLaunchQueue.items[0].acceptance.includes("终检"));
+    assert.ok(center.platformLaunchQueue.nextAction.includes(center.platformLaunchQueue.items[0].platformName));
     assert.equal(center.packages[0].preview.status, "blocked");
     assert.ok(center.packages[0].preview.headline.includes("还不能交付"));
     assert.ok(center.packages[0].preview.chapterLine.includes("1 章"));

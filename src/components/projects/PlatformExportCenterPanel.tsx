@@ -525,6 +525,27 @@ interface PlatformReadinessSummary {
   primaryAction: PlatformReadinessItem | null;
 }
 
+interface PlatformLaunchQueueItem {
+  platformId: string;
+  platformName: string;
+  actionKind: "repair_submission" | "save_baseline" | "record_effect" | "review_strategy";
+  actionLabel: string;
+  actionHref: string;
+  priority: "high" | "medium" | "low";
+  whyNow: string;
+  acceptance: string;
+  readinessStatus: PlatformReadinessItem["status"];
+  preflightScore: number;
+  finalGateScore: number;
+}
+
+interface PlatformLaunchQueue {
+  status: "blocked" | "needs_action" | "ready";
+  headline: string;
+  nextAction: string;
+  items: PlatformLaunchQueueItem[];
+}
+
 interface PlatformStrategyRankItem {
   rank: number;
   platformId: string;
@@ -804,6 +825,7 @@ interface PlatformPublishExportCenter {
   workspace: PlatformPublishWorkspace;
   platformReadinessSummary: PlatformReadinessSummary;
   effectCaptureSummary: PlatformEffectCaptureSummary;
+  platformLaunchQueue: PlatformLaunchQueue;
   executionHandoffs: PlatformPublishExecutionHandoff[];
   executionHandoffSummary: PlatformPublishExecutionHandoffSummary;
   platformStrategy: PlatformStrategyRankItem[];
@@ -1024,6 +1046,24 @@ function platformReadinessStatusClass(status: PlatformReadinessItem["status"]) {
   if (status === "needs_package_export") return "bg-blue-50 text-blue-700";
   if (status === "needs_submission_repair") return "bg-rose-50 text-rose-700";
   return "bg-slate-100 text-slate-600";
+}
+
+function platformLaunchQueueStatusLabel(status: PlatformLaunchQueue["status"]) {
+  if (status === "ready") return "可复盘";
+  if (status === "needs_action") return "待补动作";
+  return "有阻塞";
+}
+
+function platformLaunchQueueStatusClass(status: PlatformLaunchQueue["status"]) {
+  if (status === "ready") return "bg-emerald-50 text-emerald-700";
+  if (status === "needs_action") return "bg-amber-50 text-amber-700";
+  return "bg-rose-50 text-rose-700";
+}
+
+function platformLaunchPriorityLabel(priority: PlatformLaunchQueueItem["priority"]) {
+  if (priority === "high") return "高";
+  if (priority === "medium") return "中";
+  return "低";
 }
 
 function packagePreviewStatusLabel(status: PlatformPublishPackagePreview["status"]) {
@@ -2798,6 +2838,42 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
                     {item.blockers[0] ?? item.detail}
                   </div>
                 </button>
+              ))}
+            </div>
+          </div>
+          <div className="mt-3 rounded-md border border-slate-200 bg-white p-3">
+            <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
+              <div>
+                <div className="font-medium text-slate-950">平台投放队列</div>
+                <p className="mt-1 text-sm leading-6 text-slate-600">{center.platformLaunchQueue.headline}</p>
+              </div>
+              <span className={`w-fit rounded-md px-2 py-1 text-xs font-medium ${platformLaunchQueueStatusClass(center.platformLaunchQueue.status)}`}>
+                {platformLaunchQueueStatusLabel(center.platformLaunchQueue.status)}
+              </span>
+            </div>
+            <div className="mt-2 rounded-md bg-slate-50 p-2 text-sm text-slate-700">
+              <span className="font-medium text-slate-950">下一步：</span>{center.platformLaunchQueue.nextAction}
+            </div>
+            <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-4">
+              {center.platformLaunchQueue.items.slice(0, 4).map((item) => (
+                <a
+                  className="rounded-md bg-slate-50 p-3 text-sm hover:bg-slate-100"
+                  href={item.actionHref}
+                  key={`${item.platformId}-${item.actionKind}`}
+                >
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div className="font-medium text-slate-950">{item.platformName}</div>
+                    <span className="rounded-md bg-white px-2 py-1 text-[11px] font-medium text-slate-600">
+                      优先级 {platformLaunchPriorityLabel(item.priority)}
+                    </span>
+                  </div>
+                  <div className="mt-2 text-xs leading-5 text-slate-500">
+                    质检 {item.preflightScore} · 终检 {item.finalGateScore}
+                  </div>
+                  <p className="mt-2 line-clamp-2 text-xs leading-5 text-slate-600">{item.whyNow}</p>
+                  <p className="mt-1 line-clamp-2 text-xs leading-5 text-slate-500">{item.acceptance}</p>
+                  <div className="mt-2 text-xs font-medium text-slate-950">{item.actionLabel}</div>
+                </a>
               ))}
             </div>
           </div>

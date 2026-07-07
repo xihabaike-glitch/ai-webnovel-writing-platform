@@ -290,7 +290,7 @@ export function BatchDraftCenterPanel({
     }
 
     if (action.kind === "inspect_failures") {
-      window.location.assign(action.href ?? "/failures");
+      window.location.assign(hrefWithGateReturn(action.href ?? "/failures", gateReturnHref));
       return;
     }
 

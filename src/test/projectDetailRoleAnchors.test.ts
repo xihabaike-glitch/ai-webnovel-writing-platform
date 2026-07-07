@@ -83,10 +83,12 @@ test("project detail page carries gate return through control and batch panels",
 
   assert.ok(batchDraftPanel.includes("gateReturnHref?: string | null"));
   assert.ok(batchDraftPanel.includes("function hrefWithGateReturn"));
+  assert.ok(batchDraftPanel.includes("window.location.assign(hrefWithGateReturn(action.href ?? \"/failures\", gateReturnHref));"));
   assert.ok(batchDraftPanel.includes("href={hrefWithGateReturn(`/projects/${projectId}/chapters/${result.chapterId}`, gateReturnHref)}"));
 
   assert.ok(batchReviewPanel.includes("gateReturnHref?: string | null"));
   assert.ok(batchReviewPanel.includes("function hrefWithGateReturn"));
+  assert.ok(batchReviewPanel.includes("window.location.assign(hrefWithGateReturn(action.href ?? \"/failures\", gateReturnHref));"));
   assert.ok(batchReviewPanel.includes("href={hrefWithGateReturn(`/projects/${projectId}/chapters/${candidate.chapterId}`, gateReturnHref)}"));
 
   assert.ok(modelTaskAuditPanel.includes("gateReturnHref?: string | null"));

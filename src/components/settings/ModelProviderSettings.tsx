@@ -619,9 +619,13 @@ export function ModelProviderSettings({
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const focusParam = searchParams.get("focus");
   const firstDayFocusTaskType = searchParams.get("taskType");
   const firstDayReturnProjectId = searchParams.get("projectId");
-  const isFirstDayRouteFocus = searchParams.get("focus") === "first-day-route";
+  const isFirstDayRouteFocus = focusParam === "first-day-route";
+  const invalidFocusNotice = focusParam === null || focusParam === "first-day-route"
+    ? null
+    : focusParam ? `模型设置焦点「${focusParam}」不存在，已显示全部模型设置。` : null;
   const firstDayReturnHref = firstDayReturnProjectId
     ? `/projects/${encodeURIComponent(firstDayReturnProjectId)}?firstDayRoute=repaired#first-day-workflow`
     : "/projects";
@@ -1274,6 +1278,19 @@ export function ModelProviderSettings({
 
   return (
     <div className="mt-6 grid gap-5">
+      {invalidFocusNotice ? (
+        <section className="rounded-md border border-amber-200 bg-amber-50 p-4 text-amber-900">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <div className="font-medium">焦点已回退</div>
+              <p className="mt-1 text-sm leading-6">{invalidFocusNotice}</p>
+            </div>
+            <Link className="w-fit rounded-md bg-white px-3 py-2 text-sm font-medium text-amber-950 hover:bg-amber-100" href="/settings/models">
+              查看模型设置
+            </Link>
+          </div>
+        </section>
+      ) : null}
       <section className="grid gap-3">
         <div className="rounded-md border border-slate-900 bg-slate-950 p-4 text-white" id="model-provider-interfaces">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">

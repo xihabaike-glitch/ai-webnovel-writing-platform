@@ -61,6 +61,11 @@ function aiRecoveryConclusionTone(status: NonNullable<ReturnType<typeof buildGat
   return "border-emerald-200 bg-emerald-50 text-emerald-900";
 }
 
+function recheckBlockerTone(priorityLabel: string) {
+  if (priorityLabel === "优先处理") return "border-rose-100 bg-rose-50 text-rose-800";
+  return "border-slate-100 bg-white text-slate-700";
+}
+
 function shortDateTime(value: string | null) {
   if (!value) return "未记录时间";
   return new Intl.DateTimeFormat("zh-CN", {
@@ -356,8 +361,11 @@ export default async function GatePage({
                     <div>
                       <div className="font-medium text-slate-700">剩余卡点</div>
                       <div className="mt-1 grid gap-1">
-                        {focusNotice.recheckSummary.remainingEvidence.slice(0, 3).map((line) => (
-                          <div className="rounded-md bg-white px-2 py-1" key={line}>{line}</div>
+                        {focusNotice.recheckSummary.remainingBlockers.slice(0, 3).map((blocker) => (
+                          <div className={`rounded-md border px-2 py-1 ${recheckBlockerTone(blocker.priorityLabel)}`} key={`${blocker.priorityLabel}-${blocker.label}`}>
+                            <span className="font-medium">{blocker.priorityLabel}</span>
+                            <span className="ml-1">{blocker.label}：{blocker.evidence}</span>
+                          </div>
                         ))}
                       </div>
                     </div>

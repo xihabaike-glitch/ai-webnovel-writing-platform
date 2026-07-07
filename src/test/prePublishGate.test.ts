@@ -429,6 +429,38 @@ test("buildPrePublishGate", async (t) => {
     assert.ok(notice.detail.includes("已完成 5/6 步"));
   });
 
+  await t.test("orders action recheck blockers with the current gate blocker first", () => {
+    const gate = buildPrePublishGate({
+      projects: [{
+        ...readyProject,
+        id: "project-recheck-blockers",
+        title: "复检卡点作品",
+        aiTasks: [],
+        gateDispatchTasks: [],
+      }],
+      failureTasks: [],
+      batchHistory: [],
+    });
+    const notice = buildPrePublishGateFocusNotice({
+      focus: "action-recheck",
+      actionId: "project-acceptance:project-recheck-blockers",
+      gate,
+    });
+
+    assert.equal(notice.recheckSummary?.remainingBlockers[0]?.label, "审稿");
+    assert.equal(notice.recheckSummary?.remainingBlockers[0]?.priorityLabel, "优先处理");
+    assert.equal(notice.recheckSummary?.remainingBlockers[0]?.status, "current");
+    assert.ok(notice.recheckSummary?.remainingBlockers[0]?.evidence.includes("首章还缺审稿成功记录"));
+    assert.deepEqual(
+      notice.recheckSummary?.remainingBlockers.slice(1).map((item) => item.priorityLabel),
+      ["后续卡点", "后续卡点", "后续卡点"],
+    );
+    assert.deepEqual(
+      notice.recheckSummary?.remainingBlockers.map((item) => item.label),
+      ["审稿", "二改", "派单回执", "发布包"],
+    );
+  });
+
   await t.test("blocks launch when first-day handoff evidence is missing", () => {
     const gate = buildPrePublishGate({
       projects: [handoffBlockedProject],

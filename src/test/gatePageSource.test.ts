@@ -29,6 +29,12 @@ test("gate page renders action recheck summary feedback", () => {
   assert.ok(source.includes("focusNotice.recheckSummary.nextDispatch"));
 });
 
+test("gate page labels prioritized remaining blockers", () => {
+  assert.ok(source.includes("focusNotice.recheckSummary.remainingBlockers"));
+  assert.ok(source.includes("blocker.priorityLabel"));
+  assert.ok(source.includes("blocker.evidence"));
+});
+
 test("gate page renders project acceptance sheet blockers", () => {
   assert.ok(source.includes("项目验收单联动"));
   assert.ok(source.includes("gate.projectStatuses.filter((project) => project.acceptanceSheetGate.status !== \"pass\")"));

@@ -493,8 +493,18 @@ export interface PrePublishGateRecheckSummary {
   currentStepLabel: string;
   completedEvidence: string[];
   remainingEvidence: string[];
+  remainingBlockers: PrePublishGateRemainingBlocker[];
   latestEvidence: string | null;
   nextDispatch: PrePublishGateRecheckDispatch | null;
+}
+
+export interface PrePublishGateRemainingBlocker {
+  label: string;
+  status: ProjectAcceptanceStep["status"];
+  priorityLabel: "优先处理" | "后续卡点";
+  evidence: string;
+  stopRule: string;
+  href: string;
 }
 
 export interface PrePublishGateRecheckDispatch {
@@ -1652,6 +1662,26 @@ function projectAcceptanceRecheckProjectId(actionId: string | null | undefined) 
   return actionId.slice("project-acceptance:".length);
 }
 
+function buildProjectAcceptanceRemainingBlockers(
+  steps: ProjectAcceptanceStep[],
+): PrePublishGateRemainingBlocker[] {
+  return steps
+    .filter((step) => step.status !== "done")
+    .sort((left, right) => {
+      const leftRank = left.status === "current" ? 0 : 1;
+      const rightRank = right.status === "current" ? 0 : 1;
+      return leftRank - rightRank;
+    })
+    .map((step) => ({
+      label: step.label,
+      status: step.status,
+      priorityLabel: step.status === "current" ? "优先处理" : "后续卡点",
+      evidence: step.evidence,
+      stopRule: step.stopRule,
+      href: step.href,
+    }));
+}
+
 function buildProjectAcceptanceRecheckSummary(
   actionId: string | null | undefined,
   gate: PrePublishGate,
@@ -1664,6 +1694,7 @@ function buildProjectAcceptanceRecheckSummary(
   const steps = project.acceptanceSheetGate.steps;
   const currentStep = steps.find((step) => step.id === project.acceptanceSheetGate.currentStepId) ?? steps[0] ?? null;
   const completedSteps = steps.filter((step) => step.status === "done").length;
+  const remainingBlockers = buildProjectAcceptanceRemainingBlockers(steps);
 
   return {
     title: `${project.projectTitle} · 项目验收单回填`,
@@ -1673,6 +1704,7 @@ function buildProjectAcceptanceRecheckSummary(
     currentStepLabel: currentStep?.label ?? project.acceptanceSheetGate.actionLabel,
     completedEvidence: steps.filter((step) => step.status === "done").map((step) => step.evidence),
     remainingEvidence: steps.filter((step) => step.status !== "done").map((step) => `${step.label}：${step.evidence}`),
+    remainingBlockers,
     latestEvidence: project.acceptanceSheetGate.latestDispatchEvidence,
     nextDispatch: buildProjectAcceptanceNextDispatch(project, currentStep, completedSteps),
   };

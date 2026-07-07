@@ -230,6 +230,7 @@ test("buildDevelopmentOverview", async (t) => {
     assert.ok(platformScope?.currentEvidence.includes("8/8"));
     assert.ok(treeMethod?.acceptanceSignal.includes("开头"));
     assert.ok(treeMethod?.acceptanceSignal.includes("土壤"));
+    assert.equal(treeMethod?.href, "/projects#story-structure");
   });
 
   await t.test("builds a final product acceptance gate for the home page", () => {

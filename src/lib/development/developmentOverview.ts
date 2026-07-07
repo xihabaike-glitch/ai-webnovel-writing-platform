@@ -551,7 +551,7 @@ function buildRequirementTraceability(): DevelopmentOverviewRequirementTraceabil
         originalRequest: "按大树结构写作：先开头和结尾，再主干、分支，叶片和土壤负责内容填充。",
         currentEvidence: "开发文档和作品工作台都保留开头、结尾、主干、分支、叶片、土壤六步。",
         acceptanceSignal: "开头、结尾、主干、分支、叶片、土壤都有可编辑入口、PM 规则和章节生产用途。",
-        href: "/docs",
+        href: "/projects#story-structure",
       },
       {
         id: "model_interfaces",

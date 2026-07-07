@@ -9,6 +9,7 @@ export interface MultiPlatformSubmissionInput {
   genre: string;
   sellingPoint: string;
   currentWordCount: number;
+  targetLengthType?: string;
   targetWordCount: number;
   targetPlatformId: string;
   chapters: Array<SubmissionPackageChapter & SubmissionChapter>;
@@ -793,6 +794,7 @@ function buildVariant(input: MultiPlatformSubmissionInput, platform: PlatformPro
     genre: input.genre,
     sellingPoint: input.sellingPoint,
     currentWordCount: input.currentWordCount,
+    targetLengthType: input.targetLengthType,
     targetWordCount: input.targetWordCount,
     platform,
     chapters: input.chapters,

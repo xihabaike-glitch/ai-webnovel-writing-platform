@@ -101,4 +101,43 @@ test("buildSubmissionChecklist", async (t) => {
     assert.equal(reviewItem?.status, "todo");
     assert.ok(reviewItem?.detail.includes("已审稿 2/3"));
   });
+
+  await t.test("checks short closure and long-form structure by length preset", () => {
+    const shortChecklist = buildSubmissionChecklist({
+      title: "雨夜反转",
+      genre: "悬疑",
+      sellingPoint: "第一人称雨夜复仇反转故事。",
+      currentWordCount: 9500,
+      targetLengthType: "short_10k",
+      targetWordCount: 10000,
+      platform: getPlatformProfile("zhihu_yanxuan"),
+      chapters: [chapters[0]],
+      aiTasks: [],
+    });
+    const longChecklist = buildSubmissionChecklist({
+      title: "夜雨系统",
+      genre: "都市系统",
+      sellingPoint: "雨夜危机中觉醒系统，主角用一次次选择翻盘。",
+      currentWordCount: 9000,
+      targetLengthType: "long_300k_plus",
+      targetWordCount: 300000,
+      platform: getPlatformProfile("fanqie"),
+      chapters,
+      aiTasks: chapters.map((chapter) => ({
+        taskType: "chapter_review",
+        status: "succeeded",
+        chapter: { id: chapter.id },
+      })),
+    });
+
+    const shortLengthItem = shortChecklist.items.find((item) => item.id === "length-structure");
+    const longLengthItem = longChecklist.items.find((item) => item.id === "length-structure");
+    assert.equal(shortLengthItem?.status, "pass");
+    assert.ok(shortLengthItem?.detail.includes("闭环结尾"));
+    assert.equal(longLengthItem?.status, "risk");
+    assert.ok(longLengthItem?.detail.includes("主干"));
+    assert.ok(longLengthItem?.detail.includes("支线"));
+    assert.ok(longLengthItem?.detail.includes("人物弧光"));
+    assert.ok(longLengthItem?.detail.includes("伏笔回收"));
+  });
 });

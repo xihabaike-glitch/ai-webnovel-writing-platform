@@ -27,6 +27,7 @@ export interface PrePublishGateProject {
   id: string;
   title: string;
   targetPlatform: string;
+  targetLengthType: string;
   targetWordCount: number;
   currentWordCount: number;
   genre: string;

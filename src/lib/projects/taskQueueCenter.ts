@@ -22,6 +22,7 @@ export interface TaskQueueProject {
   id: string;
   title: string;
   targetPlatform: string;
+  targetLengthType: string;
   targetWordCount: number;
   currentWordCount: number;
   genre: string;
@@ -245,6 +246,7 @@ export function buildTaskQueueProjectSubmissionChecklist(project: TaskQueueProje
     genre: project.genre,
     sellingPoint: project.sellingPoint,
     currentWordCount: project.currentWordCount,
+    targetLengthType: project.targetLengthType,
     targetWordCount: project.targetWordCount,
     platform,
     chapters: project.chapters.map((chapter) => ({

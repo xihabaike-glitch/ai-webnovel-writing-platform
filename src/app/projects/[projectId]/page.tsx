@@ -226,6 +226,7 @@ export default async function ProjectPage({
     genre: project.genre,
     sellingPoint: project.sellingPoint,
     currentWordCount: project.currentWordCount,
+    targetLengthType: project.targetLengthType,
     targetWordCount: project.targetWordCount,
     platform,
     chapters: project.chapters,

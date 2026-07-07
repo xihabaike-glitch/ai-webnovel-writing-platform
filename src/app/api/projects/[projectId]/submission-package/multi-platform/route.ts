@@ -34,6 +34,7 @@ export async function GET(request: Request, { params }: Params) {
     genre: project.genre,
     sellingPoint: project.sellingPoint,
     currentWordCount: project.currentWordCount,
+    targetLengthType: project.targetLengthType,
     targetWordCount: project.targetWordCount,
     targetPlatformId: project.targetPlatform,
     chapters: project.chapters,

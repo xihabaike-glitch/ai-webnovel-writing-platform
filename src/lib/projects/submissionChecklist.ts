@@ -26,6 +26,7 @@ export interface SubmissionChecklistInput {
   genre: string;
   sellingPoint: string;
   currentWordCount: number;
+  targetLengthType?: string;
   targetWordCount: number;
   platform: PlatformProfile;
   chapters: SubmissionChapter[];
@@ -59,6 +60,60 @@ function minimumSubmissionWords(platform: PlatformProfile) {
   if (platform.id === "zhihu_yanxuan") return 1000;
   if (platform.category === "overseas") return 3000;
   return 8000;
+}
+
+function lengthTypeFor(input: SubmissionChecklistInput) {
+  if (input.targetLengthType) return input.targetLengthType;
+  if (input.targetWordCount <= 20_000) return "short_10k";
+  if (input.targetWordCount <= 80_000) return "mid_50k";
+  if (input.targetWordCount >= 800_000) return "mega_1m_plus";
+  return "long_300k_plus";
+}
+
+function lengthStructureItem(
+  input: SubmissionChecklistInput,
+  firstThree: SubmissionChapter[],
+  finalChapters: SubmissionChapter[],
+  hasHooks: boolean,
+  hasCliffhangers: boolean,
+) {
+  const lengthType = lengthTypeFor(input);
+  if (lengthType === "short_10k") {
+    const closureReady = input.currentWordCount >= Math.min(input.targetWordCount * 0.8, 8000)
+      && finalChapters.length > 0
+      && input.chapters.some((chapter) => chapter.cliffhanger.trim().length > 0);
+    return item(
+      "length-structure",
+      "篇幅结构验收",
+      closureReady ? "pass" : "todo",
+      closureReady
+        ? "短篇已具备闭环结尾检查线：字数接近目标，有定稿章节和章末回收点。"
+        : "1 万字短篇先补闭环结尾：核心反转、情绪峰值和回收点必须在投稿前收住。",
+    );
+  }
+
+  if (lengthType === "mid_50k") {
+    const midReady = firstThree.length >= 3 && hasHooks && hasCliffhangers && finalChapters.length >= 1;
+    return item(
+      "length-structure",
+      "篇幅结构验收",
+      midReady ? "pass" : "todo",
+      midReady
+        ? "中篇已有前三章钩子、章末悬念和定稿锚点，后续继续检查人物弧光收束。"
+        : "5-6 万字中篇需要明确人物弧光、三段主干和可控支线，不能只靠单章爽点推进。",
+    );
+  }
+
+  const requiredChapters = lengthType === "mega_1m_plus" ? 12 : 6;
+  const longReady = input.chapters.length >= requiredChapters && firstThree.length >= 3 && hasHooks && hasCliffhangers && finalChapters.length >= 3;
+  return item(
+    "length-structure",
+    "篇幅结构验收",
+    longReady ? "pass" : "risk",
+    longReady
+      ? "长篇结构已有足够章节锚点，可以继续复查主干、支线、人物弧光和伏笔回收。"
+      : `长篇投稿前还要补主干、支线、人物弧光和伏笔回收证据；当前 ${input.chapters.length}/${requiredChapters} 个章节锚点。`,
+  );
 }
 
 export function buildSubmissionChecklist(input: SubmissionChecklistInput): SubmissionChecklist {
@@ -128,6 +183,7 @@ export function buildSubmissionChecklist(input: SubmissionChecklistInput): Submi
       finalChapters.length > 0 ? "pass" : "risk",
       finalChapters.length > 0 ? `已有 ${finalChapters.length} 章定稿。` : "还没有定稿章节，直接投稿会显得不稳。",
     ),
+    lengthStructureItem(input, firstThree, finalChapters, hasHooks, hasCliffhangers),
     item(
       "platform-risk",
       "平台风险",

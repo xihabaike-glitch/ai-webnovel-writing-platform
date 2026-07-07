@@ -107,6 +107,7 @@ async function buildWorkflowPayload(projectId: string) {
         id: project.id,
         title: project.title,
         targetPlatform: project.targetPlatform,
+        targetLengthType: project.targetLengthType,
         targetWordCount: project.targetWordCount,
         currentWordCount: project.currentWordCount,
         genre: project.genre,

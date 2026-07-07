@@ -77,7 +77,19 @@ function executeText(execution: PrePublishGateProjectStatus["effectReview"]["opt
   return "打开位置";
 }
 
-export function GatePublishEffectReviewPanel({ packages }: { packages: PrePublishGateProjectStatus[] }) {
+function hrefWithGateReturn(href: string, gateReturnHref?: string | null) {
+  if (!gateReturnHref || !href.startsWith("/") || href.startsWith("/gate")) return href;
+
+  const hashIndex = href.indexOf("#");
+  const base = hashIndex >= 0 ? href.slice(0, hashIndex) : href;
+  const hash = hashIndex >= 0 ? href.slice(hashIndex) : "";
+  if (base.includes("gateReturn=")) return href;
+  const separator = base.includes("?") ? "&" : "?";
+
+  return `${base}${separator}gateReturn=${encodeURIComponent(gateReturnHref)}${hash}`;
+}
+
+export function GatePublishEffectReviewPanel({ packages, gateReturnHref }: { packages: PrePublishGateProjectStatus[]; gateReturnHref?: string | null }) {
   const router = useRouter();
   const [runningActionId, setRunningActionId] = useState<string | null>(null);
   const [savingVariantId, setSavingVariantId] = useState<string | null>(null);
@@ -299,7 +311,7 @@ export function GatePublishEffectReviewPanel({ packages }: { packages: PrePublis
                   <div className="text-sm font-medium text-slate-950">{item.effectReview.optimizationHeadline}</div>
                   <p className="mt-1 text-sm leading-6 text-slate-600">{item.effectReview.nextAction}</p>
                 </div>
-                <Link className="w-fit rounded-md border border-slate-200 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50" href={`/projects/${item.projectId}#publish-effect-panel`}>
+                <Link className="w-fit rounded-md border border-slate-200 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50" href={hrefWithGateReturn(`/projects/${item.projectId}#publish-effect-panel`, gateReturnHref)}>
                   打开复盘
                 </Link>
               </div>
@@ -317,7 +329,7 @@ export function GatePublishEffectReviewPanel({ packages }: { packages: PrePublis
                           <span className="text-xs text-slate-500">{action.target}</span>
                         </div>
                         {action.execution === "open_target" ? (
-                          <Link className="w-fit rounded-md border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50" href={action.href}>
+                          <Link className="w-fit rounded-md border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50" href={hrefWithGateReturn(action.href, gateReturnHref)}>
                             {executeText(action.execution)}
                           </Link>
                         ) : (

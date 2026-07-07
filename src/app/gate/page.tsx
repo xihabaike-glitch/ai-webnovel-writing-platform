@@ -498,9 +498,9 @@ export default async function GatePage({
 
       <GateFirstThreeAdoptionPanel closure={gate.firstThreeAdoptionClosure} />
 
-      <GatePublishEffectReviewPanel packages={gate.projectStatuses} />
+      <GatePublishEffectReviewPanel gateReturnHref={gateRecheckReturnHref} packages={gate.projectStatuses} />
 
-      <GatePlatformStrategyReviewPanel review={gate.strategyReview} />
+      <GatePlatformStrategyReviewPanel gateReturnHref={gateRecheckReturnHref} review={gate.strategyReview} />
 
       {aiRecoveryPanel.visible ? (
         <section className={`mb-6 rounded-md border p-4 ${aiRecoveryTone(aiRecoveryPanel.status)}`} id={aiRecoveryPanel.anchorId}>
@@ -635,7 +635,7 @@ export default async function GatePage({
         </section>
       ) : null}
 
-      <GateClosedLoopTimelinePanel packages={gate.projectStatuses} />
+      <GateClosedLoopTimelinePanel gateReturnHref={gateRecheckReturnHref} packages={gate.projectStatuses} />
 
       <section className="mb-6 grid gap-4 lg:grid-cols-[0.9fr_1.1fr]">
         <div className="rounded-md border border-slate-200 bg-white p-4">

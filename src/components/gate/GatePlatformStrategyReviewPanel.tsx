@@ -31,7 +31,19 @@ function receiptTone(status: GateActionReceipt["status"]) {
   return "border-rose-200 bg-rose-50 text-rose-800";
 }
 
-export function GatePlatformStrategyReviewPanel({ review }: { review: PrePublishGateStrategyReview }) {
+function hrefWithGateReturn(href: string, gateReturnHref?: string | null) {
+  if (!gateReturnHref || !href.startsWith("/") || href.startsWith("/gate")) return href;
+
+  const hashIndex = href.indexOf("#");
+  const base = hashIndex >= 0 ? href.slice(0, hashIndex) : href;
+  const hash = hashIndex >= 0 ? href.slice(hashIndex) : "";
+  if (base.includes("gateReturn=")) return href;
+  const separator = base.includes("?") ? "&" : "?";
+
+  return `${base}${separator}gateReturn=${encodeURIComponent(gateReturnHref)}${hash}`;
+}
+
+export function GatePlatformStrategyReviewPanel({ review, gateReturnHref }: { review: PrePublishGateStrategyReview; gateReturnHref?: string | null }) {
   const router = useRouter();
   const [runningId, setRunningId] = useState<string | null>(null);
   const [receipt, setReceipt] = useState<GateActionReceipt | null>(null);
@@ -50,7 +62,7 @@ export function GatePlatformStrategyReviewPanel({ review }: { review: PrePublish
     try {
       if (item.actionType === "open_target") {
         recordReceipt(buildGatePlatformStrategyReceipt({ item, status: "succeeded" }));
-        router.push(item.href);
+        router.push(hrefWithGateReturn(item.href, gateReturnHref));
         return;
       }
 
@@ -138,7 +150,7 @@ export function GatePlatformStrategyReviewPanel({ review }: { review: PrePublish
               <p className="mt-1 leading-6 opacity-85">{receipt.message}</p>
               <p className="mt-1 text-xs opacity-70">{new Date(receipt.createdAt).toLocaleString()}</p>
             </div>
-            <Link className="w-fit rounded-md bg-white px-3 py-2 text-xs font-medium text-slate-950" href={receipt.href}>
+            <Link className="w-fit rounded-md bg-white px-3 py-2 text-xs font-medium text-slate-950" href={hrefWithGateReturn(receipt.href, gateReturnHref)}>
               打开相关位置
             </Link>
           </div>
@@ -193,7 +205,7 @@ export function GatePlatformStrategyReviewPanel({ review }: { review: PrePublish
                 >
                   {buttonText(item)}
                 </button>
-                <Link className="w-fit rounded-md border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50" href={item.href}>
+                <Link className="w-fit rounded-md border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50" href={hrefWithGateReturn(item.href, gateReturnHref)}>
                   打开位置
                 </Link>
               </div>
@@ -214,7 +226,7 @@ export function GatePlatformStrategyReviewPanel({ review }: { review: PrePublish
             </div>
             <div className="mt-3 flex flex-wrap gap-2">
               {item.projects.map((project) => (
-                <Link className="rounded-md bg-white px-2 py-1 text-xs text-slate-600 hover:bg-slate-100" href={project.href} key={project.projectId}>
+                <Link className="rounded-md bg-white px-2 py-1 text-xs text-slate-600 hover:bg-slate-100" href={hrefWithGateReturn(project.href, gateReturnHref)} key={project.projectId}>
                   {project.projectTitle} · {project.effectLabel} · {project.loopLabel}
                 </Link>
               ))}

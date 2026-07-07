@@ -27,7 +27,19 @@ function timeText(value: Date | string) {
   });
 }
 
-export function GateClosedLoopTimelinePanel({ packages }: { packages: PrePublishGateProjectStatus[] }) {
+function hrefWithGateReturn(href: string, gateReturnHref?: string | null) {
+  if (!gateReturnHref || !href.startsWith("/") || href.startsWith("/gate")) return href;
+
+  const hashIndex = href.indexOf("#");
+  const base = hashIndex >= 0 ? href.slice(0, hashIndex) : href;
+  const hash = hashIndex >= 0 ? href.slice(hashIndex) : "";
+  if (base.includes("gateReturn=")) return href;
+  const separator = base.includes("?") ? "&" : "?";
+
+  return `${base}${separator}gateReturn=${encodeURIComponent(gateReturnHref)}${hash}`;
+}
+
+export function GateClosedLoopTimelinePanel({ packages, gateReturnHref }: { packages: PrePublishGateProjectStatus[]; gateReturnHref?: string | null }) {
   const activeLoops = packages.filter((item) => item.loopTimeline.items.length > 0 || item.status !== "empty");
 
   return (
@@ -58,13 +70,13 @@ export function GateClosedLoopTimelinePanel({ packages }: { packages: PrePublish
                 </div>
                 <p className="mt-2 text-sm leading-6 text-slate-600">{item.loopTimeline.nextAction}</p>
               </div>
-              <Link className="w-fit rounded-md border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50" href={item.loopTimeline.actionHref}>
+              <Link className="w-fit rounded-md border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50" href={hrefWithGateReturn(item.loopTimeline.actionHref, gateReturnHref)}>
                 处理下一步
               </Link>
             </div>
             <div className="mt-3 grid gap-2 lg:grid-cols-2">
               {item.loopTimeline.items.map((event) => (
-                <Link className="rounded-md border border-slate-200 bg-white p-3 text-sm hover:bg-slate-50" href={event.href} key={event.id}>
+                <Link className="rounded-md border border-slate-200 bg-white p-3 text-sm hover:bg-slate-50" href={hrefWithGateReturn(event.href, gateReturnHref)} key={event.id}>
                   <div className="flex flex-wrap items-center gap-2">
                     <span className={`rounded-md px-2 py-1 text-xs font-medium ${itemTone(event.type)}`}>{event.label}</span>
                     <span className="text-xs text-slate-500">{timeText(event.createdAt)}</span>

@@ -56,6 +56,7 @@ export interface ReferenceCaseLibraryView {
     tag: string;
     count: number;
   }>;
+  invalidCategoryNotice: string | null;
 }
 
 export interface ReferenceCaseDevelopmentPathItem {
@@ -738,6 +739,9 @@ export function buildReferenceCaseLibraryView(input?: {
   const cases = input?.cases ?? openSourceReferenceCases;
   const plan = buildReferenceCaseDevelopmentPlan(cases);
   const developmentPath = buildReferenceCaseDevelopmentPath();
+  const invalidCategoryNotice = input?.selectedCategory && !isReferenceCaseCategory(input.selectedCategory)
+    ? `参考分类「${input.selectedCategory}」不存在，已显示全部案例。`
+    : null;
   const selectedCategory = isReferenceCaseCategory(input?.selectedCategory)
     ? input.selectedCategory
     : "all";
@@ -788,5 +792,6 @@ export function buildReferenceCaseLibraryView(input?: {
       .map(([tag, count]) => ({ tag, count }))
       .sort((a, b) => b.count - a.count || a.tag.localeCompare(b.tag))
       .slice(0, 12),
+    invalidCategoryNotice,
   };
 }

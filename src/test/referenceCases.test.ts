@@ -116,6 +116,7 @@ test("open source reference cases", async (t) => {
     assert.ok(aiView.topTags.some((item) => item.tag === "rag" || item.tag === "workflow"));
 
     assert.equal(fallbackView.selectedCategory, "all");
+    assert.equal(fallbackView.invalidCategoryNotice, "参考分类「unknown」不存在，已显示全部案例。");
   });
 
   await t.test("builds a role playbook from the reference library", () => {

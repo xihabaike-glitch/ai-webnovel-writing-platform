@@ -544,7 +544,7 @@ function buildRequirementTraceability(): DevelopmentOverviewRequirementTraceabil
         originalRequest: "支持一万字左右短篇、5-6 万字中篇，以及长篇和超长篇网文规划。",
         currentEvidence: "篇幅模板已覆盖 short_10k、mid_50k、long_300k_plus、mega_1m_plus，并绑定平台默认篇幅。",
         acceptanceSignal: "作品创建后能按篇幅影响章节数量、首章钩子、发布包和长线结构验收。",
-        href: "/projects",
+        href: "/projects#create-project",
       },
       {
         id: "tree_method",

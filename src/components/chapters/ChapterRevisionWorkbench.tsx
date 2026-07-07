@@ -39,6 +39,14 @@ interface AdoptRevisionResponse {
     detail: string;
     href: string;
   };
+  followupDispatches?: Array<{
+    id: string;
+    title: string;
+    detail: string;
+    actionLabel: string;
+    href: string;
+    dueLabel?: string;
+  }>;
 }
 
 function formatDate(value: string) {
@@ -79,6 +87,7 @@ export function ChapterRevisionWorkbench({
   const [isAdopting, setIsAdopting] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [nextAction, setNextAction] = useState<AdoptRevisionResponse["nextAction"] | null>(null);
+  const [followupDispatches, setFollowupDispatches] = useState<NonNullable<AdoptRevisionResponse["followupDispatches"]>>([]);
 
   const selectedRevision = useMemo(
     () => revisions.find((revision) => revision.id === selectedRevisionId) ?? revisions[0] ?? null,
@@ -151,6 +160,7 @@ export function ChapterRevisionWorkbench({
     setIsAdopting(true);
     setMessage(null);
     setNextAction(null);
+    setFollowupDispatches([]);
     try {
       const response = await fetch(`/api/chapters/${chapter.id}/revisions/${selectedRevision.id}/adopt`, {
         method: "POST",
@@ -160,6 +170,7 @@ export function ChapterRevisionWorkbench({
       }
       const payload = await response.json().catch(() => null) as AdoptRevisionResponse | null;
       setNextAction(payload?.nextAction ?? null);
+      setFollowupDispatches(payload?.followupDispatches ?? []);
       setMessage(payload?.nextAction
         ? `已采纳候选稿。下一步：${payload.nextAction.label}，${payload.nextAction.detail}`
         : "已采纳候选稿。下一步请重新审稿，确认当前正文能否进入二改或发布质检。");
@@ -225,6 +236,15 @@ export function ChapterRevisionWorkbench({
             <Link className="w-fit rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white hover:bg-slate-800" href={hrefWithGateReturn(nextAction.href, gateReturnHref)}>
               {nextAction.label}
             </Link>
+          ) : null}
+          {followupDispatches.length ? (
+            <div className="grid w-full gap-2 sm:w-auto">
+              {followupDispatches.map((dispatch) => (
+                <Link className="w-fit rounded-md border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-100" href={hrefWithGateReturn(dispatch.href, gateReturnHref)} key={dispatch.id}>
+                  {dispatch.actionLabel}
+                </Link>
+              ))}
+            </div>
           ) : null}
         </div>
       ) : null}

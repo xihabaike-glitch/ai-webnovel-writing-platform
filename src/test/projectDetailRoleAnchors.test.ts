@@ -345,3 +345,13 @@ test("chapter detail page carries gate return through adoption next actions", ()
   assert.ok(chapterRevisionWorkbench.includes("setNextAction(payload?.nextAction ?? null);"));
   assert.ok(chapterRevisionWorkbench.includes("href={hrefWithGateReturn(nextAction.href, gateReturnHref)}"));
 });
+
+test("chapter revision workbench surfaces adoption follow-up dispatch links", () => {
+  const chapterRevisionWorkbench = readFileSync("src/components/chapters/ChapterRevisionWorkbench.tsx", "utf8");
+
+  assert.ok(chapterRevisionWorkbench.includes("followupDispatches?: Array<"));
+  assert.ok(chapterRevisionWorkbench.includes("setFollowupDispatches(payload?.followupDispatches ?? []);"));
+  assert.ok(chapterRevisionWorkbench.includes("followupDispatches.map((dispatch)"));
+  assert.ok(chapterRevisionWorkbench.includes("href={hrefWithGateReturn(dispatch.href, gateReturnHref)}"));
+  assert.ok(chapterRevisionWorkbench.includes("{dispatch.actionLabel}"));
+});

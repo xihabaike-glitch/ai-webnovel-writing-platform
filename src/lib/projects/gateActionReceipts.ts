@@ -1719,7 +1719,7 @@ function strategyRecheckHint(input: {
       status: "ready",
       label: "采纳投稿方案并复检",
       detail: "投稿方案已生成，采纳最强版本后刷新总闸门，确认资产、基准和投放链路是否补齐。",
-      actionLabel: "刷新总闸门",
+      actionLabel: "去采纳候选",
     };
   }
 
@@ -1728,7 +1728,7 @@ function strategyRecheckHint(input: {
       status: "ready",
       label: "复检前三章与发布包",
       detail: "前三章已重写，刷新总闸门后确认弱转化平台是否进入新一轮基准和回填。",
-      actionLabel: "刷新总闸门",
+      actionLabel: "去采纳改写",
     };
   }
 

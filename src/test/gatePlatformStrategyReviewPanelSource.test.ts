@@ -17,3 +17,9 @@ test("gate platform strategy review keeps project navigation returnable", () => 
   assert.ok(panelSource.includes("href={hrefWithGateReturn(item.href, gateReturnHref)}"));
   assert.ok(panelSource.includes("href={hrefWithGateReturn(project.href, gateReturnHref)}"));
 });
+
+test("gate platform strategy receipt surfaces the next adoption or recheck step", () => {
+  assert.ok(panelSource.includes("receipt.recheck.label"));
+  assert.ok(panelSource.includes("receipt.recheck.detail"));
+  assert.ok(panelSource.includes("{receipt.recheck.actionLabel}"));
+});

@@ -148,10 +148,14 @@ export function GatePlatformStrategyReviewPanel({ review, gateReturnHref }: { re
             <div>
               <div className="font-medium">{receipt.status === "succeeded" ? "策略动作已执行" : "策略动作失败"} · {receipt.label}</div>
               <p className="mt-1 leading-6 opacity-85">{receipt.message}</p>
+              <div className="mt-2 rounded-md bg-white/70 px-3 py-2">
+                <div className="text-xs font-medium opacity-80">下一步：{receipt.recheck.label}</div>
+                <p className="mt-1 text-xs leading-5 opacity-75">{receipt.recheck.detail}</p>
+              </div>
               <p className="mt-1 text-xs opacity-70">{new Date(receipt.createdAt).toLocaleString()}</p>
             </div>
             <Link className="w-fit rounded-md bg-white px-3 py-2 text-xs font-medium text-slate-950" href={hrefWithGateReturn(receipt.href, gateReturnHref)}>
-              打开相关位置
+              {receipt.recheck.actionLabel}
             </Link>
           </div>
         </div>

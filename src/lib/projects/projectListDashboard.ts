@@ -56,6 +56,24 @@ export interface ProjectListItem {
   riskFlags: string[];
   continuationStatus: "first_day_active" | "ready" | "blocked" | "complete";
   pipelineProof: ProjectListPipelineProof;
+  realSampleValidation: ProjectListRealSampleValidation;
+}
+
+export type ProjectListRealSampleValidationStatus =
+  | "blocked"
+  | "needs_acceptance"
+  | "ready_for_gate"
+  | "ready_for_publish_review";
+
+export interface ProjectListRealSampleValidation {
+  status: ProjectListRealSampleValidationStatus;
+  label: string;
+  headline: string;
+  detail: string;
+  completedEvidence: string[];
+  missingEvidence: string[];
+  nextActionLabel: string;
+  nextActionHref: string;
 }
 
 export type ProjectListPipelineStepStatus = "done" | "current" | "blocked";
@@ -341,6 +359,124 @@ function buildProjectPipelineProof(input: {
   };
 }
 
+function hasUsableOpeningSample(project: ProjectListProject) {
+  const firstChapter = project.chapters.find((chapter) => chapter.order === 1) ?? project.chapters[0];
+  if (!firstChapter) return false;
+
+  return firstChapter.wordCount > 0
+    && firstChapter.hook.trim().length > 0
+    && firstChapter.conflict.trim().length > 0
+    && firstChapter.valueShift.trim().length > 0
+    && firstChapter.cliffhanger.trim().length > 0;
+}
+
+function hasSucceededTask(project: ProjectListProject, taskType: string) {
+  return project.aiTasks.some((task) => task.taskType === taskType && task.status === "succeeded");
+}
+
+function hasAcceptedDispatch(project: ProjectListProject) {
+  return (project.gateDispatchTasks ?? []).some((task) => (
+    task.state === "completed" && task.completionEvidence.trim().length >= 20
+  ));
+}
+
+function buildRealSampleValidation(input: {
+  project: ProjectListProject;
+  outlinePercent: number;
+  supportPercent: number;
+  continuationStatus: ProjectListItem["continuationStatus"];
+}): ProjectListRealSampleValidation {
+  const baseHref = `/projects/${input.project.id}`;
+  const startReady = input.outlinePercent >= 70 && input.supportPercent >= 50;
+  const sampleReady = hasUsableOpeningSample(input.project);
+  const reviewReady = hasSucceededTask(input.project, "chapter_review");
+  const secondPassReady = hasSucceededTask(input.project, "chapter_second_pass");
+  const dispatchAccepted = hasAcceptedDispatch(input.project);
+  const publishShapeReady = input.project.chapters.length >= 3
+    && reviewReady
+    && secondPassReady
+    && dispatchAccepted
+    && (input.continuationStatus === "ready" || input.continuationStatus === "complete");
+  const completedEvidence = [
+    startReady ? "开书骨架已覆盖开头、结尾、主干、分支和土壤。" : null,
+    sampleReady ? "首章样本已有钩子、冲突、价值变化和章末追读。" : null,
+    reviewReady ? "审稿任务已有成功记录。" : null,
+    secondPassReady ? "二改任务已有成功记录。" : null,
+    dispatchAccepted ? "派单验收已有完成证据。" : null,
+    publishShapeReady ? "前三章、审稿、二改和派单证据已能进入总闸门。" : null,
+  ].filter((item): item is string => Boolean(item));
+  const missingEvidence = [
+    startReady ? null : "开书骨架缺开头钩子、结尾承诺、主干、支线或平台土壤。",
+    sampleReady ? null : "首章样本缺钩子、冲突、价值变化或章末追读证据。",
+    reviewReady ? null : "首章样本还缺审稿成功记录。",
+    secondPassReady ? null : "审稿后还缺二改成功记录。",
+    dispatchAccepted ? null : "审稿、二改或平台预检还缺派单回执和人工验收。",
+  ].filter((item): item is string => Boolean(item));
+
+  if (!startReady) {
+    return {
+      status: "blocked",
+      label: "先补骨架",
+      headline: "真实样本验收卡：开书骨架没过线。",
+      detail: "别急着让模型写正文。先把目标平台、开头钩子、结尾承诺、主干和土壤补齐。",
+      completedEvidence,
+      missingEvidence,
+      nextActionLabel: "补开书骨架",
+      nextActionHref: baseHref,
+    };
+  }
+
+  if (!sampleReady) {
+    return {
+      status: "blocked",
+      label: "先补首章",
+      headline: "真实样本验收卡：首章样本还不能拿去审。",
+      detail: "首章必须能看见钩子、冲突、价值变化和章末追读，再进入审稿或二改。",
+      completedEvidence,
+      missingEvidence,
+      nextActionLabel: "补首章样本",
+      nextActionHref: baseHref,
+    };
+  }
+
+  if (!reviewReady || !secondPassReady || !dispatchAccepted) {
+    return {
+      status: "needs_acceptance",
+      label: "待验收",
+      headline: "真实样本验收卡：首章样本要审稿、二改和派单验收。",
+      detail: "有样本不等于能批量。先让审稿、二改和人工验收留下回执，再考虑总闸门。",
+      completedEvidence,
+      missingEvidence,
+      nextActionLabel: "补派单验收",
+      nextActionHref: `/dispatch?firstDayProject=${input.project.id}#first-day-dispatch`,
+    };
+  }
+
+  if (!publishShapeReady) {
+    return {
+      status: "ready_for_gate",
+      label: "进总闸门",
+      headline: "真实样本验收卡：样本证据够了，去总闸门决定能不能放大。",
+      detail: "当前已经有样本、审稿、二改和派单验收；下一步看成本、失败率和恢复证据。",
+      completedEvidence,
+      missingEvidence,
+      nextActionLabel: "去总闸门",
+      nextActionHref: "/gate",
+    };
+  }
+
+  return {
+    status: "ready_for_publish_review",
+    label: "做发布复盘",
+    headline: "真实样本验收卡：可以进入发布包和平台复盘。",
+    detail: "别再加平台。把 8 个核心平台的样章、卖点、版本基线和反馈记录打穿。",
+    completedEvidence,
+    missingEvidence,
+    nextActionLabel: "做平台包",
+    nextActionHref: `${baseHref}#platform-export`,
+  };
+}
+
 function buildProjectListPmFocus(items: ProjectListItem[]): ProjectListPmFocus {
   const scopeLabel = `${platformDeliveryScope.statusLabel} · ${platformDeliveryScope.expansionLabel}`;
   if (items.length === 0) {
@@ -585,6 +721,12 @@ export function buildProjectListDashboard(
     const reviewCoveragePercent = reviewCoverage(project.chapters, project.aiTasks);
     const outlinePercent = outlineCoverage(project.outlineNodes);
     const supportPercent = supportCoverage(project);
+    const realSampleValidation = buildRealSampleValidation({
+      project,
+      outlinePercent,
+      supportPercent,
+      continuationStatus: continuation.status,
+    });
     const rawHealthScore = Math.round(average([
       firstDay.progressPercent,
       outlinePercent,
@@ -645,6 +787,7 @@ export function buildProjectListDashboard(
         riskLevel: riskProfile.level,
         continuationStatus: continuation.status,
       }),
+      realSampleValidation,
     };
   }).sort((left, right) => (
     left.healthScore - right.healthScore

@@ -348,6 +348,38 @@ test("buildProjectListDashboard", async (t) => {
     );
   });
 
+  await t.test("adds real sample validation so projects do not pretend the pipeline is complete", () => {
+    const dashboard = buildProjectListDashboard([emptyProject, completeProject, handoffBlockedProject], [
+      {
+        id: "provider-1",
+        providerId: "mock",
+        displayName: "Mock",
+        defaultModel: "mock-novel",
+        enabled: true,
+        encryptedApiKey: "secret",
+      },
+    ]);
+    const empty = dashboard.items.find((item) => item.id === "empty-project");
+    const ready = dashboard.items.find((item) => item.id === "ready-project");
+    const handoff = dashboard.items.find((item) => item.id === "handoff-blocked-project");
+
+    assert.equal(empty?.realSampleValidation.status, "blocked");
+    assert.ok(empty?.realSampleValidation.headline.includes("开书骨架"));
+    assert.ok(empty?.realSampleValidation.missingEvidence.some((item) => item.includes("开头钩子")));
+    assert.equal(empty?.realSampleValidation.nextActionHref, "/projects/empty-project");
+
+    assert.equal(ready?.realSampleValidation.status, "needs_acceptance");
+    assert.ok(ready?.realSampleValidation.headline.includes("审稿"));
+    assert.ok(ready?.realSampleValidation.missingEvidence.some((item) => item.includes("派单回执")));
+    assert.ok(ready?.realSampleValidation.completedEvidence.some((item) => item.includes("首章样本")));
+    assert.equal(ready?.realSampleValidation.nextActionHref, "/dispatch?firstDayProject=ready-project#first-day-dispatch");
+
+    assert.equal(handoff?.realSampleValidation.status, "ready_for_gate");
+    assert.ok(handoff?.realSampleValidation.headline.includes("总闸门"));
+    assert.ok(handoff?.realSampleValidation.completedEvidence.some((item) => item.includes("派单验收")));
+    assert.equal(handoff?.realSampleValidation.nextActionHref, "/gate");
+  });
+
   await t.test("summarizes portfolio bottlenecks across pipeline proof steps", () => {
     const dashboard = buildProjectListDashboard([emptyProject, completeProject, handoffBlockedProject], [
       {

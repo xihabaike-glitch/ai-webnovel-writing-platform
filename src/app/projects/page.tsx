@@ -45,6 +45,13 @@ function pipelineStepLabel(status: "done" | "current" | "blocked") {
   return "待验";
 }
 
+function realSampleValidationClass(status: "blocked" | "needs_acceptance" | "ready_for_gate" | "ready_for_publish_review") {
+  if (status === "blocked") return "border-rose-200 bg-rose-50 text-rose-900";
+  if (status === "needs_acceptance") return "border-amber-200 bg-amber-50 text-amber-900";
+  if (status === "ready_for_gate") return "border-sky-200 bg-sky-50 text-sky-900";
+  return "border-emerald-200 bg-emerald-50 text-emerald-900";
+}
+
 export default async function ProjectsPage({ searchParams }: ProjectsPageProps) {
   const params = await searchParams;
   const experienceLaunch = {
@@ -313,6 +320,36 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps) 
               {item.riskFlags.map((flag) => (
                 <span className="rounded-md bg-slate-100 px-2 py-1" key={flag}>{flag}</span>
               ))}
+            </div>
+            <div className={`mt-4 rounded-md border p-3 ${realSampleValidationClass(item.realSampleValidation.status)}`}>
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                <div>
+                  <div className="text-xs opacity-75">真实作品样本验收</div>
+                  <div className="mt-1 font-medium">{item.realSampleValidation.headline}</div>
+                  <p className="mt-1 text-xs leading-5 opacity-80">{item.realSampleValidation.detail}</p>
+                </div>
+                <Link className="w-fit rounded-md bg-white px-3 py-2 text-xs font-medium text-slate-950 hover:bg-slate-100" href={item.realSampleValidation.nextActionHref}>
+                  {item.realSampleValidation.nextActionLabel}
+                </Link>
+              </div>
+              <div className="mt-3 grid gap-2 md:grid-cols-2">
+                <div className="rounded-md bg-white/70 p-3 text-xs leading-5">
+                  <div className="font-medium text-slate-950">已有证据</div>
+                  <div className="mt-2 grid gap-1 text-slate-700">
+                    {item.realSampleValidation.completedEvidence.length > 0 ? item.realSampleValidation.completedEvidence.map((evidence) => (
+                      <span key={evidence}>{evidence}</span>
+                    )) : <span>暂无可用证据。</span>}
+                  </div>
+                </div>
+                <div className="rounded-md bg-white/70 p-3 text-xs leading-5">
+                  <div className="font-medium text-slate-950">缺口</div>
+                  <div className="mt-2 grid gap-1 text-slate-700">
+                    {item.realSampleValidation.missingEvidence.length > 0 ? item.realSampleValidation.missingEvidence.map((evidence) => (
+                      <span key={evidence}>{evidence}</span>
+                    )) : <span>当前样本验收没有明显缺口，下一步看总闸门和发布复盘。</span>}
+                  </div>
+                </div>
+              </div>
             </div>
             <div className="mt-4 rounded-md border border-slate-200 bg-slate-50 p-3">
               <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">

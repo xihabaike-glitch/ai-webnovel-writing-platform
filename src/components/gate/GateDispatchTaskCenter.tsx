@@ -197,9 +197,17 @@ export interface DispatchRoleIntent {
   returnHref: string;
 }
 
+function roleIntentWorkAreaLabel(roleIntent: string) {
+  if (roleIntent === "story-structure") return "结构诊断";
+  if (roleIntent === "context-recall") return "项目土壤";
+  if (roleIntent === "platform-export") return "平台导出";
+  return "作品工作区";
+}
+
 function buildRoleIntentDispatch(intent: DispatchRoleIntent): GatePlatformGrowthDispatchItem {
   const now = new Date().toISOString();
   const keySuffix = [intent.projectId, intent.roleIntent, intent.roleId].filter(Boolean).join(":");
+  const workAreaLabel = roleIntentWorkAreaLabel(intent.roleIntent);
 
   return {
     id: `role-intent:${keySuffix || intent.roleName}`,
@@ -210,12 +218,12 @@ function buildRoleIntentDispatch(intent: DispatchRoleIntent): GatePlatformGrowth
     priorityScore: 82,
     ownerRole: intent.ownerRole,
     title: `${intent.roleName}｜角色任务`,
-    detail: `从作品角色入口生成：按 ${intent.modelOwner} 的模型岗位执行，先产出可复核任务结果，再回作品工作区验收。`,
+    detail: `从作品角色入口生成：按 ${intent.modelOwner} 的模型岗位执行，先进入${workAreaLabel}产出可复核任务结果，再回作品验收。`,
     dueLabel: "今日创建",
-    actionLabel: "回作品工作区",
+    actionLabel: `打开${workAreaLabel}`,
     href: intent.returnHref,
     acceptanceCriteria: [intent.acceptance, `建议模型：${intent.modelOwner}`, "完成后必须补充产物链接、人工验收和下一步判断。"],
-    evidence: [`角色入口：${intent.roleIntent}`, `角色编号：${intent.roleId}`, `项目：${intent.projectId}`],
+    evidence: [`角色入口：${intent.roleIntent}`, `工作区：${workAreaLabel}`, `角色编号：${intent.roleId}`, `项目：${intent.projectId}`],
     reviewLatestAt: now,
   };
 }

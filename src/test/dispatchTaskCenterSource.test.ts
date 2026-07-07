@@ -71,3 +71,15 @@ test("dispatch task center can persist a role intent as a formal dispatch", () =
   assert.ok(source.includes("setFocusedCompletionDispatchKey(created.dispatchKey);"));
   assert.ok(source.includes("创建正式任务"));
 });
+
+test("role intent dispatch targets the matching project work area", () => {
+  assert.ok(source.includes("roleIntentWorkAreaLabel"));
+  assert.ok(source.includes("story-structure"));
+  assert.ok(source.includes("结构诊断"));
+  assert.ok(source.includes("context-recall"));
+  assert.ok(source.includes("项目土壤"));
+  assert.ok(source.includes("platform-export"));
+  assert.ok(source.includes("平台导出"));
+  assert.ok(source.includes("actionLabel: `打开${workAreaLabel}`"));
+  assert.ok(source.includes("`工作区：${workAreaLabel}`"));
+});

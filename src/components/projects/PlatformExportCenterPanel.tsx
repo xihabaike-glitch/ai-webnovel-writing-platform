@@ -14,7 +14,11 @@ import {
   type RawPublishRepairRunResult,
 } from "@/lib/projects/publishRepairRunResults";
 import { addGateActionReceipt, buildGatePublishEffectReceipt } from "@/lib/projects/gateActionReceipts";
-import { buildSubmissionAssetAdoptionReviewReceipt, buildSubmissionAssetEditorReview } from "@/lib/projects/platformPublishExport";
+import {
+  buildSubmissionAssetAdoptionReviewReceipt,
+  buildSubmissionAssetEditorReview,
+  type SubmissionAssetPostSaveReview,
+} from "@/lib/projects/platformPublishExport";
 
 type PublishRepairActionKind =
   | "edit_chapter"
@@ -1655,6 +1659,7 @@ export function PlatformExportCenterPanel({
   const [strategyExecutionReceipt, setStrategyExecutionReceipt] = useState<PlatformStrategyExecutionReceipt | null>(null);
   const [strategyReviewTaskReceipt, setStrategyReviewTaskReceipt] = useState<PlatformStrategyReviewTaskReceipt | null>(null);
   const [assetAdoptionReceipt, setAssetAdoptionReceipt] = useState<ReturnType<typeof buildSubmissionAssetAdoptionReviewReceipt> | null>(null);
+  const [submissionAssetPostSaveReview, setSubmissionAssetPostSaveReview] = useState<SubmissionAssetPostSaveReview | null>(null);
   const [knowledgeFeedbackReceipt, setKnowledgeFeedbackReceipt] = useState<PlatformKnowledgeFeedbackReceipt | null>(null);
   const [knowledgeFeedbackHistory, setKnowledgeFeedbackHistory] = useState<PlatformKnowledgeFeedbackReceipt[]>([]);
   const [latestEffectReview, setLatestEffectReview] = useState<PlatformPublishEffectSaveReview | null>(null);
@@ -1686,6 +1691,7 @@ export function PlatformExportCenterPanel({
     [center, selectedPlatformId],
   );
   const selectedPlatformIsRecommended = Boolean(center && selectedPackage?.platformId === center.recommendedPlatformId);
+  const hasCurrentSubmissionAssetPostSaveReview = submissionAssetPostSaveReview?.platformName === selectedPackage?.platformName;
   const multiPlatformExportSourcePrompt = exportSource === "multi-platform-package"
     ? `来自多平台投稿包，推荐先导出${selectedPackage ? ` ${selectedPackage.platformName} ` : "推荐平台"}发布包，再回填首轮真实效果。`
     : null;
@@ -1883,8 +1889,13 @@ export function PlatformExportCenterPanel({
           ...nextDraft,
         }),
       });
-      const payload = (await response.json().catch(() => null)) as { message?: string; error?: string } | null;
+      const payload = (await response.json().catch(() => null)) as {
+        message?: string;
+        postSaveReview?: SubmissionAssetPostSaveReview | null;
+        error?: string;
+      } | null;
       if (!response.ok) throw new Error(payload?.error ?? "保存投稿资产失败。");
+      setSubmissionAssetPostSaveReview(payload?.postSaveReview ?? null);
       setMessage(options?.message ?? payload?.message ?? "投稿资产已保存。");
       await loadCenter({ keepMessage: true });
       return true;
@@ -3821,6 +3832,42 @@ export function PlatformExportCenterPanel({
             <span className={`w-fit rounded-md px-2 py-1 text-xs font-medium ${assetAuditStatusClass(assetAdoptionReceipt.status)}`}>
               {assetAuditStatusLabel(assetAdoptionReceipt.status)}
             </span>
+          </div>
+        </div>
+      ) : null}
+
+      {hasCurrentSubmissionAssetPostSaveReview && submissionAssetPostSaveReview ? (
+        <div className={`mt-3 rounded-md border p-3 text-sm ${
+          submissionAssetPostSaveReview.status === "ready_for_baseline" || submissionAssetPostSaveReview.status === "ready_for_download"
+            ? "border-emerald-200 bg-emerald-50"
+            : "border-amber-200 bg-amber-50"
+        }`}>
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <div className={`font-medium ${
+                submissionAssetPostSaveReview.status === "ready_for_baseline" || submissionAssetPostSaveReview.status === "ready_for_download"
+                  ? "text-emerald-950"
+                  : "text-amber-950"
+              }`}>
+                {submissionAssetPostSaveReview.headline}
+              </div>
+              <p className="mt-1 leading-6 text-slate-700">{submissionAssetPostSaveReview.verdict}</p>
+              <div className="mt-2 grid gap-2 text-xs sm:grid-cols-2">
+                <div className="rounded-md bg-white px-2 py-1 text-slate-600">
+                  投稿资产 <span className="font-medium text-slate-950">{submissionAssetPostSaveReview.assetScore}</span>
+                </div>
+                <div className="rounded-md bg-white px-2 py-1 text-slate-600">
+                  终检 <span className="font-medium text-slate-950">{submissionAssetPostSaveReview.finalGateScore}</span>
+                </div>
+              </div>
+              <p className="mt-2 text-xs leading-5 text-slate-600">下一步：{submissionAssetPostSaveReview.nextAction}</p>
+            </div>
+            <a
+              className="w-fit rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white"
+              href={hrefWithGateReturn(submissionAssetPostSaveReview.href, gateReturnHref, projectId)}
+            >
+              {submissionAssetPostSaveReview.actionLabel}
+            </a>
           </div>
         </div>
       ) : null}

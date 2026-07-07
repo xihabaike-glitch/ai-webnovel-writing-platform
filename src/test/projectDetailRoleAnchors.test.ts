@@ -207,6 +207,11 @@ test("project detail page carries gate return through export and submission link
   assert.ok(platformExportCenterPanel.includes("href={hrefWithGateReturn(receipt.href, gateReturnHref, projectId)}"));
   assert.ok(platformExportCenterPanel.includes("href={hrefWithGateReturn(strategyExecutionReceipt.href, gateReturnHref, projectId)}"));
   assert.ok(platformExportCenterPanel.includes("href={hrefWithGateReturn(strategyReviewTaskReceipt.href, gateReturnHref, projectId)}"));
+  assert.ok(platformExportCenterPanel.includes("postSaveReview?: SubmissionAssetPostSaveReview | null"));
+  assert.ok(platformExportCenterPanel.includes("setSubmissionAssetPostSaveReview(payload?.postSaveReview ?? null);"));
+  assert.ok(platformExportCenterPanel.includes("submissionAssetPostSaveReview?.platformName === selectedPackage?.platformName"));
+  assert.ok(platformExportCenterPanel.includes("href={hrefWithGateReturn(submissionAssetPostSaveReview.href, gateReturnHref, projectId)}"));
+  assert.ok(platformExportCenterPanel.includes("{submissionAssetPostSaveReview.actionLabel}"));
   assert.ok(platformExportCenterPanel.includes("href={hrefWithGateReturn(item.href, gateReturnHref, projectId)}"));
   assert.ok(platformExportCenterPanel.includes("href={hrefWithGateReturn(actionHref(projectId, nextRepairAction), gateReturnHref, projectId)}"));
   assert.ok(platformExportCenterPanel.includes("href={hrefWithGateReturn(actionHref(projectId, step), gateReturnHref, projectId)}"));

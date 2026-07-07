@@ -34,3 +34,13 @@ test("projects page shows portfolio pipeline acceptance outcomes", () => {
   assert.ok(source.includes("dashboard.pipelineAcceptanceSummary.primaryActionHref"));
   assert.ok(source.includes("dashboard.pipelineAcceptanceSummary.primaryActionLabel"));
 });
+
+test("projects page shows the prioritized real sample acceptance queue", () => {
+  assert.ok(source.includes("dashboard.realSampleAcceptanceQueue"));
+  assert.ok(source.includes("真实样本验收队列"));
+  assert.ok(source.includes("sample.projectTitle"));
+  assert.ok(source.includes("sample.outcomeLabel"));
+  assert.ok(source.includes("sample.reason"));
+  assert.ok(source.includes("sample.actionHref"));
+  assert.ok(source.includes("sample.actionLabel"));
+});

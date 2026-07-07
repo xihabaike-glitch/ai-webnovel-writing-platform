@@ -504,6 +504,34 @@ test("buildProjectListDashboard", async (t) => {
     assert.equal(dashboard.pipelineAcceptanceSummary.primaryActionHref, "/projects/empty-project");
   });
 
+  await t.test("builds a prioritized real sample acceptance queue", () => {
+    const dashboard = buildProjectListDashboard([emptyProject, completeProject, handoffBlockedProject], [
+      {
+        id: "provider-1",
+        providerId: "mock",
+        displayName: "Mock",
+        defaultModel: "mock-novel",
+        enabled: true,
+        encryptedApiKey: "secret",
+      },
+    ]);
+
+    assert.equal(dashboard.realSampleAcceptanceQueue.length, 3);
+    assert.deepEqual(
+      dashboard.realSampleAcceptanceQueue.map((item) => item.projectId),
+      ["empty-project", "ready-project", "handoff-blocked-project"],
+    );
+    assert.deepEqual(
+      dashboard.realSampleAcceptanceQueue.map((item) => item.outcome),
+      ["repair", "repair", "hold_batch"],
+    );
+    assert.equal(dashboard.realSampleAcceptanceQueue[0]?.projectTitle, "空白新坑");
+    assert.equal(dashboard.realSampleAcceptanceQueue[0]?.actionLabel, "补开书骨架");
+    assert.equal(dashboard.realSampleAcceptanceQueue[0]?.actionHref, "/projects/empty-project");
+    assert.ok(dashboard.realSampleAcceptanceQueue[0]?.reason.includes("开书骨架"));
+    assert.ok(dashboard.realSampleAcceptanceQueue[2]?.reason.includes("总闸门"));
+  });
+
   await t.test("keeps a validation receipt on each portfolio pipeline filter", () => {
     const dashboard = buildProjectListDashboard([emptyProject, completeProject, handoffBlockedProject], [
       {

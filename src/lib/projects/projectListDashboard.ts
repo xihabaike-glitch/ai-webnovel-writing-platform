@@ -140,6 +140,19 @@ export interface ProjectListPipelineAcceptanceSummary {
   primaryActionHref: string;
 }
 
+export type ProjectListRealSampleAcceptanceOutcome = "repair" | "hold_batch" | "pass";
+
+export interface ProjectListRealSampleAcceptanceQueueItem {
+  projectId: string;
+  projectTitle: string;
+  platformName: string;
+  outcome: ProjectListRealSampleAcceptanceOutcome;
+  outcomeLabel: string;
+  reason: string;
+  actionLabel: string;
+  actionHref: string;
+}
+
 export interface ProjectListDashboard {
   overview: {
     totalProjects: number;
@@ -155,6 +168,7 @@ export interface ProjectListDashboard {
   pmFocus: ProjectListPmFocus;
   pipelineProofSummary: ProjectListPipelineProofSummary;
   pipelineAcceptanceSummary: ProjectListPipelineAcceptanceSummary;
+  realSampleAcceptanceQueue: ProjectListRealSampleAcceptanceQueueItem[];
   roleEntrypoints: ProjectRoleWorkflowEntrypoint[];
   items: ProjectListItem[];
 }
@@ -678,6 +692,38 @@ function buildPipelineAcceptanceSummary(items: ProjectListItem[]): ProjectListPi
   };
 }
 
+function realSampleOutcome(status: ProjectListRealSampleValidationStatus): {
+  outcome: ProjectListRealSampleAcceptanceOutcome;
+  outcomeLabel: string;
+  priority: number;
+} {
+  if (status === "ready_for_publish_review") return { outcome: "pass", outcomeLabel: "通过", priority: 3 };
+  if (status === "ready_for_gate") return { outcome: "hold_batch", outcomeLabel: "暂停批量", priority: 2 };
+  return { outcome: "repair", outcomeLabel: "退回修复", priority: 1 };
+}
+
+function buildRealSampleAcceptanceQueue(items: ProjectListItem[]): ProjectListRealSampleAcceptanceQueueItem[] {
+  return items
+    .map((item) => {
+      const outcome = realSampleOutcome(item.realSampleValidation.status);
+
+      return {
+        projectId: item.id,
+        projectTitle: item.title,
+        platformName: item.platformName,
+        outcome: outcome.outcome,
+        outcomeLabel: outcome.outcomeLabel,
+        reason: item.realSampleValidation.headline,
+        actionLabel: item.realSampleValidation.nextActionLabel,
+        actionHref: item.realSampleValidation.nextActionHref,
+        priority: outcome.priority,
+      };
+    })
+    .sort((left, right) => left.priority - right.priority)
+    .slice(0, 5)
+    .map(({ priority: _priority, ...item }) => item);
+}
+
 export function buildProjectRoleWorkflowEntrypoints(): ProjectRoleWorkflowEntrypoint[] {
   return [
     {
@@ -924,6 +970,7 @@ export function buildProjectListDashboard(
     pmFocus: buildProjectListPmFocus(items),
     pipelineProofSummary: buildPipelineProofSummary(items),
     pipelineAcceptanceSummary: buildPipelineAcceptanceSummary(items),
+    realSampleAcceptanceQueue: buildRealSampleAcceptanceQueue(items),
     roleEntrypoints: buildProjectRoleWorkflowEntrypoints(),
     items,
   };

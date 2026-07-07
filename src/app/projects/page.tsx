@@ -211,6 +211,37 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps) 
               <div className="mt-1 font-semibold">{dashboard.pipelineAcceptanceSummary.repairCount}</div>
             </div>
           </div>
+          <div className="mt-3 rounded-md bg-white p-3">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <div className="text-xs font-medium text-slate-500">真实样本验收队列</div>
+                <p className="mt-1 text-xs leading-5 text-slate-600">先修复证据，再进总闸门，最后看发布复盘；不要用批量生成绕过这张队列。</p>
+              </div>
+              <span className="text-xs text-slate-500">最多显示前 5 本</span>
+            </div>
+            <div className="mt-3 grid gap-2">
+              {dashboard.realSampleAcceptanceQueue.map((sample) => (
+                <div className="flex flex-col gap-2 rounded-md border border-slate-200 bg-slate-50 p-3 text-sm md:flex-row md:items-center md:justify-between" key={sample.projectId}>
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-medium text-slate-950">{sample.projectTitle}</span>
+                      <span className="rounded-md bg-white px-2 py-1 text-xs text-slate-600">{sample.platformName}</span>
+                      <span className="rounded-md bg-slate-950 px-2 py-1 text-xs font-medium text-white">{sample.outcomeLabel}</span>
+                    </div>
+                    <p className="mt-1 text-xs leading-5 text-slate-600">{sample.reason}</p>
+                  </div>
+                  <Link className="w-fit rounded-md bg-white px-3 py-2 text-xs font-medium text-slate-950 hover:bg-slate-100" href={sample.actionHref}>
+                    {sample.actionLabel}
+                  </Link>
+                </div>
+              ))}
+              {dashboard.realSampleAcceptanceQueue.length === 0 ? (
+                <div className="rounded-md border border-dashed border-slate-300 p-3 text-xs text-slate-500">
+                  暂无作品进入验收队列。先创建作品并补开书骨架。
+                </div>
+              ) : null}
+            </div>
+          </div>
         </div>
         <div className="flex flex-col gap-2 lg:flex-row lg:items-end lg:justify-between">
           <div>

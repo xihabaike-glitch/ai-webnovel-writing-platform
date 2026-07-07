@@ -197,6 +197,26 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps) 
             </Link>
           ))}
         </div>
+        <div className="mt-3 grid gap-3 lg:grid-cols-[1.1fr_0.9fr]">
+          <div className="rounded-md border border-slate-200 bg-slate-50 p-3 text-sm leading-6 text-slate-700">
+            <div className="text-xs font-medium text-slate-500">组合级验收回执</div>
+            <div className="mt-1 font-medium text-slate-950">{dashboard.pipelineProofSummary.validationReceipt.headline}</div>
+            <p className="mt-1 text-xs leading-5 text-slate-600">{dashboard.pipelineProofSummary.validationReceipt.proofPrompt}</p>
+            <div className="mt-2 grid gap-1 text-xs">
+              {dashboard.pipelineProofSummary.validationReceipt.requiredEvidence.map((evidence) => (
+                <span key={evidence}>必须看到：{evidence}</span>
+              ))}
+            </div>
+          </div>
+          <div className="rounded-md border border-rose-100 bg-rose-50 p-3 text-xs leading-5 text-rose-800">
+            <div className="font-medium">缺失就停手</div>
+            <div className="mt-2 grid gap-1">
+              {dashboard.pipelineProofSummary.validationReceipt.stopIfMissing.map((rule) => (
+                <span key={rule}>{rule}</span>
+              ))}
+            </div>
+          </div>
+        </div>
         {activePipelineStep ? (
           <div className="mt-3 flex flex-col gap-2 rounded-md bg-slate-50 p-3 text-sm text-slate-600 sm:flex-row sm:items-center sm:justify-between">
             <span>当前只看卡在「{activePipelineStep.label}」的作品。</span>

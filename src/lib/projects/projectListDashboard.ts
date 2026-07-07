@@ -114,6 +114,7 @@ export interface ProjectListPipelineProofSummary {
   recommendedProjectTitle: string | null;
   recommendedActionLabel: string;
   recommendedActionHref: string;
+  validationReceipt: ProjectListPipelineValidationReceipt;
   stepCounts: Array<{
     id: ProjectListPipelineStep["id"];
     label: string;
@@ -605,6 +606,7 @@ function buildPipelineProofSummary(items: ProjectListItem[]): ProjectListPipelin
     return current;
   }, bottleneckSeed);
   const recommendedProject = items.find((item) => item.pipelineProof.currentStepId === bottleneck.id) ?? null;
+  const bottleneckStep = fallbackSteps.find((step) => step.id === bottleneck.id) ?? fallbackSteps[0];
 
   return {
     headline: items.length === 0
@@ -618,6 +620,7 @@ function buildPipelineProofSummary(items: ProjectListItem[]): ProjectListPipelin
     recommendedProjectTitle: recommendedProject?.title ?? null,
     recommendedActionLabel: recommendedProject?.pipelineProof.nextActionLabel ?? "创建作品",
     recommendedActionHref: recommendedProject?.pipelineProof.nextActionHref ?? "#create-project",
+    validationReceipt: buildPipelineValidationReceipt(bottleneckStep),
     stepCounts,
   };
 }

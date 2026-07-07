@@ -462,4 +462,23 @@ test("buildProjectListDashboard", async (t) => {
       false,
     );
   });
+
+  await t.test("attaches the bottleneck validation receipt to the portfolio pipeline summary", () => {
+    const dashboard = buildProjectListDashboard([emptyProject, completeProject, handoffBlockedProject], [
+      {
+        id: "provider-1",
+        providerId: "mock",
+        displayName: "Mock",
+        defaultModel: "mock-novel",
+        enabled: true,
+        encryptedApiKey: "secret",
+      },
+    ]);
+
+    assert.equal(dashboard.pipelineProofSummary.validationReceipt.stepId, "project_start");
+    assert.ok(dashboard.pipelineProofSummary.validationReceipt.headline.includes("开书与大树骨架"));
+    assert.ok(dashboard.pipelineProofSummary.validationReceipt.proofPrompt.includes("开头钩子"));
+    assert.ok(dashboard.pipelineProofSummary.validationReceipt.requiredEvidence.some((item) => item.includes("目标平台")));
+    assert.ok(dashboard.pipelineProofSummary.validationReceipt.stopIfMissing.some((item) => item.includes("停在作品工作台")));
+  });
 });

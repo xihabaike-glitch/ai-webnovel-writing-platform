@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { groupReviewIssues, nonEmptyReviewGroups } from "@/lib/ai/reviewGrouping";
 import { buildAiRecoveryMemoryControlRequest, buildAiRecoveryMemoryDiagnostic, latestTaskStatus, type AiTaskWorkflowItem } from "@/lib/ai/taskWorkflow";
@@ -131,12 +132,26 @@ function modelRouteRoleLabel(role: "primary" | "fallback" | "auto" | "forced") {
   return "自动";
 }
 
+function hrefWithGateReturn(href: string, gateReturnHref?: string | null) {
+  if (!gateReturnHref || !href.startsWith("/") || href.startsWith("/gate")) return href;
+
+  const hashIndex = href.indexOf("#");
+  const base = hashIndex >= 0 ? href.slice(0, hashIndex) : href;
+  const hash = hashIndex >= 0 ? href.slice(hashIndex) : "";
+  if (base.includes("gateReturn=")) return href;
+  const separator = base.includes("?") ? "&" : "?";
+
+  return `${base}${separator}gateReturn=${encodeURIComponent(gateReturnHref)}${hash}`;
+}
+
 export function ChapterWorkflowPanel({
+  gateReturnHref,
   projectId,
   chapterId,
   platform,
   chapterCard,
 }: {
+  gateReturnHref?: string | null;
   projectId: string;
   chapterId: string;
   platform: PlatformProfile;
@@ -161,6 +176,7 @@ export function ChapterWorkflowPanel({
   const [openingRewrite, setOpeningRewrite] = useState<OpeningRewritePackage | null>(null);
   const [budgetGuard, setBudgetGuard] = useState<BudgetGuardView | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [nextAction, setNextAction] = useState<AdoptRevisionResponse["nextAction"] | null>(null);
   const groupedIssues = useMemo(
     () => (reviewResult ? nonEmptyReviewGroups(groupReviewIssues(reviewResult.issues)) : []),
     [reviewResult],
@@ -289,6 +305,7 @@ export function ChapterWorkflowPanel({
   async function adoptRevision(revisionId: string) {
     setAdoptingRevisionId(revisionId);
     setMessage(null);
+    setNextAction(null);
     try {
       const response = await fetch(`/api/chapters/${chapterId}/revisions/${revisionId}/adopt`, {
         method: "POST",
@@ -299,6 +316,7 @@ export function ChapterWorkflowPanel({
       }
 
       const payload = await response.json().catch(() => null) as AdoptRevisionResponse | null;
+      setNextAction(payload?.nextAction ?? null);
       setMessage(payload?.nextAction
         ? `已采纳候选稿并写入正文。下一步：${payload.nextAction.label}，${payload.nextAction.detail}`
         : "已采纳候选稿并写入正文。下一步请重新审稿。");
@@ -563,7 +581,16 @@ export function ChapterWorkflowPanel({
             {isRewritingOpening ? "重写中" : "开头重写"}
           </button>
         </div>
-        {message ? <p className="mt-3 text-sm text-slate-600">{message}</p> : null}
+        {message ? (
+          <div className="mt-3 flex flex-col gap-2 rounded-md bg-slate-50 p-3 text-sm text-slate-600 sm:flex-row sm:items-center sm:justify-between">
+            <span>{message}</span>
+            {nextAction ? (
+              <Link className="w-fit rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white hover:bg-slate-800" href={hrefWithGateReturn(nextAction.href, gateReturnHref)}>
+                {nextAction.label}
+              </Link>
+            ) : null}
+          </div>
+        ) : null}
         {budgetGuard ? (
           <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
             <div className="font-medium">预算修复建议</div>

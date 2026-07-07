@@ -208,3 +208,23 @@ test("chapter detail page keeps a gate recheck return path visible", () => {
   assert.ok(chapterPage.includes("来自总闸门复检"));
   assert.ok(chapterPage.includes("回总闸门复检"));
 });
+
+test("chapter detail page carries gate return through adoption next actions", () => {
+  const chapterPage = readFileSync("src/app/projects/[projectId]/chapters/[chapterId]/page.tsx", "utf8");
+  const chapterWorkflowPanel = readFileSync("src/components/ai/ChapterWorkflowPanel.tsx", "utf8");
+  const chapterRevisionWorkbench = readFileSync("src/components/chapters/ChapterRevisionWorkbench.tsx", "utf8");
+
+  assert.ok(chapterPage.includes("gateReturnHref={gateReturn}"));
+  assert.ok(chapterPage.includes("<ChapterRevisionWorkbench chapter={editableChapter} gateReturnHref={gateReturn} />"));
+  assert.ok(chapterPage.includes("<ChapterWorkflowPanel chapterCard={editableChapter} chapterId={chapterId} gateReturnHref={gateReturn} platform={platform} projectId={projectId} />"));
+
+  assert.ok(chapterWorkflowPanel.includes("gateReturnHref?: string | null"));
+  assert.ok(chapterWorkflowPanel.includes("function hrefWithGateReturn"));
+  assert.ok(chapterWorkflowPanel.includes("setNextAction(payload?.nextAction ?? null);"));
+  assert.ok(chapterWorkflowPanel.includes("href={hrefWithGateReturn(nextAction.href, gateReturnHref)}"));
+
+  assert.ok(chapterRevisionWorkbench.includes("gateReturnHref?: string | null"));
+  assert.ok(chapterRevisionWorkbench.includes("function hrefWithGateReturn"));
+  assert.ok(chapterRevisionWorkbench.includes("setNextAction(payload?.nextAction ?? null);"));
+  assert.ok(chapterRevisionWorkbench.includes("href={hrefWithGateReturn(nextAction.href, gateReturnHref)}"));
+});

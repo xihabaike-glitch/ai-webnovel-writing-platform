@@ -126,11 +126,11 @@ export default async function ChapterPage({
             />
           </div>
           <div id="chapter-revisions">
-            <ChapterRevisionWorkbench chapter={editableChapter} />
+            <ChapterRevisionWorkbench chapter={editableChapter} gateReturnHref={gateReturn} />
           </div>
         </div>
         <div id="chapter-workflow">
-          <ChapterWorkflowPanel chapterCard={editableChapter} chapterId={chapterId} platform={platform} projectId={projectId} />
+          <ChapterWorkflowPanel chapterCard={editableChapter} chapterId={chapterId} gateReturnHref={gateReturn} platform={platform} projectId={projectId} />
         </div>
       </div>
     </AppShell>

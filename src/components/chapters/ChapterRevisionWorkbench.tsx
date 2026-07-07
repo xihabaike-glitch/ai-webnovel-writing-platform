@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -50,7 +51,25 @@ function wordDeltaLabel(comparison: ChapterRevisionComparison) {
   return `当前稿少 ${Math.abs(comparison.wordDelta)} 字`;
 }
 
-export function ChapterRevisionWorkbench({ chapter }: { chapter: EditableChapter }) {
+function hrefWithGateReturn(href: string, gateReturnHref?: string | null) {
+  if (!gateReturnHref || !href.startsWith("/") || href.startsWith("/gate")) return href;
+
+  const hashIndex = href.indexOf("#");
+  const base = hashIndex >= 0 ? href.slice(0, hashIndex) : href;
+  const hash = hashIndex >= 0 ? href.slice(hashIndex) : "";
+  if (base.includes("gateReturn=")) return href;
+  const separator = base.includes("?") ? "&" : "?";
+
+  return `${base}${separator}gateReturn=${encodeURIComponent(gateReturnHref)}${hash}`;
+}
+
+export function ChapterRevisionWorkbench({
+  chapter,
+  gateReturnHref,
+}: {
+  chapter: EditableChapter;
+  gateReturnHref?: string | null;
+}) {
   const router = useRouter();
   const [revisions, setRevisions] = useState<ChapterRevisionSummary[]>([]);
   const [selectedRevisionId, setSelectedRevisionId] = useState<string | null>(null);
@@ -59,6 +78,7 @@ export function ChapterRevisionWorkbench({ chapter }: { chapter: EditableChapter
   const [isRestoring, setIsRestoring] = useState(false);
   const [isAdopting, setIsAdopting] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [nextAction, setNextAction] = useState<AdoptRevisionResponse["nextAction"] | null>(null);
 
   const selectedRevision = useMemo(
     () => revisions.find((revision) => revision.id === selectedRevisionId) ?? revisions[0] ?? null,
@@ -130,6 +150,7 @@ export function ChapterRevisionWorkbench({ chapter }: { chapter: EditableChapter
     if (!selectedRevision) return;
     setIsAdopting(true);
     setMessage(null);
+    setNextAction(null);
     try {
       const response = await fetch(`/api/chapters/${chapter.id}/revisions/${selectedRevision.id}/adopt`, {
         method: "POST",
@@ -138,6 +159,7 @@ export function ChapterRevisionWorkbench({ chapter }: { chapter: EditableChapter
         throw new Error("采纳候选稿失败。");
       }
       const payload = await response.json().catch(() => null) as AdoptRevisionResponse | null;
+      setNextAction(payload?.nextAction ?? null);
       setMessage(payload?.nextAction
         ? `已采纳候选稿。下一步：${payload.nextAction.label}，${payload.nextAction.detail}`
         : "已采纳候选稿。下一步请重新审稿，确认当前正文能否进入二改或发布质检。");
@@ -196,7 +218,16 @@ export function ChapterRevisionWorkbench({ chapter }: { chapter: EditableChapter
         </div>
       </div>
 
-      {message ? <p className="mt-3 text-sm text-slate-600">{message}</p> : null}
+      {message ? (
+        <div className="mt-3 flex flex-col gap-2 rounded-md bg-slate-50 p-3 text-sm text-slate-600 sm:flex-row sm:items-center sm:justify-between">
+          <span>{message}</span>
+          {nextAction ? (
+            <Link className="w-fit rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white hover:bg-slate-800" href={hrefWithGateReturn(nextAction.href, gateReturnHref)}>
+              {nextAction.label}
+            </Link>
+          ) : null}
+        </div>
+      ) : null}
 
       {revisions.length > 0 ? (
         <div className="mt-4 grid gap-4">

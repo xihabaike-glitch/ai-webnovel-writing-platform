@@ -142,8 +142,17 @@ test("buildChapterProductionRecheckDecision sends cleared structure diagnostics 
   assert.equal(decision.status, "cleared");
   assert.equal(decision.title, "复查通过：篇幅结构验收已解除");
   assert.equal(decision.href, "#submission-package");
-  assert.equal(decision.label, "继续投稿包");
+  assert.equal(decision.label, "生成多平台包");
   assert.ok(decision.detail.includes("篇幅结构验收已解除"));
+  assert.ok(decision.detail.includes("多平台投稿版本"));
+  assert.ok(decision.detail.includes("8 个核心平台"));
+  assert.ok(decision.detail.includes("起点中文网"));
+  assert.ok(decision.detail.includes("番茄小说"));
+  assert.ok(decision.detail.includes("七猫"));
+  assert.ok(decision.detail.includes("知乎盐选"));
+  assert.ok(decision.detail.includes("WebNovel"));
+  assert.ok(decision.detail.includes("Royal Road"));
+  assert.ok(decision.detail.includes("Wattpad"));
   assert.ok(decision.detail.includes("平台导出"));
   assert.ok(decision.detail.includes("整书结构 78 -> 86 分"));
 });

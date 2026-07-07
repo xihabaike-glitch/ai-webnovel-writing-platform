@@ -1,3 +1,4 @@
+import { platformDeliveryScope, platformProfiles } from "../platforms/platformProfiles.ts";
 import type { GateEvidenceLoopRecheck, GateStoryTreeRecheck, GateStructureDiagnosticRecheck } from "./gateActionReceipts.ts";
 
 export interface ChapterProductionRecheckPayload {
@@ -69,6 +70,13 @@ function structureDiagnosticNeedsAction(recheck: GateStructureDiagnosticRecheck)
   return recheck.verdict === "declined" || recheck.verdict === "unchanged" || recheck.currentScore < 80;
 }
 
+function corePlatformNames() {
+  return platformDeliveryScope.corePlatformIds
+    .map((platformId) => platformProfiles.find((profile) => profile.id === platformId)?.name)
+    .filter((name): name is string => Boolean(name))
+    .join("、");
+}
+
 export function buildChapterProductionRecheckDecision(
   payloads: ChapterProductionRecheckPayload[],
   fallback: DecisionFallback,
@@ -124,12 +132,13 @@ export function buildChapterProductionRecheckDecision(
   }
 
   if (structureDiagnosticRechecks.length > 0) {
+    const platformNames = corePlatformNames();
     return {
       status: "cleared",
       title: "复查通过：篇幅结构验收已解除",
-      detail: `篇幅结构验收已解除，可以继续投稿包包装和平台导出。${detailLines.join("；")}`,
+      detail: `篇幅结构验收已解除，可以生成多平台投稿版本，并继续平台导出。当前覆盖 ${platformDeliveryScope.corePlatformCount} 个核心平台：${platformNames}。${detailLines.join("；")}`,
       href: "#submission-package",
-      label: "继续投稿包",
+      label: "生成多平台包",
     };
   }
 

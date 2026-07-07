@@ -88,6 +88,11 @@ test("open source reference cases", async (t) => {
       assert.ok(item.currentEvidence.length >= 10);
       assert.ok(item.nextAction.length >= 10);
       assert.ok(item.acceptance.length >= 10);
+      assert.ok(item.pmCheckpoint, `${item.id} should expose a PM checkpoint`);
+      assert.ok(item.pmCheckpoint.risk.length >= 10);
+      assert.ok(item.pmCheckpoint.mustShip.length >= 10);
+      assert.ok(item.pmCheckpoint.proof.length >= 10);
+      assert.ok(item.pmCheckpoint.actionLabel.length >= 4);
       assert.ok(item.href.startsWith("/"));
     }
     assert.ok(allView.developmentPath.find((item) => item.id === "model_routing")?.roleIds.includes("toxic_pm"));
@@ -95,6 +100,8 @@ test("open source reference cases", async (t) => {
     const publishingPipeline = allView.developmentPath.find((item) => item.id === "publishing_pipeline");
     assert.ok(publishingPipeline?.acceptance.includes("8 个核心平台已锁定"));
     assert.equal(publishingPipeline?.acceptance.includes("平台还差 0 个"), false);
+    assert.ok(publishingPipeline?.pmCheckpoint.proof.includes("8 个核心平台"));
+    assert.ok(allView.developmentPath.find((item) => item.id === "model_routing")?.pmCheckpoint.risk.includes("聊天"));
     assert.ok(allView.topTags.length > 0);
 
     assert.equal(aiView.selectedCategory, "ai_workflow");

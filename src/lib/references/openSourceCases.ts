@@ -71,6 +71,12 @@ export interface ReferenceCaseDevelopmentPathItem {
   currentEvidence: string;
   nextAction: string;
   acceptance: string;
+  pmCheckpoint: {
+    risk: string;
+    mustShip: string;
+    proof: string;
+    actionLabel: string;
+  };
   href: string;
 }
 
@@ -613,6 +619,12 @@ export function buildReferenceCaseDevelopmentPath(): ReferenceCaseDevelopmentPat
       currentEvidence: "作品页已有大纲树、人物弧光、世界观、伏笔、章节生产和结构诊断入口。",
       nextAction: "继续把结构诊断结果回写到大纲树、前三章改写和章节卡。",
       acceptance: "作者不调用 AI 也能管理一部长篇；调用 AI 后只是在关键节点提速。",
+      pmCheckpoint: {
+        risk: "别把作者赶进聊天框，写作工作台必须先像传统写作工具一样可用。",
+        mustShip: "大纲树、章节卡、人物弧光和正文入口保持在同一个作品工作流里。",
+        proof: "作品页能看到结构诊断、章节生产、人物弧光和项目土壤的连续入口。",
+        actionLabel: "检查工作台",
+      },
       href: "/projects#story-structure",
     },
     {
@@ -624,6 +636,12 @@ export function buildReferenceCaseDevelopmentPath(): ReferenceCaseDevelopmentPat
       currentEvidence: "模型设置已覆盖 Claude、DeepSeek、Kimi、GPT 等岗位矩阵和任务路由。",
       nextAction: "把每个角色入口都绑定到可复核的模型岗位、失败替代路线和成本记录。",
       acceptance: "用户能看懂每次 AI 任务由哪个模型执行、为什么选它、失败后去哪补救。",
+      pmCheckpoint: {
+        risk: "别做多模型聊天壳；模型必须按任务分工，否则 Claude、DeepSeek、Kimi、GPT 只是供应商名单。",
+        mustShip: "每个写作角色都要有首选模型、备用模型、失败原因和复检入口。",
+        proof: "模型岗位矩阵能解释任务分工、成本压力、失败替代路线和后续复检。",
+        actionLabel: "检查模型岗位",
+      },
       href: "/settings/models#model-role-matrix",
     },
     {
@@ -635,6 +653,12 @@ export function buildReferenceCaseDevelopmentPath(): ReferenceCaseDevelopmentPat
       currentEvidence: "具体作品页已有项目土壤召回，汇总人物、设定、线索和历史章节来源。",
       nextAction: "把每次草稿、审稿、二改使用的上下文来源继续沉淀到任务时间线。",
       acceptance: "长篇续写不会凭空改设定，用户能追到模型参考了哪些资料。",
+      pmCheckpoint: {
+        risk: "别让模型凭感觉续写；长篇一旦改坏设定，后面的章节都会背锅。",
+        mustShip: "世界观、人物关系、伏笔和历史章节要能组成可审计的上下文包。",
+        proof: "项目土壤召回能说明模型引用了哪些人物、设定、线索和历史章节来源。",
+        actionLabel: "检查项目土壤",
+      },
       href: "/projects#context-recall",
     },
     {
@@ -646,6 +670,12 @@ export function buildReferenceCaseDevelopmentPath(): ReferenceCaseDevelopmentPat
       currentEvidence: "参考库和发布中心已锁定 8 个核心平台，覆盖写作、投稿、复盘三段动作。",
       nextAction: "继续把标题、简介、标签、样章、版本和发布效果变成可回滚的发布包记录。",
       acceptance: "8 个核心平台已锁定；每个平台都有可导出的发布包和可回填的效果复盘。",
+      pmCheckpoint: {
+        risk: "别只生成一份万能投稿包；平台差异不进版本和复盘，就没有发布闭环。",
+        mustShip: "8 个核心平台都要有独立标题、简介、标签、样章、版本和效果回填口径。",
+        proof: "8 个核心平台能导出发布包、保存基准版本，并回填真实曝光、点击、收藏或追读。",
+        actionLabel: "检查发布闭环",
+      },
       href: "/projects#platform-export",
     },
   ];

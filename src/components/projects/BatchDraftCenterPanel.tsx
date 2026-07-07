@@ -131,7 +131,25 @@ function statusLabel(status: BatchDraftCandidate["status"]) {
   return labels[status];
 }
 
-export function BatchDraftCenterPanel({ projectId }: { projectId: string }) {
+function hrefWithGateReturn(href: string, gateReturnHref?: string | null) {
+  if (!gateReturnHref || !href.startsWith("/") || href.startsWith("/gate")) return href;
+
+  const hashIndex = href.indexOf("#");
+  const base = hashIndex >= 0 ? href.slice(0, hashIndex) : href;
+  const hash = hashIndex >= 0 ? href.slice(hashIndex) : "";
+  if (base.includes("gateReturn=")) return href;
+  const separator = base.includes("?") ? "&" : "?";
+
+  return `${base}${separator}gateReturn=${encodeURIComponent(gateReturnHref)}${hash}`;
+}
+
+export function BatchDraftCenterPanel({
+  projectId,
+  gateReturnHref,
+}: {
+  projectId: string;
+  gateReturnHref?: string | null;
+}) {
   const [queue, setQueue] = useState<BatchDraftQueue | null>(null);
   const [activeProvider, setActiveProvider] = useState<ActiveProvider | null>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -534,7 +552,7 @@ export function BatchDraftCenterPanel({ projectId }: { projectId: string }) {
                 </div>
                 {result.shouldSecondPass ? <p className="mt-1">自动体检建议进入二改队列。</p> : null}
                 {result.error ? <p className="mt-1">{result.error}</p> : null}
-                <Link className="mt-2 inline-block text-xs font-medium text-slate-950" href={`/projects/${projectId}/chapters/${result.chapterId}`}>
+                <Link className="mt-2 inline-block text-xs font-medium text-slate-950" href={hrefWithGateReturn(`/projects/${projectId}/chapters/${result.chapterId}`, gateReturnHref)}>
                   打开章节
                 </Link>
               </div>

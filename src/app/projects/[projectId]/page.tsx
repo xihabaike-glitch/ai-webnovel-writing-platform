@@ -632,7 +632,7 @@ export default async function ProjectPage({
         <WritingWorkbenchPanel gateReturnHref={gateReturn} workbench={writingWorkbench} />
         <PlatformKnowledgeBriefPanel brief={platformKnowledgeBrief} gateReturnHref={gateReturn} projectId={project.id} />
         <div id="project-control">
-          <ProjectControlDashboardPanel projectId={project.id} />
+          <ProjectControlDashboardPanel gateReturnHref={gateReturn} projectId={project.id} />
         </div>
         <div id="first-day-workflow">
           <FirstDayWorkflowPanel gateReturnHref={gateReturn} projectId={project.id} />
@@ -770,9 +770,9 @@ export default async function ProjectPage({
           <ChapterProductionPanel gateReturnHref={gateReturn} projectId={project.id} />
         </div>
         <div id="ai-pipeline">
-          <BatchDraftCenterPanel projectId={project.id} />
+          <BatchDraftCenterPanel gateReturnHref={gateReturn} projectId={project.id} />
           <div className="mt-4">
-            <BatchReviewPipelinePanel projectId={project.id} />
+            <BatchReviewPipelinePanel gateReturnHref={gateReturn} projectId={project.id} />
           </div>
         </div>
         <div id="serialization-ops">

@@ -60,6 +60,34 @@ test("project detail page carries gate return through project work entry links",
   assert.ok(writingWorkbenchPanel.includes("href={hrefWithGateReturn(block.href, gateReturnHref)}"));
 });
 
+test("project detail page carries gate return through control and batch panels", () => {
+  const projectPage = readFileSync("src/app/projects/[projectId]/page.tsx", "utf8");
+  const controlPanel = readFileSync("src/components/projects/ProjectControlDashboardPanel.tsx", "utf8");
+  const batchDraftPanel = readFileSync("src/components/projects/BatchDraftCenterPanel.tsx", "utf8");
+  const batchReviewPanel = readFileSync("src/components/projects/BatchReviewPipelinePanel.tsx", "utf8");
+
+  assert.ok(projectPage.includes("<ProjectControlDashboardPanel gateReturnHref={gateReturn} projectId={project.id} />"));
+  assert.ok(projectPage.includes("<BatchDraftCenterPanel gateReturnHref={gateReturn} projectId={project.id} />"));
+  assert.ok(projectPage.includes("<BatchReviewPipelinePanel gateReturnHref={gateReturn} projectId={project.id} />"));
+
+  assert.ok(controlPanel.includes("gateReturnHref?: string | null"));
+  assert.ok(controlPanel.includes("function hrefWithGateReturn"));
+  assert.ok(controlPanel.includes("href={hrefWithGateReturn(`/projects/${projectId}#${dashboard.storyFoundation.targetAnchor}`, gateReturnHref)}"));
+  assert.ok(controlPanel.includes("href={hrefWithGateReturn(`/projects/${projectId}#${axis.targetAnchor}`, gateReturnHref)}"));
+  assert.ok(controlPanel.includes("href={hrefWithGateReturn(`/projects/${projectId}#world-bible`, gateReturnHref)}"));
+  assert.ok(controlPanel.includes("href={hrefWithGateReturn(projectScopedHref(projectId, dashboard.aiPipelineRecentBatch.relayTargetHref), gateReturnHref)}"));
+  assert.ok(controlPanel.includes("href={hrefWithGateReturn(projectScopedHref(projectId, dashboard.modelRouteHealth.targetHref), gateReturnHref)}"));
+  assert.ok(controlPanel.includes("href={hrefWithGateReturn(`/projects/${projectId}#${action.targetAnchor}`, gateReturnHref)}"));
+
+  assert.ok(batchDraftPanel.includes("gateReturnHref?: string | null"));
+  assert.ok(batchDraftPanel.includes("function hrefWithGateReturn"));
+  assert.ok(batchDraftPanel.includes("href={hrefWithGateReturn(`/projects/${projectId}/chapters/${result.chapterId}`, gateReturnHref)}"));
+
+  assert.ok(batchReviewPanel.includes("gateReturnHref?: string | null"));
+  assert.ok(batchReviewPanel.includes("function hrefWithGateReturn"));
+  assert.ok(batchReviewPanel.includes("href={hrefWithGateReturn(`/projects/${projectId}/chapters/${candidate.chapterId}`, gateReturnHref)}"));
+});
+
 test("project detail page carries gate return through first day workflow links", () => {
   const projectPage = readFileSync("src/app/projects/[projectId]/page.tsx", "utf8");
   const firstDayWorkflowPanel = readFileSync("src/components/projects/FirstDayWorkflowPanel.tsx", "utf8");

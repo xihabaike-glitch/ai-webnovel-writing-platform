@@ -456,13 +456,31 @@ function projectScopedHref(projectId: string, href: string) {
   return href.startsWith("#") ? `/projects/${projectId}${href}` : href;
 }
 
+function hrefWithGateReturn(href: string, gateReturnHref?: string | null) {
+  if (!gateReturnHref || !href.startsWith("/") || href.startsWith("/gate") || href.startsWith("/api/")) return href;
+
+  const hashIndex = href.indexOf("#");
+  const base = hashIndex >= 0 ? href.slice(0, hashIndex) : href;
+  const hash = hashIndex >= 0 ? href.slice(hashIndex) : "";
+  if (base.includes("gateReturn=")) return href;
+  const separator = base.includes("?") ? "&" : "?";
+
+  return `${base}${separator}gateReturn=${encodeURIComponent(gateReturnHref)}${hash}`;
+}
+
 function shortTime(value: string) {
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return value;
   return parsed.toLocaleDateString("zh-CN", { month: "2-digit", day: "2-digit" });
 }
 
-export function ProjectControlDashboardPanel({ projectId }: { projectId: string }) {
+export function ProjectControlDashboardPanel({
+  projectId,
+  gateReturnHref,
+}: {
+  projectId: string;
+  gateReturnHref?: string | null;
+}) {
   const [dashboard, setDashboard] = useState<ProjectControlDashboard | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [runningActionId, setRunningActionId] = useState<string | null>(null);
@@ -939,7 +957,7 @@ export function ProjectControlDashboardPanel({ projectId }: { projectId: string 
               ) : (
                 <Link
                   className="inline-flex w-fit items-center justify-center rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white hover:bg-slate-800"
-                  href={`/projects/${projectId}#${dashboard.storyFoundation.targetAnchor}`}
+                  href={hrefWithGateReturn(`/projects/${projectId}#${dashboard.storyFoundation.targetAnchor}`, gateReturnHref)}
                 >
                   {dashboard.storyFoundation.actionLabel}
                 </Link>
@@ -949,7 +967,7 @@ export function ProjectControlDashboardPanel({ projectId }: { projectId: string 
               {dashboard.storyFoundation.axes.map((axis) => (
                 <Link
                   className="rounded-md bg-slate-50 p-3 text-sm hover:bg-slate-100"
-                  href={`/projects/${projectId}#${axis.targetAnchor}`}
+                  href={hrefWithGateReturn(`/projects/${projectId}#${axis.targetAnchor}`, gateReturnHref)}
                   key={axis.id}
                 >
                   <div className="flex items-center justify-between gap-2">
@@ -1048,7 +1066,7 @@ export function ProjectControlDashboardPanel({ projectId }: { projectId: string 
               ) : null}
               <Link
                 className="mt-3 inline-flex w-fit items-center justify-center rounded-md border border-slate-200 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
-                href={`/projects/${projectId}#world-bible`}
+                href={hrefWithGateReturn(`/projects/${projectId}#world-bible`, gateReturnHref)}
               >
                 查看平台土壤
               </Link>
@@ -1082,14 +1100,14 @@ export function ProjectControlDashboardPanel({ projectId }: { projectId: string 
                 ) : (
                   <Link
                     className="inline-flex w-fit items-center justify-center rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white hover:bg-slate-800"
-                    href={`/projects/${projectId}#${dashboard.platformVerdict.actionAnchor}`}
+                    href={hrefWithGateReturn(`/projects/${projectId}#${dashboard.platformVerdict.actionAnchor}`, gateReturnHref)}
                   >
                     {dashboard.platformVerdict.actionLabel}
                   </Link>
                 )}
                 <Link
                   className="inline-flex w-fit items-center justify-center rounded-md border border-slate-200 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
-                  href={`/projects/${projectId}#${dashboard.platformVerdict.targetAnchor}`}
+                  href={hrefWithGateReturn(`/projects/${projectId}#${dashboard.platformVerdict.targetAnchor}`, gateReturnHref)}
                 >
                   看裁决面板
                 </Link>
@@ -1393,7 +1411,7 @@ export function ProjectControlDashboardPanel({ projectId }: { projectId: string 
               </div>
               <Link
                 className="inline-flex w-fit items-center justify-center rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white hover:bg-slate-800"
-                href={`/projects/${projectId}#${dashboard.platformFeedback.targetAnchor}`}
+                href={hrefWithGateReturn(`/projects/${projectId}#${dashboard.platformFeedback.targetAnchor}`, gateReturnHref)}
               >
                 看反哺证据
               </Link>
@@ -1415,7 +1433,7 @@ export function ProjectControlDashboardPanel({ projectId }: { projectId: string 
                 </div>
                 <Link
                   className="inline-flex w-fit shrink-0 items-center justify-center rounded-md bg-white px-3 py-2 text-xs font-medium text-slate-950"
-                  href={`/projects/${projectId}#${dashboard.platformEvidenceLoop.targetAnchor}`}
+                  href={hrefWithGateReturn(`/projects/${projectId}#${dashboard.platformEvidenceLoop.targetAnchor}`, gateReturnHref)}
                 >
                   {dashboard.platformEvidenceLoop.actionLabel}
                 </Link>
@@ -1429,7 +1447,7 @@ export function ProjectControlDashboardPanel({ projectId }: { projectId: string 
                 {dashboard.platformFeedback.recent.slice(0, 3).map((receipt) => (
                   <Link
                     className="rounded-md bg-slate-50 p-3 text-sm hover:bg-slate-100"
-                    href={`/projects/${projectId}#${receipt.href.replace(/^#/, "")}`}
+                    href={hrefWithGateReturn(`/projects/${projectId}#${receipt.href.replace(/^#/, "")}`, gateReturnHref)}
                     key={receipt.id}
                   >
                     <div className="flex flex-wrap items-center justify-between gap-2">
@@ -1574,7 +1592,7 @@ export function ProjectControlDashboardPanel({ projectId }: { projectId: string 
                 {dashboard.aiPipelineRecentBatch.relayTargetHref ? (
                   <Link
                     className="inline-flex w-fit shrink-0 items-center justify-center rounded-md bg-white px-2 py-1 font-medium text-amber-900 hover:bg-amber-100"
-                    href={projectScopedHref(projectId, dashboard.aiPipelineRecentBatch.relayTargetHref)}
+                    href={hrefWithGateReturn(projectScopedHref(projectId, dashboard.aiPipelineRecentBatch.relayTargetHref), gateReturnHref)}
                   >
                     看清单面板
                   </Link>
@@ -1599,7 +1617,7 @@ export function ProjectControlDashboardPanel({ projectId }: { projectId: string 
               </div>
               <Link
                 className="inline-flex w-fit items-center justify-center rounded-md border border-slate-200 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
-                href={projectScopedHref(projectId, dashboard.modelRouteHealth.targetHref)}
+                href={hrefWithGateReturn(projectScopedHref(projectId, dashboard.modelRouteHealth.targetHref), gateReturnHref)}
               >
                 {dashboard.modelRouteHealth.actionLabel}
               </Link>
@@ -1704,7 +1722,7 @@ export function ProjectControlDashboardPanel({ projectId }: { projectId: string 
                         ) : null}
                         <Link
                           className="inline-flex w-fit items-center justify-center rounded-md border border-slate-200 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-white"
-                          href={`/projects/${projectId}#${action.targetAnchor}`}
+                          href={hrefWithGateReturn(`/projects/${projectId}#${action.targetAnchor}`, gateReturnHref)}
                         >
                           {action.actionLabel}
                         </Link>

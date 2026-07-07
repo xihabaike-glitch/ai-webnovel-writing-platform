@@ -168,7 +168,25 @@ function modeLabel(mode: SecondPassMode) {
   return labels[mode];
 }
 
-export function BatchReviewPipelinePanel({ projectId }: { projectId: string }) {
+function hrefWithGateReturn(href: string, gateReturnHref?: string | null) {
+  if (!gateReturnHref || !href.startsWith("/") || href.startsWith("/gate")) return href;
+
+  const hashIndex = href.indexOf("#");
+  const base = hashIndex >= 0 ? href.slice(0, hashIndex) : href;
+  const hash = hashIndex >= 0 ? href.slice(hashIndex) : "";
+  if (base.includes("gateReturn=")) return href;
+  const separator = base.includes("?") ? "&" : "?";
+
+  return `${base}${separator}gateReturn=${encodeURIComponent(gateReturnHref)}${hash}`;
+}
+
+export function BatchReviewPipelinePanel({
+  projectId,
+  gateReturnHref,
+}: {
+  projectId: string;
+  gateReturnHref?: string | null;
+}) {
   const [queue, setQueue] = useState<ReviewPipelineQueue | null>(null);
   const [activeProvider, setActiveProvider] = useState<ActiveProvider | null>(null);
   const [selectedReviewIds, setSelectedReviewIds] = useState<string[]>([]);
@@ -661,7 +679,7 @@ export function BatchReviewPipelinePanel({ projectId }: { projectId: string }) {
             <div className="text-xs text-slate-500">
               <div>{reviewStatusLabel(candidate.reviewStatus)} · {candidate.reviewScore ?? "--"} 分 · {candidate.issueCount} 问题</div>
               <div className="mt-1">{secondPassStatusLabel(candidate.secondPassStatus)} · {candidate.wordCount} 字</div>
-              <Link className="mt-2 inline-block font-medium text-slate-950" href={`/projects/${projectId}/chapters/${candidate.chapterId}`}>
+              <Link className="mt-2 inline-block font-medium text-slate-950" href={hrefWithGateReturn(`/projects/${projectId}/chapters/${candidate.chapterId}`, gateReturnHref)}>
                 打开章节
               </Link>
             </div>

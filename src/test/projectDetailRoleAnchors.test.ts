@@ -38,6 +38,19 @@ test("project detail role navigator links role work to dispatch center", () => {
   assert.ok(projectPage.includes("去派单中心"));
 });
 
+test("project detail role navigator surfaces role dispatch completion evidence", () => {
+  const projectPage = readFileSync("src/app/projects/[projectId]/page.tsx", "utf8");
+
+  assert.ok(projectPage.includes('{ dispatchKey: { startsWith: "role-intent:" } }'));
+  assert.ok(projectPage.includes("roleDispatchEvidenceByIntent"));
+  assert.ok(projectPage.includes("roleDispatchEvidence"));
+  assert.ok(projectPage.includes("entry.dispatchIntent.roleId"));
+  assert.ok(projectPage.includes("角色派单状态"));
+  assert.ok(projectPage.includes("完成依据"));
+  assert.ok(projectPage.includes("roleDispatchEvidence.completionEvidence"));
+  assert.ok(projectPage.includes("hrefWithGateReturn(`/dispatch#dispatch-${roleDispatchEvidence.dispatchKey}`, gateReturn)"));
+});
+
 test("project detail page renders the single-project acceptance sheet", () => {
   const projectPage = readFileSync("src/app/projects/[projectId]/page.tsx", "utf8");
 

@@ -52,6 +52,14 @@ test("buildModelRoleMatrix", async (t) => {
 
     assert.equal(matrix.status, "ready");
     assert.equal(matrix.summary.readyRoles, 4);
+    assert.equal(matrix.interfaceCoverage.readyInterfaces, 4);
+    assert.equal(matrix.interfaceCoverage.missingInterfaces, 0);
+    assert.equal(matrix.interfaceCoverage.actionHref, "/settings/models#model-provider-interfaces");
+    assert.ok(matrix.interfaceCoverage.headline.includes("4/4"));
+    assert.deepEqual(
+      matrix.interfaceCoverage.items.map((item) => item.providerId),
+      ["claude", "deepseek", "kimi", "gpt"],
+    );
     assert.equal(matrix.roles.find((role) => role.id === "structure_editor")?.providerName, "Claude");
     assert.equal(matrix.roles.find((role) => role.id === "draft_writer")?.providerName, "DeepSeek");
     assert.equal(matrix.roles.find((role) => role.id === "context_librarian")?.providerName, "Kimi");
@@ -73,6 +81,13 @@ test("buildModelRoleMatrix", async (t) => {
 
     assert.equal(matrix.status, "blocked");
     assert.equal(matrix.summary.missingRoles, 4);
+    assert.equal(matrix.interfaceCoverage.readyInterfaces, 0);
+    assert.equal(matrix.interfaceCoverage.missingInterfaces, 4);
+    assert.ok(matrix.interfaceCoverage.headline.includes("0/4"));
+    assert.ok(matrix.interfaceCoverage.detail.includes("Claude"));
+    assert.ok(matrix.interfaceCoverage.detail.includes("DeepSeek"));
+    assert.ok(matrix.interfaceCoverage.detail.includes("Kimi"));
+    assert.ok(matrix.interfaceCoverage.detail.includes("GPT"));
     assert.ok(matrix.headline.includes("缺岗位"));
     assert.ok(matrix.nextAction.includes("配置"));
   });

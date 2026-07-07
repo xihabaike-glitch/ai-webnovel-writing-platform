@@ -41,9 +41,33 @@ export interface ModelRoleMatrix {
     partialRoles: number;
     missingRoles: number;
   };
+  interfaceCoverage: ModelProviderInterfaceCoverage;
   headline: string;
   nextAction: string;
   roles: ModelWritingRole[];
+}
+
+export interface ModelProviderInterfaceCoverageItem {
+  providerId: "claude" | "deepseek" | "kimi" | "gpt";
+  providerName: string;
+  roleTitle: string;
+  ownerLabel: string;
+  status: "ready" | "needs_save" | "missing";
+  statusLabel: string;
+  model: string | null;
+  detail: string;
+  actionLabel: string;
+}
+
+export interface ModelProviderInterfaceCoverage {
+  totalInterfaces: number;
+  readyInterfaces: number;
+  missingInterfaces: number;
+  headline: string;
+  detail: string;
+  actionHref: string;
+  actionLabel: string;
+  items: ModelProviderInterfaceCoverageItem[];
 }
 
 export interface ModelRoleMatrixPriorityBlocker {
@@ -302,6 +326,55 @@ function bestProvider(definition: RoleDefinition, providers: ModelRoleProviderIn
     })[0] ?? null;
 }
 
+function buildModelProviderInterfaceCoverage(roles: ModelWritingRole[]): ModelProviderInterfaceCoverage {
+  const roleById = new Map(roles.map((role) => [role.id, role]));
+  const items = roleDefinitions
+    .map((definition): ModelProviderInterfaceCoverageItem => {
+      const providerId = definition.preferredProviderIds[0] as ModelProviderInterfaceCoverageItem["providerId"];
+      const role = roleById.get(definition.id);
+      const status: ModelProviderInterfaceCoverageItem["status"] = role?.status === "ready"
+        ? "ready"
+        : role?.status === "partial"
+          ? "needs_save"
+          : "missing";
+      const providerName = providerLabel(providerId);
+
+      return {
+        providerId,
+        providerName,
+        roleTitle: definition.title,
+        ownerLabel: definition.ownerLabel,
+        status,
+        statusLabel: status === "ready" ? "已就绪" : status === "needs_save" ? "需补配置" : "缺接口",
+        model: role?.model ?? null,
+        detail: status === "ready"
+          ? `${providerName} 已接到「${definition.title}」，可产出${definition.deliverables.slice(0, 2).join("、")}。`
+          : status === "needs_save"
+            ? `${providerName} 可顶岗，但上下文或配置还没达到长篇要求；先补配置再放大任务。`
+            : `缺少 ${providerName} 可用接口，「${definition.title}」会退回 Mock 或人工补位。`,
+        actionLabel: status === "ready" ? "已接入" : "补接口",
+      };
+    });
+  const readyInterfaces = items.filter((item) => item.status === "ready").length;
+  const missingInterfaces = items.length - readyInterfaces;
+  const missingNames = items
+    .filter((item) => item.status !== "ready")
+    .map((item) => item.providerName);
+
+  return {
+    totalInterfaces: items.length,
+    readyInterfaces,
+    missingInterfaces,
+    headline: `模型接口留口：${readyInterfaces}/${items.length} 已就绪`,
+    detail: missingInterfaces === 0
+      ? "Claude、DeepSeek、Kimi、GPT 四个接口都已接到写作岗位，下一步检查职责路由、备用模型和复检入口。"
+      : `还缺 ${missingInterfaces} 个接口：${missingNames.join("、")}。先补齐 Claude、DeepSeek、Kimi、GPT 的写作岗位入口，再让真实项目跑 AI 任务。`,
+    actionHref: "/settings/models#model-provider-interfaces",
+    actionLabel: missingInterfaces === 0 ? "检查接口留口" : "补模型接口",
+    items,
+  };
+}
+
 function providerDisplay(provider: ModelRoleProviderInput | null) {
   return provider ? `${provider.displayName} · ${provider.defaultModel}` : "暂无可用模型";
 }
@@ -355,6 +428,7 @@ export function buildModelRoleMatrix(providers: ModelRoleProviderInput[]): Model
       partialRoles,
       missingRoles,
     },
+    interfaceCoverage: buildModelProviderInterfaceCoverage(roles),
     headline: status === "ready"
       ? "模型编辑部四个岗位已就绪，可以进入真实写作任务。"
       : status === "partial"

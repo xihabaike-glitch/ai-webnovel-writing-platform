@@ -2609,8 +2609,8 @@ export function buildPlatformStrategyExecutionReceipt(
       platformName: plan.platformName,
       title: "证据基准已保存",
       message: `${plan.platformName} 当前发布包已经入账。后面再改标题、简介或前三章，就有东西能对照。`,
-      nextAction: "回到执行链，继续处理下一个未完成步骤。",
-      href: "#package-version-history",
+      nextAction: "录入真实发布效果，把曝光、点击、收藏、追读和编辑反馈作为下一轮判断依据。",
+      href: "#publish-effect-panel",
       severity: "success",
     };
   }

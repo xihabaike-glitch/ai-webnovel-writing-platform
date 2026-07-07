@@ -1972,9 +1972,9 @@ test("buildPlatformPublishExportCenter", async (t) => {
     const effectReceipt = buildPlatformStrategyExecutionReceipt(plan, "save-publish-effect");
     const switchReceipt = buildPlatformStrategyExecutionReceipt(plan, "switch-target-platform");
 
-    assert.equal(baselineReceipt.href, "#package-version-history");
+    assert.equal(baselineReceipt.href, "#publish-effect-panel");
     assert.equal(baselineReceipt.severity, "success");
-    assert.ok(baselineReceipt.nextAction.includes("执行链"));
+    assert.ok(baselineReceipt.nextAction.includes("录入真实发布效果"));
     assert.equal(assetReceipt.href, "#submission-asset-editor");
     assert.equal(assetReceipt.severity, "needs_action");
     assert.ok(assetReceipt.message.includes("3 个候选方案"));

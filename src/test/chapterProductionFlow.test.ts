@@ -298,6 +298,62 @@ test("buildChapterProductionFlow points completed unresolved dispatches back to 
   assert.ok(flow.recheckNotice?.detail.includes("投稿预检"));
 });
 
+test("buildChapterProductionFlow points completed structure repair dispatches back to structure diagnostics", () => {
+  const flow = buildChapterProductionFlow({
+    projectId: "project-1",
+    chapters: [],
+    aiTasks: [],
+    gateTasks: [
+      {
+        dispatchKey: "submission-precheck:project-1:length-structure:character-arc",
+        state: "completed",
+        href: "/projects/project-1#character-arc",
+        completionEvidence: "已补主角欲望、缺陷和终局选择。",
+      },
+      {
+        dispatchKey: "submission-precheck:project-1:length-structure:foreshadow-payoff",
+        state: "completed",
+        href: "/projects/project-1#story-lines",
+        completionEvidence: "已给核心伏笔绑定埋点章和回收章。",
+      },
+    ],
+    submissionChecklist: {
+      readinessPercent: 88,
+      passCount: 8,
+      todoCount: 0,
+      riskCount: 1,
+      items: [
+        {
+          id: "length-structure",
+          label: "篇幅结构验收",
+          status: "risk",
+          detail: "人物弧光和伏笔回收仍需复查。",
+        },
+      ],
+    },
+  });
+  const submissionStage = flow.stages.find((stage) => stage.id === "submission");
+
+  assert.equal(submissionStage?.dispatchSummary?.pending, 0);
+  assert.equal(submissionStage?.dispatchSummary?.completed, 2);
+  assert.equal(submissionStage?.dispatchSummary?.href, "#story-structure");
+  assert.equal(submissionStage?.dispatchSummary?.actionLabel, "复查结构");
+  assert.ok(submissionStage?.dispatchSummary?.detail.includes("结构诊断"));
+  assert.equal(flow.recheckNotice?.href, "#story-structure");
+  assert.equal(flow.recheckNotice?.actionLabel, "复查结构");
+  assert.ok(flow.recheckNotice?.detail.includes("篇幅结构验收"));
+  assert.deepEqual(flow.recheckNotice?.runAction?.dispatches, [
+    {
+      dispatchKey: "submission-precheck:project-1:length-structure:character-arc",
+      completionEvidence: "已补主角欲望、缺陷和终局选择。",
+    },
+    {
+      dispatchKey: "submission-precheck:project-1:length-structure:foreshadow-payoff",
+      completionEvidence: "已给核心伏笔绑定埋点章和回收章。",
+    },
+  ]);
+});
+
 test("buildChapterProductionFlow surfaces active recheck follow-up dispatches", () => {
   const flow = buildChapterProductionFlow({
     projectId: "project-1",

@@ -371,11 +371,15 @@ function submissionDispatchSummary(tasks: ChapterProductionFlowGateTask[], faile
   if (matched.length === 0) return undefined;
   const completed = matched.filter((task) => task.state === "completed").length;
   const pending = matched.length - completed;
+  const hasStructureRepairs = matched.some((task) => task.dispatchKey.startsWith("submission-precheck:") && task.dispatchKey.split(":").at(2) === "length-structure");
   const completedDispatches = matched
     .filter((task) => task.state === "completed")
     .map((task) => ({
       dispatchKey: task.dispatchKey,
-      completionEvidence: task.completionEvidence?.trim() || "项目页复查已完成的投稿预检派单，重新计算发布准备与平台风险。",
+      completionEvidence: task.completionEvidence?.trim()
+        || (hasStructureRepairs
+          ? "项目页复查已完成的结构修复派单，重新计算大树结构诊断和投稿篇幅结构验收。"
+          : "项目页复查已完成的投稿预检派单，重新计算发布准备与平台风险。"),
     }));
 
   return {
@@ -386,9 +390,11 @@ function submissionDispatchSummary(tasks: ChapterProductionFlowGateTask[], faile
     label: `已派单 ${matched.length} 项`,
     detail: pending > 0
       ? `待完成 ${pending} 项，完成后再刷新投稿预检。`
-      : `已完成 ${completed} 项派单，但预检仍未通过，需要补证据或重新派发。`,
-    href: pending > 0 ? "/dispatch" : "#submission-precheck",
-    actionLabel: pending > 0 ? "完成派单" : "复查预检",
+      : hasStructureRepairs
+        ? `已完成 ${completed} 项结构派单，但篇幅结构验收仍未通过，需要回到结构诊断复查。`
+        : `已完成 ${completed} 项派单，但预检仍未通过，需要补证据或重新派发。`,
+    href: pending > 0 ? "/dispatch" : hasStructureRepairs ? "#story-structure" : "#submission-precheck",
+    actionLabel: pending > 0 ? "完成派单" : hasStructureRepairs ? "复查结构" : "复查预检",
   };
 }
 

@@ -35,3 +35,11 @@ test("tasks page shows invalid batch strategy feedback", () => {
   assert.ok(source.includes("查看标准档"));
   assert.ok(source.includes("href=\"/tasks?batchStrategy=standard\""));
 });
+
+test("tasks page shows invalid batch context feedback", () => {
+  assert.ok(source.includes("invalidBatchContextNotice"));
+  assert.ok(source.includes("batchContextParam ? `批量上下文「${batchContextParam}」不存在，已回退到默认生产批次。` : null"));
+  assert.ok(source.includes("批量上下文已回退"));
+  assert.ok(source.includes("查看默认批次"));
+  assert.ok(source.includes("href=\"/tasks#recommended-batch\""));
+});

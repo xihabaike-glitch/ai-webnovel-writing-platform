@@ -227,6 +227,13 @@ function isBatchExecutionStrategy(value: string | undefined) {
   return value === undefined || batchExecutionStrategies.some((strategy) => strategy.id === value);
 }
 
+function isTaskQueueBatchExecutionContext(value: string | undefined) {
+  return value === undefined
+    || value === "standard"
+    || value === "repair_resume"
+    || value === "batch_rhythm_recheck";
+}
+
 function debtFocusNoticeClass(tone: "reduced" | "cleared" | "unchanged") {
   if (tone === "cleared") return "border-emerald-200 bg-emerald-50 text-emerald-900";
   if (tone === "reduced") return "border-cyan-200 bg-cyan-50 text-cyan-900";
@@ -253,7 +260,11 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
   const invalidBatchStrategyNotice = isBatchExecutionStrategy(batchStrategyParam)
     ? null
     : batchStrategyParam ? `批量策略「${batchStrategyParam}」不存在，已回退到标准档。` : null;
-  const activeBatchContext = taskQueueBatchExecutionContext(resolvedSearchParams.batchContext);
+  const batchContextParam = resolvedSearchParams.batchContext;
+  const activeBatchContext = taskQueueBatchExecutionContext(batchContextParam);
+  const invalidBatchContextNotice = isTaskQueueBatchExecutionContext(batchContextParam)
+    ? null
+    : batchContextParam ? `批量上下文「${batchContextParam}」不存在，已回退到默认生产批次。` : null;
   const viewParam = resolvedSearchParams.view;
   const activeView = viewParam === "blocked" ? "blocked" : "all";
   const invalidViewNotice = isTaskView(viewParam)
@@ -588,6 +599,20 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
             </div>
             <Link className="w-fit rounded-md bg-white px-3 py-2 text-sm font-medium text-amber-950 hover:bg-amber-100" href="/tasks?batchStrategy=standard">
               查看标准档
+            </Link>
+          </div>
+        </section>
+      ) : null}
+
+      {invalidBatchContextNotice ? (
+        <section className="mb-6 rounded-md border border-amber-200 bg-amber-50 p-4 text-amber-900">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <div className="font-medium">批量上下文已回退</div>
+              <p className="mt-1 text-sm leading-6">{invalidBatchContextNotice}</p>
+            </div>
+            <Link className="w-fit rounded-md bg-white px-3 py-2 text-sm font-medium text-amber-950 hover:bg-amber-100" href="/tasks#recommended-batch">
+              查看默认批次
             </Link>
           </div>
         </section>

@@ -5398,6 +5398,33 @@ test("buildGateActionReceipt", async (t) => {
       "钩子/追读点：第一屏出现系统惩罚和升级目标",
       "复查证据：已重新跑前三章审稿",
     ].join("\n")), null);
+    const roleStructureTask = {
+      stage: "watch" as const,
+      title: "结构主编｜角色任务",
+      actionLabel: "打开结构诊断",
+      platformName: "角色派单",
+      evidence: ["角色入口：story-structure", "工作区：结构诊断"],
+    };
+    const roleContextTask = {
+      stage: "watch" as const,
+      title: "长上下文资料官｜角色任务",
+      actionLabel: "打开项目土壤",
+      platformName: "角色派单",
+      evidence: ["角色入口：context-recall", "工作区：项目土壤"],
+    };
+    const rolePlatformTask = {
+      stage: "watch" as const,
+      title: "平台包装官｜角色任务",
+      actionLabel: "打开平台导出",
+      platformName: "角色派单",
+      evidence: ["角色入口：platform-export", "工作区：平台导出"],
+    };
+    assert.ok(buildGateDispatchCompletionTemplate(roleStructureTask).includes("人物弧光"));
+    assert.ok(buildGateDispatchCompletionTemplate(roleStructureTask).includes("主线/支线结论"));
+    assert.ok(buildGateDispatchCompletionTemplate(roleContextTask).includes("引用来源"));
+    assert.ok(buildGateDispatchCompletionTemplate(roleContextTask).includes("进入上下文"));
+    assert.ok(buildGateDispatchCompletionTemplate(rolePlatformTask).includes("标题/简介/标签版本"));
+    assert.ok(buildGateDispatchCompletionTemplate(rolePlatformTask).includes("平台差异"));
     assert.equal(buildGateDispatchCompletionTemplate({
       stage: "model_route_governance" as const,
       title: "模型治理",

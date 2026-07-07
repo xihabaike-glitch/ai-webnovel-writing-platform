@@ -197,6 +197,9 @@ test("project detail page carries gate return through export and submission link
 
   assert.ok(submissionPackagePanel.includes("gateReturnHref?: string | null"));
   assert.ok(submissionPackagePanel.includes("function hrefWithGateReturn"));
+  assert.ok(submissionPackagePanel.includes("multiPlatformGatePrompt"));
+  assert.ok(submissionPackagePanel.includes("结构复查已放行"));
+  assert.ok(submissionPackagePanel.includes("multiPlatformButtonClass"));
   assert.ok(submissionPackagePanel.includes("href={hrefWithGateReturn(task.href, gateReturnHref, projectId)}"));
   assert.ok(submissionPackagePanel.includes("href={hrefWithGateReturn(variant.decision.actionHref, gateReturnHref, projectId)}"));
   assert.ok(submissionPackagePanel.includes("href={hrefWithGateReturn(\"#publish-effect-panel\", gateReturnHref, projectId)}"));

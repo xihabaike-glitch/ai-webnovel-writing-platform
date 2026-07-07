@@ -1699,7 +1699,7 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
                   </div>
                 ) : null}
               </div>
-              {entry.category === "effect" && entry.effectAction ? (
+              {entry.effectAction ? (
                 <RunPublishEffectQueueActionButton
                   action={entry.effectAction}
                   actionLabel={entry.actionLabel}

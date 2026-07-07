@@ -115,3 +115,8 @@ test("tasks page shows what a platform strategy task unlocks next", () => {
   assert.ok(source.includes("entry.sourceType === \"platform_strategy\" && entry.sourceNextStep"));
   assert.ok(source.includes("做完解锁："));
 });
+
+test("tasks page runs any queued platform action with the action button", () => {
+  assert.ok(source.includes("{entry.effectAction ? ("));
+  assert.ok(source.includes("action={entry.effectAction}"));
+});

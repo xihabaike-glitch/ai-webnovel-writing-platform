@@ -709,7 +709,7 @@ export function ModelTaskAuditPanel({
                         ) : (
                           <a
                             className="rounded-md bg-slate-950 px-3 py-2 text-sm font-medium text-white"
-                            href={failure.actionHref}
+                            href={hrefWithGateReturn(failure.actionHref, gateReturnHref)}
                           >
                             {failure.actionLabel}
                           </a>
@@ -718,7 +718,7 @@ export function ModelTaskAuditPanel({
                       </div>
                     ) : (
                       <div className="mt-3 flex flex-wrap items-center gap-2">
-                        <a className="text-sm font-medium text-slate-600 hover:text-slate-950" href={failure.actionHref}>
+                        <a className="text-sm font-medium text-slate-600 hover:text-slate-950" href={hrefWithGateReturn(failure.actionHref, gateReturnHref)}>
                           {failure.actionLabel}
                         </a>
                         <span className="text-xs text-slate-500">{failure.actionReason}</span>

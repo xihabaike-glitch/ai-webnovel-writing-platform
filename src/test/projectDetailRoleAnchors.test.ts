@@ -102,6 +102,7 @@ test("project detail page carries gate return through control and batch panels",
   assert.ok(modelTaskAuditPanel.includes("gateReturnHref?: string | null"));
   assert.ok(modelTaskAuditPanel.includes("function hrefWithGateReturn"));
   assert.ok(modelTaskAuditPanel.includes("href={hrefWithGateReturn(\"/settings/models\", gateReturnHref)}"));
+  assert.ok(modelTaskAuditPanel.includes("href={hrefWithGateReturn(failure.actionHref, gateReturnHref)}"));
 });
 
 test("project detail page carries gate return through first day workflow links", () => {

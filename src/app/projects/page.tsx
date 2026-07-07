@@ -27,6 +27,16 @@ function firstValue(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] : value;
 }
 
+function gateReturnFromParam(value: string | string[] | undefined) {
+  const raw = Array.isArray(value) ? value[0] : value;
+
+  if (!raw?.startsWith("/gate?focus=action-recheck")) {
+    return null;
+  }
+
+  return raw;
+}
+
 function riskLevelLabel(level: FirstDayRiskLevel) {
   if (level === "blocked") return "止损";
   if (level === "watch") return "观察";
@@ -54,6 +64,7 @@ function realSampleValidationClass(status: "blocked" | "needs_acceptance" | "rea
 
 export default async function ProjectsPage({ searchParams }: ProjectsPageProps) {
   const params = await searchParams;
+  const gateReturn = gateReturnFromParam(params?.gateReturn);
   const experienceLaunch = {
     platformId: firstValue(params?.startPlatform) ?? "",
     tactic: firstValue(params?.startTactic) ?? "",
@@ -122,6 +133,19 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps) 
           <p className="mt-1 text-sm text-slate-600">先看哪本书该救、哪本书该推，再进入具体工作台。</p>
         </div>
       </div>
+      {gateReturn ? (
+        <section className="mb-6 rounded-md border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <div className="font-medium">来自总闸门复检</div>
+              <p className="mt-1 leading-5">先核对项目流水线、真实样本验收和当前瓶颈，处理后回总闸门确认剩余卡点是否减少。</p>
+            </div>
+            <Link className="w-fit rounded-md bg-white px-3 py-2 text-sm font-medium text-amber-950 hover:bg-amber-100" href={gateReturn}>
+              回总闸门复检
+            </Link>
+          </div>
+        </section>
+      ) : null}
       <div className="mb-6" id="create-project">
         <ProjectForm experienceLaunch={experienceLaunch} />
       </div>

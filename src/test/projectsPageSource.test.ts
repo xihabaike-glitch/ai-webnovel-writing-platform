@@ -76,3 +76,14 @@ test("project creation keeps the gate return when entering first day workflow", 
   assert.ok(projectFormSource.includes("function hrefWithGateReturn"));
   assert.ok(projectFormSource.includes("router.push(hrefWithGateReturn(`/projects/${payload.project.id}${params}#first-day-workflow`, gateReturnHref));"));
 });
+
+test("project form makes short, mid, long, and mega length presets executable", () => {
+  assert.ok(projectFormSource.includes("targetWordCount: 10000"));
+  assert.ok(projectFormSource.includes("targetWordCount: 60000"));
+  assert.ok(projectFormSource.includes("targetWordCount: 300000"));
+  assert.ok(projectFormSource.includes("targetWordCount: 1000000"));
+  assert.ok(projectFormSource.includes("const selectedLengthOption = lengthOptionFor(lengthType)"));
+  assert.ok(projectFormSource.includes("setTargetWordCount(nextLengthOption.targetWordCount)"));
+  assert.ok(projectFormSource.includes('name="targetWordCount"'));
+  assert.ok(projectFormSource.includes("毒舌 PM 篇幅口径"));
+});

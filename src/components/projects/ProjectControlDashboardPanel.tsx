@@ -886,7 +886,7 @@ export function ProjectControlDashboardPanel({
             {message.actionHref && message.actionLabel ? (
               <Link
                 className="inline-flex w-fit rounded-md bg-white px-2 py-1 text-xs font-medium text-slate-900 hover:bg-slate-100"
-                href={message.actionHref}
+                href={hrefWithGateReturn(message.actionHref, gateReturnHref)}
               >
                 {message.actionLabel}
               </Link>
@@ -1173,7 +1173,7 @@ export function ProjectControlDashboardPanel({
                 ) : null}
                 <Link
                   className="inline-flex w-fit items-center justify-center rounded-md border border-slate-200 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
-                  href={dashboard.aiPipelineBatchHealth.targetHref}
+                  href={hrefWithGateReturn(projectScopedHref(projectId, dashboard.aiPipelineBatchHealth.targetHref), gateReturnHref)}
                 >
                   {dashboard.aiPipelineBatchHealth.actionLabel}
                 </Link>
@@ -1224,7 +1224,7 @@ export function ProjectControlDashboardPanel({
                   </div>
                   <Link
                     className="inline-flex w-fit rounded-md bg-white px-2 py-1 text-xs font-medium text-emerald-900 hover:bg-emerald-100"
-                    href={dashboard.aiPipelinePromptMemory.targetHref}
+                    href={hrefWithGateReturn(projectScopedHref(projectId, dashboard.aiPipelinePromptMemory.targetHref), gateReturnHref)}
                   >
                     看写审改
                   </Link>
@@ -1243,7 +1243,7 @@ export function ProjectControlDashboardPanel({
                     {dashboard.aiPipelinePromptMemory.gateActionMode === "link" && dashboard.aiPipelinePromptMemory.gateActionHref && dashboard.aiPipelinePromptMemory.gateActionLabel ? (
                       <Link
                         className="inline-flex w-fit rounded-md bg-white px-2 py-1 text-xs font-medium text-emerald-900 hover:bg-emerald-50"
-                        href={dashboard.aiPipelinePromptMemory.gateActionHref}
+                        href={hrefWithGateReturn(projectScopedHref(projectId, dashboard.aiPipelinePromptMemory.gateActionHref), gateReturnHref)}
                       >
                         {dashboard.aiPipelinePromptMemory.gateActionLabel}
                       </Link>
@@ -1352,7 +1352,7 @@ export function ProjectControlDashboardPanel({
                     {dashboard.aiPipelineControlPlan.recheckActionHref && dashboard.aiPipelineControlPlan.recheckActionLabel ? (
                       <Link
                         className="mt-2 inline-flex w-fit rounded-md bg-white px-2 py-1 font-medium text-slate-800 hover:bg-slate-100"
-                        href={dashboard.aiPipelineControlPlan.recheckActionHref}
+                        href={hrefWithGateReturn(projectScopedHref(projectId, dashboard.aiPipelineControlPlan.recheckActionHref), gateReturnHref)}
                       >
                         {dashboard.aiPipelineControlPlan.recheckActionLabel}
                       </Link>
@@ -1480,7 +1480,7 @@ export function ProjectControlDashboardPanel({
               </div>
               <Link
                 className="inline-flex w-fit items-center justify-center rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white hover:bg-slate-800"
-                href={dashboard.aiPipelineBatch.targetHref}
+                href={hrefWithGateReturn(projectScopedHref(projectId, dashboard.aiPipelineBatch.targetHref), gateReturnHref)}
               >
                 {dashboard.aiPipelineBatch.canRun ? "去执行推荐批次" : "看任务中心"}
               </Link>
@@ -1531,14 +1531,14 @@ export function ProjectControlDashboardPanel({
                 ) : null}
                 <Link
                   className="inline-flex w-fit items-center justify-center rounded-md border border-slate-200 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
-                  href={dashboard.aiPipelineRecentBatch.targetHref}
+                  href={hrefWithGateReturn(projectScopedHref(projectId, dashboard.aiPipelineRecentBatch.targetHref), gateReturnHref)}
                 >
                   {dashboard.aiPipelineRecentBatch.actionLabel}
                 </Link>
                 {dashboard.aiPipelineRecentBatch.secondaryActionLabel && dashboard.aiPipelineRecentBatch.secondaryTargetHref ? (
                   <Link
                     className="inline-flex w-fit items-center justify-center rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-white"
-                    href={dashboard.aiPipelineRecentBatch.secondaryTargetHref}
+                    href={hrefWithGateReturn(projectScopedHref(projectId, dashboard.aiPipelineRecentBatch.secondaryTargetHref), gateReturnHref)}
                   >
                     {dashboard.aiPipelineRecentBatch.secondaryActionLabel}
                   </Link>

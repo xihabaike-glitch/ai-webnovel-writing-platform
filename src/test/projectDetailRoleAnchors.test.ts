@@ -77,6 +77,14 @@ test("project detail page carries gate return through control and batch panels",
   assert.ok(controlPanel.includes("href={hrefWithGateReturn(`/projects/${projectId}#${dashboard.storyFoundation.targetAnchor}`, gateReturnHref)}"));
   assert.ok(controlPanel.includes("href={hrefWithGateReturn(`/projects/${projectId}#${axis.targetAnchor}`, gateReturnHref)}"));
   assert.ok(controlPanel.includes("href={hrefWithGateReturn(`/projects/${projectId}#world-bible`, gateReturnHref)}"));
+  assert.ok(controlPanel.includes("href={hrefWithGateReturn(message.actionHref, gateReturnHref)}"));
+  assert.ok(controlPanel.includes("href={hrefWithGateReturn(projectScopedHref(projectId, dashboard.aiPipelineBatchHealth.targetHref), gateReturnHref)}"));
+  assert.ok(controlPanel.includes("href={hrefWithGateReturn(projectScopedHref(projectId, dashboard.aiPipelinePromptMemory.targetHref), gateReturnHref)}"));
+  assert.ok(controlPanel.includes("href={hrefWithGateReturn(projectScopedHref(projectId, dashboard.aiPipelinePromptMemory.gateActionHref), gateReturnHref)}"));
+  assert.ok(controlPanel.includes("href={hrefWithGateReturn(projectScopedHref(projectId, dashboard.aiPipelineControlPlan.recheckActionHref), gateReturnHref)}"));
+  assert.ok(controlPanel.includes("href={hrefWithGateReturn(projectScopedHref(projectId, dashboard.aiPipelineBatch.targetHref), gateReturnHref)}"));
+  assert.ok(controlPanel.includes("href={hrefWithGateReturn(projectScopedHref(projectId, dashboard.aiPipelineRecentBatch.targetHref), gateReturnHref)}"));
+  assert.ok(controlPanel.includes("href={hrefWithGateReturn(projectScopedHref(projectId, dashboard.aiPipelineRecentBatch.secondaryTargetHref), gateReturnHref)}"));
   assert.ok(controlPanel.includes("href={hrefWithGateReturn(projectScopedHref(projectId, dashboard.aiPipelineRecentBatch.relayTargetHref), gateReturnHref)}"));
   assert.ok(controlPanel.includes("href={hrefWithGateReturn(projectScopedHref(projectId, dashboard.modelRouteHealth.targetHref), gateReturnHref)}"));
   assert.ok(controlPanel.includes("href={hrefWithGateReturn(`/projects/${projectId}#${action.targetAnchor}`, gateReturnHref)}"));

@@ -1043,7 +1043,7 @@ export function ModelProviderSettings({
         body: JSON.stringify({ ruleKey: item.ruleKey }),
       });
       if (!response.ok) throw new Error("生成复测派单失败。");
-      setRouteNotice({ message: `已生成「${item.providerName}」复测派单` });
+      setRouteNotice({ message: `已生成「${item.providerName}」复测派单`, href: "/dispatch", actionLabel: "去派单中心查看复测任务" });
       router.refresh();
     } catch (caught) {
       setRouteNotice({ message: caught instanceof Error ? caught.message : "生成复测派单失败。" });

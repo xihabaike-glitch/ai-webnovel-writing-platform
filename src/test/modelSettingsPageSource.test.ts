@@ -27,3 +27,8 @@ test("model settings page carries gate return through model routing links", () =
   assert.ok(settingsSource.includes("href={hrefWithGateReturn(providerSetupNotice.href, gateReturnHref)}"));
   assert.ok(settingsSource.includes("href={hrefWithGateReturn(\"/projects\", gateReturnHref)}"));
 });
+
+test("model settings retest dispatch notice links back into dispatch center", () => {
+  assert.ok(settingsSource.includes("setRouteNotice({ message: `已生成「${item.providerName}」复测派单`, href: \"/dispatch\", actionLabel: \"去派单中心查看复测任务\" });"));
+  assert.ok(settingsSource.includes("href={hrefWithGateReturn(routeNotice.href, gateReturnHref)}"));
+});

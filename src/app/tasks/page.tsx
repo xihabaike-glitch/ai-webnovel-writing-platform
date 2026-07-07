@@ -553,13 +553,13 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
         <div className="flex flex-wrap items-center gap-2">
           <Link
             className={`rounded-md border px-3 py-2 text-sm font-medium ${activeView === "all" ? "border-slate-950 bg-slate-950 text-white" : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"}`}
-            href="/tasks"
+            href={hrefWithGateReturn("/tasks", gateReturn)}
           >
             全部任务
           </Link>
           <Link
             className={`rounded-md border px-3 py-2 text-sm font-medium ${activeView === "blocked" ? "border-rose-950 bg-rose-950 text-white" : "border-rose-200 bg-white text-rose-700 hover:bg-rose-50"}`}
-            href="/tasks?view=blocked#task-debt"
+            href={hrefWithGateReturn("/tasks?view=blocked#task-debt", gateReturn)}
           >
             阻塞清债 {debtView.totalBlocked}
           </Link>
@@ -592,7 +592,7 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
               <div className="font-medium">视图已回退</div>
               <p className="mt-1 text-sm leading-6">{invalidViewNotice}</p>
             </div>
-            <Link className="w-fit rounded-md bg-white px-3 py-2 text-sm font-medium text-amber-950 hover:bg-amber-100" href="/tasks">
+            <Link className="w-fit rounded-md bg-white px-3 py-2 text-sm font-medium text-amber-950 hover:bg-amber-100" href={hrefWithGateReturn("/tasks", gateReturn)}>
               查看全部任务
             </Link>
           </div>
@@ -606,7 +606,7 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
               <div className="font-medium">清债筛选已回退</div>
               <p className="mt-1 text-sm leading-6">{invalidDebtNotice}</p>
             </div>
-            <Link className="w-fit rounded-md bg-white px-3 py-2 text-sm font-medium text-amber-950 hover:bg-amber-100" href="/tasks?view=blocked#task-debt">
+            <Link className="w-fit rounded-md bg-white px-3 py-2 text-sm font-medium text-amber-950 hover:bg-amber-100" href={hrefWithGateReturn("/tasks?view=blocked#task-debt", gateReturn)}>
               查看全部阻塞
             </Link>
           </div>
@@ -620,7 +620,7 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
               <div className="font-medium">清债完成反馈已忽略</div>
               <p className="mt-1 text-sm leading-6">{invalidClearedDebtNotice}</p>
             </div>
-            <Link className="w-fit rounded-md bg-white px-3 py-2 text-sm font-medium text-amber-950 hover:bg-amber-100" href="/tasks?view=blocked#task-debt">
+            <Link className="w-fit rounded-md bg-white px-3 py-2 text-sm font-medium text-amber-950 hover:bg-amber-100" href={hrefWithGateReturn("/tasks?view=blocked#task-debt", gateReturn)}>
               查看阻塞清债
             </Link>
           </div>
@@ -634,7 +634,7 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
               <div className="font-medium">批量策略已回退</div>
               <p className="mt-1 text-sm leading-6">{invalidBatchStrategyNotice}</p>
             </div>
-            <Link className="w-fit rounded-md bg-white px-3 py-2 text-sm font-medium text-amber-950 hover:bg-amber-100" href="/tasks?batchStrategy=standard">
+            <Link className="w-fit rounded-md bg-white px-3 py-2 text-sm font-medium text-amber-950 hover:bg-amber-100" href={hrefWithGateReturn("/tasks?batchStrategy=standard", gateReturn)}>
               查看标准档
             </Link>
           </div>
@@ -648,7 +648,7 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
               <div className="font-medium">批量上下文已回退</div>
               <p className="mt-1 text-sm leading-6">{invalidBatchContextNotice}</p>
             </div>
-            <Link className="w-fit rounded-md bg-white px-3 py-2 text-sm font-medium text-amber-950 hover:bg-amber-100" href="/tasks#recommended-batch">
+            <Link className="w-fit rounded-md bg-white px-3 py-2 text-sm font-medium text-amber-950 hover:bg-amber-100" href={hrefWithGateReturn("/tasks#recommended-batch", gateReturn)}>
               查看默认批次
             </Link>
           </div>
@@ -803,11 +803,11 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
               <p className="mt-1 max-w-3xl text-sm leading-6">{debtView.headline} {debtView.detail}</p>
             </div>
             <div className="flex flex-wrap gap-2">
-              <Link className="rounded-md bg-white/80 px-3 py-2 text-sm font-medium text-rose-900 hover:bg-white" href="/tasks">
+              <Link className="rounded-md bg-white/80 px-3 py-2 text-sm font-medium text-rose-900 hover:bg-white" href={hrefWithGateReturn("/tasks", gateReturn)}>
                 返回全部任务
               </Link>
               {debtView.totalBlocked > 0 && debtView.focusedBlockerType ? (
-                <Link className="rounded-md bg-white/80 px-3 py-2 text-sm font-medium text-rose-900 hover:bg-white" href="/tasks?view=blocked#task-debt">
+                <Link className="rounded-md bg-white/80 px-3 py-2 text-sm font-medium text-rose-900 hover:bg-white" href={hrefWithGateReturn("/tasks?view=blocked#task-debt", gateReturn)}>
                   全部阻塞
                 </Link>
               ) : null}

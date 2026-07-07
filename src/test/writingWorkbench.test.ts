@@ -114,6 +114,13 @@ test("buildWritingWorkbench", async (t) => {
     assert.ok(workbench.summary.maturityScore < 70);
     assert.equal(workbench.heroAction.label, "修开头钩子");
     assert.equal(workbench.heroAction.href, "/projects/p1/chapters/c1#chapter-editor");
+    assert.equal(workbench.pmFocus.status, "blocked");
+    assert.ok(workbench.pmFocus.headline.includes("修开头钩子"));
+    assert.equal(workbench.pmFocus.actionLabel, workbench.heroAction.label);
+    assert.equal(workbench.pmFocus.actionHref, workbench.heroAction.href);
+    assert.ok(workbench.pmFocus.detail.includes(workbench.heroAction.reason));
+    assert.ok(workbench.pmFocus.scopeLabel.includes("8/8 核心平台已完成"));
+    assert.ok(workbench.pmFocus.scopeLabel.includes("剩余 10 个平台不再添加"));
     assert.ok(workbench.treeBlocks.some((block) => block.type === "ending" && block.status === "fail"));
     assert.ok(workbench.treeBlocks.some((block) => block.type === "soil" && block.status === "fail"));
     assert.ok(workbench.treeBlocks.some((block) => (

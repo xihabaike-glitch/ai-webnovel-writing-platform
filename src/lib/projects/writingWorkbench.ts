@@ -1,5 +1,6 @@
 import { buildTaskRetryPlan } from "../ai/taskRetry.ts";
 import { getChapterRevisionSourceLabel, isChapterRevisionCandidate, previewRevisionContent } from "../chapters/revisions.ts";
+import { platformDeliveryScope } from "../platforms/platformProfiles.ts";
 import { buildProjectContextPack, type ProjectContextPack, type ProjectContextPlotThread, type ProjectContextForeshadow, type ProjectContextStatus } from "./projectContextPack.ts";
 
 export type WorkbenchStatus = "pass" | "warn" | "fail";
@@ -120,6 +121,15 @@ export interface WritingWorkbenchTreeBlock {
   href: string;
 }
 
+export interface WritingWorkbenchPmFocus {
+  status: "blocked" | "needs_action" | "ready";
+  headline: string;
+  detail: string;
+  scopeLabel: string;
+  actionLabel: string;
+  actionHref: string;
+}
+
 export interface WritingWorkbench {
   projectTitle: string;
   summary: {
@@ -133,6 +143,7 @@ export interface WritingWorkbench {
     href: string;
     reason: string;
   };
+  pmFocus: WritingWorkbenchPmFocus;
   treeBlocks: WritingWorkbenchTreeBlock[];
   chapterFocus: {
     nextChapter: WritingWorkbenchChapter | null;
@@ -509,6 +520,28 @@ function buildHeroAction(
     label: "继续写作",
     href: `/projects/${input.project.id}/chapters/${nextChapter.id}#chapter-editor`,
     reason: "下一章章节卡具备，可以进入正文和复审。",
+  };
+}
+
+function buildWritingWorkbenchPmFocus(
+  heroAction: WritingWorkbench["heroAction"],
+  maturityScore: number,
+): WritingWorkbenchPmFocus {
+  const status = maturityScore < 70
+    ? "blocked"
+    : maturityScore < 85
+      ? "needs_action"
+      : "ready";
+
+  return {
+    status,
+    headline: status === "ready"
+      ? `当前可推进：${heroAction.label}`
+      : `当前先处理：${heroAction.label}`,
+    detail: heroAction.reason,
+    scopeLabel: `${platformDeliveryScope.statusLabel} · ${platformDeliveryScope.expansionLabel}`,
+    actionLabel: heroAction.label,
+    actionHref: heroAction.href,
   };
 }
 
@@ -1148,6 +1181,7 @@ export function buildWritingWorkbench(input: WritingWorkbenchInput): WritingWork
   const nextChapterCandidate = nextChapter
     ? pendingCandidates.find((candidate) => candidate.chapterId === nextChapter.id)
     : null;
+  const heroAction = buildHeroAction(input, nextChapter, pendingCandidates);
 
   return {
     projectTitle: input.project.title,
@@ -1159,7 +1193,8 @@ export function buildWritingWorkbench(input: WritingWorkbenchInput): WritingWork
       maturityScore,
       oneLineBrief: `${input.project.genre}｜${input.project.sellingPoint}`,
     },
-    heroAction: buildHeroAction(input, nextChapter, pendingCandidates),
+    heroAction,
+    pmFocus: buildWritingWorkbenchPmFocus(heroAction, maturityScore),
     treeBlocks,
     chapterFocus: {
       nextChapter,

@@ -101,6 +101,12 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps) 
     recommendedActionLabel: activePipelineStep?.recommendedActionLabel ?? dashboard.pipelineProofSummary.recommendedActionLabel,
     recommendedProjectTitle: activePipelineStep?.recommendedProjectTitle ?? dashboard.pipelineProofSummary.recommendedProjectTitle,
   };
+  const activePipelineSummary = {
+    headline: activePipelineStep ? `当前筛选：${activePipelineStep.count}/${dashboard.pipelineProofSummary.totalProjects} 本卡在「${activePipelineStep.label}」。` : dashboard.pipelineProofSummary.headline,
+    countLabel: activePipelineStep
+      ? `${activePipelineStep.count}/${dashboard.pipelineProofSummary.totalProjects} 本卡在 ${activePipelineStep.label}`
+      : `${dashboard.pipelineProofSummary.bottleneckCount}/${dashboard.pipelineProofSummary.totalProjects} 本卡在 ${dashboard.pipelineProofSummary.bottleneckLabel}`,
+  };
   const visibleItems = activePipelineStep
     ? dashboard.items.filter((item) => item.pipelineProof.currentStepId === activePipelineStep.id)
     : dashboard.items;
@@ -176,14 +182,14 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps) 
         <div className="flex flex-col gap-2 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <div className="text-xs font-medium text-slate-500">组合流水线瓶颈</div>
-            <h2 className="mt-1 font-medium text-slate-950">{dashboard.pipelineProofSummary.headline}</h2>
+            <h2 className="mt-1 font-medium text-slate-950">{activePipelineSummary.headline}</h2>
             <p className="mt-1 text-sm text-slate-500">
               当前只统计 8 个核心平台作品，不把新增平台当作进度。
             </p>
           </div>
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
             <div className="rounded-md bg-slate-100 px-3 py-2 text-sm text-slate-700">
-              {dashboard.pipelineProofSummary.bottleneckCount}/{dashboard.pipelineProofSummary.totalProjects} 本卡在 {dashboard.pipelineProofSummary.bottleneckLabel}
+              {activePipelineSummary.countLabel}
             </div>
             <Link className="rounded-md bg-slate-950 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800" href={activePipelineAction.recommendedActionHref}>
               {activePipelineAction.recommendedProjectTitle ? `${activePipelineAction.recommendedActionLabel} · ${activePipelineAction.recommendedProjectTitle}` : activePipelineAction.recommendedActionLabel}

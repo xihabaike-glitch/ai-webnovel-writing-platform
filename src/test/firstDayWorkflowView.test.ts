@@ -957,6 +957,32 @@ test("resolveFirstDayDispatchFocus does not hijack another project when real sam
   assert.ok(focus.message.includes("没有找到这本书的首日派单卡"));
 });
 
+test("buildRealSampleMissingDispatch creates a first-day dispatch from project gaps", async () => {
+  const { buildRealSampleMissingDispatch } = await import("../lib/projects/firstDayWorkflowView.ts");
+  const dispatch = buildRealSampleMissingDispatch({
+    projectId: "project-1",
+    projectTitle: "夜雨系统",
+    platformId: "fanqie",
+    platformName: "番茄小说",
+    stepId: "publish-precheck",
+    gaps: ["审稿、二改或平台预检还缺派单回执和人工验收。"],
+    createdAt: "2026-01-01T00:00:00.000Z",
+  });
+
+  assert.equal(dispatch.id, "first-day:project-1:publish-precheck");
+  assert.equal(dispatch.platformId, "fanqie");
+  assert.equal(dispatch.platformName, "番茄小说");
+  assert.equal(dispatch.stage, "start_platform_package");
+  assert.equal(dispatch.state, "assigned");
+  assert.equal(dispatch.ownerRole, "平台运营");
+  assert.ok(dispatch.title.includes("夜雨系统"));
+  assert.ok(dispatch.title.includes("平台包预检"));
+  assert.ok(dispatch.detail.includes("真实样本验收"));
+  assert.ok(dispatch.acceptanceCriteria.some((item) => item.includes("标题、简介、标签")));
+  assert.ok(dispatch.evidence.some((item) => item.includes("审稿、二改或平台预检还缺派单回执")));
+  assert.equal(dispatch.href, "/projects/project-1?firstDayLaunch=1&nextStep=publish-precheck#first-day-workflow");
+});
+
 test("buildFirstDayDispatchAiExecutionNotice explains current-page acceptance", () => {
   const notice = buildFirstDayDispatchAiExecutionNotice({
     summary: "第一章审稿已完成",

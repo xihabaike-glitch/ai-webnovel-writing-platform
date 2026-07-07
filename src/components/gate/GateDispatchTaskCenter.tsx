@@ -17,6 +17,7 @@ import {
   type GateDispatchRecheckFollowUpChain,
   type GateDispatchTaskStateFilter,
   type GateDispatchTaskCloseoutStatus,
+  type GatePlatformGrowthDispatchItem,
   type GatePlatformGrowthDispatchState,
   type PersistedGatePlatformDispatchTask,
 } from "@/lib/projects/gateActionReceipts";
@@ -196,6 +197,7 @@ export function GateDispatchTaskCenter({
   initialReceipts,
   initialTasks,
   initialCompletionSuggestions,
+  initialRealSampleMissingDispatch,
   routeConfirmationDispatchFlow,
   initialQueueFilter = "all",
 }: {
@@ -203,6 +205,7 @@ export function GateDispatchTaskCenter({
   initialReceipts: GateActionReceipt[];
   initialTasks: PersistedGatePlatformDispatchTask[];
   initialCompletionSuggestions: WatchSampleCompletionEvidenceSuggestion[];
+  initialRealSampleMissingDispatch?: GatePlatformGrowthDispatchItem | null;
   routeConfirmationDispatchFlow: RouteConfirmationDispatchFlow;
   initialQueueFilter?: DispatchQueueFilter;
 }) {
@@ -222,6 +225,8 @@ export function GateDispatchTaskCenter({
   const [routeActionMessage, setRouteActionMessage] = useState("");
   const [routeActionLink, setRouteActionLink] = useState<RouteActionLink | null>(null);
   const [batchDecisionCard, setBatchDecisionCard] = useState<TaskQueueBatchReceiptDecisionCard | null>(null);
+  const [realSampleDispatchMessage, setRealSampleDispatchMessage] = useState("");
+  const [creatingRealSampleDispatch, setCreatingRealSampleDispatch] = useState(false);
   const [completionDrafts, setCompletionDrafts] = useState<Record<string, string>>({});
   const [focusedCompletionDispatchKey, setFocusedCompletionDispatchKey] = useState("");
   const [focusedCompletionMessage, setFocusedCompletionMessage] = useState("");
@@ -527,6 +532,28 @@ export function GateDispatchTaskCenter({
     const template = completionTextForTask(task);
     if (!template) return;
     setCompletionDrafts((current) => ({ ...current, [task.dispatchKey]: template }));
+  }
+
+  async function createRealSampleMissingDispatch() {
+    if (!initialRealSampleMissingDispatch) return;
+    setCreatingRealSampleDispatch(true);
+    setErrorMessage("");
+    setRealSampleDispatchMessage("");
+    try {
+      const created = await persistGateDispatchTask(initialRealSampleMissingDispatch);
+      setTasks((current) => {
+        const nextByKey = new Map(current.map((item) => [item.dispatchKey, item]));
+        nextByKey.set(created.dispatchKey, created);
+        return Array.from(nextByKey.values());
+      });
+      setFocusedCompletionDispatchKey(created.dispatchKey);
+      setFocusedCompletionMessage("真实样本缺口已生成首日派单，完成依据模板已准备好。");
+      setRealSampleDispatchMessage(`已生成首日派单：${created.title}`);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "生成真实样本派单失败。");
+    } finally {
+      setCreatingRealSampleDispatch(false);
+    }
   }
 
   async function executeRouteGovernanceAdvice(item: RouteConfirmationDispatchFlow["lanes"][number]["items"][number]) {
@@ -904,6 +931,16 @@ export function GateDispatchTaskCenter({
                 </div>
               ) : null}
               <div className="mt-3 flex flex-wrap gap-2">
+                {!firstDayFocus.card && initialRealSampleMissingDispatch ? (
+                  <button
+                    className="rounded-md bg-white px-3 py-2 text-xs font-medium text-amber-950 hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60"
+                    disabled={creatingRealSampleDispatch}
+                    onClick={() => void createRealSampleMissingDispatch()}
+                    type="button"
+                  >
+                    {creatingRealSampleDispatch ? "生成中" : "生成首日派单"}
+                  </button>
+                ) : null}
                 {focusedTask?.state === "assigned" && completionTextForTask(focusedTask) ? (
                   <button
                     className="rounded-md bg-white px-3 py-2 text-xs font-medium text-amber-950 hover:bg-amber-100"
@@ -917,6 +954,9 @@ export function GateDispatchTaskCenter({
                   回总闸门
                 </Link>
               </div>
+              {realSampleDispatchMessage ? (
+                <p className="mt-2 rounded-md bg-white px-2 py-1 text-xs leading-5 text-amber-950">{realSampleDispatchMessage}</p>
+              ) : null}
             </div>
           ) : null}
           {firstDayDesk.nextTask ? (

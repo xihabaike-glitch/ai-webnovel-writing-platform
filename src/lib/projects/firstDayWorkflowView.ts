@@ -1,5 +1,10 @@
 import type { FirstDayExecutionReceipt, FirstDayRiskLevel, FirstDayWorkflowStep } from "./firstDayWorkflow.ts";
-import { updatePersistedGateDispatchTaskState, type PersistedGatePlatformDispatchTask } from "./gateActionReceipts.ts";
+import {
+  updatePersistedGateDispatchTaskState,
+  type GatePlatformGrowthDispatchItem,
+  type GatePlatformGrowthReviewStage,
+  type PersistedGatePlatformDispatchTask,
+} from "./gateActionReceipts.ts";
 
 const ACCEPTANCE_MARKER = "任务中心已验收：";
 const MIN_COMPLETION_EVIDENCE_LENGTH = 8;
@@ -169,6 +174,26 @@ export interface FirstDayDispatchCardInlineAction {
     endpoint: string;
     dispatchKey: string;
   };
+}
+
+export type RealSampleDispatchStepId =
+  | "first-draft"
+  | "first-review"
+  | "first-rewrite"
+  | "publish-precheck"
+  | "story-support"
+  | "risk-recovery"
+  | "opening-hook"
+  | "skeleton";
+
+export interface RealSampleMissingDispatchInput {
+  projectId: string;
+  projectTitle: string;
+  platformId: string;
+  platformName: string;
+  stepId: string;
+  gaps: string[];
+  createdAt?: string;
 }
 
 export interface FirstDayHandoffGateCtaProgress {
@@ -763,6 +788,115 @@ function firstDayHref(task: PersistedGatePlatformDispatchTask, stepId: string) {
     return `/projects/${task.projectId}?firstDayLaunch=1&nextStep=${encodeURIComponent(stepId)}#first-day-workflow`;
   }
   return task.href;
+}
+
+function realSampleStepMeta(stepId: string): {
+  label: string;
+  stage: GatePlatformGrowthReviewStage;
+  ownerRole: string;
+  actionLabel: string;
+  acceptanceCriteria: string[];
+} {
+  if (stepId === "first-review") {
+    return {
+      label: "第一章审稿",
+      stage: "start_first_three_review",
+      ownerRole: "审稿编辑",
+      actionLabel: "补审稿验收",
+      acceptanceCriteria: ["第一章审稿已完成并列出钩子、爽点、解释密度和章末追读问题。"],
+    };
+  }
+  if (stepId === "first-rewrite") {
+    return {
+      label: "第一章二改",
+      stage: "start_rewrite_opening",
+      ownerRole: "改稿编辑",
+      actionLabel: "补二改验收",
+      acceptanceCriteria: ["第一章二改已处理审稿问题，并保留版本对照和人工采用结论。"],
+    };
+  }
+  if (stepId === "publish-precheck") {
+    return {
+      label: "平台包预检",
+      stage: "start_platform_package",
+      ownerRole: "平台运营",
+      actionLabel: "补平台包验收",
+      acceptanceCriteria: ["标题、简介、标签、卖点、样章和首轮数据回收口径已整理。"],
+    };
+  }
+  if (stepId === "story-support") {
+    return {
+      label: "故事支撑",
+      stage: "start_opening_diagnostic",
+      ownerRole: "资料官",
+      actionLabel: "补故事支撑",
+      acceptanceCriteria: ["人物弧光、核心设定和平台土壤已补齐，后续正文生成可以直接引用。"],
+    };
+  }
+  if (stepId === "risk-recovery") {
+    return {
+      label: "止损恢复",
+      stage: "start_repair_packaging",
+      ownerRole: "主编",
+      actionLabel: "补恢复证据",
+      acceptanceCriteria: ["恢复条件已写清，入口卖点、前三章兑现或平台匹配度至少改掉一项。"],
+    };
+  }
+  if (stepId === "opening-hook") {
+    return {
+      label: "第一章钩子",
+      stage: "start_opening_diagnostic",
+      ownerRole: "作者",
+      actionLabel: "补开头验收",
+      acceptanceCriteria: ["第一章目标、钩子、冲突、转变和章末悬念完整，并按目标平台开头规则检查。"],
+    };
+  }
+  if (stepId === "skeleton") {
+    return {
+      label: "作品骨架",
+      stage: "start_opening_diagnostic",
+      ownerRole: "策划",
+      actionLabel: "补骨架验收",
+      acceptanceCriteria: ["大纲树包含开头、结尾、主干、分支、叶片和土壤，至少有前三章章节卡。"],
+    };
+  }
+  return {
+    label: "第一章初稿",
+    stage: "start_first_three_review",
+    ownerRole: "AI",
+    actionLabel: "补首章样本",
+    acceptanceCriteria: ["第一章正文已生成并写回章节，钩子、冲突和章末追读已按平台打法检查。"],
+  };
+}
+
+export function buildRealSampleMissingDispatch(input: RealSampleMissingDispatchInput): GatePlatformGrowthDispatchItem {
+  const stepId = cleanEvidence(input.stepId) || "publish-precheck";
+  const meta = realSampleStepMeta(stepId);
+  const gaps = input.gaps.map(cleanEvidence).filter(Boolean);
+  const title = `${input.projectTitle || "未命名作品"} · 真实样本补证：${meta.label}`;
+  const href = `/projects/${encodeURIComponent(input.projectId)}?firstDayLaunch=1&nextStep=${encodeURIComponent(stepId)}#first-day-workflow`;
+
+  return {
+    id: `first-day:${input.projectId}:${stepId}`,
+    platformId: input.platformId,
+    platformName: input.platformName,
+    stage: meta.stage,
+    state: "assigned",
+    priorityScore: 92,
+    ownerRole: meta.ownerRole,
+    title,
+    detail: `来自真实样本验收：作品卡发现 ${gaps.length || 1} 个缺口。先生成这张首日派单，补齐证据后再回总闸门判断能不能放大。`,
+    dueLabel: "今天收口",
+    actionLabel: meta.actionLabel,
+    href,
+    acceptanceCriteria: [
+      ...meta.acceptanceCriteria,
+      "完成依据必须逐项回应真实样本验收缺口。",
+      "补证后再进入总闸门，不允许直接批量生产。",
+    ],
+    evidence: gaps.length ? gaps.map((gap) => `真实样本缺口：${gap}`) : ["真实样本缺口：项目卡缺少可验收的首日派单证据。"],
+    reviewLatestAt: input.createdAt ?? new Date().toISOString(),
+  };
 }
 
 export function buildFirstDayDispatchCenterHref(input: {

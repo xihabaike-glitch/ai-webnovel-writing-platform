@@ -22,6 +22,8 @@ import {
 import { buildPrePublishGate } from "@/lib/projects/prePublishGate";
 import { parsePublishSnapshotTags } from "@/lib/projects/platformPublishExport";
 import { buildWatchSampleCompletionEvidenceSuggestions } from "@/lib/projects/watchSampleCompletionEvidence";
+import { getPlatformProfile, type PlatformId } from "@/lib/platforms/platformProfiles";
+import { buildRealSampleMissingDispatch } from "@/lib/projects/firstDayWorkflowView";
 
 export const dynamic = "force-dynamic";
 
@@ -329,6 +331,19 @@ export default async function DispatchPage({
   ];
   const routeConfirmationDispatchFlow = buildRouteConfirmationDispatchFlow(routeConfirmationReceipts, mergedTasks);
   const completionEvidenceSuggestions = buildWatchSampleCompletionEvidenceSuggestions(receipts);
+  const realSampleProject = firstDaySource === "real-sample" && firstDayProjectId
+    ? projects.find((project) => project.id === firstDayProjectId) ?? null
+    : null;
+  const realSampleMissingDispatch = realSampleProject
+    ? buildRealSampleMissingDispatch({
+      projectId: realSampleProject.id,
+      projectTitle: realSampleProject.title,
+      platformId: realSampleProject.targetPlatform,
+      platformName: getPlatformProfile(realSampleProject.targetPlatform as PlatformId).name,
+      stepId: firstDayStepId || "publish-precheck",
+      gaps: firstDayGaps,
+    })
+    : null;
 
   return (
     <AppShell>
@@ -352,6 +367,7 @@ export default async function DispatchPage({
         initialReceipts={receiptItems}
         initialTasks={mergedTasks}
         initialCompletionSuggestions={completionEvidenceSuggestions}
+        initialRealSampleMissingDispatch={realSampleMissingDispatch}
         routeConfirmationDispatchFlow={routeConfirmationDispatchFlow}
         initialQueueFilter={initialQueueFilter}
       />

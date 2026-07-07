@@ -36,4 +36,18 @@ test("ai writing platform development document", async (t) => {
     assert.ok(doc.includes("暂停批量"));
     assert.ok(doc.includes("样本"));
   });
+
+  await t.test("documents the pipeline proof route and receipt template", () => {
+    assert.ok(doc.includes("写作到投稿流水线验收路线"));
+    assert.ok(doc.includes("流水线验收回执模板"));
+    assert.ok(doc.includes("不跳过人工采用"));
+
+    for (const step of ["开书与大树骨架", "首章样本生成", "任务与派单回执", "总闸门放大检查", "失败修复与恢复观察", "发布包与平台复盘"]) {
+      assert.ok(doc.includes(step), `${step} should be documented`);
+    }
+
+    for (const outcome of ["通过", "退回修复", "暂停批量"]) {
+      assert.ok(doc.includes(outcome), `${outcome} should be documented`);
+    }
+  });
 });

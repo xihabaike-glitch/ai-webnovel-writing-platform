@@ -468,13 +468,13 @@ export default async function GatePage({
               单本作品页卡在哪一步，总闸门就卡在哪一步；二改、派单回执和发布包缺证据时不允许放量。
             </p>
           </div>
-          <Link className="w-fit rounded-md border border-slate-200 px-3 py-2 text-sm font-medium hover:bg-slate-50" href="/projects#pipeline-projects">
+          <Link className="w-fit rounded-md border border-slate-200 px-3 py-2 text-sm font-medium hover:bg-slate-50" href={hrefWithGateReturn("/projects#pipeline-projects", gateRecheckReturnHref)}>
             回项目流水线
           </Link>
         </div>
         <div className="mt-4 grid gap-3 lg:grid-cols-2">
           {gate.projectStatuses.filter((project) => project.acceptanceSheetGate.status !== "pass").map((project) => (
-            <Link className="rounded-md border border-slate-200 bg-slate-50 p-3 text-sm hover:bg-white" href={project.acceptanceSheetGate.href} key={project.projectId}>
+            <Link className="rounded-md border border-slate-200 bg-slate-50 p-3 text-sm hover:bg-white" href={hrefWithGateReturn(project.acceptanceSheetGate.href, gateRecheckReturnHref)} key={project.projectId}>
               <div className="flex flex-wrap items-center gap-2">
                 <span className="font-medium text-slate-950">{project.projectTitle}</span>
                 <span className="rounded-md bg-white px-2 py-1 text-xs text-slate-600">{project.platformName}</span>

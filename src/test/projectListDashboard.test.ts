@@ -251,10 +251,17 @@ test("buildProjectListDashboard", async (t) => {
       assert.ok(entry.projectAnchor.startsWith("#"));
       assert.ok(entry.roleIds.length >= 1);
       assert.ok(entry.workflowSteps.length >= 3);
+      assert.ok(entry.skillBriefs.length >= 1);
       assert.deepEqual(
         entry.workflowSteps.map((step) => step.stage),
         ["先判断", "再生产", "最后验收"],
       );
+      for (const brief of entry.skillBriefs) {
+        assert.ok(brief.roleName.length >= 4);
+        assert.ok(brief.modelOwner.length >= 3);
+        assert.ok(brief.trigger.length >= 10);
+        assert.ok(brief.acceptance.length >= 10);
+      }
       for (const step of entry.workflowSteps) {
         assert.ok(step.ownerRole.length >= 4);
         assert.ok(step.action.length >= 8);
@@ -279,6 +286,11 @@ test("buildProjectListDashboard", async (t) => {
       dashboard.roleEntrypoints
         .find((entry) => entry.id === "platform-export")
         ?.roleIds.includes("overseas_packager"),
+    );
+    assert.ok(
+      dashboard.roleEntrypoints
+        .find((entry) => entry.id === "platform-export")
+        ?.skillBriefs.some((brief) => brief.acceptance.includes("WebNovel")),
     );
   });
 

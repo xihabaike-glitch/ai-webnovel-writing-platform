@@ -5,6 +5,7 @@ import { buildFirstDayRiskProfile, buildFirstDayWorkflow, type FirstDayAiTask, t
 import { buildFirstDayDispatchCenterHref } from "./firstDayWorkflowView.ts";
 import { findProjectStartTacticSummary } from "./projectStartTactics.ts";
 import { buildSubmissionChecklist } from "./submissionChecklist.ts";
+import { buildReferenceCaseRolePlaybook } from "../references/openSourceCases.ts";
 
 export interface ProjectListProject {
   id: string;
@@ -191,6 +192,12 @@ export interface ProjectRoleWorkflowEntrypoint {
   actionLabel: string;
   projectAnchor: "#story-structure" | "#context-recall" | "#platform-export";
   roleIds: string[];
+  skillBriefs: Array<{
+    roleName: string;
+    modelOwner: string;
+    trigger: string;
+    acceptance: string;
+  }>;
   workflowSteps: Array<{
     stage: "先判断" | "再生产" | "最后验收";
     ownerRole: string;
@@ -725,7 +732,25 @@ function buildRealSampleAcceptanceQueue(items: ProjectListItem[]): ProjectListRe
 }
 
 export function buildProjectRoleWorkflowEntrypoints(): ProjectRoleWorkflowEntrypoint[] {
-  return [
+  const roleById = new Map(buildReferenceCaseRolePlaybook().map((role) => [role.id, role]));
+  const withSkillBriefs = (
+    entry: Omit<ProjectRoleWorkflowEntrypoint, "skillBriefs">,
+  ): ProjectRoleWorkflowEntrypoint => ({
+    ...entry,
+    skillBriefs: entry.roleIds.flatMap((roleId) => {
+      const role = roleById.get(roleId);
+      if (!role) return [];
+
+      return {
+        roleName: role.roleName,
+        modelOwner: role.modelOwner,
+        trigger: role.skillBrief.trigger,
+        acceptance: role.skillBrief.acceptance,
+      };
+    }),
+  });
+
+  const entries: Array<Omit<ProjectRoleWorkflowEntrypoint, "skillBriefs">> = [
     {
       id: "story-structure",
       title: "结构主编入口",
@@ -811,6 +836,8 @@ export function buildProjectRoleWorkflowEntrypoints(): ProjectRoleWorkflowEntryp
       ],
     },
   ];
+
+  return entries.map(withSkillBriefs);
 }
 
 export function buildProjectListDashboard(

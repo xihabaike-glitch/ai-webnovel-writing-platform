@@ -15,6 +15,16 @@ test("project detail page exposes role workflow anchors", () => {
   }
 });
 
+test("project detail role navigator renders role skill briefs", () => {
+  const projectPage = readFileSync("src/app/projects/[projectId]/page.tsx", "utf8");
+
+  assert.ok(projectPage.includes("entry.skillBriefs.map"));
+  assert.ok(projectPage.includes("角色 Skill 口径"));
+  assert.ok(projectPage.includes("brief.trigger"));
+  assert.ok(projectPage.includes("brief.acceptance"));
+  assert.ok(projectPage.includes("brief.modelOwner"));
+});
+
 test("project detail page renders the single-project acceptance sheet", () => {
   const projectPage = readFileSync("src/app/projects/[projectId]/page.tsx", "utf8");
 

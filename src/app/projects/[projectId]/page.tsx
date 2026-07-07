@@ -618,6 +618,18 @@ export default async function ProjectPage({
                     </span>
                   ))}
                 </div>
+                <div className="mt-3 rounded-md border border-slate-200 bg-white p-2">
+                  <div className="text-xs font-medium text-slate-500">角色 Skill 口径</div>
+                  <div className="mt-2 grid gap-2">
+                    {entry.skillBriefs.map((brief) => (
+                      <div className="text-xs leading-5 text-slate-600" key={`${entry.id}-${brief.roleName}`}>
+                        <div className="font-medium text-slate-900">{brief.roleName} · {brief.modelOwner}</div>
+                        <p className="mt-1">{brief.trigger}</p>
+                        <p className="mt-1 text-slate-500">验收：{brief.acceptance}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </Link>
             ))}
           </div>

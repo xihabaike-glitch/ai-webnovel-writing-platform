@@ -245,7 +245,7 @@ function buildPipelineValidationReceipt(step: ProjectListPipelineStep): ProjectL
       stopIfMissing: ["候选稿直接覆盖正文时退回", "没有人工采用时停手", "样本质量不足时不允许批量"],
     },
     task_dispatch: {
-      proofPrompt: "记录模型执行角色、输入、输出、任务回执、人工验收和下一步任务。",
+      proofPrompt: "记录模型执行角色、输入、输出、任务回执、完成依据、人工验收和下一步任务。",
       requiredEvidence: ["角色与模型匹配", "回执有可读证据", "下一步入口明确"],
       stopIfMissing: ["回执证据太薄时停在派单中心", "没有人工验收时停手", "任务没有下一步时不进总闸门"],
     },
@@ -287,6 +287,10 @@ function buildProjectPipelineProof(input: {
   const hasAcceptedDispatch = (input.project.gateDispatchTasks ?? []).some((task) => (
     task.state === "completed" && task.completionEvidence.trim().length >= 20
   ));
+  const pendingDispatch = (input.project.gateDispatchTasks ?? []).find((task) => (
+    task.dispatchKey.startsWith(`first-day:${input.project.id}:`)
+    && task.state !== "completed"
+  )) ?? null;
   const hasPublishReadyShape = input.project.chapters.length >= 3 && input.reviewPercent >= 60;
   const baseHref = `/projects/${input.project.id}`;
   const stepDefinitions: Array<Omit<ProjectListPipelineStep, "status"> & { done: boolean }> = [
@@ -310,8 +314,19 @@ function buildProjectPipelineProof(input: {
       id: "task_dispatch",
       label: "任务与派单回执",
       done: hasAcceptedDispatch,
-      evidence: hasAcceptedDispatch ? "已有派单完成证据。" : "首章样本、审稿、二改或发布预检还缺派单回执。",
-      href: `/dispatch?firstDayProject=${input.project.id}#first-day-dispatch`,
+      evidence: hasAcceptedDispatch
+        ? "已有派单完成证据。"
+        : pendingDispatch
+          ? "派单已生成，等待填写完成依据和人工验收。"
+          : "首章样本、审稿、二改或发布预检还缺派单回执。",
+      href: pendingDispatch
+        ? buildFirstDayDispatchCenterHref({
+          projectId: input.project.id,
+          dispatchKey: pendingDispatch.dispatchKey,
+          source: "real-sample",
+          gaps: ["派单已生成，但还缺完成依据和人工验收。"],
+        })
+        : `/dispatch?firstDayProject=${input.project.id}#first-day-dispatch`,
     },
     {
       id: "gate_check",

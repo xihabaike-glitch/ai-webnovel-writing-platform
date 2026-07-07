@@ -422,6 +422,9 @@ test("buildProjectListDashboard", async (t) => {
       item.realSampleValidation.nextActionHref,
       "/dispatch?firstDayProject=pending-dispatch-project&step=publish-precheck&source=real-sample&gap=%E6%B4%BE%E5%8D%95%E5%B7%B2%E7%94%9F%E6%88%90%EF%BC%8C%E4%BD%86%E8%BF%98%E7%BC%BA%E5%AE%8C%E6%88%90%E4%BE%9D%E6%8D%AE%E5%92%8C%E4%BA%BA%E5%B7%A5%E9%AA%8C%E6%94%B6%E3%80%82#first-day-dispatch",
     );
+    assert.equal(item.pipelineProof.currentStepId, "task_dispatch");
+    assert.ok(item.pipelineProof.steps.find((step) => step.id === "task_dispatch")?.evidence.includes("派单已生成"));
+    assert.ok(item.pipelineProof.validationReceipt.proofPrompt.includes("完成依据"));
   });
 
   await t.test("summarizes portfolio bottlenecks across pipeline proof steps", () => {

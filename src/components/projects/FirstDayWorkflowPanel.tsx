@@ -175,6 +175,18 @@ function modelSettingsRepairHref(route: FirstDayModelRouteStatus, projectId: str
   return `/settings/models?${params.toString()}`;
 }
 
+function hrefWithGateReturn(href: string, gateReturnHref?: string | null) {
+  if (!gateReturnHref || !href.startsWith("/") || href.startsWith("/gate")) return href;
+
+  const hashIndex = href.indexOf("#");
+  const base = hashIndex >= 0 ? href.slice(0, hashIndex) : href;
+  const hash = hashIndex >= 0 ? href.slice(hashIndex) : "";
+  if (base.includes("gateReturn=")) return href;
+  const separator = base.includes("?") ? "&" : "?";
+
+  return `${base}${separator}gateReturn=${encodeURIComponent(gateReturnHref)}${hash}`;
+}
+
 function continuationTone(status: FirstDayContinuationAction["status"]) {
   if (status === "ready") return "border-emerald-200 bg-emerald-50 text-emerald-900";
   if (status === "blocked") return "border-amber-200 bg-amber-50 text-amber-900";
@@ -201,7 +213,15 @@ function executionSafetyTone(level: "ready" | "watch" | "blocked") {
   return "border-emerald-200 bg-emerald-50 text-emerald-950";
 }
 
-function FirstDayStepCard({ step, index }: { step: FirstDayWorkflowStep; index: number }) {
+function FirstDayStepCard({
+  gateReturnHref,
+  index,
+  step,
+}: {
+  gateReturnHref?: string | null;
+  index: number;
+  step: FirstDayWorkflowStep;
+}) {
   const view = buildFirstDayStepView(step);
 
   return (
@@ -223,7 +243,7 @@ function FirstDayStepCard({ step, index }: { step: FirstDayWorkflowStep; index: 
         </div>
       ) : null}
       <p className="mt-1 leading-6 text-slate-500">{view.instruction}</p>
-      <Link className="mt-2 inline-block font-medium text-slate-950" href={view.href}>
+      <Link className="mt-2 inline-block font-medium text-slate-950" href={hrefWithGateReturn(view.href, gateReturnHref)}>
         {view.actionLabel}
       </Link>
     </div>
@@ -232,11 +252,13 @@ function FirstDayStepCard({ step, index }: { step: FirstDayWorkflowStep; index: 
 
 function FirstDayHandoffProgressPanel({
   followupDispatches,
+  gateReturnHref,
   isAssigning,
   onAssign,
   progress,
 }: {
   followupDispatches: GatePlatformGrowthDispatchItem[];
+  gateReturnHref?: string | null;
   isAssigning: boolean;
   onAssign: (dispatch: GatePlatformGrowthDispatchItem) => void;
   progress: FirstDayExperienceHandoffProgress;
@@ -276,7 +298,7 @@ function FirstDayHandoffProgressPanel({
             <p className="mt-2 leading-5 text-emerald-800">{item.action}</p>
             <p className="mt-2 rounded-md bg-white px-2 py-2 text-xs leading-5 text-emerald-700">{item.target}</p>
             <p className="mt-2 text-xs leading-5 text-emerald-700">{item.evidence}</p>
-            <Link className="mt-2 inline-block text-xs font-medium text-emerald-950 underline underline-offset-2" href={item.href}>
+            <Link className="mt-2 inline-block text-xs font-medium text-emerald-950 underline underline-offset-2" href={hrefWithGateReturn(item.href, gateReturnHref)}>
               查看处理入口
             </Link>
           </div>
@@ -317,7 +339,7 @@ function FirstDayHandoffProgressPanel({
                 >
                   {dispatch.state === "queued" ? "派到任务中心" : "已在任务中心"}
                 </button>
-                <Link className="w-fit rounded-md bg-white/80 px-3 py-2 text-xs font-medium text-slate-900 hover:bg-white" href={dispatch.href}>
+                <Link className="w-fit rounded-md bg-white/80 px-3 py-2 text-xs font-medium text-slate-900 hover:bg-white" href={hrefWithGateReturn(dispatch.href, gateReturnHref)}>
                   打开处理入口
                 </Link>
               </div>
@@ -333,7 +355,13 @@ function FirstDayHandoffProgressPanel({
   );
 }
 
-export function FirstDayWorkflowPanel({ projectId }: { projectId: string }) {
+export function FirstDayWorkflowPanel({
+  gateReturnHref,
+  projectId,
+}: {
+  gateReturnHref?: string | null;
+  projectId: string;
+}) {
   const searchParams = useSearchParams();
   const routeRepairReturn = searchParams.get("firstDayRoute") === "repaired";
   const createdLaunch = searchParams.get("firstDayLaunch") === "1";
@@ -697,11 +725,11 @@ export function FirstDayWorkflowPanel({ projectId }: { projectId: string }) {
               </div>
             </div>
             <div className="flex shrink-0 flex-wrap gap-2">
-              <Link className="w-fit rounded-md bg-slate-950 px-3 py-2 text-sm font-medium text-white" href={executionSafetyBanner.primaryHref}>
+              <Link className="w-fit rounded-md bg-slate-950 px-3 py-2 text-sm font-medium text-white" href={hrefWithGateReturn(executionSafetyBanner.primaryHref, gateReturnHref)}>
                 {executionSafetyBanner.primaryLabel}
               </Link>
               {executionSafetyBanner.secondaryHref && executionSafetyBanner.secondaryLabel ? (
-                <Link className="w-fit rounded-md bg-white/80 px-3 py-2 text-sm font-medium text-slate-900 hover:bg-white" href={executionSafetyBanner.secondaryHref}>
+                <Link className="w-fit rounded-md bg-white/80 px-3 py-2 text-sm font-medium text-slate-900 hover:bg-white" href={hrefWithGateReturn(executionSafetyBanner.secondaryHref, gateReturnHref)}>
                   {executionSafetyBanner.secondaryLabel}
                 </Link>
               ) : null}
@@ -732,12 +760,12 @@ export function FirstDayWorkflowPanel({ projectId }: { projectId: string }) {
               {isCompletingDispatch ? "验收中" : messageActionLabel ?? "验收并进入下一步"}
             </button>
           ) : messageAction === "open_next_step" && messageActionLabel ? (
-            <Link className="w-fit rounded-md bg-slate-950 px-3 py-2 text-sm font-medium text-white" href={messageActionHref ?? workflow?.nextStep.href ?? "#first-day-workflow"}>
+            <Link className="w-fit rounded-md bg-slate-950 px-3 py-2 text-sm font-medium text-white" href={hrefWithGateReturn(messageActionHref ?? workflow?.nextStep.href ?? "#first-day-workflow", gateReturnHref)}>
               {messageActionLabel}
             </Link>
           ) : null}
           {messageSecondaryActionLabel && messageSecondaryActionHref ? (
-            <Link className="w-fit rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50" href={messageSecondaryActionHref}>
+            <Link className="w-fit rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50" href={hrefWithGateReturn(messageSecondaryActionHref, gateReturnHref)}>
               {messageSecondaryActionLabel}
             </Link>
           ) : null}
@@ -768,11 +796,11 @@ export function FirstDayWorkflowPanel({ projectId }: { projectId: string }) {
                   {isExecutingAi ? "AI 执行中" : handoffGateCta.primaryLabel}
                 </button>
               ) : (
-                <Link className="w-fit rounded-md bg-slate-950 px-3 py-2 text-sm font-medium text-white" href={handoffGateCta.primaryHref}>
+                <Link className="w-fit rounded-md bg-slate-950 px-3 py-2 text-sm font-medium text-white" href={hrefWithGateReturn(handoffGateCta.primaryHref, gateReturnHref)}>
                   {handoffGateCta.primaryLabel}
                 </Link>
               )}
-              <Link className="w-fit rounded-md bg-white/80 px-3 py-2 text-sm font-medium text-slate-900 hover:bg-white" href={handoffGateCta.secondaryHref}>
+              <Link className="w-fit rounded-md bg-white/80 px-3 py-2 text-sm font-medium text-slate-900 hover:bg-white" href={hrefWithGateReturn(handoffGateCta.secondaryHref, gateReturnHref)}>
                 {handoffGateCta.secondaryLabel}
               </Link>
             </div>
@@ -789,10 +817,10 @@ export function FirstDayWorkflowPanel({ projectId }: { projectId: string }) {
               <p className="mt-1 leading-6 opacity-90">{continuation.detail}</p>
             </div>
             <div className="flex shrink-0 flex-wrap gap-2">
-              <Link className="w-fit rounded-md bg-slate-950 px-3 py-2 text-sm font-medium text-white" href={continuation.primaryHref}>
+              <Link className="w-fit rounded-md bg-slate-950 px-3 py-2 text-sm font-medium text-white" href={hrefWithGateReturn(continuation.primaryHref, gateReturnHref)}>
                 {continuation.primaryLabel}
               </Link>
-              <Link className="w-fit rounded-md bg-white/80 px-3 py-2 text-sm font-medium text-slate-900 hover:bg-white" href={continuation.secondaryHref}>
+              <Link className="w-fit rounded-md bg-white/80 px-3 py-2 text-sm font-medium text-slate-900 hover:bg-white" href={hrefWithGateReturn(continuation.secondaryHref, gateReturnHref)}>
                 {continuation.secondaryLabel}
               </Link>
             </div>
@@ -878,6 +906,7 @@ export function FirstDayWorkflowPanel({ projectId }: { projectId: string }) {
           {workflow.handoffProgress?.visible ? (
             <FirstDayHandoffProgressPanel
               followupDispatches={handoffFollowupDispatches}
+              gateReturnHref={gateReturnHref}
               isAssigning={isDispatching}
               onAssign={(item) => void assignHandoffFollowupDispatch(item)}
               progress={workflow.handoffProgress}
@@ -895,7 +924,7 @@ export function FirstDayWorkflowPanel({ projectId }: { projectId: string }) {
               <div className="mt-1 text-xl font-semibold text-slate-950">{workflow.nextStep.label}</div>
               <p className="mt-2 text-sm leading-6 text-slate-600">{workflow.nextStep.instruction}</p>
               <div className="mt-3 flex flex-wrap items-center gap-3 text-sm">
-                <Link className="rounded-md bg-slate-950 px-3 py-2 font-medium text-white" href={workflow.nextStep.href}>
+                <Link className="rounded-md bg-slate-950 px-3 py-2 font-medium text-white" href={hrefWithGateReturn(workflow.nextStep.href, gateReturnHref)}>
                   {workflow.nextStep.actionLabel}
                 </Link>
                 <span className="text-slate-500">
@@ -921,10 +950,10 @@ export function FirstDayWorkflowPanel({ projectId }: { projectId: string }) {
                 >
                   {isDispatching ? "派单中" : "派到任务中心"}
                 </button>
-                <Link className="w-fit rounded-md border border-slate-200 px-3 py-2 text-sm font-medium hover:bg-slate-50" href={workflow.executionPackage.href}>
+                <Link className="w-fit rounded-md border border-slate-200 px-3 py-2 text-sm font-medium hover:bg-slate-50" href={hrefWithGateReturn(workflow.executionPackage.href, gateReturnHref)}>
                   {workflow.executionPackage.actionLabel}
                 </Link>
-                <Link className="w-fit rounded-md border border-slate-200 px-3 py-2 text-sm font-medium hover:bg-slate-50" href="/dispatch">
+                <Link className="w-fit rounded-md border border-slate-200 px-3 py-2 text-sm font-medium hover:bg-slate-50" href={hrefWithGateReturn("/dispatch", gateReturnHref)}>
                   打开任务中心
                 </Link>
               </div>
@@ -1057,7 +1086,7 @@ export function FirstDayWorkflowPanel({ projectId }: { projectId: string }) {
                     <div className="mt-3 flex flex-col gap-2 rounded-md bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-800 sm:flex-row sm:items-center sm:justify-between">
                       <span>{aiBlockMessage}</span>
                       {executionBlockMessage ? null : (
-                        <Link className="font-medium text-amber-900 underline underline-offset-2" href={modelSettingsRepairHref(modelRoute, projectId)}>
+                        <Link className="font-medium text-amber-900 underline underline-offset-2" href={hrefWithGateReturn(modelSettingsRepairHref(modelRoute, projectId), gateReturnHref)}>
                           去配置
                         </Link>
                       )}
@@ -1109,7 +1138,7 @@ export function FirstDayWorkflowPanel({ projectId }: { projectId: string }) {
 
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
             {workflow.steps.map((step, index) => (
-              <FirstDayStepCard index={index} key={step.id} step={step} />
+              <FirstDayStepCard gateReturnHref={gateReturnHref} index={index} key={step.id} step={step} />
             ))}
           </div>
         </div>

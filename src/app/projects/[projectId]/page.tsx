@@ -635,7 +635,7 @@ export default async function ProjectPage({
           <ProjectControlDashboardPanel projectId={project.id} />
         </div>
         <div id="first-day-workflow">
-          <FirstDayWorkflowPanel projectId={project.id} />
+          <FirstDayWorkflowPanel gateReturnHref={gateReturn} projectId={project.id} />
         </div>
         <ChapterProductionFlowPanel flow={chapterProductionFlow} />
         <section className="grid gap-4 md:grid-cols-[1.4fr_1fr]">

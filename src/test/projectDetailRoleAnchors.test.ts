@@ -60,6 +60,31 @@ test("project detail page carries gate return through project work entry links",
   assert.ok(writingWorkbenchPanel.includes("href={hrefWithGateReturn(block.href, gateReturnHref)}"));
 });
 
+test("project detail page carries gate return through first day workflow links", () => {
+  const projectPage = readFileSync("src/app/projects/[projectId]/page.tsx", "utf8");
+  const firstDayWorkflowPanel = readFileSync("src/components/projects/FirstDayWorkflowPanel.tsx", "utf8");
+
+  assert.ok(projectPage.includes("<FirstDayWorkflowPanel gateReturnHref={gateReturn} projectId={project.id} />"));
+  assert.ok(firstDayWorkflowPanel.includes("gateReturnHref?: string | null"));
+  assert.ok(firstDayWorkflowPanel.includes("function hrefWithGateReturn"));
+  assert.ok(firstDayWorkflowPanel.includes("href={hrefWithGateReturn(view.href, gateReturnHref)}"));
+  assert.ok(firstDayWorkflowPanel.includes("href={hrefWithGateReturn(item.href, gateReturnHref)}"));
+  assert.ok(firstDayWorkflowPanel.includes("href={hrefWithGateReturn(dispatch.href, gateReturnHref)}"));
+  assert.ok(firstDayWorkflowPanel.includes("href={hrefWithGateReturn(executionSafetyBanner.primaryHref, gateReturnHref)}"));
+  assert.ok(firstDayWorkflowPanel.includes("href={hrefWithGateReturn(executionSafetyBanner.secondaryHref, gateReturnHref)}"));
+  assert.ok(firstDayWorkflowPanel.includes("href={hrefWithGateReturn(messageActionHref ?? workflow?.nextStep.href ?? \"#first-day-workflow\", gateReturnHref)}"));
+  assert.ok(firstDayWorkflowPanel.includes("href={hrefWithGateReturn(messageSecondaryActionHref, gateReturnHref)}"));
+  assert.ok(firstDayWorkflowPanel.includes("href={hrefWithGateReturn(handoffGateCta.primaryHref, gateReturnHref)}"));
+  assert.ok(firstDayWorkflowPanel.includes("href={hrefWithGateReturn(handoffGateCta.secondaryHref, gateReturnHref)}"));
+  assert.ok(firstDayWorkflowPanel.includes("href={hrefWithGateReturn(continuation.primaryHref, gateReturnHref)}"));
+  assert.ok(firstDayWorkflowPanel.includes("href={hrefWithGateReturn(continuation.secondaryHref, gateReturnHref)}"));
+  assert.ok(firstDayWorkflowPanel.includes("href={hrefWithGateReturn(workflow.nextStep.href, gateReturnHref)}"));
+  assert.ok(firstDayWorkflowPanel.includes("href={hrefWithGateReturn(workflow.executionPackage.href, gateReturnHref)}"));
+  assert.ok(firstDayWorkflowPanel.includes("href={hrefWithGateReturn(\"/dispatch\", gateReturnHref)}"));
+  assert.ok(firstDayWorkflowPanel.includes("href={hrefWithGateReturn(modelSettingsRepairHref(modelRoute, projectId), gateReturnHref)}"));
+  assert.ok(firstDayWorkflowPanel.includes("<FirstDayStepCard gateReturnHref={gateReturnHref} index={index} key={step.id} step={step} />"));
+});
+
 test("chapter detail page keeps a gate recheck return path visible", () => {
   const chapterPage = readFileSync("src/app/projects/[projectId]/chapters/[chapterId]/page.tsx", "utf8");
 

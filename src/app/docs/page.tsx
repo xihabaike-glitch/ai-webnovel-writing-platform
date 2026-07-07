@@ -128,8 +128,8 @@ export default function DevelopmentDocsPage() {
             <h2 className="font-medium text-slate-950">{overview.requirementTraceability.headline}</h2>
             <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-600">{overview.requirementTraceability.pmRule}</p>
           </div>
-          <Link className="w-fit rounded-md bg-slate-950 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800" href="/projects#pipeline-projects">
-            验收真实流水线
+          <Link className="w-fit rounded-md bg-slate-950 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800" href={overview.currentPipelineValidation.actionHref}>
+            {overview.currentPipelineValidation.actionLabel}
           </Link>
         </div>
         <div className="grid gap-3 lg:grid-cols-2">

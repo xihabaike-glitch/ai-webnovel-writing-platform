@@ -9,8 +9,8 @@ test("docs page sends validation CTAs to the real pipeline receipt", () => {
 
   assert.ok(source.includes("overview.currentPipelineValidation.actionLabel"));
   assert.ok(
-    pipelineHrefUses.length >= 2,
-    "both the pipeline proof CTA and the observation CTA should jump to /projects#pipeline-projects",
+    pipelineHrefUses.length >= 3,
+    "the traceability, pipeline proof, and observation CTAs should all use the current PM validation route",
   );
 });
 

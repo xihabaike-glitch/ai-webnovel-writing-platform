@@ -62,6 +62,14 @@ test("gate page carries action recheck return paths into acceptance sheet links"
   assert.ok(source.includes("href={hrefWithGateReturn(project.acceptanceSheetGate.href, gateRecheckReturnHref)}"));
 });
 
+test("gate page carries action recheck return paths into AI recovery links", () => {
+  assert.ok(source.includes("href={hrefWithGateReturn(aiRecoveryPanel.primaryAction.href, gateRecheckReturnHref)}"));
+  assert.ok(source.includes("href={hrefWithGateReturn(aiRecoveryPanel.currentConclusion.href, gateRecheckReturnHref)}"));
+  assert.ok(source.includes("href={hrefWithGateReturn(aiRecoveryPanel.latestEvidence.href, gateRecheckReturnHref)}"));
+  assert.ok(source.includes("href={hrefWithGateReturn(aiRecoveryPanel.promptMemory.actionHref, gateRecheckReturnHref)}"));
+  assert.ok(source.includes("href={hrefWithGateReturn(group.actionHref, gateRecheckReturnHref)}"));
+});
+
 test("gate page renders project acceptance sheet blockers", () => {
   assert.ok(source.includes("项目验收单联动"));
   assert.ok(source.includes("gate.projectStatuses.filter((project) => project.acceptanceSheetGate.status !== \"pass\")"));

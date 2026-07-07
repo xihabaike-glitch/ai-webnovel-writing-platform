@@ -512,7 +512,7 @@ export default async function GatePage({
               </div>
               <p className="mt-1 max-w-3xl text-sm leading-6">{aiRecoveryPanel.detail}</p>
             </div>
-            <Link className="w-fit shrink-0 rounded-md bg-white px-4 py-2 text-sm font-medium text-slate-950 hover:bg-slate-50" href={aiRecoveryPanel.primaryAction.href}>
+            <Link className="w-fit shrink-0 rounded-md bg-white px-4 py-2 text-sm font-medium text-slate-950 hover:bg-slate-50" href={hrefWithGateReturn(aiRecoveryPanel.primaryAction.href, gateRecheckReturnHref)}>
               {aiRecoveryPanel.primaryAction.label}
             </Link>
           </div>
@@ -527,7 +527,7 @@ export default async function GatePage({
           {aiRecoveryPanel.currentConclusion ? (
             <Link
               className={`mt-3 block rounded-md border p-3 text-sm hover:bg-white ${aiRecoveryConclusionTone(aiRecoveryPanel.currentConclusion.status)}`}
-              href={aiRecoveryPanel.currentConclusion.href}
+              href={hrefWithGateReturn(aiRecoveryPanel.currentConclusion.href, gateRecheckReturnHref)}
             >
               <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
                 <div>
@@ -550,7 +550,7 @@ export default async function GatePage({
             </Link>
           ) : null}
           {aiRecoveryPanel.latestEvidence ? (
-            <Link className="mt-3 block rounded-md border border-white/70 bg-white/80 p-3 text-sm hover:bg-white" href={aiRecoveryPanel.latestEvidence.href}>
+            <Link className="mt-3 block rounded-md border border-white/70 bg-white/80 p-3 text-sm hover:bg-white" href={hrefWithGateReturn(aiRecoveryPanel.latestEvidence.href, gateRecheckReturnHref)}>
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="font-medium">{aiRecoveryPanel.latestEvidence.label}</div>
                 <div className="flex flex-wrap items-center gap-2">
@@ -593,7 +593,7 @@ export default async function GatePage({
                 {aiRecoveryPanel.promptMemory.quickAction ? (
                   <GateAiPromptMemoryQuickActionButton action={aiRecoveryPanel.promptMemory.quickAction} />
                 ) : aiRecoveryPanel.promptMemory.actionHref && aiRecoveryPanel.promptMemory.actionLabel ? (
-                  <Link className="w-fit shrink-0 rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white" href={aiRecoveryPanel.promptMemory.actionHref}>
+                  <Link className="w-fit shrink-0 rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white" href={hrefWithGateReturn(aiRecoveryPanel.promptMemory.actionHref, gateRecheckReturnHref)}>
                     {aiRecoveryPanel.promptMemory.actionLabel}
                   </Link>
                 ) : aiRecoveryPanel.promptMemory.actionLabel ? (
@@ -618,7 +618,7 @@ export default async function GatePage({
           ) : null}
           <div className="mt-3 grid gap-2 lg:grid-cols-3">
             {aiRecoveryPanel.groups.map((group) => (
-              <Link className="rounded-md border border-white/70 bg-white/70 p-3 text-sm hover:bg-white" href={group.actionHref} key={group.id}>
+              <Link className="rounded-md border border-white/70 bg-white/70 p-3 text-sm hover:bg-white" href={hrefWithGateReturn(group.actionHref, gateRecheckReturnHref)} key={group.id}>
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <span className="font-medium">{group.label}</span>
                   <span className="rounded-md bg-slate-50 px-2 py-1 text-xs text-slate-700">活跃 {group.active}/{group.total}</span>

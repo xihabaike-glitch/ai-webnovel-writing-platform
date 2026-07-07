@@ -79,6 +79,21 @@ function hrefWithGateReturn(href: string, gateReturnHref?: string | null) {
   return `${base}${separator}gateReturn=${encodeURIComponent(gateReturnHref)}${hash}`;
 }
 
+function roleDispatchHref(projectId: string, entry: ReturnType<typeof buildProjectRoleWorkflowEntrypoints>[number]) {
+  const params = new URLSearchParams({
+    roleIntent: entry.id,
+    projectId,
+    roleId: entry.dispatchIntent.roleId,
+    role: entry.dispatchIntent.ownerRole,
+    roleName: entry.dispatchIntent.roleName,
+    modelOwner: entry.dispatchIntent.modelOwner,
+    acceptance: entry.dispatchIntent.acceptance,
+    returnHref: `/projects/${projectId}${entry.projectAnchor}`,
+  });
+
+  return `/dispatch?${params.toString()}#dispatch-task-center`;
+}
+
 export default async function ProjectPage({
   params,
   searchParams,
@@ -604,12 +619,13 @@ export default async function ProjectPage({
           </div>
           <div className="grid gap-3 md:grid-cols-3">
             {roleEntrypoints.map((entry) => (
-              <Link
+              <div
                 className="rounded-md border border-slate-200 bg-slate-50 p-3 text-sm hover:border-slate-400 hover:bg-white"
-                href={hrefWithGateReturn(`/projects/${project.id}${entry.projectAnchor}`, gateReturn)}
                 key={entry.id}
               >
-                <div className="font-medium text-slate-950">{entry.title}</div>
+                <Link className="block" href={hrefWithGateReturn(`/projects/${project.id}${entry.projectAnchor}`, gateReturn)}>
+                  <div className="font-medium text-slate-950">{entry.title}</div>
+                </Link>
                 <p className="mt-1 line-clamp-2 leading-5 text-slate-600">{entry.detail}</p>
                 <div className="mt-2 flex flex-wrap gap-1">
                   {entry.workflowSteps.map((step) => (
@@ -630,7 +646,13 @@ export default async function ProjectPage({
                     ))}
                   </div>
                 </div>
-              </Link>
+                <Link
+                  className="mt-3 inline-flex w-fit rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white hover:bg-slate-800"
+                  href={hrefWithGateReturn(roleDispatchHref(project.id, entry), gateReturn)}
+                >
+                  去派单中心
+                </Link>
+              </div>
             ))}
           </div>
         </section>

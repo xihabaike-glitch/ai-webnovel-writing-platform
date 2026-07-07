@@ -24,3 +24,12 @@ test("dispatch page exposes a task center anchor for role dispatch evidence", ()
   assert.ok(source.includes("id=\"dispatch-task-center\""));
   assert.ok(source.includes("<GateDispatchTaskCenter"));
 });
+
+test("dispatch page shows role intent handoff from project role navigator", () => {
+  assert.ok(source.includes("roleIntentFromParams"));
+  assert.ok(source.includes("roleIntent"));
+  assert.ok(source.includes("来自作品角色入口"));
+  assert.ok(source.includes("roleIntent.modelOwner"));
+  assert.ok(source.includes("roleIntent.acceptance"));
+  assert.ok(source.includes("回作品工作区"));
+});

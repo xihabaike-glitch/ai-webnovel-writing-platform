@@ -56,6 +56,26 @@ function gateReturnFromParam(value: string | string[] | undefined) {
   return raw;
 }
 
+function roleIntentFromParams(params: DispatchSearchParams) {
+  const roleIntent = searchValue(params, "roleIntent");
+  if (!roleIntent) return null;
+  const projectId = searchValue(params, "projectId");
+  const returnHref = searchValue(params, "returnHref");
+
+  return {
+    roleIntent,
+    projectId,
+    roleId: searchValue(params, "roleId"),
+    roleName: searchValue(params, "roleName") || searchValue(params, "role") || "写作执行角色",
+    ownerRole: searchValue(params, "role") || "写作执行角色",
+    modelOwner: searchValue(params, "modelOwner") || "按模型岗位矩阵选择",
+    acceptance: searchValue(params, "acceptance") || "必须留下可复核产物和人工验收依据。",
+    returnHref: returnHref.startsWith("/projects/")
+      ? returnHref
+      : projectId ? `/projects/${projectId}` : "/projects",
+  };
+}
+
 function hrefWithGateReturn(href: string, gateReturnHref?: string | null) {
   if (!gateReturnHref || !href.startsWith("/") || href.startsWith("/gate")) return href;
 
@@ -232,6 +252,7 @@ export default async function DispatchPage({
   const focusDispatchKey = searchValue(resolvedSearchParams, "focus");
   const queueParam = searchValue(resolvedSearchParams, "queue");
   const gateReturn = gateReturnFromParam(resolvedSearchParams.gateReturn);
+  const roleIntent = roleIntentFromParams(resolvedSearchParams);
   const initialQueueFilter = dispatchQueueFilter(queueParam);
   const invalidQueueNotice = isDispatchQueueFilter(queueParam)
     ? null
@@ -406,6 +427,24 @@ export default async function DispatchPage({
             </div>
             <Link className="w-fit rounded-md bg-white px-3 py-2 text-sm font-medium text-amber-950 hover:bg-amber-100" href={gateReturn}>
               回总闸门复检
+            </Link>
+          </div>
+        </section>
+      ) : null}
+      {roleIntent ? (
+        <section className="mb-6 rounded-md border border-slate-200 bg-white p-4 text-sm text-slate-700">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <div className="text-xs font-medium text-slate-500">来自作品角色入口</div>
+              <h2 className="mt-1 text-lg font-semibold text-slate-950">{roleIntent.roleName}</h2>
+              <p className="mt-2 leading-6">建议模型：{roleIntent.modelOwner}。派单时按这个角色生成任务，验收时只看有没有留下可复核产物。</p>
+              <p className="mt-2 rounded-md bg-slate-50 p-2 text-xs leading-5 text-slate-600">验收：{roleIntent.acceptance}</p>
+            </div>
+            <Link
+              className="w-fit rounded-md border border-slate-200 px-3 py-2 text-sm font-medium text-slate-800 hover:bg-slate-50"
+              href={hrefWithGateReturn(roleIntent.returnHref, gateReturn)}
+            >
+              回作品工作区
             </Link>
           </div>
         </section>

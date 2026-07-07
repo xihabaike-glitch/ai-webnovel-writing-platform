@@ -192,6 +192,15 @@ export interface ProjectRoleWorkflowEntrypoint {
   actionLabel: string;
   projectAnchor: "#story-structure" | "#context-recall" | "#platform-export";
   roleIds: string[];
+  dispatchIntent: {
+    roleId: string;
+    roleName: string;
+    ownerRole: string;
+    modelOwner: string;
+    actionLabel: string;
+    trigger: string;
+    acceptance: string;
+  };
   skillBriefs: Array<{
     roleName: string;
     modelOwner: string;
@@ -734,7 +743,7 @@ function buildRealSampleAcceptanceQueue(items: ProjectListItem[]): ProjectListRe
 export function buildProjectRoleWorkflowEntrypoints(): ProjectRoleWorkflowEntrypoint[] {
   const roleById = new Map(buildReferenceCaseRolePlaybook().map((role) => [role.id, role]));
   const withSkillBriefs = (
-    entry: Omit<ProjectRoleWorkflowEntrypoint, "skillBriefs">,
+    entry: Omit<ProjectRoleWorkflowEntrypoint, "skillBriefs" | "dispatchIntent">,
   ): ProjectRoleWorkflowEntrypoint => ({
     ...entry,
     skillBriefs: entry.roleIds.flatMap((roleId) => {
@@ -748,9 +757,22 @@ export function buildProjectRoleWorkflowEntrypoints(): ProjectRoleWorkflowEntryp
         acceptance: role.skillBrief.acceptance,
       };
     }),
+    dispatchIntent: (() => {
+      const primaryRoleId = entry.roleIds.find((roleId) => roleId !== "toxic_pm") ?? entry.roleIds[0];
+      const role = primaryRoleId ? roleById.get(primaryRoleId) : null;
+      return {
+        roleId: primaryRoleId ?? "toxic_pm",
+        roleName: role?.roleName ?? entry.title,
+        ownerRole: role?.roleName ?? entry.title,
+        modelOwner: role?.modelOwner ?? "GPT / Claude",
+        actionLabel: `派给${role?.roleName ?? entry.title}`,
+        trigger: role?.skillBrief.trigger ?? entry.detail,
+        acceptance: role?.skillBrief.acceptance ?? "必须输出可验收产物，并说明下一步动作。",
+      };
+    })(),
   });
 
-  const entries: Array<Omit<ProjectRoleWorkflowEntrypoint, "skillBriefs">> = [
+  const entries: Array<Omit<ProjectRoleWorkflowEntrypoint, "skillBriefs" | "dispatchIntent">> = [
     {
       id: "story-structure",
       title: "结构主编入口",

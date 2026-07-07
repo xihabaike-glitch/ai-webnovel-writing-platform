@@ -25,6 +25,19 @@ test("project detail role navigator renders role skill briefs", () => {
   assert.ok(projectPage.includes("brief.modelOwner"));
 });
 
+test("project detail role navigator links role work to dispatch center", () => {
+  const projectPage = readFileSync("src/app/projects/[projectId]/page.tsx", "utf8");
+
+  assert.ok(projectPage.includes("roleDispatchHref"));
+  assert.ok(projectPage.includes("roleIntent"));
+  assert.ok(projectPage.includes("projectId"));
+  assert.ok(projectPage.includes("entry.dispatchIntent.roleId"));
+  assert.ok(projectPage.includes("entry.dispatchIntent.modelOwner"));
+  assert.ok(projectPage.includes("entry.dispatchIntent.acceptance"));
+  assert.ok(projectPage.includes("#dispatch-task-center"));
+  assert.ok(projectPage.includes("去派单中心"));
+});
+
 test("project detail page renders the single-project acceptance sheet", () => {
   const projectPage = readFileSync("src/app/projects/[projectId]/page.tsx", "utf8");
 

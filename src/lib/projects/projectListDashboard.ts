@@ -55,6 +55,25 @@ export interface ProjectListItem {
   riskDetail: string;
   riskFlags: string[];
   continuationStatus: "first_day_active" | "ready" | "blocked" | "complete";
+  pipelineProof: ProjectListPipelineProof;
+}
+
+export type ProjectListPipelineStepStatus = "done" | "current" | "blocked";
+
+export interface ProjectListPipelineStep {
+  id: "project_start" | "sample_draft" | "task_dispatch" | "gate_check" | "failure_repair" | "publish_package";
+  label: string;
+  status: ProjectListPipelineStepStatus;
+  evidence: string;
+  href: string;
+}
+
+export interface ProjectListPipelineProof {
+  currentStepId: ProjectListPipelineStep["id"];
+  headline: string;
+  nextActionLabel: string;
+  nextActionHref: string;
+  steps: ProjectListPipelineStep[];
 }
 
 export interface ProjectListDashboard {
@@ -163,6 +182,91 @@ function riskFlags(input: {
   if (input.wordProgressPercent < 1 && input.chapterCount > 0) flags.push("还没进入有效字数生产");
   if (flags.length === 0) flags.push("暂无明显阻塞");
   return flags;
+}
+
+function buildProjectPipelineProof(input: {
+  project: ProjectListProject;
+  outlinePercent: number;
+  supportPercent: number;
+  reviewPercent: number;
+  aiFailureRate: number;
+  riskLevel: FirstDayRiskLevel;
+  continuationStatus: ProjectListItem["continuationStatus"];
+}): ProjectListPipelineProof {
+  const hasDraftedChapter = input.project.chapters.some((chapter) => chapter.wordCount > 0);
+  const hasAcceptedDispatch = (input.project.gateDispatchTasks ?? []).some((task) => (
+    task.state === "completed" && task.completionEvidence.trim().length >= 20
+  ));
+  const hasPublishReadyShape = input.project.chapters.length >= 3 && input.reviewPercent >= 60;
+  const baseHref = `/projects/${input.project.id}`;
+  const stepDefinitions: Array<Omit<ProjectListPipelineStep, "status"> & { done: boolean }> = [
+    {
+      id: "project_start",
+      label: "开书与大树骨架",
+      done: input.outlinePercent >= 70 && input.supportPercent >= 50,
+      evidence: input.outlinePercent >= 70 && input.supportPercent >= 50
+        ? "开头、结尾、主干、分支、叶片和土壤已有基础材料。"
+        : "先补目标平台、开头钩子、结尾承诺、主干和土壤。",
+      href: baseHref,
+    },
+    {
+      id: "sample_draft",
+      label: "首章样本生成",
+      done: hasDraftedChapter,
+      evidence: hasDraftedChapter ? "已有可审稿正文样本。" : "还缺首章样本，不能进入批量生产。",
+      href: baseHref,
+    },
+    {
+      id: "task_dispatch",
+      label: "任务与派单回执",
+      done: hasAcceptedDispatch,
+      evidence: hasAcceptedDispatch ? "已有派单完成证据。" : "首章样本、审稿、二改或发布预检还缺派单回执。",
+      href: `/dispatch?firstDayProject=${input.project.id}#first-day-dispatch`,
+    },
+    {
+      id: "gate_check",
+      label: "总闸门放大检查",
+      done: input.continuationStatus === "ready" || input.continuationStatus === "complete",
+      evidence: input.continuationStatus === "ready" || input.continuationStatus === "complete"
+        ? "首日链路可进入总闸门复查。"
+        : "缺样本、复查或交接证据时不允许放量。",
+      href: "/gate",
+    },
+    {
+      id: "failure_repair",
+      label: "失败修复与恢复观察",
+      done: input.aiFailureRate < 20 && input.riskLevel === "standard",
+      evidence: input.aiFailureRate < 20 && input.riskLevel === "standard"
+        ? "当前没有高失败率或止损恢复压力。"
+        : "模型失败、观察期或止损状态未清，不允许扩大批量。",
+      href: "/failures",
+    },
+    {
+      id: "publish_package",
+      label: "发布包与平台复盘",
+      done: hasPublishReadyShape,
+      evidence: hasPublishReadyShape ? "已有前三章和审稿基础，可以推进平台包。" : "发布包还缺前三章、审稿或平台复盘证据。",
+      href: `${baseHref}#platform-export`,
+    },
+  ];
+  const currentIndex = Math.max(0, stepDefinitions.findIndex((step) => !step.done));
+  const normalizedCurrentIndex = currentIndex === -1 ? stepDefinitions.length - 1 : currentIndex;
+  const steps = stepDefinitions.map((step, index) => ({
+    id: step.id,
+    label: step.label,
+    evidence: step.evidence,
+    href: step.href,
+    status: index < normalizedCurrentIndex ? "done" : index === normalizedCurrentIndex ? "current" : "blocked",
+  })) satisfies ProjectListPipelineStep[];
+  const current = steps[normalizedCurrentIndex];
+
+  return {
+    currentStepId: current.id,
+    headline: `当前验收卡：${current.label}`,
+    nextActionLabel: current.status === "done" ? "复查发布闭环" : current.label,
+    nextActionHref: current.href,
+    steps,
+  };
 }
 
 function buildProjectListPmFocus(items: ProjectListItem[]): ProjectListPmFocus {
@@ -362,10 +466,12 @@ export function buildProjectListDashboard(
       ? clampPercent((project.currentWordCount / project.targetWordCount) * 100)
       : 0;
     const reviewCoveragePercent = reviewCoverage(project.chapters, project.aiTasks);
+    const outlinePercent = outlineCoverage(project.outlineNodes);
+    const supportPercent = supportCoverage(project);
     const rawHealthScore = Math.round(average([
       firstDay.progressPercent,
-      outlineCoverage(project.outlineNodes),
-      supportCoverage(project),
+      outlinePercent,
+      supportPercent,
       modelAudit.score,
       project.chapters.length > 0 ? 60 : 20,
       reviewCoveragePercent > 0 ? reviewCoveragePercent : project.currentWordCount > 0 ? 30 : 50,
@@ -413,6 +519,15 @@ export function buildProjectListDashboard(
         nextAction: continuation.primaryLabel,
       }),
       continuationStatus: continuation.status,
+      pipelineProof: buildProjectPipelineProof({
+        project,
+        outlinePercent,
+        supportPercent,
+        reviewPercent: reviewCoveragePercent,
+        aiFailureRate: aiFailureRatePercent,
+        riskLevel: riskProfile.level,
+        continuationStatus: continuation.status,
+      }),
     };
   }).sort((left, right) => (
     left.healthScore - right.healthScore

@@ -307,4 +307,37 @@ test("buildProjectListDashboard", async (t) => {
     assert.equal(item.healthLabel, "需盯紧");
     assert.ok(item.riskFlags.some((flag) => flag.includes("补交接验收")));
   });
+
+  await t.test("builds a six-step pipeline proof card for each project", () => {
+    const dashboard = buildProjectListDashboard([emptyProject, completeProject], [
+      {
+        id: "provider-1",
+        providerId: "mock",
+        displayName: "Mock",
+        defaultModel: "mock-novel",
+        enabled: true,
+        encryptedApiKey: "secret",
+      },
+    ]);
+    const empty = dashboard.items.find((item) => item.id === "empty-project");
+    const ready = dashboard.items.find((item) => item.id === "ready-project");
+
+    assert.deepEqual(
+      empty?.pipelineProof.steps.map((step) => step.id),
+      ["project_start", "sample_draft", "task_dispatch", "gate_check", "failure_repair", "publish_package"],
+    );
+    assert.equal(empty?.pipelineProof.currentStepId, "project_start");
+    assert.equal(empty?.pipelineProof.steps[0].status, "current");
+    assert.ok(empty?.pipelineProof.headline.includes("开书与大树骨架"));
+    assert.ok(empty?.pipelineProof.nextActionHref.includes("/projects/empty-project"));
+
+    assert.equal(ready?.pipelineProof.steps[0].status, "done");
+    assert.equal(ready?.pipelineProof.steps[1].status, "done");
+    assert.equal(ready?.pipelineProof.currentStepId, "task_dispatch");
+    assert.ok(ready?.pipelineProof.headline.includes("任务与派单回执"));
+    assert.equal(
+      ready?.pipelineProof.steps.some((step) => step.label.includes("新增平台")),
+      false,
+    );
+  });
 });

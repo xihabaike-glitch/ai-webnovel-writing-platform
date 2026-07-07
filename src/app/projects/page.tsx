@@ -33,6 +33,18 @@ function riskLevelLabel(level: FirstDayRiskLevel) {
   return "标准";
 }
 
+function pipelineStepClass(status: "done" | "current" | "blocked") {
+  if (status === "done") return "border-emerald-200 bg-emerald-50 text-emerald-900";
+  if (status === "current") return "border-slate-900 bg-slate-950 text-white";
+  return "border-slate-200 bg-slate-50 text-slate-500";
+}
+
+function pipelineStepLabel(status: "done" | "current" | "blocked") {
+  if (status === "done") return "已过";
+  if (status === "current") return "当前";
+  return "待验";
+}
+
 export default async function ProjectsPage({ searchParams }: ProjectsPageProps) {
   const params = await searchParams;
   const experienceLaunch = {
@@ -256,6 +268,30 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps) 
               {item.riskFlags.map((flag) => (
                 <span className="rounded-md bg-slate-100 px-2 py-1" key={flag}>{flag}</span>
               ))}
+            </div>
+            <div className="mt-4 rounded-md border border-slate-200 bg-slate-50 p-3">
+              <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
+                <div>
+                  <div className="text-xs text-slate-500">写作到投稿流水线</div>
+                  <div className="mt-1 font-medium text-slate-950">{item.pipelineProof.headline}</div>
+                  <p className="mt-1 text-xs leading-5 text-slate-600">
+                    {item.pipelineProof.steps.find((step) => step.id === item.pipelineProof.currentStepId)?.evidence}
+                  </p>
+                </div>
+                <Link className="w-fit rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white hover:bg-slate-800" href={item.pipelineProof.nextActionHref}>
+                  {item.pipelineProof.nextActionLabel}
+                </Link>
+              </div>
+              <div className="mt-3 grid gap-2 md:grid-cols-3 xl:grid-cols-6">
+                {item.pipelineProof.steps.map((step, index) => (
+                  <Link className={`rounded-md border p-2 text-xs leading-5 ${pipelineStepClass(step.status)}`} href={step.href} key={`${item.id}-${step.id}`}>
+                    <div className="flex items-center justify-between gap-2">
+                      <span>{index + 1}. {step.label}</span>
+                      <span className="shrink-0 opacity-75">{pipelineStepLabel(step.status)}</span>
+                    </div>
+                  </Link>
+                ))}
+              </div>
             </div>
             <div className="mt-3 h-2 overflow-hidden rounded bg-slate-100">
               <div className="h-full bg-slate-950" style={{ width: `${item.healthScore}%` }} />

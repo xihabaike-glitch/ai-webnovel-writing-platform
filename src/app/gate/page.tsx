@@ -70,6 +70,10 @@ function shortDateTime(value: string | null) {
   }).format(new Date(value));
 }
 
+function isGateFocus(value: string | null) {
+  return value === null || value === "first-day-complete";
+}
+
 export default async function GatePage({
   searchParams,
 }: {
@@ -78,6 +82,9 @@ export default async function GatePage({
   const params = await searchParams;
   const focus = Array.isArray(params?.focus) ? params?.focus[0] : params?.focus ?? null;
   const projectId = Array.isArray(params?.projectId) ? params?.projectId[0] : params?.projectId ?? null;
+  const invalidFocusNotice = isGateFocus(focus)
+    ? null
+    : focus ? `总闸门焦点「${focus}」不存在，已显示总闸门全局验收。` : null;
   const [projects, recentAiTasks, chapters, aiRecoveryDispatchRecords, aiPromptMemoryAuditRecords] = await Promise.all([
     prisma.project.findMany({
       include: {
@@ -284,6 +291,20 @@ export default async function GatePage({
           </div>
         </div>
       </section>
+
+      {invalidFocusNotice ? (
+        <section className="mb-6 rounded-md border border-amber-200 bg-amber-50 p-4 text-amber-900">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <div className="font-medium">焦点已回退</div>
+              <p className="mt-1 text-sm leading-6">{invalidFocusNotice}</p>
+            </div>
+            <Link className="w-fit rounded-md bg-white px-3 py-2 text-sm font-medium text-amber-950 hover:bg-amber-100" href="/gate">
+              查看总闸门
+            </Link>
+          </div>
+        </section>
+      ) : null}
 
       {focusNotice.visible ? (
         <section className={`mb-6 rounded-md border p-4 ${focusNoticeTone(focusNotice.tone)}`} id="first-day-complete-focus">

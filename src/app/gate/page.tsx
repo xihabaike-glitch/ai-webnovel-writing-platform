@@ -8,6 +8,7 @@ import { GateFirstThreeAdoptionPanel } from "@/components/gate/GateFirstThreeAdo
 import { GatePlatformStrategyReviewPanel } from "@/components/gate/GatePlatformStrategyReviewPanel";
 import { GatePriorityActionCard } from "@/components/gate/GatePriorityActionCard";
 import { GatePublishEffectReviewPanel } from "@/components/gate/GatePublishEffectReviewPanel";
+import { GateRecheckDispatchButton } from "@/components/gate/GateRecheckDispatchButton";
 import { buildTaskBatchHistory } from "@/lib/ai/taskBatchHistory";
 import { prisma } from "@/lib/db/prisma";
 import { buildGateAiPipelineRecoveryPanel } from "@/lib/projects/gateActionReceipts";
@@ -338,6 +339,9 @@ export default async function GatePage({
                       <p className="mt-2 text-xs leading-5 text-slate-600">
                         最近回填：{focusNotice.recheckSummary.latestEvidence}
                       </p>
+                    ) : null}
+                    {focusNotice.recheckSummary.nextDispatch ? (
+                      <GateRecheckDispatchButton dispatch={focusNotice.recheckSummary.nextDispatch} />
                     ) : null}
                   </div>
                   <div className="grid gap-2 text-xs leading-5 md:grid-cols-2">

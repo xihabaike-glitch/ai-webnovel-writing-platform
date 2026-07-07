@@ -421,6 +421,11 @@ test("buildPrePublishGate", async (t) => {
     assert.equal(notice.recheckSummary?.statusLabel, "发布包待验");
     assert.ok(notice.recheckSummary?.completedEvidence.some((line) => line.includes("首日派单已有完成依据")));
     assert.ok(notice.recheckSummary?.latestEvidence?.includes("派单中心已补齐首日平台包预检"));
+    assert.equal(notice.recheckSummary?.nextDispatch?.id, "project-acceptance-next:project-recheck-progress:publish_package");
+    assert.equal(notice.recheckSummary?.nextDispatch?.stage, "start_platform_package");
+    assert.equal(notice.recheckSummary?.nextDispatch?.ownerRole, "平台包装编辑");
+    assert.equal(notice.recheckSummary?.nextDispatch?.actionLabel, "生成下一张派单");
+    assert.ok(notice.recheckSummary?.nextDispatch?.detail.includes("发布包还缺前三章"));
     assert.ok(notice.detail.includes("已完成 5/6 步"));
   });
 

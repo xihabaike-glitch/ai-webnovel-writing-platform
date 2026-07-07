@@ -20,11 +20,13 @@ test("gate page forwards action recheck focus params", () => {
 });
 
 test("gate page renders action recheck summary feedback", () => {
+  assert.ok(source.includes("GateRecheckDispatchButton"));
   assert.ok(source.includes("focusNotice.recheckSummary"));
   assert.ok(source.includes("项目验收单回填"));
   assert.ok(source.includes("已完成 {focusNotice.recheckSummary.completedSteps}/{focusNotice.recheckSummary.totalSteps} 步"));
   assert.ok(source.includes("最近回填"));
   assert.ok(source.includes("剩余卡点"));
+  assert.ok(source.includes("focusNotice.recheckSummary.nextDispatch"));
 });
 
 test("gate page renders project acceptance sheet blockers", () => {

@@ -494,6 +494,31 @@ export interface PrePublishGateRecheckSummary {
   completedEvidence: string[];
   remainingEvidence: string[];
   latestEvidence: string | null;
+  nextDispatch: PrePublishGateRecheckDispatch | null;
+}
+
+export interface PrePublishGateRecheckDispatch {
+  id: string;
+  platformId: string;
+  platformName: string;
+  stage:
+    | "watch"
+    | "start_first_three_review"
+    | "start_opening_diagnostic"
+    | "start_platform_package"
+    | "start_publish_finalize"
+    | "ai_pipeline_sample_recheck";
+  state: "queued" | "assigned" | "completed";
+  priorityScore: number;
+  ownerRole: string;
+  title: string;
+  detail: string;
+  dueLabel: string;
+  actionLabel: string;
+  href: string;
+  acceptanceCriteria: string[];
+  evidence: string[];
+  reviewLatestAt: string;
 }
 
 export interface PrePublishGateInput {
@@ -1649,6 +1674,85 @@ function buildProjectAcceptanceRecheckSummary(
     completedEvidence: steps.filter((step) => step.status === "done").map((step) => step.evidence),
     remainingEvidence: steps.filter((step) => step.status !== "done").map((step) => `${step.label}：${step.evidence}`),
     latestEvidence: project.acceptanceSheetGate.latestDispatchEvidence,
+    nextDispatch: buildProjectAcceptanceNextDispatch(project, currentStep, completedSteps),
+  };
+}
+
+function acceptanceNextDispatchSpec(stepId: ProjectAcceptanceStep["id"]) {
+  if (stepId === "project_start") {
+    return {
+      stage: "watch",
+      ownerRole: "主编",
+      title: "补开书基础",
+    } as const;
+  }
+  if (stepId === "opening_sample") {
+    return {
+      stage: "start_opening_diagnostic",
+      ownerRole: "开头诊断编辑",
+      title: "补首章样本",
+    } as const;
+  }
+  if (stepId === "chapter_review") {
+    return {
+      stage: "start_first_three_review",
+      ownerRole: "首轮审稿编辑",
+      title: "补首章审稿",
+    } as const;
+  }
+  if (stepId === "second_pass") {
+    return {
+      stage: "ai_pipeline_sample_recheck",
+      ownerRole: "二改编辑",
+      title: "补首章二改",
+    } as const;
+  }
+  if (stepId === "dispatch_receipt") {
+    return {
+      stage: "start_publish_finalize",
+      ownerRole: "派单验收负责人",
+      title: "补首日派单回执",
+    } as const;
+  }
+  return {
+    stage: "start_platform_package",
+    ownerRole: "平台包装编辑",
+    title: "补发布包验收",
+  } as const;
+}
+
+function buildProjectAcceptanceNextDispatch(
+  project: PrePublishGateProjectStatus,
+  currentStep: ProjectAcceptanceStep | null,
+  completedSteps: number,
+): PrePublishGateRecheckDispatch | null {
+  if (!currentStep || project.acceptanceSheetGate.status === "pass") return null;
+  const spec = acceptanceNextDispatchSpec(currentStep.id);
+  const evidence = [
+    ...project.acceptanceSheetGate.steps.filter((step) => step.status === "done").map((step) => step.evidence).slice(-3),
+    project.acceptanceSheetGate.latestDispatchEvidence,
+  ].filter((line): line is string => Boolean(line));
+
+  return {
+    id: `project-acceptance-next:${project.projectId}:${currentStep.id}`,
+    platformId: project.platformId,
+    platformName: project.platformName,
+    stage: spec.stage,
+    state: "queued",
+    priorityScore: project.acceptanceSheetGate.status === "block" ? 92 : 78,
+    ownerRole: spec.ownerRole,
+    title: `${project.projectTitle}｜${spec.title}`,
+    detail: `${project.projectTitle} · ${project.platformName} · ${currentStep.evidence} ${currentStep.stopRule} 已完成 ${completedSteps}/${project.acceptanceSheetGate.steps.length} 步，处理后回总闸门复检。`,
+    dueLabel: "今天收口",
+    actionLabel: "生成下一张派单",
+    href: project.acceptanceSheetGate.href,
+    acceptanceCriteria: [
+      `完成「${currentStep.label}」证据`,
+      "写清处理结果和人工验收依据",
+      "回总闸门复检后卡点减少",
+    ],
+    evidence,
+    reviewLatestAt: new Date(0).toISOString(),
   };
 }
 

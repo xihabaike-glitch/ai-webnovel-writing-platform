@@ -150,4 +150,30 @@ test("buildDevelopmentOverview", async (t) => {
       false,
     );
   });
+
+  await t.test("builds a receipt template for the pipeline proof route", () => {
+    const overview = buildDevelopmentOverview();
+
+    assert.ok(overview.pipelineProofRoute.acceptanceReceipt.title.includes("验收回执"));
+    assert.ok(overview.pipelineProofRoute.acceptanceReceipt.pmInstruction.includes("证据"));
+    assert.deepEqual(overview.pipelineProofRoute.acceptanceReceipt.outcomeOptions, ["pass", "repair", "hold_batch"]);
+    assert.equal(overview.pipelineProofRoute.acceptanceReceipt.fields.length, overview.pipelineProofRoute.steps.length);
+
+    for (const field of overview.pipelineProofRoute.acceptanceReceipt.fields) {
+      assert.ok(overview.pipelineProofRoute.steps.some((step) => step.id === field.stepId));
+      assert.ok(field.evidencePrompt.length >= 10);
+      assert.ok(field.requiredSignals.length >= 2);
+      assert.ok(field.rejectIf.length >= 2);
+      assert.ok(field.ownerConfirmation.length >= 6);
+    }
+
+    const gateField = overview.pipelineProofRoute.acceptanceReceipt.fields.find((field) => field.stepId === "gate_check");
+    const failureField = overview.pipelineProofRoute.acceptanceReceipt.fields.find((field) => field.stepId === "failure_repair");
+    const publishField = overview.pipelineProofRoute.acceptanceReceipt.fields.find((field) => field.stepId === "publish_package");
+
+    assert.ok(gateField?.requiredSignals.some((signal) => signal.includes("样本")));
+    assert.ok(gateField?.rejectIf.some((signal) => signal.includes("缺少复查")));
+    assert.ok(failureField?.rejectIf.some((signal) => signal.includes("未修复")));
+    assert.ok(publishField?.requiredSignals.some((signal) => signal.includes("8 个核心平台")));
+  });
 });

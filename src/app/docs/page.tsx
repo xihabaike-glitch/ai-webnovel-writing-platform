@@ -157,6 +157,52 @@ export default function DevelopmentDocsPage() {
         </div>
       </section>
 
+      <section className="mb-6 rounded-md border border-slate-200 bg-white p-4">
+        <div className="mb-3 flex flex-col gap-2 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <h2 className="font-medium text-slate-950">{overview.pipelineProofRoute.acceptanceReceipt.title}</h2>
+            <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-600">{overview.pipelineProofRoute.acceptanceReceipt.pmInstruction}</p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {overview.pipelineProofRoute.acceptanceReceipt.outcomeOptions.map((option) => (
+              <span className="rounded-md bg-slate-100 px-2 py-1 text-xs font-medium text-slate-700" key={option}>
+                {option === "pass" ? "通过" : option === "repair" ? "退回修复" : "暂停批量"}
+              </span>
+            ))}
+          </div>
+        </div>
+        <div className="grid gap-3 lg:grid-cols-2">
+          {overview.pipelineProofRoute.acceptanceReceipt.fields.map((field) => {
+            const step = overview.pipelineProofRoute.steps.find((item) => item.id === field.stepId);
+            return (
+              <article className="rounded-md border border-slate-200 bg-slate-50 p-4" key={field.stepId}>
+                <div className="text-xs text-slate-500">对应步骤：{step?.title}</div>
+                <h3 className="mt-1 font-medium text-slate-950">{field.evidencePrompt}</h3>
+                <div className="mt-3 grid gap-3 md:grid-cols-2">
+                  <div className="rounded-md bg-white p-3">
+                    <div className="text-xs font-medium text-emerald-900">必须看到</div>
+                    <ul className="mt-2 grid gap-1 text-xs leading-5 text-slate-600">
+                      {field.requiredSignals.map((signal) => (
+                        <li key={signal}>{signal}</li>
+                      ))}
+                    </ul>
+                  </div>
+                  <div className="rounded-md bg-white p-3">
+                    <div className="text-xs font-medium text-rose-900">直接退回</div>
+                    <ul className="mt-2 grid gap-1 text-xs leading-5 text-slate-600">
+                      {field.rejectIf.map((signal) => (
+                        <li key={signal}>{signal}</li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+                <p className="mt-3 rounded-md bg-white p-3 text-xs leading-5 text-slate-700">负责人确认：{field.ownerConfirmation}</p>
+              </article>
+            );
+          })}
+        </div>
+      </section>
+
       <section className="mb-6 grid gap-3 lg:grid-cols-5">
         {overview.docSections.map((section, index) => (
           <article className={`rounded-md border p-4 ${sectionAccent(index)}`} key={section.id}>

@@ -74,10 +74,26 @@ export interface DevelopmentOverviewPipelineProofStep {
   stopRule: string;
 }
 
+export interface DevelopmentOverviewPipelineReceiptField {
+  stepId: DevelopmentOverviewPipelineProofStep["id"];
+  evidencePrompt: string;
+  requiredSignals: string[];
+  rejectIf: string[];
+  ownerConfirmation: string;
+}
+
+export interface DevelopmentOverviewPipelineAcceptanceReceipt {
+  title: string;
+  pmInstruction: string;
+  outcomeOptions: Array<"pass" | "repair" | "hold_batch">;
+  fields: DevelopmentOverviewPipelineReceiptField[];
+}
+
 export interface DevelopmentOverviewPipelineProofRoute {
   headline: string;
   pmRule: string;
   steps: DevelopmentOverviewPipelineProofStep[];
+  acceptanceReceipt: DevelopmentOverviewPipelineAcceptanceReceipt;
 }
 
 export interface DevelopmentOverview {
@@ -369,11 +385,62 @@ const pipelineProofSteps: DevelopmentOverviewPipelineProofStep[] = [
   },
 ];
 
+const pipelineReceiptFields: DevelopmentOverviewPipelineReceiptField[] = [
+  {
+    stepId: "project_start",
+    evidencePrompt: "记录作品名、目标平台、篇幅、开头钩子、结尾承诺、主干和土壤是否齐备。",
+    requiredSignals: ["目标平台已选", "开头钩子和结尾承诺已填写", "主干和基础土壤可用于首章样本"],
+    rejectIf: ["没有目标平台", "开头钩子为空", "结尾承诺缺失"],
+    ownerConfirmation: "作者确认骨架可进入样本。",
+  },
+  {
+    stepId: "sample_draft",
+    evidencePrompt: "记录首章样本、审稿问题、二改候选和人工采用结论。",
+    requiredSignals: ["首章样本已生成", "钩子和爽点过线", "人工采用或明确二改"],
+    rejectIf: ["候选稿直接覆盖正文", "没有人工采用", "样本质量不足仍想批量"],
+    ownerConfirmation: "结构主编确认样本过线。",
+  },
+  {
+    stepId: "task_dispatch",
+    evidencePrompt: "记录模型执行角色、输入、输出、任务回执、人工验收和下一步任务。",
+    requiredSignals: ["角色与模型匹配", "回执有可读证据", "下一步入口明确"],
+    rejectIf: ["回执证据太薄", "没有人工验收", "任务没有下一步"],
+    ownerConfirmation: "派单负责人确认回执闭合。",
+  },
+  {
+    stepId: "gate_check",
+    evidencePrompt: "记录样本、复查、成本、质量、失败率和是否允许小批量。",
+    requiredSignals: ["样本稳定", "复查通过", "成本和失败率可控"],
+    rejectIf: ["缺少复查", "失败率过高", "没有恢复证据"],
+    ownerConfirmation: "毒舌 PM 确认可以小批量。",
+  },
+  {
+    stepId: "failure_repair",
+    evidencePrompt: "记录失败原因、修复泳道、重试样本、恢复观察和是否仍需暂停批量。",
+    requiredSignals: ["失败原因已归类", "未恢复失败已处理", "恢复样本可观察"],
+    rejectIf: ["模型配置未修复", "上下文失败未修复", "未恢复失败仍存在"],
+    ownerConfirmation: "失败修复负责人确认风险解除。",
+  },
+  {
+    stepId: "publish_package",
+    evidencePrompt: "记录平台包、样章、标签、卖点、版本基线和反馈复盘。",
+    requiredSignals: ["8 个核心平台都有发布证据", "样章和卖点齐备", "反馈复盘能回到作品"],
+    rejectIf: ["发布包缺样章", "平台卖点不清", "反馈记录缺失"],
+    ownerConfirmation: "投稿包装编辑确认可复盘。",
+  },
+];
+
 function buildPipelineProofRoute(): DevelopmentOverviewPipelineProofRoute {
   return {
     headline: "写作到投稿流水线验收路线",
     pmRule: "按这 6 步验真实作品样本；不跳过人工采用，不用新增平台掩盖流水线问题。",
     steps: pipelineProofSteps,
+    acceptanceReceipt: {
+      title: "流水线验收回执模板",
+      pmInstruction: "每一步都要填证据、通过信号、退回原因和负责人确认；证据不够就退回修复，不允许用口头感觉放行。",
+      outcomeOptions: ["pass", "repair", "hold_batch"],
+      fields: pipelineReceiptFields,
+    },
   };
 }
 

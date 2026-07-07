@@ -73,6 +73,12 @@ test("open source reference cases", async (t) => {
       allView.developmentPath.map((item) => item.id),
       ["writing_workbench", "model_routing", "knowledge_recall", "publishing_pipeline"],
     );
+    assert.ok(allView.pmNextFocus, "reference view should expose a PM next focus");
+    assert.equal(allView.pmNextFocus.pathId, "model_routing");
+    assert.ok(allView.pmNextFocus.headline.includes("模型任务化"));
+    assert.ok(allView.pmNextFocus.reason.includes("聊天"));
+    assert.ok(allView.pmNextFocus.proof.includes("失败替代"));
+    assert.equal(allView.pmNextFocus.href, "/settings/models#model-role-matrix");
     const roleIds = new Set(allView.rolePlaybook.map((role) => role.id));
     for (const item of allView.developmentPath) {
       assert.ok(["已落地", "继续打磨"].includes(item.status));

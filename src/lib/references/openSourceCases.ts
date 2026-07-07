@@ -40,6 +40,7 @@ export interface ReferenceCaseLibraryView {
   platformScope: ReferenceCasePlatformScope;
   rolePlaybook: ReferenceCaseRolePlaybookItem[];
   developmentPath: ReferenceCaseDevelopmentPathItem[];
+  pmNextFocus: ReferenceCasePmNextFocus;
   selectedCategory: ReferenceCaseCategory | "all";
   categoryTabs: Array<{
     id: ReferenceCaseCategory | "all";
@@ -78,6 +79,15 @@ export interface ReferenceCaseDevelopmentPathItem {
     actionLabel: string;
   };
   href: string;
+}
+
+export interface ReferenceCasePmNextFocus {
+  pathId: ReferenceCaseDevelopmentPathItem["id"];
+  headline: string;
+  reason: string;
+  proof: string;
+  href: string;
+  actionLabel: string;
 }
 
 export interface ReferenceCasePlatformScope {
@@ -683,12 +693,45 @@ export function buildReferenceCaseDevelopmentPath(): ReferenceCaseDevelopmentPat
   return pathItems.map(withRoleSummaries);
 }
 
+export function buildReferenceCasePmNextFocus(path: ReferenceCaseDevelopmentPathItem[]): ReferenceCasePmNextFocus {
+  const focus = path.find((item) => item.status === "继续打磨" && item.roleIds.includes("toxic_pm"))
+    ?? path.find((item) => item.status === "继续打磨")
+    ?? path[0];
+
+  if (!focus) {
+    return {
+      pathId: "writing_workbench",
+      headline: "先补作品工作台，不要先做聊天。",
+      reason: "没有开发路径时，默认回到传统写作工作台，先保证作者能管理一部长篇。",
+      proof: "至少能看到大纲树、章节卡、人物弧光和正文入口。",
+      href: "/projects#story-structure",
+      actionLabel: "检查工作台",
+    };
+  }
+
+  return {
+    pathId: focus.id,
+    headline: focus.id === "model_routing"
+      ? "当前优先：模型任务化，别再做聊天壳。"
+      : `当前优先：${focus.title}`,
+    reason: focus.id === "model_routing"
+      ? "写作平台的下一步不是增加聊天入口，而是让 Claude、DeepSeek、Kimi、GPT 按写作任务分工并可复检。"
+      : focus.pmCheckpoint.risk,
+    proof: focus.id === "model_routing"
+      ? "模型岗位矩阵能说明首选模型、备用模型、失败替代路线、成本压力和后续复检入口。"
+      : focus.pmCheckpoint.proof,
+    href: focus.href,
+    actionLabel: focus.pmCheckpoint.actionLabel,
+  };
+}
+
 export function buildReferenceCaseLibraryView(input?: {
   selectedCategory?: string | null;
   cases?: OpenSourceReferenceCase[];
 }): ReferenceCaseLibraryView {
   const cases = input?.cases ?? openSourceReferenceCases;
   const plan = buildReferenceCaseDevelopmentPlan(cases);
+  const developmentPath = buildReferenceCaseDevelopmentPath();
   const selectedCategory = isReferenceCaseCategory(input?.selectedCategory)
     ? input.selectedCategory
     : "all";
@@ -723,7 +766,8 @@ export function buildReferenceCaseLibraryView(input?: {
     totalCases: plan.totalCases,
     platformScope: buildReferenceCasePlatformScope(),
     rolePlaybook: buildReferenceCaseRolePlaybook(),
-    developmentPath: buildReferenceCaseDevelopmentPath(),
+    developmentPath,
+    pmNextFocus: buildReferenceCasePmNextFocus(developmentPath),
     selectedCategory,
     categoryTabs,
     visibleCases,

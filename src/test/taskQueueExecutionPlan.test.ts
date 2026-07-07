@@ -83,7 +83,7 @@ test("buildTaskQueueExecutionPlan", async (t) => {
     assert.ok(plan.warnings.some((warning) => warning.includes("回总闸门复检")));
   });
 
-  await t.test("warns when platform strategy tasks enter the recommended batch", () => {
+  await t.test("keeps platform strategy tasks out of the generic recommended batch", () => {
     const plan = buildTaskQueueExecutionPlan([
       queueItem({
         id: "project-1:platform-strategy:fanqie:rewrite-first-three",
@@ -105,10 +105,11 @@ test("buildTaskQueueExecutionPlan", async (t) => {
       }),
     ]);
 
-    assert.equal(plan.platformStrategyCount, 1);
-    assert.deepEqual(plan.platformStrategyItemIds, ["project-1:platform-strategy:fanqie:rewrite-first-three"]);
-    assert.ok(plan.warnings.some((warning) => warning.includes("平台策略任务")));
-    assert.ok(plan.warnings.some((warning) => warning.includes("解锁前三章候选采纳")));
+    assert.equal(plan.platformStrategyCount, 0);
+    assert.deepEqual(plan.platformStrategyItemIds, []);
+    assert.deepEqual(plan.itemIds, ["project-1:second-pass:chapter-2"]);
+    assert.deepEqual(plan.chapterIds, ["chapter-2"]);
+    assert.ok(!plan.warnings.some((warning) => warning.includes("解锁前三章候选采纳")));
   });
 
   await t.test("returns a blocked plan when there are no executable items", () => {

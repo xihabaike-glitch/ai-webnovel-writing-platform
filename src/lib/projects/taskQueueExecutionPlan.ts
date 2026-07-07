@@ -29,6 +29,7 @@ export interface TaskQueueExecutionPlan {
 const executableCategories: ExecutableQueueCategory[] = ["review", "second_pass", "draft"];
 
 function isExecutableQueueItem(item: QueueItem): item is ExecutableQueueItem {
+  if (item.sourceType === "platform_strategy") return false;
   return executableCategories.includes(item.category as ExecutableQueueCategory);
 }
 

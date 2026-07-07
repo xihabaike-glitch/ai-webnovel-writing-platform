@@ -16,6 +16,9 @@ test("projects page shows the portfolio pipeline bottleneck receipt", () => {
   assert.ok(source.includes("activePipelineStep ? `当前筛选：${activePipelineStep.count}/${dashboard.pipelineProofSummary.totalProjects} 本卡在「${activePipelineStep.label}」。` : dashboard.pipelineProofSummary.headline"));
   assert.ok(source.includes("activePipelineSummary.headline"));
   assert.ok(source.includes("activePipelineSummary.countLabel"));
+  assert.ok(source.includes("invalidPipelineStep"));
+  assert.ok(source.includes("pipelineStepParam ? `流水线步骤「${pipelineStepParam}」不存在，已显示全部作品。` : null"));
+  assert.ok(source.includes("invalidPipelineStep ?"));
   assert.ok(source.includes("activePipelineValidationReceipt.headline"));
   assert.ok(source.includes("activePipelineValidationReceipt.proofPrompt"));
   assert.ok(source.includes("activePipelineValidationReceipt.requiredEvidence.map"));

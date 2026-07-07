@@ -95,6 +95,9 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps) 
   const dashboard = buildProjectListDashboard(projects, providers);
   const pipelineStepParam = firstValue(params?.pipelineStep);
   const activePipelineStep = dashboard.pipelineProofSummary.stepCounts.find((step) => step.id === pipelineStepParam) ?? null;
+  const invalidPipelineStep = !activePipelineStep
+    ? pipelineStepParam ? `流水线步骤「${pipelineStepParam}」不存在，已显示全部作品。` : null
+    : null;
   const activePipelineValidationReceipt = activePipelineStep?.validationReceipt ?? dashboard.pipelineProofSummary.validationReceipt;
   const activePipelineAction = {
     recommendedActionHref: activePipelineStep?.recommendedActionHref ?? dashboard.pipelineProofSummary.recommendedActionHref,
@@ -209,6 +212,14 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps) 
             </Link>
           ))}
         </div>
+        {invalidPipelineStep ? (
+          <div className="mt-3 flex flex-col gap-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 sm:flex-row sm:items-center sm:justify-between">
+            <span>{invalidPipelineStep}</span>
+            <Link className="w-fit rounded-md bg-white px-3 py-2 text-xs font-medium text-amber-900 hover:bg-amber-100" href="/projects#pipeline-projects">
+              查看全部作品
+            </Link>
+          </div>
+        ) : null}
         <div className="mt-3 grid gap-3 lg:grid-cols-[1.1fr_0.9fr]">
           <div className="rounded-md border border-slate-200 bg-slate-50 p-3 text-sm leading-6 text-slate-700">
             <div className="text-xs font-medium text-slate-500">组合级验收回执</div>

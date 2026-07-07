@@ -187,6 +187,9 @@ test("project detail page carries gate return through export and submission link
   assert.ok(platformExportCenterPanel.includes("exportSuccessEffectPrompt"));
   assert.ok(platformExportCenterPanel.includes("去记录发布效果"));
   assert.ok(platformExportCenterPanel.includes("href={hrefWithGateReturn(\"#publish-effect-panel\", gateReturnHref, projectId)}"));
+  assert.ok(platformExportCenterPanel.includes("effectReviewStrategyPrompt"));
+  assert.ok(platformExportCenterPanel.includes("回到策略裁决"));
+  assert.ok(platformExportCenterPanel.includes("href={hrefWithGateReturn(\"#platform-strategy-verdict\", gateReturnHref, projectId)}"));
   assert.ok(platformExportCenterPanel.includes("function hrefWithGateReturn"));
   assert.ok(platformExportCenterPanel.includes("href={hrefWithGateReturn(item.actionHref, gateReturnHref, projectId)}"));
   assert.ok(platformExportCenterPanel.includes("href={hrefWithGateReturn(handoffActionHref(projectId, center.executionHandoffSummary.primaryAction), gateReturnHref, projectId)}"));

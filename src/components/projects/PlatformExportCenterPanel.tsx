@@ -1692,6 +1692,9 @@ export function PlatformExportCenterPanel({
   const exportSuccessEffectPrompt = message?.includes("下一步记录真实发布效果") || message?.includes("下一步记录各平台真实效果")
     ? "发布包已经留下版本证据，现在去记录曝光、点击、收藏、追读和编辑反馈。"
     : null;
+  const effectReviewStrategyPrompt = latestEffectReview?.platformId === selectedPackage?.platformId
+    ? "真实效果已经入账，回到策略裁决看主平台、备选平台和下一轮动作。"
+    : null;
   const selectedAssetEditorReview = useMemo(
     () => selectedPackage
       ? buildSubmissionAssetEditorReview(selectedPackage.platformName, selectedPackage.submissionAssetAudit)
@@ -4836,6 +4839,17 @@ export function PlatformExportCenterPanel({
                         ? "重写前三章"
                         : "打开位置"}
                   </button>
+                ) : null}
+                {effectReviewStrategyPrompt ? (
+                  <div className="mt-3 flex flex-col gap-2 rounded-md bg-white p-2 sm:flex-row sm:items-center sm:justify-between">
+                    <p className="text-xs leading-5 text-slate-600">{effectReviewStrategyPrompt}</p>
+                    <a
+                      className="w-fit rounded-md border border-slate-200 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                      href={hrefWithGateReturn("#platform-strategy-verdict", gateReturnHref, projectId)}
+                    >
+                      回到策略裁决
+                    </a>
+                  </div>
                 ) : null}
               </div>
             ) : null}

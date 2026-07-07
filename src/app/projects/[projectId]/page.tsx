@@ -782,13 +782,13 @@ export default async function ProjectPage({
           <PlatformTacticExperiencePanel gateReturnHref={gateReturn} library={platformTacticExperienceLibrary} />
         </div>
         <div id="platform-export">
-          <PlatformExportCenterPanel projectId={project.id} />
+          <PlatformExportCenterPanel gateReturnHref={gateReturn} projectId={project.id} />
         </div>
         <div id="story-structure">
           <StoryStructureDiagnosticPanel projectId={project.id} />
         </div>
         <div id="submission-package">
-          <SubmissionPackagePanel projectId={project.id} submissionPackage={submissionPackage} />
+          <SubmissionPackagePanel gateReturnHref={gateReturn} projectId={project.id} submissionPackage={submissionPackage} />
         </div>
         <div id="outline-tree" className="grid gap-4 md:grid-cols-[2fr_1fr]">
           <OutlineTreePanel projectId={project.id} nodes={outlineNodes} />

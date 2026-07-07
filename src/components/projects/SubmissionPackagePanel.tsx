@@ -248,10 +248,25 @@ function decisionStatusClass(kind: MultiPlatformSubmissionVariant["decision"]["k
   return "bg-slate-100 text-slate-600";
 }
 
+function hrefWithGateReturn(href: string, gateReturnHref?: string | null, projectId?: string) {
+  const normalizedHref = gateReturnHref && href.startsWith("#") && projectId ? `/projects/${projectId}${href}` : href;
+  if (!gateReturnHref || !normalizedHref.startsWith("/") || normalizedHref.startsWith("/gate")) return normalizedHref;
+
+  const hashIndex = normalizedHref.indexOf("#");
+  const base = hashIndex >= 0 ? normalizedHref.slice(0, hashIndex) : normalizedHref;
+  const hash = hashIndex >= 0 ? normalizedHref.slice(hashIndex) : "";
+  if (base.includes("gateReturn=")) return normalizedHref;
+  const separator = base.includes("?") ? "&" : "?";
+
+  return `${base}${separator}gateReturn=${encodeURIComponent(gateReturnHref)}${hash}`;
+}
+
 export function SubmissionPackagePanel({
+  gateReturnHref,
   projectId,
   submissionPackage,
 }: {
+  gateReturnHref?: string | null;
   projectId: string;
   submissionPackage: SubmissionPackageView;
 }) {
@@ -805,7 +820,7 @@ export function SubmissionPackagePanel({
                       <div key={criterion}>{criterion}</div>
                     ))}
                   </div>
-                  <a className="mt-3 inline-flex w-fit rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50" href={task.href}>
+                  <a className="mt-3 inline-flex w-fit rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50" href={hrefWithGateReturn(task.href, gateReturnHref, projectId)}>
                     {task.actionLabel}
                   </a>
                 </div>
@@ -849,7 +864,7 @@ export function SubmissionPackagePanel({
                   </div>
                   <p className="mt-2 text-xs leading-5 text-slate-600">{variant.decision.reason}</p>
                   <p className="mt-1 text-xs leading-5 text-slate-600">{variant.decision.nextAction}</p>
-                  <a className="mt-2 inline-flex w-fit rounded-md border border-slate-200 px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50" href={variant.decision.actionHref}>
+                  <a className="mt-2 inline-flex w-fit rounded-md border border-slate-200 px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50" href={hrefWithGateReturn(variant.decision.actionHref, gateReturnHref, projectId)}>
                     去执行
                   </a>
                 </div>
@@ -927,7 +942,7 @@ export function SubmissionPackagePanel({
                       ))}
                     </div>
                   ) : null}
-                  <a className="mt-2 inline-flex w-fit rounded-md border border-slate-200 px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50" href="#publish-effect-panel">
+                  <a className="mt-2 inline-flex w-fit rounded-md border border-slate-200 px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50" href={hrefWithGateReturn("#publish-effect-panel", gateReturnHref, projectId)}>
                     回填这轮数据
                   </a>
                 </div>

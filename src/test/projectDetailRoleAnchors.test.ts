@@ -111,6 +111,42 @@ test("project detail page carries gate return through platform decision links", 
   assert.ok(platformTacticExperiencePanel.includes("href={hrefWithGateReturn(buildGatePlatformTacticExperienceStartHref(item), gateReturnHref)}"));
 });
 
+test("project detail page carries gate return through export and submission links", () => {
+  const projectPage = readFileSync("src/app/projects/[projectId]/page.tsx", "utf8");
+  const platformExportCenterPanel = readFileSync("src/components/projects/PlatformExportCenterPanel.tsx", "utf8");
+  const submissionPackagePanel = readFileSync("src/components/projects/SubmissionPackagePanel.tsx", "utf8");
+
+  assert.ok(projectPage.includes("<PlatformExportCenterPanel gateReturnHref={gateReturn} projectId={project.id} />"));
+  assert.ok(projectPage.includes("<SubmissionPackagePanel gateReturnHref={gateReturn} projectId={project.id} submissionPackage={submissionPackage} />"));
+
+  assert.ok(platformExportCenterPanel.includes("gateReturnHref?: string | null"));
+  assert.ok(platformExportCenterPanel.includes("function hrefWithGateReturn"));
+  assert.ok(platformExportCenterPanel.includes("href={hrefWithGateReturn(item.actionHref, gateReturnHref, projectId)}"));
+  assert.ok(platformExportCenterPanel.includes("href={hrefWithGateReturn(handoffActionHref(projectId, center.executionHandoffSummary.primaryAction), gateReturnHref, projectId)}"));
+  assert.ok(platformExportCenterPanel.includes("href={hrefWithGateReturn(handoffActionHref(projectId, item), gateReturnHref, projectId)}"));
+  assert.ok(platformExportCenterPanel.includes("href={hrefWithGateReturn(item.feedbackLoop.nextStepHref, gateReturnHref, projectId)}"));
+  assert.ok(platformExportCenterPanel.includes("href={hrefWithGateReturn(application.href, gateReturnHref, projectId)}"));
+  assert.ok(platformExportCenterPanel.includes("href={hrefWithGateReturn(entry.href, gateReturnHref, projectId)}"));
+  assert.ok(platformExportCenterPanel.includes("href={hrefWithGateReturn(history.href, gateReturnHref, projectId)}"));
+  assert.ok(platformExportCenterPanel.includes("href={hrefWithGateReturn(strategySwitchPlan.progress.actionHref, gateReturnHref, projectId)}"));
+  assert.ok(platformExportCenterPanel.includes("href={hrefWithGateReturn(step.href, gateReturnHref, projectId)}"));
+  assert.ok(platformExportCenterPanel.includes("href={hrefWithGateReturn(knowledgeFeedbackReceipt.href, gateReturnHref, projectId)}"));
+  assert.ok(platformExportCenterPanel.includes("href={hrefWithGateReturn(receipt.href, gateReturnHref, projectId)}"));
+  assert.ok(platformExportCenterPanel.includes("href={hrefWithGateReturn(strategyExecutionReceipt.href, gateReturnHref, projectId)}"));
+  assert.ok(platformExportCenterPanel.includes("href={hrefWithGateReturn(strategyReviewTaskReceipt.href, gateReturnHref, projectId)}"));
+  assert.ok(platformExportCenterPanel.includes("href={hrefWithGateReturn(item.href, gateReturnHref, projectId)}"));
+  assert.ok(platformExportCenterPanel.includes("href={hrefWithGateReturn(actionHref(projectId, nextRepairAction), gateReturnHref, projectId)}"));
+  assert.ok(platformExportCenterPanel.includes("href={hrefWithGateReturn(actionHref(projectId, step), gateReturnHref, projectId)}"));
+  assert.ok(platformExportCenterPanel.includes("href={hrefWithGateReturn(actionHref(projectId, action), gateReturnHref, projectId)}"));
+  assert.ok(platformExportCenterPanel.includes("href={hrefWithGateReturn(selectedPackage.preview.actionHref, gateReturnHref, projectId)}"));
+
+  assert.ok(submissionPackagePanel.includes("gateReturnHref?: string | null"));
+  assert.ok(submissionPackagePanel.includes("function hrefWithGateReturn"));
+  assert.ok(submissionPackagePanel.includes("href={hrefWithGateReturn(task.href, gateReturnHref, projectId)}"));
+  assert.ok(submissionPackagePanel.includes("href={hrefWithGateReturn(variant.decision.actionHref, gateReturnHref, projectId)}"));
+  assert.ok(submissionPackagePanel.includes("href={hrefWithGateReturn(\"#publish-effect-panel\", gateReturnHref, projectId)}"));
+});
+
 test("chapter detail page keeps a gate recheck return path visible", () => {
   const chapterPage = readFileSync("src/app/projects/[projectId]/chapters/[chapterId]/page.tsx", "utf8");
 

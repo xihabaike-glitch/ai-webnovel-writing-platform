@@ -898,6 +898,19 @@ function handoffActionHref(projectId: string, handoff: PlatformPublishExecutionH
   return handoff.actionHref || `/projects/${projectId}`;
 }
 
+function hrefWithGateReturn(href: string, gateReturnHref?: string | null, projectId?: string) {
+  const normalizedHref = gateReturnHref && href.startsWith("#") && projectId ? `/projects/${projectId}${href}` : href;
+  if (!gateReturnHref || !normalizedHref.startsWith("/") || normalizedHref.startsWith("/gate")) return normalizedHref;
+
+  const hashIndex = normalizedHref.indexOf("#");
+  const base = hashIndex >= 0 ? normalizedHref.slice(0, hashIndex) : normalizedHref;
+  const hash = hashIndex >= 0 ? normalizedHref.slice(hashIndex) : "";
+  if (base.includes("gateReturn=")) return normalizedHref;
+  const separator = base.includes("?") ? "&" : "?";
+
+  return `${base}${separator}gateReturn=${encodeURIComponent(gateReturnHref)}${hash}`;
+}
+
 function canRunAction(action: PublishRepairAction) {
   if (action.kind === "adopt_candidate") return Boolean(action.chapterId && action.candidateRevisionId);
   return (action.kind === "run_chapter_review" || action.kind === "run_second_pass") && Boolean(action.chapterId);
@@ -916,12 +929,16 @@ function resultStatusClass(status: PublishRepairRunResult["status"]) {
 }
 
 function RepairNextActionCallout({
+  gateReturnHref,
   nextAction,
   onRunAction,
+  projectId,
   runningActionId,
 }: {
+  gateReturnHref?: string | null;
   nextAction: PublishRepairNextAction;
   onRunAction: (action: PublishRepairAction) => void;
+  projectId?: string;
   runningActionId: string | null;
 }) {
   const executable = nextAction.action && canRunAction(nextAction.action);
@@ -942,7 +959,7 @@ function RepairNextActionCallout({
       ) : nextAction.href ? (
         <Link
           className="mt-3 inline-flex rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white"
-          href={nextAction.href}
+          href={hrefWithGateReturn(nextAction.href, gateReturnHref, projectId)}
         >
           {nextAction.label}
         </Link>
@@ -1606,7 +1623,13 @@ const versionActionFilters: { id: PublishPackageVersionActionFilter; label: stri
   { id: "snapshot", label: "保存" },
 ];
 
-export function PlatformExportCenterPanel({ projectId }: { projectId: string }) {
+export function PlatformExportCenterPanel({
+  gateReturnHref,
+  projectId,
+}: {
+  gateReturnHref?: string | null;
+  projectId: string;
+}) {
   const [center, setCenter] = useState<PlatformPublishExportCenter | null>(null);
   const [selectedPlatformId, setSelectedPlatformId] = useState<string>("");
   const [isLoading, setIsLoading] = useState(false);
@@ -2858,7 +2881,7 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
               {center.platformLaunchQueue.items.slice(0, 4).map((item) => (
                 <a
                   className="rounded-md bg-slate-50 p-3 text-sm hover:bg-slate-100"
-                  href={item.actionHref}
+                  href={hrefWithGateReturn(item.actionHref, gateReturnHref, projectId)}
                   key={`${item.platformId}-${item.actionKind}`}
                 >
                   <div className="flex flex-wrap items-start justify-between gap-2">
@@ -2953,7 +2976,7 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
                   {center.executionHandoffSummary.primaryAction ? (
                     <Link
                       className="w-fit rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white"
-                      href={handoffActionHref(projectId, center.executionHandoffSummary.primaryAction)}
+                      href={hrefWithGateReturn(handoffActionHref(projectId, center.executionHandoffSummary.primaryAction), gateReturnHref, projectId)}
                     >
                       {center.executionHandoffSummary.primaryAction.actionLabel}
                     </Link>
@@ -3002,7 +3025,7 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
                       <div>{item.currentAction}</div>
                       <Link
                         className="mt-2 inline-flex w-fit rounded-md bg-slate-950 px-2 py-1 text-[11px] font-medium text-white"
-                        href={handoffActionHref(projectId, item)}
+                        href={hrefWithGateReturn(handoffActionHref(projectId, item), gateReturnHref, projectId)}
                       >
                         {item.actionLabel}
                       </Link>
@@ -3147,7 +3170,7 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
                       <div className="font-medium text-cyan-950">{item.feedbackLoop.actionLabel}</div>
                       <div className="mt-1 leading-5 text-cyan-800">{item.feedbackLoop.headline}</div>
                       <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
-                        <a className="text-cyan-700 hover:text-cyan-900" href={item.feedbackLoop.nextStepHref}>
+                        <a className="text-cyan-700 hover:text-cyan-900" href={hrefWithGateReturn(item.feedbackLoop.nextStepHref, gateReturnHref, projectId)}>
                           下一步：{item.feedbackLoop.nextStepLabel}
                         </a>
                         <button
@@ -3172,7 +3195,7 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
                           {item.applications.map((application) => (
                             <a
                               className="block rounded-md border border-slate-100 bg-slate-50 p-2 hover:bg-slate-100"
-                              href={application.href}
+                              href={hrefWithGateReturn(application.href, gateReturnHref, projectId)}
                               key={`${item.platformId}-${application.area}`}
                             >
                               <div className="flex flex-wrap items-center justify-between gap-2">
@@ -3389,7 +3412,7 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
                             {item.reviewDecision.evidenceLedger.entries.slice(0, 3).map((entry) => (
                               <a
                                 className="block rounded-md bg-slate-50 p-2 hover:bg-slate-100"
-                                href={entry.href}
+                                href={hrefWithGateReturn(entry.href, gateReturnHref, projectId)}
                                 key={entry.id}
                               >
                                 <div className="flex flex-wrap items-center justify-between gap-2">
@@ -3418,7 +3441,7 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
                             {item.reviewDecision.history.slice(0, 3).map((history) => (
                               <a
                                 className="block rounded-md bg-slate-50 p-2 hover:bg-slate-100"
-                                href={history.href}
+                                href={hrefWithGateReturn(history.href, gateReturnHref, projectId)}
                                 key={history.id}
                               >
                                 <div className="flex flex-wrap items-center justify-between gap-2">
@@ -3516,7 +3539,7 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
                         {strategySwitchPlan.progress.status === "complete" ? (
                           <a
                             className="mt-3 inline-flex w-fit rounded-md bg-emerald-700 px-3 py-2 text-xs font-medium text-white hover:bg-emerald-800"
-                            href={strategySwitchPlan.progress.actionHref}
+                            href={hrefWithGateReturn(strategySwitchPlan.progress.actionHref, gateReturnHref, projectId)}
                           >
                             {strategySwitchPlan.progress.actionLabel}
                           </a>
@@ -3545,7 +3568,7 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
                     {strategySwitchPlan.steps.map((step) => (
                       <a
                         className="rounded-md bg-white p-3 text-sm hover:bg-cyan-100"
-                        href={step.href}
+                        href={hrefWithGateReturn(step.href, gateReturnHref, projectId)}
                         key={step.id}
                       >
                         <div className="flex flex-wrap items-center justify-between gap-2">
@@ -3587,7 +3610,7 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
                         </div>
                         <a
                           className="w-fit rounded-md bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
-                          href={knowledgeFeedbackReceipt.href}
+                          href={hrefWithGateReturn(knowledgeFeedbackReceipt.href, gateReturnHref, projectId)}
                         >
                           去处理
                         </a>
@@ -3625,7 +3648,7 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
                         {knowledgeFeedbackHistory.slice(0, 4).map((receipt) => (
                           <a
                             className="block rounded-md bg-slate-50 p-2 hover:bg-slate-100"
-                            href={receipt.href}
+                            href={hrefWithGateReturn(receipt.href, gateReturnHref, projectId)}
                             key={receipt.id}
                             onClick={() => setKnowledgeFeedbackReceipt(receipt)}
                           >
@@ -3662,7 +3685,7 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
                         </div>
                         <a
                           className="w-fit rounded-md bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
-                          href={strategyExecutionReceipt.href}
+                          href={hrefWithGateReturn(strategyExecutionReceipt.href, gateReturnHref, projectId)}
                         >
                           去处理
                         </a>
@@ -3724,7 +3747,7 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
                         </div>
                         <a
                           className="w-fit rounded-md bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
-                          href={strategyReviewTaskReceipt.href}
+                          href={hrefWithGateReturn(strategyReviewTaskReceipt.href, gateReturnHref, projectId)}
                         >
                           去查看
                         </a>
@@ -3784,11 +3807,13 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
               </div>
               <a
                 className="w-fit rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white"
-                href={
+                href={hrefWithGateReturn(
                   selectedPackage.finalGate.status === "ready_to_submit"
                     ? "#package-version-history"
-                    : selectedPackage.finalGate.items.find((item) => item.status !== "pass")?.href ?? "#platform-export"
-                }
+                    : selectedPackage.finalGate.items.find((item) => item.status !== "pass")?.href ?? "#platform-export",
+                  gateReturnHref,
+                  projectId,
+                )}
               >
                 {selectedPackage.finalGate.nextAction}
               </a>
@@ -3804,7 +3829,7 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
                   </div>
                   <p className="mt-2 leading-5 text-slate-600">{item.detail}</p>
                   {item.status !== "pass" ? (
-                    <a className="mt-2 inline-flex text-xs font-medium text-slate-950 underline" href={item.href}>
+                    <a className="mt-2 inline-flex text-xs font-medium text-slate-950 underline" href={hrefWithGateReturn(item.href, gateReturnHref, projectId)}>
                       {item.actionLabel}
                     </a>
                   ) : null}
@@ -3853,7 +3878,7 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
                   ) : (
                     <Link
                       className="w-fit rounded-md border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
-                      href={actionHref(projectId, nextRepairAction)}
+                      href={hrefWithGateReturn(actionHref(projectId, nextRepairAction), gateReturnHref, projectId)}
                     >
                       打开首要位置
                     </Link>
@@ -4017,7 +4042,7 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
                                     ? "bg-slate-950 text-white"
                                     : "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
                                 }`}
-                                href={actionHref(projectId, step)}
+                                href={hrefWithGateReturn(actionHref(projectId, step), gateReturnHref, projectId)}
                               >
                                 {step.status === "active" ? "打开处理" : "打开位置"}
                               </Link>
@@ -4105,7 +4130,7 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
                         ) : null}
                         <Link
                           className="rounded-md border border-slate-200 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
-                          href={actionHref(projectId, action)}
+                          href={hrefWithGateReturn(actionHref(projectId, action), gateReturnHref, projectId)}
                         >
                           打开位置
                         </Link>
@@ -5073,7 +5098,7 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
               </div>
               <a
                 className="w-fit rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-                href={selectedPackage.preview.actionHref}
+                href={hrefWithGateReturn(selectedPackage.preview.actionHref, gateReturnHref, projectId)}
               >
                 跳到动作
               </a>
@@ -5155,7 +5180,7 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
                       ) : (
                         <Link
                           className="rounded-md border border-slate-200 px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50"
-                          href={actionHref(projectId, action)}
+                          href={hrefWithGateReturn(actionHref(projectId, action), gateReturnHref, projectId)}
                           key={action.id}
                         >
                           {action.label}

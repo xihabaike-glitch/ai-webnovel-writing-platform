@@ -44,6 +44,10 @@ test("gate page carries action recheck return paths into gate item links", () =>
   assert.ok(source.includes("href={hrefWithGateReturn(item.href, gateRecheckReturnHref)}"));
 });
 
+test("gate page carries action recheck return paths into failure repair links", () => {
+  assert.ok(source.includes("href={hrefWithGateReturn(gate.failureRepairBatch.primaryActionHref, gateRecheckReturnHref)}"));
+});
+
 test("gate page renders project acceptance sheet blockers", () => {
   assert.ok(source.includes("项目验收单联动"));
   assert.ok(source.includes("gate.projectStatuses.filter((project) => project.acceptanceSheetGate.status !== \"pass\")"));

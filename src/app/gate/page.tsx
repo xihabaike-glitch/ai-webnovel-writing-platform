@@ -444,7 +444,7 @@ export default async function GatePage({
             <h2 className="font-medium">失败修复批次</h2>
             <p className="mt-1 text-sm leading-6">{gate.failureRepairBatch.title}：{gate.failureRepairBatch.detail}</p>
           </div>
-          <Link className="w-fit rounded-md bg-slate-950 px-4 py-2 text-sm font-medium text-white" href={gate.failureRepairBatch.primaryActionHref}>
+          <Link className="w-fit rounded-md bg-slate-950 px-4 py-2 text-sm font-medium text-white" href={hrefWithGateReturn(gate.failureRepairBatch.primaryActionHref, gateRecheckReturnHref)}>
             {gate.failureRepairBatch.primaryActionLabel}
           </Link>
         </div>

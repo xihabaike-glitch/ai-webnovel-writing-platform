@@ -95,6 +95,16 @@ function pmFocusBadgeClass(tone: "blocked" | "watch" | "ready") {
   return "bg-rose-100 text-rose-950";
 }
 
+function gateReturnFromParam(value: string | string[] | undefined) {
+  const raw = Array.isArray(value) ? value[0] : value;
+
+  if (!raw?.startsWith("/gate?focus=action-recheck")) {
+    return null;
+  }
+
+  return raw;
+}
+
 function toPersistedDispatch(task: {
   id: string;
   dispatchKey: string;
@@ -166,7 +176,13 @@ function groupList(groups: Array<{ id: string; label: string; count: number; per
   );
 }
 
-export default async function FailuresPage() {
+export default async function FailuresPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ gateReturn?: string | string[] }>;
+}) {
+  const query = await searchParams;
+  const gateReturn = gateReturnFromParam(query?.gateReturn);
   const [projects, tasks, chapters, receiptAudits, recheckDispatchRecords, recentRecommendedBatchAudits] = await Promise.all([
     prisma.project.findMany({
       include: {
@@ -341,6 +357,20 @@ export default async function FailuresPage() {
         <h1 className="text-2xl font-semibold">失败任务复盘</h1>
         <p className="mt-1 text-sm text-slate-600">按错误原因、模型、任务类型和项目聚合失败，先修配置和提示词，再重试。</p>
       </div>
+
+      {gateReturn ? (
+        <section className="mb-6 rounded-md border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <div className="font-medium">来自总闸门复检</div>
+              <p className="mt-1 leading-5">先处理失败复盘里的配置、重试或人工修复项，处理后回总闸门确认剩余卡点是否减少。</p>
+            </div>
+            <Link className="w-fit rounded-md bg-white px-3 py-2 text-sm font-medium text-amber-950 hover:bg-amber-100" href={gateReturn}>
+              回总闸门复检
+            </Link>
+          </div>
+        </section>
+      ) : null}
 
       <section className="mb-6 grid gap-3 md:grid-cols-3 lg:grid-cols-7">
         <div className="rounded-md border border-slate-200 bg-white p-3">

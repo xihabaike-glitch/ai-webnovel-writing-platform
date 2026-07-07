@@ -16,6 +16,8 @@ export interface TaskQueueExecutionPlan {
   scaleGate: QueueScaleGate;
   adoptionFollowupCount: number;
   adoptionFollowupItemIds: string[];
+  platformStrategyCount: number;
+  platformStrategyItemIds: string[];
   actionLabel: string;
   detail: string;
   batchModeLabel: string;
@@ -103,6 +105,8 @@ export function buildTaskQueueExecutionPlan(
       scaleGate: "none",
       adoptionFollowupCount: 0,
       adoptionFollowupItemIds: [],
+      platformStrategyCount: 0,
+      platformStrategyItemIds: [],
       actionLabel: firstBlocker ? `先处理${firstBlocker.chapterTitle}` : "暂无可执行批次",
       detail: firstBlocker?.evidence ?? "当前队列没有可直接运行的初稿、审稿或二改任务。",
       batchModeLabel: "暂无批次",
@@ -126,6 +130,11 @@ export function buildTaskQueueExecutionPlan(
   const projectTitles = [...new Set(batch.map((item) => item.projectTitle))];
   const adoptionFollowupItemIds = batch.filter((item) => item.sourceType === "first_three_adoption").map((item) => item.id);
   const adoptionFollowupCount = adoptionFollowupItemIds.length;
+  const platformStrategyItems = batch.filter((item) => item.sourceType === "platform_strategy");
+  const platformStrategyItemIds = platformStrategyItems.map((item) => item.id);
+  const platformStrategyUnlockWarnings = platformStrategyItems
+    .map((item) => item.sourceNextStep ? `本批包含平台策略任务「${item.actionLabel}」；${item.sourceNextStep}` : null)
+    .filter((warning): warning is string => Boolean(warning));
   const strategyBases = [
     ...new Map(
       batch
@@ -148,11 +157,15 @@ export function buildTaskQueueExecutionPlan(
     scaleGate: first.scaleGate,
     adoptionFollowupCount,
     adoptionFollowupItemIds,
+    platformStrategyCount: platformStrategyItemIds.length,
+    platformStrategyItemIds,
     actionLabel: `${categoryActionLabel(first.category)} ${batch.length} 个`,
     detail: `${projectTitles.join("、")} · ${first.label} · ${batch.map((item) => item.chapterTitle).join("、")}`,
     ...batchMode,
     warnings: [
       adoptionFollowupCount > 0 ? adoptionFollowupBatchWarning(adoptionFollowupCount) : null,
+      platformStrategyItemIds.length > 0 ? `本批包含 ${platformStrategyItemIds.length} 个平台策略任务；执行后不要停在生成结果，必须继续处理对应采纳、质检或效果回收。` : null,
+      ...platformStrategyUnlockWarnings,
       scaleWarningFromStrategyBases(strategyBases),
       first.scaleGate === "sample_only" ? "当前处于观察小样本闸门，只运行 1 个样本；验收依据写清通过线、不可接受项、复查证据和放量结论后才允许批量生成。" : null,
       first.scaleGate === "cleared" ? "小样本验收已过线，本批属于恢复放量；先保持同一平台打法和小批次节奏，别一次拉满。" : null,

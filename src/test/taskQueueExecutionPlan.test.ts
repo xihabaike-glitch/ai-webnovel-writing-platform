@@ -83,6 +83,34 @@ test("buildTaskQueueExecutionPlan", async (t) => {
     assert.ok(plan.warnings.some((warning) => warning.includes("回总闸门复检")));
   });
 
+  await t.test("warns when platform strategy tasks enter the recommended batch", () => {
+    const plan = buildTaskQueueExecutionPlan([
+      queueItem({
+        id: "project-1:platform-strategy:fanqie:rewrite-first-three",
+        category: "second_pass",
+        projectId: "project-1",
+        projectTitle: "项目一",
+        chapterTitle: "主平台策略执行链",
+        sourceType: "platform_strategy",
+        sourceLabel: "平台策略",
+        sourceNextStep: "解锁前三章候选采纳：生成改写候选后，先采纳并回发布质检确认样章能投。",
+        actionLabel: "重写前三章",
+      }),
+      queueItem({
+        id: "project-1:second-pass:chapter-2",
+        category: "second_pass",
+        projectId: "project-1",
+        projectTitle: "项目一",
+        chapterTitle: "第二章",
+      }),
+    ]);
+
+    assert.equal(plan.platformStrategyCount, 1);
+    assert.deepEqual(plan.platformStrategyItemIds, ["project-1:platform-strategy:fanqie:rewrite-first-three"]);
+    assert.ok(plan.warnings.some((warning) => warning.includes("平台策略任务")));
+    assert.ok(plan.warnings.some((warning) => warning.includes("解锁前三章候选采纳")));
+  });
+
   await t.test("returns a blocked plan when there are no executable items", () => {
     const plan = buildTaskQueueExecutionPlan([
       queueItem({ id: "project-1:blocked:chapter-1", category: "blocked", projectId: "project-1", projectTitle: "项目一", chapterTitle: "第一章" }),

@@ -1965,7 +1965,7 @@ export function ModelProviderSettings({
                           <span className="rounded-md bg-white px-2 py-1">{governanceStatus.latestAt.slice(0, 10)}</span>
                         ) : null}
                         {governanceStatus.status === "assigned" ? (
-                          <Link className="rounded-md bg-white px-2 py-1 font-medium text-sky-700 hover:bg-sky-50" href="/dispatch">
+                          <Link className="rounded-md bg-white px-2 py-1 font-medium text-sky-700 hover:bg-sky-50" href={hrefWithGateReturn("/dispatch", gateReturnHref)}>
                             {governanceStatus.actionLabel}
                           </Link>
                         ) : (
@@ -2544,7 +2544,7 @@ export function ModelProviderSettings({
             {modelSetupOnboarding.currentStep.action === "open_projects" ? (
               <Link
                 className="rounded-md bg-slate-950 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800"
-                href="/projects"
+                href={hrefWithGateReturn("/projects", gateReturnHref)}
               >
                 {modelSetupOnboarding.currentStep.actionLabel}
               </Link>

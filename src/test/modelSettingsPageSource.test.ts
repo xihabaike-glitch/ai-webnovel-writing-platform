@@ -23,5 +23,7 @@ test("model settings page carries gate return through model routing links", () =
   assert.ok(settingsSource.includes("href={hrefWithGateReturn(modelRoleMatrixPmFocusNotice.pipelineActionHref, gateReturnHref)}"));
   assert.ok(settingsSource.includes("href={hrefWithGateReturn(routeNotice.href, gateReturnHref)}"));
   assert.ok(settingsSource.includes("href={hrefWithGateReturn(governanceStatus.nextRecheck.href, gateReturnHref)}"));
+  assert.ok(settingsSource.includes("href={hrefWithGateReturn(\"/dispatch\", gateReturnHref)}"));
   assert.ok(settingsSource.includes("href={hrefWithGateReturn(providerSetupNotice.href, gateReturnHref)}"));
+  assert.ok(settingsSource.includes("href={hrefWithGateReturn(\"/projects\", gateReturnHref)}"));
 });

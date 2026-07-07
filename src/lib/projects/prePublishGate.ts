@@ -475,6 +475,20 @@ export interface PrePublishGateInput {
   batchStrategyId?: BatchExecutionStrategyId | string;
 }
 
+function prePublishGateActionMatchesProject(action: PrePublishGateAction, projectId: string) {
+  if (action.id.endsWith(`:${projectId}`) || action.href.includes(`/projects/${projectId}`) || action.href.includes(`firstDayProject=${projectId}`)) {
+    return true;
+  }
+
+  if (action.execution?.type === "publish_repair") return action.execution.projectId === projectId;
+  if (action.execution?.type === "first_three_adoption") {
+    const execution = action.execution.execution;
+    return execution.type === "publish_check" && execution.projectId === projectId;
+  }
+
+  return false;
+}
+
 function clampScore(score: number) {
   return Math.max(0, Math.min(100, Math.round(score)));
 }
@@ -1479,11 +1493,17 @@ export function buildPrePublishGateFocusNotice(input: {
   const taskQueueItem = input.gate.items.find((item) => item.id === "task-queue") ?? null;
   const firstDayStillBlocked = taskQueueItem?.status === "block"
     && /首日|观察闸门|交接证据/u.test(taskQueueItem.detail);
-  const primary = input.gate.releaseAction ?? input.gate.priorityActions[0] ?? null;
-  const smallBatchAction = input.gate.priorityActions.find((action) => action.execution?.type === "recommended_batch") ?? null;
   const targetProject = input.projectId
     ? input.gate.projectStatuses.find((project) => project.projectId === input.projectId) ?? null
     : null;
+  const targetProjectAction = input.projectId
+    ? input.gate.priorityActions.find((action) => prePublishGateActionMatchesProject(action, input.projectId ?? "")) ?? null
+    : null;
+  const focusedProjectAction = input.gate.status === "ready" ? null : targetProjectAction;
+  const primary = focusedProjectAction ?? input.gate.releaseAction ?? input.gate.priorityActions[0] ?? null;
+  const smallBatchAction = focusedProjectAction
+    ? null
+    : input.gate.priorityActions.find((action) => action.execution?.type === "recommended_batch") ?? null;
   const targetLead = targetProject ? `${targetProject.projectTitle} · ` : "";
   const targetBadges = targetProject ? [`作品：${targetProject.projectTitle}`] : [];
 

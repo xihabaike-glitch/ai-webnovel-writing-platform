@@ -251,6 +251,55 @@ test("buildPrePublishGate", async (t) => {
     assert.ok(notice.badges.includes("一键小批生产"));
   });
 
+  await t.test("focuses first-day completion on the target project's own next action", () => {
+    const gate = buildPrePublishGate({
+      projects: [readyProject],
+      failureTasks: [],
+      batchHistory: [],
+    });
+    const globalAction = {
+      id: "repair:other-project",
+      label: "修其他作品",
+      detail: "别的作品 · 这个动作不该劫持当前作品。",
+      href: "/projects/other-project#platform-export",
+      tone: "repair" as const,
+      execution: {
+        type: "publish_repair" as const,
+        projectId: "other-project",
+        kind: "run_second_pass" as const,
+        detail: "别的作品需要二改。",
+      },
+    };
+    const targetAction = {
+      id: "repair:project-ready",
+      label: "修夜雨系统发布包",
+      detail: "夜雨系统 · 先修当前作品的发布包。",
+      href: "/projects/project-ready#platform-export",
+      tone: "repair" as const,
+      execution: {
+        type: "publish_repair" as const,
+        projectId: "project-ready",
+        kind: "open_submission_package" as const,
+        detail: "夜雨系统需要补发布包。",
+      },
+    };
+    const notice = buildPrePublishGateFocusNotice({
+      focus: "first-day-complete",
+      projectId: "project-ready",
+      gate: {
+        ...gate,
+        status: "needs_repair",
+        priorityActions: [globalAction, targetAction],
+        releaseAction: globalAction,
+      },
+    });
+
+    assert.equal(notice.primaryLabel, "修夜雨系统发布包");
+    assert.equal(notice.primaryHref, "/projects/project-ready#platform-export");
+    assert.ok(notice.detail.includes("夜雨系统"));
+    assert.equal(notice.detail.includes("别的作品"), false);
+  });
+
   await t.test("blocks launch when first-day handoff evidence is missing", () => {
     const gate = buildPrePublishGate({
       projects: [handoffBlockedProject],

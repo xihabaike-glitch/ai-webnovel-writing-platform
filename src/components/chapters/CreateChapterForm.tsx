@@ -3,7 +3,25 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-export function CreateChapterForm({ projectId }: { projectId: string }) {
+function hrefWithGateReturn(href: string, gateReturnHref?: string | null) {
+  if (!gateReturnHref || !href.startsWith("/") || href.startsWith("/gate")) return href;
+
+  const hashIndex = href.indexOf("#");
+  const base = hashIndex >= 0 ? href.slice(0, hashIndex) : href;
+  const hash = hashIndex >= 0 ? href.slice(hashIndex) : "";
+  if (base.includes("gateReturn=")) return href;
+  const separator = base.includes("?") ? "&" : "?";
+
+  return `${base}${separator}gateReturn=${encodeURIComponent(gateReturnHref)}${hash}`;
+}
+
+export function CreateChapterForm({
+  gateReturnHref,
+  projectId,
+}: {
+  gateReturnHref?: string | null;
+  projectId: string;
+}) {
   const router = useRouter();
   const [title, setTitle] = useState("新章节");
   const [error, setError] = useState<string | null>(null);
@@ -26,7 +44,7 @@ export function CreateChapterForm({ projectId }: { projectId: string }) {
       }
 
       const payload = (await response.json()) as { chapter: { id: string } };
-      router.push(`/projects/${projectId}/chapters/${payload.chapter.id}`);
+      router.push(hrefWithGateReturn(`/projects/${projectId}/chapters/${payload.chapter.id}`, gateReturnHref));
       router.refresh();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "创建章节失败。");
@@ -59,4 +77,3 @@ export function CreateChapterForm({ projectId }: { projectId: string }) {
     </form>
   );
 }
-

@@ -48,11 +48,25 @@ function buildChildrenMap(nodes: OutlineNodeView[]) {
   return map;
 }
 
+function hrefWithGateReturn(href: string, gateReturnHref?: string | null) {
+  if (!gateReturnHref || !href.startsWith("/") || href.startsWith("/gate")) return href;
+
+  const hashIndex = href.indexOf("#");
+  const base = hashIndex >= 0 ? href.slice(0, hashIndex) : href;
+  const hash = hashIndex >= 0 ? href.slice(hashIndex) : "";
+  if (base.includes("gateReturn=")) return href;
+  const separator = base.includes("?") ? "&" : "?";
+
+  return `${base}${separator}gateReturn=${encodeURIComponent(gateReturnHref)}${hash}`;
+}
+
 function OutlineBranch({
+  gateReturnHref,
   node,
   childrenMap,
   projectId,
 }: {
+  gateReturnHref?: string | null;
   node: OutlineNodeView;
   childrenMap: Map<string, OutlineNodeView[]>;
   projectId: string;
@@ -119,7 +133,7 @@ function OutlineBranch({
       }
 
       const payload = (await response.json()) as { chapter: { id: string } };
-      router.push(`/projects/${projectId}/chapters/${payload.chapter.id}`);
+      router.push(hrefWithGateReturn(`/projects/${projectId}/chapters/${payload.chapter.id}`, gateReturnHref));
       router.refresh();
     } catch (caught) {
       setMessage(caught instanceof Error ? caught.message : "生成章节卡失败。");
@@ -265,7 +279,7 @@ function OutlineBranch({
               {node.chapterId ? (
                 <button
                   className="rounded-md bg-slate-100 px-3 py-2 text-xs font-medium hover:bg-slate-200"
-                  onClick={() => router.push(`/projects/${projectId}/chapters/${node.chapterId}`)}
+                  onClick={() => router.push(hrefWithGateReturn(`/projects/${projectId}/chapters/${node.chapterId}`, gateReturnHref))}
                   type="button"
                 >
                   打开章节
@@ -288,7 +302,7 @@ function OutlineBranch({
       {children.length > 0 ? (
         <ol className="ml-2">
           {children.map((child) => (
-            <OutlineBranch childrenMap={childrenMap} key={child.id} node={child} projectId={projectId} />
+            <OutlineBranch childrenMap={childrenMap} gateReturnHref={gateReturnHref} key={child.id} node={child} projectId={projectId} />
           ))}
         </ol>
       ) : null}
@@ -297,9 +311,11 @@ function OutlineBranch({
 }
 
 export function OutlineTreePanel({
+  gateReturnHref,
   projectId,
   nodes,
 }: {
+  gateReturnHref?: string | null;
   projectId: string;
   nodes: OutlineNodeView[];
 }) {
@@ -351,7 +367,7 @@ export function OutlineTreePanel({
       {roots.length > 0 ? (
         <ol className="mt-4 grid gap-1">
           {roots.map((node) => (
-            <OutlineBranch childrenMap={childrenMap} key={node.id} node={node} projectId={projectId} />
+            <OutlineBranch childrenMap={childrenMap} gateReturnHref={gateReturnHref} key={node.id} node={node} projectId={projectId} />
           ))}
         </ol>
       ) : (

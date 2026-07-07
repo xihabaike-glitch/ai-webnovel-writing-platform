@@ -146,7 +146,31 @@ function decisionActionLabel(decision: FirstThreeRewriteDecision) {
   return "采纳候选稿";
 }
 
-export function FirstThreeRewritePanel({ projectId }: { projectId: string }) {
+function hrefWithGateReturn(href: string, gateReturnHref?: string | null) {
+  if (!gateReturnHref || !href.startsWith("/") || href.startsWith("/gate")) return href;
+
+  const hashIndex = href.indexOf("#");
+  const base = hashIndex >= 0 ? href.slice(0, hashIndex) : href;
+  const hash = hashIndex >= 0 ? href.slice(hashIndex) : "";
+  if (base.includes("gateReturn=")) return href;
+  const separator = base.includes("?") ? "&" : "?";
+
+  return `${base}${separator}gateReturn=${encodeURIComponent(gateReturnHref)}${hash}`;
+}
+
+function firstThreeDecisionHref(projectId: string, result: GeneratedRewriteResult) {
+  if (result.evaluation?.decision.action === "keep") return `/projects/${projectId}#platform-export`;
+  if (result.evaluation?.decision.action === "second_pass") return `/projects/${projectId}/chapters/${result.chapter.id}#chapter-second-pass`;
+  return `/projects/${projectId}/chapters/${result.chapter.id}#chapter-revisions`;
+}
+
+export function FirstThreeRewritePanel({
+  gateReturnHref,
+  projectId,
+}: {
+  gateReturnHref?: string | null;
+  projectId: string;
+}) {
   const router = useRouter();
   const [rewritePackage, setRewritePackage] = useState<FirstThreeRewritePackage | null>(null);
   const [generatedResults, setGeneratedResults] = useState<GeneratedRewriteResult[]>([]);
@@ -230,7 +254,7 @@ export function FirstThreeRewritePanel({ projectId }: { projectId: string }) {
 
   async function adoptCandidateRevision(result: GeneratedRewriteResult) {
     if (!result.candidateRevisionId) {
-      window.location.href = `/projects/${projectId}/chapters/${result.chapter.id}#chapter-revisions`;
+      window.location.href = hrefWithGateReturn(`/projects/${projectId}/chapters/${result.chapter.id}#chapter-revisions`, gateReturnHref);
       throw new Error("没有拿到可自动采纳的候选稿，已带你去版本台手动处理。");
     }
     const response = await fetch(`/api/chapters/${result.chapter.id}/revisions/${result.candidateRevisionId}/adopt`, {
@@ -248,7 +272,7 @@ export function FirstThreeRewritePanel({ projectId }: { projectId: string }) {
     try {
       if (decision.action === "keep") {
         await adoptCandidateRevision(result);
-        window.location.href = `/projects/${projectId}#platform-export`;
+        window.location.href = hrefWithGateReturn(`/projects/${projectId}#platform-export`, gateReturnHref);
         setMessage("已采纳候选稿，并定位到发布质检。");
         return;
       }
@@ -276,7 +300,7 @@ export function FirstThreeRewritePanel({ projectId }: { projectId: string }) {
         return;
       }
 
-      window.location.href = `/projects/${projectId}/chapters/${result.chapter.id}#chapter-revisions`;
+      window.location.href = hrefWithGateReturn(`/projects/${projectId}/chapters/${result.chapter.id}#chapter-revisions`, gateReturnHref);
       setMessage(`已保留当前正文；第 ${result.order} 章候选稿未采纳，可在版本台查看。`);
     } catch (caught) {
       setMessage(caught instanceof Error ? caught.message : "执行决策动作失败。");
@@ -413,7 +437,7 @@ export function FirstThreeRewritePanel({ projectId }: { projectId: string }) {
                       </div>
                       <Link
                         className="text-xs font-medium text-slate-950 underline"
-                        href={`/projects/${projectId}/chapters/${result.chapter.id}`}
+                        href={hrefWithGateReturn(`/projects/${projectId}/chapters/${result.chapter.id}`, gateReturnHref)}
                       >
                         打开
                       </Link>
@@ -484,13 +508,7 @@ export function FirstThreeRewritePanel({ projectId }: { projectId: string }) {
                             </button>
                             <Link
                               className="rounded-md border border-slate-200 px-3 py-2 font-medium text-slate-700 hover:bg-slate-50"
-                              href={
-                                result.evaluation.decision.action === "keep"
-                                  ? `/projects/${projectId}#platform-export`
-                                  : result.evaluation.decision.action === "second_pass"
-                                    ? `/projects/${projectId}/chapters/${result.chapter.id}#chapter-second-pass`
-                                    : `/projects/${projectId}/chapters/${result.chapter.id}#chapter-revisions`
-                              }
+                              href={hrefWithGateReturn(firstThreeDecisionHref(projectId, result), gateReturnHref)}
                             >
                               打开工作台
                             </Link>

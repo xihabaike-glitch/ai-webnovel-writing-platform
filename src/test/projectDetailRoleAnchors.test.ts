@@ -169,6 +169,34 @@ test("project detail page carries gate return through chapter production links",
   assert.ok(chapterProductionPanel.includes("href={hrefWithGateReturn(`/projects/${projectId}/chapters/${item.chapterId}`, gateReturnHref)}"));
 });
 
+test("project detail page carries gate return through chapter creation jumps", () => {
+  const projectPage = readFileSync("src/app/projects/[projectId]/page.tsx", "utf8");
+  const outlineTreePanel = readFileSync("src/components/outlines/OutlineTreePanel.tsx", "utf8");
+  const createChapterForm = readFileSync("src/components/chapters/CreateChapterForm.tsx", "utf8");
+  const firstThreeRewritePanel = readFileSync("src/components/projects/FirstThreeRewritePanel.tsx", "utf8");
+
+  assert.ok(projectPage.includes("<OutlineTreePanel gateReturnHref={gateReturn} projectId={project.id} nodes={outlineNodes} />"));
+  assert.ok(projectPage.includes("<CreateChapterForm gateReturnHref={gateReturn} projectId={project.id} />"));
+  assert.ok(projectPage.includes("<FirstThreeRewritePanel gateReturnHref={gateReturn} projectId={project.id} />"));
+
+  assert.ok(outlineTreePanel.includes("gateReturnHref?: string | null"));
+  assert.ok(outlineTreePanel.includes("function hrefWithGateReturn"));
+  assert.ok(outlineTreePanel.includes("router.push(hrefWithGateReturn(`/projects/${projectId}/chapters/${payload.chapter.id}`, gateReturnHref));"));
+  assert.ok(outlineTreePanel.includes("router.push(hrefWithGateReturn(`/projects/${projectId}/chapters/${node.chapterId}`, gateReturnHref))"));
+  assert.ok(outlineTreePanel.includes("<OutlineBranch childrenMap={childrenMap} gateReturnHref={gateReturnHref} key={child.id} node={child} projectId={projectId} />"));
+
+  assert.ok(createChapterForm.includes("gateReturnHref?: string | null"));
+  assert.ok(createChapterForm.includes("function hrefWithGateReturn"));
+  assert.ok(createChapterForm.includes("router.push(hrefWithGateReturn(`/projects/${projectId}/chapters/${payload.chapter.id}`, gateReturnHref));"));
+
+  assert.ok(firstThreeRewritePanel.includes("gateReturnHref?: string | null"));
+  assert.ok(firstThreeRewritePanel.includes("function hrefWithGateReturn"));
+  assert.ok(firstThreeRewritePanel.includes("window.location.href = hrefWithGateReturn(`/projects/${projectId}/chapters/${result.chapter.id}#chapter-revisions`, gateReturnHref);"));
+  assert.ok(firstThreeRewritePanel.includes("window.location.href = hrefWithGateReturn(`/projects/${projectId}#platform-export`, gateReturnHref);"));
+  assert.ok(firstThreeRewritePanel.includes("href={hrefWithGateReturn(`/projects/${projectId}/chapters/${result.chapter.id}`, gateReturnHref)}"));
+  assert.ok(firstThreeRewritePanel.includes("href={hrefWithGateReturn(firstThreeDecisionHref(projectId, result), gateReturnHref)}"));
+});
+
 test("project detail page carries gate return through story experience and serialization links", () => {
   const projectPage = readFileSync("src/app/projects/[projectId]/page.tsx", "utf8");
   const storyTreeExperiencePanel = readFileSync("src/components/projects/StoryTreeExperiencePanel.tsx", "utf8");

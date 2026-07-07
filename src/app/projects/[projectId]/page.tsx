@@ -755,7 +755,7 @@ export default async function ProjectPage({
           </div>
         </section>
         <RetentionDiagnosticPanel projectId={project.id} />
-        <FirstThreeRewritePanel projectId={project.id} />
+        <FirstThreeRewritePanel gateReturnHref={gateReturn} projectId={project.id} />
         <div id="character-arc">
           <CharacterArcPanel projectId={project.id} />
         </div>
@@ -792,7 +792,7 @@ export default async function ProjectPage({
           <SubmissionPackagePanel gateReturnHref={gateReturn} projectId={project.id} submissionPackage={submissionPackage} />
         </div>
         <div id="outline-tree" className="grid gap-4 md:grid-cols-[2fr_1fr]">
-          <OutlineTreePanel projectId={project.id} nodes={outlineNodes} />
+          <OutlineTreePanel gateReturnHref={gateReturn} projectId={project.id} nodes={outlineNodes} />
           <div className="rounded-md border bg-white p-4">
             <div className="font-medium">平台策略</div>
             <p className="mt-2 text-sm text-slate-600">开头：{platform.openingRules.join("；")}</p>
@@ -802,7 +802,7 @@ export default async function ProjectPage({
         </div>
         <div className="grid gap-4 md:grid-cols-[1fr_360px]">
           <div id="create-chapter">
-            <CreateChapterForm projectId={project.id} />
+            <CreateChapterForm gateReturnHref={gateReturn} projectId={project.id} />
           </div>
           <div className="rounded-md border border-slate-200 bg-white p-4">
             <div className="mb-3 flex items-start justify-between gap-3">

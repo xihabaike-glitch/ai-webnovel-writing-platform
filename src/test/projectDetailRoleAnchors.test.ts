@@ -136,6 +136,7 @@ test("project detail page carries gate return through platform decision links", 
 
   assert.ok(platformDecisionTimelinePanel.includes("gateReturnHref?: string | null"));
   assert.ok(platformDecisionTimelinePanel.includes("function hrefWithGateReturn"));
+  assert.ok(platformDecisionTimelinePanel.includes("href={gateReturnHref ?? \"/gate\"}"));
   assert.ok(platformDecisionTimelinePanel.includes("href={hrefWithGateReturn(item.href, gateReturnHref)}"));
   assert.ok(platformDecisionTimelinePanel.includes("href={hrefWithGateReturn(event.href, gateReturnHref)}"));
 

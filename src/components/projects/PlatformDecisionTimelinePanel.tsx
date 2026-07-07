@@ -90,7 +90,7 @@ export function PlatformDecisionTimelinePanel({
             当前作品的投稿、效果、派单、返工和复测会在这里串成平台轨迹，先看真实证据，再决定放大、观察或暂停。
           </p>
         </div>
-        <Link className="w-fit rounded-md bg-slate-950 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800" href="/gate">
+        <Link className="w-fit rounded-md bg-slate-950 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800" href={gateReturnHref ?? "/gate"}>
           打开总闸门
         </Link>
       </div>

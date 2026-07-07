@@ -451,8 +451,8 @@ test("buildPrePublishGate", async (t) => {
     assert.equal(notice.recheckSummary?.remainingBlockers[0]?.priorityLabel, "优先处理");
     assert.equal(notice.recheckSummary?.remainingBlockers[0]?.status, "current");
     assert.equal(notice.recheckSummary?.remainingBlockers[0]?.actionLabel, "处理审稿");
-    assert.ok(notice.recheckSummary?.remainingBlockers[0]?.href.startsWith("/projects/project-recheck-blockers?gateReturn="));
-    assert.ok(notice.recheckSummary?.remainingBlockers[0]?.href.endsWith("#ai-pipeline"));
+    assert.ok(notice.recheckSummary?.remainingBlockers[0]?.href.startsWith("/projects?gateReturn="));
+    assert.ok(notice.recheckSummary?.remainingBlockers[0]?.href.endsWith("#pipeline-projects"));
     assert.ok(decodeURIComponent(notice.recheckSummary?.remainingBlockers[0]?.href ?? "").includes("/gate?focus=action-recheck&actionId=project-acceptance:project-recheck-blockers#gate-focus-notice"));
     assert.ok(notice.recheckSummary?.remainingBlockers[0]?.evidence.includes("首章还缺审稿成功记录"));
     assert.ok(notice.recheckSummary?.remainingBlockers.find((item) => item.label === "二改")?.href.includes("gateReturn="));
@@ -508,7 +508,7 @@ test("buildPrePublishGate", async (t) => {
     assert.equal(project.acceptanceSheetGate.repairMode, "executable");
     assert.ok(project.acceptanceSheetGate.executionHint.includes("可一键修复"));
     assert.ok(project.acceptanceSheetGate.detail.includes("二改"));
-    assert.equal(project.acceptanceSheetGate.href, "/projects/project-acceptance-blocked#ai-pipeline");
+    assert.equal(project.acceptanceSheetGate.href, "/projects#pipeline-projects");
     assert.equal(project.nextAction, project.acceptanceSheetGate.actionLabel);
     assert.equal(project.href, project.acceptanceSheetGate.href);
     assert.equal(acceptanceItem?.status, "block");
@@ -516,7 +516,7 @@ test("buildPrePublishGate", async (t) => {
     assert.equal(gate.priorityActions[0].id, "project-acceptance:project-acceptance-blocked");
     assert.equal(gate.priorityActions[0].label, project.acceptanceSheetGate.actionLabel);
     assert.ok(gate.priorityActions[0].detail.includes("可一键修复"));
-    assert.equal(gate.priorityActions[0].href, "/projects/project-acceptance-blocked#ai-pipeline");
+    assert.equal(gate.priorityActions[0].href, "/projects#pipeline-projects");
     assert.equal(gate.priorityActions[0].execution?.type, "publish_repair");
     assert.equal(gate.priorityActions[0].execution?.kind, "run_second_pass");
   });

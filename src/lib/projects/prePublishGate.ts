@@ -1392,6 +1392,7 @@ function acceptanceExecutionHint(mode: PrePublishGateAcceptanceSheetGate["repair
 }
 
 function acceptanceActionHref(projectId: string, stepId: ProjectAcceptanceStep["id"], href: string) {
+  if (href === "#ai-pipeline") return "/projects#pipeline-projects";
   const target = href.startsWith("#") ? `/projects/${projectId}${href}` : href;
   if (stepId !== "dispatch_receipt" || !target.startsWith("/dispatch?") || target.includes("step=")) return target;
   if (target.includes("#")) return target.replace("#", "&step=publish-precheck#");

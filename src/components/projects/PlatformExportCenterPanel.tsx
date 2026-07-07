@@ -1519,7 +1519,7 @@ function buildStrategyExecutionReceipt(
       title: "发布效果已入账",
       message: `${plan.platformName} 的真实数据已经写进策略系统。现在别拍脑袋，排行榜会重新算账。`,
       nextAction: "回到平台策略排行榜，看主战场是否继续加码，还是该换打法。",
-      href: "#platform-export",
+      href: "#platform-strategy-ranking",
       severity: "success",
     };
   }
@@ -1529,8 +1529,8 @@ function buildStrategyExecutionReceipt(
     platformName: plan.platformName,
     title: "主战场已切换",
     message: `${plan.platformName} 已设为当前主战场。`,
-    nextAction: "继续执行链里的下一步。",
-    href: "#platform-export",
+    nextAction: `继续执行链里的下一步：${plan.progress.actionLabel}。`,
+    href: plan.progress.actionHref,
     severity: "success",
   };
 }
@@ -2035,6 +2035,7 @@ export function PlatformExportCenterPanel({
       setVersionDetail(null);
       setVersionActionFilter("all");
       setStrategySwitchPlan(payload.switchPlan);
+      setStrategyExecutionReceipt(buildStrategyExecutionReceipt(payload.switchPlan, "switch-target-platform"));
       setMessage(payload.message ?? `已应用 ${item.platformName} 平台策略。`);
       return await loadCenter({ keepMessage: true });
     } catch (caught) {

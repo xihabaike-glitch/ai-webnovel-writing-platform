@@ -190,6 +190,9 @@ test("project detail page carries gate return through export and submission link
   assert.ok(platformExportCenterPanel.includes("effectReviewStrategyPrompt"));
   assert.ok(platformExportCenterPanel.includes("回到策略裁决"));
   assert.ok(platformExportCenterPanel.includes("href={hrefWithGateReturn(\"#platform-strategy-verdict\", gateReturnHref, projectId)}"));
+  assert.ok(platformExportCenterPanel.includes("setStrategySwitchPlan(payload.switchPlan);\n      setStrategyExecutionReceipt(buildStrategyExecutionReceipt(payload.switchPlan, \"switch-target-platform\"));"));
+  assert.ok(platformExportCenterPanel.includes("nextAction: `继续执行链里的下一步：${plan.progress.actionLabel}。`"));
+  assert.ok(platformExportCenterPanel.includes("href: plan.progress.actionHref"));
   assert.ok(platformExportCenterPanel.includes("function hrefWithGateReturn"));
   assert.ok(platformExportCenterPanel.includes("href={hrefWithGateReturn(item.actionHref, gateReturnHref, projectId)}"));
   assert.ok(platformExportCenterPanel.includes("href={hrefWithGateReturn(handoffActionHref(projectId, center.executionHandoffSummary.primaryAction), gateReturnHref, projectId)}"));

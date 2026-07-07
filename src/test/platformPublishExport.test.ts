@@ -1970,6 +1970,7 @@ test("buildPlatformPublishExportCenter", async (t) => {
     const adoptedReceipt = buildPlatformStrategyExecutionReceipt(plan, "adopt-submission-asset", 1);
     const rewriteReceipt = buildPlatformStrategyExecutionReceipt(plan, "rewrite-first-three", 3);
     const effectReceipt = buildPlatformStrategyExecutionReceipt(plan, "save-publish-effect");
+    const switchReceipt = buildPlatformStrategyExecutionReceipt(plan, "switch-target-platform");
 
     assert.equal(baselineReceipt.href, "#package-version-history");
     assert.equal(baselineReceipt.severity, "success");
@@ -1987,5 +1988,7 @@ test("buildPlatformPublishExportCenter", async (t) => {
     assert.equal(effectReceipt.severity, "success");
     assert.ok(effectReceipt.message.includes("真实数据"));
     assert.ok(effectReceipt.nextAction.includes("排行榜"));
+    assert.equal(switchReceipt.href, plan.progress.actionHref);
+    assert.ok(switchReceipt.nextAction.includes(plan.progress.actionLabel));
   });
 });

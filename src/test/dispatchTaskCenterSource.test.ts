@@ -18,3 +18,10 @@ test("dispatch task center highlights the dispatch targeted by the URL hash", ()
   assert.ok(source.includes("task.dispatchKey === hashFocusedDispatchKey"));
   assert.ok(source.includes("刚生成的派单"));
 });
+
+test("dispatch task center points completed dispatches back to remaining gate blockers", () => {
+  assert.ok(source.includes("buildGateRecheckActionLink"));
+  assert.ok(source.includes("回总闸门复检并查看剩余卡点"));
+  assert.ok(source.includes("查看剩余卡点"));
+  assert.ok(source.includes("buildGateRecheckActionLink(updated.task)"));
+});

@@ -116,6 +116,13 @@ function dispatchGateRecheckHref(task: PersistedGatePlatformDispatchTask) {
   return `/gate?focus=action-recheck&actionId=project-acceptance:${encodeURIComponent(projectId)}#gate-focus-notice`;
 }
 
+function buildGateRecheckActionLink(task: PersistedGatePlatformDispatchTask): RouteActionLink {
+  return {
+    label: "回总闸门复检并查看剩余卡点",
+    href: dispatchGateRecheckHref(task),
+  };
+}
+
 function dispatchKeyFromHash(hash: string) {
   const prefix = "#dispatch-";
   if (!hash.startsWith(prefix)) return "";
@@ -499,16 +506,16 @@ export function GateDispatchTaskCenter({
           router.refresh();
         } else if (startMetricMessage) {
           setRouteActionMessage(`${startMetricMessage}${submissionEffectMessage ? `；${submissionEffectMessage}` : ""}`);
-          setRouteActionLink({ label: "回总闸门复查", href: "/gate" });
+          setRouteActionLink(buildGateRecheckActionLink(updated.task));
         } else if (secondMetricMessage) {
           setRouteActionMessage(`${secondMetricMessage}${submissionEffectMessage ? `；${submissionEffectMessage}` : ""}`);
-          setRouteActionLink({ label: "回总闸门复查", href: "/gate" });
+          setRouteActionLink(buildGateRecheckActionLink(updated.task));
         } else if (startMetricFollowupMessage) {
           setRouteActionMessage(startMetricFollowupMessage);
-          setRouteActionLink({ label: "回总闸门复查", href: "/gate" });
+          setRouteActionLink(buildGateRecheckActionLink(updated.task));
         } else if (secondMetricFollowupMessage) {
           setRouteActionMessage(secondMetricFollowupMessage);
-          setRouteActionLink({ label: "回总闸门复查", href: "/gate" });
+          setRouteActionLink(buildGateRecheckActionLink(updated.task));
         } else if (updated.followUpTasks.length) {
           setRouteActionMessage(`已自动生成治理后复检派单：${updated.followUpTasks.map((item) => item.title).join("、")}${recheckMessage ? `；${recheckMessage}` : ""}${storyTreeMessage ? `；${storyTreeMessage}` : ""}${submissionEffectMessage ? `；${submissionEffectMessage}` : ""}`);
           setRouteActionLink(null);
@@ -525,8 +532,8 @@ export function GateDispatchTaskCenter({
           setRouteActionMessage(submissionEffectMessage);
           setRouteActionLink(null);
         } else if (updated.dispatchCompletionReceipt) {
-          setRouteActionMessage(`已生成业务回执：${updated.dispatchCompletionReceipt.label}。证据复盘会用这条回执判断派单真闭环。`);
-          setRouteActionLink({ label: "回总闸门复查", href: "/gate" });
+          setRouteActionMessage(`已生成业务回执：${updated.dispatchCompletionReceipt.label}。证据复盘会用这条回执判断派单真闭环。回总闸门查看剩余卡点。`);
+          setRouteActionLink(buildGateRecheckActionLink(updated.task));
         } else if (updated.knowledgeFeedbackReceipt) {
           setRouteActionMessage(`已回灌到项目反哺证据：${updated.knowledgeFeedbackReceipt.platformName} · ${updated.knowledgeFeedbackReceipt.completedStepLabel}`);
           setRouteActionLink(null);
@@ -1850,7 +1857,7 @@ export function GateDispatchTaskCenter({
                     ) : null}
                     {task.state === "completed" ? (
                       <Link className="mt-2 inline-flex rounded-md bg-white px-3 py-2 text-xs font-medium text-emerald-900 hover:bg-emerald-100" href={dispatchGateRecheckHref(task)}>
-                        回总闸门复检
+                        回总闸门复检并查看剩余卡点
                       </Link>
                     ) : null}
                   </div>

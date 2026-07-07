@@ -226,6 +226,7 @@ test("buildDevelopmentOverview", async (t) => {
     const roleDispatch = overview.requirementTraceability.items.find((item) => item.id === "role_dispatch");
     const tomatoStyle = overview.requirementTraceability.items.find((item) => item.id === "tomato_style");
     const treeMethod = overview.requirementTraceability.items.find((item) => item.id === "tree_method");
+    const pipelineValidation = overview.requirementTraceability.items.find((item) => item.id === "pipeline_validation");
 
     assert.ok(modelInterfaces?.currentEvidence.includes("Claude"));
     assert.ok(modelInterfaces?.currentEvidence.includes("DeepSeek"));
@@ -241,6 +242,9 @@ test("buildDevelopmentOverview", async (t) => {
     assert.ok(treeMethod?.acceptanceSignal.includes("开头"));
     assert.ok(treeMethod?.acceptanceSignal.includes("土壤"));
     assert.equal(treeMethod?.href, "/projects#story-structure");
+    assert.ok(pipelineValidation?.currentEvidence.includes("失败复盘"));
+    assert.ok(pipelineValidation?.acceptanceSignal.includes("复盘回执"));
+    assert.equal(pipelineValidation?.href, "/gate?focus=action-recheck#gate-focus-notice");
   });
 
   await t.test("builds a final product acceptance gate for the home page", () => {

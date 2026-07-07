@@ -579,7 +579,7 @@ function buildRequirementTraceability(): DevelopmentOverviewRequirementTraceabil
         originalRequest: "按照毒舌产品经理路径继续开发，让 AI 写作平台能写作、投稿、复盘，而不是只做计划。",
         currentEvidence: "作品、任务、派单、总闸门、失败复盘、模型设置和发布包已组成真实作品流水线。",
         acceptanceSignal: "真实作品能从开书证据跑到首章样本、审稿二改、发布包、总闸门和复盘回执。",
-        href: "/projects#pipeline-projects",
+        href: "/gate?focus=action-recheck#gate-focus-notice",
       },
     ],
   };

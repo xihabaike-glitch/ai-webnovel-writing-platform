@@ -50,3 +50,43 @@ test("tasks page keeps a gate recheck return path visible", () => {
   assert.ok(source.includes("来自总闸门复检"));
   assert.ok(source.includes("回总闸门复检"));
 });
+
+test("tasks page carries gate return through task work links", () => {
+  const recommendedBatchButton = readFileSync("src/components/tasks/RunRecommendedBatchButton.tsx", "utf8");
+  const publishEffectButton = readFileSync("src/components/tasks/RunPublishEffectQueueActionButton.tsx", "utf8");
+  const debtEvidenceForm = readFileSync("src/components/tasks/CompleteTaskDebtEvidenceForm.tsx", "utf8");
+
+  assert.ok(source.includes("function hrefWithGateReturn"));
+  assert.ok(source.includes("base.includes(\"gateReturn=\")"));
+  assert.ok(source.includes("href={hrefWithGateReturn(queue.recommendedNext.href, gateReturn)}"));
+  assert.ok(source.includes("href={hrefWithGateReturn(queue.pmFocus.actionHref, gateReturn)}"));
+  assert.ok(source.includes("href={hrefWithGateReturn(queue.pmFocus.pipelineActionHref, gateReturn)}"));
+  assert.ok(source.includes("href={hrefWithGateReturn(debtView.nextAction.href, gateReturn)}"));
+  assert.ok(source.includes("href={hrefWithGateReturn(group.href, gateReturn)}"));
+  assert.ok(source.includes("href={hrefWithGateReturn(entry.href, gateReturn)}"));
+  assert.ok(source.includes("href={hrefWithGateReturn(taskQueueSourcePresentation(entry)?.returnHref ?? \"/gate\", gateReturn)}"));
+  assert.ok(source.includes("href={hrefWithGateReturn(runConsole.failureRepairBatch.primaryActionHref, gateReturn)}"));
+  assert.ok(source.includes("href={hrefWithGateReturn(candidate.href, gateReturn)}"));
+  assert.ok(source.includes("href={hrefWithGateReturn(log.href, gateReturn)}"));
+  assert.ok(source.includes("href={hrefWithGateReturn(batchRhythmDecision.href, gateReturn)}"));
+  assert.ok(source.includes("href={hrefWithGateReturn(safetyPriorityBlocker.actionHref, gateReturn)}"));
+  assert.ok(source.includes("href={hrefWithGateReturn(strategyDecision.actionHref, gateReturn)}"));
+  assert.ok(source.includes("href={hrefWithGateReturn(batch.href, gateReturn)}"));
+  assert.ok(source.includes("href={hrefWithGateReturn(action.href, gateReturn)}"));
+  assert.ok(source.includes("href={hrefWithGateReturn(`/projects/${entry.projectId}`, gateReturn)}"));
+  assert.ok(source.includes("gateReturnHref={gateReturn}"));
+
+  assert.ok(recommendedBatchButton.includes("gateReturnHref?: string | null"));
+  assert.ok(recommendedBatchButton.includes("hrefWithGateReturn(payload.task.href ?? \"/dispatch\", gateReturnHref)"));
+  assert.ok(recommendedBatchButton.includes("href={hrefWithGateReturn(routeGateActions?.primaryLinkHref ?? modelRouteGate.targetHref, gateReturnHref)}"));
+  assert.ok(recommendedBatchButton.includes("href={hrefWithGateReturn(batchReceipt.primaryHref, gateReturnHref)}"));
+  assert.ok(recommendedBatchButton.includes("href={hrefWithGateReturn(batchReceipt.secondaryHref, gateReturnHref)}"));
+
+  assert.ok(publishEffectButton.includes("gateReturnHref?: string | null"));
+  assert.ok(publishEffectButton.includes("router.push(hrefWithGateReturn(href, gateReturnHref));"));
+  assert.ok(publishEffectButton.includes("href={hrefWithGateReturn(href, gateReturnHref)}"));
+
+  assert.ok(debtEvidenceForm.includes("gateReturnHref?: string | null"));
+  assert.ok(debtEvidenceForm.includes("router.push(hrefWithGateReturn(nextFeedback.autoFocusHref, gateReturnHref));"));
+  assert.ok(debtEvidenceForm.includes("href={hrefWithGateReturn(feedback.href, gateReturnHref)}"));
+});

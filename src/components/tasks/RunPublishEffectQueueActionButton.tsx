@@ -23,6 +23,18 @@ function resultMessage(
   return "已打开处理位置。";
 }
 
+function hrefWithGateReturn(href: string, gateReturnHref?: string | null) {
+  if (!gateReturnHref || !href.startsWith("/") || href.startsWith("/gate")) return href;
+
+  const hashIndex = href.indexOf("#");
+  const base = hashIndex >= 0 ? href.slice(0, hashIndex) : href;
+  const hash = hashIndex >= 0 ? href.slice(hashIndex) : "";
+  if (base.includes("gateReturn=")) return href;
+  const separator = base.includes("?") ? "&" : "?";
+
+  return `${base}${separator}gateReturn=${encodeURIComponent(gateReturnHref)}${hash}`;
+}
+
 async function recordQueueActionReceipt(input: {
   projectId: string;
   platformName: string;
@@ -65,12 +77,14 @@ export function RunPublishEffectQueueActionButton({
   projectId,
   platformName,
   actionLabel,
+  gateReturnHref,
   href,
   action,
 }: {
   projectId: string;
   platformName: string;
   actionLabel: string;
+  gateReturnHref?: string | null;
   href: string;
   action: PublishEffectQueueAction;
 }) {
@@ -80,7 +94,7 @@ export function RunPublishEffectQueueActionButton({
 
   async function runAction() {
     if (action.execution === "open_target") {
-      router.push(href);
+      router.push(hrefWithGateReturn(href, gateReturnHref));
       return;
     }
 
@@ -162,7 +176,7 @@ export function RunPublishEffectQueueActionButton({
       </button>
       {message ? (
         <div className="max-w-xs text-right text-xs leading-5 text-slate-600">
-          {message} <a className="font-medium text-slate-950 underline" href={href}>打开结果</a>
+          {message} <a className="font-medium text-slate-950 underline" href={hrefWithGateReturn(href, gateReturnHref)}>打开结果</a>
         </div>
       ) : null}
     </div>

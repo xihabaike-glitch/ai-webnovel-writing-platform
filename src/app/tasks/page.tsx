@@ -263,6 +263,18 @@ function gateReturnFromParam(value: string | string[] | undefined) {
   return raw;
 }
 
+function hrefWithGateReturn(href: string, gateReturnHref?: string | null) {
+  if (!gateReturnHref || !href.startsWith("/") || href.startsWith("/gate")) return href;
+
+  const hashIndex = href.indexOf("#");
+  const base = hashIndex >= 0 ? href.slice(0, hashIndex) : href;
+  const hash = hashIndex >= 0 ? href.slice(hashIndex) : "";
+  if (base.includes("gateReturn=")) return href;
+  const separator = base.includes("?") ? "&" : "?";
+
+  return `${base}${separator}gateReturn=${encodeURIComponent(gateReturnHref)}${hash}`;
+}
+
 export default async function TasksPage({ searchParams }: { searchParams?: Promise<{ batchStrategy?: string; batchContext?: string; view?: string; debt?: string; cleared?: string; previousDebt?: string; gateReturn?: string | string[] }> }) {
   const resolvedSearchParams = searchParams ? await searchParams : {};
   const gateReturn = gateReturnFromParam(resolvedSearchParams.gateReturn);
@@ -552,7 +564,7 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
             阻塞清债 {debtView.totalBlocked}
           </Link>
           {queue.recommendedNext ? (
-            <Link className="w-fit rounded-md bg-slate-950 px-4 py-2 text-sm font-medium text-white" href={queue.recommendedNext.href}>
+            <Link className="w-fit rounded-md bg-slate-950 px-4 py-2 text-sm font-medium text-white" href={hrefWithGateReturn(queue.recommendedNext.href, gateReturn)}>
               {recommendedQueueActionLabel(queue.recommendedNext)}
             </Link>
           ) : null}
@@ -655,10 +667,10 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Link className="w-fit rounded-md bg-white px-3 py-2 text-sm font-medium text-slate-950 hover:bg-slate-100" href={queue.pmFocus.actionHref}>
+            <Link className="w-fit rounded-md bg-white px-3 py-2 text-sm font-medium text-slate-950 hover:bg-slate-100" href={hrefWithGateReturn(queue.pmFocus.actionHref, gateReturn)}>
               {queue.pmFocus.actionLabel}
             </Link>
-            <Link className="w-fit rounded-md border border-white/25 px-3 py-2 text-sm font-medium text-white hover:bg-white/10" href={queue.pmFocus.pipelineActionHref}>
+            <Link className="w-fit rounded-md border border-white/25 px-3 py-2 text-sm font-medium text-white hover:bg-white/10" href={hrefWithGateReturn(queue.pmFocus.pipelineActionHref, gateReturn)}>
               {queue.pmFocus.pipelineActionLabel}
             </Link>
           </div>
@@ -748,7 +760,7 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
               {queue.overview.platformReadiness.headline} {queue.overview.platformReadiness.nextAction}
             </p>
           </div>
-          <Link className="w-fit rounded-md bg-slate-950 px-3 py-2 text-sm font-medium text-white" href="/tasks?view=blocked&debt=publish_repair#task-debt">
+          <Link className="w-fit rounded-md bg-slate-950 px-3 py-2 text-sm font-medium text-white" href={hrefWithGateReturn("/tasks?view=blocked&debt=publish_repair#task-debt", gateReturn)}>
             查看发布阻塞
           </Link>
         </div>
@@ -800,12 +812,12 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
                 </Link>
               ) : null}
               {debtView.nextAction ? (
-                <Link className="rounded-md bg-rose-950 px-3 py-2 text-sm font-medium text-white hover:bg-rose-900" href={debtView.nextAction.href}>
+                <Link className="rounded-md bg-rose-950 px-3 py-2 text-sm font-medium text-white hover:bg-rose-900" href={hrefWithGateReturn(debtView.nextAction.href, gateReturn)}>
                   先处理：{debtView.nextAction.actionLabel}
                 </Link>
               ) : null}
               {!debtView.nextAction && debtView.resumeActionHref && debtView.resumeActionLabel ? (
-                <Link className="rounded-md bg-emerald-950 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-900" href={debtView.resumeActionHref}>
+                <Link className="rounded-md bg-emerald-950 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-900" href={hrefWithGateReturn(debtView.resumeActionHref, gateReturn)}>
                   {debtView.resumeActionLabel}
                 </Link>
               ) : null}
@@ -815,7 +827,7 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
             {debtView.groups.map((group) => (
               <Link
                 className={`rounded-md p-3 ${debtView.focusedBlockerType === group.blockerType ? "bg-rose-950 text-white" : "bg-white/80 hover:bg-white"}`}
-                href={group.href}
+                href={hrefWithGateReturn(group.href, gateReturn)}
                 key={group.blockerType ?? "unknown"}
               >
                 <div className={`text-xs ${debtView.focusedBlockerType === group.blockerType ? "text-white/80" : "text-rose-700"}`}>{group.label}</div>
@@ -848,7 +860,7 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
                 </div>
               ) : null}
               {debtFocusChangeNotice.actionLabel && debtFocusChangeNotice.actionHref ? (
-                <Link className="mt-2 inline-flex rounded-md bg-white/80 px-3 py-1 font-medium hover:bg-white" href={debtFocusChangeNotice.actionHref}>
+                <Link className="mt-2 inline-flex rounded-md bg-white/80 px-3 py-1 font-medium hover:bg-white" href={hrefWithGateReturn(debtFocusChangeNotice.actionHref, gateReturn)}>
                   {debtFocusChangeNotice.actionLabel}
                 </Link>
               ) : null}
@@ -865,7 +877,7 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
                     <span className="font-medium">{debtRecoveryBatchRecord.decisionLabel}</span>
                     <span className="ml-1 text-slate-600">{debtRecoveryBatchRecord.decisionDetail}</span>
                   </div>
-                  <Link className="mt-2 inline-flex rounded-md bg-white px-2 py-1 font-medium hover:bg-slate-50" href={debtRecoveryBatchRecord.decisionActionHref}>
+                  <Link className="mt-2 inline-flex rounded-md bg-white px-2 py-1 font-medium hover:bg-slate-50" href={hrefWithGateReturn(debtRecoveryBatchRecord.decisionActionHref, gateReturn)}>
                     {debtRecoveryBatchRecord.decisionActionLabel}
                   </Link>
                 </div>
@@ -890,7 +902,7 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
           </div>
           <div className="mt-3 grid gap-2 lg:grid-cols-3">
             {tacticExperienceFollowupItems.slice(0, 6).map((entry) => (
-              <Link className="rounded-md bg-white/80 p-3 text-sm hover:bg-white" href={entry.href} key={entry.id}>
+              <Link className="rounded-md bg-white/80 p-3 text-sm hover:bg-white" href={hrefWithGateReturn(entry.href, gateReturn)} key={entry.id}>
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="rounded-md bg-teal-100 px-2 py-1 text-xs font-medium text-teal-800">{entry.actionLabel}</span>
                   <span className="font-medium text-slate-950">{entry.chapterTitle}</span>
@@ -918,7 +930,7 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
           </div>
           <div className="mt-3 grid gap-2 lg:grid-cols-3">
             {firstDayHandoffItems.slice(0, 6).map((entry) => (
-              <Link className="rounded-md bg-white/80 p-3 text-sm hover:bg-white" href={entry.href} key={entry.id}>
+              <Link className="rounded-md bg-white/80 p-3 text-sm hover:bg-white" href={hrefWithGateReturn(entry.href, gateReturn)} key={entry.id}>
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="rounded-md bg-cyan-100 px-2 py-1 text-xs font-medium text-cyan-800">{entry.actionLabel}</span>
                   <span className="font-medium text-slate-950">{entry.chapterTitle}</span>
@@ -951,7 +963,7 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
           </div>
           <div className="mt-3 grid gap-2 lg:grid-cols-3">
             {unlockedDrafts.slice(0, 6).map((entry) => (
-              <Link className="rounded-md bg-white/80 p-3 text-sm hover:bg-white" href={entry.href} key={entry.id}>
+              <Link className="rounded-md bg-white/80 p-3 text-sm hover:bg-white" href={hrefWithGateReturn(entry.href, gateReturn)} key={entry.id}>
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="rounded-md bg-emerald-100 px-2 py-1 text-xs font-medium text-emerald-800">准放量</span>
                   <span className="font-medium text-slate-950">{entry.chapterTitle}</span>
@@ -1035,7 +1047,7 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
             <h2 className="font-medium">失败修复批次</h2>
             <p className="mt-1 text-sm leading-6">{runConsole.failureRepairBatch.title}：{runConsole.failureRepairBatch.detail}</p>
           </div>
-          <Link className="w-fit rounded-md bg-slate-950 px-4 py-2 text-sm font-medium text-white" href={runConsole.failureRepairBatch.primaryActionHref}>
+          <Link className="w-fit rounded-md bg-slate-950 px-4 py-2 text-sm font-medium text-white" href={hrefWithGateReturn(runConsole.failureRepairBatch.primaryActionHref, gateReturn)}>
             {runConsole.failureRepairBatch.primaryActionLabel}
           </Link>
         </div>
@@ -1085,7 +1097,7 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
                   {item.directRetrySupported ? (
                     <RetryTaskButton className="flex flex-wrap items-center gap-2" taskId={item.id} />
                   ) : (
-                    <Link className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-medium hover:bg-slate-50" href={item.href}>
+                    <Link className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-medium hover:bg-slate-50" href={hrefWithGateReturn(item.href, gateReturn)}>
                       {item.actionLabel}
                     </Link>
                   )}
@@ -1117,7 +1129,7 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
                 {candidate.directRetrySupported ? (
                   <RetryTaskButton taskId={candidate.id} />
                 ) : (
-                  <Link className="mt-3 inline-flex rounded-md border border-slate-200 px-3 py-2 text-sm font-medium hover:bg-white" href={candidate.href}>
+                  <Link className="mt-3 inline-flex rounded-md border border-slate-200 px-3 py-2 text-sm font-medium hover:bg-white" href={hrefWithGateReturn(candidate.href, gateReturn)}>
                     {candidate.actionLabel}
                   </Link>
                 )}
@@ -1130,7 +1142,7 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
           <div className="mb-3 font-medium text-slate-950">最近运行日志</div>
           <div className="grid gap-3">
             {runConsole.recentLogs.map((log) => (
-              <Link className="rounded-md bg-slate-50 p-3 text-sm hover:bg-slate-100" href={log.href} key={log.id}>
+              <Link className="rounded-md bg-slate-50 p-3 text-sm hover:bg-slate-100" href={hrefWithGateReturn(log.href, gateReturn)} key={log.id}>
                 <div className="flex flex-wrap items-center gap-2">
                   <span className={`rounded-md px-2 py-1 text-xs font-medium ${runStatusClass(log.status)}`}>{log.statusLabel}</span>
                   <span className="font-medium text-slate-950">{log.taskLabel}</span>
@@ -1202,6 +1214,7 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
               <RunRecommendedBatchButton
                 disabled={!safety.canRunRecommendedBatch || !executionPlan.canRun || modelRouteBlocksRecommendedBatch}
                 executionContext="batch_rhythm_recheck"
+                gateReturnHref={gateReturn}
                 initialModelRouteGate={modelRoutePreflightGate}
                 sourceDispatchKey={batchRhythmClosure.task.dispatchKey}
                 strategyId={activeStrategy.id}
@@ -1209,14 +1222,14 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
             ) : batchRhythmClosure ? (
               <Link
                 className="w-fit shrink-0 rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white hover:bg-slate-800"
-                href={batchRhythmClosure.href}
+                href={hrefWithGateReturn(batchRhythmClosure.href, gateReturn)}
               >
                 {batchRhythmClosure.actionLabel}
               </Link>
             ) : batchRhythmDispatch ? (
               <CreateBatchRhythmDispatchButton label="生成节奏派单" />
             ) : (
-              <Link className="w-fit shrink-0 rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white hover:bg-slate-800" href={batchRhythmDecision.href}>
+              <Link className="w-fit shrink-0 rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white hover:bg-slate-800" href={hrefWithGateReturn(batchRhythmDecision.href, gateReturn)}>
                 {batchRhythmDecision.actionLabel}
               </Link>
             )}
@@ -1274,6 +1287,7 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
             <RunRecommendedBatchButton
               disabled={!safety.canRunRecommendedBatch || !executionPlan.canRun || modelRouteBlocksRecommendedBatch}
               executionContext={effectiveBatchContext}
+              gateReturnHref={gateReturn}
               initialModelRouteGate={modelRoutePreflightGate}
               strategyId={activeStrategy.id}
             />
@@ -1311,7 +1325,7 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
                   </div>
                 ) : null}
               </div>
-              <Link className="w-fit rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white hover:bg-slate-800" href={failureRepairResumeBatchRecord.stabilityActionHref ?? failureRepairResumeBatchRecord.decisionActionHref}>
+              <Link className="w-fit rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white hover:bg-slate-800" href={hrefWithGateReturn(failureRepairResumeBatchRecord.stabilityActionHref ?? failureRepairResumeBatchRecord.decisionActionHref, gateReturn)}>
                 {failureRepairResumeBatchRecord.stabilityActionLabel ?? failureRepairResumeBatchRecord.decisionActionLabel}
               </Link>
             </div>
@@ -1325,7 +1339,7 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
                 <div className="mt-1 font-medium">{safetyPriorityBlocker.title}</div>
                 <p className="mt-1 leading-6">{safetyPriorityBlocker.detail}</p>
               </div>
-              <Link className="w-fit shrink-0 rounded-md bg-rose-950 px-3 py-2 text-xs font-medium text-white hover:bg-rose-900" href={safetyPriorityBlocker.actionHref}>
+              <Link className="w-fit shrink-0 rounded-md bg-rose-950 px-3 py-2 text-xs font-medium text-white hover:bg-rose-900" href={hrefWithGateReturn(safetyPriorityBlocker.actionHref, gateReturn)}>
                 {safetyPriorityBlocker.actionLabel}
               </Link>
             </div>
@@ -1339,7 +1353,7 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
                 <div className="mt-1 font-medium">{modelRolePriorityBlocker.title}</div>
                 <p className="mt-1 leading-6">{modelRolePriorityBlocker.detail}</p>
               </div>
-              <Link className={`w-fit shrink-0 rounded-md px-3 py-2 text-xs font-medium ${modelRoleBlockerButtonClass(modelRolePriorityBlocker.tone)}`} href={modelRolePriorityBlocker.actionHref}>
+              <Link className={`w-fit shrink-0 rounded-md px-3 py-2 text-xs font-medium ${modelRoleBlockerButtonClass(modelRolePriorityBlocker.tone)}`} href={hrefWithGateReturn(modelRolePriorityBlocker.actionHref, gateReturn)}>
                 {modelRolePriorityBlocker.actionLabel}
               </Link>
             </div>
@@ -1349,7 +1363,7 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
           {batchExecutionStrategies.map((strategy) => (
             <Link
               className={`rounded-md border p-3 text-sm ${strategy.id === activeStrategy.id ? "border-slate-950 bg-slate-950 text-white" : "border-slate-200 bg-white hover:bg-slate-50"}`}
-              href={`/tasks?batchStrategy=${strategy.id}`}
+              href={hrefWithGateReturn(`/tasks?batchStrategy=${strategy.id}`, gateReturn)}
               key={strategy.id}
             >
               <div className="flex items-center justify-between gap-2">
@@ -1374,11 +1388,12 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
               <RunRecommendedBatchButton
                 disabled={!strategyDecision.canRun || modelRouteBlocksRecommendedBatch}
                 executionContext={effectiveBatchContext}
+                gateReturnHref={gateReturn}
                 initialModelRouteGate={modelRoutePreflightGate}
                 strategyId={strategyDecision.strategyId}
               />
             ) : (
-              <Link className="w-fit rounded-md bg-slate-950 px-4 py-2 text-sm font-medium text-white" href={strategyDecision.actionHref}>
+              <Link className="w-fit rounded-md bg-slate-950 px-4 py-2 text-sm font-medium text-white" href={hrefWithGateReturn(strategyDecision.actionHref, gateReturn)}>
                 {strategyDecision.actionLabel}
               </Link>
             )}
@@ -1395,7 +1410,7 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
               <div className="text-sm font-medium text-slate-950">策略效果对比</div>
               <p className="mt-1 text-sm leading-6 text-slate-600">{strategyComparison.headline}</p>
             </div>
-            <Link className="w-fit rounded-md border border-slate-200 px-3 py-2 text-sm font-medium hover:bg-slate-50" href={`/tasks?batchStrategy=${strategyComparison.recommendedStrategyId}`}>
+            <Link className="w-fit rounded-md border border-slate-200 px-3 py-2 text-sm font-medium hover:bg-slate-50" href={hrefWithGateReturn(`/tasks?batchStrategy=${strategyComparison.recommendedStrategyId}`, gateReturn)}>
               切到推荐档
             </Link>
           </div>
@@ -1479,7 +1494,7 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
               </div>
               <p className="mt-1 leading-6 text-slate-600">{item.detail}</p>
               {item.actionHref && item.actionLabel ? (
-                <Link className="mt-3 inline-flex w-fit rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white hover:bg-slate-800" href={item.actionHref}>
+                <Link className="mt-3 inline-flex w-fit rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white hover:bg-slate-800" href={hrefWithGateReturn(item.actionHref, gateReturn)}>
                   {item.actionLabel}
                 </Link>
               ) : null}
@@ -1507,7 +1522,7 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
                     <span className={`rounded-md border px-2 py-1 text-xs font-medium ${batchTone(batch.summary.successRatePercent, batch.summary.failedTasks, batch.runningTasks)}`}>
                       成功率 {batch.summary.successRatePercent}%
                     </span>
-                    <Link className="font-medium text-slate-950 hover:underline" href={batch.href}>{batch.taskLabel}</Link>
+                    <Link className="font-medium text-slate-950 hover:underline" href={hrefWithGateReturn(batch.href, gateReturn)}>{batch.taskLabel}</Link>
                     <span className="text-xs text-slate-500">{new Date(batch.startedAt).toLocaleString()}</span>
                   </div>
                   <div className="mt-2 text-slate-600">{batch.projectTitle} · {batch.chapterTitles.join("、")}</div>
@@ -1528,7 +1543,7 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
                           <RetryTaskButton className="flex flex-wrap items-center gap-2" taskId={action.taskId} />
                         </div>
                       ) : (
-                        <Link className="rounded-md border border-slate-200 px-3 py-2 text-sm font-medium hover:bg-slate-50" href={action.href} key={action.id} title={action.detail}>
+                        <Link className="rounded-md border border-slate-200 px-3 py-2 text-sm font-medium hover:bg-slate-50" href={hrefWithGateReturn(action.href, gateReturn)} key={action.id} title={action.detail}>
                           {action.label}
                         </Link>
                       )
@@ -1572,7 +1587,7 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
                       {entry.sourceLabel}
                     </span>
                   ) : null}
-                  <Link className="font-semibold text-slate-950 hover:underline" href={`/projects/${entry.projectId}`}>
+                  <Link className="font-semibold text-slate-950 hover:underline" href={hrefWithGateReturn(`/projects/${entry.projectId}`, gateReturn)}>
                     {entry.projectTitle}
                   </Link>
                 </div>
@@ -1585,7 +1600,7 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
                     <span className="font-medium">{entry.sourceLabel}：</span>{entry.sourceDetail}
                     {taskQueueSourcePresentation(entry)?.returnHref ? (
                       <div className="mt-2">
-                        <Link className="inline-flex rounded-md bg-white/80 px-2 py-1 font-medium text-indigo-800 hover:bg-white" href={taskQueueSourcePresentation(entry)?.returnHref ?? "/gate"}>
+                        <Link className="inline-flex rounded-md bg-white/80 px-2 py-1 font-medium text-indigo-800 hover:bg-white" href={hrefWithGateReturn(taskQueueSourcePresentation(entry)?.returnHref ?? "/gate", gateReturn)}>
                           {taskQueueSourcePresentation(entry)?.returnLabel}
                         </Link>
                       </div>
@@ -1602,7 +1617,7 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
                     <span className="font-medium">{entry.sourceLabel}：</span>{entry.sourceDetail}
                     {taskQueueSourcePresentation(entry)?.returnHref ? (
                       <div className="mt-2">
-                        <Link className="inline-flex rounded-md bg-white/80 px-2 py-1 font-medium text-emerald-800 hover:bg-white" href={taskQueueSourcePresentation(entry)?.returnHref ?? "/gate"}>
+                        <Link className="inline-flex rounded-md bg-white/80 px-2 py-1 font-medium text-emerald-800 hover:bg-white" href={hrefWithGateReturn(taskQueueSourcePresentation(entry)?.returnHref ?? "/gate", gateReturn)}>
                           {taskQueueSourcePresentation(entry)?.returnLabel}
                         </Link>
                       </div>
@@ -1624,6 +1639,7 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
                     completionEvidenceTemplate={entry.completionEvidenceTemplate}
                     completionEvidenceTemplateSource={entry.completionEvidenceTemplateSource}
                     dispatchKey={entry.sourceDispatchKey}
+                    gateReturnHref={gateReturn}
                     previousDebtCount={entry.blockerType ? debtView.groups.find((group) => group.blockerType === entry.blockerType)?.count ?? 0 : 0}
                   />
                 ) : null}
@@ -1673,12 +1689,13 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
                 <RunPublishEffectQueueActionButton
                   action={entry.effectAction}
                   actionLabel={entry.actionLabel}
+                  gateReturnHref={gateReturn}
                   href={entry.href}
                   platformName={entry.platformName}
                   projectId={entry.projectId}
                 />
               ) : (
-                <Link className="w-fit rounded-md border border-slate-200 px-3 py-2 text-sm font-medium hover:bg-slate-50" href={entry.href}>
+                <Link className="w-fit rounded-md border border-slate-200 px-3 py-2 text-sm font-medium hover:bg-slate-50" href={hrefWithGateReturn(entry.href, gateReturn)}>
                   {entry.actionLabel}
                 </Link>
               )}

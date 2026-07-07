@@ -5,12 +5,25 @@ import { useState } from "react";
 import { updatePersistedGateDispatchTaskState } from "@/lib/projects/gateActionReceipts";
 import { buildTaskDebtCompletionFeedback, type TaskDebtCompletionFeedback } from "@/lib/projects/taskDebtCompletionFeedback";
 
+function hrefWithGateReturn(href: string, gateReturnHref?: string | null) {
+  if (!gateReturnHref || !href.startsWith("/") || href.startsWith("/gate")) return href;
+
+  const hashIndex = href.indexOf("#");
+  const base = hashIndex >= 0 ? href.slice(0, hashIndex) : href;
+  const hash = hashIndex >= 0 ? href.slice(hashIndex) : "";
+  if (base.includes("gateReturn=")) return href;
+  const separator = base.includes("?") ? "&" : "?";
+
+  return `${base}${separator}gateReturn=${encodeURIComponent(gateReturnHref)}${hash}`;
+}
+
 export function CompleteTaskDebtEvidenceForm({
   actionLabel,
   blockerType,
   completionEvidenceTemplate,
   completionEvidenceTemplateSource,
   dispatchKey,
+  gateReturnHref,
   previousDebtCount,
 }: {
   actionLabel: string;
@@ -18,6 +31,7 @@ export function CompleteTaskDebtEvidenceForm({
   completionEvidenceTemplate?: string;
   completionEvidenceTemplateSource?: string;
   dispatchKey: string;
+  gateReturnHref?: string | null;
   previousDebtCount?: number;
 }) {
   const router = useRouter();
@@ -49,7 +63,7 @@ export function CompleteTaskDebtEvidenceForm({
         submissionEffectHeadline: updated.submissionEffectReview?.headline ?? null,
       });
       setFeedback(nextFeedback);
-      router.push(nextFeedback.autoFocusHref);
+      router.push(hrefWithGateReturn(nextFeedback.autoFocusHref, gateReturnHref));
       router.refresh();
     } catch (caught) {
       setErrorMessage(caught instanceof Error ? caught.message : "清债证据回写失败。");
@@ -97,7 +111,7 @@ export function CompleteTaskDebtEvidenceForm({
       {feedback ? (
         <div className={`mt-3 rounded-md border px-3 py-2 text-xs leading-5 ${feedback.status === "needs_follow_up" ? "border-amber-200 bg-amber-50 text-amber-900" : "border-emerald-200 bg-emerald-50 text-emerald-900"}`}>
           <div>{feedback.message}</div>
-          <a className="mt-2 inline-flex rounded-md bg-white/80 px-2 py-1 font-medium hover:bg-white" href={feedback.href}>
+          <a className="mt-2 inline-flex rounded-md bg-white/80 px-2 py-1 font-medium hover:bg-white" href={hrefWithGateReturn(feedback.href, gateReturnHref)}>
             {feedback.actionLabel}
           </a>
         </div>

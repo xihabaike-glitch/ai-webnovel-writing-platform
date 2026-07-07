@@ -99,14 +99,28 @@ function timelineItemClass(status: ReturnType<typeof buildRecommendedBatchRouteG
   return "border-slate-200 bg-slate-50 text-slate-500";
 }
 
+function hrefWithGateReturn(href: string, gateReturnHref?: string | null) {
+  if (!gateReturnHref || !href.startsWith("/") || href.startsWith("/gate")) return href;
+
+  const hashIndex = href.indexOf("#");
+  const base = hashIndex >= 0 ? href.slice(0, hashIndex) : href;
+  const hash = hashIndex >= 0 ? href.slice(hashIndex) : "";
+  if (base.includes("gateReturn=")) return href;
+  const separator = base.includes("?") ? "&" : "?";
+
+  return `${base}${separator}gateReturn=${encodeURIComponent(gateReturnHref)}${hash}`;
+}
+
 export function RunRecommendedBatchButton({
   disabled,
+  gateReturnHref,
   strategyId,
   executionContext = "standard",
   initialModelRouteGate = null,
   sourceDispatchKey,
 }: {
   disabled: boolean;
+  gateReturnHref?: string | null;
   strategyId: string;
   executionContext?: BatchExecutionContext;
   initialModelRouteGate?: BatchRunResponse["modelRouteGate"] | null;
@@ -195,7 +209,7 @@ export function RunRecommendedBatchButton({
         throw new Error(payload?.error ?? "生成模型路线复检派单失败。");
       }
       setMessage(`已生成「${payload.task.title ?? modelRouteGate.recheckAdvice.label}」复检派单。`);
-      router.push(payload.task.href ?? "/dispatch");
+      router.push(hrefWithGateReturn(payload.task.href ?? "/dispatch", gateReturnHref));
       router.refresh();
     } catch (caught) {
       setMessage(caught instanceof Error ? caught.message : "生成模型路线复检派单失败。");
@@ -256,7 +270,7 @@ export function RunRecommendedBatchButton({
                   {isCreatingRecheck ? "生成中" : "生成复检派单"}
                 </button>
               ) : null}
-              <a className="w-fit rounded-md bg-white px-3 py-2 text-xs font-medium text-slate-950" href={routeGateActions?.primaryLinkHref ?? modelRouteGate.targetHref}>
+              <a className="w-fit rounded-md bg-white px-3 py-2 text-xs font-medium text-slate-950" href={hrefWithGateReturn(routeGateActions?.primaryLinkHref ?? modelRouteGate.targetHref, gateReturnHref)}>
                 {routeGateActions?.primaryLinkLabel ?? modelRouteGate.actionLabel}
               </a>
             </div>
@@ -288,10 +302,10 @@ export function RunRecommendedBatchButton({
               <p className="mt-1 leading-6 opacity-90">{batchReceipt.detail}</p>
             </div>
             <div className="flex shrink-0 flex-wrap gap-2">
-              <a className="w-fit rounded-md bg-slate-950 px-3 py-2 text-sm font-medium text-white" href={batchReceipt.primaryHref}>
+              <a className="w-fit rounded-md bg-slate-950 px-3 py-2 text-sm font-medium text-white" href={hrefWithGateReturn(batchReceipt.primaryHref, gateReturnHref)}>
                 {batchReceipt.primaryLabel}
               </a>
-              <a className="w-fit rounded-md bg-white/80 px-3 py-2 text-sm font-medium text-slate-900 hover:bg-white" href={batchReceipt.secondaryHref}>
+              <a className="w-fit rounded-md bg-white/80 px-3 py-2 text-sm font-medium text-slate-900 hover:bg-white" href={hrefWithGateReturn(batchReceipt.secondaryHref, gateReturnHref)}>
                 {batchReceipt.secondaryLabel}
               </a>
             </div>

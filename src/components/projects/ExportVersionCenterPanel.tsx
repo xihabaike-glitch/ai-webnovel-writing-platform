@@ -40,11 +40,25 @@ function timeText(value: string | Date | null) {
   return new Date(value).toLocaleString("zh-CN");
 }
 
+function hrefWithGateReturn(href: string, gateReturnHref?: string | null) {
+  if (!gateReturnHref || !href.startsWith("/") || href.startsWith("/gate")) return href;
+
+  const hashIndex = href.indexOf("#");
+  const base = hashIndex >= 0 ? href.slice(0, hashIndex) : href;
+  const hash = hashIndex >= 0 ? href.slice(hashIndex) : "";
+  if (base.includes("gateReturn=")) return href;
+  const separator = base.includes("?") ? "&" : "?";
+
+  return `${base}${separator}gateReturn=${encodeURIComponent(gateReturnHref)}${hash}`;
+}
+
 export function ExportVersionCenterPanel({
+  gateReturnHref,
   projectHref,
   snapshots,
   summary,
 }: {
+  gateReturnHref?: string | null;
   projectHref: string;
   snapshots: ExportPackageSnapshotView[];
   summary: ExportVersionCenterSummary;
@@ -138,7 +152,7 @@ export function ExportVersionCenterPanel({
             <h2 className="font-medium">下一步</h2>
             <p className="mt-1 text-sm text-slate-600">{summary.nextAction.label}：{summary.nextAction.detail}</p>
           </div>
-          <Link className="rounded-md border border-slate-200 px-3 py-2 text-sm font-medium hover:bg-slate-50" href={`${projectHref}#submission-package`}>
+          <Link className="rounded-md border border-slate-200 px-3 py-2 text-sm font-medium hover:bg-slate-50" href={hrefWithGateReturn(`${projectHref}#submission-package`, gateReturnHref)}>
             去发布包
           </Link>
         </div>
@@ -281,7 +295,7 @@ export function ExportVersionCenterPanel({
                     : "锁定基准"}
               </button>
             ) : null}
-            <Link className="rounded-md border border-slate-200 px-3 py-2 text-sm font-medium hover:bg-slate-50" href={`${projectHref}#create-chapter`}>
+            <Link className="rounded-md border border-slate-200 px-3 py-2 text-sm font-medium hover:bg-slate-50" href={hrefWithGateReturn(`${projectHref}#create-chapter`, gateReturnHref)}>
               回到写作
             </Link>
           </div>

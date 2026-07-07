@@ -17,6 +17,18 @@ function gateReturnFromParam(value: string | string[] | undefined) {
   return raw;
 }
 
+function hrefWithGateReturn(href: string, gateReturnHref?: string | null) {
+  if (!gateReturnHref || !href.startsWith("/") || href.startsWith("/gate")) return href;
+
+  const hashIndex = href.indexOf("#");
+  const base = hashIndex >= 0 ? href.slice(0, hashIndex) : href;
+  const hash = hashIndex >= 0 ? href.slice(hashIndex) : "";
+  if (base.includes("gateReturn=")) return href;
+  const separator = base.includes("?") ? "&" : "?";
+
+  return `${base}${separator}gateReturn=${encodeURIComponent(gateReturnHref)}${hash}`;
+}
+
 export default async function ProjectExportVersionsPage({
   params,
   searchParams,
@@ -67,10 +79,10 @@ export default async function ProjectExportVersionsPage({
             </p>
           </div>
           <div className="flex flex-wrap gap-2 text-sm">
-            <Link className="rounded-md border border-slate-200 bg-white px-3 py-2 font-medium hover:bg-slate-50" href={projectHref}>
+            <Link className="rounded-md border border-slate-200 bg-white px-3 py-2 font-medium hover:bg-slate-50" href={hrefWithGateReturn(projectHref, gateReturn)}>
               返回工作台
             </Link>
-            <Link className="rounded-md bg-slate-950 px-3 py-2 font-medium text-white" href={`${projectHref}#create-chapter`}>
+            <Link className="rounded-md bg-slate-950 px-3 py-2 font-medium text-white" href={hrefWithGateReturn(`${projectHref}#create-chapter`, gateReturn)}>
               继续写作
             </Link>
           </div>
@@ -88,7 +100,7 @@ export default async function ProjectExportVersionsPage({
             </div>
           </section>
         ) : null}
-        <ExportVersionCenterPanel projectHref={projectHref} snapshots={snapshots} summary={summary} />
+        <ExportVersionCenterPanel gateReturnHref={gateReturn} projectHref={projectHref} snapshots={snapshots} summary={summary} />
       </div>
     </AppShell>
   );

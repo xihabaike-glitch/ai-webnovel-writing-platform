@@ -176,4 +176,19 @@ test("buildDevelopmentOverview", async (t) => {
     assert.ok(failureField?.rejectIf.some((signal) => signal.includes("未修复")));
     assert.ok(publishField?.requiredSignals.some((signal) => signal.includes("8 个核心平台")));
   });
+
+  await t.test("surfaces the current writing pipeline validation receipt", () => {
+    const overview = buildDevelopmentOverview();
+
+    assert.equal(overview.currentPipelineValidation.watchItemId, "writing_pipeline");
+    assert.ok(overview.currentPipelineValidation.headline.includes("真实作品"));
+    assert.ok(overview.currentPipelineValidation.pmVerdict.includes("观察中"));
+    assert.equal(overview.currentPipelineValidation.nextStepId, "project_start");
+    assert.equal(overview.currentPipelineValidation.actionHref, "/projects#pipeline-projects");
+    assert.equal(overview.currentPipelineValidation.actionLabel, "验收真实流水线");
+    assert.ok(overview.currentPipelineValidation.requiredEvidence.some((item) => item.includes("开头钩子")));
+    assert.ok(overview.currentPipelineValidation.requiredEvidence.some((item) => item.includes("人工采用")));
+    assert.ok(overview.currentPipelineValidation.requiredEvidence.some((item) => item.includes("发布包")));
+    assert.ok(overview.currentPipelineValidation.stopIfMissing.some((item) => item.includes("不允许批量")));
+  });
 });

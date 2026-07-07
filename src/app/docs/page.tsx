@@ -157,6 +157,43 @@ export default function DevelopmentDocsPage() {
         </div>
       </section>
 
+      <section className="mb-6 rounded-md border border-slate-900 bg-slate-950 p-4 text-white">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <div className="text-xs font-medium text-slate-300">观察项：写作到投稿流水线</div>
+            <h2 className="mt-1 text-lg font-semibold">{overview.currentPipelineValidation.headline}</h2>
+            <p className="mt-2 max-w-4xl text-sm leading-6 text-slate-200">{overview.currentPipelineValidation.pmVerdict}</p>
+            <div className="mt-2 text-xs text-slate-400">
+              下一步：{overview.currentPipelineValidation.nextStepTitle}
+            </div>
+          </div>
+          <Link
+            className="inline-flex w-fit shrink-0 rounded-md bg-white px-4 py-2 text-sm font-medium text-slate-950 hover:bg-slate-100"
+            href={overview.currentPipelineValidation.actionHref}
+          >
+            {overview.currentPipelineValidation.actionLabel}
+          </Link>
+        </div>
+        <div className="mt-4 grid gap-3 lg:grid-cols-2">
+          <div className="rounded-md bg-white/10 p-3">
+            <div className="text-xs font-medium text-emerald-200">必须补齐的证据</div>
+            <ul className="mt-2 grid gap-2 text-sm leading-6 text-slate-100">
+              {overview.currentPipelineValidation.requiredEvidence.map((item) => (
+                <li key={item}>{item}</li>
+              ))}
+            </ul>
+          </div>
+          <div className="rounded-md bg-white/10 p-3">
+            <div className="text-xs font-medium text-rose-200">缺失就停手</div>
+            <ul className="mt-2 grid gap-2 text-sm leading-6 text-slate-100">
+              {overview.currentPipelineValidation.stopIfMissing.map((item) => (
+                <li key={item}>{item}</li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      </section>
+
       <section className="mb-6 rounded-md border border-slate-200 bg-white p-4">
         <div className="mb-3 flex flex-col gap-2 lg:flex-row lg:items-end lg:justify-between">
           <div>

@@ -96,6 +96,18 @@ export interface DevelopmentOverviewPipelineProofRoute {
   acceptanceReceipt: DevelopmentOverviewPipelineAcceptanceReceipt;
 }
 
+export interface DevelopmentOverviewCurrentPipelineValidation {
+  watchItemId: "writing_pipeline";
+  headline: string;
+  pmVerdict: string;
+  nextStepId: DevelopmentOverviewPipelineProofStep["id"];
+  nextStepTitle: string;
+  requiredEvidence: string[];
+  stopIfMissing: string[];
+  actionHref: string;
+  actionLabel: string;
+}
+
 export interface DevelopmentOverview {
   referenceCount: number;
   platformScope: typeof platformDeliveryScope;
@@ -115,6 +127,7 @@ export interface DevelopmentOverview {
   treeWorkflow: DevelopmentOverviewTreeStep[];
   deliveryAudit: DevelopmentOverviewDeliveryAudit;
   pipelineProofRoute: DevelopmentOverviewPipelineProofRoute;
+  currentPipelineValidation: DevelopmentOverviewCurrentPipelineValidation;
   nextActions: DevelopmentOverviewAction[];
 }
 
@@ -444,6 +457,31 @@ function buildPipelineProofRoute(): DevelopmentOverviewPipelineProofRoute {
   };
 }
 
+function buildCurrentPipelineValidation(): DevelopmentOverviewCurrentPipelineValidation {
+  const nextStep = pipelineProofSteps[0];
+
+  return {
+    watchItemId: "writing_pipeline",
+    headline: "真实作品流水线验收单",
+    pmVerdict: "写作到投稿流水线仍在观察中；下一步不是继续补页面，而是拿一部真实作品从开书证据开始跑通。",
+    nextStepId: nextStep.id,
+    nextStepTitle: nextStep.title,
+    requiredEvidence: [
+      "作品页必须看到目标平台、篇幅、开头钩子、结尾承诺、主干和基础土壤。",
+      "首章样本必须进入候选稿、审稿、二改和人工采用链路。",
+      "任务回执必须带执行角色、输入、输出、验收证据和下一步入口。",
+      "发布包必须沉淀样章、标题简介标签、版本基线和平台复盘指标。",
+    ],
+    stopIfMissing: [
+      "缺开头钩子或结尾承诺时，不允许进入模型生成。",
+      "缺人工采用时，不允许批量生产。",
+      "缺发布包或反馈复盘时，不允许宣称流水线跑通。",
+    ],
+    actionHref: "/projects#pipeline-projects",
+    actionLabel: "验收真实流水线",
+  };
+}
+
 export function buildDevelopmentOverview(): DevelopmentOverview {
   return {
     referenceCount: openSourceReferenceCases.length,
@@ -464,6 +502,7 @@ export function buildDevelopmentOverview(): DevelopmentOverview {
     treeWorkflow,
     deliveryAudit: buildDeliveryAudit(),
     pipelineProofRoute: buildPipelineProofRoute(),
+    currentPipelineValidation: buildCurrentPipelineValidation(),
     nextActions: [
       {
         label: "从作品工作台验收真实写作流程",

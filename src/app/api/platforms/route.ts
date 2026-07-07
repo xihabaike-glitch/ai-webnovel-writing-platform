@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
-import { platformProfiles } from "@/lib/platforms/platformProfiles";
+import { platformDeliveryScope, platformProfiles } from "@/lib/platforms/platformProfiles";
 
 export async function GET() {
-  return NextResponse.json({ platforms: platformProfiles });
+  return NextResponse.json({ platforms: platformProfiles, deliveryScope: platformDeliveryScope });
 }
-

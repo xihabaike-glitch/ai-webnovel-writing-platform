@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { platformProfiles, type LengthType, type PlatformId } from "@/lib/platforms/platformProfiles";
+import { platformDeliveryScope, platformProfiles, type LengthType, type PlatformId } from "@/lib/platforms/platformProfiles";
 import { getPlatformWritingStyle } from "@/lib/platforms/writingStyleTemplates";
 import {
   buildGateBatchTacticEffectReview,
@@ -498,9 +498,12 @@ export function ProjectForm({ experienceLaunch }: { experienceLaunch?: ProjectFo
       </div>
       <div className="grid gap-4 md:grid-cols-2">
         <div>
-          <label className="text-sm font-medium" htmlFor="platform">
-            目标平台
-          </label>
+          <div className="flex items-center justify-between gap-3">
+            <label className="text-sm font-medium" htmlFor="platform">
+              目标平台
+            </label>
+            <span className="text-xs text-slate-500">{platformDeliveryScope.statusLabel}</span>
+          </div>
           <select
             className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2"
             id="platform"
@@ -514,6 +517,7 @@ export function ProjectForm({ experienceLaunch }: { experienceLaunch?: ProjectFo
               </option>
             ))}
           </select>
+          <p className="mt-1 text-xs leading-5 text-slate-500">{platformDeliveryScope.expansionLabel}。</p>
         </div>
         <div>
           <label className="text-sm font-medium" htmlFor="length">

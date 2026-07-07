@@ -21,6 +21,16 @@ export interface PlatformProfile {
   risks: string[];
 }
 
+export interface PlatformDeliveryScope {
+  corePlatformIds: PlatformId[];
+  corePlatformCount: number;
+  completedPlatformCount: number;
+  pausedExpansionCount: number;
+  statusLabel: string;
+  expansionLabel: string;
+  scopeDecision: string;
+}
+
 export const platformProfiles: PlatformProfile[] = [
   {
     id: "qidian",
@@ -104,6 +114,16 @@ export const platformProfiles: PlatformProfile[] = [
   },
 ];
 
+export const platformDeliveryScope: PlatformDeliveryScope = {
+  corePlatformIds: platformProfiles.map((profile) => profile.id),
+  corePlatformCount: platformProfiles.length,
+  completedPlatformCount: platformProfiles.length,
+  pausedExpansionCount: 10,
+  statusLabel: `${platformProfiles.length}/${platformProfiles.length} 核心平台已完成`,
+  expansionLabel: "剩余 10 个平台不再添加",
+  scopeDecision: "扩展平台不再作为待补缺口；剩余 10 个平台不再添加，不进入当前开发范围。先把 8 个核心平台的写作、投稿、复盘闭环做扎实。",
+};
+
 export function getPlatformProfile(id: PlatformId): PlatformProfile {
   const profile = platformProfiles.find((item) => item.id === id);
   if (!profile) {
@@ -111,4 +131,3 @@ export function getPlatformProfile(id: PlatformId): PlatformProfile {
   }
   return profile;
 }
-

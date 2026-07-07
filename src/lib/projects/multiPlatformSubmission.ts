@@ -1,4 +1,4 @@
-import { platformProfiles, type PlatformProfile } from "../platforms/platformProfiles.ts";
+import { platformDeliveryScope, platformProfiles, type PlatformProfile } from "../platforms/platformProfiles.ts";
 import type { GatePlatformGrowthDispatchItem } from "./gateActionReceipts.ts";
 import { buildSubmissionChecklist, type SubmissionAiTask, type SubmissionChapter } from "./submissionChecklist.ts";
 import { buildSubmissionPackage, type SubmissionPackage, type SubmissionPackageChapter } from "./submissionPackage.ts";
@@ -213,15 +213,13 @@ const categoryOpportunity: Record<PlatformProfile["category"], string> = {
   overseas: "适合出海版本，需要把设定解释、标签和升级承诺写得更直白。",
 };
 
-const pausedExpansionPlatformCount = 0;
-
 function buildSubmissionDeliveryScope(totalPlatforms: number) {
   return {
     corePlatformCount: totalPlatforms,
     completedPlatformCount: totalPlatforms,
-    pausedExpansionCount: pausedExpansionPlatformCount,
+    pausedExpansionCount: platformDeliveryScope.pausedExpansionCount,
     statusLabel: `${totalPlatforms}/${totalPlatforms} 核心平台已纳入发布闭环`,
-    scopeDecision: "扩展平台不再作为待补缺口，不进入本期投稿包；先把核心平台的写作、投稿和复盘跑通。",
+    scopeDecision: platformDeliveryScope.scopeDecision,
   };
 }
 
@@ -1306,7 +1304,7 @@ export function buildMultiPlatformSubmissionArchive(
     "",
     `生成时间：${generatedText}`,
     `平台范围：${deliveryScope.statusLabel}`,
-    "扩展平台：不纳入本期投稿包，不再作为待补缺口",
+    `扩展平台：${platformDeliveryScope.expansionLabel}，不纳入本期投稿包`,
     `可归档平台：${readyPlatforms.length}/${platforms.length}`,
     `归档样章合计：${totalSampleChapterCount}`,
     `归档摘要字数：${totalWordCount}`,

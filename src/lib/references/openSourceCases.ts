@@ -1,4 +1,4 @@
-import { getPlatformProfile, type PlatformId } from "../platforms/platformProfiles.ts";
+import { getPlatformProfile, platformDeliveryScope } from "../platforms/platformProfiles.ts";
 import { buildPlatformExecutionCard, type PlatformExecutionCard } from "../platforms/platformExecutionCards.ts";
 
 export type ReferenceCaseCategory =
@@ -460,29 +460,18 @@ const categoryPriority: ReferenceCaseCategory[] = [
   "publishing_pipeline",
 ];
 
-const lockedCorePlatformIds: PlatformId[] = [
-  "fanqie",
-  "qidian",
-  "qimao",
-  "jjwxc",
-  "zhihu_yanxuan",
-  "webnovel",
-  "royal_road",
-  "wattpad",
-];
-
 export function buildReferenceCasePlatformScope(): ReferenceCasePlatformScope {
-  const platformNames = lockedCorePlatformIds.map((id) => getPlatformProfile(id).name);
+  const platformNames = platformDeliveryScope.corePlatformIds.map((id) => getPlatformProfile(id).name);
 
   return {
-    corePlatformCount: platformNames.length,
-    completedPlatformCount: platformNames.length,
-    pausedExpansionCount: 0,
-    statusLabel: `${platformNames.length}/${platformNames.length} 核心平台已完成`,
-    expansionLabel: "剩余 10 个平台不再添加",
-    scopeDecision: "扩展平台不再作为待补缺口；剩余 10 个平台不再添加，不进入当前开发范围。先把 8 个核心平台的写作、投稿、复盘闭环做扎实。",
+    corePlatformCount: platformDeliveryScope.corePlatformCount,
+    completedPlatformCount: platformDeliveryScope.completedPlatformCount,
+    pausedExpansionCount: platformDeliveryScope.pausedExpansionCount,
+    statusLabel: platformDeliveryScope.statusLabel,
+    expansionLabel: platformDeliveryScope.expansionLabel,
+    scopeDecision: platformDeliveryScope.scopeDecision,
     platformNames,
-    platformCards: lockedCorePlatformIds.map(buildPlatformExecutionCard),
+    platformCards: platformDeliveryScope.corePlatformIds.map(buildPlatformExecutionCard),
   };
 }
 

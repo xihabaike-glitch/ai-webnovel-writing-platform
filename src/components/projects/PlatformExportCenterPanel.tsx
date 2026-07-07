@@ -2866,7 +2866,7 @@ export function PlatformExportCenterPanel({ projectId }: { projectId: string }) 
                   <div className="font-medium text-slate-950">8 平台执行交接卡</div>
                   <p className="mt-1 text-sm leading-6 text-slate-600">把参考库的平台抓手接到当前作品包：每个平台都显示写作、投稿、复盘和当前要处理的动作。</p>
                 </div>
-                <div className="text-xs text-slate-500">平台还差 0 个</div>
+                <div className="text-xs text-slate-500">8 平台全部覆盖</div>
               </div>
               <div className="mt-3 rounded-md bg-slate-50 p-3 text-sm">
                 <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">

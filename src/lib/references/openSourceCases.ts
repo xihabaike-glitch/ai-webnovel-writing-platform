@@ -79,6 +79,7 @@ export interface ReferenceCasePlatformScope {
   completedPlatformCount: number;
   pausedExpansionCount: number;
   statusLabel: string;
+  expansionLabel: string;
   scopeDecision: string;
   platformNames: string[];
   platformCards: ReferenceCasePlatformCard[];
@@ -462,7 +463,8 @@ export function buildReferenceCasePlatformScope(): ReferenceCasePlatformScope {
     completedPlatformCount: platformNames.length,
     pausedExpansionCount: 0,
     statusLabel: `${platformNames.length}/${platformNames.length} 核心平台已完成`,
-    scopeDecision: "扩展平台不再作为待补缺口，不进入当前开发范围；先把 8 个核心平台的写作、投稿、复盘闭环做扎实。",
+    expansionLabel: "剩余 10 个平台不再添加",
+    scopeDecision: "扩展平台不再作为待补缺口；剩余 10 个平台不再添加，不进入当前开发范围。先把 8 个核心平台的写作、投稿、复盘闭环做扎实。",
     platformNames,
     platformCards: lockedCorePlatformIds.map(buildPlatformExecutionCard),
   };
@@ -643,7 +645,7 @@ export function buildReferenceCaseDevelopmentPath(): ReferenceCaseDevelopmentPat
       roleIds: ["overseas_packager", "feedback_operator", "toxic_pm"],
       currentEvidence: "参考库和发布中心已锁定 8 个核心平台，覆盖写作、投稿、复盘三段动作。",
       nextAction: "继续把标题、简介、标签、样章、版本和发布效果变成可回滚的发布包记录。",
-      acceptance: "平台还差 0 个；每个平台都有可导出的发布包和可回填的效果复盘。",
+      acceptance: "8 个核心平台已锁定；每个平台都有可导出的发布包和可回填的效果复盘。",
       href: "/projects#platform-export",
     },
   ];

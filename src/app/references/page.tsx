@@ -66,7 +66,7 @@ export default async function ReferencesPage({ searchParams }: ReferencesPagePro
             </div>
           </div>
           <div className="w-fit rounded-md bg-white px-3 py-2 text-sm font-medium text-emerald-900">
-            扩展缺口 {view.platformScope.pausedExpansionCount} 个
+            {view.platformScope.expansionLabel}
           </div>
         </div>
       </section>
@@ -78,7 +78,7 @@ export default async function ReferencesPage({ searchParams }: ReferencesPagePro
             <p className="mt-1 text-sm text-slate-500">每个平台都要落到写作、投稿、复盘三段动作，别只停在资料收集。</p>
           </div>
           <div className="w-fit rounded-md bg-slate-950 px-3 py-2 text-sm font-medium text-white">
-            平台还差 0 个
+            8 平台已锁定
           </div>
         </div>
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">

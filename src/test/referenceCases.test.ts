@@ -92,6 +92,9 @@ test("open source reference cases", async (t) => {
     }
     assert.ok(allView.developmentPath.find((item) => item.id === "model_routing")?.roleIds.includes("toxic_pm"));
     assert.ok(allView.developmentPath.find((item) => item.id === "publishing_pipeline")?.roleIds.includes("overseas_packager"));
+    const publishingPipeline = allView.developmentPath.find((item) => item.id === "publishing_pipeline");
+    assert.ok(publishingPipeline?.acceptance.includes("8 个核心平台已锁定"));
+    assert.equal(publishingPipeline?.acceptance.includes("平台还差 0 个"), false);
     assert.ok(allView.topTags.length > 0);
 
     assert.equal(aiView.selectedCategory, "ai_workflow");
@@ -144,8 +147,9 @@ test("open source reference cases", async (t) => {
     assert.equal(view.platformScope.completedPlatformCount, 8);
     assert.equal(view.platformScope.pausedExpansionCount, 0);
     assert.equal(view.platformScope.statusLabel, "8/8 核心平台已完成");
+    assert.equal(view.platformScope.expansionLabel, "剩余 10 个平台不再添加");
     assert.ok(view.platformScope.scopeDecision.includes("扩展平台不再作为待补缺口"));
-    assert.equal(view.platformScope.scopeDecision.includes("剩余 10"), false);
+    assert.ok(view.platformScope.scopeDecision.includes("剩余 10 个平台不再添加"));
     assert.deepEqual(view.platformScope.platformNames, [
       "番茄小说",
       "起点中文网",

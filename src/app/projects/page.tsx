@@ -86,6 +86,11 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps) 
     }),
   ]);
   const dashboard = buildProjectListDashboard(projects, providers);
+  const pipelineStepParam = firstValue(params?.pipelineStep);
+  const activePipelineStep = dashboard.pipelineProofSummary.stepCounts.find((step) => step.id === pipelineStepParam) ?? null;
+  const visibleItems = activePipelineStep
+    ? dashboard.items.filter((item) => item.pipelineProof.currentStepId === activePipelineStep.id)
+    : dashboard.items;
 
   return (
     <AppShell>
@@ -174,13 +179,25 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps) 
         </div>
         <div className="mt-3 grid gap-2 md:grid-cols-3 xl:grid-cols-6">
           {dashboard.pipelineProofSummary.stepCounts.map((step, index) => (
-            <Link className="rounded-md border border-slate-200 bg-slate-50 p-3 text-sm hover:bg-slate-100" href={step.href} key={step.id}>
-              <div className="text-xs text-slate-500">第 {index + 1} 步</div>
-              <div className="mt-1 font-medium text-slate-950">{step.label}</div>
-              <div className="mt-1 text-xs text-slate-500">{step.count} 本当前卡点</div>
+            <Link
+              className={`rounded-md border p-3 text-sm ${activePipelineStep?.id === step.id ? "border-slate-900 bg-slate-950 text-white" : "border-slate-200 bg-slate-50 hover:bg-slate-100"}`}
+              href={step.filterHref}
+              key={step.id}
+            >
+              <div className={`text-xs ${activePipelineStep?.id === step.id ? "text-slate-300" : "text-slate-500"}`}>第 {index + 1} 步</div>
+              <div className={`mt-1 font-medium ${activePipelineStep?.id === step.id ? "text-white" : "text-slate-950"}`}>{step.label}</div>
+              <div className={`mt-1 text-xs ${activePipelineStep?.id === step.id ? "text-slate-300" : "text-slate-500"}`}>{step.count} 本当前卡点</div>
             </Link>
           ))}
         </div>
+        {activePipelineStep ? (
+          <div className="mt-3 flex flex-col gap-2 rounded-md bg-slate-50 p-3 text-sm text-slate-600 sm:flex-row sm:items-center sm:justify-between">
+            <span>当前只看卡在「{activePipelineStep.label}」的作品。</span>
+            <Link className="w-fit rounded-md border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-100" href="/projects#pipeline-projects">
+              查看全部作品
+            </Link>
+          </div>
+        ) : null}
       </section>
       <section className="mb-6 rounded-md border border-slate-200 bg-white p-4">
         <div className="mb-3">
@@ -234,8 +251,8 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps) 
           ))}
         </div>
       </section>
-      <section className="grid gap-3">
-        {dashboard.items.map((item) => (
+      <section className="grid gap-3" id="pipeline-projects">
+        {visibleItems.map((item) => (
           <div
             key={item.id}
             className="rounded-md border border-slate-200 bg-white p-4"
@@ -326,9 +343,9 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps) 
             </div>
           </div>
         ))}
-        {dashboard.items.length === 0 ? (
+        {visibleItems.length === 0 ? (
           <p className="rounded-md border border-dashed border-slate-300 p-4 text-sm text-slate-600">
-            还没有作品。先用上面的模板向导创建一个。
+            {dashboard.items.length === 0 ? "还没有作品。先用上面的模板向导创建一个。" : "这个流水线步骤下暂时没有作品卡点。"}
           </p>
         ) : null}
       </section>

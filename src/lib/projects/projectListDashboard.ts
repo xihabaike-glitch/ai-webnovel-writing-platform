@@ -91,6 +91,7 @@ export interface ProjectListPipelineProofSummary {
     label: string;
     count: number;
     href: string;
+    filterHref: string;
   }>;
 }
 
@@ -342,9 +343,16 @@ function buildPipelineProofSummary(items: ProjectListItem[]): ProjectListPipelin
     id: step.id,
     label: step.label,
     href: step.href,
+    filterHref: `/projects?pipelineStep=${step.id}#pipeline-projects`,
     count: items.filter((item) => item.pipelineProof.currentStepId === step.id).length,
   }));
-  const bottleneckSeed = stepCounts[0] ?? { id: "project_start", label: "开书与大树骨架", href: "/projects", count: 0 };
+  const bottleneckSeed = stepCounts[0] ?? {
+    id: "project_start",
+    label: "开书与大树骨架",
+    href: "/projects",
+    filterHref: "/projects?pipelineStep=project_start#pipeline-projects",
+    count: 0,
+  };
   const bottleneck = stepCounts.reduce((current, next) => {
     if (next.count > current.count) return next;
     return current;

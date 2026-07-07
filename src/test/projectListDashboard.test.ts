@@ -365,6 +365,10 @@ test("buildProjectListDashboard", async (t) => {
     assert.equal(dashboard.pipelineProofSummary.stepCounts.find((step) => step.id === "task_dispatch")?.count, 1);
     assert.equal(dashboard.pipelineProofSummary.stepCounts.find((step) => step.id === "gate_check")?.count, 1);
     assert.equal(
+      dashboard.pipelineProofSummary.stepCounts.find((step) => step.id === "task_dispatch")?.filterHref,
+      "/projects?pipelineStep=task_dispatch#pipeline-projects",
+    );
+    assert.equal(
       dashboard.pipelineProofSummary.stepCounts.some((step) => step.label.includes("新增平台")),
       false,
     );

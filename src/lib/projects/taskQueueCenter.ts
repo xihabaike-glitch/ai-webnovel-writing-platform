@@ -190,6 +190,7 @@ export interface TaskQueuePmFocus {
   actionHref: string;
   pipelineActionLabel: string;
   pipelineActionHref: string;
+  pipelineValidationHint: string;
 }
 
 export interface TaskQueuePlatformReadinessSummary {
@@ -319,6 +320,7 @@ function buildTaskQueuePmFocus(recommendedNext: QueueItem | null): TaskQueuePmFo
       actionHref: "/projects",
       pipelineActionLabel: "查看项目流水线",
       pipelineActionHref: "/projects#pipeline-projects",
+      pipelineValidationHint: "当前没有任务，先回项目流水线补目标平台、开头钩子、结尾承诺和基础土壤。",
     };
   }
 
@@ -334,6 +336,7 @@ function buildTaskQueuePmFocus(recommendedNext: QueueItem | null): TaskQueuePmFo
     actionHref: recommendedNext.href,
     pipelineActionLabel: "查看项目流水线",
     pipelineActionHref: "/projects#pipeline-projects",
+    pipelineValidationHint: "当前任务执行前，先回项目流水线核对执行角色、输入、输出、验收证据和下一步入口。",
   };
 }
 

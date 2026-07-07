@@ -148,7 +148,8 @@ test("open source reference cases", async (t) => {
     assert.ok(draftWriter?.modelOwner.includes("DeepSeek"));
     assert.ok(overseasPackager?.outputs.some((output) => output.includes("WebNovel")));
     assert.ok(feedbackOperator?.referenceCaseIds.includes("n8n"));
-    assert.equal(productManager?.workflowHref, "/references");
+    assert.equal(productManager?.workflowHref, "/gate");
+    assert.equal(productManager?.workflowActionLabel, "进入总闸门");
     assert.equal(draftWriter?.workflowHref, "/projects");
     assert.equal(overseasPackager?.workflowHref, "/projects#platform-export");
     assert.equal(feedbackOperator?.workflowHref, "/gate");

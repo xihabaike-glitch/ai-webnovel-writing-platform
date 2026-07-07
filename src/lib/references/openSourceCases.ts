@@ -504,8 +504,8 @@ export function buildReferenceCaseRolePlaybook(): ReferenceCaseRolePlaybookItem[
       inputs: ["用户目标", "平台范围", "30 个参考案例", "当前项目指标"],
       outputs: ["优先级判断", "下一步开发动作", "风险提醒", "验收口径"],
       referenceCaseIds: ["autogen", "crewai", "dify"],
-      workflowHref: "/references",
-      workflowActionLabel: "回看参考库",
+      workflowHref: "/gate",
+      workflowActionLabel: "进入总闸门",
       nextAction: "把每个页面的下一步动作都绑定到真实写作、投稿或复盘产物。",
     },
     {

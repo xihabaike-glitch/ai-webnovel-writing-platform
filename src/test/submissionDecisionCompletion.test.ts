@@ -110,6 +110,33 @@ test("submission decision completion effect", async (t) => {
     assert.ok(effect.editorFeedback.includes("结论：暂停"));
   });
 
+  await t.test("records paused platform recovery review as a resumable sample signal", () => {
+    const effect = buildSubmissionDecisionCompletionEffect({
+      projectId: "project-1",
+      platformId: "wattpad",
+      platformName: "Wattpad",
+      dispatchKey: "submission-decision:project-1:wattpad:pause",
+      stage: "pause_platform",
+      completedAt: "2026-01-10T10:00:00.000Z",
+      completionEvidence: [
+        "Wattpad 暂停平台复盘",
+        "暂停原因：二轮小样本未过线",
+        "参照平台：番茄小说有效标题和前三章兑现",
+        "恢复条件：只恢复一轮小样本",
+        "复盘结论：恢复一轮小样本",
+      ].join("\n"),
+    });
+
+    assert.ok(effect);
+    assert.equal(effect.views, 0);
+    assert.equal(effect.contractStatus, "unknown");
+    assert.ok(effect.editorFeedback.includes("暂停原因：二轮小样本未过线"));
+    assert.ok(effect.editorFeedback.includes("参照平台：番茄小说有效标题和前三章兑现"));
+    assert.ok(effect.editorFeedback.includes("恢复条件：只恢复一轮小样本"));
+    assert.ok(effect.editorFeedback.includes("复盘结论：恢复一轮小样本"));
+    assert.equal(effect.review.status, "watch");
+  });
+
   await t.test("ignores ordinary completion text without effect signals", () => {
     const effect = buildSubmissionDecisionCompletionEffect({
       projectId: "project-1",

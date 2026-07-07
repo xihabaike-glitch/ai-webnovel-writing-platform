@@ -92,6 +92,18 @@ function valueAfterLabel(label: string, text: string) {
 }
 
 function editorFeedback(text: string) {
+  if (/暂停原因\s*[：:=]|恢复条件\s*[：:=]|复盘结论\s*[：:=]/u.test(text)) {
+    const summary = [
+      ["暂停原因", valueAfterLabel("暂停原因", text)],
+      ["参照平台", valueAfterLabel("参照平台", text)],
+      ["恢复条件", valueAfterLabel("恢复条件", text)],
+      ["复盘结论", valueAfterLabel("复盘结论", text)],
+    ]
+      .filter(([, value]) => value)
+      .map(([label, value]) => `${label}：${value}`)
+      .join("；");
+    if (summary) return summary.slice(0, 240);
+  }
   if (/样本轮次\s*[：:=]?\s*第二轮小样本|第二轮小样本|二轮小样本|验证变量\s*[：:=]?.*前三章/u.test(text)) {
     const summary = [
       ["样本轮次", valueAfterLabel("样本轮次", text)],
@@ -117,6 +129,10 @@ function rate(numerator: number, denominator: number) {
 function hasRepairCompletionSignal(stage: string, text: string) {
   if (!repairEvidenceStages.has(stage)) return false;
   return /(?:修复对象|修复前问题|处理动作|修复后证据|复检结果|下一轮口径)\s*[：:=]\s*\S+/u.test(text);
+}
+
+function hasPauseReviewSignal(stage: string, text: string) {
+  return stage === "pause_platform" && /(?:暂停原因|参照平台|恢复条件|复盘结论)\s*[：:=]\s*\S+/u.test(text);
 }
 
 function review(input: {
@@ -177,13 +193,14 @@ export function buildSubmissionDecisionCompletionEffect(
     comments: metric(text, ["评论", "留言", "comments?"]),
     paidReads: metric(text, ["付费阅读", "付费", "订阅", "paid\\s*reads?"]),
   };
-  const contractStatus = inferSubmissionDecisionContractStatus(text);
+  const hasPauseSignal = hasPauseReviewSignal(input.stage, text);
+  const contractStatus = hasPauseSignal ? "unknown" : inferSubmissionDecisionContractStatus(text);
   const publishUrl = firstUrl(text);
   const feedback = editorFeedback(text);
   const hasMetricSignal = Object.values(effect).some((value) => value > 0);
   const hasBusinessSignal = contractStatus !== "unknown" || publishUrl.length > 0;
   const hasRepairSignal = hasRepairCompletionSignal(input.stage, text);
-  if (!hasMetricSignal && !hasBusinessSignal && !hasRepairSignal) return null;
+  if (!hasMetricSignal && !hasBusinessSignal && !hasRepairSignal && !hasPauseSignal) return null;
 
   return {
     projectId: input.projectId,

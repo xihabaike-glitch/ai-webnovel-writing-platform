@@ -368,6 +368,10 @@ function hasCompletedRepairPackageTracking(effectTracking: MultiPlatformEffectTr
   return effectTracking.evidence.some((item) => item.includes("修复包已完成"));
 }
 
+function hasPauseRecoveryTracking(effectTracking: MultiPlatformEffectTracking) {
+  return effectTracking.evidence.some((item) => item.includes("暂停复盘结论：恢复一轮小样本"));
+}
+
 function secondRoundRetestConclusion(metric: MultiPlatformPublishMetricInput): "watch" | "repair" | "pause" | null {
   const text = `${metric.editorFeedback} ${metric.notes}`;
   const isRetest = /样本轮次\s*[：:=]?\s*第二轮小样本|第二轮小样本|二轮小样本|验证变量\s*[：:=]?.*前三章/u.test(text);
@@ -376,6 +380,11 @@ function secondRoundRetestConclusion(metric: MultiPlatformPublishMetricInput): "
   if (/结论\s*[：:=]?\s*(?:回到修包装|修包装|返修|重修)|回到修包装/u.test(text)) return "repair";
   if (/结论\s*[：:=]?\s*(?:继续观察|通过|可继续)|复检通过/u.test(text)) return "watch";
   return null;
+}
+
+function pauseRecoveryConclusion(metric: MultiPlatformPublishMetricInput) {
+  const text = `${metric.editorFeedback} ${metric.notes}`;
+  return /复盘结论\s*[：:=]?\s*恢复一轮小样本|恢复条件\s*[：:=]?.*恢复一轮小样本|恢复条件\s*[：:=]?.*只恢复一轮小样本/u.test(text);
 }
 
 function buildEffectTracking(platform: PlatformProfile, metrics: MultiPlatformPublishMetricInput[]): MultiPlatformEffectTracking {
@@ -416,6 +425,7 @@ function buildEffectTracking(platform: PlatformProfile, metrics: MultiPlatformPu
   ].filter(Boolean);
   const completedRepairPackage = hasCompletedRepairPackageEvidence(latest);
   const retestConclusion = secondRoundRetestConclusion(latest);
+  const recoveredFromPause = pauseRecoveryConclusion(latest);
   const trackingEvidence = completedRepairPackage
     ? [...evidence, "修复包已完成：等待第二轮小样本重验标题、简介、标签和前三章兑现。"]
     : evidence;
@@ -444,6 +454,27 @@ function buildEffectTracking(platform: PlatformProfile, metrics: MultiPlatformPu
       nextAction: "保留当前投稿入口承诺，围绕有效卖点稳定更新，不要乱换题眼。",
       repairFocus: [],
       evidence: trackingEvidence,
+    };
+  }
+
+  if (recoveredFromPause) {
+    return {
+      status: "watch",
+      label: "恢复复检",
+      records: history.length,
+      latestSnapshotDate: new Date(latest.snapshotDate).toISOString(),
+      views: latest.views,
+      clicks: latest.clicks,
+      favorites: latest.favorites,
+      follows: latest.follows,
+      comments: latest.comments,
+      paidReads: latest.paidReads,
+      clickRatePercent,
+      favoriteRatePercent,
+      followRatePercent,
+      nextAction: "暂停复盘允许恢复一轮小样本；只回填恢复样本数据，不恢复常规投放。",
+      repairFocus: [],
+      evidence: [...trackingEvidence, "暂停复盘结论：恢复一轮小样本"],
     };
   }
 
@@ -809,6 +840,7 @@ function laneOrder(kind: MultiPlatformDecisionKind) {
 
 function decisionTaskLaneOrder(variant: MultiPlatformSubmissionVariant) {
   if (variant.decision.kind === "watch" && hasCompletedRepairPackageTracking(variant.effectTracking)) return 2.5;
+  if (variant.decision.kind === "watch" && hasPauseRecoveryTracking(variant.effectTracking)) return 2.6;
   if (variant.decision.kind === "pause" && variant.effectTracking.status === "paused") return 2.8;
   return laneOrder(variant.decision.kind);
 }
@@ -870,6 +902,13 @@ function decisionAcceptanceCriteria(
     ];
   }
   if (kind === "watch") {
+    if (hasPauseRecoveryTracking(variant.effectTracking)) {
+      return [
+        "只恢复一轮小样本，不直接回到常规投放。",
+        "回填恢复样本的曝光、点击、收藏、追读和平台反馈。",
+        "用暂停前二轮小样本和参照平台正反馈做对照。",
+      ];
+    }
     if (hasCompletedRepairPackageTracking(variant.effectTracking)) {
       return [
         "只投第二轮小样本，不提前放大或放弃。",
@@ -902,6 +941,9 @@ function decisionTaskDetail(
   variant: MultiPlatformSubmissionVariant,
   recoveryReference?: MultiPlatformSubmissionVariant | null,
 ) {
+  if (variant.decision.kind === "watch" && hasPauseRecoveryTracking(variant.effectTracking)) {
+    return `${variant.decision.reason} 暂停复盘已允许恢复一轮小样本；这一步只收恢复样本数据，不恢复常规投放。`;
+  }
   if (variant.decision.kind === "pause" && variant.effectTracking.status === "paused" && recoveryReference) {
     return `${variant.decision.reason} 恢复参照：${recoveryReference.platformName} 已有正反馈，只允许按其有效卖点做一轮恢复小样本。`;
   }

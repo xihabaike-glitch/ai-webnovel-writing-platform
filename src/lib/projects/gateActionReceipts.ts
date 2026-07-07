@@ -4616,6 +4616,12 @@ function isRepairRetestMetricCompletionTask(task: GateDispatchCompletionTemplate
   return /修复包已完成|二轮小样本|第二轮小样本|重验标题、简介、标签和前三章/u.test(text);
 }
 
+function isPauseRecoveryMetricCompletionTask(task: GateDispatchCompletionTemplateTask) {
+  if (!metricCompletionStages.has(task.stage)) return false;
+  const text = `${task.title} ${task.actionLabel} ${(task.evidence ?? []).join(" ")}`;
+  return /暂停复盘结论：恢复一轮小样本|恢复一轮小样本/u.test(text);
+}
+
 function isPausePlatformReviewTask(task: GateDispatchCompletionTemplateTask) {
   const text = `${task.title} ${task.actionLabel} ${(task.evidence ?? []).join(" ")}`;
   return task.stage === "pause_platform" && /暂停复盘|恢复小样本|恢复条件/u.test(text);
@@ -4753,6 +4759,24 @@ export function buildGateDispatchCompletionTemplate(task: GateDispatchCompletion
       "放量结论：通过恢复小批 / 未通过继续观察",
     ].join("\n");
   }
+  if (isPauseRecoveryMetricCompletionTask(task)) {
+    return [
+      `${task.title}`,
+      "样本轮次：恢复一轮小样本",
+      "恢复依据：",
+      "对照口径：暂停前二轮小样本 / 参照平台正反馈",
+      "日期：",
+      "曝光：",
+      "点击：",
+      "收藏：",
+      "追读：",
+      "评论：",
+      "付费阅读：",
+      "平台反馈：",
+      "发布链接：",
+      "结论：继续观察 / 回到修包装 / 继续暂停",
+    ].join("\n");
+  }
   if (isRepairRetestMetricCompletionTask(task)) {
     return [
       `${task.title}`,
@@ -4861,6 +4885,14 @@ export function reviewGateDispatchCompletionEvidence(
   }
 
   if (text.length < 8) return "完成派单前，请写清楚完成依据，至少 8 个字。";
+
+  if (isPauseRecoveryMetricCompletionTask(task)) {
+    const missing: string[] = [];
+    if (completedLabels(text, ["样本轮次", "恢复依据", "对照口径"]).length < 2) missing.push("样本轮次、恢复依据或对照口径");
+    if (!hasMetricOrBusinessSignal(text)) missing.push("真实数据或平台反馈");
+    if (!hasConcreteDispatchCompletionValue(completionValueAfterLabel("结论", text))) missing.push("结论");
+    return missing.length ? `请补齐恢复小样本回填依据：${missing.join("、")}。` : null;
+  }
 
   if (isRepairRetestMetricCompletionTask(task)) {
     const missing: string[] = [];

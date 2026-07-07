@@ -56,6 +56,18 @@ function gateReturnFromParam(value: string | string[] | undefined) {
   return raw;
 }
 
+function hrefWithGateReturn(href: string, gateReturnHref?: string | null) {
+  if (!gateReturnHref || !href.startsWith("/") || href.startsWith("/gate")) return href;
+
+  const hashIndex = href.indexOf("#");
+  const base = hashIndex >= 0 ? href.slice(0, hashIndex) : href;
+  const hash = hashIndex >= 0 ? href.slice(hashIndex) : "";
+  if (base.includes("gateReturn=")) return href;
+  const separator = base.includes("?") ? "&" : "?";
+
+  return `${base}${separator}gateReturn=${encodeURIComponent(gateReturnHref)}${hash}`;
+}
+
 function normalizeAssetAuditStatus(status: string): "ready" | "blocked" | "needs_work" {
   if (status === "ready" || status === "blocked") return status;
   return "needs_work";
@@ -379,7 +391,7 @@ export default async function DispatchPage({
               <div className="font-medium">队列筛选已回退</div>
               <p className="mt-1 text-sm leading-6">{invalidQueueNotice}</p>
             </div>
-            <Link className="w-fit rounded-md bg-white px-3 py-2 text-sm font-medium text-amber-950 hover:bg-amber-100" href="/dispatch">
+            <Link className="w-fit rounded-md bg-white px-3 py-2 text-sm font-medium text-amber-950 hover:bg-amber-100" href={hrefWithGateReturn("/dispatch", gateReturn)}>
               查看全部派单
             </Link>
           </div>

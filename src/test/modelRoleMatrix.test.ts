@@ -135,6 +135,13 @@ test("buildModelRoleMatrix", async (t) => {
     assert.ok(notice.proof.includes("复检"));
     assert.equal(notice.tone, "blocked");
     assert.equal(notice.actionHref, "/settings/models#model-role-matrix");
+    assert.equal(notice.pipelineActionLabel, "验收真实流水线");
+    assert.equal(notice.pipelineActionHref, "/projects#pipeline-projects");
+    assert.ok(notice.pipelineValidationHint.includes("开书"));
+    assert.ok(notice.pipelineValidationHint.includes("首章"));
+    assert.ok(notice.pipelineValidationHint.includes("审稿"));
+    assert.ok(notice.pipelineValidationHint.includes("发布包"));
+    assert.ok(notice.pipelineValidationHint.includes("复盘"));
   });
 
   await t.test("allows fallback providers but warns when context is too short", () => {

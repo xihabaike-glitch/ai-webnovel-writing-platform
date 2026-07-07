@@ -85,6 +85,9 @@ export interface ModelRoleMatrixPmFocusNotice {
   proof: string;
   actionLabel: string;
   actionHref: string;
+  pipelineActionLabel: string;
+  pipelineActionHref: string;
+  pipelineValidationHint: string;
 }
 
 export interface ModelRoleRouteDraftRoute {
@@ -478,6 +481,9 @@ export function buildModelRoleMatrixPmFocusNotice(matrix: ModelRoleMatrix): Mode
     proof,
     actionLabel: matrix.status === "ready" ? "检查职责路由" : "补模型岗位",
     actionHref: "/settings/models#model-role-matrix",
+    pipelineActionLabel: "验收真实流水线",
+    pipelineActionHref: "/projects#pipeline-projects",
+    pipelineValidationHint: "模型岗位必须落到开书、首章、审稿、发布包和复盘证据；没有真实作品流水线，就只是聊天壳。",
   };
 }
 

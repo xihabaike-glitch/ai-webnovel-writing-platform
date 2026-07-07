@@ -1399,12 +1399,23 @@ export function ModelProviderSettings({
             </div>
             <p className="mt-2 leading-6">{modelRoleMatrixPmFocusNotice.reason}</p>
             <p className="mt-1 text-xs leading-5 opacity-80">验收证据：{modelRoleMatrixPmFocusNotice.proof}</p>
-            <a
-              className="mt-3 inline-flex w-fit rounded-md bg-white px-3 py-2 text-xs font-medium text-slate-950 hover:bg-slate-100"
-              href={modelRoleMatrixPmFocusNotice.actionHref}
-            >
-              {modelRoleMatrixPmFocusNotice.actionLabel}
-            </a>
+            <div className="mt-2 rounded-md bg-white/60 px-3 py-2 text-xs leading-5 text-slate-700">
+              {modelRoleMatrixPmFocusNotice.pipelineValidationHint}
+            </div>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <a
+                className="inline-flex w-fit rounded-md bg-white px-3 py-2 text-xs font-medium text-slate-950 hover:bg-slate-100"
+                href={modelRoleMatrixPmFocusNotice.actionHref}
+              >
+                {modelRoleMatrixPmFocusNotice.actionLabel}
+              </a>
+              <a
+                className="inline-flex w-fit rounded-md border border-white/60 px-3 py-2 text-xs font-medium text-slate-950 hover:bg-white/50"
+                href={modelRoleMatrixPmFocusNotice.pipelineActionHref}
+              >
+                {modelRoleMatrixPmFocusNotice.pipelineActionLabel}
+              </a>
+            </div>
           </div>
           <div className="mt-4 grid gap-3 xl:grid-cols-2">
             {modelRoleMatrix.roles.map((role) => {

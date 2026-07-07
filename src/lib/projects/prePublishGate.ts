@@ -452,6 +452,9 @@ export interface PrePublishGatePmFocus {
   scopeLabel: string;
   actionLabel: string;
   actionHref: string;
+  pipelineActionLabel: string;
+  pipelineActionHref: string;
+  pipelineValidationHint: string;
 }
 
 export interface PrePublishGateFocusNotice {
@@ -1435,6 +1438,9 @@ function buildPrePublishGatePmFocus(
       scopeLabel,
       actionLabel: "回任务中心",
       actionHref: "/tasks",
+      pipelineActionLabel: "核对项目流水线",
+      pipelineActionHref: "/projects#pipeline-projects",
+      pipelineValidationHint: "放量前先回项目流水线补样本、复查、失败修复和发布包证据；缺证据就不允许放大生产。",
     };
   }
 
@@ -1446,6 +1452,9 @@ function buildPrePublishGatePmFocus(
     scopeLabel,
     actionLabel: releaseAction.label,
     actionHref: releaseAction.href,
+    pipelineActionLabel: "核对项目流水线",
+    pipelineActionHref: "/projects#pipeline-projects",
+    pipelineValidationHint: "放量前先回项目流水线核对样本、复查、失败修复和发布包证据；证据不闭合就只允许修复或小样本。",
   };
 }
 

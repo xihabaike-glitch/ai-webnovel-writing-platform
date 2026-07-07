@@ -174,6 +174,13 @@ test("buildPrePublishGate", async (t) => {
     assert.ok(gate.pmFocus.detail.includes(gate.releaseAction?.detail ?? ""));
     assert.ok(gate.pmFocus.scopeLabel.includes("8/8 核心平台已完成"));
     assert.ok(gate.pmFocus.scopeLabel.includes("剩余 10 个平台不再添加"));
+    assert.equal(gate.pmFocus.pipelineActionLabel, "核对项目流水线");
+    assert.equal(gate.pmFocus.pipelineActionHref, "/projects#pipeline-projects");
+    assert.ok(gate.pmFocus.pipelineValidationHint.includes("放量前"));
+    assert.ok(gate.pmFocus.pipelineValidationHint.includes("样本"));
+    assert.ok(gate.pmFocus.pipelineValidationHint.includes("复查"));
+    assert.ok(gate.pmFocus.pipelineValidationHint.includes("失败修复"));
+    assert.ok(gate.pmFocus.pipelineValidationHint.includes("发布包"));
   });
 
   await t.test("focuses first-day completion as a gate release notice", () => {

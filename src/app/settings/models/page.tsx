@@ -30,6 +30,7 @@ import {
   type RouteAvoidanceOverride,
 } from "@/lib/model-gateway/routeRecommendations";
 import { modelTaskRouteOptions } from "@/lib/model-gateway/taskRouting";
+import Link from "next/link";
 
 export const dynamic = "force-dynamic";
 
@@ -57,7 +58,23 @@ function maskProvider(provider: {
   };
 }
 
-export default async function ModelSettingsPage() {
+function gateReturnFromParam(value: string | string[] | undefined) {
+  const raw = Array.isArray(value) ? value[0] : value;
+
+  if (!raw?.startsWith("/gate?focus=action-recheck")) {
+    return null;
+  }
+
+  return raw;
+}
+
+export default async function ModelSettingsPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ gateReturn?: string | string[] }>;
+}) {
+  const query = await searchParams;
+  const gateReturn = gateReturnFromParam(query?.gateReturn);
   const [
     providers,
     routes,
@@ -267,6 +284,19 @@ export default async function ModelSettingsPage() {
     <AppShell>
       <h1 className="text-2xl font-semibold">模型设置</h1>
       <p className="mt-1 text-sm text-slate-600">配置 Claude、DeepSeek、Kimi、GPT、兼容网关或本地 Ollama。</p>
+      {gateReturn ? (
+        <section className="mt-4 rounded-md border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <div className="font-medium">来自总闸门复检</div>
+              <p className="mt-1 leading-5">先补齐模型 API Key、供应商启用状态或任务路由配置，处理后回总闸门确认剩余卡点是否减少。</p>
+            </div>
+            <Link className="w-fit rounded-md bg-white px-3 py-2 text-sm font-medium text-amber-950 hover:bg-amber-100" href={gateReturn}>
+              回总闸门复检
+            </Link>
+          </div>
+        </section>
+      ) : null}
       <ModelProviderSettings
         healthDashboard={healthDashboard}
         options={providerOptions}

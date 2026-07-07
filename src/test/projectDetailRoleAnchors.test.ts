@@ -181,6 +181,9 @@ test("project detail page carries gate return through export and submission link
   assert.ok(platformExportCenterPanel.includes("multiPlatformExportSourcePrompt"));
   assert.ok(platformExportCenterPanel.includes("来自多平台投稿包"));
   assert.ok(platformExportCenterPanel.includes("推荐先导出"));
+  assert.ok(platformExportCenterPanel.includes("selectedPlatformIsRecommended"));
+  assert.ok(platformExportCenterPanel.includes("推荐平台"));
+  assert.ok(platformExportCenterPanel.includes("当前推荐导出"));
   assert.ok(platformExportCenterPanel.includes("function hrefWithGateReturn"));
   assert.ok(platformExportCenterPanel.includes("href={hrefWithGateReturn(item.actionHref, gateReturnHref, projectId)}"));
   assert.ok(platformExportCenterPanel.includes("href={hrefWithGateReturn(handoffActionHref(projectId, center.executionHandoffSummary.primaryAction), gateReturnHref, projectId)}"));

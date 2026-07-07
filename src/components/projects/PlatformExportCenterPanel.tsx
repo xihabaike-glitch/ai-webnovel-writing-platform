@@ -1685,6 +1685,7 @@ export function PlatformExportCenterPanel({
     () => center?.packages.find((pack) => pack.platformId === selectedPlatformId) ?? center?.packages[0] ?? null,
     [center, selectedPlatformId],
   );
+  const selectedPlatformIsRecommended = Boolean(center && selectedPackage?.platformId === center.recommendedPlatformId);
   const multiPlatformExportSourcePrompt = exportSource === "multi-platform-package"
     ? `来自多平台投稿包，推荐先导出${selectedPackage ? ` ${selectedPackage.platformName} ` : "推荐平台"}发布包，再回填首轮真实效果。`
     : null;
@@ -2719,13 +2720,18 @@ export function PlatformExportCenterPanel({
             value={selectedPlatformId}
           >
             {center?.packages.map((pack) => (
-              <option key={pack.platformId} value={pack.platformId}>{pack.platformName}</option>
+              <option key={pack.platformId} value={pack.platformId}>
+                {pack.platformName}{pack.platformId === center.recommendedPlatformId ? " · 推荐平台" : ""}
+              </option>
             ))}
           </select>
         </label>
         <div className="rounded-md bg-slate-50 p-3">
           <div className="text-xs text-slate-500">可导出章节</div>
           <div className="mt-1 text-2xl font-semibold text-slate-950">{center?.totalPublishableChapters ?? 0}</div>
+          {selectedPlatformIsRecommended ? (
+            <div className="mt-1 text-xs font-medium text-cyan-700">当前推荐导出：{selectedPackage?.platformName}</div>
+          ) : null}
         </div>
         <div className="flex flex-wrap items-end gap-2">
           <button

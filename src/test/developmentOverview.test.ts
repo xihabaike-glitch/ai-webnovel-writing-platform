@@ -221,6 +221,7 @@ test("buildDevelopmentOverview", async (t) => {
 
     const modelInterfaces = overview.requirementTraceability.items.find((item) => item.id === "model_interfaces");
     const platformScope = overview.requirementTraceability.items.find((item) => item.id === "platform_8");
+    const tomatoStyle = overview.requirementTraceability.items.find((item) => item.id === "tomato_style");
     const treeMethod = overview.requirementTraceability.items.find((item) => item.id === "tree_method");
 
     assert.ok(modelInterfaces?.currentEvidence.includes("Claude"));
@@ -228,6 +229,8 @@ test("buildDevelopmentOverview", async (t) => {
     assert.ok(modelInterfaces?.currentEvidence.includes("Kimi"));
     assert.ok(modelInterfaces?.currentEvidence.includes("GPT"));
     assert.ok(platformScope?.currentEvidence.includes("8/8"));
+    assert.equal(platformScope?.href, "/projects#platform-export");
+    assert.equal(tomatoStyle?.href, "/projects#platform-export");
     assert.ok(treeMethod?.acceptanceSignal.includes("开头"));
     assert.ok(treeMethod?.acceptanceSignal.includes("土壤"));
     assert.equal(treeMethod?.href, "/projects#story-structure");

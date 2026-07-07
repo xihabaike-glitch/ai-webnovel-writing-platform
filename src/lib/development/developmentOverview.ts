@@ -537,7 +537,7 @@ function buildRequirementTraceability(): DevelopmentOverviewRequirementTraceabil
         originalRequest: "国内覆盖起点、番茄、七猫、晋江、知乎盐选；海外覆盖 WebNovel、Royal Road、Wattpad。",
         currentEvidence: `${platformDeliveryScope.statusLabel}，${platformDeliveryScope.expansionLabel}，当前不再扩剩余平台。`,
         acceptanceSignal: "8 个核心平台都有写作风格、投稿包装、复盘指标和下一步执行卡。",
-        href: "/references",
+        href: "/projects#platform-export",
       },
       {
         id: "length_modes",
@@ -572,7 +572,7 @@ function buildRequirementTraceability(): DevelopmentOverviewRequirementTraceabil
         originalRequest: "内容风格要符合番茄等平台，同时覆盖国内和海外平台差异。",
         currentEvidence: "平台写作模板已覆盖国内快读、付费长线、知乎短篇、海外英文连载和平台包装规则。",
         acceptanceSignal: "章节卡、审稿、二改和发布包能按目标平台调整钩子、爽点、节奏、标签和简介。",
-        href: "/references",
+        href: "/projects#platform-export",
       },
       {
         id: "pipeline_validation",

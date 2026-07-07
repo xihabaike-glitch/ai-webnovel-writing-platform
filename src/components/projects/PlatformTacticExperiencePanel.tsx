@@ -38,7 +38,25 @@ function fileName(item: GatePlatformTacticExperienceItem) {
   return `${item.platformName.replace(/[\\/:*?"<>|]/g, "-")}-平台打法经验.md`;
 }
 
-export function PlatformTacticExperiencePanel({ library }: { library: GatePlatformTacticExperienceLibrary }) {
+function hrefWithGateReturn(href: string, gateReturnHref?: string | null) {
+  if (!gateReturnHref || !href.startsWith("/") || href.startsWith("/gate")) return href;
+
+  const hashIndex = href.indexOf("#");
+  const base = hashIndex >= 0 ? href.slice(0, hashIndex) : href;
+  const hash = hashIndex >= 0 ? href.slice(hashIndex) : "";
+  if (base.includes("gateReturn=")) return href;
+  const separator = base.includes("?") ? "&" : "?";
+
+  return `${base}${separator}gateReturn=${encodeURIComponent(gateReturnHref)}${hash}`;
+}
+
+export function PlatformTacticExperiencePanel({
+  gateReturnHref,
+  library,
+}: {
+  gateReturnHref?: string | null;
+  library: GatePlatformTacticExperienceLibrary;
+}) {
   const [message, setMessage] = useState("");
   const [assigningDispatchId, setAssigningDispatchId] = useState("");
   const [statusFilter, setStatusFilter] = useState<GatePlatformTacticExperienceStatusFilter>("all");
@@ -168,11 +186,11 @@ export function PlatformTacticExperiencePanel({ library }: { library: GatePlatfo
                       </div>
                     ) : null}
                     <div className="mt-3 flex flex-wrap gap-2">
-                      <Link className="rounded-md border border-white/70 bg-white px-3 py-2 text-xs font-medium text-slate-950 hover:bg-white/80" href={item.href}>
+                      <Link className="rounded-md border border-white/70 bg-white px-3 py-2 text-xs font-medium text-slate-950 hover:bg-white/80" href={hrefWithGateReturn(item.href, gateReturnHref)}>
                         查看来源
                       </Link>
                       {item.status === "usable" ? (
-                        <Link className="rounded-md border border-white/70 bg-slate-950 px-3 py-2 text-xs font-medium text-white hover:bg-slate-800" href={buildGatePlatformTacticExperienceStartHref(item)}>
+                        <Link className="rounded-md border border-white/70 bg-slate-950 px-3 py-2 text-xs font-medium text-white hover:bg-slate-800" href={hrefWithGateReturn(buildGatePlatformTacticExperienceStartHref(item), gateReturnHref)}>
                           用此打法开项目
                         </Link>
                       ) : null}

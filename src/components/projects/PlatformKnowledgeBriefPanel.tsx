@@ -19,8 +19,29 @@ function shortDate(value: string) {
   return date.toLocaleDateString("zh-CN", { month: "2-digit", day: "2-digit" });
 }
 
-export function PlatformKnowledgeBriefPanel({ brief, projectId }: { brief: PlatformKnowledgeBrief; projectId: string }) {
-  const actionHref = brief.actionHref.startsWith("#") ? `/projects/${projectId}${brief.actionHref}` : brief.actionHref;
+function hrefWithGateReturn(href: string, gateReturnHref?: string | null) {
+  if (!gateReturnHref || !href.startsWith("/") || href.startsWith("/gate")) return href;
+
+  const hashIndex = href.indexOf("#");
+  const base = hashIndex >= 0 ? href.slice(0, hashIndex) : href;
+  const hash = hashIndex >= 0 ? href.slice(hashIndex) : "";
+  if (base.includes("gateReturn=")) return href;
+  const separator = base.includes("?") ? "&" : "?";
+
+  return `${base}${separator}gateReturn=${encodeURIComponent(gateReturnHref)}${hash}`;
+}
+
+export function PlatformKnowledgeBriefPanel({
+  brief,
+  gateReturnHref,
+  projectId,
+}: {
+  brief: PlatformKnowledgeBrief;
+  gateReturnHref?: string | null;
+  projectId: string;
+}) {
+  const rawActionHref = brief.actionHref.startsWith("#") ? `/projects/${projectId}${brief.actionHref}` : brief.actionHref;
+  const actionHref = hrefWithGateReturn(rawActionHref, gateReturnHref);
 
   return (
     <section className={`rounded-md border p-4 ${statusClass(brief.status)}`} id="platform-knowledge-brief">
@@ -38,7 +59,7 @@ export function PlatformKnowledgeBriefPanel({ brief, projectId }: { brief: Platf
           <Link className="rounded-md bg-white px-3 py-2 text-sm font-medium text-slate-950 hover:bg-white/80" href={actionHref}>
             {brief.nextAction}
           </Link>
-          <Link className="rounded-md border border-white/70 bg-white/70 px-3 py-2 text-sm font-medium text-slate-950 hover:bg-white" href={`/projects/${projectId}#platform-tactic-library`}>
+          <Link className="rounded-md border border-white/70 bg-white/70 px-3 py-2 text-sm font-medium text-slate-950 hover:bg-white" href={hrefWithGateReturn(`/projects/${projectId}#platform-tactic-library`, gateReturnHref)}>
             看打法库
           </Link>
         </div>

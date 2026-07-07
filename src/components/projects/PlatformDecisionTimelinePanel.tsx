@@ -36,7 +36,25 @@ function summaryFileName(item: GatePlatformDecisionTimelineItem) {
   return `${item.platformName.replace(/[\\/:*?"<>|]/g, "-")}-平台决策复盘.md`;
 }
 
-export function PlatformDecisionTimelinePanel({ timeline }: { timeline: GatePlatformDecisionTimeline }) {
+function hrefWithGateReturn(href: string, gateReturnHref?: string | null) {
+  if (!gateReturnHref || !href.startsWith("/") || href.startsWith("/gate")) return href;
+
+  const hashIndex = href.indexOf("#");
+  const base = hashIndex >= 0 ? href.slice(0, hashIndex) : href;
+  const hash = hashIndex >= 0 ? href.slice(hashIndex) : "";
+  if (base.includes("gateReturn=")) return href;
+  const separator = base.includes("?") ? "&" : "?";
+
+  return `${base}${separator}gateReturn=${encodeURIComponent(gateReturnHref)}${hash}`;
+}
+
+export function PlatformDecisionTimelinePanel({
+  gateReturnHref,
+  timeline,
+}: {
+  gateReturnHref?: string | null;
+  timeline: GatePlatformDecisionTimeline;
+}) {
   const [message, setMessage] = useState("");
   const summaryItems = [
     { label: "平台轨迹", value: timeline.summary.total, className: "bg-slate-50 text-slate-700" },
@@ -110,13 +128,13 @@ export function PlatformDecisionTimelinePanel({ timeline }: { timeline: GatePlat
                   </div>
                   <p className="mt-2 leading-6 opacity-85">{item.detail}</p>
                 </div>
-                <Link className="w-fit rounded-md bg-white px-3 py-2 text-xs font-medium text-slate-950 hover:bg-white/80" href={item.href}>
+                <Link className="w-fit rounded-md bg-white px-3 py-2 text-xs font-medium text-slate-950 hover:bg-white/80" href={hrefWithGateReturn(item.href, gateReturnHref)}>
                   {item.actionLabel}
                 </Link>
               </div>
               <div className="mt-3 grid gap-2">
                 {item.events.slice(0, 4).map((event) => (
-                  <Link className="rounded-md border border-white/70 bg-white/70 p-3 hover:bg-white" href={event.href} key={event.id}>
+                  <Link className="rounded-md border border-white/70 bg-white/70 p-3 hover:bg-white" href={hrefWithGateReturn(event.href, gateReturnHref)} key={event.id}>
                     <div className="flex flex-wrap items-center gap-2">
                       <span className={`rounded-md px-2 py-1 text-xs font-medium ${eventClass(event.type)}`}>{event.label}</span>
                       <span className="text-xs opacity-70">{timeText(event.createdAt)}</span>

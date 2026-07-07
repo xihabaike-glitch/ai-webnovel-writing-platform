@@ -630,7 +630,7 @@ export default async function ProjectPage({
           </div>
         </section>
         <WritingWorkbenchPanel gateReturnHref={gateReturn} workbench={writingWorkbench} />
-        <PlatformKnowledgeBriefPanel brief={platformKnowledgeBrief} projectId={project.id} />
+        <PlatformKnowledgeBriefPanel brief={platformKnowledgeBrief} gateReturnHref={gateReturn} projectId={project.id} />
         <div id="project-control">
           <ProjectControlDashboardPanel projectId={project.id} />
         </div>
@@ -777,9 +777,9 @@ export default async function ProjectPage({
         <div id="serialization-ops">
           <SerializationOpsPanel projectId={project.id} />
         </div>
-        <PlatformDecisionTimelinePanel timeline={platformDecisionTimeline} />
+        <PlatformDecisionTimelinePanel gateReturnHref={gateReturn} timeline={platformDecisionTimeline} />
         <div id="platform-tactic-experience">
-          <PlatformTacticExperiencePanel library={platformTacticExperienceLibrary} />
+          <PlatformTacticExperiencePanel gateReturnHref={gateReturn} library={platformTacticExperienceLibrary} />
         </div>
         <div id="platform-export">
           <PlatformExportCenterPanel projectId={project.id} />

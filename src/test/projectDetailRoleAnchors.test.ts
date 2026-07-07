@@ -85,6 +85,32 @@ test("project detail page carries gate return through first day workflow links",
   assert.ok(firstDayWorkflowPanel.includes("<FirstDayStepCard gateReturnHref={gateReturnHref} index={index} key={step.id} step={step} />"));
 });
 
+test("project detail page carries gate return through platform decision links", () => {
+  const projectPage = readFileSync("src/app/projects/[projectId]/page.tsx", "utf8");
+  const platformKnowledgeBriefPanel = readFileSync("src/components/projects/PlatformKnowledgeBriefPanel.tsx", "utf8");
+  const platformDecisionTimelinePanel = readFileSync("src/components/projects/PlatformDecisionTimelinePanel.tsx", "utf8");
+  const platformTacticExperiencePanel = readFileSync("src/components/projects/PlatformTacticExperiencePanel.tsx", "utf8");
+
+  assert.ok(projectPage.includes("<PlatformKnowledgeBriefPanel brief={platformKnowledgeBrief} gateReturnHref={gateReturn} projectId={project.id} />"));
+  assert.ok(projectPage.includes("<PlatformDecisionTimelinePanel gateReturnHref={gateReturn} timeline={platformDecisionTimeline} />"));
+  assert.ok(projectPage.includes("<PlatformTacticExperiencePanel gateReturnHref={gateReturn} library={platformTacticExperienceLibrary} />"));
+
+  assert.ok(platformKnowledgeBriefPanel.includes("gateReturnHref?: string | null"));
+  assert.ok(platformKnowledgeBriefPanel.includes("function hrefWithGateReturn"));
+  assert.ok(platformKnowledgeBriefPanel.includes("const actionHref = hrefWithGateReturn(rawActionHref, gateReturnHref);"));
+  assert.ok(platformKnowledgeBriefPanel.includes("href={hrefWithGateReturn(`/projects/${projectId}#platform-tactic-library`, gateReturnHref)}"));
+
+  assert.ok(platformDecisionTimelinePanel.includes("gateReturnHref?: string | null"));
+  assert.ok(platformDecisionTimelinePanel.includes("function hrefWithGateReturn"));
+  assert.ok(platformDecisionTimelinePanel.includes("href={hrefWithGateReturn(item.href, gateReturnHref)}"));
+  assert.ok(platformDecisionTimelinePanel.includes("href={hrefWithGateReturn(event.href, gateReturnHref)}"));
+
+  assert.ok(platformTacticExperiencePanel.includes("gateReturnHref?: string | null"));
+  assert.ok(platformTacticExperiencePanel.includes("function hrefWithGateReturn"));
+  assert.ok(platformTacticExperiencePanel.includes("href={hrefWithGateReturn(item.href, gateReturnHref)}"));
+  assert.ok(platformTacticExperiencePanel.includes("href={hrefWithGateReturn(buildGatePlatformTacticExperienceStartHref(item), gateReturnHref)}"));
+});
+
 test("chapter detail page keeps a gate recheck return path visible", () => {
   const chapterPage = readFileSync("src/app/projects/[projectId]/chapters/[chapterId]/page.tsx", "utf8");
 

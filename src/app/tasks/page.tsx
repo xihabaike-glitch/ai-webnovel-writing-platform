@@ -1227,7 +1227,7 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
                 {batchRhythmClosure.actionLabel}
               </Link>
             ) : batchRhythmDispatch ? (
-              <CreateBatchRhythmDispatchButton label="生成节奏派单" />
+              <CreateBatchRhythmDispatchButton gateReturnHref={gateReturn} label="生成节奏派单" />
             ) : (
               <Link className="w-fit shrink-0 rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white hover:bg-slate-800" href={hrefWithGateReturn(batchRhythmDecision.href, gateReturn)}>
                 {batchRhythmDecision.actionLabel}

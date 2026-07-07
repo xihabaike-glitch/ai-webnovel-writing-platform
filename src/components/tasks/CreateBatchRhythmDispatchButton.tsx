@@ -14,7 +14,25 @@ interface BatchRhythmDispatchResponse {
   } | null;
 }
 
-export function CreateBatchRhythmDispatchButton({ label = "生成派单" }: { label?: string }) {
+function hrefWithGateReturn(href: string, gateReturnHref?: string | null) {
+  if (!gateReturnHref || !href.startsWith("/") || href.startsWith("/gate")) return href;
+
+  const hashIndex = href.indexOf("#");
+  const base = hashIndex >= 0 ? href.slice(0, hashIndex) : href;
+  const hash = hashIndex >= 0 ? href.slice(hashIndex) : "";
+  if (base.includes("gateReturn=")) return href;
+  const separator = base.includes("?") ? "&" : "?";
+
+  return `${base}${separator}gateReturn=${encodeURIComponent(gateReturnHref)}${hash}`;
+}
+
+export function CreateBatchRhythmDispatchButton({
+  label = "生成派单",
+  gateReturnHref,
+}: {
+  label?: string;
+  gateReturnHref?: string | null;
+}) {
   const router = useRouter();
   const [isRunning, setIsRunning] = useState(false);
   const [message, setMessage] = useState("");
@@ -32,7 +50,7 @@ export function CreateBatchRhythmDispatchButton({ label = "生成派单" }: { la
       }
       setMessage(payload?.message ?? "批次节奏派单已处理。");
       if (payload?.task?.dispatchKey) {
-        router.push(`/dispatch#dispatch-${payload.task.dispatchKey}`);
+        router.push(hrefWithGateReturn(`/dispatch#dispatch-${payload.task.dispatchKey}`, gateReturnHref));
       }
       router.refresh();
     } catch (caught) {

@@ -55,6 +55,7 @@ test("tasks page carries gate return through task work links", () => {
   const recommendedBatchButton = readFileSync("src/components/tasks/RunRecommendedBatchButton.tsx", "utf8");
   const publishEffectButton = readFileSync("src/components/tasks/RunPublishEffectQueueActionButton.tsx", "utf8");
   const debtEvidenceForm = readFileSync("src/components/tasks/CompleteTaskDebtEvidenceForm.tsx", "utf8");
+  const batchRhythmDispatchButton = readFileSync("src/components/tasks/CreateBatchRhythmDispatchButton.tsx", "utf8");
 
   assert.ok(source.includes("function hrefWithGateReturn"));
   assert.ok(source.includes("base.includes(\"gateReturn=\")"));
@@ -89,4 +90,9 @@ test("tasks page carries gate return through task work links", () => {
   assert.ok(debtEvidenceForm.includes("gateReturnHref?: string | null"));
   assert.ok(debtEvidenceForm.includes("router.push(hrefWithGateReturn(nextFeedback.autoFocusHref, gateReturnHref));"));
   assert.ok(debtEvidenceForm.includes("href={hrefWithGateReturn(feedback.href, gateReturnHref)}"));
+
+  assert.ok(source.includes("<CreateBatchRhythmDispatchButton gateReturnHref={gateReturn} label=\"生成节奏派单\" />"));
+  assert.ok(batchRhythmDispatchButton.includes("gateReturnHref?: string | null"));
+  assert.ok(batchRhythmDispatchButton.includes("function hrefWithGateReturn"));
+  assert.ok(batchRhythmDispatchButton.includes("router.push(hrefWithGateReturn(`/dispatch#dispatch-${payload.task.dispatchKey}`, gateReturnHref));"));
 });

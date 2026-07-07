@@ -54,6 +54,15 @@ export interface ModelRoleMatrixPriorityBlocker {
   actionHref: string;
 }
 
+export interface ModelRoleMatrixPmFocusNotice {
+  tone: "blocked" | "watch" | "ready";
+  headline: string;
+  reason: string;
+  proof: string;
+  actionLabel: string;
+  actionHref: string;
+}
+
 export interface ModelRoleRouteDraftRoute {
   taskType: string;
   primaryProviderConfigId: string | null;
@@ -374,6 +383,26 @@ export function buildModelRoleMatrixPriorityBlocker(matrix: ModelRoleMatrix): Mo
     title: "模型岗位上下文不够",
     detail: `${matrix.summary.partialRoles} 个岗位只能顶岗，长篇结构、整卷资料和海外包装容易被迫拆碎。${matrix.nextAction}`,
     actionLabel: "去调整模型岗位",
+    actionHref: "/settings/models#model-role-matrix",
+  };
+}
+
+export function buildModelRoleMatrixPmFocusNotice(matrix: ModelRoleMatrix): ModelRoleMatrixPmFocusNotice {
+  const tone: ModelRoleMatrixPmFocusNotice["tone"] = matrix.status === "ready"
+    ? "ready"
+    : matrix.status === "partial"
+      ? "watch"
+      : "blocked";
+  const proof = matrix.status === "ready"
+    ? "四个写作岗位都有首选模型，下一步看职责路由、失败替代、成本压力和复检入口是否都已匹配。"
+    : "模型岗位矩阵必须说明首选模型、备用模型、失败替代路线、成本压力和后续复检入口。";
+
+  return {
+    tone,
+    headline: "当前优先：模型任务化，别再做聊天壳。",
+    reason: "写作平台的下一步不是增加聊天入口，而是让 Claude、DeepSeek、Kimi、GPT 按写作任务分工并可复检。",
+    proof,
+    actionLabel: matrix.status === "ready" ? "检查职责路由" : "补模型岗位",
     actionHref: "/settings/models#model-role-matrix",
   };
 }

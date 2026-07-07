@@ -3,7 +3,7 @@ import { ModelProviderSettings } from "@/components/settings/ModelProviderSettin
 import { prisma } from "@/lib/db/prisma";
 import { buildFirstDayRouteSummary } from "@/lib/model-gateway/firstDayRouteSummary";
 import { buildModelSetupOnboarding } from "@/lib/model-gateway/modelSetupOnboarding";
-import { buildModelRoleMatrix, buildModelRoleRouteDraft } from "@/lib/model-gateway/modelRoleMatrix";
+import { buildModelRoleMatrix, buildModelRoleMatrixPmFocusNotice, buildModelRoleRouteDraft } from "@/lib/model-gateway/modelRoleMatrix";
 import { buildPresetRouteBlueprint } from "@/lib/model-gateway/presetRouteBlueprint";
 import { providerModelPresets, providerOptions } from "@/lib/model-gateway/providerDefaults";
 import { buildProviderHealthDashboard } from "@/lib/model-gateway/providerHealth";
@@ -255,6 +255,7 @@ export default async function ModelSettingsPage() {
     firstDayRouteSummary: firstDayRouteSummary.summary,
   });
   const modelRoleMatrix = buildModelRoleMatrix(maskedProviders);
+  const modelRoleMatrixPmFocusNotice = buildModelRoleMatrixPmFocusNotice(modelRoleMatrix);
   const modelRoleRouteDraft = buildModelRoleRouteDraft(maskedProviders, routes);
   const routeConfirmationOnboarding = buildRouteConfirmationOnboarding({
     routeOptions: modelTaskRouteOptions,
@@ -274,6 +275,7 @@ export default async function ModelSettingsPage() {
         providerSetupWizard={providerSetupWizard}
         modelSetupOnboarding={modelSetupOnboarding}
         modelRoleMatrix={modelRoleMatrix}
+        modelRoleMatrixPmFocusNotice={modelRoleMatrixPmFocusNotice}
         modelRoleRouteDraft={modelRoleRouteDraft}
         firstDayRouteSummary={firstDayRouteSummary}
         presetRouteBlueprint={presetRouteBlueprint}

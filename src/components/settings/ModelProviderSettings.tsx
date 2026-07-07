@@ -18,6 +18,7 @@ import {
   buildModelRoleRouteBatchSavePlan,
   buildModelRoleRouteRecheckAdviceFromBatchPlan,
   type ModelRoleMatrix,
+  type ModelRoleMatrixPmFocusNotice,
   type ModelRoleRouteDraft,
   type ModelRoleRouteDraftItem,
   type ModelWritingRoleStatus,
@@ -536,6 +537,24 @@ const modelRoleStatusCopy: Record<ModelWritingRoleStatus, { label: string; class
   missing: { label: "缺岗位", className: "bg-rose-50 text-rose-700" },
 };
 
+const modelRolePmFocusToneCopy: Record<ModelRoleMatrixPmFocusNotice["tone"], { className: string; badgeClassName: string; label: string }> = {
+  blocked: {
+    className: "border-rose-200 bg-rose-50 text-rose-950",
+    badgeClassName: "bg-white text-rose-700",
+    label: "阻塞",
+  },
+  watch: {
+    className: "border-amber-200 bg-amber-50 text-amber-950",
+    badgeClassName: "bg-white text-amber-700",
+    label: "观察",
+  },
+  ready: {
+    className: "border-emerald-200 bg-emerald-50 text-emerald-950",
+    badgeClassName: "bg-white text-emerald-700",
+    label: "可推进",
+  },
+};
+
 function draftFromOption(option: ProviderOptionView, existing?: ProviderView): DraftProvider {
   return {
     id: existing?.id,
@@ -557,6 +576,7 @@ export function ModelProviderSettings({
   providerSetupWizard,
   modelSetupOnboarding,
   modelRoleMatrix,
+  modelRoleMatrixPmFocusNotice,
   modelRoleRouteDraft,
   firstDayRouteSummary,
   presetRouteBlueprint,
@@ -580,6 +600,7 @@ export function ModelProviderSettings({
   providerSetupWizard: ProviderSetupWizardView;
   modelSetupOnboarding: ModelSetupOnboardingView;
   modelRoleMatrix: ModelRoleMatrix;
+  modelRoleMatrixPmFocusNotice: ModelRoleMatrixPmFocusNotice;
   modelRoleRouteDraft: ModelRoleRouteDraft;
   firstDayRouteSummary: FirstDayRouteSummaryView;
   presetRouteBlueprint: PresetRouteBlueprintView;
@@ -650,6 +671,7 @@ export function ModelProviderSettings({
     () => buildModelRoleRouteBatchSavePlan(modelRoleRouteDraft),
     [modelRoleRouteDraft],
   );
+  const modelRolePmFocusTone = modelRolePmFocusToneCopy[modelRoleMatrixPmFocusNotice.tone];
   const latestRetestReviewByRuleKey = useMemo(() => {
     const reviewsByRuleKey = new Map<string, RouteAvoidanceGovernanceView["retestReview"]["items"][number]>();
     [...routeAvoidanceGovernance.retestReview.items]
@@ -1334,6 +1356,25 @@ export function ModelProviderSettings({
                 <div>缺岗位</div>
               </div>
             </div>
+          </div>
+          <div className={`mt-4 -mx-4 border-y px-4 py-3 text-sm ${modelRolePmFocusTone.className}`}>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <div className="text-xs font-medium opacity-70">毒舌 PM 优先哨卡</div>
+                <div className="mt-1 font-medium">{modelRoleMatrixPmFocusNotice.headline}</div>
+              </div>
+              <span className={`w-fit rounded-md px-2 py-1 text-xs font-medium ${modelRolePmFocusTone.badgeClassName}`}>
+                {modelRolePmFocusTone.label}
+              </span>
+            </div>
+            <p className="mt-2 leading-6">{modelRoleMatrixPmFocusNotice.reason}</p>
+            <p className="mt-1 text-xs leading-5 opacity-80">验收证据：{modelRoleMatrixPmFocusNotice.proof}</p>
+            <a
+              className="mt-3 inline-flex w-fit rounded-md bg-white px-3 py-2 text-xs font-medium text-slate-950 hover:bg-slate-100"
+              href={modelRoleMatrixPmFocusNotice.actionHref}
+            >
+              {modelRoleMatrixPmFocusNotice.actionLabel}
+            </a>
           </div>
           <div className="mt-4 grid gap-3 xl:grid-cols-2">
             {modelRoleMatrix.roles.map((role) => {

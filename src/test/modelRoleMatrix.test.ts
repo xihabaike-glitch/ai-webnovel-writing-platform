@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   buildModelRoleMatrix,
+  buildModelRoleMatrixPmFocusNotice,
   buildModelRoleMatrixPriorityBlocker,
   buildModelRoleRouteDraft,
   buildModelRoleRouteBatchSavePlan,
@@ -96,6 +97,29 @@ test("buildModelRoleMatrix", async (t) => {
     assert.ok(blocker?.detail.includes("4 个岗位"));
     assert.equal(blocker?.actionLabel, "去配置模型岗位");
     assert.equal(blocker?.actionHref, "/settings/models#model-role-matrix");
+  });
+
+  await t.test("builds the PM focus notice for model task routing", () => {
+    const matrix = buildModelRoleMatrix([
+      {
+        id: "mock",
+        providerId: "mock",
+        displayName: "Mock",
+        hasApiKey: false,
+        defaultModel: "mock-writer",
+        enabled: true,
+        maxContextTokens: 16000,
+      },
+    ]);
+
+    const notice = buildModelRoleMatrixPmFocusNotice(matrix);
+
+    assert.equal(notice.headline, "当前优先：模型任务化，别再做聊天壳。");
+    assert.ok(notice.reason.includes("聊天"));
+    assert.ok(notice.proof.includes("失败替代"));
+    assert.ok(notice.proof.includes("复检"));
+    assert.equal(notice.tone, "blocked");
+    assert.equal(notice.actionHref, "/settings/models#model-role-matrix");
   });
 
   await t.test("allows fallback providers but warns when context is too short", () => {

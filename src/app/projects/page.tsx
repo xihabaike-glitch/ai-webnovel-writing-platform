@@ -322,6 +322,25 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps) 
                   <p className="mt-1 text-xs leading-5 text-slate-600">
                     {item.pipelineProof.steps.find((step) => step.id === item.pipelineProof.currentStepId)?.evidence}
                   </p>
+                  <div className="mt-3 grid gap-2 text-xs leading-5 md:grid-cols-2">
+                    <div className="rounded-md bg-white p-3 text-slate-700">
+                      <div className="font-medium text-emerald-800">{item.pipelineProof.validationReceipt.headline}</div>
+                      <p className="mt-1 text-slate-600">{item.pipelineProof.validationReceipt.proofPrompt}</p>
+                      <div className="mt-2 grid gap-1">
+                        {item.pipelineProof.validationReceipt.requiredEvidence.map((evidence) => (
+                          <span key={evidence}>必须：{evidence}</span>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="rounded-md bg-white p-3 text-rose-800">
+                      <div className="font-medium">缺失就停手</div>
+                      <div className="mt-2 grid gap-1">
+                        {item.pipelineProof.validationReceipt.stopIfMissing.map((rule) => (
+                          <span key={rule}>{rule}</span>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
                 </div>
                 <Link className="w-fit rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white hover:bg-slate-800" href={item.pipelineProof.nextActionHref}>
                   {item.pipelineProof.nextActionLabel}

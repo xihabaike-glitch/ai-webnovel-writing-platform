@@ -330,6 +330,13 @@ test("buildProjectListDashboard", async (t) => {
     assert.equal(empty?.pipelineProof.steps[0].status, "current");
     assert.ok(empty?.pipelineProof.headline.includes("开书与大树骨架"));
     assert.ok(empty?.pipelineProof.nextActionHref.includes("/projects/empty-project"));
+    assert.equal(empty?.pipelineProof.validationReceipt.stepId, "project_start");
+    assert.ok(empty?.pipelineProof.validationReceipt.headline.includes("当前步骤验收回执"));
+    assert.ok(empty?.pipelineProof.validationReceipt.proofPrompt.includes("目标平台"));
+    assert.ok(empty?.pipelineProof.validationReceipt.requiredEvidence.some((item) => item.includes("开头钩子")));
+    assert.ok(empty?.pipelineProof.validationReceipt.requiredEvidence.some((item) => item.includes("结尾承诺")));
+    assert.ok(empty?.pipelineProof.validationReceipt.requiredEvidence.some((item) => item.includes("主干和基础土壤")));
+    assert.ok(empty?.pipelineProof.validationReceipt.stopIfMissing.some((item) => item.includes("停在作品工作台")));
 
     assert.equal(ready?.pipelineProof.steps[0].status, "done");
     assert.equal(ready?.pipelineProof.steps[1].status, "done");

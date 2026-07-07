@@ -68,11 +68,20 @@ export interface ProjectListPipelineStep {
   href: string;
 }
 
+export interface ProjectListPipelineValidationReceipt {
+  stepId: ProjectListPipelineStep["id"];
+  headline: string;
+  proofPrompt: string;
+  requiredEvidence: string[];
+  stopIfMissing: string[];
+}
+
 export interface ProjectListPipelineProof {
   currentStepId: ProjectListPipelineStep["id"];
   headline: string;
   nextActionLabel: string;
   nextActionHref: string;
+  validationReceipt: ProjectListPipelineValidationReceipt;
   steps: ProjectListPipelineStep[];
 }
 
@@ -204,6 +213,48 @@ function riskFlags(input: {
   return flags;
 }
 
+function buildPipelineValidationReceipt(step: ProjectListPipelineStep): ProjectListPipelineValidationReceipt {
+  const receipts: Record<ProjectListPipelineStep["id"], Omit<ProjectListPipelineValidationReceipt, "stepId" | "headline">> = {
+    project_start: {
+      proofPrompt: "记录作品名、目标平台、篇幅、开头钩子、结尾承诺、主干和土壤是否齐备。",
+      requiredEvidence: ["目标平台已选", "开头钩子和结尾承诺已填写", "主干和基础土壤可用于首章样本"],
+      stopIfMissing: ["没有目标平台时停在作品工作台", "开头钩子为空时停在作品工作台", "结尾承诺缺失时停在作品工作台"],
+    },
+    sample_draft: {
+      proofPrompt: "记录首章样本、审稿问题、二改候选和人工采用结论。",
+      requiredEvidence: ["首章样本已生成", "钩子和爽点过线", "人工采用或明确二改"],
+      stopIfMissing: ["候选稿直接覆盖正文时退回", "没有人工采用时停手", "样本质量不足时不允许批量"],
+    },
+    task_dispatch: {
+      proofPrompt: "记录模型执行角色、输入、输出、任务回执、人工验收和下一步任务。",
+      requiredEvidence: ["角色与模型匹配", "回执有可读证据", "下一步入口明确"],
+      stopIfMissing: ["回执证据太薄时停在派单中心", "没有人工验收时停手", "任务没有下一步时不进总闸门"],
+    },
+    gate_check: {
+      proofPrompt: "记录样本、复查、成本、质量、失败率和是否允许小批量。",
+      requiredEvidence: ["样本稳定", "复查通过", "成本和失败率可控"],
+      stopIfMissing: ["缺少复查时不允许批量", "失败率过高时不允许批量", "没有恢复证据时不允许批量"],
+    },
+    failure_repair: {
+      proofPrompt: "记录失败原因、修复泳道、重试样本、恢复观察和是否仍需暂停批量。",
+      requiredEvidence: ["失败原因已归类", "未恢复失败已处理", "恢复样本可观察"],
+      stopIfMissing: ["模型配置未修复时暂停批量", "上下文失败未修复时暂停批量", "未恢复失败仍存在时暂停批量"],
+    },
+    publish_package: {
+      proofPrompt: "记录平台包、样章、标签、卖点、版本基线和反馈复盘。",
+      requiredEvidence: ["8 个核心平台都有发布证据", "样章和卖点齐备", "反馈复盘能回到作品"],
+      stopIfMissing: ["发布包缺样章时停在发布修复", "平台卖点不清时停在发布修复", "反馈记录缺失时不宣称跑通"],
+    },
+  };
+  const receipt = receipts[step.id];
+
+  return {
+    stepId: step.id,
+    headline: `当前步骤验收回执：${step.label}`,
+    ...receipt,
+  };
+}
+
 function buildProjectPipelineProof(input: {
   project: ProjectListProject;
   outlinePercent: number;
@@ -285,6 +336,7 @@ function buildProjectPipelineProof(input: {
     headline: `当前验收卡：${current.label}`,
     nextActionLabel: current.status === "done" ? "复查发布闭环" : current.label,
     nextActionHref: current.href,
+    validationReceipt: buildPipelineValidationReceipt(current),
     steps,
   };
 }

@@ -121,6 +121,33 @@ test("buildChapterProductionRecheckDecision keeps weak structure diagnostics act
   assert.ok(decision.detail.includes("补主角弧光终局和伏笔回收章"));
 });
 
+test("buildChapterProductionRecheckDecision sends cleared structure diagnostics to submission packaging", () => {
+  const decision = buildChapterProductionRecheckDecision([
+    {
+      structureDiagnosticRecheck: {
+        projectId: "project-1",
+        platformId: "fanqie",
+        platformName: "番茄小说",
+        previousScore: 78,
+        currentScore: 86,
+        delta: 8,
+        label: "结构已过线",
+        verdict: "improved",
+        topAction: "保留现有大树结构，继续投稿包包装。",
+        weakItems: [],
+      },
+    },
+  ], { href: "#story-structure", label: "复查结构" });
+
+  assert.equal(decision.status, "cleared");
+  assert.equal(decision.title, "复查通过：篇幅结构验收已解除");
+  assert.equal(decision.href, "#submission-package");
+  assert.equal(decision.label, "继续投稿包");
+  assert.ok(decision.detail.includes("篇幅结构验收已解除"));
+  assert.ok(decision.detail.includes("平台导出"));
+  assert.ok(decision.detail.includes("整书结构 78 -> 86 分"));
+});
+
 test("buildChapterProductionRecheckDecision asks for manual confirmation without scored evidence", () => {
   const decision = buildChapterProductionRecheckDecision([{}, {}], fallback);
 

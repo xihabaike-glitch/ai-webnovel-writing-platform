@@ -123,6 +123,16 @@ export function buildChapterProductionRecheckDecision(
     };
   }
 
+  if (structureDiagnosticRechecks.length > 0) {
+    return {
+      status: "cleared",
+      title: "复查通过：篇幅结构验收已解除",
+      detail: `篇幅结构验收已解除，可以继续投稿包包装和平台导出。${detailLines.join("；")}`,
+      href: "#submission-package",
+      label: "继续投稿包",
+    };
+  }
+
   return {
     status: "cleared",
     title: "复查通过：当前卡点可以放行",

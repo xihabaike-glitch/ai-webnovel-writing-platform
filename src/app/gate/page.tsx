@@ -318,6 +318,48 @@ export default async function GatePage({
                   <span className="rounded-md bg-white/70 px-2 py-1 font-medium" key={badge}>{badge}</span>
                 ))}
               </div>
+              {focusNotice.recheckSummary ? (
+                <div className="mt-3 grid gap-2 rounded-md bg-white/70 p-3 text-sm text-slate-900 lg:grid-cols-[0.8fr_1.2fr]">
+                  <div>
+                    <div className="text-xs font-medium text-slate-500">项目验收单回填</div>
+                    <div className="mt-1 font-semibold">{focusNotice.recheckSummary.title}</div>
+                    <div className="mt-2 flex flex-wrap gap-2 text-xs">
+                      <span className="rounded-md bg-slate-950 px-2 py-1 font-medium text-white">
+                        已完成 {focusNotice.recheckSummary.completedSteps}/{focusNotice.recheckSummary.totalSteps} 步
+                      </span>
+                      <span className="rounded-md bg-white px-2 py-1 font-medium text-slate-700">
+                        {focusNotice.recheckSummary.statusLabel}
+                      </span>
+                      <span className="rounded-md bg-white px-2 py-1 font-medium text-slate-700">
+                        当前：{focusNotice.recheckSummary.currentStepLabel}
+                      </span>
+                    </div>
+                    {focusNotice.recheckSummary.latestEvidence ? (
+                      <p className="mt-2 text-xs leading-5 text-slate-600">
+                        最近回填：{focusNotice.recheckSummary.latestEvidence}
+                      </p>
+                    ) : null}
+                  </div>
+                  <div className="grid gap-2 text-xs leading-5 md:grid-cols-2">
+                    <div>
+                      <div className="font-medium text-slate-700">已补证据</div>
+                      <div className="mt-1 grid gap-1">
+                        {focusNotice.recheckSummary.completedEvidence.slice(-3).map((line) => (
+                          <div className="rounded-md bg-white px-2 py-1" key={line}>{line}</div>
+                        ))}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="font-medium text-slate-700">剩余卡点</div>
+                      <div className="mt-1 grid gap-1">
+                        {focusNotice.recheckSummary.remainingEvidence.slice(0, 3).map((line) => (
+                          <div className="rounded-md bg-white px-2 py-1" key={line}>{line}</div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : null}
             </div>
             {focusNotice.primaryAction?.execution ? (
               <div className="w-full shrink-0 lg:max-w-sm">

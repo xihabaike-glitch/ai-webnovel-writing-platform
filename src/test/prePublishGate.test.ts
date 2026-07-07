@@ -387,6 +387,43 @@ test("buildPrePublishGate", async (t) => {
     assert.ok(notice.badges.includes("上次动作已清除"));
   });
 
+  await t.test("summarizes project acceptance recheck progress after dispatch evidence is returned", () => {
+    const gate = buildPrePublishGate({
+      projects: [{
+        ...readyProject,
+        id: "project-recheck-progress",
+        title: "复检回填作品",
+        aiTasks: [
+          passedReviews[0],
+          passedSecondPasses[0],
+        ],
+        gateDispatchTasks: [{
+          dispatchKey: "first-day:project-recheck-progress:publish-precheck",
+          state: "completed",
+          completionEvidence: "派单中心已补齐首日平台包预检：标题、简介、标签、样章风险清单均已人工验收。",
+        }],
+        chapters: finalChapters.slice(0, 2),
+      }],
+      failureTasks: [],
+      batchHistory: [],
+    });
+    const notice = buildPrePublishGateFocusNotice({
+      focus: "action-recheck",
+      actionId: "project-acceptance:project-recheck-progress",
+      gate,
+    });
+
+    assert.equal(notice.visible, true);
+    assert.equal(notice.recheckSummary?.title, "复检回填作品 · 项目验收单回填");
+    assert.equal(notice.recheckSummary?.completedSteps, 5);
+    assert.equal(notice.recheckSummary?.totalSteps, 6);
+    assert.equal(notice.recheckSummary?.currentStepLabel, "发布包");
+    assert.equal(notice.recheckSummary?.statusLabel, "发布包待验");
+    assert.ok(notice.recheckSummary?.completedEvidence.some((line) => line.includes("首日派单已有完成依据")));
+    assert.ok(notice.recheckSummary?.latestEvidence?.includes("派单中心已补齐首日平台包预检"));
+    assert.ok(notice.detail.includes("已完成 5/6 步"));
+  });
+
   await t.test("blocks launch when first-day handoff evidence is missing", () => {
     const gate = buildPrePublishGate({
       projects: [handoffBlockedProject],

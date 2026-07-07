@@ -189,6 +189,8 @@ export interface PrePublishGateAcceptanceSheetGate {
   actionLabel: string;
   href: string;
   currentStepId: ProjectAcceptanceStep["id"];
+  steps: ProjectAcceptanceStep[];
+  latestDispatchEvidence: string | null;
   repairMode: "passed" | "executable" | "dispatch" | "manual";
   executionHint: string;
   execution: PrePublishGateActionExecution | null;
@@ -480,6 +482,18 @@ export interface PrePublishGateFocusNotice {
   primaryHref: string;
   primaryAction?: PrePublishGateAction | null;
   badges: string[];
+  recheckSummary?: PrePublishGateRecheckSummary | null;
+}
+
+export interface PrePublishGateRecheckSummary {
+  title: string;
+  statusLabel: string;
+  completedSteps: number;
+  totalSteps: number;
+  currentStepLabel: string;
+  completedEvidence: string[];
+  remainingEvidence: string[];
+  latestEvidence: string | null;
 }
 
 export interface PrePublishGateInput {
@@ -1384,6 +1398,9 @@ function buildAcceptanceSheetGate(
   const execution = acceptanceExecutionForStep(project, sheet.currentStepId, repairExecution);
   const repairMode = acceptanceRepairMode(status, sheet.currentStepId, execution);
   const href = acceptanceActionHref(project.id, sheet.currentStepId, sheet.actionHref);
+  const latestDispatchEvidence = (project.gateDispatchTasks ?? [])
+    .filter((task) => task.dispatchKey.startsWith("first-day:") && task.state === "completed" && task.completionEvidence.trim())
+    .map((task) => task.completionEvidence.trim())[0] ?? null;
 
   return {
     status,
@@ -1392,6 +1409,8 @@ function buildAcceptanceSheetGate(
     actionLabel: sheet.actionLabel,
     href,
     currentStepId: sheet.currentStepId,
+    steps: sheet.steps,
+    latestDispatchEvidence,
     repairMode,
     executionHint: acceptanceExecutionHint(repairMode),
     execution: repairMode === "executable" ? execution : null,
@@ -1603,6 +1622,41 @@ function buildPrePublishGatePmFocus(
   };
 }
 
+function projectAcceptanceRecheckProjectId(actionId: string | null | undefined) {
+  if (!actionId?.startsWith("project-acceptance:")) return null;
+  return actionId.slice("project-acceptance:".length);
+}
+
+function buildProjectAcceptanceRecheckSummary(
+  actionId: string | null | undefined,
+  gate: PrePublishGate,
+): PrePublishGateRecheckSummary | null {
+  const projectId = projectAcceptanceRecheckProjectId(actionId);
+  if (!projectId) return null;
+  const project = gate.projectStatuses.find((item) => item.projectId === projectId) ?? null;
+  if (!project) return null;
+
+  const steps = project.acceptanceSheetGate.steps;
+  const currentStep = steps.find((step) => step.id === project.acceptanceSheetGate.currentStepId) ?? steps[0] ?? null;
+  const completedSteps = steps.filter((step) => step.status === "done").length;
+
+  return {
+    title: `${project.projectTitle} · 项目验收单回填`,
+    statusLabel: project.acceptanceSheetGate.label,
+    completedSteps,
+    totalSteps: steps.length,
+    currentStepLabel: currentStep?.label ?? project.acceptanceSheetGate.actionLabel,
+    completedEvidence: steps.filter((step) => step.status === "done").map((step) => step.evidence),
+    remainingEvidence: steps.filter((step) => step.status !== "done").map((step) => `${step.label}：${step.evidence}`),
+    latestEvidence: project.acceptanceSheetGate.latestDispatchEvidence,
+  };
+}
+
+function appendRecheckSummaryDetail(detail: string, summary: PrePublishGateRecheckSummary | null) {
+  if (!summary) return detail;
+  return `${detail} 验收单回填：已完成 ${summary.completedSteps}/${summary.totalSteps} 步，当前卡点是「${summary.currentStepLabel}」。`;
+}
+
 export function buildPrePublishGateFocusNotice(input: {
   focus?: string | null;
   projectId?: string | null;
@@ -1610,6 +1664,7 @@ export function buildPrePublishGateFocusNotice(input: {
   gate: PrePublishGate;
 }): PrePublishGateFocusNotice {
   if (input.focus === "action-recheck") {
+    const recheckSummary = buildProjectAcceptanceRecheckSummary(input.actionId, input.gate);
     const sameAction = input.actionId
       ? input.gate.priorityActions.find((action) => action.id === input.actionId) ?? null
       : null;
@@ -1621,11 +1676,15 @@ export function buildPrePublishGateFocusNotice(input: {
         visible: true,
         tone: "blocked",
         headline: "上次动作后仍有阻塞",
-        detail: `${sameAction.detail} 这说明刚才的处理还没有完全解除当前卡点，先继续处理同一动作，再刷新总闸门复检。`,
+        detail: appendRecheckSummaryDetail(
+          `${sameAction.detail} 这说明刚才的处理还没有完全解除当前卡点，先继续处理同一动作，再刷新总闸门复检。`,
+          recheckSummary,
+        ),
         primaryLabel: sameAction.label,
         primaryHref: sameAction.href,
         primaryAction: sameAction,
         badges: ["动作复检", "继续处理同一动作", "解除后再放量"],
+        recheckSummary,
       };
     }
 
@@ -1634,13 +1693,17 @@ export function buildPrePublishGateFocusNotice(input: {
         visible: true,
         tone: "ready",
         headline: "上次动作已清除，总闸门可放行",
-        detail: primary?.detail
-          ? `上次处理的阻塞已经不在优先动作里。${primary.detail}`
-          : "上次处理的阻塞已经不在优先动作里，总闸门当前可放行。",
+        detail: appendRecheckSummaryDetail(
+          primary?.detail
+            ? `上次处理的阻塞已经不在优先动作里。${primary.detail}`
+            : "上次处理的阻塞已经不在优先动作里，总闸门当前可放行。",
+          recheckSummary,
+        ),
         primaryLabel: primary?.label ?? "进入发布闭环",
         primaryHref: primary?.href ?? "#gate-export-package",
         primaryAction: primary?.execution ? primary : null,
         badges: ["上次动作已清除", "总闸门可放行", "放量前复查证据"],
+        recheckSummary,
       };
     }
 
@@ -1648,13 +1711,17 @@ export function buildPrePublishGateFocusNotice(input: {
       visible: true,
       tone: "review",
       headline: "上次动作已清除，继续下一个阻塞",
-      detail: primary?.detail
-        ? `上次处理的动作已经不在优先队列里。现在继续处理：${primary.detail}`
-        : `上次处理的动作已经不在优先队列里。${input.gate.verdict}`,
+      detail: appendRecheckSummaryDetail(
+        primary?.detail
+          ? `上次处理的动作已经不在优先队列里。现在继续处理：${primary.detail}`
+          : `上次处理的动作已经不在优先队列里。${input.gate.verdict}`,
+        recheckSummary,
+      ),
       primaryLabel: primary?.label ?? "查看优先动作",
       primaryHref: primary?.href ?? "/gate",
       primaryAction: primary?.execution ? primary : null,
       badges: ["上次动作已清除", "继续下一个阻塞", "处理后再复检"],
+      recheckSummary,
     };
   }
 

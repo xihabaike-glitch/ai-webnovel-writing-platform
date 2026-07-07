@@ -19,4 +19,5 @@ test("gate action workspace keeps main workspace navigation returnable", () => {
   assert.ok(workspaceSource.includes("href={hrefWithGateReturn(\"/dispatch\", gateReturnHref)}"));
   assert.ok(workspaceSource.includes("href={hrefWithGateReturn(item.href, gateReturnHref)}"));
   assert.ok(workspaceSource.includes("href={hrefWithGateReturn(receipt.href, gateReturnHref)}"));
+  assert.ok(workspaceSource.includes("href={gateReturnHref ?? \"/gate\"}"));
 });

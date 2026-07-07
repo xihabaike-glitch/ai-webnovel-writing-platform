@@ -998,7 +998,7 @@ export function GateDispatchTaskCenter({
                     填入验收模板
                   </button>
                 ) : null}
-                <Link className="rounded-md border border-amber-300 bg-white/70 px-3 py-2 text-xs font-medium hover:bg-white" href="/gate">
+                <Link className="rounded-md border border-amber-300 bg-white/70 px-3 py-2 text-xs font-medium hover:bg-white" href={gateReturnHref ?? "/gate"}>
                   回总闸门
                 </Link>
               </div>

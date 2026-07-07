@@ -31,6 +31,7 @@ test("dispatch task center carries gate return into internal work links", () => 
   assert.ok(dispatchPageSource.includes("gateReturnHref={gateReturn}"));
   assert.ok(source.includes("gateReturnHref?: string | null"));
   assert.ok(source.includes("function hrefWithGateReturn"));
+  assert.ok(source.includes("href={gateReturnHref ?? \"/gate\"}"));
   assert.ok(source.includes("href={hrefWithGateReturn(firstDayDesk.nextTask.firstDayHref, gateReturnHref)}"));
   assert.ok(source.includes("href={hrefWithGateReturn(card.firstDayHref, gateReturnHref)}"));
   assert.ok(source.includes("href={hrefWithGateReturn(card.href, gateReturnHref)}"));

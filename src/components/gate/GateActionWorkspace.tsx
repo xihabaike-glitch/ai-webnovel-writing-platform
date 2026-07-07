@@ -2256,7 +2256,7 @@ export function GateActionWorkspace({
                 <Link className="inline-flex text-xs font-medium text-slate-700 hover:underline" href={hrefWithGateReturn(receipt.href, gateReturnHref)}>
                   打开相关位置
                 </Link>
-                <Link className="inline-flex text-xs font-medium text-slate-700 hover:underline" href="/gate">
+                <Link className="inline-flex text-xs font-medium text-slate-700 hover:underline" href={gateReturnHref ?? "/gate"}>
                   {receipt.recheck.actionLabel}
                 </Link>
               </div>

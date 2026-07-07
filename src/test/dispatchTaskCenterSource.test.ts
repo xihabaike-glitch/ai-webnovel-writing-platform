@@ -36,3 +36,18 @@ test("dispatch task center carries gate return into internal work links", () => 
   assert.ok(source.includes("href={hrefWithGateReturn(card.href, gateReturnHref)}"));
   assert.ok(source.includes("href={hrefWithGateReturn(task.href, gateReturnHref)}"));
 });
+
+test("dispatch task center carries gate return through dashboard work entry links", () => {
+  assert.ok(source.includes("href={hrefWithGateReturn(firstDayDesk.completionGateCta.primaryHref, gateReturnHref)}"));
+  assert.ok(source.includes("href={hrefWithGateReturn(group.executionGuide.primaryHref, gateReturnHref)}"));
+  assert.ok(source.includes("href={hrefWithGateReturn(chain.reviewIntervention.href, gateReturnHref)}"));
+  assert.ok(source.includes("href={hrefWithGateReturn(chain.latestHref, gateReturnHref)}"));
+  assert.ok(source.includes("href={hrefWithGateReturn(routeConfirmationDispatchFlow.emptyGuide.primaryHref, gateReturnHref)}"));
+  assert.ok(source.includes("href={hrefWithGateReturn(routeConfirmationDispatchFlow.emptyGuide.secondaryHref, gateReturnHref)}"));
+  assert.ok(source.includes("href={hrefWithGateReturn(item.href, gateReturnHref)}"));
+  assert.ok(source.includes("href={hrefWithGateReturn(routeActionLink.href, gateReturnHref)}"));
+  assert.ok(source.includes("href={hrefWithGateReturn(routeActionLink.secondary.href, gateReturnHref)}"));
+  assert.ok(source.includes("href={hrefWithGateReturn(routeExecutionDesk.emptyState.href, gateReturnHref)}"));
+  assert.ok(source.includes("href={hrefWithGateReturn(routeExecutionDesk.nextTask.href, gateReturnHref)}"));
+  assert.ok(source.includes("href={hrefWithGateReturn(item.href, gateReturnHref)} key={item.dispatchKey}"));
+});

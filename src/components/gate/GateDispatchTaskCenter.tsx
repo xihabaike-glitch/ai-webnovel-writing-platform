@@ -1085,7 +1085,7 @@ export function GateDispatchTaskCenter({
                 </div>
                 <Link
                   className="w-fit shrink-0 rounded-md bg-emerald-900 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-800"
-                  href={firstDayDesk.completionGateCta.primaryHref}
+                  href={hrefWithGateReturn(firstDayDesk.completionGateCta.primaryHref, gateReturnHref)}
                 >
                   {firstDayDesk.completionGateCta.primaryLabel}
                 </Link>
@@ -1188,7 +1188,7 @@ export function GateDispatchTaskCenter({
                     <div className="mt-3 flex flex-wrap gap-2">
                       <Link
                         className="rounded-md bg-white px-3 py-2 text-xs font-medium text-sky-900 hover:bg-sky-100"
-                        href={group.executionGuide.primaryHref}
+                        href={hrefWithGateReturn(group.executionGuide.primaryHref, gateReturnHref)}
                       >
                         查看派单
                       </Link>
@@ -1254,7 +1254,7 @@ export function GateDispatchTaskCenter({
                       <span className="opacity-80">{chain.reviewIntervention.ownerRole}</span>
                     </div>
                     <p className="mt-1">{chain.reviewIntervention.detail}</p>
-                    <Link className="mt-2 inline-flex rounded-md bg-white/80 px-2 py-1 font-medium hover:bg-white" href={chain.reviewIntervention.href}>
+                    <Link className="mt-2 inline-flex rounded-md bg-white/80 px-2 py-1 font-medium hover:bg-white" href={hrefWithGateReturn(chain.reviewIntervention.href, gateReturnHref)}>
                       查看复盘派单
                     </Link>
                   </div>
@@ -1287,7 +1287,7 @@ export function GateDispatchTaskCenter({
                     </div>
                   </div>
                 ) : null}
-                <Link className="mt-3 inline-flex rounded-md border border-slate-200 bg-white px-2 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50" href={chain.latestHref}>
+                <Link className="mt-3 inline-flex rounded-md border border-slate-200 bg-white px-2 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50" href={hrefWithGateReturn(chain.latestHref, gateReturnHref)}>
                   {chain.latestActionLabel}
                 </Link>
               </div>
@@ -1340,10 +1340,10 @@ export function GateDispatchTaskCenter({
                   <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">{routeConfirmationDispatchFlow.emptyGuide.detail}</p>
                 </div>
                 <div className="flex shrink-0 flex-wrap gap-2">
-                  <Link className="rounded-md bg-slate-950 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800" href={routeConfirmationDispatchFlow.emptyGuide.primaryHref}>
+                  <Link className="rounded-md bg-slate-950 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800" href={hrefWithGateReturn(routeConfirmationDispatchFlow.emptyGuide.primaryHref, gateReturnHref)}>
                     {routeConfirmationDispatchFlow.emptyGuide.primaryLabel}
                   </Link>
-                  <Link className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50" href={routeConfirmationDispatchFlow.emptyGuide.secondaryHref}>
+                  <Link className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50" href={hrefWithGateReturn(routeConfirmationDispatchFlow.emptyGuide.secondaryHref, gateReturnHref)}>
                     {routeConfirmationDispatchFlow.emptyGuide.secondaryLabel}
                   </Link>
                 </div>
@@ -1394,13 +1394,13 @@ export function GateDispatchTaskCenter({
                             >
                               {runningRouteAdviceId === item.id ? "生成中" : "生成治理派单"}
                             </button>
-                            <Link className="rounded-md bg-white px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50" href={item.href}>
+                            <Link className="rounded-md bg-white px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50" href={hrefWithGateReturn(item.href, gateReturnHref)}>
                               查看模型
                             </Link>
                           </div>
                         </div>
                       ) : (
-                        <Link className="rounded-md bg-white/70 p-2 text-xs leading-5 hover:bg-white" href={item.href} key={item.id}>
+                        <Link className="rounded-md bg-white/70 p-2 text-xs leading-5 hover:bg-white" href={hrefWithGateReturn(item.href, gateReturnHref)} key={item.id}>
                           <div className="font-medium">{item.label}</div>
                           <div className="mt-1 line-clamp-2 opacity-80">{item.detail}</div>
                           <div className="mt-1 opacity-70">{item.actionLabel} · 优先级 {item.priorityScore}</div>
@@ -1466,12 +1466,12 @@ export function GateDispatchTaskCenter({
                       {runningRouteActionLink ? "执行中" : routeActionLink.label}
                     </button>
                   ) : (
-                    <Link className={`w-fit rounded-md bg-white px-3 py-2 text-xs font-medium ${batchDecisionButtonClass(batchDecisionCard?.tone ?? "ready")}`} href={routeActionLink.href}>
+                    <Link className={`w-fit rounded-md bg-white px-3 py-2 text-xs font-medium ${batchDecisionButtonClass(batchDecisionCard?.tone ?? "ready")}`} href={hrefWithGateReturn(routeActionLink.href, gateReturnHref)}>
                       {routeActionLink.label}
                     </Link>
                   )}
                   {routeActionLink.secondary ? (
-                    <Link className={`w-fit rounded-md border bg-white/60 px-3 py-2 text-xs font-medium ${batchDecisionButtonClass(batchDecisionCard?.tone ?? "ready")}`} href={routeActionLink.secondary.href}>
+                    <Link className={`w-fit rounded-md border bg-white/60 px-3 py-2 text-xs font-medium ${batchDecisionButtonClass(batchDecisionCard?.tone ?? "ready")}`} href={hrefWithGateReturn(routeActionLink.secondary.href, gateReturnHref)}>
                       {routeActionLink.secondary.label}
                     </Link>
                   ) : null}
@@ -1515,7 +1515,7 @@ export function GateDispatchTaskCenter({
               <div className="font-medium text-slate-950">{routeExecutionDesk.emptyState.title}</div>
               <p className="mt-1 text-slate-600">{routeExecutionDesk.emptyState.detail}</p>
             </div>
-            <Link className="w-fit rounded-md bg-slate-950 px-3 py-2 font-medium text-white hover:bg-slate-800" href={routeExecutionDesk.emptyState.href}>
+            <Link className="w-fit rounded-md bg-slate-950 px-3 py-2 font-medium text-white hover:bg-slate-800" href={hrefWithGateReturn(routeExecutionDesk.emptyState.href, gateReturnHref)}>
               {routeExecutionDesk.emptyState.actionLabel}
             </Link>
           </div>
@@ -1547,7 +1547,7 @@ export function GateDispatchTaskCenter({
                     </button>
                   ) : null;
                 })()}
-                <Link className="rounded-md border border-white/20 px-3 py-2 text-sm font-medium text-white hover:bg-white/10" href={routeExecutionDesk.nextTask.href}>
+                <Link className="rounded-md border border-white/20 px-3 py-2 text-sm font-medium text-white hover:bg-white/10" href={hrefWithGateReturn(routeExecutionDesk.nextTask.href, gateReturnHref)}>
                   打开入口
                 </Link>
               </div>
@@ -1590,7 +1590,7 @@ export function GateDispatchTaskCenter({
                     >
                       定位任务
                     </button>
-                    <Link className="rounded-md bg-white px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50" href={card.href}>
+                    <Link className="rounded-md bg-white px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50" href={hrefWithGateReturn(card.href, gateReturnHref)}>
                       {card.secondaryActionLabel}
                     </Link>
                   </div>
@@ -1615,7 +1615,7 @@ export function GateDispatchTaskCenter({
           <div className="font-medium text-slate-950">收口清单</div>
           <div className="mt-3 grid gap-2">
             {center.closeoutItems.slice(0, 5).map((item) => (
-              <Link className={`rounded-md border p-3 text-sm ${closeoutClass(item.status)}`} href={item.href} key={item.dispatchKey}>
+              <Link className={`rounded-md border p-3 text-sm ${closeoutClass(item.status)}`} href={hrefWithGateReturn(item.href, gateReturnHref)} key={item.dispatchKey}>
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div className="font-medium">{item.title}</div>
                   <span className="rounded-md bg-white/70 px-2 py-1 text-xs font-medium">{item.label}</span>
@@ -1665,7 +1665,7 @@ export function GateDispatchTaskCenter({
           <div className="font-medium text-slate-950">证据待复检</div>
           <div className="mt-3 grid gap-2">
             {evidenceIssues.map((item) => (
-              <Link className={`rounded-md border p-3 text-sm ${evidenceClass(item.status)}`} href={item.href} key={item.dispatchKey}>
+              <Link className={`rounded-md border p-3 text-sm ${evidenceClass(item.status)}`} href={hrefWithGateReturn(item.href, gateReturnHref)} key={item.dispatchKey}>
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div className="font-medium">{item.title}</div>
                   <span className="rounded-md bg-white/70 px-2 py-1 text-xs font-medium">{item.label}</span>

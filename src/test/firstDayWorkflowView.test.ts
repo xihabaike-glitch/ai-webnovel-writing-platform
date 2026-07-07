@@ -863,6 +863,98 @@ test("buildFirstDayDispatchCenterHref targets the next first-day dispatch card",
     }),
     "/dispatch?firstDayProject=project-1&step=publish-precheck#first-day-dispatch",
   );
+  assert.equal(
+    buildFirstDayDispatchCenterHref({
+      projectId: "project-1",
+      stepId: "first-review",
+      source: "real-sample",
+      gaps: ["首章样本还缺审稿成功记录。", "审稿、二改或平台预检还缺派单回执和人工验收。"],
+    }),
+    "/dispatch?firstDayProject=project-1&step=first-review&source=real-sample&gap=%E9%A6%96%E7%AB%A0%E6%A0%B7%E6%9C%AC%E8%BF%98%E7%BC%BA%E5%AE%A1%E7%A8%BF%E6%88%90%E5%8A%9F%E8%AE%B0%E5%BD%95%E3%80%82&gap=%E5%AE%A1%E7%A8%BF%E3%80%81%E4%BA%8C%E6%94%B9%E6%88%96%E5%B9%B3%E5%8F%B0%E9%A2%84%E6%A3%80%E8%BF%98%E7%BC%BA%E6%B4%BE%E5%8D%95%E5%9B%9E%E6%89%A7%E5%92%8C%E4%BA%BA%E5%B7%A5%E9%AA%8C%E6%94%B6%E3%80%82#first-day-dispatch",
+  );
+});
+
+test("resolveFirstDayDispatchFocus builds a real sample acceptance draft from project gaps", () => {
+  const focus = resolveFirstDayDispatchFocus([
+    {
+      dispatchKey: "first-day:project-1:first-review",
+      id: "first-day:project-1:first-review",
+      databaseId: "",
+      projectId: "project-1",
+      platformId: "fanqie",
+      platformName: "番茄小说",
+      stage: "project_start",
+      state: "assigned",
+      priorityScore: 80,
+      ownerRole: "AI",
+      title: "夜雨系统 · 审稿第一章",
+      detail: "补齐第一章审稿。",
+      dueLabel: "今天",
+      actionLabel: "审稿第一章",
+      href: "/projects/project-1#first-day-workflow",
+      acceptanceCriteria: ["第一章审稿已完成并列出钩子、爽点和章末追读问题。"],
+      evidence: ["缺少第一章成功审稿任务"],
+      sourceReceiptId: null,
+      completionEvidence: "",
+      reviewLatestAt: "2026-01-01T00:00:00.000Z",
+      assignedAt: null,
+      completedAt: null,
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    },
+  ], {
+    projectId: "project-1",
+    stepId: "first-review",
+    source: "real-sample",
+    gaps: ["首章样本还缺审稿成功记录。", "审稿、二改或平台预检还缺派单回执和人工验收。"],
+  });
+
+  assert.equal(focus.matchedBy, "project_step");
+  assert.ok(focus.message.includes("真实样本验收"));
+  assert.ok(focus.completionTemplate?.includes("真实样本验收来源"));
+  assert.ok(focus.completionTemplate?.includes("首章样本还缺审稿成功记录"));
+  assert.ok(focus.completionTemplate?.includes("第一章审稿已完成"));
+});
+
+test("resolveFirstDayDispatchFocus does not hijack another project when real sample card is missing", () => {
+  const focus = resolveFirstDayDispatchFocus([
+    {
+      dispatchKey: "first-day:project-2:first-draft",
+      id: "first-day:project-2:first-draft",
+      databaseId: "",
+      projectId: "project-2",
+      platformId: "fanqie",
+      platformName: "番茄小说",
+      stage: "project_start",
+      state: "assigned",
+      priorityScore: 80,
+      ownerRole: "AI",
+      title: "别的项目 · 生成第一章",
+      detail: "不是当前项目。",
+      dueLabel: "今天",
+      actionLabel: "生成第一章",
+      href: "/projects/project-2#first-day-workflow",
+      acceptanceCriteria: ["第一章正文已生成并写回章节。"],
+      evidence: ["缺少第一章正文。"],
+      sourceReceiptId: null,
+      completionEvidence: "",
+      reviewLatestAt: "2026-01-01T00:00:00.000Z",
+      assignedAt: null,
+      completedAt: null,
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    },
+  ], {
+    projectId: "project-1",
+    stepId: "publish-precheck",
+    source: "real-sample",
+    gaps: ["审稿、二改或平台预检还缺派单回执和人工验收。"],
+  });
+
+  assert.equal(focus.card, null);
+  assert.equal(focus.matchedBy, "none");
+  assert.ok(focus.message.includes("真实样本验收"));
+  assert.ok(focus.message.includes("没有找到这本书的首日派单卡"));
 });
 
 test("buildFirstDayDispatchAiExecutionNotice explains current-page acceptance", () => {

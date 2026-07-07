@@ -323,6 +323,8 @@ export interface FirstDayDispatchFocusInput {
   dispatchKey?: string | null;
   projectId?: string | null;
   stepId?: string | null;
+  source?: string | null;
+  gaps?: string[];
 }
 
 export interface FirstDayDispatchFocus {
@@ -330,6 +332,7 @@ export interface FirstDayDispatchFocus {
   card: FirstDayDispatchDeskCard | null;
   matchedBy: "dispatch_key" | "project_step" | "project_active" | "project_latest" | "global_next" | "none";
   message: string;
+  completionTemplate?: string;
 }
 
 export function buildFirstDayHandoffGateCta(input: {
@@ -766,16 +769,25 @@ export function buildFirstDayDispatchCenterHref(input: {
   projectId?: string | null;
   dispatchKey?: string | null;
   stepId?: string | null;
+  source?: string | null;
+  gaps?: string[];
 }) {
   const projectId = input.projectId?.trim();
   if (!projectId) return "/dispatch#first-day-dispatch";
 
+  const params = new URLSearchParams({ firstDayProject: projectId });
   const stepId = input.stepId?.trim() || (input.dispatchKey?.startsWith("first-day:")
     ? firstDayStepId(input.dispatchKey)
     : "");
-  const stepQuery = stepId ? `&step=${encodeURIComponent(stepId)}` : "";
+  if (stepId) params.set("step", stepId);
+  const source = input.source?.trim();
+  if (source) params.set("source", source);
+  for (const gap of input.gaps ?? []) {
+    const normalized = cleanEvidence(gap);
+    if (normalized) params.append("gap", normalized);
+  }
 
-  return `/dispatch?firstDayProject=${encodeURIComponent(projectId)}${stepQuery}#first-day-dispatch`;
+  return `/dispatch?${params.toString()}#first-day-dispatch`;
 }
 
 export function isFirstDayDispatchTask(task: Pick<PersistedGatePlatformDispatchTask, "dispatchKey">) {
@@ -985,6 +997,21 @@ export function resolveFirstDayDispatchFocus(
   const dispatchKey = input.dispatchKey?.trim() || "";
   const projectId = input.projectId?.trim() || "";
   const stepId = input.stepId?.trim() || "";
+  const isRealSampleFocus = input.source === "real-sample";
+  const gaps = (input.gaps ?? []).map(cleanEvidence).filter(Boolean);
+  const realSampleTemplate = (card: FirstDayDispatchDeskCard | null) => {
+    if (!isRealSampleFocus || !card) return undefined;
+    return [
+      "真实样本验收来源：作品卡发现以下缺口，本次派单完成依据必须逐项回应。",
+      ...gaps.map((gap) => `缺口：${gap}`),
+      card.completionTemplate,
+    ].filter(Boolean).join("\n");
+  };
+  const focusMessage = (card: FirstDayDispatchDeskCard, fallback: string) => (
+    isRealSampleFocus
+      ? `来自真实样本验收：已定位到「${card.stepLabel}」，先按作品卡缺口补齐验收证据。`
+      : fallback
+  );
 
   const exact = dispatchKey ? cards.find((card) => card.dispatchKey === dispatchKey) ?? null : null;
   if (exact) {
@@ -992,7 +1019,8 @@ export function resolveFirstDayDispatchFocus(
       requested,
       card: exact,
       matchedBy: "dispatch_key",
-      message: `已定位到「${exact.stepLabel}」，先处理这张首日卡。`,
+      message: focusMessage(exact, `已定位到「${exact.stepLabel}」，先处理这张首日卡。`),
+      completionTemplate: realSampleTemplate(exact),
     };
   }
 
@@ -1003,7 +1031,8 @@ export function resolveFirstDayDispatchFocus(
       requested,
       card: projectStep,
       matchedBy: "project_step",
-      message: `已定位到「${projectStep.stepLabel}」，先补这张卡的验收证据。`,
+      message: focusMessage(projectStep, `已定位到「${projectStep.stepLabel}」，先补这张卡的验收证据。`),
+      completionTemplate: realSampleTemplate(projectStep),
     };
   }
 
@@ -1013,7 +1042,8 @@ export function resolveFirstDayDispatchFocus(
       requested,
       card: projectActive,
       matchedBy: "project_active",
-      message: `目标步骤暂未排到，先收口当前首日卡「${projectActive.stepLabel}」。`,
+      message: focusMessage(projectActive, `目标步骤暂未排到，先收口当前首日卡「${projectActive.stepLabel}」。`),
+      completionTemplate: realSampleTemplate(projectActive),
     };
   }
 
@@ -1023,7 +1053,17 @@ export function resolveFirstDayDispatchFocus(
       requested,
       card: projectLatest,
       matchedBy: "project_latest",
-      message: `这个项目的首日卡已没有未闭环项，最近一张是「${projectLatest.stepLabel}」。`,
+      message: focusMessage(projectLatest, `这个项目的首日卡已没有未闭环项，最近一张是「${projectLatest.stepLabel}」。`),
+      completionTemplate: realSampleTemplate(projectLatest),
+    };
+  }
+
+  if (isRealSampleFocus && projectId) {
+    return {
+      requested,
+      card: null,
+      matchedBy: "none",
+      message: "来自真实样本验收：没有找到这本书的首日派单卡。请先回作品首日流程生成派单，再回到这里补验收证据。",
     };
   }
 

@@ -2,6 +2,7 @@ import { buildModelTaskAuditDashboard, type ModelAuditProvider, type ModelAuditT
 import { getPlatformProfile, platformDeliveryScope, type PlatformId } from "../platforms/platformProfiles.ts";
 import { buildFirstDayContinuationAction } from "./firstDayContinuation.ts";
 import { buildFirstDayRiskProfile, buildFirstDayWorkflow, type FirstDayAiTask, type FirstDayChapter, type FirstDayCharacter, type FirstDayOutlineNode, type FirstDayRiskLevel, type FirstDayWorldEntry } from "./firstDayWorkflow.ts";
+import { buildFirstDayDispatchCenterHref } from "./firstDayWorkflowView.ts";
 import { findProjectStartTacticSummary } from "./projectStartTactics.ts";
 import { buildSubmissionChecklist } from "./submissionChecklist.ts";
 
@@ -440,6 +441,7 @@ function buildRealSampleValidation(input: {
   }
 
   if (!reviewReady || !secondPassReady || !dispatchAccepted) {
+    const stepId = !reviewReady ? "first-review" : !secondPassReady ? "first-rewrite" : "publish-precheck";
     return {
       status: "needs_acceptance",
       label: "待验收",
@@ -448,7 +450,12 @@ function buildRealSampleValidation(input: {
       completedEvidence,
       missingEvidence,
       nextActionLabel: "补派单验收",
-      nextActionHref: `/dispatch?firstDayProject=${input.project.id}#first-day-dispatch`,
+      nextActionHref: buildFirstDayDispatchCenterHref({
+        projectId: input.project.id,
+        stepId,
+        source: "real-sample",
+        gaps: missingEvidence,
+      }),
     };
   }
 

@@ -372,7 +372,8 @@ test("buildProjectListDashboard", async (t) => {
     assert.ok(ready?.realSampleValidation.headline.includes("审稿"));
     assert.ok(ready?.realSampleValidation.missingEvidence.some((item) => item.includes("派单回执")));
     assert.ok(ready?.realSampleValidation.completedEvidence.some((item) => item.includes("首章样本")));
-    assert.equal(ready?.realSampleValidation.nextActionHref, "/dispatch?firstDayProject=ready-project#first-day-dispatch");
+    assert.ok(ready?.realSampleValidation.nextActionHref.startsWith("/dispatch?firstDayProject=ready-project&step=first-rewrite&source=real-sample"));
+    assert.ok(ready?.realSampleValidation.nextActionHref.includes("gap="));
 
     assert.equal(handoff?.realSampleValidation.status, "ready_for_gate");
     assert.ok(handoff?.realSampleValidation.headline.includes("总闸门"));

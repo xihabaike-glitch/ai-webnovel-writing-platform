@@ -297,6 +297,17 @@ export function GateDispatchTaskCenter({
     }));
   }, [initialCompletionSuggestions, tasks]);
 
+  useEffect(() => {
+    if (!firstDayFocus.card || !firstDayFocus.completionTemplate) return;
+    setCompletionDrafts((current) => {
+      if (current[firstDayFocus.card!.dispatchKey]?.trim()) return current;
+      return {
+        ...current,
+        [firstDayFocus.card!.dispatchKey]: firstDayFocus.completionTemplate!,
+      };
+    });
+  }, [firstDayFocus.card, firstDayFocus.completionTemplate]);
+
   function evidenceLoopRecheckMessage(updated: Awaited<ReturnType<typeof updatePersistedGateDispatchTaskState>>) {
     const recheck = updated.evidenceLoopRecheck;
     if (!recheck) return "";
@@ -505,7 +516,8 @@ export function GateDispatchTaskCenter({
   }
 
   function completionTextForTask(task: PersistedGatePlatformDispatchTask) {
-    return completionSuggestionByKey.get(task.dispatchKey)?.completionEvidence
+    return (task.dispatchKey === firstDayFocus.card?.dispatchKey ? firstDayFocus.completionTemplate : "")
+      || completionSuggestionByKey.get(task.dispatchKey)?.completionEvidence
       || buildRouteDispatchCompletionTemplate(task)
       || buildGateDispatchCompletionTemplate(task)
       || buildFirstDayDispatchCompletionTemplate(task);

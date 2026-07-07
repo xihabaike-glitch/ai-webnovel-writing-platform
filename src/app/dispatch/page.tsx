@@ -32,6 +32,12 @@ function searchValue(params: DispatchSearchParams, key: string) {
   return Array.isArray(value) ? value[0] ?? "" : value ?? "";
 }
 
+function searchValues(params: DispatchSearchParams, key: string) {
+  const value = params[key];
+  if (Array.isArray(value)) return value.filter(Boolean);
+  return value ? [value] : [];
+}
+
 function dispatchQueueFilter(value: string): DispatchQueueFilter {
   if (value === "ai_pipeline" || value === "recheck_followup") return value;
   return "all";
@@ -196,6 +202,8 @@ export default async function DispatchPage({
   const resolvedSearchParams = await Promise.resolve(searchParams ?? {});
   const firstDayProjectId = searchValue(resolvedSearchParams, "firstDayProject");
   const firstDayStepId = searchValue(resolvedSearchParams, "step");
+  const firstDaySource = searchValue(resolvedSearchParams, "source");
+  const firstDayGaps = searchValues(resolvedSearchParams, "gap");
   const focusDispatchKey = searchValue(resolvedSearchParams, "focus");
   const initialQueueFilter = dispatchQueueFilter(searchValue(resolvedSearchParams, "queue"));
   const [tasks, receipts, projects, recentAiTasks, chapters] = await Promise.all([
@@ -338,6 +346,8 @@ export default async function DispatchPage({
           dispatchKey: focusDispatchKey,
           projectId: firstDayProjectId,
           stepId: firstDayStepId,
+          source: firstDaySource,
+          gaps: firstDayGaps,
         }}
         initialReceipts={receiptItems}
         initialTasks={mergedTasks}

@@ -733,6 +733,12 @@ export function SubmissionPackagePanel({
               >
                 {isAssigningDecisionTasks ? "派发中" : "派发执行单"}
               </button>
+              <a
+                className="rounded-md border border-slate-200 px-3 py-2 text-xs font-medium hover:bg-slate-50"
+                href={hrefWithGateReturn("#platform-export", gateReturnHref, projectId)}
+              >
+                进入平台导出
+              </a>
             </div>
           </div>
           <div className="mt-3 grid gap-2 sm:grid-cols-3">

@@ -33,15 +33,20 @@ test("gate page labels prioritized remaining blockers", () => {
   assert.ok(source.includes("focusNotice.recheckSummary.remainingBlockers"));
   assert.ok(source.includes("blocker.priorityLabel"));
   assert.ok(source.includes("blocker.evidence"));
-  assert.ok(source.includes("href={blocker.href}"));
+  assert.ok(source.includes("href={hrefWithGateReturn(blocker.href, gateRecheckReturnHref)}"));
   assert.ok(source.includes("blocker.actionLabel"));
 });
 
 test("gate page carries action recheck return paths into gate item links", () => {
   assert.ok(source.includes("gateRecheckReturnHref"));
   assert.ok(source.includes("hrefWithGateReturn"));
+  assert.ok(source.includes("base.includes(\"gateReturn=\")"));
   assert.ok(source.includes("focus === \"action-recheck\""));
+  assert.ok(source.includes("href={hrefWithGateReturn(gate.releaseAction.href, gateRecheckReturnHref)}"));
+  assert.ok(source.includes("href={hrefWithGateReturn(gate.pmFocus.actionHref, gateRecheckReturnHref)}"));
+  assert.ok(source.includes("href={hrefWithGateReturn(focusNotice.primaryHref, gateRecheckReturnHref)}"));
   assert.ok(source.includes("href={hrefWithGateReturn(item.href, gateRecheckReturnHref)}"));
+  assert.ok(source.includes("href={hrefWithGateReturn(project.href, gateRecheckReturnHref)}"));
 });
 
 test("gate page carries action recheck return paths into failure repair links", () => {

@@ -14,3 +14,14 @@ test("project detail page exposes role workflow anchors", () => {
     );
   }
 });
+
+test("project detail page renders the single-project acceptance sheet", () => {
+  const projectPage = readFileSync("src/app/projects/[projectId]/page.tsx", "utf8");
+
+  assert.ok(projectPage.includes("dashboard.realSampleAcceptanceSheet"));
+  assert.ok(projectPage.includes("单本作品验收单"));
+  assert.ok(projectPage.includes("dashboard.realSampleAcceptanceSheet.steps.map"));
+  assert.ok(projectPage.includes("step.stopRule"));
+  assert.ok(projectPage.includes("dashboard.realSampleAcceptanceSheet.actionHref"));
+  assert.ok(projectPage.includes("dashboard.realSampleAcceptanceSheet.actionLabel"));
+});

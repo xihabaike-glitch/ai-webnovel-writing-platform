@@ -87,6 +87,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ projec
             { dispatchKey: { startsWith: "story-tree:" } },
             { dispatchKey: { startsWith: "story-tree-experience:" } },
             { dispatchKey: { startsWith: "first-three-adoption:" } },
+            { dispatchKey: { startsWith: "first-day:" } },
           ],
         },
         orderBy: { updatedAt: "desc" },
@@ -179,6 +180,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ projec
     take: 100,
   });
   const dashboard = buildProjectDashboard({
+    projectId: project.id,
     currentWordCount: project.currentWordCount,
     targetWordCount: project.targetWordCount,
     platform,
@@ -186,6 +188,11 @@ export default async function ProjectPage({ params }: { params: Promise<{ projec
     aiTasks: project.aiTasks.map((task) => ({
       ...task,
       chapter: task.chapterId ? chaptersById.get(task.chapterId) ?? null : null,
+    })),
+    gateDispatchTasks: project.gateDispatchTasks.map((task) => ({
+      dispatchKey: task.dispatchKey,
+      state: task.state,
+      completionEvidence: task.completionEvidence,
     })),
   });
   const submissionChecklist = buildSubmissionChecklist({
@@ -549,6 +556,39 @@ export default async function ProjectPage({ params }: { params: Promise<{ projec
                       {step.stage}：{step.output}
                     </span>
                   ))}
+                </div>
+              </Link>
+            ))}
+          </div>
+        </section>
+        <section className="rounded-md border border-slate-900 bg-slate-950 p-4 text-white">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <div className="text-xs font-medium text-slate-300">单本作品验收单</div>
+              <h2 className="mt-1 text-lg font-semibold">{dashboard.realSampleAcceptanceSheet.title}</h2>
+              <p className="mt-2 max-w-4xl text-sm leading-6 text-slate-200">{dashboard.realSampleAcceptanceSheet.verdict}</p>
+            </div>
+            <Link
+              className="w-fit rounded-md bg-white px-3 py-2 text-sm font-medium text-slate-950 hover:bg-slate-100"
+              href={dashboard.realSampleAcceptanceSheet.actionHref}
+            >
+              {dashboard.realSampleAcceptanceSheet.actionLabel}
+            </Link>
+          </div>
+          <div className="mt-4 grid gap-2 md:grid-cols-3 xl:grid-cols-6">
+            {dashboard.realSampleAcceptanceSheet.steps.map((step, index) => (
+              <Link
+                className={`rounded-md border p-3 text-xs leading-5 ${step.status === "done" ? "border-emerald-300 bg-emerald-50 text-emerald-950" : step.status === "current" ? "border-white bg-white text-slate-950" : "border-white/15 bg-white/10 text-slate-300"}`}
+                href={step.href}
+                key={step.id}
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <span className="font-medium">{index + 1}. {step.label}</span>
+                  <span className="shrink-0 opacity-75">{step.status === "done" ? "已过" : step.status === "current" ? "当前" : "待验"}</span>
+                </div>
+                <p className="mt-2">{step.evidence}</p>
+                <div className="mt-2 rounded-md bg-white/60 p-2 text-rose-800">
+                  {step.stopRule}
                 </div>
               </Link>
             ))}

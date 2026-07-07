@@ -6,6 +6,11 @@ export interface DashboardChapter {
   order: number;
   status: string;
   wordCount: number;
+  goal?: string | null;
+  hook?: string | null;
+  conflict?: string | null;
+  valueShift?: string | null;
+  cliffhanger?: string | null;
   updatedAt: Date | string;
   aiTasks?: Array<{
     taskType: string;
@@ -30,12 +35,40 @@ export interface DashboardAiTask {
   };
 }
 
+export interface DashboardGateDispatchTask {
+  dispatchKey: string;
+  state: string;
+  completionEvidence: string;
+}
+
 export interface ProjectDashboardInput {
+  projectId?: string;
   currentWordCount: number;
   targetWordCount: number;
   platform: PlatformProfile;
   chapters: DashboardChapter[];
   aiTasks: DashboardAiTask[];
+  gateDispatchTasks?: DashboardGateDispatchTask[];
+}
+
+export type ProjectAcceptanceStepStatus = "done" | "current" | "blocked";
+
+export interface ProjectAcceptanceStep {
+  id: "project_start" | "opening_sample" | "chapter_review" | "second_pass" | "dispatch_receipt" | "publish_package";
+  label: string;
+  status: ProjectAcceptanceStepStatus;
+  evidence: string;
+  stopRule: string;
+  href: string;
+}
+
+export interface ProjectRealSampleAcceptanceSheet {
+  title: string;
+  verdict: string;
+  currentStepId: ProjectAcceptanceStep["id"];
+  actionLabel: string;
+  actionHref: string;
+  steps: ProjectAcceptanceStep[];
 }
 
 export interface ProjectDashboardSummary {
@@ -49,12 +82,118 @@ export interface ProjectDashboardSummary {
   nextChapter: DashboardChapter | null;
   recentTasks: DashboardAiTask[];
   platformWarnings: string[];
+  realSampleAcceptanceSheet: ProjectRealSampleAcceptanceSheet;
 }
 
 const chapterStatusOrder = ["outline", "draft", "revising", "final"];
 
 function clampPercent(value: number) {
   return Math.max(0, Math.min(100, Math.round(value)));
+}
+
+function hasText(value: string | null | undefined) {
+  return Boolean(value?.trim());
+}
+
+function buildProjectRealSampleAcceptanceSheet(input: ProjectDashboardInput): ProjectRealSampleAcceptanceSheet {
+  const projectHref = input.projectId ? `/projects/${input.projectId}` : "#";
+  const firstChapter = input.chapters.find((chapter) => chapter.order === 1) ?? input.chapters[0] ?? null;
+  const hasProjectStart = input.targetWordCount > 0 && input.platform.name.trim().length > 0;
+  const hasOpeningSample = Boolean(firstChapter)
+    && (firstChapter?.wordCount ?? 0) > 0
+    && hasText(firstChapter?.hook)
+    && hasText(firstChapter?.conflict)
+    && hasText(firstChapter?.valueShift)
+    && hasText(firstChapter?.cliffhanger);
+  const firstChapterId = firstChapter?.id ?? null;
+  const hasReview = input.aiTasks.some((task) => (
+    task.taskType === "chapter_review"
+    && task.status === "succeeded"
+    && (!firstChapterId || task.chapter?.id === firstChapterId)
+  ));
+  const hasSecondPass = input.aiTasks.some((task) => (
+    task.taskType === "chapter_second_pass"
+    && task.status === "succeeded"
+    && (!firstChapterId || task.chapter?.id === firstChapterId)
+  ));
+  const hasDispatchReceipt = (input.gateDispatchTasks ?? []).some((task) => (
+    task.dispatchKey.startsWith("first-day:")
+    && task.state === "completed"
+    && task.completionEvidence.trim().length >= 20
+  ));
+  const hasPublishPackageShape = input.chapters.length >= 3 && hasReview && hasSecondPass && hasDispatchReceipt;
+  const definitions: Array<Omit<ProjectAcceptanceStep, "status"> & { done: boolean }> = [
+    {
+      id: "project_start",
+      label: "开书基础",
+      done: hasProjectStart,
+      evidence: hasProjectStart ? `${input.platform.name} 目标平台和篇幅已确定。` : "目标平台或目标字数缺失。",
+      stopRule: "没有平台和篇幅时，先补作品基础，不进入模型生成。",
+      href: projectHref,
+    },
+    {
+      id: "opening_sample",
+      label: "首章样本",
+      done: hasOpeningSample,
+      evidence: hasOpeningSample ? "首章已有钩子、冲突、价值变化和章末追读。" : "首章缺正文、钩子、冲突、价值变化或章末追读。",
+      stopRule: "首章样本不完整时，不允许批量生成后续章节。",
+      href: firstChapter ? `${projectHref}/chapters/${firstChapter.id}` : `${projectHref}#create-chapter`,
+    },
+    {
+      id: "chapter_review",
+      label: "审稿",
+      done: hasReview,
+      evidence: hasReview ? "首章审稿任务已有成功记录。" : "首章还缺审稿成功记录。",
+      stopRule: "没有审稿前，不要把样本当成可放大的正文。",
+      href: "#ai-pipeline",
+    },
+    {
+      id: "second_pass",
+      label: "二改",
+      done: hasSecondPass,
+      evidence: hasSecondPass ? "首章二改任务已有成功记录。" : "审稿后还缺二改成功记录。",
+      stopRule: "没有二改闭环时，只能继续修样本，不能进总闸门放量。",
+      href: "#ai-pipeline",
+    },
+    {
+      id: "dispatch_receipt",
+      label: "派单回执",
+      done: hasDispatchReceipt,
+      evidence: hasDispatchReceipt ? "首日派单已有完成依据和人工验收。" : "还缺首日派单完成依据和人工验收。",
+      stopRule: "派单缺人工验收时，不能宣称真实样本跑通。",
+      href: input.projectId ? `/dispatch?firstDayProject=${input.projectId}#first-day-dispatch` : "/dispatch#first-day-dispatch",
+    },
+    {
+      id: "publish_package",
+      label: "发布包",
+      done: hasPublishPackageShape,
+      evidence: hasPublishPackageShape ? "前三章、审稿、二改和派单回执已能进入发布包。" : "发布包还缺前三章、二改或派单回执。",
+      stopRule: "发布包证据不齐时，不要新增平台，也不要扩大投放。",
+      href: "#platform-export",
+    },
+  ];
+  const firstMissingIndex = definitions.findIndex((step) => !step.done);
+  const currentIndex = firstMissingIndex === -1 ? definitions.length - 1 : firstMissingIndex;
+  const steps = definitions.map((step, index) => ({
+    id: step.id,
+    label: step.label,
+    evidence: step.evidence,
+    stopRule: step.stopRule,
+    href: step.href,
+    status: index < currentIndex ? "done" : index === currentIndex ? "current" : "blocked",
+  })) satisfies ProjectAcceptanceStep[];
+  const current = steps[currentIndex];
+
+  return {
+    title: "单本作品验收单",
+    verdict: firstMissingIndex === -1
+      ? "样本证据已闭合，可以进入发布包和平台复盘。"
+      : `当前先补「${current.label}」：${current.evidence}`,
+    currentStepId: current.id,
+    actionLabel: current.status === "done" ? "复查发布包" : `处理${current.label}`,
+    actionHref: current.href,
+    steps,
+  };
 }
 
 export function buildProjectDashboard(input: ProjectDashboardInput): ProjectDashboardSummary {
@@ -94,5 +233,6 @@ export function buildProjectDashboard(input: ProjectDashboardInput): ProjectDash
     nextChapter,
     recentTasks: input.aiTasks.slice(0, 6),
     platformWarnings,
+    realSampleAcceptanceSheet: buildProjectRealSampleAcceptanceSheet(input),
   };
 }

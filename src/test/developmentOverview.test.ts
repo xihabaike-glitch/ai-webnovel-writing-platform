@@ -66,4 +66,52 @@ test("buildDevelopmentOverview", async (t) => {
       false,
     );
   });
+
+  await t.test("builds a delivery audit from the original product requirements", () => {
+    const overview = buildDevelopmentOverview();
+
+    assert.equal(overview.deliveryAudit.summary.total, overview.deliveryAudit.items.length);
+    assert.ok(overview.deliveryAudit.summary.total >= 8);
+    assert.equal(overview.deliveryAudit.summary.blocked, 0);
+    assert.ok(overview.deliveryAudit.summary.ready >= 6);
+    assert.ok(overview.deliveryAudit.headline.includes("交付验收"));
+    assert.ok(overview.deliveryAudit.pmVerdict.includes("剩余 10 个平台不再添加"));
+
+    const auditIds = overview.deliveryAudit.items.map((item) => item.id);
+    assert.deepEqual(auditIds, [
+      "reference_cases",
+      "platform_scope",
+      "length_modes",
+      "tree_workflow",
+      "model_interfaces",
+      "ai_roles",
+      "writing_pipeline",
+      "pm_gates",
+    ]);
+
+    for (const item of overview.deliveryAudit.items) {
+      assert.ok(["ready", "watch", "blocked"].includes(item.status));
+      assert.ok(item.title.length >= 4);
+      assert.ok(item.requirement.length >= 10);
+      assert.ok(item.evidence.length >= 10);
+      assert.ok(item.href.startsWith("/"));
+      assert.notEqual(item.nextStep.includes("新增平台"), true);
+    }
+
+    const platformScope = overview.deliveryAudit.items.find((item) => item.id === "platform_scope");
+    const modelInterfaces = overview.deliveryAudit.items.find((item) => item.id === "model_interfaces");
+    const treeWorkflow = overview.deliveryAudit.items.find((item) => item.id === "tree_workflow");
+
+    assert.equal(platformScope?.status, "ready");
+    assert.ok(platformScope?.evidence.includes("8/8 核心平台已完成"));
+    assert.ok(platformScope?.evidence.includes("剩余 10 个平台不再添加"));
+    assert.equal(modelInterfaces?.status, "ready");
+    assert.ok(modelInterfaces?.evidence.includes("Claude"));
+    assert.ok(modelInterfaces?.evidence.includes("DeepSeek"));
+    assert.ok(modelInterfaces?.evidence.includes("Kimi"));
+    assert.ok(modelInterfaces?.evidence.includes("GPT"));
+    assert.equal(treeWorkflow?.status, "ready");
+    assert.ok(treeWorkflow?.evidence.includes("开头"));
+    assert.ok(treeWorkflow?.evidence.includes("土壤"));
+  });
 });

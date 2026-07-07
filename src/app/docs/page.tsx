@@ -14,6 +14,18 @@ function sectionAccent(index: number) {
   return accents[index] ?? "border-slate-200 bg-white text-slate-950";
 }
 
+function auditStatusClass(status: "ready" | "watch" | "blocked") {
+  if (status === "ready") return "bg-emerald-100 text-emerald-950";
+  if (status === "watch") return "bg-amber-100 text-amber-950";
+  return "bg-rose-100 text-rose-950";
+}
+
+function auditStatusLabel(status: "ready" | "watch" | "blocked") {
+  if (status === "ready") return "已覆盖";
+  if (status === "watch") return "观察中";
+  return "阻塞";
+}
+
 export default function DevelopmentDocsPage() {
   const overview = buildDevelopmentOverview();
 
@@ -56,6 +68,57 @@ export default function DevelopmentDocsPage() {
           >
             {overview.pmFocus.actionLabel}
           </Link>
+        </div>
+      </section>
+
+      <section className="mb-6 rounded-md border border-slate-200 bg-white p-4">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <h2 className="font-medium text-slate-950">{overview.deliveryAudit.headline}</h2>
+            <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-600">{overview.deliveryAudit.pmVerdict}</p>
+          </div>
+          <div className="grid grid-cols-4 gap-2 text-center text-xs">
+            <div className="rounded-md bg-slate-100 px-3 py-2">
+              <div className="font-semibold text-slate-950">{overview.deliveryAudit.summary.total}</div>
+              <div className="mt-1 text-slate-500">总项</div>
+            </div>
+            <div className="rounded-md bg-emerald-50 px-3 py-2">
+              <div className="font-semibold text-emerald-900">{overview.deliveryAudit.summary.ready}</div>
+              <div className="mt-1 text-emerald-700">已覆盖</div>
+            </div>
+            <div className="rounded-md bg-amber-50 px-3 py-2">
+              <div className="font-semibold text-amber-900">{overview.deliveryAudit.summary.watch}</div>
+              <div className="mt-1 text-amber-700">观察</div>
+            </div>
+            <div className="rounded-md bg-rose-50 px-3 py-2">
+              <div className="font-semibold text-rose-900">{overview.deliveryAudit.summary.blocked}</div>
+              <div className="mt-1 text-rose-700">阻塞</div>
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          {overview.deliveryAudit.items.map((item) => (
+            <article className="rounded-md border border-slate-200 bg-slate-50 p-4" key={item.id}>
+              <div className="flex items-start justify-between gap-3">
+                <h3 className="font-medium text-slate-950">{item.title}</h3>
+                <span className={`shrink-0 rounded-md px-2 py-1 text-xs font-medium ${auditStatusClass(item.status)}`}>
+                  {auditStatusLabel(item.status)}
+                </span>
+              </div>
+              <p className="mt-3 text-sm leading-6 text-slate-600">{item.requirement}</p>
+              <div className="mt-3 rounded-md bg-white p-3 text-xs leading-5 text-slate-700">
+                证据：{item.evidence}
+              </div>
+              <p className="mt-3 text-xs leading-5 text-slate-500">下一步：{item.nextStep}</p>
+              <Link
+                className="mt-3 inline-flex w-fit rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white hover:bg-slate-800"
+                href={item.href}
+              >
+                查看入口
+              </Link>
+            </article>
+          ))}
         </div>
       </section>
 

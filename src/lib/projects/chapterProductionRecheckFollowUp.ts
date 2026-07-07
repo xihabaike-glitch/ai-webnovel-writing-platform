@@ -1,4 +1,9 @@
-import type { GateEvidenceLoopRecheck, GatePlatformGrowthDispatchItem, GateStoryTreeRecheck } from "./gateActionReceipts.ts";
+import type {
+  GateEvidenceLoopRecheck,
+  GatePlatformGrowthDispatchItem,
+  GateStoryTreeRecheck,
+  GateStructureDiagnosticRecheck,
+} from "./gateActionReceipts.ts";
 
 export interface ChapterProductionRecheckFollowUpTaskInput {
   projectTitle: string;
@@ -8,6 +13,7 @@ export interface ChapterProductionRecheckFollowUpTaskInput {
   existingDispatchKeys?: string[];
   storyTreeRecheck?: GateStoryTreeRecheck | null;
   evidenceLoopRecheck?: GateEvidenceLoopRecheck | null;
+  structureDiagnosticRecheck?: GateStructureDiagnosticRecheck | null;
   now?: string;
 }
 
@@ -23,6 +29,10 @@ function shouldCreateEvidenceLoopFollowUp(recheck: GateEvidenceLoopRecheck) {
   return recheck.verdict === "declined" || recheck.verdict === "unchanged" || recheck.status === "pause" || recheck.status === "repair";
 }
 
+function shouldCreateStructureDiagnosticFollowUp(recheck: GateStructureDiagnosticRecheck) {
+  return recheck.verdict === "declined" || recheck.verdict === "unchanged" || recheck.currentScore < 80;
+}
+
 function storyTreePriority(recheck: GateStoryTreeRecheck) {
   const verdictBoost = recheck.verdict === "declined" ? 12 : recheck.verdict === "unchanged" ? 8 : 0;
   return Math.min(99, Math.max(70, 100 - recheck.currentScore + verdictBoost));
@@ -31,6 +41,11 @@ function storyTreePriority(recheck: GateStoryTreeRecheck) {
 function evidenceLoopPriority(recheck: GateEvidenceLoopRecheck) {
   const statusBoost = recheck.status === "pause" ? 18 : recheck.status === "repair" ? 12 : 6;
   return Math.min(99, Math.max(72, 100 - recheck.currentScore + statusBoost));
+}
+
+function structureDiagnosticPriority(recheck: GateStructureDiagnosticRecheck) {
+  const verdictBoost = recheck.verdict === "declined" ? 12 : recheck.verdict === "unchanged" ? 8 : 4;
+  return Math.min(99, Math.max(74, 100 - recheck.currentScore + verdictBoost));
 }
 
 export function buildChapterProductionRecheckFollowUpTasks(
@@ -102,6 +117,39 @@ export function buildChapterProductionRecheckFollowUpTasks(
           recheck.headline,
           recheck.nextAction,
           ...recheck.evidence.slice(0, 2),
+        ],
+        reviewLatestAt: now,
+      });
+    }
+  }
+
+  if (input.structureDiagnosticRecheck && shouldCreateStructureDiagnosticFollowUp(input.structureDiagnosticRecheck)) {
+    const recheck = input.structureDiagnosticRecheck;
+    const dispatchKey = `structure-recheck-followup:${recheck.projectId}:${sourceKey}:${recheck.currentScore}`;
+    if (!existingDispatchKeys.has(dispatchKey)) {
+      dispatches.push({
+        id: dispatchKey,
+        platformId: recheck.platformId,
+        platformName: recheck.platformName,
+        stage: "start_repair_packaging",
+        state: "assigned",
+        priorityScore: structureDiagnosticPriority(recheck),
+        ownerRole: "结构主编",
+        title: `${input.projectTitle} · 整书结构复查未解除`,
+        detail: `整书结构复查 ${recheck.previousScore ?? "无基准"} -> ${recheck.currentScore} 分，结论「${recheck.label}」。下一轮先处理：${recheck.topAction}`,
+        dueLabel: recheck.verdict === "declined" ? "今天返工" : "投稿前",
+        actionLabel: "继续补结构",
+        href: `/projects/${recheck.projectId}#story-structure`,
+        acceptanceCriteria: [
+          "把整书结构诊断提升到 80 分以上，或写清暂时不能提升的具体原因。",
+          "优先修复人物弧光、主干压力、支线覆盖、伏笔回收中仍未通过的项目。",
+          "完成后从项目页重新执行结构复查，确认投稿篇幅结构卡点是否解除。",
+        ],
+        evidence: [
+          `来源派单：${input.sourceDispatchKey}`,
+          `整书结构复查：${recheck.previousScore ?? "无基准"} -> ${recheck.currentScore} 分，${recheck.verdict}`,
+          `返工动作：${recheck.topAction}`,
+          ...recheck.weakItems.slice(0, 4).map((item) => `${item.label}：${item.status}，${item.evidence}`),
         ],
         reviewLatestAt: now,
       });

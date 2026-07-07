@@ -1,8 +1,9 @@
-import type { GateEvidenceLoopRecheck, GateStoryTreeRecheck } from "./gateActionReceipts.ts";
+import type { GateEvidenceLoopRecheck, GateStoryTreeRecheck, GateStructureDiagnosticRecheck } from "./gateActionReceipts.ts";
 
 export interface ChapterProductionRecheckPayload {
   storyTreeRecheck?: GateStoryTreeRecheck | null;
   evidenceLoopRecheck?: GateEvidenceLoopRecheck | null;
+  structureDiagnosticRecheck?: GateStructureDiagnosticRecheck | null;
   followUpTasks?: unknown[];
 }
 
@@ -45,12 +46,27 @@ function evidenceLoopLine(recheck: GateEvidenceLoopRecheck) {
   return `平台证据 ${scoreText(recheck.previousScore, recheck.currentScore)}，${verdictText}：${recheck.nextAction}`;
 }
 
+function structureDiagnosticLine(recheck: GateStructureDiagnosticRecheck) {
+  const verdictText = recheck.verdict === "improved"
+    ? "结构变好"
+    : recheck.verdict === "declined"
+      ? "结构变差"
+      : recheck.verdict === "unchanged"
+        ? "结构未动"
+        : "缺少基准";
+  return `整书结构 ${scoreText(recheck.previousScore, recheck.currentScore)}，${verdictText}：${recheck.topAction}`;
+}
+
 function storyTreeNeedsAction(recheck: GateStoryTreeRecheck) {
   return recheck.verdict === "declined" || recheck.verdict === "unchanged" || recheck.currentScore < 80;
 }
 
 function evidenceLoopNeedsAction(recheck: GateEvidenceLoopRecheck) {
   return recheck.verdict === "declined" || recheck.verdict === "unchanged" || recheck.status === "pause" || recheck.status === "repair";
+}
+
+function structureDiagnosticNeedsAction(recheck: GateStructureDiagnosticRecheck) {
+  return recheck.verdict === "declined" || recheck.verdict === "unchanged" || recheck.currentScore < 80;
 }
 
 export function buildChapterProductionRecheckDecision(
@@ -63,12 +79,19 @@ export function buildChapterProductionRecheckDecision(
   const evidenceLoopRechecks = payloads
     .map((payload) => payload.evidenceLoopRecheck)
     .filter((item): item is GateEvidenceLoopRecheck => Boolean(item));
+  const structureDiagnosticRechecks = payloads
+    .map((payload) => payload.structureDiagnosticRecheck)
+    .filter((item): item is GateStructureDiagnosticRecheck => Boolean(item));
   const detailLines = [
     ...storyTreeRechecks.map(storyTreeLine),
     ...evidenceLoopRechecks.map(evidenceLoopLine),
+    ...structureDiagnosticRechecks.map(structureDiagnosticLine),
   ];
-  const needsAction = storyTreeRechecks.some(storyTreeNeedsAction) || evidenceLoopRechecks.some(evidenceLoopNeedsAction);
-  const hasUnknown = [...storyTreeRechecks, ...evidenceLoopRechecks].some((recheck) => recheck.verdict === "unknown");
+  const needsAction = storyTreeRechecks.some(storyTreeNeedsAction)
+    || evidenceLoopRechecks.some(evidenceLoopNeedsAction)
+    || structureDiagnosticRechecks.some(structureDiagnosticNeedsAction);
+  const hasUnknown = [...storyTreeRechecks, ...evidenceLoopRechecks, ...structureDiagnosticRechecks]
+    .some((recheck) => recheck.verdict === "unknown");
 
   if (detailLines.length === 0) {
     return {

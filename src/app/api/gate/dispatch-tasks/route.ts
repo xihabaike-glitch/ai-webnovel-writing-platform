@@ -24,6 +24,7 @@ import {
 import type {
   GateEvidenceLoopRecheck,
   GateStoryTreeRecheck,
+  GateStructureDiagnosticRecheck,
   GateActionReceipt,
   GatePlatformGrowthDispatchItem,
   GatePlatformGrowthDispatchState,
@@ -34,6 +35,7 @@ import { buildProjectContextPack } from "@/lib/projects/projectContextPack";
 import { findProjectStartTacticSummary } from "@/lib/projects/projectStartTactics";
 import { buildSubmissionChecklist } from "@/lib/projects/submissionChecklist";
 import { buildSubmissionDecisionCompletionEffect } from "@/lib/projects/submissionDecisionCompletion";
+import { buildStoryStructureDiagnostic } from "@/lib/projects/storyStructureDiagnostic";
 import {
   autoDispatchSecondMetricDecision,
   autoDispatchSecondMetricFollowups,
@@ -427,6 +429,20 @@ function evidenceLoopRecheckLine(recheck: GateEvidenceLoopRecheck) {
   return `证据闭环复检：${scoreText}，${verdictText}：${recheck.label}`;
 }
 
+function structureDiagnosticRecheckLine(recheck: GateStructureDiagnosticRecheck) {
+  const scoreText = recheck.previousScore === null
+    ? `${recheck.currentScore} 分`
+    : `${recheck.previousScore} -> ${recheck.currentScore} 分`;
+  const verdictText = recheck.verdict === "improved"
+    ? "分数变好"
+    : recheck.verdict === "declined"
+      ? "分数变差"
+      : recheck.verdict === "unchanged"
+        ? "分数未变"
+        : "无历史基准";
+  return `整书结构复查：${scoreText}，${verdictText}：${recheck.label}`;
+}
+
 async function persistEvidenceLoopRecheck(
   task: Awaited<ReturnType<typeof prisma.gateDispatchTask.update>>,
   recheck: GateEvidenceLoopRecheck | null,
@@ -434,6 +450,23 @@ async function persistEvidenceLoopRecheck(
   if (!recheck) return task;
   const line = evidenceLoopRecheckLine(recheck);
   const evidence = Array.from(new Set([...parseJsonList(task.evidence), line]));
+  return prisma.gateDispatchTask.update({
+    where: { dispatchKey: task.dispatchKey },
+    data: { evidence: JSON.stringify(evidence) },
+  });
+}
+
+async function persistStructureDiagnosticRecheck(
+  task: Awaited<ReturnType<typeof prisma.gateDispatchTask.update>>,
+  recheck: GateStructureDiagnosticRecheck | null,
+) {
+  if (!recheck) return task;
+  const line = structureDiagnosticRecheckLine(recheck);
+  const evidence = Array.from(new Set([
+    ...parseJsonList(task.evidence),
+    line,
+    ...recheck.weakItems.slice(0, 3).map((item) => `${item.label}：${item.status}，${item.evidence}`),
+  ]));
   return prisma.gateDispatchTask.update({
     where: { dispatchKey: task.dispatchKey },
     data: { evidence: JSON.stringify(evidence) },
@@ -458,6 +491,95 @@ function storyTreeDispatchIds(dispatchKey: string) {
     chapterId: followUpMatch[2],
     source: "followup",
     axisId: "recheck",
+  };
+}
+
+function structureDiagnosticProjectId(dispatchKey: string, projectId: string | null) {
+  if (projectId && (
+    dispatchKey.startsWith("structure-recheck-followup:")
+    || dispatchKey.includes(":length-structure")
+  )) return projectId;
+
+  const precheckMatch = dispatchKey.match(/^submission-precheck:([^:]+):length-structure(?::[^:]+)?$/);
+  if (precheckMatch) return precheckMatch[1];
+
+  const followUpMatch = dispatchKey.match(/^structure-recheck-followup:([^:]+):/);
+  return followUpMatch?.[1] ?? null;
+}
+
+function baselineStructureDiagnosticScore(task: Awaited<ReturnType<typeof prisma.gateDispatchTask.update>>) {
+  const values = [
+    ...parseJsonList(task.evidence),
+    task.detail,
+    task.completionEvidence,
+  ];
+  let score: number | null = null;
+  for (const value of values) {
+    const arrow = value.match(/(?:整书结构复查|结构诊断|结构健康度)[^0-9]*(\d+)\s*->\s*(\d+)\s*分/);
+    const single = value.match(/(?:整书结构复查|整书结构诊断|结构诊断|结构健康度)[^0-9]*(\d+)\s*分/);
+    const parsed = arrow ? Number(arrow[2]) : single ? Number(single[1]) : Number.NaN;
+    if (Number.isFinite(parsed)) score = Math.max(0, Math.min(100, Math.round(parsed)));
+  }
+  return score;
+}
+
+async function buildStructureDiagnosticTaskRecheck(
+  task: Awaited<ReturnType<typeof prisma.gateDispatchTask.update>>,
+): Promise<GateStructureDiagnosticRecheck | null> {
+  const projectId = structureDiagnosticProjectId(task.dispatchKey, task.projectId);
+  if (!projectId) return null;
+  const project = await prisma.project.findUnique({
+    where: { id: projectId },
+    include: {
+      chapters: { orderBy: { order: "asc" } },
+      characters: { orderBy: { createdAt: "asc" } },
+      foreshadows: { orderBy: { createdAt: "asc" } },
+      outlineNodes: { orderBy: [{ depth: "asc" }, { order: "asc" }, { createdAt: "asc" }] },
+      plotThreads: { orderBy: { createdAt: "asc" } },
+    },
+  });
+  if (!project) return null;
+
+  const platform = getPlatformProfile(project.targetPlatform as PlatformId);
+  const diagnostic = buildStoryStructureDiagnostic({
+    project: {
+      id: project.id,
+      title: project.title,
+      genre: project.genre,
+      sellingPoint: project.sellingPoint,
+      targetLengthType: project.targetLengthType,
+      targetWordCount: project.targetWordCount,
+      currentWordCount: project.currentWordCount,
+    },
+    platform,
+    chapters: project.chapters,
+    outlineNodes: project.outlineNodes,
+    characters: project.characters,
+    foreshadows: project.foreshadows,
+    plotThreads: project.plotThreads,
+  });
+  const weakItems = diagnostic.items
+    .filter((item) => item.status !== "pass")
+    .map((item) => ({
+      id: item.id,
+      label: item.label,
+      status: item.status === "fail" ? "fail" as const : "warn" as const,
+      evidence: item.evidence,
+      suggestion: item.suggestion,
+    }));
+  const previousScore = baselineStructureDiagnosticScore(task);
+
+  return {
+    projectId: project.id,
+    platformId: platform.id,
+    platformName: platform.name,
+    previousScore,
+    currentScore: diagnostic.score,
+    delta: previousScore === null ? null : diagnostic.score - previousScore,
+    label: diagnostic.score >= 80 ? "结构已过线" : "结构仍未过线",
+    verdict: recheckVerdict(previousScore, diagnostic.score),
+    topAction: diagnostic.actionPlan[0] ?? "继续补人物弧光、主干压力和伏笔回收。",
+    weakItems,
   };
 }
 
@@ -974,15 +1096,20 @@ export async function PATCH(request: Request) {
   const storyTreeRecheck = nextState === "completed"
     ? await buildStoryTreeTaskRecheck(task)
     : null;
+  const structureDiagnosticRecheck = nextState === "completed"
+    ? await buildStructureDiagnosticTaskRecheck(task)
+    : null;
   const evidenceLoopTask = await persistEvidenceLoopRecheck(task, evidenceLoopRecheck);
-  const responseTask = await persistStoryTreeRecheck(evidenceLoopTask, storyTreeRecheck);
-  if (nextState === "completed" && (storyTreeRecheck || evidenceLoopRecheck)) {
+  const storyTreeTask = await persistStoryTreeRecheck(evidenceLoopTask, storyTreeRecheck);
+  const responseTask = await persistStructureDiagnosticRecheck(storyTreeTask, structureDiagnosticRecheck);
+  if (nextState === "completed" && (storyTreeRecheck || evidenceLoopRecheck || structureDiagnosticRecheck)) {
     const existingFollowUpTasks = await prisma.gateDispatchTask.findMany({
       where: {
         projectId: task.projectId ?? undefined,
         OR: [
           { dispatchKey: { startsWith: "story-tree-followup:" } },
           { dispatchKey: { startsWith: "submission-recheck-followup:" } },
+          { dispatchKey: { startsWith: "structure-recheck-followup:" } },
         ],
       },
       select: { dispatchKey: true },
@@ -995,6 +1122,7 @@ export async function PATCH(request: Request) {
       existingDispatchKeys: existingFollowUpTasks.map((item) => item.dispatchKey),
       storyTreeRecheck,
       evidenceLoopRecheck,
+      structureDiagnosticRecheck,
     });
     followUpTasks = [
       ...followUpTasks,
@@ -1028,5 +1156,6 @@ export async function PATCH(request: Request) {
     secondMetricFollowupAutoDispatch,
     evidenceLoopRecheck,
     storyTreeRecheck,
+    structureDiagnosticRecheck,
   });
 }

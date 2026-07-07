@@ -88,6 +88,39 @@ test("buildChapterProductionRecheckDecision keeps weak rechecks actionable", () 
   assert.ok(decision.detail.includes("重新补平台适配证据"));
 });
 
+test("buildChapterProductionRecheckDecision keeps weak structure diagnostics actionable", () => {
+  const decision = buildChapterProductionRecheckDecision([
+    {
+      structureDiagnosticRecheck: {
+        projectId: "project-1",
+        platformId: "fanqie",
+        platformName: "番茄小说",
+        previousScore: 61,
+        currentScore: 68,
+        delta: 7,
+        label: "结构仍未过线",
+        verdict: "improved",
+        topAction: "补主角弧光终局和伏笔回收章。",
+        weakItems: [
+          {
+            id: "character-arc",
+            label: "人物弧光",
+            status: "warn",
+            evidence: "完整弧光仍不足。",
+            suggestion: "补主角欲望、缺陷和终点变化。",
+          },
+        ],
+      },
+    },
+  ], { href: "#story-structure", label: "复查结构" });
+
+  assert.equal(decision.status, "needs_action");
+  assert.equal(decision.label, "继续处理");
+  assert.equal(decision.href, "#story-structure");
+  assert.ok(decision.detail.includes("整书结构 61 -> 68 分"));
+  assert.ok(decision.detail.includes("补主角弧光终局和伏笔回收章"));
+});
+
 test("buildChapterProductionRecheckDecision asks for manual confirmation without scored evidence", () => {
   const decision = buildChapterProductionRecheckDecision([{}, {}], fallback);
 

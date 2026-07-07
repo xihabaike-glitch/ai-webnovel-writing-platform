@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { readFileSync } from "node:fs";
 import { buildChapterProductionRecheckFollowUpTasks } from "../lib/projects/chapterProductionRecheckFollowUp.ts";
 
 test("buildChapterProductionRecheckFollowUpTasks creates story tree repair dispatches for weak rechecks", () => {
@@ -59,6 +60,55 @@ test("buildChapterProductionRecheckFollowUpTasks creates submission repair dispa
   assert.equal(dispatches[0].href, "/projects/project-1#submission-precheck");
   assert.equal(dispatches[0].actionLabel, "修投稿包");
   assert.ok(dispatches[0].evidence.includes("补平台适配和投稿包证据。"));
+});
+
+test("buildChapterProductionRecheckFollowUpTasks creates structure repair dispatches for weak whole-book diagnostics", () => {
+  const dispatches = buildChapterProductionRecheckFollowUpTasks({
+    projectTitle: "夜雨系统",
+    platformId: "fanqie",
+    platformName: "番茄小说",
+    sourceDispatchKey: "submission-precheck:project-1:length-structure:character-arc",
+    now: "2026-07-05T00:00:00.000Z",
+    structureDiagnosticRecheck: {
+      projectId: "project-1",
+      platformId: "fanqie",
+      platformName: "番茄小说",
+      previousScore: 61,
+      currentScore: 68,
+      delta: 7,
+      label: "结构仍未过线",
+      verdict: "improved",
+      topAction: "补主角弧光终局和伏笔回收章。",
+      weakItems: [
+        {
+          id: "character-arc",
+          label: "人物弧光",
+          status: "warn",
+          evidence: "完整弧光仍不足。",
+          suggestion: "补主角欲望、缺陷和终点变化。",
+        },
+        {
+          id: "foreshadow-payoff",
+          label: "伏笔回收",
+          status: "fail",
+          evidence: "回收章仍缺失。",
+          suggestion: "给关键伏笔绑定回收章。",
+        },
+      ],
+    },
+  });
+
+  assert.equal(dispatches.length, 1);
+  assert.equal(dispatches[0].id, "structure-recheck-followup:project-1:submission-precheck-project-1-length-structure-character-arc:68");
+  assert.equal(dispatches[0].stage, "start_repair_packaging");
+  assert.equal(dispatches[0].ownerRole, "结构主编");
+  assert.equal(dispatches[0].href, "/projects/project-1#story-structure");
+  assert.equal(dispatches[0].actionLabel, "继续补结构");
+  assert.ok(dispatches[0].detail.includes("61 -> 68 分"));
+  assert.ok(dispatches[0].detail.includes("补主角弧光终局和伏笔回收章"));
+  assert.ok(dispatches[0].acceptanceCriteria.some((item) => item.includes("80 分以上")));
+  assert.ok(dispatches[0].evidence.includes("人物弧光：warn，完整弧光仍不足。"));
+  assert.ok(dispatches[0].evidence.includes("伏笔回收：fail，回收章仍缺失。"));
 });
 
 test("buildChapterProductionRecheckFollowUpTasks skips passed rechecks", () => {
@@ -130,4 +180,14 @@ test("buildChapterProductionRecheckFollowUpTasks can create a second-round follo
   assert.ok(dispatches[0].id.startsWith("story-tree-followup:project-1:chapter-1:story-tree-followup-project-1-chapter-1"));
   assert.ok(dispatches[0].detail.includes("仍低于放行线"));
   assert.ok(dispatches[0].acceptanceCriteria.some((item) => item.includes("80 分以上")));
+});
+
+test("dispatch task completion route carries whole-book structure rechecks into follow-up dispatches", () => {
+  const routeSource = readFileSync("src/app/api/gate/dispatch-tasks/route.ts", "utf8");
+
+  assert.ok(routeSource.includes("buildStructureDiagnosticTaskRecheck"));
+  assert.ok(routeSource.includes("persistStructureDiagnosticRecheck"));
+  assert.ok(routeSource.includes("structureDiagnosticRecheck"));
+  assert.ok(routeSource.includes("buildStoryStructureDiagnostic"));
+  assert.ok(routeSource.includes("structure-recheck-followup:"));
 });

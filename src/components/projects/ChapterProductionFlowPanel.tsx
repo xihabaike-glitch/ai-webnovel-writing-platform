@@ -163,6 +163,7 @@ export function ChapterProductionFlowPanel({
         const payload = await response.json().catch(() => null) as {
           storyTreeRecheck?: ChapterProductionRecheckPayload["storyTreeRecheck"];
           evidenceLoopRecheck?: ChapterProductionRecheckPayload["evidenceLoopRecheck"];
+          structureDiagnosticRecheck?: ChapterProductionRecheckPayload["structureDiagnosticRecheck"];
           followUpTasks?: unknown[];
           error?: string;
         } | null;
@@ -170,6 +171,7 @@ export function ChapterProductionFlowPanel({
         return {
           storyTreeRecheck: payload?.storyTreeRecheck ?? null,
           evidenceLoopRecheck: payload?.evidenceLoopRecheck ?? null,
+          structureDiagnosticRecheck: payload?.structureDiagnosticRecheck ?? null,
           followUpTasks: payload?.followUpTasks ?? [],
         };
       }));
@@ -216,6 +218,7 @@ export function ChapterProductionFlowPanel({
         const payload = await response.json().catch(() => null) as {
           storyTreeRecheck?: ChapterProductionRecheckPayload["storyTreeRecheck"];
           evidenceLoopRecheck?: ChapterProductionRecheckPayload["evidenceLoopRecheck"];
+          structureDiagnosticRecheck?: ChapterProductionRecheckPayload["structureDiagnosticRecheck"];
           followUpTasks?: unknown[];
           error?: string;
         } | null;
@@ -223,6 +226,7 @@ export function ChapterProductionFlowPanel({
         return {
           storyTreeRecheck: payload?.storyTreeRecheck ?? null,
           evidenceLoopRecheck: payload?.evidenceLoopRecheck ?? null,
+          structureDiagnosticRecheck: payload?.structureDiagnosticRecheck ?? null,
           followUpTasks: payload?.followUpTasks ?? [],
         };
       }));

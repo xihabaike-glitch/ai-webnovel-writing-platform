@@ -393,6 +393,22 @@ export function GateDispatchTaskCenter({
     return `大树结构${scoreText}，${verdictText}：${recheck.label}`;
   }
 
+  function structureDiagnosticRecheckMessage(updated: Awaited<ReturnType<typeof updatePersistedGateDispatchTaskState>>) {
+    const recheck = updated.structureDiagnosticRecheck;
+    if (!recheck) return "";
+    const scoreText = recheck.previousScore === null
+      ? `复检 ${recheck.currentScore} 分`
+      : `复检 ${recheck.previousScore} -> ${recheck.currentScore} 分`;
+    const verdictText = recheck.verdict === "improved"
+      ? "结构变好"
+      : recheck.verdict === "declined"
+        ? "结构变差"
+        : recheck.verdict === "unchanged"
+          ? "结构持平"
+          : "无历史基准";
+    return `整书结构${scoreText}，${verdictText}：${recheck.label}`;
+  }
+
   async function updateTask(task: PersistedGatePlatformDispatchTask) {
     const targetState = nextState(task.state);
     const completionEvidence = completionDrafts[task.dispatchKey]?.trim() ?? "";
@@ -440,6 +456,7 @@ export function GateDispatchTaskCenter({
         });
         const recheckMessage = evidenceLoopRecheckMessage(updated);
         const storyTreeMessage = storyTreeRecheckMessage(updated);
+        const structureDiagnosticMessage = structureDiagnosticRecheckMessage(updated);
         const submissionEffectMessage = updated.submissionEffectReview
           ? `已自动回写投稿效果：${updated.submissionEffectReview.headline}。下一步：${updated.submissionEffectReview.nextAction}`
           : "";
@@ -531,16 +548,10 @@ export function GateDispatchTaskCenter({
           setRouteActionMessage(secondMetricFollowupMessage);
           setRouteActionLink(buildGateRecheckActionLink(updated.task));
         } else if (updated.followUpTasks.length) {
-          setRouteActionMessage(`已自动生成治理后复检派单：${updated.followUpTasks.map((item) => item.title).join("、")}${recheckMessage ? `；${recheckMessage}` : ""}${storyTreeMessage ? `；${storyTreeMessage}` : ""}${submissionEffectMessage ? `；${submissionEffectMessage}` : ""}`);
+          setRouteActionMessage(`已自动生成治理后复检派单：${updated.followUpTasks.map((item) => item.title).join("、")}${recheckMessage ? `；${recheckMessage}` : ""}${storyTreeMessage ? `；${storyTreeMessage}` : ""}${structureDiagnosticMessage ? `；${structureDiagnosticMessage}` : ""}${submissionEffectMessage ? `；${submissionEffectMessage}` : ""}`);
           setRouteActionLink(null);
-        } else if (storyTreeMessage && recheckMessage) {
-          setRouteActionMessage(`${storyTreeMessage}；${recheckMessage}${submissionEffectMessage ? `；${submissionEffectMessage}` : ""}`);
-          setRouteActionLink(null);
-        } else if (storyTreeMessage) {
-          setRouteActionMessage(`${storyTreeMessage}${submissionEffectMessage ? `；${submissionEffectMessage}` : ""}`);
-          setRouteActionLink(null);
-        } else if (recheckMessage) {
-          setRouteActionMessage(`${recheckMessage}${submissionEffectMessage ? `；${submissionEffectMessage}` : ""}`);
+        } else if (storyTreeMessage || recheckMessage || structureDiagnosticMessage) {
+          setRouteActionMessage([storyTreeMessage, recheckMessage, structureDiagnosticMessage, submissionEffectMessage].filter(Boolean).join("；"));
           setRouteActionLink(null);
         } else if (submissionEffectMessage) {
           setRouteActionMessage(submissionEffectMessage);

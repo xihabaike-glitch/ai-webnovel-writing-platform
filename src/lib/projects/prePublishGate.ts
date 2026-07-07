@@ -20,6 +20,7 @@ import {
   type PublishRepairActionKind,
 } from "./platformPublishExport.ts";
 import { canExecutePublishRepairAction } from "./publishRepairActionExecution.ts";
+import { buildProjectDashboard, type ProjectAcceptanceStep } from "./projectDashboard.ts";
 import { buildTaskQueueCenter } from "./taskQueueCenter.ts";
 
 export interface PrePublishGateProject {
@@ -175,9 +176,19 @@ export interface PrePublishGateProjectStatus {
   href: string;
   downloadHref: string | null;
   execution: PrePublishGateActionExecution | null;
+  acceptanceSheetGate: PrePublishGateAcceptanceSheetGate;
   exportVersionGate: PrePublishGateExportVersionGate;
   effectReview: PrePublishGateEffectReview;
   loopTimeline: PrePublishGateLoopTimeline;
+}
+
+export interface PrePublishGateAcceptanceSheetGate {
+  status: PrePublishGateItem["status"];
+  label: string;
+  detail: string;
+  actionLabel: string;
+  href: string;
+  currentStepId: ProjectAcceptanceStep["id"];
 }
 
 export interface PrePublishGateExportVersionGate {
@@ -1275,6 +1286,46 @@ function buildExportVersionGate(project: PrePublishGateProject): PrePublishGateE
   };
 }
 
+function buildAcceptanceSheetGate(project: PrePublishGateProject, platformName: string): PrePublishGateAcceptanceSheetGate {
+  const chaptersById = new Map(project.chapters.map((chapter) => [chapter.id, chapter]));
+  const dashboard = buildProjectDashboard({
+    projectId: project.id,
+    currentWordCount: project.currentWordCount,
+    targetWordCount: project.targetWordCount,
+    platform: getPlatformProfile(project.targetPlatform as PlatformId),
+    chapters: project.chapters,
+    aiTasks: project.aiTasks.map((task) => ({
+      id: task.id,
+      taskType: task.taskType,
+      status: task.status,
+      model: "",
+      createdAt: task.createdAt,
+      chapter: task.chapterId ? chaptersById.get(task.chapterId) ?? null : null,
+    })),
+    gateDispatchTasks: project.gateDispatchTasks?.map((task) => ({
+      dispatchKey: task.dispatchKey,
+      state: task.state,
+      completionEvidence: task.completionEvidence,
+    })) ?? [],
+  });
+  const sheet = dashboard.realSampleAcceptanceSheet;
+  const current = sheet.steps.find((step) => step.id === sheet.currentStepId) ?? sheet.steps[0];
+  const status: PrePublishGateItem["status"] = sheet.verdict.includes("已闭合")
+    ? "pass"
+    : current?.id === "publish_package"
+      ? "warn"
+      : "block";
+
+  return {
+    status,
+    label: status === "pass" ? "验收单通过" : status === "warn" ? "发布包待验" : "验收单阻塞",
+    detail: `${project.title} · ${platformName} · ${sheet.verdict}`,
+    actionLabel: sheet.actionLabel,
+    href: sheet.actionHref.startsWith("#") ? `/projects/${project.id}${sheet.actionHref}` : sheet.actionHref,
+    currentStepId: sheet.currentStepId,
+  };
+}
+
 function projectStatus(project: PrePublishGateProject): PrePublishGateProjectStatus {
   const platform = getPlatformProfile(project.targetPlatform as PlatformId);
   const aiTasks = project.aiTasks.map((task) => ({
@@ -1306,15 +1357,21 @@ function projectStatus(project: PrePublishGateProject): PrePublishGateProjectSta
   const publishableChapters = center.totalPublishableChapters;
   const exportVersionGate = buildExportVersionGate(project);
   const exportVersionBlocked = exportVersionGate.status === "block";
-  const ready = publishableChapters > 0 && pack.canExport && pack.finalGate.status === "ready_to_submit" && !exportVersionBlocked;
+  const acceptanceSheetGate = buildAcceptanceSheetGate(project, pack.platformName);
+  const acceptanceBlocked = acceptanceSheetGate.status === "block";
+  const ready = publishableChapters > 0 && pack.canExport && pack.finalGate.status === "ready_to_submit" && !exportVersionBlocked && acceptanceSheetGate.status === "pass";
   const empty = publishableChapters === 0;
   const nextAction = exportVersionBlocked
     ? exportVersionGate.actionLabel
-    : ready
+    : acceptanceBlocked
+      ? acceptanceSheetGate.actionLabel
+      : ready
       ? "导出平台发布包"
       : nextRepairAction?.label ?? pack.finalGate.nextAction ?? "回到项目工作台补齐发布资料";
   const href = exportVersionBlocked
     ? exportVersionGate.href
+    : acceptanceBlocked
+      ? acceptanceSheetGate.href
     : nextRepairAction ? actionHref(project.id, nextRepairAction) : `/projects/${project.id}#platform-export`;
 
   return {
@@ -1328,12 +1385,13 @@ function projectStatus(project: PrePublishGateProject): PrePublishGateProjectSta
     finalGateLabel: pack.finalGate.label,
     publishableChapters,
     wordCount: pack.chapters.reduce((sum, chapter) => sum + chapter.wordCount, 0),
-    blockedCount: pack.preflight.blocked.length + pack.finalGate.blockers.length + (exportVersionGate.status === "block" ? 1 : 0),
-    warningCount: pack.warnings.length + pack.preflight.warnings.length + (exportVersionGate.status === "warn" ? 1 : 0),
+    blockedCount: pack.preflight.blocked.length + pack.finalGate.blockers.length + (exportVersionGate.status === "block" ? 1 : 0) + (acceptanceSheetGate.status === "block" ? 1 : 0),
+    warningCount: pack.warnings.length + pack.preflight.warnings.length + (exportVersionGate.status === "warn" ? 1 : 0) + (acceptanceSheetGate.status === "warn" ? 1 : 0),
     nextAction,
     href,
     downloadHref: ready ? `/api/projects/${project.id}/platform-export?format=markdown&platformId=${pack.platformId}` : null,
     execution: exportVersionBlocked ? null : nextRepairAction ? publishRepairExecution(project.id, nextRepairAction) : null,
+    acceptanceSheetGate,
     exportVersionGate,
     effectReview: effectReview(
       project.id,
@@ -1364,7 +1422,7 @@ function uniqueActions(actions: PrePublishGateAction[]) {
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
-  }).slice(0, 6);
+  }).slice(0, 8);
 }
 
 function firstThreeAdoptionPriorityActions(closure: PrePublishGateAdoptionClosure) {
@@ -1777,6 +1835,8 @@ export function buildPrePublishGate(input: PrePublishGateInput): PrePublishGate 
   const emptyProjects = projectStatuses.filter((project) => project.status === "empty").length;
   const exportVersionBlockers = projectStatuses.filter((project) => project.exportVersionGate.status === "block");
   const exportVersionWarnings = projectStatuses.filter((project) => project.exportVersionGate.status === "warn");
+  const acceptanceBlockers = projectStatuses.filter((project) => project.acceptanceSheetGate.status === "block");
+  const acceptanceWarnings = projectStatuses.filter((project) => project.acceptanceSheetGate.status === "warn");
   const targetPlatformByProjectId = new Map(
     projects.map((project) => [
       project.id,
@@ -1812,6 +1872,18 @@ export function buildPrePublishGate(input: PrePublishGateInput): PrePublishGate 
           : "还没有可发布正文，先完成章节初稿和前三章质检。",
       actionLabel: readyPackages > 0 ? "查看可发布项目" : "处理发布质检",
       href: projectStatuses.find((project) => project.status !== "ready")?.href ?? projectStatuses[0]?.href ?? "/projects",
+    }),
+    gateItem({
+      id: "project-acceptance",
+      label: "项目验收单",
+      status: acceptanceBlockers.length > 0 ? "block" : acceptanceWarnings.length > 0 ? "warn" : "pass",
+      detail: acceptanceBlockers.length > 0
+        ? `${acceptanceBlockers.length} 个项目卡在单本作品验收单。下一条：${acceptanceBlockers[0].acceptanceSheetGate.detail}`
+        : acceptanceWarnings.length > 0
+          ? `${acceptanceWarnings.length} 个项目已到发布包验收，先确认平台包再放量。`
+          : "单本作品验收单没有发现阻塞。",
+      actionLabel: acceptanceBlockers[0]?.acceptanceSheetGate.actionLabel ?? acceptanceWarnings[0]?.acceptanceSheetGate.actionLabel ?? "查看作品验收",
+      href: acceptanceBlockers[0]?.acceptanceSheetGate.href ?? acceptanceWarnings[0]?.acceptanceSheetGate.href ?? "/projects#pipeline-projects",
     }),
     gateItem({
       id: "task-queue",
@@ -1888,6 +1960,14 @@ export function buildPrePublishGate(input: PrePublishGateInput): PrePublishGate 
       ? "有项目已经能投，但仍存在未处理提醒；先按优先动作走一轮。"
       : "当前发布会把未修复风险带到平台，先完成阻塞项再放行。";
   const priorityActions = uniqueActions([
+    ...acceptanceBlockers.map((project) => action(
+      `project-acceptance:${project.projectId}`,
+      project.acceptanceSheetGate.actionLabel,
+      project.acceptanceSheetGate.detail,
+      project.acceptanceSheetGate.href,
+      "repair",
+      project.execution,
+    )),
     ...firstThreeAdoptionPriorityActions(firstThreeAdoptionClosure),
     ...projectStatuses
       .filter((project) => project.status !== "ready")

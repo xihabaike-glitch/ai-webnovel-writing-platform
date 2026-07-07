@@ -29,6 +29,19 @@ const passedReviews = finalChapters.map((chapter, index) => ({
   costUsd: 0.01,
 }));
 
+const passedSecondPasses = finalChapters.map((chapter, index) => ({
+  id: `second-pass-${chapter.id}`,
+  chapterId: chapter.id,
+  taskType: "chapter_second_pass",
+  status: "succeeded",
+  outputText: JSON.stringify({ score: 94 - index, changes: ["强化钩子", "压缩解释"] }),
+  errorMessage: null,
+  createdAt: `2026-01-0${index + 1}T01:00:00.000Z`,
+  inputTokens: 1000,
+  outputTokens: 500,
+  costUsd: 0.01,
+}));
+
 const readySubmissionAsset = {
   id: "asset-ready-fanqie",
   platformId: "fanqie",
@@ -92,6 +105,7 @@ const readyProject: PrePublishGateProject = {
   chapters: finalChapters,
   aiTasks: [
     ...passedReviews,
+    ...passedSecondPasses,
     {
       id: "asset-optimize-1",
       chapterId: null,
@@ -317,6 +331,34 @@ test("buildPrePublishGate", async (t) => {
     assert.ok(queueAction?.detail.includes("开书交接证据"));
     assert.equal(gate.releaseAction?.label, "先解除阻塞：补交接验收");
     assert.equal(gate.releaseAction?.href, "/dispatch?firstDayProject=project-handoff-blocked&step=publish-precheck#first-day-dispatch");
+  });
+
+  await t.test("links project acceptance sheet blockers back into the gate", () => {
+    const gate = buildPrePublishGate({
+      projects: [{
+        ...readyProject,
+        id: "project-acceptance-blocked",
+        title: "验收缺二改",
+        aiTasks: passedReviews.slice(0, 1),
+        gateDispatchTasks: [],
+      }],
+      failureTasks: [],
+      batchHistory: [],
+    });
+    const project = gate.projectStatuses[0];
+    const acceptanceItem = gate.items.find((item) => item.id === "project-acceptance");
+
+    assert.equal(project.acceptanceSheetGate.status, "block");
+    assert.equal(project.acceptanceSheetGate.currentStepId, "second_pass");
+    assert.ok(project.acceptanceSheetGate.detail.includes("二改"));
+    assert.equal(project.acceptanceSheetGate.href, "/projects/project-acceptance-blocked#ai-pipeline");
+    assert.equal(project.nextAction, project.acceptanceSheetGate.actionLabel);
+    assert.equal(project.href, project.acceptanceSheetGate.href);
+    assert.equal(acceptanceItem?.status, "block");
+    assert.ok(acceptanceItem?.detail.includes("验收缺二改"));
+    assert.equal(gate.priorityActions[0].id, "project-acceptance:project-acceptance-blocked");
+    assert.equal(gate.priorityActions[0].label, project.acceptanceSheetGate.actionLabel);
+    assert.equal(gate.priorityActions[0].href, "/projects/project-acceptance-blocked#ai-pipeline");
   });
 
   await t.test("focuses first-day completion blockers before release", () => {

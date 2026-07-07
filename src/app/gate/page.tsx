@@ -380,6 +380,40 @@ export default async function GatePage({
 
       <GateExportPackagePanel packages={gate.projectStatuses} />
 
+      <section className="mb-6 rounded-md border border-slate-200 bg-white p-4">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <h2 className="font-medium text-slate-950">项目验收单联动</h2>
+            <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-600">
+              单本作品页卡在哪一步，总闸门就卡在哪一步；二改、派单回执和发布包缺证据时不允许放量。
+            </p>
+          </div>
+          <Link className="w-fit rounded-md border border-slate-200 px-3 py-2 text-sm font-medium hover:bg-slate-50" href="/projects#pipeline-projects">
+            回项目流水线
+          </Link>
+        </div>
+        <div className="mt-4 grid gap-3 lg:grid-cols-2">
+          {gate.projectStatuses.filter((project) => project.acceptanceSheetGate.status !== "pass").map((project) => (
+            <Link className="rounded-md border border-slate-200 bg-slate-50 p-3 text-sm hover:bg-white" href={project.acceptanceSheetGate.href} key={project.projectId}>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="font-medium text-slate-950">{project.projectTitle}</span>
+                <span className="rounded-md bg-white px-2 py-1 text-xs text-slate-600">{project.platformName}</span>
+                <span className={`rounded-md px-2 py-1 text-xs font-medium ${checkTone(project.acceptanceSheetGate.status)}`}>
+                  {project.acceptanceSheetGate.label}
+                </span>
+              </div>
+              <p className="mt-2 text-xs leading-5 text-slate-600">{project.acceptanceSheetGate.detail}</p>
+              <div className="mt-2 text-xs font-medium text-slate-950">{project.acceptanceSheetGate.actionLabel}</div>
+            </Link>
+          ))}
+          {gate.projectStatuses.filter((project) => project.acceptanceSheetGate.status !== "pass").length === 0 ? (
+            <div className="rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900">
+              单本作品验收单已全部闭合，可以继续看发布包、版本基线和平台反馈。
+            </div>
+          ) : null}
+        </div>
+      </section>
+
       <GateFirstThreeAdoptionPanel closure={gate.firstThreeAdoptionClosure} />
 
       <GatePublishEffectReviewPanel packages={gate.projectStatuses} />

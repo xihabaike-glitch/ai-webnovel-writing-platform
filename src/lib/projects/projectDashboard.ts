@@ -11,7 +11,7 @@ export interface DashboardChapter {
   conflict?: string | null;
   valueShift?: string | null;
   cliffhanger?: string | null;
-  updatedAt: Date | string;
+  updatedAt?: Date | string;
   aiTasks?: Array<{
     taskType: string;
     status: string;

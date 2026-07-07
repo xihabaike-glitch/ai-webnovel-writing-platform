@@ -11,3 +11,11 @@ test("gate page shows invalid focus feedback", () => {
   assert.ok(source.includes("查看总闸门"));
   assert.ok(source.includes("href=\"/gate\""));
 });
+
+test("gate page renders project acceptance sheet blockers", () => {
+  assert.ok(source.includes("项目验收单联动"));
+  assert.ok(source.includes("gate.projectStatuses.filter((project) => project.acceptanceSheetGate.status !== \"pass\")"));
+  assert.ok(source.includes("project.acceptanceSheetGate.label"));
+  assert.ok(source.includes("project.acceptanceSheetGate.detail"));
+  assert.ok(source.includes("project.acceptanceSheetGate.href"));
+});

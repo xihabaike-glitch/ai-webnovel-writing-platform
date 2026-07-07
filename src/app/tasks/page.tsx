@@ -215,6 +215,10 @@ function previousDebtCount(value: string | undefined) {
   return Math.max(0, Math.round(parsed));
 }
 
+function isTaskView(value: string | undefined) {
+  return value === undefined || value === "blocked";
+}
+
 function debtFocusNoticeClass(tone: "reduced" | "cleared" | "unchanged") {
   if (tone === "cleared") return "border-emerald-200 bg-emerald-50 text-emerald-900";
   if (tone === "reduced") return "border-cyan-200 bg-cyan-50 text-cyan-900";
@@ -238,7 +242,11 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
   const resolvedSearchParams = searchParams ? await searchParams : {};
   const activeStrategy = getBatchExecutionStrategy(resolvedSearchParams.batchStrategy);
   const activeBatchContext = taskQueueBatchExecutionContext(resolvedSearchParams.batchContext);
-  const activeView = resolvedSearchParams.view === "blocked" ? "blocked" : "all";
+  const viewParam = resolvedSearchParams.view;
+  const activeView = viewParam === "blocked" ? "blocked" : "all";
+  const invalidViewNotice = isTaskView(viewParam)
+    ? null
+    : viewParam ? `任务视图「${viewParam}」不存在，已显示全部任务。` : null;
   const activeDebtBlockerType = activeView === "blocked" ? debtBlockerType(resolvedSearchParams.debt) : null;
   const clearedDebtBlockerType = activeView === "blocked" ? debtBlockerType(resolvedSearchParams.cleared) : null;
   const [
@@ -508,6 +516,20 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
           ) : null}
         </div>
       </div>
+
+      {invalidViewNotice ? (
+        <section className="mb-6 rounded-md border border-amber-200 bg-amber-50 p-4 text-amber-900">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <div className="font-medium">视图已回退</div>
+              <p className="mt-1 text-sm leading-6">{invalidViewNotice}</p>
+            </div>
+            <Link className="w-fit rounded-md bg-white px-3 py-2 text-sm font-medium text-amber-950 hover:bg-amber-100" href="/tasks">
+              查看全部任务
+            </Link>
+          </div>
+        </section>
+      ) : null}
 
       <section className="mb-6 rounded-md border border-slate-900 bg-slate-950 p-4 text-white">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">

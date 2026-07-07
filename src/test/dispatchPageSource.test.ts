@@ -1,0 +1,12 @@
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import test from "node:test";
+
+const source = readFileSync("src/app/dispatch/page.tsx", "utf8");
+
+test("dispatch page shows invalid queue feedback", () => {
+  assert.ok(source.includes("invalidQueueNotice"));
+  assert.ok(source.includes("queueParam ? `派单队列「${queueParam}」不存在，已显示全部派单。` : null"));
+  assert.ok(source.includes("查看全部派单"));
+  assert.ok(source.includes("href=\"/dispatch\""));
+});

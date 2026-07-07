@@ -1,4 +1,5 @@
 import { AppShell } from "@/components/app-shell/AppShell";
+import Link from "next/link";
 import { GateDispatchTaskCenter, type DispatchQueueFilter } from "@/components/gate/GateDispatchTaskCenter";
 import { buildTaskBatchHistory } from "@/lib/ai/taskBatchHistory";
 import { prisma } from "@/lib/db/prisma";
@@ -43,6 +44,10 @@ function searchValues(params: DispatchSearchParams, key: string) {
 function dispatchQueueFilter(value: string): DispatchQueueFilter {
   if (value === "ai_pipeline" || value === "recheck_followup") return value;
   return "all";
+}
+
+function isDispatchQueueFilter(value: string) {
+  return value === "all" || value === "ai_pipeline" || value === "recheck_followup";
 }
 
 function normalizeAssetAuditStatus(status: string): "ready" | "blocked" | "needs_work" {
@@ -207,7 +212,11 @@ export default async function DispatchPage({
   const firstDaySource = searchValue(resolvedSearchParams, "source");
   const firstDayGaps = searchValues(resolvedSearchParams, "gap");
   const focusDispatchKey = searchValue(resolvedSearchParams, "focus");
-  const initialQueueFilter = dispatchQueueFilter(searchValue(resolvedSearchParams, "queue"));
+  const queueParam = searchValue(resolvedSearchParams, "queue");
+  const initialQueueFilter = dispatchQueueFilter(queueParam);
+  const invalidQueueNotice = isDispatchQueueFilter(queueParam)
+    ? null
+    : queueParam ? `派单队列「${queueParam}」不存在，已显示全部派单。` : null;
   const [tasks, receipts, projects, recentAiTasks, chapters] = await Promise.all([
     prisma.gateDispatchTask.findMany({
       orderBy: [
@@ -356,6 +365,19 @@ export default async function DispatchPage({
           {mergedTasks.length ? `${mergedTasks.length} 个派单任务` : "等待总闸门派单"}
         </div>
       </div>
+      {invalidQueueNotice ? (
+        <section className="mb-6 rounded-md border border-amber-200 bg-amber-50 p-4 text-amber-900">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <div className="font-medium">队列筛选已回退</div>
+              <p className="mt-1 text-sm leading-6">{invalidQueueNotice}</p>
+            </div>
+            <Link className="w-fit rounded-md bg-white px-3 py-2 text-sm font-medium text-amber-950 hover:bg-amber-100" href="/dispatch">
+              查看全部派单
+            </Link>
+          </div>
+        </section>
+      ) : null}
       <GateDispatchTaskCenter
         initialFirstDayFocus={{
           dispatchKey: focusDispatchKey,

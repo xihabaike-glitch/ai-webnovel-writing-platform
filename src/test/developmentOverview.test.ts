@@ -231,6 +231,7 @@ test("buildDevelopmentOverview", async (t) => {
     assert.ok(modelInterfaces?.currentEvidence.includes("DeepSeek"));
     assert.ok(modelInterfaces?.currentEvidence.includes("Kimi"));
     assert.ok(modelInterfaces?.currentEvidence.includes("GPT"));
+    assert.equal(modelInterfaces?.href, "/settings/models#model-provider-interfaces");
     assert.equal(referenceCases?.href, "/references#development-path");
     assert.ok(platformScope?.currentEvidence.includes("8/8"));
     assert.equal(platformScope?.href, "/projects#platform-export");

@@ -558,7 +558,7 @@ function buildRequirementTraceability(): DevelopmentOverviewRequirementTraceabil
         originalRequest: "对接 Claude、DeepSeek、Kimi、GPT 等模型，并预留对应接口。",
         currentEvidence: "Claude、DeepSeek、Kimi、GPT 已进入模型岗位矩阵，分别承担结构、正文、长上下文和海外包装。",
         acceptanceSignal: "模型设置页能解释首选模型、备用模型、任务分工、失败替代和复检入口。",
-        href: "/settings/models#model-role-matrix",
+        href: "/settings/models#model-provider-interfaces",
       },
       {
         id: "role_dispatch",

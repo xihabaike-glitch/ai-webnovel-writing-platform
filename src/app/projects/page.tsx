@@ -96,6 +96,11 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps) 
   const pipelineStepParam = firstValue(params?.pipelineStep);
   const activePipelineStep = dashboard.pipelineProofSummary.stepCounts.find((step) => step.id === pipelineStepParam) ?? null;
   const activePipelineValidationReceipt = activePipelineStep?.validationReceipt ?? dashboard.pipelineProofSummary.validationReceipt;
+  const activePipelineAction = {
+    recommendedActionHref: activePipelineStep?.recommendedActionHref ?? dashboard.pipelineProofSummary.recommendedActionHref,
+    recommendedActionLabel: activePipelineStep?.recommendedActionLabel ?? dashboard.pipelineProofSummary.recommendedActionLabel,
+    recommendedProjectTitle: activePipelineStep?.recommendedProjectTitle ?? dashboard.pipelineProofSummary.recommendedProjectTitle,
+  };
   const visibleItems = activePipelineStep
     ? dashboard.items.filter((item) => item.pipelineProof.currentStepId === activePipelineStep.id)
     : dashboard.items;
@@ -180,8 +185,8 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps) 
             <div className="rounded-md bg-slate-100 px-3 py-2 text-sm text-slate-700">
               {dashboard.pipelineProofSummary.bottleneckCount}/{dashboard.pipelineProofSummary.totalProjects} 本卡在 {dashboard.pipelineProofSummary.bottleneckLabel}
             </div>
-            <Link className="rounded-md bg-slate-950 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800" href={dashboard.pipelineProofSummary.recommendedActionHref}>
-              {dashboard.pipelineProofSummary.recommendedProjectTitle ? `${dashboard.pipelineProofSummary.recommendedActionLabel} · ${dashboard.pipelineProofSummary.recommendedProjectTitle}` : dashboard.pipelineProofSummary.recommendedActionLabel}
+            <Link className="rounded-md bg-slate-950 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800" href={activePipelineAction.recommendedActionHref}>
+              {activePipelineAction.recommendedProjectTitle ? `${activePipelineAction.recommendedActionLabel} · ${activePipelineAction.recommendedProjectTitle}` : activePipelineAction.recommendedActionLabel}
             </Link>
           </div>
         </div>

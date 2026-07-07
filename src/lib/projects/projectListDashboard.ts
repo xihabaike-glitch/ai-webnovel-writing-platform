@@ -122,6 +122,10 @@ export interface ProjectListPipelineProofSummary {
     href: string;
     filterHref: string;
     validationReceipt: ProjectListPipelineValidationReceipt;
+    recommendedProjectId: string | null;
+    recommendedProjectTitle: string | null;
+    recommendedActionLabel: string;
+    recommendedActionHref: string;
   }>;
 }
 
@@ -588,14 +592,23 @@ function buildPipelineProofSummary(items: ProjectListItem[]): ProjectListPipelin
     { id: "failure_repair", label: "失败修复与恢复观察", href: "/failures", status: "blocked", evidence: "" },
     { id: "publish_package", label: "发布包与平台复盘", href: "/projects", status: "blocked", evidence: "" },
   ] satisfies ProjectListPipelineStep[];
-  const stepCounts = fallbackSteps.map((step) => ({
-    id: step.id,
-    label: step.label,
-    href: step.href,
-    filterHref: `/projects?pipelineStep=${step.id}#pipeline-projects`,
-    count: items.filter((item) => item.pipelineProof.currentStepId === step.id).length,
-    validationReceipt: buildPipelineValidationReceipt(step),
-  }));
+  const stepCounts = fallbackSteps.map((step) => {
+    const stepItems = items.filter((item) => item.pipelineProof.currentStepId === step.id);
+    const stepProject = stepItems[0] ?? null;
+
+    return {
+      id: step.id,
+      label: step.label,
+      href: step.href,
+      filterHref: `/projects?pipelineStep=${step.id}#pipeline-projects`,
+      count: stepItems.length,
+      validationReceipt: buildPipelineValidationReceipt(step),
+      recommendedProjectId: stepProject?.id ?? null,
+      recommendedProjectTitle: stepProject?.title ?? null,
+      recommendedActionLabel: stepProject?.pipelineProof.nextActionLabel ?? step.label,
+      recommendedActionHref: stepProject?.pipelineProof.nextActionHref ?? `/projects?pipelineStep=${step.id}#pipeline-projects`,
+    };
+  });
   const bottleneckSeed = stepCounts[0] ?? {
     id: "project_start",
     label: "开书与大树骨架",

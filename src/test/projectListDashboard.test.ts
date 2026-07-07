@@ -500,4 +500,23 @@ test("buildProjectListDashboard", async (t) => {
     assert.ok(taskDispatchFilter?.validationReceipt.proofPrompt.includes("完成依据"));
     assert.ok(taskDispatchFilter?.validationReceipt.stopIfMissing.some((item) => item.includes("派单中心")));
   });
+
+  await t.test("attaches a matching recommended action to each portfolio pipeline filter", () => {
+    const dashboard = buildProjectListDashboard([emptyProject, completeProject, handoffBlockedProject], [
+      {
+        id: "provider-1",
+        providerId: "mock",
+        displayName: "Mock",
+        defaultModel: "mock-novel",
+        enabled: true,
+        encryptedApiKey: "secret",
+      },
+    ]);
+    const taskDispatchFilter = dashboard.pipelineProofSummary.stepCounts.find((step) => step.id === "task_dispatch");
+
+    assert.equal(taskDispatchFilter?.recommendedProjectId, "ready-project");
+    assert.equal(taskDispatchFilter?.recommendedProjectTitle, "夜雨系统");
+    assert.ok(taskDispatchFilter?.recommendedActionLabel.includes("任务与派单回执"));
+    assert.ok(taskDispatchFilter?.recommendedActionHref.includes("/dispatch?firstDayProject=ready-project"));
+  });
 });

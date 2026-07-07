@@ -10,12 +10,26 @@ import {
   type GatePlatformGrowthDispatchItem,
 } from "@/lib/projects/gateActionReceipts";
 
+function hrefWithGateReturn(href: string, gateReturnHref?: string | null) {
+  if (!gateReturnHref || !href.startsWith("/") || href.startsWith("/gate")) return href;
+
+  const hashIndex = href.indexOf("#");
+  const base = hashIndex >= 0 ? href.slice(0, hashIndex) : href;
+  const hash = hashIndex >= 0 ? href.slice(hashIndex) : "";
+  if (base.includes("gateReturn=")) return href;
+  const separator = base.includes("?") ? "&" : "?";
+
+  return `${base}${separator}gateReturn=${encodeURIComponent(gateReturnHref)}${hash}`;
+}
+
 export function FailureRepairRecheckCard({
   card,
   dispatch,
+  gateReturnHref,
 }: {
   card: GateFailureRepairRecheckCardView;
   dispatch: GatePlatformGrowthDispatchItem;
+  gateReturnHref?: string | null;
 }) {
   const router = useRouter();
   const [isSaving, setIsSaving] = useState(false);
@@ -71,7 +85,7 @@ export function FailureRepairRecheckCard({
             ))}
           </div>
         </div>
-        <Link className="w-fit rounded-md bg-white/80 px-3 py-2 text-sm font-medium hover:bg-white" href="/dispatch">
+        <Link className="w-fit rounded-md bg-white/80 px-3 py-2 text-sm font-medium hover:bg-white" href={hrefWithGateReturn("/dispatch", gateReturnHref)}>
           打开派单中心
         </Link>
       </div>
@@ -89,7 +103,7 @@ export function FailureRepairRecheckCard({
 
       <div className="mt-3 flex flex-wrap items-center gap-2">
         {card.state === "completed" ? (
-          <Link className="rounded-md bg-white px-3 py-2 text-xs font-medium text-blue-900 hover:bg-blue-100" href={card.href}>
+          <Link className="rounded-md bg-white px-3 py-2 text-xs font-medium text-blue-900 hover:bg-blue-100" href={hrefWithGateReturn(card.href, gateReturnHref)}>
             查看复检结果
           </Link>
         ) : (

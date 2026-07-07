@@ -105,6 +105,18 @@ function gateReturnFromParam(value: string | string[] | undefined) {
   return raw;
 }
 
+function hrefWithGateReturn(href: string, gateReturnHref?: string | null) {
+  if (!gateReturnHref || !href.startsWith("/") || href.startsWith("/gate")) return href;
+
+  const hashIndex = href.indexOf("#");
+  const base = hashIndex >= 0 ? href.slice(0, hashIndex) : href;
+  const hash = hashIndex >= 0 ? href.slice(hashIndex) : "";
+  if (base.includes("gateReturn=")) return href;
+  const separator = base.includes("?") ? "&" : "?";
+
+  return `${base}${separator}gateReturn=${encodeURIComponent(gateReturnHref)}${hash}`;
+}
+
 function toPersistedDispatch(task: {
   id: string;
   dispatchKey: string;
@@ -420,13 +432,13 @@ export default async function FailuresPage({
             </span>
             <Link
               className="inline-flex w-fit rounded-md bg-white px-4 py-2 text-sm font-medium text-slate-950 hover:bg-slate-100"
-              href={center.pmFocus.actionHref}
+              href={hrefWithGateReturn(center.pmFocus.actionHref, gateReturn)}
             >
               {center.pmFocus.actionLabel}
             </Link>
             <Link
               className="inline-flex w-fit rounded-md border border-white/25 px-4 py-2 text-sm font-medium text-white hover:bg-white/10"
-              href={center.pmFocus.pipelineActionHref}
+              href={hrefWithGateReturn(center.pmFocus.pipelineActionHref, gateReturn)}
             >
               {center.pmFocus.pipelineActionLabel}
             </Link>
@@ -454,14 +466,14 @@ export default async function FailuresPage({
               ))}
             </div>
           </div>
-          <Link className="w-fit rounded-md bg-slate-950 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800" href={failureRepairFollowup.href}>
+          <Link className="w-fit rounded-md bg-slate-950 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800" href={hrefWithGateReturn(failureRepairFollowup.href, gateReturn)}>
             {failureRepairFollowup.actionLabel}
           </Link>
         </div>
       </section>
 
       {failureRepairRecheckCard && failureRepairRecheckDispatch ? (
-        <FailureRepairRecheckCard card={failureRepairRecheckCard} dispatch={failureRepairRecheckDispatch} />
+        <FailureRepairRecheckCard card={failureRepairRecheckCard} dispatch={failureRepairRecheckDispatch} gateReturnHref={gateReturn} />
       ) : null}
 
       {failureRepairResumeRecommendation ? (
@@ -478,7 +490,7 @@ export default async function FailuresPage({
                 </div>
               ) : null}
             </div>
-            <Link className="w-fit rounded-md bg-slate-950 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800" href={failureRepairResumeRecommendation.href}>
+            <Link className="w-fit rounded-md bg-slate-950 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800" href={hrefWithGateReturn(failureRepairResumeRecommendation.href, gateReturn)}>
               {failureRepairResumeRecommendation.actionLabel}
             </Link>
           </div>
@@ -507,7 +519,7 @@ export default async function FailuresPage({
                 </div>
               ) : null}
             </div>
-            <Link className="w-fit rounded-md bg-slate-950 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800" href={failureRepairResumeBatchRecord.stabilityActionHref ?? failureRepairResumeBatchRecord.decisionActionHref}>
+            <Link className="w-fit rounded-md bg-slate-950 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800" href={hrefWithGateReturn(failureRepairResumeBatchRecord.stabilityActionHref ?? failureRepairResumeBatchRecord.decisionActionHref, gateReturn)}>
               {failureRepairResumeBatchRecord.stabilityActionLabel ?? failureRepairResumeBatchRecord.decisionActionLabel}
             </Link>
           </div>
@@ -538,7 +550,7 @@ export default async function FailuresPage({
                   <span className="rounded-md bg-slate-50 px-2 py-1 text-xs text-slate-600" key={item}>{item}</span>
                 ))}
               </div>
-              <Link className="mt-3 inline-flex rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white hover:bg-slate-800" href={lane.href}>
+              <Link className="mt-3 inline-flex rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white hover:bg-slate-800" href={hrefWithGateReturn(lane.href, gateReturn)}>
                 {lane.actionLabel}
               </Link>
               <FailureRepairLaneReceiptButton action={lane.receiptAction} />
@@ -585,7 +597,7 @@ export default async function FailuresPage({
                   }`}>
                     {failure.recoveryStatus === "recovered" ? "已恢复" : "未恢复"}
                   </span>
-                  <Link className="font-semibold text-slate-950 hover:underline" href={failure.href}>{failure.projectTitle}</Link>
+                  <Link className="font-semibold text-slate-950 hover:underline" href={hrefWithGateReturn(failure.href, gateReturn)}>{failure.projectTitle}</Link>
                   <span className="text-sm text-slate-500">{failure.taskLabel}</span>
                 </div>
                 <div className="mt-2 text-sm text-slate-600">

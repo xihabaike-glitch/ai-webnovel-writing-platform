@@ -298,6 +298,7 @@ export default async function ModelSettingsPage({
         </section>
       ) : null}
       <ModelProviderSettings
+        gateReturnHref={gateReturn}
         healthDashboard={healthDashboard}
         options={providerOptions}
         presets={providerModelPresets}

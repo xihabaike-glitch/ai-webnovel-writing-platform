@@ -568,7 +568,20 @@ function draftFromOption(option: ProviderOptionView, existing?: ProviderView): D
   };
 }
 
+function hrefWithGateReturn(href: string, gateReturnHref?: string | null) {
+  if (!gateReturnHref || !href.startsWith("/") || href.startsWith("/gate")) return href;
+
+  const hashIndex = href.indexOf("#");
+  const base = hashIndex >= 0 ? href.slice(0, hashIndex) : href;
+  const hash = hashIndex >= 0 ? href.slice(hashIndex) : "";
+  if (base.includes("gateReturn=")) return href;
+  const separator = base.includes("?") ? "&" : "?";
+
+  return `${base}${separator}gateReturn=${encodeURIComponent(gateReturnHref)}${hash}`;
+}
+
 export function ModelProviderSettings({
+  gateReturnHref,
   healthDashboard,
   options,
   presets,
@@ -593,6 +606,7 @@ export function ModelProviderSettings({
   routeOptions,
   routes,
 }: {
+  gateReturnHref?: string | null;
   healthDashboard: ProviderHealthDashboard;
   options: ProviderOptionView[];
   presets: ProviderModelPresetView[];
@@ -1285,7 +1299,7 @@ export function ModelProviderSettings({
               <div className="font-medium">焦点已回退</div>
               <p className="mt-1 text-sm leading-6">{invalidFocusNotice}</p>
             </div>
-            <Link className="w-fit rounded-md bg-white px-3 py-2 text-sm font-medium text-amber-950 hover:bg-amber-100" href="/settings/models">
+            <Link className="w-fit rounded-md bg-white px-3 py-2 text-sm font-medium text-amber-950 hover:bg-amber-100" href={hrefWithGateReturn("/settings/models", gateReturnHref)}>
               查看模型设置
             </Link>
           </div>
@@ -1301,7 +1315,7 @@ export function ModelProviderSettings({
             </div>
             <a
               className="inline-flex w-fit shrink-0 rounded-md bg-white px-4 py-2 text-sm font-medium text-slate-950 hover:bg-slate-100"
-              href={modelRoleMatrix.interfaceCoverage.actionHref}
+              href={hrefWithGateReturn(modelRoleMatrix.interfaceCoverage.actionHref, gateReturnHref)}
             >
               {modelRoleMatrix.interfaceCoverage.actionLabel}
             </a>
@@ -1422,13 +1436,13 @@ export function ModelProviderSettings({
             <div className="mt-3 flex flex-wrap gap-2">
               <a
                 className="inline-flex w-fit rounded-md bg-white px-3 py-2 text-xs font-medium text-slate-950 hover:bg-slate-100"
-                href={modelRoleMatrixPmFocusNotice.actionHref}
+                href={hrefWithGateReturn(modelRoleMatrixPmFocusNotice.actionHref, gateReturnHref)}
               >
                 {modelRoleMatrixPmFocusNotice.actionLabel}
               </a>
               <a
                 className="inline-flex w-fit rounded-md border border-white/60 px-3 py-2 text-xs font-medium text-slate-950 hover:bg-white/50"
-                href={modelRoleMatrixPmFocusNotice.pipelineActionHref}
+                href={hrefWithGateReturn(modelRoleMatrixPmFocusNotice.pipelineActionHref, gateReturnHref)}
               >
                 {modelRoleMatrixPmFocusNotice.pipelineActionLabel}
               </a>
@@ -1603,7 +1617,7 @@ export function ModelProviderSettings({
             <div className="flex flex-wrap items-center gap-2 rounded-md bg-slate-50 px-3 py-2 text-sm text-slate-600">
               <span>{routeNotice.message}</span>
               {routeNotice.href && routeNotice.actionLabel ? (
-                <Link className="rounded-md bg-white px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-100" href={routeNotice.href}>
+                <Link className="rounded-md bg-white px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-100" href={hrefWithGateReturn(routeNotice.href, gateReturnHref)}>
                   {routeNotice.actionLabel}
                 </Link>
               ) : null}
@@ -1934,7 +1948,7 @@ export function ModelProviderSettings({
                         <div className="mt-2 rounded-md border border-sky-100 bg-sky-50 p-2 text-sky-900">
                           <div className="flex flex-wrap items-center justify-between gap-2">
                             <span className="font-medium">下一轮复检入口</span>
-                            <Link className="rounded-md bg-white px-2 py-1 font-medium text-sky-700 hover:bg-sky-100" href={governanceStatus.nextRecheck.href}>
+                            <Link className="rounded-md bg-white px-2 py-1 font-medium text-sky-700 hover:bg-sky-100" href={hrefWithGateReturn(governanceStatus.nextRecheck.href, gateReturnHref)}>
                               {governanceStatus.nextRecheck.actionLabel}
                             </Link>
                           </div>
@@ -2775,7 +2789,7 @@ export function ModelProviderSettings({
                 </button>
               ) : null}
               {providerSetupNotice.action === "return_project" && providerSetupNotice.href ? (
-                <Link className="w-fit rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white" href={providerSetupNotice.href}>
+                <Link className="w-fit rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white" href={hrefWithGateReturn(providerSetupNotice.href, gateReturnHref)}>
                   {providerSetupNotice.actionLabel}
                 </Link>
               ) : null}

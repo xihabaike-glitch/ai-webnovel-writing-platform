@@ -122,6 +122,41 @@ export default function DevelopmentDocsPage() {
         </div>
       </section>
 
+      <section className="mb-6 rounded-md border border-slate-200 bg-white p-4">
+        <div className="mb-3 flex flex-col gap-2 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <h2 className="font-medium text-slate-950">{overview.pipelineProofRoute.headline}</h2>
+            <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-600">{overview.pipelineProofRoute.pmRule}</p>
+          </div>
+          <Link className="w-fit rounded-md border border-slate-200 px-3 py-2 text-sm font-medium hover:bg-slate-50" href="/projects">
+            开始验收
+          </Link>
+        </div>
+        <div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-3">
+          {overview.pipelineProofRoute.steps.map((step) => (
+            <article className="rounded-md border border-slate-200 bg-slate-50 p-4" key={step.id}>
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className="text-xs text-slate-500">第 {step.order} 步 · {step.owner}</div>
+                  <h3 className="mt-1 font-medium text-slate-950">{step.title}</h3>
+                </div>
+                <Link
+                  className="shrink-0 rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white hover:bg-slate-800"
+                  href={step.href}
+                >
+                  进入
+                </Link>
+              </div>
+              <p className="mt-3 text-sm leading-6 text-slate-600">{step.evidence}</p>
+              <div className="mt-3 grid gap-2 text-xs leading-5">
+                <div className="rounded-md bg-white p-3 text-emerald-800">通过：{step.passCondition}</div>
+                <div className="rounded-md bg-white p-3 text-rose-800">停手：{step.stopRule}</div>
+              </div>
+            </article>
+          ))}
+        </div>
+      </section>
+
       <section className="mb-6 grid gap-3 lg:grid-cols-5">
         {overview.docSections.map((section, index) => (
           <article className={`rounded-md border p-4 ${sectionAccent(index)}`} key={section.id}>

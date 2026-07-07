@@ -63,6 +63,23 @@ export interface DevelopmentOverviewDeliveryAudit {
   items: DevelopmentOverviewAuditItem[];
 }
 
+export interface DevelopmentOverviewPipelineProofStep {
+  id: "project_start" | "sample_draft" | "task_dispatch" | "gate_check" | "failure_repair" | "publish_package";
+  order: number;
+  title: string;
+  owner: string;
+  href: string;
+  evidence: string;
+  passCondition: string;
+  stopRule: string;
+}
+
+export interface DevelopmentOverviewPipelineProofRoute {
+  headline: string;
+  pmRule: string;
+  steps: DevelopmentOverviewPipelineProofStep[];
+}
+
 export interface DevelopmentOverview {
   referenceCount: number;
   platformScope: typeof platformDeliveryScope;
@@ -81,6 +98,7 @@ export interface DevelopmentOverview {
   docSections: DevelopmentOverviewSection[];
   treeWorkflow: DevelopmentOverviewTreeStep[];
   deliveryAudit: DevelopmentOverviewDeliveryAudit;
+  pipelineProofRoute: DevelopmentOverviewPipelineProofRoute;
   nextActions: DevelopmentOverviewAction[];
 }
 
@@ -288,6 +306,77 @@ function buildDeliveryAudit(): DevelopmentOverviewDeliveryAudit {
   };
 }
 
+const pipelineProofSteps: DevelopmentOverviewPipelineProofStep[] = [
+  {
+    id: "project_start",
+    order: 1,
+    title: "开书与大树骨架",
+    owner: "作者 + 毒舌产品经理",
+    href: "/projects",
+    evidence: "作品必须有目标平台、篇幅、开头钩子、结尾承诺、主干和基础土壤。",
+    passCondition: "章节卡可进入首章样本，且不是空白项目或纯聊天记录。",
+    stopRule: "没有目标平台、开头钩子或结尾承诺时停在作品工作台，不进入模型生成。",
+  },
+  {
+    id: "sample_draft",
+    order: 2,
+    title: "首章样本生成",
+    owner: "中文网文写手 + 长篇结构主编",
+    href: "/projects",
+    evidence: "首章样本必须进入候选稿、审稿和二改链路，不能直接覆盖正文。",
+    passCondition: "样本通过钩子、爽点、人物弧光、平台适配和人工采用检查。",
+    stopRule: "样本质量不足时只允许二改或重写，不允许批量生产。",
+  },
+  {
+    id: "task_dispatch",
+    order: 3,
+    title: "任务与派单回执",
+    owner: "派单中心 + AI 编辑部角色",
+    href: "/dispatch",
+    evidence: "模型执行、人工验收、回执接受和下一步任务必须能在任务/派单链路中闭合。",
+    passCondition: "任务有明确执行角色、输入、输出、验收证据和下一步入口。",
+    stopRule: "回执证据太薄或没有人工采用时停在派单中心，不进入总闸门放大。",
+  },
+  {
+    id: "gate_check",
+    order: 4,
+    title: "总闸门放大检查",
+    owner: "毒舌产品经理",
+    href: "/gate",
+    evidence: "总闸门必须看到样本、复查、成本、质量、失败率和恢复证据。",
+    passCondition: "样本稳定、质量过线、成本可控、没有未解决阻塞后才允许小批量。",
+    stopRule: "缺少样本、复查或失败修复证据时不允许批量。",
+  },
+  {
+    id: "failure_repair",
+    order: 5,
+    title: "失败修复与恢复观察",
+    owner: "失败修复中心",
+    href: "/failures",
+    evidence: "失败按模型配置、提示词上下文、样本重试和人工复盘分泳道处理。",
+    passCondition: "未恢复失败清空后，先跑单章样本和小批量观察。",
+    stopRule: "模型配置或上下文失败未修复时暂停批量。",
+  },
+  {
+    id: "publish_package",
+    order: 6,
+    title: "发布包与平台复盘",
+    owner: "海外投稿包装编辑 + 反馈运营",
+    href: "/projects",
+    evidence: "发布包、导出、平台策略、版本基线和效果复盘必须能回到作品。",
+    passCondition: "8 个核心平台都有写作抓手、投稿抓手、复盘指标和版本证据。",
+    stopRule: "发布包缺平台卖点、样章、标签或反馈记录时停在发布修复，不扩范围。",
+  },
+];
+
+function buildPipelineProofRoute(): DevelopmentOverviewPipelineProofRoute {
+  return {
+    headline: "写作到投稿流水线验收路线",
+    pmRule: "按这 6 步验真实作品样本；不跳过人工采用，不用新增平台掩盖流水线问题。",
+    steps: pipelineProofSteps,
+  };
+}
+
 export function buildDevelopmentOverview(): DevelopmentOverview {
   return {
     referenceCount: openSourceReferenceCases.length,
@@ -307,6 +396,7 @@ export function buildDevelopmentOverview(): DevelopmentOverview {
     docSections,
     treeWorkflow,
     deliveryAudit: buildDeliveryAudit(),
+    pipelineProofRoute: buildPipelineProofRoute(),
     nextActions: [
       {
         label: "从作品工作台验收真实写作流程",

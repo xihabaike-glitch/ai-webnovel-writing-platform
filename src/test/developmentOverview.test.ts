@@ -114,4 +114,40 @@ test("buildDevelopmentOverview", async (t) => {
     assert.ok(treeWorkflow?.evidence.includes("开头"));
     assert.ok(treeWorkflow?.evidence.includes("土壤"));
   });
+
+  await t.test("builds an executable writing-to-submission proof route", () => {
+    const overview = buildDevelopmentOverview();
+
+    assert.ok(overview.pipelineProofRoute.headline.includes("流水线验收"));
+    assert.ok(overview.pipelineProofRoute.pmRule.includes("不跳过人工采用"));
+    assert.equal(overview.pipelineProofRoute.steps.length, 6);
+    assert.deepEqual(
+      overview.pipelineProofRoute.steps.map((step) => step.id),
+      ["project_start", "sample_draft", "task_dispatch", "gate_check", "failure_repair", "publish_package"],
+    );
+
+    for (const [index, step] of overview.pipelineProofRoute.steps.entries()) {
+      assert.equal(step.order, index + 1);
+      assert.ok(step.title.length >= 4);
+      assert.ok(step.owner.length >= 4);
+      assert.ok(step.href.startsWith("/"));
+      assert.ok(step.passCondition.length >= 10);
+      assert.ok(step.stopRule.length >= 10);
+      assert.ok(step.evidence.length >= 10);
+    }
+
+    const gate = overview.pipelineProofRoute.steps.find((step) => step.id === "gate_check");
+    const failureRepair = overview.pipelineProofRoute.steps.find((step) => step.id === "failure_repair");
+    const publishPackage = overview.pipelineProofRoute.steps.find((step) => step.id === "publish_package");
+
+    assert.equal(gate?.href, "/gate");
+    assert.ok(gate?.stopRule.includes("不允许批量"));
+    assert.equal(failureRepair?.href, "/failures");
+    assert.ok(failureRepair?.stopRule.includes("暂停批量"));
+    assert.ok(publishPackage?.passCondition.includes("8 个核心平台"));
+    assert.equal(
+      overview.pipelineProofRoute.steps.some((step) => step.title.includes("新增平台")),
+      false,
+    );
+  });
 });

@@ -577,6 +577,7 @@ function item(input: Omit<QueueItem, "label" | "priority" | "blockerType" | "ris
   riskLabel?: string;
   riskNotice?: string | null;
   scaleGate?: QueueScaleGate;
+  priority?: number;
 }): QueueItem {
   return {
     ...input,
@@ -587,7 +588,7 @@ function item(input: Omit<QueueItem, "label" | "priority" | "blockerType" | "ris
     riskNotice: input.riskNotice ?? null,
     scaleGate: input.scaleGate ?? "none",
     label: categoryLabel(input.category),
-    priority: categoryPriority[input.category],
+    priority: input.priority ?? categoryPriority[input.category],
   };
 }
 
@@ -1408,15 +1409,21 @@ function platformStrategyQueueItem(input: {
 }) {
   const step = input.plan.steps.find((candidate) => candidate.status === "next") ?? null;
   if (!step || input.plan.progress.status === "complete") return null;
-  if (!input.packageReady || step.id !== "save-evidence-baseline") return null;
-  const execution: PublishEffectQueueExecution = "open_target";
+  if (step.id === "record-publish-effect") return null;
+  if (step.id === "save-evidence-baseline" && !input.packageReady) return null;
+  const execution: PublishEffectQueueExecution = step.id === "fix-submission-asset"
+    ? "generate_asset_variants"
+    : step.id === "rewrite-first-three"
+      ? "rewrite_first_three"
+      : "open_target";
+  const category: QueueItem["category"] = step.id === "rewrite-first-three" ? "second_pass" : "effect";
 
   return item({
     id: `${input.project.id}:platform-strategy:${input.plan.platformId}:${step.id}`,
     projectId: input.project.id,
     projectTitle: input.project.title,
     platformName: input.plan.platformName || input.platformName,
-    category: "effect",
+    category,
     sourceType: "platform_strategy",
     sourceLabel: "平台策略",
     sourceDetail: input.plan.decisionBasis,
@@ -1427,6 +1434,7 @@ function platformStrategyQueueItem(input: {
     riskLabel: input.riskLabel,
     riskNotice: input.riskNotice,
     scaleGate: input.scaleGate,
+    priority: 8,
     actionLabel: step.label,
     href: `${input.projectHref}${step.href}`,
     effectAction: {
@@ -1733,7 +1741,9 @@ export function buildTaskQueueCenter(projects: TaskQueueProject[]): TaskQueueCen
         plan: exportCenter.activeStrategyPlan,
       })
       : null;
-    if (activePlatformStrategyItem) queueItems.push(activePlatformStrategyItem);
+    if (activePlatformStrategyItem && !queueItems.some((entry) => entry.sourceType === "first_three_adoption")) {
+      queueItems.push(activePlatformStrategyItem);
+    }
 
     const effectQueuePackages = [
       targetPackage,
@@ -1776,12 +1786,21 @@ export function buildTaskQueueCenter(projects: TaskQueueProject[]): TaskQueueCen
         : null;
 
       if (firstDayGateCleared && effectPackage.publishVersions.length > 0 && effectPackage.publishEffect.records === 0) {
+        const strategyRecordSource = exportCenter.activeStrategyPlan?.platformId === effectPackage.platformId
+          && exportCenter.activeStrategyPlan.progress.nextStepId === "record-publish-effect"
+          ? {
+            sourceType: "platform_strategy" as const,
+            sourceLabel: "平台策略",
+            sourceDetail: exportCenter.activeStrategyPlan.decisionBasis,
+          }
+          : {};
         queueItems.push(item({
           id: `${project.id}:effect:${effectPackage.platformId}:collect`,
           projectId: project.id,
           projectTitle: project.title,
           platformName: effectPackage.platformName,
           category: "effect",
+          ...strategyRecordSource,
           chapterTitle: `${effectPackage.platformName} 发布效果`,
           evidence: "发布包已经保存过基准，但还没有录入曝光、点击、收藏、追读、评论、付费阅读或编辑反馈。",
           strategyBasis: startTactic,

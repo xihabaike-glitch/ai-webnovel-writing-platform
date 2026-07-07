@@ -168,6 +168,20 @@ const adoptedAssetVersion = {
   createdAt: "2026-07-05T00:00:00.000Z",
 };
 
+const readySubmissionAsset = {
+  id: "asset-ready",
+  platformId: "fanqie",
+  platformName: "番茄小说",
+  title: "夜雨系统：倒计时翻盘",
+  logline: "系统每晚倒计时，主角用选择把危机打成连续翻盘爽点。",
+  synopsis: "主角在雨夜绑定倒计时系统，每一次选择都牵动生死、复仇和悬疑真相。他从被迫救人开始，摸清系统规则，把惩罚变成筹码，把背叛者拖回真相现场，并在连续任务中建立稳定目标：查清当年事故、保护真正重要的人、夺回属于自己的命运。故事保持强钩子、强情绪和连续爽点，适合番茄免费长篇平台连载。",
+  overseasSynopsis: "Night Rain System follows deadly timed choices.",
+  tags: ["系统", "重生", "强爽点"],
+  note: "番茄主战场资产。",
+  source: "manual",
+  updatedAt: "2026-07-05T00:00:00.000Z",
+};
+
 function handoffWorldEntries() {
   return [{
     type: "platform_soil",
@@ -616,6 +630,59 @@ test("buildTaskQueueCenter", async (t) => {
     assert.equal(strategyItem?.href, "/projects/project-1#package-version-history");
     assert.equal(queue.recommendedNext?.id, strategyItem?.id);
     assert.equal(recommendedQueueActionLabel(queue.recommendedNext), "下一步：平台策略 · 保存证据基准");
+  });
+
+  await t.test("surfaces platform strategy asset repair in the task center", () => {
+    const queue = buildTaskQueueCenter([publishReadyProject({
+      publishSnapshots: [publishBaseline],
+      submissionAssets: [{
+        ...readySubmissionAsset,
+        id: "asset-thin",
+        synopsis: "系统倒计时翻盘。",
+        tags: ["系统"],
+      }],
+    })]);
+    const strategyItem = queue.items.find((entry) => entry.id === "project-1:platform-strategy:fanqie:fix-submission-asset");
+
+    assert.equal(strategyItem?.sourceType, "platform_strategy");
+    assert.equal(strategyItem?.actionLabel, "修投稿资产");
+    assert.equal(strategyItem?.effectAction?.execution, "generate_asset_variants");
+    assert.equal(strategyItem?.href, "/projects/project-1#submission-asset-editor");
+    assert.equal(queue.recommendedNext?.id, strategyItem?.id);
+  });
+
+  await t.test("surfaces platform strategy first-three rewrite in the task center", () => {
+    const weakChapters = publishReadyProject().chapters.map((chapter) => ({
+      ...chapter,
+      content: "太短。",
+      wordCount: 3,
+      status: "outline",
+    }));
+    const queue = buildTaskQueueCenter([publishReadyProject({
+      chapters: weakChapters,
+      aiTasks: [],
+      publishSnapshots: [publishBaseline],
+      submissionAssets: [readySubmissionAsset],
+    })]);
+    const strategyItem = queue.items.find((entry) => entry.id === "project-1:platform-strategy:fanqie:rewrite-first-three");
+
+    assert.equal(strategyItem?.sourceType, "platform_strategy");
+    assert.equal(strategyItem?.actionLabel, "重写前三章");
+    assert.equal(strategyItem?.effectAction?.execution, "rewrite_first_three");
+    assert.equal(strategyItem?.href, "/projects/project-1#first-three-rewrite");
+    assert.equal(queue.recommendedNext?.id, strategyItem?.id);
+  });
+
+  await t.test("labels publish effect collection as platform strategy work", () => {
+    const queue = buildTaskQueueCenter([publishReadyProject({
+      publishSnapshots: [publishBaseline],
+      platformPublishMetrics: [],
+    })]);
+
+    assert.equal(queue.recommendedNext?.sourceType, "platform_strategy");
+    assert.equal(queue.recommendedNext?.actionLabel, "录入发布效果");
+    assert.equal(queue.recommendedNext?.href, "/projects/project-1#publish-effect-panel");
+    assert.equal(recommendedQueueActionLabel(queue.recommendedNext), "下一步：平台策略 · 录入发布效果");
   });
 
   await t.test("advances completed publish asset optimization into candidate adoption", () => {

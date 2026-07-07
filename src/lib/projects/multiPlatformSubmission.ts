@@ -809,6 +809,7 @@ function laneOrder(kind: MultiPlatformDecisionKind) {
 
 function decisionTaskLaneOrder(variant: MultiPlatformSubmissionVariant) {
   if (variant.decision.kind === "watch" && hasCompletedRepairPackageTracking(variant.effectTracking)) return 2.5;
+  if (variant.decision.kind === "pause" && variant.effectTracking.status === "paused") return 2.8;
   return laneOrder(variant.decision.kind);
 }
 
@@ -827,7 +828,10 @@ function decisionDueLabel(kind: MultiPlatformDecisionKind) {
   return "本周复盘";
 }
 
-function decisionAcceptanceCriteria(variant: MultiPlatformSubmissionVariant) {
+function decisionAcceptanceCriteria(
+  variant: MultiPlatformSubmissionVariant,
+  recoveryReference?: MultiPlatformSubmissionVariant | null,
+) {
   const kind = variant.decision.kind;
   if (kind === "main") {
     return [
@@ -879,18 +883,38 @@ function decisionAcceptanceCriteria(variant: MultiPlatformSubmissionVariant) {
       "保留对照版本，避免多变量同时修改。",
     ];
   }
+  if (variant.effectTracking.status === "paused") {
+    return [
+      "暂停原因和二轮复检证据已归档。",
+      recoveryReference
+        ? `对照 ${recoveryReference.platformName} 的有效标题、简介、标签和前三章兑现。`
+        : "等待主平台或相邻平台出现稳定正反馈后再恢复。",
+      "如恢复，只恢复一轮小样本，不直接回到常规投放。",
+    ];
+  }
   return [
     "暂停该平台首轮投入。",
     "等主平台或相邻平台产生稳定数据后再复盘。",
   ];
 }
 
-function decisionTaskDetail(variant: MultiPlatformSubmissionVariant) {
+function decisionTaskDetail(
+  variant: MultiPlatformSubmissionVariant,
+  recoveryReference?: MultiPlatformSubmissionVariant | null,
+) {
+  if (variant.decision.kind === "pause" && variant.effectTracking.status === "paused" && recoveryReference) {
+    return `${variant.decision.reason} 恢复参照：${recoveryReference.platformName} 已有正反馈，只允许按其有效卖点做一轮恢复小样本。`;
+  }
   if (variant.decision.kind !== "repair" || !variant.effectTracking.repairFocus.length) {
     return variant.decision.reason;
   }
 
   return `${variant.decision.reason} 复盘修复焦点：${variant.effectTracking.repairFocus.join("；")}`;
+}
+
+function decisionTaskActionLabel(variant: MultiPlatformSubmissionVariant) {
+  if (variant.decision.kind === "pause" && variant.effectTracking.status === "paused") return "暂停复盘";
+  return variant.decision.label === "补投稿包" ? "补齐投稿包" : variant.decision.label;
 }
 
 function decisionDispatchStage(kind: MultiPlatformDecisionKind): GatePlatformGrowthDispatchItem["stage"] {
@@ -942,8 +966,11 @@ function projectHref(projectId: string | undefined, anchor: string) {
 }
 
 function buildDecisionTasks(variants: MultiPlatformSubmissionVariant[], projectId?: string): MultiPlatformDecisionTask[] {
+  const recoveryReference = [...variants]
+    .filter((variant) => variant.decision.kind === "main" || variant.decision.kind === "scale")
+    .sort((left, right) => right.decision.score - left.decision.score || right.fitScore - left.fitScore)[0] ?? null;
   return [...variants]
-    .filter((variant) => variant.decision.kind !== "pause")
+    .filter((variant) => variant.decision.kind !== "pause" || variant.effectTracking.status === "paused")
     .sort((left, right) => (
       decisionTaskLaneOrder(left) - decisionTaskLaneOrder(right)
       || right.decision.score - left.decision.score
@@ -958,11 +985,11 @@ function buildDecisionTasks(variants: MultiPlatformSubmissionVariant[], projectI
       ownerRole: decisionOwnerRole(variant.decision.kind),
       priorityScore: variant.decision.score,
       title: `${variant.platformName}｜${variant.decision.label}`,
-      detail: decisionTaskDetail(variant),
+      detail: decisionTaskDetail(variant, recoveryReference),
       dueLabel: decisionDueLabel(variant.decision.kind),
-      actionLabel: variant.decision.label === "补投稿包" ? "补齐投稿包" : variant.decision.label,
+      actionLabel: decisionTaskActionLabel(variant),
       href: projectHref(projectId, variant.decision.actionHref),
-      acceptanceCriteria: decisionAcceptanceCriteria(variant),
+      acceptanceCriteria: decisionAcceptanceCriteria(variant, recoveryReference),
       evidence: variant.decision.evidence,
     }));
 }

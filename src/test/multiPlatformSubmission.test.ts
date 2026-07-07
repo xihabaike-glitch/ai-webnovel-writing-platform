@@ -407,4 +407,63 @@ test("buildMultiPlatformSubmission", async (t) => {
     assert.equal(wattpad.decision.kind, "pause");
     assert.ok(wattpad.decision.nextAction.includes("暂停"));
   });
+
+  await t.test("surfaces paused platforms for recovery review when another platform has traction", () => {
+    const result = buildMultiPlatformSubmission({
+      projectId: "project-1",
+      title: "夜雨系统",
+      genre: "都市系统",
+      sellingPoint: "雨夜危机中觉醒系统，主角用一次次选择翻盘。",
+      currentWordCount: 9000,
+      targetWordCount: 300000,
+      targetPlatformId: "fanqie",
+      chapters,
+      aiTasks: [],
+      platformPublishMetrics: [
+        {
+          platformId: "fanqie",
+          platformName: "番茄小说",
+          views: 12000,
+          clicks: 1440,
+          favorites: 420,
+          follows: 240,
+          comments: 30,
+          paidReads: 0,
+          editorFeedback: "二轮数据稳定，标题和前三章兑现有效。",
+          contractStatus: "unknown",
+          publishUrl: "https://fanqie.example/book/1",
+          notes: "正反馈平台，可作为相邻平台恢复参照。",
+          snapshotDate: "2026-01-09T08:00:00.000Z",
+        },
+        {
+          platformId: "wattpad",
+          platformName: "Wattpad",
+          views: 3000,
+          clicks: 240,
+          favorites: 75,
+          follows: 30,
+          comments: 1,
+          paidReads: 0,
+          editorFeedback: "样本轮次：第二轮小样本；验证变量：标题、简介、标签、前三章兑现；结论：暂停。",
+          contractStatus: "unknown",
+          publishUrl: "",
+          notes: "由派单完成依据自动回写；派单编号：submission-decision:project-1:wattpad:watch",
+          snapshotDate: "2026-01-08T08:00:00.000Z",
+        },
+      ],
+    });
+
+    const pausedTask = result.decisionBoard.tasks.find((task) => task.platformId === "wattpad" && task.kind === "pause");
+    assert.ok(pausedTask);
+    assert.equal(pausedTask.actionLabel, "暂停复盘");
+    assert.ok(pausedTask.detail.includes("番茄小说"));
+    assert.ok(pausedTask.acceptanceCriteria.some((item) => item.includes("暂停原因")));
+    assert.ok(pausedTask.acceptanceCriteria.some((item) => item.includes("恢复一轮小样本")));
+    const pausedDispatch = buildMultiPlatformDecisionDispatch(pausedTask, {
+      projectId: "project-1",
+      reviewLatestAt: "2026-01-09T08:00:00.000Z",
+    });
+    assert.equal(pausedDispatch.stage, "pause_platform");
+    assert.ok(pausedDispatch.acceptanceCriteria.some((item) => item.includes("恢复一轮小样本")));
+  });
 });

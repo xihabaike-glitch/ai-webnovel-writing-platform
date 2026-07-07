@@ -4616,6 +4616,11 @@ function isRepairRetestMetricCompletionTask(task: GateDispatchCompletionTemplate
   return /修复包已完成|二轮小样本|第二轮小样本|重验标题、简介、标签和前三章/u.test(text);
 }
 
+function isPausePlatformReviewTask(task: GateDispatchCompletionTemplateTask) {
+  const text = `${task.title} ${task.actionLabel} ${(task.evidence ?? []).join(" ")}`;
+  return task.stage === "pause_platform" && /暂停复盘|恢复小样本|恢复条件/u.test(text);
+}
+
 function isAiPipelineScaleCompletionTask(task: GateDispatchCompletionTemplateTask) {
   return task.stage === "ai_pipeline_small_batch";
 }
@@ -4794,6 +4799,15 @@ export function buildGateDispatchCompletionTemplate(task: GateDispatchCompletion
       "结论：可发布 / 需修包装",
     ].join("\n");
   }
+  if (isPausePlatformReviewTask(task)) {
+    return [
+      `${task.title}`,
+      "暂停原因：",
+      "参照平台：",
+      "恢复条件：",
+      "复盘结论：继续暂停 / 恢复一轮小样本 / 转回修包装",
+    ].join("\n");
+  }
   if (repairCompletionStages.has(task.stage)) {
     return [
       `${task.title}`,
@@ -4869,6 +4883,11 @@ export function reviewGateDispatchCompletionEvidence(
     return hasConcreteDispatchCompletionValue(completionValueAfterLabel("结论", text))
       ? null
       : "请补齐发布包完成依据：结论。";
+  }
+
+  if (isPausePlatformReviewTask(task)) {
+    const filled = completedLabels(text, ["暂停原因", "参照平台", "恢复条件", "复盘结论"]);
+    return filled.length >= 3 ? null : "请补齐暂停复盘依据：暂停原因、参照平台、恢复条件或复盘结论至少写清 3 项。";
   }
 
   if (repairCompletionStages.has(task.stage)) {

@@ -5245,6 +5245,12 @@ test("buildGateActionReceipt", async (t) => {
       actionLabel: "派给增长运营",
       platformName: "Royal Road",
     };
+    const pauseReviewTask = {
+      stage: "pause_platform" as const,
+      title: "Wattpad 暂停平台复盘",
+      actionLabel: "暂停复盘",
+      platformName: "Wattpad",
+    };
     const openingTask = {
       stage: "start_rewrite_opening" as const,
       title: "WebNovel 首轮开头重写",
@@ -5316,6 +5322,17 @@ test("buildGateActionReceipt", async (t) => {
       "处理动作：重写英文卖点并收窄 LitRPG 标签",
       "修复后证据：已保存新版发布包",
     ].join("\n")), null);
+
+    assert.ok(buildGateDispatchCompletionTemplate(pauseReviewTask).includes("暂停原因"));
+    assert.ok(buildGateDispatchCompletionTemplate(pauseReviewTask).includes("恢复条件"));
+    assert.equal(reviewGateDispatchCompletionEvidence(pauseReviewTask, [
+      "Wattpad 暂停平台复盘",
+      "暂停原因：二轮小样本未过线",
+      "参照平台：番茄小说有效标题和前三章兑现",
+      "恢复条件：只恢复一轮小样本",
+      "复盘结论：暂不常规投放",
+    ].join("\n")), null);
+    assert.ok(reviewGateDispatchCompletionEvidence(pauseReviewTask, "暂停原因：已记录")?.includes("暂停复盘"));
 
     assert.ok(buildGateDispatchCompletionTemplate(openingTask).includes("钩子/追读点"));
     assert.equal(reviewGateDispatchCompletionEvidence(openingTask, [

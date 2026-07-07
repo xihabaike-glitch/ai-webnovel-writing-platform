@@ -464,6 +464,7 @@ export default async function DispatchPage({
           initialRealSampleMissingDispatch={realSampleMissingDispatch}
           routeConfirmationDispatchFlow={routeConfirmationDispatchFlow}
           initialQueueFilter={initialQueueFilter}
+          initialRoleIntent={roleIntent}
           gateReturnHref={gateReturn}
         />
       </section>

@@ -52,3 +52,12 @@ test("dispatch task center carries gate return through dashboard work entry link
   assert.ok(source.includes("href={hrefWithGateReturn(routeExecutionDesk.nextTask.href, gateReturnHref)}"));
   assert.ok(source.includes("href={hrefWithGateReturn(item.href, gateReturnHref)} key={item.dispatchKey}"));
 });
+
+test("dispatch task center renders a role intent task draft", () => {
+  assert.ok(dispatchPageSource.includes("initialRoleIntent={roleIntent}"));
+  assert.ok(source.includes("initialRoleIntent?: DispatchRoleIntent | null"));
+  assert.ok(source.includes("角色任务草稿"));
+  assert.ok(source.includes("initialRoleIntent.modelOwner"));
+  assert.ok(source.includes("initialRoleIntent.acceptance"));
+  assert.ok(source.includes("href={hrefWithGateReturn(initialRoleIntent.returnHref, gateReturnHref)}"));
+});

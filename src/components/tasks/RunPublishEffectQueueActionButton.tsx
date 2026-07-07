@@ -35,6 +35,11 @@ function hrefWithGateReturn(href: string, gateReturnHref?: string | null) {
   return `${base}${separator}gateReturn=${encodeURIComponent(gateReturnHref)}${hash}`;
 }
 
+function queueActionTaskId(payload?: { task?: { id?: string }; results?: Array<{ task?: { id?: string } }> } | null) {
+  const resultTask = payload?.results?.find((result) => result.task?.id)?.task;
+  return payload?.task?.id ?? resultTask?.id ?? null;
+}
+
 async function recordQueueActionReceipt(input: {
   projectId: string;
   platformName: string;
@@ -42,7 +47,7 @@ async function recordQueueActionReceipt(input: {
   href: string;
   action: PublishEffectQueueAction;
   status: "succeeded" | "failed";
-  payload?: { task?: { id?: string }; variants?: unknown[]; results?: unknown[] } | null;
+  payload?: { task?: { id?: string }; variants?: unknown[]; results?: Array<{ task?: { id?: string } }> } | null;
   error?: string | null;
 }) {
   if (input.action.execution === "open_target") return;
@@ -54,7 +59,7 @@ async function recordQueueActionReceipt(input: {
     actionLabel: input.actionLabel,
     href: input.href,
     status: input.status,
-    taskId: input.payload?.task?.id ?? null,
+    taskId: queueActionTaskId(input.payload),
     variantCount: input.payload?.variants?.length ?? 0,
     rewrittenChapterCount: input.payload?.results?.length ?? 0,
     error: input.error,
@@ -116,7 +121,7 @@ export function RunPublishEffectQueueActionButton({
       const payload = await response.json().catch(() => null) as {
         task?: { id?: string };
         variants?: unknown[];
-        results?: unknown[];
+        results?: Array<{ task?: { id?: string } }>;
         error?: string;
       } | null;
       if (!response.ok) {

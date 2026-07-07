@@ -120,3 +120,12 @@ test("tasks page runs any queued platform action with the action button", () => 
   assert.ok(source.includes("{entry.effectAction ? ("));
   assert.ok(source.includes("action={entry.effectAction}"));
 });
+
+test("queue action button records task ids from first-three rewrite results", () => {
+  const publishEffectButton = readFileSync("src/components/tasks/RunPublishEffectQueueActionButton.tsx", "utf8");
+
+  assert.ok(publishEffectButton.includes("function queueActionTaskId"));
+  assert.ok(publishEffectButton.includes("const resultTask = payload?.results?.find((result) => result.task?.id)?.task"));
+  assert.ok(publishEffectButton.includes("return payload?.task?.id ?? resultTask?.id ?? null"));
+  assert.ok(publishEffectButton.includes("taskId: queueActionTaskId(input.payload)"));
+});

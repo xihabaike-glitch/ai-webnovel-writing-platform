@@ -34,3 +34,12 @@ test("project detail page keeps a gate recheck return path visible", () => {
   assert.ok(projectPage.includes("来自总闸门复检"));
   assert.ok(projectPage.includes("回总闸门复检"));
 });
+
+test("chapter detail page keeps a gate recheck return path visible", () => {
+  const chapterPage = readFileSync("src/app/projects/[projectId]/chapters/[chapterId]/page.tsx", "utf8");
+
+  assert.ok(chapterPage.includes("searchParams"));
+  assert.ok(chapterPage.includes("gateReturn"));
+  assert.ok(chapterPage.includes("来自总闸门复检"));
+  assert.ok(chapterPage.includes("回总闸门复检"));
+});

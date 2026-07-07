@@ -3,7 +3,7 @@ import type { TaskBatchHistoryItem } from "../ai/taskBatchHistory.ts";
 import { buildTaskRunConsole, type FailureRepairBatch, type TaskRunInput } from "../ai/taskRunConsole.ts";
 import { buildExportSnapshotHistory } from "../export/snapshots.ts";
 import { buildExportVersionCenter } from "../export/versionCenter.ts";
-import { getPlatformProfile, type PlatformId } from "../platforms/platformProfiles.ts";
+import { getPlatformProfile, platformDeliveryScope, type PlatformId } from "../platforms/platformProfiles.ts";
 import { buildBatchExecutionSafety } from "./batchExecutionSafety.ts";
 import { getBatchExecutionStrategy, type BatchExecutionStrategyId } from "./batchExecutionStrategy.ts";
 import { buildBatchStrategyComparison, buildBatchStrategyDecision } from "./batchStrategyComparison.ts";
@@ -442,6 +442,16 @@ export interface PrePublishGate {
   firstThreeAdoptionClosure: PrePublishGateAdoptionClosure;
   priorityActions: PrePublishGateAction[];
   releaseAction: PrePublishGateAction | null;
+  pmFocus: PrePublishGatePmFocus;
+}
+
+export interface PrePublishGatePmFocus {
+  status: "empty" | "blocked" | "review" | "ready";
+  headline: string;
+  detail: string;
+  scopeLabel: string;
+  actionLabel: string;
+  actionHref: string;
 }
 
 export interface PrePublishGateFocusNotice {
@@ -1412,6 +1422,33 @@ function buildReleaseAction(
   };
 }
 
+function buildPrePublishGatePmFocus(
+  status: PrePublishGate["status"],
+  releaseAction: PrePublishGateAction | null,
+): PrePublishGatePmFocus {
+  const scopeLabel = `${platformDeliveryScope.statusLabel} · ${platformDeliveryScope.expansionLabel}`;
+  if (!releaseAction) {
+    return {
+      status: "empty",
+      headline: "总闸门没有可验收动作，先回任务中心补生产证据。",
+      detail: "当前没有发布包、阻塞修复或推荐批次可以直接执行。先补章节、审稿、投稿资产或平台效果，再回总闸门复查。",
+      scopeLabel,
+      actionLabel: "回任务中心",
+      actionHref: "/tasks",
+    };
+  }
+
+  const focusStatus = status === "ready" ? "ready" : status === "blocked" ? "blocked" : "review";
+  return {
+    status: focusStatus,
+    headline: status === "ready" ? `当前可放行：${releaseAction.label}` : `当前先验收：${releaseAction.label}`,
+    detail: releaseAction.detail,
+    scopeLabel,
+    actionLabel: releaseAction.label,
+    actionHref: releaseAction.href,
+  };
+}
+
 export function buildPrePublishGateFocusNotice(input: {
   focus?: string | null;
   gate: PrePublishGate;
@@ -1902,5 +1939,6 @@ export function buildPrePublishGate(input: PrePublishGateInput): PrePublishGate 
     firstThreeAdoptionClosure,
     priorityActions,
     releaseAction,
+    pmFocus: buildPrePublishGatePmFocus(status, releaseAction),
   };
 }

@@ -167,6 +167,13 @@ test("buildPrePublishGate", async (t) => {
     assert.equal(gate.releaseAction?.label, "进入发布闭环");
     assert.equal(gate.releaseAction?.href, "#gate-export-package");
     assert.ok(gate.releaseAction?.detail.includes("采纳一个投稿资产候选"));
+    assert.equal(gate.pmFocus.status, "ready");
+    assert.equal(gate.pmFocus.actionLabel, gate.releaseAction?.label);
+    assert.equal(gate.pmFocus.actionHref, gate.releaseAction?.href);
+    assert.ok(gate.pmFocus.headline.includes("进入发布闭环"));
+    assert.ok(gate.pmFocus.detail.includes(gate.releaseAction?.detail ?? ""));
+    assert.ok(gate.pmFocus.scopeLabel.includes("8/8 核心平台已完成"));
+    assert.ok(gate.pmFocus.scopeLabel.includes("剩余 10 个平台不再添加"));
   });
 
   await t.test("focuses first-day completion as a gate release notice", () => {

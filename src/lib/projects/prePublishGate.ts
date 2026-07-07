@@ -189,6 +189,9 @@ export interface PrePublishGateAcceptanceSheetGate {
   actionLabel: string;
   href: string;
   currentStepId: ProjectAcceptanceStep["id"];
+  repairMode: "passed" | "executable" | "dispatch" | "manual";
+  executionHint: string;
+  execution: PrePublishGateActionExecution | null;
 }
 
 export interface PrePublishGateExportVersionGate {
@@ -1286,7 +1289,70 @@ function buildExportVersionGate(project: PrePublishGateProject): PrePublishGateE
   };
 }
 
-function buildAcceptanceSheetGate(project: PrePublishGateProject, platformName: string): PrePublishGateAcceptanceSheetGate {
+function acceptanceExecutionForStep(
+  project: PrePublishGateProject,
+  currentStepId: ProjectAcceptanceStep["id"],
+  preferredExecution: PrePublishGateActionExecution | null,
+) {
+  if (preferredExecution?.type === "publish_repair") {
+    if (currentStepId === "chapter_review" && preferredExecution.kind === "run_chapter_review") return preferredExecution;
+    if (currentStepId === "second_pass" && preferredExecution.kind === "run_second_pass") return preferredExecution;
+  }
+  const firstChapter = project.chapters[0];
+  if (!firstChapter) return null;
+  if (currentStepId === "chapter_review") {
+    return {
+      type: "publish_repair",
+      projectId: project.id,
+      kind: "run_chapter_review",
+      chapterId: firstChapter.id,
+      chapterTitle: firstChapter.title,
+      detail: "单本作品验收单缺首章审稿证据。",
+    } satisfies PrePublishGateActionExecution;
+  }
+  if (currentStepId === "second_pass") {
+    return {
+      type: "publish_repair",
+      projectId: project.id,
+      kind: "run_second_pass",
+      chapterId: firstChapter.id,
+      chapterTitle: firstChapter.title,
+      detail: "单本作品验收单缺首章二改证据。",
+    } satisfies PrePublishGateActionExecution;
+  }
+  return null;
+}
+
+function acceptanceRepairMode(
+  status: PrePublishGateItem["status"],
+  currentStepId: ProjectAcceptanceStep["id"],
+  execution: PrePublishGateActionExecution | null,
+): PrePublishGateAcceptanceSheetGate["repairMode"] {
+  if (status === "pass") return "passed";
+  if (currentStepId === "dispatch_receipt") return "dispatch";
+  if (execution) return "executable";
+  return "manual";
+}
+
+function acceptanceExecutionHint(mode: PrePublishGateAcceptanceSheetGate["repairMode"]) {
+  if (mode === "passed") return "验收证据已闭合，可以进入发布包确认。";
+  if (mode === "executable") return "可一键修复：总闸门会直接运行对应审稿或二改动作。";
+  if (mode === "dispatch") return "需去派单中心补完成依据和人工验收，补完后总闸门会自动复检。";
+  return "需回到作品页补齐当前验收步骤，再回总闸门复检。";
+}
+
+function acceptanceActionHref(projectId: string, stepId: ProjectAcceptanceStep["id"], href: string) {
+  const target = href.startsWith("#") ? `/projects/${projectId}${href}` : href;
+  if (stepId !== "dispatch_receipt" || !target.startsWith("/dispatch?") || target.includes("step=")) return target;
+  if (target.includes("#")) return target.replace("#", "&step=publish-precheck#");
+  return `${target}&step=publish-precheck`;
+}
+
+function buildAcceptanceSheetGate(
+  project: PrePublishGateProject,
+  platformName: string,
+  repairExecution: PrePublishGateActionExecution | null,
+): PrePublishGateAcceptanceSheetGate {
   const chaptersById = new Map(project.chapters.map((chapter) => [chapter.id, chapter]));
   const dashboard = buildProjectDashboard({
     projectId: project.id,
@@ -1315,14 +1381,20 @@ function buildAcceptanceSheetGate(project: PrePublishGateProject, platformName: 
     : current?.id === "publish_package"
       ? "warn"
       : "block";
+  const execution = acceptanceExecutionForStep(project, sheet.currentStepId, repairExecution);
+  const repairMode = acceptanceRepairMode(status, sheet.currentStepId, execution);
+  const href = acceptanceActionHref(project.id, sheet.currentStepId, sheet.actionHref);
 
   return {
     status,
     label: status === "pass" ? "验收单通过" : status === "warn" ? "发布包待验" : "验收单阻塞",
     detail: `${project.title} · ${platformName} · ${sheet.verdict}`,
     actionLabel: sheet.actionLabel,
-    href: sheet.actionHref.startsWith("#") ? `/projects/${project.id}${sheet.actionHref}` : sheet.actionHref,
+    href,
     currentStepId: sheet.currentStepId,
+    repairMode,
+    executionHint: acceptanceExecutionHint(repairMode),
+    execution: repairMode === "executable" ? execution : null,
   };
 }
 
@@ -1357,7 +1429,8 @@ function projectStatus(project: PrePublishGateProject): PrePublishGateProjectSta
   const publishableChapters = center.totalPublishableChapters;
   const exportVersionGate = buildExportVersionGate(project);
   const exportVersionBlocked = exportVersionGate.status === "block";
-  const acceptanceSheetGate = buildAcceptanceSheetGate(project, pack.platformName);
+  const repairExecution = exportVersionBlocked ? null : nextRepairAction ? publishRepairExecution(project.id, nextRepairAction) : null;
+  const acceptanceSheetGate = buildAcceptanceSheetGate(project, pack.platformName, repairExecution);
   const acceptanceBlocked = acceptanceSheetGate.status === "block";
   const ready = publishableChapters > 0 && pack.canExport && pack.finalGate.status === "ready_to_submit" && !exportVersionBlocked && acceptanceSheetGate.status === "pass";
   const empty = publishableChapters === 0;
@@ -1390,7 +1463,7 @@ function projectStatus(project: PrePublishGateProject): PrePublishGateProjectSta
     nextAction,
     href,
     downloadHref: ready ? `/api/projects/${project.id}/platform-export?format=markdown&platformId=${pack.platformId}` : null,
-    execution: exportVersionBlocked ? null : nextRepairAction ? publishRepairExecution(project.id, nextRepairAction) : null,
+    execution: acceptanceBlocked ? acceptanceSheetGate.execution : repairExecution,
     acceptanceSheetGate,
     exportVersionGate,
     effectReview: effectReview(
@@ -1963,10 +2036,10 @@ export function buildPrePublishGate(input: PrePublishGateInput): PrePublishGate 
     ...acceptanceBlockers.map((project) => action(
       `project-acceptance:${project.projectId}`,
       project.acceptanceSheetGate.actionLabel,
-      project.acceptanceSheetGate.detail,
+      `${project.acceptanceSheetGate.detail} ${project.acceptanceSheetGate.executionHint}`,
       project.acceptanceSheetGate.href,
       "repair",
-      project.execution,
+      project.acceptanceSheetGate.execution,
     )),
     ...firstThreeAdoptionPriorityActions(firstThreeAdoptionClosure),
     ...projectStatuses

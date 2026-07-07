@@ -17,5 +17,6 @@ test("gate page renders project acceptance sheet blockers", () => {
   assert.ok(source.includes("gate.projectStatuses.filter((project) => project.acceptanceSheetGate.status !== \"pass\")"));
   assert.ok(source.includes("project.acceptanceSheetGate.label"));
   assert.ok(source.includes("project.acceptanceSheetGate.detail"));
+  assert.ok(source.includes("project.acceptanceSheetGate.executionHint"));
   assert.ok(source.includes("project.acceptanceSheetGate.href"));
 });

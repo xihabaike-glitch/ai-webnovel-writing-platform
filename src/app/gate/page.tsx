@@ -403,6 +403,7 @@ export default async function GatePage({
                 </span>
               </div>
               <p className="mt-2 text-xs leading-5 text-slate-600">{project.acceptanceSheetGate.detail}</p>
+              <p className="mt-1 text-xs leading-5 text-slate-600">{project.acceptanceSheetGate.executionHint}</p>
               <div className="mt-2 text-xs font-medium text-slate-950">{project.acceptanceSheetGate.actionLabel}</div>
             </Link>
           ))}

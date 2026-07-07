@@ -350,6 +350,8 @@ test("buildPrePublishGate", async (t) => {
 
     assert.equal(project.acceptanceSheetGate.status, "block");
     assert.equal(project.acceptanceSheetGate.currentStepId, "second_pass");
+    assert.equal(project.acceptanceSheetGate.repairMode, "executable");
+    assert.ok(project.acceptanceSheetGate.executionHint.includes("可一键修复"));
     assert.ok(project.acceptanceSheetGate.detail.includes("二改"));
     assert.equal(project.acceptanceSheetGate.href, "/projects/project-acceptance-blocked#ai-pipeline");
     assert.equal(project.nextAction, project.acceptanceSheetGate.actionLabel);
@@ -358,7 +360,37 @@ test("buildPrePublishGate", async (t) => {
     assert.ok(acceptanceItem?.detail.includes("验收缺二改"));
     assert.equal(gate.priorityActions[0].id, "project-acceptance:project-acceptance-blocked");
     assert.equal(gate.priorityActions[0].label, project.acceptanceSheetGate.actionLabel);
+    assert.ok(gate.priorityActions[0].detail.includes("可一键修复"));
     assert.equal(gate.priorityActions[0].href, "/projects/project-acceptance-blocked#ai-pipeline");
+    assert.equal(gate.priorityActions[0].execution?.type, "publish_repair");
+    assert.equal(gate.priorityActions[0].execution?.kind, "run_second_pass");
+  });
+
+  await t.test("marks acceptance dispatch receipt blockers as manual evidence repair", () => {
+    const gate = buildPrePublishGate({
+      projects: [{
+        ...readyProject,
+        id: "project-dispatch-receipt-blocked",
+        title: "验收缺派单回执",
+        aiTasks: [
+          passedReviews[0],
+          passedSecondPasses[0],
+        ],
+        gateDispatchTasks: [],
+      }],
+      failureTasks: [],
+      batchHistory: [],
+    });
+    const project = gate.projectStatuses[0];
+
+    assert.equal(project.acceptanceSheetGate.status, "block");
+    assert.equal(project.acceptanceSheetGate.currentStepId, "dispatch_receipt");
+    assert.equal(project.acceptanceSheetGate.repairMode, "dispatch");
+    assert.ok(project.acceptanceSheetGate.executionHint.includes("派单中心"));
+    assert.equal(project.acceptanceSheetGate.href, "/dispatch?firstDayProject=project-dispatch-receipt-blocked&step=publish-precheck#first-day-dispatch");
+    assert.equal(gate.priorityActions[0].id, "project-acceptance:project-dispatch-receipt-blocked");
+    assert.ok(gate.priorityActions[0].detail.includes("派单中心"));
+    assert.equal(gate.priorityActions[0].execution, null);
   });
 
   await t.test("focuses first-day completion blockers before release", () => {

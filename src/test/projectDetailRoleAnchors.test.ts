@@ -35,6 +35,31 @@ test("project detail page keeps a gate recheck return path visible", () => {
   assert.ok(projectPage.includes("回总闸门复检"));
 });
 
+test("project detail page carries gate return through project work entry links", () => {
+  const projectPage = readFileSync("src/app/projects/[projectId]/page.tsx", "utf8");
+  const writingWorkbenchPanel = readFileSync("src/components/projects/WritingWorkbenchPanel.tsx", "utf8");
+
+  assert.ok(projectPage.includes("function hrefWithGateReturn"));
+  assert.ok(projectPage.includes("<WritingWorkbenchPanel gateReturnHref={gateReturn} workbench={writingWorkbench} />"));
+  assert.ok(projectPage.includes("href={hrefWithGateReturn(`/projects/${project.id}${entry.projectAnchor}`, gateReturn)}"));
+  assert.ok(projectPage.includes("href={hrefWithGateReturn(dashboard.realSampleAcceptanceSheet.actionHref, gateReturn)}"));
+  assert.ok(projectPage.includes("href={hrefWithGateReturn(step.href, gateReturn)}"));
+  assert.ok(projectPage.includes("href={hrefWithGateReturn(`/projects/${project.id}/chapters/${dashboard.nextChapter.id}`, gateReturn)}"));
+  assert.ok(projectPage.includes("href={hrefWithGateReturn(`/projects/${project.id}/exports`, gateReturn)}"));
+  assert.ok(projectPage.includes("href={hrefWithGateReturn(`/projects/${project.id}/chapters/${chapter.id}`, gateReturn)}"));
+
+  assert.ok(writingWorkbenchPanel.includes("gateReturnHref?: string | null"));
+  assert.ok(writingWorkbenchPanel.includes("function hrefWithGateReturn"));
+  assert.ok(writingWorkbenchPanel.includes("href={hrefWithGateReturn(workbench.heroAction.href, gateReturnHref)}"));
+  assert.ok(writingWorkbenchPanel.includes("href={hrefWithGateReturn(link.href, gateReturnHref)}"));
+  assert.ok(writingWorkbenchPanel.includes("href={hrefWithGateReturn(workbench.pmFocus.actionHref, gateReturnHref)}"));
+  assert.ok(writingWorkbenchPanel.includes("href={hrefWithGateReturn(workbench.firstThreeAdoption.href, gateReturnHref)}"));
+  assert.ok(writingWorkbenchPanel.includes("href={hrefWithGateReturn(candidate.href, gateReturnHref)}"));
+  assert.ok(writingWorkbenchPanel.includes("href={hrefWithGateReturn(step.href, gateReturnHref)}"));
+  assert.ok(writingWorkbenchPanel.includes("href={hrefWithGateReturn(asset.href, gateReturnHref)}"));
+  assert.ok(writingWorkbenchPanel.includes("href={hrefWithGateReturn(block.href, gateReturnHref)}"));
+});
+
 test("chapter detail page keeps a gate recheck return path visible", () => {
   const chapterPage = readFileSync("src/app/projects/[projectId]/chapters/[chapterId]/page.tsx", "utf8");
 

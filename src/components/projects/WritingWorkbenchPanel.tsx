@@ -36,7 +36,25 @@ function recallPriorityLabel(priority: WritingWorkbench["contextFocus"]["recallP
   return "可选";
 }
 
-export function WritingWorkbenchPanel({ workbench }: { workbench: WritingWorkbench }) {
+function hrefWithGateReturn(href: string, gateReturnHref?: string | null) {
+  if (!gateReturnHref || !href.startsWith("/") || href.startsWith("/gate")) return href;
+
+  const hashIndex = href.indexOf("#");
+  const base = hashIndex >= 0 ? href.slice(0, hashIndex) : href;
+  const hash = hashIndex >= 0 ? href.slice(hashIndex) : "";
+  if (base.includes("gateReturn=")) return href;
+  const separator = base.includes("?") ? "&" : "?";
+
+  return `${base}${separator}gateReturn=${encodeURIComponent(gateReturnHref)}${hash}`;
+}
+
+export function WritingWorkbenchPanel({
+  gateReturnHref,
+  workbench,
+}: {
+  gateReturnHref?: string | null;
+  workbench: WritingWorkbench;
+}) {
   const generalPendingCandidates = workbench.pendingCandidates.filter((candidate) => candidate.source !== "first_three_rewrite_candidate");
 
   return (
@@ -51,7 +69,7 @@ export function WritingWorkbenchPanel({ workbench }: { workbench: WritingWorkben
             </div>
             <Link
               className="inline-flex w-fit items-center rounded-md bg-slate-950 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
-              href={workbench.heroAction.href}
+              href={hrefWithGateReturn(workbench.heroAction.href, gateReturnHref)}
             >
               {workbench.heroAction.label}
             </Link>
@@ -80,7 +98,7 @@ export function WritingWorkbenchPanel({ workbench }: { workbench: WritingWorkben
             {workbench.quickLinks.map((link) => (
               <Link
                 className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100"
-                href={link.href}
+                href={hrefWithGateReturn(link.href, gateReturnHref)}
                 key={link.href}
               >
                 {link.label}
@@ -100,7 +118,7 @@ export function WritingWorkbenchPanel({ workbench }: { workbench: WritingWorkben
           </div>
           <Link
             className="inline-flex w-fit shrink-0 rounded-md bg-white px-4 py-2 text-sm font-medium text-slate-950 hover:bg-slate-100"
-            href={workbench.pmFocus.actionHref}
+            href={hrefWithGateReturn(workbench.pmFocus.actionHref, gateReturnHref)}
           >
             {workbench.pmFocus.actionLabel}
           </Link>
@@ -116,14 +134,14 @@ export function WritingWorkbenchPanel({ workbench }: { workbench: WritingWorkben
             </div>
             <Link
               className="inline-flex w-fit rounded-md bg-amber-950 px-3 py-2 text-sm font-medium text-white hover:bg-amber-900"
-              href={workbench.firstThreeAdoption.href}
+              href={hrefWithGateReturn(workbench.firstThreeAdoption.href, gateReturnHref)}
             >
               {workbench.firstThreeAdoption.actionLabel}
             </Link>
           </div>
           <div className="mt-3 grid gap-2 md:grid-cols-3">
             {workbench.firstThreeAdoption.candidates.map((candidate) => (
-              <Link className="rounded-md bg-white p-3 text-sm hover:bg-amber-100" href={candidate.href} key={candidate.id}>
+              <Link className="rounded-md bg-white p-3 text-sm hover:bg-amber-100" href={hrefWithGateReturn(candidate.href, gateReturnHref)} key={candidate.id}>
                 <div className="font-medium text-slate-950">第 {candidate.chapterOrder} 章 · {candidate.chapterTitle}</div>
                 <div className="mt-1 text-xs text-slate-500">{candidate.sourceLabel} · {candidate.wordCount} 字</div>
                 <p className="mt-2 line-clamp-2 text-xs leading-5 text-slate-600">{candidate.preview}</p>
@@ -146,7 +164,7 @@ export function WritingWorkbenchPanel({ workbench }: { workbench: WritingWorkben
           </div>
           <div className="mt-3 grid gap-2 md:grid-cols-2">
             {workbench.firstThreeAdoption.followupChain.map((step) => (
-              <Link className="rounded-md bg-white/80 p-3 text-sm hover:bg-white" href={step.href} key={step.id}>
+              <Link className="rounded-md bg-white/80 p-3 text-sm hover:bg-white" href={hrefWithGateReturn(step.href, gateReturnHref)} key={step.id}>
                 <div className="flex items-center justify-between gap-2">
                   <div className="font-medium text-slate-950">{step.label}</div>
                   <span className={`rounded-md border px-2 py-1 text-xs ${statusClass(step.status)}`}>
@@ -181,7 +199,7 @@ export function WritingWorkbenchPanel({ workbench }: { workbench: WritingWorkben
                     <div className="font-medium text-slate-950">第 {candidate.chapterOrder} 章 · {candidate.chapterTitle}</div>
                     <div className="mt-1 text-xs text-slate-500">{candidate.sourceLabel} · {candidate.wordCount} 字</div>
                   </div>
-                  <Link className="shrink-0 text-xs font-medium text-slate-950 underline" href={candidate.href}>
+                  <Link className="shrink-0 text-xs font-medium text-slate-950 underline" href={hrefWithGateReturn(candidate.href, gateReturnHref)}>
                     处理
                   </Link>
                 </div>
@@ -206,7 +224,7 @@ export function WritingWorkbenchPanel({ workbench }: { workbench: WritingWorkben
           {workbench.startSoil.assets.map((asset) => (
             <Link
               className="rounded-md bg-slate-50 p-3 hover:bg-slate-100"
-              href={asset.href}
+              href={hrefWithGateReturn(asset.href, gateReturnHref)}
               key={asset.id}
             >
               <div className="flex items-center justify-between gap-2">
@@ -236,7 +254,7 @@ export function WritingWorkbenchPanel({ workbench }: { workbench: WritingWorkben
               </span>
             </div>
             <div className="mt-1 text-xs text-slate-500">{block.count} 个素材</div>
-            <Link className="mt-3 block text-sm font-medium text-slate-950 hover:text-slate-700" href={block.href}>
+            <Link className="mt-3 block text-sm font-medium text-slate-950 hover:text-slate-700" href={hrefWithGateReturn(block.href, gateReturnHref)}>
               {block.focusTitle}
             </Link>
             <p className="mt-1 line-clamp-2 text-xs leading-5 text-slate-500">{block.focusDetail}</p>

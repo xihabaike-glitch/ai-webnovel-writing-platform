@@ -61,6 +61,18 @@ function gateReturnFromParam(value: string | string[] | undefined) {
   return raw;
 }
 
+function hrefWithGateReturn(href: string, gateReturnHref?: string | null) {
+  if (!gateReturnHref || !href.startsWith("/") || href.startsWith("/gate")) return href;
+
+  const hashIndex = href.indexOf("#");
+  const base = hashIndex >= 0 ? href.slice(0, hashIndex) : href;
+  const hash = hashIndex >= 0 ? href.slice(hashIndex) : "";
+  if (base.includes("gateReturn=")) return href;
+  const separator = base.includes("?") ? "&" : "?";
+
+  return `${base}${separator}gateReturn=${encodeURIComponent(gateReturnHref)}${hash}`;
+}
+
 export default async function ProjectPage({
   params,
   searchParams,
@@ -568,7 +580,7 @@ export default async function ProjectPage({
             {roleEntrypoints.map((entry) => (
               <Link
                 className="rounded-md border border-slate-200 bg-slate-50 p-3 text-sm hover:border-slate-400 hover:bg-white"
-                href={`/projects/${project.id}${entry.projectAnchor}`}
+                href={hrefWithGateReturn(`/projects/${project.id}${entry.projectAnchor}`, gateReturn)}
                 key={entry.id}
               >
                 <div className="font-medium text-slate-950">{entry.title}</div>
@@ -593,7 +605,7 @@ export default async function ProjectPage({
             </div>
             <Link
               className="w-fit rounded-md bg-white px-3 py-2 text-sm font-medium text-slate-950 hover:bg-slate-100"
-              href={dashboard.realSampleAcceptanceSheet.actionHref}
+              href={hrefWithGateReturn(dashboard.realSampleAcceptanceSheet.actionHref, gateReturn)}
             >
               {dashboard.realSampleAcceptanceSheet.actionLabel}
             </Link>
@@ -602,7 +614,7 @@ export default async function ProjectPage({
             {dashboard.realSampleAcceptanceSheet.steps.map((step, index) => (
               <Link
                 className={`rounded-md border p-3 text-xs leading-5 ${step.status === "done" ? "border-emerald-300 bg-emerald-50 text-emerald-950" : step.status === "current" ? "border-white bg-white text-slate-950" : "border-white/15 bg-white/10 text-slate-300"}`}
-                href={step.href}
+                href={hrefWithGateReturn(step.href, gateReturn)}
                 key={step.id}
               >
                 <div className="flex items-start justify-between gap-2">
@@ -617,7 +629,7 @@ export default async function ProjectPage({
             ))}
           </div>
         </section>
-        <WritingWorkbenchPanel workbench={writingWorkbench} />
+        <WritingWorkbenchPanel gateReturnHref={gateReturn} workbench={writingWorkbench} />
         <PlatformKnowledgeBriefPanel brief={platformKnowledgeBrief} projectId={project.id} />
         <div id="project-control">
           <ProjectControlDashboardPanel projectId={project.id} />
@@ -636,7 +648,7 @@ export default async function ProjectPage({
               {dashboard.nextChapter ? (
                 <Link
                   className="rounded-md bg-slate-950 px-4 py-2 text-sm font-medium text-white"
-                  href={`/projects/${project.id}/chapters/${dashboard.nextChapter.id}`}
+                  href={hrefWithGateReturn(`/projects/${project.id}/chapters/${dashboard.nextChapter.id}`, gateReturn)}
                 >
                   继续写作
                 </Link>
@@ -797,7 +809,7 @@ export default async function ProjectPage({
                 <div className="font-medium">资料包导出</div>
                 <p className="mt-1 text-xs leading-5 text-slate-500">正文、大纲、人物、设定和伏笔会一起进入 Markdown 备份包。</p>
               </div>
-              <Link className="rounded-md border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50" href={`/projects/${project.id}/exports`}>
+              <Link className="rounded-md border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50" href={hrefWithGateReturn(`/projects/${project.id}/exports`, gateReturn)}>
                 版本中心
               </Link>
             </div>
@@ -838,7 +850,7 @@ export default async function ProjectPage({
               {dashboard.unreviewedChapters.slice(0, 6).map((chapter) => (
                 <Link
                   className="rounded-md bg-slate-50 p-3 text-sm hover:bg-slate-100"
-                  href={`/projects/${project.id}/chapters/${chapter.id}`}
+                  href={hrefWithGateReturn(`/projects/${project.id}/chapters/${chapter.id}`, gateReturn)}
                   key={chapter.id}
                 >
                   <div className="font-medium">{chapter.title}</div>
@@ -862,7 +874,7 @@ export default async function ProjectPage({
             {project.chapters.map((chapter) => (
               <Link
                 className="rounded-md border border-slate-200 px-3 py-2 hover:bg-slate-50"
-                href={`/projects/${project.id}/chapters/${chapter.id}`}
+                href={hrefWithGateReturn(`/projects/${project.id}/chapters/${chapter.id}`, gateReturn)}
                 key={chapter.id}
               >
                 <div className="font-medium">{chapter.title}</div>

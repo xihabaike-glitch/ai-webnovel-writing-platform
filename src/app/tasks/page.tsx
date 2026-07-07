@@ -219,6 +219,10 @@ function isTaskView(value: string | undefined) {
   return value === undefined || value === "blocked";
 }
 
+function isDebtBlockerType(value: string | undefined) {
+  return value === undefined || debtBlockerType(value) !== null;
+}
+
 function debtFocusNoticeClass(tone: "reduced" | "cleared" | "unchanged") {
   if (tone === "cleared") return "border-emerald-200 bg-emerald-50 text-emerald-900";
   if (tone === "reduced") return "border-cyan-200 bg-cyan-50 text-cyan-900";
@@ -247,7 +251,11 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
   const invalidViewNotice = isTaskView(viewParam)
     ? null
     : viewParam ? `任务视图「${viewParam}」不存在，已显示全部任务。` : null;
-  const activeDebtBlockerType = activeView === "blocked" ? debtBlockerType(resolvedSearchParams.debt) : null;
+  const debtParam = resolvedSearchParams.debt;
+  const activeDebtBlockerType = activeView === "blocked" ? debtBlockerType(debtParam) : null;
+  const invalidDebtNotice = activeView === "blocked" && !isDebtBlockerType(debtParam)
+    ? debtParam ? `清债类型「${debtParam}」不存在，已显示全部阻塞债务。` : null
+    : null;
   const clearedDebtBlockerType = activeView === "blocked" ? debtBlockerType(resolvedSearchParams.cleared) : null;
   const [
     projects,
@@ -526,6 +534,20 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
             </div>
             <Link className="w-fit rounded-md bg-white px-3 py-2 text-sm font-medium text-amber-950 hover:bg-amber-100" href="/tasks">
               查看全部任务
+            </Link>
+          </div>
+        </section>
+      ) : null}
+
+      {invalidDebtNotice ? (
+        <section className="mb-6 rounded-md border border-amber-200 bg-amber-50 p-4 text-amber-900">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <div className="font-medium">清债筛选已回退</div>
+              <p className="mt-1 text-sm leading-6">{invalidDebtNotice}</p>
+            </div>
+            <Link className="w-fit rounded-md bg-white px-3 py-2 text-sm font-medium text-amber-950 hover:bg-amber-100" href="/tasks?view=blocked#task-debt">
+              查看全部阻塞
             </Link>
           </div>
         </section>

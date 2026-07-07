@@ -11,3 +11,11 @@ test("tasks page shows invalid view feedback", () => {
   assert.ok(source.includes("查看全部任务"));
   assert.ok(source.includes("href=\"/tasks\""));
 });
+
+test("tasks page shows invalid debt feedback", () => {
+  assert.ok(source.includes("invalidDebtNotice"));
+  assert.ok(source.includes("debtParam ? `清债类型「${debtParam}」不存在，已显示全部阻塞债务。` : null"));
+  assert.ok(source.includes("清债筛选已回退"));
+  assert.ok(source.includes("查看全部阻塞"));
+  assert.ok(source.includes("href=\"/tasks?view=blocked#task-debt\""));
+});

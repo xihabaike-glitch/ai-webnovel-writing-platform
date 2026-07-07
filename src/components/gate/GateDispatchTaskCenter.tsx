@@ -197,6 +197,29 @@ export interface DispatchRoleIntent {
   returnHref: string;
 }
 
+function buildRoleIntentDispatch(intent: DispatchRoleIntent): GatePlatformGrowthDispatchItem {
+  const now = new Date().toISOString();
+  const keySuffix = [intent.projectId, intent.roleIntent, intent.roleId].filter(Boolean).join(":");
+
+  return {
+    id: `role-intent:${keySuffix || intent.roleName}`,
+    platformId: "role-dispatch",
+    platformName: "角色派单",
+    stage: "watch",
+    state: "queued",
+    priorityScore: 82,
+    ownerRole: intent.ownerRole,
+    title: `${intent.roleName}｜角色任务`,
+    detail: `从作品角色入口生成：按 ${intent.modelOwner} 的模型岗位执行，先产出可复核任务结果，再回作品工作区验收。`,
+    dueLabel: "今日创建",
+    actionLabel: "回作品工作区",
+    href: intent.returnHref,
+    acceptanceCriteria: [intent.acceptance, `建议模型：${intent.modelOwner}`, "完成后必须补充产物链接、人工验收和下一步判断。"],
+    evidence: [`角色入口：${intent.roleIntent}`, `角色编号：${intent.roleId}`, `项目：${intent.projectId}`],
+    reviewLatestAt: now,
+  };
+}
+
 interface RouteActionExecution {
   kind?: "route_action" | "first_day_ai";
   method: "POST";
@@ -278,6 +301,7 @@ export function GateDispatchTaskCenter({
   const [batchDecisionCard, setBatchDecisionCard] = useState<TaskQueueBatchReceiptDecisionCard | null>(null);
   const [realSampleDispatchMessage, setRealSampleDispatchMessage] = useState("");
   const [creatingRealSampleDispatch, setCreatingRealSampleDispatch] = useState(false);
+  const [creatingRoleIntentDispatch, setCreatingRoleIntentDispatch] = useState(false);
   const [completionDrafts, setCompletionDrafts] = useState<Record<string, string>>({});
   const [focusedCompletionDispatchKey, setFocusedCompletionDispatchKey] = useState("");
   const [focusedCompletionMessage, setFocusedCompletionMessage] = useState("");
@@ -625,6 +649,31 @@ export function GateDispatchTaskCenter({
       setErrorMessage(error instanceof Error ? error.message : "生成真实样本派单失败。");
     } finally {
       setCreatingRealSampleDispatch(false);
+    }
+  }
+
+  async function createRoleIntentDispatch() {
+    if (!initialRoleIntent) return;
+    setCreatingRoleIntentDispatch(true);
+    setErrorMessage("");
+    setRouteActionMessage("");
+    setRouteActionLink(null);
+    try {
+      const created = await persistGateDispatchTask(buildRoleIntentDispatch(initialRoleIntent));
+      setTasks((current) => {
+        const nextByKey = new Map(current.map((item) => [item.dispatchKey, item]));
+        nextByKey.set(created.dispatchKey, created);
+        return Array.from(nextByKey.values());
+      });
+      setFocusedCompletionDispatchKey(created.dispatchKey);
+      setFocusedCompletionMessage("角色任务已生成正式派单，先补完成依据再回作品验收。");
+      setRoleFilter(created.ownerRole);
+      setQueueFilter("all");
+      setRouteActionMessage(`已创建正式角色派单：${created.title}`);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "创建角色派单失败。");
+    } finally {
+      setCreatingRoleIntentDispatch(false);
     }
   }
 
@@ -1641,6 +1690,14 @@ export function GateDispatchTaskCenter({
             <div className="flex shrink-0 flex-wrap gap-2 lg:justify-end">
               <button
                 className="rounded-md bg-slate-950 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800"
+                disabled={creatingRoleIntentDispatch}
+                onClick={() => void createRoleIntentDispatch()}
+                type="button"
+              >
+                {creatingRoleIntentDispatch ? "创建中" : "创建正式任务"}
+              </button>
+              <button
+                className="rounded-md border border-slate-200 px-3 py-2 text-sm font-medium text-slate-800 hover:bg-slate-50"
                 onClick={() => setRoleFilter(initialRoleIntent.ownerRole)}
                 type="button"
               >

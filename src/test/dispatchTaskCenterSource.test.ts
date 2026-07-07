@@ -61,3 +61,13 @@ test("dispatch task center renders a role intent task draft", () => {
   assert.ok(source.includes("initialRoleIntent.acceptance"));
   assert.ok(source.includes("href={hrefWithGateReturn(initialRoleIntent.returnHref, gateReturnHref)}"));
 });
+
+test("dispatch task center can persist a role intent as a formal dispatch", () => {
+  assert.ok(source.includes("buildRoleIntentDispatch"));
+  assert.ok(source.includes("createRoleIntentDispatch"));
+  assert.ok(source.includes("creatingRoleIntentDispatch"));
+  assert.ok(source.includes("const created = await persistGateDispatchTask(buildRoleIntentDispatch(initialRoleIntent));"));
+  assert.ok(source.includes("nextByKey.set(created.dispatchKey, created);"));
+  assert.ok(source.includes("setFocusedCompletionDispatchKey(created.dispatchKey);"));
+  assert.ok(source.includes("创建正式任务"));
+});

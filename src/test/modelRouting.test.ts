@@ -8,6 +8,7 @@ import {
 import { buildFirstDayRouteSummary } from "../lib/model-gateway/firstDayRouteSummary.ts";
 import { buildFirstDayRouteFocusNotice } from "../lib/model-gateway/modelSettingsFocus.ts";
 import { buildPresetRouteBlueprint } from "../lib/model-gateway/presetRouteBlueprint.ts";
+import { buildRoutedGenerationRouteDecision } from "../lib/model-gateway/routedGeneration.ts";
 import {
   selectForcedModelProviderCandidate,
   selectModelProviderCandidatesForTask,
@@ -182,6 +183,43 @@ test("model task routing", async (t) => {
     assert.ok(modelTaskRouteOptions.some((option) => option.taskType === "control_asset_generate"));
     assert.equal(labelForRoutedTask("chapter_second_pass"), "章节二改");
     assert.equal(labelForRoutedTask("control_asset_generate"), "总控资料生成");
+  });
+
+  await t.test("builds a PM route decision explanation before model execution", () => {
+    const decision = buildRoutedGenerationRouteDecision({
+      taskType: "chapter_review",
+      candidates: [
+        { provider: gptProvider, role: "primary" },
+        { provider: mockProvider, role: "fallback" },
+      ],
+      budgetGuard: {
+        allowed: true,
+        enforcement: "warn",
+        status: "warn",
+        summary: "预算使用已超过 70%，建议小批量试跑。",
+        estimatedTaskCostUsd: 0.018,
+        estimatedBatchCostUsd: 0.018,
+        projectedUsedUsd: 4.82,
+        monthlyBudgetUsd: 5,
+        usedUsd: 4.802,
+        remainingBudgetUsd: 0.198,
+        recommendedBatchSize: 1,
+        failureRatePercent: 12,
+        blockers: [],
+        warnings: ["预算使用已超过 70%，建议小批量试跑。"],
+        repairActions: [],
+      },
+    });
+
+    assert.equal(decision.taskLabel, "章节审稿");
+    assert.equal(decision.primaryProviderName, "GPT · gpt-5-mini");
+    assert.equal(decision.fallbackProviderName, "Mock · mock-writer");
+    assert.equal(decision.confirmationMode, "manual_recommended");
+    assert.ok(decision.headline.includes("章节审稿"));
+    assert.ok(decision.selectionReason.includes("主模型"));
+    assert.ok(decision.failoverPlan.includes("失败后切换"));
+    assert.ok(decision.costPressure.includes("$0.0180"));
+    assert.ok(decision.acceptanceChecklist.some((item) => item.includes("人工确认")));
   });
 
   await t.test("builds route confirmation receipts for applied recommendations", () => {

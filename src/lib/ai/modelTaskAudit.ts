@@ -106,6 +106,23 @@ export interface ModelEffectComparisonRow {
   reason: string;
 }
 
+export interface ModelRouteDecisionAuditRow {
+  id: string;
+  taskType: string;
+  taskLabel: string;
+  headline: string;
+  primaryProviderName: string;
+  fallbackProviderName: string | null;
+  selectionReason: string;
+  failoverPlan: string;
+  costPressure: string;
+  confirmationMode: "auto" | "manual_recommended" | "manual_required";
+  acceptanceChecklist: string[];
+  status: string;
+  chapterTitle: string;
+  createdAt: string;
+}
+
 export interface ModelTaskAuditDashboard {
   status: "healthy" | "watch" | "waste";
   score: number;
@@ -157,6 +174,7 @@ export interface ModelTaskAuditDashboard {
   providerRows: ProviderAuditRow[];
   taskTypeRows: TaskTypeAuditRow[];
   modelEffectRows: ModelEffectComparisonRow[];
+  routeDecisionRows: ModelRouteDecisionAuditRow[];
   routeRecommendations: RouteRecommendation[];
   recentFailures: RecentFailure[];
   riskFlags: string[];
@@ -292,6 +310,53 @@ function routeAttempt(task: ModelAuditTask) {
     role: typeof record.role === "string" ? record.role : null,
     attemptNumber: typeof record.attemptNumber === "number" ? record.attemptNumber : null,
   };
+}
+
+function stringField(record: Record<string, unknown>, key: string) {
+  const value = record[key];
+  return typeof value === "string" ? value : null;
+}
+
+function routeDecisionFromTask(task: ModelAuditTask): ModelRouteDecisionAuditRow | null {
+  const snapshot = parseJsonObject(task.inputSnapshot);
+  const decision = snapshot?.routeDecision;
+  if (!decision || typeof decision !== "object" || Array.isArray(decision)) return null;
+  const record = decision as Record<string, unknown>;
+  const taskType = stringField(record, "taskType") ?? task.taskType;
+  const taskLabel = stringField(record, "taskLabel") ?? labelFor(taskType);
+  const headline = stringField(record, "headline");
+  const primaryProviderName = stringField(record, "primaryProviderName");
+  const confirmationMode = stringField(record, "confirmationMode");
+  if (!headline || !primaryProviderName) return null;
+
+  return {
+    id: task.id,
+    taskType,
+    taskLabel,
+    headline,
+    primaryProviderName,
+    fallbackProviderName: stringField(record, "fallbackProviderName"),
+    selectionReason: stringField(record, "selectionReason") ?? "本次任务已记录模型路由决策。",
+    failoverPlan: stringField(record, "failoverPlan") ?? "本次任务未记录失败替代路线。",
+    costPressure: stringField(record, "costPressure") ?? "本次任务未记录成本压力。",
+    confirmationMode: confirmationMode === "auto" || confirmationMode === "manual_recommended" || confirmationMode === "manual_required"
+      ? confirmationMode
+      : "manual_recommended",
+    acceptanceChecklist: Array.isArray(record.acceptanceChecklist)
+      ? record.acceptanceChecklist.filter((item): item is string => typeof item === "string")
+      : [],
+    status: task.status,
+    chapterTitle: task.chapter?.title ?? "项目任务",
+    createdAt: dateIso(task.createdAt),
+  };
+}
+
+function buildRouteDecisionRows(tasks: ModelAuditTask[]): ModelRouteDecisionAuditRow[] {
+  return tasks
+    .map(routeDecisionFromTask)
+    .filter((row): row is ModelRouteDecisionAuditRow => Boolean(row))
+    .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime())
+    .slice(0, 6);
 }
 
 function qualityScore(task: ModelAuditTask) {
@@ -671,6 +736,7 @@ export function buildModelTaskAuditDashboard(
   const providerRows = buildProviderRows(tasks);
   const taskTypeRows = buildTaskTypeRows(tasks);
   const modelEffectRows = buildModelEffectRows(tasks);
+  const routeDecisionRows = buildRouteDecisionRows(tasks);
   const routeRecommendations = buildRouteRecommendations(
     tasks
       .filter((task) => task.providerConfigId)
@@ -702,6 +768,7 @@ export function buildModelTaskAuditDashboard(
     providerRows,
     taskTypeRows,
     modelEffectRows,
+    routeDecisionRows,
     routeRecommendations,
     recentFailures: buildRecentFailures(tasks),
     riskFlags: buildRiskFlags(summary, providerReadiness),

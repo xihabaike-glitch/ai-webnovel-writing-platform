@@ -90,6 +90,48 @@ test("buildModelTaskAuditDashboard", async (t) => {
     assert.ok(dashboard.nextActions.some((action) => action.includes("API Key")));
   });
 
+  await t.test("surfaces latest route decisions from routed task snapshots", () => {
+    const dashboard = buildModelTaskAuditDashboard([
+      {
+        id: "task-route-decision",
+        taskType: "chapter_review",
+        providerConfigId: "deepseek-provider",
+        model: "deepseek-chat",
+        status: "running",
+        inputSnapshot: JSON.stringify({
+          routeDecision: {
+            taskType: "chapter_review",
+            taskLabel: "章节审稿",
+            headline: "章节审稿将使用 DeepSeek · deepseek-chat，备用 Mock · mock-novel。",
+            primaryProviderName: "DeepSeek · deepseek-chat",
+            fallbackProviderName: "Mock · mock-novel",
+            selectionReason: "章节审稿先走主模型 DeepSeek · deepseek-chat。",
+            failoverPlan: "主模型失败后切换到 Mock · mock-novel。",
+            costPressure: "成本压力：预计 $0.0180 / 次；预算观察。",
+            confirmationMode: "manual_recommended",
+            acceptanceChecklist: ["主模型已匹配章节审稿职责", "失败替代路线已配置", "建议人工确认预算、失败替代和复检入口后再执行"],
+          },
+        }),
+        inputTokens: null,
+        outputTokens: null,
+        costUsd: null,
+        outputText: null,
+        errorMessage: null,
+        createdAt: "2026-01-04T00:00:00.000Z",
+        modelProvider: { providerId: "deepseek", displayName: "DeepSeek" },
+        chapter: { title: "第一章" },
+      },
+    ], providers);
+
+    assert.equal(dashboard.routeDecisionRows.length, 1);
+    assert.equal(dashboard.routeDecisionRows[0].taskLabel, "章节审稿");
+    assert.equal(dashboard.routeDecisionRows[0].primaryProviderName, "DeepSeek · deepseek-chat");
+    assert.equal(dashboard.routeDecisionRows[0].fallbackProviderName, "Mock · mock-novel");
+    assert.equal(dashboard.routeDecisionRows[0].confirmationMode, "manual_recommended");
+    assert.ok(dashboard.routeDecisionRows[0].costPressure.includes("$0.0180"));
+    assert.ok(dashboard.routeDecisionRows[0].acceptanceChecklist.some((item) => item.includes("人工确认")));
+  });
+
   await t.test("rewards a healthy model workflow", () => {
     const dashboard = buildModelTaskAuditDashboard([
       {

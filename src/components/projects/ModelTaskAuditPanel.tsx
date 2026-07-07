@@ -156,6 +156,22 @@ interface ModelTaskAuditDashboard {
   providerRows: ProviderAuditRow[];
   taskTypeRows: TaskTypeAuditRow[];
   modelEffectRows: ModelEffectComparisonRow[];
+  routeDecisionRows: Array<{
+    id: string;
+    taskType: string;
+    taskLabel: string;
+    headline: string;
+    primaryProviderName: string;
+    fallbackProviderName: string | null;
+    selectionReason: string;
+    failoverPlan: string;
+    costPressure: string;
+    confirmationMode: "auto" | "manual_recommended" | "manual_required";
+    acceptanceChecklist: string[];
+    status: string;
+    chapterTitle: string;
+    createdAt: string;
+  }>;
   routeRecommendations: RouteRecommendationView[];
   recentFailures: RecentFailure[];
   riskFlags: string[];
@@ -193,6 +209,12 @@ function routeStatusClass(value: RouteRecommendationView["status"]) {
   if (value === "ready") return "bg-cyan-50 text-cyan-700";
   if (value === "current") return "bg-emerald-50 text-emerald-700";
   return "bg-slate-100 text-slate-600";
+}
+
+function confirmationModeCopy(mode: ModelTaskAuditDashboard["routeDecisionRows"][number]["confirmationMode"]) {
+  if (mode === "auto") return { label: "自动执行", className: "bg-emerald-50 text-emerald-700" };
+  if (mode === "manual_required") return { label: "必须确认", className: "bg-rose-50 text-rose-700" };
+  return { label: "建议确认", className: "bg-amber-50 text-amber-700" };
 }
 
 function budgetStatusClass(status: ModelTaskAuditDashboard["budgetCenter"]["status"]) {
@@ -527,6 +549,44 @@ export function ModelTaskAuditPanel({ projectId }: { projectId: string }) {
                 </div>
               ))}
               {dashboard.routeRecommendations.length === 0 ? <p className="text-sm text-slate-600">还没有模型路线样本。</p> : null}
+            </div>
+          </div>
+
+          <div className="rounded-md border border-slate-200 p-3">
+            <div className="font-medium text-slate-950">最近路由决策</div>
+            <div className="mt-3 grid gap-2 lg:grid-cols-2">
+              {dashboard.routeDecisionRows.map((decision) => {
+                const confirmation = confirmationModeCopy(decision.confirmationMode);
+                return (
+                  <div className="rounded-md bg-slate-50 p-3 text-sm" key={decision.id}>
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <div>
+                        <div className="font-medium text-slate-950">{decision.taskLabel} · {decision.chapterTitle}</div>
+                        <div className="mt-1 text-xs text-slate-500">{new Date(decision.createdAt).toLocaleString()}</div>
+                      </div>
+                      <span className={`rounded-md px-2 py-1 text-xs font-medium ${confirmation.className}`}>
+                        {confirmation.label}
+                      </span>
+                    </div>
+                    <p className="mt-2 leading-6 text-slate-700">{decision.headline}</p>
+                    <div className="mt-2 grid gap-1 text-xs text-slate-600">
+                      <div>首选：{decision.primaryProviderName}</div>
+                      <div>备用：{decision.fallbackProviderName ?? "暂无"}</div>
+                      <div>{decision.costPressure}</div>
+                    </div>
+                    <p className="mt-2 text-xs leading-5 text-slate-500">{decision.selectionReason}</p>
+                    <p className="mt-1 text-xs leading-5 text-slate-500">{decision.failoverPlan}</p>
+                    {decision.acceptanceChecklist.length ? (
+                      <div className="mt-2 flex flex-wrap gap-1 text-xs text-slate-500">
+                        {decision.acceptanceChecklist.slice(0, 3).map((item) => (
+                          <span className="rounded-md bg-white px-2 py-1" key={item}>{item}</span>
+                        ))}
+                      </div>
+                    ) : null}
+                  </div>
+                );
+              })}
+              {dashboard.routeDecisionRows.length === 0 ? <p className="text-sm text-slate-600">还没有可审计的路由决策。</p> : null}
             </div>
           </div>
 

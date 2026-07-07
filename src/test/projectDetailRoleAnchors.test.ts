@@ -25,3 +25,12 @@ test("project detail page renders the single-project acceptance sheet", () => {
   assert.ok(projectPage.includes("dashboard.realSampleAcceptanceSheet.actionHref"));
   assert.ok(projectPage.includes("dashboard.realSampleAcceptanceSheet.actionLabel"));
 });
+
+test("project detail page keeps a gate recheck return path visible", () => {
+  const projectPage = readFileSync("src/app/projects/[projectId]/page.tsx", "utf8");
+
+  assert.ok(projectPage.includes("searchParams"));
+  assert.ok(projectPage.includes("gateReturn"));
+  assert.ok(projectPage.includes("来自总闸门复检"));
+  assert.ok(projectPage.includes("回总闸门复检"));
+});

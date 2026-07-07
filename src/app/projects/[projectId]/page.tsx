@@ -55,8 +55,22 @@ function aiTaskLabel(taskType: string) {
   return labels[taskType] ?? taskType;
 }
 
-export default async function ProjectPage({ params }: { params: Promise<{ projectId: string }> }) {
+function gateReturnFromParam(value: string | string[] | undefined) {
+  const raw = Array.isArray(value) ? value[0] : value;
+  if (!raw?.startsWith("/gate?focus=action-recheck")) return null;
+  return raw;
+}
+
+export default async function ProjectPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ projectId: string }>;
+  searchParams?: Promise<{ gateReturn?: string | string[] }>;
+}) {
   const { projectId } = await params;
+  const query = await searchParams;
+  const gateReturn = gateReturnFromParam(query?.gateReturn);
   const project = await prisma.project.findUnique({
     where: { id: projectId },
     include: {
@@ -531,6 +545,15 @@ export default async function ProjectPage({ params }: { params: Promise<{ projec
             {platform.name} · {project.currentWordCount}/{project.targetWordCount} 字 · {project.genre}
           </p>
         </div>
+        {gateReturn ? (
+          <section className="rounded-md border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+            <div className="font-medium">来自总闸门复检</div>
+            <p className="mt-1 leading-5">先处理当前卡点，处理后回总闸门确认剩余卡点是否减少。</p>
+            <Link className="mt-3 inline-flex rounded-md bg-white px-3 py-2 text-xs font-medium text-amber-900 hover:bg-amber-100" href={gateReturn}>
+              回总闸门复检
+            </Link>
+          </section>
+        ) : null}
         <section className="rounded-md border border-slate-200 bg-white p-4">
           <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
             <div>

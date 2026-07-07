@@ -1663,10 +1663,23 @@ function projectAcceptanceRecheckProjectId(actionId: string | null | undefined) 
   return actionId.slice("project-acceptance:".length);
 }
 
+function projectAcceptanceGateReturnHref(projectId: string) {
+  return `/gate?focus=action-recheck&actionId=project-acceptance:${encodeURIComponent(projectId)}#gate-focus-notice`;
+}
+
+function appendGateReturnHref(href: string, gateReturnHref: string) {
+  const hashIndex = href.indexOf("#");
+  const base = hashIndex === -1 ? href : href.slice(0, hashIndex);
+  const hash = hashIndex === -1 ? "" : href.slice(hashIndex);
+  const separator = base.includes("?") ? "&" : "?";
+  return `${base}${separator}gateReturn=${encodeURIComponent(gateReturnHref)}${hash}`;
+}
+
 function buildProjectAcceptanceRemainingBlockers(
   projectId: string,
   steps: ProjectAcceptanceStep[],
 ): PrePublishGateRemainingBlocker[] {
+  const gateReturnHref = projectAcceptanceGateReturnHref(projectId);
   return steps
     .filter((step) => step.status !== "done")
     .sort((left, right) => {
@@ -1681,7 +1694,7 @@ function buildProjectAcceptanceRemainingBlockers(
       actionLabel: `处理${step.label}`,
       evidence: step.evidence,
       stopRule: step.stopRule,
-      href: acceptanceActionHref(projectId, step.id, step.href),
+      href: appendGateReturnHref(acceptanceActionHref(projectId, step.id, step.href), gateReturnHref),
     }));
 }
 

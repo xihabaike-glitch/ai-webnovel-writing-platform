@@ -219,6 +219,7 @@ test("buildDevelopmentOverview", async (t) => {
       assert.notEqual(item.currentEvidence.includes("待补"), true);
     }
 
+    const referenceCases = overview.requirementTraceability.items.find((item) => item.id === "reference_30");
     const modelInterfaces = overview.requirementTraceability.items.find((item) => item.id === "model_interfaces");
     const platformScope = overview.requirementTraceability.items.find((item) => item.id === "platform_8");
     const lengthModes = overview.requirementTraceability.items.find((item) => item.id === "length_modes");
@@ -229,6 +230,7 @@ test("buildDevelopmentOverview", async (t) => {
     assert.ok(modelInterfaces?.currentEvidence.includes("DeepSeek"));
     assert.ok(modelInterfaces?.currentEvidence.includes("Kimi"));
     assert.ok(modelInterfaces?.currentEvidence.includes("GPT"));
+    assert.equal(referenceCases?.href, "/references#development-path");
     assert.ok(platformScope?.currentEvidence.includes("8/8"));
     assert.equal(platformScope?.href, "/projects#platform-export");
     assert.equal(lengthModes?.href, "/projects#create-project");

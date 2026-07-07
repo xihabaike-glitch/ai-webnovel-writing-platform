@@ -530,7 +530,7 @@ function buildRequirementTraceability(): DevelopmentOverviewRequirementTraceabil
         originalRequest: "从 GitHub 和技能网站筛选至少 30 个 AI 写作、知识库、工作流和发布案例作为参考。",
         currentEvidence: `${openSourceReferenceCases.length} 个开源参考案例已进入参考库，且按可借鉴动作拆成开发路线。`,
         acceptanceSignal: "参考库能筛选案例，并能把案例转成角色分工、写作流程或平台发布动作。",
-        href: "/references",
+        href: "/references#development-path",
       },
       {
         id: "platform_8",

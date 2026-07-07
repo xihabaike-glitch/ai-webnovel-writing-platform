@@ -195,7 +195,7 @@ export default async function ReferencesPage({ searchParams }: ReferencesPagePro
         </div>
       </section>
 
-      <section className="mb-6 rounded-md border border-slate-200 bg-white p-4">
+      <section className="mb-6 rounded-md border border-slate-200 bg-white p-4" id="development-path">
         <div className="mb-3 flex flex-col gap-2 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <h2 className="font-medium text-slate-950">毒舌 PM 开发路径</h2>

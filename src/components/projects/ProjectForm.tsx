@@ -78,7 +78,25 @@ function preferLaunchExperience(items: GatePlatformTacticExperienceItem[], launc
   return [matched, ...items.filter((item) => item !== matched)];
 }
 
-export function ProjectForm({ experienceLaunch }: { experienceLaunch?: ProjectFormExperienceLaunch }) {
+function hrefWithGateReturn(href: string, gateReturnHref?: string | null) {
+  if (!gateReturnHref || !href.startsWith("/") || href.startsWith("/gate")) return href;
+
+  const hashIndex = href.indexOf("#");
+  const base = hashIndex >= 0 ? href.slice(0, hashIndex) : href;
+  const hash = hashIndex >= 0 ? href.slice(hashIndex) : "";
+  if (base.includes("gateReturn=")) return href;
+  const separator = base.includes("?") ? "&" : "?";
+
+  return `${base}${separator}gateReturn=${encodeURIComponent(gateReturnHref)}${hash}`;
+}
+
+export function ProjectForm({
+  experienceLaunch,
+  gateReturnHref,
+}: {
+  experienceLaunch?: ProjectFormExperienceLaunch;
+  gateReturnHref?: string | null;
+}) {
   const router = useRouter();
   const launchPlatform = launchPlatformId(experienceLaunch);
   const defaultTemplate = projectTemplates.find((template) => template.platformId === launchPlatform) ?? projectTemplates[0];
@@ -265,7 +283,7 @@ export function ProjectForm({ experienceLaunch }: { experienceLaunch?: ProjectFo
       const params = payload.launchReceipt
         ? `?firstDayLaunch=1&nextStep=${encodeURIComponent(payload.launchReceipt.nextStepId)}`
         : "";
-      router.push(`/projects/${payload.project.id}${params}#first-day-workflow`);
+      router.push(hrefWithGateReturn(`/projects/${payload.project.id}${params}#first-day-workflow`, gateReturnHref));
       router.refresh();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "创建作品失败。");

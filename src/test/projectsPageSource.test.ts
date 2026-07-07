@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 
 const source = readFileSync("src/app/projects/page.tsx", "utf8");
+const projectFormSource = readFileSync("src/components/projects/ProjectForm.tsx", "utf8");
 
 test("projects page shows the portfolio pipeline bottleneck receipt", () => {
   assert.ok(source.includes("activePipelineValidationReceipt"));
@@ -67,4 +68,11 @@ test("projects page carries gate return through project action links", () => {
   assert.ok(source.includes("href={hrefWithGateReturn(item.realSampleValidation.nextActionHref, gateReturn)}"));
   assert.ok(source.includes("href={hrefWithGateReturn(item.pipelineProof.nextActionHref, gateReturn)}"));
   assert.ok(source.includes("href={hrefWithGateReturn(step.href, gateReturn)}"));
+});
+
+test("project creation keeps the gate return when entering first day workflow", () => {
+  assert.ok(source.includes("<ProjectForm experienceLaunch={experienceLaunch} gateReturnHref={gateReturn} />"));
+  assert.ok(projectFormSource.includes("gateReturnHref?: string | null"));
+  assert.ok(projectFormSource.includes("function hrefWithGateReturn"));
+  assert.ok(projectFormSource.includes("router.push(hrefWithGateReturn(`/projects/${payload.project.id}${params}#first-day-workflow`, gateReturnHref));"));
 });

@@ -160,7 +160,7 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps) 
         </section>
       ) : null}
       <div className="mb-6" id="create-project">
-        <ProjectForm experienceLaunch={experienceLaunch} />
+        <ProjectForm experienceLaunch={experienceLaunch} gateReturnHref={gateReturn} />
       </div>
       <section className="mb-6 grid gap-3 md:grid-cols-3 lg:grid-cols-6">
         <div className="rounded-md border border-slate-200 bg-white p-3">

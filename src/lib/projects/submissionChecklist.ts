@@ -31,6 +31,19 @@ export interface SubmissionChecklistInput {
   platform: PlatformProfile;
   chapters: SubmissionChapter[];
   aiTasks: SubmissionAiTask[];
+  structureDiagnostic?: SubmissionStructureDiagnostic;
+}
+
+export interface SubmissionStructureDiagnostic {
+  score: number;
+  items: SubmissionStructureDiagnosticItem[];
+}
+
+export interface SubmissionStructureDiagnosticItem {
+  id: string;
+  label: string;
+  status: "pass" | "warn" | "fail";
+  evidence: string;
 }
 
 export interface SubmissionChecklistItem {
@@ -101,6 +114,25 @@ function lengthStructureItem(
       midReady
         ? "中篇已有前三章钩子、章末悬念和定稿锚点，后续继续检查人物弧光收束。"
         : "5-6 万字中篇需要明确人物弧光、三段主干和可控支线，不能只靠单章爽点推进。",
+    );
+  }
+
+  const diagnostic = input.structureDiagnostic;
+  if (diagnostic) {
+    const requiredIds = ["tree-skeleton", "trunk-pressure", "branch-coverage", "character-arc", "foreshadow-payoff"];
+    const requiredItems = requiredIds
+      .map((id) => diagnostic.items.find((entry) => entry.id === id))
+      .filter((entry): entry is SubmissionStructureDiagnosticItem => Boolean(entry));
+    const weakItems = requiredItems.filter((entry) => entry.status !== "pass");
+    const diagnosticReady = diagnostic.score >= 72 && requiredItems.length === requiredIds.length && weakItems.length === 0;
+
+    return item(
+      "length-structure",
+      "篇幅结构验收",
+      diagnosticReady ? "pass" : "risk",
+      diagnosticReady
+        ? `结构诊断 ${diagnostic.score} 分：主干、支线、人物弧光和伏笔回收已通过，可进入投稿前包装。`
+        : `结构诊断 ${diagnostic.score} 分，长篇投稿前先补${weakItems.map((entry) => entry.label).join("、") || "主干、支线、人物弧光和伏笔回收"}。`,
     );
   }
 

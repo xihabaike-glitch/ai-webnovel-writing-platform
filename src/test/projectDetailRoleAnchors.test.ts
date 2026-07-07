@@ -26,6 +26,14 @@ test("project detail page renders the single-project acceptance sheet", () => {
   assert.ok(projectPage.includes("dashboard.realSampleAcceptanceSheet.actionLabel"));
 });
 
+test("project detail page feeds story structure diagnostic into submission checklist", () => {
+  const projectPage = readFileSync("src/app/projects/[projectId]/page.tsx", "utf8");
+
+  assert.ok(projectPage.includes("buildStoryStructureDiagnostic"));
+  assert.ok(projectPage.includes("const submissionStructureDiagnostic = buildStoryStructureDiagnostic"));
+  assert.ok(projectPage.includes("structureDiagnostic: submissionStructureDiagnostic"));
+});
+
 test("project detail page keeps a gate recheck return path visible", () => {
   const projectPage = readFileSync("src/app/projects/[projectId]/page.tsx", "utf8");
 

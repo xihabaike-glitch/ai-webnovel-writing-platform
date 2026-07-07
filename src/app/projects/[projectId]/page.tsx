@@ -37,6 +37,7 @@ import { gatePlatformDispatchTaskFromRecord } from "@/lib/projects/gateDispatchT
 import { buildPlatformKnowledgeBrief } from "@/lib/projects/platformKnowledgeBrief";
 import { buildProjectDashboard } from "@/lib/projects/projectDashboard";
 import { buildProjectRoleWorkflowEntrypoints } from "@/lib/projects/projectListDashboard";
+import { buildStoryStructureDiagnostic } from "@/lib/projects/storyStructureDiagnostic";
 import { buildSubmissionChecklist } from "@/lib/projects/submissionChecklist";
 import { buildSubmissionPackage } from "@/lib/projects/submissionPackage";
 import { buildWritingWorkbench } from "@/lib/projects/writingWorkbench";
@@ -221,6 +222,23 @@ export default async function ProjectPage({
       completionEvidence: task.completionEvidence,
     })),
   });
+  const submissionStructureDiagnostic = buildStoryStructureDiagnostic({
+    project: {
+      id: project.id,
+      title: project.title,
+      genre: project.genre,
+      sellingPoint: project.sellingPoint,
+      targetLengthType: project.targetLengthType,
+      targetWordCount: project.targetWordCount,
+      currentWordCount: project.currentWordCount,
+    },
+    platform,
+    chapters: project.chapters,
+    outlineNodes: project.outlineNodes,
+    characters: project.characters,
+    foreshadows: project.foreshadows,
+    plotThreads: project.plotThreads,
+  });
   const submissionChecklist = buildSubmissionChecklist({
     title: project.title,
     genre: project.genre,
@@ -237,6 +255,7 @@ export default async function ProjectPage({
       chapter: task.chapterId ? { id: task.chapterId } : null,
       createdAt: task.createdAt,
     })),
+    structureDiagnostic: submissionStructureDiagnostic,
   });
   const chapterProductionFlow = buildChapterProductionFlow({
     projectId: project.id,

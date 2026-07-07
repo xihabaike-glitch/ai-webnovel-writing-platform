@@ -628,6 +628,7 @@ test("buildTaskQueueCenter", async (t) => {
     assert.equal(strategyItem?.chapterTitle, "主平台策略执行链");
     assert.equal(strategyItem?.actionLabel, "保存证据基准");
     assert.ok(strategyItem?.evidence.includes("先处理「保存证据基准」"));
+    assert.ok(strategyItem?.sourceNextStep?.includes("解锁发布效果记录"));
     assert.equal(strategyItem?.href, "/projects/project-1#package-version-history");
     assert.equal(queue.recommendedNext?.id, strategyItem?.id);
     assert.equal(recommendedQueueActionLabel(queue.recommendedNext), "下一步：平台策略 · 保存证据基准");
@@ -647,6 +648,7 @@ test("buildTaskQueueCenter", async (t) => {
 
     assert.equal(strategyItem?.sourceType, "platform_strategy");
     assert.equal(strategyItem?.actionLabel, "修投稿资产");
+    assert.ok(strategyItem?.sourceNextStep?.includes("解锁候选采纳"));
     assert.equal(strategyItem?.effectAction?.execution, "generate_asset_variants");
     assert.equal(strategyItem?.href, "/projects/project-1#submission-asset-editor");
     assert.equal(queue.recommendedNext?.id, strategyItem?.id);
@@ -669,6 +671,7 @@ test("buildTaskQueueCenter", async (t) => {
 
     assert.equal(strategyItem?.sourceType, "platform_strategy");
     assert.equal(strategyItem?.actionLabel, "重写前三章");
+    assert.ok(strategyItem?.sourceNextStep?.includes("解锁前三章候选采纳"));
     assert.equal(strategyItem?.effectAction?.execution, "rewrite_first_three");
     assert.equal(strategyItem?.href, "/projects/project-1#first-three-rewrite");
     assert.equal(queue.recommendedNext?.id, strategyItem?.id);
@@ -683,6 +686,7 @@ test("buildTaskQueueCenter", async (t) => {
     assert.equal(queue.overview.platformStrategyTasks, 1);
     assert.equal(queue.recommendedNext?.sourceType, "platform_strategy");
     assert.equal(queue.recommendedNext?.actionLabel, "录入发布效果");
+    assert.ok(queue.recommendedNext?.sourceNextStep?.includes("解锁平台策略复盘"));
     assert.equal(queue.recommendedNext?.href, "/projects/project-1#publish-effect-panel");
     assert.equal(recommendedQueueActionLabel(queue.recommendedNext), "下一步：平台策略 · 录入发布效果");
   });

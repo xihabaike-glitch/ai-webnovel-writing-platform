@@ -110,3 +110,8 @@ test("tasks page surfaces platform strategy work in the overview", () => {
   assert.ok(source.includes("href={hrefWithGateReturn(\"/tasks#platform-strategy-tasks\", gateReturn)}"));
   assert.ok(source.includes("id=\"platform-strategy-tasks\""));
 });
+
+test("tasks page shows what a platform strategy task unlocks next", () => {
+  assert.ok(source.includes("entry.sourceType === \"platform_strategy\" && entry.sourceNextStep"));
+  assert.ok(source.includes("做完解锁："));
+});

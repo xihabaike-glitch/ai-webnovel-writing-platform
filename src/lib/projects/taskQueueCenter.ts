@@ -128,6 +128,7 @@ export interface QueueItem {
   sourceType?: "first_day_handoff" | "first_three_adoption" | "tactic_experience_followup" | "export_version_recheck" | "platform_strategy";
   sourceLabel?: string;
   sourceDetail?: string;
+  sourceNextStep?: string;
   sourceDispatchKey?: string;
   completionEvidenceTemplate?: string;
   completionEvidenceTemplateSource?: string;
@@ -1428,6 +1429,7 @@ function platformStrategyQueueItem(input: {
     sourceType: "platform_strategy",
     sourceLabel: "平台策略",
     sourceDetail: input.plan.decisionBasis,
+    sourceNextStep: platformStrategyNextStepHint(step.id),
     chapterTitle: "主平台策略执行链",
     evidence: input.plan.progress.verdict,
     strategyBasis: input.startTactic,
@@ -1444,6 +1446,14 @@ function platformStrategyQueueItem(input: {
       actionId: `platform-strategy:${input.plan.platformId}:${execution}`,
     },
   });
+}
+
+function platformStrategyNextStepHint(stepId: string) {
+  if (stepId === "save-evidence-baseline") return "解锁发布效果记录：先把当前平台包变成可对照基准，再录入曝光、点击、收藏和追读。";
+  if (stepId === "fix-submission-asset") return "解锁候选采纳：生成新标题、简介、标签和卖点候选后，先采纳一版再保存新基准。";
+  if (stepId === "rewrite-first-three") return "解锁前三章候选采纳：生成改写候选后，先采纳并回发布质检确认样章能投。";
+  if (stepId === "record-publish-effect") return "解锁平台策略复盘：用真实效果决定修投稿资产、重写前三章，还是保存下一轮基准。";
+  return "解锁下一步平台策略复盘。";
 }
 
 export function buildTaskQueueCenter(projects: TaskQueueProject[]): TaskQueueCenter {
@@ -1793,6 +1803,7 @@ export function buildTaskQueueCenter(projects: TaskQueueProject[]): TaskQueueCen
             sourceType: "platform_strategy" as const,
             sourceLabel: "平台策略",
             sourceDetail: exportCenter.activeStrategyPlan.decisionBasis,
+            sourceNextStep: platformStrategyNextStepHint("record-publish-effect"),
           }
           : {};
         queueItems.push(item({

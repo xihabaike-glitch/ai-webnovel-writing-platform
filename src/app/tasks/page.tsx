@@ -1633,6 +1633,11 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
                     <span className="font-medium">{entry.sourceLabel}：</span>{entry.sourceDetail}
                   </div>
                 ) : null}
+                {entry.sourceType === "platform_strategy" && entry.sourceNextStep ? (
+                  <div className="mt-2 rounded-md border border-violet-200 bg-white px-3 py-2 text-xs leading-5 text-violet-950">
+                    <span className="font-medium">做完解锁：</span>{entry.sourceNextStep}
+                  </div>
+                ) : null}
                 {entry.sourceType === "tactic_experience_followup" && entry.sourceDispatchKey ? (
                   <CompleteTacticExperienceFollowupForm
                     actionLabel={entry.actionLabel}

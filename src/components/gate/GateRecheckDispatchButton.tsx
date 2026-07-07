@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { persistGateDispatchTask, type GatePlatformGrowthDispatchItem } from "@/lib/projects/gateActionReceipts";
 import type { PrePublishGateRecheckDispatch } from "@/lib/projects/prePublishGate";
@@ -10,6 +11,7 @@ export function GateRecheckDispatchButton({
 }: {
   dispatch: PrePublishGateRecheckDispatch;
 }) {
+  const router = useRouter();
   const [state, setState] = useState<"idle" | "running" | "assigned" | "failed">("idle");
   const [message, setMessage] = useState("");
   const dispatchHref = `/dispatch#dispatch-${dispatch.id}`;
@@ -21,6 +23,7 @@ export function GateRecheckDispatchButton({
       await persistGateDispatchTask({ ...(dispatch as GatePlatformGrowthDispatchItem), state: "assigned" });
       setState("assigned");
       setMessage(`已生成派单：${dispatch.title}`);
+      router.push(dispatchHref);
     } catch (error) {
       setState("failed");
       setMessage(error instanceof Error ? error.message : "派单生成失败。");

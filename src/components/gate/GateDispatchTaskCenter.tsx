@@ -116,6 +116,12 @@ function dispatchGateRecheckHref(task: PersistedGatePlatformDispatchTask) {
   return `/gate?focus=action-recheck&actionId=project-acceptance:${encodeURIComponent(projectId)}#gate-focus-notice`;
 }
 
+function dispatchKeyFromHash(hash: string) {
+  const prefix = "#dispatch-";
+  if (!hash.startsWith(prefix)) return "";
+  return decodeURIComponent(hash.slice(prefix.length));
+}
+
 function routeFlowLaneClass(laneId: RouteConfirmationDispatchFlowLaneId) {
   if (laneId === "needs_governance") return "border-amber-200 bg-amber-50 text-amber-900";
   if (laneId === "waiting_recheck") return "border-sky-200 bg-sky-50 text-sky-900";
@@ -241,6 +247,7 @@ export function GateDispatchTaskCenter({
   const [completionDrafts, setCompletionDrafts] = useState<Record<string, string>>({});
   const [focusedCompletionDispatchKey, setFocusedCompletionDispatchKey] = useState("");
   const [focusedCompletionMessage, setFocusedCompletionMessage] = useState("");
+  const [hashFocusedDispatchKey, setHashFocusedDispatchKey] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
   const center = useMemo(() => buildGateDispatchTaskCenter(tasks), [tasks]);
   const firstDayDesk = useMemo(() => buildFirstDayDispatchDesk(tasks), [tasks]);
@@ -323,6 +330,15 @@ export function GateDispatchTaskCenter({
       };
     });
   }, [firstDayFocus.card, firstDayFocus.completionTemplate]);
+
+  useEffect(() => {
+    function syncHashFocus() {
+      setHashFocusedDispatchKey(dispatchKeyFromHash(window.location.hash));
+    }
+    syncHashFocus();
+    window.addEventListener("hashchange", syncHashFocus);
+    return () => window.removeEventListener("hashchange", syncHashFocus);
+  }, []);
 
   function evidenceLoopRecheckMessage(updated: Awaited<ReturnType<typeof updatePersistedGateDispatchTaskState>>) {
     const recheck = updated.evidenceLoopRecheck;
@@ -1726,7 +1742,8 @@ export function GateDispatchTaskCenter({
           const firstDayInlineAction = buildFirstDayDispatchCardInlineAction(firstDayCardByKey.get(task.dispatchKey));
           const firstDayInlineExecution = firstDayInlineAction.execution;
           const isFocusedCompletionTask = task.dispatchKey === focusedCompletionDispatchKey;
-          const isFocusedTask = task.dispatchKey === focusedDispatchKey || isFocusedCompletionTask;
+          const isHashFocusedTask = task.dispatchKey === hashFocusedDispatchKey;
+          const isFocusedTask = task.dispatchKey === focusedDispatchKey || isFocusedCompletionTask || isHashFocusedTask;
           const completionDraft = completionDrafts[task.dispatchKey] ?? "";
           const completionAcceptanceState = buildFirstDayReturnedEvidenceAcceptanceState({
             completionEvidence: completionDraft,
@@ -1758,6 +1775,11 @@ export function GateDispatchTaskCenter({
                   <span className="text-sm text-slate-500">{task.platformName}</span>
                 </div>
                 <p className="mt-2 text-sm leading-6 text-slate-600">{task.detail}</p>
+                {isHashFocusedTask ? (
+                  <p className="mt-2 rounded-md bg-amber-50 px-2 py-1 text-xs font-medium text-amber-800">
+                    刚生成的派单：先从这张卡片收口完成依据。
+                  </p>
+                ) : null}
                 <div className="mt-2 flex flex-wrap gap-2 text-xs text-slate-500">
                   <span className="rounded-md bg-slate-50 px-2 py-1">{task.ownerRole}</span>
                   <span className="rounded-md bg-slate-50 px-2 py-1">{task.dueLabel}</span>

@@ -10,3 +10,11 @@ test("dispatch task center sends completed acceptance dispatches back to gate re
   assert.ok(source.includes("project-acceptance:${encodeURIComponent(projectId)}"));
   assert.ok(source.includes("回总闸门复检"));
 });
+
+test("dispatch task center highlights the dispatch targeted by the URL hash", () => {
+  assert.ok(source.includes("dispatchKeyFromHash"));
+  assert.ok(source.includes("hashFocusedDispatchKey"));
+  assert.ok(source.includes("window.addEventListener(\"hashchange\", syncHashFocus)"));
+  assert.ok(source.includes("task.dispatchKey === hashFocusedDispatchKey"));
+  assert.ok(source.includes("刚生成的派单"));
+});

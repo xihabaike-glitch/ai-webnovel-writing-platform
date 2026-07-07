@@ -76,6 +76,20 @@ export interface ProjectListPipelineProof {
   steps: ProjectListPipelineStep[];
 }
 
+export interface ProjectListPipelineProofSummary {
+  headline: string;
+  totalProjects: number;
+  bottleneckStepId: ProjectListPipelineStep["id"] | null;
+  bottleneckLabel: string;
+  bottleneckCount: number;
+  stepCounts: Array<{
+    id: ProjectListPipelineStep["id"];
+    label: string;
+    count: number;
+    href: string;
+  }>;
+}
+
 export interface ProjectListDashboard {
   overview: {
     totalProjects: number;
@@ -89,6 +103,7 @@ export interface ProjectListDashboard {
     blockedProjects: number;
   };
   pmFocus: ProjectListPmFocus;
+  pipelineProofSummary: ProjectListPipelineProofSummary;
   roleEntrypoints: ProjectRoleWorkflowEntrypoint[];
   items: ProjectListItem[];
 }
@@ -307,6 +322,39 @@ function buildProjectListPmFocus(items: ProjectListItem[]): ProjectListPmFocus {
     projectTitle: target.title,
     actionLabel: target.nextAction,
     actionHref: target.nextActionHref,
+  };
+}
+
+function buildPipelineProofSummary(items: ProjectListItem[]): ProjectListPipelineProofSummary {
+  const fallbackSteps = items[0]?.pipelineProof.steps ?? [
+    { id: "project_start", label: "开书与大树骨架", href: "/projects", status: "blocked", evidence: "" },
+    { id: "sample_draft", label: "首章样本生成", href: "/projects", status: "blocked", evidence: "" },
+    { id: "task_dispatch", label: "任务与派单回执", href: "/dispatch", status: "blocked", evidence: "" },
+    { id: "gate_check", label: "总闸门放大检查", href: "/gate", status: "blocked", evidence: "" },
+    { id: "failure_repair", label: "失败修复与恢复观察", href: "/failures", status: "blocked", evidence: "" },
+    { id: "publish_package", label: "发布包与平台复盘", href: "/projects", status: "blocked", evidence: "" },
+  ] satisfies ProjectListPipelineStep[];
+  const stepCounts = fallbackSteps.map((step) => ({
+    id: step.id,
+    label: step.label,
+    href: step.href,
+    count: items.filter((item) => item.pipelineProof.currentStepId === step.id).length,
+  }));
+  const bottleneckSeed = stepCounts[0] ?? { id: "project_start", label: "开书与大树骨架", href: "/projects", count: 0 };
+  const bottleneck = stepCounts.reduce((current, next) => {
+    if (next.count > current.count) return next;
+    return current;
+  }, bottleneckSeed);
+
+  return {
+    headline: items.length === 0
+      ? "流水线还没有作品样本，先开一本书。"
+      : `${items.length} 本作品的流水线瓶颈在「${bottleneck.label}」。`,
+    totalProjects: items.length,
+    bottleneckStepId: items.length === 0 ? null : bottleneck.id,
+    bottleneckLabel: items.length === 0 ? "暂无作品" : bottleneck.label,
+    bottleneckCount: items.length === 0 ? 0 : bottleneck.count,
+    stepCounts,
   };
 }
 
@@ -547,6 +595,7 @@ export function buildProjectListDashboard(
       blockedProjects: items.filter((item) => item.riskLevel === "blocked").length,
     },
     pmFocus: buildProjectListPmFocus(items),
+    pipelineProofSummary: buildPipelineProofSummary(items),
     roleEntrypoints: buildProjectRoleWorkflowEntrypoints(),
     items,
   };

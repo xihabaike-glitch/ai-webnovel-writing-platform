@@ -340,4 +340,29 @@ test("buildProjectListDashboard", async (t) => {
       false,
     );
   });
+
+  await t.test("summarizes portfolio bottlenecks across pipeline proof steps", () => {
+    const dashboard = buildProjectListDashboard([emptyProject, completeProject, handoffBlockedProject], [
+      {
+        id: "provider-1",
+        providerId: "mock",
+        displayName: "Mock",
+        defaultModel: "mock-novel",
+        enabled: true,
+        encryptedApiKey: "secret",
+      },
+    ]);
+
+    assert.ok(dashboard.pipelineProofSummary.headline.includes("流水线"));
+    assert.equal(dashboard.pipelineProofSummary.totalProjects, 3);
+    assert.equal(dashboard.pipelineProofSummary.bottleneckStepId, "project_start");
+    assert.ok(dashboard.pipelineProofSummary.bottleneckLabel.includes("开书与大树骨架"));
+    assert.equal(dashboard.pipelineProofSummary.stepCounts.find((step) => step.id === "project_start")?.count, 1);
+    assert.equal(dashboard.pipelineProofSummary.stepCounts.find((step) => step.id === "task_dispatch")?.count, 1);
+    assert.equal(dashboard.pipelineProofSummary.stepCounts.find((step) => step.id === "gate_check")?.count, 1);
+    assert.equal(
+      dashboard.pipelineProofSummary.stepCounts.some((step) => step.label.includes("新增平台")),
+      false,
+    );
+  });
 });

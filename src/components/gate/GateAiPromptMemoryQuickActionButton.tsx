@@ -27,15 +27,29 @@ interface GateAiPipelineDispatchTask {
   [key: string]: unknown;
 }
 
+function hrefWithGateReturn(href: string, gateReturnHref?: string | null) {
+  if (!gateReturnHref || !href.startsWith("/") || href.startsWith("/gate")) return href;
+
+  const hashIndex = href.indexOf("#");
+  const base = hashIndex >= 0 ? href.slice(0, hashIndex) : href;
+  const hash = hashIndex >= 0 ? href.slice(hashIndex) : "";
+  if (base.includes("gateReturn=")) return href;
+  const separator = base.includes("?") ? "&" : "?";
+
+  return `${base}${separator}gateReturn=${encodeURIComponent(gateReturnHref)}${hash}`;
+}
+
 export function GateAiPromptMemoryQuickActionButton({
   action,
+  gateReturnHref,
 }: {
   action: GateAiPromptMemoryQuickAction;
+  gateReturnHref?: string | null;
 }) {
   const router = useRouter();
   const [isRunning, setIsRunning] = useState(false);
   const [message, setMessage] = useState("");
-  const [href, setHref] = useState(action.successHref);
+  const [href, setHref] = useState(hrefWithGateReturn(action.successHref, gateReturnHref));
 
   async function runAction() {
     setIsRunning(true);
@@ -54,7 +68,7 @@ export function GateAiPromptMemoryQuickActionButton({
       };
       if (!response.ok) throw new Error(payload.error ?? "生成失败");
       let nextMessage = payload.message ?? "已生成复验派单。";
-      let nextHref = payload.dispatchHref ?? action.successHref;
+      let nextHref = hrefWithGateReturn(payload.dispatchHref ?? action.successHref, gateReturnHref);
       if (payload.dispatchKey) {
         const lookupResponse = await fetch(action.runAfterCreate.lookupEndpoint);
         const lookupPayload = await lookupResponse.json().catch(() => ({})) as {
@@ -85,8 +99,8 @@ export function GateAiPromptMemoryQuickActionButton({
         const recoveryText = runPayload.recoveryDispatch?.title ? `，并生成后续派单：${runPayload.recoveryDispatch.title}` : "";
         nextMessage = `已生成并运行 1 章复验：${succeeded}/${total} 成功，成功率 ${runPayload.routeEffectSummary?.successRatePercent ?? 0}%，质量 ${quality}${recoveryText}。`;
         nextHref = runPayload.recoveryDispatch?.dispatchKey
-          ? `/dispatch?queue=ai_pipeline#dispatch-${runPayload.recoveryDispatch.dispatchKey}`
-          : payload.dispatchHref ?? nextHref;
+          ? hrefWithGateReturn(`/dispatch?queue=ai_pipeline#dispatch-${runPayload.recoveryDispatch.dispatchKey}`, gateReturnHref)
+          : nextHref;
       }
       setMessage(nextMessage);
       setHref(nextHref);

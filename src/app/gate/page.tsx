@@ -371,7 +371,7 @@ export default async function GatePage({
                       </p>
                     ) : null}
                     {focusNotice.recheckSummary.nextDispatch ? (
-                      <GateRecheckDispatchButton dispatch={focusNotice.recheckSummary.nextDispatch} />
+                      <GateRecheckDispatchButton dispatch={focusNotice.recheckSummary.nextDispatch} gateReturnHref={gateRecheckReturnHref} />
                     ) : null}
                   </div>
                   <div className="grid gap-2 text-xs leading-5 md:grid-cols-2">
@@ -591,7 +591,7 @@ export default async function GatePage({
                   <p className="mt-1 text-xs leading-5 opacity-75">{aiRecoveryPanel.promptMemory.detail}</p>
                 </div>
                 {aiRecoveryPanel.promptMemory.quickAction ? (
-                  <GateAiPromptMemoryQuickActionButton action={aiRecoveryPanel.promptMemory.quickAction} />
+                  <GateAiPromptMemoryQuickActionButton action={aiRecoveryPanel.promptMemory.quickAction} gateReturnHref={gateRecheckReturnHref} />
                 ) : aiRecoveryPanel.promptMemory.actionHref && aiRecoveryPanel.promptMemory.actionLabel ? (
                   <Link className="w-fit shrink-0 rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white" href={hrefWithGateReturn(aiRecoveryPanel.promptMemory.actionHref, gateRecheckReturnHref)}>
                     {aiRecoveryPanel.promptMemory.actionLabel}

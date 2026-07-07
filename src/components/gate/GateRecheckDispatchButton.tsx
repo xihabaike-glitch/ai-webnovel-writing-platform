@@ -6,15 +6,29 @@ import { useState } from "react";
 import { persistGateDispatchTask, type GatePlatformGrowthDispatchItem } from "@/lib/projects/gateActionReceipts";
 import type { PrePublishGateRecheckDispatch } from "@/lib/projects/prePublishGate";
 
+function hrefWithGateReturn(href: string, gateReturnHref?: string | null) {
+  if (!gateReturnHref || !href.startsWith("/") || href.startsWith("/gate")) return href;
+
+  const hashIndex = href.indexOf("#");
+  const base = hashIndex >= 0 ? href.slice(0, hashIndex) : href;
+  const hash = hashIndex >= 0 ? href.slice(hashIndex) : "";
+  if (base.includes("gateReturn=")) return href;
+  const separator = base.includes("?") ? "&" : "?";
+
+  return `${base}${separator}gateReturn=${encodeURIComponent(gateReturnHref)}${hash}`;
+}
+
 export function GateRecheckDispatchButton({
   dispatch,
+  gateReturnHref,
 }: {
   dispatch: PrePublishGateRecheckDispatch;
+  gateReturnHref?: string | null;
 }) {
   const router = useRouter();
   const [state, setState] = useState<"idle" | "running" | "assigned" | "failed">("idle");
   const [message, setMessage] = useState("");
-  const dispatchHref = `/dispatch#dispatch-${dispatch.id}`;
+  const dispatchHref = hrefWithGateReturn(`/dispatch#dispatch-${dispatch.id}`, gateReturnHref);
 
   async function assign() {
     setState("running");

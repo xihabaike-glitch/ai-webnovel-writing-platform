@@ -12,6 +12,13 @@ test("gate page shows invalid focus feedback", () => {
   assert.ok(source.includes("href=\"/gate\""));
 });
 
+test("gate page forwards action recheck focus params", () => {
+  assert.ok(source.includes("value === \"action-recheck\""));
+  assert.ok(source.includes("actionId"));
+  assert.ok(source.includes("buildPrePublishGateFocusNotice({ focus, projectId, actionId, gate })"));
+  assert.ok(source.includes("id=\"gate-focus-notice\""));
+});
+
 test("gate page renders project acceptance sheet blockers", () => {
   assert.ok(source.includes("项目验收单联动"));
   assert.ok(source.includes("gate.projectStatuses.filter((project) => project.acceptanceSheetGate.status !== \"pass\")"));

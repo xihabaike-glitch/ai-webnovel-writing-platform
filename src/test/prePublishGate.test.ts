@@ -314,6 +314,79 @@ test("buildPrePublishGate", async (t) => {
     assert.equal(notice.detail.includes("别的作品"), false);
   });
 
+  await t.test("focuses action recheck on the same blocker when it remains open", () => {
+    const gate = buildPrePublishGate({
+      projects: [readyProject],
+      failureTasks: [],
+      batchHistory: [],
+    });
+    const acceptanceAction = {
+      id: "project-acceptance:project-ready",
+      label: "执行二改",
+      detail: "夜雨系统 · 单本作品验收单仍缺首章二改证据。",
+      href: "/projects/project-ready#ai-pipeline",
+      tone: "repair" as const,
+      execution: {
+        type: "publish_repair" as const,
+        projectId: "project-ready",
+        kind: "run_second_pass" as const,
+        chapterId: "chapter-1",
+        detail: "缺首章二改证据。",
+      },
+    };
+    const notice = buildPrePublishGateFocusNotice({
+      focus: "action-recheck",
+      actionId: "project-acceptance:project-ready",
+      gate: {
+        ...gate,
+        status: "blocked",
+        priorityActions: [acceptanceAction],
+        releaseAction: acceptanceAction,
+      },
+    });
+
+    assert.equal(notice.visible, true);
+    assert.equal(notice.tone, "blocked");
+    assert.equal(notice.headline, "上次动作后仍有阻塞");
+    assert.equal(notice.primaryAction?.id, "project-acceptance:project-ready");
+    assert.ok(notice.detail.includes("单本作品验收单"));
+    assert.ok(notice.badges.includes("继续处理同一动作"));
+  });
+
+  await t.test("focuses action recheck on the next gate blocker after the previous action clears", () => {
+    const gate = buildPrePublishGate({
+      projects: [readyProject],
+      failureTasks: [],
+      batchHistory: [],
+    });
+    const nextAction = {
+      id: "queue:next",
+      label: "补任务队列",
+      detail: "夜雨系统 · 还有任务队列阻塞，先补完成依据。",
+      href: "/tasks?view=blocked",
+      tone: "repair" as const,
+      execution: null,
+    };
+    const notice = buildPrePublishGateFocusNotice({
+      focus: "action-recheck",
+      actionId: "project-acceptance:project-ready",
+      gate: {
+        ...gate,
+        status: "blocked",
+        priorityActions: [nextAction],
+        releaseAction: nextAction,
+      },
+    });
+
+    assert.equal(notice.visible, true);
+    assert.equal(notice.tone, "review");
+    assert.equal(notice.headline, "上次动作已清除，继续下一个阻塞");
+    assert.equal(notice.primaryLabel, "补任务队列");
+    assert.equal(notice.primaryHref, "/tasks?view=blocked");
+    assert.ok(notice.detail.includes("夜雨系统"));
+    assert.ok(notice.badges.includes("上次动作已清除"));
+  });
+
   await t.test("blocks launch when first-day handoff evidence is missing", () => {
     const gate = buildPrePublishGate({
       projects: [handoffBlockedProject],

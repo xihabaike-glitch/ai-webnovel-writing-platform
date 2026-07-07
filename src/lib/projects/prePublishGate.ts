@@ -1606,8 +1606,58 @@ function buildPrePublishGatePmFocus(
 export function buildPrePublishGateFocusNotice(input: {
   focus?: string | null;
   projectId?: string | null;
+  actionId?: string | null;
   gate: PrePublishGate;
 }): PrePublishGateFocusNotice {
+  if (input.focus === "action-recheck") {
+    const sameAction = input.actionId
+      ? input.gate.priorityActions.find((action) => action.id === input.actionId) ?? null
+      : null;
+    const primary = sameAction ?? input.gate.releaseAction ?? input.gate.priorityActions[0] ?? null;
+    const gateReady = input.gate.status === "ready";
+
+    if (sameAction) {
+      return {
+        visible: true,
+        tone: "blocked",
+        headline: "上次动作后仍有阻塞",
+        detail: `${sameAction.detail} 这说明刚才的处理还没有完全解除当前卡点，先继续处理同一动作，再刷新总闸门复检。`,
+        primaryLabel: sameAction.label,
+        primaryHref: sameAction.href,
+        primaryAction: sameAction,
+        badges: ["动作复检", "继续处理同一动作", "解除后再放量"],
+      };
+    }
+
+    if (gateReady) {
+      return {
+        visible: true,
+        tone: "ready",
+        headline: "上次动作已清除，总闸门可放行",
+        detail: primary?.detail
+          ? `上次处理的阻塞已经不在优先动作里。${primary.detail}`
+          : "上次处理的阻塞已经不在优先动作里，总闸门当前可放行。",
+        primaryLabel: primary?.label ?? "进入发布闭环",
+        primaryHref: primary?.href ?? "#gate-export-package",
+        primaryAction: primary?.execution ? primary : null,
+        badges: ["上次动作已清除", "总闸门可放行", "放量前复查证据"],
+      };
+    }
+
+    return {
+      visible: true,
+      tone: "review",
+      headline: "上次动作已清除，继续下一个阻塞",
+      detail: primary?.detail
+        ? `上次处理的动作已经不在优先队列里。现在继续处理：${primary.detail}`
+        : `上次处理的动作已经不在优先队列里。${input.gate.verdict}`,
+      primaryLabel: primary?.label ?? "查看优先动作",
+      primaryHref: primary?.href ?? "/gate",
+      primaryAction: primary?.execution ? primary : null,
+      badges: ["上次动作已清除", "继续下一个阻塞", "处理后再复检"],
+    };
+  }
+
   if (input.focus !== "first-day-complete") {
     return {
       visible: false,

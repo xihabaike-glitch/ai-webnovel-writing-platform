@@ -60,6 +60,10 @@ function receiptDisplayMessage(receipt: GateActionReceipt) {
   return `${receipt.message} ${receipt.recheck.detail} ${receipt.recheck.actionLabel}`;
 }
 
+function actionRecheckHref(action: PrePublishGateAction) {
+  return `/gate?focus=action-recheck&actionId=${encodeURIComponent(action.id)}#gate-focus-notice`;
+}
+
 export function GatePriorityActionCard({
   action,
   index,
@@ -83,6 +87,7 @@ export function GatePriorityActionCard({
       });
       setMessage(receiptDisplayMessage(receipt));
       onReceipt?.(receipt);
+      router.replace(actionRecheckHref(action));
       router.refresh();
       return;
     }
@@ -133,6 +138,7 @@ export function GatePriorityActionCard({
           completionEvidence: firstThreeAdoptionCompletionEvidence(execution, payload),
         });
       }
+      router.replace(actionRecheckHref(action));
       router.refresh();
     } catch (caught) {
       const errorMessage = caught instanceof Error ? caught.message : "动作执行失败。";

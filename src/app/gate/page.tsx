@@ -71,17 +71,18 @@ function shortDateTime(value: string | null) {
 }
 
 function isGateFocus(value: string | null) {
-  return value === null || value === "first-day-complete";
+  return value === null || value === "first-day-complete" || value === "action-recheck";
 }
 
 export default async function GatePage({
   searchParams,
 }: {
-  searchParams?: Promise<{ focus?: string | string[]; projectId?: string | string[] }>;
+  searchParams?: Promise<{ focus?: string | string[]; projectId?: string | string[]; actionId?: string | string[] }>;
 }) {
   const params = await searchParams;
   const focus = Array.isArray(params?.focus) ? params?.focus[0] : params?.focus ?? null;
   const projectId = Array.isArray(params?.projectId) ? params?.projectId[0] : params?.projectId ?? null;
+  const actionId = Array.isArray(params?.actionId) ? params?.actionId[0] : params?.actionId ?? null;
   const invalidFocusNotice = isGateFocus(focus)
     ? null
     : focus ? `总闸门焦点「${focus}」不存在，已显示总闸门全局验收。` : null;
@@ -214,7 +215,7 @@ export default async function GatePage({
     failureTasks: recentTasksWithChapter,
     batchHistory: buildTaskBatchHistory(recentTasksWithChapter),
   });
-  const focusNotice = buildPrePublishGateFocusNotice({ focus, projectId, gate });
+  const focusNotice = buildPrePublishGateFocusNotice({ focus, projectId, actionId, gate });
   const aiRecoveryPanel = buildGateAiPipelineRecoveryPanel(
     aiRecoveryDispatchRecords.map(gatePlatformDispatchTaskFromRecord),
     aiPromptMemoryAuditRecords.map((audit) => ({
@@ -307,7 +308,7 @@ export default async function GatePage({
       ) : null}
 
       {focusNotice.visible ? (
-        <section className={`mb-6 rounded-md border p-4 ${focusNoticeTone(focusNotice.tone)}`} id="first-day-complete-focus">
+        <section className={`mb-6 rounded-md border p-4 ${focusNoticeTone(focusNotice.tone)}`} id="gate-focus-notice">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
             <div>
               <div className="text-lg font-semibold">{focusNotice.headline}</div>

@@ -73,10 +73,11 @@ function shortDateTime(value: string | null) {
 export default async function GatePage({
   searchParams,
 }: {
-  searchParams?: Promise<{ focus?: string | string[] }>;
+  searchParams?: Promise<{ focus?: string | string[]; projectId?: string | string[] }>;
 }) {
   const params = await searchParams;
   const focus = Array.isArray(params?.focus) ? params?.focus[0] : params?.focus ?? null;
+  const projectId = Array.isArray(params?.projectId) ? params?.projectId[0] : params?.projectId ?? null;
   const [projects, recentAiTasks, chapters, aiRecoveryDispatchRecords, aiPromptMemoryAuditRecords] = await Promise.all([
     prisma.project.findMany({
       include: {
@@ -206,7 +207,7 @@ export default async function GatePage({
     failureTasks: recentTasksWithChapter,
     batchHistory: buildTaskBatchHistory(recentTasksWithChapter),
   });
-  const focusNotice = buildPrePublishGateFocusNotice({ focus, gate });
+  const focusNotice = buildPrePublishGateFocusNotice({ focus, projectId, gate });
   const aiRecoveryPanel = buildGateAiPipelineRecoveryPanel(
     aiRecoveryDispatchRecords.map(gatePlatformDispatchTaskFromRecord),
     aiPromptMemoryAuditRecords.map((audit) => ({

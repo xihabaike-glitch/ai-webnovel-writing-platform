@@ -1460,6 +1460,7 @@ function buildPrePublishGatePmFocus(
 
 export function buildPrePublishGateFocusNotice(input: {
   focus?: string | null;
+  projectId?: string | null;
   gate: PrePublishGate;
 }): PrePublishGateFocusNotice {
   if (input.focus !== "first-day-complete") {
@@ -1480,17 +1481,22 @@ export function buildPrePublishGateFocusNotice(input: {
     && /首日|观察闸门|交接证据/u.test(taskQueueItem.detail);
   const primary = input.gate.releaseAction ?? input.gate.priorityActions[0] ?? null;
   const smallBatchAction = input.gate.priorityActions.find((action) => action.execution?.type === "recommended_batch") ?? null;
+  const targetProject = input.projectId
+    ? input.gate.projectStatuses.find((project) => project.projectId === input.projectId) ?? null
+    : null;
+  const targetLead = targetProject ? `${targetProject.projectTitle} · ` : "";
+  const targetBadges = targetProject ? [`作品：${targetProject.projectTitle}`] : [];
 
   if (firstDayStillBlocked) {
     return {
       visible: true,
       tone: "blocked",
       headline: "首日放行仍被阻塞",
-      detail: `${taskQueueItem?.detail ?? "首日链路还没有完全通过总闸门。"} ${primary?.detail ?? "先补齐首日证据，再回到这里复查放行。"}`,
+      detail: `${targetLead}${taskQueueItem?.detail ?? "首日链路还没有完全通过总闸门。"} ${primary?.detail ?? "先补齐首日证据，再回到这里复查放行。"}`,
       primaryLabel: primary?.label ?? taskQueueItem?.actionLabel ?? "查看首日阻塞",
       primaryHref: primary?.href ?? taskQueueItem?.href ?? "/tasks",
       primaryAction: null,
-      badges: ["首日闸门未放行", "先补首日证据", "禁止直接批量"],
+      badges: [...targetBadges, "首日闸门未放行", "先补首日证据", "禁止直接批量"],
     };
   }
 
@@ -1499,11 +1505,11 @@ export function buildPrePublishGateFocusNotice(input: {
       visible: true,
       tone: "ready",
       headline: "首日链路已放行，可以执行小批生产",
-      detail: `首日派单已收口，先跑推荐小批验证质量、成本和路线稳定性。${smallBatchAction.detail}`,
+      detail: `${targetLead}首日派单已收口，先跑推荐小批验证质量、成本和路线稳定性。${smallBatchAction.detail}`,
       primaryLabel: smallBatchAction.label,
       primaryHref: smallBatchAction.href,
       primaryAction: smallBatchAction,
-      badges: ["首日链路通过", "一键小批生产", "执行后回总闸门复盘"],
+      badges: [...targetBadges, "首日链路通过", "一键小批生产", "执行后回总闸门复盘"],
     };
   }
 
@@ -1512,11 +1518,11 @@ export function buildPrePublishGateFocusNotice(input: {
       visible: true,
       tone: "ready",
       headline: "首日链路已放行",
-      detail: `首日派单已收口，总闸门当前可放行。${primary?.detail ? `下一步：${primary.detail}` : "可以进入平台包导出、批量生产或发布复盘。"}`,
+      detail: `${targetLead}首日派单已收口，总闸门当前可放行。${primary?.detail ? `下一步：${primary.detail}` : "可以进入平台包导出、批量生产或发布复盘。"}`,
       primaryLabel: primary?.label ?? "进入发布闭环",
       primaryHref: primary?.href ?? "#gate-export-package",
       primaryAction: null,
-      badges: ["首日链路通过", "总闸门可放行", "进入批量前复查完成"],
+      badges: [...targetBadges, "首日链路通过", "总闸门可放行", "进入批量前复查完成"],
     };
   }
 
@@ -1524,11 +1530,11 @@ export function buildPrePublishGateFocusNotice(input: {
     visible: true,
     tone: "review",
     headline: "首日链路已收口，仍需处理总闸门",
-    detail: `首日派单已完成，但总闸门还有发布包、失败任务或批量策略提醒。${primary?.detail ? `优先处理：${primary.detail}` : input.gate.verdict}`,
+    detail: `${targetLead}首日派单已完成，但总闸门还有发布包、失败任务或批量策略提醒。${primary?.detail ? `优先处理：${primary.detail}` : input.gate.verdict}`,
     primaryLabel: primary?.label ?? "查看优先动作",
     primaryHref: primary?.href ?? "/gate",
     primaryAction: null,
-    badges: ["首日派单完成", "总闸门仍需复查", "处理后再放量"],
+    badges: [...targetBadges, "首日派单完成", "总闸门仍需复查", "处理后再放量"],
   };
 }
 

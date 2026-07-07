@@ -191,6 +191,7 @@ test("buildPrePublishGate", async (t) => {
     });
     const notice = buildPrePublishGateFocusNotice({
       focus: "first-day-complete",
+      projectId: "project-ready",
       gate,
     });
 
@@ -201,6 +202,8 @@ test("buildPrePublishGate", async (t) => {
     assert.equal(notice.primaryLabel, "进入发布闭环");
     assert.equal(notice.primaryHref, "#gate-export-package");
     assert.ok(notice.badges.includes("首日链路通过"));
+    assert.ok(notice.badges.includes("作品：夜雨系统"));
+    assert.ok(notice.detail.includes("夜雨系统"));
   });
 
   await t.test("focuses first-day completion on executable small-batch production", () => {

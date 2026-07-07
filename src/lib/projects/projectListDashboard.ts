@@ -180,7 +180,13 @@ function average(values: number[]) {
   return values.reduce((sum, value) => sum + value, 0) / values.length;
 }
 
-const firstDayCompleteGateHref = "/gate?focus=first-day-complete";
+function firstDayCompleteGateHref(projectId: string) {
+  const params = new URLSearchParams({
+    focus: "first-day-complete",
+    projectId,
+  });
+  return `/gate?${params.toString()}`;
+}
 
 function healthLabel(score: number): ProjectListItem["healthLabel"] {
   if (score >= 75) return "可推进";
@@ -337,7 +343,7 @@ function buildProjectPipelineProof(input: {
       evidence: input.continuationStatus === "ready" || input.continuationStatus === "complete"
         ? "首日链路可进入总闸门复查。"
         : "缺样本、复查或交接证据时不允许放量。",
-      href: hasAcceptedDispatch ? firstDayCompleteGateHref : "/gate",
+      href: hasAcceptedDispatch ? firstDayCompleteGateHref(input.project.id) : "/gate",
     },
     {
       id: "failure_repair",
@@ -514,7 +520,7 @@ function buildRealSampleValidation(input: {
       completedEvidence,
       missingEvidence,
       nextActionLabel: "去总闸门",
-      nextActionHref: firstDayCompleteGateHref,
+      nextActionHref: firstDayCompleteGateHref(input.project.id),
     };
   }
 

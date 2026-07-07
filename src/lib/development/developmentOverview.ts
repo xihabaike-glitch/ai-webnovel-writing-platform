@@ -108,6 +108,28 @@ export interface DevelopmentOverviewCurrentPipelineValidation {
   actionLabel: string;
 }
 
+export interface DevelopmentOverviewRequirementTraceItem {
+  id:
+    | "reference_30"
+    | "platform_8"
+    | "length_modes"
+    | "tree_method"
+    | "model_interfaces"
+    | "role_dispatch"
+    | "tomato_style"
+    | "pipeline_validation";
+  originalRequest: string;
+  currentEvidence: string;
+  acceptanceSignal: string;
+  href: string;
+}
+
+export interface DevelopmentOverviewRequirementTraceability {
+  headline: string;
+  pmRule: string;
+  items: DevelopmentOverviewRequirementTraceItem[];
+}
+
 export interface DevelopmentOverview {
   referenceCount: number;
   platformScope: typeof platformDeliveryScope;
@@ -128,6 +150,7 @@ export interface DevelopmentOverview {
   deliveryAudit: DevelopmentOverviewDeliveryAudit;
   pipelineProofRoute: DevelopmentOverviewPipelineProofRoute;
   currentPipelineValidation: DevelopmentOverviewCurrentPipelineValidation;
+  requirementTraceability: DevelopmentOverviewRequirementTraceability;
   nextActions: DevelopmentOverviewAction[];
 }
 
@@ -482,6 +505,71 @@ function buildCurrentPipelineValidation(): DevelopmentOverviewCurrentPipelineVal
   };
 }
 
+function buildRequirementTraceability(): DevelopmentOverviewRequirementTraceability {
+  return {
+    headline: "原始需求追踪矩阵",
+    pmRule: "逐条对照原始要求、当前产品证据和可验收信号；没有证据的要求不能靠口头说完成。",
+    items: [
+      {
+        id: "reference_30",
+        originalRequest: "从 GitHub 和技能网站筛选至少 30 个 AI 写作、知识库、工作流和发布案例作为参考。",
+        currentEvidence: `${openSourceReferenceCases.length} 个开源参考案例已进入参考库，且按可借鉴动作拆成开发路线。`,
+        acceptanceSignal: "参考库能筛选案例，并能把案例转成角色分工、写作流程或平台发布动作。",
+        href: "/references",
+      },
+      {
+        id: "platform_8",
+        originalRequest: "国内覆盖起点、番茄、七猫、晋江、知乎盐选；海外覆盖 WebNovel、Royal Road、Wattpad。",
+        currentEvidence: `${platformDeliveryScope.statusLabel}，${platformDeliveryScope.expansionLabel}，当前不再扩剩余平台。`,
+        acceptanceSignal: "8 个核心平台都有写作风格、投稿包装、复盘指标和下一步执行卡。",
+        href: "/references",
+      },
+      {
+        id: "length_modes",
+        originalRequest: "支持一万字左右短篇、5-6 万字中篇，以及长篇和超长篇网文规划。",
+        currentEvidence: "篇幅模板已覆盖 short_10k、mid_50k、long_300k_plus、mega_1m_plus，并绑定平台默认篇幅。",
+        acceptanceSignal: "作品创建后能按篇幅影响章节数量、首章钩子、发布包和长线结构验收。",
+        href: "/projects",
+      },
+      {
+        id: "tree_method",
+        originalRequest: "按大树结构写作：先开头和结尾，再主干、分支，叶片和土壤负责内容填充。",
+        currentEvidence: "开发文档和作品工作台都保留开头、结尾、主干、分支、叶片、土壤六步。",
+        acceptanceSignal: "开头、结尾、主干、分支、叶片、土壤都有可编辑入口、PM 规则和章节生产用途。",
+        href: "/docs",
+      },
+      {
+        id: "model_interfaces",
+        originalRequest: "对接 Claude、DeepSeek、Kimi、GPT 等模型，并预留对应接口。",
+        currentEvidence: "Claude、DeepSeek、Kimi、GPT 已进入模型岗位矩阵，分别承担结构、正文、长上下文和海外包装。",
+        acceptanceSignal: "模型设置页能解释首选模型、备用模型、任务分工、失败替代和复检入口。",
+        href: "/settings/models#model-role-matrix",
+      },
+      {
+        id: "role_dispatch",
+        originalRequest: "把不同角色分配到不同 Skill 或模型岗位，服务策划、正文、资料、海外包装和复盘。",
+        currentEvidence: "派单中心、任务中心和参考库已把毒舌 PM、结构主编、中文写手、资料官、海外包装编辑拆成执行角色。",
+        acceptanceSignal: "每个任务回执都能看到执行角色、输入输出、验收证据和下一步入口。",
+        href: "/dispatch",
+      },
+      {
+        id: "tomato_style",
+        originalRequest: "内容风格要符合番茄等平台，同时覆盖国内和海外平台差异。",
+        currentEvidence: "平台写作模板已覆盖国内快读、付费长线、知乎短篇、海外英文连载和平台包装规则。",
+        acceptanceSignal: "章节卡、审稿、二改和发布包能按目标平台调整钩子、爽点、节奏、标签和简介。",
+        href: "/references",
+      },
+      {
+        id: "pipeline_validation",
+        originalRequest: "按照毒舌产品经理路径继续开发，让 AI 写作平台能写作、投稿、复盘，而不是只做计划。",
+        currentEvidence: "作品、任务、派单、总闸门、失败复盘、模型设置和发布包已组成真实作品流水线。",
+        acceptanceSignal: "真实作品能从开书证据跑到首章样本、审稿二改、发布包、总闸门和复盘回执。",
+        href: "/projects#pipeline-projects",
+      },
+    ],
+  };
+}
+
 export function buildDevelopmentOverview(): DevelopmentOverview {
   return {
     referenceCount: openSourceReferenceCases.length,
@@ -503,6 +591,7 @@ export function buildDevelopmentOverview(): DevelopmentOverview {
     deliveryAudit: buildDeliveryAudit(),
     pipelineProofRoute: buildPipelineProofRoute(),
     currentPipelineValidation: buildCurrentPipelineValidation(),
+    requirementTraceability: buildRequirementTraceability(),
     nextActions: [
       {
         label: "从作品工作台验收真实写作流程",

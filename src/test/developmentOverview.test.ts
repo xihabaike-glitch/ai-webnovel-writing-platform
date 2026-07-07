@@ -191,4 +191,44 @@ test("buildDevelopmentOverview", async (t) => {
     assert.ok(overview.currentPipelineValidation.requiredEvidence.some((item) => item.includes("发布包")));
     assert.ok(overview.currentPipelineValidation.stopIfMissing.some((item) => item.includes("不允许批量")));
   });
+
+  await t.test("maps original requirements to current product evidence", () => {
+    const overview = buildDevelopmentOverview();
+
+    assert.equal(overview.requirementTraceability.headline, "原始需求追踪矩阵");
+    assert.ok(overview.requirementTraceability.pmRule.includes("逐条对照"));
+    assert.deepEqual(
+      overview.requirementTraceability.items.map((item) => item.id),
+      [
+        "reference_30",
+        "platform_8",
+        "length_modes",
+        "tree_method",
+        "model_interfaces",
+        "role_dispatch",
+        "tomato_style",
+        "pipeline_validation",
+      ],
+    );
+
+    for (const item of overview.requirementTraceability.items) {
+      assert.ok(item.originalRequest.length >= 12);
+      assert.ok(item.currentEvidence.length >= 12);
+      assert.ok(item.acceptanceSignal.length >= 12);
+      assert.ok(item.href.startsWith("/"));
+      assert.notEqual(item.currentEvidence.includes("待补"), true);
+    }
+
+    const modelInterfaces = overview.requirementTraceability.items.find((item) => item.id === "model_interfaces");
+    const platformScope = overview.requirementTraceability.items.find((item) => item.id === "platform_8");
+    const treeMethod = overview.requirementTraceability.items.find((item) => item.id === "tree_method");
+
+    assert.ok(modelInterfaces?.currentEvidence.includes("Claude"));
+    assert.ok(modelInterfaces?.currentEvidence.includes("DeepSeek"));
+    assert.ok(modelInterfaces?.currentEvidence.includes("Kimi"));
+    assert.ok(modelInterfaces?.currentEvidence.includes("GPT"));
+    assert.ok(platformScope?.currentEvidence.includes("8/8"));
+    assert.ok(treeMethod?.acceptanceSignal.includes("开头"));
+    assert.ok(treeMethod?.acceptanceSignal.includes("土壤"));
+  });
 });

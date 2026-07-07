@@ -13,3 +13,12 @@ test("docs page sends validation CTAs to the real pipeline receipt", () => {
     "both the pipeline proof CTA and the observation CTA should jump to /projects#pipeline-projects",
   );
 });
+
+test("docs page renders original requirement traceability", () => {
+  assert.ok(source.includes("overview.requirementTraceability.headline"));
+  assert.ok(source.includes("overview.requirementTraceability.pmRule"));
+  assert.ok(source.includes("overview.requirementTraceability.items.map"));
+  assert.ok(source.includes("item.originalRequest"));
+  assert.ok(source.includes("item.currentEvidence"));
+  assert.ok(source.includes("item.acceptanceSignal"));
+});

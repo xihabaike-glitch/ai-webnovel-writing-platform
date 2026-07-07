@@ -1689,6 +1689,9 @@ export function PlatformExportCenterPanel({
   const multiPlatformExportSourcePrompt = exportSource === "multi-platform-package"
     ? `来自多平台投稿包，推荐先导出${selectedPackage ? ` ${selectedPackage.platformName} ` : "推荐平台"}发布包，再回填首轮真实效果。`
     : null;
+  const exportSuccessEffectPrompt = message?.includes("下一步记录真实发布效果") || message?.includes("下一步记录各平台真实效果")
+    ? "发布包已经留下版本证据，现在去记录曝光、点击、收藏、追读和编辑反馈。"
+    : null;
   const selectedAssetEditorReview = useMemo(
     () => selectedPackage
       ? buildSubmissionAssetEditorReview(selectedPackage.platformName, selectedPackage.submissionAssetAudit)
@@ -3778,6 +3781,17 @@ export function PlatformExportCenterPanel({
       ) : null}
 
       {message ? <p className="mt-3 text-sm text-slate-600">{message}</p> : null}
+      {exportSuccessEffectPrompt ? (
+        <div className="mt-3 flex flex-col gap-3 rounded-md border border-cyan-200 bg-cyan-50 p-3 text-sm sm:flex-row sm:items-center sm:justify-between">
+          <p className="leading-6 text-cyan-800">{exportSuccessEffectPrompt}</p>
+          <a
+            className="w-fit rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white"
+            href={hrefWithGateReturn("#publish-effect-panel", gateReturnHref, projectId)}
+          >
+            去记录发布效果
+          </a>
+        </div>
+      ) : null}
 
       {assetAdoptionReceipt ? (
         <div className={`mt-3 rounded-md border p-3 text-sm ${assetEditorReviewToneClass(assetAdoptionReceipt.tone)}`}>

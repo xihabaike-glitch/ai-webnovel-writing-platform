@@ -55,6 +55,11 @@ function firstThreeAdoptionCompletionEvidence(
   return `采纳后发布质检已刷新：${execution.title}${payload.message ? `，${payload.message}` : ""}。`;
 }
 
+function receiptDisplayMessage(receipt: GateActionReceipt) {
+  if (receipt.status === "failed") return receipt.message;
+  return `${receipt.message} ${receipt.recheck.detail} ${receipt.recheck.actionLabel}`;
+}
+
 export function GatePriorityActionCard({
   action,
   index,
@@ -76,7 +81,7 @@ export function GatePriorityActionCard({
         payload: { message: "已记录失败修复批次处理，刷新后确认未恢复失败是否清空。" },
         status: "succeeded",
       });
-      setMessage(receipt.message);
+      setMessage(receiptDisplayMessage(receipt));
       onReceipt?.(receipt);
       router.refresh();
       return;
@@ -121,7 +126,7 @@ export function GatePriorityActionCard({
         }
         : payload;
       const receipt = buildGateActionReceipt({ action, payload: receiptPayload, status: "succeeded" });
-      setMessage(receipt.message);
+      setMessage(receiptDisplayMessage(receipt));
       onReceipt?.(receipt);
       if (execution.type === "first_three_adoption") {
         await updatePersistedGateDispatchTaskState(execution.itemId, "completed", {
@@ -137,7 +142,7 @@ export function GatePriorityActionCard({
         status: "failed",
         fallbackError: errorMessage,
       });
-      setMessage(receipt.message);
+      setMessage(receiptDisplayMessage(receipt));
       onReceipt?.(receipt);
     } finally {
       setIsRunning(false);

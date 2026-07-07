@@ -1603,6 +1603,14 @@ function recheckHint(input: {
   }
 
   if (input.action.execution?.type === "publish_repair") {
+    if (input.action.id.startsWith("project-acceptance:")) {
+      return {
+        status: "ready",
+        label: "复检项目验收单",
+        detail: "单本作品验收单修复动作已完成，刷新总闸门后确认审稿、二改、派单回执和发布包验收是否解除阻塞。",
+        actionLabel: "刷新总闸门",
+      };
+    }
     return {
       status: "ready",
       label: "重新质检发布包",

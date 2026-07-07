@@ -762,6 +762,35 @@ test("buildGateActionReceipt", async (t) => {
     assert.ok(receipt.recheck.detail.includes("发布修复已完成"));
   });
 
+  await t.test("asks to recheck project acceptance after an acceptance repair succeeds", () => {
+    const receipt = buildGateActionReceipt({
+      action: {
+        ...action,
+        id: "project-acceptance:project-1",
+        label: "执行二改",
+        detail: "验收单缺首章二改证据。可一键修复。",
+        href: "/projects/project-1#ai-pipeline",
+        execution: {
+          type: "publish_repair",
+          projectId: "project-1",
+          kind: "run_second_pass",
+          chapterId: "chapter-1",
+          detail: "单本作品验收单缺首章二改证据。",
+        },
+      },
+      status: "succeeded",
+      now: "2026-01-01T00:00:00.000Z",
+      payload: { message: "二改任务已完成。" },
+    });
+
+    assert.equal(receipt.executionType, "publish_repair");
+    assert.equal(receipt.recheck.status, "ready");
+    assert.equal(receipt.recheck.label, "复检项目验收单");
+    assert.ok(receipt.recheck.detail.includes("单本作品验收单"));
+    assert.ok(receipt.recheck.detail.includes("刷新总闸门"));
+    assert.equal(receipt.recheck.actionLabel, "刷新总闸门");
+  });
+
   await t.test("trims receipts by latest created time", () => {
     const receipts = Array.from({ length: 10 }, (_, index) => buildGateActionReceipt({
       action,

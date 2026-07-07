@@ -450,7 +450,15 @@ test("buildPrePublishGate", async (t) => {
     assert.equal(notice.recheckSummary?.remainingBlockers[0]?.label, "审稿");
     assert.equal(notice.recheckSummary?.remainingBlockers[0]?.priorityLabel, "优先处理");
     assert.equal(notice.recheckSummary?.remainingBlockers[0]?.status, "current");
+    assert.equal(notice.recheckSummary?.remainingBlockers[0]?.actionLabel, "处理审稿");
+    assert.equal(notice.recheckSummary?.remainingBlockers[0]?.href, "/projects/project-recheck-blockers#ai-pipeline");
     assert.ok(notice.recheckSummary?.remainingBlockers[0]?.evidence.includes("首章还缺审稿成功记录"));
+    assert.equal(notice.recheckSummary?.remainingBlockers.find((item) => item.label === "二改")?.href, "/projects/project-recheck-blockers#ai-pipeline");
+    assert.equal(
+      notice.recheckSummary?.remainingBlockers.find((item) => item.label === "派单回执")?.href,
+      "/dispatch?firstDayProject=project-recheck-blockers&step=publish-precheck#first-day-dispatch",
+    );
+    assert.equal(notice.recheckSummary?.remainingBlockers.find((item) => item.label === "发布包")?.href, "/projects/project-recheck-blockers#platform-export");
     assert.deepEqual(
       notice.recheckSummary?.remainingBlockers.slice(1).map((item) => item.priorityLabel),
       ["后续卡点", "后续卡点", "后续卡点"],

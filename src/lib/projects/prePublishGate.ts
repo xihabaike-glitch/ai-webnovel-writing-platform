@@ -502,6 +502,7 @@ export interface PrePublishGateRemainingBlocker {
   label: string;
   status: ProjectAcceptanceStep["status"];
   priorityLabel: "优先处理" | "后续卡点";
+  actionLabel: string;
   evidence: string;
   stopRule: string;
   href: string;
@@ -1663,6 +1664,7 @@ function projectAcceptanceRecheckProjectId(actionId: string | null | undefined) 
 }
 
 function buildProjectAcceptanceRemainingBlockers(
+  projectId: string,
   steps: ProjectAcceptanceStep[],
 ): PrePublishGateRemainingBlocker[] {
   return steps
@@ -1676,9 +1678,10 @@ function buildProjectAcceptanceRemainingBlockers(
       label: step.label,
       status: step.status,
       priorityLabel: step.status === "current" ? "优先处理" : "后续卡点",
+      actionLabel: `处理${step.label}`,
       evidence: step.evidence,
       stopRule: step.stopRule,
-      href: step.href,
+      href: acceptanceActionHref(projectId, step.id, step.href),
     }));
 }
 
@@ -1694,7 +1697,7 @@ function buildProjectAcceptanceRecheckSummary(
   const steps = project.acceptanceSheetGate.steps;
   const currentStep = steps.find((step) => step.id === project.acceptanceSheetGate.currentStepId) ?? steps[0] ?? null;
   const completedSteps = steps.filter((step) => step.status === "done").length;
-  const remainingBlockers = buildProjectAcceptanceRemainingBlockers(steps);
+  const remainingBlockers = buildProjectAcceptanceRemainingBlockers(project.projectId, steps);
 
   return {
     title: `${project.projectTitle} · 项目验收单回填`,

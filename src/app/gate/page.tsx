@@ -362,10 +362,11 @@ export default async function GatePage({
                       <div className="font-medium text-slate-700">剩余卡点</div>
                       <div className="mt-1 grid gap-1">
                         {focusNotice.recheckSummary.remainingBlockers.slice(0, 3).map((blocker) => (
-                          <div className={`rounded-md border px-2 py-1 ${recheckBlockerTone(blocker.priorityLabel)}`} key={`${blocker.priorityLabel}-${blocker.label}`}>
+                          <Link className={`rounded-md border px-2 py-1 ${recheckBlockerTone(blocker.priorityLabel)}`} href={blocker.href} key={`${blocker.priorityLabel}-${blocker.label}`}>
                             <span className="font-medium">{blocker.priorityLabel}</span>
                             <span className="ml-1">{blocker.label}：{blocker.evidence}</span>
-                          </div>
+                            <span className="ml-2 font-medium underline underline-offset-2">{blocker.actionLabel}</span>
+                          </Link>
                         ))}
                       </div>
                     </div>

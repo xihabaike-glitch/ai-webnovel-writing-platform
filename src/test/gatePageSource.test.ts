@@ -33,6 +33,8 @@ test("gate page labels prioritized remaining blockers", () => {
   assert.ok(source.includes("focusNotice.recheckSummary.remainingBlockers"));
   assert.ok(source.includes("blocker.priorityLabel"));
   assert.ok(source.includes("blocker.evidence"));
+  assert.ok(source.includes("href={blocker.href}"));
+  assert.ok(source.includes("blocker.actionLabel"));
 });
 
 test("gate page renders project acceptance sheet blockers", () => {

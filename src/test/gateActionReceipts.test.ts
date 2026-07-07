@@ -5546,6 +5546,32 @@ test("buildGateActionReceipt", async (t) => {
     assert.equal(receipt.recheck.label, "采纳投稿方案并复检");
   });
 
+  await t.test("records platform strategy rewrite task ids from result tasks", () => {
+    const receipt = buildGatePlatformStrategyReceipt({
+      item: {
+        ...strategyPlatform,
+        recommendation: "repair",
+        actionType: "rewrite_first_three",
+        label: "先修再投",
+        actionLabel: "重写前三章",
+      },
+      status: "succeeded",
+      now: "2026-01-01T00:00:00.000Z",
+      payload: {
+        results: [
+          { task: { id: "rewrite-task-1", status: "succeeded" } },
+          { task: { id: "rewrite-task-2", status: "succeeded" } },
+        ],
+      },
+    });
+
+    assert.equal(receipt.executionType, "platform_strategy");
+    assert.equal(receipt.actionId, "platform-strategy:fanqie:rewrite_first_three");
+    assert.equal(receipt.succeededCount, 2);
+    assert.equal(receipt.taskId, "rewrite-task-1");
+    assert.equal(receipt.recheck.label, "复检前三章与发布包");
+  });
+
   await t.test("keeps platform strategy failures actionable", () => {
     const receipt = buildGatePlatformStrategyReceipt({
       item: {

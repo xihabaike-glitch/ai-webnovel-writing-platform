@@ -1370,6 +1370,23 @@ export interface GatePlatformStrategyReceiptPayload {
   };
 }
 
+function gatePlatformStrategyPayloadTaskId(payload: GatePlatformStrategyReceiptPayload) {
+  if (payload.task?.id) return payload.task.id;
+
+  for (const result of payload.results ?? []) {
+    if (!result || typeof result !== "object") continue;
+    const record = result as Record<string, unknown>;
+    if (typeof record.taskId === "string" && record.taskId) return record.taskId;
+    const task = record.task;
+    if (task && typeof task === "object") {
+      const taskRecord = task as Record<string, unknown>;
+      if (typeof taskRecord.id === "string" && taskRecord.id) return taskRecord.id;
+    }
+  }
+
+  return null;
+}
+
 export interface GatePublishEffectReceiptMetric {
   views: number;
   clicks: number;
@@ -2429,7 +2446,7 @@ export function buildGatePlatformStrategyReceipt(input: {
     executionType: "platform_strategy",
     succeededCount,
     failedCount: input.status === "failed" ? 1 : 0,
-    taskId: payload.task?.id ?? null,
+    taskId: gatePlatformStrategyPayloadTaskId(payload),
     platformId: input.item.platformId,
     platformName: input.item.platformName,
     recheck: strategyRecheckHint({

@@ -92,6 +92,19 @@ function valueAfterLabel(label: string, text: string) {
 }
 
 function editorFeedback(text: string) {
+  if (/样本轮次\s*[：:=]?\s*恢复一轮小样本|恢复依据\s*[：:=]|对照口径\s*[：:=]/u.test(text)) {
+    const summary = [
+      ["样本轮次", valueAfterLabel("样本轮次", text)],
+      ["恢复依据", valueAfterLabel("恢复依据", text)],
+      ["对照口径", valueAfterLabel("对照口径", text)],
+      ["平台反馈", valueAfterLabel("平台反馈", text)],
+      ["结论", valueAfterLabel("结论", text)],
+    ]
+      .filter(([, value]) => value)
+      .map(([label, value]) => `${label}：${value}`)
+      .join("；");
+    if (summary) return summary.slice(0, 240);
+  }
   if (/暂停原因\s*[：:=]|恢复条件\s*[：:=]|复盘结论\s*[：:=]/u.test(text)) {
     const summary = [
       ["暂停原因", valueAfterLabel("暂停原因", text)],

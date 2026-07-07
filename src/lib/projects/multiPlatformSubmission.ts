@@ -387,6 +387,16 @@ function pauseRecoveryConclusion(metric: MultiPlatformPublishMetricInput) {
   return /复盘结论\s*[：:=]?\s*恢复一轮小样本|恢复条件\s*[：:=]?.*恢复一轮小样本|恢复条件\s*[：:=]?.*只恢复一轮小样本/u.test(text);
 }
 
+function resumedSampleConclusion(metric: MultiPlatformPublishMetricInput): "watch" | "repair" | "pause" | null {
+  const text = `${metric.editorFeedback} ${metric.notes}`;
+  const isRecoverySample = /样本轮次\s*[：:=]?\s*恢复一轮小样本|恢复一轮小样本|恢复依据\s*[：:=]|对照口径\s*[：:=]/u.test(text);
+  if (!isRecoverySample) return null;
+  if (/结论\s*[：:=]?\s*(?:继续暂停|暂停|停止|放弃)|继续暂停/u.test(text)) return "pause";
+  if (/结论\s*[：:=]?\s*(?:回到修包装|修包装|返修|重修)|回到修包装/u.test(text)) return "repair";
+  if (/结论\s*[：:=]?\s*(?:继续观察|通过|可继续)|恢复样本通过/u.test(text)) return "watch";
+  return null;
+}
+
 function buildEffectTracking(platform: PlatformProfile, metrics: MultiPlatformPublishMetricInput[]): MultiPlatformEffectTracking {
   const history = metrics
     .filter((metric) => metric.platformId === platform.id)
@@ -426,6 +436,7 @@ function buildEffectTracking(platform: PlatformProfile, metrics: MultiPlatformPu
   const completedRepairPackage = hasCompletedRepairPackageEvidence(latest);
   const retestConclusion = secondRoundRetestConclusion(latest);
   const recoveredFromPause = pauseRecoveryConclusion(latest);
+  const recoverySampleConclusion = resumedSampleConclusion(latest);
   const trackingEvidence = completedRepairPackage
     ? [...evidence, "修复包已完成：等待第二轮小样本重验标题、简介、标签和前三章兑现。"]
     : evidence;
@@ -475,6 +486,70 @@ function buildEffectTracking(platform: PlatformProfile, metrics: MultiPlatformPu
       nextAction: "暂停复盘允许恢复一轮小样本；只回填恢复样本数据，不恢复常规投放。",
       repairFocus: [],
       evidence: [...trackingEvidence, "暂停复盘结论：恢复一轮小样本"],
+    };
+  }
+
+  if (recoverySampleConclusion === "pause") {
+    return {
+      status: "paused",
+      label: "继续暂停",
+      records: history.length,
+      latestSnapshotDate: new Date(latest.snapshotDate).toISOString(),
+      views: latest.views,
+      clicks: latest.clicks,
+      favorites: latest.favorites,
+      follows: latest.follows,
+      comments: latest.comments,
+      paidReads: latest.paidReads,
+      clickRatePercent,
+      favoriteRatePercent,
+      followRatePercent,
+      nextAction: "恢复小样本仍未过线，继续暂停该平台；不要恢复常规投放。",
+      repairFocus: [],
+      evidence: [...trackingEvidence, "恢复小样本结论：继续暂停"],
+    };
+  }
+
+  if (recoverySampleConclusion === "repair") {
+    const recoveryRepairFocus = "恢复小样本未通过：回到标题、简介、标签和前三章兑现修包装。";
+    return {
+      status: "weak",
+      label: "偏弱",
+      records: history.length,
+      latestSnapshotDate: new Date(latest.snapshotDate).toISOString(),
+      views: latest.views,
+      clicks: latest.clicks,
+      favorites: latest.favorites,
+      follows: latest.follows,
+      comments: latest.comments,
+      paidReads: latest.paidReads,
+      clickRatePercent,
+      favoriteRatePercent,
+      followRatePercent,
+      nextAction: "恢复小样本要求回到修包装；先修入口承诺，再决定是否再试。",
+      repairFocus: [...new Set([recoveryRepairFocus, ...repairFocus])],
+      evidence: [...trackingEvidence, "恢复小样本结论：回到修包装"],
+    };
+  }
+
+  if (recoverySampleConclusion === "watch") {
+    return {
+      status: "watch",
+      label: "恢复观察",
+      records: history.length,
+      latestSnapshotDate: new Date(latest.snapshotDate).toISOString(),
+      views: latest.views,
+      clicks: latest.clicks,
+      favorites: latest.favorites,
+      follows: latest.follows,
+      comments: latest.comments,
+      paidReads: latest.paidReads,
+      clickRatePercent,
+      favoriteRatePercent,
+      followRatePercent,
+      nextAction: "恢复小样本继续观察一轮；只收数据，不恢复常规投放。",
+      repairFocus: [],
+      evidence: [...trackingEvidence, "恢复小样本结论：继续观察"],
     };
   }
 
@@ -644,13 +719,18 @@ function buildDecision(
   }
 
   if (effectTracking.status === "paused") {
+    const recoveredPause = effectTracking.evidence.some((item) => item.includes("恢复小样本结论：继续暂停"));
     return {
       kind: "pause",
       label: decisionLabel("pause"),
       priority: "low",
       score: clampScore(fitScore - 30),
-      reason: `${platform.name} 二轮小样本复检已给出暂停结论，继续投入会消耗注意力。`,
-      nextAction: "暂停该平台，不再投第三轮；等主平台或相邻平台跑出稳定数据后再复盘。",
+      reason: recoveredPause
+        ? `${platform.name} 恢复小样本仍要求继续暂停，继续投入会消耗注意力。`
+        : `${platform.name} 二轮小样本复检已给出暂停结论，继续投入会消耗注意力。`,
+      nextAction: recoveredPause
+        ? "继续暂停该平台，不恢复常规投放；等主平台出现更强对照后再复盘。"
+        : "暂停该平台，不再投第三轮；等主平台或相邻平台跑出稳定数据后再复盘。",
       actionHref: "#publish-effect-panel",
       evidence: effectTracking.evidence,
     };

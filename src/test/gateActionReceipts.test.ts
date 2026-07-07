@@ -5278,6 +5278,12 @@ test("buildGateActionReceipt", async (t) => {
       title: "七猫小说 修复包二轮小样本复检",
       evidence: ["修复包已完成：等待第二轮小样本重验标题、简介、标签和前三章兑现。"],
     };
+    const pauseRecoveryMetricTask = {
+      ...metricTask,
+      stage: "record_metrics" as const,
+      title: "Wattpad 恢复小样本回填",
+      evidence: ["暂停复盘结论：恢复一轮小样本"],
+    };
     const repairRetestTemplate = buildGateDispatchCompletionTemplate(repairRetestMetricTask);
     assert.ok(repairRetestTemplate.includes("样本轮次：第二轮小样本"));
     assert.ok(repairRetestTemplate.includes("验证变量：标题、简介、标签、前三章兑现"));
@@ -5304,6 +5310,28 @@ test("buildGateActionReceipt", async (t) => {
       "追读：31",
       "结论：继续观察",
     ].join("\n"))?.includes("样本轮次"));
+
+    const pauseRecoveryTemplate = buildGateDispatchCompletionTemplate(pauseRecoveryMetricTask);
+    assert.ok(pauseRecoveryTemplate.includes("样本轮次：恢复一轮小样本"));
+    assert.ok(pauseRecoveryTemplate.includes("恢复依据"));
+    assert.equal(reviewGateDispatchCompletionEvidence(pauseRecoveryMetricTask, [
+      "Wattpad 恢复小样本回填",
+      "样本轮次：恢复一轮小样本",
+      "恢复依据：番茄小说有效标题和前三章兑现",
+      "对照口径：暂停前二轮小样本 / 参照平台正反馈",
+      "日期：2026-07-07",
+      "曝光：2000",
+      "点击：120",
+      "收藏：42",
+      "追读：16",
+      "平台反馈：恢复样本继续观察",
+      "结论：继续观察",
+    ].join("\n")), null);
+    assert.ok(reviewGateDispatchCompletionEvidence(pauseRecoveryMetricTask, [
+      "Wattpad 恢复小样本回填",
+      "样本轮次：恢复一轮小样本",
+      "结论：继续观察",
+    ].join("\n"))?.includes("真实数据"));
 
     assert.ok(buildGateDispatchCompletionTemplate(packageTask).includes("基准版本"));
     assert.ok(reviewGateDispatchCompletionEvidence(packageTask, [

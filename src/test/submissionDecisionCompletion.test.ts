@@ -137,6 +137,37 @@ test("submission decision completion effect", async (t) => {
     assert.equal(effect.review.status, "watch");
   });
 
+  await t.test("preserves resumed sample metric conclusion for platform decisions", () => {
+    const effect = buildSubmissionDecisionCompletionEffect({
+      projectId: "project-1",
+      platformId: "wattpad",
+      platformName: "Wattpad",
+      dispatchKey: "submission-decision:project-1:wattpad:watch",
+      stage: "record_metrics",
+      completedAt: "2026-01-11T10:00:00.000Z",
+      completionEvidence: [
+        "Wattpad 恢复小样本回填",
+        "样本轮次：恢复一轮小样本",
+        "恢复依据：番茄小说有效标题和前三章兑现",
+        "对照口径：暂停前二轮小样本 / 参照平台正反馈",
+        "日期：2026-01-11",
+        "曝光：2000",
+        "点击：80",
+        "收藏：20",
+        "追读：5",
+        "平台反馈：恢复样本仍未站稳",
+        "结论：继续暂停",
+      ].join("\n"),
+    });
+
+    assert.ok(effect);
+    assert.equal(effect.views, 2000);
+    assert.ok(effect.editorFeedback.includes("样本轮次：恢复一轮小样本"));
+    assert.ok(effect.editorFeedback.includes("恢复依据：番茄小说有效标题和前三章兑现"));
+    assert.ok(effect.editorFeedback.includes("对照口径：暂停前二轮小样本 / 参照平台正反馈"));
+    assert.ok(effect.editorFeedback.includes("结论：继续暂停"));
+  });
+
   await t.test("ignores ordinary completion text without effect signals", () => {
     const effect = buildSubmissionDecisionCompletionEffect({
       projectId: "project-1",

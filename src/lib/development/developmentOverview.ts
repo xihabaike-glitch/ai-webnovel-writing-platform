@@ -565,7 +565,7 @@ function buildRequirementTraceability(): DevelopmentOverviewRequirementTraceabil
         originalRequest: "把不同角色分配到不同 Skill 或模型岗位，服务策划、正文、资料、海外包装和复盘。",
         currentEvidence: "派单中心、任务中心和参考库已把毒舌 PM、结构主编、中文写手、资料官、海外包装编辑拆成执行角色。",
         acceptanceSignal: "每个任务回执都能看到执行角色、输入输出、验收证据和下一步入口。",
-        href: "/dispatch",
+        href: "/dispatch#dispatch-task-center",
       },
       {
         id: "tomato_style",

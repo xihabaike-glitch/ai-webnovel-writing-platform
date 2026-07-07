@@ -410,22 +410,24 @@ export default async function DispatchPage({
           </div>
         </section>
       ) : null}
-      <GateDispatchTaskCenter
-        initialFirstDayFocus={{
-          dispatchKey: focusDispatchKey,
-          projectId: firstDayProjectId,
-          stepId: firstDayStepId,
-          source: firstDaySource,
-          gaps: firstDayGaps,
-        }}
-        initialReceipts={receiptItems}
-        initialTasks={mergedTasks}
-        initialCompletionSuggestions={completionEvidenceSuggestions}
-        initialRealSampleMissingDispatch={realSampleMissingDispatch}
-        routeConfirmationDispatchFlow={routeConfirmationDispatchFlow}
-        initialQueueFilter={initialQueueFilter}
-        gateReturnHref={gateReturn}
-      />
+      <section id="dispatch-task-center">
+        <GateDispatchTaskCenter
+          initialFirstDayFocus={{
+            dispatchKey: focusDispatchKey,
+            projectId: firstDayProjectId,
+            stepId: firstDayStepId,
+            source: firstDaySource,
+            gaps: firstDayGaps,
+          }}
+          initialReceipts={receiptItems}
+          initialTasks={mergedTasks}
+          initialCompletionSuggestions={completionEvidenceSuggestions}
+          initialRealSampleMissingDispatch={realSampleMissingDispatch}
+          routeConfirmationDispatchFlow={routeConfirmationDispatchFlow}
+          initialQueueFilter={initialQueueFilter}
+          gateReturnHref={gateReturn}
+        />
+      </section>
     </AppShell>
   );
 }

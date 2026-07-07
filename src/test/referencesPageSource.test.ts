@@ -14,3 +14,10 @@ test("references page exposes a development path anchor for requirement evidence
   assert.ok(source.includes("id=\"development-path\""));
   assert.ok(source.includes("毒舌 PM 开发路径"));
 });
+
+test("references page renders role skill execution briefs", () => {
+  assert.ok(source.includes("Skill 执行口径"));
+  assert.ok(source.includes("role.skillBrief.trigger"));
+  assert.ok(source.includes("role.skillBrief.steps.map"));
+  assert.ok(source.includes("role.skillBrief.acceptance"));
+});

@@ -290,6 +290,18 @@ export default async function ReferencesPage({ searchParams }: ReferencesPagePro
                   <div className="text-xs font-medium text-slate-500">产物</div>
                   <p className="mt-1 leading-6 text-slate-700">{role.outputs.join("、")}</p>
                 </div>
+                <div className="rounded-md border border-slate-200 bg-white p-3">
+                  <div className="text-xs font-medium text-slate-500">Skill 执行口径</div>
+                  <p className="mt-1 leading-6 text-slate-700">{role.skillBrief.trigger}</p>
+                  <div className="mt-2 grid gap-1">
+                    {role.skillBrief.steps.map((step) => (
+                      <div className="rounded-md bg-slate-50 px-2 py-1 text-xs leading-5 text-slate-600" key={step}>
+                        {step}
+                      </div>
+                    ))}
+                  </div>
+                  <p className="mt-2 text-xs leading-5 text-slate-500">验收：{role.skillBrief.acceptance}</p>
+                </div>
                 <div>
                   <div className="text-xs font-medium text-slate-500">参考案例</div>
                   <p className="mt-1 leading-6 text-slate-700">{role.referenceCaseIds.join("、")}</p>

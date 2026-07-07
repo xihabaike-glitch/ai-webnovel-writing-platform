@@ -121,6 +121,11 @@ export interface ReferenceCaseRolePlaybookItem {
   whenToUse: string;
   inputs: string[];
   outputs: string[];
+  skillBrief: {
+    trigger: string;
+    steps: string[];
+    acceptance: string;
+  };
   referenceCaseIds: string[];
   workflowHref: string;
   workflowActionLabel: string;
@@ -503,6 +508,11 @@ export function buildReferenceCaseRolePlaybook(): ReferenceCaseRolePlaybookItem[
       whenToUse: "开书前、阶段复盘和功能取舍时使用，负责把炫技想法压回可交付闭环。",
       inputs: ["用户目标", "平台范围", "30 个参考案例", "当前项目指标"],
       outputs: ["优先级判断", "下一步开发动作", "风险提醒", "验收口径"],
+      skillBrief: {
+        trigger: "当需求发散、平台范围膨胀或页面只剩漂亮展示时启动。",
+        steps: ["先砍掉不服务写作闭环的功能", "把下一步绑定到可验证产物", "写清验收证据和失败退回条件"],
+        acceptance: "每次结论都必须说明谁执行、产物在哪里、缺什么证据就不放行。",
+      },
       referenceCaseIds: ["autogen", "crewai", "dify"],
       workflowHref: "/gate",
       workflowActionLabel: "进入总闸门",
@@ -516,6 +526,11 @@ export function buildReferenceCaseRolePlaybook(): ReferenceCaseRolePlaybookItem[
       whenToUse: "设计开头结尾、主干支线、人物弧光和伏笔回收时使用。",
       inputs: ["大纲树", "人物卡", "伏笔线", "历史章节"],
       outputs: ["人物弧光审校", "主线支线诊断", "前三章结构复审", "结尾回收清单"],
+      skillBrief: {
+        trigger: "当开头钩子、结尾回收、人物弧光或主线支线没有互相咬住时启动。",
+        steps: ["先审开头和结尾是否构成承诺与回收", "再检查主干、分支、伏笔和人物变化是否能支撑篇幅", "把诊断落到前三章改写或结构修复任务"],
+        acceptance: "必须输出可回写的大纲节点、人物弧光风险和下一章/前三章修订动作。",
+      },
       referenceCaseIds: ["novelwriter", "bibisco", "manuskript", "langchain"],
       workflowHref: "/projects#story-structure",
       workflowActionLabel: "进入结构诊断",
@@ -529,6 +544,11 @@ export function buildReferenceCaseRolePlaybook(): ReferenceCaseRolePlaybookItem[
       whenToUse: "章节初稿、小样本试写、爽点补强和中文节奏改写时使用。",
       inputs: ["章节卡", "平台土壤", "人物当前状态", "上一章悬念"],
       outputs: ["章节初稿", "开头钩子候选", "爽点补强段落", "二改候选稿"],
+      skillBrief: {
+        trigger: "当章节卡已齐、需要生成章节小样本或补强网文节奏时启动。",
+        steps: ["先按平台土壤写 1 章样本", "每 300-500 字推进目标、冲突或爽点", "输出候选稿并等待审稿和人工采用"],
+        acceptance: "章节不得直接覆盖正文，必须经过审稿、二改或人工采用后才能进入生产批量。",
+      },
       referenceCaseIds: ["wavemaker", "writer", "flowise"],
       workflowHref: "/projects",
       workflowActionLabel: "进入写作工作台",
@@ -542,6 +562,11 @@ export function buildReferenceCaseRolePlaybook(): ReferenceCaseRolePlaybookItem[
       whenToUse: "整理世界观、压缩长资料、召回历史章节和连续性检查时使用。",
       inputs: ["世界观条目", "人物关系", "历史章节", "素材来源"],
       outputs: ["项目土壤摘要", "上下文召回包", "连续性风险", "资料引用说明"],
+      skillBrief: {
+        trigger: "当长篇上下文变多、模型容易忘设定或历史章节需要被召回时启动。",
+        steps: ["先按人物、势力、伏笔和章节历史整理资料包", "标注每条资料来源和使用场景", "把召回结果交给审稿、初稿或二改链路"],
+        acceptance: "输出必须能追溯来源，并说明哪些资料进入了模型上下文、哪些风险仍未解决。",
+      },
       referenceCaseIds: ["llama-index", "logseq", "joplin", "outline"],
       workflowHref: "/projects#context-recall",
       workflowActionLabel: "查看项目土壤",
@@ -555,6 +580,11 @@ export function buildReferenceCaseRolePlaybook(): ReferenceCaseRolePlaybookItem[
       whenToUse: "适配 WebNovel、Royal Road、Wattpad 的英文简介、标签和章节标题时使用。",
       inputs: ["中文卖点", "目标海外平台", "样章", "平台反馈"],
       outputs: ["WebNovel synopsis", "Royal Road progression pitch", "Wattpad tags", "英文章节标题包"],
+      skillBrief: {
+        trigger: "当中文卖点需要转成 WebNovel、Royal Road 或 Wattpad 投稿包装时启动。",
+        steps: ["先识别目标海外平台的读者预期", "把中文爽点改写成英文 synopsis、progression pitch 或情绪标签", "保存为投稿资产版本等待采纳和发布基准"],
+        acceptance: "必须分别覆盖 WebNovel、Royal Road、Wattpad 的包装口径，并进入平台发布版本记录。",
+      },
       referenceCaseIds: ["lobe-chat", "librechat", "pandoc"],
       workflowHref: "/projects#platform-export",
       workflowActionLabel: "进入平台发布",
@@ -568,6 +598,11 @@ export function buildReferenceCaseRolePlaybook(): ReferenceCaseRolePlaybookItem[
       whenToUse: "发布后回填点击、收藏、读完、评论和签约反馈时使用。",
       inputs: ["发布包版本", "平台效果数据", "A/B 候选", "历史复盘"],
       outputs: ["下一轮优化建议", "标题简介 A/B 判断", "平台知识反馈", "是否放量结论"],
+      skillBrief: {
+        trigger: "当发布包已有版本基准，需要用真实数据判断是否继续、修复或换平台时启动。",
+        steps: ["先回填曝光、点击、收藏、追读、评论和签约等真实数据", "再对比发布包版本和 A/B 候选效果", "把结论回写到平台知识库和下一轮优化任务"],
+        acceptance: "没有真实数据不允许放量；复盘必须给出继续、观察、修复或暂停的明确判断。",
+      },
       referenceCaseIds: ["n8n", "zola", "mdbook", "honkit"],
       workflowHref: "/gate",
       workflowActionLabel: "进入复盘闸门",

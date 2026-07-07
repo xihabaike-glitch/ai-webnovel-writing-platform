@@ -131,6 +131,9 @@ test("open source reference cases", async (t) => {
       assert.ok(role.whenToUse.length >= 10);
       assert.ok(role.inputs.length >= 2);
       assert.ok(role.outputs.length >= 2);
+      assert.ok(role.skillBrief.trigger.length >= 10);
+      assert.ok(role.skillBrief.steps.length >= 2);
+      assert.ok(role.skillBrief.acceptance.length >= 10);
       assert.ok(role.referenceCaseIds.length >= 2);
       assert.ok(role.referenceCaseIds.every((id) => openSourceReferenceCases.some((item) => item.id === id)));
       assert.equal(typeof role.workflowHref, "string", `${role.id} should expose a workflow href`);
@@ -148,6 +151,10 @@ test("open source reference cases", async (t) => {
     assert.ok(draftWriter?.modelOwner.includes("DeepSeek"));
     assert.ok(overseasPackager?.outputs.some((output) => output.includes("WebNovel")));
     assert.ok(feedbackOperator?.referenceCaseIds.includes("n8n"));
+    assert.ok(productManager?.skillBrief.steps.some((step) => step.includes("验收")));
+    assert.ok(draftWriter?.skillBrief.trigger.includes("章节"));
+    assert.ok(overseasPackager?.skillBrief.acceptance.includes("WebNovel"));
+    assert.ok(feedbackOperator?.skillBrief.steps.some((step) => step.includes("真实数据")));
     assert.equal(productManager?.workflowHref, "/gate");
     assert.equal(productManager?.workflowActionLabel, "进入总闸门");
     assert.equal(draftWriter?.workflowHref, "/projects");

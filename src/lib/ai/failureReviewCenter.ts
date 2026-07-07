@@ -83,6 +83,9 @@ export interface FailureReviewPmFocus {
   proof: string;
   actionLabel: string;
   actionHref: string;
+  pipelineActionLabel: string;
+  pipelineActionHref: string;
+  pipelineValidationHint: string;
 }
 
 export interface FailureReviewCenter {
@@ -354,6 +357,9 @@ function buildFailureReviewPmFocus(
       proof: `${topLane.priorityLabel} · ${topLane.count} 个未恢复失败 · ${topLane.evidence.join("、") || "等待修复证据"}`,
       actionLabel: topLane.actionLabel,
       actionHref: topLane.href,
+      pipelineActionLabel: "核对项目流水线",
+      pipelineActionHref: "/projects#pipeline-projects",
+      pipelineValidationHint: "恢复前先停批量；修复后回项目流水线核对恢复样本、失败率和放量条件，再决定是否恢复生产。",
     };
   }
 
@@ -366,6 +372,9 @@ function buildFailureReviewPmFocus(
       proof: "未恢复失败 0 个；恢复节奏仍需观察失败率、成本和质量分。",
       actionLabel: "去任务中心",
       actionHref: "/tasks",
+      pipelineActionLabel: "核对项目流水线",
+      pipelineActionHref: "/projects#pipeline-projects",
+      pipelineValidationHint: "项目流水线必须看到恢复样本、失败率观察和放量条件，再从单章样本恢复到小批量。",
     };
   }
 
@@ -377,6 +386,9 @@ function buildFailureReviewPmFocus(
     proof: "未恢复失败 0 个；失败中心暂无待修复泳道。",
     actionLabel: "去任务中心",
     actionHref: "/tasks",
+    pipelineActionLabel: "核对项目流水线",
+    pipelineActionHref: "/projects#pipeline-projects",
+    pipelineValidationHint: "项目流水线继续保留样本、复查、失败率和发布包证据；后续放量仍按小样本观察。",
   };
 }
 

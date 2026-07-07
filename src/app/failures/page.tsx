@@ -380,6 +380,9 @@ export default async function FailuresPage() {
             <h2 className="mt-1 text-lg font-semibold">{center.pmFocus.headline}</h2>
             <p className="mt-2 max-w-4xl text-sm leading-6 text-slate-200">{center.pmFocus.detail}</p>
             <p className="mt-2 text-xs leading-5 text-slate-400">验收证据：{center.pmFocus.proof}</p>
+            <div className="mt-2 rounded-md bg-white/10 px-3 py-2 text-xs leading-5 text-slate-200">
+              {center.pmFocus.pipelineValidationHint}
+            </div>
           </div>
           <div className="flex shrink-0 flex-col gap-2">
             <span className={`w-fit rounded-md px-2 py-1 text-xs font-medium ${pmFocusBadgeClass(center.pmFocus.tone)}`}>
@@ -390,6 +393,12 @@ export default async function FailuresPage() {
               href={center.pmFocus.actionHref}
             >
               {center.pmFocus.actionLabel}
+            </Link>
+            <Link
+              className="inline-flex w-fit rounded-md border border-white/25 px-4 py-2 text-sm font-medium text-white hover:bg-white/10"
+              href={center.pmFocus.pipelineActionHref}
+            >
+              {center.pmFocus.pipelineActionLabel}
             </Link>
           </div>
         </div>

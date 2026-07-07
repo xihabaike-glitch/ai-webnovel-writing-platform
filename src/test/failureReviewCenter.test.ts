@@ -147,6 +147,12 @@ test("buildFailureReviewCenter", async (t) => {
     assert.equal(center.pmFocus.actionLabel, "去模型设置");
     assert.equal(center.pmFocus.actionHref, "/settings/models");
     assert.ok(center.pmFocus.proof.includes("P0"));
+    assert.equal(center.pmFocus.pipelineActionLabel, "核对项目流水线");
+    assert.equal(center.pmFocus.pipelineActionHref, "/projects#pipeline-projects");
+    assert.ok(center.pmFocus.pipelineValidationHint.includes("恢复前"));
+    assert.ok(center.pmFocus.pipelineValidationHint.includes("恢复样本"));
+    assert.ok(center.pmFocus.pipelineValidationHint.includes("失败率"));
+    assert.ok(center.pmFocus.pipelineValidationHint.includes("放量条件"));
     assert.equal(center.repairLanes[0].priorityLabel, "P0");
     assert.equal(center.repairLanes[0].label, "先修模型配置");
     assert.equal(center.repairLanes[0].actionLabel, "去模型设置");
@@ -206,5 +212,7 @@ test("buildFailureReviewCenter", async (t) => {
     assert.ok(center.pmFocus.headline.includes("未恢复失败已清空"));
     assert.ok(center.pmFocus.detail.includes("单章样本"));
     assert.equal(center.pmFocus.actionHref, "/tasks");
+    assert.equal(center.pmFocus.pipelineActionHref, "/projects#pipeline-projects");
+    assert.ok(center.pmFocus.pipelineValidationHint.includes("项目流水线"));
   });
 });

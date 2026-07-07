@@ -1624,9 +1624,11 @@ const versionActionFilters: { id: PublishPackageVersionActionFilter; label: stri
 ];
 
 export function PlatformExportCenterPanel({
+  exportSource,
   gateReturnHref,
   projectId,
 }: {
+  exportSource?: "multi-platform-package" | null;
   gateReturnHref?: string | null;
   projectId: string;
 }) {
@@ -1683,6 +1685,9 @@ export function PlatformExportCenterPanel({
     () => center?.packages.find((pack) => pack.platformId === selectedPlatformId) ?? center?.packages[0] ?? null,
     [center, selectedPlatformId],
   );
+  const multiPlatformExportSourcePrompt = exportSource === "multi-platform-package"
+    ? `来自多平台投稿包，推荐先导出${selectedPackage ? ` ${selectedPackage.platformName} ` : "推荐平台"}发布包，再回填首轮真实效果。`
+    : null;
   const selectedAssetEditorReview = useMemo(
     () => selectedPackage
       ? buildSubmissionAssetEditorReview(selectedPackage.platformName, selectedPackage.submissionAssetAudit)
@@ -2693,6 +2698,11 @@ export function PlatformExportCenterPanel({
           {isLoading ? "读取中" : "刷新发布包"}
         </button>
       </div>
+      {multiPlatformExportSourcePrompt ? (
+        <div className="mt-3 rounded-md border border-cyan-200 bg-cyan-50 px-3 py-2 text-sm leading-6 text-cyan-800">
+          {multiPlatformExportSourcePrompt}
+        </div>
+      ) : null}
 
       <div className="mt-4 grid gap-3 lg:grid-cols-[220px_1fr_auto]">
         <label className="grid gap-1 text-sm text-slate-600">

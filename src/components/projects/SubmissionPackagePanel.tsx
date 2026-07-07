@@ -735,7 +735,7 @@ export function SubmissionPackagePanel({
               </button>
               <a
                 className="rounded-md border border-slate-200 px-3 py-2 text-xs font-medium hover:bg-slate-50"
-                href={hrefWithGateReturn("#platform-export", gateReturnHref, projectId)}
+                href={hrefWithGateReturn(`/projects/${projectId}?exportSource=multi-platform-package#platform-export`, gateReturnHref, projectId)}
               >
                 进入平台导出
               </a>

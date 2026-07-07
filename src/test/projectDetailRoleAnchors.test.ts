@@ -171,10 +171,16 @@ test("project detail page carries gate return through export and submission link
   const platformExportCenterPanel = readFileSync("src/components/projects/PlatformExportCenterPanel.tsx", "utf8");
   const submissionPackagePanel = readFileSync("src/components/projects/SubmissionPackagePanel.tsx", "utf8");
 
-  assert.ok(projectPage.includes("<PlatformExportCenterPanel gateReturnHref={gateReturn} projectId={project.id} />"));
+  assert.ok(projectPage.includes("<PlatformExportCenterPanel exportSource={exportSource} gateReturnHref={gateReturn} projectId={project.id} />"));
   assert.ok(projectPage.includes("<SubmissionPackagePanel gateReturnHref={gateReturn} projectId={project.id} submissionPackage={submissionPackage} />"));
+  assert.ok(projectPage.includes("exportSourceFromParam"));
+  assert.ok(projectPage.includes("exportSource={exportSource}"));
 
   assert.ok(platformExportCenterPanel.includes("gateReturnHref?: string | null"));
+  assert.ok(platformExportCenterPanel.includes("exportSource?: \"multi-platform-package\" | null"));
+  assert.ok(platformExportCenterPanel.includes("multiPlatformExportSourcePrompt"));
+  assert.ok(platformExportCenterPanel.includes("来自多平台投稿包"));
+  assert.ok(platformExportCenterPanel.includes("推荐先导出"));
   assert.ok(platformExportCenterPanel.includes("function hrefWithGateReturn"));
   assert.ok(platformExportCenterPanel.includes("href={hrefWithGateReturn(item.actionHref, gateReturnHref, projectId)}"));
   assert.ok(platformExportCenterPanel.includes("href={hrefWithGateReturn(handoffActionHref(projectId, center.executionHandoffSummary.primaryAction), gateReturnHref, projectId)}"));
@@ -201,7 +207,7 @@ test("project detail page carries gate return through export and submission link
   assert.ok(submissionPackagePanel.includes("结构复查已放行"));
   assert.ok(submissionPackagePanel.includes("multiPlatformButtonClass"));
   assert.ok(submissionPackagePanel.includes("进入平台导出"));
-  assert.ok(submissionPackagePanel.includes("href={hrefWithGateReturn(\"#platform-export\", gateReturnHref, projectId)}"));
+  assert.ok(submissionPackagePanel.includes("href={hrefWithGateReturn(`/projects/${projectId}?exportSource=multi-platform-package#platform-export`, gateReturnHref, projectId)}"));
   assert.ok(submissionPackagePanel.includes("href={hrefWithGateReturn(task.href, gateReturnHref, projectId)}"));
   assert.ok(submissionPackagePanel.includes("href={hrefWithGateReturn(variant.decision.actionHref, gateReturnHref, projectId)}"));
   assert.ok(submissionPackagePanel.includes("href={hrefWithGateReturn(\"#publish-effect-panel\", gateReturnHref, projectId)}"));

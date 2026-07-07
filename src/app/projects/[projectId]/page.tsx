@@ -62,6 +62,11 @@ function gateReturnFromParam(value: string | string[] | undefined) {
   return raw;
 }
 
+function exportSourceFromParam(value: string | string[] | undefined) {
+  const raw = Array.isArray(value) ? value[0] : value;
+  return raw === "multi-platform-package" ? raw : null;
+}
+
 function hrefWithGateReturn(href: string, gateReturnHref?: string | null) {
   if (!gateReturnHref || !href.startsWith("/") || href.startsWith("/gate")) return href;
 
@@ -79,11 +84,12 @@ export default async function ProjectPage({
   searchParams,
 }: {
   params: Promise<{ projectId: string }>;
-  searchParams?: Promise<{ gateReturn?: string | string[] }>;
+  searchParams?: Promise<{ exportSource?: string | string[]; gateReturn?: string | string[] }>;
 }) {
   const { projectId } = await params;
   const query = await searchParams;
   const gateReturn = gateReturnFromParam(query?.gateReturn);
+  const exportSource = exportSourceFromParam(query?.exportSource);
   const project = await prisma.project.findUnique({
     where: { id: projectId },
     include: {
@@ -803,7 +809,7 @@ export default async function ProjectPage({
           <PlatformTacticExperiencePanel gateReturnHref={gateReturn} library={platformTacticExperienceLibrary} />
         </div>
         <div id="platform-export">
-          <PlatformExportCenterPanel gateReturnHref={gateReturn} projectId={project.id} />
+          <PlatformExportCenterPanel exportSource={exportSource} gateReturnHref={gateReturn} projectId={project.id} />
         </div>
         <div id="story-structure">
           <StoryStructureDiagnosticPanel projectId={project.id} />

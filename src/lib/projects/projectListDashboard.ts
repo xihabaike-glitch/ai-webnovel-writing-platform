@@ -180,6 +180,8 @@ function average(values: number[]) {
   return values.reduce((sum, value) => sum + value, 0) / values.length;
 }
 
+const firstDayCompleteGateHref = "/gate?focus=first-day-complete";
+
 function healthLabel(score: number): ProjectListItem["healthLabel"] {
   if (score >= 75) return "可推进";
   if (score >= 50) return "需盯紧";
@@ -335,7 +337,7 @@ function buildProjectPipelineProof(input: {
       evidence: input.continuationStatus === "ready" || input.continuationStatus === "complete"
         ? "首日链路可进入总闸门复查。"
         : "缺样本、复查或交接证据时不允许放量。",
-      href: "/gate",
+      href: hasAcceptedDispatch ? firstDayCompleteGateHref : "/gate",
     },
     {
       id: "failure_repair",
@@ -512,7 +514,7 @@ function buildRealSampleValidation(input: {
       completedEvidence,
       missingEvidence,
       nextActionLabel: "去总闸门",
-      nextActionHref: "/gate",
+      nextActionHref: firstDayCompleteGateHref,
     };
   }
 

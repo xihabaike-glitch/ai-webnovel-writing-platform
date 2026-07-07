@@ -397,7 +397,10 @@ test("buildProjectListDashboard", async (t) => {
     assert.equal(handoff?.realSampleValidation.status, "ready_for_gate");
     assert.ok(handoff?.realSampleValidation.headline.includes("总闸门"));
     assert.ok(handoff?.realSampleValidation.completedEvidence.some((item) => item.includes("派单验收")));
-    assert.equal(handoff?.realSampleValidation.nextActionHref, "/gate");
+    assert.equal(handoff?.realSampleValidation.nextActionHref, "/gate?focus=first-day-complete");
+    assert.equal(handoff?.pipelineProof.currentStepId, "gate_check");
+    assert.equal(handoff?.pipelineProof.nextActionHref, "/gate?focus=first-day-complete");
+    assert.ok(handoff?.pipelineProof.steps.find((step) => step.id === "gate_check")?.href.includes("focus=first-day-complete"));
   });
 
   await t.test("recognizes generated first-day dispatches that still need acceptance evidence", () => {

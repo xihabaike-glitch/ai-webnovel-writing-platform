@@ -12,3 +12,11 @@ test("AppShell keeps the PM delivery path visible globally", () => {
   assert.ok(source.includes("overview.modelInterfaces.readyLabel"), "AppShell should show model interface readiness");
   assert.ok(source.includes("剩余 10 个平台不再添加"), "AppShell should keep platform expansion out of the global path");
 });
+
+test("AppShell navigation can wrap on narrow screens", () => {
+  assert.equal(source.includes("h-14 max-w-7xl"), false, "header should not lock the nav into a fixed-height row");
+  assert.ok(source.includes("flex-col gap-3") || source.includes("flex-col gap-2"), "header should stack title and nav on narrow screens");
+  assert.ok(source.includes("flex-wrap"), "navigation and PM chips should wrap instead of overflowing");
+  assert.ok(source.includes("leading-5"), "compact global text needs stable line height when wrapped");
+  assert.ok(source.includes("px-4") && source.includes("sm:px-6"), "shell spacing should tighten on mobile and expand on larger screens");
+});

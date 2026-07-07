@@ -9,11 +9,11 @@ export function AppShell({ children }: { children: ReactNode }) {
   return (
     <div className="min-h-screen bg-slate-50 text-slate-950">
       <header className="border-b border-slate-200 bg-white">
-        <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-6">
+        <div className="mx-auto flex max-w-7xl flex-col gap-3 px-4 py-3 sm:px-6 lg:flex-row lg:items-center lg:justify-between">
           <Link className="font-semibold" href="/">
             AI 网文写作平台
           </Link>
-          <nav className="flex gap-4 text-sm text-slate-600">
+          <nav className="flex flex-wrap gap-x-4 gap-y-2 text-sm leading-5 text-slate-600">
             <Link href="/projects">作品</Link>
             <Link href="/tasks">任务</Link>
             <Link href="/dispatch">派单</Link>
@@ -25,8 +25,8 @@ export function AppShell({ children }: { children: ReactNode }) {
           </nav>
         </div>
         <div className="border-t border-slate-100 bg-slate-950 text-white">
-          <div className="mx-auto flex max-w-7xl flex-col gap-2 px-6 py-2 text-xs sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex flex-wrap items-center gap-2 text-slate-200">
+          <div className="mx-auto flex max-w-7xl flex-col gap-2 px-4 py-2 text-xs leading-5 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-slate-200">
               <span className="font-medium text-white">毒舌 PM 路线</span>
               <span>{overview.platformScope.statusLabel}</span>
               <span>{expansionLabel}</span>
@@ -43,7 +43,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           </div>
         </div>
       </header>
-      <main className="mx-auto max-w-7xl px-6 py-6">{children}</main>
+      <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6">{children}</main>
     </div>
   );
 }

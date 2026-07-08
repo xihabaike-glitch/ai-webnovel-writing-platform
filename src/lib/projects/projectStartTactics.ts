@@ -398,11 +398,12 @@ export function buildProjectStartKnowledgeFeedbackExperiences(
         priorityScore: status === "usable" ? 92 : status === "blocked" ? 90 : 72,
         latestAt,
         evidence: uniqueLines([
+          `知识来源：${receipt.title}`,
           `平台反哺：${receipt.actionLabel}`,
           `已推进：${receipt.completedStepLabel}`,
           receipt.stopReason,
           receipt.nextAction,
-        ], 4),
+        ], 5),
       };
     });
 }
@@ -1344,7 +1345,7 @@ export function buildProjectStartTacticWorldEntry(
   platformName: string,
   handoff?: ProjectStartExperienceHandoff | null,
 ): ProjectStartTacticWorldEntry {
-  const evidence = advice.evidence.slice(0, 2).map((item) => `证据：${trimLine(item)}`);
+  const evidence = advice.evidence.slice(0, 4).map((item) => `证据：${trimLine(item)}`);
   const checklist = advice.checklist.slice(0, 3).map((item) => `检查：${trimLine(item)}`);
   const handoffLines = handoff
     ? [

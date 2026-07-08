@@ -1593,6 +1593,39 @@ test("buildProjectStartTacticAdvice", async (t) => {
     ])?.title, "首轮平台打法：番茄小说");
   });
 
+  await t.test("keeps platform knowledge feedback evidence in start soil", () => {
+    const platform = getPlatformProfile("fanqie");
+    const template = getDefaultTemplateForPlatform(platform.id);
+    const style = getPlatformWritingStyle(platform.id);
+    const result = buildProjectStartGateExperience({
+      platform,
+      template,
+      style,
+      receipts: [],
+      knowledgeFeedbackReceipts: [{
+        id: "platform-knowledge:project-1:fanqie:publish_effect:metric-1",
+        projectId: "project-1",
+        platformId: "fanqie",
+        platformName: "番茄小说",
+        actionLabel: "执行正反馈链",
+        title: "番茄小说 正反馈经验已沉淀",
+        message: "点击和追读变好，正反馈经验已经进入生成链路。",
+        completedStepLabel: "发布效果正反馈",
+        stopReason: "可复用信号：强钩子标题",
+        nextAction: "复盘平台策略排序",
+        href: "#platform-strategy-ranking",
+        severity: "success",
+        createdAt: "2026-07-05T10:00:00.000Z",
+      }],
+    });
+    const entry = buildProjectStartTacticWorldEntry(result.advice, platform.name);
+
+    assert.ok(entry.content.includes("知识来源：番茄小说 正反馈经验已沉淀"));
+    assert.ok(entry.content.includes("平台反哺：执行正反馈链"));
+    assert.ok(entry.content.includes("已推进：发布效果正反馈"));
+    assert.ok(entry.content.includes("可复用信号：强钩子标题"));
+  });
+
   await t.test("turns start advice into editable opening soil assets", () => {
     const platform = getPlatformProfile("fanqie");
     const template = getDefaultTemplateForPlatform(platform.id);

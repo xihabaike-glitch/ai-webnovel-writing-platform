@@ -76,6 +76,10 @@ test("project detail page renders the single-project acceptance sheet", () => {
   assert.ok(projectPage.includes("item.ownerRole"));
   assert.ok(projectPage.includes("item.executionHint"));
   assert.ok(projectPage.includes("item.dispatchDraftHref"));
+  assert.ok(projectPage.includes("href={hrefWithGateReturn(item.href, gateReturn)}"));
+  assert.ok(projectPage.includes("item.stopRule"));
+  assert.ok(projectPage.includes("停手线"));
+  assert.ok(projectPage.includes("直接处理入口"));
   assert.ok(projectPage.includes("生成派单草稿"));
   assert.ok(projectPage.includes("dashboard.realSampleAcceptanceSheet.steps.map"));
   assert.ok(projectPage.includes("step.stopRule"));

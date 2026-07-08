@@ -726,6 +726,11 @@ test("buildPrePublishGate", async (t) => {
     assert.equal(project.acceptanceSheetGate.repairMode, "executable");
     assert.ok(project.acceptanceSheetGate.executionHint.includes("可一键修复"));
     assert.ok(project.acceptanceSheetGate.detail.includes("二改"));
+    assert.equal(project.acceptanceSheetGate.runbookStep.stepId, "sample_draft");
+    assert.ok(project.acceptanceSheetGate.runbookStep.title.includes("首章样本"));
+    assert.ok(project.acceptanceSheetGate.runbookStep.sampleAction.includes("首章样本"));
+    assert.ok(project.acceptanceSheetGate.runbookStep.proofToCapture.includes("人工采用"));
+    assert.ok(project.acceptanceSheetGate.runbookStep.rollbackIfWeak.includes("二改"));
     assert.equal(project.acceptanceSheetGate.href, "/projects#pipeline-projects");
     assert.equal(project.nextAction, project.acceptanceSheetGate.actionLabel);
     assert.equal(project.href, project.acceptanceSheetGate.href);
@@ -760,6 +765,8 @@ test("buildPrePublishGate", async (t) => {
     assert.equal(project.acceptanceSheetGate.currentStepId, "dispatch_receipt");
     assert.equal(project.acceptanceSheetGate.repairMode, "dispatch");
     assert.ok(project.acceptanceSheetGate.executionHint.includes("派单中心"));
+    assert.equal(project.acceptanceSheetGate.runbookStep.stepId, "task_dispatch");
+    assert.ok(project.acceptanceSheetGate.runbookStep.proofToCapture.includes("派单回执"));
     assert.equal(project.acceptanceSheetGate.href, "/dispatch?firstDayProject=project-dispatch-receipt-blocked&step=publish-precheck#first-day-dispatch");
     assert.equal(gate.priorityActions[0].id, "project-acceptance:project-dispatch-receipt-blocked");
     assert.ok(gate.priorityActions[0].detail.includes("派单中心"));

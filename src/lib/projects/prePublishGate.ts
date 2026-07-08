@@ -21,7 +21,7 @@ import {
   type PublishRepairActionKind,
 } from "./platformPublishExport.ts";
 import { canExecutePublishRepairAction } from "./publishRepairActionExecution.ts";
-import { buildProjectDashboard, type ProjectAcceptanceStep } from "./projectDashboard.ts";
+import { buildProjectDashboard, type ProjectAcceptanceRunbookStep, type ProjectAcceptanceStep } from "./projectDashboard.ts";
 import { buildProjectRoleWorkflowEntrypoints } from "./projectListDashboard.ts";
 import { buildTaskQueueCenter } from "./taskQueueCenter.ts";
 
@@ -196,6 +196,7 @@ export interface PrePublishGateAcceptanceSheetGate {
   latestDispatchEvidence: string | null;
   latestRecheckReceipt: PrePublishGateRecheckReceipt | null;
   roleClosureProgress: PrePublishGateRoleClosureProgress | null;
+  runbookStep: ProjectAcceptanceRunbookStep;
   repairMode: "passed" | "executable" | "dispatch" | "manual";
   executionHint: string;
   execution: PrePublishGateActionExecution | null;
@@ -1606,6 +1607,18 @@ function buildAcceptanceSheetGate(
     .map((task) => task.completionEvidence.trim())[0] ?? null;
   const latestRecheckReceipt = latestProjectAcceptanceRecheckReceipt(project);
   const roleClosureProgress = sheet.roleClosureProgress;
+  const currentMissingEvidence = sheet.missingEvidence.find((item) => item.stepId === sheet.currentStepId)
+    ?? sheet.missingEvidence[0]
+    ?? null;
+  const runbookStep = currentMissingEvidence?.runbookStep
+    ?? {
+      stepId: "publish_package",
+      title: "发布包与平台复盘",
+      owner: "投稿包装编辑 + 反馈运营",
+      sampleAction: "复查发布包、版本基线、平台卖点、样章和真实反馈。",
+      proofToCapture: "保存发布包、导出版本、平台卖点、样章、反馈记录、复盘指标和下一轮修订任务。",
+      rollbackIfWeak: "平台卖点、前三章兑现、标签或反馈记录缺失时，停在发布修复，不宣称流水线完成。",
+    } satisfies ProjectAcceptanceRunbookStep;
 
   return {
     status,
@@ -1618,6 +1631,7 @@ function buildAcceptanceSheetGate(
     latestDispatchEvidence,
     latestRecheckReceipt,
     roleClosureProgress,
+    runbookStep,
     repairMode,
     executionHint: acceptanceExecutionHint(repairMode),
     execution: repairMode === "executable" ? execution : null,

@@ -635,6 +635,14 @@ export default async function GatePage({
               </div>
               <p className="mt-2 text-xs leading-5 text-slate-600">{project.acceptanceSheetGate.detail}</p>
               <p className="mt-1 text-xs leading-5 text-slate-600">{project.acceptanceSheetGate.executionHint}</p>
+              <div className="mt-2 rounded-md bg-white p-2 text-xs leading-5 text-slate-700">
+                <div className="font-medium text-slate-950">当前实跑动作 · {project.acceptanceSheetGate.runbookStep.title}</div>
+                <div className="mt-1 grid gap-1">
+                  <span>样本动作：{project.acceptanceSheetGate.runbookStep.sampleAction}</span>
+                  <span>要抓证据：{project.acceptanceSheetGate.runbookStep.proofToCapture}</span>
+                  <span>退路：{project.acceptanceSheetGate.runbookStep.rollbackIfWeak}</span>
+                </div>
+              </div>
               <div className="mt-2 text-xs font-medium text-slate-950">{project.acceptanceSheetGate.actionLabel}</div>
             </Link>
           ))}

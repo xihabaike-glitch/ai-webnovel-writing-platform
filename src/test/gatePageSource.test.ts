@@ -122,6 +122,11 @@ test("gate page renders project acceptance sheet blockers", () => {
   assert.ok(source.includes("project.acceptanceSheetGate.label"));
   assert.ok(source.includes("project.acceptanceSheetGate.detail"));
   assert.ok(source.includes("project.acceptanceSheetGate.executionHint"));
+  assert.ok(source.includes("当前实跑动作"));
+  assert.ok(source.includes("project.acceptanceSheetGate.runbookStep.title"));
+  assert.ok(source.includes("project.acceptanceSheetGate.runbookStep.sampleAction"));
+  assert.ok(source.includes("project.acceptanceSheetGate.runbookStep.proofToCapture"));
+  assert.ok(source.includes("project.acceptanceSheetGate.runbookStep.rollbackIfWeak"));
   assert.ok(source.includes("project.acceptanceSheetGate.href"));
 });
 

@@ -210,6 +210,12 @@ test("buildDevelopmentOverview", async (t) => {
     assert.ok(overview.currentPipelineValidation.requiredEvidence.some((item) => item.includes("人工采用")));
     assert.ok(overview.currentPipelineValidation.requiredEvidence.some((item) => item.includes("发布包")));
     assert.ok(overview.currentPipelineValidation.stopIfMissing.some((item) => item.includes("不允许批量")));
+    assert.equal(overview.currentPipelineValidation.finalReview.title, "真实作品流水线终检清单");
+    assert.equal(overview.currentPipelineValidation.finalReview.receiptHref, "/gate?focus=action-recheck&source=real-sample-receipt#gate-focus-notice");
+    assert.ok(overview.currentPipelineValidation.finalReview.passSignals.some((item) => item.includes("开书证据")));
+    assert.ok(overview.currentPipelineValidation.finalReview.passSignals.some((item) => item.includes("发布包")));
+    assert.ok(overview.currentPipelineValidation.finalReview.repairSignals.some((item) => item.includes("退回")));
+    assert.ok(overview.currentPipelineValidation.finalReview.holdBatchSignals.some((item) => item.includes("暂停批量")));
   });
 
   await t.test("maps original requirements to current product evidence", () => {

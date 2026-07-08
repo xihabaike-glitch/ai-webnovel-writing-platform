@@ -45,3 +45,11 @@ test("docs page renders the final acceptance evidence matrix", () => {
   assert.ok(source.includes("item.nextAction"));
   assert.ok(source.includes("item.evidenceHref"));
 });
+
+test("docs page renders the real pipeline final review checklist", () => {
+  assert.ok(source.includes("overview.currentPipelineValidation.finalReview.title"));
+  assert.ok(source.includes("overview.currentPipelineValidation.finalReview.passSignals.map"));
+  assert.ok(source.includes("overview.currentPipelineValidation.finalReview.repairSignals.map"));
+  assert.ok(source.includes("overview.currentPipelineValidation.finalReview.holdBatchSignals.map"));
+  assert.ok(source.includes("overview.currentPipelineValidation.finalReview.receiptHref"));
+});

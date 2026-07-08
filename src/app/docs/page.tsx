@@ -321,6 +321,46 @@ export default function DevelopmentDocsPage() {
             </ul>
           </div>
         </div>
+        <div className="mt-3 rounded-md bg-white/10 p-3">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <div className="text-xs font-medium text-slate-300">终检判定</div>
+              <h3 className="mt-1 font-medium text-white">{overview.currentPipelineValidation.finalReview.title}</h3>
+            </div>
+            <Link
+              className="w-fit rounded-md bg-white px-3 py-2 text-xs font-medium text-slate-950 hover:bg-slate-100"
+              href={overview.currentPipelineValidation.finalReview.receiptHref}
+            >
+              {overview.currentPipelineValidation.finalReview.receiptLabel}
+            </Link>
+          </div>
+          <div className="mt-3 grid gap-3 lg:grid-cols-3">
+            <div className="rounded-md bg-white p-3 text-xs leading-5 text-emerald-800">
+              <div className="font-medium">通过</div>
+              <ul className="mt-2 grid gap-1">
+                {overview.currentPipelineValidation.finalReview.passSignals.map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
+            </div>
+            <div className="rounded-md bg-white p-3 text-xs leading-5 text-amber-900">
+              <div className="font-medium">退回修复</div>
+              <ul className="mt-2 grid gap-1">
+                {overview.currentPipelineValidation.finalReview.repairSignals.map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
+            </div>
+            <div className="rounded-md bg-white p-3 text-xs leading-5 text-rose-800">
+              <div className="font-medium">暂停批量</div>
+              <ul className="mt-2 grid gap-1">
+                {overview.currentPipelineValidation.finalReview.holdBatchSignals.map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </div>
       </section>
 
       <section className="mb-6 rounded-md border border-slate-200 bg-white p-4">

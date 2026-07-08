@@ -104,6 +104,14 @@ export interface DevelopmentOverviewCurrentPipelineValidation {
   nextStepTitle: string;
   requiredEvidence: string[];
   stopIfMissing: string[];
+  finalReview: {
+    title: string;
+    passSignals: string[];
+    repairSignals: string[];
+    holdBatchSignals: string[];
+    receiptHref: string;
+    receiptLabel: string;
+  };
   actionHref: string;
   actionLabel: string;
 }
@@ -537,6 +545,24 @@ function buildCurrentPipelineValidation(): DevelopmentOverviewCurrentPipelineVal
       "缺人工采用时，不允许批量生产。",
       "缺发布包或反馈复盘时，不允许宣称流水线跑通。",
     ],
+    finalReview: {
+      title: "真实作品流水线终检清单",
+      passSignals: [
+        "开书证据、首章样本、审稿二改和人工采用都能互相追溯。",
+        "发布包、版本基线、平台复盘指标已经回到作品页。",
+        "总闸门复检后剩余卡点减少，且没有未恢复失败。",
+      ],
+      repairSignals: [
+        "任一环节缺少负责人确认、回执依据或下一步入口，退回对应工作区修复。",
+        "首章钩子、平台卖点或前三章兑现不足，退回审稿二改或发布包修复。",
+      ],
+      holdBatchSignals: [
+        "缺人工采用、缺复查、失败率过高或恢复观察不足时暂停批量。",
+        "模型岗位缺岗、成本失控或发布反馈缺失时暂停批量。",
+      ],
+      receiptHref: "/gate?focus=action-recheck&source=real-sample-receipt#gate-focus-notice",
+      receiptLabel: "查看真实样本回执复检",
+    },
     actionHref: "/projects#pipeline-projects",
     actionLabel: "验收真实流水线",
   };

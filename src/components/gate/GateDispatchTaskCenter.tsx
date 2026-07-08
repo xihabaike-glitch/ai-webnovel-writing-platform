@@ -184,7 +184,7 @@ function routeFlowFilterFromLane(laneId: RouteConfirmationDispatchFlowLaneId): R
   return laneId;
 }
 
-export type DispatchQueueFilter = "all" | "recheck_followup" | "ai_pipeline";
+export type DispatchQueueFilter = "all" | "recheck_followup" | "ai_pipeline" | "role_closure";
 
 export interface DispatchRoleIntent {
   roleIntent: string;
@@ -252,6 +252,22 @@ function isAiPipelineExecutableTask(task: PersistedGatePlatformDispatchTask) {
   return task.platformId === "ai-pipeline"
     && (task.stage === "ai_pipeline_sample_recheck" || task.stage === "ai_pipeline_small_batch")
     && task.state !== "completed";
+}
+
+function isRoleClosureDispatchTask(task: PersistedGatePlatformDispatchTask) {
+  return task.dispatchKey.startsWith("role-intent:")
+    || task.platformId === "role-dispatch"
+    || task.stage === "start_role_dispatch_closure";
+}
+
+function roleClosureLaneLabel(task: PersistedGatePlatformDispatchTask) {
+  if (task.dispatchKey.includes(":story-structure:")) return "结构";
+  if (task.dispatchKey.includes(":context-recall:")) return "资料";
+  if (task.dispatchKey.includes(":platform-export:")) return "平台";
+  if (task.href.includes("#story-structure")) return "结构";
+  if (task.href.includes("#context-recall")) return "资料";
+  if (task.href.includes("#platform-export")) return "平台";
+  return "角色";
 }
 
 function routeCompletionRecordChips(record: RouteDispatchCompletionRecord) {
@@ -330,6 +346,18 @@ export function GateDispatchTaskCenter({
   const aiPipelineTaskKeys = useMemo(() => (
     new Set(center.aiPipelineDispatches.map((task) => task.dispatchKey))
   ), [center.aiPipelineDispatches]);
+  const roleClosureTasks = useMemo(() => tasks.filter(isRoleClosureDispatchTask), [tasks]);
+  const roleClosureTaskKeys = useMemo(() => (
+    new Set(roleClosureTasks.map((task) => task.dispatchKey))
+  ), [roleClosureTasks]);
+  const activeRoleClosureTasks = useMemo(() => (
+    roleClosureTasks.filter((task) => task.state !== "completed")
+  ), [roleClosureTasks]);
+  const roleClosureLaneCounts = useMemo(() => ({
+    structure: roleClosureTasks.filter((task) => roleClosureLaneLabel(task) === "结构").length,
+    context: roleClosureTasks.filter((task) => roleClosureLaneLabel(task) === "资料").length,
+    platform: roleClosureTasks.filter((task) => roleClosureLaneLabel(task) === "平台").length,
+  }), [roleClosureTasks]);
   const completionSuggestionByKey = useMemo(() => (
     new Map(initialCompletionSuggestions.map((suggestion) => [suggestion.dispatchKey, suggestion]))
   ), [initialCompletionSuggestions]);
@@ -374,9 +402,11 @@ export function GateDispatchTaskCenter({
     });
     const queueFilteredTasks = queueFilter === "ai_pipeline"
       ? baseTasks.filter((task) => aiPipelineTaskKeys.has(task.dispatchKey))
-      : baseTasks;
+      : queueFilter === "role_closure"
+        ? baseTasks.filter((task) => roleClosureTaskKeys.has(task.dispatchKey))
+        : baseTasks;
     return filterRouteConfirmationDispatchTasks(queueFilteredTasks, routeFlowFilter);
-  }, [aiPipelineTaskKeys, platformFilter, queueFilter, roleFilter, routeFlowFilter, stateFilter, tasks]);
+  }, [aiPipelineTaskKeys, platformFilter, queueFilter, roleClosureTaskKeys, roleFilter, routeFlowFilter, stateFilter, tasks]);
 
   useEffect(() => {
     setCompletionDrafts((current) => buildWatchSampleAutoCompletionDrafts({
@@ -1004,6 +1034,16 @@ export function GateDispatchTaskCenter({
           <div className="text-xs opacity-75">AI 写审改</div>
           <div className="mt-1 text-2xl font-semibold">{center.summary.activeAiPipeline}</div>
           <div className="mt-1 text-xs opacity-75">复检派单 {center.summary.aiPipeline}</div>
+        </button>
+        <button
+          className={`rounded-md border p-3 text-left ${queueFilter === "role_closure" ? "border-violet-300 bg-violet-50 text-violet-900" : "border-slate-200 bg-white"}`}
+          onClick={() => setQueueFilter((current) => current === "role_closure" ? "all" : "role_closure")}
+          type="button"
+        >
+          <div className="text-xs opacity-75">角色闭环</div>
+          <div className="mt-1 text-2xl font-semibold">{activeRoleClosureTasks.length}</div>
+          <div className="mt-1 text-xs opacity-75">结构 {roleClosureLaneCounts.structure} · 资料 {roleClosureLaneCounts.context} · 平台 {roleClosureLaneCounts.platform}</div>
+          <div className="mt-1 text-xs font-medium opacity-75">只看角色闭环</div>
         </button>
         <div className="rounded-md border border-slate-200 bg-white p-3">
           <div className="text-xs text-slate-500">返工链</div>
@@ -1822,6 +1862,7 @@ export function GateDispatchTaskCenter({
               <option value="all">全部队列</option>
               <option value="recheck_followup">复查失败返工</option>
               <option value="ai_pipeline">AI 写审改复检</option>
+              <option value="role_closure">角色闭环</option>
             </select>
           </label>
           <label className="grid gap-1 text-xs font-medium text-slate-600">

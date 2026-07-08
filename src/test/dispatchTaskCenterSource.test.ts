@@ -83,3 +83,16 @@ test("role intent dispatch targets the matching project work area", () => {
   assert.ok(source.includes("actionLabel: `打开${workAreaLabel}`"));
   assert.ok(source.includes("`工作区：${workAreaLabel}`"));
 });
+
+test("dispatch task center groups gate role closure dispatches", () => {
+  assert.ok(source.includes("role_closure"));
+  assert.ok(source.includes("isRoleClosureDispatchTask"));
+  assert.ok(source.includes("roleClosureTaskKeys"));
+  assert.ok(source.includes("activeRoleClosureTasks"));
+  assert.ok(source.includes("角色闭环"));
+  assert.ok(source.includes("结构"));
+  assert.ok(source.includes("资料"));
+  assert.ok(source.includes("平台"));
+  assert.ok(source.includes("只看角色闭环"));
+  assert.ok(source.includes("queueFilter === \"role_closure\""));
+});

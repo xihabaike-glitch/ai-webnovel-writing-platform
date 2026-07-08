@@ -280,6 +280,7 @@ export type GatePlatformGrowthReviewStage =
   | "start_first_three_review"
   | "start_opening_diagnostic"
   | "start_platform_package"
+  | "start_role_dispatch_closure"
   | "start_publish_finalize"
   | "start_metrics_recovery"
   | "start_repair_packaging"

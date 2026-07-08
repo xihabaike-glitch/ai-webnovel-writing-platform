@@ -1208,6 +1208,76 @@ test("buildProjectControlDashboard", async (t) => {
     assert.equal(dashboard.aiPipelineControlPlan.canRecheck, false);
   });
 
+  await t.test("routes production decision to AI pipeline recheck dispatch acceptance", () => {
+    const dashboard = buildProjectControlDashboard({
+      project,
+      platform: getPlatformProfile("fanqie"),
+      chapters: [chapter],
+      outlineNodes: [],
+      characters: [],
+      worldEntries: [],
+      foreshadows: [],
+      plotThreads: [],
+      aiTasks: [],
+      gateActionAudits: [
+        {
+          receiptId: "blocked-batch",
+          label: "失败批次",
+          detail: "番茄小说 · 夜雨系统 · 批量初稿 2 个",
+          href: "/tasks#recommended-batch",
+          status: "failed",
+          message: "推荐批次失败。",
+          executionType: "recommended_batch",
+          succeededCount: 0,
+          failedCount: 2,
+          payload: JSON.stringify({
+            plan: {
+              strategyBases: [{ title: "首轮平台打法：番茄小说", label: "三轮稳住", primaryTactic: "先稳小样本。" }],
+              actionLabel: "批量初稿 2 个",
+              category: "draft",
+            },
+            routeEffectSummary: { successRatePercent: 0, knownCostUsd: 0.02, averageQualityScore: 68 },
+            batchReceipt: { status: "repair", headline: "批次有失败，先修再放大" },
+          }),
+          createdAt: "2026-01-02T00:00:00.000Z",
+        },
+        {
+          receiptId: "ai-plan-dispatched",
+          actionId: "ai-pipeline-control:demo-project",
+          label: "批量打法修复清单",
+          detail: "三轮稳住打法：成功率 0%，质量 68，失败 2。",
+          href: "/projects/demo-project#ai-pipeline",
+          status: "succeeded",
+          message: "复检完成：先修打法。只能恢复小样本复验。",
+          executionType: "control_action",
+          succeededCount: 3,
+          failedCount: 0,
+          payload: JSON.stringify({
+            aiPipelineControlPlan: {
+              status: "repair",
+              items: [{ id: "stop-scale", label: "停用三轮稳住打法继续放量", completed: true }],
+              recheck: {
+                status: "sample_required",
+                healthLabel: "先修打法",
+                detail: "还有失败样本。",
+                dispatchKey: "ai-pipeline-recheck:demo-project:ai-plan-dispatched:sample",
+                dispatchTitle: "AI 写审改：跑 1 章小样本复验",
+              },
+            },
+          }),
+          createdAt: "2026-01-03T00:00:00.000Z",
+        },
+      ],
+      submissionChecklist: checklist,
+    });
+
+    assert.equal(dashboard.productionDecision.dispatchStatus, "assigned");
+    assert.equal(dashboard.productionDecision.dispatchLabel, "待派单验收");
+    assert.ok(dashboard.productionDecision.dispatchDetail.includes("AI 写审改：跑 1 章小样本复验"));
+    assert.equal(dashboard.productionDecision.primaryActionLabel, "看复检派单");
+    assert.equal(dashboard.productionDecision.primaryTargetHref, "/dispatch?queue=ai_pipeline#dispatch-ai-pipeline-recheck:demo-project:ai-plan-dispatched:sample");
+  });
+
   await t.test("surfaces AI pipeline recheck recovery outcome", () => {
     const dashboard = buildProjectControlDashboard({
       project,
@@ -1255,6 +1325,76 @@ test("buildProjectControlDashboard", async (t) => {
     assert.ok(dashboard.aiPipelineControlPlan.recheckOutcomeDetail.includes("谨慎小批"));
     assert.equal(dashboard.aiPipelineControlPlan.recheckActionLabel, "恢复小批执行");
     assert.equal(dashboard.aiPipelineControlPlan.recheckActionHref, "/tasks#recommended-batch");
+  });
+
+  await t.test("routes production decision to recovered AI pipeline small batch", () => {
+    const dashboard = buildProjectControlDashboard({
+      project,
+      platform: getPlatformProfile("fanqie"),
+      chapters: [chapter],
+      outlineNodes: [],
+      characters: [],
+      worldEntries: [],
+      foreshadows: [],
+      plotThreads: [],
+      aiTasks: [],
+      gateActionAudits: [
+        {
+          receiptId: "blocked-batch",
+          label: "失败批次",
+          detail: "番茄小说 · 夜雨系统 · 批量初稿 2 个",
+          href: "/tasks#recommended-batch",
+          status: "failed",
+          message: "推荐批次失败。",
+          executionType: "recommended_batch",
+          succeededCount: 0,
+          failedCount: 2,
+          payload: JSON.stringify({
+            plan: {
+              strategyBases: [{ title: "首轮平台打法：番茄小说", label: "三轮稳住", primaryTactic: "先稳小样本。" }],
+              actionLabel: "批量初稿 2 个",
+              category: "draft",
+            },
+            routeEffectSummary: { successRatePercent: 0, knownCostUsd: 0.02, averageQualityScore: 68 },
+            batchReceipt: { status: "repair", headline: "批次有失败，先修再放大" },
+          }),
+          createdAt: "2026-01-02T00:00:00.000Z",
+        },
+        {
+          receiptId: "ai-plan-ready",
+          actionId: "ai-pipeline-control:demo-project",
+          label: "批量打法修复清单",
+          detail: "三轮稳住打法：成功率 0%，质量 68，失败 2。",
+          href: "/projects/demo-project#ai-pipeline",
+          status: "succeeded",
+          message: "复检完成：可小批恢复。",
+          executionType: "control_action",
+          succeededCount: 3,
+          failedCount: 0,
+          payload: JSON.stringify({
+            aiPipelineControlPlan: {
+              status: "watch",
+              items: [{ id: "stop-scale", label: "停用三轮稳住打法继续放量", completed: true }],
+              recheck: {
+                status: "small_batch_ready",
+                healthLabel: "可小批恢复",
+                detail: "小样本通过，可以恢复谨慎小批。",
+              },
+            },
+          }),
+          createdAt: "2026-01-03T00:00:00.000Z",
+        },
+      ],
+      submissionChecklist: checklist,
+    });
+
+    assert.equal(dashboard.aiPipelineControlPlan.canRecheck, false);
+    assert.equal(dashboard.productionDecision.dispatchStatus, "completed");
+    assert.equal(dashboard.productionDecision.dispatchLabel, "可恢复小批");
+    assert.ok(dashboard.productionDecision.dispatchDetail.includes("谨慎小批"));
+    assert.equal(dashboard.productionDecision.primaryActionLabel, "恢复小批执行");
+    assert.equal(dashboard.productionDecision.primaryTargetHref, "/tasks#recommended-batch");
+    assert.equal(dashboard.productionDecision.primaryActionExecution, "link");
   });
 
   await t.test("turns AI recovery outcome into visible prompt memory", () => {

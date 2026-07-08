@@ -1349,12 +1349,30 @@ function aiPipelineControlPlanDispatchFields(
 ): Pick<ProductionDecisionSummary, "dispatchStatus" | "dispatchLabel" | "dispatchDetail" | "dispatchHref"> {
   if (!plan.hasPlan) return emptyProductionDispatch();
 
+  if (plan.recheckStatus === "small_batch_ready") {
+    return {
+      dispatchStatus: "completed",
+      dispatchLabel: "可恢复小批",
+      dispatchDetail: plan.recheckOutcomeDetail || plan.recheckMessage || "复检已允许恢复谨慎小批执行。",
+      dispatchHref: plan.recheckActionHref ?? "/tasks#recommended-batch",
+    };
+  }
+
   if (plan.recheckDispatchHref) {
     return {
+      dispatchStatus: "assigned",
+      dispatchLabel: "待派单验收",
+      dispatchDetail: `${plan.recheckDispatchTitle ?? "AI 写审改复检派单"}待验收：${plan.recheckOutcomeDetail || plan.recheckMessage || "完成派单验收后再判断能否恢复小批。"}`,
+      dispatchHref: plan.recheckDispatchHref,
+    };
+  }
+
+  if (plan.recheckStatus === "sample_required") {
+    return {
       dispatchStatus: "needs_governance",
-      dispatchLabel: plan.recheckOutcomeLabel || "复检派单",
-      dispatchDetail: plan.recheckOutcomeDetail || plan.recheckMessage || "复检已经转入派单，等验收后再恢复批量生产。",
-      dispatchHref: plan.recheckActionHref ?? plan.recheckDispatchHref,
+      dispatchLabel: "继续修复",
+      dispatchDetail: plan.recheckOutcomeDetail || plan.recheckMessage || "复检仍要求先跑小样本，不能直接恢复批量生产。",
+      dispatchHref: "#ai-pipeline",
     };
   }
 
@@ -1375,6 +1393,56 @@ function aiPipelineControlPlanDispatchFields(
   };
 }
 
+function aiPipelineProductionPrimaryAction(
+  plan: AiPipelineControlPlanSummary,
+  dispatch: Pick<ProductionDecisionSummary, "dispatchStatus" | "dispatchHref">,
+  activeLabel: string,
+  fallbackHref: string,
+): Pick<ProductionDecisionSummary, "primaryActionLabel" | "primaryTargetHref" | "primaryActionExecution" | "primaryActionReceiptId"> {
+  if (dispatch.dispatchStatus === "none") {
+    return {
+      primaryActionLabel: activeLabel,
+      primaryTargetHref: fallbackHref,
+      primaryActionExecution: "link",
+      primaryActionReceiptId: null,
+    };
+  }
+
+  if (plan.recheckStatus === "small_batch_ready") {
+    return {
+      primaryActionLabel: plan.recheckActionLabel ?? "恢复小批执行",
+      primaryTargetHref: plan.recheckActionHref ?? dispatch.dispatchHref ?? "/tasks#recommended-batch",
+      primaryActionExecution: "link",
+      primaryActionReceiptId: null,
+    };
+  }
+
+  if (plan.recheckDispatchHref) {
+    return {
+      primaryActionLabel: "看复检派单",
+      primaryTargetHref: plan.recheckDispatchHref,
+      primaryActionExecution: "link",
+      primaryActionReceiptId: null,
+    };
+  }
+
+  if (dispatch.dispatchStatus === "completed") {
+    return {
+      primaryActionLabel: "复检批量健康",
+      primaryTargetHref: dispatch.dispatchHref ?? "#ai-pipeline",
+      primaryActionExecution: "ai_pipeline_recheck",
+      primaryActionReceiptId: plan.receiptId,
+    };
+  }
+
+  return {
+    primaryActionLabel: "看修复清单",
+    primaryTargetHref: dispatch.dispatchHref ?? "#ai-pipeline",
+    primaryActionExecution: "link",
+    primaryActionReceiptId: null,
+  };
+}
+
 function buildProductionDecisionSummary(input: {
   batch: AiPipelineBatchSummary;
   batchHealth: AiPipelineBatchHealthSummary;
@@ -1386,6 +1454,12 @@ function buildProductionDecisionSummary(input: {
   const aiPipelineControlDispatch = aiPipelineControlPlanDispatchFields(input.aiPipelineControlPlan);
   if (input.batchHealth.status === "blocked") {
     const hasControlDispatch = aiPipelineControlDispatch.dispatchStatus !== "none";
+    const primaryAction = aiPipelineProductionPrimaryAction(
+      input.aiPipelineControlPlan,
+      aiPipelineControlDispatch,
+      "修批量打法",
+      "/failures",
+    );
     return {
       status: "repair",
       tone: "block",
@@ -1397,14 +1471,7 @@ function buildProductionDecisionSummary(input: {
       actionMode: hasControlDispatch ? null : "seed",
       executeLabel: "生成修复清单",
       ...aiPipelineControlDispatch,
-      primaryActionLabel: hasControlDispatch
-        ? aiPipelineControlDispatch.dispatchStatus === "completed"
-          ? "复检批量健康"
-          : "看修复清单"
-        : "修批量打法",
-      primaryTargetHref: hasControlDispatch ? aiPipelineControlDispatch.dispatchHref ?? "#ai-pipeline" : "/failures",
-      primaryActionExecution: hasControlDispatch && aiPipelineControlDispatch.dispatchStatus === "completed" ? "ai_pipeline_recheck" : "link",
-      primaryActionReceiptId: hasControlDispatch && aiPipelineControlDispatch.dispatchStatus === "completed" ? input.aiPipelineControlPlan.receiptId : null,
+      ...primaryAction,
       secondaryActionLabel: input.modelRouteHealth.actionLabel,
       secondaryTargetHref: input.modelRouteHealth.targetHref,
     };
@@ -1457,6 +1524,12 @@ function buildProductionDecisionSummary(input: {
 
   if (input.batchHealth.status === "watch") {
     const hasControlDispatch = aiPipelineControlDispatch.dispatchStatus !== "none";
+    const primaryAction = aiPipelineProductionPrimaryAction(
+      input.aiPipelineControlPlan,
+      aiPipelineControlDispatch,
+      input.batchHealth.executeLabel,
+      input.batchHealth.targetHref,
+    );
     return {
       status: "recheck",
       tone: "watch",
@@ -1468,14 +1541,7 @@ function buildProductionDecisionSummary(input: {
       actionMode: hasControlDispatch ? null : "seed",
       executeLabel: input.batchHealth.executeLabel,
       ...aiPipelineControlDispatch,
-      primaryActionLabel: hasControlDispatch
-        ? aiPipelineControlDispatch.dispatchStatus === "completed"
-          ? "复检批量健康"
-          : "看复验清单"
-        : input.batchHealth.executeLabel,
-      primaryTargetHref: hasControlDispatch ? aiPipelineControlDispatch.dispatchHref ?? "#ai-pipeline" : input.batchHealth.targetHref,
-      primaryActionExecution: hasControlDispatch && aiPipelineControlDispatch.dispatchStatus === "completed" ? "ai_pipeline_recheck" : "link",
-      primaryActionReceiptId: hasControlDispatch && aiPipelineControlDispatch.dispatchStatus === "completed" ? input.aiPipelineControlPlan.receiptId : null,
+      ...primaryAction,
       secondaryActionLabel: input.modelRouteHealth.actionLabel,
       secondaryTargetHref: input.modelRouteHealth.targetHref,
     };
@@ -1654,7 +1720,7 @@ function buildAiPipelineControlPlanSummary(audits: ControlBatchAudit[] = []): Ai
     completedCount,
     totalCount,
     items,
-    canRecheck: totalCount > 0 && completedCount === totalCount && !recheckDispatchKey,
+    canRecheck: totalCount > 0 && completedCount === totalCount && !recheckStatus && !recheckDispatchKey,
     recheckLabel: "复检批量健康",
     recheckStatus,
     recheckMessage,

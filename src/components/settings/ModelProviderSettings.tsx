@@ -2864,7 +2864,7 @@ export function ModelProviderSettings({
             {message ? <span className="text-sm text-slate-600">{message}</span> : null}
           </div>
           {providerSetupNotice ? (
-            <div className="flex flex-col gap-2 rounded-md border border-sky-200 bg-sky-50 p-3 text-sm text-sky-900 sm:flex-row sm:items-center sm:justify-between">
+            <div aria-label="模型配置动作已完成" className="flex flex-col gap-2 rounded-md border border-sky-200 bg-sky-50 p-3 text-sm text-sky-900 sm:flex-row sm:items-center sm:justify-between">
               <span>{providerSetupNotice.message}</span>
               {providerSetupNotice.action === "apply_first_day_routes" ? (
                 <button
@@ -2879,6 +2879,11 @@ export function ModelProviderSettings({
               {providerSetupNotice.action === "return_project" && providerSetupNotice.href ? (
                 <Link className="w-fit rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white" href={hrefWithGateReturn(providerSetupNotice.href, gateReturnHref)}>
                   {providerSetupNotice.actionLabel}
+                </Link>
+              ) : null}
+              {gateReturnHref ? (
+                <Link className="w-fit rounded-md bg-white px-3 py-2 text-xs font-medium text-sky-800 hover:bg-sky-100" href={gateReturnHref}>
+                  回总闸门复检
                 </Link>
               ) : null}
             </div>

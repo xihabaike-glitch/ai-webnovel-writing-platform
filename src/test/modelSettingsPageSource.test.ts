@@ -47,3 +47,10 @@ test("model settings renders concrete provider interface contracts", () => {
   assert.ok(settingsSource.includes("contract.defaultBaseUrl"));
   assert.ok(settingsSource.includes("contract.connectionTestLabel"));
 });
+
+test("model settings exposes gate recheck inside model setup action notices", () => {
+  assert.ok(settingsSource.includes("模型配置动作已完成"));
+  assert.ok(settingsSource.includes("回总闸门复检"));
+  assert.ok(settingsSource.includes("href={gateReturnHref}"));
+  assert.ok(settingsSource.includes("gateReturnHref ? ("));
+});

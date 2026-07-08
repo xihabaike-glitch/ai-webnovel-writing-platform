@@ -65,6 +65,11 @@ test("tasks page shows task receipt acceptance criteria in the PM focus", () => 
 test("tasks page renders receipt templates on queue items", () => {
   assert.ok(source.includes("任务回执模板"));
   assert.ok(source.includes("entry.receiptTemplate.map"));
+  assert.ok(source.includes("entry.runbookStep"));
+  assert.ok(source.includes("当前实跑动作"));
+  assert.ok(source.includes("entry.runbookStep.sampleAction"));
+  assert.ok(source.includes("entry.runbookStep.proofToCapture"));
+  assert.ok(source.includes("entry.runbookStep.rollbackIfWeak"));
   assert.ok(source.includes("break-words"));
   assert.ok(source.includes('className="grid min-w-0 gap-3 [&>*]:min-w-0"'));
   assert.ok(source.includes('className="mt-1 grid min-w-0 gap-1"'));

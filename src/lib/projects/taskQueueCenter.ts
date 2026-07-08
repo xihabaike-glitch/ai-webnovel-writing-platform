@@ -1,6 +1,7 @@
 import { buildBatchDraftQueue } from "../ai/batchDrafts.ts";
 import { buildReviewPipelineQueue } from "../ai/batchReviewPipeline.ts";
 import { getChapterRevisionSourceLabel, isChapterRevisionCandidate, previewRevisionContent } from "../chapters/revisions.ts";
+import { buildDevelopmentOverview, type DevelopmentOverviewPipelineProofStep } from "../development/developmentOverview.ts";
 import { buildExportSnapshotHistory } from "../export/snapshots.ts";
 import { buildExportVersionCenter } from "../export/versionCenter.ts";
 import { getPlatformProfile, platformDeliveryScope, type PlatformId } from "../platforms/platformProfiles.ts";
@@ -129,6 +130,15 @@ export interface QueueHandoffGuidance {
   firstDayOutcome: QueueFirstDayExecutionOutcome | null;
 }
 
+export interface TaskQueueRunbookStep {
+  stepId: DevelopmentOverviewPipelineProofStep["id"];
+  title: string;
+  owner: string;
+  sampleAction: string;
+  proofToCapture: string;
+  rollbackIfWeak: string;
+}
+
 export interface QueueItem {
   id: string;
   projectId: string;
@@ -144,6 +154,7 @@ export interface QueueItem {
   completionEvidenceTemplate?: string;
   completionEvidenceTemplateSource?: string;
   receiptTemplate: string[];
+  runbookStep: TaskQueueRunbookStep;
   label: string;
   chapterTitle: string;
   evidence: string;
@@ -721,7 +732,43 @@ function buildQueueItemReceiptTemplate(input: Pick<QueueItem, "projectTitle" | "
   ];
 }
 
-function item(input: Omit<QueueItem, "label" | "priority" | "blockerType" | "riskLevel" | "riskLabel" | "riskNotice" | "scaleGate" | "evidenceChips" | "receiptTemplate"> & {
+function runbookStepIdForQueueItem(input: Pick<QueueItem, "category" | "sourceType" | "blockerType">): DevelopmentOverviewPipelineProofStep["id"] {
+  if (input.blockerType === "chapter_card" || input.blockerType === "risk_recovery" || input.blockerType === "first_day_gate") {
+    return "project_start";
+  }
+  if (input.category === "candidate" || input.category === "draft" || input.category === "review" || input.category === "second_pass" || input.sourceType === "first_three_adoption") {
+    return "sample_draft";
+  }
+  if (input.blockerType === "role_closure" || input.category === "handoff" || input.sourceType === "role_closure" || input.sourceType === "first_day_handoff") {
+    return "task_dispatch";
+  }
+  if (input.blockerType === "watch_scale_gate") {
+    return "gate_check";
+  }
+  if (input.category === "effect" || input.category === "export" || input.blockerType === "publish_repair" || input.blockerType === "export_version" || input.sourceType === "platform_strategy" || input.sourceType === "export_version_recheck") {
+    return "publish_package";
+  }
+  return "task_dispatch";
+}
+
+function buildTaskQueueRunbookStep(input: Pick<QueueItem, "category" | "sourceType" | "blockerType">): TaskQueueRunbookStep {
+  const overview = buildDevelopmentOverview();
+  const stepId = runbookStepIdForQueueItem(input);
+  const runbookItem = overview.currentPipelineValidation.runbook.items.find((entry) => entry.stepId === stepId)
+    ?? overview.currentPipelineValidation.runbook.items[0];
+  const proofStep = overview.pipelineProofRoute.steps.find((step) => step.id === runbookItem.stepId);
+
+  return {
+    stepId: runbookItem.stepId,
+    title: proofStep?.title ?? runbookItem.stepId,
+    owner: runbookItem.owner,
+    sampleAction: runbookItem.sampleAction,
+    proofToCapture: runbookItem.proofToCapture,
+    rollbackIfWeak: runbookItem.rollbackIfWeak,
+  };
+}
+
+function item(input: Omit<QueueItem, "label" | "priority" | "blockerType" | "riskLevel" | "riskLabel" | "riskNotice" | "scaleGate" | "evidenceChips" | "receiptTemplate" | "runbookStep"> & {
   blockerType?: QueueItem["blockerType"];
   riskLevel?: QueueItem["riskLevel"];
   riskLabel?: string;
@@ -748,6 +795,7 @@ function item(input: Omit<QueueItem, "label" | "priority" | "blockerType" | "ris
     priority: input.priority ?? categoryPriority[input.category],
     evidenceChips: input.evidenceChips ?? queueEvidenceChips({ sourceType: input.sourceType, handoffGuidance }),
     receiptTemplate: buildQueueItemReceiptTemplate(normalized),
+    runbookStep: buildTaskQueueRunbookStep(normalized),
   };
 }
 

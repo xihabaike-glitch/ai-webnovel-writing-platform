@@ -285,6 +285,12 @@ test("buildTaskQueueCenter", async (t) => {
     assert.ok(queue.recommendedNext?.receiptTemplate.some((line) => line.includes("人工验收：通过 / 退回")));
     assert.ok(queue.recommendedNext?.receiptTemplate.some((line) => line.includes("下一步：")));
     assert.ok(queue.recommendedNext?.receiptTemplate.some((line) => line.includes("停手线：")));
+    assert.ok(queue.recommendedNext?.runbookStep.title.length);
+    assert.ok(queue.recommendedNext?.runbookStep.owner.length);
+    assert.ok(queue.recommendedNext?.runbookStep.sampleAction.length);
+    assert.ok(queue.recommendedNext?.runbookStep.proofToCapture.length);
+    assert.ok(queue.recommendedNext?.runbookStep.rollbackIfWeak.length);
+    assert.ok(queue.items.every((item) => item.runbookStep.stepId.length));
   });
 
   await t.test("builds a focused blocked debt view for clearing batch risks", () => {

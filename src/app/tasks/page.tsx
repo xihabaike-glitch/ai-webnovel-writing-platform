@@ -1728,6 +1728,14 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
                   {entry.platformName} · {entry.chapterTitle}
                 </div>
                 <p className="mt-2 text-sm leading-6 text-slate-600">{entry.evidence}</p>
+                <div className="mt-3 rounded-md border border-sky-200 bg-sky-50 px-3 py-2 text-xs leading-5 text-sky-950">
+                  <div className="font-medium text-slate-950">当前实跑动作 · {entry.runbookStep.title}</div>
+                  <div className="mt-1 grid min-w-0 gap-1">
+                    <span className="min-w-0 break-words">样本动作：{entry.runbookStep.sampleAction}</span>
+                    <span className="min-w-0 break-words">要抓证据：{entry.runbookStep.proofToCapture}</span>
+                    <span className="min-w-0 break-words">退路：{entry.runbookStep.rollbackIfWeak}</span>
+                  </div>
+                </div>
                 <div className="mt-3 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs leading-5 text-slate-700">
                   <div className="font-medium text-slate-950">任务回执模板</div>
                   <div className="mt-1 grid min-w-0 gap-1">

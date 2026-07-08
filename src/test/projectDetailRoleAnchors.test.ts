@@ -521,6 +521,10 @@ test("chapter editor can write a first chapter sample acceptance receipt", () =>
   assert.ok(chapterEditor.includes("生成首章验收回执"));
   assert.ok(chapterEditor.includes("首章验收回执已写入总闸门"));
   assert.ok(chapterEditor.includes("projectId: chapter.projectId"));
+  assert.ok(chapterEditor.includes("openingSampleGateRecheckHref"));
+  assert.ok(chapterEditor.includes("source=real-sample-receipt"));
+  assert.ok(chapterEditor.includes("查看首章回执复检"));
+  assert.ok(chapterEditor.includes("saveChapter({ refresh: false })"));
   assert.ok(chapterEditor.includes("gateReturnHref"));
 });
 

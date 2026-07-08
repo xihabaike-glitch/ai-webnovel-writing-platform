@@ -76,8 +76,9 @@ export function ChapterEditor({ chapter, gateReturnHref }: { chapter: EditableCh
   ];
   const firstChapterSampleDoneCount = firstChapterSampleChecklist.filter((item) => item.done).length;
   const firstChapterSampleReady = firstChapterSampleDoneCount === firstChapterSampleChecklist.length;
+  const openingSampleGateRecheckHref = `/gate?focus=action-recheck&projectId=${encodeURIComponent(chapter.projectId)}&source=real-sample-receipt#gate-focus-notice`;
 
-  async function saveChapter() {
+  async function saveChapter(options: { refresh?: boolean } = {}) {
     setIsSaving(true);
     setMessage(null);
 
@@ -104,7 +105,9 @@ export function ChapterEditor({ chapter, gateReturnHref }: { chapter: EditableCh
       }
 
       setMessage("已保存");
-      router.refresh();
+      if (options.refresh !== false) {
+        router.refresh();
+      }
       return true;
     } catch (caught) {
       setMessage(caught instanceof Error ? caught.message : "保存失败。");
@@ -119,7 +122,7 @@ export function ChapterEditor({ chapter, gateReturnHref }: { chapter: EditableCh
     setReceiptMessage(null);
     setIsWritingReceipt(true);
 
-    const saved = await saveChapter();
+    const saved = await saveChapter({ refresh: false });
     if (!saved) {
       setIsWritingReceipt(false);
       return;
@@ -211,7 +214,17 @@ export function ChapterEditor({ chapter, gateReturnHref }: { chapter: EditableCh
               >
                 {isWritingReceipt ? "写入中" : "生成首章验收回执"}
               </button>
-              {receiptMessage ? <span className="text-xs text-slate-600">{receiptMessage}</span> : null}
+              {receiptMessage ? (
+                <>
+                  <span className="text-xs text-slate-600">{receiptMessage}</span>
+                  <a
+                    className="w-fit rounded-md border border-sky-200 bg-white px-3 py-2 text-xs font-medium text-sky-900 hover:bg-sky-100"
+                    href={openingSampleGateRecheckHref}
+                  >
+                    查看首章回执复检
+                  </a>
+                </>
+              ) : null}
             </div>
           ) : null}
         </section>
@@ -269,7 +282,7 @@ export function ChapterEditor({ chapter, gateReturnHref }: { chapter: EditableCh
           <button
             className="rounded-md bg-slate-950 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
             disabled={isSaving}
-            onClick={saveChapter}
+            onClick={() => saveChapter()}
             type="button"
           >
             {isSaving ? "保存中" : "保存章节"}

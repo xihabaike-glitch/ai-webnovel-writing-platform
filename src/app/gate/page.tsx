@@ -256,6 +256,18 @@ export default async function GatePage({
   const realSampleReceiptProjectTitle = realSampleReceiptFocus
     ? projects.find((project) => project.id === projectId)?.title ?? projectId ?? "未指定作品"
     : null;
+  const gateActionReceipts = projects.flatMap((project) => project.gateActionAudits.map(gateActionReceiptFromAuditRecord));
+  const latestOpeningSampleReceipt = realSampleReceiptFocus
+    ? gateActionReceipts
+        .filter((receipt) => (
+          receipt.actionId.startsWith("project-acceptance:opening_sample:")
+          && (!projectId || receipt.actionId === `project-acceptance:opening_sample:${projectId}`)
+        ))
+        .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime())[0] ?? null
+    : null;
+  const openingSampleReceiptLines = latestOpeningSampleReceipt
+    ? latestOpeningSampleReceipt.message.split("\n").filter(Boolean).slice(0, 8)
+    : [];
   const chaptersById = new Map(chapters.map((chapter) => [chapter.id, chapter]));
   const recentTasksWithChapter = recentAiTasks.map((task) => ({
     ...task,
@@ -331,9 +343,7 @@ export default async function GatePage({
     deliveryActionLabel: gate.realPipelineFinalReview.primaryActionLabel,
     deliveryActionHref: gate.realPipelineFinalReview.primaryActionHref,
   });
-  const finalDeliveryReceiptReview = buildGateFinalDeliveryReceiptReview(
-    projects.flatMap((project) => project.gateActionAudits.map(gateActionReceiptFromAuditRecord)),
-  );
+  const finalDeliveryReceiptReview = buildGateFinalDeliveryReceiptReview(gateActionReceipts);
   const {
     closeoutPercent: finalDeliveryGateCloseoutPercent,
     releaseLabel: finalDeliveryGateReleaseLabel,
@@ -695,6 +705,30 @@ export default async function GatePage({
             )}
           </div>
           <div className="mt-4 rounded-md border border-white/70 bg-white/75 p-3">
+            {latestOpeningSampleReceipt ? (
+              <div className="mb-4 rounded-md border border-sky-100 bg-white/80 p-3 text-sm text-sky-950">
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                  <div>
+                    <div className="text-xs font-medium text-sky-700">首章样本回执已接收</div>
+                    <h3 className="mt-1 font-medium">{latestOpeningSampleReceipt.label}</h3>
+                    <p className="mt-1 leading-6 text-slate-700">{latestOpeningSampleReceipt.detail}</p>
+                  </div>
+                  <Link
+                    className="w-fit rounded-md border border-sky-200 bg-white px-3 py-2 text-xs font-medium text-sky-950 hover:bg-sky-100"
+                    href={hrefWithGateReturn(latestOpeningSampleReceipt.href, gateRecheckReturnHref)}
+                  >
+                    查看首章
+                  </Link>
+                </div>
+                <div className="mt-3 grid gap-2 lg:grid-cols-2">
+                  {openingSampleReceiptLines.map((line) => (
+                    <div className="rounded-md bg-sky-50 px-3 py-2 text-xs leading-5 text-slate-700" key={line}>
+                      {line}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null}
             <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
               <div>
                 <div className="text-xs font-medium text-sky-700">真实作品流水线终检</div>

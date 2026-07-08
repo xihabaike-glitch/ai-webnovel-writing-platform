@@ -43,6 +43,16 @@ test("gate page renders real sample receipt recheck context", () => {
   assert.ok(source.includes("href={hrefWithGateReturn(`/projects/${projectId}#pipeline-projects`, gateRecheckReturnHref)}"));
 });
 
+test("gate page surfaces the latest opening sample receipt in real sample focus", () => {
+  assert.ok(source.includes("latestOpeningSampleReceipt"));
+  assert.ok(source.includes("project-acceptance:opening_sample:"));
+  assert.ok(source.includes("openingSampleReceiptLines"));
+  assert.ok(source.includes("latestOpeningSampleReceipt.message.split"));
+  assert.ok(source.includes("首章样本回执已接收"));
+  assert.ok(source.includes("openingSampleReceiptLines.map"));
+  assert.ok(source.includes("latestOpeningSampleReceipt.href"));
+});
+
 test("gate page renders real sample final review checklist", () => {
   assert.ok(source.includes("buildDevelopmentOverview"));
   assert.ok(source.includes("overview.currentPipelineValidation.finalReview"));

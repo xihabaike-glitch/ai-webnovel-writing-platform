@@ -69,6 +69,9 @@ export interface ProjectAcceptanceMissingEvidence {
   stopRule: string;
   href: string;
   actionLabel: string;
+  ownerRole: string;
+  actionMode: "workspace" | "ai_task" | "dispatch" | "publish";
+  executionHint: string;
 }
 
 export interface ProjectRoleClosureLane {
@@ -140,6 +143,47 @@ const missingEvidenceActionLabels: Record<ProjectAcceptanceStep["id"], string> =
   dispatch_receipt: "回填派单验收",
   role_dispatch: "补角色派单",
   publish_package: "打开发布包",
+};
+
+const missingEvidenceExecutionSpecs: Record<
+  ProjectAcceptanceStep["id"],
+  Pick<ProjectAcceptanceMissingEvidence, "ownerRole" | "actionMode" | "executionHint">
+> = {
+  project_start: {
+    ownerRole: "主编",
+    actionMode: "workspace",
+    executionHint: "回作品工作台补目标平台、篇幅和开书基础，再进入模型生成。",
+  },
+  opening_sample: {
+    ownerRole: "开头编辑",
+    actionMode: "workspace",
+    executionHint: "打开第一章补正文、钩子、冲突、价值变化和章末追读。",
+  },
+  chapter_review: {
+    ownerRole: "审稿编辑",
+    actionMode: "ai_task",
+    executionHint: "在 AI 流水线里启动章节审稿，保留成功任务记录和人工判断。",
+  },
+  second_pass: {
+    ownerRole: "二改编辑",
+    actionMode: "ai_task",
+    executionHint: "在 AI 流水线里启动章节二改，二改结果通过后再进总闸门放量。",
+  },
+  dispatch_receipt: {
+    ownerRole: "派单验收负责人",
+    actionMode: "dispatch",
+    executionHint: "去派单中心补完成依据、人工验收和下一步判断。",
+  },
+  role_dispatch: {
+    ownerRole: "角色验收负责人",
+    actionMode: "dispatch",
+    executionHint: "补齐结构、资料、平台包装角色派单闭环，再回总闸门复检。",
+  },
+  publish_package: {
+    ownerRole: "平台包装编辑",
+    actionMode: "publish",
+    executionHint: "打开发布包补前三章、卖点、标签、简介和平台复盘入口。",
+  },
 };
 
 function roleDispatchPrefix(projectId: string | undefined, intentId: string) {
@@ -294,6 +338,7 @@ function buildProjectRealSampleAcceptanceSheet(input: ProjectDashboardInput): Pr
       stopRule: step.stopRule,
       href: step.href,
       actionLabel: missingEvidenceActionLabels[step.id],
+      ...missingEvidenceExecutionSpecs[step.id],
     })) satisfies ProjectAcceptanceMissingEvidence[];
   const steps = definitions.map((step, index) => ({
     id: step.id,

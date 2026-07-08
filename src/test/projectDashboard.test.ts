@@ -117,8 +117,15 @@ test("buildProjectDashboard", async (t) => {
     );
     assert.ok(dashboard.realSampleAcceptanceSheet.missingEvidence[0]?.reason.includes("二改"));
     assert.equal(dashboard.realSampleAcceptanceSheet.missingEvidence[0]?.actionLabel, "启动二改");
+    assert.equal(dashboard.realSampleAcceptanceSheet.missingEvidence[0]?.ownerRole, "二改编辑");
+    assert.equal(dashboard.realSampleAcceptanceSheet.missingEvidence[0]?.actionMode, "ai_task");
+    assert.ok(dashboard.realSampleAcceptanceSheet.missingEvidence[0]?.executionHint.includes("章节二改"));
     assert.equal(dashboard.realSampleAcceptanceSheet.missingEvidence[1]?.actionLabel, "回填派单验收");
+    assert.equal(dashboard.realSampleAcceptanceSheet.missingEvidence[1]?.ownerRole, "派单验收负责人");
+    assert.equal(dashboard.realSampleAcceptanceSheet.missingEvidence[1]?.actionMode, "dispatch");
+    assert.ok(dashboard.realSampleAcceptanceSheet.missingEvidence[1]?.executionHint.includes("派单中心"));
     assert.equal(dashboard.realSampleAcceptanceSheet.missingEvidence[2]?.actionLabel, "打开发布包");
+    assert.equal(dashboard.realSampleAcceptanceSheet.missingEvidence[2]?.actionMode, "publish");
     assert.ok(dashboard.realSampleAcceptanceSheet.blockReason.includes("不能进总闸门放量"));
     assert.ok(dashboard.realSampleAcceptanceSheet.steps.find((step) => step.id === "opening_sample")?.evidence.includes("钩子"));
     assert.ok(dashboard.realSampleAcceptanceSheet.steps.find((step) => step.id === "dispatch_receipt")?.stopRule.includes("人工验收"));
@@ -207,6 +214,9 @@ test("buildProjectDashboard", async (t) => {
     assert.ok(blocked.realSampleAcceptanceSheet.steps.find((step) => step.id === "role_dispatch")?.evidence.includes("资料官"));
     assert.equal(blocked.realSampleAcceptanceSheet.missingEvidence[0]?.stepId, "role_dispatch");
     assert.equal(blocked.realSampleAcceptanceSheet.missingEvidence[0]?.actionLabel, "补角色派单");
+    assert.equal(blocked.realSampleAcceptanceSheet.missingEvidence[0]?.ownerRole, "角色验收负责人");
+    assert.equal(blocked.realSampleAcceptanceSheet.missingEvidence[0]?.actionMode, "dispatch");
+    assert.ok(blocked.realSampleAcceptanceSheet.missingEvidence[0]?.executionHint.includes("结构、资料、平台包装"));
     assert.equal(blocked.realSampleAcceptanceSheet.roleClosureProgress?.completedRoles, 1);
     assert.equal(blocked.realSampleAcceptanceSheet.roleClosureProgress?.totalRoles, 3);
     assert.deepEqual(blocked.realSampleAcceptanceSheet.roleClosureProgress?.completedLabels, ["结构主编"]);

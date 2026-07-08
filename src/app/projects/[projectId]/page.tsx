@@ -758,6 +758,8 @@ export default async function ProjectPage({
                   >
                     <div className="font-medium text-white">{item.label}</div>
                     <p className="mt-1 text-slate-300">{item.reason}</p>
+                    <div className="mt-2 text-slate-400">负责人：{item.ownerRole}</div>
+                    <p className="mt-1 text-slate-300">{item.executionHint}</p>
                     <div className="mt-2 inline-flex rounded-md bg-white px-2 py-1 font-medium text-slate-950">
                       {item.actionLabel}
                     </div>

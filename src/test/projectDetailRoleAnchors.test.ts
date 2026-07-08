@@ -73,6 +73,8 @@ test("project detail page renders the single-project acceptance sheet", () => {
   assert.ok(projectPage.includes("证据缺口"));
   assert.ok(projectPage.includes("dashboard.realSampleAcceptanceSheet.blockReason"));
   assert.ok(projectPage.includes("item.actionLabel"));
+  assert.ok(projectPage.includes("item.ownerRole"));
+  assert.ok(projectPage.includes("item.executionHint"));
   assert.ok(projectPage.includes("dashboard.realSampleAcceptanceSheet.steps.map"));
   assert.ok(projectPage.includes("step.stopRule"));
   assert.ok(projectPage.includes("dashboard.realSampleAcceptanceSheet.actionHref"));

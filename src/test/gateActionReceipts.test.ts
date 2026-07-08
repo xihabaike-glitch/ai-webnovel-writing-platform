@@ -57,6 +57,7 @@ import {
   buildGateFirstThreeAdoptionReceipt,
   buildGateExportVersionActionReceipt,
   buildGateFinalDeliveryReceipt,
+  buildGateFinalDeliveryReceiptReview,
   buildGatePublishEffectReceipt,
   filterGateDispatchTasks,
   filterGateActionReceipts,
@@ -1637,6 +1638,113 @@ test("buildGateActionReceipt", async (t) => {
     assert.ok(receipt.message.includes("人工验收：通过 / 退回"));
     assert.equal(receipt.recheck.status, "blocked");
     assert.equal(receipt.recheck.label, "复检最终交付清单");
+  });
+
+  await t.test("reviews final delivery receipts as a gate closeout summary", () => {
+    const readyItem = {
+      id: "publish-package" as const,
+      label: "发布包",
+      status: "done" as const,
+      evidence: "发布包已保存版本。",
+      actionLabel: "查看发布包",
+      actionHref: "#platform-export",
+      receiptTemplate: [
+        "交付项：发布包",
+        "当前状态：已交付",
+        "证据：发布包已保存版本。",
+        "产物位置：#platform-export",
+        "人工验收：通过 / 退回，并写明理由。",
+        "下一步：查看发布包",
+        "停手线：缺产物位置、人工验收或下一步判断，不允许回总闸门标记闭环。",
+      ],
+    };
+    const blockedItem = {
+      id: "real-effect" as const,
+      label: "真实效果",
+      status: "blocked" as const,
+      evidence: "还没有回填真实投放数据。",
+      actionLabel: "录入发布效果",
+      actionHref: "#publish-effect-panel",
+      receiptTemplate: [
+        "交付项：真实效果",
+        "当前状态：阻塞",
+        "证据：还没有回填真实投放数据。",
+        "产物位置：#publish-effect-panel",
+        "人工验收：通过 / 退回，并写明理由。",
+        "下一步：录入发布效果",
+        "停手线：缺产物位置、人工验收或下一步判断，不允许回总闸门标记闭环。",
+      ],
+    };
+    const review = buildGateFinalDeliveryReceiptReview([
+      buildGateFinalDeliveryReceipt({
+        projectId: "project-1",
+        platformId: "fanqie",
+        platformName: "番茄小说",
+        item: readyItem,
+        now: "2026-01-01T00:00:01.000Z",
+      }),
+      buildGateFinalDeliveryReceipt({
+        projectId: "project-1",
+        platformId: "fanqie",
+        platformName: "番茄小说",
+        item: blockedItem,
+        now: "2026-01-01T00:00:02.000Z",
+      }),
+    ]);
+
+    assert.equal(review.status, "blocked");
+    assert.equal(review.platformName, "番茄小说");
+    assert.equal(review.completedCount, 1);
+    assert.equal(review.blockedCount, 1);
+    assert.equal(review.missingCount, 4);
+    assert.equal(review.totalCount, 6);
+    assert.equal(review.actionLabel, "处理最终交付缺口");
+    assert.equal(review.href, "/projects/project-1#publish-effect-panel");
+    assert.ok(review.detail.includes("已写回 2/6 项"));
+    assert.ok(review.evidence.some((item) => item.includes("真实效果")));
+  });
+
+  await t.test("marks final delivery receipt review ready only after all six items close", () => {
+    const itemIds = [
+      ["publish-package", "发布包", "#platform-export"],
+      ["submission-asset", "投稿材料", "#submission-package"],
+      ["sample-chapters", "前三章样章", "#publish-chapters"],
+      ["publish-baseline", "发布基准", "#package-version-history"],
+      ["real-effect", "真实效果", "#publish-effect-panel"],
+      ["strategy-review", "策略复盘", "#platform-strategy-ranking"],
+    ] as const;
+    const receipts = itemIds.map(([id, label, href], index) => buildGateFinalDeliveryReceipt({
+      projectId: "project-1",
+      platformId: "fanqie",
+      platformName: "番茄小说",
+      now: `2026-01-01T00:00:0${index}.000Z`,
+      item: {
+        id,
+        label,
+        status: "done",
+        evidence: `${label}已交付。`,
+        actionLabel: `查看${label}`,
+        actionHref: href,
+        receiptTemplate: [
+          `交付项：${label}`,
+          "当前状态：已交付",
+          `证据：${label}已交付。`,
+          `产物位置：${href}`,
+          "人工验收：通过 / 退回，并写明理由。",
+          `下一步：查看${label}`,
+          "停手线：缺产物位置、人工验收或下一步判断，不允许回总闸门标记闭环。",
+        ],
+      },
+    }));
+    const review = buildGateFinalDeliveryReceiptReview(receipts);
+
+    assert.equal(review.status, "ready");
+    assert.equal(review.completedCount, 6);
+    assert.equal(review.blockedCount, 0);
+    assert.equal(review.missingCount, 0);
+    assert.equal(review.label, "最终交付已闭环");
+    assert.equal(review.actionLabel, "复检总闸门");
+    assert.equal(review.href, "/gate");
   });
 
   await t.test("builds export version action receipts for executable gate repairs", () => {

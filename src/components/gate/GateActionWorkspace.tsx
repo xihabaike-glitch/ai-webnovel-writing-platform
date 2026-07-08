@@ -8,6 +8,7 @@ import {
   buildGateActionReceiptSummary,
   buildGateActionReviewAdvice,
   buildGateFailureRepairReceiptReview,
+  buildGateFinalDeliveryReceiptReview,
   buildGateFailureRepairRecheckDispatchItems,
   buildGateFailureRepairRecheckResolution,
   buildGateFailureRepairThirdRoundDispatchItems,
@@ -127,6 +128,13 @@ function failureRepairReviewClass(status: ReturnType<typeof buildGateFailureRepa
   if (status === "recheck") return "border-blue-200 bg-blue-50 text-blue-900";
   if (status === "blocked") return "border-rose-200 bg-rose-50 text-rose-900";
   return "border-amber-200 bg-amber-50 text-amber-900";
+}
+
+function finalDeliveryReviewClass(status: ReturnType<typeof buildGateFinalDeliveryReceiptReview>["status"]) {
+  if (status === "ready") return "border-emerald-200 bg-emerald-50 text-emerald-900";
+  if (status === "blocked") return "border-rose-200 bg-rose-50 text-rose-900";
+  if (status === "in_progress") return "border-amber-200 bg-amber-50 text-amber-900";
+  return "border-slate-200 bg-white text-slate-900";
 }
 
 function failureRepairResolutionClass(status: ReturnType<typeof buildGateFailureRepairRecheckResolution>["status"]) {
@@ -407,6 +415,7 @@ export function GateActionWorkspace({
   const summary = buildGateActionReceiptSummary(receipts);
   const filteredSummary = buildGateActionReceiptSummary(filteredReceipts);
   const failureRepairReview = buildGateFailureRepairReceiptReview(failureRepairBatch, receipts);
+  const finalDeliveryReview = buildGateFinalDeliveryReceiptReview(receipts);
   const failureRepairResolution = buildGateFailureRepairRecheckResolution(failureRepairBatch, persistedDispatchTasks);
   const failureRepairThirdRound = buildGateFailureRepairThirdRoundResolution(failureRepairBatch, persistedDispatchTasks);
   const reviewAdvice = buildGateActionReviewAdvice(filteredReceipts);
@@ -680,6 +689,31 @@ export function GateActionWorkspace({
           </label>
         </div>
         <div className="mt-3 grid gap-2">
+          <div className={`rounded-md border p-3 ${finalDeliveryReviewClass(finalDeliveryReview.status)}`}>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <div className="text-sm font-medium">最终交付闭环复检</div>
+                <p className="mt-1 text-xs leading-5 opacity-85">{finalDeliveryReview.label} · {finalDeliveryReview.detail}</p>
+              </div>
+              <Link
+                className="w-fit rounded-md bg-white px-3 py-2 text-xs font-medium text-slate-950"
+                href={hrefWithGateReturn(finalDeliveryReview.href, gateReturnHref)}
+              >
+                {finalDeliveryReview.actionLabel}
+              </Link>
+            </div>
+            <div className="mt-3 grid gap-2 text-xs sm:grid-cols-4">
+              <div className="rounded-md bg-white/70 px-3 py-2">平台 {finalDeliveryReview.platformName}</div>
+              <div className="rounded-md bg-white/70 px-3 py-2">已闭环 {finalDeliveryReview.completedCount}/{finalDeliveryReview.totalCount}</div>
+              <div className="rounded-md bg-white/70 px-3 py-2">阻塞 {finalDeliveryReview.blockedCount}</div>
+              <div className="rounded-md bg-white/70 px-3 py-2">缺项 {finalDeliveryReview.missingCount}</div>
+            </div>
+            {finalDeliveryReview.evidence.length ? (
+              <div className="mt-2 grid gap-1 text-xs opacity-80">
+                {finalDeliveryReview.evidence.map((item) => <div key={item}>{item}</div>)}
+              </div>
+            ) : null}
+          </div>
           <div className={`rounded-md border p-3 ${failureRepairReviewClass(failureRepairReview.status)}`}>
             <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
               <div>

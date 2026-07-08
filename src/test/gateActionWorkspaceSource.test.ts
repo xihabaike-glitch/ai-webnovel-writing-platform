@@ -38,3 +38,13 @@ test("gate action workspace shows dispatch receipt acceptance criteria", () => {
   assert.ok(workspaceSource.includes("下一步"));
   assert.ok(workspaceSource.includes("gateDispatchReceiptAcceptanceCriteria.map"));
 });
+
+test("gate action workspace shows final delivery receipt closeout review", () => {
+  assert.ok(workspaceSource.includes("buildGateFinalDeliveryReceiptReview"));
+  assert.ok(workspaceSource.includes("finalDeliveryReview"));
+  assert.ok(workspaceSource.includes("最终交付闭环复检"));
+  assert.ok(workspaceSource.includes("finalDeliveryReview.completedCount"));
+  assert.ok(workspaceSource.includes("finalDeliveryReview.blockedCount"));
+  assert.ok(workspaceSource.includes("finalDeliveryReview.missingCount"));
+  assert.ok(workspaceSource.includes("finalDeliveryReview.evidence.map"));
+});

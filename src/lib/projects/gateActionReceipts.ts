@@ -168,6 +168,35 @@ export interface GateActionReceiptSummary {
   }>;
 }
 
+export type GateFinalDeliveryReceiptReviewStatus = "empty" | "in_progress" | "blocked" | "ready";
+
+export interface GateFinalDeliveryReceiptReviewItem {
+  id: PlatformFinalDeliveryChecklistItem["id"];
+  label: string;
+  status: "done" | "blocked" | "missing";
+  evidence: string;
+  href: string;
+  latestAt: string | null;
+}
+
+export interface GateFinalDeliveryReceiptReview {
+  status: GateFinalDeliveryReceiptReviewStatus;
+  label: string;
+  headline: string;
+  detail: string;
+  platformId: string | null;
+  platformName: string;
+  completedCount: number;
+  blockedCount: number;
+  missingCount: number;
+  writtenCount: number;
+  totalCount: number;
+  actionLabel: string;
+  href: string;
+  evidence: string[];
+  items: GateFinalDeliveryReceiptReviewItem[];
+}
+
 export type GateRecommendedBatchReceiptFocusTone = "ready" | "review" | "blocked";
 
 export interface GateRecommendedBatchReceiptFocus {
@@ -2538,6 +2567,166 @@ function finalDeliveryReceiptHref(projectId: string, actionHref: string) {
 
 function finalDeliveryReceiptRecheckStatus(status: PlatformFinalDeliveryChecklistItem["status"]) {
   return status === "done" ? "ready" : "blocked";
+}
+
+const finalDeliveryReceiptItemLabels: Record<PlatformFinalDeliveryChecklistItem["id"], string> = {
+  "publish-package": "发布包",
+  "submission-asset": "投稿材料",
+  "sample-chapters": "前三章样章",
+  "publish-baseline": "发布基准",
+  "real-effect": "真实效果",
+  "strategy-review": "策略复盘",
+};
+
+const finalDeliveryReceiptItemIds = Object.keys(finalDeliveryReceiptItemLabels) as PlatformFinalDeliveryChecklistItem["id"][];
+
+function parseFinalDeliveryReceiptActionId(actionId: string) {
+  const match = actionId.match(/^final-delivery:([^:]+):([^:]+)$/);
+  if (!match) return null;
+  const itemId = match[2] as PlatformFinalDeliveryChecklistItem["id"];
+  if (!finalDeliveryReceiptItemLabels[itemId]) return null;
+  return {
+    platformId: match[1],
+    itemId,
+  };
+}
+
+function receiptCreatedAtMs(receipt: GateActionReceipt) {
+  const ms = new Date(receipt.createdAt).getTime();
+  return Number.isFinite(ms) ? ms : 0;
+}
+
+function finalDeliveryProjectHref(receipt: GateActionReceipt | null) {
+  const projectMatch = receipt?.href.match(/^\/projects\/([^?#]+)/);
+  return projectMatch ? `/projects/${projectMatch[1]}#platform-export` : "/projects";
+}
+
+function finalDeliveryReceiptEvidence(receipt: GateActionReceipt) {
+  const evidenceLine = receipt.message.split("\n").find((line) => line.startsWith("证据："));
+  if (evidenceLine) return evidenceLine.replace(/^证据：/, "");
+  return receipt.detail;
+}
+
+function finalDeliveryPlatformName(platformId: string) {
+  return platformProfiles.find((profile) => profile.id === platformId)?.name ?? platformId;
+}
+
+export function buildGateFinalDeliveryReceiptReview(receipts: GateActionReceipt[]): GateFinalDeliveryReceiptReview {
+  const platformMap = new Map<string, {
+    platformId: string;
+    platformName: string;
+    latestAt: number;
+    items: Map<PlatformFinalDeliveryChecklistItem["id"], GateActionReceipt>;
+  }>();
+
+  for (const receipt of receipts) {
+    const parsed = parseFinalDeliveryReceiptActionId(receipt.actionId);
+    if (!parsed || receipt.status !== "succeeded") continue;
+    const platformId = receipt.platformId ?? parsed.platformId;
+    const platformName = receipt.platformName ?? finalDeliveryPlatformName(platformId);
+    const platform = platformMap.get(platformId) ?? {
+      platformId,
+      platformName,
+      latestAt: 0,
+      items: new Map<PlatformFinalDeliveryChecklistItem["id"], GateActionReceipt>(),
+    };
+    const current = platform.items.get(parsed.itemId);
+    if (!current || receiptCreatedAtMs(receipt) >= receiptCreatedAtMs(current)) {
+      platform.items.set(parsed.itemId, receipt);
+    }
+    platform.latestAt = Math.max(platform.latestAt, receiptCreatedAtMs(receipt));
+    platformMap.set(platformId, platform);
+  }
+
+  if (platformMap.size === 0) {
+    return {
+      status: "empty",
+      label: "最终交付未写回",
+      headline: "最终交付闭环复检",
+      detail: "还没有最终交付回执。先到作品发布中心逐项写回交付证据，总闸门才能判断是否真正闭环。",
+      platformId: null,
+      platformName: "全部平台",
+      completedCount: 0,
+      blockedCount: 0,
+      missingCount: finalDeliveryReceiptItemIds.length,
+      writtenCount: 0,
+      totalCount: finalDeliveryReceiptItemIds.length,
+      actionLabel: "去发布中心写回",
+      href: "/projects",
+      evidence: ["缺最终交付回执：发布包、投稿材料、前三章样章、发布基准、真实效果、策略复盘。"],
+      items: finalDeliveryReceiptItemIds.map((id) => ({
+        id,
+        label: finalDeliveryReceiptItemLabels[id],
+        status: "missing",
+        evidence: "尚未写回最终交付回执。",
+        href: "/projects",
+        latestAt: null,
+      })),
+    };
+  }
+
+  const platform = [...platformMap.values()].sort((left, right) => {
+    const leftDone = [...left.items.values()].filter((receipt) => receipt.recheck.status === "ready").length;
+    const rightDone = [...right.items.values()].filter((receipt) => receipt.recheck.status === "ready").length;
+    return rightDone - leftDone || right.latestAt - left.latestAt || left.platformName.localeCompare(right.platformName);
+  })[0]!;
+  const latestReceipt = [...platform.items.values()].sort((left, right) => receiptCreatedAtMs(right) - receiptCreatedAtMs(left))[0] ?? null;
+  const fallbackHref = finalDeliveryProjectHref(latestReceipt);
+  const items = finalDeliveryReceiptItemIds.map((id): GateFinalDeliveryReceiptReviewItem => {
+    const receipt = platform.items.get(id);
+    if (!receipt) {
+      return {
+        id,
+        label: finalDeliveryReceiptItemLabels[id],
+        status: "missing",
+        evidence: "尚未写回最终交付回执。",
+        href: fallbackHref,
+        latestAt: null,
+      };
+    }
+    return {
+      id,
+      label: finalDeliveryReceiptItemLabels[id],
+      status: receipt.recheck.status === "ready" ? "done" : "blocked",
+      evidence: finalDeliveryReceiptEvidence(receipt),
+      href: receipt.href,
+      latestAt: receipt.createdAt,
+    };
+  });
+  const completedCount = items.filter((item) => item.status === "done").length;
+  const blockedCount = items.filter((item) => item.status === "blocked").length;
+  const missingCount = items.filter((item) => item.status === "missing").length;
+  const writtenCount = items.length - missingCount;
+  const totalCount = finalDeliveryReceiptItemIds.length;
+  const status: GateFinalDeliveryReceiptReviewStatus = completedCount === totalCount
+    ? "ready"
+    : blockedCount > 0
+      ? "blocked"
+      : "in_progress";
+  const firstIncomplete = items.find((item) => item.status === "blocked") ?? items.find((item) => item.status === "missing") ?? null;
+
+  return {
+    status,
+    label: status === "ready" ? "最终交付已闭环" : status === "blocked" ? "最终交付仍有卡点" : "最终交付写回中",
+    headline: "最终交付闭环复检",
+    detail: status === "ready"
+      ? `${platform.platformName} 6/6 项最终交付回执均已闭环，可以回到总闸门做最终放行判断。`
+      : `${platform.platformName} 已写回 ${writtenCount}/${totalCount} 项，已闭环 ${completedCount}，阻塞 ${blockedCount}，缺项 ${missingCount}。`,
+    platformId: platform.platformId,
+    platformName: platform.platformName,
+    completedCount,
+    blockedCount,
+    missingCount,
+    writtenCount,
+    totalCount,
+    actionLabel: status === "ready" ? "复检总闸门" : "处理最终交付缺口",
+    href: status === "ready" ? "/gate" : firstIncomplete?.href ?? fallbackHref,
+    evidence: items
+      .filter((item) => item.status !== "done")
+      .slice(0, 4)
+      .map((item) => `${item.status === "blocked" ? "阻塞" : "缺项"}：${item.label} · ${item.evidence}`),
+    items,
+  };
 }
 
 export function buildGateFinalDeliveryReceipt(input: {

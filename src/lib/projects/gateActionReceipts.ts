@@ -4698,6 +4698,10 @@ function isAiPipelineCompletionTask(task: GateDispatchCompletionTemplateTask) {
     || isAiPipelineRollbackCompletionTask(task);
 }
 
+function isProjectAcceptanceNextCompletionTask(task: GateDispatchCompletionTemplateTask) {
+  return task.dispatchKey?.startsWith("project-acceptance-next:") ?? false;
+}
+
 function aiPipelineCompletionKind(task: GateDispatchCompletionTemplateTask): GateAiPipelineRecoveryCompletionKind | null {
   if (isAiPipelineRollbackCompletionTask(task)) return "rollback_repair";
   if (isAiPipelineScaleCompletionTask(task)) return "small_batch_resume";
@@ -4849,6 +4853,17 @@ export function buildGateDispatchCompletionTemplate(task: GateDispatchCompletion
       "放量结论：通过恢复小批 / 未通过继续观察",
     ].join("\n");
   }
+  if (isProjectAcceptanceNextCompletionTask(task)) {
+    return [
+      `${task.title}`,
+      "复检分流补证据模板",
+      "完成项：",
+      "产物链接/位置：",
+      "人工验收：通过 / 退回",
+      "回总闸门复检结论：验收缺口已解除 / 卡点已减少 / 卡点仍在",
+      "下一动作：进入发布闭环 / 生成下一张派单 / 继续处理当前卡点",
+    ].join("\n");
+  }
   if (isPauseRecoveryMetricCompletionTask(task)) {
     return [
       `${task.title}`,
@@ -4975,6 +4990,13 @@ export function reviewGateDispatchCompletionEvidence(
   }
 
   if (text.length < 8) return "完成派单前，请写清楚完成依据，至少 8 个字。";
+
+  if (isProjectAcceptanceNextCompletionTask(task)) {
+    const filled = completedLabels(text, ["完成项", "产物链接/位置", "人工验收", "回总闸门复检结论", "下一动作"]);
+    return filled.length >= 4
+      ? null
+      : "请补齐复检分流完成依据：完成项、产物链接/位置、人工验收、回总闸门复检结论或下一动作至少写清 4 项。";
+  }
 
   if (isPauseRecoveryMetricCompletionTask(task)) {
     const missing: string[] = [];

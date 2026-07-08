@@ -5398,6 +5398,30 @@ test("buildGateActionReceipt", async (t) => {
       "钩子/追读点：第一屏出现系统惩罚和升级目标",
       "复查证据：已重新跑前三章审稿",
     ].join("\n")), null);
+    const projectAcceptanceNextTask = {
+      dispatchKey: "project-acceptance-next:project-1:publish_package",
+      stage: "start_platform_package" as const,
+      title: "夜雨系统｜补发布包验收",
+      actionLabel: "生成下一张派单",
+      platformName: "番茄小说",
+      evidence: ["发布包还缺前三章发布资产。"],
+    };
+    assert.ok(buildGateDispatchCompletionTemplate(projectAcceptanceNextTask).includes("复检分流补证据模板"));
+    assert.ok(buildGateDispatchCompletionTemplate(projectAcceptanceNextTask).includes("回总闸门复检结论"));
+    assert.equal(reviewGateDispatchCompletionEvidence(projectAcceptanceNextTask, [
+      "夜雨系统｜补发布包验收",
+      "完成项：已补齐番茄发布包标题、简介、标签和前三章样章",
+      "产物链接/位置：/projects/project-1#platform-export",
+      "人工验收：通过",
+      "回总闸门复检结论：卡点已减少",
+      "下一动作：生成下一张派单",
+    ].join("\n")), null);
+    assert.ok(reviewGateDispatchCompletionEvidence(projectAcceptanceNextTask, [
+      "夜雨系统｜补发布包验收",
+      "完成项：已补发布包",
+      "产物链接/位置：/projects/project-1#platform-export",
+      "下一动作：继续处理当前卡点",
+    ].join("\n"))?.includes("人工验收"));
     const roleStructureTask = {
       stage: "watch" as const,
       title: "结构主编｜角色任务",

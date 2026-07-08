@@ -163,5 +163,46 @@ test("buildTaskRunConsole", async (t) => {
     assert.ok(withArchive?.archiveExperienceReceipt.evidence.some((line) => line.includes("必须执行")));
     assert.equal(missing?.archiveExperienceReceipt.status, "missing");
     assert.equal(missing?.archiveExperienceReceipt.label, "缺归档经验回执");
+    assert.equal(console.archiveExperienceRepairQueue.status, "needs_repair");
+    assert.equal(console.archiveExperienceRepairQueue.missingCount, 1);
+    assert.equal(console.archiveExperienceRepairQueue.actionLabel, "回章节重试审稿");
+    assert.equal(console.archiveExperienceRepairQueue.actionHref, "/projects/project-1/chapters/chapter-1");
+    assert.equal(console.archiveExperienceRepairQueue.items[0].id, "task-no-archive");
+    assert.equal(console.archiveExperienceRepairQueue.items[0].taskLabel, "章节审稿");
+    assert.ok(console.archiveExperienceRepairQueue.items[0].detail.includes("最终交付归档强制执行"));
+    assert.ok(console.archiveExperienceRepairQueue.guidance.some((line) => line.includes("先补开书经验")));
+  });
+
+  await t.test("clears archive repair items when a newer same-scope task includes archive experience", () => {
+    const console = buildTaskRunConsole([
+      {
+        ...baseTask,
+        id: "old-missing-review",
+        taskType: "chapter_review",
+        inputSnapshot: JSON.stringify({ prompt: { userPrompt: "普通审稿提示词" } }),
+        createdAt: "2026-01-01T00:00:00.000Z",
+        updatedAt: "2026-01-01T00:00:05.000Z",
+      },
+      {
+        ...baseTask,
+        id: "new-attached-review",
+        taskType: "chapter_review",
+        inputSnapshot: JSON.stringify({
+          prompt: {
+            userPrompt: [
+              "最终交付归档强制执行：",
+              "- 不允许忽略开书经验；这条经验来自上一轮交付归档。",
+              "- 必须执行：审稿要核对复制动作。",
+            ].join("\n"),
+          },
+        }),
+        createdAt: "2026-01-01T00:10:00.000Z",
+        updatedAt: "2026-01-01T00:10:05.000Z",
+      },
+    ], { now: new Date("2026-01-01T00:20:00.000Z") });
+
+    assert.equal(console.archiveExperienceRepairQueue.status, "clear");
+    assert.equal(console.archiveExperienceRepairQueue.missingCount, 0);
+    assert.deepEqual(console.archiveExperienceRepairQueue.items, []);
   });
 });

@@ -126,10 +126,10 @@ test("buildBatchExecutionSafety", async (t) => {
     assert.ok(archiveGate?.detail.includes("缺归档经验回执"));
     assert.ok(archiveGate?.detail.includes("不进入推荐批量"));
     assert.equal(archiveGate?.actionLabel, "回任务运行台");
-    assert.equal(archiveGate?.actionHref, "/tasks#task-run-console");
+    assert.equal(archiveGate?.actionHref, "/tasks?focus=archive-experience#task-run-console");
     const blocker = buildBatchSafetyPriorityBlocker(safety);
     assert.equal(blocker?.id, "archive-experience");
-    assert.equal(blocker?.actionHref, "/tasks#task-run-console");
+    assert.equal(blocker?.actionHref, "/tasks?focus=archive-experience#task-run-console");
   });
 
   await t.test("blocks recommended batches until first-day gate debt is cleared", () => {

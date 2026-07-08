@@ -358,8 +358,10 @@ function hrefWithGateReturn(href: string, gateReturnHref?: string | null) {
   return `${base}${separator}gateReturn=${encodeURIComponent(gateReturnHref)}${hash}`;
 }
 
-export default async function TasksPage({ searchParams }: { searchParams?: Promise<{ batchStrategy?: string; batchContext?: string; view?: string; debt?: string; cleared?: string; previousDebt?: string; gateReturn?: string | string[] }> }) {
+export default async function TasksPage({ searchParams }: { searchParams?: Promise<{ batchStrategy?: string; batchContext?: string; view?: string; debt?: string; cleared?: string; previousDebt?: string; gateReturn?: string | string[]; focus?: string | string[] }> }) {
   const resolvedSearchParams = searchParams ? await searchParams : {};
+  const focusParam = Array.isArray(resolvedSearchParams.focus) ? resolvedSearchParams.focus[0] : resolvedSearchParams.focus;
+  const archiveExperienceFocused = focusParam === "archive-experience";
   const gateReturn = gateReturnFromParam(resolvedSearchParams.gateReturn);
   const batchStrategyParam = resolvedSearchParams.batchStrategy;
   const activeStrategy = getBatchExecutionStrategy(batchStrategyParam);
@@ -551,7 +553,13 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
   const taskQueueProjects = normalizeTaskQueueProjects(projects);
   const safetyProjects = projects.map((project) => ({
     aiTasks: project.aiTasks.map((task) => ({
+      id: task.id,
+      projectId: project.id,
+      chapterId: task.chapterId,
+      taskType: task.taskType,
       status: task.status,
+      inputSnapshot: task.inputSnapshot ?? null,
+      createdAt: task.createdAt,
       inputTokens: task.inputTokens ?? null,
       outputTokens: task.outputTokens ?? null,
       costUsd: task.costUsd ?? null,
@@ -1230,6 +1238,58 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
             </div>
           </div>
         </div>
+        {(runConsole.archiveExperienceRepairQueue.status === "needs_repair" || archiveExperienceFocused) ? (
+          <div
+            className={`mt-4 rounded-md border p-4 ${archiveExperienceFocused ? "border-rose-300 bg-rose-50" : "border-amber-200 bg-amber-50"}`}
+            id="archive-experience-repair"
+          >
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+              <div>
+                <h3 className="font-medium text-slate-950">归档经验修复入口</h3>
+                <p className="mt-1 text-sm leading-6 text-slate-700">
+                  {runConsole.archiveExperienceRepairQueue.title}：{runConsole.archiveExperienceRepairQueue.detail}
+                </p>
+              </div>
+              <Link
+                className="w-fit rounded-md bg-slate-950 px-4 py-2 text-sm font-medium text-white"
+                href={hrefWithGateReturn(runConsole.archiveExperienceRepairQueue.actionHref, gateReturn)}
+              >
+                {runConsole.archiveExperienceRepairQueue.actionLabel}
+              </Link>
+            </div>
+            <div className="mt-4 grid gap-3 lg:grid-cols-[0.85fr_1.15fr]">
+              <div className="grid gap-2 text-sm text-slate-700">
+                {runConsole.archiveExperienceRepairQueue.guidance.map((line) => (
+                  <div className="rounded-md bg-white/70 px-3 py-2" key={line}>{line}</div>
+                ))}
+              </div>
+              <div className="grid gap-2">
+                {runConsole.archiveExperienceRepairQueue.items.map((item) => (
+                  <Link
+                    className="rounded-md bg-white/80 p-3 text-sm hover:bg-white"
+                    href={hrefWithGateReturn(item.href, gateReturn)}
+                    key={item.id}
+                  >
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="rounded-md bg-rose-100 px-2 py-1 text-xs font-medium text-rose-800">缺回执</span>
+                      <span className="font-medium text-slate-950">{item.taskLabel}</span>
+                      <span className="text-xs text-slate-500">{item.statusLabel} · {new Date(item.createdAt).toLocaleString()}</span>
+                    </div>
+                    <div className="mt-2 text-slate-600">{item.projectTitle} · {item.chapterTitle}</div>
+                    <p className="mt-1 leading-6 text-slate-600">{item.detail}</p>
+                    <div className="mt-2 text-xs text-slate-500">{item.providerName} · {item.model}</div>
+                    <div className="mt-3 inline-flex rounded-md border border-slate-200 px-3 py-2 text-sm font-medium text-slate-800">
+                      {item.actionLabel}
+                    </div>
+                  </Link>
+                ))}
+                {runConsole.archiveExperienceRepairQueue.items.length === 0 ? (
+                  <p className="rounded-md bg-white/70 p-3 text-sm text-slate-700">当前没有缺归档经验回执的最新写审改任务。</p>
+                ) : null}
+              </div>
+            </div>
+          </div>
+        ) : null}
       </section>
 
       <section className={`mb-6 rounded-md border p-4 ${repairBatchTone(runConsole.failureRepairBatch.status)}`} id="failure-repair-batch">

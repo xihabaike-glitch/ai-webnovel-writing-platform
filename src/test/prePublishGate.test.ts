@@ -312,7 +312,7 @@ test("buildPrePublishGate", async (t) => {
     assert.equal(archiveItem?.label, "归档经验回执");
     assert.ok(archiveItem?.detail.includes("缺归档经验回执"));
     assert.equal(archiveItem?.actionLabel, "回任务运行台");
-    assert.equal(archiveItem?.href, "/tasks#task-run-console");
+    assert.equal(archiveItem?.href, "/tasks?focus=archive-experience#task-run-console");
     assert.equal(gate.realPipelineFinalReview.outcome, "hold_batch");
     assert.ok(gate.realPipelineFinalReview.holdBatchSignals.some((line) => line.includes("归档经验")));
     assert.equal(gate.finalDeliveryRelease.status, "blocked");

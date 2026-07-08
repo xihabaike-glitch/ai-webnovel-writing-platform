@@ -4,9 +4,13 @@ import { buildTaskArchiveExperienceReceipt } from "../ai/taskRunConsole.ts";
 
 export interface SafetyTaskProject {
   aiTasks: Array<{
+    id?: string | null;
+    projectId?: string | null;
+    chapterId?: string | null;
     taskType?: string | null;
     status: string;
     inputSnapshot?: string | null;
+    createdAt?: Date | string | null;
     inputTokens: number | null;
     outputTokens: number | null;
     costUsd: number | null;
@@ -172,16 +176,31 @@ function isOpenExportVersion(item: QueueItem) {
 }
 
 function missingArchiveExperienceReceipts(projects: SafetyTaskProject[]) {
-  return projects
-    .flatMap((project) => project.aiTasks)
-    .filter((task) => {
+  const latestByScope = new Map<string, SafetyTaskProject["aiTasks"][number]>();
+  projects.forEach((project, projectIndex) => {
+    project.aiTasks.forEach((task, taskIndex) => {
       if (!task.taskType) return false;
       const receipt = buildTaskArchiveExperienceReceipt({
         taskType: task.taskType,
         inputSnapshot: task.inputSnapshot ?? "",
       });
-      return receipt.status === "missing";
+      if (receipt.status === "not_applicable") return false;
+      const key = `${projectIndex}:${task.projectId ?? "project"}:${task.chapterId ?? "project-task"}:${task.taskType}`;
+      const current = latestByScope.get(key);
+      const taskTime = task.createdAt ? new Date(task.createdAt).getTime() : Number.MAX_SAFE_INTEGER - taskIndex;
+      const currentTime = current?.createdAt ? new Date(current.createdAt).getTime() : Number.NEGATIVE_INFINITY;
+      if (!current || taskTime >= currentTime) latestByScope.set(key, task);
+      return true;
     });
+  });
+
+  return [...latestByScope.values()].filter((task) => {
+    const receipt = buildTaskArchiveExperienceReceipt({
+      taskType: task.taskType ?? "",
+      inputSnapshot: task.inputSnapshot ?? "",
+    });
+    return receipt.status === "missing";
+  });
 }
 
 export function buildFailureRepairResumeRecommendation(input: {
@@ -326,7 +345,7 @@ export function buildBatchExecutionSafety(
         : `${missingArchiveExperienceCount} 个写审改任务缺归档经验回执；先回任务运行台核对「最终交付归档强制执行」，不进入推荐批量。`,
       missingArchiveExperienceCount === 0 ? undefined : {
         actionLabel: "回任务运行台",
-        actionHref: "/tasks#task-run-console",
+        actionHref: "/tasks?focus=archive-experience#task-run-console",
       },
     ),
     safetyItem(

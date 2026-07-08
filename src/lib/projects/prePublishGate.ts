@@ -2023,7 +2023,7 @@ function buildRealPipelineFinalReview(input: {
   const holdAction = input.modelRoleBlocker?.tone === "blocked"
     ? { label: input.modelRoleBlocker.actionLabel, href: input.modelRoleBlocker.actionHref }
     : input.archiveExperienceBlocker
-      ? { label: input.archiveExperienceBlocker.actionLabel ?? "回任务运行台", href: input.archiveExperienceBlocker.actionHref ?? "/tasks#task-run-console" }
+      ? { label: input.archiveExperienceBlocker.actionLabel ?? "回任务运行台", href: input.archiveExperienceBlocker.actionHref ?? "/tasks?focus=archive-experience#task-run-console" }
     : input.failedTasks > 0
       ? { label: input.failureRepairBatch.primaryActionLabel, href: input.failureRepairBatch.primaryActionHref }
       : input.acceptanceWarnings[0]
@@ -2886,9 +2886,13 @@ export function buildPrePublishGate(input: PrePublishGateInput): PrePublishGate 
   ));
   const safetyProjects = projects.map((project) => ({
     aiTasks: project.aiTasks.map((task) => ({
+      id: task.id,
+      projectId: project.id,
+      chapterId: task.chapterId,
       taskType: task.taskType,
       status: task.status,
       inputSnapshot: task.inputSnapshot ?? null,
+      createdAt: task.createdAt,
       inputTokens: task.inputTokens ?? null,
       outputTokens: task.outputTokens ?? null,
       costUsd: task.costUsd ?? null,
@@ -2966,7 +2970,7 @@ export function buildPrePublishGate(input: PrePublishGateInput): PrePublishGate 
       status: archiveExperienceBlocker ? "block" : "pass",
       detail: archiveExperienceBlocker?.detail ?? "写稿、审稿、二改任务均未发现缺归档经验回执。",
       actionLabel: archiveExperienceBlocker?.actionLabel ?? "查看任务运行台",
-      href: archiveExperienceBlocker?.actionHref ?? "/tasks#task-run-console",
+      href: archiveExperienceBlocker?.actionHref ?? "/tasks?focus=archive-experience#task-run-console",
     }),
     gateItem({
       id: "task-queue",
@@ -3069,7 +3073,7 @@ export function buildPrePublishGate(input: PrePublishGateInput): PrePublishGate 
         "archive-experience",
         archiveExperienceBlocker.actionLabel ?? "回任务运行台",
         archiveExperienceBlocker.detail,
-        archiveExperienceBlocker.actionHref ?? "/tasks#task-run-console",
+        archiveExperienceBlocker.actionHref ?? "/tasks?focus=archive-experience#task-run-console",
         "repair",
       )
       : null,

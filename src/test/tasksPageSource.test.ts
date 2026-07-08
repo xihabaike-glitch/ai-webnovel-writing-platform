@@ -106,6 +106,21 @@ test("tasks page shows archive experience execution receipts on run logs", () =>
   assert.ok(source.includes("最终交付归档强制执行"));
 });
 
+test("tasks page gives archive experience blockers a direct repair entry", () => {
+  assert.ok(source.includes("focus?: string | string[]"));
+  assert.ok(source.includes("const focusParam = Array.isArray(resolvedSearchParams.focus) ? resolvedSearchParams.focus[0] : resolvedSearchParams.focus"));
+  assert.ok(source.includes("const archiveExperienceFocused = focusParam === \"archive-experience\""));
+  assert.ok(source.includes("taskType: task.taskType"));
+  assert.ok(source.includes("inputSnapshot: task.inputSnapshot ?? null"));
+  assert.ok(source.includes("createdAt: task.createdAt"));
+  assert.ok(source.includes("id=\"archive-experience-repair\""));
+  assert.ok(source.includes("归档经验修复入口"));
+  assert.ok(source.includes("runConsole.archiveExperienceRepairQueue.items.map"));
+  assert.ok(source.includes("runConsole.archiveExperienceRepairQueue.guidance.map"));
+  assert.ok(source.includes("href={hrefWithGateReturn(item.href, gateReturn)}"));
+  assert.ok(source.includes("archiveExperienceFocused"));
+});
+
 test("tasks page carries gate return through task work links", () => {
   const recommendedBatchButton = readFileSync("src/components/tasks/RunRecommendedBatchButton.tsx", "utf8");
   const publishEffectButton = readFileSync("src/components/tasks/RunPublishEffectQueueActionButton.tsx", "utf8");

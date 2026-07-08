@@ -55,6 +55,34 @@ export interface TaskArchiveExperienceReceipt {
   nextAction: string;
 }
 
+export interface TaskArchiveExperienceRepairItem {
+  id: string;
+  projectId: string;
+  projectTitle: string;
+  chapterTitle: string;
+  taskType: string;
+  taskLabel: string;
+  statusLabel: string;
+  providerName: string;
+  model: string;
+  createdAt: string;
+  href: string;
+  actionLabel: string;
+  detail: string;
+  evidence: string[];
+}
+
+export interface TaskArchiveExperienceRepairQueue {
+  status: "clear" | "needs_repair";
+  missingCount: number;
+  title: string;
+  detail: string;
+  actionLabel: string;
+  actionHref: string;
+  guidance: string[];
+  items: TaskArchiveExperienceRepairItem[];
+}
+
 export interface TaskRetryCandidate {
   id: string;
   projectId: string;
@@ -117,6 +145,7 @@ export interface TaskRunConsole {
     succeededTasks: number;
   }>;
   failureRepairBatch: FailureRepairBatch;
+  archiveExperienceRepairQueue: TaskArchiveExperienceRepairQueue;
   retryCandidates: TaskRetryCandidate[];
   recentLogs: TaskRunLog[];
   nextActions: string[];
@@ -290,6 +319,17 @@ function chapterHref(task: TaskRunInput) {
   return task.chapterId ? `/projects/${task.projectId}/chapters/${task.chapterId}` : `/projects/${task.projectId}`;
 }
 
+function archiveExperienceRepairActionLabel(taskType: string) {
+  if (taskType === "chapter_draft") return "回章节重试初稿";
+  if (taskType === "chapter_review") return "回章节重试审稿";
+  if (taskType === "chapter_second_pass") return "回章节重试二改";
+  return "回项目补经验";
+}
+
+function archiveExperienceScopeKey(task: Pick<TaskRunInput, "projectId" | "chapterId" | "taskType">) {
+  return `${task.projectId}:${task.chapterId ?? "project"}:${task.taskType}`;
+}
+
 function runtimeMs(task: TaskRunInput) {
   return Math.max(0, new Date(task.updatedAt).getTime() - new Date(task.createdAt).getTime());
 }
@@ -322,6 +362,66 @@ function buildLog(task: TaskRunInput): TaskRunLog {
     errorMessage: task.status === "failed" ? compact(task.errorMessage) : null,
     href: chapterHref(task),
     archiveExperienceReceipt: buildTaskArchiveExperienceReceipt(task),
+  };
+}
+
+function buildArchiveExperienceRepairQueue(tasks: TaskRunInput[]): TaskArchiveExperienceRepairQueue {
+  const latestByScope = new Map<string, TaskRunInput>();
+  const sortedTasks = [...tasks].sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime());
+  for (const task of sortedTasks) {
+    const receipt = buildTaskArchiveExperienceReceipt(task);
+    if (receipt.status === "not_applicable") continue;
+    const key = archiveExperienceScopeKey(task);
+    if (!latestByScope.has(key)) latestByScope.set(key, task);
+  }
+
+  const items = [...latestByScope.values()]
+    .map((task) => ({ task, log: buildLog(task) }))
+    .filter(({ log }) => log.archiveExperienceReceipt.status === "missing")
+    .sort((left, right) => new Date(right.log.createdAt).getTime() - new Date(left.log.createdAt).getTime())
+    .map(({ log }): TaskArchiveExperienceRepairItem => ({
+      id: log.id,
+      projectId: log.projectId,
+      projectTitle: log.projectTitle,
+      chapterTitle: log.chapterTitle,
+      taskType: log.taskType,
+      taskLabel: log.taskLabel,
+      statusLabel: log.statusLabel,
+      providerName: log.providerName,
+      model: log.model,
+      createdAt: log.createdAt,
+      href: log.href,
+      actionLabel: archiveExperienceRepairActionLabel(log.taskType),
+      detail: `${log.projectTitle} · ${log.chapterTitle} · ${log.taskLabel} 缺「最终交付归档强制执行」输入，不能作为放量依据。`,
+      evidence: log.archiveExperienceReceipt.evidence,
+    }));
+
+  if (items.length === 0) {
+    return {
+      status: "clear",
+      missingCount: 0,
+      title: "归档经验回执已闭合",
+      detail: "最新写稿、审稿、二改任务未发现缺归档经验回执，可以继续看失败复盘和批量安全阀。",
+      actionLabel: "查看运行日志",
+      actionHref: "/tasks#task-run-console",
+      guidance: ["继续保留归档经验证据；新任务如果缺「最终交付归档强制执行」，会重新进入修复队列。"],
+      items: [],
+    };
+  }
+
+  return {
+    status: "needs_repair",
+    missingCount: items.length,
+    title: "归档经验修复入口",
+    detail: `${items.length} 个最新写审改任务缺归档经验回执；先补开书经验并单章重跑，再回总闸门复检。`,
+    actionLabel: items[0]?.actionLabel ?? "回任务运行台",
+    actionHref: items[0]?.href ?? "/tasks?focus=archive-experience#task-run-console",
+    guidance: [
+      "先补开书经验或 startTactic，再重跑对应章节任务。",
+      "只看同项目、同章节、同任务类型的最新任务；新任务补齐后旧缺口自动退场。",
+      "回执里必须出现「最终交付归档强制执行」和至少一条复制动作或避坑边界。",
+    ],
+    items,
   };
 }
 
@@ -525,6 +625,7 @@ export function buildTaskRunConsole(tasks: TaskRunInput[], options: { now?: Date
     summary,
     taskTypeRows: buildTaskTypeRows(tasks),
     failureRepairBatch,
+    archiveExperienceRepairQueue: buildArchiveExperienceRepairQueue(tasks),
     retryCandidates,
     recentLogs: sortedTasks.slice(0, 12).map(buildLog),
     nextActions: nextActions({ summary, retryCandidates }),

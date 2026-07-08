@@ -14,6 +14,13 @@ test("home page routes users into the current PM delivery path", () => {
   assert.ok(source.includes("overview.finalAcceptanceGate.metrics.watch"), "home page should show watch count in the final gate");
   assert.ok(source.includes("overview.finalAcceptanceGate.metrics.blocked"), "home page should show blocked count in the final gate");
   assert.ok(source.includes("overview.finalAcceptanceGate.stopRule"), "home page should show the PM stop rule");
+  assert.ok(source.includes("overview.finalAcceptanceGate.evidenceMatrix.title"), "home page should show the original requirement evidence matrix");
+  assert.ok(source.includes("overview.finalAcceptanceGate.evidenceMatrix.pmRule"), "home page should show the matrix proof rule");
+  assert.ok(source.includes("overview.finalAcceptanceGate.evidenceMatrix.items.map"), "home page should render each final acceptance evidence row");
+  assert.ok(source.includes("item.currentProof"), "home page should show current proof for each original requirement");
+  assert.ok(source.includes("item.missingEvidence"), "home page should show remaining gap for each original requirement");
+  assert.ok(source.includes("item.nextAction"), "home page should show next action for each original requirement");
+  assert.ok(source.includes("item.evidenceHref"), "home page should link each requirement to its evidence");
   assert.ok(source.includes("overview.pipelineProofRoute.steps.map"), "home page should show the six-step proof route, not just page shortcuts");
   assert.ok(source.includes("overview.pipelineProofRoute.pmRule"), "home page should show the proof route rule");
   assert.ok(source.includes("step.passCondition"), "home page should show pass conditions for each route step");

@@ -36,6 +36,13 @@ test("projects page shows evidence and stop rules on every portfolio pipeline st
 test("projects page shows portfolio pipeline acceptance outcomes", () => {
   assert.ok(source.includes("dashboard.pipelineAcceptanceSummary"));
   assert.ok(source.includes("真实流水线验收判定"));
+  assert.ok(source.includes("真实作品流水线终检"));
+  assert.ok(source.includes("overview.currentPipelineValidation.finalReview"));
+  assert.ok(source.includes("overview.currentPipelineValidation.finalReview.title"));
+  assert.ok(source.includes("overview.currentPipelineValidation.finalReview.passSignals.map"));
+  assert.ok(source.includes("overview.currentPipelineValidation.finalReview.repairSignals.map"));
+  assert.ok(source.includes("overview.currentPipelineValidation.finalReview.holdBatchSignals.map"));
+  assert.ok(source.includes("overview.currentPipelineValidation.finalReview.receiptHref"));
   assert.ok(source.includes("dashboard.pipelineAcceptanceSummary.passCount"));
   assert.ok(source.includes("dashboard.pipelineAcceptanceSummary.repairCount"));
   assert.ok(source.includes("dashboard.pipelineAcceptanceSummary.holdBatchCount"));

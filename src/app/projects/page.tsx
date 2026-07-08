@@ -2,6 +2,7 @@ import Link from "next/link";
 import { AppShell } from "@/components/app-shell/AppShell";
 import { ProjectForm } from "@/components/projects/ProjectForm";
 import { prisma } from "@/lib/db/prisma";
+import { buildDevelopmentOverview } from "@/lib/development/developmentOverview";
 import { buildProjectListDashboard } from "@/lib/projects/projectListDashboard";
 import type { FirstDayRiskLevel } from "@/lib/projects/firstDayWorkflow";
 
@@ -139,6 +140,7 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps) 
     }),
   ]);
   const dashboard = buildProjectListDashboard(projects, providers);
+  const overview = buildDevelopmentOverview();
   const pipelineStepParam = firstValue(params?.pipelineStep);
   const closureLaneParam = firstValue(params?.closureLane);
   const activePipelineStep = dashboard.pipelineProofSummary.stepCounts.find((step) => step.id === pipelineStepParam) ?? null;
@@ -330,6 +332,46 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps) 
             <div className="rounded-md bg-rose-50 p-3 text-sm text-rose-900">
               <div className="text-xs opacity-75">需修复</div>
               <div className="mt-1 font-semibold">{dashboard.pipelineAcceptanceSummary.repairCount}</div>
+            </div>
+          </div>
+          <div className="mt-3 rounded-md border border-slate-200 bg-white p-3">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <div className="text-xs font-medium text-slate-500">真实作品流水线终检</div>
+                <h3 className="mt-1 font-medium text-slate-950">{overview.currentPipelineValidation.finalReview.title}</h3>
+              </div>
+              <Link
+                className="w-fit rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white hover:bg-slate-800"
+                href={overview.currentPipelineValidation.finalReview.receiptHref}
+              >
+                {overview.currentPipelineValidation.finalReview.receiptLabel}
+              </Link>
+            </div>
+            <div className="mt-3 grid gap-3 lg:grid-cols-3">
+              <div className="rounded-md bg-emerald-50 p-3 text-xs leading-5 text-emerald-900">
+                <div className="font-medium text-emerald-950">通过信号</div>
+                <ul className="mt-2 grid gap-1">
+                  {overview.currentPipelineValidation.finalReview.passSignals.map((signal) => (
+                    <li key={signal}>{signal}</li>
+                  ))}
+                </ul>
+              </div>
+              <div className="rounded-md bg-rose-50 p-3 text-xs leading-5 text-rose-900">
+                <div className="font-medium text-rose-950">退回信号</div>
+                <ul className="mt-2 grid gap-1">
+                  {overview.currentPipelineValidation.finalReview.repairSignals.map((signal) => (
+                    <li key={signal}>{signal}</li>
+                  ))}
+                </ul>
+              </div>
+              <div className="rounded-md bg-amber-50 p-3 text-xs leading-5 text-amber-900">
+                <div className="font-medium text-amber-950">暂停批量信号</div>
+                <ul className="mt-2 grid gap-1">
+                  {overview.currentPipelineValidation.finalReview.holdBatchSignals.map((signal) => (
+                    <li key={signal}>{signal}</li>
+                  ))}
+                </ul>
+              </div>
             </div>
           </div>
           <div className="mt-3 rounded-md bg-white p-3">

@@ -50,6 +50,12 @@ test("gate action workspace shows final delivery receipt closeout review", () =>
   assert.ok(workspaceSource.includes("finalDeliveryReview.latestFeedback"));
   assert.ok(workspaceSource.includes("finalDeliveryReview.remainingFeedback"));
   assert.ok(workspaceSource.includes("下一刀"));
+  assert.ok(workspaceSource.includes("最终交付收口面板"));
+  assert.ok(workspaceSource.includes("finalDeliveryCompletionPercent"));
+  assert.ok(workspaceSource.includes("aria-label=\"最终交付完成率\""));
+  assert.ok(workspaceSource.includes("放行判断"));
+  assert.ok(workspaceSource.includes("收口缺口"));
+  assert.ok(workspaceSource.includes("finalDeliveryNextCutLabel"));
   assert.ok(workspaceSource.includes("最终交付逐项复检"));
   assert.ok(workspaceSource.includes("finalDeliveryReview.items.map"));
   assert.ok(workspaceSource.includes("finalDeliveryReviewItemStatusLabel"));

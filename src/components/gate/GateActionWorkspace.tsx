@@ -442,6 +442,15 @@ export function GateActionWorkspace({
   const filteredSummary = buildGateActionReceiptSummary(filteredReceipts);
   const failureRepairReview = buildGateFailureRepairReceiptReview(failureRepairBatch, receipts);
   const finalDeliveryReview = buildGateFinalDeliveryReceiptReview(receipts);
+  const finalDeliveryCompletionPercent = finalDeliveryReview.totalCount > 0
+    ? Math.round((finalDeliveryReview.completedCount / finalDeliveryReview.totalCount) * 100)
+    : 0;
+  const finalDeliveryNextCutLabel = finalDeliveryReview.items.find((item) => item.status !== "done")?.label ?? "保持复盘";
+  const finalDeliveryReleaseLabel = finalDeliveryReview.status === "ready"
+    ? "可以交付"
+    : finalDeliveryReview.status === "empty"
+      ? "等待回执"
+      : "暂不放行";
   const failureRepairResolution = buildGateFailureRepairRecheckResolution(failureRepairBatch, persistedDispatchTasks);
   const failureRepairThirdRound = buildGateFailureRepairThirdRoundResolution(failureRepairBatch, persistedDispatchTasks);
   const reviewAdvice = buildGateActionReviewAdvice(filteredReceipts);
@@ -733,6 +742,28 @@ export function GateActionWorkspace({
               <div className="rounded-md bg-white/70 px-3 py-2">已闭环 {finalDeliveryReview.completedCount}/{finalDeliveryReview.totalCount}</div>
               <div className="rounded-md bg-white/70 px-3 py-2">阻塞 {finalDeliveryReview.blockedCount}</div>
               <div className="rounded-md bg-white/70 px-3 py-2">缺项 {finalDeliveryReview.missingCount}</div>
+            </div>
+            <div className="mt-3 rounded-md border border-white/70 bg-white/80 p-3 text-xs text-slate-700" aria-label="最终交付收口面板">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <div className="font-medium text-slate-950">最终交付收口面板</div>
+                  <p className="mt-1 leading-5 text-slate-600">{finalDeliveryReview.headline}</p>
+                </div>
+                <div className="w-fit rounded-md bg-slate-950 px-2 py-1 text-[11px] font-semibold text-white">
+                  完成率 {finalDeliveryCompletionPercent}%
+                </div>
+              </div>
+              <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-200" aria-label="最终交付完成率">
+                <div
+                  className="h-full rounded-full bg-emerald-500"
+                  style={{ width: `${finalDeliveryCompletionPercent}%` }}
+                />
+              </div>
+              <div className="mt-3 grid gap-2 sm:grid-cols-3">
+                <div className="rounded-md bg-white px-3 py-2 font-medium text-slate-800">放行判断：{finalDeliveryReleaseLabel}</div>
+                <div className="rounded-md bg-white px-3 py-2 font-medium text-slate-800">收口缺口：{finalDeliveryReview.remainingCount}</div>
+                <div className="rounded-md bg-white px-3 py-2 font-medium text-slate-800">下一刀：{finalDeliveryNextCutLabel}</div>
+              </div>
             </div>
             <div className="mt-2 grid gap-2 text-xs sm:grid-cols-2">
               <div className="rounded-md bg-white/80 px-3 py-2 font-medium">{finalDeliveryReview.latestFeedback}</div>

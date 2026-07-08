@@ -498,6 +498,9 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps) 
                         <Link className="rounded-md bg-slate-950 px-2 py-1 font-medium text-white hover:bg-slate-800" href={sample.receipt.gateRecheckHref}>
                           回总闸门复检
                         </Link>
+                        <Link className="rounded-md border border-emerald-200 bg-emerald-50 px-2 py-1 font-medium text-emerald-800 hover:bg-emerald-100" href={sample.receipt.finalReleaseHref}>
+                          {sample.receipt.finalReleaseLabel}
+                        </Link>
                       </div>
                     </div>
                   </div>

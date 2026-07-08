@@ -89,6 +89,8 @@ test("projects page renders real sample receipt templates for the final gate", (
   assert.ok(source.includes("sample.receipt.ownerConfirmation"));
   assert.ok(source.includes("sample.receipt.evidenceHref"));
   assert.ok(source.includes("sample.receipt.gateRecheckHref"));
+  assert.ok(source.includes("sample.receipt.finalReleaseHref"));
+  assert.ok(source.includes("sample.receipt.finalReleaseLabel"));
   assert.ok(source.includes("回总闸门复检"));
 });
 

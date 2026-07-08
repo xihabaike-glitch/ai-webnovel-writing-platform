@@ -206,6 +206,8 @@ export interface ProjectListRealSampleAcceptanceReceipt {
   outcomeLabel: string;
   evidenceHref: string;
   gateRecheckHref: string;
+  finalReleaseHref: string;
+  finalReleaseLabel: string;
   fields: ProjectListRealSampleAcceptanceReceiptField[];
   stopRule: string;
   ownerConfirmation: string;
@@ -948,6 +950,8 @@ function buildRealSampleAcceptanceReceipt(
     outcomeLabel: outcome.outcomeLabel,
     evidenceHref: item.realSampleValidation.nextActionHref,
     gateRecheckHref: `/gate?${params.toString()}#gate-focus-notice`,
+    finalReleaseHref: "/gate#pipeline-final-review",
+    finalReleaseLabel: "查看最终交付正式放行卡",
     fields: [
       { label: "验收状态", value: outcome.outcomeLabel },
       { label: "已收证据", value: completedEvidence },

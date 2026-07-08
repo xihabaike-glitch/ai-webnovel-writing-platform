@@ -54,6 +54,14 @@ test("tasks page keeps a gate recheck return path visible", () => {
 test("tasks page shows task receipt acceptance criteria in the PM focus", () => {
   assert.ok(source.includes("taskReceiptAcceptanceCriteria"));
   assert.ok(source.includes("任务回执验收口径"));
+  assert.ok(source.includes("任务回执收口面板"));
+  assert.ok(source.includes("taskReceiptCloseoutPercent"));
+  assert.ok(source.includes("aria-label=\"任务回执完成率\""));
+  assert.ok(source.includes("taskReceiptReleaseLabel"));
+  assert.ok(source.includes("taskReceiptNextCutLabel"));
+  assert.ok(source.includes("放行判断"));
+  assert.ok(source.includes("收口缺口"));
+  assert.ok(source.includes("下一刀"));
   assert.ok(source.includes("执行角色"));
   assert.ok(source.includes("输入"));
   assert.ok(source.includes("输出"));

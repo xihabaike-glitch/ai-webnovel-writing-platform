@@ -520,6 +520,21 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
     ...task,
     chapter: task.chapterId ? chaptersById.get(task.chapterId) ?? null : null,
   })));
+  const taskReceiptCloseoutGapCount = queue.overview.blockedCards + runConsole.summary.failedTasks + runConsole.summary.staleRunningTasks;
+  const taskReceiptClosedCount = Math.max(0, queue.overview.totalItems - queue.overview.blockedCards);
+  const taskReceiptCloseoutPercent = queue.overview.totalItems > 0
+    ? Math.round((taskReceiptClosedCount / queue.overview.totalItems) * 100)
+    : 0;
+  const taskReceiptReleaseLabel = queue.overview.totalItems === 0
+    ? "等待任务"
+    : taskReceiptCloseoutGapCount > 0
+      ? "暂不放行"
+      : runConsole.summary.runningTasks > 0 || runConsole.summary.queuedTasks > 0
+        ? "等待运行回执"
+        : "可以回总闸门";
+  const taskReceiptNextCutLabel = queue.recommendedNext
+    ? recommendedQueueActionLabel(queue.recommendedNext)
+    : runConsole.nextActions[0] ?? "回总闸门复检";
   const batchHistory = buildTaskBatchHistory(recentAiTasks.map((task) => ({
     ...task,
     chapter: task.chapterId ? chaptersById.get(task.chapterId) ?? null : null,
@@ -702,6 +717,30 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
                     {criterion}
                   </span>
                 ))}
+              </div>
+            </div>
+            <div className="mt-3 rounded-md border border-white/15 bg-white/5 p-3 text-xs text-slate-200" aria-label="任务回执收口面板">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <div className="font-medium text-white">任务回执收口面板</div>
+                  <p className="mt-1 leading-5 text-slate-300">
+                    每张任务卡必须有执行角色、输入、输出、人工验收和下一步；缺证据不送总闸门。
+                  </p>
+                </div>
+                <div className="w-fit rounded-md bg-white px-2 py-1 text-[11px] font-semibold text-slate-950">
+                  完成率 {taskReceiptCloseoutPercent}%
+                </div>
+              </div>
+              <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/15" aria-label="任务回执完成率">
+                <div
+                  className="h-full rounded-full bg-emerald-400"
+                  style={{ width: `${taskReceiptCloseoutPercent}%` }}
+                />
+              </div>
+              <div className="mt-3 grid gap-2 sm:grid-cols-3">
+                <div className="rounded-md bg-white/10 px-3 py-2 font-medium text-white">放行判断：{taskReceiptReleaseLabel}</div>
+                <div className="rounded-md bg-white/10 px-3 py-2 font-medium text-white">收口缺口：{taskReceiptCloseoutGapCount}</div>
+                <div className="rounded-md bg-white/10 px-3 py-2 font-medium text-white">下一刀：{taskReceiptNextCutLabel}</div>
               </div>
             </div>
           </div>

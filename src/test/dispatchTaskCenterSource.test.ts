@@ -27,6 +27,14 @@ test("dispatch task center points completed dispatches back to remaining gate bl
   assert.ok(source.includes("buildGateRecheckActionLink(updated.task)"));
 });
 
+test("dispatch task center routes completed role closure dispatches back to gate recheck", () => {
+  assert.ok(source.includes("isRoleClosureDispatchTask(updated.task)"));
+  assert.ok(source.includes("角色闭环已完成"));
+  assert.ok(source.includes("回总闸门复检角色闭环"));
+  assert.ok(source.includes("isRoleClosureTask"));
+  assert.ok(source.includes("角色闭环回填"));
+});
+
 test("dispatch task center carries gate return into internal work links", () => {
   assert.ok(dispatchPageSource.includes("gateReturnHref={gateReturn}"));
   assert.ok(source.includes("gateReturnHref?: string | null"));

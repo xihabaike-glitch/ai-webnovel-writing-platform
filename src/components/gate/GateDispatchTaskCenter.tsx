@@ -573,7 +573,14 @@ export function GateDispatchTaskCenter({
           ? `已自动生成三轮动作后的回流派单：${secondMetricFollowups.map((item) => item.title).join("、")}`
           : "";
         const firstDayUpdate = buildFirstDayDispatchUpdateSummary(updated);
-        if (firstDayUpdate.visible) {
+        const roleClosureCompleted = targetState === "completed" && isRoleClosureDispatchTask(updated.task);
+        if (roleClosureCompleted) {
+          setRouteActionMessage(`角色闭环已完成：${roleClosureLaneLabel(updated.task)}线已回填。回总闸门复检角色闭环，确认剩余卡点是否减少。`);
+          setRouteActionLink({
+            ...buildGateRecheckActionLink(updated.task),
+            label: "回总闸门复检角色闭环",
+          });
+        } else if (firstDayUpdate.visible) {
           const firstDayFollowUp = updated.followUpTasks.find((item) => item.dispatchKey.startsWith("first-day:")) ?? null;
           const firstDayPrompt = buildFirstDayPostDispatchCompletionPrompt({
             completedTitle: updated.task.title,
@@ -1948,6 +1955,7 @@ export function GateDispatchTaskCenter({
           const isFocusedCompletionTask = task.dispatchKey === focusedCompletionDispatchKey;
           const isHashFocusedTask = task.dispatchKey === hashFocusedDispatchKey;
           const isFocusedTask = task.dispatchKey === focusedDispatchKey || isFocusedCompletionTask || isHashFocusedTask;
+          const isRoleClosureTask = isRoleClosureDispatchTask(task);
           const completionDraft = completionDrafts[task.dispatchKey] ?? "";
           const completionAcceptanceState = buildFirstDayReturnedEvidenceAcceptanceState({
             completionEvidence: completionDraft,
@@ -2045,6 +2053,11 @@ export function GateDispatchTaskCenter({
                 {task.completionEvidence ? (
                   <div className="mt-3 rounded-md bg-emerald-50 p-3 text-sm leading-6 text-emerald-800">
                     <p>完成依据：{task.completionEvidence}</p>
+                    {isRoleClosureTask ? (
+                      <p className="mt-2 rounded-md bg-white px-2 py-1 text-xs font-medium text-emerald-900">
+                        角色闭环回填：回总闸门复检角色闭环，确认结构、资料、平台三类角色缺口是否减少。
+                      </p>
+                    ) : null}
                     {completionRecordChips.length ? (
                       <div className="mt-2 flex flex-wrap gap-2 text-xs">
                         {completionRecordChips.map((chip) => (
@@ -2053,8 +2066,8 @@ export function GateDispatchTaskCenter({
                       </div>
                     ) : null}
                     {task.state === "completed" ? (
-                      <Link className="mt-2 inline-flex rounded-md bg-white px-3 py-2 text-xs font-medium text-emerald-900 hover:bg-emerald-100" href={dispatchGateRecheckHref(task)}>
-                        回总闸门复检并查看剩余卡点
+                      <Link className="mt-2 inline-flex rounded-md bg-white px-3 py-2 text-xs font-medium text-emerald-900 hover:bg-emerald-100" href={hrefWithGateReturn(dispatchGateRecheckHref(task), gateReturnHref)}>
+                        {isRoleClosureTask ? "回总闸门复检角色闭环" : "回总闸门复检并查看剩余卡点"}
                       </Link>
                     ) : null}
                   </div>

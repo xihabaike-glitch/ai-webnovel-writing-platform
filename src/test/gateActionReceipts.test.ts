@@ -59,6 +59,7 @@ import {
   buildGateFinalDeliveryReceipt,
   buildGateFinalDeliveryReceiptReview,
   buildGatePublishEffectReceipt,
+  buildGateOpeningSampleAcceptanceReceipt,
   filterGateDispatchTasks,
   filterGateActionReceipts,
   gateActionReceiptPlatform,
@@ -6205,5 +6206,39 @@ test("buildGateActionReceipt", async (t) => {
     assert.equal(receipt.message, "模型额度不足。");
     assert.equal(receipt.recheck.status, "blocked");
     assert.equal(receipt.recheck.actionLabel, "打开相关位置");
+  });
+
+  await t.test("builds a first chapter sample acceptance receipt", () => {
+    const receipt = buildGateOpeningSampleAcceptanceReceipt({
+      projectId: "project-1",
+      projectTitle: "夜雨系统",
+      chapter: {
+        id: "chapter-1",
+        title: "第一章 雨夜系统",
+        wordCount: 1800,
+        hook: "雨夜倒计时弹出，主角必须在十分钟内改命。",
+        conflict: "主角与夺命系统、旧案真凶同时对撞。",
+        valueShift: "主角从被动逃命变成掌握第一条反杀线索。",
+        cliffhanger: "门外的人喊出了只有死者才知道的名字。",
+      },
+      gateReturnHref: "/gate?focus=action-recheck#gate-focus-notice",
+      now: "2026-01-01T00:00:00.000Z",
+    });
+
+    assert.equal(receipt.actionId, "project-acceptance:opening_sample:project-1");
+    assert.equal(receipt.label, "回写首章样本验收");
+    assert.equal(receipt.href, "/projects/project-1/chapters/chapter-1");
+    assert.equal(receipt.executionType, "manual");
+    assert.equal(receipt.succeededCount, 1);
+    assert.equal(receipt.failedCount, 0);
+    assert.ok(receipt.message.includes("完成项：首章样本"));
+    assert.ok(receipt.message.includes("正文字数：1800"));
+    assert.ok(receipt.message.includes("钩子：雨夜倒计时"));
+    assert.ok(receipt.message.includes("冲突：主角与夺命系统"));
+    assert.ok(receipt.message.includes("价值变化：主角从被动逃命"));
+    assert.ok(receipt.message.includes("章末追读：门外的人"));
+    assert.ok(receipt.message.includes("回总闸门复检结论：首章样本缺口已解除"));
+    assert.equal(receipt.recheck.status, "ready");
+    assert.equal(receipt.recheck.actionLabel, "回总闸门复检");
   });
 });

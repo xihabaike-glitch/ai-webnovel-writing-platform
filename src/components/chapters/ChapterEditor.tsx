@@ -3,10 +3,18 @@
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { buildChapterUpdatePayload, type ChapterStatus } from "@/lib/chapters/chapterPayload";
+import {
+  buildGateOpeningSampleAcceptanceReceipt,
+  loadGateActionReceipts,
+  persistGateActionReceipt,
+  saveGateActionReceipts,
+} from "@/lib/projects/gateActionReceipts";
 import { countWords } from "@/lib/text/wordCount";
 
 interface EditableChapter {
   id: string;
+  projectId: string;
+  projectTitle?: string | null;
   order: number;
   title: string;
   content: string;
@@ -30,7 +38,9 @@ export function ChapterEditor({ chapter, gateReturnHref }: { chapter: EditableCh
   const [cliffhanger, setCliffhanger] = useState(chapter.cliffhanger);
   const [status, setStatus] = useState<ChapterStatus>((chapter.status as ChapterStatus) || "draft");
   const [message, setMessage] = useState<string | null>(null);
+  const [receiptMessage, setReceiptMessage] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [isWritingReceipt, setIsWritingReceipt] = useState(false);
   const wordCount = useMemo(() => countWords(content), [content]);
   const firstChapterSampleChecklist = [
     {
@@ -65,6 +75,7 @@ export function ChapterEditor({ chapter, gateReturnHref }: { chapter: EditableCh
     },
   ];
   const firstChapterSampleDoneCount = firstChapterSampleChecklist.filter((item) => item.done).length;
+  const firstChapterSampleReady = firstChapterSampleDoneCount === firstChapterSampleChecklist.length;
 
   async function saveChapter() {
     setIsSaving(true);
@@ -94,10 +105,60 @@ export function ChapterEditor({ chapter, gateReturnHref }: { chapter: EditableCh
 
       setMessage("已保存");
       router.refresh();
+      return true;
     } catch (caught) {
       setMessage(caught instanceof Error ? caught.message : "保存失败。");
+      return false;
     } finally {
       setIsSaving(false);
+    }
+  }
+
+  async function writeOpeningSampleAcceptanceReceipt() {
+    if (!firstChapterSampleReady) return;
+    setReceiptMessage(null);
+    setIsWritingReceipt(true);
+
+    const saved = await saveChapter();
+    if (!saved) {
+      setIsWritingReceipt(false);
+      return;
+    }
+
+    const receipt = buildGateOpeningSampleAcceptanceReceipt({
+      projectId: chapter.projectId,
+      projectTitle: chapter.projectTitle,
+      chapter: {
+        id: chapter.id,
+        title,
+        wordCount,
+        hook,
+        conflict,
+        valueShift,
+        cliffhanger,
+      },
+      gateReturnHref,
+    });
+
+    try {
+      const savedReceipt = await persistGateActionReceipt(receipt, {
+        openingSampleAcceptance: {
+          projectId: chapter.projectId,
+          chapterId: chapter.id,
+          wordCount,
+          checklist: firstChapterSampleChecklist.map((item) => ({
+            id: item.id,
+            label: item.label,
+            done: item.done,
+          })),
+        },
+      });
+      saveGateActionReceipts([savedReceipt, ...loadGateActionReceipts()]);
+      setReceiptMessage("首章验收回执已写入总闸门");
+    } catch (caught) {
+      setReceiptMessage(caught instanceof Error ? caught.message : "首章验收回执写入失败。");
+    } finally {
+      setIsWritingReceipt(false);
     }
   }
 
@@ -140,6 +201,19 @@ export function ChapterEditor({ chapter, gateReturnHref }: { chapter: EditableCh
               </div>
             ))}
           </div>
+          {firstChapterSampleReady ? (
+            <div className="mt-4 flex flex-col gap-2 border-t border-sky-100 pt-3 sm:flex-row sm:items-center">
+              <button
+                className="w-fit rounded-md border border-sky-300 bg-white px-3 py-2 text-xs font-medium text-sky-900 hover:bg-sky-100 disabled:opacity-50"
+                disabled={isSaving || isWritingReceipt}
+                onClick={writeOpeningSampleAcceptanceReceipt}
+                type="button"
+              >
+                {isWritingReceipt ? "写入中" : "生成首章验收回执"}
+              </button>
+              {receiptMessage ? <span className="text-xs text-slate-600">{receiptMessage}</span> : null}
+            </div>
+          ) : null}
         </section>
       ) : null}
       <div className="rounded-md border border-slate-200 bg-white p-4">

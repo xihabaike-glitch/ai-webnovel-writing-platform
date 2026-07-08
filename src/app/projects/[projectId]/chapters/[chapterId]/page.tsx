@@ -100,6 +100,8 @@ export default async function ChapterPage({
   });
   const editableChapter = {
     id: chapter.id,
+    projectId: chapter.projectId,
+    projectTitle: chapter.project.title,
     order: chapter.order,
     title: chapter.title,
     content: chapter.content,

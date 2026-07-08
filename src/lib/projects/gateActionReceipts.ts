@@ -2564,6 +2564,61 @@ export function buildGateAdviceActionReceipt(input: {
   };
 }
 
+export function buildGateOpeningSampleAcceptanceReceipt(input: {
+  projectId: string;
+  projectTitle?: string | null;
+  chapter: {
+    id: string;
+    title: string;
+    wordCount: number;
+    hook: string;
+    conflict: string;
+    valueShift: string;
+    cliffhanger: string;
+  };
+  gateReturnHref?: string | null;
+  now?: Date | string;
+}): GateActionReceipt {
+  const createdAt = input.now ? new Date(input.now).toISOString() : new Date().toISOString();
+  const projectLabel = input.projectTitle?.trim() || input.projectId;
+  const href = `/projects/${input.projectId}/chapters/${input.chapter.id}`;
+  const message = [
+    "完成项：首章样本",
+    `作品：${projectLabel}`,
+    `章节：${input.chapter.title}`,
+    `正文字数：${input.chapter.wordCount}`,
+    `钩子：${input.chapter.hook.trim()}`,
+    `冲突：${input.chapter.conflict.trim()}`,
+    `价值变化：${input.chapter.valueShift.trim()}`,
+    `章末追读：${input.chapter.cliffhanger.trim()}`,
+    "人工验收：通过",
+    "回总闸门复检结论：首章样本缺口已解除",
+    `下一动作：${input.gateReturnHref ? "回总闸门复检，确认剩余卡点是否减少。" : "回总闸门复检，确认后续审稿、二改和派单卡点。"}`,
+    "停手线：首章样本不完整时，不允许批量生成后续章节。",
+  ].join("\n");
+
+  return {
+    id: `project-acceptance-opening-sample:${input.projectId}:${input.chapter.id}:${createdAt}`,
+    actionId: `project-acceptance:opening_sample:${input.projectId}`,
+    label: "回写首章样本验收",
+    detail: `${projectLabel} · ${input.chapter.title} · 首章样本五项已补齐`,
+    href,
+    status: "succeeded",
+    message,
+    executionType: "manual",
+    succeededCount: 1,
+    failedCount: 0,
+    taskId: null,
+    recheck: {
+      status: "ready",
+      label: "复检单本作品验收单",
+      detail: "首章样本正文、钩子、冲突、价值变化和章末追读已写回回执，回总闸门确认首章样本缺口是否解除。",
+      actionLabel: "回总闸门复检",
+    },
+    createdAt,
+  };
+}
+
 function finalDeliveryReceiptHref(projectId: string, actionHref: string) {
   if (actionHref.startsWith("#")) return `/projects/${projectId}${actionHref}`;
   return actionHref;

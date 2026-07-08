@@ -491,6 +491,7 @@ test("chapter editor turns first chapter sample gaps into a five item workbench"
   const chapterPage = readFileSync("src/app/projects/[projectId]/chapters/[chapterId]/page.tsx", "utf8");
   const chapterEditor = readFileSync("src/components/chapters/ChapterEditor.tsx", "utf8");
 
+  assert.ok(chapterPage.includes("projectId: chapter.projectId"));
   assert.ok(chapterPage.includes("order: chapter.order"));
   assert.ok(chapterPage.includes("<ChapterEditor"));
   assert.ok(chapterPage.includes("gateReturnHref={gateReturn}"));
@@ -507,6 +508,20 @@ test("chapter editor turns first chapter sample gaps into a five item workbench"
   }
   assert.ok(chapterEditor.includes("href={gateReturnHref}"));
   assert.ok(chapterEditor.includes("处理后回总闸门复检"));
+});
+
+test("chapter editor can write a first chapter sample acceptance receipt", () => {
+  const chapterEditor = readFileSync("src/components/chapters/ChapterEditor.tsx", "utf8");
+
+  assert.ok(chapterEditor.includes("buildGateOpeningSampleAcceptanceReceipt"));
+  assert.ok(chapterEditor.includes("persistGateActionReceipt"));
+  assert.ok(chapterEditor.includes("saveGateActionReceipts"));
+  assert.ok(chapterEditor.includes("loadGateActionReceipts"));
+  assert.ok(chapterEditor.includes("firstChapterSampleDoneCount === firstChapterSampleChecklist.length"));
+  assert.ok(chapterEditor.includes("生成首章验收回执"));
+  assert.ok(chapterEditor.includes("首章验收回执已写入总闸门"));
+  assert.ok(chapterEditor.includes("projectId: chapter.projectId"));
+  assert.ok(chapterEditor.includes("gateReturnHref"));
 });
 
 test("chapter detail page surfaces pending candidate production gate", () => {

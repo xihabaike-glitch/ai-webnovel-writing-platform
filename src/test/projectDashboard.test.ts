@@ -120,6 +120,13 @@ test("buildProjectDashboard", async (t) => {
     assert.equal(dashboard.realSampleAcceptanceSheet.missingEvidence[0]?.ownerRole, "二改编辑");
     assert.equal(dashboard.realSampleAcceptanceSheet.missingEvidence[0]?.actionMode, "ai_task");
     assert.ok(dashboard.realSampleAcceptanceSheet.missingEvidence[0]?.executionHint.includes("章节二改"));
+    const secondPassDraftHref = dashboard.realSampleAcceptanceSheet.missingEvidence[0]?.dispatchDraftHref;
+    assert.equal(typeof secondPassDraftHref, "string");
+    assert.ok(secondPassDraftHref.startsWith("/dispatch?"));
+    assert.ok(secondPassDraftHref.includes("roleIntent=acceptance-gap"));
+    assert.ok(secondPassDraftHref.includes("roleId=second_pass"));
+    assert.ok(decodeURIComponent(secondPassDraftHref).includes("完成「二改」证据"));
+    assert.ok(decodeURIComponent(secondPassDraftHref).includes("/projects/project-1#ai-pipeline"));
     assert.equal(dashboard.realSampleAcceptanceSheet.missingEvidence[1]?.actionLabel, "回填派单验收");
     assert.equal(dashboard.realSampleAcceptanceSheet.missingEvidence[1]?.ownerRole, "派单验收负责人");
     assert.equal(dashboard.realSampleAcceptanceSheet.missingEvidence[1]?.actionMode, "dispatch");
@@ -217,6 +224,10 @@ test("buildProjectDashboard", async (t) => {
     assert.equal(blocked.realSampleAcceptanceSheet.missingEvidence[0]?.ownerRole, "角色验收负责人");
     assert.equal(blocked.realSampleAcceptanceSheet.missingEvidence[0]?.actionMode, "dispatch");
     assert.ok(blocked.realSampleAcceptanceSheet.missingEvidence[0]?.executionHint.includes("结构、资料、平台包装"));
+    const roleDispatchDraftHref = blocked.realSampleAcceptanceSheet.missingEvidence[0]?.dispatchDraftHref;
+    assert.equal(typeof roleDispatchDraftHref, "string");
+    assert.ok(roleDispatchDraftHref.includes("roleId=role_dispatch"));
+    assert.ok(decodeURIComponent(roleDispatchDraftHref).includes("补齐结构、资料、平台包装角色派单闭环"));
     assert.equal(blocked.realSampleAcceptanceSheet.roleClosureProgress?.completedRoles, 1);
     assert.equal(blocked.realSampleAcceptanceSheet.roleClosureProgress?.totalRoles, 3);
     assert.deepEqual(blocked.realSampleAcceptanceSheet.roleClosureProgress?.completedLabels, ["结构主编"]);

@@ -753,7 +753,7 @@ export default async function ProjectPage({
                 {dashboard.realSampleAcceptanceSheet.missingEvidence.map((item) => (
                   <Link
                     className="rounded-md bg-white/10 p-2 hover:bg-white/15"
-                    href={hrefWithGateReturn(item.href, gateReturn)}
+                    href={hrefWithGateReturn(item.dispatchDraftHref, gateReturn)}
                     key={item.stepId}
                   >
                     <div className="font-medium text-white">{item.label}</div>
@@ -762,6 +762,9 @@ export default async function ProjectPage({
                     <p className="mt-1 text-slate-300">{item.executionHint}</p>
                     <div className="mt-2 inline-flex rounded-md bg-white px-2 py-1 font-medium text-slate-950">
                       {item.actionLabel}
+                    </div>
+                    <div className="mt-2 inline-flex rounded-md border border-white/20 px-2 py-1 font-medium text-white">
+                      生成派单草稿
                     </div>
                   </Link>
                 ))}

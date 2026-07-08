@@ -72,6 +72,7 @@ export interface ProjectAcceptanceMissingEvidence {
   ownerRole: string;
   actionMode: "workspace" | "ai_task" | "dispatch" | "publish";
   executionHint: string;
+  dispatchDraftHref: string;
 }
 
 export interface ProjectRoleClosureLane {
@@ -185,6 +186,29 @@ const missingEvidenceExecutionSpecs: Record<
     executionHint: "打开发布包补前三章、卖点、标签、简介和平台复盘入口。",
   },
 };
+
+function buildAcceptanceGapDispatchDraftHref(
+  input: ProjectDashboardInput,
+  step: Omit<ProjectAcceptanceStep, "status">,
+  execution: Pick<ProjectAcceptanceMissingEvidence, "ownerRole" | "executionHint">,
+) {
+  const projectId = input.projectId ?? "";
+  const returnHref = step.href.startsWith("/projects/")
+    ? step.href
+    : projectId ? `/projects/${projectId}${step.href.startsWith("#") ? step.href : ""}` : "/projects";
+  const params = new URLSearchParams({
+    roleIntent: "acceptance-gap",
+    projectId,
+    roleId: step.id,
+    roleName: execution.ownerRole,
+    role: execution.ownerRole,
+    modelOwner: "按模型岗位矩阵选择",
+    acceptance: `完成「${step.label}」证据：${step.evidence}${step.stopRule} ${execution.executionHint} 处理后回总闸门复检。`,
+    returnHref,
+  });
+
+  return `/dispatch?${params.toString()}#dispatch-task-center`;
+}
 
 function roleDispatchPrefix(projectId: string | undefined, intentId: string) {
   return projectId ? `role-intent:${projectId}:${intentId}:` : `role-intent:`;
@@ -331,15 +355,20 @@ function buildProjectRealSampleAcceptanceSheet(input: ProjectDashboardInput): Pr
   const completedSteps = definitions.filter((step) => step.done).length;
   const missingEvidence = definitions
     .filter((step) => !step.done)
-    .map((step) => ({
-      stepId: step.id,
-      label: step.label,
-      reason: step.evidence,
-      stopRule: step.stopRule,
-      href: step.href,
-      actionLabel: missingEvidenceActionLabels[step.id],
-      ...missingEvidenceExecutionSpecs[step.id],
-    })) satisfies ProjectAcceptanceMissingEvidence[];
+    .map((step) => {
+      const execution = missingEvidenceExecutionSpecs[step.id];
+
+      return {
+        stepId: step.id,
+        label: step.label,
+        reason: step.evidence,
+        stopRule: step.stopRule,
+        href: step.href,
+        actionLabel: missingEvidenceActionLabels[step.id],
+        ...execution,
+        dispatchDraftHref: buildAcceptanceGapDispatchDraftHref(input, step, execution),
+      };
+    }) satisfies ProjectAcceptanceMissingEvidence[];
   const steps = definitions.map((step, index) => ({
     id: step.id,
     label: step.label,

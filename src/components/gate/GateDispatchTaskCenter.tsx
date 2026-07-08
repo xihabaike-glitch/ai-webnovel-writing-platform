@@ -201,6 +201,7 @@ function roleIntentWorkAreaLabel(roleIntent: string) {
   if (roleIntent === "story-structure") return "结构诊断";
   if (roleIntent === "context-recall") return "项目土壤";
   if (roleIntent === "platform-export") return "平台导出";
+  if (roleIntent === "acceptance-gap") return "验收缺口";
   return "作品工作区";
 }
 

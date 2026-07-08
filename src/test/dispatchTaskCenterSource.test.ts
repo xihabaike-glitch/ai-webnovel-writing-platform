@@ -88,6 +88,8 @@ test("role intent dispatch targets the matching project work area", () => {
   assert.ok(source.includes("项目土壤"));
   assert.ok(source.includes("platform-export"));
   assert.ok(source.includes("平台导出"));
+  assert.ok(source.includes("acceptance-gap"));
+  assert.ok(source.includes("验收缺口"));
   assert.ok(source.includes("actionLabel: `打开${workAreaLabel}`"));
   assert.ok(source.includes("`工作区：${workAreaLabel}`"));
 });

@@ -443,6 +443,10 @@ test("buildPrePublishGate", async (t) => {
     assert.equal(notice.recheckSummary?.totalSteps, 6);
     assert.equal(notice.recheckSummary?.currentStepLabel, "发布包");
     assert.equal(notice.recheckSummary?.statusLabel, "发布包待验");
+    assert.equal(notice.recheckSummary?.recheckVerdict.tone, "progress");
+    assert.equal(notice.recheckSummary?.recheckVerdict.label, "卡点已减少");
+    assert.ok(notice.recheckSummary?.recheckVerdict.detail.includes("已补 5/6 步"));
+    assert.ok(notice.recheckSummary?.recheckVerdict.detail.includes("继续处理「发布包」"));
     assert.ok(notice.recheckSummary?.completedEvidence.some((line) => line.includes("首日派单已有完成依据")));
     assert.ok(notice.recheckSummary?.latestEvidence?.includes("派单中心已补齐首日平台包预检"));
     assert.equal(notice.recheckSummary?.nextDispatch?.id, "project-acceptance-next:project-recheck-progress:publish_package");

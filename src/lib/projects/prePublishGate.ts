@@ -495,6 +495,7 @@ export interface PrePublishGateRecheckSummary {
   completedSteps: number;
   totalSteps: number;
   currentStepLabel: string;
+  recheckVerdict: PrePublishGateRecheckVerdict;
   completedEvidence: string[];
   remainingEvidence: string[];
   remainingBlockers: PrePublishGateRemainingBlocker[];
@@ -502,6 +503,12 @@ export interface PrePublishGateRecheckSummary {
   latestEvidence: string | null;
   nextDispatch: PrePublishGateRecheckDispatch | null;
   nextDispatches: PrePublishGateRecheckDispatch[];
+}
+
+export interface PrePublishGateRecheckVerdict {
+  tone: "cleared" | "progress" | "stalled";
+  label: string;
+  detail: string;
 }
 
 export interface PrePublishGateRoleClosureProgress {
@@ -1769,6 +1776,36 @@ function buildProjectAcceptanceRemainingBlockers(
     }));
 }
 
+function buildProjectAcceptanceRecheckVerdict(input: {
+  completedSteps: number;
+  totalSteps: number;
+  currentStepLabel: string;
+  remainingBlockers: PrePublishGateRemainingBlocker[];
+  latestEvidence: string | null;
+}): PrePublishGateRecheckVerdict {
+  if (input.remainingBlockers.length === 0) {
+    return {
+      tone: "cleared",
+      label: "验收缺口已解除",
+      detail: `已补 ${input.completedSteps}/${input.totalSteps} 步；这张验收单不再卡总闸门，放量前复查发布包和失败队列。`,
+    };
+  }
+
+  if (input.latestEvidence) {
+    return {
+      tone: "progress",
+      label: "卡点已减少",
+      detail: `已补 ${input.completedSteps}/${input.totalSteps} 步；继续处理「${input.currentStepLabel}」，否则总闸门不会放行。`,
+    };
+  }
+
+  return {
+    tone: "stalled",
+    label: "卡点仍在",
+    detail: `已补 ${input.completedSteps}/${input.totalSteps} 步；当前仍卡在「${input.currentStepLabel}」，先补完成依据和人工验收。`,
+  };
+}
+
 function buildProjectAcceptanceRecheckSummary(
   actionId: string | null | undefined,
   gate: PrePublishGate,
@@ -1784,18 +1821,27 @@ function buildProjectAcceptanceRecheckSummary(
   const remainingBlockers = buildProjectAcceptanceRemainingBlockers(project.projectId, steps);
   const nextDispatch = buildProjectAcceptanceNextDispatch(project, currentStep, completedSteps);
   const nextDispatches = buildProjectAcceptanceNextDispatches(project, currentStep, completedSteps, nextDispatch);
+  const latestEvidence = project.acceptanceSheetGate.latestDispatchEvidence;
+  const currentStepLabel = currentStep?.label ?? project.acceptanceSheetGate.actionLabel;
 
   return {
     title: `${project.projectTitle} · 项目验收单回填`,
     statusLabel: project.acceptanceSheetGate.label,
     completedSteps,
     totalSteps: steps.length,
-    currentStepLabel: currentStep?.label ?? project.acceptanceSheetGate.actionLabel,
+    currentStepLabel,
+    recheckVerdict: buildProjectAcceptanceRecheckVerdict({
+      completedSteps,
+      totalSteps: steps.length,
+      currentStepLabel,
+      remainingBlockers,
+      latestEvidence,
+    }),
     completedEvidence: steps.filter((step) => step.status === "done").map((step) => step.evidence),
     remainingEvidence: steps.filter((step) => step.status !== "done").map((step) => `${step.label}：${step.evidence}`),
     remainingBlockers,
     roleClosureProgress: project.acceptanceSheetGate.roleClosureProgress,
-    latestEvidence: project.acceptanceSheetGate.latestDispatchEvidence,
+    latestEvidence,
     nextDispatch,
     nextDispatches,
   };

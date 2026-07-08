@@ -67,6 +67,12 @@ function recheckBlockerTone(priorityLabel: string) {
   return "border-slate-100 bg-white text-slate-700";
 }
 
+function recheckVerdictTone(tone: "cleared" | "progress" | "stalled") {
+  if (tone === "cleared") return "border-emerald-200 bg-emerald-50 text-emerald-900";
+  if (tone === "progress") return "border-blue-200 bg-blue-50 text-blue-900";
+  return "border-amber-200 bg-amber-50 text-amber-900";
+}
+
 function shortDateTime(value: string | null) {
   if (!value) return "未记录时间";
   return new Intl.DateTimeFormat("zh-CN", {
@@ -369,6 +375,10 @@ export default async function GatePage({
                   <div>
                     <div className="text-xs font-medium text-slate-500">项目验收单回填</div>
                     <div className="mt-1 font-semibold">{focusNotice.recheckSummary.title}</div>
+                    <div className={`mt-2 rounded-md border px-2 py-2 text-xs leading-5 ${recheckVerdictTone(focusNotice.recheckSummary.recheckVerdict.tone)}`}>
+                      <div className="font-medium">复检结论：{focusNotice.recheckSummary.recheckVerdict.label}</div>
+                      <div className="mt-1">{focusNotice.recheckSummary.recheckVerdict.detail}</div>
+                    </div>
                     <div className="mt-2 flex flex-wrap gap-2 text-xs">
                       <span className="rounded-md bg-slate-950 px-2 py-1 font-medium text-white">
                         已完成 {focusNotice.recheckSummary.completedSteps}/{focusNotice.recheckSummary.totalSteps} 步

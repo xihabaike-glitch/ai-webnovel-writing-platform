@@ -23,6 +23,9 @@ test("gate page renders action recheck summary feedback", () => {
   assert.ok(source.includes("GateRecheckDispatchButton"));
   assert.ok(source.includes("focusNotice.recheckSummary"));
   assert.ok(source.includes("项目验收单回填"));
+  assert.ok(source.includes("复检结论"));
+  assert.ok(source.includes("focusNotice.recheckSummary.recheckVerdict.label"));
+  assert.ok(source.includes("focusNotice.recheckSummary.recheckVerdict.detail"));
   assert.ok(source.includes("已完成 {focusNotice.recheckSummary.completedSteps}/{focusNotice.recheckSummary.totalSteps} 步"));
   assert.ok(source.includes("最近回填"));
   assert.ok(source.includes("剩余卡点"));

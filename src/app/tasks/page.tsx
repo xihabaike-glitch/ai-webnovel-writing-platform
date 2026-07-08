@@ -950,6 +950,13 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
                 </div>
                 <div className="mt-2 text-slate-600">{entry.projectTitle} · {entry.platformName}</div>
                 <p className="mt-2 line-clamp-2 leading-6 text-slate-600">{entry.evidence}</p>
+                {entry.evidenceChips.length ? (
+                  <div className="mt-2 flex flex-wrap gap-1 text-xs">
+                    {entry.evidenceChips.map((chip) => (
+                      <span className="rounded-md bg-cyan-100 px-2 py-1 font-medium text-cyan-800" key={chip}>{chip}</span>
+                    ))}
+                  </div>
+                ) : null}
                 {entry.handoffGuidance?.firstDayActions.length ? (
                   <div className="mt-2 text-xs font-medium text-cyan-800">
                     {entry.handoffGuidance.firstDayActions[0]}

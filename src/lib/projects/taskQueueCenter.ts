@@ -135,6 +135,7 @@ export interface QueueItem {
   label: string;
   chapterTitle: string;
   evidence: string;
+  evidenceChips: string[];
   strategyBasis?: ProjectStartTacticSummary | null;
   handoffGuidance?: QueueHandoffGuidance | null;
   riskLevel: FirstDayRiskLevel;
@@ -592,24 +593,58 @@ function buildHandoffGuidance(startTactic: ProjectStartTacticSummary | null): Qu
   };
 }
 
-function item(input: Omit<QueueItem, "label" | "priority" | "blockerType" | "riskLevel" | "riskLabel" | "riskNotice" | "scaleGate"> & {
+function uniqueEvidenceChips(lines: Array<string | null | undefined>, limit = 4) {
+  const seen = new Set<string>();
+  return lines
+    .map((line) => line?.trim())
+    .filter((line): line is string => Boolean(line))
+    .filter((line) => {
+      if (seen.has(line)) return false;
+      seen.add(line);
+      return true;
+    })
+    .slice(0, limit);
+}
+
+function queueEvidenceChips(input: {
+  sourceType?: QueueItem["sourceType"];
+  handoffGuidance?: QueueHandoffGuidance | null;
+}) {
+  if (input.sourceType !== "first_day_handoff" || !input.handoffGuidance) return [];
+  const evidence = input.handoffGuidance.evidence;
+  const knowledgeSource = evidence.find((line) => /知识来源/u.test(line));
+  const platformFeedback = evidence.find((line) => /平台反哺/u.test(line))
+    ?? evidence.find((line) => line !== knowledgeSource && /正反馈|反馈/u.test(line));
+  const avoidRule = input.handoffGuidance.avoidRules[0];
+
+  return uniqueEvidenceChips([
+    knowledgeSource,
+    platformFeedback,
+    avoidRule ? `避坑：${avoidRule.replace(/^避坑边界[:：]?/u, "").trim()}` : null,
+  ], 3);
+}
+
+function item(input: Omit<QueueItem, "label" | "priority" | "blockerType" | "riskLevel" | "riskLabel" | "riskNotice" | "scaleGate" | "evidenceChips"> & {
   blockerType?: QueueItem["blockerType"];
   riskLevel?: QueueItem["riskLevel"];
   riskLabel?: string;
   riskNotice?: string | null;
   scaleGate?: QueueScaleGate;
   priority?: number;
+  evidenceChips?: string[];
 }): QueueItem {
+  const handoffGuidance = input.handoffGuidance ?? (input.strategyBasis ? buildHandoffGuidance(input.strategyBasis) : null);
   return {
     ...input,
     blockerType: input.blockerType ?? null,
     riskLevel: input.riskLevel ?? "standard",
     riskLabel: input.riskLabel ?? "标准",
-    handoffGuidance: input.handoffGuidance ?? (input.strategyBasis ? buildHandoffGuidance(input.strategyBasis) : null),
+    handoffGuidance,
     riskNotice: input.riskNotice ?? null,
     scaleGate: input.scaleGate ?? "none",
     label: categoryLabel(input.category),
     priority: input.priority ?? categoryPriority[input.category],
+    evidenceChips: input.evidenceChips ?? queueEvidenceChips({ sourceType: input.sourceType, handoffGuidance }),
   };
 }
 

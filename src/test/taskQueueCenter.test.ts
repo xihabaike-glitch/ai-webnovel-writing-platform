@@ -195,6 +195,8 @@ function handoffWorldEntries() {
       "交接状态：reuse",
       "交接标签：稳定加码",
       "交接说明：沿用番茄首章强钩子打法。",
+      "交接证据：知识来源：番茄小说 正反馈经验已沉淀",
+      "交接证据：平台反哺：执行正反馈链",
       "首日动作：开头必须落地第一段倒计时。",
       "首日动作：验证前三章追读承诺是否兑现。",
       "避坑边界：不要直接放量，先做小样本。",
@@ -1020,6 +1022,9 @@ test("buildTaskQueueCenter", async (t) => {
     assert.ok(handoffs.some((item) => item.sourceDetail?.includes("历史打法")));
     assert.ok(handoffs[0]?.handoffGuidance?.firstDayActions.some((action) => action.includes("倒计时")));
     assert.ok(handoffs[0]?.handoffGuidance?.avoidRules.some((rule) => rule.includes("小样本")));
+    assert.ok(handoffs[0]?.evidenceChips.some((chip) => chip.includes("知识来源：番茄小说")));
+    assert.ok(handoffs[0]?.evidenceChips.some((chip) => chip.includes("平台反哺")));
+    assert.ok(handoffs[0]?.evidenceChips.some((chip) => chip.includes("避坑")));
     assert.equal(queue.recommendedNext?.sourceType, "first_day_handoff");
     assert.equal(recommendedQueueActionLabel(queue.recommendedNext), "下一步：补交接证据");
   });

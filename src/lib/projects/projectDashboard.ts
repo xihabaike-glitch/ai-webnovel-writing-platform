@@ -247,8 +247,32 @@ function hasPublishPackageRecheckReceipt(input: ProjectDashboardInput) {
   });
 }
 
+function roleClosureRecheckReceipt(input: ProjectDashboardInput) {
+  const projectPrefix = input.projectId
+    ? `project-acceptance-next:${input.projectId}:role_dispatch`
+    : "project-acceptance-next:";
+  return (input.gateDispatchTasks ?? []).find((task) => {
+    if (!task.dispatchKey.startsWith(projectPrefix)) return false;
+    if (input.projectId === undefined && !task.dispatchKey.endsWith(":role_dispatch")) return false;
+    if (!hasCompletedDispatchEvidence(task)) return false;
+
+    const text = task.completionEvidence;
+    const completedItem = completionValueAfterLabel("完成项", text);
+    const artifact = completionValueAfterLabel("产物链接/位置", text);
+    const manualAcceptance = completionValueAfterLabel("人工验收", text);
+    const gateConclusion = completionValueAfterLabel("回总闸门复检结论", text);
+    const roleSignals = ["资料官", "平台包装"].filter((signal) => completedItem.includes(signal));
+
+    return roleSignals.length >= 2
+      && artifact.length >= 8
+      && /通过|已验收|确认|合格/u.test(manualAcceptance)
+      && /验收缺口已解除|已解除|通过/u.test(gateConclusion);
+  }) ?? null;
+}
+
 function buildRoleDispatchAcceptance(input: ProjectDashboardInput) {
   const tasks = input.gateDispatchTasks ?? [];
+  const recheckReceipt = roleClosureRecheckReceipt(input);
   const roleDispatchTasks = tasks.filter((task) => (
     input.projectId
       ? task.dispatchKey.startsWith(`role-intent:${input.projectId}:`)
@@ -260,11 +284,17 @@ function buildRoleDispatchAcceptance(input: ProjectDashboardInput) {
       task.dispatchKey.startsWith(roleDispatchPrefix(input.projectId, intent.id))
       && hasCompletedDispatchEvidence(task)
     ));
+    const coveredByRecheck = Boolean(
+      recheckReceipt
+      && (intent.id === "context-recall" || intent.id === "platform-export")
+      && recheckReceipt.completionEvidence.includes(intent.label),
+    );
     return {
       id: intent.id,
       label: intent.label,
-      status: completedTask ? "done" : "missing",
-      evidence: completedTask?.completionEvidence.trim() || `${intent.label}还缺完成依据。`,
+      status: completedTask || coveredByRecheck ? "done" : "missing",
+      evidence: completedTask?.completionEvidence.trim()
+        || (coveredByRecheck ? `复检分流收据已补齐${intent.label}角色闭环：${recheckReceipt?.completionEvidence.trim()}` : `${intent.label}还缺完成依据。`),
     } satisfies ProjectRoleClosureLane;
   });
   const completedLabels = lanes.filter((lane) => lane.status === "done").map((lane) => lane.label);

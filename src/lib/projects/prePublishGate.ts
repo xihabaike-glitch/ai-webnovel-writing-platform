@@ -1543,7 +1543,7 @@ function buildAcceptanceSheetGate(
     .filter((task) => task.dispatchKey.startsWith("first-day:") && task.state === "completed" && task.completionEvidence.trim())
     .map((task) => task.completionEvidence.trim())[0] ?? null;
   const latestRecheckReceipt = latestProjectAcceptanceRecheckReceipt(project);
-  const roleClosureProgress = buildRoleClosureProgress(project);
+  const roleClosureProgress = sheet.roleClosureProgress;
 
   return {
     status,

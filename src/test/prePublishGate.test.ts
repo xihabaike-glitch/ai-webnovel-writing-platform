@@ -546,6 +546,52 @@ test("buildPrePublishGate", async (t) => {
     assert.ok(notice.recheckSummary?.nextDispatches[1]?.acceptanceCriteria.some((item) => item.includes("WebNovel")));
   });
 
+  await t.test("uses role closure recheck receipts to reduce gate blockers", () => {
+    const gate = buildPrePublishGate({
+      projects: [{
+        ...readyProject,
+        id: "project-recheck-role-receipt",
+        gateDispatchTasks: [
+          {
+            dispatchKey: "first-day:project-recheck-role-receipt:publish-precheck",
+            state: "completed",
+            completionEvidence: "首日平台包预检已完成，标题、简介、标签、卖点、样章和风险清单已验收。",
+          },
+          {
+            dispatchKey: "role-intent:project-recheck-role-receipt:story-structure:structure_editor",
+            state: "completed",
+            completionEvidence: "结构主编完成人物弧光、主线支线、开头钩子和结尾回收复查。",
+          },
+          {
+            dispatchKey: "project-acceptance-next:project-recheck-role-receipt:role_dispatch",
+            state: "completed",
+            completionEvidence: [
+              "复检分流补证据模板",
+              "完成项：已补齐资料官和平台包装角色闭环",
+              "产物链接/位置：/projects/project-recheck-role-receipt#context-recall；/projects/project-recheck-role-receipt#platform-export",
+              "人工验收：通过",
+              "回总闸门复检结论：验收缺口已解除",
+            ].join("\n"),
+          },
+        ],
+      }],
+      failureTasks: [],
+      batchHistory: [],
+    });
+    const notice = buildPrePublishGateFocusNotice({
+      focus: "action-recheck",
+      actionId: "project-acceptance:project-recheck-role-receipt",
+      gate,
+    });
+
+    assert.equal(notice.visible, true);
+    assert.equal(notice.recheckSummary?.recheckVerdict.tone, "cleared");
+    assert.equal(notice.recheckSummary?.roleClosureProgress?.completedRoles, 3);
+    assert.deepEqual(notice.recheckSummary?.roleClosureProgress?.missingLabels, []);
+    assert.equal(notice.recheckSummary?.nextDispatch, null);
+    assert.ok(notice.recheckSummary?.latestRecheckReceipt?.evidence.includes("资料官和平台包装"));
+  });
+
   await t.test("orders action recheck blockers with the current gate blocker first", () => {
     const gate = buildPrePublishGate({
       projects: [{

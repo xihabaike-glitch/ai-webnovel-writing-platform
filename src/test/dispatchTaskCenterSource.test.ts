@@ -80,6 +80,14 @@ test("dispatch task center can persist a role intent as a formal dispatch", () =
   assert.ok(source.includes("创建正式任务"));
 });
 
+test("dispatch task center creates acceptance gap drafts as gate recheck tasks", () => {
+  assert.ok(source.includes("initialRoleIntent.roleIntent === \"acceptance-gap\""));
+  assert.ok(source.includes("验收缺口已生成正式派单"));
+  assert.ok(source.includes("回总闸门复检验收缺口"));
+  assert.ok(source.includes("dispatchGateRecheckHref(created)"));
+  assert.ok(source.includes("task.projectId ?? projectIdFromFirstDayDispatchKey(task.dispatchKey)"));
+});
+
 test("role intent dispatch targets the matching project work area", () => {
   assert.ok(source.includes("roleIntentWorkAreaLabel"));
   assert.ok(source.includes("story-structure"));

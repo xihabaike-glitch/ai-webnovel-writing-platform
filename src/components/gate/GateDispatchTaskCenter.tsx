@@ -123,7 +123,7 @@ function projectIdFromFirstDayDispatchKey(dispatchKey: string) {
 }
 
 function dispatchGateRecheckHref(task: PersistedGatePlatformDispatchTask) {
-  const projectId = projectIdFromFirstDayDispatchKey(task.dispatchKey);
+  const projectId = task.projectId ?? projectIdFromFirstDayDispatchKey(task.dispatchKey);
   if (!projectId) return "/gate#gate-focus-notice";
   return `/gate?focus=action-recheck&actionId=project-acceptance:${encodeURIComponent(projectId)}#gate-focus-notice`;
 }
@@ -727,16 +727,25 @@ export function GateDispatchTaskCenter({
     setRouteActionLink(null);
     try {
       const created = await persistGateDispatchTask(buildRoleIntentDispatch(initialRoleIntent));
+      const acceptanceGapDraft = initialRoleIntent.roleIntent === "acceptance-gap";
       setTasks((current) => {
         const nextByKey = new Map(current.map((item) => [item.dispatchKey, item]));
         nextByKey.set(created.dispatchKey, created);
         return Array.from(nextByKey.values());
       });
       setFocusedCompletionDispatchKey(created.dispatchKey);
-      setFocusedCompletionMessage("角色任务已生成正式派单，先补完成依据再回作品验收。");
+      setFocusedCompletionMessage(acceptanceGapDraft
+        ? "验收缺口已生成正式派单，先补完成依据再回总闸门复检。"
+        : "角色任务已生成正式派单，先补完成依据再回作品验收。");
       setRoleFilter(created.ownerRole);
       setQueueFilter("all");
-      setRouteActionMessage(`已创建正式角色派单：${created.title}`);
+      setRouteActionMessage(acceptanceGapDraft ? `验收缺口已生成正式派单：${created.title}` : `已创建正式角色派单：${created.title}`);
+      if (acceptanceGapDraft) {
+        setRouteActionLink({
+          label: "回总闸门复检验收缺口",
+          href: dispatchGateRecheckHref(created),
+        });
+      }
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "创建角色派单失败。");
     } finally {

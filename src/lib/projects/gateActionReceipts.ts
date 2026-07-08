@@ -1547,6 +1547,11 @@ function recommendedBatchFocusTone(receipt: GateActionReceipt): GateRecommendedB
 }
 
 function recommendedBatchFocusHeadline(tone: GateRecommendedBatchReceiptFocusTone, context?: GateActionReceiptBatchContext | null) {
+  if (context?.batchModeLabel === "首日扩展小批") {
+    if (tone === "blocked") return "首日扩展回执提示先修复";
+    if (tone === "review") return "首日扩展质量需要复查";
+    return "首日扩展回执待补数据";
+  }
   if (context?.scaleGate === "cleared") {
     if (tone === "blocked") return "恢复批回执提示先修复";
     if (tone === "review") return "恢复批质量需要复查";
@@ -1583,6 +1588,7 @@ function recommendedBatchFocusBadges(receipt: GateActionReceipt) {
   ];
   if (typeof summary?.averageQualityScore === "number") badges.push(`质量 ${summary.averageQualityScore}`);
   if (typeof summary?.knownCostUsd === "number") badges.push(`成本 $${summary.knownCostUsd.toFixed(4)}`);
+  if (receipt.batchContext?.batchModeLabel === "首日扩展小批") badges.push("首日扩展", "回填数据");
   if (receipt.batchContext?.scaleGate === "cleared") badges.push("恢复放量");
   if (receipt.batchContext?.scaleGate === "sample_only") badges.push("小样本验证");
   return badges;

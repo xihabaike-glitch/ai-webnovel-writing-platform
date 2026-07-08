@@ -259,6 +259,43 @@ test("buildGateActionReceipt", async (t) => {
     assert.deepEqual(focus.badges.slice(0, 2), ["成功 1", "失败 0"]);
   });
 
+  await t.test("labels first-day scale batch focus as data backfill work", () => {
+    const receipt = buildGateActionReceipt({
+      action,
+      status: "succeeded",
+      now: "2026-01-01T00:00:00.000Z",
+      payload: {
+        results: [
+          { status: "succeeded", taskId: "task-1" },
+        ],
+        routeEffectSummary: {
+          successRatePercent: 100,
+          knownCostUsd: 0.01,
+          averageQualityScore: 90,
+        },
+        plan: {
+          scaleGate: "none",
+          actionLabel: "批量初稿 1 个",
+          category: "draft",
+          batchModeLabel: "首日扩展小批",
+        },
+        batchReceipt: {
+          status: "continue",
+          headline: "首日扩展小批通过，先回填数据",
+          detail: "先回填曝光、点击、收藏、追读。",
+        },
+      },
+    });
+
+    const focus = buildGateRecommendedBatchReceiptFocus(receipt);
+
+    assert.equal(focus.headline, "首日扩展回执待补数据");
+    assert.ok(focus.detail.includes("首日扩展"));
+    assert.ok(focus.detail.includes("首日扩展小批通过"));
+    assert.ok(focus.badges.includes("首日扩展"));
+    assert.ok(focus.badges.includes("回填数据"));
+  });
+
   await t.test("keeps recovered batch identity in the recommended batch focus summary", () => {
     const receipt = buildGateActionReceipt({
       action,

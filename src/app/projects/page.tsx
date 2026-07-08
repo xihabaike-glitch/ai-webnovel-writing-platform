@@ -350,6 +350,14 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps) 
                       <span className="rounded-md bg-slate-950 px-2 py-1 text-xs font-medium text-white">{sample.outcomeLabel}</span>
                     </div>
                     <p className="mt-1 text-xs leading-5 text-slate-600">{sample.reason}</p>
+                    <div className="mt-2 rounded-md border border-slate-200 bg-white p-3 text-xs leading-5 text-slate-700">
+                      <div className="font-medium text-slate-950">当前实跑动作 · {sample.runbookStep.title}</div>
+                      <div className="mt-2 grid gap-2 md:grid-cols-3">
+                        <p><span className="font-medium text-slate-950">样本动作：</span>{sample.runbookStep.sampleAction}</p>
+                        <p><span className="font-medium text-slate-950">要抓证据：</span>{sample.runbookStep.proofToCapture}</p>
+                        <p><span className="font-medium text-slate-950">退路：</span>{sample.runbookStep.rollbackIfWeak}</p>
+                      </div>
+                    </div>
                     <div className="mt-2 grid gap-2 text-xs leading-5 md:grid-cols-2">
                       <div>
                         <div className="font-medium text-emerald-800">已收证据</div>

@@ -612,6 +612,13 @@ test("buildProjectListDashboard", async (t) => {
     assert.ok(dashboard.realSampleAcceptanceQueue[0]?.receipt.fields.some((field) => field.label === "缺口" && field.value.includes("开书骨架")));
     assert.ok(dashboard.realSampleAcceptanceQueue[0]?.receipt.stopRule.includes("缺口"));
     assert.ok(dashboard.realSampleAcceptanceQueue[0]?.receipt.ownerConfirmation.includes("人工确认"));
+    assert.equal(dashboard.realSampleAcceptanceQueue[0]?.runbookStep.stepId, "project_start");
+    assert.ok(dashboard.realSampleAcceptanceQueue[0]?.runbookStep.title.includes("开书"));
+    assert.ok(dashboard.realSampleAcceptanceQueue[0]?.runbookStep.sampleAction.includes("真实作品开书"));
+    assert.ok(dashboard.realSampleAcceptanceQueue[0]?.runbookStep.proofToCapture.includes("大树骨架"));
+    assert.ok(dashboard.realSampleAcceptanceQueue[0]?.runbookStep.rollbackIfWeak.includes("回到作品页补骨架"));
+    assert.equal(dashboard.realSampleAcceptanceQueue[2]?.runbookStep.stepId, "gate_check");
+    assert.ok(dashboard.realSampleAcceptanceQueue[2]?.runbookStep.rollbackIfWeak.includes("暂停批量"));
     assert.equal(dashboard.realSampleAcceptanceQueue[2]?.receipt.outcomeLabel, "暂停批量");
     assert.ok(dashboard.realSampleAcceptanceQueue[2]?.receipt.fields.some((field) => field.label === "已收证据" && field.value.includes("派单验收")));
   });

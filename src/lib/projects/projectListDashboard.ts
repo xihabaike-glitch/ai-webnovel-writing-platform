@@ -6,6 +6,7 @@ import { buildFirstDayDispatchCenterHref } from "./firstDayWorkflowView.ts";
 import { findProjectStartTacticSummary } from "./projectStartTactics.ts";
 import { buildSubmissionChecklist } from "./submissionChecklist.ts";
 import { buildReferenceCaseRolePlaybook } from "../references/openSourceCases.ts";
+import { buildDevelopmentOverview } from "../development/developmentOverview.ts";
 
 export interface ProjectListProject {
   id: string;
@@ -210,6 +211,15 @@ export interface ProjectListRealSampleAcceptanceReceipt {
   ownerConfirmation: string;
 }
 
+export interface ProjectListRealSampleRunbookStep {
+  stepId: ProjectListPipelineStep["id"];
+  title: string;
+  owner: string;
+  sampleAction: string;
+  proofToCapture: string;
+  rollbackIfWeak: string;
+}
+
 export interface ProjectListRealSampleAcceptanceQueueItem {
   projectId: string;
   projectTitle: string;
@@ -221,6 +231,7 @@ export interface ProjectListRealSampleAcceptanceQueueItem {
   missingEvidence: string[];
   actionLabel: string;
   actionHref: string;
+  runbookStep: ProjectListRealSampleRunbookStep;
   receipt: ProjectListRealSampleAcceptanceReceipt;
 }
 
@@ -952,6 +963,23 @@ function buildRealSampleAcceptanceReceipt(
   };
 }
 
+function buildRealSampleRunbookStep(item: ProjectListItem): ProjectListRealSampleRunbookStep {
+  const overview = buildDevelopmentOverview();
+  const step = item.pipelineProof.steps.find((entry) => entry.id === item.pipelineProof.currentStepId)
+    ?? item.pipelineProof.steps[0];
+  const runbookItem = overview.currentPipelineValidation.runbook.items.find((entry) => entry.stepId === item.pipelineProof.currentStepId)
+    ?? overview.currentPipelineValidation.runbook.items[0];
+
+  return {
+    stepId: runbookItem.stepId,
+    title: step?.label ?? runbookItem.stepId,
+    owner: runbookItem.owner,
+    sampleAction: runbookItem.sampleAction,
+    proofToCapture: runbookItem.proofToCapture,
+    rollbackIfWeak: runbookItem.rollbackIfWeak,
+  };
+}
+
 function buildRealSampleAcceptanceQueue(items: ProjectListItem[]): ProjectListRealSampleAcceptanceQueueItem[] {
   return items
     .map((item) => {
@@ -968,6 +996,7 @@ function buildRealSampleAcceptanceQueue(items: ProjectListItem[]): ProjectListRe
         missingEvidence: item.realSampleValidation.missingEvidence,
         actionLabel: item.realSampleValidation.nextActionLabel,
         actionHref: item.realSampleValidation.nextActionHref,
+        runbookStep: buildRealSampleRunbookStep(item),
         receipt: buildRealSampleAcceptanceReceipt(item, outcome),
         priority: outcome.priority,
       };

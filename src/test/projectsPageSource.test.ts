@@ -49,6 +49,11 @@ test("projects page shows the prioritized real sample acceptance queue", () => {
   assert.ok(source.includes("sample.projectTitle"));
   assert.ok(source.includes("sample.outcomeLabel"));
   assert.ok(source.includes("sample.reason"));
+  assert.ok(source.includes("当前实跑动作"));
+  assert.ok(source.includes("sample.runbookStep.title"));
+  assert.ok(source.includes("sample.runbookStep.sampleAction"));
+  assert.ok(source.includes("sample.runbookStep.proofToCapture"));
+  assert.ok(source.includes("sample.runbookStep.rollbackIfWeak"));
   assert.ok(source.includes("已收证据"));
   assert.ok(source.includes("缺口退回"));
   assert.ok(source.includes("sample.completedEvidence.slice(0, 2).map"));

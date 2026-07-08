@@ -194,6 +194,16 @@ interface SubmissionAbTest {
   markdown: string;
 }
 
+const publishLoopAcceptanceCriteria = [
+  "平台包",
+  "样章",
+  "标签",
+  "卖点",
+  "版本基线",
+  "真实反馈",
+  "复盘指标",
+];
+
 function optimizedMarkdown(title: string, optimized: OptimizedSubmissionPackage) {
   return [
     `# ${title} 优化投稿资料`,
@@ -604,6 +614,16 @@ export function SubmissionPackagePanel({
         </div>
       </div>
       {message ? <p className="mt-3 text-sm text-slate-600">{message}</p> : null}
+      <div className="mt-3 rounded-md border border-slate-200 bg-slate-50 p-3">
+        <div className="text-xs font-medium text-slate-500">发布包与平台复盘验收口径</div>
+        <div className="mt-2 flex flex-wrap gap-2">
+          {publishLoopAcceptanceCriteria.map((criterion) => (
+            <span className="rounded-md bg-white px-2 py-1 text-xs text-slate-600" key={criterion}>
+              {criterion}
+            </span>
+          ))}
+        </div>
+      </div>
       {multiPlatformGatePrompt ? (
         <div className="mt-3 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm leading-6 text-emerald-800">
           {multiPlatformGatePrompt}

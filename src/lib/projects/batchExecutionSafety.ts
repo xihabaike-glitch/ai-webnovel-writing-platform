@@ -109,6 +109,7 @@ function isOpenAiPipelineRecoveryFollowup(item: QueueItem) {
 const priorityBlockerOrder = [
   "ai-pipeline-recovery",
   "first-day-gate",
+  "risk-recovery",
   "role-closure",
   "pending-candidates",
   "running-tasks",
@@ -150,6 +151,10 @@ function isOpenRoleClosure(item: QueueItem) {
 
 function isOpenFirstDayGate(item: QueueItem) {
   return item.blockerType === "first_day_gate";
+}
+
+function isOpenRiskRecovery(item: QueueItem) {
+  return item.blockerType === "risk_recovery";
 }
 
 export function buildFailureRepairResumeRecommendation(input: {
@@ -227,6 +232,8 @@ export function buildBatchExecutionSafety(
   const blockedCount = queueItems.filter((item) => item.category === "blocked").length;
   const firstDayGateItems = queueItems.filter(isOpenFirstDayGate);
   const firstDayGateCount = firstDayGateItems.length;
+  const riskRecoveryItems = queueItems.filter(isOpenRiskRecovery);
+  const riskRecoveryCount = riskRecoveryItems.length;
   const roleClosureItems = queueItems.filter(isOpenRoleClosure);
   const roleClosureCount = roleClosureItems.length;
   const candidateCount = queueItems.filter((item) => item.category === "candidate").length;
@@ -288,6 +295,18 @@ export function buildBatchExecutionSafety(
       firstDayGateCount === 0 ? undefined : {
         actionLabel: "补首日链路",
         actionHref: "/tasks?view=blocked&debt=first_day_gate#task-debt",
+      },
+    ),
+    safetyItem(
+      "risk-recovery",
+      "开书止损",
+      riskRecoveryCount === 0 ? "pass" : "block",
+      riskRecoveryCount === 0
+        ? "当前没有未验收的止损恢复债务。"
+        : `${riskRecoveryCount} 个开书止损恢复未验收：${riskRecoveryItems.slice(0, 3).map((item) => item.chapterTitle).join("、")}；先写清止损原因、恢复条件和不再放大的边界，不进入推荐批量。`,
+      riskRecoveryCount === 0 ? undefined : {
+        actionLabel: "做恢复验证",
+        actionHref: "/tasks?view=blocked&debt=risk_recovery#task-debt",
       },
     ),
     safetyItem(

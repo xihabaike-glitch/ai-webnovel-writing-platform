@@ -130,6 +130,35 @@ test("buildBatchExecutionSafety", async (t) => {
     assert.equal(firstDayGate?.actionHref, "/tasks?view=blocked&debt=first_day_gate#task-debt");
   });
 
+  await t.test("blocks recommended batches until risk recovery evidence is accepted", () => {
+    const safety = buildBatchExecutionSafety([
+      {
+        ...baseItem,
+        id: "project-1:risk-recovery:fanqie",
+        category: "blocked",
+        blockerType: "risk_recovery",
+        label: "开书止损",
+        chapterTitle: "首日止损恢复",
+        evidence: "止损原因、恢复条件和不再放大的边界还没写清。",
+        actionLabel: "做恢复验证",
+        href: "/tasks?view=blocked&debt=risk_recovery#task-debt",
+        priority: 5,
+      },
+      baseItem,
+    ], [{ aiTasks: [] }]);
+
+    assert.equal(safety.recommendedBatchSize, 1);
+    assert.deepEqual(safety.recommendedBatchIds, ["item-1"]);
+    assert.equal(safety.canRunRecommendedBatch, false);
+    const recoveryGate = safety.items.find((item) => item.id === "risk-recovery");
+    assert.equal(recoveryGate?.status, "block");
+    assert.ok(recoveryGate?.detail.includes("开书止损"));
+    assert.ok(recoveryGate?.detail.includes("恢复条件"));
+    assert.ok(recoveryGate?.detail.includes("不进入推荐批量"));
+    assert.equal(recoveryGate?.actionLabel, "做恢复验证");
+    assert.equal(recoveryGate?.actionHref, "/tasks?view=blocked&debt=risk_recovery#task-debt");
+  });
+
   await t.test("blocks recommended batches until role closure dispatches are accepted", () => {
     const safety = buildBatchExecutionSafety([
       {

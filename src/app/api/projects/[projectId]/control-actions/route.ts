@@ -595,6 +595,73 @@ export async function POST(request: Request, { params }: Params) {
     });
   }
 
+  if (areaId === "model-route") {
+    const now = new Date();
+    const dispatchKey = `model-route-repair:${projectId}:${now.getTime()}`;
+    const title = "模型路线修复派单";
+    const detail = [
+      `${project.title} 的模型路线被项目总控标记为修复优先。`,
+      "先处理失败任务、避用路线、成本异常和备用路线触发，再恢复推荐批次。",
+    ].join(" ");
+    const acceptanceCriteria = [
+      "定位失败任务对应的任务类型、供应商和模型",
+      "写清主路线、备用路线、避用路线和切换条件",
+      "完成 1 章小样本复测，记录成功率、质量分、成本和备用触发",
+      "复测通过后再回项目总控判断是否恢复小批生产",
+    ];
+    const evidence = [
+      "来源：项目总控生产判断",
+      "问题：模型路线存在失败、避用、成本或备用路线触发风险",
+      "边界：复测通过前不扩大 AI 写审改批量",
+    ];
+
+    const task = await prisma.gateDispatchTask.upsert({
+      where: { dispatchKey },
+      create: {
+        dispatchKey,
+        projectId,
+        platformId: "model-routing",
+        platformName: "模型路由",
+        stage: "model_route_confirmation_recheck",
+        state: "assigned",
+        priorityScore: 92,
+        ownerRole: "模型治理",
+        title,
+        detail,
+        dueLabel: "今天",
+        actionLabel: "修复并复测",
+        href: `/settings/models?projectId=${projectId}#model-task-audit`,
+        acceptanceCriteria: JSON.stringify(acceptanceCriteria),
+        evidence: JSON.stringify(evidence),
+        sourceReceiptId: null,
+        completionEvidence: "",
+        reviewLatestAt: now,
+        assignedAt: now,
+        completedAt: null,
+      },
+      update: {
+        state: "assigned",
+        priorityScore: 92,
+        detail,
+        actionLabel: "修复并复测",
+        acceptanceCriteria: JSON.stringify(acceptanceCriteria),
+        evidence: JSON.stringify(evidence),
+        reviewLatestAt: now,
+        assignedAt: now,
+        completedAt: null,
+      },
+    });
+
+    return NextResponse.json({
+      areaId,
+      targetAnchor: "ai-pipeline",
+      created: [title],
+      message: "已创建模型路线修复派单，先修路由再恢复批量生产。",
+      dispatchKey: task.dispatchKey,
+      dispatchHref: `/dispatch#dispatch-${task.dispatchKey}`,
+    });
+  }
+
   return NextResponse.json({
     error: "这个动作需要进入模块选择具体章节或发布项，暂不适合自动执行。",
   }, { status: 400 });

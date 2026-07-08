@@ -1530,6 +1530,13 @@ test("buildProjectControlDashboard", async (t) => {
     assert.ok(dashboard.modelRouteHealth.preferredRouteLabels.some((label) => label.includes("正文初稿")));
     assert.ok(dashboard.modelRouteHealth.avoidRouteLabels.some((label) => label.includes("章节审稿")));
     assert.equal(dashboard.modelRouteHealth.targetHref, "/settings/models");
+    assert.equal(dashboard.productionDecision.status, "repair");
+    assert.equal(dashboard.productionDecision.label, "先修复");
+    assert.equal(dashboard.productionDecision.actionExecutable, true);
+    assert.equal(dashboard.productionDecision.actionAreaId, "model-route");
+    assert.equal(dashboard.productionDecision.actionMode, "seed");
+    assert.equal(dashboard.productionDecision.executeLabel, "生成模型路线修复派单");
+    assert.equal(dashboard.productionDecision.primaryActionLabel, "修模型路线");
   });
 
   await t.test("pauses project starts when the stored tactic is a historical avoidance signal", () => {

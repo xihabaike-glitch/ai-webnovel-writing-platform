@@ -128,6 +128,7 @@ test("project detail page carries gate return through project work entry links",
 test("project detail page carries gate return through control and batch panels", () => {
   const projectPage = readFileSync("src/app/projects/[projectId]/page.tsx", "utf8");
   const controlPanel = readFileSync("src/components/projects/ProjectControlDashboardPanel.tsx", "utf8");
+  const controlActionsRoute = readFileSync("src/app/api/projects/[projectId]/control-actions/route.ts", "utf8");
   const batchDraftPanel = readFileSync("src/components/projects/BatchDraftCenterPanel.tsx", "utf8");
   const batchReviewPanel = readFileSync("src/components/projects/BatchReviewPipelinePanel.tsx", "utf8");
   const modelTaskAuditPanel = readFileSync("src/components/projects/ModelTaskAuditPanel.tsx", "utf8");
@@ -150,6 +151,9 @@ test("project detail page carries gate return through control and batch panels",
   assert.ok(controlPanel.includes("dashboard.productionDecision.actionExecutable"));
   assert.ok(controlPanel.includes("onClick={() => void executeProductionDecisionAction()}"));
   assert.ok(controlPanel.includes("href={hrefWithGateReturn(projectScopedHref(projectId, dashboard.productionDecision.primaryTargetHref), gateReturnHref)}"));
+  assert.ok(controlActionsRoute.includes("if (areaId === \"model-route\")"));
+  assert.ok(controlActionsRoute.includes("model-route-repair:"));
+  assert.ok(controlActionsRoute.includes("模型路线修复派单"));
   assert.ok(controlPanel.includes("href={hrefWithGateReturn(projectScopedHref(projectId, dashboard.aiPipelineBatchHealth.targetHref), gateReturnHref)}"));
   assert.ok(controlPanel.includes("href={hrefWithGateReturn(projectScopedHref(projectId, dashboard.aiPipelinePromptMemory.targetHref), gateReturnHref)}"));
   assert.ok(controlPanel.includes("href={hrefWithGateReturn(projectScopedHref(projectId, dashboard.aiPipelinePromptMemory.gateActionHref), gateReturnHref)}"));

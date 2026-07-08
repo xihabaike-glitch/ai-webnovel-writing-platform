@@ -463,6 +463,7 @@ test("buildPrePublishGate", async (t) => {
     assert.ok(notice.recheckSummary?.latestEvidence?.includes("派单中心已补齐首日平台包预检"));
     assert.equal(notice.recheckSummary?.latestRecheckReceipt?.dispatchKey, "project-acceptance-next:project-recheck-progress:publish_package");
     assert.ok(notice.recheckSummary?.latestRecheckReceipt?.evidence.includes("验收缺口已解除"));
+    assert.deepEqual(notice.recheckSummary?.closedItems, ["发布包"]);
     assert.equal(notice.recheckSummary?.nextDispatch, null);
     assert.ok(notice.detail.includes("已完成 6/6 步"));
   });
@@ -588,6 +589,7 @@ test("buildPrePublishGate", async (t) => {
     assert.equal(notice.recheckSummary?.recheckVerdict.tone, "cleared");
     assert.equal(notice.recheckSummary?.roleClosureProgress?.completedRoles, 3);
     assert.deepEqual(notice.recheckSummary?.roleClosureProgress?.missingLabels, []);
+    assert.deepEqual(notice.recheckSummary?.closedItems, ["资料官", "平台包装"]);
     assert.equal(notice.recheckSummary?.nextDispatch, null);
     assert.ok(notice.recheckSummary?.latestRecheckReceipt?.evidence.includes("资料官和平台包装"));
   });

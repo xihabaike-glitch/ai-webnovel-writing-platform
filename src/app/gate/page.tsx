@@ -414,6 +414,16 @@ export default async function GatePage({
                         <div className="mt-1">{focusNotice.recheckSummary.latestRecheckReceipt.evidence}</div>
                       </div>
                     ) : null}
+                    {focusNotice.recheckSummary.closedItems.length ? (
+                      <div className="mt-2 rounded-md border border-emerald-100 bg-emerald-50 px-2 py-2 text-xs leading-5 text-emerald-900">
+                        <div className="font-medium">本次已关闭</div>
+                        <div className="mt-1 flex flex-wrap gap-1">
+                          {focusNotice.recheckSummary.closedItems.map((item) => (
+                            <span className="rounded-md bg-white px-2 py-1 font-medium" key={item}>{item}</span>
+                          ))}
+                        </div>
+                      </div>
+                    ) : null}
                     {focusNotice.recheckSummary.roleClosureProgress ? (() => {
                       const roleClosureProgress = focusNotice.recheckSummary.roleClosureProgress;
                       return (

@@ -504,6 +504,7 @@ export interface PrePublishGateRecheckSummary {
   roleClosureProgress: PrePublishGateRoleClosureProgress | null;
   latestEvidence: string | null;
   latestRecheckReceipt: PrePublishGateRecheckReceipt | null;
+  closedItems: string[];
   nextDispatch: PrePublishGateRecheckDispatch | null;
   nextDispatches: PrePublishGateRecheckDispatch[];
 }
@@ -1877,6 +1878,17 @@ function buildProjectAcceptanceRecheckNextStep(input: {
   };
 }
 
+function buildProjectAcceptanceClosedItems(
+  receipt: PrePublishGateRecheckReceipt | null,
+): string[] {
+  if (!receipt) return [];
+  if (receipt.dispatchKey.endsWith(":publish_package")) return ["发布包"];
+  if (receipt.dispatchKey.endsWith(":role_dispatch")) {
+    return ["资料官", "平台包装"].filter((label) => receipt.evidence.includes(label));
+  }
+  return [];
+}
+
 function buildProjectAcceptanceRecheckSummary(
   actionId: string | null | undefined,
   gate: PrePublishGate,
@@ -1896,6 +1908,7 @@ function buildProjectAcceptanceRecheckSummary(
   const nextDispatches = buildProjectAcceptanceNextDispatches(project, currentStep, completedSteps, nextDispatch);
   const latestEvidence = project.acceptanceSheetGate.latestDispatchEvidence;
   const latestRecheckReceipt = project.acceptanceSheetGate.latestRecheckReceipt;
+  const closedItems = buildProjectAcceptanceClosedItems(latestRecheckReceipt);
   const currentStepLabel = currentStep?.label ?? project.acceptanceSheetGate.actionLabel;
   const recheckVerdict = buildProjectAcceptanceRecheckVerdict({
     acceptanceStatus: project.acceptanceSheetGate.status,
@@ -1927,6 +1940,7 @@ function buildProjectAcceptanceRecheckSummary(
     roleClosureProgress: project.acceptanceSheetGate.roleClosureProgress,
     latestEvidence,
     latestRecheckReceipt,
+    closedItems,
     nextDispatch,
     nextDispatches,
   };

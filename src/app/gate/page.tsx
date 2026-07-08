@@ -360,7 +360,7 @@ export default async function GatePage({
         </div>
       </section>
 
-      <section className="mb-6 rounded-md border border-sky-200 bg-sky-50 p-4 text-sky-950">
+      <section className="mb-6 rounded-md border border-sky-200 bg-sky-50 p-4 text-sky-950" id="pipeline-final-review">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <div className="text-xs font-medium text-sky-700">真实作品流水线自动终检</div>

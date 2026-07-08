@@ -47,6 +47,7 @@ test("gate page renders computed real pipeline final review verdict", () => {
   assert.ok(source.includes("gate.realPipelineFinalReview"));
   assert.ok(source.includes("const finalReview = gate.realPipelineFinalReview;"));
   assert.ok(source.includes("真实作品流水线自动终检"));
+  assert.ok(source.includes("id=\"pipeline-final-review\""));
   assert.ok(source.includes("finalReview.outcomeLabel"));
   assert.ok(source.includes("finalReview.headline"));
   assert.ok(source.includes("finalReview.detail"));

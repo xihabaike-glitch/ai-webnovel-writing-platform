@@ -311,6 +311,12 @@ test("buildDevelopmentOverview", async (t) => {
     assert.equal(overview.finalAcceptanceGate.actionLabel, overview.currentPipelineValidation.actionLabel);
     assert.ok(overview.finalAcceptanceGate.stopRule.includes("不要新增平台"));
     assert.ok(overview.finalAcceptanceGate.stopRule.includes("模型岗位缺岗"));
+    assert.equal(overview.finalAcceptanceGate.livePipelineReview.title, "总闸门实时裁决");
+    assert.equal(overview.finalAcceptanceGate.livePipelineReview.href, "/gate#pipeline-final-review");
+    assert.ok(overview.finalAcceptanceGate.livePipelineReview.detail.includes("通过"));
+    assert.ok(overview.finalAcceptanceGate.livePipelineReview.detail.includes("退回修复"));
+    assert.ok(overview.finalAcceptanceGate.livePipelineReview.detail.includes("暂停批量"));
+    assert.deepEqual(overview.finalAcceptanceGate.livePipelineReview.outcomeLabels, ["通过", "退回修复", "暂停批量"]);
   });
 
   await t.test("builds final acceptance evidence rows from original requirements", () => {

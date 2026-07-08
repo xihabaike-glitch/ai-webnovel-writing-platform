@@ -179,6 +179,13 @@ export interface DevelopmentOverviewFinalAcceptanceGate {
   stopRule: string;
   actionHref: string;
   actionLabel: string;
+  livePipelineReview: {
+    title: string;
+    detail: string;
+    href: string;
+    actionLabel: string;
+    outcomeLabels: Array<"通过" | "退回修复" | "暂停批量">;
+  };
   evidenceMatrix: DevelopmentOverviewFinalAcceptanceEvidenceMatrix;
 }
 
@@ -814,6 +821,13 @@ function buildFinalAcceptanceGate(
     stopRule: "不要新增平台、不要堆演示页；模型岗位缺岗或没有真实作品流水线证据，就不能宣称产品完成。",
     actionHref: currentPipelineValidation.actionHref,
     actionLabel: currentPipelineValidation.actionLabel,
+    livePipelineReview: {
+      title: "总闸门实时裁决",
+      detail: "打开总闸门实时查看真实作品流水线自动终检：通过就进发布闭环，退回修复就补作品证据，暂停批量就先处理模型、失败或复检风险。",
+      href: "/gate#pipeline-final-review",
+      actionLabel: "查看实时裁决",
+      outcomeLabels: ["通过", "退回修复", "暂停批量"],
+    },
     evidenceMatrix: buildFinalAcceptanceEvidenceMatrix(requirementTraceability),
   };
 }

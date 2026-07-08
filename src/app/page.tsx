@@ -75,6 +75,26 @@ export default function HomePage() {
               <div className="mt-1 font-semibold">{overview.finalAcceptanceGate.metrics.blocked}</div>
             </div>
           </div>
+          <div className="mt-4 rounded-md border border-sky-100 bg-sky-50 p-3">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+              <div>
+                <div className="text-xs font-medium text-sky-700">总闸门实时口径</div>
+                <h3 className="mt-1 font-medium text-slate-950">{overview.finalAcceptanceGate.livePipelineReview.title}</h3>
+                <p className="mt-1 max-w-4xl text-sm leading-6 text-slate-700">{overview.finalAcceptanceGate.livePipelineReview.detail}</p>
+                <div className="mt-2 flex flex-wrap gap-1 text-xs">
+                  {overview.finalAcceptanceGate.livePipelineReview.outcomeLabels.map((label) => (
+                    <span className="rounded-md bg-white px-2 py-1 font-medium text-sky-950" key={label}>{label}</span>
+                  ))}
+                </div>
+              </div>
+              <Link
+                className="w-fit rounded-md bg-sky-950 px-3 py-2 text-sm font-medium text-white hover:bg-sky-900"
+                href={overview.finalAcceptanceGate.livePipelineReview.href}
+              >
+                {overview.finalAcceptanceGate.livePipelineReview.actionLabel}
+              </Link>
+            </div>
+          </div>
         </section>
 
         <section className="rounded-md border border-slate-900 bg-slate-950 p-4 text-white">

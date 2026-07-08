@@ -17,6 +17,9 @@ test("home page routes users into the current PM delivery path", () => {
   assert.ok(source.includes("overview.finalAcceptanceGate.evidenceMatrix.title"), "home page should show the original requirement evidence matrix");
   assert.ok(source.includes("overview.finalAcceptanceGate.evidenceMatrix.pmRule"), "home page should show the matrix proof rule");
   assert.ok(source.includes("overview.finalAcceptanceGate.evidenceMatrix.items.map"), "home page should render each final acceptance evidence row");
+  assert.ok(source.includes("overview.finalAcceptanceGate.livePipelineReview.title"), "home page should show the live final review entry");
+  assert.ok(source.includes("overview.finalAcceptanceGate.livePipelineReview.href"), "home page should link to the live gate verdict");
+  assert.ok(source.includes("overview.finalAcceptanceGate.livePipelineReview.outcomeLabels.map"), "home page should show the three live verdict outcomes");
   assert.ok(source.includes("item.currentProof"), "home page should show current proof for each original requirement");
   assert.ok(source.includes("item.missingEvidence"), "home page should show remaining gap for each original requirement");
   assert.ok(source.includes("item.nextAction"), "home page should show next action for each original requirement");

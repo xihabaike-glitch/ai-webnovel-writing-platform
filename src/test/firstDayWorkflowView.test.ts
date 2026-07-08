@@ -1290,9 +1290,12 @@ test("buildFirstDayDispatchCompletionTemplate covers first-day step types", () =
       "执行开书交接动作：开头：第一段给倒计时。",
       "避开交接边界：不要直接放量，先做小样本。",
     ],
+    evidence: ["知识来源：番茄小说 正反馈经验已沉淀", "平台反哺：执行正反馈链"],
   });
   assert.ok(handoffTemplate.includes("交接动作已落地：开头：第一段给倒计时。"));
   assert.ok(handoffTemplate.includes("避坑边界已确认：不要直接放量，先做小样本。"));
+  assert.ok(handoffTemplate.includes("知识来源：番茄小说 正反馈经验已沉淀"));
+  assert.ok(handoffTemplate.includes("平台反哺：执行正反馈链"));
   assert.ok(buildFirstDayDispatchCompletionTemplate({
     dispatchKey: "first-day:project-1:first-draft",
     dueLabel: "今天止损验证",

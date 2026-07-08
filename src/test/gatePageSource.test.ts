@@ -87,3 +87,10 @@ test("gate page renders project acceptance sheet blockers", () => {
   assert.ok(source.includes("project.acceptanceSheetGate.executionHint"));
   assert.ok(source.includes("project.acceptanceSheetGate.href"));
 });
+
+test("gate page feeds model role blockers into the final gate", () => {
+  assert.ok(source.includes("buildModelRoleMatrix"));
+  assert.ok(source.includes("buildModelRoleMatrixPriorityBlocker"));
+  assert.ok(source.includes("const modelRolePriorityBlocker = buildModelRoleMatrixPriorityBlocker(modelRoleMatrix);"));
+  assert.ok(source.includes("modelRoleBlocker: modelRolePriorityBlocker"));
+});

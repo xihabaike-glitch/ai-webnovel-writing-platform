@@ -3,6 +3,7 @@ import type { TaskBatchHistoryItem } from "../ai/taskBatchHistory.ts";
 import { buildTaskRunConsole, type FailureRepairBatch, type TaskRunInput } from "../ai/taskRunConsole.ts";
 import { buildExportSnapshotHistory } from "../export/snapshots.ts";
 import { buildExportVersionCenter } from "../export/versionCenter.ts";
+import type { ModelRoleMatrixPriorityBlocker } from "../model-gateway/modelRoleMatrix.ts";
 import { getPlatformProfile, platformDeliveryScope, type PlatformId } from "../platforms/platformProfiles.ts";
 import { buildBatchExecutionSafety } from "./batchExecutionSafety.ts";
 import { getBatchExecutionStrategy, type BatchExecutionStrategyId } from "./batchExecutionStrategy.ts";
@@ -559,6 +560,7 @@ export interface PrePublishGateInput {
   failureTasks?: FailureReviewTask[];
   batchHistory?: TaskBatchHistoryItem[];
   batchStrategyId?: BatchExecutionStrategyId | string;
+  modelRoleBlocker?: ModelRoleMatrixPriorityBlocker | null;
 }
 
 function prePublishGateActionMatchesProject(action: PrePublishGateAction, projectId: string) {
@@ -1667,7 +1669,8 @@ function buildReleaseAction(
   }
 
   const nextAction = status === "blocked"
-    ? priorityActions.find((item) => item.id.startsWith("export-version:"))
+    ? priorityActions.find((item) => item.id === "model-roles")
+      ?? priorityActions.find((item) => item.id.startsWith("export-version:"))
       ?? priorityActions.find((item) => item.id === "queue:next")
       ?? priorityActions.find((item) => item.id.startsWith("adoption-followup:"))
       ?? priorityActions.find((item) => item.id.startsWith("repair:"))
@@ -2346,6 +2349,14 @@ export function buildPrePublishGate(input: PrePublishGateInput): PrePublishGate 
   const firstThreeAdoptionClosure = buildFirstThreeAdoptionClosure(projects);
 
   const items: PrePublishGateItem[] = [
+    ...(input.modelRoleBlocker ? [gateItem({
+      id: "model-roles",
+      label: "模型岗位",
+      status: input.modelRoleBlocker.tone === "blocked" ? "block" as const : "warn" as const,
+      detail: input.modelRoleBlocker.detail,
+      actionLabel: input.modelRoleBlocker.actionLabel,
+      href: input.modelRoleBlocker.actionHref,
+    })] : []),
     gateItem({
       id: "publish-package",
       label: "发布包",
@@ -2445,6 +2456,15 @@ export function buildPrePublishGate(input: PrePublishGateInput): PrePublishGate 
       ? "有项目已经能投，但仍存在未处理提醒；先按优先动作走一轮。"
       : "当前发布会把未修复风险带到平台，先完成阻塞项再放行。";
   const priorityActions = uniqueActions([
+    input.modelRoleBlocker
+      ? action(
+        "model-roles",
+        input.modelRoleBlocker.actionLabel,
+        input.modelRoleBlocker.detail,
+        input.modelRoleBlocker.actionHref,
+        input.modelRoleBlocker.tone === "blocked" ? "repair" : "review",
+      )
+      : null,
     ...acceptanceBlockers.map((project) => action(
       `project-acceptance:${project.projectId}`,
       project.acceptanceSheetGate.actionLabel,

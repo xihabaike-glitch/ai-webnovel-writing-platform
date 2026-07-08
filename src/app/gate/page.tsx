@@ -11,6 +11,7 @@ import { GatePublishEffectReviewPanel } from "@/components/gate/GatePublishEffec
 import { GateRecheckDispatchButton } from "@/components/gate/GateRecheckDispatchButton";
 import { buildTaskBatchHistory } from "@/lib/ai/taskBatchHistory";
 import { prisma } from "@/lib/db/prisma";
+import { buildModelRoleMatrix, buildModelRoleMatrixPriorityBlocker } from "@/lib/model-gateway/modelRoleMatrix";
 import { buildGateAiPipelineRecoveryPanel } from "@/lib/projects/gateActionReceipts";
 import { gatePlatformDispatchTaskFromRecord } from "@/lib/projects/gateDispatchTaskRecords";
 import { buildPrePublishGate, buildPrePublishGateFocusNotice, type PrePublishGateFocusNotice, type PrePublishGateItem } from "@/lib/projects/prePublishGate";
@@ -117,7 +118,7 @@ export default async function GatePage({
   const invalidFocusNotice = isGateFocus(focus)
     ? null
     : focus ? `总闸门焦点「${focus}」不存在，已显示总闸门全局验收。` : null;
-  const [projects, recentAiTasks, chapters, aiRecoveryDispatchRecords, aiPromptMemoryAuditRecords] = await Promise.all([
+  const [projects, recentAiTasks, chapters, aiRecoveryDispatchRecords, aiPromptMemoryAuditRecords, modelProviders] = await Promise.all([
     prisma.project.findMany({
       include: {
         chapters: { orderBy: { order: "asc" } },
@@ -201,6 +202,9 @@ export default async function GatePage({
       orderBy: { createdAt: "desc" },
       take: 40,
     }),
+    prisma.modelProvider.findMany({
+      orderBy: { updatedAt: "desc" },
+    }),
   ]);
   const chaptersById = new Map(chapters.map((chapter) => [chapter.id, chapter]));
   const recentTasksWithChapter = recentAiTasks.map((task) => ({
@@ -241,10 +245,21 @@ export default async function GatePage({
       createdAt: version.createdAt,
     })),
   }));
+  const modelRoleMatrix = buildModelRoleMatrix(modelProviders.map((provider) => ({
+    id: provider.id,
+    providerId: provider.providerId,
+    displayName: provider.displayName,
+    encryptedApiKey: provider.encryptedApiKey,
+    defaultModel: provider.defaultModel,
+    enabled: provider.enabled,
+    maxContextTokens: provider.maxContextTokens,
+  })));
+  const modelRolePriorityBlocker = buildModelRoleMatrixPriorityBlocker(modelRoleMatrix);
   const gate = buildPrePublishGate({
     projects: gateProjects,
     failureTasks: recentTasksWithChapter,
     batchHistory: buildTaskBatchHistory(recentTasksWithChapter),
+    modelRoleBlocker: modelRolePriorityBlocker,
   });
   const focusNotice = buildPrePublishGateFocusNotice({ focus, projectId, actionId, gate });
   const aiRecoveryPanel = buildGateAiPipelineRecoveryPanel(

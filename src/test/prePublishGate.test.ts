@@ -197,6 +197,30 @@ test("buildPrePublishGate", async (t) => {
     assert.ok(gate.pmFocus.pipelineValidationHint.includes("发布包"));
   });
 
+  await t.test("blocks launch when model writing roles are missing", () => {
+    const gate = buildPrePublishGate({
+      projects: [readyProject],
+      failureTasks: [],
+      batchHistory: [],
+      modelRoleBlocker: {
+        tone: "blocked",
+        title: "模型编辑部缺岗",
+        detail: "4 个岗位还没可用模型。先补 Claude / DeepSeek / Kimi / GPT 的职责分工。",
+        actionLabel: "去配置模型岗位",
+        actionHref: "/settings/models?focus=model-role-matrix#model-role-matrix",
+      },
+    });
+
+    const modelItem = gate.items.find((item) => item.id === "model-roles");
+
+    assert.equal(gate.status, "blocked");
+    assert.equal(modelItem?.status, "block");
+    assert.equal(modelItem?.actionLabel, "去配置模型岗位");
+    assert.equal(gate.releaseAction?.href, "/settings/models?focus=model-role-matrix#model-role-matrix");
+    assert.equal(gate.pmFocus.status, "blocked");
+    assert.ok(gate.pmFocus.headline.includes("模型"));
+  });
+
   await t.test("focuses first-day completion as a gate release notice", () => {
     const gate = buildPrePublishGate({
       projects: [readyProject],

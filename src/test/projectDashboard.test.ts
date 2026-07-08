@@ -108,7 +108,11 @@ test("buildProjectDashboard", async (t) => {
     assert.equal(dashboard.realSampleAcceptanceSheet.currentStepId, "second_pass");
     assert.ok(dashboard.realSampleAcceptanceSheet.verdict.includes("二改"));
     assert.equal(dashboard.realSampleAcceptanceSheet.actionHref, "#ai-pipeline");
-    assert.equal(dashboard.realSampleAcceptanceSheet.finalReleaseHref, "/gate#pipeline-final-review");
+    assert.ok(dashboard.realSampleAcceptanceSheet.finalReleaseHref.startsWith("/gate?"));
+    assert.ok(dashboard.realSampleAcceptanceSheet.finalReleaseHref.includes("focus=action-recheck"));
+    assert.ok(dashboard.realSampleAcceptanceSheet.finalReleaseHref.includes("projectId=project-1"));
+    assert.ok(dashboard.realSampleAcceptanceSheet.finalReleaseHref.includes("source=real-sample-receipt"));
+    assert.ok(dashboard.realSampleAcceptanceSheet.finalReleaseHref.endsWith("#pipeline-final-review"));
     assert.equal(dashboard.realSampleAcceptanceSheet.finalReleaseLabel, "查看最终交付正式放行卡");
     assert.equal(dashboard.realSampleAcceptanceSheet.completedSteps, 3);
     assert.equal(dashboard.realSampleAcceptanceSheet.totalSteps, 6);
@@ -274,7 +278,11 @@ test("buildProjectDashboard", async (t) => {
     assert.equal(passed.realSampleAcceptanceSheet.completedSteps, 7);
     assert.equal(passed.realSampleAcceptanceSheet.totalSteps, 7);
     assert.equal(passed.realSampleAcceptanceSheet.gateStatus, "ready");
-    assert.equal(passed.realSampleAcceptanceSheet.finalReleaseHref, "/gate#pipeline-final-review");
+    assert.ok(passed.realSampleAcceptanceSheet.finalReleaseHref.startsWith("/gate?"));
+    assert.ok(passed.realSampleAcceptanceSheet.finalReleaseHref.includes("focus=action-recheck"));
+    assert.ok(passed.realSampleAcceptanceSheet.finalReleaseHref.includes("projectId=project-role-gate"));
+    assert.ok(passed.realSampleAcceptanceSheet.finalReleaseHref.includes("source=real-sample-receipt"));
+    assert.ok(passed.realSampleAcceptanceSheet.finalReleaseHref.endsWith("#pipeline-final-review"));
     assert.equal(passed.realSampleAcceptanceSheet.finalReleaseLabel, "查看最终交付正式放行卡");
     assert.deepEqual(passed.realSampleAcceptanceSheet.missingEvidence, []);
     assert.ok(passed.realSampleAcceptanceSheet.blockReason.includes("可以进入发布包"));

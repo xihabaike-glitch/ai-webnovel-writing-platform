@@ -503,6 +503,11 @@ function buildProjectRealSampleAcceptanceSheet(input: ProjectDashboardInput): Pr
   })) satisfies ProjectAcceptanceStep[];
   const current = steps[currentIndex];
   const gateStatus = missingEvidence.length === 0 ? "ready" : "blocked";
+  const finalReleaseParams = new URLSearchParams({
+    focus: "action-recheck",
+    source: "real-sample-receipt",
+  });
+  if (input.projectId) finalReleaseParams.set("projectId", input.projectId);
 
   return {
     title: "单本作品验收单",
@@ -512,7 +517,7 @@ function buildProjectRealSampleAcceptanceSheet(input: ProjectDashboardInput): Pr
     currentStepId: current.id,
     actionLabel: gateStatus === "ready" ? "复查发布包" : `处理${current.label}`,
     actionHref: current.href,
-    finalReleaseHref: "/gate#pipeline-final-review",
+    finalReleaseHref: `/gate?${finalReleaseParams.toString()}#pipeline-final-review`,
     finalReleaseLabel: "查看最终交付正式放行卡",
     gateStatus,
     completedSteps,

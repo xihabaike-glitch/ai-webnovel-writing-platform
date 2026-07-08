@@ -125,7 +125,12 @@ test("dispatch task center auto-fills role closure completion templates", () => 
 test("dispatch task center auto-fills acceptance gap completion templates", () => {
   assert.ok(source.includes("isAcceptanceGapDispatchTask"));
   assert.ok(source.includes("acceptanceGapCompletionTemplates"));
+  assert.ok(source.includes("acceptanceGapRunbookStep"));
   assert.ok(source.includes("验收缺口完成依据模板"));
+  assert.ok(source.includes("当前实跑动作："));
+  assert.ok(source.includes("样本动作："));
+  assert.ok(source.includes("要抓证据："));
+  assert.ok(source.includes("退路："));
   assert.ok(source.includes("完成项："));
   assert.ok(source.includes("人工验收："));
   assert.ok(source.includes("回总闸门复检："));

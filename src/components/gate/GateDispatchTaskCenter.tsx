@@ -38,6 +38,7 @@ import {
 } from "@/lib/projects/firstDayWorkflowView";
 import { buildWatchSampleAutoCompletionDrafts } from "@/lib/projects/watchSampleCompletionEvidence";
 import type { WatchSampleCompletionEvidenceSuggestion } from "@/lib/projects/watchSampleCompletionEvidence";
+import { buildDevelopmentOverview } from "@/lib/development/developmentOverview";
 import {
   buildTaskQueueBatchReceiptDecisionCard,
   type TaskQueueBatchReceipt,
@@ -302,6 +303,36 @@ function isAcceptanceGapDispatchTask(task: PersistedGatePlatformDispatchTask) {
     || task.evidence.some((item) => item.includes("角色入口：acceptance-gap"));
 }
 
+function acceptanceGapRoleId(task: PersistedGatePlatformDispatchTask) {
+  const evidenceRoleId = task.evidence.find((item) => item.startsWith("角色编号："))?.replace("角色编号：", "").trim();
+  if (evidenceRoleId) return evidenceRoleId;
+  const [, keyRoleId] = task.dispatchKey.split(":acceptance-gap:");
+  return keyRoleId?.split(":")[0] ?? "";
+}
+
+function acceptanceGapRunbookStep(task: PersistedGatePlatformDispatchTask) {
+  const roleId = acceptanceGapRoleId(task);
+  const proofStepId = roleId === "project_start"
+    ? "project_start"
+    : roleId === "publish_package"
+      ? "publish_package"
+      : roleId === "dispatch_receipt" || roleId === "role_dispatch"
+        ? "task_dispatch"
+        : "sample_draft";
+  const overview = buildDevelopmentOverview();
+  const runbookItem = overview.currentPipelineValidation.runbook.items.find((item) => item.stepId === proofStepId)
+    ?? overview.currentPipelineValidation.runbook.items[0];
+  const proofStep = overview.pipelineProofRoute.steps.find((step) => step.id === runbookItem.stepId);
+
+  return {
+    title: proofStep?.title ?? runbookItem.stepId,
+    owner: runbookItem.owner,
+    sampleAction: runbookItem.sampleAction,
+    proofToCapture: runbookItem.proofToCapture,
+    rollbackIfWeak: runbookItem.rollbackIfWeak,
+  };
+}
+
 function isProjectAcceptanceNextDispatchTask(task: PersistedGatePlatformDispatchTask) {
   return task.dispatchKey.startsWith("project-acceptance-next:");
 }
@@ -347,9 +378,14 @@ function buildChapterAdoptionCompletionTemplate(task: PersistedGatePlatformDispa
 
 function buildAcceptanceGapCompletionTemplate(task: PersistedGatePlatformDispatchTask) {
   if (!isAcceptanceGapDispatchTask(task)) return "";
+  const runbookStep = acceptanceGapRunbookStep(task);
   return [
     `${task.title}`,
     "验收缺口完成依据模板",
+    `当前实跑动作：${runbookStep.title}（${runbookStep.owner}）`,
+    `样本动作：${runbookStep.sampleAction}`,
+    `要抓证据：${runbookStep.proofToCapture}`,
+    `退路：${runbookStep.rollbackIfWeak}`,
     "完成项：",
     "产物链接/位置：",
     "人工验收：通过 / 退回",

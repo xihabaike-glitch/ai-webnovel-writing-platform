@@ -7222,6 +7222,14 @@ export function buildGatePlatformDecisionTimeline(input: {
     const recheckReviewType = isRecheckReview ? recheckReviewTypeFromDispatchKey(task.dispatchKey) : null;
     const completedAt = task.completedAt ?? task.updatedAt;
     const handoffStageLabel = firstDayHandoffStageLabel(task.dispatchKey);
+    const eventEvidence = Array.from(new Set([
+      ...(isFirstDayHandoff ? [`新书开局闭环：${handoffStageLabel}`] : []),
+      ...(isFirstDayHandoff && task.state === "completed" && task.completionEvidence.trim() ? [`交接完成证据：${task.completionEvidence.trim()}`] : []),
+      ...(recheckReviewType ? [`复盘类型：${recheckReviewTypeLabel(recheckReviewType)}`] : []),
+      ...(isRecheckReview && task.state === "completed" && task.completionEvidence.trim() ? [`复盘结论：${task.completionEvidence.trim()}`] : []),
+      ...task.evidence,
+      ...task.acceptanceCriteria,
+    ]));
     eventPlatform.events.push({
       id: `task:${task.dispatchKey}`,
       type: isRecheckReview || isRetreatRecheck ? "recheck" : isRetreatRepair ? "repair" : "dispatch",
@@ -7235,14 +7243,7 @@ export function buildGatePlatformDecisionTimeline(input: {
         : `${task.ownerRole} · ${task.title}`,
       href: isFirstDayHandoff ? task.href : task.state === "completed" ? "/dispatch" : task.href,
       createdAt: task.state === "completed" ? completedAt : task.updatedAt,
-      evidence: Array.from(new Set([
-        ...(isFirstDayHandoff ? [`新书开局闭环：${handoffStageLabel}`] : []),
-        ...(isFirstDayHandoff && task.state === "completed" && task.completionEvidence.trim() ? [`交接完成证据：${task.completionEvidence.trim()}`] : []),
-        ...(recheckReviewType ? [`复盘类型：${recheckReviewTypeLabel(recheckReviewType)}`] : []),
-        ...(isRecheckReview && task.state === "completed" && task.completionEvidence.trim() ? [`复盘结论：${task.completionEvidence.trim()}`] : []),
-        ...task.evidence,
-        ...task.acceptanceCriteria,
-      ])).slice(0, 4),
+      evidence: eventEvidence.slice(0, isFirstDayHandoff ? 8 : 4),
     });
   }
 
@@ -7540,7 +7541,7 @@ function completedFirstDayHandoffFromTimeline(events: GatePlatformDecisionTimeli
   const completedStages = new Set(handoffEvents.map((event) => firstDayHandoffStageFromDispatchKey(event.id.replace(/^task:/, ""))));
   const allStagesCompleted = ["opening", "verification", "platform-package"].every((stage) => completedStages.has(stage as ReturnType<typeof firstDayHandoffStageFromDispatchKey>));
   const allEvidence = Array.from(new Set(handoffEvents.flatMap((event) => event.evidence)));
-  const evidence = allEvidence.slice(0, 4);
+  const evidence = firstDayHandoffReusableEvidence(allEvidence);
   const evidenceText = allEvidence.join(" ");
   const recoveryScale = /恢复放量/u.test(evidenceText);
   const recoveryScaleOutcome = recoveryScale
@@ -7551,7 +7552,10 @@ function completedFirstDayHandoffFromTimeline(events: GatePlatformDecisionTimeli
         : "watch"
     : null;
   const recoveryScaleConclusion = recoveryScale
-    ? allEvidence.find((line) => /放量结论|继续观察|暂停|未过线|可以恢复|可恢复/u.test(line)) ?? ""
+    ? allEvidence.find((line) => /放量结论[:：]\s*(暂停|不通过|未过线|失败|通过|已通过|继续观察|可以恢复|可恢复)/u.test(line))
+      ?? allEvidence.find((line) => /继续观察|暂停|未过线|可以恢复|可恢复/u.test(line))
+      ?? allEvidence.find((line) => /放量结论/u.test(line))
+      ?? ""
     : "";
 
   return {
@@ -7564,6 +7568,22 @@ function completedFirstDayHandoffFromTimeline(events: GatePlatformDecisionTimeli
     recoveryScaleOutcome,
     recoveryScaleConclusion,
   };
+}
+
+function firstDayHandoffReusableEvidence(evidence: string[]) {
+  const knowledgeSource = evidence.find((line) => /知识来源/u.test(line));
+  const platformFeedback = evidence.find((line) => /平台反哺/u.test(line))
+    ?? evidence.find((line) => line !== knowledgeSource && /正反馈|反馈/u.test(line));
+  const action = evidence.find((line) => /交接动作已落地|执行开书交接动作|首日动作/u.test(line));
+  const avoid = evidence.find((line) => /避坑边界已确认|避开交接边界|不要直接放量|小样本/u.test(line));
+  const fallback = evidence.filter((line) => ![knowledgeSource, platformFeedback, action, avoid].includes(line));
+  return Array.from(new Set([
+    knowledgeSource,
+    platformFeedback,
+    action,
+    avoid,
+    ...fallback,
+  ].filter((line): line is string => Boolean(line)))).slice(0, 6);
 }
 
 function structuredRecoveryFollowupEvidence(detail: string) {
@@ -7822,7 +7842,7 @@ export function buildGatePlatformTacticExperienceLibrary(
           `闭环进度：${completedFirstDayHandoff.completedCount}/3 段交接完成`,
           ...completedFirstDayHandoff.evidence,
           ...base.evidence,
-        ].slice(0, 5),
+        ].slice(0, 8),
       };
     }
 

@@ -4500,8 +4500,17 @@ test("buildGateActionReceipt", async (t) => {
         dueLabel: "今天",
         actionLabel: "查看交接",
         href: "/projects/project-1#first-day-launch",
-        acceptanceCriteria: ["交接证据已写清", "下一步验收口径已明确"],
-        evidence: ["经验来源：番茄强钩子打法", "目标：新书第一天开局"],
+        acceptanceCriteria: [
+          "交接动作已落地：开头：第一段给倒计时。",
+          "避坑边界已确认：不要直接放量，先做小样本。",
+          "下一步验收口径已明确",
+        ],
+        evidence: [
+          "知识来源：番茄小说 正反馈经验已沉淀",
+          "平台反哺：执行正反馈链",
+          "经验来源：番茄强钩子打法",
+          "目标：新书第一天开局",
+        ],
         completionEvidence: input.completionEvidence,
         reviewLatestAt: input.completedAt,
         assignedAt: "2026-01-01T00:00:00.000Z",
@@ -4552,6 +4561,10 @@ test("buildGateActionReceipt", async (t) => {
     assert.equal(fanqieExperience?.tactic, "新书开局闭环打法");
     assert.ok(fanqieExperience?.reuseHint.includes("先锁开头钩子"));
     assert.ok(fanqieExperience?.risk.includes("不能直接当成长线加码结论"));
+    assert.ok(fanqieExperience?.evidence.some((line) => line.includes("知识来源：番茄小说")));
+    assert.ok(fanqieExperience?.evidence.some((line) => line.includes("平台反哺")));
+    assert.ok(fanqieExperience?.evidence.some((line) => line.includes("交接动作已落地")));
+    assert.ok(fanqieExperience?.evidence.some((line) => line.includes("避坑边界已确认")));
     assert.ok(fanqieMarkdown.includes("已用于新书开局并闭环"));
     assert.ok(fanqieMarkdown.includes("闭环进度：3/3 段交接完成"));
   });

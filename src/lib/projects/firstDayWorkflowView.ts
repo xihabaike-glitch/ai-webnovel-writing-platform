@@ -1413,7 +1413,7 @@ export function buildFirstDayDispatchUpdateSummary(input: {
 
 export function buildFirstDayPostDispatchCompletionPrompt(input: {
   completedTitle: string;
-  updateSummary: Pick<FirstDayDispatchUpdateSummary, "visible" | "status" | "title" | "detail"> | null;
+  updateSummary: Pick<FirstDayDispatchUpdateSummary, "visible" | "status" | "title" | "detail" | "actionLabel" | "href"> | null;
   nextStep: Pick<FirstDayWorkflowStep, "label" | "owner" | "actionLabel" | "href"> & { dispatchHref?: string; dispatchKey?: string } | null;
   executionPlan: { executable: boolean; blockedReason?: string } | null;
 }): FirstDayPostDispatchCompletionPrompt {
@@ -1447,6 +1447,9 @@ export function buildFirstDayPostDispatchCompletionPrompt(input: {
   if (input.updateSummary?.visible) {
     return {
       message: `${input.updateSummary.title}：${input.updateSummary.detail}`,
+      action: input.updateSummary.href ? "open_next_step" : undefined,
+      actionLabel: input.updateSummary.href ? input.updateSummary.actionLabel : undefined,
+      actionHref: input.updateSummary.href || undefined,
     };
   }
 

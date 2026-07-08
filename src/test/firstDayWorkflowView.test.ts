@@ -1270,7 +1270,9 @@ test("buildFirstDayPostDispatchCompletionPrompt offers direct AI continuation wh
   assert.equal(manualStep.focusDispatchKey, "first-day:project-1:publish-precheck");
   assert.equal(manualStep.focusMessage, "下一张首日派单卡已就绪，可以继续推进。");
   assert.equal(completed.message, "首日工作流已收口：可以进入后续生产。");
-  assert.equal(completed.action, undefined);
+  assert.equal(completed.action, "open_next_step");
+  assert.equal(completed.actionLabel, "看任务队列");
+  assert.equal(completed.actionHref, "/tasks");
 });
 
 test("buildFirstDayRouteRepairReturnNotice only offers AI continuation when route and plan are executable", () => {

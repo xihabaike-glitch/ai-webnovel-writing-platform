@@ -450,6 +450,42 @@ test("buildProjectListDashboard", async (t) => {
     assert.ok(item.pipelineProof.validationReceipt.proofPrompt.includes("完成依据"));
   });
 
+  await t.test("surfaces role closure progress on project list items", () => {
+    const dashboard = buildProjectListDashboard([{
+      ...handoffBlockedProject,
+      gateDispatchTasks: [
+        ...(handoffBlockedProject.gateDispatchTasks ?? []),
+        {
+          dispatchKey: "role-intent:handoff-blocked-project:story-structure:structure_editor",
+          state: "completed",
+          completionEvidence: "结构主编完成人物弧光、主线支线、开头钩子和结尾回收复查。",
+        },
+        {
+          dispatchKey: "role-intent:handoff-blocked-project:context-recall:context_librarian",
+          state: "assigned",
+          completionEvidence: "",
+        },
+      ],
+    }], [
+      {
+        id: "provider-1",
+        providerId: "mock",
+        displayName: "Mock",
+        defaultModel: "mock-novel",
+        enabled: true,
+        encryptedApiKey: "secret",
+      },
+    ]);
+    const item = dashboard.items[0];
+
+    assert.equal(item.roleClosureProgress?.completedRoles, 1);
+    assert.equal(item.roleClosureProgress?.totalRoles, 3);
+    assert.deepEqual(item.roleClosureProgress?.completedLabels, ["结构主编"]);
+    assert.deepEqual(item.roleClosureProgress?.missingLabels, ["资料官", "平台包装"]);
+    assert.ok(item.roleClosureProgress?.headline.includes("角色闭环 1/3"));
+    assert.equal(item.roleClosureProgress?.lanes.find((lane) => lane.label === "资料官")?.status, "missing");
+  });
+
   await t.test("summarizes portfolio bottlenecks across pipeline proof steps", () => {
     const dashboard = buildProjectListDashboard([emptyProject, completeProject, handoffBlockedProject], [
       {

@@ -59,6 +59,23 @@ export interface ProjectListItem {
   continuationStatus: "first_day_active" | "ready" | "blocked" | "complete";
   pipelineProof: ProjectListPipelineProof;
   realSampleValidation: ProjectListRealSampleValidation;
+  roleClosureProgress: ProjectListRoleClosureProgress | null;
+}
+
+export interface ProjectListRoleClosureLane {
+  id: "story-structure" | "context-recall" | "platform-export";
+  label: string;
+  status: "done" | "missing";
+  evidence: string;
+}
+
+export interface ProjectListRoleClosureProgress {
+  headline: string;
+  completedRoles: number;
+  totalRoles: number;
+  completedLabels: string[];
+  missingLabels: string[];
+  lanes: ProjectListRoleClosureLane[];
 }
 
 export type ProjectListRealSampleValidationStatus =
@@ -450,6 +467,45 @@ function hasAcceptedDispatch(project: ProjectListProject) {
   return (project.gateDispatchTasks ?? []).some((task) => (
     task.state === "completed" && task.completionEvidence.trim().length >= 20
   ));
+}
+
+const roleClosureProgressLanes = [
+  { id: "story-structure", label: "结构主编" },
+  { id: "context-recall", label: "资料官" },
+  { id: "platform-export", label: "平台包装" },
+] as const;
+
+function buildProjectListRoleClosureProgress(project: ProjectListProject): ProjectListRoleClosureProgress | null {
+  const roleDispatches = (project.gateDispatchTasks ?? []).filter((task) => task.dispatchKey.startsWith(`role-intent:${project.id}:`));
+  if (roleDispatches.length === 0) return null;
+
+  const lanes = roleClosureProgressLanes.map((lane) => {
+    const completedDispatch = roleDispatches.find((task) => (
+      task.dispatchKey.startsWith(`role-intent:${project.id}:${lane.id}:`)
+      && task.state === "completed"
+      && task.completionEvidence.trim().length >= 20
+    ));
+
+    return {
+      id: lane.id,
+      label: lane.label,
+      status: completedDispatch ? "done" : "missing",
+      evidence: completedDispatch?.completionEvidence.trim() || `${lane.label}还缺完成依据。`,
+    } satisfies ProjectListRoleClosureLane;
+  });
+  const completedLabels = lanes.filter((lane) => lane.status === "done").map((lane) => lane.label);
+  const missingLabels = lanes.filter((lane) => lane.status === "missing").map((lane) => lane.label);
+
+  return {
+    headline: missingLabels.length === 0
+      ? `角色闭环 ${completedLabels.length}/${lanes.length}：三类角色已闭合`
+      : `角色闭环 ${completedLabels.length}/${lanes.length}：还缺${missingLabels.join("、")}`,
+    completedRoles: completedLabels.length,
+    totalRoles: lanes.length,
+    completedLabels,
+    missingLabels,
+    lanes,
+  };
 }
 
 function pendingFirstDayDispatch(project: ProjectListProject, stepId: string) {
@@ -939,6 +995,7 @@ export function buildProjectListDashboard(
       supportPercent,
       continuationStatus: continuation.status,
     });
+    const roleClosureProgress = buildProjectListRoleClosureProgress(project);
     const rawHealthScore = Math.round(average([
       firstDay.progressPercent,
       outlinePercent,
@@ -1000,6 +1057,7 @@ export function buildProjectListDashboard(
         continuationStatus: continuation.status,
       }),
       realSampleValidation,
+      roleClosureProgress,
     };
   }).sort((left, right) => (
     left.healthScore - right.healthScore

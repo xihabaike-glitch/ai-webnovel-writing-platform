@@ -46,6 +46,16 @@ test("projects page shows the prioritized real sample acceptance queue", () => {
   assert.ok(source.includes("sample.actionLabel"));
 });
 
+test("projects page renders role closure progress on project cards", () => {
+  assert.ok(source.includes('{ dispatchKey: { startsWith: "role-intent:" } }'));
+  assert.ok(source.includes("item.roleClosureProgress"));
+  assert.ok(source.includes("角色闭环进度"));
+  assert.ok(source.includes("item.roleClosureProgress.headline"));
+  assert.ok(source.includes("item.roleClosureProgress.lanes.map"));
+  assert.ok(source.includes("lane.status === \"done\""));
+  assert.ok(source.includes("lane.evidence"));
+});
+
 test("projects page keeps a gate recheck return path visible", () => {
   assert.ok(source.includes("gateReturnFromParam"));
   assert.ok(source.includes("gateReturn"));

@@ -91,7 +91,12 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps) 
         characters: { orderBy: { createdAt: "asc" } },
         worldEntries: { orderBy: [{ type: "asc" }, { createdAt: "asc" }] },
         gateDispatchTasks: {
-          where: { dispatchKey: { startsWith: "first-day:" } },
+          where: {
+            OR: [
+              { dispatchKey: { startsWith: "first-day:" } },
+              { dispatchKey: { startsWith: "role-intent:" } },
+            ],
+          },
           select: {
             dispatchKey: true,
             state: true,
@@ -492,6 +497,29 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps) 
                 </div>
               </div>
             </div>
+            {item.roleClosureProgress ? (
+              <div className="mt-4 rounded-md border border-slate-200 bg-slate-50 p-3">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <div className="text-xs text-slate-500">角色闭环进度</div>
+                    <div className="mt-1 font-medium text-slate-950">{item.roleClosureProgress.headline}</div>
+                  </div>
+                  <Link className="w-fit rounded-md bg-white px-3 py-2 text-xs font-medium text-slate-800 hover:bg-slate-100" href={hrefWithGateReturn(`/projects/${item.id}#story-structure`, gateReturn)}>
+                    查看角色工作
+                  </Link>
+                </div>
+                <div className="mt-3 grid gap-2 md:grid-cols-3">
+                  {item.roleClosureProgress.lanes.map((lane) => (
+                    <div className="rounded-md bg-white px-3 py-2 text-xs leading-5" key={`${item.id}-${lane.id}`}>
+                      <div className={lane.status === "done" ? "font-medium text-emerald-700" : "font-medium text-amber-700"}>
+                        {lane.status === "done" ? "已回填" : "待补齐"} · {lane.label}
+                      </div>
+                      <p className="mt-1 text-slate-600">{lane.evidence}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null}
             <div className="mt-4 rounded-md border border-slate-200 bg-slate-50 p-3">
               <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
                 <div>

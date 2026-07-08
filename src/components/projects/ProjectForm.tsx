@@ -63,6 +63,34 @@ function riskGateClass(level: ProjectStartRiskGateLevel) {
   return "border-emerald-200 bg-emerald-50 text-emerald-900";
 }
 
+function firstDayExecutionOutcome(label: string) {
+  if (label === "执行扩展") {
+    return {
+      badge: "可以扩展",
+      title: "首日执行结论：可以扩展",
+      nextMove: "下一本书可沿用生成-审稿-二改顺序，先扩到下一章或下一小段小样本。",
+      boundary: "仍要回填曝光、点击、收藏、追读，未过下一轮数据前不直接批量复制。",
+    };
+  }
+  if (label === "执行观察") {
+    return {
+      badge: "继续观察",
+      title: "首日执行结论：继续观察",
+      nextMove: "下一本书只复用执行顺序，先补追读、收藏和点击证据。",
+      boundary: "追读证据不足前，不扩展章节，也不把观察样本写成成功打法。",
+    };
+  }
+  if (label === "执行避坑") {
+    return {
+      badge: "先避坑",
+      title: "首日执行结论：先避坑",
+      nextMove: "下一本书先重做入口卖点、前三章兑现或平台匹配，再跑一轮小样本。",
+      boundary: "不要复用首日未过线的开头、平台包装或扩展节奏。",
+    };
+  }
+  return null;
+}
+
 interface ProjectFormExperienceLaunch {
   platformId?: string;
   tactic?: string;
@@ -167,6 +195,7 @@ export function ProjectForm({
     handoff: startExperienceHandoff,
     advice: tacticAdvice,
   });
+  const firstDayOutcome = firstDayExecutionOutcome(tacticAdvice.label);
   const recoveryHandoffPanel = buildProjectStartRecoveryHandoffPanel(startExperienceHandoff);
   const launchRequested = Boolean(launchPlatform && experienceLaunch?.tactic);
   const launchMatched = launchRequested
@@ -426,6 +455,24 @@ export function ProjectForm({
             </button>
           ) : null}
         </div>
+        {firstDayOutcome ? (
+          <div className="rounded-md border border-white/80 bg-white/75 p-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="font-medium">{firstDayOutcome.title}</div>
+              <span className="rounded-md bg-slate-950 px-2 py-1 text-xs font-medium text-white">{firstDayOutcome.badge}</span>
+            </div>
+            <div className="mt-3 grid gap-2 md:grid-cols-2">
+              <div className="rounded-md bg-white/80 p-2 text-xs leading-5">
+                <div className="font-medium opacity-70">下一步</div>
+                <p className="mt-1">{firstDayOutcome.nextMove}</p>
+              </div>
+              <div className="rounded-md bg-white/80 p-2 text-xs leading-5">
+                <div className="font-medium opacity-70">边界</div>
+                <p className="mt-1">{firstDayOutcome.boundary}</p>
+              </div>
+            </div>
+          </div>
+        ) : null}
         {recoveryHandoffPanel ? (
           <div className="rounded-md border border-cyan-200 bg-cyan-50 p-3 text-cyan-950">
             <div className="flex flex-wrap items-center gap-2">

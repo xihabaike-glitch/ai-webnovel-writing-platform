@@ -97,3 +97,17 @@ test("project form makes short, mid, long, and mega length presets executable", 
   assert.ok(projectFormSource.includes('name="targetWordCount"'));
   assert.ok(projectFormSource.includes("毒舌 PM 篇幅口径"));
 });
+
+test("project form surfaces first-day execution outcomes before creation", () => {
+  assert.ok(projectFormSource.includes("function firstDayExecutionOutcome"));
+  assert.ok(projectFormSource.includes("const firstDayOutcome = firstDayExecutionOutcome"));
+  assert.ok(projectFormSource.includes("首日执行结论"));
+  assert.ok(projectFormSource.includes("可以扩展"));
+  assert.ok(projectFormSource.includes("继续观察"));
+  assert.ok(projectFormSource.includes("先避坑"));
+  assert.ok(projectFormSource.includes("执行扩展"));
+  assert.ok(projectFormSource.includes("执行观察"));
+  assert.ok(projectFormSource.includes("执行避坑"));
+  assert.ok(projectFormSource.includes("firstDayOutcome.nextMove"));
+  assert.ok(projectFormSource.includes("firstDayOutcome.boundary"));
+});

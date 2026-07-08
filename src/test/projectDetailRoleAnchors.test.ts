@@ -129,6 +129,17 @@ test("project detail page carries gate return through project work entry links",
   assert.ok(writingWorkbenchPanel.includes("href={hrefWithGateReturn(block.href, gateReturnHref)}"));
 });
 
+test("project writing workbench renders a concrete today path", () => {
+  const writingWorkbenchPanel = readFileSync("src/components/projects/WritingWorkbenchPanel.tsx", "utf8");
+
+  assert.ok(writingWorkbenchPanel.includes("今日写作路径"));
+  assert.ok(writingWorkbenchPanel.includes("workbench.writingPath.map"));
+  assert.ok(writingWorkbenchPanel.includes("pathItem.stopRule"));
+  assert.ok(writingWorkbenchPanel.includes("停手线"));
+  assert.ok(writingWorkbenchPanel.includes("pathItem.actionLabel"));
+  assert.ok(writingWorkbenchPanel.includes("href={hrefWithGateReturn(pathItem.href, gateReturnHref)}"));
+});
+
 test("project detail page carries gate return through control and batch panels", () => {
   const projectPage = readFileSync("src/app/projects/[projectId]/page.tsx", "utf8");
   const controlPanel = readFileSync("src/components/projects/ProjectControlDashboardPanel.tsx", "utf8");

@@ -125,6 +125,39 @@ export function WritingWorkbenchPanel({
         </div>
       </div>
 
+      <div className="mt-4 rounded-md border border-slate-200 bg-white p-3" id="today-writing-path">
+        <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <div className="text-sm font-medium text-slate-950">今日写作路径</div>
+            <p className="mt-1 text-xs text-slate-500">按大树顺序推进：先开头和结尾，再主干、分支、叶片和土壤；每一步过停手线再往后走。</p>
+          </div>
+          <span className="w-fit rounded-md bg-slate-100 px-2 py-1 text-xs font-medium text-slate-600">
+            {workbench.writingPath.length} 步
+          </span>
+        </div>
+        <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+          {workbench.writingPath.map((pathItem) => (
+            <div className="rounded-md bg-slate-50 p-3" key={pathItem.id}>
+              <div className="flex items-center justify-between gap-2">
+                <div className="text-xs font-medium text-slate-500">第 {pathItem.order} 步 · {pathItem.label}</div>
+                <span className={`rounded-md border px-2 py-1 text-xs ${statusClass(pathItem.status)}`}>
+                  {statusLabel(pathItem.status)}
+                </span>
+              </div>
+              <div className="mt-2 line-clamp-1 text-sm font-medium text-slate-950">{pathItem.title}</div>
+              <p className="mt-1 line-clamp-2 text-xs leading-5 text-slate-600">{pathItem.detail}</p>
+              <p className="mt-2 text-xs leading-5 text-slate-500">停手线：{pathItem.stopRule}</p>
+              <Link
+                className="mt-3 inline-flex w-fit rounded-md bg-white px-3 py-2 text-xs font-medium text-slate-950 ring-1 ring-slate-200 hover:bg-slate-100"
+                href={hrefWithGateReturn(pathItem.href, gateReturnHref)}
+              >
+                {pathItem.actionLabel}
+              </Link>
+            </div>
+          ))}
+        </div>
+      </div>
+
       {workbench.firstThreeAdoption.status === "pending" ? (
         <div className="mt-4 rounded-md border border-amber-200 bg-amber-50 p-3">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">

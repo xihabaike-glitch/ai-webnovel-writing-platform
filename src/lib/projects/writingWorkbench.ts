@@ -121,6 +121,19 @@ export interface WritingWorkbenchTreeBlock {
   href: string;
 }
 
+export interface WritingWorkbenchPathItem {
+  id: string;
+  order: number;
+  treeType: WritingWorkbenchTreeBlock["type"];
+  label: string;
+  status: WorkbenchStatus;
+  title: string;
+  detail: string;
+  stopRule: string;
+  actionLabel: string;
+  href: string;
+}
+
 export interface WritingWorkbenchPmFocus {
   status: "blocked" | "needs_action" | "ready";
   headline: string;
@@ -145,6 +158,7 @@ export interface WritingWorkbench {
   };
   pmFocus: WritingWorkbenchPmFocus;
   treeBlocks: WritingWorkbenchTreeBlock[];
+  writingPath: WritingWorkbenchPathItem[];
   chapterFocus: {
     nextChapter: WritingWorkbenchChapter | null;
     hookStatus: WorkbenchStatus;
@@ -449,6 +463,63 @@ function buildTreeBlocks(input: WritingWorkbenchInput): WritingWorkbenchTreeBloc
           ? `${requirement.label}已有素材，但数量或关键字段还不够。`
           : `缺少${requirement.label}，大树结构还断着。`,
       ...treeBlockFocus(input, requirement.type, status),
+    };
+  });
+}
+
+const writingPathCopy: Record<WritingWorkbenchTreeBlock["type"], {
+  label: string;
+  stopRule: string;
+  actionLabel: string;
+}> = {
+  opening: {
+    label: "先定开头",
+    stopRule: "第一屏必须有钩子、危机、选择和不可逆代价。",
+    actionLabel: "处理开头钩子",
+  },
+  ending: {
+    label: "再定结尾",
+    stopRule: "结尾承诺必须写清情绪回收、真相回收和人物弧光终点。",
+    actionLabel: "处理结尾承诺",
+  },
+  trunk: {
+    label: "搭主干",
+    stopRule: "主干必须写清长期目标、阶段阻力和升级节奏。",
+    actionLabel: "处理主干结构",
+  },
+  branch: {
+    label: "长分支",
+    stopRule: "分支至少覆盖关系线、对抗线和秘密/世界线。",
+    actionLabel: "处理分支支线",
+  },
+  leaf: {
+    label: "铺叶片",
+    stopRule: "章节卡必须有钩子、冲突、价值变化和章末悬念。",
+    actionLabel: "处理章节叶片",
+  },
+  soil: {
+    label: "补土壤",
+    stopRule: "土壤必须能被模型召回：平台规则、人物、设定或伏笔至少一类可用。",
+    actionLabel: "处理项目土壤",
+  },
+};
+
+function buildWritingPath(treeBlocks: WritingWorkbenchTreeBlock[]): WritingWorkbenchPathItem[] {
+  return treeRequirements.flatMap((requirement, index) => {
+    const block = treeBlocks.find((item) => item.type === requirement.type);
+    if (!block) return [];
+    const copy = writingPathCopy[block.type];
+    return {
+      id: `writing-path-${block.type}`,
+      order: index + 1,
+      treeType: block.type,
+      label: copy.label,
+      status: block.status,
+      title: block.focusTitle,
+      detail: block.nextAction || block.focusDetail || block.note,
+      stopRule: copy.stopRule,
+      actionLabel: block.status === "pass" ? `复查${block.label}` : copy.actionLabel,
+      href: block.href,
     };
   });
 }
@@ -1196,6 +1267,7 @@ export function buildWritingWorkbench(input: WritingWorkbenchInput): WritingWork
     heroAction,
     pmFocus: buildWritingWorkbenchPmFocus(heroAction, maturityScore),
     treeBlocks,
+    writingPath: buildWritingPath(treeBlocks),
     chapterFocus: {
       nextChapter,
       hookStatus,

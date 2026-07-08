@@ -121,6 +121,16 @@ test("buildWritingWorkbench", async (t) => {
     assert.ok(workbench.pmFocus.detail.includes(workbench.heroAction.reason));
     assert.ok(workbench.pmFocus.scopeLabel.includes("8/8 核心平台已完成"));
     assert.ok(workbench.pmFocus.scopeLabel.includes("剩余 10 个平台不再添加"));
+    assert.deepEqual(workbench.writingPath.slice(0, 6).map((item) => item.treeType), ["opening", "ending", "trunk", "branch", "leaf", "soil"]);
+    assert.equal(workbench.writingPath[0].order, 1);
+    assert.equal(workbench.writingPath[0].label, "先定开头");
+    assert.equal(workbench.writingPath[0].status, "warn");
+    assert.equal(workbench.writingPath[0].href, "/projects/p1#outline-tree");
+    assert.ok(workbench.writingPath[0].stopRule.includes("钩子"));
+    assert.ok(workbench.writingPath[1].label.includes("结尾"));
+    assert.ok(workbench.writingPath[1].stopRule.includes("结尾承诺"));
+    assert.ok(workbench.writingPath[4].actionLabel.includes("章节"));
+    assert.ok(workbench.writingPath.every((item) => item.stopRule.length > 0));
     assert.ok(workbench.treeBlocks.some((block) => block.type === "ending" && block.status === "fail"));
     assert.ok(workbench.treeBlocks.some((block) => block.type === "soil" && block.status === "fail"));
     assert.ok(workbench.treeBlocks.some((block) => (

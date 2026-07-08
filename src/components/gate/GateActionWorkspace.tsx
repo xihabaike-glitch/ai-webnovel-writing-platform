@@ -370,6 +370,14 @@ function batchTacticScaleDecisionClass(tone: "allow" | "watch" | "block") {
   return "border-rose-200 bg-white/70 text-rose-900";
 }
 
+const gateDispatchReceiptAcceptanceCriteria = [
+  "执行角色",
+  "输入",
+  "输出",
+  "人工验收",
+  "下一步",
+];
+
 export function GateActionWorkspace({
   actions,
   failureRepairBatch,
@@ -756,6 +764,14 @@ export function GateActionWorkspace({
             <div>
               <div className="text-xs font-medium text-slate-500">派单证据总控</div>
               <p className="mt-1 text-xs text-slate-500">把派单中心的完成证据反哺到总闸门，区分真闭环和纸面完成。</p>
+              <div className="mt-2 flex flex-wrap gap-1">
+                <span className="rounded-md bg-slate-100 px-2 py-1 text-xs font-medium text-slate-600">派单回执验收口径</span>
+                {gateDispatchReceiptAcceptanceCriteria.map((criterion) => (
+                  <span className="rounded-md bg-white px-2 py-1 text-xs text-slate-600" key={criterion}>
+                    {criterion}
+                  </span>
+                ))}
+              </div>
             </div>
             <Link
               className="w-fit rounded-md border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"

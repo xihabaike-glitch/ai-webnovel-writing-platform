@@ -27,3 +27,14 @@ test("gate action workspace shows batch tactic scale decisions", () => {
   assert.ok(workspaceSource.includes("{item.scaleDecisionLabel}"));
   assert.ok(workspaceSource.includes("{item.scaleDecisionDetail}"));
 });
+
+test("gate action workspace shows dispatch receipt acceptance criteria", () => {
+  assert.ok(workspaceSource.includes("gateDispatchReceiptAcceptanceCriteria"));
+  assert.ok(workspaceSource.includes("派单回执验收口径"));
+  assert.ok(workspaceSource.includes("执行角色"));
+  assert.ok(workspaceSource.includes("输入"));
+  assert.ok(workspaceSource.includes("输出"));
+  assert.ok(workspaceSource.includes("人工验收"));
+  assert.ok(workspaceSource.includes("下一步"));
+  assert.ok(workspaceSource.includes("gateDispatchReceiptAcceptanceCriteria.map"));
+});

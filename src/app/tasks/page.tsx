@@ -1250,12 +1250,22 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
                   {runConsole.archiveExperienceRepairQueue.title}：{runConsole.archiveExperienceRepairQueue.detail}
                 </p>
               </div>
-              <Link
-                className="w-fit rounded-md bg-slate-950 px-4 py-2 text-sm font-medium text-white"
-                href={hrefWithGateReturn(runConsole.archiveExperienceRepairQueue.actionHref, gateReturn)}
-              >
-                {runConsole.archiveExperienceRepairQueue.actionLabel}
-              </Link>
+              <div className="flex flex-wrap gap-2">
+                {archiveExperienceFocused && gateReturn ? (
+                  <Link
+                    className="w-fit rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-950 hover:bg-slate-50"
+                    href={gateReturn}
+                  >
+                    归档经验修复后回总闸门复检
+                  </Link>
+                ) : null}
+                <Link
+                  className="w-fit rounded-md bg-slate-950 px-4 py-2 text-sm font-medium text-white"
+                  href={hrefWithGateReturn(runConsole.archiveExperienceRepairQueue.actionHref, gateReturn)}
+                >
+                  {runConsole.archiveExperienceRepairQueue.actionLabel}
+                </Link>
+              </div>
             </div>
             <div className="mt-4 grid gap-3 lg:grid-cols-[0.85fr_1.15fr]">
               <div className="grid gap-2 text-sm text-slate-700">

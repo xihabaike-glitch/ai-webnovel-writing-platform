@@ -125,6 +125,12 @@ test("tasks page gives archive experience blockers a direct repair entry", () =>
   assert.ok(source.includes("archiveExperienceFocused"));
 });
 
+test("tasks archive experience repair panel keeps the gate recheck return visible", () => {
+  assert.ok(source.includes("archiveExperienceFocused && gateReturn"));
+  assert.ok(source.includes("归档经验修复后回总闸门复检"));
+  assert.ok(source.includes("href={gateReturn}"));
+});
+
 test("tasks page carries gate return through task work links", () => {
   const recommendedBatchButton = readFileSync("src/components/tasks/RunRecommendedBatchButton.tsx", "utf8");
   const publishEffectButton = readFileSync("src/components/tasks/RunPublishEffectQueueActionButton.tsx", "utf8");

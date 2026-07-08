@@ -246,6 +246,10 @@ interface ProductionDecisionSummary {
   actionAreaId: string | null;
   actionMode: "seed" | null;
   executeLabel: string;
+  dispatchStatus: "none" | "assigned" | "completed" | "needs_governance";
+  dispatchLabel: string;
+  dispatchDetail: string;
+  dispatchHref: string | null;
   primaryActionLabel: string;
   primaryTargetHref: string;
   secondaryActionLabel: string;
@@ -1023,6 +1027,22 @@ export function ProjectControlDashboardPanel({
                 <div className="mt-2 rounded-md bg-white/70 px-2 py-1 text-xs leading-5">
                   {dashboard.productionDecision.reason}
                 </div>
+                {dashboard.productionDecision.dispatchLabel ? (
+                  <div className="mt-2 flex flex-col gap-2 rounded-md bg-white/70 px-2 py-2 text-xs leading-5 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <span className="font-semibold">{dashboard.productionDecision.dispatchLabel}</span>
+                      <span className="ml-2">{dashboard.productionDecision.dispatchDetail}</span>
+                    </div>
+                    {dashboard.productionDecision.dispatchHref ? (
+                      <Link
+                        className="inline-flex w-fit shrink-0 rounded-md bg-white px-2 py-1 font-medium text-slate-950 hover:bg-slate-50"
+                        href={hrefWithGateReturn(dashboard.productionDecision.dispatchHref, gateReturnHref)}
+                      >
+                        看派单
+                      </Link>
+                    ) : null}
+                  </div>
+                ) : null}
               </div>
               <div className="flex shrink-0 flex-wrap gap-2">
                 {dashboard.productionDecision.actionExecutable ? (

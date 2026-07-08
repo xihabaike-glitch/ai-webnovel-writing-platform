@@ -1539,6 +1539,80 @@ test("buildProjectControlDashboard", async (t) => {
     assert.equal(dashboard.productionDecision.primaryActionLabel, "修模型路线");
   });
 
+  await t.test("feeds model route repair dispatch status back into production decision", () => {
+    const dashboard = buildProjectControlDashboard({
+      project: {
+        ...project,
+        aiMonthlyBudgetUsd: 5,
+        aiMaxTaskCostUsd: 0.25,
+        aiMaxBatchCostUsd: 1,
+        aiMaxFailureRatePercent: 20,
+        aiBudgetEnforcement: "block",
+      },
+      platform: getPlatformProfile("fanqie"),
+      chapters: [chapter],
+      outlineNodes: [],
+      characters: [],
+      worldEntries: [],
+      foreshadows: [],
+      plotThreads: [],
+      modelProviders: [
+        {
+          id: "gpt-provider",
+          providerId: "gpt",
+          displayName: "GPT",
+          defaultModel: "gpt-4.1",
+          enabled: true,
+          encryptedApiKey: "encrypted",
+        },
+      ],
+      modelRoutes: [
+        { taskType: "chapter_review", primaryProviderConfigId: "gpt-provider", fallbackProviderConfigId: null },
+      ],
+      aiTasks: [
+        {
+          id: "review-1",
+          projectId: "project-1",
+          chapterId: "chapter-1",
+          taskType: "chapter_review",
+          providerConfigId: "gpt-provider",
+          model: "gpt-4.1",
+          status: "failed",
+          outputText: null,
+          inputSnapshot: "{}",
+          inputTokens: 700,
+          outputTokens: 0,
+          costUsd: 0.02,
+          errorMessage: "timeout",
+          createdAt: "2026-01-03T00:00:00.000Z",
+          modelProvider: { providerId: "gpt", displayName: "GPT" },
+        },
+      ],
+      gateDispatchTasks: [
+        {
+          dispatchKey: "model-route-repair:project-1:123",
+          stage: "model_route_confirmation_recheck",
+          state: "assigned",
+          title: "模型路线修复派单",
+          detail: "修复章节审稿模型路线。",
+          href: "/settings/models?projectId=project-1#model-task-audit",
+          actionLabel: "修复并复测",
+          completionEvidence: "",
+          reviewLatestAt: "2026-01-04T00:00:00.000Z",
+        },
+      ],
+      submissionChecklist: checklist,
+    });
+
+    assert.equal(dashboard.productionDecision.dispatchStatus, "assigned");
+    assert.equal(dashboard.productionDecision.dispatchLabel, "已派单");
+    assert.ok(dashboard.productionDecision.dispatchDetail.includes("模型路线修复派单"));
+    assert.equal(dashboard.productionDecision.dispatchHref, "/dispatch#dispatch-model-route-repair:project-1:123");
+    assert.equal(dashboard.productionDecision.actionExecutable, false);
+    assert.equal(dashboard.productionDecision.primaryActionLabel, "查看模型路线派单");
+    assert.equal(dashboard.productionDecision.primaryTargetHref, "/dispatch#dispatch-model-route-repair:project-1:123");
+  });
+
   await t.test("pauses project starts when the stored tactic is a historical avoidance signal", () => {
     const dashboard = buildProjectControlDashboard({
       project,

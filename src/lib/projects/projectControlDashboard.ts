@@ -152,6 +152,19 @@ export interface ControlBatchAudit {
   createdAt: Date | string;
 }
 
+export interface ControlGateDispatchTask {
+  dispatchKey: string;
+  stage: string;
+  state: string;
+  title: string;
+  detail: string;
+  href: string;
+  actionLabel: string;
+  completionEvidence: string;
+  reviewLatestAt: Date | string;
+  completedAt?: Date | string | null;
+}
+
 export interface ProjectControlDashboardInput {
   project: ControlProject;
   platform: PlatformProfile;
@@ -168,6 +181,7 @@ export interface ProjectControlDashboardInput {
   platformPublishMetrics?: PlatformPublishMetricInput[];
   platformKnowledgeFeedbackReceipts?: ControlPlatformFeedbackReceipt[];
   gateActionAudits?: ControlBatchAudit[];
+  gateDispatchTasks?: ControlGateDispatchTask[];
   modelProviders?: ModelAuditProvider[];
   modelRoutes?: ModelAuditRoute[];
   submissionChecklist: SubmissionChecklist;
@@ -335,6 +349,10 @@ export interface ProductionDecisionSummary {
   actionAreaId: string | null;
   actionMode: "seed" | null;
   executeLabel: string;
+  dispatchStatus: "none" | "assigned" | "completed" | "needs_governance";
+  dispatchLabel: string;
+  dispatchDetail: string;
+  dispatchHref: string | null;
   primaryActionLabel: string;
   primaryTargetHref: string;
   secondaryActionLabel: string;
@@ -1277,11 +1295,51 @@ function buildModelRouteHealthSummary(input: ProjectControlDashboardInput): Mode
   };
 }
 
+function latestModelRouteRepairDispatch(tasks: ControlGateDispatchTask[] = []) {
+  return [...tasks]
+    .filter((task) => task.dispatchKey.startsWith("model-route-repair:"))
+    .sort((left, right) => new Date(right.reviewLatestAt).getTime() - new Date(left.reviewLatestAt).getTime())[0] ?? null;
+}
+
+function modelRouteRepairDispatchFields(
+  task: ControlGateDispatchTask | null,
+  modelRouteHealth: ModelRouteHealthSummary,
+): Pick<ProductionDecisionSummary, "dispatchStatus" | "dispatchLabel" | "dispatchDetail" | "dispatchHref"> {
+  if (!task) {
+    return {
+      dispatchStatus: "none",
+      dispatchLabel: "",
+      dispatchDetail: "",
+      dispatchHref: null,
+    };
+  }
+  const href = `/dispatch#dispatch-${task.dispatchKey}`;
+  if (task.state === "completed") {
+    const stillRepair = modelRouteHealth.status === "repair";
+    return {
+      dispatchStatus: stillRepair ? "needs_governance" : "completed",
+      dispatchLabel: stillRepair ? "仍需治理" : "已通过",
+      dispatchDetail: stillRepair
+        ? `${task.title}已完成，但模型路线仍在修复态；继续治理或补一轮复测证据。`
+        : `${task.title}已完成，模型路线可回到小批生产判断。`,
+      dispatchHref: href,
+    };
+  }
+  return {
+    dispatchStatus: "assigned",
+    dispatchLabel: "已派单",
+    dispatchDetail: `${task.title}待处理：${task.actionLabel || "修复并复测"}。`,
+    dispatchHref: href,
+  };
+}
+
 function buildProductionDecisionSummary(input: {
   batch: AiPipelineBatchSummary;
   batchHealth: AiPipelineBatchHealthSummary;
   modelRouteHealth: ModelRouteHealthSummary;
+  modelRouteRepairDispatch: ControlGateDispatchTask | null;
 }): ProductionDecisionSummary {
+  const modelRouteDispatch = modelRouteRepairDispatchFields(input.modelRouteRepairDispatch, input.modelRouteHealth);
   if (input.batchHealth.status === "blocked") {
     return {
       status: "repair",
@@ -1293,6 +1351,10 @@ function buildProductionDecisionSummary(input: {
       actionAreaId: "ai-pipeline",
       actionMode: "seed",
       executeLabel: "生成修复清单",
+      dispatchStatus: "none",
+      dispatchLabel: "",
+      dispatchDetail: "",
+      dispatchHref: null,
       primaryActionLabel: "修批量打法",
       primaryTargetHref: "/failures",
       secondaryActionLabel: input.modelRouteHealth.actionLabel,
@@ -1307,12 +1369,13 @@ function buildProductionDecisionSummary(input: {
       label: "先修复",
       headline: "模型路线有失败或避用信号，先修路由再继续写。",
       reason: `模型路线：${input.modelRouteHealth.headline} 批量健康：${input.batchHealth.scaleDecisionLabel}。`,
-      actionExecutable: true,
-      actionAreaId: "model-route",
-      actionMode: "seed",
+      actionExecutable: modelRouteDispatch.dispatchStatus === "none",
+      actionAreaId: modelRouteDispatch.dispatchStatus === "none" ? "model-route" : null,
+      actionMode: modelRouteDispatch.dispatchStatus === "none" ? "seed" : null,
       executeLabel: "生成模型路线修复派单",
-      primaryActionLabel: "修模型路线",
-      primaryTargetHref: input.modelRouteHealth.targetHref,
+      ...modelRouteDispatch,
+      primaryActionLabel: modelRouteDispatch.dispatchHref ? "查看模型路线派单" : "修模型路线",
+      primaryTargetHref: modelRouteDispatch.dispatchHref ?? input.modelRouteHealth.targetHref,
       secondaryActionLabel: input.batchHealth.actionLabel,
       secondaryTargetHref: input.batchHealth.targetHref,
     };
@@ -1329,6 +1392,10 @@ function buildProductionDecisionSummary(input: {
       actionAreaId: null,
       actionMode: null,
       executeLabel: input.modelRouteHealth.actionLabel,
+      dispatchStatus: "none",
+      dispatchLabel: "",
+      dispatchDetail: "",
+      dispatchHref: null,
       primaryActionLabel: input.modelRouteHealth.actionLabel,
       primaryTargetHref: input.modelRouteHealth.targetHref,
       secondaryActionLabel: input.batchHealth.actionLabel,
@@ -1347,6 +1414,10 @@ function buildProductionDecisionSummary(input: {
       actionAreaId: "ai-pipeline",
       actionMode: "seed",
       executeLabel: input.batchHealth.executeLabel,
+      dispatchStatus: "none",
+      dispatchLabel: "",
+      dispatchDetail: "",
+      dispatchHref: null,
       primaryActionLabel: input.batchHealth.executeLabel,
       primaryTargetHref: input.batchHealth.targetHref,
       secondaryActionLabel: input.modelRouteHealth.actionLabel,
@@ -1365,6 +1436,10 @@ function buildProductionDecisionSummary(input: {
       actionAreaId: null,
       actionMode: null,
       executeLabel: input.batch.canRun ? "执行推荐批次" : input.batch.actionLabel,
+      dispatchStatus: "none",
+      dispatchLabel: "",
+      dispatchDetail: "",
+      dispatchHref: null,
       primaryActionLabel: input.batch.canRun ? "执行推荐批次" : input.batch.actionLabel,
       primaryTargetHref: input.batch.targetHref,
       secondaryActionLabel: input.modelRouteHealth.actionLabel,
@@ -1382,6 +1457,10 @@ function buildProductionDecisionSummary(input: {
     actionAreaId: null,
     actionMode: null,
     executeLabel: "执行推荐批次",
+    dispatchStatus: "none",
+    dispatchLabel: "",
+    dispatchDetail: "",
+    dispatchHref: null,
     primaryActionLabel: "执行推荐批次",
     primaryTargetHref: input.batch.targetHref,
     secondaryActionLabel: input.batchHealth.actionLabel,
@@ -2205,10 +2284,12 @@ export function buildProjectControlDashboard(input: ProjectControlDashboardInput
   const aiPipelineControlPlan = buildAiPipelineControlPlanSummary(input.gateActionAudits);
   const aiPipelinePromptMemory = buildAiPipelinePromptMemorySummary(input.gateActionAudits);
   const modelRouteHealth = buildModelRouteHealthSummary(input);
+  const modelRouteRepairDispatch = latestModelRouteRepairDispatch(input.gateDispatchTasks);
   const productionDecision = buildProductionDecisionSummary({
     batch: aiPipelineBatch,
     batchHealth: aiPipelineBatchHealth,
     modelRouteHealth,
+    modelRouteRepairDispatch,
   });
   const aiPipelineBaseEvidence = `${batchDraft.readyCandidates} 章可初稿，${reviewPipeline.reviewReadyCount} 章待审，${reviewPipeline.secondPassReadyCount} 章可二改。`;
   const aiPipelineArea = aiPipelineAreaDecision({

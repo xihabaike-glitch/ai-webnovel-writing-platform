@@ -122,6 +122,19 @@ test("gate page summarizes final delivery closeout across task and dispatch rece
   assert.ok(source.includes("进入最终交付判断"));
 });
 
+test("gate page breaks final delivery gaps into closeout lanes", () => {
+  assert.ok(source.includes("finalDeliveryGateGapLanes"));
+  assert.ok(source.includes("最终交付缺口拆解"));
+  assert.ok(source.includes("发布卡点"));
+  assert.ok(source.includes("派单回执"));
+  assert.ok(source.includes("AI 任务"));
+  assert.ok(source.includes("最终交付回执"));
+  assert.ok(source.includes("lane.count"));
+  assert.ok(source.includes("lane.nextAction"));
+  assert.ok(source.includes("lane.href"));
+  assert.ok(source.includes("finalDeliveryGateGapLanes.map"));
+});
+
 test("gate page links final delivery blockers to the matching closeout surface", () => {
   assert.ok(source.includes("buildFinalDeliveryGateCloseout"));
   assert.ok(source.includes("finalDeliveryGatePrimaryActionHref"));

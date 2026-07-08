@@ -377,6 +377,44 @@ export default async function GatePage({
     lockLabel: finalDeliveryGateLockLabel,
     deliveryHref: finalDeliveryGateDeliveryHref,
   } = finalDeliveryGateCloseout;
+  const finalDeliveryGateGapLanes = [
+    {
+      label: "发布卡点",
+      count: gate.overview.blockedTasks,
+      status: gate.overview.blockedTasks > 0 ? "待处理" : "已清零",
+      detail: gate.overview.blockedTasks > 0 ? gate.pmFocus.detail : "发布包、项目验收单和平台卡点没有阻塞。",
+      nextAction: gate.pmFocus.actionLabel,
+      href: gate.pmFocus.actionHref,
+    },
+    {
+      label: "派单回执",
+      count: finalDeliveryDispatchCloseout.summary.active,
+      status: finalDeliveryDispatchCloseout.summary.active > 0 ? "待收口" : "已闭环",
+      detail: finalDeliveryDispatchCloseout.summary.active > 0
+        ? (finalDeliveryDispatchCloseout.nextActions[0] ?? "还有派单没有完成依据或下一步回执。")
+        : "派单中心没有未闭环任务。",
+      nextAction: finalDeliveryDispatchCloseout.nextActions[0] ?? "查看派单中心",
+      href: "/dispatch",
+    },
+    {
+      label: "AI 任务",
+      count: finalDeliveryGateAiGapCount,
+      status: finalDeliveryGateAiGapCount > 0 ? "待收口" : "已闭环",
+      detail: finalDeliveryGateAiGapCount > 0
+        ? (finalDeliveryTaskRunCloseout.nextActions[0] ?? "还有失败、运行中、排队或停滞的 AI 任务。")
+        : "AI 写审改任务没有失败、排队、运行中或停滞项。",
+      nextAction: finalDeliveryTaskRunCloseout.nextActions[0] ?? "查看任务队列",
+      href: "/tasks",
+    },
+    {
+      label: "最终交付回执",
+      count: finalDeliveryReceiptReview.remainingCount,
+      status: finalDeliveryReceiptReview.remainingCount > 0 ? "待写回" : "已闭环",
+      detail: finalDeliveryReceiptReview.remainingFeedback,
+      nextAction: finalDeliveryReceiptReview.actionLabel,
+      href: finalDeliveryReceiptReview.href,
+    },
+  ];
   const focusNotice = buildPrePublishGateFocusNotice({ focus, projectId, actionId, gate });
   const aiRecoveryPanel = buildGateAiPipelineRecoveryPanel(
     aiRecoveryDispatchRecords.map(gatePlatformDispatchTaskFromRecord),
@@ -495,6 +533,36 @@ export default async function GatePage({
           <div className="rounded-md bg-slate-50 p-3">
             <div className="text-xs text-slate-500">下一刀</div>
             <div className="mt-1 font-semibold text-slate-950">{finalDeliveryGateNextCutLabel}</div>
+          </div>
+        </div>
+        <div className="mt-4 rounded-md border border-slate-200 bg-slate-50 p-3" aria-label="最终交付缺口拆解">
+          <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <div className="text-xs font-medium text-slate-500">最终交付缺口拆解</div>
+              <div className="mt-1 text-sm font-semibold text-slate-950">发布、派单、AI、交付回执四条线逐项收口</div>
+            </div>
+            <div className="text-xs text-slate-500">缺口清零才开放最终交付</div>
+          </div>
+          <div className="mt-3 grid gap-2 lg:grid-cols-4">
+            {finalDeliveryGateGapLanes.map((lane) => (
+              <Link
+                className={`rounded-md border bg-white p-3 text-xs leading-5 hover:bg-slate-50 ${
+                  lane.count > 0 ? "border-amber-200 text-amber-900" : "border-emerald-200 text-emerald-900"
+                }`}
+                href={hrefWithGateReturn(lane.href, gateRecheckReturnHref)}
+                key={lane.label}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-medium">{lane.label}</span>
+                  <span className="rounded-md bg-slate-50 px-2 py-1 font-semibold">{lane.count}</span>
+                </div>
+                <div className="mt-2 font-medium">{lane.status}</div>
+                <p className="mt-1 text-slate-600">{lane.detail}</p>
+                <div className="mt-2 rounded-md bg-slate-50 px-2 py-1 font-medium text-slate-800">
+                  下一步：{lane.nextAction}
+                </div>
+              </Link>
+            ))}
           </div>
         </div>
         <div className="mt-4 flex flex-col gap-2 rounded-md border border-slate-200 bg-slate-50 p-3 sm:flex-row sm:items-center sm:justify-between" aria-label="最终交付行动入口">

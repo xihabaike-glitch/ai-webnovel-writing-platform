@@ -158,6 +158,9 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps) 
   const visibleItems = activeProductionClosureLane
     ? pipelineFilteredItems.filter((item) => item.productionClosure.some((closure) => closure.id === activeProductionClosureLane.id && closure.status !== "allow"))
     : pipelineFilteredItems;
+  const activeProductionClosureCountLabel = activeProductionClosureLane
+    ? `${visibleItems.length}/${pipelineFilteredItems.length} 本还有卡点`
+    : "";
 
   return (
     <AppShell>
@@ -388,7 +391,7 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps) 
         ) : null}
         {activeProductionClosureLane ? (
           <div className="mt-3 flex flex-col gap-2 rounded-md bg-slate-50 p-3 text-sm text-slate-600 sm:flex-row sm:items-center sm:justify-between">
-            <span>当前只看生产闭环「{activeProductionClosureLane.label}」里还没放行的作品。</span>
+            <span>当前只看生产闭环「{activeProductionClosureLane.label}」里还没放行的作品，{activeProductionClosureCountLabel}。</span>
             <Link className="w-fit rounded-md border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-100" href={hrefWithGateReturn("/projects#pipeline-projects", gateReturn)}>
               查看全部作品
             </Link>
@@ -668,7 +671,11 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps) 
         ))}
         {visibleItems.length === 0 ? (
           <p className="rounded-md border border-dashed border-slate-300 p-4 text-sm text-slate-600">
-            {dashboard.items.length === 0 ? "还没有作品。先用上面的模板向导创建一个。" : "这个流水线步骤下暂时没有作品卡点。"}
+            {dashboard.items.length === 0
+              ? "还没有作品。先用上面的模板向导创建一个。"
+              : activeProductionClosureLane
+                ? "这条生产闭环当前没有未放行作品。回到全部作品，继续看真实流水线或发布复盘。"
+                : "这个流水线步骤下暂时没有作品卡点。"}
           </p>
         ) : null}
       </section>

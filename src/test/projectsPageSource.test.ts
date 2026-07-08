@@ -64,6 +64,9 @@ test("projects page filters project cards by production closure lane", () => {
   assert.ok(source.includes("item.productionClosure.some((closure) => closure.id === activeProductionClosureLane.id && closure.status !== \"allow\")"));
   assert.ok(source.includes("`/projects?closureLane=${productionLane.id}#pipeline-projects`"));
   assert.ok(source.includes("当前只看生产闭环"));
+  assert.ok(source.includes("activeProductionClosureCountLabel"));
+  assert.ok(source.includes("visibleItems.length"));
+  assert.ok(source.includes("这条生产闭环当前没有未放行作品"));
 });
 
 test("projects page renders role closure progress on project cards", () => {

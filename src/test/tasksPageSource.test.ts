@@ -200,6 +200,21 @@ test("tasks page shows what a platform strategy task unlocks next", () => {
   assert.ok(source.includes("做完解锁："));
 });
 
+test("tasks page groups first-day execution outcomes in handoff work", () => {
+  assert.ok(source.includes("firstDayOutcomeHandoffItems"));
+  assert.ok(source.includes("queue.overview.firstDayOutcomeScale"));
+  assert.ok(source.includes("queue.overview.firstDayOutcomeWatch"));
+  assert.ok(source.includes("queue.overview.firstDayOutcomeBlocked"));
+  assert.ok(source.includes("首日执行分流"));
+  assert.ok(source.includes("可以扩展"));
+  assert.ok(source.includes("继续观察"));
+  assert.ok(source.includes("先避坑"));
+  assert.ok(source.includes("entry.handoffGuidance.firstDayOutcome"));
+  assert.ok(source.includes("firstDayOutcome.badge"));
+  assert.ok(source.includes("firstDayOutcome.nextMove"));
+  assert.ok(source.includes("firstDayOutcome.boundary"));
+});
+
 test("tasks page runs any queued platform action with the action button", () => {
   assert.ok(source.includes("{entry.effectAction ? ("));
   assert.ok(source.includes("action={entry.effectAction}"));

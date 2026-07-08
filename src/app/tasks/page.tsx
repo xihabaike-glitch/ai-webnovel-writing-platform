@@ -516,6 +516,7 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
     : activeBatchContext;
   const unlockedDrafts = queue.items.filter((entry) => entry.category === "draft" && entry.scaleGate === "cleared");
   const firstDayHandoffItems = queue.items.filter((entry) => entry.sourceType === "first_day_handoff");
+  const firstDayOutcomeHandoffItems = firstDayHandoffItems.filter((entry) => entry.handoffGuidance?.firstDayOutcome);
   const tacticExperienceFollowupItems = queue.items.filter((entry) => entry.sourceType === "tactic_experience_followup");
   const modelRoutePreflightGate = executionPlan.canRun
     ? buildRecommendedBatchModelRouteGate({
@@ -942,28 +943,63 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
             </div>
           </div>
           <div className="mt-3 grid gap-2 lg:grid-cols-3">
-            {firstDayHandoffItems.slice(0, 6).map((entry) => (
-              <Link className="rounded-md bg-white/80 p-3 text-sm hover:bg-white" href={hrefWithGateReturn(entry.href, gateReturn)} key={entry.id}>
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="rounded-md bg-cyan-100 px-2 py-1 text-xs font-medium text-cyan-800">{entry.actionLabel}</span>
-                  <span className="font-medium text-slate-950">{entry.chapterTitle}</span>
+            <div className="rounded-md bg-white/80 p-3 text-sm lg:col-span-3">
+              <div className="font-medium text-slate-950">首日执行分流</div>
+              <div className="mt-2 grid gap-2 md:grid-cols-3">
+                <div className="rounded-md border border-emerald-200 bg-emerald-50 p-2 text-emerald-900">
+                  <div className="text-xs opacity-75">可以扩展</div>
+                  <div className="mt-1 text-xl font-semibold">{queue.overview.firstDayOutcomeScale}</div>
                 </div>
-                <div className="mt-2 text-slate-600">{entry.projectTitle} · {entry.platformName}</div>
-                <p className="mt-2 line-clamp-2 leading-6 text-slate-600">{entry.evidence}</p>
-                {entry.evidenceChips.length ? (
-                  <div className="mt-2 flex flex-wrap gap-1 text-xs">
-                    {entry.evidenceChips.map((chip) => (
-                      <span className="rounded-md bg-cyan-100 px-2 py-1 font-medium text-cyan-800" key={chip}>{chip}</span>
-                    ))}
+                <div className="rounded-md border border-amber-200 bg-amber-50 p-2 text-amber-900">
+                  <div className="text-xs opacity-75">继续观察</div>
+                  <div className="mt-1 text-xl font-semibold">{queue.overview.firstDayOutcomeWatch}</div>
+                </div>
+                <div className="rounded-md border border-rose-200 bg-rose-50 p-2 text-rose-900">
+                  <div className="text-xs opacity-75">先避坑</div>
+                  <div className="mt-1 text-xl font-semibold">{queue.overview.firstDayOutcomeBlocked}</div>
+                </div>
+              </div>
+              {firstDayOutcomeHandoffItems.length ? (
+                <p className="mt-2 text-xs leading-5 text-slate-600">
+                  已识别 {firstDayOutcomeHandoffItems.length} 张首日结论卡，按扩展、观察、避坑分流处理。
+                </p>
+              ) : null}
+            </div>
+            {firstDayHandoffItems.slice(0, 6).map((entry) => {
+              const firstDayOutcome = entry.handoffGuidance ? entry.handoffGuidance.firstDayOutcome : null;
+              return (
+                <Link className="rounded-md bg-white/80 p-3 text-sm hover:bg-white" href={hrefWithGateReturn(entry.href, gateReturn)} key={entry.id}>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="rounded-md bg-cyan-100 px-2 py-1 text-xs font-medium text-cyan-800">{entry.actionLabel}</span>
+                    {firstDayOutcome ? (
+                      <span className="rounded-md bg-slate-950 px-2 py-1 text-xs font-medium text-white">{firstDayOutcome.badge}</span>
+                    ) : null}
+                    <span className="font-medium text-slate-950">{entry.chapterTitle}</span>
                   </div>
-                ) : null}
-                {entry.handoffGuidance?.firstDayActions.length ? (
-                  <div className="mt-2 text-xs font-medium text-cyan-800">
-                    {entry.handoffGuidance.firstDayActions[0]}
-                  </div>
-                ) : null}
-              </Link>
-            ))}
+                  <div className="mt-2 text-slate-600">{entry.projectTitle} · {entry.platformName}</div>
+                  <p className="mt-2 line-clamp-2 leading-6 text-slate-600">{entry.evidence}</p>
+                  {firstDayOutcome ? (
+                    <div className="mt-2 rounded-md bg-cyan-50 p-2 text-xs leading-5 text-cyan-950">
+                      <div className="font-medium">{firstDayOutcome.title}</div>
+                      <div className="mt-1">{firstDayOutcome.nextMove}</div>
+                      <div className="mt-1 opacity-80">{firstDayOutcome.boundary}</div>
+                    </div>
+                  ) : null}
+                  {entry.evidenceChips.length ? (
+                    <div className="mt-2 flex flex-wrap gap-1 text-xs">
+                      {entry.evidenceChips.map((chip) => (
+                        <span className="rounded-md bg-cyan-100 px-2 py-1 font-medium text-cyan-800" key={chip}>{chip}</span>
+                      ))}
+                    </div>
+                  ) : null}
+                  {entry.handoffGuidance?.firstDayActions.length ? (
+                    <div className="mt-2 text-xs font-medium text-cyan-800">
+                      {entry.handoffGuidance.firstDayActions[0]}
+                    </div>
+                  ) : null}
+                </Link>
+              );
+            })}
           </div>
         </section>
       ) : null}

@@ -110,12 +110,23 @@ export interface TaskQueueProject {
 
 export type QueueScaleGate = "none" | "sample_only" | "cleared";
 
+export type QueueFirstDayExecutionOutcomeStatus = "scale" | "watch" | "blocked";
+
+export interface QueueFirstDayExecutionOutcome {
+  status: QueueFirstDayExecutionOutcomeStatus;
+  badge: string;
+  title: string;
+  nextMove: string;
+  boundary: string;
+}
+
 export interface QueueHandoffGuidance {
   label: string;
   detail: string | null;
   firstDayActions: string[];
   avoidRules: string[];
   evidence: string[];
+  firstDayOutcome: QueueFirstDayExecutionOutcome | null;
 }
 
 export interface QueueItem {
@@ -173,6 +184,9 @@ export interface TaskQueueCenter {
     watchSampleOnly: number;
     watchCleared: number;
     firstDayHandoffs: number;
+    firstDayOutcomeScale: number;
+    firstDayOutcomeWatch: number;
+    firstDayOutcomeBlocked: number;
     firstThreeAdoptionFollowups: number;
     tacticExperienceFollowups: number;
     platformStrategyTasks: number;
@@ -590,7 +604,59 @@ function buildHandoffGuidance(startTactic: ProjectStartTacticSummary | null): Qu
     firstDayActions,
     avoidRules,
     evidence,
+    firstDayOutcome: firstDayExecutionOutcomeFromHandoff({
+      label: startTactic.handoffLabel ?? startTactic.label,
+      detail: startTactic.handoffDetail ?? null,
+      firstDayActions,
+      avoidRules,
+    }),
   };
+}
+
+function firstDayExecutionOutcomeFromHandoff(input: {
+  label: string;
+  detail: string | null;
+  firstDayActions: string[];
+  avoidRules: string[];
+}): QueueFirstDayExecutionOutcome | null {
+  const text = [
+    input.label,
+    input.detail,
+    ...input.firstDayActions,
+    ...input.avoidRules,
+  ].join(" ");
+
+  if (/执行避坑|先避坑|首日未过线|未过线|不要复用首日未过线/u.test(text)) {
+    return {
+      status: "blocked",
+      badge: "先避坑",
+      title: "首日执行先避坑",
+      nextMove: "先重做入口卖点、前三章兑现或平台匹配，再跑一轮小样本。",
+      boundary: "不要复用首日未过线的开头、平台包装或扩展节奏。",
+    };
+  }
+
+  if (/执行观察|继续观察|补追读|追读证据不足/u.test(text)) {
+    return {
+      status: "watch",
+      badge: "继续观察",
+      title: "首日执行继续观察",
+      nextMove: "只复用执行顺序，先补追读、收藏和点击证据。",
+      boundary: "追读证据不足前不扩展章节，也不把观察样本写成成功打法。",
+    };
+  }
+
+  if (/执行扩展|可以扩展|小样本扩展/u.test(text)) {
+    return {
+      status: "scale",
+      badge: "可以扩展",
+      title: "首日执行可扩展",
+      nextMove: "先沿用生成-审稿-二改顺序，扩到下一章或下一小段小样本。",
+      boundary: "继续回填曝光、点击、收藏、追读，未过下一轮数据前不直接批量复制。",
+    };
+  }
+
+  return null;
 }
 
 function uniqueEvidenceChips(lines: Array<string | null | undefined>, limit = 4) {
@@ -616,8 +682,10 @@ function queueEvidenceChips(input: {
   const platformFeedback = evidence.find((line) => /平台反哺/u.test(line))
     ?? evidence.find((line) => line !== knowledgeSource && /正反馈|反馈/u.test(line));
   const avoidRule = input.handoffGuidance.avoidRules[0];
+  const firstDayOutcome = input.handoffGuidance.firstDayOutcome;
 
   return uniqueEvidenceChips([
+    firstDayOutcome ? `首日结论：${firstDayOutcome.badge}` : null,
     knowledgeSource,
     platformFeedback,
     avoidRule ? `避坑：${avoidRule.replace(/^避坑边界[:：]?/u, "").trim()}` : null,
@@ -2135,6 +2203,9 @@ export function buildTaskQueueCenter(projects: TaskQueueProject[]): TaskQueueCen
       watchSampleOnly: items.filter((entry) => entry.scaleGate === "sample_only" && isAutomatedQueueItem(entry)).length,
       watchCleared: items.filter((entry) => entry.scaleGate === "cleared" && isAutomatedQueueItem(entry)).length,
       firstDayHandoffs: items.filter((entry) => entry.sourceType === "first_day_handoff").length,
+      firstDayOutcomeScale: items.filter((entry) => entry.sourceType === "first_day_handoff" && entry.handoffGuidance?.firstDayOutcome?.status === "scale").length,
+      firstDayOutcomeWatch: items.filter((entry) => entry.sourceType === "first_day_handoff" && entry.handoffGuidance?.firstDayOutcome?.status === "watch").length,
+      firstDayOutcomeBlocked: items.filter((entry) => entry.sourceType === "first_day_handoff" && entry.handoffGuidance?.firstDayOutcome?.status === "blocked").length,
       firstThreeAdoptionFollowups: items.filter((entry) => entry.sourceType === "first_three_adoption").length,
       tacticExperienceFollowups: items.filter((entry) => entry.sourceType === "tactic_experience_followup").length,
       platformStrategyTasks: items.filter((entry) => entry.sourceType === "platform_strategy").length,

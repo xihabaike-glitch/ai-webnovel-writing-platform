@@ -204,6 +204,30 @@ function handoffWorldEntries() {
   }];
 }
 
+function firstDayOutcomeHandoffWorldEntries(input: {
+  handoffLabel: string;
+  action: string;
+  avoidRule: string;
+}) {
+  return [{
+    type: "platform_soil",
+    title: "首轮平台打法：番茄小说",
+    content: [
+      "状态：历史可复用",
+      "打法：首日执行数据回流打法。",
+      "开头动作：第一段给倒计时。",
+      "验证动作：回填曝光、点击、收藏、追读。",
+      "风险：不要把任务完成误判成平台过线。",
+      "交接状态：reuse",
+      `交接标签：${input.handoffLabel}`,
+      "交接说明：首日执行结论已经回流新项目开书。",
+      "交接证据：首日执行数据回收：已回流。",
+      `首日动作：${input.action}`,
+      `避坑边界：${input.avoidRule}`,
+    ].join("\n"),
+  }];
+}
+
 test("buildTaskQueueCenter", async (t) => {
   await t.test("collects cross-project draft, review, second-pass, export, and blocked tasks", () => {
     const queue = buildTaskQueueCenter([{ ...project, gateDispatchTasks: firstDayCompleteDispatches(project.id) }]);
@@ -1027,6 +1051,68 @@ test("buildTaskQueueCenter", async (t) => {
     assert.ok(handoffs[0]?.evidenceChips.some((chip) => chip.includes("避坑")));
     assert.equal(queue.recommendedNext?.sourceType, "first_day_handoff");
     assert.equal(recommendedQueueActionLabel(queue.recommendedNext), "下一步：补交接证据");
+  });
+
+  await t.test("classifies first-day execution outcome handoffs for task routing", () => {
+    function projectWithOutcome(input: {
+      id: string;
+      handoffLabel: string;
+      action: string;
+      avoidRule: string;
+    }): TaskQueueProject {
+      return {
+        ...project,
+        id: input.id,
+        title: `夜雨系统 ${input.id}`,
+        worldEntries: firstDayOutcomeHandoffWorldEntries(input),
+        gateDispatchTasks: [
+          ...firstDayCompleteDispatches(input.id),
+          {
+            dispatchKey: `first-day-handoff:${input.id}:opening`,
+            stage: "start_opening_diagnostic",
+            state: "assigned",
+            title: `夜雨系统 ${input.id} · 经验开书交接：开头打法`,
+            detail: "把首日执行结论拆到第一章首屏。",
+            actionLabel: "处理首日结论",
+            href: `/projects/${input.id}#first-day-workflow`,
+            completionEvidence: "",
+          },
+        ],
+      };
+    }
+
+    const queue = buildTaskQueueCenter([
+      projectWithOutcome({
+        id: "project-scale",
+        handoffLabel: "执行扩展交接",
+        action: "执行扩展：沿用生成-审稿-二改顺序，扩到下一章小样本。",
+        avoidRule: "执行扩展不是直接批量放量，未过下一轮数据前不直接批量复制。",
+      }),
+      projectWithOutcome({
+        id: "project-watch",
+        handoffLabel: "执行观察交接",
+        action: "执行观察：只补追读和收藏证据，不扩展章节。",
+        avoidRule: "首日数据还在观察，不要把补追读任务当成扩展通过。",
+      }),
+      projectWithOutcome({
+        id: "project-blocked",
+        handoffLabel: "执行避坑交接",
+        action: "执行避坑：先重做入口卖点和前三章兑现。",
+        avoidRule: "不要复用首日未过线的开头、平台包装或扩展节奏。",
+      }),
+    ]);
+    const handoffs = queue.items.filter((item) => item.sourceType === "first_day_handoff");
+
+    assert.equal(queue.overview.firstDayOutcomeScale, 1);
+    assert.equal(queue.overview.firstDayOutcomeWatch, 1);
+    assert.equal(queue.overview.firstDayOutcomeBlocked, 1);
+    assert.deepEqual(
+      handoffs.map((item) => item.handoffGuidance?.firstDayOutcome?.badge).sort(),
+      ["先避坑", "可以扩展", "继续观察"].sort(),
+    );
+    assert.ok(handoffs.some((item) => item.evidenceChips.some((chip) => chip.includes("首日结论：可以扩展"))));
+    assert.ok(handoffs.some((item) => item.handoffGuidance?.firstDayOutcome?.nextMove.includes("下一章")));
+    assert.ok(handoffs.some((item) => item.handoffGuidance?.firstDayOutcome?.boundary.includes("不要复用首日未过线")));
   });
 
   await t.test("surfaces recovery tactic experience follow-up dispatches as queue work", () => {

@@ -119,6 +119,17 @@ test("tasks page surfaces role closure work in the queue", () => {
   assert.ok(source.includes("entry.sourceType === \"role_closure\" && entry.sourceDetail"));
 });
 
+test("tasks page exposes role closure as a batch safety blocker", () => {
+  const safetySource = readFileSync("src/lib/projects/batchExecutionSafety.ts", "utf8");
+
+  assert.ok(source.includes("const safetyPriorityBlocker = buildBatchSafetyPriorityBlocker(safety);"));
+  assert.ok(source.includes("href={hrefWithGateReturn(safetyPriorityBlocker.actionHref, gateReturn)}"));
+  assert.ok(source.includes("{safetyPriorityBlocker.actionLabel}"));
+  assert.ok(safetySource.includes("\"role-closure\""));
+  assert.ok(safetySource.includes("roleClosureCount === 0 ? \"pass\" : \"block\""));
+  assert.ok(safetySource.includes("\"/tasks?view=blocked&debt=role_closure#task-debt\""));
+});
+
 test("tasks page shows what a platform strategy task unlocks next", () => {
   assert.ok(source.includes("entry.sourceType === \"platform_strategy\" && entry.sourceNextStep"));
   assert.ok(source.includes("做完解锁："));

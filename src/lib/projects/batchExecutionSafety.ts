@@ -108,6 +108,7 @@ function isOpenAiPipelineRecoveryFollowup(item: QueueItem) {
 
 const priorityBlockerOrder = [
   "ai-pipeline-recovery",
+  "role-closure",
   "pending-candidates",
   "running-tasks",
   "failure-rate",
@@ -140,6 +141,10 @@ export function buildBatchSafetyPriorityBlocker(safety: Pick<BatchExecutionSafet
 
 function resumeTaskLabel(item: QueueItem) {
   return `${item.projectTitle} · ${item.chapterTitle} · ${item.actionLabel}`;
+}
+
+function isOpenRoleClosure(item: QueueItem) {
+  return item.blockerType === "role_closure" || item.sourceType === "role_closure";
 }
 
 export function buildFailureRepairResumeRecommendation(input: {
@@ -215,6 +220,8 @@ export function buildBatchExecutionSafety(
     ? [firstRunnable]
     : runnable.slice(0, strategy.maxBatchSize);
   const blockedCount = queueItems.filter((item) => item.category === "blocked").length;
+  const roleClosureItems = queueItems.filter(isOpenRoleClosure);
+  const roleClosureCount = roleClosureItems.length;
   const candidateCount = queueItems.filter((item) => item.category === "candidate").length;
   const firstCandidate = queueItems.find((item) => item.category === "candidate") ?? null;
   const aiPipelineRecoveryFollowupCount = queueItems.filter(isOpenAiPipelineRecoveryFollowup).length;
@@ -262,6 +269,18 @@ export function buildBatchExecutionSafety(
       aiPipelineRecoveryFollowupCount === 0 ? undefined : {
         actionLabel: "回恢复闸门",
         actionHref: "/gate#ai-pipeline-recovery",
+      },
+    ),
+    safetyItem(
+      "role-closure",
+      "角色闭环",
+      roleClosureCount === 0 ? "pass" : "block",
+      roleClosureCount === 0
+        ? "结构、资料和平台包装角色闭环没有未验收派单。"
+        : `${roleClosureCount} 个角色闭环派单未验收：${roleClosureItems.slice(0, 3).map((item) => item.sourceLabel ?? item.chapterTitle).join("、")}；先补结构、资料或平台包装证据，不进入推荐批量。`,
+      roleClosureCount === 0 ? undefined : {
+        actionLabel: "补角色验收",
+        actionHref: "/tasks?view=blocked&debt=role_closure#task-debt",
       },
     ),
     safetyItem(

@@ -102,6 +102,37 @@ test("buildBatchExecutionSafety", async (t) => {
     assert.equal(recoveryGate?.actionHref, "/gate#ai-pipeline-recovery");
   });
 
+  await t.test("blocks recommended batches until role closure dispatches are accepted", () => {
+    const safety = buildBatchExecutionSafety([
+      {
+        ...baseItem,
+        id: "project-1:role-closure:role-intent:project-1:context-recall:2026-07-08",
+        category: "blocked",
+        blockerType: "role_closure",
+        sourceType: "role_closure",
+        sourceLabel: "角色闭环 · 资料官",
+        label: "角色闭环",
+        chapterTitle: "资料官闭环",
+        evidence: "资料官派单还没有可验收完成依据。",
+        actionLabel: "补角色验收",
+        href: "/dispatch#dispatch-role-intent%3Aproject-1%3Acontext-recall%3A2026-07-08",
+        priority: 6,
+      },
+      baseItem,
+    ], [{ aiTasks: [] }]);
+
+    assert.equal(safety.recommendedBatchSize, 1);
+    assert.deepEqual(safety.recommendedBatchIds, ["item-1"]);
+    assert.equal(safety.canRunRecommendedBatch, false);
+    const roleGate = safety.items.find((item) => item.id === "role-closure");
+    assert.equal(roleGate?.status, "block");
+    assert.ok(roleGate?.detail.includes("角色闭环"));
+    assert.ok(roleGate?.detail.includes("资料官"));
+    assert.ok(roleGate?.detail.includes("不进入推荐批量"));
+    assert.equal(roleGate?.actionLabel, "补角色验收");
+    assert.equal(roleGate?.actionHref, "/tasks?view=blocked&debt=role_closure#task-debt");
+  });
+
   await t.test("prioritizes the PM blocker that should be handled before running batches", () => {
     const safety = buildBatchExecutionSafety([
       { ...baseItem, id: "candidate-1", category: "candidate", label: "待采纳", priority: 5, actionLabel: "处理候选稿" },
@@ -138,6 +169,33 @@ test("buildBatchExecutionSafety", async (t) => {
     assert.equal(blocker?.actionLabel, "回恢复闸门");
     assert.equal(blocker?.actionHref, "/gate#ai-pipeline-recovery");
     assert.ok(blocker?.detail.includes("不回推荐批量"));
+  });
+
+  await t.test("prioritizes role closure before generic candidate debt", () => {
+    const safety = buildBatchExecutionSafety([
+      { ...baseItem, id: "candidate-1", category: "candidate", label: "待采纳", priority: 5, actionLabel: "处理候选稿" },
+      {
+        ...baseItem,
+        id: "project-1:role-closure:role-intent:project-1:platform-export:2026-07-08",
+        category: "blocked",
+        blockerType: "role_closure",
+        sourceType: "role_closure",
+        sourceLabel: "角色闭环 · 平台包装",
+        label: "角色闭环",
+        chapterTitle: "平台包装闭环",
+        evidence: "平台包装派单还没有可验收完成依据。",
+        actionLabel: "补角色验收",
+        href: "/dispatch#dispatch-role-intent%3Aproject-1%3Aplatform-export%3A2026-07-08",
+        priority: 6,
+      },
+      baseItem,
+    ], [{ aiTasks: [] }]);
+    const blocker = buildBatchSafetyPriorityBlocker(safety);
+
+    assert.equal(blocker?.id, "role-closure");
+    assert.equal(blocker?.title, "先处理 角色闭环");
+    assert.equal(blocker?.actionLabel, "补角色验收");
+    assert.equal(blocker?.actionHref, "/tasks?view=blocked&debt=role_closure#task-debt");
   });
 
   await t.test("blocks execution when too many tasks are already running", () => {

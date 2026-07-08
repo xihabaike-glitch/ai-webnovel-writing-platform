@@ -353,12 +353,12 @@ test("buildGateActionReceipt", async (t) => {
     assert.equal(receipt.succeededCount, 1);
     assert.equal(receipt.failedCount, 0);
     assert.equal(receipt.platformId, "fanqie");
-    assert.equal(receipt.platformName, "前三章采纳闭环");
+    assert.equal(receipt.platformName, "章节采纳闭环");
     assert.ok(receipt.message.includes("已闭合 1 个"));
     assert.equal(receipt.firstThreeAdoptionClosure?.closedCount, 1);
     assert.equal(receipt.firstThreeAdoptionClosure?.blockedCount, 0);
     assert.equal(receipt.firstThreeAdoptionClosure?.closed[0]?.title, "第 1 章采纳后重新审稿");
-    assert.ok(receipt.firstThreeAdoptionClosure?.nextAction.includes("刷新总闸门"));
+    assert.ok(receipt.firstThreeAdoptionClosure?.nextAction.includes("确认章节采纳链路放行"));
     assert.equal(receipt.recheck.status, "ready");
     assert.equal(receipt.recheck.label, "复检采纳闭环");
 

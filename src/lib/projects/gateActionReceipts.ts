@@ -2620,7 +2620,7 @@ export function buildGateFirstThreeAdoptionReceipt(input: {
       ? "批量刷新质检"
       : firstItem?.label ?? "采纳后续处理";
   const platformId = firstItem?.platformId ?? "first-three-adoption";
-  const platformName = "前三章采纳闭环";
+  const platformName = "章节采纳闭环";
   const projectCount = new Set(input.items.map((item) => item.projectId)).size;
   const detailTarget = input.items.length > 1
     ? `${projectCount} 个项目 · ${input.items.length} 个后续任务`
@@ -2670,7 +2670,7 @@ export function buildFirstThreeAdoptionClosureSummary(
     : `本批 ${closed.length} 条采纳后续已闭合。`;
   const nextAction = blocked.length > 0
     ? "先处理失败项，再刷新总闸门复检。"
-    : "刷新总闸门复检，确认前三章采纳链路放行。";
+    : "刷新总闸门复检，确认章节采纳链路放行。";
 
   return {
     closedCount: closed.length,

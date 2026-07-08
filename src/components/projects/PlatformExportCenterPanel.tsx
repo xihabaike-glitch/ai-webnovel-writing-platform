@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import {
   actionFromRunResult,
@@ -14,7 +14,7 @@ import {
   type PublishRepairRunResult,
   type RawPublishRepairRunResult,
 } from "@/lib/projects/publishRepairRunResults";
-import { addGateActionReceipt, buildGateFinalDeliveryReceipt, buildGatePublishEffectReceipt } from "@/lib/projects/gateActionReceipts";
+import { addGateActionReceipt, buildGateFinalDeliveryReceipt, buildGatePublishEffectReceipt, persistGateActionReceipt } from "@/lib/projects/gateActionReceipts";
 import {
   buildSubmissionAssetAdoptionReviewReceipt,
   buildSubmissionAssetEditorReview,
@@ -946,6 +946,21 @@ function hrefWithGateReturn(href: string, gateReturnHref?: string | null, projec
   return `${base}${separator}gateReturn=${encodeURIComponent(gateReturnHref)}${hash}`;
 }
 
+function finalDeliveryGateReturnHref(gateReturnHref: string | null | undefined, projectId: string) {
+  if (!gateReturnHref) return null;
+  try {
+    const url = new URL(gateReturnHref, "http://localhost");
+    url.searchParams.set("focus", "action-recheck");
+    url.searchParams.set("projectId", projectId);
+    url.searchParams.set("actionId", `final-delivery:${projectId}`);
+    url.searchParams.set("source", "final-delivery-receipt");
+    url.hash = "gate-focus-notice";
+    return `${url.pathname}${url.search}${url.hash}`;
+  } catch {
+    return gateReturnHref;
+  }
+}
+
 function canRunAction(action: PublishRepairAction) {
   if (action.kind === "adopt_candidate") return Boolean(action.chapterId && action.candidateRevisionId);
   return (action.kind === "run_chapter_review" || action.kind === "run_second_pass") && Boolean(action.chapterId);
@@ -1708,6 +1723,7 @@ export function PlatformExportCenterPanel({
   gateReturnHref?: string | null;
   projectId: string;
 }) {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const finalDeliveryFocus = searchParams.get("finalDeliveryFocus");
   const [center, setCenter] = useState<PlatformPublishExportCenter | null>(null);
@@ -2547,15 +2563,21 @@ export function PlatformExportCenterPanel({
     }
   }
 
-  function recordFinalDeliveryReceipt(item: PlatformFinalDeliveryChecklistItem) {
+  async function recordFinalDeliveryReceipt(item: PlatformFinalDeliveryChecklistItem) {
     if (!selectedPackage) return;
-    addGateActionReceipt(buildGateFinalDeliveryReceipt({
+    const receipt = buildGateFinalDeliveryReceipt({
       projectId,
       platformId: selectedPackage.platformId,
       platformName: selectedPackage.platformName,
       item,
-    }));
+    });
+    addGateActionReceipt(receipt);
     setMessage(`${selectedPackage.platformName}「${item.label}」最终交付回执已写回总闸门。`);
+    const returnHref = finalDeliveryGateReturnHref(gateReturnHref, projectId);
+    if (returnHref) {
+      await persistGateActionReceipt(receipt).catch(() => null);
+      router.push(returnHref);
+    }
   }
 
   async function downloadMarkdown() {

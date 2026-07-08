@@ -1689,6 +1689,16 @@ function finalDeliveryAuditIsDone(audit: NonNullable<PrePublishGateProject["gate
   return audit.status === "succeeded" && (audit.message ?? "").includes("当前状态：已交付");
 }
 
+function finalDeliveryGateReturnHref(projectId: string) {
+  const params = new URLSearchParams({
+    focus: "action-recheck",
+    projectId,
+    actionId: `final-delivery:${projectId}`,
+    source: "final-delivery-receipt",
+  });
+  return `/gate?${params.toString()}#gate-focus-notice`;
+}
+
 function buildFinalDeliveryGate(project: PrePublishGateProject, platformId: string): PrePublishGateFinalDeliveryGate {
   const latestByItem = new Map<FinalDeliveryGateItemId, NonNullable<PrePublishGateProject["gateActionAudits"]>[number]>();
   for (const audit of project.gateActionAudits ?? []) {
@@ -1714,7 +1724,9 @@ function buildFinalDeliveryGate(project: PrePublishGateProject, platformId: stri
   const firstMissing = finalDeliveryGateItemIds.find((itemId) => !latestByItem.has(itemId));
   const firstGap = firstBlocked ?? firstMissing ?? null;
   const status: PrePublishGateItem["status"] = completedCount === finalDeliveryGateItemIds.length ? "pass" : "block";
-  const focusHref = firstGap ? `?finalDeliveryFocus=${encodeURIComponent(firstGap)}` : "";
+  const hrefParams = new URLSearchParams();
+  if (firstGap) hrefParams.set("finalDeliveryFocus", firstGap);
+  hrefParams.set("gateReturn", finalDeliveryGateReturnHref(project.id));
 
   return {
     status,
@@ -1723,7 +1735,7 @@ function buildFinalDeliveryGate(project: PrePublishGateProject, platformId: stri
       ? `${project.title} 已写回 ${completedCount}/${finalDeliveryGateItemIds.length} 项最终交付回执。`
       : `${project.title} 最终交付回执未闭环：已闭环 ${completedCount}，阻塞 ${blockedCount}，缺项 ${missingCount}${firstGap ? `。下一项：${finalDeliveryGateItemLabels[firstGap]}` : ""}。`,
     actionLabel: status === "pass" ? "查看最终交付回执" : "写回最终交付回执",
-    href: status === "pass" ? `/projects/${project.id}#platform-export` : `/projects/${project.id}${focusHref}#platform-export`,
+    href: status === "pass" ? `/projects/${project.id}#platform-export` : `/projects/${project.id}?${hrefParams.toString()}#platform-export`,
     completedCount,
     blockedCount,
     missingCount,

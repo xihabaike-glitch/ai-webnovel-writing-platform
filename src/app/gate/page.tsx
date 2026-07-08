@@ -131,6 +131,7 @@ export default async function GatePage({
   const source = Array.isArray(params?.source) ? params?.source[0] : params?.source ?? null;
   const overview = buildDevelopmentOverview();
   const realSampleReceiptFocus = focus === "action-recheck" && source === "real-sample-receipt";
+  const finalDeliveryReceiptFocus = focus === "action-recheck" && source === "final-delivery-receipt";
   const gateRecheckReturnHref = buildGateRecheckReturnHref(focus, projectId, actionId, source);
   const invalidFocusNotice = isGateFocus(focus)
     ? null
@@ -160,7 +161,7 @@ export default async function GatePage({
           },
         },
         gateActionAudits: {
-          where: { executionType: { in: ["recommended_batch", "export_version"] } },
+          where: { executionType: { in: ["recommended_batch", "export_version", "manual"] } },
           orderBy: { createdAt: "desc" },
           take: 80,
           select: {
@@ -424,6 +425,28 @@ export default async function GatePage({
             <Link className="w-fit rounded-md bg-white px-3 py-2 text-sm font-medium text-amber-950 hover:bg-amber-100" href="/gate">
               查看总闸门
             </Link>
+          </div>
+        </section>
+      ) : null}
+
+      {finalDeliveryReceiptFocus ? (
+        <section className="mb-6 rounded-md border border-amber-200 bg-amber-50 p-4 text-amber-950">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <div className="text-xs font-medium text-amber-700">来自作品发布中心的最终交付写回</div>
+              <h2 className="mt-1 font-medium">最终交付回执已带回总闸门</h2>
+              <p className="mt-1 max-w-3xl text-sm leading-6">
+                已收到最终交付回执。先看复检结论、缺项是否减少，以及下一动作分流；如果仍有阻塞，就继续处理高亮缺项，不扩大投放范围。
+              </p>
+            </div>
+            {projectId ? (
+              <Link
+                className="w-fit rounded-md bg-white px-3 py-2 text-sm font-medium text-amber-950 hover:bg-amber-100"
+                href={hrefWithGateReturn(`/projects/${projectId}#platform-export`, gateRecheckReturnHref)}
+              >
+                回发布中心
+              </Link>
+            ) : null}
           </div>
         </section>
       ) : null}

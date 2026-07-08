@@ -36,11 +36,17 @@ test("platform export center renders the final delivery checklist", () => {
   assert.ok(source.includes("finalDeliveryChecklistStatusClass"));
   assert.ok(source.includes("buildGateFinalDeliveryReceipt"));
   assert.ok(source.includes("recordFinalDeliveryReceipt"));
-  assert.ok(source.includes("addGateActionReceipt(buildGateFinalDeliveryReceipt"));
+  assert.ok(source.includes("const receipt = buildGateFinalDeliveryReceipt"));
+  assert.ok(source.includes("addGateActionReceipt(receipt"));
   assert.ok(source.includes("写回总闸门"));
   assert.ok(source.includes("useSearchParams"));
+  assert.ok(source.includes("useRouter"));
   assert.ok(source.includes("finalDeliveryFocus"));
   assert.ok(source.includes("focusedFinalDeliveryItem"));
   assert.ok(source.includes("总闸门带回的待处理项"));
   assert.ok(source.includes("border-amber-300"));
+  assert.ok(source.includes("finalDeliveryGateReturnHref"));
+  assert.ok(source.includes("source\", \"final-delivery-receipt"));
+  assert.ok(source.includes("persistGateActionReceipt(receipt"));
+  assert.ok(source.includes("router.push(returnHref"));
 });

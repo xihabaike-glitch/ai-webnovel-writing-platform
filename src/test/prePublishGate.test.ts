@@ -251,7 +251,18 @@ test("buildPrePublishGate", async (t) => {
     assert.equal(finalDeliveryItem?.status, "block");
     assert.equal(finalDeliveryItem?.actionLabel, "写回最终交付回执");
     assert.equal(gate.releaseAction?.label, "先解除阻塞：写回最终交付回执");
-    assert.equal(gate.releaseAction?.href, "/projects/project-ready?finalDeliveryFocus=publish-package#platform-export");
+    const releaseHref = new URL(gate.releaseAction?.href ?? "", "http://localhost");
+    const releaseGateReturn = new URL(releaseHref.searchParams.get("gateReturn") ?? "", "http://localhost");
+
+    assert.equal(releaseHref.pathname, "/projects/project-ready");
+    assert.equal(releaseHref.searchParams.get("finalDeliveryFocus"), "publish-package");
+    assert.equal(releaseHref.hash, "#platform-export");
+    assert.equal(releaseGateReturn.pathname, "/gate");
+    assert.equal(releaseGateReturn.searchParams.get("focus"), "action-recheck");
+    assert.equal(releaseGateReturn.searchParams.get("projectId"), "project-ready");
+    assert.equal(releaseGateReturn.searchParams.get("actionId"), "final-delivery:project-ready");
+    assert.equal(releaseGateReturn.searchParams.get("source"), "final-delivery-receipt");
+    assert.equal(releaseGateReturn.hash, "#gate-focus-notice");
     assert.equal(gate.realPipelineFinalReview.outcome, "repair");
     assert.ok(gate.realPipelineFinalReview.repairSignals.some((line) => line.includes("最终交付")));
   });
@@ -266,10 +277,15 @@ test("buildPrePublishGate", async (t) => {
       batchHistory: [],
     });
     const finalDeliveryItem = gate.items.find((item) => item.id === "final-delivery");
+    const finalDeliveryHref = new URL(finalDeliveryItem?.href ?? "", "http://localhost");
+    const releaseHref = new URL(gate.releaseAction?.href ?? "", "http://localhost");
 
     assert.equal(finalDeliveryItem?.status, "block");
-    assert.equal(finalDeliveryItem?.href, "/projects/project-ready?finalDeliveryFocus=real-effect#platform-export");
-    assert.equal(gate.releaseAction?.href, "/projects/project-ready?finalDeliveryFocus=real-effect#platform-export");
+    assert.equal(finalDeliveryHref.pathname, "/projects/project-ready");
+    assert.equal(finalDeliveryHref.searchParams.get("finalDeliveryFocus"), "real-effect");
+    assert.equal(new URL(finalDeliveryHref.searchParams.get("gateReturn") ?? "", "http://localhost").searchParams.get("actionId"), "final-delivery:project-ready");
+    assert.equal(releaseHref.searchParams.get("finalDeliveryFocus"), "real-effect");
+    assert.equal(releaseHref.searchParams.get("gateReturn"), finalDeliveryHref.searchParams.get("gateReturn"));
   });
 
   await t.test("blocks launch when model writing roles are missing", () => {

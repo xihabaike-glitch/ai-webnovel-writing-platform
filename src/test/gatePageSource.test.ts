@@ -22,6 +22,14 @@ test("gate page forwards action recheck focus params", () => {
   assert.ok(source.includes("id=\"gate-focus-notice\""));
 });
 
+test("gate page includes final delivery receipts in recheck context", () => {
+  assert.ok(source.includes("executionType: { in: [\"recommended_batch\", \"export_version\", \"manual\"] }"));
+  assert.ok(source.includes("finalDeliveryReceiptFocus"));
+  assert.ok(source.includes("source === \"final-delivery-receipt\""));
+  assert.ok(source.includes("最终交付回执已带回总闸门"));
+  assert.ok(source.includes("来自作品发布中心的最终交付写回"));
+});
+
 test("gate page renders real sample receipt recheck context", () => {
   assert.ok(source.includes("realSampleReceiptFocus"));
   assert.ok(source.includes("source === \"real-sample-receipt\""));

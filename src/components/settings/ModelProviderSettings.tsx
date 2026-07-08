@@ -652,6 +652,7 @@ export function ModelProviderSettings({
   const router = useRouter();
   const searchParams = useSearchParams();
   const focusParam = searchParams.get("focus");
+  const providerParam = searchParams.get("provider");
   const firstDayFocusTaskType = searchParams.get("taskType");
   const firstDayReturnProjectId = searchParams.get("projectId");
   const isFirstDayRouteFocus = focusParam === "first-day-route";
@@ -666,7 +667,8 @@ export function ModelProviderSettings({
     () => new Map(providers.map((provider) => [provider.providerId, provider])),
     [providers],
   );
-  const [selectedProviderId, setSelectedProviderId] = useState<ModelProviderId>(options[0]?.providerId ?? "mock");
+  const selectedInitialProviderId = options.find((option) => providerParam === option.providerId)?.providerId ?? options[0]?.providerId ?? "mock";
+  const [selectedProviderId, setSelectedProviderId] = useState<ModelProviderId>(selectedInitialProviderId);
   const selectedOption = options.find((option) => option.providerId === selectedProviderId) ?? options[0];
   const selectedPresets = presets.filter((preset) => preset.providerId === selectedProviderId);
   const selectedSetupGuideItem = providerSetupGuide.items.find((item) => item.providerId === selectedProviderId);
@@ -754,6 +756,10 @@ export function ModelProviderSettings({
     setSelectedProviderId(providerId);
     setDraft(draftFromOption(option, existingByProvider.get(providerId)));
     setMessage(null);
+  }
+
+  function isSelectableProviderId(providerId: string | null): providerId is ModelProviderId {
+    return options.some((option) => providerId === option.providerId);
   }
 
   function selectProviderBySetupStatus(statuses: ProviderSetupGuideView["items"][number]["status"][]) {
@@ -993,6 +999,13 @@ export function ModelProviderSettings({
     projectId: firstDayReturnProjectId,
     focusedItem: focusedFirstDayRoute,
   });
+
+  useEffect(() => {
+    if (!providerParam) return;
+    if (!isSelectableProviderId(providerParam)) return;
+    if (providerParam === selectedProviderId) return;
+    selectProvider(providerParam);
+  }, [providerParam, selectedProviderId]);
 
   useEffect(() => {
     if (!isFirstDayRouteFocus) return;

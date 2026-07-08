@@ -77,3 +77,11 @@ test("model settings renders the PM model role repair queue", () => {
   assert.ok(settingsSource.includes("href={hrefWithGateReturn(item.href, gateReturnHref)}"));
   assert.ok(settingsSource.includes("href={hrefWithGateReturn(item.gateReturnHref, gateReturnHref)}"));
 });
+
+test("model settings preselects provider from the repair queue link", () => {
+  assert.ok(settingsSource.includes("providerParam = searchParams.get(\"provider\")"));
+  assert.ok(settingsSource.includes("selectedInitialProviderId"));
+  assert.ok(settingsSource.includes("providerParam === option.providerId"));
+  assert.ok(settingsSource.includes("selectProvider(providerParam)"));
+  assert.ok(settingsSource.includes("modelRoleRepairQueue[0].href"));
+});

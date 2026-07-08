@@ -139,7 +139,7 @@ test("buildModelRoleMatrix", async (t) => {
     assert.ok(queue[0]?.evidenceChecklist.includes("API Key 已保存"));
     assert.ok(queue[0]?.evidenceChecklist.includes("连接测试通过"));
     assert.ok(queue[0]?.evidenceChecklist.includes("回职责矩阵复检"));
-    assert.equal(queue[0]?.href, "/settings/models#provider-config-form");
+    assert.equal(queue[0]?.href, "/settings/models?provider=claude#provider-config-form");
     assert.equal(queue[0]?.gateReturnHref, "/settings/models?focus=model-role-matrix#model-role-matrix");
   });
 

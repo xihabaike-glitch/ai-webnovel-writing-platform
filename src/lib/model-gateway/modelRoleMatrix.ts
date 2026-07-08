@@ -500,7 +500,7 @@ export function buildModelRoleRepairQueue(matrix: ModelRoleMatrix): ModelRoleRep
         detail: item.status === "missing"
           ? `先给${providerName}保存 API Key、默认模型和上下文上限，再测试连接；否则「${item.roleTitle}」会继续退回 Mock 或人工补位。`
           : `${providerName} 已能顶岗，但上下文或配置不够稳；先补默认模型、上下文上限和连接测试，再放进真实写作链路。`,
-        href: "/settings/models#provider-config-form",
+        href: `/settings/models?provider=${item.providerId}#provider-config-form`,
         gateReturnHref: "/settings/models?focus=model-role-matrix#model-role-matrix",
         evidenceChecklist: ["API Key 已保存", "连接测试通过", "默认模型与上下文已保存", "回职责矩阵复检"],
         stopLine: `未完成${providerName}修复前，不允许把「${item.roleTitle}」算作真实模型岗位。`,

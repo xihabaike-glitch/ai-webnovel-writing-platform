@@ -902,7 +902,7 @@ export interface PlatformPublishExecutionHandoff {
   feedbackMetric: string[];
   referenceAction: string;
   currentAction: string;
-  actionKind: PublishRepairActionKind | "save_publish_baseline" | "record_publish_effect";
+  actionKind: PublishRepairActionKind | "save_publish_baseline" | "record_publish_effect" | "review_platform_strategy";
   actionLabel: string;
   actionHref: string;
   chapterId?: string;
@@ -4280,19 +4280,22 @@ function buildPlatformPublishExecutionHandoff(pack: PlatformPublishPackage): Pla
   const firstBlocker = pack.preflight.blocked[0] ?? pack.finalGate.blockers[0] ?? "";
   const nextStep = pack.repairPath.nextStep;
   const needsBaseline = pack.canExport && pack.publishVersions.length === 0;
+  const readyToReview = pack.canExport && !needsBaseline && pack.effectCapturePlan.status === "ready_to_review";
   const currentAction = pack.canExport
     ? needsBaseline
       ? `可导出：先保存发布基准，再按${pack.platformName}投稿包进入小范围发布和数据复盘。`
-      : `可导出：按${pack.platformName}投稿包进入小范围发布和数据复盘。`
+      : readyToReview
+        ? `已回填效果：进入${pack.platformName}平台排序，决定放大、迭代还是换打法。`
+        : `可导出：按${pack.platformName}投稿包进入小范围发布和数据复盘。`
     : `先修：${firstBlocker || nextStep?.label || executionCard.nextAction}`;
   const actionKind = pack.canExport
-    ? needsBaseline ? "save_publish_baseline" : "record_publish_effect"
+    ? needsBaseline ? "save_publish_baseline" : readyToReview ? "review_platform_strategy" : "record_publish_effect"
     : nextStep?.kind ?? "open_submission_package";
   const actionLabel = pack.canExport
-    ? needsBaseline ? "保存发布基准" : "记录发布效果"
+    ? needsBaseline ? "保存发布基准" : readyToReview ? "查看平台排序" : "记录发布效果"
     : nextStep?.label ?? "处理阻塞";
   const actionHref = pack.canExport
-    ? needsBaseline ? "#package-version-history" : "#publish-effect-panel"
+    ? needsBaseline ? "#package-version-history" : readyToReview ? "#platform-strategy-ranking" : "#publish-effect-panel"
     : publishExecutionHandoffActionHref(actionKind, nextStep?.chapterId);
 
   return {
@@ -4322,6 +4325,7 @@ function publishExecutionHandoffActionHref(
 ) {
   if (actionKind === "save_publish_baseline") return "#package-version-history";
   if (actionKind === "record_publish_effect") return "#publish-effect-panel";
+  if (actionKind === "review_platform_strategy") return "#platform-strategy-ranking";
   if (actionKind === "open_submission_package") return "#submission-assets";
   if (actionKind === "add_publish_chapters") return "#create-chapter";
   if (actionKind === "run_second_pass" && chapterId) return "#chapter-second-pass";
@@ -4341,6 +4345,7 @@ function handoffActionRank(item: PlatformPublishExecutionHandoff) {
     open_submission_package: 5,
     save_publish_baseline: 6,
     record_publish_effect: 7,
+    review_platform_strategy: 8,
   };
   return (item.canExport ? 100 : 0) + kindRank[item.actionKind];
 }
@@ -4386,7 +4391,9 @@ function buildPlatformPublishExecutionHandoffSummary(
   if (blockedCount === 0) {
     const headline = primaryAction.actionKind === "save_publish_baseline"
       ? `${readyCount}/${handoffs.length} 平台可导出，先保存发布基准，影响 ${primaryActionPlatformNames.length} 个平台。`
-      : `${readyCount}/${handoffs.length} 平台可导出，可以进入复盘，影响 ${primaryActionPlatformNames.length} 个平台。`;
+      : primaryAction.actionKind === "review_platform_strategy"
+        ? `${readyCount}/${handoffs.length} 平台已完成效果回填，进入平台排序，影响 ${primaryActionPlatformNames.length} 个平台。`
+        : `${readyCount}/${handoffs.length} 平台可导出，可以进入复盘，影响 ${primaryActionPlatformNames.length} 个平台。`;
     return {
       readyCount,
       blockedCount,

@@ -1940,6 +1940,11 @@ test("buildPlatformPublishExportCenter", async (t) => {
     const plan = buildPlatformStrategySwitchPlan(strategy, getPlatformProfile("qimao"), pack);
 
     assert.equal(pack.publishEffect.records, 1);
+    assert.equal(center.executionHandoffs[0].actionKind, "review_platform_strategy");
+    assert.equal(center.executionHandoffs[0].actionLabel, "查看平台排序");
+    assert.equal(center.executionHandoffs[0].actionHref, "#platform-strategy-ranking");
+    assert.ok(center.executionHandoffSummary.headline.includes("进入平台排序"));
+    assert.equal(center.executionHandoffSummary.primaryAction?.actionKind, "review_platform_strategy");
     assert.equal(plan.progress.status, "complete");
     assert.equal(plan.progress.completedSteps, 5);
     assert.equal(plan.progress.progressPercent, 100);

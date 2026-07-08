@@ -801,7 +801,7 @@ interface PlatformPublishExecutionHandoff {
   feedbackMetric: string[];
   referenceAction: string;
   currentAction: string;
-  actionKind: PublishRepairAction["kind"] | "record_publish_effect";
+  actionKind: PublishRepairAction["kind"] | "save_publish_baseline" | "record_publish_effect";
   actionLabel: string;
   actionHref: string;
   chapterId?: string;

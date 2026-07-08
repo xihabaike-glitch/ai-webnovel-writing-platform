@@ -902,7 +902,7 @@ export interface PlatformPublishExecutionHandoff {
   feedbackMetric: string[];
   referenceAction: string;
   currentAction: string;
-  actionKind: PublishRepairActionKind | "record_publish_effect";
+  actionKind: PublishRepairActionKind | "save_publish_baseline" | "record_publish_effect";
   actionLabel: string;
   actionHref: string;
   chapterId?: string;
@@ -4279,13 +4279,20 @@ function buildPlatformPublishExecutionHandoff(pack: PlatformPublishPackage): Pla
   const executionCard = buildPlatformExecutionCard(pack.platformId);
   const firstBlocker = pack.preflight.blocked[0] ?? pack.finalGate.blockers[0] ?? "";
   const nextStep = pack.repairPath.nextStep;
+  const needsBaseline = pack.canExport && pack.publishVersions.length === 0;
   const currentAction = pack.canExport
-    ? `可导出：按${pack.platformName}投稿包进入小范围发布和数据复盘。`
+    ? needsBaseline
+      ? `可导出：先保存发布基准，再按${pack.platformName}投稿包进入小范围发布和数据复盘。`
+      : `可导出：按${pack.platformName}投稿包进入小范围发布和数据复盘。`
     : `先修：${firstBlocker || nextStep?.label || executionCard.nextAction}`;
-  const actionKind = pack.canExport ? "record_publish_effect" : nextStep?.kind ?? "open_submission_package";
-  const actionLabel = pack.canExport ? "记录发布效果" : nextStep?.label ?? "处理阻塞";
+  const actionKind = pack.canExport
+    ? needsBaseline ? "save_publish_baseline" : "record_publish_effect"
+    : nextStep?.kind ?? "open_submission_package";
+  const actionLabel = pack.canExport
+    ? needsBaseline ? "保存发布基准" : "记录发布效果"
+    : nextStep?.label ?? "处理阻塞";
   const actionHref = pack.canExport
-    ? "#publish-effect-panel"
+    ? needsBaseline ? "#package-version-history" : "#publish-effect-panel"
     : publishExecutionHandoffActionHref(actionKind, nextStep?.chapterId);
 
   return {
@@ -4313,6 +4320,7 @@ function publishExecutionHandoffActionHref(
   actionKind: PlatformPublishExecutionHandoff["actionKind"],
   chapterId?: string,
 ) {
+  if (actionKind === "save_publish_baseline") return "#package-version-history";
   if (actionKind === "record_publish_effect") return "#publish-effect-panel";
   if (actionKind === "open_submission_package") return "#submission-assets";
   if (actionKind === "add_publish_chapters") return "#create-chapter";
@@ -4331,7 +4339,8 @@ function handoffActionRank(item: PlatformPublishExecutionHandoff) {
     run_second_pass: 3,
     run_chapter_review: 4,
     open_submission_package: 5,
-    record_publish_effect: 6,
+    save_publish_baseline: 6,
+    record_publish_effect: 7,
   };
   return (item.canExport ? 100 : 0) + kindRank[item.actionKind];
 }
@@ -4375,13 +4384,16 @@ function buildPlatformPublishExecutionHandoffSummary(
     .map((item) => item.platformName);
 
   if (blockedCount === 0) {
+    const headline = primaryAction.actionKind === "save_publish_baseline"
+      ? `${readyCount}/${handoffs.length} 平台可导出，先保存发布基准，影响 ${primaryActionPlatformNames.length} 个平台。`
+      : `${readyCount}/${handoffs.length} 平台可导出，可以进入复盘，影响 ${primaryActionPlatformNames.length} 个平台。`;
     return {
       readyCount,
       blockedCount,
       primaryAction,
       primaryActionCount: primaryActionPlatformNames.length,
       primaryActionPlatformNames,
-      headline: `${readyCount}/${handoffs.length} 平台可导出，可以进入复盘，影响 ${primaryActionPlatformNames.length} 个平台。`,
+      headline,
       nextAction: `先处理 ${primaryAction.platformName}：${primaryAction.actionLabel}。`,
     };
   }

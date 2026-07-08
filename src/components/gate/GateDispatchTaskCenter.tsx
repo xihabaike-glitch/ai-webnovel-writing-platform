@@ -112,6 +112,14 @@ function actionLabel(state: GatePlatformGrowthDispatchState) {
   return "重新打开";
 }
 
+const dispatchReceiptAcceptanceCriteria = [
+  "执行角色",
+  "输入",
+  "输出",
+  "人工验收",
+  "下一步",
+];
+
 function nextState(state: GatePlatformGrowthDispatchState): GatePlatformGrowthDispatchState {
   if (state === "queued") return "assigned";
   if (state === "assigned") return "completed";
@@ -2140,6 +2148,16 @@ export function GateDispatchTaskCenter({
                           {completionSuggestion ? "填入小样本结果" : "填入模板"}
                         </button>
                       ) : null}
+                    </div>
+                    <div className="rounded-md border border-slate-200 bg-slate-50 p-2 text-xs">
+                      <div className="font-medium text-slate-700">任务回执验收口径</div>
+                      <div className="mt-2 flex flex-wrap gap-1">
+                        {dispatchReceiptAcceptanceCriteria.map((criterion) => (
+                          <span className="rounded-md bg-white px-2 py-1 text-slate-600" key={criterion}>
+                            {criterion}
+                          </span>
+                        ))}
+                      </div>
                     </div>
                     {completionSuggestion ? (
                       <p className="rounded-md bg-emerald-50 px-2 py-1 text-xs leading-5 text-emerald-800">

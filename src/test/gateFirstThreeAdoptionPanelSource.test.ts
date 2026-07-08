@@ -24,3 +24,11 @@ test("gate adoption panel uses unified chapter adoption copy", () => {
   assert.equal(panelSource.includes("前三章采纳闭环"), false);
   assert.equal(panelSource.includes("暂无前三章采纳后续任务"), false);
 });
+
+test("gate adoption panel shows a release decision summary", () => {
+  assert.ok(panelSource.includes("function adoptionReleaseDecision"));
+  assert.ok(panelSource.includes("放行判定"));
+  assert.ok(panelSource.includes("已闭合清单"));
+  assert.ok(panelSource.includes("剩余卡点"));
+  assert.ok(panelSource.includes("刷新总闸门复检"));
+});

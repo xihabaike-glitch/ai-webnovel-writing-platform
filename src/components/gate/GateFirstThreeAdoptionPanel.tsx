@@ -92,6 +92,35 @@ function batchClosureSummary(results: GateFirstThreeAdoptionReceiptResult[]) {
   };
 }
 
+function adoptionReleaseDecision(closure: PrePublishGateAdoptionClosure) {
+  if (closure.total === 0) {
+    return {
+      title: "暂无采纳后续",
+      detail: "还没有需要复检的章节采纳任务，先生成并采纳候选稿。",
+      className: "border-slate-200 bg-slate-50 text-slate-800",
+    };
+  }
+  if (closure.pending > 0) {
+    return {
+      title: "暂不放行",
+      detail: `还有 ${closure.pending} 个章节采纳后续没闭合，先处理剩余卡点再刷新总闸门。`,
+      className: "border-rose-200 bg-rose-50 text-rose-900",
+    };
+  }
+  if (closure.receiptEvidence < closure.total) {
+    return {
+      title: "需要补回执",
+      detail: `任务都已完成，但回执证据只有 ${closure.receiptEvidence}/${closure.total} 条，补齐后再放行。`,
+      className: "border-amber-200 bg-amber-50 text-amber-900",
+    };
+  }
+  return {
+    title: "可以放行",
+    detail: "章节采纳后的重新审稿、必要二改和发布质检都有证据，可以进入后续发布检查。",
+    className: "border-emerald-200 bg-emerald-50 text-emerald-900",
+  };
+}
+
 function stateText(state: string) {
   if (state === "completed") return "完成";
   if (state === "assigned") return "已派单";
@@ -176,6 +205,9 @@ export function GateFirstThreeAdoptionPanel({ closure, gateReturnHref }: { closu
   const topRepairQueueItem = closure.repairQueue[0] ?? null;
   const topRepairFollowupItem = topRepairQueueItem ? itemsById.get(topRepairQueueItem.followupItemId) ?? null : null;
   const topRepairExecuteLabel = topRepairFollowupItem ? executeLabel(topRepairFollowupItem) : null;
+  const releaseDecision = adoptionReleaseDecision(closure);
+  const closedPreviewItems = closure.items.filter((item) => item.status === "pass").slice(0, 3);
+  const blockedPreviewItems = closure.items.filter((item) => item.status !== "pass").slice(0, 3);
 
   useEffect(() => {
     setFollowupResults((current) => {
@@ -370,6 +402,56 @@ export function GateFirstThreeAdoptionPanel({ closure, gateReturnHref }: { closu
           <div className="rounded-md bg-white/80 px-3 py-2">
             <div className="text-lg font-semibold text-slate-950">{closure.receiptEvidence}</div>
             <div>回执</div>
+          </div>
+        </div>
+      </div>
+      <div className={`mt-4 rounded-md border p-3 text-sm ${releaseDecision.className}`}>
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <div className="text-xs font-medium uppercase text-slate-400">放行判定</div>
+            <div className="mt-1 font-medium">{releaseDecision.title}</div>
+            <p className="mt-1 leading-6 opacity-90">{releaseDecision.detail}</p>
+          </div>
+          <button
+            className="w-fit rounded-md bg-white px-3 py-2 text-xs font-medium text-slate-900 shadow-sm hover:bg-slate-50"
+            onClick={() => router.refresh()}
+            type="button"
+          >
+            刷新总闸门复检
+          </button>
+        </div>
+        <div className="mt-3 grid gap-3 lg:grid-cols-2">
+          <div className="rounded-md bg-white/70 p-3">
+            <div className="font-medium text-slate-950">已闭合清单</div>
+            {closedPreviewItems.length ? (
+              <div className="mt-2 grid gap-2">
+                {closedPreviewItems.map((item) => (
+                  <div className="text-xs leading-5 text-emerald-800" key={item.id}>
+                    {item.projectTitle} · {item.title}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="mt-2 text-xs leading-5 opacity-75">还没有闭合项，先从优先修复或批量审稿开始。</p>
+            )}
+          </div>
+          <div className="rounded-md bg-white/70 p-3">
+            <div className="font-medium text-slate-950">剩余卡点</div>
+            {blockedPreviewItems.length ? (
+              <div className="mt-2 grid gap-2">
+                {blockedPreviewItems.map((item) => (
+                  <Link
+                    className="text-xs leading-5 text-rose-800 underline-offset-2 hover:underline"
+                    href={hrefWithGateReturn(item.href, gateReturnHref)}
+                    key={item.id}
+                  >
+                    {item.projectTitle} · {item.title}
+                  </Link>
+                ))}
+              </div>
+            ) : (
+              <p className="mt-2 text-xs leading-5 opacity-75">当前没有剩余采纳卡点，复检后继续看发布包、版本基线和平台效果。</p>
+            )}
           </div>
         </div>
       </div>

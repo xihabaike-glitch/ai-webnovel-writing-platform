@@ -94,6 +94,39 @@ function exportSnapshot(input: {
   };
 }
 
+const finalDeliveryAuditItems = [
+  ["publish-package", "发布包", "#platform-export"],
+  ["submission-asset", "投稿材料", "#submission-package"],
+  ["sample-chapters", "前三章样章", "#publish-chapters"],
+  ["publish-baseline", "发布基准", "#package-version-history"],
+  ["real-effect", "真实效果", "#publish-effect-panel"],
+  ["strategy-review", "策略复盘", "#platform-strategy-ranking"],
+] as const;
+
+function finalDeliveryAudits(projectId: string, platformId = "fanqie") {
+  return finalDeliveryAuditItems.map(([itemId, label, href], index) => ({
+    actionId: `final-delivery:${platformId}:${itemId}`,
+    executionType: "manual",
+    status: "succeeded",
+    succeededCount: 1,
+    failedCount: 0,
+    taskId: null,
+    platformId,
+    label: `回写${label}交付回执`,
+    message: [
+      `交付项：${label}`,
+      "当前状态：已交付",
+      `证据：${label}已交付。`,
+      `产物位置：${href}`,
+      "人工验收：通过 / 退回，并写明理由。",
+      `下一步：查看${label}`,
+      "停手线：缺产物位置、人工验收或下一步判断，不允许回总闸门标记闭环。",
+    ].join("\n"),
+    payload: JSON.stringify({ projectId }),
+    createdAt: `2026-01-12T00:00:0${index}.000Z`,
+  }));
+}
+
 const readyProject: PrePublishGateProject = {
   id: "project-ready",
   title: "夜雨系统",
@@ -121,6 +154,7 @@ const readyProject: PrePublishGateProject = {
     },
   ],
   gateDispatchTasks: firstDayCompleteDispatches("project-ready"),
+  gateActionAudits: finalDeliveryAudits("project-ready"),
   submissionAssets: [readySubmissionAsset],
 };
 
@@ -202,6 +236,24 @@ test("buildPrePublishGate", async (t) => {
     assert.equal(gate.realPipelineFinalReview.primaryActionHref, "#gate-export-package");
     assert.ok(gate.realPipelineFinalReview.evidence.some((line) => line.includes("夜雨系统")));
     assert.ok(gate.realPipelineFinalReview.passSignals.some((line) => line.includes("项目验收单通过")));
+  });
+
+  await t.test("blocks launch when final delivery receipts are missing", () => {
+    const gate = buildPrePublishGate({
+      projects: [{ ...readyProject, gateActionAudits: [] }],
+      failureTasks: [],
+      batchHistory: [],
+    });
+    const finalDeliveryItem = gate.items.find((item) => item.id === "final-delivery");
+
+    assert.equal(gate.status, "blocked");
+    assert.equal(gate.label, "暂不发布");
+    assert.equal(finalDeliveryItem?.status, "block");
+    assert.equal(finalDeliveryItem?.actionLabel, "写回最终交付回执");
+    assert.equal(gate.releaseAction?.label, "先解除阻塞：写回最终交付回执");
+    assert.equal(gate.releaseAction?.href, "/projects/project-ready#platform-export");
+    assert.equal(gate.realPipelineFinalReview.outcome, "repair");
+    assert.ok(gate.realPipelineFinalReview.repairSignals.some((line) => line.includes("最终交付")));
   });
 
   await t.test("blocks launch when model writing roles are missing", () => {
@@ -876,7 +928,9 @@ test("buildPrePublishGate", async (t) => {
     const gate = buildPrePublishGate({
       projects: [{
         ...readyProject,
-        gateActionAudits: [{
+        gateActionAudits: [
+          ...finalDeliveryAudits("project-ready"),
+          {
           actionId: "export-version:project-ready:regenerate_snapshot",
           executionType: "export_version",
           status: "succeeded",
@@ -887,7 +941,8 @@ test("buildPrePublishGate", async (t) => {
           label: "重导最新包",
           message: "夜雨系统 已按导出快照重新生成。",
           createdAt: "2026-07-05T05:05:00.000Z",
-        }],
+          },
+        ],
         exportPackageSnapshots: [
           exportSnapshot({
             id: "latest-regressed",
@@ -1192,7 +1247,9 @@ test("buildPrePublishGate", async (t) => {
             completionEvidence: "采纳后发布质检已刷新：番茄小说 发布包版本 snapshot-1，质检 92 分，可导出。",
           },
         ],
-        gateActionAudits: [{
+        gateActionAudits: [
+          ...finalDeliveryAudits("project-ready"),
+          {
           actionId: "recommended-batch:standard:review:project-ready",
           executionType: "recommended_batch",
           status: "succeeded",
@@ -1214,7 +1271,8 @@ test("buildPrePublishGate", async (t) => {
             routeEffectSummary: { successRatePercent: 100, knownCostUsd: 0.01, averageQualityScore: 91 },
             batchReceipt: { status: "continue", headline: "采纳闭环批量审稿通过" },
           }),
-        }],
+          },
+        ],
       }],
       failureTasks: [],
       batchHistory: [],
@@ -1251,7 +1309,9 @@ test("buildPrePublishGate", async (t) => {
             completionEvidence: "采纳后发布质检已刷新：番茄小说 发布包版本 snapshot-1，质检 92 分，可导出。",
           },
         ],
-        gateActionAudits: [{
+        gateActionAudits: [
+          ...finalDeliveryAudits("project-ready"),
+          {
           actionId: "recommended-batch:standard:review:project-ready",
           executionType: "recommended_batch",
           status: "failed",
@@ -1279,7 +1339,8 @@ test("buildPrePublishGate", async (t) => {
             routeEffectSummary: { successRatePercent: 0, knownCostUsd: 0.01, averageQualityScore: null },
             batchReceipt: { status: "repair", headline: "批次有失败，先修再放大" },
           }),
-        }],
+          },
+        ],
       }],
       failureTasks: [],
       batchHistory: [],
@@ -1320,7 +1381,9 @@ test("buildPrePublishGate", async (t) => {
             completionEvidence: "采纳后发布质检已刷新：番茄小说 发布包版本 snapshot-1，质检 92 分，可导出。",
           },
         ],
-        gateActionAudits: [{
+        gateActionAudits: [
+          ...finalDeliveryAudits("project-ready"),
+          {
           actionId: "recommended-batch:standard:review:project-ready",
           executionType: "recommended_batch",
           status: "succeeded",
@@ -1347,7 +1410,8 @@ test("buildPrePublishGate", async (t) => {
             routeEffectSummary: { successRatePercent: 100, knownCostUsd: 0.01, averageQualityScore: 72 },
             batchReceipt: { status: "review_quality", headline: "质量不够，先二改或复审" },
           }),
-        }],
+          },
+        ],
       }],
       failureTasks: [],
       batchHistory: [],
@@ -1384,7 +1448,9 @@ test("buildPrePublishGate", async (t) => {
             href: "/projects/project-ready#platform-export",
           },
         ],
-        gateActionAudits: [{
+        gateActionAudits: [
+          ...finalDeliveryAudits("project-ready"),
+          {
           actionId: "recommended-batch:standard:export:project-ready",
           executionType: "recommended_batch",
           status: "failed",
@@ -1412,7 +1478,8 @@ test("buildPrePublishGate", async (t) => {
             routeEffectSummary: { successRatePercent: 0, knownCostUsd: 0.01, averageQualityScore: null },
             batchReceipt: { status: "repair", headline: "批次有失败，先修再放大" },
           }),
-        }],
+          },
+        ],
       }],
       failureTasks: [],
       batchHistory: [],

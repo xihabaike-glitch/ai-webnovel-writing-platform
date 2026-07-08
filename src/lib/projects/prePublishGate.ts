@@ -180,9 +180,22 @@ export interface PrePublishGateProjectStatus {
   downloadHref: string | null;
   execution: PrePublishGateActionExecution | null;
   acceptanceSheetGate: PrePublishGateAcceptanceSheetGate;
+  finalDeliveryGate: PrePublishGateFinalDeliveryGate;
   exportVersionGate: PrePublishGateExportVersionGate;
   effectReview: PrePublishGateEffectReview;
   loopTimeline: PrePublishGateLoopTimeline;
+}
+
+export interface PrePublishGateFinalDeliveryGate {
+  status: PrePublishGateItem["status"];
+  label: string;
+  detail: string;
+  actionLabel: string;
+  href: string;
+  completedCount: number;
+  blockedCount: number;
+  missingCount: number;
+  totalCount: number;
 }
 
 export interface PrePublishGateAcceptanceSheetGate {
@@ -1652,6 +1665,71 @@ function buildAcceptanceSheetGate(
   };
 }
 
+const finalDeliveryGateItemLabels = {
+  "publish-package": "发布包",
+  "submission-asset": "投稿材料",
+  "sample-chapters": "前三章样章",
+  "publish-baseline": "发布基准",
+  "real-effect": "真实效果",
+  "strategy-review": "策略复盘",
+} as const;
+
+type FinalDeliveryGateItemId = keyof typeof finalDeliveryGateItemLabels;
+
+const finalDeliveryGateItemIds = Object.keys(finalDeliveryGateItemLabels) as FinalDeliveryGateItemId[];
+
+function finalDeliveryAuditItemId(actionId: string, platformId: string) {
+  const prefix = `final-delivery:${platformId}:`;
+  if (!actionId.startsWith(prefix)) return null;
+  const itemId = actionId.slice(prefix.length) as FinalDeliveryGateItemId;
+  return finalDeliveryGateItemLabels[itemId] ? itemId : null;
+}
+
+function finalDeliveryAuditIsDone(audit: NonNullable<PrePublishGateProject["gateActionAudits"]>[number]) {
+  return audit.status === "succeeded" && (audit.message ?? "").includes("当前状态：已交付");
+}
+
+function buildFinalDeliveryGate(project: PrePublishGateProject, platformId: string): PrePublishGateFinalDeliveryGate {
+  const latestByItem = new Map<FinalDeliveryGateItemId, NonNullable<PrePublishGateProject["gateActionAudits"]>[number]>();
+  for (const audit of project.gateActionAudits ?? []) {
+    const itemId = finalDeliveryAuditItemId(audit.actionId, platformId);
+    if (!itemId) continue;
+    const current = latestByItem.get(itemId);
+    const auditAt = new Date(audit.createdAt).getTime();
+    const currentAt = current ? new Date(current.createdAt).getTime() : Number.NEGATIVE_INFINITY;
+    if (!current || auditAt >= currentAt) latestByItem.set(itemId, audit);
+  }
+
+  const completedCount = finalDeliveryGateItemIds.filter((itemId) => {
+    const audit = latestByItem.get(itemId);
+    return audit ? finalDeliveryAuditIsDone(audit) : false;
+  }).length;
+  const writtenCount = latestByItem.size;
+  const blockedCount = [...latestByItem.values()].filter((audit) => !finalDeliveryAuditIsDone(audit)).length;
+  const missingCount = finalDeliveryGateItemIds.length - writtenCount;
+  const firstBlocked = finalDeliveryGateItemIds.find((itemId) => {
+    const audit = latestByItem.get(itemId);
+    return audit ? !finalDeliveryAuditIsDone(audit) : false;
+  });
+  const firstMissing = finalDeliveryGateItemIds.find((itemId) => !latestByItem.has(itemId));
+  const firstGap = firstBlocked ?? firstMissing ?? null;
+  const status: PrePublishGateItem["status"] = completedCount === finalDeliveryGateItemIds.length ? "pass" : "block";
+
+  return {
+    status,
+    label: status === "pass" ? "最终交付已闭环" : "最终交付未闭环",
+    detail: status === "pass"
+      ? `${project.title} 已写回 ${completedCount}/${finalDeliveryGateItemIds.length} 项最终交付回执。`
+      : `${project.title} 最终交付回执未闭环：已闭环 ${completedCount}，阻塞 ${blockedCount}，缺项 ${missingCount}${firstGap ? `。下一项：${finalDeliveryGateItemLabels[firstGap]}` : ""}。`,
+    actionLabel: status === "pass" ? "查看最终交付回执" : "写回最终交付回执",
+    href: `/projects/${project.id}#platform-export`,
+    completedCount,
+    blockedCount,
+    missingCount,
+    totalCount: finalDeliveryGateItemIds.length,
+  };
+}
+
 function projectStatus(project: PrePublishGateProject): PrePublishGateProjectStatus {
   const platform = getPlatformProfile(project.targetPlatform as PlatformId);
   const aiTasks = project.aiTasks.map((task) => ({
@@ -1685,6 +1763,7 @@ function projectStatus(project: PrePublishGateProject): PrePublishGateProjectSta
   const exportVersionBlocked = exportVersionGate.status === "block";
   const repairExecution = exportVersionBlocked ? null : nextRepairAction ? publishRepairExecution(project.id, nextRepairAction) : null;
   const acceptanceSheetGate = buildAcceptanceSheetGate(project, pack.platformName, repairExecution);
+  const finalDeliveryGate = buildFinalDeliveryGate(project, pack.platformId);
   const acceptanceBlocked = acceptanceSheetGate.status === "block";
   const ready = publishableChapters > 0 && pack.canExport && pack.finalGate.status === "ready_to_submit" && !exportVersionBlocked && acceptanceSheetGate.status === "pass";
   const empty = publishableChapters === 0;
@@ -1719,6 +1798,7 @@ function projectStatus(project: PrePublishGateProject): PrePublishGateProjectSta
     downloadHref: ready ? `/api/projects/${project.id}/platform-export?format=markdown&platformId=${pack.platformId}` : null,
     execution: acceptanceBlocked ? acceptanceSheetGate.execution : repairExecution,
     acceptanceSheetGate,
+    finalDeliveryGate,
     exportVersionGate,
     effectReview: effectReview(
       project.id,
@@ -1800,6 +1880,7 @@ function buildReleaseAction(
   const nextAction = status === "blocked"
     ? priorityActions.find((item) => item.id === "model-roles")
       ?? priorityActions.find((item) => item.id.startsWith("export-version:"))
+      ?? priorityActions.find((item) => item.id.startsWith("final-delivery:"))
       ?? priorityActions.find((item) => item.id === "queue:next")
       ?? priorityActions.find((item) => item.id.startsWith("adoption-followup:"))
       ?? priorityActions.find((item) => item.id.startsWith("repair:"))
@@ -1870,6 +1951,7 @@ function buildRealPipelineFinalReview(input: {
   failedTasks: number;
   acceptanceBlockers: PrePublishGateProjectStatus[];
   acceptanceWarnings: PrePublishGateProjectStatus[];
+  finalDeliveryBlockers: PrePublishGateProjectStatus[];
   failureRepairBatch: FailureRepairBatch;
 }): PrePublishGateRealPipelineFinalReview {
   const acceptedProjects = input.projectStatuses.filter((project) => project.acceptanceSheetGate.status === "pass");
@@ -1880,6 +1962,7 @@ function buildRealPipelineFinalReview(input: {
   ].filter((item): item is string => Boolean(item));
   const repairSignals = [
     ...input.acceptanceBlockers.slice(0, 3).map((project) => `项目验收单缺口：${project.projectTitle} · ${project.acceptanceSheetGate.label}。`),
+    ...input.finalDeliveryBlockers.slice(0, 3).map((project) => `最终交付缺口：${project.projectTitle} · ${project.finalDeliveryGate.label}。`),
     input.repairPackages > 0 ? `发布质检待修：${input.repairPackages} 个项目还不能发。` : null,
     input.emptyProjects > 0 ? `正文缺口：${input.emptyProjects} 个项目暂无可发布正文。` : null,
     input.taskBlockers > 0 ? `任务队列阻塞：${input.taskBlockers} 个阻塞项挡住生产链路。` : null,
@@ -2741,6 +2824,8 @@ export function buildPrePublishGate(input: PrePublishGateInput): PrePublishGate 
   const exportVersionWarnings = projectStatuses.filter((project) => project.exportVersionGate.status === "warn");
   const acceptanceBlockers = projectStatuses.filter((project) => project.acceptanceSheetGate.status === "block");
   const acceptanceWarnings = projectStatuses.filter((project) => project.acceptanceSheetGate.status === "warn");
+  const finalDeliveryCandidates = projectStatuses.filter((project) => project.status === "ready");
+  const finalDeliveryBlockers = finalDeliveryCandidates.filter((project) => project.finalDeliveryGate.status === "block");
   const gateBlockingQueueItems = queue.items.filter((item) => {
     if (item.category !== "blocked") return false;
     if (item.blockerType !== "publish_repair") return true;
@@ -2823,6 +2908,18 @@ export function buildPrePublishGate(input: PrePublishGateInput): PrePublishGate 
       href: exportVersionBlockers[0]?.exportVersionGate.href ?? exportVersionWarnings[0]?.exportVersionGate.href ?? "/projects",
     }),
     gateItem({
+      id: "final-delivery",
+      label: "最终交付",
+      status: finalDeliveryBlockers.length > 0 ? "block" : "pass",
+      detail: finalDeliveryBlockers.length > 0
+        ? `${finalDeliveryBlockers.length} 个可发布项目还没有最终交付闭环。下一条：${finalDeliveryBlockers[0].finalDeliveryGate.detail}`
+        : finalDeliveryCandidates.length > 0
+          ? `${finalDeliveryCandidates.length} 个可发布项目的最终交付回执已闭环。`
+          : "等待项目先通过发布包质检，再做最终交付回执复检。",
+      actionLabel: finalDeliveryBlockers[0]?.finalDeliveryGate.actionLabel ?? "查看最终交付",
+      href: finalDeliveryBlockers[0]?.finalDeliveryGate.href ?? finalDeliveryCandidates[0]?.finalDeliveryGate.href ?? "/projects",
+    }),
+    gateItem({
       id: "ai-failures",
       label: "失败复盘",
       status: failureGateStatus(failureRepairBatch),
@@ -2882,6 +2979,13 @@ export function buildPrePublishGate(input: PrePublishGateInput): PrePublishGate 
       project.acceptanceSheetGate.href,
       "repair",
       project.acceptanceSheetGate.execution,
+    )),
+    ...finalDeliveryBlockers.map((project) => action(
+      `final-delivery:${project.projectId}`,
+      project.finalDeliveryGate.actionLabel,
+      `${project.projectTitle} · ${project.platformName} · ${project.finalDeliveryGate.detail}`,
+      project.finalDeliveryGate.href,
+      "repair",
     )),
     ...firstThreeAdoptionPriorityActions(firstThreeAdoptionClosure),
     ...projectStatuses
@@ -2955,6 +3059,7 @@ export function buildPrePublishGate(input: PrePublishGateInput): PrePublishGate 
     failedTasks,
     acceptanceBlockers,
     acceptanceWarnings,
+    finalDeliveryBlockers,
     failureRepairBatch,
   });
 

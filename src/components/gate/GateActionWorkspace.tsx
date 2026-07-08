@@ -137,6 +137,18 @@ function finalDeliveryReviewClass(status: ReturnType<typeof buildGateFinalDelive
   return "border-slate-200 bg-white text-slate-900";
 }
 
+function finalDeliveryReviewItemStatusLabel(status: ReturnType<typeof buildGateFinalDeliveryReceiptReview>["items"][number]["status"]) {
+  if (status === "done") return "已闭环";
+  if (status === "blocked") return "阻塞";
+  return "缺项";
+}
+
+function finalDeliveryReviewItemClass(status: ReturnType<typeof buildGateFinalDeliveryReceiptReview>["items"][number]["status"]) {
+  if (status === "done") return "border-emerald-200 bg-white/75 text-emerald-900 hover:bg-white";
+  if (status === "blocked") return "border-rose-200 bg-white/75 text-rose-900 hover:bg-white";
+  return "border-amber-200 bg-white/75 text-amber-900 hover:bg-white";
+}
+
 function failureRepairResolutionClass(status: ReturnType<typeof buildGateFailureRepairRecheckResolution>["status"]) {
   if (status === "resolved") return "border-emerald-200 bg-emerald-50 text-emerald-900";
   if (status === "failed") return "border-rose-200 bg-rose-50 text-rose-900";
@@ -711,6 +723,19 @@ export function GateActionWorkspace({
             <div className="mt-2 grid gap-2 text-xs sm:grid-cols-2">
               <div className="rounded-md bg-white/80 px-3 py-2 font-medium">{finalDeliveryReview.latestFeedback}</div>
               <div className="rounded-md bg-white/80 px-3 py-2 font-medium" aria-label="下一刀">{finalDeliveryReview.remainingFeedback}</div>
+            </div>
+            <div className="mt-2 grid gap-1 text-xs" aria-label="最终交付逐项复检">
+              {finalDeliveryReview.items.map((item) => (
+                <Link
+                  className={`flex min-h-12 flex-col justify-center gap-1 rounded-md border px-3 py-2 transition sm:grid sm:grid-cols-[96px_64px_minmax(0,1fr)] sm:items-center ${finalDeliveryReviewItemClass(item.status)}`}
+                  href={hrefWithGateReturn(item.href, gateReturnHref)}
+                  key={item.id}
+                >
+                  <span className="font-medium">{item.label}</span>
+                  <span className="text-[11px] font-semibold">{finalDeliveryReviewItemStatusLabel(item.status)}</span>
+                  <span className="text-[11px] leading-4 opacity-75 sm:truncate">{item.evidence}</span>
+                </Link>
+              ))}
             </div>
             {finalDeliveryReview.evidence.length ? (
               <div className="mt-2 grid gap-1 text-xs opacity-80">

@@ -3029,6 +3029,14 @@ export function ModelProviderSettings({
               {currentTestResult.repairHint ? (
                 <p className="mt-2 text-slate-700">建议：{currentTestResult.repairHint}</p>
               ) : null}
+              {currentTestResult && gateReturnHref ? (
+                <Link
+                  className="mt-3 inline-flex w-fit rounded-md bg-white px-3 py-2 text-xs font-medium text-slate-900 hover:bg-slate-50"
+                  href={gateReturnHref}
+                >
+                  连接测试后回总闸门复检
+                </Link>
+              ) : null}
             </div>
           ) : null}
         </form>

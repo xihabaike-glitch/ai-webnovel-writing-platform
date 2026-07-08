@@ -25,3 +25,8 @@ test("model role repair entry keeps the gate recheck return visible", () => {
   assert.ok(source.includes("模型岗位修复后回总闸门复检"));
   assert.ok(source.includes("href={gateReturnHref}"));
 });
+
+test("model connection result keeps the gate recheck return visible", () => {
+  assert.ok(source.includes("currentTestResult && gateReturnHref"));
+  assert.ok(source.includes("连接测试后回总闸门复检"));
+});

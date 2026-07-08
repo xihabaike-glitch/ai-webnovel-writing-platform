@@ -134,6 +134,7 @@ test("project detail page carries gate return through control and batch panels",
   const modelTaskAuditPanel = readFileSync("src/components/projects/ModelTaskAuditPanel.tsx", "utf8");
 
   assert.ok(projectPage.includes("<ProjectControlDashboardPanel gateReturnHref={gateReturn} projectId={project.id} />"));
+  assert.ok(projectPage.includes('id="control-dashboard"'));
   assert.ok(projectPage.includes("<BatchDraftCenterPanel gateReturnHref={gateReturn} projectId={project.id} />"));
   assert.ok(projectPage.includes("<BatchReviewPipelinePanel gateReturnHref={gateReturn} projectId={project.id} />"));
   assert.ok(projectPage.includes("<ModelTaskAuditPanel gateReturnHref={gateReturn} projectId={project.id} />"));

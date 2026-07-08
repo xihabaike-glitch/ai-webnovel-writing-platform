@@ -795,7 +795,9 @@ export default async function ProjectPage({
         <WritingWorkbenchPanel gateReturnHref={gateReturn} workbench={writingWorkbench} />
         <PlatformKnowledgeBriefPanel brief={platformKnowledgeBrief} gateReturnHref={gateReturn} projectId={project.id} />
         <div id="project-control">
-          <ProjectControlDashboardPanel gateReturnHref={gateReturn} projectId={project.id} />
+          <div id="control-dashboard">
+            <ProjectControlDashboardPanel gateReturnHref={gateReturn} projectId={project.id} />
+          </div>
         </div>
         <div id="first-day-workflow">
           <FirstDayWorkflowPanel gateReturnHref={gateReturn} projectId={project.id} />

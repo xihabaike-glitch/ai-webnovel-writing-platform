@@ -127,6 +127,9 @@ export default function HomePage() {
                   <p className="rounded-md bg-white p-2 text-slate-700">
                     当前证据：<span className="break-words">{item.currentProof}</span>
                   </p>
+                  <p className="rounded-md bg-white p-2 text-emerald-800">
+                    验收信号：<span className="break-words">{item.proofLabel}</span>
+                  </p>
                   <p className="rounded-md bg-white p-2 text-amber-900">
                     缺口：<span className="break-words">{item.missingEvidence}</span>
                   </p>

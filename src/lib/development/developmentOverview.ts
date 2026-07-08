@@ -696,9 +696,9 @@ function buildRequirementTraceability(): DevelopmentOverviewRequirementTraceabil
       {
         id: "pipeline_validation",
         originalRequest: "按照毒舌产品经理路径继续开发，让 AI 写作平台能写作、投稿、复盘，而不是只做计划。",
-        currentEvidence: "作品、任务、派单、总闸门、失败复盘、模型设置和发布包已组成真实作品流水线。",
-        acceptanceSignal: "真实作品能从开书证据跑到首章样本、审稿二改、发布包、总闸门和复盘回执。",
-        href: "/gate?focus=action-recheck#gate-focus-notice",
+        currentEvidence: "作品、任务、派单、总闸门、失败复盘、模型设置、发布包和最终交付正式放行卡已组成真实作品流水线。",
+        acceptanceSignal: "真实作品能从开书证据跑到首章样本、审稿二改、发布包、总闸门、最终交付正式放行和复盘回执。",
+        href: "/gate#pipeline-final-review",
       },
     ],
   };
@@ -774,8 +774,8 @@ const finalAcceptanceMeta: Record<
     requirementTitle: "真实作品流水线",
     status: "watch",
     owner: "毒舌产品经理",
-    missingEvidence: "真实作品流水线样本回执已可见，仍需用真实作品持续验收",
-    nextAction: "拿一部真实作品从开书证据跑到首章样本、审稿二改、发布包和复盘回执。",
+    missingEvidence: "真实作品流水线已接入最终交付正式放行卡，仍需用真实作品持续验收正式放行证据",
+    nextAction: "回总闸门查看真实流水线终检和最终交付正式放行卡，再决定交付、修复或暂停批量。",
   },
 };
 

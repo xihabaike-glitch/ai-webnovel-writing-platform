@@ -295,8 +295,10 @@ test("buildDevelopmentOverview", async (t) => {
     assert.ok(treeMethod?.acceptanceSignal.includes("土壤"));
     assert.equal(treeMethod?.href, "/projects#story-structure");
     assert.ok(pipelineValidation?.currentEvidence.includes("失败复盘"));
+    assert.ok(pipelineValidation?.currentEvidence.includes("最终交付正式放行卡"));
     assert.ok(pipelineValidation?.acceptanceSignal.includes("复盘回执"));
-    assert.equal(pipelineValidation?.href, "/gate?focus=action-recheck#gate-focus-notice");
+    assert.ok(pipelineValidation?.acceptanceSignal.includes("最终交付正式放行"));
+    assert.equal(pipelineValidation?.href, "/gate#pipeline-final-review");
   });
 
   await t.test("builds a final product acceptance gate for the home page", () => {
@@ -351,9 +353,11 @@ test("buildDevelopmentOverview", async (t) => {
     const models = overview.finalAcceptanceGate.evidenceMatrix.items.find((item) => item.requirementId === "model_interfaces");
 
     assert.equal(pipeline?.status, "watch");
-    assert.ok(pipeline?.missingEvidence.includes("回执已可见"));
-    assert.ok(pipeline?.missingEvidence.includes("持续验收"));
-    assert.equal(pipeline?.evidenceHref, "/gate?focus=action-recheck#gate-focus-notice");
+    assert.ok(pipeline?.currentProof.includes("最终交付正式放行卡"));
+    assert.ok(pipeline?.proofLabel.includes("正式放行"));
+    assert.ok(pipeline?.missingEvidence.includes("正式放行"));
+    assert.equal(pipeline?.evidenceHref, "/gate#pipeline-final-review");
+    assert.ok(pipeline?.nextAction.includes("总闸门"));
     assert.equal(platform?.status, "ready");
     assert.equal(platform?.missingEvidence, "无新增平台缺口");
     assert.equal(models?.evidenceHref, "/settings/models?focus=model-role-matrix#model-role-matrix");

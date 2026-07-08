@@ -866,6 +866,7 @@ export interface GatePlatformScaleGateItem {
   platformId: string;
   platformName: string;
   status: GatePlatformScaleGateStatus;
+  decisionLabel: string;
   label: string;
   detail: string;
   actionLabel: string;
@@ -886,6 +887,13 @@ export interface GatePlatformScaleGate {
   };
   nextActions: string[];
   items: GatePlatformScaleGateItem[];
+}
+
+function scaleGateDecisionLabel(status: GatePlatformScaleGateStatus) {
+  if (status === "ready") return "允许小步加码";
+  if (status === "blocked_evidence") return "禁止放大";
+  if (status === "needs_dispatch") return "继续观察";
+  return "继续当前阶段";
 }
 
 export type GatePlatformScaleFollowupStatus = "tracked" | "needs_effect" | "needs_completion" | "missing_evidence";
@@ -6359,6 +6367,7 @@ export function buildGatePlatformScaleGate(
         platformId: review.platformId,
         platformName: review.platformName,
         status: "not_candidate",
+        decisionLabel: scaleGateDecisionLabel("not_candidate"),
         label: review.stageLabel,
         detail: `${review.platformName} 还在「${review.stageLabel}」阶段，先完成当前动作，别把没闭环的问题伪装成增长机会。`,
         actionLabel: "处理当前阶段",
@@ -6374,6 +6383,7 @@ export function buildGatePlatformScaleGate(
         platformId: review.platformId,
         platformName: review.platformName,
         status: "blocked_evidence",
+        decisionLabel: scaleGateDecisionLabel("blocked_evidence"),
         label: "禁止加码",
         detail: `${review.platformName} 已进入加码候选，但派单证据仍是「${issue.label}」。先把证据链闭上，再谈扩大投入。`,
         actionLabel: issue.status === "active" ? "处理派单" : "补齐证据",
@@ -6389,6 +6399,7 @@ export function buildGatePlatformScaleGate(
         platformId: review.platformId,
         platformName: review.platformName,
         status: "blocked_evidence",
+        decisionLabel: scaleGateDecisionLabel("blocked_evidence"),
         label: "等待加码效果",
         detail: `${review.platformName} 上一轮加码还没有完成效果对照：${scaleFollowupIssue.detail}`,
         actionLabel: scaleFollowupIssue.actionLabel,
@@ -6404,6 +6415,7 @@ export function buildGatePlatformScaleGate(
         platformId: review.platformId,
         platformName: review.platformName,
         status: "blocked_evidence",
+        decisionLabel: scaleGateDecisionLabel("blocked_evidence"),
         label: cadenceIssue.label,
         detail: `${review.platformName} 未通过连续加码节奏检查：${cadenceIssue.detail}`,
         actionLabel: cadenceIssue.actionLabel,
@@ -6420,6 +6432,7 @@ export function buildGatePlatformScaleGate(
           platformId: review.platformId,
           platformName: review.platformName,
           status: "blocked_evidence",
+          decisionLabel: scaleGateDecisionLabel("blocked_evidence"),
           label: retreatResolutionIssue.label,
           detail: `${review.platformName} 触发撤退/换打法闸，修复验收仍是「${retreatResolutionIssue.label}」：${retreatResolutionIssue.detail}`,
           actionLabel: retreatResolutionIssue.actionLabel,
@@ -6435,6 +6448,7 @@ export function buildGatePlatformScaleGate(
           platformId: review.platformId,
           platformName: review.platformName,
           status: "blocked_evidence",
+          decisionLabel: scaleGateDecisionLabel("blocked_evidence"),
           label: "复测仍异常",
           detail: `${review.platformName} 已完成撤退修复并有复测数据，但最新数据仍触发「${retreatIssue.label}」。继续修打法或换平台，不允许加码。`,
           actionLabel: retreatIssue.actionLabel,
@@ -6449,6 +6463,7 @@ export function buildGatePlatformScaleGate(
         platformId: review.platformId,
         platformName: review.platformName,
         status: "blocked_evidence",
+        decisionLabel: scaleGateDecisionLabel("blocked_evidence"),
         label: retreatIssue.label,
         detail: `${review.platformName} 触发撤退/换打法闸：${retreatIssue.detail}`,
         actionLabel: retreatIssue.actionLabel,
@@ -6464,6 +6479,7 @@ export function buildGatePlatformScaleGate(
         platformId: review.platformId,
         platformName: review.platformName,
         status: "needs_dispatch",
+        decisionLabel: scaleGateDecisionLabel("needs_dispatch"),
         label: "修复后重验",
         detail: `${review.platformName} 已完成撤退修复并有复测数据。先重新生成一张小步加码派单，别沿用撤退前的旧证据。`,
         actionLabel: "重新派单验收",
@@ -6479,6 +6495,7 @@ export function buildGatePlatformScaleGate(
         platformId: review.platformId,
         platformName: review.platformName,
         status: "needs_dispatch",
+        decisionLabel: scaleGateDecisionLabel("needs_dispatch"),
         label: "先派单验收",
         detail: `${review.platformName} 的效果链路看起来可加码，但还没有同平台真闭环派单。先生成并完成加码派单，避免凭感觉扩量。`,
         actionLabel: "去派单验收",
@@ -6493,6 +6510,7 @@ export function buildGatePlatformScaleGate(
       platformId: review.platformId,
       platformName: review.platformName,
       status: "ready",
+      decisionLabel: scaleGateDecisionLabel("ready"),
       label: "允许小步加码",
       detail: `${review.platformName} 有效果回执，也有同平台真闭环派单，可以进入一轮小幅加码。`,
       actionLabel: "执行小步加码",

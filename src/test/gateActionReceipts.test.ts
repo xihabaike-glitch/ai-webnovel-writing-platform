@@ -3268,6 +3268,9 @@ test("buildGateActionReceipt", async (t) => {
     assert.equal(gate.items.find((item) => item.platformId === "fanqie")?.status, "ready");
     assert.equal(gate.items.find((item) => item.platformId === "qimao")?.status, "blocked_evidence");
     assert.equal(gate.items.find((item) => item.platformId === "webnovel")?.status, "needs_dispatch");
+    assert.equal(gate.items.find((item) => item.platformId === "fanqie")?.decisionLabel, "允许小步加码");
+    assert.equal(gate.items.find((item) => item.platformId === "qimao")?.decisionLabel, "禁止放大");
+    assert.equal(gate.items.find((item) => item.platformId === "webnovel")?.decisionLabel, "继续观察");
     assert.ok(gate.nextActions.some((actionText) => actionText.includes("真闭环派单")));
   });
 

@@ -1594,6 +1594,7 @@ export function GateActionWorkspace({
                     <div>
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="font-medium">{item.platformName}</span>
+                        <span className="rounded-md bg-white px-2 py-1 text-xs font-semibold">{item.decisionLabel}</span>
                         <span className="rounded-md bg-white/70 px-2 py-1 text-xs font-medium">{item.label}</span>
                       </div>
                       <p className="mt-2 leading-6 opacity-85">{item.detail}</p>

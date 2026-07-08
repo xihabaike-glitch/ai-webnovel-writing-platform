@@ -56,6 +56,16 @@ test("projects page shows the portfolio production closure summary", () => {
   assert.ok(source.includes("productionLane.actionLabel"));
 });
 
+test("projects page filters project cards by production closure lane", () => {
+  assert.ok(source.includes("closureLaneParam"));
+  assert.ok(source.includes("activeProductionClosureLane"));
+  assert.ok(source.includes("invalidClosureLane"));
+  assert.ok(source.includes("pipelineFilteredItems"));
+  assert.ok(source.includes("item.productionClosure.some((closure) => closure.id === activeProductionClosureLane.id && closure.status !== \"allow\")"));
+  assert.ok(source.includes("`/projects?closureLane=${productionLane.id}#pipeline-projects`"));
+  assert.ok(source.includes("当前只看生产闭环"));
+});
+
 test("projects page renders role closure progress on project cards", () => {
   assert.ok(source.includes('{ dispatchKey: { startsWith: "role-intent:" } }'));
   assert.ok(source.includes("item.roleClosureProgress"));

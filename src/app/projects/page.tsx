@@ -131,9 +131,14 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps) 
   ]);
   const dashboard = buildProjectListDashboard(projects, providers);
   const pipelineStepParam = firstValue(params?.pipelineStep);
+  const closureLaneParam = firstValue(params?.closureLane);
   const activePipelineStep = dashboard.pipelineProofSummary.stepCounts.find((step) => step.id === pipelineStepParam) ?? null;
+  const activeProductionClosureLane = dashboard.productionClosureSummary.lanes.find((lane) => lane.id === closureLaneParam) ?? null;
   const invalidPipelineStep = !activePipelineStep
     ? pipelineStepParam ? `流水线步骤「${pipelineStepParam}」不存在，已显示全部作品。` : null
+    : null;
+  const invalidClosureLane = !activeProductionClosureLane
+    ? closureLaneParam ? `生产闭环「${closureLaneParam}」不存在，已显示全部作品。` : null
     : null;
   const activePipelineValidationReceipt = activePipelineStep?.validationReceipt ?? dashboard.pipelineProofSummary.validationReceipt;
   const activePipelineAction = {
@@ -147,9 +152,12 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps) 
       ? `${activePipelineStep.count}/${dashboard.pipelineProofSummary.totalProjects} 本卡在 ${activePipelineStep.label}`
       : `${dashboard.pipelineProofSummary.bottleneckCount}/${dashboard.pipelineProofSummary.totalProjects} 本卡在 ${dashboard.pipelineProofSummary.bottleneckLabel}`,
   };
-  const visibleItems = activePipelineStep
+  const pipelineFilteredItems = activePipelineStep
     ? dashboard.items.filter((item) => item.pipelineProof.currentStepId === activePipelineStep.id)
     : dashboard.items;
+  const visibleItems = activeProductionClosureLane
+    ? pipelineFilteredItems.filter((item) => item.productionClosure.some((closure) => closure.id === activeProductionClosureLane.id && closure.status !== "allow"))
+    : pipelineFilteredItems;
 
   return (
     <AppShell>
@@ -245,9 +253,8 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps) 
           </div>
           <div className="mt-3 grid gap-2 md:grid-cols-3">
             {dashboard.productionClosureSummary.lanes.map((productionLane) => (
-              <Link
-                className="rounded-md border border-white/10 bg-white/5 p-3 text-sm hover:bg-white/10"
-                href={hrefWithGateReturn(productionLane.actionHref, gateReturn)}
+              <article
+                className={`rounded-md border p-3 text-sm ${activeProductionClosureLane?.id === productionLane.id ? "border-white bg-white/15" : "border-white/10 bg-white/5"}`}
                 key={productionLane.id}
               >
                 <div className="flex items-center justify-between gap-2">
@@ -260,10 +267,15 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps) 
                   <span className="rounded-md bg-rose-400/15 px-2 py-1 text-rose-100">阻塞 {productionLane.blockCount}</span>
                 </div>
                 <p className="mt-2 text-xs leading-5 text-slate-300">{productionLane.detail}</p>
-                <div className="mt-2 text-xs font-medium text-white">
-                  {productionLane.primaryProjectTitle ? `${productionLane.actionLabel} · ${productionLane.primaryProjectTitle}` : productionLane.actionLabel}
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Link className="rounded-md bg-white px-2 py-1 text-xs font-medium text-slate-950 hover:bg-slate-100" href={hrefWithGateReturn(`/projects?closureLane=${productionLane.id}#pipeline-projects`, gateReturn)}>
+                    查看卡点
+                  </Link>
+                  <Link className="rounded-md bg-white/10 px-2 py-1 text-xs font-medium text-white hover:bg-white/20" href={hrefWithGateReturn(productionLane.actionHref, gateReturn)}>
+                    {productionLane.primaryProjectTitle ? `${productionLane.actionLabel} · ${productionLane.primaryProjectTitle}` : productionLane.actionLabel}
+                  </Link>
                 </div>
-              </Link>
+              </article>
             ))}
           </div>
         </div>
@@ -362,6 +374,22 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps) 
           <div className="mt-3 flex flex-col gap-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 sm:flex-row sm:items-center sm:justify-between">
             <span>{invalidPipelineStep}</span>
             <Link className="w-fit rounded-md bg-white px-3 py-2 text-xs font-medium text-amber-900 hover:bg-amber-100" href={hrefWithGateReturn("/projects#pipeline-projects", gateReturn)}>
+              查看全部作品
+            </Link>
+          </div>
+        ) : null}
+        {invalidClosureLane ? (
+          <div className="mt-3 flex flex-col gap-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 sm:flex-row sm:items-center sm:justify-between">
+            <span>{invalidClosureLane}</span>
+            <Link className="w-fit rounded-md bg-white px-3 py-2 text-xs font-medium text-amber-900 hover:bg-amber-100" href={hrefWithGateReturn("/projects#pipeline-projects", gateReturn)}>
+              查看全部作品
+            </Link>
+          </div>
+        ) : null}
+        {activeProductionClosureLane ? (
+          <div className="mt-3 flex flex-col gap-2 rounded-md bg-slate-50 p-3 text-sm text-slate-600 sm:flex-row sm:items-center sm:justify-between">
+            <span>当前只看生产闭环「{activeProductionClosureLane.label}」里还没放行的作品。</span>
+            <Link className="w-fit rounded-md border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-100" href={hrefWithGateReturn("/projects#pipeline-projects", gateReturn)}>
               查看全部作品
             </Link>
           </div>

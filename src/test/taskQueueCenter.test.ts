@@ -279,6 +279,12 @@ test("buildTaskQueueCenter", async (t) => {
     assert.ok(queue.pmFocus.pipelineValidationHint.includes("执行角色"));
     assert.ok(queue.pmFocus.pipelineValidationHint.includes("验收证据"));
     assert.ok(queue.pmFocus.pipelineValidationHint.includes("下一步入口"));
+    assert.ok(queue.recommendedNext?.receiptTemplate.some((line) => line.includes("执行角色：")));
+    assert.ok(queue.recommendedNext?.receiptTemplate.some((line) => line.includes("输入：")));
+    assert.ok(queue.recommendedNext?.receiptTemplate.some((line) => line.includes("输出：")));
+    assert.ok(queue.recommendedNext?.receiptTemplate.some((line) => line.includes("人工验收：通过 / 退回")));
+    assert.ok(queue.recommendedNext?.receiptTemplate.some((line) => line.includes("下一步：")));
+    assert.ok(queue.recommendedNext?.receiptTemplate.some((line) => line.includes("停手线：")));
   });
 
   await t.test("builds a focused blocked debt view for clearing batch risks", () => {

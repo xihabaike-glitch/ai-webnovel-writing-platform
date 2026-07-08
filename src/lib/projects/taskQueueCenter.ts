@@ -143,6 +143,7 @@ export interface QueueItem {
   sourceDispatchKey?: string;
   completionEvidenceTemplate?: string;
   completionEvidenceTemplateSource?: string;
+  receiptTemplate: string[];
   label: string;
   chapterTitle: string;
   evidence: string;
@@ -692,7 +693,35 @@ function queueEvidenceChips(input: {
   ], 3);
 }
 
-function item(input: Omit<QueueItem, "label" | "priority" | "blockerType" | "riskLevel" | "riskLabel" | "riskNotice" | "scaleGate" | "evidenceChips"> & {
+function queueReceiptOwnerRole(input: Pick<QueueItem, "category" | "sourceType" | "blockerType">) {
+  if (input.sourceType === "role_closure" || input.blockerType === "role_closure") return "角色验收负责人";
+  if (input.sourceType === "platform_strategy") return "平台策略运营";
+  if (input.sourceType === "first_day_handoff" || input.blockerType === "first_day_gate") return "首日链路负责人";
+  if (input.sourceType === "first_three_adoption") return "采纳闭环负责人";
+  if (input.sourceType === "tactic_experience_followup") return "打法复盘负责人";
+  if (input.category === "review") return "审稿编辑";
+  if (input.category === "second_pass") return "二改编辑";
+  if (input.category === "draft") return "正文生成负责人";
+  if (input.category === "effect") return "发布复盘运营";
+  if (input.category === "export") return "投稿资料负责人";
+  if (input.category === "blocked") return "阻塞清债负责人";
+  return "任务执行负责人";
+}
+
+function buildQueueItemReceiptTemplate(input: Pick<QueueItem, "projectTitle" | "platformName" | "chapterTitle" | "category" | "sourceType" | "blockerType" | "actionLabel" | "evidence" | "href">) {
+  const ownerRole = queueReceiptOwnerRole(input);
+  return [
+    `执行角色：${ownerRole}`,
+    `输入：${input.projectTitle} · ${input.platformName} · ${input.chapterTitle} · ${input.evidence}`,
+    `输出：${input.actionLabel}后的产物链接、任务结果或修复记录`,
+    "人工验收：通过 / 退回",
+    `验收证据：产物位置、执行结果、人工判断和可复检链接 ${input.href}`,
+    `下一步：${input.actionLabel}后回任务队列或总闸门复检`,
+    "停手线：没有输出、人工验收和下一步入口，不允许进入推荐批次或总闸门放量。",
+  ];
+}
+
+function item(input: Omit<QueueItem, "label" | "priority" | "blockerType" | "riskLevel" | "riskLabel" | "riskNotice" | "scaleGate" | "evidenceChips" | "receiptTemplate"> & {
   blockerType?: QueueItem["blockerType"];
   riskLevel?: QueueItem["riskLevel"];
   riskLabel?: string;
@@ -702,9 +731,14 @@ function item(input: Omit<QueueItem, "label" | "priority" | "blockerType" | "ris
   evidenceChips?: string[];
 }): QueueItem {
   const handoffGuidance = input.handoffGuidance ?? (input.strategyBasis ? buildHandoffGuidance(input.strategyBasis) : null);
-  return {
+  const normalized = {
     ...input,
     blockerType: input.blockerType ?? null,
+    sourceType: input.sourceType,
+  };
+  return {
+    ...input,
+    blockerType: normalized.blockerType,
     riskLevel: input.riskLevel ?? "standard",
     riskLabel: input.riskLabel ?? "标准",
     handoffGuidance,
@@ -713,6 +747,7 @@ function item(input: Omit<QueueItem, "label" | "priority" | "blockerType" | "ris
     label: categoryLabel(input.category),
     priority: input.priority ?? categoryPriority[input.category],
     evidenceChips: input.evidenceChips ?? queueEvidenceChips({ sourceType: input.sourceType, handoffGuidance }),
+    receiptTemplate: buildQueueItemReceiptTemplate(normalized),
   };
 }
 

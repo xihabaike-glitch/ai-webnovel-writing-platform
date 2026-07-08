@@ -62,6 +62,15 @@ test("tasks page shows task receipt acceptance criteria in the PM focus", () => 
   assert.ok(source.includes("taskReceiptAcceptanceCriteria.map"));
 });
 
+test("tasks page renders receipt templates on queue items", () => {
+  assert.ok(source.includes("任务回执模板"));
+  assert.ok(source.includes("entry.receiptTemplate.map"));
+  assert.ok(source.includes("break-words"));
+  assert.ok(source.includes('className="grid min-w-0 gap-3 [&>*]:min-w-0"'));
+  assert.ok(source.includes('className="mt-1 grid min-w-0 gap-1"'));
+  assert.ok(source.includes('className="min-w-0 break-words"'));
+});
+
 test("tasks page carries gate return through task work links", () => {
   const recommendedBatchButton = readFileSync("src/components/tasks/RunRecommendedBatchButton.tsx", "utf8");
   const publishEffectButton = readFileSync("src/components/tasks/RunPublishEffectQueueActionButton.tsx", "utf8");

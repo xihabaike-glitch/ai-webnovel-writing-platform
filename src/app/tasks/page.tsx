@@ -1700,7 +1700,7 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
         </div>
       </section>
 
-      <section className="grid gap-3" id="platform-strategy-tasks">
+      <section className="grid min-w-0 gap-3 [&>*]:min-w-0" id="platform-strategy-tasks">
         {visibleQueueItems.map((entry) => (
           <div className="rounded-md border border-slate-200 bg-white p-4" key={entry.id}>
             <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
@@ -1728,6 +1728,14 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
                   {entry.platformName} · {entry.chapterTitle}
                 </div>
                 <p className="mt-2 text-sm leading-6 text-slate-600">{entry.evidence}</p>
+                <div className="mt-3 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs leading-5 text-slate-700">
+                  <div className="font-medium text-slate-950">任务回执模板</div>
+                  <div className="mt-1 grid min-w-0 gap-1">
+                    {entry.receiptTemplate.map((line) => (
+                      <span className="min-w-0 break-words" key={line}>{line}</span>
+                    ))}
+                  </div>
+                </div>
                 {entry.sourceType === "first_three_adoption" && entry.sourceDetail ? (
                   <div className={`mt-3 rounded-md border px-3 py-2 text-xs leading-5 ${taskQueueSourcePresentation(entry)?.detailClass ?? "border-indigo-200 bg-indigo-50 text-indigo-950"}`}>
                     <span className="font-medium">{entry.sourceLabel}：</span>{entry.sourceDetail}

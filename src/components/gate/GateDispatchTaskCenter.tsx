@@ -121,6 +121,66 @@ const dispatchReceiptAcceptanceCriteria = [
   "下一步",
 ];
 
+interface DispatchReceiptCloseoutPreview {
+  fields: Array<{
+    label: string;
+    ready: boolean;
+    detail: string;
+  }>;
+  missingLabels: string[];
+}
+
+function hasCompletionAcceptanceSignal(text: string) {
+  return /人工验收|验收|通过|退回|采用|未采用|确认|驳回/.test(text);
+}
+
+function hasCompletionNextStepSignal(text: string) {
+  return /下一步|下一动作|下一轮|下一批|继续|暂停|回总闸门|回作品|修复|复检|放量结论|复验结论|结论/.test(text);
+}
+
+function buildDispatchReceiptCloseoutPreview(
+  task: PersistedGatePlatformDispatchTask,
+  completionEvidence: string,
+): DispatchReceiptCloseoutPreview {
+  const text = completionEvidence.trim();
+  const fields = [
+    {
+      label: "执行角色",
+      ready: Boolean(task.ownerRole.trim()),
+      detail: task.ownerRole || "未指定执行角色",
+    },
+    {
+      label: "输入",
+      ready: Boolean(task.detail.trim()),
+      detail: task.detail || "未指定输入任务",
+    },
+    {
+      label: "输出",
+      ready: text.length >= 8,
+      detail: text.length >= 8 ? "完成依据已写入输出摘要" : "完成依据至少写清产物、结果或回填位置",
+    },
+    {
+      label: "人工验收",
+      ready: hasCompletionAcceptanceSignal(text),
+      detail: hasCompletionAcceptanceSignal(text) ? "已看到人工验收信号" : "请写明通过、退回、采用或驳回原因",
+    },
+    {
+      label: "下一步",
+      ready: hasCompletionNextStepSignal(text) || Boolean(task.actionLabel.trim() && task.href.trim()),
+      detail: hasCompletionNextStepSignal(text)
+        ? "完成依据已写下一步"
+        : task.actionLabel
+          ? `页面下一步：${task.actionLabel}`
+          : "请写清下一步入口",
+    },
+  ];
+
+  return {
+    fields,
+    missingLabels: fields.filter((field) => !field.ready).map((field) => field.label),
+  };
+}
+
 function nextState(state: GatePlatformGrowthDispatchState): GatePlatformGrowthDispatchState {
   if (state === "queued") return "assigned";
   if (state === "assigned") return "completed";
@@ -735,6 +795,11 @@ export function GateDispatchTaskCenter({
     const completionEvidence = completionDrafts[task.dispatchKey]?.trim() ?? "";
     if (targetState === "completed" && completionEvidence.length < 8) {
       setErrorMessage("完成前请写清楚完成依据，至少 8 个字。");
+      return;
+    }
+    const completionCloseoutPreview = buildDispatchReceiptCloseoutPreview(task, completionEvidence);
+    if (targetState === "completed" && completionCloseoutPreview.missingLabels.length) {
+      setErrorMessage(`完成前请补齐派单回执字段：${completionCloseoutPreview.missingLabels.join("、")}。`);
       return;
     }
     const routeCompletionIssue = targetState === "completed"
@@ -2294,6 +2359,7 @@ export function GateDispatchTaskCenter({
             isFocusedCompletionTask
             || (Boolean(completionSuggestion) && completionAcceptanceState.canComplete)
           );
+          const completionCloseoutPreview = buildDispatchReceiptCloseoutPreview(task, completionDraft);
           return (
           <div
             className={`min-w-0 rounded-md border bg-white p-4 ${isFocusedTask ? "border-amber-300 ring-2 ring-amber-200" : "border-slate-200"}`}
@@ -2372,6 +2438,27 @@ export function GateDispatchTaskCenter({
                         {dispatchReceiptAcceptanceCriteria.map((criterion) => (
                           <span className="rounded-md bg-white px-2 py-1 text-slate-600" key={criterion}>
                             {criterion}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                    <div className={`rounded-md border p-2 text-xs ${completionCloseoutPreview.missingLabels.length ? "border-amber-200 bg-amber-50 text-amber-900" : "border-emerald-200 bg-emerald-50 text-emerald-800"}`}>
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div className="font-medium">派单回执预检</div>
+                        <span className="rounded-md bg-white/80 px-2 py-1 font-medium">
+                          {completionCloseoutPreview.missingLabels.length
+                            ? `缺少回执字段：${completionCloseoutPreview.missingLabels.join("、")}`
+                            : "回执预检通过"}
+                        </span>
+                      </div>
+                      <div className="mt-2 flex flex-wrap gap-1">
+                        {completionCloseoutPreview.fields.map((field) => (
+                          <span
+                            className={`rounded-md px-2 py-1 ${field.ready ? "bg-white text-emerald-800" : "bg-white text-amber-800"}`}
+                            key={field.label}
+                            title={field.detail}
+                          >
+                            {field.ready ? "已带" : "待补"}：{field.label}
                           </span>
                         ))}
                       </div>

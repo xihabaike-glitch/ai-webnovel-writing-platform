@@ -81,6 +81,32 @@ function parseJsonList(value: string) {
   }
 }
 
+function hasDispatchCompletionAcceptanceSignal(text: string) {
+  return /人工验收|验收|通过|退回|采用|未采用|确认|驳回/.test(text);
+}
+
+function hasDispatchCompletionNextStepSignal(text: string) {
+  return /下一步|下一动作|下一轮|下一批|继续|暂停|回总闸门|回作品|修复|复检|放量结论|复验结论|结论/.test(text);
+}
+
+function missingDispatchReceiptCloseoutLabels(task: {
+  ownerRole: string;
+  detail: string;
+  actionLabel: string;
+  href: string;
+}, completionEvidence: string) {
+  const text = completionEvidence.trim();
+  const checks = [
+    { label: "执行角色", ready: Boolean(task.ownerRole.trim()) },
+    { label: "输入", ready: Boolean(task.detail.trim()) },
+    { label: "输出", ready: text.length >= 8 },
+    { label: "人工验收", ready: hasDispatchCompletionAcceptanceSignal(text) },
+    { label: "下一步", ready: hasDispatchCompletionNextStepSignal(text) || Boolean(task.actionLabel.trim() && task.href.trim()) },
+  ];
+
+  return checks.filter((item) => !item.ready).map((item) => item.label);
+}
+
 function toTask(item: {
   id: string;
   dispatchKey: string;
@@ -1009,6 +1035,10 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: "派单不存在。" }, { status: 404 });
   }
   if (nextState === "completed") {
+    const missingCloseoutLabels = missingDispatchReceiptCloseoutLabels(existingTask, completionEvidence);
+    if (missingCloseoutLabels.length) {
+      return NextResponse.json({ error: `完成前请补齐派单回执字段：${missingCloseoutLabels.join("、")}。` }, { status: 400 });
+    }
     const acceptanceCriteria = parseJsonList(existingTask.acceptanceCriteria);
     const evidence = parseJsonList(existingTask.evidence);
     const validation = validateFirstDayDispatchCompletionEvidence({

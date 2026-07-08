@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 
 const source = readFileSync("src/components/gate/GateDispatchTaskCenter.tsx", "utf8");
 const dispatchPageSource = readFileSync("src/app/dispatch/page.tsx", "utf8");
+const dispatchTaskRouteSource = readFileSync("src/app/api/gate/dispatch-tasks/route.ts", "utf8");
 
 test("dispatch task center sends completed acceptance dispatches back to gate recheck", () => {
   assert.ok(source.includes("dispatchGateRecheckHref"));
@@ -201,6 +202,23 @@ test("dispatch task center renders a visible per-task receipt template", () => {
   assert.ok(source.includes("break-words"));
   assert.ok(source.includes("overflowWrap: \"anywhere\""));
   assert.ok(source.includes("wordBreak: \"break-word\""));
+});
+
+test("dispatch task center previews missing PM receipt fields before completion", () => {
+  assert.ok(source.includes("buildDispatchReceiptCloseoutPreview"));
+  assert.ok(source.includes("completionCloseoutPreview"));
+  assert.ok(source.includes("派单回执预检"));
+  assert.ok(source.includes("缺少回执字段"));
+  assert.ok(source.includes("回执预检通过"));
+  assert.ok(source.includes("completionCloseoutPreview.missingLabels"));
+  assert.ok(source.includes("完成前请补齐派单回执字段"));
+});
+
+test("dispatch task completion API rejects missing PM receipt fields", () => {
+  assert.ok(dispatchTaskRouteSource.includes("missingDispatchReceiptCloseoutLabels"));
+  assert.ok(dispatchTaskRouteSource.includes("hasDispatchCompletionAcceptanceSignal"));
+  assert.ok(dispatchTaskRouteSource.includes("完成前请补齐派单回执字段"));
+  assert.ok(dispatchTaskRouteSource.includes("missingCloseoutLabels.join(\"、\")"));
 });
 
 test("dispatch task center labels acceptance recheck next-step dispatches", () => {

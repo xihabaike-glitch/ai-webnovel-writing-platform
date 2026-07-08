@@ -201,6 +201,8 @@ export interface ProjectListRealSampleAcceptanceQueueItem {
   outcome: ProjectListRealSampleAcceptanceOutcome;
   outcomeLabel: string;
   reason: string;
+  completedEvidence: string[];
+  missingEvidence: string[];
   actionLabel: string;
   actionHref: string;
 }
@@ -908,6 +910,8 @@ function buildRealSampleAcceptanceQueue(items: ProjectListItem[]): ProjectListRe
         outcome: outcome.outcome,
         outcomeLabel: outcome.outcomeLabel,
         reason: item.realSampleValidation.headline,
+        completedEvidence: item.realSampleValidation.completedEvidence,
+        missingEvidence: item.realSampleValidation.missingEvidence,
         actionLabel: item.realSampleValidation.nextActionLabel,
         actionHref: item.realSampleValidation.nextActionHref,
         priority: outcome.priority,

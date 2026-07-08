@@ -342,14 +342,40 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps) 
             </div>
             <div className="mt-3 grid gap-2">
               {dashboard.realSampleAcceptanceQueue.map((sample) => (
-                <div className="flex flex-col gap-2 rounded-md border border-slate-200 bg-slate-50 p-3 text-sm md:flex-row md:items-center md:justify-between" key={sample.projectId}>
-                  <div>
+                <div className="flex flex-col gap-3 rounded-md border border-slate-200 bg-slate-50 p-3 text-sm md:flex-row md:items-start md:justify-between" key={sample.projectId}>
+                  <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="font-medium text-slate-950">{sample.projectTitle}</span>
                       <span className="rounded-md bg-white px-2 py-1 text-xs text-slate-600">{sample.platformName}</span>
                       <span className="rounded-md bg-slate-950 px-2 py-1 text-xs font-medium text-white">{sample.outcomeLabel}</span>
                     </div>
                     <p className="mt-1 text-xs leading-5 text-slate-600">{sample.reason}</p>
+                    <div className="mt-2 grid gap-2 text-xs leading-5 md:grid-cols-2">
+                      <div>
+                        <div className="font-medium text-emerald-800">已收证据</div>
+                        {sample.completedEvidence.length ? (
+                          <ul className="mt-1 space-y-1 text-slate-600">
+                            {sample.completedEvidence.slice(0, 2).map((evidence) => (
+                              <li key={evidence}>- {evidence}</li>
+                            ))}
+                          </ul>
+                        ) : (
+                          <p className="mt-1 text-slate-500">暂无已收证据。</p>
+                        )}
+                      </div>
+                      <div>
+                        <div className="font-medium text-rose-800">缺口退回</div>
+                        {sample.missingEvidence.length ? (
+                          <ul className="mt-1 space-y-1 text-slate-600">
+                            {sample.missingEvidence.slice(0, 2).map((evidence) => (
+                              <li key={evidence}>- {evidence}</li>
+                            ))}
+                          </ul>
+                        ) : (
+                          <p className="mt-1 text-slate-500">没有缺口，等待下一道闸门。</p>
+                        )}
+                      </div>
+                    </div>
                   </div>
                   <Link className="w-fit rounded-md bg-white px-3 py-2 text-xs font-medium text-slate-950 hover:bg-slate-100" href={hrefWithGateReturn(sample.actionHref, gateReturn)}>
                     {sample.actionLabel}

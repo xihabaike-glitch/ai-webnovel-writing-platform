@@ -597,6 +597,9 @@ test("buildProjectListDashboard", async (t) => {
     assert.equal(dashboard.realSampleAcceptanceQueue[0]?.actionLabel, "补开书骨架");
     assert.equal(dashboard.realSampleAcceptanceQueue[0]?.actionHref, "/projects/empty-project");
     assert.ok(dashboard.realSampleAcceptanceQueue[0]?.reason.includes("开书骨架"));
+    assert.ok(dashboard.realSampleAcceptanceQueue[0]?.missingEvidence.some((item) => item.includes("开书骨架")));
+    assert.ok((dashboard.realSampleAcceptanceQueue[2]?.completedEvidence.length ?? 0) >= 5);
+    assert.ok(dashboard.realSampleAcceptanceQueue[2]?.completedEvidence.some((item) => item.includes("派单验收")));
     assert.ok(dashboard.realSampleAcceptanceQueue[2]?.reason.includes("总闸门"));
   });
 

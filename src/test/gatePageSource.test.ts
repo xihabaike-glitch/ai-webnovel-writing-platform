@@ -167,6 +167,12 @@ test("gate page renders the final delivery formal release card", () => {
   assert.ok(source.includes("gate.finalDeliveryRelease.actionLabel"));
 });
 
+test("gate page keeps the formal release verdict visible before it is ready", () => {
+  assert.equal(source.includes("{gate.finalDeliveryRelease.status === \"ready\" ? ("), false);
+  assert.ok(source.includes("aria-label=\"最终交付正式放行判定\""));
+  assert.ok(source.includes("gate.finalDeliveryRelease.status === \"ready\" ? \"正式放行证据\" : \"未放行依据\""));
+});
+
 test("gate page renders action recheck summary feedback", () => {
   assert.ok(source.includes("GateRecheckDispatchButton"));
   assert.ok(source.includes("focusNotice.recheckSummary"));

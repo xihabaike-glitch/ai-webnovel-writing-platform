@@ -121,6 +121,7 @@ test("tasks page gives archive experience blockers a direct repair entry", () =>
   assert.ok(source.includes("item.directRepairSupported"));
   assert.ok(source.includes('purpose="archive_experience_repair"'));
   assert.ok(source.includes("label={item.repairActionLabel}"));
+  assert.ok(source.includes("successHref={gateReturn}"));
   assert.ok(source.includes("archiveExperienceFocused"));
 });
 
@@ -173,7 +174,10 @@ test("tasks page carries gate return through task work links", () => {
   assert.ok(batchRhythmDispatchButton.includes("router.push(hrefWithGateReturn(`/dispatch#dispatch-${payload.task.dispatchKey}`, gateReturnHref));"));
 
   assert.ok(retryTaskButton.includes("purpose?: \"failure_retry\" | \"archive_experience_repair\""));
+  assert.ok(retryTaskButton.includes("successHref?: string | null"));
   assert.ok(retryTaskButton.includes("body: JSON.stringify({ purpose })"));
+  assert.ok(retryTaskButton.includes("if (successHref)"));
+  assert.ok(retryTaskButton.includes("router.push(successHref);"));
   assert.ok(retryTaskButton.includes("{isRetrying ? runningLabel : label}"));
 });
 

@@ -9,12 +9,14 @@ export function RetryTaskButton({
   label = "一键重试",
   runningLabel = "重试中",
   purpose = "failure_retry",
+  successHref = null,
 }: {
   taskId: string;
   className?: string;
   label?: string;
   runningLabel?: string;
   purpose?: "failure_retry" | "archive_experience_repair";
+  successHref?: string | null;
 }) {
   const router = useRouter();
   const [isRetrying, setIsRetrying] = useState(false);
@@ -34,7 +36,11 @@ export function RetryTaskButton({
         throw new Error(payload.error ?? "重试失败。");
       }
       setMessage(payload.task?.status === "succeeded" ? "执行成功" : "已发起重跑");
-      router.refresh();
+      if (successHref) {
+        router.push(successHref);
+      } else {
+        router.refresh();
+      }
     } catch (caught) {
       setMessage(caught instanceof Error ? caught.message : "重试失败。");
     } finally {

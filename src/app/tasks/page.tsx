@@ -1281,6 +1281,7 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
                           label={item.repairActionLabel}
                           purpose="archive_experience_repair"
                           runningLabel="补经验重跑中"
+                          successHref={gateReturn}
                           taskId={item.id}
                         />
                       ) : null}

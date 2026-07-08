@@ -111,7 +111,7 @@ test("buildModelRoleMatrix", async (t) => {
     assert.equal(blocker?.title, "模型编辑部缺岗");
     assert.ok(blocker?.detail.includes("4 个岗位"));
     assert.equal(blocker?.actionLabel, "去配置模型岗位");
-    assert.equal(blocker?.actionHref, "/settings/models#model-role-matrix");
+    assert.equal(blocker?.actionHref, "/settings/models?focus=model-role-matrix#model-role-matrix");
   });
 
   await t.test("builds the PM focus notice for model task routing", () => {
@@ -134,7 +134,7 @@ test("buildModelRoleMatrix", async (t) => {
     assert.ok(notice.proof.includes("失败替代"));
     assert.ok(notice.proof.includes("复检"));
     assert.equal(notice.tone, "blocked");
-    assert.equal(notice.actionHref, "/settings/models#model-role-matrix");
+    assert.equal(notice.actionHref, "/settings/models?focus=model-role-matrix#model-role-matrix");
     assert.equal(notice.pipelineActionLabel, "验收真实流水线");
     assert.equal(notice.pipelineActionHref, "/projects#pipeline-projects");
     assert.ok(notice.pipelineValidationHint.includes("开书"));
@@ -203,7 +203,7 @@ test("buildModelRoleMatrix", async (t) => {
     assert.equal(blocker?.tone, "watch");
     assert.equal(blocker?.title, "模型岗位上下文不够");
     assert.ok(blocker?.detail.includes("3 个岗位"));
-    assert.equal(blocker?.actionHref, "/settings/models#model-role-matrix");
+    assert.equal(blocker?.actionHref, "/settings/models?focus=model-role-matrix#model-role-matrix");
   });
 
   await t.test("does not show a PM blocker once all model roles are ready", () => {

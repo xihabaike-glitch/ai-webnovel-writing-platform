@@ -451,7 +451,7 @@ export function buildModelRoleMatrixPriorityBlocker(matrix: ModelRoleMatrix): Mo
       title: "模型编辑部缺岗",
       detail: `${matrix.summary.missingRoles} 个岗位还没可用模型。继续跑真实写作会变成 Mock 或人工救火，先补 Claude / DeepSeek / Kimi / GPT 的职责分工。${matrix.nextAction}`,
       actionLabel: "去配置模型岗位",
-      actionHref: "/settings/models#model-role-matrix",
+      actionHref: "/settings/models?focus=model-role-matrix#model-role-matrix",
     };
   }
 
@@ -460,7 +460,7 @@ export function buildModelRoleMatrixPriorityBlocker(matrix: ModelRoleMatrix): Mo
     title: "模型岗位上下文不够",
     detail: `${matrix.summary.partialRoles} 个岗位只能顶岗，长篇结构、整卷资料和海外包装容易被迫拆碎。${matrix.nextAction}`,
     actionLabel: "去调整模型岗位",
-    actionHref: "/settings/models#model-role-matrix",
+    actionHref: "/settings/models?focus=model-role-matrix#model-role-matrix",
   };
 }
 
@@ -480,7 +480,7 @@ export function buildModelRoleMatrixPmFocusNotice(matrix: ModelRoleMatrix): Mode
     reason: "写作平台的下一步不是增加聊天入口，而是让 Claude、DeepSeek、Kimi、GPT 按写作任务分工并可复检。",
     proof,
     actionLabel: matrix.status === "ready" ? "检查职责路由" : "补模型岗位",
-    actionHref: "/settings/models#model-role-matrix",
+    actionHref: "/settings/models?focus=model-role-matrix#model-role-matrix",
     pipelineActionLabel: "验收真实流水线",
     pipelineActionHref: "/projects#pipeline-projects",
     pipelineValidationHint: "模型岗位必须落到开书、首章、审稿、发布包和复盘证据；没有真实作品流水线，就只是聊天壳。",

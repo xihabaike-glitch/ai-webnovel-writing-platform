@@ -637,7 +637,8 @@ export function ModelProviderSettings({
   const firstDayFocusTaskType = searchParams.get("taskType");
   const firstDayReturnProjectId = searchParams.get("projectId");
   const isFirstDayRouteFocus = focusParam === "first-day-route";
-  const invalidFocusNotice = focusParam === null || focusParam === "first-day-route"
+  const isModelRoleMatrixFocus = focusParam === "model-role-matrix";
+  const invalidFocusNotice = focusParam === null || focusParam === "first-day-route" || focusParam === "model-role-matrix"
     ? null
     : focusParam ? `模型设置焦点「${focusParam}」不存在，已显示全部模型设置。` : null;
   const firstDayReturnHref = firstDayReturnProjectId
@@ -1302,6 +1303,24 @@ export function ModelProviderSettings({
             <Link className="w-fit rounded-md bg-white px-3 py-2 text-sm font-medium text-amber-950 hover:bg-amber-100" href={hrefWithGateReturn("/settings/models", gateReturnHref)}>
               查看模型设置
             </Link>
+          </div>
+        </section>
+      ) : null}
+      {isModelRoleMatrixFocus ? (
+        <section className="rounded-md border border-rose-200 bg-rose-50 p-4 text-rose-950">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <div className="font-medium">模型岗位修复入口</div>
+              <p className="mt-1 text-sm leading-6">
+                推荐批次被拦住时，先在这里补齐 Claude、DeepSeek、Kimi、GPT 的写作岗位，再保存职责路由和小样本复检派单。
+              </p>
+            </div>
+            <a
+              className="w-fit rounded-md bg-white px-3 py-2 text-sm font-medium text-rose-950 hover:bg-rose-100"
+              href={hrefWithGateReturn("/settings/models#model-role-matrix", gateReturnHref)}
+            >
+              定位岗位矩阵
+            </a>
           </div>
         </section>
       ) : null}

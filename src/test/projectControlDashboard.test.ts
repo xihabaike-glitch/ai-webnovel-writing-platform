@@ -2091,6 +2091,170 @@ test("buildProjectControlDashboard", async (t) => {
     assert.equal(dashboard.productionDecision.primaryTargetHref, "/dispatch#dispatch-model-route-repair:project-1:123");
   });
 
+  await t.test("closes completed model route repair dispatches as passed production decisions", () => {
+    const dashboard = buildProjectControlDashboard({
+      project: {
+        ...project,
+        aiMonthlyBudgetUsd: 5,
+        aiMaxTaskCostUsd: 0.25,
+        aiMaxBatchCostUsd: 1,
+        aiMaxFailureRatePercent: 20,
+        aiBudgetEnforcement: "block",
+      },
+      platform: getPlatformProfile("fanqie"),
+      chapters: [chapter],
+      outlineNodes: [],
+      characters: [],
+      worldEntries: [],
+      foreshadows: [],
+      plotThreads: [],
+      modelProviders: [
+        {
+          id: "gpt-provider",
+          providerId: "gpt",
+          displayName: "GPT",
+          defaultModel: "gpt-4.1",
+          enabled: true,
+          encryptedApiKey: "encrypted",
+        },
+      ],
+      modelRoutes: [
+        { taskType: "chapter_review", primaryProviderConfigId: "gpt-provider", fallbackProviderConfigId: null },
+      ],
+      aiTasks: [
+        {
+          id: "review-1",
+          projectId: "project-1",
+          chapterId: "chapter-1",
+          taskType: "chapter_review",
+          providerConfigId: "gpt-provider",
+          model: "gpt-4.1",
+          status: "failed",
+          outputText: null,
+          inputSnapshot: "{}",
+          inputTokens: 700,
+          outputTokens: 0,
+          costUsd: 0.02,
+          errorMessage: "timeout",
+          createdAt: "2026-01-03T00:00:00.000Z",
+          modelProvider: { providerId: "gpt", displayName: "GPT" },
+        },
+      ],
+      gateDispatchTasks: [
+        {
+          dispatchKey: "model-route-repair:project-1:123",
+          stage: "model_route_confirmation_recheck",
+          state: "completed",
+          title: "模型路线修复派单",
+          detail: "修复章节审稿模型路线。",
+          href: "/settings/models?projectId=project-1#model-task-audit",
+          actionLabel: "修复并复测",
+          completionEvidence: [
+            "模型路线修复派单",
+            "样本数：2",
+            "成功率：100%",
+            "质量：86",
+            "成本：正常",
+            "备用命中：未命中备用",
+            "是否需要治理：否",
+          ].join("\n"),
+          reviewLatestAt: "2026-01-04T00:00:00.000Z",
+          completedAt: "2026-01-04T00:00:00.000Z",
+        },
+      ],
+      submissionChecklist: checklist,
+    });
+
+    assert.equal(dashboard.productionDecision.dispatchStatus, "completed");
+    assert.equal(dashboard.productionDecision.dispatchLabel, "已通过");
+    assert.ok(dashboard.productionDecision.dispatchDetail.includes("成功率 100%"));
+    assert.ok(dashboard.productionDecision.dispatchDetail.includes("质量 86"));
+    assert.equal(dashboard.productionDecision.primaryActionLabel, "继续生产判断");
+    assert.equal(dashboard.productionDecision.primaryTargetHref, "/tasks#recommended-batch");
+  });
+
+  await t.test("closes completed model route repair dispatches as governance-needed production decisions", () => {
+    const dashboard = buildProjectControlDashboard({
+      project: {
+        ...project,
+        aiMonthlyBudgetUsd: 5,
+        aiMaxTaskCostUsd: 0.25,
+        aiMaxBatchCostUsd: 1,
+        aiMaxFailureRatePercent: 20,
+        aiBudgetEnforcement: "block",
+      },
+      platform: getPlatformProfile("fanqie"),
+      chapters: [chapter],
+      outlineNodes: [],
+      characters: [],
+      worldEntries: [],
+      foreshadows: [],
+      plotThreads: [],
+      modelProviders: [
+        {
+          id: "gpt-provider",
+          providerId: "gpt",
+          displayName: "GPT",
+          defaultModel: "gpt-4.1",
+          enabled: true,
+          encryptedApiKey: "encrypted",
+        },
+      ],
+      modelRoutes: [
+        { taskType: "chapter_review", primaryProviderConfigId: "gpt-provider", fallbackProviderConfigId: null },
+      ],
+      aiTasks: [
+        {
+          id: "review-1",
+          projectId: "project-1",
+          chapterId: "chapter-1",
+          taskType: "chapter_review",
+          providerConfigId: "gpt-provider",
+          model: "gpt-4.1",
+          status: "failed",
+          outputText: null,
+          inputSnapshot: "{}",
+          inputTokens: 700,
+          outputTokens: 0,
+          costUsd: 0.02,
+          errorMessage: "timeout",
+          createdAt: "2026-01-03T00:00:00.000Z",
+          modelProvider: { providerId: "gpt", displayName: "GPT" },
+        },
+      ],
+      gateDispatchTasks: [
+        {
+          dispatchKey: "model-route-repair:project-1:123",
+          stage: "model_route_confirmation_recheck",
+          state: "completed",
+          title: "模型路线修复派单",
+          detail: "修复章节审稿模型路线。",
+          href: "/settings/models?projectId=project-1#model-task-audit",
+          actionLabel: "修复并复测",
+          completionEvidence: [
+            "模型路线修复派单",
+            "样本数：2",
+            "成功率：50%",
+            "质量：62",
+            "成本：偏高",
+            "备用命中：命中备用",
+            "是否需要治理：是",
+          ].join("\n"),
+          reviewLatestAt: "2026-01-04T00:00:00.000Z",
+          completedAt: "2026-01-04T00:00:00.000Z",
+        },
+      ],
+      submissionChecklist: checklist,
+    });
+
+    assert.equal(dashboard.productionDecision.dispatchStatus, "needs_governance");
+    assert.equal(dashboard.productionDecision.dispatchLabel, "仍需治理");
+    assert.ok(dashboard.productionDecision.dispatchDetail.includes("成功率 50%"));
+    assert.ok(dashboard.productionDecision.dispatchDetail.includes("质量 62"));
+    assert.equal(dashboard.productionDecision.primaryActionLabel, "继续治理模型路线");
+    assert.equal(dashboard.productionDecision.primaryTargetHref, "/settings/models");
+  });
+
   await t.test("pauses project starts when the stored tactic is a historical avoidance signal", () => {
     const dashboard = buildProjectControlDashboard({
       project,

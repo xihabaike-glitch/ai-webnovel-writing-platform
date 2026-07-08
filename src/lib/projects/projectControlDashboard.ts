@@ -23,6 +23,10 @@ import {
   type GateAiPipelineRecoveryCompletionOutcome,
   type GateDispatchCompletionTemplateTask,
 } from "./gateActionReceipts.ts";
+import {
+  parseRouteDispatchCompletionEvidence,
+  type RouteDispatchCompletionRecord,
+} from "../model-gateway/routeConfirmation.ts";
 
 export interface ControlProject {
   title: string;
@@ -1308,6 +1312,25 @@ function latestModelRouteRepairDispatch(tasks: ControlGateDispatchTask[] = []) {
     .sort((left, right) => new Date(right.reviewLatestAt).getTime() - new Date(left.reviewLatestAt).getTime())[0] ?? null;
 }
 
+function modelRouteRepairCompletion(task: ControlGateDispatchTask): RouteDispatchCompletionRecord | null {
+  if (task.state !== "completed" || !task.completionEvidence.trim()) return null;
+  return parseRouteDispatchCompletionEvidence({
+    stage: task.stage,
+    title: task.title,
+    actionLabel: task.actionLabel,
+  }, task.completionEvidence);
+}
+
+function modelRouteRepairCompletionLine(completion: RouteDispatchCompletionRecord) {
+  return [
+    completion.sampleCount !== null ? `样本 ${completion.sampleCount}` : null,
+    completion.successRatePercent !== null ? `成功率 ${completion.successRatePercent}%` : null,
+    completion.qualityScore !== null ? `质量 ${completion.qualityScore}` : null,
+    completion.cost ? `成本 ${completion.cost}` : null,
+    completion.fallbackHit !== null ? completion.fallbackHit ? "命中备用" : "未命中备用" : null,
+  ].filter((item): item is string => Boolean(item)).join("，");
+}
+
 function modelRouteRepairDispatchFields(
   task: ControlGateDispatchTask | null,
   modelRouteHealth: ModelRouteHealthSummary,
@@ -1322,6 +1345,22 @@ function modelRouteRepairDispatchFields(
   }
   const href = `/dispatch#dispatch-${task.dispatchKey}`;
   if (task.state === "completed") {
+    const completion = modelRouteRepairCompletion(task);
+    if (completion) {
+      const passed = completion.needsGovernance === false
+        && (completion.successRatePercent ?? 0) >= 80
+        && (completion.qualityScore ?? 0) >= 80
+        && completion.fallbackHit !== true;
+      const evidenceLine = modelRouteRepairCompletionLine(completion);
+      return {
+        dispatchStatus: passed ? "completed" : "needs_governance",
+        dispatchLabel: passed ? "已通过" : "仍需治理",
+        dispatchDetail: passed
+          ? `${task.title}已验收通过：${evidenceLine || task.completionEvidence.trim()}。`
+          : `${task.title}验收仍需治理：${evidenceLine || task.completionEvidence.trim()}。`,
+        dispatchHref: passed ? "/tasks#recommended-batch" : href,
+      };
+    }
     const stillRepair = modelRouteHealth.status === "repair";
     return {
       dispatchStatus: stillRepair ? "needs_governance" : "completed",
@@ -1569,8 +1608,16 @@ function buildProductionDecisionSummary(input: {
       actionMode: modelRouteDispatch.dispatchStatus === "none" ? "seed" : null,
       executeLabel: "生成模型路线修复派单",
       ...modelRouteDispatch,
-      primaryActionLabel: modelRouteDispatch.dispatchHref ? "查看模型路线派单" : "修模型路线",
-      primaryTargetHref: modelRouteDispatch.dispatchHref ?? input.modelRouteHealth.targetHref,
+      primaryActionLabel: modelRouteDispatch.dispatchStatus === "completed"
+        ? "继续生产判断"
+        : modelRouteDispatch.dispatchStatus === "needs_governance"
+          ? "继续治理模型路线"
+          : modelRouteDispatch.dispatchHref ? "查看模型路线派单" : "修模型路线",
+      primaryTargetHref: modelRouteDispatch.dispatchStatus === "completed"
+        ? "/tasks#recommended-batch"
+        : modelRouteDispatch.dispatchStatus === "needs_governance"
+          ? input.modelRouteHealth.targetHref
+          : modelRouteDispatch.dispatchHref ?? input.modelRouteHealth.targetHref,
       primaryActionExecution: "link",
       primaryActionReceiptId: null,
       secondaryActionLabel: input.batchHealth.actionLabel,

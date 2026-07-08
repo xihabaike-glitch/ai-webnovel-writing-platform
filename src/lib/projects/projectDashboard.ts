@@ -218,6 +218,35 @@ function hasCompletedDispatchEvidence(task: DashboardGateDispatchTask) {
   return task.state === "completed" && task.completionEvidence.trim().length >= 20;
 }
 
+function completionValueAfterLabel(label: string, text: string) {
+  const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const match = text.match(new RegExp(`${escaped}\\s*[：:=]\\s*([^\\n]+)`, "u"));
+  return match?.[1]?.trim() ?? "";
+}
+
+function hasPublishPackageRecheckReceipt(input: ProjectDashboardInput) {
+  const projectPrefix = input.projectId
+    ? `project-acceptance-next:${input.projectId}:publish_package`
+    : "project-acceptance-next:";
+  return (input.gateDispatchTasks ?? []).some((task) => {
+    if (!task.dispatchKey.startsWith(projectPrefix)) return false;
+    if (input.projectId === undefined && !task.dispatchKey.endsWith(":publish_package")) return false;
+    if (!hasCompletedDispatchEvidence(task)) return false;
+
+    const text = task.completionEvidence;
+    const completedItem = completionValueAfterLabel("完成项", text);
+    const artifact = completionValueAfterLabel("产物链接/位置", text);
+    const manualAcceptance = completionValueAfterLabel("人工验收", text);
+    const gateConclusion = completionValueAfterLabel("回总闸门复检结论", text);
+    const packageSignals = ["发布包", "标题", "简介", "标签", "样章", "前三章"].filter((signal) => completedItem.includes(signal));
+
+    return packageSignals.length >= 4
+      && artifact.length >= 8
+      && /通过|已验收|确认|合格/u.test(manualAcceptance)
+      && /验收缺口已解除|已解除|通过/u.test(gateConclusion);
+  });
+}
+
 function buildRoleDispatchAcceptance(input: ProjectDashboardInput) {
   const tasks = input.gateDispatchTasks ?? [];
   const roleDispatchTasks = tasks.filter((task) => (
@@ -289,7 +318,9 @@ function buildProjectRealSampleAcceptanceSheet(input: ProjectDashboardInput): Pr
   ));
   const roleDispatchAcceptance = buildRoleDispatchAcceptance(input);
   const hasRoleDispatchClosure = !roleDispatchAcceptance.active || roleDispatchAcceptance.done;
-  const hasPublishPackageShape = input.chapters.length >= 3 && hasReview && hasSecondPass && hasDispatchReceipt && hasRoleDispatchClosure;
+  const hasPublishPackageRecheck = hasPublishPackageRecheckReceipt(input);
+  const hasPublishPackagePrerequisites = hasReview && hasSecondPass && hasDispatchReceipt && hasRoleDispatchClosure;
+  const hasPublishPackageShape = hasPublishPackagePrerequisites && (input.chapters.length >= 3 || hasPublishPackageRecheck);
   const definitions: Array<Omit<ProjectAcceptanceStep, "status"> & { done: boolean }> = [
     {
       id: "project_start",
@@ -345,13 +376,18 @@ function buildProjectRealSampleAcceptanceSheet(input: ProjectDashboardInput): Pr
       id: "publish_package",
       label: "发布包",
       done: hasPublishPackageShape,
-      evidence: hasPublishPackageShape ? "前三章、审稿、二改和派单回执已能进入发布包。" : "发布包还缺前三章、二改或派单回执。",
+      evidence: hasPublishPackageShape
+        ? hasPublishPackageRecheck
+          ? "发布包复检分流已补齐标题、简介、标签、前三章样章和人工验收。"
+          : "前三章、审稿、二改和派单回执已能进入发布包。"
+        : "发布包还缺前三章、二改或派单回执。",
       stopRule: "发布包证据不齐时，不要新增平台，也不要扩大投放。",
       href: "#platform-export",
     },
   ];
   const firstMissingIndex = definitions.findIndex((step) => !step.done);
   const currentIndex = firstMissingIndex === -1 ? definitions.length - 1 : firstMissingIndex;
+  const allDone = firstMissingIndex === -1;
   const completedSteps = definitions.filter((step) => step.done).length;
   const missingEvidence = definitions
     .filter((step) => !step.done)
@@ -375,7 +411,7 @@ function buildProjectRealSampleAcceptanceSheet(input: ProjectDashboardInput): Pr
     evidence: step.evidence,
     stopRule: step.stopRule,
     href: step.href,
-    status: index < currentIndex ? "done" : index === currentIndex ? "current" : "blocked",
+    status: allDone || index < currentIndex ? "done" : index === currentIndex ? "current" : "blocked",
   })) satisfies ProjectAcceptanceStep[];
   const current = steps[currentIndex];
   const gateStatus = missingEvidence.length === 0 ? "ready" : "blocked";

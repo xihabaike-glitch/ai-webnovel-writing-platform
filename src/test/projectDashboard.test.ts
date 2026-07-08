@@ -263,4 +263,80 @@ test("buildProjectDashboard", async (t) => {
     assert.equal(passed.realSampleAcceptanceSheet.roleClosureProgress?.missingLabels.length, 0);
     assert.ok(passed.realSampleAcceptanceSheet.roleClosureProgress?.headline.includes("三类角色已闭合"));
   });
+
+  await t.test("uses publish package recheck receipts to close the acceptance sheet", () => {
+    const dashboard = buildProjectDashboard({
+      projectId: "project-publish-recheck",
+      currentWordCount: 4400,
+      targetWordCount: 300000,
+      platform: getPlatformProfile("fanqie"),
+      chapters: [
+        {
+          id: "chapter-1",
+          title: "第一章",
+          order: 1,
+          status: "draft",
+          wordCount: 2200,
+          goal: "让主角遭遇系统。",
+          hook: "门外倒计时和陌生求救同时出现。",
+          conflict: "主角必须在自保和救人之间选择。",
+          valueShift: "普通生活被系统任务击穿。",
+          cliffhanger: "系统提示第一次选择失败过。",
+          updatedAt: "2026-07-01T00:00:00.000Z",
+        },
+        {
+          id: "chapter-2",
+          title: "第二章",
+          order: 2,
+          status: "draft",
+          wordCount: 2200,
+          updatedAt: "2026-07-01T00:00:00.000Z",
+        },
+      ],
+      aiTasks: [
+        {
+          id: "task-1",
+          taskType: "chapter_review",
+          status: "succeeded",
+          model: "mock-editor",
+          createdAt: "2026-07-01T00:00:00.000Z",
+          chapter: { id: "chapter-1", title: "第一章" },
+          modelProvider: { providerId: "mock", displayName: "Mock" },
+        },
+        {
+          id: "task-2",
+          taskType: "chapter_second_pass",
+          status: "succeeded",
+          model: "mock-editor",
+          createdAt: "2026-07-01T00:00:00.000Z",
+          chapter: { id: "chapter-1", title: "第一章" },
+          modelProvider: { providerId: "mock", displayName: "Mock" },
+        },
+      ],
+      gateDispatchTasks: [
+        {
+          dispatchKey: "first-day:project-publish-recheck:publish-precheck",
+          state: "completed",
+          completionEvidence: "首日派单已完成，人工验收确认样本、审稿、二改和发布预检可以进入下一步。",
+        },
+        {
+          dispatchKey: "project-acceptance-next:project-publish-recheck:publish_package",
+          state: "completed",
+          completionEvidence: [
+            "复检分流补证据模板",
+            "完成项：已补齐番茄发布包标题、简介、标签和前三章样章",
+            "产物链接/位置：/projects/project-publish-recheck#platform-export",
+            "人工验收：通过",
+            "回总闸门复检结论：验收缺口已解除",
+          ].join("\n"),
+        },
+      ],
+    });
+
+    assert.equal(dashboard.realSampleAcceptanceSheet.currentStepId, "publish_package");
+    assert.equal(dashboard.realSampleAcceptanceSheet.gateStatus, "ready");
+    assert.equal(dashboard.realSampleAcceptanceSheet.completedSteps, 6);
+    assert.deepEqual(dashboard.realSampleAcceptanceSheet.missingEvidence, []);
+    assert.ok(dashboard.realSampleAcceptanceSheet.steps.find((step) => step.id === "publish_package")?.evidence.includes("复检分流"));
+  });
 });

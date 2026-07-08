@@ -1531,7 +1531,7 @@ function buildAcceptanceSheetGate(
   });
   const sheet = dashboard.realSampleAcceptanceSheet;
   const current = sheet.steps.find((step) => step.id === sheet.currentStepId) ?? sheet.steps[0];
-  const status: PrePublishGateItem["status"] = sheet.verdict.includes("已闭合")
+  const status: PrePublishGateItem["status"] = sheet.gateStatus === "ready"
     ? "pass"
     : current?.id === "publish_package"
       ? "warn"

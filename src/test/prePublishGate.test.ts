@@ -428,7 +428,13 @@ test("buildPrePublishGate", async (t) => {
         }, {
           dispatchKey: "project-acceptance-next:project-recheck-progress:publish_package",
           state: "completed",
-          completionEvidence: "复检分流已补发布包依据：前三章样章、标题简介、标签和人工验收通过。",
+          completionEvidence: [
+            "复检分流补证据模板",
+            "完成项：已补齐番茄发布包标题、简介、标签和前三章样章",
+            "产物链接/位置：/projects/project-recheck-progress#platform-export",
+            "人工验收：通过",
+            "回总闸门复检结论：验收缺口已解除",
+          ].join("\n"),
         }],
         chapters: finalChapters.slice(0, 2),
       }],
@@ -443,27 +449,22 @@ test("buildPrePublishGate", async (t) => {
 
     assert.equal(notice.visible, true);
     assert.equal(notice.recheckSummary?.title, "复检回填作品 · 项目验收单回填");
-    assert.equal(notice.recheckSummary?.completedSteps, 5);
+    assert.equal(notice.recheckSummary?.completedSteps, 6);
     assert.equal(notice.recheckSummary?.totalSteps, 6);
     assert.equal(notice.recheckSummary?.currentStepLabel, "发布包");
-    assert.equal(notice.recheckSummary?.statusLabel, "发布包待验");
-    assert.equal(notice.recheckSummary?.recheckVerdict.tone, "progress");
-    assert.equal(notice.recheckSummary?.recheckVerdict.label, "卡点已减少");
-    assert.ok(notice.recheckSummary?.recheckVerdict.detail.includes("已补 5/6 步"));
-    assert.ok(notice.recheckSummary?.recheckVerdict.detail.includes("继续处理「发布包」"));
-    assert.equal(notice.recheckSummary?.nextStep.tone, "dispatch");
-    assert.equal(notice.recheckSummary?.nextStep.label, "生成下一张派单");
-    assert.ok(notice.recheckSummary?.nextStep.detail.includes("继续补「发布包」"));
+    assert.equal(notice.recheckSummary?.statusLabel, "验收单通过");
+    assert.equal(notice.recheckSummary?.recheckVerdict.tone, "cleared");
+    assert.equal(notice.recheckSummary?.recheckVerdict.label, "验收缺口已解除");
+    assert.ok(notice.recheckSummary?.recheckVerdict.detail.includes("已补 6/6 步"));
+    assert.equal(notice.recheckSummary?.nextStep.tone, "release");
+    assert.ok(notice.recheckSummary?.nextStep.label.includes("补前三章"));
+    assert.ok(notice.recheckSummary?.nextStep.detail.includes("验收缺口已解除"));
     assert.ok(notice.recheckSummary?.completedEvidence.some((line) => line.includes("首日派单已有完成依据")));
     assert.ok(notice.recheckSummary?.latestEvidence?.includes("派单中心已补齐首日平台包预检"));
     assert.equal(notice.recheckSummary?.latestRecheckReceipt?.dispatchKey, "project-acceptance-next:project-recheck-progress:publish_package");
-    assert.ok(notice.recheckSummary?.latestRecheckReceipt?.evidence.includes("复检分流已补发布包依据"));
-    assert.equal(notice.recheckSummary?.nextDispatch?.id, "project-acceptance-next:project-recheck-progress:publish_package");
-    assert.equal(notice.recheckSummary?.nextDispatch?.stage, "start_platform_package");
-    assert.equal(notice.recheckSummary?.nextDispatch?.ownerRole, "平台包装编辑");
-    assert.equal(notice.recheckSummary?.nextDispatch?.actionLabel, "生成下一张派单");
-    assert.ok(notice.recheckSummary?.nextDispatch?.detail.includes("发布包还缺前三章"));
-    assert.ok(notice.detail.includes("已完成 5/6 步"));
+    assert.ok(notice.recheckSummary?.latestRecheckReceipt?.evidence.includes("验收缺口已解除"));
+    assert.equal(notice.recheckSummary?.nextDispatch, null);
+    assert.ok(notice.detail.includes("已完成 6/6 步"));
   });
 
   await t.test("routes cleared acceptance rechecks to the release action", () => {

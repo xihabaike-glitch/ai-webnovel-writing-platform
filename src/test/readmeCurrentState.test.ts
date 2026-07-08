@@ -20,6 +20,10 @@ test("README reflects the current runnable PM delivery state", () => {
   assert.ok(readme.includes("职责路由"));
   assert.ok(readme.includes("推荐批次缺岗硬拦截"));
   assert.ok(readme.includes("验收真实流水线"));
+  assert.ok(readme.includes("端到端可见验收口径地图"));
+  for (const criterion of ["任务回执验收口径", "派单回执验收口径", "失败修复回执验收口径", "发布包与平台复盘验收口径"]) {
+    assert.ok(readme.includes(criterion), `${criterion} should be documented in the README`);
+  }
   assert.ok(readme.includes("npm install"));
   assert.ok(readme.includes("npm run dev"));
   assert.ok(readme.includes("npm test"));

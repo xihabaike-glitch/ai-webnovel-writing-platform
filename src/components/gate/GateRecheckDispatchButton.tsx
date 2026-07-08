@@ -20,23 +20,28 @@ function hrefWithGateReturn(href: string, gateReturnHref?: string | null) {
 
 export function GateRecheckDispatchButton({
   dispatch,
+  dispatches,
   gateReturnHref,
 }: {
   dispatch: PrePublishGateRecheckDispatch;
+  dispatches?: PrePublishGateRecheckDispatch[];
   gateReturnHref?: string | null;
 }) {
   const router = useRouter();
   const [state, setState] = useState<"idle" | "running" | "assigned" | "failed">("idle");
   const [message, setMessage] = useState("");
+  const dispatchQueue = dispatches?.length ? dispatches : [dispatch];
   const dispatchHref = hrefWithGateReturn(`/dispatch#dispatch-${dispatch.id}`, gateReturnHref);
 
   async function assign() {
     setState("running");
     setMessage("");
     try {
-      await persistGateDispatchTask({ ...(dispatch as GatePlatformGrowthDispatchItem), state: "assigned" });
+      await Promise.all(dispatchQueue.map((item) => (
+        persistGateDispatchTask({ ...(item as GatePlatformGrowthDispatchItem), state: "assigned" })
+      )));
       setState("assigned");
-      setMessage(`已生成派单：${dispatch.title}`);
+      setMessage(dispatchQueue.length > 1 ? `已生成 ${dispatchQueue.length} 张派单` : `已生成派单：${dispatch.title}`);
       router.push(dispatchHref);
     } catch (error) {
       setState("failed");
@@ -52,7 +57,7 @@ export function GateRecheckDispatchButton({
         onClick={() => void assign()}
         type="button"
       >
-        {state === "running" ? "生成中" : state === "assigned" ? "已生成派单" : "生成下一张派单"}
+        {state === "running" ? "生成中" : state === "assigned" ? "已生成派单" : dispatchQueue.length > 1 ? `生成 ${dispatchQueue.length} 张派单` : "生成下一张派单"}
       </button>
       {state === "assigned" ? (
         <Link className="rounded-md border border-emerald-200 bg-white px-3 py-2 text-xs font-medium text-emerald-700" href={dispatchHref}>

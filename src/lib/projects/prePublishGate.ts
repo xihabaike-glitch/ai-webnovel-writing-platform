@@ -21,6 +21,7 @@ import {
 } from "./platformPublishExport.ts";
 import { canExecutePublishRepairAction } from "./publishRepairActionExecution.ts";
 import { buildProjectDashboard, type ProjectAcceptanceStep } from "./projectDashboard.ts";
+import { buildProjectRoleWorkflowEntrypoints } from "./projectListDashboard.ts";
 import { buildTaskQueueCenter } from "./taskQueueCenter.ts";
 
 export interface PrePublishGateProject {
@@ -497,6 +498,7 @@ export interface PrePublishGateRecheckSummary {
   remainingBlockers: PrePublishGateRemainingBlocker[];
   latestEvidence: string | null;
   nextDispatch: PrePublishGateRecheckDispatch | null;
+  nextDispatches: PrePublishGateRecheckDispatch[];
 }
 
 export interface PrePublishGateRemainingBlocker {
@@ -1714,6 +1716,8 @@ function buildProjectAcceptanceRecheckSummary(
   const currentStep = steps.find((step) => step.id === project.acceptanceSheetGate.currentStepId) ?? steps[0] ?? null;
   const completedSteps = steps.filter((step) => step.status === "done").length;
   const remainingBlockers = buildProjectAcceptanceRemainingBlockers(project.projectId, steps);
+  const nextDispatch = buildProjectAcceptanceNextDispatch(project, currentStep, completedSteps);
+  const nextDispatches = buildProjectAcceptanceNextDispatches(project, currentStep, completedSteps, nextDispatch);
 
   return {
     title: `${project.projectTitle} · 项目验收单回填`,
@@ -1725,7 +1729,8 @@ function buildProjectAcceptanceRecheckSummary(
     remainingEvidence: steps.filter((step) => step.status !== "done").map((step) => `${step.label}：${step.evidence}`),
     remainingBlockers,
     latestEvidence: project.acceptanceSheetGate.latestDispatchEvidence,
-    nextDispatch: buildProjectAcceptanceNextDispatch(project, currentStep, completedSteps),
+    nextDispatch,
+    nextDispatches,
   };
 }
 
@@ -1779,6 +1784,55 @@ function acceptanceNextDispatchSpec(stepId: ProjectAcceptanceStep["id"]) {
   } as const;
 }
 
+const roleDispatchClosureSpecs = [
+  { entryId: "story-structure", missingLabel: "结构主编" },
+  { entryId: "context-recall", missingLabel: "资料官" },
+  { entryId: "platform-export", missingLabel: "平台包装" },
+] as const;
+
+function missingRoleDispatchClosureSpecs(currentStep: ProjectAcceptanceStep | null) {
+  if (currentStep?.id !== "role_dispatch") return [];
+  return roleDispatchClosureSpecs.filter((spec) => currentStep.evidence.includes(spec.missingLabel));
+}
+
+function buildRoleDispatchClosureDispatches(
+  project: PrePublishGateProjectStatus,
+  currentStep: ProjectAcceptanceStep | null,
+  completedSteps: number,
+): PrePublishGateRecheckDispatch[] {
+  const roleEntrypoints = buildProjectRoleWorkflowEntrypoints();
+  return missingRoleDispatchClosureSpecs(currentStep).flatMap((spec) => {
+    const entry = roleEntrypoints.find((item) => item.id === spec.entryId);
+    if (!entry || !currentStep) return [];
+    const intent = entry.dispatchIntent;
+
+    return {
+      id: `role-intent:${project.projectId}:${entry.id}:${intent.roleId}`,
+      platformId: project.platformId,
+      platformName: project.platformName,
+      stage: "start_role_dispatch_closure",
+      state: "queued",
+      priorityScore: project.acceptanceSheetGate.status === "block" ? 92 : 78,
+      ownerRole: intent.ownerRole,
+      title: `${project.projectTitle}｜${intent.actionLabel}`,
+      detail: `${project.projectTitle} · ${project.platformName} · ${entry.detail} ${currentStep.stopRule} 已完成 ${completedSteps}/${project.acceptanceSheetGate.steps.length} 步，处理后回总闸门复检。`,
+      dueLabel: "今天收口",
+      actionLabel: intent.actionLabel,
+      href: `/projects/${project.projectId}${entry.projectAnchor}`,
+      acceptanceCriteria: [
+        intent.acceptance,
+        `建议模型：${intent.modelOwner}`,
+        "完成后必须补充产物链接、人工验收和下一步判断。",
+      ],
+      evidence: [
+        ...project.acceptanceSheetGate.steps.filter((step) => step.status === "done").map((step) => step.evidence).slice(-3),
+        currentStep.evidence,
+      ],
+      reviewLatestAt: new Date(0).toISOString(),
+    };
+  });
+}
+
 function buildProjectAcceptanceNextDispatch(
   project: PrePublishGateProjectStatus,
   currentStep: ProjectAcceptanceStep | null,
@@ -1812,6 +1866,17 @@ function buildProjectAcceptanceNextDispatch(
     evidence,
     reviewLatestAt: new Date(0).toISOString(),
   };
+}
+
+function buildProjectAcceptanceNextDispatches(
+  project: PrePublishGateProjectStatus,
+  currentStep: ProjectAcceptanceStep | null,
+  completedSteps: number,
+  fallback: PrePublishGateRecheckDispatch | null,
+) {
+  const roleDispatches = buildRoleDispatchClosureDispatches(project, currentStep, completedSteps);
+  if (roleDispatches.length > 0) return roleDispatches;
+  return fallback ? [fallback] : [];
 }
 
 function appendRecheckSummaryDetail(detail: string, summary: PrePublishGateRecheckSummary | null) {

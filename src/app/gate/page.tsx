@@ -371,7 +371,11 @@ export default async function GatePage({
                       </p>
                     ) : null}
                     {focusNotice.recheckSummary.nextDispatch ? (
-                      <GateRecheckDispatchButton dispatch={focusNotice.recheckSummary.nextDispatch} gateReturnHref={gateRecheckReturnHref} />
+                      <GateRecheckDispatchButton
+                        dispatch={focusNotice.recheckSummary.nextDispatch}
+                        dispatches={focusNotice.recheckSummary.nextDispatches}
+                        gateReturnHref={gateRecheckReturnHref}
+                      />
                     ) : null}
                   </div>
                   <div className="grid gap-2 text-xs leading-5 md:grid-cols-2">

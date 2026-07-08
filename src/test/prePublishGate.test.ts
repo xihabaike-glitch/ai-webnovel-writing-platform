@@ -465,6 +465,19 @@ test("buildPrePublishGate", async (t) => {
     assert.equal(notice.recheckSummary?.nextDispatch?.ownerRole, "角色验收负责人");
     assert.ok(notice.recheckSummary?.nextDispatch?.title.includes("补角色派单闭环"));
     assert.ok(notice.recheckSummary?.nextDispatch?.detail.includes("资料官"));
+    assert.deepEqual(
+      notice.recheckSummary?.nextDispatches.map((dispatch) => dispatch.id),
+      [
+        "role-intent:project-recheck-role:context-recall:context_librarian",
+        "role-intent:project-recheck-role:platform-export:overseas_packager",
+      ],
+    );
+    assert.deepEqual(
+      notice.recheckSummary?.nextDispatches.map((dispatch) => dispatch.ownerRole),
+      ["长上下文资料官", "海外投稿包装编辑"],
+    );
+    assert.ok(notice.recheckSummary?.nextDispatches[0]?.href.includes("/projects/project-recheck-role#context-recall"));
+    assert.ok(notice.recheckSummary?.nextDispatches[1]?.acceptanceCriteria.some((item) => item.includes("WebNovel")));
   });
 
   await t.test("orders action recheck blockers with the current gate blocker first", () => {

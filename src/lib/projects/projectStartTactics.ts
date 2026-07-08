@@ -884,6 +884,21 @@ export function buildProjectStartExperienceDigest(input: {
   };
 }
 
+export function buildProjectStartExecutionPromptBlock(startTactic?: ProjectStartTacticSummary | null) {
+  if (!startTactic) return "";
+  const lines = uniqueLines([
+    `来源：${startTactic.label}`,
+    ...((startTactic.handoffEvidence ?? []).map((item) => `证据：${item}`)),
+    ...((startTactic.firstDayActions ?? []).map((item) => `复制动作：${item}`)),
+    ...((startTactic.avoidRules ?? []).map((item) => `不能踩：${item}`)),
+    `开头动作：${startTactic.openingMove}`,
+    `验证动作：${startTactic.verificationMove}`,
+    startTactic.risk ? `风险提醒：${startTactic.risk}` : null,
+  ], 10);
+  if (lines.length <= 1) return "";
+  return ["开书经验执行摘要：", ...lines.map((line) => `- ${line}`)].join("\n");
+}
+
 function handoffDueLabel(status: ProjectStartExperienceHandoffStatus) {
   if (status === "blocked") return "今天止损确认";
   if (status === "small_sample" || status === "reuse") return "今天小样本验证";

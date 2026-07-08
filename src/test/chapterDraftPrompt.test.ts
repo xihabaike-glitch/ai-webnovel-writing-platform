@@ -82,6 +82,47 @@ test("buildChapterDraftPrompt", async (t) => {
     assert.ok(tacticPrompt.userPrompt.includes("记录首轮曝光、点击、收藏、追读"));
   });
 
+  await t.test("injects reusable start experience evidence into draft execution", () => {
+    const tacticPrompt = buildChapterDraftPrompt({
+      projectTitle: "夜雨系统",
+      genre: "都市系统",
+      sellingPoint: "雨夜系统翻盘",
+      platform: getPlatformProfile("fanqie"),
+      startTactic: {
+        title: "首轮平台打法：番茄小说",
+        label: "闭环交接",
+        primaryTactic: "新书开局闭环打法已经进入首日流程。",
+        openingMove: "第一段直接给倒计时和不可逆危机。",
+        verificationMove: "记录首轮曝光、点击、收藏、追读。",
+        risk: "不要直接放量。",
+        firstDayActions: [
+          "闭环复用：沿用已完成的新书开局三段交接。",
+          "开头：第一段给不可逆危机。",
+        ],
+        avoidRules: ["不要直接放量，先做小样本。"],
+        handoffEvidence: [
+          "知识来源：番茄小说 正反馈经验已沉淀",
+          "平台反哺：执行正反馈链",
+        ],
+      },
+      targetWords: 1200,
+      chapter: {
+        title: "第一章 雨夜系统",
+        goal: "让主角遭遇不可逆事件。",
+        hook: "系统倒计时只剩十秒。",
+        conflict: "主角必须在逃跑和救人之间选择。",
+        valueShift: "普通生活转向失控危机。",
+        cliffhanger: "系统给出第二个选择。",
+        content: "",
+      },
+    });
+
+    assert.ok(tacticPrompt.userPrompt.includes("开书经验执行摘要"));
+    assert.ok(tacticPrompt.userPrompt.includes("知识来源：番茄小说"));
+    assert.ok(tacticPrompt.userPrompt.includes("复制动作：闭环复用"));
+    assert.ok(tacticPrompt.userPrompt.includes("不能踩：不要直接放量"));
+  });
+
   await t.test("includes project context recall when available", () => {
     const projectContext = buildProjectContextPack({
       currentChapterId: "chapter-2",

@@ -1,5 +1,5 @@
 import type { PlatformProfile } from "../platforms/platformProfiles.ts";
-import type { ProjectStartTacticSummary } from "../projects/projectStartTactics.ts";
+import { buildProjectStartExecutionPromptBlock, type ProjectStartTacticSummary } from "../projects/projectStartTactics.ts";
 import { countWords } from "../text/wordCount.ts";
 
 export interface OpeningDiagnosticInput {
@@ -177,8 +177,10 @@ function verdict(score: number) {
 
 function buildRewritePlan(items: OpeningDiagnosticItem[], platform: PlatformProfile, startTactic?: ProjectStartTacticSummary | null) {
   const failed = items.filter((entry) => entry.status !== "pass");
+  const experienceBlock = buildProjectStartExecutionPromptBlock(startTactic);
   return [
     startTactic ? `先执行首轮平台打法：${startTactic.openingMove}` : null,
+    experienceBlock ? experienceBlock : null,
     failed[0]?.suggestion ?? "保留当前开局钩子，把主角选择和代价再写得更具体。",
     failed[1]?.suggestion ?? `继续贴合${platform.name}的审稿重点：${platform.reviewFocus.join("、")}。`,
     "把前 800 字改成：异常事件 -> 主角即时反应 -> 两难选择 -> 明确代价 -> 章末新问题。",
@@ -223,6 +225,7 @@ export function buildOpeningDiagnostic(input: OpeningDiagnosticInput): OpeningDi
       ...input.platform.openingRules,
       ...input.platform.reviewFocus.slice(0, 3),
       ...(input.startTactic ? [`首轮打法：${input.startTactic.openingMove}`] : []),
+      ...buildProjectStartExecutionPromptBlock(input.startTactic).split("\n").filter(Boolean),
     ],
   };
 

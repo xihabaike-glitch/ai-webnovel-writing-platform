@@ -236,9 +236,22 @@ interface ControlAssetQualityReport {
   createdAt: string;
 }
 
+interface ProductionDecisionSummary {
+  status: "continue" | "recheck" | "repair" | "watch";
+  tone: "allow" | "watch" | "block";
+  label: string;
+  headline: string;
+  reason: string;
+  primaryActionLabel: string;
+  primaryTargetHref: string;
+  secondaryActionLabel: string;
+  secondaryTargetHref: string;
+}
+
 interface ProjectControlDashboard {
   overallScore: number;
   verdict: string;
+  productionDecision: ProductionDecisionSummary;
   platformVerdict: PlatformControlVerdictSummary;
   platformFeedback: PlatformFeedbackSummary;
   platformEvidenceLoop: PlatformEvidenceLoopSummary;
@@ -374,6 +387,12 @@ function qualityStatusLabel(status: ControlAssetQualityReport["status"]) {
   if (status === "pass") return "通过";
   if (status === "warn") return "需看";
   return "拦截";
+}
+
+function productionDecisionClass(tone: ProductionDecisionSummary["tone"]) {
+  if (tone === "allow") return "border-emerald-200 bg-emerald-50 text-emerald-900";
+  if (tone === "watch") return "border-amber-200 bg-amber-50 text-amber-900";
+  return "border-rose-200 bg-rose-50 text-rose-900";
 }
 
 function platformVerdictStatusLabel(status: PlatformControlVerdictSummary["status"]) {
@@ -947,6 +966,37 @@ export function ProjectControlDashboardPanel({
               <div className="rounded-md bg-slate-50 p-3">
                 <div className="text-xs text-slate-500">可导出</div>
                 <div className="mt-1 text-2xl font-semibold text-slate-950">{dashboard.metrics.publishableChapters}</div>
+              </div>
+            </div>
+          </div>
+
+          <div className={`rounded-md border p-3 ${productionDecisionClass(dashboard.productionDecision.tone)}`}>
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+              <div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="font-medium">生产总控判断</div>
+                  <span className="rounded-md bg-white/70 px-2 py-1 text-[11px] font-semibold">
+                    {dashboard.productionDecision.label}
+                  </span>
+                </div>
+                <p className="mt-2 text-sm leading-6">{dashboard.productionDecision.headline}</p>
+                <div className="mt-2 rounded-md bg-white/70 px-2 py-1 text-xs leading-5">
+                  {dashboard.productionDecision.reason}
+                </div>
+              </div>
+              <div className="flex shrink-0 flex-wrap gap-2">
+                <Link
+                  className="inline-flex w-fit items-center justify-center rounded-md bg-white px-3 py-2 text-xs font-medium text-slate-950 hover:bg-slate-50"
+                  href={hrefWithGateReturn(projectScopedHref(projectId, dashboard.productionDecision.primaryTargetHref), gateReturnHref)}
+                >
+                  {dashboard.productionDecision.primaryActionLabel}
+                </Link>
+                <Link
+                  className="inline-flex w-fit items-center justify-center rounded-md border border-white/70 px-3 py-2 text-xs font-medium hover:bg-white/60"
+                  href={hrefWithGateReturn(projectScopedHref(projectId, dashboard.productionDecision.secondaryTargetHref), gateReturnHref)}
+                >
+                  {dashboard.productionDecision.secondaryActionLabel}
+                </Link>
               </div>
             </div>
           </div>

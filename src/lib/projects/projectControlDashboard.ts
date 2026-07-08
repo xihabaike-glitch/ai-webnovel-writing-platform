@@ -325,9 +325,22 @@ export interface AiPipelinePromptMemorySummary {
   targetHref: string;
 }
 
+export interface ProductionDecisionSummary {
+  status: "continue" | "recheck" | "repair" | "watch";
+  tone: "allow" | "watch" | "block";
+  label: string;
+  headline: string;
+  reason: string;
+  primaryActionLabel: string;
+  primaryTargetHref: string;
+  secondaryActionLabel: string;
+  secondaryTargetHref: string;
+}
+
 export interface ProjectControlDashboard {
   overallScore: number;
   verdict: string;
+  productionDecision: ProductionDecisionSummary;
   platformVerdict: PlatformControlVerdictSummary;
   platformFeedback: PlatformFeedbackSummary;
   platformEvidenceLoop: PlatformEvidenceLoopSummary;
@@ -1260,6 +1273,94 @@ function buildModelRouteHealthSummary(input: ProjectControlDashboardInput): Mode
   };
 }
 
+function buildProductionDecisionSummary(input: {
+  batch: AiPipelineBatchSummary;
+  batchHealth: AiPipelineBatchHealthSummary;
+  modelRouteHealth: ModelRouteHealthSummary;
+}): ProductionDecisionSummary {
+  if (input.batchHealth.status === "blocked") {
+    return {
+      status: "repair",
+      tone: "block",
+      label: "先修复",
+      headline: "批量健康已经跌线，别继续扩大 AI 写审改。",
+      reason: `批量健康：${input.batchHealth.scaleDecisionLabel}；模型路线：${input.modelRouteHealth.label}。先修复失败任务和低分环节，再谈继续生产。`,
+      primaryActionLabel: "修批量打法",
+      primaryTargetHref: "/failures",
+      secondaryActionLabel: input.modelRouteHealth.actionLabel,
+      secondaryTargetHref: input.modelRouteHealth.targetHref,
+    };
+  }
+
+  if (input.modelRouteHealth.status === "repair") {
+    return {
+      status: "repair",
+      tone: "block",
+      label: "先修复",
+      headline: "模型路线有失败或避用信号，先修路由再继续写。",
+      reason: `模型路线：${input.modelRouteHealth.headline} 批量健康：${input.batchHealth.scaleDecisionLabel}。`,
+      primaryActionLabel: "修模型路线",
+      primaryTargetHref: input.modelRouteHealth.targetHref,
+      secondaryActionLabel: input.batchHealth.actionLabel,
+      secondaryTargetHref: input.batchHealth.targetHref,
+    };
+  }
+
+  if (input.modelRouteHealth.status === "cost_guard") {
+    return {
+      status: "watch",
+      tone: "watch",
+      label: "先控成本",
+      headline: "模型路线能跑，但成本闸门还没稳住。",
+      reason: `模型路线：${input.modelRouteHealth.detail}；批量健康：${input.batchHealth.scaleDecisionLabel}。先控成本，再继续放量。`,
+      primaryActionLabel: input.modelRouteHealth.actionLabel,
+      primaryTargetHref: input.modelRouteHealth.targetHref,
+      secondaryActionLabel: input.batchHealth.actionLabel,
+      secondaryTargetHref: input.batchHealth.targetHref,
+    };
+  }
+
+  if (input.batchHealth.status === "watch") {
+    return {
+      status: "recheck",
+      tone: "watch",
+      label: "小批复验",
+      headline: "批量样本还薄，下一步只跑复验小批。",
+      reason: `批量健康：${input.batchHealth.scaleDecisionDetail} 模型路线：${input.modelRouteHealth.label}。`,
+      primaryActionLabel: input.batchHealth.executeLabel,
+      primaryTargetHref: input.batchHealth.targetHref,
+      secondaryActionLabel: input.modelRouteHealth.actionLabel,
+      secondaryTargetHref: input.modelRouteHealth.targetHref,
+    };
+  }
+
+  if (input.batchHealth.status === "empty" || input.modelRouteHealth.status === "empty") {
+    return {
+      status: "watch",
+      tone: "watch",
+      label: "先建样本",
+      headline: "还缺可复盘样本，先跑一轮推荐小批。",
+      reason: `批量健康：${input.batchHealth.scaleDecisionDetail} 模型路线：${input.modelRouteHealth.headline}`,
+      primaryActionLabel: input.batch.canRun ? "执行推荐批次" : input.batch.actionLabel,
+      primaryTargetHref: input.batch.targetHref,
+      secondaryActionLabel: input.modelRouteHealth.actionLabel,
+      secondaryTargetHref: input.modelRouteHealth.targetHref,
+    };
+  }
+
+  return {
+    status: "continue",
+    tone: "allow",
+    label: "继续生产",
+    headline: "批量健康和模型路线都过线，可以继续小步生产。",
+    reason: `批量健康：${input.batchHealth.scaleDecisionLabel}；模型路线：${input.modelRouteHealth.label}。继续按推荐批次小步推进，并保留下一批回执。`,
+    primaryActionLabel: "执行推荐批次",
+    primaryTargetHref: input.batch.targetHref,
+    secondaryActionLabel: input.batchHealth.actionLabel,
+    secondaryTargetHref: input.batchHealth.targetHref,
+  };
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
@@ -2076,6 +2177,11 @@ export function buildProjectControlDashboard(input: ProjectControlDashboardInput
   const aiPipelineControlPlan = buildAiPipelineControlPlanSummary(input.gateActionAudits);
   const aiPipelinePromptMemory = buildAiPipelinePromptMemorySummary(input.gateActionAudits);
   const modelRouteHealth = buildModelRouteHealthSummary(input);
+  const productionDecision = buildProductionDecisionSummary({
+    batch: aiPipelineBatch,
+    batchHealth: aiPipelineBatchHealth,
+    modelRouteHealth,
+  });
   const aiPipelineBaseEvidence = `${batchDraft.readyCandidates} 章可初稿，${reviewPipeline.reviewReadyCount} 章待审，${reviewPipeline.secondPassReadyCount} 章可二改。`;
   const aiPipelineArea = aiPipelineAreaDecision({
     baseScore: aiPipelineScore,
@@ -2133,6 +2239,7 @@ export function buildProjectControlDashboard(input: ProjectControlDashboardInput
   return {
     overallScore,
     verdict: verdict(overallScore),
+    productionDecision,
     platformVerdict,
     platformFeedback,
     platformEvidenceLoop,

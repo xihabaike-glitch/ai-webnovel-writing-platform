@@ -195,6 +195,11 @@ test("buildProjectControlDashboard", async (t) => {
     assert.equal(dashboard.aiPipelineBatchHealth.status, "empty");
     assert.ok(dashboard.modelRouteHealth.totalTasks >= 1);
     assert.ok(dashboard.modelRouteHealth.nextActions.length > 0);
+    assert.equal(dashboard.productionDecision.status, "watch");
+    assert.equal(dashboard.productionDecision.label, "先建样本");
+    assert.equal(dashboard.productionDecision.primaryActionLabel, "执行推荐批次");
+    assert.equal(dashboard.productionDecision.primaryTargetHref, "/tasks#recommended-batch");
+    assert.ok(dashboard.productionDecision.reason.includes("批量健康"));
     assert.equal(dashboard.storyFoundation.status, "blocked");
     assert.equal(dashboard.storyFoundation.label, "先搭底座");
     assert.equal(dashboard.storyFoundation.axes.length, 5);
@@ -631,7 +636,20 @@ test("buildProjectControlDashboard", async (t) => {
       worldEntries: [],
       foreshadows: [],
       plotThreads: [],
-      aiTasks: [],
+      aiTasks: [
+        {
+          id: "review-stable-1",
+          chapterId: "chapter-1",
+          taskType: "chapter_review",
+          status: "succeeded",
+          outputText: JSON.stringify({ score: 92, issues: [] }),
+          errorMessage: null,
+          modelProvider: "Claude",
+          model: "claude-sonnet-4.5",
+          costUsd: 0.01,
+          createdAt: "2026-01-02T00:00:00.000Z",
+        },
+      ],
       gateActionAudits: [
         {
           receiptId: "stable-2",
@@ -677,6 +695,12 @@ test("buildProjectControlDashboard", async (t) => {
     assert.equal(dashboard.aiPipelineBatchHealth.scaleDecisionLabel, "允许小步加码");
     assert.equal(dashboard.aiPipelineBatchHealth.scaleDecisionTone, "allow");
     assert.ok(dashboard.aiPipelineBatchHealth.scaleDecisionDetail.includes("小步加码"));
+    assert.equal(dashboard.productionDecision.status, "continue");
+    assert.equal(dashboard.productionDecision.label, "继续生产");
+    assert.equal(dashboard.productionDecision.primaryActionLabel, "执行推荐批次");
+    assert.equal(dashboard.productionDecision.primaryTargetHref, "/tasks#recommended-batch");
+    assert.ok(dashboard.productionDecision.reason.includes("批量健康"));
+    assert.ok(dashboard.productionDecision.reason.includes("模型路线"));
     assert.equal(dashboard.aiPipelineBatchHealth.tacticLabel, "三轮稳住打法");
     assert.equal(dashboard.aiPipelineBatchHealth.sampleBatches, 2);
     assert.equal(dashboard.aiPipelineBatchHealth.successRatePercent, 100);
@@ -855,6 +879,10 @@ test("buildProjectControlDashboard", async (t) => {
     assert.equal(dashboard.aiPipelineBatchHealth.scaleDecisionLabel, "禁止放大");
     assert.equal(dashboard.aiPipelineBatchHealth.scaleDecisionTone, "block");
     assert.ok(dashboard.aiPipelineBatchHealth.scaleDecisionDetail.includes("先修复"));
+    assert.equal(dashboard.productionDecision.status, "repair");
+    assert.equal(dashboard.productionDecision.label, "先修复");
+    assert.equal(dashboard.productionDecision.primaryActionLabel, "修批量打法");
+    assert.equal(dashboard.productionDecision.primaryTargetHref, "/failures");
     assert.equal(aiArea?.status, "blocked");
     assert.equal(aiArea?.actionLabel, "修批量打法");
     assert.equal(aiArea?.canExecute, true);

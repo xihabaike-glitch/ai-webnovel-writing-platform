@@ -143,6 +143,10 @@ test("project detail page carries gate return through control and batch panels",
   assert.ok(controlPanel.includes("href={hrefWithGateReturn(`/projects/${projectId}#${axis.targetAnchor}`, gateReturnHref)}"));
   assert.ok(controlPanel.includes("href={hrefWithGateReturn(`/projects/${projectId}#world-bible`, gateReturnHref)}"));
   assert.ok(controlPanel.includes("href={hrefWithGateReturn(message.actionHref, gateReturnHref)}"));
+  assert.ok(controlPanel.includes("function productionDecisionClass"));
+  assert.ok(controlPanel.includes("{dashboard.productionDecision.label}"));
+  assert.ok(controlPanel.includes("{dashboard.productionDecision.reason}"));
+  assert.ok(controlPanel.includes("href={hrefWithGateReturn(projectScopedHref(projectId, dashboard.productionDecision.primaryTargetHref), gateReturnHref)}"));
   assert.ok(controlPanel.includes("href={hrefWithGateReturn(projectScopedHref(projectId, dashboard.aiPipelineBatchHealth.targetHref), gateReturnHref)}"));
   assert.ok(controlPanel.includes("href={hrefWithGateReturn(projectScopedHref(projectId, dashboard.aiPipelinePromptMemory.targetHref), gateReturnHref)}"));
   assert.ok(controlPanel.includes("href={hrefWithGateReturn(projectScopedHref(projectId, dashboard.aiPipelinePromptMemory.gateActionHref), gateReturnHref)}"));

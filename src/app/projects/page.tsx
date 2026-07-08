@@ -184,6 +184,20 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps) 
       href: projectsFilterHref({ pipelineStepId: activePipelineStep?.id ?? null, closureLaneId: null }),
     } : null,
   ].filter((item): item is { id: string; label: string; href: string } => Boolean(item));
+  const pipelineAcceptanceGapCount = Math.max(0, dashboard.pipelineAcceptanceSummary.totalProjects - dashboard.pipelineAcceptanceSummary.passCount);
+  const pipelineAcceptanceCloseoutPercent = dashboard.pipelineAcceptanceSummary.totalProjects > 0
+    ? Math.round((dashboard.pipelineAcceptanceSummary.passCount / dashboard.pipelineAcceptanceSummary.totalProjects) * 100)
+    : 0;
+  const pipelineAcceptanceReleaseLabel = dashboard.pipelineAcceptanceSummary.totalProjects === 0
+    ? "等待作品样本"
+    : dashboard.pipelineAcceptanceSummary.repairCount > 0
+      ? "暂不放行"
+      : dashboard.pipelineAcceptanceSummary.holdBatchCount > 0
+        ? "暂停批量"
+        : "可以进入发布复盘";
+  const pipelineAcceptanceNextCutLabel = pipelineAcceptanceGapCount > 0
+    ? dashboard.pipelineProofSummary.bottleneckLabel
+    : "发布复盘";
 
   return (
     <AppShell>
@@ -332,6 +346,30 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps) 
             <div className="rounded-md bg-rose-50 p-3 text-sm text-rose-900">
               <div className="text-xs opacity-75">需修复</div>
               <div className="mt-1 font-semibold">{dashboard.pipelineAcceptanceSummary.repairCount}</div>
+            </div>
+          </div>
+          <div className="mt-3 rounded-md border border-slate-200 bg-white p-3 text-xs text-slate-700" aria-label="真实流水线收口面板">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <div className="font-medium text-slate-950">真实流水线收口面板</div>
+                <p className="mt-1 leading-5 text-slate-600">
+                  先让真实作品样本过开书、任务回执、总闸门和发布复盘，不用批量生成掩盖缺口。
+                </p>
+              </div>
+              <div className="w-fit rounded-md bg-slate-950 px-2 py-1 text-[11px] font-semibold text-white">
+                完成率 {pipelineAcceptanceCloseoutPercent}%
+              </div>
+            </div>
+            <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-200" aria-label="真实流水线完成率">
+              <div
+                className="h-full rounded-full bg-emerald-500"
+                style={{ width: `${pipelineAcceptanceCloseoutPercent}%` }}
+              />
+            </div>
+            <div className="mt-3 grid gap-2 sm:grid-cols-3">
+              <div className="rounded-md bg-slate-50 px-3 py-2 font-medium text-slate-800">放行判断：{pipelineAcceptanceReleaseLabel}</div>
+              <div className="rounded-md bg-slate-50 px-3 py-2 font-medium text-slate-800">收口缺口：{pipelineAcceptanceGapCount}</div>
+              <div className="rounded-md bg-slate-50 px-3 py-2 font-medium text-slate-800">下一刀：{pipelineAcceptanceNextCutLabel}</div>
             </div>
           </div>
           <div className="mt-3 rounded-md border border-slate-200 bg-white p-3">

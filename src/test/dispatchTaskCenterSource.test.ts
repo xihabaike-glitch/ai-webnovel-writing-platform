@@ -181,6 +181,21 @@ test("dispatch task center shows dispatch receipt acceptance criteria before com
   assert.ok(source.includes("dispatchReceiptAcceptanceCriteria.map"));
 });
 
+test("dispatch task center renders a visible per-task receipt template", () => {
+  assert.ok(source.includes("buildDispatchReceiptTemplate"));
+  assert.ok(source.includes("派单回执模板"));
+  assert.ok(source.includes("receiptTemplate.map"));
+  assert.ok(source.includes("执行角色："));
+  assert.ok(source.includes("输入："));
+  assert.ok(source.includes("输出："));
+  assert.ok(source.includes("人工验收："));
+  assert.ok(source.includes("下一步："));
+  assert.ok(source.includes("停手线："));
+  assert.ok(source.includes("break-words"));
+  assert.ok(source.includes("overflowWrap: \"anywhere\""));
+  assert.ok(source.includes("wordBreak: \"break-word\""));
+});
+
 test("dispatch task center labels acceptance recheck next-step dispatches", () => {
   assert.ok(source.includes("isProjectAcceptanceNextDispatchTask"));
   assert.ok(source.includes("project-acceptance-next:"));

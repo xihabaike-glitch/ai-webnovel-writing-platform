@@ -144,6 +144,23 @@ function buildGateRecheckActionLink(task: PersistedGatePlatformDispatchTask): Ro
   };
 }
 
+function buildDispatchReceiptTemplate(task: PersistedGatePlatformDispatchTask, completionTemplate: string) {
+  const evidenceLine = task.evidence.length > 0 ? task.evidence.slice(0, 3).join("、") : "等待补充任务证据";
+  const outputLine = completionTemplate
+    ? "按完成依据模板提交可复核产物、结果摘要和回填位置。"
+    : `完成「${task.actionLabel}」并留下可复核产物。`;
+
+  return [
+    `执行角色：${task.ownerRole}`,
+    `输入：${task.detail}`,
+    `输出：${outputLine}`,
+    "人工验收：通过 / 退回，并写清退回原因。",
+    `下一步：${task.actionLabel}（${task.href}）`,
+    `证据来源：${evidenceLine}`,
+    "停手线：没有产物链接、人工验收和下一步判断，不允许标记完成。",
+  ];
+}
+
 function dispatchKeyFromHash(hash: string) {
   const prefix = "#dispatch-";
   if (!hash.startsWith(prefix)) return "";
@@ -2210,6 +2227,7 @@ export function GateDispatchTaskCenter({
         {filteredTasks.map((task) => {
           const completionSuggestion = completionSuggestionByKey.get(task.dispatchKey);
           const completionTemplate = completionTextForTask(task);
+          const receiptTemplate = buildDispatchReceiptTemplate(task, completionTemplate);
           const firstDayCompletionHint = buildFirstDayDispatchCompletionHint(task);
           const completionRecord = task.completionEvidence
             ? parseRouteDispatchCompletionEvidence(task, task.completionEvidence)
@@ -2242,12 +2260,12 @@ export function GateDispatchTaskCenter({
           );
           return (
           <div
-            className={`rounded-md border bg-white p-4 ${isFocusedTask ? "border-amber-300 ring-2 ring-amber-200" : "border-slate-200"}`}
+            className={`min-w-0 rounded-md border bg-white p-4 ${isFocusedTask ? "border-amber-300 ring-2 ring-amber-200" : "border-slate-200"}`}
             id={`dispatch-${task.dispatchKey}`}
             key={task.dispatchKey}
           >
             <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-              <div>
+              <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className={`rounded-md px-2 py-1 text-xs font-medium ${stateClass(task.state)}`}>{stateLabel(task.state)}</span>
                   {isRecheckFollowUp ? <span className="rounded-md bg-amber-50 px-2 py-1 text-xs font-medium text-amber-800">复查返工</span> : null}
@@ -2283,6 +2301,20 @@ export function GateDispatchTaskCenter({
                   {task.acceptanceCriteria.map((criterion) => (
                     <span className="rounded-md bg-slate-50 px-2 py-1" key={criterion}>{criterion}</span>
                   ))}
+                </div>
+                <div className="mt-3 rounded-md border border-slate-200 bg-slate-50 p-3" aria-label="派单回执模板，含停手线">
+                  <div className="text-xs font-medium text-slate-700">派单回执模板</div>
+                  <div className="mt-2 grid gap-1.5">
+                    {receiptTemplate.map((line) => (
+                      <div
+                        className="break-words break-all text-xs leading-5 text-slate-600"
+                        key={line}
+                        style={{ overflowWrap: "anywhere", wordBreak: "break-word" }}
+                      >
+                        {line}
+                      </div>
+                    ))}
+                  </div>
                 </div>
                 {task.state === "assigned" ? (
                   <div className="mt-3 grid gap-1">

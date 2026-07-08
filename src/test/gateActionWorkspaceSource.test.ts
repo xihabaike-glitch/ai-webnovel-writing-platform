@@ -40,6 +40,17 @@ test("gate action workspace shows dispatch receipt acceptance criteria", () => {
   assert.ok(workspaceSource.includes("gateDispatchReceiptAcceptanceCriteria.map"));
 });
 
+test("gate action workspace explains missing dispatch receipt fields", () => {
+  assert.ok(workspaceSource.includes("gateDispatchMissingReceiptFields"));
+  assert.ok(workspaceSource.includes("缺字段解释"));
+  assert.ok(workspaceSource.includes("缺少派单回执字段"));
+  assert.ok(workspaceSource.includes("缺字段："));
+  assert.ok(workspaceSource.includes("missingReceiptFields.map"));
+  assert.ok(workspaceSource.includes("执行角色"));
+  assert.ok(workspaceSource.includes("人工验收"));
+  assert.ok(workspaceSource.includes("下一步"));
+});
+
 test("gate action workspace shows final delivery receipt closeout review", () => {
   assert.ok(workspaceSource.includes("buildGateFinalDeliveryReceiptReview"));
   assert.ok(workspaceSource.includes("finalDeliveryReview"));

@@ -269,6 +269,23 @@ function evidenceStateClass(status: GateDispatchEvidenceReviewStatus) {
   return "border-slate-200 bg-slate-50 text-slate-800";
 }
 
+function gateDispatchMissingReceiptFields(item: {
+  status: GateDispatchEvidenceReviewStatus;
+  evidence: string[];
+}) {
+  if (item.status !== "missing_evidence") return [];
+  const fieldLine = item.evidence.find((line) => line.includes("缺少派单回执字段"));
+  if (fieldLine) {
+    const fields = fieldLine
+      .replace(/^.*缺少派单回执字段[:：]/, "")
+      .split(/[、,，]/u)
+      .map((field) => field.trim())
+      .filter(Boolean);
+    if (fields.length) return fields;
+  }
+  return item.evidence.some((line) => line.includes("缺少完成依据")) ? ["完成依据"] : [];
+}
+
 function startValidationClass(status: GateProjectStartValidationStatus) {
   if (status === "ready") return "border-emerald-200 bg-emerald-50 text-emerald-900";
   if (status === "missing_evidence") return "border-rose-200 bg-rose-50 text-rose-900";
@@ -919,7 +936,9 @@ export function GateActionWorkspace({
           ) : null}
           {dispatchEvidenceIssues.length ? (
             <div className="grid gap-2 xl:grid-cols-2">
-              {dispatchEvidenceIssues.map((item) => (
+              {dispatchEvidenceIssues.map((item) => {
+                const missingReceiptFields = gateDispatchMissingReceiptFields(item);
+                return (
                 <div className={`rounded-md border p-3 text-sm ${evidenceStateClass(item.status)}`} key={item.dispatchKey}>
                   <div className="flex flex-wrap items-start justify-between gap-2">
                     <div>
@@ -928,6 +947,16 @@ export function GateActionWorkspace({
                         <span className="rounded-md bg-white/70 px-2 py-1 text-xs font-medium">{item.label}</span>
                       </div>
                       <p className="mt-2 leading-6 opacity-85">{item.detail}</p>
+                      {missingReceiptFields.length ? (
+                        <div className="mt-2 rounded-md bg-white/70 px-2 py-2 text-xs leading-5" aria-label="缺字段解释">
+                          <div className="font-medium">缺字段：总闸门看到的证据还缺这些 PM 回执项</div>
+                          <div className="mt-2 flex flex-wrap gap-1">
+                            {missingReceiptFields.map((field) => (
+                              <span className="rounded-md bg-white px-2 py-1 font-medium text-rose-900" key={field}>{field}</span>
+                            ))}
+                          </div>
+                        </div>
+                      ) : null}
                     </div>
                     <div className="text-right text-xs opacity-75">
                       <div>{item.platformName}</div>
@@ -955,7 +984,8 @@ export function GateActionWorkspace({
                     ) : null}
                   </div>
                 </div>
-              ))}
+                );
+              })}
             </div>
           ) : visibleDispatchTasks.length ? (
             <p className="rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">

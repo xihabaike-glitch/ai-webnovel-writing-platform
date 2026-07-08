@@ -518,6 +518,7 @@ export interface PrePublishGateRecheckDispatch {
     | "start_first_three_review"
     | "start_opening_diagnostic"
     | "start_platform_package"
+    | "start_role_dispatch_closure"
     | "start_publish_finalize"
     | "ai_pipeline_sample_recheck";
   state: "queued" | "assigned" | "completed";
@@ -1762,6 +1763,13 @@ function acceptanceNextDispatchSpec(stepId: ProjectAcceptanceStep["id"]) {
       stage: "start_publish_finalize",
       ownerRole: "派单验收负责人",
       title: "补首日派单回执",
+    } as const;
+  }
+  if (stepId === "role_dispatch") {
+    return {
+      stage: "start_role_dispatch_closure",
+      ownerRole: "角色验收负责人",
+      title: "补角色派单闭环",
     } as const;
   }
   return {

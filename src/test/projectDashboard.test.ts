@@ -111,4 +111,108 @@ test("buildProjectDashboard", async (t) => {
     assert.ok(dashboard.realSampleAcceptanceSheet.steps.find((step) => step.id === "opening_sample")?.evidence.includes("钩子"));
     assert.ok(dashboard.realSampleAcceptanceSheet.steps.find((step) => step.id === "dispatch_receipt")?.stopRule.includes("人工验收"));
   });
+
+  await t.test("requires active role intent dispatches to close before publish package acceptance", () => {
+    const baseInput = {
+      projectId: "project-role-gate",
+      currentWordCount: 6600,
+      targetWordCount: 300000,
+      platform: getPlatformProfile("fanqie"),
+      chapters: [
+        {
+          id: "chapter-1",
+          title: "第一章",
+          order: 1,
+          status: "draft",
+          wordCount: 2200,
+          goal: "让主角遭遇系统。",
+          hook: "门外倒计时和陌生求救同时出现。",
+          conflict: "主角必须在自保和救人之间选择。",
+          valueShift: "普通生活被系统任务击穿。",
+          cliffhanger: "系统提示第一次选择失败过。",
+          updatedAt: "2026-07-01T00:00:00.000Z",
+        },
+        {
+          id: "chapter-2",
+          title: "第二章",
+          order: 2,
+          status: "draft",
+          wordCount: 2200,
+          updatedAt: "2026-07-01T00:00:00.000Z",
+        },
+        {
+          id: "chapter-3",
+          title: "第三章",
+          order: 3,
+          status: "draft",
+          wordCount: 2200,
+          updatedAt: "2026-07-01T00:00:00.000Z",
+        },
+      ],
+      aiTasks: [
+        {
+          id: "task-1",
+          taskType: "chapter_review",
+          status: "succeeded",
+          model: "mock-editor",
+          createdAt: "2026-07-01T00:00:00.000Z",
+          chapter: { id: "chapter-1", title: "第一章" },
+          modelProvider: { providerId: "mock", displayName: "Mock" },
+        },
+        {
+          id: "task-2",
+          taskType: "chapter_second_pass",
+          status: "succeeded",
+          model: "mock-editor",
+          createdAt: "2026-07-01T00:00:00.000Z",
+          chapter: { id: "chapter-1", title: "第一章" },
+          modelProvider: { providerId: "mock", displayName: "Mock" },
+        },
+      ],
+      gateDispatchTasks: [
+        {
+          dispatchKey: "first-day:project-role-gate:publish-precheck",
+          state: "completed",
+          completionEvidence: "首日派单已完成，人工验收确认样本、审稿、二改和发布预检可以进入下一步。",
+        },
+        {
+          dispatchKey: "role-intent:project-role-gate:story-structure:structure_editor",
+          state: "completed",
+          completionEvidence: "结构主编完成人物弧光、主线支线、开头钩子和结尾回收复查。",
+        },
+      ],
+    };
+
+    const blocked = buildProjectDashboard(baseInput);
+
+    assert.deepEqual(
+      blocked.realSampleAcceptanceSheet.steps.map((step) => step.id),
+      ["project_start", "opening_sample", "chapter_review", "second_pass", "dispatch_receipt", "role_dispatch", "publish_package"],
+    );
+    assert.equal(blocked.realSampleAcceptanceSheet.currentStepId, "role_dispatch");
+    assert.ok(blocked.realSampleAcceptanceSheet.verdict.includes("角色闭环"));
+    assert.ok(blocked.realSampleAcceptanceSheet.actionHref.includes("#story-structure"));
+    assert.ok(blocked.realSampleAcceptanceSheet.steps.find((step) => step.id === "role_dispatch")?.evidence.includes("资料官"));
+
+    const passed = buildProjectDashboard({
+      ...baseInput,
+      gateDispatchTasks: [
+        ...baseInput.gateDispatchTasks,
+        {
+          dispatchKey: "role-intent:project-role-gate:context-recall:context_librarian",
+          state: "completed",
+          completionEvidence: "资料官完成项目土壤、上下文引用、排除资料和连续性风险复查。",
+        },
+        {
+          dispatchKey: "role-intent:project-role-gate:platform-export:overseas_packager",
+          state: "completed",
+          completionEvidence: "平台包装官完成番茄、起点、七猫、知乎盐选、WebNovel、Royal Road、Wattpad 发布包差异复查。",
+        },
+      ],
+    });
+
+    assert.equal(passed.realSampleAcceptanceSheet.currentStepId, "publish_package");
+    assert.ok(passed.realSampleAcceptanceSheet.verdict.includes("已闭合"));
+    assert.ok(passed.realSampleAcceptanceSheet.steps.find((step) => step.id === "role_dispatch")?.evidence.includes("结构主编、资料官、平台包装"));
+  });
 });

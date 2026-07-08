@@ -54,7 +54,7 @@ export interface ProjectDashboardInput {
 export type ProjectAcceptanceStepStatus = "done" | "current" | "blocked";
 
 export interface ProjectAcceptanceStep {
-  id: "project_start" | "opening_sample" | "chapter_review" | "second_pass" | "dispatch_receipt" | "publish_package";
+  id: "project_start" | "opening_sample" | "chapter_review" | "second_pass" | "dispatch_receipt" | "role_dispatch" | "publish_package";
   label: string;
   status: ProjectAcceptanceStepStatus;
   evidence: string;
@@ -95,6 +95,46 @@ function hasText(value: string | null | undefined) {
   return Boolean(value?.trim());
 }
 
+const requiredRoleDispatchIntents = [
+  { id: "story-structure", label: "结构主编" },
+  { id: "context-recall", label: "资料官" },
+  { id: "platform-export", label: "平台包装" },
+] as const;
+
+function roleDispatchPrefix(projectId: string | undefined, intentId: string) {
+  return projectId ? `role-intent:${projectId}:${intentId}:` : `role-intent:`;
+}
+
+function hasCompletedDispatchEvidence(task: DashboardGateDispatchTask) {
+  return task.state === "completed" && task.completionEvidence.trim().length >= 20;
+}
+
+function buildRoleDispatchAcceptance(input: ProjectDashboardInput) {
+  const tasks = input.gateDispatchTasks ?? [];
+  const roleDispatchTasks = tasks.filter((task) => (
+    input.projectId
+      ? task.dispatchKey.startsWith(`role-intent:${input.projectId}:`)
+      : task.dispatchKey.startsWith("role-intent:")
+  ));
+  const active = roleDispatchTasks.length > 0;
+  const completedLabels = requiredRoleDispatchIntents
+    .filter((intent) => roleDispatchTasks.some((task) => (
+      task.dispatchKey.startsWith(roleDispatchPrefix(input.projectId, intent.id))
+      && hasCompletedDispatchEvidence(task)
+    )))
+    .map((intent) => intent.label);
+  const missingLabels = requiredRoleDispatchIntents
+    .filter((intent) => !completedLabels.includes(intent.label))
+    .map((intent) => intent.label);
+
+  return {
+    active,
+    done: active && missingLabels.length === 0,
+    completedLabels,
+    missingLabels,
+  };
+}
+
 function buildProjectRealSampleAcceptanceSheet(input: ProjectDashboardInput): ProjectRealSampleAcceptanceSheet {
   const projectHref = input.projectId ? `/projects/${input.projectId}` : "#";
   const firstChapter = input.chapters.find((chapter) => chapter.order === 1) ?? input.chapters[0] ?? null;
@@ -118,10 +158,11 @@ function buildProjectRealSampleAcceptanceSheet(input: ProjectDashboardInput): Pr
   ));
   const hasDispatchReceipt = (input.gateDispatchTasks ?? []).some((task) => (
     task.dispatchKey.startsWith("first-day:")
-    && task.state === "completed"
-    && task.completionEvidence.trim().length >= 20
+    && hasCompletedDispatchEvidence(task)
   ));
-  const hasPublishPackageShape = input.chapters.length >= 3 && hasReview && hasSecondPass && hasDispatchReceipt;
+  const roleDispatchAcceptance = buildRoleDispatchAcceptance(input);
+  const hasRoleDispatchClosure = !roleDispatchAcceptance.active || roleDispatchAcceptance.done;
+  const hasPublishPackageShape = input.chapters.length >= 3 && hasReview && hasSecondPass && hasDispatchReceipt && hasRoleDispatchClosure;
   const definitions: Array<Omit<ProjectAcceptanceStep, "status"> & { done: boolean }> = [
     {
       id: "project_start",
@@ -163,6 +204,16 @@ function buildProjectRealSampleAcceptanceSheet(input: ProjectDashboardInput): Pr
       stopRule: "派单缺人工验收时，不能宣称真实样本跑通。",
       href: input.projectId ? `/dispatch?firstDayProject=${input.projectId}#first-day-dispatch` : "/dispatch#first-day-dispatch",
     },
+    ...(roleDispatchAcceptance.active ? [{
+      id: "role_dispatch" as const,
+      label: "角色闭环",
+      done: roleDispatchAcceptance.done,
+      evidence: roleDispatchAcceptance.done
+        ? `角色派单已闭合：${roleDispatchAcceptance.completedLabels.join("、")}均有完成依据。`
+        : `角色派单还缺${roleDispatchAcceptance.missingLabels.join("、")}完成依据。`,
+      stopRule: "结构、资料和平台包装角色没有闭环时，不允许把发布包当成可投放版本。",
+      href: `${projectHref}#story-structure`,
+    }] : []),
     {
       id: "publish_package",
       label: "发布包",

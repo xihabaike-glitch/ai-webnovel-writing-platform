@@ -429,6 +429,44 @@ test("buildPrePublishGate", async (t) => {
     assert.ok(notice.detail.includes("已完成 5/6 步"));
   });
 
+  await t.test("routes project acceptance recheck to role dispatch closure when role evidence is incomplete", () => {
+    const gate = buildPrePublishGate({
+      projects: [{
+        ...readyProject,
+        id: "project-recheck-role",
+        gateDispatchTasks: [
+          {
+            dispatchKey: "first-day:project-recheck-role:publish-precheck",
+            state: "completed",
+            completionEvidence: "首日平台包预检已完成，标题、简介、标签、卖点、样章和风险清单已验收。",
+          },
+          {
+            dispatchKey: "role-intent:project-recheck-role:story-structure:structure_editor",
+            state: "completed",
+            completionEvidence: "结构主编完成人物弧光、主线支线、开头钩子和结尾回收复查。",
+          },
+        ],
+      }],
+      failureTasks: [],
+      batchHistory: [],
+    });
+    const notice = buildPrePublishGateFocusNotice({
+      focus: "action-recheck",
+      actionId: "project-acceptance:project-recheck-role",
+      gate,
+    });
+
+    assert.equal(notice.visible, true);
+    assert.equal(notice.recheckSummary?.completedSteps, 5);
+    assert.equal(notice.recheckSummary?.totalSteps, 7);
+    assert.equal(notice.recheckSummary?.currentStepLabel, "角色闭环");
+    assert.equal(notice.recheckSummary?.nextDispatch?.id, "project-acceptance-next:project-recheck-role:role_dispatch");
+    assert.equal(notice.recheckSummary?.nextDispatch?.stage, "start_role_dispatch_closure");
+    assert.equal(notice.recheckSummary?.nextDispatch?.ownerRole, "角色验收负责人");
+    assert.ok(notice.recheckSummary?.nextDispatch?.title.includes("补角色派单闭环"));
+    assert.ok(notice.recheckSummary?.nextDispatch?.detail.includes("资料官"));
+  });
+
   await t.test("orders action recheck blockers with the current gate blocker first", () => {
     const gate = buildPrePublishGate({
       projects: [{

@@ -13,6 +13,7 @@ const WATCH_COMPLETION_REQUIRED_KEYWORDS = ["通过线", "不可接受", "复查
 const HANDOFF_ACTION_KEYWORDS = ["交接动作", "首日动作", "开头", "验证", "落地"];
 const HANDOFF_AVOID_KEYWORDS = ["避坑边界", "避开", "不要", "小样本", "不放量", "暂停"];
 const HANDOFF_PACKAGE_KEYWORDS = ["平台回收", "回收口径", "标题", "简介", "标签", "样章", "曝光", "点击", "收藏", "追读"];
+const REAL_SAMPLE_PLATFORM_BACKFILL_KEYWORDS = ["曝光", "点击", "收藏", "追读", "质量"];
 
 function watchSampleEvidenceGaps(completionEvidence: string) {
   const gaps: string[] = [];
@@ -658,6 +659,16 @@ function requiredHandoffSourceEvidence(evidence: string[] = []) {
   return handoffEvidenceCompletionLines(evidence);
 }
 
+function isRealSamplePlatformBackfill(input: Pick<FirstDayDispatchCompletionValidationInput, "dispatchKey" | "title" | "acceptanceCriteria" | "evidence">) {
+  if (firstDayStepId(input.dispatchKey) !== "publish-precheck") return false;
+  const joined = [
+    input.title,
+    ...(input.acceptanceCriteria ?? []),
+    ...(input.evidence ?? []),
+  ].filter((item): item is string => Boolean(item)).join(" ");
+  return /真实样本/u.test(joined) && /平台包|平台回收|曝光|点击|收藏|追读/u.test(joined);
+}
+
 function firstDayCompletionRiskLevel(input: Pick<FirstDayDispatchCompletionValidationInput, "dispatchKey" | "dueLabel" | "title" | "acceptanceCriteria" | "evidence">): FirstDayRiskLevel {
   if (!isFirstDayDispatchTask({ dispatchKey: input.dispatchKey })) return "standard";
   const joined = [
@@ -720,6 +731,17 @@ export function validateFirstDayDispatchCompletionEvidence(input: FirstDayDispat
       valid: false,
       level,
       error: "止损验证派单必须写清恢复条件，例如入口卖点、前三章兑现或平台匹配度具体改了什么。",
+    };
+  }
+
+  const missingRealSampleBackfill = isRealSamplePlatformBackfill(input)
+    ? missingKeywords(trimmedEvidence, REAL_SAMPLE_PLATFORM_BACKFILL_KEYWORDS)
+    : [];
+  if (missingRealSampleBackfill.length > 0) {
+    return {
+      valid: false,
+      level,
+      error: `真实样本平台包补证必须写清数据回收：${missingRealSampleBackfill.join("、")}。`,
     };
   }
 

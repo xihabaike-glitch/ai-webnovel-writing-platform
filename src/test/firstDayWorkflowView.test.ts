@@ -1060,6 +1060,33 @@ test("buildFirstDayReturnedEvidenceAcceptanceState highlights cleared watch samp
   assert.equal(state.primaryActionLabel, "验收并解除观察闸门");
 });
 
+test("buildFirstDayReturnedEvidenceAcceptanceState blocks thin real-sample platform backfill", () => {
+  const dispatch = firstDayWorkflowView.buildRealSampleMissingDispatch({
+    projectId: "project-1",
+    projectTitle: "夜雨系统",
+    platformId: "fanqie",
+    platformName: "番茄小说",
+    stepId: "publish-precheck",
+    gaps: ["首日扩展小批已过线，请补曝光、点击、收藏、追读和质量证据。"],
+    createdAt: "2026-01-01T00:00:00.000Z",
+  });
+  const state = buildFirstDayReturnedEvidenceAcceptanceState({
+    completionEvidence: "平台包预检已完成，标题、简介、标签和样章都已复查。",
+    hasDispatch: true,
+    dispatchKey: dispatch.id,
+    dueLabel: dispatch.dueLabel,
+    title: dispatch.title,
+    acceptanceCriteria: dispatch.acceptanceCriteria,
+    evidence: dispatch.evidence,
+  });
+
+  assert.equal(state.visible, true);
+  assert.equal(state.canComplete, false);
+  assert.equal(state.primaryActionLabel, "补足验收依据");
+  assert.equal(state.primaryActionDisabled, true);
+  assert.ok(state.buttonHint.includes("曝光、点击、收藏、追读"));
+});
+
 test("buildFirstDayDispatchUpdateSummary explains watch sample scale-up status", () => {
   const cleared = buildFirstDayDispatchUpdateSummary({
     task: {

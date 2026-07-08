@@ -196,6 +196,14 @@ test("project detail page carries gate return through first day workflow links",
   assert.ok(firstDayWorkflowPanel.includes("<FirstDayStepCard gateReturnHref={gateReturnHref} index={index} key={step.id} step={step} />"));
 });
 
+test("first day workflow panel validates returned evidence against the active dispatch", () => {
+  const firstDayWorkflowPanel = readFileSync("src/components/projects/FirstDayWorkflowPanel.tsx", "utf8");
+
+  assert.ok(firstDayWorkflowPanel.includes("function returnedEvidenceValidationContext"));
+  assert.ok(firstDayWorkflowPanel.includes("...returnedEvidenceValidationContext(payload.dispatch)"));
+  assert.ok(firstDayWorkflowPanel.includes("...returnedEvidenceValidationContext(dispatch)"));
+});
+
 test("project detail page carries gate return through platform decision links", () => {
   const projectPage = readFileSync("src/app/projects/[projectId]/page.tsx", "utf8");
   const platformKnowledgeBriefPanel = readFileSync("src/components/projects/PlatformKnowledgeBriefPanel.tsx", "utf8");

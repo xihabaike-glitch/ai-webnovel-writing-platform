@@ -188,6 +188,17 @@ function hrefWithGateReturn(href: string, gateReturnHref?: string | null) {
   return `${base}${separator}gateReturn=${encodeURIComponent(gateReturnHref)}${hash}`;
 }
 
+function returnedEvidenceValidationContext(dispatch: GatePlatformGrowthDispatchItem | null | undefined) {
+  if (!dispatch) return {};
+  return {
+    dispatchKey: dispatch.id,
+    dueLabel: dispatch.dueLabel,
+    title: dispatch.title,
+    acceptanceCriteria: dispatch.acceptanceCriteria,
+    evidence: dispatch.evidence,
+  };
+}
+
 function continuationTone(status: FirstDayContinuationAction["status"]) {
   if (status === "ready") return "border-emerald-200 bg-emerald-50 text-emerald-900";
   if (status === "blocked") return "border-amber-200 bg-amber-50 text-amber-900";
@@ -425,6 +436,7 @@ export function FirstDayWorkflowPanel({
         const returnedState = buildFirstDayReturnedEvidenceAcceptanceState({
           completionEvidence: returnedCompletionEvidence,
           hasDispatch: Boolean(payload.dispatch),
+          ...returnedEvidenceValidationContext(payload.dispatch),
         });
         setCompletionEvidence(returnedCompletionEvidence);
         showMessage(returnedState.message);
@@ -625,6 +637,7 @@ export function FirstDayWorkflowPanel({
   const returnedEvidenceState = buildFirstDayReturnedEvidenceAcceptanceState({
     completionEvidence: returnedCompletionEvidence,
     hasDispatch: Boolean(dispatch),
+    ...returnedEvidenceValidationContext(dispatch),
   });
 
   useEffect(() => {

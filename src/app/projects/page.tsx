@@ -50,6 +50,15 @@ function hrefWithGateReturn(href: string, gateReturnHref?: string | null, curren
   return `${base}${separator}gateReturn=${encodeURIComponent(gateReturnHref)}${hash}`;
 }
 
+function projectsFilterHref(input: { pipelineStepId?: string | null; closureLaneId?: string | null }) {
+  const params = new URLSearchParams();
+  if (input.pipelineStepId) params.set("pipelineStep", input.pipelineStepId);
+  if (input.closureLaneId) params.set("closureLane", input.closureLaneId);
+  const query = params.toString();
+
+  return `/projects${query ? `?${query}` : ""}#pipeline-projects`;
+}
+
 function riskLevelLabel(level: FirstDayRiskLevel) {
   if (level === "blocked") return "止损";
   if (level === "watch") return "观察";
@@ -271,7 +280,7 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps) 
                 </div>
                 <p className="mt-2 text-xs leading-5 text-slate-300">{productionLane.detail}</p>
                 <div className="mt-3 flex flex-wrap gap-2">
-                  <Link className="rounded-md bg-white px-2 py-1 text-xs font-medium text-slate-950 hover:bg-slate-100" href={hrefWithGateReturn(`/projects?closureLane=${productionLane.id}#pipeline-projects`, gateReturn)}>
+                  <Link className="rounded-md bg-white px-2 py-1 text-xs font-medium text-slate-950 hover:bg-slate-100" href={hrefWithGateReturn(projectsFilterHref({ pipelineStepId: activePipelineStep?.id ?? null, closureLaneId: productionLane.id }), gateReturn)}>
                     查看卡点
                   </Link>
                   <Link className="rounded-md bg-white/10 px-2 py-1 text-xs font-medium text-white hover:bg-white/20" href={hrefWithGateReturn(productionLane.actionHref, gateReturn)}>
@@ -364,7 +373,7 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps) 
           {dashboard.pipelineProofSummary.stepCounts.map((step, index) => (
             <Link
               className={`rounded-md border p-3 text-sm ${activePipelineStep?.id === step.id ? "border-slate-900 bg-slate-950 text-white" : "border-slate-200 bg-slate-50 hover:bg-slate-100"}`}
-              href={hrefWithGateReturn(step.filterHref, gateReturn)}
+              href={hrefWithGateReturn(projectsFilterHref({ pipelineStepId: step.id, closureLaneId: activeProductionClosureLane?.id ?? null }), gateReturn)}
               key={step.id}
             >
               <div className={`text-xs ${activePipelineStep?.id === step.id ? "text-slate-300" : "text-slate-500"}`}>第 {index + 1} 步</div>

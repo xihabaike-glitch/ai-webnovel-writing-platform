@@ -60,9 +60,11 @@ test("projects page filters project cards by production closure lane", () => {
   assert.ok(source.includes("closureLaneParam"));
   assert.ok(source.includes("activeProductionClosureLane"));
   assert.ok(source.includes("invalidClosureLane"));
+  assert.ok(source.includes("function projectsFilterHref"));
   assert.ok(source.includes("pipelineFilteredItems"));
   assert.ok(source.includes("item.productionClosure.some((closure) => closure.id === activeProductionClosureLane.id && closure.status !== \"allow\")"));
-  assert.ok(source.includes("`/projects?closureLane=${productionLane.id}#pipeline-projects`"));
+  assert.ok(source.includes("projectsFilterHref({ pipelineStepId: activePipelineStep?.id ?? null, closureLaneId: productionLane.id })"));
+  assert.ok(source.includes("projectsFilterHref({ pipelineStepId: step.id, closureLaneId: activeProductionClosureLane?.id ?? null })"));
   assert.ok(source.includes("当前只看生产闭环"));
   assert.ok(source.includes("activeProductionClosureCountLabel"));
   assert.ok(source.includes("visibleItems.length"));
@@ -101,7 +103,7 @@ test("projects page carries gate return through project action links", () => {
   assert.ok(source.includes("href={hrefWithGateReturn(dashboard.pipelineAcceptanceSummary.primaryActionHref, gateReturn)}"));
   assert.ok(source.includes("href={hrefWithGateReturn(sample.actionHref, gateReturn)}"));
   assert.ok(source.includes("href={hrefWithGateReturn(activePipelineAction.recommendedActionHref, gateReturn)}"));
-  assert.ok(source.includes("href={hrefWithGateReturn(step.filterHref, gateReturn)}"));
+  assert.ok(source.includes("href={hrefWithGateReturn(projectsFilterHref({ pipelineStepId: step.id, closureLaneId: activeProductionClosureLane?.id ?? null }), gateReturn)}"));
   assert.ok(source.includes("href={hrefWithGateReturn(\"/projects#pipeline-projects\", gateReturn)}"));
   assert.ok(source.includes("href={hrefWithGateReturn(`/projects/${item.id}${entry.projectAnchor}`, gateReturn)}"));
   assert.ok(source.includes("href={hrefWithGateReturn(\"#create-project\", gateReturn, \"/projects\")}"));

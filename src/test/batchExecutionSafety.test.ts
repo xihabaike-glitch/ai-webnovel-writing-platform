@@ -219,6 +219,35 @@ test("buildBatchExecutionSafety", async (t) => {
     assert.equal(publishGate?.actionHref, "/tasks?view=blocked&debt=publish_repair#task-debt");
   });
 
+  await t.test("blocks recommended batches until export version risk is cleared", () => {
+    const safety = buildBatchExecutionSafety([
+      {
+        ...baseItem,
+        id: "project-1:export-version:risk",
+        category: "blocked",
+        blockerType: "export_version",
+        label: "导出版本",
+        chapterTitle: "导出版本风险",
+        evidence: "最新导出包比基准少章节，存在回退风险。",
+        actionLabel: "处理导出版本",
+        href: "/projects/project-1/exports#export-baseline-comparison",
+        priority: 8,
+      },
+      baseItem,
+    ], [{ aiTasks: [] }]);
+
+    assert.equal(safety.recommendedBatchSize, 1);
+    assert.deepEqual(safety.recommendedBatchIds, ["item-1"]);
+    assert.equal(safety.canRunRecommendedBatch, false);
+    const exportGate = safety.items.find((item) => item.id === "export-version");
+    assert.equal(exportGate?.status, "block");
+    assert.ok(exportGate?.detail.includes("导出版本"));
+    assert.ok(exportGate?.detail.includes("回退风险"));
+    assert.ok(exportGate?.detail.includes("不进入推荐批量"));
+    assert.equal(exportGate?.actionLabel, "修导出版本");
+    assert.equal(exportGate?.actionHref, "/tasks?view=blocked&debt=export_version#task-debt");
+  });
+
   await t.test("prioritizes the PM blocker that should be handled before running batches", () => {
     const safety = buildBatchExecutionSafety([
       { ...baseItem, id: "candidate-1", category: "candidate", label: "待采纳", priority: 5, actionLabel: "处理候选稿" },

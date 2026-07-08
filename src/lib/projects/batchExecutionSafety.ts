@@ -112,6 +112,7 @@ const priorityBlockerOrder = [
   "risk-recovery",
   "role-closure",
   "publish-repair",
+  "export-version",
   "pending-candidates",
   "running-tasks",
   "failure-rate",
@@ -160,6 +161,10 @@ function isOpenRiskRecovery(item: QueueItem) {
 
 function isOpenPublishRepair(item: QueueItem) {
   return item.blockerType === "publish_repair";
+}
+
+function isOpenExportVersion(item: QueueItem) {
+  return item.blockerType === "export_version";
 }
 
 export function buildFailureRepairResumeRecommendation(input: {
@@ -243,6 +248,8 @@ export function buildBatchExecutionSafety(
   const roleClosureCount = roleClosureItems.length;
   const publishRepairItems = queueItems.filter(isOpenPublishRepair);
   const publishRepairCount = publishRepairItems.length;
+  const exportVersionItems = queueItems.filter(isOpenExportVersion);
+  const exportVersionCount = exportVersionItems.length;
   const candidateCount = queueItems.filter((item) => item.category === "candidate").length;
   const firstCandidate = queueItems.find((item) => item.category === "candidate") ?? null;
   const aiPipelineRecoveryFollowupCount = queueItems.filter(isOpenAiPipelineRecoveryFollowup).length;
@@ -338,6 +345,18 @@ export function buildBatchExecutionSafety(
       publishRepairCount === 0 ? undefined : {
         actionLabel: "先修发布质检",
         actionHref: "/tasks?view=blocked&debt=publish_repair#task-debt",
+      },
+    ),
+    safetyItem(
+      "export-version",
+      "导出版本",
+      exportVersionCount === 0 ? "pass" : "block",
+      exportVersionCount === 0
+        ? "当前没有未处理的导出版本回退风险。"
+        : `${exportVersionCount} 个导出版本回退风险未清：${exportVersionItems.slice(0, 3).map((item) => item.chapterTitle).join("、")}；先重导、锁定或恢复可信基线，不进入推荐批量。`,
+      exportVersionCount === 0 ? undefined : {
+        actionLabel: "修导出版本",
+        actionHref: "/tasks?view=blocked&debt=export_version#task-debt",
       },
     ),
     safetyItem(

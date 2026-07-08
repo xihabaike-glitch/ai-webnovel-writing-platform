@@ -850,6 +850,10 @@ test("buildPrePublishGate", async (t) => {
     assert.ok(project.acceptanceSheetGate.runbookStep.sampleAction.includes("首章样本"));
     assert.ok(project.acceptanceSheetGate.runbookStep.proofToCapture.includes("人工采用"));
     assert.ok(project.acceptanceSheetGate.runbookStep.rollbackIfWeak.includes("二改"));
+    assert.ok(project.acceptanceSheetGate.receiptTemplate.some((line) => line.includes("完成项：二改")));
+    assert.ok(project.acceptanceSheetGate.receiptTemplate.some((line) => line.includes("回总闸门复检结论")));
+    assert.ok(project.acceptanceSheetGate.dispatchDraftHref.startsWith("/dispatch?"));
+    assert.ok(decodeURIComponent(project.acceptanceSheetGate.dispatchDraftHref).includes("完成「二改」证据"));
     assert.equal(project.acceptanceSheetGate.href, "/projects#pipeline-projects");
     assert.equal(project.nextAction, project.acceptanceSheetGate.actionLabel);
     assert.equal(project.href, project.acceptanceSheetGate.href);

@@ -227,6 +227,10 @@ test("gate page renders project acceptance sheet blockers", () => {
   assert.ok(source.includes("project.acceptanceSheetGate.runbookStep.sampleAction"));
   assert.ok(source.includes("project.acceptanceSheetGate.runbookStep.proofToCapture"));
   assert.ok(source.includes("project.acceptanceSheetGate.runbookStep.rollbackIfWeak"));
+  assert.ok(source.includes("验收回执模板"));
+  assert.ok(source.includes("project.acceptanceSheetGate.receiptTemplate.map"));
+  assert.ok(source.includes("href={hrefWithGateReturn(project.acceptanceSheetGate.dispatchDraftHref, gateRecheckReturnHref)}"));
+  assert.ok(source.includes("生成派单草稿"));
   assert.ok(source.includes("project.acceptanceSheetGate.href"));
 });
 

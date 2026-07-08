@@ -962,7 +962,7 @@ export default async function GatePage({
         </div>
         <div className="mt-4 grid gap-3 lg:grid-cols-2">
           {gate.projectStatuses.filter((project) => project.acceptanceSheetGate.status !== "pass").map((project) => (
-            <Link className="rounded-md border border-slate-200 bg-slate-50 p-3 text-sm hover:bg-white" href={hrefWithGateReturn(project.acceptanceSheetGate.href, gateRecheckReturnHref)} key={project.projectId}>
+            <div className="rounded-md border border-slate-200 bg-slate-50 p-3 text-sm" key={project.projectId}>
               <div className="flex flex-wrap items-center gap-2">
                 <span className="font-medium text-slate-950">{project.projectTitle}</span>
                 <span className="rounded-md bg-white px-2 py-1 text-xs text-slate-600">{project.platformName}</span>
@@ -980,8 +980,31 @@ export default async function GatePage({
                   <span>退路：{project.acceptanceSheetGate.runbookStep.rollbackIfWeak}</span>
                 </div>
               </div>
-              <div className="mt-2 text-xs font-medium text-slate-950">{project.acceptanceSheetGate.actionLabel}</div>
-            </Link>
+              {project.acceptanceSheetGate.receiptTemplate.length ? (
+                <div className="mt-2 rounded-md border border-slate-200 bg-white p-2 text-xs leading-5 text-slate-700">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="font-medium text-slate-950">验收回执模板</div>
+                    <Link
+                      className="w-fit rounded-md bg-slate-950 px-2 py-1 text-xs font-medium text-white hover:bg-slate-800"
+                      href={hrefWithGateReturn(project.acceptanceSheetGate.dispatchDraftHref, gateRecheckReturnHref)}
+                    >
+                      生成派单草稿
+                    </Link>
+                  </div>
+                  <div className="mt-2 grid gap-1">
+                    {project.acceptanceSheetGate.receiptTemplate.map((line) => (
+                      <span className="rounded-md bg-slate-50 px-2 py-1" key={line}>{line}</span>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+              <Link
+                className="mt-2 inline-flex w-fit rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-950 hover:bg-slate-50"
+                href={hrefWithGateReturn(project.acceptanceSheetGate.href, gateRecheckReturnHref)}
+              >
+                {project.acceptanceSheetGate.actionLabel}
+              </Link>
+            </div>
           ))}
           {gate.projectStatuses.filter((project) => project.acceptanceSheetGate.status !== "pass").length === 0 ? (
             <div className="rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900">

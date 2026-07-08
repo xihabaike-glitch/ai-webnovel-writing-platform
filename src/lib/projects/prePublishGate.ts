@@ -221,6 +221,8 @@ export interface PrePublishGateAcceptanceSheetGate {
   latestRecheckReceipt: PrePublishGateRecheckReceipt | null;
   roleClosureProgress: PrePublishGateRoleClosureProgress | null;
   runbookStep: ProjectAcceptanceRunbookStep;
+  receiptTemplate: string[];
+  dispatchDraftHref: string;
   repairMode: "passed" | "executable" | "dispatch" | "manual";
   executionHint: string;
   execution: PrePublishGateActionExecution | null;
@@ -1671,6 +1673,8 @@ function buildAcceptanceSheetGate(
     latestRecheckReceipt,
     roleClosureProgress,
     runbookStep,
+    receiptTemplate: currentMissingEvidence?.receiptTemplate ?? [],
+    dispatchDraftHref: currentMissingEvidence?.dispatchDraftHref ?? href,
     repairMode,
     executionHint: acceptanceExecutionHint(repairMode),
     execution: repairMode === "executable" ? execution : null,

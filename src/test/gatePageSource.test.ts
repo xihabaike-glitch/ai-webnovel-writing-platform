@@ -46,11 +46,24 @@ test("gate page renders real sample receipt recheck context", () => {
 test("gate page surfaces the latest opening sample receipt in real sample focus", () => {
   assert.ok(source.includes("latestOpeningSampleReceipt"));
   assert.ok(source.includes("project-acceptance:opening_sample:"));
+  assert.ok(source.includes("openingSampleReceiptProjectId"));
+  assert.ok(source.includes("replace(\"project-acceptance:opening_sample:\", \"\")"));
   assert.ok(source.includes("openingSampleReceiptLines"));
   assert.ok(source.includes("latestOpeningSampleReceipt.message.split"));
   assert.ok(source.includes("首章样本回执已接收"));
   assert.ok(source.includes("openingSampleReceiptLines.map"));
   assert.ok(source.includes("latestOpeningSampleReceipt.href"));
+});
+
+test("gate page turns opening sample receipts into PM recheck branches", () => {
+  assert.ok(source.includes("openingSampleRecheckActions"));
+  assert.ok(source.includes("首章回执复检分流"));
+  assert.ok(source.includes("继续审稿二改"));
+  assert.ok(source.includes("#chapter-workflow"));
+  assert.ok(source.includes("补作品证据"));
+  assert.ok(source.includes("#pipeline-projects"));
+  assert.ok(source.includes("暂停批量检查"));
+  assert.ok(source.includes("openingSampleRecheckActions.map"));
 });
 
 test("gate page renders real sample final review checklist", () => {

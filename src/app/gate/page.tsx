@@ -253,9 +253,6 @@ export default async function GatePage({
       orderBy: { updatedAt: "desc" },
     }),
   ]);
-  const realSampleReceiptProjectTitle = realSampleReceiptFocus
-    ? projects.find((project) => project.id === projectId)?.title ?? projectId ?? "未指定作品"
-    : null;
   const gateActionReceipts = projects.flatMap((project) => project.gateActionAudits.map(gateActionReceiptFromAuditRecord));
   const latestOpeningSampleReceipt = realSampleReceiptFocus
     ? gateActionReceipts
@@ -267,6 +264,31 @@ export default async function GatePage({
     : null;
   const openingSampleReceiptLines = latestOpeningSampleReceipt
     ? latestOpeningSampleReceipt.message.split("\n").filter(Boolean).slice(0, 8)
+    : [];
+  const openingSampleReceiptProjectId = latestOpeningSampleReceipt
+    ? latestOpeningSampleReceipt.actionId.replace("project-acceptance:opening_sample:", "")
+    : projectId;
+  const realSampleReceiptProjectTitle = realSampleReceiptFocus
+    ? projects.find((project) => project.id === openingSampleReceiptProjectId)?.title ?? openingSampleReceiptProjectId ?? "未指定作品"
+    : null;
+  const openingSampleRecheckActions = latestOpeningSampleReceipt && openingSampleReceiptProjectId
+    ? [
+        {
+          label: "继续审稿二改",
+          detail: "首章样本五项已补齐，下一步进入审稿、首章诊断和二改候选，不直接放大批量。",
+          href: `${latestOpeningSampleReceipt.href}#chapter-workflow`,
+        },
+        {
+          label: "补作品证据",
+          detail: "回作品页补齐大树骨架、章节生产证据和发布包入口，保证后续回执能追溯。",
+          href: `/projects/${openingSampleReceiptProjectId}#pipeline-projects`,
+        },
+        {
+          label: "暂停批量检查",
+          detail: "如果人工采用、复查、失败修复或模型岗位证据不足，先停批量，回失败与总闸门检查风险。",
+          href: "/failures",
+        },
+      ]
     : [];
   const chaptersById = new Map(chapters.map((chapter) => [chapter.id, chapter]));
   const recentTasksWithChapter = recentAiTasks.map((task) => ({
@@ -726,6 +748,21 @@ export default async function GatePage({
                       {line}
                     </div>
                   ))}
+                </div>
+                <div className="mt-3 rounded-md border border-sky-100 bg-slate-50 p-3">
+                  <div className="text-xs font-medium text-sky-700">首章回执复检分流</div>
+                  <div className="mt-2 grid gap-2 lg:grid-cols-3">
+                    {openingSampleRecheckActions.map((action) => (
+                      <Link
+                        className="rounded-md border border-slate-200 bg-white p-3 text-xs leading-5 text-slate-700 hover:border-sky-200 hover:bg-sky-50"
+                        href={hrefWithGateReturn(action.href, gateRecheckReturnHref)}
+                        key={action.label}
+                      >
+                        <div className="font-medium text-slate-950">{action.label}</div>
+                        <p className="mt-1">{action.detail}</p>
+                      </Link>
+                    ))}
+                  </div>
                 </div>
               </div>
             ) : null}

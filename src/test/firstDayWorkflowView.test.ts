@@ -1504,7 +1504,18 @@ test("validateFirstDayDispatchCompletionEvidence enforces risky first-day eviden
       "执行开书交接动作：开头：第一段给倒计时。",
       "避开交接边界：不要直接放量，先保留首轮验证。",
     ],
+    evidence: ["知识来源：番茄小说 正反馈经验已沉淀", "平台反哺：执行正反馈链"],
     completionEvidence: "交接动作已落地：开头第一段给倒计时。避坑边界已确认：不要直接放量，先保留首轮验证。",
+  });
+  const handoffWithSourceReady = validateFirstDayDispatchCompletionEvidence({
+    dispatchKey: "first-day:project-1:first-draft",
+    acceptanceCriteria: [
+      "第一章正文已生成并写回章节",
+      "执行开书交接动作：开头：第一段给倒计时。",
+      "避开交接边界：不要直接放量，先保留首轮验证。",
+    ],
+    evidence: ["知识来源：番茄小说 正反馈经验已沉淀", "平台反哺：执行正反馈链"],
+    completionEvidence: "知识来源：番茄小说 正反馈经验已沉淀。平台反哺：执行正反馈链。交接动作已落地：开头第一段给倒计时。避坑边界已确认：不要直接放量，先保留首轮验证。",
   });
   const openingHandoffThin = validateFirstDayDispatchCompletionEvidence({
     dispatchKey: "first-day-handoff:project-1:opening",
@@ -1553,7 +1564,9 @@ test("validateFirstDayDispatchCompletionEvidence enforces risky first-day eviden
   assert.ok(handoffMissingAction.error?.includes("交接动作"));
   assert.equal(handoffMissingAvoid.valid, false);
   assert.ok(handoffMissingAvoid.error?.includes("避坑边界"));
-  assert.equal(handoffReady.valid, true);
+  assert.equal(handoffReady.valid, false);
+  assert.ok(handoffReady.error?.includes("知识来源"));
+  assert.equal(handoffWithSourceReady.valid, true);
   assert.equal(openingHandoffThin.valid, false);
   assert.ok(openingHandoffThin.error?.includes("开头打法交接"));
   assert.equal(openingHandoffReady.valid, true);

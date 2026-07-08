@@ -654,6 +654,10 @@ function hasHandoffAvoidCriteria(input: Pick<FirstDayDispatchCompletionValidatio
   return (input.acceptanceCriteria ?? []).some((criterion) => criterion.startsWith("避开交接边界："));
 }
 
+function requiredHandoffSourceEvidence(evidence: string[] = []) {
+  return handoffEvidenceCompletionLines(evidence);
+}
+
 function firstDayCompletionRiskLevel(input: Pick<FirstDayDispatchCompletionValidationInput, "dispatchKey" | "dueLabel" | "title" | "acceptanceCriteria" | "evidence">): FirstDayRiskLevel {
   if (!isFirstDayDispatchTask({ dispatchKey: input.dispatchKey })) return "standard";
   const joined = [
@@ -749,6 +753,16 @@ export function validateFirstDayDispatchCompletionEvidence(input: FirstDayDispat
       valid: false,
       level,
       error: "这张首日派单带有避坑边界，完成依据必须写清避开了什么、为何仍只做小样本或不放量。",
+    };
+  }
+
+  const missingSourceEvidence = requiredHandoffSourceEvidence(input.evidence)
+    .filter((line) => !trimmedEvidence.includes(line));
+  if (missingSourceEvidence.length > 0) {
+    return {
+      valid: false,
+      level,
+      error: `这张首日派单带有交接来源，完成依据必须保留：${missingSourceEvidence.join("、")}。`,
     };
   }
 

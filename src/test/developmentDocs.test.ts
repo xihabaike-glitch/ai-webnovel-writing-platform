@@ -56,6 +56,22 @@ test("ai writing platform development document", async (t) => {
     }
   });
 
+  await t.test("documents the unified scale decision gate", () => {
+    assert.ok(doc.includes("统一放量三态"));
+    for (const label of ["允许小步加码", "继续观察", "禁止放大"]) {
+      assert.ok(doc.includes(label), `${label} should be documented`);
+    }
+
+    for (const route of ["/tasks", "/gate", "/projects/[projectId]", "/failures"]) {
+      assert.ok(doc.includes(route), `${route} should be documented as a scale decision surface`);
+    }
+
+    assert.ok(doc.includes("推荐批次安全阀"));
+    assert.ok(doc.includes("恢复小批"));
+    assert.ok(doc.includes("首日扩展"));
+    assert.ok(doc.includes("不能各自发明放量口径"));
+  });
+
   await t.test("uses the current delivery route instead of old kickoff instructions", () => {
     assert.equal(doc.includes("建议下一步不要直接开写代码"), false);
     assert.equal(doc.includes("`PRD.md`：产品需求文档，锁定页面、字段、MVP 范围。"), false);

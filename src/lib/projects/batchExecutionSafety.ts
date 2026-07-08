@@ -68,6 +68,9 @@ const estimatedTokensByCategory: Record<QueueItem["category"], number> = {
   blocked: 0,
 };
 
+const aiPipelineRecoveryRecheckHref =
+  "/gate?focus=action-recheck&source=ai-pipeline-recovery#ai-pipeline-recovery";
+
 function money(value: number) {
   return Math.round(value * 1000000) / 1000000;
 }
@@ -333,7 +336,7 @@ export function buildBatchExecutionSafety(
         : `${aiPipelineRecoveryFollowupCount} 个 AI 写审改恢复派单未闭环；先回恢复闸门跑小样本或回滚修复，不回推荐批量。`,
       aiPipelineRecoveryFollowupCount === 0 ? undefined : {
         actionLabel: "回恢复闸门",
-        actionHref: "/gate#ai-pipeline-recovery",
+        actionHref: aiPipelineRecoveryRecheckHref,
       },
     ),
     safetyItem(

@@ -1253,7 +1253,7 @@ test("buildTaskQueueCenter", async (t) => {
       tone: "ai_pipeline_recovery",
       badgeClass: "bg-emerald-50 text-emerald-700",
       detailClass: "border-emerald-200 bg-emerald-50 text-emerald-950",
-      returnHref: "/gate#ai-pipeline-recovery",
+      returnHref: "/gate?focus=action-recheck&source=ai-pipeline-recovery#ai-pipeline-recovery",
       returnLabel: "回 AI 写审改恢复闸门",
     });
     assert.equal(rollback?.sourceLabel, "AI 写审改恢复");

@@ -20,6 +20,8 @@ import { findProjectStartTacticSummary, type ProjectStartTacticEntryLike, type P
 import { buildSubmissionChecklist, type SubmissionChecklist } from "./submissionChecklist.ts";
 
 const exportVersionReceiptRecheckHref = "/gate?focus=action-recheck&source=export-version-receipt#gate-export-package";
+const aiPipelineRecoveryRecheckHref =
+  "/gate?focus=action-recheck&source=ai-pipeline-recovery#ai-pipeline-recovery";
 
 export interface TaskQueueProject {
   id: string;
@@ -418,7 +420,7 @@ export function taskQueueSourcePresentation(entry: QueueItem | null): TaskQueueS
       tone: "ai_pipeline_recovery",
       badgeClass: "bg-emerald-50 text-emerald-700",
       detailClass: "border-emerald-200 bg-emerald-50 text-emerald-950",
-      returnHref: "/gate#ai-pipeline-recovery",
+      returnHref: aiPipelineRecoveryRecheckHref,
       returnLabel: "回 AI 写审改恢复闸门",
     };
   }

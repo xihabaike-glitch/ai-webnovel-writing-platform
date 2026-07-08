@@ -99,7 +99,7 @@ test("buildBatchExecutionSafety", async (t) => {
     assert.ok(recoveryGate?.detail.includes("AI 写审改恢复"));
     assert.ok(recoveryGate?.detail.includes("不回推荐批量"));
     assert.equal(recoveryGate?.actionLabel, "回恢复闸门");
-    assert.equal(recoveryGate?.actionHref, "/gate#ai-pipeline-recovery");
+    assert.equal(recoveryGate?.actionHref, "/gate?focus=action-recheck&source=ai-pipeline-recovery#ai-pipeline-recovery");
   });
 
   await t.test("blocks recommended batches when writing task archive experience receipts are missing", () => {
@@ -312,7 +312,7 @@ test("buildBatchExecutionSafety", async (t) => {
     assert.equal(blocker?.id, "ai-pipeline-recovery");
     assert.equal(blocker?.title, "先处理 AI 写审改恢复");
     assert.equal(blocker?.actionLabel, "回恢复闸门");
-    assert.equal(blocker?.actionHref, "/gate#ai-pipeline-recovery");
+    assert.equal(blocker?.actionHref, "/gate?focus=action-recheck&source=ai-pipeline-recovery#ai-pipeline-recovery");
     assert.ok(blocker?.detail.includes("不回推荐批量"));
   });
 

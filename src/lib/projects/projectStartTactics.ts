@@ -158,6 +158,15 @@ export interface ProjectStartRecoveryHandoffPanel {
   evidence: string[];
 }
 
+export interface ProjectStartExperienceDigest {
+  title: string;
+  badge: string;
+  reason: string;
+  copyActions: string[];
+  avoidRules: string[];
+  evidence: string[];
+}
+
 function routeDetailValue(detail: string, label: string) {
   const match = detail.match(new RegExp(`${label}：([^；;]+)`));
   return match?.[1]?.trim() || null;
@@ -508,7 +517,7 @@ export function buildProjectStartPlatformExperienceGuide(input: {
         priorityScore: firstDayClosedLoop ? experience.priorityScore + 12 : thirdStable ? experience.priorityScore + 8 : recoveryScale ? experience.priorityScore + 6 : experience.priorityScore,
         source: "experience",
         href: experience.href,
-        evidence: experience.evidence.slice(0, 3),
+        evidence: experience.evidence.slice(0, firstDayClosedLoop ? 5 : 3),
       };
     }
 
@@ -825,6 +834,53 @@ export function buildProjectStartRecoveryHandoffPanel(handoff: ProjectStartExper
     blockedRule: handoff.avoidRules.find((rule) => /不直接放量|小样本|放量/u.test(rule))
       ?? "未过小样本前不直接放量。",
     evidence: handoff.evidence.slice(0, 2),
+  };
+}
+
+function evidenceValueAfterLabel(line: string, labelPattern: RegExp) {
+  const match = line.match(labelPattern);
+  return match?.[1]?.trim() ?? null;
+}
+
+export function buildProjectStartExperienceDigest(input: {
+  platformName: string;
+  handoff: ProjectStartExperienceHandoff;
+  advice: ProjectStartTacticAdvice;
+}): ProjectStartExperienceDigest {
+  const evidence = uniqueLines([
+    ...input.handoff.evidence,
+    ...input.advice.evidence,
+  ], 8);
+  const landedActions = evidence
+    .map((line) => evidenceValueAfterLabel(line, /(?:交接动作已落地|首日动作|执行开书交接动作)[:：]\s*(.+)$/u))
+    .filter((line): line is string => Boolean(line));
+  const avoidedRules = evidence
+    .map((line) => evidenceValueAfterLabel(line, /(?:避坑边界已确认|避开交接边界)[:：]\s*(.+)$/u))
+    .filter((line): line is string => Boolean(line));
+  const sourceEvidence = uniqueLines([
+    evidence.find((line) => /知识来源/u.test(line)),
+    evidence.find((line) => /平台反哺/u.test(line)),
+    evidence.find((line) => /已用于新书开局并闭环|闭环进度|新书开局闭环/u.test(line)),
+    ...evidence,
+  ], 4);
+
+  return {
+    title: `${input.platformName} 开书经验摘要`,
+    badge: input.handoff.label,
+    reason: input.handoff.detail || input.advice.primaryTactic,
+    copyActions: uniqueLines([
+      input.handoff.firstDayActions.find((action) => /闭环|复用|恢复放量|三轮/u.test(action)),
+      ...landedActions,
+      ...input.handoff.firstDayActions,
+      `开头动作：${input.advice.openingMove}`,
+      `验证动作：${input.advice.verificationMove}`,
+    ], 4),
+    avoidRules: uniqueLines([
+      ...avoidedRules,
+      ...input.handoff.avoidRules,
+      input.advice.risk,
+    ], 3),
+    evidence: sourceEvidence,
   };
 }
 

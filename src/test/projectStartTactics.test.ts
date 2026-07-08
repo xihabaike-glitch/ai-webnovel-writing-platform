@@ -16,6 +16,7 @@ import {
 import {
   buildProjectStartExperienceHandoff,
   buildProjectStartExperienceHandoffDispatchPackage,
+  buildProjectStartExperienceDigest,
   buildProjectStartRecoveryHandoffPanel,
   buildProjectStartPlatformExperienceGuide,
   buildProjectStartGateExperience,
@@ -1320,6 +1321,65 @@ test("buildProjectStartTacticAdvice", async (t) => {
     assert.equal(handoff.label, "闭环交接");
     assert.ok(handoff.firstDayActions.some((action) => action.includes("闭环复用")));
     assert.ok(handoff.evidence.some((item) => item.includes("已用于新书开局并闭环")));
+  });
+
+  await t.test("builds a creation-page digest from reusable handoff evidence", () => {
+    const platform = getPlatformProfile("fanqie");
+    const template = getDefaultTemplateForPlatform(platform.id);
+    const style = getPlatformWritingStyle(platform.id);
+    const advice = buildProjectStartTacticAdvice({ platform, template, style });
+    const handoff = buildProjectStartExperienceHandoff({
+      platform,
+      template,
+      guide: buildProjectStartPlatformExperienceGuide({
+        platforms: [platform],
+        experiences: [{
+          platformId: "fanqie",
+          platformName: "番茄小说",
+          status: "usable",
+          label: "可复用打法",
+          tactic: "新书开局闭环打法",
+          lesson: "已完成开局交接。",
+          reuseHint: "先锁开头钩子，再把前三章兑现写进验收线。",
+          risk: "不要直接放量，先做小样本。",
+          href: "/gate#platform-tactic-experience",
+          sourceStatus: "healthy",
+          sourceLabel: "新书开局闭环",
+          priorityScore: 94,
+          latestAt: "2026-01-03T00:00:00.000Z",
+          evidence: [
+            "知识来源：番茄小说 正反馈经验已沉淀",
+            "平台反哺：执行正反馈链",
+            "交接动作已落地：开头：第一段给倒计时。",
+            "避坑边界已确认：不要直接放量，先做小样本。",
+          ],
+        }],
+      }),
+      advice,
+      riskGate: {
+        level: "pass",
+        requiresConfirmation: false,
+        label: "可优先",
+        title: "番茄小说 优先开书",
+        detail: "新书开局闭环打法 已经被用于新书第一天流程并完成交接。",
+        actionLabel: "创建作品",
+        evidence: ["已用于新书开局并闭环"],
+      },
+      recommendedTemplate: template,
+    });
+    const digest = buildProjectStartExperienceDigest({
+      platformName: platform.name,
+      handoff,
+      advice,
+    });
+
+    assert.equal(digest.title, "番茄小说 开书经验摘要");
+    assert.ok(digest.reason.includes("已经被用于新书第一天流程"));
+    assert.ok(digest.copyActions.some((action) => action.includes("闭环复用")));
+    assert.ok(digest.copyActions.some((action) => action.includes("第一段给")));
+    assert.ok(digest.avoidRules.some((rule) => rule.includes("不要直接放量")));
+    assert.ok(digest.evidence.some((line) => line.includes("知识来源：番茄小说")));
+    assert.ok(digest.evidence.some((line) => line.includes("平台反哺")));
   });
 
   await t.test("turns completed recovery follow-up experience into a first-day small-sample handoff", () => {

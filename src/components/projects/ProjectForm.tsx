@@ -16,6 +16,7 @@ import {
 } from "@/lib/projects/gateActionReceipts";
 import {
   buildProjectStartExperienceHandoff,
+  buildProjectStartExperienceDigest,
   buildProjectStartKnowledgeFeedbackExperiences,
   buildProjectStartRiskGate,
   buildProjectStartRecoveryHandoffPanel,
@@ -160,6 +161,11 @@ export function ProjectForm({
     advice: tacticAdvice,
     riskGate: selectedRiskGate,
     recommendedTemplate: recommendedStartTemplate,
+  });
+  const startExperienceDigest = buildProjectStartExperienceDigest({
+    platformName: selectedProfile.name,
+    handoff: startExperienceHandoff,
+    advice: tacticAdvice,
   });
   const recoveryHandoffPanel = buildProjectStartRecoveryHandoffPanel(startExperienceHandoff);
   const launchRequested = Boolean(launchPlatform && experienceLaunch?.tactic);
@@ -449,6 +455,39 @@ export function ProjectForm({
             ) : null}
           </div>
         ) : null}
+        <div className="rounded-md border border-white/70 bg-white/70 p-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="font-medium">{startExperienceDigest.title}</div>
+            <span className="rounded-md bg-slate-950 px-2 py-1 text-xs font-medium text-white">{startExperienceDigest.badge}</span>
+          </div>
+          <p className="mt-2 text-xs leading-5 opacity-80">{startExperienceDigest.reason}</p>
+          <div className="mt-3 grid gap-2 md:grid-cols-3">
+            <div className="rounded-md bg-white/80 p-2 text-xs leading-5">
+              <div className="font-medium opacity-70">为什么推荐</div>
+              <div className="mt-2 grid gap-1">
+                {startExperienceDigest.evidence.slice(0, 2).map((line) => (
+                  <p key={line}>{line}</p>
+                ))}
+              </div>
+            </div>
+            <div className="rounded-md bg-white/80 p-2 text-xs leading-5">
+              <div className="font-medium opacity-70">复制动作</div>
+              <div className="mt-2 grid gap-1">
+                {startExperienceDigest.copyActions.slice(0, 2).map((line) => (
+                  <p key={line}>{line}</p>
+                ))}
+              </div>
+            </div>
+            <div className="rounded-md bg-white/80 p-2 text-xs leading-5">
+              <div className="font-medium opacity-70">不能踩</div>
+              <div className="mt-2 grid gap-1">
+                {startExperienceDigest.avoidRules.slice(0, 2).map((line) => (
+                  <p key={line}>{line}</p>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
         <div className="grid gap-2 md:grid-cols-2">
           <div className="rounded-md bg-white/70 p-3">
             <div className="text-xs font-medium opacity-70">首日动作</div>

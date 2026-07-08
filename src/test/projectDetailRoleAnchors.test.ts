@@ -483,10 +483,16 @@ test("chapter detail page surfaces pending candidate production gate", () => {
 
 test("chapter revision workbench surfaces adoption follow-up dispatch links", () => {
   const chapterRevisionWorkbench = readFileSync("src/components/chapters/ChapterRevisionWorkbench.tsx", "utf8");
+  const adoptRoute = readFileSync("src/app/api/chapters/[chapterId]/revisions/[revisionId]/adopt/route.ts", "utf8");
 
   assert.ok(chapterRevisionWorkbench.includes("followupDispatches?: Array<"));
   assert.ok(chapterRevisionWorkbench.includes("setFollowupDispatches(payload?.followupDispatches ?? []);"));
   assert.ok(chapterRevisionWorkbench.includes("followupDispatches.map((dispatch)"));
   assert.ok(chapterRevisionWorkbench.includes("href={hrefWithGateReturn(dispatch.href, gateReturnHref)}"));
   assert.ok(chapterRevisionWorkbench.includes("{dispatch.actionLabel}"));
+
+  assert.ok(adoptRoute.includes("buildChapterAdoptionFollowupDispatches"));
+  assert.ok(adoptRoute.includes("revisionSource: revision.source"));
+  assert.ok(adoptRoute.includes(".map((dispatch) => persistServerGateDispatchTask(dispatch))"));
+  assert.ok(adoptRoute.includes("系统已派发后续生产待办"));
 });

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { isChapterRevisionCandidate } from "@/lib/chapters/revisions";
-import { buildFirstThreeAdoptionFollowupDispatches } from "@/lib/chapters/revisionAdoptionFollowup";
+import { buildChapterAdoptionFollowupDispatches, buildFirstThreeAdoptionFollowupDispatches } from "@/lib/chapters/revisionAdoptionFollowup";
 import { countWords } from "@/lib/text/wordCount";
 import { prisma } from "@/lib/db/prisma";
 import { getActiveModelProvider } from "@/lib/model-gateway/activeProvider";
@@ -129,8 +129,8 @@ export async function POST(_request: Request, { params }: Params) {
 
     return savedChapter;
   });
-  const followupDispatches = revision.source === "first_three_rewrite_candidate" && project && platform
-    ? await Promise.all(buildFirstThreeAdoptionFollowupDispatches({
+  const followupDispatches = project && platform
+    ? await Promise.all((revision.source === "first_three_rewrite_candidate" ? buildFirstThreeAdoptionFollowupDispatches({
       projectId: project.id,
       projectTitle: project.title,
       platformId: platform.id,
@@ -139,7 +139,17 @@ export async function POST(_request: Request, { params }: Params) {
       chapterOrder: chapter.order,
       chapterTitle: revision.title || chapter.title,
       revisionId: revision.id,
-    }).map((dispatch) => persistServerGateDispatchTask(dispatch)))
+    }) : buildChapterAdoptionFollowupDispatches({
+      projectId: project.id,
+      projectTitle: project.title,
+      platformId: platform.id,
+      platformName: platform.name,
+      chapterId: chapter.id,
+      chapterOrder: chapter.order,
+      chapterTitle: revision.title || chapter.title,
+      revisionId: revision.id,
+      revisionSource: revision.source,
+    })).map((dispatch) => persistServerGateDispatchTask(dispatch)))
     : [];
 
   return NextResponse.json({
@@ -150,7 +160,7 @@ export async function POST(_request: Request, { params }: Params) {
       label: "去审稿",
       href: `/projects/${chapter.projectId}/chapters/${chapter.id}#chapter-workflow`,
       detail: followupDispatches.length
-        ? "候选稿已采纳，系统已派发重新审稿和发布质检待办。旧审稿不再代表当前正文。"
+        ? "候选稿已采纳，系统已派发后续生产待办。旧审稿不再代表当前正文。"
         : "候选稿已采纳，旧审稿不再代表当前正文。先重新审稿，再决定二改或发布质检。",
     },
   });

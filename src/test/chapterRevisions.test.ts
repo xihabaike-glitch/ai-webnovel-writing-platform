@@ -8,6 +8,7 @@ import {
   summarizeChapterRevisions,
 } from "../lib/chapters/revisions.ts";
 import { buildFirstThreeAdoptionFollowupDispatches } from "../lib/chapters/revisionAdoptionFollowup.ts";
+import { buildChapterAdoptionFollowupDispatches } from "../lib/chapters/revisionAdoptionFollowup.ts";
 import {
   buildFirstThreePublishCompletionEvidence,
   buildFirstThreeReviewCompletionEvidence,
@@ -239,6 +240,60 @@ test("chapter revision summaries", async (t) => {
     assert.equal(dispatches[1].actionLabel, "回发布质检");
     assert.equal(dispatches[1].href, "/projects/project-1#platform-export");
     assert.ok(dispatches[1].evidence.some((item) => item.includes("revision-first-three")));
+  });
+
+  await t.test("builds task-center follow-ups after ordinary candidate adoption", () => {
+    const dispatches = buildChapterAdoptionFollowupDispatches({
+      projectId: "project-1",
+      projectTitle: "夜雨系统",
+      platformId: "fanqie",
+      platformName: "番茄小说",
+      chapterId: "chapter-1",
+      chapterOrder: 4,
+      chapterTitle: "第四章 追杀反转",
+      revisionId: "revision-draft",
+      revisionSource: "ai_draft_candidate",
+      createdAt: "2026-07-05T12:00:00.000Z",
+    });
+
+    assert.equal(dispatches.length, 2);
+    assert.equal(dispatches[0].id, "chapter-adoption:project-1:chapter-1:revision-draft:review");
+    assert.equal(dispatches[0].stage, "start_first_three_review");
+    assert.equal(dispatches[0].state, "assigned");
+    assert.equal(dispatches[0].ownerRole, "首轮审稿编辑");
+    assert.equal(dispatches[0].actionLabel, "重新审稿");
+    assert.equal(dispatches[0].href, "/projects/project-1/chapters/chapter-1#chapter-workflow");
+    assert.ok(dispatches[0].evidence.some((item) => item.includes("AI 初稿候选")));
+
+    assert.equal(dispatches[1].id, "chapter-adoption:project-1:chapter-1:revision-draft:second-pass");
+    assert.equal(dispatches[1].stage, "start_rewrite_opening");
+    assert.equal(dispatches[1].ownerRole, "二改编辑");
+    assert.equal(dispatches[1].actionLabel, "启动二改");
+    assert.equal(dispatches[1].href, "/projects/project-1/chapters/chapter-1#chapter-second-pass");
+    assert.ok(dispatches[1].acceptanceCriteria.some((item) => item.includes("审稿问题")));
+  });
+
+  await t.test("routes adopted second-pass candidates toward publish checks", () => {
+    const dispatches = buildChapterAdoptionFollowupDispatches({
+      projectId: "project-1",
+      projectTitle: "夜雨系统",
+      platformId: "fanqie",
+      platformName: "番茄小说",
+      chapterId: "chapter-1",
+      chapterOrder: 4,
+      chapterTitle: "第四章 追杀反转",
+      revisionId: "revision-second-pass",
+      revisionSource: "chapter_second_pass_candidate",
+      createdAt: "2026-07-05T12:00:00.000Z",
+    });
+
+    assert.equal(dispatches.length, 2);
+    assert.equal(dispatches[0].actionLabel, "重新审稿");
+    assert.equal(dispatches[1].id, "chapter-adoption:project-1:chapter-1:revision-second-pass:publish-check");
+    assert.equal(dispatches[1].stage, "start_publish_finalize");
+    assert.equal(dispatches[1].ownerRole, "发布质检编辑");
+    assert.equal(dispatches[1].actionLabel, "回发布质检");
+    assert.equal(dispatches[1].href, "/projects/project-1#platform-export");
   });
 
   await t.test("builds automatic completion evidence for adoption follow-ups", () => {

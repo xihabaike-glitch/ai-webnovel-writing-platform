@@ -47,6 +47,7 @@ export interface GateActionReceiptPayload {
     adoptionFollowupCount?: number;
     adoptionFollowupItemIds?: string[];
     executionContext?: "standard" | "repair_resume" | "batch_rhythm_recheck";
+    batchModeLabel?: string;
   };
   startTactics?: GateActionReceiptStartTactic[];
   variants?: unknown[];
@@ -101,6 +102,7 @@ export interface GateActionReceiptBatchContext {
   category: string | null;
   receiptHeadline: string;
   receiptStatus: string;
+  batchModeLabel?: string;
   rhythmRecheck?: {
     dispatchKey: string;
     title: string;
@@ -1284,32 +1286,46 @@ function batchTacticEffectExperienceItem(item: GateBatchTacticEffectItem): GateP
   const platform = platformFromBatchTacticTitle(item.tacticTitle);
   if (!platform) return null;
   const recovery = item.recoveryBatches > 0;
+  const firstDayScale = (item.firstDayScaleBatches ?? 0) > 0;
   const recoveryStableGate = recovery
     ? item.recoveryBatches >= 2
       ? `恢复放量：已验证 ${item.recoveryBatches} 批，满足连续稳定入库线`
       : `恢复放量：已验证 ${item.recoveryBatches} 批，还差 ${2 - item.recoveryBatches} 批稳定样本才准入库`
+    : null;
+  const firstDayScaleGate = firstDayScale
+    ? `首日扩展：已验证 ${item.firstDayScaleBatches} 批，仍需回填曝光、点击、收藏、追读`
     : null;
   return {
     platformId: platform.id,
     platformName: platform.name,
     status: item.status,
     label: item.status === "usable" ? "可复用打法" : item.status === "blocked" ? "避坑样本" : "观察样本",
-    tactic: recovery
+    tactic: firstDayScale
+      ? item.status === "blocked" ? "首日扩展避坑" : "首日扩展观察"
+      : recovery
       ? item.status === "usable" ? "恢复放量打法" : item.status === "blocked" ? "恢复放量避坑" : "恢复放量观察"
       : item.label,
-    lesson: recovery
+    lesson: firstDayScale
+      ? item.status === "blocked"
+        ? `${platform.name} 首日扩展小批已经出现失败或低分，不能继续把这条首日扩展节奏放大。`
+        : `${platform.name} 首日扩展小批已经跑通，成功率 ${item.successRatePercent}%，质量 ${item.averageQualityScore ?? "缺"}，但只能作为数据回填前的观察样本。`
+      : recovery
       ? item.status === "usable"
         ? `${platform.name} 恢复放量已经连续稳定，成功率 ${item.successRatePercent}%，质量 ${item.averageQualityScore ?? "缺"}，可以作为解除闸门后的谨慎参考打法。`
         : item.status === "blocked"
           ? `${platform.name} 恢复放量样本已经变成避坑信号，先停掉这套恢复节奏，拆失败和低分原因。`
           : `${platform.name} 恢复放量样本还薄，只能作为观察流程，不能写成成功打法。`
       : `${platform.name} ${item.label}，成功率 ${item.successRatePercent}%，质量 ${item.averageQualityScore ?? "缺"}。`,
-    reuseHint: recovery
+    reuseHint: firstDayScale
+      ? "同类项目只能复用首日扩展的数据回填清单；先补曝光、点击、收藏、追读，不要把一章样本误判成可复用放量打法。"
+      : recovery
       ? item.status === "usable"
         ? "新项目可以参考这套恢复后的平台节奏，但新项目仍先跑小样本，确认前三章兑现、模型路线和追读证据后再加码。"
         : "新项目只能复用这套恢复验证清单，先小样本，不要直接放量。"
       : item.nextAction,
-    risk: recovery
+    risk: firstDayScale
+      ? "首日扩展小批只证明 1 个新样本过线，不直接批量放大；缺真实平台数据前不进入可复用打法库。"
+      : recovery
       ? "恢复放量是解除闸门后的参考，不是跨题材无限复用；换题材、换平台或模型路线变化时必须重新小样本验证。"
       : item.risk,
     href: "/gate#platform-tactic-experience",
@@ -1318,6 +1334,7 @@ function batchTacticEffectExperienceItem(item: GateBatchTacticEffectItem): GateP
     priorityScore: item.status === "usable" ? 88 : item.status === "watch" ? 68 : 95,
     latestAt: item.latestAt,
     evidence: [
+      firstDayScaleGate,
       recoveryStableGate,
       `批量效果：成功 ${item.succeededTasks}，失败 ${item.failedTasks}，成功率 ${item.successRatePercent}%，质量 ${item.averageQualityScore ?? "缺"}`,
       ...item.evidence,
@@ -1345,6 +1362,7 @@ export interface GateBatchTacticEffectItem {
   knownCostUsd: number;
   recoveryBatches: number;
   rhythmRecheckBatches?: number;
+  firstDayScaleBatches?: number;
   latestAt: string;
   evidence: string[];
   nextAction: string;
@@ -1484,8 +1502,9 @@ function batchContextFromPayload(payload: GateActionReceiptPayload): GateActionR
   const category = typeof payload.plan?.category === "string" ? payload.plan.category : null;
   const receiptHeadline = payload.batchReceipt?.headline ?? "";
   const receiptStatus = payload.batchReceipt?.status ?? "";
+  const batchModeLabel = typeof payload.plan?.batchModeLabel === "string" ? payload.plan.batchModeLabel : "";
   const rhythmRecheck = payload.batchRhythmRecheck ?? null;
-  if (scaleGate === "none" && !actionLabel && !receiptHeadline && !rhythmRecheck) return null;
+  if (scaleGate === "none" && !actionLabel && !receiptHeadline && !batchModeLabel && !rhythmRecheck) return null;
 
   return {
     scaleGate,
@@ -1493,6 +1512,7 @@ function batchContextFromPayload(payload: GateActionReceiptPayload): GateActionR
     category,
     receiptHeadline,
     receiptStatus,
+    batchModeLabel: batchModeLabel || undefined,
     rhythmRecheck,
   };
 }
@@ -1500,6 +1520,7 @@ function batchContextFromPayload(payload: GateActionReceiptPayload): GateActionR
 function batchContextText(context?: GateActionReceiptBatchContext | null) {
   if (!context) return "";
   if (context.rhythmRecheck) return "节奏复验";
+  if (context.batchModeLabel === "首日扩展小批") return "首日扩展";
   if (context.scaleGate === "cleared") return "恢复放量";
   if (context.scaleGate === "sample_only") return "小样本";
   return "";
@@ -8319,6 +8340,10 @@ export function buildGateBatchTacticEffectReview(
     const knownCostUsd = Number(sortedReceipts.reduce((sum, receipt) => sum + (receipt.batchEffectSummary?.knownCostUsd ?? 0), 0).toFixed(4));
     const recoveryBatches = sortedReceipts.filter((receipt) => receipt.batchContext?.scaleGate === "cleared").length;
     const rhythmRecheckBatches = sortedReceipts.filter((receipt) => receipt.batchContext?.rhythmRecheck).length;
+    const firstDayScaleBatches = sortedReceipts.filter((receipt) => (
+      receipt.batchContext?.batchModeLabel === "首日扩展小批"
+      || receipt.batchContext?.receiptHeadline.includes("首日扩展小批")
+    )).length;
     const thirdRoundMode = batchTacticThirdRoundMode(group.tactic);
     const baseStatus = batchTacticStatus({
       sampleBatches: sortedReceipts.length,
@@ -8328,8 +8353,11 @@ export function buildGateBatchTacticEffectReview(
     });
     const recoveryAdjustedStatus = recoveryBatches > 0 && baseStatus === "usable" && recoveryBatches < 2 ? "watch" : baseStatus;
     const rhythmAdjustedStatus = rhythmRecheckBatches > 0 && recoveryAdjustedStatus === "usable" && rhythmRecheckBatches < 2 ? "watch" : recoveryAdjustedStatus;
-    const status = thirdRoundMode === "downgrade" && rhythmAdjustedStatus === "usable" ? "watch" : rhythmAdjustedStatus;
-    const label = rhythmRecheckBatches > 0
+    const firstDayScaleAdjustedStatus = firstDayScaleBatches > 0 && rhythmAdjustedStatus === "usable" ? "watch" : rhythmAdjustedStatus;
+    const status = thirdRoundMode === "downgrade" && firstDayScaleAdjustedStatus === "usable" ? "watch" : firstDayScaleAdjustedStatus;
+    const label = firstDayScaleBatches > 0
+      ? status === "blocked" ? "首日扩展避坑" : "首日扩展观察"
+      : rhythmRecheckBatches > 0
       ? status === "usable" ? "节奏复验打法" : status === "blocked" ? "节奏复验避坑" : "节奏复验观察"
       : recoveryBatches > 0
       ? status === "usable" ? "恢复放量打法" : status === "blocked" ? "恢复放量避坑" : "恢复放量观察"
@@ -8343,7 +8371,9 @@ export function buildGateBatchTacticEffectReview(
     const nextAction = status === "blocked"
       ? "先拆失败样本和低分原因，暂停把这套打法继续放进新批次。"
       : status === "watch"
-        ? rhythmRecheckBatches > 0
+        ? firstDayScaleBatches > 0
+          ? "首日扩展小批只证明新样本能跑通；先补曝光、点击、收藏、追读，不直接批量放大。"
+          : rhythmRecheckBatches > 0
           ? "节奏复验已经回流，但样本仍薄；再跑一轮稳定小批后，才允许恢复普通推荐节奏。"
           : recoveryBatches > 0
           ? "恢复放量样本还薄，至少再跑一轮稳定批次后，才允许写成新项目可复用打法。"
@@ -8378,6 +8408,7 @@ export function buildGateBatchTacticEffectReview(
       knownCostUsd,
       recoveryBatches,
       rhythmRecheckBatches,
+      firstDayScaleBatches,
       latestAt: sortedReceipts[0]?.createdAt ?? new Date(0).toISOString(),
       evidence,
       nextAction,

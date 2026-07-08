@@ -508,6 +508,46 @@ test("buildGateActionReceipt", async (t) => {
     assert.ok(review.items[0]?.nextAction.includes("新项目仍先跑小样本"));
   });
 
+  await t.test("keeps first-day scale batches in data-backfill watch", () => {
+    const tactic = {
+      title: "首轮平台打法：番茄小说",
+      label: "执行扩展",
+      primaryTactic: "沿用生成-审稿-二改顺序，扩到下一章小样本。",
+      openingMove: "第一段继续给不可逆危机。",
+      verificationMove: "回填曝光、点击、收藏、追读后再判断。",
+      risk: "首日扩展不是直接批量放大。",
+    };
+    const receipt = buildGateActionReceipt({
+      action,
+      status: "succeeded",
+      now: "2026-01-03T00:00:00.000Z",
+      payload: {
+        results: [{ status: "succeeded", taskId: "task-1" }],
+        routeEffectSummary: { successRatePercent: 100, knownCostUsd: 0.01, averageQualityScore: 90 },
+        plan: {
+          strategyBases: [tactic],
+          scaleGate: "none",
+          actionLabel: "批量初稿 1 个",
+          category: "draft",
+          batchModeLabel: "首日扩展小批",
+        },
+        batchReceipt: {
+          status: "continue",
+          headline: "首日扩展小批通过，先回填数据",
+        },
+      },
+    });
+    const review = buildGateBatchTacticEffectReview([receipt]);
+
+    assert.equal(receipt.batchContext?.batchModeLabel, "首日扩展小批");
+    assert.equal(review.items[0]?.status, "watch");
+    assert.equal(review.items[0]?.label, "首日扩展观察");
+    assert.equal(review.items[0]?.firstDayScaleBatches, 1);
+    assert.ok(review.items[0]?.evidence[0].includes("首日扩展"));
+    assert.ok(review.items[0]?.nextAction.includes("曝光、点击、收藏、追读"));
+    assert.ok(review.items[0]?.nextAction.includes("不直接批量放大"));
+  });
+
   await t.test("keeps a single healthy third-round stable batch in watch", () => {
     const tactic = {
       title: "首轮平台打法：番茄小说",
@@ -2013,6 +2053,41 @@ test("buildGateActionReceipt", async (t) => {
     assert.equal(library.items[0]?.tactic, "恢复放量观察");
     assert.ok(library.items[0]?.evidence.some((line) => line.includes("还差 1 批")));
     assert.ok(library.items[0]?.reuseHint.includes("不要直接放量"));
+  });
+
+  await t.test("feeds first-day scale batch effects into tactic experience as watch only", () => {
+    const library = buildGatePlatformTacticExperienceLibrary({
+      summary: { total: 0, healthy: 0, needsEffect: 0, repairing: 0, blocked: 0 },
+      items: [],
+      nextActions: [],
+    }, 6, [{
+      id: "fanqie:first-day-scale",
+      status: "watch",
+      label: "首日扩展观察",
+      tacticTitle: "首轮平台打法：番茄小说",
+      tacticLabel: "执行扩展",
+      primaryTactic: "沿用生成-审稿-二改顺序，扩到下一章小样本。",
+      openingMove: "第一段继续给不可逆危机。",
+      verificationMove: "回填曝光、点击、收藏、追读后再判断。",
+      risk: "首日扩展不是直接批量放大。",
+      sampleBatches: 1,
+      succeededTasks: 1,
+      failedTasks: 0,
+      successRatePercent: 100,
+      averageQualityScore: 90,
+      knownCostUsd: 0.01,
+      recoveryBatches: 0,
+      firstDayScaleBatches: 1,
+      latestAt: "2026-01-03T00:00:00.000Z",
+      evidence: ["沉淀批量初稿 1 个经验｜首日扩展：成功 1，失败 0，质量 90"],
+      nextAction: "首日扩展小批只证明 1 个新样本过线；先补曝光、点击、收藏、追读，不直接批量放大。",
+    }]);
+
+    assert.equal(library.items[0]?.status, "watch");
+    assert.equal(library.items[0]?.tactic, "首日扩展观察");
+    assert.ok(library.items[0]?.lesson.includes("首日扩展小批"));
+    assert.ok(library.items[0]?.reuseHint.includes("曝光、点击、收藏、追读"));
+    assert.ok(library.items[0]?.risk.includes("不直接批量放大"));
   });
 
   await t.test("turns project start validation advice into three dispatch cards", () => {

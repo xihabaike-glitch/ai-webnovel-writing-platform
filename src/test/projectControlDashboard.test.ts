@@ -1278,6 +1278,192 @@ test("buildProjectControlDashboard", async (t) => {
     assert.equal(dashboard.productionDecision.primaryTargetHref, "/dispatch?queue=ai_pipeline#dispatch-ai-pipeline-recheck:demo-project:ai-plan-dispatched:sample");
   });
 
+  await t.test("closes completed AI pipeline recheck dispatches as recoverable production decisions", () => {
+    const dispatchKey = "ai-pipeline-recheck:demo-project:ai-plan-dispatched:sample";
+    const dashboard = buildProjectControlDashboard({
+      project,
+      platform: getPlatformProfile("fanqie"),
+      chapters: [chapter],
+      outlineNodes: [],
+      characters: [],
+      worldEntries: [],
+      foreshadows: [],
+      plotThreads: [],
+      aiTasks: [],
+      gateActionAudits: [
+        {
+          receiptId: "blocked-batch",
+          label: "失败批次",
+          detail: "番茄小说 · 夜雨系统 · 批量初稿 2 个",
+          href: "/tasks#recommended-batch",
+          status: "failed",
+          message: "推荐批次失败。",
+          executionType: "recommended_batch",
+          succeededCount: 0,
+          failedCount: 2,
+          payload: JSON.stringify({
+            plan: {
+              strategyBases: [{ title: "首轮平台打法：番茄小说", label: "三轮稳住", primaryTactic: "先稳小样本。" }],
+              actionLabel: "批量初稿 2 个",
+              category: "draft",
+            },
+            routeEffectSummary: { successRatePercent: 0, knownCostUsd: 0.02, averageQualityScore: 68 },
+            batchReceipt: { status: "repair", headline: "批次有失败，先修再放大" },
+          }),
+          createdAt: "2026-01-02T00:00:00.000Z",
+        },
+        {
+          receiptId: "ai-plan-dispatched",
+          actionId: "ai-pipeline-control:demo-project",
+          label: "批量打法修复清单",
+          detail: "三轮稳住打法：成功率 0%，质量 68，失败 2。",
+          href: "/projects/demo-project#ai-pipeline",
+          status: "succeeded",
+          message: "复检完成：先修打法。只能恢复小样本复验。",
+          executionType: "control_action",
+          succeededCount: 3,
+          failedCount: 0,
+          payload: JSON.stringify({
+            aiPipelineControlPlan: {
+              status: "repair",
+              items: [{ id: "stop-scale", label: "停用三轮稳住打法继续放量", completed: true }],
+              recheck: {
+                status: "sample_required",
+                healthLabel: "先修打法",
+                detail: "还有失败样本。",
+                dispatchKey,
+                dispatchTitle: "AI 写审改：跑 1 章小样本复验",
+              },
+            },
+          }),
+          createdAt: "2026-01-03T00:00:00.000Z",
+        },
+      ],
+      gateDispatchTasks: [
+        {
+          dispatchKey,
+          stage: "ai_pipeline_sample_recheck",
+          state: "completed",
+          title: "AI 写审改：跑 1 章小样本复验",
+          detail: "复检小样本。",
+          href: "/projects/demo-project#ai-pipeline",
+          actionLabel: "跑小样本复验",
+          completionEvidence: [
+            "AI 写审改：跑 1 章小样本复验",
+            "样本范围：第 1 章",
+            "成功率：100%",
+            "质量：86",
+            "失败/成本：无失败，成本正常",
+            "放量结论：通过恢复小批",
+          ].join("\n"),
+          reviewLatestAt: "2026-01-04T00:00:00.000Z",
+          completedAt: "2026-01-04T00:00:00.000Z",
+        },
+      ],
+      submissionChecklist: checklist,
+    });
+
+    assert.equal(dashboard.productionDecision.dispatchStatus, "completed");
+    assert.equal(dashboard.productionDecision.dispatchLabel, "可恢复小批");
+    assert.ok(dashboard.productionDecision.dispatchDetail.includes("成功率：100%"));
+    assert.ok(dashboard.productionDecision.dispatchDetail.includes("通过恢复小批"));
+    assert.equal(dashboard.productionDecision.primaryActionLabel, "恢复小批执行");
+    assert.equal(dashboard.productionDecision.primaryTargetHref, "/tasks#recommended-batch");
+  });
+
+  await t.test("closes completed AI pipeline recheck dispatches as continued repair decisions", () => {
+    const dispatchKey = "ai-pipeline-recheck:demo-project:ai-plan-dispatched:sample";
+    const dashboard = buildProjectControlDashboard({
+      project,
+      platform: getPlatformProfile("fanqie"),
+      chapters: [chapter],
+      outlineNodes: [],
+      characters: [],
+      worldEntries: [],
+      foreshadows: [],
+      plotThreads: [],
+      aiTasks: [],
+      gateActionAudits: [
+        {
+          receiptId: "blocked-batch",
+          label: "失败批次",
+          detail: "番茄小说 · 夜雨系统 · 批量初稿 2 个",
+          href: "/tasks#recommended-batch",
+          status: "failed",
+          message: "推荐批次失败。",
+          executionType: "recommended_batch",
+          succeededCount: 0,
+          failedCount: 2,
+          payload: JSON.stringify({
+            plan: {
+              strategyBases: [{ title: "首轮平台打法：番茄小说", label: "三轮稳住", primaryTactic: "先稳小样本。" }],
+              actionLabel: "批量初稿 2 个",
+              category: "draft",
+            },
+            routeEffectSummary: { successRatePercent: 0, knownCostUsd: 0.02, averageQualityScore: 68 },
+            batchReceipt: { status: "repair", headline: "批次有失败，先修再放大" },
+          }),
+          createdAt: "2026-01-02T00:00:00.000Z",
+        },
+        {
+          receiptId: "ai-plan-dispatched",
+          actionId: "ai-pipeline-control:demo-project",
+          label: "批量打法修复清单",
+          detail: "三轮稳住打法：成功率 0%，质量 68，失败 2。",
+          href: "/projects/demo-project#ai-pipeline",
+          status: "succeeded",
+          message: "复检完成：先修打法。只能恢复小样本复验。",
+          executionType: "control_action",
+          succeededCount: 3,
+          failedCount: 0,
+          payload: JSON.stringify({
+            aiPipelineControlPlan: {
+              status: "repair",
+              items: [{ id: "stop-scale", label: "停用三轮稳住打法继续放量", completed: true }],
+              recheck: {
+                status: "sample_required",
+                healthLabel: "先修打法",
+                detail: "还有失败样本。",
+                dispatchKey,
+                dispatchTitle: "AI 写审改：跑 1 章小样本复验",
+              },
+            },
+          }),
+          createdAt: "2026-01-03T00:00:00.000Z",
+        },
+      ],
+      gateDispatchTasks: [
+        {
+          dispatchKey,
+          stage: "ai_pipeline_sample_recheck",
+          state: "completed",
+          title: "AI 写审改：跑 1 章小样本复验",
+          detail: "复检小样本。",
+          href: "/projects/demo-project#ai-pipeline",
+          actionLabel: "跑小样本复验",
+          completionEvidence: [
+            "AI 写审改：跑 1 章小样本复验",
+            "样本范围：第 1 章",
+            "成功率：50%",
+            "质量：72",
+            "失败/成本：1 个失败，成本正常",
+            "放量结论：不放量，继续修复",
+          ].join("\n"),
+          reviewLatestAt: "2026-01-04T00:00:00.000Z",
+          completedAt: "2026-01-04T00:00:00.000Z",
+        },
+      ],
+      submissionChecklist: checklist,
+    });
+
+    assert.equal(dashboard.productionDecision.dispatchStatus, "needs_governance");
+    assert.equal(dashboard.productionDecision.dispatchLabel, "继续修复");
+    assert.ok(dashboard.productionDecision.dispatchDetail.includes("成功率：50%"));
+    assert.ok(dashboard.productionDecision.dispatchDetail.includes("继续修复"));
+    assert.equal(dashboard.productionDecision.primaryActionLabel, "看修复清单");
+    assert.equal(dashboard.productionDecision.primaryTargetHref, "#ai-pipeline");
+  });
+
   await t.test("surfaces AI pipeline recheck recovery outcome", () => {
     const dashboard = buildProjectControlDashboard({
       project,

@@ -18,6 +18,11 @@ import { buildStoryLineDashboard } from "./storyLines.ts";
 import type { SubmissionChecklist } from "./submissionChecklist.ts";
 import { buildTaskQueueBatchHealthReview } from "./taskQueueBatchHealth.ts";
 import { buildWorldBibleDashboard } from "./worldBible.ts";
+import {
+  parseAiPipelineRecoveryCompletionEvidence,
+  type GateAiPipelineRecoveryCompletionOutcome,
+  type GateDispatchCompletionTemplateTask,
+} from "./gateActionReceipts.ts";
 
 export interface ControlProject {
   title: string;
@@ -1344,10 +1349,66 @@ function emptyProductionDispatch(): Pick<ProductionDecisionSummary, "dispatchSta
   };
 }
 
+interface AiPipelineRecheckDispatchCompletion {
+  task: ControlGateDispatchTask;
+  outcome: GateAiPipelineRecoveryCompletionOutcome;
+}
+
+function latestAiPipelineRecheckDispatchCompletion(
+  plan: AiPipelineControlPlanSummary,
+  tasks: ControlGateDispatchTask[] = [],
+): AiPipelineRecheckDispatchCompletion | null {
+  if (!plan.recheckDispatchKey) return null;
+  const matches = tasks
+    .filter((task) => task.dispatchKey === plan.recheckDispatchKey && task.state === "completed" && task.completionEvidence.trim())
+    .sort((left, right) => new Date(right.completedAt ?? right.reviewLatestAt).getTime() - new Date(left.completedAt ?? left.reviewLatestAt).getTime());
+
+  for (const task of matches) {
+    const templateTask: GateDispatchCompletionTemplateTask = {
+      dispatchKey: task.dispatchKey,
+      stage: task.stage as GateDispatchCompletionTemplateTask["stage"],
+      title: task.title,
+      actionLabel: task.actionLabel,
+      platformName: "AI 写审改",
+      href: task.href,
+    };
+    const outcome = parseAiPipelineRecoveryCompletionEvidence(templateTask, task.completionEvidence);
+    if (outcome) return { task, outcome };
+  }
+
+  return null;
+}
+
+function aiPipelineRecheckCompletionDetail(completion: AiPipelineRecheckDispatchCompletion) {
+  const evidence = completion.outcome.evidence.length > 0
+    ? completion.outcome.evidence.join("；")
+    : completion.task.completionEvidence.trim();
+  const nextAction = completion.outcome.nextAction ? ` 下一步：${completion.outcome.nextAction}。` : "";
+  return `${completion.task.title}已验收：${evidence}${nextAction}`;
+}
+
 function aiPipelineControlPlanDispatchFields(
   plan: AiPipelineControlPlanSummary,
+  recheckCompletion: AiPipelineRecheckDispatchCompletion | null,
 ): Pick<ProductionDecisionSummary, "dispatchStatus" | "dispatchLabel" | "dispatchDetail" | "dispatchHref"> {
   if (!plan.hasPlan) return emptyProductionDispatch();
+
+  if (recheckCompletion) {
+    if (recheckCompletion.outcome.outcome === "usable") {
+      return {
+        dispatchStatus: "completed",
+        dispatchLabel: "可恢复小批",
+        dispatchDetail: aiPipelineRecheckCompletionDetail(recheckCompletion),
+        dispatchHref: "/tasks#recommended-batch",
+      };
+    }
+    return {
+      dispatchStatus: "needs_governance",
+      dispatchLabel: "继续修复",
+      dispatchDetail: aiPipelineRecheckCompletionDetail(recheckCompletion),
+      dispatchHref: "#ai-pipeline",
+    };
+  }
 
   if (plan.recheckStatus === "small_batch_ready") {
     return {
@@ -1417,6 +1478,24 @@ function aiPipelineProductionPrimaryAction(
     };
   }
 
+  if (plan.recheckDispatchHref && dispatch.dispatchStatus === "completed") {
+    return {
+      primaryActionLabel: "恢复小批执行",
+      primaryTargetHref: dispatch.dispatchHref ?? "/tasks#recommended-batch",
+      primaryActionExecution: "link",
+      primaryActionReceiptId: null,
+    };
+  }
+
+  if (plan.recheckDispatchHref && dispatch.dispatchStatus === "needs_governance") {
+    return {
+      primaryActionLabel: "看修复清单",
+      primaryTargetHref: dispatch.dispatchHref ?? "#ai-pipeline",
+      primaryActionExecution: "link",
+      primaryActionReceiptId: null,
+    };
+  }
+
   if (plan.recheckDispatchHref) {
     return {
       primaryActionLabel: "看复检派单",
@@ -1447,11 +1526,12 @@ function buildProductionDecisionSummary(input: {
   batch: AiPipelineBatchSummary;
   batchHealth: AiPipelineBatchHealthSummary;
   aiPipelineControlPlan: AiPipelineControlPlanSummary;
+  aiPipelineRecheckCompletion: AiPipelineRecheckDispatchCompletion | null;
   modelRouteHealth: ModelRouteHealthSummary;
   modelRouteRepairDispatch: ControlGateDispatchTask | null;
 }): ProductionDecisionSummary {
   const modelRouteDispatch = modelRouteRepairDispatchFields(input.modelRouteRepairDispatch, input.modelRouteHealth);
-  const aiPipelineControlDispatch = aiPipelineControlPlanDispatchFields(input.aiPipelineControlPlan);
+  const aiPipelineControlDispatch = aiPipelineControlPlanDispatchFields(input.aiPipelineControlPlan, input.aiPipelineRecheckCompletion);
   if (input.batchHealth.status === "blocked") {
     const hasControlDispatch = aiPipelineControlDispatch.dispatchStatus !== "none";
     const primaryAction = aiPipelineProductionPrimaryAction(
@@ -2411,10 +2491,12 @@ export function buildProjectControlDashboard(input: ProjectControlDashboardInput
   const aiPipelinePromptMemory = buildAiPipelinePromptMemorySummary(input.gateActionAudits);
   const modelRouteHealth = buildModelRouteHealthSummary(input);
   const modelRouteRepairDispatch = latestModelRouteRepairDispatch(input.gateDispatchTasks);
+  const aiPipelineRecheckCompletion = latestAiPipelineRecheckDispatchCompletion(aiPipelineControlPlan, input.gateDispatchTasks);
   const productionDecision = buildProductionDecisionSummary({
     batch: aiPipelineBatch,
     batchHealth: aiPipelineBatchHealth,
     aiPipelineControlPlan,
+    aiPipelineRecheckCompletion,
     modelRouteHealth,
     modelRouteRepairDispatch,
   });

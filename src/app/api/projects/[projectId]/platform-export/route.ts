@@ -358,6 +358,7 @@ async function buildCenter(projectId: string) {
     })),
   });
   const center = buildPlatformPublishExportCenter({
+    projectId: project.id,
     project: {
       title: project.title,
       genre: project.genre,

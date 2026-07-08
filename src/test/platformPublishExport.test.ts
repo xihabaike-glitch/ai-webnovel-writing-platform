@@ -377,6 +377,7 @@ test("buildPlatformPublishExportCenter", async (t) => {
 
   await t.test("builds a PM final delivery handoff when every delivery item is closed", () => {
     const center = buildPlatformPublishExportCenter({
+      projectId: "project-final-delivery",
       project: {
         title: "夜雨系统",
         genre: "都市系统",
@@ -444,7 +445,12 @@ test("buildPlatformPublishExportCenter", async (t) => {
     assert.ok(center.finalDeliveryHandoff.gateReceiptPreview.some((line) => line.includes("交付包状态：ready")));
     assert.ok(center.finalDeliveryHandoff.evidenceLines.some((line) => line.includes("发布包")));
     assert.ok(center.finalDeliveryHandoff.evidenceLines.some((line) => line.includes("策略复盘")));
-    assert.equal(center.finalDeliveryHandoff.actionHref, "/gate#pipeline-final-review");
+    assert.ok(center.finalDeliveryHandoff.actionHref.startsWith("/gate?"));
+    assert.ok(center.finalDeliveryHandoff.actionHref.includes("focus=action-recheck"));
+    assert.ok(center.finalDeliveryHandoff.actionHref.includes("projectId=project-final-delivery"));
+    assert.ok(center.finalDeliveryHandoff.actionHref.includes("source=final-delivery-receipt"));
+    assert.ok(center.finalDeliveryHandoff.actionHref.includes("finalDeliveryFocus=publish-package"));
+    assert.ok(center.finalDeliveryHandoff.actionHref.endsWith("#pipeline-final-review"));
   });
 
   await t.test("blocks export when candidate adoption makes old reviews stale", () => {

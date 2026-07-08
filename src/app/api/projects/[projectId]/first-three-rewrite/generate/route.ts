@@ -107,6 +107,7 @@ export async function POST(request: Request, { params }: Params) {
     })),
   });
   const center = buildPlatformPublishExportCenter({
+    projectId: project.id,
     project: {
       title: project.title,
       genre: project.genre,

@@ -91,6 +91,7 @@ export async function GET(_request: Request, { params }: Params) {
     createdAt: version.createdAt,
   }));
   const publishCenter = buildPlatformPublishExportCenter({
+    projectId: project.id,
     project: {
       title: project.title,
       genre: project.genre,

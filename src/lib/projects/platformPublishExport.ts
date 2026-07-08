@@ -395,6 +395,7 @@ export interface PlatformDispatchCompletionEffectValidation {
 }
 
 export interface PlatformPublishExportInput {
+  projectId?: string;
   project: PublishExportProject;
   chapters: PublishExportChapter[];
   aiTasks?: PublishExportAiTask[];
@@ -4964,6 +4965,7 @@ function buildPlatformFinalDeliveryHandoff(
   checklist: PlatformFinalDeliveryChecklist,
   pack: PlatformPublishPackage | undefined,
   strategyVerdict: PlatformStrategyAutoVerdict,
+  projectId?: string,
 ): PlatformFinalDeliveryHandoff {
   const nextGap = checklist.items.find((item) => item.status !== "done") ?? null;
   const gapCount = checklist.totalCount - checklist.doneCount;
@@ -4978,6 +4980,16 @@ function buildPlatformFinalDeliveryHandoff(
     : nextGap
       ? `不能交付，先处理 ${nextGap.label}：${nextGap.actionLabel}。`
       : "不能交付，先补齐最终交付清单。";
+  const finalDeliveryGateHref = (() => {
+    const params = new URLSearchParams({
+      focus: "action-recheck",
+      source: "final-delivery-receipt",
+      finalDeliveryFocus: "publish-package",
+    });
+    if (projectId) params.set("projectId", projectId);
+
+    return `/gate?${params.toString()}#pipeline-final-review`;
+  })();
 
   return {
     status: checklist.status,
@@ -4986,7 +4998,7 @@ function buildPlatformFinalDeliveryHandoff(
     headline,
     pmVerdict,
     actionLabel: checklist.status === "ready" ? "回总闸门终检" : nextGap?.actionLabel ?? "补最终交付证据",
-    actionHref: checklist.status === "ready" ? "/gate#pipeline-final-review" : nextGap?.actionHref ?? "#platform-export",
+    actionHref: checklist.status === "ready" ? finalDeliveryGateHref : nextGap?.actionHref ?? "#platform-export",
     doneCount: checklist.doneCount,
     gapCount,
     evidenceLines: checklist.items.map((item) => `${item.label}：${item.evidence}`),
@@ -5024,7 +5036,7 @@ export function buildPlatformPublishExportCenter(input: PlatformPublishExportInp
     effectCaptureSummary,
     platformLaunchQueue: buildPlatformLaunchQueue(platformReadinessSummary),
     finalDeliveryChecklist,
-    finalDeliveryHandoff: buildPlatformFinalDeliveryHandoff(finalDeliveryChecklist, activePackage, strategyVerdict),
+    finalDeliveryHandoff: buildPlatformFinalDeliveryHandoff(finalDeliveryChecklist, activePackage, strategyVerdict, input.projectId),
     executionHandoffs,
     executionHandoffSummary: buildPlatformPublishExecutionHandoffSummary(executionHandoffs),
     platformStrategy,

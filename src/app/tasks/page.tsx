@@ -1425,6 +1425,12 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
                     <span className="ml-1 opacity-85">{failureRepairResumeBatchRecord.stabilityDetail}</span>
                   </div>
                 ) : null}
+                {failureRepairResumeBatchRecord.scaleDecisionLabel && failureRepairResumeBatchRecord.scaleDecisionTone ? (
+                  <div className={`mt-2 rounded-md border px-2 py-1 text-xs leading-5 ${executionScaleDecisionClass(failureRepairResumeBatchRecord.scaleDecisionTone)}`}>
+                    <span className="font-medium">{failureRepairResumeBatchRecord.scaleDecisionLabel}</span>
+                    <span className="ml-1 opacity-85">{failureRepairResumeBatchRecord.scaleDecisionDetail}</span>
+                  </div>
+                ) : null}
               </div>
               <Link className="w-fit rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white hover:bg-slate-800" href={hrefWithGateReturn(failureRepairResumeBatchRecord.stabilityActionHref ?? failureRepairResumeBatchRecord.decisionActionHref, gateReturn)}>
                 {failureRepairResumeBatchRecord.stabilityActionLabel ?? failureRepairResumeBatchRecord.decisionActionLabel}

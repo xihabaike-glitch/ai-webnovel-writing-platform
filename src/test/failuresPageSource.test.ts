@@ -21,6 +21,8 @@ test("failures page carries gate return through repair links", () => {
   assert.ok(source.includes("href={hrefWithGateReturn(failureRepairResumeBatchRecord.stabilityActionHref ?? failureRepairResumeBatchRecord.decisionActionHref, gateReturn)}"));
   assert.ok(source.includes("href={hrefWithGateReturn(lane.href, gateReturn)}"));
   assert.ok(source.includes("href={hrefWithGateReturn(failure.href, gateReturn)}"));
+  assert.ok(source.includes("failureRepairResumeBatchRecord.scaleDecisionLabel"));
+  assert.ok(source.includes("failureRepairResumeBatchRecord.scaleDecisionDetail"));
   assert.ok(source.includes("<FailureRepairRecheckCard card={failureRepairRecheckCard} dispatch={failureRepairRecheckDispatch} gateReturnHref={gateReturn} />"));
 
   assert.ok(recheckCardSource.includes("gateReturnHref?: string | null"));

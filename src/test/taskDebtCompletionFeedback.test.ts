@@ -403,6 +403,9 @@ test("buildFailureRepairResumeBatchRecord allows leaving recovery mode after two
   assert.equal(record?.stabilityTone, "ready");
   assert.equal(record?.stableRuns, 2);
   assert.equal(record?.stabilityLabel, "连续稳定，可回普通批次");
+  assert.equal(record?.scaleDecisionLabel, "允许小步加码");
+  assert.equal(record?.scaleDecisionTone, "allow");
+  assert.match(record?.scaleDecisionDetail ?? "", /回普通推荐批次/);
   assert.equal(record?.stabilityActionLabel, "回普通推荐批次");
   assert.equal(record?.stabilityActionHref, "/tasks#recommended-batch");
   assert.match(record?.stabilityDetail ?? "", /连续 2 次/);
@@ -433,6 +436,9 @@ test("buildFailureRepairResumeBatchRecord keeps one healthy repair resume batch 
   assert.equal(record?.stabilityTone, "watch");
   assert.equal(record?.stableRuns, 1);
   assert.equal(record?.stabilityLabel, "继续恢复观察");
+  assert.equal(record?.scaleDecisionLabel, "继续观察");
+  assert.equal(record?.scaleDecisionTone, "watch");
+  assert.match(record?.scaleDecisionDetail ?? "", /先别退出恢复模式/);
   assert.equal(record?.stabilityActionHref, "/tasks?batchContext=repair_resume#recommended-batch");
   assert.match(record?.stabilityDetail ?? "", /还差 1 次/);
 });
@@ -479,6 +485,9 @@ test("buildFailureRepairResumeBatchRecord blocks leaving recovery mode after the
   assert.equal(record?.stabilityTone, "blocked");
   assert.equal(record?.stableRuns, 0);
   assert.equal(record?.stabilityLabel, "恢复稳定性中断");
+  assert.equal(record?.scaleDecisionLabel, "禁止放大");
+  assert.equal(record?.scaleDecisionTone, "block");
+  assert.match(record?.scaleDecisionDetail ?? "", /不能退出恢复模式/);
   assert.equal(record?.stabilityActionLabel, "查看失败修复");
   assert.equal(record?.stabilityActionHref, "/failures");
   assert.match(record?.stabilityDetail ?? "", /最近恢复小批未过线/);

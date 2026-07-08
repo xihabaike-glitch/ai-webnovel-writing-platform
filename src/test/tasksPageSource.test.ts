@@ -245,6 +245,11 @@ test("tasks page shares execution scale decisions with recommended batch control
   assert.ok(buttonSource.includes("{scaleDecisionLabel ? ("));
 });
 
+test("tasks page shows failure repair resume scale decisions", () => {
+  assert.ok(source.includes("failureRepairResumeBatchRecord.scaleDecisionLabel"));
+  assert.ok(source.includes("failureRepairResumeBatchRecord.scaleDecisionDetail"));
+});
+
 test("tasks page runs any queued platform action with the action button", () => {
   assert.ok(source.includes("{entry.effectAction ? ("));
   assert.ok(source.includes("action={entry.effectAction}"));

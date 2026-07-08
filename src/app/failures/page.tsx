@@ -89,6 +89,12 @@ function resumeStabilityClass(tone: "ready" | "watch" | "blocked") {
   return "bg-amber-100 text-amber-950";
 }
 
+function resumeScaleDecisionClass(tone: "allow" | "watch" | "block") {
+  if (tone === "allow") return "border-emerald-200 bg-white/80 text-emerald-950";
+  if (tone === "block") return "border-rose-200 bg-white/80 text-rose-950";
+  return "border-amber-200 bg-white/80 text-amber-950";
+}
+
 function pmFocusBadgeClass(tone: "blocked" | "watch" | "ready") {
   if (tone === "ready") return "bg-emerald-100 text-emerald-950";
   if (tone === "watch") return "bg-amber-100 text-amber-950";
@@ -516,6 +522,12 @@ export default async function FailuresPage({
                 <div className={`mt-3 rounded-md px-3 py-2 text-sm ${resumeStabilityClass(failureRepairResumeBatchRecord.stabilityTone)}`}>
                   <div className="font-medium">{failureRepairResumeBatchRecord.stabilityLabel}</div>
                   <p className="mt-1 leading-6">{failureRepairResumeBatchRecord.stabilityDetail}</p>
+                </div>
+              ) : null}
+              {failureRepairResumeBatchRecord.scaleDecisionLabel && failureRepairResumeBatchRecord.scaleDecisionTone ? (
+                <div className={`mt-3 rounded-md border px-3 py-2 text-sm ${resumeScaleDecisionClass(failureRepairResumeBatchRecord.scaleDecisionTone)}`}>
+                  <span className="font-medium">{failureRepairResumeBatchRecord.scaleDecisionLabel}</span>
+                  <span className="ml-1 opacity-85">{failureRepairResumeBatchRecord.scaleDecisionDetail}</span>
                 </div>
               ) : null}
             </div>

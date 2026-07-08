@@ -66,6 +66,9 @@ export interface TaskDebtRecoveryBatchRecord {
   decisionDetail: string;
   decisionActionLabel: string;
   decisionActionHref: string;
+  scaleDecisionLabel?: string;
+  scaleDecisionTone?: "allow" | "watch" | "block";
+  scaleDecisionDetail?: string;
   stabilityTone?: "ready" | "watch" | "blocked";
   stableRuns?: number;
   requiredStableRuns?: number;
@@ -183,6 +186,9 @@ function buildFailureRepairResumeStability(records: Array<{ payload: Record<stri
       requiredStableRuns,
       stabilityLabel: "恢复稳定性中断",
       stabilityDetail: "最近恢复小批未过线，不能退出恢复模式。先修失败、质量或成本问题，再重新跑恢复小批。",
+      scaleDecisionLabel: "禁止放大",
+      scaleDecisionTone: "block" as const,
+      scaleDecisionDetail: "最近恢复小批未过线，不能退出恢复模式；先修失败、质量或成本问题，再重新跑恢复小批。",
       stabilityActionLabel: "查看失败修复",
       stabilityActionHref: "/failures",
     };
@@ -197,6 +203,9 @@ function buildFailureRepairResumeStability(records: Array<{ payload: Record<stri
       requiredStableRuns,
       stabilityLabel: "连续稳定，可回普通批次",
       stabilityDetail: `恢复小批已连续 ${stableRuns} 次过线，可以从恢复模式回到普通推荐批次，但仍保留安全阀。`,
+      scaleDecisionLabel: "允许小步加码",
+      scaleDecisionTone: "allow" as const,
+      scaleDecisionDetail: `恢复小批已连续 ${stableRuns} 次过线，可以回普通推荐批次；下一批仍按安全阀小步加码。`,
       stabilityActionLabel: "回普通推荐批次",
       stabilityActionHref: "/tasks#recommended-batch",
     };
@@ -208,6 +217,9 @@ function buildFailureRepairResumeStability(records: Array<{ payload: Record<stri
     requiredStableRuns,
     stabilityLabel: "继续恢复观察",
     stabilityDetail: `恢复小批已有 ${stableRuns} 次过线，还差 ${requiredStableRuns - stableRuns} 次连续稳定，先别退出恢复模式。`,
+    scaleDecisionLabel: "继续观察",
+    scaleDecisionTone: "watch" as const,
+    scaleDecisionDetail: `恢复小批已有 ${stableRuns} 次过线，还差 ${requiredStableRuns - stableRuns} 次连续稳定，先别退出恢复模式。`,
     stabilityActionLabel: "继续恢复小批",
     stabilityActionHref: "/tasks?batchContext=repair_resume#recommended-batch",
   };

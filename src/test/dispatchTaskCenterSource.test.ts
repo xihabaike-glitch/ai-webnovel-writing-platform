@@ -165,7 +165,8 @@ test("dispatch task center routes completed chapter adoption follow-ups back to 
   assert.ok(source.includes("采纳后续已完成"));
   assert.ok(source.includes("新正文已完成"));
   assert.ok(source.includes("回总闸门复检采纳后续"));
-  assert.ok(source.includes("确认前三章正文、二改和发布质检卡点是否减少"));
+  assert.ok(source.includes("确认章节正文、二改和发布质检卡点是否减少"));
+  assert.equal(source.includes("确认前三章正文、二改和发布质检卡点是否减少"), false);
   assert.ok(source.includes("isChapterAdoptionTask ? \"回总闸门复检采纳后续\""));
 });
 

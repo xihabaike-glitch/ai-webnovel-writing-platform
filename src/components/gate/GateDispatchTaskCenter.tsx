@@ -306,7 +306,7 @@ function chapterAdoptionTemplateTitle(task: PersistedGatePlatformDispatchTask) {
 }
 
 function chapterAdoptionCompletionImpactHint(task: PersistedGatePlatformDispatchTask) {
-  return `新正文已完成${chapterAdoptionLaneLabel(task)}回填；回总闸门复检采纳后续，确认前三章正文、二改和发布质检卡点是否减少。`;
+  return `新正文已完成${chapterAdoptionLaneLabel(task)}回填；回总闸门复检采纳后续，确认章节正文、二改和发布质检卡点是否减少。`;
 }
 
 function buildChapterAdoptionCompletionTemplate(task: PersistedGatePlatformDispatchTask) {

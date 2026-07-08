@@ -24,6 +24,7 @@ import {
 import {
   buildFirstDayDispatchCompletionTemplate,
   buildFirstDayDispatchDesk,
+  buildFirstDayDispatchEvidenceChips,
   buildFirstDayDispatchCompletionHint,
   buildFirstDayDispatchAiExecutionNotice,
   buildFirstDayDispatchCardInlineAction,
@@ -2063,6 +2064,7 @@ export function GateDispatchTaskCenter({
           const recheckChain = recheckChainByDispatchKey.get(task.dispatchKey);
           const firstDayInlineAction = buildFirstDayDispatchCardInlineAction(firstDayCardByKey.get(task.dispatchKey));
           const firstDayInlineExecution = firstDayInlineAction.execution;
+          const firstDayEvidenceChips = buildFirstDayDispatchEvidenceChips(task);
           const isFocusedCompletionTask = task.dispatchKey === focusedCompletionDispatchKey;
           const isHashFocusedTask = task.dispatchKey === hashFocusedDispatchKey;
           const isFocusedTask = task.dispatchKey === focusedDispatchKey || isFocusedCompletionTask || isHashFocusedTask;
@@ -2111,6 +2113,14 @@ export function GateDispatchTaskCenter({
                   <span className="rounded-md bg-slate-50 px-2 py-1">优先级 {task.priorityScore}</span>
                   {recheckChain ? <span className="rounded-md bg-slate-50 px-2 py-1">链路 {recheckChain.active}/{recheckChain.total} 未闭环</span> : null}
                   {task.completedAt ? <span className="rounded-md bg-slate-50 px-2 py-1">完成 {new Date(task.completedAt).toLocaleString()}</span> : null}
+                  {firstDayEvidenceChips.map((chip) => (
+                    <span
+                      className={`rounded-md px-2 py-1 ${chip.startsWith("缺") ? "bg-amber-50 text-amber-800" : "bg-cyan-50 text-cyan-800"}`}
+                      key={chip}
+                    >
+                      {chip}
+                    </span>
+                  ))}
                 </div>
                 <div className="mt-3 flex flex-wrap gap-2 text-xs text-slate-500">
                   {task.acceptanceCriteria.map((criterion) => (

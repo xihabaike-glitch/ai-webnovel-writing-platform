@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import * as firstDayWorkflowView from "../lib/projects/firstDayWorkflowView.ts";
 import {
   buildFirstDayDispatchCompletionTemplate,
   buildFirstDayDispatchDesk,
@@ -57,6 +58,26 @@ test("buildFirstDayStepView keeps normal evidence unchanged", () => {
   assert.equal(view.primaryEvidence, "第一章：天降系统。钩子：主角被迫当天逆袭。");
   assert.equal(view.acceptanceEvidence, null);
   assert.equal(view.hasTaskAcceptance, false);
+});
+
+test("buildFirstDayDispatchEvidenceChips surfaces handoff knowledge sources", () => {
+  const chips = firstDayWorkflowView.buildFirstDayDispatchEvidenceChips({
+    dispatchKey: "first-day-handoff:project-1:opening",
+    dueLabel: "今天小样本验证",
+    title: "夜雨系统 · 经验开书交接：开头打法",
+    acceptanceCriteria: ["交接动作已落地：开头：第一段给倒计时。"],
+    evidence: [
+      "交接类型：复用交接",
+      "知识来源：番茄小说 正反馈经验已沉淀",
+      "平台反哺：执行正反馈链",
+      "避坑边界：不要直接放量，先做小样本。",
+    ],
+    completionEvidence: "",
+  });
+
+  assert.ok(chips.some((chip) => chip.includes("知识来源：番茄小说")));
+  assert.ok(chips.some((chip) => chip.includes("平台反哺")));
+  assert.ok(chips.some((chip) => chip.includes("避坑")));
 });
 
 test("buildFirstDayReceiptCompletionAction only allows successful receipts with enough evidence", () => {

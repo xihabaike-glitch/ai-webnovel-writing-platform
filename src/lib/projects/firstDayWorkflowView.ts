@@ -144,6 +144,39 @@ function buildWatchSampleEvidenceChips(
   return allFields.map((field) => `已填${field}`);
 }
 
+function uniqueEvidenceChips(lines: Array<string | null | undefined>, limit = 4) {
+  const seen = new Set<string>();
+  return lines
+    .map((line) => cleanEvidence(line ?? ""))
+    .filter(Boolean)
+    .filter((line) => {
+      if (seen.has(line)) return false;
+      seen.add(line);
+      return true;
+    })
+    .slice(0, limit);
+}
+
+export function buildFirstDayDispatchEvidenceChips(
+  task: Pick<PersistedGatePlatformDispatchTask, "dispatchKey" | "dueLabel" | "title" | "acceptanceCriteria" | "evidence" | "completionEvidence">
+) {
+  if (isFirstDayHandoffDispatchTask(task)) {
+    const knowledgeSource = task.evidence.find((line) => /知识来源/u.test(line));
+    const platformFeedback = task.evidence.find((line) => /平台反哺/u.test(line))
+      ?? task.evidence.find((line) => line !== knowledgeSource && /正反馈|反馈/u.test(line));
+    const avoidRule = task.evidence.find((line) => /避坑边界/u.test(line))
+      ?? task.acceptanceCriteria.find((line) => /避坑边界|不要|小样本|不直接放量/u.test(line));
+
+    return uniqueEvidenceChips([
+      knowledgeSource,
+      platformFeedback,
+      avoidRule ? `避坑：${avoidRule.replace(/^避坑边界[:：]?/u, "").trim()}` : null,
+    ], 3);
+  }
+
+  return buildWatchSampleEvidenceChips(task);
+}
+
 export interface FirstDayDispatchDesk {
   summary: {
     total: number;
@@ -1026,7 +1059,7 @@ function toFirstDayCard(task: PersistedGatePlatformDispatchTask): FirstDayDispat
     completionTemplate: buildFirstDayDispatchCompletionTemplate(task),
     acceptanceCriteria: task.acceptanceCriteria,
     evidence: task.evidence,
-    evidenceChips: buildWatchSampleEvidenceChips(task),
+    evidenceChips: buildFirstDayDispatchEvidenceChips(task),
     completionHint: buildFirstDayDispatchCompletionHint(task),
     continuation: aiContinuation
       ? {

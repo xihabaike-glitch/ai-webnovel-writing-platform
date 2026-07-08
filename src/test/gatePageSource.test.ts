@@ -59,6 +59,8 @@ test("gate page renders computed real pipeline final review verdict", () => {
   assert.ok(source.includes("const finalReview = gate.realPipelineFinalReview;"));
   assert.ok(source.includes("buildGateFinalDeliveryReceiptReview"));
   assert.ok(source.includes("finalDeliveryReceiptReview"));
+  assert.ok(source.includes("function hrefWithFinalDeliveryFocus"));
+  assert.ok(source.includes("finalDeliveryFocus="));
   assert.ok(source.includes("真实作品流水线自动终检"));
   assert.ok(source.includes("id=\"pipeline-final-review\""));
   assert.ok(source.includes("finalReview.outcomeLabel"));
@@ -72,6 +74,7 @@ test("gate page renders computed real pipeline final review verdict", () => {
   assert.ok(source.includes("六项放行证据台账"));
   assert.ok(source.includes("finalDeliveryReceiptReview.items.map"));
   assert.ok(source.includes("finalDeliveryReceiptReview.remainingFeedback"));
+  assert.ok(source.includes("href={hrefWithGateReturn(hrefWithFinalDeliveryFocus(item.href, item.id), gateRecheckReturnHref)}"));
   assert.ok(
     source.indexOf("真实作品流水线自动终检") < source.indexOf("{realSampleReceiptFocus ? ("),
     "computed final review should be visible on the gate before receipt-specific context",

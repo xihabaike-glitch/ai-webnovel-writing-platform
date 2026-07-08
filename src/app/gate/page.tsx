@@ -122,6 +122,18 @@ function hrefWithGateReturn(href: string, gateReturn: string | null) {
   return `${base}${separator}gateReturn=${encodeURIComponent(gateReturn)}${hash}`;
 }
 
+function hrefWithFinalDeliveryFocus(href: string, finalDeliveryFocus: string) {
+  if (!href.startsWith("/projects")) return href;
+
+  const hashIndex = href.indexOf("#");
+  const base = hashIndex >= 0 ? href.slice(0, hashIndex) : href;
+  const hash = hashIndex >= 0 ? href.slice(hashIndex) : "";
+  if (base.includes("finalDeliveryFocus=")) return href;
+  const separator = base.includes("?") ? "&" : "?";
+
+  return `${base}${separator}finalDeliveryFocus=${encodeURIComponent(finalDeliveryFocus)}${hash}`;
+}
+
 export default async function GatePage({
   searchParams,
 }: {
@@ -606,7 +618,7 @@ export default async function GatePage({
                       ? "border-amber-200 bg-amber-50 text-amber-950"
                       : "border-slate-200 bg-slate-50 text-slate-700"
                 }`}
-                href={hrefWithGateReturn(item.href, gateRecheckReturnHref)}
+                href={hrefWithGateReturn(hrefWithFinalDeliveryFocus(item.href, item.id), gateRecheckReturnHref)}
                 key={item.id}
               >
                 <div className="flex items-center justify-between gap-2">

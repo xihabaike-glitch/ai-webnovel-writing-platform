@@ -1413,6 +1413,23 @@ function buildStrategyReviewTaskReceipt(
   };
 }
 
+function buildPlatformPublishReceiptTemplate(pack: PlatformPublishPackage) {
+  const effectSummary = pack.publishEffect.records > 0
+    ? `已记录 ${pack.publishEffect.records} 次，${pack.publishEffect.verdict}`
+    : `待回填真实效果，${pack.effectCapturePlan.nextAction}`;
+
+  return [
+    `平台：${pack.platformName}`,
+    `发布包：${pack.canExport ? "可导出" : "暂不可导出"} · 质检 ${pack.preflight.score} 分 · ${pack.preview.titleLine}`,
+    `投稿材料：${pack.submissionAssetAudit.status === "ready" ? "已过线" : "仍需修复"} · ${pack.preview.assetLine}`,
+    `样章：${pack.preview.chapterLine}`,
+    `发布效果：${effectSummary}`,
+    "人工验收：通过 / 退回，并写清标题、简介、标签、样章和平台数据是否达标。",
+    `下一步：${pack.publishEffect.nextAction}`,
+    "停手线：缺平台卖点、样章、标签或真实效果复盘时，不扩大投放范围。",
+  ];
+}
+
 function switchStepStatusLabel(status: PlatformStrategySwitchStep["status"]) {
   if (status === "done") return "已完成";
   if (status === "next") return "现在做";
@@ -1697,6 +1714,10 @@ export function PlatformExportCenterPanel({
   const selectedPackage = useMemo(
     () => center?.packages.find((pack) => pack.platformId === selectedPlatformId) ?? center?.packages[0] ?? null,
     [center, selectedPlatformId],
+  );
+  const publishReceiptTemplate = useMemo(
+    () => selectedPackage ? buildPlatformPublishReceiptTemplate(selectedPackage) : [],
+    [selectedPackage],
   );
   const selectedPlatformIsRecommended = Boolean(center && selectedPackage?.platformId === center.recommendedPlatformId);
   const hasCurrentSubmissionAssetPostSaveReview = submissionAssetPostSaveReview?.platformName === selectedPackage?.platformName;
@@ -5242,6 +5263,20 @@ export function PlatformExportCenterPanel({
             </div>
             <p className="mt-3 text-sm leading-6 text-slate-600">{selectedPackage.synopsis}</p>
             <div className="mt-3 text-sm text-slate-600">标签：{selectedPackage.tags.join("、")}</div>
+            <div className="mt-3 rounded-md border border-slate-200 bg-slate-50 p-3" aria-label="发布包与平台复盘回执模板，含停手线">
+              <div className="text-xs font-medium text-slate-700">发布包与平台复盘回执模板</div>
+              <div className="mt-2 grid gap-1.5">
+                {publishReceiptTemplate.map((line) => (
+                  <div
+                    className="break-words break-all text-xs leading-5 text-slate-600"
+                    key={line}
+                    style={{ overflowWrap: "anywhere", wordBreak: "break-word" }}
+                  >
+                    {line}
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
 
           <div className="grid gap-4 lg:grid-cols-[1fr_1fr]">

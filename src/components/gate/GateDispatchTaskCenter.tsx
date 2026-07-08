@@ -276,6 +276,10 @@ function isAcceptanceGapDispatchTask(task: PersistedGatePlatformDispatchTask) {
     || task.evidence.some((item) => item.includes("角色入口：acceptance-gap"));
 }
 
+function isProjectAcceptanceNextDispatchTask(task: PersistedGatePlatformDispatchTask) {
+  return task.dispatchKey.startsWith("project-acceptance-next:");
+}
+
 function buildAcceptanceGapCompletionTemplate(task: PersistedGatePlatformDispatchTask) {
   if (!isAcceptanceGapDispatchTask(task)) return "";
   return [
@@ -286,6 +290,19 @@ function buildAcceptanceGapCompletionTemplate(task: PersistedGatePlatformDispatc
     "人工验收：通过 / 退回",
     "回总闸门复检：已复检 / 待复检",
     "下一步：解除阻塞 / 继续修复 / 小样本观察",
+  ].join("\n");
+}
+
+function buildProjectAcceptanceNextCompletionTemplate(task: PersistedGatePlatformDispatchTask) {
+  if (!isProjectAcceptanceNextDispatchTask(task)) return "";
+  return [
+    `${task.title}`,
+    "复检分流补证据模板",
+    "完成项：",
+    "产物链接/位置：",
+    "人工验收：通过 / 退回",
+    "回总闸门复检结论：验收缺口已解除 / 卡点已减少 / 卡点仍在",
+    "下一动作：进入发布闭环 / 生成下一张派单 / 继续处理当前卡点",
   ].join("\n");
 }
 
@@ -460,6 +477,13 @@ export function GateDispatchTaskCenter({
       .filter((item) => item.template.trim().length > 0)
   ), [tasks]);
 
+  const projectAcceptanceNextCompletionTemplates = useMemo(() => (
+    tasks
+      .filter((task) => task.state === "assigned" && isProjectAcceptanceNextDispatchTask(task))
+      .map((task) => ({ task, template: buildProjectAcceptanceNextCompletionTemplate(task) }))
+      .filter((item) => item.template.trim().length > 0)
+  ), [tasks]);
+
   useEffect(() => {
     if (roleClosureCompletionTemplates.length === 0) return;
     setCompletionDrafts((current) => {
@@ -487,6 +511,20 @@ export function GateDispatchTaskCenter({
       return changed ? next : current;
     });
   }, [acceptanceGapCompletionTemplates]);
+
+  useEffect(() => {
+    if (projectAcceptanceNextCompletionTemplates.length === 0) return;
+    setCompletionDrafts((current) => {
+      let changed = false;
+      const next = { ...current };
+      for (const { task, template } of projectAcceptanceNextCompletionTemplates) {
+        if (current[task.dispatchKey]?.trim()) continue;
+        next[task.dispatchKey] = template;
+        changed = true;
+      }
+      return changed ? next : current;
+    });
+  }, [projectAcceptanceNextCompletionTemplates]);
 
   useEffect(() => {
     function syncHashFocus() {
@@ -726,6 +764,7 @@ export function GateDispatchTaskCenter({
     return (task.dispatchKey === firstDayFocus.card?.dispatchKey ? firstDayFocus.completionTemplate : "")
       || completionSuggestionByKey.get(task.dispatchKey)?.completionEvidence
       || buildRouteDispatchCompletionTemplate(task)
+      || buildProjectAcceptanceNextCompletionTemplate(task)
       || buildAcceptanceGapCompletionTemplate(task)
       || buildGateDispatchCompletionTemplate(task)
       || buildFirstDayDispatchCompletionTemplate(task);
@@ -2006,6 +2045,7 @@ export function GateDispatchTaskCenter({
           const isHashFocusedTask = task.dispatchKey === hashFocusedDispatchKey;
           const isFocusedTask = task.dispatchKey === focusedDispatchKey || isFocusedCompletionTask || isHashFocusedTask;
           const isRoleClosureTask = isRoleClosureDispatchTask(task);
+          const isProjectAcceptanceNextTask = isProjectAcceptanceNextDispatchTask(task);
           const completionDraft = completionDrafts[task.dispatchKey] ?? "";
           const completionAcceptanceState = buildFirstDayReturnedEvidenceAcceptanceState({
             completionEvidence: completionDraft,
@@ -2031,6 +2071,7 @@ export function GateDispatchTaskCenter({
                 <div className="flex flex-wrap items-center gap-2">
                   <span className={`rounded-md px-2 py-1 text-xs font-medium ${stateClass(task.state)}`}>{stateLabel(task.state)}</span>
                   {isRecheckFollowUp ? <span className="rounded-md bg-amber-50 px-2 py-1 text-xs font-medium text-amber-800">复查返工</span> : null}
+                  {isProjectAcceptanceNextTask ? <span className="rounded-md bg-blue-50 px-2 py-1 text-xs font-medium text-blue-800">总闸门复检分流</span> : null}
                   {aiPipelineTaskKeys.has(task.dispatchKey) ? <span className="rounded-md bg-sky-50 px-2 py-1 text-xs font-medium text-sky-800">AI 复检</span> : null}
                   {recheckChain ? <span className="rounded-md bg-sky-50 px-2 py-1 text-xs font-medium text-sky-800">R{recheckChain.round}/R{recheckChain.maxRound}</span> : null}
                   <span className="font-semibold text-slate-950">{task.title}</span>

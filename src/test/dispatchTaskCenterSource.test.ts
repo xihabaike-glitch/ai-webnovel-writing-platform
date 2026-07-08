@@ -130,3 +130,11 @@ test("dispatch task center auto-fills acceptance gap completion templates", () =
   assert.ok(source.includes("人工验收："));
   assert.ok(source.includes("回总闸门复检："));
 });
+
+test("dispatch task center labels acceptance recheck next-step dispatches", () => {
+  assert.ok(source.includes("isProjectAcceptanceNextDispatchTask"));
+  assert.ok(source.includes("project-acceptance-next:"));
+  assert.ok(source.includes("总闸门复检分流"));
+  assert.ok(source.includes("复检分流补证据模板"));
+  assert.ok(source.includes("回总闸门复检结论："));
+});

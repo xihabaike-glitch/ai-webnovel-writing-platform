@@ -557,6 +557,7 @@ interface PlatformFinalDeliveryChecklistItem {
   evidence: string;
   actionLabel: string;
   actionHref: string;
+  receiptTemplate: string[];
 }
 
 interface PlatformFinalDeliveryChecklist {
@@ -3017,6 +3018,14 @@ export function PlatformExportCenterPanel({
                   </div>
                   <p className="mt-2 line-clamp-2 text-xs leading-5 text-slate-600">{item.evidence}</p>
                   <div className="mt-2 text-xs font-medium text-slate-950">{item.actionLabel}</div>
+                  <div className="mt-3 rounded-md border border-slate-200 bg-white p-2" aria-label="最终交付回执模板">
+                    <div className="text-[11px] font-medium text-slate-500">最终交付回执模板</div>
+                    <div className="mt-1 grid gap-1 text-[11px] leading-4 text-slate-600" style={{ overflowWrap: "anywhere", wordBreak: "break-word" }}>
+                      {item.receiptTemplate.map((line) => (
+                        <div key={line}>{line}</div>
+                      ))}
+                    </div>
+                  </div>
                 </a>
               ))}
             </div>

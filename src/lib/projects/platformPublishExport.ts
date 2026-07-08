@@ -849,6 +849,7 @@ export interface PlatformFinalDeliveryChecklistItem {
   evidence: string;
   actionLabel: string;
   actionHref: string;
+  receiptTemplate: string[];
 }
 
 export interface PlatformFinalDeliveryChecklist {
@@ -4755,12 +4756,35 @@ function deliveryChecklistStatus(items: PlatformFinalDeliveryChecklistItem[]): P
   return "ready";
 }
 
+function finalDeliveryChecklistItemStatusLabel(status: PlatformFinalDeliveryChecklistItem["status"]) {
+  if (status === "done") return "已交付";
+  if (status === "todo") return "待处理";
+  return "卡住";
+}
+
+function withFinalDeliveryReceiptTemplate(
+  item: Omit<PlatformFinalDeliveryChecklistItem, "receiptTemplate">,
+): PlatformFinalDeliveryChecklistItem {
+  return {
+    ...item,
+    receiptTemplate: [
+      `交付项：${item.label}`,
+      `当前状态：${finalDeliveryChecklistItemStatusLabel(item.status)}`,
+      `证据：${item.evidence}`,
+      `产物位置：${item.actionHref}`,
+      "人工验收：通过 / 退回，并写明理由。",
+      `下一步：${item.actionLabel}`,
+      "停手线：缺产物位置、人工验收或下一步判断，不允许回总闸门标记闭环。",
+    ],
+  };
+}
+
 function buildPlatformFinalDeliveryChecklist(
   pack: PlatformPublishPackage | undefined,
   strategyVerdict: PlatformStrategyAutoVerdict,
 ): PlatformFinalDeliveryChecklist {
   if (!pack) {
-    const items: PlatformFinalDeliveryChecklistItem[] = [
+    const items = [
       {
         id: "publish-package",
         label: "发布包",
@@ -4809,7 +4833,7 @@ function buildPlatformFinalDeliveryChecklist(
         actionLabel: "先补证据",
         actionHref: "#platform-strategy-ranking",
       },
-    ];
+    ].map((item) => withFinalDeliveryReceiptTemplate(item as Omit<PlatformFinalDeliveryChecklistItem, "receiptTemplate">));
 
     return {
       status: "blocked",
@@ -4829,7 +4853,7 @@ function buildPlatformFinalDeliveryChecklist(
   const baselineSaved = pack.publishVersions.length > 0;
   const effectReady = pack.effectCapturePlan.status === "ready_to_review";
   const strategyReady = effectReady && strategyVerdict.status === "ready";
-  const items: PlatformFinalDeliveryChecklistItem[] = [
+  const items = [
     {
       id: "publish-package",
       label: "发布包",
@@ -4896,7 +4920,7 @@ function buildPlatformFinalDeliveryChecklist(
       actionLabel: strategyReady ? "查看裁决" : "做策略复盘",
       actionHref: "#platform-strategy-ranking",
     },
-  ];
+  ].map((item) => withFinalDeliveryReceiptTemplate(item as Omit<PlatformFinalDeliveryChecklistItem, "receiptTemplate">));
   const doneCount = items.filter((item) => item.status === "done").length;
   const todoCount = items.filter((item) => item.status === "todo").length;
   const blockedCount = items.filter((item) => item.status === "blocked").length;

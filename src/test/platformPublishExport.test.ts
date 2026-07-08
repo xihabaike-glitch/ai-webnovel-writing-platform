@@ -212,6 +212,9 @@ test("buildPlatformPublishExportCenter", async (t) => {
     assert.ok(center.finalDeliveryChecklist.nextAction.includes("发布包"));
     assert.equal(center.finalDeliveryChecklist.items.find((item) => item.id === "publish-package")?.status, "blocked");
     assert.equal(center.finalDeliveryChecklist.items.find((item) => item.id === "real-effect")?.actionHref, "#publish-effect-panel");
+    assert.ok(center.finalDeliveryChecklist.items.every((item) => item.receiptTemplate.some((line) => line.includes(`交付项：${item.label}`))));
+    assert.ok(center.finalDeliveryChecklist.items.every((item) => item.receiptTemplate.some((line) => line.includes("人工验收：通过 / 退回"))));
+    assert.ok(center.finalDeliveryChecklist.items.every((item) => item.receiptTemplate.some((line) => line.includes("停手线"))));
     assert.equal(center.packages[0].preview.status, "blocked");
     assert.ok(center.packages[0].preview.headline.includes("还不能交付"));
     assert.ok(center.packages[0].preview.chapterLine.includes("1 章"));
@@ -359,6 +362,10 @@ test("buildPlatformPublishExportCenter", async (t) => {
     assert.equal(center.finalDeliveryChecklist.items.find((item) => item.id === "publish-baseline")?.status, "todo");
     assert.equal(center.finalDeliveryChecklist.items.find((item) => item.id === "real-effect")?.status, "blocked");
     assert.ok(center.finalDeliveryChecklist.nextAction.includes("保存发布基准"));
+    const baselineReceipt = center.finalDeliveryChecklist.items.find((item) => item.id === "publish-baseline")?.receiptTemplate ?? [];
+    assert.ok(baselineReceipt.some((line) => line.includes("交付项：发布基准")));
+    assert.ok(baselineReceipt.some((line) => line.includes("产物位置：#package-version-history")));
+    assert.ok(baselineReceipt.some((line) => line.includes("下一步：保存发布基准")));
     assert.equal(pack.preview.status, "needs_baseline");
     assert.ok(pack.preview.headline.includes("缺发布基准"));
     assert.equal(pack.preview.actionHref, "#platform-export");

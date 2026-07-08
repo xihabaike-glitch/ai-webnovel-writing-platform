@@ -159,6 +159,16 @@ test("dispatch task center groups chapter adoption follow-up dispatches", () => 
   assert.ok(source.includes("queueFilter === \"chapter_adoption\""));
 });
 
+test("dispatch task center routes completed chapter adoption follow-ups back to gate recheck", () => {
+  assert.ok(source.includes("chapterAdoptionCompletionImpactHint"));
+  assert.ok(source.includes("isChapterAdoptionCompleted"));
+  assert.ok(source.includes("采纳后续已完成"));
+  assert.ok(source.includes("新正文已完成"));
+  assert.ok(source.includes("回总闸门复检采纳后续"));
+  assert.ok(source.includes("确认前三章正文、二改和发布质检卡点是否减少"));
+  assert.ok(source.includes("isChapterAdoptionTask ? \"回总闸门复检采纳后续\""));
+});
+
 test("dispatch task center shows dispatch receipt acceptance criteria before completion", () => {
   assert.ok(source.includes("dispatchReceiptAcceptanceCriteria"));
   assert.ok(source.includes("任务回执验收口径"));

@@ -305,6 +305,10 @@ function chapterAdoptionTemplateTitle(task: PersistedGatePlatformDispatchTask) {
   return "采纳后审稿完成依据模板";
 }
 
+function chapterAdoptionCompletionImpactHint(task: PersistedGatePlatformDispatchTask) {
+  return `新正文已完成${chapterAdoptionLaneLabel(task)}回填；回总闸门复检采纳后续，确认前三章正文、二改和发布质检卡点是否减少。`;
+}
+
 function buildChapterAdoptionCompletionTemplate(task: PersistedGatePlatformDispatchTask) {
   if (!isChapterAdoptionDispatchTask(task)) return "";
   const adoptionVersion = task.evidence.find((item) => item.startsWith("采纳版本：")) ?? "采纳版本：";
@@ -743,6 +747,7 @@ export function GateDispatchTaskCenter({
         const firstDayUpdate = buildFirstDayDispatchUpdateSummary(updated);
         const projectAcceptanceNextCompleted = targetState === "completed" && isProjectAcceptanceNextDispatchTask(updated.task);
         const roleClosureCompleted = targetState === "completed" && isRoleClosureDispatchTask(updated.task);
+        const isChapterAdoptionCompleted = targetState === "completed" && isChapterAdoptionDispatchTask(updated.task);
         if (projectAcceptanceNextCompleted) {
           setRouteActionMessage(`复检分流已完成：${projectAcceptanceNextImpactHint(updated.task)} 回总闸门查看卡点变化。`);
           setRouteActionLink({
@@ -754,6 +759,12 @@ export function GateDispatchTaskCenter({
           setRouteActionLink({
             ...buildGateRecheckActionLink(updated.task),
             label: "回总闸门复检角色闭环",
+          });
+        } else if (isChapterAdoptionCompleted) {
+          setRouteActionMessage(`采纳后续已完成：${chapterAdoptionCompletionImpactHint(updated.task)}`);
+          setRouteActionLink({
+            ...buildGateRecheckActionLink(updated.task),
+            label: "回总闸门复检采纳后续",
           });
         } else if (firstDayUpdate.visible) {
           const firstDayFollowUp = updated.followUpTasks.find((item) => item.dispatchKey.startsWith("first-day:")) ?? null;
@@ -2342,6 +2353,11 @@ export function GateDispatchTaskCenter({
                         角色闭环回填：回总闸门复检角色闭环，确认结构、资料、平台三类角色缺口是否减少。
                       </p>
                     ) : null}
+                    {isChapterAdoptionTask ? (
+                      <p className="mt-2 rounded-md bg-white px-2 py-1 text-xs font-medium text-emerald-900">
+                        {chapterAdoptionCompletionImpactHint(task)}
+                      </p>
+                    ) : null}
                     {completionRecordChips.length ? (
                       <div className="mt-2 flex flex-wrap gap-2 text-xs">
                         {completionRecordChips.map((chip) => (
@@ -2351,7 +2367,7 @@ export function GateDispatchTaskCenter({
                     ) : null}
                     {task.state === "completed" ? (
                       <Link className="mt-2 inline-flex rounded-md bg-white px-3 py-2 text-xs font-medium text-emerald-900 hover:bg-emerald-100" href={hrefWithGateReturn(dispatchGateRecheckHref(task), gateReturnHref)}>
-                        {isRoleClosureTask ? "回总闸门复检角色闭环" : "回总闸门复检并查看剩余卡点"}
+                        {isRoleClosureTask ? "回总闸门复检角色闭环" : isChapterAdoptionTask ? "回总闸门复检采纳后续" : "回总闸门复检并查看剩余卡点"}
                       </Link>
                     ) : null}
                   </div>

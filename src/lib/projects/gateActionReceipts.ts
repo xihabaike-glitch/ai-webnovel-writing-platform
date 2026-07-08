@@ -13,6 +13,12 @@ import { buildAiPipelinePromptMemorySummary, type AiPipelinePromptMemorySummary,
 export const gateActionReceiptStorageKey = "ai-webnovel-gate-action-receipts";
 export const gateActionReceiptUpdatedEvent = "ai-webnovel-gate-action-receipts-updated";
 export const defaultGateActionReceiptLimit = 20;
+const platformTacticExperienceRecheckHref = "/gate?focus=action-recheck&source=platform-tactic-experience#platform-tactic-experience";
+
+function normalizePlatformTacticExperienceHref(href?: string | null) {
+  if (!href || href === "/gate#platform-tactic-experience") return platformTacticExperienceRecheckHref;
+  return href;
+}
 
 export type GateActionReceiptExecutionType =
   | PrePublishGateActionExecution["type"]
@@ -1305,7 +1311,7 @@ export function buildGatePlatformTacticExperienceFollowupDispatch(
     detail: spec.detail,
     dueLabel: spec.dueLabel,
     actionLabel: spec.actionLabel,
-    href: item.href || "/gate#platform-tactic-experience",
+    href: normalizePlatformTacticExperienceHref(item.href),
     acceptanceCriteria: spec.acceptanceCriteria,
     evidence: commonEvidence,
     reviewLatestAt: item.latestAt,
@@ -1373,7 +1379,7 @@ function batchTacticEffectExperienceItem(item: GateBatchTacticEffectItem): GateP
       : recovery
       ? "恢复放量是解除闸门后的参考，不是跨题材无限复用；换题材、换平台或模型路线变化时必须重新小样本验证。"
       : item.risk,
-    href: "/gate#platform-tactic-experience",
+    href: platformTacticExperienceRecheckHref,
     sourceStatus: item.status === "blocked" ? "blocked" : item.status === "watch" ? "needs_effect" : "healthy",
     sourceLabel: item.label,
     priorityScore: item.status === "usable" ? 88 : item.status === "watch" ? 68 : 95,

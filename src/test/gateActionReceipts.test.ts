@@ -5353,6 +5353,7 @@ test("buildGateActionReceipt", async (t) => {
 
     assert.equal(usable?.stage, "scale_up");
     assert.equal(usable?.actionLabel, "继续小样本");
+    assert.equal(usable?.href, "/gate?focus=action-recheck&source=platform-tactic-experience#platform-tactic-experience");
     assert.ok(usable?.title.includes("继续小样本"));
     assert.ok(usable?.acceptanceCriteria.some((line) => line.includes("小样本")));
     assert.equal(watch?.stage, "start_metrics_recovery");

@@ -1115,7 +1115,7 @@ test("buildPrePublishGate", async (t) => {
     assert.equal(receiptReview.status, "handled");
     assert.equal(receiptReview.label, "重导最新包");
     assert.equal(receiptReview.actionLabel, "复检总闸门");
-    assert.equal(receiptReview.href, "/gate#gate-export-package");
+    assert.equal(receiptReview.href, "/gate?focus=action-recheck&source=export-version-receipt#gate-export-package");
     assert.ok(receiptReview.detail.includes("重新生成"));
   });
 

@@ -26,6 +26,8 @@ import { buildProjectDashboard, type ProjectAcceptanceRunbookStep, type ProjectA
 import { buildProjectRoleWorkflowEntrypoints } from "./projectListDashboard.ts";
 import { buildTaskQueueCenter } from "./taskQueueCenter.ts";
 
+const exportVersionReceiptRecheckHref = "/gate?focus=action-recheck&source=export-version-receipt#gate-export-package";
+
 export interface PrePublishGateProject {
   id: string;
   title: string;
@@ -1374,7 +1376,7 @@ function buildExportVersionGate(project: PrePublishGateProject): PrePublishGateE
       label: latestReceipt.label ?? "导出版本动作已执行",
       detail: latestReceipt.message ?? "已经留下导出版本处理回执，刷新后继续确认基准、差异和发布包风险。",
       actionLabel: "复检总闸门",
-      href: "/gate#gate-export-package",
+      href: exportVersionReceiptRecheckHref,
       latestActionId: latestReceipt.actionId,
       latestAt: latestReceipt.createdAt,
     }

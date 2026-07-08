@@ -622,7 +622,7 @@ test("buildTaskQueueCenter", async (t) => {
     assert.equal(versionItem?.category, "export");
     assert.equal(versionItem?.sourceType, "export_version_recheck");
     assert.equal(versionItem?.actionLabel, "复检总闸门");
-    assert.equal(versionItem?.href, "/gate#gate-export-package");
+    assert.equal(versionItem?.href, "/gate?focus=action-recheck&source=export-version-receipt#gate-export-package");
     assert.equal(queue.overview.exportVersionBlocked, 0);
   });
 

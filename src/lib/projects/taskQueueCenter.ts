@@ -19,6 +19,8 @@ import {
 import { findProjectStartTacticSummary, type ProjectStartTacticEntryLike, type ProjectStartTacticSummary } from "./projectStartTactics.ts";
 import { buildSubmissionChecklist, type SubmissionChecklist } from "./submissionChecklist.ts";
 
+const exportVersionReceiptRecheckHref = "/gate?focus=action-recheck&source=export-version-receipt#gate-export-package";
+
 export interface TaskQueueProject {
   id: string;
   title: string;
@@ -1469,7 +1471,7 @@ function exportVersionQueueItem(input: {
         chapterTitle: "导出版本复检",
         evidence: `${receiptAction}已留下回执，但最新版本仍需要总闸门复检：${decision.detail}`,
         actionLabel: "复检总闸门",
-        href: "/gate#gate-export-package",
+        href: exportVersionReceiptRecheckHref,
       });
     }
 
@@ -1497,7 +1499,7 @@ function exportVersionQueueItem(input: {
         chapterTitle: "导出基准复检",
         evidence: "导出基准动作已经留下回执，回总闸门确认正式基准是否生效。",
         actionLabel: "复检总闸门",
-        href: "/gate#gate-export-package",
+        href: exportVersionReceiptRecheckHref,
       });
     }
 
@@ -1524,7 +1526,7 @@ function exportVersionQueueItem(input: {
         chapterTitle: "新基准复检",
         evidence: "新导出基准已经留下回执，回总闸门确认版本替换是否完成。",
         actionLabel: "复检总闸门",
-        href: "/gate#gate-export-package",
+        href: exportVersionReceiptRecheckHref,
       });
     }
 

@@ -99,6 +99,12 @@ function runStatusClass(status: string) {
   return "bg-slate-100 text-slate-700";
 }
 
+function archiveExperienceReceiptClass(status: TaskRunLog["archiveExperienceReceipt"]["status"]) {
+  if (status === "attached") return "border-emerald-200 bg-emerald-50 text-emerald-900";
+  if (status === "missing") return "border-rose-200 bg-rose-50 text-rose-900";
+  return "border-slate-200 bg-white text-slate-700";
+}
+
 function runtimeLabel(ms: number) {
   if (ms < 1000) return `${ms}ms`;
   const seconds = Math.round(ms / 1000);
@@ -1336,6 +1342,19 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
                 <div className="mt-2 text-slate-600">{log.projectTitle} · {log.chapterTitle}</div>
                 <div className="mt-1 text-xs text-slate-500">{logMeta(log)}</div>
                 {log.errorMessage ? <p className="mt-2 leading-6 text-rose-700">{log.errorMessage}</p> : null}
+                {log.archiveExperienceReceipt.status !== "not_applicable" ? (
+                  <div className={`mt-3 rounded-md border p-3 text-xs leading-5 ${archiveExperienceReceiptClass(log.archiveExperienceReceipt.status)}`}>
+                    <div className="font-medium">归档经验执行回执 · {log.archiveExperienceReceipt.label}</div>
+                    <p className="mt-1">{log.archiveExperienceReceipt.detail}</p>
+                    <div className="mt-2 font-medium">最终交付归档强制执行输入证据</div>
+                    <ul className="mt-1 grid gap-1">
+                      {log.archiveExperienceReceipt.evidence.map((line) => (
+                        <li className="break-words" key={line}>{line}</li>
+                      ))}
+                    </ul>
+                    <p className="mt-2">下一步：{log.archiveExperienceReceipt.nextAction}</p>
+                  </div>
+                ) : null}
               </Link>
             ))}
             {runConsole.recentLogs.length === 0 ? <p className="text-sm text-slate-600">暂无运行日志。</p> : null}

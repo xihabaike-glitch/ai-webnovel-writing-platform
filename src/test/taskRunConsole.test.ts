@@ -129,4 +129,39 @@ test("buildTaskRunConsole", async (t) => {
     assert.equal(console.failureRepairBatch.items[1].actionLabel, "一键重试");
     assert.ok(console.failureRepairBatch.guidance.some((line) => line.includes("先修配置")));
   });
+
+  await t.test("builds archive experience receipts from task input snapshots", () => {
+    const console = buildTaskRunConsole([
+      {
+        ...baseTask,
+        inputSnapshot: JSON.stringify({
+          prompt: {
+            userPrompt: [
+              "最终交付归档强制执行：",
+              "- 不允许忽略开书经验；这条经验来自上一轮交付归档。",
+              "- 初稿必须把复制动作写进正文事件。",
+              "- 踩到不能踩边界时必须退回修正：不要直接放量。",
+              "- 必须执行：开头动作：第一段直接给倒计时。",
+            ].join("\n"),
+          },
+        }),
+      },
+      {
+        ...baseTask,
+        id: "task-no-archive",
+        taskType: "chapter_review",
+        inputSnapshot: JSON.stringify({ prompt: { userPrompt: "普通审稿提示词" } }),
+      },
+    ], { now: new Date("2026-01-01T00:01:00.000Z") });
+
+    const withArchive = console.recentLogs.find((log) => log.id === "task-1");
+    const missing = console.recentLogs.find((log) => log.id === "task-no-archive");
+
+    assert.equal(withArchive?.archiveExperienceReceipt.status, "attached");
+    assert.equal(withArchive?.archiveExperienceReceipt.label, "归档经验已执行");
+    assert.ok(withArchive?.archiveExperienceReceipt.evidence.some((line) => line.includes("不允许忽略开书经验")));
+    assert.ok(withArchive?.archiveExperienceReceipt.evidence.some((line) => line.includes("必须执行")));
+    assert.equal(missing?.archiveExperienceReceipt.status, "missing");
+    assert.equal(missing?.archiveExperienceReceipt.label, "缺归档经验回执");
+  });
 });

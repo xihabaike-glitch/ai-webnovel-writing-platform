@@ -98,6 +98,14 @@ test("tasks page previews PM receipt fields on queue items", () => {
   assert.ok(source.includes("待补"));
 });
 
+test("tasks page shows archive experience execution receipts on run logs", () => {
+  assert.ok(source.includes("归档经验执行回执"));
+  assert.ok(source.includes("log.archiveExperienceReceipt"));
+  assert.ok(source.includes("archiveExperienceReceipt.status"));
+  assert.ok(source.includes("archiveExperienceReceipt.evidence.map"));
+  assert.ok(source.includes("最终交付归档强制执行"));
+});
+
 test("tasks page carries gate return through task work links", () => {
   const recommendedBatchButton = readFileSync("src/components/tasks/RunRecommendedBatchButton.tsx", "utf8");
   const publishEffectButton = readFileSync("src/components/tasks/RunPublishEffectQueueActionButton.tsx", "utf8");

@@ -14,6 +14,7 @@ import { buildTaskRunConsole } from "@/lib/ai/taskRunConsole";
 import { prisma } from "@/lib/db/prisma";
 import { buildDevelopmentOverview } from "@/lib/development/developmentOverview";
 import { buildModelRoleMatrix, buildModelRoleMatrixPriorityBlocker } from "@/lib/model-gateway/modelRoleMatrix";
+import { buildFinalDeliveryGateCloseout } from "@/lib/projects/finalDeliveryGateCloseout";
 import { buildGateAiPipelineRecoveryPanel, buildGateDispatchTaskCenter } from "@/lib/projects/gateActionReceipts";
 import { gatePlatformDispatchTaskFromRecord } from "@/lib/projects/gateDispatchTaskRecords";
 import { buildPrePublishGate, buildPrePublishGateFocusNotice, type PrePublishGateFocusNotice, type PrePublishGateItem } from "@/lib/projects/prePublishGate";
@@ -297,59 +298,29 @@ export default async function GatePage({
     + finalDeliveryTaskRunCloseout.summary.staleRunningTasks
     + finalDeliveryTaskRunCloseout.summary.runningTasks
     + finalDeliveryTaskRunCloseout.summary.queuedTasks;
-  const finalDeliveryGateOpenLaneCount = [
-    gate.overview.blockedTasks,
-    finalDeliveryDispatchCloseout.summary.active,
-    finalDeliveryGateAiGapCount,
-  ].filter((count) => count > 0).length;
-  const finalDeliveryGateCloseoutPercent = Math.round(((3 - finalDeliveryGateOpenLaneCount) / 3) * 100);
-  const finalDeliveryGateReleaseLabel = gate.status === "ready"
-    && finalDeliveryDispatchCloseout.summary.active === 0
-    && finalDeliveryGateAiGapCount === 0
-    ? "可以进入最终交付"
-    : gate.overview.blockedTasks > 0
-      ? "先清发布卡点"
-      : finalDeliveryDispatchCloseout.summary.active > 0
-        ? "先收派单回执"
-        : finalDeliveryGateAiGapCount > 0
-          ? "先收 AI 任务"
-          : "等待总闸门复检";
-  const finalDeliveryGateNextCutLabel = gate.overview.blockedTasks > 0
-    ? gate.pmFocus.actionLabel
-    : finalDeliveryDispatchCloseout.summary.active > 0
-      ? finalDeliveryDispatchCloseout.nextActions[0] ?? "回派单中心收口"
-      : finalDeliveryTaskRunCloseout.nextActions[0] ?? gate.realPipelineFinalReview.primaryActionLabel ?? "进入最终交付";
-  const finalDeliveryGatePrimaryActionHref = gate.overview.blockedTasks > 0
-    ? gate.pmFocus.actionHref
-    : finalDeliveryDispatchCloseout.summary.active > 0
-      ? "/dispatch#dispatch-receipt-closeout"
-      : finalDeliveryGateAiGapCount > 0
-        ? "/tasks#task-receipt-closeout"
-        : gate.realPipelineFinalReview.primaryActionHref;
-  const finalDeliveryGatePrimaryActionLabel = gate.overview.blockedTasks > 0
-    ? "处理发布卡点"
-    : finalDeliveryDispatchCloseout.summary.active > 0
-      ? "收派单回执"
-      : finalDeliveryGateAiGapCount > 0
-        ? "收 AI 任务"
-        : gate.realPipelineFinalReview.primaryActionLabel;
-  const finalDeliveryGateSecondaryActions = [
-    {
-      label: "收派单回执",
-      href: "/dispatch#dispatch-receipt-closeout",
-      count: finalDeliveryDispatchCloseout.summary.active,
-    },
-    {
-      label: "收 AI 任务",
-      href: "/tasks#task-receipt-closeout",
-      count: finalDeliveryGateAiGapCount,
-    },
-  ];
-  const finalDeliveryGateLocked = finalDeliveryGateOpenLaneCount > 0 || gate.status !== "ready";
-  const finalDeliveryGateLockLabel = finalDeliveryGateLocked
-    ? "最终交付已锁定"
-    : "最终交付入口已开放";
-  const finalDeliveryGateDeliveryHref = gate.realPipelineFinalReview.primaryActionHref;
+  const finalDeliveryGateCloseout = buildFinalDeliveryGateCloseout({
+    gateStatus: gate.status,
+    publishBlockedCount: gate.overview.blockedTasks,
+    dispatchActiveCount: finalDeliveryDispatchCloseout.summary.active,
+    aiOpenCount: finalDeliveryGateAiGapCount,
+    pmActionLabel: gate.pmFocus.actionLabel,
+    pmActionHref: gate.pmFocus.actionHref,
+    dispatchNextAction: finalDeliveryDispatchCloseout.nextActions[0],
+    taskNextAction: finalDeliveryTaskRunCloseout.nextActions[0],
+    deliveryActionLabel: gate.realPipelineFinalReview.primaryActionLabel,
+    deliveryActionHref: gate.realPipelineFinalReview.primaryActionHref,
+  });
+  const {
+    closeoutPercent: finalDeliveryGateCloseoutPercent,
+    releaseLabel: finalDeliveryGateReleaseLabel,
+    nextCutLabel: finalDeliveryGateNextCutLabel,
+    primaryActionHref: finalDeliveryGatePrimaryActionHref,
+    primaryActionLabel: finalDeliveryGatePrimaryActionLabel,
+    secondaryActions: finalDeliveryGateSecondaryActions,
+    locked: finalDeliveryGateLocked,
+    lockLabel: finalDeliveryGateLockLabel,
+    deliveryHref: finalDeliveryGateDeliveryHref,
+  } = finalDeliveryGateCloseout;
   const focusNotice = buildPrePublishGateFocusNotice({ focus, projectId, actionId, gate });
   const aiRecoveryPanel = buildGateAiPipelineRecoveryPanel(
     aiRecoveryDispatchRecords.map(gatePlatformDispatchTaskFromRecord),

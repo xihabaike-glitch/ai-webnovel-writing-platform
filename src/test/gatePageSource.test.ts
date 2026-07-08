@@ -88,23 +88,21 @@ test("gate page summarizes final delivery closeout across task and dispatch rece
 });
 
 test("gate page links final delivery blockers to the matching closeout surface", () => {
+  assert.ok(source.includes("buildFinalDeliveryGateCloseout"));
   assert.ok(source.includes("finalDeliveryGatePrimaryActionHref"));
   assert.ok(source.includes("finalDeliveryGatePrimaryActionLabel"));
   assert.ok(source.includes("finalDeliveryGateSecondaryActions"));
-  assert.ok(source.includes("\"处理发布卡点\""));
-  assert.ok(source.includes("\"收派单回执\""));
-  assert.ok(source.includes("\"收 AI 任务\""));
-  assert.ok(source.includes("\"/dispatch#dispatch-receipt-closeout\""));
-  assert.ok(source.includes("\"/tasks#task-receipt-closeout\""));
+  assert.ok(source.includes("dispatchActiveCount: finalDeliveryDispatchCloseout.summary.active"));
+  assert.ok(source.includes("aiOpenCount: finalDeliveryGateAiGapCount"));
   assert.ok(source.includes("aria-label=\"最终交付行动入口\""));
   assert.ok(source.includes("finalDeliveryGateSecondaryActions.map"));
 });
 
 test("gate page locks the final delivery exit until every closeout lane is clear", () => {
+  assert.ok(source.includes("buildFinalDeliveryGateCloseout"));
   assert.ok(source.includes("finalDeliveryGateLocked"));
   assert.ok(source.includes("finalDeliveryGateLockLabel"));
   assert.ok(source.includes("finalDeliveryGateDeliveryHref"));
-  assert.ok(source.includes("最终交付已锁定"));
   assert.ok(source.includes("缺口清零后开放"));
   assert.ok(source.includes("aria-label=\"最终交付锁定提示\""));
   assert.ok(source.includes("aria-disabled=\"true\""));

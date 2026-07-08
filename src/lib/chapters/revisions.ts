@@ -53,6 +53,22 @@ export interface ChapterRevisionComparison {
   currentPreview: string;
 }
 
+export interface PendingCandidateGateInput {
+  projectId: string;
+  chapter: ChapterRevisionComparable & { id: string };
+  revisions: ChapterRevisionInput[];
+}
+
+export interface PendingCandidateGate {
+  status: "blocked" | "clear";
+  revisionId: string | null;
+  label: string;
+  title: string;
+  detail: string;
+  actionLabel: string;
+  href: string;
+}
+
 const sourceLabels: Record<string, string> = {
   ai_draft_candidate: "AI 初稿候选",
   ai_draft_before_overwrite: "AI 生成前旧稿",
@@ -129,5 +145,42 @@ export function buildChapterRevisionComparison(
     changedFields,
     oldPreview: previewRevisionContent(revision.content),
     currentPreview: previewRevisionContent(current.content),
+  };
+}
+
+function isCandidateAlreadyCurrent(chapter: ChapterRevisionComparable, revision: ChapterRevisionComparable) {
+  return normalized(chapter.title) === normalized(revision.title)
+    && normalized(chapter.content) === normalized(revision.content)
+    && chapter.wordCount === revision.wordCount;
+}
+
+export function buildPendingCandidateGate(input: PendingCandidateGateInput): PendingCandidateGate {
+  const latestCandidate = input.revisions
+    .filter((revision) => isChapterRevisionCandidate(revision.source))
+    .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime())[0];
+  const href = `/projects/${input.projectId}/chapters/${input.chapter.id}#chapter-revisions`;
+
+  if (!latestCandidate || isCandidateAlreadyCurrent(input.chapter, latestCandidate)) {
+    return {
+      status: "clear",
+      revisionId: null,
+      label: "候选稿已处理",
+      title: "当前正文没有待采纳候选。",
+      detail: "可以继续审稿、二改或发布质检。",
+      actionLabel: "查看版本区",
+      href,
+    };
+  }
+
+  const sourceLabel = getChapterRevisionSourceLabel(latestCandidate.source);
+
+  return {
+    status: "blocked",
+    revisionId: latestCandidate.id,
+    label: "待采纳候选稿",
+    title: `先处理${sourceLabel}`,
+    detail: `当前正文还不是最新修复稿。最新候选是「${latestCandidate.title}」，先采纳、保留当前稿或继续二改，再进入审稿和发布质检。`,
+    actionLabel: "去采纳候选",
+    href,
   };
 }

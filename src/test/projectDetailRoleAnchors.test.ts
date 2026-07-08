@@ -470,6 +470,17 @@ test("chapter detail page carries gate return through adoption next actions", ()
   assert.ok(chapterRevisionWorkbench.includes("href={hrefWithGateReturn(nextAction.href, gateReturnHref)}"));
 });
 
+test("chapter detail page surfaces pending candidate production gate", () => {
+  const chapterPage = readFileSync("src/app/projects/[projectId]/chapters/[chapterId]/page.tsx", "utf8");
+
+  assert.ok(chapterPage.includes("buildPendingCandidateGate"));
+  assert.ok(chapterPage.includes("candidateProductionGate"));
+  assert.ok(chapterPage.includes("章节生产闸"));
+  assert.ok(chapterPage.includes("candidateProductionGate.label"));
+  assert.ok(chapterPage.includes("candidateProductionGate.actionLabel"));
+  assert.ok(chapterPage.includes("hrefWithGateReturn(candidateProductionGate.href, gateReturn)"));
+});
+
 test("chapter revision workbench surfaces adoption follow-up dispatch links", () => {
   const chapterRevisionWorkbench = readFileSync("src/components/chapters/ChapterRevisionWorkbench.tsx", "utf8");
 

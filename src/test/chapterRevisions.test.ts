@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   buildChapterRevisionComparison,
+  buildPendingCandidateGate,
   isChapterRevisionCandidate,
   previewRevisionContent,
   summarizeChapterRevisions,
@@ -141,6 +142,78 @@ test("chapter revision summaries", async (t) => {
     assert.equal(comparison.wordDelta, 4);
     assert.deepEqual(comparison.changedFields, ["标题", "正文", "章节目标", "开头钩子"]);
     assert.equal(comparison.oldPreview, "旧稿第一段。");
+  });
+
+  await t.test("builds a production gate for the latest unadopted candidate", () => {
+    const gate = buildPendingCandidateGate({
+      projectId: "project-1",
+      chapter: {
+        id: "chapter-1",
+        title: "第一章 当前稿",
+        content: "当前正文还停在旧版本。",
+        wordCount: 12,
+        status: "draft",
+      },
+      revisions: [
+        {
+          id: "older-candidate",
+          source: "ai_draft_candidate",
+          sourceTaskId: "task-old",
+          title: "第一章 旧候选",
+          content: "旧候选稿。",
+          wordCount: 10,
+          status: "draft",
+          notes: "旧候选。",
+          createdAt: "2026-07-01T00:00:00.000Z",
+        },
+        {
+          id: "latest-candidate",
+          source: "chapter_second_pass_candidate",
+          sourceTaskId: "task-new",
+          title: "第一章 二改候选",
+          content: "二改候选稿更强，但还没有进入正文。",
+          wordCount: 18,
+          status: "revising",
+          notes: "二改候选。",
+          createdAt: "2026-07-02T00:00:00.000Z",
+        },
+      ],
+    });
+
+    assert.equal(gate.status, "blocked");
+    assert.equal(gate.revisionId, "latest-candidate");
+    assert.equal(gate.label, "待采纳候选稿");
+    assert.ok(gate.title.includes("先处理二改候选稿"));
+    assert.ok(gate.detail.includes("当前正文还不是最新修复稿"));
+    assert.equal(gate.actionLabel, "去采纳候选");
+    assert.equal(gate.href, "/projects/project-1/chapters/chapter-1#chapter-revisions");
+
+    const adoptedGate = buildPendingCandidateGate({
+      projectId: "project-1",
+      chapter: {
+        id: "chapter-1",
+        title: "第一章 二改候选",
+        content: "二改候选稿更强，但还没有进入正文。",
+        wordCount: 18,
+        status: "revising",
+      },
+      revisions: [
+        {
+          id: "latest-candidate",
+          source: "chapter_second_pass_candidate",
+          sourceTaskId: "task-new",
+          title: "第一章 二改候选",
+          content: "二改候选稿更强，但还没有进入正文。",
+          wordCount: 18,
+          status: "revising",
+          notes: "已经采纳过的候选。",
+          createdAt: "2026-07-02T00:00:00.000Z",
+        },
+      ],
+    });
+
+    assert.equal(adoptedGate.status, "clear");
+    assert.equal(adoptedGate.revisionId, null);
   });
 
   await t.test("builds follow-up dispatches after first-three adoption", () => {

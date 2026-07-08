@@ -4,6 +4,7 @@ import { ChapterEditor } from "@/components/chapters/ChapterEditor";
 import { ChapterRevisionWorkbench } from "@/components/chapters/ChapterRevisionWorkbench";
 import { ChapterSecondPassPanel } from "@/components/chapters/ChapterSecondPassPanel";
 import { buildStoryTreeChapterExperienceRecommendations, buildStoryTreeExperienceGuide, buildStoryTreeExperienceReviewBacklog, buildStoryTreeExperienceSecondPassAdvice } from "@/lib/ai/storyTreeExperience";
+import { buildPendingCandidateGate } from "@/lib/chapters/revisions";
 import { buildStoryTreeQualityAudit } from "@/lib/ai/storyTreeQualityAudit";
 import { prisma } from "@/lib/db/prisma";
 import { getPlatformProfile, type PlatformId } from "@/lib/platforms/platformProfiles";
@@ -21,6 +22,18 @@ function gateReturnFromParam(value: string | string[] | undefined) {
   return raw;
 }
 
+function hrefWithGateReturn(href: string, gateReturnHref?: string | null) {
+  if (!gateReturnHref || !href.startsWith("/") || href.startsWith("/gate")) return href;
+
+  const hashIndex = href.indexOf("#");
+  const base = hashIndex >= 0 ? href.slice(0, hashIndex) : href;
+  const hash = hashIndex >= 0 ? href.slice(hashIndex) : "";
+  if (base.includes("gateReturn=")) return href;
+  const separator = base.includes("?") ? "&" : "?";
+
+  return `${base}${separator}gateReturn=${encodeURIComponent(gateReturnHref)}${hash}`;
+}
+
 export default async function ChapterPage({
   params,
   searchParams,
@@ -34,6 +47,10 @@ export default async function ChapterPage({
   const chapter = await prisma.chapter.findUnique({
     where: { id: chapterId },
     include: {
+      revisions: {
+        orderBy: { createdAt: "desc" },
+        take: 12,
+      },
       project: {
         include: {
           gateDispatchTasks: {
@@ -93,6 +110,11 @@ export default async function ChapterPage({
     status: chapter.status,
     wordCount: chapter.wordCount,
   };
+  const candidateProductionGate = buildPendingCandidateGate({
+    projectId,
+    chapter: editableChapter,
+    revisions: chapter.revisions,
+  });
 
   return (
     <AppShell>
@@ -107,6 +129,20 @@ export default async function ChapterPage({
               <Link className="mt-3 inline-flex rounded-md bg-white px-3 py-2 text-xs font-medium text-amber-900 hover:bg-amber-100" href={gateReturn}>
                 回总闸门复检
               </Link>
+            </section>
+          ) : null}
+          {candidateProductionGate.status === "blocked" ? (
+            <section className="rounded-md border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-950">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <div className="text-xs font-medium text-emerald-700">章节生产闸 · {candidateProductionGate.label}</div>
+                  <h2 className="mt-1 font-medium text-slate-950">{candidateProductionGate.title}</h2>
+                  <p className="mt-1 leading-6 text-slate-700">{candidateProductionGate.detail}</p>
+                </div>
+                <Link className="w-fit rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white hover:bg-slate-800" href={hrefWithGateReturn(candidateProductionGate.href, gateReturn)}>
+                  {candidateProductionGate.actionLabel}
+                </Link>
+              </div>
             </section>
           ) : null}
           <div id="chapter-editor">

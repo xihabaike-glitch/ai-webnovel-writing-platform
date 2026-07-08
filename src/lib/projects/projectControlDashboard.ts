@@ -355,6 +355,8 @@ export interface ProductionDecisionSummary {
   dispatchHref: string | null;
   primaryActionLabel: string;
   primaryTargetHref: string;
+  primaryActionExecution: "link" | "ai_pipeline_recheck";
+  primaryActionReceiptId: string | null;
   secondaryActionLabel: string;
   secondaryTargetHref: string;
 }
@@ -1401,6 +1403,8 @@ function buildProductionDecisionSummary(input: {
           : "看修复清单"
         : "修批量打法",
       primaryTargetHref: hasControlDispatch ? aiPipelineControlDispatch.dispatchHref ?? "#ai-pipeline" : "/failures",
+      primaryActionExecution: hasControlDispatch && aiPipelineControlDispatch.dispatchStatus === "completed" ? "ai_pipeline_recheck" : "link",
+      primaryActionReceiptId: hasControlDispatch && aiPipelineControlDispatch.dispatchStatus === "completed" ? input.aiPipelineControlPlan.receiptId : null,
       secondaryActionLabel: input.modelRouteHealth.actionLabel,
       secondaryTargetHref: input.modelRouteHealth.targetHref,
     };
@@ -1420,6 +1424,8 @@ function buildProductionDecisionSummary(input: {
       ...modelRouteDispatch,
       primaryActionLabel: modelRouteDispatch.dispatchHref ? "查看模型路线派单" : "修模型路线",
       primaryTargetHref: modelRouteDispatch.dispatchHref ?? input.modelRouteHealth.targetHref,
+      primaryActionExecution: "link",
+      primaryActionReceiptId: null,
       secondaryActionLabel: input.batchHealth.actionLabel,
       secondaryTargetHref: input.batchHealth.targetHref,
     };
@@ -1442,6 +1448,8 @@ function buildProductionDecisionSummary(input: {
       dispatchHref: null,
       primaryActionLabel: input.modelRouteHealth.actionLabel,
       primaryTargetHref: input.modelRouteHealth.targetHref,
+      primaryActionExecution: "link",
+      primaryActionReceiptId: null,
       secondaryActionLabel: input.batchHealth.actionLabel,
       secondaryTargetHref: input.batchHealth.targetHref,
     };
@@ -1466,6 +1474,8 @@ function buildProductionDecisionSummary(input: {
           : "看复验清单"
         : input.batchHealth.executeLabel,
       primaryTargetHref: hasControlDispatch ? aiPipelineControlDispatch.dispatchHref ?? "#ai-pipeline" : input.batchHealth.targetHref,
+      primaryActionExecution: hasControlDispatch && aiPipelineControlDispatch.dispatchStatus === "completed" ? "ai_pipeline_recheck" : "link",
+      primaryActionReceiptId: hasControlDispatch && aiPipelineControlDispatch.dispatchStatus === "completed" ? input.aiPipelineControlPlan.receiptId : null,
       secondaryActionLabel: input.modelRouteHealth.actionLabel,
       secondaryTargetHref: input.modelRouteHealth.targetHref,
     };
@@ -1488,6 +1498,8 @@ function buildProductionDecisionSummary(input: {
       dispatchHref: null,
       primaryActionLabel: input.batch.canRun ? "执行推荐批次" : input.batch.actionLabel,
       primaryTargetHref: input.batch.targetHref,
+      primaryActionExecution: "link",
+      primaryActionReceiptId: null,
       secondaryActionLabel: input.modelRouteHealth.actionLabel,
       secondaryTargetHref: input.modelRouteHealth.targetHref,
     };
@@ -1509,6 +1521,8 @@ function buildProductionDecisionSummary(input: {
     dispatchHref: null,
     primaryActionLabel: "执行推荐批次",
     primaryTargetHref: input.batch.targetHref,
+    primaryActionExecution: "link",
+    primaryActionReceiptId: null,
     secondaryActionLabel: input.batchHealth.actionLabel,
     secondaryTargetHref: input.batchHealth.targetHref,
   };

@@ -153,6 +153,8 @@ test("project detail page carries gate return through control and batch panels",
   assert.ok(controlPanel.includes("dashboard.productionDecision.dispatchHref"));
   assert.ok(controlPanel.includes("dashboard.productionDecision.actionExecutable"));
   assert.ok(controlPanel.includes("onClick={() => void executeProductionDecisionAction()}"));
+  assert.ok(controlPanel.includes("dashboard.productionDecision.primaryActionExecution === \"ai_pipeline_recheck\""));
+  assert.ok(controlPanel.includes("onClick={() => void recheckBatchChecklist()}"));
   assert.ok(controlPanel.includes("href={hrefWithGateReturn(projectScopedHref(projectId, dashboard.productionDecision.primaryTargetHref), gateReturnHref)}"));
   assert.ok(controlActionsRoute.includes("if (areaId === \"model-route\")"));
   assert.ok(controlActionsRoute.includes("model-route-repair:"));

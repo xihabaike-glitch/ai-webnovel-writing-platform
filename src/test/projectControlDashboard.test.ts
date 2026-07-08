@@ -1034,6 +1034,79 @@ test("buildProjectControlDashboard", async (t) => {
     assert.equal(dashboard.productionDecision.primaryTargetHref, "#ai-pipeline");
   });
 
+  await t.test("promotes a completed AI pipeline checklist recheck to the production decision action", () => {
+    const dashboard = buildProjectControlDashboard({
+      project,
+      platform: getPlatformProfile("fanqie"),
+      chapters: [chapter],
+      outlineNodes: [],
+      characters: [],
+      worldEntries: [],
+      foreshadows: [],
+      plotThreads: [],
+      aiTasks: [],
+      gateActionAudits: [
+        {
+          receiptId: "blocked-batch",
+          label: "失败批次",
+          detail: "番茄小说 · 夜雨系统 · 批量初稿 2 个",
+          href: "/tasks#recommended-batch",
+          status: "failed",
+          message: "推荐批次失败。",
+          executionType: "recommended_batch",
+          succeededCount: 0,
+          failedCount: 2,
+          payload: JSON.stringify({
+            plan: {
+              strategyBases: [{
+                title: "首轮平台打法：番茄小说",
+                label: "三轮稳住",
+                primaryTactic: "三轮数据已站住，可以小批放大。",
+                openingMove: "第一段给不可逆危机。",
+                verificationMove: "继续回填曝光、点击、收藏和追读。",
+                risk: "稳定加码不是无限放量。",
+              }],
+              actionLabel: "批量初稿 2 个",
+              category: "draft",
+            },
+            routeEffectSummary: { successRatePercent: 0, knownCostUsd: 0.02, averageQualityScore: 68 },
+            batchReceipt: { status: "repair", headline: "批次有失败，先修再放大" },
+          }),
+          createdAt: "2026-01-02T00:00:00.000Z",
+        },
+        {
+          receiptId: "ai-plan-complete",
+          actionId: "ai-pipeline-control:demo-project",
+          label: "批量打法修复清单",
+          detail: "三轮稳住打法：成功率 0%，质量 68，失败 2。",
+          href: "/projects/demo-project#ai-pipeline",
+          status: "succeeded",
+          message: "已生成批量打法修复清单。",
+          executionType: "control_action",
+          succeededCount: 3,
+          failedCount: 0,
+          payload: JSON.stringify({
+            aiPipelineControlPlan: {
+              status: "repair",
+              items: [
+                { id: "stop-scale", label: "停用三轮稳住打法继续放量", completed: true },
+                { id: "review-failures", label: "复盘 2 个失败任务的错误原因", completed: true },
+              ],
+            },
+          }),
+          createdAt: "2026-01-03T00:00:00.000Z",
+        },
+      ],
+      submissionChecklist: checklist,
+    });
+
+    assert.equal(dashboard.aiPipelineControlPlan.canRecheck, true);
+    assert.equal(dashboard.productionDecision.dispatchStatus, "completed");
+    assert.equal(dashboard.productionDecision.primaryActionLabel, "复检批量健康");
+    assert.equal(dashboard.productionDecision.primaryActionExecution, "ai_pipeline_recheck");
+    assert.equal(dashboard.productionDecision.primaryActionReceiptId, "ai-plan-complete");
+  });
+
   await t.test("enables AI pipeline recheck after every repair checklist item is complete", () => {
     const dashboard = buildProjectControlDashboard({
       project,

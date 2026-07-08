@@ -252,6 +252,8 @@ interface ProductionDecisionSummary {
   dispatchHref: string | null;
   primaryActionLabel: string;
   primaryTargetHref: string;
+  primaryActionExecution: "link" | "ai_pipeline_recheck";
+  primaryActionReceiptId: string | null;
   secondaryActionLabel: string;
   secondaryTargetHref: string;
 }
@@ -1053,6 +1055,15 @@ export function ProjectControlDashboardPanel({
                     type="button"
                   >
                     {runningProductionDecisionAction ? "执行中" : dashboard.productionDecision.executeLabel}
+                  </button>
+                ) : dashboard.productionDecision.primaryActionExecution === "ai_pipeline_recheck" ? (
+                  <button
+                    className="inline-flex w-fit items-center justify-center rounded-md bg-white px-3 py-2 text-xs font-medium text-slate-950 hover:bg-slate-50 disabled:opacity-50"
+                    disabled={runningBatchRecheck}
+                    onClick={() => void recheckBatchChecklist()}
+                    type="button"
+                  >
+                    {runningBatchRecheck ? "复检中" : dashboard.productionDecision.primaryActionLabel}
                   </button>
                 ) : (
                   <Link

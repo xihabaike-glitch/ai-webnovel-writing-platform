@@ -543,22 +543,25 @@ function buildPipelineProofRoute(): DevelopmentOverviewPipelineProofRoute {
 }
 
 function buildCurrentPipelineValidation(): DevelopmentOverviewCurrentPipelineValidation {
-  const nextStep = pipelineProofSteps[0];
+  const nextStep = pipelineProofSteps.find((step) => step.id === "gate_check") ?? pipelineProofSteps[0];
 
   return {
     watchItemId: "writing_pipeline",
     headline: "真实作品流水线验收单",
-    pmVerdict: "写作到投稿流水线仍在观察中；下一步不是继续补页面，而是拿一部真实作品从开书证据开始跑通。",
+    pmVerdict: "写作到投稿流水线仍在观察中；首章样本回执已能写回总闸门，下一步先复检样本证据，再决定修复、继续小样本或暂停批量。",
     nextStepId: nextStep.id,
     nextStepTitle: nextStep.title,
     requiredEvidence: [
       "作品页必须看到目标平台、篇幅、开头钩子、结尾承诺、主干和基础土壤。",
+      "首章样本回执必须写入总闸门，并能在真实样本复检区看到最新回执。",
       "首章样本必须进入候选稿、审稿、二改和人工采用链路。",
+      "总闸门必须展示样本回执、复查结论、剩余卡点和下一步分流。",
       "任务回执必须带执行角色、输入、输出、验收证据和下一步入口。",
       "发布包必须沉淀样章、标题简介标签、版本基线和平台复盘指标。",
     ],
     stopIfMissing: [
       "缺开头钩子或结尾承诺时，不允许进入模型生成。",
+      "缺首章样本回执或总闸门复检入口时，不允许进入批量生产。",
       "缺人工采用时，不允许批量生产。",
       "缺发布包或反馈复盘时，不允许宣称流水线跑通。",
     ],
@@ -627,8 +630,8 @@ function buildCurrentPipelineValidation(): DevelopmentOverviewCurrentPipelineVal
         },
       ],
     },
-    actionHref: "/projects#pipeline-projects",
-    actionLabel: "验收真实流水线",
+    actionHref: "/gate?focus=action-recheck&source=real-sample-receipt#gate-focus-notice",
+    actionLabel: "复检首章样本回执",
   };
 }
 
@@ -774,8 +777,8 @@ const finalAcceptanceMeta: Record<
     requirementTitle: "真实作品流水线",
     status: "watch",
     owner: "毒舌产品经理",
-    missingEvidence: "真实作品流水线已接入最终交付正式放行卡，仍需用真实作品持续验收正式放行证据",
-    nextAction: "回总闸门查看真实流水线终检和最终交付正式放行卡，再决定交付、修复或暂停批量。",
+    missingEvidence: "真实作品流水线已接入首章样本回执和最终交付正式放行卡，仍需用真实作品持续验收正式放行证据",
+    nextAction: "回总闸门复检首章样本回执和真实流水线终检，再决定交付、修复或暂停批量。",
   },
 };
 
@@ -861,9 +864,9 @@ export function buildDevelopmentOverview(): DevelopmentOverview {
     finalAcceptanceGate: buildFinalAcceptanceGate(deliveryAudit, currentPipelineValidation, requirementTraceability),
     nextActions: [
       {
-        label: "从作品工作台验收真实写作流程",
-        detail: "开书、首章、审稿、二改和发布包必须能串起来。",
-        href: "/projects",
+        label: "复检首章样本回执",
+        detail: "首章样本写回总闸门后，先看回执、剩余卡点和下一步分流。",
+        href: "/gate?focus=action-recheck&source=real-sample-receipt#gate-focus-notice",
       },
       {
         label: "确认模型岗位接口",

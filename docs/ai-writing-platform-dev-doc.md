@@ -74,7 +74,7 @@
 
 下一步不是继续加平台，也不是堆更多炫技能力，而是逐项证明现有闭环可以跑通：
 
-1. 从 `/projects` 创建或打开作品，完成开头钩子、结尾承诺、主干、分支和章节卡。
+1. 当前下一步是从 `/gate?focus=action-recheck&source=real-sample-receipt#gate-focus-notice` 复检首章样本回执；首章样本回执已能写回总闸门，先看回执、剩余卡点和下一步分流。
 2. 从 `/settings/models?focus=model-role-matrix#model-role-matrix` 确认模型岗位矩阵和职责路由，确保 Claude、DeepSeek、Kimi、GPT 都有明确用途；缺岗时先处理推荐批次缺岗硬拦截。
 3. 从 `/tasks` 和 `/dispatch` 验收首日写作、模型执行、回执接受和下一步任务。
 4. 从 `/gate` 检查是否允许批量生产。
@@ -161,7 +161,7 @@
 | AI 编辑部角色分工 | 已覆盖 | `/dispatch#dispatch-task-center` | 无角色分工缺口 | 让每个任务回执都带角色产物、输入输出、人工验收和下一步入口。 |
 | 平台风格适配 | 已覆盖 | `/projects#platform-export` | 无平台风格范围缺口 | 继续用章节卡、审稿、二改和发布包检验钩子、爽点、节奏、标签和简介。 |
 | 传统写作工具底座 | 已覆盖 | `/projects#pipeline-projects` | 无传统写作资产缺口 | 确保 AI 只能沿大纲、人物、世界观、伏笔、章节和发布包执行。 |
-| 真实作品流水线 | 观察中 | `/gate#pipeline-final-review` | 真实作品流水线已接入最终交付正式放行卡，仍需用真实作品持续验收正式放行证据 | 回总闸门查看真实流水线终检和最终交付正式放行卡，再决定交付、修复或暂停批量。 |
+| 真实作品流水线 | 观察中 | `/gate#pipeline-final-review` | 真实作品流水线已接入首章样本回执和最终交付正式放行卡，仍需用真实作品持续验收正式放行证据 | 回总闸门复检首章样本回执和真实流水线终检，再决定交付、修复或暂停批量。 |
 
 ## 1. 毒舌产品经理 5.0 结论
 
@@ -863,9 +863,9 @@ MVP 合格标准：
 
 ## 16. 下一步
 
-当前下一步不是重写计划，也不是继续加平台，而是拿现有产品跑真实闭环：
+当前下一步不是重写计划，也不是继续加平台，而是拿现有产品跑真实闭环。当前下一步是从 `/gate?focus=action-recheck&source=real-sample-receipt#gate-focus-notice` 复检首章样本回执；首章样本回执已能写回总闸门，先看回执、剩余卡点和下一步分流：
 
-1. 从 `/projects` 跑一条真实作品样本：创建或打开作品，补齐目标平台、篇幅、开头钩子、结尾承诺、主干、分支、叶片和土壤。
+1. 从 `/gate?focus=action-recheck&source=real-sample-receipt#gate-focus-notice` 复检首章样本回执：确认总闸门能看到最新首章样本回执、回执详情、剩余卡点和可点击下一步。
 2. 从 `/settings/models?focus=model-role-matrix#model-role-matrix` 检查模型岗位矩阵和职责路由：Claude、DeepSeek、Kimi、GPT 必须有清晰岗位、备用模型、成本观察和人工验收入口；推荐批次缺岗硬拦截未解除前不允许放大生产。
 3. 从 `/dispatch` 验证任务回执：首章样本、审稿、二改、平台包和失败修复都要有执行角色、输入、输出、验收证据和下一步。
 4. 从 `/gate` 判断是否允许小批量：没有样本、复查、质量、成本、失败率和恢复证据时，不允许放大生产。

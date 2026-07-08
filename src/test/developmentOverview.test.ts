@@ -64,8 +64,9 @@ test("buildDevelopmentOverview", async (t) => {
   await t.test("prioritizes the next route instead of expanding more platforms", () => {
     const overview = buildDevelopmentOverview();
 
-    assert.equal(overview.nextActions[0].href, "/projects");
-    assert.ok(overview.nextActions[0].label.includes("作品"));
+    assert.equal(overview.nextActions[0].href, "/gate?focus=action-recheck&source=real-sample-receipt#gate-focus-notice");
+    assert.ok(overview.nextActions[0].label.includes("首章样本回执"));
+    assert.ok(overview.nextActions[0].detail.includes("总闸门"));
     assert.ok(overview.nextActions.some((action) => action.href === "/settings/models"));
     assert.ok(overview.nextActions.some((action) => action.href === "/references"));
     assert.equal(
@@ -203,12 +204,17 @@ test("buildDevelopmentOverview", async (t) => {
     assert.equal(overview.currentPipelineValidation.watchItemId, "writing_pipeline");
     assert.ok(overview.currentPipelineValidation.headline.includes("真实作品"));
     assert.ok(overview.currentPipelineValidation.pmVerdict.includes("观察中"));
-    assert.equal(overview.currentPipelineValidation.nextStepId, "project_start");
-    assert.equal(overview.currentPipelineValidation.actionHref, "/projects#pipeline-projects");
-    assert.equal(overview.currentPipelineValidation.actionLabel, "验收真实流水线");
+    assert.ok(overview.currentPipelineValidation.pmVerdict.includes("首章样本回执"));
+    assert.equal(overview.currentPipelineValidation.nextStepId, "gate_check");
+    assert.equal(overview.currentPipelineValidation.nextStepTitle, "总闸门放大检查");
+    assert.equal(overview.currentPipelineValidation.actionHref, "/gate?focus=action-recheck&source=real-sample-receipt#gate-focus-notice");
+    assert.equal(overview.currentPipelineValidation.actionLabel, "复检首章样本回执");
     assert.ok(overview.currentPipelineValidation.requiredEvidence.some((item) => item.includes("开头钩子")));
+    assert.ok(overview.currentPipelineValidation.requiredEvidence.some((item) => item.includes("首章样本回执")));
+    assert.ok(overview.currentPipelineValidation.requiredEvidence.some((item) => item.includes("总闸门")));
     assert.ok(overview.currentPipelineValidation.requiredEvidence.some((item) => item.includes("人工采用")));
     assert.ok(overview.currentPipelineValidation.requiredEvidence.some((item) => item.includes("发布包")));
+    assert.ok(overview.currentPipelineValidation.stopIfMissing.some((item) => item.includes("首章样本回执")));
     assert.ok(overview.currentPipelineValidation.stopIfMissing.some((item) => item.includes("不允许批量")));
     assert.equal(overview.currentPipelineValidation.finalReview.title, "真实作品流水线终检清单");
     assert.equal(overview.currentPipelineValidation.finalReview.receiptHref, "/gate?focus=action-recheck&source=real-sample-receipt#gate-focus-notice");
@@ -311,6 +317,8 @@ test("buildDevelopmentOverview", async (t) => {
     assert.equal(overview.finalAcceptanceGate.metrics.blocked, overview.deliveryAudit.summary.blocked);
     assert.equal(overview.finalAcceptanceGate.actionHref, overview.currentPipelineValidation.actionHref);
     assert.equal(overview.finalAcceptanceGate.actionLabel, overview.currentPipelineValidation.actionLabel);
+    assert.equal(overview.finalAcceptanceGate.actionHref, "/gate?focus=action-recheck&source=real-sample-receipt#gate-focus-notice");
+    assert.equal(overview.finalAcceptanceGate.actionLabel, "复检首章样本回执");
     assert.ok(overview.finalAcceptanceGate.stopRule.includes("不要新增平台"));
     assert.ok(overview.finalAcceptanceGate.stopRule.includes("模型岗位缺岗"));
     assert.equal(overview.finalAcceptanceGate.livePipelineReview.title, "总闸门实时裁决");

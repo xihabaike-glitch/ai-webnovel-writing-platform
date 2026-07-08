@@ -133,7 +133,8 @@ test("ai writing platform development document", async (t) => {
     assert.equal(doc.includes("`TECHNICAL_DESIGN.md`：技术方案，锁定数据库、模型网关、编辑器选型、API。"), false);
 
     assert.ok(doc.includes("当前下一步"));
-    assert.ok(doc.includes("从 `/projects` 跑一条真实作品样本"));
+    assert.ok(doc.includes("当前下一步是从 `/gate?focus=action-recheck&source=real-sample-receipt#gate-focus-notice` 复检首章样本回执"));
+    assert.ok(doc.includes("首章样本回执已能写回总闸门"));
     assert.ok(doc.includes("从 `/gate` 判断是否允许小批量"));
     assert.ok(doc.includes("不再把新增平台当作进度"));
   });

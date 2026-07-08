@@ -30,6 +30,9 @@ export function WritingPathQuickFixButton({ fix }: { fix: WritingWorkbenchQuickF
         const projectHref = fix.endpoint.replace(/^\/api/, "").replace(/\/chapters\/from-outline$/, "");
         router.push(`${projectHref}/chapters/${payload.chapter.id}`);
       }
+      if (fix.kind === "chapter_draft_candidate" && fix.successHref) {
+        router.push(fix.successHref);
+      }
       router.refresh();
     } catch (caught) {
       setMessage(caught instanceof Error ? caught.message : "执行失败，请重试。");

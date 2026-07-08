@@ -250,12 +250,13 @@ export interface WritingWorkbenchAdoptionFollowupStep {
 
 export interface WritingWorkbenchQuickFix {
   id: string;
-  kind: "chapter_hook" | "chapter_card" | "chapter_from_outline" | "character_seed" | "story_line_seed" | "foreshadow_seed" | "world_seed";
+  kind: "chapter_hook" | "chapter_card" | "chapter_from_outline" | "chapter_draft_candidate" | "character_seed" | "story_line_seed" | "foreshadow_seed" | "world_seed";
   label: string;
   description: string;
   method: "PATCH" | "POST";
   endpoint: string;
   payload: Record<string, string>;
+  successHref?: string;
 }
 
 export interface WritingWorkbenchModelAction {
@@ -506,26 +507,56 @@ const writingPathCopy: Record<WritingWorkbenchTreeBlock["type"], {
 };
 
 function quickFixForPathBlock(
+  input: WritingWorkbenchInput,
   block: WritingWorkbenchTreeBlock,
   quickFixes: WritingWorkbenchQuickFix[],
+  nextChapter: WritingWorkbenchChapter | null,
 ): WritingWorkbenchQuickFix | null {
   if (block.type === "opening") return quickFixes.find((fix) => fix.kind === "chapter_hook") ?? null;
   if (block.type === "trunk") return quickFixes.find((fix) => fix.kind === "story_line_seed") ?? null;
   if (block.type === "branch") return quickFixes.find((fix) => fix.kind === "foreshadow_seed") ?? null;
-  if (block.type === "leaf") return quickFixes.find((fix) => fix.kind === "chapter_card" || fix.kind === "chapter_from_outline") ?? null;
+  if (block.type === "leaf") {
+    const cardFix = quickFixes.find((fix) => fix.kind === "chapter_card" || fix.kind === "chapter_from_outline");
+    if (cardFix) return cardFix;
+    if (
+      nextChapter
+      && hasText(nextChapter.hook)
+      && hasText(nextChapter.conflict)
+      && hasText(nextChapter.cliffhanger)
+      && nextChapter.wordCount <= 0
+      && !hasText(nextChapter.content)
+    ) {
+      return {
+        id: `chapter-draft-${nextChapter.id}`,
+        kind: "chapter_draft_candidate",
+        label: "生成正文候选",
+        description: `把「${nextChapter.title}」从章节卡扩写成可采纳正文候选稿。`,
+        method: "POST",
+        endpoint: "/api/ai/tasks/chapter-draft",
+        payload: {
+          chapterId: nextChapter.id,
+          targetWords: input.project.targetPlatformName.includes("起点") ? "2600" : "1800",
+        },
+        successHref: `/projects/${input.project.id}/chapters/${nextChapter.id}#chapter-revisions`,
+      };
+    }
+    return null;
+  }
   if (block.type === "soil") return quickFixes.find((fix) => fix.kind === "world_seed") ?? null;
   return null;
 }
 
 function buildWritingPath(
+  input: WritingWorkbenchInput,
   treeBlocks: WritingWorkbenchTreeBlock[],
   quickFixes: WritingWorkbenchQuickFix[],
+  nextChapter: WritingWorkbenchChapter | null,
 ): WritingWorkbenchPathItem[] {
   return treeRequirements.flatMap((requirement, index) => {
     const block = treeBlocks.find((item) => item.type === requirement.type);
     if (!block) return [];
     const copy = writingPathCopy[block.type];
-    const quickFix = quickFixForPathBlock(block, quickFixes);
+    const quickFix = quickFixForPathBlock(input, block, quickFixes, nextChapter);
     return {
       id: `writing-path-${block.type}`,
       order: index + 1,
@@ -1302,7 +1333,7 @@ export function buildWritingWorkbench(input: WritingWorkbenchInput): WritingWork
     heroAction,
     pmFocus: buildWritingWorkbenchPmFocus(heroAction, maturityScore),
     treeBlocks,
-    writingPath: buildWritingPath(treeBlocks, quickFixes),
+    writingPath: buildWritingPath(input, treeBlocks, quickFixes, nextChapter),
     chapterFocus: {
       nextChapter,
       hookStatus,

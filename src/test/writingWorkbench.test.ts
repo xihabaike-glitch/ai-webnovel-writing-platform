@@ -291,6 +291,45 @@ test("buildWritingWorkbench", async (t) => {
     assert.equal(workbench.modelTimeline.emptyState, "还没有模型执行记录。");
   });
 
+  await t.test("routes a complete empty chapter card into draft candidate generation", () => {
+    const workbench = buildWritingWorkbench({
+      project: {
+        id: "p-draft-path",
+        title: "雨夜选择",
+        genre: "都市系统",
+        sellingPoint: "雨夜危机中主角获得选择系统。",
+        targetPlatformName: "番茄小说",
+        targetWordCount: 300000,
+        currentWordCount: 0,
+      },
+      chapters: [
+        {
+          id: "draft-c1",
+          title: "第一章 雨夜倒计时",
+          order: 1,
+          status: "outline",
+          wordCount: 0,
+          content: "",
+          hook: "主角收到未来自己的死亡提醒。",
+          conflict: "救人会暴露系统，不救人会失去关键证人。",
+          cliffhanger: "系统提示这不是第一次失败。",
+        },
+      ],
+      outlineNodes: [],
+      characters: [],
+      worldEntries: [{ id: "soil-1", type: "platform_soil", title: "番茄土壤", content: "首屏危机、选择、章末追读。" }],
+      aiTasks: [],
+    });
+
+    const leafPath = workbench.writingPath.find((item) => item.treeType === "leaf");
+    assert.equal(leafPath?.quickFix?.kind, "chapter_draft_candidate");
+    assert.equal(leafPath?.quickFix?.label, "生成正文候选");
+    assert.equal(leafPath?.quickFix?.endpoint, "/api/ai/tasks/chapter-draft");
+    assert.equal(leafPath?.quickFix?.payload.chapterId, "draft-c1");
+    assert.equal(leafPath?.quickFix?.payload.targetWords, "1800");
+    assert.equal(leafPath?.quickFix?.successHref, "/projects/p-draft-path/chapters/draft-c1#chapter-revisions");
+  });
+
   await t.test("surfaces latest unadopted candidate revisions before more writing", () => {
     const baseInput = {
       project: {

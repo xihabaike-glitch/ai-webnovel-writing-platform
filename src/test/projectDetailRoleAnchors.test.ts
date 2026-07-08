@@ -146,6 +146,8 @@ test("project writing workbench renders a concrete today path", () => {
   assert.ok(writingPathQuickFixButton.includes("可执行草稿"));
   assert.ok(writingPathQuickFixButton.includes("fetch(fix.endpoint"));
   assert.ok(writingPathQuickFixButton.includes("fix.kind === \"chapter_from_outline\""));
+  assert.ok(writingPathQuickFixButton.includes("fix.kind === \"chapter_draft_candidate\""));
+  assert.ok(writingPathQuickFixButton.includes("fix.successHref"));
   assert.ok(writingPathQuickFixButton.includes("payload.chapter.id"));
   assert.ok(writingPathQuickFixButton.includes("router.push"));
   assert.ok(writingPathQuickFixButton.includes("router.refresh()"));

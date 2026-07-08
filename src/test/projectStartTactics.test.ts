@@ -1416,6 +1416,109 @@ test("buildProjectStartTacticAdvice", async (t) => {
     assert.ok(handoff.evidence.some((line) => line.includes("初稿质检：86")));
   });
 
+  await t.test("routes first-day metric outcomes into distinct project start paths", () => {
+    const platform = getPlatformProfile("fanqie");
+    const template = getDefaultTemplateForPlatform(platform.id);
+    const style = getPlatformWritingStyle(platform.id);
+    const scaleExperience: GatePlatformTacticExperienceItem = {
+      platformId: "fanqie",
+      platformName: "番茄小说",
+      status: "usable",
+      label: "可复用打法",
+      tactic: "首日执行小样本扩展",
+      lesson: "首日执行链路跑通且首轮数据过线，可以进入小样本扩展。",
+      reuseHint: "同类新项目可复用生成-审稿-二改顺序，并扩到下一章小样本。",
+      risk: "扩展仍要按曝光、点击、收藏、追读回收，不允许直接批量放量。",
+      href: "/gate#platform-tactic-experience",
+      sourceStatus: "healthy",
+      sourceLabel: "首日执行数据过线",
+      priorityScore: 92,
+      latestAt: "2026-01-04T00:00:00.000Z",
+      evidence: ["首日执行数据回收：进入小样本扩展", "追读率 2.4%，收藏率 6%。"],
+    };
+    const watchExperience: GatePlatformTacticExperienceItem = {
+      ...scaleExperience,
+      status: "watch",
+      tactic: "首日执行继续观察",
+      lesson: "首日执行链路跑通，但追读证据不足。",
+      reuseHint: "同类新项目只能先补追读证据，不复用扩展结论。",
+      risk: "继续观察期间不要扩到多章或多平台。",
+      sourceStatus: "needs_effect",
+      sourceLabel: "首日执行数据观察",
+      priorityScore: 86,
+      latestAt: "2026-01-04T01:00:00.000Z",
+      evidence: ["首日执行数据回收：继续观察", "追读证据不足，需要补追读。"],
+    };
+    const blockedExperience: GatePlatformTacticExperienceItem = {
+      ...scaleExperience,
+      status: "blocked",
+      label: "避坑样本",
+      tactic: "首日执行暂停避坑",
+      lesson: "首日执行链路完成但首轮数据未过线。",
+      reuseHint: "同类新项目先暂停这套开头和平台包装，重做入口卖点后再验证。",
+      risk: "未重做入口卖点、前三章兑现或平台匹配前，不允许继续扩展。",
+      sourceStatus: "blocked",
+      sourceLabel: "首日执行避坑",
+      priorityScore: 91,
+      latestAt: "2026-01-04T02:00:00.000Z",
+      evidence: ["首日执行数据回收：暂停", "追读率 0%，不允许继续。"],
+    };
+
+    const scaleGuide = buildProjectStartPlatformExperienceGuide({ platforms: [platform], experiences: [scaleExperience] });
+    const watchGuide = buildProjectStartPlatformExperienceGuide({ platforms: [platform], experiences: [watchExperience] });
+    const blockedGuide = buildProjectStartPlatformExperienceGuide({ platforms: [platform], experiences: [blockedExperience] });
+    const scaleAdvice = buildProjectStartTacticAdvice({ platform, template, style, experience: scaleExperience });
+    const watchAdvice = buildProjectStartTacticAdvice({ platform, template, style, experience: watchExperience });
+    const blockedAdvice = buildProjectStartTacticAdvice({ platform, template, style, experience: blockedExperience });
+    const scaleGate = buildProjectStartRiskGate(scaleGuide.items[0] ?? null);
+    const watchGate = buildProjectStartRiskGate(watchGuide.items[0] ?? null);
+    const blockedGate = buildProjectStartRiskGate(blockedGuide.items[0] ?? null);
+    const scaleHandoff = buildProjectStartExperienceHandoff({
+      platform,
+      template,
+      guide: scaleGuide,
+      advice: scaleAdvice,
+      riskGate: scaleGate,
+      recommendedTemplate: template,
+    });
+    const watchHandoff = buildProjectStartExperienceHandoff({
+      platform,
+      template,
+      guide: watchGuide,
+      advice: watchAdvice,
+      riskGate: watchGate,
+      recommendedTemplate: template,
+    });
+    const blockedHandoff = buildProjectStartExperienceHandoff({
+      platform,
+      template,
+      guide: blockedGuide,
+      advice: blockedAdvice,
+      riskGate: blockedGate,
+      recommendedTemplate: template,
+    });
+
+    assert.equal(scaleGuide.items[0]?.label, "执行扩展");
+    assert.equal(scaleAdvice.label, "执行扩展");
+    assert.equal(scaleGate.level, "pass");
+    assert.equal(scaleHandoff.label, "执行扩展交接");
+    assert.ok(scaleHandoff.firstDayActions.some((action) => action.includes("小样本扩展")));
+    assert.ok(scaleHandoff.avoidRules.some((rule) => rule.includes("不直接批量")));
+
+    assert.equal(watchGuide.items[0]?.label, "执行观察");
+    assert.equal(watchAdvice.label, "执行观察");
+    assert.equal(watchGate.level, "watch");
+    assert.equal(watchHandoff.label, "执行观察交接");
+    assert.ok(watchAdvice.verificationMove.includes("补追读"));
+
+    assert.equal(blockedGuide.items[0]?.label, "执行避坑");
+    assert.equal(blockedAdvice.label, "执行避坑");
+    assert.equal(blockedGate.level, "blocked");
+    assert.equal(blockedGate.requiresConfirmation, true);
+    assert.equal(blockedHandoff.label, "执行避坑交接");
+    assert.ok(blockedHandoff.avoidRules.some((rule) => rule.includes("不要复用首日未过线")));
+  });
+
   await t.test("builds a creation-page digest from reusable handoff evidence", () => {
     const platform = getPlatformProfile("fanqie");
     const template = getDefaultTemplateForPlatform(platform.id);

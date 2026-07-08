@@ -4569,6 +4569,93 @@ test("buildGateActionReceipt", async (t) => {
     assert.ok(fanqieMarkdown.includes("闭环进度：3/3 段交接完成"));
   });
 
+  await t.test("feeds completed first-day AI execution closeouts into reusable platform tactic experience", () => {
+    function executionTask(input: {
+      suffix: "first-draft" | "first-review" | "first-rewrite";
+      title: string;
+      completionEvidence: string;
+      completedAt: string;
+    }) {
+      return {
+        id: `first-day:project-1:${input.suffix}`,
+        databaseId: `dispatch-db-first-day-${input.suffix}`,
+        dispatchKey: `first-day:project-1:${input.suffix}`,
+        projectId: "project-1",
+        sourceReceiptId: null,
+        platformId: "fanqie",
+        platformName: "番茄小说",
+        stage: "start_first_three_review" as const,
+        state: "completed" as const,
+        priorityScore: 88,
+        ownerRole: "AI 写作主编",
+        title: input.title,
+        detail: "执行首日第一章生成、审稿和二改闭环。",
+        dueLabel: "今天",
+        actionLabel: "查看首日执行",
+        href: "/dispatch?firstDayProject=project-1#first-day-dispatch",
+        acceptanceCriteria: [
+          "首日闭环证据必须包含执行节点、写回章节、当前字数、执行模型和复检结论。",
+          "生成-审稿-二改三段必须全部完成后，才允许进入平台经验库。",
+        ],
+        evidence: [
+          "知识来源：番茄小说 首章强钩子",
+          "平台反哺：首日先跑第一章小样本",
+        ],
+        completionEvidence: input.completionEvidence,
+        reviewLatestAt: input.completedAt,
+        assignedAt: "2026-01-01T00:00:00.000Z",
+        completedAt: input.completedAt,
+        createdAt: "2026-01-01T00:00:00.000Z",
+        updatedAt: input.completedAt,
+      };
+    }
+
+    const timeline = buildGatePlatformDecisionTimeline({
+      receipts: [],
+      tasks: [
+        executionTask({
+          suffix: "first-draft",
+          title: "番茄小说 第一章初稿",
+          completionEvidence: "第一章正文已生成。首日闭环证据：执行节点：第一章初稿；写回章节：第一章 雨夜系统；当前字数：1320；执行模型：DeepSeek；初稿质检：86。",
+          completedAt: "2026-01-01T01:00:00.000Z",
+        }),
+        executionTask({
+          suffix: "first-review",
+          title: "番茄小说 第一章审稿",
+          completionEvidence: "第一章审稿完成。首日闭环证据：执行节点：第一章审稿；审稿章节：第一章 雨夜系统；审稿评分：72；问题数量：2；执行模型：Kimi。",
+          completedAt: "2026-01-01T02:00:00.000Z",
+        }),
+        executionTask({
+          suffix: "first-rewrite",
+          title: "番茄小说 第一章二改",
+          completionEvidence: "第一章二改完成。首日闭环证据：执行节点：第一章二改；写回章节：第一章 雨夜系统；当前字数：1480；执行模型：Claude；二改复检：90。",
+          completedAt: "2026-01-01T03:00:00.000Z",
+        }),
+      ],
+      limit: 10,
+    });
+    const fanqieTimeline = timeline.items.find((item) => item.platformId === "fanqie");
+    const tacticLibrary = buildGatePlatformTacticExperienceLibrary(timeline, 10);
+    const fanqieExperience = tacticLibrary.items.find((item) => item.platformId === "fanqie");
+    const fanqieMarkdown = buildGatePlatformTacticExperienceMarkdown(fanqieExperience!);
+
+    assert.equal(fanqieTimeline?.label, "首日执行闭环");
+    assert.equal(fanqieTimeline?.events[0].label, "首日执行完成");
+    assert.equal(fanqieExperience?.status, "watch");
+    assert.equal(fanqieExperience?.sourceLabel, "首日执行闭环");
+    assert.equal(fanqieExperience?.tactic, "首日执行闭环打法");
+    assert.ok(fanqieExperience?.lesson.includes("初稿、审稿、二改"));
+    assert.ok(fanqieExperience?.reuseHint.includes("生成-审稿-二改"));
+    assert.ok(fanqieExperience?.risk.includes("不证明平台放量有效"));
+    assert.ok(fanqieExperience?.evidence.some((line) => line.includes("初稿质检：86")));
+    assert.ok(fanqieExperience?.evidence.some((line) => line.includes("审稿评分：72")));
+    assert.ok(fanqieExperience?.evidence.some((line) => line.includes("二改复检：90")));
+    assert.ok(fanqieExperience?.evidence.some((line) => line.includes("执行模型：DeepSeek")));
+    assert.ok(fanqieExperience?.evidence.some((line) => line.includes("执行模型：Kimi")));
+    assert.ok(fanqieExperience?.evidence.some((line) => line.includes("执行模型：Claude")));
+    assert.ok(fanqieMarkdown.includes("首日执行闭环：3/3"));
+  });
+
   await t.test("classifies recovery scale first-day handoff conclusions in tactic experience", () => {
     function recoveryHandoffTask(input: {
       projectId: string;

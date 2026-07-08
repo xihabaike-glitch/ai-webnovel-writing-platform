@@ -3410,6 +3410,10 @@ function isFirstDayHandoffDispatchTask(task: Pick<PersistedGatePlatformDispatchT
   return task.dispatchKey.startsWith("first-day-handoff:");
 }
 
+function isFirstDayExecutionDispatchTask(task: Pick<PersistedGatePlatformDispatchTask, "dispatchKey">) {
+  return /^first-day:[^:]+:(first-draft|first-review|first-rewrite)$/u.test(task.dispatchKey);
+}
+
 function firstDayHandoffStageFromDispatchKey(dispatchKey: string) {
   const stage = dispatchKey.split(":").at(-1);
   if (stage === "opening" || stage === "verification" || stage === "platform-package") return stage;
@@ -3422,6 +3426,20 @@ function firstDayHandoffStageLabel(dispatchKey: string) {
   if (stage === "verification") return "验收口径交接";
   if (stage === "platform-package") return "平台包装回收";
   return "经验开书交接";
+}
+
+function firstDayExecutionStageFromDispatchKey(dispatchKey: string) {
+  const stage = dispatchKey.split(":").at(-1);
+  if (stage === "first-draft" || stage === "first-review" || stage === "first-rewrite") return stage;
+  return "execution";
+}
+
+function firstDayExecutionStageLabel(dispatchKey: string) {
+  const stage = firstDayExecutionStageFromDispatchKey(dispatchKey);
+  if (stage === "first-draft") return "第一章初稿";
+  if (stage === "first-review") return "第一章审稿";
+  if (stage === "first-rewrite") return "第一章二改";
+  return "首日执行";
 }
 
 export function buildGatePlatformDispatchReceipt(input: {
@@ -7219,12 +7237,16 @@ export function buildGatePlatformDecisionTimeline(input: {
     const isRetreatRepair = isRetreatDispatchStage(task.stage);
     const isRetreatRecheck = isRetreatRecheckDispatchTask(task);
     const isFirstDayHandoff = isFirstDayHandoffDispatchTask(task);
+    const isFirstDayExecution = isFirstDayExecutionDispatchTask(task);
     const recheckReviewType = isRecheckReview ? recheckReviewTypeFromDispatchKey(task.dispatchKey) : null;
     const completedAt = task.completedAt ?? task.updatedAt;
     const handoffStageLabel = firstDayHandoffStageLabel(task.dispatchKey);
+    const executionStageLabel = firstDayExecutionStageLabel(task.dispatchKey);
     const eventEvidence = Array.from(new Set([
       ...(isFirstDayHandoff ? [`新书开局闭环：${handoffStageLabel}`] : []),
       ...(isFirstDayHandoff && task.state === "completed" && task.completionEvidence.trim() ? [`交接完成证据：${task.completionEvidence.trim()}`] : []),
+      ...(isFirstDayExecution ? [`首日执行闭环：${executionStageLabel}`] : []),
+      ...(isFirstDayExecution && task.state === "completed" && task.completionEvidence.trim() ? [`首日执行完成证据：${task.completionEvidence.trim()}`] : []),
       ...(recheckReviewType ? [`复盘类型：${recheckReviewTypeLabel(recheckReviewType)}`] : []),
       ...(isRecheckReview && task.state === "completed" && task.completionEvidence.trim() ? [`复盘结论：${task.completionEvidence.trim()}`] : []),
       ...task.evidence,
@@ -7234,16 +7256,18 @@ export function buildGatePlatformDecisionTimeline(input: {
       id: `task:${task.dispatchKey}`,
       type: isRecheckReview || isRetreatRecheck ? "recheck" : isRetreatRepair ? "repair" : "dispatch",
       label: task.state === "completed"
-        ? isFirstDayHandoff ? "开书交接闭环" : isRecheckReview ? "复盘完成" : isRetreatRecheck ? "重验完成" : isRetreatRepair ? "修复完成" : "派单完成"
-        : isFirstDayHandoff ? "开书交接派单" : isRecheckReview ? "复盘派单" : isRetreatRecheck ? "重验派单" : isRetreatRepair ? "修复派单" : "平台派单",
+        ? isFirstDayHandoff ? "开书交接闭环" : isFirstDayExecution ? "首日执行完成" : isRecheckReview ? "复盘完成" : isRetreatRecheck ? "重验完成" : isRetreatRepair ? "修复完成" : "派单完成"
+        : isFirstDayHandoff ? "开书交接派单" : isFirstDayExecution ? "首日执行派单" : isRecheckReview ? "复盘派单" : isRetreatRecheck ? "重验派单" : isRetreatRepair ? "修复派单" : "平台派单",
       detail: task.state === "completed" && task.completionEvidence.trim()
         ? isFirstDayHandoff
           ? `已用于新书开局并闭环：${task.completionEvidence.trim()}`
+          : isFirstDayExecution
+            ? `首日执行已闭环：${task.completionEvidence.trim()}`
           : task.completionEvidence.trim()
         : `${task.ownerRole} · ${task.title}`,
-      href: isFirstDayHandoff ? task.href : task.state === "completed" ? "/dispatch" : task.href,
+      href: isFirstDayHandoff || isFirstDayExecution ? task.href : task.state === "completed" ? "/dispatch" : task.href,
       createdAt: task.state === "completed" ? completedAt : task.updatedAt,
-      evidence: eventEvidence.slice(0, isFirstDayHandoff ? 8 : 4),
+      evidence: eventEvidence.slice(0, isFirstDayHandoff || isFirstDayExecution ? 8 : 4),
     });
   }
 
@@ -7320,6 +7344,7 @@ export function buildGatePlatformDecisionTimeline(input: {
     const completedRecheckReviewEvent = sortedEvents.find((event) => event.id.startsWith("task:recheck-review:") && event.label === "复盘完成");
     const completedRecheckReviewType = completedRecheckReviewEvent ? recheckReviewTypeFromDispatchKey(completedRecheckReviewEvent.id.replace(/^task:/, "")) : null;
     const completedFirstDayHandoff = completedFirstDayHandoffFromTimeline(sortedEvents);
+    const completedFirstDayExecution = completedFirstDayExecutionFromTimeline(sortedEvents);
     let status: GatePlatformDecisionTimelineStatus = "healthy";
     let label = "健康观察";
     let detail = `${platform.platformName} 当前没有撤退修复债，继续按总闸门节奏观察。`;
@@ -7362,6 +7387,12 @@ export function buildGatePlatformDecisionTimeline(input: {
       detail = `${platform.platformName} 的平台经验已经完成开头打法、验收口径和平台包装交接，可作为下一本开书的首轮打法样本。`;
       actionLabel = "查看交接证据";
       href = completedFirstDayHandoff.latestEvent.href;
+    } else if (completedFirstDayExecution?.allStagesCompleted) {
+      status = "healthy";
+      label = "首日执行闭环";
+      detail = `${platform.platformName} 已完成第一章初稿、审稿、二改三段 AI 执行闭环，可作为后续开书的生产链路样本。`;
+      actionLabel = "查看首日执行";
+      href = completedFirstDayExecution.latestEvent.href;
     }
 
     return {
@@ -7570,6 +7601,26 @@ function completedFirstDayHandoffFromTimeline(events: GatePlatformDecisionTimeli
   };
 }
 
+function completedFirstDayExecutionFromTimeline(events: GatePlatformDecisionTimelineEvent[]) {
+  const executionEvents = events
+    .filter((event) => event.id.startsWith("task:first-day:") && event.label === "首日执行完成")
+    .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime());
+  if (executionEvents.length === 0) return null;
+
+  const completedStages = new Set(executionEvents.map((event) => firstDayExecutionStageFromDispatchKey(event.id.replace(/^task:/, ""))));
+  const allStagesCompleted = ["first-draft", "first-review", "first-rewrite"].every((stage) => completedStages.has(stage as ReturnType<typeof firstDayExecutionStageFromDispatchKey>));
+  const allEvidence = Array.from(new Set(executionEvents.flatMap((event) => event.evidence)));
+  const evidence = firstDayExecutionReusableEvidence(allEvidence);
+
+  return {
+    latestEvent: executionEvents[0],
+    completedStages,
+    completedCount: completedStages.size,
+    allStagesCompleted,
+    evidence,
+  };
+}
+
 function firstDayHandoffReusableEvidence(evidence: string[]) {
   const knowledgeSource = evidence.find((line) => /知识来源/u.test(line));
   const platformFeedback = evidence.find((line) => /平台反哺/u.test(line))
@@ -7584,6 +7635,31 @@ function firstDayHandoffReusableEvidence(evidence: string[]) {
     avoid,
     ...fallback,
   ].filter((line): line is string => Boolean(line)))).slice(0, 6);
+}
+
+function firstDayExecutionReusableEvidence(evidence: string[]) {
+  const closureLines = evidence.filter((line) => /首日闭环证据|执行节点|初稿质检|审稿评分|二改复检|执行模型/u.test(line));
+  const closureSegments = closureLines.flatMap((line) => {
+    const source = line.includes("首日闭环证据") ? line.replace(/^.*?首日闭环证据[:：]\s*/u, "") : line;
+    return source
+      .split(/[；;\n]/u)
+      .map((segment) => markdownLine(segment.replace(/[。.]$/u, "")))
+      .filter((segment) => /执行节点|写回章节|审稿章节|当前字数|执行模型|初稿质检|审稿评分|问题数量|二改复检/u.test(segment));
+  });
+  const qualitySignals = closureSegments.filter((line) => /初稿质检|审稿评分|二改复检/u.test(line));
+  const modelSignals = closureSegments.filter((line) => /执行模型/u.test(line));
+  const nodeSignals = closureSegments.filter((line) => /执行节点/u.test(line));
+  const contextSignals = closureSegments.filter((line) => ![...qualitySignals, ...modelSignals, ...nodeSignals].includes(line));
+  const knowledgeSource = evidence.find((line) => /知识来源/u.test(line));
+  const platformFeedback = evidence.find((line) => /平台反哺/u.test(line));
+  return Array.from(new Set([
+    ...qualitySignals,
+    ...modelSignals,
+    ...nodeSignals,
+    ...contextSignals,
+    knowledgeSource,
+    platformFeedback,
+  ].filter((line): line is string => Boolean(line)))).slice(0, 12);
 }
 
 function structuredRecoveryFollowupEvidence(detail: string) {
@@ -7658,6 +7734,7 @@ export function buildGatePlatformTacticExperienceLibrary(
     const finalEvent = item.events.find((event) => event.type === "final") ?? null;
     const completedRecheckReview = completedRecheckReviewFromTimeline(item);
     const completedFirstDayHandoff = completedFirstDayHandoffFromTimeline(item.events);
+    const completedFirstDayExecution = completedFirstDayExecutionFromTimeline(item.events);
     const completedRecoveryFollowup = completedRecoveryFollowupFromTimeline(item.events);
     const completedAiPipelineRecovery = completedAiPipelineRecoveryFromTimeline(item.events);
     const evidenceLoopRecheck = evidenceLoopRecheckFromTimeline(item);
@@ -7788,6 +7865,25 @@ export function buildGatePlatformTacticExperienceLibrary(
           ...completedRecoveryFollowup.evidence,
           ...base.evidence,
         ].slice(0, 5),
+      };
+    }
+
+    if (completedFirstDayExecution?.allStagesCompleted) {
+      return {
+        ...base,
+        status: "watch",
+        label: "观察样本",
+        tactic: "首日执行闭环打法",
+        lesson: `${item.platformName} 已完成第一章初稿、审稿、二改三段首日 AI 执行闭环，说明生成、质检和二改链路已经跑通。`,
+        reuseHint: "同类新项目可复用生成-审稿-二改顺序、模型路线和完成证据格式，但首轮仍要回填平台曝光、点击、收藏和追读。",
+        risk: "首日执行闭环只证明生产链路跑通，不证明平台放量有效；缺曝光、点击、收藏、追读前不要写成稳定打法。",
+        sourceLabel: "首日执行闭环",
+        href: completedFirstDayExecution.latestEvent.href,
+        evidence: [
+          `首日执行闭环：${completedFirstDayExecution.completedCount}/3`,
+          ...completedFirstDayExecution.evidence,
+          ...base.evidence,
+        ].slice(0, 12),
       };
     }
 

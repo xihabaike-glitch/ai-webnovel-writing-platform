@@ -1746,9 +1746,14 @@ test("buildProjectStartTacticAdvice", async (t) => {
         recommendedPlatformName: "番茄小说",
         recommendedTemplateId: template.id,
         shouldSwitchTemplate: false,
-        firstDayActions: ["开头：第一段给不可逆危机。"],
+        firstDayActions: ["闭环复用：沿用已完成的新书开局三段交接。"],
         avoidRules: ["不要直接放量，先做小样本。"],
-        evidence: ["最终判定：稳定加码。"],
+        evidence: [
+          "知识来源：番茄小说 正反馈经验已沉淀",
+          "平台反哺：执行正反馈链",
+          "交接动作已落地：开头：第一段给不可逆危机。",
+          "避坑边界已确认：不要直接放量，先做小样本。",
+        ],
       },
       modelRoutes: [{
         taskLabel: "正文初稿",
@@ -1769,10 +1774,13 @@ test("buildProjectStartTacticAdvice", async (t) => {
     ]);
     assert.ok(entries.every((entry) => entry.type === "platform_soil"));
     assert.ok(entries.find((entry) => entry.title.startsWith("开局钩子"))?.content.includes("首屏承诺"));
+    assert.ok(entries.find((entry) => entry.title.startsWith("开局钩子"))?.content.includes("知识来源：番茄小说"));
+    assert.ok(entries.find((entry) => entry.title.startsWith("开局钩子"))?.content.includes("第一段给不可逆危机"));
     assert.ok(entries.find((entry) => entry.title.startsWith("前三章"))?.content.includes(template.firstThree[0].cliffhanger));
     assert.ok(entries.find((entry) => entry.title.startsWith("人物弧光"))?.content.includes(template.protagonist.arcEnd));
     assert.ok(entries.find((entry) => entry.title.startsWith("大树结构"))?.content.includes("开头"));
     assert.ok(entries.find((entry) => entry.title.startsWith("平台避坑"))?.content.includes("不要直接放量"));
+    assert.ok(entries.find((entry) => entry.title.startsWith("平台避坑"))?.content.includes("平台反哺：执行正反馈链"));
     assert.ok(entries.find((entry) => entry.title.startsWith("模型分工"))?.content.includes("DeepSeek"));
   });
 });

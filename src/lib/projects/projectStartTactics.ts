@@ -1437,13 +1437,20 @@ function labeledList(items: Array<string | null | undefined>, fallback: string) 
   return (lines.length ? lines : [fallback]).map((line) => `- ${trimLine(line)}`).join("\n");
 }
 
-function platformOpeningAsset(advice: ProjectStartTacticAdvice, platform: PlatformProfile, style: PlatformWritingStyleTemplate): ProjectStartSoilWorldEntry {
+function platformOpeningAsset(
+  advice: ProjectStartTacticAdvice,
+  platform: PlatformProfile,
+  style: PlatformWritingStyleTemplate,
+  digest?: ProjectStartExperienceDigest | null,
+): ProjectStartSoilWorldEntry {
   return {
     type: "platform_soil",
     title: `开局钩子土壤：${platform.name}`,
     content: [
       `平台：${platform.name}`,
       `首屏承诺：${style.firstScreen}`,
+      digest ? `经验来源：${digest.evidence.join("；")}` : null,
+      digest ? `经验动作：${digest.copyActions.join("；")}` : null,
       `开头动作：${trimLine(advice.openingMove)}`,
       `读者问题：主角为什么现在非行动不可，退一步会失去什么。`,
       `钩子素材：`,
@@ -1453,7 +1460,7 @@ function platformOpeningAsset(advice: ProjectStartTacticAdvice, platform: Platfo
         ...platform.openingRules,
       ], "第一屏给出危机、选择和继续读的理由。"),
       `验收口径：首段有不可逆变化，章末有明确追读问题。`,
-    ].join("\n"),
+    ].filter((line): line is string => Boolean(line)).join("\n"),
   };
 }
 
@@ -1571,8 +1578,16 @@ export function buildProjectStartSoilWorldEntries(input: {
   handoff?: ProjectStartExperienceHandoff | null;
   modelRoutes?: ProjectStartModelRouteExperience[];
 }): ProjectStartSoilWorldEntry[] {
+  const digest = input.handoff
+    ? buildProjectStartExperienceDigest({
+      platformName: input.platform.name,
+      handoff: input.handoff,
+      advice: input.advice,
+    })
+    : null;
+
   return [
-    platformOpeningAsset(input.advice, input.platform, input.style),
+    platformOpeningAsset(input.advice, input.platform, input.style, digest),
     firstThreeAsset(input.advice, input.platform, input.template, input.style),
     characterArcAsset(input.platform, input.template),
     treeStructureAsset(input.advice, input.platform, input.template),

@@ -102,6 +102,36 @@ test("buildBatchExecutionSafety", async (t) => {
     assert.equal(recoveryGate?.actionHref, "/gate#ai-pipeline-recovery");
   });
 
+  await t.test("blocks recommended batches when writing task archive experience receipts are missing", () => {
+    const safety = buildBatchExecutionSafety([baseItem], [
+      {
+        aiTasks: [
+          {
+            status: "succeeded",
+            taskType: "chapter_review",
+            inputSnapshot: JSON.stringify({ prompt: { userPrompt: "普通审稿提示词，没有归档经验。" } }),
+            inputTokens: 1000,
+            outputTokens: 500,
+            costUsd: 0.01,
+          },
+        ],
+      },
+    ]);
+
+    assert.equal(safety.recommendedBatchSize, 1);
+    assert.equal(safety.canRunRecommendedBatch, false);
+    const archiveGate = safety.items.find((item) => item.id === "archive-experience");
+    assert.equal(archiveGate?.status, "block");
+    assert.equal(archiveGate?.label, "归档经验回执");
+    assert.ok(archiveGate?.detail.includes("缺归档经验回执"));
+    assert.ok(archiveGate?.detail.includes("不进入推荐批量"));
+    assert.equal(archiveGate?.actionLabel, "回任务运行台");
+    assert.equal(archiveGate?.actionHref, "/tasks#task-run-console");
+    const blocker = buildBatchSafetyPriorityBlocker(safety);
+    assert.equal(blocker?.id, "archive-experience");
+    assert.equal(blocker?.actionHref, "/tasks#task-run-console");
+  });
+
   await t.test("blocks recommended batches until first-day gate debt is cleared", () => {
     const safety = buildBatchExecutionSafety([
       {

@@ -227,7 +227,7 @@ function archiveExperienceEvidence(promptText: string) {
   return evidence;
 }
 
-function buildArchiveExperienceReceipt(task: TaskRunInput): TaskArchiveExperienceReceipt {
+export function buildTaskArchiveExperienceReceipt(task: Pick<TaskRunInput, "taskType" | "inputSnapshot">): TaskArchiveExperienceReceipt {
   if (!archiveExperienceTaskTypes.has(task.taskType)) {
     return {
       status: "not_applicable",
@@ -321,7 +321,7 @@ function buildLog(task: TaskRunInput): TaskRunLog {
     costUsd: money(task.costUsd ?? 0),
     errorMessage: task.status === "failed" ? compact(task.errorMessage) : null,
     href: chapterHref(task),
-    archiveExperienceReceipt: buildArchiveExperienceReceipt(task),
+    archiveExperienceReceipt: buildTaskArchiveExperienceReceipt(task),
   };
 }
 

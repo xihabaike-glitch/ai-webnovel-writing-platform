@@ -1,9 +1,12 @@
 import type { QueueItem } from "./taskQueueCenter.ts";
 import { defaultBatchExecutionStrategy, type BatchExecutionStrategy } from "./batchExecutionStrategy.ts";
+import { buildTaskArchiveExperienceReceipt } from "../ai/taskRunConsole.ts";
 
 export interface SafetyTaskProject {
   aiTasks: Array<{
+    taskType?: string | null;
     status: string;
+    inputSnapshot?: string | null;
     inputTokens: number | null;
     outputTokens: number | null;
     costUsd: number | null;
@@ -108,6 +111,7 @@ function isOpenAiPipelineRecoveryFollowup(item: QueueItem) {
 
 const priorityBlockerOrder = [
   "ai-pipeline-recovery",
+  "archive-experience",
   "first-day-gate",
   "risk-recovery",
   "role-closure",
@@ -165,6 +169,19 @@ function isOpenPublishRepair(item: QueueItem) {
 
 function isOpenExportVersion(item: QueueItem) {
   return item.blockerType === "export_version";
+}
+
+function missingArchiveExperienceReceipts(projects: SafetyTaskProject[]) {
+  return projects
+    .flatMap((project) => project.aiTasks)
+    .filter((task) => {
+      if (!task.taskType) return false;
+      const receipt = buildTaskArchiveExperienceReceipt({
+        taskType: task.taskType,
+        inputSnapshot: task.inputSnapshot ?? "",
+      });
+      return receipt.status === "missing";
+    });
 }
 
 export function buildFailureRepairResumeRecommendation(input: {
@@ -250,6 +267,7 @@ export function buildBatchExecutionSafety(
   const publishRepairCount = publishRepairItems.length;
   const exportVersionItems = queueItems.filter(isOpenExportVersion);
   const exportVersionCount = exportVersionItems.length;
+  const missingArchiveExperienceCount = missingArchiveExperienceReceipts(projects).length;
   const candidateCount = queueItems.filter((item) => item.category === "candidate").length;
   const firstCandidate = queueItems.find((item) => item.category === "candidate") ?? null;
   const aiPipelineRecoveryFollowupCount = queueItems.filter(isOpenAiPipelineRecoveryFollowup).length;
@@ -297,6 +315,18 @@ export function buildBatchExecutionSafety(
       aiPipelineRecoveryFollowupCount === 0 ? undefined : {
         actionLabel: "回恢复闸门",
         actionHref: "/gate#ai-pipeline-recovery",
+      },
+    ),
+    safetyItem(
+      "archive-experience",
+      "归档经验回执",
+      missingArchiveExperienceCount === 0 ? "pass" : "block",
+      missingArchiveExperienceCount === 0
+        ? "写稿、审稿、二改任务均未发现缺归档经验回执。"
+        : `${missingArchiveExperienceCount} 个写审改任务缺归档经验回执；先回任务运行台核对「最终交付归档强制执行」，不进入推荐批量。`,
+      missingArchiveExperienceCount === 0 ? undefined : {
+        actionLabel: "回任务运行台",
+        actionHref: "/tasks#task-run-console",
       },
     ),
     safetyItem(

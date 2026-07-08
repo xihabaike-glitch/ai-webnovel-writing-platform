@@ -1908,6 +1908,7 @@ function buildReleaseAction(
 
   const nextAction = status === "blocked"
     ? priorityActions.find((item) => item.id === "model-roles")
+      ?? priorityActions.find((item) => item.id === "archive-experience")
       ?? priorityActions.find((item) => item.id.startsWith("export-version:"))
       ?? priorityActions.find((item) => item.id.startsWith("final-delivery:"))
       ?? priorityActions.find((item) => item.id === "queue:next")
@@ -1981,6 +1982,7 @@ function buildRealPipelineFinalReview(input: {
   acceptanceBlockers: PrePublishGateProjectStatus[];
   acceptanceWarnings: PrePublishGateProjectStatus[];
   finalDeliveryBlockers: PrePublishGateProjectStatus[];
+  archiveExperienceBlocker?: { detail: string; actionLabel?: string; actionHref?: string } | null;
   failureRepairBatch: FailureRepairBatch;
 }): PrePublishGateRealPipelineFinalReview {
   const acceptedProjects = input.projectStatuses.filter((project) => project.acceptanceSheetGate.status === "pass");
@@ -1998,6 +2000,7 @@ function buildRealPipelineFinalReview(input: {
   ].filter((item): item is string => Boolean(item));
   const holdBatchSignals = [
     input.modelRoleBlocker?.tone === "blocked" ? `模型岗位缺岗：${input.modelRoleBlocker.detail}` : null,
+    input.archiveExperienceBlocker ? `归档经验回执缺口：${input.archiveExperienceBlocker.detail}` : null,
     input.failedTasks > 0 ? `失败恢复未清：${input.failedTasks} 个失败任务未恢复。` : null,
     ...input.acceptanceWarnings.slice(0, 3).map((project) => `总闸门待复检：${project.projectTitle} · ${project.acceptanceSheetGate.label}。`),
     input.status === "needs_repair" && repairSignals.length === 0 ? "仍有提醒项未处理，批量前先停在总闸门复检。" : null,
@@ -2019,6 +2022,8 @@ function buildRealPipelineFinalReview(input: {
     : { label: "回作品流水线修复", href: "/projects#pipeline-projects" };
   const holdAction = input.modelRoleBlocker?.tone === "blocked"
     ? { label: input.modelRoleBlocker.actionLabel, href: input.modelRoleBlocker.actionHref }
+    : input.archiveExperienceBlocker
+      ? { label: input.archiveExperienceBlocker.actionLabel ?? "回任务运行台", href: input.archiveExperienceBlocker.actionHref ?? "/tasks#task-run-console" }
     : input.failedTasks > 0
       ? { label: input.failureRepairBatch.primaryActionLabel, href: input.failureRepairBatch.primaryActionHref }
       : input.acceptanceWarnings[0]
@@ -2080,6 +2085,7 @@ function buildFinalDeliveryRelease(input: {
     0,
   );
   const firstBlocker = input.finalDeliveryBlockers[0] ?? null;
+  const archiveExperienceHold = input.finalReview.holdBatchSignals.find((line) => line.includes("归档经验")) ?? null;
   const status: PrePublishGateFinalDeliveryRelease["status"] = input.finalDeliveryCandidates.length === 0
     ? "empty"
     : input.gateStatus === "ready" && input.finalReview.outcome === "pass" && input.finalDeliveryBlockers.length === 0
@@ -2100,9 +2106,11 @@ function buildFinalDeliveryRelease(input: {
       ? "可以交付。6 项最终交付回执、真实流水线终检和总闸门状态已经对齐。"
       : firstBlocker
         ? `不能交付。先处理 ${firstBlocker.projectTitle}：${firstBlocker.finalDeliveryGate.detail}`
+        : archiveExperienceHold
+          ? `不能交付。${archiveExperienceHold} 先回任务运行台补齐「最终交付归档强制执行」证据。`
         : "不能交付。先让至少一个项目通过发布包、项目验收单和最终交付回执。",
-    actionLabel: status === "ready" ? "正式放行交付包" : firstBlocker?.finalDeliveryGate.actionLabel ?? "回作品流水线补证据",
-    actionHref: status === "ready" ? "#pipeline-final-review" : firstBlocker?.finalDeliveryGate.href ?? "/projects#pipeline-projects",
+    actionLabel: status === "ready" ? "正式放行交付包" : firstBlocker?.finalDeliveryGate.actionLabel ?? input.finalReview.primaryActionLabel,
+    actionHref: status === "ready" ? "#pipeline-final-review" : firstBlocker?.finalDeliveryGate.href ?? input.finalReview.primaryActionHref,
     projectCount: input.finalDeliveryCandidates.length,
     completedReceiptCount,
     evidence: [
@@ -2878,7 +2886,9 @@ export function buildPrePublishGate(input: PrePublishGateInput): PrePublishGate 
   ));
   const safetyProjects = projects.map((project) => ({
     aiTasks: project.aiTasks.map((task) => ({
+      taskType: task.taskType,
       status: task.status,
+      inputSnapshot: task.inputSnapshot ?? null,
       inputTokens: task.inputTokens ?? null,
       outputTokens: task.outputTokens ?? null,
       costUsd: task.costUsd ?? null,
@@ -2897,6 +2907,7 @@ export function buildPrePublishGate(input: PrePublishGateInput): PrePublishGate 
   const exportVersionWarnings = projectStatuses.filter((project) => project.exportVersionGate.status === "warn");
   const acceptanceBlockers = projectStatuses.filter((project) => project.acceptanceSheetGate.status === "block");
   const acceptanceWarnings = projectStatuses.filter((project) => project.acceptanceSheetGate.status === "warn");
+  const archiveExperienceBlocker = safety.items.find((item) => item.id === "archive-experience" && item.status === "block") ?? null;
   const finalDeliveryCandidates = projectStatuses.filter((project) => project.status === "ready");
   const finalDeliveryBlockers = finalDeliveryCandidates.filter((project) => project.finalDeliveryGate.status === "block");
   const gateBlockingQueueItems = queue.items.filter((item) => {
@@ -2948,6 +2959,14 @@ export function buildPrePublishGate(input: PrePublishGateInput): PrePublishGate 
           : "单本作品验收单没有发现阻塞。",
       actionLabel: acceptanceBlockers[0]?.acceptanceSheetGate.actionLabel ?? acceptanceWarnings[0]?.acceptanceSheetGate.actionLabel ?? "查看作品验收",
       href: acceptanceBlockers[0]?.acceptanceSheetGate.href ?? acceptanceWarnings[0]?.acceptanceSheetGate.href ?? "/projects#pipeline-projects",
+    }),
+    gateItem({
+      id: "archive-experience",
+      label: "归档经验回执",
+      status: archiveExperienceBlocker ? "block" : "pass",
+      detail: archiveExperienceBlocker?.detail ?? "写稿、审稿、二改任务均未发现缺归档经验回执。",
+      actionLabel: archiveExperienceBlocker?.actionLabel ?? "查看任务运行台",
+      href: archiveExperienceBlocker?.actionHref ?? "/tasks#task-run-console",
     }),
     gateItem({
       id: "task-queue",
@@ -3045,6 +3064,15 @@ export function buildPrePublishGate(input: PrePublishGateInput): PrePublishGate 
         input.modelRoleBlocker.tone === "blocked" ? "repair" : "review",
       )
       : null,
+    archiveExperienceBlocker
+      ? action(
+        "archive-experience",
+        archiveExperienceBlocker.actionLabel ?? "回任务运行台",
+        archiveExperienceBlocker.detail,
+        archiveExperienceBlocker.actionHref ?? "/tasks#task-run-console",
+        "repair",
+      )
+      : null,
     ...acceptanceBlockers.map((project) => action(
       `project-acceptance:${project.projectId}`,
       project.acceptanceSheetGate.actionLabel,
@@ -3133,6 +3161,7 @@ export function buildPrePublishGate(input: PrePublishGateInput): PrePublishGate 
     acceptanceBlockers,
     acceptanceWarnings,
     finalDeliveryBlockers,
+    archiveExperienceBlocker,
     failureRepairBatch,
   });
   const finalDeliveryRelease = buildFinalDeliveryRelease({

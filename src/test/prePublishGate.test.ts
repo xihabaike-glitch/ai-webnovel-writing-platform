@@ -16,6 +16,20 @@ const finalChapters = [1, 2, 3].map((order) => ({
   status: "final",
 }));
 
+function archiveExperienceInputSnapshot(taskLabel: string) {
+  return JSON.stringify({
+    prompt: {
+      userPrompt: [
+        "最终交付归档强制执行：",
+        "- 不允许忽略开书经验；这条经验来自上一轮交付归档。",
+        `- 复制动作：${taskLabel} 必须保留第一段倒计时和三章内爽点兑现。`,
+        "- 踩到不能踩边界时必须退回修正：不要直接放量。",
+        "- 必须执行：开头动作写进正文或审稿判断。",
+      ].join("\n"),
+    },
+  });
+}
+
 const passedReviews = finalChapters.map((chapter, index) => ({
   id: `review-${chapter.id}`,
   chapterId: chapter.id,
@@ -24,6 +38,7 @@ const passedReviews = finalChapters.map((chapter, index) => ({
   outputText: JSON.stringify({ score: 92 - index, shouldSecondPass: false }),
   errorMessage: null,
   createdAt: `2026-01-0${index + 1}T00:00:00.000Z`,
+  inputSnapshot: archiveExperienceInputSnapshot(`审稿 ${chapter.title}`),
   inputTokens: 1000,
   outputTokens: 500,
   costUsd: 0.01,
@@ -37,6 +52,7 @@ const passedSecondPasses = finalChapters.map((chapter, index) => ({
   outputText: JSON.stringify({ score: 94 - index, changes: ["强化钩子", "压缩解释"] }),
   errorMessage: null,
   createdAt: `2026-01-0${index + 1}T01:00:00.000Z`,
+  inputSnapshot: archiveExperienceInputSnapshot(`二改 ${chapter.title}`),
   inputTokens: 1000,
   outputTokens: 500,
   costUsd: 0.01,
@@ -274,6 +290,33 @@ test("buildPrePublishGate", async (t) => {
     assert.equal(releaseGateReturn.hash, "#gate-focus-notice");
     assert.equal(gate.realPipelineFinalReview.outcome, "repair");
     assert.ok(gate.realPipelineFinalReview.repairSignals.some((line) => line.includes("最终交付")));
+  });
+
+  await t.test("blocks formal release when writing tasks lack archive experience receipts", () => {
+    const gate = buildPrePublishGate({
+      projects: [{
+        ...readyProject,
+        aiTasks: readyProject.aiTasks.map((task) => (
+          task.taskType === "chapter_review"
+            ? { ...task, inputSnapshot: JSON.stringify({ prompt: { userPrompt: "普通审稿提示词，没有归档经验。" } }) }
+            : task
+        )),
+      }],
+      failureTasks: [],
+      batchHistory: [],
+    });
+    const archiveItem = gate.items.find((item) => item.id === "archive-experience");
+
+    assert.equal(gate.status, "blocked");
+    assert.equal(archiveItem?.status, "block");
+    assert.equal(archiveItem?.label, "归档经验回执");
+    assert.ok(archiveItem?.detail.includes("缺归档经验回执"));
+    assert.equal(archiveItem?.actionLabel, "回任务运行台");
+    assert.equal(archiveItem?.href, "/tasks#task-run-console");
+    assert.equal(gate.realPipelineFinalReview.outcome, "hold_batch");
+    assert.ok(gate.realPipelineFinalReview.holdBatchSignals.some((line) => line.includes("归档经验")));
+    assert.equal(gate.finalDeliveryRelease.status, "blocked");
+    assert.ok(gate.finalDeliveryRelease.pmVerdict.includes("归档经验"));
   });
 
   await t.test("focuses the first blocked final delivery receipt from the gate", () => {

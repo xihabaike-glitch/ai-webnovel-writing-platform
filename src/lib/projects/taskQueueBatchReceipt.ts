@@ -501,6 +501,9 @@ export function buildTaskQueueBatchGateActionReceipt(input: {
       chapterIds: input.plan.chapterIds,
       adoptionFollowupCount: input.plan.adoptionFollowupCount,
       adoptionFollowupItemIds: input.plan.adoptionFollowupItemIds,
+      scaleDecisionLabel: input.plan.scaleDecisionLabel,
+      scaleDecisionTone: input.plan.scaleDecisionTone,
+      scaleDecisionDetail: input.plan.scaleDecisionDetail,
       executionContext,
     },
     results: input.results.map((result) => ({

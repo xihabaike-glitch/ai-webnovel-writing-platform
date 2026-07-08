@@ -425,6 +425,9 @@ export interface AiPipelineRecentBatchSummary {
   hasRecent: boolean;
   status: "continue" | "repair" | "review_quality" | "watch_cost" | "empty";
   label: string;
+  scaleDecisionLabel: string;
+  scaleDecisionTone: "allow" | "watch" | "block" | "standard";
+  scaleDecisionDetail: string;
   headline: string;
   detail: string;
   actionLabel: string;
@@ -847,6 +850,49 @@ function recentBatchLabel(status: AiPipelineRecentBatchSummary["status"]) {
   return "暂无回流";
 }
 
+function recentBatchScaleDecision(
+  payload: Record<string, unknown> | null,
+  status: AiPipelineRecentBatchSummary["status"],
+): Pick<AiPipelineRecentBatchSummary, "scaleDecisionLabel" | "scaleDecisionTone" | "scaleDecisionDetail"> {
+  const plan = isRecord(payload?.plan) ? payload.plan : null;
+  const planLabel = textValue(plan?.scaleDecisionLabel);
+  const planTone = plan?.scaleDecisionTone;
+  const planDetail = textValue(plan?.scaleDecisionDetail);
+  if (planLabel && (planTone === "allow" || planTone === "watch" || planTone === "block" || planTone === "standard")) {
+    return {
+      scaleDecisionLabel: planLabel,
+      scaleDecisionTone: planTone,
+      scaleDecisionDetail: planDetail ?? "沿用任务中心推荐批次的放量边界。",
+    };
+  }
+  if (status === "repair" || status === "review_quality") {
+    return {
+      scaleDecisionLabel: "禁止放大",
+      scaleDecisionTone: "block" as const,
+      scaleDecisionDetail: "最近批次失败或质量未过线，先完成修复与复检，再回到推荐批次。",
+    };
+  }
+  if (status === "watch_cost") {
+    return {
+      scaleDecisionLabel: "继续观察",
+      scaleDecisionTone: "watch" as const,
+      scaleDecisionDetail: "最近批次成本或模型路线仍需观察，先收齐成本、质量和失败证据。",
+    };
+  }
+  if (status === "continue") {
+    return {
+      scaleDecisionLabel: "允许小步加码",
+      scaleDecisionTone: "allow" as const,
+      scaleDecisionDetail: "最近批次可以继续，但仍要保留下一批真实成功率、质量、成本和失败回执。",
+    };
+  }
+  return {
+    scaleDecisionLabel: "标准生产",
+    scaleDecisionTone: "standard" as const,
+    scaleDecisionDetail: "还没有最近批次回流，先执行推荐小批次再判断放量边界。",
+  };
+}
+
 function buildAiPipelineRecentBatchSummary(audits: ControlBatchAudit[] = []): AiPipelineRecentBatchSummary {
   const latest = audits
     .filter((audit) => audit.executionType === "recommended_batch")
@@ -857,6 +903,9 @@ function buildAiPipelineRecentBatchSummary(audits: ControlBatchAudit[] = []): Ai
       hasRecent: false,
       status: "empty",
       label: "暂无回流",
+      scaleDecisionLabel: "标准生产",
+      scaleDecisionTone: "standard",
+      scaleDecisionDetail: "还没有最近批次回流，先执行推荐小批次再判断放量边界。",
       headline: "还没有推荐批次执行结果。",
       detail: "先执行一次推荐批次，项目总控才有成功率、质量和成本证据。",
       actionLabel: "去任务中心",
@@ -885,6 +934,7 @@ function buildAiPipelineRecentBatchSummary(audits: ControlBatchAudit[] = []): Ai
   const route = isRecord(payload?.routeEffectSummary) ? payload.routeEffectSummary : null;
   const batchReceipt = isRecord(payload?.batchReceipt) ? payload.batchReceipt : null;
   const status = batchReceiptStatus(batchReceipt?.status);
+  const scaleDecision = recentBatchScaleDecision(payload, status);
   const warnings = stringArray(batchReceipt?.warnings);
   const headline = typeof batchReceipt?.headline === "string" && batchReceipt.headline
     ? batchReceipt.headline
@@ -911,6 +961,7 @@ function buildAiPipelineRecentBatchSummary(audits: ControlBatchAudit[] = []): Ai
     hasRecent: true,
     status,
     label: recentBatchLabel(status),
+    ...scaleDecision,
     headline,
     detail,
     actionLabel: primaryLabel,

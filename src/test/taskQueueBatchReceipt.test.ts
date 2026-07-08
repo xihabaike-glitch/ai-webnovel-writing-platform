@@ -30,6 +30,12 @@ const plan: TaskQueueExecutionPlan = {
   adoptionFollowupItemIds: [],
   actionLabel: "批量初稿 1 个",
   detail: "夜雨系统 · 待生成 · 第一章",
+  scaleDecisionLabel: "标准生产",
+  scaleDecisionTone: "standard",
+  scaleDecisionDetail: "按推荐小批次执行并回收质量、成本和失败证据。",
+  batchModeLabel: "标准推荐批次",
+  batchModeTone: "standard",
+  batchModeDetail: "按当前队列优先级生成推荐小批次。",
   warnings: [],
 };
 
@@ -536,6 +542,9 @@ test("buildTaskQueueBatchGateActionReceipt turns a recommended batch into gate e
   assert.equal(gateReceipt.payload.plan.scaleGate, "none");
   assert.equal(gateReceipt.payload.plan.actionLabel, "批量初稿 1 个");
   assert.equal(gateReceipt.payload.plan.category, "draft");
+  assert.equal(gateReceipt.payload.plan.scaleDecisionLabel, "标准生产");
+  assert.equal(gateReceipt.payload.plan.scaleDecisionTone, "standard");
+  assert.ok(gateReceipt.payload.plan.scaleDecisionDetail?.includes("推荐小批次"));
   assert.deepEqual(gateReceipt.payload.plan.itemIds, plan.itemIds);
   assert.deepEqual(gateReceipt.payload.plan.adoptionFollowupItemIds, []);
   assert.equal(gateReceipt.payload.results[0]?.chapterId, "chapter-1");

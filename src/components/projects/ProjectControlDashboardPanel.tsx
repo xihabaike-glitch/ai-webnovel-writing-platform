@@ -59,6 +59,9 @@ interface AiPipelineRecentBatchSummary {
   hasRecent: boolean;
   status: "continue" | "repair" | "review_quality" | "watch_cost" | "empty";
   label: string;
+  scaleDecisionLabel: string;
+  scaleDecisionTone: "allow" | "watch" | "block" | "standard";
+  scaleDecisionDetail: string;
   headline: string;
   detail: string;
   actionLabel: string;
@@ -415,6 +418,13 @@ function aiRecentBatchClass(status: AiPipelineRecentBatchSummary["status"]) {
   if (status === "review_quality") return "bg-amber-50 text-amber-700";
   if (status === "watch_cost") return "bg-blue-50 text-blue-700";
   return "bg-slate-100 text-slate-700";
+}
+
+function aiRecentBatchScaleDecisionClass(tone: AiPipelineRecentBatchSummary["scaleDecisionTone"]) {
+  if (tone === "allow") return "border-emerald-200 bg-emerald-50 text-emerald-800";
+  if (tone === "watch") return "border-amber-200 bg-amber-50 text-amber-800";
+  if (tone === "block") return "border-rose-200 bg-rose-50 text-rose-800";
+  return "border-slate-200 bg-white text-slate-700";
 }
 
 function aiBatchHealthClass(status: AiPipelineBatchHealthSummary["status"]) {
@@ -1509,6 +1519,9 @@ export function ProjectControlDashboardPanel({
                   <span className={`rounded-md px-2 py-1 text-[11px] font-medium ${aiRecentBatchClass(dashboard.aiPipelineRecentBatch.status)}`}>
                     {dashboard.aiPipelineRecentBatch.label}
                   </span>
+                  <span className={`rounded-md border px-2 py-1 text-[11px] font-semibold ${aiRecentBatchScaleDecisionClass(dashboard.aiPipelineRecentBatch.scaleDecisionTone)}`}>
+                    {dashboard.aiPipelineRecentBatch.scaleDecisionLabel}
+                  </span>
                   {dashboard.aiPipelineRecentBatch.createdAt ? (
                     <span className="text-xs text-slate-500">{shortTime(dashboard.aiPipelineRecentBatch.createdAt)}</span>
                   ) : null}
@@ -1516,6 +1529,9 @@ export function ProjectControlDashboardPanel({
                 <p className="mt-1 text-sm leading-6 text-slate-600">{dashboard.aiPipelineRecentBatch.headline}</p>
                 <div className="mt-2 rounded-md bg-slate-50 px-2 py-1 text-xs leading-5 text-slate-600">
                   {dashboard.aiPipelineRecentBatch.detail}
+                </div>
+                <div className={`mt-2 rounded-md border px-2 py-1 text-xs leading-5 ${aiRecentBatchScaleDecisionClass(dashboard.aiPipelineRecentBatch.scaleDecisionTone)}`}>
+                  {dashboard.aiPipelineRecentBatch.scaleDecisionDetail}
                 </div>
               </div>
               <div className="flex shrink-0 flex-wrap gap-2">

@@ -48,6 +48,9 @@ export interface GateActionReceiptPayload {
     adoptionFollowupItemIds?: string[];
     executionContext?: "standard" | "repair_resume" | "batch_rhythm_recheck";
     batchModeLabel?: string;
+    scaleDecisionLabel?: string;
+    scaleDecisionTone?: "allow" | "watch" | "block" | "standard";
+    scaleDecisionDetail?: string;
   };
   startTactics?: GateActionReceiptStartTactic[];
   variants?: unknown[];

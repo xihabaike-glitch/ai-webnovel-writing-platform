@@ -561,6 +561,11 @@ test("buildProjectControlDashboard", async (t) => {
           succeededCount: 3,
           failedCount: 1,
           payload: JSON.stringify({
+            plan: {
+              scaleDecisionLabel: "禁止放大",
+              scaleDecisionTone: "block",
+              scaleDecisionDetail: "当前命中失败样本，先完成修复与复检，再回到推荐批次。",
+            },
             routeEffectSummary: { successRatePercent: 75, knownCostUsd: 0.0425, averageQualityScore: 78, verdict: "成功率偏低。" },
             batchReceipt: {
               status: "repair",
@@ -588,6 +593,9 @@ test("buildProjectControlDashboard", async (t) => {
     assert.equal(dashboard.aiPipelineRecentBatch.knownCostUsd, 0.0425);
     assert.equal(dashboard.aiPipelineRecentBatch.succeededCount, 3);
     assert.equal(dashboard.aiPipelineRecentBatch.failedCount, 1);
+    assert.equal(dashboard.aiPipelineRecentBatch.scaleDecisionLabel, "禁止放大");
+    assert.equal(dashboard.aiPipelineRecentBatch.scaleDecisionTone, "block");
+    assert.ok(dashboard.aiPipelineRecentBatch.scaleDecisionDetail.includes("修复与复检"));
     assert.equal(dashboard.aiPipelineRecentBatch.actionLabel, "查看失败修复");
     assert.equal(dashboard.aiPipelineRecentBatch.targetHref, "/failures");
     assert.equal(dashboard.aiPipelineRecentBatch.secondaryActionLabel, "回任务队列");

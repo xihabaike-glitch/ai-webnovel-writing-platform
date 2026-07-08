@@ -729,6 +729,14 @@ export default async function ProjectPage({
               <div className="text-xs font-medium text-slate-300">单本作品验收单</div>
               <h2 className="mt-1 text-lg font-semibold">{dashboard.realSampleAcceptanceSheet.title}</h2>
               <p className="mt-2 max-w-4xl text-sm leading-6 text-slate-200">{dashboard.realSampleAcceptanceSheet.verdict}</p>
+              <div className="mt-3 flex flex-wrap gap-2 text-xs">
+                <span className="rounded-md bg-white/10 px-2 py-1 text-slate-100">
+                  已完成 {dashboard.realSampleAcceptanceSheet.completedSteps}/{dashboard.realSampleAcceptanceSheet.totalSteps} 步
+                </span>
+                <span className={dashboard.realSampleAcceptanceSheet.gateStatus === "ready" ? "rounded-md bg-emerald-300 px-2 py-1 text-emerald-950" : "rounded-md bg-amber-300 px-2 py-1 text-amber-950"}>
+                  {dashboard.realSampleAcceptanceSheet.gateStatus === "ready" ? "可进发布复盘" : "仍需补证据"}
+                </span>
+              </div>
             </div>
             <Link
               className="w-fit rounded-md bg-white px-3 py-2 text-sm font-medium text-slate-950 hover:bg-slate-100"
@@ -736,6 +744,26 @@ export default async function ProjectPage({
             >
               {dashboard.realSampleAcceptanceSheet.actionLabel}
             </Link>
+          </div>
+          <div className="mt-4 rounded-md border border-white/10 bg-white/5 p-3 text-xs leading-5 text-slate-200">
+            <div className="font-medium text-white">证据缺口</div>
+            <p className="mt-1 text-slate-300">{dashboard.realSampleAcceptanceSheet.blockReason}</p>
+            {dashboard.realSampleAcceptanceSheet.missingEvidence.length > 0 ? (
+              <div className="mt-3 grid gap-2 md:grid-cols-3">
+                {dashboard.realSampleAcceptanceSheet.missingEvidence.map((item) => (
+                  <Link
+                    className="rounded-md bg-white/10 p-2 hover:bg-white/15"
+                    href={hrefWithGateReturn(item.href, gateReturn)}
+                    key={item.stepId}
+                  >
+                    <div className="font-medium text-white">{item.label}</div>
+                    <p className="mt-1 text-slate-300">{item.reason}</p>
+                  </Link>
+                ))}
+              </div>
+            ) : (
+              <p className="mt-2 text-emerald-200">当前没有缺口，可以进入发布包和平台复盘。</p>
+            )}
           </div>
           <div className="mt-4 grid gap-2 md:grid-cols-3 xl:grid-cols-6">
             {dashboard.realSampleAcceptanceSheet.steps.map((step, index) => (

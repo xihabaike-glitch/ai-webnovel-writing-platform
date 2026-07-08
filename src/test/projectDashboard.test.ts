@@ -108,6 +108,15 @@ test("buildProjectDashboard", async (t) => {
     assert.equal(dashboard.realSampleAcceptanceSheet.currentStepId, "second_pass");
     assert.ok(dashboard.realSampleAcceptanceSheet.verdict.includes("二改"));
     assert.equal(dashboard.realSampleAcceptanceSheet.actionHref, "#ai-pipeline");
+    assert.equal(dashboard.realSampleAcceptanceSheet.completedSteps, 3);
+    assert.equal(dashboard.realSampleAcceptanceSheet.totalSteps, 6);
+    assert.equal(dashboard.realSampleAcceptanceSheet.gateStatus, "blocked");
+    assert.deepEqual(
+      dashboard.realSampleAcceptanceSheet.missingEvidence.map((item) => item.stepId),
+      ["second_pass", "dispatch_receipt", "publish_package"],
+    );
+    assert.ok(dashboard.realSampleAcceptanceSheet.missingEvidence[0]?.reason.includes("二改"));
+    assert.ok(dashboard.realSampleAcceptanceSheet.blockReason.includes("不能进总闸门放量"));
     assert.ok(dashboard.realSampleAcceptanceSheet.steps.find((step) => step.id === "opening_sample")?.evidence.includes("钩子"));
     assert.ok(dashboard.realSampleAcceptanceSheet.steps.find((step) => step.id === "dispatch_receipt")?.stopRule.includes("人工验收"));
   });
@@ -218,6 +227,11 @@ test("buildProjectDashboard", async (t) => {
 
     assert.equal(passed.realSampleAcceptanceSheet.currentStepId, "publish_package");
     assert.ok(passed.realSampleAcceptanceSheet.verdict.includes("已闭合"));
+    assert.equal(passed.realSampleAcceptanceSheet.completedSteps, 7);
+    assert.equal(passed.realSampleAcceptanceSheet.totalSteps, 7);
+    assert.equal(passed.realSampleAcceptanceSheet.gateStatus, "ready");
+    assert.deepEqual(passed.realSampleAcceptanceSheet.missingEvidence, []);
+    assert.ok(passed.realSampleAcceptanceSheet.blockReason.includes("可以进入发布包"));
     assert.ok(passed.realSampleAcceptanceSheet.steps.find((step) => step.id === "role_dispatch")?.evidence.includes("结构主编、资料官、平台包装"));
     assert.equal(passed.realSampleAcceptanceSheet.roleClosureProgress?.completedRoles, 3);
     assert.equal(passed.realSampleAcceptanceSheet.roleClosureProgress?.missingLabels.length, 0);

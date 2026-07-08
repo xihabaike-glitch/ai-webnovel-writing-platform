@@ -62,6 +62,14 @@ export interface ProjectAcceptanceStep {
   href: string;
 }
 
+export interface ProjectAcceptanceMissingEvidence {
+  stepId: ProjectAcceptanceStep["id"];
+  label: string;
+  reason: string;
+  stopRule: string;
+  href: string;
+}
+
 export interface ProjectRoleClosureLane {
   id: "story-structure" | "context-recall" | "platform-export";
   label: string;
@@ -84,6 +92,11 @@ export interface ProjectRealSampleAcceptanceSheet {
   currentStepId: ProjectAcceptanceStep["id"];
   actionLabel: string;
   actionHref: string;
+  gateStatus: "ready" | "blocked";
+  completedSteps: number;
+  totalSteps: number;
+  missingEvidence: ProjectAcceptanceMissingEvidence[];
+  blockReason: string;
   steps: ProjectAcceptanceStep[];
   roleClosureProgress: ProjectRoleClosureProgress | null;
 }
@@ -260,6 +273,16 @@ function buildProjectRealSampleAcceptanceSheet(input: ProjectDashboardInput): Pr
   ];
   const firstMissingIndex = definitions.findIndex((step) => !step.done);
   const currentIndex = firstMissingIndex === -1 ? definitions.length - 1 : firstMissingIndex;
+  const completedSteps = definitions.filter((step) => step.done).length;
+  const missingEvidence = definitions
+    .filter((step) => !step.done)
+    .map((step) => ({
+      stepId: step.id,
+      label: step.label,
+      reason: step.evidence,
+      stopRule: step.stopRule,
+      href: step.href,
+    })) satisfies ProjectAcceptanceMissingEvidence[];
   const steps = definitions.map((step, index) => ({
     id: step.id,
     label: step.label,
@@ -269,6 +292,7 @@ function buildProjectRealSampleAcceptanceSheet(input: ProjectDashboardInput): Pr
     status: index < currentIndex ? "done" : index === currentIndex ? "current" : "blocked",
   })) satisfies ProjectAcceptanceStep[];
   const current = steps[currentIndex];
+  const gateStatus = missingEvidence.length === 0 ? "ready" : "blocked";
 
   return {
     title: "单本作品验收单",
@@ -276,8 +300,13 @@ function buildProjectRealSampleAcceptanceSheet(input: ProjectDashboardInput): Pr
       ? "样本证据已闭合，可以进入发布包和平台复盘。"
       : `当前先补「${current.label}」：${current.evidence}`,
     currentStepId: current.id,
-    actionLabel: current.status === "done" ? "复查发布包" : `处理${current.label}`,
+    actionLabel: gateStatus === "ready" ? "复查发布包" : `处理${current.label}`,
     actionHref: current.href,
+    gateStatus,
+    completedSteps,
+    totalSteps: definitions.length,
+    missingEvidence,
+    blockReason: gateStatus === "ready" ? "样本证据已闭合，可以进入发布包和平台复盘。" : current.stopRule,
     steps,
     roleClosureProgress: roleDispatchAcceptance.roleClosureProgress,
   };

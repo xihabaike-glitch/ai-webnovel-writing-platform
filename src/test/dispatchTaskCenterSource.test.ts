@@ -139,6 +139,14 @@ test("dispatch task center labels acceptance recheck next-step dispatches", () =
   assert.ok(source.includes("回总闸门复检结论："));
 });
 
+test("dispatch task center explains which gate blockers recheck receipts can close", () => {
+  assert.ok(source.includes("projectAcceptanceNextImpactHint"));
+  assert.ok(source.includes("这张复检收据会关闭发布包验收卡点"));
+  assert.ok(source.includes("这张复检收据会关闭资料官、平台包装角色线"));
+  assert.ok(source.includes("复检分流已完成"));
+  assert.ok(source.includes("回总闸门查看卡点变化"));
+});
+
 test("dispatch task center shows acceptance recheck receipt counts", () => {
   assert.ok(source.includes("待总闸门复检"));
   assert.ok(source.includes("evidenceReview.summary.acceptanceRecheck"));

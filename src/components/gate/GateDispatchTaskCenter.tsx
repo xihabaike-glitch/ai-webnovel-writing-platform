@@ -306,6 +306,17 @@ function buildProjectAcceptanceNextCompletionTemplate(task: PersistedGatePlatfor
   ].join("\n");
 }
 
+function projectAcceptanceNextImpactHint(task: PersistedGatePlatformDispatchTask) {
+  if (!isProjectAcceptanceNextDispatchTask(task)) return "";
+  if (task.dispatchKey.endsWith(":publish_package")) {
+    return "这张复检收据会关闭发布包验收卡点；总闸门仍会继续检查前三章、导出版本和发布效果。";
+  }
+  if (task.dispatchKey.endsWith(":role_dispatch")) {
+    return "这张复检收据会关闭资料官、平台包装角色线；结构主编仍需自己的角色回填。";
+  }
+  return "这张复检收据会被总闸门用于判断验收缺口是否减少。";
+}
+
 function routeCompletionRecordChips(record: RouteDispatchCompletionRecord) {
   const chips: string[] = [];
   if (record.sampleCount !== null) chips.push(`样本 ${record.sampleCount}`);
@@ -651,8 +662,15 @@ export function GateDispatchTaskCenter({
           ? `已自动生成三轮动作后的回流派单：${secondMetricFollowups.map((item) => item.title).join("、")}`
           : "";
         const firstDayUpdate = buildFirstDayDispatchUpdateSummary(updated);
+        const projectAcceptanceNextCompleted = targetState === "completed" && isProjectAcceptanceNextDispatchTask(updated.task);
         const roleClosureCompleted = targetState === "completed" && isRoleClosureDispatchTask(updated.task);
-        if (roleClosureCompleted) {
+        if (projectAcceptanceNextCompleted) {
+          setRouteActionMessage(`复检分流已完成：${projectAcceptanceNextImpactHint(updated.task)} 回总闸门查看卡点变化。`);
+          setRouteActionLink({
+            ...buildGateRecheckActionLink(updated.task),
+            label: "回总闸门查看卡点变化",
+          });
+        } else if (roleClosureCompleted) {
           setRouteActionMessage(`角色闭环已完成：${roleClosureLaneLabel(updated.task)}线已回填。回总闸门复检角色闭环，确认剩余卡点是否减少。`);
           setRouteActionLink({
             ...buildGateRecheckActionLink(updated.task),
@@ -2148,6 +2166,11 @@ export function GateDispatchTaskCenter({
                 {task.completionEvidence ? (
                   <div className="mt-3 rounded-md bg-emerald-50 p-3 text-sm leading-6 text-emerald-800">
                     <p>完成依据：{task.completionEvidence}</p>
+                    {isProjectAcceptanceNextTask ? (
+                      <p className="mt-2 rounded-md bg-white px-2 py-1 text-xs font-medium text-emerald-900">
+                        {projectAcceptanceNextImpactHint(task)}
+                      </p>
+                    ) : null}
                     {isRoleClosureTask ? (
                       <p className="mt-2 rounded-md bg-white px-2 py-1 text-xs font-medium text-emerald-900">
                         角色闭环回填：回总闸门复检角色闭环，确认结构、资料、平台三类角色缺口是否减少。

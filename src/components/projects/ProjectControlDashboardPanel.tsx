@@ -242,6 +242,10 @@ interface ProductionDecisionSummary {
   label: string;
   headline: string;
   reason: string;
+  actionExecutable: boolean;
+  actionAreaId: string | null;
+  actionMode: "seed" | null;
+  executeLabel: string;
   primaryActionLabel: string;
   primaryTargetHref: string;
   secondaryActionLabel: string;
@@ -526,6 +530,7 @@ export function ProjectControlDashboardPanel({
   const [runningVerdictAction, setRunningVerdictAction] = useState(false);
   const [runningStartDecision, setRunningStartDecision] = useState(false);
   const [runningFoundationAction, setRunningFoundationAction] = useState(false);
+  const [runningProductionDecisionAction, setRunningProductionDecisionAction] = useState(false);
   const [runningBatchHealthAction, setRunningBatchHealthAction] = useState(false);
   const [runningRecentBatchAction, setRunningRecentBatchAction] = useState(false);
   const [runningChecklistItemId, setRunningChecklistItemId] = useState<string | null>(null);
@@ -671,6 +676,41 @@ export function ProjectControlDashboardPanel({
       setMessage(caught instanceof Error ? caught.message : "生成批量健康动作失败。");
     } finally {
       setRunningBatchHealthAction(false);
+    }
+  }
+
+  async function executeProductionDecisionAction() {
+    if (!dashboard?.productionDecision.actionExecutable || !dashboard.productionDecision.actionAreaId || !dashboard.productionDecision.actionMode) return;
+    setRunningProductionDecisionAction(true);
+    setMessage(null);
+    try {
+      const response = await fetch(`/api/projects/${projectId}/control-actions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          areaId: dashboard.productionDecision.actionAreaId,
+          mode: dashboard.productionDecision.actionMode,
+        }),
+      });
+      const payload = await response.json() as {
+        message?: string;
+        error?: string;
+        targetAnchor?: string;
+        created?: string[];
+      };
+      if (!response.ok) {
+        throw new Error(payload.error ?? "执行生产总控动作失败。");
+      }
+      await loadDashboard();
+      const created = payload.created?.length ? `清单：${payload.created.slice(0, 3).join("；")}。` : "";
+      setMessage([payload.message ?? "生产总控动作已执行。", created].filter(Boolean).join(" "));
+      if (payload.targetAnchor && typeof window !== "undefined") {
+        window.location.hash = payload.targetAnchor;
+      }
+    } catch (caught) {
+      setMessage(caught instanceof Error ? caught.message : "执行生产总控动作失败。");
+    } finally {
+      setRunningProductionDecisionAction(false);
     }
   }
 
@@ -985,12 +1025,23 @@ export function ProjectControlDashboardPanel({
                 </div>
               </div>
               <div className="flex shrink-0 flex-wrap gap-2">
-                <Link
-                  className="inline-flex w-fit items-center justify-center rounded-md bg-white px-3 py-2 text-xs font-medium text-slate-950 hover:bg-slate-50"
-                  href={hrefWithGateReturn(projectScopedHref(projectId, dashboard.productionDecision.primaryTargetHref), gateReturnHref)}
-                >
-                  {dashboard.productionDecision.primaryActionLabel}
-                </Link>
+                {dashboard.productionDecision.actionExecutable ? (
+                  <button
+                    className="inline-flex w-fit items-center justify-center rounded-md bg-white px-3 py-2 text-xs font-medium text-slate-950 hover:bg-slate-50 disabled:opacity-50"
+                    disabled={runningProductionDecisionAction}
+                    onClick={() => void executeProductionDecisionAction()}
+                    type="button"
+                  >
+                    {runningProductionDecisionAction ? "执行中" : dashboard.productionDecision.executeLabel}
+                  </button>
+                ) : (
+                  <Link
+                    className="inline-flex w-fit items-center justify-center rounded-md bg-white px-3 py-2 text-xs font-medium text-slate-950 hover:bg-slate-50"
+                    href={hrefWithGateReturn(projectScopedHref(projectId, dashboard.productionDecision.primaryTargetHref), gateReturnHref)}
+                  >
+                    {dashboard.productionDecision.primaryActionLabel}
+                  </Link>
+                )}
                 <Link
                   className="inline-flex w-fit items-center justify-center rounded-md border border-white/70 px-3 py-2 text-xs font-medium hover:bg-white/60"
                   href={hrefWithGateReturn(projectScopedHref(projectId, dashboard.productionDecision.secondaryTargetHref), gateReturnHref)}

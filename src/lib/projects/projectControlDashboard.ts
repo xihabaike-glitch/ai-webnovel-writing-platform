@@ -331,6 +331,10 @@ export interface ProductionDecisionSummary {
   label: string;
   headline: string;
   reason: string;
+  actionExecutable: boolean;
+  actionAreaId: string | null;
+  actionMode: "seed" | null;
+  executeLabel: string;
   primaryActionLabel: string;
   primaryTargetHref: string;
   secondaryActionLabel: string;
@@ -1285,6 +1289,10 @@ function buildProductionDecisionSummary(input: {
       label: "先修复",
       headline: "批量健康已经跌线，别继续扩大 AI 写审改。",
       reason: `批量健康：${input.batchHealth.scaleDecisionLabel}；模型路线：${input.modelRouteHealth.label}。先修复失败任务和低分环节，再谈继续生产。`,
+      actionExecutable: true,
+      actionAreaId: "ai-pipeline",
+      actionMode: "seed",
+      executeLabel: "生成修复清单",
       primaryActionLabel: "修批量打法",
       primaryTargetHref: "/failures",
       secondaryActionLabel: input.modelRouteHealth.actionLabel,
@@ -1299,6 +1307,10 @@ function buildProductionDecisionSummary(input: {
       label: "先修复",
       headline: "模型路线有失败或避用信号，先修路由再继续写。",
       reason: `模型路线：${input.modelRouteHealth.headline} 批量健康：${input.batchHealth.scaleDecisionLabel}。`,
+      actionExecutable: false,
+      actionAreaId: null,
+      actionMode: null,
+      executeLabel: "修模型路线",
       primaryActionLabel: "修模型路线",
       primaryTargetHref: input.modelRouteHealth.targetHref,
       secondaryActionLabel: input.batchHealth.actionLabel,
@@ -1313,6 +1325,10 @@ function buildProductionDecisionSummary(input: {
       label: "先控成本",
       headline: "模型路线能跑，但成本闸门还没稳住。",
       reason: `模型路线：${input.modelRouteHealth.detail}；批量健康：${input.batchHealth.scaleDecisionLabel}。先控成本，再继续放量。`,
+      actionExecutable: false,
+      actionAreaId: null,
+      actionMode: null,
+      executeLabel: input.modelRouteHealth.actionLabel,
       primaryActionLabel: input.modelRouteHealth.actionLabel,
       primaryTargetHref: input.modelRouteHealth.targetHref,
       secondaryActionLabel: input.batchHealth.actionLabel,
@@ -1327,6 +1343,10 @@ function buildProductionDecisionSummary(input: {
       label: "小批复验",
       headline: "批量样本还薄，下一步只跑复验小批。",
       reason: `批量健康：${input.batchHealth.scaleDecisionDetail} 模型路线：${input.modelRouteHealth.label}。`,
+      actionExecutable: true,
+      actionAreaId: "ai-pipeline",
+      actionMode: "seed",
+      executeLabel: input.batchHealth.executeLabel,
       primaryActionLabel: input.batchHealth.executeLabel,
       primaryTargetHref: input.batchHealth.targetHref,
       secondaryActionLabel: input.modelRouteHealth.actionLabel,
@@ -1341,6 +1361,10 @@ function buildProductionDecisionSummary(input: {
       label: "先建样本",
       headline: "还缺可复盘样本，先跑一轮推荐小批。",
       reason: `批量健康：${input.batchHealth.scaleDecisionDetail} 模型路线：${input.modelRouteHealth.headline}`,
+      actionExecutable: false,
+      actionAreaId: null,
+      actionMode: null,
+      executeLabel: input.batch.canRun ? "执行推荐批次" : input.batch.actionLabel,
       primaryActionLabel: input.batch.canRun ? "执行推荐批次" : input.batch.actionLabel,
       primaryTargetHref: input.batch.targetHref,
       secondaryActionLabel: input.modelRouteHealth.actionLabel,
@@ -1354,6 +1378,10 @@ function buildProductionDecisionSummary(input: {
     label: "继续生产",
     headline: "批量健康和模型路线都过线，可以继续小步生产。",
     reason: `批量健康：${input.batchHealth.scaleDecisionLabel}；模型路线：${input.modelRouteHealth.label}。继续按推荐批次小步推进，并保留下一批回执。`,
+    actionExecutable: false,
+    actionAreaId: null,
+    actionMode: null,
+    executeLabel: "执行推荐批次",
     primaryActionLabel: "执行推荐批次",
     primaryTargetHref: input.batch.targetHref,
     secondaryActionLabel: input.batchHealth.actionLabel,

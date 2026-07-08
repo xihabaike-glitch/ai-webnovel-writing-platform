@@ -197,6 +197,7 @@ test("buildProjectControlDashboard", async (t) => {
     assert.ok(dashboard.modelRouteHealth.nextActions.length > 0);
     assert.equal(dashboard.productionDecision.status, "watch");
     assert.equal(dashboard.productionDecision.label, "先建样本");
+    assert.equal(dashboard.productionDecision.actionExecutable, false);
     assert.equal(dashboard.productionDecision.primaryActionLabel, "执行推荐批次");
     assert.equal(dashboard.productionDecision.primaryTargetHref, "/tasks#recommended-batch");
     assert.ok(dashboard.productionDecision.reason.includes("批量健康"));
@@ -697,6 +698,7 @@ test("buildProjectControlDashboard", async (t) => {
     assert.ok(dashboard.aiPipelineBatchHealth.scaleDecisionDetail.includes("小步加码"));
     assert.equal(dashboard.productionDecision.status, "continue");
     assert.equal(dashboard.productionDecision.label, "继续生产");
+    assert.equal(dashboard.productionDecision.actionExecutable, false);
     assert.equal(dashboard.productionDecision.primaryActionLabel, "执行推荐批次");
     assert.equal(dashboard.productionDecision.primaryTargetHref, "/tasks#recommended-batch");
     assert.ok(dashboard.productionDecision.reason.includes("批量健康"));
@@ -881,6 +883,10 @@ test("buildProjectControlDashboard", async (t) => {
     assert.ok(dashboard.aiPipelineBatchHealth.scaleDecisionDetail.includes("先修复"));
     assert.equal(dashboard.productionDecision.status, "repair");
     assert.equal(dashboard.productionDecision.label, "先修复");
+    assert.equal(dashboard.productionDecision.actionExecutable, true);
+    assert.equal(dashboard.productionDecision.actionAreaId, "ai-pipeline");
+    assert.equal(dashboard.productionDecision.actionMode, "seed");
+    assert.equal(dashboard.productionDecision.executeLabel, "生成修复清单");
     assert.equal(dashboard.productionDecision.primaryActionLabel, "修批量打法");
     assert.equal(dashboard.productionDecision.primaryTargetHref, "/failures");
     assert.equal(aiArea?.status, "blocked");

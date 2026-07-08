@@ -1005,6 +1005,66 @@ test("buildPrePublishGate", async (t) => {
     assert.equal(gate.releaseAction?.label, "先解除阻塞：重新审稿");
   });
 
+  await t.test("blocks launch while ordinary chapter adoption follow-ups are unfinished", () => {
+    const gate = buildPrePublishGate({
+      projects: [{
+        ...readyProject,
+        gateDispatchTasks: [
+          ...firstDayCompleteDispatches("project-ready"),
+          {
+            dispatchKey: "chapter-adoption:project-ready:chapter-4:revision-draft:review",
+            state: "completed",
+            completionEvidence: "采纳后重新审稿已完成：第 4 章《追杀反转》，审稿分 89，问题 1 个。",
+            title: "第 4 章采纳后重新审稿",
+            detail: "采纳后的新正文需要重新审稿。",
+            actionLabel: "重新审稿",
+            href: "/projects/project-ready/chapters/chapter-4#chapter-workflow",
+          },
+          {
+            dispatchKey: "chapter-adoption:project-ready:chapter-4:revision-draft:second-pass",
+            state: "assigned",
+            completionEvidence: "",
+            title: "第 4 章采纳后启动二改",
+            detail: "按采纳后审稿问题启动二改。",
+            actionLabel: "启动二改",
+            href: "/projects/project-ready/chapters/chapter-4#chapter-second-pass",
+          },
+          {
+            dispatchKey: "chapter-adoption:project-ready:chapter-4:revision-second-pass:publish-check",
+            platformId: "fanqie",
+            state: "queued",
+            completionEvidence: "",
+            title: "第 4 章采纳后发布质检",
+            detail: "二改采纳后回发布包刷新质检。",
+            actionLabel: "回发布质检",
+            href: "/projects/project-ready#platform-export",
+          },
+        ],
+      }],
+      failureTasks: [],
+      batchHistory: [],
+    });
+    const adoptionItem = gate.items.find((item) => item.id === "first-three-adoption-loop");
+    const notice = buildPrePublishGateFocusNotice({
+      focus: "action-recheck",
+      actionId: "project-acceptance:project-ready",
+      gate,
+    });
+
+    assert.equal(gate.status, "blocked");
+    assert.equal(gate.firstThreeAdoptionClosure.total, 3);
+    assert.equal(gate.firstThreeAdoptionClosure.completed, 1);
+    assert.equal(gate.firstThreeAdoptionClosure.pending, 2);
+    assert.equal(gate.firstThreeAdoptionClosure.repairQueue[0].followupItemId, "chapter-adoption:project-ready:chapter-4:revision-draft:second-pass");
+    assert.equal(gate.firstThreeAdoptionClosure.repairQueue[0].actionLabel, "启动二改");
+    assert.deepEqual(gate.firstThreeAdoptionClosure.timelines[0].steps.map((step) => step.label), ["候选已采纳", "重新审稿", "启动二改", "发布质检", "发布放行"]);
+    assert.deepEqual(gate.firstThreeAdoptionClosure.timelines[0].steps.map((step) => step.status), ["pass", "pass", "block", "waiting", "waiting"]);
+    assert.equal(gate.firstThreeAdoptionClosure.timelines[0].nextActionLabel, "启动二改");
+    assert.ok(adoptionItem?.detail.includes("下一条：夜雨系统 · 第 4 章采纳后启动二改"));
+    assert.equal(notice.recheckSummary?.firstThreeAdoptionProgress?.totalTimelines, 1);
+    assert.equal(notice.recheckSummary?.firstThreeAdoptionProgress?.lanes[0]?.nextActionLabel, "启动二改");
+  });
+
   await t.test("adds executable gate action for adoption publish checks", () => {
     const gate = buildPrePublishGate({
       projects: [{

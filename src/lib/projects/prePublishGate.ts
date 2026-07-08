@@ -317,7 +317,8 @@ export interface PrePublishGateAdoptionFollowupItem {
   chapterId: string | null;
   revisionId: string | null;
   platformId: string | null;
-  type: "review" | "publish_check" | "other";
+  family: "first_three" | "chapter";
+  type: "review" | "second_pass" | "publish_check" | "other";
   label: string;
   title: string;
   status: PrePublishGateItem["status"];
@@ -355,7 +356,7 @@ export type PrePublishGateAdoptionFollowupExecution =
     platformId: string | null;
   };
 
-export type PrePublishGateAdoptionTimelineStepType = "adopted" | "review" | "publish_check" | "release";
+export type PrePublishGateAdoptionTimelineStepType = "adopted" | "review" | "second_pass" | "publish_check" | "release";
 export type PrePublishGateAdoptionTimelineStepStatus = PrePublishGateItem["status"] | "waiting";
 
 export interface PrePublishGateAdoptionTimelineStep {
@@ -641,7 +642,8 @@ function gateItem(input: PrePublishGateItem): PrePublishGateItem {
 type PrePublishGateDispatchTask = NonNullable<PrePublishGateProject["gateDispatchTasks"]>[number];
 
 function isFirstThreeAdoptionFollowup(task: PrePublishGateDispatchTask) {
-  return task.dispatchKey.startsWith("first-three-adoption:");
+  return task.dispatchKey.startsWith("first-three-adoption:")
+    || task.dispatchKey.startsWith("chapter-adoption:");
 }
 
 function firstThreeAdoptionFollowups(projects: PrePublishGateProject[]) {
@@ -660,22 +662,25 @@ function firstThreeFollowupHref(projectId: string, task: PrePublishGateDispatchT
 
 function firstThreeFollowupType(task: PrePublishGateDispatchTask): PrePublishGateAdoptionFollowupItem["type"] {
   if (task.dispatchKey.endsWith(":review")) return "review";
+  if (task.dispatchKey.endsWith(":second-pass")) return "second_pass";
   if (task.dispatchKey.endsWith(":publish-check")) return "publish_check";
   return "other";
 }
 
 function firstThreeFollowupLabel(type: PrePublishGateAdoptionFollowupItem["type"]) {
   if (type === "review") return "重新审稿";
+  if (type === "second_pass") return "启动二改";
   if (type === "publish_check") return "发布质检";
   return "后续任务";
 }
 
 function parseFirstThreeAdoptionDispatchKey(dispatchKey: string) {
   const parts = dispatchKey.split(":");
-  if (parts.length < 5 || parts[0] !== "first-three-adoption") {
-    return { chapterId: null, revisionId: null };
+  if (parts.length < 5 || (parts[0] !== "first-three-adoption" && parts[0] !== "chapter-adoption")) {
+    return { family: "first_three" as const, chapterId: null, revisionId: null };
   }
   return {
+    family: parts[0] === "chapter-adoption" ? "chapter" as const : "first_three" as const,
     chapterId: parts[2] || null,
     revisionId: parts[3] || null,
   };
@@ -812,25 +817,34 @@ function firstThreeAdoptionTimelineStep(input: {
 function buildFirstThreeAdoptionTimelines(items: PrePublishGateAdoptionFollowupItem[]): PrePublishGateAdoptionTimeline[] {
   const groups = new Map<string, PrePublishGateAdoptionFollowupItem[]>();
   for (const item of items) {
-    const key = `${item.projectId}:${item.chapterId ?? "unknown"}:${item.revisionId ?? "unknown"}`;
+    const key = item.family === "chapter"
+      ? `${item.family}:${item.projectId}:${item.chapterId ?? "unknown"}`
+      : `${item.family}:${item.projectId}:${item.chapterId ?? "unknown"}:${item.revisionId ?? "unknown"}`;
     groups.set(key, [...(groups.get(key) ?? []), item]);
   }
 
   return [...groups.entries()].map(([id, group]) => {
     const first = group[0];
     const review = group.find((item) => item.type === "review") ?? null;
+    const secondPass = group.find((item) => item.type === "second_pass") ?? null;
     const publish = group.find((item) => item.type === "publish_check") ?? null;
     const projectHref = `/projects/${first.projectId}`;
-    const releaseStatus: PrePublishGateAdoptionTimelineStepStatus = review?.status === "pass" && publish?.status === "pass"
+    const needsSecondPass = group.some((item) => item.family === "chapter" && item.type === "second_pass");
+    const secondPassReady = !needsSecondPass || secondPass?.status === "pass";
+    const releaseStatus: PrePublishGateAdoptionTimelineStepStatus = review?.status === "pass" && secondPassReady && publish?.status === "pass"
       ? "pass"
-      : review?.status === "warn" || publish?.status === "warn"
+      : review?.status === "warn" || secondPass?.status === "warn" || publish?.status === "warn"
         ? "warn"
         : "waiting";
     const releaseDetail = releaseStatus === "pass"
-      ? "重新审稿和发布质检都已回填，可以回到总闸门判断发布放行。"
+      ? needsSecondPass
+        ? "重新审稿、二改和发布质检都已回填，可以回到总闸门判断发布放行。"
+        : "重新审稿和发布质检都已回填，可以回到总闸门判断发布放行。"
       : releaseStatus === "warn"
         ? "存在缺证据的闭环任务，补齐验收证据后再判断发布放行。"
-        : "等待重新审稿和发布质检全部闭合后，再判断发布放行。";
+        : needsSecondPass
+          ? "等待重新审稿、二改和发布质检全部闭合后，再判断发布放行。"
+          : "等待重新审稿和发布质检全部闭合后，再判断发布放行。";
     const steps: PrePublishGateAdoptionTimelineStep[] = [
       {
         id: `${id}:adopted`,
@@ -838,7 +852,7 @@ function buildFirstThreeAdoptionTimelines(items: PrePublishGateAdoptionFollowupI
         label: "候选已采纳",
         status: "pass",
         followupItemId: null,
-        detail: "前三章候选已经写入正文，旧审稿与旧发布质检自动过期。",
+        detail: first.family === "chapter" ? "章节候选已经写入正文，旧审稿与旧发布质检自动过期。" : "前三章候选已经写入正文，旧审稿与旧发布质检自动过期。",
         evidence: "正文已采用候选版本。",
         actionLabel: "查看作品",
         href: projectHref,
@@ -853,13 +867,23 @@ function buildFirstThreeAdoptionTimelines(items: PrePublishGateAdoptionFollowupI
         actionLabel: "重新审稿",
         href: projectHref,
       }),
+      ...(needsSecondPass ? [firstThreeAdoptionTimelineStep({
+        id: `${id}:second-pass`,
+        type: "second_pass",
+        label: "启动二改",
+        item: secondPass,
+        fallbackStatus: review?.status === "pass" ? "block" : "waiting",
+        detail: review?.status === "pass" ? "重新审稿已完成，等待按审稿问题启动二改。" : "先完成采纳后重新审稿，再启动二改。",
+        actionLabel: "启动二改",
+        href: first.chapterId ? `/projects/${first.projectId}/chapters/${first.chapterId}#chapter-second-pass` : projectHref,
+      })] : []),
       firstThreeAdoptionTimelineStep({
         id: `${id}:publish-check`,
         type: "publish_check",
         label: "发布质检",
-        item: publish,
-        fallbackStatus: review?.status === "pass" ? "block" : "waiting",
-        detail: review?.status === "pass" ? "重新审稿已完成，等待刷新发布质检。" : "先完成采纳后重新审稿，再回发布质检。",
+        item: needsSecondPass && !secondPassReady ? null : publish,
+        fallbackStatus: review?.status === "pass" && secondPassReady ? "block" : "waiting",
+        detail: review?.status === "pass" && secondPassReady ? "前置采纳后续已完成，等待刷新发布质检。" : "先完成采纳后重新审稿和必要二改，再回发布质检。",
         actionLabel: "回发布质检",
         href: projectHref,
       }),
@@ -888,7 +912,7 @@ function buildFirstThreeAdoptionTimelines(items: PrePublishGateAdoptionFollowupI
       revisionId: first.revisionId,
       platformId,
       status,
-      label: `${first.projectTitle} · ${review?.title ?? publish?.title ?? "前三章采纳"}`,
+      label: `${first.projectTitle} · ${review?.title ?? secondPass?.title ?? publish?.title ?? (first.family === "chapter" ? "章节采纳" : "前三章采纳")}`,
       detail: status === "pass"
         ? "采纳后的审稿、发布质检和放行判断已经闭合。"
         : `${nextStep.label}：${nextStep.detail}`,
@@ -926,15 +950,20 @@ function firstThreeAdoptionRepairDetail(item: PrePublishGateAdoptionFollowupItem
   if (item.type === "review") {
     return "采纳后的正文还没有重新审稿，旧审稿不能继续当发布通行证。先生成新审稿，再决定是否二改。";
   }
+  if (item.type === "second_pass") {
+    return "采纳后的正文已经重新审稿，但二改还没有闭合。先按审稿问题启动二改，采纳二改后再回发布质检。";
+  }
   if (item.type === "publish_check") {
-    return "采纳后的前三章会改变标题、简介、标签和兑现判断。重新审稿后刷新发布质检，避免拿旧包装去投平台。";
+    return item.family === "chapter"
+      ? "采纳后的章节正文会改变发布包一致性。重新审稿和必要二改后刷新发布质检，避免拿旧包装去投平台。"
+      : "采纳后的前三章会改变标题、简介、标签和兑现判断。重新审稿后刷新发布质检，避免拿旧包装去投平台。";
   }
   return item.detail || "采纳后的后续任务没有闭合，发布前需要处理。";
 }
 
 function firstThreeAdoptionRepairPriority(item: PrePublishGateAdoptionFollowupItem) {
   const statusWeight = item.status === "block" ? 20 : item.status === "warn" ? 10 : 0;
-  const typeWeight = item.type === "review" ? 78 : item.type === "publish_check" ? 70 : 58;
+  const typeWeight = item.type === "review" ? 78 : item.type === "second_pass" ? 74 : item.type === "publish_check" ? 70 : 58;
   return statusWeight + typeWeight;
 }
 
@@ -1032,6 +1061,7 @@ function buildFirstThreeAdoptionClosure(projects: PrePublishGateProject[]): PreP
       chapterId: keyParts.chapterId,
       revisionId: keyParts.revisionId,
       platformId: task.platformId ?? null,
+      family: keyParts.family,
       type,
       label: firstThreeFollowupLabel(type),
       title: task.title ?? firstThreeFollowupLabel(type),
@@ -1043,7 +1073,7 @@ function buildFirstThreeAdoptionClosure(projects: PrePublishGateProject[]): PreP
           ? "任务中心批量执行已经产出验收回执，回总闸门后可用于复检放行。"
         : task.detail ?? "采纳后的正文需要重新审稿并刷新发布质检。",
       evidence,
-      actionLabel: task.actionLabel ?? (type === "publish_check" ? "回发布质检" : "重新审稿"),
+      actionLabel: task.actionLabel ?? (type === "publish_check" ? "回发布质检" : type === "second_pass" ? "启动二改" : "重新审稿"),
       href: firstThreeFollowupHref(project.id, task),
       execution: firstThreeFollowupExecution({
         projectId: project.id,
@@ -1057,6 +1087,7 @@ function buildFirstThreeAdoptionClosure(projects: PrePublishGateProject[]): PreP
   const missingEvidenceItems = items.filter((item) => item.status === "warn");
   const receiptEvidenceItems = items.filter((item) => item.evidence.includes("任务中心批量回执已验收"));
   const reviewPending = pendingItems.filter((item) => item.type === "review").length;
+  const secondPassPending = pendingItems.filter((item) => item.type === "second_pass").length;
   const publishPending = pendingItems.filter((item) => item.type === "publish_check").length;
   const executableReviewChapterIds = new Set(items.flatMap((item) => (
     item.status !== "pass" && item.execution?.type === "chapter_review" ? [item.execution.chapterId] : []
@@ -1073,12 +1104,12 @@ function buildFirstThreeAdoptionClosure(projects: PrePublishGateProject[]): PreP
       ? "warn"
       : "pass";
   const detail = pendingItems.length > 0
-      ? `${affectedProjects} 个项目有前三章采纳后续未闭环：${reviewPending} 个待重新审稿，${publishPending} 个待发布质检。正文变更后不能沿用旧审稿。`
+      ? `${affectedProjects} 个项目有章节采纳后续未闭环：${reviewPending} 个待重新审稿，${secondPassPending} 个待二改，${publishPending} 个待发布质检。正文变更后不能沿用旧审稿。`
     : missingEvidenceItems.length > 0
       ? `${missingEvidenceItems.length} 个采纳后续任务已完成但缺少验收证据，发布前补齐证据。`
       : followups.length > 0
         ? `已验收 ${followups.length} 个采纳后续任务，其中 ${receiptEvidenceItems.length} 个来自任务中心批量回执；重新审稿和发布质检都已回填。`
-        : "当前没有未闭环的前三章采纳后续任务。";
+        : "当前没有未闭环的章节采纳后续任务。";
   const repairQueue = buildFirstThreeAdoptionRepairQueue(items);
 
   return {

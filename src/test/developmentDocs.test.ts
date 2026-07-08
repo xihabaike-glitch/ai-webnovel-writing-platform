@@ -72,6 +72,13 @@ test("ai writing platform development document", async (t) => {
     assert.ok(doc.includes("不能各自发明放量口径"));
   });
 
+  await t.test("documents the production closure status strip", () => {
+    assert.ok(doc.includes("顶部总控统一闭环看板"));
+    assert.ok(doc.includes("批量健康、AI 写审改、模型路线"));
+    assert.ok(doc.includes("只看一个总控入口就能判断能否继续生产"));
+    assert.ok(doc.includes("productionClosure"));
+  });
+
   await t.test("uses the current delivery route instead of old kickoff instructions", () => {
     assert.equal(doc.includes("建议下一步不要直接开写代码"), false);
     assert.equal(doc.includes("`PRD.md`：产品需求文档，锁定页面、字段、MVP 范围。"), false);

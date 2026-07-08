@@ -75,6 +75,11 @@ test("project detail page renders the single-project acceptance sheet", () => {
   assert.ok(projectPage.includes("item.actionLabel"));
   assert.ok(projectPage.includes("item.ownerRole"));
   assert.ok(projectPage.includes("item.executionHint"));
+  assert.ok(projectPage.includes("当前实跑动作"));
+  assert.ok(projectPage.includes("item.runbookStep.title"));
+  assert.ok(projectPage.includes("item.runbookStep.sampleAction"));
+  assert.ok(projectPage.includes("item.runbookStep.proofToCapture"));
+  assert.ok(projectPage.includes("item.runbookStep.rollbackIfWeak"));
   assert.ok(projectPage.includes("回执模板"));
   assert.ok(projectPage.includes("item.receiptTemplate.map"));
   assert.ok(projectPage.includes('className="grid min-w-0 gap-6 [&>*]:min-w-0"'));

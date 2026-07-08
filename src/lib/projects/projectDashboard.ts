@@ -1,4 +1,5 @@
 import type { PlatformProfile } from "@/lib/platforms/platformProfiles";
+import { buildDevelopmentOverview, type DevelopmentOverviewPipelineProofStep } from "../development/developmentOverview.ts";
 
 export interface DashboardChapter {
   id: string;
@@ -72,8 +73,18 @@ export interface ProjectAcceptanceMissingEvidence {
   ownerRole: string;
   actionMode: "workspace" | "ai_task" | "dispatch" | "publish";
   executionHint: string;
+  runbookStep: ProjectAcceptanceRunbookStep;
   receiptTemplate: string[];
   dispatchDraftHref: string;
+}
+
+export interface ProjectAcceptanceRunbookStep {
+  stepId: DevelopmentOverviewPipelineProofStep["id"];
+  title: string;
+  owner: string;
+  sampleAction: string;
+  proofToCapture: string;
+  rollbackIfWeak: string;
 }
 
 export interface ProjectRoleClosureLane {
@@ -227,6 +238,30 @@ function buildAcceptanceGapReceiptTemplate(
     `下一动作：${execution.executionHint}`,
     `停手线：${step.stopRule}`,
   ];
+}
+
+function proofRouteStepIdForAcceptanceStep(stepId: ProjectAcceptanceStep["id"]): DevelopmentOverviewPipelineProofStep["id"] {
+  if (stepId === "project_start") return "project_start";
+  if (stepId === "publish_package") return "publish_package";
+  if (stepId === "dispatch_receipt" || stepId === "role_dispatch") return "task_dispatch";
+  return "sample_draft";
+}
+
+function buildProjectAcceptanceRunbookStep(stepId: ProjectAcceptanceStep["id"]): ProjectAcceptanceRunbookStep {
+  const overview = buildDevelopmentOverview();
+  const proofStepId = proofRouteStepIdForAcceptanceStep(stepId);
+  const runbookItem = overview.currentPipelineValidation.runbook.items.find((item) => item.stepId === proofStepId)
+    ?? overview.currentPipelineValidation.runbook.items[0];
+  const proofStep = overview.pipelineProofRoute.steps.find((step) => step.id === runbookItem.stepId);
+
+  return {
+    stepId: runbookItem.stepId,
+    title: proofStep?.title ?? runbookItem.stepId,
+    owner: runbookItem.owner,
+    sampleAction: runbookItem.sampleAction,
+    proofToCapture: runbookItem.proofToCapture,
+    rollbackIfWeak: runbookItem.rollbackIfWeak,
+  };
 }
 
 function roleDispatchPrefix(projectId: string | undefined, intentId: string) {
@@ -451,6 +486,7 @@ function buildProjectRealSampleAcceptanceSheet(input: ProjectDashboardInput): Pr
         href: step.href,
         actionLabel: missingEvidenceActionLabels[step.id],
         ...execution,
+        runbookStep: buildProjectAcceptanceRunbookStep(step.id),
         receiptTemplate: buildAcceptanceGapReceiptTemplate(step, execution),
         dispatchDraftHref: buildAcceptanceGapDispatchDraftHref(input, step, execution),
       };

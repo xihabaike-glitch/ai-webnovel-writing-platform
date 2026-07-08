@@ -760,6 +760,14 @@ export default async function ProjectPage({
                     <p className="mt-2 rounded-md bg-rose-300/15 p-2 text-rose-100">停手线：{item.stopRule}</p>
                     <div className="mt-2 text-slate-400">负责人：{item.ownerRole}</div>
                     <p className="mt-1 text-slate-300">{item.executionHint}</p>
+                    <div className="mt-2 rounded-md bg-white/10 p-2 text-slate-200">
+                      <div className="font-medium text-white">当前实跑动作 · {item.runbookStep.title}</div>
+                      <div className="mt-1 grid gap-1">
+                        <span>样本动作：{item.runbookStep.sampleAction}</span>
+                        <span>要抓证据：{item.runbookStep.proofToCapture}</span>
+                        <span>退路：{item.runbookStep.rollbackIfWeak}</span>
+                      </div>
+                    </div>
                     <div className="mt-2 rounded-md bg-slate-950/50 p-2">
                       <div className="font-medium text-white">回执模板</div>
                       <div className="mt-1 grid gap-1 break-words text-slate-300">

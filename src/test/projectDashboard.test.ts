@@ -127,6 +127,15 @@ test("buildProjectDashboard", async (t) => {
     assert.ok(dashboard.realSampleAcceptanceSheet.missingEvidence[0]?.receiptTemplate.some((line) => line.includes("验收证据：")));
     assert.ok(dashboard.realSampleAcceptanceSheet.missingEvidence[0]?.receiptTemplate.some((line) => line.includes("人工验收：通过 / 退回")));
     assert.ok(dashboard.realSampleAcceptanceSheet.missingEvidence[0]?.receiptTemplate.some((line) => line.includes("下一动作：")));
+    assert.equal(dashboard.realSampleAcceptanceSheet.missingEvidence[0]?.runbookStep.stepId, "sample_draft");
+    assert.ok(dashboard.realSampleAcceptanceSheet.missingEvidence[0]?.runbookStep.title.includes("首章样本"));
+    assert.ok(dashboard.realSampleAcceptanceSheet.missingEvidence[0]?.runbookStep.sampleAction.includes("首章样本"));
+    assert.ok(dashboard.realSampleAcceptanceSheet.missingEvidence[0]?.runbookStep.proofToCapture.includes("人工采用"));
+    assert.ok(dashboard.realSampleAcceptanceSheet.missingEvidence[0]?.runbookStep.rollbackIfWeak.includes("二改"));
+    assert.equal(dashboard.realSampleAcceptanceSheet.missingEvidence[1]?.runbookStep.stepId, "task_dispatch");
+    assert.ok(dashboard.realSampleAcceptanceSheet.missingEvidence[1]?.runbookStep.proofToCapture.includes("派单回执"));
+    assert.equal(dashboard.realSampleAcceptanceSheet.missingEvidence[2]?.runbookStep.stepId, "publish_package");
+    assert.ok(dashboard.realSampleAcceptanceSheet.missingEvidence[2]?.runbookStep.rollbackIfWeak.includes("发布修复"));
     const secondPassDraftHref = dashboard.realSampleAcceptanceSheet.missingEvidence[0]?.dispatchDraftHref;
     assert.equal(typeof secondPassDraftHref, "string");
     assert.ok(secondPassDraftHref.startsWith("/dispatch?"));

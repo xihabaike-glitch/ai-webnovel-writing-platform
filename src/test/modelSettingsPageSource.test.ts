@@ -54,3 +54,14 @@ test("model settings exposes gate recheck inside model setup action notices", ()
   assert.ok(settingsSource.includes("href={gateReturnHref}"));
   assert.ok(settingsSource.includes("gateReturnHref ? ("));
 });
+
+test("model settings summarizes model role route closeout for PM review", () => {
+  assert.ok(settingsSource.includes("模型职责路线收口面板"));
+  assert.ok(settingsSource.includes("modelRoleRouteCloseoutPercent"));
+  assert.ok(settingsSource.includes("aria-label=\"模型职责路线完成率\""));
+  assert.ok(settingsSource.includes("放行判断"));
+  assert.ok(settingsSource.includes("收口缺口"));
+  assert.ok(settingsSource.includes("下一刀"));
+  assert.ok(settingsSource.includes("modelRoleRouteNextCutLabel"));
+  assert.ok(settingsSource.includes("modelRoleRouteReleaseLabel"));
+});

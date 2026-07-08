@@ -705,6 +705,20 @@ export function ModelProviderSettings({
     () => buildModelRoleRouteBatchSavePlan(modelRoleRouteDraft),
     [modelRoleRouteDraft],
   );
+  const modelRoleRouteClosedCount = modelRoleRouteDraft.summary.current;
+  const modelRoleRouteActionableCount = modelRoleRouteDraft.summary.ready;
+  const modelRoleRouteGapCount = modelRoleRouteDraft.summary.ready + modelRoleRouteDraft.summary.missing;
+  const modelRoleRouteCloseoutPercent = modelRoleRouteDraft.summary.total > 0
+    ? Math.round((modelRoleRouteClosedCount / modelRoleRouteDraft.summary.total) * 100)
+    : 0;
+  const modelRoleRouteNextCutLabel = modelRoleRouteDraft.items.find((item) => item.status === "ready")?.label
+    ?? modelRoleRouteDraft.items.find((item) => item.status === "missing")?.label
+    ?? "跑小样本复检";
+  const modelRoleRouteReleaseLabel = modelRoleRouteDraft.summary.missing > 0
+    ? "暂不放行"
+    : modelRoleRouteDraft.summary.ready > 0
+      ? "先保存职责路线"
+      : "可以进入复检";
   const modelRolePmFocusTone = modelRolePmFocusToneCopy[modelRoleMatrixPmFocusNotice.tone];
   const latestRetestReviewByRuleKey = useMemo(() => {
     const reviewsByRuleKey = new Map<string, RouteAvoidanceGovernanceView["retestReview"]["items"][number]>();
@@ -1592,6 +1606,31 @@ export function ModelProviderSettings({
                 ))}
               </div>
             ) : null}
+            <div className="mt-3 rounded-md border border-slate-200 bg-slate-50 p-3 text-xs text-slate-700" aria-label="模型职责路线收口面板">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <div className="font-medium text-slate-950">模型职责路线收口面板</div>
+                  <p className="mt-1 leading-5 text-slate-600">
+                    先把六类写作任务绑定到首选模型、备用模型、人工验收和复检动作，再进入真实流水线。
+                  </p>
+                </div>
+                <div className="w-fit rounded-md bg-slate-950 px-2 py-1 text-[11px] font-semibold text-white">
+                  完成率 {modelRoleRouteCloseoutPercent}%
+                </div>
+              </div>
+              <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-200" aria-label="模型职责路线完成率">
+                <div
+                  className="h-full rounded-full bg-emerald-500"
+                  style={{ width: `${modelRoleRouteCloseoutPercent}%` }}
+                />
+              </div>
+              <div className="mt-3 grid gap-2 sm:grid-cols-4">
+                <div className="rounded-md bg-white px-3 py-2 font-medium text-slate-800">放行判断：{modelRoleRouteReleaseLabel}</div>
+                <div className="rounded-md bg-white px-3 py-2 font-medium text-slate-800">收口缺口：{modelRoleRouteGapCount}</div>
+                <div className="rounded-md bg-white px-3 py-2 font-medium text-slate-800">可保存：{modelRoleRouteActionableCount}</div>
+                <div className="rounded-md bg-white px-3 py-2 font-medium text-slate-800">下一刀：{modelRoleRouteNextCutLabel}</div>
+              </div>
+            </div>
             <div className="mt-3 grid gap-2 lg:grid-cols-2">
               {modelRoleRouteDraft.items.map((item) => {
                 const status = roleRouteDraftStatusCopy[item.status];

@@ -112,6 +112,16 @@ export interface DevelopmentOverviewCurrentPipelineValidation {
     receiptHref: string;
     receiptLabel: string;
   };
+  runbook: {
+    title: string;
+    items: Array<{
+      stepId: DevelopmentOverviewPipelineProofStep["id"];
+      owner: string;
+      sampleAction: string;
+      proofToCapture: string;
+      rollbackIfWeak: string;
+    }>;
+  };
   actionHref: string;
   actionLabel: string;
 }
@@ -562,6 +572,53 @@ function buildCurrentPipelineValidation(): DevelopmentOverviewCurrentPipelineVal
       ],
       receiptHref: "/gate?focus=action-recheck&source=real-sample-receipt#gate-focus-notice",
       receiptLabel: "查看真实样本回执复检",
+    },
+    runbook: {
+      title: "真实作品样本运行手册",
+      items: [
+        {
+          stepId: "project_start",
+          owner: "作者 + 作品工作台负责人",
+          sampleAction: "选一部真实作品开书，补齐目标平台、篇幅、开头钩子、结尾承诺、主干、分支和土壤。",
+          proofToCapture: "保存作品页的大树骨架、平台选择、篇幅模板和可进入首章样本的截图或回执。",
+          rollbackIfWeak: "目标平台、开头钩子或结尾承诺缺失时，回到作品页补骨架，不进入模型生成。",
+        },
+        {
+          stepId: "sample_draft",
+          owner: "中文网文写手 + 长篇结构主编",
+          sampleAction: "只生成首章样本，走候选稿、审稿、二改和人工采用，不直接覆盖正式正文。",
+          proofToCapture: "保存首章样本、审稿问题、二改候选、人工采用结论和未采用原因。",
+          rollbackIfWeak: "钩子、爽点、人物弧光或平台节奏不过线时，退回二改或重写，不进入批量。",
+        },
+        {
+          stepId: "task_dispatch",
+          owner: "派单负责人 + AI 编辑部角色",
+          sampleAction: "把首章、审稿、二改、发布包或失败修复生成正式派单，并要求角色、输入、输出齐全。",
+          proofToCapture: "保存派单回执、执行模型、输入摘要、输出摘要、人工验收和下一步入口。",
+          rollbackIfWeak: "缺执行角色、输入输出或人工验收时，退回派单中心补回执，不送总闸门。",
+        },
+        {
+          stepId: "gate_check",
+          owner: "毒舌产品经理",
+          sampleAction: "把真实样本带回总闸门复检，只判断是否允许小样本继续，不直接宣布批量跑通。",
+          proofToCapture: "保存样本、复查、成本、质量、失败率、恢复证据和总闸门剩余卡点变化。",
+          rollbackIfWeak: "缺复查、失败率过高或模型岗位缺岗时，暂停批量并转入对应修复入口。",
+        },
+        {
+          stepId: "failure_repair",
+          owner: "失败修复中心",
+          sampleAction: "按模型配置、提示词上下文、样本重试、人工复盘分泳道处理失败，再跑恢复小样本。",
+          proofToCapture: "保存失败原因、修复泳道、重试样本、恢复观察记录和是否仍需暂停批量。",
+          rollbackIfWeak: "未恢复失败仍存在或恢复观察不足时，继续小样本观察，不扩大批量。",
+        },
+        {
+          stepId: "publish_package",
+          owner: "投稿包装编辑 + 反馈运营",
+          sampleAction: "为目标平台生成发布包，回收标题、简介、标签、样章、版本基线和真实反馈。",
+          proofToCapture: "保存发布包、导出版本、平台卖点、样章、反馈记录、复盘指标和下一轮修订任务。",
+          rollbackIfWeak: "平台卖点、前三章兑现、标签或反馈记录缺失时，停在发布修复，不宣称流水线完成。",
+        },
+      ],
     },
     actionHref: "/projects#pipeline-projects",
     actionLabel: "验收真实流水线",

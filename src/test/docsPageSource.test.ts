@@ -53,3 +53,11 @@ test("docs page renders the real pipeline final review checklist", () => {
   assert.ok(source.includes("overview.currentPipelineValidation.finalReview.holdBatchSignals.map"));
   assert.ok(source.includes("overview.currentPipelineValidation.finalReview.receiptHref"));
 });
+
+test("docs page renders the real sample runbook", () => {
+  assert.ok(source.includes("overview.currentPipelineValidation.runbook.title"));
+  assert.ok(source.includes("overview.currentPipelineValidation.runbook.items.map"));
+  assert.ok(source.includes("item.sampleAction"));
+  assert.ok(source.includes("item.proofToCapture"));
+  assert.ok(source.includes("item.rollbackIfWeak"));
+});

@@ -361,6 +361,26 @@ export default function DevelopmentDocsPage() {
             </div>
           </div>
         </div>
+        <div className="mt-3 rounded-md bg-white/10 p-3">
+          <div className="text-xs font-medium text-slate-300">实跑步骤</div>
+          <h3 className="mt-1 font-medium text-white">{overview.currentPipelineValidation.runbook.title}</h3>
+          <div className="mt-3 grid gap-3 lg:grid-cols-2">
+            {overview.currentPipelineValidation.runbook.items.map((item, index) => {
+              const step = overview.pipelineProofRoute.steps.find((entry) => entry.id === item.stepId);
+              return (
+                <article className="rounded-md bg-white p-3 text-xs leading-5 text-slate-700" key={item.stepId}>
+                  <div className="text-slate-500">第 {index + 1} 步 · {item.owner}</div>
+                  <h4 className="mt-1 font-medium text-slate-950">{step?.title}</h4>
+                  <div className="mt-2 grid gap-2">
+                    <p><span className="font-medium text-slate-950">样本动作：</span>{item.sampleAction}</p>
+                    <p><span className="font-medium text-slate-950">要抓的证据：</span>{item.proofToCapture}</p>
+                    <p><span className="font-medium text-slate-950">退路：</span>{item.rollbackIfWeak}</p>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        </div>
       </section>
 
       <section className="mb-6 rounded-md border border-slate-200 bg-white p-4">

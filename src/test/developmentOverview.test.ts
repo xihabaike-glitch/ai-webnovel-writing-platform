@@ -216,6 +216,21 @@ test("buildDevelopmentOverview", async (t) => {
     assert.ok(overview.currentPipelineValidation.finalReview.passSignals.some((item) => item.includes("发布包")));
     assert.ok(overview.currentPipelineValidation.finalReview.repairSignals.some((item) => item.includes("退回")));
     assert.ok(overview.currentPipelineValidation.finalReview.holdBatchSignals.some((item) => item.includes("暂停批量")));
+    assert.equal(overview.currentPipelineValidation.runbook.title, "真实作品样本运行手册");
+    assert.equal(
+      overview.currentPipelineValidation.runbook.items.length,
+      overview.pipelineProofRoute.steps.length,
+    );
+    assert.deepEqual(
+      overview.currentPipelineValidation.runbook.items.map((item) => item.stepId),
+      overview.pipelineProofRoute.steps.map((step) => step.id),
+    );
+    assert.ok(overview.currentPipelineValidation.runbook.items.every((item) => item.owner.length >= 4));
+    assert.ok(overview.currentPipelineValidation.runbook.items.every((item) => item.sampleAction.length >= 10));
+    assert.ok(overview.currentPipelineValidation.runbook.items.every((item) => item.proofToCapture.length >= 10));
+    assert.ok(overview.currentPipelineValidation.runbook.items.every((item) => item.rollbackIfWeak.length >= 10));
+    assert.ok(overview.currentPipelineValidation.runbook.items[0]?.sampleAction.includes("开书"));
+    assert.ok(overview.currentPipelineValidation.runbook.items.at(-1)?.proofToCapture.includes("复盘"));
   });
 
   await t.test("maps original requirements to current product evidence", () => {

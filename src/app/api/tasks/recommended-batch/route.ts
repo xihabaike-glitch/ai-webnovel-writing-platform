@@ -5,6 +5,7 @@ import { reviewChapterDraft } from "@/lib/ai/chapterReviewGeneration";
 import { generateChapterSecondPass } from "@/lib/ai/chapterSecondPassGeneration";
 import { prisma } from "@/lib/db/prisma";
 import { buildBatchRouteEffectSummary } from "@/lib/model-gateway/batchRouteEffectSummary";
+import { buildModelRoleMatrix, buildModelRoleMatrixPriorityBlocker } from "@/lib/model-gateway/modelRoleMatrix";
 import { buildRouteConfirmationRecheckEvidenceFromDispatchTasks } from "@/lib/model-gateway/routeConfirmation";
 import { buildBatchExecutionSafety } from "@/lib/projects/batchExecutionSafety";
 import { getBatchExecutionStrategy } from "@/lib/projects/batchExecutionStrategy";
@@ -229,6 +230,16 @@ export async function POST(request: Request) {
   }));
   const queue = buildTaskQueueCenter(taskQueueProjects);
   const safety = buildBatchExecutionSafety(queue.items, safetyProjects, strategy);
+  const modelRoleMatrix = buildModelRoleMatrix(modelProviders.map((provider) => ({
+    id: provider.id,
+    providerId: provider.providerId,
+    displayName: provider.displayName,
+    encryptedApiKey: provider.encryptedApiKey,
+    defaultModel: provider.defaultModel,
+    enabled: provider.enabled,
+    maxContextTokens: provider.maxContextTokens,
+  })));
+  const modelRolePriorityBlocker = buildModelRoleMatrixPriorityBlocker(modelRoleMatrix);
   const batchRhythmSourceTask = executionContext === "batch_rhythm_recheck"
     ? await prisma.gateDispatchTask.findUnique({
       where: { dispatchKey: sourceDispatchKey },
@@ -298,6 +309,9 @@ export async function POST(request: Request) {
   }
   if (!safety.canRunRecommendedBatch) {
     return NextResponse.json({ error: safety.warnings[0] ?? "批量安全阀未通过。", plan, safety, modelRouteGate }, { status: 429 });
+  }
+  if (modelRolePriorityBlocker?.tone === "blocked") {
+    return NextResponse.json({ error: modelRolePriorityBlocker.detail, plan, safety, modelRouteGate, modelRoleMatrix }, { status: 429 });
   }
 
   const secondPassCandidates = new Map<string, ReturnType<typeof buildReviewPipelineQueue>["candidates"][number]>();

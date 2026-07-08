@@ -492,6 +492,7 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
     maxContextTokens: provider.maxContextTokens,
   })));
   const modelRolePriorityBlocker = buildModelRoleMatrixPriorityBlocker(modelRoleMatrix);
+  const modelRolesBlockRecommendedBatch = modelRolePriorityBlocker?.tone === "blocked";
   const executionPlan = buildTaskQueueExecutionPlan(queue.items, activeStrategy.maxBatchSize, activeStrategy);
   const runConsole = buildTaskRunConsole(recentAiTasks.map((task) => ({
     ...task,
@@ -539,7 +540,7 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
         resumeActionLabel: debtView.resumeActionLabel,
         resumeActionHref: debtView.resumeActionHref,
         resumeBatch: {
-          canRun: safety.canRunRecommendedBatch && executionPlan.canRun && !modelRouteBlocksRecommendedBatch,
+          canRun: safety.canRunRecommendedBatch && executionPlan.canRun && !modelRouteBlocksRecommendedBatch && !modelRolesBlockRecommendedBatch,
           actionLabel: executionPlan.actionLabel,
           detail: executionPlan.detail,
           href: "/tasks#recommended-batch",
@@ -1224,7 +1225,7 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
             </div>
             {batchRhythmClosure?.status === "completed" ? (
               <RunRecommendedBatchButton
-                disabled={!safety.canRunRecommendedBatch || !executionPlan.canRun || modelRouteBlocksRecommendedBatch}
+                disabled={!safety.canRunRecommendedBatch || !executionPlan.canRun || modelRouteBlocksRecommendedBatch || modelRolesBlockRecommendedBatch}
                 executionContext="batch_rhythm_recheck"
                 gateReturnHref={gateReturn}
                 initialModelRouteGate={modelRoutePreflightGate}
@@ -1294,10 +1295,10 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
           </div>
           <div className="flex flex-col gap-2 lg:items-end">
             <div className="rounded-md bg-slate-50 px-3 py-2 text-sm font-medium text-slate-700">
-              {safety.canRunRecommendedBatch && executionPlan.canRun && !modelRouteBlocksRecommendedBatch ? "建议批次可执行" : "建议先处理阻塞"}
+              {safety.canRunRecommendedBatch && executionPlan.canRun && !modelRouteBlocksRecommendedBatch && !modelRolesBlockRecommendedBatch ? "建议批次可执行" : "建议先处理阻塞"}
             </div>
             <RunRecommendedBatchButton
-              disabled={!safety.canRunRecommendedBatch || !executionPlan.canRun || modelRouteBlocksRecommendedBatch}
+              disabled={!safety.canRunRecommendedBatch || !executionPlan.canRun || modelRouteBlocksRecommendedBatch || modelRolesBlockRecommendedBatch}
               executionContext={effectiveBatchContext}
               gateReturnHref={gateReturn}
               initialModelRouteGate={modelRoutePreflightGate}

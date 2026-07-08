@@ -170,6 +170,21 @@ test("tasks page exposes export version as a batch safety blocker", () => {
   assert.ok(safetySource.includes("\"/tasks?view=blocked&debt=export_version#task-debt\""));
 });
 
+test("tasks page blocks recommended batches when model roles are missing", () => {
+  assert.ok(source.includes("const modelRolesBlockRecommendedBatch = modelRolePriorityBlocker?.tone === \"blocked\";"));
+  assert.ok(source.includes("disabled={!safety.canRunRecommendedBatch || !executionPlan.canRun || modelRouteBlocksRecommendedBatch || modelRolesBlockRecommendedBatch}"));
+  assert.ok(source.includes("canRun: safety.canRunRecommendedBatch && executionPlan.canRun && !modelRouteBlocksRecommendedBatch && !modelRolesBlockRecommendedBatch"));
+});
+
+test("recommended batch API blocks direct execution when model roles are missing", () => {
+  const routeSource = readFileSync("src/app/api/tasks/recommended-batch/route.ts", "utf8");
+
+  assert.ok(routeSource.includes("buildModelRoleMatrix"));
+  assert.ok(routeSource.includes("buildModelRoleMatrixPriorityBlocker"));
+  assert.ok(routeSource.includes("modelRolePriorityBlocker?.tone === \"blocked\""));
+  assert.ok(routeSource.includes("return NextResponse.json({ error: modelRolePriorityBlocker.detail"));
+});
+
 test("tasks page shows what a platform strategy task unlocks next", () => {
   assert.ok(source.includes("entry.sourceType === \"platform_strategy\" && entry.sourceNextStep"));
   assert.ok(source.includes("做完解锁："));

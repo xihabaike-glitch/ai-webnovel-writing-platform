@@ -242,7 +242,7 @@ function buildRoleIntentDispatch(intent: DispatchRoleIntent): GatePlatformGrowth
     platformId: "role-dispatch",
     platformName: "角色派单",
     stage: "watch",
-    state: "queued",
+    state: intent.roleIntent === "acceptance-gap" ? "assigned" : "queued",
     priorityScore: 82,
     ownerRole: intent.ownerRole,
     title: `${intent.roleName}｜角色任务`,
@@ -976,7 +976,7 @@ export function GateDispatchTaskCenter({
       });
       setFocusedCompletionDispatchKey(created.dispatchKey);
       setFocusedCompletionMessage(acceptanceGapDraft
-        ? "验收缺口已生成正式派单，先补完成依据再回总闸门复检。"
+        ? "验收缺口已生成正式派单，完成依据模板已预填；补产物链接和人工验收后回总闸门复检。"
         : "角色任务已生成正式派单，先补完成依据再回作品验收。");
       setRoleFilter(created.ownerRole);
       setQueueFilter("all");

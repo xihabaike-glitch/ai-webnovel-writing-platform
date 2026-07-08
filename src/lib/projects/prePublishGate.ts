@@ -496,6 +496,7 @@ export interface PrePublishGateRecheckSummary {
   totalSteps: number;
   currentStepLabel: string;
   recheckVerdict: PrePublishGateRecheckVerdict;
+  nextStep: PrePublishGateRecheckNextStep;
   completedEvidence: string[];
   remainingEvidence: string[];
   remainingBlockers: PrePublishGateRemainingBlocker[];
@@ -508,6 +509,13 @@ export interface PrePublishGateRecheckSummary {
 export interface PrePublishGateRecheckVerdict {
   tone: "cleared" | "progress" | "stalled";
   label: string;
+  detail: string;
+}
+
+export interface PrePublishGateRecheckNextStep {
+  tone: "release" | "dispatch" | "repair";
+  label: string;
+  href: string;
   detail: string;
 }
 
@@ -1777,13 +1785,14 @@ function buildProjectAcceptanceRemainingBlockers(
 }
 
 function buildProjectAcceptanceRecheckVerdict(input: {
+  acceptanceStatus: PrePublishGateProjectStatus["acceptanceSheetGate"]["status"];
   completedSteps: number;
   totalSteps: number;
   currentStepLabel: string;
   remainingBlockers: PrePublishGateRemainingBlocker[];
   latestEvidence: string | null;
 }): PrePublishGateRecheckVerdict {
-  if (input.remainingBlockers.length === 0) {
+  if (input.acceptanceStatus === "pass" || input.remainingBlockers.length === 0) {
     return {
       tone: "cleared",
       label: "验收缺口已解除",
@@ -1806,6 +1815,44 @@ function buildProjectAcceptanceRecheckVerdict(input: {
   };
 }
 
+function buildProjectAcceptanceRecheckNextStep(input: {
+  verdict: PrePublishGateRecheckVerdict;
+  currentStepLabel: string;
+  nextDispatch: PrePublishGateRecheckDispatch | null;
+  remainingBlockers: PrePublishGateRemainingBlocker[];
+  releaseAction: PrePublishGateAction | null;
+  fallbackAction: PrePublishGateAction | null;
+}): PrePublishGateRecheckNextStep {
+  if (input.verdict.tone === "cleared") {
+    const action = input.releaseAction ?? input.fallbackAction;
+    return {
+      tone: "release",
+      label: action?.label ?? "进入发布闭环",
+      href: action?.href ?? "#gate-export-package",
+      detail: `验收缺口已解除；下一步按「${action?.label ?? "进入发布闭环"}」继续，不要回头重复补同一张单。`,
+    };
+  }
+
+  if (input.nextDispatch) {
+    return {
+      tone: "dispatch",
+      label: input.nextDispatch.actionLabel,
+      href: input.nextDispatch.href,
+      detail: `继续补「${input.currentStepLabel}」完成依据；生成派单后处理产物链接、人工验收和回总闸门复检。`,
+    };
+  }
+
+  const blocker = input.remainingBlockers[0] ?? null;
+  return {
+    tone: "repair",
+    label: blocker?.actionLabel ?? "继续处理当前卡点",
+    href: blocker?.href ?? "/gate",
+    detail: blocker
+      ? `当前还卡在「${blocker.label}」；先处理这一个卡点，别跳到后续步骤。`
+      : "当前没有可自动派发的下一步，先回总闸门核对优先动作。",
+  };
+}
+
 function buildProjectAcceptanceRecheckSummary(
   actionId: string | null | undefined,
   gate: PrePublishGate,
@@ -1818,11 +1865,21 @@ function buildProjectAcceptanceRecheckSummary(
   const steps = project.acceptanceSheetGate.steps;
   const currentStep = steps.find((step) => step.id === project.acceptanceSheetGate.currentStepId) ?? steps[0] ?? null;
   const completedSteps = steps.filter((step) => step.status === "done").length;
-  const remainingBlockers = buildProjectAcceptanceRemainingBlockers(project.projectId, steps);
+  const remainingBlockers = project.acceptanceSheetGate.status === "pass"
+    ? []
+    : buildProjectAcceptanceRemainingBlockers(project.projectId, steps);
   const nextDispatch = buildProjectAcceptanceNextDispatch(project, currentStep, completedSteps);
   const nextDispatches = buildProjectAcceptanceNextDispatches(project, currentStep, completedSteps, nextDispatch);
   const latestEvidence = project.acceptanceSheetGate.latestDispatchEvidence;
   const currentStepLabel = currentStep?.label ?? project.acceptanceSheetGate.actionLabel;
+  const recheckVerdict = buildProjectAcceptanceRecheckVerdict({
+    acceptanceStatus: project.acceptanceSheetGate.status,
+    completedSteps,
+    totalSteps: steps.length,
+    currentStepLabel,
+    remainingBlockers,
+    latestEvidence,
+  });
 
   return {
     title: `${project.projectTitle} · 项目验收单回填`,
@@ -1830,12 +1887,14 @@ function buildProjectAcceptanceRecheckSummary(
     completedSteps,
     totalSteps: steps.length,
     currentStepLabel,
-    recheckVerdict: buildProjectAcceptanceRecheckVerdict({
-      completedSteps,
-      totalSteps: steps.length,
+    recheckVerdict,
+    nextStep: buildProjectAcceptanceRecheckNextStep({
+      verdict: recheckVerdict,
       currentStepLabel,
+      nextDispatch,
       remainingBlockers,
-      latestEvidence,
+      releaseAction: gate.releaseAction,
+      fallbackAction: gate.priorityActions[0] ?? null,
     }),
     completedEvidence: steps.filter((step) => step.status === "done").map((step) => step.evidence),
     remainingEvidence: steps.filter((step) => step.status !== "done").map((step) => `${step.label}：${step.evidence}`),

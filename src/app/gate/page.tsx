@@ -73,6 +73,12 @@ function recheckVerdictTone(tone: "cleared" | "progress" | "stalled") {
   return "border-amber-200 bg-amber-50 text-amber-900";
 }
 
+function recheckNextStepTone(tone: "release" | "dispatch" | "repair") {
+  if (tone === "release") return "border-emerald-200 bg-white text-emerald-900 hover:bg-emerald-50";
+  if (tone === "dispatch") return "border-blue-200 bg-white text-blue-900 hover:bg-blue-50";
+  return "border-amber-200 bg-white text-amber-900 hover:bg-amber-50";
+}
+
 function shortDateTime(value: string | null) {
   if (!value) return "未记录时间";
   return new Intl.DateTimeFormat("zh-CN", {
@@ -379,6 +385,13 @@ export default async function GatePage({
                       <div className="font-medium">复检结论：{focusNotice.recheckSummary.recheckVerdict.label}</div>
                       <div className="mt-1">{focusNotice.recheckSummary.recheckVerdict.detail}</div>
                     </div>
+                    <Link
+                      className={`mt-2 block rounded-md border px-2 py-2 text-xs leading-5 ${recheckNextStepTone(focusNotice.recheckSummary.nextStep.tone)}`}
+                      href={hrefWithGateReturn(focusNotice.recheckSummary.nextStep.href, gateRecheckReturnHref)}
+                    >
+                      <div className="font-medium">下一动作分流：{focusNotice.recheckSummary.nextStep.label}</div>
+                      <div className="mt-1">{focusNotice.recheckSummary.nextStep.detail}</div>
+                    </Link>
                     <div className="mt-2 flex flex-wrap gap-2 text-xs">
                       <span className="rounded-md bg-slate-950 px-2 py-1 font-medium text-white">
                         已完成 {focusNotice.recheckSummary.completedSteps}/{focusNotice.recheckSummary.totalSteps} 步

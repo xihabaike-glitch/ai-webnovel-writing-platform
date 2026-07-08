@@ -447,6 +447,9 @@ test("buildPrePublishGate", async (t) => {
     assert.equal(notice.recheckSummary?.recheckVerdict.label, "卡点已减少");
     assert.ok(notice.recheckSummary?.recheckVerdict.detail.includes("已补 5/6 步"));
     assert.ok(notice.recheckSummary?.recheckVerdict.detail.includes("继续处理「发布包」"));
+    assert.equal(notice.recheckSummary?.nextStep.tone, "dispatch");
+    assert.equal(notice.recheckSummary?.nextStep.label, "生成下一张派单");
+    assert.ok(notice.recheckSummary?.nextStep.detail.includes("继续补「发布包」"));
     assert.ok(notice.recheckSummary?.completedEvidence.some((line) => line.includes("首日派单已有完成依据")));
     assert.ok(notice.recheckSummary?.latestEvidence?.includes("派单中心已补齐首日平台包预检"));
     assert.equal(notice.recheckSummary?.nextDispatch?.id, "project-acceptance-next:project-recheck-progress:publish_package");
@@ -455,6 +458,27 @@ test("buildPrePublishGate", async (t) => {
     assert.equal(notice.recheckSummary?.nextDispatch?.actionLabel, "生成下一张派单");
     assert.ok(notice.recheckSummary?.nextDispatch?.detail.includes("发布包还缺前三章"));
     assert.ok(notice.detail.includes("已完成 5/6 步"));
+  });
+
+  await t.test("routes cleared acceptance rechecks to the release action", () => {
+    const gate = buildPrePublishGate({
+      projects: [readyProject],
+      failureTasks: [],
+      batchHistory: [],
+    });
+    const notice = buildPrePublishGateFocusNotice({
+      focus: "action-recheck",
+      actionId: "project-acceptance:project-ready",
+      gate,
+    });
+
+    assert.equal(notice.visible, true);
+    assert.equal(notice.recheckSummary?.recheckVerdict.tone, "cleared");
+    assert.equal(notice.recheckSummary?.nextStep.tone, "release");
+    assert.equal(notice.recheckSummary?.nextStep.label, "进入发布闭环");
+    assert.equal(notice.recheckSummary?.nextStep.href, "#gate-export-package");
+    assert.ok(notice.recheckSummary?.nextStep.detail.includes("验收缺口已解除"));
+    assert.equal(notice.recheckSummary?.nextDispatch, null);
   });
 
   await t.test("routes project acceptance recheck to role dispatch closure when role evidence is incomplete", () => {

@@ -100,6 +100,7 @@ export default async function ChapterPage({
   });
   const editableChapter = {
     id: chapter.id,
+    order: chapter.order,
     title: chapter.title,
     content: chapter.content,
     goal: chapter.goal,
@@ -149,6 +150,7 @@ export default async function ChapterPage({
             <ChapterEditor
               key={`${chapter.id}-${chapter.updatedAt.toISOString()}`}
               chapter={editableChapter}
+              gateReturnHref={gateReturn}
             />
           </div>
           <div id="chapter-second-pass">

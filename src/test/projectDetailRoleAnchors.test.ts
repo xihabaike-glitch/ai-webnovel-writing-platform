@@ -487,6 +487,28 @@ test("chapter detail page carries gate return through adoption next actions", ()
   assert.ok(chapterRevisionWorkbench.includes("href={hrefWithGateReturn(nextAction.href, gateReturnHref)}"));
 });
 
+test("chapter editor turns first chapter sample gaps into a five item workbench", () => {
+  const chapterPage = readFileSync("src/app/projects/[projectId]/chapters/[chapterId]/page.tsx", "utf8");
+  const chapterEditor = readFileSync("src/components/chapters/ChapterEditor.tsx", "utf8");
+
+  assert.ok(chapterPage.includes("order: chapter.order"));
+  assert.ok(chapterPage.includes("<ChapterEditor"));
+  assert.ok(chapterPage.includes("gateReturnHref={gateReturn}"));
+
+  assert.ok(chapterEditor.includes("gateReturnHref?: string | null"));
+  assert.ok(chapterEditor.includes("chapter.order === 1"));
+  assert.ok(chapterEditor.includes("首章样本补齐工作台"));
+  assert.ok(chapterEditor.includes("首章样本完成"));
+  for (const item of ["正文", "钩子", "冲突", "价值变化", "章末追读"]) {
+    assert.ok(chapterEditor.includes(`label: "${item}"`));
+  }
+  for (const field of ["content", "hook", "conflict", "valueShift", "cliffhanger"]) {
+    assert.ok(chapterEditor.includes(`${field}.trim().length > 0`));
+  }
+  assert.ok(chapterEditor.includes("href={gateReturnHref}"));
+  assert.ok(chapterEditor.includes("处理后回总闸门复检"));
+});
+
 test("chapter detail page surfaces pending candidate production gate", () => {
   const chapterPage = readFileSync("src/app/projects/[projectId]/chapters/[chapterId]/page.tsx", "utf8");
 

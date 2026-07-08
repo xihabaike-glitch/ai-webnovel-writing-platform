@@ -433,7 +433,7 @@ export default async function DispatchPage({
             </div>
             <Link
               className="w-fit rounded-md border border-emerald-300/60 bg-emerald-300/10 px-3 py-2 text-xs font-semibold text-emerald-100 hover:bg-emerald-300/20"
-              href="/gate#pipeline-final-review"
+              href="/gate?focus=action-recheck&source=final-delivery-receipt#pipeline-final-review"
             >
               查看最终交付正式放行卡
             </Link>

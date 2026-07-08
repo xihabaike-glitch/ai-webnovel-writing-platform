@@ -183,6 +183,16 @@ test("recommended batch API blocks direct execution when model roles are missing
   assert.ok(routeSource.includes("buildModelRoleMatrixPriorityBlocker"));
   assert.ok(routeSource.includes("modelRolePriorityBlocker?.tone === \"blocked\""));
   assert.ok(routeSource.includes("return NextResponse.json({ error: modelRolePriorityBlocker.detail"));
+  assert.ok(routeSource.includes("modelRoleBlocker: modelRolePriorityBlocker"));
+});
+
+test("recommended batch button surfaces model role repair actions from the API", () => {
+  const buttonSource = readFileSync("src/components/tasks/RunRecommendedBatchButton.tsx", "utf8");
+
+  assert.ok(buttonSource.includes("modelRoleBlocker?: {"));
+  assert.ok(buttonSource.includes("setModelRoleBlocker(payload.modelRoleBlocker ?? null);"));
+  assert.ok(buttonSource.includes("模型岗位修复"));
+  assert.ok(buttonSource.includes("href={hrefWithGateReturn(modelRoleBlocker.actionHref, gateReturnHref)}"));
 });
 
 test("tasks page shows what a platform strategy task unlocks next", () => {

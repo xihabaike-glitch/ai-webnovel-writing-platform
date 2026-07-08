@@ -70,6 +70,13 @@ export interface BatchRunResponse {
       completedAt: string | null;
     } | null;
   };
+  modelRoleBlocker?: {
+    tone: "blocked" | "watch";
+    title: string;
+    detail: string;
+    actionLabel: string;
+    actionHref: string;
+  };
 }
 
 type BatchExecutionContext = "standard" | "repair_resume" | "batch_rhythm_recheck";
@@ -131,6 +138,7 @@ export function RunRecommendedBatchButton({
   const [message, setMessage] = useState<string | null>(null);
   const [batchReceipt, setBatchReceipt] = useState<BatchRunResponse["batchReceipt"] | null>(null);
   const [modelRouteGate, setModelRouteGate] = useState<BatchRunResponse["modelRouteGate"] | null>(initialModelRouteGate);
+  const [modelRoleBlocker, setModelRoleBlocker] = useState<BatchRunResponse["modelRoleBlocker"] | null>(null);
   const [isCreatingRecheck, setIsCreatingRecheck] = useState(false);
   const routeGateTimeline = modelRouteGate ? buildRecommendedBatchRouteGateTimeline(modelRouteGate) : null;
   const routeGateActions = modelRouteGate ? buildRecommendedBatchRouteGateActions(modelRouteGate) : null;
@@ -153,6 +161,7 @@ export function RunRecommendedBatchButton({
     setMessage(null);
     setBatchReceipt(null);
     setModelRouteGate(initialModelRouteGate);
+    setModelRoleBlocker(null);
     try {
       const params = new URLSearchParams({
         strategy: strategyId,
@@ -164,6 +173,7 @@ export function RunRecommendedBatchButton({
       });
       const payload = (await response.json()) as BatchRunResponse;
       setModelRouteGate(payload.modelRouteGate ?? null);
+      setModelRoleBlocker(payload.modelRoleBlocker ?? null);
       if (!response.ok) {
         setMessage(payload.error ?? "推荐批次执行失败。");
         router.refresh();
@@ -183,6 +193,7 @@ export function RunRecommendedBatchButton({
           : payload.plan?.actionLabel ?? "推荐批次";
       setMessage(`${contextLabel}完成：成功 ${succeeded}，失败 ${failed}。${summary}${tacticText}`);
       setBatchReceipt(payload.batchReceipt ?? null);
+      setModelRoleBlocker(null);
       router.refresh();
     } catch (caught) {
       setMessage(caught instanceof Error ? caught.message : "推荐批次执行失败。");
@@ -229,6 +240,23 @@ export function RunRecommendedBatchButton({
       {isRunning ? "执行中" : runActionLabel}
       </button>
       {message ? <p className="max-w-xl text-sm text-slate-600">{message}</p> : null}
+      {modelRoleBlocker ? (
+        <div className="w-full max-w-2xl rounded-md border border-rose-200 bg-rose-50 p-3 text-left text-sm text-rose-950">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <div className="text-xs font-medium text-rose-700">模型岗位修复</div>
+              <div className="mt-1 font-medium">{modelRoleBlocker.title}</div>
+              <p className="mt-1 leading-6">{modelRoleBlocker.detail}</p>
+            </div>
+            <a
+              className="w-fit shrink-0 rounded-md bg-white px-3 py-2 text-xs font-medium text-rose-950 hover:bg-rose-100"
+              href={hrefWithGateReturn(modelRoleBlocker.actionHref, gateReturnHref)}
+            >
+              {modelRoleBlocker.actionLabel}
+            </a>
+          </div>
+        </div>
+      ) : null}
       {modelRouteGate ? (
         <div className={`w-full max-w-2xl rounded-md border p-3 text-left text-sm ${modelRouteGateTone(modelRouteGate.status)}`}>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">

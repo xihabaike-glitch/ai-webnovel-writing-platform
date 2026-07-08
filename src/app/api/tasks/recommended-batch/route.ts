@@ -311,7 +311,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: safety.warnings[0] ?? "批量安全阀未通过。", plan, safety, modelRouteGate }, { status: 429 });
   }
   if (modelRolePriorityBlocker?.tone === "blocked") {
-    return NextResponse.json({ error: modelRolePriorityBlocker.detail, plan, safety, modelRouteGate, modelRoleMatrix }, { status: 429 });
+    return NextResponse.json({ error: modelRolePriorityBlocker.detail, plan, safety, modelRouteGate, modelRoleMatrix, modelRoleBlocker: modelRolePriorityBlocker }, { status: 429 });
   }
 
   const secondPassCandidates = new Map<string, ReturnType<typeof buildReviewPipelineQueue>["candidates"][number]>();

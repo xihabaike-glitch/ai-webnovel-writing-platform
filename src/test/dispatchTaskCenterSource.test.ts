@@ -131,6 +131,18 @@ test("dispatch task center auto-fills acceptance gap completion templates", () =
   assert.ok(source.includes("回总闸门复检："));
 });
 
+test("dispatch task center auto-fills chapter adoption follow-up templates", () => {
+  assert.ok(source.includes("isChapterAdoptionDispatchTask"));
+  assert.ok(source.includes("chapterAdoptionCompletionTemplates"));
+  assert.ok(source.includes("buildChapterAdoptionCompletionTemplate(task)"));
+  assert.ok(source.includes("采纳后审稿完成依据模板"));
+  assert.ok(source.includes("采纳后二改完成依据模板"));
+  assert.ok(source.includes("二改采纳后发布质检模板"));
+  assert.ok(source.includes("采纳版本："));
+  assert.ok(source.includes("人工验收：通过 / 退回"));
+  assert.ok(source.includes("下一步：进入二改 / 回发布质检 / 继续修稿"));
+});
+
 test("dispatch task center shows dispatch receipt acceptance criteria before completion", () => {
   assert.ok(source.includes("dispatchReceiptAcceptanceCriteria"));
   assert.ok(source.includes("任务回执验收口径"));

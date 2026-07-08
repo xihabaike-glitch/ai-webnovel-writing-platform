@@ -289,6 +289,35 @@ function isProjectAcceptanceNextDispatchTask(task: PersistedGatePlatformDispatch
   return task.dispatchKey.startsWith("project-acceptance-next:");
 }
 
+function isChapterAdoptionDispatchTask(task: PersistedGatePlatformDispatchTask) {
+  return task.dispatchKey.startsWith("chapter-adoption:");
+}
+
+function chapterAdoptionTemplateTitle(task: PersistedGatePlatformDispatchTask) {
+  if (task.dispatchKey.endsWith(":second-pass")) return "采纳后二改完成依据模板";
+  if (task.dispatchKey.endsWith(":publish-check")) return "二改采纳后发布质检模板";
+  return "采纳后审稿完成依据模板";
+}
+
+function buildChapterAdoptionCompletionTemplate(task: PersistedGatePlatformDispatchTask) {
+  if (!isChapterAdoptionDispatchTask(task)) return "";
+  const adoptionVersion = task.evidence.find((item) => item.startsWith("采纳版本：")) ?? "采纳版本：";
+  const candidateSource = task.evidence.find((item) => item.startsWith("候选来源：")) ?? "候选来源：";
+  const chapterLine = task.evidence.find((item) => item.startsWith("章节：")) ?? "章节：";
+
+  return [
+    `${task.title}`,
+    chapterAdoptionTemplateTitle(task),
+    adoptionVersion,
+    candidateSource,
+    chapterLine,
+    "完成项：",
+    "产物链接/位置：",
+    "人工验收：通过 / 退回",
+    "下一步：进入二改 / 回发布质检 / 继续修稿",
+  ].join("\n");
+}
+
 function buildAcceptanceGapCompletionTemplate(task: PersistedGatePlatformDispatchTask) {
   if (!isAcceptanceGapDispatchTask(task)) return "";
   return [
@@ -504,6 +533,13 @@ export function GateDispatchTaskCenter({
       .filter((item) => item.template.trim().length > 0)
   ), [tasks]);
 
+  const chapterAdoptionCompletionTemplates = useMemo(() => (
+    tasks
+      .filter((task) => task.state === "assigned" && isChapterAdoptionDispatchTask(task))
+      .map((task) => ({ task, template: buildChapterAdoptionCompletionTemplate(task) }))
+      .filter((item) => item.template.trim().length > 0)
+  ), [tasks]);
+
   useEffect(() => {
     if (roleClosureCompletionTemplates.length === 0) return;
     setCompletionDrafts((current) => {
@@ -545,6 +581,20 @@ export function GateDispatchTaskCenter({
       return changed ? next : current;
     });
   }, [projectAcceptanceNextCompletionTemplates]);
+
+  useEffect(() => {
+    if (chapterAdoptionCompletionTemplates.length === 0) return;
+    setCompletionDrafts((current) => {
+      let changed = false;
+      const next = { ...current };
+      for (const { task, template } of chapterAdoptionCompletionTemplates) {
+        if (current[task.dispatchKey]?.trim()) continue;
+        next[task.dispatchKey] = template;
+        changed = true;
+      }
+      return changed ? next : current;
+    });
+  }, [chapterAdoptionCompletionTemplates]);
 
   useEffect(() => {
     function syncHashFocus() {
@@ -791,6 +841,7 @@ export function GateDispatchTaskCenter({
     return (task.dispatchKey === firstDayFocus.card?.dispatchKey ? firstDayFocus.completionTemplate : "")
       || completionSuggestionByKey.get(task.dispatchKey)?.completionEvidence
       || buildRouteDispatchCompletionTemplate(task)
+      || buildChapterAdoptionCompletionTemplate(task)
       || buildProjectAcceptanceNextCompletionTemplate(task)
       || buildAcceptanceGapCompletionTemplate(task)
       || buildGateDispatchCompletionTemplate(task)

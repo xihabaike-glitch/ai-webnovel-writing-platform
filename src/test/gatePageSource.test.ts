@@ -57,6 +57,8 @@ test("gate page renders real sample final review checklist", () => {
 test("gate page renders computed real pipeline final review verdict", () => {
   assert.ok(source.includes("gate.realPipelineFinalReview"));
   assert.ok(source.includes("const finalReview = gate.realPipelineFinalReview;"));
+  assert.ok(source.includes("buildGateFinalDeliveryReceiptReview"));
+  assert.ok(source.includes("finalDeliveryReceiptReview"));
   assert.ok(source.includes("真实作品流水线自动终检"));
   assert.ok(source.includes("id=\"pipeline-final-review\""));
   assert.ok(source.includes("finalReview.outcomeLabel"));
@@ -67,9 +69,16 @@ test("gate page renders computed real pipeline final review verdict", () => {
   assert.ok(source.includes("finalReview.passSignals.map"));
   assert.ok(source.includes("finalReview.repairSignals.map"));
   assert.ok(source.includes("finalReview.holdBatchSignals.map"));
+  assert.ok(source.includes("六项放行证据台账"));
+  assert.ok(source.includes("finalDeliveryReceiptReview.items.map"));
+  assert.ok(source.includes("finalDeliveryReceiptReview.remainingFeedback"));
   assert.ok(
     source.indexOf("真实作品流水线自动终检") < source.indexOf("{realSampleReceiptFocus ? ("),
     "computed final review should be visible on the gate before receipt-specific context",
+  );
+  assert.ok(
+    source.indexOf("id=\"pipeline-final-review\"") < source.indexOf("六项放行证据台账"),
+    "final delivery evidence ledger should stay inside the always-visible final review section",
   );
 });
 

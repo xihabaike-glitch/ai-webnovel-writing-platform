@@ -15,7 +15,7 @@ import { prisma } from "@/lib/db/prisma";
 import { buildDevelopmentOverview } from "@/lib/development/developmentOverview";
 import { buildModelRoleMatrix, buildModelRoleMatrixPriorityBlocker } from "@/lib/model-gateway/modelRoleMatrix";
 import { buildFinalDeliveryGateCloseout } from "@/lib/projects/finalDeliveryGateCloseout";
-import { buildGateAiPipelineRecoveryPanel, buildGateDispatchTaskCenter } from "@/lib/projects/gateActionReceipts";
+import { buildGateAiPipelineRecoveryPanel, buildGateDispatchTaskCenter, buildGateFinalDeliveryReceiptReview, gateActionReceiptFromAuditRecord } from "@/lib/projects/gateActionReceipts";
 import { gatePlatformDispatchTaskFromRecord } from "@/lib/projects/gateDispatchTaskRecords";
 import { buildPrePublishGate, buildPrePublishGateFocusNotice, type PrePublishGateFocusNotice, type PrePublishGateItem } from "@/lib/projects/prePublishGate";
 import { parsePublishSnapshotTags } from "@/lib/projects/platformPublishExport";
@@ -169,15 +169,24 @@ export default async function GatePage({
           orderBy: { createdAt: "desc" },
           take: 80,
           select: {
+            receiptId: true,
             actionId: true,
+            projectId: true,
             executionType: true,
             status: true,
             succeededCount: true,
             failedCount: true,
             taskId: true,
             platformId: true,
+            platformName: true,
             label: true,
+            detail: true,
+            href: true,
             message: true,
+            recheckStatus: true,
+            recheckLabel: true,
+            recheckDetail: true,
+            recheckAction: true,
             payload: true,
             createdAt: true,
           },
@@ -310,6 +319,9 @@ export default async function GatePage({
     deliveryActionLabel: gate.realPipelineFinalReview.primaryActionLabel,
     deliveryActionHref: gate.realPipelineFinalReview.primaryActionHref,
   });
+  const finalDeliveryReceiptReview = buildGateFinalDeliveryReceiptReview(
+    projects.flatMap((project) => project.gateActionAudits.map(gateActionReceiptFromAuditRecord)),
+  );
   const {
     closeoutPercent: finalDeliveryGateCloseoutPercent,
     releaseLabel: finalDeliveryGateReleaseLabel,
@@ -569,6 +581,41 @@ export default async function GatePage({
                 ))}
               </ul>
             </div>
+          </div>
+        </div>
+        <div className="mt-3 rounded-md bg-white/80 p-3 text-xs leading-5 text-sky-950" aria-label="六项放行证据台账">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <div className="font-medium">六项放行证据台账</div>
+              <p className="mt-1 text-slate-700">{finalDeliveryReceiptReview.remainingFeedback}</p>
+            </div>
+            <Link
+              className="w-fit rounded-md border border-sky-200 bg-white px-2 py-1 font-medium text-sky-950 hover:bg-sky-50"
+              href={hrefWithGateReturn(finalDeliveryReceiptReview.href, gateRecheckReturnHref)}
+            >
+              {finalDeliveryReceiptReview.actionLabel}
+            </Link>
+          </div>
+          <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            {finalDeliveryReceiptReview.items.map((item) => (
+              <Link
+                className={`rounded-md border p-2 hover:bg-white ${
+                  item.status === "done"
+                    ? "border-emerald-200 bg-emerald-50 text-emerald-950"
+                    : item.status === "blocked"
+                      ? "border-amber-200 bg-amber-50 text-amber-950"
+                      : "border-slate-200 bg-slate-50 text-slate-700"
+                }`}
+                href={hrefWithGateReturn(item.href, gateRecheckReturnHref)}
+                key={item.id}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-medium">{item.label}</span>
+                  <span>{item.status === "done" ? "已闭环" : item.status === "blocked" ? "仍阻塞" : "缺项"}</span>
+                </div>
+                <p className="mt-1 line-clamp-2">{item.evidence}</p>
+              </Link>
+            ))}
           </div>
         </div>
       </section>

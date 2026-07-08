@@ -13,7 +13,7 @@ import {
   type PublishRepairRunResult,
   type RawPublishRepairRunResult,
 } from "@/lib/projects/publishRepairRunResults";
-import { addGateActionReceipt, buildGatePublishEffectReceipt } from "@/lib/projects/gateActionReceipts";
+import { addGateActionReceipt, buildGateFinalDeliveryReceipt, buildGatePublishEffectReceipt } from "@/lib/projects/gateActionReceipts";
 import {
   buildSubmissionAssetAdoptionReviewReceipt,
   buildSubmissionAssetEditorReview,
@@ -2540,6 +2540,17 @@ export function PlatformExportCenterPanel({
     }
   }
 
+  function recordFinalDeliveryReceipt(item: PlatformFinalDeliveryChecklistItem) {
+    if (!selectedPackage) return;
+    addGateActionReceipt(buildGateFinalDeliveryReceipt({
+      projectId,
+      platformId: selectedPackage.platformId,
+      platformName: selectedPackage.platformName,
+      item,
+    }));
+    setMessage(`${selectedPackage.platformName}「${item.label}」最终交付回执已写回总闸门。`);
+  }
+
   async function downloadMarkdown() {
     if (!selectedPackage) return;
     if (!selectedPackage.canExport) {
@@ -3005,9 +3016,8 @@ export function PlatformExportCenterPanel({
             </div>
             <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
               {center.finalDeliveryChecklist.items.map((item) => (
-                <a
+                <div
                   className="rounded-md border border-slate-100 bg-slate-50 p-3 text-sm hover:border-slate-300 hover:bg-white"
-                  href={hrefWithGateReturn(item.actionHref, gateReturnHref, projectId)}
                   key={item.id}
                 >
                   <div className="flex flex-wrap items-start justify-between gap-2">
@@ -3017,7 +3027,21 @@ export function PlatformExportCenterPanel({
                     </span>
                   </div>
                   <p className="mt-2 line-clamp-2 text-xs leading-5 text-slate-600">{item.evidence}</p>
-                  <div className="mt-2 text-xs font-medium text-slate-950">{item.actionLabel}</div>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <a
+                      className="rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:border-slate-300 hover:bg-slate-50"
+                      href={hrefWithGateReturn(item.actionHref, gateReturnHref, projectId)}
+                    >
+                      {item.actionLabel}
+                    </a>
+                    <button
+                      className="rounded-md bg-slate-950 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-slate-800"
+                      onClick={() => recordFinalDeliveryReceipt(item)}
+                      type="button"
+                    >
+                      写回总闸门
+                    </button>
+                  </div>
                   <div className="mt-3 rounded-md border border-slate-200 bg-white p-2" aria-label="最终交付回执模板">
                     <div className="text-[11px] font-medium text-slate-500">最终交付回执模板</div>
                     <div className="mt-1 grid gap-1 text-[11px] leading-4 text-slate-600" style={{ overflowWrap: "anywhere", wordBreak: "break-word" }}>
@@ -3026,7 +3050,7 @@ export function PlatformExportCenterPanel({
                       ))}
                     </div>
                   </div>
-                </a>
+                </div>
               ))}
             </div>
           </div>

@@ -34,4 +34,8 @@ test("platform export center renders the final delivery checklist", () => {
   assert.ok(source.includes("最终交付回执模板"));
   assert.ok(source.includes("item.receiptTemplate.map"));
   assert.ok(source.includes("finalDeliveryChecklistStatusClass"));
+  assert.ok(source.includes("buildGateFinalDeliveryReceipt"));
+  assert.ok(source.includes("recordFinalDeliveryReceipt"));
+  assert.ok(source.includes("addGateActionReceipt(buildGateFinalDeliveryReceipt"));
+  assert.ok(source.includes("写回总闸门"));
 });

@@ -56,6 +56,7 @@ import {
   buildGateDispatchTaskCloseoutItem,
   buildGateFirstThreeAdoptionReceipt,
   buildGateExportVersionActionReceipt,
+  buildGateFinalDeliveryReceipt,
   buildGatePublishEffectReceipt,
   filterGateDispatchTasks,
   filterGateActionReceipts,
@@ -1600,6 +1601,42 @@ test("buildGateActionReceipt", async (t) => {
     assert.equal(receipt.platformName, "番茄小说");
     assert.ok(receipt.message.includes("曝光 1200"));
     assert.equal(receipt.recheck.label, "复检发布效果建议");
+  });
+
+  await t.test("builds final delivery checklist receipts for the gate audit log", () => {
+    const receipt = buildGateFinalDeliveryReceipt({
+      projectId: "project-1",
+      platformId: "fanqie",
+      platformName: "番茄小说",
+      now: "2026-01-01T00:00:04.000Z",
+      item: {
+        id: "publish-baseline",
+        label: "发布基准",
+        status: "todo",
+        evidence: "发布包已过线，但还没有保存发布基准。",
+        actionLabel: "保存发布基准",
+        actionHref: "#package-version-history",
+        receiptTemplate: [
+          "交付项：发布基准",
+          "当前状态：待处理",
+          "证据：发布包已过线，但还没有保存发布基准。",
+          "产物位置：#package-version-history",
+          "人工验收：通过 / 退回，并写明理由。",
+          "下一步：保存发布基准",
+          "停手线：缺产物位置、人工验收或下一步判断，不允许回总闸门标记闭环。",
+        ],
+      },
+    });
+
+    assert.equal(receipt.id, "final-delivery:fanqie:publish-baseline:2026-01-01T00:00:04.000Z");
+    assert.equal(receipt.actionId, "final-delivery:fanqie:publish-baseline");
+    assert.equal(receipt.executionType, "manual");
+    assert.equal(receipt.platformName, "番茄小说");
+    assert.equal(receipt.href, "/projects/project-1#package-version-history");
+    assert.ok(receipt.message.includes("交付项：发布基准"));
+    assert.ok(receipt.message.includes("人工验收：通过 / 退回"));
+    assert.equal(receipt.recheck.status, "blocked");
+    assert.equal(receipt.recheck.label, "复检最终交付清单");
   });
 
   await t.test("builds export version action receipts for executable gate repairs", () => {

@@ -5,6 +5,7 @@ import type {
   PrePublishGateExportVersionAction,
   PrePublishGateStrategyPlatform,
 } from "./prePublishGate.ts";
+import type { PlatformFinalDeliveryChecklistItem } from "./platformPublishExport.ts";
 import type { FailureRepairBatch } from "../ai/taskRunConsole.ts";
 import { platformProfiles } from "../platforms/platformProfiles.ts";
 import { buildAiPipelinePromptMemorySummary, type AiPipelinePromptMemorySummary, type ControlBatchAudit } from "./projectControlDashboard.ts";
@@ -2525,6 +2526,49 @@ export function buildGateAdviceActionReceipt(input: {
       label: "复检建议处理结果",
       detail: "已进入建议对应的处理位置，完成采纳、回填或修复后刷新总闸门，确认审计建议是否解除。",
       actionLabel: "刷新总闸门",
+    },
+    createdAt,
+  };
+}
+
+function finalDeliveryReceiptHref(projectId: string, actionHref: string) {
+  if (actionHref.startsWith("#")) return `/projects/${projectId}${actionHref}`;
+  return actionHref;
+}
+
+function finalDeliveryReceiptRecheckStatus(status: PlatformFinalDeliveryChecklistItem["status"]) {
+  return status === "done" ? "ready" : "blocked";
+}
+
+export function buildGateFinalDeliveryReceipt(input: {
+  projectId: string;
+  platformId: string;
+  platformName: string;
+  item: PlatformFinalDeliveryChecklistItem;
+  now?: Date | string;
+}): GateActionReceipt {
+  const createdAt = input.now ? new Date(input.now).toISOString() : new Date().toISOString();
+  return {
+    id: `final-delivery:${input.platformId}:${input.item.id}:${createdAt}`,
+    actionId: `final-delivery:${input.platformId}:${input.item.id}`,
+    label: `回写${input.item.label}交付回执`,
+    detail: `${input.platformName} · ${input.item.label} · ${input.item.evidence}`,
+    href: finalDeliveryReceiptHref(input.projectId, input.item.actionHref),
+    status: "succeeded",
+    message: input.item.receiptTemplate.join("\n"),
+    executionType: "manual",
+    succeededCount: 1,
+    failedCount: 0,
+    taskId: null,
+    platformId: input.platformId,
+    platformName: input.platformName,
+    recheck: {
+      status: finalDeliveryReceiptRecheckStatus(input.item.status),
+      label: "复检最终交付清单",
+      detail: input.item.status === "done"
+        ? "该交付项已写回回执，回总闸门复检最终交付清单是否闭环。"
+        : "该交付项仍未完成，回执已记录当前证据和停手线，先处理下一步再复检。",
+      actionLabel: "回总闸门复检",
     },
     createdAt,
   };

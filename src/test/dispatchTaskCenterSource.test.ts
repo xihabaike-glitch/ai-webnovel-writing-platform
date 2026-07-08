@@ -143,6 +143,22 @@ test("dispatch task center auto-fills chapter adoption follow-up templates", () 
   assert.ok(source.includes("下一步：进入二改 / 回发布质检 / 继续修稿"));
 });
 
+test("dispatch task center groups chapter adoption follow-up dispatches", () => {
+  assert.ok(source.includes("\"chapter_adoption\""));
+  assert.ok(source.includes("chapterAdoptionTasks"));
+  assert.ok(source.includes("chapterAdoptionTaskKeys"));
+  assert.ok(source.includes("activeChapterAdoptionTasks"));
+  assert.ok(source.includes("chapterAdoptionLaneCounts"));
+  assert.ok(source.includes("chapterAdoptionLaneLabel"));
+  assert.ok(source.includes("采纳后续"));
+  assert.ok(source.includes("重新审稿"));
+  assert.ok(source.includes("启动二改"));
+  assert.ok(source.includes("发布质检"));
+  assert.ok(source.includes("只看采纳后续"));
+  assert.ok(source.includes("回章节工作流"));
+  assert.ok(source.includes("queueFilter === \"chapter_adoption\""));
+});
+
 test("dispatch task center shows dispatch receipt acceptance criteria before completion", () => {
   assert.ok(source.includes("dispatchReceiptAcceptanceCriteria"));
   assert.ok(source.includes("任务回执验收口径"));

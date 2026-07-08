@@ -193,7 +193,7 @@ function routeFlowFilterFromLane(laneId: RouteConfirmationDispatchFlowLaneId): R
   return laneId;
 }
 
-export type DispatchQueueFilter = "all" | "recheck_followup" | "ai_pipeline" | "role_closure";
+export type DispatchQueueFilter = "all" | "recheck_followup" | "ai_pipeline" | "role_closure" | "chapter_adoption";
 
 export interface DispatchRoleIntent {
   roleIntent: string;
@@ -291,6 +291,12 @@ function isProjectAcceptanceNextDispatchTask(task: PersistedGatePlatformDispatch
 
 function isChapterAdoptionDispatchTask(task: PersistedGatePlatformDispatchTask) {
   return task.dispatchKey.startsWith("chapter-adoption:");
+}
+
+function chapterAdoptionLaneLabel(task: PersistedGatePlatformDispatchTask) {
+  if (task.dispatchKey.endsWith(":second-pass")) return "启动二改";
+  if (task.dispatchKey.endsWith(":publish-check")) return "发布质检";
+  return "重新审稿";
 }
 
 function chapterAdoptionTemplateTitle(task: PersistedGatePlatformDispatchTask) {
@@ -443,6 +449,18 @@ export function GateDispatchTaskCenter({
     context: roleClosureTasks.filter((task) => roleClosureLaneLabel(task) === "资料").length,
     platform: roleClosureTasks.filter((task) => roleClosureLaneLabel(task) === "平台").length,
   }), [roleClosureTasks]);
+  const chapterAdoptionTasks = useMemo(() => tasks.filter(isChapterAdoptionDispatchTask), [tasks]);
+  const chapterAdoptionTaskKeys = useMemo(() => (
+    new Set(chapterAdoptionTasks.map((task) => task.dispatchKey))
+  ), [chapterAdoptionTasks]);
+  const activeChapterAdoptionTasks = useMemo(() => (
+    chapterAdoptionTasks.filter((task) => task.state !== "completed")
+  ), [chapterAdoptionTasks]);
+  const chapterAdoptionLaneCounts = useMemo(() => ({
+    review: chapterAdoptionTasks.filter((task) => chapterAdoptionLaneLabel(task) === "重新审稿").length,
+    secondPass: chapterAdoptionTasks.filter((task) => chapterAdoptionLaneLabel(task) === "启动二改").length,
+    publishCheck: chapterAdoptionTasks.filter((task) => chapterAdoptionLaneLabel(task) === "发布质检").length,
+  }), [chapterAdoptionTasks]);
   const completionSuggestionByKey = useMemo(() => (
     new Map(initialCompletionSuggestions.map((suggestion) => [suggestion.dispatchKey, suggestion]))
   ), [initialCompletionSuggestions]);
@@ -489,9 +507,11 @@ export function GateDispatchTaskCenter({
       ? baseTasks.filter((task) => aiPipelineTaskKeys.has(task.dispatchKey))
       : queueFilter === "role_closure"
         ? baseTasks.filter((task) => roleClosureTaskKeys.has(task.dispatchKey))
-        : baseTasks;
+        : queueFilter === "chapter_adoption"
+          ? baseTasks.filter((task) => chapterAdoptionTaskKeys.has(task.dispatchKey))
+          : baseTasks;
     return filterRouteConfirmationDispatchTasks(queueFilteredTasks, routeFlowFilter);
-  }, [aiPipelineTaskKeys, platformFilter, queueFilter, roleClosureTaskKeys, roleFilter, routeFlowFilter, stateFilter, tasks]);
+  }, [aiPipelineTaskKeys, chapterAdoptionTaskKeys, platformFilter, queueFilter, roleClosureTaskKeys, roleFilter, routeFlowFilter, stateFilter, tasks]);
 
   useEffect(() => {
     setCompletionDrafts((current) => buildWatchSampleAutoCompletionDrafts({
@@ -1240,6 +1260,16 @@ export function GateDispatchTaskCenter({
           <div className="mt-1 text-xs opacity-75">结构 {roleClosureLaneCounts.structure} · 资料 {roleClosureLaneCounts.context} · 平台 {roleClosureLaneCounts.platform}</div>
           <div className="mt-1 text-xs font-medium opacity-75">只看角色闭环</div>
         </button>
+        <button
+          className={`rounded-md border p-3 text-left ${queueFilter === "chapter_adoption" ? "border-emerald-300 bg-emerald-50 text-emerald-900" : "border-slate-200 bg-white"}`}
+          onClick={() => setQueueFilter((current) => current === "chapter_adoption" ? "all" : "chapter_adoption")}
+          type="button"
+        >
+          <div className="text-xs opacity-75">采纳后续</div>
+          <div className="mt-1 text-2xl font-semibold">{activeChapterAdoptionTasks.length}</div>
+          <div className="mt-1 text-xs opacity-75">重新审稿 {chapterAdoptionLaneCounts.review} · 启动二改 {chapterAdoptionLaneCounts.secondPass} · 发布质检 {chapterAdoptionLaneCounts.publishCheck}</div>
+          <div className="mt-1 text-xs font-medium opacity-75">只看采纳后续</div>
+        </button>
         <div className="rounded-md border border-slate-200 bg-white p-3">
           <div className="text-xs text-slate-500">返工链</div>
           <div className="mt-1 text-2xl font-semibold">{center.summary.recheckFollowUpChains}</div>
@@ -1526,6 +1556,60 @@ export function GateDispatchTaskCenter({
                 ) : null}
               </div>
             ))}
+          </div>
+        </section>
+      ) : null}
+
+      {chapterAdoptionTasks.length > 0 ? (
+        <section className="rounded-md border border-emerald-200 bg-emerald-50 p-4">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <div className="font-medium text-emerald-950">采纳后续任务</div>
+              <p className="mt-1 max-w-3xl text-sm leading-6 text-emerald-800">
+                候选稿采纳后，正文已经改变；必须按重新审稿、启动二改、发布质检把新正文重新闭环，旧分数不能直接放行。
+              </p>
+            </div>
+            <button
+              className="w-fit rounded-md bg-white px-3 py-2 text-sm font-medium text-emerald-900 hover:bg-emerald-100"
+              onClick={() => setQueueFilter("chapter_adoption")}
+              type="button"
+            >
+              只看采纳后续
+            </button>
+          </div>
+          <div className="mt-3 grid gap-3 lg:grid-cols-3">
+            {activeChapterAdoptionTasks.slice(0, 6).map((task) => (
+              <div className="rounded-md border border-emerald-100 bg-white/85 p-3 text-sm text-emerald-950" key={task.dispatchKey}>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className={`rounded-md px-2 py-1 text-xs font-medium ${stateClass(task.state)}`}>{stateLabel(task.state)}</span>
+                  <span className="rounded-md bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-800">{chapterAdoptionLaneLabel(task)}</span>
+                  <span className="font-medium">{task.title}</span>
+                </div>
+                <p className="mt-2 line-clamp-2 leading-6 text-emerald-800">{task.detail}</p>
+                <div className="mt-2 flex flex-wrap gap-2 text-xs text-emerald-700">
+                  <span className="rounded-md bg-white px-2 py-1">{task.ownerRole}</span>
+                  <span className="rounded-md bg-white px-2 py-1">{task.actionLabel}</span>
+                  <span className="rounded-md bg-white px-2 py-1">优先级 {task.priorityScore}</span>
+                </div>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Link className="rounded-md bg-emerald-900 px-3 py-2 text-xs font-medium text-white hover:bg-emerald-800" href={hrefWithGateReturn(task.href, gateReturnHref)}>
+                    回章节工作流
+                  </Link>
+                  <button
+                    className="rounded-md bg-white px-3 py-2 text-xs font-medium text-emerald-900 hover:bg-emerald-100"
+                    onClick={() => setFocusedCompletionDispatchKey(task.dispatchKey)}
+                    type="button"
+                  >
+                    定位回执
+                  </button>
+                </div>
+              </div>
+            ))}
+            {activeChapterAdoptionTasks.length === 0 ? (
+              <p className="rounded-md border border-emerald-100 bg-white/80 p-3 text-sm leading-6 text-emerald-800">
+                采纳后续任务已全部完成，回总闸门复检即可确认前三章正文闭环。
+              </p>
+            ) : null}
           </div>
         </section>
       ) : null}
@@ -2062,6 +2146,7 @@ export function GateDispatchTaskCenter({
               <option value="recheck_followup">复查失败返工</option>
               <option value="ai_pipeline">AI 写审改复检</option>
               <option value="role_closure">角色闭环</option>
+              <option value="chapter_adoption">采纳后续</option>
             </select>
           </label>
           <label className="grid gap-1 text-xs font-medium text-slate-600">
@@ -2128,6 +2213,7 @@ export function GateDispatchTaskCenter({
           const isHashFocusedTask = task.dispatchKey === hashFocusedDispatchKey;
           const isFocusedTask = task.dispatchKey === focusedDispatchKey || isFocusedCompletionTask || isHashFocusedTask;
           const isRoleClosureTask = isRoleClosureDispatchTask(task);
+          const isChapterAdoptionTask = isChapterAdoptionDispatchTask(task);
           const isProjectAcceptanceNextTask = isProjectAcceptanceNextDispatchTask(task);
           const completionDraft = completionDrafts[task.dispatchKey] ?? "";
           const completionAcceptanceState = buildFirstDayReturnedEvidenceAcceptanceState({
@@ -2154,6 +2240,7 @@ export function GateDispatchTaskCenter({
                 <div className="flex flex-wrap items-center gap-2">
                   <span className={`rounded-md px-2 py-1 text-xs font-medium ${stateClass(task.state)}`}>{stateLabel(task.state)}</span>
                   {isRecheckFollowUp ? <span className="rounded-md bg-amber-50 px-2 py-1 text-xs font-medium text-amber-800">复查返工</span> : null}
+                  {isChapterAdoptionTask ? <span className="rounded-md bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-800">采纳后续 · {chapterAdoptionLaneLabel(task)}</span> : null}
                   {isProjectAcceptanceNextTask ? <span className="rounded-md bg-blue-50 px-2 py-1 text-xs font-medium text-blue-800">总闸门复检分流</span> : null}
                   {aiPipelineTaskKeys.has(task.dispatchKey) ? <span className="rounded-md bg-sky-50 px-2 py-1 text-xs font-medium text-sky-800">AI 复检</span> : null}
                   {recheckChain ? <span className="rounded-md bg-sky-50 px-2 py-1 text-xs font-medium text-sky-800">R{recheckChain.round}/R{recheckChain.maxRound}</span> : null}

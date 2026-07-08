@@ -5,7 +5,7 @@ import { buildFirstDayRouteSummary } from "@/lib/model-gateway/firstDayRouteSumm
 import { buildModelSetupOnboarding } from "@/lib/model-gateway/modelSetupOnboarding";
 import { buildModelRoleMatrix, buildModelRoleMatrixPmFocusNotice, buildModelRoleRouteDraft } from "@/lib/model-gateway/modelRoleMatrix";
 import { buildPresetRouteBlueprint } from "@/lib/model-gateway/presetRouteBlueprint";
-import { providerModelPresets, providerOptions } from "@/lib/model-gateway/providerDefaults";
+import { providerInterfaceContracts, providerModelPresets, providerOptions } from "@/lib/model-gateway/providerDefaults";
 import { buildProviderHealthDashboard } from "@/lib/model-gateway/providerHealth";
 import { buildProviderSetupGuide } from "@/lib/model-gateway/providerSetupGuide";
 import { buildProviderSetupWizard } from "@/lib/model-gateway/providerSetupWizard";
@@ -302,6 +302,7 @@ export default async function ModelSettingsPage({
         healthDashboard={healthDashboard}
         options={providerOptions}
         presets={providerModelPresets}
+        interfaceContracts={providerInterfaceContracts}
         providerSetupGuide={providerSetupGuide}
         providerSetupWizard={providerSetupWizard}
         modelSetupOnboarding={modelSetupOnboarding}

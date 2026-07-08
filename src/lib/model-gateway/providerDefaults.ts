@@ -21,6 +21,19 @@ export interface ProviderModelPreset {
   note: string;
 }
 
+export interface ProviderInterfaceContract {
+  providerId: "claude" | "deepseek" | "kimi" | "gpt";
+  providerName: string;
+  ownerRole: string;
+  protocolLabel: string;
+  authHeaderLabel: string;
+  requestPath: string;
+  defaultBaseUrl: string;
+  defaultModel: string;
+  connectionTestLabel: string;
+  evidenceChecklist: string[];
+}
+
 export const providerOptions: ProviderOption[] = [
   {
     providerId: "mock",
@@ -152,6 +165,57 @@ export const providerModelPresets: ProviderModelPreset[] = [
     maxContextTokens: 128000,
     taskTags: ["正文初稿", "低成本批量"],
     note: "适合中文长文续写、批量章节和平台资料改写。",
+  },
+];
+
+export const providerInterfaceContracts: ProviderInterfaceContract[] = [
+  {
+    providerId: "claude",
+    providerName: "Claude",
+    ownerRole: "长篇结构主编",
+    protocolLabel: "Anthropic Messages API",
+    authHeaderLabel: "x-api-key",
+    requestPath: "/v1/messages",
+    defaultBaseUrl: "https://api.anthropic.com",
+    defaultModel: "claude-sonnet-4-5",
+    connectionTestLabel: "保存后执行连接测试，确认结构审稿岗位可调用。",
+    evidenceChecklist: ["API Key", "Base URL", "默认模型", "连接测试", "岗位路由"],
+  },
+  {
+    providerId: "deepseek",
+    providerName: "DeepSeek",
+    ownerRole: "低成本正文写手",
+    protocolLabel: "OpenAI-compatible Chat Completions",
+    authHeaderLabel: "Authorization: Bearer",
+    requestPath: "/chat/completions",
+    defaultBaseUrl: "https://api.deepseek.com",
+    defaultModel: "deepseek-v4-flash",
+    connectionTestLabel: "保存后执行连接测试，确认批量初稿岗位可调用。",
+    evidenceChecklist: ["API Key", "Base URL", "默认模型", "连接测试", "岗位路由"],
+  },
+  {
+    providerId: "kimi",
+    providerName: "Kimi",
+    ownerRole: "长上下文资料管理员",
+    protocolLabel: "OpenAI-compatible Chat Completions",
+    authHeaderLabel: "Authorization: Bearer",
+    requestPath: "/chat/completions",
+    defaultBaseUrl: "https://api.moonshot.ai/v1",
+    defaultModel: "kimi-k2.6",
+    connectionTestLabel: "保存后执行连接测试，确认资料整合岗位可调用。",
+    evidenceChecklist: ["API Key", "Base URL", "默认模型", "连接测试", "岗位路由"],
+  },
+  {
+    providerId: "gpt",
+    providerName: "GPT / OpenAI",
+    ownerRole: "海外包装与综合二改",
+    protocolLabel: "OpenAI-compatible Chat Completions",
+    authHeaderLabel: "Authorization: Bearer",
+    requestPath: "/chat/completions",
+    defaultBaseUrl: "https://api.openai.com/v1",
+    defaultModel: "gpt-5-mini",
+    connectionTestLabel: "保存后执行连接测试，确认海外包装岗位可调用。",
+    evidenceChecklist: ["API Key", "Base URL", "默认模型", "连接测试", "岗位路由"],
   },
 ];
 

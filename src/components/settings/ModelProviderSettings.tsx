@@ -47,6 +47,19 @@ interface ProviderModelPresetView {
   note: string;
 }
 
+interface ProviderInterfaceContractView {
+  providerId: ModelProviderId;
+  providerName: string;
+  ownerRole: string;
+  protocolLabel: string;
+  authHeaderLabel: string;
+  requestPath: string;
+  defaultBaseUrl: string;
+  defaultModel: string;
+  connectionTestLabel: string;
+  evidenceChecklist: string[];
+}
+
 interface ProviderSetupGuideView {
   summary: {
     total: number;
@@ -585,6 +598,7 @@ export function ModelProviderSettings({
   healthDashboard,
   options,
   presets,
+  interfaceContracts,
   providerSetupGuide,
   providerSetupWizard,
   modelSetupOnboarding,
@@ -610,6 +624,7 @@ export function ModelProviderSettings({
   healthDashboard: ProviderHealthDashboard;
   options: ProviderOptionView[];
   presets: ProviderModelPresetView[];
+  interfaceContracts: ProviderInterfaceContractView[];
   providerSetupGuide: ProviderSetupGuideView;
   providerSetupWizard: ProviderSetupWizardView;
   modelSetupOnboarding: ModelSetupOnboardingView;
@@ -1352,6 +1367,60 @@ export function ModelProviderSettings({
                 <div className="mt-2 text-xs leading-5 text-slate-300">{item.roleTitle}</div>
                 <p className="mt-1 line-clamp-2 text-xs leading-5 text-slate-300">{item.detail}</p>
               </div>
+            ))}
+          </div>
+        </div>
+        <div className="rounded-md border border-slate-200 bg-white p-4" id="model-provider-interface-contracts">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <div className="text-xs font-medium text-slate-500">开发接口验收</div>
+              <h2 className="mt-1 font-medium text-slate-950">模型接口合同</h2>
+              <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-600">
+                Claude、DeepSeek、Kimi、GPT 都保留可替换接口；上线前按协议、鉴权、地址、模型名和连接测试逐项验收。
+              </p>
+            </div>
+            <a
+              className="w-fit rounded-md bg-slate-950 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800"
+              href={hrefWithGateReturn("/settings/models#provider-config-form", gateReturnHref)}
+            >
+              去配置接口
+            </a>
+          </div>
+          <div className="mt-4 grid gap-3 lg:grid-cols-4">
+            {interfaceContracts.map((contract) => (
+              <article className="rounded-md border border-slate-200 bg-slate-50 p-3 text-sm" key={contract.providerId}>
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <div className="text-xs text-slate-500">{contract.ownerRole}</div>
+                    <h3 className="mt-1 font-medium text-slate-950">{contract.providerName}</h3>
+                  </div>
+                  <span className="rounded-md bg-white px-2 py-1 text-xs text-slate-600">{contract.protocolLabel}</span>
+                </div>
+                <dl className="mt-3 grid gap-2 text-xs text-slate-700">
+                  <div className="rounded-md bg-white px-2 py-1">
+                    <dt className="text-slate-500">鉴权</dt>
+                    <dd className="mt-0.5 font-medium text-slate-950">{contract.authHeaderLabel}</dd>
+                  </div>
+                  <div className="rounded-md bg-white px-2 py-1">
+                    <dt className="text-slate-500">请求路径</dt>
+                    <dd className="mt-0.5 font-medium text-slate-950">{contract.requestPath}</dd>
+                  </div>
+                  <div className="rounded-md bg-white px-2 py-1">
+                    <dt className="text-slate-500">默认地址</dt>
+                    <dd className="mt-0.5 break-all font-medium text-slate-950">{contract.defaultBaseUrl}</dd>
+                  </div>
+                  <div className="rounded-md bg-white px-2 py-1">
+                    <dt className="text-slate-500">默认模型</dt>
+                    <dd className="mt-0.5 break-all font-medium text-slate-950">{contract.defaultModel}</dd>
+                  </div>
+                </dl>
+                <p className="mt-3 text-xs leading-5 text-slate-600">{contract.connectionTestLabel}</p>
+                <div className="mt-3 flex flex-wrap gap-1 text-xs text-slate-600">
+                  {contract.evidenceChecklist.map((item) => (
+                    <span className="rounded-md bg-white px-2 py-1" key={item}>{item}</span>
+                  ))}
+                </div>
+              </article>
             ))}
           </div>
         </div>

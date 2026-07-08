@@ -32,3 +32,18 @@ test("model settings retest dispatch notice links back into dispatch center", ()
   assert.ok(settingsSource.includes("setRouteNotice({ message: `已生成「${item.providerName}」复测派单`, href: \"/dispatch\", actionLabel: \"去派单中心查看复测任务\" });"));
   assert.ok(settingsSource.includes("href={hrefWithGateReturn(routeNotice.href, gateReturnHref)}"));
 });
+
+test("model settings renders concrete provider interface contracts", () => {
+  assert.ok(source.includes("providerInterfaceContracts"));
+  assert.ok(source.includes("interfaceContracts={providerInterfaceContracts}"));
+
+  assert.ok(settingsSource.includes("interfaceContracts: ProviderInterfaceContractView[]"));
+  assert.ok(settingsSource.includes("模型接口合同"));
+  assert.ok(settingsSource.includes("id=\"model-provider-interface-contracts\""));
+  assert.ok(settingsSource.includes("interfaceContracts.map"));
+  assert.ok(settingsSource.includes("contract.protocolLabel"));
+  assert.ok(settingsSource.includes("contract.authHeaderLabel"));
+  assert.ok(settingsSource.includes("contract.requestPath"));
+  assert.ok(settingsSource.includes("contract.defaultBaseUrl"));
+  assert.ok(settingsSource.includes("contract.connectionTestLabel"));
+});

@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { buildModelSetupOnboarding } from "../lib/model-gateway/modelSetupOnboarding.ts";
-import { getProviderModelPresets, providerModelPresets, providerOptions } from "../lib/model-gateway/providerDefaults.ts";
+import { getProviderModelPresets, providerInterfaceContracts, providerModelPresets, providerOptions } from "../lib/model-gateway/providerDefaults.ts";
 import { buildProviderSetupGuide } from "../lib/model-gateway/providerSetupGuide.ts";
 import { buildProviderSetupWizard } from "../lib/model-gateway/providerSetupWizard.ts";
 
@@ -28,6 +28,36 @@ test("provider model presets", async (t) => {
     assert.equal(ids.size, providerModelPresets.length);
     assert.ok(providerModelPresets.some((preset) => preset.providerId === "deepseek" && preset.taskTags.includes("低成本批量")));
     assert.ok(providerModelPresets.some((preset) => preset.providerId === "kimi" && preset.taskTags.includes("长篇规划")));
+  });
+
+  await t.test("documents concrete interface contracts for required cloud providers", () => {
+    const requiredProviderIds = ["claude", "deepseek", "kimi", "gpt"];
+
+    assert.deepEqual(providerInterfaceContracts.map((contract) => contract.providerId), requiredProviderIds);
+
+    for (const contract of providerInterfaceContracts) {
+      const option = providerOptions.find((item) => item.providerId === contract.providerId);
+
+      assert.ok(option, `${contract.providerId} should link to a provider option`);
+      assert.equal(contract.defaultBaseUrl, option?.defaultBaseUrl);
+      assert.equal(contract.defaultModel, option?.defaultModel);
+      assert.ok(contract.ownerRole.trim().length > 0);
+      assert.ok(contract.connectionTestLabel.includes("连接测试"));
+      assert.ok(contract.evidenceChecklist.includes("API Key"));
+      assert.ok(contract.evidenceChecklist.includes("Base URL"));
+      assert.ok(contract.evidenceChecklist.includes("默认模型"));
+      assert.ok(contract.evidenceChecklist.includes("岗位路由"));
+    }
+
+    const claude = providerInterfaceContracts.find((contract) => contract.providerId === "claude");
+    const openAiCompatible = providerInterfaceContracts.filter((contract) => contract.providerId !== "claude");
+
+    assert.equal(claude?.protocolLabel, "Anthropic Messages API");
+    assert.equal(claude?.authHeaderLabel, "x-api-key");
+    assert.equal(claude?.requestPath, "/v1/messages");
+    assert.ok(openAiCompatible.every((contract) => contract.protocolLabel === "OpenAI-compatible Chat Completions"));
+    assert.ok(openAiCompatible.every((contract) => contract.authHeaderLabel === "Authorization: Bearer"));
+    assert.ok(openAiCompatible.every((contract) => contract.requestPath === "/chat/completions"));
   });
 
   await t.test("builds a launch setup guide for required writing providers", () => {

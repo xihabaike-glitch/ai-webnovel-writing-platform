@@ -4849,40 +4849,6 @@ export function parseAiPipelineRecoveryCompletionEvidence(
 }
 
 export function buildGateDispatchCompletionTemplate(task: GateDispatchCompletionTemplateTask) {
-  const roleIntent = roleIntentFromTaskEvidence(task);
-  if (roleIntent === "story-structure") {
-    return [
-      `${task.title}`,
-      "工作区：结构诊断",
-      "人物弧光：",
-      "主线/支线结论：",
-      "开头钩子与结尾回收：",
-      "伏笔风险：",
-      "下一步：回写大纲树 / 改前三章 / 继续观察",
-    ].join("\n");
-  }
-  if (roleIntent === "context-recall") {
-    return [
-      `${task.title}`,
-      "工作区：项目土壤",
-      "引用来源：人物卡 / 世界观 / 伏笔 / 历史章节",
-      "进入上下文：",
-      "排除资料：",
-      "连续性风险：",
-      "下一步：交给初稿 / 审稿 / 二改",
-    ].join("\n");
-  }
-  if (roleIntent === "platform-export") {
-    return [
-      `${task.title}`,
-      "工作区：平台导出",
-      "标题/简介/标签版本：",
-      "平台差异：番茄 / 起点 / 七猫 / 知乎盐选 / WebNovel / Royal Road / Wattpad",
-      "样章兑现：",
-      "基准版本：",
-      "下一步：保存发布包 / 记录发布效果 / 回总闸门复盘",
-    ].join("\n");
-  }
   if (isAiPipelineRollbackCompletionTask(task)) {
     return [
       `${task.title}`,
@@ -5026,6 +4992,40 @@ export function buildGateDispatchCompletionTemplate(task: GateDispatchCompletion
       "改动或诊断结论：",
       "复查证据：",
       "下一步：",
+    ].join("\n");
+  }
+  const roleIntent = roleIntentFromTaskEvidence(task);
+  if (roleIntent === "story-structure") {
+    return [
+      `${task.title}`,
+      "工作区：结构诊断",
+      "人物弧光：",
+      "主线/支线结论：",
+      "开头钩子与结尾回收：",
+      "伏笔风险：",
+      "下一步：回写大纲树 / 改前三章 / 继续观察",
+    ].join("\n");
+  }
+  if (roleIntent === "context-recall") {
+    return [
+      `${task.title}`,
+      "工作区：项目土壤",
+      "引用来源：人物卡 / 世界观 / 伏笔 / 历史章节",
+      "进入上下文：",
+      "排除资料：",
+      "连续性风险：",
+      "下一步：交给初稿 / 审稿 / 二改",
+    ].join("\n");
+  }
+  if (roleIntent === "platform-export") {
+    return [
+      `${task.title}`,
+      "工作区：平台导出",
+      "标题/简介/标签版本：",
+      "平台差异：番茄 / 起点 / 七猫 / 知乎盐选 / WebNovel / Royal Road / Wattpad",
+      "样章兑现：",
+      "基准版本：",
+      "下一步：保存发布包 / 记录发布效果 / 回总闸门复盘",
     ].join("\n");
   }
   return "";

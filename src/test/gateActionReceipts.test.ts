@@ -5425,6 +5425,22 @@ test("buildGateActionReceipt", async (t) => {
     assert.ok(buildGateDispatchCompletionTemplate(roleContextTask).includes("进入上下文"));
     assert.ok(buildGateDispatchCompletionTemplate(rolePlatformTask).includes("标题/简介/标签版本"));
     assert.ok(buildGateDispatchCompletionTemplate(rolePlatformTask).includes("平台差异"));
+    assert.ok(buildGateDispatchCompletionTemplate({
+      dispatchKey: "role-intent:project-1:context-recall:context_librarian",
+      stage: "start_role_dispatch_closure" as const,
+      title: "夜雨系统｜派给长上下文资料官",
+      actionLabel: "派给长上下文资料官",
+      platformName: "番茄小说",
+      evidence: ["角色派单还缺资料官、平台包装完成依据。"],
+    }).includes("进入上下文"));
+    assert.ok(buildGateDispatchCompletionTemplate({
+      dispatchKey: "role-intent:project-1:platform-export:overseas_packager",
+      stage: "start_role_dispatch_closure" as const,
+      title: "夜雨系统｜派给海外投稿包装编辑",
+      actionLabel: "派给海外投稿包装编辑",
+      platformName: "番茄小说",
+      evidence: ["角色派单还缺平台包装完成依据。"],
+    }).includes("平台差异"));
     assert.equal(buildGateDispatchCompletionTemplate({
       stage: "model_route_governance" as const,
       title: "模型治理",

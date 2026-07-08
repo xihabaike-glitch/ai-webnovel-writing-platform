@@ -4584,7 +4584,7 @@ export function buildGateDispatchTaskCenter(
 export type GateDispatchCompletionTemplateTask = Pick<
   PersistedGatePlatformDispatchTask,
   "stage" | "title" | "actionLabel" | "platformName"
-> & Partial<Pick<PersistedGatePlatformDispatchTask, "acceptanceCriteria" | "evidence">>;
+> & Partial<Pick<PersistedGatePlatformDispatchTask, "acceptanceCriteria" | "dispatchKey" | "evidence" | "href">>;
 
 export type GateAiPipelineRecoveryCompletionKind = "sample_recheck" | "small_batch_resume" | "rollback_repair";
 
@@ -4602,7 +4602,10 @@ export interface GateAiPipelineRecoveryCompletionOutcome {
   evidence: string[];
 }
 
-function roleIntentFromTaskEvidence(task: Pick<GateDispatchCompletionTemplateTask, "evidence">) {
+function roleIntentFromTaskEvidence(task: Pick<GateDispatchCompletionTemplateTask, "evidence" | "dispatchKey" | "href">) {
+  if (task.dispatchKey?.includes(":story-structure:") || task.href?.includes("#story-structure")) return "story-structure";
+  if (task.dispatchKey?.includes(":context-recall:") || task.href?.includes("#context-recall")) return "context-recall";
+  if (task.dispatchKey?.includes(":platform-export:") || task.href?.includes("#platform-export")) return "platform-export";
   const evidence = task.evidence ?? [];
   if (evidence.some((item) => item.includes("角色入口：story-structure"))) return "story-structure";
   if (evidence.some((item) => item.includes("角色入口：context-recall"))) return "context-recall";

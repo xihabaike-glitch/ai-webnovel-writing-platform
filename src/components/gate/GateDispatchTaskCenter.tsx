@@ -427,6 +427,27 @@ export function GateDispatchTaskCenter({
     });
   }, [firstDayFocus.card, firstDayFocus.completionTemplate]);
 
+  const roleClosureCompletionTemplates = useMemo(() => (
+    roleClosureTasks
+      .filter((task) => task.state === "assigned")
+      .map((task) => ({ task, template: buildGateDispatchCompletionTemplate(task) }))
+      .filter((item) => item.template.trim().length > 0)
+  ), [roleClosureTasks]);
+
+  useEffect(() => {
+    if (roleClosureCompletionTemplates.length === 0) return;
+    setCompletionDrafts((current) => {
+      let changed = false;
+      const next = { ...current };
+      for (const { task, template } of roleClosureCompletionTemplates) {
+        if (current[task.dispatchKey]?.trim()) continue;
+        next[task.dispatchKey] = template;
+        changed = true;
+      }
+      return changed ? next : current;
+    });
+  }, [roleClosureCompletionTemplates]);
+
   useEffect(() => {
     function syncHashFocus() {
       setHashFocusedDispatchKey(dispatchKeyFromHash(window.location.hash));

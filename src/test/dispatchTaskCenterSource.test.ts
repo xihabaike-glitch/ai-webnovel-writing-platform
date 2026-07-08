@@ -96,3 +96,10 @@ test("dispatch task center groups gate role closure dispatches", () => {
   assert.ok(source.includes("只看角色闭环"));
   assert.ok(source.includes("queueFilter === \"role_closure\""));
 });
+
+test("dispatch task center auto-fills role closure completion templates", () => {
+  assert.ok(source.includes("roleClosureCompletionTemplates"));
+  assert.ok(source.includes("buildGateDispatchCompletionTemplate(task)"));
+  assert.ok(source.includes("if (current[task.dispatchKey]?.trim()) continue"));
+  assert.ok(source.includes("[task.dispatchKey]: template"));
+});

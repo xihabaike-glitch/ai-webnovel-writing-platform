@@ -46,6 +46,8 @@ test("platform export center renders the final delivery checklist", () => {
   assert.ok(source.includes("总闸门带回的待处理项"));
   assert.ok(source.includes("border-amber-300"));
   assert.ok(source.includes("finalDeliveryGateReturnHref"));
+  assert.ok(source.includes("finalDeliveryGateReturnHref(gateReturnHref, projectId, item.id)"));
+  assert.ok(source.includes("url.searchParams.set(\"finalDeliveryFocus\", finalDeliveryFocus);"));
   assert.ok(source.includes("source\", \"final-delivery-receipt"));
   assert.ok(source.includes("persistGateActionReceipt(receipt"));
   assert.ok(source.includes("router.push(returnHref"));

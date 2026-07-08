@@ -94,12 +94,13 @@ function isGateFocus(value: string | null) {
   return value === null || value === "first-day-complete" || value === "action-recheck";
 }
 
-function buildGateRecheckReturnHref(focus: string | null, projectId: string | null, actionId: string | null, source: string | null) {
+function buildGateRecheckReturnHref(focus: string | null, projectId: string | null, actionId: string | null, source: string | null, finalDeliveryFocus: string | null) {
   if (focus === "action-recheck") {
     const params = new URLSearchParams({ focus: "action-recheck" });
     if (projectId) params.set("projectId", projectId);
     if (actionId) params.set("actionId", actionId);
     if (source) params.set("source", source);
+    if (finalDeliveryFocus) params.set("finalDeliveryFocus", finalDeliveryFocus);
 
     return `/gate?${params.toString()}#gate-focus-notice`;
   }
@@ -122,17 +123,18 @@ function hrefWithGateReturn(href: string, gateReturn: string | null) {
 export default async function GatePage({
   searchParams,
 }: {
-  searchParams?: Promise<{ focus?: string | string[]; projectId?: string | string[]; actionId?: string | string[]; source?: string | string[] }>;
+  searchParams?: Promise<{ focus?: string | string[]; projectId?: string | string[]; actionId?: string | string[]; source?: string | string[]; finalDeliveryFocus?: string | string[] }>;
 }) {
   const params = await searchParams;
   const focus = Array.isArray(params?.focus) ? params?.focus[0] : params?.focus ?? null;
   const projectId = Array.isArray(params?.projectId) ? params?.projectId[0] : params?.projectId ?? null;
   const actionId = Array.isArray(params?.actionId) ? params?.actionId[0] : params?.actionId ?? null;
   const source = Array.isArray(params?.source) ? params?.source[0] : params?.source ?? null;
+  const finalDeliveryFocus = Array.isArray(params?.finalDeliveryFocus) ? params?.finalDeliveryFocus[0] : params?.finalDeliveryFocus ?? null;
   const overview = buildDevelopmentOverview();
   const realSampleReceiptFocus = focus === "action-recheck" && source === "real-sample-receipt";
   const finalDeliveryReceiptFocus = focus === "action-recheck" && source === "final-delivery-receipt";
-  const gateRecheckReturnHref = buildGateRecheckReturnHref(focus, projectId, actionId, source);
+  const gateRecheckReturnHref = buildGateRecheckReturnHref(focus, projectId, actionId, source, finalDeliveryFocus);
   const invalidFocusNotice = isGateFocus(focus)
     ? null
     : focus ? `总闸门焦点「${focus}」不存在，已显示总闸门全局验收。` : null;
@@ -936,7 +938,7 @@ export default async function GatePage({
 
         <div className="rounded-md border border-slate-200 bg-white p-4">
           <div className="mb-3 font-medium text-slate-950">优先动作</div>
-          <GateActionWorkspace actions={gate.priorityActions} failureRepairBatch={gate.failureRepairBatch} gateReturnHref={gateRecheckReturnHref} />
+          <GateActionWorkspace actions={gate.priorityActions} failureRepairBatch={gate.failureRepairBatch} finalDeliveryFocus={finalDeliveryFocus} gateReturnHref={gateRecheckReturnHref} />
         </div>
       </section>
 

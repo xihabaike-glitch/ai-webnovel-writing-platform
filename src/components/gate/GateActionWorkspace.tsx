@@ -413,10 +413,12 @@ const gateDispatchReceiptAcceptanceCriteria = [
 export function GateActionWorkspace({
   actions,
   failureRepairBatch,
+  finalDeliveryFocus,
   gateReturnHref,
 }: {
   actions: PrePublishGateAction[];
   failureRepairBatch: FailureRepairBatch;
+  finalDeliveryFocus?: string | null;
   gateReturnHref?: string | null;
 }) {
   const router = useRouter();
@@ -737,17 +739,21 @@ export function GateActionWorkspace({
               <div className="rounded-md bg-white/80 px-3 py-2 font-medium" aria-label="下一刀">{finalDeliveryReview.remainingFeedback}</div>
             </div>
             <div className="mt-2 grid gap-1 text-xs" aria-label="最终交付逐项复检">
-              {finalDeliveryReview.items.map((item) => (
-                <Link
-                  className={`flex min-h-12 flex-col justify-center gap-1 rounded-md border px-3 py-2 transition sm:grid sm:grid-cols-[96px_64px_minmax(0,1fr)] sm:items-center ${finalDeliveryReviewItemClass(item.status)}`}
-                  href={hrefWithGateReturn(hrefWithFinalDeliveryFocus(item.href, item.id), gateReturnHref)}
-                  key={item.id}
-                >
-                  <span className="font-medium">{item.label}</span>
-                  <span className="text-[11px] font-semibold">{finalDeliveryReviewItemStatusLabel(item.status)}</span>
-                  <span className="text-[11px] leading-4 opacity-75 sm:truncate">{item.evidence}</span>
-                </Link>
-              ))}
+              {finalDeliveryReview.items.map((item) => {
+                const isFocusedFinalDeliveryReviewItem = item.id === finalDeliveryFocus;
+
+                return (
+                  <Link
+                    className={`flex min-h-12 flex-col justify-center gap-1 rounded-md border px-3 py-2 transition sm:grid sm:grid-cols-[96px_96px_minmax(0,1fr)] sm:items-center ${finalDeliveryReviewItemClass(item.status)} ${isFocusedFinalDeliveryReviewItem ? "ring-2 ring-amber-300" : ""}`}
+                    href={hrefWithGateReturn(hrefWithFinalDeliveryFocus(item.href, item.id), gateReturnHref)}
+                    key={item.id}
+                  >
+                    <span className="font-medium">{item.label}</span>
+                    <span className="text-[11px] font-semibold">{isFocusedFinalDeliveryReviewItem ? "刚写回总闸门" : finalDeliveryReviewItemStatusLabel(item.status)}</span>
+                    <span className="text-[11px] leading-4 opacity-75 sm:truncate">{item.evidence}</span>
+                  </Link>
+                );
+              })}
             </div>
             {finalDeliveryReview.evidence.length ? (
               <div className="mt-2 grid gap-1 text-xs opacity-80">

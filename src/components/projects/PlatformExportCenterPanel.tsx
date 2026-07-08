@@ -946,7 +946,7 @@ function hrefWithGateReturn(href: string, gateReturnHref?: string | null, projec
   return `${base}${separator}gateReturn=${encodeURIComponent(gateReturnHref)}${hash}`;
 }
 
-function finalDeliveryGateReturnHref(gateReturnHref: string | null | undefined, projectId: string) {
+function finalDeliveryGateReturnHref(gateReturnHref: string | null | undefined, projectId: string, finalDeliveryFocus: string) {
   if (!gateReturnHref) return null;
   try {
     const url = new URL(gateReturnHref, "http://localhost");
@@ -954,6 +954,7 @@ function finalDeliveryGateReturnHref(gateReturnHref: string | null | undefined, 
     url.searchParams.set("projectId", projectId);
     url.searchParams.set("actionId", `final-delivery:${projectId}`);
     url.searchParams.set("source", "final-delivery-receipt");
+    url.searchParams.set("finalDeliveryFocus", finalDeliveryFocus);
     url.hash = "gate-focus-notice";
     return `${url.pathname}${url.search}${url.hash}`;
   } catch {
@@ -2573,7 +2574,7 @@ export function PlatformExportCenterPanel({
     });
     addGateActionReceipt(receipt);
     setMessage(`${selectedPackage.platformName}「${item.label}」最终交付回执已写回总闸门。`);
-    const returnHref = finalDeliveryGateReturnHref(gateReturnHref, projectId);
+    const returnHref = finalDeliveryGateReturnHref(gateReturnHref, projectId, item.id);
     if (returnHref) {
       await persistGateActionReceipt(receipt).catch(() => null);
       router.push(returnHref);

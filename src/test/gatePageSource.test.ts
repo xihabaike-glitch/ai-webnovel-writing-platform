@@ -16,8 +16,11 @@ test("gate page forwards action recheck focus params", () => {
   assert.ok(source.includes("value === \"action-recheck\""));
   assert.ok(source.includes("actionId"));
   assert.ok(source.includes("source?: string | string[]"));
+  assert.ok(source.includes("finalDeliveryFocus?: string | string[]"));
   assert.ok(source.includes("const source = Array.isArray(params?.source) ? params?.source[0] : params?.source ?? null"));
+  assert.ok(source.includes("const finalDeliveryFocus = Array.isArray(params?.finalDeliveryFocus) ? params?.finalDeliveryFocus[0] : params?.finalDeliveryFocus ?? null"));
   assert.ok(source.includes("if (source) params.set(\"source\", source);"));
+  assert.ok(source.includes("if (finalDeliveryFocus) params.set(\"finalDeliveryFocus\", finalDeliveryFocus);"));
   assert.ok(source.includes("buildPrePublishGateFocusNotice({ focus, projectId, actionId, gate })"));
   assert.ok(source.includes("id=\"gate-focus-notice\""));
 });
@@ -126,6 +129,7 @@ test("gate page carries action recheck return paths into gate item links", () =>
   assert.ok(source.includes("hrefWithGateReturn"));
   assert.ok(source.includes("base.includes(\"gateReturn=\")"));
   assert.ok(source.includes("focus === \"action-recheck\""));
+  assert.ok(source.includes("finalDeliveryFocus={finalDeliveryFocus}"));
   assert.ok(source.includes("href={hrefWithGateReturn(gate.releaseAction.href, gateRecheckReturnHref)}"));
   assert.ok(source.includes("href={hrefWithGateReturn(gate.pmFocus.actionHref, gateRecheckReturnHref)}"));
   assert.ok(source.includes("href={hrefWithGateReturn(focusNotice.primaryHref, gateRecheckReturnHref)}"));

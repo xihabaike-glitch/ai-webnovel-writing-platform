@@ -6,8 +6,9 @@ const gatePageSource = readFileSync("src/app/gate/page.tsx", "utf8");
 const workspaceSource = readFileSync("src/components/gate/GateActionWorkspace.tsx", "utf8");
 
 test("gate action workspace receives action recheck return paths", () => {
-  assert.ok(gatePageSource.includes("<GateActionWorkspace actions={gate.priorityActions} failureRepairBatch={gate.failureRepairBatch} gateReturnHref={gateRecheckReturnHref} />"));
+  assert.ok(gatePageSource.includes("<GateActionWorkspace actions={gate.priorityActions} failureRepairBatch={gate.failureRepairBatch} finalDeliveryFocus={finalDeliveryFocus} gateReturnHref={gateRecheckReturnHref} />"));
   assert.ok(workspaceSource.includes("gateReturnHref?: string | null"));
+  assert.ok(workspaceSource.includes("finalDeliveryFocus?: string | null"));
   assert.ok(workspaceSource.includes("function hrefWithGateReturn"));
 });
 
@@ -54,6 +55,9 @@ test("gate action workspace shows final delivery receipt closeout review", () =>
   assert.ok(workspaceSource.includes("finalDeliveryReviewItemStatusLabel"));
   assert.ok(workspaceSource.includes("function hrefWithFinalDeliveryFocus"));
   assert.ok(workspaceSource.includes("finalDeliveryFocus"));
+  assert.ok(workspaceSource.includes("const isFocusedFinalDeliveryReviewItem = item.id === finalDeliveryFocus;"));
+  assert.ok(workspaceSource.includes("刚写回总闸门"));
+  assert.ok(workspaceSource.includes("ring-2 ring-amber-300"));
   assert.ok(workspaceSource.includes("href={hrefWithGateReturn(hrefWithFinalDeliveryFocus(item.href, item.id), gateReturnHref)}"));
   assert.ok(workspaceSource.includes("finalDeliveryReview.evidence.map"));
 });

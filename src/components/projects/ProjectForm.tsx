@@ -443,7 +443,7 @@ export function ProjectForm({
           </div>
           <Link
             className="w-fit rounded-md bg-emerald-950 px-3 py-2 text-xs font-medium text-white hover:bg-emerald-900"
-            href={hrefWithGateReturn("/gate#platform-tactic-experience", gateReturnHref)}
+            href={hrefWithGateReturn("/gate?focus=action-recheck&source=platform-tactic-experience#platform-tactic-experience", gateReturnHref)}
           >
             查看归档经验库
           </Link>

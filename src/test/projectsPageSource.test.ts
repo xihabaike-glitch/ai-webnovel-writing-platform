@@ -210,5 +210,6 @@ test("project form surfaces final delivery archive reuse before creation", () =>
   assert.ok(projectFormSource.includes("selectedArchiveNextUse"));
   assert.ok(projectFormSource.includes("startExperienceHandoff.firstDayActions.slice(0, 2).map"));
   assert.ok(projectFormSource.includes("startExperienceHandoff.avoidRules.slice(0, 2).map"));
-  assert.ok(projectFormSource.includes("hrefWithGateReturn(\"/gate#platform-tactic-experience\", gateReturnHref)"));
+  assert.ok(projectFormSource.includes("hrefWithGateReturn(\"/gate?focus=action-recheck&source=platform-tactic-experience#platform-tactic-experience\", gateReturnHref)"));
+  assert.equal(projectFormSource.includes("hrefWithGateReturn(\"/gate#platform-tactic-experience\", gateReturnHref)"), false);
 });

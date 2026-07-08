@@ -290,6 +290,10 @@ function isFirstDayClosedLoopExperience(experience: GatePlatformTacticExperience
   return experience.sourceLabel === "新书开局闭环" || experience.tactic === "新书开局闭环打法";
 }
 
+function isFirstDayExecutionExperience(experience: GatePlatformTacticExperienceItem) {
+  return experience.sourceLabel === "首日执行闭环" || experience.tactic === "首日执行闭环打法";
+}
+
 function isThirdMetricStableExperience(experience: GatePlatformTacticExperienceItem) {
   return experience.tactic === "三轮稳定加码打法";
 }
@@ -322,6 +326,7 @@ function isThirdMetricFinalExperience(experience: GatePlatformTacticExperienceIt
 function experiencePriorityForProjectStart(experience: GatePlatformTacticExperienceItem) {
   if (experience.status === "blocked") return 4000 + experience.priorityScore;
   if (isFirstDayClosedLoopExperience(experience)) return 3500 + experience.priorityScore;
+  if (isFirstDayExecutionExperience(experience)) return 3400 + experience.priorityScore;
   if (isThirdMetricFinalExperience(experience)) return 3300 + experience.priorityScore;
   if (experience.status === "usable") return 3000 + experience.priorityScore;
   if (experience.status === "watch") return 2000 + experience.priorityScore;
@@ -548,6 +553,7 @@ export function buildProjectStartPlatformExperienceGuide(input: {
       const isAcceptanceReview = experience ? isAcceptanceReviewExperience(experience) : false;
       const isWeakExecutionReview = experience ? isWeakExecutionReviewExperience(experience) : false;
       const isDispatchCompletion = experience ? isDispatchCompletionExperience(experience) : false;
+      const isFirstDayExecution = experience ? isFirstDayExecutionExperience(experience) : false;
       const isThirdDowngrade = experience ? isThirdMetricDowngradeExperience(experience) : false;
       return {
         platformId: platform.id,
@@ -561,6 +567,8 @@ export function buildProjectStartPlatformExperienceGuide(input: {
             ? "动作观察"
             : isDispatchCompletion
               ? "验收待效果"
+              : isFirstDayExecution
+                ? "执行闭环"
               : experience?.status === "watch" ? "历史观察" : batchEffect ? batchRecoveryLabel(batchEffect) : "批量观察",
         headline: isThirdDowngrade
           ? `${platform.name} 三轮后降档`
@@ -570,6 +578,8 @@ export function buildProjectStartPlatformExperienceGuide(input: {
             ? `${platform.name} 先收口动作`
             : isDispatchCompletion
               ? `${platform.name} 验收已完成，先补效果`
+              : isFirstDayExecution
+                ? `${platform.name} 首日执行已跑通`
               : isRecoveryBatchEffect(batchEffect) ? `${platform.name} 恢复放量继续观察` : `${platform.name} 小样本观察`,
         detail: experience?.status === "watch"
           ? isThirdDowngrade
@@ -580,6 +590,8 @@ export function buildProjectStartPlatformExperienceGuide(input: {
               ? `历史返工复盘暴露执行动作太虚。${experience.reuseHint}`
               : isDispatchCompletion
                 ? `历史派单已经完成验收，但还缺真实效果证明。${experience.reuseHint}`
+                : isFirstDayExecution
+                  ? `首日生成、审稿、二改链路已经跑通，但还缺平台真实效果证明。${experience.reuseHint}`
                 : `${experience.tactic} 还不能写成成功打法。${experience.reuseHint}`
           : isRecoveryBatchEffect(batchEffect)
             ? `${batchEffect?.tacticLabel ?? "恢复放量观察"} 样本还薄，解除闸门后也只能小批验证。`
@@ -732,6 +744,7 @@ export function buildProjectStartExperienceHandoff(input: {
   const recommendedItem = input.guide.items.find((item) => item.status === "recommended") ?? null;
   const recommendedTemplate = input.recommendedTemplate ?? null;
   const firstDayClosedLoop = guideItem?.label === "开局闭环";
+  const firstDayExecution = guideItem?.label === "执行闭环";
   const thirdMetricStable = guideItem?.label === "三轮稳住";
   const thirdMetricDowngrade = guideItem?.label === "三轮降档";
   const thirdMetricAvoidance = guideItem?.label === "三轮暂停" || guideItem?.label === "三轮换平台";
@@ -764,7 +777,7 @@ export function buildProjectStartExperienceHandoff(input: {
   const label = status === "blocked"
     ? thirdMetricAvoidance ? "三轮避坑交接" : "避坑交接"
     : status === "small_sample"
-      ? thirdMetricDowngrade ? "三轮降档交接" : "观察交接"
+      ? firstDayExecution ? "执行闭环交接" : thirdMetricDowngrade ? "三轮降档交接" : "观察交接"
       : status === "reuse" && firstDayClosedLoop
         ? "闭环交接"
         : status === "reuse" && thirdMetricStable
@@ -791,6 +804,8 @@ export function buildProjectStartExperienceHandoff(input: {
     shouldSwitchTemplate,
     firstDayActions: uniqueLines([
       firstDayClosedLoop ? "闭环复用：沿用已完成的新书开局三段交接。" : null,
+      firstDayExecution ? "执行闭环：复用生成-审稿-二改顺序，首日只跑第一章小样本。" : null,
+      firstDayExecution ? "模型路线：沿用首日闭环里的初稿、审稿、二改模型证据，执行后必须重新回填质量分。" : null,
       thirdMetricStable ? "三轮复用：沿用已站住的平台包装、前三章兑现和小步加码节奏。" : null,
       thirdMetricDowngrade ? "三轮降档：只复用修复流程，首轮不放量。" : null,
       recoveryScale ? "恢复放量小样本：只把历史打法当作解除闸门后的参考，首日先验证开头、前三章兑现和追读信号。" : null,
@@ -801,6 +816,7 @@ export function buildProjectStartExperienceHandoff(input: {
     avoidRules: uniqueLines([
       status === "blocked" ? "不要直接复用历史失败入口、题材包装或前三章兑现方式。" : null,
       thirdMetricAvoidance ? "三轮最终结论已经避坑，未写清重启条件前不要硬上。" : null,
+      firstDayExecution ? "首日执行闭环不等于平台效果过线，未回填曝光、点击、收藏、追读前不放量。" : null,
       recoveryScale ? "恢复放量经验不等于新书直接放量，未过小样本前不直接放量。" : null,
       guideItem?.status === "watch" ? "不要把观察样本当成成功样本放量。" : null,
       input.advice.risk,
@@ -1193,6 +1209,31 @@ export function buildProjectStartTacticAdvice(input: {
           "首轮效果：必须回填曝光、点击、收藏、追读",
           `模板前三章：${firstThreeTitles}`,
           `必须具备：${style.mustHave.join("、")}`,
+        ]),
+      };
+    }
+
+    if (isFirstDayExecutionExperience(experience)) {
+      const qualityEvidence = experience.evidence.filter((line) => /初稿质检|审稿评分|二改复检/u.test(line));
+      const modelEvidence = experience.evidence.filter((line) => /执行模型/u.test(line));
+      return {
+        status: "history_watch",
+        label: "执行闭环",
+        title: `${platform.name}：首日执行链路已跑通，先小样本复用`,
+        primaryTactic: experience.lesson,
+        openingMove: `先复用生成-审稿-二改顺序：${experience.reuseHint}`,
+        verificationMove: `创建后先按首日执行闭环验收：${qualityEvidence.join("；") || "初稿质检、审稿评分、二改复检必须回填"}；首轮仍要补曝光、点击、收藏、追读。${modelRouteVerification}`,
+        risk: experience.risk,
+        evidence: withModelEvidence([
+          `首日执行闭环：${experience.sourceLabel}`,
+          ...experience.evidence,
+        ]),
+        checklist: withModelChecklist([
+          "执行顺序：第一章先生成，再审稿，再二改，不跳过质检",
+          `模型路线：${modelEvidence.join("；") || "记录初稿、审稿、二改的执行模型"}`,
+          "质量证据：初稿质检、审稿评分、二改复检必须写回",
+          "平台效果：曝光、点击、收藏、追读没有回填前不进入放量",
+          `模板前三章：${firstThreeTitles}`,
         ]),
       };
     }

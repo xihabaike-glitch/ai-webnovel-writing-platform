@@ -1323,6 +1323,99 @@ test("buildProjectStartTacticAdvice", async (t) => {
     assert.ok(handoff.evidence.some((item) => item.includes("已用于新书开局并闭环")));
   });
 
+  await t.test("feeds completed first-day AI execution experience into new project starts", () => {
+    function executionTask(input: {
+      suffix: "first-draft" | "first-review" | "first-rewrite";
+      completionEvidence: string;
+      completedAt: string;
+    }): PersistedGatePlatformDispatchTask {
+      return {
+        databaseId: `task-fanqie-first-day-execution-${input.suffix}`,
+        dispatchKey: `first-day:project-1:${input.suffix}`,
+        id: `first-day:project-1:${input.suffix}`,
+        projectId: "project-1",
+        platformId: "fanqie",
+        platformName: "番茄小说",
+        stage: "start_first_three_review",
+        state: "completed",
+        priorityScore: 88,
+        ownerRole: "AI 写作主编",
+        title: "番茄小说 首日 AI 执行",
+        detail: "执行首日第一章生成、审稿和二改闭环。",
+        dueLabel: "今天",
+        actionLabel: "查看首日执行",
+        href: "/dispatch?firstDayProject=project-1#first-day-dispatch",
+        acceptanceCriteria: ["生成-审稿-二改三段必须全部完成"],
+        evidence: ["知识来源：番茄小说 首章强钩子", "平台反哺：首日先跑第一章小样本"],
+        sourceReceiptId: null,
+        completionEvidence: input.completionEvidence,
+        reviewLatestAt: input.completedAt,
+        assignedAt: "2026-01-01T00:00:00.000Z",
+        completedAt: input.completedAt,
+        createdAt: "2026-01-01T00:00:00.000Z",
+        updatedAt: input.completedAt,
+      };
+    }
+
+    const platform = getPlatformProfile("fanqie");
+    const template = getDefaultTemplateForPlatform(platform.id);
+    const style = getPlatformWritingStyle(platform.id);
+    const result = buildProjectStartGateExperience({
+      platform,
+      template,
+      style,
+      receipts: [],
+      tasks: [
+        executionTask({
+          suffix: "first-draft",
+          completionEvidence: "第一章正文已生成。首日闭环证据：执行节点：第一章初稿；写回章节：第一章 雨夜系统；当前字数：1320；执行模型：DeepSeek；初稿质检：86。",
+          completedAt: "2026-01-01T01:00:00.000Z",
+        }),
+        executionTask({
+          suffix: "first-review",
+          completionEvidence: "第一章审稿完成。首日闭环证据：执行节点：第一章审稿；审稿章节：第一章 雨夜系统；审稿评分：72；问题数量：2；执行模型：Kimi。",
+          completedAt: "2026-01-01T02:00:00.000Z",
+        }),
+        executionTask({
+          suffix: "first-rewrite",
+          completionEvidence: "第一章二改完成。首日闭环证据：执行节点：第一章二改；写回章节：第一章 雨夜系统；当前字数：1480；执行模型：Claude；二改复检：90。",
+          completedAt: "2026-01-01T03:00:00.000Z",
+        }),
+      ],
+    });
+    const guide = buildProjectStartPlatformExperienceGuide({
+      platforms: [platform],
+      experiences: result.experiences,
+    });
+    const riskGate = buildProjectStartRiskGate(guide.items[0] ?? null);
+    const handoff = buildProjectStartExperienceHandoff({
+      platform,
+      template,
+      guide,
+      advice: result.advice,
+      riskGate,
+      recommendedTemplate: template,
+    });
+
+    assert.equal(result.selection.experience?.tactic, "首日执行闭环打法");
+    assert.equal(result.advice.status, "history_watch");
+    assert.equal(result.advice.label, "执行闭环");
+    assert.ok(result.advice.openingMove.includes("生成-审稿-二改"));
+    assert.ok(result.advice.verificationMove.includes("初稿质检"));
+    assert.ok(result.advice.verificationMove.includes("审稿评分"));
+    assert.ok(result.advice.verificationMove.includes("二改复检"));
+    assert.ok(result.advice.checklist.some((item) => item.includes("DeepSeek")));
+    assert.ok(result.advice.checklist.some((item) => item.includes("Kimi")));
+    assert.ok(result.advice.checklist.some((item) => item.includes("Claude")));
+    assert.equal(guide.items[0]?.label, "执行闭环");
+    assert.ok(guide.items[0]?.detail.includes("生成、审稿、二改链路"));
+    assert.equal(riskGate.level, "watch");
+    assert.equal(handoff.label, "执行闭环交接");
+    assert.ok(handoff.firstDayActions.some((action) => action.includes("生成-审稿-二改")));
+    assert.ok(handoff.firstDayActions.some((action) => action.includes("模型路线")));
+    assert.ok(handoff.evidence.some((line) => line.includes("初稿质检：86")));
+  });
+
   await t.test("builds a creation-page digest from reusable handoff evidence", () => {
     const platform = getPlatformProfile("fanqie");
     const template = getDefaultTemplateForPlatform(platform.id);

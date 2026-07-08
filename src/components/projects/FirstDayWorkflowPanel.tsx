@@ -43,6 +43,7 @@ interface FirstDayExecutionPackage {
     handoffDetail: string;
     firstDayActions: string[];
     avoidRules: string[];
+    handoffEvidence: string[];
     acceptanceCriteria: string[];
     missingEvidence: string[];
   } | null;
@@ -858,6 +859,16 @@ export function FirstDayWorkflowPanel({
                   </div>
                 </div>
               ) : null}
+              {continuation.handoffGuidance.evidence.length > 0 ? (
+                <div>
+                  <div className="font-medium">交接证据</div>
+                  <div className="mt-1 grid gap-1">
+                    {continuation.handoffGuidance.evidence.slice(0, 3).map((evidence) => (
+                      <div key={evidence}>- {evidence}</div>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
             </div>
           ) : null}
         </div>
@@ -1020,6 +1031,14 @@ export function FirstDayWorkflowPanel({
                         ))}
                       </div>
                     ) : null}
+                  </div>
+                ) : null}
+                {workflow.executionPackage.tacticFocus.handoffEvidence.length ? (
+                  <div className="mt-3 rounded-md bg-white px-2 py-2 text-xs leading-5 text-slate-600">
+                    <div className="font-medium text-slate-700">交接证据</div>
+                    {workflow.executionPackage.tacticFocus.handoffEvidence.slice(0, 3).map((evidence) => (
+                      <p className="mt-1" key={evidence}>{evidence}</p>
+                    ))}
                   </div>
                 ) : null}
               </div>

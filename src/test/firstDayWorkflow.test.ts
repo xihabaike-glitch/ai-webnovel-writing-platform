@@ -160,7 +160,7 @@ test("buildFirstDayWorkflow", async (t) => {
       recommendedTemplateId: "fanqie_system_reversal" as const,
       firstDayActions: ["开头：第一段给倒计时。", "验证：回填前三章追读。"],
       avoidRules: ["不要直接放量，先做小样本。"],
-      handoffEvidence: ["最终判定：稳定加码。"],
+      handoffEvidence: ["知识来源：番茄小说 正反馈经验已沉淀", "最终判定：稳定加码。"],
     };
     const workflow = buildFirstDayWorkflow({
       project,
@@ -208,6 +208,8 @@ test("buildFirstDayWorkflow", async (t) => {
     assert.ok(workflow.executionPackage.modelPrompt.includes("交接说明"));
     assert.ok(workflow.executionPackage.modelPrompt.includes("首日动作"));
     assert.ok(workflow.executionPackage.modelPrompt.includes("避坑边界"));
+    assert.ok(workflow.executionPackage.modelPrompt.includes("知识来源：番茄小说"));
+    assert.ok(workflow.handoffProgress?.evidence.some((item) => item.includes("知识来源：番茄小说")));
     assert.ok(workflow.executionPackage.modelPrompt.includes("模型路线复检"));
     assert.equal(dispatch.dueLabel, "今天小样本验证");
     assert.ok(dispatch.title.includes("小样本验证"));

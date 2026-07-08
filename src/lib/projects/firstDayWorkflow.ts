@@ -625,6 +625,7 @@ function modelPrompt(input: {
       input.tacticFocus.handoffDetail ? `- 交接说明：${input.tacticFocus.handoffDetail}` : "",
       ...input.tacticFocus.firstDayActions.map((action) => `- 首日动作：${action}`),
       ...input.tacticFocus.avoidRules.map((rule) => `- 避坑边界：${rule}`),
+      ...input.tacticFocus.handoffEvidence.map((evidence) => `- 交接证据：${evidence}`),
     ].filter(Boolean).join("\n") : "",
     `交接要求：${input.handoffNote}`,
     "验收标准：",

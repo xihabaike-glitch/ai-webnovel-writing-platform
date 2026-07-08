@@ -418,7 +418,7 @@ export default async function DispatchPage({
           {mergedTasks.length ? `${mergedTasks.length} 个派单任务` : "等待总闸门派单"}
         </div>
       </div>
-      <section className="mb-6 rounded-md border border-slate-200 bg-slate-950 p-4 text-sm text-slate-200" aria-label="派发回执闭环面板">
+      <section className="mb-6 rounded-md border border-slate-200 bg-slate-950 p-4 text-sm text-slate-200" id="dispatch-receipt-closeout" aria-label="派发回执闭环面板">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="max-w-3xl">
             <div className="text-xs font-medium uppercase tracking-wide text-slate-400">PM Closeout</div>

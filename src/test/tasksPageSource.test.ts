@@ -55,6 +55,7 @@ test("tasks page shows task receipt acceptance criteria in the PM focus", () => 
   assert.ok(source.includes("taskReceiptAcceptanceCriteria"));
   assert.ok(source.includes("任务回执验收口径"));
   assert.ok(source.includes("任务回执收口面板"));
+  assert.ok(source.includes("id=\"task-receipt-closeout\""));
   assert.ok(source.includes("taskReceiptCloseoutPercent"));
   assert.ok(source.includes("aria-label=\"任务回执完成率\""));
   assert.ok(source.includes("taskReceiptReleaseLabel"));

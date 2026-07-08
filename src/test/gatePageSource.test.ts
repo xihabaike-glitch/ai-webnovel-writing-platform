@@ -87,6 +87,19 @@ test("gate page summarizes final delivery closeout across task and dispatch rece
   assert.ok(source.includes("进入最终交付判断"));
 });
 
+test("gate page links final delivery blockers to the matching closeout surface", () => {
+  assert.ok(source.includes("finalDeliveryGatePrimaryActionHref"));
+  assert.ok(source.includes("finalDeliveryGatePrimaryActionLabel"));
+  assert.ok(source.includes("finalDeliveryGateSecondaryActions"));
+  assert.ok(source.includes("\"处理发布卡点\""));
+  assert.ok(source.includes("\"收派单回执\""));
+  assert.ok(source.includes("\"收 AI 任务\""));
+  assert.ok(source.includes("\"/dispatch#dispatch-receipt-closeout\""));
+  assert.ok(source.includes("\"/tasks#task-receipt-closeout\""));
+  assert.ok(source.includes("aria-label=\"最终交付行动入口\""));
+  assert.ok(source.includes("finalDeliveryGateSecondaryActions.map"));
+});
+
 test("gate page renders action recheck summary feedback", () => {
   assert.ok(source.includes("GateRecheckDispatchButton"));
   assert.ok(source.includes("focusNotice.recheckSummary"));

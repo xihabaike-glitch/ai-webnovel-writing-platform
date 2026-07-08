@@ -719,7 +719,7 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
                 ))}
               </div>
             </div>
-            <div className="mt-3 rounded-md border border-white/15 bg-white/5 p-3 text-xs text-slate-200" aria-label="任务回执收口面板">
+            <div className="mt-3 rounded-md border border-white/15 bg-white/5 p-3 text-xs text-slate-200" id="task-receipt-closeout" aria-label="任务回执收口面板">
               <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                 <div>
                   <div className="font-medium text-white">任务回执收口面板</div>

@@ -23,6 +23,7 @@ test("dispatch page keeps a gate recheck return path visible", () => {
 test("dispatch page shows dispatch receipt closeout before returning to gate", () => {
   assert.ok(source.includes("dispatchReceiptCloseoutPercent"));
   assert.ok(source.includes("派发回执闭环面板"));
+  assert.ok(source.includes("id=\"dispatch-receipt-closeout\""));
   assert.ok(source.includes("aria-label=\"派发回执完成率\""));
   assert.ok(source.includes("dispatchReceiptGateReturnLabel"));
   assert.ok(source.includes("dispatchReceiptNextCutLabel"));

@@ -319,6 +319,32 @@ export default async function GatePage({
     : finalDeliveryDispatchCloseout.summary.active > 0
       ? finalDeliveryDispatchCloseout.nextActions[0] ?? "回派单中心收口"
       : finalDeliveryTaskRunCloseout.nextActions[0] ?? gate.realPipelineFinalReview.primaryActionLabel ?? "进入最终交付";
+  const finalDeliveryGatePrimaryActionHref = gate.overview.blockedTasks > 0
+    ? gate.pmFocus.actionHref
+    : finalDeliveryDispatchCloseout.summary.active > 0
+      ? "/dispatch#dispatch-receipt-closeout"
+      : finalDeliveryGateAiGapCount > 0
+        ? "/tasks#task-receipt-closeout"
+        : gate.realPipelineFinalReview.primaryActionHref;
+  const finalDeliveryGatePrimaryActionLabel = gate.overview.blockedTasks > 0
+    ? "处理发布卡点"
+    : finalDeliveryDispatchCloseout.summary.active > 0
+      ? "收派单回执"
+      : finalDeliveryGateAiGapCount > 0
+        ? "收 AI 任务"
+        : gate.realPipelineFinalReview.primaryActionLabel;
+  const finalDeliveryGateSecondaryActions = [
+    {
+      label: "收派单回执",
+      href: "/dispatch#dispatch-receipt-closeout",
+      count: finalDeliveryDispatchCloseout.summary.active,
+    },
+    {
+      label: "收 AI 任务",
+      href: "/tasks#task-receipt-closeout",
+      count: finalDeliveryGateAiGapCount,
+    },
+  ];
   const focusNotice = buildPrePublishGateFocusNotice({ focus, projectId, actionId, gate });
   const aiRecoveryPanel = buildGateAiPipelineRecoveryPanel(
     aiRecoveryDispatchRecords.map(gatePlatformDispatchTaskFromRecord),
@@ -437,6 +463,29 @@ export default async function GatePage({
           <div className="rounded-md bg-slate-50 p-3">
             <div className="text-xs text-slate-500">下一刀</div>
             <div className="mt-1 font-semibold text-slate-950">{finalDeliveryGateNextCutLabel}</div>
+          </div>
+        </div>
+        <div className="mt-4 flex flex-col gap-2 rounded-md border border-slate-200 bg-slate-50 p-3 sm:flex-row sm:items-center sm:justify-between" aria-label="最终交付行动入口">
+          <div>
+            <div className="text-xs font-medium text-slate-500">当前该点哪里</div>
+            <div className="mt-1 text-sm font-semibold text-slate-950">{finalDeliveryGatePrimaryActionLabel}</div>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Link
+              className="w-fit rounded-md bg-slate-950 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800"
+              href={hrefWithGateReturn(finalDeliveryGatePrimaryActionHref, gateRecheckReturnHref)}
+            >
+              {finalDeliveryGatePrimaryActionLabel}
+            </Link>
+            {finalDeliveryGateSecondaryActions.map((action) => (
+              <Link
+                className="w-fit rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-800 hover:bg-slate-100"
+                href={hrefWithGateReturn(action.href, gateRecheckReturnHref)}
+                key={action.href}
+              >
+                {action.label} · {action.count}
+              </Link>
+            ))}
           </div>
         </div>
       </section>

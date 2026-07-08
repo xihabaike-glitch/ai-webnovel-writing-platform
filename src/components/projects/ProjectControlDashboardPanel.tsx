@@ -89,6 +89,9 @@ interface AiPipelineBatchHealthSummary {
   hasSamples: boolean;
   status: "usable" | "watch" | "blocked" | "empty";
   label: string;
+  scaleDecisionLabel: string;
+  scaleDecisionTone: "allow" | "watch" | "block" | "standard";
+  scaleDecisionDetail: string;
   headline: string;
   detail: string;
   actionLabel: string;
@@ -421,6 +424,13 @@ function aiRecentBatchClass(status: AiPipelineRecentBatchSummary["status"]) {
 }
 
 function aiRecentBatchScaleDecisionClass(tone: AiPipelineRecentBatchSummary["scaleDecisionTone"]) {
+  if (tone === "allow") return "border-emerald-200 bg-emerald-50 text-emerald-800";
+  if (tone === "watch") return "border-amber-200 bg-amber-50 text-amber-800";
+  if (tone === "block") return "border-rose-200 bg-rose-50 text-rose-800";
+  return "border-slate-200 bg-white text-slate-700";
+}
+
+function aiBatchHealthScaleDecisionClass(tone: AiPipelineBatchHealthSummary["scaleDecisionTone"]) {
   if (tone === "allow") return "border-emerald-200 bg-emerald-50 text-emerald-800";
   if (tone === "watch") return "border-amber-200 bg-amber-50 text-amber-800";
   if (tone === "block") return "border-rose-200 bg-rose-50 text-rose-800";
@@ -1161,6 +1171,9 @@ export function ProjectControlDashboardPanel({
                   <span className={`rounded-md px-2 py-1 text-[11px] font-medium ${aiBatchHealthClass(dashboard.aiPipelineBatchHealth.status)}`}>
                     {dashboard.aiPipelineBatchHealth.label}
                   </span>
+                  <span className={`rounded-md border px-2 py-1 text-[11px] font-semibold ${aiBatchHealthScaleDecisionClass(dashboard.aiPipelineBatchHealth.scaleDecisionTone)}`}>
+                    {dashboard.aiPipelineBatchHealth.scaleDecisionLabel}
+                  </span>
                   {dashboard.aiPipelineBatchHealth.latestAt ? (
                     <span className="text-xs text-slate-500">{shortTime(dashboard.aiPipelineBatchHealth.latestAt)}</span>
                   ) : null}
@@ -1168,6 +1181,9 @@ export function ProjectControlDashboardPanel({
                 <p className="mt-1 text-sm leading-6 text-slate-600">{dashboard.aiPipelineBatchHealth.headline}</p>
                 <div className="mt-2 rounded-md bg-slate-50 px-2 py-1 text-xs leading-5 text-slate-600">
                   {dashboard.aiPipelineBatchHealth.detail}
+                </div>
+                <div className={`mt-2 rounded-md border px-2 py-1 text-xs leading-5 ${aiBatchHealthScaleDecisionClass(dashboard.aiPipelineBatchHealth.scaleDecisionTone)}`}>
+                  {dashboard.aiPipelineBatchHealth.scaleDecisionDetail}
                 </div>
               </div>
               <div className="flex flex-wrap gap-2">

@@ -455,6 +455,9 @@ export interface AiPipelineBatchHealthSummary {
   hasSamples: boolean;
   status: "usable" | "watch" | "blocked" | "empty";
   label: string;
+  scaleDecisionLabel: string;
+  scaleDecisionTone: "allow" | "watch" | "block" | "standard";
+  scaleDecisionDetail: string;
   headline: string;
   detail: string;
   actionLabel: string;
@@ -1000,6 +1003,38 @@ function batchHealthHeadline(status: AiPipelineBatchHealthSummary["status"], lab
   return "本书还没有可复盘的批量打法样本。";
 }
 
+function batchHealthScaleDecision(
+  status: AiPipelineBatchHealthSummary["status"],
+  nextAction: string,
+): Pick<AiPipelineBatchHealthSummary, "scaleDecisionLabel" | "scaleDecisionTone" | "scaleDecisionDetail"> {
+  if (status === "usable") {
+    return {
+      scaleDecisionLabel: "允许小步加码",
+      scaleDecisionTone: "allow",
+      scaleDecisionDetail: "本书批量打法已达到可参考线，后续只能小步加码，并继续回收成功率、质量、成本和失败证据。",
+    };
+  }
+  if (status === "blocked") {
+    return {
+      scaleDecisionLabel: "禁止放大",
+      scaleDecisionTone: "block",
+      scaleDecisionDetail: "本书批量健康已跌线，先修复失败任务和低分环节，复检通过前不要继续放大。",
+    };
+  }
+  if (status === "watch") {
+    return {
+      scaleDecisionLabel: "继续观察",
+      scaleDecisionTone: "watch",
+      scaleDecisionDetail: nextAction || "本书批量样本仍薄，继续小批验证，不进入放大生产。",
+    };
+  }
+  return {
+    scaleDecisionLabel: "标准生产",
+    scaleDecisionTone: "standard",
+    scaleDecisionDetail: "本书还没有批量健康样本，先建立推荐小批次样本，再判断放量边界。",
+  };
+}
+
 function buildAiPipelineBatchHealthSummary(audits: ControlBatchAudit[] = []): AiPipelineBatchHealthSummary {
   const review = buildTaskQueueBatchHealthReview(audits, 5);
   const primary = review.items[0] ?? null;
@@ -1013,6 +1048,7 @@ function buildAiPipelineBatchHealthSummary(audits: ControlBatchAudit[] = []): Ai
       hasSamples: false,
       status: "empty",
       label: "缺样本",
+      ...batchHealthScaleDecision("empty", ""),
       headline: "本书还没有可复盘的批量打法样本。",
       detail: "先从任务中心跑一次带首轮打法的推荐批次，项目总控才会判断这套打法能不能继续。",
       actionLabel: "去任务中心",
@@ -1042,6 +1078,7 @@ function buildAiPipelineBatchHealthSummary(audits: ControlBatchAudit[] = []): Ai
     hasSamples: true,
     status: primary.status,
     label: batchHealthStatusLabel(primary.status),
+    ...batchHealthScaleDecision(primary.status, primary.nextAction),
     headline: batchHealthHeadline(primary.status, primary.label),
     detail: primary.nextAction,
     actionLabel: canArchiveRecoveryExperience ? "写入经验库" : primary.status === "blocked" ? "看失败复盘" : "看任务中心",

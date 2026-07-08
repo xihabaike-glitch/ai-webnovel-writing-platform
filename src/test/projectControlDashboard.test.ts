@@ -674,6 +674,9 @@ test("buildProjectControlDashboard", async (t) => {
     assert.equal(dashboard.aiPipelineBatchHealth.hasSamples, true);
     assert.equal(dashboard.aiPipelineBatchHealth.status, "usable");
     assert.equal(dashboard.aiPipelineBatchHealth.label, "可参考");
+    assert.equal(dashboard.aiPipelineBatchHealth.scaleDecisionLabel, "允许小步加码");
+    assert.equal(dashboard.aiPipelineBatchHealth.scaleDecisionTone, "allow");
+    assert.ok(dashboard.aiPipelineBatchHealth.scaleDecisionDetail.includes("小步加码"));
     assert.equal(dashboard.aiPipelineBatchHealth.tacticLabel, "三轮稳住打法");
     assert.equal(dashboard.aiPipelineBatchHealth.sampleBatches, 2);
     assert.equal(dashboard.aiPipelineBatchHealth.successRatePercent, 100);
@@ -727,6 +730,9 @@ test("buildProjectControlDashboard", async (t) => {
     });
 
     assert.equal(dashboard.aiPipelineBatchHealth.hasSamples, true);
+    assert.equal(dashboard.aiPipelineBatchHealth.scaleDecisionLabel, "继续观察");
+    assert.equal(dashboard.aiPipelineBatchHealth.scaleDecisionTone, "watch");
+    assert.ok(dashboard.aiPipelineBatchHealth.scaleDecisionDetail.includes("恢复放量样本还薄"));
     assert.equal(dashboard.aiPipelineBatchHealth.sampleBatches, 1);
     assert.equal(dashboard.aiPipelineBatchHealth.tacticLabel, "恢复放量观察");
     assert.equal(dashboard.aiPipelineBatchHealth.executeLabel, "再跑稳定批次");
@@ -846,6 +852,9 @@ test("buildProjectControlDashboard", async (t) => {
     const aiArea = dashboard.areas.find((area) => area.id === "ai-pipeline");
 
     assert.equal(dashboard.aiPipelineBatchHealth.status, "blocked");
+    assert.equal(dashboard.aiPipelineBatchHealth.scaleDecisionLabel, "禁止放大");
+    assert.equal(dashboard.aiPipelineBatchHealth.scaleDecisionTone, "block");
+    assert.ok(dashboard.aiPipelineBatchHealth.scaleDecisionDetail.includes("先修复"));
     assert.equal(aiArea?.status, "blocked");
     assert.equal(aiArea?.actionLabel, "修批量打法");
     assert.equal(aiArea?.canExecute, true);

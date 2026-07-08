@@ -32,6 +32,17 @@ test("gate page renders real sample receipt recheck context", () => {
   assert.ok(source.includes("href={hrefWithGateReturn(`/projects/${projectId}#pipeline-projects`, gateRecheckReturnHref)}"));
 });
 
+test("gate page renders real sample final review checklist", () => {
+  assert.ok(source.includes("buildDevelopmentOverview"));
+  assert.ok(source.includes("overview.currentPipelineValidation.finalReview"));
+  assert.ok(source.includes("真实作品流水线终检"));
+  assert.ok(source.includes("overview.currentPipelineValidation.finalReview.title"));
+  assert.ok(source.includes("overview.currentPipelineValidation.finalReview.passSignals.map"));
+  assert.ok(source.includes("overview.currentPipelineValidation.finalReview.repairSignals.map"));
+  assert.ok(source.includes("overview.currentPipelineValidation.finalReview.holdBatchSignals.map"));
+  assert.ok(source.includes("overview.currentPipelineValidation.finalReview.receiptHref"));
+});
+
 test("gate page renders action recheck summary feedback", () => {
   assert.ok(source.includes("GateRecheckDispatchButton"));
   assert.ok(source.includes("focusNotice.recheckSummary"));

@@ -11,6 +11,7 @@ import { GatePublishEffectReviewPanel } from "@/components/gate/GatePublishEffec
 import { GateRecheckDispatchButton } from "@/components/gate/GateRecheckDispatchButton";
 import { buildTaskBatchHistory } from "@/lib/ai/taskBatchHistory";
 import { prisma } from "@/lib/db/prisma";
+import { buildDevelopmentOverview } from "@/lib/development/developmentOverview";
 import { buildModelRoleMatrix, buildModelRoleMatrixPriorityBlocker } from "@/lib/model-gateway/modelRoleMatrix";
 import { buildGateAiPipelineRecoveryPanel } from "@/lib/projects/gateActionReceipts";
 import { gatePlatformDispatchTaskFromRecord } from "@/lib/projects/gateDispatchTaskRecords";
@@ -128,6 +129,7 @@ export default async function GatePage({
   const projectId = Array.isArray(params?.projectId) ? params?.projectId[0] : params?.projectId ?? null;
   const actionId = Array.isArray(params?.actionId) ? params?.actionId[0] : params?.actionId ?? null;
   const source = Array.isArray(params?.source) ? params?.source[0] : params?.source ?? null;
+  const overview = buildDevelopmentOverview();
   const realSampleReceiptFocus = focus === "action-recheck" && source === "real-sample-receipt";
   const gateRecheckReturnHref = buildGateRecheckReturnHref(focus, projectId, actionId, source);
   const invalidFocusNotice = isGateFocus(focus)
@@ -396,6 +398,46 @@ export default async function GatePage({
                 回作品证据入口
               </Link>
             )}
+          </div>
+          <div className="mt-4 rounded-md border border-white/70 bg-white/75 p-3">
+            <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
+              <div>
+                <div className="text-xs font-medium text-sky-700">真实作品流水线终检</div>
+                <h3 className="mt-1 font-medium text-sky-950">{overview.currentPipelineValidation.finalReview.title}</h3>
+              </div>
+              <Link
+                className="w-fit rounded-md border border-sky-200 bg-white px-3 py-2 text-sm font-medium text-sky-950 hover:bg-sky-100"
+                href={overview.currentPipelineValidation.finalReview.receiptHref}
+              >
+                {overview.currentPipelineValidation.finalReview.receiptLabel}
+              </Link>
+            </div>
+            <div className="mt-3 grid gap-2 text-sm lg:grid-cols-3">
+              <div className="rounded-md bg-emerald-50 p-3 text-emerald-900">
+                <div className="text-xs font-medium">可放行信号</div>
+                <ul className="mt-2 space-y-1 leading-5">
+                  {overview.currentPipelineValidation.finalReview.passSignals.map((signal) => (
+                    <li key={signal}>{signal}</li>
+                  ))}
+                </ul>
+              </div>
+              <div className="rounded-md bg-amber-50 p-3 text-amber-900">
+                <div className="text-xs font-medium">退回修复信号</div>
+                <ul className="mt-2 space-y-1 leading-5">
+                  {overview.currentPipelineValidation.finalReview.repairSignals.map((signal) => (
+                    <li key={signal}>{signal}</li>
+                  ))}
+                </ul>
+              </div>
+              <div className="rounded-md bg-rose-50 p-3 text-rose-900">
+                <div className="text-xs font-medium">暂停批量信号</div>
+                <ul className="mt-2 space-y-1 leading-5">
+                  {overview.currentPipelineValidation.finalReview.holdBatchSignals.map((signal) => (
+                    <li key={signal}>{signal}</li>
+                  ))}
+                </ul>
+              </div>
+            </div>
           </div>
         </section>
       ) : null}

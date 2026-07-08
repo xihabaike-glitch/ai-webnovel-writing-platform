@@ -19,3 +19,9 @@ test("model settings treats model role matrix focus as a repair entry", () => {
   assert.ok(source.includes("推荐批次被拦住时，先在这里补齐 Claude、DeepSeek、Kimi、GPT 的写作岗位"));
   assert.ok(source.includes("href={hrefWithGateReturn(\"/settings/models#model-role-matrix\", gateReturnHref)}"));
 });
+
+test("model role repair entry keeps the gate recheck return visible", () => {
+  assert.ok(source.includes("isModelRoleMatrixFocus && gateReturnHref"));
+  assert.ok(source.includes("模型岗位修复后回总闸门复检"));
+  assert.ok(source.includes("href={gateReturnHref}"));
+});

@@ -1360,12 +1360,22 @@ export function ModelProviderSettings({
                 推荐批次被拦住时，先在这里补齐 Claude、DeepSeek、Kimi、GPT 的写作岗位，再保存职责路由和小样本复检派单。
               </p>
             </div>
-            <a
-              className="w-fit rounded-md bg-white px-3 py-2 text-sm font-medium text-rose-950 hover:bg-rose-100"
-              href={hrefWithGateReturn("/settings/models#model-role-matrix", gateReturnHref)}
-            >
-              定位岗位矩阵
-            </a>
+            <div className="flex flex-wrap gap-2">
+              {isModelRoleMatrixFocus && gateReturnHref ? (
+                <Link
+                  className="w-fit rounded-md border border-rose-200 bg-white px-3 py-2 text-sm font-medium text-rose-950 hover:bg-rose-100"
+                  href={gateReturnHref}
+                >
+                  模型岗位修复后回总闸门复检
+                </Link>
+              ) : null}
+              <a
+                className="w-fit rounded-md bg-white px-3 py-2 text-sm font-medium text-rose-950 hover:bg-rose-100"
+                href={hrefWithGateReturn("/settings/models#model-role-matrix", gateReturnHref)}
+              >
+                定位岗位矩阵
+              </a>
+            </div>
           </div>
         </section>
       ) : null}

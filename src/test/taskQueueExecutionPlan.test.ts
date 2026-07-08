@@ -21,6 +21,55 @@ function queueItem(input: Partial<QueueItem> & Pick<QueueItem, "id" | "category"
   };
 }
 
+function firstDayOutcomeGuidance(status: "scale" | "watch" | "blocked"): QueueItem["handoffGuidance"] {
+  if (status === "scale") {
+    return {
+      label: "执行扩展交接",
+      detail: "首日数据过线，可以进入小样本扩展。",
+      firstDayActions: ["执行扩展：沿用生成-审稿-二改顺序，扩到下一章小样本。"],
+      avoidRules: ["执行扩展不是直接批量放量。"],
+      evidence: ["首日执行数据回收：进入小样本扩展"],
+      firstDayOutcome: {
+        status: "scale",
+        badge: "可以扩展",
+        title: "首日执行可扩展",
+        nextMove: "扩到下一章小样本。",
+        boundary: "未过下一轮数据前不直接批量复制。",
+      },
+    };
+  }
+  if (status === "watch") {
+    return {
+      label: "执行观察交接",
+      detail: "首日追读证据不足。",
+      firstDayActions: ["执行观察：只补追读和收藏证据，不扩展章节。"],
+      avoidRules: ["首日数据还在观察，不要把补追读任务当成扩展通过。"],
+      evidence: ["首日执行数据回收：继续观察"],
+      firstDayOutcome: {
+        status: "watch",
+        badge: "继续观察",
+        title: "首日执行继续观察",
+        nextMove: "先补追读证据。",
+        boundary: "追读证据不足前不扩展章节。",
+      },
+    };
+  }
+  return {
+    label: "执行避坑交接",
+    detail: "首日数据未过线。",
+    firstDayActions: ["执行避坑：先重做入口卖点和前三章兑现。"],
+    avoidRules: ["不要复用首日未过线的开头、平台包装或扩展节奏。"],
+    evidence: ["首日执行数据回收：暂停"],
+    firstDayOutcome: {
+      status: "blocked",
+      badge: "先避坑",
+      title: "首日执行先避坑",
+      nextMove: "先重做入口卖点。",
+      boundary: "不要复用首日未过线的开头。",
+    },
+  };
+}
+
 test("buildTaskQueueExecutionPlan", async (t) => {
   await t.test("keeps the recommended batch in one project and one action category", () => {
     const plan = buildTaskQueueExecutionPlan([
@@ -219,5 +268,67 @@ test("buildTaskQueueExecutionPlan", async (t) => {
     assert.deepEqual(plan.chapterIds, ["chapter-1"]);
     assert.ok(plan.warnings.some((warning) => warning.includes("三轮降档样本")));
     assert.ok(plan.warnings.some((warning) => warning.includes("观察小样本闸门")));
+  });
+
+  await t.test("limits first-day scale outcomes to one recovery sample", () => {
+    const plan = buildTaskQueueExecutionPlan([
+      queueItem({
+        id: "project-1:draft:chapter-1",
+        category: "draft",
+        projectId: "project-1",
+        projectTitle: "项目一",
+        chapterTitle: "第一章",
+        handoffGuidance: firstDayOutcomeGuidance("scale"),
+      }),
+      queueItem({
+        id: "project-1:draft:chapter-2",
+        category: "draft",
+        projectId: "project-1",
+        projectTitle: "项目一",
+        chapterTitle: "第二章",
+        handoffGuidance: firstDayOutcomeGuidance("scale"),
+      }),
+    ], 8);
+
+    assert.equal(plan.canRun, true);
+    assert.deepEqual(plan.itemIds, ["project-1:draft:chapter-1"]);
+    assert.deepEqual(plan.chapterIds, ["chapter-1"]);
+    assert.equal(plan.batchModeTone, "recovery");
+    assert.ok(plan.batchModeLabel.includes("首日扩展"));
+    assert.ok(plan.warnings.some((warning) => warning.includes("首日执行可扩展")));
+    assert.ok(plan.warnings.some((warning) => warning.includes("不直接批量")));
+  });
+
+  await t.test("blocks first-day watch and avoidance outcomes from recommended batches", () => {
+    const watchPlan = buildTaskQueueExecutionPlan([
+      queueItem({
+        id: "project-1:draft:chapter-1",
+        category: "draft",
+        projectId: "project-1",
+        projectTitle: "项目一",
+        chapterTitle: "第一章",
+        handoffGuidance: firstDayOutcomeGuidance("watch"),
+      }),
+    ]);
+    const blockedPlan = buildTaskQueueExecutionPlan([
+      queueItem({
+        id: "project-2:draft:chapter-1",
+        category: "draft",
+        projectId: "project-2",
+        projectTitle: "项目二",
+        chapterTitle: "第一章",
+        handoffGuidance: firstDayOutcomeGuidance("blocked"),
+      }),
+    ]);
+
+    assert.equal(watchPlan.canRun, false);
+    assert.ok(watchPlan.actionLabel.includes("先补首日观察证据"));
+    assert.ok(watchPlan.detail.includes("继续观察"));
+    assert.ok(watchPlan.warnings.some((warning) => warning.includes("追读证据")));
+
+    assert.equal(blockedPlan.canRun, false);
+    assert.ok(blockedPlan.actionLabel.includes("先处理首日避坑"));
+    assert.ok(blockedPlan.detail.includes("先避坑"));
+    assert.ok(blockedPlan.warnings.some((warning) => warning.includes("重做入口")));
   });
 });

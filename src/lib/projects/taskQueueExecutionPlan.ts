@@ -30,6 +30,8 @@ const executableCategories: ExecutableQueueCategory[] = ["review", "second_pass"
 
 function isExecutableQueueItem(item: QueueItem): item is ExecutableQueueItem {
   if (item.sourceType === "platform_strategy") return false;
+  const firstDayOutcomeStatus = item.handoffGuidance?.firstDayOutcome?.status;
+  if (firstDayOutcomeStatus === "watch" || firstDayOutcomeStatus === "blocked") return false;
   return executableCategories.includes(item.category as ExecutableQueueCategory);
 }
 
@@ -84,6 +86,52 @@ function batchModeFromScaleGate(scaleGate: QueueScaleGate) {
   };
 }
 
+function firstDayOutcomeBatchMode(item: QueueItem) {
+  if (item.handoffGuidance?.firstDayOutcome?.status !== "scale") return null;
+  return {
+    batchModeLabel: "首日扩展小批",
+    batchModeTone: "recovery" as const,
+    batchModeDetail: "首日执行数据已经过线，但本批只扩 1 个小样本；回填新一轮曝光、点击、收藏、追读后再决定是否继续。",
+  };
+}
+
+function firstDayOutcomeBlockedPlanItem(queueItems: QueueItem[]) {
+  return queueItems.find((item) => {
+    const status = item.handoffGuidance?.firstDayOutcome?.status;
+    return status === "watch" || status === "blocked";
+  }) ?? null;
+}
+
+function firstDayOutcomeBlockedPlan(item: QueueItem): TaskQueueExecutionPlan {
+  const outcome = item.handoffGuidance?.firstDayOutcome;
+  const watch = outcome?.status === "watch";
+  return {
+    canRun: false,
+    category: null,
+    projectId: item.projectId,
+    projectIds: [item.projectId],
+    projectTitle: item.projectTitle,
+    itemIds: [],
+    chapterIds: [],
+    strategyBases: [],
+    scaleGate: item.scaleGate,
+    adoptionFollowupCount: 0,
+    adoptionFollowupItemIds: [],
+    platformStrategyCount: 0,
+    platformStrategyItemIds: [],
+    actionLabel: watch ? "先补首日观察证据" : "先处理首日避坑",
+    detail: `${item.projectTitle} · ${outcome?.badge ?? item.riskLabel} · ${outcome?.nextMove ?? item.evidence}`,
+    batchModeLabel: watch ? "首日观察暂停批量" : "首日避坑暂停批量",
+    batchModeTone: watch ? "sample" : "standard",
+    batchModeDetail: outcome?.boundary ?? "首日结论没有过线前，不进入推荐批量。",
+    warnings: [
+      watch
+        ? `首日执行继续观察：${outcome?.boundary ?? "追读证据不足前不扩展章节。"}`
+        : `首日执行先避坑：${outcome?.nextMove ?? "先重做入口卖点、前三章兑现或平台匹配。"}`
+    ],
+  };
+}
+
 export function buildTaskQueueExecutionPlan(
   queueItems: QueueItem[],
   maxBatchSize = defaultBatchExecutionStrategy.maxBatchSize,
@@ -93,6 +141,8 @@ export function buildTaskQueueExecutionPlan(
   const first = executable[0];
 
   if (!first) {
+    const firstDayBlocked = firstDayOutcomeBlockedPlanItem(queueItems);
+    if (firstDayBlocked) return firstDayOutcomeBlockedPlan(firstDayBlocked);
     const firstBlocker = queueItems.find((item) => item.category === "blocked") ?? null;
     return {
       canRun: false,
@@ -121,7 +171,8 @@ export function buildTaskQueueExecutionPlan(
     };
   }
 
-  const batch = first.scaleGate === "sample_only"
+  const firstDayScaleSample = first.handoffGuidance?.firstDayOutcome?.status === "scale";
+  const batch = first.scaleGate === "sample_only" || firstDayScaleSample
     ? [first]
     : executable
       .filter((item) => item.category === first.category && (strategy.allowCrossProject || item.projectId === first.projectId))
@@ -144,7 +195,8 @@ export function buildTaskQueueExecutionPlan(
         .map((basis) => [basis.title, basis]),
     ).values(),
   ];
-  const batchMode = batchModeFromScaleGate(first.scaleGate);
+  const batchMode = firstDayOutcomeBatchMode(first) ?? batchModeFromScaleGate(first.scaleGate);
+  const firstDayOutcome = first.handoffGuidance?.firstDayOutcome ?? null;
 
   return {
     canRun: batch.length > 0,
@@ -168,6 +220,7 @@ export function buildTaskQueueExecutionPlan(
       platformStrategyItemIds.length > 0 ? `本批包含 ${platformStrategyItemIds.length} 个平台策略任务；执行后不要停在生成结果，必须继续处理对应采纳、质检或效果回收。` : null,
       ...platformStrategyUnlockWarnings,
       scaleWarningFromStrategyBases(strategyBases),
+      firstDayOutcome?.status === "scale" ? `首日执行可扩展：${firstDayOutcome.nextMove} ${firstDayOutcome.boundary}` : null,
       first.scaleGate === "sample_only" ? "当前处于观察小样本闸门，只运行 1 个样本；验收依据写清通过线、不可接受项、复查证据和放量结论后才允许批量生成。" : null,
       first.scaleGate === "cleared" ? "小样本验收已过线，本批属于恢复放量；先保持同一平台打法和小批次节奏，别一次拉满。" : null,
       sameCategoryOtherProjects > 0 && !strategy.allowCrossProject ? `还有 ${sameCategoryOtherProjects} 个同类任务分布在其他项目，本批先保持单项目上下文。` : null,

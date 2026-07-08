@@ -55,6 +55,39 @@ describe("buildChapterReviewPrompt", () => {
     assert.match(prompt.userPrompt, /start_tactic/);
   });
 
+  it("audits reusable start experience evidence during review", () => {
+    const prompt = buildChapterReviewPrompt({
+      projectTitle: "夜雨系统",
+      platform: getPlatformProfile("fanqie"),
+      startTactic: {
+        title: "首轮平台打法：番茄小说",
+        label: "闭环交接",
+        primaryTactic: "新书开局闭环打法已经进入首日流程。",
+        openingMove: "第一段直接给倒计时和不可逆危机。",
+        verificationMove: "记录首轮曝光、点击、收藏、追读。",
+        risk: "不要直接放量。",
+        firstDayActions: ["开头：第一段给不可逆危机。"],
+        avoidRules: ["不要直接放量，先做小样本。"],
+        handoffEvidence: ["知识来源：番茄小说 正反馈经验已沉淀"],
+      },
+      chapter: {
+        title: "第一章",
+        content: "林晚推开门。",
+        goal: "启动危机",
+        hook: "门后有未知风险",
+        conflict: "逃避或面对",
+        valueShift: "平静到失控",
+        cliffhanger: "系统出现",
+      },
+    });
+
+    assert.match(prompt.userPrompt, /开书经验执行摘要/);
+    assert.match(prompt.userPrompt, /知识来源：番茄小说/);
+    assert.match(prompt.userPrompt, /复制动作：开头：第一段给不可逆危机/);
+    assert.match(prompt.userPrompt, /不能踩：不要直接放量/);
+    assert.match(prompt.userPrompt, /审稿时必须核对开书经验执行摘要/);
+  });
+
   it("includes project context recall and continuity audit instruction", () => {
     const projectContext = buildProjectContextPack({
       currentChapterId: "chapter-2",

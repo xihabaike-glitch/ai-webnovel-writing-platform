@@ -1,6 +1,6 @@
 import type { PlatformProfile } from "../platforms/platformProfiles.ts";
 import type { ProjectContextPack } from "../projects/projectContextPack.ts";
-import type { ProjectStartTacticSummary } from "../projects/projectStartTactics.ts";
+import { buildProjectStartExecutionPromptBlock, type ProjectStartTacticSummary } from "../projects/projectStartTactics.ts";
 import { buildAiRecoveryPromptBlock, type AiRecoveryPromptMemory } from "./aiRecoveryPromptMemory.ts";
 
 interface ChapterReviewPromptInput {
@@ -31,6 +31,7 @@ export function buildChapterReviewPrompt(input: ChapterReviewPromptInput) {
         `风险提醒：${input.startTactic.risk || "按平台反馈继续校准。"}`,
       ]
     : [];
+  const startExperiencePromptBlock = buildProjectStartExecutionPromptBlock(input.startTactic);
   const systemPrompt =
     "你是严格的网文编辑。你只输出 JSON，不输出闲聊。重点检查钩子、冲突、爽点、人物弧光、伏笔和平台适配。";
 
@@ -39,6 +40,7 @@ export function buildChapterReviewPrompt(input: ChapterReviewPromptInput) {
     `目标平台：${input.platform.name}`,
     `平台审稿重点：${input.platform.reviewFocus.join("、")}`,
     ...startTacticLines,
+    startExperiencePromptBlock,
     input.projectContext?.promptBlock ?? "",
     buildAiRecoveryPromptBlock(input.aiRecoveryMemory, "review"),
     `章节标题：${input.chapter.title}`,
@@ -51,6 +53,7 @@ export function buildChapterReviewPrompt(input: ChapterReviewPromptInput) {
     input.chapter.content,
     "输出 JSON 字段：score, issues, summary。issues 内含 severity, type, message, suggestion。",
     input.startTactic ? "审稿时必须单独判断正文是否执行了首轮平台打法；没执行就把 type 标成 start_tactic 或 platform_fit。" : "",
+    startExperiencePromptBlock ? "审稿时必须核对开书经验执行摘要；缺证据来源、复制动作或踩到避坑边界，就把 type 标成 start_tactic。" : "",
     input.projectContext ? "审稿时必须单独判断正文是否违背项目上下文召回包；如果人物弧光、世界观规则、伏笔状态或历史章节承接冲突，把 type 标成 continuity 或 context_fit。" : "",
   ].join("\n");
 

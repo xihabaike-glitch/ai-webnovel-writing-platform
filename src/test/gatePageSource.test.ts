@@ -29,6 +29,15 @@ test("gate page renders action recheck summary feedback", () => {
   assert.ok(source.includes("focusNotice.recheckSummary.nextDispatch"));
 });
 
+test("gate page renders role closure recheck progress", () => {
+  assert.ok(source.includes("focusNotice.recheckSummary.roleClosureProgress"));
+  assert.ok(source.includes("角色闭环进度"));
+  assert.ok(source.includes("roleClosureProgress.headline"));
+  assert.ok(source.includes("roleClosureProgress.lanes.map"));
+  assert.ok(source.includes("lane.status === \"done\""));
+  assert.ok(source.includes("lane.evidence"));
+});
+
 test("gate page labels prioritized remaining blockers", () => {
   assert.ok(source.includes("focusNotice.recheckSummary.remainingBlockers"));
   assert.ok(source.includes("blocker.priorityLabel"));

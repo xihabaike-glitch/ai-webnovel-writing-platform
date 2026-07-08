@@ -370,6 +370,25 @@ export default async function GatePage({
                         最近回填：{focusNotice.recheckSummary.latestEvidence}
                       </p>
                     ) : null}
+                    {focusNotice.recheckSummary.roleClosureProgress ? (() => {
+                      const roleClosureProgress = focusNotice.recheckSummary.roleClosureProgress;
+                      return (
+                        <div className="mt-2 rounded-md border border-slate-200 bg-white p-2 text-xs leading-5">
+                          <div className="font-medium text-slate-700">角色闭环进度</div>
+                          <div className="mt-1 font-semibold text-slate-950">{roleClosureProgress.headline}</div>
+                          <div className="mt-2 grid gap-1">
+                            {roleClosureProgress.lanes.map((lane) => (
+                              <div className="rounded-md bg-slate-50 px-2 py-1" key={lane.id}>
+                                <span className={`font-medium ${lane.status === "done" ? "text-emerald-700" : "text-amber-700"}`}>
+                                  {lane.status === "done" ? "已回填" : "待补齐"} · {lane.label}
+                                </span>
+                                <span className="ml-1 text-slate-600">{lane.evidence}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })() : null}
                     {focusNotice.recheckSummary.nextDispatch ? (
                       <GateRecheckDispatchButton
                         dispatch={focusNotice.recheckSummary.nextDispatch}

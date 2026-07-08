@@ -460,6 +460,13 @@ test("buildPrePublishGate", async (t) => {
     assert.equal(notice.recheckSummary?.completedSteps, 5);
     assert.equal(notice.recheckSummary?.totalSteps, 7);
     assert.equal(notice.recheckSummary?.currentStepLabel, "角色闭环");
+    assert.equal(notice.recheckSummary?.roleClosureProgress?.completedRoles, 1);
+    assert.equal(notice.recheckSummary?.roleClosureProgress?.totalRoles, 3);
+    assert.deepEqual(notice.recheckSummary?.roleClosureProgress?.completedLabels, ["结构主编"]);
+    assert.deepEqual(notice.recheckSummary?.roleClosureProgress?.missingLabels, ["资料官", "平台包装"]);
+    assert.ok(notice.recheckSummary?.roleClosureProgress?.headline.includes("角色闭环 1/3"));
+    assert.ok(notice.recheckSummary?.roleClosureProgress?.lanes.find((lane) => lane.label === "结构主编")?.evidence.includes("结构主编完成"));
+    assert.equal(notice.recheckSummary?.roleClosureProgress?.lanes.find((lane) => lane.label === "资料官")?.status, "missing");
     assert.equal(notice.recheckSummary?.nextDispatch?.id, "project-acceptance-next:project-recheck-role:role_dispatch");
     assert.equal(notice.recheckSummary?.nextDispatch?.stage, "start_role_dispatch_closure");
     assert.equal(notice.recheckSummary?.nextDispatch?.ownerRole, "角色验收负责人");

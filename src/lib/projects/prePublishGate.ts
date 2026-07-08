@@ -193,6 +193,7 @@ export interface PrePublishGateAcceptanceSheetGate {
   currentStepId: ProjectAcceptanceStep["id"];
   steps: ProjectAcceptanceStep[];
   latestDispatchEvidence: string | null;
+  roleClosureProgress: PrePublishGateRoleClosureProgress | null;
   repairMode: "passed" | "executable" | "dispatch" | "manual";
   executionHint: string;
   execution: PrePublishGateActionExecution | null;
@@ -496,9 +497,26 @@ export interface PrePublishGateRecheckSummary {
   completedEvidence: string[];
   remainingEvidence: string[];
   remainingBlockers: PrePublishGateRemainingBlocker[];
+  roleClosureProgress: PrePublishGateRoleClosureProgress | null;
   latestEvidence: string | null;
   nextDispatch: PrePublishGateRecheckDispatch | null;
   nextDispatches: PrePublishGateRecheckDispatch[];
+}
+
+export interface PrePublishGateRoleClosureProgress {
+  headline: string;
+  completedRoles: number;
+  totalRoles: number;
+  completedLabels: string[];
+  missingLabels: string[];
+  lanes: PrePublishGateRoleClosureLane[];
+}
+
+export interface PrePublishGateRoleClosureLane {
+  id: "story-structure" | "context-recall" | "platform-export";
+  label: string;
+  status: "done" | "missing";
+  evidence: string;
 }
 
 export interface PrePublishGateRemainingBlocker {
@@ -1403,6 +1421,49 @@ function acceptanceActionHref(projectId: string, stepId: ProjectAcceptanceStep["
   return `${target}&step=publish-precheck`;
 }
 
+const roleClosureProgressLanes = [
+  { id: "story-structure", label: "结构主编" },
+  { id: "context-recall", label: "资料官" },
+  { id: "platform-export", label: "平台包装" },
+] as const;
+
+function completedRoleDispatchEvidence(task: NonNullable<PrePublishGateProject["gateDispatchTasks"]>[number]) {
+  const evidence = task.completionEvidence.trim();
+  return task.state === "completed" && evidence.length >= 20 ? evidence : "";
+}
+
+function buildRoleClosureProgress(project: PrePublishGateProject): PrePublishGateRoleClosureProgress | null {
+  const roleTasks = (project.gateDispatchTasks ?? []).filter((task) => task.dispatchKey.startsWith(`role-intent:${project.id}:`));
+  if (roleTasks.length === 0) return null;
+
+  const lanes = roleClosureProgressLanes.map((lane) => {
+    const completedTask = roleTasks.find((task) => (
+      task.dispatchKey.startsWith(`role-intent:${project.id}:${lane.id}:`)
+      && completedRoleDispatchEvidence(task)
+    ));
+    const evidence = completedTask ? completedRoleDispatchEvidence(completedTask) : `${lane.label}还缺完成依据。`;
+    return {
+      id: lane.id,
+      label: lane.label,
+      status: completedTask ? "done" : "missing",
+      evidence,
+    } satisfies PrePublishGateRoleClosureLane;
+  });
+  const completedLabels = lanes.filter((lane) => lane.status === "done").map((lane) => lane.label);
+  const missingLabels = lanes.filter((lane) => lane.status === "missing").map((lane) => lane.label);
+
+  return {
+    headline: missingLabels.length === 0
+      ? `角色闭环 ${completedLabels.length}/${lanes.length}：三类角色已闭合`
+      : `角色闭环 ${completedLabels.length}/${lanes.length}：还缺${missingLabels.join("、")}`,
+    completedRoles: completedLabels.length,
+    totalRoles: lanes.length,
+    completedLabels,
+    missingLabels,
+    lanes,
+  };
+}
+
 function buildAcceptanceSheetGate(
   project: PrePublishGateProject,
   platformName: string,
@@ -1442,6 +1503,7 @@ function buildAcceptanceSheetGate(
   const latestDispatchEvidence = (project.gateDispatchTasks ?? [])
     .filter((task) => task.dispatchKey.startsWith("first-day:") && task.state === "completed" && task.completionEvidence.trim())
     .map((task) => task.completionEvidence.trim())[0] ?? null;
+  const roleClosureProgress = buildRoleClosureProgress(project);
 
   return {
     status,
@@ -1452,6 +1514,7 @@ function buildAcceptanceSheetGate(
     currentStepId: sheet.currentStepId,
     steps: sheet.steps,
     latestDispatchEvidence,
+    roleClosureProgress,
     repairMode,
     executionHint: acceptanceExecutionHint(repairMode),
     execution: repairMode === "executable" ? execution : null,
@@ -1728,6 +1791,7 @@ function buildProjectAcceptanceRecheckSummary(
     completedEvidence: steps.filter((step) => step.status === "done").map((step) => step.evidence),
     remainingEvidence: steps.filter((step) => step.status !== "done").map((step) => `${step.label}：${step.evidence}`),
     remainingBlockers,
+    roleClosureProgress: project.acceptanceSheetGate.roleClosureProgress,
     latestEvidence: project.acceptanceSheetGate.latestDispatchEvidence,
     nextDispatch,
     nextDispatches,

@@ -97,6 +97,42 @@ export default function HomePage() {
           </div>
         </section>
 
+        <section className="rounded-md border border-emerald-200 bg-emerald-50 p-4">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <div className="text-xs font-medium text-emerald-700">交付后不是散场</div>
+              <h2 className="mt-1 font-medium text-slate-950">{overview.finalDeliveryArchive.title}</h2>
+              <p className="mt-2 max-w-4xl text-sm leading-6 text-slate-700">{overview.finalDeliveryArchive.pmRule}</p>
+            </div>
+            <Link
+              className="w-fit rounded-md bg-emerald-950 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-900"
+              href="/gate#platform-tactic-experience"
+            >
+              查看平台经验库
+            </Link>
+          </div>
+          <div className="mt-3 flex flex-wrap gap-2 text-xs">
+            {overview.finalDeliveryArchive.closeoutSignals.map((signal) => (
+              <span className="rounded-md bg-white px-2 py-1 font-medium text-emerald-950" key={signal}>
+                {signal}
+              </span>
+            ))}
+          </div>
+          <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            {overview.finalDeliveryArchive.reuseTargets.map((target) => (
+              <Link
+                className="rounded-md border border-emerald-100 bg-white p-3 text-sm hover:border-emerald-300 hover:bg-emerald-50"
+                href={target.href}
+                key={target.id}
+              >
+                <div className="font-medium text-slate-950">{target.label}</div>
+                <p className="mt-2 text-xs leading-5 text-slate-600">证据：{target.evidence}</p>
+                <p className="mt-2 text-xs leading-5 text-emerald-900">复用：{target.nextUse}</p>
+              </Link>
+            ))}
+          </div>
+        </section>
+
         <section className="rounded-md border border-slate-900 bg-slate-950 p-4 text-white">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
             <div>

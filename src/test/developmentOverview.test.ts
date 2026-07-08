@@ -329,6 +329,37 @@ test("buildDevelopmentOverview", async (t) => {
     assert.deepEqual(overview.finalAcceptanceGate.livePipelineReview.outcomeLabels, ["通过", "退回修复", "暂停批量"]);
   });
 
+  await t.test("builds a final delivery archive reuse package", () => {
+    const overview = buildDevelopmentOverview();
+
+    assert.equal(overview.finalDeliveryArchive.title, "最终交付归档复用");
+    assert.ok(overview.finalDeliveryArchive.pmRule.includes("交付不是结束"));
+    assert.ok(overview.finalDeliveryArchive.pmRule.includes("下一本书"));
+    assert.deepEqual(
+      overview.finalDeliveryArchive.reuseTargets.map((item) => item.id),
+      ["release_package", "dispatch_receipts", "task_receipts", "platform_experience"],
+    );
+    assert.ok(overview.finalDeliveryArchive.closeoutSignals.some((item) => item.includes("最终交付正式放行卡")));
+    assert.ok(overview.finalDeliveryArchive.closeoutSignals.some((item) => item.includes("派单回执")));
+    assert.ok(overview.finalDeliveryArchive.closeoutSignals.some((item) => item.includes("AI 任务回执")));
+    assert.ok(overview.finalDeliveryArchive.closeoutSignals.some((item) => item.includes("平台经验")));
+
+    for (const target of overview.finalDeliveryArchive.reuseTargets) {
+      assert.ok(target.label.length >= 4);
+      assert.ok(target.evidence.length >= 10);
+      assert.ok(target.nextUse.length >= 10);
+      assert.ok(target.href.startsWith("/"));
+      assert.equal(target.nextUse.includes("新增平台"), false);
+    }
+
+    const releasePackage = overview.finalDeliveryArchive.reuseTargets.find((item) => item.id === "release_package");
+    const platformExperience = overview.finalDeliveryArchive.reuseTargets.find((item) => item.id === "platform_experience");
+
+    assert.equal(releasePackage?.href, "/projects#platform-export");
+    assert.equal(platformExperience?.href, "/gate#platform-tactic-experience");
+    assert.ok(platformExperience?.nextUse.includes("开书"));
+  });
+
   await t.test("builds final acceptance evidence rows from original requirements", () => {
     const overview = buildDevelopmentOverview();
 

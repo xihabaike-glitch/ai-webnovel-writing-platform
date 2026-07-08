@@ -189,6 +189,19 @@ export interface DevelopmentOverviewFinalAcceptanceGate {
   evidenceMatrix: DevelopmentOverviewFinalAcceptanceEvidenceMatrix;
 }
 
+export interface DevelopmentOverviewFinalDeliveryArchive {
+  title: string;
+  pmRule: string;
+  closeoutSignals: string[];
+  reuseTargets: Array<{
+    id: "release_package" | "dispatch_receipts" | "task_receipts" | "platform_experience";
+    label: string;
+    evidence: string;
+    nextUse: string;
+    href: string;
+  }>;
+}
+
 export interface DevelopmentOverview {
   referenceCount: number;
   platformScope: typeof platformDeliveryScope;
@@ -211,6 +224,7 @@ export interface DevelopmentOverview {
   currentPipelineValidation: DevelopmentOverviewCurrentPipelineValidation;
   requirementTraceability: DevelopmentOverviewRequirementTraceability;
   finalAcceptanceGate: DevelopmentOverviewFinalAcceptanceGate;
+  finalDeliveryArchive: DevelopmentOverviewFinalDeliveryArchive;
   nextActions: DevelopmentOverviewAction[];
 }
 
@@ -835,6 +849,49 @@ function buildFinalAcceptanceGate(
   };
 }
 
+function buildFinalDeliveryArchive(): DevelopmentOverviewFinalDeliveryArchive {
+  return {
+    title: "最终交付归档复用",
+    pmRule: "交付不是结束，是下一本书的土壤。最终放行后必须把发布包、派单回执、AI 任务回执和平台经验沉淀成可复用入口。",
+    closeoutSignals: [
+      "最终交付正式放行卡证明本轮可以交付。",
+      "派单回执证明人工角色、验收依据和下一步都已闭环。",
+      "AI 任务回执证明模型执行、失败修复和采用结论可追溯。",
+      "平台经验证明起点、番茄、七猫、晋江、知乎盐选、WebNovel、Royal Road、Wattpad 的打法能被下一本书复用。",
+    ],
+    reuseTargets: [
+      {
+        id: "release_package",
+        label: "发布包归档",
+        evidence: "保留标题、简介、标签、样章、版本基线和最终交付清单。",
+        nextUse: "下一本书选平台时，直接对照已交付包的卖点、样章和版本基线。",
+        href: "/projects#platform-export",
+      },
+      {
+        id: "dispatch_receipts",
+        label: "派单回执归档",
+        evidence: "保留角色、输入、输出、人工验收、完成依据和下一步回执。",
+        nextUse: "下一轮派单先复用已经证明有效的角色分工和验收口径。",
+        href: "/dispatch#dispatch-task-center",
+      },
+      {
+        id: "task_receipts",
+        label: "AI 任务回执归档",
+        evidence: "保留模型岗位、任务类型、失败修复、采用结论和成本风险。",
+        nextUse: "下一次章节、审稿、改写和海外包装先走通过验证的模型路线。",
+        href: "/tasks",
+      },
+      {
+        id: "platform_experience",
+        label: "平台经验归档",
+        evidence: "保留投放效果、恢复样本、止损结论、可复用打法和禁用边界。",
+        nextUse: "新书开书时先读取平台经验，再决定目标平台、篇幅和首章钩子。",
+        href: "/gate#platform-tactic-experience",
+      },
+    ],
+  };
+}
+
 export function buildDevelopmentOverview(): DevelopmentOverview {
   const deliveryAudit = buildDeliveryAudit();
   const currentPipelineValidation = buildCurrentPipelineValidation();
@@ -862,6 +919,7 @@ export function buildDevelopmentOverview(): DevelopmentOverview {
     currentPipelineValidation,
     requirementTraceability,
     finalAcceptanceGate: buildFinalAcceptanceGate(deliveryAudit, currentPipelineValidation, requirementTraceability),
+    finalDeliveryArchive: buildFinalDeliveryArchive(),
     nextActions: [
       {
         label: "复检首章样本回执",

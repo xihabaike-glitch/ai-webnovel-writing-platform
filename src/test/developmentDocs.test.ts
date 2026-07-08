@@ -79,6 +79,26 @@ test("ai writing platform development document", async (t) => {
     assert.ok(doc.includes("productionClosure"));
   });
 
+  await t.test("documents the visible end-to-end acceptance criteria map", () => {
+    assert.ok(doc.includes("端到端可见验收口径地图"));
+    for (const route of ["/projects", "/tasks", "/dispatch", "/gate", "/failures"]) {
+      assert.ok(doc.includes(route), `${route} should be documented in the visible acceptance map`);
+    }
+
+    for (const criterion of [
+      "任务回执验收口径",
+      "派单回执验收口径",
+      "失败修复回执验收口径",
+      "发布包与平台复盘验收口径",
+    ]) {
+      assert.ok(doc.includes(criterion), `${criterion} should be documented`);
+    }
+
+    for (const proof of ["执行角色", "输入", "输出", "人工验收", "下一步", "失败原因", "修复泳道", "版本基线", "真实反馈", "复盘指标"]) {
+      assert.ok(doc.includes(proof), `${proof} should be documented as visible proof`);
+    }
+  });
+
   await t.test("uses the current delivery route instead of old kickoff instructions", () => {
     assert.equal(doc.includes("建议下一步不要直接开写代码"), false);
     assert.equal(doc.includes("`PRD.md`：产品需求文档，锁定页面、字段、MVP 范围。"), false);

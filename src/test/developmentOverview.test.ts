@@ -12,9 +12,14 @@ test("buildDevelopmentOverview", async (t) => {
     assert.equal(overview.platformScope.expansionLabel, "剩余 10 个平台不再添加");
     assert.ok(overview.referenceCount >= 30);
     assert.equal(overview.modelInterfaces.total, 4);
+    assert.equal(overview.modelInterfaces.readyLabel, "Claude / DeepSeek / Kimi / GPT 已进入模型岗位矩阵");
     assert.deepEqual(
       overview.modelInterfaces.items.map((item) => item.providerId),
       ["claude", "deepseek", "kimi", "gpt"],
+    );
+    assert.equal(
+      overview.modelInterfaces.items.every((item) => item.href === "/settings/models?focus=model-role-matrix#model-role-matrix"),
+      true,
     );
   });
 
@@ -26,6 +31,8 @@ test("buildDevelopmentOverview", async (t) => {
     assert.ok(overview.pmFocus.detail.includes("投稿"));
     assert.ok(overview.pmFocus.detail.includes("复盘"));
     assert.equal(overview.pmFocus.actionHref, "/projects");
+    assert.ok(overview.pmFocus.proof.includes("模型岗位矩阵"));
+    assert.equal(overview.pmFocus.proof.includes("接口已按岗位预留"), false);
     assert.equal(overview.docSections.length, 5);
     assert.deepEqual(
       overview.docSections.map((section) => section.id),
@@ -111,6 +118,8 @@ test("buildDevelopmentOverview", async (t) => {
     assert.ok(modelInterfaces?.evidence.includes("DeepSeek"));
     assert.ok(modelInterfaces?.evidence.includes("Kimi"));
     assert.ok(modelInterfaces?.evidence.includes("GPT"));
+    assert.ok(modelInterfaces?.evidence.includes("总闸门"));
+    assert.equal(modelInterfaces?.href, "/settings/models?focus=model-role-matrix#model-role-matrix");
     assert.equal(treeWorkflow?.status, "ready");
     assert.ok(treeWorkflow?.evidence.includes("开头"));
     assert.ok(treeWorkflow?.evidence.includes("土壤"));
@@ -119,7 +128,7 @@ test("buildDevelopmentOverview", async (t) => {
       platform_scope: "/projects#platform-export",
       length_modes: "/projects#create-project",
       tree_workflow: "/projects#story-structure",
-      model_interfaces: "/settings/models#model-provider-interfaces",
+      model_interfaces: "/settings/models?focus=model-role-matrix#model-role-matrix",
       ai_roles: "/dispatch#dispatch-task-center",
       writing_pipeline: "/projects#pipeline-projects",
       pm_gates: "/gate?focus=action-recheck#gate-focus-notice",
@@ -245,7 +254,8 @@ test("buildDevelopmentOverview", async (t) => {
     assert.ok(modelInterfaces?.currentEvidence.includes("DeepSeek"));
     assert.ok(modelInterfaces?.currentEvidence.includes("Kimi"));
     assert.ok(modelInterfaces?.currentEvidence.includes("GPT"));
-    assert.equal(modelInterfaces?.href, "/settings/models#model-provider-interfaces");
+    assert.ok(modelInterfaces?.acceptanceSignal.includes("总闸门"));
+    assert.equal(modelInterfaces?.href, "/settings/models?focus=model-role-matrix#model-role-matrix");
     assert.equal(referenceCases?.href, "/references#development-path");
     assert.ok(platformScope?.currentEvidence.includes("8/8"));
     assert.equal(platformScope?.href, "/projects#platform-export");
@@ -279,5 +289,6 @@ test("buildDevelopmentOverview", async (t) => {
     assert.equal(overview.finalAcceptanceGate.actionHref, overview.currentPipelineValidation.actionHref);
     assert.equal(overview.finalAcceptanceGate.actionLabel, overview.currentPipelineValidation.actionLabel);
     assert.ok(overview.finalAcceptanceGate.stopRule.includes("不要新增平台"));
+    assert.ok(overview.finalAcceptanceGate.stopRule.includes("模型岗位缺岗"));
   });
 });

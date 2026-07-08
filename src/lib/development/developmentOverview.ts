@@ -170,34 +170,36 @@ export interface DevelopmentOverview {
   nextActions: DevelopmentOverviewAction[];
 }
 
+const modelRoleMatrixHref = "/settings/models?focus=model-role-matrix#model-role-matrix";
+
 const modelInterfaces: DevelopmentOverviewModelInterface[] = [
   {
     providerId: "claude",
     providerName: "Claude",
     ownerRole: "长篇结构主编",
     reservedFor: "人物弧光、主线支线、前三章结构复审和长上下文审稿。",
-    href: "/settings/models#model-role-matrix",
+    href: modelRoleMatrixHref,
   },
   {
     providerId: "deepseek",
     providerName: "DeepSeek",
     ownerRole: "中文网文写手",
     reservedFor: "章节初稿、爽点补强、中文节奏改写和小样本试写。",
-    href: "/settings/models#model-role-matrix",
+    href: modelRoleMatrixHref,
   },
   {
     providerId: "kimi",
     providerName: "Kimi",
     ownerRole: "长上下文资料官",
     reservedFor: "世界观整理、历史章节召回、资料压缩和连续性检查。",
-    href: "/settings/models#model-role-matrix",
+    href: modelRoleMatrixHref,
   },
   {
     providerId: "gpt",
     providerName: "GPT",
     ownerRole: "海外投稿包装编辑",
     reservedFor: "WebNovel、Royal Road、Wattpad 的英文简介、标签和包装改写。",
-    href: "/settings/models#model-role-matrix",
+    href: modelRoleMatrixHref,
   },
 ];
 
@@ -260,10 +262,10 @@ const docSections: DevelopmentOverviewSection[] = [
   {
     id: "model_interfaces",
     title: "模型接口",
-    summary: "Claude、DeepSeek、Kimi、GPT 作为四类模型岗位预留接口，分别负责结构、正文、长上下文和海外包装。",
+    summary: "Claude、DeepSeek、Kimi、GPT 已进入模型岗位矩阵，分别负责结构、正文、长上下文和海外包装；缺岗会被推荐批次和总闸门硬拦截。",
     evidenceItems: ["模型设置页已有 provider 配置、角色矩阵、任务路由和失败替代。", "模型调用必须服务具体写作任务，不做泛聊天中心。"],
     acceptance: "四个模型接口都有明确岗位、任务、备用和人工验收入口。",
-    href: "/settings/models#model-role-matrix",
+    href: modelRoleMatrixHref,
   },
   {
     id: "platform_delivery",
@@ -325,9 +327,9 @@ const deliveryAuditItems: DevelopmentOverviewAuditItem[] = [
     title: "四类模型接口",
     status: "ready",
     requirement: "对接 Claude、DeepSeek、Kimi、GPT 等模型，并预留对应接口。",
-    evidence: "Claude、DeepSeek、Kimi、GPT 已在模型岗位中分别承担结构、正文、长上下文和海外包装。",
-    nextStep: "进入模型设置检查接口、备用模型、任务路由和失败替代。",
-    href: "/settings/models#model-provider-interfaces",
+    evidence: "Claude、DeepSeek、Kimi、GPT 已在模型岗位矩阵中分别承担结构、正文、长上下文和海外包装；缺岗会拦住推荐批次和总闸门。",
+    nextStep: "进入模型岗位矩阵检查首选模型、备用模型、任务路由、失败替代和缺岗硬拦截。",
+    href: modelRoleMatrixHref,
   },
   {
     id: "ai_roles",
@@ -558,8 +560,8 @@ function buildRequirementTraceability(): DevelopmentOverviewRequirementTraceabil
         id: "model_interfaces",
         originalRequest: "对接 Claude、DeepSeek、Kimi、GPT 等模型，并预留对应接口。",
         currentEvidence: "Claude、DeepSeek、Kimi、GPT 已进入模型岗位矩阵，分别承担结构、正文、长上下文和海外包装。",
-        acceptanceSignal: "模型设置页能解释首选模型、备用模型、任务分工、失败替代和复检入口。",
-        href: "/settings/models#model-provider-interfaces",
+        acceptanceSignal: "模型设置页能解释首选模型、备用模型、任务分工、失败替代、复检入口和模型岗位缺岗总闸门。",
+        href: modelRoleMatrixHref,
       },
       {
         id: "role_dispatch",
@@ -607,7 +609,7 @@ function buildFinalAcceptanceGate(
         ? `${summary.ready}/${summary.total} 项已覆盖，${summary.watch} 项观察中；最终验收要先跑通真实流水线。`
         : `${summary.ready}/${summary.total} 项已覆盖，可以进入真实流水线复盘验收。`,
     metrics: summary,
-    stopRule: "不要新增平台、不要堆演示页；没有真实作品流水线证据，就不能宣称产品完成。",
+    stopRule: "不要新增平台、不要堆演示页；模型岗位缺岗或没有真实作品流水线证据，就不能宣称产品完成。",
     actionHref: currentPipelineValidation.actionHref,
     actionLabel: currentPipelineValidation.actionLabel,
   };
@@ -623,13 +625,13 @@ export function buildDevelopmentOverview(): DevelopmentOverview {
     pmFocus: {
       headline: "开发文档先收束，别再加戏。",
       detail: "当前重点是把写作、投稿、复盘三段闭环解释清楚，并让每个入口都能回到真实作品生产；剩余 10 个平台不再添加。",
-      proof: `${platformDeliveryScope.statusLabel}；${openSourceReferenceCases.length} 个开源参考案例已沉淀；4 个模型接口已按岗位预留。`,
+      proof: `${platformDeliveryScope.statusLabel}；${openSourceReferenceCases.length} 个开源参考案例已沉淀；4 个模型已进入模型岗位矩阵并接入缺岗闸门。`,
       actionHref: "/projects",
       actionLabel: "进入作品工作台",
     },
     modelInterfaces: {
       total: modelInterfaces.length,
-      readyLabel: "Claude / DeepSeek / Kimi / GPT 接口已预留",
+      readyLabel: "Claude / DeepSeek / Kimi / GPT 已进入模型岗位矩阵",
       items: modelInterfaces,
     },
     docSections,

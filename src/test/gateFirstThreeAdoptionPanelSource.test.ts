@@ -16,3 +16,11 @@ test("gate first-three adoption panel keeps repair and timeline navigation retur
   assert.ok(panelSource.includes("href={hrefWithGateReturn(item.href, gateReturnHref)}"));
   assert.ok(panelSource.includes("href={hrefWithGateReturn(timeline.href, gateReturnHref)}"));
 });
+
+test("gate adoption panel uses unified chapter adoption copy", () => {
+  assert.ok(panelSource.includes("章节采纳闭环"));
+  assert.ok(panelSource.includes("章节采纳后续任务"));
+  assert.ok(panelSource.includes("重新审稿、必要二改、刷新发布质检"));
+  assert.equal(panelSource.includes("前三章采纳闭环"), false);
+  assert.equal(panelSource.includes("暂无前三章采纳后续任务"), false);
+});

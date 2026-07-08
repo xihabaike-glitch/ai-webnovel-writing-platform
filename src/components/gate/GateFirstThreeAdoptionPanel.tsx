@@ -351,7 +351,7 @@ export function GateFirstThreeAdoptionPanel({ closure, gateReturnHref }: { closu
     <section className={`mb-6 rounded-md border p-4 ${panelTone(closure.status)}`} id="first-three-adoption-closure">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <div>
-          <h2 className="font-medium text-slate-950">前三章采纳闭环</h2>
+          <h2 className="font-medium text-slate-950">章节采纳闭环</h2>
           <p className="mt-1 text-sm leading-6 text-slate-700">{closure.detail}</p>
         </div>
         <div className="grid grid-cols-4 gap-2 text-center text-xs text-slate-700">
@@ -517,7 +517,7 @@ export function GateFirstThreeAdoptionPanel({ closure, gateReturnHref }: { closu
         <div className="mt-4 grid gap-3">
           <div>
             <div className="text-sm font-medium text-slate-950">采纳后发布链路</div>
-            <p className="mt-1 text-xs leading-5 text-slate-600">先确认候选已写入正文，再重新审稿、刷新发布质检，最后回总闸门判断是否放行。</p>
+            <p className="mt-1 text-xs leading-5 text-slate-600">先确认候选已写入正文，再重新审稿、必要二改、刷新发布质检，最后回总闸门判断是否放行。</p>
           </div>
           {visibleTimelines.map((timeline) => (
             <div className="rounded-md border border-white/70 bg-white p-3 text-sm shadow-sm" key={timeline.id}>
@@ -609,7 +609,7 @@ export function GateFirstThreeAdoptionPanel({ closure, gateReturnHref }: { closu
         </div>
       ) : (
         <p className="mt-4 rounded-md border border-dashed border-white/80 bg-white/70 p-3 text-sm text-slate-600">
-          暂无前三章采纳后续任务。生成并采纳前三章候选后，这里会追踪重新审稿和发布质检。
+          暂无章节采纳后续任务。生成并采纳前三章或普通章节候选后，这里会追踪重新审稿、必要二改、刷新发布质检。
         </p>
       )}
     </section>

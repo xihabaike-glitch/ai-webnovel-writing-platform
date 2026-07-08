@@ -65,3 +65,15 @@ test("model settings summarizes model role route closeout for PM review", () => 
   assert.ok(settingsSource.includes("modelRoleRouteNextCutLabel"));
   assert.ok(settingsSource.includes("modelRoleRouteReleaseLabel"));
 });
+
+test("model settings renders the PM model role repair queue", () => {
+  assert.ok(source.includes("buildModelRoleRepairQueue"));
+  assert.ok(source.includes("modelRoleRepairQueue"));
+  assert.ok(settingsSource.includes("模型岗位 PM 修复队列"));
+  assert.ok(settingsSource.includes("modelRoleRepairQueue.map"));
+  assert.ok(settingsSource.includes("item.priorityLabel"));
+  assert.ok(settingsSource.includes("item.repairLabel"));
+  assert.ok(settingsSource.includes("item.evidenceChecklist.map"));
+  assert.ok(settingsSource.includes("href={hrefWithGateReturn(item.href, gateReturnHref)}"));
+  assert.ok(settingsSource.includes("href={hrefWithGateReturn(item.gateReturnHref, gateReturnHref)}"));
+});

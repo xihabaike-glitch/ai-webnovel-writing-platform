@@ -78,6 +78,21 @@ export interface ModelRoleMatrixPriorityBlocker {
   actionHref: string;
 }
 
+export interface ModelRoleRepairQueueItem {
+  providerId: "claude" | "deepseek" | "kimi" | "gpt";
+  providerName: string;
+  roleTitle: string;
+  ownerLabel: string;
+  status: "needs_save" | "missing";
+  priorityLabel: string;
+  repairLabel: string;
+  detail: string;
+  href: string;
+  gateReturnHref: string;
+  evidenceChecklist: string[];
+  stopLine: string;
+}
+
 export interface ModelRoleMatrixPmFocusNotice {
   tone: "blocked" | "watch" | "ready";
   headline: string;
@@ -382,6 +397,10 @@ function providerDisplay(provider: ModelRoleProviderInput | null) {
   return provider ? `${provider.displayName} · ${provider.defaultModel}` : "暂无可用模型";
 }
 
+function modelRoleRepairProviderName(providerId: ModelRoleRepairQueueItem["providerId"], providerName: string) {
+  return providerId === "gpt" ? "GPT" : providerName;
+}
+
 function sameRoute(
   route: ModelRoleRouteDraftRoute | undefined,
   primaryProviderConfigId: string | null,
@@ -462,6 +481,31 @@ export function buildModelRoleMatrixPriorityBlocker(matrix: ModelRoleMatrix): Mo
     actionLabel: "去调整模型岗位",
     actionHref: "/settings/models?focus=model-role-matrix#model-role-matrix",
   };
+}
+
+export function buildModelRoleRepairQueue(matrix: ModelRoleMatrix): ModelRoleRepairQueueItem[] {
+  return matrix.interfaceCoverage.items
+    .filter((item): item is ModelProviderInterfaceCoverageItem & { status: "needs_save" | "missing" } => item.status !== "ready")
+    .map((item, index): ModelRoleRepairQueueItem => {
+      const providerName = modelRoleRepairProviderName(item.providerId, item.providerName);
+
+      return {
+        providerId: item.providerId,
+        providerName,
+        roleTitle: item.roleTitle,
+        ownerLabel: item.ownerLabel,
+        status: item.status,
+        priorityLabel: `第 ${index + 1} 步`,
+        repairLabel: item.status === "missing" ? `配置 ${providerName}` : `补强 ${providerName}`,
+        detail: item.status === "missing"
+          ? `先给${providerName}保存 API Key、默认模型和上下文上限，再测试连接；否则「${item.roleTitle}」会继续退回 Mock 或人工补位。`
+          : `${providerName} 已能顶岗，但上下文或配置不够稳；先补默认模型、上下文上限和连接测试，再放进真实写作链路。`,
+        href: "/settings/models#provider-config-form",
+        gateReturnHref: "/settings/models?focus=model-role-matrix#model-role-matrix",
+        evidenceChecklist: ["API Key 已保存", "连接测试通过", "默认模型与上下文已保存", "回职责矩阵复检"],
+        stopLine: `未完成${providerName}修复前，不允许把「${item.roleTitle}」算作真实模型岗位。`,
+      };
+    });
 }
 
 export function buildModelRoleMatrixPmFocusNotice(matrix: ModelRoleMatrix): ModelRoleMatrixPmFocusNotice {

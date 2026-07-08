@@ -4,6 +4,7 @@ import {
   buildModelRoleMatrix,
   buildModelRoleMatrixPmFocusNotice,
   buildModelRoleMatrixPriorityBlocker,
+  buildModelRoleRepairQueue,
   buildModelRoleRouteDraft,
   buildModelRoleRouteBatchSavePlan,
   buildModelRoleRouteRecheckAdviceFromBatchPlan,
@@ -112,6 +113,34 @@ test("buildModelRoleMatrix", async (t) => {
     assert.ok(blocker?.detail.includes("4 个岗位"));
     assert.equal(blocker?.actionLabel, "去配置模型岗位");
     assert.equal(blocker?.actionHref, "/settings/models?focus=model-role-matrix#model-role-matrix");
+  });
+
+  await t.test("builds an ordered PM repair queue for missing model interfaces", () => {
+    const matrix = buildModelRoleMatrix([
+      {
+        id: "mock",
+        providerId: "mock",
+        displayName: "Mock",
+        hasApiKey: false,
+        defaultModel: "mock-writer",
+        enabled: true,
+        maxContextTokens: 16000,
+      },
+    ]);
+
+    const queue = buildModelRoleRepairQueue(matrix);
+
+    assert.deepEqual(
+      queue.map((item) => item.providerName),
+      ["Claude", "DeepSeek", "Kimi", "GPT"],
+    );
+    assert.equal(queue[0]?.priorityLabel, "第 1 步");
+    assert.equal(queue[0]?.repairLabel, "配置 Claude");
+    assert.ok(queue[0]?.evidenceChecklist.includes("API Key 已保存"));
+    assert.ok(queue[0]?.evidenceChecklist.includes("连接测试通过"));
+    assert.ok(queue[0]?.evidenceChecklist.includes("回职责矩阵复检"));
+    assert.equal(queue[0]?.href, "/settings/models#provider-config-form");
+    assert.equal(queue[0]?.gateReturnHref, "/settings/models?focus=model-role-matrix#model-role-matrix");
   });
 
   await t.test("builds the PM focus notice for model task routing", () => {

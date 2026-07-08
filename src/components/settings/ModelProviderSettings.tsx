@@ -19,6 +19,7 @@ import {
   buildModelRoleRouteRecheckAdviceFromBatchPlan,
   type ModelRoleMatrix,
   type ModelRoleMatrixPmFocusNotice,
+  type ModelRoleRepairQueueItem,
   type ModelRoleRouteDraft,
   type ModelRoleRouteDraftItem,
   type ModelWritingRoleStatus,
@@ -604,6 +605,7 @@ export function ModelProviderSettings({
   modelSetupOnboarding,
   modelRoleMatrix,
   modelRoleMatrixPmFocusNotice,
+  modelRoleRepairQueue,
   modelRoleRouteDraft,
   firstDayRouteSummary,
   presetRouteBlueprint,
@@ -630,6 +632,7 @@ export function ModelProviderSettings({
   modelSetupOnboarding: ModelSetupOnboardingView;
   modelRoleMatrix: ModelRoleMatrix;
   modelRoleMatrixPmFocusNotice: ModelRoleMatrixPmFocusNotice;
+  modelRoleRepairQueue: ModelRoleRepairQueueItem[];
   modelRoleRouteDraft: ModelRoleRouteDraft;
   firstDayRouteSummary: FirstDayRouteSummaryView;
   presetRouteBlueprint: PresetRouteBlueprintView;
@@ -1550,6 +1553,58 @@ export function ModelProviderSettings({
               </a>
             </div>
           </div>
+          {modelRoleRepairQueue.length ? (
+            <div className="mt-4 rounded-md border border-rose-100 bg-rose-50 p-3 text-sm text-rose-950" aria-label="模型岗位 PM 修复队列">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <div className="font-medium">模型岗位 PM 修复队列</div>
+                  <p className="mt-1 text-xs leading-5 text-rose-800">
+                    按顺序补接口，补完一项就回职责矩阵复检；没有连接测试和证据回写，不算岗位就位。
+                  </p>
+                </div>
+                <a
+                  className="w-fit rounded-md bg-white px-3 py-2 text-xs font-medium text-rose-950 hover:bg-rose-100"
+                  href={hrefWithGateReturn(modelRoleRepairQueue[0].href, gateReturnHref)}
+                >
+                  处理第一项
+                </a>
+              </div>
+              <div className="mt-3 grid gap-2 lg:grid-cols-2">
+                {modelRoleRepairQueue.map((item) => (
+                  <article className="rounded-md border border-rose-100 bg-white p-3" key={item.providerId}>
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <div>
+                        <div className="text-xs font-medium text-rose-700">{item.priorityLabel} · {item.ownerLabel}</div>
+                        <h3 className="mt-1 font-medium text-slate-950">{item.repairLabel}</h3>
+                      </div>
+                      <span className="rounded-md bg-rose-50 px-2 py-1 text-xs font-medium text-rose-700">{item.roleTitle}</span>
+                    </div>
+                    <p className="mt-2 text-xs leading-5 text-slate-700">{item.detail}</p>
+                    <div className="mt-2 flex flex-wrap gap-1 text-xs text-slate-600">
+                      {item.evidenceChecklist.map((evidence) => (
+                        <span className="rounded-md bg-slate-50 px-2 py-1" key={evidence}>{evidence}</span>
+                      ))}
+                    </div>
+                    <p className="mt-2 text-xs leading-5 text-amber-700">{item.stopLine}</p>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <a
+                        className="rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white hover:bg-slate-800"
+                        href={hrefWithGateReturn(item.href, gateReturnHref)}
+                      >
+                        {item.repairLabel}
+                      </a>
+                      <a
+                        className="rounded-md border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-800 hover:bg-slate-50"
+                        href={hrefWithGateReturn(item.gateReturnHref, gateReturnHref)}
+                      >
+                        回职责矩阵复检
+                      </a>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            </div>
+          ) : null}
           <div className="mt-4 grid gap-3 xl:grid-cols-2">
             {modelRoleMatrix.roles.map((role) => {
               const status = modelRoleStatusCopy[role.status];

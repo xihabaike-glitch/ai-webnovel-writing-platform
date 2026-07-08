@@ -356,7 +356,7 @@ test("buildDevelopmentOverview", async (t) => {
     const platformExperience = overview.finalDeliveryArchive.reuseTargets.find((item) => item.id === "platform_experience");
 
     assert.equal(releasePackage?.href, "/projects#platform-export");
-    assert.equal(platformExperience?.href, "/gate#platform-tactic-experience");
+    assert.equal(platformExperience?.href, "/gate?focus=action-recheck&source=platform-tactic-experience#platform-tactic-experience");
     assert.ok(platformExperience?.nextUse.includes("开书"));
   });
 

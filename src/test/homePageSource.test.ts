@@ -24,6 +24,8 @@ test("home page routes users into the current PM delivery path", () => {
   assert.ok(source.includes("overview.finalDeliveryArchive.pmRule"), "home page should explain the archive reuse PM rule");
   assert.ok(source.includes("overview.finalDeliveryArchive.closeoutSignals.map"), "home page should show final delivery archive closeout signals");
   assert.ok(source.includes("overview.finalDeliveryArchive.reuseTargets.map"), "home page should render every archive reuse target");
+  assert.ok(source.includes("platformExperienceArchive?.href"), "home page should route the platform archive CTA through the overview data");
+  assert.equal(source.includes("href=\"/gate#platform-tactic-experience\""), false, "home page should not hard-code a bare platform experience gate link");
   assert.ok(source.includes("target.evidence"), "home page should show archive evidence for each reuse target");
   assert.ok(source.includes("target.nextUse"), "home page should show how each archived item is reused");
   assert.ok(source.includes("item.currentProof"), "home page should show current proof for each original requirement");

@@ -16,6 +16,7 @@ function auditStatusLabel(status: "ready" | "watch" | "blocked") {
 
 export default function HomePage() {
   const overview = buildDevelopmentOverview();
+  const platformExperienceArchive = overview.finalDeliveryArchive.reuseTargets.find((target) => target.id === "platform_experience");
 
   return (
     <AppShell>
@@ -106,7 +107,7 @@ export default function HomePage() {
             </div>
             <Link
               className="w-fit rounded-md bg-emerald-950 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-900"
-              href="/gate#platform-tactic-experience"
+              href={platformExperienceArchive?.href ?? "/gate?focus=action-recheck&source=platform-tactic-experience#platform-tactic-experience"}
             >
               查看平台经验库
             </Link>

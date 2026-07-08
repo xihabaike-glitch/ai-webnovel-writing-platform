@@ -230,6 +230,7 @@ export interface DevelopmentOverview {
 
 const modelRoleMatrixHref = "/settings/models?focus=model-role-matrix#model-role-matrix";
 const finalDeliveryRecheckHref = "/gate?focus=action-recheck&source=final-delivery-receipt#pipeline-final-review";
+const platformExperienceRecheckHref = "/gate?focus=action-recheck&source=platform-tactic-experience#platform-tactic-experience";
 
 const modelInterfaces: DevelopmentOverviewModelInterface[] = [
   {
@@ -887,7 +888,7 @@ function buildFinalDeliveryArchive(): DevelopmentOverviewFinalDeliveryArchive {
         label: "平台经验归档",
         evidence: "保留投放效果、恢复样本、止损结论、可复用打法和禁用边界。",
         nextUse: "新书开书时先读取平台经验，再决定目标平台、篇幅和首章钩子。",
-        href: "/gate#platform-tactic-experience",
+        href: platformExperienceRecheckHref,
       },
     ],
   };

@@ -198,3 +198,17 @@ test("project form surfaces first-day execution outcomes before creation", () =>
   assert.ok(projectFormSource.includes("firstDayOutcome.nextMove"));
   assert.ok(projectFormSource.includes("firstDayOutcome.boundary"));
 });
+
+test("project form surfaces final delivery archive reuse before creation", () => {
+  assert.ok(projectFormSource.includes("finalDeliveryArchiveBridge"));
+  assert.ok(projectFormSource.includes("最终交付归档回灌"));
+  assert.ok(projectFormSource.includes("交付归档正在反向喂给这次开书"));
+  assert.ok(projectFormSource.includes("archiveSignal"));
+  assert.ok(projectFormSource.includes("recommendedPlatformLabel"));
+  assert.ok(projectFormSource.includes("recommendedTemplateLabel"));
+  assert.ok(projectFormSource.includes("selectedArchiveEvidence"));
+  assert.ok(projectFormSource.includes("selectedArchiveNextUse"));
+  assert.ok(projectFormSource.includes("startExperienceHandoff.firstDayActions.slice(0, 2).map"));
+  assert.ok(projectFormSource.includes("startExperienceHandoff.avoidRules.slice(0, 2).map"));
+  assert.ok(projectFormSource.includes("hrefWithGateReturn(\"/gate#platform-tactic-experience\", gateReturnHref)"));
+});

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { platformDeliveryScope, platformProfiles, type LengthType, type PlatformId } from "@/lib/platforms/platformProfiles";
@@ -197,6 +198,21 @@ export function ProjectForm({
   });
   const firstDayOutcome = firstDayExecutionOutcome(tacticAdvice.label);
   const recoveryHandoffPanel = buildProjectStartRecoveryHandoffPanel(startExperienceHandoff);
+  const finalDeliveryArchiveBridge = {
+    archiveSignal: platformExperienceGuide.summary.total > 0
+      ? `已读取 ${platformExperienceGuide.summary.total} 条平台归档经验，其中 ${platformExperienceGuide.summary.recommended} 条可优先复用。`
+      : "暂无最终交付归档经验，本次开书会先按模板小样本验证，并把结果回写经验库。",
+    recommendedPlatformLabel: selectedPlatformGuide
+      ? `${selectedPlatformGuide.platformName} · ${selectedPlatformGuide.label}`
+      : `${selectedProfile.name} · 模板默认`,
+    recommendedTemplateLabel: recommendedStartTemplate.label,
+    selectedArchiveEvidence: selectedPlatformGuide?.evidence[0]
+      ?? startExperienceDigest.evidence[0]
+      ?? "当前没有可直接复用的交付证据，先保留首轮数据回收。",
+    selectedArchiveNextUse: selectedPlatformGuide
+      ? `本次开书先执行「${tacticAdvice.openingMove}」，再用「${tacticAdvice.verificationMove}」验收。`
+      : "本次开书先按平台模板跑首章样本，交付后再沉淀为下一本书的土壤。",
+  };
   const launchRequested = Boolean(launchPlatform && experienceLaunch?.tactic);
   const launchMatched = launchRequested
     && selectedEvidence.experience?.platformId === launchPlatform
@@ -418,6 +434,57 @@ export function ProjectForm({
           </div>
         </div>
       ) : null}
+      <div className="grid gap-3 rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-950">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <div className="text-xs font-medium text-emerald-700">最终交付归档回灌</div>
+            <div className="mt-1 font-medium">交付归档正在反向喂给这次开书</div>
+            <p className="mt-1 text-xs leading-5 text-emerald-900">{finalDeliveryArchiveBridge.archiveSignal}</p>
+          </div>
+          <Link
+            className="w-fit rounded-md bg-emerald-950 px-3 py-2 text-xs font-medium text-white hover:bg-emerald-900"
+            href={hrefWithGateReturn("/gate#platform-tactic-experience", gateReturnHref)}
+          >
+            查看归档经验库
+          </Link>
+        </div>
+        <div className="grid gap-2 md:grid-cols-3">
+          <div className="rounded-md bg-white/80 p-2 text-xs leading-5">
+            <div className="font-medium text-emerald-900">推荐平台</div>
+            <p className="mt-1">{finalDeliveryArchiveBridge.recommendedPlatformLabel}</p>
+          </div>
+          <div className="rounded-md bg-white/80 p-2 text-xs leading-5">
+            <div className="font-medium text-emerald-900">推荐模板</div>
+            <p className="mt-1">{finalDeliveryArchiveBridge.recommendedTemplateLabel}</p>
+          </div>
+          <div className="rounded-md bg-white/80 p-2 text-xs leading-5">
+            <div className="font-medium text-emerald-900">归档证据</div>
+            <p className="mt-1">{finalDeliveryArchiveBridge.selectedArchiveEvidence}</p>
+          </div>
+        </div>
+        <div className="grid gap-2 md:grid-cols-3">
+          <div className="rounded-md bg-white/80 p-2 text-xs leading-5">
+            <div className="font-medium text-emerald-900">复用方式</div>
+            <p className="mt-1">{finalDeliveryArchiveBridge.selectedArchiveNextUse}</p>
+          </div>
+          <div className="rounded-md bg-white/80 p-2 text-xs leading-5">
+            <div className="font-medium text-emerald-900">首日动作</div>
+            <div className="mt-1 grid gap-1">
+              {startExperienceHandoff.firstDayActions.slice(0, 2).map((action) => (
+                <p key={action}>{action}</p>
+              ))}
+            </div>
+          </div>
+          <div className="rounded-md bg-white/80 p-2 text-xs leading-5">
+            <div className="font-medium text-emerald-900">避坑边界</div>
+            <div className="mt-1 grid gap-1">
+              {startExperienceHandoff.avoidRules.slice(0, 2).map((rule) => (
+                <p key={rule}>{rule}</p>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
       {selectedBatchEffect ? (
         <div className={`rounded-md border p-3 text-sm ${tacticAdviceClass(tacticAdvice.status)}`}>
           <div className="flex flex-wrap items-center gap-2">

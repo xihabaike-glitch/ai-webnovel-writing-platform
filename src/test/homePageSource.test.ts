@@ -14,6 +14,10 @@ test("home page routes users into the current PM delivery path", () => {
   assert.ok(source.includes("overview.finalAcceptanceGate.metrics.watch"), "home page should show watch count in the final gate");
   assert.ok(source.includes("overview.finalAcceptanceGate.metrics.blocked"), "home page should show blocked count in the final gate");
   assert.ok(source.includes("overview.finalAcceptanceGate.stopRule"), "home page should show the PM stop rule");
+  assert.ok(source.includes("overview.pipelineProofRoute.steps.map"), "home page should show the six-step proof route, not just page shortcuts");
+  assert.ok(source.includes("overview.pipelineProofRoute.pmRule"), "home page should show the proof route rule");
+  assert.ok(source.includes("step.passCondition"), "home page should show pass conditions for each route step");
+  assert.ok(source.includes("step.stopRule"), "home page should show stop rules for each route step");
   assert.ok(source.includes("overview.nextActions.map"), "home page should surface the next delivery actions");
   assert.equal(source.includes("新增平台"), false, "home page must not point the user toward adding more platforms");
 });

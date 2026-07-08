@@ -65,6 +65,43 @@ export default function HomePage() {
           </div>
         </section>
 
+        <section className="grid gap-3">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <div className="text-xs font-medium text-slate-500">当前验收路线</div>
+              <h2 className="mt-1 font-medium text-slate-950">{overview.pipelineProofRoute.headline}</h2>
+              <p className="mt-1 max-w-4xl text-sm leading-6 text-slate-600">{overview.pipelineProofRoute.pmRule}</p>
+            </div>
+            <Link
+              className="w-fit rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-medium hover:bg-slate-50"
+              href={overview.currentPipelineValidation.actionHref}
+            >
+              {overview.currentPipelineValidation.actionLabel}
+            </Link>
+          </div>
+          <div className="grid gap-3 lg:grid-cols-3">
+            {overview.pipelineProofRoute.steps.map((step) => (
+              <Link
+                className="rounded-md border border-slate-200 bg-white p-4 text-sm hover:border-slate-400 hover:bg-slate-50"
+                href={step.href}
+                key={step.id}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <div className="text-xs text-slate-500">第 {step.order} 步 · {step.owner}</div>
+                    <h3 className="mt-1 font-medium text-slate-950">{step.title}</h3>
+                  </div>
+                  <span className="rounded-md bg-slate-100 px-2 py-1 text-xs font-medium text-slate-600">
+                    验收
+                  </span>
+                </div>
+                <p className="mt-3 leading-6 text-slate-600">{step.passCondition}</p>
+                <p className="mt-2 text-xs leading-5 text-rose-700">{step.stopRule}</p>
+              </Link>
+            ))}
+          </div>
+        </section>
+
         <section className="grid gap-3 md:grid-cols-3">
           <div className="rounded-md border border-slate-200 bg-white p-4">
             <div className="text-xs text-slate-500">平台范围</div>

@@ -708,6 +708,10 @@ export function GateActionWorkspace({
               <div className="rounded-md bg-white/70 px-3 py-2">阻塞 {finalDeliveryReview.blockedCount}</div>
               <div className="rounded-md bg-white/70 px-3 py-2">缺项 {finalDeliveryReview.missingCount}</div>
             </div>
+            <div className="mt-2 grid gap-2 text-xs sm:grid-cols-2">
+              <div className="rounded-md bg-white/80 px-3 py-2 font-medium">{finalDeliveryReview.latestFeedback}</div>
+              <div className="rounded-md bg-white/80 px-3 py-2 font-medium" aria-label="下一刀">{finalDeliveryReview.remainingFeedback}</div>
+            </div>
             {finalDeliveryReview.evidence.length ? (
               <div className="mt-2 grid gap-1 text-xs opacity-80">
                 {finalDeliveryReview.evidence.map((item) => <div key={item}>{item}</div>)}

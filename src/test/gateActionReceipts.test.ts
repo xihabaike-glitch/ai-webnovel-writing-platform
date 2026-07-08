@@ -1701,6 +1701,10 @@ test("buildGateActionReceipt", async (t) => {
     assert.equal(review.actionLabel, "处理最终交付缺口");
     assert.equal(review.href, "/projects/project-1#publish-effect-panel");
     assert.ok(review.detail.includes("已写回 2/6 项"));
+    assert.equal(review.remainingCount, 5);
+    assert.equal(review.latestItem?.label, "真实效果");
+    assert.equal(review.latestFeedback, "刚写回：真实效果 · 仍阻塞");
+    assert.equal(review.remainingFeedback, "还剩 5 项未闭环，下一刀：真实效果。");
     assert.ok(review.evidence.some((item) => item.includes("真实效果")));
   });
 
@@ -1745,6 +1749,10 @@ test("buildGateActionReceipt", async (t) => {
     assert.equal(review.label, "最终交付已闭环");
     assert.equal(review.actionLabel, "复检总闸门");
     assert.equal(review.href, "/gate");
+    assert.equal(review.remainingCount, 0);
+    assert.equal(review.latestItem?.label, "策略复盘");
+    assert.equal(review.latestFeedback, "刚写回：策略复盘 · 已闭环");
+    assert.equal(review.remainingFeedback, "6/6 已闭环，回总闸门做最终放行。");
   });
 
   await t.test("builds export version action receipts for executable gate repairs", () => {

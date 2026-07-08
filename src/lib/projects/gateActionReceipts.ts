@@ -189,8 +189,12 @@ export interface GateFinalDeliveryReceiptReview {
   completedCount: number;
   blockedCount: number;
   missingCount: number;
+  remainingCount: number;
   writtenCount: number;
   totalCount: number;
+  latestItem: GateFinalDeliveryReceiptReviewItem | null;
+  latestFeedback: string;
+  remainingFeedback: string;
   actionLabel: string;
   href: string;
   evidence: string[];
@@ -2611,6 +2615,12 @@ function finalDeliveryPlatformName(platformId: string) {
   return platformProfiles.find((profile) => profile.id === platformId)?.name ?? platformId;
 }
 
+function finalDeliveryItemStatusText(status: GateFinalDeliveryReceiptReviewItem["status"]) {
+  if (status === "done") return "已闭环";
+  if (status === "blocked") return "仍阻塞";
+  return "缺项";
+}
+
 export function buildGateFinalDeliveryReceiptReview(receipts: GateActionReceipt[]): GateFinalDeliveryReceiptReview {
   const platformMap = new Map<string, {
     platformId: string;
@@ -2649,8 +2659,12 @@ export function buildGateFinalDeliveryReceiptReview(receipts: GateActionReceipt[
       completedCount: 0,
       blockedCount: 0,
       missingCount: finalDeliveryReceiptItemIds.length,
+      remainingCount: finalDeliveryReceiptItemIds.length,
       writtenCount: 0,
       totalCount: finalDeliveryReceiptItemIds.length,
+      latestItem: null,
+      latestFeedback: "还没有写回最终交付回执",
+      remainingFeedback: "还剩 6 项未闭环，先写回发布包。",
       actionLabel: "去发布中心写回",
       href: "/projects",
       evidence: ["缺最终交付回执：发布包、投稿材料、前三章样章、发布基准、真实效果、策略复盘。"],
@@ -2696,6 +2710,7 @@ export function buildGateFinalDeliveryReceiptReview(receipts: GateActionReceipt[
   const completedCount = items.filter((item) => item.status === "done").length;
   const blockedCount = items.filter((item) => item.status === "blocked").length;
   const missingCount = items.filter((item) => item.status === "missing").length;
+  const remainingCount = blockedCount + missingCount;
   const writtenCount = items.length - missingCount;
   const totalCount = finalDeliveryReceiptItemIds.length;
   const status: GateFinalDeliveryReceiptReviewStatus = completedCount === totalCount
@@ -2704,6 +2719,14 @@ export function buildGateFinalDeliveryReceiptReview(receipts: GateActionReceipt[
       ? "blocked"
       : "in_progress";
   const firstIncomplete = items.find((item) => item.status === "blocked") ?? items.find((item) => item.status === "missing") ?? null;
+  const latestParsed = latestReceipt ? parseFinalDeliveryReceiptActionId(latestReceipt.actionId) : null;
+  const latestItem = latestParsed ? items.find((item) => item.id === latestParsed.itemId) ?? null : null;
+  const latestFeedback = latestItem
+    ? `刚写回：${latestItem.label} · ${finalDeliveryItemStatusText(latestItem.status)}`
+    : "还没有写回最终交付回执";
+  const remainingFeedback = remainingCount === 0
+    ? `${totalCount}/${totalCount} 已闭环，回总闸门做最终放行。`
+    : `还剩 ${remainingCount} 项未闭环，下一刀：${firstIncomplete?.label ?? "复检总闸门"}。`;
 
   return {
     status,
@@ -2717,8 +2740,12 @@ export function buildGateFinalDeliveryReceiptReview(receipts: GateActionReceipt[
     completedCount,
     blockedCount,
     missingCount,
+    remainingCount,
     writtenCount,
     totalCount,
+    latestItem,
+    latestFeedback,
+    remainingFeedback,
     actionLabel: status === "ready" ? "复检总闸门" : "处理最终交付缺口",
     href: status === "ready" ? "/gate" : firstIncomplete?.href ?? fallbackHref,
     evidence: items

@@ -1406,6 +1406,36 @@ export function buildFirstDayLaunchPackage(input: FirstDayDispatchInput): FirstD
 }
 
 export function buildFirstDayFollowUpDispatch(input: FirstDayFollowUpDispatchInput): GatePlatformGrowthDispatchItem | null {
+  const metricsDispatchId = `first-day:${input.project.id}:metrics-recovery`;
+  if (input.completedDispatchKey === `first-day:${input.project.id}:publish-precheck`) {
+    if (input.existingDispatchKeys?.includes(metricsDispatchId)) return null;
+    const publishStep = input.workflow.steps.find((step) => step.id === "publish-precheck");
+    return {
+      id: metricsDispatchId,
+      platformId: input.platform.id,
+      platformName: input.platform.name,
+      stage: "start_metrics_recovery",
+      state: "assigned",
+      priorityScore: 82,
+      ownerRole: "数据运营",
+      title: `${input.project.title} · 首轮数据回收`,
+      detail: "平台包预检已完成，下一步回收首轮曝光、点击、收藏、追读，判断首日执行闭环是否能进入后续小样本。",
+      dueLabel: "今天回收首轮数据",
+      actionLabel: "回收首轮数据",
+      href: `/projects/${input.project.id}#publish-effect-panel`,
+      acceptanceCriteria: [
+        "首轮曝光必须回填，缺曝光不能判断平台入口是否打开。",
+        "首轮点击必须回填，用来判断标题、简介、标签和卖点是否有效。",
+        "首轮收藏必须回填，用来判断样章和题材承诺是否成立。",
+        "首轮追读必须回填，用来判断第一章初稿、审稿、二改闭环是否值得扩大。",
+      ],
+      evidence: [
+        publishStep?.evidence ? `平台包预检已完成：${publishStep.evidence}` : "平台包预检已完成。",
+        "等待首轮曝光、点击、收藏、追读回收。",
+      ],
+      reviewLatestAt: new Date().toISOString(),
+    };
+  }
   if (input.workflow.completedCount >= input.workflow.totalSteps) return null;
   const dispatch = buildFirstDayDispatchItem(input);
   if (dispatch.id === input.completedDispatchKey) return null;

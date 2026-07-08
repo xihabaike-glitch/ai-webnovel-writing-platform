@@ -748,6 +748,108 @@ test("buildFirstDayWorkflow", async (t) => {
     }), null);
   });
 
+  await t.test("routes completed execution closeout into publish precheck and metric recovery", () => {
+    const platform = getPlatformProfile("fanqie");
+    const dispatchTasks = [
+      {
+        dispatchKey: "first-day:project-1:first-draft",
+        state: "completed" as const,
+        completionEvidence: "第一章正文已生成。首日闭环证据：执行节点：第一章初稿；写回章节：第一章 雨夜系统；当前字数：1320；执行模型：DeepSeek；初稿质检：86。",
+      },
+      {
+        dispatchKey: "first-day:project-1:first-review",
+        state: "completed" as const,
+        completionEvidence: "第一章审稿完成。首日闭环证据：执行节点：第一章审稿；审稿章节：第一章 雨夜系统；审稿评分：72；问题数量：2；执行模型：Kimi。",
+      },
+      {
+        dispatchKey: "first-day:project-1:first-rewrite",
+        state: "completed" as const,
+        completionEvidence: "第一章二改完成。首日闭环证据：执行节点：第一章二改；写回章节：第一章 雨夜系统；当前字数：1480；执行模型：Claude；二改复检：90。",
+      },
+    ];
+    const workflow = buildFirstDayWorkflow({
+      project,
+      platform,
+      chapters: [chapter, { ...chapter, id: "chapter-2", order: 2 }, { ...chapter, id: "chapter-3", order: 3 }],
+      outlineNodes,
+      characters,
+      worldEntries,
+      aiTasks: [],
+      dispatchTasks,
+      submissionChecklist: checklist,
+    });
+    const followUp = buildFirstDayFollowUpDispatch({
+      workflow,
+      project,
+      platform,
+      completedDispatchKey: "first-day:project-1:first-rewrite",
+      existingDispatchKeys: dispatchTasks.map((task) => task.dispatchKey),
+    });
+
+    assert.equal(workflow.nextStep.id, "publish-precheck");
+    assert.equal(followUp?.id, "first-day:project-1:publish-precheck");
+    assert.equal(followUp?.stage, "start_platform_package");
+    assert.ok(followUp?.title.includes("平台包预检"));
+    assert.ok(followUp?.acceptanceCriteria.some((criterion) => criterion.includes("首轮曝光、点击、收藏、追读回收口径")));
+    assert.ok(followUp?.evidence.some((item) => item.includes("首轮数据回收")));
+    assert.ok(followUp?.detail.includes("小投放基准"));
+  });
+
+  await t.test("routes completed publish precheck into first metric recovery dispatch", () => {
+    const platform = getPlatformProfile("fanqie");
+    const dispatchTasks = [
+      {
+        dispatchKey: "first-day:project-1:first-draft",
+        state: "completed" as const,
+        completionEvidence: "第一章正文已生成。首日闭环证据：执行节点：第一章初稿；写回章节：第一章 雨夜系统；当前字数：1320；执行模型：DeepSeek；初稿质检：86。",
+      },
+      {
+        dispatchKey: "first-day:project-1:first-review",
+        state: "completed" as const,
+        completionEvidence: "第一章审稿完成。首日闭环证据：执行节点：第一章审稿；审稿章节：第一章 雨夜系统；审稿评分：72；问题数量：2；执行模型：Kimi。",
+      },
+      {
+        dispatchKey: "first-day:project-1:first-rewrite",
+        state: "completed" as const,
+        completionEvidence: "第一章二改完成。首日闭环证据：执行节点：第一章二改；写回章节：第一章 雨夜系统；当前字数：1480；执行模型：Claude；二改复检：90。",
+      },
+      {
+        dispatchKey: "first-day:project-1:publish-precheck",
+        state: "completed" as const,
+        completionEvidence: "平台包预检已完成，标题、简介、标签、卖点、样章和首轮曝光、点击、收藏、追读回收口径已写清。",
+      },
+    ];
+    const workflow = buildFirstDayWorkflow({
+      project,
+      platform,
+      chapters: [chapter, { ...chapter, id: "chapter-2", order: 2 }, { ...chapter, id: "chapter-3", order: 3 }],
+      outlineNodes,
+      characters,
+      worldEntries,
+      aiTasks: [],
+      dispatchTasks,
+      submissionChecklist: checklist,
+    });
+    const followUp = buildFirstDayFollowUpDispatch({
+      workflow,
+      project,
+      platform,
+      completedDispatchKey: "first-day:project-1:publish-precheck",
+      existingDispatchKeys: dispatchTasks.map((task) => task.dispatchKey),
+    });
+
+    assert.equal(workflow.progressPercent, 100);
+    assert.equal(followUp?.id, "first-day:project-1:metrics-recovery");
+    assert.equal(followUp?.stage, "start_metrics_recovery");
+    assert.equal(followUp?.ownerRole, "数据运营");
+    assert.ok(followUp?.title.includes("首轮数据回收"));
+    assert.ok(followUp?.acceptanceCriteria.some((criterion) => criterion.includes("曝光")));
+    assert.ok(followUp?.acceptanceCriteria.some((criterion) => criterion.includes("点击")));
+    assert.ok(followUp?.acceptanceCriteria.some((criterion) => criterion.includes("收藏")));
+    assert.ok(followUp?.acceptanceCriteria.some((criterion) => criterion.includes("追读")));
+    assert.ok(followUp?.evidence.some((item) => item.includes("平台包预检已完成")));
+  });
+
   await t.test("locks downstream work when the skeleton is empty", () => {
     const workflow = buildFirstDayWorkflow({
       project,

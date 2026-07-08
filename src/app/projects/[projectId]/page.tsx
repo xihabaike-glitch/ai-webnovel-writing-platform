@@ -738,12 +738,21 @@ export default async function ProjectPage({
                 </span>
               </div>
             </div>
-            <Link
-              className="w-fit rounded-md bg-white px-3 py-2 text-sm font-medium text-slate-950 hover:bg-slate-100"
-              href={hrefWithGateReturn(dashboard.realSampleAcceptanceSheet.actionHref, gateReturn)}
-            >
-              {dashboard.realSampleAcceptanceSheet.actionLabel}
-            </Link>
+            <div className="flex flex-wrap gap-2">
+              <Link
+                className="w-fit rounded-md bg-white px-3 py-2 text-sm font-medium text-slate-950 hover:bg-slate-100"
+                href={hrefWithGateReturn(dashboard.realSampleAcceptanceSheet.actionHref, gateReturn)}
+              >
+                {dashboard.realSampleAcceptanceSheet.actionLabel}
+              </Link>
+              <Link
+                aria-label="查看最终交付正式放行卡"
+                className="w-fit rounded-md border border-emerald-300/60 bg-emerald-300/10 px-3 py-2 text-sm font-medium text-emerald-100 hover:bg-emerald-300/20"
+                href={dashboard.realSampleAcceptanceSheet.finalReleaseHref}
+              >
+                {dashboard.realSampleAcceptanceSheet.finalReleaseLabel}
+              </Link>
+            </div>
           </div>
           <div className="mt-4 rounded-md border border-white/10 bg-white/5 p-3 text-xs leading-5 text-slate-200">
             <div className="font-medium text-white">证据缺口</div>

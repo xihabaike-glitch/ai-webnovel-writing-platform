@@ -109,6 +109,8 @@ export interface ProjectRealSampleAcceptanceSheet {
   currentStepId: ProjectAcceptanceStep["id"];
   actionLabel: string;
   actionHref: string;
+  finalReleaseHref: string;
+  finalReleaseLabel: string;
   gateStatus: "ready" | "blocked";
   completedSteps: number;
   totalSteps: number;
@@ -510,6 +512,8 @@ function buildProjectRealSampleAcceptanceSheet(input: ProjectDashboardInput): Pr
     currentStepId: current.id,
     actionLabel: gateStatus === "ready" ? "复查发布包" : `处理${current.label}`,
     actionHref: current.href,
+    finalReleaseHref: "/gate#pipeline-final-review",
+    finalReleaseLabel: "查看最终交付正式放行卡",
     gateStatus,
     completedSteps,
     totalSteps: definitions.length,

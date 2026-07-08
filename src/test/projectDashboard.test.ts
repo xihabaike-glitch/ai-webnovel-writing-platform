@@ -108,6 +108,8 @@ test("buildProjectDashboard", async (t) => {
     assert.equal(dashboard.realSampleAcceptanceSheet.currentStepId, "second_pass");
     assert.ok(dashboard.realSampleAcceptanceSheet.verdict.includes("二改"));
     assert.equal(dashboard.realSampleAcceptanceSheet.actionHref, "#ai-pipeline");
+    assert.equal(dashboard.realSampleAcceptanceSheet.finalReleaseHref, "/gate#pipeline-final-review");
+    assert.equal(dashboard.realSampleAcceptanceSheet.finalReleaseLabel, "查看最终交付正式放行卡");
     assert.equal(dashboard.realSampleAcceptanceSheet.completedSteps, 3);
     assert.equal(dashboard.realSampleAcceptanceSheet.totalSteps, 6);
     assert.equal(dashboard.realSampleAcceptanceSheet.gateStatus, "blocked");
@@ -272,6 +274,8 @@ test("buildProjectDashboard", async (t) => {
     assert.equal(passed.realSampleAcceptanceSheet.completedSteps, 7);
     assert.equal(passed.realSampleAcceptanceSheet.totalSteps, 7);
     assert.equal(passed.realSampleAcceptanceSheet.gateStatus, "ready");
+    assert.equal(passed.realSampleAcceptanceSheet.finalReleaseHref, "/gate#pipeline-final-review");
+    assert.equal(passed.realSampleAcceptanceSheet.finalReleaseLabel, "查看最终交付正式放行卡");
     assert.deepEqual(passed.realSampleAcceptanceSheet.missingEvidence, []);
     assert.ok(passed.realSampleAcceptanceSheet.blockReason.includes("可以进入发布包"));
     assert.ok(passed.realSampleAcceptanceSheet.steps.find((step) => step.id === "role_dispatch")?.evidence.includes("结构主编、资料官、平台包装"));

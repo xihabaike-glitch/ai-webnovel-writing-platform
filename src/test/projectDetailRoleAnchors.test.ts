@@ -94,6 +94,9 @@ test("project detail page renders the single-project acceptance sheet", () => {
   assert.ok(projectPage.includes("step.stopRule"));
   assert.ok(projectPage.includes("dashboard.realSampleAcceptanceSheet.actionHref"));
   assert.ok(projectPage.includes("dashboard.realSampleAcceptanceSheet.actionLabel"));
+  assert.ok(projectPage.includes("dashboard.realSampleAcceptanceSheet.finalReleaseHref"));
+  assert.ok(projectPage.includes("dashboard.realSampleAcceptanceSheet.finalReleaseLabel"));
+  assert.ok(projectPage.includes("查看最终交付正式放行卡"));
 });
 
 test("project detail page feeds story structure diagnostic into submission checklist", () => {

@@ -463,13 +463,26 @@ export default async function GatePage({
                     <div>
                       <div className="font-medium text-slate-700">剩余卡点</div>
                       <div className="mt-1 grid gap-1">
-                        {focusNotice.recheckSummary.remainingBlockers.slice(0, 3).map((blocker) => (
-                          <Link className={`rounded-md border px-2 py-1 ${recheckBlockerTone(blocker.priorityLabel)}`} href={hrefWithGateReturn(blocker.href, gateRecheckReturnHref)} key={`${blocker.priorityLabel}-${blocker.label}`}>
-                            <span className="font-medium">{blocker.priorityLabel}</span>
-                            <span className="ml-1">{blocker.label}：{blocker.evidence}</span>
-                            <span className="ml-2 font-medium underline underline-offset-2">{blocker.actionLabel}</span>
-                          </Link>
+                        {focusNotice.recheckSummary.blockerGroups.map((group) => (
+                          <div className="rounded-md border border-slate-200 bg-white p-2" key={group.label}>
+                            <div className="font-medium text-slate-800">{group.label}</div>
+                            <div className="mt-1 text-slate-500">{group.detail}</div>
+                            <div className="mt-2 grid gap-1">
+                              {group.items.slice(0, 3).map((blocker) => (
+                                <Link className={`rounded-md border px-2 py-1 ${recheckBlockerTone(blocker.priorityLabel)}`} href={hrefWithGateReturn(blocker.href, gateRecheckReturnHref)} key={`${blocker.priorityLabel}-${blocker.label}`}>
+                                  <span className="font-medium">{blocker.priorityLabel}</span>
+                                  <span className="ml-1">{blocker.label}：{blocker.evidence}</span>
+                                  <span className="ml-2 font-medium underline underline-offset-2">{blocker.actionLabel}</span>
+                                </Link>
+                              ))}
+                            </div>
+                          </div>
                         ))}
+                        {focusNotice.recheckSummary.blockerGroups.length === 0 ? (
+                          <div className="rounded-md border border-emerald-100 bg-emerald-50 px-2 py-1 text-emerald-900">
+                            可放行后处理：当前没有单本作品验收硬卡点，继续看发布包、导出版本和平台效果。
+                          </div>
+                        ) : null}
                       </div>
                     </div>
                   </div>

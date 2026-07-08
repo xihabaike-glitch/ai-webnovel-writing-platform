@@ -501,6 +501,7 @@ export interface PrePublishGateRecheckSummary {
   completedEvidence: string[];
   remainingEvidence: string[];
   remainingBlockers: PrePublishGateRemainingBlocker[];
+  blockerGroups: PrePublishGateBlockerGroup[];
   roleClosureProgress: PrePublishGateRoleClosureProgress | null;
   latestEvidence: string | null;
   latestRecheckReceipt: PrePublishGateRecheckReceipt | null;
@@ -551,6 +552,12 @@ export interface PrePublishGateRemainingBlocker {
   evidence: string;
   stopRule: string;
   href: string;
+}
+
+export interface PrePublishGateBlockerGroup {
+  label: "当前必须处理" | "后续观察" | "可放行后处理";
+  detail: string;
+  items: PrePublishGateRemainingBlocker[];
 }
 
 export interface PrePublishGateRecheckDispatch {
@@ -1809,6 +1816,29 @@ function buildProjectAcceptanceRemainingBlockers(
     }));
 }
 
+function buildProjectAcceptanceBlockerGroups(
+  blockers: PrePublishGateRemainingBlocker[],
+): PrePublishGateBlockerGroup[] {
+  const currentItems = blockers.filter((blocker) => blocker.priorityLabel === "优先处理");
+  const laterItems = blockers.filter((blocker) => blocker.priorityLabel === "后续卡点");
+  const groups: PrePublishGateBlockerGroup[] = [];
+  if (currentItems.length) {
+    groups.push({
+      label: "当前必须处理",
+      detail: "先处理这一组；它没关掉之前，不要跳到后续卡点。",
+      items: currentItems,
+    });
+  }
+  if (laterItems.length) {
+    groups.push({
+      label: "后续观察",
+      detail: "等当前卡点关闭后再看这一组，不要提前跳步骤。",
+      items: laterItems,
+    });
+  }
+  return groups;
+}
+
 function buildProjectAcceptanceRecheckVerdict(input: {
   acceptanceStatus: PrePublishGateProjectStatus["acceptanceSheetGate"]["status"];
   completedSteps: number;
@@ -1904,6 +1934,7 @@ function buildProjectAcceptanceRecheckSummary(
   const remainingBlockers = project.acceptanceSheetGate.status === "pass"
     ? []
     : buildProjectAcceptanceRemainingBlockers(project.projectId, steps);
+  const blockerGroups = buildProjectAcceptanceBlockerGroups(remainingBlockers);
   const nextDispatch = buildProjectAcceptanceNextDispatch(project, currentStep, completedSteps);
   const nextDispatches = buildProjectAcceptanceNextDispatches(project, currentStep, completedSteps, nextDispatch);
   const latestEvidence = project.acceptanceSheetGate.latestDispatchEvidence;
@@ -1937,6 +1968,7 @@ function buildProjectAcceptanceRecheckSummary(
     completedEvidence: steps.filter((step) => step.status === "done").map((step) => step.evidence),
     remainingEvidence: steps.filter((step) => step.status !== "done").map((step) => `${step.label}：${step.evidence}`),
     remainingBlockers,
+    blockerGroups,
     roleClosureProgress: project.acceptanceSheetGate.roleClosureProgress,
     latestEvidence,
     latestRecheckReceipt,

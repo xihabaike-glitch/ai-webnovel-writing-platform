@@ -49,7 +49,11 @@ test("gate page renders role closure recheck progress", () => {
 });
 
 test("gate page labels prioritized remaining blockers", () => {
-  assert.ok(source.includes("focusNotice.recheckSummary.remainingBlockers"));
+  assert.ok(source.includes("focusNotice.recheckSummary.blockerGroups"));
+  assert.ok(source.includes("可放行后处理"));
+  assert.ok(source.includes("group.label"));
+  assert.ok(source.includes("group.detail"));
+  assert.ok(source.includes("group.items"));
   assert.ok(source.includes("blocker.priorityLabel"));
   assert.ok(source.includes("blocker.evidence"));
   assert.ok(source.includes("href={hrefWithGateReturn(blocker.href, gateRecheckReturnHref)}"));

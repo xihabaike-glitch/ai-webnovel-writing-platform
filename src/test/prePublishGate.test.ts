@@ -632,6 +632,16 @@ test("buildPrePublishGate", async (t) => {
       notice.recheckSummary?.remainingBlockers.map((item) => item.label),
       ["审稿", "二改", "派单回执", "发布包"],
     );
+    assert.deepEqual(
+      notice.recheckSummary?.blockerGroups.map((group) => group.label),
+      ["当前必须处理", "后续观察"],
+    );
+    assert.deepEqual(
+      notice.recheckSummary?.blockerGroups.map((group) => group.items.map((item) => item.label)),
+      [["审稿"], ["二改", "派单回执", "发布包"]],
+    );
+    assert.ok(notice.recheckSummary?.blockerGroups[0]?.detail.includes("先处理"));
+    assert.ok(notice.recheckSummary?.blockerGroups[1]?.detail.includes("不要提前跳"));
   });
 
   await t.test("blocks launch when first-day handoff evidence is missing", () => {

@@ -950,7 +950,7 @@ function buildRealSampleAcceptanceReceipt(
     outcomeLabel: outcome.outcomeLabel,
     evidenceHref: item.realSampleValidation.nextActionHref,
     gateRecheckHref: `/gate?${params.toString()}#gate-focus-notice`,
-    finalReleaseHref: "/gate#pipeline-final-review",
+    finalReleaseHref: `/gate?${params.toString()}#pipeline-final-review`,
     finalReleaseLabel: "查看最终交付正式放行卡",
     fields: [
       { label: "验收状态", value: outcome.outcomeLabel },

@@ -608,7 +608,11 @@ test("buildProjectListDashboard", async (t) => {
     assert.ok(dashboard.realSampleAcceptanceQueue[0]?.receipt.gateRecheckHref.startsWith("/gate?"));
     assert.ok(dashboard.realSampleAcceptanceQueue[0]?.receipt.gateRecheckHref.includes("focus=action-recheck"));
     assert.ok(dashboard.realSampleAcceptanceQueue[0]?.receipt.gateRecheckHref.includes("projectId=empty-project"));
-    assert.equal(dashboard.realSampleAcceptanceQueue[0]?.receipt.finalReleaseHref, "/gate#pipeline-final-review");
+    assert.ok(dashboard.realSampleAcceptanceQueue[0]?.receipt.finalReleaseHref.startsWith("/gate?"));
+    assert.ok(dashboard.realSampleAcceptanceQueue[0]?.receipt.finalReleaseHref.includes("focus=action-recheck"));
+    assert.ok(dashboard.realSampleAcceptanceQueue[0]?.receipt.finalReleaseHref.includes("projectId=empty-project"));
+    assert.ok(dashboard.realSampleAcceptanceQueue[0]?.receipt.finalReleaseHref.includes("source=real-sample-receipt"));
+    assert.ok(dashboard.realSampleAcceptanceQueue[0]?.receipt.finalReleaseHref.endsWith("#pipeline-final-review"));
     assert.equal(dashboard.realSampleAcceptanceQueue[0]?.receipt.finalReleaseLabel, "查看最终交付正式放行卡");
     assert.ok(dashboard.realSampleAcceptanceQueue[0]?.receipt.fields.some((field) => field.label === "验收状态" && field.value === "退回修复"));
     assert.ok(dashboard.realSampleAcceptanceQueue[0]?.receipt.fields.some((field) => field.label === "缺口" && field.value.includes("开书骨架")));

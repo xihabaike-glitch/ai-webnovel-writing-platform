@@ -727,8 +727,13 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
                     每张任务卡必须有执行角色、输入、输出、人工验收和下一步；缺证据不送总闸门。
                   </p>
                 </div>
-                <div className="w-fit rounded-md bg-white px-2 py-1 text-[11px] font-semibold text-slate-950">
-                  完成率 {taskReceiptCloseoutPercent}%
+                <div className="flex flex-wrap gap-2">
+                  <div className="w-fit rounded-md bg-white px-2 py-1 text-[11px] font-semibold text-slate-950">
+                    完成率 {taskReceiptCloseoutPercent}%
+                  </div>
+                  <Link className="w-fit rounded-md border border-emerald-300/60 bg-emerald-300/10 px-2 py-1 text-[11px] font-semibold text-emerald-100 hover:bg-emerald-300/20" href="/gate#pipeline-final-review">
+                    查看最终交付正式放行卡
+                  </Link>
                 </div>
               </div>
               <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/15" aria-label="任务回执完成率">

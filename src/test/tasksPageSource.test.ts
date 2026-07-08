@@ -60,6 +60,8 @@ test("tasks page shows task receipt acceptance criteria in the PM focus", () => 
   assert.ok(source.includes("aria-label=\"任务回执完成率\""));
   assert.ok(source.includes("taskReceiptReleaseLabel"));
   assert.ok(source.includes("taskReceiptNextCutLabel"));
+  assert.ok(source.includes("/gate#pipeline-final-review"));
+  assert.ok(source.includes("查看最终交付正式放行卡"));
   assert.ok(source.includes("放行判断"));
   assert.ok(source.includes("收口缺口"));
   assert.ok(source.includes("下一刀"));

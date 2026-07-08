@@ -229,6 +229,7 @@ export interface DevelopmentOverview {
 }
 
 const modelRoleMatrixHref = "/settings/models?focus=model-role-matrix#model-role-matrix";
+const finalDeliveryRecheckHref = "/gate?focus=action-recheck&source=final-delivery-receipt#pipeline-final-review";
 
 const modelInterfaces: DevelopmentOverviewModelInterface[] = [
   {
@@ -715,7 +716,7 @@ function buildRequirementTraceability(): DevelopmentOverviewRequirementTraceabil
         originalRequest: "按照毒舌产品经理路径继续开发，让 AI 写作平台能写作、投稿、复盘，而不是只做计划。",
         currentEvidence: "作品、任务、派单、总闸门、失败复盘、模型设置、发布包和最终交付正式放行卡已组成真实作品流水线。",
         acceptanceSignal: "真实作品能从开书证据跑到首章样本、审稿二改、发布包、总闸门、最终交付正式放行和复盘回执。",
-        href: "/gate#pipeline-final-review",
+        href: finalDeliveryRecheckHref,
       },
     ],
   };
@@ -841,7 +842,7 @@ function buildFinalAcceptanceGate(
     livePipelineReview: {
       title: "总闸门实时裁决",
       detail: "打开总闸门实时查看真实作品流水线自动终检：通过就进发布闭环，退回修复就补作品证据，暂停批量就先处理模型、失败或复检风险。",
-      href: "/gate#pipeline-final-review",
+      href: finalDeliveryRecheckHref,
       actionLabel: "查看实时裁决",
       outcomeLabels: ["通过", "退回修复", "暂停批量"],
     },

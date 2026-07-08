@@ -304,7 +304,7 @@ test("buildDevelopmentOverview", async (t) => {
     assert.ok(pipelineValidation?.currentEvidence.includes("最终交付正式放行卡"));
     assert.ok(pipelineValidation?.acceptanceSignal.includes("复盘回执"));
     assert.ok(pipelineValidation?.acceptanceSignal.includes("最终交付正式放行"));
-    assert.equal(pipelineValidation?.href, "/gate#pipeline-final-review");
+    assert.equal(pipelineValidation?.href, "/gate?focus=action-recheck&source=final-delivery-receipt#pipeline-final-review");
   });
 
   await t.test("builds a final product acceptance gate for the home page", () => {
@@ -322,7 +322,7 @@ test("buildDevelopmentOverview", async (t) => {
     assert.ok(overview.finalAcceptanceGate.stopRule.includes("不要新增平台"));
     assert.ok(overview.finalAcceptanceGate.stopRule.includes("模型岗位缺岗"));
     assert.equal(overview.finalAcceptanceGate.livePipelineReview.title, "总闸门实时裁决");
-    assert.equal(overview.finalAcceptanceGate.livePipelineReview.href, "/gate#pipeline-final-review");
+    assert.equal(overview.finalAcceptanceGate.livePipelineReview.href, "/gate?focus=action-recheck&source=final-delivery-receipt#pipeline-final-review");
     assert.ok(overview.finalAcceptanceGate.livePipelineReview.detail.includes("通过"));
     assert.ok(overview.finalAcceptanceGate.livePipelineReview.detail.includes("退回修复"));
     assert.ok(overview.finalAcceptanceGate.livePipelineReview.detail.includes("暂停批量"));
@@ -395,7 +395,7 @@ test("buildDevelopmentOverview", async (t) => {
     assert.ok(pipeline?.currentProof.includes("最终交付正式放行卡"));
     assert.ok(pipeline?.proofLabel.includes("正式放行"));
     assert.ok(pipeline?.missingEvidence.includes("正式放行"));
-    assert.equal(pipeline?.evidenceHref, "/gate#pipeline-final-review");
+    assert.equal(pipeline?.evidenceHref, "/gate?focus=action-recheck&source=final-delivery-receipt#pipeline-final-review");
     assert.ok(pipeline?.nextAction.includes("总闸门"));
     assert.equal(platform?.status, "ready");
     assert.equal(platform?.missingEvidence, "无新增平台缺口");

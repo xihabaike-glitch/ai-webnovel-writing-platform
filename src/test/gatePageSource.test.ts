@@ -15,8 +15,21 @@ test("gate page shows invalid focus feedback", () => {
 test("gate page forwards action recheck focus params", () => {
   assert.ok(source.includes("value === \"action-recheck\""));
   assert.ok(source.includes("actionId"));
+  assert.ok(source.includes("source?: string | string[]"));
+  assert.ok(source.includes("const source = Array.isArray(params?.source) ? params?.source[0] : params?.source ?? null"));
+  assert.ok(source.includes("if (source) params.set(\"source\", source);"));
   assert.ok(source.includes("buildPrePublishGateFocusNotice({ focus, projectId, actionId, gate })"));
   assert.ok(source.includes("id=\"gate-focus-notice\""));
+});
+
+test("gate page renders real sample receipt recheck context", () => {
+  assert.ok(source.includes("realSampleReceiptFocus"));
+  assert.ok(source.includes("source === \"real-sample-receipt\""));
+  assert.ok(source.includes("真实作品流水线样本回执复检"));
+  assert.ok(source.includes("来自作品页真实样本验收队列"));
+  assert.ok(source.includes("realSampleReceiptProjectTitle"));
+  assert.ok(source.includes("真实样本回执已带回总闸门"));
+  assert.ok(source.includes("href={hrefWithGateReturn(`/projects/${projectId}#pipeline-projects`, gateRecheckReturnHref)}"));
 });
 
 test("gate page renders action recheck summary feedback", () => {

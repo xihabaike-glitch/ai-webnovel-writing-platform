@@ -93,11 +93,12 @@ function isGateFocus(value: string | null) {
   return value === null || value === "first-day-complete" || value === "action-recheck";
 }
 
-function buildGateRecheckReturnHref(focus: string | null, projectId: string | null, actionId: string | null) {
+function buildGateRecheckReturnHref(focus: string | null, projectId: string | null, actionId: string | null, source: string | null) {
   if (focus === "action-recheck") {
     const params = new URLSearchParams({ focus: "action-recheck" });
     if (projectId) params.set("projectId", projectId);
     if (actionId) params.set("actionId", actionId);
+    if (source) params.set("source", source);
 
     return `/gate?${params.toString()}#gate-focus-notice`;
   }
@@ -120,13 +121,15 @@ function hrefWithGateReturn(href: string, gateReturn: string | null) {
 export default async function GatePage({
   searchParams,
 }: {
-  searchParams?: Promise<{ focus?: string | string[]; projectId?: string | string[]; actionId?: string | string[] }>;
+  searchParams?: Promise<{ focus?: string | string[]; projectId?: string | string[]; actionId?: string | string[]; source?: string | string[] }>;
 }) {
   const params = await searchParams;
   const focus = Array.isArray(params?.focus) ? params?.focus[0] : params?.focus ?? null;
   const projectId = Array.isArray(params?.projectId) ? params?.projectId[0] : params?.projectId ?? null;
   const actionId = Array.isArray(params?.actionId) ? params?.actionId[0] : params?.actionId ?? null;
-  const gateRecheckReturnHref = buildGateRecheckReturnHref(focus, projectId, actionId);
+  const source = Array.isArray(params?.source) ? params?.source[0] : params?.source ?? null;
+  const realSampleReceiptFocus = focus === "action-recheck" && source === "real-sample-receipt";
+  const gateRecheckReturnHref = buildGateRecheckReturnHref(focus, projectId, actionId, source);
   const invalidFocusNotice = isGateFocus(focus)
     ? null
     : focus ? `总闸门焦点「${focus}」不存在，已显示总闸门全局验收。` : null;
@@ -218,6 +221,9 @@ export default async function GatePage({
       orderBy: { updatedAt: "desc" },
     }),
   ]);
+  const realSampleReceiptProjectTitle = realSampleReceiptFocus
+    ? projects.find((project) => project.id === projectId)?.title ?? projectId ?? "未指定作品"
+    : null;
   const chaptersById = new Map(chapters.map((chapter) => [chapter.id, chapter]));
   const recentTasksWithChapter = recentAiTasks.map((task) => ({
     ...task,
@@ -361,6 +367,35 @@ export default async function GatePage({
             <Link className="w-fit rounded-md bg-white px-3 py-2 text-sm font-medium text-amber-950 hover:bg-amber-100" href="/gate">
               查看总闸门
             </Link>
+          </div>
+        </section>
+      ) : null}
+
+      {realSampleReceiptFocus ? (
+        <section className="mb-6 rounded-md border border-sky-200 bg-sky-50 p-4 text-sky-950">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <div className="text-xs font-medium text-sky-700">来自作品页真实样本验收队列</div>
+              <h2 className="mt-1 font-medium">真实作品流水线样本回执复检</h2>
+              <p className="mt-1 max-w-3xl text-sm leading-6">
+                真实样本回执已带回总闸门：{realSampleReceiptProjectTitle}。先看项目验收单回填、剩余卡点和下一动作分流，再决定放行、补派单或继续修复。
+              </p>
+            </div>
+            {projectId ? (
+              <Link
+                className="w-fit rounded-md bg-white px-3 py-2 text-sm font-medium text-sky-950 hover:bg-sky-100"
+                href={hrefWithGateReturn(`/projects/${projectId}#pipeline-projects`, gateRecheckReturnHref)}
+              >
+                回作品证据入口
+              </Link>
+            ) : (
+              <Link
+                className="w-fit rounded-md bg-white px-3 py-2 text-sm font-medium text-sky-950 hover:bg-sky-100"
+                href={hrefWithGateReturn("/projects#pipeline-projects", gateRecheckReturnHref)}
+              >
+                回作品证据入口
+              </Link>
+            )}
           </div>
         </section>
       ) : null}

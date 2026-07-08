@@ -961,6 +961,38 @@ export function buildProjectStartExecutionPromptBlock(startTactic?: ProjectStart
   return ["开书经验执行摘要：", ...lines.map((line) => `- ${line}`)].join("\n");
 }
 
+export function buildProjectStartArchiveEnforcementPromptBlock(
+  startTactic: ProjectStartTacticSummary | null | undefined,
+  phase: "draft" | "review" | "second_pass",
+) {
+  if (!startTactic) return "";
+  const copyActions = uniqueLines([
+    ...(startTactic.firstDayActions ?? []),
+    startTactic.openingMove ? `开头动作：${startTactic.openingMove}` : null,
+    startTactic.verificationMove ? `验证动作：${startTactic.verificationMove}` : null,
+  ], 3);
+  const avoidRules = uniqueLines([
+    ...(startTactic.avoidRules ?? []),
+    startTactic.risk,
+  ], 3);
+  const phaseRule = phase === "draft"
+    ? "初稿必须把复制动作写进正文事件，不能只写成设定说明。"
+    : phase === "review"
+      ? "审稿必须逐条核对复制动作和避坑边界，缺执行证据就标 start_tactic。"
+      : "二改必须把复制动作改进正文，不能只在说明里复述经验。";
+  const boundaryRule = avoidRules.length
+    ? `踩到不能踩边界时必须退回修正：${avoidRules.join("；")}`
+    : "踩到不能踩边界时必须退回修正，不能为了爽点破坏已归档经验。";
+
+  return [
+    "最终交付归档强制执行：",
+    `- 不允许忽略开书经验；这条经验来自上一轮交付归档，会影响本章写作、审稿和二改。`,
+    `- ${phaseRule}`,
+    `- ${boundaryRule}`,
+    ...copyActions.map((action) => `- 必须执行：${action}`),
+  ].join("\n");
+}
+
 function handoffDueLabel(status: ProjectStartExperienceHandoffStatus) {
   if (status === "blocked") return "今天止损确认";
   if (status === "small_sample" || status === "reuse") return "今天小样本验证";

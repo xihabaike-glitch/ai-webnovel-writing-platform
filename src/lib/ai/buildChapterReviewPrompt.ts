@@ -1,6 +1,10 @@
 import type { PlatformProfile } from "../platforms/platformProfiles.ts";
 import type { ProjectContextPack } from "../projects/projectContextPack.ts";
-import { buildProjectStartExecutionPromptBlock, type ProjectStartTacticSummary } from "../projects/projectStartTactics.ts";
+import {
+  buildProjectStartArchiveEnforcementPromptBlock,
+  buildProjectStartExecutionPromptBlock,
+  type ProjectStartTacticSummary,
+} from "../projects/projectStartTactics.ts";
 import { buildAiRecoveryPromptBlock, type AiRecoveryPromptMemory } from "./aiRecoveryPromptMemory.ts";
 
 interface ChapterReviewPromptInput {
@@ -32,6 +36,7 @@ export function buildChapterReviewPrompt(input: ChapterReviewPromptInput) {
       ]
     : [];
   const startExperiencePromptBlock = buildProjectStartExecutionPromptBlock(input.startTactic);
+  const startArchiveEnforcementPromptBlock = buildProjectStartArchiveEnforcementPromptBlock(input.startTactic, "review");
   const systemPrompt =
     "你是严格的网文编辑。你只输出 JSON，不输出闲聊。重点检查钩子、冲突、爽点、人物弧光、伏笔和平台适配。";
 
@@ -41,6 +46,7 @@ export function buildChapterReviewPrompt(input: ChapterReviewPromptInput) {
     `平台审稿重点：${input.platform.reviewFocus.join("、")}`,
     ...startTacticLines,
     startExperiencePromptBlock,
+    startArchiveEnforcementPromptBlock,
     input.projectContext?.promptBlock ?? "",
     buildAiRecoveryPromptBlock(input.aiRecoveryMemory, "review"),
     `章节标题：${input.chapter.title}`,

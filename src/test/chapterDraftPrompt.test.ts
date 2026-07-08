@@ -121,6 +121,10 @@ test("buildChapterDraftPrompt", async (t) => {
     assert.ok(tacticPrompt.userPrompt.includes("知识来源：番茄小说"));
     assert.ok(tacticPrompt.userPrompt.includes("复制动作：闭环复用"));
     assert.ok(tacticPrompt.userPrompt.includes("不能踩：不要直接放量"));
+    assert.ok(tacticPrompt.userPrompt.includes("最终交付归档强制执行"));
+    assert.ok(tacticPrompt.userPrompt.includes("不允许忽略开书经验"));
+    assert.ok(tacticPrompt.userPrompt.includes("初稿必须把复制动作写进正文事件"));
+    assert.ok(tacticPrompt.userPrompt.includes("踩到不能踩边界"));
   });
 
   await t.test("includes project context recall when available", () => {

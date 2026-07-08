@@ -86,6 +86,10 @@ describe("buildChapterReviewPrompt", () => {
     assert.match(prompt.userPrompt, /复制动作：开头：第一段给不可逆危机/);
     assert.match(prompt.userPrompt, /不能踩：不要直接放量/);
     assert.match(prompt.userPrompt, /审稿时必须核对开书经验执行摘要/);
+    assert.match(prompt.userPrompt, /最终交付归档强制执行/);
+    assert.match(prompt.userPrompt, /不允许忽略开书经验/);
+    assert.match(prompt.userPrompt, /审稿必须逐条核对复制动作和避坑边界/);
+    assert.match(prompt.userPrompt, /踩到不能踩边界/);
   });
 
   it("includes project context recall and continuity audit instruction", () => {

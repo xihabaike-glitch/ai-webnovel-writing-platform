@@ -116,6 +116,10 @@ test("buildChapterSecondPassPrompt", async (t) => {
     assert.ok(tacticPrompt.userPrompt.includes("复制动作：开头：第一段给不可逆危机"));
     assert.ok(tacticPrompt.userPrompt.includes("不能踩：不要直接放量"));
     assert.ok(tacticPrompt.userPrompt.includes("二改必须按开书经验执行摘要修正文"));
+    assert.ok(tacticPrompt.userPrompt.includes("最终交付归档强制执行"));
+    assert.ok(tacticPrompt.userPrompt.includes("不允许忽略开书经验"));
+    assert.ok(tacticPrompt.userPrompt.includes("二改必须把复制动作改进正文"));
+    assert.ok(tacticPrompt.userPrompt.includes("踩到不能踩边界"));
   });
 
   await t.test("includes project context recall plan when available", () => {

@@ -1,7 +1,11 @@
 import type { PlatformProfile } from "../platforms/platformProfiles.ts";
 import { buildPlatformWritingStylePromptBlock } from "../platforms/writingStyleTemplates.ts";
 import type { ProjectContextPack } from "../projects/projectContextPack.ts";
-import { buildProjectStartExecutionPromptBlock, type ProjectStartTacticSummary } from "../projects/projectStartTactics.ts";
+import {
+  buildProjectStartArchiveEnforcementPromptBlock,
+  buildProjectStartExecutionPromptBlock,
+  type ProjectStartTacticSummary,
+} from "../projects/projectStartTactics.ts";
 import { buildAiRecoveryPromptBlock, type AiRecoveryPromptMemory } from "./aiRecoveryPromptMemory.ts";
 import type { StoryTreeExperienceGuide } from "./storyTreeExperience.ts";
 import { buildStoryTreeProductionBlock } from "./storyTreeProduction.ts";
@@ -41,6 +45,7 @@ export function buildChapterDraftPrompt(input: ChapterDraftPromptInput) {
       ].join("\n")
     : "";
   const startExperiencePromptBlock = buildProjectStartExecutionPromptBlock(input.startTactic);
+  const startArchiveEnforcementPromptBlock = buildProjectStartArchiveEnforcementPromptBlock(input.startTactic, "draft");
   const systemPrompt = [
     "你是高执行力网文写手，只输出正文初稿，不输出解释、标题、Markdown 或审稿意见。",
     "优先满足平台读者预期：开头有钩子，中段有冲突推进，结尾有明确悬念。",
@@ -65,6 +70,7 @@ export function buildChapterDraftPrompt(input: ChapterDraftPromptInput) {
     platformStyle,
     startTacticLines,
     startExperiencePromptBlock,
+    startArchiveEnforcementPromptBlock,
     storyTreeBlock,
     input.projectContext?.promptBlock ?? "",
     buildAiRecoveryPromptBlock(input.aiRecoveryMemory, "draft"),

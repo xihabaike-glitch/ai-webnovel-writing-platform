@@ -1,6 +1,10 @@
 import type { PlatformProfile } from "../platforms/platformProfiles.ts";
 import type { ProjectContextPack } from "../projects/projectContextPack.ts";
-import { buildProjectStartExecutionPromptBlock, type ProjectStartTacticSummary } from "../projects/projectStartTactics.ts";
+import {
+  buildProjectStartArchiveEnforcementPromptBlock,
+  buildProjectStartExecutionPromptBlock,
+  type ProjectStartTacticSummary,
+} from "../projects/projectStartTactics.ts";
 import { buildAiRecoveryPromptBlock, type AiRecoveryPromptMemory } from "./aiRecoveryPromptMemory.ts";
 
 export type SecondPassMode = "more_hook" | "more_payoff" | "less_exposition" | "more_emotion" | "platform_fit";
@@ -47,6 +51,7 @@ export function buildChapterSecondPassPrompt(input: ChapterSecondPassPromptInput
       ]
     : [];
   const startExperiencePromptBlock = buildProjectStartExecutionPromptBlock(input.startTactic);
+  const startArchiveEnforcementPromptBlock = buildProjectStartArchiveEnforcementPromptBlock(input.startTactic, "second_pass");
   const systemPrompt = [
     "你是毒舌但高执行力的网文二改写手，只输出二改后的正文。",
     "你不会解释修改思路，不输出标题、Markdown、清单或审稿意见。",
@@ -72,6 +77,7 @@ export function buildChapterSecondPassPrompt(input: ChapterSecondPassPromptInput
     `平台审稿重点：${input.platform.reviewFocus.join("、")}`,
     ...startTacticLines,
     startExperiencePromptBlock,
+    startArchiveEnforcementPromptBlock,
     input.projectContext?.promptBlock ?? "",
     buildAiRecoveryPromptBlock(input.aiRecoveryMemory, "second_pass"),
     `二改方向：${modeInstructions[input.mode]}`,

@@ -306,6 +306,11 @@ test("project detail page carries gate return through export and submission link
 
   assert.ok(platformExportCenterPanel.includes("gateReturnHref?: string | null"));
   assert.ok(platformExportCenterPanel.includes("exportSource?: \"multi-platform-package\" | null"));
+  assert.ok(platformExportCenterPanel.includes("const finalDeliveryFocus = searchParams.get(\"finalDeliveryFocus\");"));
+  assert.ok(platformExportCenterPanel.includes("focusedFinalDeliveryItem"));
+  assert.ok(platformExportCenterPanel.includes("总闸门带回的待处理项"));
+  assert.ok(platformExportCenterPanel.includes("const isFocusedFinalDeliveryItem = item.id === finalDeliveryFocus;"));
+  assert.ok(platformExportCenterPanel.includes("id={`final-delivery-${item.id}`}"));
   assert.ok(platformExportCenterPanel.includes("multiPlatformExportSourcePrompt"));
   assert.ok(platformExportCenterPanel.includes("来自多平台投稿包"));
   assert.ok(platformExportCenterPanel.includes("推荐先导出"));

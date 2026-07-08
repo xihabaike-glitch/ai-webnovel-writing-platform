@@ -123,6 +123,18 @@ function hrefWithGateReturn(href: string, gateReturnHref?: string | null) {
   return `${base}${separator}gateReturn=${encodeURIComponent(gateReturnHref)}${hash}`;
 }
 
+function hrefWithFinalDeliveryFocus(href: string, finalDeliveryFocus: string) {
+  if (!href.startsWith("/projects/")) return href;
+
+  const hashIndex = href.indexOf("#");
+  const base = hashIndex >= 0 ? href.slice(0, hashIndex) : href;
+  const hash = hashIndex >= 0 ? href.slice(hashIndex) : "";
+  if (base.includes("finalDeliveryFocus=")) return href;
+  const separator = base.includes("?") ? "&" : "?";
+
+  return `${base}${separator}finalDeliveryFocus=${encodeURIComponent(finalDeliveryFocus)}${hash}`;
+}
+
 function failureRepairReviewClass(status: ReturnType<typeof buildGateFailureRepairReceiptReview>["status"]) {
   if (status === "cleared" || status === "clear") return "border-emerald-200 bg-emerald-50 text-emerald-900";
   if (status === "recheck") return "border-blue-200 bg-blue-50 text-blue-900";
@@ -728,7 +740,7 @@ export function GateActionWorkspace({
               {finalDeliveryReview.items.map((item) => (
                 <Link
                   className={`flex min-h-12 flex-col justify-center gap-1 rounded-md border px-3 py-2 transition sm:grid sm:grid-cols-[96px_64px_minmax(0,1fr)] sm:items-center ${finalDeliveryReviewItemClass(item.status)}`}
-                  href={hrefWithGateReturn(item.href, gateReturnHref)}
+                  href={hrefWithGateReturn(hrefWithFinalDeliveryFocus(item.href, item.id), gateReturnHref)}
                   key={item.id}
                 >
                   <span className="font-medium">{item.label}</span>

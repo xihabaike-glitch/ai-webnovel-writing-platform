@@ -5160,6 +5160,30 @@ test("buildGateActionReceipt", async (t) => {
       createdAt: "2026-01-01T00:30:00.000Z",
       updatedAt: "2026-01-01T00:30:00.000Z",
     };
+    const acceptanceRecheckTask = {
+      ...baseDispatch,
+      id: "project-acceptance-next:project-5:publish_package",
+      databaseId: "dispatch-db-acceptance-recheck",
+      dispatchKey: "project-acceptance-next:project-5:publish_package",
+      projectId: "project-5",
+      sourceReceiptId: null,
+      completionEvidence: [
+        "完成项：已补齐发布包标题、简介、标签和样章",
+        "产物链接/位置：/projects/project-5#platform-export",
+        "人工验收：通过",
+        "回总闸门复检结论：卡点已减少",
+        "下一动作：生成下一张派单",
+      ].join("\n"),
+      platformId: "fanqie",
+      platformName: "番茄小说",
+      stage: "start_platform_package" as const,
+      state: "completed" as const,
+      priorityScore: 88,
+      assignedAt: "2026-01-01T00:30:00.000Z",
+      completedAt: "2026-01-01T01:00:00.000Z",
+      createdAt: "2026-01-01T00:30:00.000Z",
+      updatedAt: "2026-01-01T01:00:00.000Z",
+    };
     const laterBusinessReceipt = buildGatePublishEffectReceipt({
       projectId: "project-1",
       platformId: "fanqie",
@@ -5182,10 +5206,11 @@ test("buildGateActionReceipt", async (t) => {
       needsReceiptTask,
       missingEvidenceTask,
       activeTask,
+      acceptanceRecheckTask,
     ], [dispatchReceiptAfterCompletion, laterBusinessReceipt]);
 
     assert.equal(review.summary.verified, 1);
-    assert.equal(review.summary.needsReceipt, 1);
+    assert.equal(review.summary.needsReceipt, 2);
     assert.equal(review.summary.missingEvidence, 1);
     assert.equal(review.summary.active, 1);
     assert.equal(review.items[0].status, "missing_evidence");
@@ -5199,6 +5224,9 @@ test("buildGateActionReceipt", async (t) => {
     assert.equal(review.items.find((item) => item.dispatchKey === missingEvidenceTask.dispatchKey)?.href, "/dispatch");
     assert.equal(review.items.find((item) => item.dispatchKey === activeTask.dispatchKey)?.actionLabel, activeTask.actionLabel);
     assert.equal(review.items.find((item) => item.dispatchKey === activeTask.dispatchKey)?.href, activeTask.href);
+    assert.equal(review.items.find((item) => item.dispatchKey === acceptanceRecheckTask.dispatchKey)?.label, "待总闸门复检");
+    assert.equal(review.items.find((item) => item.dispatchKey === acceptanceRecheckTask.dispatchKey)?.actionLabel, "回总闸门复检");
+    assert.equal(review.items.find((item) => item.dispatchKey === acceptanceRecheckTask.dispatchKey)?.href, "/gate?focus=action-recheck&actionId=project-acceptance:project-5#gate-focus-notice");
     assert.ok(review.nextActions.some((actionText) => actionText.includes("后续业务回执")));
   });
 

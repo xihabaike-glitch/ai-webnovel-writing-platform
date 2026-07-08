@@ -5142,6 +5142,31 @@ export function buildGateDispatchEvidenceReview(
       };
     }
 
+    if (isProjectAcceptanceNextCompletionTask(task)) {
+      const projectAcceptanceHref = task.projectId
+        ? `/gate?focus=action-recheck&actionId=project-acceptance:${encodeURIComponent(task.projectId)}#gate-focus-notice`
+        : "/gate#gate-focus-notice";
+      return {
+        dispatchKey: task.dispatchKey,
+        platformId: task.platformId,
+        platformName: task.platformName,
+        stage: task.stage,
+        ownerRole: task.ownerRole,
+        title: task.title,
+        priorityScore: task.priorityScore,
+        state: task.state,
+        status: "needs_receipt",
+        label: "待总闸门复检",
+        detail: "复检分流单已经写入完成依据，下一步必须回总闸门刷新验收结论，不能用同平台普通业务回执冒充闭环。",
+        actionLabel: "回总闸门复检",
+        href: projectAcceptanceHref,
+        completionEvidence,
+        completedAt: task.completedAt,
+        latestReceiptAt: null,
+        evidence: [`完成依据：${completionEvidence}`, "等待总闸门复检结论"],
+      };
+    }
+
     const latestOperationalReceipt = completedAt
       ? latestReceiptFor(operationalReceipts, (receipt) => {
           const platform = gateActionReceiptPlatform(receipt);

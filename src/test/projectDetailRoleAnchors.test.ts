@@ -142,7 +142,12 @@ test("project writing workbench renders a concrete today path", () => {
   assert.ok(writingWorkbenchPanel.includes("pathItem.quickFix"));
   assert.ok(writingWorkbenchPanel.includes("<WritingPathQuickFixButton fix={pathItem.quickFix} />"));
   assert.ok(writingPathQuickFixButton.includes("执行补全草稿"));
+  assert.ok(writingPathQuickFixButton.includes("fix.label"));
+  assert.ok(writingPathQuickFixButton.includes("可执行草稿"));
   assert.ok(writingPathQuickFixButton.includes("fetch(fix.endpoint"));
+  assert.ok(writingPathQuickFixButton.includes("fix.kind === \"chapter_from_outline\""));
+  assert.ok(writingPathQuickFixButton.includes("payload.chapter.id"));
+  assert.ok(writingPathQuickFixButton.includes("router.push"));
   assert.ok(writingPathQuickFixButton.includes("router.refresh()"));
 });
 

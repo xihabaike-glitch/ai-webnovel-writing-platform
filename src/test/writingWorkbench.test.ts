@@ -261,6 +261,11 @@ test("buildWritingWorkbench", async (t) => {
       && block.href === "/projects/p2#create-chapter"
       && block.nextAction.includes("创建第一章")
     )));
+    const leafPath = workbench.writingPath.find((item) => item.treeType === "leaf");
+    assert.equal(leafPath?.quickFix?.kind, "chapter_from_outline");
+    assert.equal(leafPath?.quickFix?.endpoint, "/api/projects/p2/chapters/from-outline");
+    assert.equal(leafPath?.quickFix?.payload.outlineNodeId, "root");
+    assert.ok(leafPath?.quickFix?.label.includes("生成第一章"));
     assert.ok(workbench.characterFocus.nextAction.includes("主角人物卡"));
     assert.ok(workbench.quickFixes.some((fix) => fix.kind === "character_seed"));
     assert.ok(workbench.quickFixes.some((fix) => (

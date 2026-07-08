@@ -250,7 +250,7 @@ export interface WritingWorkbenchAdoptionFollowupStep {
 
 export interface WritingWorkbenchQuickFix {
   id: string;
-  kind: "chapter_hook" | "chapter_card" | "character_seed" | "story_line_seed" | "foreshadow_seed" | "world_seed";
+  kind: "chapter_hook" | "chapter_card" | "chapter_from_outline" | "character_seed" | "story_line_seed" | "foreshadow_seed" | "world_seed";
   label: string;
   description: string;
   method: "PATCH" | "POST";
@@ -512,7 +512,7 @@ function quickFixForPathBlock(
   if (block.type === "opening") return quickFixes.find((fix) => fix.kind === "chapter_hook") ?? null;
   if (block.type === "trunk") return quickFixes.find((fix) => fix.kind === "story_line_seed") ?? null;
   if (block.type === "branch") return quickFixes.find((fix) => fix.kind === "foreshadow_seed") ?? null;
-  if (block.type === "leaf") return quickFixes.find((fix) => fix.kind === "chapter_card") ?? null;
+  if (block.type === "leaf") return quickFixes.find((fix) => fix.kind === "chapter_card" || fix.kind === "chapter_from_outline") ?? null;
   if (block.type === "soil") return quickFixes.find((fix) => fix.kind === "world_seed") ?? null;
   return null;
 }
@@ -863,9 +863,25 @@ function buildQuickFixes(
   projectContext: ProjectContextPack,
 ): WritingWorkbenchQuickFix[] {
   const fixes: WritingWorkbenchQuickFix[] = [];
+  const firstOutlineNode = input.outlineNodes.find((node) => ["opening", "leaf", "trunk", "root"].includes(node.type))
+    ?? input.outlineNodes[0];
   const projectHook = input.project.sellingPoint
     ? `${input.project.sellingPoint}但第一段必须先给危机、选择和不可逆代价。`
     : `${input.project.title}第一段必须先给危机、选择和不可逆代价。`;
+
+  if (!nextChapter && firstOutlineNode) {
+    fixes.push({
+      id: `chapter-from-outline-${firstOutlineNode.id}`,
+      kind: "chapter_from_outline",
+      label: "生成第一章章节卡",
+      description: `把「${firstOutlineNode.title}」直接落成第一章章节卡，下一步进入正文初稿。`,
+      method: "POST",
+      endpoint: `/api/projects/${input.project.id}/chapters/from-outline`,
+      payload: {
+        outlineNodeId: firstOutlineNode.id,
+      },
+    });
+  }
 
   if (nextChapter && !hasText(nextChapter.hook)) {
     fixes.push({

@@ -75,6 +75,10 @@ test("project detail page renders the single-project acceptance sheet", () => {
   assert.ok(projectPage.includes("item.actionLabel"));
   assert.ok(projectPage.includes("item.ownerRole"));
   assert.ok(projectPage.includes("item.executionHint"));
+  assert.ok(projectPage.includes("回执模板"));
+  assert.ok(projectPage.includes("item.receiptTemplate.map"));
+  assert.ok(projectPage.includes('className="grid min-w-0 gap-6 [&>*]:min-w-0"'));
+  assert.ok(projectPage.includes('className="mt-1 grid gap-1 break-words text-slate-300"'));
   assert.ok(projectPage.includes("item.dispatchDraftHref"));
   assert.ok(projectPage.includes("href={hrefWithGateReturn(item.href, gateReturn)}"));
   assert.ok(projectPage.includes("item.stopRule"));

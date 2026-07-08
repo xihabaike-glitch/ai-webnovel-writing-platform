@@ -612,7 +612,7 @@ export default async function ProjectPage({
 
   return (
     <AppShell>
-      <div className="grid gap-6">
+      <div className="grid min-w-0 gap-6 [&>*]:min-w-0">
         <div>
           <h1 className="text-2xl font-semibold">{project.title}</h1>
           <p className="mt-1 text-sm text-slate-600">
@@ -760,6 +760,14 @@ export default async function ProjectPage({
                     <p className="mt-2 rounded-md bg-rose-300/15 p-2 text-rose-100">停手线：{item.stopRule}</p>
                     <div className="mt-2 text-slate-400">负责人：{item.ownerRole}</div>
                     <p className="mt-1 text-slate-300">{item.executionHint}</p>
+                    <div className="mt-2 rounded-md bg-slate-950/50 p-2">
+                      <div className="font-medium text-white">回执模板</div>
+                      <div className="mt-1 grid gap-1 break-words text-slate-300">
+                        {item.receiptTemplate.map((line) => (
+                          <span key={line}>{line}</span>
+                        ))}
+                      </div>
+                    </div>
                     <div className="mt-3 flex flex-wrap gap-2">
                       <Link className="inline-flex rounded-md bg-white px-2 py-1 font-medium text-slate-950 hover:bg-slate-100" href={hrefWithGateReturn(item.href, gateReturn)}>
                         直接处理入口 · {item.actionLabel}

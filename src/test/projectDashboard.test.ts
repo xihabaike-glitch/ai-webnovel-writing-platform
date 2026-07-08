@@ -120,6 +120,13 @@ test("buildProjectDashboard", async (t) => {
     assert.equal(dashboard.realSampleAcceptanceSheet.missingEvidence[0]?.ownerRole, "二改编辑");
     assert.equal(dashboard.realSampleAcceptanceSheet.missingEvidence[0]?.actionMode, "ai_task");
     assert.ok(dashboard.realSampleAcceptanceSheet.missingEvidence[0]?.executionHint.includes("章节二改"));
+    assert.ok(dashboard.realSampleAcceptanceSheet.missingEvidence[0]?.receiptTemplate.some((line) => line.includes("完成项：二改")));
+    assert.ok(dashboard.realSampleAcceptanceSheet.missingEvidence[0]?.receiptTemplate.some((line) => line.includes("执行角色：二改编辑")));
+    assert.ok(dashboard.realSampleAcceptanceSheet.missingEvidence[0]?.receiptTemplate.some((line) => line.includes("输入：")));
+    assert.ok(dashboard.realSampleAcceptanceSheet.missingEvidence[0]?.receiptTemplate.some((line) => line.includes("输出：")));
+    assert.ok(dashboard.realSampleAcceptanceSheet.missingEvidence[0]?.receiptTemplate.some((line) => line.includes("验收证据：")));
+    assert.ok(dashboard.realSampleAcceptanceSheet.missingEvidence[0]?.receiptTemplate.some((line) => line.includes("人工验收：通过 / 退回")));
+    assert.ok(dashboard.realSampleAcceptanceSheet.missingEvidence[0]?.receiptTemplate.some((line) => line.includes("下一动作：")));
     const secondPassDraftHref = dashboard.realSampleAcceptanceSheet.missingEvidence[0]?.dispatchDraftHref;
     assert.equal(typeof secondPassDraftHref, "string");
     assert.ok(secondPassDraftHref.startsWith("/dispatch?"));

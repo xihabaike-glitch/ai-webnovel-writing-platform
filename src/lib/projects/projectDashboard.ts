@@ -72,6 +72,7 @@ export interface ProjectAcceptanceMissingEvidence {
   ownerRole: string;
   actionMode: "workspace" | "ai_task" | "dispatch" | "publish";
   executionHint: string;
+  receiptTemplate: string[];
   dispatchDraftHref: string;
 }
 
@@ -208,6 +209,24 @@ function buildAcceptanceGapDispatchDraftHref(
   });
 
   return `/dispatch?${params.toString()}#dispatch-task-center`;
+}
+
+function buildAcceptanceGapReceiptTemplate(
+  step: Omit<ProjectAcceptanceStep, "status">,
+  execution: Pick<ProjectAcceptanceMissingEvidence, "ownerRole" | "executionHint">,
+) {
+  return [
+    `完成项：${step.label}`,
+    `执行角色：${execution.ownerRole}`,
+    `输入：验收缺口“${step.label}”与停手线“${step.stopRule}”`,
+    "输出：已修复/已补齐的作品材料与产物链接",
+    "验收证据：人工验收记录、产物位置、回总闸门复检结论",
+    "产物链接/位置：",
+    "人工验收：通过 / 退回",
+    `回总闸门复检结论：${step.label}缺口已解除 / 卡点仍在`,
+    `下一动作：${execution.executionHint}`,
+    `停手线：${step.stopRule}`,
+  ];
 }
 
 function roleDispatchPrefix(projectId: string | undefined, intentId: string) {
@@ -432,6 +451,7 @@ function buildProjectRealSampleAcceptanceSheet(input: ProjectDashboardInput): Pr
         href: step.href,
         actionLabel: missingEvidenceActionLabels[step.id],
         ...execution,
+        receiptTemplate: buildAcceptanceGapReceiptTemplate(step, execution),
         dispatchDraftHref: buildAcceptanceGapDispatchDraftHref(input, step, execution),
       };
     }) satisfies ProjectAcceptanceMissingEvidence[];

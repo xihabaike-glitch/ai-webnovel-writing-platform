@@ -26,6 +26,13 @@ test("projects page shows the portfolio pipeline bottleneck receipt", () => {
   assert.ok(source.includes("activePipelineValidationReceipt.stopIfMissing.map"));
 });
 
+test("projects page shows evidence and stop rules on every portfolio pipeline step card", () => {
+  assert.ok(source.includes("step.validationReceipt.requiredEvidence[0]"), "step cards should expose the first required evidence before users click");
+  assert.ok(source.includes("step.validationReceipt.stopIfMissing[0]"), "step cards should expose the first stop rule before users click");
+  assert.ok(source.includes("验收口径："), "step cards should name the evidence line as an acceptance rule");
+  assert.ok(source.includes("停手线："), "step cards should name the stop rule line clearly");
+});
+
 test("projects page shows portfolio pipeline acceptance outcomes", () => {
   assert.ok(source.includes("dashboard.pipelineAcceptanceSummary"));
   assert.ok(source.includes("真实流水线验收判定"));

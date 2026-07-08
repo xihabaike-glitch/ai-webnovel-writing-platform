@@ -391,6 +391,12 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps) 
               <div className={`text-xs ${activePipelineStep?.id === step.id ? "text-slate-300" : "text-slate-500"}`}>第 {index + 1} 步</div>
               <div className={`mt-1 font-medium ${activePipelineStep?.id === step.id ? "text-white" : "text-slate-950"}`}>{step.label}</div>
               <div className={`mt-1 text-xs ${activePipelineStep?.id === step.id ? "text-slate-300" : "text-slate-500"}`}>{step.count} 本当前卡点</div>
+              <div className={`mt-2 text-xs leading-5 ${activePipelineStep?.id === step.id ? "text-slate-200" : "text-slate-600"}`}>
+                验收口径：{step.validationReceipt.requiredEvidence[0]}
+              </div>
+              <div className={`mt-1 text-xs leading-5 ${activePipelineStep?.id === step.id ? "text-rose-100" : "text-rose-700"}`}>
+                停手线：{step.validationReceipt.stopIfMissing[0]}
+              </div>
             </Link>
           ))}
         </div>

@@ -291,4 +291,43 @@ test("buildDevelopmentOverview", async (t) => {
     assert.ok(overview.finalAcceptanceGate.stopRule.includes("不要新增平台"));
     assert.ok(overview.finalAcceptanceGate.stopRule.includes("模型岗位缺岗"));
   });
+
+  await t.test("builds final acceptance evidence rows from original requirements", () => {
+    const overview = buildDevelopmentOverview();
+
+    assert.equal(overview.finalAcceptanceGate.evidenceMatrix.title, "原始需求最终验收矩阵");
+    assert.ok(overview.finalAcceptanceGate.evidenceMatrix.pmRule.includes("证据链接"));
+    assert.equal(
+      overview.finalAcceptanceGate.evidenceMatrix.items.length,
+      overview.requirementTraceability.items.length,
+    );
+
+    const traceIds = overview.requirementTraceability.items.map((item) => item.id);
+    assert.deepEqual(
+      overview.finalAcceptanceGate.evidenceMatrix.items.map((item) => item.requirementId),
+      traceIds,
+    );
+
+    for (const item of overview.finalAcceptanceGate.evidenceMatrix.items) {
+      assert.ok(["ready", "watch", "blocked"].includes(item.status));
+      assert.ok(item.owner.length >= 4);
+      assert.ok(item.proofLabel.length >= 4);
+      assert.ok(item.evidenceHref.startsWith("/"));
+      assert.ok(item.currentProof.length >= 12);
+      assert.ok(item.missingEvidence.length >= 2);
+      assert.ok(item.nextAction.length >= 8);
+      assert.equal(item.nextAction.includes("新增平台"), false);
+    }
+
+    const pipeline = overview.finalAcceptanceGate.evidenceMatrix.items.find((item) => item.requirementId === "pipeline_validation");
+    const platform = overview.finalAcceptanceGate.evidenceMatrix.items.find((item) => item.requirementId === "platform_8");
+    const models = overview.finalAcceptanceGate.evidenceMatrix.items.find((item) => item.requirementId === "model_interfaces");
+
+    assert.equal(pipeline?.status, "watch");
+    assert.ok(pipeline?.missingEvidence.includes("真实作品"));
+    assert.equal(pipeline?.evidenceHref, "/gate?focus=action-recheck#gate-focus-notice");
+    assert.equal(platform?.status, "ready");
+    assert.equal(platform?.missingEvidence, "无新增平台缺口");
+    assert.equal(models?.evidenceHref, "/settings/models?focus=model-role-matrix#model-role-matrix");
+  });
 });

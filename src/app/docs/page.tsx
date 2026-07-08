@@ -200,6 +200,57 @@ export default function DevelopmentDocsPage() {
         </div>
       </section>
 
+      <section className="mb-6 rounded-md border border-slate-900 bg-slate-950 p-4 text-white">
+        <div className="mb-4 flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <div className="text-xs font-medium text-slate-300">最终验收闸门</div>
+            <h2 className="mt-1 font-medium">{overview.finalAcceptanceGate.evidenceMatrix.title}</h2>
+            <p className="mt-1 max-w-4xl text-sm leading-6 text-slate-200">{overview.finalAcceptanceGate.evidenceMatrix.pmRule}</p>
+          </div>
+          <Link
+            className="inline-flex w-fit shrink-0 rounded-md bg-white px-3 py-2 text-sm font-medium text-slate-950 hover:bg-slate-100"
+            href={overview.finalAcceptanceGate.actionHref}
+          >
+            {overview.finalAcceptanceGate.actionLabel}
+          </Link>
+        </div>
+        <div className="grid gap-3 lg:grid-cols-2">
+          {overview.finalAcceptanceGate.evidenceMatrix.items.map((item) => (
+            <article className="min-w-0 rounded-md bg-white/10 p-4" key={item.requirementId}>
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                <div className="min-w-0">
+                  <div className="text-xs text-slate-400">负责人：{item.owner}</div>
+                  <h3 className="mt-1 break-words font-medium text-white">{item.requirementTitle}</h3>
+                </div>
+                <span className={`w-fit shrink-0 rounded-md px-2 py-1 text-xs font-medium ${auditStatusClass(item.status)}`}>
+                  {auditStatusLabel(item.status)}
+                </span>
+              </div>
+              <div className="mt-3 grid gap-2 text-xs leading-5">
+                <div className="rounded-md bg-white p-3 text-slate-700">
+                  当前证据：<span className="break-words">{item.currentProof}</span>
+                </div>
+                <div className="rounded-md bg-white p-3 text-emerald-800">
+                  验收信号：<span className="break-words">{item.proofLabel}</span>
+                </div>
+                <div className="rounded-md bg-white p-3 text-amber-900">
+                  缺口：<span className="break-words">{item.missingEvidence}</span>
+                </div>
+                <div className="rounded-md bg-white p-3 text-slate-700">
+                  下一步：<span className="break-words">{item.nextAction}</span>
+                </div>
+              </div>
+              <Link
+                className="mt-3 inline-flex w-fit rounded-md border border-white/20 bg-white px-3 py-2 text-xs font-medium text-slate-950 hover:bg-slate-100"
+                href={item.evidenceHref}
+              >
+                查看证据链接
+              </Link>
+            </article>
+          ))}
+        </div>
+      </section>
+
       <section className="mb-6 rounded-md border border-slate-200 bg-white p-4">
         <div className="mb-3 flex flex-col gap-2 lg:flex-row lg:items-end lg:justify-between">
           <div>

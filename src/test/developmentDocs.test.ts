@@ -99,6 +99,21 @@ test("ai writing platform development document", async (t) => {
     }
   });
 
+  await t.test("documents the final acceptance evidence matrix", () => {
+    assert.ok(doc.includes("原始需求最终验收矩阵"));
+    assert.ok(doc.includes("证据链接"));
+    assert.ok(doc.includes("验收状态"));
+    assert.ok(doc.includes("缺口"));
+    assert.ok(doc.includes("下一步"));
+
+    for (const requirement of ["30 个开源参考案例", "8 个核心平台范围", "四类模型接口", "真实作品流水线"]) {
+      assert.ok(doc.includes(requirement), `${requirement} should be documented in the final acceptance matrix`);
+    }
+
+    assert.ok(doc.includes("真实作品流水线样本回执"));
+    assert.ok(doc.includes("无新增平台缺口"));
+  });
+
   await t.test("uses the current delivery route instead of old kickoff instructions", () => {
     assert.equal(doc.includes("建议下一步不要直接开写代码"), false);
     assert.equal(doc.includes("`PRD.md`：产品需求文档，锁定页面、字段、MVP 范围。"), false);

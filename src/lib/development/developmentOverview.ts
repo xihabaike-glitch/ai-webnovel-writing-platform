@@ -131,6 +131,24 @@ export interface DevelopmentOverviewRequirementTraceability {
   items: DevelopmentOverviewRequirementTraceItem[];
 }
 
+export interface DevelopmentOverviewFinalAcceptanceEvidenceItem {
+  requirementId: DevelopmentOverviewRequirementTraceItem["id"];
+  requirementTitle: string;
+  status: DevelopmentOverviewAuditStatus;
+  owner: string;
+  proofLabel: string;
+  evidenceHref: string;
+  currentProof: string;
+  missingEvidence: string;
+  nextAction: string;
+}
+
+export interface DevelopmentOverviewFinalAcceptanceEvidenceMatrix {
+  title: string;
+  pmRule: string;
+  items: DevelopmentOverviewFinalAcceptanceEvidenceItem[];
+}
+
 export interface DevelopmentOverviewFinalAcceptanceGate {
   title: string;
   verdict: string;
@@ -143,6 +161,7 @@ export interface DevelopmentOverviewFinalAcceptanceGate {
   stopRule: string;
   actionHref: string;
   actionLabel: string;
+  evidenceMatrix: DevelopmentOverviewFinalAcceptanceEvidenceMatrix;
 }
 
 export interface DevelopmentOverview {
@@ -595,9 +614,109 @@ function buildRequirementTraceability(): DevelopmentOverviewRequirementTraceabil
   };
 }
 
+const finalAcceptanceMeta: Record<
+  DevelopmentOverviewRequirementTraceItem["id"],
+  {
+    requirementTitle: string;
+    status: DevelopmentOverviewAuditStatus;
+    owner: string;
+    missingEvidence: string;
+    nextAction: string;
+  }
+> = {
+  reference_30: {
+    requirementTitle: "30 个开源参考案例",
+    status: "ready",
+    owner: "产品参考官",
+    missingEvidence: "无参考数量缺口",
+    nextAction: "只把案例转成写作、派单、模型和平台动作，不继续堆资料。",
+  },
+  platform_8: {
+    requirementTitle: "8 个核心平台范围",
+    status: "ready",
+    owner: "平台策略编辑",
+    missingEvidence: "无新增平台缺口",
+    nextAction: "继续打磨 8 个核心平台的写作抓手、投稿抓手和复盘指标。",
+  },
+  length_modes: {
+    requirementTitle: "短中长篇篇幅模式",
+    status: "ready",
+    owner: "长篇结构主编",
+    missingEvidence: "无篇幅模板缺口",
+    nextAction: "把篇幅选择继续落到章节数量、首章钩子和发布包验收。",
+  },
+  tree_method: {
+    requirementTitle: "大树写作法",
+    status: "ready",
+    owner: "结构主编",
+    missingEvidence: "无结构入口缺口",
+    nextAction: "用作品工作台检查每本书是否补齐开头、结尾、主干、分支、叶片和土壤。",
+  },
+  model_interfaces: {
+    requirementTitle: "四类模型接口",
+    status: "ready",
+    owner: "模型岗位管理员",
+    missingEvidence: "无模型岗位缺口",
+    nextAction: "继续检查首选模型、备用模型、任务路由、失败替代和缺岗硬拦截。",
+  },
+  role_dispatch: {
+    requirementTitle: "AI 编辑部角色分工",
+    status: "ready",
+    owner: "派单负责人",
+    missingEvidence: "无角色分工缺口",
+    nextAction: "让每个任务回执都带角色产物、输入输出、人工验收和下一步入口。",
+  },
+  tomato_style: {
+    requirementTitle: "平台风格适配",
+    status: "ready",
+    owner: "平台策略编辑",
+    missingEvidence: "无平台风格范围缺口",
+    nextAction: "继续用章节卡、审稿、二改和发布包检验钩子、爽点、节奏、标签和简介。",
+  },
+  traditional_tooling: {
+    requirementTitle: "传统写作工具底座",
+    status: "ready",
+    owner: "作品工作台负责人",
+    missingEvidence: "无传统写作资产缺口",
+    nextAction: "确保 AI 只能沿大纲、人物、世界观、伏笔、章节和发布包执行。",
+  },
+  pipeline_validation: {
+    requirementTitle: "真实作品流水线",
+    status: "watch",
+    owner: "毒舌产品经理",
+    missingEvidence: "真实作品流水线样本回执仍需持续验收",
+    nextAction: "拿一部真实作品从开书证据跑到首章样本、审稿二改、发布包和复盘回执。",
+  },
+};
+
+function buildFinalAcceptanceEvidenceMatrix(
+  requirementTraceability: DevelopmentOverviewRequirementTraceability,
+): DevelopmentOverviewFinalAcceptanceEvidenceMatrix {
+  return {
+    title: "原始需求最终验收矩阵",
+    pmRule: "每条原始需求都必须有证据链接、验收状态、缺口和下一步；没有证据链接，就不要说完成。",
+    items: requirementTraceability.items.map((item) => {
+      const meta = finalAcceptanceMeta[item.id];
+
+      return {
+        requirementId: item.id,
+        requirementTitle: meta.requirementTitle,
+        status: meta.status,
+        owner: meta.owner,
+        proofLabel: item.acceptanceSignal,
+        evidenceHref: item.href,
+        currentProof: item.currentEvidence,
+        missingEvidence: meta.missingEvidence,
+        nextAction: meta.nextAction,
+      };
+    }),
+  };
+}
+
 function buildFinalAcceptanceGate(
   deliveryAudit: DevelopmentOverviewDeliveryAudit,
   currentPipelineValidation: DevelopmentOverviewCurrentPipelineValidation,
+  requirementTraceability: DevelopmentOverviewRequirementTraceability,
 ): DevelopmentOverviewFinalAcceptanceGate {
   const { summary } = deliveryAudit;
 
@@ -612,12 +731,14 @@ function buildFinalAcceptanceGate(
     stopRule: "不要新增平台、不要堆演示页；模型岗位缺岗或没有真实作品流水线证据，就不能宣称产品完成。",
     actionHref: currentPipelineValidation.actionHref,
     actionLabel: currentPipelineValidation.actionLabel,
+    evidenceMatrix: buildFinalAcceptanceEvidenceMatrix(requirementTraceability),
   };
 }
 
 export function buildDevelopmentOverview(): DevelopmentOverview {
   const deliveryAudit = buildDeliveryAudit();
   const currentPipelineValidation = buildCurrentPipelineValidation();
+  const requirementTraceability = buildRequirementTraceability();
 
   return {
     referenceCount: openSourceReferenceCases.length,
@@ -639,8 +760,8 @@ export function buildDevelopmentOverview(): DevelopmentOverview {
     deliveryAudit,
     pipelineProofRoute: buildPipelineProofRoute(),
     currentPipelineValidation,
-    requirementTraceability: buildRequirementTraceability(),
-    finalAcceptanceGate: buildFinalAcceptanceGate(deliveryAudit, currentPipelineValidation),
+    requirementTraceability,
+    finalAcceptanceGate: buildFinalAcceptanceGate(deliveryAudit, currentPipelineValidation, requirementTraceability),
     nextActions: [
       {
         label: "从作品工作台验收真实写作流程",

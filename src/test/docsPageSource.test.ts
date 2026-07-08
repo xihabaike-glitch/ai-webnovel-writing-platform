@@ -34,3 +34,14 @@ test("docs page renders the visible acceptance criteria map", () => {
     assert.ok(source.includes(criterion), `${criterion} should be visible on the docs page`);
   }
 });
+
+test("docs page renders the final acceptance evidence matrix", () => {
+  assert.ok(source.includes("overview.finalAcceptanceGate.evidenceMatrix.title"));
+  assert.ok(source.includes("overview.finalAcceptanceGate.evidenceMatrix.pmRule"));
+  assert.ok(source.includes("overview.finalAcceptanceGate.evidenceMatrix.items.map"));
+  assert.ok(source.includes("item.requirementTitle"));
+  assert.ok(source.includes("item.currentProof"));
+  assert.ok(source.includes("item.missingEvidence"));
+  assert.ok(source.includes("item.nextAction"));
+  assert.ok(source.includes("item.evidenceHref"));
+});

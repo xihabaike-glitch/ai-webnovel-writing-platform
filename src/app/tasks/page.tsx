@@ -17,7 +17,7 @@ import { batchExecutionStrategies, getBatchExecutionStrategy } from "@/lib/proje
 import type { GateBatchTacticEffectStatus } from "@/lib/projects/gateActionReceipts";
 import { gatePlatformDispatchTaskFromRecord } from "@/lib/projects/gateDispatchTaskRecords";
 import { buildRecommendedBatchModelRouteGate } from "@/lib/projects/recommendedBatchModelRouteGate";
-import { buildFailureRepairResumeBatchRecord, buildTaskDebtFocusChangeNotice, buildTaskDebtRecoveryBatchRecord } from "@/lib/projects/taskDebtCompletionFeedback";
+import { buildFailureRepairResumeBatchRecord, buildFirstDayScaleBatchRecord, buildTaskDebtFocusChangeNotice, buildTaskDebtRecoveryBatchRecord } from "@/lib/projects/taskDebtCompletionFeedback";
 import { buildTaskQueueBatchHealthReview, buildTaskQueueBatchRhythmClosure, buildTaskQueueBatchRhythmDecision, buildTaskQueueBatchRhythmDispatch } from "@/lib/projects/taskQueueBatchHealth";
 import { taskQueueBatchExecutionContext } from "@/lib/projects/taskQueueBatchReceipt";
 import { buildTaskQueueCenter, buildTaskQueueDebtView, buildTaskQueueProjectSubmissionChecklist, recommendedQueueActionLabel, taskQueueSourcePresentation, type QueueItem, type TaskQueueProject } from "@/lib/projects/taskQueueCenter";
@@ -510,6 +510,7 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
   const batchRhythmTasks = batchRhythmTaskRecords.map(gatePlatformDispatchTaskFromRecord);
   const batchRhythmClosure = buildTaskQueueBatchRhythmClosure(batchRhythmDecision, batchTacticEffectReview, batchRhythmTasks);
   const debtRecoveryBatchRecord = buildTaskDebtRecoveryBatchRecord(recentRecommendedBatchAudits);
+  const firstDayScaleBatchRecord = buildFirstDayScaleBatchRecord(recentRecommendedBatchAudits);
   const failureRepairResumeBatchRecord = buildFailureRepairResumeBatchRecord(recentRecommendedBatchAudits);
   const effectiveBatchContext = activeBatchContext === "repair_resume" && failureRepairResumeBatchRecord?.stabilityTone === "ready"
     ? "standard"
@@ -1357,6 +1358,29 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
                 ? "恢复小批已连续稳定，这次执行会按普通推荐批次记录，继续保留安全阀。"
                 : "这一批来自失败修复复检后的恢复入口。执行回执会按恢复小批记录，不会被当作普通放量批次。"}
             </p>
+          </div>
+        ) : null}
+        {firstDayScaleBatchRecord ? (
+          <div className={`mt-4 rounded-md border p-3 text-sm ${resumeBatchDecisionClass(firstDayScaleBatchRecord.decisionTone)}`}>
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+              <div>
+                <div className="text-xs font-medium uppercase opacity-80">首日扩展回流</div>
+                <div className="mt-1 font-medium">{firstDayScaleBatchRecord.headline}</div>
+                <p className="mt-1 leading-6">{firstDayScaleBatchRecord.detail}</p>
+                <div className="mt-2 flex flex-wrap gap-1.5 text-xs">
+                  {firstDayScaleBatchRecord.metrics.map((metric) => (
+                    <span className="rounded-md bg-white/75 px-2 py-1 font-medium" key={metric}>{metric}</span>
+                  ))}
+                </div>
+                <div className="mt-2 rounded-md bg-white/75 px-2 py-1 text-xs leading-5">
+                  <span className="font-medium">{firstDayScaleBatchRecord.decisionLabel}</span>
+                  <span className="ml-1 opacity-85">{firstDayScaleBatchRecord.decisionDetail}</span>
+                </div>
+              </div>
+              <Link className="w-fit rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white hover:bg-slate-800" href={hrefWithGateReturn(firstDayScaleBatchRecord.decisionActionHref, gateReturn)}>
+                {firstDayScaleBatchRecord.decisionActionLabel}
+              </Link>
+            </div>
           </div>
         ) : null}
         {activeBatchContext === "repair_resume" && failureRepairResumeBatchRecord ? (

@@ -215,6 +215,14 @@ test("tasks page groups first-day execution outcomes in handoff work", () => {
   assert.ok(source.includes("firstDayOutcome.boundary"));
 });
 
+test("tasks page surfaces first-day scale batch receipts as a follow-up card", () => {
+  assert.ok(source.includes("buildFirstDayScaleBatchRecord"));
+  assert.ok(source.includes("firstDayScaleBatchRecord"));
+  assert.ok(source.includes("首日扩展回流"));
+  assert.ok(source.includes("firstDayScaleBatchRecord.decisionActionHref"));
+  assert.ok(source.includes("firstDayScaleBatchRecord.decisionActionLabel"));
+});
+
 test("tasks page runs any queued platform action with the action button", () => {
   assert.ok(source.includes("{entry.effectAction ? ("));
   assert.ok(source.includes("action={entry.effectAction}"));

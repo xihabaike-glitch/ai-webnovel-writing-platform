@@ -216,6 +216,14 @@ function buildRecoveryBatchRecord(input: {
   audits: TaskDebtRecoveryBatchAudit[];
   predicate: (payload: Record<string, unknown>) => boolean;
   headlinePrefix: string;
+  decision?: (input: {
+    successRate: number | null;
+    failedTasks: number | null;
+    averageQualityScore: number | null;
+    averageCostPerSucceededTaskUsd: number | null;
+    actionLabel: string;
+    actionHref: string;
+  }) => Pick<TaskDebtRecoveryBatchRecord, "decisionTone" | "decisionLabel" | "decisionDetail" | "decisionActionLabel" | "decisionActionHref">;
   stability?: (records: Array<{ payload: Record<string, unknown>; audit: TaskDebtRecoveryBatchAudit }>) => Partial<TaskDebtRecoveryBatchRecord>;
 }): TaskDebtRecoveryBatchRecord | null {
   const records = input.audits
@@ -254,7 +262,7 @@ function buildRecoveryBatchRecord(input: {
     ].filter((metric): metric is string => Boolean(metric)),
     actionLabel,
     actionHref,
-    ...buildTaskDebtRecoveryDecision({
+    ...(input.decision ?? buildTaskDebtRecoveryDecision)({
       successRate,
       failedTasks,
       averageQualityScore,
@@ -266,11 +274,73 @@ function buildRecoveryBatchRecord(input: {
   };
 }
 
+function buildFirstDayScaleDecision(input: {
+  successRate: number | null;
+  failedTasks: number | null;
+  averageQualityScore: number | null;
+  averageCostPerSucceededTaskUsd: number | null;
+  actionLabel: string;
+  actionHref: string;
+}): Pick<TaskDebtRecoveryBatchRecord, "decisionTone" | "decisionLabel" | "decisionDetail" | "decisionActionLabel" | "decisionActionHref"> {
+  const failedTasks = input.failedTasks ?? 0;
+  if (failedTasks > 0 || (input.successRate !== null && input.successRate < 80)) {
+    return {
+      decisionTone: "repair",
+      decisionLabel: "先修扩展样本",
+      decisionDetail: "首日扩展小批已经出现失败或成功率低于 80%。别继续扩，先修失败样本和模型路线。",
+      decisionActionLabel: "查看失败修复",
+      decisionActionHref: "/failures",
+    };
+  }
+
+  if (input.averageQualityScore === null || input.averageQualityScore < 80) {
+    return {
+      decisionTone: "rollback",
+      decisionLabel: "回滚首日观察",
+      decisionDetail: "首日扩展小批缺少质量证据或质量低于 80 分。先回到派单中心补小样本验收，别把弱样本当成可扩展。",
+      decisionActionLabel: "回任务中心补首日数据",
+      decisionActionHref: "/dispatch",
+    };
+  }
+
+  if (input.averageCostPerSucceededTaskUsd !== null && input.averageCostPerSucceededTaskUsd > 0.05) {
+    return {
+      decisionTone: "watch",
+      decisionLabel: "看成本再扩",
+      decisionDetail: `首日扩展小批质量能过，但单个成功任务平均成本 $${input.averageCostPerSucceededTaskUsd.toFixed(4)}，先观察模型消耗。`,
+      decisionActionLabel: input.actionLabel,
+      decisionActionHref: input.actionHref,
+    };
+  }
+
+  return {
+    decisionTone: "continue",
+    decisionLabel: "补首日数据",
+    decisionDetail: "首日扩展小批只证明 1 个新样本过线，不直接批量放大。先回填曝光、点击、收藏、追读和质量证据，再由总闸门判断是否继续扩展。",
+    decisionActionLabel: input.actionLabel,
+    decisionActionHref: input.actionHref,
+  };
+}
+
 export function buildTaskDebtRecoveryBatchRecord(audits: TaskDebtRecoveryBatchAudit[]): TaskDebtRecoveryBatchRecord | null {
   return buildRecoveryBatchRecord({
     audits,
     headlinePrefix: "恢复小批已回流",
     predicate: (payload) => taskDebtRecord(payload.plan)?.scaleGate === "cleared",
+  });
+}
+
+export function buildFirstDayScaleBatchRecord(audits: TaskDebtRecoveryBatchAudit[]): TaskDebtRecoveryBatchRecord | null {
+  return buildRecoveryBatchRecord({
+    audits,
+    headlinePrefix: "首日扩展小批已回流",
+    decision: buildFirstDayScaleDecision,
+    predicate: (payload) => {
+      const plan = taskDebtRecord(payload.plan);
+      const batchReceipt = taskDebtRecord(payload.batchReceipt);
+      return plan?.batchModeLabel === "首日扩展小批"
+        || batchReceipt?.headline === "首日扩展小批通过，先回填数据";
+    },
   });
 }
 

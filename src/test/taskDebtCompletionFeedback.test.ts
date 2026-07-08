@@ -4,6 +4,7 @@ import {
   buildTaskDebtCompletionFeedback,
   buildTaskDebtFocusChangeNotice,
   buildFailureRepairResumeBatchRecord,
+  buildFirstDayScaleBatchRecord,
   buildTaskDebtRecoveryBatchRecord,
 } from "../lib/projects/taskDebtCompletionFeedback.ts";
 
@@ -153,6 +154,46 @@ test("buildTaskDebtRecoveryBatchRecord summarizes the latest cleared resume batc
   assert.equal(record?.decisionLabel, "继续小批");
   assert.equal(record?.decisionActionHref, "/tasks#recommended-batch");
   assert.match(record?.decisionDetail ?? "", /已过线/);
+});
+
+test("buildFirstDayScaleBatchRecord summarizes first-day scale batches as data backfill work", () => {
+  const record = buildFirstDayScaleBatchRecord([{
+    label: "沉淀批量初稿 1 个经验",
+    href: "/gate",
+    payload: JSON.stringify({
+      plan: {
+        scaleGate: "none",
+        batchModeLabel: "首日扩展小批",
+        actionLabel: "批量初稿 1 个",
+      },
+      routeEffectSummary: {
+        successRatePercent: 100,
+        failedTasks: 0,
+        knownCostUsd: 0.01,
+        averageQualityScore: 82,
+        averageCostPerSucceededTaskUsd: 0.01,
+      },
+      batchReceipt: {
+        headline: "首日扩展小批通过，先回填数据",
+        detail: "首日数据过线后，本批只扩 1 个小样本；这不是直接批量放大。",
+        primaryLabel: "回任务中心补首日数据",
+        primaryHref: "/dispatch",
+      },
+    }),
+    createdAt: "2026-07-06T09:00:00.000Z",
+  }]);
+
+  assert.equal(record?.headline, "首日扩展小批已回流：首日扩展小批通过，先回填数据");
+  assert.equal(record?.detail, "首日数据过线后，本批只扩 1 个小样本；这不是直接批量放大。");
+  assert.deepEqual(record?.metrics, ["成功率 100%", "失败 0", "成本 $0.0100", "质量 82"]);
+  assert.equal(record?.actionLabel, "回任务中心补首日数据");
+  assert.equal(record?.actionHref, "/dispatch");
+  assert.equal(record?.decisionTone, "continue");
+  assert.equal(record?.decisionLabel, "补首日数据");
+  assert.equal(record?.decisionActionLabel, "回任务中心补首日数据");
+  assert.equal(record?.decisionActionHref, "/dispatch");
+  assert.match(record?.decisionDetail ?? "", /曝光、点击、收藏、追读/);
+  assert.match(record?.decisionDetail ?? "", /不直接批量放大/);
 });
 
 test("buildTaskDebtRecoveryBatchRecord sends failed resume batches to repair", () => {

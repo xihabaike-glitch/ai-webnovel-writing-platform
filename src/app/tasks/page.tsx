@@ -162,6 +162,58 @@ const taskReceiptAcceptanceCriteria = [
   "下一步",
 ];
 
+interface TaskReceiptCloseoutPreview {
+  fields: Array<{
+    label: string;
+    ready: boolean;
+    detail: string;
+  }>;
+  missingLabels: string[];
+}
+
+function receiptTemplateHasLabel(entry: QueueItem, label: string) {
+  const templateText = [
+    ...entry.receiptTemplate,
+    entry.completionEvidenceTemplate ?? "",
+  ].join("\n");
+  return templateText.includes(`${label}：`) || templateText.includes(`${label}:`);
+}
+
+function buildTaskReceiptCloseoutPreview(entry: QueueItem): TaskReceiptCloseoutPreview {
+  const fields = [
+    {
+      label: "执行角色",
+      ready: receiptTemplateHasLabel(entry, "执行角色"),
+      detail: receiptTemplateHasLabel(entry, "执行角色") ? "任务回执模板已指定执行角色" : "请在回执里写清谁执行",
+    },
+    {
+      label: "输入",
+      ready: receiptTemplateHasLabel(entry, "输入") || Boolean(entry.evidence.trim()),
+      detail: receiptTemplateHasLabel(entry, "输入") ? "任务回执模板已带输入来源" : "请在回执里写清输入素材或任务来源",
+    },
+    {
+      label: "输出",
+      ready: receiptTemplateHasLabel(entry, "输出") || Boolean(entry.completionEvidenceTemplate?.trim()),
+      detail: receiptTemplateHasLabel(entry, "输出") ? "任务回执模板已要求输出产物" : "请写清产物、结果或回填位置",
+    },
+    {
+      label: "人工验收",
+      ready: receiptTemplateHasLabel(entry, "人工验收"),
+      detail: receiptTemplateHasLabel(entry, "人工验收") ? "任务回执模板已要求人工验收" : "请写通过、退回、采用或驳回原因",
+    },
+    {
+      label: "下一步",
+      ready: receiptTemplateHasLabel(entry, "下一步") || Boolean(entry.actionLabel.trim() && entry.href.trim()),
+      detail: receiptTemplateHasLabel(entry, "下一步") ? "任务回执模板已要求下一步" : `页面下一步：${entry.actionLabel}`,
+    },
+  ];
+
+  return {
+    fields,
+    missingLabels: fields.filter((field) => !field.ready).map((field) => field.label),
+  };
+}
+
 function batchTone(successRate: number, failedTasks: number, runningTasks: number) {
   if (runningTasks > 0) return "border-blue-200 bg-blue-50 text-blue-800";
   if (failedTasks > 0 || successRate < 80) return "border-rose-200 bg-rose-50 text-rose-800";
@@ -1745,7 +1797,9 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
       </section>
 
       <section className="grid min-w-0 gap-3 [&>*]:min-w-0" id="platform-strategy-tasks">
-        {visibleQueueItems.map((entry) => (
+        {visibleQueueItems.map((entry) => {
+          const taskReceiptCloseoutPreview = buildTaskReceiptCloseoutPreview(entry);
+          return (
           <div className="rounded-md border border-slate-200 bg-white p-4" key={entry.id}>
             <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
               <div>
@@ -1785,6 +1839,27 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
                   <div className="mt-1 grid min-w-0 gap-1">
                     {entry.receiptTemplate.map((line) => (
                       <span className="min-w-0 break-words" key={line}>{line}</span>
+                    ))}
+                  </div>
+                </div>
+                <div className={`mt-3 rounded-md border px-3 py-2 text-xs leading-5 ${taskReceiptCloseoutPreview.missingLabels.length ? "border-amber-200 bg-amber-50 text-amber-900" : "border-emerald-200 bg-emerald-50 text-emerald-800"}`}>
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="font-medium">任务回执预检</div>
+                    <span className="rounded-md bg-white/80 px-2 py-1 font-medium">
+                      {taskReceiptCloseoutPreview.missingLabels.length
+                        ? `缺少回执字段：${taskReceiptCloseoutPreview.missingLabels.join("、")}`
+                        : "回执预检通过"}
+                    </span>
+                  </div>
+                  <div className="mt-2 flex flex-wrap gap-1">
+                    {taskReceiptCloseoutPreview.fields.map((field) => (
+                      <span
+                        className={`rounded-md px-2 py-1 ${field.ready ? "bg-white text-emerald-800" : "bg-white text-amber-800"}`}
+                        key={field.label}
+                        title={field.detail}
+                      >
+                        {field.ready ? "已带" : "待补"}：{field.label}
+                      </span>
                     ))}
                   </div>
                 </div>
@@ -1916,7 +1991,8 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
               )}
             </div>
           </div>
-        ))}
+          );
+        })}
         {visibleQueueItems.length === 0 ? (
           <p className="rounded-md border border-dashed border-slate-300 bg-white p-4 text-sm text-slate-600">
             {activeView === "blocked" ? "当前没有阻塞债，可以回到全部任务继续推进。" : "当前没有可调度任务。先创建项目、补章节卡或生成正文。"}

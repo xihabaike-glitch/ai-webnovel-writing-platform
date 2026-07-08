@@ -87,6 +87,17 @@ test("tasks page renders receipt templates on queue items", () => {
   assert.ok(source.includes('className="min-w-0 break-words"'));
 });
 
+test("tasks page previews PM receipt fields on queue items", () => {
+  assert.ok(source.includes("buildTaskReceiptCloseoutPreview"));
+  assert.ok(source.includes("taskReceiptCloseoutPreview"));
+  assert.ok(source.includes("任务回执预检"));
+  assert.ok(source.includes("缺少回执字段"));
+  assert.ok(source.includes("回执预检通过"));
+  assert.ok(source.includes("taskReceiptCloseoutPreview.missingLabels"));
+  assert.ok(source.includes("已带"));
+  assert.ok(source.includes("待补"));
+});
+
 test("tasks page carries gate return through task work links", () => {
   const recommendedBatchButton = readFileSync("src/components/tasks/RunRecommendedBatchButton.tsx", "utf8");
   const publishEffectButton = readFileSync("src/components/tasks/RunPublishEffectQueueActionButton.tsx", "utf8");

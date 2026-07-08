@@ -132,6 +132,7 @@ export interface WritingWorkbenchPathItem {
   stopRule: string;
   actionLabel: string;
   href: string;
+  quickFix: WritingWorkbenchQuickFix | null;
 }
 
 export interface WritingWorkbenchPmFocus {
@@ -504,11 +505,27 @@ const writingPathCopy: Record<WritingWorkbenchTreeBlock["type"], {
   },
 };
 
-function buildWritingPath(treeBlocks: WritingWorkbenchTreeBlock[]): WritingWorkbenchPathItem[] {
+function quickFixForPathBlock(
+  block: WritingWorkbenchTreeBlock,
+  quickFixes: WritingWorkbenchQuickFix[],
+): WritingWorkbenchQuickFix | null {
+  if (block.type === "opening") return quickFixes.find((fix) => fix.kind === "chapter_hook") ?? null;
+  if (block.type === "trunk") return quickFixes.find((fix) => fix.kind === "story_line_seed") ?? null;
+  if (block.type === "branch") return quickFixes.find((fix) => fix.kind === "foreshadow_seed") ?? null;
+  if (block.type === "leaf") return quickFixes.find((fix) => fix.kind === "chapter_card") ?? null;
+  if (block.type === "soil") return quickFixes.find((fix) => fix.kind === "world_seed") ?? null;
+  return null;
+}
+
+function buildWritingPath(
+  treeBlocks: WritingWorkbenchTreeBlock[],
+  quickFixes: WritingWorkbenchQuickFix[],
+): WritingWorkbenchPathItem[] {
   return treeRequirements.flatMap((requirement, index) => {
     const block = treeBlocks.find((item) => item.type === requirement.type);
     if (!block) return [];
     const copy = writingPathCopy[block.type];
+    const quickFix = quickFixForPathBlock(block, quickFixes);
     return {
       id: `writing-path-${block.type}`,
       order: index + 1,
@@ -520,6 +537,7 @@ function buildWritingPath(treeBlocks: WritingWorkbenchTreeBlock[]): WritingWorkb
       stopRule: copy.stopRule,
       actionLabel: block.status === "pass" ? `复查${block.label}` : copy.actionLabel,
       href: block.href,
+      quickFix,
     };
   });
 }
@@ -1253,6 +1271,7 @@ export function buildWritingWorkbench(input: WritingWorkbenchInput): WritingWork
     ? pendingCandidates.find((candidate) => candidate.chapterId === nextChapter.id)
     : null;
   const heroAction = buildHeroAction(input, nextChapter, pendingCandidates);
+  const quickFixes = buildQuickFixes(input, nextChapter, projectContext);
 
   return {
     projectTitle: input.project.title,
@@ -1267,7 +1286,7 @@ export function buildWritingWorkbench(input: WritingWorkbenchInput): WritingWork
     heroAction,
     pmFocus: buildWritingWorkbenchPmFocus(heroAction, maturityScore),
     treeBlocks,
-    writingPath: buildWritingPath(treeBlocks),
+    writingPath: buildWritingPath(treeBlocks, quickFixes),
     chapterFocus: {
       nextChapter,
       hookStatus,
@@ -1315,6 +1334,6 @@ export function buildWritingWorkbench(input: WritingWorkbenchInput): WritingWork
       { label: "模型任务", href: `/projects/${input.project.id}#ai-pipeline` },
       { label: "发布包", href: `/projects/${input.project.id}#platform-export` },
     ],
-    quickFixes: buildQuickFixes(input, nextChapter, projectContext),
+    quickFixes,
   };
 }

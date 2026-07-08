@@ -131,6 +131,7 @@ test("project detail page carries gate return through project work entry links",
 
 test("project writing workbench renders a concrete today path", () => {
   const writingWorkbenchPanel = readFileSync("src/components/projects/WritingWorkbenchPanel.tsx", "utf8");
+  const writingPathQuickFixButton = readFileSync("src/components/projects/WritingPathQuickFixButton.tsx", "utf8");
 
   assert.ok(writingWorkbenchPanel.includes("今日写作路径"));
   assert.ok(writingWorkbenchPanel.includes("workbench.writingPath.map"));
@@ -138,6 +139,11 @@ test("project writing workbench renders a concrete today path", () => {
   assert.ok(writingWorkbenchPanel.includes("停手线"));
   assert.ok(writingWorkbenchPanel.includes("pathItem.actionLabel"));
   assert.ok(writingWorkbenchPanel.includes("href={hrefWithGateReturn(pathItem.href, gateReturnHref)}"));
+  assert.ok(writingWorkbenchPanel.includes("pathItem.quickFix"));
+  assert.ok(writingWorkbenchPanel.includes("<WritingPathQuickFixButton fix={pathItem.quickFix} />"));
+  assert.ok(writingPathQuickFixButton.includes("执行补全草稿"));
+  assert.ok(writingPathQuickFixButton.includes("fetch(fix.endpoint"));
+  assert.ok(writingPathQuickFixButton.includes("router.refresh()"));
 });
 
 test("project detail page carries gate return through control and batch panels", () => {

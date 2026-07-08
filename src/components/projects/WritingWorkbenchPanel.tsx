@@ -3,6 +3,7 @@ import type { WritingWorkbench, WorkbenchStatus } from "@/lib/projects/writingWo
 import { WorkbenchModelActionPanel } from "./WorkbenchModelActionPanel";
 import { WorkbenchModelTimelinePanel } from "./WorkbenchModelTimelinePanel";
 import { WorkbenchQuickFixPanel } from "./WorkbenchQuickFixPanel";
+import { WritingPathQuickFixButton } from "./WritingPathQuickFixButton";
 
 function statusLabel(status: WorkbenchStatus) {
   if (status === "pass") return "已具备";
@@ -153,6 +154,7 @@ export function WritingWorkbenchPanel({
               >
                 {pathItem.actionLabel}
               </Link>
+              {pathItem.quickFix ? <WritingPathQuickFixButton fix={pathItem.quickFix} /> : null}
             </div>
           ))}
         </div>

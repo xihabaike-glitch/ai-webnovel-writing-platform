@@ -127,9 +127,14 @@ test("buildWritingWorkbench", async (t) => {
     assert.equal(workbench.writingPath[0].status, "warn");
     assert.equal(workbench.writingPath[0].href, "/projects/p1#outline-tree");
     assert.ok(workbench.writingPath[0].stopRule.includes("钩子"));
+    assert.equal(workbench.writingPath[0].quickFix?.id, "chapter-hook-c1");
+    assert.equal(workbench.writingPath[0].quickFix?.endpoint, "/api/chapters/c1");
+    assert.equal(workbench.writingPath[2].quickFix?.kind, "story_line_seed");
+    assert.equal(workbench.writingPath[3].quickFix?.kind, "foreshadow_seed");
     assert.ok(workbench.writingPath[1].label.includes("结尾"));
     assert.ok(workbench.writingPath[1].stopRule.includes("结尾承诺"));
     assert.ok(workbench.writingPath[4].actionLabel.includes("章节"));
+    assert.equal(workbench.writingPath[5].quickFix?.kind, "world_seed");
     assert.ok(workbench.writingPath.every((item) => item.stopRule.length > 0));
     assert.ok(workbench.treeBlocks.some((block) => block.type === "ending" && block.status === "fail"));
     assert.ok(workbench.treeBlocks.some((block) => block.type === "soil" && block.status === "fail"));

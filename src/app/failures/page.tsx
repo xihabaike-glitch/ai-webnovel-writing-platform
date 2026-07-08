@@ -101,6 +101,14 @@ function pmFocusBadgeClass(tone: "blocked" | "watch" | "ready") {
   return "bg-rose-100 text-rose-950";
 }
 
+const failureRepairReceiptAcceptanceCriteria = [
+  "失败原因",
+  "修复泳道",
+  "重试样本",
+  "恢复观察",
+  "是否暂停批量",
+];
+
 function gateReturnFromParam(value: string | string[] | undefined) {
   const raw = Array.isArray(value) ? value[0] : value;
 
@@ -430,6 +438,16 @@ export default async function FailuresPage({
             <p className="mt-2 text-xs leading-5 text-slate-400">验收证据：{center.pmFocus.proof}</p>
             <div className="mt-2 rounded-md bg-white/10 px-3 py-2 text-xs leading-5 text-slate-200">
               {center.pmFocus.pipelineValidationHint}
+            </div>
+            <div className="mt-3 rounded-md border border-white/15 bg-white/5 p-3">
+              <div className="text-xs font-medium text-slate-300">失败修复回执验收口径</div>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {failureRepairReceiptAcceptanceCriteria.map((criterion) => (
+                  <span className="rounded-md bg-white/10 px-2 py-1 text-xs text-slate-100" key={criterion}>
+                    {criterion}
+                  </span>
+                ))}
+              </div>
             </div>
           </div>
           <div className="flex shrink-0 flex-col gap-2">

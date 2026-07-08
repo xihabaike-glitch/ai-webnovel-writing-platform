@@ -12,6 +12,17 @@ test("failures page keeps a gate recheck return path visible", () => {
   assert.ok(source.includes("回总闸门复检"));
 });
 
+test("failures page shows failure repair receipt acceptance criteria", () => {
+  assert.ok(source.includes("failureRepairReceiptAcceptanceCriteria"));
+  assert.ok(source.includes("失败修复回执验收口径"));
+  assert.ok(source.includes("失败原因"));
+  assert.ok(source.includes("修复泳道"));
+  assert.ok(source.includes("重试样本"));
+  assert.ok(source.includes("恢复观察"));
+  assert.ok(source.includes("是否暂停批量"));
+  assert.ok(source.includes("failureRepairReceiptAcceptanceCriteria.map"));
+});
+
 test("failures page carries gate return through repair links", () => {
   assert.ok(source.includes("function hrefWithGateReturn"));
   assert.ok(source.includes("href={hrefWithGateReturn(center.pmFocus.actionHref, gateReturn)}"));

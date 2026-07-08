@@ -4656,6 +4656,146 @@ test("buildGateActionReceipt", async (t) => {
     assert.ok(fanqieMarkdown.includes("首日执行闭环：3/3"));
   });
 
+  await t.test("feeds first-day metric recovery back into execution tactic outcomes", () => {
+    function executionTask(input: {
+      projectId: string;
+      suffix: "first-draft" | "first-review" | "first-rewrite";
+      completionEvidence: string;
+      completedAt: string;
+    }) {
+      return {
+        id: `first-day:${input.projectId}:${input.suffix}`,
+        databaseId: `dispatch-db-${input.projectId}-${input.suffix}`,
+        dispatchKey: `first-day:${input.projectId}:${input.suffix}`,
+        projectId: input.projectId,
+        sourceReceiptId: null,
+        platformId: "fanqie",
+        platformName: "番茄小说",
+        stage: "start_first_three_review" as const,
+        state: "completed" as const,
+        priorityScore: 88,
+        ownerRole: "AI 写作主编",
+        title: "番茄小说 首日 AI 执行",
+        detail: "执行首日第一章生成、审稿和二改闭环。",
+        dueLabel: "今天",
+        actionLabel: "查看首日执行",
+        href: `/dispatch?firstDayProject=${input.projectId}#first-day-dispatch`,
+        acceptanceCriteria: ["生成-审稿-二改三段必须全部完成"],
+        evidence: ["知识来源：番茄小说 首章强钩子", "平台反哺：首日先跑第一章小样本"],
+        completionEvidence: input.completionEvidence,
+        reviewLatestAt: input.completedAt,
+        assignedAt: "2026-01-01T00:00:00.000Z",
+        completedAt: input.completedAt,
+        createdAt: "2026-01-01T00:00:00.000Z",
+        updatedAt: input.completedAt,
+      };
+    }
+    function metricsTask(input: {
+      projectId: string;
+      completionEvidence: string;
+      completedAt: string;
+    }) {
+      return {
+        id: `first-day:${input.projectId}:metrics-recovery`,
+        databaseId: `dispatch-db-${input.projectId}-metrics`,
+        dispatchKey: `first-day:${input.projectId}:metrics-recovery`,
+        projectId: input.projectId,
+        sourceReceiptId: null,
+        platformId: "fanqie",
+        platformName: "番茄小说",
+        stage: "start_metrics_recovery" as const,
+        state: "completed" as const,
+        priorityScore: 92,
+        ownerRole: "数据运营",
+        title: "番茄小说 首轮数据回收",
+        detail: "回收首日执行闭环后的首轮平台数据。",
+        dueLabel: "今天",
+        actionLabel: "回填首轮数据",
+        href: `/projects/${input.projectId}#publish-effect-panel`,
+        acceptanceCriteria: ["曝光、点击、收藏、追读必须回填", "按数据决定扩展、观察或暂停"],
+        evidence: ["来源：首日执行闭环", "首轮平台反馈"],
+        completionEvidence: input.completionEvidence,
+        reviewLatestAt: input.completedAt,
+        assignedAt: "2026-01-01T04:00:00.000Z",
+        completedAt: input.completedAt,
+        createdAt: "2026-01-01T04:00:00.000Z",
+        updatedAt: input.completedAt,
+      };
+    }
+    const executionSet = (projectId: string) => [
+      executionTask({
+        projectId,
+        suffix: "first-draft",
+        completionEvidence: "第一章正文已生成。首日闭环证据：执行节点：第一章初稿；执行模型：DeepSeek；初稿质检：86。",
+        completedAt: "2026-01-01T01:00:00.000Z",
+      }),
+      executionTask({
+        projectId,
+        suffix: "first-review",
+        completionEvidence: "第一章审稿完成。首日闭环证据：执行节点：第一章审稿；审稿评分：72；执行模型：Kimi。",
+        completedAt: "2026-01-01T02:00:00.000Z",
+      }),
+      executionTask({
+        projectId,
+        suffix: "first-rewrite",
+        completionEvidence: "第一章二改完成。首日闭环证据：执行节点：第一章二改；执行模型：Claude；二改复检：90。",
+        completedAt: "2026-01-01T03:00:00.000Z",
+      }),
+    ];
+
+    const passTimeline = buildGatePlatformDecisionTimeline({
+      receipts: [],
+      tasks: [
+        ...executionSet("project-pass"),
+        metricsTask({
+          projectId: "project-pass",
+          completionEvidence: "首轮数据已回收：曝光 360，点击率 8%，收藏率 5%，追读率 2.4%，结论：可以进入小样本扩展。",
+          completedAt: "2026-01-01T05:00:00.000Z",
+        }),
+      ],
+      limit: 10,
+    });
+    const watchTimeline = buildGatePlatformDecisionTimeline({
+      receipts: [],
+      tasks: [
+        ...executionSet("project-watch"),
+        metricsTask({
+          projectId: "project-watch",
+          completionEvidence: "首轮数据已回收：曝光 220，点击率 6%，收藏率 3%，追读证据不足，结论：继续观察，补追读证据。",
+          completedAt: "2026-01-01T05:00:00.000Z",
+        }),
+      ],
+      limit: 10,
+    });
+    const blockedTimeline = buildGatePlatformDecisionTimeline({
+      receipts: [],
+      tasks: [
+        ...executionSet("project-blocked"),
+        metricsTask({
+          projectId: "project-blocked",
+          completionEvidence: "首轮数据未过线：曝光 180，点击率 2%，收藏率 1%，追读率 0，结论：暂停，不允许继续放量。",
+          completedAt: "2026-01-01T05:00:00.000Z",
+        }),
+      ],
+      limit: 10,
+    });
+
+    const passExperience = buildGatePlatformTacticExperienceLibrary(passTimeline, 10).items[0];
+    const watchExperience = buildGatePlatformTacticExperienceLibrary(watchTimeline, 10).items[0];
+    const blockedExperience = buildGatePlatformTacticExperienceLibrary(blockedTimeline, 10).items[0];
+
+    assert.equal(passExperience?.status, "usable");
+    assert.equal(passExperience?.tactic, "首日执行小样本扩展");
+    assert.ok(passExperience?.reuseHint.includes("小样本扩展"));
+    assert.ok(passExperience?.evidence.some((line) => line.includes("追读率 2.4%")));
+    assert.equal(watchExperience?.status, "watch");
+    assert.equal(watchExperience?.tactic, "首日执行继续观察");
+    assert.ok(watchExperience?.risk.includes("追读证据不足"));
+    assert.equal(blockedExperience?.status, "blocked");
+    assert.equal(blockedExperience?.tactic, "首日执行暂停避坑");
+    assert.ok(blockedExperience?.risk.includes("暂停"));
+  });
+
   await t.test("classifies recovery scale first-day handoff conclusions in tactic experience", () => {
     function recoveryHandoffTask(input: {
       projectId: string;

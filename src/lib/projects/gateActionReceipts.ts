@@ -7662,6 +7662,34 @@ function firstDayExecutionReusableEvidence(evidence: string[]) {
   ].filter((line): line is string => Boolean(line)))).slice(0, 12);
 }
 
+function completedFirstDayMetricRecoveryFromTimeline(events: GatePlatformDecisionTimelineEvent[]) {
+  const metricEvents = events
+    .filter((event) => /^task:first-day:[^:]+:metrics-recovery$/u.test(event.id) && event.label === "派单完成")
+    .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime());
+  const event = metricEvents[0] ?? null;
+  if (!event) return null;
+
+  const text = event.detail;
+  const outcome: GatePlatformTacticExperienceStatus = /暂停|不允许继续|未过线|失败|追读率\s*0(?:\.0+)?\s*%?/u.test(text)
+    ? "blocked"
+    : /继续观察|证据不足|追读证据不足|补追读/u.test(text)
+      ? "watch"
+      : /可以进入小样本扩展|进入小样本扩展|小样本扩展|通过|已过线|追读率\s*(?:[2-9](?:\.\d+)?|[1-9]\d+(?:\.\d+)?)\s*%/u.test(text)
+        ? "usable"
+        : "watch";
+  const conclusion = markdownLine(event.detail);
+
+  return {
+    event,
+    outcome,
+    conclusion,
+    evidence: Array.from(new Set([
+      `首轮数据回收：${conclusion}`,
+      ...event.evidence,
+    ])).slice(0, 5),
+  };
+}
+
 function structuredRecoveryFollowupEvidence(detail: string) {
   const scope = completionValueAfterLabel("加码范围", detail);
   const baseline = completionValueAfterLabel("基准版本", detail);
@@ -7735,6 +7763,7 @@ export function buildGatePlatformTacticExperienceLibrary(
     const completedRecheckReview = completedRecheckReviewFromTimeline(item);
     const completedFirstDayHandoff = completedFirstDayHandoffFromTimeline(item.events);
     const completedFirstDayExecution = completedFirstDayExecutionFromTimeline(item.events);
+    const completedFirstDayMetricRecovery = completedFirstDayMetricRecoveryFromTimeline(item.events);
     const completedRecoveryFollowup = completedRecoveryFollowupFromTimeline(item.events);
     const completedAiPipelineRecovery = completedAiPipelineRecoveryFromTimeline(item.events);
     const evidenceLoopRecheck = evidenceLoopRecheckFromTimeline(item);
@@ -7865,6 +7894,39 @@ export function buildGatePlatformTacticExperienceLibrary(
           ...completedRecoveryFollowup.evidence,
           ...base.evidence,
         ].slice(0, 5),
+      };
+    }
+
+    if (completedFirstDayMetricRecovery && completedFirstDayExecution?.allStagesCompleted) {
+      const outcome = completedFirstDayMetricRecovery.outcome;
+      const conclusion = completedFirstDayMetricRecovery.conclusion;
+      return {
+        ...base,
+        status: outcome,
+        label: outcome === "blocked" ? "避坑样本" : outcome === "usable" ? "可复用打法" : "观察样本",
+        tactic: outcome === "blocked" ? "首日执行暂停避坑" : outcome === "usable" ? "首日执行小样本扩展" : "首日执行继续观察",
+        lesson: outcome === "blocked"
+          ? `${item.platformName} 首日执行闭环后的首轮数据没有过线，这条写审改路线要暂停扩展，先重做开头、平台包或前三章兑现。`
+          : outcome === "usable"
+            ? `${item.platformName} 首日执行闭环已经拿到首轮平台数据正反馈，可以进入谨慎小样本扩展。`
+            : `${item.platformName} 首日执行闭环已经回收首轮数据，但追读或转化证据还不够，只能继续观察。`,
+        reuseHint: outcome === "blocked"
+          ? "同类新项目先不要复用这条首日执行路线，重做开头承诺、审稿标准和平台包装后再跑 1 章小样本。"
+          : outcome === "usable"
+            ? "同类新项目可复用生成-审稿-二改顺序，并进入小样本扩展；扩展前仍要保留曝光、点击、收藏、追读对照。"
+            : "同类新项目只能复用生成-审稿-二改检查清单，先补追读证据，不要扩大批量。",
+        risk: outcome === "usable"
+          ? "首轮数据只证明小样本过线，不等于稳定放量；下一轮仍要看连续曝光、点击、收藏和追读。"
+          : conclusion,
+        sourceLabel: outcome === "blocked" ? "首日执行避坑" : outcome === "usable" ? "首日执行数据过线" : "首日执行数据观察",
+        href: completedFirstDayMetricRecovery.event.href,
+        evidence: [
+          `首日执行数据回收：${outcome === "blocked" ? "暂停" : outcome === "usable" ? "小样本扩展" : "继续观察"}`,
+          ...completedFirstDayMetricRecovery.evidence,
+          `首日执行闭环：${completedFirstDayExecution.completedCount}/3`,
+          ...completedFirstDayExecution.evidence,
+          ...base.evidence,
+        ].slice(0, 12),
       };
     }
 

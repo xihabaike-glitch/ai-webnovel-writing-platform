@@ -181,6 +181,18 @@ const pendingDispatchProject: ProjectListProject = {
   }],
 };
 
+const modelRouteRepairProject: ProjectListProject = {
+  ...completeProject,
+  id: "model-route-repair-project",
+  title: "模型路线待修复",
+  updatedAt: "2026-01-06T00:00:00.000Z",
+  gateDispatchTasks: [{
+    dispatchKey: "model-route-repair:model-route-repair-project:123",
+    state: "assigned",
+    completionEvidence: "",
+  }],
+};
+
 test("buildProjectListDashboard", async (t) => {
   await t.test("sorts projects by operational urgency and summarizes portfolio metrics", () => {
     const dashboard = buildProjectListDashboard([completeProject, emptyProject], [
@@ -586,6 +598,39 @@ test("buildProjectListDashboard", async (t) => {
     assert.equal(dashboard.realSampleAcceptanceQueue[0]?.actionHref, "/projects/empty-project");
     assert.ok(dashboard.realSampleAcceptanceQueue[0]?.reason.includes("开书骨架"));
     assert.ok(dashboard.realSampleAcceptanceQueue[2]?.reason.includes("总闸门"));
+  });
+
+  await t.test("summarizes production closure lanes across the project portfolio", () => {
+    const dashboard = buildProjectListDashboard([emptyProject, completeProject, handoffBlockedProject, modelRouteRepairProject], [
+      {
+        id: "provider-1",
+        providerId: "mock",
+        displayName: "Mock",
+        defaultModel: "mock-novel",
+        enabled: true,
+        encryptedApiKey: "secret",
+      },
+    ]);
+
+    assert.deepEqual(
+      dashboard.productionClosureSummary.lanes.map((lane) => lane.id),
+      ["batch-health", "ai-pipeline", "model-route"],
+    );
+    assert.ok(dashboard.productionClosureSummary.headline.includes("组合生产闭环"));
+    const batch = dashboard.productionClosureSummary.lanes.find((lane) => lane.id === "batch-health");
+    const aiPipeline = dashboard.productionClosureSummary.lanes.find((lane) => lane.id === "ai-pipeline");
+    const modelRoute = dashboard.productionClosureSummary.lanes.find((lane) => lane.id === "model-route");
+
+    assert.equal(batch?.allowCount, 0);
+    assert.equal(batch?.watchCount, 1);
+    assert.equal(batch?.blockCount, 3);
+    assert.equal(aiPipeline?.allowCount, 1);
+    assert.equal(aiPipeline?.watchCount, 2);
+    assert.equal(aiPipeline?.blockCount, 1);
+    assert.equal(modelRoute?.primaryProjectId, "model-route-repair-project");
+    assert.equal(modelRoute?.primaryProjectTitle, "模型路线待修复");
+    assert.equal(modelRoute?.actionLabel, "处理模型路线");
+    assert.equal(modelRoute?.actionHref, "/dispatch#dispatch-model-route-repair:model-route-repair-project:123");
   });
 
   await t.test("keeps a validation receipt on each portfolio pipeline filter", () => {

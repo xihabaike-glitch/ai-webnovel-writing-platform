@@ -46,6 +46,16 @@ test("projects page shows the prioritized real sample acceptance queue", () => {
   assert.ok(source.includes("sample.actionLabel"));
 });
 
+test("projects page shows the portfolio production closure summary", () => {
+  assert.ok(source.includes("dashboard.productionClosureSummary"));
+  assert.ok(source.includes("组合生产闭环"));
+  assert.ok(source.includes("productionLane.allowCount"));
+  assert.ok(source.includes("productionLane.watchCount"));
+  assert.ok(source.includes("productionLane.blockCount"));
+  assert.ok(source.includes("productionLane.actionHref"));
+  assert.ok(source.includes("productionLane.actionLabel"));
+});
+
 test("projects page renders role closure progress on project cards", () => {
   assert.ok(source.includes('{ dispatchKey: { startsWith: "role-intent:" } }'));
   assert.ok(source.includes("item.roleClosureProgress"));

@@ -59,7 +59,41 @@ export interface ProjectListItem {
   continuationStatus: "first_day_active" | "ready" | "blocked" | "complete";
   pipelineProof: ProjectListPipelineProof;
   realSampleValidation: ProjectListRealSampleValidation;
+  productionClosure: ProjectListProductionClosureItem[];
   roleClosureProgress: ProjectListRoleClosureProgress | null;
+}
+
+export type ProjectListProductionClosureId = "batch-health" | "ai-pipeline" | "model-route";
+export type ProjectListProductionClosureStatus = "allow" | "watch" | "block";
+
+export interface ProjectListProductionClosureItem {
+  id: ProjectListProductionClosureId;
+  label: string;
+  status: ProjectListProductionClosureStatus;
+  statusLabel: string;
+  detail: string;
+  actionLabel: string;
+  actionHref: string;
+}
+
+export interface ProjectListProductionClosureLane {
+  id: ProjectListProductionClosureId;
+  label: string;
+  allowCount: number;
+  watchCount: number;
+  blockCount: number;
+  primaryProjectId: string | null;
+  primaryProjectTitle: string | null;
+  statusLabel: string;
+  detail: string;
+  actionLabel: string;
+  actionHref: string;
+}
+
+export interface ProjectListProductionClosureSummary {
+  headline: string;
+  totalProjects: number;
+  lanes: ProjectListProductionClosureLane[];
 }
 
 export interface ProjectListRoleClosureLane {
@@ -187,6 +221,7 @@ export interface ProjectListDashboard {
   pipelineProofSummary: ProjectListPipelineProofSummary;
   pipelineAcceptanceSummary: ProjectListPipelineAcceptanceSummary;
   realSampleAcceptanceQueue: ProjectListRealSampleAcceptanceQueueItem[];
+  productionClosureSummary: ProjectListProductionClosureSummary;
   roleEntrypoints: ProjectRoleWorkflowEntrypoint[];
   items: ProjectListItem[];
 }
@@ -640,6 +675,93 @@ function buildRealSampleValidation(input: {
   };
 }
 
+function closureStatusLabel(status: ProjectListProductionClosureStatus) {
+  if (status === "allow") return "可推进";
+  if (status === "watch") return "先观察";
+  return "先修复";
+}
+
+function latestProjectDispatch(project: ProjectListProject, prefix: string) {
+  return (project.gateDispatchTasks ?? []).find((task) => task.dispatchKey.startsWith(prefix)) ?? null;
+}
+
+function buildProjectListProductionClosure(input: {
+  project: ProjectListProject;
+  modelAuditScore: number;
+  realSampleValidation: ProjectListRealSampleValidation;
+}): ProjectListProductionClosureItem[] {
+  const baseHref = `/projects/${input.project.id}`;
+  const sampleReady = hasUsableOpeningSample(input.project);
+  const reviewReady = hasSucceededTask(input.project, "chapter_review");
+  const secondPassReady = hasSucceededTask(input.project, "chapter_second_pass");
+  const dispatchAccepted = hasAcceptedDispatch(input.project);
+  const modelRouteDispatch = latestProjectDispatch(input.project, `model-route-repair:${input.project.id}:`);
+  const modelRouteDispatchAccepted = modelRouteDispatch?.state === "completed" && modelRouteDispatch.completionEvidence.trim().length >= 20;
+  const modelRouteStatus: ProjectListProductionClosureStatus = modelRouteDispatch
+    ? modelRouteDispatchAccepted ? "allow" : "block"
+    : input.modelAuditScore >= 75
+      ? "allow"
+      : input.project.aiTasks.some((task) => task.status === "succeeded")
+        ? "watch"
+        : "block";
+  const batchStatus: ProjectListProductionClosureStatus = input.realSampleValidation.status === "ready_for_publish_review"
+    ? "allow"
+    : input.realSampleValidation.status === "ready_for_gate"
+      ? "watch"
+      : "block";
+  const aiPipelineStatus: ProjectListProductionClosureStatus = reviewReady && secondPassReady && dispatchAccepted
+    ? "allow"
+    : sampleReady && (reviewReady || secondPassReady || dispatchAccepted)
+      ? "watch"
+      : "block";
+
+  return [
+    {
+      id: "batch-health",
+      label: "批量健康",
+      status: batchStatus,
+      statusLabel: closureStatusLabel(batchStatus),
+      detail: input.realSampleValidation.headline,
+      actionLabel: input.realSampleValidation.nextActionLabel,
+      actionHref: input.realSampleValidation.nextActionHref,
+    },
+    {
+      id: "ai-pipeline",
+      label: "AI 写审改",
+      status: aiPipelineStatus,
+      statusLabel: closureStatusLabel(aiPipelineStatus),
+      detail: aiPipelineStatus === "allow"
+        ? "首章样本、审稿、二改和派单验收已经形成回流。"
+        : aiPipelineStatus === "watch"
+          ? "AI 写审改链路已有样本，但还缺二改或人工验收闭环。"
+          : "AI 写审改链路还缺可用样本、审稿或派单证据。",
+      actionLabel: aiPipelineStatus === "allow" ? "查看写审改" : "补写审改",
+      actionHref: aiPipelineStatus === "block" && !sampleReady
+        ? baseHref
+        : `${baseHref}#ai-pipeline`,
+    },
+    {
+      id: "model-route",
+      label: "模型路线",
+      status: modelRouteStatus,
+      statusLabel: closureStatusLabel(modelRouteStatus),
+      detail: modelRouteDispatch
+        ? modelRouteDispatchAccepted
+          ? modelRouteDispatch.completionEvidence.trim()
+          : "模型路线修复派单已生成，但还缺完成依据和复检证据。"
+        : modelRouteStatus === "allow"
+          ? "模型任务审计分已过线，继续保留小样本复检。"
+          : input.project.aiTasks.some((task) => task.status === "succeeded")
+            ? "已有模型任务记录，但还需要路线复检确认。"
+            : "还没有足够模型执行证据，先补模型路线或小样本。",
+      actionLabel: modelRouteDispatch && !modelRouteDispatchAccepted ? "处理模型路线" : "查看模型路线",
+      actionHref: modelRouteDispatch && !modelRouteDispatchAccepted
+        ? `/dispatch#dispatch-${modelRouteDispatch.dispatchKey}`
+        : `${baseHref}#ai-pipeline`,
+    },
+  ];
+}
+
 function buildProjectListPmFocus(items: ProjectListItem[]): ProjectListPmFocus {
   const scopeLabel = `${platformDeliveryScope.statusLabel} · ${platformDeliveryScope.expansionLabel}`;
   if (items.length === 0) {
@@ -794,6 +916,68 @@ function buildRealSampleAcceptanceQueue(items: ProjectListItem[]): ProjectListRe
     .sort((left, right) => left.priority - right.priority)
     .slice(0, 5)
     .map(({ priority: _priority, ...item }) => item);
+}
+
+function productionClosurePriority(status: ProjectListProductionClosureStatus) {
+  if (status === "block") return 0;
+  if (status === "watch") return 1;
+  return 2;
+}
+
+function productionClosureActionPriority(closure: ProjectListProductionClosureItem) {
+  if (closure.id === "model-route" && closure.actionHref.startsWith("/dispatch#dispatch-model-route-repair:")) return -1;
+  return 0;
+}
+
+function buildProductionClosureSummary(items: ProjectListItem[]): ProjectListProductionClosureSummary {
+  const laneSeeds: Array<{ id: ProjectListProductionClosureId; label: string }> = [
+    { id: "batch-health", label: "批量健康" },
+    { id: "ai-pipeline", label: "AI 写审改" },
+    { id: "model-route", label: "模型路线" },
+  ];
+  const lanes = laneSeeds.map((seed) => {
+    const laneItems = items
+      .map((item) => ({
+        project: item,
+        closure: item.productionClosure.find((closure) => closure.id === seed.id),
+      }))
+      .filter((entry): entry is { project: ProjectListItem; closure: ProjectListProductionClosureItem } => Boolean(entry.closure));
+    const primary = [...laneItems].sort((left, right) => (
+      productionClosureActionPriority(left.closure) - productionClosureActionPriority(right.closure)
+      || productionClosurePriority(left.closure.status) - productionClosurePriority(right.closure.status)
+      || left.project.healthScore - right.project.healthScore
+      || new Date(right.project.updatedAt).getTime() - new Date(left.project.updatedAt).getTime()
+    ))[0] ?? null;
+
+    return {
+      id: seed.id,
+      label: seed.label,
+      allowCount: laneItems.filter((entry) => entry.closure.status === "allow").length,
+      watchCount: laneItems.filter((entry) => entry.closure.status === "watch").length,
+      blockCount: laneItems.filter((entry) => entry.closure.status === "block").length,
+      primaryProjectId: primary?.project.id ?? null,
+      primaryProjectTitle: primary?.project.title ?? null,
+      statusLabel: primary?.closure.statusLabel ?? "暂无作品",
+      detail: primary?.closure.detail ?? "还没有作品进入这条闭环。",
+      actionLabel: primary?.closure.actionLabel ?? "创建作品",
+      actionHref: primary?.closure.actionHref ?? "#create-project",
+    } satisfies ProjectListProductionClosureLane;
+  });
+  const blockedLane = lanes.find((lane) => lane.blockCount > 0);
+  const watchLane = lanes.find((lane) => lane.watchCount > 0);
+  const focusLane = blockedLane ?? watchLane ?? lanes[0];
+
+  return {
+    headline: items.length === 0
+      ? "组合生产闭环：还没有作品样本。"
+      : focusLane.blockCount > 0
+        ? `组合生产闭环：先处理「${focusLane.label}」的 ${focusLane.blockCount} 个阻塞。`
+        : focusLane.watchCount > 0
+          ? `组合生产闭环：${focusLane.label} 还有 ${focusLane.watchCount} 本需要观察。`
+          : "组合生产闭环：三条生产线都可以继续小步推进。",
+    totalProjects: items.length,
+    lanes,
+  };
 }
 
 export function buildProjectRoleWorkflowEntrypoints(): ProjectRoleWorkflowEntrypoint[] {
@@ -995,6 +1179,11 @@ export function buildProjectListDashboard(
       supportPercent,
       continuationStatus: continuation.status,
     });
+    const productionClosure = buildProjectListProductionClosure({
+      project,
+      modelAuditScore: modelAudit.score,
+      realSampleValidation,
+    });
     const roleClosureProgress = buildProjectListRoleClosureProgress(project);
     const rawHealthScore = Math.round(average([
       firstDay.progressPercent,
@@ -1057,6 +1246,7 @@ export function buildProjectListDashboard(
         continuationStatus: continuation.status,
       }),
       realSampleValidation,
+      productionClosure,
       roleClosureProgress,
     };
   }).sort((left, right) => (
@@ -1080,6 +1270,7 @@ export function buildProjectListDashboard(
     pipelineProofSummary: buildPipelineProofSummary(items),
     pipelineAcceptanceSummary: buildPipelineAcceptanceSummary(items),
     realSampleAcceptanceQueue: buildRealSampleAcceptanceQueue(items),
+    productionClosureSummary: buildProductionClosureSummary(items),
     roleEntrypoints: buildProjectRoleWorkflowEntrypoints(),
     items,
   };

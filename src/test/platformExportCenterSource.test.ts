@@ -53,6 +53,9 @@ test("platform export center renders the final delivery checklist", () => {
   assert.ok(source.includes("url.searchParams.set(\"finalDeliveryFocus\", finalDeliveryFocus);"));
   assert.ok(source.includes("source\", \"final-delivery-receipt"));
   assert.ok(source.includes("persistGateActionReceipt(receipt"));
+  assert.ok(source.includes("await persistGateActionReceipt(receipt).catch(() => null);"));
+  assert.ok(source.includes("if (returnHref) {\n      router.push(returnHref);\n      return;\n    }"));
+  assert.ok(source.includes("await loadCenter({ keepMessage: true });"));
   assert.ok(source.includes("router.push(returnHref"));
 });
 

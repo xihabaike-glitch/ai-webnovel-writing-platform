@@ -2589,11 +2589,13 @@ export function PlatformExportCenterPanel({
     });
     addGateActionReceipt(receipt);
     setMessage(`${selectedPackage.platformName}「${item.label}」最终交付回执已写回总闸门。`);
+    await persistGateActionReceipt(receipt).catch(() => null);
     const returnHref = finalDeliveryGateReturnHref(gateReturnHref, projectId, item.id);
     if (returnHref) {
-      await persistGateActionReceipt(receipt).catch(() => null);
       router.push(returnHref);
+      return;
     }
+    await loadCenter({ keepMessage: true });
   }
 
   async function downloadMarkdown() {

@@ -1356,6 +1356,9 @@ export interface GateBatchTacticEffectItem {
   id: string;
   status: GateBatchTacticEffectStatus;
   label: string;
+  scaleDecisionLabel: string;
+  scaleDecisionTone: "allow" | "watch" | "block";
+  scaleDecisionDetail: string;
   tacticTitle: string;
   tacticLabel: string;
   primaryTactic: string;
@@ -8329,6 +8332,28 @@ function thirdRoundBatchContextText(mode: ReturnType<typeof batchTacticThirdRoun
   return "";
 }
 
+function batchTacticScaleDecision(status: GateBatchTacticEffectStatus) {
+  if (status === "blocked") {
+    return {
+      scaleDecisionLabel: "禁止放大",
+      scaleDecisionTone: "block" as const,
+      scaleDecisionDetail: "先拆失败样本和低分原因，修复证据没闭合前不要继续放大。",
+    };
+  }
+  if (status === "watch") {
+    return {
+      scaleDecisionLabel: "继续观察",
+      scaleDecisionTone: "watch" as const,
+      scaleDecisionDetail: "样本还薄，只能小批验证；通过线、复查证据和下一轮真实数据齐全前不要放大。",
+    };
+  }
+  return {
+    scaleDecisionLabel: "允许小步加码",
+    scaleDecisionTone: "allow" as const,
+    scaleDecisionDetail: "可以小步加码，但要保留下一批真实成功率、质量、成本和失败回执。",
+  };
+}
+
 export function buildGateBatchTacticEffectReview(
   receipts: GateActionReceipt[],
   limit = 6,
@@ -8386,6 +8411,7 @@ export function buildGateBatchTacticEffectReview(
       : recoveryBatches > 0
       ? status === "usable" ? "恢复放量打法" : status === "blocked" ? "恢复放量避坑" : "恢复放量观察"
       : thirdRoundBatchTacticLabel(status, thirdRoundMode);
+    const scaleDecision = batchTacticScaleDecision(status);
     const evidence = sortedReceipts.slice(0, 3).map((receipt) => {
       const quality = receipt.batchEffectSummary?.averageQualityScore ?? "缺";
       const context = [batchContextText(receipt.batchContext), thirdRoundBatchContextText(thirdRoundMode)].filter(Boolean).join("｜");
@@ -8418,6 +8444,7 @@ export function buildGateBatchTacticEffectReview(
       id,
       status,
       label,
+      ...scaleDecision,
       tacticTitle: group.tactic.title,
       tacticLabel: group.tactic.label || "首轮打法",
       primaryTactic: group.tactic.primaryTactic,

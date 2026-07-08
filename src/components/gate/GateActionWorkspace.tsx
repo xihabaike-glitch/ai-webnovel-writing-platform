@@ -364,6 +364,12 @@ function batchTacticEffectLabel(status: GateBatchTacticEffectStatus) {
   return "可复用";
 }
 
+function batchTacticScaleDecisionClass(tone: "allow" | "watch" | "block") {
+  if (tone === "allow") return "border-emerald-200 bg-white/70 text-emerald-900";
+  if (tone === "watch") return "border-amber-200 bg-white/70 text-amber-900";
+  return "border-rose-200 bg-white/70 text-rose-900";
+}
+
 export function GateActionWorkspace({
   actions,
   failureRepairBatch,
@@ -1846,7 +1852,9 @@ export function GateActionWorkspace({
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="font-medium">{item.tacticLabel}</span>
                     <span className="rounded-md bg-white/70 px-2 py-1 text-xs font-medium">{batchTacticEffectLabel(item.status)}</span>
+                    <span className={`rounded-md border px-2 py-1 text-xs font-semibold ${batchTacticScaleDecisionClass(item.scaleDecisionTone)}`}>{item.scaleDecisionLabel}</span>
                   </div>
+                  <p className="mt-2 rounded-md bg-white/70 p-2 text-xs leading-5 opacity-85">{item.scaleDecisionDetail}</p>
                   <div className="mt-3 rounded-md bg-white/70 p-3">
                     <div className="text-xs font-medium opacity-70">开头动作</div>
                     <p className="mt-1 font-medium leading-6">{item.openingMove || item.primaryTactic}</p>

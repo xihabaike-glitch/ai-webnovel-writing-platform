@@ -465,6 +465,9 @@ test("buildGateActionReceipt", async (t) => {
     assert.equal(usable?.averageQualityScore, 89);
     assert.equal(usable?.recoveryBatches, 0);
     assert.equal(blocked?.status, "blocked");
+    assert.equal(blocked?.scaleDecisionLabel, "禁止放大");
+    assert.equal(blocked?.scaleDecisionTone, "block");
+    assert.ok(blocked?.scaleDecisionDetail.includes("先拆失败样本"));
     assert.ok(blocked?.nextAction.includes("暂停"));
   });
 
@@ -501,6 +504,9 @@ test("buildGateActionReceipt", async (t) => {
     assert.equal(receipt.batchContext?.scaleGate, "cleared");
     assert.equal(review.items[0]?.status, "watch");
     assert.equal(review.items[0]?.label, "恢复放量观察");
+    assert.equal(review.items[0]?.scaleDecisionLabel, "继续观察");
+    assert.equal(review.items[0]?.scaleDecisionTone, "watch");
+    assert.ok(review.items[0]?.scaleDecisionDetail.includes("不要放大"));
     assert.equal(review.items[0]?.recoveryBatches, 1);
     assert.ok(review.items[0]?.evidence[0].includes("恢复放量"));
     assert.ok(review.items[0]?.nextAction.includes("至少再跑一轮"));
@@ -541,6 +547,9 @@ test("buildGateActionReceipt", async (t) => {
 
     assert.equal(review.items[0]?.status, "usable");
     assert.equal(review.items[0]?.label, "恢复放量打法");
+    assert.equal(review.items[0]?.scaleDecisionLabel, "允许小步加码");
+    assert.equal(review.items[0]?.scaleDecisionTone, "allow");
+    assert.ok(review.items[0]?.scaleDecisionDetail.includes("保留下一批"));
     assert.equal(review.items[0]?.recoveryBatches, 2);
     assert.ok(review.items[0]?.nextAction.includes("新项目仍先跑小样本"));
   });

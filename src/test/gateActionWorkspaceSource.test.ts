@@ -21,3 +21,9 @@ test("gate action workspace keeps main workspace navigation returnable", () => {
   assert.ok(workspaceSource.includes("href={hrefWithGateReturn(receipt.href, gateReturnHref)}"));
   assert.ok(workspaceSource.includes("href={gateReturnHref ?? \"/gate\"}"));
 });
+
+test("gate action workspace shows batch tactic scale decisions", () => {
+  assert.ok(workspaceSource.includes("function batchTacticScaleDecisionClass"));
+  assert.ok(workspaceSource.includes("{item.scaleDecisionLabel}"));
+  assert.ok(workspaceSource.includes("{item.scaleDecisionDetail}"));
+});

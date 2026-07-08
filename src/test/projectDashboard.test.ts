@@ -193,6 +193,11 @@ test("buildProjectDashboard", async (t) => {
     assert.ok(blocked.realSampleAcceptanceSheet.verdict.includes("角色闭环"));
     assert.ok(blocked.realSampleAcceptanceSheet.actionHref.includes("#story-structure"));
     assert.ok(blocked.realSampleAcceptanceSheet.steps.find((step) => step.id === "role_dispatch")?.evidence.includes("资料官"));
+    assert.equal(blocked.realSampleAcceptanceSheet.roleClosureProgress?.completedRoles, 1);
+    assert.equal(blocked.realSampleAcceptanceSheet.roleClosureProgress?.totalRoles, 3);
+    assert.deepEqual(blocked.realSampleAcceptanceSheet.roleClosureProgress?.completedLabels, ["结构主编"]);
+    assert.deepEqual(blocked.realSampleAcceptanceSheet.roleClosureProgress?.missingLabels, ["资料官", "平台包装"]);
+    assert.ok(blocked.realSampleAcceptanceSheet.roleClosureProgress?.headline.includes("角色闭环 1/3"));
 
     const passed = buildProjectDashboard({
       ...baseInput,
@@ -214,5 +219,8 @@ test("buildProjectDashboard", async (t) => {
     assert.equal(passed.realSampleAcceptanceSheet.currentStepId, "publish_package");
     assert.ok(passed.realSampleAcceptanceSheet.verdict.includes("已闭合"));
     assert.ok(passed.realSampleAcceptanceSheet.steps.find((step) => step.id === "role_dispatch")?.evidence.includes("结构主编、资料官、平台包装"));
+    assert.equal(passed.realSampleAcceptanceSheet.roleClosureProgress?.completedRoles, 3);
+    assert.equal(passed.realSampleAcceptanceSheet.roleClosureProgress?.missingLabels.length, 0);
+    assert.ok(passed.realSampleAcceptanceSheet.roleClosureProgress?.headline.includes("三类角色已闭合"));
   });
 });

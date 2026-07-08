@@ -62,6 +62,22 @@ export interface ProjectAcceptanceStep {
   href: string;
 }
 
+export interface ProjectRoleClosureLane {
+  id: "story-structure" | "context-recall" | "platform-export";
+  label: string;
+  status: "done" | "missing";
+  evidence: string;
+}
+
+export interface ProjectRoleClosureProgress {
+  headline: string;
+  completedRoles: number;
+  totalRoles: number;
+  completedLabels: string[];
+  missingLabels: string[];
+  lanes: ProjectRoleClosureLane[];
+}
+
 export interface ProjectRealSampleAcceptanceSheet {
   title: string;
   verdict: string;
@@ -69,6 +85,7 @@ export interface ProjectRealSampleAcceptanceSheet {
   actionLabel: string;
   actionHref: string;
   steps: ProjectAcceptanceStep[];
+  roleClosureProgress: ProjectRoleClosureProgress | null;
 }
 
 export interface ProjectDashboardSummary {
@@ -117,21 +134,39 @@ function buildRoleDispatchAcceptance(input: ProjectDashboardInput) {
       : task.dispatchKey.startsWith("role-intent:")
   ));
   const active = roleDispatchTasks.length > 0;
-  const completedLabels = requiredRoleDispatchIntents
-    .filter((intent) => roleDispatchTasks.some((task) => (
+  const lanes = requiredRoleDispatchIntents.map((intent) => {
+    const completedTask = roleDispatchTasks.find((task) => (
       task.dispatchKey.startsWith(roleDispatchPrefix(input.projectId, intent.id))
       && hasCompletedDispatchEvidence(task)
-    )))
-    .map((intent) => intent.label);
-  const missingLabels = requiredRoleDispatchIntents
-    .filter((intent) => !completedLabels.includes(intent.label))
-    .map((intent) => intent.label);
+    ));
+    return {
+      id: intent.id,
+      label: intent.label,
+      status: completedTask ? "done" : "missing",
+      evidence: completedTask?.completionEvidence.trim() || `${intent.label}还缺完成依据。`,
+    } satisfies ProjectRoleClosureLane;
+  });
+  const completedLabels = lanes.filter((lane) => lane.status === "done").map((lane) => lane.label);
+  const missingLabels = lanes.filter((lane) => lane.status === "missing").map((lane) => lane.label);
+  const roleClosureProgress: ProjectRoleClosureProgress | null = active
+    ? {
+      headline: missingLabels.length === 0
+        ? `角色闭环 ${completedLabels.length}/${lanes.length}：三类角色已闭合`
+        : `角色闭环 ${completedLabels.length}/${lanes.length}：还缺${missingLabels.join("、")}`,
+      completedRoles: completedLabels.length,
+      totalRoles: lanes.length,
+      completedLabels,
+      missingLabels,
+      lanes,
+    }
+    : null;
 
   return {
     active,
     done: active && missingLabels.length === 0,
     completedLabels,
     missingLabels,
+    roleClosureProgress,
   };
 }
 
@@ -244,6 +279,7 @@ function buildProjectRealSampleAcceptanceSheet(input: ProjectDashboardInput): Pr
     actionLabel: current.status === "done" ? "复查发布包" : `处理${current.label}`,
     actionHref: current.href,
     steps,
+    roleClosureProgress: roleDispatchAcceptance.roleClosureProgress,
   };
 }
 

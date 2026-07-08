@@ -51,6 +51,17 @@ test("project detail role navigator surfaces role dispatch completion evidence",
   assert.ok(projectPage.includes("hrefWithGateReturn(`/dispatch#dispatch-${roleDispatchEvidence.dispatchKey}`, gateReturn)"));
 });
 
+test("project detail role navigator renders shared role closure progress", () => {
+  const projectPage = readFileSync("src/app/projects/[projectId]/page.tsx", "utf8");
+
+  assert.ok(projectPage.includes("dashboard.realSampleAcceptanceSheet.roleClosureProgress"));
+  assert.ok(projectPage.includes("角色闭环进度"));
+  assert.ok(projectPage.includes("roleClosureProgress.headline"));
+  assert.ok(projectPage.includes("roleClosureProgress.lanes.map"));
+  assert.ok(projectPage.includes("lane.status === \"done\""));
+  assert.ok(projectPage.includes("lane.evidence"));
+});
+
 test("project detail page renders the single-project acceptance sheet", () => {
   const projectPage = readFileSync("src/app/projects/[projectId]/page.tsx", "utf8");
 

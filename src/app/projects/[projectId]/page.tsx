@@ -608,6 +608,7 @@ export default async function ProjectPage({
         return [roleDispatchEvidenceKey(intentId, roleId), task] as const;
       }),
   );
+  const roleClosureProgress = dashboard.realSampleAcceptanceSheet.roleClosureProgress;
 
   return (
     <AppShell>
@@ -637,6 +638,29 @@ export default async function ProjectPage({
               回到参考库
             </Link>
           </div>
+          {roleClosureProgress ? (
+            <div className="mb-3 rounded-md border border-slate-200 bg-slate-50 p-3 text-sm">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <div className="text-xs font-medium text-slate-500">角色闭环进度</div>
+                  <div className="mt-1 font-semibold text-slate-950">{roleClosureProgress.headline}</div>
+                </div>
+                <div className="text-xs font-medium text-slate-500">
+                  {roleClosureProgress.completedRoles}/{roleClosureProgress.totalRoles} 已回填
+                </div>
+              </div>
+              <div className="mt-3 grid gap-2 md:grid-cols-3">
+                {roleClosureProgress.lanes.map((lane) => (
+                  <div className="rounded-md bg-white px-3 py-2 text-xs leading-5" key={lane.id}>
+                    <div className={lane.status === "done" ? "font-medium text-emerald-700" : "font-medium text-amber-700"}>
+                      {lane.status === "done" ? "已回填" : "待补齐"} · {lane.label}
+                    </div>
+                    <p className="mt-1 text-slate-600">{lane.evidence}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
           <div className="grid gap-3 md:grid-cols-3">
             {roleEntrypoints.map((entry) => {
               const roleDispatchEvidence = roleDispatchEvidenceByIntent.get(

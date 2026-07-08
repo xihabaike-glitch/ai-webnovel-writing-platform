@@ -30,6 +30,8 @@ test("dispatch page shows dispatch receipt closeout before returning to gate", (
   assert.ok(source.includes("回总闸门判断"));
   assert.ok(source.includes("未闭环派单"));
   assert.ok(source.includes("下一刀"));
+  assert.ok(source.includes("/gate#pipeline-final-review"));
+  assert.ok(source.includes("查看最终交付正式放行卡"));
 });
 
 test("dispatch page exposes a task center anchor for role dispatch evidence", () => {

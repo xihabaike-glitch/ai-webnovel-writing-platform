@@ -223,6 +223,14 @@ test("tasks page surfaces first-day scale batch receipts as a follow-up card", (
   assert.ok(source.includes("firstDayScaleBatchRecord.decisionActionLabel"));
 });
 
+test("tasks page mirrors scale gate decision labels from the gate workspace", () => {
+  assert.ok(source.includes("function scaleGateDecisionLabel"));
+  assert.ok(source.includes("if (riskLevel === \"blocked\") return \"禁止放大\";"));
+  assert.ok(source.includes("if (scaleGate === \"cleared\") return \"允许小步加码\";"));
+  assert.ok(source.includes("if (scaleGate === \"sample_only\") return \"继续观察\";"));
+  assert.ok(source.includes("{scaleGateDecisionLabel(entry.scaleGate, entry.riskLevel)}"));
+});
+
 test("tasks page runs any queued platform action with the action button", () => {
   assert.ok(source.includes("{entry.effectAction ? ("));
   assert.ok(source.includes("action={entry.effectAction}"));

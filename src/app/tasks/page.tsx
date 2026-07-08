@@ -71,6 +71,13 @@ function scaleGateLabel(scaleGate: QueueItem["scaleGate"]) {
   return "标准批次";
 }
 
+function scaleGateDecisionLabel(scaleGate: QueueItem["scaleGate"], riskLevel: QueueItem["riskLevel"]) {
+  if (riskLevel === "blocked") return "禁止放大";
+  if (scaleGate === "cleared") return "允许小步加码";
+  if (scaleGate === "sample_only") return "继续观察";
+  return "标准生产";
+}
+
 function executionBatchModeClass(tone: "standard" | "sample" | "recovery") {
   if (tone === "recovery") return "border-emerald-200 bg-emerald-50 text-emerald-800";
   if (tone === "sample") return "border-amber-200 bg-amber-50 text-amber-800";
@@ -1659,7 +1666,7 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
                   </span>
                   {entry.scaleGate !== "none" ? (
                     <span className={`rounded-md border px-2 py-1 text-xs font-medium ${scaleGateClass(entry.scaleGate)}`}>
-                      {scaleGateLabel(entry.scaleGate)}
+                      {scaleGateDecisionLabel(entry.scaleGate, entry.riskLevel)} · {scaleGateLabel(entry.scaleGate)}
                     </span>
                   ) : null}
                   {taskQueueSourcePresentation(entry) ? (

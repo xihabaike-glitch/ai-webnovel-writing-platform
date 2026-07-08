@@ -75,6 +75,12 @@ function realSampleValidationClass(status: "blocked" | "needs_acceptance" | "rea
   return "border-emerald-200 bg-emerald-50 text-emerald-900";
 }
 
+function productionClosureStatusClass(status: "allow" | "watch" | "block") {
+  if (status === "allow") return "border-emerald-200 bg-emerald-50 text-emerald-900";
+  if (status === "watch") return "border-amber-200 bg-amber-50 text-amber-900";
+  return "border-rose-200 bg-rose-50 text-rose-900";
+}
+
 export default async function ProjectsPage({ searchParams }: ProjectsPageProps) {
   const params = await searchParams;
   const gateReturn = gateReturnFromParam(params?.gateReturn);
@@ -532,6 +538,33 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps) 
                     )) : <span>当前样本验收没有明显缺口，下一步看总闸门和发布复盘。</span>}
                   </div>
                 </div>
+              </div>
+            </div>
+            <div className="mt-4 rounded-md border border-slate-200 bg-white p-3">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <div className="text-xs text-slate-500">单本生产闭环</div>
+                  <div className="mt-1 font-medium text-slate-950">批量健康、AI 写审改、模型路线必须一起过线。</div>
+                </div>
+                <Link className="w-fit rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white hover:bg-slate-800" href={hrefWithGateReturn(`/projects/${item.id}#control-dashboard`, gateReturn)}>
+                  看总控
+                </Link>
+              </div>
+              <div className="mt-3 grid gap-2 md:grid-cols-3">
+                {item.productionClosure.map((closure) => (
+                  <Link
+                    className={`rounded-md border p-3 text-xs leading-5 hover:bg-white ${productionClosureStatusClass(closure.status)}`}
+                    href={hrefWithGateReturn(closure.actionHref, gateReturn)}
+                    key={`${item.id}-${closure.id}`}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-medium">{closure.label}</span>
+                      <span className="rounded-md bg-white px-2 py-1 text-[11px] font-medium text-slate-900">{closure.statusLabel}</span>
+                    </div>
+                    <p className="mt-2 text-slate-700">{closure.detail}</p>
+                    <div className="mt-2 font-medium text-slate-950">{closure.actionLabel}</div>
+                  </Link>
+                ))}
               </div>
             </div>
             {item.roleClosureProgress ? (

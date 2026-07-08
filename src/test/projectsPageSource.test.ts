@@ -66,6 +66,15 @@ test("projects page renders role closure progress on project cards", () => {
   assert.ok(source.includes("lane.evidence"));
 });
 
+test("projects page renders production closure lanes on each project card", () => {
+  assert.ok(source.includes("item.productionClosure.map"));
+  assert.ok(source.includes("单本生产闭环"));
+  assert.ok(source.includes("closure.statusLabel"));
+  assert.ok(source.includes("closure.detail"));
+  assert.ok(source.includes("closure.actionHref"));
+  assert.ok(source.includes("closure.actionLabel"));
+});
+
 test("projects page keeps a gate recheck return path visible", () => {
   assert.ok(source.includes("gateReturnFromParam"));
   assert.ok(source.includes("gateReturn"));

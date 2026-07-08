@@ -231,6 +231,20 @@ test("tasks page mirrors scale gate decision labels from the gate workspace", ()
   assert.ok(source.includes("{scaleGateDecisionLabel(entry.scaleGate, entry.riskLevel)}"));
 });
 
+test("tasks page shares execution scale decisions with recommended batch controls", () => {
+  const buttonSource = readFileSync("src/components/tasks/RunRecommendedBatchButton.tsx", "utf8");
+
+  assert.ok(source.includes("function executionScaleDecisionClass"));
+  assert.ok(source.includes("{executionPlan.scaleDecisionLabel}"));
+  assert.ok(source.includes("scaleDecisionLabel={executionPlan.scaleDecisionLabel}"));
+  assert.ok(source.includes("scaleDecisionDetail={executionPlan.scaleDecisionDetail}"));
+  assert.ok(source.includes("scaleDecisionTone={executionPlan.scaleDecisionTone}"));
+  assert.ok(buttonSource.includes("scaleDecisionLabel?: string"));
+  assert.ok(buttonSource.includes("scaleDecisionDetail?: string"));
+  assert.ok(buttonSource.includes("scaleDecisionTone?: \"allow\" | \"watch\" | \"block\" | \"standard\""));
+  assert.ok(buttonSource.includes("{scaleDecisionLabel ? ("));
+});
+
 test("tasks page runs any queued platform action with the action button", () => {
   assert.ok(source.includes("{entry.effectAction ? ("));
   assert.ok(source.includes("action={entry.effectAction}"));

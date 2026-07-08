@@ -20,6 +20,9 @@ export interface TaskQueueExecutionPlan {
   platformStrategyItemIds: string[];
   actionLabel: string;
   detail: string;
+  scaleDecisionLabel: string;
+  scaleDecisionTone: "allow" | "watch" | "block" | "standard";
+  scaleDecisionDetail: string;
   batchModeLabel: string;
   batchModeTone: "standard" | "sample" | "recovery";
   batchModeDetail: string;
@@ -86,6 +89,36 @@ function batchModeFromScaleGate(scaleGate: QueueScaleGate) {
   };
 }
 
+function scaleDecisionFromItem(item: QueueItem | null) {
+  const firstDayOutcomeStatus = item?.handoffGuidance?.firstDayOutcome?.status;
+  if (item?.riskLevel === "blocked" || firstDayOutcomeStatus === "blocked") {
+    return {
+      scaleDecisionLabel: "禁止放大",
+      scaleDecisionTone: "block" as const,
+      scaleDecisionDetail: "当前命中止损或避坑条件，先完成修复与复检，再回到推荐批次。",
+    };
+  }
+  if (item?.scaleGate === "cleared" || firstDayOutcomeStatus === "scale") {
+    return {
+      scaleDecisionLabel: "允许小步加码",
+      scaleDecisionTone: "allow" as const,
+      scaleDecisionDetail: "复检或首日数据已过线，可以进入小批扩展，但仍要保留质量、成本和失败回收。",
+    };
+  }
+  if (item?.scaleGate === "sample_only" || firstDayOutcomeStatus === "watch" || item?.blockerType === "watch_scale_gate") {
+    return {
+      scaleDecisionLabel: "继续观察",
+      scaleDecisionTone: "watch" as const,
+      scaleDecisionDetail: "当前只运行 1 个样本或补观察证据，通过线写清前不要扩大批量。",
+    };
+  }
+  return {
+    scaleDecisionLabel: "标准生产",
+    scaleDecisionTone: "standard" as const,
+    scaleDecisionDetail: "未命中特殊放量闸门，按推荐小批次执行并回收质量、成本和失败证据。",
+  };
+}
+
 function firstDayOutcomeBatchMode(item: QueueItem) {
   if (item.handoffGuidance?.firstDayOutcome?.status !== "scale") return null;
   return {
@@ -121,6 +154,7 @@ function firstDayOutcomeBlockedPlan(item: QueueItem): TaskQueueExecutionPlan {
     platformStrategyItemIds: [],
     actionLabel: watch ? "先补首日观察证据" : "先处理首日避坑",
     detail: `${item.projectTitle} · ${outcome?.badge ?? item.riskLabel} · ${outcome?.nextMove ?? item.evidence}`,
+    ...scaleDecisionFromItem(item),
     batchModeLabel: watch ? "首日观察暂停批量" : "首日避坑暂停批量",
     batchModeTone: watch ? "sample" : "standard",
     batchModeDetail: outcome?.boundary ?? "首日结论没有过线前，不进入推荐批量。",
@@ -160,6 +194,7 @@ export function buildTaskQueueExecutionPlan(
       platformStrategyItemIds: [],
       actionLabel: firstBlocker ? `先处理${firstBlocker.chapterTitle}` : "暂无可执行批次",
       detail: firstBlocker?.evidence ?? "当前队列没有可直接运行的初稿、审稿或二改任务。",
+      ...scaleDecisionFromItem(firstBlocker),
       batchModeLabel: "暂无批次",
       batchModeTone: firstBlocker?.blockerType === "watch_scale_gate" ? "sample" : "standard",
       batchModeDetail: firstBlocker
@@ -197,6 +232,7 @@ export function buildTaskQueueExecutionPlan(
   ];
   const batchMode = firstDayOutcomeBatchMode(first) ?? batchModeFromScaleGate(first.scaleGate);
   const firstDayOutcome = first.handoffGuidance?.firstDayOutcome ?? null;
+  const scaleDecision = scaleDecisionFromItem(first);
 
   return {
     canRun: batch.length > 0,
@@ -214,6 +250,7 @@ export function buildTaskQueueExecutionPlan(
     platformStrategyItemIds,
     actionLabel: `${categoryActionLabel(first.category)} ${batch.length} 个`,
     detail: `${projectTitles.join("、")} · ${first.label} · ${batch.map((item) => item.chapterTitle).join("、")}`,
+    ...scaleDecision,
     ...batchMode,
     warnings: [
       adoptionFollowupCount > 0 ? adoptionFollowupBatchWarning(adoptionFollowupCount) : null,

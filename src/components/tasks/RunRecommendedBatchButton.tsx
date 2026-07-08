@@ -106,6 +106,13 @@ function timelineItemClass(status: ReturnType<typeof buildRecommendedBatchRouteG
   return "border-slate-200 bg-slate-50 text-slate-500";
 }
 
+function scaleDecisionToneClass(tone: "allow" | "watch" | "block" | "standard") {
+  if (tone === "allow") return "border-emerald-200 bg-emerald-50 text-emerald-900";
+  if (tone === "watch") return "border-amber-200 bg-amber-50 text-amber-900";
+  if (tone === "block") return "border-rose-200 bg-rose-50 text-rose-900";
+  return "border-slate-200 bg-slate-50 text-slate-700";
+}
+
 function hrefWithGateReturn(href: string, gateReturnHref?: string | null) {
   if (!gateReturnHref || !href.startsWith("/") || href.startsWith("/gate")) return href;
 
@@ -124,6 +131,9 @@ export function RunRecommendedBatchButton({
   strategyId,
   executionContext = "standard",
   initialModelRouteGate = null,
+  scaleDecisionDetail,
+  scaleDecisionLabel,
+  scaleDecisionTone = "standard",
   sourceDispatchKey,
 }: {
   disabled: boolean;
@@ -131,6 +141,9 @@ export function RunRecommendedBatchButton({
   strategyId: string;
   executionContext?: BatchExecutionContext;
   initialModelRouteGate?: BatchRunResponse["modelRouteGate"] | null;
+  scaleDecisionDetail?: string;
+  scaleDecisionLabel?: string;
+  scaleDecisionTone?: "allow" | "watch" | "block" | "standard";
   sourceDispatchKey?: string;
 }) {
   const router = useRouter();
@@ -239,6 +252,12 @@ export function RunRecommendedBatchButton({
       >
       {isRunning ? "执行中" : runActionLabel}
       </button>
+      {scaleDecisionLabel ? (
+        <div className={`w-full max-w-2xl rounded-md border px-3 py-2 text-left text-xs leading-5 ${scaleDecisionToneClass(scaleDecisionTone)}`}>
+          <span className="font-medium">{scaleDecisionLabel}</span>
+          {scaleDecisionDetail ? <span className="ml-1 opacity-85">{scaleDecisionDetail}</span> : null}
+        </div>
+      ) : null}
       {message ? <p className="max-w-xl text-sm text-slate-600">{message}</p> : null}
       {modelRoleBlocker ? (
         <div className="w-full max-w-2xl rounded-md border border-rose-200 bg-rose-50 p-3 text-left text-sm text-rose-950">

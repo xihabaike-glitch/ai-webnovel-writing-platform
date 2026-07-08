@@ -84,6 +84,13 @@ function executionBatchModeClass(tone: "standard" | "sample" | "recovery") {
   return "border-slate-200 bg-white text-slate-700";
 }
 
+function executionScaleDecisionClass(tone: "allow" | "watch" | "block" | "standard") {
+  if (tone === "allow") return "border-emerald-200 bg-emerald-50 text-emerald-800";
+  if (tone === "watch") return "border-amber-200 bg-amber-50 text-amber-800";
+  if (tone === "block") return "border-rose-200 bg-rose-50 text-rose-800";
+  return "border-slate-200 bg-white text-slate-700";
+}
+
 function runStatusClass(status: string) {
   if (status === "succeeded") return "bg-emerald-50 text-emerald-700";
   if (status === "failed") return "bg-rose-50 text-rose-700";
@@ -1280,6 +1287,9 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
                 executionContext="batch_rhythm_recheck"
                 gateReturnHref={gateReturn}
                 initialModelRouteGate={modelRoutePreflightGate}
+                scaleDecisionDetail={executionPlan.scaleDecisionDetail}
+                scaleDecisionLabel={executionPlan.scaleDecisionLabel}
+                scaleDecisionTone={executionPlan.scaleDecisionTone}
                 sourceDispatchKey={batchRhythmClosure.task.dispatchKey}
                 strategyId={activeStrategy.id}
               />
@@ -1345,14 +1355,18 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
             <p className="mt-1 text-sm text-slate-600">先看本批数量、混跑风险、并发占用和预算估算，再一键执行推荐小批次。</p>
           </div>
           <div className="flex flex-col gap-2 lg:items-end">
-            <div className="rounded-md bg-slate-50 px-3 py-2 text-sm font-medium text-slate-700">
-              {safety.canRunRecommendedBatch && executionPlan.canRun && !modelRouteBlocksRecommendedBatch && !modelRolesBlockRecommendedBatch ? "建议批次可执行" : "建议先处理阻塞"}
+            <div className={`rounded-md border px-3 py-2 text-sm font-medium ${executionScaleDecisionClass(executionPlan.scaleDecisionTone)}`}>
+              <div>{safety.canRunRecommendedBatch && executionPlan.canRun && !modelRouteBlocksRecommendedBatch && !modelRolesBlockRecommendedBatch ? "建议批次可执行" : "建议先处理阻塞"}</div>
+              <div className="mt-1 text-xs">{executionPlan.scaleDecisionLabel}</div>
             </div>
             <RunRecommendedBatchButton
               disabled={!safety.canRunRecommendedBatch || !executionPlan.canRun || modelRouteBlocksRecommendedBatch || modelRolesBlockRecommendedBatch}
               executionContext={effectiveBatchContext}
               gateReturnHref={gateReturn}
               initialModelRouteGate={modelRoutePreflightGate}
+              scaleDecisionDetail={executionPlan.scaleDecisionDetail}
+              scaleDecisionLabel={executionPlan.scaleDecisionLabel}
+              scaleDecisionTone={executionPlan.scaleDecisionTone}
               strategyId={activeStrategy.id}
             />
           </div>
@@ -1477,6 +1491,9 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
                 executionContext={effectiveBatchContext}
                 gateReturnHref={gateReturn}
                 initialModelRouteGate={modelRoutePreflightGate}
+                scaleDecisionDetail={executionPlan.scaleDecisionDetail}
+                scaleDecisionLabel={executionPlan.scaleDecisionLabel}
+                scaleDecisionTone={executionPlan.scaleDecisionTone}
                 strategyId={strategyDecision.strategyId}
               />
             ) : (
@@ -1529,8 +1546,13 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
               <div className="font-medium text-slate-950">{executionPlan.actionLabel}</div>
               <p className="mt-1 leading-6 text-slate-600">{executionPlan.detail}</p>
             </div>
-            <div className={`w-fit rounded-md border px-2 py-1 text-xs font-medium ${executionBatchModeClass(executionPlan.batchModeTone)}`}>
-              {executionPlan.batchModeLabel}
+            <div className="flex flex-wrap gap-2">
+              <div className={`w-fit rounded-md border px-2 py-1 text-xs font-medium ${executionBatchModeClass(executionPlan.batchModeTone)}`}>
+                {executionPlan.batchModeLabel}
+              </div>
+              <div className={`w-fit rounded-md border px-2 py-1 text-xs font-medium ${executionScaleDecisionClass(executionPlan.scaleDecisionTone)}`}>
+                {executionPlan.scaleDecisionLabel}
+              </div>
             </div>
           </div>
           <p className="mt-2 text-xs leading-5 text-slate-600">{executionPlan.batchModeDetail}</p>

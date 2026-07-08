@@ -214,6 +214,9 @@ test("buildTaskQueueExecutionPlan", async (t) => {
     assert.equal(plan.canRun, true);
     assert.deepEqual(plan.itemIds, ["project-1:draft:chapter-1"]);
     assert.deepEqual(plan.chapterIds, ["chapter-1"]);
+    assert.equal(plan.scaleDecisionLabel, "继续观察");
+    assert.equal(plan.scaleDecisionTone, "watch");
+    assert.ok(plan.scaleDecisionDetail.includes("只运行 1 个样本"));
     assert.ok(plan.warnings.some((warning) => warning.includes("小样本闸门")));
   });
 
@@ -225,6 +228,9 @@ test("buildTaskQueueExecutionPlan", async (t) => {
 
     assert.equal(plan.scaleGate, "cleared");
     assert.deepEqual(plan.chapterIds, ["chapter-1", "chapter-2"]);
+    assert.equal(plan.scaleDecisionLabel, "允许小步加码");
+    assert.equal(plan.scaleDecisionTone, "allow");
+    assert.ok(plan.scaleDecisionDetail.includes("小批"));
     assert.equal(plan.batchModeLabel, "复检通过恢复批");
     assert.equal(plan.batchModeTone, "recovery");
     assert.ok(plan.batchModeDetail.includes("谨慎恢复"));
@@ -322,11 +328,15 @@ test("buildTaskQueueExecutionPlan", async (t) => {
     ]);
 
     assert.equal(watchPlan.canRun, false);
+    assert.equal(watchPlan.scaleDecisionLabel, "继续观察");
+    assert.equal(watchPlan.scaleDecisionTone, "watch");
     assert.ok(watchPlan.actionLabel.includes("先补首日观察证据"));
     assert.ok(watchPlan.detail.includes("继续观察"));
     assert.ok(watchPlan.warnings.some((warning) => warning.includes("追读证据")));
 
     assert.equal(blockedPlan.canRun, false);
+    assert.equal(blockedPlan.scaleDecisionLabel, "禁止放大");
+    assert.equal(blockedPlan.scaleDecisionTone, "block");
     assert.ok(blockedPlan.actionLabel.includes("先处理首日避坑"));
     assert.ok(blockedPlan.detail.includes("先避坑"));
     assert.ok(blockedPlan.warnings.some((warning) => warning.includes("重做入口")));

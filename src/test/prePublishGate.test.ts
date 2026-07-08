@@ -425,6 +425,10 @@ test("buildPrePublishGate", async (t) => {
           dispatchKey: "first-day:project-recheck-progress:publish-precheck",
           state: "completed",
           completionEvidence: "派单中心已补齐首日平台包预检：标题、简介、标签、样章风险清单均已人工验收。",
+        }, {
+          dispatchKey: "project-acceptance-next:project-recheck-progress:publish_package",
+          state: "completed",
+          completionEvidence: "复检分流已补发布包依据：前三章样章、标题简介、标签和人工验收通过。",
         }],
         chapters: finalChapters.slice(0, 2),
       }],
@@ -452,6 +456,8 @@ test("buildPrePublishGate", async (t) => {
     assert.ok(notice.recheckSummary?.nextStep.detail.includes("继续补「发布包」"));
     assert.ok(notice.recheckSummary?.completedEvidence.some((line) => line.includes("首日派单已有完成依据")));
     assert.ok(notice.recheckSummary?.latestEvidence?.includes("派单中心已补齐首日平台包预检"));
+    assert.equal(notice.recheckSummary?.latestRecheckReceipt?.dispatchKey, "project-acceptance-next:project-recheck-progress:publish_package");
+    assert.ok(notice.recheckSummary?.latestRecheckReceipt?.evidence.includes("复检分流已补发布包依据"));
     assert.equal(notice.recheckSummary?.nextDispatch?.id, "project-acceptance-next:project-recheck-progress:publish_package");
     assert.equal(notice.recheckSummary?.nextDispatch?.stage, "start_platform_package");
     assert.equal(notice.recheckSummary?.nextDispatch?.ownerRole, "平台包装编辑");

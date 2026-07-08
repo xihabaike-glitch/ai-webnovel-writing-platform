@@ -194,6 +194,7 @@ export interface PrePublishGateAcceptanceSheetGate {
   currentStepId: ProjectAcceptanceStep["id"];
   steps: ProjectAcceptanceStep[];
   latestDispatchEvidence: string | null;
+  latestRecheckReceipt: PrePublishGateRecheckReceipt | null;
   roleClosureProgress: PrePublishGateRoleClosureProgress | null;
   repairMode: "passed" | "executable" | "dispatch" | "manual";
   executionHint: string;
@@ -502,8 +503,14 @@ export interface PrePublishGateRecheckSummary {
   remainingBlockers: PrePublishGateRemainingBlocker[];
   roleClosureProgress: PrePublishGateRoleClosureProgress | null;
   latestEvidence: string | null;
+  latestRecheckReceipt: PrePublishGateRecheckReceipt | null;
   nextDispatch: PrePublishGateRecheckDispatch | null;
   nextDispatches: PrePublishGateRecheckDispatch[];
+}
+
+export interface PrePublishGateRecheckReceipt {
+  dispatchKey: string;
+  evidence: string;
 }
 
 export interface PrePublishGateRecheckVerdict {
@@ -1481,6 +1488,21 @@ function buildRoleClosureProgress(project: PrePublishGateProject): PrePublishGat
   };
 }
 
+function latestProjectAcceptanceRecheckReceipt(project: PrePublishGateProject): PrePublishGateRecheckReceipt | null {
+  const receipts = (project.gateDispatchTasks ?? [])
+    .filter((task) => (
+      task.dispatchKey.startsWith(`project-acceptance-next:${project.id}:`)
+      && task.state === "completed"
+      && task.completionEvidence.trim()
+    ))
+    .map((task) => ({
+      dispatchKey: task.dispatchKey,
+      evidence: task.completionEvidence.trim(),
+    }));
+
+  return receipts.at(-1) ?? null;
+}
+
 function buildAcceptanceSheetGate(
   project: PrePublishGateProject,
   platformName: string,
@@ -1520,6 +1542,7 @@ function buildAcceptanceSheetGate(
   const latestDispatchEvidence = (project.gateDispatchTasks ?? [])
     .filter((task) => task.dispatchKey.startsWith("first-day:") && task.state === "completed" && task.completionEvidence.trim())
     .map((task) => task.completionEvidence.trim())[0] ?? null;
+  const latestRecheckReceipt = latestProjectAcceptanceRecheckReceipt(project);
   const roleClosureProgress = buildRoleClosureProgress(project);
 
   return {
@@ -1531,6 +1554,7 @@ function buildAcceptanceSheetGate(
     currentStepId: sheet.currentStepId,
     steps: sheet.steps,
     latestDispatchEvidence,
+    latestRecheckReceipt,
     roleClosureProgress,
     repairMode,
     executionHint: acceptanceExecutionHint(repairMode),
@@ -1871,6 +1895,7 @@ function buildProjectAcceptanceRecheckSummary(
   const nextDispatch = buildProjectAcceptanceNextDispatch(project, currentStep, completedSteps);
   const nextDispatches = buildProjectAcceptanceNextDispatches(project, currentStep, completedSteps, nextDispatch);
   const latestEvidence = project.acceptanceSheetGate.latestDispatchEvidence;
+  const latestRecheckReceipt = project.acceptanceSheetGate.latestRecheckReceipt;
   const currentStepLabel = currentStep?.label ?? project.acceptanceSheetGate.actionLabel;
   const recheckVerdict = buildProjectAcceptanceRecheckVerdict({
     acceptanceStatus: project.acceptanceSheetGate.status,
@@ -1878,7 +1903,7 @@ function buildProjectAcceptanceRecheckSummary(
     totalSteps: steps.length,
     currentStepLabel,
     remainingBlockers,
-    latestEvidence,
+    latestEvidence: latestEvidence ?? latestRecheckReceipt?.evidence ?? null,
   });
 
   return {
@@ -1901,6 +1926,7 @@ function buildProjectAcceptanceRecheckSummary(
     remainingBlockers,
     roleClosureProgress: project.acceptanceSheetGate.roleClosureProgress,
     latestEvidence,
+    latestRecheckReceipt,
     nextDispatch,
     nextDispatches,
   };
@@ -2015,6 +2041,7 @@ function buildProjectAcceptanceNextDispatch(
   const evidence = [
     ...project.acceptanceSheetGate.steps.filter((step) => step.status === "done").map((step) => step.evidence).slice(-3),
     project.acceptanceSheetGate.latestDispatchEvidence,
+    project.acceptanceSheetGate.latestRecheckReceipt?.evidence,
   ].filter((line): line is string => Boolean(line));
 
   return {

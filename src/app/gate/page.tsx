@@ -408,6 +408,12 @@ export default async function GatePage({
                         最近回填：{focusNotice.recheckSummary.latestEvidence}
                       </p>
                     ) : null}
+                    {focusNotice.recheckSummary.latestRecheckReceipt ? (
+                      <div className="mt-2 rounded-md border border-blue-100 bg-blue-50 px-2 py-2 text-xs leading-5 text-blue-900">
+                        <div className="font-medium">复检分流收据：{focusNotice.recheckSummary.latestRecheckReceipt.dispatchKey}</div>
+                        <div className="mt-1">{focusNotice.recheckSummary.latestRecheckReceipt.evidence}</div>
+                      </div>
+                    ) : null}
                     {focusNotice.recheckSummary.roleClosureProgress ? (() => {
                       const roleClosureProgress = focusNotice.recheckSummary.roleClosureProgress;
                       return (

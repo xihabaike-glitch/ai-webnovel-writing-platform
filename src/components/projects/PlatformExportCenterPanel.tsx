@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import {
   actionFromRunResult,
@@ -1707,6 +1708,8 @@ export function PlatformExportCenterPanel({
   gateReturnHref?: string | null;
   projectId: string;
 }) {
+  const searchParams = useSearchParams();
+  const finalDeliveryFocus = searchParams.get("finalDeliveryFocus");
   const [center, setCenter] = useState<PlatformPublishExportCenter | null>(null);
   const [selectedPlatformId, setSelectedPlatformId] = useState<string>("");
   const [isLoading, setIsLoading] = useState(false);
@@ -1760,6 +1763,10 @@ export function PlatformExportCenterPanel({
   const selectedPackage = useMemo(
     () => center?.packages.find((pack) => pack.platformId === selectedPlatformId) ?? center?.packages[0] ?? null,
     [center, selectedPlatformId],
+  );
+  const focusedFinalDeliveryItem = useMemo(
+    () => center?.finalDeliveryChecklist.items.find((item) => item.id === finalDeliveryFocus) ?? null,
+    [center, finalDeliveryFocus],
   );
   const publishReceiptTemplate = useMemo(
     () => selectedPackage ? buildPlatformPublishReceiptTemplate(selectedPackage) : [],
@@ -3014,44 +3021,53 @@ export function PlatformExportCenterPanel({
             <div className="mt-2 rounded-md bg-slate-50 p-2 text-sm text-slate-700">
               <span className="font-medium text-slate-950">下一步：</span>{center.finalDeliveryChecklist.nextAction}
             </div>
+            {focusedFinalDeliveryItem ? (
+              <div className="mt-2 rounded-md border border-amber-200 bg-amber-50 p-2 text-sm leading-6 text-amber-900">
+                <span className="font-medium">总闸门带回的待处理项：</span>{focusedFinalDeliveryItem.label} · {focusedFinalDeliveryItem.evidence}
+              </div>
+            ) : null}
             <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
-              {center.finalDeliveryChecklist.items.map((item) => (
-                <div
-                  className="rounded-md border border-slate-100 bg-slate-50 p-3 text-sm hover:border-slate-300 hover:bg-white"
-                  key={item.id}
-                >
-                  <div className="flex flex-wrap items-start justify-between gap-2">
-                    <div className="font-medium text-slate-950">{item.label}</div>
-                    <span className={`rounded-md px-2 py-1 text-[11px] font-medium ${finalDeliveryChecklistItemStatusClass(item.status)}`}>
-                      {finalDeliveryChecklistItemStatusLabel(item.status)}
-                    </span>
-                  </div>
-                  <p className="mt-2 line-clamp-2 text-xs leading-5 text-slate-600">{item.evidence}</p>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    <a
-                      className="rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:border-slate-300 hover:bg-slate-50"
-                      href={hrefWithGateReturn(item.actionHref, gateReturnHref, projectId)}
-                    >
-                      {item.actionLabel}
-                    </a>
-                    <button
-                      className="rounded-md bg-slate-950 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-slate-800"
-                      onClick={() => recordFinalDeliveryReceipt(item)}
-                      type="button"
-                    >
-                      写回总闸门
-                    </button>
-                  </div>
-                  <div className="mt-3 rounded-md border border-slate-200 bg-white p-2" aria-label="最终交付回执模板">
-                    <div className="text-[11px] font-medium text-slate-500">最终交付回执模板</div>
-                    <div className="mt-1 grid gap-1 text-[11px] leading-4 text-slate-600" style={{ overflowWrap: "anywhere", wordBreak: "break-word" }}>
-                      {item.receiptTemplate.map((line) => (
-                        <div key={line}>{line}</div>
-                      ))}
+              {center.finalDeliveryChecklist.items.map((item) => {
+                const isFocusedFinalDeliveryItem = item.id === finalDeliveryFocus;
+                return (
+                  <div
+                    className={`rounded-md border p-3 text-sm ${isFocusedFinalDeliveryItem ? "border-amber-300 bg-amber-50 ring-2 ring-amber-100" : "border-slate-100 bg-slate-50 hover:border-slate-300 hover:bg-white"}`}
+                    id={`final-delivery-${item.id}`}
+                    key={item.id}
+                  >
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <div className="font-medium text-slate-950">{item.label}</div>
+                      <span className={`rounded-md px-2 py-1 text-[11px] font-medium ${finalDeliveryChecklistItemStatusClass(item.status)}`}>
+                        {finalDeliveryChecklistItemStatusLabel(item.status)}
+                      </span>
+                    </div>
+                    <p className="mt-2 line-clamp-2 text-xs leading-5 text-slate-600">{item.evidence}</p>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <a
+                        className="rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:border-slate-300 hover:bg-slate-50"
+                        href={hrefWithGateReturn(item.actionHref, gateReturnHref, projectId)}
+                      >
+                        {item.actionLabel}
+                      </a>
+                      <button
+                        className="rounded-md bg-slate-950 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-slate-800"
+                        onClick={() => recordFinalDeliveryReceipt(item)}
+                        type="button"
+                      >
+                        写回总闸门
+                      </button>
+                    </div>
+                    <div className="mt-3 rounded-md border border-slate-200 bg-white p-2" aria-label="最终交付回执模板">
+                      <div className="text-[11px] font-medium text-slate-500">最终交付回执模板</div>
+                      <div className="mt-1 grid gap-1 text-[11px] leading-4 text-slate-600" style={{ overflowWrap: "anywhere", wordBreak: "break-word" }}>
+                        {item.receiptTemplate.map((line) => (
+                          <div key={line}>{line}</div>
+                        ))}
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
           <div className="mt-3 rounded-md border border-slate-200 bg-white p-3">

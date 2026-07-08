@@ -251,9 +251,25 @@ test("buildPrePublishGate", async (t) => {
     assert.equal(finalDeliveryItem?.status, "block");
     assert.equal(finalDeliveryItem?.actionLabel, "写回最终交付回执");
     assert.equal(gate.releaseAction?.label, "先解除阻塞：写回最终交付回执");
-    assert.equal(gate.releaseAction?.href, "/projects/project-ready#platform-export");
+    assert.equal(gate.releaseAction?.href, "/projects/project-ready?finalDeliveryFocus=publish-package#platform-export");
     assert.equal(gate.realPipelineFinalReview.outcome, "repair");
     assert.ok(gate.realPipelineFinalReview.repairSignals.some((line) => line.includes("最终交付")));
+  });
+
+  await t.test("focuses the first blocked final delivery receipt from the gate", () => {
+    const audits = finalDeliveryAudits("project-ready").map((audit) => audit.actionId.endsWith(":real-effect")
+      ? { ...audit, message: audit.message.replace("当前状态：已交付", "当前状态：阻塞") }
+      : audit);
+    const gate = buildPrePublishGate({
+      projects: [{ ...readyProject, gateActionAudits: audits }],
+      failureTasks: [],
+      batchHistory: [],
+    });
+    const finalDeliveryItem = gate.items.find((item) => item.id === "final-delivery");
+
+    assert.equal(finalDeliveryItem?.status, "block");
+    assert.equal(finalDeliveryItem?.href, "/projects/project-ready?finalDeliveryFocus=real-effect#platform-export");
+    assert.equal(gate.releaseAction?.href, "/projects/project-ready?finalDeliveryFocus=real-effect#platform-export");
   });
 
   await t.test("blocks launch when model writing roles are missing", () => {

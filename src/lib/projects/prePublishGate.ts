@@ -1714,6 +1714,7 @@ function buildFinalDeliveryGate(project: PrePublishGateProject, platformId: stri
   const firstMissing = finalDeliveryGateItemIds.find((itemId) => !latestByItem.has(itemId));
   const firstGap = firstBlocked ?? firstMissing ?? null;
   const status: PrePublishGateItem["status"] = completedCount === finalDeliveryGateItemIds.length ? "pass" : "block";
+  const focusHref = firstGap ? `?finalDeliveryFocus=${encodeURIComponent(firstGap)}` : "";
 
   return {
     status,
@@ -1722,7 +1723,7 @@ function buildFinalDeliveryGate(project: PrePublishGateProject, platformId: stri
       ? `${project.title} 已写回 ${completedCount}/${finalDeliveryGateItemIds.length} 项最终交付回执。`
       : `${project.title} 最终交付回执未闭环：已闭环 ${completedCount}，阻塞 ${blockedCount}，缺项 ${missingCount}${firstGap ? `。下一项：${finalDeliveryGateItemLabels[firstGap]}` : ""}。`,
     actionLabel: status === "pass" ? "查看最终交付回执" : "写回最终交付回执",
-    href: `/projects/${project.id}#platform-export`,
+    href: status === "pass" ? `/projects/${project.id}#platform-export` : `/projects/${project.id}${focusHref}#platform-export`,
     completedCount,
     blockedCount,
     missingCount,

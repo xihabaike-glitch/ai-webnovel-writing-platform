@@ -10,6 +10,8 @@ test("dispatch task center sends completed acceptance dispatches back to gate re
   assert.ok(source.includes("dispatchGateRecheckHref"));
   assert.ok(source.includes("focus=action-recheck"));
   assert.ok(source.includes("project-acceptance:${encodeURIComponent(projectId)}"));
+  assert.ok(source.includes("return \"/gate?focus=action-recheck#gate-focus-notice\""));
+  assert.equal(source.includes("return \"/gate#gate-focus-notice\""), false);
   assert.ok(source.includes("回总闸门复检"));
 });
 

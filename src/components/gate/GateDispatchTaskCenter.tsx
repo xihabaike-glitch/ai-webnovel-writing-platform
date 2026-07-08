@@ -194,7 +194,7 @@ function projectIdFromFirstDayDispatchKey(dispatchKey: string) {
 
 function dispatchGateRecheckHref(task: PersistedGatePlatformDispatchTask) {
   const projectId = task.projectId ?? projectIdFromFirstDayDispatchKey(task.dispatchKey);
-  if (!projectId) return "/gate#gate-focus-notice";
+  if (!projectId) return "/gate?focus=action-recheck#gate-focus-notice";
   return `/gate?focus=action-recheck&actionId=project-acceptance:${encodeURIComponent(projectId)}#gate-focus-notice`;
 }
 

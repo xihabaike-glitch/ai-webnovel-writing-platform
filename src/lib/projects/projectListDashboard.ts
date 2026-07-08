@@ -194,6 +194,22 @@ export interface ProjectListPipelineAcceptanceSummary {
 
 export type ProjectListRealSampleAcceptanceOutcome = "repair" | "hold_batch" | "pass";
 
+export interface ProjectListRealSampleAcceptanceReceiptField {
+  label: "验收状态" | "已收证据" | "缺口" | "下一步";
+  value: string;
+}
+
+export interface ProjectListRealSampleAcceptanceReceipt {
+  title: string;
+  ownerRole: string;
+  outcomeLabel: string;
+  evidenceHref: string;
+  gateRecheckHref: string;
+  fields: ProjectListRealSampleAcceptanceReceiptField[];
+  stopRule: string;
+  ownerConfirmation: string;
+}
+
 export interface ProjectListRealSampleAcceptanceQueueItem {
   projectId: string;
   projectTitle: string;
@@ -205,6 +221,7 @@ export interface ProjectListRealSampleAcceptanceQueueItem {
   missingEvidence: string[];
   actionLabel: string;
   actionHref: string;
+  receipt: ProjectListRealSampleAcceptanceReceipt;
 }
 
 export interface ProjectListDashboard {
@@ -898,6 +915,43 @@ function realSampleOutcome(status: ProjectListRealSampleValidationStatus): {
   return { outcome: "repair", outcomeLabel: "退回修复", priority: 1 };
 }
 
+function buildRealSampleAcceptanceReceipt(
+  item: ProjectListItem,
+  outcome: ReturnType<typeof realSampleOutcome>,
+): ProjectListRealSampleAcceptanceReceipt {
+  const completedEvidence = item.realSampleValidation.completedEvidence.length
+    ? item.realSampleValidation.completedEvidence.join("；")
+    : "暂无已收证据";
+  const missingEvidence = item.realSampleValidation.missingEvidence.length
+    ? item.realSampleValidation.missingEvidence.join("；")
+    : "没有缺口，等待下一道闸门";
+  const params = new URLSearchParams({
+    focus: "action-recheck",
+    projectId: item.id,
+    source: "real-sample-receipt",
+  });
+
+  return {
+    title: `真实作品流水线样本回执：${item.title}`,
+    ownerRole: "毒舌产品经理 + 作者",
+    outcomeLabel: outcome.outcomeLabel,
+    evidenceHref: item.realSampleValidation.nextActionHref,
+    gateRecheckHref: `/gate?${params.toString()}#gate-focus-notice`,
+    fields: [
+      { label: "验收状态", value: outcome.outcomeLabel },
+      { label: "已收证据", value: completedEvidence },
+      { label: "缺口", value: missingEvidence },
+      { label: "下一步", value: item.realSampleValidation.nextActionLabel },
+    ],
+    stopRule: outcome.outcome === "pass"
+      ? "发布复盘缺版本基线、样章或反馈记录时，仍要退回补证据。"
+      : outcome.outcome === "hold_batch"
+        ? "总闸门未复检前暂停批量，不允许直接扩大生产。"
+        : "缺口未补齐前退回修复，不允许宣称真实作品流水线跑通。",
+    ownerConfirmation: "负责人必须人工确认：证据入口可打开、缺口已处理、下一步能回总闸门复检。",
+  };
+}
+
 function buildRealSampleAcceptanceQueue(items: ProjectListItem[]): ProjectListRealSampleAcceptanceQueueItem[] {
   return items
     .map((item) => {
@@ -914,6 +968,7 @@ function buildRealSampleAcceptanceQueue(items: ProjectListItem[]): ProjectListRe
         missingEvidence: item.realSampleValidation.missingEvidence,
         actionLabel: item.realSampleValidation.nextActionLabel,
         actionHref: item.realSampleValidation.nextActionHref,
+        receipt: buildRealSampleAcceptanceReceipt(item, outcome),
         priority: outcome.priority,
       };
     })

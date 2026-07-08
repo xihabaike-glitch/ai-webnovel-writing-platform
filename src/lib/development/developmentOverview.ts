@@ -684,7 +684,7 @@ const finalAcceptanceMeta: Record<
     requirementTitle: "真实作品流水线",
     status: "watch",
     owner: "毒舌产品经理",
-    missingEvidence: "真实作品流水线样本回执仍需持续验收",
+    missingEvidence: "真实作品流水线样本回执已可见，仍需用真实作品持续验收",
     nextAction: "拿一部真实作品从开书证据跑到首章样本、审稿二改、发布包和复盘回执。",
   },
 };

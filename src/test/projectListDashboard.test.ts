@@ -601,6 +601,19 @@ test("buildProjectListDashboard", async (t) => {
     assert.ok((dashboard.realSampleAcceptanceQueue[2]?.completedEvidence.length ?? 0) >= 5);
     assert.ok(dashboard.realSampleAcceptanceQueue[2]?.completedEvidence.some((item) => item.includes("派单验收")));
     assert.ok(dashboard.realSampleAcceptanceQueue[2]?.reason.includes("总闸门"));
+    assert.equal(dashboard.realSampleAcceptanceQueue[0]?.receipt.title, "真实作品流水线样本回执：空白新坑");
+    assert.equal(dashboard.realSampleAcceptanceQueue[0]?.receipt.outcomeLabel, "退回修复");
+    assert.equal(dashboard.realSampleAcceptanceQueue[0]?.receipt.ownerRole, "毒舌产品经理 + 作者");
+    assert.equal(dashboard.realSampleAcceptanceQueue[0]?.receipt.evidenceHref, "/projects/empty-project");
+    assert.ok(dashboard.realSampleAcceptanceQueue[0]?.receipt.gateRecheckHref.startsWith("/gate?"));
+    assert.ok(dashboard.realSampleAcceptanceQueue[0]?.receipt.gateRecheckHref.includes("focus=action-recheck"));
+    assert.ok(dashboard.realSampleAcceptanceQueue[0]?.receipt.gateRecheckHref.includes("projectId=empty-project"));
+    assert.ok(dashboard.realSampleAcceptanceQueue[0]?.receipt.fields.some((field) => field.label === "验收状态" && field.value === "退回修复"));
+    assert.ok(dashboard.realSampleAcceptanceQueue[0]?.receipt.fields.some((field) => field.label === "缺口" && field.value.includes("开书骨架")));
+    assert.ok(dashboard.realSampleAcceptanceQueue[0]?.receipt.stopRule.includes("缺口"));
+    assert.ok(dashboard.realSampleAcceptanceQueue[0]?.receipt.ownerConfirmation.includes("人工确认"));
+    assert.equal(dashboard.realSampleAcceptanceQueue[2]?.receipt.outcomeLabel, "暂停批量");
+    assert.ok(dashboard.realSampleAcceptanceQueue[2]?.receipt.fields.some((field) => field.label === "已收证据" && field.value.includes("派单验收")));
   });
 
   await t.test("summarizes production closure lanes across the project portfolio", () => {

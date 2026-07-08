@@ -110,7 +110,8 @@ test("ai writing platform development document", async (t) => {
       assert.ok(doc.includes(requirement), `${requirement} should be documented in the final acceptance matrix`);
     }
 
-    assert.ok(doc.includes("真实作品流水线样本回执"));
+    assert.ok(doc.includes("真实作品流水线样本回执已可见"));
+    assert.ok(doc.includes("仍需用真实作品持续验收"));
     assert.ok(doc.includes("无新增平台缺口"));
   });
 

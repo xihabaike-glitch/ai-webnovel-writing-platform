@@ -57,6 +57,21 @@ test("projects page shows the prioritized real sample acceptance queue", () => {
   assert.ok(source.includes("sample.actionLabel"));
 });
 
+test("projects page renders real sample receipt templates for the final gate", () => {
+  assert.ok(source.includes("真实作品流水线样本回执"));
+  assert.ok(source.includes("sample.receipt.title"));
+  assert.ok(source.includes("sample.receipt.ownerRole"));
+  assert.ok(source.includes("sample.receipt.outcomeLabel"));
+  assert.ok(source.includes("sample.receipt.fields.map"));
+  assert.ok(source.includes("field.label"));
+  assert.ok(source.includes("field.value"));
+  assert.ok(source.includes("sample.receipt.stopRule"));
+  assert.ok(source.includes("sample.receipt.ownerConfirmation"));
+  assert.ok(source.includes("sample.receipt.evidenceHref"));
+  assert.ok(source.includes("sample.receipt.gateRecheckHref"));
+  assert.ok(source.includes("回总闸门复检"));
+});
+
 test("projects page shows the portfolio production closure summary", () => {
   assert.ok(source.includes("dashboard.productionClosureSummary"));
   assert.ok(source.includes("组合生产闭环"));

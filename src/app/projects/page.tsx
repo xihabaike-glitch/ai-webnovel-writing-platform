@@ -376,6 +376,42 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps) 
                         )}
                       </div>
                     </div>
+                    <div className="mt-3 rounded-md border border-slate-200 bg-white p-3 text-xs leading-5 text-slate-700">
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                        <div>
+                          <div className="text-[11px] font-medium text-slate-500">真实作品流水线样本回执</div>
+                          <div className="font-medium text-slate-950">{sample.receipt.title}</div>
+                          <div className="mt-1 text-slate-500">负责人：{sample.receipt.ownerRole}</div>
+                        </div>
+                        <span className="w-fit rounded-md bg-slate-950 px-2 py-1 font-medium text-white">
+                          {sample.receipt.outcomeLabel}
+                        </span>
+                      </div>
+                      <div className="mt-3 grid gap-2 md:grid-cols-2">
+                        {sample.receipt.fields.map((field) => (
+                          <div className="rounded-md bg-slate-50 p-2" key={`${sample.projectId}-${field.label}`}>
+                            <div className="font-medium text-slate-950">{field.label}</div>
+                            <div className="mt-1 break-words text-slate-600">{field.value}</div>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="mt-3 grid gap-2 md:grid-cols-2">
+                        <div className="rounded-md bg-rose-50 p-2 text-rose-800">
+                          停手线：{sample.receipt.stopRule}
+                        </div>
+                        <div className="rounded-md bg-emerald-50 p-2 text-emerald-800">
+                          负责人确认：{sample.receipt.ownerConfirmation}
+                        </div>
+                      </div>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <Link className="rounded-md border border-slate-200 bg-white px-2 py-1 font-medium text-slate-700 hover:bg-slate-100" href={hrefWithGateReturn(sample.receipt.evidenceHref, gateReturn)}>
+                          查看证据入口
+                        </Link>
+                        <Link className="rounded-md bg-slate-950 px-2 py-1 font-medium text-white hover:bg-slate-800" href={sample.receipt.gateRecheckHref}>
+                          回总闸门复检
+                        </Link>
+                      </div>
+                    </div>
                   </div>
                   <Link className="w-fit rounded-md bg-white px-3 py-2 text-xs font-medium text-slate-950 hover:bg-slate-100" href={hrefWithGateReturn(sample.actionHref, gateReturn)}>
                     {sample.actionLabel}

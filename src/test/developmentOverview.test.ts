@@ -324,7 +324,8 @@ test("buildDevelopmentOverview", async (t) => {
     const models = overview.finalAcceptanceGate.evidenceMatrix.items.find((item) => item.requirementId === "model_interfaces");
 
     assert.equal(pipeline?.status, "watch");
-    assert.ok(pipeline?.missingEvidence.includes("真实作品"));
+    assert.ok(pipeline?.missingEvidence.includes("回执已可见"));
+    assert.ok(pipeline?.missingEvidence.includes("持续验收"));
     assert.equal(pipeline?.evidenceHref, "/gate?focus=action-recheck#gate-focus-notice");
     assert.equal(platform?.status, "ready");
     assert.equal(platform?.missingEvidence, "无新增平台缺口");

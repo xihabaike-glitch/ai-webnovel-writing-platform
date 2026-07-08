@@ -190,6 +190,35 @@ test("buildBatchExecutionSafety", async (t) => {
     assert.equal(roleGate?.actionHref, "/tasks?view=blocked&debt=role_closure#task-debt");
   });
 
+  await t.test("blocks recommended batches until publish package repairs are cleared", () => {
+    const safety = buildBatchExecutionSafety([
+      {
+        ...baseItem,
+        id: "project-1:publish-repair:fanqie",
+        category: "blocked",
+        blockerType: "publish_repair",
+        label: "发布质检",
+        chapterTitle: "番茄小说投稿包",
+        evidence: "平台卖点、样章或反馈复盘缺失，发布包不能投。",
+        actionLabel: "先修发布质检",
+        href: "/projects/project-1#platform-export",
+        priority: 7,
+      },
+      baseItem,
+    ], [{ aiTasks: [] }]);
+
+    assert.equal(safety.recommendedBatchSize, 1);
+    assert.deepEqual(safety.recommendedBatchIds, ["item-1"]);
+    assert.equal(safety.canRunRecommendedBatch, false);
+    const publishGate = safety.items.find((item) => item.id === "publish-repair");
+    assert.equal(publishGate?.status, "block");
+    assert.ok(publishGate?.detail.includes("发布质检"));
+    assert.ok(publishGate?.detail.includes("番茄小说投稿包"));
+    assert.ok(publishGate?.detail.includes("不进入推荐批量"));
+    assert.equal(publishGate?.actionLabel, "先修发布质检");
+    assert.equal(publishGate?.actionHref, "/tasks?view=blocked&debt=publish_repair#task-debt");
+  });
+
   await t.test("prioritizes the PM blocker that should be handled before running batches", () => {
     const safety = buildBatchExecutionSafety([
       { ...baseItem, id: "candidate-1", category: "candidate", label: "待采纳", priority: 5, actionLabel: "处理候选稿" },

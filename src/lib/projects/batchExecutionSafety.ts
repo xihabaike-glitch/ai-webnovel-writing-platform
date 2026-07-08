@@ -111,6 +111,7 @@ const priorityBlockerOrder = [
   "first-day-gate",
   "risk-recovery",
   "role-closure",
+  "publish-repair",
   "pending-candidates",
   "running-tasks",
   "failure-rate",
@@ -155,6 +156,10 @@ function isOpenFirstDayGate(item: QueueItem) {
 
 function isOpenRiskRecovery(item: QueueItem) {
   return item.blockerType === "risk_recovery";
+}
+
+function isOpenPublishRepair(item: QueueItem) {
+  return item.blockerType === "publish_repair";
 }
 
 export function buildFailureRepairResumeRecommendation(input: {
@@ -236,6 +241,8 @@ export function buildBatchExecutionSafety(
   const riskRecoveryCount = riskRecoveryItems.length;
   const roleClosureItems = queueItems.filter(isOpenRoleClosure);
   const roleClosureCount = roleClosureItems.length;
+  const publishRepairItems = queueItems.filter(isOpenPublishRepair);
+  const publishRepairCount = publishRepairItems.length;
   const candidateCount = queueItems.filter((item) => item.category === "candidate").length;
   const firstCandidate = queueItems.find((item) => item.category === "candidate") ?? null;
   const aiPipelineRecoveryFollowupCount = queueItems.filter(isOpenAiPipelineRecoveryFollowup).length;
@@ -319,6 +326,18 @@ export function buildBatchExecutionSafety(
       roleClosureCount === 0 ? undefined : {
         actionLabel: "补角色验收",
         actionHref: "/tasks?view=blocked&debt=role_closure#task-debt",
+      },
+    ),
+    safetyItem(
+      "publish-repair",
+      "发布质检",
+      publishRepairCount === 0 ? "pass" : "block",
+      publishRepairCount === 0
+        ? "当前没有未修复的平台发布包质检债务。"
+        : `${publishRepairCount} 个发布质检债务未清：${publishRepairItems.slice(0, 3).map((item) => item.chapterTitle).join("、")}；先补样章、平台卖点、标签或反馈复盘，不进入推荐批量。`,
+      publishRepairCount === 0 ? undefined : {
+        actionLabel: "先修发布质检",
+        actionHref: "/tasks?view=blocked&debt=publish_repair#task-debt",
       },
     ),
     safetyItem(

@@ -2297,6 +2297,16 @@ export function buildPrePublishGate(input: PrePublishGateInput): PrePublishGate 
   const projects = input.projects;
   const queue = buildTaskQueueCenter(projects);
   const strategy = getBatchExecutionStrategy(input.batchStrategyId);
+  const targetPlatformByProjectId = new Map(
+    projects.map((project) => [
+      project.id,
+      getPlatformProfile(project.targetPlatform as PlatformId).name,
+    ]),
+  );
+  const gateSafetyQueueItems = queue.items.filter((item) => (
+    item.blockerType !== "publish_repair"
+    || targetPlatformByProjectId.get(item.projectId) === item.platformName
+  ));
   const safetyProjects = projects.map((project) => ({
     aiTasks: project.aiTasks.map((task) => ({
       status: task.status,
@@ -2305,8 +2315,8 @@ export function buildPrePublishGate(input: PrePublishGateInput): PrePublishGate 
       costUsd: task.costUsd ?? null,
     })),
   }));
-  const safety = buildBatchExecutionSafety(queue.items, safetyProjects, strategy);
-  const comparison = buildBatchStrategyComparison(queue.items, safetyProjects, input.batchHistory ?? []);
+  const safety = buildBatchExecutionSafety(gateSafetyQueueItems, safetyProjects, strategy);
+  const comparison = buildBatchStrategyComparison(gateSafetyQueueItems, safetyProjects, input.batchHistory ?? []);
   const decision = buildBatchStrategyDecision(comparison, strategy.id);
   const failureCenter = buildFailureReviewCenter(input.failureTasks ?? []);
   const failureRepairBatch = buildTaskRunConsole((input.failureTasks ?? []).map(failureTaskToRunInput)).failureRepairBatch;
@@ -2318,12 +2328,6 @@ export function buildPrePublishGate(input: PrePublishGateInput): PrePublishGate 
   const exportVersionWarnings = projectStatuses.filter((project) => project.exportVersionGate.status === "warn");
   const acceptanceBlockers = projectStatuses.filter((project) => project.acceptanceSheetGate.status === "block");
   const acceptanceWarnings = projectStatuses.filter((project) => project.acceptanceSheetGate.status === "warn");
-  const targetPlatformByProjectId = new Map(
-    projects.map((project) => [
-      project.id,
-      getPlatformProfile(project.targetPlatform as PlatformId).name,
-    ]),
-  );
   const gateBlockingQueueItems = queue.items.filter((item) => {
     if (item.category !== "blocked") return false;
     if (item.blockerType !== "publish_repair") return true;

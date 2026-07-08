@@ -150,6 +150,16 @@ test("tasks page exposes risk recovery as a batch safety blocker", () => {
   assert.ok(safetySource.includes("\"/tasks?view=blocked&debt=risk_recovery#task-debt\""));
 });
 
+test("tasks page exposes publish repair as a batch safety blocker", () => {
+  const safetySource = readFileSync("src/lib/projects/batchExecutionSafety.ts", "utf8");
+
+  assert.ok(source.includes("const safetyPriorityBlocker = buildBatchSafetyPriorityBlocker(safety);"));
+  assert.ok(source.includes("href={hrefWithGateReturn(safetyPriorityBlocker.actionHref, gateReturn)}"));
+  assert.ok(safetySource.includes("\"publish-repair\""));
+  assert.ok(safetySource.includes("publishRepairCount === 0 ? \"pass\" : \"block\""));
+  assert.ok(safetySource.includes("\"/tasks?view=blocked&debt=publish_repair#task-debt\""));
+});
+
 test("tasks page shows what a platform strategy task unlocks next", () => {
   assert.ok(source.includes("entry.sourceType === \"platform_strategy\" && entry.sourceNextStep"));
   assert.ok(source.includes("做完解锁："));

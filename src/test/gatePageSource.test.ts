@@ -73,6 +73,20 @@ test("gate page renders computed real pipeline final review verdict", () => {
   );
 });
 
+test("gate page summarizes final delivery closeout across task and dispatch receipts", () => {
+  assert.ok(source.includes("buildGateDispatchTaskCenter"));
+  assert.ok(source.includes("buildTaskRunConsole"));
+  assert.ok(source.includes("finalDeliveryGateCloseoutPercent"));
+  assert.ok(source.includes("最终交付总闸门面板"));
+  assert.ok(source.includes("aria-label=\"最终交付总闸门进度\""));
+  assert.ok(source.includes("finalDeliveryGateReleaseLabel"));
+  assert.ok(source.includes("finalDeliveryGateNextCutLabel"));
+  assert.ok(source.includes("发布卡点"));
+  assert.ok(source.includes("派单未闭环"));
+  assert.ok(source.includes("AI 未收口"));
+  assert.ok(source.includes("进入最终交付判断"));
+});
+
 test("gate page renders action recheck summary feedback", () => {
   assert.ok(source.includes("GateRecheckDispatchButton"));
   assert.ok(source.includes("focusNotice.recheckSummary"));

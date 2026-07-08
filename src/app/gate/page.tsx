@@ -10,10 +10,11 @@ import { GatePriorityActionCard } from "@/components/gate/GatePriorityActionCard
 import { GatePublishEffectReviewPanel } from "@/components/gate/GatePublishEffectReviewPanel";
 import { GateRecheckDispatchButton } from "@/components/gate/GateRecheckDispatchButton";
 import { buildTaskBatchHistory } from "@/lib/ai/taskBatchHistory";
+import { buildTaskRunConsole } from "@/lib/ai/taskRunConsole";
 import { prisma } from "@/lib/db/prisma";
 import { buildDevelopmentOverview } from "@/lib/development/developmentOverview";
 import { buildModelRoleMatrix, buildModelRoleMatrixPriorityBlocker } from "@/lib/model-gateway/modelRoleMatrix";
-import { buildGateAiPipelineRecoveryPanel } from "@/lib/projects/gateActionReceipts";
+import { buildGateAiPipelineRecoveryPanel, buildGateDispatchTaskCenter } from "@/lib/projects/gateActionReceipts";
 import { gatePlatformDispatchTaskFromRecord } from "@/lib/projects/gateDispatchTaskRecords";
 import { buildPrePublishGate, buildPrePublishGateFocusNotice, type PrePublishGateFocusNotice, type PrePublishGateItem } from "@/lib/projects/prePublishGate";
 import { parsePublishSnapshotTags } from "@/lib/projects/platformPublishExport";
@@ -138,7 +139,7 @@ export default async function GatePage({
   const invalidFocusNotice = isGateFocus(focus)
     ? null
     : focus ? `总闸门焦点「${focus}」不存在，已显示总闸门全局验收。` : null;
-  const [projects, recentAiTasks, chapters, aiRecoveryDispatchRecords, aiPromptMemoryAuditRecords, modelProviders] = await Promise.all([
+  const [projects, recentAiTasks, chapters, allGateDispatchRecords, aiRecoveryDispatchRecords, aiPromptMemoryAuditRecords, modelProviders] = await Promise.all([
     prisma.project.findMany({
       include: {
         chapters: { orderBy: { order: "asc" } },
@@ -198,6 +199,10 @@ export default async function GatePage({
     }),
     prisma.chapter.findMany({
       select: { id: true, title: true },
+    }),
+    prisma.gateDispatchTask.findMany({
+      orderBy: [{ state: "asc" }, { priorityScore: "desc" }, { updatedAt: "desc" }],
+      take: 200,
     }),
     prisma.gateDispatchTask.findMany({
       where: {
@@ -284,6 +289,36 @@ export default async function GatePage({
     batchHistory: buildTaskBatchHistory(recentTasksWithChapter),
     modelRoleBlocker: modelRolePriorityBlocker,
   });
+  const finalDeliveryDispatchCloseout = buildGateDispatchTaskCenter(
+    allGateDispatchRecords.map(gatePlatformDispatchTaskFromRecord),
+  );
+  const finalDeliveryTaskRunCloseout = buildTaskRunConsole(recentTasksWithChapter);
+  const finalDeliveryGateAiGapCount = finalDeliveryTaskRunCloseout.summary.failedTasks
+    + finalDeliveryTaskRunCloseout.summary.staleRunningTasks
+    + finalDeliveryTaskRunCloseout.summary.runningTasks
+    + finalDeliveryTaskRunCloseout.summary.queuedTasks;
+  const finalDeliveryGateOpenLaneCount = [
+    gate.overview.blockedTasks,
+    finalDeliveryDispatchCloseout.summary.active,
+    finalDeliveryGateAiGapCount,
+  ].filter((count) => count > 0).length;
+  const finalDeliveryGateCloseoutPercent = Math.round(((3 - finalDeliveryGateOpenLaneCount) / 3) * 100);
+  const finalDeliveryGateReleaseLabel = gate.status === "ready"
+    && finalDeliveryDispatchCloseout.summary.active === 0
+    && finalDeliveryGateAiGapCount === 0
+    ? "可以进入最终交付"
+    : gate.overview.blockedTasks > 0
+      ? "先清发布卡点"
+      : finalDeliveryDispatchCloseout.summary.active > 0
+        ? "先收派单回执"
+        : finalDeliveryGateAiGapCount > 0
+          ? "先收 AI 任务"
+          : "等待总闸门复检";
+  const finalDeliveryGateNextCutLabel = gate.overview.blockedTasks > 0
+    ? gate.pmFocus.actionLabel
+    : finalDeliveryDispatchCloseout.summary.active > 0
+      ? finalDeliveryDispatchCloseout.nextActions[0] ?? "回派单中心收口"
+      : finalDeliveryTaskRunCloseout.nextActions[0] ?? gate.realPipelineFinalReview.primaryActionLabel ?? "进入最终交付";
   const focusNotice = buildPrePublishGateFocusNotice({ focus, projectId, actionId, gate });
   const aiRecoveryPanel = buildGateAiPipelineRecoveryPanel(
     aiRecoveryDispatchRecords.map(gatePlatformDispatchTaskFromRecord),
@@ -359,6 +394,49 @@ export default async function GatePage({
             <Link className="w-fit rounded-md border border-white/25 px-3 py-2 text-sm font-medium text-white hover:bg-white/10" href={hrefWithGateReturn(gate.pmFocus.pipelineActionHref, gateRecheckReturnHref)}>
               {gate.pmFocus.pipelineActionLabel}
             </Link>
+          </div>
+        </div>
+      </section>
+
+      <section className="mb-6 rounded-md border border-slate-200 bg-white p-4 text-sm text-slate-700" aria-label="最终交付总闸门面板">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div className="max-w-4xl">
+            <div className="text-xs font-medium text-slate-500">Final Delivery Closeout</div>
+            <h2 className="mt-1 text-lg font-semibold text-slate-950">最终交付总闸门面板</h2>
+            <p className="mt-2 leading-6">
+              这里不看页面漂不漂亮，只看发布卡点、派单回执和 AI 任务有没有一起收口；有一条没收完，就别假装已经能交付。
+            </p>
+          </div>
+          <div className="w-fit rounded-md bg-slate-950 px-3 py-2 text-sm font-semibold text-white">
+            完成率 {finalDeliveryGateCloseoutPercent}%
+          </div>
+        </div>
+        <div className="mt-4 h-2 overflow-hidden rounded-full bg-slate-100" aria-label="最终交付总闸门进度">
+          <div
+            className="h-full rounded-full bg-emerald-500"
+            style={{ width: `${finalDeliveryGateCloseoutPercent}%` }}
+          />
+        </div>
+        <div className="mt-4 grid gap-3 md:grid-cols-5">
+          <div className="rounded-md bg-slate-50 p-3">
+            <div className="text-xs text-slate-500">进入最终交付判断</div>
+            <div className="mt-1 font-semibold text-slate-950">{finalDeliveryGateReleaseLabel}</div>
+          </div>
+          <div className="rounded-md bg-slate-50 p-3">
+            <div className="text-xs text-slate-500">发布卡点</div>
+            <div className="mt-1 font-semibold text-slate-950">{gate.overview.blockedTasks}</div>
+          </div>
+          <div className="rounded-md bg-slate-50 p-3">
+            <div className="text-xs text-slate-500">派单未闭环</div>
+            <div className="mt-1 font-semibold text-slate-950">{finalDeliveryDispatchCloseout.summary.active}</div>
+          </div>
+          <div className="rounded-md bg-slate-50 p-3">
+            <div className="text-xs text-slate-500">AI 未收口</div>
+            <div className="mt-1 font-semibold text-slate-950">{finalDeliveryGateAiGapCount}</div>
+          </div>
+          <div className="rounded-md bg-slate-50 p-3">
+            <div className="text-xs text-slate-500">下一刀</div>
+            <div className="mt-1 font-semibold text-slate-950">{finalDeliveryGateNextCutLabel}</div>
           </div>
         </div>
       </section>

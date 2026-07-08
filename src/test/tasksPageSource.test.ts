@@ -111,6 +111,14 @@ test("tasks page surfaces platform strategy work in the overview", () => {
   assert.ok(source.includes("id=\"platform-strategy-tasks\""));
 });
 
+test("tasks page surfaces role closure work in the queue", () => {
+  assert.ok(source.includes('{ dispatchKey: { startsWith: "role-intent:" } }'));
+  assert.ok(source.includes("queue.overview.roleClosureTasks"));
+  assert.ok(source.includes("角色闭环"));
+  assert.ok(source.includes("debt=role_closure"));
+  assert.ok(source.includes("entry.sourceType === \"role_closure\" && entry.sourceDetail"));
+});
+
 test("tasks page shows what a platform strategy task unlocks next", () => {
   assert.ok(source.includes("entry.sourceType === \"platform_strategy\" && entry.sourceNextStep"));
   assert.ok(source.includes("做完解锁："));

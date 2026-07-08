@@ -124,8 +124,8 @@ export interface QueueItem {
   projectTitle: string;
   platformName: string;
   category: "candidate" | "handoff" | "draft" | "review" | "second_pass" | "effect" | "export" | "blocked";
-  blockerType: "chapter_card" | "publish_repair" | "export_version" | "risk_recovery" | "watch_scale_gate" | "first_day_gate" | null;
-  sourceType?: "first_day_handoff" | "first_three_adoption" | "tactic_experience_followup" | "export_version_recheck" | "platform_strategy";
+  blockerType: "chapter_card" | "publish_repair" | "export_version" | "risk_recovery" | "watch_scale_gate" | "first_day_gate" | "role_closure" | null;
+  sourceType?: "first_day_handoff" | "first_three_adoption" | "tactic_experience_followup" | "export_version_recheck" | "platform_strategy" | "role_closure";
   sourceLabel?: string;
   sourceDetail?: string;
   sourceNextStep?: string;
@@ -175,6 +175,7 @@ export interface TaskQueueCenter {
     firstThreeAdoptionFollowups: number;
     tacticExperienceFollowups: number;
     platformStrategyTasks: number;
+    roleClosureTasks: number;
     platformReadiness: TaskQueuePlatformReadinessSummary;
   };
   pmFocus: TaskQueuePmFocus;
@@ -359,9 +360,10 @@ function blockerPriority(blockerType: QueueItem["blockerType"]) {
   if (blockerType === "first_day_gate") return 0;
   if (blockerType === "risk_recovery") return 1;
   if (blockerType === "watch_scale_gate") return 2;
-  if (blockerType === "publish_repair") return 3;
-  if (blockerType === "export_version") return 4;
-  if (blockerType === "chapter_card") return 5;
+  if (blockerType === "role_closure") return 3;
+  if (blockerType === "publish_repair") return 4;
+  if (blockerType === "export_version") return 5;
+  if (blockerType === "chapter_card") return 6;
   return 9;
 }
 
@@ -432,6 +434,16 @@ export function taskQueueSourcePresentation(entry: QueueItem | null): TaskQueueS
     };
   }
 
+  if (entry?.sourceType === "role_closure") {
+    return {
+      tone: "standard",
+      badgeClass: "bg-amber-50 text-amber-700",
+      detailClass: "border-amber-200 bg-amber-50 text-amber-950",
+      returnHref: "/dispatch?queue=role_closure#dispatch-task-center",
+      returnLabel: "回角色派单中心",
+    };
+  }
+
   return null;
 }
 
@@ -439,6 +451,7 @@ function blockerDebtLabel(blockerType: QueueItem["blockerType"]) {
   if (blockerType === "first_day_gate") return "首日闸门";
   if (blockerType === "risk_recovery") return "开书止损";
   if (blockerType === "watch_scale_gate") return "观察闸门";
+  if (blockerType === "role_closure") return "角色闭环";
   if (blockerType === "publish_repair") return "发布质检";
   if (blockerType === "export_version") return "导出版本";
   if (blockerType === "chapter_card") return "章节卡";
@@ -449,6 +462,7 @@ function blockerDebtActionLabel(blockerType: QueueItem["blockerType"]) {
   if (blockerType === "first_day_gate") return "补首日链路";
   if (blockerType === "risk_recovery") return "写恢复条件";
   if (blockerType === "watch_scale_gate") return "补小样本验收";
+  if (blockerType === "role_closure") return "补角色验收";
   if (blockerType === "publish_repair") return "先修发布质检";
   if (blockerType === "export_version") return "修导出版本";
   if (blockerType === "chapter_card") return "补章节卡";
@@ -470,6 +484,11 @@ function blockerDebtAcceptanceCriteria(blockerType: QueueItem["blockerType"]) {
     "小样本验收写清通过线、不可接受项和复查证据。",
     "成功率、质量分、失败样本和放量结论齐全。",
     "结论明确允许恢复后续初稿批次。",
+  ];
+  if (blockerType === "role_closure") return [
+    "结构、资料和平台包装三类角色至少补齐当前缺口。",
+    "完成依据必须写清产物、证据入口和下一步交接对象。",
+    "处理后回到总闸门或项目页确认角色闭环数量下降。",
   ];
   if (blockerType === "publish_repair") return [
     "发布质检阻塞项已经修复或有明确暂缓理由。",
@@ -970,6 +989,78 @@ function firstDayExperienceHandoffQueueItems(input: {
         scaleGate: input.scaleGate,
         actionLabel: missingEvidence || invalidEvidence ? "补交接证据" : task.actionLabel ?? "处理交接",
         href: task.href ?? firstDayDispatchHref(input.project.id),
+      });
+    });
+}
+
+const roleClosureLaneLabels = [
+  { intent: "story-structure", label: "结构主编" },
+  { intent: "context-recall", label: "资料官" },
+  { intent: "platform-export", label: "平台包装" },
+] as const;
+
+function roleClosureLaneLabel(dispatchKey: string) {
+  return roleClosureLaneLabels.find((lane) => dispatchKey.includes(`:${lane.intent}:`))?.label ?? "角色";
+}
+
+function roleClosureLaneRank(dispatchKey: string) {
+  const index = roleClosureLaneLabels.findIndex((lane) => dispatchKey.includes(`:${lane.intent}:`));
+  return index === -1 ? roleClosureLaneLabels.length : index;
+}
+
+function activeRoleClosureQueueItems(input: {
+  project: TaskQueueProject;
+  projectHref: string;
+  platformName: string;
+  startTactic: ProjectStartTacticSummary | null;
+  riskLevel: FirstDayRiskLevel;
+  riskLabel: string;
+  riskNotice: string | null;
+  scaleGate: QueueScaleGate;
+}) {
+  return (input.project.gateDispatchTasks ?? [])
+    .filter((task) => (
+      task.dispatchKey.startsWith(`role-intent:${input.project.id}:`)
+      && !(task.state === "completed" && task.completionEvidence.trim().length >= 20)
+    ))
+    .map((task): QueueItem => {
+      const roleLabel = roleClosureLaneLabel(task.dispatchKey);
+      const fallbackHref = `/dispatch#dispatch-${encodeURIComponent(task.dispatchKey)}`;
+      const templateStage = task.stage === "start_role_dispatch_closure" ? task.stage : "start_role_dispatch_closure";
+      const templateTask: GateDispatchCompletionTemplateTask = {
+        dispatchKey: task.dispatchKey,
+        stage: templateStage,
+        title: task.title ?? `${input.project.title} · ${roleLabel}闭环`,
+        actionLabel: task.actionLabel ?? "补角色验收",
+        platformName: input.platformName,
+        href: task.href ?? input.projectHref,
+        evidence: [task.detail ?? `${roleLabel}还缺完成依据。`],
+        acceptanceCriteria: ["写清角色产物", "写清证据入口", "写清下一步交接对象"],
+      };
+
+      return item({
+        id: `${input.project.id}:role-closure:${task.dispatchKey}`,
+        projectId: input.project.id,
+        projectTitle: input.project.title,
+        platformName: input.platformName,
+        category: "blocked",
+        blockerType: "role_closure",
+        sourceType: "role_closure",
+        sourceLabel: `角色闭环 · ${roleLabel}`,
+        sourceDetail: task.detail ?? `${roleLabel}派单还没有可验收完成依据。`,
+        sourceDispatchKey: task.dispatchKey,
+        completionEvidenceTemplate: buildGateDispatchCompletionTemplate(templateTask),
+        completionEvidenceTemplateSource: `${roleLabel}闭环模板`,
+        chapterTitle: `${roleLabel}闭环`,
+        evidence: task.detail ?? `${roleLabel}派单还没有可验收完成依据。`,
+        strategyBasis: input.startTactic,
+        riskLevel: input.riskLevel,
+        riskLabel: input.riskLabel,
+        riskNotice: input.riskNotice,
+        scaleGate: input.scaleGate,
+        actionLabel: task.actionLabel ?? "补角色验收",
+        href: fallbackHref,
+        priority: 32 + roleClosureLaneRank(task.dispatchKey),
       });
     });
 }
@@ -1526,6 +1617,17 @@ export function buildTaskQueueCenter(projects: TaskQueueProject[]): TaskQueueCen
       scaleGate,
     }));
 
+    queueItems.push(...activeRoleClosureQueueItems({
+      project,
+      projectHref,
+      platformName: platform.name,
+      startTactic,
+      riskLevel: riskProfile.level,
+      riskLabel: riskProfile.label,
+      riskNotice,
+      scaleGate,
+    }));
+
     queueItems.push(...firstThreeAdoptionFollowupQueueItems({
       project,
       projectHref,
@@ -2001,6 +2103,7 @@ export function buildTaskQueueCenter(projects: TaskQueueProject[]): TaskQueueCen
       firstThreeAdoptionFollowups: items.filter((entry) => entry.sourceType === "first_three_adoption").length,
       tacticExperienceFollowups: items.filter((entry) => entry.sourceType === "tactic_experience_followup").length,
       platformStrategyTasks: items.filter((entry) => entry.sourceType === "platform_strategy").length,
+      roleClosureTasks: items.filter((entry) => entry.sourceType === "role_closure").length,
       platformReadiness: buildTaskQueuePlatformReadinessSummary(platformReadinessSummaries),
     },
     pmFocus: buildTaskQueuePmFocus(recommendedNext),

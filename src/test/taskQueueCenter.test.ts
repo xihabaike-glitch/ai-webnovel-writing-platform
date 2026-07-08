@@ -901,6 +901,52 @@ test("buildTaskQueueCenter", async (t) => {
     assert.equal(queue.recommendedNext?.blockerType, "first_day_gate");
   });
 
+  await t.test("surfaces role closure dispatches as blocked queue work", () => {
+    const queue = buildTaskQueueCenter([{
+      ...project,
+      gateDispatchTasks: [
+        ...firstDayCompleteDispatches(project.id),
+        {
+          dispatchKey: "role-intent:project-1:story-structure:structure_editor",
+          state: "completed",
+          completionEvidence: "结构主编完成人物弧光、主线支线、开头钩子和结尾回收复查。",
+        },
+        {
+          dispatchKey: "role-intent:project-1:context-recall:context_librarian",
+          state: "assigned",
+          completionEvidence: "",
+          title: "补资料官闭环",
+          detail: "资料官需要补上下文引用和排除资料。",
+          actionLabel: "补资料闭环",
+          href: "/projects/project-1#context-recall",
+        },
+        {
+          dispatchKey: "role-intent:project-1:platform-export:overseas_packager",
+          state: "queued",
+          completionEvidence: "",
+          title: "补平台包装闭环",
+          detail: "平台包装需要补多平台投稿包差异。",
+          actionLabel: "补平台闭环",
+          href: "/projects/project-1#platform-export",
+        },
+      ],
+    }]);
+    const roleItems = queue.items.filter((item) => item.blockerType === "role_closure");
+
+    assert.equal(queue.overview.roleClosureTasks, 2);
+    assert.equal(roleItems.length, 2);
+    assert.deepEqual(roleItems.map((item) => item.sourceLabel), ["角色闭环 · 资料官", "角色闭环 · 平台包装"]);
+    assert.ok(roleItems.every((item) => item.sourceType === "role_closure"));
+    assert.ok(roleItems.every((item) => item.href.startsWith("/dispatch#dispatch-role-intent%3Aproject-1%3A")));
+    assert.ok(roleItems[0]?.completionEvidenceTemplate?.includes("资料"));
+    const debt = buildTaskQueueDebtView(queue.items, "role_closure");
+
+    assert.equal(debt.focusedBlockerType, "role_closure");
+    assert.equal(debt.groups.find((group) => group.blockerType === "role_closure")?.label, "角色闭环");
+    assert.equal(debt.groups.find((group) => group.blockerType === "role_closure")?.actionLabel, "补角色验收");
+    assert.ok(debt.focusAcceptanceCriteria.some((criterion) => criterion.includes("结构、资料和平台包装")));
+  });
+
   await t.test("keeps the first-day gate closed when handoff evidence is missing", () => {
     const queue = buildTaskQueueCenter([{
       ...project,

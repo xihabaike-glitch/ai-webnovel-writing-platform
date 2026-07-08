@@ -43,6 +43,7 @@ function blockerTypeLabel(entry: QueueItem) {
   if (entry.blockerType === "risk_recovery") return "开书止损";
   if (entry.blockerType === "watch_scale_gate") return "观察闸门";
   if (entry.blockerType === "first_day_gate") return "首日闸门";
+  if (entry.blockerType === "role_closure") return "角色闭环";
   return entry.label;
 }
 
@@ -195,6 +196,7 @@ function debtBlockerType(value: string | undefined): QueueItem["blockerType"] | 
     || value === "risk_recovery"
     || value === "watch_scale_gate"
     || value === "first_day_gate"
+    || value === "role_closure"
   ) return value;
   return null;
 }
@@ -203,6 +205,7 @@ function debtBlockerTypeName(blockerType: QueueItem["blockerType"]) {
   if (blockerType === "first_day_gate") return "首日闸门";
   if (blockerType === "risk_recovery") return "开书止损";
   if (blockerType === "watch_scale_gate") return "观察闸门";
+  if (blockerType === "role_closure") return "角色闭环";
   if (blockerType === "publish_repair") return "发布质检";
   if (blockerType === "export_version") return "导出版本";
   if (blockerType === "chapter_card") return "章节卡";
@@ -365,6 +368,7 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
               { dispatchKey: { startsWith: "first-day:" } },
               { dispatchKey: { startsWith: "first-day-handoff:" } },
               { dispatchKey: { startsWith: "first-three-adoption:" } },
+              { dispatchKey: { startsWith: "role-intent:" } },
             ],
           },
           select: {
@@ -750,6 +754,10 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
           <div className="text-xs text-slate-500">采纳闭环</div>
           <div className="mt-1 text-2xl font-semibold">{queue.overview.firstThreeAdoptionFollowups}</div>
         </div>
+        <Link className="rounded-md border border-amber-200 bg-amber-50 p-3 text-amber-950 hover:bg-amber-100" href={hrefWithGateReturn("/tasks?view=blocked&debt=role_closure#task-debt", gateReturn)}>
+          <div className="text-xs text-amber-700">角色闭环</div>
+          <div className="mt-1 text-2xl font-semibold">{queue.overview.roleClosureTasks}</div>
+        </Link>
         <Link className="rounded-md border border-violet-200 bg-violet-50 p-3 text-violet-950 hover:bg-violet-100" href={hrefWithGateReturn("/tasks#platform-strategy-tasks", gateReturn)}>
           <div className="text-xs text-violet-700">平台策略</div>
           <div className="mt-1 text-2xl font-semibold">{queue.overview.platformStrategyTasks}</div>
@@ -1631,6 +1639,18 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
                 {entry.sourceType === "platform_strategy" && entry.sourceDetail ? (
                   <div className={`mt-3 rounded-md border px-3 py-2 text-xs leading-5 ${taskQueueSourcePresentation(entry)?.detailClass ?? "border-violet-200 bg-violet-50 text-violet-950"}`}>
                     <span className="font-medium">{entry.sourceLabel}：</span>{entry.sourceDetail}
+                  </div>
+                ) : null}
+                {entry.sourceType === "role_closure" && entry.sourceDetail ? (
+                  <div className={`mt-3 rounded-md border px-3 py-2 text-xs leading-5 ${taskQueueSourcePresentation(entry)?.detailClass ?? "border-amber-200 bg-amber-50 text-amber-950"}`}>
+                    <span className="font-medium">{entry.sourceLabel}：</span>{entry.sourceDetail}
+                    {taskQueueSourcePresentation(entry)?.returnHref ? (
+                      <div className="mt-2">
+                        <Link className="inline-flex rounded-md bg-white/80 px-2 py-1 font-medium text-amber-800 hover:bg-white" href={hrefWithGateReturn(taskQueueSourcePresentation(entry)?.returnHref ?? "/dispatch", gateReturn)}>
+                          {taskQueueSourcePresentation(entry)?.returnLabel}
+                        </Link>
+                      </div>
+                    ) : null}
                   </div>
                 ) : null}
                 {entry.sourceType === "platform_strategy" && entry.sourceNextStep ? (

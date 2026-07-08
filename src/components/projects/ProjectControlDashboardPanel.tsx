@@ -258,10 +258,21 @@ interface ProductionDecisionSummary {
   secondaryTargetHref: string;
 }
 
+interface ProductionClosureItem {
+  id: "batch-health" | "ai-pipeline" | "model-route";
+  label: string;
+  tone: "allow" | "watch" | "block";
+  statusLabel: string;
+  detail: string;
+  actionLabel: string;
+  targetHref: string;
+}
+
 interface ProjectControlDashboard {
   overallScore: number;
   verdict: string;
   productionDecision: ProductionDecisionSummary;
+  productionClosure: ProductionClosureItem[];
   platformVerdict: PlatformControlVerdictSummary;
   platformFeedback: PlatformFeedbackSummary;
   platformEvidenceLoop: PlatformEvidenceLoopSummary;
@@ -403,6 +414,12 @@ function productionDecisionClass(tone: ProductionDecisionSummary["tone"]) {
   if (tone === "allow") return "border-emerald-200 bg-emerald-50 text-emerald-900";
   if (tone === "watch") return "border-amber-200 bg-amber-50 text-amber-900";
   return "border-rose-200 bg-rose-50 text-rose-900";
+}
+
+function productionClosureClass(tone: ProductionClosureItem["tone"]) {
+  if (tone === "allow") return "border-emerald-200 text-emerald-800";
+  if (tone === "watch") return "border-amber-200 text-amber-800";
+  return "border-rose-200 text-rose-800";
 }
 
 function platformVerdictStatusLabel(status: PlatformControlVerdictSummary["status"]) {
@@ -1045,6 +1062,19 @@ export function ProjectControlDashboardPanel({
                     ) : null}
                   </div>
                 ) : null}
+                <div className="mt-3 grid gap-2 border-t border-white/70 pt-3 sm:grid-cols-3">
+                  {dashboard.productionClosure.map((closure) => (
+                    <Link
+                      className={`block border-l-2 pl-3 text-xs leading-5 hover:bg-white/40 ${productionClosureClass(closure.tone)}`}
+                      href={hrefWithGateReturn(projectScopedHref(projectId, closure.targetHref), gateReturnHref)}
+                      key={closure.id}
+                    >
+                      <span className="block font-semibold">{closure.label} · {closure.statusLabel}</span>
+                      <span className="mt-1 block line-clamp-2">{closure.detail}</span>
+                      <span className="mt-1 block font-medium">{closure.actionLabel}</span>
+                    </Link>
+                  ))}
+                </div>
               </div>
               <div className="flex shrink-0 flex-wrap gap-2">
                 {dashboard.productionDecision.actionExecutable ? (

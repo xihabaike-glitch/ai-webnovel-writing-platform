@@ -370,10 +370,21 @@ export interface ProductionDecisionSummary {
   secondaryTargetHref: string;
 }
 
+export interface ProductionClosureItem {
+  id: "batch-health" | "ai-pipeline" | "model-route";
+  label: string;
+  tone: "allow" | "watch" | "block";
+  statusLabel: string;
+  detail: string;
+  actionLabel: string;
+  targetHref: string;
+}
+
 export interface ProjectControlDashboard {
   overallScore: number;
   verdict: string;
   productionDecision: ProductionDecisionSummary;
+  productionClosure: ProductionClosureItem[];
   platformVerdict: PlatformControlVerdictSummary;
   platformFeedback: PlatformFeedbackSummary;
   platformEvidenceLoop: PlatformEvidenceLoopSummary;
@@ -1721,6 +1732,66 @@ function buildProductionDecisionSummary(input: {
   };
 }
 
+function closureToneFromDispatch(status: ProductionDecisionSummary["dispatchStatus"]): ProductionClosureItem["tone"] | null {
+  if (status === "completed") return "allow";
+  if (status === "assigned") return "watch";
+  if (status === "needs_governance") return "block";
+  return null;
+}
+
+function buildProductionClosure(input: {
+  batchHealth: AiPipelineBatchHealthSummary;
+  aiPipelineControlPlan: AiPipelineControlPlanSummary;
+  aiPipelineRecheckCompletion: AiPipelineRecheckDispatchCompletion | null;
+  modelRouteHealth: ModelRouteHealthSummary;
+  modelRouteRepairDispatch: ControlGateDispatchTask | null;
+}): ProductionClosureItem[] {
+  const aiPipelineDispatch = aiPipelineControlPlanDispatchFields(input.aiPipelineControlPlan, input.aiPipelineRecheckCompletion);
+  const modelRouteDispatch = modelRouteRepairDispatchFields(input.modelRouteRepairDispatch, input.modelRouteHealth);
+  const aiTone = closureToneFromDispatch(aiPipelineDispatch.dispatchStatus)
+    ?? (input.aiPipelineControlPlan.hasPlan ? "watch" : input.batchHealth.status === "blocked" ? "block" : "watch");
+  const modelTone = closureToneFromDispatch(modelRouteDispatch.dispatchStatus)
+    ?? (input.modelRouteHealth.status === "healthy" ? "allow" : input.modelRouteHealth.status === "repair" ? "block" : "watch");
+
+  return [
+    {
+      id: "batch-health",
+      label: "批量健康",
+      tone: input.batchHealth.status === "usable" ? "allow" : input.batchHealth.status === "blocked" ? "block" : "watch",
+      statusLabel: input.batchHealth.scaleDecisionLabel,
+      detail: input.batchHealth.scaleDecisionDetail,
+      actionLabel: input.batchHealth.actionLabel,
+      targetHref: input.batchHealth.targetHref,
+    },
+    {
+      id: "ai-pipeline",
+      label: "AI 写审改",
+      tone: aiTone,
+      statusLabel: aiPipelineDispatch.dispatchLabel || input.aiPipelineControlPlan.label,
+      detail: aiPipelineDispatch.dispatchDetail || input.aiPipelineControlPlan.nextAction,
+      actionLabel: aiPipelineDispatch.dispatchStatus === "completed"
+        ? "看恢复动作"
+        : aiPipelineDispatch.dispatchStatus === "assigned"
+          ? "看派单"
+          : "看写审改",
+      targetHref: aiPipelineDispatch.dispatchHref ?? "#ai-pipeline",
+    },
+    {
+      id: "model-route",
+      label: "模型路线",
+      tone: modelTone,
+      statusLabel: modelRouteDispatch.dispatchLabel || input.modelRouteHealth.label,
+      detail: modelRouteDispatch.dispatchDetail || input.modelRouteHealth.detail,
+      actionLabel: modelRouteDispatch.dispatchStatus === "completed"
+        ? "继续生产"
+        : modelRouteDispatch.dispatchStatus === "assigned"
+          ? "看派单"
+          : input.modelRouteHealth.actionLabel,
+      targetHref: modelRouteDispatch.dispatchHref ?? input.modelRouteHealth.targetHref,
+    },
+  ];
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
@@ -2547,6 +2618,13 @@ export function buildProjectControlDashboard(input: ProjectControlDashboardInput
     modelRouteHealth,
     modelRouteRepairDispatch,
   });
+  const productionClosure = buildProductionClosure({
+    batchHealth: aiPipelineBatchHealth,
+    aiPipelineControlPlan,
+    aiPipelineRecheckCompletion,
+    modelRouteHealth,
+    modelRouteRepairDispatch,
+  });
   const aiPipelineBaseEvidence = `${batchDraft.readyCandidates} 章可初稿，${reviewPipeline.reviewReadyCount} 章待审，${reviewPipeline.secondPassReadyCount} 章可二改。`;
   const aiPipelineArea = aiPipelineAreaDecision({
     baseScore: aiPipelineScore,
@@ -2605,6 +2683,7 @@ export function buildProjectControlDashboard(input: ProjectControlDashboardInput
     overallScore,
     verdict: verdict(overallScore),
     productionDecision,
+    productionClosure,
     platformVerdict,
     platformFeedback,
     platformEvidenceLoop,

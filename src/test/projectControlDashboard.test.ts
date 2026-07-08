@@ -201,6 +201,13 @@ test("buildProjectControlDashboard", async (t) => {
     assert.equal(dashboard.productionDecision.primaryActionLabel, "执行推荐批次");
     assert.equal(dashboard.productionDecision.primaryTargetHref, "/tasks#recommended-batch");
     assert.ok(dashboard.productionDecision.reason.includes("批量健康"));
+    assert.deepEqual(dashboard.productionClosure.map((item) => item.id), ["batch-health", "ai-pipeline", "model-route"]);
+    assert.equal(dashboard.productionClosure[0].label, "批量健康");
+    assert.equal(dashboard.productionClosure[0].tone, "watch");
+    assert.equal(dashboard.productionClosure[1].label, "AI 写审改");
+    assert.equal(dashboard.productionClosure[1].targetHref, "#ai-pipeline");
+    assert.equal(dashboard.productionClosure[2].label, "模型路线");
+    assert.equal(dashboard.productionClosure[2].tone, "watch");
     assert.equal(dashboard.storyFoundation.status, "blocked");
     assert.equal(dashboard.storyFoundation.label, "先搭底座");
     assert.equal(dashboard.storyFoundation.axes.length, 5);

@@ -151,6 +151,9 @@ test("project detail page carries gate return through control and batch panels",
   assert.ok(controlPanel.includes("{dashboard.productionDecision.dispatchLabel}"));
   assert.ok(controlPanel.includes("{dashboard.productionDecision.dispatchDetail}"));
   assert.ok(controlPanel.includes("dashboard.productionDecision.dispatchHref"));
+  assert.ok(controlPanel.includes("dashboard.productionClosure.map"));
+  assert.ok(controlPanel.includes("closure.tone"));
+  assert.ok(controlPanel.includes("closure.targetHref"));
   assert.ok(controlPanel.includes("dashboard.productionDecision.actionExecutable"));
   assert.ok(controlPanel.includes("onClick={() => void executeProductionDecisionAction()}"));
   assert.ok(controlPanel.includes("dashboard.productionDecision.primaryActionExecution === \"ai_pipeline_recheck\""));

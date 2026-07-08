@@ -102,6 +102,34 @@ test("buildBatchExecutionSafety", async (t) => {
     assert.equal(recoveryGate?.actionHref, "/gate#ai-pipeline-recovery");
   });
 
+  await t.test("blocks recommended batches until first-day gate debt is cleared", () => {
+    const safety = buildBatchExecutionSafety([
+      {
+        ...baseItem,
+        id: "project-1:first-day-gate:fanqie",
+        category: "blocked",
+        blockerType: "first_day_gate",
+        label: "首日闸门",
+        chapterTitle: "首日链路",
+        evidence: "首日样本、交接证据或平台预检还未闭环。",
+        actionLabel: "补首日链路",
+        href: "/dispatch?firstDayProject=project-1#first-day-dispatch",
+        priority: 4,
+      },
+      baseItem,
+    ], [{ aiTasks: [] }]);
+
+    assert.equal(safety.recommendedBatchSize, 1);
+    assert.deepEqual(safety.recommendedBatchIds, ["item-1"]);
+    assert.equal(safety.canRunRecommendedBatch, false);
+    const firstDayGate = safety.items.find((item) => item.id === "first-day-gate");
+    assert.equal(firstDayGate?.status, "block");
+    assert.ok(firstDayGate?.detail.includes("首日闸门"));
+    assert.ok(firstDayGate?.detail.includes("不进入推荐批量"));
+    assert.equal(firstDayGate?.actionLabel, "补首日链路");
+    assert.equal(firstDayGate?.actionHref, "/tasks?view=blocked&debt=first_day_gate#task-debt");
+  });
+
   await t.test("blocks recommended batches until role closure dispatches are accepted", () => {
     const safety = buildBatchExecutionSafety([
       {

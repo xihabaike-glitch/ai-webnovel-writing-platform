@@ -130,6 +130,16 @@ test("tasks page exposes role closure as a batch safety blocker", () => {
   assert.ok(safetySource.includes("\"/tasks?view=blocked&debt=role_closure#task-debt\""));
 });
 
+test("tasks page exposes first-day gate as a batch safety blocker", () => {
+  const safetySource = readFileSync("src/lib/projects/batchExecutionSafety.ts", "utf8");
+
+  assert.ok(source.includes("const safetyPriorityBlocker = buildBatchSafetyPriorityBlocker(safety);"));
+  assert.ok(source.includes("href={hrefWithGateReturn(safetyPriorityBlocker.actionHref, gateReturn)}"));
+  assert.ok(safetySource.includes("\"first-day-gate\""));
+  assert.ok(safetySource.includes("firstDayGateCount === 0 ? \"pass\" : \"block\""));
+  assert.ok(safetySource.includes("\"/tasks?view=blocked&debt=first_day_gate#task-debt\""));
+});
+
 test("tasks page shows what a platform strategy task unlocks next", () => {
   assert.ok(source.includes("entry.sourceType === \"platform_strategy\" && entry.sourceNextStep"));
   assert.ok(source.includes("做完解锁："));

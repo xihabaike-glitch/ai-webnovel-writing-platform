@@ -3098,8 +3098,18 @@ export function PlatformExportCenterPanel({
               </div>
             </div>
             {focusedFinalDeliveryItem ? (
-              <div className="mt-2 rounded-md border border-amber-200 bg-amber-50 p-2 text-sm leading-6 text-amber-900">
-                <span className="font-medium">总闸门带回的待处理项：</span>{focusedFinalDeliveryItem.label} · {focusedFinalDeliveryItem.evidence}
+              <div className="mt-2 flex flex-col gap-2 rounded-md border border-amber-200 bg-amber-50 p-2 text-sm leading-6 text-amber-900 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <span className="font-medium">总闸门带回的待处理项：</span>{focusedFinalDeliveryItem.label} · {focusedFinalDeliveryItem.evidence}
+                </div>
+                {focusedFinalDeliveryItem && gateReturnHref ? (
+                  <a
+                    className="w-fit rounded-md bg-white px-2.5 py-1.5 text-xs font-medium text-amber-950 hover:bg-amber-100"
+                    href={gateReturnHref}
+                  >
+                    处理后回总闸门复检
+                  </a>
+                ) : null}
               </div>
             ) : null}
             <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-3">

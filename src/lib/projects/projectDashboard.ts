@@ -68,6 +68,7 @@ export interface ProjectAcceptanceMissingEvidence {
   reason: string;
   stopRule: string;
   href: string;
+  actionLabel: string;
 }
 
 export interface ProjectRoleClosureLane {
@@ -130,6 +131,16 @@ const requiredRoleDispatchIntents = [
   { id: "context-recall", label: "资料官" },
   { id: "platform-export", label: "平台包装" },
 ] as const;
+
+const missingEvidenceActionLabels: Record<ProjectAcceptanceStep["id"], string> = {
+  project_start: "补开书基础",
+  opening_sample: "补首章样本",
+  chapter_review: "启动审稿",
+  second_pass: "启动二改",
+  dispatch_receipt: "回填派单验收",
+  role_dispatch: "补角色派单",
+  publish_package: "打开发布包",
+};
 
 function roleDispatchPrefix(projectId: string | undefined, intentId: string) {
   return projectId ? `role-intent:${projectId}:${intentId}:` : `role-intent:`;
@@ -282,6 +293,7 @@ function buildProjectRealSampleAcceptanceSheet(input: ProjectDashboardInput): Pr
       reason: step.evidence,
       stopRule: step.stopRule,
       href: step.href,
+      actionLabel: missingEvidenceActionLabels[step.id],
     })) satisfies ProjectAcceptanceMissingEvidence[];
   const steps = definitions.map((step, index) => ({
     id: step.id,

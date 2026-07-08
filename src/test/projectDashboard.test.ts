@@ -116,6 +116,9 @@ test("buildProjectDashboard", async (t) => {
       ["second_pass", "dispatch_receipt", "publish_package"],
     );
     assert.ok(dashboard.realSampleAcceptanceSheet.missingEvidence[0]?.reason.includes("二改"));
+    assert.equal(dashboard.realSampleAcceptanceSheet.missingEvidence[0]?.actionLabel, "启动二改");
+    assert.equal(dashboard.realSampleAcceptanceSheet.missingEvidence[1]?.actionLabel, "回填派单验收");
+    assert.equal(dashboard.realSampleAcceptanceSheet.missingEvidence[2]?.actionLabel, "打开发布包");
     assert.ok(dashboard.realSampleAcceptanceSheet.blockReason.includes("不能进总闸门放量"));
     assert.ok(dashboard.realSampleAcceptanceSheet.steps.find((step) => step.id === "opening_sample")?.evidence.includes("钩子"));
     assert.ok(dashboard.realSampleAcceptanceSheet.steps.find((step) => step.id === "dispatch_receipt")?.stopRule.includes("人工验收"));
@@ -202,6 +205,8 @@ test("buildProjectDashboard", async (t) => {
     assert.ok(blocked.realSampleAcceptanceSheet.verdict.includes("角色闭环"));
     assert.ok(blocked.realSampleAcceptanceSheet.actionHref.includes("#story-structure"));
     assert.ok(blocked.realSampleAcceptanceSheet.steps.find((step) => step.id === "role_dispatch")?.evidence.includes("资料官"));
+    assert.equal(blocked.realSampleAcceptanceSheet.missingEvidence[0]?.stepId, "role_dispatch");
+    assert.equal(blocked.realSampleAcceptanceSheet.missingEvidence[0]?.actionLabel, "补角色派单");
     assert.equal(blocked.realSampleAcceptanceSheet.roleClosureProgress?.completedRoles, 1);
     assert.equal(blocked.realSampleAcceptanceSheet.roleClosureProgress?.totalRoles, 3);
     assert.deepEqual(blocked.realSampleAcceptanceSheet.roleClosureProgress?.completedLabels, ["结构主编"]);

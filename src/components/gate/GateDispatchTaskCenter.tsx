@@ -271,6 +271,24 @@ function roleClosureLaneLabel(task: PersistedGatePlatformDispatchTask) {
   return "角色";
 }
 
+function isAcceptanceGapDispatchTask(task: PersistedGatePlatformDispatchTask) {
+  return task.dispatchKey.includes(":acceptance-gap:")
+    || task.evidence.some((item) => item.includes("角色入口：acceptance-gap"));
+}
+
+function buildAcceptanceGapCompletionTemplate(task: PersistedGatePlatformDispatchTask) {
+  if (!isAcceptanceGapDispatchTask(task)) return "";
+  return [
+    `${task.title}`,
+    "验收缺口完成依据模板",
+    "完成项：",
+    "产物链接/位置：",
+    "人工验收：通过 / 退回",
+    "回总闸门复检：已复检 / 待复检",
+    "下一步：解除阻塞 / 继续修复 / 小样本观察",
+  ].join("\n");
+}
+
 function routeCompletionRecordChips(record: RouteDispatchCompletionRecord) {
   const chips: string[] = [];
   if (record.sampleCount !== null) chips.push(`样本 ${record.sampleCount}`);
@@ -435,6 +453,13 @@ export function GateDispatchTaskCenter({
       .filter((item) => item.template.trim().length > 0)
   ), [roleClosureTasks]);
 
+  const acceptanceGapCompletionTemplates = useMemo(() => (
+    tasks
+      .filter((task) => task.state === "assigned" && isAcceptanceGapDispatchTask(task))
+      .map((task) => ({ task, template: buildAcceptanceGapCompletionTemplate(task) }))
+      .filter((item) => item.template.trim().length > 0)
+  ), [tasks]);
+
   useEffect(() => {
     if (roleClosureCompletionTemplates.length === 0) return;
     setCompletionDrafts((current) => {
@@ -448,6 +473,20 @@ export function GateDispatchTaskCenter({
       return changed ? next : current;
     });
   }, [roleClosureCompletionTemplates]);
+
+  useEffect(() => {
+    if (acceptanceGapCompletionTemplates.length === 0) return;
+    setCompletionDrafts((current) => {
+      let changed = false;
+      const next = { ...current };
+      for (const { task, template } of acceptanceGapCompletionTemplates) {
+        if (current[task.dispatchKey]?.trim()) continue;
+        next[task.dispatchKey] = template;
+        changed = true;
+      }
+      return changed ? next : current;
+    });
+  }, [acceptanceGapCompletionTemplates]);
 
   useEffect(() => {
     function syncHashFocus() {
@@ -687,6 +726,7 @@ export function GateDispatchTaskCenter({
     return (task.dispatchKey === firstDayFocus.card?.dispatchKey ? firstDayFocus.completionTemplate : "")
       || completionSuggestionByKey.get(task.dispatchKey)?.completionEvidence
       || buildRouteDispatchCompletionTemplate(task)
+      || buildAcceptanceGapCompletionTemplate(task)
       || buildGateDispatchCompletionTemplate(task)
       || buildFirstDayDispatchCompletionTemplate(task);
   }

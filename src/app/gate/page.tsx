@@ -443,6 +443,31 @@ export default async function GatePage({
                         </div>
                       );
                     })() : null}
+                    {focusNotice.recheckSummary.firstThreeAdoptionProgress ? (() => {
+                      const adoptionProgress = focusNotice.recheckSummary.firstThreeAdoptionProgress;
+                      return (
+                        <div className="mt-2 rounded-md border border-emerald-200 bg-white p-2 text-xs leading-5">
+                          <div className="font-medium text-emerald-800">采纳后续闭环</div>
+                          <div className="mt-1 font-semibold text-slate-950">{adoptionProgress.headline}</div>
+                          <p className="mt-1 text-slate-600">{adoptionProgress.detail}</p>
+                          <div className="mt-2 grid gap-1">
+                            {adoptionProgress.lanes.map((lane) => (
+                              <Link
+                                className="rounded-md bg-emerald-50 px-2 py-1 hover:bg-emerald-100"
+                                href={hrefWithGateReturn(lane.href, gateRecheckReturnHref)}
+                                key={lane.id}
+                              >
+                                <span className={`font-medium ${lane.status === "done" ? "text-emerald-700" : lane.status === "warning" ? "text-amber-700" : "text-rose-700"}`}>
+                                  {lane.status === "done" ? "已解除" : lane.status === "warning" ? "证据不足" : "仍阻塞"} · {lane.label}
+                                </span>
+                                <span className="ml-1 text-slate-600">{lane.completedSteps}/{lane.totalSteps} 步</span>
+                                <span className="ml-2 font-medium underline underline-offset-2">{lane.nextActionLabel}</span>
+                              </Link>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })() : null}
                     {focusNotice.recheckSummary.nextDispatch ? (
                       <GateRecheckDispatchButton
                         dispatch={focusNotice.recheckSummary.nextDispatch}

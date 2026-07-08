@@ -503,6 +503,7 @@ export interface PrePublishGateRecheckSummary {
   remainingBlockers: PrePublishGateRemainingBlocker[];
   blockerGroups: PrePublishGateBlockerGroup[];
   roleClosureProgress: PrePublishGateRoleClosureProgress | null;
+  firstThreeAdoptionProgress: PrePublishGateFirstThreeAdoptionProgress | null;
   latestEvidence: string | null;
   latestRecheckReceipt: PrePublishGateRecheckReceipt | null;
   closedItems: string[];
@@ -542,6 +543,28 @@ export interface PrePublishGateRoleClosureLane {
   label: string;
   status: "done" | "missing";
   evidence: string;
+}
+
+export interface PrePublishGateFirstThreeAdoptionProgress {
+  headline: string;
+  detail: string;
+  totalTimelines: number;
+  completedTimelines: number;
+  blockedTimelines: number;
+  warningTimelines: number;
+  lanes: PrePublishGateFirstThreeAdoptionProgressLane[];
+}
+
+export interface PrePublishGateFirstThreeAdoptionProgressLane {
+  id: string;
+  label: string;
+  status: "done" | "blocked" | "warning";
+  detail: string;
+  evidence: string;
+  nextActionLabel: string;
+  href: string;
+  completedSteps: number;
+  totalSteps: number;
 }
 
 export interface PrePublishGateRemainingBlocker {
@@ -1919,6 +1942,55 @@ function buildProjectAcceptanceClosedItems(
   return [];
 }
 
+function buildFirstThreeAdoptionRecheckProgress(
+  projectId: string,
+  closure: PrePublishGateAdoptionClosure,
+): PrePublishGateFirstThreeAdoptionProgress | null {
+  const timelines = closure.timelines.filter((timeline) => timeline.projectId === projectId);
+  if (timelines.length === 0) return null;
+
+  const lanes = timelines.map((timeline) => {
+    const nextStep = timeline.steps.find((step) => step.status !== "pass") ?? timeline.steps.at(-1) ?? null;
+    const latestEvidence = timeline.steps
+      .filter((step) => step.status === "pass" && step.evidence.trim())
+      .map((step) => step.evidence.trim())
+      .at(-1) ?? nextStep?.evidence ?? timeline.detail;
+    return {
+      id: timeline.id,
+      label: timeline.label,
+      status: timeline.status === "pass" ? "done" : timeline.status === "warn" ? "warning" : "blocked",
+      detail: timeline.detail,
+      evidence: latestEvidence,
+      nextActionLabel: timeline.nextActionLabel,
+      href: timeline.href,
+      completedSteps: timeline.completedSteps,
+      totalSteps: timeline.totalSteps,
+    } satisfies PrePublishGateFirstThreeAdoptionProgressLane;
+  });
+  const completedTimelines = lanes.filter((lane) => lane.status === "done").length;
+  const blockedTimelines = lanes.filter((lane) => lane.status === "blocked").length;
+  const warningTimelines = lanes.filter((lane) => lane.status === "warning").length;
+  const totalTimelines = lanes.length;
+  const issueText = [
+    blockedTimelines ? `仍阻塞 ${blockedTimelines} 条` : "",
+    warningTimelines ? `证据不足 ${warningTimelines} 条` : "",
+  ].filter(Boolean).join("，");
+
+  return {
+    headline: issueText
+      ? `采纳后续 ${completedTimelines}/${totalTimelines}：${issueText}`
+      : `采纳后续 ${completedTimelines}/${totalTimelines}：新正文闭环已解除`,
+    detail: issueText
+      ? `${issueText}；先处理卡住的重新审稿、二改或发布质检，再刷新总闸门。`
+      : "采纳后的重新审稿、二改判断和发布质检都已闭合，可以继续看发布放行。",
+    totalTimelines,
+    completedTimelines,
+    blockedTimelines,
+    warningTimelines,
+    lanes,
+  };
+}
+
 function buildProjectAcceptanceRecheckSummary(
   actionId: string | null | undefined,
   gate: PrePublishGate,
@@ -1940,6 +2012,7 @@ function buildProjectAcceptanceRecheckSummary(
   const latestEvidence = project.acceptanceSheetGate.latestDispatchEvidence;
   const latestRecheckReceipt = project.acceptanceSheetGate.latestRecheckReceipt;
   const closedItems = buildProjectAcceptanceClosedItems(latestRecheckReceipt);
+  const firstThreeAdoptionProgress = buildFirstThreeAdoptionRecheckProgress(project.projectId, gate.firstThreeAdoptionClosure);
   const currentStepLabel = currentStep?.label ?? project.acceptanceSheetGate.actionLabel;
   const recheckVerdict = buildProjectAcceptanceRecheckVerdict({
     acceptanceStatus: project.acceptanceSheetGate.status,
@@ -1970,6 +2043,7 @@ function buildProjectAcceptanceRecheckSummary(
     remainingBlockers,
     blockerGroups,
     roleClosureProgress: project.acceptanceSheetGate.roleClosureProgress,
+    firstThreeAdoptionProgress,
     latestEvidence,
     latestRecheckReceipt,
     closedItems,

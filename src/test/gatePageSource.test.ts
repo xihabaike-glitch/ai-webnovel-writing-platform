@@ -48,6 +48,16 @@ test("gate page renders role closure recheck progress", () => {
   assert.ok(source.includes("lane.evidence"));
 });
 
+test("gate page renders first-three adoption recheck progress", () => {
+  assert.ok(source.includes("focusNotice.recheckSummary.firstThreeAdoptionProgress"));
+  assert.ok(source.includes("采纳后续闭环"));
+  assert.ok(source.includes("adoptionProgress.headline"));
+  assert.ok(source.includes("adoptionProgress.lanes.map"));
+  assert.ok(source.includes("lane.status === \"done\""));
+  assert.ok(source.includes("lane.nextActionLabel"));
+  assert.ok(source.includes("href={hrefWithGateReturn(lane.href, gateRecheckReturnHref)}"));
+});
+
 test("gate page labels prioritized remaining blockers", () => {
   assert.ok(source.includes("focusNotice.recheckSummary.blockerGroups"));
   assert.ok(source.includes("可放行后处理"));

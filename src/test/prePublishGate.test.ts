@@ -594,6 +594,49 @@ test("buildPrePublishGate", async (t) => {
     assert.ok(notice.recheckSummary?.latestRecheckReceipt?.evidence.includes("资料官和平台包装"));
   });
 
+  await t.test("shows first-three adoption closure progress in action recheck", () => {
+    const gate = buildPrePublishGate({
+      projects: [{
+        ...readyProject,
+        id: "project-recheck-adoption",
+        gateDispatchTasks: [
+          ...firstDayCompleteDispatches("project-recheck-adoption"),
+          {
+            dispatchKey: "first-three-adoption:project-recheck-adoption:chapter-1:revision-1:review",
+            state: "completed",
+            completionEvidence: "采纳后重新审稿已完成：第 1 章《第1夜》，任务 review-1，审稿分 91，问题 0 个。",
+          },
+          {
+            dispatchKey: "first-three-adoption:project-recheck-adoption:chapter-1:revision-1:publish-check",
+            state: "assigned",
+            completionEvidence: "",
+            title: "第 1 章采纳后发布质检",
+            detail: "重新审稿后回发布包刷新质检。",
+            actionLabel: "回发布质检",
+            href: "/projects/project-recheck-adoption#platform-export",
+          },
+        ],
+      }],
+      failureTasks: [],
+      batchHistory: [],
+    });
+    const notice = buildPrePublishGateFocusNotice({
+      focus: "action-recheck",
+      actionId: "project-acceptance:project-recheck-adoption",
+      gate,
+    });
+
+    assert.equal(notice.visible, true);
+    assert.equal(notice.recheckSummary?.firstThreeAdoptionProgress?.totalTimelines, 1);
+    assert.equal(notice.recheckSummary?.firstThreeAdoptionProgress?.completedTimelines, 0);
+    assert.equal(notice.recheckSummary?.firstThreeAdoptionProgress?.blockedTimelines, 1);
+    assert.ok(notice.recheckSummary?.firstThreeAdoptionProgress?.headline.includes("采纳后续 0/1"));
+    assert.ok(notice.recheckSummary?.firstThreeAdoptionProgress?.detail.includes("仍阻塞 1 条"));
+    assert.equal(notice.recheckSummary?.firstThreeAdoptionProgress?.lanes[0]?.status, "blocked");
+    assert.equal(notice.recheckSummary?.firstThreeAdoptionProgress?.lanes[0]?.nextActionLabel, "回发布质检");
+    assert.ok(notice.recheckSummary?.firstThreeAdoptionProgress?.lanes[0]?.detail.includes("发布质检"));
+  });
+
   await t.test("orders action recheck blockers with the current gate blocker first", () => {
     const gate = buildPrePublishGate({
       projects: [{

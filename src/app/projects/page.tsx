@@ -170,6 +170,18 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps) 
   const activeProductionClosureCountLabel = activeProductionClosureLane
     ? `${visibleItems.length}/${pipelineFilteredItems.length} 本还有卡点`
     : "";
+  const activeFilterChips = [
+    activePipelineStep ? {
+      id: "pipeline-step",
+      label: `流水线：${activePipelineStep.label}`,
+      href: projectsFilterHref({ pipelineStepId: null, closureLaneId: activeProductionClosureLane?.id ?? null }),
+    } : null,
+    activeProductionClosureLane ? {
+      id: "production-closure",
+      label: `生产闭环：${activeProductionClosureLane.label}`,
+      href: projectsFilterHref({ pipelineStepId: activePipelineStep?.id ?? null, closureLaneId: null }),
+    } : null,
+  ].filter((item): item is { id: string; label: string; href: string } => Boolean(item));
 
   return (
     <AppShell>
@@ -432,6 +444,21 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps) 
             <Link className="w-fit rounded-md border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-100" href={hrefWithGateReturn("/projects#pipeline-projects", gateReturn)}>
               查看全部作品
             </Link>
+          </div>
+        ) : null}
+        {activeFilterChips.length > 0 ? (
+          <div className="mt-3 rounded-md border border-slate-200 bg-white p-3 text-sm">
+            <div className="text-xs font-medium text-slate-500">当前筛选条件</div>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {activeFilterChips.map((chip) => (
+                <span className="inline-flex items-center gap-2 rounded-md bg-slate-100 px-2 py-1 text-xs text-slate-700" key={chip.id}>
+                  {chip.label}
+                  <Link className="font-medium text-slate-950 hover:underline" href={hrefWithGateReturn(chip.href, gateReturn)}>
+                    清除这个条件
+                  </Link>
+                </span>
+              ))}
+            </div>
           </div>
         ) : null}
       </section>

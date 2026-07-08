@@ -61,10 +61,15 @@ test("projects page filters project cards by production closure lane", () => {
   assert.ok(source.includes("activeProductionClosureLane"));
   assert.ok(source.includes("invalidClosureLane"));
   assert.ok(source.includes("function projectsFilterHref"));
+  assert.ok(source.includes("activeFilterChips"));
+  assert.ok(source.includes("当前筛选条件"));
+  assert.ok(source.includes("清除这个条件"));
   assert.ok(source.includes("pipelineFilteredItems"));
   assert.ok(source.includes("item.productionClosure.some((closure) => closure.id === activeProductionClosureLane.id && closure.status !== \"allow\")"));
   assert.ok(source.includes("projectsFilterHref({ pipelineStepId: activePipelineStep?.id ?? null, closureLaneId: productionLane.id })"));
   assert.ok(source.includes("projectsFilterHref({ pipelineStepId: step.id, closureLaneId: activeProductionClosureLane?.id ?? null })"));
+  assert.ok(source.includes("projectsFilterHref({ pipelineStepId: null, closureLaneId: activeProductionClosureLane?.id ?? null })"));
+  assert.ok(source.includes("projectsFilterHref({ pipelineStepId: activePipelineStep?.id ?? null, closureLaneId: null })"));
   assert.ok(source.includes("当前只看生产闭环"));
   assert.ok(source.includes("activeProductionClosureCountLabel"));
   assert.ok(source.includes("visibleItems.length"));

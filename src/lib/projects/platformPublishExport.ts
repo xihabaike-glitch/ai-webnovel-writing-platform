@@ -1,5 +1,5 @@
-import type { PlatformProfile } from "../platforms/platformProfiles.ts";
-import { platformProfiles, type PlatformId } from "../platforms/platformProfiles.ts";
+import type { PlatformDeliveryScope, PlatformProfile } from "../platforms/platformProfiles.ts";
+import { platformDeliveryScope, platformProfiles, type PlatformId } from "../platforms/platformProfiles.ts";
 import { buildPlatformExecutionCard } from "../platforms/platformExecutionCards.ts";
 import { getChapterRevisionSourceLabel, isChapterRevisionCandidate } from "../chapters/revisions.ts";
 import { publishRepairTaskSource } from "./publishRepairActionExecution.ts";
@@ -803,6 +803,7 @@ export interface PlatformKnowledgeInsight {
 
 export interface PlatformPublishExportCenter {
   packages: PlatformPublishPackage[];
+  deliveryScope: PlatformDeliveryScope;
   recommendedPlatformId: PlatformId;
   totalPublishableChapters: number;
   workspace: PlatformPublishWorkspace;
@@ -4718,6 +4719,7 @@ export function buildPlatformPublishExportCenter(input: PlatformPublishExportInp
 
   return {
     packages,
+    deliveryScope: platformDeliveryScope,
     recommendedPlatformId: input.targetPlatform.id,
     totalPublishableChapters: publishableChapters(input.chapters).length,
     workspace: buildPublishWorkspace(packages),

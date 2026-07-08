@@ -824,6 +824,14 @@ interface PlatformPublishExecutionHandoffSummary {
 
 interface PlatformPublishExportCenter {
   packages: PlatformPublishPackage[];
+  deliveryScope: {
+    corePlatformCount: number;
+    completedPlatformCount: number;
+    pausedExpansionCount: number;
+    statusLabel: string;
+    expansionLabel: string;
+    scopeDecision: string;
+  };
   recommendedPlatformId: string;
   totalPublishableChapters: number;
   workspace: PlatformPublishWorkspace;
@@ -2798,6 +2806,17 @@ export function PlatformExportCenterPanel({
 
       {center ? (
         <div className="mt-3 rounded-md border border-slate-200 p-3">
+          <div className="mb-3 rounded-md border border-emerald-100 bg-emerald-50 p-3 text-sm leading-6 text-emerald-900">
+            <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
+              <div>
+                <div className="font-medium">{center.deliveryScope.statusLabel}</div>
+                <div className="mt-1">{center.deliveryScope.scopeDecision}</div>
+              </div>
+              <div className="w-fit rounded-md bg-white px-2 py-1 text-xs font-medium text-emerald-800">
+                {center.deliveryScope.expansionLabel}
+              </div>
+            </div>
+          </div>
           <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
             <div>
               <div className="font-medium text-slate-950">全平台发布工作台</div>

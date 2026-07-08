@@ -111,6 +111,10 @@ test("buildPlatformPublishExportCenter", async (t) => {
     });
 
     assert.equal(center.packages.length, platformProfiles.length);
+    assert.equal(center.deliveryScope.statusLabel, "8/8 核心平台已完成");
+    assert.equal(center.deliveryScope.expansionLabel, "剩余 10 个平台不再添加");
+    assert.equal(center.deliveryScope.pausedExpansionCount, 10);
+    assert.ok(center.deliveryScope.scopeDecision.includes("扩展平台不再作为待补缺口"));
     assert.equal(center.recommendedPlatformId, "fanqie");
     assert.equal(center.totalPublishableChapters, 1);
     assert.ok(center.packages.some((pack) => pack.platformId === "qidian"));

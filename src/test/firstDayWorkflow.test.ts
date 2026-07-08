@@ -343,6 +343,9 @@ test("buildFirstDayWorkflow", async (t) => {
     assert.ok(receipt.summary.includes("已写回"));
     assert.ok(receipt.completionEvidence.includes("1320 字"));
     assert.ok(receipt.completionEvidence.includes("DeepSeek"));
+    assert.ok(receipt.completionEvidence.includes("首日闭环证据"));
+    assert.ok(receipt.closureEvidence.some((item) => item.includes("初稿质检：86")));
+    assert.ok(receipt.closureEvidence.some((item) => item.includes("执行模型：DeepSeek")));
     assert.ok(receipt.detailItems.some((item) => item.includes("自动质检")));
   });
 
@@ -373,6 +376,9 @@ test("buildFirstDayWorkflow", async (t) => {
     assert.equal(receipt.writeBackTarget, "AI 任务审稿记录");
     assert.ok(receipt.completionEvidence.includes("评分 72"));
     assert.ok(receipt.completionEvidence.includes("2 个问题"));
+    assert.ok(receipt.completionEvidence.includes("首日闭环证据"));
+    assert.ok(receipt.closureEvidence.some((item) => item.includes("审稿评分：72")));
+    assert.ok(receipt.closureEvidence.some((item) => item.includes("问题数量：2")));
     assert.ok(receipt.nextAction.includes("二改"));
   });
 
@@ -399,6 +405,8 @@ test("buildFirstDayWorkflow", async (t) => {
     assert.ok(receipt.summary.includes("二改已写回"));
     assert.ok(receipt.completionEvidence.includes("保留改前版本"));
     assert.ok(receipt.completionEvidence.includes("90 分复检"));
+    assert.ok(receipt.completionEvidence.includes("首日闭环证据"));
+    assert.ok(receipt.closureEvidence.some((item) => item.includes("二改复检：90")));
   });
 
   await t.test("builds a write-back receipt for first-day control assets execution", () => {

@@ -206,6 +206,7 @@ export interface FirstDayExecutionReceipt {
   writeBackTarget: string;
   nextAction: string;
   completionEvidence: string;
+  closureEvidence: string[];
   detailItems: string[];
 }
 
@@ -895,6 +896,11 @@ function providerLabel(result: unknown) {
   return textValue(provider?.displayName) || textValue(provider?.model) || "当前模型路线";
 }
 
+function evidenceWithFirstDayClosure(completionEvidence: string, closureEvidence: string[]) {
+  if (closureEvidence.length === 0) return completionEvidence;
+  return `${completionEvidence} 首日闭环证据：${closureEvidence.join("；")}。`;
+}
+
 function chapterLabel(result: unknown) {
   const item = record(result);
   const chapter = record(item?.chapter);
@@ -954,6 +960,7 @@ export function buildFirstDayExecutionReceipt(input: {
       writeBackTarget: "未写回",
       nextAction: "修复模型路线、预算或素材问题后重试当前节点。",
       completionEvidence: "",
+      closureEvidence: [],
       detailItems: [error],
     };
   }
@@ -963,12 +970,23 @@ export function buildFirstDayExecutionReceipt(input: {
     const wordCount = chapterWordCount(input.result);
     const provider = providerLabel(input.result);
     const score = auditScore(input.result, "draftQuality");
+    const closureEvidence = [
+      "执行节点：第一章初稿",
+      `写回章节：${title}`,
+      `当前字数：${wordCount}`,
+      `执行模型：${provider}`,
+      score === null ? "初稿质检：待查看任务记录" : `初稿质检：${score}`,
+    ];
     return {
       success: true,
       summary: `第一章初稿已写回：${title}，当前 ${wordCount} 字。`,
       writeBackTarget: title,
       nextAction: "检查正文后完成派单验收，再进入第一章审稿。",
-      completionEvidence: `第一章正文已生成并写回章节《${title}》，当前 ${wordCount} 字；使用 ${provider}，已留下初稿任务${score === null ? "" : `和 ${score} 分自动质检`}，可以进入审稿。`,
+      completionEvidence: evidenceWithFirstDayClosure(
+        `第一章正文已生成并写回章节《${title}》，当前 ${wordCount} 字；使用 ${provider}，已留下初稿任务${score === null ? "" : `和 ${score} 分自动质检`}，可以进入审稿。`,
+        closureEvidence,
+      ),
+      closureEvidence,
       detailItems: [
         `写回章节：${title}`,
         `当前字数：${wordCount}`,
@@ -982,12 +1000,24 @@ export function buildFirstDayExecutionReceipt(input: {
     const title = chapterLabel(input.result);
     const provider = providerLabel(input.result);
     const review = reviewResult(input.result);
+    const closureEvidence = [
+      "执行节点：第一章审稿",
+      `审稿章节：${title}`,
+      review.score === null ? "审稿评分：待查看任务记录" : `审稿评分：${review.score}`,
+      `问题数量：${review.issueCount}`,
+      `执行模型：${provider}`,
+      ...(review.summary ? [`审稿摘要：${review.summary}`] : []),
+    ];
     return {
       success: true,
       summary: `第一章审稿已完成：${title}${review.score === null ? "" : `，评分 ${review.score}`}。`,
       writeBackTarget: "AI 任务审稿记录",
       nextAction: "按审稿问题做二改，不要直接扩大批量生成。",
-      completionEvidence: `第一章审稿已完成：《${title}》${review.score === null ? "" : `评分 ${review.score}`}，发现 ${review.issueCount} 个问题；使用 ${provider}，审稿结果已记录，可以进入二改。`,
+      completionEvidence: evidenceWithFirstDayClosure(
+        `第一章审稿已完成：《${title}》${review.score === null ? "" : `评分 ${review.score}`}，发现 ${review.issueCount} 个问题；使用 ${provider}，审稿结果已记录，可以进入二改。`,
+        closureEvidence,
+      ),
+      closureEvidence,
       detailItems: [
         `审稿章节：${title}`,
         review.score === null ? "审稿评分：待查看任务记录" : `审稿评分：${review.score}`,
@@ -1002,12 +1032,23 @@ export function buildFirstDayExecutionReceipt(input: {
     const wordCount = chapterWordCount(input.result);
     const provider = providerLabel(input.result);
     const score = auditScore(input.result, "secondPassAudit");
+    const closureEvidence = [
+      "执行节点：第一章二改",
+      `写回章节：${title}`,
+      `当前字数：${wordCount}`,
+      `执行模型：${provider}`,
+      score === null ? "二改复检：待查看任务记录" : `二改复检：${score}`,
+    ];
     return {
       success: true,
       summary: `第一章二改已写回：${title}，当前 ${wordCount} 字。`,
       writeBackTarget: title,
       nextAction: "检查改前版本对照和复检分数，再进入平台包预检。",
-      completionEvidence: `二改已写回章节《${title}》，当前 ${wordCount} 字；使用 ${provider}，已保留改前版本${score === null ? "" : `并完成 ${score} 分复检`}，可以进入平台包预检。`,
+      completionEvidence: evidenceWithFirstDayClosure(
+        `二改已写回章节《${title}》，当前 ${wordCount} 字；使用 ${provider}，已保留改前版本${score === null ? "" : `并完成 ${score} 分复检`}，可以进入平台包预检。`,
+        closureEvidence,
+      ),
+      closureEvidence,
       detailItems: [
         `写回章节：${title}`,
         `当前字数：${wordCount}`,
@@ -1030,6 +1071,7 @@ export function buildFirstDayExecutionReceipt(input: {
       completionEvidence: receipt.failed.length > 0 || receipt.created.length === 0
         ? ""
         : `人物和设定支撑已生成并落库：新增 ${receipt.created.length} 项${createdPreview ? `（${createdPreview}）` : ""}；覆盖 ${receipt.areaLabels.join("、")}，可以进入第一章初稿。`,
+      closureEvidence: [],
       detailItems: [
         `新增资料：${receipt.created.length} 项`,
         `覆盖范围：${receipt.areaLabels.join("、") || "待确认"}`,
@@ -1045,6 +1087,7 @@ export function buildFirstDayExecutionReceipt(input: {
     writeBackTarget: "未写回",
     nextAction: input.plan.blockedReason ?? "请按当前节点说明人工处理。",
     completionEvidence: "",
+    closureEvidence: [],
     detailItems: [input.plan.blockedReason ?? "人工节点"],
   };
 }

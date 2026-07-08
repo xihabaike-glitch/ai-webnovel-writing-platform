@@ -1265,11 +1265,7 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
               </div>
               <div className="grid gap-2">
                 {runConsole.archiveExperienceRepairQueue.items.map((item) => (
-                  <Link
-                    className="rounded-md bg-white/80 p-3 text-sm hover:bg-white"
-                    href={hrefWithGateReturn(item.href, gateReturn)}
-                    key={item.id}
-                  >
+                  <div className="rounded-md bg-white/80 p-3 text-sm" key={item.id}>
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="rounded-md bg-rose-100 px-2 py-1 text-xs font-medium text-rose-800">缺回执</span>
                       <span className="font-medium text-slate-950">{item.taskLabel}</span>
@@ -1278,10 +1274,21 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
                     <div className="mt-2 text-slate-600">{item.projectTitle} · {item.chapterTitle}</div>
                     <p className="mt-1 leading-6 text-slate-600">{item.detail}</p>
                     <div className="mt-2 text-xs text-slate-500">{item.providerName} · {item.model}</div>
-                    <div className="mt-3 inline-flex rounded-md border border-slate-200 px-3 py-2 text-sm font-medium text-slate-800">
-                      {item.actionLabel}
+                    <div className="mt-3 flex flex-wrap items-center gap-2">
+                      {item.directRepairSupported ? (
+                        <RetryTaskButton
+                          className="flex flex-wrap items-center gap-2"
+                          label={item.repairActionLabel}
+                          purpose="archive_experience_repair"
+                          runningLabel="补经验重跑中"
+                          taskId={item.id}
+                        />
+                      ) : null}
+                      <Link className="inline-flex rounded-md border border-slate-200 px-3 py-2 text-sm font-medium text-slate-800 hover:bg-white" href={hrefWithGateReturn(item.href, gateReturn)}>
+                        {item.actionLabel}
+                      </Link>
                     </div>
-                  </Link>
+                  </div>
                 ))}
                 {runConsole.archiveExperienceRepairQueue.items.length === 0 ? (
                   <p className="rounded-md bg-white/70 p-3 text-sm text-slate-700">当前没有缺归档经验回执的最新写审改任务。</p>

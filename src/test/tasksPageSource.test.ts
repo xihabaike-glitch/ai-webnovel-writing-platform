@@ -118,6 +118,9 @@ test("tasks page gives archive experience blockers a direct repair entry", () =>
   assert.ok(source.includes("runConsole.archiveExperienceRepairQueue.items.map"));
   assert.ok(source.includes("runConsole.archiveExperienceRepairQueue.guidance.map"));
   assert.ok(source.includes("href={hrefWithGateReturn(item.href, gateReturn)}"));
+  assert.ok(source.includes("item.directRepairSupported"));
+  assert.ok(source.includes('purpose="archive_experience_repair"'));
+  assert.ok(source.includes("label={item.repairActionLabel}"));
   assert.ok(source.includes("archiveExperienceFocused"));
 });
 
@@ -126,6 +129,7 @@ test("tasks page carries gate return through task work links", () => {
   const publishEffectButton = readFileSync("src/components/tasks/RunPublishEffectQueueActionButton.tsx", "utf8");
   const debtEvidenceForm = readFileSync("src/components/tasks/CompleteTaskDebtEvidenceForm.tsx", "utf8");
   const batchRhythmDispatchButton = readFileSync("src/components/tasks/CreateBatchRhythmDispatchButton.tsx", "utf8");
+  const retryTaskButton = readFileSync("src/components/tasks/RetryTaskButton.tsx", "utf8");
 
   assert.ok(source.includes("function hrefWithGateReturn"));
   assert.ok(source.includes("base.includes(\"gateReturn=\")"));
@@ -167,6 +171,10 @@ test("tasks page carries gate return through task work links", () => {
   assert.ok(batchRhythmDispatchButton.includes("gateReturnHref?: string | null"));
   assert.ok(batchRhythmDispatchButton.includes("function hrefWithGateReturn"));
   assert.ok(batchRhythmDispatchButton.includes("router.push(hrefWithGateReturn(`/dispatch#dispatch-${payload.task.dispatchKey}`, gateReturnHref));"));
+
+  assert.ok(retryTaskButton.includes("purpose?: \"failure_retry\" | \"archive_experience_repair\""));
+  assert.ok(retryTaskButton.includes("body: JSON.stringify({ purpose })"));
+  assert.ok(retryTaskButton.includes("{isRetrying ? runningLabel : label}"));
 });
 
 test("tasks page shows platform strategy task source detail", () => {

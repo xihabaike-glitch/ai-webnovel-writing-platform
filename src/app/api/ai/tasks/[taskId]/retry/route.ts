@@ -2,15 +2,25 @@ import { NextResponse } from "next/server";
 import { generateChapterDraft } from "@/lib/ai/chapterDraftGeneration";
 import { reviewChapterDraft } from "@/lib/ai/chapterReviewGeneration";
 import { generateChapterSecondPass } from "@/lib/ai/chapterSecondPassGeneration";
-import { buildTaskRetryPlan, parseSecondPassRetryPayload } from "@/lib/ai/taskRetry";
+import { buildTaskRetryPlan, parseSecondPassRetryPayload, type TaskRetryPurpose } from "@/lib/ai/taskRetry";
 import { prisma } from "@/lib/db/prisma";
 
 interface Params {
   params: Promise<{ taskId: string }>;
 }
 
-export async function POST(_request: Request, { params }: Params) {
+function retryPurposeFromBody(body: unknown): TaskRetryPurpose {
+  if (body && typeof body === "object" && !Array.isArray(body) && "purpose" in body) {
+    const purpose = (body as { purpose?: unknown }).purpose;
+    if (purpose === "archive_experience_repair") return purpose;
+  }
+  return "failure_retry";
+}
+
+export async function POST(request: Request, { params }: Params) {
   const { taskId } = await params;
+  const requestBody = await request.json().catch(() => null);
+  const purpose = retryPurposeFromBody(requestBody);
   const task = await prisma.aiTask.findUnique({
     where: { id: taskId },
   });
@@ -19,7 +29,7 @@ export async function POST(_request: Request, { params }: Params) {
     return NextResponse.json({ error: "Task not found" }, { status: 404 });
   }
 
-  const retryPlan = buildTaskRetryPlan(task);
+  const retryPlan = buildTaskRetryPlan(task, { purpose });
   if (!retryPlan.supported || !task.chapterId) {
     return NextResponse.json({ error: retryPlan.reason }, { status: 400 });
   }

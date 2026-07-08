@@ -60,4 +60,37 @@ test("task retry helpers", async (t) => {
       inputSnapshot: "{}",
     }).supported, false);
   });
+
+  await t.test("allows archive experience repair reruns for missing archive writing tasks", () => {
+    const plan = buildTaskRetryPlan({
+      chapterId: "chapter-1",
+      taskType: "chapter_review",
+      status: "succeeded",
+      inputSnapshot: JSON.stringify({ prompt: { userPrompt: "普通审稿提示词" } }),
+    }, { purpose: "archive_experience_repair" });
+
+    assert.equal(plan.supported, true);
+    assert.equal(plan.actionLabel, "一键补经验重跑");
+    assert.ok(plan.reason.includes("最终交付归档强制执行"));
+  });
+
+  await t.test("does not archive-rerun tasks that already include archive experience", () => {
+    const plan = buildTaskRetryPlan({
+      chapterId: "chapter-1",
+      taskType: "chapter_review",
+      status: "succeeded",
+      inputSnapshot: JSON.stringify({
+        prompt: {
+          userPrompt: [
+            "最终交付归档强制执行：",
+            "- 不允许忽略开书经验；这条经验来自上一轮交付归档。",
+            "- 必须执行：审稿核对复制动作。",
+          ].join("\n"),
+        },
+      }),
+    }, { purpose: "archive_experience_repair" });
+
+    assert.equal(plan.supported, false);
+    assert.ok(plan.reason.includes("已经带归档经验"));
+  });
 });

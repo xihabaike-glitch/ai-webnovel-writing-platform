@@ -1,4 +1,5 @@
 import { buildTaskRetryPlan } from "./taskRetry.ts";
+import { buildTaskArchiveExperienceReceipt, type TaskArchiveExperienceReceipt } from "./archiveExperienceReceipt.ts";
 
 export interface TaskRunInput {
   id: string;
@@ -47,14 +48,6 @@ export interface TaskRunLog {
   archiveExperienceReceipt: TaskArchiveExperienceReceipt;
 }
 
-export interface TaskArchiveExperienceReceipt {
-  status: "not_applicable" | "attached" | "missing";
-  label: string;
-  detail: string;
-  evidence: string[];
-  nextAction: string;
-}
-
 export interface TaskArchiveExperienceRepairItem {
   id: string;
   projectId: string;
@@ -68,6 +61,8 @@ export interface TaskArchiveExperienceRepairItem {
   createdAt: string;
   href: string;
   actionLabel: string;
+  repairActionLabel: string;
+  directRepairSupported: boolean;
   detail: string;
   evidence: string[];
 }
@@ -169,15 +164,6 @@ const statusLabels: Record<string, string> = {
   failed: "失败",
 };
 
-const archiveExperienceTaskTypes = new Set(["chapter_draft", "chapter_review", "chapter_second_pass"]);
-const archiveExperienceEvidencePatterns = [
-  "最终交付归档强制执行",
-  "不允许忽略开书经验",
-  "复制动作",
-  "踩到不能踩边界",
-  "必须执行",
-];
-
 function labelFor(taskType: string) {
   return taskLabels[taskType] ?? taskType;
 }
@@ -196,97 +182,6 @@ function money(value: number) {
 
 function compact(message: string | null) {
   return (message || "任务失败，但没有记录错误信息。").replace(/\s+/g, " ").trim();
-}
-
-function parseJsonObject(value: string) {
-  try {
-    const parsed: unknown = JSON.parse(value);
-    return parsed && typeof parsed === "object" && !Array.isArray(parsed)
-      ? parsed as Record<string, unknown>
-      : null;
-  } catch {
-    return null;
-  }
-}
-
-function textFromUnknown(value: unknown): string | null {
-  if (typeof value === "string") return value;
-  if (Array.isArray(value)) {
-    const parts = value.map(textFromUnknown).filter((part): part is string => Boolean(part));
-    return parts.length > 0 ? parts.join("\n") : null;
-  }
-  if (value && typeof value === "object") {
-    const parts = Object.values(value).map(textFromUnknown).filter((part): part is string => Boolean(part));
-    return parts.length > 0 ? parts.join("\n") : null;
-  }
-  return null;
-}
-
-function promptTextFromSnapshot(snapshot: string) {
-  const parsed = parseJsonObject(snapshot);
-  if (!parsed) return snapshot;
-
-  const prompt = parsed.prompt && typeof parsed.prompt === "object" && !Array.isArray(parsed.prompt)
-    ? parsed.prompt as Record<string, unknown>
-    : null;
-  const candidates = [
-    prompt?.userPrompt,
-    prompt?.systemPrompt,
-    parsed.userPrompt,
-    parsed.prompt,
-    parsed.messages,
-  ];
-
-  return candidates
-    .map(textFromUnknown)
-    .filter((part): part is string => Boolean(part))
-    .join("\n") || snapshot;
-}
-
-function archiveExperienceEvidence(promptText: string) {
-  const evidence: string[] = [];
-  for (const line of promptText.split(/\r?\n/u)) {
-    const trimmed = line.trim();
-    if (!trimmed) continue;
-    if (archiveExperienceEvidencePatterns.some((pattern) => trimmed.includes(pattern)) && !evidence.includes(trimmed)) {
-      evidence.push(trimmed);
-    }
-    if (evidence.length >= 5) break;
-  }
-  return evidence;
-}
-
-export function buildTaskArchiveExperienceReceipt(task: Pick<TaskRunInput, "taskType" | "inputSnapshot">): TaskArchiveExperienceReceipt {
-  if (!archiveExperienceTaskTypes.has(task.taskType)) {
-    return {
-      status: "not_applicable",
-      label: "无需归档经验",
-      detail: "非写稿、审稿、二改任务，按原任务回执验收。",
-      evidence: [],
-      nextAction: "继续检查任务输出和失败修复记录。",
-    };
-  }
-
-  const promptText = promptTextFromSnapshot(task.inputSnapshot);
-  const evidence = archiveExperienceEvidence(promptText);
-  const hasArchiveExperience = promptText.includes("最终交付归档强制执行") && evidence.length > 0;
-  if (hasArchiveExperience) {
-    return {
-      status: "attached",
-      label: "归档经验已执行",
-      detail: "任务输入已带最终交付归档强制执行，模型不能跳过上一轮开书经验。",
-      evidence,
-      nextAction: "完成后核对正文、审稿或二改是否落实复制动作和避坑边界。",
-    };
-  }
-
-  return {
-    status: "missing",
-    label: "缺归档经验回执",
-    detail: "任务输入没有检测到最终交付归档强制执行，下一轮需要先补开书经验再重跑。",
-    evidence: ["inputSnapshot 未包含：最终交付归档强制执行"],
-    nextAction: "回开书经验或章节页补齐 startTactic 后，再发起单章验证。",
-  };
 }
 
 function isRetryableError(message: string | null) {
@@ -379,22 +274,27 @@ function buildArchiveExperienceRepairQueue(tasks: TaskRunInput[]): TaskArchiveEx
     .map((task) => ({ task, log: buildLog(task) }))
     .filter(({ log }) => log.archiveExperienceReceipt.status === "missing")
     .sort((left, right) => new Date(right.log.createdAt).getTime() - new Date(left.log.createdAt).getTime())
-    .map(({ log }): TaskArchiveExperienceRepairItem => ({
-      id: log.id,
-      projectId: log.projectId,
-      projectTitle: log.projectTitle,
-      chapterTitle: log.chapterTitle,
-      taskType: log.taskType,
-      taskLabel: log.taskLabel,
-      statusLabel: log.statusLabel,
-      providerName: log.providerName,
-      model: log.model,
-      createdAt: log.createdAt,
-      href: log.href,
-      actionLabel: archiveExperienceRepairActionLabel(log.taskType),
-      detail: `${log.projectTitle} · ${log.chapterTitle} · ${log.taskLabel} 缺「最终交付归档强制执行」输入，不能作为放量依据。`,
-      evidence: log.archiveExperienceReceipt.evidence,
-    }));
+    .map(({ task, log }): TaskArchiveExperienceRepairItem => {
+      const repairPlan = buildTaskRetryPlan(task, { purpose: "archive_experience_repair" });
+      return {
+        id: log.id,
+        projectId: log.projectId,
+        projectTitle: log.projectTitle,
+        chapterTitle: log.chapterTitle,
+        taskType: log.taskType,
+        taskLabel: log.taskLabel,
+        statusLabel: log.statusLabel,
+        providerName: log.providerName,
+        model: log.model,
+        createdAt: log.createdAt,
+        href: log.href,
+        actionLabel: archiveExperienceRepairActionLabel(log.taskType),
+        repairActionLabel: repairPlan.actionLabel,
+        directRepairSupported: repairPlan.supported,
+        detail: `${log.projectTitle} · ${log.chapterTitle} · ${log.taskLabel} 缺「最终交付归档强制执行」输入，不能作为放量依据。`,
+        evidence: log.archiveExperienceReceipt.evidence,
+      };
+    });
 
   if (items.length === 0) {
     return {

@@ -169,6 +169,8 @@ test("buildTaskRunConsole", async (t) => {
     assert.equal(console.archiveExperienceRepairQueue.actionHref, "/projects/project-1/chapters/chapter-1");
     assert.equal(console.archiveExperienceRepairQueue.items[0].id, "task-no-archive");
     assert.equal(console.archiveExperienceRepairQueue.items[0].taskLabel, "章节审稿");
+    assert.equal(console.archiveExperienceRepairQueue.items[0].directRepairSupported, true);
+    assert.equal(console.archiveExperienceRepairQueue.items[0].repairActionLabel, "一键补经验重跑");
     assert.ok(console.archiveExperienceRepairQueue.items[0].detail.includes("最终交付归档强制执行"));
     assert.ok(console.archiveExperienceRepairQueue.guidance.some((line) => line.includes("先补开书经验")));
   });

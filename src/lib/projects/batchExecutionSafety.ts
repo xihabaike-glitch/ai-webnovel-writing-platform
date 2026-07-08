@@ -1,6 +1,6 @@
 import type { QueueItem } from "./taskQueueCenter.ts";
 import { defaultBatchExecutionStrategy, type BatchExecutionStrategy } from "./batchExecutionStrategy.ts";
-import { buildTaskArchiveExperienceReceipt } from "../ai/taskRunConsole.ts";
+import { buildTaskArchiveExperienceReceipt } from "../ai/archiveExperienceReceipt.ts";
 
 export interface SafetyTaskProject {
   aiTasks: Array<{

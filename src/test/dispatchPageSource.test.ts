@@ -20,6 +20,17 @@ test("dispatch page keeps a gate recheck return path visible", () => {
   assert.ok(source.includes("回总闸门复检"));
 });
 
+test("dispatch page shows dispatch receipt closeout before returning to gate", () => {
+  assert.ok(source.includes("dispatchReceiptCloseoutPercent"));
+  assert.ok(source.includes("派发回执闭环面板"));
+  assert.ok(source.includes("aria-label=\"派发回执完成率\""));
+  assert.ok(source.includes("dispatchReceiptGateReturnLabel"));
+  assert.ok(source.includes("dispatchReceiptNextCutLabel"));
+  assert.ok(source.includes("回总闸门判断"));
+  assert.ok(source.includes("未闭环派单"));
+  assert.ok(source.includes("下一刀"));
+});
+
 test("dispatch page exposes a task center anchor for role dispatch evidence", () => {
   assert.ok(source.includes("id=\"dispatch-task-center\""));
   assert.ok(source.includes("<GateDispatchTaskCenter"));

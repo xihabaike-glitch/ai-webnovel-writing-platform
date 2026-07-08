@@ -15,6 +15,7 @@ import {
   buildGateFailureRepairRecheckDispatchItems,
   buildGateFailureRepairRecheckResolution,
   buildGateFailureRepairThirdRoundDispatchItems,
+  buildGateDispatchTaskCenter,
   type GateActionReceipt,
   type GatePlatformGrowthDispatchItem,
   type GatePlatformGrowthDispatchState,
@@ -378,6 +379,18 @@ export default async function DispatchPage({
     ...generatedTasks,
     ...persistedTasks.filter((task) => !generatedKeys.has(task.dispatchKey)),
   ];
+  const dispatchReceiptCloseout = buildGateDispatchTaskCenter(mergedTasks);
+  const dispatchReceiptCloseoutPercent = dispatchReceiptCloseout.summary.total > 0
+    ? Math.round((dispatchReceiptCloseout.summary.completed / dispatchReceiptCloseout.summary.total) * 100)
+    : 0;
+  const dispatchReceiptGateReturnLabel = dispatchReceiptCloseout.summary.total === 0
+    ? "等待总闸门派单"
+    : dispatchReceiptCloseout.summary.overdue > 0
+      ? "先收逾期回执"
+      : dispatchReceiptCloseout.summary.active > 0
+        ? "暂不回总闸门"
+        : "可以回总闸门复检";
+  const dispatchReceiptNextCutLabel = dispatchReceiptCloseout.nextActions[0] ?? "回总闸门复检并确认卡点变化";
   const routeConfirmationDispatchFlow = buildRouteConfirmationDispatchFlow(routeConfirmationReceipts, mergedTasks);
   const completionEvidenceSuggestions = buildWatchSampleCompletionEvidenceSuggestions(receipts);
   const realSampleProject = firstDaySource === "real-sample" && firstDayProjectId
@@ -405,6 +418,44 @@ export default async function DispatchPage({
           {mergedTasks.length ? `${mergedTasks.length} 个派单任务` : "等待总闸门派单"}
         </div>
       </div>
+      <section className="mb-6 rounded-md border border-slate-200 bg-slate-950 p-4 text-sm text-slate-200" aria-label="派发回执闭环面板">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div className="max-w-3xl">
+            <div className="text-xs font-medium uppercase tracking-wide text-slate-400">PM Closeout</div>
+            <h2 className="mt-1 text-lg font-semibold text-white">派发回执闭环面板</h2>
+            <p className="mt-2 leading-6 text-slate-300">
+              派单不是甩锅，只有任务状态、完成证据、人工验收和下一步都收齐，才允许回总闸门复检。
+            </p>
+          </div>
+          <div className="w-fit rounded-md bg-white px-3 py-2 text-sm font-semibold text-slate-950">
+            完成率 {dispatchReceiptCloseoutPercent}%
+          </div>
+        </div>
+        <div className="mt-4 h-2 overflow-hidden rounded-full bg-white/15" aria-label="派发回执完成率">
+          <div
+            className="h-full rounded-full bg-emerald-400"
+            style={{ width: `${dispatchReceiptCloseoutPercent}%` }}
+          />
+        </div>
+        <div className="mt-4 grid gap-3 md:grid-cols-4">
+          <div className="rounded-md bg-white/10 p-3">
+            <div className="text-xs text-slate-400">回总闸门判断</div>
+            <div className="mt-1 font-semibold text-white">{dispatchReceiptGateReturnLabel}</div>
+          </div>
+          <div className="rounded-md bg-white/10 p-3">
+            <div className="text-xs text-slate-400">未闭环派单</div>
+            <div className="mt-1 font-semibold text-white">{dispatchReceiptCloseout.summary.active}</div>
+          </div>
+          <div className="rounded-md bg-white/10 p-3">
+            <div className="text-xs text-slate-400">逾期回执</div>
+            <div className="mt-1 font-semibold text-white">{dispatchReceiptCloseout.summary.overdue}</div>
+          </div>
+          <div className="rounded-md bg-white/10 p-3">
+            <div className="text-xs text-slate-400">下一刀</div>
+            <div className="mt-1 font-semibold text-white">{dispatchReceiptNextCutLabel}</div>
+          </div>
+        </div>
+      </section>
       {invalidQueueNotice ? (
         <section className="mb-6 rounded-md border border-amber-200 bg-amber-50 p-4 text-amber-900">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">

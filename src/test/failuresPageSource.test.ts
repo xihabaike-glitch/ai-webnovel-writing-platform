@@ -23,6 +23,13 @@ test("failures page shows failure repair receipt acceptance criteria", () => {
   assert.ok(source.includes("failureRepairReceiptAcceptanceCriteria.map"));
 });
 
+test("failures page renders per-lane failure repair receipt templates", () => {
+  assert.ok(source.includes("失败修复回执模板"));
+  assert.ok(source.includes("lane.receiptTemplate.map"));
+  assert.ok(source.includes("break-words"));
+  assert.ok(source.includes("停手线"));
+});
+
 test("failures page carries gate return through repair links", () => {
   assert.ok(source.includes("function hrefWithGateReturn"));
   assert.ok(source.includes("href={hrefWithGateReturn(center.pmFocus.actionHref, gateReturn)}"));

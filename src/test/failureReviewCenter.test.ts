@@ -164,6 +164,13 @@ test("buildFailureReviewCenter", async (t) => {
     assert.match(center.repairLanes[0].receiptAction.message, /模型配置修复/);
     assert.equal(center.repairLanes[0].receiptAction.payload.laneId, "config");
     assert.deepEqual(center.repairLanes[0].receiptAction.payload.sampleTaskIds, ["config-failure"]);
+    assert.ok(center.repairLanes[0].receiptTemplate.some((line) => line.includes("失败原因：密钥/权限 1")));
+    assert.ok(center.repairLanes[0].receiptTemplate.some((line) => line.includes("修复泳道：P0 · 先修模型配置")));
+    assert.ok(center.repairLanes[0].receiptTemplate.some((line) => line.includes("重试样本：config-failure")));
+    assert.ok(center.repairLanes[0].receiptTemplate.some((line) => line.includes("恢复观察：修复后只跑 1 个样本")));
+    assert.ok(center.repairLanes[0].receiptTemplate.some((line) => line.includes("批量结论：继续暂停批量")));
+    assert.ok(center.repairLanes[0].receiptTemplate.some((line) => line.includes("下一步：去模型设置")));
+    assert.ok(center.repairLanes[0].receiptTemplate.some((line) => line.includes("停手线：没有重试样本和恢复观察")));
 
     const promptLane = center.repairLanes.find((lane) => lane.id === "prompt_context");
     assert.equal(promptLane?.priorityLabel, "P1");
@@ -171,6 +178,7 @@ test("buildFailureReviewCenter", async (t) => {
     assert.equal(promptLane?.href, "/projects/project-1/chapters/chapter-context");
     assert.equal(promptLane?.receiptAction.id, "failure-repair-batch");
     assert.equal(promptLane?.receiptAction.label, "记录上下文修复");
+    assert.ok(promptLane?.receiptTemplate.some((line) => line.includes("批量结论：继续暂停批量")));
 
     const retryLane = center.repairLanes.find((lane) => lane.id === "retry_sample");
     assert.equal(retryLane?.priorityLabel, "P2");
@@ -179,6 +187,7 @@ test("buildFailureReviewCenter", async (t) => {
     assert.equal(retryLane?.receiptAction.id, "repair-batch-retry:timeout-failure");
     assert.equal(retryLane?.receiptAction.label, "记录样本重试");
     assert.match(retryLane?.receiptAction.message ?? "", /单章重试样本/);
+    assert.ok(retryLane?.receiptTemplate.some((line) => line.includes("批量结论：只允许小样本观察")));
 
     const manualLane = center.repairLanes.find((lane) => lane.id === "manual_review");
     assert.equal(manualLane?.priorityLabel, "P3");
@@ -186,6 +195,7 @@ test("buildFailureReviewCenter", async (t) => {
     assert.equal(manualLane?.href, "/projects/project-1");
     assert.equal(manualLane?.receiptAction.id, "failure-repair-batch");
     assert.equal(manualLane?.receiptAction.label, "记录人工复盘");
+    assert.ok(manualLane?.receiptTemplate.some((line) => line.includes("人工复盘输入")));
   });
 
   await t.test("allows resume watch only when unresolved failures are clear", () => {

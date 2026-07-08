@@ -568,7 +568,7 @@ export default async function FailuresPage({
         </div>
         <div className="mt-4 grid gap-3 lg:grid-cols-4">
           {center.repairLanes.map((lane) => (
-            <div className="rounded-md border border-slate-200 p-3 text-sm" key={lane.id}>
+            <div className="min-w-0 rounded-md border border-slate-200 p-3 text-sm" key={lane.id}>
               <div className="flex items-center justify-between gap-2">
                 <span className="rounded-md bg-rose-50 px-2 py-1 text-xs font-medium text-rose-700">{lane.priorityLabel}</span>
                 <span className="text-xs text-slate-500">{lane.count} 个</span>
@@ -579,6 +579,16 @@ export default async function FailuresPage({
                 {lane.evidence.slice(0, 3).map((item) => (
                   <span className="rounded-md bg-slate-50 px-2 py-1 text-xs text-slate-600" key={item}>{item}</span>
                 ))}
+              </div>
+              <div className="mt-3 rounded-md border border-slate-200 bg-slate-50 p-3" aria-label="失败修复回执模板，含停手线">
+                <div className="text-xs font-medium text-slate-700">失败修复回执模板</div>
+                <div className="mt-2 grid gap-1.5">
+                  {lane.receiptTemplate.map((line) => (
+                    <div className="break-words text-xs leading-5 text-slate-600" key={line}>
+                      {line}
+                    </div>
+                  ))}
+                </div>
               </div>
               <Link className="mt-3 inline-flex rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white hover:bg-slate-800" href={hrefWithGateReturn(lane.href, gateReturn)}>
                 {lane.actionLabel}

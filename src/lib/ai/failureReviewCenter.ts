@@ -60,6 +60,7 @@ export interface FailureRepairLane {
   href: string;
   evidence: string[];
   sampleTaskIds: string[];
+  receiptTemplate: string[];
   receiptAction: {
     id: string;
     label: string;
@@ -203,6 +204,36 @@ function repairLaneId(item: FailureReviewItem): FailureRepairLaneId {
   return "manual_review";
 }
 
+function batchDecisionForLane(laneId: FailureRepairLaneId) {
+  if (laneId === "retry_sample") return "只允许小样本观察，重试样本成功后再回总闸门判断是否恢复。";
+  return "继续暂停批量，直到修复证据、重试样本和恢复观察都闭合。";
+}
+
+function buildRepairReceiptTemplate(input: {
+  laneId: FailureRepairLaneId;
+  priorityLabel: FailureRepairLane["priorityLabel"];
+  label: string;
+  actionLabel: string;
+  detail: string;
+  href: string;
+  evidence: string[];
+  sampleTaskIds: string[];
+}) {
+  const evidenceLine = input.evidence.length > 0 ? input.evidence.join("、") : "等待补充失败证据";
+  const sampleLine = input.sampleTaskIds.length > 0 ? input.sampleTaskIds.join("、") : "先选择 1 个失败任务";
+
+  return [
+    `失败原因：${evidenceLine}`,
+    `修复泳道：${input.priorityLabel} · ${input.label}`,
+    `修复动作：${input.detail}`,
+    `重试样本：${sampleLine}`,
+    "恢复观察：修复后只跑 1 个样本，观察成功状态、质量分、成本和同类失败是否清空。",
+    `批量结论：${batchDecisionForLane(input.laneId)}`,
+    `下一步：${input.actionLabel}（${input.href}）`,
+    "停手线：没有重试样本和恢复观察，不允许恢复推荐批次。",
+  ];
+}
+
 function buildRepairLanes(items: FailureReviewItem[]): FailureRepairLane[] {
   const laneOrder: FailureRepairLaneId[] = ["config", "prompt_context", "retry_sample", "manual_review"];
   const laneMeta: Record<FailureRepairLaneId, {
@@ -271,6 +302,17 @@ function buildRepairLanes(items: FailureReviewItem[]): FailureRepairLane[] {
       const href = meta.href ?? values[0].href;
       const detail = meta.detail(values.length);
       const receiptActionId = laneId === "retry_sample" ? `repair-batch-retry:${sampleTaskIds[0]}` : "failure-repair-batch";
+      const evidence = [...categoryEvidence, ...providerEvidence];
+      const receiptTemplate = buildRepairReceiptTemplate({
+        laneId,
+        priorityLabel: meta.priorityLabel,
+        label: meta.label,
+        actionLabel: meta.actionLabel,
+        detail,
+        href,
+        evidence,
+        sampleTaskIds,
+      });
 
       return {
         id: laneId,
@@ -280,8 +322,9 @@ function buildRepairLanes(items: FailureReviewItem[]): FailureRepairLane[] {
         detail,
         actionLabel: meta.actionLabel,
         href,
-        evidence: [...categoryEvidence, ...providerEvidence],
+        evidence,
         sampleTaskIds,
+        receiptTemplate,
         receiptAction: {
           id: receiptActionId,
           label: meta.receiptLabel,
@@ -292,7 +335,7 @@ function buildRepairLanes(items: FailureReviewItem[]): FailureRepairLane[] {
             source: "failure_repair_lane",
             laneId,
             sampleTaskIds,
-            evidence: [...categoryEvidence, ...providerEvidence],
+            evidence,
           },
         },
       };

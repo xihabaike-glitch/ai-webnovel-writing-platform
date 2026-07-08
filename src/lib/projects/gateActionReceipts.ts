@@ -717,6 +717,7 @@ export interface GateDispatchEvidenceReview {
     completed: number;
     verified: number;
     needsReceipt: number;
+    acceptanceRecheck: number;
     missingEvidence: number;
     active: number;
   };
@@ -5219,6 +5220,7 @@ export function buildGateDispatchEvidenceReview(
 
   const verified = items.filter((item) => item.status === "verified").length;
   const needsReceipt = items.filter((item) => item.status === "needs_receipt").length;
+  const acceptanceRecheck = items.filter((item) => item.dispatchKey.startsWith("project-acceptance-next:") && item.status === "needs_receipt").length;
   const missingEvidence = items.filter((item) => item.status === "missing_evidence").length;
   const active = items.filter((item) => item.status === "active").length;
   const completed = tasks.filter((task) => task.state === "completed").length;
@@ -5235,11 +5237,13 @@ export function buildGateDispatchEvidenceReview(
       completed,
       verified,
       needsReceipt,
+      acceptanceRecheck,
       missingEvidence,
       active,
     },
     nextActions: [
       missingEvidence > 0 ? `${missingEvidence} 个完成任务缺依据，先补证据，否则就是纸面闭环。` : null,
+      acceptanceRecheck > 0 ? `${acceptanceRecheck} 个复检分流单已补依据，必须回总闸门刷新验收结论。` : null,
       needsReceipt > 0 ? `${needsReceipt} 个完成任务还缺后续业务回执，去总闸门刷新或执行对应动作。` : null,
       active > 0 ? `${active} 个派单还没完成，今天只推进能拿到验收证据的事项。` : null,
       tasks.length > 0 && verified === completed && active === 0 ? "全部完成任务都有后续业务回执，可以进入下一轮平台加码判断。" : null,

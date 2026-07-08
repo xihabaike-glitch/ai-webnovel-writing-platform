@@ -5211,6 +5211,7 @@ test("buildGateActionReceipt", async (t) => {
 
     assert.equal(review.summary.verified, 1);
     assert.equal(review.summary.needsReceipt, 2);
+    assert.equal(review.summary.acceptanceRecheck, 1);
     assert.equal(review.summary.missingEvidence, 1);
     assert.equal(review.summary.active, 1);
     assert.equal(review.items[0].status, "missing_evidence");

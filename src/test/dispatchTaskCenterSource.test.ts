@@ -138,3 +138,8 @@ test("dispatch task center labels acceptance recheck next-step dispatches", () =
   assert.ok(source.includes("复检分流补证据模板"));
   assert.ok(source.includes("回总闸门复检结论："));
 });
+
+test("dispatch task center shows acceptance recheck receipt counts", () => {
+  assert.ok(source.includes("待总闸门复检"));
+  assert.ok(source.includes("evidenceReview.summary.acceptanceRecheck"));
+});

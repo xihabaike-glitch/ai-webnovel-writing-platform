@@ -1924,6 +1924,10 @@ export function GateDispatchTaskCenter({
               <div className="text-xs opacity-75">待业务回执</div>
               <div className="mt-1 text-2xl font-semibold">{evidenceReview.summary.needsReceipt}</div>
             </div>
+            <div className="rounded-md bg-blue-50 p-3 text-blue-800">
+              <div className="text-xs opacity-75">待总闸门复检</div>
+              <div className="mt-1 text-2xl font-semibold">{evidenceReview.summary.acceptanceRecheck}</div>
+            </div>
             <div className="rounded-md bg-rose-50 p-3 text-rose-800">
               <div className="text-xs opacity-75">缺依据</div>
               <div className="mt-1 text-2xl font-semibold">{evidenceReview.summary.missingEvidence}</div>

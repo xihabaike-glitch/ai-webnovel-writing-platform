@@ -5571,6 +5571,33 @@ export function buildGateDispatchEvidenceReview(
       };
     }
 
+    const completionEvidenceError = reviewGateDispatchCompletionEvidence(task, completionEvidence);
+    if (completionEvidenceError) {
+      return {
+        dispatchKey: task.dispatchKey,
+        platformId: task.platformId,
+        platformName: task.platformName,
+        stage: task.stage,
+        ownerRole: task.ownerRole,
+        title: task.title,
+        priorityScore: task.priorityScore,
+        state: task.state,
+        status: "missing_evidence",
+        label: "缺完成依据",
+        detail: `完成依据太薄，至少写清执行角色、输入、输出、人工验收和下一步；${completionEvidenceError}`,
+        actionLabel: reviewAction(task, "missing_evidence"),
+        href: reviewHref(task, "missing_evidence"),
+        completionEvidence,
+        completedAt: task.completedAt,
+        latestReceiptAt: null,
+        evidence: [
+          "缺少派单回执字段：执行角色、输入、输出、人工验收、下一步",
+          `校验意见：${completionEvidenceError}`,
+          ...task.evidence,
+        ],
+      };
+    }
+
     return {
       dispatchKey: task.dispatchKey,
       platformId: task.platformId,

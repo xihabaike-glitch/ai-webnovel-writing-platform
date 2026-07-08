@@ -5633,7 +5633,15 @@ test("buildGateActionReceipt", async (t) => {
       dispatchKey: "qimao:record_metrics",
       projectId: "project-2",
       sourceReceiptId: null,
-      completionEvidence: "已完成数据整理，等待闸门回执。",
+      completionEvidence: [
+        "执行角色：追读数据运营",
+        "输入：七猫小说 · 发布效果回收 · 曝光点击收藏追读",
+        "输出：已完成数据整理，等待闸门回执。",
+        "曝光：1000；点击：180；收藏：35；追读：12",
+        "人工验收：通过",
+        "结论：数据已整理，等待回填发布效果",
+        "下一步：回填发布效果",
+      ].join("\n"),
       platformId: "qimao",
       platformName: "七猫小说",
       stage: "start_metrics_recovery" as const,
@@ -5800,6 +5808,37 @@ test("buildGateActionReceipt", async (t) => {
     assert.equal(metaOnlyReview.items[0].status, "needs_receipt");
     assert.equal(completedReview.items[0].status, "verified");
     assert.equal(completedReview.items[0].latestReceiptAt, completionReceipt.createdAt);
+  });
+
+  await t.test("rejects thin dispatch completion evidence without PM receipt fields", () => {
+    const baseDispatch = buildGatePlatformGrowthDispatchItems([buildGatePlatformStrategyReceipt({
+      item: strategyPlatform,
+      status: "succeeded",
+      now: "2026-01-01T00:00:00.000Z",
+      payload: {
+        variants: [{ strategy: "强钩子版" }],
+      },
+    })])[0];
+    const thinTask = {
+      ...baseDispatch,
+      databaseId: "dispatch-db-thin-evidence",
+      dispatchKey: "fanqie:thin-completion",
+      projectId: "project-thin",
+      sourceReceiptId: null,
+      completionEvidence: "已完成，等下一步。",
+      state: "completed" as const,
+      assignedAt: "2026-01-01T00:30:00.000Z",
+      completedAt: "2026-01-01T01:00:00.000Z",
+      createdAt: "2026-01-01T00:30:00.000Z",
+      updatedAt: "2026-01-01T01:00:00.000Z",
+    };
+
+    const review = buildGateDispatchEvidenceReview([thinTask], []);
+
+    assert.equal(review.summary.missingEvidence, 1);
+    assert.equal(review.items[0].status, "missing_evidence");
+    assert.ok(review.items[0].detail.includes("执行角色"));
+    assert.ok(review.items[0].evidence.some((line) => line.includes("缺少派单回执字段")));
   });
 
   await t.test("builds and validates platform dispatch completion templates", () => {

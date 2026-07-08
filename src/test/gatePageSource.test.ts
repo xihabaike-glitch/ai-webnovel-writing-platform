@@ -45,14 +45,20 @@ test("gate page renders real sample final review checklist", () => {
 
 test("gate page renders computed real pipeline final review verdict", () => {
   assert.ok(source.includes("gate.realPipelineFinalReview"));
-  assert.ok(source.includes("gate.realPipelineFinalReview.outcomeLabel"));
-  assert.ok(source.includes("gate.realPipelineFinalReview.headline"));
-  assert.ok(source.includes("gate.realPipelineFinalReview.detail"));
-  assert.ok(source.includes("gate.realPipelineFinalReview.primaryActionHref"));
-  assert.ok(source.includes("gate.realPipelineFinalReview.evidence.map"));
-  assert.ok(source.includes("gate.realPipelineFinalReview.passSignals.map"));
-  assert.ok(source.includes("gate.realPipelineFinalReview.repairSignals.map"));
-  assert.ok(source.includes("gate.realPipelineFinalReview.holdBatchSignals.map"));
+  assert.ok(source.includes("const finalReview = gate.realPipelineFinalReview;"));
+  assert.ok(source.includes("真实作品流水线自动终检"));
+  assert.ok(source.includes("finalReview.outcomeLabel"));
+  assert.ok(source.includes("finalReview.headline"));
+  assert.ok(source.includes("finalReview.detail"));
+  assert.ok(source.includes("finalReview.primaryActionHref"));
+  assert.ok(source.includes("finalReview.evidence.map"));
+  assert.ok(source.includes("finalReview.passSignals.map"));
+  assert.ok(source.includes("finalReview.repairSignals.map"));
+  assert.ok(source.includes("finalReview.holdBatchSignals.map"));
+  assert.ok(
+    source.indexOf("真实作品流水线自动终检") < source.indexOf("{realSampleReceiptFocus ? ("),
+    "computed final review should be visible on the gate before receipt-specific context",
+  );
 });
 
 test("gate page renders action recheck summary feedback", () => {

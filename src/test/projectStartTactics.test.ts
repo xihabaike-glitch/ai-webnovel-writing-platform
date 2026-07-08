@@ -1461,6 +1461,45 @@ test("buildProjectStartTacticAdvice", async (t) => {
     assert.ok(handoffPackage.nextAction.includes("派单中心"));
   });
 
+  await t.test("keeps knowledge feedback source in first-day handoff dispatch evidence", () => {
+    const platform = getPlatformProfile("fanqie");
+    const template = getDefaultTemplateForPlatform(platform.id);
+    const handoffPackage = buildProjectStartExperienceHandoffDispatchPackage({
+      project: { id: "project-knowledge", title: "夜雨系统" },
+      platform,
+      handoff: {
+        status: "reuse",
+        label: "复用交接",
+        title: "番茄小说 正反馈开局交接",
+        detail: "平台知识反馈已经证明强钩子标题和前三章兑现可复用。",
+        selectedPlatformId: platform.id,
+        selectedPlatformName: platform.name,
+        recommendedPlatformId: platform.id,
+        recommendedPlatformName: platform.name,
+        recommendedTemplateId: template.id,
+        shouldSwitchTemplate: false,
+        firstDayActions: [
+          "开头：第一段给不可逆危机。",
+          "验证：回填前三章追读。",
+          "平台包：标题必须兑现强钩子。",
+          "模型复检：正文初稿走 DeepSeek，复查走 Kimi。",
+        ],
+        avoidRules: [
+          "不要直接放量，先做小样本。",
+          "不要只复用标题，不复用前三章兑现。",
+          "不要省略平台反馈回收字段。",
+        ],
+        evidence: [
+          "知识来源：番茄小说 正反馈经验已沉淀",
+          "平台反哺：执行正反馈链",
+        ],
+      },
+      now: "2026-01-03T00:00:00.000Z",
+    });
+
+    assert.ok(handoffPackage.dispatches.every((item) => item.evidence.some((line) => line.includes("知识来源：番茄小说"))));
+  });
+
   await t.test("parses only complete first-day handoff dispatch requests", () => {
     const valid = parseProjectStartExperienceHandoffDispatchRequest({
       handoff: {

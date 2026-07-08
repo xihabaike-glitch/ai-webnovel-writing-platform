@@ -839,9 +839,9 @@ function handoffEvidence(handoff: ProjectStartExperienceHandoff) {
     `交接类型：${handoff.label}`,
     `交接目标：${handoff.title}`,
     handoff.detail,
+    ...handoff.evidence,
     ...handoff.firstDayActions.map((action) => `首日动作：${action}`),
     ...handoff.avoidRules.map((rule) => `避坑边界：${rule}`),
-    ...handoff.evidence,
   ], 8);
 }
 

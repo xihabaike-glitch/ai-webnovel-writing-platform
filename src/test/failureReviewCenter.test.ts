@@ -153,6 +153,13 @@ test("buildFailureReviewCenter", async (t) => {
     assert.ok(center.pmFocus.pipelineValidationHint.includes("恢复样本"));
     assert.ok(center.pmFocus.pipelineValidationHint.includes("失败率"));
     assert.ok(center.pmFocus.pipelineValidationHint.includes("放量条件"));
+    assert.equal(center.runbookStep.stepId, "failure_repair");
+    assert.ok(center.runbookStep.title.includes("失败修复"));
+    assert.ok(center.runbookStep.owner.includes("失败修复"));
+    assert.ok(center.runbookStep.sampleAction.includes("失败"));
+    assert.ok(center.runbookStep.proofToCapture.includes("恢复观察"));
+    assert.ok(center.runbookStep.rollbackIfWeak.includes("小样本观察"));
+    assert.ok(center.repairLanes.every((lane) => lane.runbookStep.stepId === "failure_repair"));
     assert.equal(center.repairLanes[0].priorityLabel, "P0");
     assert.equal(center.repairLanes[0].label, "先修模型配置");
     assert.equal(center.repairLanes[0].actionLabel, "去模型设置");

@@ -439,6 +439,14 @@ export default async function FailuresPage({
             <div className="mt-2 rounded-md bg-white/10 px-3 py-2 text-xs leading-5 text-slate-200">
               {center.pmFocus.pipelineValidationHint}
             </div>
+            <div className="mt-3 rounded-md border border-white/15 bg-white/5 p-3 text-xs leading-5 text-slate-200">
+              <div className="font-medium text-white">失败修复实跑手册 · {center.runbookStep.title}</div>
+              <div className="mt-1 grid gap-1">
+                <span>当前实跑动作：{center.runbookStep.sampleAction}</span>
+                <span>要抓证据：{center.runbookStep.proofToCapture}</span>
+                <span>退路：{center.runbookStep.rollbackIfWeak}</span>
+              </div>
+            </div>
             <div className="mt-3 rounded-md border border-white/15 bg-white/5 p-3">
               <div className="text-xs font-medium text-slate-300">失败修复回执验收口径</div>
               <div className="mt-2 flex flex-wrap gap-2">
@@ -579,6 +587,14 @@ export default async function FailuresPage({
                 {lane.evidence.slice(0, 3).map((item) => (
                   <span className="rounded-md bg-slate-50 px-2 py-1 text-xs text-slate-600" key={item}>{item}</span>
                 ))}
+              </div>
+              <div className="mt-3 rounded-md border border-sky-200 bg-sky-50 p-3 text-xs leading-5 text-sky-950">
+                <div className="font-medium text-slate-950">{lane.runbookStep.title}</div>
+                <div className="mt-1 grid gap-1">
+                  <span className="break-words">修复样本动作：{lane.runbookStep.sampleAction}</span>
+                  <span className="break-words">要抓证据：{lane.runbookStep.proofToCapture}</span>
+                  <span className="break-words">退路：{lane.runbookStep.rollbackIfWeak}</span>
+                </div>
               </div>
               <div className="mt-3 rounded-md border border-slate-200 bg-slate-50 p-3" aria-label="失败修复回执模板，含停手线">
                 <div className="text-xs font-medium text-slate-700">失败修复回执模板</div>

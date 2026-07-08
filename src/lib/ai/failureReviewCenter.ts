@@ -1,3 +1,5 @@
+import { buildDevelopmentOverview, type DevelopmentOverviewPipelineProofStep } from "../development/developmentOverview.ts";
+
 export interface FailureReviewTask {
   id: string;
   projectId: string;
@@ -50,6 +52,15 @@ export interface FailureReviewItem {
 
 export type FailureRepairLaneId = "config" | "prompt_context" | "retry_sample" | "manual_review";
 
+export interface FailureRepairRunbookStep {
+  stepId: DevelopmentOverviewPipelineProofStep["id"];
+  title: string;
+  owner: string;
+  sampleAction: string;
+  proofToCapture: string;
+  rollbackIfWeak: string;
+}
+
 export interface FailureRepairLane {
   id: FailureRepairLaneId;
   priorityLabel: "P0" | "P1" | "P2" | "P3";
@@ -61,6 +72,7 @@ export interface FailureRepairLane {
   evidence: string[];
   sampleTaskIds: string[];
   receiptTemplate: string[];
+  runbookStep: FailureRepairRunbookStep;
   receiptAction: {
     id: string;
     label: string;
@@ -103,6 +115,7 @@ export interface FailureReviewCenter {
   providerGroups: FailureGroup[];
   taskTypeGroups: FailureGroup[];
   projectGroups: FailureGroup[];
+  runbookStep: FailureRepairRunbookStep;
   repairLanes: FailureRepairLane[];
   pmFocus: FailureReviewPmFocus;
   recentFailures: FailureReviewItem[];
@@ -144,6 +157,22 @@ const categorySuggestions: Record<FailureCategory, string> = {
 };
 
 const retryableCategories = new Set<FailureCategory>(["rate_limit", "timeout", "network", "provider", "json_parse"]);
+
+function buildFailureRepairRunbookStep(): FailureRepairRunbookStep {
+  const overview = buildDevelopmentOverview();
+  const runbookItem = overview.currentPipelineValidation.runbook.items.find((item) => item.stepId === "failure_repair")
+    ?? overview.currentPipelineValidation.runbook.items[0];
+  const proofStep = overview.pipelineProofRoute.steps.find((step) => step.id === runbookItem.stepId);
+
+  return {
+    stepId: runbookItem.stepId,
+    title: proofStep?.title ?? runbookItem.stepId,
+    owner: runbookItem.owner,
+    sampleAction: runbookItem.sampleAction,
+    proofToCapture: runbookItem.proofToCapture,
+    rollbackIfWeak: runbookItem.rollbackIfWeak,
+  };
+}
 
 function labelForTask(taskType: string) {
   return taskLabels[taskType] ?? taskType;
@@ -234,7 +263,7 @@ function buildRepairReceiptTemplate(input: {
   ];
 }
 
-function buildRepairLanes(items: FailureReviewItem[]): FailureRepairLane[] {
+function buildRepairLanes(items: FailureReviewItem[], runbookStep: FailureRepairRunbookStep): FailureRepairLane[] {
   const laneOrder: FailureRepairLaneId[] = ["config", "prompt_context", "retry_sample", "manual_review"];
   const laneMeta: Record<FailureRepairLaneId, {
     priorityLabel: FailureRepairLane["priorityLabel"];
@@ -325,6 +354,7 @@ function buildRepairLanes(items: FailureReviewItem[]): FailureRepairLane[] {
         evidence,
         sampleTaskIds,
         receiptTemplate,
+        runbookStep,
         receiptAction: {
           id: receiptActionId,
           label: meta.receiptLabel,
@@ -491,7 +521,8 @@ export function buildFailureReviewCenter(tasks: FailureReviewTask[]): FailureRev
     (item) => item.projectTitle,
     () => "回到项目工作台，先单章重试失败任务，不要直接批量扩大。",
   );
-  const repairLanes = buildRepairLanes(unresolvedFailures);
+  const runbookStep = buildFailureRepairRunbookStep();
+  const repairLanes = buildRepairLanes(unresolvedFailures, runbookStep);
 
   return {
     summary: {
@@ -507,6 +538,7 @@ export function buildFailureReviewCenter(tasks: FailureReviewTask[]): FailureRev
     providerGroups,
     taskTypeGroups,
     projectGroups,
+    runbookStep,
     repairLanes,
     pmFocus: buildFailureReviewPmFocus(unresolvedFailures, recoveredFailures, repairLanes),
     recentFailures: failures.slice(0, 12),

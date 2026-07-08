@@ -15,6 +15,12 @@ test("failures page keeps a gate recheck return path visible", () => {
 test("failures page shows failure repair receipt acceptance criteria", () => {
   assert.ok(source.includes("failureRepairReceiptAcceptanceCriteria"));
   assert.ok(source.includes("失败修复回执验收口径"));
+  assert.ok(source.includes("失败修复实跑手册"));
+  assert.ok(source.includes("center.runbookStep"));
+  assert.ok(source.includes("当前实跑动作"));
+  assert.ok(source.includes("center.runbookStep.sampleAction"));
+  assert.ok(source.includes("center.runbookStep.proofToCapture"));
+  assert.ok(source.includes("center.runbookStep.rollbackIfWeak"));
   assert.ok(source.includes("失败原因"));
   assert.ok(source.includes("修复泳道"));
   assert.ok(source.includes("重试样本"));
@@ -25,6 +31,10 @@ test("failures page shows failure repair receipt acceptance criteria", () => {
 
 test("failures page renders per-lane failure repair receipt templates", () => {
   assert.ok(source.includes("失败修复回执模板"));
+  assert.ok(source.includes("lane.runbookStep"));
+  assert.ok(source.includes("修复样本动作"));
+  assert.ok(source.includes("lane.runbookStep.proofToCapture"));
+  assert.ok(source.includes("lane.runbookStep.rollbackIfWeak"));
   assert.ok(source.includes("lane.receiptTemplate.map"));
   assert.ok(source.includes("break-words"));
   assert.ok(source.includes("停手线"));

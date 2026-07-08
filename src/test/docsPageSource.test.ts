@@ -22,3 +22,15 @@ test("docs page renders original requirement traceability", () => {
   assert.ok(source.includes("item.currentEvidence"));
   assert.ok(source.includes("item.acceptanceSignal"));
 });
+
+test("docs page renders the visible acceptance criteria map", () => {
+  assert.ok(source.includes("visibleAcceptanceCriteriaMap"));
+  assert.ok(source.includes("端到端可见验收口径地图"));
+  assert.ok(source.includes("entry.route"));
+  assert.ok(source.includes("entry.criteria"));
+  assert.ok(source.includes("entry.proof"));
+
+  for (const criterion of ["开书与发布复盘", "任务回执", "派单回执", "总闸门放量", "失败修复"]) {
+    assert.ok(source.includes(criterion), `${criterion} should be visible on the docs page`);
+  }
+});

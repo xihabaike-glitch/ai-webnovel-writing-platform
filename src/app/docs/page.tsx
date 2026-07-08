@@ -26,6 +26,34 @@ function auditStatusLabel(status: "ready" | "watch" | "blocked") {
   return "阻塞";
 }
 
+const visibleAcceptanceCriteriaMap = [
+  {
+    route: "/projects",
+    criteria: "开书与发布复盘",
+    proof: "开头钩子、结尾承诺、主干分支、发布包、版本基线、真实反馈和复盘指标。",
+  },
+  {
+    route: "/tasks",
+    criteria: "任务回执",
+    proof: "执行角色、输入、输出、人工验收和下一步必须可见。",
+  },
+  {
+    route: "/dispatch",
+    criteria: "派单回执",
+    proof: "完成依据必须能回到总闸门复检，不能只写已完成。",
+  },
+  {
+    route: "/gate",
+    criteria: "总闸门放量",
+    proof: "样本、复查、质量、成本、失败率和恢复证据缺一项就不放大。",
+  },
+  {
+    route: "/failures",
+    criteria: "失败修复",
+    proof: "失败原因、修复泳道、重试样本、恢复观察和暂停批量结论必须齐备。",
+  },
+];
+
 export default function DevelopmentDocsPage() {
   const overview = buildDevelopmentOverview();
 
@@ -117,6 +145,24 @@ export default function DevelopmentDocsPage() {
               >
                 查看入口
               </Link>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <section className="mb-6 rounded-md border border-slate-200 bg-white p-4">
+        <div className="mb-3">
+          <h2 className="font-medium text-slate-950">端到端可见验收口径地图</h2>
+          <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-600">
+            页面上看不到的证据，不算证据；没有下一步的回执，不算闭环。
+          </p>
+        </div>
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+          {visibleAcceptanceCriteriaMap.map((entry) => (
+            <article className="rounded-md border border-slate-200 bg-slate-50 p-3" key={entry.route}>
+              <div className="text-xs font-medium text-slate-500">{entry.route}</div>
+              <h3 className="mt-1 font-medium text-slate-950">{entry.criteria}</h3>
+              <p className="mt-2 text-xs leading-5 text-slate-600">{entry.proof}</p>
             </article>
           ))}
         </div>

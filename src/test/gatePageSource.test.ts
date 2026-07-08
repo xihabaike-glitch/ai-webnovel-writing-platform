@@ -187,6 +187,17 @@ test("gate page renders action recheck summary feedback", () => {
   assert.ok(source.includes("focusNotice.recheckSummary.nextDispatch"));
 });
 
+test("gate page renders archive experience recheck receipt evidence", () => {
+  assert.ok(source.includes("focusNotice.archiveExperienceRecheck"));
+  assert.ok(source.includes("归档经验复检回执"));
+  assert.ok(source.includes("archiveExperienceRecheck.latestTaskId"));
+  assert.ok(source.includes("archiveExperienceRecheck.latestTaskStatus"));
+  assert.ok(source.includes("archiveExperienceRecheck.scopeLabel"));
+  assert.ok(source.includes("archiveExperienceRecheck.evidence.map"));
+  assert.ok(source.includes("archiveExperienceRecheck.nextActionHref"));
+  assert.ok(source.includes("actionId === \"archive-experience\""));
+});
+
 test("gate page renders role closure recheck progress", () => {
   assert.ok(source.includes("focusNotice.recheckSummary.roleClosureProgress"));
   assert.ok(source.includes("角色闭环进度"));

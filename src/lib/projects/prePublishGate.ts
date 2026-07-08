@@ -1,4 +1,5 @@
 import { buildFailureReviewCenter, type FailureReviewTask } from "../ai/failureReviewCenter.ts";
+import { buildTaskArchiveExperienceReceipt, type TaskArchiveExperienceReceipt } from "../ai/archiveExperienceReceipt.ts";
 import type { TaskBatchHistoryItem } from "../ai/taskBatchHistory.ts";
 import { buildTaskRunConsole, type FailureRepairBatch, type TaskRunInput } from "../ai/taskRunConsole.ts";
 import { buildExportSnapshotHistory } from "../export/snapshots.ts";
@@ -489,11 +490,26 @@ export interface PrePublishGate {
   projectStatuses: PrePublishGateProjectStatus[];
   strategyReview: PrePublishGateStrategyReview;
   firstThreeAdoptionClosure: PrePublishGateAdoptionClosure;
+  archiveExperienceRecheck: PrePublishGateArchiveExperienceRecheck;
   priorityActions: PrePublishGateAction[];
   releaseAction: PrePublishGateAction | null;
   pmFocus: PrePublishGatePmFocus;
   realPipelineFinalReview: PrePublishGateRealPipelineFinalReview;
   finalDeliveryRelease: PrePublishGateFinalDeliveryRelease;
+}
+
+export interface PrePublishGateArchiveExperienceRecheck {
+  status: "empty" | "cleared" | "blocked";
+  headline: string;
+  detail: string;
+  scopeLabel: string;
+  latestTaskId: string | null;
+  latestTaskStatus: string | null;
+  latestTaskLabel: string;
+  latestTaskCreatedAt: string | null;
+  evidence: string[];
+  nextActionLabel: string;
+  nextActionHref: string;
 }
 
 export interface PrePublishGateRealPipelineFinalReview {
@@ -531,6 +547,7 @@ export interface PrePublishGateFocusNotice {
   primaryAction?: PrePublishGateAction | null;
   badges: string[];
   recheckSummary?: PrePublishGateRecheckSummary | null;
+  archiveExperienceRecheck?: PrePublishGateArchiveExperienceRecheck | null;
 }
 
 export interface PrePublishGateRecheckSummary {
@@ -2525,6 +2542,123 @@ function appendRecheckSummaryDetail(detail: string, summary: PrePublishGateReche
   return `${detail} 验收单回填：已完成 ${summary.completedSteps}/${summary.totalSteps} 步，当前卡点是「${summary.currentStepLabel}」。`;
 }
 
+function archiveExperienceTaskTypeLabel(taskType: string) {
+  if (taskType === "chapter_draft") return "初稿";
+  if (taskType === "chapter_review") return "审稿";
+  if (taskType === "chapter_second_pass") return "二改";
+  return "写作任务";
+}
+
+function archiveExperienceTaskTime(task: { createdAt: Date | string }) {
+  return new Date(task.createdAt).getTime();
+}
+
+function archiveExperienceTaskCreatedAt(task: { createdAt: Date | string }) {
+  return task.createdAt instanceof Date ? task.createdAt.toISOString() : task.createdAt;
+}
+
+function buildArchiveExperienceRecheck(projects: PrePublishGateProject[]): PrePublishGateArchiveExperienceRecheck {
+  const latestByScope = new Map<string, {
+    projectTitle: string;
+    chapterTitle: string;
+    taskId: string;
+    taskType: string;
+    taskStatus: string;
+    createdAt: Date | string;
+    receipt: TaskArchiveExperienceReceipt;
+  }>();
+
+  for (const project of projects) {
+    for (const task of project.aiTasks) {
+      const receipt = buildTaskArchiveExperienceReceipt({
+        taskType: task.taskType,
+        inputSnapshot: task.inputSnapshot ?? "",
+      });
+      if (receipt.status === "not_applicable") continue;
+
+      const chapter = project.chapters.find((item) => item.id === task.chapterId) ?? null;
+      const scopeKey = `${project.id}:${task.chapterId ?? "project"}:${task.taskType}`;
+      const current = latestByScope.get(scopeKey);
+      if (current && archiveExperienceTaskTime(current) >= archiveExperienceTaskTime(task)) continue;
+
+      latestByScope.set(scopeKey, {
+        projectTitle: project.title,
+        chapterTitle: chapter?.title ?? "整本作品",
+        taskId: task.id,
+        taskType: task.taskType,
+        taskStatus: task.status,
+        createdAt: task.createdAt,
+        receipt,
+      });
+    }
+  }
+
+  const latestTasks = Array.from(latestByScope.values())
+    .sort((left, right) => archiveExperienceTaskTime(right) - archiveExperienceTaskTime(left));
+
+  if (latestTasks.length === 0) {
+    return {
+      status: "empty",
+      headline: "暂无归档经验复检任务",
+      detail: "当前没有写稿、审稿或二改任务可复检；先完成真实章节任务后再检查归档经验回执。",
+      scopeLabel: "无写作任务",
+      latestTaskId: null,
+      latestTaskStatus: null,
+      latestTaskLabel: "暂无任务",
+      latestTaskCreatedAt: null,
+      evidence: ["暂无写稿、审稿或二改任务。"],
+      nextActionLabel: "查看任务运行台",
+      nextActionHref: "/tasks?focus=archive-experience#task-run-console",
+    };
+  }
+
+  const missingTasks = latestTasks.filter((task) => task.receipt.status === "missing");
+  const targetTask = missingTasks[0] ?? latestTasks[0];
+  const taskLabel = archiveExperienceTaskTypeLabel(targetTask.taskType);
+  const scopeLabel = `${targetTask.projectTitle} · ${targetTask.chapterTitle} · ${taskLabel}`;
+  const baseEvidence = [
+    `任务 ID：${targetTask.taskId}`,
+    `任务状态：${targetTask.taskStatus}`,
+    `复检范围：${scopeLabel}`,
+    ...targetTask.receipt.evidence,
+  ];
+
+  if (missingTasks.length > 0) {
+    return {
+      status: "blocked",
+      headline: "归档经验复检仍阻塞",
+      detail: `${missingTasks.length} 个最新写审改任务缺归档经验回执；先回任务运行台补经验重跑，再回总闸门复检。`,
+      scopeLabel,
+      latestTaskId: targetTask.taskId,
+      latestTaskStatus: targetTask.taskStatus,
+      latestTaskLabel: `${taskLabel} · ${targetTask.receipt.label}`,
+      latestTaskCreatedAt: archiveExperienceTaskCreatedAt(targetTask),
+      evidence: baseEvidence,
+      nextActionLabel: "回任务运行台补经验重跑",
+      nextActionHref: "/tasks?focus=archive-experience#task-run-console",
+    };
+  }
+
+  return {
+    status: "cleared",
+    headline: "归档经验复检已解除",
+    detail: "最新写稿、审稿、二改任务均带最终交付归档强制执行；可以继续看最终交付和平台发布证据。",
+    scopeLabel,
+    latestTaskId: targetTask.taskId,
+    latestTaskStatus: targetTask.taskStatus,
+    latestTaskLabel: `${taskLabel} · ${targetTask.receipt.label}`,
+    latestTaskCreatedAt: archiveExperienceTaskCreatedAt(targetTask),
+    evidence: baseEvidence,
+    nextActionLabel: "查看最终交付复检",
+    nextActionHref: "#pipeline-final-review",
+  };
+}
+
+function appendArchiveExperienceRecheckDetail(detail: string, recheck: PrePublishGateArchiveExperienceRecheck | null) {
+  if (!recheck) return detail;
+  return `${detail} 归档经验复检：${recheck.detail} 最新任务：${recheck.latestTaskId ?? "暂无"}（${recheck.latestTaskStatus ?? "未记录状态"}）。`;
+}
+
 export function buildPrePublishGateFocusNotice(input: {
   focus?: string | null;
   projectId?: string | null;
@@ -2533,6 +2667,9 @@ export function buildPrePublishGateFocusNotice(input: {
 }): PrePublishGateFocusNotice {
   if (input.focus === "action-recheck") {
     const recheckSummary = buildProjectAcceptanceRecheckSummary(input.actionId, input.gate);
+    const archiveExperienceRecheck = input.actionId === "archive-experience"
+      ? input.gate.archiveExperienceRecheck
+      : null;
     const sameAction = input.actionId
       ? input.gate.priorityActions.find((action) => action.id === input.actionId) ?? null
       : null;
@@ -2544,15 +2681,19 @@ export function buildPrePublishGateFocusNotice(input: {
         visible: true,
         tone: "blocked",
         headline: "上次动作后仍有阻塞",
-        detail: appendRecheckSummaryDetail(
-          `${sameAction.detail} 这说明刚才的处理还没有完全解除当前卡点，先继续处理同一动作，再刷新总闸门复检。`,
-          recheckSummary,
+        detail: appendArchiveExperienceRecheckDetail(
+          appendRecheckSummaryDetail(
+            `${sameAction.detail} 这说明刚才的处理还没有完全解除当前卡点，先继续处理同一动作，再刷新总闸门复检。`,
+            recheckSummary,
+          ),
+          archiveExperienceRecheck,
         ),
         primaryLabel: sameAction.label,
         primaryHref: sameAction.href,
         primaryAction: sameAction,
-        badges: ["动作复检", "继续处理同一动作", "解除后再放量"],
+        badges: ["动作复检", "继续处理同一动作", "解除后再放量", ...(archiveExperienceRecheck ? ["归档经验复检"] : [])],
         recheckSummary,
+        archiveExperienceRecheck,
       };
     }
 
@@ -2561,17 +2702,21 @@ export function buildPrePublishGateFocusNotice(input: {
         visible: true,
         tone: "ready",
         headline: "上次动作已清除，总闸门可放行",
-        detail: appendRecheckSummaryDetail(
-          primary?.detail
-            ? `上次处理的阻塞已经不在优先动作里。${primary.detail}`
-            : "上次处理的阻塞已经不在优先动作里，总闸门当前可放行。",
-          recheckSummary,
+        detail: appendArchiveExperienceRecheckDetail(
+          appendRecheckSummaryDetail(
+            primary?.detail
+              ? `上次处理的阻塞已经不在优先动作里。${primary.detail}`
+              : "上次处理的阻塞已经不在优先动作里，总闸门当前可放行。",
+            recheckSummary,
+          ),
+          archiveExperienceRecheck,
         ),
         primaryLabel: primary?.label ?? "进入发布闭环",
         primaryHref: primary?.href ?? "#gate-export-package",
         primaryAction: primary?.execution ? primary : null,
-        badges: ["上次动作已清除", "总闸门可放行", "放量前复查证据"],
+        badges: ["上次动作已清除", "总闸门可放行", "放量前复查证据", ...(archiveExperienceRecheck ? ["归档经验复检"] : [])],
         recheckSummary,
+        archiveExperienceRecheck,
       };
     }
 
@@ -2579,17 +2724,21 @@ export function buildPrePublishGateFocusNotice(input: {
       visible: true,
       tone: "review",
       headline: "上次动作已清除，继续下一个阻塞",
-      detail: appendRecheckSummaryDetail(
-        primary?.detail
-          ? `上次处理的动作已经不在优先队列里。现在继续处理：${primary.detail}`
-          : `上次处理的动作已经不在优先队列里。${input.gate.verdict}`,
-        recheckSummary,
+      detail: appendArchiveExperienceRecheckDetail(
+        appendRecheckSummaryDetail(
+          primary?.detail
+            ? `上次处理的动作已经不在优先队列里。现在继续处理：${primary.detail}`
+            : `上次处理的动作已经不在优先队列里。${input.gate.verdict}`,
+          recheckSummary,
+        ),
+        archiveExperienceRecheck,
       ),
       primaryLabel: primary?.label ?? "查看优先动作",
       primaryHref: primary?.href ?? "/gate",
       primaryAction: primary?.execution ? primary : null,
-      badges: ["上次动作已清除", "继续下一个阻塞", "处理后再复检"],
+      badges: ["上次动作已清除", "继续下一个阻塞", "处理后再复检", ...(archiveExperienceRecheck ? ["归档经验复检"] : [])],
       recheckSummary,
+      archiveExperienceRecheck,
     };
   }
 
@@ -2603,6 +2752,7 @@ export function buildPrePublishGateFocusNotice(input: {
       primaryHref: "",
       primaryAction: null,
       badges: [],
+      archiveExperienceRecheck: null,
     };
   }
 
@@ -3174,6 +3324,7 @@ export function buildPrePublishGate(input: PrePublishGateInput): PrePublishGate 
     finalDeliveryCandidates,
     finalDeliveryBlockers,
   });
+  const archiveExperienceRecheck = buildArchiveExperienceRecheck(projects);
 
   return {
     status,
@@ -3198,6 +3349,7 @@ export function buildPrePublishGate(input: PrePublishGateInput): PrePublishGate 
     projectStatuses,
     strategyReview,
     firstThreeAdoptionClosure,
+    archiveExperienceRecheck,
     priorityActions,
     releaseAction,
     pmFocus: buildPrePublishGatePmFocus(status, releaseAction),

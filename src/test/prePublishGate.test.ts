@@ -319,6 +319,61 @@ test("buildPrePublishGate", async (t) => {
     assert.ok(gate.finalDeliveryRelease.pmVerdict.includes("归档经验"));
   });
 
+  await t.test("summarizes archive experience recheck evidence after repair reruns", () => {
+    const gate = buildPrePublishGate({
+      projects: [readyProject],
+      failureTasks: [],
+      batchHistory: [],
+    });
+    const notice = buildPrePublishGateFocusNotice({
+      focus: "action-recheck",
+      actionId: "archive-experience",
+      gate,
+    });
+
+    assert.equal(gate.archiveExperienceRecheck.status, "cleared");
+    assert.equal(gate.archiveExperienceRecheck.latestTaskId, "second-pass-chapter-3");
+    assert.equal(gate.archiveExperienceRecheck.latestTaskStatus, "succeeded");
+    assert.ok(gate.archiveExperienceRecheck.latestTaskLabel.includes("二改"));
+    assert.ok(gate.archiveExperienceRecheck.scopeLabel.includes("夜雨系统"));
+    assert.ok(gate.archiveExperienceRecheck.scopeLabel.includes("第3夜"));
+    assert.ok(gate.archiveExperienceRecheck.evidence.some((line) => line.includes("最终交付归档强制执行")));
+    assert.ok(gate.archiveExperienceRecheck.evidence.some((line) => line.includes("复制动作")));
+    assert.equal(gate.archiveExperienceRecheck.nextActionHref, "#pipeline-final-review");
+    assert.equal(notice.visible, true);
+    assert.equal(notice.archiveExperienceRecheck?.status, "cleared");
+    assert.ok(notice.detail.includes("归档经验"));
+  });
+
+  await t.test("keeps archive experience recheck blocked when latest writing receipts are still missing", () => {
+    const gate = buildPrePublishGate({
+      projects: [{
+        ...readyProject,
+        aiTasks: readyProject.aiTasks.map((task) => (
+          task.taskType === "chapter_review"
+            ? { ...task, inputSnapshot: JSON.stringify({ prompt: { userPrompt: "普通审稿提示词，没有归档经验。" } }) }
+            : task
+        )),
+      }],
+      failureTasks: [],
+      batchHistory: [],
+    });
+    const notice = buildPrePublishGateFocusNotice({
+      focus: "action-recheck",
+      actionId: "archive-experience",
+      gate,
+    });
+
+    assert.equal(gate.archiveExperienceRecheck.status, "blocked");
+    assert.equal(gate.archiveExperienceRecheck.latestTaskId, "review-chapter-3");
+    assert.equal(gate.archiveExperienceRecheck.latestTaskStatus, "succeeded");
+    assert.ok(gate.archiveExperienceRecheck.detail.includes("缺归档经验回执"));
+    assert.equal(gate.archiveExperienceRecheck.nextActionHref, "/tasks?focus=archive-experience#task-run-console");
+    assert.equal(notice.visible, true);
+    assert.equal(notice.archiveExperienceRecheck?.status, "blocked");
+    assert.ok(notice.badges.includes("归档经验复检"));
+  });
+
   await t.test("focuses the first blocked final delivery receipt from the gate", () => {
     const audits = finalDeliveryAudits("project-ready").map((audit) => audit.actionId.endsWith(":real-effect")
       ? { ...audit, message: audit.message.replace("当前状态：已交付", "当前状态：阻塞") }

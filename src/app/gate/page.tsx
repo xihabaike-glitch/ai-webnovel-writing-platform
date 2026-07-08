@@ -345,6 +345,11 @@ export default async function GatePage({
       count: finalDeliveryGateAiGapCount,
     },
   ];
+  const finalDeliveryGateLocked = finalDeliveryGateOpenLaneCount > 0 || gate.status !== "ready";
+  const finalDeliveryGateLockLabel = finalDeliveryGateLocked
+    ? "最终交付已锁定"
+    : "最终交付入口已开放";
+  const finalDeliveryGateDeliveryHref = gate.realPipelineFinalReview.primaryActionHref;
   const focusNotice = buildPrePublishGateFocusNotice({ focus, projectId, actionId, gate });
   const aiRecoveryPanel = buildGateAiPipelineRecoveryPanel(
     aiRecoveryDispatchRecords.map(gatePlatformDispatchTaskFromRecord),
@@ -487,6 +492,30 @@ export default async function GatePage({
               </Link>
             ))}
           </div>
+        </div>
+        <div className="mt-3 flex flex-col gap-2 rounded-md border border-amber-200 bg-amber-50 p-3 sm:flex-row sm:items-center sm:justify-between" aria-label="最终交付锁定提示">
+          <div>
+            <div className="text-xs font-medium text-amber-700">最终交付出口</div>
+            <div className="mt-1 font-semibold text-amber-950">{finalDeliveryGateLockLabel}</div>
+            <p className="mt-1 text-xs leading-5 text-amber-900">
+              {finalDeliveryGateLocked ? "缺口清零后开放；现在只允许走上面的收口动作。" : "所有收口线已清，可以进入最终交付。"}
+            </p>
+          </div>
+          {!finalDeliveryGateLocked ? (
+            <Link
+              className="w-fit rounded-md bg-amber-950 px-3 py-2 text-sm font-medium text-white hover:bg-amber-900"
+              href={hrefWithGateReturn(finalDeliveryGateDeliveryHref, gateRecheckReturnHref)}
+            >
+              进入最终交付
+            </Link>
+          ) : (
+            <span
+              aria-disabled="true"
+              className="w-fit rounded-md border border-amber-200 bg-white px-3 py-2 text-sm font-medium text-amber-800"
+            >
+              缺口清零后开放
+            </span>
+          )}
         </div>
       </section>
 

@@ -100,6 +100,18 @@ test("gate page links final delivery blockers to the matching closeout surface",
   assert.ok(source.includes("finalDeliveryGateSecondaryActions.map"));
 });
 
+test("gate page locks the final delivery exit until every closeout lane is clear", () => {
+  assert.ok(source.includes("finalDeliveryGateLocked"));
+  assert.ok(source.includes("finalDeliveryGateLockLabel"));
+  assert.ok(source.includes("finalDeliveryGateDeliveryHref"));
+  assert.ok(source.includes("最终交付已锁定"));
+  assert.ok(source.includes("缺口清零后开放"));
+  assert.ok(source.includes("aria-label=\"最终交付锁定提示\""));
+  assert.ok(source.includes("aria-disabled=\"true\""));
+  assert.ok(source.includes("!finalDeliveryGateLocked ? ("));
+  assert.ok(source.includes("href={hrefWithGateReturn(finalDeliveryGateDeliveryHref, gateRecheckReturnHref)}"));
+});
+
 test("gate page renders action recheck summary feedback", () => {
   assert.ok(source.includes("GateRecheckDispatchButton"));
   assert.ok(source.includes("focusNotice.recheckSummary"));

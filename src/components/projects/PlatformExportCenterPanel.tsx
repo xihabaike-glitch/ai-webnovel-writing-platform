@@ -572,6 +572,20 @@ interface PlatformFinalDeliveryChecklist {
   items: PlatformFinalDeliveryChecklistItem[];
 }
 
+interface PlatformFinalDeliveryHandoff {
+  status: PlatformFinalDeliveryChecklist["status"];
+  platformId: string | null;
+  platformName: string;
+  headline: string;
+  pmVerdict: string;
+  actionLabel: string;
+  actionHref: string;
+  doneCount: number;
+  gapCount: number;
+  evidenceLines: string[];
+  gateReceiptPreview: string[];
+}
+
 interface PlatformStrategyRankItem {
   rank: number;
   platformId: string;
@@ -861,6 +875,7 @@ interface PlatformPublishExportCenter {
   effectCaptureSummary: PlatformEffectCaptureSummary;
   platformLaunchQueue: PlatformLaunchQueue;
   finalDeliveryChecklist: PlatformFinalDeliveryChecklist;
+  finalDeliveryHandoff: PlatformFinalDeliveryHandoff;
   executionHandoffs: PlatformPublishExecutionHandoff[];
   executionHandoffSummary: PlatformPublishExecutionHandoffSummary;
   platformStrategy: PlatformStrategyRankItem[];
@@ -3043,6 +3058,44 @@ export function PlatformExportCenterPanel({
             </div>
             <div className="mt-2 rounded-md bg-slate-50 p-2 text-sm text-slate-700">
               <span className="font-medium text-slate-950">下一步：</span>{center.finalDeliveryChecklist.nextAction}
+            </div>
+            <div className="mt-3 rounded-md border border-slate-200 bg-white p-3" aria-label="最终交付交接包">
+              <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
+                <div>
+                  <div className="text-xs font-medium text-slate-500">最终交付交接包</div>
+                  <h3 className="mt-1 font-medium text-slate-950">{center.finalDeliveryHandoff.headline}</h3>
+                  <p className="mt-1 text-sm leading-6 text-slate-600">{center.finalDeliveryHandoff.pmVerdict}</p>
+                </div>
+                <a
+                  className="w-fit rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white hover:bg-slate-800"
+                  href={center.finalDeliveryHandoff.actionHref}
+                >
+                  {center.finalDeliveryHandoff.actionLabel}
+                </a>
+              </div>
+              <div className="mt-3 grid gap-2 text-xs text-slate-500 sm:grid-cols-3">
+                <div>平台 <span className="font-medium text-slate-950">{center.finalDeliveryHandoff.platformName}</span></div>
+                <div>已闭环 <span className="font-medium text-slate-950">{center.finalDeliveryHandoff.doneCount}</span></div>
+                <div>缺口 <span className="font-medium text-slate-950">{center.finalDeliveryHandoff.gapCount}</span></div>
+              </div>
+              <div className="mt-3 grid gap-2 lg:grid-cols-2">
+                <div className="rounded-md border border-slate-100 bg-slate-50 p-2">
+                  <div className="text-[11px] font-medium text-slate-500">回总闸门终检预览</div>
+                  <div className="mt-1 grid gap-1 text-[11px] leading-4 text-slate-600" style={{ overflowWrap: "anywhere", wordBreak: "break-word" }}>
+                    {center.finalDeliveryHandoff.gateReceiptPreview.map((line) => (
+                      <div key={line}>{line}</div>
+                    ))}
+                  </div>
+                </div>
+                <div className="rounded-md border border-slate-100 bg-slate-50 p-2">
+                  <div className="text-[11px] font-medium text-slate-500">交付证据摘要</div>
+                  <div className="mt-1 grid gap-1 text-[11px] leading-4 text-slate-600" style={{ overflowWrap: "anywhere", wordBreak: "break-word" }}>
+                    {center.finalDeliveryHandoff.evidenceLines.map((line) => (
+                      <div key={line}>{line}</div>
+                    ))}
+                  </div>
+                </div>
+              </div>
             </div>
             {focusedFinalDeliveryItem ? (
               <div className="mt-2 rounded-md border border-amber-200 bg-amber-50 p-2 text-sm leading-6 text-amber-900">

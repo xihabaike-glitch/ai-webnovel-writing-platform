@@ -52,3 +52,13 @@ test("platform export center renders the final delivery checklist", () => {
   assert.ok(source.includes("persistGateActionReceipt(receipt"));
   assert.ok(source.includes("router.push(returnHref"));
 });
+
+test("platform export center renders the PM final delivery handoff package", () => {
+  assert.ok(source.includes("center.finalDeliveryHandoff.headline"));
+  assert.ok(source.includes("center.finalDeliveryHandoff.pmVerdict"));
+  assert.ok(source.includes("center.finalDeliveryHandoff.gateReceiptPreview.map"));
+  assert.ok(source.includes("center.finalDeliveryHandoff.evidenceLines.map"));
+  assert.ok(source.includes("最终交付交接包"));
+  assert.ok(source.includes("回总闸门终检"));
+  assert.ok(source.includes("aria-label=\"最终交付交接包\""));
+});

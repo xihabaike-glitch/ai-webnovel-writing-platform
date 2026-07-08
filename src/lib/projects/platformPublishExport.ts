@@ -811,6 +811,7 @@ export interface PlatformPublishExportCenter {
   effectCaptureSummary: PlatformEffectCaptureSummary;
   platformLaunchQueue: PlatformLaunchQueue;
   finalDeliveryChecklist: PlatformFinalDeliveryChecklist;
+  finalDeliveryHandoff: PlatformFinalDeliveryHandoff;
   executionHandoffs: PlatformPublishExecutionHandoff[];
   executionHandoffSummary: PlatformPublishExecutionHandoffSummary;
   platformStrategy: PlatformStrategyRankItem[];
@@ -861,6 +862,20 @@ export interface PlatformFinalDeliveryChecklist {
   todoCount: number;
   blockedCount: number;
   items: PlatformFinalDeliveryChecklistItem[];
+}
+
+export interface PlatformFinalDeliveryHandoff {
+  status: PlatformFinalDeliveryChecklist["status"];
+  platformId: PlatformId | null;
+  platformName: string;
+  headline: string;
+  pmVerdict: string;
+  actionLabel: string;
+  actionHref: string;
+  doneCount: number;
+  gapCount: number;
+  evidenceLines: string[];
+  gateReceiptPreview: string[];
 }
 
 export interface PlatformReadinessItem {
@@ -4945,6 +4960,47 @@ function buildPlatformFinalDeliveryChecklist(
   };
 }
 
+function buildPlatformFinalDeliveryHandoff(
+  checklist: PlatformFinalDeliveryChecklist,
+  pack: PlatformPublishPackage | undefined,
+  strategyVerdict: PlatformStrategyAutoVerdict,
+): PlatformFinalDeliveryHandoff {
+  const nextGap = checklist.items.find((item) => item.status !== "done") ?? null;
+  const gapCount = checklist.totalCount - checklist.doneCount;
+  const platformName = pack?.platformName ?? "未选择平台";
+  const headline = checklist.status === "ready"
+    ? `${platformName} 最终交付交接包已成形。`
+    : checklist.status === "blocked"
+      ? `${platformName} 最终交付交接包有硬阻塞。`
+      : `${platformName} 最终交付交接包还差 ${gapCount} 项。`;
+  const pmVerdict = checklist.status === "ready"
+    ? "可以回总闸门做最终放行判断，但仍需保留 6 项回执证据。"
+    : nextGap
+      ? `不能交付，先处理 ${nextGap.label}：${nextGap.actionLabel}。`
+      : "不能交付，先补齐最终交付清单。";
+
+  return {
+    status: checklist.status,
+    platformId: pack?.platformId ?? null,
+    platformName,
+    headline,
+    pmVerdict,
+    actionLabel: checklist.status === "ready" ? "回总闸门终检" : nextGap?.actionLabel ?? "补最终交付证据",
+    actionHref: checklist.status === "ready" ? "/gate#pipeline-final-review" : nextGap?.actionHref ?? "#platform-export",
+    doneCount: checklist.doneCount,
+    gapCount,
+    evidenceLines: checklist.items.map((item) => `${item.label}：${item.evidence}`),
+    gateReceiptPreview: [
+      `平台：${platformName}`,
+      `交付包状态：${checklist.status}`,
+      `完成项：${checklist.doneCount}/${checklist.totalCount}`,
+      `缺口数：${gapCount}`,
+      `策略裁决：${strategyVerdict.headline}`,
+      `PM 判定：${pmVerdict}`,
+    ],
+  };
+}
+
 export function buildPlatformPublishExportCenter(input: PlatformPublishExportInput): PlatformPublishExportCenter {
   const platforms = input.platforms ?? platformProfiles;
   const packages = platforms.map((platform) => buildPlatformPackage(input, platform));
@@ -4956,6 +5012,7 @@ export function buildPlatformPublishExportCenter(input: PlatformPublishExportInp
   const effectCaptureSummary = buildPlatformEffectCaptureSummary(packages);
   const activeStrategy = platformStrategy.find((strategy) => strategy.platformId === input.targetPlatform.id) ?? null;
   const activePackage = packages.find((pack) => pack.platformId === input.targetPlatform.id);
+  const finalDeliveryChecklist = buildPlatformFinalDeliveryChecklist(activePackage, strategyVerdict);
 
   return {
     packages,
@@ -4966,7 +5023,8 @@ export function buildPlatformPublishExportCenter(input: PlatformPublishExportInp
     platformReadinessSummary,
     effectCaptureSummary,
     platformLaunchQueue: buildPlatformLaunchQueue(platformReadinessSummary),
-    finalDeliveryChecklist: buildPlatformFinalDeliveryChecklist(activePackage, strategyVerdict),
+    finalDeliveryChecklist,
+    finalDeliveryHandoff: buildPlatformFinalDeliveryHandoff(finalDeliveryChecklist, activePackage, strategyVerdict),
     executionHandoffs,
     executionHandoffSummary: buildPlatformPublishExecutionHandoffSummary(executionHandoffs),
     platformStrategy,

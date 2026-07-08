@@ -375,6 +375,78 @@ test("buildPlatformPublishExportCenter", async (t) => {
     assert.ok(pack.preview.assetLine.includes("个"));
   });
 
+  await t.test("builds a PM final delivery handoff when every delivery item is closed", () => {
+    const center = buildPlatformPublishExportCenter({
+      project: {
+        title: "夜雨系统",
+        genre: "都市系统",
+        sellingPoint: "雨夜危机中觉醒系统，主角用选择翻盘。",
+        currentWordCount: 9000,
+        targetWordCount: 300000,
+      },
+      targetPlatform: getPlatformProfile("fanqie"),
+      chapters: finalChapters,
+      aiTasks: [
+        ...passedReviews,
+        {
+          id: "asset-optimize-1",
+          chapterId: null,
+          taskType: "platform_submission_asset_optimize",
+          status: "succeeded",
+          inputSnapshot: JSON.stringify({ platformId: "fanqie" }),
+          outputText: assetOptimizationOutput,
+          createdAt: "2026-01-07T07:00:00.000Z",
+        },
+      ],
+      submissionChecklist: readyChecklist,
+      platforms: [getPlatformProfile("fanqie")],
+      publishSnapshots: [
+        {
+          id: "snapshot-fanqie",
+          platformId: "fanqie",
+          platformName: "番茄小说",
+          title: "夜雨系统：倒计时重生",
+          action: "snapshot",
+          chapterCount: 3,
+          wordCount: 7800,
+          preflightScore: 96,
+          canExport: true,
+          createdAt: "2026-01-08T08:00:00.000Z",
+        },
+      ],
+      platformPublishMetrics: [
+        {
+          id: "metric-fanqie",
+          platformId: "fanqie",
+          platformName: "番茄小说",
+          views: 1200,
+          clicks: 180,
+          favorites: 72,
+          follows: 36,
+          comments: 12,
+          paidReads: 0,
+          editorFeedback: "标题方向可以，前三章继续加压。",
+          contractStatus: "pending",
+          publishUrl: "https://fanqie.example/book/1",
+          notes: "首轮测试数据。",
+          snapshotDate: "2026-01-09T08:00:00.000Z",
+        },
+      ],
+    });
+
+    assert.equal(center.finalDeliveryChecklist.status, "ready");
+    assert.equal(center.finalDeliveryHandoff.status, "ready");
+    assert.equal(center.finalDeliveryHandoff.platformName, "番茄小说");
+    assert.equal(center.finalDeliveryHandoff.doneCount, 6);
+    assert.equal(center.finalDeliveryHandoff.gapCount, 0);
+    assert.ok(center.finalDeliveryHandoff.headline.includes("最终交付交接包"));
+    assert.ok(center.finalDeliveryHandoff.pmVerdict.includes("可以回总闸门"));
+    assert.ok(center.finalDeliveryHandoff.gateReceiptPreview.some((line) => line.includes("交付包状态：ready")));
+    assert.ok(center.finalDeliveryHandoff.evidenceLines.some((line) => line.includes("发布包")));
+    assert.ok(center.finalDeliveryHandoff.evidenceLines.some((line) => line.includes("策略复盘")));
+    assert.equal(center.finalDeliveryHandoff.actionHref, "/gate#pipeline-final-review");
+  });
+
   await t.test("blocks export when candidate adoption makes old reviews stale", () => {
     const center = buildPlatformPublishExportCenter({
       project: {

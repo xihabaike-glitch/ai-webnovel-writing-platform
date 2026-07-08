@@ -160,6 +160,7 @@ test("buildFirstDayScaleBatchRecord summarizes first-day scale batches as data b
   const record = buildFirstDayScaleBatchRecord([{
     label: "沉淀批量初稿 1 个经验",
     href: "/gate",
+    projectId: "project-1",
     payload: JSON.stringify({
       plan: {
         scaleGate: "none",
@@ -187,11 +188,11 @@ test("buildFirstDayScaleBatchRecord summarizes first-day scale batches as data b
   assert.equal(record?.detail, "首日数据过线后，本批只扩 1 个小样本；这不是直接批量放大。");
   assert.deepEqual(record?.metrics, ["成功率 100%", "失败 0", "成本 $0.0100", "质量 82"]);
   assert.equal(record?.actionLabel, "回任务中心补首日数据");
-  assert.equal(record?.actionHref, "/dispatch");
+  assert.equal(record?.actionHref, "/dispatch?firstDayProject=project-1&step=publish-precheck&source=real-sample&gap=%E9%A6%96%E6%97%A5%E6%89%A9%E5%B1%95%E5%B0%8F%E6%89%B9%E5%B7%B2%E8%BF%87%E7%BA%BF%EF%BC%8C%E8%AF%B7%E8%A1%A5%E6%9B%9D%E5%85%89%E3%80%81%E7%82%B9%E5%87%BB%E3%80%81%E6%94%B6%E8%97%8F%E3%80%81%E8%BF%BD%E8%AF%BB%E5%92%8C%E8%B4%A8%E9%87%8F%E8%AF%81%E6%8D%AE%E3%80%82#first-day-dispatch");
   assert.equal(record?.decisionTone, "continue");
   assert.equal(record?.decisionLabel, "补首日数据");
   assert.equal(record?.decisionActionLabel, "回任务中心补首日数据");
-  assert.equal(record?.decisionActionHref, "/dispatch");
+  assert.equal(record?.decisionActionHref, record?.actionHref);
   assert.match(record?.decisionDetail ?? "", /曝光、点击、收藏、追读/);
   assert.match(record?.decisionDetail ?? "", /不直接批量放大/);
 });

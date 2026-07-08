@@ -52,6 +52,7 @@ export interface TaskDebtRecoveryBatchAudit {
   href: string;
   payload: string | null;
   createdAt: Date | string;
+  projectId?: string | null;
 }
 
 export interface TaskDebtRecoveryBatchRecord {
@@ -216,6 +217,12 @@ function buildRecoveryBatchRecord(input: {
   audits: TaskDebtRecoveryBatchAudit[];
   predicate: (payload: Record<string, unknown>) => boolean;
   headlinePrefix: string;
+  actionHref?: (input: {
+    audit: TaskDebtRecoveryBatchAudit;
+    payload: Record<string, unknown>;
+    batchReceipt: Record<string, unknown> | null;
+    defaultHref: string;
+  }) => string;
   decision?: (input: {
     successRate: number | null;
     failedTasks: number | null;
@@ -247,9 +254,15 @@ function buildRecoveryBatchRecord(input: {
   const actionLabel = typeof batchReceipt?.primaryLabel === "string" && batchReceipt.primaryLabel
     ? batchReceipt.primaryLabel
     : "查看推荐批次";
-  const actionHref = typeof batchReceipt?.primaryHref === "string" && batchReceipt.primaryHref
+  const defaultActionHref = typeof batchReceipt?.primaryHref === "string" && batchReceipt.primaryHref
     ? batchReceipt.primaryHref
     : latest.audit.href || "/tasks#recommended-batch";
+  const actionHref = input.actionHref?.({
+    audit: latest.audit,
+    payload: latest.payload,
+    batchReceipt,
+    defaultHref: defaultActionHref,
+  }) ?? defaultActionHref;
 
   return {
     headline: `${input.headlinePrefix}：${headline}`,
@@ -272,6 +285,18 @@ function buildRecoveryBatchRecord(input: {
     }),
     ...input.stability?.(records),
   };
+}
+
+function firstDayScaleBackfillHref(input: { audit: TaskDebtRecoveryBatchAudit; defaultHref: string }) {
+  const projectId = input.audit.projectId?.trim();
+  if (!projectId) return input.defaultHref;
+  const params = new URLSearchParams({
+    firstDayProject: projectId,
+    step: "publish-precheck",
+    source: "real-sample",
+  });
+  params.append("gap", "首日扩展小批已过线，请补曝光、点击、收藏、追读和质量证据。");
+  return `/dispatch?${params.toString()}#first-day-dispatch`;
 }
 
 function buildFirstDayScaleDecision(input: {
@@ -334,6 +359,7 @@ export function buildFirstDayScaleBatchRecord(audits: TaskDebtRecoveryBatchAudit
   return buildRecoveryBatchRecord({
     audits,
     headlinePrefix: "首日扩展小批已回流",
+    actionHref: ({ audit, defaultHref }) => firstDayScaleBackfillHref({ audit, defaultHref }),
     decision: buildFirstDayScaleDecision,
     predicate: (payload) => {
       const plan = taskDebtRecord(payload.plan);

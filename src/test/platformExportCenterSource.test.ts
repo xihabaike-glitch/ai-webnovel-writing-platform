@@ -25,3 +25,11 @@ test("platform export center renders publish package and effect receipt template
   assert.ok(source.includes("overflowWrap: \"anywhere\""));
   assert.ok(source.includes("wordBreak: \"break-word\""));
 });
+
+test("platform export center renders the final delivery checklist", () => {
+  assert.ok(source.includes("center.finalDeliveryChecklist.headline"));
+  assert.ok(source.includes("center.finalDeliveryChecklist.nextAction"));
+  assert.ok(source.includes("center.finalDeliveryChecklist.items.map"));
+  assert.ok(source.includes("最终交付清单"));
+  assert.ok(source.includes("finalDeliveryChecklistStatusClass"));
+});

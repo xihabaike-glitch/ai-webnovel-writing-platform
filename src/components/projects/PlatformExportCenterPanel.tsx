@@ -550,6 +550,26 @@ interface PlatformLaunchQueue {
   items: PlatformLaunchQueueItem[];
 }
 
+interface PlatformFinalDeliveryChecklistItem {
+  id: "publish-package" | "submission-asset" | "sample-chapters" | "publish-baseline" | "real-effect" | "strategy-review";
+  label: string;
+  status: "done" | "todo" | "blocked";
+  evidence: string;
+  actionLabel: string;
+  actionHref: string;
+}
+
+interface PlatformFinalDeliveryChecklist {
+  status: "ready" | "needs_action" | "blocked";
+  headline: string;
+  nextAction: string;
+  totalCount: number;
+  doneCount: number;
+  todoCount: number;
+  blockedCount: number;
+  items: PlatformFinalDeliveryChecklistItem[];
+}
+
 interface PlatformStrategyRankItem {
   rank: number;
   platformId: string;
@@ -838,6 +858,7 @@ interface PlatformPublishExportCenter {
   platformReadinessSummary: PlatformReadinessSummary;
   effectCaptureSummary: PlatformEffectCaptureSummary;
   platformLaunchQueue: PlatformLaunchQueue;
+  finalDeliveryChecklist: PlatformFinalDeliveryChecklist;
   executionHandoffs: PlatformPublishExecutionHandoff[];
   executionHandoffSummary: PlatformPublishExecutionHandoffSummary;
   platformStrategy: PlatformStrategyRankItem[];
@@ -1093,6 +1114,30 @@ function platformLaunchPriorityLabel(priority: PlatformLaunchQueueItem["priority
   if (priority === "high") return "高";
   if (priority === "medium") return "中";
   return "低";
+}
+
+function finalDeliveryChecklistStatusLabel(status: PlatformFinalDeliveryChecklist["status"]) {
+  if (status === "ready") return "已闭环";
+  if (status === "needs_action") return "待补齐";
+  return "有阻塞";
+}
+
+function finalDeliveryChecklistStatusClass(status: PlatformFinalDeliveryChecklist["status"]) {
+  if (status === "ready") return "bg-emerald-50 text-emerald-700";
+  if (status === "needs_action") return "bg-amber-50 text-amber-700";
+  return "bg-rose-50 text-rose-700";
+}
+
+function finalDeliveryChecklistItemStatusLabel(status: PlatformFinalDeliveryChecklistItem["status"]) {
+  if (status === "done") return "已交付";
+  if (status === "todo") return "待处理";
+  return "卡住";
+}
+
+function finalDeliveryChecklistItemStatusClass(status: PlatformFinalDeliveryChecklistItem["status"]) {
+  if (status === "done") return "bg-emerald-50 text-emerald-700";
+  if (status === "todo") return "bg-amber-50 text-amber-700";
+  return "bg-rose-50 text-rose-700";
 }
 
 function packagePreviewStatusLabel(status: PlatformPublishPackagePreview["status"]) {
@@ -2935,6 +2980,44 @@ export function PlatformExportCenterPanel({
                     {item.blockers[0] ?? item.detail}
                   </div>
                 </button>
+              ))}
+            </div>
+          </div>
+          <div className="mt-3 rounded-md border border-slate-200 bg-white p-3">
+            <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
+              <div>
+                <div className="font-medium text-slate-950">最终交付清单</div>
+                <p className="mt-1 text-sm leading-6 text-slate-600">{center.finalDeliveryChecklist.headline}</p>
+              </div>
+              <span className={`w-fit rounded-md px-2 py-1 text-xs font-medium ${finalDeliveryChecklistStatusClass(center.finalDeliveryChecklist.status)}`}>
+                {finalDeliveryChecklistStatusLabel(center.finalDeliveryChecklist.status)}
+              </span>
+            </div>
+            <div className="mt-3 grid gap-2 text-xs text-slate-500 sm:grid-cols-4">
+              <div>总项 <span className="font-medium text-slate-950">{center.finalDeliveryChecklist.totalCount}</span></div>
+              <div>已交付 <span className="font-medium text-slate-950">{center.finalDeliveryChecklist.doneCount}</span></div>
+              <div>待处理 <span className="font-medium text-slate-950">{center.finalDeliveryChecklist.todoCount}</span></div>
+              <div>阻塞 <span className="font-medium text-slate-950">{center.finalDeliveryChecklist.blockedCount}</span></div>
+            </div>
+            <div className="mt-2 rounded-md bg-slate-50 p-2 text-sm text-slate-700">
+              <span className="font-medium text-slate-950">下一步：</span>{center.finalDeliveryChecklist.nextAction}
+            </div>
+            <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+              {center.finalDeliveryChecklist.items.map((item) => (
+                <a
+                  className="rounded-md border border-slate-100 bg-slate-50 p-3 text-sm hover:border-slate-300 hover:bg-white"
+                  href={hrefWithGateReturn(item.actionHref, gateReturnHref, projectId)}
+                  key={item.id}
+                >
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div className="font-medium text-slate-950">{item.label}</div>
+                    <span className={`rounded-md px-2 py-1 text-[11px] font-medium ${finalDeliveryChecklistItemStatusClass(item.status)}`}>
+                      {finalDeliveryChecklistItemStatusLabel(item.status)}
+                    </span>
+                  </div>
+                  <p className="mt-2 line-clamp-2 text-xs leading-5 text-slate-600">{item.evidence}</p>
+                  <div className="mt-2 text-xs font-medium text-slate-950">{item.actionLabel}</div>
+                </a>
               ))}
             </div>
           </div>

@@ -205,6 +205,13 @@ test("buildPlatformPublishExportCenter", async (t) => {
     assert.ok(center.platformLaunchQueue.items[0].whyNow.includes("终检"));
     assert.ok(center.platformLaunchQueue.items[0].acceptance.includes("终检"));
     assert.ok(center.platformLaunchQueue.nextAction.includes(center.platformLaunchQueue.items[0].platformName));
+    assert.equal(center.finalDeliveryChecklist.status, "blocked");
+    assert.equal(center.finalDeliveryChecklist.totalCount, 6);
+    assert.equal(center.finalDeliveryChecklist.blockedCount > 0, true);
+    assert.ok(center.finalDeliveryChecklist.headline.includes("最终交付"));
+    assert.ok(center.finalDeliveryChecklist.nextAction.includes("发布包"));
+    assert.equal(center.finalDeliveryChecklist.items.find((item) => item.id === "publish-package")?.status, "blocked");
+    assert.equal(center.finalDeliveryChecklist.items.find((item) => item.id === "real-effect")?.actionHref, "#publish-effect-panel");
     assert.equal(center.packages[0].preview.status, "blocked");
     assert.ok(center.packages[0].preview.headline.includes("还不能交付"));
     assert.ok(center.packages[0].preview.chapterLine.includes("1 章"));
@@ -344,6 +351,14 @@ test("buildPlatformPublishExportCenter", async (t) => {
     assert.equal(center.platformReadinessSummary.items[0]?.actionHref, "#platform-export");
     assert.ok(center.platformReadinessSummary.headline.includes("1 个平台发布包已过线"));
     assert.ok(center.platformReadinessSummary.nextAction.includes("保存发布基准"));
+    assert.equal(center.finalDeliveryChecklist.status, "needs_action");
+    assert.equal(center.finalDeliveryChecklist.doneCount, 3);
+    assert.equal(center.finalDeliveryChecklist.todoCount, 1);
+    assert.equal(center.finalDeliveryChecklist.blockedCount, 2);
+    assert.equal(center.finalDeliveryChecklist.items.find((item) => item.id === "publish-package")?.status, "done");
+    assert.equal(center.finalDeliveryChecklist.items.find((item) => item.id === "publish-baseline")?.status, "todo");
+    assert.equal(center.finalDeliveryChecklist.items.find((item) => item.id === "real-effect")?.status, "blocked");
+    assert.ok(center.finalDeliveryChecklist.nextAction.includes("保存发布基准"));
     assert.equal(pack.preview.status, "needs_baseline");
     assert.ok(pack.preview.headline.includes("缺发布基准"));
     assert.equal(pack.preview.actionHref, "#platform-export");

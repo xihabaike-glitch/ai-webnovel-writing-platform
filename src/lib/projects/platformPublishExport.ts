@@ -810,6 +810,7 @@ export interface PlatformPublishExportCenter {
   platformReadinessSummary: PlatformReadinessSummary;
   effectCaptureSummary: PlatformEffectCaptureSummary;
   platformLaunchQueue: PlatformLaunchQueue;
+  finalDeliveryChecklist: PlatformFinalDeliveryChecklist;
   executionHandoffs: PlatformPublishExecutionHandoff[];
   executionHandoffSummary: PlatformPublishExecutionHandoffSummary;
   platformStrategy: PlatformStrategyRankItem[];
@@ -839,6 +840,26 @@ export interface PlatformLaunchQueue {
   headline: string;
   nextAction: string;
   items: PlatformLaunchQueueItem[];
+}
+
+export interface PlatformFinalDeliveryChecklistItem {
+  id: "publish-package" | "submission-asset" | "sample-chapters" | "publish-baseline" | "real-effect" | "strategy-review";
+  label: string;
+  status: "done" | "todo" | "blocked";
+  evidence: string;
+  actionLabel: string;
+  actionHref: string;
+}
+
+export interface PlatformFinalDeliveryChecklist {
+  status: "ready" | "needs_action" | "blocked";
+  headline: string;
+  nextAction: string;
+  totalCount: number;
+  doneCount: number;
+  todoCount: number;
+  blockedCount: number;
+  items: PlatformFinalDeliveryChecklistItem[];
 }
 
 export interface PlatformReadinessItem {
@@ -4724,6 +4745,182 @@ function buildPlatformLaunchQueue(readiness: PlatformReadinessSummary): Platform
   };
 }
 
+function deliveryChecklistStatus(items: PlatformFinalDeliveryChecklistItem[]): PlatformFinalDeliveryChecklist["status"] {
+  const coreBlocked = items.some((item) => (
+    (item.id === "publish-package" || item.id === "submission-asset" || item.id === "sample-chapters")
+    && item.status === "blocked"
+  ));
+  if (coreBlocked) return "blocked";
+  if (items.some((item) => item.status !== "done")) return "needs_action";
+  return "ready";
+}
+
+function buildPlatformFinalDeliveryChecklist(
+  pack: PlatformPublishPackage | undefined,
+  strategyVerdict: PlatformStrategyAutoVerdict,
+): PlatformFinalDeliveryChecklist {
+  if (!pack) {
+    const items: PlatformFinalDeliveryChecklistItem[] = [
+      {
+        id: "publish-package",
+        label: "发布包",
+        status: "blocked",
+        evidence: "还没有可检查的平台发布包。",
+        actionLabel: "生成发布包",
+        actionHref: "#platform-export",
+      },
+      {
+        id: "submission-asset",
+        label: "投稿资产",
+        status: "blocked",
+        evidence: "标题、简介、标签和卖点尚未落到平台包。",
+        actionLabel: "补投稿资产",
+        actionHref: "#submission-asset-editor",
+      },
+      {
+        id: "sample-chapters",
+        label: "样章",
+        status: "blocked",
+        evidence: "缺少可投样章或前三章质检证据。",
+        actionLabel: "补样章",
+        actionHref: "#publish-chapters",
+      },
+      {
+        id: "publish-baseline",
+        label: "发布基准",
+        status: "blocked",
+        evidence: "发布包未成形，不能保存版本基准。",
+        actionLabel: "先生成包",
+        actionHref: "#platform-export",
+      },
+      {
+        id: "real-effect",
+        label: "真实效果",
+        status: "blocked",
+        evidence: "没有发布基准，无法回填真实平台效果。",
+        actionLabel: "先存基准",
+        actionHref: "#publish-effect-panel",
+      },
+      {
+        id: "strategy-review",
+        label: "策略复盘",
+        status: "blocked",
+        evidence: "缺发布包和真实效果，平台排序无法裁决。",
+        actionLabel: "先补证据",
+        actionHref: "#platform-strategy-ranking",
+      },
+    ];
+
+    return {
+      status: "blocked",
+      headline: "最终交付清单未成形，先生成一个平台发布包。",
+      nextAction: "先生成发布包，再检查投稿资产、样章和发布基准。",
+      totalCount: items.length,
+      doneCount: 0,
+      todoCount: 0,
+      blockedCount: items.length,
+      items,
+    };
+  }
+
+  const packageReady = pack.canExport && pack.finalGate.status === "ready_to_submit";
+  const assetReady = pack.submissionAssetAudit.status === "ready";
+  const chaptersReady = pack.chapters.length > 0 && pack.chapters.every((chapter) => chapter.ready);
+  const baselineSaved = pack.publishVersions.length > 0;
+  const effectReady = pack.effectCapturePlan.status === "ready_to_review";
+  const strategyReady = effectReady && strategyVerdict.status === "ready";
+  const items: PlatformFinalDeliveryChecklistItem[] = [
+    {
+      id: "publish-package",
+      label: "发布包",
+      status: packageReady ? "done" : "blocked",
+      evidence: packageReady
+        ? `${pack.platformName} 终检 ${pack.finalGate.score} 分，发布包允许导出。`
+        : `${pack.platformName} 终检 ${pack.finalGate.score} 分：${pack.finalGate.nextAction}`,
+      actionLabel: packageReady ? "查看发布包" : "修发布包",
+      actionHref: "#platform-export",
+    },
+    {
+      id: "submission-asset",
+      label: "投稿资产",
+      status: assetReady ? "done" : "blocked",
+      evidence: assetReady
+        ? `标题、简介、标签已过投稿资产质检，资产分 ${pack.submissionAssetAudit.score}。`
+        : `投稿资产质检 ${pack.submissionAssetAudit.score} 分，还没到可投线。`,
+      actionLabel: assetReady ? "查看资产" : "修投稿资产",
+      actionHref: "#submission-asset-editor",
+    },
+    {
+      id: "sample-chapters",
+      label: "样章",
+      status: chaptersReady ? "done" : "blocked",
+      evidence: chaptersReady
+        ? `${pack.chapters.length} 章样章已通过发布前质检，共 ${pack.chapters.reduce((sum, chapter) => sum + chapter.wordCount, 0)} 字。`
+        : `样章还没过线：${pack.preflight.blocked[0] ?? "缺可投章节或审稿证据。"}`,
+      actionLabel: chaptersReady ? "查看样章" : "补样章质检",
+      actionHref: "#publish-chapters",
+    },
+    {
+      id: "publish-baseline",
+      label: "发布基准",
+      status: baselineSaved ? "done" : packageReady ? "todo" : "blocked",
+      evidence: baselineSaved
+        ? `版本历史已有 ${pack.publishVersions.length} 条发布基准。`
+        : packageReady
+          ? "发布包已过线，但还没有保存发布基准。"
+          : "发布包未过线，不能保存基准。",
+      actionLabel: baselineSaved ? "查看版本" : "保存发布基准",
+      actionHref: "#package-version-history",
+    },
+    {
+      id: "real-effect",
+      label: "真实效果",
+      status: effectReady ? "done" : baselineSaved ? "todo" : "blocked",
+      evidence: effectReady
+        ? `已记录 ${pack.publishEffect.records} 次真实效果，${pack.publishEffect.verdict}`
+        : baselineSaved
+          ? pack.effectCapturePlan.nextAction
+          : "发布基准未保存，真实效果无法归因到版本。",
+      actionLabel: effectReady ? "查看效果" : "回填真实效果",
+      actionHref: "#publish-effect-panel",
+    },
+    {
+      id: "strategy-review",
+      label: "策略复盘",
+      status: strategyReady ? "done" : effectReady ? "todo" : "blocked",
+      evidence: strategyReady
+        ? strategyVerdict.headline
+        : effectReady
+          ? strategyVerdict.nextAction
+          : "真实效果未就绪，平台排序缺少裁决证据。",
+      actionLabel: strategyReady ? "查看裁决" : "做策略复盘",
+      actionHref: "#platform-strategy-ranking",
+    },
+  ];
+  const doneCount = items.filter((item) => item.status === "done").length;
+  const todoCount = items.filter((item) => item.status === "todo").length;
+  const blockedCount = items.filter((item) => item.status === "blocked").length;
+  const status = deliveryChecklistStatus(items);
+  const nextItem = items.find((item) => item.status === "todo") ?? items.find((item) => item.status === "blocked") ?? null;
+
+  return {
+    status,
+    headline: status === "ready"
+      ? `${pack.platformName} 最终交付清单已闭环。`
+      : status === "blocked"
+        ? `${pack.platformName} 最终交付清单有硬阻塞，先别扩大投放。`
+        : `${pack.platformName} 最终交付清单还差 ${todoCount + blockedCount} 项。`,
+    nextAction: nextItem
+      ? `${nextItem.label}：${nextItem.actionLabel}。${nextItem.evidence}`
+      : "进入平台排序，决定继续加码、观察还是换打法。",
+    totalCount: items.length,
+    doneCount,
+    todoCount,
+    blockedCount,
+    items,
+  };
+}
+
 export function buildPlatformPublishExportCenter(input: PlatformPublishExportInput): PlatformPublishExportCenter {
   const platforms = input.platforms ?? platformProfiles;
   const packages = platforms.map((platform) => buildPlatformPackage(input, platform));
@@ -4745,6 +4942,7 @@ export function buildPlatformPublishExportCenter(input: PlatformPublishExportInp
     platformReadinessSummary,
     effectCaptureSummary,
     platformLaunchQueue: buildPlatformLaunchQueue(platformReadinessSummary),
+    finalDeliveryChecklist: buildPlatformFinalDeliveryChecklist(activePackage, strategyVerdict),
     executionHandoffs,
     executionHandoffSummary: buildPlatformPublishExecutionHandoffSummary(executionHandoffs),
     platformStrategy,

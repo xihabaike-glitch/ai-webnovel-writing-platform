@@ -1614,6 +1614,63 @@ test("buildProjectStartTacticAdvice", async (t) => {
     assert.ok(handoffPackage.nextAction.includes("派单中心"));
   });
 
+  await t.test("turns first-day execution handoff into executable draft review rewrite dispatches", () => {
+    const platform = getPlatformProfile("fanqie");
+    const template = getDefaultTemplateForPlatform(platform.id);
+    const handoffPackage = buildProjectStartExperienceHandoffDispatchPackage({
+      project: { id: "project-execution", title: "夜雨系统" },
+      platform,
+      handoff: {
+        status: "small_sample",
+        label: "执行闭环交接",
+        title: "番茄小说 首日执行链路已跑通",
+        detail: "首日生成、审稿、二改链路已经跑通，但还缺平台真实效果证明。",
+        selectedPlatformId: platform.id,
+        selectedPlatformName: platform.name,
+        recommendedPlatformId: platform.id,
+        recommendedPlatformName: platform.name,
+        recommendedTemplateId: template.id,
+        shouldSwitchTemplate: false,
+        firstDayActions: [
+          "执行闭环：复用生成-审稿-二改顺序，首日只跑第一章小样本。",
+          "模型路线：沿用首日闭环里的初稿、审稿、二改模型证据，执行后必须重新回填质量分。",
+          "开头：先抓首章高压钩子。",
+          "验证：回填曝光、点击、收藏、追读。",
+        ],
+        avoidRules: [
+          "首日执行闭环不等于平台效果过线，未回填曝光、点击、收藏、追读前不放量。",
+          "不要跳过审稿直接二改。",
+        ],
+        evidence: [
+          "初稿质检：86",
+          "审稿评分：72",
+          "二改复检：90",
+          "执行模型：DeepSeek",
+          "执行模型：Kimi",
+          "执行模型：Claude",
+        ],
+      },
+      now: "2026-01-03T00:00:00.000Z",
+    });
+
+    assert.equal(handoffPackage.label, "执行闭环交接");
+    assert.ok(handoffPackage.nextAction.includes("初稿、审稿、二改"));
+    assert.deepEqual(handoffPackage.dispatches.map((item) => item.id), [
+      "first-day:project-execution:first-draft",
+      "first-day:project-execution:first-review",
+      "first-day:project-execution:first-rewrite",
+    ]);
+    assert.deepEqual(handoffPackage.dispatches.map((item) => item.ownerRole), ["正文主笔", "审稿编辑", "改稿编辑"]);
+    assert.ok(handoffPackage.dispatches[0]?.title.includes("第一章初稿"));
+    assert.ok(handoffPackage.dispatches[1]?.title.includes("第一章审稿"));
+    assert.ok(handoffPackage.dispatches[2]?.title.includes("第一章二改"));
+    assert.ok(handoffPackage.dispatches[0]?.acceptanceCriteria.some((item) => item.includes("生成-审稿-二改")));
+    assert.ok(handoffPackage.dispatches[1]?.acceptanceCriteria.some((item) => item.includes("审稿评分")));
+    assert.ok(handoffPackage.dispatches[2]?.acceptanceCriteria.some((item) => item.includes("二改复检")));
+    assert.ok(handoffPackage.dispatches.every((item) => item.acceptanceCriteria.some((criterion) => criterion.includes("模型路线"))));
+    assert.ok(handoffPackage.dispatches.every((item) => item.evidence.some((line) => line.includes("初稿质检：86"))));
+  });
+
   await t.test("keeps knowledge feedback source in first-day handoff dispatch evidence", () => {
     const platform = getPlatformProfile("fanqie");
     const template = getDefaultTemplateForPlatform(platform.id);

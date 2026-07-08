@@ -956,6 +956,17 @@ export function buildProjectStartExperienceHandoffDispatchPackage(input: {
   const verificationAction = input.handoff.firstDayActions.find((action) => /验证|回填|追读|前三章|小样本/u.test(action))
     ?? "写清前三章验收标准、通过线和不可接受项。";
   const avoidRule = input.handoff.avoidRules[0] ?? "不要把经验结论当成免检放量。";
+  const isExecutionHandoff = input.handoff.label === "执行闭环交接"
+    || /生成-审稿-二改|首日执行闭环/u.test([
+      input.handoff.label,
+      input.handoff.title,
+      ...input.handoff.firstDayActions,
+      ...input.handoff.evidence,
+    ].join(" "));
+  const qualityEvidence = input.handoff.evidence.filter((line) => /初稿质检|审稿评分|二改复检/u.test(line));
+  const modelEvidence = input.handoff.evidence.filter((line) => /执行模型/u.test(line));
+  const modelRouteEvidence = modelEvidence.length ? `模型路线：${modelEvidence.join("；")}` : "模型路线必须记录初稿、审稿、二改的执行模型。";
+  const qualityEvidenceLine = qualityEvidence.length ? `质量证据：${qualityEvidence.join("；")}` : "质量证据必须写回初稿质检、审稿评分和二改复检。";
 
   const shared = {
     platformId: input.platform.id,
@@ -965,6 +976,70 @@ export function buildProjectStartExperienceHandoffDispatchPackage(input: {
     evidence,
     reviewLatestAt: now,
   };
+
+  if (isExecutionHandoff) {
+    return {
+      label: input.handoff.label,
+      title: input.handoff.title,
+      nextAction: "已生成首日执行闭环任务包，去派单中心按顺序完成第一章初稿、审稿、二改。",
+      dispatches: [
+        {
+          ...shared,
+          id: `first-day:${input.project.id}:first-draft`,
+          stage: "start_first_three_review",
+          priorityScore: 90,
+          ownerRole: "正文主笔",
+          title: `${input.project.title} · 首日执行闭环：第一章初稿`,
+          detail: "按已沉淀的首日执行链路先生成第一章正文，重点验证开头钩子、冲突升级和章末追读理由。",
+          actionLabel: "生成第一章初稿",
+          href: `${projectHref}#first-day-workflow`,
+          acceptanceCriteria: [
+            `执行动作：${firstAction}`,
+            "生成-审稿-二改顺序必须从第一章初稿开始，不跳过正文写回。",
+            modelRouteEvidence,
+            "初稿完成后必须回填字数、执行模型和初稿质检。",
+            `避坑边界已确认：${avoidRule}`,
+          ],
+        },
+        {
+          ...shared,
+          id: `first-day:${input.project.id}:first-review`,
+          stage: "start_first_three_review",
+          priorityScore: 86,
+          ownerRole: "审稿编辑",
+          title: `${input.project.title} · 首日执行闭环：第一章审稿`,
+          detail: "按执行闭环对第一章做审稿，重点检查钩子、爽点、冲突、解释密度和章末追读。",
+          actionLabel: "审稿第一章",
+          href: `${projectHref}#first-day-workflow`,
+          acceptanceCriteria: [
+            `验证动作已进入首轮复查：${verificationAction}`,
+            "审稿必须输出审稿评分、问题数量和必须二改的问题清单。",
+            qualityEvidenceLine,
+            modelRouteEvidence,
+            "审稿完成后才允许进入第一章二改。",
+          ],
+        },
+        {
+          ...shared,
+          id: `first-day:${input.project.id}:first-rewrite`,
+          stage: "start_first_three_review",
+          priorityScore: 84,
+          ownerRole: "改稿编辑",
+          title: `${input.project.title} · 首日执行闭环：第一章二改`,
+          detail: "处理审稿问题并写回二改版本，保留质量复检结果和版本对照。",
+          actionLabel: "完成第一章二改",
+          href: `${projectHref}#first-day-workflow`,
+          acceptanceCriteria: [
+            "二改必须逐项回应审稿问题，不能只做措辞润色。",
+            "二改复检必须写回质量分、字数和执行模型。",
+            qualityEvidenceLine,
+            modelRouteEvidence,
+            "首日执行闭环不等于平台效果过线，后续仍要回填曝光、点击、收藏、追读。",
+          ],
+        },
+      ],
+    };
+  }
 
   return {
     label: input.handoff.label,

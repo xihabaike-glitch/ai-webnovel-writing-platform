@@ -110,6 +110,15 @@ test("gate page locks the final delivery exit until every closeout lane is clear
   assert.ok(source.includes("href={hrefWithGateReturn(finalDeliveryGateDeliveryHref, gateRecheckReturnHref)}"));
 });
 
+test("gate page renders the final delivery formal release card", () => {
+  assert.ok(source.includes("gate.finalDeliveryRelease.status"));
+  assert.ok(source.includes("最终交付正式放行卡"));
+  assert.ok(source.includes("aria-label=\"最终交付正式放行卡\""));
+  assert.ok(source.includes("gate.finalDeliveryRelease.pmVerdict"));
+  assert.ok(source.includes("gate.finalDeliveryRelease.evidence.map"));
+  assert.ok(source.includes("gate.finalDeliveryRelease.actionLabel"));
+});
+
 test("gate page renders action recheck summary feedback", () => {
   assert.ok(source.includes("GateRecheckDispatchButton"));
   assert.ok(source.includes("focusNotice.recheckSummary"));

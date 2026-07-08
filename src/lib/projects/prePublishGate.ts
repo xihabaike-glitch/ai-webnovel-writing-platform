@@ -198,6 +198,17 @@ export interface PrePublishGateFinalDeliveryGate {
   totalCount: number;
 }
 
+export interface PrePublishGateFinalDeliveryRelease {
+  status: "ready" | "blocked" | "empty";
+  headline: string;
+  pmVerdict: string;
+  actionLabel: string;
+  actionHref: string;
+  projectCount: number;
+  completedReceiptCount: number;
+  evidence: string[];
+}
+
 export interface PrePublishGateAcceptanceSheetGate {
   status: PrePublishGateItem["status"];
   label: string;
@@ -480,6 +491,7 @@ export interface PrePublishGate {
   releaseAction: PrePublishGateAction | null;
   pmFocus: PrePublishGatePmFocus;
   realPipelineFinalReview: PrePublishGateRealPipelineFinalReview;
+  finalDeliveryRelease: PrePublishGateFinalDeliveryRelease;
 }
 
 export interface PrePublishGateRealPipelineFinalReview {
@@ -2053,6 +2065,50 @@ function buildRealPipelineFinalReview(input: {
   };
 }
 
+function buildFinalDeliveryRelease(input: {
+  gateStatus: PrePublishGate["status"];
+  finalReview: PrePublishGateRealPipelineFinalReview;
+  finalDeliveryCandidates: PrePublishGateProjectStatus[];
+  finalDeliveryBlockers: PrePublishGateProjectStatus[];
+}): PrePublishGateFinalDeliveryRelease {
+  const completedReceiptCount = input.finalDeliveryCandidates.reduce(
+    (sum, project) => sum + project.finalDeliveryGate.completedCount,
+    0,
+  );
+  const firstBlocker = input.finalDeliveryBlockers[0] ?? null;
+  const status: PrePublishGateFinalDeliveryRelease["status"] = input.finalDeliveryCandidates.length === 0
+    ? "empty"
+    : input.gateStatus === "ready" && input.finalReview.outcome === "pass" && input.finalDeliveryBlockers.length === 0
+      ? "ready"
+      : "blocked";
+  const evidence = input.finalDeliveryCandidates.slice(0, 4).map((project) => (
+    `${project.projectTitle}：${project.platformName} · ${project.finalDeliveryGate.label} · ${project.finalDeliveryGate.completedCount}/${project.finalDeliveryGate.totalCount} 项回执。`
+  ));
+
+  return {
+    status,
+    headline: status === "ready"
+      ? "最终交付正式放行"
+      : status === "empty"
+        ? "最终交付等待可发布项目"
+        : "最终交付仍未正式放行",
+    pmVerdict: status === "ready"
+      ? "可以交付。6 项最终交付回执、真实流水线终检和总闸门状态已经对齐。"
+      : firstBlocker
+        ? `不能交付。先处理 ${firstBlocker.projectTitle}：${firstBlocker.finalDeliveryGate.detail}`
+        : "不能交付。先让至少一个项目通过发布包、项目验收单和最终交付回执。",
+    actionLabel: status === "ready" ? "正式放行交付包" : firstBlocker?.finalDeliveryGate.actionLabel ?? "回作品流水线补证据",
+    actionHref: status === "ready" ? "#pipeline-final-review" : firstBlocker?.finalDeliveryGate.href ?? "/projects#pipeline-projects",
+    projectCount: input.finalDeliveryCandidates.length,
+    completedReceiptCount,
+    evidence: [
+      ...evidence,
+      `真实终检：${input.finalReview.headline}。`,
+      `总闸门裁决：${input.finalReview.outcomeLabel}。`,
+    ],
+  };
+}
+
 function projectAcceptanceRecheckProjectId(actionId: string | null | undefined) {
   if (!actionId?.startsWith("project-acceptance:")) return null;
   return actionId.slice("project-acceptance:".length);
@@ -3075,6 +3131,12 @@ export function buildPrePublishGate(input: PrePublishGateInput): PrePublishGate 
     finalDeliveryBlockers,
     failureRepairBatch,
   });
+  const finalDeliveryRelease = buildFinalDeliveryRelease({
+    gateStatus: status,
+    finalReview: realPipelineFinalReview,
+    finalDeliveryCandidates,
+    finalDeliveryBlockers,
+  });
 
   return {
     status,
@@ -3103,5 +3165,6 @@ export function buildPrePublishGate(input: PrePublishGateInput): PrePublishGate 
     releaseAction,
     pmFocus: buildPrePublishGatePmFocus(status, releaseAction),
     realPipelineFinalReview,
+    finalDeliveryRelease,
   };
 }

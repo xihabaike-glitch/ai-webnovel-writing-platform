@@ -236,6 +236,15 @@ test("buildPrePublishGate", async (t) => {
     assert.equal(gate.realPipelineFinalReview.primaryActionHref, "#gate-export-package");
     assert.ok(gate.realPipelineFinalReview.evidence.some((line) => line.includes("夜雨系统")));
     assert.ok(gate.realPipelineFinalReview.passSignals.some((line) => line.includes("项目验收单通过")));
+    assert.equal(gate.finalDeliveryRelease.status, "ready");
+    assert.equal(gate.finalDeliveryRelease.actionLabel, "正式放行交付包");
+    assert.equal(gate.finalDeliveryRelease.actionHref, "#pipeline-final-review");
+    assert.equal(gate.finalDeliveryRelease.projectCount, 1);
+    assert.equal(gate.finalDeliveryRelease.completedReceiptCount, 6);
+    assert.ok(gate.finalDeliveryRelease.headline.includes("最终交付正式放行"));
+    assert.ok(gate.finalDeliveryRelease.pmVerdict.includes("可以交付"));
+    assert.ok(gate.finalDeliveryRelease.evidence.some((line) => line.includes("最终交付已闭环")));
+    assert.ok(gate.finalDeliveryRelease.evidence.some((line) => line.includes("真实作品流水线终检通过")));
   });
 
   await t.test("blocks launch when final delivery receipts are missing", () => {

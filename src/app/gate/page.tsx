@@ -488,6 +488,35 @@ export default async function GatePage({
             </span>
           )}
         </div>
+        {gate.finalDeliveryRelease.status === "ready" ? (
+          <div className="mt-3 rounded-md border border-emerald-200 bg-emerald-50 p-3 text-emerald-950" aria-label="最终交付正式放行卡">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+              <div>
+                <div className="text-xs font-medium text-emerald-700">最终交付正式放行卡</div>
+                <h3 className="mt-1 font-semibold">{gate.finalDeliveryRelease.headline}</h3>
+                <p className="mt-1 max-w-4xl text-sm leading-6">{gate.finalDeliveryRelease.pmVerdict}</p>
+              </div>
+              <Link
+                className="w-fit rounded-md bg-emerald-950 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-900"
+                href={hrefWithGateReturn(gate.finalDeliveryRelease.actionHref, gateRecheckReturnHref)}
+              >
+                {gate.finalDeliveryRelease.actionLabel}
+              </Link>
+            </div>
+            <div className="mt-3 grid gap-2 text-xs text-emerald-900 sm:grid-cols-2">
+              <div>放行项目 <span className="font-semibold">{gate.finalDeliveryRelease.projectCount}</span></div>
+              <div>闭环回执 <span className="font-semibold">{gate.finalDeliveryRelease.completedReceiptCount}</span></div>
+            </div>
+            <div className="mt-3 rounded-md bg-white/70 p-2 text-xs leading-5 text-emerald-950">
+              <div className="font-medium">正式放行证据</div>
+              <ul className="mt-1 space-y-1">
+                {gate.finalDeliveryRelease.evidence.map((line) => (
+                  <li key={line}>{line}</li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        ) : null}
       </section>
 
       <section className="mb-6 rounded-md border border-sky-200 bg-sky-50 p-4 text-sky-950" id="pipeline-final-review">

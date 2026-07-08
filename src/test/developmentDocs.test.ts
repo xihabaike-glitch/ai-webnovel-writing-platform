@@ -122,7 +122,8 @@ test("ai writing platform development document", async (t) => {
     }
 
     assert.ok(doc.includes("最终交付正式放行卡"));
-    assert.ok(doc.includes("/gate#pipeline-final-review"));
+    assert.equal(doc.includes("`/gate#pipeline-final-review`"), false);
+    assert.ok(doc.includes("/gate?focus=action-recheck&source=final-delivery-receipt#pipeline-final-review"));
     assert.ok(doc.includes("仍需用真实作品持续验收正式放行证据"));
     assert.ok(doc.includes("无新增平台缺口"));
   });

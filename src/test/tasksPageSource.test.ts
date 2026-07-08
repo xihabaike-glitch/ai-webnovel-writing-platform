@@ -51,6 +51,17 @@ test("tasks page keeps a gate recheck return path visible", () => {
   assert.ok(source.includes("回总闸门复检"));
 });
 
+test("tasks page shows task receipt acceptance criteria in the PM focus", () => {
+  assert.ok(source.includes("taskReceiptAcceptanceCriteria"));
+  assert.ok(source.includes("任务回执验收口径"));
+  assert.ok(source.includes("执行角色"));
+  assert.ok(source.includes("输入"));
+  assert.ok(source.includes("输出"));
+  assert.ok(source.includes("人工验收"));
+  assert.ok(source.includes("下一步"));
+  assert.ok(source.includes("taskReceiptAcceptanceCriteria.map"));
+});
+
 test("tasks page carries gate return through task work links", () => {
   const recommendedBatchButton = readFileSync("src/components/tasks/RunRecommendedBatchButton.tsx", "utf8");
   const publishEffectButton = readFileSync("src/components/tasks/RunPublishEffectQueueActionButton.tsx", "utf8");

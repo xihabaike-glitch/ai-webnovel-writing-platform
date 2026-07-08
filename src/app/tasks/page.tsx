@@ -154,6 +154,14 @@ function usd(value: number) {
   return `$${value.toFixed(4)}`;
 }
 
+const taskReceiptAcceptanceCriteria = [
+  "执行角色",
+  "输入",
+  "输出",
+  "人工验收",
+  "下一步",
+];
+
 function batchTone(successRate: number, failedTasks: number, runningTasks: number) {
   if (runningTasks > 0) return "border-blue-200 bg-blue-50 text-blue-800";
   if (failedTasks > 0 || successRate < 80) return "border-rose-200 bg-rose-50 text-rose-800";
@@ -685,6 +693,16 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
             <div className="mt-2 text-xs text-slate-400">{queue.pmFocus.scopeLabel}</div>
             <div className="mt-2 rounded-md bg-white/10 px-3 py-2 text-xs leading-5 text-slate-200">
               {queue.pmFocus.pipelineValidationHint}
+            </div>
+            <div className="mt-3 rounded-md border border-white/15 bg-white/5 p-3">
+              <div className="text-xs font-medium text-slate-300">任务回执验收口径</div>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {taskReceiptAcceptanceCriteria.map((criterion) => (
+                  <span className="rounded-md bg-white/10 px-2 py-1 text-xs text-slate-100" key={criterion}>
+                    {criterion}
+                  </span>
+                ))}
+              </div>
             </div>
           </div>
           <div className="flex flex-wrap gap-2">

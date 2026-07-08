@@ -15,7 +15,7 @@
 5. `/gate`：总闸门。负责生产放大前的证据检查，防止没有样本、没有复查、没有失败修复就进入批量。
 6. `/failures`：失败修复中心。按模型配置、提示词上下文、样本重试和人工复盘拆分修复泳道，必要时暂停批量。
 7. `/references`：开源参考库。收录 30 个以上 GitHub 项目，并把参考价值转成产品开发路径、AI 编辑部角色和平台执行卡。
-8. `/settings/models`：模型设置。预留 Claude、DeepSeek、Kimi、GPT、OpenAI-compatible 等接口，并把模型绑定到具体写作岗位。
+8. `/settings/models`：模型设置。承接 Claude、DeepSeek、Kimi、GPT、OpenAI-compatible、模型岗位矩阵、职责路由和推荐批次缺岗硬拦截后的修复入口。
 
 ### 0.2 平台范围锁定
 
@@ -34,6 +34,8 @@
 
 模型岗位必须绑定任务、备用模型、人工验收和成本观察。任何模型输出默认是候选稿或回执，不得直接覆盖作者正文。
 
+当前模型闭环已经进入验收口径：`/settings/models?focus=model-role-matrix#model-role-matrix` 是模型岗位修复入口；Claude、DeepSeek、Kimi、GPT 缺岗时，`/tasks` 的推荐批次按钮和 `/api/tasks/recommended-batch` 都会触发推荐批次缺岗硬拦截。修复顺序是先补模型岗位矩阵，再保存职责路由，最后生成小样本复检派单，不能靠默认模型或 Mock 继续放大生产。
+
 ### 0.4 毒舌 PM 闸门
 
 当前产品的 PM 闸门规则如下：
@@ -49,7 +51,7 @@
 下一步不是继续加平台，也不是堆更多炫技能力，而是逐项证明现有闭环可以跑通：
 
 1. 从 `/projects` 创建或打开作品，完成开头钩子、结尾承诺、主干、分支和章节卡。
-2. 从 `/settings/models` 确认模型岗位和任务路由，确保 Claude、DeepSeek、Kimi、GPT 都有明确用途。
+2. 从 `/settings/models?focus=model-role-matrix#model-role-matrix` 确认模型岗位矩阵和职责路由，确保 Claude、DeepSeek、Kimi、GPT 都有明确用途；缺岗时先处理推荐批次缺岗硬拦截。
 3. 从 `/tasks` 和 `/dispatch` 验收首日写作、模型执行、回执接受和下一步任务。
 4. 从 `/gate` 检查是否允许批量生产。
 5. 从 `/failures` 处理失败修复中心的优先泳道，必要时暂停批量。
@@ -782,7 +784,7 @@ MVP 合格标准：
 当前下一步不是重写计划，也不是继续加平台，而是拿现有产品跑真实闭环：
 
 1. 从 `/projects` 跑一条真实作品样本：创建或打开作品，补齐目标平台、篇幅、开头钩子、结尾承诺、主干、分支、叶片和土壤。
-2. 从 `/settings/models` 检查模型岗位：Claude、DeepSeek、Kimi、GPT 必须有清晰岗位、备用模型、成本观察和人工验收入口。
+2. 从 `/settings/models?focus=model-role-matrix#model-role-matrix` 检查模型岗位矩阵和职责路由：Claude、DeepSeek、Kimi、GPT 必须有清晰岗位、备用模型、成本观察和人工验收入口；推荐批次缺岗硬拦截未解除前不允许放大生产。
 3. 从 `/dispatch` 验证任务回执：首章样本、审稿、二改、平台包和失败修复都要有执行角色、输入、输出、验收证据和下一步。
 4. 从 `/gate` 判断是否允许小批量：没有样本、复查、质量、成本、失败率和恢复证据时，不允许放大生产。
 5. 从 `/failures` 做失败修复：模型配置、提示词上下文、样本重试和人工复盘必须分泳道处理，未修复时暂停批量。

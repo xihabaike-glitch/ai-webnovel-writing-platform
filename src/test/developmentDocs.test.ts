@@ -31,6 +31,11 @@ test("ai writing platform development document", async (t) => {
     }
 
     assert.ok(doc.includes("模型岗位"));
+    assert.ok(doc.includes("模型岗位矩阵"));
+    assert.ok(doc.includes("职责路由"));
+    assert.ok(doc.includes("推荐批次缺岗硬拦截"));
+    assert.ok(doc.includes("focus=model-role-matrix"));
+    assert.equal(doc.includes("模型设置。预留 Claude、DeepSeek、Kimi、GPT"), false);
     assert.ok(doc.includes("毒舌 PM 闸门"));
     assert.ok(doc.includes("失败修复中心"));
     assert.ok(doc.includes("暂停批量"));

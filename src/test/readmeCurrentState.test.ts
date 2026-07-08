@@ -15,6 +15,10 @@ test("README reflects the current runnable PM delivery state", () => {
   assert.ok(readme.includes("8/8 核心平台已完成"));
   assert.ok(readme.includes("剩余 10 个平台不再添加"));
   assert.ok(readme.includes("Claude / DeepSeek / Kimi / GPT"));
+  assert.equal(readme.includes("预留 Claude / DeepSeek / Kimi / GPT"), false);
+  assert.ok(readme.includes("模型岗位矩阵"));
+  assert.ok(readme.includes("职责路由"));
+  assert.ok(readme.includes("推荐批次缺岗硬拦截"));
   assert.ok(readme.includes("验收真实流水线"));
   assert.ok(readme.includes("npm install"));
   assert.ok(readme.includes("npm run dev"));

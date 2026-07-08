@@ -158,7 +158,7 @@ function withAdoptionFollowupReturn(plan: TaskQueueExecutionPlan, receipt: TaskQ
   return {
     ...receipt,
     primaryLabel: "回总闸门复检",
-    primaryHref: "/gate#first-three-adoption-closure",
+    primaryHref: "/gate?focus=action-recheck&source=first-three-adoption#first-three-adoption-closure",
     secondaryLabel: receipt.primaryLabel,
     secondaryHref: receipt.primaryHref,
     warnings: [

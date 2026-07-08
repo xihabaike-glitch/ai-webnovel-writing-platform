@@ -415,7 +415,7 @@ test("buildTaskQueueBatchReceipt routes adoption follow-up batches back to the g
 
   assert.equal(receipt.status, "continue");
   assert.equal(receipt.primaryLabel, "回总闸门复检");
-  assert.equal(receipt.primaryHref, "/gate#first-three-adoption-closure");
+  assert.equal(receipt.primaryHref, "/gate?focus=action-recheck&source=first-three-adoption#first-three-adoption-closure");
   assert.equal(receipt.secondaryLabel, "进入批量二改");
   assert.ok(receipt.evidenceItems.some((item) => item.includes("采纳闭环：1 个")));
   assert.ok(receipt.warnings.some((warning) => warning.includes("采纳闭环任务跑完不等于发布放行")));

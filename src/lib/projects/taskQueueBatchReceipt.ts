@@ -133,6 +133,15 @@ function thirdRoundEvidence(mode: ReturnType<typeof thirdRoundBatchMode>) {
   return null;
 }
 
+function firstDayScaleMode(plan: TaskQueueExecutionPlan) {
+  return plan.batchModeLabel === "首日扩展小批";
+}
+
+function firstDayScaleEvidence(plan: TaskQueueExecutionPlan) {
+  if (!firstDayScaleMode(plan)) return null;
+  return `${plan.batchModeLabel}：${plan.batchModeDetail}`;
+}
+
 function executionContextEvidence(context: TaskQueueBatchExecutionContext) {
   if (context === "batch_rhythm_recheck") return "执行上下文：节奏派单回流复验小批";
   if (context === "repair_resume") return "执行上下文：失败修复后恢复小批";
@@ -221,6 +230,7 @@ export function buildTaskQueueBatchReceipt(input: {
     executionContextEvidence(executionContext),
     batchRhythmSourceEvidence(input.batchRhythmSource),
     `执行批次：${input.plan.actionLabel}`,
+    firstDayScaleEvidence(input.plan),
     adoptionFollowupEvidence(input.plan),
     thirdRoundEvidence(thirdRoundBatchMode(input.plan)),
     `成功/失败：${input.routeEffectSummary.succeededTasks}/${input.routeEffectSummary.failedTasks}`,
@@ -239,6 +249,7 @@ export function buildTaskQueueBatchReceipt(input: {
     ? sampleCompletionEvidenceTemplate({ ...input, passed: samplePassed })
     : undefined;
   const scaleUpRecovery = input.plan.scaleGate === "cleared";
+  const firstDayScale = firstDayScaleMode(input.plan);
   const thirdRoundMode = thirdRoundBatchMode(input.plan);
 
   if (failed.length > 0 || input.routeEffectSummary.successRatePercent < 80) {
@@ -354,6 +365,24 @@ export function buildTaskQueueBatchReceipt(input: {
         thirdRoundMode === "downgrade" ? "三轮降档批次只沉淀修复流程，不沉淀加码结论。" : null,
         "别继续点批量。先完成小样本验收，再让系统决定是否恢复后续初稿批次。",
       ].filter((warning): warning is string => Boolean(warning)),
+    });
+  }
+
+  if (firstDayScale) {
+    return withAdoptionFollowupReturn(input.plan, {
+      status: "continue",
+      headline: "首日扩展小批通过，先回填数据",
+      detail: "首日数据过线后，本批只扩 1 个小样本；这不是直接批量放大。先回填新一轮曝光、点击、收藏、追读和质量证据，再决定是否继续扩展。",
+      primaryLabel: "回任务中心补首日数据",
+      primaryHref: "/dispatch",
+      secondaryLabel: "查看任务队列",
+      secondaryHref: "/tasks#recommended-batch",
+      evidenceItems,
+      warnings: [
+        input.routeEffectSummary.verdict,
+        input.plan.batchModeDetail,
+        "首日扩展小批通过也不直接批量放大；下一步必须补齐曝光、点击、收藏、追读，再让总闸门复盘。",
+      ],
     });
   }
 

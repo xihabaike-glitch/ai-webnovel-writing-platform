@@ -263,6 +263,48 @@ test("buildTaskQueueBatchReceipt keeps healthy cleared watch scale-up batches sm
   assert.ok(receipt.warnings.some((warning) => warning.includes("继续小批")));
 });
 
+test("buildTaskQueueBatchReceipt turns first-day scale samples into evidence collection receipts", () => {
+  const firstDayScalePlan: TaskQueueExecutionPlan = {
+    ...plan,
+    batchModeLabel: "首日扩展小批",
+    batchModeTone: "recovery",
+    batchModeDetail: "首日执行数据已经过线，但本批只扩 1 个小样本；回填新一轮曝光、点击、收藏、追读后再决定是否继续。",
+    warnings: ["首日执行可扩展：先跑 1 个小样本，不直接批量放大。"],
+  };
+  const batchReceipt = buildTaskQueueBatchReceipt({
+    plan: firstDayScalePlan,
+    results: [{ status: "succeeded", taskId: "task-1", chapterId: "chapter-1", chapterTitle: "第一章", error: null, qualityScore: 88 }],
+    routeEffectSummary: {
+      ...routeEffect,
+      averageQualityScore: 88,
+      verdict: "首日扩展小批稳定。",
+    },
+  });
+  const gateReceipt = buildTaskQueueBatchGateActionReceipt({
+    plan: firstDayScalePlan,
+    results: [{ status: "succeeded", taskId: "task-1", chapterId: "chapter-1", chapterTitle: "第一章", error: null, qualityScore: 88 }],
+    routeEffectSummary: {
+      ...routeEffect,
+      averageQualityScore: 88,
+      verdict: "首日扩展小批稳定。",
+    },
+    batchReceipt,
+    strategyId: "standard",
+    now: "2026-01-01T00:00:00.000Z",
+  });
+
+  assert.equal(batchReceipt.status, "continue");
+  assert.equal(batchReceipt.headline, "首日扩展小批通过，先回填数据");
+  assert.equal(batchReceipt.primaryLabel, "回任务中心补首日数据");
+  assert.equal(batchReceipt.primaryHref, "/dispatch");
+  assert.ok(batchReceipt.detail.includes("只扩 1 个小样本"));
+  assert.ok(batchReceipt.detail.includes("曝光、点击、收藏、追读"));
+  assert.ok(batchReceipt.evidenceItems.some((item) => item.includes("首日扩展小批")));
+  assert.ok(batchReceipt.warnings.some((warning) => warning.includes("不直接批量放大")));
+  assert.equal(gateReceipt.payload.batchReceipt.headline, "首日扩展小批通过，先回填数据");
+  assert.equal(gateReceipt.payload.batchReceipt.primaryHref, "/dispatch");
+});
+
 test("buildTaskQueueBatchReceipt rolls back weak third-round stable batches to watch", () => {
   const receipt = buildTaskQueueBatchReceipt({
     plan: {

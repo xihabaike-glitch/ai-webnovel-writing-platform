@@ -43,6 +43,18 @@ test("gate page renders real sample final review checklist", () => {
   assert.ok(source.includes("overview.currentPipelineValidation.finalReview.receiptHref"));
 });
 
+test("gate page renders computed real pipeline final review verdict", () => {
+  assert.ok(source.includes("gate.realPipelineFinalReview"));
+  assert.ok(source.includes("gate.realPipelineFinalReview.outcomeLabel"));
+  assert.ok(source.includes("gate.realPipelineFinalReview.headline"));
+  assert.ok(source.includes("gate.realPipelineFinalReview.detail"));
+  assert.ok(source.includes("gate.realPipelineFinalReview.primaryActionHref"));
+  assert.ok(source.includes("gate.realPipelineFinalReview.evidence.map"));
+  assert.ok(source.includes("gate.realPipelineFinalReview.passSignals.map"));
+  assert.ok(source.includes("gate.realPipelineFinalReview.repairSignals.map"));
+  assert.ok(source.includes("gate.realPipelineFinalReview.holdBatchSignals.map"));
+});
+
 test("gate page renders action recheck summary feedback", () => {
   assert.ok(source.includes("GateRecheckDispatchButton"));
   assert.ok(source.includes("focusNotice.recheckSummary"));

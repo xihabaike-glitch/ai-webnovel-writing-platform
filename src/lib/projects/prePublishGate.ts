@@ -466,6 +466,20 @@ export interface PrePublishGate {
   priorityActions: PrePublishGateAction[];
   releaseAction: PrePublishGateAction | null;
   pmFocus: PrePublishGatePmFocus;
+  realPipelineFinalReview: PrePublishGateRealPipelineFinalReview;
+}
+
+export interface PrePublishGateRealPipelineFinalReview {
+  outcome: "pass" | "repair" | "hold_batch";
+  outcomeLabel: "通过" | "退回修复" | "暂停批量";
+  headline: string;
+  detail: string;
+  primaryActionLabel: string;
+  primaryActionHref: string;
+  evidence: string[];
+  passSignals: string[];
+  repairSignals: string[];
+  holdBatchSignals: string[];
 }
 
 export interface PrePublishGatePmFocus {
@@ -1844,6 +1858,105 @@ function buildPrePublishGatePmFocus(
   };
 }
 
+function buildRealPipelineFinalReview(input: {
+  status: PrePublishGate["status"];
+  releaseAction: PrePublishGateAction | null;
+  modelRoleBlocker?: ModelRoleMatrixPriorityBlocker | null;
+  projectStatuses: PrePublishGateProjectStatus[];
+  readyPackages: number;
+  repairPackages: number;
+  emptyProjects: number;
+  taskBlockers: number;
+  failedTasks: number;
+  acceptanceBlockers: PrePublishGateProjectStatus[];
+  acceptanceWarnings: PrePublishGateProjectStatus[];
+  failureRepairBatch: FailureRepairBatch;
+}): PrePublishGateRealPipelineFinalReview {
+  const acceptedProjects = input.projectStatuses.filter((project) => project.acceptanceSheetGate.status === "pass");
+  const passSignals = [
+    acceptedProjects.length > 0 ? `项目验收单通过：${acceptedProjects.length} 本真实作品可追溯。` : null,
+    input.readyPackages > 0 ? `发布包可用：${input.readyPackages} 个项目已有可导出资产。` : null,
+    input.failedTasks === 0 ? "失败复盘清零：没有未恢复失败任务。" : null,
+  ].filter((item): item is string => Boolean(item));
+  const repairSignals = [
+    ...input.acceptanceBlockers.slice(0, 3).map((project) => `项目验收单缺口：${project.projectTitle} · ${project.acceptanceSheetGate.label}。`),
+    input.repairPackages > 0 ? `发布质检待修：${input.repairPackages} 个项目还不能发。` : null,
+    input.emptyProjects > 0 ? `正文缺口：${input.emptyProjects} 个项目暂无可发布正文。` : null,
+    input.taskBlockers > 0 ? `任务队列阻塞：${input.taskBlockers} 个阻塞项挡住生产链路。` : null,
+  ].filter((item): item is string => Boolean(item));
+  const holdBatchSignals = [
+    input.modelRoleBlocker?.tone === "blocked" ? `模型岗位缺岗：${input.modelRoleBlocker.detail}` : null,
+    input.failedTasks > 0 ? `失败恢复未清：${input.failedTasks} 个失败任务未恢复。` : null,
+    ...input.acceptanceWarnings.slice(0, 3).map((project) => `总闸门待复检：${project.projectTitle} · ${project.acceptanceSheetGate.label}。`),
+    input.status === "needs_repair" && repairSignals.length === 0 ? "仍有提醒项未处理，批量前先停在总闸门复检。" : null,
+  ].filter((item): item is string => Boolean(item));
+  const evidence = input.projectStatuses.slice(0, 4).map((project) => {
+    const receipt = project.acceptanceSheetGate.latestRecheckReceipt?.evidence
+      ?? project.acceptanceSheetGate.latestDispatchEvidence
+      ?? project.acceptanceSheetGate.detail;
+    return `${project.projectTitle}：${project.acceptanceSheetGate.label}；${receipt}`;
+  });
+
+  const passAction = input.releaseAction ?? {
+    label: "进入发布闭环",
+    href: "#gate-export-package",
+  };
+  const repairTarget = input.acceptanceBlockers[0] ?? input.projectStatuses.find((project) => project.status !== "ready") ?? null;
+  const repairAction = repairTarget
+    ? { label: repairTarget.acceptanceSheetGate.actionLabel, href: repairTarget.acceptanceSheetGate.href }
+    : { label: "回作品流水线修复", href: "/projects#pipeline-projects" };
+  const holdAction = input.modelRoleBlocker?.tone === "blocked"
+    ? { label: input.modelRoleBlocker.actionLabel, href: input.modelRoleBlocker.actionHref }
+    : input.failedTasks > 0
+      ? { label: input.failureRepairBatch.primaryActionLabel, href: input.failureRepairBatch.primaryActionHref }
+      : input.acceptanceWarnings[0]
+        ? { label: input.acceptanceWarnings[0].acceptanceSheetGate.actionLabel, href: input.acceptanceWarnings[0].acceptanceSheetGate.href }
+        : { label: input.releaseAction?.label ?? "回总闸门复检", href: input.releaseAction?.href ?? "/gate?focus=action-recheck#gate-focus-notice" };
+
+  if (holdBatchSignals.length > 0) {
+    return {
+      outcome: "hold_batch",
+      outcomeLabel: "暂停批量",
+      headline: "真实作品流水线终检：暂停批量",
+      detail: "有恢复、复检或模型岗位风险，先停住批量生产，处理完再回总闸门。",
+      primaryActionLabel: holdAction.label,
+      primaryActionHref: holdAction.href,
+      evidence,
+      passSignals,
+      repairSignals,
+      holdBatchSignals,
+    };
+  }
+
+  if (input.status === "ready" && input.readyPackages > 0 && repairSignals.length === 0) {
+    return {
+      outcome: "pass",
+      outcomeLabel: "通过",
+      headline: "真实作品流水线终检通过",
+      detail: "项目验收单、失败复盘、模型岗位和发布包已对齐，可以进入发布闭环。",
+      primaryActionLabel: passAction.label,
+      primaryActionHref: passAction.href,
+      evidence,
+      passSignals,
+      repairSignals,
+      holdBatchSignals,
+    };
+  }
+
+  return {
+    outcome: "repair",
+    outcomeLabel: "退回修复",
+    headline: "真实作品流水线终检：退回修复",
+    detail: "真实样本证据还没闭合，先按项目验收单和任务队列补证据。",
+    primaryActionLabel: repairAction.label,
+    primaryActionHref: repairAction.href,
+    evidence,
+    passSignals,
+    repairSignals,
+    holdBatchSignals,
+  };
+}
+
 function projectAcceptanceRecheckProjectId(actionId: string | null | undefined) {
   if (!actionId?.startsWith("project-acceptance:")) return null;
   return actionId.slice("project-acceptance:".length);
@@ -2830,6 +2943,20 @@ export function buildPrePublishGate(input: PrePublishGateInput): PrePublishGate 
       .map((project) => action(`export:${project.projectId}`, "导出平台发布包", `${project.projectTitle} · ${project.platformName} 已通过发布质检。`, project.href, "primary")),
   ].filter((item): item is PrePublishGateAction => Boolean(item)));
   const releaseAction = buildReleaseAction(status, projectStatuses, priorityActions);
+  const realPipelineFinalReview = buildRealPipelineFinalReview({
+    status,
+    releaseAction,
+    modelRoleBlocker: input.modelRoleBlocker,
+    projectStatuses,
+    readyPackages,
+    repairPackages,
+    emptyProjects,
+    taskBlockers,
+    failedTasks,
+    acceptanceBlockers,
+    acceptanceWarnings,
+    failureRepairBatch,
+  });
 
   return {
     status,
@@ -2857,5 +2984,6 @@ export function buildPrePublishGate(input: PrePublishGateInput): PrePublishGate 
     priorityActions,
     releaseAction,
     pmFocus: buildPrePublishGatePmFocus(status, releaseAction),
+    realPipelineFinalReview,
   };
 }

@@ -399,6 +399,59 @@ export default async function GatePage({
               </Link>
             )}
           </div>
+          <div className="mt-4 rounded-md border border-sky-100 bg-white p-3">
+            <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
+              <div>
+                <div className="text-xs font-medium text-sky-700">毒舌 PM 自动终检结论</div>
+                <h3 className="mt-1 font-medium text-sky-950">
+                  {gate.realPipelineFinalReview.outcomeLabel} · {gate.realPipelineFinalReview.headline}
+                </h3>
+                <p className="mt-1 text-sm leading-6 text-slate-700">{gate.realPipelineFinalReview.detail}</p>
+              </div>
+              <Link
+                className="w-fit rounded-md bg-sky-950 px-3 py-2 text-sm font-medium text-white hover:bg-sky-900"
+                href={hrefWithGateReturn(gate.realPipelineFinalReview.primaryActionHref, gateRecheckReturnHref)}
+              >
+                {gate.realPipelineFinalReview.primaryActionLabel}
+              </Link>
+            </div>
+            <div className="mt-3 grid gap-2 text-xs leading-5 lg:grid-cols-2">
+              <div className="rounded-md bg-slate-50 p-2 text-slate-700">
+                <div className="font-medium text-slate-950">当前证据</div>
+                <ul className="mt-1 space-y-1">
+                  {gate.realPipelineFinalReview.evidence.map((line) => (
+                    <li key={line}>{line}</li>
+                  ))}
+                </ul>
+              </div>
+              <div className="grid gap-2">
+                <div className="rounded-md bg-emerald-50 p-2 text-emerald-900">
+                  <div className="font-medium">通过依据</div>
+                  <ul className="mt-1 space-y-1">
+                    {gate.realPipelineFinalReview.passSignals.map((line) => (
+                      <li key={line}>{line}</li>
+                    ))}
+                  </ul>
+                </div>
+                <div className="rounded-md bg-amber-50 p-2 text-amber-900">
+                  <div className="font-medium">退回依据</div>
+                  <ul className="mt-1 space-y-1">
+                    {gate.realPipelineFinalReview.repairSignals.map((line) => (
+                      <li key={line}>{line}</li>
+                    ))}
+                  </ul>
+                </div>
+                <div className="rounded-md bg-rose-50 p-2 text-rose-900">
+                  <div className="font-medium">暂停依据</div>
+                  <ul className="mt-1 space-y-1">
+                    {gate.realPipelineFinalReview.holdBatchSignals.map((line) => (
+                      <li key={line}>{line}</li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
           <div className="mt-4 rounded-md border border-white/70 bg-white/75 p-3">
             <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
               <div>

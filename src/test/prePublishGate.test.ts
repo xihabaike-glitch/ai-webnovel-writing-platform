@@ -195,6 +195,13 @@ test("buildPrePublishGate", async (t) => {
     assert.ok(gate.pmFocus.pipelineValidationHint.includes("复查"));
     assert.ok(gate.pmFocus.pipelineValidationHint.includes("失败修复"));
     assert.ok(gate.pmFocus.pipelineValidationHint.includes("发布包"));
+    assert.equal(gate.realPipelineFinalReview.outcome, "pass");
+    assert.equal(gate.realPipelineFinalReview.outcomeLabel, "通过");
+    assert.ok(gate.realPipelineFinalReview.headline.includes("真实作品流水线终检通过"));
+    assert.ok(gate.realPipelineFinalReview.detail.includes("项目验收单、失败复盘、模型岗位和发布包"));
+    assert.equal(gate.realPipelineFinalReview.primaryActionHref, "#gate-export-package");
+    assert.ok(gate.realPipelineFinalReview.evidence.some((line) => line.includes("夜雨系统")));
+    assert.ok(gate.realPipelineFinalReview.passSignals.some((line) => line.includes("项目验收单通过")));
   });
 
   await t.test("blocks launch when model writing roles are missing", () => {
@@ -219,6 +226,25 @@ test("buildPrePublishGate", async (t) => {
     assert.equal(gate.releaseAction?.href, "/settings/models?focus=model-role-matrix#model-role-matrix");
     assert.equal(gate.pmFocus.status, "blocked");
     assert.ok(gate.pmFocus.headline.includes("模型"));
+    assert.equal(gate.realPipelineFinalReview.outcome, "hold_batch");
+    assert.equal(gate.realPipelineFinalReview.outcomeLabel, "暂停批量");
+    assert.ok(gate.realPipelineFinalReview.headline.includes("暂停批量"));
+    assert.ok(gate.realPipelineFinalReview.holdBatchSignals.some((line) => line.includes("模型岗位")));
+    assert.equal(gate.realPipelineFinalReview.primaryActionHref, "/settings/models?focus=model-role-matrix#model-role-matrix");
+  });
+
+  await t.test("sends incomplete real sample receipts back to repair", () => {
+    const gate = buildPrePublishGate({
+      projects: [blockedProject],
+      failureTasks: [],
+      batchHistory: [],
+    });
+
+    assert.equal(gate.realPipelineFinalReview.outcome, "repair");
+    assert.equal(gate.realPipelineFinalReview.outcomeLabel, "退回修复");
+    assert.ok(gate.realPipelineFinalReview.headline.includes("退回修复"));
+    assert.ok(gate.realPipelineFinalReview.repairSignals.some((line) => line.includes("项目验收单")));
+    assert.ok(gate.realPipelineFinalReview.primaryActionHref.startsWith("/projects"));
   });
 
   await t.test("focuses first-day completion as a gate release notice", () => {

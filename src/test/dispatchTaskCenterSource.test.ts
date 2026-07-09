@@ -206,7 +206,7 @@ test("dispatch task center renders a visible per-task receipt template", () => {
   assert.ok(source.includes("wordBreak: \"break-word\""));
 });
 
-test("dispatch task center previews missing PM receipt fields before completion", () => {
+test("dispatch task center previews missing quality gate receipt fields before completion", () => {
   assert.ok(source.includes("buildDispatchReceiptCloseoutPreview"));
   assert.ok(source.includes("completionCloseoutPreview"));
   assert.ok(source.includes("派单回执预检"));
@@ -216,7 +216,7 @@ test("dispatch task center previews missing PM receipt fields before completion"
   assert.ok(source.includes("完成前请补齐派单回执字段"));
 });
 
-test("dispatch task completion API rejects missing PM receipt fields", () => {
+test("dispatch task completion API rejects missing quality gate receipt fields", () => {
   assert.ok(dispatchTaskRouteSource.includes("missingDispatchReceiptCloseoutLabels"));
   assert.ok(dispatchTaskRouteSource.includes("hasDispatchCompletionAcceptanceSignal"));
   assert.ok(dispatchTaskRouteSource.includes("完成前请补齐派单回执字段"));

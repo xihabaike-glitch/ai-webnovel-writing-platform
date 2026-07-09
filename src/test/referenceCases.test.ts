@@ -73,7 +73,7 @@ test("open source reference cases", async (t) => {
       allView.developmentPath.map((item) => item.id),
       ["writing_workbench", "model_routing", "knowledge_recall", "publishing_pipeline"],
     );
-    assert.ok(allView.pmNextFocus, "reference view should expose a PM next focus");
+    assert.ok(allView.pmNextFocus, "reference view should expose a quality gate next focus");
     assert.equal(allView.pmNextFocus.pathId, "model_routing");
     assert.ok(allView.pmNextFocus.headline.includes("模型任务化"));
     assert.ok(allView.pmNextFocus.reason.includes("聊天"));
@@ -94,7 +94,7 @@ test("open source reference cases", async (t) => {
       assert.ok(item.currentEvidence.length >= 10);
       assert.ok(item.nextAction.length >= 10);
       assert.ok(item.acceptance.length >= 10);
-      assert.ok(item.pmCheckpoint, `${item.id} should expose a PM checkpoint`);
+      assert.ok(item.pmCheckpoint, `${item.id} should expose a quality gate checkpoint`);
       assert.ok(item.pmCheckpoint.risk.length >= 10);
       assert.ok(item.pmCheckpoint.mustShip.length >= 10);
       assert.ok(item.pmCheckpoint.proof.length >= 10);

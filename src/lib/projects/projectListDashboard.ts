@@ -946,7 +946,7 @@ function buildRealSampleAcceptanceReceipt(
 
   return {
     title: `真实作品流水线样本回执：${item.title}`,
-    ownerRole: "毒舌产品经理 + 作者",
+    ownerRole: "产品验收闸门 + 作者",
     outcomeLabel: outcome.outcomeLabel,
     evidenceHref: item.realSampleValidation.nextActionHref,
     gateRecheckHref: `/gate?${params.toString()}#gate-focus-notice`,
@@ -1115,7 +1115,7 @@ export function buildProjectRoleWorkflowEntrypoints(): ProjectRoleWorkflowEntryp
       workflowSteps: [
         {
           stage: "先判断",
-          ownerRole: "毒舌产品经理",
+          ownerRole: "产品验收闸门",
           action: "先判定题材、平台和开篇钩子是不是值得继续投入。",
           output: "开书判断报告",
         },

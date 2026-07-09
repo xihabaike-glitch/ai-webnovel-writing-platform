@@ -93,7 +93,7 @@ test("buildModelRoleMatrix", async (t) => {
     assert.ok(matrix.nextAction.includes("配置"));
   });
 
-  await t.test("surfaces a PM blocker for missing model roles", () => {
+  await t.test("surfaces a quality gate blocker for missing model roles", () => {
     const matrix = buildModelRoleMatrix([
       {
         id: "mock",
@@ -115,7 +115,7 @@ test("buildModelRoleMatrix", async (t) => {
     assert.equal(blocker?.actionHref, "/settings/models?focus=model-role-matrix#model-role-matrix");
   });
 
-  await t.test("builds an ordered PM repair queue for missing model interfaces", () => {
+  await t.test("builds an ordered quality gate repair queue for missing model interfaces", () => {
     const matrix = buildModelRoleMatrix([
       {
         id: "mock",
@@ -143,7 +143,7 @@ test("buildModelRoleMatrix", async (t) => {
     assert.equal(queue[0]?.gateReturnHref, "/settings/models?focus=model-role-matrix#model-role-matrix");
   });
 
-  await t.test("builds the PM focus notice for model task routing", () => {
+  await t.test("builds the quality gate focus notice for model task routing", () => {
     const matrix = buildModelRoleMatrix([
       {
         id: "mock",
@@ -205,7 +205,7 @@ test("buildModelRoleMatrix", async (t) => {
     assert.ok(matrix.nextAction.includes("上下文"));
   });
 
-  await t.test("surfaces a PM watch card when roles are only partial", () => {
+  await t.test("surfaces a quality gate watch card when roles are only partial", () => {
     const matrix = buildModelRoleMatrix([
       {
         id: "gpt-small",
@@ -235,7 +235,7 @@ test("buildModelRoleMatrix", async (t) => {
     assert.equal(blocker?.actionHref, "/settings/models?focus=model-role-matrix#model-role-matrix");
   });
 
-  await t.test("does not show a PM blocker once all model roles are ready", () => {
+  await t.test("does not show a quality gate blocker once all model roles are ready", () => {
     const matrix = buildModelRoleMatrix([
       {
         id: "claude",

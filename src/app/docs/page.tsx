@@ -63,7 +63,7 @@ export default function DevelopmentDocsPage() {
         <div>
           <h1 className="text-2xl font-semibold">开发文档总览</h1>
           <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-600">
-            把毒舌 PM 路线、8 平台范围、AI 模型接口和大树写作流程收束到一页。重点不是展示资料多，而是证明产品能写作、能投稿、能复盘。
+            把主控闸门 路线、8 平台范围、AI 模型接口和大树写作流程收束到一页。重点不是展示资料多，而是证明产品能写作、能投稿、能复盘。
           </p>
         </div>
         <div className="grid gap-3 sm:grid-cols-3">
@@ -85,7 +85,7 @@ export default function DevelopmentDocsPage() {
       <section className="mb-6 rounded-md border border-slate-900 bg-slate-950 p-4 text-white">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div>
-            <div className="text-xs font-medium text-slate-300">毒舌 PM 开发文档焦点</div>
+            <div className="text-xs font-medium text-slate-300">主控闸门 开发文档焦点</div>
             <h2 className="mt-1 text-lg font-semibold">{overview.pmFocus.headline}</h2>
             <p className="mt-2 max-w-4xl text-sm leading-6 text-slate-200">{overview.pmFocus.detail}</p>
             <p className="mt-2 text-xs leading-5 text-slate-400">验收证据：{overview.pmFocus.proof}</p>
@@ -470,7 +470,7 @@ export default function DevelopmentDocsPage() {
               <h3 className="mt-1 font-medium text-slate-950">{step.name}</h3>
               <p className="mt-2 text-sm leading-6 text-slate-600">{step.productMeaning}</p>
               <div className="mt-3 rounded-md bg-white p-3 text-xs leading-5 text-slate-700">
-                毒舌 PM：{step.pmRule}
+                主控闸门：{step.pmRule}
               </div>
             </article>
           ))}

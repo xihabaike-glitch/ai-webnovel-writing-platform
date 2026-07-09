@@ -27,7 +27,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         <div className="border-t border-slate-100 bg-slate-950 text-white">
           <div className="mx-auto flex max-w-7xl flex-col gap-2 px-4 py-2 text-xs leading-5 sm:flex-row sm:items-center sm:justify-between sm:px-6">
             <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-slate-200">
-              <span className="font-medium text-white">毒舌 PM 路线</span>
+              <span className="font-medium text-white">主控闸门 路线</span>
               <span>{overview.platformScope.statusLabel}</span>
               <span>{expansionLabel}</span>
               <span>{overview.modelInterfaces.readyLabel}</span>

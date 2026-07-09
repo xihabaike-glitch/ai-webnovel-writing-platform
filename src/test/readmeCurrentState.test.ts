@@ -4,7 +4,7 @@ import test from "node:test";
 
 const readme = readFileSync("README.md", "utf8");
 
-test("README reflects the current runnable PM delivery state", () => {
+test("README reflects the current runnable quality gate delivery state", () => {
   assert.ok(readme.includes("可运行的网页产品骨架"));
   assert.equal(readme.includes("当前阶段以产品与技术文档为主"), false);
 

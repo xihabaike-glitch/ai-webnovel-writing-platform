@@ -12,7 +12,7 @@ test("references page shows invalid category feedback", () => {
 
 test("references page exposes a development path anchor for requirement evidence", () => {
   assert.ok(source.includes("id=\"development-path\""));
-  assert.ok(source.includes("毒舌 PM 开发路径"));
+  assert.ok(source.includes("主控闸门 开发路径"));
 });
 
 test("references page renders role skill execution briefs", () => {

@@ -51,7 +51,7 @@ test("tasks page keeps a gate recheck return path visible", () => {
   assert.ok(source.includes("回总闸门复检"));
 });
 
-test("tasks page shows task receipt acceptance criteria in the PM focus", () => {
+test("tasks page shows task receipt acceptance criteria in the quality gate focus", () => {
   assert.ok(source.includes("taskReceiptAcceptanceCriteria"));
   assert.ok(source.includes("任务回执验收口径"));
   assert.ok(source.includes("任务回执收口面板"));
@@ -88,7 +88,7 @@ test("tasks page renders receipt templates on queue items", () => {
   assert.ok(source.includes('className="min-w-0 break-words"'));
 });
 
-test("tasks page previews PM receipt fields on queue items", () => {
+test("tasks page previews quality gate receipt fields on queue items", () => {
   assert.ok(source.includes("buildTaskReceiptCloseoutPreview"));
   assert.ok(source.includes("taskReceiptCloseoutPreview"));
   assert.ok(source.includes("任务回执预检"));

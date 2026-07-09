@@ -375,7 +375,7 @@ test("buildPlatformPublishExportCenter", async (t) => {
     assert.ok(pack.preview.assetLine.includes("个"));
   });
 
-  await t.test("builds a PM final delivery handoff when every delivery item is closed", () => {
+  await t.test("builds a quality gate final delivery handoff when every delivery item is closed", () => {
     const center = buildPlatformPublishExportCenter({
       projectId: "project-final-delivery",
       project: {
@@ -2054,7 +2054,7 @@ test("buildPlatformPublishExportCenter", async (t) => {
     assert.equal(plan.steps.find((step) => step.id === "record-publish-effect")?.executable, false);
   });
 
-  await t.test("builds PM-style receipts after strategy steps execute", () => {
+  await t.test("builds quality gate-style receipts after strategy steps execute", () => {
     const strategy = {
       rank: 1,
       platformId: "qimao" as const,

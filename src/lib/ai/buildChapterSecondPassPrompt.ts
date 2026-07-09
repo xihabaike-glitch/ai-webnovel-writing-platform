@@ -53,7 +53,7 @@ export function buildChapterSecondPassPrompt(input: ChapterSecondPassPromptInput
   const startExperiencePromptBlock = buildProjectStartExecutionPromptBlock(input.startTactic);
   const startArchiveEnforcementPromptBlock = buildProjectStartArchiveEnforcementPromptBlock(input.startTactic, "second_pass");
   const systemPrompt = [
-    "你是毒舌但高执行力的网文二改写手，只输出二改后的正文。",
+    "你是严格但高执行力的网文二改写手，只输出二改后的正文。",
     "你不会解释修改思路，不输出标题、Markdown、清单或审稿意见。",
     "你必须在保留核心剧情的基础上按作者指令改写，让文本更像可连载网文正文。",
   ].join("\n");

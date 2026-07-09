@@ -217,7 +217,7 @@ test("buildProjectListDashboard", async (t) => {
     assert.equal(dashboard.items[1].nextAction, "启动二改");
   });
 
-  await t.test("surfaces a toxic PM portfolio focus before project cards", () => {
+  await t.test("surfaces a control gate portfolio focus before project cards", () => {
     const dashboard = buildProjectListDashboard([completeProject, emptyProject], [
       {
         id: "provider-1",
@@ -603,7 +603,7 @@ test("buildProjectListDashboard", async (t) => {
     assert.ok(dashboard.realSampleAcceptanceQueue[2]?.reason.includes("总闸门"));
     assert.equal(dashboard.realSampleAcceptanceQueue[0]?.receipt.title, "真实作品流水线样本回执：空白新坑");
     assert.equal(dashboard.realSampleAcceptanceQueue[0]?.receipt.outcomeLabel, "退回修复");
-    assert.equal(dashboard.realSampleAcceptanceQueue[0]?.receipt.ownerRole, "毒舌产品经理 + 作者");
+    assert.equal(dashboard.realSampleAcceptanceQueue[0]?.receipt.ownerRole, "产品验收闸门 + 作者");
     assert.equal(dashboard.realSampleAcceptanceQueue[0]?.receipt.evidenceHref, "/projects/empty-project");
     assert.ok(dashboard.realSampleAcceptanceQueue[0]?.receipt.gateRecheckHref.startsWith("/gate?"));
     assert.ok(dashboard.realSampleAcceptanceQueue[0]?.receipt.gateRecheckHref.includes("focus=action-recheck"));

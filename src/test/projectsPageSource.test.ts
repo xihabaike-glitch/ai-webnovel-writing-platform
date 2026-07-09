@@ -182,7 +182,7 @@ test("project form makes short, mid, long, and mega length presets executable", 
   assert.ok(projectFormSource.includes("const selectedLengthOption = lengthOptionFor(lengthType)"));
   assert.ok(projectFormSource.includes("setTargetWordCount(nextLengthOption.targetWordCount)"));
   assert.ok(projectFormSource.includes('name="targetWordCount"'));
-  assert.ok(projectFormSource.includes("毒舌 PM 篇幅口径"));
+  assert.ok(projectFormSource.includes("主控闸门 篇幅口径"));
 });
 
 test("project form surfaces first-day execution outcomes before creation", () => {

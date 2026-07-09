@@ -262,7 +262,7 @@ export const openSourceReferenceCases: OpenSourceReferenceCase[] = [
     category: "ai_workflow",
     sourceUrl: "https://github.com/microsoft/autogen",
     referenceValue: "多代理协作模式适合参考策划、编辑、审稿、运营等角色分工。",
-    aiWritingLesson: "可以把毒舌产品经理、主编、爽点编辑、设定编辑、海外本地化编辑拆成不同模型角色。",
+    aiWritingLesson: "可以把产品验收闸门、主编、爽点编辑、设定编辑、海外本地化编辑拆成不同模型角色。",
     productRisk: "多代理容易互相空转，需要任务终止条件和明确产物格式。",
     tags: ["multi-agent", "review", "roles"],
   },
@@ -502,7 +502,7 @@ export function buildReferenceCaseRolePlaybook(): ReferenceCaseRolePlaybookItem[
   return [
     {
       id: "toxic_pm",
-      roleName: "毒舌产品经理",
+      roleName: "产品验收闸门",
       modelOwner: "GPT / Claude",
       skillOwner: "产品梳理 Skill",
       whenToUse: "开书前、阶段复盘和功能取舍时使用，负责把炫技想法压回可交付闭环。",
@@ -683,7 +683,7 @@ export function buildReferenceCaseDevelopmentPath(): ReferenceCaseDevelopmentPat
       id: "model_routing",
       title: "多模型任务路由",
       status: "继续打磨",
-      ownerRole: "毒舌产品经理",
+      ownerRole: "产品验收闸门",
       roleIds: ["toxic_pm", "structure_editor", "draft_writer", "context_librarian", "overseas_packager"],
       currentEvidence: "模型设置已覆盖 Claude、DeepSeek、Kimi、GPT 等岗位矩阵和任务路由。",
       nextAction: "把每个角色入口都绑定到可复核的模型岗位、失败替代路线和成本记录。",

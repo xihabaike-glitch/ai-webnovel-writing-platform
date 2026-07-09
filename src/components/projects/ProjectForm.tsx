@@ -711,7 +711,7 @@ export function ProjectForm({
           </select>
           <input name="targetWordCount" type="hidden" value={targetWordCount} />
           <p className="mt-1 text-xs leading-5 text-slate-500">
-            毒舌 PM 篇幅口径：{selectedLengthOption.pmRule} 目标约 {selectedLengthOption.targetWordCount.toLocaleString("zh-CN")} 字。
+            主控闸门 篇幅口径：{selectedLengthOption.pmRule} 目标约 {selectedLengthOption.targetWordCount.toLocaleString("zh-CN")} 字。
           </p>
         </div>
       </div>

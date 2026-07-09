@@ -109,7 +109,7 @@ test("project platform decision timeline", async (t) => {
       href: "/projects/project-1#platform-export",
       completionEvidence: [
         "番茄小说 发布包定稿",
-        "标题：重生后我靠毒舌系统爆红",
+        "标题：重生后我靠犀利系统爆红",
         "简介：第一章直接给冲突和反转",
         "标签：重生、系统、逆袭",
         "结论：可发布",

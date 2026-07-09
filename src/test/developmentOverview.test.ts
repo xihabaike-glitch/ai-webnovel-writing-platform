@@ -23,7 +23,7 @@ test("buildDevelopmentOverview", async (t) => {
     );
   });
 
-  await t.test("builds a PM-facing development document map", () => {
+  await t.test("builds a control-facing development document map", () => {
     const overview = buildDevelopmentOverview();
 
     assert.ok(overview.pmFocus.headline.includes("开发文档"));

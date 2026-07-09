@@ -185,7 +185,7 @@ test("model task routing", async (t) => {
     assert.equal(labelForRoutedTask("control_asset_generate"), "总控资料生成");
   });
 
-  await t.test("builds a PM route decision explanation before model execution", () => {
+  await t.test("builds a quality gate route decision explanation before model execution", () => {
     const decision = buildRoutedGenerationRouteDecision({
       taskType: "chapter_review",
       candidates: [

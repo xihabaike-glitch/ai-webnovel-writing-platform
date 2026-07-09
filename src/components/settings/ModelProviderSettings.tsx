@@ -1383,7 +1383,7 @@ export function ModelProviderSettings({
         <div className="rounded-md border border-slate-900 bg-slate-950 p-4 text-white" id="model-provider-interfaces">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
             <div>
-              <div className="text-xs font-medium text-slate-300">毒舌 PM 模型接口留口</div>
+              <div className="text-xs font-medium text-slate-300">主控闸门 模型接口留口</div>
               <h2 className="mt-1 text-lg font-semibold">{modelRoleMatrix.interfaceCoverage.headline}</h2>
               <p className="mt-2 max-w-4xl text-sm leading-6 text-slate-200">{modelRoleMatrix.interfaceCoverage.detail}</p>
             </div>
@@ -1549,7 +1549,7 @@ export function ModelProviderSettings({
           <div className={`mt-4 -mx-4 border-y px-4 py-3 text-sm ${modelRolePmFocusTone.className}`}>
             <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
               <div>
-                <div className="text-xs font-medium opacity-70">毒舌 PM 优先哨卡</div>
+                <div className="text-xs font-medium opacity-70">主控闸门 优先哨卡</div>
                 <div className="mt-1 font-medium">{modelRoleMatrixPmFocusNotice.headline}</div>
               </div>
               <span className={`w-fit rounded-md px-2 py-1 text-xs font-medium ${modelRolePmFocusTone.badgeClassName}`}>
@@ -1577,10 +1577,10 @@ export function ModelProviderSettings({
             </div>
           </div>
           {modelRoleRepairQueue.length ? (
-            <div className="mt-4 rounded-md border border-rose-100 bg-rose-50 p-3 text-sm text-rose-950" aria-label="模型岗位 PM 修复队列">
+            <div className="mt-4 rounded-md border border-rose-100 bg-rose-50 p-3 text-sm text-rose-950" aria-label="模型岗位修复队列">
               <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                 <div>
-                  <div className="font-medium">模型岗位 PM 修复队列</div>
+                  <div className="font-medium">模型岗位修复队列</div>
                   <p className="mt-1 text-xs leading-5 text-rose-800">
                     按顺序补接口，补完一项就回职责矩阵复检；没有连接测试和证据回写，不算岗位就位。
                   </p>

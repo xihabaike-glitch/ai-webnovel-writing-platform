@@ -5008,7 +5008,7 @@ function buildPlatformFinalDeliveryHandoff(
       `完成项：${checklist.doneCount}/${checklist.totalCount}`,
       `缺口数：${gapCount}`,
       `策略裁决：${strategyVerdict.headline}`,
-      `PM 判定：${pmVerdict}`,
+      `验收判定：${pmVerdict}`,
     ],
   };
 }

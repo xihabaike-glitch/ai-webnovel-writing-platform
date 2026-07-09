@@ -26,7 +26,7 @@ test("ai writing platform development document", async (t) => {
     assert.ok(doc.includes("扩展平台不再作为待补缺口"));
   });
 
-  await t.test("documents the reserved model interfaces and PM gates", () => {
+  await t.test("documents the reserved model interfaces and quality gates", () => {
     for (const provider of ["Claude", "DeepSeek", "Kimi", "GPT"]) {
       assert.ok(doc.includes(provider), `${provider} should be documented`);
     }
@@ -37,7 +37,7 @@ test("ai writing platform development document", async (t) => {
     assert.ok(doc.includes("推荐批次缺岗硬拦截"));
     assert.ok(doc.includes("focus=model-role-matrix"));
     assert.equal(doc.includes("模型设置。预留 Claude、DeepSeek、Kimi、GPT"), false);
-    assert.ok(doc.includes("毒舌 PM 闸门"));
+    assert.ok(doc.includes("主控闸门 闸门"));
     assert.ok(doc.includes("失败修复中心"));
     assert.ok(doc.includes("暂停批量"));
     assert.ok(doc.includes("样本"));

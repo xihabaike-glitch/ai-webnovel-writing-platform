@@ -421,7 +421,7 @@ export default async function DispatchPage({
       <section className="mb-6 rounded-md border border-slate-200 bg-slate-950 p-4 text-sm text-slate-200" id="dispatch-receipt-closeout" aria-label="派发回执闭环面板">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="max-w-3xl">
-            <div className="text-xs font-medium uppercase tracking-wide text-slate-400">PM Closeout</div>
+            <div className="text-xs font-medium uppercase tracking-wide text-slate-400">验收闭环</div>
             <h2 className="mt-1 text-lg font-semibold text-white">派发回执闭环面板</h2>
             <p className="mt-2 leading-6 text-slate-300">
               派单不是甩锅，只有任务状态、完成证据、人工验收和下一步都收齐，才允许回总闸门复检。

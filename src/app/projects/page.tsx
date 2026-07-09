@@ -269,7 +269,7 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps) 
       <section className="mb-6 rounded-md border border-slate-900 bg-slate-950 p-4 text-white">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div>
-            <div className="text-xs font-medium text-slate-300">毒舌 PM 当前只看这一件事</div>
+            <div className="text-xs font-medium text-slate-300">主控闸门 当前只看这一件事</div>
             <h2 className="mt-1 text-lg font-semibold">{dashboard.pmFocus.headline}</h2>
             <p className="mt-2 max-w-4xl text-sm leading-6 text-slate-200">{dashboard.pmFocus.detail}</p>
             <div className="mt-2 text-xs text-slate-400">{dashboard.pmFocus.scopeLabel}</div>

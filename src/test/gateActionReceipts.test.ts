@@ -5797,7 +5797,7 @@ test("buildGateActionReceipt", async (t) => {
       sourceReceiptId: null,
       completionEvidence: [
         "番茄小说 发布包定稿",
-        "标题：重生后我靠毒舌系统爆红",
+        "标题：重生后我靠犀利系统爆红",
         "简介：第一章直接给冲突和反转",
         "标签：重生、系统、逆袭",
         "结论：可发布",
@@ -5832,7 +5832,7 @@ test("buildGateActionReceipt", async (t) => {
     assert.equal(completedReview.items[0].latestReceiptAt, completionReceipt.createdAt);
   });
 
-  await t.test("rejects thin dispatch completion evidence without PM receipt fields", () => {
+  await t.test("rejects thin dispatch completion evidence without quality gate receipt fields", () => {
     const baseDispatch = buildGatePlatformGrowthDispatchItems([buildGatePlatformStrategyReceipt({
       item: strategyPlatform,
       status: "succeeded",
@@ -5973,7 +5973,7 @@ test("buildGateActionReceipt", async (t) => {
     assert.ok(buildGateDispatchCompletionTemplate(packageTask).includes("基准版本"));
     assert.ok(reviewGateDispatchCompletionEvidence(packageTask, [
       "番茄小说 发布包定稿",
-      "标题：重生后我靠毒舌系统爆红",
+      "标题：重生后我靠犀利系统爆红",
       "简介：第一章直接给冲突和反转",
       "标签：重生、系统、逆袭",
       "结论：可发布",

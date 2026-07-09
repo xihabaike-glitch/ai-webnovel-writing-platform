@@ -174,7 +174,7 @@ export function buildTaskQueueBatchRhythmDispatch(
     stage: repair ? "repair_tactic" : "watch",
     state: "queued",
     priorityScore: repair ? 92 : 68,
-    ownerRole: repair ? "毒舌产品经理" : "增长运营",
+    ownerRole: repair ? "产品验收闸门" : "增长运营",
     title: repair ? "批次节奏跌线修复" : "批次节奏观察小批",
     detail: decision.detail,
     dueLabel: repair ? "今天" : "下一批前",

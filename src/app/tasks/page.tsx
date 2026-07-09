@@ -768,7 +768,7 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
       <section className="mb-6 rounded-md border border-slate-900 bg-slate-950 p-4 text-white">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div>
-            <div className="text-xs font-medium text-slate-300">毒舌 PM 当前只派这一单</div>
+            <div className="text-xs font-medium text-slate-300">主控闸门 当前只派这一单</div>
             <h2 className="mt-1 text-lg font-semibold">{queue.pmFocus.headline}</h2>
             <p className="mt-2 max-w-4xl text-sm leading-6 text-slate-200">{queue.pmFocus.detail}</p>
             <div className="mt-2 text-xs text-slate-400">{queue.pmFocus.scopeLabel}</div>
@@ -1653,7 +1653,7 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
           <div className="mt-4 rounded-md border border-rose-200 bg-rose-50 p-3 text-sm text-rose-900">
             <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
               <div>
-                <div className="text-xs font-medium uppercase text-rose-700">PM 优先处理</div>
+                <div className="text-xs font-medium uppercase text-rose-700">优先处理</div>
                 <div className="mt-1 font-medium">{safetyPriorityBlocker.title}</div>
                 <p className="mt-1 leading-6">{safetyPriorityBlocker.detail}</p>
               </div>
@@ -1698,7 +1698,7 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
         <div className="mt-4 rounded-md border border-slate-200 bg-slate-50 p-3">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
             <div>
-              <div className="text-sm font-medium text-slate-950">PM 决策卡</div>
+              <div className="text-sm font-medium text-slate-950">验收决策卡</div>
               <p className="mt-1 text-sm font-medium text-slate-950">{strategyDecision.title}</p>
               <p className="mt-1 text-sm leading-6 text-slate-600">{strategyDecision.detail}</p>
             </div>

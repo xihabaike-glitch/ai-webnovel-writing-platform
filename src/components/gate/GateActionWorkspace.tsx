@@ -949,7 +949,7 @@ export function GateActionWorkspace({
                       <p className="mt-2 leading-6 opacity-85">{item.detail}</p>
                       {missingReceiptFields.length ? (
                         <div className="mt-2 rounded-md bg-white/70 px-2 py-2 text-xs leading-5" aria-label="缺字段解释">
-                          <div className="font-medium">缺字段：总闸门看到的证据还缺这些 PM 回执项</div>
+                          <div className="font-medium">缺字段：总闸门看到的证据还缺这些 验收回执项</div>
                           <div className="mt-2 flex flex-wrap gap-1">
                             {missingReceiptFields.map((field) => (
                               <span className="rounded-md bg-white px-2 py-1 font-medium text-rose-900" key={field}>{field}</span>
@@ -2291,7 +2291,7 @@ export function GateActionWorkspace({
           )}
         </div>
         <div className="mt-3 grid gap-2">
-          <div className="text-xs font-medium text-slate-500">毒舌复盘建议</div>
+          <div className="text-xs font-medium text-slate-500">严格复盘建议</div>
           {reviewAdvice.map((item) => (
             <div className={`rounded-md border p-3 text-sm ${adviceClass(item.severity)}`} key={item.id}>
               <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">

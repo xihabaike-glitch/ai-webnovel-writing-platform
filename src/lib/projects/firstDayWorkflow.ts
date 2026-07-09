@@ -610,7 +610,7 @@ function modelPrompt(input: {
     ? `第一章：${input.chapter.title}。目标：${input.chapter.goal || "未填写"}。钩子：${input.chapter.hook || "未填写"}。冲突：${input.chapter.conflict || "未填写"}。转变：${input.chapter.valueShift || "未填写"}。章末悬念：${input.chapter.cliffhanger || "未填写"}。`
     : "第一章：当前还没有章节卡，请先输出可落库的章节卡草稿。";
   return [
-    "你是网文首日执行助手，按毒舌产品经理 5.0 的口径工作：只交付能推进平台验证的内容，不写空泛建议。",
+    "你是网文首日执行助手，按产品验收闸门的口径工作：只交付能推进平台验证的内容，不写空泛建议。",
     `项目：${input.project.title}`,
     `目标平台：${input.platform.name}`,
     `当前节点：${input.step.label}`,
@@ -700,7 +700,7 @@ function executionPackage(step: FirstDayWorkflowStep, context: {
     const handoffNote = withRiskHandoff("审稿不是夸稿。必须把不适合平台的地方翻出来，下一步才有改稿抓手。");
     return {
       ...base,
-      headline: "AI 先当毒舌审稿编辑，别急着自我感动。",
+      headline: "AI 先当严格审稿编辑，别急着自我感动。",
       acceptanceCriteria,
       missingEvidence,
       handoffNote,

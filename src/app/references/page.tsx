@@ -74,7 +74,7 @@ export default async function ReferencesPage({ searchParams }: ReferencesPagePro
       <section className="mb-6 rounded-md border border-slate-900 bg-slate-950 p-4 text-white">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div>
-            <div className="text-xs font-medium text-slate-300">毒舌 PM 平台范围回答</div>
+            <div className="text-xs font-medium text-slate-300">主控闸门 平台范围回答</div>
             <h2 className="mt-1 text-lg font-semibold">{view.platformScope.pmFocus.headline}</h2>
             <p className="mt-2 max-w-4xl text-sm leading-6 text-slate-200">{view.platformScope.pmFocus.detail}</p>
           </div>
@@ -172,7 +172,7 @@ export default async function ReferencesPage({ searchParams }: ReferencesPagePro
 
       <section className="mb-6 grid gap-4 lg:grid-cols-[0.9fr_1.1fr]">
         <div className="rounded-md border border-slate-200 bg-white p-4">
-          <div className="mb-3 font-medium text-slate-950">毒舌 PM 结论</div>
+          <div className="mb-3 font-medium text-slate-950">主控闸门 结论</div>
           <div className="grid gap-2">
             {view.productManagerNotes.map((note, index) => (
               <div className="rounded-md bg-slate-50 p-3 text-sm leading-6 text-slate-700" key={note}>
@@ -198,7 +198,7 @@ export default async function ReferencesPage({ searchParams }: ReferencesPagePro
       <section className="mb-6 rounded-md border border-slate-200 bg-white p-4" id="development-path">
         <div className="mb-3 flex flex-col gap-2 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <h2 className="font-medium text-slate-950">毒舌 PM 开发路径</h2>
+            <h2 className="font-medium text-slate-950">主控闸门 开发路径</h2>
             <p className="mt-1 text-sm text-slate-500">把参考案例、8 平台和 AI 编辑部收束成当前可交付路线，逐条看证据和验收口径。</p>
           </div>
           <Link className="w-fit rounded-md border border-slate-200 px-3 py-2 text-sm font-medium hover:bg-slate-50" href="/projects">
@@ -235,7 +235,7 @@ export default async function ReferencesPage({ searchParams }: ReferencesPagePro
                 <p className="text-xs leading-5 text-slate-500">验收：{item.acceptance}</p>
               </div>
               <div className="mt-3 rounded-md border border-slate-200 bg-white p-3 text-xs leading-5 text-slate-600">
-                <div className="font-medium text-slate-900">毒舌 PM 哨卡</div>
+                <div className="font-medium text-slate-900">主控闸门 哨卡</div>
                 <div className="mt-2">风险：{item.pmCheckpoint.risk}</div>
                 <div>必须交付：{item.pmCheckpoint.mustShip}</div>
                 <div>验收证据：{item.pmCheckpoint.proof}</div>

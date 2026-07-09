@@ -432,7 +432,7 @@ export default async function FailuresPage({
       <section className="mb-6 rounded-md border border-slate-900 bg-slate-950 p-4 text-white">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div>
-            <div className="text-xs font-medium text-slate-300">毒舌 PM 失败修复焦点</div>
+            <div className="text-xs font-medium text-slate-300">主控闸门 失败修复焦点</div>
             <h2 className="mt-1 text-lg font-semibold">{center.pmFocus.headline}</h2>
             <p className="mt-2 max-w-4xl text-sm leading-6 text-slate-200">{center.pmFocus.detail}</p>
             <p className="mt-2 text-xs leading-5 text-slate-400">验收证据：{center.pmFocus.proof}</p>

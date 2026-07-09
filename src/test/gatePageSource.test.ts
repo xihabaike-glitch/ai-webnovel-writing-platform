@@ -56,7 +56,7 @@ test("gate page surfaces the latest opening sample receipt in real sample focus"
   assert.ok(source.includes("latestOpeningSampleReceipt.href"));
 });
 
-test("gate page turns opening sample receipts into PM recheck branches", () => {
+test("gate page turns opening sample receipts into quality gate recheck branches", () => {
   assert.ok(source.includes("openingSampleRecheckActions"));
   assert.ok(source.includes("首章回执复检分流"));
   assert.ok(source.includes("继续审稿二改"));

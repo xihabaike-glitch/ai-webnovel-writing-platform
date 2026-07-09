@@ -55,7 +55,7 @@ test("model settings exposes gate recheck inside model setup action notices", ()
   assert.ok(settingsSource.includes("gateReturnHref ? ("));
 });
 
-test("model settings summarizes model role route closeout for PM review", () => {
+test("model settings summarizes model role route closeout for quality gate review", () => {
   assert.ok(settingsSource.includes("模型职责路线收口面板"));
   assert.ok(settingsSource.includes("modelRoleRouteCloseoutPercent"));
   assert.ok(settingsSource.includes("aria-label=\"模型职责路线完成率\""));
@@ -66,10 +66,10 @@ test("model settings summarizes model role route closeout for PM review", () => 
   assert.ok(settingsSource.includes("modelRoleRouteReleaseLabel"));
 });
 
-test("model settings renders the PM model role repair queue", () => {
+test("model settings renders the quality gate model role repair queue", () => {
   assert.ok(source.includes("buildModelRoleRepairQueue"));
   assert.ok(source.includes("modelRoleRepairQueue"));
-  assert.ok(settingsSource.includes("模型岗位 PM 修复队列"));
+  assert.ok(settingsSource.includes("模型岗位修复队列"));
   assert.ok(settingsSource.includes("modelRoleRepairQueue.map"));
   assert.ok(settingsSource.includes("item.priorityLabel"));
   assert.ok(settingsSource.includes("item.repairLabel"));

@@ -278,7 +278,7 @@ test("buildBatchExecutionSafety", async (t) => {
     assert.equal(exportGate?.actionHref, "/tasks?view=blocked&debt=export_version#task-debt");
   });
 
-  await t.test("prioritizes the PM blocker that should be handled before running batches", () => {
+  await t.test("prioritizes the quality gate blocker that should be handled before running batches", () => {
     const safety = buildBatchExecutionSafety([
       { ...baseItem, id: "candidate-1", category: "candidate", label: "待采纳", priority: 5, actionLabel: "处理候选稿" },
       {

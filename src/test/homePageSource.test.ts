@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 
-test("home page routes users into the current PM delivery path", () => {
+test("home page routes users into the current control delivery path", () => {
   const source = readFileSync("src/app/page.tsx", "utf8");
 
   assert.ok(source.includes("buildDevelopmentOverview"), "home page should reuse the development overview instead of drifting into a separate pitch");
@@ -13,7 +13,7 @@ test("home page routes users into the current PM delivery path", () => {
   assert.ok(source.includes("overview.finalAcceptanceGate.metrics.ready"), "home page should show ready count in the final gate");
   assert.ok(source.includes("overview.finalAcceptanceGate.metrics.watch"), "home page should show watch count in the final gate");
   assert.ok(source.includes("overview.finalAcceptanceGate.metrics.blocked"), "home page should show blocked count in the final gate");
-  assert.ok(source.includes("overview.finalAcceptanceGate.stopRule"), "home page should show the PM stop rule");
+  assert.ok(source.includes("overview.finalAcceptanceGate.stopRule"), "home page should show the quality gate stop rule");
   assert.ok(source.includes("overview.finalAcceptanceGate.evidenceMatrix.title"), "home page should show the original requirement evidence matrix");
   assert.ok(source.includes("overview.finalAcceptanceGate.evidenceMatrix.pmRule"), "home page should show the matrix proof rule");
   assert.ok(source.includes("overview.finalAcceptanceGate.evidenceMatrix.items.map"), "home page should render each final acceptance evidence row");
@@ -21,7 +21,7 @@ test("home page routes users into the current PM delivery path", () => {
   assert.ok(source.includes("overview.finalAcceptanceGate.livePipelineReview.href"), "home page should link to the live gate verdict");
   assert.ok(source.includes("overview.finalAcceptanceGate.livePipelineReview.outcomeLabels.map"), "home page should show the three live verdict outcomes");
   assert.ok(source.includes("overview.finalDeliveryArchive.title"), "home page should show the final delivery archive reuse card");
-  assert.ok(source.includes("overview.finalDeliveryArchive.pmRule"), "home page should explain the archive reuse PM rule");
+  assert.ok(source.includes("overview.finalDeliveryArchive.pmRule"), "home page should explain the archive reuse quality gate rule");
   assert.ok(source.includes("overview.finalDeliveryArchive.closeoutSignals.map"), "home page should show final delivery archive closeout signals");
   assert.ok(source.includes("overview.finalDeliveryArchive.reuseTargets.map"), "home page should render every archive reuse target");
   assert.ok(source.includes("platformExperienceArchive?.href"), "home page should route the platform archive CTA through the overview data");

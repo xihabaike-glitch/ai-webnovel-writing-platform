@@ -59,7 +59,7 @@ test("platform export center renders the final delivery checklist", () => {
   assert.ok(source.includes("router.push(returnHref"));
 });
 
-test("platform export center renders the PM final delivery handoff package", () => {
+test("platform export center renders the quality gate final delivery handoff package", () => {
   assert.ok(source.includes("center.finalDeliveryHandoff.headline"));
   assert.ok(source.includes("center.finalDeliveryHandoff.pmVerdict"));
   assert.ok(source.includes("center.finalDeliveryHandoff.gateReceiptPreview.map"));

@@ -395,7 +395,7 @@ test("buildTaskQueueBatchRhythmDispatch creates a repair dispatch for weak batch
 
   assert.equal(dispatch?.id, "batch-rhythm:repair:2026-01-03T00:00:00.000Z");
   assert.equal(dispatch?.stage, "repair_tactic");
-  assert.equal(dispatch?.ownerRole, "毒舌产品经理");
+  assert.equal(dispatch?.ownerRole, "产品验收闸门");
   assert.equal(dispatch?.actionLabel, "处理批次修复");
   assert.equal(dispatch?.href, "/failures");
   assert.ok(dispatch?.acceptanceCriteria.some((item) => item.includes("失败样本")));

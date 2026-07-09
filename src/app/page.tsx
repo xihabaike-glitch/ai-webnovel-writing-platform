@@ -22,7 +22,7 @@ export default function HomePage() {
     <AppShell>
       <section className="grid gap-6">
         <div className="rounded-md border border-slate-900 bg-slate-950 p-5 text-white">
-          <div className="text-xs font-medium text-slate-300">毒舌 PM 当前只看这一条交付线</div>
+          <div className="text-xs font-medium text-slate-300">主控闸门 当前只看这一条交付线</div>
           <h1 className="mt-2 max-w-4xl text-3xl font-semibold">写作品，不是陪聊天框闲聊</h1>
           <p className="mt-3 max-w-4xl text-sm leading-6 text-slate-200">
             {overview.currentPipelineValidation.pmVerdict}
@@ -46,7 +46,7 @@ export default function HomePage() {
         <section className="rounded-md border border-slate-200 bg-white p-4">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
             <div>
-              <div className="text-xs font-medium text-slate-500">毒舌 PM 总闸门</div>
+              <div className="text-xs font-medium text-slate-500">主控闸门 总闸门</div>
               <h2 className="mt-1 font-medium text-slate-950">{overview.finalAcceptanceGate.title}</h2>
               <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">{overview.finalAcceptanceGate.verdict}</p>
               <p className="mt-2 text-xs leading-5 text-rose-700">{overview.finalAcceptanceGate.stopRule}</p>

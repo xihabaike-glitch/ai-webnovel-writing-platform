@@ -6,6 +6,11 @@ import { useEffect, useRef, useState } from "react";
 import { platformDeliveryScope, platformProfiles, type LengthType, type PlatformId } from "@/lib/platforms/platformProfiles";
 import { getPlatformWritingStyle } from "@/lib/platforms/writingStyleTemplates";
 import {
+  launchPlatformId,
+  preferLaunchExperience,
+  type FinalDeliveryArchiveLaunch,
+} from "@/lib/projects/finalDeliveryArchiveLaunch";
+import {
   buildGateBatchTacticEffectReview,
   buildGatePlatformDecisionTimeline,
   buildGatePlatformTacticExperienceLibrary,
@@ -92,26 +97,6 @@ function firstDayExecutionOutcome(label: string) {
   return null;
 }
 
-interface ProjectFormExperienceLaunch {
-  platformId?: string;
-  tactic?: string;
-  source?: string;
-}
-
-function launchPlatformId(input: ProjectFormExperienceLaunch | undefined): PlatformId | null {
-  const platform = platformProfiles.find((profile) => profile.id === input?.platformId);
-  return platform?.id ?? null;
-}
-
-function preferLaunchExperience(items: GatePlatformTacticExperienceItem[], launch: ProjectFormExperienceLaunch | undefined) {
-  const platformId = launchPlatformId(launch);
-  const tactic = launch?.tactic?.trim();
-  if (!platformId || !tactic) return items;
-  const matched = items.find((item) => item.platformId === platformId && item.tactic === tactic);
-  if (!matched) return items;
-  return [matched, ...items.filter((item) => item !== matched)];
-}
-
 function hrefWithGateReturn(href: string, gateReturnHref?: string | null) {
   if (!gateReturnHref || !href.startsWith("/") || href.startsWith("/gate")) return href;
 
@@ -128,7 +113,7 @@ export function ProjectForm({
   experienceLaunch,
   gateReturnHref,
 }: {
-  experienceLaunch?: ProjectFormExperienceLaunch;
+  experienceLaunch?: FinalDeliveryArchiveLaunch;
   gateReturnHref?: string | null;
 }) {
   const router = useRouter();

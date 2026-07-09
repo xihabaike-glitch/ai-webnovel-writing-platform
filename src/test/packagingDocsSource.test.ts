@@ -12,6 +12,8 @@ test("open source packaging docs exist", () => {
     "docs/COMMUNITY.md",
     "docs/LAUNCH_PLAN.md",
     "docs/PRESS_KIT.md",
+    "docs/GITHUB_INTRO.md",
+    "LICENSE",
     ".github/ISSUE_TEMPLATE/bug_report.md",
     ".github/ISSUE_TEMPLATE/feature_request.md",
     ".github/ISSUE_TEMPLATE/platform_rule.md",
@@ -28,8 +30,12 @@ test("readme presents the public open source positioning", () => {
   assert.ok(readme.includes("不是普通 AI 聊天框"));
   assert.ok(readme.includes("作者才是主编"));
   assert.ok(readme.includes("## Quick Start"));
+  assert.ok(readme.includes("cp .env.example .env"));
+  assert.ok(readme.includes("npm run db:seed"));
+  assert.ok(readme.includes("本地 SQLite"));
   assert.ok(readme.includes("## Community"));
   assert.ok(readme.includes("## Contributing"));
+  assert.ok(readme.includes("MIT License"));
 });
 
 test("positioning and press kit explain the unique value", () => {
@@ -43,6 +49,31 @@ test("positioning and press kit explain the unique value", () => {
   assert.ok(pressKit.includes("GitHub Release 文案"));
   assert.ok(pressKit.includes("社群招募短文"));
   assert.ok(pressKit.includes("7 天 AI 网文首章样本挑战"));
+});
+
+test("github intro and license are ready for public release", () => {
+  const intro = read("docs/GITHUB_INTRO.md");
+  const license = read("LICENSE");
+
+  assert.ok(intro.includes("GitHub About Description"));
+  assert.ok(intro.includes("推荐 Topics"));
+  assert.ok(intro.includes("docs/POSITIONING.md"));
+  assert.ok(intro.includes("docs/PRESS_KIT.md"));
+  assert.ok(license.includes("MIT License"));
+  assert.ok(license.includes("Copyright (c) 2026 xihabaike-glitch"));
+});
+
+test("quick start docs include fresh clone bootstrap steps", () => {
+  const readme = read("README.md");
+  const usage = read("docs/USAGE.md");
+
+  for (const doc of [readme, usage]) {
+    assert.ok(doc.includes("cp .env.example .env"));
+    assert.ok(doc.includes("npm install"));
+    assert.ok(doc.includes("npm run db:seed"));
+    assert.ok(doc.includes("npm run dev"));
+    assert.ok(doc.includes("本地 SQLite"));
+  }
 });
 
 test("community and roadmap describe creator participation", () => {

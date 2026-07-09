@@ -64,9 +64,13 @@ The platform scope is intentionally locked to these eight channels. The next pri
 ## Quick Start
 
 ```bash
+cp .env.example .env
 npm install
+npm run db:seed
 npm run dev
 ```
+
+`npm run db:seed` 会初始化本地 SQLite 演示/种子数据，让 `/projects`、`/references`、`/gate`、`/dispatch` 等页面在 fresh clone 后就能浏览完整样例。
 
 Open:
 
@@ -79,12 +83,6 @@ Useful checks:
 ```bash
 npm test
 npm run build
-```
-
-Seed local data when needed:
-
-```bash
-npm run db:seed
 ```
 
 ## Recommended Workflow
@@ -139,4 +137,4 @@ See `ROADMAP.md`.
 
 ## License
 
-License information will follow the repository owner’s open-source release decision.
+MIT License. See `LICENSE`.

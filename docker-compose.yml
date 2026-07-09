@@ -3,7 +3,7 @@ services:
     build:
       context: .
     ports:
-      - "3000:3000"
+      - "${APP_PORT:-3000}:3000"
     environment:
       DATABASE_URL: "file:/app/data/dev.db"
       SEED_ON_FIRST_RUN: "1"

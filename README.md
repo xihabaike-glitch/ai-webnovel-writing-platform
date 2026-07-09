@@ -75,6 +75,18 @@ docker compose up
 http://localhost:3000
 ```
 
+如果你的电脑已经有其他程序占用了 `3000` 端口，可以换到 `3001`：
+
+```bash
+APP_PORT=3001 docker compose up
+```
+
+然后打开：
+
+```txt
+http://localhost:3001
+```
+
 ## 本地运行
 
 ```bash

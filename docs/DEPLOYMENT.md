@@ -36,6 +36,18 @@ docker compose up -d
 docker compose down
 ```
 
+如果你的电脑已经有其他程序占用了 `3000` 端口，可以换到 `3001`：
+
+```bash
+APP_PORT=3001 docker compose up -d
+```
+
+然后打开：
+
+```txt
+http://localhost:3001
+```
+
 如果你想重新初始化演示数据，可以先删除 Docker volume，再重新启动。注意：这会删除本地数据。
 
 ## 方式二：本地一键脚本
@@ -100,6 +112,8 @@ npm run start
 ```txt
 3000
 ```
+
+Docker 启动时可以用 `APP_PORT` 改成本机端口，例如 `APP_PORT=3001 docker compose up -d`。容器内部仍然使用 `3000`。
 
 如果你使用云服务器，可以再用反向代理把域名指向 `3000` 端口。这里不展开服务器账号、域名、证书和私有部署细节。
 

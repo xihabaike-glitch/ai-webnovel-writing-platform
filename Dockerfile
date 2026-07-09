@@ -1,12 +1,17 @@
-FROM node:22-bookworm-slim AS deps
+FROM node:22-bookworm-slim AS base
 
 WORKDIR /app
+RUN apt-get update -y \
+  && apt-get install -y --no-install-recommends openssl \
+  && rm -rf /var/lib/apt/lists/*
+
+FROM base AS deps
+
 COPY package.json package-lock.json ./
 RUN npm ci
 
-FROM node:22-bookworm-slim AS builder
+FROM base AS builder
 
-WORKDIR /app
 ENV DATABASE_URL="file:/app/data/dev.db"
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
@@ -14,9 +19,8 @@ RUN npx prisma generate
 RUN mkdir -p /app/data
 RUN npm run build
 
-FROM node:22-bookworm-slim AS runner
+FROM base AS runner
 
-WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=3000
 ENV HOSTNAME=0.0.0.0

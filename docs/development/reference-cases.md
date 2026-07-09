@@ -7,7 +7,7 @@
 当前项目已经有平台模板、开书流程、模型路由、任务队列和发布门禁。下一步不要再堆“AI 聊天”，应该补齐四件事：
 
 1. 写作工作台：让作者能在同一处看到开头钩子、结尾、主干、支线、人物弧光、章节卡和正文。
-2. 模型任务化：Claude、DeepSeek、Kimi、GPT 不要只做供应商配置，要按任务自动分工。
+2. 模型任务化：Claude、DeepSeek、Gemini、GPT 不要只做供应商配置，要按任务自动分工。
 3. 项目知识库：世界观、人物、伏笔、历史章节、平台策略都要变成模型可召回的土壤。
 4. 多平台发布流水线：起点、番茄、七猫、知乎盐选、WebNovel、Royal Road、Wattpad 要能生成不同投稿包和复盘版本。
 
@@ -34,7 +34,7 @@
 | crewAI | https://github.com/crewAIInc/crewAI | 角色、任务、流程和产物交付清晰。 | Skill 角色适合承担平台定位、人物弧光、发布包装。 | 角色过多会让用户迷糊。 |
 | n8n | https://github.com/n8n-io/n8n | 自动化触发器、外部服务连接和任务执行。 | 发布、数据回收、复盘提醒可以闭环。 | 自动推进前必须有人审稿。 |
 | Open WebUI | https://github.com/open-webui/open-webui | 多模型聊天、知识库、本地模型体验。 | 作者需要看到任务用了哪个模型、成本和 fallback。 | 聊天范式会稀释写作平台定位。 |
-| LibreChat | https://github.com/danny-avila/LibreChat | 多提供商接入和插件生态。 | Claude、GPT、DeepSeek、Kimi 要统一接入口径。 | 不要只做统一聊天壳。 |
+| LibreChat | https://github.com/danny-avila/LibreChat | 多提供商接入和插件生态。 | Claude、GPT、DeepSeek、Gemini 要统一接入口径。 | 不要只做统一聊天壳。 |
 | LobeChat | https://github.com/lobehub/lobe-chat | 模型配置、角色市场、现代 UI。 | 可做番茄编辑、起点主编、盐选反转编辑等角色预设。 | 角色必须绑定真实产物。 |
 | AnythingLLM | https://github.com/Mintplex-Labs/anything-llm | 工作区文档、知识问答和 RAG。 | 每本书应有独立素材库，限制模型引用范围。 | 文档问答不等于创作节奏。 |
 | Jan | https://github.com/menloresearch/jan | 本地 AI、隐私和低成本试写。 | 长篇设定和未公开大纲可走本地或私有模型路线。 | 本地模型质量差异大。 |

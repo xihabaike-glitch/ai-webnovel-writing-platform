@@ -134,7 +134,7 @@ export function buildFirstDayRouteSummary(input: {
   const nextActions = [
     summary.applicableRecommendations > 0 ? `可一键应用 ${summary.applicableRecommendations} 条首日推荐路线。` : null,
     missing.length ? `先补齐${missing.join("、")}的模型路线。` : null,
-    summary.mockFallback > 0 ? "Mock 兜底只适合本地验收，接平台前要替换为 Claude、DeepSeek、Kimi、GPT 等有效供应商。" : null,
+    summary.mockFallback > 0 ? "Mock 兜底只适合本地验收，接平台前要替换为 Claude、DeepSeek、Gemini、GPT 等有效供应商。" : null,
     "首日工作流至少要保证总控资料、第一章初稿、第一章审稿、二改四条路线可解释。",
   ].filter((action): action is string => Boolean(action));
 

@@ -222,7 +222,7 @@ export const openSourceReferenceCases: OpenSourceReferenceCase[] = [
     category: "ai_workflow",
     sourceUrl: "https://github.com/langgenius/dify",
     referenceValue: "应用编排、提示词、知识库、模型接入和调试链路完整，适合参考 AI 应用生产后台。",
-    aiWritingLesson: "网文平台需要把 Claude、DeepSeek、Kimi、GPT 等模型包装成写作任务，而不是只提供聊天窗口。",
+    aiWritingLesson: "网文平台需要把 Claude、DeepSeek、Gemini、GPT 等模型包装成写作任务，而不是只提供聊天窗口。",
     productRisk: "通用平台能力强但不垂直，若照搬会失去网文平台的题材、爽点和连载节奏判断。",
     tags: ["workflow", "rag", "llm"],
   },
@@ -301,7 +301,7 @@ export const openSourceReferenceCases: OpenSourceReferenceCase[] = [
     name: "LibreChat",
     category: "ai_workflow",
     sourceUrl: "https://github.com/danny-avila/LibreChat",
-    referenceValue: "多提供商聊天和插件生态适合参考 Claude、GPT、DeepSeek、Kimi 等统一接入。",
+    referenceValue: "多提供商聊天和插件生态适合参考 Claude、GPT、DeepSeek、Gemini 等统一接入。",
     aiWritingLesson: "模型供应商设置要独立于写作业务，让平台按任务自动选择长上下文、低成本或强审稿模型。",
     productRisk: "若只做统一聊天壳，无法形成网文平台的持续生产壁垒。",
     tags: ["providers", "chat", "plugins"],
@@ -557,7 +557,7 @@ export function buildReferenceCaseRolePlaybook(): ReferenceCaseRolePlaybookItem[
     {
       id: "context_librarian",
       roleName: "长上下文资料官",
-      modelOwner: "Kimi 优先",
+      modelOwner: "Gemini 优先",
       skillOwner: "资料召回 Skill",
       whenToUse: "整理世界观、压缩长资料、召回历史章节和连续性检查时使用。",
       inputs: ["世界观条目", "人物关系", "历史章节", "素材来源"],
@@ -593,7 +593,7 @@ export function buildReferenceCaseRolePlaybook(): ReferenceCaseRolePlaybookItem[
     {
       id: "feedback_operator",
       roleName: "数据复盘运营",
-      modelOwner: "Kimi / GPT",
+      modelOwner: "Gemini / GPT",
       skillOwner: "发布复盘 Skill",
       whenToUse: "发布后回填点击、收藏、读完、评论和签约反馈时使用。",
       inputs: ["发布包版本", "平台效果数据", "A/B 候选", "历史复盘"],
@@ -636,7 +636,7 @@ export function buildReferenceCaseDevelopmentPlan(
     categoryBlocks,
     nextBuildMoves: [
       "写作工作台：参考 novelWriter、bibisco、Manuskript，把开书、人物弧光、大纲树、章节卡和正文编辑放进同一个工作区。",
-      "模型路由：参考 Dify、Flowise、LangChain，把 Claude、DeepSeek、Kimi、GPT 的任务分工接到开头钩子、正文生成、复审和二改。",
+      "模型路由：参考 Dify、Flowise、LangChain，把 Claude、DeepSeek、Gemini、GPT 的任务分工接到开头钩子、正文生成、复审和二改。",
       "知识库：参考 Logseq、Joplin、Outline，把世界观、伏笔、人物关系和历史章节做成可召回的项目土壤。",
       `发布流水线：参考 mdBook、HonKit、Pandoc，只覆盖当前锁定的 ${platformScope.corePlatformCount} 个核心平台：${platformList}，把投稿包做成可导出版本。`,
     ],
@@ -685,11 +685,11 @@ export function buildReferenceCaseDevelopmentPath(): ReferenceCaseDevelopmentPat
       status: "继续打磨",
       ownerRole: "产品验收闸门",
       roleIds: ["toxic_pm", "structure_editor", "draft_writer", "context_librarian", "overseas_packager"],
-      currentEvidence: "模型设置已覆盖 Claude、DeepSeek、Kimi、GPT 等岗位矩阵和任务路由。",
+      currentEvidence: "模型设置已覆盖 Claude、DeepSeek、Gemini、GPT 等岗位矩阵和任务路由。",
       nextAction: "把每个角色入口都绑定到可复核的模型岗位、失败替代路线和成本记录。",
       acceptance: "用户能看懂每次 AI 任务由哪个模型执行、为什么选它、失败后去哪补救。",
       qualityCheckpoint: {
-        risk: "别做多模型聊天壳；模型必须按任务分工，否则 Claude、DeepSeek、Kimi、GPT 只是供应商名单。",
+        risk: "别做多模型聊天壳；模型必须按任务分工，否则 Claude、DeepSeek、Gemini、GPT 只是供应商名单。",
         mustShip: "每个写作角色都要有首选模型、备用模型、失败原因和复检入口。",
         proof: "模型岗位矩阵能解释任务分工、成本压力、失败替代路线和后续复检。",
         actionLabel: "检查模型岗位",
@@ -757,7 +757,7 @@ export function buildReferenceCaseQualityNextFocus(path: ReferenceCaseDevelopmen
       ? "当前优先：模型任务化，别再做聊天壳。"
       : `当前优先：${focus.title}`,
     reason: focus.id === "model_routing"
-      ? "写作平台的下一步不是增加聊天入口，而是让 Claude、DeepSeek、Kimi、GPT 按写作任务分工并可复检。"
+      ? "写作平台的下一步不是增加聊天入口，而是让 Claude、DeepSeek、Gemini、GPT 按写作任务分工并可复检。"
       : focus.qualityCheckpoint.risk,
     proof: focus.id === "model_routing"
       ? "模型岗位矩阵能说明首选模型、备用模型、失败替代路线、成本压力和后续复检入口。"

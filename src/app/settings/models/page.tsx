@@ -284,7 +284,7 @@ export default async function ModelSettingsPage({
   return (
     <AppShell>
       <h1 className="text-2xl font-semibold">模型设置</h1>
-      <p className="mt-1 text-sm text-slate-600">配置 Claude、DeepSeek、Kimi、GPT、兼容网关或本地 Ollama。</p>
+      <p className="mt-1 text-sm text-slate-600">配置 Claude、DeepSeek、Gemini、GPT、兼容网关或本地 Ollama。</p>
       {gateReturn ? (
         <section className="mt-4 rounded-md border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">

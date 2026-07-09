@@ -591,15 +591,15 @@ const providerApiKeyHelp: Partial<Record<ModelProviderId, ProviderApiKeyHelp>> =
     keepDefaultFields: ["Base URL", "模型名", "上下文上限"],
     commonFixes: ["401：Key 错或无权限", "404：模型名不对", "429：额度或频率限制", "超时：稍后重试或换备用模型"],
   },
-  kimi: {
-    headline: "适合长上下文：整理人物、世界观、长篇资料和连续性检查。",
-    keyPageLabel: "打开 Kimi API Console",
-    keyPageUrl: "https://platform.kimi.ai/console/api-keys",
-    keyNameHint: "建议命名为 Webnovel Writer，本地保存后页面不会回显完整 Key。",
-    defaultValueHint: "Base URL 保持 https://api.moonshot.ai/v1；模型先用 kimi-k2.6。",
-    billingHint: "需要 Kimi API 平台账号和可用额度；聊天会员不等于 API 额度。",
+  gemini: {
+    headline: "适合长上下文：整理人物、世界观、长篇资料、连续性检查和海外平台包装。",
+    keyPageLabel: "打开 Google AI Studio API Keys",
+    keyPageUrl: "https://aistudio.google.com/apikey",
+    keyNameHint: "在 Google AI Studio 创建 API Key，建议命名为 Webnovel Writer。",
+    defaultValueHint: "Base URL 保持 https://generativelanguage.googleapis.com/v1beta/openai/；模型先用 gemini-2.5-flash。",
+    billingHint: "需要 Google AI Studio / Gemini API 可用额度；Gemini 网页会员不等于 API 额度。",
     keepDefaultFields: ["Base URL", "模型名", "上下文上限"],
-    commonFixes: ["401：Key 无效或复制不完整", "402/余额：先检查 API 额度", "404：模型名不在账号可用列表", "超时：降低任务长度"],
+    commonFixes: ["401：Key 无效或复制不完整", "403：API Key 权限或项目限制", "404：模型名不在账号可用列表", "429：额度或频率限制"],
   },
   claude: {
     headline: "适合结构审稿：人物弧光、主线支线、复杂二改判断。",
@@ -653,7 +653,7 @@ const providerApiKeyHelp: Partial<Record<ModelProviderId, ProviderApiKeyHelp>> =
   },
 };
 
-const preferredRealProviderOrder: ModelProviderId[] = ["deepseek", "kimi", "claude", "gpt"];
+const preferredRealProviderOrder: ModelProviderId[] = ["deepseek", "gemini", "claude", "gpt"];
 
 function draftFromOption(option: ProviderOptionView, existing?: ProviderView): DraftProvider {
   return {
@@ -1464,7 +1464,7 @@ export function ModelProviderSettings({
             <div>
               <div className="font-medium">模型岗位修复入口</div>
               <p className="mt-1 text-sm leading-6">
-                推荐批次被拦住时，先在这里补齐 Claude、DeepSeek、Kimi、GPT 的写作岗位，再保存职责路由和小样本复检派单。
+                推荐批次被拦住时，先在这里补齐 Claude、DeepSeek、Gemini、GPT 的写作岗位，再保存职责路由和小样本复检派单。
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -1523,7 +1523,7 @@ export function ModelProviderSettings({
               <div className="text-xs font-medium text-slate-500">开发接口验收</div>
               <h2 className="mt-1 font-medium text-slate-950">模型接口合同</h2>
               <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-600">
-                Claude、DeepSeek、Kimi、GPT 都保留可替换接口；上线前按协议、鉴权、地址、模型名和连接测试逐项验收。
+                Claude、DeepSeek、Gemini、GPT 都保留可替换接口；上线前按协议、鉴权、地址、模型名和连接测试逐项验收。
               </p>
             </div>
             <a
@@ -1576,7 +1576,7 @@ export function ModelProviderSettings({
             <div>
               <h2 className="font-medium text-slate-950">真实模型接入向导</h2>
               <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-600">
-                先接入 DeepSeek、Kimi、Claude、GPT 里的至少两个真实模型，再去修复首日路线。别让正式写作还靠 Mock 顶着。
+                先接入 DeepSeek、Gemini、Claude、GPT 里的至少两个真实模型，再去修复首日路线。别让正式写作还靠 Mock 顶着。
               </p>
             </div>
             <div className="flex flex-wrap gap-2 text-xs text-slate-600">
@@ -2897,7 +2897,7 @@ export function ModelProviderSettings({
           <div>
             <h2 className="font-medium text-slate-950">模型供应商配置向导</h2>
             <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-600">
-              按首日上线优先级准备 DeepSeek、Kimi、Claude、GPT；真实模型就绪后，冷启动蓝图会自动给首日工作流分配路线。
+              按首日上线优先级准备 DeepSeek、Gemini、Claude、GPT；真实模型就绪后，冷启动蓝图会自动给首日工作流分配路线。
             </p>
           </div>
           <div className="flex flex-wrap gap-2 text-xs text-slate-600">
@@ -3080,7 +3080,7 @@ export function ModelProviderSettings({
             <span className="text-xs leading-5 text-slate-600">
               {selectedOption.requiresApiKey
                 ? "完整 Key 只需要粘贴在这个输入框。保存后输入框会清空显示，这是安全设计；旧 Key 不会因为留空而被覆盖。"
-                : "Mock 和本地模型不需要 Key；正式写作建议选择 DeepSeek、Kimi、Claude 或 GPT。"}
+                : "Mock 和本地模型不需要 Key；正式写作建议选择 DeepSeek、Gemini、Claude 或 GPT。"}
             </span>
           </label>
           {selectedPresets.length ? (

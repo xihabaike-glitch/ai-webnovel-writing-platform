@@ -52,7 +52,7 @@ export interface ProviderHealthDashboard {
 }
 
 function isKnownProviderId(providerId: string): providerId is ModelProviderId {
-  return ["claude", "deepseek", "kimi", "gpt", "openai_compatible", "ollama", "mock"].includes(providerId);
+  return ["claude", "deepseek", "gemini", "gpt", "openai_compatible", "ollama", "mock"].includes(providerId);
 }
 
 function contextTaskFit(maxContextTokens: number | null) {

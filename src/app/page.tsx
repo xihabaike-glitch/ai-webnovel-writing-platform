@@ -231,7 +231,7 @@ export default function HomePage() {
           <div className="rounded-md border border-slate-200 bg-white p-4">
             <div className="text-xs text-slate-500">模型接口</div>
             <div className="mt-1 font-semibold text-slate-950">{overview.modelInterfaces.readyLabel}</div>
-            <p className="mt-2 text-sm leading-6 text-slate-600">Claude、DeepSeek、Kimi、GPT 分别进入写作岗位。</p>
+            <p className="mt-2 text-sm leading-6 text-slate-600">Claude、DeepSeek、Gemini、GPT 分别进入写作岗位。</p>
           </div>
           <div className="rounded-md border border-slate-200 bg-white p-4">
             <div className="text-xs text-slate-500">参考案例</div>

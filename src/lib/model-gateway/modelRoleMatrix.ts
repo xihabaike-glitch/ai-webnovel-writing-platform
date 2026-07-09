@@ -48,7 +48,7 @@ export interface ModelRoleMatrix {
 }
 
 export interface ModelProviderInterfaceCoverageItem {
-  providerId: "claude" | "deepseek" | "kimi" | "gpt";
+  providerId: "claude" | "deepseek" | "gemini" | "gpt";
   providerName: string;
   roleTitle: string;
   ownerLabel: string;
@@ -79,7 +79,7 @@ export interface ModelRoleMatrixPriorityBlocker {
 }
 
 export interface ModelRoleRepairQueueItem {
-  providerId: "claude" | "deepseek" | "kimi" | "gpt";
+  providerId: "claude" | "deepseek" | "gemini" | "gpt";
   providerName: string;
   roleTitle: string;
   ownerLabel: string;
@@ -185,7 +185,7 @@ const roleDefinitions: RoleDefinition[] = [
     title: "长篇结构主编",
     ownerLabel: "Claude 优先",
     preferredProviderIds: ["claude"],
-    fallbackProviderIds: ["gpt", "kimi", "deepseek"],
+    fallbackProviderIds: ["gpt", "gemini", "deepseek"],
     minContextTokens: 128000,
     taskTypes: ["story_structure_diagnostic", "chapter_review", "chapter_second_pass", "first_three_rewrite"],
     deliverables: ["人物弧光审校", "主线支线诊断", "伏笔回收建议", "前三章结构复审"],
@@ -195,7 +195,7 @@ const roleDefinitions: RoleDefinition[] = [
     title: "中文网文写手",
     ownerLabel: "DeepSeek 优先",
     preferredProviderIds: ["deepseek"],
-    fallbackProviderIds: ["kimi", "gpt", "claude"],
+    fallbackProviderIds: ["gemini", "gpt", "claude"],
     minContextTokens: 32000,
     taskTypes: ["chapter_draft", "first_three_rewrite"],
     deliverables: ["章节初稿", "爽点补强", "批量小样本", "平台节奏试写"],
@@ -203,8 +203,8 @@ const roleDefinitions: RoleDefinition[] = [
   {
     id: "context_librarian",
     title: "长上下文资料官",
-    ownerLabel: "Kimi 优先",
-    preferredProviderIds: ["kimi"],
+    ownerLabel: "Gemini 优先",
+    preferredProviderIds: ["gemini"],
     fallbackProviderIds: ["claude", "gpt", "deepseek"],
     minContextTokens: 128000,
     taskTypes: ["control_asset_generate", "story_tree_recheck", "chapter_review"],
@@ -215,7 +215,7 @@ const roleDefinitions: RoleDefinition[] = [
     title: "海外投稿包装编辑",
     ownerLabel: "GPT 优先",
     preferredProviderIds: ["gpt"],
-    fallbackProviderIds: ["claude", "kimi", "deepseek"],
+    fallbackProviderIds: ["claude", "gemini", "deepseek"],
     minContextTokens: 32000,
     taskTypes: ["submission_package_optimize", "multi_platform_submission"],
     deliverables: ["英文 synopsis", "WebNovel/Royal Road/Wattpad 包装", "标签与简介", "多语言改写"],
@@ -288,7 +288,7 @@ const roleRouteDraftDefinitions: Array<{
 ];
 
 function isKnownProviderId(providerId: string): providerId is ModelProviderId {
-  return ["claude", "deepseek", "kimi", "gpt", "openai_compatible", "ollama", "mock"].includes(providerId);
+  return ["claude", "deepseek", "gemini", "gpt", "openai_compatible", "ollama", "mock"].includes(providerId);
 }
 
 function providerNeedsApiKey(providerId: string) {
@@ -385,8 +385,8 @@ function buildModelProviderInterfaceCoverage(roles: ModelWritingRole[]): ModelPr
     missingInterfaces,
     headline: `模型接口留口：${readyInterfaces}/${items.length} 已就绪`,
     detail: missingInterfaces === 0
-      ? "Claude、DeepSeek、Kimi、GPT 四个接口都已接到写作岗位，下一步检查职责路由、备用模型和复检入口。"
-      : `还缺 ${missingInterfaces} 个接口：${missingNames.join("、")}。先补齐 Claude、DeepSeek、Kimi、GPT 的写作岗位入口，再让真实项目跑 AI 任务。`,
+      ? "Claude、DeepSeek、Gemini、GPT 四个接口都已接到写作岗位，下一步检查职责路由、备用模型和复检入口。"
+      : `还缺 ${missingInterfaces} 个接口：${missingNames.join("、")}。先补齐 Claude、DeepSeek、Gemini、GPT 的写作岗位入口，再让真实项目跑 AI 任务。`,
     actionHref: "/settings/models#model-provider-interfaces",
     actionLabel: missingInterfaces === 0 ? "检查接口留口" : "补模型接口",
     items,
@@ -468,7 +468,7 @@ export function buildModelRoleMatrixPriorityBlocker(matrix: ModelRoleMatrix): Mo
     return {
       tone: "blocked",
       title: "模型编辑部缺岗",
-      detail: `${matrix.summary.missingRoles} 个岗位还没可用模型。继续跑真实写作会变成 Mock 或人工救火，先补 Claude / DeepSeek / Kimi / GPT 的职责分工。${matrix.nextAction}`,
+      detail: `${matrix.summary.missingRoles} 个岗位还没可用模型。继续跑真实写作会变成 Mock 或人工救火，先补 Claude / DeepSeek / Gemini / GPT 的职责分工。${matrix.nextAction}`,
       actionLabel: "去配置模型岗位",
       actionHref: "/settings/models?focus=model-role-matrix#model-role-matrix",
     };
@@ -521,7 +521,7 @@ export function buildModelRoleMatrixQualityFocusNotice(matrix: ModelRoleMatrix):
   return {
     tone,
     headline: "当前优先：模型任务化，别再做聊天壳。",
-    reason: "写作平台的下一步不是增加聊天入口，而是让 Claude、DeepSeek、Kimi、GPT 按写作任务分工并可复检。",
+    reason: "写作平台的下一步不是增加聊天入口，而是让 Claude、DeepSeek、Gemini、GPT 按写作任务分工并可复检。",
     proof,
     actionLabel: matrix.status === "ready" ? "检查职责路由" : "补模型岗位",
     actionHref: "/settings/models?focus=model-role-matrix#model-role-matrix",

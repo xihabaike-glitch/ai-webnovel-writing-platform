@@ -22,7 +22,7 @@ export interface ProviderModelPreset {
 }
 
 export interface ProviderInterfaceContract {
-  providerId: "claude" | "deepseek" | "kimi" | "gpt";
+  providerId: "claude" | "deepseek" | "gemini" | "gpt";
   providerName: string;
   ownerRole: string;
   protocolLabel: string;
@@ -68,12 +68,12 @@ export const providerOptions: ProviderOption[] = [
     note: "OpenAI 兼容格式，适合低成本长文本。",
   },
   {
-    providerId: "kimi",
-    displayName: "Kimi",
-    defaultBaseUrl: "https://api.moonshot.ai/v1",
-    defaultModel: "kimi-k2.6",
+    providerId: "gemini",
+    displayName: "Gemini",
+    defaultBaseUrl: "https://generativelanguage.googleapis.com/v1beta/openai/",
+    defaultModel: "gemini-2.5-flash",
     requiresApiKey: true,
-    note: "OpenAI 兼容格式，适合长上下文中文写作。",
+    note: "Google Gemini OpenAI 兼容格式，适合长上下文、资料整理和海外平台包装。",
   },
   {
     providerId: "openai_compatible",
@@ -149,22 +149,22 @@ export const providerModelPresets: ProviderModelPreset[] = [
     note: "适合拆问题、查逻辑断点、做复杂审稿，不建议作为所有任务默认。",
   },
   {
-    id: "kimi-long-context",
-    providerId: "kimi",
-    label: "Kimi 长上下文",
-    model: "kimi-k2.6",
-    maxContextTokens: 128000,
+    id: "gemini-long-context",
+    providerId: "gemini",
+    label: "Gemini 长上下文",
+    model: "gemini-2.5-pro",
+    maxContextTokens: 1048576,
     taskTags: ["长篇规划", "审稿二改"],
-    note: "适合整卷材料、人物线和世界观资料一起读的任务。",
+    note: "适合整卷材料、人物线、世界观资料和长上下文连续性检查。",
   },
   {
-    id: "kimi-draft",
-    providerId: "kimi",
-    label: "Kimi 中文初稿",
-    model: "kimi-k2.6",
-    maxContextTokens: 128000,
+    id: "gemini-draft",
+    providerId: "gemini",
+    label: "Gemini 快速初稿",
+    model: "gemini-2.5-flash",
+    maxContextTokens: 1048576,
     taskTags: ["正文初稿", "低成本批量"],
-    note: "适合中文长文续写、批量章节和平台资料改写。",
+    note: "适合快速章节样本、平台资料改写和海外包装试跑。",
   },
 ];
 
@@ -194,14 +194,14 @@ export const providerInterfaceContracts: ProviderInterfaceContract[] = [
     evidenceChecklist: ["API Key", "Base URL", "默认模型", "连接测试", "岗位路由"],
   },
   {
-    providerId: "kimi",
-    providerName: "Kimi",
-    ownerRole: "长上下文资料管理员",
+    providerId: "gemini",
+    providerName: "Gemini",
+    ownerRole: "长上下文资料官",
     protocolLabel: "OpenAI-compatible Chat Completions",
     authHeaderLabel: "Authorization: Bearer",
     requestPath: "/chat/completions",
-    defaultBaseUrl: "https://api.moonshot.ai/v1",
-    defaultModel: "kimi-k2.6",
+    defaultBaseUrl: "https://generativelanguage.googleapis.com/v1beta/openai/",
+    defaultModel: "gemini-2.5-flash",
     connectionTestLabel: "保存后执行连接测试，确认资料整合岗位可调用。",
     evidenceChecklist: ["API Key", "Base URL", "默认模型", "连接测试", "岗位路由"],
   },

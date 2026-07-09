@@ -1829,7 +1829,7 @@ function modelRouteAsset(platform: PlatformProfile, modelRoutes: ProjectStartMod
     title: `模型分工土壤：${platform.name}`,
     content: [
       `平台：${platform.name}`,
-      `用途：把 Claude、DeepSeek、Kimi、GPT 等模型路线沉淀为项目首轮分工。`,
+      `用途：把 Claude、DeepSeek、Gemini、GPT 等模型路线沉淀为项目首轮分工。`,
       ...modelRoutes.map((route) => [
         `任务：${route.taskLabel}`,
         `首选：${route.primaryProviderName}`,

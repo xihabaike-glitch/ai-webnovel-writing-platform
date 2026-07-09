@@ -1270,7 +1270,7 @@ function buildModelRouteHealthSummary(input: ProjectControlDashboardInput): Mode
           ? "healthy"
           : "watch";
   const headline = status === "empty"
-    ? "模型路线还没有项目样本，别急着判断 Claude、DeepSeek、Kimi、GPT 谁更适合。"
+    ? "模型路线还没有项目样本，别急着判断 Claude、DeepSeek、Gemini、GPT 谁更适合。"
     : status === "repair"
       ? "模型路线已经暴露失败或避用信号，先修路由再继续写。"
       : status === "cost_guard"

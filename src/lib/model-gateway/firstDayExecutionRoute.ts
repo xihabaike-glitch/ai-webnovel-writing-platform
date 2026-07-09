@@ -27,7 +27,7 @@ export interface FirstDayExecutionRouteStatus {
 export function buildFirstDayExecutionRouteBlockMessage(route: FirstDayExecutionRouteStatus) {
   if (route.status === "ready") return null;
   if (route.status === "mock_fallback") {
-    return `当前节点「${route.taskLabel}」仍在使用 Mock 兜底，不能直接 AI 执行。请先到模型配置中心换成 Claude、DeepSeek、Kimi、GPT 等真实模型路线。`;
+    return `当前节点「${route.taskLabel}」仍在使用 Mock 兜底，不能直接 AI 执行。请先到模型配置中心换成 Claude、DeepSeek、Gemini、GPT 等真实模型路线。`;
   }
   if (route.status === "missing_route") {
     return `当前节点「${route.taskLabel}」还没有可用模型路线，不能直接 AI 执行。请先到模型配置中心配置首选模型或备用模型。`;

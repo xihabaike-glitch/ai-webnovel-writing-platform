@@ -1,7 +1,7 @@
 export type ModelProviderId =
   | "claude"
   | "deepseek"
-  | "kimi"
+  | "gemini"
   | "gpt"
   | "openai_compatible"
   | "ollama"

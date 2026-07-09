@@ -46,7 +46,7 @@ Application Services
      Model Gateway
         ├─ Claude Adapter
         ├─ DeepSeek Adapter
-        ├─ Kimi Adapter
+        ├─ Gemini Adapter
         ├─ GPT Adapter
         ├─ OpenAI-Compatible Adapter
         └─ Ollama Adapter
@@ -284,7 +284,7 @@ export interface WorldEntry {
 export type ModelProviderId =
   | "claude"
   | "deepseek"
-  | "kimi"
+  | "gemini"
   | "gpt"
   | "openai_compatible"
   | "ollama";
@@ -559,7 +559,7 @@ export interface ModelAdapter {
 
 1. GPT 使用 OpenAI Responses 或 Chat Completions 兼容接口。
 2. DeepSeek 使用 OpenAI-compatible adapter。
-3. Kimi 使用 OpenAI-compatible adapter。
+3. Gemini 使用 OpenAI-compatible adapter。
 4. Claude 使用 Anthropic adapter。
 5. OpenAI-compatible 允许用户自定义 baseUrl。
 6. Ollama 使用本地 `/api/chat` adapter，用于本机模型验证。
@@ -699,7 +699,7 @@ GET /api/model-task-routes
 POST /api/model-task-routes
 ```
 
-`/api/model-providers/test` 是所有真实模型配置进入岗位矩阵前的硬闸门。Claude、DeepSeek、Kimi、GPT 与本地 Ollama 都必须先通过连接测试，再参与职责路由、推荐批次和生产任务派单。
+`/api/model-providers/test` 是所有真实模型配置进入岗位矩阵前的硬闸门。Claude、DeepSeek、Gemini、GPT 与本地 Ollama 都必须先通过连接测试，再参与职责路由、推荐批次和生产任务派单。
 
 ### 8.8 AI Writing Tasks
 
@@ -817,7 +817,7 @@ AI 助手不是聊天主页面，只是任务面板：
 
 ### Step 6：模型设置和 Model Gateway
 
-实现模型配置、Mock 演示 adapter、Claude Anthropic adapter、DeepSeek/Kimi/GPT/OpenAI-compatible Chat Completions adapter、Ollama 本地 adapter，并把连接测试结果写回模型设置页。
+实现模型配置、Mock 演示 adapter、Claude Anthropic adapter、DeepSeek/Gemini/GPT/OpenAI-compatible Chat Completions adapter、Ollama 本地 adapter，并把连接测试结果写回模型设置页。
 
 ### Step 7：AI 章节审稿
 

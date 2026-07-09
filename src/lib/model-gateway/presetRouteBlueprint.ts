@@ -60,12 +60,12 @@ const taskTagWeights: Record<RoutedModelTaskType, Partial<Record<ProviderModelPr
 };
 
 const taskProviderOrder: Record<RoutedModelTaskType, string[]> = {
-  chapter_draft: ["deepseek", "kimi", "gpt", "claude"],
-  chapter_review: ["claude", "gpt", "kimi", "deepseek"],
-  chapter_second_pass: ["claude", "kimi", "gpt", "deepseek"],
-  submission_package_optimize: ["gpt", "claude", "kimi", "deepseek"],
-  first_three_rewrite: ["gpt", "claude", "kimi", "deepseek"],
-  control_asset_generate: ["kimi", "claude", "gpt", "deepseek"],
+  chapter_draft: ["deepseek", "gemini", "gpt", "claude"],
+  chapter_review: ["claude", "gpt", "gemini", "deepseek"],
+  chapter_second_pass: ["claude", "gemini", "gpt", "deepseek"],
+  submission_package_optimize: ["gpt", "claude", "gemini", "deepseek"],
+  first_three_rewrite: ["gpt", "claude", "gemini", "deepseek"],
+  control_asset_generate: ["gemini", "claude", "gpt", "deepseek"],
 };
 
 function canUseProvider(provider: PresetRouteBlueprintProvider) {
@@ -178,7 +178,7 @@ function reasonItems(
   primary: { provider: PresetRouteBlueprintProvider; matchedTags: ProviderModelPresetTaskTag[] } | null,
   fallback: { provider: PresetRouteBlueprintProvider } | null,
 ) {
-  if (!primary) return ["没有可用首选模型。", "先配置 GPT、Claude、DeepSeek 或 Kimi，并完成连接测试。"];
+  if (!primary) return ["没有可用首选模型。", "先配置 GPT、Claude、DeepSeek 或 Gemini，并完成连接测试。"];
   return [
     `${providerName(primary.provider)} 命中 ${primary.matchedTags.length ? primary.matchedTags.join("、") : "任务预设"}。`,
     fallback ? `备用路线是 ${providerName(fallback.provider)}，用于失败、超时或成本异常时兜底。` : "当前没有备用路线，执行前要谨慎。",
@@ -226,7 +226,7 @@ export function buildPresetRouteBlueprint(
       matchedTags,
       reason: primary
         ? `冷启动建议用 ${providerName(primary.provider)}，命中 ${matchedTags.join("、")}；备用 ${fallback ? providerName(fallback.provider) : "暂缺"}。`
-        : `「${option.label}」还没有可用的写作预设模型，先配置 GPT、Claude、DeepSeek 或 Kimi。`,
+        : `「${option.label}」还没有可用的写作预设模型，先配置 GPT、Claude、DeepSeek 或 Gemini。`,
       routingRole: taskRole(option.taskType),
       fallbackPlan: fallbackPlan(option.taskType, fallback),
       costEstimate: costEstimate(option.taskType, primary),

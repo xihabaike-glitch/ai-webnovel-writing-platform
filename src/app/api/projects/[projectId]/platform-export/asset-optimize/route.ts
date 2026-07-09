@@ -176,7 +176,7 @@ export async function POST(request: Request, { params }: Params) {
 
   try {
     const result = await adapter.generate({
-      providerId: provider.providerId as "claude" | "deepseek" | "kimi" | "gpt" | "openai_compatible" | "ollama" | "mock",
+      providerId: provider.providerId as "claude" | "deepseek" | "gemini" | "gpt" | "openai_compatible" | "ollama" | "mock",
       model: provider.defaultModel,
       systemPrompt: prompt.systemPrompt,
       userPrompt: prompt.userPrompt,

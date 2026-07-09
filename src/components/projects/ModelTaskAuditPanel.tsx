@@ -348,7 +348,7 @@ export function ModelTaskAuditPanel({
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h2 className="font-medium">模型任务与成本审计</h2>
-          <p className="mt-1 text-sm text-slate-600">看清 Claude、DeepSeek、Kimi、GPT 等模型调用的成功率、Token、成本和失败风险。</p>
+          <p className="mt-1 text-sm text-slate-600">看清 Claude、DeepSeek、Gemini、GPT 等模型调用的成功率、Token、成本和失败风险。</p>
         </div>
         <button
           className="rounded-md border border-slate-200 px-3 py-2 text-sm font-medium hover:bg-slate-50 disabled:opacity-50"

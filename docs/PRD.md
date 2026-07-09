@@ -340,7 +340,7 @@ MVP 平台：
 
 1. Claude
 2. DeepSeek
-3. Kimi
+3. Gemini
 4. GPT
 5. OpenAI-compatible
 6. Ollama 预留

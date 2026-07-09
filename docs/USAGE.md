@@ -221,7 +221,7 @@ npm run build
 
 这里是模型设置页。
 
-用于配置 Claude、DeepSeek、Kimi、GPT、OpenAI-compatible 或自定义兼容模型，并把它们绑定到不同写作岗位。
+用于配置 Claude、DeepSeek、Gemini、GPT、OpenAI-compatible 或自定义兼容模型，并把它们绑定到不同写作岗位。
 
 ## 5. 首章样本怎么跑
 
@@ -246,7 +246,7 @@ npm run build
 
 1. Claude：长篇结构主编，适合人物弧光、主线支线、长上下文审稿。
 2. DeepSeek：中文网文写手，适合首章样本、爽点补强、中文节奏改写。
-3. Kimi：长上下文资料官，适合整理世界观、历史章节、设定和连续性。
+3. Gemini：长上下文资料官，适合整理世界观、历史章节、设定和连续性。
 4. GPT：海外投稿包装编辑，适合 WebNovel、Royal Road、Wattpad 的英文简介、标签和包装改写。
 5. OpenAI-compatible：兼容型编辑位，适合你已有兼容接口、想保持统一接入方式时使用。
 
@@ -266,7 +266,7 @@ API Key 配置是第一次使用最容易卡住的地方。你可以把它理解
 最简单的顺序：
 
 1. 打开 `/settings/models`。
-2. 先选 DeepSeek、Kimi、Claude、GPT 里的一个。
+2. 先选 DeepSeek、Gemini、Claude、GPT 里的一个。
 3. 按页面里的“API Key 配置助手”打开对应服务商控制台。
 4. 在服务商控制台创建一个新的 API Key。
 5. 回到本平台，把 Key 粘贴到 API Key 输入框。
@@ -280,7 +280,7 @@ API Key 配置是第一次使用最容易卡住的地方。你可以把它理解
 第一次真实使用，建议先接入 1-2 个模型：
 
 1. DeepSeek：适合低成本试跑首章初稿和批量小样本。
-2. Kimi：适合长上下文资料整理、世界观和人物线。
+2. Gemini：适合长上下文资料整理、世界观和人物线。
 3. Claude：适合结构审稿、人物弧光和复杂二改。
 4. GPT：适合综合写作、海外平台简介和投稿包装。
 
@@ -312,7 +312,7 @@ API Key 配置是第一次使用最容易卡住的地方。你可以把它理解
 
 1. API Key 复制不完整。
 2. 账号没有 API 额度。
-3. ChatGPT/Claude/Kimi 的网页会员不等于 API 额度。
+3. ChatGPT/Claude/Gemini 的网页会员不等于 API 额度。
 4. 模型名写错。
 5. Base URL 写错。
 6. 当前服务商限流。
@@ -430,7 +430,7 @@ API Key 配置是第一次使用最容易卡住的地方。你可以把它理解
 
 因为不同模型擅长的事情不一样。把结构、改写、资料整理、英文包装分开，通常更稳。
 
-### 为什么我有 ChatGPT/Claude/Kimi 会员，API 还是失败？
+### 为什么我有 ChatGPT/Claude/Gemini 会员，API 还是失败？
 
 网页会员和 API 调用通常是两套计费。你需要去对应 API 控制台创建 Key，并确认 API 账号有可用额度。
 

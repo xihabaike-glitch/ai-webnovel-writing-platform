@@ -54,7 +54,7 @@ export interface ProviderSetupWizard {
   nextActions: string[];
 }
 
-const launchProviderOrder: ModelProviderId[] = ["deepseek", "kimi", "claude", "gpt"];
+const launchProviderOrder: ModelProviderId[] = ["deepseek", "gemini", "claude", "gpt"];
 
 function statusFor(option: ProviderSetupWizardOption, provider: ProviderSetupWizardProvider | undefined): ProviderSetupWizardItem["status"] {
   if (!launchProviderOrder.includes(option.providerId)) return "optional";

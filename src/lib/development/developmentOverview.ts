@@ -2,7 +2,7 @@ import { platformDeliveryScope } from "../platforms/platformProfiles.ts";
 import { openSourceReferenceCases } from "../references/openSourceCases.ts";
 
 export interface DevelopmentOverviewModelInterface {
-  providerId: "claude" | "deepseek" | "kimi" | "gpt";
+  providerId: "claude" | "deepseek" | "gemini" | "gpt";
   providerName: string;
   ownerRole: string;
   reservedFor: string;
@@ -248,8 +248,8 @@ const modelInterfaces: DevelopmentOverviewModelInterface[] = [
     href: modelRoleMatrixHref,
   },
   {
-    providerId: "kimi",
-    providerName: "Kimi",
+    providerId: "gemini",
+    providerName: "Gemini",
     ownerRole: "长上下文资料官",
     reservedFor: "世界观整理、历史章节召回、资料压缩和连续性检查。",
     href: modelRoleMatrixHref,
@@ -322,7 +322,7 @@ const docSections: DevelopmentOverviewSection[] = [
   {
     id: "model_interfaces",
     title: "模型接口",
-    summary: "Claude、DeepSeek、Kimi、GPT 已进入模型岗位矩阵，分别负责结构、正文、长上下文和海外包装；缺岗会被推荐批次和总闸门硬拦截。",
+    summary: "Claude、DeepSeek、Gemini、GPT 已进入模型岗位矩阵，分别负责结构、正文、长上下文和海外包装；缺岗会被推荐批次和总闸门硬拦截。",
     evidenceItems: ["模型设置页已有 provider 配置、角色矩阵、任务路由和失败替代。", "模型调用必须服务具体写作任务，不做泛聊天中心。"],
     acceptance: "四个模型接口都有明确岗位、任务、备用和人工验收入口。",
     href: modelRoleMatrixHref,
@@ -386,8 +386,8 @@ const deliveryAuditItems: DevelopmentOverviewAuditItem[] = [
     id: "model_interfaces",
     title: "四类模型接口",
     status: "ready",
-    requirement: "对接 Claude、DeepSeek、Kimi、GPT 等模型，并预留对应接口。",
-    evidence: "Claude、DeepSeek、Kimi、GPT 已在模型岗位矩阵中分别承担结构、正文、长上下文和海外包装；缺岗会拦住推荐批次和总闸门。",
+    requirement: "对接 Claude、DeepSeek、Gemini、GPT 等模型，并预留对应接口。",
+    evidence: "Claude、DeepSeek、Gemini、GPT 已在模型岗位矩阵中分别承担结构、正文、长上下文和海外包装；缺岗会拦住推荐批次和总闸门。",
     nextStep: "进入模型岗位矩阵检查首选模型、备用模型、任务路由、失败替代和缺岗硬拦截。",
     href: modelRoleMatrixHref,
   },
@@ -686,8 +686,8 @@ function buildRequirementTraceability(): DevelopmentOverviewRequirementTraceabil
       },
       {
         id: "model_interfaces",
-        originalRequest: "对接 Claude、DeepSeek、Kimi、GPT 等模型，并预留对应接口。",
-        currentEvidence: "Claude、DeepSeek、Kimi、GPT 已进入模型岗位矩阵，分别承担结构、正文、长上下文和海外包装。",
+        originalRequest: "对接 Claude、DeepSeek、Gemini、GPT 等模型，并预留对应接口。",
+        currentEvidence: "Claude、DeepSeek、Gemini、GPT 已进入模型岗位矩阵，分别承担结构、正文、长上下文和海外包装。",
         acceptanceSignal: "模型设置页能解释首选模型、备用模型、任务分工、失败替代、复检入口和模型岗位缺岗总闸门。",
         href: modelRoleMatrixHref,
       },
@@ -911,7 +911,7 @@ export function buildDevelopmentOverview(): DevelopmentOverview {
     },
     modelInterfaces: {
       total: modelInterfaces.length,
-      readyLabel: "Claude / DeepSeek / Kimi / GPT 已进入模型岗位矩阵",
+      readyLabel: "Claude / DeepSeek / Gemini / GPT 已进入模型岗位矩阵",
       items: modelInterfaces,
     },
     docSections,
@@ -930,7 +930,7 @@ export function buildDevelopmentOverview(): DevelopmentOverview {
       },
       {
         label: "确认模型岗位接口",
-        detail: "检查 Claude、DeepSeek、Kimi、GPT 是否分别承担结构、正文、资料和海外包装。",
+        detail: "检查 Claude、DeepSeek、Gemini、GPT 是否分别承担结构、正文、资料和海外包装。",
         href: "/settings/models",
       },
       {

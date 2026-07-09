@@ -1078,7 +1078,7 @@ export function FirstDayWorkflowPanel({
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <div className="text-xs font-medium text-slate-500">AI 执行草稿</div>
-                  <p className="mt-1 text-sm leading-6 text-slate-600">可以直接让平台执行；也可以复制给 Claude、DeepSeek、Kimi、GPT 或其他模型手动执行。</p>
+                  <p className="mt-1 text-sm leading-6 text-slate-600">可以直接让平台执行；也可以复制给 Claude、DeepSeek、Gemini、GPT 或其他模型手动执行。</p>
                 </div>
                 <div className="flex flex-wrap gap-2">
                   <button

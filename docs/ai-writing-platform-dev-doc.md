@@ -15,7 +15,7 @@
 5. `/gate`：总闸门。负责生产放大前的证据检查，防止没有样本、没有复查、没有失败修复就进入批量。
 6. `/failures`：失败修复中心。按模型配置、提示词上下文、样本重试和人工复盘拆分修复泳道，必要时暂停批量。
 7. `/references`：开源参考库。收录 30 个以上 GitHub 项目，并把参考价值转成产品开发路径、AI 编辑部角色和平台执行卡。
-8. `/settings/models`：模型设置。承接 Claude、DeepSeek、Kimi、GPT、OpenAI-compatible、模型岗位矩阵、职责路由和推荐批次缺岗硬拦截后的修复入口。
+8. `/settings/models`：模型设置。承接 Claude、DeepSeek、Gemini、GPT、OpenAI-compatible、模型岗位矩阵、职责路由和推荐批次缺岗硬拦截后的修复入口。
 
 ### 0.2 平台范围锁定
 
@@ -29,12 +29,12 @@
 
 1. Claude：长篇结构主编，负责人物弧光、主线支线、前三章结构复审和长上下文审稿。
 2. DeepSeek：中文网文写手，负责章节初稿、爽点补强、中文节奏改写和小样本试写。
-3. Kimi：长上下文资料官，负责世界观整理、历史章节召回、资料压缩和连续性检查。
+3. Gemini：长上下文资料官，负责世界观整理、历史章节召回、资料压缩和连续性检查。
 4. GPT：海外投稿包装编辑，负责 WebNovel、Royal Road、Wattpad 的英文简介、标签和包装改写。
 
 模型岗位必须绑定任务、备用模型、人工验收和成本观察。任何模型输出默认是候选稿或回执，不得直接覆盖作者正文。
 
-当前模型闭环已经进入验收口径：`/settings/models?focus=model-role-matrix#model-role-matrix` 是模型岗位修复入口；Claude、DeepSeek、Kimi、GPT 缺岗时，`/tasks` 的推荐批次按钮和 `/api/tasks/recommended-batch` 都会触发推荐批次缺岗硬拦截。修复顺序是先补模型岗位矩阵，再保存职责路由，最后生成小样本复检派单，不能靠默认模型或 Mock 继续放大生产。
+当前模型闭环已经进入验收口径：`/settings/models?focus=model-role-matrix#model-role-matrix` 是模型岗位修复入口；Claude、DeepSeek、Gemini、GPT 缺岗时，`/tasks` 的推荐批次按钮和 `/api/tasks/recommended-batch` 都会触发推荐批次缺岗硬拦截。修复顺序是先补模型岗位矩阵，再保存职责路由，最后生成小样本复检派单，不能靠默认模型或 Mock 继续放大生产。
 
 ### 0.4 主控闸门 闸门
 
@@ -66,7 +66,7 @@
 
 1. 批量健康：读取最近 AI 批次的放量三态，判断当前是允许小步加码、继续观察还是禁止放大。
 2. AI 写审改：读取 AI 写审改派单和复查完成证据，判断章节初稿、审稿、二改链路是否已经回流。
-3. 模型路线：读取模型路线修复派单和复检证据，判断 Claude、DeepSeek、Kimi、GPT 的职责路由是否仍有缺口。
+3. 模型路线：读取模型路线修复派单和复检证据，判断 Claude、DeepSeek、Gemini、GPT 的职责路由是否仍有缺口。
 
 这块看板不是新的判断体系，它只是把已经存在的推荐批次安全阀、AI 流水线复查和模型路线修复证据收束到 `/projects/[projectId]` 顶部。后续新增生产入口时，应优先补 `productionClosure` 的证据来源，而不是再造一套页面级状态文案。
 
@@ -75,7 +75,7 @@
 下一步不是继续加平台，也不是堆更多炫技能力，而是逐项证明现有闭环可以跑通：
 
 1. 当前下一步是从 `/gate?focus=action-recheck&source=real-sample-receipt#gate-focus-notice` 复检首章样本回执；首章样本回执已能写回总闸门，先看回执、剩余卡点和下一步分流。
-2. 从 `/settings/models?focus=model-role-matrix#model-role-matrix` 确认模型岗位矩阵和职责路由，确保 Claude、DeepSeek、Kimi、GPT 都有明确用途；缺岗时先处理推荐批次缺岗硬拦截。
+2. 从 `/settings/models?focus=model-role-matrix#model-role-matrix` 确认模型岗位矩阵和职责路由，确保 Claude、DeepSeek、Gemini、GPT 都有明确用途；缺岗时先处理推荐批次缺岗硬拦截。
 3. 从 `/tasks` 和 `/dispatch` 验收首日写作、模型执行、回执接受和下一步任务。
 4. 从 `/gate` 检查是否允许批量生产。
 5. 从 `/failures` 处理失败修复中心的优先泳道，必要时暂停批量。
@@ -157,7 +157,7 @@
 | 8 个核心平台范围 | 已覆盖 | `/projects#platform-export` | 无新增平台缺口 | 继续打磨起点、番茄、七猫、晋江、知乎盐选、WebNovel、Royal Road、Wattpad 的写作抓手、投稿抓手和复盘指标。 |
 | 短中长篇篇幅模式 | 已覆盖 | `/projects#create-project` | 无篇幅模板缺口 | 把篇幅选择继续落到章节数量、首章钩子和发布包验收。 |
 | 大树写作法 | 已覆盖 | `/projects#story-structure` | 无结构入口缺口 | 用作品工作台检查每本书是否补齐开头、结尾、主干、分支、叶片和土壤。 |
-| 四类模型接口 | 已覆盖 | `/settings/models?focus=model-role-matrix#model-role-matrix` | 无模型岗位缺口 | 继续检查 Claude、DeepSeek、Kimi、GPT 的首选模型、备用模型、任务路由、失败替代和缺岗硬拦截。 |
+| 四类模型接口 | 已覆盖 | `/settings/models?focus=model-role-matrix#model-role-matrix` | 无模型岗位缺口 | 继续检查 Claude、DeepSeek、Gemini、GPT 的首选模型、备用模型、任务路由、失败替代和缺岗硬拦截。 |
 | AI 编辑部角色分工 | 已覆盖 | `/dispatch#dispatch-task-center` | 无角色分工缺口 | 让每个任务回执都带角色产物、输入输出、人工验收和下一步入口。 |
 | 平台风格适配 | 已覆盖 | `/projects#platform-export` | 无平台风格范围缺口 | 继续用章节卡、审稿、二改和发布包检验钩子、爽点、节奏、标签和简介。 |
 | 传统写作工具底座 | 已覆盖 | `/projects#pipeline-projects` | 无传统写作资产缺口 | 确保 AI 只能沿大纲、人物、世界观、伏笔、章节和发布包执行。 |
@@ -177,7 +177,7 @@
 
 1. “一键生成百万字小说”：听起来爽，实际交付不可控，容易变成垃圾内容工厂。
 2. “全平台风格自动适配”：第一版只做规则提示和结构建议，不承诺一键变爆款。
-3. “所有模型都深度适配”：第一版只做统一模型适配器，Claude、DeepSeek、Kimi、GPT 先用同一协议接入。
+3. “所有模型都深度适配”：第一版只做统一模型适配器，Claude、DeepSeek、Gemini、GPT 先用同一协议接入。
 4. “复杂社交社区”：先别做。写作工具最怕还没解决写作，就开始做社区。
 5. “漂亮大屏数据看板”：作者最需要的是能写、能管、能改，不是看仪表盘自我感动。
 
@@ -185,7 +185,7 @@
 
 1. 长篇工程管理：章节、卷、人物、设定、伏笔、时间线。
 2. 平台策略库：起点、番茄、七猫、晋江、知乎盐选、WebNovel、Royal Road、Wattpad。
-3. 多模型适配：Claude、DeepSeek、Kimi、GPT、OpenAI-compatible、自定义本地模型。
+3. 多模型适配：Claude、DeepSeek、Gemini、GPT、OpenAI-compatible、自定义本地模型。
 4. 结构化审稿：钩子、爽点、章末悬念、人物弧光、伏笔回收、平台适配。
 5. 作者可控：AI 只能建议和生成候选稿，最终进入正文必须由作者确认。
 
@@ -208,7 +208,7 @@
 2. 先写开头钩子和结尾，再构建主干和支线。
 3. 在章节编辑器中写正文，同时查看人物、伏笔和平台提示。
 4. 调用 AI 检查章节钩子、爽点、人物弧光和章末悬念。
-5. 调用不同模型做不同任务，例如 Claude 审结构、DeepSeek 写中文网文段落、Kimi 整理长上下文、GPT 做多语言和综合改写。
+5. 调用不同模型做不同任务，例如 Claude 审结构、DeepSeek 写中文网文段落、Gemini 整理长上下文、GPT 做多语言和综合改写。
 6. 导出章节包、大纲、人物设定、投稿摘要。
 
 ## 3. 30 个 GitHub 开源项目筛选
@@ -486,7 +486,7 @@
 
 1. Claude
 2. DeepSeek
-3. Kimi
+3. Gemini
 4. GPT
 5. OpenAI-compatible 自定义接口
 6. Ollama/本地模型预留
@@ -497,7 +497,7 @@
 export type ModelProviderId =
   | "claude"
   | "deepseek"
-  | "kimi"
+  | "gemini"
   | "gpt"
   | "openai_compatible"
   | "ollama";
@@ -540,7 +540,7 @@ export interface GenerateResult {
 |---|---|---|
 | 长篇结构审稿 | Claude | 长上下文、结构理解强 |
 | 中文网文段落生成 | DeepSeek | 中文表达和成本较适合批量 |
-| 长资料整理 | Kimi | 长上下文资料处理优势 |
+| 长资料整理 | Gemini | 长上下文资料处理优势 |
 | 多语言/海外改写 | GPT | 综合能力和英文输出稳定 |
 | 私有草稿审阅 | Ollama/本地模型 | 隐私优先 |
 
@@ -774,7 +774,7 @@ POST /api/ai/tasks/continuity-check
 
 1. Claude 配置
 2. DeepSeek 配置
-3. Kimi 配置
+3. Gemini 配置
 4. GPT 配置
 5. OpenAI-compatible 配置
 6. 调用日志
@@ -855,7 +855,7 @@ MVP 合格标准：
 1. 作者不调用 AI，也能当传统写作工具使用。
 2. 作者调用 AI，可以完成章节审稿、钩子检查、平台适配。
 3. 每个 AI 输出都有来源上下文和应用按钮。
-4. 支持至少 4 类模型提供商：Claude、DeepSeek、Kimi、GPT。
+4. 支持至少 4 类模型提供商：Claude、DeepSeek、Gemini、GPT。
 5. 支持至少 8 个目标平台画像：起点、番茄、七猫、晋江、知乎盐选、WebNovel、Royal Road、Wattpad。
 6. 能导出可投稿/可备份的文稿和大纲。
 
@@ -866,7 +866,7 @@ MVP 合格标准：
 当前下一步不是重写计划，也不是继续加平台，而是拿现有产品跑真实闭环。当前下一步是从 `/gate?focus=action-recheck&source=real-sample-receipt#gate-focus-notice` 复检首章样本回执；首章样本回执已能写回总闸门，先看回执、剩余卡点和下一步分流：
 
 1. 从 `/gate?focus=action-recheck&source=real-sample-receipt#gate-focus-notice` 复检首章样本回执：确认总闸门能看到最新首章样本回执、回执详情、剩余卡点和可点击下一步。
-2. 从 `/settings/models?focus=model-role-matrix#model-role-matrix` 检查模型岗位矩阵和职责路由：Claude、DeepSeek、Kimi、GPT 必须有清晰岗位、备用模型、成本观察和人工验收入口；推荐批次缺岗硬拦截未解除前不允许放大生产。
+2. 从 `/settings/models?focus=model-role-matrix#model-role-matrix` 检查模型岗位矩阵和职责路由：Claude、DeepSeek、Gemini、GPT 必须有清晰岗位、备用模型、成本观察和人工验收入口；推荐批次缺岗硬拦截未解除前不允许放大生产。
 3. 从 `/dispatch` 验证任务回执：首章样本、审稿、二改、平台包和失败修复都要有执行角色、输入、输出、验收证据和下一步。
 4. 从 `/gate` 判断是否允许小批量：没有样本、复查、质量、成本、失败率和恢复证据时，不允许放大生产。
 5. 从 `/failures` 做失败修复：模型配置、提示词上下文、样本重试和人工复盘必须分泳道处理，未修复时暂停批量。

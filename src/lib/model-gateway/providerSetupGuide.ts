@@ -51,7 +51,7 @@ export interface ProviderSetupGuide {
   nextActions: string[];
 }
 
-const launchProviderOrder: ModelProviderId[] = ["deepseek", "kimi", "claude", "gpt", "openai_compatible", "ollama", "mock"];
+const launchProviderOrder: ModelProviderId[] = ["deepseek", "gemini", "claude", "gpt", "openai_compatible", "ollama", "mock"];
 
 function statusFor(option: ProviderSetupGuideOption, provider: ProviderSetupGuideProvider | undefined): ProviderSetupGuideItem["status"] {
   if (!provider && option.providerId === "mock") return "optional";
@@ -122,7 +122,7 @@ export function buildProviderSetupGuide(input: {
     },
     items,
     nextActions: [
-      needsKey > 0 ? `先补 ${needsKey} 个云模型 API Key，优先 DeepSeek、Kimi、Claude、GPT。` : null,
+      needsKey > 0 ? `先补 ${needsKey} 个云模型 API Key，优先 DeepSeek、Gemini、Claude、GPT。` : null,
       needsTest > 0 ? `${needsTest} 个模型需要保存上下文上限并测试连接。` : null,
       ready >= 2 ? "已有至少 2 个可用模型，可以进入冷启动路由蓝图。" : "至少准备 2 个真实模型，再应用首日推荐路线。",
     ].filter((action): action is string => Boolean(action)),

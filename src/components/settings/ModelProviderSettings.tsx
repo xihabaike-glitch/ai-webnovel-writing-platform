@@ -653,6 +653,8 @@ const providerApiKeyHelp: Partial<Record<ModelProviderId, ProviderApiKeyHelp>> =
   },
 };
 
+const preferredRealProviderOrder: ModelProviderId[] = ["deepseek", "kimi", "claude", "gpt"];
+
 function draftFromOption(option: ProviderOptionView, existing?: ProviderView): DraftProvider {
   return {
     id: existing?.id,
@@ -751,7 +753,15 @@ export function ModelProviderSettings({
     () => new Map(providers.map((provider) => [provider.providerId, provider])),
     [providers],
   );
-  const selectedInitialProviderId = options.find((option) => providerParam === option.providerId)?.providerId ?? options[0]?.providerId ?? "mock";
+  const providerFromParam = options.find((option) => providerParam === option.providerId)?.providerId;
+  const firstActionableRealProvider = providerSetupWizard.items.find((item) => item.status !== "ready")?.providerId
+    ?? providerSetupWizard.items[0]?.providerId;
+  const firstPreferredRealProvider = preferredRealProviderOrder.find((providerId) => options.some((option) => option.providerId === providerId));
+  const selectedInitialProviderId = providerFromParam
+    ?? firstActionableRealProvider
+    ?? firstPreferredRealProvider
+    ?? options[0]?.providerId
+    ?? "mock";
   const [selectedProviderId, setSelectedProviderId] = useState<ModelProviderId>(selectedInitialProviderId);
   const selectedOption = options.find((option) => option.providerId === selectedProviderId) ?? options[0];
   const selectedPresets = presets.filter((preset) => preset.providerId === selectedProviderId);
@@ -2950,7 +2960,7 @@ export function ModelProviderSettings({
             );
           })}
         </nav>
-        <form className="grid gap-4 rounded-md border border-slate-200 bg-white p-4" onSubmit={saveProvider}>
+        <form className="grid gap-4 rounded-md border border-slate-200 bg-white p-4" id="provider-config-form" onSubmit={saveProvider}>
           <div>
             <div className="flex flex-wrap items-center gap-2">
               <h2 className="font-medium">{selectedOption.displayName}</h2>
@@ -3049,6 +3059,30 @@ export function ModelProviderSettings({
               </div>
             </div>
           ) : null}
+          <label
+            className={`grid gap-2 rounded-md border p-3 text-sm ${
+              selectedOption.requiresApiKey ? "border-amber-200 bg-amber-50" : "border-slate-200 bg-slate-50"
+            }`}
+            htmlFor="api-key-input"
+          >
+            <span className="font-medium text-slate-950">
+              {selectedOption.requiresApiKey ? "在这里粘贴 API Key" : "API Key"}
+            </span>
+            <input
+              className="rounded-md border border-slate-300 bg-white px-3 py-2"
+              disabled={!selectedOption.requiresApiKey}
+              id="api-key-input"
+              onChange={(event) => setDraft((current) => ({ ...current, apiKey: event.target.value }))}
+              placeholder={existing?.hasApiKey ? "已保存，留空则不覆盖；如需更换就在这里粘贴新 Key" : selectedOption.requiresApiKey ? "把服务商控制台复制出来的 Key 粘贴到这里" : "这个模型不需要 API Key"}
+              type="password"
+              value={draft.apiKey}
+            />
+            <span className="text-xs leading-5 text-slate-600">
+              {selectedOption.requiresApiKey
+                ? "完整 Key 只需要粘贴在这个输入框。保存后输入框会清空显示，这是安全设计；旧 Key 不会因为留空而被覆盖。"
+                : "Mock 和本地模型不需要 Key；正式写作建议选择 DeepSeek、Kimi、Claude 或 GPT。"}
+            </span>
+          </label>
           {selectedPresets.length ? (
             <div className="grid gap-2">
               <div className="text-sm font-medium text-slate-950">写作任务模型预设</div>
@@ -3100,16 +3134,6 @@ export function ModelProviderSettings({
               onChange={(event) => setDraft((current) => ({ ...current, defaultModel: event.target.value }))}
               placeholder={selectedOption.defaultModel || "provider-model-name"}
               value={draft.defaultModel}
-            />
-          </label>
-          <label className="grid gap-1 text-sm">
-            API Key
-            <input
-              className="rounded-md border border-slate-200 px-3 py-2"
-              onChange={(event) => setDraft((current) => ({ ...current, apiKey: event.target.value }))}
-              placeholder={existing?.hasApiKey ? "已保存，留空则不覆盖" : selectedOption.requiresApiKey ? "请输入 API Key" : "无需填写"}
-              type="password"
-              value={draft.apiKey}
             />
           </label>
           <label className="grid gap-1 text-sm">

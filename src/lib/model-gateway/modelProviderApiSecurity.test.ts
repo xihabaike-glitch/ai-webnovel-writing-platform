@@ -103,6 +103,31 @@ test("provider save may retain a key when raw URLs share one normalized origin",
   assert.equal(Object.hasOwn(updateData, "encryptedApiKey"), false);
 });
 
+test("provider save clears a stored key only when explicitly requested", async (t) => {
+  const existing = storedProvider();
+  let updateData: Record<string, unknown> | undefined;
+  replaceProviderMethod(t, "findUnique", async () => existing);
+  replaceProviderMethod(t, "update", async (args: { data: Record<string, unknown> }) => {
+    updateData = args.data;
+    return { ...existing, ...args.data };
+  });
+
+  const response = await saveProvider(jsonRequest("http://localhost/api/model-providers", {
+    id: existing.id,
+    providerId: existing.providerId,
+    displayName: existing.displayName,
+    baseUrl: existing.baseUrl,
+    apiKey: "",
+    defaultModel: existing.defaultModel,
+    enabled: existing.enabled,
+  }));
+
+  assert.equal(response.status, 200);
+  assert.equal(updateData?.encryptedApiKey, null);
+  const payload = await response.json() as { provider?: { hasApiKey?: boolean } };
+  assert.equal(payload.provider?.hasApiKey, false);
+});
+
 test("provider save rejects stored-key reuse when a concurrent credential rotation wins", async (t) => {
   const existing = storedProvider();
   let staleUpdateData: Record<string, unknown> | undefined;

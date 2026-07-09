@@ -1,11 +1,34 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  buildProviderApiKeyClearRequest,
   getUnhandledProviderDeepLink,
   getProviderWizardCardAction,
   performProviderConfigurationHandoff,
   scheduleProviderConfigurationHandoff,
 } from "./ModelProviderSettings";
+
+test("credential clear requests preserve provider settings and send an explicit empty key", () => {
+  assert.deepEqual(buildProviderApiKeyClearRequest({
+    id: "provider-1",
+    providerId: "gemini",
+    displayName: "Gemini",
+    baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai/",
+    hasApiKey: true,
+    defaultModel: "gemini-2.5-flash",
+    enabled: true,
+    maxContextTokens: 1048576,
+  }), {
+    id: "provider-1",
+    providerId: "gemini",
+    displayName: "Gemini",
+    baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai/",
+    apiKey: "",
+    defaultModel: "gemini-2.5-flash",
+    enabled: true,
+    maxContextTokens: 1048576,
+  });
+});
 
 type HandoffTarget = {
   focus: () => void;

@@ -146,6 +146,19 @@ interface ProviderView {
   maxContextTokens: number | null;
 }
 
+export function buildProviderApiKeyClearRequest(provider: ProviderView) {
+  return {
+    id: provider.id,
+    providerId: provider.providerId,
+    displayName: provider.displayName,
+    baseUrl: provider.baseUrl ?? "",
+    apiKey: "",
+    defaultModel: provider.defaultModel,
+    enabled: provider.enabled,
+    maxContextTokens: provider.maxContextTokens ?? undefined,
+  };
+}
+
 interface RouteOptionView {
   taskType: string;
   label: string;
@@ -823,6 +836,7 @@ export function ModelProviderSettings({
   const handledProviderDeepLinkRef = useRef<string | null>(null);
   const [providerSetupNotice, setProviderSetupNotice] = useState<ProviderSetupNotice | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [clearingProviderId, setClearingProviderId] = useState<string | null>(null);
   const [testingProviderId, setTestingProviderId] = useState<ModelProviderId | null>(null);
   const [testResults, setTestResults] = useState<Record<string, ConnectionTestResult>>({});
   const [routeDrafts, setRouteDrafts] = useState<Record<string, RouteDraft>>(() => Object.fromEntries(
@@ -1095,6 +1109,38 @@ export function ModelProviderSettings({
         actionLabel: "应用首日路线",
         action: "apply_first_day_routes",
       });
+    }
+  }
+
+  async function clearStoredApiKey() {
+    if (!existing?.hasApiKey) return;
+    if (!window.confirm(`确定清除 ${existing.displayName} 已保存的 API Key？清除后，该模型会停止处理真实写作任务，直到重新填写 Key。`)) {
+      return;
+    }
+
+    setClearingProviderId(existing.id);
+    setMessage(null);
+    setProviderSetupNotice(null);
+    try {
+      const response = await fetch("/api/model-providers", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(buildProviderApiKeyClearRequest(existing)),
+      });
+      if (!response.ok) throw new Error("清除 API Key 失败。");
+
+      setDraft((current) => ({ ...current, apiKey: "" }));
+      setTestResults((current) => {
+        const next = { ...current };
+        delete next[existing.providerId];
+        return next;
+      });
+      setMessage("已清除保存的 API Key");
+      router.refresh();
+    } catch (caught) {
+      setMessage(caught instanceof Error ? caught.message : "清除 API Key 失败。");
+    } finally {
+      setClearingProviderId(null);
     }
   }
 
@@ -3172,6 +3218,20 @@ export function ModelProviderSettings({
                 : "Mock 和本地模型不需要 Key；正式写作建议选择 DeepSeek、Gemini、Claude 或 GPT。"}
             </span>
           </label>
+          {existing?.hasApiKey && selectedOption.requiresApiKey ? (
+            <div className="flex flex-wrap items-center gap-3 text-sm">
+              <button
+                className="rounded-md border border-rose-300 px-3 py-2 font-medium text-rose-700 hover:bg-rose-50 disabled:opacity-50"
+                disabled={isSaving || Boolean(testingProviderId) || clearingProviderId === existing.id}
+                onClick={() => void clearStoredApiKey()}
+                title="从本机数据库中移除这个模型的 API Key"
+                type="button"
+              >
+                {clearingProviderId === existing.id ? "清除中" : "清除已保存 Key"}
+              </button>
+              <span className="text-xs text-slate-500">清除后需要重新填写 Key，模型才能继续调用。</span>
+            </div>
+          ) : null}
           {selectedPresets.length ? (
             <div className="grid gap-2">
               <div className="text-sm font-medium text-slate-950">写作任务模型预设</div>
@@ -3247,14 +3307,14 @@ export function ModelProviderSettings({
           <div className="flex items-center gap-3">
             <button
               className="rounded-md bg-slate-950 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-              disabled={isSaving || testingProviderId === draft.providerId}
+              disabled={isSaving || testingProviderId === draft.providerId || Boolean(clearingProviderId)}
               type="submit"
             >
               {isSaving ? "保存并测试中" : "保存配置"}
             </button>
             <button
               className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 disabled:opacity-50"
-              disabled={isSaving || testingProviderId === draft.providerId}
+              disabled={isSaving || testingProviderId === draft.providerId || Boolean(clearingProviderId)}
               onClick={testProviderConnection}
               type="button"
             >

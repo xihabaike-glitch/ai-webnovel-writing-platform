@@ -24,6 +24,13 @@ const aiPipelineRecoveryRecheckHref =
   "/gate?focus=action-recheck&source=ai-pipeline-recovery#ai-pipeline-recovery";
 const firstThreeAdoptionRecheckHref =
   "/gate?focus=action-recheck&source=first-three-adoption#first-three-adoption-closure";
+const platformTacticExperienceRecheckHref =
+  "/gate?focus=action-recheck&source=platform-tactic-experience#platform-tactic-experience";
+
+function normalizePlatformTacticExperienceHref(href?: string | null) {
+  if (!href || href === "/gate#platform-tactic-experience") return platformTacticExperienceRecheckHref;
+  return href;
+}
 
 export interface TaskQueueProject {
   id: string;
@@ -1395,7 +1402,7 @@ function tacticExperienceFollowupQueueItems(input: {
         riskNotice: input.riskNotice,
         scaleGate: input.scaleGate,
         actionLabel,
-        href: task.href ?? "/gate#platform-tactic-experience",
+        href: normalizePlatformTacticExperienceHref(task.href),
       });
     });
 }

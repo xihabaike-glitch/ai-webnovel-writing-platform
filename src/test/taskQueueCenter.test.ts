@@ -1155,7 +1155,7 @@ test("buildTaskQueueCenter", async (t) => {
     assert.ok(followup?.completionEvidenceTemplate?.includes("加码范围："));
     assert.ok(followup?.completionEvidenceTemplate?.includes("风险边界："));
     assert.equal(followup?.actionLabel, "继续小样本");
-    assert.equal(followup?.href, "/gate#platform-tactic-experience");
+    assert.equal(followup?.href, "/gate?focus=action-recheck&source=platform-tactic-experience#platform-tactic-experience");
     assert.equal(queue.recommendedNext?.sourceType, "tactic_experience_followup");
     assert.equal(recommendedQueueActionLabel(queue.recommendedNext), "下一步：打法闭环 · 继续小样本");
   });

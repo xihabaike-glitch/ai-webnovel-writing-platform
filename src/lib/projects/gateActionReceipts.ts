@@ -5528,7 +5528,7 @@ export function buildGateDispatchEvidenceReview(
     if (isProjectAcceptanceNextCompletionTask(task)) {
       const projectAcceptanceHref = task.projectId
         ? `/gate?focus=action-recheck&actionId=project-acceptance:${encodeURIComponent(task.projectId)}#gate-focus-notice`
-        : "/gate#gate-focus-notice";
+        : "/gate?focus=action-recheck#gate-focus-notice";
       return {
         dispatchKey: task.dispatchKey,
         platformId: task.platformId,

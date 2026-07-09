@@ -5723,6 +5723,13 @@ test("buildGateActionReceipt", async (t) => {
       createdAt: "2026-01-01T00:30:00.000Z",
       updatedAt: "2026-01-01T01:00:00.000Z",
     };
+    const acceptanceRecheckFallbackTask = {
+      ...acceptanceRecheckTask,
+      id: "project-acceptance-next:unknown:publish_package",
+      databaseId: "dispatch-db-acceptance-recheck-fallback",
+      dispatchKey: "project-acceptance-next:unknown:publish_package",
+      projectId: null,
+    };
     const laterBusinessReceipt = buildGatePublishEffectReceipt({
       projectId: "project-1",
       platformId: "fanqie",
@@ -5746,11 +5753,12 @@ test("buildGateActionReceipt", async (t) => {
       missingEvidenceTask,
       activeTask,
       acceptanceRecheckTask,
+      acceptanceRecheckFallbackTask,
     ], [dispatchReceiptAfterCompletion, laterBusinessReceipt]);
 
     assert.equal(review.summary.verified, 1);
-    assert.equal(review.summary.needsReceipt, 2);
-    assert.equal(review.summary.acceptanceRecheck, 1);
+    assert.equal(review.summary.needsReceipt, 3);
+    assert.equal(review.summary.acceptanceRecheck, 2);
     assert.equal(review.summary.missingEvidence, 1);
     assert.equal(review.summary.active, 1);
     assert.equal(review.items[0].status, "missing_evidence");
@@ -5767,6 +5775,7 @@ test("buildGateActionReceipt", async (t) => {
     assert.equal(review.items.find((item) => item.dispatchKey === acceptanceRecheckTask.dispatchKey)?.label, "待总闸门复检");
     assert.equal(review.items.find((item) => item.dispatchKey === acceptanceRecheckTask.dispatchKey)?.actionLabel, "回总闸门复检");
     assert.equal(review.items.find((item) => item.dispatchKey === acceptanceRecheckTask.dispatchKey)?.href, "/gate?focus=action-recheck&actionId=project-acceptance:project-5#gate-focus-notice");
+    assert.equal(review.items.find((item) => item.dispatchKey === acceptanceRecheckFallbackTask.dispatchKey)?.href, "/gate?focus=action-recheck#gate-focus-notice");
     assert.ok(review.nextActions.some((actionText) => actionText.includes("后续业务回执")));
   });
 

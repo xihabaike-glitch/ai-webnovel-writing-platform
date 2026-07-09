@@ -475,6 +475,17 @@ interface ProviderSetupNotice {
   href?: string;
 }
 
+interface ProviderApiKeyHelp {
+  headline: string;
+  keyPageLabel: string;
+  keyPageUrl: string | null;
+  keyNameHint: string;
+  defaultValueHint: string;
+  billingHint: string;
+  keepDefaultFields: string[];
+  commonFixes: string[];
+}
+
 const statusCopy: Record<ProviderHealthStatus, { label: string; className: string }> = {
   ready: { label: "可用", className: "border-emerald-200 bg-emerald-50 text-emerald-700" },
   warn: { label: "需注意", className: "border-amber-200 bg-amber-50 text-amber-700" },
@@ -566,6 +577,79 @@ const modelRoleQualityFocusToneCopy: Record<ModelRoleMatrixQualityFocusNotice["t
     className: "border-emerald-200 bg-emerald-50 text-emerald-950",
     badgeClassName: "bg-white text-emerald-700",
     label: "可推进",
+  },
+};
+
+const providerApiKeyHelp: Partial<Record<ModelProviderId, ProviderApiKeyHelp>> = {
+  deepseek: {
+    headline: "适合先接入：成本低，适合首章初稿和批量小样本。",
+    keyPageLabel: "打开 DeepSeek Platform",
+    keyPageUrl: "https://platform.deepseek.com/",
+    keyNameHint: "建议命名为 Webnovel Writer 或你的项目名，方便以后停用。",
+    defaultValueHint: "Base URL 保持 https://api.deepseek.com；模型先用 deepseek-v4-flash 或 deepseek-v4-pro。",
+    billingHint: "通常需要账号可用额度；如果测试失败，先看余额、地区权限和模型名。",
+    keepDefaultFields: ["Base URL", "模型名", "上下文上限"],
+    commonFixes: ["401：Key 错或无权限", "404：模型名不对", "429：额度或频率限制", "超时：稍后重试或换备用模型"],
+  },
+  kimi: {
+    headline: "适合长上下文：整理人物、世界观、长篇资料和连续性检查。",
+    keyPageLabel: "打开 Kimi API Console",
+    keyPageUrl: "https://platform.kimi.ai/console/api-keys",
+    keyNameHint: "建议命名为 Webnovel Writer，本地保存后页面不会回显完整 Key。",
+    defaultValueHint: "Base URL 保持 https://api.moonshot.ai/v1；模型先用 kimi-k2.6。",
+    billingHint: "需要 Kimi API 平台账号和可用额度；聊天会员不等于 API 额度。",
+    keepDefaultFields: ["Base URL", "模型名", "上下文上限"],
+    commonFixes: ["401：Key 无效或复制不完整", "402/余额：先检查 API 额度", "404：模型名不在账号可用列表", "超时：降低任务长度"],
+  },
+  claude: {
+    headline: "适合结构审稿：人物弧光、主线支线、复杂二改判断。",
+    keyPageLabel: "打开 Claude Console",
+    keyPageUrl: "https://platform.claude.com/",
+    keyNameHint: "在 Claude Console 创建 API Key；Claude 网页会员和 API 计费是两套。",
+    defaultValueHint: "Base URL 保持 https://api.anthropic.com；模型先用 claude-sonnet-4-5。",
+    billingHint: "需要 Claude Console 组织、API 权限和账单设置。",
+    keepDefaultFields: ["Base URL", "模型名", "上下文上限"],
+    commonFixes: ["401：Key 或组织权限不对", "403：账号/API 权限不足", "404：模型名不对", "429：频率或额度限制"],
+  },
+  gpt: {
+    headline: "适合综合写作和海外包装：简介、标签、WebNovel/Royal Road/Wattpad 改写。",
+    keyPageLabel: "打开 OpenAI API Keys",
+    keyPageUrl: "https://platform.openai.com/api-keys",
+    keyNameHint: "创建 Project API Key；完整 Key 只会在创建时显示一次。",
+    defaultValueHint: "Base URL 保持 https://api.openai.com/v1；模型先用 gpt-5-mini。",
+    billingHint: "需要 OpenAI Platform 项目和可用余额；ChatGPT 订阅不等于 API 额度。",
+    keepDefaultFields: ["Base URL", "模型名", "上下文上限"],
+    commonFixes: ["401：Key 错或项目权限不对", "429：额度或速率限制", "404：模型名不在项目权限内", "余额不足：检查 Billing"],
+  },
+  openai_compatible: {
+    headline: "适合高级用户：OpenRouter、硅基流动、自建网关或其他兼容服务。",
+    keyPageLabel: "打开你的兼容平台控制台",
+    keyPageUrl: null,
+    keyNameHint: "从对应平台创建 Key，再确认它使用 Authorization: Bearer 格式。",
+    defaultValueHint: "必须自己填写 Base URL 和模型名，常见格式是 https://example.com/v1。",
+    billingHint: "如果是第三方聚合平台，先确认余额、模型权限、区域和并发限制。",
+    keepDefaultFields: ["显示名称", "上下文上限"],
+    commonFixes: ["Base URL 少了 /v1", "模型名和平台展示名不一致", "Key 权限不含该模型", "服务商不完全兼容 Chat Completions"],
+  },
+  ollama: {
+    headline: "适合本机离线试跑：不需要 API Key，但需要先启动 Ollama。",
+    keyPageLabel: "查看 Ollama 本地服务",
+    keyPageUrl: "http://localhost:11434",
+    keyNameHint: "无需 API Key。",
+    defaultValueHint: "Base URL 保持 http://localhost:11434；模型名要和本机拉取的模型一致。",
+    billingHint: "本机运行不走云端计费，但速度取决于电脑配置。",
+    keepDefaultFields: ["Base URL"],
+    commonFixes: ["本机没启动 Ollama", "模型名不存在", "内存不足", "响应慢：换小模型"],
+  },
+  mock: {
+    headline: "适合看流程：不调用真实模型，不需要 API Key。",
+    keyPageLabel: "无需打开外部平台",
+    keyPageUrl: null,
+    keyNameHint: "无需 API Key。",
+    defaultValueHint: "保持默认即可，只用于演示写作流水线。",
+    billingHint: "不会产生模型费用，也不能代表真实写作质量。",
+    keepDefaultFields: ["显示名称", "模型名"],
+    commonFixes: ["正式写作前换成真实模型", "不要把 Mock 当投稿前质量依据"],
   },
 };
 
@@ -706,6 +790,7 @@ export function ModelProviderSettings({
   ));
   const [routeNotice, setRouteNotice] = useState<RouteNotice | null>(null);
   const currentTestResult = testResults[selectedProviderId];
+  const selectedApiKeyHelp = providerApiKeyHelp[selectedProviderId];
   const roleRouteBatchSavePlan = useMemo(
     () => buildModelRoleRouteBatchSavePlan(modelRoleRouteDraft),
     [modelRoleRouteDraft],
@@ -800,6 +885,18 @@ export function ModelProviderSettings({
       maxContextTokens: String(preset.maxContextTokens),
     }));
     setMessage(`已套用「${preset.label}」`);
+  }
+
+  function applyRecommendedConnectionDefaults() {
+    const preset = selectedPresets[0];
+    setDraft((current) => ({
+      ...current,
+      baseUrl: selectedOption.defaultBaseUrl || current.baseUrl,
+      defaultModel: preset?.model || selectedOption.defaultModel || current.defaultModel,
+      maxContextTokens: preset?.maxContextTokens ? String(preset.maxContextTokens) : current.maxContextTokens,
+      enabled: true,
+    }));
+    setMessage("已套用推荐接口值，粘贴 Key 后保存并测试。");
   }
 
   async function runProviderConnectionTest(input: {
@@ -2881,6 +2978,77 @@ export function ModelProviderSettings({
               </div>
             ) : null}
           </div>
+          {selectedApiKeyHelp ? (
+            <div className="grid gap-3 rounded-md border border-sky-200 bg-sky-50 p-3 text-sm text-sky-950 lg:grid-cols-[1.2fr_1fr]">
+              <div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="rounded-md bg-white px-2 py-1 text-xs font-medium text-sky-700">API Key 配置助手</span>
+                  <span className="text-xs text-sky-700">{existing?.hasApiKey ? "已保存 Key，留空不会覆盖" : selectedOption.requiresApiKey ? "需要粘贴 Key" : "无需 Key"}</span>
+                </div>
+                <p className="mt-2 leading-6">{selectedApiKeyHelp.headline}</p>
+                <ol className="mt-3 grid gap-2 text-xs leading-5 text-sky-900 md:grid-cols-3">
+                  <li className="rounded-md bg-white p-2">
+                    <span className="font-medium">1. 创建 Key</span>
+                    <div className="mt-1">{selectedApiKeyHelp.keyNameHint}</div>
+                  </li>
+                  <li className="rounded-md bg-white p-2">
+                    <span className="font-medium">2. 保持默认值</span>
+                    <div className="mt-1">{selectedApiKeyHelp.defaultValueHint}</div>
+                  </li>
+                  <li className="rounded-md bg-white p-2">
+                    <span className="font-medium">3. 保存并测试</span>
+                    <div className="mt-1">看到“连接成功”后，再去应用首日路线。</div>
+                  </li>
+                </ol>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {selectedApiKeyHelp.keyPageUrl ? (
+                    <a
+                      className="rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white hover:bg-slate-800"
+                      href={selectedApiKeyHelp.keyPageUrl}
+                      rel="noreferrer"
+                      target="_blank"
+                    >
+                      {selectedApiKeyHelp.keyPageLabel}
+                    </a>
+                  ) : (
+                    <span className="rounded-md bg-white px-3 py-2 text-xs font-medium text-sky-800">{selectedApiKeyHelp.keyPageLabel}</span>
+                  )}
+                  <button
+                    className="rounded-md border border-sky-200 bg-white px-3 py-2 text-xs font-medium text-sky-800 hover:bg-sky-100"
+                    onClick={applyRecommendedConnectionDefaults}
+                    type="button"
+                  >
+                    套用推荐值
+                  </button>
+                </div>
+              </div>
+              <div className="grid gap-2">
+                <div className="rounded-md bg-white p-3 text-xs leading-5 text-sky-900">
+                  <div className="font-medium">安全提醒</div>
+                  <p className="mt-1">
+                    Key 只在输入框里粘贴一次，保存后页面不会显示完整 Key；已有 Key 时输入框留空，不会覆盖旧 Key。不要把 Key 发到 GitHub、聊天记录或截图里。
+                  </p>
+                </div>
+                <div className="rounded-md bg-white p-3 text-xs leading-5 text-sky-900">
+                  <div className="font-medium">优先别改这些字段</div>
+                  <div className="mt-2 flex flex-wrap gap-1">
+                    {selectedApiKeyHelp.keepDefaultFields.map((item) => (
+                      <span className="rounded-md bg-sky-50 px-2 py-1" key={item}>{item}</span>
+                    ))}
+                  </div>
+                </div>
+                <div className="rounded-md bg-white p-3 text-xs leading-5 text-sky-900">
+                  <div className="font-medium">失败时先看</div>
+                  <div className="mt-2 grid gap-1">
+                    {selectedApiKeyHelp.commonFixes.map((item) => (
+                      <span key={item}>{item}</span>
+                    ))}
+                  </div>
+                  <p className="mt-2 text-sky-700">{selectedApiKeyHelp.billingHint}</p>
+                </div>
+              </div>
+            </div>
+          ) : null}
           {selectedPresets.length ? (
             <div className="grid gap-2">
               <div className="text-sm font-medium text-slate-950">写作任务模型预设</div>

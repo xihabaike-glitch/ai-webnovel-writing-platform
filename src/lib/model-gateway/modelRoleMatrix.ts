@@ -93,7 +93,7 @@ export interface ModelRoleRepairQueueItem {
   stopLine: string;
 }
 
-export interface ModelRoleMatrixPmFocusNotice {
+export interface ModelRoleMatrixQualityFocusNotice {
   tone: "blocked" | "watch" | "ready";
   headline: string;
   reason: string;
@@ -508,8 +508,8 @@ export function buildModelRoleRepairQueue(matrix: ModelRoleMatrix): ModelRoleRep
     });
 }
 
-export function buildModelRoleMatrixPmFocusNotice(matrix: ModelRoleMatrix): ModelRoleMatrixPmFocusNotice {
-  const tone: ModelRoleMatrixPmFocusNotice["tone"] = matrix.status === "ready"
+export function buildModelRoleMatrixQualityFocusNotice(matrix: ModelRoleMatrix): ModelRoleMatrixQualityFocusNotice {
+  const tone: ModelRoleMatrixQualityFocusNotice["tone"] = matrix.status === "ready"
     ? "ready"
     : matrix.status === "partial"
       ? "watch"

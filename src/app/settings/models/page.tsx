@@ -3,7 +3,7 @@ import { ModelProviderSettings } from "@/components/settings/ModelProviderSettin
 import { prisma } from "@/lib/db/prisma";
 import { buildFirstDayRouteSummary } from "@/lib/model-gateway/firstDayRouteSummary";
 import { buildModelSetupOnboarding } from "@/lib/model-gateway/modelSetupOnboarding";
-import { buildModelRoleMatrix, buildModelRoleMatrixPmFocusNotice, buildModelRoleRepairQueue, buildModelRoleRouteDraft } from "@/lib/model-gateway/modelRoleMatrix";
+import { buildModelRoleMatrix, buildModelRoleMatrixQualityFocusNotice, buildModelRoleRepairQueue, buildModelRoleRouteDraft } from "@/lib/model-gateway/modelRoleMatrix";
 import { buildPresetRouteBlueprint } from "@/lib/model-gateway/presetRouteBlueprint";
 import { providerInterfaceContracts, providerModelPresets, providerOptions } from "@/lib/model-gateway/providerDefaults";
 import { buildProviderHealthDashboard } from "@/lib/model-gateway/providerHealth";
@@ -272,7 +272,7 @@ export default async function ModelSettingsPage({
     firstDayRouteSummary: firstDayRouteSummary.summary,
   });
   const modelRoleMatrix = buildModelRoleMatrix(maskedProviders);
-  const modelRoleMatrixPmFocusNotice = buildModelRoleMatrixPmFocusNotice(modelRoleMatrix);
+  const modelRoleMatrixQualityFocusNotice = buildModelRoleMatrixQualityFocusNotice(modelRoleMatrix);
   const modelRoleRepairQueue = buildModelRoleRepairQueue(modelRoleMatrix);
   const modelRoleRouteDraft = buildModelRoleRouteDraft(maskedProviders, routes);
   const routeConfirmationOnboarding = buildRouteConfirmationOnboarding({
@@ -308,7 +308,7 @@ export default async function ModelSettingsPage({
         providerSetupWizard={providerSetupWizard}
         modelSetupOnboarding={modelSetupOnboarding}
         modelRoleMatrix={modelRoleMatrix}
-        modelRoleMatrixPmFocusNotice={modelRoleMatrixPmFocusNotice}
+        modelRoleMatrixQualityFocusNotice={modelRoleMatrixQualityFocusNotice}
         modelRoleRepairQueue={modelRoleRepairQueue}
         modelRoleRouteDraft={modelRoleRouteDraft}
         firstDayRouteSummary={firstDayRouteSummary}

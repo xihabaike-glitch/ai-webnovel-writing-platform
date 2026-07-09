@@ -359,8 +359,8 @@ export default async function GatePage({
     publishBlockedCount: gate.overview.blockedTasks,
     dispatchActiveCount: finalDeliveryDispatchCloseout.summary.active,
     aiOpenCount: finalDeliveryGateAiGapCount,
-    pmActionLabel: gate.pmFocus.actionLabel,
-    pmActionHref: gate.pmFocus.actionHref,
+    qualityActionLabel: gate.qualityFocus.actionLabel,
+    qualityActionHref: gate.qualityFocus.actionHref,
     dispatchNextAction: finalDeliveryDispatchCloseout.nextActions[0],
     taskNextAction: finalDeliveryTaskRunCloseout.nextActions[0],
     deliveryActionLabel: gate.realPipelineFinalReview.primaryActionLabel,
@@ -383,9 +383,9 @@ export default async function GatePage({
       label: "发布卡点",
       count: gate.overview.blockedTasks,
       status: gate.overview.blockedTasks > 0 ? "待处理" : "已清零",
-      detail: gate.overview.blockedTasks > 0 ? gate.pmFocus.detail : "发布包、项目验收单和平台卡点没有阻塞。",
-      nextAction: gate.pmFocus.actionLabel,
-      href: gate.pmFocus.actionHref,
+      detail: gate.overview.blockedTasks > 0 ? gate.qualityFocus.detail : "发布包、项目验收单和平台卡点没有阻塞。",
+      nextAction: gate.qualityFocus.actionLabel,
+      href: gate.qualityFocus.actionHref,
     },
     {
       label: "派单回执",
@@ -478,19 +478,19 @@ export default async function GatePage({
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <div className="text-xs font-medium text-slate-300">主控闸门 当前只验收这一项</div>
-            <h2 className="mt-1 text-lg font-semibold">{gate.pmFocus.headline}</h2>
-            <p className="mt-2 max-w-4xl text-sm leading-6 text-slate-200">{gate.pmFocus.detail}</p>
-            <div className="mt-2 text-xs text-slate-400">{gate.pmFocus.scopeLabel}</div>
+            <h2 className="mt-1 text-lg font-semibold">{gate.qualityFocus.headline}</h2>
+            <p className="mt-2 max-w-4xl text-sm leading-6 text-slate-200">{gate.qualityFocus.detail}</p>
+            <div className="mt-2 text-xs text-slate-400">{gate.qualityFocus.scopeLabel}</div>
             <div className="mt-2 rounded-md bg-white/10 px-3 py-2 text-xs leading-5 text-slate-200">
-              {gate.pmFocus.pipelineValidationHint}
+              {gate.qualityFocus.pipelineValidationHint}
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Link className="w-fit rounded-md bg-white px-3 py-2 text-sm font-medium text-slate-950 hover:bg-slate-100" href={hrefWithGateReturn(gate.pmFocus.actionHref, gateRecheckReturnHref)}>
-              {gate.pmFocus.actionLabel}
+            <Link className="w-fit rounded-md bg-white px-3 py-2 text-sm font-medium text-slate-950 hover:bg-slate-100" href={hrefWithGateReturn(gate.qualityFocus.actionHref, gateRecheckReturnHref)}>
+              {gate.qualityFocus.actionLabel}
             </Link>
-            <Link className="w-fit rounded-md border border-white/25 px-3 py-2 text-sm font-medium text-white hover:bg-white/10" href={hrefWithGateReturn(gate.pmFocus.pipelineActionHref, gateRecheckReturnHref)}>
-              {gate.pmFocus.pipelineActionLabel}
+            <Link className="w-fit rounded-md border border-white/25 px-3 py-2 text-sm font-medium text-white hover:bg-white/10" href={hrefWithGateReturn(gate.qualityFocus.pipelineActionHref, gateRecheckReturnHref)}>
+              {gate.qualityFocus.pipelineActionLabel}
             </Link>
           </div>
         </div>
@@ -628,7 +628,7 @@ export default async function GatePage({
             <div>
               <div className="text-xs font-medium opacity-75">最终交付正式放行卡</div>
               <h3 className="mt-1 font-semibold">{gate.finalDeliveryRelease.headline}</h3>
-              <p className="mt-1 max-w-4xl text-sm leading-6">{gate.finalDeliveryRelease.pmVerdict}</p>
+              <p className="mt-1 max-w-4xl text-sm leading-6">{gate.finalDeliveryRelease.qualityVerdict}</p>
             </div>
             <Link
               className="w-fit rounded-md bg-slate-950 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800"

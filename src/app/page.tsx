@@ -25,7 +25,7 @@ export default function HomePage() {
           <div className="text-xs font-medium text-slate-300">主控闸门 当前只看这一条交付线</div>
           <h1 className="mt-2 max-w-4xl text-3xl font-semibold">写作品，不是陪聊天框闲聊</h1>
           <p className="mt-3 max-w-4xl text-sm leading-6 text-slate-200">
-            {overview.currentPipelineValidation.pmVerdict}
+            {overview.currentPipelineValidation.qualityVerdict}
           </p>
           <div className="mt-4 flex flex-wrap gap-2">
             <Link
@@ -103,7 +103,7 @@ export default function HomePage() {
             <div>
               <div className="text-xs font-medium text-emerald-700">交付后不是散场</div>
               <h2 className="mt-1 font-medium text-slate-950">{overview.finalDeliveryArchive.title}</h2>
-              <p className="mt-2 max-w-4xl text-sm leading-6 text-slate-700">{overview.finalDeliveryArchive.pmRule}</p>
+              <p className="mt-2 max-w-4xl text-sm leading-6 text-slate-700">{overview.finalDeliveryArchive.qualityRule}</p>
             </div>
             <Link
               className="w-fit rounded-md bg-emerald-950 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-900"
@@ -139,7 +139,7 @@ export default function HomePage() {
             <div>
               <div className="text-xs font-medium text-slate-300">原始需求验收</div>
               <h2 className="mt-1 font-medium">{overview.finalAcceptanceGate.evidenceMatrix.title}</h2>
-              <p className="mt-1 max-w-4xl text-sm leading-6 text-slate-200">{overview.finalAcceptanceGate.evidenceMatrix.pmRule}</p>
+              <p className="mt-1 max-w-4xl text-sm leading-6 text-slate-200">{overview.finalAcceptanceGate.evidenceMatrix.qualityRule}</p>
             </div>
             <Link
               className="inline-flex w-fit shrink-0 rounded-md bg-white px-3 py-2 text-sm font-medium text-slate-950 hover:bg-slate-100"
@@ -190,7 +190,7 @@ export default function HomePage() {
             <div>
               <div className="text-xs font-medium text-slate-500">当前验收路线</div>
               <h2 className="mt-1 font-medium text-slate-950">{overview.pipelineProofRoute.headline}</h2>
-              <p className="mt-1 max-w-4xl text-sm leading-6 text-slate-600">{overview.pipelineProofRoute.pmRule}</p>
+              <p className="mt-1 max-w-4xl text-sm leading-6 text-slate-600">{overview.pipelineProofRoute.qualityRule}</p>
             </div>
             <Link
               className="w-fit rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-medium hover:bg-slate-50"

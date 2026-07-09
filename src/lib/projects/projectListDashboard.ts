@@ -249,7 +249,7 @@ export interface ProjectListDashboard {
     watchProjects: number;
     blockedProjects: number;
   };
-  pmFocus: ProjectListPmFocus;
+  qualityFocus: ProjectListQualityFocus;
   pipelineProofSummary: ProjectListPipelineProofSummary;
   pipelineAcceptanceSummary: ProjectListPipelineAcceptanceSummary;
   realSampleAcceptanceQueue: ProjectListRealSampleAcceptanceQueueItem[];
@@ -258,7 +258,7 @@ export interface ProjectListDashboard {
   items: ProjectListItem[];
 }
 
-export interface ProjectListPmFocus {
+export interface ProjectListQualityFocus {
   status: "empty" | "blocked" | "needs_action" | "ready";
   headline: string;
   detail: string;
@@ -794,7 +794,7 @@ function buildProjectListProductionClosure(input: {
   ];
 }
 
-function buildProjectListPmFocus(items: ProjectListItem[]): ProjectListPmFocus {
+function buildProjectListQualityFocus(items: ProjectListItem[]): ProjectListQualityFocus {
   const scopeLabel = `${platformDeliveryScope.statusLabel} · ${platformDeliveryScope.expansionLabel}`;
   if (items.length === 0) {
     return {
@@ -1358,7 +1358,7 @@ export function buildProjectListDashboard(
       watchProjects: items.filter((item) => item.riskLevel === "watch").length,
       blockedProjects: items.filter((item) => item.riskLevel === "blocked").length,
     },
-    pmFocus: buildProjectListPmFocus(items),
+    qualityFocus: buildProjectListQualityFocus(items),
     pipelineProofSummary: buildPipelineProofSummary(items),
     pipelineAcceptanceSummary: buildPipelineAcceptanceSummary(items),
     realSampleAcceptanceQueue: buildRealSampleAcceptanceQueue(items),

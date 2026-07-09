@@ -88,7 +88,7 @@ export interface FailureRepairLane {
   };
 }
 
-export interface FailureReviewPmFocus {
+export interface FailureReviewQualityFocus {
   tone: "blocked" | "watch" | "ready";
   resumePolicy: "hold_batch" | "sample_only" | "watch_resume";
   headline: string;
@@ -117,7 +117,7 @@ export interface FailureReviewCenter {
   projectGroups: FailureGroup[];
   runbookStep: FailureRepairRunbookStep;
   repairLanes: FailureRepairLane[];
-  pmFocus: FailureReviewPmFocus;
+  qualityFocus: FailureReviewQualityFocus;
   recentFailures: FailureReviewItem[];
   nextActions: string[];
 }
@@ -413,11 +413,11 @@ function nextActions(items: FailureReviewItem[], categoryGroups: FailureGroup[],
   return actions.slice(0, 5);
 }
 
-function buildFailureReviewPmFocus(
+function buildFailureReviewQualityFocus(
   unresolvedFailures: FailureReviewItem[],
   recoveredFailures: number,
   repairLanes: FailureRepairLane[],
-): FailureReviewPmFocus {
+): FailureReviewQualityFocus {
   const topLane = repairLanes[0];
   if (topLane) {
     const retryOnly = topLane.id === "retry_sample";
@@ -540,7 +540,7 @@ export function buildFailureReviewCenter(tasks: FailureReviewTask[]): FailureRev
     projectGroups,
     runbookStep,
     repairLanes,
-    pmFocus: buildFailureReviewPmFocus(unresolvedFailures, recoveredFailures, repairLanes),
+    qualityFocus: buildFailureReviewQualityFocus(unresolvedFailures, recoveredFailures, repairLanes),
     recentFailures: failures.slice(0, 12),
     nextActions: nextActions(unresolvedFailures, categoryGroups, providerGroups, recoveredFailures),
   };

@@ -38,11 +38,11 @@ import {
 } from "@/lib/projects/projectStartTactics";
 import { projectTemplates, type ProjectTemplate } from "@/lib/projects/projectTemplates";
 
-const lengthOptions: Array<{ id: LengthType; label: string; targetWordCount: number; pmRule: string }> = [
-  { id: "short_10k", label: "1 万字短篇", targetWordCount: 10000, pmRule: "短篇只留一个强钩子、一个核心反转和一个闭环结尾。" },
-  { id: "mid_50k", label: "5-6 万字中篇", targetWordCount: 60000, pmRule: "中篇必须有清晰人物弧光、三段主干和可控支线。" },
-  { id: "long_300k_plus", label: "30 万字以上长篇", targetWordCount: 300000, pmRule: "长篇先定开头结尾，再立主干、分支和阶段爽点。" },
-  { id: "mega_1m_plus", label: "100 万字以上超长篇", targetWordCount: 1000000, pmRule: "超长篇必须用大树结构管理主线、势力、地图和长期悬念。" },
+const lengthOptions: Array<{ id: LengthType; label: string; targetWordCount: number; qualityRule: string }> = [
+  { id: "short_10k", label: "1 万字短篇", targetWordCount: 10000, qualityRule: "短篇只留一个强钩子、一个核心反转和一个闭环结尾。" },
+  { id: "mid_50k", label: "5-6 万字中篇", targetWordCount: 60000, qualityRule: "中篇必须有清晰人物弧光、三段主干和可控支线。" },
+  { id: "long_300k_plus", label: "30 万字以上长篇", targetWordCount: 300000, qualityRule: "长篇先定开头结尾，再立主干、分支和阶段爽点。" },
+  { id: "mega_1m_plus", label: "100 万字以上超长篇", targetWordCount: 1000000, qualityRule: "超长篇必须用大树结构管理主线、势力、地图和长期悬念。" },
 ];
 
 function lengthOptionFor(id: LengthType) {
@@ -711,7 +711,7 @@ export function ProjectForm({
           </select>
           <input name="targetWordCount" type="hidden" value={targetWordCount} />
           <p className="mt-1 text-xs leading-5 text-slate-500">
-            主控闸门 篇幅口径：{selectedLengthOption.pmRule} 目标约 {selectedLengthOption.targetWordCount.toLocaleString("zh-CN")} 字。
+            主控闸门 篇幅口径：{selectedLengthOption.qualityRule} 目标约 {selectedLengthOption.targetWordCount.toLocaleString("zh-CN")} 字。
           </p>
         </div>
       </div>

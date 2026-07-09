@@ -5,8 +5,8 @@ export interface FinalDeliveryGateCloseoutInput {
   publishBlockedCount: number;
   dispatchActiveCount: number;
   aiOpenCount: number;
-  pmActionLabel: string;
-  pmActionHref: string;
+  qualityActionLabel: string;
+  qualityActionHref: string;
   dispatchNextAction?: string;
   taskNextAction?: string;
   deliveryActionLabel: string;
@@ -52,13 +52,13 @@ export function buildFinalDeliveryGateCloseout(input: FinalDeliveryGateCloseoutI
           : "等待总闸门复检";
 
   const nextCutLabel = input.publishBlockedCount > 0
-    ? input.pmActionLabel
+    ? input.qualityActionLabel
     : input.dispatchActiveCount > 0
       ? input.dispatchNextAction ?? "回派单中心收口"
       : input.taskNextAction ?? input.deliveryActionLabel ?? "进入最终交付";
 
   const primaryActionHref = input.publishBlockedCount > 0
-    ? input.pmActionHref
+    ? input.qualityActionHref
     : input.dispatchActiveCount > 0
       ? "/dispatch#dispatch-receipt-closeout"
       : input.aiOpenCount > 0

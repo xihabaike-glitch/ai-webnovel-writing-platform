@@ -19,6 +19,9 @@ if (!existsSync(".env") || !existsSync("node_modules")) {
   run(npmCommand, ["run", "setup"]);
 }
 
+console.log("正在同步本地数据库结构...");
+run(npmCommand, ["run", "db:init"]);
+
 if (!existsSync(".next")) {
   console.log("正在构建应用...");
   run(npmCommand, ["run", "build"]);

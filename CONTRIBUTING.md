@@ -24,11 +24,10 @@ Please include the user type, target platform, current workflow step, expected r
 - Explain user value.
 - Do not add new platforms without discussion.
 - Do not let AI overwrite accepted manuscript content.
-- Run relevant tests.
+- Run the build check before submitting.
 
 ## Local Checks
 
 ```bash
-npm test
 npm run build
 ```

@@ -18,7 +18,7 @@ import {
   buildModelRoleRouteBatchSavePlan,
   buildModelRoleRouteRecheckAdviceFromBatchPlan,
   type ModelRoleMatrix,
-  type ModelRoleMatrixPmFocusNotice,
+  type ModelRoleMatrixQualityFocusNotice,
   type ModelRoleRepairQueueItem,
   type ModelRoleRouteDraft,
   type ModelRoleRouteDraftItem,
@@ -551,7 +551,7 @@ const modelRoleStatusCopy: Record<ModelWritingRoleStatus, { label: string; class
   missing: { label: "缺岗位", className: "bg-rose-50 text-rose-700" },
 };
 
-const modelRolePmFocusToneCopy: Record<ModelRoleMatrixPmFocusNotice["tone"], { className: string; badgeClassName: string; label: string }> = {
+const modelRoleQualityFocusToneCopy: Record<ModelRoleMatrixQualityFocusNotice["tone"], { className: string; badgeClassName: string; label: string }> = {
   blocked: {
     className: "border-rose-200 bg-rose-50 text-rose-950",
     badgeClassName: "bg-white text-rose-700",
@@ -604,7 +604,7 @@ export function ModelProviderSettings({
   providerSetupWizard,
   modelSetupOnboarding,
   modelRoleMatrix,
-  modelRoleMatrixPmFocusNotice,
+  modelRoleMatrixQualityFocusNotice,
   modelRoleRepairQueue,
   modelRoleRouteDraft,
   firstDayRouteSummary,
@@ -631,7 +631,7 @@ export function ModelProviderSettings({
   providerSetupWizard: ProviderSetupWizardView;
   modelSetupOnboarding: ModelSetupOnboardingView;
   modelRoleMatrix: ModelRoleMatrix;
-  modelRoleMatrixPmFocusNotice: ModelRoleMatrixPmFocusNotice;
+  modelRoleMatrixQualityFocusNotice: ModelRoleMatrixQualityFocusNotice;
   modelRoleRepairQueue: ModelRoleRepairQueueItem[];
   modelRoleRouteDraft: ModelRoleRouteDraft;
   firstDayRouteSummary: FirstDayRouteSummaryView;
@@ -724,7 +724,7 @@ export function ModelProviderSettings({
     : modelRoleRouteDraft.summary.ready > 0
       ? "先保存职责路线"
       : "可以进入复检";
-  const modelRolePmFocusTone = modelRolePmFocusToneCopy[modelRoleMatrixPmFocusNotice.tone];
+  const modelRoleQualityFocusTone = modelRoleQualityFocusToneCopy[modelRoleMatrixQualityFocusNotice.tone];
   const latestRetestReviewByRuleKey = useMemo(() => {
     const reviewsByRuleKey = new Map<string, RouteAvoidanceGovernanceView["retestReview"]["items"][number]>();
     [...routeAvoidanceGovernance.retestReview.items]
@@ -1546,33 +1546,33 @@ export function ModelProviderSettings({
               </div>
             </div>
           </div>
-          <div className={`mt-4 -mx-4 border-y px-4 py-3 text-sm ${modelRolePmFocusTone.className}`}>
+          <div className={`mt-4 -mx-4 border-y px-4 py-3 text-sm ${modelRoleQualityFocusTone.className}`}>
             <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
               <div>
                 <div className="text-xs font-medium opacity-70">主控闸门 优先哨卡</div>
-                <div className="mt-1 font-medium">{modelRoleMatrixPmFocusNotice.headline}</div>
+                <div className="mt-1 font-medium">{modelRoleMatrixQualityFocusNotice.headline}</div>
               </div>
-              <span className={`w-fit rounded-md px-2 py-1 text-xs font-medium ${modelRolePmFocusTone.badgeClassName}`}>
-                {modelRolePmFocusTone.label}
+              <span className={`w-fit rounded-md px-2 py-1 text-xs font-medium ${modelRoleQualityFocusTone.badgeClassName}`}>
+                {modelRoleQualityFocusTone.label}
               </span>
             </div>
-            <p className="mt-2 leading-6">{modelRoleMatrixPmFocusNotice.reason}</p>
-            <p className="mt-1 text-xs leading-5 opacity-80">验收证据：{modelRoleMatrixPmFocusNotice.proof}</p>
+            <p className="mt-2 leading-6">{modelRoleMatrixQualityFocusNotice.reason}</p>
+            <p className="mt-1 text-xs leading-5 opacity-80">验收证据：{modelRoleMatrixQualityFocusNotice.proof}</p>
             <div className="mt-2 rounded-md bg-white/60 px-3 py-2 text-xs leading-5 text-slate-700">
-              {modelRoleMatrixPmFocusNotice.pipelineValidationHint}
+              {modelRoleMatrixQualityFocusNotice.pipelineValidationHint}
             </div>
             <div className="mt-3 flex flex-wrap gap-2">
               <a
                 className="inline-flex w-fit rounded-md bg-white px-3 py-2 text-xs font-medium text-slate-950 hover:bg-slate-100"
-                href={hrefWithGateReturn(modelRoleMatrixPmFocusNotice.actionHref, gateReturnHref)}
+                href={hrefWithGateReturn(modelRoleMatrixQualityFocusNotice.actionHref, gateReturnHref)}
               >
-                {modelRoleMatrixPmFocusNotice.actionLabel}
+                {modelRoleMatrixQualityFocusNotice.actionLabel}
               </a>
               <a
                 className="inline-flex w-fit rounded-md border border-white/60 px-3 py-2 text-xs font-medium text-slate-950 hover:bg-white/50"
-                href={hrefWithGateReturn(modelRoleMatrixPmFocusNotice.pipelineActionHref, gateReturnHref)}
+                href={hrefWithGateReturn(modelRoleMatrixQualityFocusNotice.pipelineActionHref, gateReturnHref)}
               >
-                {modelRoleMatrixPmFocusNotice.pipelineActionLabel}
+                {modelRoleMatrixQualityFocusNotice.pipelineActionLabel}
               </a>
             </div>
           </div>

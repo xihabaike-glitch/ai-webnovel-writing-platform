@@ -86,15 +86,15 @@ export default function DevelopmentDocsPage() {
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <div className="text-xs font-medium text-slate-300">主控闸门 开发文档焦点</div>
-            <h2 className="mt-1 text-lg font-semibold">{overview.pmFocus.headline}</h2>
-            <p className="mt-2 max-w-4xl text-sm leading-6 text-slate-200">{overview.pmFocus.detail}</p>
-            <p className="mt-2 text-xs leading-5 text-slate-400">验收证据：{overview.pmFocus.proof}</p>
+            <h2 className="mt-1 text-lg font-semibold">{overview.qualityFocus.headline}</h2>
+            <p className="mt-2 max-w-4xl text-sm leading-6 text-slate-200">{overview.qualityFocus.detail}</p>
+            <p className="mt-2 text-xs leading-5 text-slate-400">验收证据：{overview.qualityFocus.proof}</p>
           </div>
           <Link
             className="inline-flex w-fit shrink-0 rounded-md bg-white px-4 py-2 text-sm font-medium text-slate-950 hover:bg-slate-100"
-            href={overview.pmFocus.actionHref}
+            href={overview.qualityFocus.actionHref}
           >
-            {overview.pmFocus.actionLabel}
+            {overview.qualityFocus.actionLabel}
           </Link>
         </div>
       </section>
@@ -103,7 +103,7 @@ export default function DevelopmentDocsPage() {
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <h2 className="font-medium text-slate-950">{overview.deliveryAudit.headline}</h2>
-            <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-600">{overview.deliveryAudit.pmVerdict}</p>
+            <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-600">{overview.deliveryAudit.qualityVerdict}</p>
           </div>
           <div className="grid grid-cols-4 gap-2 text-center text-xs">
             <div className="rounded-md bg-slate-100 px-3 py-2">
@@ -172,7 +172,7 @@ export default function DevelopmentDocsPage() {
         <div className="mb-4 flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <h2 className="font-medium text-slate-950">{overview.requirementTraceability.headline}</h2>
-            <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-600">{overview.requirementTraceability.pmRule}</p>
+            <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-600">{overview.requirementTraceability.qualityRule}</p>
           </div>
           <Link className="w-fit rounded-md bg-slate-950 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800" href={overview.currentPipelineValidation.actionHref}>
             {overview.currentPipelineValidation.actionLabel}
@@ -205,7 +205,7 @@ export default function DevelopmentDocsPage() {
           <div>
             <div className="text-xs font-medium text-slate-300">最终验收闸门</div>
             <h2 className="mt-1 font-medium">{overview.finalAcceptanceGate.evidenceMatrix.title}</h2>
-            <p className="mt-1 max-w-4xl text-sm leading-6 text-slate-200">{overview.finalAcceptanceGate.evidenceMatrix.pmRule}</p>
+            <p className="mt-1 max-w-4xl text-sm leading-6 text-slate-200">{overview.finalAcceptanceGate.evidenceMatrix.qualityRule}</p>
           </div>
           <Link
             className="inline-flex w-fit shrink-0 rounded-md bg-white px-3 py-2 text-sm font-medium text-slate-950 hover:bg-slate-100"
@@ -255,7 +255,7 @@ export default function DevelopmentDocsPage() {
         <div className="mb-3 flex flex-col gap-2 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <h2 className="font-medium text-slate-950">{overview.pipelineProofRoute.headline}</h2>
-            <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-600">{overview.pipelineProofRoute.pmRule}</p>
+            <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-600">{overview.pipelineProofRoute.qualityRule}</p>
           </div>
           <Link className="w-fit rounded-md border border-slate-200 px-3 py-2 text-sm font-medium hover:bg-slate-50" href={overview.currentPipelineValidation.actionHref}>
             {overview.currentPipelineValidation.actionLabel}
@@ -291,7 +291,7 @@ export default function DevelopmentDocsPage() {
           <div>
             <div className="text-xs font-medium text-slate-300">观察项：写作到投稿流水线</div>
             <h2 className="mt-1 text-lg font-semibold">{overview.currentPipelineValidation.headline}</h2>
-            <p className="mt-2 max-w-4xl text-sm leading-6 text-slate-200">{overview.currentPipelineValidation.pmVerdict}</p>
+            <p className="mt-2 max-w-4xl text-sm leading-6 text-slate-200">{overview.currentPipelineValidation.qualityVerdict}</p>
             <div className="mt-2 text-xs text-slate-400">
               下一步：{overview.currentPipelineValidation.nextStepTitle}
             </div>
@@ -387,7 +387,7 @@ export default function DevelopmentDocsPage() {
         <div className="mb-3 flex flex-col gap-2 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <h2 className="font-medium text-slate-950">{overview.pipelineProofRoute.acceptanceReceipt.title}</h2>
-            <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-600">{overview.pipelineProofRoute.acceptanceReceipt.pmInstruction}</p>
+            <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-600">{overview.pipelineProofRoute.acceptanceReceipt.qualityInstruction}</p>
           </div>
           <div className="flex flex-wrap gap-2">
             {overview.pipelineProofRoute.acceptanceReceipt.outcomeOptions.map((option) => (
@@ -470,7 +470,7 @@ export default function DevelopmentDocsPage() {
               <h3 className="mt-1 font-medium text-slate-950">{step.name}</h3>
               <p className="mt-2 text-sm leading-6 text-slate-600">{step.productMeaning}</p>
               <div className="mt-3 rounded-md bg-white p-3 text-xs leading-5 text-slate-700">
-                主控闸门：{step.pmRule}
+                主控闸门：{step.qualityRule}
               </div>
             </article>
           ))}

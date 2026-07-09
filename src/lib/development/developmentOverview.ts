@@ -10,7 +10,7 @@ export interface DevelopmentOverviewModelInterface {
 }
 
 export interface DevelopmentOverviewSection {
-  id: "product_scope" | "writing_workflow" | "model_interfaces" | "platform_delivery" | "pm_gates";
+  id: "product_scope" | "writing_workflow" | "model_interfaces" | "platform_delivery" | "quality_gates";
   title: string;
   summary: string;
   evidenceItems: string[];
@@ -22,7 +22,7 @@ export interface DevelopmentOverviewTreeStep {
   id: "opening" | "ending" | "trunk" | "branches" | "leaves" | "soil";
   name: string;
   productMeaning: string;
-  pmRule: string;
+  qualityRule: string;
 }
 
 export interface DevelopmentOverviewAction {
@@ -42,7 +42,7 @@ export interface DevelopmentOverviewAuditItem {
     | "model_interfaces"
     | "ai_roles"
     | "writing_pipeline"
-    | "pm_gates";
+    | "quality_gates";
   title: string;
   status: DevelopmentOverviewAuditStatus;
   requirement: string;
@@ -53,7 +53,7 @@ export interface DevelopmentOverviewAuditItem {
 
 export interface DevelopmentOverviewDeliveryAudit {
   headline: string;
-  pmVerdict: string;
+  qualityVerdict: string;
   summary: {
     total: number;
     ready: number;
@@ -84,14 +84,14 @@ export interface DevelopmentOverviewPipelineReceiptField {
 
 export interface DevelopmentOverviewPipelineAcceptanceReceipt {
   title: string;
-  pmInstruction: string;
+  qualityInstruction: string;
   outcomeOptions: Array<"pass" | "repair" | "hold_batch">;
   fields: DevelopmentOverviewPipelineReceiptField[];
 }
 
 export interface DevelopmentOverviewPipelineProofRoute {
   headline: string;
-  pmRule: string;
+  qualityRule: string;
   steps: DevelopmentOverviewPipelineProofStep[];
   acceptanceReceipt: DevelopmentOverviewPipelineAcceptanceReceipt;
 }
@@ -99,7 +99,7 @@ export interface DevelopmentOverviewPipelineProofRoute {
 export interface DevelopmentOverviewCurrentPipelineValidation {
   watchItemId: "writing_pipeline";
   headline: string;
-  pmVerdict: string;
+  qualityVerdict: string;
   nextStepId: DevelopmentOverviewPipelineProofStep["id"];
   nextStepTitle: string;
   requiredEvidence: string[];
@@ -145,7 +145,7 @@ export interface DevelopmentOverviewRequirementTraceItem {
 
 export interface DevelopmentOverviewRequirementTraceability {
   headline: string;
-  pmRule: string;
+  qualityRule: string;
   items: DevelopmentOverviewRequirementTraceItem[];
 }
 
@@ -163,7 +163,7 @@ export interface DevelopmentOverviewFinalAcceptanceEvidenceItem {
 
 export interface DevelopmentOverviewFinalAcceptanceEvidenceMatrix {
   title: string;
-  pmRule: string;
+  qualityRule: string;
   items: DevelopmentOverviewFinalAcceptanceEvidenceItem[];
 }
 
@@ -191,7 +191,7 @@ export interface DevelopmentOverviewFinalAcceptanceGate {
 
 export interface DevelopmentOverviewFinalDeliveryArchive {
   title: string;
-  pmRule: string;
+  qualityRule: string;
   closeoutSignals: string[];
   reuseTargets: Array<{
     id: "release_package" | "dispatch_receipts" | "task_receipts" | "platform_experience";
@@ -205,7 +205,7 @@ export interface DevelopmentOverviewFinalDeliveryArchive {
 export interface DevelopmentOverview {
   referenceCount: number;
   platformScope: typeof platformDeliveryScope;
-  pmFocus: {
+  qualityFocus: {
     headline: string;
     detail: string;
     proof: string;
@@ -268,37 +268,37 @@ const treeWorkflow: DevelopmentOverviewTreeStep[] = [
     id: "opening",
     name: "开头：抓人钩子",
     productMeaning: "先判断读者为什么愿意继续看，尤其是番茄、知乎盐选和 Wattpad 的开场情绪。",
-    pmRule: "没有钩子就别批量写，第一章必须能证明读者会往下滑。",
+    qualityRule: "没有钩子就别批量写，第一章必须能证明读者会往下滑。",
   },
   {
     id: "ending",
     name: "结尾：回收承诺",
     productMeaning: "先定终局、情绪偿还和主角变化，避免长篇写到后面散架。",
-    pmRule: "结尾不是摆设，是主干和分支的验收标准。",
+    qualityRule: "结尾不是摆设，是主干和分支的验收标准。",
   },
   {
     id: "trunk",
     name: "主干：长期推进",
     productMeaning: "主线、卷结构、升级体系、关系推进和阶段 Boss 共同组成长篇骨架。",
-    pmRule: "主干不清，起点、Royal Road 这类长线平台一定会掉。",
+    qualityRule: "主干不清，起点、Royal Road 这类长线平台一定会掉。",
   },
   {
     id: "branches",
     name: "分支：支线与人物弧光",
     productMeaning: "人物弧光、支线事件、伏笔链和情感线从主干生长出来。",
-    pmRule: "分支必须服务主线，不允许为了热闹乱开坑。",
+    qualityRule: "分支必须服务主线，不允许为了热闹乱开坑。",
   },
   {
     id: "leaves",
     name: "叶片：章节内容填充",
     productMeaning: "每章的爽点、冲突、章末悬念、台词和细节都属于叶片。",
-    pmRule: "叶片可以多，但每片都要给读者即时反馈。",
+    qualityRule: "叶片可以多，但每片都要给读者即时反馈。",
   },
   {
     id: "soil",
     name: "土壤：设定与素材",
     productMeaning: "世界观、平台规则、历史章节、素材来源和复盘经验为模型提供上下文。",
-    pmRule: "土壤不够，模型就会胡写；土壤必须能被召回、审计和复用。",
+    qualityRule: "土壤不够，模型就会胡写；土壤必须能被召回、审计和复用。",
   },
 ];
 
@@ -336,7 +336,7 @@ const docSections: DevelopmentOverviewSection[] = [
     href: "/references",
   },
   {
-    id: "pm_gates",
+    id: "quality_gates",
     title: "主控闸门 闸门",
     summary: "每个关键中心都必须回答下一步、风险、验收证据和不能做什么，避免产品变成漂亮但不能交付的展示页。",
     evidenceItems: ["总闸门、任务中心、失败复盘和参考库已经有 验收焦点卡。", "批量生产必须经过样本、复查、失败修复和恢复观察。"],
@@ -410,7 +410,7 @@ const deliveryAuditItems: DevelopmentOverviewAuditItem[] = [
     href: "/projects#pipeline-projects",
   },
   {
-    id: "pm_gates",
+    id: "quality_gates",
     title: "主控闸门 闸门",
     status: "ready",
     requirement: "按照产品验收闸门路径，所有批量生产前必须有样本、复查、失败修复和可点击下一步。",
@@ -430,7 +430,7 @@ function buildDeliveryAudit(): DevelopmentOverviewDeliveryAudit {
 
   return {
     headline: "原始需求交付验收清单",
-    pmVerdict: `${summary.ready}/${summary.total} 项已覆盖，${summary.watch} 项观察中；剩余 10 个平台不再添加，下一步验真实作品流水线。`,
+    qualityVerdict: `${summary.ready}/${summary.total} 项已覆盖，${summary.watch} 项观察中；剩余 10 个平台不再添加，下一步验真实作品流水线。`,
     summary,
     items: deliveryAuditItems,
   };
@@ -547,11 +547,11 @@ const pipelineReceiptFields: DevelopmentOverviewPipelineReceiptField[] = [
 function buildPipelineProofRoute(): DevelopmentOverviewPipelineProofRoute {
   return {
     headline: "写作到投稿流水线验收路线",
-    pmRule: "按这 6 步验真实作品样本；不跳过人工采用，不用新增平台掩盖流水线问题。",
+    qualityRule: "按这 6 步验真实作品样本；不跳过人工采用，不用新增平台掩盖流水线问题。",
     steps: pipelineProofSteps,
     acceptanceReceipt: {
       title: "流水线验收回执模板",
-      pmInstruction: "每一步都要填证据、通过信号、退回原因和负责人确认；证据不够就退回修复，不允许用口头感觉放行。",
+      qualityInstruction: "每一步都要填证据、通过信号、退回原因和负责人确认；证据不够就退回修复，不允许用口头感觉放行。",
       outcomeOptions: ["pass", "repair", "hold_batch"],
       fields: pipelineReceiptFields,
     },
@@ -564,7 +564,7 @@ function buildCurrentPipelineValidation(): DevelopmentOverviewCurrentPipelineVal
   return {
     watchItemId: "writing_pipeline",
     headline: "真实作品流水线验收单",
-    pmVerdict: "写作到投稿流水线仍在观察中；首章样本回执已能写回总闸门，下一步先复检样本证据，再决定修复、继续小样本或暂停批量。",
+    qualityVerdict: "写作到投稿流水线仍在观察中；首章样本回执已能写回总闸门，下一步先复检样本证据，再决定修复、继续小样本或暂停批量。",
     nextStepId: nextStep.id,
     nextStepTitle: nextStep.title,
     requiredEvidence: [
@@ -654,7 +654,7 @@ function buildCurrentPipelineValidation(): DevelopmentOverviewCurrentPipelineVal
 function buildRequirementTraceability(): DevelopmentOverviewRequirementTraceability {
   return {
     headline: "原始需求追踪矩阵",
-    pmRule: "逐条对照原始要求、当前产品证据和可验收信号；没有证据的要求不能靠口头说完成。",
+    qualityRule: "逐条对照原始要求、当前产品证据和可验收信号；没有证据的要求不能靠口头说完成。",
     items: [
       {
         id: "reference_30",
@@ -803,7 +803,7 @@ function buildFinalAcceptanceEvidenceMatrix(
 ): DevelopmentOverviewFinalAcceptanceEvidenceMatrix {
   return {
     title: "原始需求最终验收矩阵",
-    pmRule: "每条原始需求都必须有证据链接、验收状态、缺口和下一步；没有证据链接，就不要说完成。",
+    qualityRule: "每条原始需求都必须有证据链接、验收状态、缺口和下一步；没有证据链接，就不要说完成。",
     items: requirementTraceability.items.map((item) => {
       const meta = finalAcceptanceMeta[item.id];
 
@@ -854,7 +854,7 @@ function buildFinalAcceptanceGate(
 function buildFinalDeliveryArchive(): DevelopmentOverviewFinalDeliveryArchive {
   return {
     title: "最终交付归档复用",
-    pmRule: "交付不是结束，是下一本书的土壤。最终放行后必须把发布包、派单回执、AI 任务回执和平台经验沉淀成可复用入口。",
+    qualityRule: "交付不是结束，是下一本书的土壤。最终放行后必须把发布包、派单回执、AI 任务回执和平台经验沉淀成可复用入口。",
     closeoutSignals: [
       "最终交付正式放行卡证明本轮可以交付。",
       "派单回执证明人工角色、验收依据和下一步都已闭环。",
@@ -902,7 +902,7 @@ export function buildDevelopmentOverview(): DevelopmentOverview {
   return {
     referenceCount: openSourceReferenceCases.length,
     platformScope: platformDeliveryScope,
-    pmFocus: {
+    qualityFocus: {
       headline: "开发文档先收束，别再加戏。",
       detail: "当前重点是把写作、投稿、复盘三段闭环解释清楚，并让每个入口都能回到真实作品生产；剩余 10 个平台不再添加。",
       proof: `${platformDeliveryScope.statusLabel}；${openSourceReferenceCases.length} 个开源参考案例已沉淀；4 个模型已进入模型岗位矩阵并接入缺岗闸门。`,

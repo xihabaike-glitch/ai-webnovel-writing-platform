@@ -135,7 +135,7 @@ export interface WritingWorkbenchPathItem {
   quickFix: WritingWorkbenchQuickFix | null;
 }
 
-export interface WritingWorkbenchPmFocus {
+export interface WritingWorkbenchQualityFocus {
   status: "blocked" | "needs_action" | "ready";
   headline: string;
   detail: string;
@@ -157,7 +157,7 @@ export interface WritingWorkbench {
     href: string;
     reason: string;
   };
-  pmFocus: WritingWorkbenchPmFocus;
+  qualityFocus: WritingWorkbenchQualityFocus;
   treeBlocks: WritingWorkbenchTreeBlock[];
   writingPath: WritingWorkbenchPathItem[];
   chapterFocus: {
@@ -643,10 +643,10 @@ function buildHeroAction(
   };
 }
 
-function buildWritingWorkbenchPmFocus(
+function buildWritingWorkbenchQualityFocus(
   heroAction: WritingWorkbench["heroAction"],
   maturityScore: number,
-): WritingWorkbenchPmFocus {
+): WritingWorkbenchQualityFocus {
   const status = maturityScore < 70
     ? "blocked"
     : maturityScore < 85
@@ -1331,7 +1331,7 @@ export function buildWritingWorkbench(input: WritingWorkbenchInput): WritingWork
       oneLineBrief: `${input.project.genre}｜${input.project.sellingPoint}`,
     },
     heroAction,
-    pmFocus: buildWritingWorkbenchPmFocus(heroAction, maturityScore),
+    qualityFocus: buildWritingWorkbenchQualityFocus(heroAction, maturityScore),
     treeBlocks,
     writingPath: buildWritingPath(input, treeBlocks, quickFixes, nextChapter),
     chapterFocus: {

@@ -769,11 +769,11 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <div className="text-xs font-medium text-slate-300">主控闸门 当前只派这一单</div>
-            <h2 className="mt-1 text-lg font-semibold">{queue.pmFocus.headline}</h2>
-            <p className="mt-2 max-w-4xl text-sm leading-6 text-slate-200">{queue.pmFocus.detail}</p>
-            <div className="mt-2 text-xs text-slate-400">{queue.pmFocus.scopeLabel}</div>
+            <h2 className="mt-1 text-lg font-semibold">{queue.qualityFocus.headline}</h2>
+            <p className="mt-2 max-w-4xl text-sm leading-6 text-slate-200">{queue.qualityFocus.detail}</p>
+            <div className="mt-2 text-xs text-slate-400">{queue.qualityFocus.scopeLabel}</div>
             <div className="mt-2 rounded-md bg-white/10 px-3 py-2 text-xs leading-5 text-slate-200">
-              {queue.pmFocus.pipelineValidationHint}
+              {queue.qualityFocus.pipelineValidationHint}
             </div>
             <div className="mt-3 rounded-md border border-white/15 bg-white/5 p-3">
               <div className="text-xs font-medium text-slate-300">任务回执验收口径</div>
@@ -816,11 +816,11 @@ export default async function TasksPage({ searchParams }: { searchParams?: Promi
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Link className="w-fit rounded-md bg-white px-3 py-2 text-sm font-medium text-slate-950 hover:bg-slate-100" href={hrefWithGateReturn(queue.pmFocus.actionHref, gateReturn)}>
-              {queue.pmFocus.actionLabel}
+            <Link className="w-fit rounded-md bg-white px-3 py-2 text-sm font-medium text-slate-950 hover:bg-slate-100" href={hrefWithGateReturn(queue.qualityFocus.actionHref, gateReturn)}>
+              {queue.qualityFocus.actionLabel}
             </Link>
-            <Link className="w-fit rounded-md border border-white/25 px-3 py-2 text-sm font-medium text-white hover:bg-white/10" href={hrefWithGateReturn(queue.pmFocus.pipelineActionHref, gateReturn)}>
-              {queue.pmFocus.pipelineActionLabel}
+            <Link className="w-fit rounded-md border border-white/25 px-3 py-2 text-sm font-medium text-white hover:bg-white/10" href={hrefWithGateReturn(queue.qualityFocus.pipelineActionHref, gateReturn)}>
+              {queue.qualityFocus.pipelineActionLabel}
             </Link>
           </div>
         </div>

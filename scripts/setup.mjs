@@ -36,7 +36,7 @@ function ensureDependencies() {
 
 function ensureNodeVersion() {
   const major = Number.parseInt(process.versions.node.split(".")[0] ?? "0", 10);
-  if (major >= 20) return;
+  if (major >= 22) return;
 
   console.error("当前 Node.js 版本过低。请安装 Node.js 22 LTS 后重试。");
   process.exit(1);

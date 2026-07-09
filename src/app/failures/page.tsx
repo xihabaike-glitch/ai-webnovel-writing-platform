@@ -95,7 +95,7 @@ function resumeScaleDecisionClass(tone: "allow" | "watch" | "block") {
   return "border-amber-200 bg-white/80 text-amber-950";
 }
 
-function pmFocusBadgeClass(tone: "blocked" | "watch" | "ready") {
+function qualityFocusBadgeClass(tone: "blocked" | "watch" | "ready") {
   if (tone === "ready") return "bg-emerald-100 text-emerald-950";
   if (tone === "watch") return "bg-amber-100 text-amber-950";
   return "bg-rose-100 text-rose-950";
@@ -433,11 +433,11 @@ export default async function FailuresPage({
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <div className="text-xs font-medium text-slate-300">主控闸门 失败修复焦点</div>
-            <h2 className="mt-1 text-lg font-semibold">{center.pmFocus.headline}</h2>
-            <p className="mt-2 max-w-4xl text-sm leading-6 text-slate-200">{center.pmFocus.detail}</p>
-            <p className="mt-2 text-xs leading-5 text-slate-400">验收证据：{center.pmFocus.proof}</p>
+            <h2 className="mt-1 text-lg font-semibold">{center.qualityFocus.headline}</h2>
+            <p className="mt-2 max-w-4xl text-sm leading-6 text-slate-200">{center.qualityFocus.detail}</p>
+            <p className="mt-2 text-xs leading-5 text-slate-400">验收证据：{center.qualityFocus.proof}</p>
             <div className="mt-2 rounded-md bg-white/10 px-3 py-2 text-xs leading-5 text-slate-200">
-              {center.pmFocus.pipelineValidationHint}
+              {center.qualityFocus.pipelineValidationHint}
             </div>
             <div className="mt-3 rounded-md border border-white/15 bg-white/5 p-3 text-xs leading-5 text-slate-200">
               <div className="font-medium text-white">失败修复实跑手册 · {center.runbookStep.title}</div>
@@ -459,20 +459,20 @@ export default async function FailuresPage({
             </div>
           </div>
           <div className="flex shrink-0 flex-col gap-2">
-            <span className={`w-fit rounded-md px-2 py-1 text-xs font-medium ${pmFocusBadgeClass(center.pmFocus.tone)}`}>
-              {center.pmFocus.resumePolicy === "hold_batch" ? "暂停批量" : center.pmFocus.resumePolicy === "sample_only" ? "只跑样本" : "观察恢复"}
+            <span className={`w-fit rounded-md px-2 py-1 text-xs font-medium ${qualityFocusBadgeClass(center.qualityFocus.tone)}`}>
+              {center.qualityFocus.resumePolicy === "hold_batch" ? "暂停批量" : center.qualityFocus.resumePolicy === "sample_only" ? "只跑样本" : "观察恢复"}
             </span>
             <Link
               className="inline-flex w-fit rounded-md bg-white px-4 py-2 text-sm font-medium text-slate-950 hover:bg-slate-100"
-              href={hrefWithGateReturn(center.pmFocus.actionHref, gateReturn)}
+              href={hrefWithGateReturn(center.qualityFocus.actionHref, gateReturn)}
             >
-              {center.pmFocus.actionLabel}
+              {center.qualityFocus.actionLabel}
             </Link>
             <Link
               className="inline-flex w-fit rounded-md border border-white/25 px-4 py-2 text-sm font-medium text-white hover:bg-white/10"
-              href={hrefWithGateReturn(center.pmFocus.pipelineActionHref, gateReturn)}
+              href={hrefWithGateReturn(center.qualityFocus.pipelineActionHref, gateReturn)}
             >
-              {center.pmFocus.pipelineActionLabel}
+              {center.qualityFocus.pipelineActionLabel}
             </Link>
           </div>
         </div>

@@ -870,7 +870,7 @@ export interface PlatformFinalDeliveryHandoff {
   platformId: PlatformId | null;
   platformName: string;
   headline: string;
-  pmVerdict: string;
+  qualityVerdict: string;
   actionLabel: string;
   actionHref: string;
   doneCount: number;
@@ -4975,7 +4975,7 @@ function buildPlatformFinalDeliveryHandoff(
     : checklist.status === "blocked"
       ? `${platformName} 最终交付交接包有硬阻塞。`
       : `${platformName} 最终交付交接包还差 ${gapCount} 项。`;
-  const pmVerdict = checklist.status === "ready"
+  const qualityVerdict = checklist.status === "ready"
     ? "可以回总闸门做最终放行判断，但仍需保留 6 项回执证据。"
     : nextGap
       ? `不能交付，先处理 ${nextGap.label}：${nextGap.actionLabel}。`
@@ -4996,7 +4996,7 @@ function buildPlatformFinalDeliveryHandoff(
     platformId: pack?.platformId ?? null,
     platformName,
     headline,
-    pmVerdict,
+    qualityVerdict,
     actionLabel: checklist.status === "ready" ? "回总闸门终检" : nextGap?.actionLabel ?? "补最终交付证据",
     actionHref: checklist.status === "ready" ? finalDeliveryGateHref : nextGap?.actionHref ?? "#platform-export",
     doneCount: checklist.doneCount,
@@ -5008,7 +5008,7 @@ function buildPlatformFinalDeliveryHandoff(
       `完成项：${checklist.doneCount}/${checklist.totalCount}`,
       `缺口数：${gapCount}`,
       `策略裁决：${strategyVerdict.headline}`,
-      `验收判定：${pmVerdict}`,
+      `验收判定：${qualityVerdict}`,
     ],
   };
 }

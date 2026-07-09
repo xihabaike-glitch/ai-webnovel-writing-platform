@@ -577,7 +577,7 @@ interface PlatformFinalDeliveryHandoff {
   platformId: string | null;
   platformName: string;
   headline: string;
-  pmVerdict: string;
+  qualityVerdict: string;
   actionLabel: string;
   actionHref: string;
   doneCount: number;
@@ -3066,7 +3066,7 @@ export function PlatformExportCenterPanel({
                 <div>
                   <div className="text-xs font-medium text-slate-500">最终交付交接包</div>
                   <h3 className="mt-1 font-medium text-slate-950">{center.finalDeliveryHandoff.headline}</h3>
-                  <p className="mt-1 text-sm leading-6 text-slate-600">{center.finalDeliveryHandoff.pmVerdict}</p>
+                  <p className="mt-1 text-sm leading-6 text-slate-600">{center.finalDeliveryHandoff.qualityVerdict}</p>
                 </div>
                 <a
                   className="w-fit rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white hover:bg-slate-800"

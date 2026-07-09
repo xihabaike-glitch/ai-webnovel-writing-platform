@@ -270,12 +270,12 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps) 
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <div className="text-xs font-medium text-slate-300">主控闸门 当前只看这一件事</div>
-            <h2 className="mt-1 text-lg font-semibold">{dashboard.pmFocus.headline}</h2>
-            <p className="mt-2 max-w-4xl text-sm leading-6 text-slate-200">{dashboard.pmFocus.detail}</p>
-            <div className="mt-2 text-xs text-slate-400">{dashboard.pmFocus.scopeLabel}</div>
+            <h2 className="mt-1 text-lg font-semibold">{dashboard.qualityFocus.headline}</h2>
+            <p className="mt-2 max-w-4xl text-sm leading-6 text-slate-200">{dashboard.qualityFocus.detail}</p>
+            <div className="mt-2 text-xs text-slate-400">{dashboard.qualityFocus.scopeLabel}</div>
           </div>
-          <Link className="w-fit rounded-md bg-white px-3 py-2 text-sm font-medium text-slate-950 hover:bg-slate-100" href={hrefWithGateReturn(dashboard.pmFocus.actionHref, gateReturn)}>
-            {dashboard.pmFocus.actionLabel}
+          <Link className="w-fit rounded-md bg-white px-3 py-2 text-sm font-medium text-slate-950 hover:bg-slate-100" href={hrefWithGateReturn(dashboard.qualityFocus.actionHref, gateReturn)}>
+            {dashboard.qualityFocus.actionLabel}
           </Link>
         </div>
       </section>

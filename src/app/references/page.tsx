@@ -75,14 +75,14 @@ export default async function ReferencesPage({ searchParams }: ReferencesPagePro
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <div className="text-xs font-medium text-slate-300">主控闸门 平台范围回答</div>
-            <h2 className="mt-1 text-lg font-semibold">{view.platformScope.pmFocus.headline}</h2>
-            <p className="mt-2 max-w-4xl text-sm leading-6 text-slate-200">{view.platformScope.pmFocus.detail}</p>
+            <h2 className="mt-1 text-lg font-semibold">{view.platformScope.qualityFocus.headline}</h2>
+            <p className="mt-2 max-w-4xl text-sm leading-6 text-slate-200">{view.platformScope.qualityFocus.detail}</p>
           </div>
           <Link
             className="inline-flex w-fit shrink-0 rounded-md bg-white px-4 py-2 text-sm font-medium text-slate-950 hover:bg-slate-100"
-            href={view.platformScope.pmFocus.actionHref}
+            href={view.platformScope.qualityFocus.actionHref}
           >
-            {view.platformScope.pmFocus.actionLabel}
+            {view.platformScope.qualityFocus.actionLabel}
           </Link>
         </div>
       </section>
@@ -174,7 +174,7 @@ export default async function ReferencesPage({ searchParams }: ReferencesPagePro
         <div className="rounded-md border border-slate-200 bg-white p-4">
           <div className="mb-3 font-medium text-slate-950">主控闸门 结论</div>
           <div className="grid gap-2">
-            {view.productManagerNotes.map((note, index) => (
+            {view.acceptanceNotes.map((note, index) => (
               <div className="rounded-md bg-slate-50 p-3 text-sm leading-6 text-slate-700" key={note}>
                 <span className="mr-2 font-semibold text-slate-950">{index + 1}.</span>
                 {note}
@@ -207,14 +207,14 @@ export default async function ReferencesPage({ searchParams }: ReferencesPagePro
         </div>
         <div className="mb-3 rounded-md border border-slate-900 bg-slate-950 p-4 text-white">
           <div className="text-xs text-slate-300">当前优先哨卡</div>
-          <div className="mt-1 font-medium">{view.pmNextFocus.headline}</div>
-          <p className="mt-2 text-sm leading-6 text-slate-200">{view.pmNextFocus.reason}</p>
-          <p className="mt-1 text-xs leading-5 text-slate-300">验收证据：{view.pmNextFocus.proof}</p>
+          <div className="mt-1 font-medium">{view.qualityNextFocus.headline}</div>
+          <p className="mt-2 text-sm leading-6 text-slate-200">{view.qualityNextFocus.reason}</p>
+          <p className="mt-1 text-xs leading-5 text-slate-300">验收证据：{view.qualityNextFocus.proof}</p>
           <Link
             className="mt-3 inline-flex w-fit rounded-md bg-white px-3 py-2 text-xs font-medium text-slate-950 hover:bg-slate-100"
-            href={view.pmNextFocus.href}
+            href={view.qualityNextFocus.href}
           >
-            {view.pmNextFocus.actionLabel}
+            {view.qualityNextFocus.actionLabel}
           </Link>
         </div>
         <div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-4">
@@ -236,9 +236,9 @@ export default async function ReferencesPage({ searchParams }: ReferencesPagePro
               </div>
               <div className="mt-3 rounded-md border border-slate-200 bg-white p-3 text-xs leading-5 text-slate-600">
                 <div className="font-medium text-slate-900">主控闸门 哨卡</div>
-                <div className="mt-2">风险：{item.pmCheckpoint.risk}</div>
-                <div>必须交付：{item.pmCheckpoint.mustShip}</div>
-                <div>验收证据：{item.pmCheckpoint.proof}</div>
+                <div className="mt-2">风险：{item.qualityCheckpoint.risk}</div>
+                <div>必须交付：{item.qualityCheckpoint.mustShip}</div>
+                <div>验收证据：{item.qualityCheckpoint.proof}</div>
               </div>
               <div className="mt-3 flex flex-wrap gap-1">
                 {item.roleSummaries.map((role) => (
@@ -251,7 +251,7 @@ export default async function ReferencesPage({ searchParams }: ReferencesPagePro
                 className="mt-3 inline-flex w-fit rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white hover:bg-slate-800"
                 href={item.href}
               >
-                {item.pmCheckpoint.actionLabel}
+                {item.qualityCheckpoint.actionLabel}
               </Link>
             </article>
           ))}

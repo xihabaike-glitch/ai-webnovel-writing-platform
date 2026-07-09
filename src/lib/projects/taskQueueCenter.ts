@@ -218,12 +218,12 @@ export interface TaskQueueCenter {
     roleClosureTasks: number;
     platformReadiness: TaskQueuePlatformReadinessSummary;
   };
-  pmFocus: TaskQueuePmFocus;
+  qualityFocus: TaskQueueQualityFocus;
   items: QueueItem[];
   recommendedNext: QueueItem | null;
 }
 
-export interface TaskQueuePmFocus {
+export interface TaskQueueQualityFocus {
   status: "empty" | "blocked" | "ready";
   headline: string;
   detail: string;
@@ -351,7 +351,7 @@ function buildTaskQueuePlatformReadinessSummary(
   };
 }
 
-function buildTaskQueuePmFocus(recommendedNext: QueueItem | null): TaskQueuePmFocus {
+function buildTaskQueueQualityFocus(recommendedNext: QueueItem | null): TaskQueueQualityFocus {
   const scopeLabel = `${platformDeliveryScope.statusLabel} · ${platformDeliveryScope.expansionLabel}`;
   if (!recommendedNext) {
     return {
@@ -2308,7 +2308,7 @@ export function buildTaskQueueCenter(projects: TaskQueueProject[]): TaskQueueCen
       roleClosureTasks: items.filter((entry) => entry.sourceType === "role_closure").length,
       platformReadiness: buildTaskQueuePlatformReadinessSummary(platformReadinessSummaries),
     },
-    pmFocus: buildTaskQueuePmFocus(recommendedNext),
+    qualityFocus: buildTaskQueueQualityFocus(recommendedNext),
     items,
     recommendedNext,
   };

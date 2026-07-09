@@ -204,7 +204,7 @@ export interface PrePublishGateFinalDeliveryGate {
 export interface PrePublishGateFinalDeliveryRelease {
   status: "ready" | "blocked" | "empty";
   headline: string;
-  pmVerdict: string;
+  qualityVerdict: string;
   actionLabel: string;
   actionHref: string;
   projectCount: number;
@@ -514,7 +514,7 @@ export interface PrePublishGate {
   archiveExperienceRecheck: PrePublishGateArchiveExperienceRecheck;
   priorityActions: PrePublishGateAction[];
   releaseAction: PrePublishGateAction | null;
-  pmFocus: PrePublishGatePmFocus;
+  qualityFocus: PrePublishGateQualityFocus;
   realPipelineFinalReview: PrePublishGateRealPipelineFinalReview;
   finalDeliveryRelease: PrePublishGateFinalDeliveryRelease;
   finalDeliveryPlatformTacticArchives: PrePublishGateFinalDeliveryPlatformTacticArchiveCard[];
@@ -547,7 +547,7 @@ export interface PrePublishGateRealPipelineFinalReview {
   holdBatchSignals: string[];
 }
 
-export interface PrePublishGatePmFocus {
+export interface PrePublishGateQualityFocus {
   status: "empty" | "blocked" | "review" | "ready";
   headline: string;
   detail: string;
@@ -1976,10 +1976,10 @@ function buildReleaseAction(
   };
 }
 
-function buildPrePublishGatePmFocus(
+function buildPrePublishGateQualityFocus(
   status: PrePublishGate["status"],
   releaseAction: PrePublishGateAction | null,
-): PrePublishGatePmFocus {
+): PrePublishGateQualityFocus {
   const scopeLabel = `${platformDeliveryScope.statusLabel} · ${platformDeliveryScope.expansionLabel}`;
   if (!releaseAction) {
     return {
@@ -2149,7 +2149,7 @@ function buildFinalDeliveryRelease(input: {
       : status === "empty"
         ? "最终交付等待可发布项目"
         : "最终交付仍未正式放行",
-    pmVerdict: status === "ready"
+    qualityVerdict: status === "ready"
       ? `可以交付。${scopePrefix}6 项最终交付回执、真实流水线终检和总闸门状态已经对齐。`
       : firstBlocker
         ? `不能交付。先处理 ${firstBlocker.projectTitle}：${firstBlocker.finalDeliveryGate.detail}`
@@ -3463,7 +3463,7 @@ export function buildPrePublishGate(input: PrePublishGateInput): PrePublishGate 
     archiveExperienceRecheck,
     priorityActions,
     releaseAction,
-    pmFocus: buildPrePublishGatePmFocus(status, releaseAction),
+    qualityFocus: buildPrePublishGateQualityFocus(status, releaseAction),
     realPipelineFinalReview,
     finalDeliveryRelease,
     finalDeliveryPlatformTacticArchives,

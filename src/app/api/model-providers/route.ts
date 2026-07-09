@@ -12,7 +12,7 @@ import {
   providerRequiresApiKey,
 } from "@/lib/model-gateway/providerCredentialSecurity";
 import { providerOptions } from "@/lib/model-gateway/providerDefaults";
-import { loadModelProviderById, loadModelProviders } from "@/lib/model-gateway/providerStore";
+import { loadModelProviderById, loadModelProviders } from "@/lib/model-gateway/providerStore.server";
 import { saveModelProviderSchema } from "@/lib/validators/modelProvider";
 
 function maskProvider(provider: {

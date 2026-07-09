@@ -9,7 +9,7 @@ import { providerInterfaceContracts, providerModelPresets, providerOptions } fro
 import { buildProviderHealthDashboard } from "@/lib/model-gateway/providerHealth";
 import { buildProviderSetupGuide } from "@/lib/model-gateway/providerSetupGuide";
 import { buildProviderSetupWizard } from "@/lib/model-gateway/providerSetupWizard";
-import { loadModelProviders } from "@/lib/model-gateway/providerStore";
+import { loadModelProviders } from "@/lib/model-gateway/providerStore.server";
 import { buildRouteEffectAudit } from "@/lib/model-gateway/routeEffectAudit";
 import {
   buildRouteConfirmationHistory,

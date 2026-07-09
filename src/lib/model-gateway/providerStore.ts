@@ -1,10 +1,5 @@
 import type { ModelProvider } from "@prisma/client";
-import { prisma } from "../db/prisma.ts";
 import { CredentialCryptoError, migrateStoredApiKey } from "./credentialCrypto.ts";
-
-if (typeof window !== "undefined") {
-  throw new Error("providerStore may only be imported by server code.");
-}
 
 export interface ProviderStoreDatabase {
   modelProvider: {
@@ -16,8 +11,6 @@ export interface ProviderStoreDatabase {
     }): Promise<{ count: number }>;
   };
 }
-
-const defaultDatabase = prisma as unknown as ProviderStoreDatabase;
 
 async function migrateProviderCredential(
   provider: ModelProvider,
@@ -48,7 +41,7 @@ async function migrateProviderCredential(
   }
 }
 
-export async function loadModelProviders(database: ProviderStoreDatabase = defaultDatabase) {
+export async function loadModelProviders(database: ProviderStoreDatabase) {
   const providers = await database.modelProvider.findMany({
     orderBy: { updatedAt: "desc" },
   });
@@ -58,7 +51,7 @@ export async function loadModelProviders(database: ProviderStoreDatabase = defau
 
 export async function loadModelProviderById(
   id: string,
-  database: ProviderStoreDatabase = defaultDatabase,
+  database: ProviderStoreDatabase,
 ) {
   const provider = await database.modelProvider.findUnique({ where: { id } });
   return provider ? migrateProviderCredential(provider, database) : null;

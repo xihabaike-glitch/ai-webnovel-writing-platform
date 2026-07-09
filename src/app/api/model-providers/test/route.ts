@@ -10,7 +10,7 @@ import {
   providerRequiresApiKey,
 } from "@/lib/model-gateway/providerCredentialSecurity";
 import { testModelProviderConnection } from "@/lib/model-gateway/providerConnection";
-import { loadModelProviderById } from "@/lib/model-gateway/providerStore";
+import { loadModelProviderById } from "@/lib/model-gateway/providerStore.server";
 import { testModelProviderSchema } from "@/lib/validators/modelProvider";
 
 export async function POST(request: Request) {

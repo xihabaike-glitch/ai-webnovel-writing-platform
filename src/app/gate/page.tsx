@@ -344,6 +344,7 @@ export default async function GatePage({
     failureTasks: recentTasksWithChapter,
     batchHistory: buildTaskBatchHistory(recentTasksWithChapter),
     modelRoleBlocker: modelRolePriorityBlocker,
+    focusedProjectId: projectId ?? undefined,
   });
   const finalDeliveryDispatchCloseout = buildGateDispatchTaskCenter(
     allGateDispatchRecords.map(gatePlatformDispatchTaskFromRecord),

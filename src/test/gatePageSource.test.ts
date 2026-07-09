@@ -21,6 +21,7 @@ test("gate page forwards action recheck focus params", () => {
   assert.ok(source.includes("const finalDeliveryFocus = Array.isArray(params?.finalDeliveryFocus) ? params?.finalDeliveryFocus[0] : params?.finalDeliveryFocus ?? null"));
   assert.ok(source.includes("if (source) params.set(\"source\", source);"));
   assert.ok(source.includes("if (finalDeliveryFocus) params.set(\"finalDeliveryFocus\", finalDeliveryFocus);"));
+  assert.ok(source.includes("focusedProjectId: projectId ?? undefined"));
   assert.ok(source.includes("buildPrePublishGateFocusNotice({ focus, projectId, actionId, gate })"));
   assert.ok(source.includes("id=\"gate-focus-notice\""));
 });

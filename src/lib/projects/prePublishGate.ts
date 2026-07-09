@@ -676,6 +676,7 @@ export interface PrePublishGateInput {
   batchHistory?: TaskBatchHistoryItem[];
   batchStrategyId?: BatchExecutionStrategyId | string;
   modelRoleBlocker?: ModelRoleMatrixPriorityBlocker | null;
+  focusedProjectId?: string | null;
 }
 
 function prePublishGateActionMatchesProject(action: PrePublishGateAction, projectId: string) {
@@ -2098,6 +2099,7 @@ function buildFinalDeliveryRelease(input: {
   finalReview: PrePublishGateRealPipelineFinalReview;
   finalDeliveryCandidates: PrePublishGateProjectStatus[];
   finalDeliveryBlockers: PrePublishGateProjectStatus[];
+  focusedProjectId?: string | null;
 }): PrePublishGateFinalDeliveryRelease {
   const completedReceiptCount = input.finalDeliveryCandidates.reduce(
     (sum, project) => sum + project.finalDeliveryGate.completedCount,
@@ -2105,6 +2107,12 @@ function buildFinalDeliveryRelease(input: {
   );
   const firstBlocker = input.finalDeliveryBlockers[0] ?? null;
   const archiveExperienceHold = input.finalReview.holdBatchSignals.find((line) => line.includes("归档经验")) ?? null;
+  const focusedProject = input.focusedProjectId
+    ? input.finalDeliveryCandidates.find((project) => project.projectId === input.focusedProjectId)
+      ?? input.finalDeliveryBlockers.find((project) => project.projectId === input.focusedProjectId)
+      ?? null
+    : null;
+  const scopePrefix = focusedProject ? `${focusedProject.projectTitle}：` : "";
   const status: PrePublishGateFinalDeliveryRelease["status"] = input.finalDeliveryCandidates.length === 0
     ? "empty"
     : input.gateStatus === "ready" && input.finalReview.outcome === "pass" && input.finalDeliveryBlockers.length === 0
@@ -2122,7 +2130,7 @@ function buildFinalDeliveryRelease(input: {
         ? "最终交付等待可发布项目"
         : "最终交付仍未正式放行",
     pmVerdict: status === "ready"
-      ? "可以交付。6 项最终交付回执、真实流水线终检和总闸门状态已经对齐。"
+      ? `可以交付。${scopePrefix}6 项最终交付回执、真实流水线终检和总闸门状态已经对齐。`
       : firstBlocker
         ? `不能交付。先处理 ${firstBlocker.projectTitle}：${firstBlocker.finalDeliveryGate.detail}`
         : archiveExperienceHold
@@ -3304,27 +3312,49 @@ export function buildPrePublishGate(input: PrePublishGateInput): PrePublishGate 
       .map((project) => action(`export:${project.projectId}`, "导出平台发布包", `${project.projectTitle} · ${project.platformName} 已通过发布质检。`, project.href, "primary")),
   ].filter((item): item is PrePublishGateAction => Boolean(item)));
   const releaseAction = buildReleaseAction(status, projectStatuses, priorityActions);
+  const focusedProjectStatuses = input.focusedProjectId
+    ? projectStatuses.filter((project) => project.projectId === input.focusedProjectId)
+    : [];
+  const finalReviewProjectStatuses = focusedProjectStatuses.length > 0 ? focusedProjectStatuses : projectStatuses;
+  const finalReviewReadyPackages = finalReviewProjectStatuses.filter((project) => project.status === "ready").length;
+  const finalReviewRepairPackages = finalReviewProjectStatuses.filter((project) => project.status === "needs_repair").length;
+  const finalReviewEmptyProjects = finalReviewProjectStatuses.filter((project) => project.status === "empty").length;
+  const finalReviewAcceptanceBlockers = finalReviewProjectStatuses.filter((project) => project.acceptanceSheetGate.status === "block");
+  const finalReviewAcceptanceWarnings = finalReviewProjectStatuses.filter((project) => project.acceptanceSheetGate.status === "warn");
+  const finalReviewFinalDeliveryCandidates = finalReviewProjectStatuses.filter((project) => project.status === "ready");
+  const finalReviewFinalDeliveryBlockers = finalReviewFinalDeliveryCandidates.filter((project) => project.finalDeliveryGate.status === "block");
+  const finalReviewStatus: PrePublishGate["status"] = input.modelRoleBlocker?.tone === "blocked"
+    || archiveExperienceBlocker
+    || failedTasks > 0
+    || finalReviewReadyPackages === 0
+    || finalReviewAcceptanceBlockers.length > 0
+    || finalReviewFinalDeliveryBlockers.length > 0
+      ? "blocked"
+      : finalReviewRepairPackages > 0 || finalReviewEmptyProjects > 0 || finalReviewAcceptanceWarnings.length > 0
+        ? "needs_repair"
+        : "ready";
   const realPipelineFinalReview = buildRealPipelineFinalReview({
-    status,
+    status: finalReviewStatus,
     releaseAction,
     modelRoleBlocker: input.modelRoleBlocker,
-    projectStatuses,
-    readyPackages,
-    repairPackages,
-    emptyProjects,
+    projectStatuses: finalReviewProjectStatuses,
+    readyPackages: finalReviewReadyPackages,
+    repairPackages: finalReviewRepairPackages,
+    emptyProjects: finalReviewEmptyProjects,
     taskBlockers,
     failedTasks,
-    acceptanceBlockers,
-    acceptanceWarnings,
-    finalDeliveryBlockers,
+    acceptanceBlockers: finalReviewAcceptanceBlockers,
+    acceptanceWarnings: finalReviewAcceptanceWarnings,
+    finalDeliveryBlockers: finalReviewFinalDeliveryBlockers,
     archiveExperienceBlocker,
     failureRepairBatch,
   });
   const finalDeliveryRelease = buildFinalDeliveryRelease({
-    gateStatus: status,
+    gateStatus: finalReviewStatus,
     finalReview: realPipelineFinalReview,
-    finalDeliveryCandidates,
-    finalDeliveryBlockers,
+    finalDeliveryCandidates: finalReviewFinalDeliveryCandidates,
+    finalDeliveryBlockers: finalReviewFinalDeliveryBlockers,
+    focusedProjectId: input.focusedProjectId,
   });
   const archiveExperienceRecheck = buildArchiveExperienceRecheck(projects);
 

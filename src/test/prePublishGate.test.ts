@@ -292,6 +292,37 @@ test("buildPrePublishGate", async (t) => {
     assert.ok(gate.realPipelineFinalReview.repairSignals.some((line) => line.includes("最终交付")));
   });
 
+  await t.test("focuses the formal release card on the requested project", () => {
+    const focusedReadyProject = {
+      ...readyProject,
+      id: "project-focused-ready",
+      title: "聚焦可交付项目",
+      gateDispatchTasks: firstDayCompleteDispatches("project-focused-ready"),
+      gateActionAudits: finalDeliveryAudits("project-focused-ready"),
+    };
+    const unrelatedFinalDeliveryBlocker = {
+      ...readyProject,
+      id: "project-unrelated-blocker",
+      title: "旁路缺回执项目",
+      gateDispatchTasks: firstDayCompleteDispatches("project-unrelated-blocker"),
+      gateActionAudits: [],
+    };
+    const gate = buildPrePublishGate({
+      projects: [focusedReadyProject, unrelatedFinalDeliveryBlocker],
+      failureTasks: [],
+      batchHistory: [],
+      focusedProjectId: "project-focused-ready",
+    });
+
+    assert.equal(gate.finalDeliveryRelease.status, "ready");
+    assert.equal(gate.finalDeliveryRelease.projectCount, 1);
+    assert.equal(gate.finalDeliveryRelease.completedReceiptCount, 6);
+    assert.ok(gate.finalDeliveryRelease.pmVerdict.includes("聚焦可交付项目"));
+    assert.ok(gate.finalDeliveryRelease.evidence.some((line) => line.includes("聚焦可交付项目")));
+    assert.equal(gate.finalDeliveryRelease.evidence.some((line) => line.includes("旁路缺回执项目")), false);
+    assert.equal(gate.realPipelineFinalReview.repairSignals.some((line) => line.includes("旁路缺回执项目")), false);
+  });
+
   await t.test("blocks formal release when writing tasks lack archive experience receipts", () => {
     const gate = buildPrePublishGate({
       projects: [{

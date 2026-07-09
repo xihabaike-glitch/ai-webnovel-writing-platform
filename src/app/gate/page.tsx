@@ -651,6 +651,48 @@ export default async function GatePage({
               ))}
             </ul>
           </div>
+          {gate.finalDeliveryPlatformTacticArchives.length ? (
+            <div className="mt-3 grid gap-3" aria-label="平台打法归档卡">
+              {gate.finalDeliveryPlatformTacticArchives.map((archive) => (
+                <div className="rounded-md border border-emerald-200 bg-white/80 p-3 text-xs leading-5 text-emerald-950" key={`${archive.projectId}:${archive.platformId}`}>
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                      <div className="font-medium">平台打法归档卡 · {archive.platformName}</div>
+                      <div className="mt-1 text-slate-700">{archive.projectTitle} · {archive.label}</div>
+                      <p className="mt-1 text-slate-600">{archive.detail}</p>
+                    </div>
+                    {archive.status === "reusable" ? (
+                      <Link className="w-fit rounded-md bg-emerald-950 px-3 py-2 text-xs font-medium text-white hover:bg-emerald-900" href={hrefWithGateReturn(archive.reuseHref, gateRecheckReturnHref)}>
+                        用这条打法开新书
+                      </Link>
+                    ) : (
+                      <Link className="w-fit rounded-md border border-emerald-200 bg-white px-3 py-2 text-xs font-medium text-emerald-900 hover:bg-emerald-50" href={hrefWithGateReturn(archive.repairHref, gateRecheckReturnHref)}>
+                        补归档证据
+                      </Link>
+                    )}
+                  </div>
+                  <div className="mt-2 grid gap-2 md:grid-cols-2">
+                    <div className="rounded-md bg-emerald-50 p-2">
+                      <div className="font-medium">复用打法</div>
+                      <p className="mt-1">{archive.openingHook}</p>
+                      <p className="mt-1">{archive.firstThreePromise}</p>
+                      <p className="mt-1">{archive.packagingTactic}</p>
+                      <p className="mt-1">{archive.verificationAction}</p>
+                    </div>
+                    <div className="rounded-md bg-amber-50 p-2 text-amber-950">
+                      <div className="font-medium">停手线</div>
+                      <p className="mt-1">{archive.stopLine}</p>
+                    </div>
+                  </div>
+                  <ul className="mt-2 space-y-1 rounded-md bg-slate-50 p-2 text-slate-700">
+                    {archive.evidence.map((line) => (
+                      <li key={line}>{line}</li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
+          ) : null}
         </div>
       </section>
 

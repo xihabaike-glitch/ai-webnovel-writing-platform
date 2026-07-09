@@ -174,6 +174,15 @@ test("gate page keeps the formal release verdict visible before it is ready", ()
   assert.ok(source.includes("gate.finalDeliveryRelease.status === \"ready\" ? \"正式放行证据\" : \"未放行依据\""));
 });
 
+test("gate page renders final delivery platform tactic archive cards", () => {
+  assert.ok(source.includes("gate.finalDeliveryPlatformTacticArchives"));
+  assert.ok(source.includes("平台打法归档卡"));
+  assert.ok(source.includes("用这条打法开新书"));
+  assert.ok(source.includes("archive.reuseHref"));
+  assert.ok(source.includes("archive.stopLine"));
+  assert.ok(source.includes("archive.evidence.map"));
+});
+
 test("gate page renders action recheck summary feedback", () => {
   assert.ok(source.includes("GateRecheckDispatchButton"));
   assert.ok(source.includes("focusNotice.recheckSummary"));

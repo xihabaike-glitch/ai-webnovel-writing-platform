@@ -371,6 +371,18 @@ test("buildGateActionReceipt", async (t) => {
     assert.equal(summary.executionTypes[0]?.type, "first_three_adoption");
   });
 
+  await t.test("points first-three adoption fallback receipts to the focused gate recheck", () => {
+    const receipt = buildGateFirstThreeAdoptionReceipt({
+      mode: "batch_review",
+      items: [],
+      results: [],
+      now: "2026-01-01T00:00:00.000Z",
+    });
+
+    assert.equal(receipt.href, "/gate?focus=action-recheck&source=first-three-adoption#first-three-adoption-closure");
+    assert.equal(receipt.recheck.actionLabel, "刷新总闸门");
+  });
+
   await t.test("records failed first-three adoption batch receipts", () => {
     const receipt = buildGateFirstThreeAdoptionReceipt({
       mode: "batch_review",

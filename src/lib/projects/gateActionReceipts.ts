@@ -14,6 +14,8 @@ export const gateActionReceiptStorageKey = "ai-webnovel-gate-action-receipts";
 export const gateActionReceiptUpdatedEvent = "ai-webnovel-gate-action-receipts-updated";
 export const defaultGateActionReceiptLimit = 20;
 const platformTacticExperienceRecheckHref = "/gate?focus=action-recheck&source=platform-tactic-experience#platform-tactic-experience";
+const firstThreeAdoptionRecheckHref =
+  "/gate?focus=action-recheck&source=first-three-adoption#first-three-adoption-closure";
 
 function normalizePlatformTacticExperienceHref(href?: string | null) {
   if (!href || href === "/gate#platform-tactic-experience") return platformTacticExperienceRecheckHref;
@@ -2957,7 +2959,7 @@ export function buildGateFirstThreeAdoptionReceipt(input: {
     actionId: `first-three-adoption:${input.mode}`,
     label: modeLabel,
     detail: `${detailTarget} · 采纳后正文变更闭环`,
-    href: firstItem?.href ?? "/gate#first-three-adoption-closure",
+    href: firstItem?.href ?? firstThreeAdoptionRecheckHref,
     status: failedCount > 0 ? "failed" : "succeeded",
     message,
     executionType: "first_three_adoption",

@@ -1,70 +1,134 @@
 # AI Webnovel Writing Platform
 
-面向网文作者的 AI 写作生产平台：用大树结构管理作品，用 Claude、DeepSeek、Kimi、GPT 组成 AI 编辑部，从开书、首章样本、审稿二改、派单回执到总闸门和发布包，跑通可验收的网文创作流水线。
+让 AI 像编辑部一样协作，让作者像主编一样掌控网文生产。
 
-AI 网文写作平台不是“一键生成小说”的聊天玩具，而是一个面向作者和工作室的写作生产系统。传统写作工作台负责作品、章节、大纲、人物、世界观、伏笔和发布包；AI 模型负责候选稿、审稿、补强、改写、资料整理、平台适配和任务回执；毒舌 PM 闸门负责拦住没有证据的批量生产。
+Open-source AI writing workspace for serious webnovel creators.
 
-## GitHub 简介
+AI Webnovel Writing Platform 是一个面向网文创作者的开源 AI 写作生产平台。它不是普通 AI 聊天框，也不是一键生成小说工具，而是把大树结构、平台打法、AI 编辑部、任务回执、失败修复和投稿包放进同一条可验收创作流水线。
 
-**Short description**
+## Why This Exists
 
-AI webnovel writing platform for structured long-form fiction, platform-specific writing workflows, multi-model editorial roles, PM gates, dispatch receipts, and submission packages.
+现在很多 AI 写作工具都停在“帮我写一段”。
 
-**中文简介**
+但真正的网文创作不是一次生成，而是一条长期生产线：
 
-一个专为网文作者设计的 AI 写作工作台，帮助作者从选平台、定篇幅、搭大纲树、写章节、审稿、二改、派单、失败修复到导出投稿，完成可持续、可验收、可复盘的连载生产流程。
+选平台 → 定卖点 → 搭结构 → 写首章 → 审稿 → 二改 → 人工采用 → 小样本验证 → 失败修复 → 扩写 → 投稿包 → 数据复盘。
 
-**核心亮点**
+所以这个项目不把 AI 放在中心，而是把作品放在中心。AI 是编辑部成员，作者才是主编。
 
-- 大树写作法：开头、结尾、主干、分支、叶片、土壤分层管理。
-- 8 个核心平台：起点中文网、番茄小说、七猫、晋江文学城、知乎盐选、WebNovel、Royal Road、Wattpad。
-- AI 编辑部：Claude、DeepSeek、Kimi、GPT 和 OpenAI-compatible 模型按岗位协作。
-- 作者可控：AI 输出默认是候选稿或回执，不能直接覆盖正文。
-- 毒舌 PM 闸门：没有样本、复查、失败修复和发布包证据，不允许批量生产。
+## Core Features
 
-## 当前交付口径
+- Story Tree First：先写开头和结尾，再写主干、分支、叶片和土壤。
+- Platform-Aware Writing：围绕 8 个核心平台组织开头、篇幅、标签、卖点、投稿包和复盘指标。
+- AI Editorial Team：Claude、DeepSeek、Kimi、GPT 和 OpenAI-compatible 模型按岗位协作。
+- Author-Controlled Draft Flow：AI 输出默认是候选稿、审稿意见、二改版本或任务回执，不能直接覆盖正文。
+- Dispatch Receipts：每个任务都记录角色、输入、输出、人工验收和下一步。
+- PM Gate：没有样本、复查、失败修复和发布包证据，不允许扩大批量。
+- Failure Recovery：按模型配置、提示词上下文、样本重试和人工复盘拆解失败原因。
+- Submission Packages：从标题、简介、标签、样章、卖点、版本基线到真实反馈形成闭环。
 
-- `/`：毒舌 PM 交付入口，直达“验收真实流水线”。
-- `/docs`：开发文档总览，汇总 PM 路线、8 平台范围、模型接口和流水线验收口径。
+## Supported Platforms
+
+- 起点中文网
+- 番茄小说
+- 七猫
+- 晋江文学城
+- 知乎盐选
+- WebNovel
+- Royal Road
+- Wattpad
+
+The platform scope is intentionally locked to these eight channels. The next priority is improving writing, submission, and review loops, not adding more platforms.
+
+## Product Map
+
+- `/`：毒舌 PM 交付入口，直达真实流水线验收。
+- `/docs`：开发文档总览。
 - `/projects`：作品工作台，承载开书、大树结构、章节、人物、世界观、伏笔、首日流程、前三章改写和平台发布包。
-- `/tasks`：任务中心，集中处理跨项目草稿、审稿、二改、导出、投稿修复和批量节奏。
+- `/projects/[projectId]`：单本作品总控页。
+- `/tasks`：任务中心，处理跨项目草稿、审稿、二改、导出、投稿修复和批量节奏。
 - `/dispatch`：派单中心，把模型执行、角色任务、完成证据和人工验收串起来。
-- `/gate`：总闸门，负责批量生产前的样本、复查、失败率、成本和恢复证据检查。
-- `/failures`：失败修复中心，按模型配置、提示词上下文、样本重试和人工复盘拆分修复泳道。
-- `/references`：开源参考库，沉淀 30+ GitHub 案例、AI 编辑部角色和平台执行卡。
-- `/settings/models`：模型设置，承接 Claude / DeepSeek / Kimi / GPT、OpenAI-compatible、模型岗位矩阵、职责路由和推荐批次缺岗硬拦截后的修复入口。
+- `/gate`：总闸门，检查样本、复查、失败率、成本和恢复证据。
+- `/failures`：失败修复中心。
+- `/references`：30+ GitHub 案例、AI 编辑部角色和平台执行卡。
+- `/settings/models`：Claude、DeepSeek、Kimi、GPT、OpenAI-compatible 和模型岗位矩阵。
 
-平台范围已经锁定：8/8 核心平台已完成，覆盖起点中文网、番茄小说、七猫、晋江文学城、知乎盐选、WebNovel、Royal Road、Wattpad；剩余 10 个平台不再添加。
-
-## 端到端可见验收口径地图
-
-- `/projects`：承接开书、发布包与平台复盘验收口径，发布包必须看到平台包、样章、标签、卖点、版本基线、真实反馈和复盘指标。
-- `/tasks`：承接任务回执验收口径，每个推荐任务都要看到执行角色、输入、输出、人工验收和下一步。
-- `/dispatch`：承接派单回执验收口径，完成派单前必须补完成依据，回总闸门时才有可复检证据。
-- `/gate`：承接放量复检和派单证据总控，缺样本、复查、质量、成本、失败率或恢复证据时禁止放大。
-- `/failures`：承接失败修复回执验收口径，固定检查失败原因、修复泳道、重试样本、恢复观察和是否暂停批量。
-
-## 本地运行
+## Quick Start
 
 ```bash
 npm install
 npm run dev
 ```
 
-常用验证：
+Open:
+
+```txt
+http://localhost:3000
+```
+
+Useful checks:
 
 ```bash
 npm test
 npm run build
 ```
 
-开发时优先证明真实作品流水线：开书骨架、首章样本、审稿二改、派单回执、模型岗位矩阵、职责路由、总闸门、失败修复、发布包和平台复盘。不要把“新增平台”当作进度。
+Seed local data when needed:
+
+```bash
+npm run db:seed
+```
+
+## Recommended Workflow
+
+1. Create a project in `/projects`.
+2. Choose target platform and length.
+3. Build the story tree: hook, ending promise, trunk, branches, leaves, and soil.
+4. Prepare characters, worldbuilding, foreshadows, and chapter cards.
+5. Run one first-chapter sample before batch production.
+6. Review, rewrite, and manually accept or reject AI candidates.
+7. Record dispatch receipts in `/dispatch`.
+8. Recheck production readiness in `/gate`.
+9. Repair failures in `/failures`.
+10. Build submission packages and review feedback in `/projects`.
+
+## Community
+
+社群名称：AI 网文创作实验室。
+
+这是给网文作者、AI 写作产品开发者、剧情策划、提示词玩家和内容创业者的开源实验社群。我们会围绕首章钩子拆解、平台打法共建、AI 编辑部提示词、失败样本复盘、投稿包互评和 7 天 AI 网文首章样本挑战进行共创。
+
+See `docs/COMMUNITY.md` and `docs/LAUNCH_PLAN.md`.
+
+## Contributing
+
+欢迎贡献：
+
+- 平台规则和真实经验。
+- 写作模板和首章样本。
+- AI 编辑部提示词。
+- 失败复盘。
+- 文档改进。
+- Bug 修复和产品功能。
+
+Start with `CONTRIBUTING.md`.
+
+## Roadmap
+
+See `ROADMAP.md`.
 
 ## Documents
 
-- `docs/USAGE.md`: 产品使用说明
-- `docs/GITHUB_INTRO.md`: GitHub 简介、仓库描述和推广文案素材
-- `docs/ai-writing-platform-dev-doc.md`: 项目梳理、竞品参考与整体开发文档
-- `docs/PRD.md`: 产品需求文档
-- `docs/TECHNICAL_DESIGN.md`: 技术设计文档
-- `docs/superpowers/plans/2026-07-01-ai-writing-platform-mvp.md`: MVP 实施计划
+- `docs/USAGE.md`：产品使用说明。
+- `docs/POSITIONING.md`：项目定位与独特价值。
+- `docs/COMMUNITY.md`：社群说明。
+- `docs/LAUNCH_PLAN.md`：发布计划。
+- `docs/PRESS_KIT.md`：对外发布文案素材。
+- `docs/GITHUB_INTRO.md`：GitHub 简介和 Topics 素材。
+- `docs/ai-writing-platform-dev-doc.md`：项目梳理、竞品参考与整体开发文档。
+- `docs/PRD.md`：产品需求文档。
+- `docs/TECHNICAL_DESIGN.md`：技术设计文档。
+
+## License
+
+License information will follow the repository owner’s open-source release decision.

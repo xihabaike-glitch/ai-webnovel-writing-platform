@@ -1,6 +1,6 @@
 ---
 name: Writing workflow
-about: Share a real sample workflow, first-chapter challenge, or failure retrospective
+about: Share a real sample workflow or failure retrospective
 title: "[Workflow] "
 labels: writing-workflow
 ---
@@ -17,4 +17,4 @@ labels: writing-workflow
 
 ## 失败点或复盘
 
-## 希望社区帮助什么
+## 希望项目改进什么

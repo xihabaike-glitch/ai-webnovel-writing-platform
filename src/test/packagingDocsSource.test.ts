@@ -9,9 +9,6 @@ test("open source packaging docs exist", () => {
     "CONTRIBUTING.md",
     "ROADMAP.md",
     "docs/POSITIONING.md",
-    "docs/COMMUNITY.md",
-    "docs/LAUNCH_PLAN.md",
-    "docs/PRESS_KIT.md",
     "docs/GITHUB_INTRO.md",
     "LICENSE",
     ".github/ISSUE_TEMPLATE/bug_report.md",
@@ -33,22 +30,17 @@ test("readme presents the public open source positioning", () => {
   assert.ok(readme.includes("cp .env.example .env"));
   assert.ok(readme.includes("npm run db:seed"));
   assert.ok(readme.includes("本地 SQLite"));
-  assert.ok(readme.includes("## Community"));
   assert.ok(readme.includes("## Contributing"));
   assert.ok(readme.includes("MIT License"));
 });
 
-test("positioning and press kit explain the unique value", () => {
+test("positioning explains the unique value", () => {
   const positioning = read("docs/POSITIONING.md");
-  const pressKit = read("docs/PRESS_KIT.md");
 
   assert.ok(positioning.includes("普通 AI 写作工具解决“帮我写一段”"));
   assert.ok(positioning.includes("传统小说软件解决“帮我管理章节”"));
   assert.ok(positioning.includes("通用 Agent 平台解决“帮我编排模型”"));
   assert.ok(positioning.includes("一条可持续生产流水线"));
-  assert.ok(pressKit.includes("GitHub Release 文案"));
-  assert.ok(pressKit.includes("社群招募短文"));
-  assert.ok(pressKit.includes("7 天 AI 网文首章样本挑战"));
 });
 
 test("github intro and license are ready for public release", () => {
@@ -58,7 +50,6 @@ test("github intro and license are ready for public release", () => {
   assert.ok(intro.includes("GitHub About Description"));
   assert.ok(intro.includes("推荐 Topics"));
   assert.ok(intro.includes("docs/POSITIONING.md"));
-  assert.ok(intro.includes("docs/PRESS_KIT.md"));
   assert.ok(license.includes("MIT License"));
   assert.ok(license.includes("Copyright (c) 2026 xihabaike-glitch"));
 });
@@ -76,18 +67,15 @@ test("quick start docs include fresh clone bootstrap steps", () => {
   }
 });
 
-test("community and roadmap describe creator participation", () => {
-  const community = read("docs/COMMUNITY.md");
+test("roadmap describes product progress without community operations", () => {
   const roadmap = read("ROADMAP.md");
 
-  assert.ok(community.includes("AI 网文创作实验室"));
-  assert.ok(community.includes("首章钩子拆解"));
-  assert.ok(community.includes("平台打法共建"));
-  assert.ok(community.includes("失败样本复盘"));
   assert.ok(roadmap.includes("Phase 1"));
   assert.ok(roadmap.includes("Phase 2"));
   assert.ok(roadmap.includes("Phase 3"));
   assert.ok(roadmap.includes("Phase 4"));
+  assert.ok(roadmap.includes("Platform Template Quality"));
+  assert.ok(roadmap.includes("Product Extensibility"));
 });
 
 test("usage guide is detailed enough for first-run creators", () => {

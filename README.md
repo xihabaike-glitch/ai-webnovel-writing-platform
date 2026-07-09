@@ -98,14 +98,6 @@ npm run build
 9. Repair failures in `/failures`.
 10. Build submission packages and review feedback in `/projects`.
 
-## Community
-
-社群名称：AI 网文创作实验室。
-
-这是给网文作者、AI 写作产品开发者、剧情策划、提示词玩家和内容创业者的开源实验社群。我们会围绕首章钩子拆解、平台打法共建、AI 编辑部提示词、失败样本复盘、投稿包互评和 7 天 AI 网文首章样本挑战进行共创。
-
-See `docs/COMMUNITY.md` and `docs/LAUNCH_PLAN.md`.
-
 ## Contributing
 
 欢迎贡献：
@@ -127,9 +119,6 @@ See `ROADMAP.md`.
 
 - `docs/USAGE.md`：产品使用说明。
 - `docs/POSITIONING.md`：项目定位与独特价值。
-- `docs/COMMUNITY.md`：社群说明。
-- `docs/LAUNCH_PLAN.md`：发布计划。
-- `docs/PRESS_KIT.md`：对外发布文案素材。
 - `docs/GITHUB_INTRO.md`：GitHub 简介和 Topics 素材。
 - `docs/ai-writing-platform-dev-doc.md`：项目梳理、竞品参考与整体开发文档。
 - `docs/PRD.md`：产品需求文档。

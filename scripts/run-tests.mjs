@@ -77,7 +77,14 @@ export function discoverTestFiles({ cwd = process.cwd() } = {}) {
 }
 
 export function testCommandArgs(files) {
-  return ["--import", "tsx", "--test", ...files];
+  return [
+    "--import",
+    "tsx",
+    "--import",
+    "./scripts/register-test-loader.mjs",
+    "--test",
+    ...files,
+  ];
 }
 
 export function runTestFiles(files, { cwd = process.cwd(), runNode = spawnSync } = {}) {

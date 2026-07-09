@@ -48,6 +48,8 @@ test("test runner passes filenames with spaces as individual Node arguments", ()
   assert.deepEqual(testCommandArgs(files), [
     "--import",
     "tsx",
+    "--import",
+    "./scripts/register-test-loader.mjs",
     "--test",
     "scripts/a test.test.ts",
     "src/features/b test.test.ts",

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { worldEntryTypes, type WorldEntryType } from "@/lib/projects/worldBible";
 
 interface WorldBibleEntry {
@@ -73,7 +73,7 @@ export function WorldBiblePanel({ projectId }: { projectId: string }) {
     [dashboard, editingId],
   );
 
-  async function loadWorldEntries() {
+  const loadWorldEntries = useCallback(async () => {
     setIsLoading(true);
     setMessage(null);
     try {
@@ -92,7 +92,7 @@ export function WorldBiblePanel({ projectId }: { projectId: string }) {
     } finally {
       setIsLoading(false);
     }
-  }
+  }, [projectId]);
 
   async function createEntry() {
     setIsSaving(true);
@@ -183,7 +183,7 @@ export function WorldBiblePanel({ projectId }: { projectId: string }) {
 
   useEffect(() => {
     void loadWorldEntries();
-  }, [projectId]);
+  }, [loadWorldEntries]);
 
   return (
     <section className="rounded-md border border-slate-200 bg-white p-4">

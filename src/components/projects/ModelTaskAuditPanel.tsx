@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import { RetryTaskButton } from "@/components/tasks/RetryTaskButton";
 
@@ -255,7 +255,7 @@ export function ModelTaskAuditPanel({
     aiBudgetEnforcement: "block" as "off" | "warn" | "block",
   });
 
-  async function loadAudit() {
+  const loadAudit = useCallback(async () => {
     setIsLoading(true);
     setMessage(null);
     try {
@@ -277,11 +277,11 @@ export function ModelTaskAuditPanel({
     } finally {
       setIsLoading(false);
     }
-  }
+  }, [projectId]);
 
   useEffect(() => {
     void loadAudit();
-  }, [projectId]);
+  }, [loadAudit]);
 
   async function saveBudget(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 interface ChapterProductionItem {
   id: string;
@@ -110,7 +110,7 @@ export function ChapterProductionPanel({
   const [repairDrafts, setRepairDrafts] = useState<Record<string, Record<string, string>>>({});
   const [message, setMessage] = useState<string | null>(null);
 
-  async function loadSchedule() {
+  const loadSchedule = useCallback(async () => {
     setIsLoading(true);
     setMessage(null);
     try {
@@ -130,7 +130,7 @@ export function ChapterProductionPanel({
     } finally {
       setIsLoading(false);
     }
-  }
+  }, [projectId]);
 
   function updateRepairDraft(fixId: string, field: string, value: string) {
     setRepairDrafts((current) => ({
@@ -187,7 +187,7 @@ export function ChapterProductionPanel({
 
   useEffect(() => {
     void loadSchedule();
-  }, [projectId]);
+  }, [loadSchedule]);
 
   const dashboard = schedule?.dashboard;
 

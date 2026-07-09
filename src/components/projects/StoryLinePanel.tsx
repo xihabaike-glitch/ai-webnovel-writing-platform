@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 interface ChapterOption {
   id: string;
@@ -89,7 +89,7 @@ export function StoryLinePanel({ projectId }: { projectId: string }) {
   const [isSaving, setIsSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
-  async function loadStoryLines() {
+  const loadStoryLines = useCallback(async () => {
     setIsLoading(true);
     setMessage(null);
     try {
@@ -101,7 +101,7 @@ export function StoryLinePanel({ projectId }: { projectId: string }) {
     } finally {
       setIsLoading(false);
     }
-  }
+  }, [projectId]);
 
   async function createForeshadow() {
     setIsSaving(true);
@@ -183,7 +183,7 @@ export function StoryLinePanel({ projectId }: { projectId: string }) {
 
   useEffect(() => {
     void loadStoryLines();
-  }, [projectId]);
+  }, [loadStoryLines]);
 
   const chapters = payload?.chapters ?? [];
 

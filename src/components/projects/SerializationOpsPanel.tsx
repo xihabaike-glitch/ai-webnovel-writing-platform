@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 interface SerializationChapter {
   id: string;
@@ -308,7 +308,7 @@ export function SerializationOpsPanel({
   const [restoringVersionId, setRestoringVersionId] = useState<string | null>(null);
   const [message, setMessage] = useState<OpsMessage | null>(null);
 
-  async function loadOps() {
+  const loadOps = useCallback(async () => {
     setIsLoading(true);
     setMessage(null);
     try {
@@ -327,7 +327,7 @@ export function SerializationOpsPanel({
     } finally {
       setIsLoading(false);
     }
-  }
+  }, [projectId]);
 
   async function runAction(action: SerializationAction) {
     if (!action.execution) return;
@@ -481,7 +481,7 @@ export function SerializationOpsPanel({
 
   useEffect(() => {
     void loadOps();
-  }, [projectId]);
+  }, [loadOps]);
 
   return (
     <section className="rounded-md border border-slate-200 bg-white p-4">

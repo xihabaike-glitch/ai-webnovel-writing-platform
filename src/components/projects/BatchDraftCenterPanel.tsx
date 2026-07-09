@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 interface BatchDraftCandidate {
   chapterId: string;
@@ -172,7 +172,7 @@ export function BatchDraftCenterPanel({
     [queue],
   );
 
-  async function loadQueue() {
+  const loadQueue = useCallback(async () => {
     setIsLoading(true);
     setMessage(null);
     try {
@@ -199,7 +199,7 @@ export function BatchDraftCenterPanel({
     } finally {
       setIsLoading(false);
     }
-  }
+  }, [projectId]);
 
   async function generateBatch() {
     setIsGenerating(true);
@@ -359,7 +359,7 @@ export function BatchDraftCenterPanel({
 
   useEffect(() => {
     void loadQueue();
-  }, [projectId]);
+  }, [loadQueue]);
 
   return (
     <section className="rounded-md border border-slate-200 bg-white p-4">

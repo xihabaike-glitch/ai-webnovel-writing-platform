@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 type SecondPassMode = "more_hook" | "more_payoff" | "less_exposition" | "more_emotion" | "platform_fit";
 
@@ -213,7 +213,7 @@ export function BatchReviewPipelinePanel({
     [queue],
   );
 
-  async function loadQueue() {
+  const loadQueue = useCallback(async () => {
     setIsLoading(true);
     setMessage(null);
     try {
@@ -248,7 +248,7 @@ export function BatchReviewPipelinePanel({
     } finally {
       setIsLoading(false);
     }
-  }
+  }, [projectId]);
 
   async function runBatch(action: "review" | "second_pass") {
     const chapterIds = action === "review" ? selectedReviewIds : selectedSecondPassIds;
@@ -517,7 +517,7 @@ export function BatchReviewPipelinePanel({
 
   useEffect(() => {
     void loadQueue();
-  }, [projectId]);
+  }, [loadQueue]);
 
   return (
     <section className="rounded-md border border-slate-200 bg-white p-4" id="review-pipeline">

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { buildFirstDayExecutionRouteBlockMessage, type FirstDayExecutionRouteStatus } from "@/lib/model-gateway/firstDayExecutionRoute";
 import { buildFirstDayDispatchCenterHref, buildFirstDayDispatchUpdateSummary, buildFirstDayExecutionReceiptFollowupPrompt, buildFirstDayExecutionRiskNotice, buildFirstDayExecutionSafetyBanner, buildFirstDayHandoffGateCta, buildFirstDayPostDispatchCompletionPrompt, buildFirstDayReceiptCompletionAction, buildFirstDayReceiptCompletionEvidence, buildFirstDayReturnedEvidenceAcceptanceState, buildFirstDayRouteRepairReturnNotice, buildFirstDayStepView, completeFirstDayDispatchStep, type FirstDayWorkflowMessageAction } from "@/lib/projects/firstDayWorkflowView";
@@ -400,23 +400,23 @@ export function FirstDayWorkflowPanel({
   const completionEvidenceRef = useRef<HTMLTextAreaElement | null>(null);
   const hasFocusedReturnedEvidence = useRef(false);
 
-  function showMessage(
+  const showMessage = useCallback((
     nextMessage: string | null,
     action?: FirstDayMessageAction,
     actionLabel?: string,
     actionHref?: string,
     secondaryActionLabel?: string,
     secondaryActionHref?: string,
-  ) {
+  ) => {
     setMessage(nextMessage);
     setMessageAction(action ?? null);
     setMessageActionLabel(actionLabel ?? null);
     setMessageActionHref(actionHref ?? null);
     setMessageSecondaryActionLabel(secondaryActionLabel ?? null);
     setMessageSecondaryActionHref(secondaryActionHref ?? null);
-  }
+  }, []);
 
-  async function loadWorkflow(options?: { fromRouteRepair?: boolean }) {
+  const loadWorkflow = useCallback(async (options?: { fromRouteRepair?: boolean }) => {
     setIsLoading(true);
     showMessage(null);
     setExecutionReceipt(null);
@@ -460,7 +460,7 @@ export function FirstDayWorkflowPanel({
     } finally {
       setIsLoading(false);
     }
-  }
+  }, [createdLaunch, projectId, returnedCompletionEvidence, showMessage]);
 
   async function assignFirstDayDispatch() {
     if (!dispatch) return;
@@ -632,7 +632,7 @@ export function FirstDayWorkflowPanel({
 
   useEffect(() => {
     void loadWorkflow({ fromRouteRepair: routeRepairReturn });
-  }, [projectId, routeRepairReturn, createdLaunch, returnedCompletionEvidence]);
+  }, [loadWorkflow, routeRepairReturn]);
 
   const returnedEvidenceState = buildFirstDayReturnedEvidenceAcceptanceState({
     completionEvidence: returnedCompletionEvidence,

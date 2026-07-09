@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 interface CharacterCard {
   id: string;
@@ -66,7 +66,7 @@ export function CharacterArcPanel({ projectId }: { projectId: string }) {
     [dashboard, editingId],
   );
 
-  async function loadCharacters() {
+  const loadCharacters = useCallback(async () => {
     setIsLoading(true);
     setMessage(null);
     try {
@@ -85,7 +85,7 @@ export function CharacterArcPanel({ projectId }: { projectId: string }) {
     } finally {
       setIsLoading(false);
     }
-  }
+  }, [projectId]);
 
   async function createCharacter() {
     setIsSaving(true);
@@ -177,7 +177,7 @@ export function CharacterArcPanel({ projectId }: { projectId: string }) {
 
   useEffect(() => {
     void loadCharacters();
-  }, [projectId]);
+  }, [loadCharacters]);
 
   return (
     <section className="rounded-md border border-slate-200 bg-white p-4">

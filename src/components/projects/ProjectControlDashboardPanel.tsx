@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { buildAiPipelineDispatchFeedback, type ProjectControlDashboardActionFeedback } from "@/lib/projects/projectControlDashboardFeedback";
 
 interface ControlArea {
@@ -561,7 +561,7 @@ export function ProjectControlDashboardPanel({
   const [runningMemoryAction, setRunningMemoryAction] = useState<"confirm" | "rollback" | "clear" | null>(null);
   const [message, setMessage] = useState<string | ProjectControlDashboardActionFeedback | null>(null);
 
-  async function loadDashboard() {
+  const loadDashboard = useCallback(async () => {
     setIsLoading(true);
     setMessage(null);
     try {
@@ -576,11 +576,11 @@ export function ProjectControlDashboardPanel({
     } finally {
       setIsLoading(false);
     }
-  }
+  }, [projectId]);
 
   useEffect(() => {
     void loadDashboard();
-  }, [projectId]);
+  }, [loadDashboard]);
 
   async function executeAction(action: ControlPriorityAction, mode: "seed" | "ai") {
     setRunningActionId(`${action.id}-${mode}`);

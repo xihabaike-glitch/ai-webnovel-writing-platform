@@ -1,6 +1,6 @@
 import type { SecondPassMode } from "./buildChapterSecondPassPrompt.ts";
 import type { ProjectStartTacticSummary } from "../projects/projectStartTactics.ts";
-import { parseChapterReviewResult, type ChapterReviewResult } from "./chapterReviewGeneration.ts";
+import { parseChapterReviewResult, type ChapterReviewResult } from "./chapterReviewResult.ts";
 
 export interface ReviewPipelineChapter {
   id: string;

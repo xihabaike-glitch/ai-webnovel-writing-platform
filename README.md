@@ -154,7 +154,7 @@ See `ROADMAP.md`.
 ## Documents
 
 - `docs/USAGE.md`：产品使用说明。
-- `docs/DEPLOYMENT.md`：Docker、本地脚本和云服务器部署说明。
+- `docs/DEPLOYMENT.md`：Docker 与本地启动部署说明。
 - `docs/POSITIONING.md`：项目定位与独特价值。
 - `docs/GITHUB_INTRO.md`：GitHub 简介和 Topics 素材。
 - `docs/ai-writing-platform-dev-doc.md`：项目梳理、竞品参考与整体开发文档。

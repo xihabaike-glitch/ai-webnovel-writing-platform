@@ -1,17 +1,36 @@
--- Repair historical duplicate orders deterministically before enforcing uniqueness.
+-- Repair only historical duplicate orders before enforcing uniqueness. Existing
+-- gaps are meaningful author data, so keep the first chapter at each order and
+-- append later duplicates after the project's current maximum order.
 WITH ranked_chapters AS (
-  SELECT "id", ROW_NUMBER() OVER (
-    PARTITION BY "projectId"
-    ORDER BY "order" ASC, "createdAt" ASC, "id" ASC
-  ) AS "nextOrder"
+  SELECT
+    "id",
+    "projectId",
+    "order",
+    "createdAt",
+    ROW_NUMBER() OVER (
+      PARTITION BY "projectId", "order"
+      ORDER BY "createdAt" ASC, "id" ASC
+    ) AS "duplicateRank",
+    MAX("order") OVER (PARTITION BY "projectId") AS "maxOrder"
   FROM "Chapter"
+),
+duplicate_chapters AS (
+  SELECT
+    "id",
+    (CASE WHEN "maxOrder" > 0 THEN "maxOrder" ELSE 0 END) + ROW_NUMBER() OVER (
+      PARTITION BY "projectId"
+      ORDER BY "order" ASC, "createdAt" ASC, "id" ASC
+    ) AS "nextOrder"
+  FROM ranked_chapters
+  WHERE "duplicateRank" > 1
 )
 UPDATE "Chapter"
 SET "order" = (
   SELECT "nextOrder"
-  FROM ranked_chapters
-  WHERE ranked_chapters."id" = "Chapter"."id"
-);
+  FROM duplicate_chapters
+  WHERE duplicate_chapters."id" = "Chapter"."id"
+)
+WHERE "id" IN (SELECT "id" FROM duplicate_chapters);
 
 -- Keep the newest active task and fail older duplicate work before adding the guard.
 WITH ranked_active_tasks AS (

@@ -294,10 +294,15 @@ test("legacy db-push schema baselines only initial, deploys the repair, and reru
     INSERT INTO "Project" (
       "id", "title", "targetPlatform", "targetLengthType",
       "targetWordCount", "genre", "createdAt", "updatedAt"
-    ) VALUES (
-      'project-1', 'Migration rehearsal', 'qidian', 'long',
-      100000, 'fantasy', '2026-07-10T00:00:00.000Z', '2026-07-10T00:00:00.000Z'
-    );
+    ) VALUES
+      (
+        'project-1', 'Migration rehearsal', 'qidian', 'long',
+        100000, 'fantasy', '2026-07-10T00:00:00.000Z', '2026-07-10T00:00:00.000Z'
+      ),
+      (
+        'project-gaps', 'Preserve chapter gaps', 'qidian', 'long',
+        100000, 'fantasy', '2026-07-10T00:00:00.000Z', '2026-07-10T00:00:00.000Z'
+      );
     INSERT INTO "ModelProvider" (
       "id", "providerId", "displayName", "defaultModel", "createdAt", "updatedAt"
     ) VALUES (
@@ -308,7 +313,10 @@ test("legacy db-push schema baselines only initial, deploys the repair, and reru
       "id", "projectId", "order", "title", "createdAt", "updatedAt"
     ) VALUES
       ('chapter-old', 'project-1', 1, 'Old', '2026-07-10T00:00:00.000Z', '2026-07-10T00:00:00.000Z'),
-      ('chapter-new', 'project-1', 1, 'New', '2026-07-10T01:00:00.000Z', '2026-07-10T01:00:00.000Z');
+      ('chapter-new', 'project-1', 1, 'New', '2026-07-10T01:00:00.000Z', '2026-07-10T01:00:00.000Z'),
+      ('chapter-gap-1', 'project-gaps', 1, 'Gap one', '2026-07-10T00:00:00.000Z', '2026-07-10T00:00:00.000Z'),
+      ('chapter-gap-3', 'project-gaps', 3, 'Gap three', '2026-07-10T01:00:00.000Z', '2026-07-10T01:00:00.000Z'),
+      ('chapter-gap-5', 'project-gaps', 5, 'Gap five', '2026-07-10T02:00:00.000Z', '2026-07-10T02:00:00.000Z');
     INSERT INTO "AiTask" (
       "id", "projectId", "chapterId", "taskType", "providerConfigId",
       "model", "status", "inputSnapshot", "createdAt", "updatedAt"
@@ -343,8 +351,17 @@ test("legacy db-push schema baselines only initial, deploys the repair, and reru
     .all() as Array<{ order: number }>;
   assert.deepEqual(
     chapterOrders.map(({ order }) => order),
-    [1, 2],
+    [1, 1, 2, 3, 5],
   );
+
+  const preservedGapChapters = migratedDatabase
+    .prepare('SELECT "id", "order", "title" FROM "Chapter" WHERE "projectId" = ? ORDER BY "order"')
+    .all("project-gaps") as Array<{ id: string; order: number; title: string }>;
+  assert.deepEqual(preservedGapChapters.map(({ id, order, title }) => ({ id, order, title })), [
+    { id: "chapter-gap-1", order: 1, title: "Gap one" },
+    { id: "chapter-gap-3", order: 3, title: "Gap three" },
+    { id: "chapter-gap-5", order: 5, title: "Gap five" },
+  ]);
 
   const taskStatuses = migratedDatabase
     .prepare('SELECT "id", "status" FROM "AiTask" ORDER BY "id"')

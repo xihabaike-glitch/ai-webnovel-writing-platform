@@ -175,7 +175,7 @@ docs 目录：
 2. `docs/COMMUNITY.md`：社群说明。
 3. `docs/LAUNCH_PLAN.md`：发布计划。
 4. `docs/PRESS_KIT.md`：发布文案素材。
-5. `docs/USAGE.md`：已存在，后续只补充入口。
+5. `docs/USAGE.md`：扩写为详细使用说明，覆盖首次启动、开书、作品工作台、大树结构、首章样本、模型岗位、任务中心、派单回执、总闸门、失败修复、发布包、社群挑战、常见问题和验收清单。
 6. `docs/GITHUB_INTRO.md`：已存在，后续整合到 README 和 PRESS_KIT。
 
 GitHub 目录：
@@ -445,6 +445,7 @@ Roadmap 不应该只是技术清单，而要让作者和开发者都看懂。
 4. 作者能找到使用说明。
 5. Roadmap 能说明下一步方向。
 6. Issue 模板能引导高质量反馈。
+7. `docs/USAGE.md` 能让第一次打开项目的作者按页面顺序跑完一轮真实首章样本。
 
 ### 10.2 社群包装验收
 

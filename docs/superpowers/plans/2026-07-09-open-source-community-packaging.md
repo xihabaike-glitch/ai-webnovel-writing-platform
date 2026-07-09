@@ -47,6 +47,9 @@ Create:
 - `docs/PRESS_KIT.md`  
   Copy-ready GitHub, Zhihu, WeChat, short-video, and community launch materials.
 
+- `docs/USAGE.md`  
+  Detailed creator-facing manual covering first run, page-by-page workflow, first-chapter sample, AI editorial roles, receipts, PM gate, failure repair, submission packages, community challenge, FAQ, and acceptance checklist.
+
 - `.github/ISSUE_TEMPLATE/bug_report.md`  
   Bug report template for product, docs, workflow, and model configuration issues.
 
@@ -147,6 +150,20 @@ test("community and roadmap describe creator participation", () => {
   assert.ok(roadmap.includes("Phase 4"));
 });
 
+test("usage guide is detailed enough for first-run creators", () => {
+  const usage = read("docs/USAGE.md");
+
+  assert.ok(usage.includes("首次使用：从 0 到第一条可验收样本"));
+  assert.ok(usage.includes("页面级操作手册"));
+  assert.ok(usage.includes("首章样本怎么跑"));
+  assert.ok(usage.includes("AI 编辑部岗位怎么配"));
+  assert.ok(usage.includes("任务回执怎么填"));
+  assert.ok(usage.includes("总闸门怎么看"));
+  assert.ok(usage.includes("发布包怎么检查"));
+  assert.ok(usage.includes("常见问题"));
+  assert.ok(usage.includes("最小验收清单"));
+});
+
 test("github templates request actionable evidence", () => {
   const bug = read(".github/ISSUE_TEMPLATE/bug_report.md");
   const feature = read(".github/ISSUE_TEMPLATE/feature_request.md");
@@ -171,7 +188,7 @@ Run:
 node --test src/test/packagingDocsSource.test.ts
 ```
 
-Expected: FAIL because the new packaging files do not exist and README does not yet contain the complete public packaging structure.
+Expected: FAIL because the new packaging files do not exist, README does not yet contain the complete public packaging structure, and `docs/USAGE.md` does not yet include the expanded first-run creator manual sections.
 
 - [ ] **Step 3: Commit the failing test**
 
@@ -553,7 +570,80 @@ git commit -m "docs: add open source launch package"
 
 ---
 
-### Task 4: Add Contribution Guide and GitHub Templates
+### Task 4: Expand Detailed Usage Guide
+
+**Files:**
+- Modify: `docs/USAGE.md`
+- Test: `src/test/packagingDocsSource.test.ts`
+
+**Interfaces:**
+- Consumes: Existing usage guide, README workflow, and community challenge language.
+- Produces: A detailed first-run manual referenced by README and verified by `usage guide is detailed enough for first-run creators`.
+
+- [ ] **Step 1: Expand `docs/USAGE.md`**
+
+Rewrite or extend `docs/USAGE.md` so it keeps the existing product explanation and includes these exact section headings:
+
+```md
+## 3. 首次使用：从 0 到第一条可验收样本
+
+## 4. 页面级操作手册
+
+## 5. 首章样本怎么跑
+
+## 6. AI 编辑部岗位怎么配
+
+## 7. 任务回执怎么填
+
+## 8. 总闸门怎么看
+
+## 9. 失败修复怎么处理
+
+## 10. 发布包怎么检查
+
+## 11. 社群共创和 7 天首章样本挑战
+
+## 12. 常见问题
+
+## 13. 最小验收清单
+```
+
+The content under those headings must explain:
+
+- how to start the local app;
+- what to do first in `/projects`;
+- how to build the story tree;
+- how to run only one first-chapter sample before batch production;
+- how to configure Claude, DeepSeek, Kimi, GPT, and OpenAI-compatible models as editorial roles;
+- how to use `/tasks`, `/dispatch`, `/gate`, `/failures`, `/references`, and `/settings/models`;
+- what evidence makes a dispatch receipt complete;
+- how to decide between allow small-step scale, observe, and block;
+- how to inspect submission packages;
+- how community members can join the 7-day first-chapter challenge;
+- common mistakes and answers.
+
+- [ ] **Step 2: Run focused test**
+
+Run:
+
+```bash
+node --test src/test/packagingDocsSource.test.ts
+```
+
+Expected: Still FAIL because CONTRIBUTING and GitHub templates are not created yet, but usage-guide assertions pass.
+
+- [ ] **Step 3: Commit usage guide**
+
+Run:
+
+```bash
+git add docs/USAGE.md
+git commit -m "docs: expand creator usage guide"
+```
+
+---
+
+### Task 5: Add Contribution Guide and GitHub Templates
 
 **Files:**
 - Create: `CONTRIBUTING.md`
@@ -745,7 +835,7 @@ Run:
 node --test src/test/packagingDocsSource.test.ts
 ```
 
-Expected: PASS with 5 tests passing.
+Expected: PASS with 6 tests passing.
 
 - [ ] **Step 5: Commit contribution files**
 
@@ -758,7 +848,7 @@ git commit -m "docs: add contribution and github templates"
 
 ---
 
-### Task 5: Verify Packaging and Push
+### Task 6: Verify Packaging and Push
 
 **Files:**
 - Verify only, no planned file changes.
@@ -775,7 +865,7 @@ Run:
 node --test src/test/packagingDocsSource.test.ts
 ```
 
-Expected: PASS, 5 tests passing.
+Expected: PASS, 6 tests passing.
 
 - [ ] **Step 2: Run full test suite**
 

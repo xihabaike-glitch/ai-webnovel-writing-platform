@@ -32,10 +32,9 @@ npm run dev
 http://localhost:3000
 ```
 
-常用验证命令：
+常用构建命令：
 
 ```bash
-npm test
 npm run build
 ```
 

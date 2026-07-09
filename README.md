@@ -78,10 +78,9 @@ Open:
 http://localhost:3000
 ```
 
-Useful checks:
+Useful check:
 
 ```bash
-npm test
 npm run build
 ```
 

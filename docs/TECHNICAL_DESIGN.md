@@ -694,19 +694,69 @@ POST /api/model-providers
 GET /api/model-providers
 PATCH /api/model-providers/:providerConfigId
 DELETE /api/model-providers/:providerConfigId
+POST /api/model-providers/test
+GET /api/model-task-routes
+POST /api/model-task-routes
 ```
 
-### 8.8 AI Tasks
+`/api/model-providers/test` 是所有真实模型配置进入岗位矩阵前的硬闸门。Claude、DeepSeek、Kimi、GPT 与本地 Ollama 都必须先通过连接测试，再参与职责路由、推荐批次和生产任务派单。
+
+### 8.8 AI Writing Tasks
 
 ```txt
-POST /api/ai/tasks/hook-review
+POST /api/ai/tasks/chapter-draft
 POST /api/ai/tasks/chapter-review
-POST /api/ai/tasks/arc-review
-POST /api/ai/tasks/foreshadow-review
-POST /api/ai/tasks/platform-adapt
-POST /api/ai/tasks/outline-expand
-POST /api/ai/tasks/synopsis-translate
+POST /api/ai/tasks/chapter-workflow
+POST /api/ai/tasks/[taskId]/retry
+POST /api/projects/[projectId]/batch-drafts
+POST /api/projects/[projectId]/batch-review
+POST /api/projects/[projectId]/first-three-rewrite/generate
+POST /api/projects/[projectId]/first-three-rewrite
+POST /api/projects/[projectId]/retention-diagnostic
+POST /api/projects/[projectId]/structure-diagnostic
+POST /api/chapters/[chapterId]/opening-diagnostic
+POST /api/chapters/[chapterId]/opening-rewrite
+POST /api/chapters/[chapterId]/second-pass
+POST /api/chapters/[chapterId]/revisions/[revisionId]/adopt
+POST /api/chapters/[chapterId]/revisions/[revisionId]/restore
 ```
+
+### 8.9 Platform Export And Submission
+
+```txt
+GET /api/projects/[projectId]/platform-export
+POST /api/projects/[projectId]/platform-export
+POST /api/projects/[projectId]/platform-export/asset-optimize
+POST /api/projects/[projectId]/platform-export/repair
+GET /api/projects/[projectId]/submission-package
+POST /api/projects/[projectId]/submission-package
+POST /api/projects/[projectId]/submission-package/optimize
+POST /api/projects/[projectId]/submission-package/ab-test
+POST /api/projects/[projectId]/submission-package/multi-platform
+POST /api/projects/[projectId]/submission-precheck/repair
+```
+
+### 8.10 Gate, Receipt And Recovery
+
+```txt
+GET /api/gate/action-receipts
+POST /api/gate/action-receipts
+GET /api/gate/ai-pipeline-recheck-samples
+POST /api/gate/dispatch-tasks
+POST /api/gate/evidence-loops
+POST /api/gate/knowledge-feedback
+POST /api/projects/[projectId]/control-actions
+GET /api/projects/[projectId]/control-dashboard
+POST /api/projects/[projectId]/start-decision/execute
+POST /api/projects/[projectId]/start-handoff-dispatches
+POST /api/projects/[projectId]/story-tree-recheck
+POST /api/projects/[projectId]/story-tree-experience/apply
+POST /api/chapters/[chapterId]/story-tree-experience/effect
+GET /api/tasks/recommended-batch
+POST /api/tasks/batch-rhythm-dispatch
+```
+
+这些接口共同服务“真实作品流水线”：章节写审改、前三章采用、平台投稿包、回总闸门复检、失败修复与恢复观察都必须能留下可追踪回执。
 
 ## 9. 页面设计要点
 

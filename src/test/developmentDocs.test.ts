@@ -152,4 +152,35 @@ test("ai writing platform development document", async (t) => {
     assert.equal(technicalDoc.includes("再接真实 Claude / OpenAI-compatible"), false);
     assert.equal(technicalDoc.includes("先用 mock 测试，再接真实模型"), false);
   });
+
+  await t.test("keeps the technical design API map aligned with implemented routes", () => {
+    for (const route of [
+      "/api/ai/tasks/chapter-draft",
+      "/api/ai/tasks/chapter-review",
+      "/api/ai/tasks/chapter-workflow",
+      "/api/ai/tasks/[taskId]/retry",
+      "/api/model-providers/test",
+      "/api/model-task-routes",
+      "/api/projects/[projectId]/batch-drafts",
+      "/api/projects/[projectId]/batch-review",
+      "/api/projects/[projectId]/first-three-rewrite/generate",
+      "/api/projects/[projectId]/platform-export/asset-optimize",
+      "/api/projects/[projectId]/submission-package/optimize",
+      "/api/gate/ai-pipeline-recheck-samples",
+      "/api/gate/action-receipts",
+    ]) {
+      assert.ok(technicalDoc.includes(route), `${route} should be documented in the API map`);
+    }
+
+    for (const staleRoute of [
+      "/api/ai/tasks/hook-review",
+      "/api/ai/tasks/arc-review",
+      "/api/ai/tasks/foreshadow-review",
+      "/api/ai/tasks/platform-adapt",
+      "/api/ai/tasks/outline-expand",
+      "/api/ai/tasks/synopsis-translate",
+    ]) {
+      assert.equal(technicalDoc.includes(staleRoute), false, `${staleRoute} should not remain as a stale planned route`);
+    }
+  });
 });

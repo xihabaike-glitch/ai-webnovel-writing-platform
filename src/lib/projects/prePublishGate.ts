@@ -2188,9 +2188,9 @@ function buildFinalDeliveryPlatformTacticArchiveCards(input: {
           : "blocked";
       const tactic = encodeArchiveTactic(project.platformName, project.projectTitle);
       const reuseParams = new URLSearchParams({
-        launchPlatform: project.platformId,
-        launchTactic: tactic,
-        launchSource: "final-delivery-archive",
+        startPlatform: project.platformId,
+        startTactic: tactic,
+        startSource: "final-delivery-archive",
       });
 
       return {

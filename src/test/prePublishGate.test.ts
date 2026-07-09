@@ -278,8 +278,10 @@ test("buildPrePublishGate", async (t) => {
     assert.ok(archive.verificationAction.length > 0);
     assert.ok(archive.stopLine.includes("停手"));
     assert.ok(archive.reuseHref.startsWith("/projects?"));
-    assert.ok(archive.reuseHref.includes("launchPlatform=fanqie"));
-    assert.ok(archive.reuseHref.includes("launchTactic="));
+    assert.ok(archive.reuseHref.includes("startPlatform=fanqie"));
+    assert.ok(archive.reuseHref.includes("startTactic="));
+    assert.ok(archive.reuseHref.includes("startSource=final-delivery-archive"));
+    assert.equal(archive.reuseHref.includes("launchPlatform="), false);
     assert.equal(archive.repairHref, "#pipeline-final-review");
   });
 

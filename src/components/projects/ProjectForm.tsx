@@ -217,6 +217,7 @@ export function ProjectForm({
   const launchMatched = launchRequested
     && selectedEvidence.experience?.platformId === launchPlatform
     && selectedEvidence.experience?.tactic === experienceLaunch?.tactic;
+  const finalDeliveryArchiveLaunch = experienceLaunch?.source === "final-delivery-archive";
 
   useEffect(() => {
     let ignore = false;
@@ -355,10 +356,12 @@ export function ProjectForm({
     <form action={createProject} className="grid gap-4 rounded-md border border-slate-200 bg-white p-4">
       {launchRequested ? (
         <div className={`rounded-md border p-3 text-sm ${launchMatched ? "border-emerald-200 bg-emerald-50 text-emerald-900" : "border-amber-200 bg-amber-50 text-amber-900"}`}>
-          <div className="font-medium">经验开书入口</div>
+          <div className="font-medium">{finalDeliveryArchiveLaunch ? "最终交付归档打法" : "经验开书入口"}</div>
           <p className="mt-1 leading-6">
             {launchMatched
-              ? `已匹配「${selectedEvidence.experience?.platformName} · ${selectedEvidence.experience?.tactic}」，本次开书会优先使用这条历史打法。`
+              ? finalDeliveryArchiveLaunch
+                ? `已匹配最终交付归档打法「${selectedEvidence.experience?.platformName} · ${selectedEvidence.experience?.tactic}」，这条归档会影响推荐平台、模板、首章动作和停手线。`
+                : `已匹配「${selectedEvidence.experience?.platformName} · ${selectedEvidence.experience?.tactic}」，本次开书会优先使用这条历史打法。`
               : `正在按「${experienceLaunch?.tactic}」寻找历史经验；若当前数据暂未加载到精确样本，会先切到对应平台模板。`}
           </p>
         </div>

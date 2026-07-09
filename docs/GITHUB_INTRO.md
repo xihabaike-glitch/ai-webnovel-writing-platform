@@ -1,3 +1,5 @@
+> This file is the compact GitHub metadata and copy index. For full launch copy, use `docs/PRESS_KIT.md`. For product positioning, use `docs/POSITIONING.md`.
+
 # GitHub 简介素材
 
 本文用于填写 GitHub 仓库简介、README 开头、社交分享文案和项目置顶说明。

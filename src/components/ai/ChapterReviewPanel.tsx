@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { groupReviewIssues, nonEmptyReviewGroups } from "@/lib/ai/reviewGrouping";
 import type { PlatformProfile } from "@/lib/platforms/platformProfiles";
 
@@ -36,16 +36,16 @@ export function ChapterReviewPanel({
   const [isRunning, setIsRunning] = useState(false);
   const groupedIssues = useMemo(() => (result ? nonEmptyReviewGroups(groupReviewIssues(result.issues)) : []), [result]);
 
-  async function loadHistory() {
+  const loadHistory = useCallback(async () => {
     const response = await fetch(`/api/ai/tasks/chapter-review?chapterId=${chapterId}`);
     if (!response.ok) return;
     const payload = (await response.json()) as { tasks: ReviewTask[] };
     setHistory(payload.tasks);
-  }
+  }, [chapterId]);
 
   useEffect(() => {
     void loadHistory();
-  }, [chapterId]);
+  }, [loadHistory]);
 
   async function runReview() {
     setIsRunning(true);

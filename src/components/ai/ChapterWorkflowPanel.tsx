@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { groupReviewIssues, nonEmptyReviewGroups } from "@/lib/ai/reviewGrouping";
@@ -189,7 +189,7 @@ export function ChapterWorkflowPanel({
     [workflow],
   );
 
-  async function loadWorkflow() {
+  const loadWorkflow = useCallback(async () => {
     const response = await fetch(`/api/ai/tasks/chapter-workflow?chapterId=${chapterId}`);
     if (!response.ok) return;
     const payload = (await response.json()) as WorkflowPayload;
@@ -197,9 +197,9 @@ export function ChapterWorkflowPanel({
     const latestReview = payload.tasks.find((task) => task.taskType === "chapter_review" && task.outputText);
     const parsedReview = parseReview(latestReview?.outputText ?? null);
     if (parsedReview) setReviewResult(parsedReview);
-  }
+  }, [chapterId]);
 
-  async function loadRevisions() {
+  const loadRevisions = useCallback(async () => {
     const response = await fetch(`/api/chapters/${chapterId}/revisions`);
     if (!response.ok) return;
     const payload = (await response.json()) as { revisions: ChapterRevisionSummary[] };
@@ -208,12 +208,12 @@ export function ChapterWorkflowPanel({
       if (!current) return payload.revisions[0] ?? null;
       return payload.revisions.find((revision) => revision.id === current.id) ?? payload.revisions[0] ?? null;
     });
-  }
+  }, [chapterId]);
 
   useEffect(() => {
     void loadWorkflow();
     void loadRevisions();
-  }, [chapterId]);
+  }, [loadRevisions, loadWorkflow]);
 
   async function generateDraft() {
     if (!styleScore.canGenerate) {

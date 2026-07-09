@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   buildChapterRevisionComparison,
@@ -95,7 +95,7 @@ export function ChapterRevisionWorkbench({
   );
   const comparison = selectedRevision ? buildChapterRevisionComparison(chapter, selectedRevision) : null;
 
-  async function loadRevisions(nextSelectedId?: string) {
+  const loadRevisions = useCallback(async (nextSelectedId?: string) => {
     setIsLoading(true);
     setMessage(null);
     try {
@@ -111,7 +111,7 @@ export function ChapterRevisionWorkbench({
     } finally {
       setIsLoading(false);
     }
-  }
+  }, [chapter.id]);
 
   async function createSnapshot() {
     setIsSnapshotting(true);
@@ -184,7 +184,7 @@ export function ChapterRevisionWorkbench({
 
   useEffect(() => {
     void loadRevisions();
-  }, []);
+  }, [loadRevisions]);
 
   return (
     <section className="rounded-md border border-slate-200 bg-white p-4">

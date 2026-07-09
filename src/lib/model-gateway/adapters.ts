@@ -1,15 +1,24 @@
+import { CredentialCryptoError, decodeStoredApiKey } from "./credentialCrypto.ts";
+import {
+  ModelGatewayError,
+  requestModelJson,
+  type ModelGatewayErrorCategory,
+  type ModelRequestTransport,
+} from "./requestTransport.ts";
+import { getProviderDefaultBaseUrl } from "./providerDefaults.ts";
 import type { GenerateRequest, GenerateResult, ModelAdapter } from "./types.ts";
 
-type FetchLike = typeof fetch;
+export { ModelGatewayError };
+export type { ModelGatewayErrorCategory, ModelRequestTransport };
+
+interface AdapterDependencies {
+  requestImpl: ModelRequestTransport;
+}
 
 export interface RuntimeModelProvider {
   providerId: string;
   baseUrl: string | null;
   encryptedApiKey: string | null;
-}
-
-function joinUrl(baseUrl: string, path: string) {
-  return `${baseUrl.replace(/\/+$/, "")}${path}`;
 }
 
 function messagesFromRequest(request: GenerateRequest) {
@@ -19,35 +28,59 @@ function messagesFromRequest(request: GenerateRequest) {
   ];
 }
 
-function requireApiKey(apiKey: string | null | undefined, providerId: string) {
-  if (!apiKey) {
-    throw new Error(`${providerId} provider requires an API key.`);
+async function requireApiKey(value: string | null | undefined) {
+  if (!value) throw new ModelGatewayError("missing_api_key");
+  try {
+    return (await decodeStoredApiKey(value)).apiKey;
+  } catch (error) {
+    if (error instanceof CredentialCryptoError && error.code === "credential_secret_invalid") {
+      throw new ModelGatewayError("credential_configuration_error");
+    }
+    throw new ModelGatewayError("credential_error");
   }
-  return apiKey;
 }
 
-async function readError(response: Response) {
-  const text = await response.text().catch(() => "");
-  return text || `${response.status} ${response.statusText}`;
+function payloadFrom<T>(value: unknown) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new ModelGatewayError("invalid_response");
+  }
+  return value as T;
+}
+
+function adapterTransport(dependencies?: typeof fetch | AdapterDependencies) {
+  // Legacy fetch injection is ignored because fetch would perform a second DNS resolution.
+  return dependencies && typeof dependencies === "object"
+    ? dependencies.requestImpl
+    : requestModelJson;
+}
+
+function openAICompatibleBaseUrl(provider: RuntimeModelProvider) {
+  const configuredBaseUrl = provider.baseUrl?.trim();
+  if (configuredBaseUrl) return configuredBaseUrl;
+
+  const defaultBaseUrl = getProviderDefaultBaseUrl(provider.providerId);
+  if (!defaultBaseUrl) throw new ModelGatewayError("invalid_endpoint");
+  return defaultBaseUrl;
 }
 
 export class OpenAICompatibleAdapter implements ModelAdapter {
   private readonly provider: RuntimeModelProvider;
-  private readonly fetchImpl: FetchLike;
+  private readonly requestImpl: ModelRequestTransport;
 
-  constructor(provider: RuntimeModelProvider, fetchImpl: FetchLike = fetch) {
+  constructor(provider: RuntimeModelProvider, dependencies?: typeof fetch | AdapterDependencies) {
     this.provider = provider;
-    this.fetchImpl = fetchImpl;
+    this.requestImpl = adapterTransport(dependencies);
   }
 
   async generate(request: GenerateRequest): Promise<GenerateResult> {
-    const baseUrl = this.provider.baseUrl || "https://api.openai.com/v1";
-    const apiKey = requireApiKey(this.provider.encryptedApiKey, this.provider.providerId);
-    const response = await this.fetchImpl(joinUrl(baseUrl, "/chat/completions"), {
+    const response = await this.requestImpl({
+      baseUrl: openAICompatibleBaseUrl(this.provider),
+      path: "/chat/completions",
+      providerId: this.provider.providerId,
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
+        Authorization: `Bearer ${await requireApiKey(this.provider.encryptedApiKey)}`,
       },
       body: JSON.stringify({
         model: request.model,
@@ -56,20 +89,12 @@ export class OpenAICompatibleAdapter implements ModelAdapter {
         max_tokens: request.maxTokens,
       }),
     });
-
-    if (!response.ok) {
-      throw new Error(`Model request failed: ${await readError(response)}`);
-    }
-
-    const payload = (await response.json()) as {
+    const payload = payloadFrom<{
       choices?: Array<{ message?: { content?: string } }>;
       usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number };
-    };
-    const text = payload.choices?.[0]?.message?.content?.trim();
-    if (!text) {
-      throw new Error("Model response did not include message content.");
-    }
-
+    }>(response.payload);
+    const text = (Array.isArray(payload.choices) ? payload.choices : [])[0]?.message?.content?.trim();
+    if (!text) throw new ModelGatewayError("invalid_response");
     return {
       text,
       usage: {
@@ -82,22 +107,23 @@ export class OpenAICompatibleAdapter implements ModelAdapter {
 
 export class AnthropicMessagesAdapter implements ModelAdapter {
   private readonly provider: RuntimeModelProvider;
-  private readonly fetchImpl: FetchLike;
+  private readonly requestImpl: ModelRequestTransport;
 
-  constructor(provider: RuntimeModelProvider, fetchImpl: FetchLike = fetch) {
+  constructor(provider: RuntimeModelProvider, dependencies?: typeof fetch | AdapterDependencies) {
     this.provider = provider;
-    this.fetchImpl = fetchImpl;
+    this.requestImpl = adapterTransport(dependencies);
   }
 
   async generate(request: GenerateRequest): Promise<GenerateResult> {
-    const baseUrl = this.provider.baseUrl || "https://api.anthropic.com";
-    const apiKey = requireApiKey(this.provider.encryptedApiKey, "claude");
-    const response = await this.fetchImpl(joinUrl(baseUrl, "/v1/messages"), {
+    const response = await this.requestImpl({
+      baseUrl: this.provider.baseUrl || "https://api.anthropic.com",
+      path: "/v1/messages",
+      providerId: this.provider.providerId,
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         "anthropic-version": "2023-06-01",
-        "x-api-key": apiKey,
+        "x-api-key": await requireApiKey(this.provider.encryptedApiKey),
       },
       body: JSON.stringify({
         model: request.model,
@@ -107,24 +133,17 @@ export class AnthropicMessagesAdapter implements ModelAdapter {
         messages: [{ role: "user", content: request.userPrompt }],
       }),
     });
-
-    if (!response.ok) {
-      throw new Error(`Claude request failed: ${await readError(response)}`);
-    }
-
-    const payload = (await response.json()) as {
+    const payload = payloadFrom<{
       content?: Array<{ type: string; text?: string }>;
       usage?: { input_tokens?: number; output_tokens?: number };
-    };
-    const text = payload.content
-      ?.filter((block) => block.type === "text")
+    }>(response.payload);
+    const text = (Array.isArray(payload.content) ? payload.content : [])
+      .filter((block): block is { type: string; text?: string } => Boolean(block) && typeof block === "object")
+      .filter((block) => block.type === "text")
       .map((block) => block.text)
       .join("\n")
       .trim();
-    if (!text) {
-      throw new Error("Claude response did not include text content.");
-    }
-
+    if (!text) throw new ModelGatewayError("invalid_response");
     return {
       text,
       usage: {
@@ -137,16 +156,18 @@ export class AnthropicMessagesAdapter implements ModelAdapter {
 
 export class OllamaAdapter implements ModelAdapter {
   private readonly provider: RuntimeModelProvider;
-  private readonly fetchImpl: FetchLike;
+  private readonly requestImpl: ModelRequestTransport;
 
-  constructor(provider: RuntimeModelProvider, fetchImpl: FetchLike = fetch) {
+  constructor(provider: RuntimeModelProvider, dependencies?: typeof fetch | AdapterDependencies) {
     this.provider = provider;
-    this.fetchImpl = fetchImpl;
+    this.requestImpl = adapterTransport(dependencies);
   }
 
   async generate(request: GenerateRequest): Promise<GenerateResult> {
-    const baseUrl = this.provider.baseUrl || "http://localhost:11434";
-    const response = await this.fetchImpl(joinUrl(baseUrl, "/api/chat"), {
+    const response = await this.requestImpl({
+      baseUrl: this.provider.baseUrl || "http://localhost:11434",
+      path: "/api/chat",
+      providerId: "ollama",
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -159,21 +180,13 @@ export class OllamaAdapter implements ModelAdapter {
         },
       }),
     });
-
-    if (!response.ok) {
-      throw new Error(`Ollama request failed: ${await readError(response)}`);
-    }
-
-    const payload = (await response.json()) as {
+    const payload = payloadFrom<{
       message?: { content?: string };
       prompt_eval_count?: number;
       eval_count?: number;
-    };
+    }>(response.payload);
     const text = payload.message?.content?.trim();
-    if (!text) {
-      throw new Error("Ollama response did not include message content.");
-    }
-
+    if (!text) throw new ModelGatewayError("invalid_response");
     return {
       text,
       usage: {

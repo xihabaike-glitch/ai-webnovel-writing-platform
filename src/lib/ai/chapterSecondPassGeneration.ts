@@ -13,7 +13,7 @@ import {
 import { prisma } from "@/lib/db/prisma";
 import { runRoutedGeneration } from "@/lib/model-gateway/routedGeneration";
 import { getPlatformProfile, type PlatformId } from "@/lib/platforms/platformProfiles";
-import { persistServerGateDispatchTask } from "@/lib/projects/gateDispatchTaskPersistence";
+import { persistServerGateDispatchTaskWithDatabase } from "@/lib/projects/gateDispatchTaskPersistence";
 import { gatePlatformDispatchTaskFromRecord } from "@/lib/projects/gateDispatchTaskRecords";
 import { findProjectStartTacticSummary } from "@/lib/projects/projectStartTactics";
 import { countWords } from "@/lib/text/wordCount";
@@ -130,46 +130,31 @@ export async function generateChapterSecondPass(options: GenerateChapterSecondPa
       temperature: 0.76,
       maxTokens: 3200,
     },
-  });
-
-  if (generation.ok) {
-    const { result, provider, task } = generation;
-    const wordCount = countWords(result.text);
-    const secondPassAudit = buildDraftQualityAudit({
-      platform,
-      targetWords: options.targetWords ?? Math.max(1200, chapter.wordCount),
-      content: result.text,
-      startTactic,
-      chapter: {
-        title: chapter.title,
-        goal: chapter.goal,
-        hook: chapter.hook,
-        conflict: chapter.conflict,
-        valueShift: chapter.valueShift,
-        cliffhanger: chapter.cliffhanger,
-      },
-    });
-    const storyTreeExperienceEffects = usedStoryTreeExperienceAdvice.map((advice) => buildStoryTreeExperienceEffectFeedback({
-      advice,
-      audit: secondPassAudit.treeAudit,
-    }));
-
-    const [updatedTask, candidateRevision] = await prisma.$transaction(async (tx) => {
-      const savedTask = await tx.aiTask.update({
-        where: { id: task.id },
-        data: {
-          status: "succeeded",
-          outputText: result.text,
-          inputTokens: result.usage?.inputTokens,
-          outputTokens: result.usage?.outputTokens,
-          costUsd: result.usage?.costUsd,
+    persistSuccess: async ({ transaction, result, provider, task }) => {
+      const wordCount = countWords(result.text);
+      const secondPassAudit = buildDraftQualityAudit({
+        platform,
+        targetWords: options.targetWords ?? Math.max(1200, chapter.wordCount),
+        content: result.text,
+        startTactic,
+        chapter: {
+          title: chapter.title,
+          goal: chapter.goal,
+          hook: chapter.hook,
+          conflict: chapter.conflict,
+          valueShift: chapter.valueShift,
+          cliffhanger: chapter.cliffhanger,
         },
       });
-      const savedCandidate = await tx.chapterRevision.create({
+      const storyTreeExperienceEffects = usedStoryTreeExperienceAdvice.map((advice) => buildStoryTreeExperienceEffectFeedback({
+        advice,
+        audit: secondPassAudit.treeAudit,
+      }));
+      const candidateRevision = await transaction.chapterRevision.create({
         data: {
           chapterId: chapter.id,
           source: "chapter_second_pass_candidate",
-          sourceTaskId: generation.task.id,
+          sourceTaskId: task.id,
           title: chapter.title,
           content: result.text,
           wordCount,
@@ -182,7 +167,7 @@ export async function generateChapterSecondPass(options: GenerateChapterSecondPa
           notes: `二改候选稿。质量 ${secondPassAudit.score} 分；指令：${instruction}`,
         },
       });
-      await tx.aiTask.create({
+      await transaction.aiTask.create({
         data: {
           projectId: chapter.projectId,
           chapterId: chapter.id,
@@ -208,32 +193,39 @@ export async function generateChapterSecondPass(options: GenerateChapterSecondPa
         const sourceTask = chapter.project.gateDispatchTasks.find((item) => item.id === effect.databaseId);
         const evidence = sourceTask ? parseJsonList(sourceTask.evidence) : [];
         if (evidence.includes(effect.line)) continue;
-        await tx.gateDispatchTask.update({
+        await transaction.gateDispatchTask.update({
           where: { id: effect.databaseId },
           data: { evidence: JSON.stringify([...evidence, effect.line]) },
         });
       }
-      return [savedTask, savedCandidate];
-    });
-    const storyTreeDispatches = await Promise.all(buildStoryTreeRewriteDispatchItems({
-      source: "chapter_second_pass",
-      projectId: chapter.projectId,
-      projectTitle: chapter.project.title,
-      chapterId: chapter.id,
-      chapterOrder: chapter.order,
-      chapterTitle: chapter.title,
-      platform,
-      audit: secondPassAudit.treeAudit,
-    }).map(persistServerGateDispatchTask));
+      const storyTreeDispatches = [];
+      for (const dispatch of buildStoryTreeRewriteDispatchItems({
+        source: "chapter_second_pass",
+        projectId: chapter.projectId,
+        projectTitle: chapter.project.title,
+        chapterId: chapter.id,
+        chapterOrder: chapter.order,
+        chapterTitle: chapter.title,
+        platform,
+        audit: secondPassAudit.treeAudit,
+      })) {
+        storyTreeDispatches.push(await persistServerGateDispatchTaskWithDatabase(dispatch, transaction));
+      }
+      return { candidateRevision, secondPassAudit, storyTreeExperienceEffects, storyTreeDispatches };
+    },
+  });
+
+  if (generation.ok) {
+    const { result, provider, task, persistence } = generation;
 
     return {
-      task: updatedTask,
+      task,
       chapter,
-      candidateRevision,
+      candidateRevision: persistence.candidateRevision,
       content: result.text,
-      secondPassAudit,
-      storyTreeExperienceEffects,
-      storyTreeDispatches,
+      secondPassAudit: persistence.secondPassAudit,
+      storyTreeExperienceEffects: persistence.storyTreeExperienceEffects,
+      storyTreeDispatches: persistence.storyTreeDispatches,
       activeProvider: {
         id: provider.id,
         providerId: provider.providerId,

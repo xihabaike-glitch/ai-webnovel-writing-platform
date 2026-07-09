@@ -112,6 +112,16 @@ export interface ProjectContextPack {
   recallPlan: ProjectContextRecallPlan;
 }
 
+export function upsertProjectContextChapter<TChapter extends ProjectContextChapter>(
+  chapters: TChapter[],
+  chapter: TChapter,
+): TChapter[] {
+  return chapters
+    .filter((item) => item.id !== chapter.id && item.order !== chapter.order)
+    .concat(chapter)
+    .sort((left, right) => left.order - right.order || left.id.localeCompare(right.id));
+}
+
 function hasText(value: string | null | undefined) {
   return Boolean(value?.trim());
 }

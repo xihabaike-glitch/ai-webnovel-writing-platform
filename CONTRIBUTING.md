@@ -29,5 +29,13 @@ Please include the user type, target platform, current workflow step, expected r
 ## Local Checks
 
 ```bash
-npm run build
+npm run check
+```
+
+`npm run check` generates and validates Prisma, runs lint and all TypeScript tests, then builds the production application. Prisma validation supplies a local SQLite URL when `DATABASE_URL` and `.env` are absent, so this command works in a clean clone after `npm install`.
+
+The test suite includes real fresh-database and legacy-baseline SQLite migration rehearsals. With Docker installed, also verify the Compose environment handoff:
+
+```bash
+npm run test:compose-config
 ```

@@ -3,8 +3,10 @@ import { z } from "zod";
 import type { Project } from "@prisma/client";
 import { buildBatchDraftQueue, type BatchDraftQueue } from "@/lib/ai/batchDrafts";
 import { buildBatchRunGuard } from "@/lib/ai/batchRunGuard";
+import { mapBatchChapterGenerationError, mapBatchChapterGenerationFailure } from "@/lib/ai/chapterGenerationHttp";
 import { generateChapterDraft } from "@/lib/ai/chapterDraftGeneration";
 import { buildModelBudgetGuard } from "@/lib/ai/modelBudget";
+import { assertUniqueChapterIds, preflightAiTaskBatch } from "@/lib/ai/taskSingleFlight";
 import { prisma } from "@/lib/db/prisma";
 import { getActiveModelProvider } from "@/lib/model-gateway/activeProvider";
 import { buildBatchRouteEffectSummary } from "@/lib/model-gateway/batchRouteEffectSummary";
@@ -190,6 +192,23 @@ export async function POST(request: Request, { params }: Params) {
   }
 
   const input = parsed.data;
+  try {
+    assertUniqueChapterIds(input.chapterIds);
+  } catch (error) {
+    return NextResponse.json({ error: error instanceof Error ? error.message : "Duplicate chapter IDs" }, { status: 400 });
+  }
+  try {
+    await preflightAiTaskBatch(projectId, input.chapterIds.map((chapterId) => ({ chapterId, taskType: "chapter_draft" })));
+  } catch (error) {
+    const mapped = mapBatchChapterGenerationError(error, {
+      chapterId: error && typeof error === "object" && "chapterId" in error && typeof error.chapterId === "string"
+        ? error.chapterId
+        : input.chapterIds[0],
+      requestedCount: input.chapterIds.length,
+      completedResults: [],
+    });
+    return NextResponse.json(mapped.body, { status: mapped.status });
+  }
   const queue = await getQueue(projectId, project.targetPlatform);
   const candidateById = new Map(queue.candidates.map((candidate) => [candidate.chapterId, candidate]));
   const rejected = input.chapterIds
@@ -240,10 +259,28 @@ export async function POST(request: Request, { params }: Params) {
 
   const results = [];
   for (const chapterId of input.chapterIds) {
-    const result = await generateChapterDraft({
-      chapterId,
-      targetWords: input.targetWords,
-    });
+    let result;
+    try {
+      result = await generateChapterDraft({
+        chapterId,
+        targetWords: input.targetWords,
+      });
+    } catch (error) {
+      const mapped = mapBatchChapterGenerationError(error, {
+        chapterId,
+        requestedCount: input.chapterIds.length,
+        completedResults: results,
+      });
+      return NextResponse.json(mapped.body, { status: mapped.status });
+    }
+    if ("error" in result) {
+      const mapped = mapBatchChapterGenerationFailure(result, {
+        chapterId,
+        requestedCount: input.chapterIds.length,
+        completedResults: results,
+      });
+      return NextResponse.json(mapped.body, { status: mapped.status });
+    }
 
     results.push({
       chapterId,

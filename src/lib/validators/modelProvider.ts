@@ -11,18 +11,28 @@ const routeRecommendationExplanationSchema = z.object({
   })).max(8),
 });
 
-export const saveModelProviderSchema = z.object({
+const modelProviderSchema = z.object({
   id: z.string().optional(),
   providerId: z.enum(["claude", "deepseek", "gemini", "gpt", "openai_compatible", "ollama", "mock"]),
-  displayName: z.string().min(1).max(80),
-  baseUrl: z.string().max(300).optional(),
-  apiKey: z.string().max(500).optional(),
-  defaultModel: z.string().min(1).max(120),
+  displayName: z.string().trim().min(1).max(80),
+  baseUrl: z.string().trim().max(300).optional(),
+  apiKey: z.string().trim().max(500).optional(),
+  defaultModel: z.string().trim().min(1).max(120),
   enabled: z.boolean().optional(),
   maxContextTokens: z.number().int().positive().optional(),
 });
 
-export const testModelProviderSchema = saveModelProviderSchema.pick({
+export const saveModelProviderSchema = modelProviderSchema.superRefine((value, ctx) => {
+  if (value.providerId === "openai_compatible" && !value.baseUrl) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "OpenAI-compatible 供应商必须填写 Base URL。",
+      path: ["baseUrl"],
+    });
+  }
+});
+
+export const testModelProviderSchema = modelProviderSchema.pick({
   id: true,
   providerId: true,
   baseUrl: true,

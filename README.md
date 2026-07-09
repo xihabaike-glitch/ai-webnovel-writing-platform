@@ -63,9 +63,10 @@ The platform scope is intentionally locked to these eight channels. The next pri
 
 ## 一键启动
 
-如果你不熟悉开发环境，推荐先安装 Docker Desktop，然后运行：
+如果你不熟悉开发环境，推荐先安装 Docker Desktop 和 Node.js 22，然后运行：
 
 ```bash
+npm run env:ensure-secret
 docker compose up
 ```
 
@@ -87,16 +88,22 @@ APP_PORT=3001 docker compose up
 http://localhost:3001
 ```
 
+这是一个单用户、local-first 的写作工作台。Docker 默认只发布到 `127.0.0.1`，不能从局域网或公网直接访问。请不要把它直接暴露到公网；任何远程访问都必须由外部认证层和 HTTPS 保护。
+
+`MODEL_CREDENTIAL_SECRET` 用于保护已保存的模型凭据。`npm run env:ensure-secret` 会在本机忽略的 `.env` 不存在时从 `.env.example` 创建它，并确保其中有有效的 32 字节密钥；需要替换时生成 Base64 值，且不会打印密钥。请妥善备份 `.env`，不要把它提交到仓库或更换为新的值，否则已保存的凭据可能无法读取。
+
 ## 本地运行
 
 ```bash
-cp .env.example .env
+npm run env:ensure-secret
 npm install
 npm run db:seed
 npm run dev
 ```
 
 `npm run db:seed` 会初始化本地 SQLite 演示/种子数据，让 `/projects`、`/references`、`/gate`、`/dispatch` 等页面在 fresh clone 后就能浏览完整样例。
+
+新数据库会按顺序部署初始 migration 和修复 migration。如果你升级的是早期由 `prisma db push` 创建、且没有 Prisma migration 记录的数据库，不要直接运行普通启动命令。先备份 SQLite 数据库，再严格按 [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) 的一次性基线步骤操作。
 
 Open:
 
@@ -107,8 +114,10 @@ http://localhost:3000
 构建检查：
 
 ```bash
-npm run build
+npm run check
 ```
+
+`npm run check` 在 clean clone 中不需要预先创建 `.env`；Prisma 验证会使用一个仅用于本地检查的 SQLite URL。
 
 更多部署方式见 `docs/DEPLOYMENT.md`。
 

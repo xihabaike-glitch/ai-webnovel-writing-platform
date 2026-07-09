@@ -3,10 +3,13 @@ services:
     build:
       context: .
     ports:
-      - "${APP_PORT:-3000}:3000"
+      - "127.0.0.1:${APP_PORT:-3000}:3000"
     environment:
       DATABASE_URL: "file:/app/data/dev.db"
+      MODEL_CREDENTIAL_SECRET: "${MODEL_CREDENTIAL_SECRET:?Set MODEL_CREDENTIAL_SECRET in .env before starting Docker}"
       SEED_ON_FIRST_RUN: "1"
+      DATABASE_BASELINE: "${DATABASE_BASELINE:-0}"
+      BASELINE_MIGRATION: "${BASELINE_MIGRATION:-}"
     volumes:
       - webnovel-data:/app/data
     restart: unless-stopped

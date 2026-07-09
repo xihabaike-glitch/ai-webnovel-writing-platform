@@ -1,4 +1,36 @@
+import type { Prisma } from "@prisma/client";
 import type { PlatformProfile } from "@/lib/platforms/platformProfiles";
+
+export class OutlineNodeAlreadyClaimedError extends Error {
+  constructor() {
+    super("Outline node was already claimed by another chapter request.");
+    this.name = "OutlineNodeAlreadyClaimedError";
+  }
+}
+
+export async function claimOutlineNodeForChapter(
+  transaction: Pick<Prisma.TransactionClient, "outlineNode">,
+  input: {
+    outlineNodeId: string;
+    projectId: string;
+    chapterId: string;
+  },
+) {
+  const claim = await transaction.outlineNode.updateMany({
+    where: {
+      id: input.outlineNodeId,
+      projectId: input.projectId,
+      chapterId: null,
+    },
+    data: {
+      chapterId: input.chapterId,
+      status: "chapter_card",
+    },
+  });
+  if (claim.count !== 1) {
+    throw new OutlineNodeAlreadyClaimedError();
+  }
+}
 
 export interface ChapterFromOutlineInput {
   projectTitle: string;

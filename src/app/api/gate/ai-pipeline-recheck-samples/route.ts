@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { buildReviewPipelineQueue } from "@/lib/ai/batchReviewPipeline";
+import { ChapterGenerationFailureError, mapBatchChapterGenerationError } from "@/lib/ai/chapterGenerationHttp";
 import { generateChapterDraft } from "@/lib/ai/chapterDraftGeneration";
 import { reviewChapterDraft } from "@/lib/ai/chapterReviewGeneration";
 import { generateChapterSecondPass } from "@/lib/ai/chapterSecondPassGeneration";
@@ -125,6 +126,7 @@ async function runPlanItem(input: {
 }> {
   if (input.category === "draft") {
     const result = await generateChapterDraft({ chapterId: input.chapterId });
+    if ("error" in result) throw new ChapterGenerationFailureError(result);
     return {
       chapterId: input.chapterId,
       status: "error" in result ? "failed" : "succeeded",
@@ -143,6 +145,7 @@ async function runPlanItem(input: {
 
   if (input.category === "review") {
     const result = await reviewChapterDraft(input.chapterId);
+    if ("error" in result) throw new ChapterGenerationFailureError(result);
     return {
       chapterId: input.chapterId,
       status: "error" in result ? "failed" : "succeeded",
@@ -165,6 +168,7 @@ async function runPlanItem(input: {
     instruction: candidate?.instruction ?? "按审稿意见强化钩子、冲突、爽点和章末追读。",
     mode: candidate?.secondPassMode,
   });
+  if ("error" in result) throw new ChapterGenerationFailureError(result);
   return {
     chapterId: input.chapterId,
     status: "error" in result ? "failed" : "succeeded",
@@ -216,7 +220,16 @@ export async function POST(request: Request) {
 
   const results = [];
   for (const chapterId of plan.chapterIds) {
-    results.push(await runPlanItem({ category: plan.category, chapterId, secondPassCandidates }));
+    try {
+      results.push(await runPlanItem({ category: plan.category, chapterId, secondPassCandidates }));
+    } catch (error) {
+      const mapped = mapBatchChapterGenerationError(error, {
+        chapterId,
+        requestedCount: plan.chapterIds.length,
+        completedResults: results,
+      });
+      return NextResponse.json({ ...mapped.body, plan }, { status: mapped.status });
+    }
   }
 
   const routeEffectSummary = buildBatchRouteEffectSummary(results.map((result) => ({

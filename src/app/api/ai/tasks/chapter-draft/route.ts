@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { mapChapterGenerationError, mapChapterGenerationFailure } from "@/lib/ai/chapterGenerationHttp";
 import { generateChapterDraft } from "@/lib/ai/chapterDraftGeneration";
 import { prisma } from "@/lib/db/prisma";
 
@@ -11,8 +12,8 @@ export async function POST(request: Request) {
       targetWords: body.targetWords,
     });
     if ("error" in result) {
-      const error = result.error ?? "生成正文失败。";
-      return NextResponse.json({ task: result.task, error, budgetGuard: result.budgetGuard }, { status: error.startsWith("预算拦截") ? 429 : 500 });
+      const mapped = mapChapterGenerationFailure(result);
+      return NextResponse.json(mapped.body, { status: mapped.status });
     }
 
     return NextResponse.json({
@@ -25,9 +26,8 @@ export async function POST(request: Request) {
       attempts: result.attempts,
     });
   } catch (caught) {
-    const message = caught instanceof Error ? caught.message : "Unknown draft generation error";
-    const status = message === "Chapter not found" ? 404 : 500;
-    return NextResponse.json({ error: message }, { status });
+    const mapped = mapChapterGenerationError(caught, "Unknown draft generation error");
+    return NextResponse.json(mapped.body, { status: mapped.status });
   }
 }
 

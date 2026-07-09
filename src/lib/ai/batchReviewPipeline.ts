@@ -1,5 +1,6 @@
 import type { SecondPassMode } from "./buildChapterSecondPassPrompt.ts";
 import type { ProjectStartTacticSummary } from "../projects/projectStartTactics.ts";
+import { parseChapterReviewResult, type ChapterReviewResult } from "./chapterReviewGeneration.ts";
 
 export interface ReviewPipelineChapter {
   id: string;
@@ -46,17 +47,7 @@ export interface ReviewPipelineQueue {
   candidates: ReviewPipelineCandidate[];
 }
 
-interface ParsedReview {
-  score?: number;
-  shouldSecondPass?: boolean;
-  issues?: Array<{
-    severity?: string;
-    type?: string;
-    message?: string;
-    suggestion?: string;
-  }>;
-  summary?: string;
-}
+type ParsedReview = ChapterReviewResult;
 
 function latestTask(tasks: ReviewPipelineTask[], chapterId: string, taskType: string) {
   return tasks.find((task) => task.chapterId === chapterId && task.taskType === taskType);
@@ -77,7 +68,7 @@ function hasRunning(tasks: ReviewPipelineTask[], chapterId: string, taskType: st
 function parseReview(outputText: string | null): ParsedReview | null {
   if (!outputText) return null;
   try {
-    return JSON.parse(outputText) as ParsedReview;
+    return parseChapterReviewResult(outputText);
   } catch {
     return null;
   }

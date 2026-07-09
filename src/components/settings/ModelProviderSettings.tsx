@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
@@ -486,6 +486,54 @@ interface ProviderApiKeyHelp {
   commonFixes: string[];
 }
 
+interface ProviderConfigurationHandoffRefs {
+  form: { current: { scrollIntoView: (options?: ScrollIntoViewOptions) => void } | null };
+  apiKeyInput: { current: { focus: () => void } | null };
+  firstEditableField: { current: { focus: () => void } | null };
+}
+
+export function scheduleProviderConfigurationHandoff(
+  requiresApiKey: boolean,
+  refs: ProviderConfigurationHandoffRefs,
+  scheduleFrame: (callback: FrameRequestCallback) => unknown = requestAnimationFrame,
+) {
+  scheduleFrame(() => {
+    refs.form.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    (requiresApiKey ? refs.apiKeyInput.current : refs.firstEditableField.current)?.focus();
+  });
+}
+
+export function getUnhandledProviderDeepLink<T extends string>(
+  providerParam: string | null,
+  handledProviderParam: string | null,
+  isSelectableProviderId: (providerId: string) => providerId is T,
+): T | null {
+  if (!providerParam || providerParam === handledProviderParam) return null;
+  return isSelectableProviderId(providerParam) ? providerParam : null;
+}
+
+export function performProviderConfigurationHandoff<T extends string>({
+  providerId,
+  selectedProviderId,
+  selectProvider,
+  scheduleConfigurationHandoff,
+}: {
+  providerId: T;
+  selectedProviderId: T;
+  selectProvider: (providerId: T) => void;
+  scheduleConfigurationHandoff: (providerId: T) => void;
+}) {
+  if (providerId !== selectedProviderId) selectProvider(providerId);
+  scheduleConfigurationHandoff(providerId);
+}
+
+export function getProviderWizardCardAction(status: string, nextAction: string) {
+  return {
+    label: status === "ready" ? "查看配置" : nextAction,
+    disabled: false,
+  };
+}
+
 const statusCopy: Record<ProviderHealthStatus, { label: string; className: string }> = {
   ready: { label: "可用", className: "border-emerald-200 bg-emerald-50 text-emerald-700" },
   warn: { label: "需注意", className: "border-amber-200 bg-amber-50 text-amber-700" },
@@ -769,6 +817,10 @@ export function ModelProviderSettings({
   const existing = existingByProvider.get(selectedProviderId);
   const [draft, setDraft] = useState<DraftProvider>(() => draftFromOption(selectedOption, existing));
   const [message, setMessage] = useState<string | null>(null);
+  const providerConfigFormRef = useRef<HTMLFormElement>(null);
+  const apiKeyInputRef = useRef<HTMLInputElement>(null);
+  const firstEditableProviderFieldRef = useRef<HTMLInputElement>(null);
+  const handledProviderDeepLinkRef = useRef<string | null>(null);
   const [providerSetupNotice, setProviderSetupNotice] = useState<ProviderSetupNotice | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [testingProviderId, setTestingProviderId] = useState<ModelProviderId | null>(null);
@@ -853,17 +905,35 @@ export function ModelProviderSettings({
     setMessage(null);
   }
 
+  function focusProviderConfiguration(providerId: ModelProviderId) {
+    const option = options.find((item) => item.providerId === providerId);
+    scheduleProviderConfigurationHandoff(option?.requiresApiKey ?? false, {
+      form: providerConfigFormRef,
+      apiKeyInput: apiKeyInputRef,
+      firstEditableField: firstEditableProviderFieldRef,
+    });
+  }
+
+  function selectProviderAndFocus(providerId: ModelProviderId) {
+    performProviderConfigurationHandoff({
+      providerId,
+      selectedProviderId,
+      selectProvider,
+      scheduleConfigurationHandoff: focusProviderConfiguration,
+    });
+  }
+
   function isSelectableProviderId(providerId: string | null): providerId is ModelProviderId {
     return options.some((option) => providerId === option.providerId);
   }
 
   function selectProviderBySetupStatus(statuses: ProviderSetupGuideView["items"][number]["status"][]) {
     const item = providerSetupGuide.items.find((candidate) => statuses.includes(candidate.status));
-    selectProvider(item?.providerId ?? selectedProviderId);
+    selectProviderAndFocus(item?.providerId ?? selectedProviderId);
   }
 
   function selectProviderFromWizard(item: ProviderSetupWizardView["items"][number]) {
-    selectProvider(item.providerId);
+    selectProviderAndFocus(item.providerId);
     setDraft((current) => ({
       ...current,
       baseUrl: item.defaultBaseUrl,
@@ -1108,10 +1178,22 @@ export function ModelProviderSettings({
   });
 
   useEffect(() => {
-    if (!providerParam) return;
-    if (!isSelectableProviderId(providerParam)) return;
-    if (providerParam === selectedProviderId) return;
-    selectProvider(providerParam);
+    if (!providerParam) {
+      handledProviderDeepLinkRef.current = null;
+      return;
+    }
+    if (!isSelectableProviderId(providerParam)) {
+      handledProviderDeepLinkRef.current = null;
+      return;
+    }
+    const providerId = getUnhandledProviderDeepLink(
+      providerParam,
+      handledProviderDeepLinkRef.current,
+      isSelectableProviderId,
+    );
+    if (!providerId) return;
+    handledProviderDeepLinkRef.current = providerId;
+    selectProviderAndFocus(providerId);
   }, [providerParam, selectedProviderId]);
 
   useEffect(() => {
@@ -1586,44 +1668,47 @@ export function ModelProviderSettings({
             </div>
           </div>
           <div className="mt-3 grid gap-2 lg:grid-cols-4">
-            {providerSetupWizard.items.map((item) => (
-              <article
-                className={`rounded-md border p-3 text-sm ${
-                  selectedProviderId === item.providerId ? "border-slate-950 bg-slate-50" : "border-slate-200 bg-white"
-                }`}
-                key={item.providerId}
-              >
-                <div className="flex flex-wrap items-start justify-between gap-2">
-                  <div>
-                    <div className="text-xs text-slate-500">第 {item.priority} 个</div>
-                    <h3 className="mt-1 font-medium text-slate-950">{item.displayName}</h3>
-                  </div>
-                  <span className={`rounded-md px-2 py-1 text-xs font-medium ${providerSetupWizardStatusCopy[item.status]}`}>
-                    {item.statusLabel}
-                  </span>
-                </div>
-                <p className="mt-2 min-h-10 leading-5 text-slate-700">{item.headline}</p>
-                <div className="mt-2 grid gap-1 text-xs text-slate-600">
-                  <span className="rounded-md bg-slate-50 px-2 py-1">推荐 {item.recommendedPresetLabel}</span>
-                  <span className="rounded-md bg-slate-50 px-2 py-1">{item.recommendedModel}</span>
-                  <span className="rounded-md bg-slate-50 px-2 py-1">上下文 {item.recommendedContextTokens ? item.recommendedContextTokens.toLocaleString() : "未设"} tokens</span>
-                </div>
-                <div className="mt-2 flex flex-wrap gap-1 text-xs text-slate-500">
-                  {item.fitTags.map((tag) => (
-                    <span className="rounded-md bg-slate-100 px-2 py-1" key={tag}>{tag}</span>
-                  ))}
-                </div>
-                <p className="mt-2 line-clamp-2 text-xs leading-5 text-slate-500">{item.why}</p>
-                <button
-                  className="mt-3 w-full rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
-                  disabled={item.status === "ready" && selectedProviderId === item.providerId}
-                  onClick={() => selectProviderFromWizard(item)}
-                  type="button"
+            {providerSetupWizard.items.map((item) => {
+              const action = getProviderWizardCardAction(item.status, item.nextAction);
+              return (
+                <article
+                  className={`rounded-md border p-3 text-sm ${
+                    selectedProviderId === item.providerId ? "border-slate-950 bg-slate-50" : "border-slate-200 bg-white"
+                  }`}
+                  key={item.providerId}
                 >
-                  {item.status === "ready" ? "查看配置" : item.nextAction}
-                </button>
-              </article>
-            ))}
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div>
+                      <div className="text-xs text-slate-500">第 {item.priority} 个</div>
+                      <h3 className="mt-1 font-medium text-slate-950">{item.displayName}</h3>
+                    </div>
+                    <span className={`rounded-md px-2 py-1 text-xs font-medium ${providerSetupWizardStatusCopy[item.status]}`}>
+                      {item.statusLabel}
+                    </span>
+                  </div>
+                  <p className="mt-2 min-h-10 leading-5 text-slate-700">{item.headline}</p>
+                  <div className="mt-2 grid gap-1 text-xs text-slate-600">
+                    <span className="rounded-md bg-slate-50 px-2 py-1">推荐 {item.recommendedPresetLabel}</span>
+                    <span className="rounded-md bg-slate-50 px-2 py-1">{item.recommendedModel}</span>
+                    <span className="rounded-md bg-slate-50 px-2 py-1">上下文 {item.recommendedContextTokens ? item.recommendedContextTokens.toLocaleString() : "未设"} tokens</span>
+                  </div>
+                  <div className="mt-2 flex flex-wrap gap-1 text-xs text-slate-500">
+                    {item.fitTags.map((tag) => (
+                      <span className="rounded-md bg-slate-100 px-2 py-1" key={tag}>{tag}</span>
+                    ))}
+                  </div>
+                  <p className="mt-2 line-clamp-2 text-xs leading-5 text-slate-500">{item.why}</p>
+                  <button
+                    className="mt-3 w-full rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
+                    disabled={action.disabled}
+                    onClick={() => selectProviderFromWizard(item)}
+                    type="button"
+                  >
+                    {action.label}
+                  </button>
+                </article>
+              );
+            })}
           </div>
           <div className="mt-3 grid gap-2 text-sm leading-6 text-slate-600 md:grid-cols-3">
             {providerSetupWizard.nextActions.map((action) => (
@@ -2914,7 +2999,7 @@ export function ModelProviderSettings({
               <button
                 className={`rounded-md border p-3 text-left text-sm ${item.providerId === selectedProviderId ? "border-slate-950 bg-slate-50" : "border-slate-200 bg-white hover:bg-slate-50"}`}
                 key={item.providerId}
-                onClick={() => selectProvider(item.providerId)}
+                onClick={() => selectProviderAndFocus(item.providerId)}
                 type="button"
               >
                 <div className="flex flex-wrap items-center justify-between gap-2">
@@ -2949,7 +3034,7 @@ export function ModelProviderSettings({
               <button
                 className={`rounded-md border px-3 py-3 text-left text-sm ${isSelected ? "border-slate-950 bg-white" : "border-slate-200 bg-slate-50 hover:bg-white"}`}
                 key={option.providerId}
-                onClick={() => selectProvider(option.providerId)}
+                onClick={() => selectProviderAndFocus(option.providerId)}
                 type="button"
               >
                 <div className="font-medium text-slate-950">{option.displayName}</div>
@@ -2960,7 +3045,7 @@ export function ModelProviderSettings({
             );
           })}
         </nav>
-        <form className="grid gap-4 rounded-md border border-slate-200 bg-white p-4" id="provider-config-form" onSubmit={saveProvider}>
+        <form className="grid gap-4 rounded-md border border-slate-200 bg-white p-4" id="provider-config-form" onSubmit={saveProvider} ref={providerConfigFormRef} tabIndex={-1}>
           <div>
             <div className="flex flex-wrap items-center gap-2">
               <h2 className="font-medium">{selectedOption.displayName}</h2>
@@ -3069,15 +3154,18 @@ export function ModelProviderSettings({
               {selectedOption.requiresApiKey ? "在这里粘贴 API Key" : "API Key"}
             </span>
             <input
+              aria-describedby="api-key-help"
+              aria-required={selectedOption.requiresApiKey}
               className="rounded-md border border-slate-300 bg-white px-3 py-2"
               disabled={!selectedOption.requiresApiKey}
               id="api-key-input"
               onChange={(event) => setDraft((current) => ({ ...current, apiKey: event.target.value }))}
               placeholder={existing?.hasApiKey ? "已保存，留空则不覆盖；如需更换就在这里粘贴新 Key" : selectedOption.requiresApiKey ? "把服务商控制台复制出来的 Key 粘贴到这里" : "这个模型不需要 API Key"}
+              ref={apiKeyInputRef}
               type="password"
               value={draft.apiKey}
             />
-            <span className="text-xs leading-5 text-slate-600">
+            <span className="text-xs leading-5 text-slate-600" id="api-key-help">
               {selectedOption.requiresApiKey
                 ? "完整 Key 只需要粘贴在这个输入框。保存后输入框会清空显示，这是安全设计；旧 Key 不会因为留空而被覆盖。"
                 : "Mock 和本地模型不需要 Key；正式写作建议选择 DeepSeek、Gemini、Claude 或 GPT。"}
@@ -3115,6 +3203,7 @@ export function ModelProviderSettings({
             <input
               className="rounded-md border border-slate-200 px-3 py-2"
               onChange={(event) => setDraft((current) => ({ ...current, displayName: event.target.value }))}
+              ref={firstEditableProviderFieldRef}
               value={draft.displayName}
             />
           </label>
@@ -3170,10 +3259,10 @@ export function ModelProviderSettings({
             >
               {testingProviderId === draft.providerId ? "测试中" : "测试连接"}
             </button>
-            {message ? <span className="text-sm text-slate-600">{message}</span> : null}
+            {message ? <span aria-live={message.includes("失败") ? "assertive" : "polite"} className="text-sm text-slate-600" role={message.includes("失败") ? "alert" : "status"}>{message}</span> : null}
           </div>
           {providerSetupNotice ? (
-            <div aria-label="模型配置动作已完成" className="flex flex-col gap-2 rounded-md border border-sky-200 bg-sky-50 p-3 text-sm text-sky-900 sm:flex-row sm:items-center sm:justify-between">
+            <div aria-label="模型配置动作已完成" aria-live="polite" className="flex flex-col gap-2 rounded-md border border-sky-200 bg-sky-50 p-3 text-sm text-sky-900 sm:flex-row sm:items-center sm:justify-between" role="status">
               <span>{providerSetupNotice.message}</span>
               {providerSetupNotice.action === "apply_first_day_routes" ? (
                 <button
@@ -3198,7 +3287,7 @@ export function ModelProviderSettings({
             </div>
           ) : null}
           {currentTestResult ? (
-            <div className={`rounded-md border p-4 text-sm ${currentTestResult.ok ? "border-emerald-200 bg-emerald-50" : "border-rose-200 bg-rose-50"}`}>
+            <div aria-live={currentTestResult.ok ? "polite" : "assertive"} className={`rounded-md border p-4 text-sm ${currentTestResult.ok ? "border-emerald-200 bg-emerald-50" : "border-rose-200 bg-rose-50"}`} role={currentTestResult.ok ? "status" : "alert"}>
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <h3 className={`font-medium ${currentTestResult.ok ? "text-emerald-800" : "text-rose-800"}`}>
                   {currentTestResult.ok ? "连接成功" : "连接失败"}

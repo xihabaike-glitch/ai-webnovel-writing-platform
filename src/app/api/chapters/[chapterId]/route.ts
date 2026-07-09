@@ -25,26 +25,33 @@ export async function PATCH(request: Request, { params }: Params) {
   const body = await request.json();
   const input = updateChapterSchema.parse(body);
   const wordCount = typeof input.content === "string" ? countWords(input.content) : undefined;
+  const chapter = await prisma.$transaction(async (tx) => {
+    const existing = await tx.chapter.findUnique({ where: { id: chapterId }, select: { projectId: true } });
+    if (!existing) return null;
+    const updated = await tx.chapter.update({
+      where: { id: chapterId },
+      data: {
+        ...input,
+        ...(wordCount === undefined ? {} : { wordCount }),
+      },
+    });
 
-  const chapter = await prisma.chapter.update({
-    where: { id: chapterId },
-    data: {
-      ...input,
-      ...(wordCount === undefined ? {} : { wordCount }),
-    },
+    if (wordCount !== undefined) {
+      const chapters = await tx.chapter.findMany({
+        where: { projectId: existing.projectId },
+        select: { wordCount: true },
+      });
+      await tx.project.update({
+        where: { id: existing.projectId },
+        data: { currentWordCount: chapters.reduce((sum, item) => sum + item.wordCount, 0) },
+      });
+    }
+    return updated;
   });
 
-  const chapters = await prisma.chapter.findMany({
-    where: { projectId: chapter.projectId },
-    select: { wordCount: true },
-  });
-
-  await prisma.project.update({
-    where: { id: chapter.projectId },
-    data: {
-      currentWordCount: chapters.reduce((sum, item) => sum + item.wordCount, 0),
-    },
-  });
+  if (!chapter) {
+    return NextResponse.json({ error: "Chapter not found" }, { status: 404 });
+  }
 
   return NextResponse.json({ chapter });
 }

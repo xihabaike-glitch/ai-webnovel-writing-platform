@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { ChapterGenerationFailureError, mapBatchChapterGenerationError } from "@/lib/ai/chapterGenerationHttp";
 import { generateChapterDraft } from "@/lib/ai/chapterDraftGeneration";
 import { reviewChapterDraft } from "@/lib/ai/chapterReviewGeneration";
 import { prisma } from "@/lib/db/prisma";
@@ -247,33 +248,44 @@ export async function POST(request: Request) {
 
   const results = [];
   for (const chapterId of executionPlan.chapterIds) {
-    if (executionPlan.taskType === "chapter_draft") {
-      const result = await generateChapterDraft({ chapterId });
-      results.push({
-        chapterId,
-        taskId: result.task.id,
-        status: "error" in result ? "failed" : "succeeded",
-        providerName: result.provider.displayName,
-        model: result.provider.model,
-        routeRole: result.attempts.find((attempt) => attempt.taskId === result.task.id)?.role ?? null,
-        score: "error" in result ? null : result.draftQuality.score,
-        error: "error" in result ? result.error ?? null : null,
-      });
-      continue;
-    }
+    try {
+      if (executionPlan.taskType === "chapter_draft") {
+        const result = await generateChapterDraft({ chapterId });
+        if ("error" in result) throw new ChapterGenerationFailureError(result);
+        results.push({
+          chapterId,
+          taskId: result.task.id,
+          status: "succeeded",
+          providerName: result.provider.displayName,
+          model: result.provider.model,
+          routeRole: result.attempts.find((attempt) => attempt.taskId === result.task.id)?.role ?? null,
+          score: result.draftQuality.score,
+          error: null,
+        });
+        continue;
+      }
 
-    if (executionPlan.taskType === "chapter_review") {
-      const result = await reviewChapterDraft(chapterId);
-      results.push({
+      if (executionPlan.taskType === "chapter_review") {
+        const result = await reviewChapterDraft(chapterId);
+        if ("error" in result) throw new ChapterGenerationFailureError(result);
+        results.push({
+          chapterId,
+          taskId: result.task.id,
+          status: "succeeded",
+          providerName: result.provider.displayName,
+          model: result.provider.model,
+          routeRole: result.attempts.find((attempt) => attempt.taskId === result.task.id)?.role ?? null,
+          score: result.result.score,
+          error: null,
+        });
+      }
+    } catch (error) {
+      const mapped = mapBatchChapterGenerationError(error, {
         chapterId,
-        taskId: result.task.id,
-        status: "error" in result ? "failed" : "succeeded",
-        providerName: result.provider.displayName,
-        model: result.provider.model,
-        routeRole: result.attempts.find((attempt) => attempt.taskId === result.task.id)?.role ?? null,
-        score: "error" in result ? null : result.result.score,
-        error: "error" in result ? result.error ?? null : null,
+        requestedCount: executionPlan.chapterIds.length,
+        completedResults: results,
       });
+      return NextResponse.json({ ...mapped.body, samplePlan, executionPlan }, { status: mapped.status });
     }
   }
 

@@ -1,10 +1,34 @@
+"use client";
+
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 import { buildDevelopmentOverview } from "@/lib/development/developmentOverview";
+
+const navigationLinks = [
+  { href: "/projects", label: "作品" },
+  { href: "/tasks", label: "任务" },
+  { href: "/dispatch", label: "派单" },
+  { href: "/gate", label: "总闸门" },
+  { href: "/references", label: "参考库" },
+  { href: "/docs", label: "开发文档" },
+  { href: "/failures", label: "复盘" },
+  { href: "/settings/models", label: "模型设置" },
+];
+
+export function navigationLinkState(pathname: string, href: string): { ariaCurrent: "page" | undefined; className: string } {
+  const isCurrent = pathname === href || pathname.startsWith(`${href}/`);
+
+  return {
+    ariaCurrent: isCurrent ? "page" : undefined,
+    className: isCurrent ? "font-medium text-slate-950 underline underline-offset-4" : "hover:text-slate-950",
+  };
+}
 
 export function AppShell({ children }: { children: ReactNode }) {
   const overview = buildDevelopmentOverview();
   const expansionLabel = "剩余 10 个平台不再添加";
+  const pathname = usePathname();
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-950">
@@ -14,14 +38,15 @@ export function AppShell({ children }: { children: ReactNode }) {
             AI 网文写作平台
           </Link>
           <nav className="flex flex-wrap gap-x-4 gap-y-2 text-sm leading-5 text-slate-600">
-            <Link href="/projects">作品</Link>
-            <Link href="/tasks">任务</Link>
-            <Link href="/dispatch">派单</Link>
-            <Link href="/gate">总闸门</Link>
-            <Link href="/references">参考库</Link>
-            <Link href="/docs">开发文档</Link>
-            <Link href="/failures">复盘</Link>
-            <Link href="/settings/models">模型设置</Link>
+            {navigationLinks.map((link) => {
+              const state = navigationLinkState(pathname, link.href);
+
+              return (
+                <Link aria-current={state.ariaCurrent} className={state.className} href={link.href} key={link.href}>
+                  {link.label}
+                </Link>
+              );
+            })}
           </nav>
         </div>
         <div className="border-t border-slate-100 bg-slate-950 text-white">

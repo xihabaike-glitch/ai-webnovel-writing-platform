@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { mapChapterGenerationError, mapChapterGenerationFailure } from "@/lib/ai/chapterGenerationHttp";
 import { reviewChapterDraft } from "@/lib/ai/chapterReviewGeneration";
 import { prisma } from "@/lib/db/prisma";
 
@@ -8,15 +9,14 @@ export async function POST(request: Request) {
   try {
     const review = await reviewChapterDraft(body.chapterId);
     if ("error" in review) {
-      const error = review.error ?? "审稿失败。";
-      return NextResponse.json({ task: review.task, error, budgetGuard: review.budgetGuard }, { status: error.startsWith("预算拦截") ? 429 : 500 });
+      const mapped = mapChapterGenerationFailure(review);
+      return NextResponse.json(mapped.body, { status: mapped.status });
     }
 
     return NextResponse.json({ task: review.task, result: review.result, attempts: review.attempts });
   } catch (caught) {
-    const message = caught instanceof Error ? caught.message : "Unknown review error";
-    const status = message === "Chapter not found" ? 404 : 500;
-    return NextResponse.json({ error: message }, { status });
+    const mapped = mapChapterGenerationError(caught, "Unknown review error");
+    return NextResponse.json(mapped.body, { status: mapped.status });
   }
 }
 

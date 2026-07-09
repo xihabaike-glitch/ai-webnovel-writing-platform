@@ -1,6 +1,12 @@
-import type { AiTask, ModelProvider } from "@prisma/client";
+import type { AiTask, ModelProvider, Prisma } from "@prisma/client";
 import { prisma } from "../db/prisma.ts";
 import { buildModelBudgetGuard, type ModelBudgetGuard } from "../ai/modelBudget.ts";
+import {
+  AiTaskSupersededError,
+  createRunningAiTask,
+  recoverStaleAiTaskAndAssertAvailable,
+  transitionRunningAiTask,
+} from "../ai/taskSingleFlight.ts";
 import { getModelProviderCandidates, type SelectedModelProviderCandidate } from "./activeProvider.ts";
 import type { ForcedProviderTarget, ProviderCandidateRole } from "./providerSelection.ts";
 import { labelForRoutedTask, type RoutedModelTaskType } from "./taskRouting.ts";
@@ -17,13 +23,14 @@ export interface RoutedGenerationAttempt {
   errorMessage?: string;
 }
 
-export interface RoutedGenerationSuccess {
+export interface RoutedGenerationSuccess<TPersistence = undefined> {
   ok: true;
   task: AiTask;
   result: GenerateResult;
   provider: ModelProvider;
   role: RoutedGenerationAttempt["role"];
   attempts: RoutedGenerationAttempt[];
+  persistence: TPersistence;
 }
 
 export interface RoutedGenerationFailure {
@@ -56,13 +63,22 @@ export interface RoutedGenerationRouteDecision {
   acceptanceChecklist: string[];
 }
 
-export interface RunRoutedGenerationOptions {
+export interface RoutedGenerationPersistenceContext {
+  transaction: Prisma.TransactionClient;
+  task: AiTask;
+  result: GenerateResult;
+  provider: ModelProvider;
+  role: RoutedGenerationAttempt["role"];
+}
+
+export interface RunRoutedGenerationOptions<TPersistence = undefined> {
   projectId: string;
   chapterId?: string;
   taskType: RoutedModelTaskType;
   inputSnapshot: unknown;
   request: Omit<GenerateRequest, "providerId" | "model">;
   validateResult?: (result: GenerateResult, provider: ModelProvider) => void;
+  persistSuccess?: (context: RoutedGenerationPersistenceContext) => Promise<TPersistence>;
   forcedProvider?: ForcedProviderTarget;
 }
 
@@ -140,7 +156,13 @@ function snapshotWithAttempt(
   });
 }
 
-export async function runRoutedGeneration(options: RunRoutedGenerationOptions): Promise<RoutedGenerationSuccess | RoutedGenerationFailure> {
+export async function runRoutedGeneration<TPersistence = undefined>(
+  options: RunRoutedGenerationOptions<TPersistence>,
+): Promise<RoutedGenerationSuccess<TPersistence> | RoutedGenerationFailure> {
+  if (options.chapterId) {
+    await recoverStaleAiTaskAndAssertAvailable(options.chapterId, options.taskType);
+  }
+
   const candidates = await getModelProviderCandidates(options.taskType, {
     forcedProvider: options.forcedProvider,
   });
@@ -226,66 +248,30 @@ export async function runRoutedGeneration(options: RunRoutedGenerationOptions): 
   }
 
   for (const [index, candidate] of candidates.entries()) {
-    const task = await prisma.aiTask.create({
-      data: {
-        projectId: options.projectId,
-        chapterId: options.chapterId,
-        taskType: options.taskType,
-        providerConfigId: candidate.provider.id,
-        model: candidate.provider.defaultModel,
-        status: "running",
-        inputSnapshot: snapshotWithAttempt(options.inputSnapshot, candidate, index + 1, routeDecision),
-      },
+    const task = await createRunningAiTask({
+      projectId: options.projectId,
+      chapterId: options.chapterId,
+      taskType: options.taskType,
+      providerConfigId: candidate.provider.id,
+      model: candidate.provider.defaultModel,
+      inputSnapshot: snapshotWithAttempt(options.inputSnapshot, candidate, index + 1, routeDecision),
     });
 
+    let result: GenerateResult;
     try {
-      const result = await candidate.adapter.generate({
+      result = await candidate.adapter.generate({
         ...options.request,
         providerId: candidate.provider.providerId as ModelProviderId,
         model: candidate.provider.defaultModel,
       });
       options.validateResult?.(result, candidate.provider);
-
-      const updatedTask = await prisma.aiTask.update({
-        where: { id: task.id },
-        data: {
-          status: "succeeded",
-          outputText: result.text,
-          inputTokens: result.usage?.inputTokens,
-          outputTokens: result.usage?.outputTokens,
-          costUsd: result.usage?.costUsd,
-        },
-      });
-
-      attempts.push({
-        taskId: updatedTask.id,
-        providerConfigId: candidate.provider.id,
-        providerId: candidate.provider.providerId,
-        displayName: candidate.provider.displayName,
-        model: candidate.provider.defaultModel,
-        role: candidate.role,
-        status: "succeeded",
-      });
-
-      return {
-        ok: true,
-        task: updatedTask,
-        result,
-        provider: candidate.provider,
-        role: candidate.role,
-        attempts,
-      };
     } catch (caught) {
       const message = caught instanceof Error ? caught.message : `Unknown ${options.taskType} error`;
       const retryHint = index < candidates.length - 1
         ? `；已切换下一个模型：${providerLabel(candidates[index + 1])}`
         : "";
-      const failedTask = await prisma.aiTask.update({
-        where: { id: task.id },
-        data: {
-          status: "failed",
-          errorMessage: `${message}${retryHint}`,
-        },
+      const failedTask = await transitionRunningAiTask(task.id, "failed", {
+        errorMessage: `${message}${retryHint}`,
       });
 
       attempts.push({
@@ -307,7 +293,79 @@ export async function runRoutedGeneration(options: RunRoutedGenerationOptions): 
         error: message,
         attempts,
       };
+      continue;
     }
+
+    let updatedTask: AiTask;
+    let persistence: TPersistence;
+    try {
+      const completed = await prisma.$transaction(async (transaction) => {
+        const persisted = options.persistSuccess
+          ? await options.persistSuccess({
+              transaction,
+              task,
+              result,
+              provider: candidate.provider,
+              role: candidate.role,
+            })
+          : undefined as TPersistence;
+        const succeededTask = await transitionRunningAiTask(task.id, "succeeded", {
+          outputText: result.text,
+          inputTokens: result.usage?.inputTokens,
+          outputTokens: result.usage?.outputTokens,
+          costUsd: result.usage?.costUsd,
+        }, transaction);
+        return { persisted, succeededTask };
+      });
+      updatedTask = completed.succeededTask;
+      persistence = completed.persisted;
+    } catch (caught) {
+      if (caught instanceof AiTaskSupersededError) {
+        throw caught;
+      }
+      const message = caught instanceof Error ? caught.message : `Unknown ${options.taskType} persistence error`;
+      const failedTask = await transitionRunningAiTask(task.id, "failed", {
+        errorMessage: message,
+      });
+      attempts.push({
+        taskId: failedTask.id,
+        providerConfigId: candidate.provider.id,
+        providerId: candidate.provider.providerId,
+        displayName: candidate.provider.displayName,
+        model: candidate.provider.defaultModel,
+        role: candidate.role,
+        status: "failed",
+        errorMessage: message,
+      });
+      return {
+        ok: false,
+        task: failedTask,
+        provider: candidate.provider,
+        role: candidate.role,
+        error: message,
+        attempts,
+      };
+    }
+
+    attempts.push({
+      taskId: updatedTask.id,
+      providerConfigId: candidate.provider.id,
+      providerId: candidate.provider.providerId,
+      displayName: candidate.provider.displayName,
+      model: candidate.provider.defaultModel,
+      role: candidate.role,
+      status: "succeeded",
+    });
+
+    return {
+      ok: true,
+      task: updatedTask,
+      result,
+      provider: candidate.provider,
+      role: candidate.role,
+      attempts,
+      persistence,
+    };
   }
 
   if (!lastFailure) {

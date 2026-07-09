@@ -1,6 +1,7 @@
 import type { ModelProvider } from "@prisma/client";
 import { prisma } from "../db/prisma.ts";
 import { createModelAdapter } from "./adapterFactory.ts";
+import { loadModelProviders } from "./providerStore.ts";
 import {
   selectForcedModelProviderCandidate,
   selectModelProviderCandidatesForTask,
@@ -37,20 +38,21 @@ async function ensureMockProvider() {
 }
 
 export async function getActiveModelProvider(taskType?: RoutedModelTaskType): Promise<SelectedModelProvider> {
-  const providers = await prisma.modelProvider.findMany({
-    orderBy: { updatedAt: "desc" },
-  });
+  const providers = await loadModelProviders();
   let provider: ModelProvider | undefined;
 
   if (taskType) {
     const route = await prisma.modelTaskRoute.findUnique({
       where: { taskType },
-      include: {
-        primaryProvider: true,
-        fallbackProvider: true,
+      select: {
+        primaryProviderConfigId: true,
+        fallbackProviderConfigId: true,
       },
     });
-    provider = selectModelProviderForTask(providers, route);
+    provider = selectModelProviderForTask(providers, route ? {
+      primaryProvider: providers.find((candidate) => candidate.id === route.primaryProviderConfigId),
+      fallbackProvider: providers.find((candidate) => candidate.id === route.fallbackProviderConfigId),
+    } : null);
   }
 
   provider = provider ?? selectModelProviderForTask(providers) ?? await ensureMockProvider();
@@ -69,9 +71,7 @@ export async function getModelProviderCandidates(
   taskType?: RoutedModelTaskType,
   options: ModelProviderCandidateOptions = {},
 ): Promise<SelectedModelProviderCandidate[]> {
-  let providers = await prisma.modelProvider.findMany({
-    orderBy: { updatedAt: "desc" },
-  });
+  let providers = await loadModelProviders();
 
   if (providers.length === 0) {
     providers = [await ensureMockProvider()];
@@ -92,13 +92,17 @@ export async function getModelProviderCandidates(
   } | null = null;
 
   if (taskType) {
-    route = await prisma.modelTaskRoute.findUnique({
+    const storedRoute = await prisma.modelTaskRoute.findUnique({
       where: { taskType },
-      include: {
-        primaryProvider: true,
-        fallbackProvider: true,
+      select: {
+        primaryProviderConfigId: true,
+        fallbackProviderConfigId: true,
       },
     });
+    route = storedRoute ? {
+      primaryProvider: providers.find((candidate) => candidate.id === storedRoute.primaryProviderConfigId),
+      fallbackProvider: providers.find((candidate) => candidate.id === storedRoute.fallbackProviderConfigId),
+    } : null;
   }
 
   let candidates = selectModelProviderCandidatesForTask(providers, route);

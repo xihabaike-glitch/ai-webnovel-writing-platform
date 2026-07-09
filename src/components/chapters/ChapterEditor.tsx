@@ -37,8 +37,8 @@ export function ChapterEditor({ chapter, gateReturnHref }: { chapter: EditableCh
   const [valueShift, setValueShift] = useState(chapter.valueShift);
   const [cliffhanger, setCliffhanger] = useState(chapter.cliffhanger);
   const [status, setStatus] = useState<ChapterStatus>((chapter.status as ChapterStatus) || "draft");
-  const [message, setMessage] = useState<string | null>(null);
-  const [receiptMessage, setReceiptMessage] = useState<string | null>(null);
+  const [message, setMessage] = useState<{ text: string; tone: "status" | "alert" } | null>(null);
+  const [receiptMessage, setReceiptMessage] = useState<{ text: string; tone: "status" | "alert" } | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isWritingReceipt, setIsWritingReceipt] = useState(false);
   const wordCount = useMemo(() => countWords(content), [content]);
@@ -104,13 +104,13 @@ export function ChapterEditor({ chapter, gateReturnHref }: { chapter: EditableCh
         throw new Error("保存失败，请稍后重试。");
       }
 
-      setMessage("已保存");
+      setMessage({ text: "已保存", tone: "status" });
       if (options.refresh !== false) {
         router.refresh();
       }
       return true;
     } catch (caught) {
-      setMessage(caught instanceof Error ? caught.message : "保存失败。");
+      setMessage({ text: caught instanceof Error ? caught.message : "保存失败。", tone: "alert" });
       return false;
     } finally {
       setIsSaving(false);
@@ -157,9 +157,9 @@ export function ChapterEditor({ chapter, gateReturnHref }: { chapter: EditableCh
         },
       });
       saveGateActionReceipts([savedReceipt, ...loadGateActionReceipts()]);
-      setReceiptMessage("首章验收回执已写入总闸门");
+      setReceiptMessage({ text: "首章验收回执已写入总闸门", tone: "status" });
     } catch (caught) {
-      setReceiptMessage(caught instanceof Error ? caught.message : "首章验收回执写入失败。");
+      setReceiptMessage({ text: caught instanceof Error ? caught.message : "首章验收回执写入失败。", tone: "alert" });
     } finally {
       setIsWritingReceipt(false);
     }
@@ -216,7 +216,9 @@ export function ChapterEditor({ chapter, gateReturnHref }: { chapter: EditableCh
               </button>
               {receiptMessage ? (
                 <>
-                  <span className="text-xs text-slate-600">{receiptMessage}</span>
+                  <span aria-live={receiptMessage.tone === "alert" ? "assertive" : "polite"} className="text-xs text-slate-600" role={receiptMessage.tone}>
+                    {receiptMessage.text}
+                  </span>
                   <a
                     className="w-fit rounded-md border border-sky-200 bg-white px-3 py-2 text-xs font-medium text-sky-900 hover:bg-sky-100"
                     href={openingSampleGateRecheckHref}
@@ -232,14 +234,18 @@ export function ChapterEditor({ chapter, gateReturnHref }: { chapter: EditableCh
       <div className="rounded-md border border-slate-200 bg-white p-4">
         <div className="mb-3 flex items-center justify-between">
           <input
+            aria-label="章节标题"
             className="min-w-0 flex-1 rounded-md border border-transparent px-2 py-1 font-medium outline-none focus:border-slate-200"
+            id="chapter-title"
             onChange={(event) => setTitle(event.target.value)}
             value={title}
           />
           <span className="text-sm text-slate-500">{wordCount} 字</span>
         </div>
         <textarea
+          aria-label="章节正文"
           className="min-h-[420px] w-full resize-y rounded-md border border-slate-200 p-3 leading-7 outline-none focus:border-slate-400"
+          id="chapter-content"
           onChange={(event) => setContent(event.target.value)}
           value={content}
         />
@@ -287,7 +293,7 @@ export function ChapterEditor({ chapter, gateReturnHref }: { chapter: EditableCh
           >
             {isSaving ? "保存中" : "保存章节"}
           </button>
-          {message ? <span>{message}</span> : null}
+          {message ? <span aria-live={message.tone === "alert" ? "assertive" : "polite"} role={message.tone}>{message.text}</span> : null}
         </div>
       </div>
     </div>

@@ -63,6 +63,8 @@ model Chapter {
 
   outlineNodes OutlineNode[]
   revisions    ChapterRevision[]
+
+  @@unique([projectId, order])
 }
 
 model ChapterRevision {
@@ -228,6 +230,8 @@ model AiTask {
 
   project       Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
   modelProvider ModelProvider @relation(fields: [providerConfigId], references: [id], onDelete: Restrict)
+
+  @@index([chapterId, taskType, status, updatedAt])
 }
 
 model PublishPackageSnapshot {

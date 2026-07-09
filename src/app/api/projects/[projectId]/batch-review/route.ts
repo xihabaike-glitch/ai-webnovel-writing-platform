@@ -3,9 +3,11 @@ import { z } from "zod";
 import type { Project } from "@prisma/client";
 import { buildReviewPipelineQueue, type ReviewPipelineQueue } from "@/lib/ai/batchReviewPipeline";
 import { buildBatchRunGuard } from "@/lib/ai/batchRunGuard";
+import { mapBatchChapterGenerationError, mapBatchChapterGenerationFailure } from "@/lib/ai/chapterGenerationHttp";
 import { generateChapterSecondPass } from "@/lib/ai/chapterSecondPassGeneration";
 import { reviewChapterDraft } from "@/lib/ai/chapterReviewGeneration";
 import { buildModelBudgetGuard } from "@/lib/ai/modelBudget";
+import { assertUniqueChapterIds, preflightAiTaskBatch } from "@/lib/ai/taskSingleFlight";
 import { prisma } from "@/lib/db/prisma";
 import { getActiveModelProvider } from "@/lib/model-gateway/activeProvider";
 import { buildBatchRouteEffectSummary } from "@/lib/model-gateway/batchRouteEffectSummary";
@@ -207,6 +209,24 @@ export async function POST(request: Request, { params }: Params) {
   }
 
   const input = parsed.data;
+  try {
+    assertUniqueChapterIds(input.chapterIds);
+  } catch (error) {
+    return NextResponse.json({ error: error instanceof Error ? error.message : "Duplicate chapter IDs" }, { status: 400 });
+  }
+  const taskType = input.action === "review" ? "chapter_review" : "chapter_second_pass";
+  try {
+    await preflightAiTaskBatch(projectId, input.chapterIds.map((chapterId) => ({ chapterId, taskType })));
+  } catch (error) {
+    const mapped = mapBatchChapterGenerationError(error, {
+      chapterId: error && typeof error === "object" && "chapterId" in error && typeof error.chapterId === "string"
+        ? error.chapterId
+        : input.chapterIds[0],
+      requestedCount: input.chapterIds.length,
+      completedResults: [],
+    });
+    return NextResponse.json(mapped.body, { status: mapped.status });
+  }
   const queue = await getQueue(projectId);
   const candidateById = new Map(queue.candidates.map((candidate) => [candidate.chapterId, candidate]));
   const rejected = input.chapterIds
@@ -263,7 +283,25 @@ export async function POST(request: Request, { params }: Params) {
   for (const chapterId of input.chapterIds) {
     const candidate = candidateById.get(chapterId);
     if (input.action === "review") {
-      const result = await reviewChapterDraft(chapterId);
+      let result;
+      try {
+        result = await reviewChapterDraft(chapterId);
+      } catch (error) {
+        const mapped = mapBatchChapterGenerationError(error, {
+          chapterId,
+          requestedCount: input.chapterIds.length,
+          completedResults: results,
+        });
+        return NextResponse.json(mapped.body, { status: mapped.status });
+      }
+      if ("error" in result) {
+        const mapped = mapBatchChapterGenerationFailure(result, {
+          chapterId,
+          requestedCount: input.chapterIds.length,
+          completedResults: results,
+        });
+        return NextResponse.json(mapped.body, { status: mapped.status });
+      }
       results.push({
         chapterId,
         status: "error" in result ? "failed" : "succeeded",
@@ -280,12 +318,30 @@ export async function POST(request: Request, { params }: Params) {
         costUsd: result.task.costUsd,
       });
     } else {
-      const result = await generateChapterSecondPass({
-        chapterId,
-        instruction: candidate?.instruction ?? "按审稿意见强化钩子、冲突、爽点和章末追读。",
-        mode: candidate?.secondPassMode,
-        targetWords: input.targetWords,
-      });
+      let result;
+      try {
+        result = await generateChapterSecondPass({
+          chapterId,
+          instruction: candidate?.instruction ?? "按审稿意见强化钩子、冲突、爽点和章末追读。",
+          mode: candidate?.secondPassMode,
+          targetWords: input.targetWords,
+        });
+      } catch (error) {
+        const mapped = mapBatchChapterGenerationError(error, {
+          chapterId,
+          requestedCount: input.chapterIds.length,
+          completedResults: results,
+        });
+        return NextResponse.json(mapped.body, { status: mapped.status });
+      }
+      if ("error" in result) {
+        const mapped = mapBatchChapterGenerationFailure(result, {
+          chapterId,
+          requestedCount: input.chapterIds.length,
+          completedResults: results,
+        });
+        return NextResponse.json(mapped.body, { status: mapped.status });
+      }
       results.push({
         chapterId,
         status: "error" in result ? "failed" : "succeeded",

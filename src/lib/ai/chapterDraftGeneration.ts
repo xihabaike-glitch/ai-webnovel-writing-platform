@@ -7,7 +7,7 @@ import { prisma } from "@/lib/db/prisma";
 import { runRoutedGeneration } from "@/lib/model-gateway/routedGeneration";
 import type { ForcedProviderTarget } from "@/lib/model-gateway/providerSelection";
 import { getPlatformProfile, type PlatformId } from "@/lib/platforms/platformProfiles";
-import { persistServerGateDispatchTask } from "@/lib/projects/gateDispatchTaskPersistence";
+import { persistServerGateDispatchTaskWithDatabase } from "@/lib/projects/gateDispatchTaskPersistence";
 import { gatePlatformDispatchTaskFromRecord } from "@/lib/projects/gateDispatchTaskRecords";
 import { buildProjectContextPack } from "@/lib/projects/projectContextPack";
 import { findProjectStartTacticSummary } from "@/lib/projects/projectStartTactics";
@@ -99,44 +99,28 @@ export async function generateChapterDraft(options: GenerateChapterDraftOptions)
       temperature: 0.8,
       maxTokens: 2400,
     },
-    forcedProvider: options.forcedProvider,
-  });
-
-  if (generation.ok) {
-    const { result, provider, task } = generation;
-    const wordCount = countWords(result.text);
-    const draftQuality = buildDraftQualityAudit({
-      platform,
-      targetWords: options.targetWords ?? 1200,
-      content: result.text,
-      projectContext,
-      startTactic,
-      chapter: {
-        title: chapter.title,
-        goal: chapter.goal,
-        hook: chapter.hook,
-        conflict: chapter.conflict,
-        valueShift: chapter.valueShift,
-        cliffhanger: chapter.cliffhanger,
-      },
-    });
-
-    const [updatedTask, candidateRevision] = await prisma.$transaction(async (tx) => {
-      const savedTask = await tx.aiTask.update({
-        where: { id: task.id },
-        data: {
-          status: "succeeded",
-          outputText: result.text,
-          inputTokens: result.usage?.inputTokens,
-          outputTokens: result.usage?.outputTokens,
-          costUsd: result.usage?.costUsd,
+    persistSuccess: async ({ transaction, result, provider, task }) => {
+      const wordCount = countWords(result.text);
+      const draftQuality = buildDraftQualityAudit({
+        platform,
+        targetWords: options.targetWords ?? 1200,
+        content: result.text,
+        projectContext,
+        startTactic,
+        chapter: {
+          title: chapter.title,
+          goal: chapter.goal,
+          hook: chapter.hook,
+          conflict: chapter.conflict,
+          valueShift: chapter.valueShift,
+          cliffhanger: chapter.cliffhanger,
         },
       });
-      const savedCandidate = await tx.chapterRevision.create({
+      const candidateRevision = await transaction.chapterRevision.create({
         data: {
           chapterId: chapter.id,
           source: "ai_draft_candidate",
-          sourceTaskId: generation.task.id,
+          sourceTaskId: task.id,
           title: chapter.title,
           content: result.text,
           wordCount,
@@ -149,7 +133,7 @@ export async function generateChapterDraft(options: GenerateChapterDraftOptions)
           notes: `AI 初稿候选。质量 ${draftQuality.score} 分；采纳后才会进入正文。`,
         },
       });
-      await tx.aiTask.create({
+      await transaction.aiTask.create({
         data: {
           projectId: chapter.projectId,
           chapterId: chapter.id,
@@ -169,26 +153,34 @@ export async function generateChapterDraft(options: GenerateChapterDraftOptions)
           costUsd: 0,
         },
       });
-      return [savedTask, savedCandidate];
-    });
-    const storyTreeDispatches = await Promise.all(buildStoryTreeRewriteDispatchItems({
-      source: "chapter_draft",
-      projectId: chapter.projectId,
-      projectTitle: chapter.project.title,
-      chapterId: chapter.id,
-      chapterOrder: chapter.order,
-      chapterTitle: chapter.title,
-      platform,
-      audit: draftQuality.treeAudit,
-    }).map(persistServerGateDispatchTask));
+      const storyTreeDispatches = [];
+      for (const dispatch of buildStoryTreeRewriteDispatchItems({
+        source: "chapter_draft",
+        projectId: chapter.projectId,
+        projectTitle: chapter.project.title,
+        chapterId: chapter.id,
+        chapterOrder: chapter.order,
+        chapterTitle: chapter.title,
+        platform,
+        audit: draftQuality.treeAudit,
+      })) {
+        storyTreeDispatches.push(await persistServerGateDispatchTaskWithDatabase(dispatch, transaction));
+      }
+      return { candidateRevision, draftQuality, storyTreeDispatches };
+    },
+    forcedProvider: options.forcedProvider,
+  });
+
+  if (generation.ok) {
+    const { result, provider, task, persistence } = generation;
 
     return {
-      task: updatedTask,
+      task,
       chapter,
-      candidateRevision,
+      candidateRevision: persistence.candidateRevision,
       content: result.text,
-      draftQuality,
-      storyTreeDispatches,
+      draftQuality: persistence.draftQuality,
+      storyTreeDispatches: persistence.storyTreeDispatches,
       provider: {
         id: provider.id,
         providerId: provider.providerId,

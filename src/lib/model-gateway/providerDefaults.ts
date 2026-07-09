@@ -223,6 +223,10 @@ export function getProviderOption(providerId: ModelProviderId) {
   return providerOptions.find((option) => option.providerId === providerId);
 }
 
+export function getProviderDefaultBaseUrl(providerId: string) {
+  return providerOptions.find((option) => option.providerId === providerId)?.defaultBaseUrl || null;
+}
+
 export function getProviderModelPresets(providerId: string) {
   return providerModelPresets.filter((preset) => preset.providerId === providerId);
 }

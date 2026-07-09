@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { ChapterGenerationFailureError, mapChapterGenerationError } from "@/lib/ai/chapterGenerationHttp";
 import { generateChapterDraft } from "@/lib/ai/chapterDraftGeneration";
 import { generateChapterSecondPass } from "@/lib/ai/chapterSecondPassGeneration";
 import { reviewChapterDraft } from "@/lib/ai/chapterReviewGeneration";
@@ -176,18 +177,24 @@ export async function POST(_request: Request, { params }: Params) {
   try {
     let result: unknown;
     if (executionPlan.actionKind === "chapter_draft") {
-      result = await generateChapterDraft({
+      const generated = await generateChapterDraft({
         chapterId: executionPlan.chapterId ?? "",
         targetWords: 1200,
       });
+      if ("error" in generated) throw new ChapterGenerationFailureError(generated);
+      result = generated;
     } else if (executionPlan.actionKind === "chapter_review") {
-      result = await reviewChapterDraft(executionPlan.chapterId ?? "");
+      const generated = await reviewChapterDraft(executionPlan.chapterId ?? "");
+      if ("error" in generated) throw new ChapterGenerationFailureError(generated);
+      result = generated;
     } else if (executionPlan.actionKind === "chapter_second_pass") {
-      result = await generateChapterSecondPass({
+      const generated = await generateChapterSecondPass({
         chapterId: executionPlan.chapterId ?? "",
         instruction: payload.workflow.executionPackage.handoffNote,
         mode: "platform_fit",
       });
+      if ("error" in generated) throw new ChapterGenerationFailureError(generated);
+      result = generated;
     } else if (executionPlan.actionKind === "control_assets") {
       const areaIds = executionPlan.controlAreaIds ?? [];
       result = await Promise.all(areaIds.map((areaId) => generateControlAssets(projectId, areaId as ControlAssetAreaId)));
@@ -206,13 +213,13 @@ export async function POST(_request: Request, { params }: Params) {
       completionEvidence: executionReceipt.success ? executionReceipt.completionEvidence || executionPlan.completionEvidence : "",
     });
   } catch (caught) {
-    const message = caught instanceof Error ? caught.message : "首日 AI 执行失败。";
+    const mapped = mapChapterGenerationError(caught, "首日 AI 执行失败。");
     return NextResponse.json({
+      ...mapped.body,
       workflow: payload.workflow,
       dispatch: payload.dispatch,
       executionPlan,
       modelRoute: payload.modelRoute,
-      error: message,
-    }, { status: message === "Chapter not found" ? 404 : 500 });
+    }, { status: mapped.status });
   }
 }

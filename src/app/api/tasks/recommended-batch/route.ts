@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { buildReviewPipelineQueue } from "@/lib/ai/batchReviewPipeline";
+import { ChapterGenerationFailureError, mapBatchChapterGenerationError } from "@/lib/ai/chapterGenerationHttp";
 import { generateChapterDraft } from "@/lib/ai/chapterDraftGeneration";
 import { reviewChapterDraft } from "@/lib/ai/chapterReviewGeneration";
 import { generateChapterSecondPass } from "@/lib/ai/chapterSecondPassGeneration";
@@ -328,64 +329,81 @@ export async function POST(request: Request) {
   const results: RecommendedBatchResult[] = [];
 
   for (const chapterId of plan.chapterIds) {
-    if (plan.category === "draft") {
-      const result = await generateChapterDraft({ chapterId });
+    try {
+      if (plan.category === "draft") {
+        const result = await generateChapterDraft({ chapterId });
+        if ("error" in result) throw new ChapterGenerationFailureError(result);
+        results.push({
+          chapterId,
+          status: "succeeded",
+          taskId: result.task.id,
+          chapterTitle: result.chapter.title,
+          error: null,
+          providerName: result.provider.displayName,
+          model: result.provider.model,
+          role: roleFor(result, result.task.id),
+          inputTokens: result.task.inputTokens,
+          outputTokens: result.task.outputTokens,
+          costUsd: result.task.costUsd,
+          qualityScore: result.draftQuality.score,
+        });
+        continue;
+      }
+
+      if (plan.category === "review") {
+        const result = await reviewChapterDraft(chapterId);
+        if ("error" in result) throw new ChapterGenerationFailureError(result);
+        results.push({
+          chapterId,
+          status: "succeeded",
+          taskId: result.task.id,
+          chapterTitle: result.chapter.title,
+          error: null,
+          providerName: result.provider.displayName,
+          model: result.provider.model,
+          role: roleFor(result, result.task.id),
+          inputTokens: result.task.inputTokens,
+          outputTokens: result.task.outputTokens,
+          costUsd: result.task.costUsd,
+          qualityScore: result.result.score,
+        });
+        continue;
+      }
+
+      const candidate = secondPassCandidates.get(chapterId);
+      const result = await generateChapterSecondPass({
+        chapterId,
+        instruction: candidate?.instruction ?? "按审稿意见强化钩子、冲突、爽点和章末追读。",
+        mode: candidate?.secondPassMode,
+      });
+      if ("error" in result) throw new ChapterGenerationFailureError(result);
       results.push({
         chapterId,
-        status: "error" in result ? "failed" : "succeeded",
+        status: "succeeded",
         taskId: result.task.id,
         chapterTitle: result.chapter.title,
-        error: "error" in result ? result.error ?? null : null,
-        providerName: result.provider.displayName,
-        model: result.provider.model,
+        error: null,
+        providerName: result.activeProvider.displayName,
+        model: result.activeProvider.model,
         role: roleFor(result, result.task.id),
         inputTokens: result.task.inputTokens,
         outputTokens: result.task.outputTokens,
         costUsd: result.task.costUsd,
-        qualityScore: "error" in result ? null : result.draftQuality.score,
+        qualityScore: result.secondPassAudit.score,
       });
-      continue;
-    }
-
-    if (plan.category === "review") {
-      const result = await reviewChapterDraft(chapterId);
-      results.push({
+    } catch (error) {
+      const mapped = mapBatchChapterGenerationError(error, {
         chapterId,
-        status: "error" in result ? "failed" : "succeeded",
-        taskId: result.task.id,
-        chapterTitle: result.chapter.title,
-        error: "error" in result ? result.error ?? null : null,
-        providerName: result.provider.displayName,
-        model: result.provider.model,
-        role: roleFor(result, result.task.id),
-        inputTokens: result.task.inputTokens,
-        outputTokens: result.task.outputTokens,
-        costUsd: result.task.costUsd,
-        qualityScore: "error" in result ? null : result.result.score,
+        requestedCount: plan.chapterIds.length,
+        completedResults: results,
       });
-      continue;
+      return NextResponse.json({
+        ...mapped.body,
+        plan,
+        safety,
+        modelRouteGate,
+      }, { status: mapped.status });
     }
-
-    const candidate = secondPassCandidates.get(chapterId);
-    const result = await generateChapterSecondPass({
-      chapterId,
-      instruction: candidate?.instruction ?? "按审稿意见强化钩子、冲突、爽点和章末追读。",
-      mode: candidate?.secondPassMode,
-    });
-    results.push({
-      chapterId,
-      status: "error" in result ? "failed" : "succeeded",
-      taskId: result.task.id,
-      chapterTitle: result.chapter.title,
-      error: "error" in result ? result.error ?? null : null,
-      providerName: result.activeProvider.displayName,
-      model: result.activeProvider.model,
-      role: roleFor(result, result.task.id),
-      inputTokens: result.task.inputTokens,
-      outputTokens: result.task.outputTokens,
-      costUsd: result.task.costUsd,
-      qualityScore: "error" in result ? null : result.secondPassAudit.score,
-    });
   }
 
   const routeEffectSummary = buildBatchRouteEffectSummary(results.map((result) => ({

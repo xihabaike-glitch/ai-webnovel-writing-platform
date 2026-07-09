@@ -1,8 +1,13 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
-import { buildChapterCardFromOutline } from "@/lib/chapters/chapterFromOutline";
+import {
+  buildChapterCardFromOutline,
+  claimOutlineNodeForChapter,
+  OutlineNodeAlreadyClaimedError,
+} from "@/lib/chapters/chapterFromOutline";
 import { getPlatformProfile, type PlatformId } from "@/lib/platforms/platformProfiles";
 import { createChapterFromOutlineSchema } from "@/lib/validators/outline";
+import { ChapterOrderConflictError, createWithNextChapterOrder } from "@/lib/chapters/chapterOrder";
 
 interface Params {
   params: Promise<{ projectId: string }>;
@@ -36,20 +41,20 @@ export async function POST(request: Request, { params }: Params) {
     }
   }
 
-  const count = await prisma.chapter.count({ where: { projectId } });
   const platform = getPlatformProfile(project.targetPlatform as PlatformId);
-  const card = buildChapterCardFromOutline({
-    projectTitle: project.title,
-    platform,
-    outlineNode,
-    nextOrder: count + 1,
-  });
-
-  const chapter = await prisma.$transaction(async (tx) => {
-    const created = await tx.chapter.create({
+  let chapter;
+  try {
+    chapter = await createWithNextChapterOrder(projectId, async (tx, order) => {
+      const card = buildChapterCardFromOutline({
+        projectTitle: project.title,
+        platform,
+        outlineNode,
+        nextOrder: order,
+      });
+      const created = await tx.chapter.create({
       data: {
         projectId,
-        order: count + 1,
+        order,
         title: card.title,
         goal: card.goal,
         hook: card.hook,
@@ -58,18 +63,32 @@ export async function POST(request: Request, { params }: Params) {
         cliffhanger: card.cliffhanger,
         status: card.status,
       },
-    });
+      });
 
-    await tx.outlineNode.update({
-      where: { id: outlineNode.id },
-      data: {
+      await claimOutlineNodeForChapter(tx, {
+        outlineNodeId: outlineNode.id,
+        projectId,
         chapterId: created.id,
-        status: "chapter_card",
-      },
-    });
+      });
 
-    return created;
-  });
+      return created;
+    });
+  } catch (error) {
+    if (error instanceof ChapterOrderConflictError) {
+      return NextResponse.json({ error: error.message }, { status: 409 });
+    }
+    if (error instanceof OutlineNodeAlreadyClaimedError) {
+      const claimedNode = await prisma.outlineNode.findFirst({
+        where: { id: input.outlineNodeId, projectId },
+        include: { chapter: true },
+      });
+      if (claimedNode?.chapter) {
+        return NextResponse.json({ chapter: claimedNode.chapter, skipped: true });
+      }
+      return NextResponse.json({ error: error.message }, { status: 409 });
+    }
+    throw error;
+  }
 
   return NextResponse.json({ chapter }, { status: 201 });
 }

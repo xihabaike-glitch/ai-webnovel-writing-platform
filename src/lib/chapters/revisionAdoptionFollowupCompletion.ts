@@ -1,5 +1,7 @@
 import { prisma } from "../db/prisma.ts";
 
+type ReviewFollowupDatabase = Pick<typeof prisma, "gateDispatchTask">;
+
 export interface FirstThreeReviewCompletionInput {
   projectId: string;
   chapterId: string;
@@ -30,9 +32,12 @@ export function buildFirstThreePublishCompletionEvidence(input: FirstThreePublis
   return `采纳后发布质检已刷新：${input.platformName} 发布包版本 ${input.snapshotId}，质检 ${input.preflightScore} 分，${input.canExport ? "可导出" : "仍未通过"}。`;
 }
 
-export async function completeFirstThreeReviewFollowup(input: FirstThreeReviewCompletionInput) {
+export async function completeFirstThreeReviewFollowup(
+  input: FirstThreeReviewCompletionInput,
+  database: ReviewFollowupDatabase = prisma,
+) {
   const now = input.completedAt ?? new Date();
-  return prisma.gateDispatchTask.updateMany({
+  return database.gateDispatchTask.updateMany({
     where: {
       projectId: input.projectId,
       dispatchKey: {

@@ -19,8 +19,10 @@ if (!existsSync(".env") || !existsSync("node_modules")) {
   run(npmCommand, ["run", "setup"]);
 }
 
-console.log("正在同步本地数据库结构...");
-run(npmCommand, ["run", "db:init"]);
+run(npmCommand, ["run", "env:ensure-secret"]);
+
+console.log("正在部署已提交的数据库迁移...");
+run(npmCommand, ["run", "db:deploy"]);
 
 if (!existsSync(".next")) {
   console.log("正在构建应用...");

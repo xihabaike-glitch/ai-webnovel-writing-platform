@@ -2,22 +2,27 @@ import { prisma } from "../db/prisma.ts";
 import type { GatePlatformGrowthDispatchItem } from "./gateActionReceipts.ts";
 import { gatePlatformDispatchTaskFromRecord } from "./gateDispatchTaskRecords.ts";
 
+type GateDispatchTaskDatabase = Pick<typeof prisma, "project" | "gateDispatchTask">;
+
 function projectIdFromHref(href: string) {
   const match = href.match(/\/projects\/([^/#?]+)/);
   return match?.[1] ?? null;
 }
 
-export async function persistServerGateDispatchTask(dispatch: GatePlatformGrowthDispatchItem) {
+export async function persistServerGateDispatchTaskWithDatabase(
+  dispatch: GatePlatformGrowthDispatchItem,
+  database: GateDispatchTaskDatabase,
+) {
   const now = new Date();
   const candidateProjectId = projectIdFromHref(dispatch.href);
   const project = candidateProjectId
-    ? await prisma.project.findUnique({
+    ? await database.project.findUnique({
       where: { id: candidateProjectId },
       select: { id: true },
     })
     : null;
   const projectId = project?.id ?? null;
-  const task = await prisma.gateDispatchTask.upsert({
+  const task = await database.gateDispatchTask.upsert({
     where: { dispatchKey: dispatch.id },
     create: {
       dispatchKey: dispatch.id,
@@ -62,4 +67,8 @@ export async function persistServerGateDispatchTask(dispatch: GatePlatformGrowth
   });
 
   return gatePlatformDispatchTaskFromRecord(task);
+}
+
+export async function persistServerGateDispatchTask(dispatch: GatePlatformGrowthDispatchItem) {
+  return persistServerGateDispatchTaskWithDatabase(dispatch, prisma);
 }

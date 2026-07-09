@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { buildBatchRunGuard } from "@/lib/ai/batchRunGuard";
+import { ChapterGenerationFailureError, mapBatchChapterGenerationError, mapChapterGenerationError } from "@/lib/ai/chapterGenerationHttp";
 import { reviewChapterDraft } from "@/lib/ai/chapterReviewGeneration";
 import { generateChapterSecondPass } from "@/lib/ai/chapterSecondPassGeneration";
 import { isChapterRevisionCandidate } from "@/lib/chapters/revisions";
@@ -256,15 +257,7 @@ async function runPublishRepairAction(projectId: string, action: PublishRepairAc
       chapterTitle: action.chapterTitle ?? chapter.title,
     });
     if ("error" in review) {
-      return {
-        action: action.kind,
-        chapterId: chapter.id,
-        chapterTitle: chapter.title,
-        status: "failed",
-        taskId: markedTask.id,
-        score: null,
-        error: review.error,
-      };
+      throw new ChapterGenerationFailureError({ ...review, task: markedTask });
     }
 
     return {
@@ -296,15 +289,7 @@ async function runPublishRepairAction(projectId: string, action: PublishRepairAc
       chapterTitle: action.chapterTitle ?? chapter.title,
     });
     if ("error" in secondPass) {
-      return {
-        action: action.kind,
-        chapterId: chapter.id,
-        chapterTitle: chapter.title,
-        status: "failed",
-        taskId: markedTask.id,
-        score: null,
-        error: secondPass.error,
-      };
+      throw new ChapterGenerationFailureError({ ...secondPass, task: markedTask });
     }
 
     return {
@@ -379,7 +364,20 @@ export async function POST(request: Request, { params }: Params) {
 
   const results = [];
   for (const action of actions) {
-    results.push(await runPublishRepairAction(projectId, action));
+    try {
+      results.push(await runPublishRepairAction(projectId, action));
+    } catch (error) {
+      if (isBatch) {
+        const mapped = mapBatchChapterGenerationError(error, {
+          chapterId: action.chapterId ?? "",
+          requestedCount: actions.length,
+          completedResults: results,
+        });
+        return NextResponse.json(mapped.body, { status: mapped.status });
+      }
+      const mapped = mapChapterGenerationError(error, "Publish repair generation failed");
+      return NextResponse.json({ ...mapped.body, action: action.kind, chapterId: action.chapterId ?? null }, { status: mapped.status });
+    }
   }
 
   const failed = results.filter((result) => result.status === "failed");

@@ -281,7 +281,7 @@ export default async function GatePage({
         {
           label: "补作品证据",
           detail: "回作品页补齐大树骨架、章节生产证据和发布包入口，保证后续回执能追溯。",
-          href: `/projects/${openingSampleReceiptProjectId}#pipeline-projects`,
+          href: `/projects/${openingSampleReceiptProjectId}#project-control`,
         },
         {
           label: "暂停批量检查",
@@ -834,7 +834,7 @@ export default async function GatePage({
             {projectId ? (
               <Link
                 className="w-fit rounded-md bg-white px-3 py-2 text-sm font-medium text-sky-950 hover:bg-sky-100"
-                href={hrefWithGateReturn(`/projects/${projectId}#pipeline-projects`, gateRecheckReturnHref)}
+                href={hrefWithGateReturn(`/projects/${projectId}#project-control`, gateRecheckReturnHref)}
               >
                 回作品证据入口
               </Link>

@@ -1,5 +1,8 @@
-import { existsSync, copyFileSync } from "node:fs";
+import { chmodSync, existsSync, copyFileSync, readFileSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
+import { randomBytes } from "node:crypto";
+import { resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm";
 
@@ -14,14 +17,44 @@ function run(command, args) {
   }
 }
 
-function ensureEnv() {
-  if (existsSync(".env")) {
+function secureEnvFile(envPath) {
+  if (process.platform !== "win32") chmodSync(envPath, 0o600);
+}
+
+export function ensureEnv(envPath = ".env", examplePath = ".env.example") {
+  if (existsSync(envPath)) {
     console.log("已找到 .env");
     return;
   }
 
-  copyFileSync(".env.example", ".env");
+  copyFileSync(examplePath, envPath);
+  secureEnvFile(envPath);
   console.log("已从 .env.example 创建 .env");
+}
+
+function validCredentialSecret(value) {
+  if (/^[a-f0-9]{64}$/i.test(value)) return true;
+  if (!/^[A-Za-z0-9+/_-]+={0,2}$/.test(value) || value.length % 4 === 1) return false;
+  const unpadded = value.replace(/=+$/, "");
+  const decoded = Buffer.from(unpadded.replace(/-/g, "+").replace(/_/g, "/"), "base64");
+  const canonical = unpadded.replace(/\+/g, "-").replace(/\//g, "_");
+  return decoded.length === 32 && decoded.toString("base64url") === canonical;
+}
+
+export function ensureCredentialSecret(envPath = ".env") {
+  const current = readFileSync(envPath, "utf8");
+  const existing = /^MODEL_CREDENTIAL_SECRET=(.*)$/m.exec(current)?.[1].trim() ?? "";
+  if (validCredentialSecret(existing)) {
+    secureEnvFile(envPath);
+    return;
+  }
+
+  const secret = randomBytes(32).toString("base64");
+  const next = /^MODEL_CREDENTIAL_SECRET=.*$/m.test(current)
+    ? current.replace(/^MODEL_CREDENTIAL_SECRET=.*$/m, `MODEL_CREDENTIAL_SECRET=${secret}`)
+    : `${current.trimEnd()}\nMODEL_CREDENTIAL_SECRET=${secret}\n`;
+  writeFileSync(envPath, next);
+  secureEnvFile(envPath);
 }
 
 function ensureDependencies() {
@@ -42,12 +75,19 @@ function ensureNodeVersion() {
   process.exit(1);
 }
 
-ensureNodeVersion();
-ensureEnv();
-ensureDependencies();
+function main() {
+  ensureNodeVersion();
+  ensureEnv();
+  ensureCredentialSecret();
+  ensureDependencies();
 
-console.log("正在初始化本地数据库和演示数据...");
-run(npmCommand, ["run", "db:seed"]);
+  console.log("正在初始化本地数据库和演示数据...");
+  run(npmCommand, ["run", "db:seed"]);
 
-console.log("\n准备完成。下一步运行：");
-console.log("npm run local:start");
+  console.log("\n准备完成。下一步运行：");
+  console.log("npm run local:start");
+}
+
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  main();
+}

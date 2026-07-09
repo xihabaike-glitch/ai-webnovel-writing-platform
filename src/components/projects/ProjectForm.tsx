@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { type FormEvent, useEffect, useRef, useState } from "react";
 import { platformDeliveryScope, platformProfiles, type LengthType, type PlatformId } from "@/lib/platforms/platformProfiles";
 import { getPlatformWritingStyle } from "@/lib/platforms/writingStyleTemplates";
 import {
@@ -47,6 +47,20 @@ const lengthOptions: Array<{ id: LengthType; label: string; targetWordCount: num
 
 function lengthOptionFor(id: LengthType) {
   return lengthOptions.find((option) => option.id === id) ?? lengthOptions[0];
+}
+
+export function firstInvalidProjectField({ title, genre }: { title: string; genre: string }): "title" | "genre" | null {
+  if (!title.trim()) return "title";
+  if (!genre.trim()) return "genre";
+  return null;
+}
+
+export function focusFirstInvalidProjectControl(form: HTMLFormElement, invalidControl?: EventTarget | null) {
+  const firstInvalidControl = form.querySelector<HTMLElement>(":invalid");
+  if (firstInvalidControl && (!invalidControl || firstInvalidControl === invalidControl)) {
+    firstInvalidControl.focus();
+  }
+  return firstInvalidControl;
 }
 
 function tacticAdviceClass(status: ProjectStartTacticAdviceStatus) {
@@ -136,6 +150,9 @@ export function ProjectForm({
   const [riskAcknowledged, setRiskAcknowledged] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState({ title: null as string | null, genre: null as string | null });
+  const titleInputRef = useRef<HTMLInputElement>(null);
+  const genreInputRef = useRef<HTMLInputElement>(null);
   const selectedProfile = platformProfiles.find((profile) => profile.id === platformId) ?? platformProfiles[0];
   const selectedTemplate = projectTemplates.find((template) => template.id === templateId) ?? defaultTemplate;
   const selectedLengthOption = lengthOptionFor(lengthType);
@@ -292,8 +309,38 @@ export function ProjectForm({
     applyTemplateFields(template);
   }
 
+  function clearFieldError(field: "title" | "genre") {
+    setFieldErrors((current) => current[field] ? { ...current, [field]: null } : current);
+  }
+
+  function validateRequiredFields() {
+    const nextErrors = {
+      title: title.trim() ? null : "请填写作品名。",
+      genre: genre.trim() ? null : "请填写题材。",
+    };
+    setFieldErrors(nextErrors);
+
+    const firstInvalidField = firstInvalidProjectField({ title, genre });
+    if (firstInvalidField) {
+      (firstInvalidField === "title" ? titleInputRef : genreInputRef).current?.focus();
+      return false;
+    }
+    return true;
+  }
+
+  function reportFirstInvalidControl(event: FormEvent<HTMLFormElement>) {
+    const firstInvalidControl = focusFirstInvalidProjectControl(event.currentTarget, event.target);
+    if (event.target !== firstInvalidControl) return;
+
+    setFieldErrors({
+      title: titleInputRef.current?.validity.valid ? null : "请填写作品名。",
+      genre: genreInputRef.current?.validity.valid ? null : "请填写题材。",
+    });
+  }
+
   async function createProject(formData: FormData) {
     setError(null);
+    if (!validateRequiredFields()) return;
     if (selectedRiskGate.requiresConfirmation && !riskAcknowledged) {
       setError("这个平台命中避坑信号。请先确认恢复条件，再创建作品。");
       return;
@@ -338,7 +385,7 @@ export function ProjectForm({
   }
 
   return (
-    <form action={createProject} className="grid gap-4 rounded-md border border-slate-200 bg-white p-4">
+    <form action={createProject} className="grid gap-4 rounded-md border border-slate-200 bg-white p-4" onInvalid={reportFirstInvalidControl}>
       {launchRequested ? (
         <div className={`rounded-md border p-3 text-sm ${launchMatched ? "border-emerald-200 bg-emerald-50 text-emerald-900" : "border-amber-200 bg-amber-50 text-amber-900"}`}>
           <div className="font-medium">{finalDeliveryArchiveLaunch ? "最终交付归档打法" : "经验开书入口"}</div>
@@ -621,15 +668,21 @@ export function ProjectForm({
           作品名
         </label>
         <input
-          className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2"
+          aria-describedby={fieldErrors.title ? "title-error" : undefined}
+          aria-invalid={fieldErrors.title ? true : undefined}
+          className={`mt-1 w-full rounded-md border px-3 py-2 ${fieldErrors.title ? "border-red-500" : "border-slate-200"}`}
           id="title"
           name="title"
           onChange={(event) => {
             markUserTouchedStartDefaults();
             setTitle(event.target.value);
+            clearFieldError("title");
           }}
+          ref={titleInputRef}
+          required
           value={title}
         />
+        {fieldErrors.title ? <p className="mt-1 text-sm text-red-600" id="title-error" role="alert">{fieldErrors.title}</p> : null}
       </div>
       <div className="grid gap-4 md:grid-cols-2">
         <div>
@@ -637,15 +690,21 @@ export function ProjectForm({
             题材
           </label>
           <input
-            className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2"
+            aria-describedby={fieldErrors.genre ? "genre-error" : undefined}
+            aria-invalid={fieldErrors.genre ? true : undefined}
+            className={`mt-1 w-full rounded-md border px-3 py-2 ${fieldErrors.genre ? "border-red-500" : "border-slate-200"}`}
             id="genre"
             name="genre"
             onChange={(event) => {
               markUserTouchedStartDefaults();
               setGenre(event.target.value);
+              clearFieldError("genre");
             }}
+            ref={genreInputRef}
+            required
             value={genre}
           />
+          {fieldErrors.genre ? <p className="mt-1 text-sm text-red-600" id="genre-error" role="alert">{fieldErrors.genre}</p> : null}
         </div>
         <div>
           <label className="text-sm font-medium" htmlFor="updateCadence">
@@ -824,7 +883,8 @@ export function ProjectForm({
           value={sellingPoint}
         />
       </div>
-      {error ? <p className="text-sm text-red-600">{error}</p> : null}
+      {error ? <p className="text-sm text-red-600" role="alert">{error}</p> : null}
+      {isSubmitting ? <p className="sr-only" role="status">正在创建作品</p> : null}
       <button
         className="w-fit rounded-md bg-slate-950 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
         disabled={isSubmitting || !canSubmit}

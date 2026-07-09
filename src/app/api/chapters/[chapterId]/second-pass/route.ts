@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { mapChapterGenerationError, mapChapterGenerationFailure } from "@/lib/ai/chapterGenerationHttp";
 import {
   generateChapterSecondPass,
   normalizeSecondPassMode,
@@ -32,8 +33,8 @@ export async function POST(request: Request, { params }: Params) {
       targetWords: body.targetWords,
     });
     if ("error" in result) {
-      const error = result.error ?? "二改失败。";
-      return NextResponse.json({ task: result.task, error, budgetGuard: result.budgetGuard }, { status: error.startsWith("预算拦截") ? 429 : 500 });
+      const mapped = mapChapterGenerationFailure(result);
+      return NextResponse.json(mapped.body, { status: mapped.status });
     }
 
     return NextResponse.json({
@@ -48,8 +49,7 @@ export async function POST(request: Request, { params }: Params) {
       attempts: result.attempts,
     });
   } catch (caught) {
-    const message = caught instanceof Error ? caught.message : "Unknown second pass error";
-    const status = message === "Chapter not found" ? 404 : 500;
-    return NextResponse.json({ error: message }, { status });
+    const mapped = mapChapterGenerationError(caught, "Unknown second pass error");
+    return NextResponse.json(mapped.body, { status: mapped.status });
   }
 }

@@ -2040,7 +2040,7 @@ export function GateActionWorkspace({
             </p>
           )}
         </div>
-        <div className="mt-3 grid gap-2">
+        <div className="mt-3 grid gap-2" id="platform-tactic-experience">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <div className="text-xs font-medium text-slate-500">平台打法经验库</div>

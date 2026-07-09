@@ -8,6 +8,7 @@ import { buildProjectContextPack } from "@/lib/projects/projectContextPack";
 import { findProjectStartTacticSummary } from "@/lib/projects/projectStartTactics";
 import { completeFirstThreeReviewFollowup } from "@/lib/chapters/revisionAdoptionFollowupCompletion";
 import { gatePlatformDispatchTaskFromRecord } from "@/lib/projects/gateDispatchTaskRecords";
+import { z } from "zod";
 
 export interface ReviewIssueResult {
   severity: string;
@@ -18,8 +19,31 @@ export interface ReviewIssueResult {
 
 export interface ChapterReviewResult {
   score: number;
+  shouldSecondPass?: boolean;
   issues: ReviewIssueResult[];
   summary: string;
+}
+
+const reviewIssueSchema = z.object({
+  severity: z.string().trim().min(1),
+  type: z.string().trim().min(1),
+  message: z.string().trim().min(1),
+  suggestion: z.string().trim().min(1),
+}).strict();
+
+const chapterReviewResultSchema = z.object({
+  score: z.number().finite().min(0).max(100),
+  shouldSecondPass: z.boolean().optional(),
+  issues: z.array(reviewIssueSchema),
+  summary: z.string().trim().min(1),
+});
+
+export function parseChapterReviewResult(outputText: string): ChapterReviewResult {
+  try {
+    return chapterReviewResultSchema.parse(JSON.parse(outputText));
+  } catch {
+    throw new Error("Invalid chapter review result");
+  }
 }
 
 export interface ReviewChapterDraftOptions {
@@ -98,27 +122,30 @@ export async function reviewChapterDraft(chapterId: string, options: ReviewChapt
       userPrompt: prompt.userPrompt,
     },
     validateResult: (result) => {
-      JSON.parse(result.text);
+      parseChapterReviewResult(result.text);
+    },
+    persistSuccess: async ({ transaction, result, task }) => {
+      const parsedResult = parseChapterReviewResult(result.text);
+      await completeFirstThreeReviewFollowup({
+        projectId: chapter.projectId,
+        chapterId: chapter.id,
+        chapterOrder: chapter.order,
+        chapterTitle: chapter.title,
+        taskId: task.id,
+        score: parsedResult.score,
+        issueCount: parsedResult.issues.length,
+      }, transaction);
+      return { parsedResult };
     },
     forcedProvider: options.forcedProvider,
   });
 
   if (generation.ok) {
-    const { result, provider } = generation;
-    const parsedResult = JSON.parse(result.text) as ChapterReviewResult;
-    await completeFirstThreeReviewFollowup({
-      projectId: chapter.projectId,
-      chapterId: chapter.id,
-      chapterOrder: chapter.order,
-      chapterTitle: chapter.title,
-      taskId: generation.task.id,
-      score: parsedResult.score,
-      issueCount: Array.isArray(parsedResult.issues) ? parsedResult.issues.length : null,
-    });
+    const { provider, persistence } = generation;
 
     return {
       task: generation.task,
-      result: parsedResult,
+      result: persistence.parsedResult,
       chapter,
       provider: {
         id: provider.id,

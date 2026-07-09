@@ -1,6 +1,12 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { buildBatchDraftQueue } from "@/lib/ai/batchDrafts";
+import { createWithNextChapterOrder, getChapterOrderConflictContract } from "@/lib/chapters/chapterOrder";
+import {
+  buildChapterCardFromOutline,
+  claimOutlineNodeForChapter,
+  OutlineNodeAlreadyClaimedError,
+} from "@/lib/chapters/chapterFromOutline";
 import { getPlatformProfile, type PlatformId } from "@/lib/platforms/platformProfiles";
 import { generateControlAssets, type ControlAssetAreaId } from "@/lib/projects/controlAssetGeneration";
 import {
@@ -504,32 +510,58 @@ export async function POST(request: Request, { params }: Params) {
       return NextResponse.json(result(areaId, "chapter-production", [], "暂无可直接生成章节卡的大纲节点；先补大纲字段或新增分支/叶片。"));
     }
 
+    const outlineNodesById = new Map(project.outlineNodes.map((node) => [node.id, node]));
     const created: string[] = [];
-    await prisma.$transaction(async (tx) => {
-      for (const seed of seeds) {
-        const chapter = await tx.chapter.create({
-          data: {
+    let skippedCount = 0;
+
+    for (const seed of seeds) {
+      const outlineNode = outlineNodesById.get(seed.outlineNodeId);
+      if (!outlineNode) continue;
+
+      try {
+        const chapterTitle = await createWithNextChapterOrder(projectId, async (tx, order) => {
+          const card = buildChapterCardFromOutline({
+            projectTitle: project.title,
+            platform,
+            outlineNode,
+            nextOrder: order,
+          });
+          const chapter = await tx.chapter.create({
+            data: {
+              projectId,
+              order,
+              title: card.title,
+              goal: card.goal,
+              hook: card.hook,
+              conflict: card.conflict,
+              valueShift: card.valueShift,
+              cliffhanger: card.cliffhanger,
+              status: card.status,
+            },
+          });
+
+          await claimOutlineNodeForChapter(tx, {
+            outlineNodeId: seed.outlineNodeId,
             projectId,
-            order: project.chapters.length + created.length + 1,
-            title: seed.title,
-            goal: seed.goal,
-            hook: seed.hook,
-            conflict: seed.conflict,
-            valueShift: seed.valueShift,
-            cliffhanger: seed.cliffhanger,
-            status: seed.status,
-          },
-        });
-        await tx.outlineNode.update({
-          where: { id: seed.outlineNodeId },
-          data: {
             chapterId: chapter.id,
-            status: "chapter_card",
-          },
+          });
+
+          return chapter.title;
         });
-        created.push(seed.title);
+        created.push(chapterTitle);
+      } catch (error) {
+        if (error instanceof OutlineNodeAlreadyClaimedError) {
+          skippedCount += 1;
+          continue;
+        }
+        const conflict = getChapterOrderConflictContract(error);
+        if (conflict) {
+          const { status, ...body } = conflict;
+          return NextResponse.json(body, { status });
+        }
+        throw error;
       }
-    });
+    }
 
     const [chapters, draftTasks] = await Promise.all([
       prisma.chapter.findMany({
@@ -549,7 +581,12 @@ export async function POST(request: Request, { params }: Params) {
       }),
     ]);
     const draftHandoff = buildChapterCardDraftHandoff(buildBatchDraftQueue(chapters, draftTasks, platform));
-    const baseResult = result(areaId, "chapter-production", created);
+    const baseResult = result(
+      areaId,
+      "chapter-production",
+      created,
+      skippedCount > 0 ? `并发请求已先认领 ${skippedCount} 个大纲节点，本次已跳过且未留下孤立章节。` : undefined,
+    );
 
     return NextResponse.json({
       ...baseResult,

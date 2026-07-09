@@ -11,8 +11,10 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:seed": "tsx prisma/seed.ts",
-    "db:init": "sqlite3 prisma/dev.db < prisma/init-sqlite.sql",
-    "db:seed": "npm run db:init && npm run prisma:seed"
+    "db:init": "prisma db push",
+    "db:seed": "npm run db:init && npm run prisma:seed",
+    "setup": "node scripts/setup.mjs",
+    "local:start": "node scripts/start.mjs"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

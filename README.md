@@ -61,7 +61,21 @@ The platform scope is intentionally locked to these eight channels. The next pri
 - `/references`：30+ GitHub 案例、AI 编辑部角色和平台执行卡。
 - `/settings/models`：Claude、DeepSeek、Kimi、GPT、OpenAI-compatible 和模型岗位矩阵。
 
-## Quick Start
+## 一键启动
+
+如果你不熟悉开发环境，推荐先安装 Docker Desktop，然后运行：
+
+```bash
+docker compose up
+```
+
+打开：
+
+```txt
+http://localhost:3000
+```
+
+## 本地运行
 
 ```bash
 cp .env.example .env
@@ -78,11 +92,13 @@ Open:
 http://localhost:3000
 ```
 
-Useful check:
+构建检查：
 
 ```bash
 npm run build
 ```
+
+更多部署方式见 `docs/DEPLOYMENT.md`。
 
 ## Recommended Workflow
 
@@ -117,6 +133,7 @@ See `ROADMAP.md`.
 ## Documents
 
 - `docs/USAGE.md`：产品使用说明。
+- `docs/DEPLOYMENT.md`：Docker、本地脚本和云服务器部署说明。
 - `docs/POSITIONING.md`：项目定位与独特价值。
 - `docs/GITHUB_INTRO.md`：GitHub 简介和 Topics 素材。
 - `docs/ai-writing-platform-dev-doc.md`：项目梳理、竞品参考与整体开发文档。

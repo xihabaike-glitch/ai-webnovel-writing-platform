@@ -1,0 +1,15 @@
+services:
+  web:
+    build:
+      context: .
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: "file:/app/data/dev.db"
+      SEED_ON_FIRST_RUN: "1"
+    volumes:
+      - webnovel-data:/app/data
+    restart: unless-stopped
+
+volumes:
+  webnovel-data:

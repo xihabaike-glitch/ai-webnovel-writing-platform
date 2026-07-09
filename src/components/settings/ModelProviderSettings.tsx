@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
@@ -898,34 +898,35 @@ export function ModelProviderSettings({
     });
   }
 
-  function selectProvider(providerId: ModelProviderId) {
+  const selectProvider = useCallback((providerId: ModelProviderId) => {
     const option = options.find((item) => item.providerId === providerId) ?? options[0];
     setSelectedProviderId(providerId);
     setDraft(draftFromOption(option, existingByProvider.get(providerId)));
     setMessage(null);
-  }
+  }, [existingByProvider, options]);
 
-  function focusProviderConfiguration(providerId: ModelProviderId) {
+  const focusProviderConfiguration = useCallback((providerId: ModelProviderId) => {
     const option = options.find((item) => item.providerId === providerId);
     scheduleProviderConfigurationHandoff(option?.requiresApiKey ?? false, {
       form: providerConfigFormRef,
       apiKeyInput: apiKeyInputRef,
       firstEditableField: firstEditableProviderFieldRef,
     });
-  }
+  }, [options]);
 
-  function selectProviderAndFocus(providerId: ModelProviderId) {
+  const selectProviderAndFocus = useCallback((providerId: ModelProviderId) => {
     performProviderConfigurationHandoff({
       providerId,
       selectedProviderId,
       selectProvider,
       scheduleConfigurationHandoff: focusProviderConfiguration,
     });
-  }
+  }, [focusProviderConfiguration, selectProvider, selectedProviderId]);
 
-  function isSelectableProviderId(providerId: string | null): providerId is ModelProviderId {
-    return options.some((option) => providerId === option.providerId);
-  }
+  const isSelectableProviderId = useCallback(
+    (providerId: string | null): providerId is ModelProviderId => options.some((option) => providerId === option.providerId),
+    [options],
+  );
 
   function selectProviderBySetupStatus(statuses: ProviderSetupGuideView["items"][number]["status"][]) {
     const item = providerSetupGuide.items.find((candidate) => statuses.includes(candidate.status));
@@ -1194,7 +1195,7 @@ export function ModelProviderSettings({
     if (!providerId) return;
     handledProviderDeepLinkRef.current = providerId;
     selectProviderAndFocus(providerId);
-  }, [providerParam, selectedProviderId]);
+  }, [isSelectableProviderId, providerParam, selectProviderAndFocus, selectedProviderId]);
 
   useEffect(() => {
     if (!isFirstDayRouteFocus) return;

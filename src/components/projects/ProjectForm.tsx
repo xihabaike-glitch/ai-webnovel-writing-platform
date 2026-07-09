@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { type FormEvent, useEffect, useRef, useState } from "react";
+import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { platformDeliveryScope, platformProfiles, type LengthType, type PlatformId } from "@/lib/platforms/platformProfiles";
 import { getPlatformWritingStyle } from "@/lib/platforms/writingStyleTemplates";
 import {
@@ -132,7 +132,10 @@ export function ProjectForm({
 }) {
   const router = useRouter();
   const launchPlatform = launchPlatformId(experienceLaunch);
-  const defaultTemplate = projectTemplates.find((template) => template.platformId === launchPlatform) ?? projectTemplates[0];
+  const defaultTemplate = useMemo(
+    () => projectTemplates.find((template) => template.platformId === launchPlatform) ?? projectTemplates[0],
+    [launchPlatform],
+  );
   const userTouchedStartDefaultsRef = useRef(false);
   const historyDefaultAppliedRef = useRef(Boolean(launchPlatform));
   const launchAppliedRef = useRef(false);
@@ -279,7 +282,7 @@ export function ProjectForm({
     return () => {
       ignore = true;
     };
-  }, [experienceLaunch, launchPlatform]);
+  }, [defaultTemplate, experienceLaunch, launchPlatform]);
 
   function markUserTouchedStartDefaults() {
     userTouchedStartDefaultsRef.current = true;

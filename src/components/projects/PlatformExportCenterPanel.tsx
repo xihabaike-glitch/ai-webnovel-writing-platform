@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   actionFromRunResult,
   buildPublishRepairExitPrompt,
@@ -1870,6 +1870,91 @@ export function PlatformExportCenterPanel({
     if (versionActionFilter === "all") return versions;
     return versions.filter((version) => normalizeVersionAction(version.action) === versionActionFilter);
   }, [selectedPackage, versionActionFilter]);
+  const selectedPackageAssetPlatformId = selectedPackage?.platformId;
+  const selectedPackageAssetCategory = selectedPackage?.category;
+  const selectedPackageAssetTitle = selectedPackage?.title ?? "";
+  const selectedPackageAssetLogline = selectedPackage?.logline ?? "";
+  const selectedPackageAssetSynopsis = selectedPackage?.synopsis ?? "";
+  const selectedPackageAssetTags = selectedPackage?.tags.join("、") ?? "";
+  const selectedPackageAssetSubmissionSynopsis = selectedPackage?.submissionAsset?.synopsis ?? "";
+  const selectedPackageAssetOverseasSynopsis = selectedPackage?.submissionAsset?.overseasSynopsis ?? "";
+  const selectedPackageAssetNote = selectedPackage?.submissionAsset?.note ?? "";
+  const selectedPackageAssetUpdatedAt = selectedPackage?.submissionAsset?.updatedAt;
+  const selectedPackageAssetDraft = useMemo(() => {
+    if (!selectedPackageAssetPlatformId) return null;
+    return {
+      updatedAt: selectedPackageAssetUpdatedAt,
+      draft: {
+        title: selectedPackageAssetTitle,
+        logline: selectedPackageAssetLogline,
+        synopsis: selectedPackageAssetCategory === "overseas"
+          ? selectedPackageAssetSubmissionSynopsis
+          : selectedPackageAssetSynopsis,
+        overseasSynopsis: selectedPackageAssetCategory === "overseas"
+          ? selectedPackageAssetSynopsis
+          : selectedPackageAssetOverseasSynopsis,
+        tags: selectedPackageAssetTags,
+        note: selectedPackageAssetNote,
+      },
+    };
+  }, [
+    selectedPackageAssetCategory,
+    selectedPackageAssetLogline,
+    selectedPackageAssetNote,
+    selectedPackageAssetOverseasSynopsis,
+    selectedPackageAssetPlatformId,
+    selectedPackageAssetSubmissionSynopsis,
+    selectedPackageAssetSynopsis,
+    selectedPackageAssetTags,
+    selectedPackageAssetTitle,
+    selectedPackageAssetUpdatedAt,
+  ]);
+  const selectedPackageEffectPlatformId = selectedPackage?.platformId;
+  const selectedPackageEffectLatestId = selectedPackage?.publishEffect.latest?.id;
+  const selectedPackageEffectLatestViews = selectedPackage?.publishEffect.latest?.views;
+  const selectedPackageEffectLatestClicks = selectedPackage?.publishEffect.latest?.clicks;
+  const selectedPackageEffectLatestFavorites = selectedPackage?.publishEffect.latest?.favorites;
+  const selectedPackageEffectLatestFollows = selectedPackage?.publishEffect.latest?.follows;
+  const selectedPackageEffectLatestComments = selectedPackage?.publishEffect.latest?.comments;
+  const selectedPackageEffectLatestPaidReads = selectedPackage?.publishEffect.latest?.paidReads;
+  const selectedPackageEffectLatestContractStatus = selectedPackage?.publishEffect.latest?.contractStatus;
+  const selectedPackageEffectLatestPublishUrl = selectedPackage?.publishEffect.latest?.publishUrl;
+  const selectedPackageEffectLatestEditorFeedback = selectedPackage?.publishEffect.latest?.editorFeedback;
+  const selectedPackageEffectLatestNotes = selectedPackage?.publishEffect.latest?.notes;
+  const selectedPackageEffectLatestSnapshotDate = selectedPackage?.publishEffect.latest?.snapshotDate;
+  const selectedPackageEffectDraft = useMemo(() => {
+    if (!selectedPackageEffectPlatformId) return null;
+    return {
+      latestId: selectedPackageEffectLatestId,
+      draft: {
+        views: selectedPackageEffectLatestViews === undefined ? "" : String(selectedPackageEffectLatestViews),
+        clicks: selectedPackageEffectLatestClicks === undefined ? "" : String(selectedPackageEffectLatestClicks),
+        favorites: selectedPackageEffectLatestFavorites === undefined ? "" : String(selectedPackageEffectLatestFavorites),
+        follows: selectedPackageEffectLatestFollows === undefined ? "" : String(selectedPackageEffectLatestFollows),
+        comments: selectedPackageEffectLatestComments === undefined ? "" : String(selectedPackageEffectLatestComments),
+        paidReads: selectedPackageEffectLatestPaidReads === undefined ? "" : String(selectedPackageEffectLatestPaidReads),
+        contractStatus: selectedPackageEffectLatestContractStatus ?? "unknown",
+        publishUrl: selectedPackageEffectLatestPublishUrl ?? "",
+        editorFeedback: selectedPackageEffectLatestEditorFeedback ?? "",
+        notes: selectedPackageEffectLatestNotes ?? "",
+        snapshotDate: formatDateInput(selectedPackageEffectLatestSnapshotDate),
+      },
+    };
+  }, [
+    selectedPackageEffectLatestClicks,
+    selectedPackageEffectLatestComments,
+    selectedPackageEffectLatestContractStatus,
+    selectedPackageEffectLatestEditorFeedback,
+    selectedPackageEffectLatestFavorites,
+    selectedPackageEffectLatestFollows,
+    selectedPackageEffectLatestId,
+    selectedPackageEffectLatestNotes,
+    selectedPackageEffectLatestPaidReads,
+    selectedPackageEffectLatestPublishUrl,
+    selectedPackageEffectLatestSnapshotDate,
+    selectedPackageEffectLatestViews,
+    selectedPackageEffectPlatformId,
+  ]);
 
   async function persistKnowledgeFeedbackReceipt(receipt: PlatformKnowledgeFeedbackReceipt) {
     const response = await fetch(`/api/projects/${projectId}/platform-export`, {
@@ -1912,7 +1997,7 @@ export function PlatformExportCenterPanel({
     }
   }
 
-  async function loadCenter(options?: { keepMessage?: boolean }) {
+  const loadCenter = useCallback(async (options?: { keepMessage?: boolean }) => {
     setIsLoading(true);
     if (!options?.keepMessage) setMessage(null);
     try {
@@ -1940,7 +2025,7 @@ export function PlatformExportCenterPanel({
     } finally {
       setIsLoading(false);
     }
-  }
+  }, [projectId]);
 
   async function loadVersionDetail(versionId: string) {
     setSelectedVersionId(versionId);
@@ -2791,7 +2876,7 @@ export function PlatformExportCenterPanel({
 
   useEffect(() => {
     void loadCenter();
-  }, [projectId]);
+  }, [loadCenter]);
 
   useEffect(() => {
     const history = loadKnowledgeFeedbackHistory(projectId);
@@ -2800,39 +2885,15 @@ export function PlatformExportCenterPanel({
   }, [projectId]);
 
   useEffect(() => {
-    if (!selectedPackage) return;
-    setAssetDraft({
-      title: selectedPackage.title,
-      logline: selectedPackage.logline,
-      synopsis: selectedPackage.category === "overseas"
-        ? selectedPackage.submissionAsset?.synopsis ?? ""
-        : selectedPackage.synopsis,
-      overseasSynopsis: selectedPackage.category === "overseas"
-        ? selectedPackage.synopsis
-        : selectedPackage.submissionAsset?.overseasSynopsis ?? "",
-      tags: selectedPackage.tags.join("、"),
-      note: selectedPackage.submissionAsset?.note ?? "",
-    });
+    if (!selectedPackageAssetDraft) return;
+    setAssetDraft(selectedPackageAssetDraft.draft);
     setAssetOptimizationVariants([]);
-  }, [selectedPackage?.platformId, selectedPackage?.submissionAsset?.updatedAt]);
+  }, [selectedPackageAssetDraft]);
 
   useEffect(() => {
-    if (!selectedPackage) return;
-    const latest = selectedPackage.publishEffect.latest;
-    setEffectDraft({
-      views: latest ? String(latest.views) : "",
-      clicks: latest ? String(latest.clicks) : "",
-      favorites: latest ? String(latest.favorites) : "",
-      follows: latest ? String(latest.follows) : "",
-      comments: latest ? String(latest.comments) : "",
-      paidReads: latest ? String(latest.paidReads) : "",
-      contractStatus: latest?.contractStatus ?? "unknown",
-      publishUrl: latest?.publishUrl ?? "",
-      editorFeedback: latest?.editorFeedback ?? "",
-      notes: latest?.notes ?? "",
-      snapshotDate: formatDateInput(latest?.snapshotDate),
-    });
-  }, [selectedPackage?.platformId, selectedPackage?.publishEffect.latest?.id]);
+    if (!selectedPackageEffectDraft) return;
+    setEffectDraft(selectedPackageEffectDraft.draft);
+  }, [selectedPackageEffectDraft]);
 
   return (
     <section className="rounded-md border border-slate-200 bg-white p-4">

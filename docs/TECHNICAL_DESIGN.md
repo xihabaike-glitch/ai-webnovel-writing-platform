@@ -555,14 +555,16 @@ export interface ModelAdapter {
 }
 ```
 
-MVP 适配策略：
+当前适配策略：
 
 1. GPT 使用 OpenAI Responses 或 Chat Completions 兼容接口。
 2. DeepSeek 使用 OpenAI-compatible adapter。
 3. Kimi 使用 OpenAI-compatible adapter。
 4. Claude 使用 Anthropic adapter。
 5. OpenAI-compatible 允许用户自定义 baseUrl。
-6. Ollama 先预留类型，P2 再实现。
+6. Ollama 使用本地 `/api/chat` adapter，用于本机模型验证。
+7. Mock 只保留为本地演示和测试兜底，不作为真实交付模型。
+8. 每个真实 provider 保存后必须执行连接测试，连接测试通过后才能进入模型岗位矩阵、任务路由和推荐批次。
 
 ## 7. AI 任务设计
 
@@ -791,11 +793,11 @@ AI 助手不是聊天主页面，只是任务面板：
 
 ### Step 6：模型设置和 Model Gateway
 
-实现模型配置和 mock adapter，再接真实 Claude / OpenAI-compatible。
+实现模型配置、Mock 演示 adapter、Claude Anthropic adapter、DeepSeek/Kimi/GPT/OpenAI-compatible Chat Completions adapter、Ollama 本地 adapter，并把连接测试结果写回模型设置页。
 
 ### Step 7：AI 章节审稿
 
-实现第一个 AI 任务：章节审稿。先用 mock 测试，再接真实模型。
+实现 AI 写审改任务链路：章节初稿、章节审稿、二改、前三章改写、发布包优化都必须通过模型岗位矩阵选择真实 provider；Mock 只用于本地验收和无密钥演示。
 
 ### Step 8：导出
 

@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 
 const doc = readFileSync("docs/ai-writing-platform-dev-doc.md", "utf8");
+const technicalDoc = readFileSync("docs/TECHNICAL_DESIGN.md", "utf8");
 
 test("ai writing platform development document", async (t) => {
   await t.test("reflects the current delivery scope and page map", () => {
@@ -138,5 +139,17 @@ test("ai writing platform development document", async (t) => {
     assert.ok(doc.includes("首章样本回执已能写回总闸门"));
     assert.ok(doc.includes("从 `/gate` 判断是否允许小批量"));
     assert.ok(doc.includes("不再把新增平台当作进度"));
+  });
+
+  await t.test("keeps the technical design aligned with real model adapters", () => {
+    for (const provider of ["Claude Adapter", "DeepSeek Adapter", "Kimi Adapter", "GPT Adapter"]) {
+      assert.ok(technicalDoc.includes(provider), `${provider} should stay in the architecture map`);
+    }
+
+    assert.ok(technicalDoc.includes("OpenAI-compatible"));
+    assert.ok(technicalDoc.includes("Anthropic"));
+    assert.ok(technicalDoc.includes("连接测试"));
+    assert.equal(technicalDoc.includes("再接真实 Claude / OpenAI-compatible"), false);
+    assert.equal(technicalDoc.includes("先用 mock 测试，再接真实模型"), false);
   });
 });

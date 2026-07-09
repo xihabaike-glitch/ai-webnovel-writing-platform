@@ -22,6 +22,8 @@ import { buildSubmissionChecklist, type SubmissionChecklist } from "./submission
 const exportVersionReceiptRecheckHref = "/gate?focus=action-recheck&source=export-version-receipt#gate-export-package";
 const aiPipelineRecoveryRecheckHref =
   "/gate?focus=action-recheck&source=ai-pipeline-recovery#ai-pipeline-recovery";
+const firstThreeAdoptionRecheckHref =
+  "/gate?focus=action-recheck&source=first-three-adoption#first-three-adoption-closure";
 
 export interface TaskQueueProject {
   id: string;
@@ -440,7 +442,7 @@ export function taskQueueSourcePresentation(entry: QueueItem | null): TaskQueueS
       tone: "standard",
       badgeClass: "bg-indigo-50 text-indigo-700",
       detailClass: "border-indigo-200 bg-indigo-50 text-indigo-950",
-      returnHref: "/gate#first-three-adoption-closure",
+      returnHref: firstThreeAdoptionRecheckHref,
       returnLabel: "回总闸门复检",
     };
   }

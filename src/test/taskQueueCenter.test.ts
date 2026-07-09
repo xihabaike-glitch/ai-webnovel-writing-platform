@@ -1414,6 +1414,13 @@ test("buildTaskQueueCenter", async (t) => {
     assert.equal(reviewFollowup?.executionChapterId, "chapter-review");
     assert.equal(reviewFollowup?.actionLabel, "重新审稿");
     assert.equal(reviewFollowup?.href, "/projects/project-1/chapters/chapter-review#chapter-workflow");
+    assert.deepEqual(taskQueueSourcePresentation(reviewFollowup ?? null), {
+      tone: "standard",
+      badgeClass: "bg-indigo-50 text-indigo-700",
+      detailClass: "border-indigo-200 bg-indigo-50 text-indigo-950",
+      returnHref: "/gate?focus=action-recheck&source=first-three-adoption#first-three-adoption-closure",
+      returnLabel: "回总闸门复检",
+    });
     assert.equal(publishFollowup?.category, "export");
     assert.equal(publishFollowup?.sourceType, "first_three_adoption");
     assert.ok(publishFollowup?.sourceDetail?.includes("刷新质检后再导出"));

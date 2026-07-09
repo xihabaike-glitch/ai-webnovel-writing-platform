@@ -212,6 +212,25 @@ export interface PrePublishGateFinalDeliveryRelease {
   evidence: string[];
 }
 
+export interface PrePublishGateFinalDeliveryPlatformTacticArchiveCard {
+  status: "reusable" | "needs_evidence" | "blocked";
+  projectId: string;
+  projectTitle: string;
+  platformId: string;
+  platformName: string;
+  tactic: string;
+  label: string;
+  detail: string;
+  evidence: string[];
+  openingHook: string;
+  firstThreePromise: string;
+  packagingTactic: string;
+  verificationAction: string;
+  stopLine: string;
+  reuseHref: string;
+  repairHref: string;
+}
+
 export interface PrePublishGateAcceptanceSheetGate {
   status: PrePublishGateItem["status"];
   label: string;
@@ -498,6 +517,7 @@ export interface PrePublishGate {
   pmFocus: PrePublishGatePmFocus;
   realPipelineFinalReview: PrePublishGateRealPipelineFinalReview;
   finalDeliveryRelease: PrePublishGateFinalDeliveryRelease;
+  finalDeliveryPlatformTacticArchives: PrePublishGateFinalDeliveryPlatformTacticArchiveCard[];
 }
 
 export interface PrePublishGateArchiveExperienceRecheck {
@@ -2148,6 +2168,61 @@ function buildFinalDeliveryRelease(input: {
   };
 }
 
+function encodeArchiveTactic(platformName: string, projectTitle: string) {
+  return `${platformName}最终交付打法：${projectTitle}`;
+}
+
+function buildFinalDeliveryPlatformTacticArchiveCards(input: {
+  projects: PrePublishGateProjectStatus[];
+  finalReview: PrePublishGateRealPipelineFinalReview;
+}): PrePublishGateFinalDeliveryPlatformTacticArchiveCard[] {
+  return input.projects
+    .filter((project) => project.status === "ready" || project.finalDeliveryGate.completedCount > 0)
+    .map((project) => {
+      const allReceiptsDone = project.finalDeliveryGate.completedCount === project.finalDeliveryGate.totalCount;
+      const finalReviewPassed = input.finalReview.outcome === "pass";
+      const status: PrePublishGateFinalDeliveryPlatformTacticArchiveCard["status"] = !allReceiptsDone
+        ? "needs_evidence"
+        : finalReviewPassed
+          ? "reusable"
+          : "blocked";
+      const tactic = encodeArchiveTactic(project.platformName, project.projectTitle);
+      const reuseParams = new URLSearchParams({
+        launchPlatform: project.platformId,
+        launchTactic: tactic,
+        launchSource: "final-delivery-archive",
+      });
+
+      return {
+        status,
+        projectId: project.projectId,
+        projectTitle: project.projectTitle,
+        platformId: project.platformId,
+        platformName: project.platformName,
+        tactic,
+        label: status === "reusable" ? "平台打法归档可复用" : status === "needs_evidence" ? "平台打法归档缺证据" : "平台打法归档暂停复用",
+        detail: status === "reusable"
+          ? `${project.projectTitle} 已完成最终交付，可作为 ${project.platformName} 下一本书的开局打法土壤。`
+          : status === "needs_evidence"
+            ? `${project.projectTitle} 还缺最终交付回执，不能作为成功打法复用。`
+            : `${project.projectTitle} 当前处于${input.finalReview.outcomeLabel}，暂停批量复用。`,
+        evidence: [
+          `${project.projectTitle}：${project.platformName} · ${project.finalDeliveryGate.label} · ${project.finalDeliveryGate.completedCount}/${project.finalDeliveryGate.totalCount} 项回执。`,
+          `真实作品流水线终检：${input.finalReview.headline}。`,
+          `发布包状态：${project.finalGateLabel}。`,
+          `平台复盘：${project.loopTimeline.label} · ${project.loopTimeline.nextAction}。`,
+        ],
+        openingHook: `${project.platformName} 开局沿用已交付样本的高压钩子，第一屏给危机、选择或强承诺。`,
+        firstThreePromise: "前三章必须兑现钩子、规则证明和第一次升级，不把爽点拖到第四章之后。",
+        packagingTactic: `标题、简介、标签和样章先对齐 ${project.platformName} 已交付包，再做小样本验证。`,
+        verificationAction: "新书首日只跑小样本，回填曝光、点击、收藏、追读或平台等价指标。",
+        stopLine: "停手线：缺最终交付回执、真实终检未通过或首日数据未回填，不允许把这条打法当作可放量经验。",
+        reuseHref: status === "reusable" ? `/projects?${reuseParams.toString()}#new-project` : "",
+        repairHref: status === "reusable" ? "#pipeline-final-review" : status === "needs_evidence" ? project.finalDeliveryGate.href : input.finalReview.primaryActionHref,
+      };
+    });
+}
+
 function projectAcceptanceRecheckProjectId(actionId: string | null | undefined) {
   if (!actionId?.startsWith("project-acceptance:")) return null;
   return actionId.slice("project-acceptance:".length);
@@ -3356,6 +3431,10 @@ export function buildPrePublishGate(input: PrePublishGateInput): PrePublishGate 
     finalDeliveryBlockers: finalReviewFinalDeliveryBlockers,
     focusedProjectId: input.focusedProjectId,
   });
+  const finalDeliveryPlatformTacticArchives = buildFinalDeliveryPlatformTacticArchiveCards({
+    projects: finalReviewProjectStatuses,
+    finalReview: realPipelineFinalReview,
+  });
   const archiveExperienceRecheck = buildArchiveExperienceRecheck(projects);
 
   return {
@@ -3387,5 +3466,6 @@ export function buildPrePublishGate(input: PrePublishGateInput): PrePublishGate 
     pmFocus: buildPrePublishGatePmFocus(status, releaseAction),
     realPipelineFinalReview,
     finalDeliveryRelease,
+    finalDeliveryPlatformTacticArchives,
   };
 }

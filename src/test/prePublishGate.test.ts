@@ -261,6 +261,26 @@ test("buildPrePublishGate", async (t) => {
     assert.ok(gate.finalDeliveryRelease.pmVerdict.includes("可以交付"));
     assert.ok(gate.finalDeliveryRelease.evidence.some((line) => line.includes("最终交付已闭环")));
     assert.ok(gate.finalDeliveryRelease.evidence.some((line) => line.includes("真实作品流水线终检通过")));
+    assert.equal(gate.finalDeliveryPlatformTacticArchives.length, 1);
+    const archive = gate.finalDeliveryPlatformTacticArchives[0];
+    assert.equal(archive.status, "reusable");
+    assert.equal(archive.projectId, "project-ready");
+    assert.equal(archive.projectTitle, "夜雨系统");
+    assert.equal(archive.platformId, "fanqie");
+    assert.equal(archive.platformName, "番茄小说");
+    assert.ok(archive.label.includes("平台打法归档"));
+    assert.ok(archive.tactic.includes("番茄"));
+    assert.ok(archive.evidence.some((line) => line.includes("最终交付已闭环")));
+    assert.ok(archive.evidence.some((line) => line.includes("真实作品流水线终检通过")));
+    assert.ok(archive.openingHook.length > 0);
+    assert.ok(archive.firstThreePromise.length > 0);
+    assert.ok(archive.packagingTactic.length > 0);
+    assert.ok(archive.verificationAction.length > 0);
+    assert.ok(archive.stopLine.includes("停手"));
+    assert.ok(archive.reuseHref.startsWith("/projects?"));
+    assert.ok(archive.reuseHref.includes("launchPlatform=fanqie"));
+    assert.ok(archive.reuseHref.includes("launchTactic="));
+    assert.equal(archive.repairHref, "#pipeline-final-review");
   });
 
   await t.test("blocks launch when final delivery receipts are missing", () => {
@@ -290,6 +310,13 @@ test("buildPrePublishGate", async (t) => {
     assert.equal(releaseGateReturn.hash, "#gate-focus-notice");
     assert.equal(gate.realPipelineFinalReview.outcome, "repair");
     assert.ok(gate.realPipelineFinalReview.repairSignals.some((line) => line.includes("最终交付")));
+    assert.equal(gate.finalDeliveryPlatformTacticArchives.length, 1);
+    const archive = gate.finalDeliveryPlatformTacticArchives[0];
+    assert.equal(archive.status, "needs_evidence");
+    assert.equal(archive.projectId, "project-ready");
+    assert.equal(archive.reuseHref, "");
+    assert.ok(archive.detail.includes("最终交付回执"));
+    assert.ok(archive.repairHref.includes("/projects/project-ready"));
   });
 
   await t.test("focuses the formal release card on the requested project", () => {
@@ -348,6 +375,12 @@ test("buildPrePublishGate", async (t) => {
     assert.ok(gate.realPipelineFinalReview.holdBatchSignals.some((line) => line.includes("归档经验")));
     assert.equal(gate.finalDeliveryRelease.status, "blocked");
     assert.ok(gate.finalDeliveryRelease.pmVerdict.includes("归档经验"));
+    assert.equal(gate.finalDeliveryPlatformTacticArchives.length, 1);
+    const archive = gate.finalDeliveryPlatformTacticArchives[0];
+    assert.equal(archive.status, "blocked");
+    assert.equal(archive.reuseHref, "");
+    assert.ok(archive.detail.includes("暂停批量"));
+    assert.equal(archive.repairHref, gate.realPipelineFinalReview.primaryActionHref);
   });
 
   await t.test("summarizes archive experience recheck evidence after repair reruns", () => {

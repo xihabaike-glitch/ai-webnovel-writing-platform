@@ -1,8 +1,26 @@
 # AI Webnovel Writing Platform
 
-AI 网文写作平台项目。
+面向网文作者的 AI 写作生产平台：用大树结构管理作品，用 Claude、DeepSeek、Kimi、GPT 组成 AI 编辑部，从开书、首章样本、审稿二改、派单回执到总闸门和发布包，跑通可验收的网文创作流水线。
 
-当前已经从“计划文档”推进到可运行的网页产品骨架。产品入口不是聊天框，而是面向网文作者的 AI 写作生产平台：传统写作工作台负责作品、章节、大纲、人物、世界观、伏笔和发布包，AI 模型负责审稿、补强、改写、平台适配和任务回执。
+AI 网文写作平台不是“一键生成小说”的聊天玩具，而是一个面向作者和工作室的写作生产系统。传统写作工作台负责作品、章节、大纲、人物、世界观、伏笔和发布包；AI 模型负责候选稿、审稿、补强、改写、资料整理、平台适配和任务回执；毒舌 PM 闸门负责拦住没有证据的批量生产。
+
+## GitHub 简介
+
+**Short description**
+
+AI webnovel writing platform for structured long-form fiction, platform-specific writing workflows, multi-model editorial roles, PM gates, dispatch receipts, and submission packages.
+
+**中文简介**
+
+一个专为网文作者设计的 AI 写作工作台，帮助作者从选平台、定篇幅、搭大纲树、写章节、审稿、二改、派单、失败修复到导出投稿，完成可持续、可验收、可复盘的连载生产流程。
+
+**核心亮点**
+
+- 大树写作法：开头、结尾、主干、分支、叶片、土壤分层管理。
+- 8 个核心平台：起点中文网、番茄小说、七猫、晋江文学城、知乎盐选、WebNovel、Royal Road、Wattpad。
+- AI 编辑部：Claude、DeepSeek、Kimi、GPT 和 OpenAI-compatible 模型按岗位协作。
+- 作者可控：AI 输出默认是候选稿或回执，不能直接覆盖正文。
+- 毒舌 PM 闸门：没有样本、复查、失败修复和发布包证据，不允许批量生产。
 
 ## 当前交付口径
 
@@ -44,6 +62,8 @@ npm run build
 
 ## Documents
 
+- `docs/USAGE.md`: 产品使用说明
+- `docs/GITHUB_INTRO.md`: GitHub 简介、仓库描述和推广文案素材
 - `docs/ai-writing-platform-dev-doc.md`: 项目梳理、竞品参考与整体开发文档
 - `docs/PRD.md`: 产品需求文档
 - `docs/TECHNICAL_DESIGN.md`: 技术设计文档
